@@ -41,7 +41,7 @@
 | 客户配置草案 | `config/customers/yoyoosun/` |
 | 部署 runbook、检查清单、evidence 模板 | `deployments/yoyoosun/` |
 | 当前运行 Compose 主路径 | `server/deploy/compose/prod` |
-| 客户 raw Excel / PDF / 图片 | `docs/customers/yoyoosun/raw-source-files/` 或受控外部存储，不能放本部署目录 |
+| 客户 raw Excel / PDF / 图片与私密 manifest | 客户专属 Private 仓库 `plush-toy-erp-customer-yoyoosun-private`；Product Core 当前工作树不保存副本 |
 
 ## 常用检查
 

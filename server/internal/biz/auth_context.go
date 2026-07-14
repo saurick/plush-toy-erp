@@ -23,6 +23,10 @@ const (
 	AuthOK
 	AuthExpired
 	AuthInvalid
+	// AuthUnavailable means the token could not be verified against the server-side
+	// session/account source because that source failed. It must not be treated as
+	// an anonymous or invalid-token success path by sensitive endpoints such as logout.
+	AuthUnavailable
 )
 
 func WithAuthState(ctx context.Context, st AuthState) context.Context {

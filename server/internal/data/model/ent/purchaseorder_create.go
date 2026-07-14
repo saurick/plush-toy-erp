@@ -94,6 +94,20 @@ func (_c *PurchaseOrderCreate) SetNillableLifecycleStatus(v *string) *PurchaseOr
 	return _c
 }
 
+// SetVersion sets the "version" field.
+func (_c *PurchaseOrderCreate) SetVersion(v int) *PurchaseOrderCreate {
+	_c.mutation.SetVersion(v)
+	return _c
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_c *PurchaseOrderCreate) SetNillableVersion(v *int) *PurchaseOrderCreate {
+	if v != nil {
+		_c.SetVersion(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *PurchaseOrderCreate) SetNote(v string) *PurchaseOrderCreate {
 	_c.mutation.SetNote(v)
@@ -195,6 +209,10 @@ func (_c *PurchaseOrderCreate) defaults() {
 		v := purchaseorder.DefaultLifecycleStatus
 		_c.mutation.SetLifecycleStatus(v)
 	}
+	if _, ok := _c.mutation.Version(); !ok {
+		v := purchaseorder.DefaultVersion
+		_c.mutation.SetVersion(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := purchaseorder.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -237,6 +255,14 @@ func (_c *PurchaseOrderCreate) check() error {
 	if v, ok := _c.mutation.LifecycleStatus(); ok {
 		if err := purchaseorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.lifecycle_status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "PurchaseOrder.version"`)}
+	}
+	if v, ok := _c.mutation.Version(); ok {
+		if err := purchaseorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.version": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.Note(); ok {
@@ -306,6 +332,10 @@ func (_c *PurchaseOrderCreate) createSpec() (*PurchaseOrder, *sqlgraph.CreateSpe
 	if value, ok := _c.mutation.LifecycleStatus(); ok {
 		_spec.SetField(purchaseorder.FieldLifecycleStatus, field.TypeString, value)
 		_node.LifecycleStatus = value
+	}
+	if value, ok := _c.mutation.Version(); ok {
+		_spec.SetField(purchaseorder.FieldVersion, field.TypeInt, value)
+		_node.Version = value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(purchaseorder.FieldNote, field.TypeString, value)

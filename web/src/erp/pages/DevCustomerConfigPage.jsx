@@ -19,16 +19,21 @@ import DevPageNav from '../components/dev/DevPageNav.jsx'
 import DevTaskNav from '../components/dev/DevTaskNav.jsx'
 import {
   activateCustomerConfig,
+  checkCustomerConfigTransition,
   getEffectiveSession,
   publishCustomerConfig,
   validateCustomerConfig,
 } from '../api/customerConfigApi.mjs'
 import {
+  assertEffectiveCustomerConfigIdentity,
+  assertPublishedCustomerConfigIdentity,
+  confirmCustomerConfigTransition,
+} from '../api/customerConfigTransition.mjs'
+import {
   DEV_CUSTOMER_CONFIG_QUERY_KEY,
   DEV_CUSTOMER_CONFIG_RELEASE_BATCH_QUERY_KEY,
   DEV_CUSTOMER_CONFIG_SOURCE_PATH,
   DEV_CUSTOMER_CONFIG_VIEW_QUERY_KEY,
-  assertCustomerConfigReadbackRevision,
   buildCustomerConfigDevOverviewFromSearch,
 } from '../config/devCustomerConfig.mjs'
 
@@ -490,8 +495,26 @@ function DryRunSummary({ dryRunState, onRunDryRun }) {
   )
 }
 
-function TestApplySummary({ applyState, onApplyTestConfig }) {
+function TestApplySummary({
+  applyState,
+  canApplyTestConfig,
+  unavailableReason,
+  onApplyTestConfig,
+}) {
   if (applyState.status === 'idle') {
+    if (!canApplyTestConfig) {
+      return (
+        <Alert
+          type="warning"
+          showIcon
+          message="当前配置包不可应用"
+          description={
+            unavailableReason ||
+            '当前配置包只供预览；完成正式评审前不会发布或激活。'
+          }
+        />
+      )
+    }
     return (
       <Alert
         type="info"
@@ -540,6 +563,7 @@ function TestApplySummary({ applyState, onApplyTestConfig }) {
         <Button
           type="primary"
           loading={applyState.status === 'running'}
+          disabled={!canApplyTestConfig}
           onClick={onApplyTestConfig}
         >
           重新应用测试配置
@@ -1559,20 +1583,29 @@ function ImportPanel({
         </div>
         <div className="erp-dev-customer-import-hero__copy">
           <Text strong>
-            当前页支持测试版试跑和当前 Vite
-            代理后端应用；正式发布只交给统一执行器。
+            {importSummary.canApplyTestConfig
+              ? '当前页支持测试版试跑和当前 Vite 代理后端应用；正式发布只交给统一执行器。'
+              : '当前配置只支持预览和试跑；当前不会发布或激活。'}
           </Text>
           <Text type="secondary">
-            当前工作台只从已登记 customer package
-            读取配置，执行结构预检、差异预览、Dry Run
-            证据、当前代理后端配置应用和发布门禁复核；不提供原始包上传，也不把配置发布写成业务数据导入。
+            {importSummary.canApplyTestConfig
+              ? '当前工作台只从已登记 customer package 读取配置，执行结构预检、差异预览、Dry Run 证据、当前代理后端配置应用和发布门禁复核；不提供原始包上传，也不把配置发布写成业务数据导入。'
+              : '当前工作台只从已登记 customer package 读取配置，执行结构预检、差异预览、Dry Run 证据和发布门禁复核；当前配置包未达到应用门禁，不提供原始包上传或后端写入。'}
           </Text>
         </div>
         <Alert
-          type="info"
+          type={importSummary.canApplyTestConfig ? 'info' : 'warning'}
           showIcon
-          message="当前代理后端应用只写客户配置控制面"
-          description="页面试跑不写数据库；应用操作通过当前 Vite /rpc 代理调用客户配置校验、发布和激活，当前固定目标为 http://127.0.0.1:8300。真实客户业务数据导入与正式发布仍是单独专项。"
+          message={
+            importSummary.canApplyTestConfig
+              ? '当前代理后端应用只写客户配置控制面'
+              : '当前配置包未开放后端应用'
+          }
+          description={
+            importSummary.canApplyTestConfig
+              ? '页面试跑不写数据库；应用操作通过当前 Vite /rpc 代理调用客户配置校验、发布和激活，当前固定目标为 http://127.0.0.1:8300。真实客户业务数据导入与正式发布仍是单独专项。'
+              : '页面仅可生成预览和试跑证据；完成正式评审并开放运行时、发布与激活前，不会调用客户配置写接口。'
+          }
         />
       </section>
       <section className="erp-dev-customer-panel erp-dev-customer-panel--wide erp-dev-customer-section-nav">
@@ -1631,8 +1664,9 @@ function ImportPanel({
               <Text strong>当前代理后端应用 / Current Proxy Apply</Text>
             </div>
             <Paragraph type="secondary">
-              一键把已选甲方配置应用到当前 Vite 代理后端的客户配置控制面；当前
-              /rpc 固定代理 http://127.0.0.1:8300。
+              {importSummary.canApplyTestConfig
+                ? '把已选客户配置应用到当前 Vite 代理后端的客户配置控制面；当前 /rpc 固定代理 http://127.0.0.1:8300。'
+                : importSummary.testApply.note}
             </Paragraph>
             <div className="erp-dev-customer-test-apply-primary">
               <Button
@@ -1644,11 +1678,15 @@ function ImportPanel({
                 应用到当前后端
               </Button>
               <Text type="secondary">
-                校验 / 发布 / 激活 / 有效配置投影；不导入客户业务数据。
+                {importSummary.canApplyTestConfig
+                  ? '校验 / 发布 / 激活 / 有效配置投影；不导入客户业务数据。'
+                  : '当前只可预览和试跑，不会发布或激活。'}
               </Text>
             </div>
             <TestApplySummary
               applyState={applyState}
+              canApplyTestConfig={importSummary.canApplyTestConfig}
+              unavailableReason={importSummary.testApply.note}
               onApplyTestConfig={onApplyTestConfig}
             />
           </section>
@@ -2062,6 +2100,13 @@ export default function DevCustomerConfigPage() {
   }
 
   const handleApplyTestConfig = async () => {
+    if (!overview.importSummary.canApplyTestConfig) {
+      setApplyState({
+        status: 'error',
+        error: overview.importSummary.testApply.note || '当前配置包不可应用。',
+      })
+      return
+    }
     const requestId = applyRequestRef.current + 1
     applyRequestRef.current = requestId
     applyAbortRef.current?.abort()
@@ -2108,40 +2153,31 @@ export default function DevCustomerConfigPage() {
         status: 'running',
         step: '正在发布测试配置版本',
       })
-      let publish = null
-      let publishSkipped = false
-      try {
-        publish = await publishCustomerConfig(manifest)
-      } catch (publishError) {
-        let activeSession = null
-        try {
-          activeSession = await getEffectiveSession({
-            customer_key: manifest.customer_key,
-          })
-        } catch {
-          // 保留原始发布错误；读回失败不能作为重复发布成功证据。
-        }
-        if (activeSession?.configRevision !== manifest.revision) {
-          throw publishError
-        }
-        publishSkipped = true
-      }
+      const publish = await publishCustomerConfig(manifest)
+      assertPublishedCustomerConfigIdentity(publish, manifest, validation)
       if (!ensureCurrent()) {
         return
       }
 
       setApplyState({
         status: 'running',
-        step: publishSkipped
-          ? '当前 revision 已激活，正在确认有效配置投影'
-          : '正在激活测试配置版本',
+        step: '正在检查配置切换条件',
       })
-      const activated = publishSkipped
-        ? { status: 'already_active' }
-        : await activateCustomerConfig({
-            customer_key: manifest.customer_key,
-            revision: manifest.revision,
-          })
+      const transition = await confirmCustomerConfigTransition({
+        action: 'activate',
+        manifest,
+        validation,
+        check: checkCustomerConfigTransition,
+      })
+      if (!ensureCurrent()) {
+        return
+      }
+
+      setApplyState({
+        status: 'running',
+        step: '正在激活测试配置版本',
+      })
+      const activated = await activateCustomerConfig(transition.mutationPayload)
       if (!ensureCurrent()) {
         return
       }
@@ -2156,7 +2192,11 @@ export default function DevCustomerConfigPage() {
       if (!ensureCurrent()) {
         return
       }
-      assertCustomerConfigReadbackRevision(effectiveSession, manifest.revision)
+      assertEffectiveCustomerConfigIdentity(
+        effectiveSession,
+        manifest,
+        validation
+      )
 
       setApplyState({
         status: 'success',
@@ -2165,6 +2205,7 @@ export default function DevCustomerConfigPage() {
           manifestSummary: manifestPayload.summary,
           validation,
           publish,
+          transition,
           activated,
           effectiveSession,
           steps: [
@@ -2183,10 +2224,17 @@ export default function DevCustomerConfigPage() {
             {
               key: 'publish',
               label: '发布测试版本',
-              status: publishSkipped ? 'test_apply_done' : 'passed',
-              note: publishSkipped
-                ? '当前 revision 已激活，跳过重复发布'
-                : publish?.status || '客户配置发布通过',
+              status: 'passed',
+              note: publish?.status || '客户配置发布通过',
+            },
+            {
+              key: 'transition',
+              label: '切换检查',
+              status: 'passed',
+              note:
+                transition.transition?.noop === true
+                  ? '当前已是目标配置版本'
+                  : '配置切换条件通过',
             },
             {
               key: 'activate',

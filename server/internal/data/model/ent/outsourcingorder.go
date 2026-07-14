@@ -37,6 +37,8 @@ type OutsourcingOrder struct {
 	ExpectedReturnDate *time.Time `json:"expected_return_date,omitempty"`
 	// LifecycleStatus holds the value of the "lifecycle_status" field.
 	LifecycleStatus string `json:"lifecycle_status,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -87,7 +89,7 @@ func (*OutsourcingOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case outsourcingorder.FieldSupplierSnapshot, outsourcingorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
-		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldSourceSalesOrderID:
+		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldSourceSalesOrderID, outsourcingorder.FieldVersion:
 			values[i] = new(sql.NullInt64)
 		case outsourcingorder.FieldOutsourcingOrderNo, outsourcingorder.FieldSourceOrderNo, outsourcingorder.FieldLifecycleStatus, outsourcingorder.FieldNote:
 			values[i] = new(sql.NullString)
@@ -174,6 +176,12 @@ func (_m *OutsourcingOrder) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field lifecycle_status", values[i])
 			} else if value.Valid {
 				_m.LifecycleStatus = value.String
+			}
+		case outsourcingorder.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
 			}
 		case outsourcingorder.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -272,6 +280,9 @@ func (_m *OutsourcingOrder) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("lifecycle_status=")
 	builder.WriteString(_m.LifecycleStatus)
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {
 		builder.WriteString("note=")

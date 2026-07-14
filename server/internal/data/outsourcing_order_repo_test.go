@@ -95,6 +95,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 		OutsourcingOrderNo: created.Order.OutsourcingOrderNo,
 		SupplierID:         supplier.ID,
 		OrderDate:          orderDate,
+		ExpectedVersion:    created.Order.Version,
 	}, []*biz.OutsourcingOrderItemSaveMutation{{
 		ID: created.Items[0].ID,
 		OutsourcingOrderItemMutation: biz.OutsourcingOrderItemMutation{

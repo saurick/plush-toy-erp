@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -11,6 +13,17 @@ import (
 
 type WorkflowTask struct {
 	ent.Schema
+}
+
+func (WorkflowTask) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"workflow_tasks_status_allowed":          "task_status_key IN ('ready', 'blocked', 'done', 'rejected')",
+			"workflow_tasks_version_positive":        "version > 0",
+			"workflow_tasks_process_anchors_paired":  "((process_instance_id IS NULL AND process_node_instance_id IS NULL) OR (process_instance_id IS NOT NULL AND process_node_instance_id IS NOT NULL))",
+			"workflow_tasks_urge_count_non_negative": "urge_count >= 0",
+		}},
+	}
 }
 
 func (WorkflowTask) Fields() []ent.Field {
@@ -79,15 +92,32 @@ func (WorkflowTask) Fields() []ent.Field {
 		field.Time("due_at").
 			Optional().
 			Nillable(),
-		field.Time("started_at").
-			Optional().
-			Nillable(),
 		field.Time("completed_at").
 			Optional().
 			Nillable(),
-		field.Time("closed_at").
+		field.Bool("critical_path").
+			Default(false),
+		field.Int("urge_count").
+			Default(0).
+			NonNegative(),
+		field.Time("last_urged_at").
 			Optional().
 			Nillable(),
+		field.Int("last_urged_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("last_urged_by_role_key").
+			Optional().
+			Nillable().
+			MaxLen(32),
+		field.Time("escalated_at").
+			Optional().
+			Nillable(),
+		field.String("escalate_target_role_key").
+			Optional().
+			Nillable().
+			MaxLen(32),
 		// Payload is a workflow display/action snapshot, not inventory, shipment or finance truth.
 		field.JSON("payload", map[string]any{}).
 			Optional(),
@@ -114,6 +144,16 @@ func (WorkflowTask) Fields() []ent.Field {
 func (WorkflowTask) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("events", WorkflowTaskEvent.Type),
+		edge.From("process_instance", ProcessInstance.Type).
+			Ref("workflow_tasks").
+			Field("process_instance_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("process_node_instance", ProcessNodeInstance.Type).
+			Ref("workflow_tasks").
+			Field("process_node_instance_id").
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 
@@ -127,6 +167,8 @@ func (WorkflowTask) Indexes() []ent.Index {
 		index.Fields("config_revision", "owner_pool_key", "task_status_key"),
 		index.Fields("process_instance_id", "task_status_key"),
 		index.Fields("process_node_instance_id"),
+		index.Fields("task_status_key", "critical_path", "due_at", "id"),
+		index.Fields("urge_count", "escalated_at", "id"),
 		index.Fields("due_at"),
 	}
 }

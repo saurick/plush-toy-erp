@@ -239,20 +239,3 @@ func TestWorkflowUsecase_WarehouseInboundSettledBusinessStatusDoesNotTriggerSpec
 		})
 	}
 }
-
-func TestWorkflowUsecase_WarehouseInboundNonDerivedStatusKeepsOriginalBehavior(t *testing.T) {
-	repo := &stubWorkflowRepo{currentTask: warehouseInboundWorkflowTask()}
-	uc := NewWorkflowUsecase(repo)
-
-	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
-		ID:            701,
-		TaskStatusKey: "processing",
-		Payload:       map[string]any{},
-	}, 7, "warehouse")
-	if err != nil {
-		t.Fatalf("processing should keep original behavior, got %v", err)
-	}
-	if repo.updateTaskInput.SideEffects != nil {
-		t.Fatalf("processing should not derive side effects")
-	}
-}

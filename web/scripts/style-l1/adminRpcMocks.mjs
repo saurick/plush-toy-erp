@@ -60,7 +60,8 @@ export async function installAdminRpcMocks(
       key: item.key || item.path,
       label: item.label,
       path: item.path,
-      required_permissions: item.required_permissions || [],
+      required_any: item.required_any || [],
+      required_all: item.required_all || [],
     }))
     .filter((item) => item.path)
   const mockPermissions = [
@@ -96,7 +97,7 @@ export async function installAdminRpcMocks(
       module: 'system',
     },
     {
-      permission_key: 'system.permission.manage',
+      permission_key: 'system.role.permission.manage',
       name: '管理角色权限',
       module: 'system',
     },
@@ -142,28 +143,46 @@ export async function installAdminRpcMocks(
     const readKey = [...parts.slice(0, -1), 'read'].join('.')
     const menus = mockMenus
       .filter((menu) =>
-        (menu.required_permissions || []).some(
+        [...(menu.required_any || []), ...(menu.required_all || [])].some(
           (key) => key === item.permission_key || key === readKey
         )
       )
       .map(({ key, label, path }) => ({ key, label, path }))
+    const conditions = [
+      item.module === 'system'
+        ? '仍受超级管理员保护、禁止自我停用或注销等安全规则限制'
+        : item.module === 'mobile'
+          ? '进入后仍只显示当前岗位或指定给本人的任务'
+          : '仍受客户模块状态、业务状态和任务归属限制',
+    ]
     return {
       ...item,
       usage: {
-        menus,
-        control_type:
-          action === 'read' || action === 'access'
-            ? '页面入口和内容'
-            : action === 'create'
-              ? '新建按钮和表单'
-              : '操作按钮',
-        effect: '显示并允许执行',
-        condition:
-          item.module === 'system'
-            ? '仍受超级管理员保护、禁止自我停用或注销等安全规则限制'
-            : item.module === 'mobile'
-              ? '进入后仍只显示当前岗位或指定给本人的任务'
-              : '仍受客户模块状态、业务状态和任务归属限制',
+        pages: menus.map((menu) => ({
+          key: menu.key,
+          name: menu.label,
+          path: menu.path,
+          section_key: '',
+          section_name: '',
+          control_key: `${menu.key}-${item.permission_key}`,
+          control_name: item.name,
+          control_type:
+            action === 'read' || action === 'access'
+              ? 'page'
+              : action === 'create'
+                ? 'form'
+                : 'button',
+          effect: '显示并允许执行',
+          backend_methods: [],
+          required_any: [item.permission_key],
+          required_all: [],
+          conditions,
+        })),
+        backend_only: menus.length === 0,
+        backend_methods: [],
+        required_any: [item.permission_key],
+        required_all: [],
+        conditions,
       },
     }
   })

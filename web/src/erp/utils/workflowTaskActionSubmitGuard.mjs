@@ -10,11 +10,17 @@ import {
 
 const DEFAULT_DENIED_FALLBACK = '当前账号不能提交这个任务动作'
 const DEFAULT_ERROR_FALLBACK = '核对任务动作权限失败'
-const REASON_REQUIRED_ACTION_MODES = new Set(['block', 'reject', 'urge'])
+const REASON_REQUIRED_ACTION_MODES = new Set([
+  'block',
+  'reject',
+  'resume',
+  'urge',
+])
 
 const REASON_REQUIRED_MESSAGES = Object.freeze({
   block: '请先填写阻塞原因',
   reject: '请先填写退回原因',
+  resume: '请先填写阻塞解除说明',
   urge: '请先填写催办原因',
 })
 

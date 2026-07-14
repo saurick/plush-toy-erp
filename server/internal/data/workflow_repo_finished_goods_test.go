@@ -270,7 +270,15 @@ func TestWorkflowRepo_FinishedGoodsQCReworkIdempotencyHonorsRejectedTerminalStat
 				t.Fatalf("complete rework task failed: %v", err)
 			}
 
-			_, nextRoundErr := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version+1, "finished-goods-qc-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
+			nextRoundVersion := qcTask.Version + 1
+			if tc.status == "blocked" {
+				resumed := resumeWorkflowTaskForNextRound(
+					t, ctx, uc, qcTask.ID, nextRoundVersion,
+					"finished-goods-qc-blocked-resume-next-round", 8, "quality",
+				)
+				nextRoundVersion = resumed.Version
+			}
+			_, nextRoundErr := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, nextRoundVersion, "finished-goods-qc-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
 				ID:            qcTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,
@@ -315,12 +323,13 @@ func TestWorkflowRepo_FinishedGoodsQCBlockedThenRejectedReusesActiveReworkAndRef
 	qcTask := createFinishedGoodsQCTask(t, ctx, repo, 4701)
 
 	blockedReason := "车缝开线待判责"
-	if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version, "finished-goods-qc-blocked-then-rejected-blocked", &biz.WorkflowTaskStatusUpdate{
+	blocked, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version, "finished-goods-qc-blocked-then-rejected-blocked", &biz.WorkflowTaskStatusUpdate{
 		ID:            qcTask.ID,
 		TaskStatusKey: "blocked",
 		Reason:        blockedReason,
 		Payload:       map[string]any{},
-	}), 8, "quality"); err != nil {
+	}), 8, "quality")
+	if err != nil {
 		t.Fatalf("blocked update failed: %v", err)
 	}
 
@@ -339,9 +348,13 @@ func TestWorkflowRepo_FinishedGoodsQCBlockedThenRejectedReusesActiveReworkAndRef
 		t.Fatalf("expected one rework task after blocked, got %d", len(reworkTasks))
 	}
 	reworkTaskID := reworkTasks[0].ID
+	resumed := resumeWorkflowTaskForNextRound(
+		t, ctx, uc, qcTask.ID, blocked.Version,
+		"finished-goods-qc-blocked-then-rejected-resume", 8, "quality",
+	)
 
 	rejectedReason := "复检尺寸偏差"
-	if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, qcTask.Version+1, "finished-goods-qc-blocked-then-rejected-rejected", &biz.WorkflowTaskStatusUpdate{
+	if _, err := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(qcTask.ID, resumed.Version, "finished-goods-qc-blocked-then-rejected-rejected", &biz.WorkflowTaskStatusUpdate{
 		ID:            qcTask.ID,
 		TaskStatusKey: "rejected",
 		Reason:        rejectedReason,

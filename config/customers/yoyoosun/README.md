@@ -11,6 +11,8 @@
 - 不改变后端 RBAC 动作权限、Workflow / Fact 边界、schema、migration 或真实导入。
 - 不改 Ent schema。
 
+客户工程指导图片已作为私密人工参考资料迁入客户专属 Private 仓库，当前配置包不再保存或发布这些原件。只有 `public-assets/` 中经过审查的品牌资源可以进入 dev server / 生产 overlay。
+
 当前已接入：
 
 - `menuConfig.mjs`：永绅前端品牌和桌面菜单配置源。部署时把经过审查的 `customer-config.example.js` 发布为静态根路径 `customer-config.js`，并只复制 `public-assets/` 到 `/customer-assets/yoyoosun/`。菜单隐藏不是安全边界，后端仍以 RBAC、active revision、模块状态和业务 usecase 校验为准。
@@ -18,7 +20,6 @@
 - `customer-config.example.js`：永绅 yoyoosun 前端部署注入示例。默认产品 Web 包只带中性的 `web/public/customer-config.js` 占位，不能把本示例复制进 Product Core 默认产物。
 
 - `public-assets/`：唯一允许复制到公开前端产物的客户静态资源，目前只含 favicon 等经过审查的品牌资源。
-- `assets/engineering-work-instruction/`：客户工程表来源证据，只用于受控人工评审和模板设计，不由 dev server/生产 overlay 发布，也不再注入无鉴权的工程打印草稿。
 - 版本化配置和试用 fixture 不保存真实员工姓名、手机号或签字人；真实合同经办信息由客户 active revision 或本单 `contract_party_snapshot` 受控维护并审计。
 
 - `fieldNumberingConfig.mjs`：永绅 yoyoosun 字段显示和编号规则配置草案。该文件当前 `runtimeEnabled=false`，只作为 Customer Config 评审清单；不接前端运行时、不改后端、不改 schema、不执行导入。
@@ -46,7 +47,7 @@
 cd /Users/simon/projects/plush-toy-erp
 node scripts/qa/customer-config-boundaries.mjs
 node scripts/qa/customer-package-lint.mjs --customer yoyoosun
-node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun
+node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview
 ```
 
 如需生成本地预览报告：

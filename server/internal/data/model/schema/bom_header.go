@@ -5,6 +5,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -12,6 +13,15 @@ import (
 
 type BOMHeader struct {
 	ent.Schema
+}
+
+func (BOMHeader) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"bom_headers_status_allowed":          "status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')",
+			"bom_headers_effective_dates_ordered": "effective_from IS NULL OR effective_to IS NULL OR effective_to > effective_from",
+		}},
+	}
 }
 
 func (BOMHeader) Fields() []ent.Field {

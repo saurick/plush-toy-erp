@@ -17,6 +17,16 @@
 | `node scripts/deploy/release-evidence-closeout-runner.mjs` | materialize closeout plan；默认 report-only，显式确认后才执行可运行机器步骤 | 默认否，`--execute` 才执行 |
 | `node scripts/deploy/customer-config-release-readiness.mjs` | 聚合客户配置 manifest、release evidence、activation gate 和读回证据 | 否，只聚合证据 |
 | `node scripts/deploy/customer-config-release-execute.mjs` | 客户配置 validate / publish / activate / rollback 执行器 | 默认否，显式确认后才调用 JSON-RPC |
+| `node scripts/deploy/source-archive-release-check.mjs` | 从指定 committed Git ref 构建临时源码包并检查构建输入闭包；`--light` 验证解包与客户 Web overlay，`--execute` 才执行 clean-worktree release 检查 | 默认否；`--execute` 运行独立 T8 源码包检查 |
+
+`source-archive-release-check.mjs` 始终从 committed tree 创建临时 archive，不把当前 dirty worktree 混入源码包。默认 plan 和 `--light` 只提供源码包结构诊断；`--execute` 仍要求 clean worktree，并通过 archive 内的 `scripts/lib/pnpm.sh` 解析与 `web/package.json` 锁定版本一致的 Node / pnpm，不直接信任 raw `PATH` 中的 pnpm。该入口是独立的 T8 source-package 检查，不替代 `fast.sh` / `full.sh` / `strict.sh`，也不证明目标环境发布、migration、smoke、release evidence 或人工签收已经完成。
+
+```bash
+node scripts/deploy/source-archive-release-check.mjs --ref HEAD --json
+node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD --json
+# 只在 clean worktree 且准备执行独立源码包构建检查时运行：
+node scripts/deploy/source-archive-release-check.mjs --execute --ref HEAD
+```
 
 ## 客户配置读回 preflight
 
@@ -49,6 +59,7 @@ node --test scripts/deploy/release-evidence-closeout-plan.test.mjs
 node --test scripts/deploy/production-preflight.test.mjs
 node --test scripts/deploy/run-smoke-script.test.mjs
 node --test scripts/deploy/customer-config-release-readiness.test.mjs
+node --test scripts/deploy/source-archive-release-check.test.mjs
 ```
 
 涉及发布证据口径时，再补：

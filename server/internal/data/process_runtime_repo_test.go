@@ -8,12 +8,112 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/enttest"
 
 	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
 	_ "github.com/mattn/go-sqlite3"
 )
+
+func activateProcessNodeForTest(t *testing.T, ctx context.Context, repo *processRuntimeRepo, instance *biz.ProcessInstance, node *biz.ProcessNodeInstance) *biz.ProcessNodeInstance {
+	t.Helper()
+	activated, err := repo.ActivateProcessNodeInstance(ctx, &biz.ProcessNodeInstanceActivate{
+		ID:                node.ID,
+		ProcessInstanceID: instance.ID,
+		ExpectedVersion:   node.Version,
+	}, 7)
+	if err != nil {
+		t.Fatalf("activate process node fixture: %v", err)
+	}
+	return activated
+}
+
+func TestProcessRuntimeRepoCreateRejectsNonInitialStatuses(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_repo_initial_status?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewProcessRuntimeRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	validInput := func() *biz.ProcessInstanceCreate {
+		return &biz.ProcessInstanceCreate{
+			ProcessKey:      "initial_status",
+			ProcessVersion:  "v1",
+			ConfigRevision:  "rev-1",
+			DefinitionHash:  "sha256:initial-status",
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			IdempotencyKey:  "initial-status/v1",
+			Status:          biz.ProcessStatusActive,
+			Nodes: []biz.ProcessNodeInstanceCreate{{
+				NodeKey: "start", NodeType: biz.ProcessNodeTypeHumanTask,
+				Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{},
+			}},
+		}
+	}
+
+	for _, status := range []string{biz.ProcessStatusCompleted, biz.ProcessStatusBlocked, "cancelled", "unknown"} {
+		in := validInput()
+		in.Status = status
+		if _, _, err := repo.CreateProcessInstance(ctx, in, 7); !errors.Is(err, biz.ErrBadParam) {
+			t.Fatalf("expected repo to reject initial process status %q, got %v", status, err)
+		}
+	}
+	for _, status := range []string{
+		biz.ProcessNodeStatusActive,
+		biz.ProcessNodeStatusCompleted,
+		biz.ProcessNodeStatusBlocked,
+		"skipped",
+		"failed",
+		"unknown",
+	} {
+		in := validInput()
+		in.Nodes[0].Status = status
+		if _, _, err := repo.CreateProcessInstance(ctx, in, 7); !errors.Is(err, biz.ErrBadParam) {
+			t.Fatalf("expected repo to reject initial process node status %q, got %v", status, err)
+		}
+	}
+}
+
+func TestProcessRuntimeSchemaRejectsUnknownAndInvalidLifecycleStates(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_schema_status?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	newInstance := func(key, status string) *ent.ProcessInstanceCreate {
+		return client.ProcessInstance.Create().
+			SetProcessKey(key).
+			SetProcessVersion("v1").
+			SetConfigRevision("rev-1").
+			SetDefinitionHash("sha256:" + key).
+			SetBusinessRefType("sales_order").
+			SetBusinessRefID(1001).
+			SetIdempotencyKey(key + "/v1").
+			SetStatus(status)
+	}
+	if _, err := newInstance("unknown", "unknown").Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected unknown process status DB constraint, got %v", err)
+	}
+	if _, err := newInstance("completed_without_time", biz.ProcessStatusCompleted).Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected completed process lifecycle DB constraint, got %v", err)
+	}
+	instance, err := newInstance("valid", biz.ProcessStatusActive).Save(ctx)
+	if err != nil {
+		t.Fatalf("create valid process schema fixture: %v", err)
+	}
+	newNode := func(key, status string) *ent.ProcessNodeInstanceCreate {
+		return client.ProcessNodeInstance.Create().
+			SetProcessInstanceID(instance.ID).
+			SetNodeKey(key).
+			SetNodeType(biz.ProcessNodeTypeHumanTask).
+			SetStatus(status)
+	}
+	if _, err := newNode("unknown", "unknown").Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected unknown process node status DB constraint, got %v", err)
+	}
+	if _, err := newNode("active_without_time", biz.ProcessNodeStatusActive).Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected active process node lifecycle DB constraint, got %v", err)
+	}
+}
 
 func TestProcessRuntimeRepoCreateAndRead(t *testing.T) {
 	ctx := context.Background()
@@ -44,7 +144,7 @@ func TestProcessRuntimeRepoCreateAndRead(t *testing.T) {
 				NodeKey:               "prepare_engineering_data",
 				NodeType:              biz.ProcessNodeTypeHumanTask,
 				Attempt:               1,
-				Status:                biz.ProcessNodeStatusActive,
+				Status:                biz.ProcessNodeStatusWaiting,
 				OwnerPoolKey:          &ownerPoolKey,
 				RequiredCapabilityKey: &requiredCapabilityKey,
 				PolicySnapshot:        map[string]any{"sla_hours": 24},
@@ -67,6 +167,15 @@ func TestProcessRuntimeRepoCreateAndRead(t *testing.T) {
 	if len(nodes) != 2 {
 		t.Fatalf("expected 2 nodes, got %d", len(nodes))
 	}
+	if _, err := repo.CompleteProcessNodeInstance(ctx, &biz.ProcessNodeInstanceComplete{
+		ID:                nodes[0].ID,
+		ProcessInstanceID: instance.ID,
+		ExpectedVersion:   nodes[0].Version,
+		Outcome:           "should_not_complete",
+	}, 7); !errors.Is(err, biz.ErrProcessNodeInstanceNotActive) {
+		t.Fatalf("expected waiting node completion rejected, got %v", err)
+	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	if nodes[0].OwnerPoolKey == nil || *nodes[0].OwnerPoolKey != ownerPoolKey {
 		t.Fatalf("expected owner pool on first node, got %#v", nodes[0].OwnerPoolKey)
 	}
@@ -117,6 +226,14 @@ func TestProcessRuntimeRepoCreateAndRead(t *testing.T) {
 		Outcome:           "CONFIRMED",
 	}, 7); !errors.Is(err, biz.ErrProcessNodeInstanceConflict) {
 		t.Fatalf("expected stale version conflict, got %v", err)
+	}
+	if _, err := repo.CompleteProcessNodeInstance(ctx, &biz.ProcessNodeInstanceComplete{
+		ID:                nodes[0].ID,
+		ProcessInstanceID: instance.ID,
+		ExpectedVersion:   completedNode.Version,
+		Outcome:           "CONFIRMED",
+	}, 7); !errors.Is(err, biz.ErrProcessNodeInstanceSettled) {
+		t.Fatalf("expected current completed node to be classified as settled, got %v", err)
 	}
 	nextNode, err := repo.GetProcessNodeInstance(ctx, nodes[1].ID)
 	if err != nil {
@@ -188,12 +305,13 @@ func TestProcessRuntimeRepoCompletesDomainNodeWithFingerprintAtomically(t *testi
 		Status:          biz.ProcessStatusActive,
 		Nodes: []biz.ProcessNodeInstanceCreate{{
 			NodeKey: "publish_engineering_package", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1,
-			Status: biz.ProcessNodeStatusActive, PolicySnapshot: map[string]any{"command_key": "engineering_package.publish"},
+			Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{"command_key": "engineering_package.publish"},
 		}},
 	}, 7)
 	if err != nil {
 		t.Fatalf("create process failed: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	fingerprint := "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
 	claimed, err := repo.ClaimProcessNodeDomainCommand(ctx, &biz.ProcessNodeDomainCommandClaim{
 		ProcessInstanceID: instance.ID, ProcessNodeInstanceID: nodes[0].ID, ExpectedVersion: nodes[0].Version,
@@ -277,12 +395,13 @@ func TestProcessRuntimeRepoMarksDomainResultCompensatedWithExactCAS(t *testing.T
 		BusinessRefType: "shipment", BusinessRefID: 88, IdempotencyKey: "shipment:88:flow", Status: biz.ProcessStatusActive,
 		Nodes: []biz.ProcessNodeInstanceCreate{{
 			NodeKey: "ship", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1,
-			Status: biz.ProcessNodeStatusActive, PolicySnapshot: map[string]any{"command_key": "shipment.ship"},
+			Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{"command_key": "shipment.ship"},
 		}},
 	}, 7)
 	if err != nil {
 		t.Fatalf("create process: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	fingerprint := "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	if _, err := repo.ClaimProcessNodeDomainCommand(ctx, &biz.ProcessNodeDomainCommandClaim{
 		ProcessInstanceID: instance.ID, ProcessNodeInstanceID: nodes[0].ID, ExpectedVersion: nodes[0].Version,
@@ -413,7 +532,7 @@ func TestProcessRuntimeRepoRejectsChangedCreateIntentForSameIdempotency(t *testi
 				NodeKey:        "approve_order",
 				NodeType:       biz.ProcessNodeTypeHumanTask,
 				Attempt:        1,
-				Status:         biz.ProcessNodeStatusActive,
+				Status:         biz.ProcessNodeStatusWaiting,
 				OwnerPoolKey:   &ownerPoolKey,
 				PolicySnapshot: map[string]any{"sla_hours": 24},
 				DueAt:          &dueAt,
@@ -424,6 +543,7 @@ func TestProcessRuntimeRepoRejectsChangedCreateIntentForSameIdempotency(t *testi
 	if err != nil {
 		t.Fatalf("first create failed: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, first, nodes[0])
 
 	cloneInput := func() *biz.ProcessInstanceCreate {
 		cloned := *in
@@ -519,7 +639,7 @@ func TestProcessRuntimeRepoCreateProcessNodeInstanceAttempt(t *testing.T) {
 				NodeKey:               "prepare_engineering_data",
 				NodeType:              biz.ProcessNodeTypeHumanTask,
 				Attempt:               1,
-				Status:                biz.ProcessNodeStatusActive,
+				Status:                biz.ProcessNodeStatusWaiting,
 				OwnerPoolKey:          &ownerPoolKey,
 				RequiredCapabilityKey: &requiredCapabilityKey,
 				PolicySnapshot:        map[string]any{"return_max_attempts": 2},
@@ -530,6 +650,7 @@ func TestProcessRuntimeRepoCreateProcessNodeInstanceAttempt(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create process failed: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	completedNode, err := repo.CompleteProcessNodeInstance(ctx, &biz.ProcessNodeInstanceComplete{
 		ID:                nodes[0].ID,
 		ProcessInstanceID: instance.ID,
@@ -610,7 +731,7 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 				NodeKey:        "prepare_engineering_data",
 				NodeType:       biz.ProcessNodeTypeDomainCommand,
 				Attempt:        1,
-				Status:         biz.ProcessNodeStatusActive,
+				Status:         biz.ProcessNodeStatusWaiting,
 				PolicySnapshot: map[string]any{"command_key": "engineering_data.check"},
 				DueAt:          &dueAt,
 			},
@@ -619,6 +740,7 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create process failed: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	activeNode, err := repo.GetProcessNodeInstance(ctx, nodes[0].ID)
 	if err != nil {
 		t.Fatalf("get active node failed: %v", err)
@@ -631,7 +753,7 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("claim blocked domain command failed: %v", err)
 	}
-	blockedNode, err := repo.BlockProcessNodeInstance(ctx, &biz.ProcessNodeInstanceBlock{
+	blockedNode, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
 		ProcessInstanceID:        instance.ID,
 		ProcessNodeInstanceID:    activeNode.ID,
 		ExpectedVersion:          activeNode.Version,
@@ -654,7 +776,7 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 	if blockedNode.Version != activeNode.Version+1 {
 		t.Fatalf("expected blocked node version increment, got %d from %d", blockedNode.Version, activeNode.Version)
 	}
-	if _, err := repo.BlockProcessNodeInstance(ctx, &biz.ProcessNodeInstanceBlock{
+	if _, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
 		ProcessInstanceID:     instance.ID,
 		ProcessNodeInstanceID: activeNode.ID,
 		ExpectedVersion:       activeNode.Version,
@@ -663,18 +785,140 @@ func TestProcessRuntimeRepoBlockProcessNodeInstanceAndProcess(t *testing.T) {
 	}, 7); !errors.Is(err, biz.ErrProcessNodeInstanceConflict) {
 		t.Fatalf("expected stale block conflict, got %v", err)
 	}
-	blockedProcess, err := repo.BlockProcessInstance(ctx, &biz.ProcessInstanceBlock{
-		ID: instance.ID,
-	}, 7)
+	blockedProcess, err := repo.GetProcessInstance(ctx, instance.ID)
 	if err != nil {
-		t.Fatalf("block process failed: %v", err)
+		t.Fatalf("get atomically blocked process failed: %v", err)
 	}
 	if blockedProcess.Status != biz.ProcessStatusBlocked || blockedProcess.CompletedAt != nil {
 		t.Fatalf("expected blocked process without completed_at, got %#v", blockedProcess)
 	}
-	if _, err := repo.BlockProcessInstance(ctx, &biz.ProcessInstanceBlock{
-		ID: instance.ID,
+}
+
+func TestProcessRuntimeRepoBlockProcessNodeAndInstanceRollsBackNodeWhenProcessCannotBlock(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_repo_atomic_block_rollback?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewProcessRuntimeRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	instance, nodes, err := repo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:      "engineering_release",
+		ProcessVersion:  "v1",
+		ConfigRevision:  "yoyoosun-rev-1",
+		DefinitionHash:  "sha256:definition",
+		BusinessRefType: "sales_order",
+		BusinessRefID:   1002,
+		IdempotencyKey:  "sales_order:1002:engineering_release:block-rollback",
+		Status:          biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{
+			{
+				NodeKey:        "prepare_engineering_data",
+				NodeType:       biz.ProcessNodeTypeHumanTask,
+				Attempt:        1,
+				Status:         biz.ProcessNodeStatusWaiting,
+				PolicySnapshot: map[string]any{},
+			},
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create process failed: %v", err)
+	}
+	activeNode := activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
+	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{ID: instance.ID}, 7); err != nil {
+		t.Fatalf("settle process fixture: %v", err)
+	}
+
+	if _, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
+		ProcessInstanceID:     instance.ID,
+		ProcessNodeInstanceID: activeNode.ID,
+		ExpectedVersion:       activeNode.Version,
+		Reason:                "must roll back",
+		Outcome:               "blocked",
 	}, 7); !errors.Is(err, biz.ErrProcessInstanceSettled) {
-		t.Fatalf("expected settled process error on duplicate block, got %v", err)
+		t.Fatalf("expected settled process failure, got %v", err)
+	}
+	currentNode, err := repo.GetProcessNodeInstance(ctx, activeNode.ID)
+	if err != nil {
+		t.Fatalf("get node after rollback: %v", err)
+	}
+	if currentNode.Status != biz.ProcessNodeStatusActive || currentNode.Version != activeNode.Version || currentNode.Outcome != nil {
+		t.Fatalf("node mutation must roll back with process failure, before=%#v after=%#v", activeNode, currentNode)
+	}
+}
+
+func TestProcessRuntimeRepoCompleteProcessNodeRequiresActiveStatus(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:process_runtime_repo_complete_status_guard?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewProcessRuntimeRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	instance, nodes, err := repo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:      "status_guard",
+		ProcessVersion:  "v1",
+		ConfigRevision:  "yoyoosun-rev-1",
+		DefinitionHash:  "sha256:definition",
+		BusinessRefType: "sales_order",
+		BusinessRefID:   1003,
+		IdempotencyKey:  "sales_order:1003:status-guard",
+		Status:          biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{
+			{NodeKey: "waiting", NodeType: biz.ProcessNodeTypeHumanTask, Attempt: 1, Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{}},
+			{NodeKey: "blocked", NodeType: biz.ProcessNodeTypeHumanTask, Attempt: 1, Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{}},
+			{NodeKey: "completed", NodeType: biz.ProcessNodeTypeHumanTask, Attempt: 1, Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{}},
+		},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create process failed: %v", err)
+	}
+	now := time.Now()
+	if _, err := client.ProcessNodeInstance.UpdateOneID(nodes[1].ID).
+		SetStatus(biz.ProcessNodeStatusBlocked).
+		SetStartedAt(now).
+		Save(ctx); err != nil {
+		t.Fatalf("prepare blocked node fixture: %v", err)
+	}
+	if _, err := client.ProcessNodeInstance.UpdateOneID(nodes[2].ID).
+		SetStatus(biz.ProcessNodeStatusCompleted).
+		SetStartedAt(now).
+		SetCompletedAt(now).
+		Save(ctx); err != nil {
+		t.Fatalf("prepare completed node fixture: %v", err)
+	}
+	for i := range nodes {
+		nodes[i], err = repo.GetProcessNodeInstance(ctx, nodes[i].ID)
+		if err != nil {
+			t.Fatalf("reload guarded node fixture: %v", err)
+		}
+	}
+	tests := []struct {
+		name string
+		node *biz.ProcessNodeInstance
+		want error
+	}{
+		{name: "waiting", node: nodes[0], want: biz.ErrProcessNodeInstanceNotActive},
+		{name: "blocked", node: nodes[1], want: biz.ErrProcessNodeInstanceNotActive},
+		{name: "completed", node: nodes[2], want: biz.ErrProcessNodeInstanceSettled},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if _, err := repo.CompleteProcessNodeInstance(ctx, &biz.ProcessNodeInstanceComplete{
+				ID:                tt.node.ID,
+				ProcessInstanceID: instance.ID,
+				ExpectedVersion:   tt.node.Version,
+				Outcome:           "invalid completion",
+			}, 7); !errors.Is(err, tt.want) {
+				t.Fatalf("expected %v, got %v", tt.want, err)
+			}
+			current, err := repo.GetProcessNodeInstance(ctx, tt.node.ID)
+			if err != nil {
+				t.Fatalf("get guarded node: %v", err)
+			}
+			completedAtChanged := (current.CompletedAt == nil) != (tt.node.CompletedAt == nil)
+			if current.CompletedAt != nil && tt.node.CompletedAt != nil && !current.CompletedAt.Equal(*tt.node.CompletedAt) {
+				completedAtChanged = true
+			}
+			if current.Status != tt.node.Status || current.Version != tt.node.Version || completedAtChanged {
+				t.Fatalf("invalid completion must not mutate node, before=%#v after=%#v", tt.node, current)
+			}
+		})
 	}
 }

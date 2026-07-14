@@ -16,7 +16,7 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "list_units", "listUnits":
+	case "list_units":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialRead); res != nil {
 			return id, res, nil
 		}
@@ -30,7 +30,7 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 			"limit":  normalizedLimit(pm),
 			"offset": normalizedOffset(pm),
 		})}, nil
-	case "list_warehouses", "listWarehouses":
+	case "list_warehouses":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}

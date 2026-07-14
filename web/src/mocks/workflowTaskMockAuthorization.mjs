@@ -1,14 +1,10 @@
 import {
+  canWorkflowTaskStatusRunAction,
   getWorkflowTaskActionPermission,
   getWorkflowTaskActionStatusKey,
 } from '../erp/utils/workflowTaskActionContract.mjs'
 
-const TERMINAL_TASK_STATUS_KEYS = new Set([
-  'done',
-  'rejected',
-  'cancelled',
-  'closed',
-])
+const TERMINAL_TASK_STATUS_KEYS = new Set(['done', 'rejected'])
 
 function normalizedRoleKeys(adminProfile = {}) {
   return new Set(
@@ -190,6 +186,9 @@ export function workflowMockActionDecision({
   } else if (terminal) {
     reasonCode = 'terminal_task'
     reason = '该任务已结束，只能查看上下文。'
+  } else if (!canWorkflowTaskStatusRunAction(task, action)) {
+    reasonCode = 'status_transition_not_allowed'
+    reason = '当前任务状态不允许执行该动作。'
   } else if (!permissionAllowed) {
     reasonCode = 'missing_permission'
     reason = '当前账号缺少执行该动作所需权限。'

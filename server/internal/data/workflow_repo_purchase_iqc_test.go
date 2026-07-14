@@ -269,7 +269,15 @@ func TestWorkflowRepo_PurchaseIQCExceptionIdempotencyHonorsRejectedTerminalState
 				t.Fatalf("complete exception task failed: %v", err)
 			}
 
-			_, nextRoundErr := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(iqcTask.ID, iqcTask.Version+1, "purchase-iqc-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
+			nextRoundVersion := iqcTask.Version + 1
+			if tc.status == "blocked" {
+				resumed := resumeWorkflowTaskForNextRound(
+					t, ctx, uc, iqcTask.ID, nextRoundVersion,
+					"purchase-iqc-blocked-resume-next-round", 8, "quality",
+				)
+				nextRoundVersion = resumed.Version
+			}
+			_, nextRoundErr := uc.UpdateTaskStatus(ctx, workflowRepoTestStatusMutation(iqcTask.ID, nextRoundVersion, "purchase-iqc-"+tc.status+"-next-round", &biz.WorkflowTaskStatusUpdate{
 				ID:            iqcTask.ID,
 				TaskStatusKey: tc.status,
 				Reason:        reason,

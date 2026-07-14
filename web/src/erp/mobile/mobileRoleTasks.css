@@ -282,16 +282,16 @@
   overflow: hidden;
 }
 
-.mobile-role-summary-metric--pending {
+.mobile-role-summary-metric--ready {
   --mobile-role-summary-tone: #2563eb;
-}
-
-.mobile-role-summary-metric--processing {
-  --mobile-role-summary-tone: #0891b2;
 }
 
 .mobile-role-summary-metric--blocked {
   --mobile-role-summary-tone: #d97706;
+}
+
+.mobile-role-summary-metric--rejected {
+  --mobile-role-summary-tone: #dc2626;
 }
 
 .mobile-role-summary-metric--done {
@@ -319,16 +319,16 @@
   word-break: break-word;
 }
 
-.mobile-role-summary-metric--pending .mobile-role-metric-button__value,
-.mobile-role-summary-metric--processing .mobile-role-metric-button__value,
+.mobile-role-summary-metric--ready .mobile-role-metric-button__value,
 .mobile-role-summary-metric--blocked .mobile-role-metric-button__value,
+.mobile-role-summary-metric--rejected .mobile-role-metric-button__value,
 .mobile-role-summary-metric--done .mobile-role-metric-button__value {
   color: var(--mobile-role-summary-tone);
 }
 
-.mobile-role-summary-metric--pending .mobile-role-metric-button__label,
-.mobile-role-summary-metric--processing .mobile-role-metric-button__label,
+.mobile-role-summary-metric--ready .mobile-role-metric-button__label,
 .mobile-role-summary-metric--blocked .mobile-role-metric-button__label,
+.mobile-role-summary-metric--rejected .mobile-role-metric-button__label,
 .mobile-role-summary-metric--done .mobile-role-metric-button__label {
   color: var(--mobile-role-summary-tone);
 }
@@ -609,6 +609,11 @@
   font-weight: 650;
 }
 
+.mobile-role-load-error button:focus-visible {
+  outline: 2px solid rgb(239 68 68 / 0.55);
+  outline-offset: 2px;
+}
+
 .mobile-role-scroll-top {
   position: absolute;
   right: 18px;
@@ -752,6 +757,18 @@
   border-color: var(--erp-border);
   background: rgb(15 23 42 / 0.94);
   box-shadow: 0 10px 28px rgb(0 0 0 / 0.26);
+}
+
+[data-erp-theme='dark'] .mobile-role-load-error {
+  border-color: rgb(248 113 113 / 0.45);
+  background: rgb(127 29 29 / 0.28);
+  color: #fecaca;
+}
+
+[data-erp-theme='dark'] .mobile-role-load-error button {
+  border-color: rgb(248 113 113 / 0.5);
+  background: rgb(30 41 59 / 0.96);
+  color: #fecaca;
 }
 
 [data-erp-theme='dark'] .mobile-role-message-tabs::before {

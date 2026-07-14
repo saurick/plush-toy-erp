@@ -18,17 +18,19 @@ type PurchaseReceiptItem struct {
 }
 
 var purchaseReceiptItemLockedFields = map[string]struct{}{
-	"receipt_id":             {},
-	"material_id":            {},
-	"warehouse_id":           {},
-	"unit_id":                {},
-	"lot_id":                 {},
-	"purchase_order_item_id": {},
-	"lot_no":                 {},
-	"quantity":               {},
-	"unit_price":             {},
-	"amount":                 {},
-	"source_line_no":         {},
+	"receipt_id":               {},
+	"material_id":              {},
+	"warehouse_id":             {},
+	"unit_id":                  {},
+	"lot_id":                   {},
+	"purchase_order_item_id":   {},
+	"lot_no":                   {},
+	"quantity":                 {},
+	"unit_price":               {},
+	"amount":                   {},
+	"source_line_no":           {},
+	"idempotency_key":          {},
+	"idempotency_payload_hash": {},
 }
 
 func (PurchaseReceiptItem) Hooks() []ent.Hook {
@@ -55,6 +57,20 @@ func (PurchaseReceiptItem) Annotations() []schema.Annotation {
 				"purchase_receipt_items_quantity_positive":       "quantity > 0",
 				"purchase_receipt_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
 				"purchase_receipt_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
+				"purchase_receipt_items_idempotency_bundle_complete": `
+(
+  (
+    idempotency_key IS NULL
+    AND idempotency_payload_hash IS NULL
+  )
+  OR
+  (
+    idempotency_key IS NOT NULL
+    AND length(trim(idempotency_key)) BETWEEN 1 AND 128
+    AND idempotency_payload_hash IS NOT NULL
+    AND length(idempotency_payload_hash) = 64
+  )
+)`,
 			},
 		},
 	}
@@ -86,6 +102,14 @@ func (PurchaseReceiptItem) Fields() []ent.Field {
 		optionalDecimalField("unit_price"),
 		optionalDecimalField("amount"),
 		field.String("source_line_no").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("idempotency_key").
+			Optional().
+			Nillable().
+			MaxLen(128),
+		field.String("idempotency_payload_hash").
 			Optional().
 			Nillable().
 			MaxLen(64),
@@ -150,6 +174,11 @@ func (PurchaseReceiptItem) Indexes() []ent.Index {
 		index.Fields("warehouse_id"),
 		index.Fields("lot_id"),
 		index.Fields("purchase_order_item_id"),
+		index.Fields("receipt_id", "idempotency_key").
+			Unique().
+			Annotations(
+				entsql.IndexWhere("idempotency_key IS NOT NULL AND idempotency_key <> ''"),
+			),
 		index.Fields("receipt_id", "source_line_no").
 			Unique().
 			Annotations(

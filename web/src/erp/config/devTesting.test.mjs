@@ -75,8 +75,9 @@ const scriptsReadmeMarkdown = `
 
 \`\`\`bash
 node scripts/import/customerSourceExtract.mjs \\
-  --manifest docs/customers/yoyoosun/source-manifest.json \\
-  --out output/customers/yoyoosun/source-extract
+  --manifest ../plush-toy-erp-customer-yoyoosun-private/manifests/source-manifest.json \\
+  --raw-dir ../plush-toy-erp-customer-yoyoosun-private/sources \\
+  --out ../plush-toy-erp-customer-yoyoosun-private/output/source-extract
 \`\`\`
 
 \`\`\`text
@@ -570,7 +571,11 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
-    /customer-config-runtime-manifest\.mjs --customer yoyoosun --mode compile/
+    /customer-config-runtime-manifest\.mjs --all --mode preview/
+  )
+  assert.doesNotMatch(
+    getPresetCopyText('customer-config-package-runtime'),
+    /customer-config-runtime-manifest\.mjs .*--mode (?:validate|compile)/
   )
   assert.match(
     getPresetCopyText('customer-config-package-runtime'),
@@ -778,7 +783,7 @@ test('devTesting: 只索引当前测试入口白名单文档', () => {
   assert.equal(docs[3].commandBlocks[0].sourceLabel, '前端脚本：web 脚本说明')
   assert.equal(docs[3].commandCount, 2)
   assert.equal(docs[4].category, 'QA 脚本')
-  assert.equal(docs[4].commandCount, 3)
+  assert.equal(docs[4].commandCount, 4)
 })
 
 test('devTesting: 当前维护白名单中的真实文档都能进入索引', () => {
@@ -824,8 +829,9 @@ test('devTesting: fenced block 只提取 shell 命令和续行', () => {
   assert.equal(blocks[0].sourceLabel, 'QA 脚本：QA 脚本说明')
   assert.deepEqual(blocks[0].commands, [
     'node scripts/import/customerSourceExtract.mjs \\',
-    '--manifest docs/customers/yoyoosun/source-manifest.json \\',
-    '--out output/customers/yoyoosun/source-extract',
+    '--manifest ../plush-toy-erp-customer-yoyoosun-private/manifests/source-manifest.json \\',
+    '--raw-dir ../plush-toy-erp-customer-yoyoosun-private/sources \\',
+    '--out ../plush-toy-erp-customer-yoyoosun-private/output/source-extract',
   ])
 })
 
@@ -922,7 +928,7 @@ test('devTesting: 支持分类和关键词筛选并汇总', () => {
   assert.equal(summary.tierCount, 3)
   assert.equal(summary.docCount, 3)
   assert.equal(summary.docsWithCommands, 3)
-  assert.equal(summary.commandCount, 10)
+  assert.equal(summary.commandCount, 11)
   assert.deepEqual(
     getDevTestingCategoryOptions(docs).map((item) => item.value),
     ['all', '测试策略', '前端验证', 'QA 脚本']

@@ -33,14 +33,10 @@ const COLLABORATION_PANEL_DEFAULT_HEIGHT = 260
 const COLLABORATION_PANEL_MIN_HEIGHT = 240
 const COLLABORATION_PANEL_MAX_HEIGHT = 560
 const DEFAULT_TASK_STATUS_LABELS = new Map([
-  ['pending', '待处理'],
   ['ready', '可执行'],
-  ['processing', '处理中'],
   ['blocked', '阻塞'],
   ['rejected', '退回'],
   ['done', '已完成'],
-  ['closed', '已关闭'],
-  ['cancelled', '已取消'],
 ])
 
 function joinClassNames(...items) {
@@ -156,6 +152,7 @@ export function CollaborationTaskPanel({
   onCompleteTask,
   onBlockTask,
   onRejectTask,
+  onResumeTask,
   urgingTaskID,
   taskActionLoadingID,
 }) {
@@ -175,7 +172,11 @@ export function CollaborationTaskPanel({
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
   const hasAdminProfile = adminProfile && typeof adminProfile === 'object'
   const hasActionHandler = Boolean(
-    onCompleteTask || onBlockTask || onRejectTask || onUrgeTask
+    onCompleteTask ||
+      onBlockTask ||
+      onRejectTask ||
+      onResumeTask ||
+      onUrgeTask
   )
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
@@ -187,6 +188,7 @@ export function CollaborationTaskPanel({
       (mode === 'complete' && onCompleteTask) ||
       (mode === 'block' && onBlockTask) ||
       (mode === 'reject' && onRejectTask) ||
+      (mode === 'resume' && onResumeTask) ||
       (mode === 'urge' && onUrgeTask)
   )
   const actionDrawerReadonlyReason = actionDrawerAccess.loading
@@ -372,7 +374,9 @@ export function CollaborationTaskPanel({
           ? onBlockTask
           : actionDrawerMode === 'reject'
             ? onRejectTask
-            : onUrgeTask
+            : actionDrawerMode === 'resume'
+              ? onResumeTask
+              : onUrgeTask
 
     if (!actionHandler) return
 
@@ -403,6 +407,7 @@ export function CollaborationTaskPanel({
     onBlockTask,
     onCompleteTask,
     onRejectTask,
+    onResumeTask,
     onUrgeTask,
   ])
   const renderTaskList = (items, emptyText, hiddenCount = 0) => {

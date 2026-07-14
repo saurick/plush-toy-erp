@@ -5,6 +5,7 @@ import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
   rejectWorkflowTaskAction,
+  resumeWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../../api/workflowApi.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
@@ -39,7 +40,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         action_key: operation,
         reason: '',
         payload: {
-          outsourcing_order_page_action: operation,
+          surface_key: 'outsourcing_orders',
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -89,8 +90,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         action_key: operation,
         reason,
         payload: {
-          outsourcing_order_page_action: operation,
-          blocked_reason: reason,
+          surface_key: 'outsourcing_orders',
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -141,8 +141,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         action_key: operation,
         reason,
         payload: {
-          outsourcing_order_page_action: operation,
-          rejected_reason: reason,
+          surface_key: 'outsourcing_orders',
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -183,6 +182,57 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
     [loadWorkflowTasks, runMutationInFlight]
   )
 
+  const resumeWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const scope = `${task.id}:resume`
+      const operation = 'resume'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
+        reason,
+        payload: {
+          surface_key: 'outsourcing_orders',
+        },
+      }
+      return runMutationInFlight(task.id, async () => {
+        const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
+          attemptStore: mutationAttemptsRef.current,
+          scope,
+          operation,
+          params,
+          verify: () =>
+            verifyWorkflowTaskActionAccessBeforeSubmit({
+              task,
+              actionKey: operation,
+              reason,
+              onWarning: message.warning,
+              onError: message.error,
+            }),
+        })
+        if (!accessVerified) return false
+        await runWorkflowTaskMutationWithFailureRefresh(
+          () =>
+            mutationAttemptsRef.current.run({
+              scope,
+              operation,
+              mutate: resumeWorkflowTaskAction,
+              params,
+            }),
+          loadWorkflowTasks
+        )
+        message.success('任务已解除阻塞')
+        try {
+          await loadWorkflowTasks()
+        } catch {
+          message.warning('操作已成功但列表刷新失败，请手动刷新')
+        }
+        return true
+      })
+    },
+    [loadWorkflowTasks, runMutationInFlight]
+  )
+
   const urgeOutsourcingWorkflowTask = useCallback(
     async (task, { reason = '' } = {}) => {
       const scope = `${task.id}:urge`
@@ -193,7 +243,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
         action: 'urge_task',
         reason,
         payload: {
-          entry: 'outsourcing_order_page',
+          surface_key: 'outsourcing_orders',
         },
       }
       return runMutationInFlight(task.id, async () => {
@@ -238,6 +288,7 @@ export function useOutsourcingOrderWorkflowActions({ loadWorkflowTasks }) {
     blockWorkflowTask,
     completeWorkflowTask,
     rejectWorkflowTask,
+    resumeWorkflowTask,
     urgeOutsourcingWorkflowTask,
   }
 }

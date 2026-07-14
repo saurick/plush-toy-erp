@@ -446,7 +446,7 @@ test('printPdf: 服务端 PDF 错误不会透传 JSON 或文本正文', async ()
   }
 })
 
-test('printPdf: 服务端 PDF fetch payload 写入 customer_key', async () => {
+test('printPdf: 服务端 PDF payload 不允许客户端选择客户或资源基址', async () => {
   const originalWindow = globalThis.window
   const originalFetch = globalThis.fetch
   const originalLocalStorage = globalThis.localStorage
@@ -480,7 +480,8 @@ test('printPdf: 服务端 PDF fetch payload 写入 customer_key', async () => {
     })
 
     assert.equal(blob.size, 3)
-    assert.equal(payload?.customer_key, 'yoyoosun')
+    assert.equal(Object.hasOwn(payload, 'customer_key'), false)
+    assert.equal(Object.hasOwn(payload, 'base_url'), false)
     assert.equal(payload?.template_key, 'material-purchase-contract')
   } finally {
     if (typeof originalWindow === 'undefined') {
@@ -924,7 +925,7 @@ test('printPdf: 仅预览模式会对大图快照开启降载', () => {
   )
 })
 
-test('printPdf: SVG 和小图快照不会被误压缩', () => {
+test('printPdf: SVG 与外链图片始终先本地栅格化，小型内嵌位图保持原样', () => {
   assert.equal(
     __TEST_ONLY__.shouldOptimizeServerPdfImageSource(
       'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
@@ -932,7 +933,16 @@ test('printPdf: SVG 和小图快照不会被误压缩', () => {
         snapshotMode: 'preview',
       }
     ),
-    false
+    true
+  )
+  assert.equal(
+    __TEST_ONLY__.shouldOptimizeServerPdfImageSource(
+      'data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=',
+      {
+        snapshotMode: 'download',
+      }
+    ),
+    true
   )
   assert.equal(
     __TEST_ONLY__.shouldOptimizeServerPdfImageSource(
@@ -945,7 +955,7 @@ test('printPdf: SVG 和小图快照不会被误压缩', () => {
   )
   assert.equal(
     __TEST_ONLY__.shouldOptimizeServerPdfImageSource('/uploads/paper.jpg', {
-      snapshotMode: 'preview',
+      snapshotMode: 'download',
     }),
     true
   )
@@ -997,6 +1007,14 @@ test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
     'class',
     'erp-material-contract-paper erp-print-shell--preparing erp-material-contract-table__row-selected'
   )
+  target.setAttribute('contenteditable', 'true')
+  target.setAttribute('spellcheck', 'false')
+  target.setAttribute('tabindex', '0')
+  const editor = root.ownerDocument.createElement('input')
+  editor.setAttribute('accept', 'image/*')
+  editor.setAttribute('autocomplete', 'off')
+  editor.setAttribute('inputmode', 'decimal')
+  target.appendChild(editor)
 
   assert.equal(
     __TEST_ONLY__.inlineServerPdfStylesheets(root, root.ownerDocument),
@@ -1017,6 +1035,7 @@ test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
   assert.match(inlineStyle.textContent, /margin: 0 auto/)
   assert.doesNotMatch(inlineStyle.textContent, /erp-dashboard-card/)
   assert.doesNotMatch(inlineStyle.textContent, /erp-sidebar-panel/)
+  assert.doesNotMatch(inlineStyle.textContent, /127\.0\.0\.1|https?:/)
 
   __TEST_ONLY__.normalizeServerPdfSnapshotRuntimeState(root)
   assert.equal(root.getAttribute('data-erp-theme'), 'light')
@@ -1024,6 +1043,12 @@ test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
   assert.equal(root.style.colorScheme, 'light')
   assert.equal(body.getAttribute('data-erp-theme'), 'light')
   assert.equal(target.getAttribute('class'), 'erp-material-contract-paper')
+  assert.equal(target.getAttribute('contenteditable'), null)
+  assert.equal(target.getAttribute('spellcheck'), null)
+  assert.equal(target.getAttribute('tabindex'), null)
+  assert.equal(editor.getAttribute('accept'), null)
+  assert.equal(editor.getAttribute('autocomplete'), null)
+  assert.equal(editor.getAttribute('inputmode'), null)
   assert.equal(head.querySelector('link'), null)
   assert.doesNotMatch(head.outerHTML, /modulepreload/)
 

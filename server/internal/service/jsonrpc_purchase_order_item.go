@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderItem(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "list_purchase_order_items", "listPurchaseOrderItems":
+	case "list_purchase_order_items":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
 			return id, res, nil
 		}

@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
+	"server/internal/data/model/ent/workflowtask"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -412,6 +413,21 @@ func (_c *ProcessNodeInstanceCreate) SetProcessInstance(v *ProcessInstance) *Pro
 	return _c.SetProcessInstanceID(v.ID)
 }
 
+// AddWorkflowTaskIDs adds the "workflow_tasks" edge to the WorkflowTask entity by IDs.
+func (_c *ProcessNodeInstanceCreate) AddWorkflowTaskIDs(ids ...int) *ProcessNodeInstanceCreate {
+	_c.mutation.AddWorkflowTaskIDs(ids...)
+	return _c
+}
+
+// AddWorkflowTasks adds the "workflow_tasks" edges to the WorkflowTask entity.
+func (_c *ProcessNodeInstanceCreate) AddWorkflowTasks(v ...*WorkflowTask) *ProcessNodeInstanceCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddWorkflowTaskIDs(ids...)
+}
+
 // Mutation returns the ProcessNodeInstanceMutation object of the builder.
 func (_c *ProcessNodeInstanceCreate) Mutation() *ProcessNodeInstanceMutation {
 	return _c.mutation
@@ -764,6 +780,22 @@ func (_c *ProcessNodeInstanceCreate) createSpec() (*ProcessNodeInstance, *sqlgra
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.ProcessInstanceID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.WorkflowTasksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   processnodeinstance.WorkflowTasksTable,
+			Columns: []string{processnodeinstance.WorkflowTasksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

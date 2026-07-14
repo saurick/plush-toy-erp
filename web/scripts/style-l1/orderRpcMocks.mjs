@@ -16,6 +16,7 @@ export async function installOrderRpcMocks(page, context) {
       order_date: nowUnix(),
       expected_ship_date: nowUnix() + 86_400,
       lifecycle_status: 'draft',
+      version: 1,
       note: '',
       created_at: nowUnix(),
       updated_at: nowUnix(),
@@ -46,8 +47,18 @@ export async function installOrderRpcMocks(page, context) {
         data = {
           sales_order_items: [salesOrderItem],
           total: 1,
-          limit: 100,
-          offset: 0,
+          limit: Number(params.limit || 50),
+          offset: Number(params.offset || 0),
+        }
+        break
+      case 'save_sales_order_with_items':
+        data = {
+          sales_order: {
+            ...salesOrder,
+            ...params,
+            version: Number(params.expected_version || 0) + 1,
+          },
+          sales_order_items: [salesOrderItem],
         }
         break
       case 'create_sales_order':
@@ -92,6 +103,7 @@ export async function installOrderRpcMocks(page, context) {
       purchase_date: nowUnix(),
       expected_arrival_date: nowUnix() + 86_400 * 7,
       lifecycle_status: 'draft',
+      version: 1,
       note: '',
       created_at: nowUnix(),
       updated_at: nowUnix(),
@@ -128,13 +140,17 @@ export async function installOrderRpcMocks(page, context) {
         data = {
           purchase_order_items: [purchaseOrderItem],
           total: 1,
-          limit: 100,
-          offset: 0,
+          limit: Number(params.limit || 50),
+          offset: Number(params.offset || 0),
         }
         break
       case 'save_purchase_order_with_items':
         data = {
-          purchase_order: { ...purchaseOrder, ...params },
+          purchase_order: {
+            ...purchaseOrder,
+            ...params,
+            version: Number(params.expected_version || 0) + 1,
+          },
           purchase_order_items: [purchaseOrderItem],
         }
         break
@@ -186,6 +202,7 @@ export async function installOrderRpcMocks(page, context) {
       order_date: nowUnix(),
       expected_return_date: nowUnix() + 86_400 * 7,
       lifecycle_status: 'draft',
+      version: 1,
       note: '样式加工合同',
       created_at: nowUnix(),
       updated_at: nowUnix(),
@@ -226,13 +243,17 @@ export async function installOrderRpcMocks(page, context) {
         data = {
           outsourcing_order_items: [outsourcingOrderItem],
           total: 1,
-          limit: 100,
-          offset: 0,
+          limit: Number(params.limit || 50),
+          offset: Number(params.offset || 0),
         }
         break
       case 'save_outsourcing_order_with_items':
         data = {
-          outsourcing_order: { ...outsourcingOrder, ...params },
+          outsourcing_order: {
+            ...outsourcingOrder,
+            ...params,
+            version: Number(params.expected_version || 0) + 1,
+          },
           outsourcing_order_items: [outsourcingOrderItem],
         }
         break

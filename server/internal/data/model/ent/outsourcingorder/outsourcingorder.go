@@ -32,6 +32,8 @@ const (
 	FieldExpectedReturnDate = "expected_return_date"
 	// FieldLifecycleStatus holds the string denoting the lifecycle_status field in the database.
 	FieldLifecycleStatus = "lifecycle_status"
+	// FieldVersion holds the string denoting the version field in the database.
+	FieldVersion = "version"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -72,6 +74,7 @@ var Columns = []string{
 	FieldOrderDate,
 	FieldExpectedReturnDate,
 	FieldLifecycleStatus,
+	FieldVersion,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -100,6 +103,10 @@ var (
 	DefaultLifecycleStatus string
 	// LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
 	LifecycleStatusValidator func(string) error
+	// DefaultVersion holds the default value on creation for the "version" field.
+	DefaultVersion int
+	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	VersionValidator func(int) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -151,6 +158,11 @@ func ByExpectedReturnDate(opts ...sql.OrderTermOption) OrderOption {
 // ByLifecycleStatus orders the results by the lifecycle_status field.
 func ByLifecycleStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldLifecycleStatus, opts...).ToFunc()
+}
+
+// ByVersion orders the results by the version field.
+func ByVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVersion, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

@@ -187,6 +187,28 @@ test('workflowTaskActionSubmitGuard: required reason stops before backend explai
   assert.deepEqual(warnings, ['请先填写退回原因'])
 })
 
+test('workflowTaskActionSubmitGuard: resume requires an unblock explanation', async () => {
+  let explainCalls = 0
+  const warnings = []
+  const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({
+    explainWorkflowActionAccess: async () => {
+      explainCalls += 1
+      return { actions: [{ action_key: 'resume', allowed: true }] }
+    },
+  })
+
+  const allowed = await verifyWorkflowTaskActionAccessBeforeSubmit({
+    task: { id: 42 },
+    actionKey: 'resume',
+    reason: ' ',
+    onWarning: (message) => warnings.push(message),
+  })
+
+  assert.equal(allowed, false)
+  assert.equal(explainCalls, 0)
+  assert.deepEqual(warnings, ['请先填写阻塞解除说明'])
+})
+
 test('workflowTaskActionSubmitGuard: missing requested backend action denies before submit', async () => {
   const warnings = []
   const { verifyWorkflowTaskActionAccessBeforeSubmit } = loadSubmitGuard({

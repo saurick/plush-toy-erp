@@ -7,72 +7,21 @@ print_help() {
   bash scripts/qa/strict.sh
 
 作用:
-  执行严格质量检查（warning 也视为失败）
+  执行严格质量检查。strict 直接复用 full，保证是 full 的真实超集，
+  再追加零 warning、shell / YAML 格式、扩展浏览器视口和严格漏洞扫描。
 
 检查内容:
-  1) db-guard + secrets
-  2) phase-label-boundaries
-  3) core-boundary
-  4) workflow-fact-boundary
-  5) workflow-ui-action-boundary
-  6) formal-frontend-customer-config-boundary
-  7) customer-config-effective-session-probe（无凭据 get_effective_session 探针边界测试，不执行真实登录）
-  8) admin-profile-sync
-  9) frontend-role-menu-seed-contracts
-  10) dev-entry-config-contracts
-  11) trial-role-entry-docs
-  12) trial-account-rbac（无后端单测 + 浏览器 smoke 输入模板边界测试，不执行真实登录）
-  13) real-login-smoke-shared（真实登录 smoke 共享 URL 凭据边界单测，不执行真实登录）
-  14) mobile-auth-login-route-smoke（输入模板 + URL 凭据边界单测，不启动浏览器）
-  15) purchase-receipt-real-write-browser-e2e（输入模板 + 持久测试数据确认边界，不启动浏览器）
-  16) sales-order-field-chain-boundary
-  17) dev-entry-boundary
-  18) frontend-error-message-boundary
-  19) docs-inventory
-  20) industry-template-boundaries
-  21) private-deployment-boundaries
-  22) customer-web-config-overlay
-  23) deployment-package-lint
-  24) run-smoke-script（CLI + 输入模板 + release gate 兼容报告）
-  25) immutable-version-evidence
-  26) release-evidence-gate
-  27) production-preflight
-  28) backup-restore-rehearsal-script
-  29) rollback-rehearsal-report
-  30) customer-config-manifest-evidence
-  31) customer-config-activation-gate
-  32) customer-config-release-execute
-  33) customer-config-release-readiness（聚合门禁 + 输入模板）
-  34) customer-config-boundaries
-  35) customer-package-lint
-  36) customer-package-preview-boundary
-  37) customer-config-runtime-manifest
-  38) customer-import-tooling
-  39) test-data-isolation-boundary
-  40) manual-acceptance（甲方手工验收数据与写入边界测试）
-  41) trial-simulated-data
-  42) operational-fact-simulated-closure
-  43) mobile-workflow-simulated-closure
-  44) mobile-workflow-runtime-browser-smoke
-  45) purchase-receipt-real-write-e2e（输入模板边界测试，不运行 Go 测试）
-  46) finance-production-browser-e2e（真实后端浏览器脚本 CLI + localhost + 无 mock 边界测试，不启动浏览器）
-  47) mvp-closure
-  48) industry-template-closure
-  49) private-deployment-package-closure
-  50) shellcheck + shfmt（可选）
-  51) web: eslint --max-warnings=0 + stylelint --max-warnings=0 + (可选 test) + build
-  52) server: local PostgreSQL critical transaction gate + go test ./... + make build
-  53) govulncheck（可选，最后运行，避免网络扫描扰动本地数据库并发门禁）
+  full: 全部 full 门禁，浏览器覆盖桌面、手机与平板关键入口
+  shell/yaml: shellcheck + shfmt + yamllint（严格模式）
+  web: eslint + stylelint（零 warning）
+  govulncheck: 严格模式，最后运行
 
 环境变量:
-  SKIP_DB_GUARD=1           跳过 DB 守卫
-  SKIP_SECRETS_SCAN=1       跳过密钥扫描
-  SECRETS_STRICT=1          secrets 命中时阻断
-  STRICT_SKIP_SHELLCHECK=1  跳过 shellcheck
-  STRICT_SKIP_SHFMT=1       跳过 shfmt
-  STRICT_SKIP_GOVULNCHECK=1 跳过 govulncheck
   QA_BASE_RANGE=...         指定 diff 范围供 db-guard/secrets 使用
-  PURCHASE_RECEIPT_PG_DB_URL=...  本地隔离 PostgreSQL 关键事务测试库；只允许防呆脚本接受的本地/test DSN
+
+结果边界:
+  strict 拒绝全部 SKIP_* / STRICT_SKIP_*，先真实完成 full 全部门禁，
+  再执行严格附加项；不存在可由调用者自签的跳过或 coverage receipt。
 USAGE
 }
 
@@ -87,6 +36,26 @@ if [[ $# -gt 0 ]]; then
   exit 1
 fi
 
+for variable in \
+  SKIP_DB_GUARD \
+  SKIP_ERROR_CODE_SYNC \
+  SKIP_ERROR_CODE_GUARD \
+  ERROR_CODE_GUARD_STAGED_ONLY \
+  SKIP_SECRETS_SCAN \
+  SECRETS_STAGED_ONLY \
+  SKIP_GOVULNCHECK \
+  SKIP_SHELLCHECK \
+  SKIP_SHFMT \
+  SKIP_YAMLLINT \
+  STRICT_SKIP_SHELLCHECK \
+  STRICT_SKIP_SHFMT \
+  STRICT_SKIP_GOVULNCHECK; do
+  if [[ -n "${!variable:-}" && "${!variable}" != "0" ]]; then
+    echo "[qa:strict] status=incomplete reason=forbidden_skip variable=$variable"
+    exit 2
+  fi
+done
+
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
@@ -95,6 +64,8 @@ if ! command -v node >/dev/null 2>&1; then
   exit 1
 fi
 
+# ROOT_DIR pins the repository helper; ShellCheck cannot resolve this dynamic path.
+# shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/lib/pnpm.sh"
 require_project_node "$ROOT_DIR"
 PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
@@ -104,374 +75,27 @@ if ! command -v go >/dev/null 2>&1; then
   exit 1
 fi
 
-if [ -x "$ROOT_DIR/scripts/qa/db-guard.sh" ]; then
-  bash "$ROOT_DIR/scripts/qa/db-guard.sh"
-fi
+node "$ROOT_DIR/scripts/qa/gate-profiles.mjs" --profile strict
 
-if [ -x "$ROOT_DIR/scripts/qa/secrets.sh" ]; then
-  bash "$ROOT_DIR/scripts/qa/secrets.sh"
-fi
+echo "[qa:strict] 运行 full 超集基线与扩展浏览器场景"
+QA_BROWSER_SCENARIOS="root-redirect-desktop,root-redirect-mobile,print-center-engineering-preview-tablet" \
+  bash "$ROOT_DIR/scripts/qa/full.sh"
 
-if [ -f "$ROOT_DIR/scripts/qa/core-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行 core 边界测试"
-  node --test "$ROOT_DIR/scripts/qa/core-boundary.test.mjs"
-fi
+SHELLCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/shellcheck.sh"
 
-if [ -f "$ROOT_DIR/scripts/qa/workflow-fact-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行 Workflow / Fact 边界测试"
-  node --test "$ROOT_DIR/scripts/qa/workflow-fact-boundary.test.mjs"
-fi
+SHFMT_STRICT=1 SHFMT_CHECK=1 bash "$ROOT_DIR/scripts/qa/shfmt.sh"
 
-if [ -f "$ROOT_DIR/scripts/qa/workflow-ui-action-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行 Workflow UI action 边界测试"
-  node --test "$ROOT_DIR/scripts/qa/workflow-ui-action-boundary.test.mjs"
-fi
+YAMLLINT_STRICT=1 YAMLLINT_ALL=1 bash "$ROOT_DIR/scripts/qa/yamllint.sh"
 
-if [ -f "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行正式前端客户配置投影边界测试"
-  node --test "$ROOT_DIR/scripts/qa/formal-frontend-customer-config-boundary.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs" ]; then
-  if [ -f "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.test.mjs" ]; then
-    echo "[qa:strict] 运行客户配置 effective session 无凭据探针边界测试"
-    node --test "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.test.mjs"
-  fi
-  echo "[qa:strict] 运行客户配置 effective session 无凭据探针语法检查"
-  node --check "$ROOT_DIR/scripts/qa/customer-config-effective-session-probe.mjs"
-fi
-
-if [ -f "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs" ]; then
-  echo "[qa:strict] 运行前端菜单投影同步边界测试"
-  node --test "$ROOT_DIR/web/src/erp/utils/adminProfileSync.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/web/src/erp/config/entryConfig.test.mjs" ]; then
-  echo "[qa:strict] 运行角色菜单与入口配置合同测试"
-  node --test \
-    "$ROOT_DIR/web/src/erp/config/entryConfig.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/menuPermissions.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/seedData.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/workflowStatus.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/web/src/erp/config/devTesting.test.mjs" ]; then
-  echo "[qa:strict] 运行开发入口配置合同测试"
-  node --test \
-    "$ROOT_DIR/web/src/erp/config/devHub.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/devTesting.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/devDocs.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/devGovernance.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/devPrototypes.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/devCapabilityLedger.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/devCustomerConfig.test.mjs" \
-    "$ROOT_DIR/web/src/erp/config/printTemplates.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/trial-role-entry-docs.test.mjs" ]; then
-  echo "[qa:strict] 运行试用角色入口文档边界测试"
-  node --test "$ROOT_DIR/scripts/qa/trial-role-entry-docs.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs" ]; then
-  if [ -f "$ROOT_DIR/scripts/qa/trial-account-rbac.test.mjs" ]; then
-    echo "[qa:strict] 运行试用账号 RBAC 边界单测"
-    node --test "$ROOT_DIR/scripts/qa/trial-account-rbac.test.mjs"
-  fi
-  echo "[qa:strict] 运行试用账号 RBAC 脚本语法检查"
-  node --check "$ROOT_DIR/scripts/qa/trial-account-rbac.mjs"
-fi
-
-if [ -f "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs" ]; then
-  if [ -f "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.test.mjs" ]; then
-    echo "[qa:strict] 运行试用账号浏览器 smoke 输入模板边界测试"
-    node --test "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.test.mjs"
-  fi
-  echo "[qa:strict] 运行试用账号浏览器 smoke 脚本语法检查"
-  node --check "$ROOT_DIR/web/scripts/trialDemoAccountBrowserSmoke.mjs"
-fi
-
-if [ -f "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs" ]; then
-  echo "[qa:strict] 运行真实登录 smoke 共享 URL 边界测试"
-  node --test "$ROOT_DIR/web/scripts/realLoginSmokeShared.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs" ]; then
-  echo "[qa:strict] 运行岗位任务端认证回跳 smoke 边界测试"
-  node --test "$ROOT_DIR/web/scripts/mobileAuthLoginRouteSmoke.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs" ]; then
-  echo "[qa:strict] 运行采购入库真实写入浏览器 e2e 边界测试"
-  node --test "$ROOT_DIR/web/scripts/purchaseReceiptRealWriteBrowserE2E.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/sales-order-field-chain-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行销售订单字段链路边界测试"
-  node --test "$ROOT_DIR/scripts/qa/sales-order-field-chain-boundary.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/dev-entry-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行开发验收入口边界测试"
-  node --test "$ROOT_DIR/scripts/qa/dev-entry-boundary.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行正式前端错误提示边界测试"
-  node --test "$ROOT_DIR/scripts/qa/frontend-error-message-boundary.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/docs-inventory.test.mjs" ]; then
-  echo "[qa:strict] 运行文档清单登记测试"
-  node --test "$ROOT_DIR/scripts/qa/docs-inventory.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs" ]; then
-  echo "[qa:strict] 运行活跃路径阶段编号命名边界检查"
-  node "$ROOT_DIR/scripts/qa/phase-label-boundaries.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/phase-label-boundaries.test.mjs" ]; then
-  echo "[qa:strict] 运行阶段编号命名边界测试"
-  node --test "$ROOT_DIR/scripts/qa/phase-label-boundaries.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs" ]; then
-  echo "[qa:strict] 运行行业模板候选边界检查"
-  node "$ROOT_DIR/scripts/qa/industry-template-boundaries.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs" ]; then
-  echo "[qa:strict] 运行多客户私有化复制边界检查"
-  node "$ROOT_DIR/scripts/qa/private-deployment-boundaries.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/build/apply-customer-web-config.test.mjs" ]; then
-  echo "[qa:strict] 运行客户前端配置 overlay 脚本测试"
-  node --test "$ROOT_DIR/scripts/build/apply-customer-web-config.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" ]; then
-  echo "[qa:strict] 运行客户私有化部署资料包检查"
-  node "$ROOT_DIR/scripts/deploy/deployment-package-lint.mjs" --customer yoyoosun
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs" ]; then
-  echo "[qa:strict] 运行客户私有化部署资料包检查测试"
-  node --test "$ROOT_DIR/scripts/deploy/deployment-package-lint.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/run-smoke-script.test.mjs" ]; then
-  echo "[qa:strict] 运行 smoke 脚本测试"
-  node --test "$ROOT_DIR/scripts/deploy/run-smoke-script.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/immutable-version-evidence.test.mjs" ]; then
-  echo "[qa:strict] 运行 immutable version evidence 写入器测试"
-  node --test "$ROOT_DIR/scripts/deploy/immutable-version-evidence.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/release-evidence-gate.test.mjs" ]; then
-  echo "[qa:strict] 运行 yoyoosun 发布证据门禁测试"
-  node --test "$ROOT_DIR/scripts/deploy/release-evidence-gate.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/release-evidence-status.test.mjs" ]; then
-  echo "[qa:strict] 运行 release evidence 状态检查脚本测试"
-  node --test "$ROOT_DIR/scripts/deploy/release-evidence-status.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/production-preflight.test.mjs" ]; then
-  echo "[qa:strict] 运行生产发布 preflight 测试"
-  node --test "$ROOT_DIR/scripts/deploy/production-preflight.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/migrate-online.test.mjs" ]; then
-  echo "[qa:strict] 运行线上 migration 整段串行锁测试"
-  node --test "$ROOT_DIR/scripts/deploy/migrate-online.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/backup-restore-rehearsal-script.test.mjs" ]; then
-  echo "[qa:strict] 运行备份恢复演练脚本测试"
-  node --test "$ROOT_DIR/scripts/deploy/backup-restore-rehearsal-script.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/rollback-rehearsal-report.test.mjs" ]; then
-  echo "[qa:strict] 运行回滚演练报告生成器测试"
-  node --test "$ROOT_DIR/scripts/deploy/rollback-rehearsal-report.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/customer-config-manifest-evidence.test.mjs" ]; then
-  echo "[qa:strict] 运行客户配置 manifest evidence 生成器测试"
-  node --test "$ROOT_DIR/scripts/deploy/customer-config-manifest-evidence.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/customer-config-activation-gate.test.mjs" ]; then
-  echo "[qa:strict] 运行客户配置激活证据门禁测试"
-  node --test "$ROOT_DIR/scripts/deploy/customer-config-activation-gate.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/customer-config-release-execute.test.mjs" ]; then
-  echo "[qa:strict] 运行客户配置发布执行器测试"
-  node --test "$ROOT_DIR/scripts/deploy/customer-config-release-execute.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/deploy/customer-config-release-readiness.test.mjs" ]; then
-  echo "[qa:strict] 运行客户配置发布就绪聚合门禁测试"
-  node --test "$ROOT_DIR/scripts/deploy/customer-config-release-readiness.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs" ]; then
-  echo "[qa:strict] 运行客户配置草案边界检查"
-  node "$ROOT_DIR/scripts/qa/customer-config-boundaries.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" ]; then
-  echo "[qa:strict] 运行客户配置包结构检查"
-  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer demo
-  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer demo --mode compile
-  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer yoyoosun
-  node "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" --customer yoyoosun --mode compile
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/customer-package-lint.test.mjs" ]; then
-  echo "[qa:strict] 运行客户配置包结构检查测试"
-  node --test "$ROOT_DIR/scripts/qa/customer-package-lint.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/customer-package-preview-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行客户配置包 preview-only 边界测试"
-  node --test "$ROOT_DIR/scripts/qa/customer-package-preview-boundary.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" ]; then
-  echo "[qa:strict] 运行客户配置运行时 manifest 检查"
-  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer demo
-  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer demo --mode compile
-  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer yoyoosun
-  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer yoyoosun --mode compile
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.test.mjs" ]; then
-  echo "[qa:strict] 运行客户配置运行时 manifest 测试"
-  node --test "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.test.mjs"
-fi
-
-if ls "$ROOT_DIR"/scripts/import/*.test.mjs >/dev/null 2>&1; then
-  echo "[qa:strict] 运行客户导入工具测试"
-  for test_file in "$ROOT_DIR"/scripts/import/*.test.mjs; do
-    node --test "$test_file"
-  done
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs" ]; then
-  echo "[qa:strict] 运行测试业务数据隔离边界守卫"
-  node --test "$ROOT_DIR/scripts/qa/test-data-isolation-boundary.test.mjs"
-fi
-
-manual_acceptance_tests=("$ROOT_DIR"/scripts/qa/manual-acceptance-*.test.mjs)
-if [ -f "${manual_acceptance_tests[0]}" ]; then
-  echo "[qa:strict] 运行甲方手工验收数据与写入边界测试"
-  node --test "${manual_acceptance_tests[@]}"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs" ]; then
-  echo "[qa:strict] 运行试用模拟数据工具测试"
-  node --test "$ROOT_DIR/scripts/qa/trial-simulated-data.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行 业务事实模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/operational-fact-simulated-closure.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行岗位任务端模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/mobile-workflow-simulated-closure.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs" ]; then
-  echo "[qa:strict] 运行岗位任务端真实浏览器模拟任务回归边界测试"
-  node --test "$ROOT_DIR/scripts/qa/mobile-workflow-runtime-browser-smoke.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs" ]; then
-  echo "[qa:strict] 运行采购入库服务层真实写入 e2e 边界测试"
-  node --test "$ROOT_DIR/scripts/qa/purchase-receipt-real-write-e2e.test.mjs"
-fi
-
-browser_e2e_contract_tests=(
-  "$ROOT_DIR/scripts/qa/finance-cancellation-browser-e2e.test.mjs"
-  "$ROOT_DIR/scripts/qa/production-order-browser-e2e.test.mjs"
-)
-if [ -f "${browser_e2e_contract_tests[0]}" ] && [ -f "${browser_e2e_contract_tests[1]}" ]; then
-  echo "[qa:strict] 运行财务取消与生产订单真实后端浏览器脚本边界测试"
-  node --test "${browser_e2e_contract_tests[@]}"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs" ]; then
-  echo "[qa:strict] 运行 PostgreSQL 关键事务门禁合同测试"
-  node --test "$ROOT_DIR/scripts/qa/critical-postgres-gate.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/production-order-api-runtime.test.mjs" ]; then
-  echo "[qa:strict] 运行生产订单 API/RBAC runtime 合同测试"
-  node --test "$ROOT_DIR/scripts/qa/production-order-api-runtime.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行 ERP MVP 闭环验收工具测试"
-  node --test "$ROOT_DIR/scripts/qa/mvp-closure.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行行业模板模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/industry-template-closure.test.mjs"
-fi
-
-if [ -f "$ROOT_DIR/scripts/qa/private-deployment-package-closure.test.mjs" ]; then
-  echo "[qa:strict] 运行多客户私有化复制模拟闭环工具测试"
-  node --test "$ROOT_DIR/scripts/qa/private-deployment-package-closure.test.mjs"
-fi
-
-if [[ "${STRICT_SKIP_SHELLCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shellcheck.sh" ]; then
-  SHELLCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/shellcheck.sh"
-fi
-
-if [[ "${STRICT_SKIP_SHFMT:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/shfmt.sh" ]; then
-  SHFMT_STRICT=1 SHFMT_CHECK=1 bash "$ROOT_DIR/scripts/qa/shfmt.sh"
-fi
-
-echo "[qa:strict] 运行 web 严格检查"
+echo "[qa:strict] 运行 web 零 warning 检查"
 (
   cd "$ROOT_DIR/web"
   "$PNPM_BIN" exec eslint --max-warnings=0 --ext .js --ext .jsx src/
   "$PNPM_BIN" exec stylelint "src/**/*.{css,scss,sass}" --max-warnings=0
-
-  # 兼容仓库差异：只有定义了 test 脚本才执行前端测试。
-  if node -e "const fs=require('fs');const pkg=JSON.parse(fs.readFileSync('package.json','utf8'));process.exit(pkg.scripts&&pkg.scripts.test?0:1)"; then
-    "$PNPM_BIN" test
-  else
-    echo "[qa:strict] web/package.json 未定义 test，跳过前端测试"
-  fi
-
-  "$PNPM_BIN" build
 )
 
-echo "[qa:strict] 运行 server 严格检查"
-(
-  cd "$ROOT_DIR/server"
-  make purchase_receipt_pg_createdb
-  make purchase_receipt_migrate_apply
-  make critical_transactions_pg_test
-  go test ./...
-  make build
-)
+# strict 末尾重复严格漏洞扫描，确保严格附加项完成后仍无漏洞阻断；
+# full 自身已经真实执行其固定 govulncheck，未借此跳过任何 full gate。
+GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
 
-# govulncheck 可能走外部网络，放在所有本地编译与 PostgreSQL 门禁之后，
-# 避免代理或系统网络异常占满本地端口时误报业务并发失败。
-if [[ "${STRICT_SKIP_GOVULNCHECK:-0}" != "1" ]] && [ -x "$ROOT_DIR/scripts/qa/govulncheck.sh" ]; then
-  GOVULNCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/govulncheck.sh"
-fi
-
-echo "[qa:strict] 全部通过"
+echo "[qa:strict] status=complete 全部门禁通过"

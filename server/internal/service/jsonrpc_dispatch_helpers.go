@@ -50,6 +50,10 @@ func isSensitiveRPCParamKey(key string) bool {
 	return strings.Contains(normalized, "password") ||
 		strings.Contains(normalized, "token") ||
 		strings.Contains(normalized, "secret") ||
+		strings.Contains(normalized, "username") ||
+		strings.Contains(normalized, "phone") ||
+		normalized == "reason" ||
+		strings.HasSuffix(normalized, "_reason") ||
 		strings.Contains(normalized, "idempotency_key") ||
 		strings.Contains(normalized, "intent_hash") ||
 		strings.Contains(normalized, "base64") ||

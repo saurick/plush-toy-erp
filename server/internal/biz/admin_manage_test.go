@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"slices"
 	"strings"
@@ -15,14 +16,20 @@ import (
 )
 
 type stubAdminManageRepo struct {
-	adminsByID    map[int]*AdminUser
-	adminsByName  map[string]*AdminUser
-	adminsByPhone map[string]*AdminUser
-	customRoles   map[string]AdminRole
-	rolePerms     map[string][]string
-	auditEvents   []RuntimeAuditEvent
-	nextID        int
+	adminsByID           map[int]*AdminUser
+	adminsByName         map[string]*AdminUser
+	adminsByPhone        map[string]*AdminUser
+	customRoles          map[string]AdminRole
+	rolePerms            map[string][]string
+	roleVersions         map[string]int
+	auditEvents          []RuntimeAuditEvent
+	nextID               int
+	getAdminByIDCalls    int
+	getAdminByIDErrAfter int
+	getAdminByIDErr      error
 }
+
+var _ AdminManageRepo = (*stubAdminManageRepo)(nil)
 
 func newStubAdminManageRepo() *stubAdminManageRepo {
 	return &stubAdminManageRepo{
@@ -31,6 +38,7 @@ func newStubAdminManageRepo() *stubAdminManageRepo {
 		adminsByPhone: map[string]*AdminUser{},
 		customRoles:   map[string]AdminRole{},
 		rolePerms:     map[string][]string{},
+		roleVersions:  map[string]int{},
 		auditEvents:   []RuntimeAuditEvent{},
 		nextID:        10,
 	}
@@ -62,6 +70,8 @@ func (r *stubAdminManageRepo) roleByKey(roleKey string) AdminRole {
 				Builtin:     role.Builtin,
 				Disabled:    role.Disabled,
 				SortOrder:   role.SortOrder,
+				Type:        role.Type,
+				Version:     max(role.Version, r.roleVersions[role.Key]),
 				Permissions: NormalizePermissionKeys(permissions),
 			}
 		}
@@ -83,6 +93,10 @@ func (r *stubAdminManageRepo) addCustomRole(role AdminRole) {
 		return
 	}
 	role.Builtin = false
+	role.Type = NormalizeRoleType(role.Type, role.Key, role.Builtin)
+	if role.Version <= 0 {
+		role.Version = 1
+	}
 	role.Permissions = NormalizePermissionKeys(role.Permissions)
 	r.customRoles[role.Key] = role
 }
@@ -125,6 +139,13 @@ func (r *stubAdminManageRepo) applyAdminRoles(admin *AdminUser, roleKeys []strin
 }
 
 func (r *stubAdminManageRepo) GetAdminByID(_ context.Context, id int) (*AdminUser, error) {
+	r.getAdminByIDCalls++
+	if r.getAdminByIDErrAfter > 0 && r.getAdminByIDCalls > r.getAdminByIDErrAfter {
+		if r.getAdminByIDErr != nil {
+			return nil, r.getAdminByIDErr
+		}
+		return nil, errors.New("unexpected post-commit admin read")
+	}
 	admin, ok := r.adminsByID[id]
 	if !ok {
 		return nil, ErrAdminNotFound
@@ -156,7 +177,15 @@ func (r *stubAdminManageRepo) ListAdmins(_ context.Context) ([]*AdminUser, error
 	return out, nil
 }
 
-func (r *stubAdminManageRepo) CreateAdmin(_ context.Context, admin *AdminCreate) (*AdminUser, error) {
+func (r *stubAdminManageRepo) CreateAdminWithAudit(ctx context.Context, command *AdminCreateCommand) (*AdminUser, error) {
+	if command == nil || command.Admin == nil {
+		return nil, ErrBadParam
+	}
+	operator, ok := r.adminsByID[command.OperatorID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	admin := command.Admin
 	if _, exists := r.adminsByName[admin.Username]; exists {
 		return nil, ErrAdminExists
 	}
@@ -177,16 +206,45 @@ func (r *stubAdminManageRepo) CreateAdmin(_ context.Context, admin *AdminCreate)
 	if created.Phone != "" {
 		r.adminsByPhone[created.Phone] = created
 	}
+	event, err := BuildAdminControlAuditEvent(
+		operator, "admin_user.create", "admin_user", created.ID, created.Username,
+		nil, AdminAuditUserSnapshot(created),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
+		return nil, err
+	}
 	return r.clone(created), nil
 }
 
-func (r *stubAdminManageRepo) UpdateAdminRoles(_ context.Context, id int, roleKeys []string) error {
-	admin, ok := r.adminsByID[id]
-	if !ok {
-		return ErrAdminNotFound
+func (r *stubAdminManageRepo) SetAdminRolesWithAudit(ctx context.Context, change *AdminRolesChange) (*AdminUser, error) {
+	if change == nil {
+		return nil, ErrBadParam
 	}
-	r.applyAdminRoles(admin, roleKeys)
-	return nil
+	admin, ok := r.adminsByID[change.AdminID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	operator, ok := r.adminsByID[change.OperatorID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	before := AdminAuditUserSnapshot(admin)
+	r.applyAdminRoles(admin, change.RoleKeys)
+	admin.UpdatedAt = time.Now()
+	event, err := BuildAdminControlAuditEvent(
+		operator, "admin_user.roles.set", "admin_user", admin.ID, admin.Username,
+		before, AdminAuditUserSnapshot(admin),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
+		return nil, err
+	}
+	return r.clone(admin), nil
 }
 
 func (r *stubAdminManageRepo) ListRoles(_ context.Context) ([]AdminRole, error) {
@@ -206,13 +264,16 @@ func (r *stubAdminManageRepo) ListPermissions(_ context.Context) ([]AdminPermiss
 	out := make([]AdminPermission, 0, len(defs))
 	for _, permission := range defs {
 		out = append(out, AdminPermission{
-			Key:         permission.Key,
-			Name:        permission.Name,
-			Description: permission.Description,
-			Module:      permission.Module,
-			Action:      permission.Action,
-			Resource:    permission.Resource,
-			Builtin:     permission.Builtin,
+			Key:               permission.Key,
+			Name:              permission.Name,
+			Description:       permission.Description,
+			Module:            permission.Module,
+			Action:            permission.Action,
+			Resource:          permission.Resource,
+			Builtin:           permission.Builtin,
+			Class:             permission.Class,
+			Assignable:        permission.Assignable,
+			NonProductionOnly: permission.NonProductionOnly,
 		})
 	}
 	return out, nil
@@ -226,12 +287,29 @@ func (r *stubAdminManageRepo) GetRoleByKey(_ context.Context, roleKey string) (*
 	return &role, nil
 }
 
-func (r *stubAdminManageRepo) UpdateRolePermissions(_ context.Context, roleKey string, permissionKeys []string) error {
-	role := r.roleByKey(roleKey)
-	if role.Key == "" {
-		return ErrRoleNotFound
+func (r *stubAdminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, change *RolePermissionsChange) (*AdminRole, error) {
+	if change == nil {
+		return nil, ErrBadParam
 	}
-	r.rolePerms[role.Key] = NormalizePermissionKeys(permissionKeys)
+	role := r.roleByKey(change.RoleKey)
+	if role.Key == "" {
+		return nil, ErrRoleNotFound
+	}
+	if role.Version != change.ExpectedVersion {
+		return nil, ErrRoleVersionConflict
+	}
+	operator, ok := r.adminsByID[change.OperatorID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	before := AdminAuditRoleSnapshot(&role)
+	r.rolePerms[role.Key] = NormalizePermissionKeys(change.PermissionKeys)
+	nextVersion := role.Version + 1
+	r.roleVersions[role.Key] = nextVersion
+	if customRole, ok := r.customRoles[role.Key]; ok {
+		customRole.Version = nextVersion
+		r.customRoles[role.Key] = customRole
+	}
 	for _, admin := range r.adminsByID {
 		roleKeys := make([]string, 0, len(admin.Roles))
 		for _, item := range admin.Roles {
@@ -239,22 +317,51 @@ func (r *stubAdminManageRepo) UpdateRolePermissions(_ context.Context, roleKey s
 		}
 		r.applyAdminRoles(admin, roleKeys)
 	}
-	return nil
+	updated := r.roleByKey(role.Key)
+	event, err := BuildAdminControlAuditEvent(
+		operator, "role.permissions.set", "role", updated.ID, updated.Key,
+		before, AdminAuditRoleSnapshot(&updated),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
+		return nil, err
+	}
+	return &updated, nil
 }
 
-func (r *stubAdminManageRepo) UpdateAdminPhone(_ context.Context, id int, phone string) error {
-	admin, ok := r.adminsByID[id]
-	if !ok {
-		return ErrAdminNotFound
+func (r *stubAdminManageRepo) SetAdminPhoneWithAudit(ctx context.Context, change *AdminPhoneChange) (*AdminUser, error) {
+	if change == nil {
+		return nil, ErrBadParam
 	}
+	admin, ok := r.adminsByID[change.AdminID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	operator, ok := r.adminsByID[change.OperatorID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	before := AdminAuditUserSnapshot(admin)
 	if admin.Phone != "" {
 		delete(r.adminsByPhone, admin.Phone)
 	}
-	admin.Phone = phone
-	if phone != "" {
-		r.adminsByPhone[phone] = admin
+	admin.Phone = change.Phone
+	if change.Phone != "" {
+		r.adminsByPhone[change.Phone] = admin
 	}
-	return nil
+	event, err := BuildAdminControlAuditEvent(
+		operator, "admin_user.phone.set", "admin_user", admin.ID, admin.Username,
+		before, AdminAuditUserSnapshot(admin),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
+		return nil, err
+	}
+	return r.clone(admin), nil
 }
 
 func (r *stubAdminManageRepo) UpdateAdminERPColumnOrder(_ context.Context, id int, moduleKey string, order []string) error {
@@ -276,15 +383,24 @@ func (r *stubAdminManageRepo) UpdateAdminERPColumnOrder(_ context.Context, id in
 	return nil
 }
 
-func (r *stubAdminManageRepo) ChangeAdminLifecycle(_ context.Context, change *AdminLifecycleChange) (int, error) {
+func (r *stubAdminManageRepo) ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (*AdminUser, int, error) {
 	if change == nil {
-		return 0, ErrBadParam
+		return nil, 0, ErrBadParam
 	}
 	admin, ok := r.adminsByID[change.AdminID]
 	if !ok {
-		return 0, ErrAdminNotFound
+		return nil, 0, ErrAdminNotFound
 	}
+	operator, ok := r.adminsByID[change.OperatorID]
+	if !ok {
+		return nil, 0, ErrAdminNotFound
+	}
+	if !change.Revoke && admin.Disabled == change.Disabled {
+		return r.clone(admin), 0, nil
+	}
+	before := AdminAuditUserSnapshot(admin)
 	admin.Disabled = change.Disabled
+	admin.AuthVersion++
 	admin.StatusReason = change.Reason
 	now := time.Now()
 	admin.StatusChangedAt = &now
@@ -292,19 +408,48 @@ func (r *stubAdminManageRepo) ChangeAdminLifecycle(_ context.Context, change *Ad
 	if change.Revoke {
 		admin.RevokedAt = &now
 	}
-	if err := r.RecordRuntimeAuditEvent(context.Background(), change.AuditEvent); err != nil {
-		return 0, err
+	action := "admin_user.disabled.set"
+	if change.Revoke {
+		action = "admin_user.revoked"
 	}
-	return 0, nil
+	event, err := BuildAdminControlAuditEvent(
+		operator, action, "admin_user", admin.ID, admin.Username,
+		before, AdminAuditUserSnapshot(admin),
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
+		return nil, 0, err
+	}
+	return r.clone(admin), 0, nil
 }
 
-func (r *stubAdminManageRepo) UpdateAdminPasswordHash(_ context.Context, id int, passwordHash string) error {
-	admin, ok := r.adminsByID[id]
-	if !ok {
-		return ErrAdminNotFound
+func (r *stubAdminManageRepo) ResetAdminPasswordWithAudit(ctx context.Context, reset *AdminPasswordReset) (*AdminUser, error) {
+	if reset == nil {
+		return nil, ErrBadParam
 	}
-	admin.PasswordHash = passwordHash
-	return nil
+	admin, ok := r.adminsByID[reset.AdminID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	operator, ok := r.adminsByID[reset.OperatorID]
+	if !ok {
+		return nil, ErrAdminNotFound
+	}
+	admin.PasswordHash = reset.PasswordHash
+	admin.AuthVersion++
+	event, err := BuildAdminControlAuditEvent(
+		operator, "admin_user.password.reset", "admin_user", admin.ID, admin.Username,
+		map[string]any{"password_reset": false}, map[string]any{"password_reset": true},
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
+		return nil, err
+	}
+	return r.clone(admin), nil
 }
 
 func (r *stubAdminManageRepo) RecordRuntimeAuditEvent(_ context.Context, event *RuntimeAuditEventCreate) error {
@@ -549,6 +694,18 @@ func TestAdminManageUsecase_SetDisabledRequiresReasonAndCannotRestoreRevoked(t *
 	if err != nil || updated.AccountStatus() != AdminAccountStatusSuspended || updated.StatusReason != "临时离岗" {
 		t.Fatalf("unexpected suspended account: %#v err=%v", updated, err)
 	}
+	disabledAuthVersion := updated.AuthVersion
+	disabledAuditCount := len(repo.auditEvents)
+	idempotent, err := uc.SetDisabled(ctx, 2, true, "重复请求不应覆盖")
+	if err != nil {
+		t.Fatalf("idempotent SetDisabled() error = %v", err)
+	}
+	if idempotent.AuthVersion != disabledAuthVersion || idempotent.StatusReason != "临时离岗" {
+		t.Fatalf("idempotent SetDisabled() changed account: %#v", idempotent)
+	}
+	if len(repo.auditEvents) != disabledAuditCount {
+		t.Fatalf("idempotent SetDisabled() audit count = %d, want %d", len(repo.auditEvents), disabledAuditCount)
+	}
 	now := time.Now()
 	repo.adminsByID[2].RevokedAt = &now
 	if _, err := uc.SetDisabled(ctx, 2, false, "恢复"); !errors.Is(err, ErrAdminRevoked) {
@@ -586,7 +743,7 @@ func TestAdminManageUsecase_RevokePreservesIdentityAndAudits(t *testing.T) {
 	}
 }
 
-func TestAdminManageUsecase_SetRolesRejectsSuperAdmin(t *testing.T) {
+func TestAdminManageUsecase_SetRolesRejectsSuperAdminSelfChangeWithStableError(t *testing.T) {
 	repo := newStubAdminManageRepo()
 	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
 	repo.adminsByName["root"] = repo.adminsByID[1]
@@ -599,8 +756,8 @@ func TestAdminManageUsecase_SetRolesRejectsSuperAdmin(t *testing.T) {
 	})
 
 	_, err := uc.SetRoles(ctx, 1, []string{AdminRoleKey})
-	if !errors.Is(err, ErrNoPermission) {
-		t.Fatalf("expected ErrNoPermission, got %v", err)
+	if !errors.Is(err, ErrAdminSelfRoleChangeForbidden) {
+		t.Fatalf("expected ErrAdminSelfRoleChangeForbidden, got %v", err)
 	}
 }
 
@@ -746,9 +903,13 @@ func TestAdminManageUsecase_SetRolePermissionsRecordsAudit(t *testing.T) {
 		Role:     RoleAdmin,
 	})
 
-	_, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionWarehouseInventoryRead})
+	role := repo.roleByKey(WarehouseRoleKey)
+	updated, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionWarehouseInventoryRead}, role.Version)
 	if err != nil {
 		t.Fatalf("SetRolePermissions() error = %v", err)
+	}
+	if updated.Version != role.Version+1 {
+		t.Fatalf("role version = %d, want %d", updated.Version, role.Version+1)
 	}
 	if len(repo.auditEvents) != 1 {
 		t.Fatalf("expected role permission audit event, got %d", len(repo.auditEvents))
@@ -767,10 +928,11 @@ func TestAdminManageUsecase_SetRolePermissionsRejectsUnknownPermission(t *testin
 	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
 	before := append([]string(nil), repo.roleByKey(WarehouseRoleKey).Permissions...)
 
+	role := repo.roleByKey(WarehouseRoleKey)
 	_, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{
 		PermissionWarehouseInventoryRead,
 		"warehouse.inventory.unsupported_action",
-	})
+	}, role.Version)
 	if !errors.Is(err, ErrPermissionNotFound) {
 		t.Fatalf("SetRolePermissions() error = %v, want ErrPermissionNotFound", err)
 	}
@@ -779,6 +941,236 @@ func TestAdminManageUsecase_SetRolePermissionsRejectsUnknownPermission(t *testin
 	}
 	if len(repo.auditEvents) != 0 {
 		t.Fatalf("rejected permission change wrote audit events: %#v", repo.auditEvents)
+	}
+}
+
+func TestAdminManageUsecase_SetRolesRejectsSelfEscalationAndSystemRoles(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "operator"}
+	repo.applyAdminRoles(repo.adminsByID[1], []string{AdminRoleKey})
+	repo.adminsByName["operator"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "manager"}
+	repo.adminsByName["manager"] = repo.adminsByID[2]
+	repo.adminsByID[3] = &AdminUser{ID: 3, Username: "system-operator"}
+	repo.applyAdminRoles(repo.adminsByID[3], []string{AdminRoleKey})
+	repo.adminsByName["system-operator"] = repo.adminsByID[3]
+
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+
+	if _, err := uc.SetRoles(ctx, 1, []string{BossRoleKey}); !errors.Is(err, ErrAdminSelfRoleChangeForbidden) {
+		t.Fatalf("self role change error = %v, want ErrAdminSelfRoleChangeForbidden", err)
+	}
+	repo.adminsByID[4] = &AdminUser{ID: 4, Username: "super", IsSuperAdmin: true}
+	repo.adminsByName["super"] = repo.adminsByID[4]
+	superCtx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 4, Role: RoleAdmin})
+	if _, err := uc.SetRoles(superCtx, 4, []string{BossRoleKey}); !errors.Is(err, ErrAdminSelfRoleChangeForbidden) {
+		t.Fatalf("super self role change error = %v, want ErrAdminSelfRoleChangeForbidden", err)
+	}
+	if _, err := uc.SetRoles(ctx, 2, []string{AdminRoleKey}); !errors.Is(err, ErrPrivilegedRoleAssignmentForbidden) {
+		t.Fatalf("system role assignment error = %v, want ErrPrivilegedRoleAssignmentForbidden", err)
+	}
+	if _, err := uc.SetRoles(ctx, 3, []string{WarehouseRoleKey}); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
+		t.Fatalf("system role target change error = %v, want ErrPrivilegedAdminTargetForbidden", err)
+	}
+	if _, err := uc.SetPhone(ctx, 3, "13800138000"); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
+		t.Fatalf("system role target phone error = %v, want ErrPrivilegedAdminTargetForbidden", err)
+	}
+	if _, err := uc.SetDisabled(ctx, 3, true, "临时停用"); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
+		t.Fatalf("system role target disable error = %v, want ErrPrivilegedAdminTargetForbidden", err)
+	}
+	if _, _, err := uc.Revoke(ctx, 3, "员工离职"); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
+		t.Fatalf("system role target revoke error = %v, want ErrPrivilegedAdminTargetForbidden", err)
+	}
+	if _, err := uc.ResetPassword(ctx, 3, "new-secret"); !errors.Is(err, ErrPrivilegedAdminTargetForbidden) {
+		t.Fatalf("system role target password error = %v, want ErrPrivilegedAdminTargetForbidden", err)
+	}
+	if len(repo.auditEvents) != 0 {
+		t.Fatalf("rejected system target changes wrote audit events: %#v", repo.auditEvents)
+	}
+}
+
+func TestAdminManageUsecase_SuperAdminCanMaintainSystemRoleTarget(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "system-operator", PasswordHash: "old"}
+	repo.applyAdminRoles(repo.adminsByID[2], []string{AdminRoleKey})
+	repo.adminsByName["system-operator"] = repo.adminsByID[2]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+
+	if _, err := uc.SetPhone(ctx, 2, "13800138000"); err != nil {
+		t.Fatalf("super SetPhone(system target) error = %v", err)
+	}
+	if _, err := uc.ResetPassword(ctx, 2, "new-secret"); err != nil {
+		t.Fatalf("super ResetPassword(system target) error = %v", err)
+	}
+	if _, err := uc.SetDisabled(ctx, 2, true, "临时停用"); err != nil {
+		t.Fatalf("super SetDisabled(system target) error = %v", err)
+	}
+	updated, _, err := uc.Revoke(ctx, 2, "员工离职")
+	if err != nil || updated.AccountStatus() != AdminAccountStatusRevoked {
+		t.Fatalf("super Revoke(system target) admin=%#v err=%v", updated, err)
+	}
+}
+
+func TestAdminManageUsecase_LifecycleReturnsTransactionSnapshotWithoutPostCommitRead(t *testing.T) {
+	for _, revoke := range []bool{false, true} {
+		t.Run(fmt.Sprintf("revoke=%t", revoke), func(t *testing.T) {
+			repo := newStubAdminManageRepo()
+			repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+			repo.adminsByName["root"] = repo.adminsByID[1]
+			repo.adminsByID[2] = &AdminUser{ID: 2, Username: "worker"}
+			repo.adminsByName["worker"] = repo.adminsByID[2]
+			repo.getAdminByIDErrAfter = 2
+			repo.getAdminByIDErr = errors.New("sentinel post-commit read")
+			uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+			ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+
+			var updated *AdminUser
+			var err error
+			if revoke {
+				updated, _, err = uc.Revoke(ctx, 2, "员工离职")
+			} else {
+				updated, err = uc.SetDisabled(ctx, 2, true, "临时停用")
+			}
+			if err != nil || updated == nil {
+				t.Fatalf("lifecycle result=%#v err=%v", updated, err)
+			}
+			if repo.getAdminByIDCalls != 2 {
+				t.Fatalf("GetAdminByID calls = %d, want 2 pre-transaction reads", repo.getAdminByIDCalls)
+			}
+		})
+	}
+}
+
+func TestAdminManageUsecase_DebugRoleAssignmentIsNonProductionOnly(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "debugger"}
+	repo.adminsByName["debugger"] = repo.adminsByID[2]
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+
+	production := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	if _, err := production.SetRoles(ctx, 2, []string{DebugOperatorRoleKey}); !errors.Is(err, ErrDebugRoleProductionForbidden) {
+		t.Fatalf("production debug role assignment error = %v, want ErrDebugRoleProductionForbidden", err)
+	}
+
+	development := NewAdminManageUsecase(
+		repo,
+		log.NewStdLogger(io.Discard),
+		tracesdk.NewTracerProvider(),
+		AdminRoleAssignmentContext{Environment: "development"},
+	)
+	updated, err := development.SetRoles(ctx, 2, []string{DebugOperatorRoleKey})
+	if err != nil {
+		t.Fatalf("development debug role assignment error = %v", err)
+	}
+	if !AdminHasRole(updated, DebugOperatorRoleKey) {
+		t.Fatalf("expected debug role in development, got %#v", updated.Roles)
+	}
+}
+
+func TestAdminManageUsecase_SetRolePermissionsEnforcesRoleBoundaryAndVersion(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+
+	adminRole := repo.roleByKey(AdminRoleKey)
+	if _, err := uc.SetRolePermissions(ctx, AdminRoleKey, []string{PermissionWarehouseInventoryRead}, adminRole.Version); !errors.Is(err, ErrSystemRoleImmutable) {
+		t.Fatalf("system role mutation error = %v, want ErrSystemRoleImmutable", err)
+	}
+	warehouseRole := repo.roleByKey(WarehouseRoleKey)
+	if _, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionSystemUserRead}, warehouseRole.Version); !errors.Is(err, ErrPermissionNotDelegable) {
+		t.Fatalf("control-plane permission delegation error = %v, want ErrPermissionNotDelegable", err)
+	}
+	if _, err := uc.SetRolePermissions(ctx, WarehouseRoleKey, []string{PermissionWarehouseInventoryRead}, warehouseRole.Version+1); !errors.Is(err, ErrRoleVersionConflict) {
+		t.Fatalf("stale role version error = %v, want ErrRoleVersionConflict", err)
+	}
+	if len(repo.auditEvents) != 0 {
+		t.Fatalf("rejected permission changes wrote audit events: %#v", repo.auditEvents)
+	}
+}
+
+func TestAdminManageUsecase_SetRolePermissionsRejectsOwnBusinessRole(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "operator"}
+	repo.applyAdminRoles(repo.adminsByID[1], []string{AdminRoleKey, WarehouseRoleKey})
+	repo.adminsByName["operator"] = repo.adminsByID[1]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+	warehouseRole := repo.roleByKey(WarehouseRoleKey)
+
+	if _, err := uc.SetRolePermissions(
+		ctx,
+		WarehouseRoleKey,
+		[]string{PermissionWarehouseInventoryRead, PermissionPurchaseOrderRead},
+		warehouseRole.Version,
+	); !errors.Is(err, ErrAdminSelfRolePermissionForbidden) {
+		t.Fatalf("own business role permission change error = %v, want ErrAdminSelfRolePermissionForbidden", err)
+	}
+	if len(repo.auditEvents) != 0 {
+		t.Fatalf("rejected own-role permission change wrote audit events: %#v", repo.auditEvents)
+	}
+}
+
+func TestAdminManageUsecase_ListRolesWithAccessUsesCurrentAdminAndEnvironment(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	repo.adminsByID[2] = &AdminUser{ID: 2, Username: "operator"}
+	repo.applyAdminRoles(repo.adminsByID[2], []string{AdminRoleKey, SalesRoleKey})
+	repo.adminsByName["operator"] = repo.adminsByID[2]
+	repo.addCustomRole(AdminRole{
+		Key:         "legacy_polluted_role",
+		Name:        "待修复角色",
+		Permissions: []string{PermissionSystemUserRead},
+	})
+
+	production := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	superContext := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+	_, superAccess, err := production.ListRolesWithAccess(superContext)
+	if err != nil {
+		t.Fatalf("ListRolesWithAccess(super) error = %v", err)
+	}
+	if !superAccess[AdminRoleKey].Assignable || superAccess[AdminRoleKey].PermissionsEditable {
+		t.Fatalf("super admin system-role access = %#v", superAccess[AdminRoleKey])
+	}
+	if superAccess[DebugOperatorRoleKey].Assignable || superAccess[DebugOperatorRoleKey].AssignmentBlockedReason == "" {
+		t.Fatalf("production debug-role access = %#v", superAccess[DebugOperatorRoleKey])
+	}
+
+	operatorContext := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 2, Role: RoleAdmin})
+	_, operatorAccess, err := production.ListRolesWithAccess(operatorContext)
+	if err != nil {
+		t.Fatalf("ListRolesWithAccess(operator) error = %v", err)
+	}
+	if operatorAccess[AdminRoleKey].Assignable {
+		t.Fatalf("non-super system-role access = %#v", operatorAccess[AdminRoleKey])
+	}
+	if !operatorAccess[SalesRoleKey].Assignable || operatorAccess[SalesRoleKey].PermissionsEditable {
+		t.Fatalf("operator own business-role access = %#v", operatorAccess[SalesRoleKey])
+	}
+	if operatorAccess["legacy_polluted_role"].Assignable || !operatorAccess["legacy_polluted_role"].PermissionsEditable {
+		t.Fatalf("legacy polluted role access = %#v", operatorAccess["legacy_polluted_role"])
+	}
+
+	development := NewAdminManageUsecase(
+		repo,
+		log.NewStdLogger(io.Discard),
+		tracesdk.NewTracerProvider(),
+		AdminRoleAssignmentContext{Environment: "dev"},
+	)
+	_, developmentAccess, err := development.ListRolesWithAccess(superContext)
+	if err != nil {
+		t.Fatalf("ListRolesWithAccess(development) error = %v", err)
+	}
+	if !developmentAccess[DebugOperatorRoleKey].Assignable {
+		t.Fatalf("development debug-role access = %#v", developmentAccess[DebugOperatorRoleKey])
 	}
 }
 
@@ -802,6 +1194,16 @@ func TestAdminManageUsecase_SetPhoneRejectsDuplicatePhone(t *testing.T) {
 	_, err := uc.SetPhone(ctx, 2, "13800138000")
 	if !errors.Is(err, ErrAdminPhoneExists) {
 		t.Fatalf("expected ErrAdminPhoneExists, got %v", err)
+	}
+}
+
+func TestAdminAuditUserSnapshotMasksPhone(t *testing.T) {
+	snapshot := AdminAuditUserSnapshot(&AdminUser{ID: 2, Username: "worker", Phone: "13800138000"})
+	if snapshot["phone"] != "138****8000" {
+		t.Fatalf("masked phone = %#v, want 138****8000", snapshot["phone"])
+	}
+	if strings.Contains(fmt.Sprint(snapshot), "13800138000") {
+		t.Fatalf("audit snapshot exposed raw phone: %#v", snapshot)
 	}
 }
 

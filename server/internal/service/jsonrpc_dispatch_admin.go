@@ -75,12 +75,15 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		username := getString(pm, "username")
 		phone := getString(pm, "phone")
 		password := getString(pm, "password")
+		if biz.ValidateAdminPassword(password) != nil {
+			return id, invalidAdminPasswordResult(), nil
+		}
 		roleKeys, ok := getStrictStringSlice(pm, "role_keys", false)
 		if !ok {
 			return id, invalidAdminParamResult(), nil
 		}
 		if len(biz.NormalizeAdminRoleKeys(roleKeys)) > 0 {
-			if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+			if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRoleAssign); res != nil {
 				return id, res, nil
 			}
 		}
@@ -99,13 +102,16 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		}, nil
 
 	case "rbac_options", "menu_options":
-		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSystemRoleRead, biz.PermissionSystemPermissionRead); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRoleRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemPermissionRead); res != nil {
 			return id, res, nil
 		}
 		if res := rejectUnknownAdminParams(pm); res != nil {
 			return id, res, nil
 		}
-		roles, err := d.adminManageUC.ListRoles(ctx)
+		roles, roleAccess, err := d.adminManageUC.ListRolesWithAccess(ctx)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -117,17 +123,17 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"roles":              roleOptionsToAny(roles),
+				"roles":              roleOptionsToAny(roles, roleAccess),
 				"permissions":        permissionOptionsToAny(permissions),
 				"menus":              menuOptionsToAny(biz.BuiltinAdminMenus()),
-				"role_options":       roleOptionsToAny(roles),
+				"role_options":       roleOptionsToAny(roles, roleAccess),
 				"permission_options": permissionOptionsToAny(permissions),
 				"menu_options":       menuOptionsToAny(biz.BuiltinAdminMenus()),
 			}),
 		}, nil
 
 	case "set_roles":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserRoleAssign); res != nil {
 			return id, res, nil
 		}
 		if res := rejectUnknownAdminParams(pm, "id", "role_keys"); res != nil {
@@ -151,17 +157,21 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		}, nil
 
 	case "set_role_permissions":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemPermissionManage); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRolePermissionManage); res != nil {
 			return id, res, nil
 		}
-		if res := rejectUnknownAdminParams(pm, "role_key", "permission_keys"); res != nil {
+		if res := rejectUnknownAdminParams(pm, "role_key", "permission_keys", "expected_version"); res != nil {
 			return id, res, nil
 		}
 		permissionKeys, ok := getStrictStringSlice(pm, "permission_keys", true)
 		if !ok {
 			return id, invalidAdminParamResult(), nil
 		}
-		role, err := d.adminManageUC.SetRolePermissions(ctx, getString(pm, "role_key"), permissionKeys)
+		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		role, err := d.adminManageUC.SetRolePermissions(ctx, getString(pm, "role_key"), permissionKeys, expectedVersion)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -169,15 +179,7 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"role": map[string]any{
-					"id":          role.ID,
-					"role_key":    role.Key,
-					"name":        role.Name,
-					"description": role.Description,
-					"builtin":     role.Builtin,
-					"disabled":    role.Disabled,
-					"sort_order":  role.SortOrder,
-				},
+				"role": adminRoleToMap(*role, true),
 			}),
 		}, nil
 
@@ -326,8 +328,11 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		}
 		adminID := getInt(pm, "id", 0)
 		password := getString(pm, "password")
-		if adminID <= 0 || len(password) < 6 {
+		if adminID <= 0 {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if biz.ValidateAdminPassword(password) != nil {
+			return id, invalidAdminPasswordResult(), nil
 		}
 		admin, err := d.adminManageUC.ResetPassword(ctx, adminID, password)
 		if err != nil {
@@ -346,6 +351,17 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			Code:    errcode.UnknownMethod.Code,
 			Message: fmt.Sprintf("未知管理员接口 method=%s", method),
 		}, nil
+	}
+}
+
+func invalidAdminPasswordResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code: errcode.InvalidParam.Code,
+		Message: fmt.Sprintf(
+			"密码至少 %d 位，且不能超过 %d 字节",
+			biz.AdminPasswordMinLength,
+			biz.AdminPasswordMaxBytes,
+		),
 	}
 }
 
@@ -388,6 +404,30 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 	case errors.Is(err, biz.ErrPermissionNotFound):
 		l.Warnf("[admin] permission not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "权限不存在"}
+	case errors.Is(err, biz.ErrAdminSelfRoleChangeForbidden):
+		l.Warnf("[admin] self role change denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能修改当前登录账号的角色"}
+	case errors.Is(err, biz.ErrAdminSelfRolePermissionForbidden):
+		l.Warnf("[admin] own role permission change denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "不能修改当前登录账号正在使用的角色权限"}
+	case errors.Is(err, biz.ErrPrivilegedRoleAssignmentForbidden):
+		l.Warnf("[admin] privileged role assignment denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该角色受系统保护，当前账号不能分配"}
+	case errors.Is(err, biz.ErrPrivilegedAdminTargetForbidden):
+		l.Warnf("[admin] privileged admin target denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "该系统账号受保护，只有超级管理员可以维护"}
+	case errors.Is(err, biz.ErrSystemRoleImmutable):
+		l.Warnf("[admin] system role mutation denied err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "产品系统角色只能查看，不能修改权限"}
+	case errors.Is(err, biz.ErrPermissionNotDelegable):
+		l.Warnf("[admin] permission not delegable err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该权限不能分配给业务角色"}
+	case errors.Is(err, biz.ErrDebugRoleProductionForbidden):
+		l.Warnf("[admin] debug role rejected by environment err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前环境不能分配调试角色"}
+	case errors.Is(err, biz.ErrRoleVersionConflict):
+		l.Warnf("[admin] role version conflict err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: "角色权限刚刚发生变化，请刷新后重试"}
 	case errors.Is(err, biz.ErrRoleExists):
 		l.Warnf("[admin] role exists err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "角色已存在"}

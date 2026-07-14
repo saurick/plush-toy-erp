@@ -17,7 +17,7 @@
 | 规划下一轮产品实现 | [产品完成路线图](product/产品完成路线图.md) | [产品台账索引](product/产品台账索引.md)、[模块实施治理](product/模块实施治理.md)、对应目录 README |
 | 改菜单、页面、原型或信息密度 | [web/README.md](../web/README.md)、[产品原型资产](product/prototypes/README.md) | 对应原型 README、真实运行页、[正式产品入口与菜单配置计划](product/正式产品入口与菜单配置计划.md) |
 | 改 Workflow、状态或 Fact 边界 | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test |
-| 改客户资料、导入或交付资料 | [客户资料入口](customers/README.md)、[yoyoosun 客户资料](customers/yoyoosun/README.md) | [客户交付矩阵](customers/yoyoosun/客户交付矩阵.md)、[客户差异台账](customers/yoyoosun/客户差异台账.md)、[source-manifest.json](customers/yoyoosun/source-manifest.json)、对应脚本说明 |
+| 改客户资料、导入或交付资料 | [新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户资料入口](customers/README.md) | [标准样例客户](customers/reference-customer/README.md)、目标客户 README / 差异台账 / 交付矩阵、对应脚本说明；私密 manifest 与原件不在 Product Core |
 | 改部署、发布或低配运行口径 | [部署约定](部署约定.md) | [server/deploy/README.md](../server/deploy/README.md)、[prod Compose README](../server/deploy/compose/prod/README.md)、[scripts/README.md](../scripts/README.md) |
 | 查全量 Markdown 在哪里 | [文档清单](文档清单.md) | 最近目录 README、`rg` 搜索和当前代码 |
 

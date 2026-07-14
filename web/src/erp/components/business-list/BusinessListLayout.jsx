@@ -2,6 +2,7 @@ import React from 'react'
 
 import {
   CalendarOutlined,
+  MoreOutlined,
   RollbackOutlined,
   SearchOutlined,
 } from '@ant-design/icons'
@@ -9,8 +10,12 @@ import {
   Button,
   Card,
   DatePicker,
+  Drawer,
+  Dropdown,
   Empty,
+  Grid,
   Input,
+  Popconfirm,
   Popover,
   Select,
   Space,
@@ -37,8 +42,272 @@ const BUSINESS_TABLE_DEFAULT_SCROLL_X = 960
 const BUSINESS_TABLE_DEFAULT_COLUMN_WIDTH = 160
 const BUSINESS_TABLE_MIN_COLUMN_WIDTH = 88
 const BUSINESS_TABLE_SELECTION_COLUMN_WIDTH = 52
+const PHONE_SELECTION_ACTION_LIMIT = 1
+const TABLET_SELECTION_ACTION_LIMIT = 2
 function joinClassNames(...items) {
   return items.filter(Boolean).join(' ')
+}
+
+function flattenSelectionActions(children) {
+  const actions = []
+
+  React.Children.forEach(children, (child) => {
+    if (React.isValidElement(child) && child.type === React.Fragment) {
+      actions.push(...flattenSelectionActions(child.props.children))
+      return
+    }
+    if (child != null && child !== false) actions.push(child)
+  })
+
+  return actions
+}
+
+function inspectSelectionAction(action) {
+  if (!React.isValidElement(action)) {
+    return { actionable: false, enabled: false, score: -1 }
+  }
+
+  if (action.type === Tag) {
+    return { actionable: false, enabled: false, score: -1 }
+  }
+
+  if (action.type === Button) {
+    const enabled =
+      action.props.disabled !== true && action.props.loading !== true
+    if (action.props.type === 'primary') {
+      return { actionable: true, enabled, score: 100 }
+    }
+    if (action.props.danger) {
+      return { actionable: true, enabled, score: 10 }
+    }
+    if (action.props.type === 'link') {
+      return { actionable: true, enabled, score: 0 }
+    }
+    return { actionable: true, enabled, score: 40 }
+  }
+
+  const nestedActions = flattenSelectionActions(action.props.children)
+    .map(inspectSelectionAction)
+    .filter((item) => item.actionable)
+  if (nestedActions.length > 0) {
+    const enabledNestedActions = nestedActions.filter((item) => item.enabled)
+    const rankedNestedActions =
+      enabledNestedActions.length > 0 ? enabledNestedActions : nestedActions
+    const nestedScore = Math.max(
+      ...rankedNestedActions.map((item) => item.score)
+    )
+    return {
+      actionable: true,
+      enabled:
+        action.props.disabled !== true && enabledNestedActions.length > 0,
+      score: action.type === Dropdown ? Math.min(nestedScore, 30) : nestedScore,
+    }
+  }
+
+  // Shared action components such as the attachment button expose their
+  // interaction internally, so keep them as normal-priority actions.
+  if (typeof action.type === 'function' || typeof action.type === 'object') {
+    return {
+      actionable: true,
+      enabled: action.props.disabled !== true && action.props.loading !== true,
+      score: 30,
+    }
+  }
+
+  return { actionable: false, enabled: false, score: -1 }
+}
+
+function partitionSelectionActions(children, limit) {
+  const nodes = flattenSelectionActions(children)
+  const descriptors = nodes.map((node, index) => ({
+    index,
+    node,
+    ...inspectSelectionAction(node),
+  }))
+  const visibleIndexes = new Set(
+    descriptors
+      .filter((item) => item.actionable)
+      .sort(
+        (left, right) =>
+          Number(right.enabled) - Number(left.enabled) ||
+          right.score - left.score ||
+          left.index - right.index
+      )
+      .slice(0, limit)
+      .map((item) => item.index)
+  )
+
+  return {
+    context: descriptors
+      .filter((item) => !item.actionable)
+      .map((item) => item.node),
+    visible: descriptors
+      .filter((item) => visibleIndexes.has(item.index))
+      .map((item) => item.node),
+    overflow: descriptors
+      .filter((item) => item.actionable && !visibleIndexes.has(item.index))
+      .map((item) => item.node),
+  }
+}
+
+function callSelectionActionThenClose(handler, close, ...args) {
+  try {
+    return handler?.(...args)
+  } finally {
+    close()
+  }
+}
+
+function wrapOverflowSelectionAction(action, close) {
+  if (!React.isValidElement(action)) return action
+
+  if (action.type === Button) {
+    return React.cloneElement(action, {
+      onClick: (...args) =>
+        callSelectionActionThenClose(action.props.onClick, close, ...args),
+    })
+  }
+
+  if (action.type === Popconfirm) {
+    return React.cloneElement(action, {
+      onConfirm: (...args) =>
+        callSelectionActionThenClose(action.props.onConfirm, close, ...args),
+    })
+  }
+
+  if (action.type === Dropdown) {
+    const menu = action.props.menu || {}
+    return React.cloneElement(action, {
+      menu: {
+        ...menu,
+        onClick: (...args) =>
+          callSelectionActionThenClose(menu.onClick, close, ...args),
+      },
+    })
+  }
+
+  if (action.props.children) {
+    return React.cloneElement(
+      action,
+      undefined,
+      React.Children.map(action.props.children, (child) =>
+        wrapOverflowSelectionAction(child, close)
+      )
+    )
+  }
+
+  return action
+}
+
+function containsDeferredSelectionAction(action) {
+  if (!React.isValidElement(action)) return false
+  if (action.type === Popconfirm || action.type === Dropdown) return true
+  return React.Children.toArray(action.props.children).some(
+    containsDeferredSelectionAction
+  )
+}
+
+function ResponsiveSelectionActions({ children, hasSelection }) {
+  const screens = Grid.useBreakpoint()
+  const [moreActionsOpen, setMoreActionsOpen] = React.useState(false)
+  const moreActionsButtonRef = React.useRef(null)
+  const moreActionsListRef = React.useRef(null)
+  const compact = !screens.lg
+  const visibleLimit = screens.md
+    ? TABLET_SELECTION_ACTION_LIMIT
+    : PHONE_SELECTION_ACTION_LIMIT
+  const { context, visible, overflow } = React.useMemo(
+    () => partitionSelectionActions(children, visibleLimit),
+    [children, visibleLimit]
+  )
+  const closeMoreActions = React.useCallback(() => {
+    setMoreActionsOpen(false)
+  }, [])
+
+  React.useEffect(() => {
+    if (!compact || !hasSelection) setMoreActionsOpen(false)
+  }, [compact, hasSelection])
+
+  if (!compact || overflow.length === 0) {
+    return (
+      <Space
+        wrap
+        className="erp-business-selection-action-bar__actions erp-business-module-selection-actions"
+      >
+        {children}
+      </Space>
+    )
+  }
+
+  return (
+    <>
+      <div className="erp-business-selection-action-bar__actions erp-business-selection-action-bar__actions--compact erp-business-module-selection-actions">
+        {context.length > 0 ? (
+          <div className="erp-business-selection-action-bar__compact-context">
+            {context}
+          </div>
+        ) : null}
+        <div className="erp-business-selection-action-bar__compact-visible">
+          {visible}
+        </div>
+        <Button
+          ref={moreActionsButtonRef}
+          className="erp-business-selection-action-bar__compact-more"
+          disabled={!hasSelection}
+          icon={<MoreOutlined />}
+          aria-label={`更多操作，共 ${overflow.length} 项`}
+          onClick={() => setMoreActionsOpen(true)}
+        >
+          更多操作
+        </Button>
+      </div>
+      <Drawer
+        rootClassName="erp-business-selection-action-drawer"
+        title="更多操作"
+        placement={screens.md ? 'right' : 'bottom'}
+        width={screens.md ? 420 : undefined}
+        height={screens.md ? undefined : 'min(70vh, 560px)'}
+        open={moreActionsOpen}
+        keyboard
+        maskClosable
+        destroyOnHidden={false}
+        onClose={closeMoreActions}
+        afterOpenChange={(open) => {
+          window.requestAnimationFrame(() => {
+            if (open) {
+              moreActionsListRef.current
+                ?.querySelector('button:not(:disabled)')
+                ?.focus({ preventScroll: true })
+              return
+            }
+            moreActionsButtonRef.current?.focus({ preventScroll: true })
+          })
+        }}
+      >
+        <div
+          ref={moreActionsListRef}
+          className="erp-business-selection-action-drawer__list"
+        >
+          {overflow.map((action, index) => (
+            <div
+              key={action?.key || `selection-overflow-action-${index}`}
+              className="erp-business-selection-action-drawer__item"
+              onClick={(event) => {
+                if (
+                  !containsDeferredSelectionAction(action) &&
+                  event.target.closest('button')
+                ) {
+                  closeMoreActions()
+                }
+              }}
+            >
+              {wrapOverflowSelectionAction(action, closeMoreActions)}
+            </div>
+          ))}
+        </div>
+      </Drawer>
+    </>
+  )
 }
 
 function resolveBusinessTableColumnWidth(column = {}) {
@@ -590,12 +859,9 @@ export function SelectionActionBar({
           </div>
         ) : null}
       </div>
-      <Space
-        wrap
-        className="erp-business-selection-action-bar__actions erp-business-module-selection-actions"
-      >
+      <ResponsiveSelectionActions hasSelection={hasSelection}>
         {children}
-      </Space>
+      </ResponsiveSelectionActions>
     </div>
   )
 

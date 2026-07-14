@@ -4,7 +4,11 @@ import test from 'node:test'
 import {
   buildWorkflowDashboardStats,
   buildWorkflowTaskAlert,
+  createWorkflowWorkbenchSnapshot,
+  getWorkflowWorkbenchRoleKeys,
+  getWorkflowWorkbenchScopeKey,
   getWorkflowTaskDueStatus,
+  readWorkflowWorkbenchSnapshot,
 } from './workflowDashboardStats.mjs'
 import {
   formatWorkflowAlertSource,
@@ -20,7 +24,7 @@ function task(overrides = {}) {
   return {
     id: overrides.id || Math.floor(Math.random() * 100000),
     task_name: overrides.task_name || '测试任务',
-    task_status_key: overrides.task_status_key || 'pending',
+    task_status_key: overrides.task_status_key || 'ready',
     owner_role_key: overrides.owner_role_key || 'sales',
     source_type: overrides.source_type || 'project-orders',
     source_id: overrides.source_id || 1,
@@ -29,6 +33,78 @@ function task(overrides = {}) {
     ...overrides,
   }
 }
+
+test('workflowDashboardStats: 工作台岗位只读取有效会话真源并拒绝旧形状别名', () => {
+  assert.deepEqual(
+    getWorkflowWorkbenchRoleKeys({
+      effective_session: { roles: [] },
+      roles: [{ role_key: 'sales' }],
+    }),
+    []
+  )
+  assert.deepEqual(
+    getWorkflowWorkbenchRoleKeys({
+      effective_session: { roles: ['sales', 'purchase', 'sales'] },
+      roles: [{ role_key: 'boss' }],
+    }),
+    ['sales', 'purchase']
+  )
+  assert.deepEqual(
+    getWorkflowWorkbenchRoleKeys({
+      roles: [
+        { role_key: 'warehouse' },
+        { key: 'boss' },
+        'sales',
+      ],
+    }),
+    ['warehouse']
+  )
+})
+
+test('workflowDashboardStats: 工作台快照绑定客户、revision 和岗位范围', () => {
+  const adminProfile = {
+    effective_session: {
+      customer: { key: 'customer-a' },
+      config_revision: 'revision-1',
+      roles: ['sales', 'purchase'],
+    },
+  }
+  const scopeKey = getWorkflowWorkbenchScopeKey(adminProfile, [
+    'purchase',
+    'sales',
+  ])
+  const snapshot = createWorkflowWorkbenchSnapshot(scopeKey, {
+    tasks: [{ id: 1 }],
+    riskTaskIDs: [1],
+  })
+  assert.equal(readWorkflowWorkbenchSnapshot(snapshot, scopeKey), snapshot)
+
+  for (const nextScopeKey of [
+    getWorkflowWorkbenchScopeKey(
+      {
+        effective_session: {
+          ...adminProfile.effective_session,
+          customer: { key: 'customer-b' },
+        },
+      },
+      ['purchase', 'sales']
+    ),
+    getWorkflowWorkbenchScopeKey(
+      {
+        effective_session: {
+          ...adminProfile.effective_session,
+          config_revision: 'revision-2',
+        },
+      },
+      ['purchase', 'sales']
+    ),
+    getWorkflowWorkbenchScopeKey(adminProfile, ['sales']),
+  ]) {
+    const visible = readWorkflowWorkbenchSnapshot(snapshot, nextScopeKey)
+    assert.deepEqual(visible.tasks, [])
+    assert.equal(visible.riskTaskIDs.size, 0)
+  }
+})
 
 test('dashboardTaskDisplay: 看板任务来源回显不直接露出内部来源或英文模块 key', () => {
   const sourceLabel = formatWorkflowTaskSource(
@@ -156,35 +232,29 @@ test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式或 Wor
 test('workflowDashboardStats: 统计任务状态和 due_at 计算态', () => {
   const stats = buildWorkflowDashboardStats(
     [
-      task({ id: 1, task_status_key: 'pending' }),
-      task({ id: 2, task_status_key: 'processing' }),
-      task({ id: 3, task_status_key: 'blocked' }),
-      task({ id: 4, task_status_key: 'rejected' }),
-      task({ id: 5, due_at: NOW_SEC - 60 }),
-      task({ id: 6, due_at: NOW_SEC + 60 * 60 }),
-      task({ id: 7, task_status_key: 'done', due_at: NOW_SEC - 60 }),
-      task({ id: 8, task_status_key: 'closed', due_at: NOW_SEC - 60 }),
-      task({ id: 9, task_status_key: 'cancelled', due_at: NOW_SEC - 60 }),
+      task({ id: 1, task_status_key: 'ready' }),
+      task({ id: 2, task_status_key: 'blocked' }),
+      task({ id: 3, task_status_key: 'rejected' }),
+      task({ id: 4, due_at: NOW_SEC - 60 }),
+      task({ id: 5, due_at: NOW_SEC + 60 * 60 }),
+      task({ id: 6, task_status_key: 'done', due_at: NOW_SEC - 60 }),
     ],
     { nowMs: NOW_MS }
   )
 
-  assert.equal(stats.total, 9)
-  assert.equal(stats.pending, 3)
-  assert.equal(stats.processing, 1)
+  assert.equal(stats.total, 6)
+  assert.equal(stats.ready, 3)
   assert.equal(stats.blocked, 1)
   assert.equal(stats.rejected, 1)
   assert.equal(stats.overdue, 1)
   assert.equal(stats.dueSoon, 1)
   assert.equal(stats.done, 1)
-  assert.equal(stats.closed, 1)
-  assert.equal(stats.cancelled, 1)
-  assert.equal(stats.active, 5)
-  assert.equal(stats.roleDistribution.sales, 9)
+  assert.equal(stats.active, 4)
+  assert.equal(stats.roleDistribution.sales, 6)
 })
 
 test('workflowDashboardStats: 终态任务不产生超时预警', () => {
-  const terminalTasks = ['done', 'rejected', 'closed', 'cancelled'].map(
+  const terminalTasks = ['done', 'rejected'].map(
     (statusKey, index) =>
       task({
         id: index + 1,
@@ -197,6 +267,20 @@ test('workflowDashboardStats: 终态任务不产生超时预警', () => {
     assert.equal(getWorkflowTaskDueStatus(item, NOW_MS), 'none')
     assert.equal(buildWorkflowTaskAlert(item, { nowMs: NOW_MS }), null)
   })
+
+  for (const removedStatusKey of [
+    'pending',
+    'processing',
+    'cancelled',
+    'closed',
+  ]) {
+    const removedTask = task({
+      task_status_key: removedStatusKey,
+      due_at: NOW_SEC - 60,
+    })
+    assert.equal(getWorkflowTaskDueStatus(removedTask, NOW_MS), 'none')
+    assert.equal(buildWorkflowTaskAlert(removedTask, { nowMs: NOW_MS }), null)
+  }
 })
 
 test('workflowDashboardStats: 预警等级覆盖 blocked due_soon qc shipment priority finance', () => {
@@ -473,24 +557,16 @@ test('workflowDashboardStats: PMC 老板和财务关注事项按规则汇总', (
 test('workflowDashboardStats: 催办和升级进入预警统计', () => {
   const urgedTask = task({
     id: 11,
-    payload: {
-      urged: true,
-      urge_count: 2,
-      last_urge_at: NOW_SEC,
-      last_urge_reason: '请今天处理',
-    },
+    urge_count: 2,
+    last_urged_at: NOW_SEC,
   })
   const escalatedTask = task({
     id: 12,
     owner_role_key: 'finance',
-    payload: {
-      urged: true,
-      escalated: true,
-      last_urge_action: 'escalate_to_boss',
-      escalate_target_role_key: 'boss',
-      notification_type: 'urgent_escalation',
-      alert_type: 'urgent_escalation',
-    },
+    urge_count: 1,
+    last_urged_at: NOW_SEC,
+    escalated_at: NOW_SEC,
+    escalate_target_role_key: 'boss',
   })
 
   assert.deepEqual(
@@ -523,6 +599,17 @@ test('workflowDashboardStats: 催办和升级进入预警统计', () => {
   assert.equal(stats.buckets.bossEscalations.length, 1)
   assert.equal(stats.pmcFocus, 2)
   assert.equal(stats.bossFocus, 1)
+
+  const payloadOnly = task({
+    payload: {
+      urged: true,
+      urge_count: 9,
+      last_urge_at: NOW_SEC,
+      escalated: true,
+      escalate_target_role_key: 'boss',
+    },
+  })
+  assert.equal(buildWorkflowTaskAlert(payloadOnly, { nowMs: NOW_MS }), null)
 })
 
 test('workflowDashboardStats: 委外延期和回货预警进入对应桶', () => {

@@ -304,20 +304,6 @@ func (_c *FinanceFactCreate) SetNillableCancelReason(v *string) *FinanceFactCrea
 	return _c
 }
 
-// SetCancelAuditVersion sets the "cancel_audit_version" field.
-func (_c *FinanceFactCreate) SetCancelAuditVersion(v int) *FinanceFactCreate {
-	_c.mutation.SetCancelAuditVersion(v)
-	return _c
-}
-
-// SetNillableCancelAuditVersion sets the "cancel_audit_version" field if the given value is not nil.
-func (_c *FinanceFactCreate) SetNillableCancelAuditVersion(v *int) *FinanceFactCreate {
-	if v != nil {
-		_c.SetCancelAuditVersion(*v)
-	}
-	return _c
-}
-
 // SetNote sets the "note" field.
 func (_c *FinanceFactCreate) SetNote(v string) *FinanceFactCreate {
 	_c.mutation.SetNote(v)
@@ -438,10 +424,6 @@ func (_c *FinanceFactCreate) defaults() error {
 	if _, ok := _c.mutation.OccurredAtSpecified(); !ok {
 		v := financefact.DefaultOccurredAtSpecified
 		_c.mutation.SetOccurredAtSpecified(v)
-	}
-	if _, ok := _c.mutation.CancelAuditVersion(); !ok {
-		v := financefact.DefaultCancelAuditVersion
-		_c.mutation.SetCancelAuditVersion(v)
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if financefact.DefaultCreatedAt == nil {
@@ -572,9 +554,6 @@ func (_c *FinanceFactCreate) check() error {
 			return &ValidationError{Name: "cancel_reason", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.cancel_reason": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.CancelAuditVersion(); !ok {
-		return &ValidationError{Name: "cancel_audit_version", err: errors.New(`ent: missing required field "FinanceFact.cancel_audit_version"`)}
-	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := financefact.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "FinanceFact.note": %w`, err)}
@@ -699,10 +678,6 @@ func (_c *FinanceFactCreate) createSpec() (*FinanceFact, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.CancelReason(); ok {
 		_spec.SetField(financefact.FieldCancelReason, field.TypeString, value)
 		_node.CancelReason = &value
-	}
-	if value, ok := _c.mutation.CancelAuditVersion(); ok {
-		_spec.SetField(financefact.FieldCancelAuditVersion, field.TypeInt, value)
-		_node.CancelAuditVersion = value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(financefact.FieldNote, field.TypeString, value)

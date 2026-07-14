@@ -153,12 +153,14 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			Where(
 				outsourcingorder.ID(id),
 				outsourcingorder.LifecycleStatus(biz.OutsourcingOrderStatusDraft),
+				outsourcingorder.Version(in.ExpectedVersion),
 			).
 			SetOutsourcingOrderNo(in.OutsourcingOrderNo).
 			SetSupplierID(in.SupplierID).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
-			SetOrderDate(in.OrderDate)
+			SetOrderDate(in.OrderDate).
+			SetVersion(in.ExpectedVersion + 1)
 		if in.SourceOrderNo == nil {
 			update.ClearSourceOrderNo()
 		} else {
@@ -184,13 +186,20 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			return nil, err
 		}
 		if affected == 0 {
-			if _, err := tx.OutsourcingOrder.Get(ctx, id); err != nil {
+			current, err := tx.OutsourcingOrder.Get(ctx, id)
+			if err != nil {
 				if ent.IsNotFound(err) {
 					return nil, biz.ErrOutsourcingOrderNotFound
 				}
 				return nil, err
 			}
-			return nil, biz.ErrBadParam
+			if current.LifecycleStatus != biz.OutsourcingOrderStatusDraft {
+				return nil, biz.ErrBadParam
+			}
+			if current.Version != in.ExpectedVersion {
+				return nil, biz.ErrOutsourcingOrderConflict
+			}
+			return nil, biz.ErrOutsourcingOrderConflict
 		}
 		orderRow, err = tx.OutsourcingOrder.Get(ctx, id)
 		if err != nil {
@@ -599,6 +608,7 @@ func entOutsourcingOrderToBiz(row *ent.OutsourcingOrder) *biz.OutsourcingOrder {
 		OrderDate:             row.OrderDate,
 		ExpectedReturnDate:    row.ExpectedReturnDate,
 		LifecycleStatus:       row.LifecycleStatus,
+		Version:               row.Version,
 		Note:                  row.Note,
 		CreatedAt:             row.CreatedAt,
 		UpdatedAt:             row.UpdatedAt,

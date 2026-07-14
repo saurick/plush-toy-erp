@@ -239,6 +239,27 @@ func (_u *SalesOrderUpdate) SetNillableLifecycleStatus(v *string) *SalesOrderUpd
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *SalesOrderUpdate) SetVersion(v int) *SalesOrderUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *SalesOrderUpdate) SetNillableVersion(v *int) *SalesOrderUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *SalesOrderUpdate) AddVersion(v int) *SalesOrderUpdate {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *SalesOrderUpdate) SetNote(v string) *SalesOrderUpdate {
 	_u.mutation.SetNote(v)
@@ -467,6 +488,11 @@ func (_u *SalesOrderUpdate) check() error {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.lifecycle_status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := salesorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := salesorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.note": %w`, err)}
@@ -549,6 +575,12 @@ func (_u *SalesOrderUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(salesorder.FieldLifecycleStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(salesorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(salesorder.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(salesorder.FieldNote, field.TypeString, value)
@@ -950,6 +982,27 @@ func (_u *SalesOrderUpdateOne) SetNillableLifecycleStatus(v *string) *SalesOrder
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *SalesOrderUpdateOne) SetVersion(v int) *SalesOrderUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *SalesOrderUpdateOne) SetNillableVersion(v *int) *SalesOrderUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *SalesOrderUpdateOne) AddVersion(v int) *SalesOrderUpdateOne {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *SalesOrderUpdateOne) SetNote(v string) *SalesOrderUpdateOne {
 	_u.mutation.SetNote(v)
@@ -1191,6 +1244,11 @@ func (_u *SalesOrderUpdateOne) check() error {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.lifecycle_status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := salesorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := salesorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "SalesOrder.note": %w`, err)}
@@ -1290,6 +1348,12 @@ func (_u *SalesOrderUpdateOne) sqlSave(ctx context.Context) (_node *SalesOrder, 
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(salesorder.FieldLifecycleStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(salesorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(salesorder.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(salesorder.FieldNote, field.TypeString, value)

@@ -248,7 +248,7 @@ NODE
   pdf_sha256=""
   pdf_body="$(mktemp "${TMPDIR:-/tmp}/yoyoosun-pdf-smoke.XXXXXX")"
   if [[ -n "$token" ]]; then
-    pdf_payload='{"title":"Release PDF Smoke","file_name":"release-pdf-smoke.pdf","template_key":"material-purchase-contract","customer_key":"yoyoosun","html":"<!doctype html><html><body><p>release-pdf-smoke</p></body></html>"}'
+    pdf_payload='{"title":"Release PDF Smoke","file_name":"release-pdf-smoke.pdf","template_key":"material-purchase-contract","html":"<!doctype html><html><body><p>release-pdf-smoke</p></body></html>"}'
     pdf_curl_meta="$(
       curl -k --connect-timeout 2 --max-time 45 --retry 1 --retry-delay 1 --retry-connrefused \
         -sS \

@@ -1,7 +1,15 @@
+import { getRoleDisplayName } from './roleKeys.mjs'
+
+export const ADMIN_ACCOUNT_STATUS = Object.freeze({
+  ACTIVE: 'active',
+  SUSPENDED: 'suspended',
+  REVOKED: 'revoked',
+})
+
 export const ADMIN_STATUS_FILTERS = Object.freeze({
   ALL: 'all',
-  ENABLED: 'enabled',
-  DISABLED: 'disabled',
+  ACTIVE: ADMIN_ACCOUNT_STATUS.ACTIVE,
+  SUSPENDED: ADMIN_ACCOUNT_STATUS.SUSPENDED,
   REVOKED: 'revoked',
   SUPER: 'super',
 })
@@ -27,22 +35,32 @@ function normalizeList(values = []) {
   return Array.isArray(values) ? values : []
 }
 
-function getRoleKey(role = {}) {
-  return role?.role_key || role?.key || ''
+function getRoleVisibleName(role = {}) {
+  const name = String(role?.name || '').trim()
+  if (name) return name
+  return getRoleDisplayName(role?.role_key || role?.key, '已配置角色')
 }
 
-function getPermissionKey(permission = {}) {
-  return typeof permission === 'string'
-    ? permission
-    : permission?.permission_key || permission?.key || ''
+export function getAdminAccountStatus(admin = {}) {
+  if (admin?.is_super_admin === true) return ADMIN_ACCOUNT_STATUS.ACTIVE
+  const status = String(admin?.account_status || '').trim()
+  return Object.values(ADMIN_ACCOUNT_STATUS).includes(status) ? status : ''
 }
 
 function getAdminStatusText(admin = {}) {
   if (admin.is_super_admin === true) {
     return '超级管理员 始终启用 启用 全部角色 全部权限'
   }
-  if (admin.account_status === 'revoked') return '普通管理员 已注销 离职'
-  return admin.disabled ? '普通管理员 禁用 暂停' : '普通管理员 启用'
+  switch (getAdminAccountStatus(admin)) {
+    case ADMIN_ACCOUNT_STATUS.ACTIVE:
+      return '普通管理员 启用'
+    case ADMIN_ACCOUNT_STATUS.SUSPENDED:
+      return '普通管理员 临时禁用 暂停'
+    case ADMIN_ACCOUNT_STATUS.REVOKED:
+      return '普通管理员 已注销 离职'
+    default:
+      return '普通管理员 状态待刷新'
+  }
 }
 
 export function matchesAdminStatus(
@@ -56,30 +74,29 @@ export function matchesAdminStatus(
   if (normalizedStatus === ADMIN_STATUS_FILTERS.SUPER) {
     return admin.is_super_admin === true
   }
-  if (normalizedStatus === ADMIN_STATUS_FILTERS.DISABLED) {
+  if (normalizedStatus === ADMIN_STATUS_FILTERS.SUSPENDED) {
     return (
       admin.is_super_admin !== true &&
-      Boolean(admin.disabled) &&
-      admin.account_status !== 'revoked'
+      getAdminAccountStatus(admin) === ADMIN_ACCOUNT_STATUS.SUSPENDED
     )
   }
   if (normalizedStatus === ADMIN_STATUS_FILTERS.REVOKED) {
-    return admin.is_super_admin !== true && admin.account_status === 'revoked'
+    return (
+      admin.is_super_admin !== true &&
+      getAdminAccountStatus(admin) === ADMIN_ACCOUNT_STATUS.REVOKED
+    )
   }
-  if (normalizedStatus === ADMIN_STATUS_FILTERS.ENABLED) {
-    return admin.is_super_admin === true || !admin.disabled
+  if (normalizedStatus === ADMIN_STATUS_FILTERS.ACTIVE) {
+    return getAdminAccountStatus(admin) === ADMIN_ACCOUNT_STATUS.ACTIVE
   }
   return true
 }
 
 export function matchesAdminKeyword(admin = {}, keyword = '') {
   const roles = normalizeList(admin.roles)
-  const permissions = normalizeList(admin.permissions)
   const menus = normalizeList(admin.menus)
   const roleDisplayText =
     admin.is_super_admin === true || roles.length > 0 ? '' : '未分配角色'
-  const permissionDisplayText =
-    admin.is_super_admin === true || permissions.length > 0 ? '' : '无权限'
 
   return includesKeyword(
     [
@@ -87,14 +104,8 @@ export function matchesAdminKeyword(admin = {}, keyword = '') {
       admin.phone,
       getAdminStatusText(admin),
       roleDisplayText,
-      permissionDisplayText,
-      ...roles.flatMap((role) => [getRoleKey(role), role.name]),
-      ...permissions.flatMap((permission) => [
-        getPermissionKey(permission),
-        permission?.name,
-        permission?.module,
-      ]),
-      ...menus.flatMap((menu) => [menu?.path, menu?.label]),
+      ...roles.map(getRoleVisibleName),
+      ...menus.map((menu) => menu?.label),
     ],
     keyword
   )
@@ -131,9 +142,25 @@ export function filterPermissionGroups(permissionGroups = [], keyword = '') {
         return section
       }
 
-      const matchedItems = items.filter((item) =>
-        includesKeyword([item.label, item.key], normalizedKeyword)
-      )
+      const matchedItems = items.filter((item) => {
+        const pages = normalizeList(item?.usage?.pages)
+        return includesKeyword(
+          [
+            item.label,
+            item.description,
+            item?.usage?.defaultActionLabel,
+            item?.usage?.outcome,
+            ...normalizeList(item?.usage?.restrictions),
+            ...pages.flatMap((page) => [
+              page?.pageLabel,
+              page?.sectionLabel,
+              page?.actionLabel,
+              ...normalizeList(page?.restrictions),
+            ]),
+          ],
+          normalizedKeyword
+        )
+      })
 
       if (matchedItems.length === 0) {
         return null

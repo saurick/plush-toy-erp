@@ -7,16 +7,7 @@ if [ -z "$cmd" ]; then
   exit 2
 fi
 
-PURCHASE_RETURN_PG_DB_URL="${PURCHASE_RETURN_PG_DB_URL:-postgres://postgres:purchase-return-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable}"
-PURCHASE_RETURN_PG_MAX_MIGRATION_VERSION="${PURCHASE_RETURN_PG_MAX_MIGRATION_VERSION:-20260426142444}"
-PURCHASE_RETURN_PG_MIGRATE_DIR=""
-
-cleanup_purchase_return_migrate_dir() {
-  if [ -n "$PURCHASE_RETURN_PG_MIGRATE_DIR" ] && [ -d "$PURCHASE_RETURN_PG_MIGRATE_DIR" ]; then
-    rm -rf "$PURCHASE_RETURN_PG_MIGRATE_DIR"
-  fi
-}
-trap cleanup_purchase_return_migrate_dir EXIT
+PURCHASE_RETURN_PG_DB_URL="${PURCHASE_RETURN_PG_DB_URL:-postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable}"
 
 parse_output="$(
   python3 - "$PURCHASE_RETURN_PG_DB_URL" <<'PY'
@@ -70,31 +61,18 @@ eval "$parse_output"
 echo "purchase return target host=${PURCHASE_RETURN_PG_DB_HOST} db=${PURCHASE_RETURN_PG_DB_NAME}"
 echo "purchase return target dsn=${PURCHASE_RETURN_PG_DB_SAFE_URL}"
 
-prepare_purchase_return_migrate_dir() {
-  if [ -n "$PURCHASE_RETURN_PG_MIGRATE_DIR" ]; then
-    echo "$PURCHASE_RETURN_PG_MIGRATE_DIR"
-    return
-  fi
-  PURCHASE_RETURN_PG_MIGRATE_DIR="$(mktemp -d)"
-  local found_max=0
-  local source_file base version
-  for source_file in internal/data/model/migrate/*.sql; do
-    base="$(basename "$source_file")"
-    version="${base%%_*}"
-    if [[ "$version" > "$PURCHASE_RETURN_PG_MAX_MIGRATION_VERSION" ]]; then
-      continue
-    fi
-    if [ "$version" = "$PURCHASE_RETURN_PG_MAX_MIGRATION_VERSION" ]; then
-      found_max=1
-    fi
-    cp "$source_file" "$PURCHASE_RETURN_PG_MIGRATE_DIR/$base"
-  done
-  if [ "$found_max" -ne 1 ]; then
-    echo "ERROR: purchase_return max migration ${PURCHASE_RETURN_PG_MAX_MIGRATION_VERSION} not found" >&2
-    exit 1
-  fi
-  atlas migrate hash --dir "file://${PURCHASE_RETURN_PG_MIGRATE_DIR}" >/dev/null
-  echo "$PURCHASE_RETURN_PG_MIGRATE_DIR"
+run_verified_go_test() {
+  local required_prefix="$1"
+  shift
+  local report_file
+  report_file="$(mktemp)"
+  (
+    trap 'rm -f "$report_file"' EXIT
+    "$@" | tee "$report_file"
+    node ../scripts/qa/verify-go-test-json.mjs \
+      --report "$report_file" \
+      --require-prefix "$required_prefix"
+  )
 }
 
 case "$cmd" in
@@ -103,17 +81,15 @@ createdb)
     psql "$PURCHASE_RETURN_PG_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"${PURCHASE_RETURN_PG_DB_NAME}\""
   ;;
 status)
-  purchase_return_dir="$(prepare_purchase_return_migrate_dir)"
-  echo "purchase_return migration max_version=${PURCHASE_RETURN_PG_MAX_MIGRATION_VERSION}"
-  atlas migrate status --dir "file://${purchase_return_dir}" --url "$PURCHASE_RETURN_PG_DB_URL"
+  atlas migrate status --dir "file://internal/data/model/migrate" --url "$PURCHASE_RETURN_PG_DB_URL"
   ;;
 apply)
-  purchase_return_dir="$(prepare_purchase_return_migrate_dir)"
-  echo "purchase_return migration max_version=${PURCHASE_RETURN_PG_MAX_MIGRATION_VERSION}"
-  atlas migrate apply --dir "file://${purchase_return_dir}" --url "$PURCHASE_RETURN_PG_DB_URL"
+  atlas migrate apply --dir "file://internal/data/model/migrate" --url "$PURCHASE_RETURN_PG_DB_URL"
   ;;
 test)
-  PURCHASE_RETURN_PG_TEST=1 PURCHASE_RETURN_PG_TEST_DB_URL="$PURCHASE_RETURN_PG_DB_URL" go test ./internal/data -run TestPurchaseReturnPostgres -count=1
+  run_verified_go_test TestPurchaseReturnPostgres \
+    env PURCHASE_RETURN_PG_TEST=1 PURCHASE_RETURN_PG_TEST_DB_URL="$PURCHASE_RETURN_PG_DB_URL" \
+    go test -json ./internal/data -run '^TestPurchaseReturnPostgres' -count=1
   ;;
 dropdb)
   psql "$PURCHASE_RETURN_PG_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"${PURCHASE_RETURN_PG_DB_NAME}\" WITH (FORCE)"

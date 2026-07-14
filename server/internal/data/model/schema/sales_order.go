@@ -20,6 +20,7 @@ func (SalesOrder) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
+				"sales_orders_version_positive":         "version > 0",
 			},
 		},
 	}
@@ -65,6 +66,9 @@ func (SalesOrder) Fields() []ent.Field {
 			NotEmpty().
 			Default("draft").
 			MaxLen(32),
+		field.Int("version").
+			Positive().
+			Default(1),
 		field.String("note").
 			Optional().
 			Nillable().

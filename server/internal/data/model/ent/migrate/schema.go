@@ -402,6 +402,7 @@ var (
 		{Name: "revision", Type: field.TypeString, Size: 64},
 		{Name: "product_version", Type: field.TypeString, Size: 128, Default: ""},
 		{Name: "config_hash", Type: field.TypeString, Size: 128},
+		{Name: "config_hash_version", Type: field.TypeInt16, Default: 1},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "published"},
 		{Name: "compiled_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "published_by", Type: field.TypeInt, Nullable: true},
@@ -433,7 +434,7 @@ var (
 			{
 				Name:    "customerconfigrevision_customer_key_status",
 				Unique:  false,
-				Columns: []*schema.Column{CustomerConfigRevisionsColumns[1], CustomerConfigRevisionsColumns[5]},
+				Columns: []*schema.Column{CustomerConfigRevisionsColumns[1], CustomerConfigRevisionsColumns[6]},
 			},
 			{
 				Name:    "customerconfigrevision_config_hash",
@@ -502,7 +503,6 @@ var (
 		{Name: "settled_at", Type: field.TypeTime, Nullable: true},
 		{Name: "cancelled_at", Type: field.TypeTime, Nullable: true},
 		{Name: "cancel_reason", Type: field.TypeString, Nullable: true, Size: 255},
-		{Name: "cancel_audit_version", Type: field.TypeInt, Default: 1},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -516,7 +516,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "finance_facts_admin_users_canceller",
-				Columns:    []*schema.Column{FinanceFactsColumns[27]},
+				Columns:    []*schema.Column{FinanceFactsColumns[26]},
 				RefColumns: []*schema.Column{AdminUsersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -916,6 +916,7 @@ var (
 		{Name: "order_date", Type: field.TypeTime},
 		{Name: "expected_return_date", Type: field.TypeTime, Nullable: true},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -929,7 +930,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_orders_suppliers_outsourcing_orders",
-				Columns:    []*schema.Column{OutsourcingOrdersColumns[12]},
+				Columns:    []*schema.Column{OutsourcingOrdersColumns[13]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -943,7 +944,7 @@ var (
 			{
 				Name:    "outsourcingorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[12]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[13]},
 			},
 			{
 				Name:    "outsourcingorder_source_order_no",
@@ -1762,6 +1763,7 @@ var (
 		{Name: "purchase_date", Type: field.TypeTime},
 		{Name: "expected_arrival_date", Type: field.TypeTime, Nullable: true},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -1775,7 +1777,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_orders_suppliers_purchase_orders",
-				Columns:    []*schema.Column{PurchaseOrdersColumns[11]},
+				Columns:    []*schema.Column{PurchaseOrdersColumns[12]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -1789,7 +1791,7 @@ var (
 			{
 				Name:    "purchaseorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseOrdersColumns[11]},
+				Columns: []*schema.Column{PurchaseOrdersColumns[12]},
 			},
 			{
 				Name:    "purchaseorder_supplier_purchase_order_no",
@@ -2089,6 +2091,8 @@ var (
 		{Name: "unit_price", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "amount", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "source_line_no", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "idempotency_key", Type: field.TypeString, Nullable: true, Size: 128},
+		{Name: "idempotency_payload_hash", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -2107,37 +2111,37 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "purchase_receipt_items_inventory_lots_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[9]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[11]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_materials_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[10]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[12]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_purchase_order_items_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[11]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[13]},
 				RefColumns: []*schema.Column{PurchaseOrderItemsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_purchase_receipts_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[12]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[14]},
 				RefColumns: []*schema.Column{PurchaseReceiptsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_units_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[13]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[15]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "purchase_receipt_items_warehouses_purchase_receipt_items",
-				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[14]},
+				Columns:    []*schema.Column{PurchaseReceiptItemsColumns[16]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2146,32 +2150,40 @@ var (
 			{
 				Name:    "purchasereceiptitem_receipt_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[12]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14]},
 			},
 			{
 				Name:    "purchasereceiptitem_material_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[10]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[12]},
 			},
 			{
 				Name:    "purchasereceiptitem_warehouse_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[16]},
 			},
 			{
 				Name:    "purchasereceiptitem_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[9]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11]},
 			},
 			{
 				Name:    "purchasereceiptitem_purchase_order_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[11]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[13]},
+			},
+			{
+				Name:    "purchasereceiptitem_receipt_id_idempotency_key",
+				Unique:  true,
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14], PurchaseReceiptItemsColumns[6]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "idempotency_key IS NOT NULL AND idempotency_key <> ''",
+				},
 			},
 			{
 				Name:    "purchasereceiptitem_receipt_id_source_line_no",
 				Unique:  true,
-				Columns: []*schema.Column{PurchaseReceiptItemsColumns[12], PurchaseReceiptItemsColumns[5]},
+				Columns: []*schema.Column{PurchaseReceiptItemsColumns[14], PurchaseReceiptItemsColumns[5]},
 				Annotation: &entsql.IndexAnnotation{
 					Where: "source_line_no IS NOT NULL AND source_line_no <> ''",
 				},
@@ -2362,7 +2374,7 @@ var (
 				Symbol:     "quality_inspections_materials_quality_inspections",
 				Columns:    []*schema.Column{QualityInspectionsColumns[16]},
 				RefColumns: []*schema.Column{MaterialsColumns[0]},
-				OnDelete:   schema.SetNull,
+				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "quality_inspections_purchase_receipts_quality_inspections",
@@ -2456,8 +2468,10 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 128},
 		{Name: "description", Type: field.TypeString, Size: 512, Default: ""},
 		{Name: "builtin", Type: field.TypeBool, Default: false},
+		{Name: "role_type", Type: field.TypeEnum, Enums: []string{"system", "business_default", "custom"}, Default: "custom"},
 		{Name: "disabled", Type: field.TypeBool, Default: false},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
@@ -2475,12 +2489,12 @@ var (
 			{
 				Name:    "role_disabled",
 				Unique:  false,
-				Columns: []*schema.Column{RolesColumns[5]},
+				Columns: []*schema.Column{RolesColumns[6]},
 			},
 			{
 				Name:    "role_sort_order",
 				Unique:  false,
-				Columns: []*schema.Column{RolesColumns[6]},
+				Columns: []*schema.Column{RolesColumns[7]},
 			},
 		},
 	}
@@ -2607,6 +2621,7 @@ var (
 		{Name: "order_date", Type: field.TypeTime},
 		{Name: "planned_delivery_date", Type: field.TypeTime, Nullable: true},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
+		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -2620,7 +2635,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "sales_orders_customers_sales_orders",
-				Columns:    []*schema.Column{SalesOrdersColumns[15]},
+				Columns:    []*schema.Column{SalesOrdersColumns[16]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2634,7 +2649,7 @@ var (
 			{
 				Name:    "salesorder_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{SalesOrdersColumns[15]},
+				Columns: []*schema.Column{SalesOrdersColumns[16]},
 			},
 			{
 				Name:    "salesorder_customer_order_no",
@@ -3228,27 +3243,46 @@ var (
 		{Name: "owner_pool_key", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "required_capability_key", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "config_revision", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "process_instance_id", Type: field.TypeInt, Nullable: true},
-		{Name: "process_node_instance_id", Type: field.TypeInt, Nullable: true},
 		{Name: "assignee_id", Type: field.TypeInt, Nullable: true},
 		{Name: "priority", Type: field.TypeInt16, Default: 0},
 		{Name: "blocked_reason", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "due_at", Type: field.TypeTime, Nullable: true},
-		{Name: "started_at", Type: field.TypeTime, Nullable: true},
 		{Name: "completed_at", Type: field.TypeTime, Nullable: true},
-		{Name: "closed_at", Type: field.TypeTime, Nullable: true},
+		{Name: "critical_path", Type: field.TypeBool, Default: false},
+		{Name: "urge_count", Type: field.TypeInt, Default: 0},
+		{Name: "last_urged_at", Type: field.TypeTime, Nullable: true},
+		{Name: "last_urged_by", Type: field.TypeInt, Nullable: true},
+		{Name: "last_urged_by_role_key", Type: field.TypeString, Nullable: true, Size: 32},
+		{Name: "escalated_at", Type: field.TypeTime, Nullable: true},
+		{Name: "escalate_target_role_key", Type: field.TypeString, Nullable: true, Size: 32},
 		{Name: "payload", Type: field.TypeJSON, Nullable: true},
 		{Name: "version", Type: field.TypeInt, Default: 1},
 		{Name: "created_by", Type: field.TypeInt, Nullable: true},
 		{Name: "updated_by", Type: field.TypeInt, Nullable: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "process_instance_id", Type: field.TypeInt, Nullable: true},
+		{Name: "process_node_instance_id", Type: field.TypeInt, Nullable: true},
 	}
 	// WorkflowTasksTable holds the schema information for the "workflow_tasks" table.
 	WorkflowTasksTable = &schema.Table{
 		Name:       "workflow_tasks",
 		Columns:    WorkflowTasksColumns,
 		PrimaryKey: []*schema.Column{WorkflowTasksColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "workflow_tasks_process_instances_workflow_tasks",
+				Columns:    []*schema.Column{WorkflowTasksColumns[31]},
+				RefColumns: []*schema.Column{ProcessInstancesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+			{
+				Symbol:     "workflow_tasks_process_node_instances_workflow_tasks",
+				Columns:    []*schema.Column{WorkflowTasksColumns[32]},
+				RefColumns: []*schema.Column{ProcessNodeInstancesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
 		Indexes: []*schema.Index{
 			{
 				Name:    "workflowtask_task_code",
@@ -3283,17 +3317,27 @@ var (
 			{
 				Name:    "workflowtask_process_instance_id_task_status_key",
 				Unique:  false,
-				Columns: []*schema.Column{WorkflowTasksColumns[13], WorkflowTasksColumns[8]},
+				Columns: []*schema.Column{WorkflowTasksColumns[31], WorkflowTasksColumns[8]},
 			},
 			{
 				Name:    "workflowtask_process_node_instance_id",
 				Unique:  false,
-				Columns: []*schema.Column{WorkflowTasksColumns[14]},
+				Columns: []*schema.Column{WorkflowTasksColumns[32]},
+			},
+			{
+				Name:    "workflowtask_task_status_key_critical_path_due_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[8], WorkflowTasksColumns[18], WorkflowTasksColumns[16], WorkflowTasksColumns[0]},
+			},
+			{
+				Name:    "workflowtask_urge_count_escalated_at_id",
+				Unique:  false,
+				Columns: []*schema.Column{WorkflowTasksColumns[19], WorkflowTasksColumns[23], WorkflowTasksColumns[0]},
 			},
 			{
 				Name:    "workflowtask_due_at",
 				Unique:  false,
-				Columns: []*schema.Column{WorkflowTasksColumns[18]},
+				Columns: []*schema.Column{WorkflowTasksColumns[16]},
 			},
 		},
 	}
@@ -3415,6 +3459,11 @@ func init() {
 		"admin_users_status_audit_bundle":       "((\"status_changed_at\" IS NULL AND \"status_changed_by\" IS NULL AND \"status_reason\" IS NULL) OR (\"status_changed_at\" IS NOT NULL AND \"status_changed_by\" IS NOT NULL))",
 	}
 	BomHeadersTable.ForeignKeys[0].RefTable = ProductsTable
+	BomHeadersTable.Annotation = &entsql.Annotation{}
+	BomHeadersTable.Annotation.Checks = map[string]string{
+		"bom_headers_effective_dates_ordered": "effective_from IS NULL OR effective_to IS NULL OR effective_to > effective_from",
+		"bom_headers_status_allowed":          "status IN ('DRAFT', 'ACTIVE', 'ARCHIVED')",
+	}
 	BomItemsTable.ForeignKeys[0].RefTable = BomHeadersTable
 	BomItemsTable.ForeignKeys[1].RefTable = MaterialsTable
 	BomItemsTable.ForeignKeys[2].RefTable = UnitsTable
@@ -3432,12 +3481,16 @@ func init() {
 	ContactsTable.Annotation.Checks = map[string]string{
 		"contacts_owner_type_allowed": "owner_type IN ('CUSTOMER', 'SUPPLIER')",
 	}
+	CustomerConfigRevisionsTable.Annotation = &entsql.Annotation{}
+	CustomerConfigRevisionsTable.Annotation.Checks = map[string]string{
+		"customer_config_revisions_hash_version":   "config_hash_version = 1",
+		"customer_config_revisions_status_allowed": "status IN ('building', 'published', 'active', 'superseded')",
+	}
 	FinanceFactsTable.ForeignKeys[0].RefTable = AdminUsersTable
 	FinanceFactsTable.Annotation = &entsql.Annotation{}
 	FinanceFactsTable.Annotation.Checks = map[string]string{
 		"finance_facts_amount_positive":          "amount > 0",
-		"finance_facts_cancel_audit_bundle":      "\n(\n  (status = 'CANCELLED' AND cancel_audit_version = 0\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n  OR\n  (status = 'CANCELLED' AND cancel_audit_version = 1\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255)\n  OR\n  (status <> 'CANCELLED'\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n)",
-		"finance_facts_cancel_audit_version":     "cancel_audit_version IN (0, 1)",
+		"finance_facts_cancel_audit_bundle":      "\n(\n  (status = 'CANCELLED'\n    AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL\n    AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255)\n  OR\n  (status <> 'CANCELLED'\n    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)\n)",
 		"finance_facts_collection_type_allowed":  "collection_type IS NULL OR collection_type IN ('ADVANCE_RECEIPT', 'ACCOUNTS_RECEIVABLE')",
 		"finance_facts_counterparty_allowed":     "counterparty_type IN ('CUSTOMER', 'SUPPLIER', 'OTHER')",
 		"finance_facts_currency_allowed":         "currency IN ('USD', 'CNY', 'HKD')",
@@ -3486,6 +3539,7 @@ func init() {
 	OutsourcingOrdersTable.Annotation = &entsql.Annotation{}
 	OutsourcingOrdersTable.Annotation.Checks = map[string]string{
 		"outsourcing_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'confirmed', 'closed', 'canceled')",
+		"outsourcing_orders_version_positive":         "version > 0",
 	}
 	OutsourcingOrderItemsTable.ForeignKeys[0].RefTable = MaterialsTable
 	OutsourcingOrderItemsTable.ForeignKeys[1].RefTable = OutsourcingOrdersTable
@@ -3508,7 +3562,19 @@ func init() {
 	ProcessesTable.Annotation.Checks = map[string]string{
 		"processes_sort_order_non_negative": "sort_order >= 0",
 	}
+	ProcessInstancesTable.Annotation = &entsql.Annotation{}
+	ProcessInstancesTable.Annotation.Checks = map[string]string{
+		"process_instances_lifecycle_bundle": "((status = 'completed' AND completed_at IS NOT NULL) OR (status IN ('active', 'blocked') AND completed_at IS NULL))",
+		"process_instances_status_allowed":   "status IN ('active', 'completed', 'blocked')",
+	}
 	ProcessNodeInstancesTable.ForeignKeys[0].RefTable = ProcessInstancesTable
+	ProcessNodeInstancesTable.Annotation = &entsql.Annotation{}
+	ProcessNodeInstancesTable.Annotation.Checks = map[string]string{
+		"process_node_instances_lifecycle_bundle": "((status = 'waiting' AND started_at IS NULL AND completed_at IS NULL) OR (status = 'active' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'completed' AND started_at IS NOT NULL AND completed_at IS NOT NULL) OR (status = 'blocked' AND started_at IS NOT NULL AND completed_at IS NULL))",
+		"process_node_instances_status_allowed":   "status IN ('waiting', 'active', 'completed', 'blocked')",
+		"process_node_instances_type_allowed":     "node_type IN ('human_task', 'approval', 'domain_command', 'wait_event', 'end')",
+		"process_node_instances_version_positive": "version > 0",
+	}
 	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
 	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
 	ProductSkusTable.ForeignKeys[1].RefTable = UnitsTable
@@ -3578,6 +3644,7 @@ func init() {
 	PurchaseOrdersTable.Annotation = &entsql.Annotation{}
 	PurchaseOrdersTable.Annotation.Checks = map[string]string{
 		"purchase_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
+		"purchase_orders_version_positive":         "version > 0",
 	}
 	PurchaseOrderItemsTable.ForeignKeys[0].RefTable = MaterialsTable
 	PurchaseOrderItemsTable.ForeignKeys[1].RefTable = PurchaseOrdersTable
@@ -3589,6 +3656,10 @@ func init() {
 		"purchase_order_items_line_status_allowed":     "line_status IN ('open', 'closed', 'canceled')",
 		"purchase_order_items_purchased_qty_positive":  "purchased_quantity > 0",
 		"purchase_order_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+	}
+	PurchaseReceiptsTable.Annotation = &entsql.Annotation{}
+	PurchaseReceiptsTable.Annotation.Checks = map[string]string{
+		"purchase_receipts_idempotency_bundle_complete": "\n(\n  (\n    idempotency_key IS NULL\n    AND idempotency_payload_hash IS NULL\n    AND idempotency_item_count IS NULL\n  )\n  OR\n  (\n    idempotency_key IS NOT NULL\n    AND length(trim(idempotency_key)) BETWEEN 1 AND 128\n    AND idempotency_payload_hash IS NOT NULL\n    AND length(idempotency_payload_hash) = 64\n    AND idempotency_item_count IS NOT NULL\n    AND idempotency_item_count > 0\n  )\n)",
 	}
 	PurchaseReceiptAdjustmentsTable.ForeignKeys[0].RefTable = PurchaseReceiptsTable
 	PurchaseReceiptAdjustmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
@@ -3609,9 +3680,10 @@ func init() {
 	PurchaseReceiptItemsTable.ForeignKeys[5].RefTable = WarehousesTable
 	PurchaseReceiptItemsTable.Annotation = &entsql.Annotation{}
 	PurchaseReceiptItemsTable.Annotation.Checks = map[string]string{
-		"purchase_receipt_items_amount_non_negative":     "amount IS NULL OR amount >= 0",
-		"purchase_receipt_items_quantity_positive":       "quantity > 0",
-		"purchase_receipt_items_unit_price_non_negative": "unit_price IS NULL OR unit_price >= 0",
+		"purchase_receipt_items_amount_non_negative":         "amount IS NULL OR amount >= 0",
+		"purchase_receipt_items_idempotency_bundle_complete": "\n(\n  (\n    idempotency_key IS NULL\n    AND idempotency_payload_hash IS NULL\n  )\n  OR\n  (\n    idempotency_key IS NOT NULL\n    AND length(trim(idempotency_key)) BETWEEN 1 AND 128\n    AND idempotency_payload_hash IS NOT NULL\n    AND length(idempotency_payload_hash) = 64\n  )\n)",
+		"purchase_receipt_items_quantity_positive":           "quantity > 0",
+		"purchase_receipt_items_unit_price_non_negative":     "unit_price IS NULL OR unit_price >= 0",
 	}
 	PurchaseReturnsTable.ForeignKeys[0].RefTable = PurchaseReceiptsTable
 	PurchaseReturnItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
@@ -3631,10 +3703,16 @@ func init() {
 	QualityInspectionsTable.ForeignKeys[2].RefTable = PurchaseReceiptsTable
 	QualityInspectionsTable.ForeignKeys[3].RefTable = PurchaseReceiptItemsTable
 	QualityInspectionsTable.ForeignKeys[4].RefTable = WarehousesTable
+	RolesTable.Annotation = &entsql.Annotation{}
+	RolesTable.Annotation.Checks = map[string]string{
+		"roles_role_type_allowed": "role_type IN ('system', 'business_default', 'custom')",
+		"roles_version_positive":  "version > 0",
+	}
 	SalesOrdersTable.ForeignKeys[0].RefTable = CustomersTable
 	SalesOrdersTable.Annotation = &entsql.Annotation{}
 	SalesOrdersTable.Annotation.Checks = map[string]string{
 		"sales_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'active', 'closed', 'canceled')",
+		"sales_orders_version_positive":         "version > 0",
 	}
 	SalesOrderItemsTable.ForeignKeys[0].RefTable = ProductSkusTable
 	SalesOrderItemsTable.ForeignKeys[1].RefTable = SalesOrdersTable
@@ -3680,6 +3758,19 @@ func init() {
 	SuppliersTable.Annotation = &entsql.Annotation{}
 	SuppliersTable.Annotation.Checks = map[string]string{
 		"suppliers_supplier_type_allowed": "supplier_type IS NULL OR supplier_type IN ('material', 'outsourcing', 'service', 'mixed')",
+	}
+	WorkflowBusinessStatesTable.Annotation = &entsql.Annotation{}
+	WorkflowBusinessStatesTable.Annotation.Checks = map[string]string{
+		"workflow_business_states_status_allowed": "business_status_key IN ('project_pending', 'project_approved', 'engineering_preparing', 'material_preparing', 'production_ready', 'production_processing', 'qc_pending', 'iqc_pending', 'qc_failed', 'warehouse_processing', 'warehouse_inbound_pending', 'inbound_done', 'shipment_pending', 'shipping_released', 'shipped', 'reconciling', 'settled', 'blocked', 'cancelled', 'closed')",
+	}
+	WorkflowTasksTable.ForeignKeys[0].RefTable = ProcessInstancesTable
+	WorkflowTasksTable.ForeignKeys[1].RefTable = ProcessNodeInstancesTable
+	WorkflowTasksTable.Annotation = &entsql.Annotation{}
+	WorkflowTasksTable.Annotation.Checks = map[string]string{
+		"workflow_tasks_process_anchors_paired":  "((process_instance_id IS NULL AND process_node_instance_id IS NULL) OR (process_instance_id IS NOT NULL AND process_node_instance_id IS NOT NULL))",
+		"workflow_tasks_status_allowed":          "task_status_key IN ('ready', 'blocked', 'done', 'rejected')",
+		"workflow_tasks_urge_count_non_negative": "urge_count >= 0",
+		"workflow_tasks_version_positive":        "version > 0",
 	}
 	WorkflowTaskEventsTable.ForeignKeys[0].RefTable = WorkflowTasksTable
 	WorkflowTaskEventsTable.Annotation = &entsql.Annotation{}

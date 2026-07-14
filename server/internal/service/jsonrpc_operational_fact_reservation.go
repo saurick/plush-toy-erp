@@ -13,7 +13,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_stock_reservation", "createStockReservation":
+	case "create_stock_reservation":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
@@ -26,7 +26,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		}
 		item, err := d.operationalFactUC.CreateStockReservation(ctx, in)
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
-	case "release_stock_reservation", "releaseStockReservation":
+	case "release_stock_reservation":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionSalesOrderUpdate, biz.PermissionWarehouseOutboundConfirm); res != nil {
 			return id, res, nil
 		}
@@ -35,7 +35,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		}
 		item, err := d.operationalFactUC.ReleaseStockReservation(ctx, getInt(pm, "id", 0))
 		return id, operationalFactStockReservationResult(ctx, d, item, err), nil
-	case "list_stock_reservations", "listStockReservations":
+	case "list_stock_reservations":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionWarehouseInventoryRead, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
 		}

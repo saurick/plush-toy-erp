@@ -30,7 +30,7 @@ import { buildPurchaseOrderColumns } from '../components/purchase-orders/purchas
 import {
   listMaterials,
   listContactsByOwner,
-  listPurchaseOrderItems,
+  listAllPurchaseOrderItems,
   listPurchaseOrders,
   listSuppliers,
   listUnits,
@@ -68,6 +68,15 @@ import {
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
+import {
+  commitSourceDocumentSaveResult,
+  createSourceDocumentOpenEditController,
+  isMutationResultUnknown,
+  isResourceVersionConflict,
+  openSourceDocumentEditWithAccessGate,
+  selectOpenSourceDocumentItems,
+  settleSourceDocumentPostSaveEffect,
+} from '../utils/sourceDocumentMutation.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
@@ -167,6 +176,14 @@ export default function V1PurchaseOrdersPage() {
   }, [])
 
   const beginLatestRequest = useLatestRequestCoordinator()
+  const sourceDocumentOpenEditController = useMemo(
+    () =>
+      createSourceDocumentOpenEditController({
+        beginLatestRequest,
+        setLoading: setItemsLoading,
+      }),
+    [beginLatestRequest]
+  )
 
   const unitOptions = useMemo(
     () => uniqueReferenceOptions(units, unitOption),
@@ -284,27 +301,22 @@ export default function V1PurchaseOrdersPage() {
     blockWorkflowTask,
     completeWorkflowTask,
     rejectWorkflowTask,
+    resumeWorkflowTask,
     urgePurchaseWorkflowTask,
   } = usePurchaseOrderWorkflowActions({ loadWorkflowTasks })
 
-  const loadOrderItems = useCallback(async (order) => {
+  const loadOrderItems = useCallback(async (order, options = {}) => {
     if (!order?.id) {
-      return []
+      throw new Error('缺少采购订单，无法加载明细')
     }
-    setItemsLoading(true)
-    try {
-      const data = await listPurchaseOrderItems({
+    const data = await listAllPurchaseOrderItems(
+      {
         purchase_order_id: order.id,
-        limit: 200,
-      })
-      const nextItems = data?.purchase_order_items || []
-      return nextItems
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '加载采购订单明细失败'))
-      return []
-    } finally {
-      setItemsLoading(false)
-    }
+        expected_version: order.version,
+      },
+      options
+    )
+    return data.purchase_order_items
   }, [])
 
   const loadPrintReferenceData = useCallback(async () => {
@@ -350,6 +362,7 @@ export default function V1PurchaseOrdersPage() {
   }, [outletContext, refreshPageData])
 
   const openCreateModal = () => {
+    sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
     form.setFieldsValue({
@@ -372,34 +385,62 @@ export default function V1PurchaseOrdersPage() {
   }
 
   const openEditModal = async (record) => {
-    orderAttachmentRef.current?.clearPendingAttachments()
-    const lines = await loadOrderItems(record)
-    setEditingOrder(record)
-    form.setFieldsValue({
-      purchase_order_no: record.purchase_order_no || '',
-      supplier_id: record.supplier_id,
-      supplier_purchase_order_no: record.supplier_purchase_order_no || '',
-      purchase_date: unixToDateInputValue(record.purchase_date),
-      expected_arrival_date: unixToDateInputValue(record.expected_arrival_date),
-      contract_party_snapshot:
-        record.contract_party_snapshot &&
-        typeof record.contract_party_snapshot === 'object'
-          ? record.contract_party_snapshot
-          : contractPartySnapshotFromPrintTemplateDefaults(
-              purchasePrintTemplateDefaults,
-              MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY
-            ),
-      note: record.note || '',
-      items:
-        lines
-          .filter((line) => line.line_status !== 'canceled')
-          .map(normalizePurchaseLineFormValue).length > 0
-          ? lines
-              .filter((line) => line.line_status !== 'canceled')
-              .map(normalizePurchaseLineFormValue)
-          : [createBlankPurchaseLine(1)],
+    const editResult = await openSourceDocumentEditWithAccessGate({
+      canUpdate,
+      document: record,
+      invalidatePending: () => sourceDocumentOpenEditController.invalidate(),
+      isEditable: (order) =>
+        canEditPurchaseOrderSelection({ canUpdate: true, order }),
+      open: () =>
+        sourceDocumentOpenEditController.open({
+          loadItems: ({ signal }) => loadOrderItems(record, { signal }),
+          enterEditing: (lines) => {
+            const openLines = selectOpenSourceDocumentItems(lines).map(
+              normalizePurchaseLineFormValue
+            )
+            orderAttachmentRef.current?.clearPendingAttachments()
+            setEditingOrder(record)
+            form.setFieldsValue({
+              purchase_order_no: record.purchase_order_no || '',
+              supplier_id: record.supplier_id,
+              supplier_purchase_order_no:
+                record.supplier_purchase_order_no || '',
+              purchase_date: unixToDateInputValue(record.purchase_date),
+              expected_arrival_date: unixToDateInputValue(
+                record.expected_arrival_date
+              ),
+              contract_party_snapshot:
+                record.contract_party_snapshot &&
+                typeof record.contract_party_snapshot === 'object'
+                  ? record.contract_party_snapshot
+                  : contractPartySnapshotFromPrintTemplateDefaults(
+                      purchasePrintTemplateDefaults,
+                      MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY
+                    ),
+              note: record.note || '',
+              items:
+                openLines.length > 0 ? openLines : [createBlankPurchaseLine(1)],
+            })
+            setModalOpen(true)
+          },
+        }),
     })
-    setModalOpen(true)
+    if (editResult.status === 'blocked') {
+      if (editResult.reason === 'forbidden') {
+        message.warning('当前账号没有编辑采购订单的权限。')
+      } else if (editResult.reason === 'not_editable') {
+        message.warning('采购订单提交后已冻结，不能继续编辑。')
+      }
+      return
+    }
+    if (editResult.status === 'load_failed') {
+      message.error(
+        `${getActionErrorMessage(
+          editResult.error,
+          '加载采购订单明细失败'
+        )}，未进入编辑`
+      )
+    }
   }
 
   const resolveSupplierSnapshot = useCallback(
@@ -466,31 +507,71 @@ export default function V1PurchaseOrdersPage() {
   const handleSave = async () => {
     setSaving(true)
     try {
-      const values = await form.validateFields()
-      const supplier = suppliers.find((item) => item.id === values.supplier_id)
-      const supplierSnapshot = await resolveSupplierSnapshot(supplier, {
-        notifyOnError: true,
+      let params
+      try {
+        const values = await form.validateFields()
+        const supplier = suppliers.find(
+          (item) => item.id === values.supplier_id
+        )
+        const supplierSnapshot = await resolveSupplierSnapshot(supplier, {
+          notifyOnError: true,
+        })
+        params = buildPurchaseOrderParams(values, {
+          id: editingOrder?.id,
+          expected_version: editingOrder?.id ? editingOrder.version : undefined,
+          supplier_snapshot: supplierSnapshot,
+          items: (values.items || []).map((line, index) =>
+            buildPurchaseOrderItemParams(line, {
+              id: line.id,
+              line_no: Number(line.line_no || index + 1),
+            })
+          ),
+        })
+      } catch (error) {
+        if (!error?.errorFields) {
+          message.error(getActionErrorMessage(error, '准备采购订单保存'))
+        }
+        return
+      }
+
+      const saveResult = await commitSourceDocumentSaveResult({
+        save: async () => {
+          const result = await savePurchaseOrderWithItems(params)
+          return result.purchase_order
+        },
+        bindSaved: (savedOrder) => {
+          setEditingOrder(savedOrder)
+          setSelectedOrder(savedOrder)
+          applySelectedRowKeys([savedOrder.id])
+        },
       })
-      const params = buildPurchaseOrderParams(values, {
-        id: editingOrder?.id,
-        supplier_snapshot: supplierSnapshot,
-        items: (values.items || []).map((line, index) =>
-          buildPurchaseOrderItemParams(line, {
-            id: line.id,
-            line_no: Number(line.line_no || index + 1),
-          })
-        ),
-      })
-      const result = await savePurchaseOrderWithItems(params)
-      const saved = result?.purchase_order
+      if (saveResult.status === 'save_failed') {
+        const saveError = saveResult.error
+        if (isResourceVersionConflict(saveError)) {
+          message.warning(
+            '该单据已被其他人更新，本次内容没有覆盖最新数据。请核对最新单据后再保存。'
+          )
+        } else if (isMutationResultUnknown(saveError)) {
+          message.warning(
+            '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。'
+          )
+        } else {
+          message.error(getActionErrorMessage(saveError, '保存采购订单失败'))
+        }
+        return
+      }
+
+      const { saved } = saveResult
+      const attachmentEffect = await settleSourceDocumentPostSaveEffect(() =>
+        orderAttachmentRef.current?.flushPendingAttachments(saved.id)
+      )
       const attachmentSaved =
-        (await orderAttachmentRef.current?.flushPendingAttachments(
-          saved?.id
-        )) !== false
-      if (saved) {
-        setSelectedOrder(saved)
-        applySelectedRowKeys([saved.id])
-        await loadOrderItems(saved)
+        attachmentEffect.status === 'fulfilled' &&
+        attachmentEffect.value !== false
+      if (attachmentEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(attachmentEffect.error, '上传采购订单附件')
+        )
       }
       orderAttachmentRef.current?.clearPendingAttachments()
       setModalOpen(false)
@@ -499,10 +580,20 @@ export default function V1PurchaseOrdersPage() {
           ? '采购订单已保存'
           : '采购订单已保存，未上传的附件请重新选择'
       )
-      await loadOrders()
-    } catch (error) {
-      if (error?.errorFields) return
-      message.error(getActionErrorMessage(error, '保存采购订单失败'))
+      const detailEffect = await settleSourceDocumentPostSaveEffect(() =>
+        loadOrderItems(saved)
+      )
+      if (detailEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(detailEffect.error, '刷新采购订单明细')
+        )
+      }
+      const refreshEffect = await settleSourceDocumentPostSaveEffect(loadOrders)
+      if (refreshEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(refreshEffect.error, '刷新采购订单列表')
+        )
+      }
     } finally {
       setSaving(false)
     }
@@ -516,9 +607,21 @@ export default function V1PurchaseOrdersPage() {
       if (updated) {
         setSelectedOrder(updated)
         applySelectedRowKeys([updated.id])
-        await loadOrderItems(updated)
+        const detailEffect = await settleSourceDocumentPostSaveEffect(() =>
+          loadOrderItems(updated)
+        )
+        if (detailEffect.status === 'rejected') {
+          message.warning(
+            getActionErrorMessage(detailEffect.error, '刷新采购订单明细')
+          )
+        }
       }
-      await loadOrders()
+      const refreshEffect = await settleSourceDocumentPostSaveEffect(loadOrders)
+      if (refreshEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(refreshEffect.error, '刷新采购订单列表')
+        )
+      }
     } catch (error) {
       message.error(getActionErrorMessage(error, `${action.label}采购订单失败`))
     } finally {
@@ -905,6 +1008,7 @@ export default function V1PurchaseOrdersPage() {
         }
         onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
         onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
+        onResumeTask={canUpdateWorkflowTasks ? resumeWorkflowTask : undefined}
         onUrgeTask={
           canUpdateWorkflowTasks ? urgePurchaseWorkflowTask : undefined
         }
@@ -934,6 +1038,7 @@ export default function V1PurchaseOrdersPage() {
         canUpdate={canUpdate}
         onOk={handleSave}
         onCancel={() => {
+          sourceDocumentOpenEditController.invalidate()
           orderAttachmentRef.current?.clearPendingAttachments()
           setModalOpen(false)
         }}

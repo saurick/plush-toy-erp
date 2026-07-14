@@ -58,6 +58,32 @@ func TestJsonrpcDispatcher_RequireAdmin_DisabledAdminUsesAdminDisabled(t *testin
 	}
 }
 
+func TestJsonrpcDispatcher_GetCurrentAdminUsesVerifiedMiddlewareIdentity(t *testing.T) {
+	j := &jsonrpcDispatcher{}
+	claims := &biz.AuthClaims{UserID: 7, Username: "verified", Role: biz.RoleAdmin}
+	verified := &biz.AdminUser{ID: 7, Username: "verified", AuthVersion: 3}
+	ctx := biz.NewContextWithClaims(context.Background(), claims)
+	ctx = biz.WithCurrentAdmin(ctx, verified)
+
+	admin, err := j.getCurrentAdmin(ctx, claims)
+	if err != nil {
+		t.Fatalf("getCurrentAdmin() error = %v", err)
+	}
+	if admin != verified {
+		t.Fatalf("getCurrentAdmin() = %#v, want verified middleware identity", admin)
+	}
+}
+
+func TestJsonrpcDispatcher_GetCurrentAdminRejectsMismatchedVerifiedIdentity(t *testing.T) {
+	j := &jsonrpcDispatcher{}
+	claims := &biz.AuthClaims{UserID: 7, Username: "verified", Role: biz.RoleAdmin}
+	ctx := biz.WithCurrentAdmin(context.Background(), &biz.AdminUser{ID: 8, Username: "other"})
+
+	if _, err := j.getCurrentAdmin(ctx, claims); err == nil {
+		t.Fatalf("getCurrentAdmin() accepted mismatched verified identity")
+	}
+}
+
 func TestJsonrpcDispatcher_WorkflowMetadataRequiresAdminAndReturnsStates(t *testing.T) {
 	j := &jsonrpcDispatcher{
 		log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),

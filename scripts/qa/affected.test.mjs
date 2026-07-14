@@ -58,6 +58,80 @@ test("affected: docs-only changes stay at T1", () => {
   assert.equal(plan.requiresFull, false);
 });
 
+test("affected: customer raw-source README selects the fail-closed privacy boundary", () => {
+  const plan = buildAffectedPlan(
+    ["docs/customers/yoyoosun/raw-source-files/README.md"],
+    { root: ROOT },
+  );
+
+  assert(ids(plan).includes("docs-inventory"));
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes(
+        "scripts/qa/customer-source-repository-boundary.test.mjs",
+      ),
+    ),
+  );
+  assert.equal(plan.highestLevel, "T6");
+});
+
+test("affected: non-public customer config binary selects the privacy boundary", () => {
+  const plan = buildAffectedPlan(
+    ["config/customers/yoyoosun/private-form.png"],
+    { root: ROOT },
+  );
+
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes(
+        "scripts/qa/customer-source-repository-boundary.test.mjs",
+      ),
+    ),
+  );
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/customer-package-lint.test.mjs"),
+    ),
+  );
+  assert.equal(plan.highestLevel, "T6");
+});
+
+test("affected: CI workflow changes run the repository CI contract", () => {
+  const plan = buildAffectedPlan([".github/workflows/ci.yml"], { root: ROOT });
+
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/ci-workflow.test.mjs"),
+    ),
+  );
+  assert(
+    plan.followUps.some((item) => item.id === "remote-ci-enforcement"),
+  );
+  assert.equal(plan.requiresFull, false);
+});
+
+test("affected: broad canonical audit is non-blocking and explicit", () => {
+  const runtimePlan = buildAffectedPlan(["server/internal/biz/workflow.go"], {
+    root: ROOT,
+  });
+  assert(!ids(runtimePlan).includes("canonical-runtime-boundary"));
+
+  const auditPlan = buildAffectedPlan(
+    ["scripts/qa/experimental/canonical-runtime-audit.mjs"],
+    { root: ROOT },
+  );
+  assert.deepEqual(ids(auditPlan), [
+    "diff-check",
+    "node-check:scripts/qa/experimental/canonical-runtime-audit.mjs",
+  ]);
+  assert(
+    auditPlan.followUps.some(
+      (item) => item.id === "experimental-canonical-audit",
+    ),
+  );
+  assert.equal(auditPlan.requiresFull, false);
+});
+
 test("affected: a web helper with a sibling test uses the focused test", () => {
   const plan = buildAffectedPlan(["web/src/erp/utils/dateRange.mjs"], {
     root: ROOT,
@@ -95,6 +169,17 @@ test("affected: schema changes select migration guard and data tests without aut
   assert.equal(ids(plan).includes("full"), false);
 });
 
+test("affected: generated Ent changes select DB proof and regeneration follow-up", () => {
+  const plan = buildAffectedPlan(
+    ["server/internal/data/model/ent/client.go"],
+    { root: ROOT },
+  );
+
+  assert(ids(plan).includes("db-guard"));
+  assert(ids(plan).includes("server-data"));
+  assert(plan.followUps.some((item) => item.id === "schema-generation"));
+});
+
 test("affected: business fact repo changes include the local PostgreSQL transaction gate", () => {
   const plan = buildAffectedPlan(["server/internal/data/inventory_repo.go"], {
     root: ROOT,
@@ -105,6 +190,19 @@ test("affected: business fact repo changes include the local PostgreSQL transact
   assert(ids(plan).includes("critical-pg-migrate"));
   assert(ids(plan).includes("critical-pg-test"));
   assert.equal(plan.highestLevel, "T7");
+});
+
+test("affected: transactional workflow and customer repositories select critical PostgreSQL", () => {
+  for (const file of [
+    "server/internal/data/workflow_repo.go",
+    "server/internal/data/customer_config_repo.go",
+    "server/internal/data/source_document_repo.go",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert(ids(plan).includes("critical-pg-create"), file);
+    assert(ids(plan).includes("critical-pg-migrate"), file);
+    assert(ids(plan).includes("critical-pg-test"), file);
+  }
 });
 
 test("affected: customer config changes select the T6 boundary suite", () => {
@@ -120,6 +218,32 @@ test("affected: customer config changes select the T6 boundary suite", () => {
     item.args.includes("scripts/qa/customer-config-runtime-manifest.test.mjs"),
   );
   assert.equal(configCommand?.level, "T6");
+  assert(
+    plan.commands.some((item) => item.args.includes("config/customers/index.test.mjs")),
+  );
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/build/apply-customer-web-config.test.mjs"),
+    ),
+  );
+});
+
+test("affected: private deployment template changes include isolation boundaries", () => {
+  const plan = buildAffectedPlan(
+    ["config/private-deployment-template/reference-customer.env.example"],
+    { root: ROOT },
+  );
+
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/private-deployment-boundaries.test.mjs"),
+    ),
+  );
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/private-deployment-package-closure.test.mjs"),
+    ),
+  );
 });
 
 test("affected: visible login pages still require browser regression", () => {
@@ -167,6 +291,42 @@ test("affected: deleted tests do not execute stale paths", () => {
     false,
   );
   assert.deepEqual(ids(qaPlan), ["diff-check", "full"]);
+});
+
+test("affected: QA shell scripts keep syntax proof and escalate without a sibling test", () => {
+  const noSibling = buildAffectedPlan(["scripts/qa/go-vet.sh"], {
+    root: ROOT,
+  });
+  assert.deepEqual(ids(noSibling), [
+    "bash-n:scripts/qa/go-vet.sh",
+    "diff-check",
+    "full",
+  ]);
+  assert.equal(noSibling.requiresFull, true);
+
+  const withSibling = buildAffectedPlan(["scripts/qa/db-guard.sh"], {
+    root: ROOT,
+  });
+  assert(ids(withSibling).includes("bash-n:scripts/qa/db-guard.sh"));
+  assert(
+    withSibling.commands.some((item) =>
+      item.args.includes("scripts/qa/db-guard.test.mjs"),
+    ),
+  );
+  assert.equal(ids(withSibling).includes("full"), false);
+});
+
+test("affected: CI YAML parser changes rerun the structural workflow contract", () => {
+  const plan = buildAffectedPlan(["scripts/qa/ci-workflow-yaml-check.go"], {
+    root: ROOT,
+  });
+
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/ci-workflow.test.mjs"),
+    ),
+  );
+  assert.equal(ids(plan).includes("full"), false);
 });
 
 test("affected: default collection includes unstaged, staged, and untracked files", async () => {

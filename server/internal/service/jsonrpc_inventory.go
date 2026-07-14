@@ -29,7 +29,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 	}
 
 	switch method {
-	case "list_inventory_balances", "listInventoryBalances":
+	case "list_inventory_balances":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
@@ -43,7 +43,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 			"limit":              normalizedLimit(pm),
 			"offset":             normalizedOffset(pm),
 		}), nil
-	case "list_inventory_lots", "listInventoryLots":
+	case "list_inventory_lots":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
@@ -61,7 +61,7 @@ func (d *jsonrpcDispatcher) handleInventory(
 			"limit":          normalizedLimit(pm),
 			"offset":         normalizedOffset(pm),
 		}), nil
-	case "list_inventory_txns", "listInventoryTxns":
+	case "list_inventory_txns":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}

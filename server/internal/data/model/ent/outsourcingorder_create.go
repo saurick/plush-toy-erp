@@ -108,6 +108,20 @@ func (_c *OutsourcingOrderCreate) SetNillableLifecycleStatus(v *string) *Outsour
 	return _c
 }
 
+// SetVersion sets the "version" field.
+func (_c *OutsourcingOrderCreate) SetVersion(v int) *OutsourcingOrderCreate {
+	_c.mutation.SetVersion(v)
+	return _c
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_c *OutsourcingOrderCreate) SetNillableVersion(v *int) *OutsourcingOrderCreate {
+	if v != nil {
+		_c.SetVersion(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *OutsourcingOrderCreate) SetNote(v string) *OutsourcingOrderCreate {
 	_c.mutation.SetNote(v)
@@ -209,6 +223,10 @@ func (_c *OutsourcingOrderCreate) defaults() {
 		v := outsourcingorder.DefaultLifecycleStatus
 		_c.mutation.SetLifecycleStatus(v)
 	}
+	if _, ok := _c.mutation.Version(); !ok {
+		v := outsourcingorder.DefaultVersion
+		_c.mutation.SetVersion(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := outsourcingorder.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -256,6 +274,14 @@ func (_c *OutsourcingOrderCreate) check() error {
 	if v, ok := _c.mutation.LifecycleStatus(); ok {
 		if err := outsourcingorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.lifecycle_status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "OutsourcingOrder.version"`)}
+	}
+	if v, ok := _c.mutation.Version(); ok {
+		if err := outsourcingorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.version": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.Note(); ok {
@@ -329,6 +355,10 @@ func (_c *OutsourcingOrderCreate) createSpec() (*OutsourcingOrder, *sqlgraph.Cre
 	if value, ok := _c.mutation.LifecycleStatus(); ok {
 		_spec.SetField(outsourcingorder.FieldLifecycleStatus, field.TypeString, value)
 		_node.LifecycleStatus = value
+	}
+	if value, ok := _c.mutation.Version(); ok {
+		_spec.SetField(outsourcingorder.FieldVersion, field.TypeInt, value)
+		_node.Version = value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(outsourcingorder.FieldNote, field.TypeString, value)

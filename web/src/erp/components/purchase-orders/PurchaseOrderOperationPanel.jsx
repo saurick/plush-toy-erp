@@ -188,7 +188,8 @@ export default function PurchaseOrderOperationPanel({
         <Button
           size="small"
           icon={<EditOutlined />}
-          disabled={!selectedOrderCanEdit}
+          loading={itemsLoading}
+          disabled={!selectedOrderCanEdit || itemsLoading}
           onClick={() => openEditModal(singleSelectedOrder)}
         >
           编辑

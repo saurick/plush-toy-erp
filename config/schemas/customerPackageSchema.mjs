@@ -15,7 +15,36 @@ export const customerPackageSchema = Object.freeze({
     "processPolicies",
     "extensionPoints",
   ]),
-  allowedStatuses: Object.freeze(["draft", "preview_only"]),
+  allowedStatuses: Object.freeze(["draft", "preview_only", "release_ready"]),
+  allowedRuntimeProcessSelectionKeys: Object.freeze([
+    "processKey",
+    "processVersion",
+    "variantKey",
+    "businessRefType",
+  ]),
+  allowedRuntimeProcessSelections: Object.freeze([
+    Object.freeze({
+      processKey: "sales_order_acceptance",
+      processVersion: "v1",
+      variantKeys: Object.freeze([
+        "approval_pmc",
+        "approval_engineering_pmc",
+      ]),
+      businessRefType: "sales_order",
+    }),
+    Object.freeze({
+      processKey: "material_supply",
+      processVersion: "v1",
+      variantKeys: Object.freeze(["purchase_receipt_iqc_inbound"]),
+      businessRefType: "purchase_order",
+    }),
+    Object.freeze({
+      processKey: "finished_goods_delivery",
+      processVersion: "v1",
+      variantKeys: Object.freeze(["quality_finance_ship_receivable"]),
+      businessRefType: "shipment",
+    }),
+  ]),
   allowedWorkflowNodeTypes: Object.freeze([
     "human_task",
     "approval",
@@ -64,6 +93,17 @@ export const customerPackageSchema = Object.freeze({
     "buyerContact",
     "buyerAddress",
   ]),
+  allowedFieldPolicyOverrideKeys: Object.freeze([
+    "surfaceKey",
+    "fieldKey",
+    "visible",
+    "reason",
+  ]),
+  requiredFieldPolicyOverrideKeys: Object.freeze([
+    "surfaceKey",
+    "fieldKey",
+    "visible",
+  ]),
   requiredBoundaryFalseKeys: Object.freeze([
     "createsTenant",
     "changesSchema",
@@ -106,6 +146,7 @@ export const customerPackageSchema = Object.freeze({
   ]),
   previewSections: Object.freeze([
     "identity",
+    "runtimeProcessSelections",
     "workflows",
     "businessFlows",
     "stateMachines",

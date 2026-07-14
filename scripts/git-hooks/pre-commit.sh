@@ -1,44 +1,57 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+CALLER_DIR="$(pwd -P)"
 ROOT_DIR="$(git rev-parse --show-toplevel)"
+if [[ -n "${GIT_INDEX_FILE:-}" && "$GIT_INDEX_FILE" != /* ]]; then
+  export GIT_INDEX_FILE="$CALLER_DIR/$GIT_INDEX_FILE"
+fi
 cd "$ROOT_DIR"
 
-collect_staged_files() {
-  STAGED_FILES=()
-  while IFS= read -r -d '' file; do
-    STAGED_FILES+=("$file")
-  done < <(git diff --cached --name-only --diff-filter=ACMR -z)
+STAGED_FILES=()
+while IFS= read -r -d '' file; do
+  STAGED_FILES+=("$file")
+done < <(git diff --cached --name-only --diff-filter=ACMRD -z)
+
+if [[ "${#STAGED_FILES[@]}" -eq 0 ]]; then
+  exit 0
+fi
+
+echo "[pre-commit] 检查暂存 diff"
+git diff --cached --check
+
+INDEX_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/plush-pre-commit-index.XXXXXX")"
+INDEX_ROOT="$(cd "$INDEX_ROOT" && pwd -P)"
+GIT_DIR_PATH="$(git rev-parse --absolute-git-dir)"
+cleanup() {
+  rm -rf "$INDEX_ROOT"
 }
+trap cleanup EXIT
 
-build_web_targets() {
-  PRETTIER_TARGETS_WEB=()
-  PRETTIER_TARGETS_ROOT=()
-  ESLINT_TARGETS_WEB=()
-  ESLINT_TARGETS_ROOT=()
+# 所有后续检查都读取同一份 index 快照。这样其他 checker/config 的
+# 未暂存 WIP 既不能放宽本次提交，也不会让 partial staging 被误检为 worktree 内容。
+git checkout-index --all --prefix="$INDEX_ROOT/"
+export GIT_DIR="$GIT_DIR_PATH"
+export GIT_WORK_TREE="$INDEX_ROOT"
+cd "$INDEX_ROOT"
 
-  for file in "${STAGED_FILES[@]}"; do
-    [[ "$file" =~ ^web/ ]] || continue
+echo "[pre-commit] 检查 required 文件的暂存状态与 executable bit"
+node "$INDEX_ROOT/scripts/qa/gate-profiles.mjs" \
+  --profile fast --source index-transition --baseline HEAD
 
-    case "$file" in
-    web/node_modules/* | web/build/*)
-      continue
-      ;;
-    esac
+echo "[pre-commit] 检查错误码生成同步"
+bash "$INDEX_ROOT/scripts/qa/error-code-sync.sh"
 
-    case "$file" in
-    *.js | *.jsx | *.ts | *.tsx | *.cjs | *.mjs | *.css | *.scss | *.sass | *.json | *.md | *.html | *.yml | *.yaml)
-      PRETTIER_TARGETS_WEB+=("${file#web/}")
-      PRETTIER_TARGETS_ROOT+=("$file")
-      ;;
-    esac
+echo "[pre-commit] 检查暂存错误码"
+ERROR_CODE_GUARD_STAGED_ONLY=1 bash "$INDEX_ROOT/scripts/qa/error-codes.sh"
 
-    if [[ "$file" =~ ^web/src/.*\.(js|jsx)$ ]]; then
-      ESLINT_TARGETS_WEB+=("${file#web/}")
-      ESLINT_TARGETS_ROOT+=("$file")
-    fi
-  done
-}
+echo "[pre-commit] 扫描暂存内容中的密钥"
+SECRETS_STRICT=1 SECRETS_STAGED_ONLY=1 bash "$INDEX_ROOT/scripts/qa/secrets.sh"
+
+SHELL_TARGETS=()
+YAML_TARGETS=()
+GO_TARGETS=()
+RUN_GO_ALL=0
 
 add_go_target() {
   local target="$1"
@@ -49,177 +62,61 @@ add_go_target() {
   GO_TARGETS+=("$target")
 }
 
-detect_go_targets() {
-  HAS_GO_CHANGES=0
-  RUN_GO_ALL=0
-  GO_TARGETS=()
-
-  local file rel dir
-  for file in "${STAGED_FILES[@]}"; do
-    case "$file" in
-    server/go.mod | server/go.sum | .golangci.yml | .golangci.yaml | .golangci.toml | .golangci.json)
-      HAS_GO_CHANGES=1
-      RUN_GO_ALL=1
-      ;;
-    esac
-
-    if [[ "$file" =~ ^server/.*\.go$ ]]; then
-      HAS_GO_CHANGES=1
-      rel="${file#server/}"
-      dir="$(dirname "$rel")"
-      if [[ "$dir" == "." ]]; then
-        add_go_target "./"
-      else
-        add_go_target "./$dir"
-      fi
-    fi
-  done
-
-  GO_VET_ARGS=()
-  GOLANGCI_ARGS=()
-  if [[ "$HAS_GO_CHANGES" -eq 1 ]]; then
-    if [[ "$RUN_GO_ALL" -eq 1 || "${#GO_TARGETS[@]}" -eq 0 ]]; then
-      GO_VET_ARGS=(./...)
-      GOLANGCI_ARGS=(./...)
-    else
-      GO_VET_ARGS=("${GO_TARGETS[@]}")
-      GOLANGCI_ARGS=("${GO_TARGETS[@]}")
-    fi
-  fi
-}
-
-is_yaml_ignored() {
-  local file="$1"
+for file in "${STAGED_FILES[@]}"; do
   case "$file" in
-  .git/* | web/node_modules/* | web/build/* | server/bin/* | web/pnpm-lock.yaml | .playwright-cli/*)
-    return 0
-    ;;
-  *)
-    return 1
+  scripts/*.sh | .githooks/pre-commit | .githooks/pre-push | .githooks/commit-msg)
+    [[ -f "$file" ]] && SHELL_TARGETS+=("$file")
     ;;
   esac
-}
 
-detect_yaml_targets() {
-  YAML_TARGETS=()
-  local file
-  for file in "${STAGED_FILES[@]}"; do
+  case "$file" in
+  *.yml | *.yaml)
     case "$file" in
-    *.yml | *.yaml)
-      if is_yaml_ignored "$file"; then
-        continue
-      fi
-      YAML_TARGETS+=("$file")
-      ;;
+    web/pnpm-lock.yaml | web/node_modules/* | web/build/* | server/bin/* | .playwright-cli/*) ;;
+    *) YAML_TARGETS+=("$file") ;;
     esac
-  done
-}
+    ;;
+  esac
 
-detect_shell_targets() {
-  SHFMT_TARGETS_ROOT=()
-  local file
-  for file in "${STAGED_FILES[@]}"; do
-    case "$file" in
-    scripts/* | .githooks/*) ;;
-    *)
-      continue
-      ;;
-    esac
+  case "$file" in
+  server/go.mod | server/go.sum | .golangci.yml | .golangci.yaml | .golangci.toml | .golangci.json)
+    RUN_GO_ALL=1
+    ;;
+  server/*.go)
+    relative="${file#server/}"
+    directory="$(dirname "$relative")"
+    if [[ "$directory" == "." ]]; then
+      add_go_target "./"
+    else
+      add_go_target "./$directory"
+    fi
+    ;;
+  esac
+done
 
-    case "$file" in
-    *.sh | .githooks/pre-commit | .githooks/pre-push | .githooks/commit-msg)
-      [[ -f "$file" ]] || continue
-      SHFMT_TARGETS_ROOT+=("$file")
-      ;;
-    esac
-  done
-}
+if [[ "${#SHELL_TARGETS[@]}" -gt 0 ]]; then
+  echo "[pre-commit] 检查暂存 shell 文件格式"
+  SHFMT_STRICT=1 SHFMT_CHECK=1 bash "$INDEX_ROOT/scripts/qa/shfmt.sh" "${SHELL_TARGETS[@]}"
 
-collect_staged_files
-if [[ "${#STAGED_FILES[@]}" -eq 0 ]]; then
-  exit 0
+  echo "[pre-commit] 运行 shellcheck"
+  SHELLCHECK_STRICT=1 bash "$INDEX_ROOT/scripts/qa/shellcheck.sh" "${SHELL_TARGETS[@]}"
 fi
 
-build_web_targets
-if [[ "${#PRETTIER_TARGETS_WEB[@]}" -gt 0 || "${#ESLINT_TARGETS_WEB[@]}" -gt 0 ]]; then
-  source "$ROOT_DIR/scripts/lib/pnpm.sh"
-  PNPM_BIN="$(resolve_project_pnpm "$ROOT_DIR")"
-fi
-
-if [[ "${#PRETTIER_TARGETS_WEB[@]}" -gt 0 ]]; then
-  echo "[pre-commit] 运行 Prettier（仅暂存文件）"
-  (
-    cd "$ROOT_DIR/web"
-    "$PNPM_BIN" exec prettier --write "${PRETTIER_TARGETS_WEB[@]}"
-  )
-  git add -- "${PRETTIER_TARGETS_ROOT[@]}"
-fi
-
-if [[ "${#ESLINT_TARGETS_WEB[@]}" -gt 0 ]]; then
-  echo "[pre-commit] 运行 ESLint --fix（仅暂存文件）"
-  (
-    cd "$ROOT_DIR/web"
-    "$PNPM_BIN" exec eslint --fix --ext .js --ext .jsx "${ESLINT_TARGETS_WEB[@]}"
-  )
-  git add -- "${ESLINT_TARGETS_ROOT[@]}"
-fi
-
-collect_staged_files
-if [[ "${#STAGED_FILES[@]}" -eq 0 ]]; then
-  exit 0
-fi
-
-detect_shell_targets
-if [[ "${#SHFMT_TARGETS_ROOT[@]}" -gt 0 ]]; then
-  echo "[pre-commit] 运行 shfmt（仅暂存脚本）"
-  SHFMT_STRICT=1 bash "$ROOT_DIR/scripts/qa/shfmt.sh" "${SHFMT_TARGETS_ROOT[@]}"
-  git add -- "${SHFMT_TARGETS_ROOT[@]}"
-fi
-
-collect_staged_files
-if [[ "${#STAGED_FILES[@]}" -eq 0 ]]; then
-  exit 0
-fi
-
-echo "[pre-commit] 运行 shellcheck"
-SHELLCHECK_STRICT=1 bash "$ROOT_DIR/scripts/qa/shellcheck.sh"
-
-if [[ -f "$ROOT_DIR/scripts/gen-error-codes.mjs" ]]; then
-  if ! command -v node >/dev/null 2>&1; then
-    echo "[pre-commit] 未找到 node，无法同步前端错误码生成产物"
-    exit 1
+if [[ "$RUN_GO_ALL" -eq 1 || "${#GO_TARGETS[@]}" -gt 0 ]]; then
+  if [[ "$RUN_GO_ALL" -eq 1 ]]; then
+    GO_TARGETS=(./...)
   fi
+  echo "[pre-commit] 检测到 Go 改动，运行 go vet"
+  bash "$INDEX_ROOT/scripts/qa/go-vet.sh" "${GO_TARGETS[@]}"
 
-  # 先同步生成产物，再做守卫检查，避免把目录真源与前端常量拆开提交。
-  echo "[pre-commit] 同步前端错误码生成产物"
-  node "$ROOT_DIR/scripts/gen-error-codes.mjs"
-  if [[ -f "$ROOT_DIR/web/src/common/consts/errorCodes.generated.js" ]]; then
-    git add -- "$ROOT_DIR/web/src/common/consts/errorCodes.generated.js"
-  fi
+  echo "[pre-commit] 检测到 Go 改动，运行 golangci-lint"
+  GOLANGCI_STRICT=1 GOLANGCI_ONLY_NEW=1 \
+    bash "$INDEX_ROOT/scripts/qa/golangci-lint.sh" "${GO_TARGETS[@]}"
 fi
 
-echo "[pre-commit] 运行错误码生成同步检查"
-bash "$ROOT_DIR/scripts/qa/error-code-sync.sh"
-
-echo "[pre-commit] 运行错误码魔法数字检查（仅暂存文件）"
-ERROR_CODE_GUARD_STAGED_ONLY=1 bash "$ROOT_DIR/scripts/qa/error-codes.sh"
-
-echo "[pre-commit] 运行 gitleaks（仅暂存文件）"
-SECRETS_STRICT=1 SECRETS_STAGED_ONLY=1 bash "$ROOT_DIR/scripts/qa/secrets.sh"
-
-detect_go_targets
-if [[ "$HAS_GO_CHANGES" -eq 1 ]]; then
-  echo "[pre-commit] 检测到 Go 相关改动，运行 go vet（仅改动包）"
-  bash "$ROOT_DIR/scripts/qa/go-vet.sh" "${GO_VET_ARGS[@]}"
-
-  echo "[pre-commit] 检测到 Go 相关改动，运行 golangci-lint（仅新增问题）"
-  GOLANGCI_STRICT=1 GOLANGCI_ONLY_NEW=1 bash "$ROOT_DIR/scripts/qa/golangci-lint.sh" "${GOLANGCI_ARGS[@]}"
-fi
-
-detect_yaml_targets
 if [[ "${#YAML_TARGETS[@]}" -gt 0 ]]; then
-  echo "[pre-commit] 运行 yamllint（仅暂存 YAML）"
-  YAMLLINT_STRICT=1 bash "$ROOT_DIR/scripts/qa/yamllint.sh" "${YAML_TARGETS[@]}"
+  echo "[pre-commit] 检查暂存 YAML"
+  YAMLLINT_STRICT=1 bash "$INDEX_ROOT/scripts/qa/yamllint.sh" "${YAML_TARGETS[@]}"
 fi
 
-echo "[pre-commit] 完成"
+echo "[pre-commit] 完成（check-only，未修改或重新暂存文件）"

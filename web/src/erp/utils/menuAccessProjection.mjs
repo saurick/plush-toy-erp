@@ -6,17 +6,11 @@ function normalizeStringList(values = []) {
 
 export function isMenuVisibleForPermissionKeys(menu = {}, permissionKeys = []) {
   const permissionSet = new Set(normalizeStringList(permissionKeys))
-  const legacyRequired = normalizeStringList(menu?.required_permissions)
   const requiredAny = normalizeStringList(menu?.required_any)
   const requiredAll = normalizeStringList(menu?.required_all)
-  const usesExplicitRequirementMode =
-    Array.isArray(menu?.required_any) || Array.isArray(menu?.required_all)
-  const effectiveRequiredAny = usesExplicitRequirementMode
-    ? requiredAny
-    : legacyRequired
   const hasAny =
-    effectiveRequiredAny.length === 0 ||
-    effectiveRequiredAny.some((permissionKey) =>
+    requiredAny.length === 0 ||
+    requiredAny.some((permissionKey) =>
       permissionSet.has(permissionKey)
     )
   const hasAll = requiredAll.every((permissionKey) =>

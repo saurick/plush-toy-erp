@@ -12,6 +12,7 @@ const DEFAULT_CUSTOMER = "yoyoosun";
 const PUBLISH_CONFIRM_PHRASE = "PUBLISH_YOYOOSUN_CONFIG";
 const ACTIVATE_CONFIRM_PHRASE = "ACTIVATE_YOYOOSUN_CONFIG";
 const ROLLBACK_CONFIRM_PHRASE = "ROLLBACK_YOYOOSUN_CONFIG";
+const CUSTOMER_CONFIG_HASH_VERSION = 1;
 
 const USAGE = `Customer config release executor
 
@@ -177,6 +178,7 @@ export function buildInputTemplate(customer = DEFAULT_CUSTOMER) {
     operations: [
       "validate_customer_config",
       "publish_customer_config",
+      "check_customer_config_transition before activate or rollback",
       "activate_customer_config",
       "rollback_customer_config",
       "get_effective_session after activate or rollback",
@@ -283,34 +285,6 @@ function manifestSummary(manifest) {
 }
 
 function buildOperations({ manifest, activate, activateOnly, rollback }) {
-  if (rollback) {
-    return [
-      {
-        key: "rollback",
-        rpcPath: "/rpc/customer_config",
-        method: "rollback_customer_config",
-        params: {
-          customer_key: manifest.customer_key,
-          target_revision: manifest.revision,
-        },
-        summary: "roll back active customer config to the manifest revision",
-      },
-    ];
-  }
-  if (activateOnly) {
-    return [
-      {
-        key: "activate",
-        rpcPath: "/rpc/customer_config",
-        method: "activate_customer_config",
-        params: {
-          customer_key: manifest.customer_key,
-          revision: manifest.revision,
-        },
-        summary: "activate already published customer config revision",
-      },
-    ];
-  }
   const operations = [
     {
       key: "validate",
@@ -319,31 +293,55 @@ function buildOperations({ manifest, activate, activateOnly, rollback }) {
       params: manifest,
       summary: "validate compiled customer config manifest",
     },
-    {
+  ];
+  if (!activateOnly && !rollback) {
+    operations.push({
       key: "publish",
       rpcPath: "/rpc/customer_config",
       method: "publish_customer_config",
       params: manifest,
       summary: "publish compiled customer config revision",
-    },
-  ];
-  if (activate) {
+    });
+  }
+  if (activate || rollback) {
+    const action = rollback ? "rollback" : "activate";
     operations.push({
-      key: "activate",
+      key: "transition-check",
       rpcPath: "/rpc/customer_config",
-      method: "activate_customer_config",
+      method: "check_customer_config_transition",
+      params: {
+        action,
+        customer_key: manifest.customer_key,
+        target_revision: manifest.revision,
+      },
+      summary: `check ${action} blockers and active revision before mutation`,
+    });
+    operations.push({
+      key: action,
+      rpcPath: "/rpc/customer_config",
+      method: rollback
+        ? "rollback_customer_config"
+        : "activate_customer_config",
       params: {
         customer_key: manifest.customer_key,
-        revision: manifest.revision,
+        ...(rollback
+          ? { target_revision: manifest.revision }
+          : { revision: manifest.revision }),
       },
-      summary: "activate published customer config revision",
+      summary: rollback
+        ? "roll back active customer config to the manifest revision"
+        : activateOnly
+          ? "activate already published customer config revision"
+          : "activate published customer config revision",
     });
   }
   return operations;
 }
 
 function arrayFrom(value) {
-  return Array.isArray(value) ? value.filter((item) => typeof item === "string" && item.trim() !== "") : [];
+  return Array.isArray(value)
+    ? value.filter((item) => typeof item === "string" && item.trim() !== "")
+    : [];
 }
 
 function sortedKeys(value) {
@@ -387,7 +385,12 @@ async function rpcCall({ backendURL, token, rpcPath, method, params }) {
   return json.result.data || {};
 }
 
-async function verifyEffectiveSession({ backendURL, token, manifest }) {
+async function verifyEffectiveSession({
+  backendURL,
+  token,
+  manifest,
+  validatedIdentity,
+}) {
   const data = await rpcCall({
     backendURL,
     token,
@@ -395,14 +398,23 @@ async function verifyEffectiveSession({ backendURL, token, manifest }) {
     method: "get_effective_session",
     params: { customer_key: manifest.customer_key },
   });
-  const session = data.session || data;
+  const session = data?.session;
+  if (!session || typeof session !== "object" || Array.isArray(session)) {
+    throw new CliError(
+      "get_effective_session response does not contain the required session object",
+    );
+  }
   const pages = arrayFrom(session.pages);
   const actions = arrayFrom(session.actions);
   const workPools = arrayFrom(session.workPools);
   const manifestPages = arrayFrom(manifest.compiled_snapshot?.pages);
-  const manifestFieldPolicySurfaces = sortedKeys(manifest.compiled_snapshot?.fieldPolicies);
+  const manifestFieldPolicySurfaces = sortedKeys(
+    manifest.compiled_snapshot?.fieldPolicies,
+  );
   const sessionFieldPolicySurfaces = sortedKeys(session.fieldPolicies);
-  const pagesSubsetOfManifest = pages.every((pageKey) => manifestPages.includes(pageKey));
+  const pagesSubsetOfManifest = pages.every((pageKey) =>
+    manifestPages.includes(pageKey),
+  );
   const fieldPolicySurfacesMatchManifest = sameStringSet(
     sessionFieldPolicySurfaces,
     manifestFieldPolicySurfaces,
@@ -412,19 +424,45 @@ async function verifyEffectiveSession({ backendURL, token, manifest }) {
     throw new CliError("effective session customer does not match manifest");
   }
   if (session.configRevision !== manifest.revision) {
-    throw new CliError("effective session configRevision does not match manifest revision");
+    throw new CliError(
+      "effective session configRevision does not match manifest revision",
+    );
+  }
+  if (
+    String(session.configHash || "")
+      .trim()
+      .toLowerCase() !== validatedIdentity.configHash
+  ) {
+    throw new CliError(
+      "effective session configHash does not match validated manifest",
+    );
+  }
+  if (
+    Number(session.configHashVersion) !== validatedIdentity.configHashVersion
+  ) {
+    throw new CliError(
+      "effective session configHashVersion does not match validated manifest",
+    );
   }
   if (session.source !== "active_customer_config_revision") {
-    throw new CliError("effective session source is not active_customer_config_revision");
+    throw new CliError(
+      "effective session source is not active_customer_config_revision",
+    );
   }
   if (pages.length === 0) {
-    throw new CliError("effective session pages must not be empty after activation");
+    throw new CliError(
+      "effective session pages must not be empty after activation",
+    );
   }
   if (!pagesSubsetOfManifest) {
-    throw new CliError("effective session pages must be a subset of manifest pages");
+    throw new CliError(
+      "effective session pages must be a subset of manifest pages",
+    );
   }
   if (!fieldPolicySurfacesMatchManifest) {
-    throw new CliError("effective session field policy surfaces do not match manifest");
+    throw new CliError(
+      "effective session field policy surfaces do not match manifest",
+    );
   }
 
   return {
@@ -433,6 +471,8 @@ async function verifyEffectiveSession({ backendURL, token, manifest }) {
     customerKey: session.customer?.key || "",
     revision: manifest.revision,
     configRevision: session.configRevision || "",
+    configHash: validatedIdentity.configHash,
+    configHashVersion: validatedIdentity.configHashVersion,
     source: session.source || "",
     pageCount: pages.length,
     actionCount: actions.length,
@@ -476,22 +516,258 @@ function requireExecutionConfirmation({ activate, rollback }) {
     expected = ROLLBACK_CONFIRM_PHRASE;
   }
   if (process.env.CUSTOMER_CONFIG_CONFIRM !== expected) {
-    throw new CliError(`execution requires CUSTOMER_CONFIG_CONFIRM=${expected}`);
+    throw new CliError(
+      `execution requires CUSTOMER_CONFIG_CONFIRM=${expected}`,
+    );
   }
 }
 
-async function executeOperations({ backendURL, operations, manifest, activate, rollback }) {
+function requireValidationIdentity(data, manifest) {
+  const validation = data?.validation;
+  const configHash = String(validation?.config_hash || "")
+    .trim()
+    .toLowerCase();
+  if (
+    validation?.customer_key !== manifest.customer_key ||
+    validation?.revision !== manifest.revision ||
+    !/^[a-f0-9]{64}$/.test(configHash) ||
+    Number(validation?.config_hash_version) !== CUSTOMER_CONFIG_HASH_VERSION ||
+    validation?.compiled_snapshot_ok !== true
+  ) {
+    throw new CliError(
+      "validate_customer_config response does not prove the manifest identity",
+    );
+  }
+  return {
+    configHash,
+    configHashVersion: CUSTOMER_CONFIG_HASH_VERSION,
+    productVersion: manifest.product_version,
+  };
+}
+
+function requirePublishedIdentity(data, manifest, identity) {
+  const revision = data?.revision;
+  const status = String(revision?.status || "");
+  if (
+    revision?.customer_key !== manifest.customer_key ||
+    revision?.revision !== manifest.revision ||
+    String(revision?.product_version || "") !== identity.productVersion ||
+    String(revision?.config_hash || "")
+      .trim()
+      .toLowerCase() !== identity.configHash ||
+    Number(revision?.config_hash_version) !== identity.configHashVersion ||
+    !["published", "active", "superseded"].includes(status)
+  ) {
+    throw new CliError(
+      "publish_customer_config response does not match the validated manifest identity",
+    );
+  }
+}
+
+function requireMutationIdentity(data, manifest, identity, action) {
+  const revision = data?.revision;
+  if (
+    revision?.customer_key !== manifest.customer_key ||
+    revision?.revision !== manifest.revision ||
+    String(revision?.product_version || "") !== identity.productVersion ||
+    String(revision?.config_hash || "")
+      .trim()
+      .toLowerCase() !== identity.configHash ||
+    Number(revision?.config_hash_version) !== identity.configHashVersion ||
+    revision?.status !== "active"
+  ) {
+    throw new CliError(
+      `${action}_customer_config response does not match the validated manifest identity`,
+    );
+  }
+}
+
+function requireTransitionResponse(data, manifest, identity, action) {
+  const transition = data?.transition;
+  const blockersAreValid =
+    Array.isArray(transition?.blockers) &&
+    transition.blockers.every(
+      (blocker) =>
+        blocker &&
+        typeof blocker === "object" &&
+        !Array.isArray(blocker) &&
+        typeof blocker.code === "string" &&
+        blocker.code.trim() !== "",
+    );
+  if (
+    !transition ||
+    transition.action !== action ||
+    transition.customer_key !== manifest.customer_key ||
+    transition.target_revision !== manifest.revision ||
+    String(transition.target_config_hash || "")
+      .trim()
+      .toLowerCase() !== identity.configHash ||
+    String(transition.target_product_version || "") !==
+      identity.productVersion ||
+    typeof transition.expected_active_revision !== "string" ||
+    typeof transition.observed_active_revision !== "string" ||
+    typeof transition.allowed !== "boolean" ||
+    !blockersAreValid
+  ) {
+    throw new CliError(
+      "check_customer_config_transition response does not match the validated manifest identity",
+    );
+  }
+  return transition;
+}
+
+function transitionBlockerCodes(transition) {
+  return transition.blockers.map((blocker) => blocker.code.trim()).sort();
+}
+
+async function checkTransition({
+  backendURL,
+  token,
+  operation,
+  manifest,
+  identity,
+}) {
+  const baseParams = {
+    ...operation.params,
+    expected_config_hash: identity.configHash,
+    expected_product_version: identity.productVersion,
+  };
+  const firstData = await rpcCall({
+    backendURL,
+    token,
+    rpcPath: operation.rpcPath,
+    method: operation.method,
+    params: { ...baseParams, expected_active_revision: "" },
+  });
+  let attempts = 1;
+  let transition = requireTransitionResponse(
+    firstData,
+    manifest,
+    identity,
+    operation.params.action,
+  );
+  if (transition.expected_active_revision !== "") {
+    throw new CliError(
+      "check_customer_config_transition did not echo the requested active revision",
+    );
+  }
+  const observedActiveRevision = transition.observed_active_revision.trim();
+  if (observedActiveRevision !== "") {
+    const confirmedData = await rpcCall({
+      backendURL,
+      token,
+      rpcPath: operation.rpcPath,
+      method: operation.method,
+      params: {
+        ...baseParams,
+        expected_active_revision: observedActiveRevision,
+      },
+    });
+    attempts += 1;
+    transition = requireTransitionResponse(
+      confirmedData,
+      manifest,
+      identity,
+      operation.params.action,
+    );
+    if (
+      transition.expected_active_revision !== observedActiveRevision ||
+      transition.observed_active_revision !== observedActiveRevision
+    ) {
+      throw new CliError(
+        "active customer config revision changed during transition preflight",
+      );
+    }
+  }
+  const blockerCodes = transitionBlockerCodes(transition);
+  if (!transition.allowed || blockerCodes.length > 0) {
+    throw new CliError(
+      `customer config ${operation.params.action} transition blocked: ${blockerCodes.join(",") || "unknown_blocker"}`,
+    );
+  }
+  return {
+    action: transition.action,
+    customerKey: transition.customer_key,
+    targetRevision: transition.target_revision,
+    targetConfigHash: identity.configHash,
+    targetProductVersion: identity.productVersion,
+    expectedActiveRevision: transition.expected_active_revision,
+    observedActiveRevision: transition.observed_active_revision,
+    allowed: true,
+    noop: transition.noop === true,
+    blockerCodes: [],
+    attempts,
+  };
+}
+
+async function executeOperations({
+  backendURL,
+  operations,
+  manifest,
+  activate,
+  rollback,
+}) {
   requireExecutionConfirmation({ activate, rollback });
   const token = await resolveAdminToken(backendURL);
   const results = [];
+  let validatedIdentity = null;
+  let transitionCheck = null;
   for (const operation of operations) {
+    if (operation.key === "transition-check") {
+      if (!validatedIdentity) {
+        throw new CliError(
+          "transition preflight requires validated manifest identity",
+        );
+      }
+      transitionCheck = await checkTransition({
+        backendURL,
+        token,
+        operation,
+        manifest,
+        identity: validatedIdentity,
+      });
+      results.push({
+        key: operation.key,
+        method: operation.method,
+        resultRevision: transitionCheck.targetRevision,
+        resultStatus: "allowed",
+        attempts: transitionCheck.attempts,
+      });
+      continue;
+    }
+    let params = operation.params;
+    if (operation.key === "activate" || operation.key === "rollback") {
+      if (!validatedIdentity || !transitionCheck?.allowed) {
+        throw new CliError(
+          `${operation.key}_customer_config requires an allowed transition preflight`,
+        );
+      }
+      params = {
+        ...params,
+        expected_config_hash: validatedIdentity.configHash,
+        expected_product_version: validatedIdentity.productVersion,
+        expected_active_revision: transitionCheck.observedActiveRevision,
+      };
+    }
     const data = await rpcCall({
       backendURL,
       token,
       rpcPath: operation.rpcPath,
       method: operation.method,
-      params: operation.params,
+      params,
     });
+    if (operation.key === "validate") {
+      validatedIdentity = requireValidationIdentity(data, manifest);
+    }
+    if (operation.key === "publish") {
+      if (!validatedIdentity) {
+        throw new CliError("publish requires validated manifest identity");
+      }
+      requirePublishedIdentity(data, manifest, validatedIdentity);
+    }
+    if (operation.key === "activate" || operation.key === "rollback") {
+      requireMutationIdentity(data, manifest, validatedIdentity, operation.key);
+    }
     results.push({
       key: operation.key,
       method: operation.method,
@@ -506,9 +782,24 @@ async function executeOperations({ backendURL, operations, manifest, activate, r
           backendURL,
           token: process.env.CUSTOMER_CONFIG_VERIFY_TOKEN || token,
           manifest,
+          validatedIdentity,
         })
       : null;
-  return { results, effectiveSessionVerification };
+  const validatedConfigIdentity = validatedIdentity
+    ? {
+        customerKey: manifest.customer_key,
+        revision: manifest.revision,
+        productVersion: validatedIdentity.productVersion,
+        configHash: validatedIdentity.configHash,
+        configHashVersion: validatedIdentity.configHashVersion,
+      }
+    : null;
+  return {
+    results,
+    validatedConfigIdentity,
+    transitionCheck,
+    effectiveSessionVerification,
+  };
 }
 
 async function loadAndValidateInputs(options, repoRoot) {
@@ -566,6 +857,8 @@ async function writeReport({
   backendURL,
   operations,
   results,
+  validatedConfigIdentity,
+  transitionCheck,
   effectiveSessionVerification,
   executed,
 }) {
@@ -592,6 +885,8 @@ async function writeReport({
       summary: operation.summary,
     })),
     results,
+    validatedConfigIdentity,
+    transitionCheck,
     effectiveSessionVerification,
     noRawFileUpload: true,
     noDirectDatabaseWrite: true,
@@ -620,6 +915,10 @@ async function writeReport({
       `| backendEndpointAlias | ${backendURL || ""} |`,
       `| activationGateChecked | ${Boolean(activationGate)} |`,
       `| operationCount | ${operations.length} |`,
+      `| validatedConfigHash | ${validatedConfigIdentity?.configHash || ""} |`,
+      `| validatedConfigHashVersion | ${validatedConfigIdentity?.configHashVersion || ""} |`,
+      `| transitionAllowed | ${transitionCheck?.allowed === true} |`,
+      `| transitionObservedActiveRevision | ${transitionCheck?.observedActiveRevision || ""} |`,
       `| effectiveSessionVerified | ${effectiveSessionVerification?.status === "verified"} |`,
       "",
       "This report is generated by the customer config release executor. The executor uses JSON-RPC customer_config APIs only when --execute is explicitly set. It does not upload raw customer files, write database tables directly, generate migrations, import business data, or write Workflow / Fact runtime state.",
@@ -669,7 +968,12 @@ export async function runCustomerConfigRelease(options, runtime = {}) {
         activate: Boolean(options.activate),
         rollback: Boolean(options.rollback),
       })
-    : { results: [], effectiveSessionVerification: null };
+    : {
+        results: [],
+        validatedConfigIdentity: null,
+        transitionCheck: null,
+        effectiveSessionVerification: null,
+      };
   return writeReport({
     options,
     manifestPath,
@@ -679,6 +983,8 @@ export async function runCustomerConfigRelease(options, runtime = {}) {
     backendURL,
     operations,
     results: results.results,
+    validatedConfigIdentity: results.validatedConfigIdentity,
+    transitionCheck: results.transitionCheck,
     effectiveSessionVerification: results.effectiveSessionVerification,
     executed: Boolean(options.execute),
   });

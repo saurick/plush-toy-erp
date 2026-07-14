@@ -1,0 +1,8 @@
+title = "plush-toy-erp secret scanning"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Atlas checksum entries are content hashes, not credentials"
+paths = ['''(^|/)server/internal/data/model/migrate/atlas\.sum$''']

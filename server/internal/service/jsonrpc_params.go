@@ -30,6 +30,25 @@ func getOptionalPositiveIntPtr(pm map[string]any, key string) *int {
 	return &value
 }
 
+func getRequiredJSONRPCPositiveInt(pm map[string]any, key string) (int, bool) {
+	const maxJSONSafeInteger = float64(9007199254740991)
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return 0, false
+	}
+	switch value := raw.(type) {
+	case float64:
+		if value <= 0 || value > maxJSONSafeInteger || value != float64(int64(value)) {
+			return 0, false
+		}
+		return int(value), true
+	case int:
+		return value, value > 0
+	default:
+		return 0, false
+	}
+}
+
 func getRequiredJSONRPCTime(pm map[string]any, key string) (time.Time, bool) {
 	if _, ok := pm[key]; !ok {
 		return time.Time{}, false

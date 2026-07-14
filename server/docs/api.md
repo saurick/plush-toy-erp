@@ -15,8 +15,8 @@ HTTP 路由：
 
 其中：
 
-- `{url}` 表示业务域，例如 `system`、`auth`、`user`
-- `method` 表示具体动作，例如 `login`、`me`、`list`
+- `{url}` 表示业务域，例如 `system`、`auth`、`admin`
+- `method` 表示具体动作，例如 `admin_login`、`me`、`list`
 
 ## 当前默认保留的业务域
 
@@ -29,22 +29,13 @@ HTTP 路由：
 
 ### `auth`
 
-- `login`
 - `admin_login`
 - `send_sms_code`
 - `sms_login`
 - `logout`
 - `me`
 
-用途：用户登录、管理员登录、短信验证码登录、退出和当前登录态查询。当前产品不提供公开自助注册方法；协作账号来源回到受控初始化或后续账号管理流程。
-
-### `user`
-
-- `list`
-- `set_disabled`
-- `reset_password`
-
-用途：管理员查看协作账号目录，启用/禁用用户，以及在用户忘记密码时协助重置密码。
+用途：管理员密码登录、管理员短信验证码登录、退出和当前登录态查询。当前产品不提供普通协作账号登录或公开自助注册方法。
 
 ### `admin`
 
@@ -58,9 +49,19 @@ HTTP 路由：
 - `set_phone`
 - `set_erp_column_order`
 - `set_disabled`
+- `revoke`
 - `reset_password`
 
 用途：管理员读取当前账号资料；具备对应系统权限的管理员创建管理员、绑定登录手机号、给管理员分配角色、给角色分配权限、启用 / 禁用普通管理员，以及在普通管理员忘记密码时协助重置密码。
+
+## 已退出运行时的旧接口
+
+以下旧接口不属于当前 API，调用时按未知业务域或未知方法处理：
+
+- `auth.login`
+- `user.list`
+- `user.set_disabled`
+- `user.reset_password`
 
 ## 鉴权规则
 
@@ -102,9 +103,15 @@ HTTP 路由：
 - `token_type`
 - `issued_at`
 
-`auth.sms_login` 只接受 `scope=admin`，按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`。普通协作账号登录链路已停用，旧 `auth.login` 和 `scope=user` 不再是主路径。
+`auth.sms_login` 只接受 `scope=admin`，验证码通过后按 `admin_users.phone` 查找管理员，返回字段额外包含 `is_super_admin`、`roles`、`permissions`、`menus`、`erp_preferences`。普通协作账号登录链路及 `scope=user` 已退出运行时。
 
-岗位任务端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`；服务端会校验该手机号已绑定管理员账号，且该管理员具备当前岗位任务端角色或对应 `mobile.<role>.access` 权限。手机号未绑定返回 `AuthPhoneNotBound`，不返回“用户不存在”；手机号已绑定但未授权当前岗位任务端角色返回 `AuthMobileRoleDenied`。
+岗位任务端请求 `auth.send_sms_code` 和 `auth.sms_login` 时会额外携带 `mobile_role_key`。对格式合法的手机号，发码接口始终返回相同的“验证码已发送”受理合同；服务端只在账号存在、active 且具备 `mobile.<role>.access` 时实际请求短信发送，账号资格、查询失败或短信供应商失败只进入内部脱敏日志，不能从公开响应判断手机号是否绑定管理员或具备岗位资格。
+
+短信登录先校验验证码，再读取账号和 RBAC。手机号未绑定、账号停用 / 注销、缺少当前岗位入口权限、验证码不存在 / 错误 / 过期或尝试次数耗尽，对外统一返回 `AuthLoginRejected`；内部日志仍使用稳定原因并只记录脱敏手机号。
+
+密码或短信验证码核验完成后，服务端在创建 session 的同一短事务内再次锁定并核对账号状态、`auth_version`、短信登录手机号和当前岗位入口权限；并发禁用、注销、重置密码或调整相关登录条件时，不会返回一个已经失效的“登录成功”结果。
+
+`auth.admin_login` 同样不对外区分用户名不存在、密码错误、账号停用 / 注销或登录期间凭据版本变化，统一返回 `AuthLoginRejected`。凭据查询故障返回 `Internal`，不能降级成“账号不存在”。每个用户名 / 密码尝试都会执行一次 bcrypt 比较；只有密码匹配后才加载完整 RBAC，并再次核对账号状态、密码哈希和 `auth_version`。
 
 ### `auth.send_sms_code`
 
@@ -122,21 +129,18 @@ HTTP 路由：
 - `mock_delivery`
 - `mock_code`
 
-`data.auth.sms.mode=mock` 时，服务端使用进程内验证码存储，验证码 5 分钟有效、60 秒内不可重复发送、最多尝试 5 次，`mock_delivery=true` 且返回 `mock_code` 只用于 local / dev / test。`data.auth.sms.mode=provider` 时，后端使用阿里云号码认证 PNVS 短信认证发送并核验验证码，`mock_delivery=false` 且不返回 `mock_code`；登录校验接口和手机号 / 岗位权限边界保持不变。
+`data.auth.sms.mode=mock` 时，服务端使用进程内验证码存储，验证码 5 分钟有效、60 秒内不可重复发送、最多尝试 5 次，`mock_delivery=true` 且返回 `mock_code` 只用于 local / dev / test。为保持防枚举合同，不合格账号也会收到相同格式但不可验证的诱饵码，因此公开发码响应不能作为账号存在或已授权的证据。`data.auth.sms.mode=provider` 时，后端使用阿里云号码认证 PNVS 短信认证发送并核验验证码，`mock_delivery=false` 且不返回 `mock_code`。
 
 短信登录用户可见错误按错误码收口：
 
 | 错误码 | 典型场景 | 用户提示 |
 | --- | --- | --- |
 | `AuthInvalidPhone` | 手机号格式不正确 | 手机号格式不正确 |
-| `AuthPhoneNotBound` | 手机号未绑定管理员账号 | 该手机号未开通登录权限，请联系管理员 |
-| `AuthMobileRoleDenied` | 岗位任务端手机号已绑定但无当前岗位权限 | 该账号暂无当前岗位任务端登录权限，请联系管理员 |
-| `AuthSMSCodeTooFrequent` | 本地频控或阿里云返回发送过于频繁 | 验证码发送过于频繁，请稍后再试 |
+| `AuthLoginRejected` | 手机号未绑定、账号不可用、无当前岗位入口权限，或验证码不存在 / 错误 / 过期 / 尝试次数耗尽 | 登录信息不正确或账号不可用 |
 | `AuthSMSServiceQuotaExceeded` | 阿里云短信套餐 / 余额 / 额度已用完 | 短信服务额度已用完，请联系管理员处理 |
 | `AuthSMSServiceUnavailable` | 阿里云服务异常、网络超时或服务商拒绝发送 / 核验 | 短信服务暂不可用，请稍后再试或联系管理员 |
-| `AuthInvalidSMSCode` | 验证码错误或服务商返回验证码不匹配 | 验证码错误 |
-| `AuthSMSCodeExpired` | 验证码过期 | 验证码已过期，请重新获取 |
-| `AuthSMSCodeAttemptsExceeded` | 本地 mock 验证码错误次数过多 | 验证码错误次数过多，请重新获取 |
+
+`AuthInvalidSMSCode`、`AuthSMSCodeExpired`、`AuthSMSCodeAttemptsExceeded` 只保留为服务端内部分类，不作为公开短信登录响应返回。
 
 ### `auth.me`
 
@@ -147,9 +151,9 @@ HTTP 路由：
 请求字段：
 
 - `id`：普通管理员 ID
-- `password`：新密码，至少 6 位
+- `password`：新密码，至少 8 位且不超过 72 字节；密码按原值校验，不做 trim 或大小写归一化
 
-成功后覆盖该普通管理员的 `password_hash`，旧密码立即失效；接口不返回明文密码，也不允许重置超级管理员账号。
+成功后在同一事务覆盖该普通管理员的 `password_hash`、递增 `auth_version`、注销该账号全部 active admin session，并追加不含密码、密码哈希或 session key 的控制面审计。旧密码和旧 token 立即失效；接口不返回明文密码，也不允许非超级管理员维护受保护的系统账号。
 
 ## 当前未纳入主干的业务能力
 

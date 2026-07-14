@@ -106,6 +106,8 @@ func salesOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.SalesOrder
 func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrSalesOrderConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[sales_order] invalid param err=%v", err)
 		return invalidParamResult()
@@ -167,6 +169,7 @@ func salesOrderToMap(item *biz.SalesOrder) map[string]any {
 		"order_date":            item.OrderDate.Unix(),
 		"planned_delivery_date": optionalTimeUnix(item.PlannedDeliveryDate),
 		"lifecycle_status":      item.LifecycleStatus,
+		"version":               item.Version,
 		"note":                  optionalStringValue(item.Note),
 		"created_at":            item.CreatedAt.Unix(),
 		"updated_at":            item.UpdatedAt.Unix(),

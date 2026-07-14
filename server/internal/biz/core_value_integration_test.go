@@ -155,13 +155,14 @@ func TestNormalizePurchaseItemsUseCoreMoneyAndQuantityGuards(t *testing.T) {
 	price := decimal.NewFromInt(3)
 	negative := decimal.NewFromInt(-1)
 	receiptItem := PurchaseReceiptItemCreate{
-		ReceiptID:   1,
-		MaterialID:  2,
-		WarehouseID: 3,
-		Quantity:    decimal.NewFromInt(4),
-		UnitID:      5,
-		UnitPrice:   &price,
-		Amount:      &price,
+		ReceiptID:      1,
+		MaterialID:     2,
+		WarehouseID:    3,
+		Quantity:       decimal.NewFromInt(4),
+		UnitID:         5,
+		UnitPrice:      &price,
+		Amount:         &price,
+		IdempotencyKey: "test:receipt-item:core-value",
 	}
 	if _, err := normalizePurchaseReceiptItemCreate(receiptItem); err != nil {
 		t.Fatalf("normalizePurchaseReceiptItemCreate() error = %v", err)

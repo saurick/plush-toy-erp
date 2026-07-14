@@ -45,7 +45,7 @@ sh migrate_online.sh --status-only
 9. 已完成 pre-migration 备份并填写 `backup-evidence.md` 后，再执行 migration apply：
 
 ```bash
-sh migrate_online.sh --apply
+MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 ```
 
 10. 启动业务服务：

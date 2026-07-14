@@ -257,7 +257,10 @@ func TestOutsourcingOrderUsecaseLifecycleGuards(t *testing.T) {
 	if _, err := uc.CancelOutsourcingOrder(ctx, 4); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected settled order transition rejected, got %v", err)
 	}
-	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 2, &OutsourcingOrderMutation{}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 1, &OutsourcingOrderMutation{}, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing version rejected, got %v", err)
+	}
+	if _, err := uc.SaveOutsourcingOrderWithItems(ctx, 2, &OutsourcingOrderMutation{ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected submitted outsourcing contract to be frozen, got %v", err)
 	}
 }

@@ -29,9 +29,18 @@ func NewCustomerConfigRepo(d *Data, logger log.Logger) *customerConfigRepo {
 
 var _ biz.CustomerConfigRepo = (*customerConfigRepo)(nil)
 
+const (
+	customerConfigAuditActionActivate = "customer_config.activate"
+	customerConfigAuditActionRollback = "customer_config.rollback"
+	// customerConfigStatusBuilding is visible only inside the publication
+	// transaction. PostgreSQL projection guards accept inserts in this state and
+	// reject every mutation after the revision becomes published.
+	customerConfigStatusBuilding = "building"
+)
+
 func (r *customerConfigRepo) GetCustomerConfigRevision(ctx context.Context, customerKey, revision string) (*biz.CustomerConfigRevision, error) {
 	row := r.data.sqldb.QueryRowContext(ctx, `
-SELECT id, customer_key, revision, product_version, config_hash, status, compiled_snapshot,
+SELECT id, customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
        published_by, published_at, activated_by, activated_at, created_at, updated_at
 FROM customer_config_revisions
 WHERE customer_key = $1 AND revision = $2
@@ -48,7 +57,7 @@ LIMIT 1`, customerKey, revision)
 
 func (r *customerConfigRepo) GetActiveCustomerConfigRevision(ctx context.Context, customerKey string) (*biz.CustomerConfigRevision, error) {
 	row := r.data.sqldb.QueryRowContext(ctx, `
-SELECT id, customer_key, revision, product_version, config_hash, status, compiled_snapshot,
+SELECT id, customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
        published_by, published_at, activated_by, activated_at, created_at, updated_at
 FROM customer_config_revisions
 WHERE customer_key = $1 AND status = $2
@@ -82,45 +91,79 @@ func (r *customerConfigRepo) PublishCustomerConfig(
 		return nil, err
 	}
 	now := time.Now()
-	if _, err := tx.ExecContext(ctx, `
-INSERT INTO customer_config_revisions
-  (customer_key, revision, product_version, config_hash, status, compiled_snapshot, published_by, published_at, created_at, updated_at)
-VALUES
-  ($1, $2, $3, $4, $5, $6::jsonb, $7, $8, $9, $10)
-ON CONFLICT (customer_key, revision) DO UPDATE SET
-  product_version = EXCLUDED.product_version,
-  config_hash = EXCLUDED.config_hash,
-  status = EXCLUDED.status,
-  compiled_snapshot = EXCLUDED.compiled_snapshot,
-  published_by = EXCLUDED.published_by,
-  published_at = EXCLUDED.published_at,
-  updated_at = EXCLUDED.updated_at`,
+	result, err := tx.ExecContext(ctx, `
+	INSERT INTO customer_config_revisions
+	  (customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot, published_by, published_at, created_at, updated_at)
+	VALUES
+	  ($1, $2, $3, $4, $5, $6, $7::jsonb, $8, $9, $10, $11)
+	ON CONFLICT (customer_key, revision) DO NOTHING`,
 		in.CustomerKey,
 		in.Revision,
 		in.ProductVersion,
 		configHash,
-		biz.CustomerConfigStatusPublished,
+		biz.CustomerConfigHashVersion,
+		customerConfigStatusBuilding,
 		string(snapshotJSON),
 		publishedBy,
 		publishedAt,
 		now,
 		now,
-	); err != nil {
+	)
+	if err != nil {
 		return nil, err
+	}
+	inserted, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if inserted == 0 {
+		existing, err := getCustomerConfigRevisionForUpdate(ctx, tx, in.CustomerKey, in.Revision)
+		if err != nil {
+			return nil, err
+		}
+		if existing.ConfigHash != configHash || existing.ConfigHashVersion != biz.CustomerConfigHashVersion || existing.ProductVersion != in.ProductVersion {
+			return nil, biz.ErrCustomerConfigRevisionImmutable
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return existing, nil
 	}
 
-	if err := replaceCustomerConfigCompiledRows(ctx, tx, in, now); err != nil {
+	if err := insertCustomerConfigCompiledRows(ctx, tx, in, now); err != nil {
 		return nil, err
 	}
+	published, err := tx.ExecContext(ctx, `
+UPDATE customer_config_revisions
+SET status = $3, updated_at = $4
+WHERE customer_key = $1 AND revision = $2 AND status = $5`,
+		in.CustomerKey,
+		in.Revision,
+		biz.CustomerConfigStatusPublished,
+		now,
+		customerConfigStatusBuilding,
+	)
+	if err != nil {
+		return nil, err
+	}
+	publishedRows, err := published.RowsAffected()
+	if err != nil {
+		return nil, err
+	}
+	if publishedRows != 1 {
+		return nil, biz.ErrCustomerConfigRevisionImmutable
+	}
 	if err := writeCustomerConfigAudit(ctx, tx, "customer_config.publish", in.CustomerKey, in.Revision, publishedBy, map[string]any{
-		"status":            biz.CustomerConfigStatusPublished,
-		"product_version":   in.ProductVersion,
-		"config_hash":       configHash,
-		"module_count":      len(in.ModuleStates),
-		"role_count":        len(in.RoleProfiles),
-		"entitlement_count": len(in.AccessEntitlements),
-		"work_pool_count":   len(in.WorkPools),
-		"membership_count":  len(in.WorkPoolMemberships),
+		"status":              biz.CustomerConfigStatusPublished,
+		"product_version":     in.ProductVersion,
+		"config_hash":         configHash,
+		"config_hash_version": biz.CustomerConfigHashVersion,
+		"module_count":        len(in.ModuleStates),
+		"role_count":          len(in.RoleProfiles),
+		"entitlement_count":   len(in.AccessEntitlements),
+		"work_pool_count":     len(in.WorkPools),
+		"membership_count":    len(in.WorkPoolMemberships),
 	}); err != nil {
 		return nil, err
 	}
@@ -131,22 +174,24 @@ ON CONFLICT (customer_key, revision) DO UPDATE SET
 	return r.GetCustomerConfigRevision(ctx, in.CustomerKey, in.Revision)
 }
 
-func replaceCustomerConfigCompiledRows(ctx context.Context, tx *sql.Tx, in biz.CustomerConfigPublishInput, now time.Time) error {
-	for _, tableName := range []string{
-		"deployment_module_states",
-		"role_profiles",
-		"access_entitlements",
-		"work_pools",
-		"work_pool_memberships",
-	} {
-		if _, err := tx.ExecContext(ctx,
-			"DELETE FROM "+tableName+" WHERE customer_key = $1 AND config_revision = $2",
-			in.CustomerKey,
-			in.Revision,
-		); err != nil {
-			return err
+func getCustomerConfigRevisionForUpdate(ctx context.Context, tx *sql.Tx, customerKey, revision string) (*biz.CustomerConfigRevision, error) {
+	row := tx.QueryRowContext(ctx, `
+	SELECT id, customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
+	       published_by, published_at, activated_by, activated_at, created_at, updated_at
+	FROM customer_config_revisions
+	WHERE customer_key = $1 AND revision = $2
+	FOR UPDATE`, customerKey, revision)
+	item, err := scanCustomerConfigRevision(row)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, biz.ErrCustomerConfigNotFound
 		}
+		return nil, err
 	}
+	return item, nil
+}
+
+func insertCustomerConfigCompiledRows(ctx context.Context, tx *sql.Tx, in biz.CustomerConfigPublishInput, now time.Time) error {
 	for _, item := range in.ModuleStates {
 		if _, err := tx.ExecContext(ctx, `
 INSERT INTO deployment_module_states
@@ -214,25 +259,25 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
 
 func (r *customerConfigRepo) ActivateCustomerConfig(
 	ctx context.Context,
-	customerKey, revision string,
+	customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string,
 	activatedBy int,
 	activatedAt time.Time,
 ) (*biz.CustomerConfigRevision, error) {
-	return r.switchActiveCustomerConfigRevision(ctx, customerKey, revision, activatedBy, activatedAt, "customer_config.activate")
+	return r.switchActiveCustomerConfigRevision(ctx, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision, activatedBy, activatedAt, customerConfigAuditActionActivate)
 }
 
 func (r *customerConfigRepo) RollbackCustomerConfig(
 	ctx context.Context,
-	customerKey, targetRevision string,
+	customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string,
 	actorID int,
 	rolledBackAt time.Time,
 ) (*biz.CustomerConfigRevision, error) {
-	return r.switchActiveCustomerConfigRevision(ctx, customerKey, targetRevision, actorID, rolledBackAt, "customer_config.rollback")
+	return r.switchActiveCustomerConfigRevision(ctx, customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision, actorID, rolledBackAt, customerConfigAuditActionRollback)
 }
 
 func (r *customerConfigRepo) switchActiveCustomerConfigRevision(
 	ctx context.Context,
-	customerKey, revision string,
+	customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string,
 	actorID int,
 	activatedAt time.Time,
 	auditAction string,
@@ -244,7 +289,8 @@ func (r *customerConfigRepo) switchActiveCustomerConfigRevision(
 	defer rollbackSQLTx(ctx, tx, r.log)
 
 	rows, err := tx.QueryContext(ctx, `
-SELECT id, revision
+SELECT id, customer_key, revision, product_version, config_hash, config_hash_version, status, compiled_snapshot,
+       published_by, published_at, activated_by, activated_at, created_at, updated_at
 FROM customer_config_revisions
 WHERE customer_key = $1
 ORDER BY id
@@ -252,15 +298,19 @@ FOR UPDATE`, customerKey)
 	if err != nil {
 		return nil, err
 	}
-	targetFound := false
+	var target *biz.CustomerConfigRevision
+	var previousActive *biz.CustomerConfigRevision
 	for rows.Next() {
-		var id int
-		var lockedRevision string
-		if err := rows.Scan(&id, &lockedRevision); err != nil {
+		item, err := scanCustomerConfigRevision(rows)
+		if err != nil {
+			_ = rows.Close()
 			return nil, err
 		}
-		if lockedRevision == revision {
-			targetFound = true
+		if item.Revision == revision {
+			target = item
+		}
+		if item.Status == biz.CustomerConfigStatusActive {
+			previousActive = item
 		}
 	}
 	if err := rows.Err(); err != nil {
@@ -270,10 +320,46 @@ FOR UPDATE`, customerKey)
 	if err := rows.Close(); err != nil {
 		return nil, err
 	}
-	if !targetFound {
+	if target == nil {
 		return nil, biz.ErrCustomerConfigNotFound
 	}
-	now := time.Now()
+	observedActiveRevision := ""
+	if previousActive != nil {
+		observedActiveRevision = strings.TrimSpace(previousActive.Revision)
+	}
+	if auditAction == customerConfigAuditActionRollback && previousActive == nil {
+		return nil, biz.ErrCustomerConfigActiveRevisionChanged
+	}
+	if observedActiveRevision != strings.TrimSpace(expectedActiveRevision) {
+		return nil, biz.ErrCustomerConfigActiveRevisionChanged
+	}
+	if target.ConfigHashVersion != biz.CustomerConfigHashVersion {
+		return nil, biz.ErrCustomerConfigHashMismatch
+	}
+	if target.ConfigHash != expectedConfigHash {
+		return nil, biz.ErrCustomerConfigHashMismatch
+	}
+	if strings.TrimSpace(target.ProductVersion) != strings.TrimSpace(expectedProductVersion) {
+		return nil, biz.ErrCustomerConfigProductVersionMismatch
+	}
+	idempotent, err := validateCustomerConfigSwitchTarget(auditAction, target)
+	if err != nil {
+		return nil, err
+	}
+	modules, err := listDeploymentModuleStatesTx(ctx, tx, customerKey, revision)
+	if err != nil {
+		return nil, err
+	}
+	if err := biz.ValidateCustomerConfigModuleClosure(modules); err != nil {
+		return nil, err
+	}
+	if idempotent {
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return target, nil
+	}
 	if _, err := tx.ExecContext(ctx, `
 UPDATE customer_config_revisions
 SET status = $3, updated_at = $4
@@ -281,12 +367,12 @@ WHERE customer_key = $1 AND status = $2 AND revision <> $5`,
 		customerKey,
 		biz.CustomerConfigStatusActive,
 		biz.CustomerConfigStatusSuperseded,
-		now,
+		activatedAt,
 		revision,
 	); err != nil {
 		return nil, err
 	}
-	if _, err := tx.ExecContext(ctx, `
+	result, err := tx.ExecContext(ctx, `
 UPDATE customer_config_revisions
 SET status = $3, activated_by = $4, activated_at = $5, updated_at = $6
 WHERE customer_key = $1 AND revision = $2`,
@@ -295,14 +381,30 @@ WHERE customer_key = $1 AND revision = $2`,
 		biz.CustomerConfigStatusActive,
 		actorID,
 		activatedAt,
-		now,
-	); err != nil {
+		activatedAt,
+	)
+	if err != nil {
 		return nil, err
 	}
-	after := map[string]any{
-		"status": biz.CustomerConfigStatusActive,
+	updated, err := result.RowsAffected()
+	if err != nil {
+		return nil, err
 	}
-	if auditAction == "customer_config.rollback" {
+	if updated != 1 {
+		return nil, biz.ErrCustomerConfigNotFound
+	}
+	after := map[string]any{
+		"status":                   biz.CustomerConfigStatusActive,
+		"config_hash":              target.ConfigHash,
+		"config_hash_version":      target.ConfigHashVersion,
+		"expected_active_revision": strings.TrimSpace(expectedActiveRevision),
+		"observed_active_revision": observedActiveRevision,
+	}
+	if previousActive != nil && previousActive.Revision != revision {
+		after["previous_active_revision"] = previousActive.Revision
+		after["previous_active_config_hash"] = previousActive.ConfigHash
+	}
+	if auditAction == customerConfigAuditActionRollback {
 		after["rollback_target_revision"] = revision
 	}
 	if err := writeCustomerConfigAudit(ctx, tx, auditAction, customerKey, revision, actorID, after); err != nil {
@@ -312,7 +414,56 @@ WHERE customer_key = $1 AND revision = $2`,
 		return nil, err
 	}
 	tx = nil
-	return r.GetCustomerConfigRevision(ctx, customerKey, revision)
+	target.Status = biz.CustomerConfigStatusActive
+	target.ActivatedBy = &actorID
+	target.ActivatedAt = &activatedAt
+	target.UpdatedAt = activatedAt
+	return target, nil
+}
+
+func validateCustomerConfigSwitchTarget(auditAction string, target *biz.CustomerConfigRevision) (bool, error) {
+	if target == nil {
+		return false, biz.ErrBadParam
+	}
+	switch auditAction {
+	case customerConfigAuditActionActivate:
+		switch target.Status {
+		case biz.CustomerConfigStatusPublished:
+			return false, nil
+		case biz.CustomerConfigStatusActive:
+			if target.ActivatedAt != nil {
+				return true, nil
+			}
+		}
+	case customerConfigAuditActionRollback:
+		if target.Status == biz.CustomerConfigStatusSuperseded && target.ActivatedAt != nil {
+			return false, nil
+		}
+	}
+	return false, biz.ErrBadParam
+}
+
+func listDeploymentModuleStatesTx(ctx context.Context, tx *sql.Tx, customerKey, revision string) ([]biz.DeploymentModuleStateInput, error) {
+	rows, err := tx.QueryContext(ctx, `
+SELECT module_key, contract_version, state, reason
+FROM deployment_module_states
+WHERE customer_key = $1 AND config_revision = $2
+ORDER BY module_key ASC
+FOR SHARE`, customerKey, revision)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	out := []biz.DeploymentModuleStateInput{}
+	for rows.Next() {
+		var item biz.DeploymentModuleStateInput
+		if err := rows.Scan(&item.ModuleKey, &item.ContractVersion, &item.State, &item.Reason); err != nil {
+			return nil, err
+		}
+		out = append(out, item)
+	}
+	return out, rows.Err()
 }
 
 func writeCustomerConfigAudit(ctx context.Context, tx *sql.Tx, action, customerKey, revision string, actorUserID int, after map[string]any) error {
@@ -541,7 +692,7 @@ SELECT COUNT(*)
 FROM workflow_tasks
 WHERE config_revision = $1
   AND owner_pool_key IN (`+poolClause+`)
-  AND task_status_key NOT IN ('done', 'cancelled', 'closed')`, queryArgs...).Scan(&count); err != nil {
+  AND task_status_key IN ('ready', 'blocked')`, queryArgs...).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil
@@ -610,6 +761,7 @@ func scanCustomerConfigRevision(row customerConfigRevisionScanner) (*biz.Custome
 		&item.Revision,
 		&item.ProductVersion,
 		&item.ConfigHash,
+		&item.ConfigHashVersion,
 		&item.Status,
 		&snapshotRaw,
 		&item.PublishedBy,

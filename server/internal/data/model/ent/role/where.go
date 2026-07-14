@@ -84,6 +84,11 @@ func SortOrder(v int) predicate.Role {
 	return predicate.Role(sql.FieldEQ(FieldSortOrder, v))
 }
 
+// Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
+func Version(v int) predicate.Role {
+	return predicate.Role(sql.FieldEQ(FieldVersion, v))
+}
+
 // CreatedAt applies equality check predicate on the "created_at" field. It's identical to CreatedAtEQ.
 func CreatedAt(v time.Time) predicate.Role {
 	return predicate.Role(sql.FieldEQ(FieldCreatedAt, v))
@@ -299,6 +304,26 @@ func BuiltinNEQ(v bool) predicate.Role {
 	return predicate.Role(sql.FieldNEQ(FieldBuiltin, v))
 }
 
+// RoleTypeEQ applies the EQ predicate on the "role_type" field.
+func RoleTypeEQ(v RoleType) predicate.Role {
+	return predicate.Role(sql.FieldEQ(FieldRoleType, v))
+}
+
+// RoleTypeNEQ applies the NEQ predicate on the "role_type" field.
+func RoleTypeNEQ(v RoleType) predicate.Role {
+	return predicate.Role(sql.FieldNEQ(FieldRoleType, v))
+}
+
+// RoleTypeIn applies the In predicate on the "role_type" field.
+func RoleTypeIn(vs ...RoleType) predicate.Role {
+	return predicate.Role(sql.FieldIn(FieldRoleType, vs...))
+}
+
+// RoleTypeNotIn applies the NotIn predicate on the "role_type" field.
+func RoleTypeNotIn(vs ...RoleType) predicate.Role {
+	return predicate.Role(sql.FieldNotIn(FieldRoleType, vs...))
+}
+
 // DisabledEQ applies the EQ predicate on the "disabled" field.
 func DisabledEQ(v bool) predicate.Role {
 	return predicate.Role(sql.FieldEQ(FieldDisabled, v))
@@ -347,6 +372,46 @@ func SortOrderLT(v int) predicate.Role {
 // SortOrderLTE applies the LTE predicate on the "sort_order" field.
 func SortOrderLTE(v int) predicate.Role {
 	return predicate.Role(sql.FieldLTE(FieldSortOrder, v))
+}
+
+// VersionEQ applies the EQ predicate on the "version" field.
+func VersionEQ(v int) predicate.Role {
+	return predicate.Role(sql.FieldEQ(FieldVersion, v))
+}
+
+// VersionNEQ applies the NEQ predicate on the "version" field.
+func VersionNEQ(v int) predicate.Role {
+	return predicate.Role(sql.FieldNEQ(FieldVersion, v))
+}
+
+// VersionIn applies the In predicate on the "version" field.
+func VersionIn(vs ...int) predicate.Role {
+	return predicate.Role(sql.FieldIn(FieldVersion, vs...))
+}
+
+// VersionNotIn applies the NotIn predicate on the "version" field.
+func VersionNotIn(vs ...int) predicate.Role {
+	return predicate.Role(sql.FieldNotIn(FieldVersion, vs...))
+}
+
+// VersionGT applies the GT predicate on the "version" field.
+func VersionGT(v int) predicate.Role {
+	return predicate.Role(sql.FieldGT(FieldVersion, v))
+}
+
+// VersionGTE applies the GTE predicate on the "version" field.
+func VersionGTE(v int) predicate.Role {
+	return predicate.Role(sql.FieldGTE(FieldVersion, v))
+}
+
+// VersionLT applies the LT predicate on the "version" field.
+func VersionLT(v int) predicate.Role {
+	return predicate.Role(sql.FieldLT(FieldVersion, v))
+}
+
+// VersionLTE applies the LTE predicate on the "version" field.
+func VersionLTE(v int) predicate.Role {
+	return predicate.Role(sql.FieldLTE(FieldVersion, v))
 }
 
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.

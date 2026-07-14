@@ -12,7 +12,6 @@ const WORKFLOW_TASK_CREATE_PUBLIC_PARAM_KEYS = new Set([
   'required_capability_key',
   'assignee_id',
   'priority',
-  'blocked_reason',
   'due_at',
   'payload',
 ])
@@ -23,17 +22,6 @@ const WORKFLOW_TASK_CREATE_REQUIRED_STRING_KEYS = Object.freeze([
   'task_name',
   'source_type',
   'owner_role_key',
-])
-
-const WORKFLOW_TASK_STATE_KEYS = new Set([
-  'pending',
-  'ready',
-  'processing',
-  'blocked',
-  'done',
-  'rejected',
-  'cancelled',
-  'closed',
 ])
 
 const WORKFLOW_BUSINESS_STATE_KEYS = new Set([
@@ -89,9 +77,9 @@ export function requireWorkflowTaskCreateParams(params = {}) {
   }
 
   const taskStatusKey = normalizedOptionalString(params, 'task_status_key')
-  normalized.task_status_key = taskStatusKey || 'pending'
-  if (!WORKFLOW_TASK_STATE_KEYS.has(normalized.task_status_key)) {
-    throw new TypeError('task_status_key 不支持')
+  normalized.task_status_key = taskStatusKey || 'ready'
+  if (normalized.task_status_key !== 'ready') {
+    throw new TypeError('普通创建只支持 ready 状态')
   }
 
   const businessStatusKey = normalizedOptionalString(
@@ -146,7 +134,6 @@ export function requireWorkflowTaskCreateParams(params = {}) {
     'source_no',
     'owner_pool_key',
     'required_capability_key',
-    'blocked_reason',
   ]) {
     normalized[key] = normalizedOptionalString(params, key)
   }

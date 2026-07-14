@@ -46,6 +46,10 @@ type PurchaseReceiptItem struct {
 	Amount *decimal.Decimal `json:"amount,omitempty"`
 	// SourceLineNo holds the value of the "source_line_no" field.
 	SourceLineNo *string `json:"source_line_no,omitempty"`
+	// IdempotencyKey holds the value of the "idempotency_key" field.
+	IdempotencyKey *string `json:"idempotency_key,omitempty"`
+	// IdempotencyPayloadHash holds the value of the "idempotency_payload_hash" field.
+	IdempotencyPayloadHash *string `json:"idempotency_payload_hash,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -187,7 +191,7 @@ func (*PurchaseReceiptItem) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case purchasereceiptitem.FieldID, purchasereceiptitem.FieldReceiptID, purchasereceiptitem.FieldMaterialID, purchasereceiptitem.FieldWarehouseID, purchasereceiptitem.FieldUnitID, purchasereceiptitem.FieldLotID, purchasereceiptitem.FieldPurchaseOrderItemID:
 			values[i] = new(sql.NullInt64)
-		case purchasereceiptitem.FieldLotNo, purchasereceiptitem.FieldSourceLineNo, purchasereceiptitem.FieldNote:
+		case purchasereceiptitem.FieldLotNo, purchasereceiptitem.FieldSourceLineNo, purchasereceiptitem.FieldIdempotencyKey, purchasereceiptitem.FieldIdempotencyPayloadHash, purchasereceiptitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case purchasereceiptitem.FieldCreatedAt, purchasereceiptitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -283,6 +287,20 @@ func (_m *PurchaseReceiptItem) assignValues(columns []string, values []any) erro
 			} else if value.Valid {
 				_m.SourceLineNo = new(string)
 				*_m.SourceLineNo = value.String
+			}
+		case purchasereceiptitem.FieldIdempotencyKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_key", values[i])
+			} else if value.Valid {
+				_m.IdempotencyKey = new(string)
+				*_m.IdempotencyKey = value.String
+			}
+		case purchasereceiptitem.FieldIdempotencyPayloadHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field idempotency_payload_hash", values[i])
+			} else if value.Valid {
+				_m.IdempotencyPayloadHash = new(string)
+				*_m.IdempotencyPayloadHash = value.String
 			}
 		case purchasereceiptitem.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -426,6 +444,16 @@ func (_m *PurchaseReceiptItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.SourceLineNo; v != nil {
 		builder.WriteString("source_line_no=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyKey; v != nil {
+		builder.WriteString("idempotency_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.IdempotencyPayloadHash; v != nil {
+		builder.WriteString("idempotency_payload_hash=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

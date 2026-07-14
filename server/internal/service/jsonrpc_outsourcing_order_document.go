@@ -15,7 +15,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "save_outsourcing_order_with_items", "saveOutsourcingOrderWithItems":
+	case "save_outsourcing_order_with_items":
 		orderID := getInt(pm, "id", 0)
 		permission := biz.PermissionOutsourcingOrderCreate
 		if orderID > 0 {
@@ -27,10 +27,19 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
+		expectedVersion := 0
+		if orderID > 0 {
+			var ok bool
+			expectedVersion, ok = getRequiredJSONRPCPositiveInt(pm, "expected_version")
+			if !ok {
+				return id, invalidParamResult(), nil
+			}
+		}
 		in, ok := outsourcingOrderMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		in.ExpectedVersion = expectedVersion
 		items, ok := outsourcingOrderItemSaveMutationsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -42,13 +51,13 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderDocument(
 		}
 		result, err := d.outsourcingOrderUC.SaveOutsourcingOrderWithItems(ctx, orderID, in, items)
 		return id, outsourcingOrderWithItemsMutationResult(ctx, d, result, err), nil
-	case "get_outsourcing_order", "getOutsourcingOrder":
+	case "get_outsourcing_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.outsourcingOrderUC.GetOutsourcingOrder(ctx, getInt(pm, "id", 0))
 		return id, outsourcingOrderMutationResult(ctx, d, item, err), nil
-	case "list_outsourcing_orders", "listOutsourcingOrders":
+	case "list_outsourcing_orders":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {
 			return id, res, nil
 		}

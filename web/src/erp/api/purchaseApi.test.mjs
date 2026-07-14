@@ -37,3 +37,15 @@ test('purchaseApi: exposes purchase receipt methods only', () => {
     assert.doesNotMatch(source, new RegExp(forbiddenActionName))
   }
 })
+
+test('purchaseApi: retry-safe writes require hidden keys and validate business results', () => {
+  assert.match(
+    source,
+    /createPurchaseReceiptFromPurchaseOrder[\s\S]*?requirePurchaseReceiptIdempotencyKey\(params\.idempotency_key\)[\s\S]*?validatePurchaseReceiptDraft/u
+  )
+  assert.match(
+    source,
+    /addPurchaseReceiptItem[\s\S]*?requirePurchaseReceiptIdempotencyKey\(params\.idempotency_key\)[\s\S]*?validatePurchaseReceiptItem/u
+  )
+  assert.doesNotMatch(source, /idempotency_payload_hash/u)
+})

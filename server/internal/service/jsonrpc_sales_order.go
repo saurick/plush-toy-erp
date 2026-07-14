@@ -27,16 +27,16 @@ func (d *jsonrpcDispatcher) handleSalesOrder(
 	}
 
 	switch method {
-	case "save_sales_order_with_items", "saveSalesOrderWithItems",
-		"get_sales_order", "getSalesOrder",
-		"list_sales_orders", "listSalesOrders":
+	case "save_sales_order_with_items",
+		"get_sales_order",
+		"list_sales_orders":
 		return d.handleSalesOrderDocument(ctx, method, id, pm)
-	case "submit_sales_order", "submitSalesOrder",
-		"activate_sales_order", "activateSalesOrder",
-		"close_sales_order", "closeSalesOrder",
-		"cancel_sales_order", "cancelSalesOrder":
+	case "submit_sales_order",
+		"activate_sales_order",
+		"close_sales_order",
+		"cancel_sales_order":
 		return d.handleSalesOrderLifecycle(ctx, method, id, pm, claims.UserID)
-	case "list_sales_order_items", "listSalesOrderItems":
+	case "list_sales_order_items":
 		return d.handleSalesOrderItem(ctx, method, id, pm)
 	default:
 		return id, unknownSalesOrderResult(method), nil

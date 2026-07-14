@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_material", "createMaterial":
+	case "create_material":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialCreate); res != nil {
 			return id, res, nil
 		}
@@ -23,7 +23,7 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		}
 		item, err := d.masterDataUC.CreateMaterial(ctx, materialMutationFromParams(pm))
 		return id, materialMutationResult(ctx, d, item, err), nil
-	case "update_material", "updateMaterial":
+	case "update_material":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialUpdate); res != nil {
 			return id, res, nil
 		}
@@ -32,13 +32,13 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 		}
 		item, err := d.masterDataUC.UpdateMaterial(ctx, getInt(pm, "id", 0), materialMutationFromParams(pm))
 		return id, materialMutationResult(ctx, d, item, err), nil
-	case "get_material", "getMaterial":
+	case "get_material":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.GetMaterial(ctx, getInt(pm, "id", 0))
 		return id, materialMutationResult(ctx, d, item, err), nil
-	case "list_materials", "listMaterials":
+	case "list_materials":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialRead); res != nil {
 			return id, res, nil
 		}
@@ -52,7 +52,7 @@ func (d *jsonrpcDispatcher) handleMasterDataMaterial(
 			"limit":     normalizedLimit(pm),
 			"offset":    normalizedOffset(pm),
 		})}, nil
-	case "set_material_active", "setMaterialActive":
+	case "set_material_active":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionMaterialDisable); res != nil {
 			return id, res, nil
 		}

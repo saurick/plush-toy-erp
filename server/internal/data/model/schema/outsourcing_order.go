@@ -20,6 +20,7 @@ func (OutsourcingOrder) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"outsourcing_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'confirmed', 'closed', 'canceled')",
+				"outsourcing_orders_version_positive":         "version > 0",
 			},
 		},
 	}
@@ -53,6 +54,9 @@ func (OutsourcingOrder) Fields() []ent.Field {
 			NotEmpty().
 			Default("draft").
 			MaxLen(32),
+		field.Int("version").
+			Positive().
+			Default(1),
 		field.String("note").
 			Optional().
 			Nillable().

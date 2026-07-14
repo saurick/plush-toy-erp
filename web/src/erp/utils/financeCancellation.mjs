@@ -23,8 +23,7 @@ export function validateFinanceCancellationResult(task, request) {
     typeof task.cancelled_by_name !== 'string' ||
     !task.cancelled_by_name.trim() ||
     typeof task.cancel_reason !== 'string' ||
-    !task.cancel_reason.trim() ||
-    task.cancel_audit_legacy === true
+    !task.cancel_reason.trim()
   ) {
     const error = new Error('财务记录已提交，但返回结果不完整，请刷新后核对')
     error.isInvalidResponse = true
@@ -36,9 +35,6 @@ export function validateFinanceCancellationResult(task, request) {
 export function financeCancelAuditText(record, formatUnixDate) {
   if (record?.status !== 'CANCELLED') {
     return '-'
-  }
-  if (record?.cancel_audit_legacy) {
-    return '历史记录，取消审计信息缺失'
   }
   const actor = String(record?.cancelled_by_name || '').trim()
   const reason = String(record?.cancel_reason || '').trim()

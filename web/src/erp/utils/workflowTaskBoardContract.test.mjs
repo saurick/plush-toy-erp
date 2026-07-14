@@ -13,7 +13,13 @@ function overviewResponse() {
       total: 1,
       limit: 5,
       offset: 0,
-      tasks: [{ id: index + 1 }],
+      tasks: [
+        {
+          id: index + 1,
+          version: 1,
+          task_status_key: ['ready', 'blocked', 'ready', 'rejected'][index],
+        },
+      ],
     })),
     source_types: ['inbound', 'project-orders'],
   }
@@ -41,6 +47,30 @@ test('workflowTaskBoardContract: 畸形成功响应 fail closed', () => {
       ),
     },
     { ...overviewResponse(), source_types: ['inbound', 'inbound'] },
+    {
+      ...overviewResponse(),
+      lanes: overviewResponse().lanes.map((lane, index) =>
+        index === 0
+          ? { ...lane, tasks: [{ id: 1, version: 1, task_status_key: 'pending' }] }
+          : lane
+      ),
+    },
+    {
+      ...overviewResponse(),
+      lanes: overviewResponse().lanes.map((lane, index) =>
+        index === 1
+          ? { ...lane, tasks: [{ id: 2, version: 1, task_status_key: 'rejected' }] }
+          : lane
+      ),
+    },
+    {
+      ...overviewResponse(),
+      lanes: overviewResponse().lanes.map((lane, index) =>
+        index === 3
+          ? { ...lane, tasks: [{ id: 4, version: 0, task_status_key: 'done' }] }
+          : lane
+      ),
+    },
   ]
 
   for (const response of invalidResponses) {

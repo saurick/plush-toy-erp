@@ -10,6 +10,7 @@ import (
 
 	"server/internal/biz"
 
+	"entgo.io/ent/dialect"
 	"github.com/go-kratos/kratos/v2/log"
 )
 
@@ -60,6 +61,7 @@ func (r *adminAuthRepo) GetAdminByID(ctx context.Context, id int) (*biz.AdminUse
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			l.Infof("GetAdminByID not found id=%d", id)
+			return nil, biz.ErrUserNotFound
 		} else {
 			l.Errorf("GetAdminByID failed id=%d err=%v", id, err)
 		}
@@ -121,9 +123,10 @@ func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string)
 	).Scan(&id, &uname, &phone, &passwordHash, &isSuperAdmin, &erpPreferences, &disabled, &authVersion, &revokedAt, &statusReason, &statusChangedAt, &statusChangedBy, &lastLoginAt, &createdAt, &updatedAt)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			l.Infof("GetAdminByUsername not found username=%s", username)
+			l.Info("GetAdminByUsername not found")
+			return nil, biz.ErrUserNotFound
 		} else {
-			l.Errorf("GetAdminByUsername failed username=%s err=%v", username, err)
+			l.Errorf("GetAdminByUsername failed err=%v", err)
 		}
 		return nil, err
 	}
@@ -144,9 +147,6 @@ func (r *adminAuthRepo) GetAdminByUsername(ctx context.Context, username string)
 		LastLoginAt:     lastLoginAt,
 		CreatedAt:       createdAt,
 		UpdatedAt:       updatedAt,
-	}
-	if err := loadAdminRBAC(ctx, r.data.sqldb, admin); err != nil {
-		return nil, err
 	}
 	return admin, nil
 }
@@ -184,6 +184,7 @@ func (r *adminAuthRepo) GetAdminByPhone(ctx context.Context, phone string) (*biz
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			l.Infof("GetAdminByPhone not found phone=%s", maskAdminAuthPhone(phone))
+			return nil, biz.ErrPhoneNotBound
 		} else {
 			l.Errorf("GetAdminByPhone failed phone=%s err=%v", maskAdminAuthPhone(phone), err)
 		}
@@ -231,14 +232,74 @@ func (r *adminAuthRepo) UpdateAdminLastLogin(ctx context.Context, id int, t time
 	return err
 }
 
-func (r *adminAuthRepo) CreateAdminSession(ctx context.Context, session *biz.AdminSession) error {
+func (r *adminAuthRepo) CreateAdminSession(
+	ctx context.Context,
+	session *biz.AdminSession,
+	constraint biz.AdminSessionIssueConstraint,
+) error {
 	if session == nil || strings.TrimSpace(session.SessionKey) == "" || session.AdminUserID <= 0 || session.AuthVersion <= 0 || session.ExpiresAt.IsZero() {
 		return biz.ErrBadParam
 	}
-	_, err := r.data.sqldb.ExecContext(ctx, `
+	expectedPhone := strings.TrimSpace(constraint.ExpectedPhone)
+	requiredPermission := strings.TrimSpace(constraint.RequiredPermission)
+	tx, err := r.data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	accountQuery := `
+SELECT is_super_admin
+FROM admin_users
+WHERE id = $1
+  AND auth_version = $2
+  AND disabled = FALSE
+  AND revoked_at IS NULL`
+	accountArgs := []any{session.AdminUserID, session.AuthVersion}
+	if expectedPhone != "" {
+		accountQuery += " AND phone = $3"
+		accountArgs = append(accountArgs, expectedPhone)
+	}
+	if r.data.sqlDialect == dialect.Postgres {
+		accountQuery += " FOR UPDATE"
+	}
+	var isSuperAdmin bool
+	if err := tx.QueryRowContext(ctx, accountQuery, accountArgs...).Scan(&isSuperAdmin); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return biz.ErrAuthVersionStale
+		}
+		return err
+	}
+
+	if requiredPermission != "" && !isSuperAdmin {
+		permissionQuery := `
+SELECT r.id
+FROM admin_user_roles aur
+JOIN roles r ON r.id = aur.role_id
+JOIN role_permissions rp ON rp.role_id = r.id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE aur.admin_user_id = $1
+  AND r.disabled = FALSE
+  AND p.permission_key = $2
+LIMIT 1`
+		if r.data.sqlDialect == dialect.Postgres {
+			permissionQuery += " FOR SHARE OF r"
+		}
+		var roleID int
+		if err := tx.QueryRowContext(ctx, permissionQuery, session.AdminUserID, requiredPermission).Scan(&roleID); err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return biz.ErrMobileRoleDenied
+			}
+			return err
+		}
+	}
+
+	if _, err := tx.ExecContext(ctx, `
 INSERT INTO admin_sessions (session_key, admin_user_id, auth_version, issued_at, expires_at, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $4, $4)`, session.SessionKey, session.AdminUserID, session.AuthVersion, session.IssuedAt, session.ExpiresAt)
-	return err
+VALUES ($1, $2, $3, $4, $5, $4, $4)`, session.SessionKey, session.AdminUserID, session.AuthVersion, session.IssuedAt, session.ExpiresAt); err != nil {
+		return err
+	}
+	return tx.Commit()
 }
 
 func (r *adminAuthRepo) GetAdminSession(ctx context.Context, sessionKey string) (*biz.AdminSession, error) {
@@ -256,6 +317,9 @@ FROM admin_sessions WHERE session_key = $1 LIMIT 1`, sessionKey).Scan(
 		&session.ExpiresAt, &revokedAt, &revokeReason,
 	)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, biz.ErrSessionNotFound
+		}
 		return nil, err
 	}
 	if revokedAt.Valid {

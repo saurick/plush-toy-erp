@@ -9,31 +9,34 @@ import (
 )
 
 type memProcessRuntimeRepo struct {
-	created              *ProcessInstanceCreate
-	process              *ProcessInstance
-	node                 *ProcessNodeInstance
-	nodes                []*ProcessNodeInstance
-	completedNode        *ProcessNodeInstanceComplete
-	completedNodes       []*ProcessNodeInstanceComplete
-	completedProcess     *ProcessInstanceComplete
-	linkedRef            *ProcessInstanceLinkedBusinessRefRecord
-	blockedNode          *ProcessNodeInstanceBlock
-	blockedProcess       *ProcessInstanceBlock
-	activatedNode        *ProcessNodeInstanceActivate
-	createdAttempt       *ProcessNodeInstanceAttemptCreate
-	claimedDomainCommand *ProcessNodeDomainCommandClaim
-	claimCalls           int
-	resultRecordCalls    int
-	compensationCalls    int
-	settleDuringClaim    bool
-	completeNodeFailures int
-	completeNodeErr      error
+	created                 *ProcessInstanceCreate
+	process                 *ProcessInstance
+	node                    *ProcessNodeInstance
+	nodes                   []*ProcessNodeInstance
+	completedNode           *ProcessNodeInstanceComplete
+	completedNodes          []*ProcessNodeInstanceComplete
+	completedProcess        *ProcessInstanceComplete
+	linkedRef               *ProcessInstanceLinkedBusinessRefRecord
+	blockedNode             *ProcessNodeInstanceBlock
+	blockedProcess          *ProcessInstanceBlock
+	activatedNode           *ProcessNodeInstanceActivate
+	createdAttempt          *ProcessNodeInstanceAttemptCreate
+	claimedDomainCommand    *ProcessNodeDomainCommandClaim
+	claimCalls              int
+	resultRecordCalls       int
+	compensationCalls       int
+	settleDuringClaim       bool
+	completeNodeFailures    int
+	completeNodeErr         error
+	completeProcessFailures int
+	completeProcessErr      error
 }
 
 type stubProcessOwnerRoleResolver struct {
 	explanation          *WorkflowTaskCandidateExplanation
 	err                  error
 	customerKey          string
+	configRevision       string
 	ownerPoolKey         string
 	requiredCapabilities []string
 }
@@ -71,6 +74,10 @@ func processTestIntPtr(value int) *int {
 	return &value
 }
 
+func processTestStringPtr(value string) *string {
+	return &value
+}
+
 func (s *recordingWorkflowRepo) CreateWorkflowTask(ctx context.Context, in *WorkflowTaskCreate, actorID int) (*WorkflowTask, error) {
 	s.createTaskInputs = append(s.createTaskInputs, in)
 	return s.stubWorkflowRepo.CreateWorkflowTask(ctx, in, actorID)
@@ -90,6 +97,11 @@ func (s *retryWorkflowRepo) CreateWorkflowTask(_ context.Context, in *WorkflowTa
 	}
 	created := &WorkflowTask{
 		TaskCode:              in.TaskCode,
+		TaskGroup:             in.TaskGroup,
+		TaskName:              in.TaskName,
+		SourceType:            in.SourceType,
+		SourceID:              in.SourceID,
+		SourceNo:              in.SourceNo,
 		TaskStatusKey:         in.TaskStatusKey,
 		OwnerRoleKey:          in.OwnerRoleKey,
 		OwnerPoolKey:          in.OwnerPoolKey,
@@ -97,6 +109,9 @@ func (s *retryWorkflowRepo) CreateWorkflowTask(_ context.Context, in *WorkflowTa
 		ConfigRevision:        in.ConfigRevision,
 		ProcessInstanceID:     in.ProcessInstanceID,
 		ProcessNodeInstanceID: in.ProcessNodeInstanceID,
+		Priority:              in.Priority,
+		CriticalPath:          in.CriticalPath,
+		DueAt:                 in.DueAt,
 		Payload:               in.Payload,
 	}
 	s.createdByCode[in.TaskCode] = created
@@ -140,8 +155,9 @@ func (h *stubProcessBranchPolicyHandler) ResolveProcessBranch(ctx context.Contex
 	return &ProcessBranchPolicyResult{NextNodeKey: "engineering_release_approval"}, nil
 }
 
-func (r *stubProcessOwnerRoleResolver) WorkflowCandidateOwnerRoleKeys(ctx context.Context, customerKey string, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
+func (r *stubProcessOwnerRoleResolver) WorkflowCandidateOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
 	r.customerKey = customerKey
+	r.configRevision = revision
 	r.ownerPoolKey = ownerPoolKey
 	r.requiredCapabilities = append([]string{}, requiredCapabilities...)
 	if r.err != nil {
@@ -151,11 +167,11 @@ func (r *stubProcessOwnerRoleResolver) WorkflowCandidateOwnerRoleKeys(ctx contex
 		return r.explanation, nil
 	}
 	return &WorkflowTaskCandidateExplanation{
-		ConfigRevision:         "yoyoosun-rev-1",
+		ConfigRevision:         revision,
 		OwnerPoolKey:           ownerPoolKey,
 		RequiredCapabilities:   requiredCapabilities,
 		CandidateOwnerRoleKeys: []string{EngineeringRoleKey},
-		Source:                 "active_customer_config",
+		Source:                 "customer_config_revision",
 	}, nil
 }
 
@@ -393,6 +409,12 @@ func (r *memProcessRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context,
 		if node.Version != in.ExpectedVersion {
 			return nil, ErrProcessNodeInstanceConflict
 		}
+		if node.Status != ProcessNodeStatusActive {
+			if isSettledProcessNodeStatus(node.Status) {
+				return nil, ErrProcessNodeInstanceSettled
+			}
+			return nil, ErrProcessNodeInstanceNotActive
+		}
 		if in.DomainCommandFingerprint != nil && (node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != *in.DomainCommandFingerprint) {
 			return nil, ErrIdempotencyConflict
 		}
@@ -410,6 +432,12 @@ func (r *memProcessRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context,
 	if r.node.Version != in.ExpectedVersion {
 		return nil, ErrProcessNodeInstanceConflict
 	}
+	if r.node.Status != ProcessNodeStatusActive {
+		if isSettledProcessNodeStatus(r.node.Status) {
+			return nil, ErrProcessNodeInstanceSettled
+		}
+		return nil, ErrProcessNodeInstanceNotActive
+	}
 	if in.DomainCommandFingerprint != nil && (r.node.DomainCommandFingerprint == nil || *r.node.DomainCommandFingerprint != *in.DomainCommandFingerprint) {
 		return nil, ErrIdempotencyConflict
 	}
@@ -426,6 +454,10 @@ func (r *memProcessRuntimeRepo) CompleteProcessInstance(ctx context.Context, in 
 	r.completedProcess = in
 	if in == nil || in.ID <= 0 {
 		return nil, ErrBadParam
+	}
+	if r.completeProcessFailures > 0 {
+		r.completeProcessFailures--
+		return nil, r.completeProcessErr
 	}
 	if r.process != nil && r.process.ID == in.ID {
 		if r.process.Status != "" && r.process.Status != ProcessStatusActive {
@@ -502,6 +534,37 @@ func (r *memProcessRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in
 	out.Version = in.ExpectedVersion + 1
 	r.node = &out
 	return &out, nil
+}
+
+func (r *memProcessRuntimeRepo) BlockProcessNodeAndInstance(ctx context.Context, in *ProcessNodeInstanceBlock, actorID int) (*ProcessNodeInstance, error) {
+	if in == nil || in.ProcessNodeInstanceID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 {
+		return nil, ErrBadParam
+	}
+	node := r.memProcessNode(in.ProcessNodeInstanceID)
+	if node == nil {
+		return nil, ErrProcessNodeInstanceNotFound
+	}
+	if node.ProcessInstanceID != in.ProcessInstanceID || node.Status != ProcessNodeStatusActive || node.Version != in.ExpectedVersion {
+		return nil, ErrProcessNodeInstanceConflict
+	}
+	if in.DomainCommandFingerprint != nil && (node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != *in.DomainCommandFingerprint) {
+		return nil, ErrIdempotencyConflict
+	}
+	if r.process == nil || r.process.ID != in.ProcessInstanceID {
+		return nil, ErrProcessInstanceNotFound
+	}
+	if r.process.Status != "" && r.process.Status != ProcessStatusActive {
+		return nil, ErrProcessInstanceSettled
+	}
+
+	r.blockedNode = in
+	r.blockedProcess = &ProcessInstanceBlock{ID: in.ProcessInstanceID}
+	node.Status = ProcessNodeStatusBlocked
+	node.Outcome = &in.Outcome
+	node.DomainCommandFingerprint = in.DomainCommandFingerprint
+	node.Version = in.ExpectedVersion + 1
+	r.process.Status = ProcessStatusBlocked
+	return node, nil
 }
 
 func (r *memProcessRuntimeRepo) BlockProcessInstance(ctx context.Context, in *ProcessInstanceBlock, actorID int) (*ProcessInstance, error) {
@@ -617,6 +680,54 @@ func TestProcessRuntimeUsecaseCreateNormalizesDefaults(t *testing.T) {
 	}
 }
 
+func TestProcessRuntimeUsecaseCreateRejectsNonInitialStatuses(t *testing.T) {
+	validInput := func() *ProcessInstanceCreate {
+		return &ProcessInstanceCreate{
+			ProcessKey:      "engineering_release",
+			ProcessVersion:  "v1",
+			ConfigRevision:  "yoyoosun-rev-1",
+			DefinitionHash:  "sha256:definition",
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+			IdempotencyKey:  "sales_order:1001:engineering_release:v1",
+			Status:          ProcessStatusActive,
+			Nodes: []ProcessNodeInstanceCreate{{
+				NodeKey: "prepare_engineering_data", NodeType: ProcessNodeTypeHumanTask,
+				Status: ProcessNodeStatusWaiting,
+			}},
+		}
+	}
+
+	for _, status := range []string{ProcessStatusCompleted, ProcessStatusBlocked, "cancelled", "unknown"} {
+		t.Run("instance_"+status, func(t *testing.T) {
+			in := validInput()
+			in.Status = status
+			uc := NewProcessRuntimeUsecase(&memProcessRuntimeRepo{}, &stubWorkflowRepo{})
+			if _, _, err := uc.CreateProcessInstance(context.Background(), in, 7); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("expected non-initial process status %q rejected, got %v", status, err)
+			}
+		})
+	}
+
+	for _, status := range []string{
+		ProcessNodeStatusActive,
+		ProcessNodeStatusCompleted,
+		ProcessNodeStatusBlocked,
+		"skipped",
+		"failed",
+		"unknown",
+	} {
+		t.Run("node_"+status, func(t *testing.T) {
+			in := validInput()
+			in.Nodes[0].Status = status
+			uc := NewProcessRuntimeUsecase(&memProcessRuntimeRepo{}, &stubWorkflowRepo{})
+			if _, _, err := uc.CreateProcessInstance(context.Background(), in, 7); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("expected non-initial process node status %q rejected, got %v", status, err)
+			}
+		})
+	}
+}
+
 func TestProcessRuntimeUsecaseRejectsInvalidNodeType(t *testing.T) {
 	uc := NewProcessRuntimeUsecase(&memProcessRuntimeRepo{}, &stubWorkflowRepo{})
 	_, _, err := uc.CreateProcessInstance(context.Background(), &ProcessInstanceCreate{
@@ -696,52 +807,164 @@ func TestProcessRuntimeUsecaseStartProcessInstanceActivatesFirstWaitingApprovalN
 	}
 }
 
-func TestProcessRuntimeUsecaseStartProcessInstanceReturnsActiveFirstNode(t *testing.T) {
+func TestProcessRuntimeUsecaseStartProcessInstanceRepairsMissingTaskAfterActivation(t *testing.T) {
+	for _, nodeType := range []string{ProcessNodeTypeHumanTask, ProcessNodeTypeApproval} {
+		t.Run(nodeType, func(t *testing.T) {
+			ownerPoolKey := "engineering_data"
+			requiredCapabilityKey := PermissionWorkflowTaskComplete
+			processRepo := &memProcessRuntimeRepo{
+				process: &ProcessInstance{
+					ID:              10,
+					Status:          ProcessStatusActive,
+					ConfigRevision:  "yoyoosun-rev-1",
+					BusinessRefType: "sales_order",
+					BusinessRefID:   1001,
+				},
+				nodes: []*ProcessNodeInstance{
+					{
+						ID:                    20,
+						ProcessInstanceID:     10,
+						NodeKey:               "prepare_engineering_data",
+						NodeType:              nodeType,
+						Attempt:               1,
+						Status:                ProcessNodeStatusWaiting,
+						Version:               1,
+						OwnerPoolKey:          &ownerPoolKey,
+						RequiredCapabilityKey: &requiredCapabilityKey,
+					},
+				},
+			}
+			createErr := errors.New("create workflow task failed once")
+			workflowRepo := &retryWorkflowRepo{remainingFailures: 1, failureErr: createErr}
+			uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{})
+
+			if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); !errors.Is(err, createErr) {
+				t.Fatalf("expected first task creation failure, got %v", err)
+			}
+			if processRepo.nodes[0].Status != ProcessNodeStatusActive {
+				t.Fatalf("node activation must persist before task creation retry, got %#v", processRepo.nodes[0])
+			}
+			if len(workflowRepo.createdByCode) != 0 {
+				t.Fatalf("failed task creation must not leave a task, got %#v", workflowRepo.createdByCode)
+			}
+
+			startedNode, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7)
+			if err != nil {
+				t.Fatalf("expected retry to repair missing task, got %v", err)
+			}
+			if startedNode.Status != ProcessNodeStatusActive || len(workflowRepo.createdByCode) != 1 {
+				t.Fatalf("expected one repaired task for active node, node=%#v tasks=%#v", startedNode, workflowRepo.createdByCode)
+			}
+			if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); err != nil {
+				t.Fatalf("expected exact task replay on later retry, got %v", err)
+			}
+			if len(workflowRepo.createdByCode) != 1 || workflowRepo.createCalls != 3 {
+				t.Fatalf("retries must retain exactly one task, calls=%d tasks=%#v", workflowRepo.createCalls, workflowRepo.createdByCode)
+			}
+		})
+	}
+}
+
+func TestProcessRuntimeUsecaseStartProcessInstanceRepairsCompletedEndProcess(t *testing.T) {
+	completeErr := errors.New("complete process failed once")
 	processRepo := &memProcessRuntimeRepo{
-		process: &ProcessInstance{
-			ID:              10,
-			Status:          ProcessStatusActive,
-			ConfigRevision:  "yoyoosun-rev-1",
-			BusinessRefType: "sales_order",
-			BusinessRefID:   1001,
-		},
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive},
 		nodes: []*ProcessNodeInstance{
 			{
 				ID:                20,
 				ProcessInstanceID: 10,
-				NodeKey:           "submit_sales_order",
-				NodeType:          ProcessNodeTypeDomainCommand,
-				Attempt:           1,
-				Status:            ProcessNodeStatusActive,
-				Version:           3,
-				PolicySnapshot:    map[string]any{"command_key": ProcessDomainCommandSalesOrderSubmit},
-			},
-			{
-				ID:                21,
-				ProcessInstanceID: 10,
-				NodeKey:           "boss_approval",
-				NodeType:          ProcessNodeTypeApproval,
+				NodeKey:           "process_end",
+				NodeType:          ProcessNodeTypeEnd,
 				Attempt:           1,
 				Status:            ProcessNodeStatusWaiting,
 				Version:           1,
 			},
 		},
+		completeProcessFailures: 1,
+		completeProcessErr:      completeErr,
 	}
-	workflowRepo := &stubWorkflowRepo{}
-	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{})
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
 
-	startedNode, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7)
+	if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); !errors.Is(err, completeErr) {
+		t.Fatalf("expected first process completion failure, got %v", err)
+	}
+	if processRepo.nodes[0].Status != ProcessNodeStatusCompleted || processRepo.process.Status != ProcessStatusActive {
+		t.Fatalf("expected completed END with active process after partial failure, node=%#v process=%#v", processRepo.nodes[0], processRepo.process)
+	}
+
+	replayedNode, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7)
 	if err != nil {
-		t.Fatalf("expected active first node to be returned, got %v", err)
+		t.Fatalf("expected retry to complete process, got %v", err)
 	}
-	if startedNode.ID != 20 || startedNode.Status != ProcessNodeStatusActive {
-		t.Fatalf("unexpected started node %#v", startedNode)
+	if replayedNode.Status != ProcessNodeStatusCompleted || processRepo.process.Status != ProcessStatusCompleted {
+		t.Fatalf("expected completed process after retry, node=%#v process=%#v", replayedNode, processRepo.process)
 	}
-	if processRepo.activatedNode != nil {
-		t.Fatalf("active first node should not be activated again, got %#v", processRepo.activatedNode)
+	if len(processRepo.completedNodes) != 1 {
+		t.Fatalf("END completion must not be repeated, got %d calls", len(processRepo.completedNodes))
 	}
-	if workflowRepo.createTaskInput != nil {
-		t.Fatalf("active first node should not create duplicate linked workflow task")
+	if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); err != nil {
+		t.Fatalf("matching completed END must replay after process completion, got %v", err)
+	}
+}
+
+func TestProcessRuntimeUsecaseStartProcessInstanceReturnsActiveAutonomousNodeWithoutExecuting(t *testing.T) {
+	tests := []struct {
+		name           string
+		nodeType       string
+		policySnapshot map[string]any
+	}{
+		{name: "domain command", nodeType: ProcessNodeTypeDomainCommand, policySnapshot: map[string]any{"command_key": ProcessDomainCommandSalesOrderSubmit}},
+		{name: "wait event", nodeType: ProcessNodeTypeWaitEvent, policySnapshot: map[string]any{"event_key": "sales_order.reviewed"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			processRepo := &memProcessRuntimeRepo{
+				process: &ProcessInstance{
+					ID:              10,
+					Status:          ProcessStatusActive,
+					ConfigRevision:  "yoyoosun-rev-1",
+					BusinessRefType: "sales_order",
+					BusinessRefID:   1001,
+				},
+				nodes: []*ProcessNodeInstance{
+					{
+						ID:                20,
+						ProcessInstanceID: 10,
+						NodeKey:           "autonomous_first_node",
+						NodeType:          tt.nodeType,
+						Attempt:           1,
+						Status:            ProcessNodeStatusActive,
+						Version:           3,
+						PolicySnapshot:    tt.policySnapshot,
+					},
+					{
+						ID:                21,
+						ProcessInstanceID: 10,
+						NodeKey:           "boss_approval",
+						NodeType:          ProcessNodeTypeApproval,
+						Attempt:           1,
+						Status:            ProcessNodeStatusWaiting,
+						Version:           1,
+					},
+				},
+			}
+			workflowRepo := &stubWorkflowRepo{}
+			uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{})
+
+			startedNode, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7)
+			if err != nil {
+				t.Fatalf("expected active first node to be returned, got %v", err)
+			}
+			if startedNode.ID != 20 || startedNode.Status != ProcessNodeStatusActive {
+				t.Fatalf("unexpected started node %#v", startedNode)
+			}
+			if processRepo.activatedNode != nil || processRepo.completedNode != nil || processRepo.completedProcess != nil {
+				t.Fatalf("active autonomous node must not be activated or settled by Start: activated=%#v completed_node=%#v completed_process=%#v", processRepo.activatedNode, processRepo.completedNode, processRepo.completedProcess)
+			}
+			if workflowRepo.createTaskInput != nil {
+				t.Fatalf("active autonomous node must not create a linked workflow task")
+			}
+		})
 	}
 }
 
@@ -794,6 +1017,167 @@ func TestProcessRuntimeUsecaseStartProcessInstanceDoesNotCreateTaskForDomainComm
 	if processRepo.completedNode != nil || processRepo.completedProcess != nil {
 		t.Fatalf("domain command start must not complete node or process")
 	}
+}
+
+func TestProcessRuntimeUsecaseStartProcessInstanceReconcilesSettledDomainCommand(t *testing.T) {
+	ownerPoolKey := "boss_approval"
+	requiredCapabilityKey := PermissionWorkflowTaskApprove
+	settled := processTestSettledDomainCommandNode(t, ProcessDomainCommandEffectStateNone, nil)
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{
+			ID:              10,
+			Status:          ProcessStatusActive,
+			ConfigRevision:  "yoyoosun-rev-1",
+			BusinessRefType: "sales_order",
+			BusinessRefID:   1001,
+		},
+		nodes: []*ProcessNodeInstance{
+			settled,
+			{
+				ID:                    21,
+				ProcessInstanceID:     10,
+				NodeKey:               "boss_approval",
+				NodeType:              ProcessNodeTypeApproval,
+				Attempt:               1,
+				Status:                ProcessNodeStatusWaiting,
+				Version:               1,
+				OwnerPoolKey:          &ownerPoolKey,
+				RequiredCapabilityKey: &requiredCapabilityKey,
+			},
+		},
+	}
+	workflowRepo := &retryWorkflowRepo{}
+	ownerResolver := &stubProcessOwnerRoleResolver{explanation: &WorkflowTaskCandidateExplanation{
+		ConfigRevision:         "yoyoosun-rev-1",
+		OwnerPoolKey:           ownerPoolKey,
+		RequiredCapabilities:   []string{requiredCapabilityKey},
+		CandidateOwnerRoleKeys: []string{BossRoleKey},
+		Source:                 "active_customer_config",
+	}}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, ownerResolver)
+	handler := &stubProcessDomainCommandHandler{}
+	if err := uc.RegisterDomainCommandHandler("engineering_package.publish", handler); err != nil {
+		t.Fatalf("register handler: %v", err)
+	}
+
+	replayed, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7)
+	if err != nil {
+		t.Fatalf("settled domain command must reconcile downstream activation: %v", err)
+	}
+	if replayed != settled || processRepo.nodes[1].Status != ProcessNodeStatusActive || len(workflowRepo.createdByCode) != 1 {
+		t.Fatalf("settled command did not repair downstream task: replayed=%#v next=%#v tasks=%#v", replayed, processRepo.nodes[1], workflowRepo.createdByCode)
+	}
+	if handler.validateCalls != 0 || handler.calls != 0 || processRepo.completedNode != nil {
+		t.Fatalf("Start must not validate, execute, or re-complete a settled domain command: handler=%#v completed=%#v", handler, processRepo.completedNode)
+	}
+	if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); err != nil {
+		t.Fatalf("later Start must replay the repaired state: %v", err)
+	}
+	if len(workflowRepo.createdByCode) != 1 {
+		t.Fatalf("repeated Start must retain exactly one downstream task, got %#v", workflowRepo.createdByCode)
+	}
+}
+
+func TestProcessRuntimeUsecaseStartProcessInstanceSettledDomainCommandFailsClosedWithoutEvidence(t *testing.T) {
+	fingerprint := strings.Repeat("a", 64)
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: 20, ProcessInstanceID: 10, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand,
+				Status: ProcessNodeStatusCompleted, Version: 4, PolicySnapshot: map[string]any{"command_key": "engineering_package.publish"},
+				DomainCommandFingerprint: &fingerprint,
+			},
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "downstream", NodeType: ProcessNodeTypeApproval, Status: ProcessNodeStatusWaiting, Version: 1},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+
+	if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+		t.Fatalf("settled domain command without durable result must fail closed, got %v", err)
+	}
+	if processRepo.activatedNode != nil || processRepo.completedProcess != nil {
+		t.Fatalf("unsafe Start must not advance or complete: activated=%#v completed=%#v", processRepo.activatedNode, processRepo.completedProcess)
+	}
+}
+
+func TestProcessRuntimeUsecaseStartProcessInstanceCompletedCompensatedDomainCommandFailsClosed(t *testing.T) {
+	effectRef := &ProcessBusinessRef{RefType: "shipment", RefID: 88}
+	settled := processTestSettledDomainCommandNode(t, ProcessDomainCommandEffectStateApplied, effectRef)
+	mark, err := BuildProcessNodeDomainCommandCompensationMark(settled, "出货事实已冲正")
+	if err != nil {
+		t.Fatalf("build compensation mark: %v", err)
+	}
+	effectState := ProcessDomainCommandEffectStateCompensated
+	now := time.Now()
+	settled.DomainCommandEffectState = &effectState
+	settled.DomainCommandCompensation = mark.Compensation
+	settled.DomainCommandCompensationHash = &mark.CompensationHash
+	settled.DomainCommandCompensatedAt = &now
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "shipment", BusinessRefID: 88},
+		nodes: []*ProcessNodeInstance{
+			settled,
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "downstream", NodeType: ProcessNodeTypeHumanTask, Status: ProcessNodeStatusWaiting, Version: 1},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+
+	if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+		t.Fatalf("completed compensated domain command must require explicit recovery, got %v", err)
+	}
+	if processRepo.activatedNode != nil || processRepo.completedProcess != nil {
+		t.Fatalf("compensated Start must not advance or complete: activated=%#v completed=%#v", processRepo.activatedNode, processRepo.completedProcess)
+	}
+}
+
+func TestProcessRuntimeUsecaseStartProcessInstanceCompletedProcessDoesNotReplayCompletedDomainCommand(t *testing.T) {
+	settled := processTestSettledDomainCommandNode(t, ProcessDomainCommandEffectStateNone, nil)
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusCompleted},
+		nodes: []*ProcessNodeInstance{
+			settled,
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "downstream", NodeType: ProcessNodeTypeHumanTask, Status: ProcessNodeStatusWaiting, Version: 1},
+		},
+	}
+	uc := NewProcessRuntimeUsecase(processRepo, &stubWorkflowRepo{})
+
+	if _, err := uc.StartProcessInstance(context.Background(), &ProcessInstanceStart{ID: 10}, 7); !errors.Is(err, ErrProcessInstanceSettled) {
+		t.Fatalf("completed process may only replay its completed END node, got %v", err)
+	}
+	if processRepo.activatedNode != nil || processRepo.completedProcess != nil {
+		t.Fatalf("completed process must not repair a divergent domain-command path: activated=%#v completed=%#v", processRepo.activatedNode, processRepo.completedProcess)
+	}
+}
+
+func processTestSettledDomainCommandNode(t *testing.T, effectState string, effectRef *ProcessBusinessRef) *ProcessNodeInstance {
+	t.Helper()
+	fingerprint := strings.Repeat("a", 64)
+	outcome := "published"
+	node := &ProcessNodeInstance{
+		ID: 20, ProcessInstanceID: 10, NodeKey: "publish_engineering_package", NodeType: ProcessNodeTypeDomainCommand,
+		Status: ProcessNodeStatusCompleted, Version: 4, Outcome: &outcome,
+		PolicySnapshot:           map[string]any{"command_key": "engineering_package.publish"},
+		DomainCommandFingerprint: &fingerprint,
+	}
+	record, err := processDomainCommandResultRecord(node, "engineering_package.publish", fingerprint, &ProcessDomainCommandResult{
+		Outcome:     outcome,
+		EffectState: effectState,
+		EffectRef:   effectRef,
+	})
+	if err != nil {
+		t.Fatalf("build durable result record: %v", err)
+	}
+	now := time.Now()
+	node.DomainCommandProtocolVersion = &record.ProtocolVersion
+	node.DomainCommandResultState = &record.ResultState
+	node.DomainCommandResult = record.Result
+	node.DomainCommandResultHash = &record.ResultHash
+	node.DomainCommandEffectState = &record.EffectState
+	node.DomainCommandEffectRefType = record.EffectRefType
+	node.DomainCommandEffectRefID = record.EffectRefID
+	node.DomainCommandResultRecordedAt = &now
+	return node
 }
 
 func TestProcessRuntimeUsecaseStartProcessInstanceRejectsSettledProcess(t *testing.T) {
@@ -996,6 +1380,9 @@ func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskUsesInstanceCustomerKeyFor
 	if resolver.customerKey != "customer-a" {
 		t.Fatalf("expected resolver customer key from process snapshot, got %q", resolver.customerKey)
 	}
+	if resolver.configRevision != "customer-a-rev-1" {
+		t.Fatalf("expected resolver revision from process instance, got %q", resolver.configRevision)
+	}
 	if resolver.ownerPoolKey != ownerPoolKey {
 		t.Fatalf("expected resolver owner pool %q, got %q", ownerPoolKey, resolver.ownerPoolKey)
 	}
@@ -1004,6 +1391,39 @@ func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskUsesInstanceCustomerKeyFor
 	}
 	if workflowRepo.createTaskInput == nil || workflowRepo.createTaskInput.OwnerRoleKey != WarehouseRoleKey {
 		t.Fatalf("expected resolved warehouse owner role, got %#v", workflowRepo.createTaskInput)
+	}
+}
+
+func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskRejectsMissingConfigRevision(t *testing.T) {
+	ownerPoolKey := "engineering_data"
+	requiredCapabilityKey := PermissionWorkflowTaskComplete
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, BusinessRefType: "sales_order", BusinessRefID: 1001},
+		node: &ProcessNodeInstance{
+			ID:                    20,
+			ProcessInstanceID:     10,
+			NodeKey:               "prepare_engineering_data",
+			NodeType:              ProcessNodeTypeHumanTask,
+			Status:                ProcessNodeStatusActive,
+			Version:               2,
+			OwnerPoolKey:          &ownerPoolKey,
+			RequiredCapabilityKey: &requiredCapabilityKey,
+		},
+	}
+	workflowRepo := &stubWorkflowRepo{}
+	resolver := &stubProcessOwnerRoleResolver{}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, resolver)
+
+	_, err := uc.CreateLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCreate{
+		ProcessInstanceID:     10,
+		ProcessNodeInstanceID: 20,
+		ExpectedVersion:       2,
+	}, 7)
+	if !errors.Is(err, ErrProcessTaskOwnerRoleNotFound) {
+		t.Fatalf("expected missing config revision to fail closed, got %v", err)
+	}
+	if resolver.configRevision != "" || workflowRepo.createTaskInput != nil {
+		t.Fatalf("missing revision must not query active config or create a task")
 	}
 }
 
@@ -1188,25 +1608,23 @@ func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskReturnsExistingOnRetry(t *
 			Version:           3,
 		},
 	}
-	workflowRepo := &stubWorkflowRepo{
-		createTaskErr: ErrWorkflowTaskExists,
-		taskByCode: &WorkflowTask{
-			ID:                    88,
-			TaskCode:              "PROC-10-NODE-20-A1",
-			TaskStatusKey:         "ready",
-			OwnerRoleKey:          EngineeringRoleKey,
-			ProcessInstanceID:     &processInstanceID,
-			ProcessNodeInstanceID: &processNodeInstanceID,
-		},
-	}
+	workflowRepo := &stubWorkflowRepo{}
 	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
-
-	task, err := uc.CreateLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCreate{
+	input := &ProcessLinkedWorkflowTaskCreate{
 		ProcessInstanceID:     processInstanceID,
 		ProcessNodeInstanceID: processNodeInstanceID,
 		ExpectedVersion:       3,
 		OwnerRoleKey:          EngineeringRoleKey,
-	}, 7)
+	}
+	created, err := uc.CreateLinkedWorkflowTask(context.Background(), input, 7)
+	if err != nil {
+		t.Fatalf("expected initial linked task creation, got %v", err)
+	}
+	created.ID = 88
+	workflowRepo.createTaskErr = ErrWorkflowTaskExists
+	workflowRepo.taskByCode = created
+
+	task, err := uc.CreateLinkedWorkflowTask(context.Background(), input, 7)
 	if err != nil {
 		t.Fatalf("expected existing linked workflow task on retry, got %v", err)
 	}
@@ -1215,6 +1633,147 @@ func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskReturnsExistingOnRetry(t *
 	}
 	if !workflowRepo.getByCodeCalled {
 		t.Fatalf("expected retry path to read existing task by task_code")
+	}
+}
+
+func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskReturnsLookupError(t *testing.T) {
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, ConfigRevision: "yoyoosun-rev-1", BusinessRefType: "sales_order", BusinessRefID: 1001},
+		node: &ProcessNodeInstance{
+			ID:                20,
+			ProcessInstanceID: 10,
+			NodeKey:           "prepare_engineering_data",
+			NodeType:          ProcessNodeTypeHumanTask,
+			Attempt:           1,
+			Status:            ProcessNodeStatusActive,
+			Version:           3,
+		},
+	}
+	lookupErr := errors.New("workflow task lookup unavailable")
+	workflowRepo := &stubWorkflowRepo{createTaskErr: ErrWorkflowTaskExists, getByCodeErr: lookupErr}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+
+	_, err := uc.CreateLinkedWorkflowTask(context.Background(), &ProcessLinkedWorkflowTaskCreate{
+		ProcessInstanceID:     10,
+		ProcessNodeInstanceID: 20,
+		ExpectedVersion:       3,
+		OwnerRoleKey:          EngineeringRoleKey,
+	}, 7)
+	if !errors.Is(err, lookupErr) {
+		t.Fatalf("expected actual task lookup error, got %v", err)
+	}
+}
+
+func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskRejectsImmutableIntentMismatch(t *testing.T) {
+	dueAt := time.Date(2026, 7, 14, 9, 0, 0, 0, time.UTC)
+	sourceNo := "SO-1001"
+	tests := []struct {
+		name   string
+		mutate func(*WorkflowTask)
+	}{
+		{name: "task group", mutate: func(task *WorkflowTask) { task.TaskGroup = "other_group" }},
+		{name: "task name", mutate: func(task *WorkflowTask) { task.TaskName = "其他任务" }},
+		{name: "source type", mutate: func(task *WorkflowTask) { task.SourceType = "purchase_order" }},
+		{name: "source id", mutate: func(task *WorkflowTask) { task.SourceID = 1002 }},
+		{name: "source no", mutate: func(task *WorkflowTask) { task.SourceNo = processTestStringPtr("SO-OTHER") }},
+		{name: "owner role", mutate: func(task *WorkflowTask) { task.OwnerRoleKey = WarehouseRoleKey }},
+		{name: "owner pool", mutate: func(task *WorkflowTask) { task.OwnerPoolKey = processTestStringPtr("warehouse_execution") }},
+		{name: "required capability", mutate: func(task *WorkflowTask) {
+			task.RequiredCapabilityKey = processTestStringPtr(PermissionWorkflowTaskApprove)
+		}},
+		{name: "config revision", mutate: func(task *WorkflowTask) { task.ConfigRevision = processTestStringPtr("yoyoosun-rev-2") }},
+		{name: "priority", mutate: func(task *WorkflowTask) { task.Priority++ }},
+		{name: "critical path", mutate: func(task *WorkflowTask) { task.CriticalPath = !task.CriticalPath }},
+		{name: "due at", mutate: func(task *WorkflowTask) { changed := dueAt.Add(time.Hour); task.DueAt = &changed }},
+		{name: "creation payload", mutate: func(task *WorkflowTask) {
+			task.Payload = map[string]any{"business_context": map[string]any{"source": "purchase_order"}}
+		}},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ownerPoolKey := "engineering_data"
+			requiredCapabilityKey := PermissionWorkflowTaskComplete
+			processRepo := &memProcessRuntimeRepo{
+				process: &ProcessInstance{
+					ID:              10,
+					ConfigRevision:  "yoyoosun-rev-1",
+					BusinessRefType: "sales_order",
+					BusinessRefID:   1001,
+					BusinessRefNo:   &sourceNo,
+				},
+				node: &ProcessNodeInstance{
+					ID:                    20,
+					ProcessInstanceID:     10,
+					NodeKey:               "prepare_engineering_data",
+					NodeType:              ProcessNodeTypeHumanTask,
+					Attempt:               1,
+					Status:                ProcessNodeStatusActive,
+					Version:               3,
+					OwnerPoolKey:          &ownerPoolKey,
+					RequiredCapabilityKey: &requiredCapabilityKey,
+					DueAt:                 &dueAt,
+				},
+			}
+			workflowRepo := &stubWorkflowRepo{}
+			uc := NewProcessRuntimeUsecase(processRepo, workflowRepo, &stubProcessOwnerRoleResolver{})
+			input := &ProcessLinkedWorkflowTaskCreate{
+				ProcessInstanceID:     10,
+				ProcessNodeInstanceID: 20,
+				ExpectedVersion:       3,
+				Payload: map[string]any{
+					"business_context": map[string]any{"source": "sales_order"},
+				},
+			}
+			created, err := uc.CreateLinkedWorkflowTask(context.Background(), input, 7)
+			if err != nil {
+				t.Fatalf("create linked task fixture: %v", err)
+			}
+			tt.mutate(created)
+			workflowRepo.createTaskErr = ErrWorkflowTaskExists
+			workflowRepo.taskByCode = created
+
+			if _, err := uc.CreateLinkedWorkflowTask(context.Background(), input, 7); !errors.Is(err, ErrWorkflowTaskExists) {
+				t.Fatalf("expected immutable task mismatch conflict, got %v", err)
+			}
+		})
+	}
+}
+
+func TestProcessRuntimeUsecaseCreateLinkedWorkflowTaskAllowsLifecycleChangesOnReplay(t *testing.T) {
+	processRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, ConfigRevision: "yoyoosun-rev-1", BusinessRefType: "sales_order", BusinessRefID: 1001},
+		node: &ProcessNodeInstance{
+			ID:                20,
+			ProcessInstanceID: 10,
+			NodeKey:           "prepare_engineering_data",
+			NodeType:          ProcessNodeTypeHumanTask,
+			Attempt:           1,
+			Status:            ProcessNodeStatusActive,
+			Version:           3,
+		},
+	}
+	workflowRepo := &stubWorkflowRepo{}
+	uc := NewProcessRuntimeUsecase(processRepo, workflowRepo)
+	input := &ProcessLinkedWorkflowTaskCreate{
+		ProcessInstanceID:     10,
+		ProcessNodeInstanceID: 20,
+		ExpectedVersion:       3,
+		OwnerRoleKey:          EngineeringRoleKey,
+	}
+	created, err := uc.CreateLinkedWorkflowTask(context.Background(), input, 7)
+	if err != nil {
+		t.Fatalf("create linked task fixture: %v", err)
+	}
+	assigneeID := 99
+	created.TaskStatusKey = "blocked"
+	created.AssigneeID = &assigneeID
+	created.Payload = map[string]any{"runtime": "changed"}
+	workflowRepo.createTaskErr = ErrWorkflowTaskExists
+	workflowRepo.taskByCode = created
+
+	if _, err := uc.CreateLinkedWorkflowTask(context.Background(), input, 7); err != nil {
+		t.Fatalf("lifecycle changes must not invalidate immutable task replay, got %v", err)
 	}
 }
 
@@ -3265,6 +3824,50 @@ func TestProcessRuntimeUsecaseSettledDomainCommandWithoutCurrentDurableResultFai
 	}
 }
 
+type processRuntimeRepoWithoutDurableResultProtocol struct {
+	ProcessRuntimeRepo
+}
+
+func TestProcessRuntimeUsecaseSettledDomainCommandWithoutDurableResultProtocolFailsClosed(t *testing.T) {
+	commandKey := "shipment.ship"
+	idempotencyKey := "process:10:node:20:shipment.ship"
+	payload := map[string]any{"shipment_id": 88}
+	fingerprint, err := processDomainCommandFingerprint(commandKey, idempotencyKey, payload)
+	if err != nil {
+		t.Fatalf("fingerprint: %v", err)
+	}
+	outcome := ShipmentProcessCommandOutcomeShipped
+	baseRepo := &memProcessRuntimeRepo{
+		process: &ProcessInstance{ID: 10, Status: ProcessStatusActive, BusinessRefType: "shipment", BusinessRefID: 88},
+		nodes: []*ProcessNodeInstance{
+			{
+				ID: 20, ProcessInstanceID: 10, NodeKey: "ship", NodeType: ProcessNodeTypeDomainCommand,
+				Status: ProcessNodeStatusCompleted, Version: 4, Outcome: &outcome,
+				PolicySnapshot:           map[string]any{"command_key": commandKey},
+				DomainCommandFingerprint: &fingerprint,
+			},
+			{ID: 21, ProcessInstanceID: 10, NodeKey: "done", NodeType: ProcessNodeTypeEnd, Attempt: 1, Status: ProcessNodeStatusWaiting, Version: 1},
+		},
+	}
+	repo := &processRuntimeRepoWithoutDurableResultProtocol{ProcessRuntimeRepo: baseRepo}
+	handler := &stubProcessDomainCommandHandler{}
+	uc := NewProcessRuntimeUsecase(repo, &stubWorkflowRepo{})
+	if err := uc.RegisterDomainCommandHandler(commandKey, handler); err != nil {
+		t.Fatalf("register handler: %v", err)
+	}
+
+	_, err = uc.ExecuteDomainCommandNode(context.Background(), &ProcessDomainCommandExecution{
+		ProcessInstanceID: 10, ProcessNodeInstanceID: 20, ExpectedVersion: 3,
+		CommandKey: commandKey, IdempotencyKey: idempotencyKey, Payload: payload,
+	}, 7)
+	if !errors.Is(err, ErrProcessDomainCommandRecoveryRequired) {
+		t.Fatalf("settled command without durable result protocol must fail closed, got %v", err)
+	}
+	if handler.validateCalls != 0 || handler.calls != 0 || baseRepo.activatedNode != nil || baseRepo.completedProcess != nil {
+		t.Fatalf("adapter without durable evidence must not validate, execute, activate downstream, or complete process: handler=%#v activated=%#v completed=%#v", handler, baseRepo.activatedNode, baseRepo.completedProcess)
+	}
+}
+
 func TestProcessRuntimeUsecaseExecuteDomainCommandNodeRejectsMissingHandler(t *testing.T) {
 	commandKey := "engineering_package.publish"
 	processRepo := &memProcessRuntimeRepo{
@@ -3482,7 +4085,7 @@ func TestProcessRuntimeUsecaseCompleteLinkedWorkflowTaskRejectsUnfinishedTask(t 
 	workflowRepo := &stubWorkflowRepo{
 		currentTask: &WorkflowTask{
 			ID:                    99,
-			TaskStatusKey:         "processing",
+			TaskStatusKey:         "ready",
 			ProcessInstanceID:     &processID,
 			ProcessNodeInstanceID: &nodeID,
 		},

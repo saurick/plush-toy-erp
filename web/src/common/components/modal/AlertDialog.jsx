@@ -10,9 +10,28 @@ export default function AlertDialog({
   onConfirm = null,
   className = '',
 }) {
+  const titleId = React.useId()
+  const messageId = React.useId()
+  const confirmingRef = React.useRef(false)
+
+  React.useEffect(() => {
+    if (open) confirmingRef.current = false
+  }, [open])
+
   const handleConfirm = () => {
-    onConfirm?.()
-    onClose?.()
+    if (confirmingRef.current) return
+    confirmingRef.current = true
+    try {
+      onConfirm?.()
+      if (typeof onClose === 'function') {
+        onClose()
+      } else {
+        confirmingRef.current = false
+      }
+    } catch (error) {
+      confirmingRef.current = false
+      throw error
+    }
   }
 
   return (
@@ -20,10 +39,16 @@ export default function AlertDialog({
       open={open}
       onClose={onClose}
       className={`app-alert-dialog ${className}`.trim()}
+      role="alertdialog"
+      ariaLabel={title ? '' : '提示'}
+      ariaLabelledBy={title ? titleId : ''}
+      ariaDescribedBy={message ? messageId : ''}
+      initialFocusSelector="[data-app-alert-confirm]"
     >
       <div className="flex flex-col items-center gap-5 py-2 text-center">
         {title ? (
           <div
+            id={titleId}
             className="text-xl font-semibold leading-8 text-slate-900 sm:text-2xl"
             data-app-alert-title
           >
@@ -33,6 +58,7 @@ export default function AlertDialog({
 
         {message ? (
           <div
+            id={messageId}
             className="whitespace-pre-line text-sm leading-7 text-slate-600 sm:text-base"
             data-app-alert-message
           >

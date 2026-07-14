@@ -13,7 +13,31 @@ import {
   workflowTaskMutationSignature,
 } from '../../src/erp/utils/workflowTaskMutation.mjs'
 import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
+import { purchaseReceiptMutationSignature } from '../../src/erp/utils/purchaseReceiptMutation.mjs'
 import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+
+function purchaseReceiptMutationResult(attempts, scope, params, create) {
+  const idempotencyKey = String(params?.idempotency_key || '').trim()
+  if (!idempotencyKey || [...idempotencyKey].length > 128) {
+    return {
+      error: { code: 40010, message: '采购入库请求缺少有效请求标识', data: {} },
+    }
+  }
+  const attemptKey = `${scope}:${idempotencyKey}`
+  const signature = purchaseReceiptMutationSignature(params)
+  const current = attempts.get(attemptKey)
+  if (current?.signature === signature) {
+    return { data: current.data }
+  }
+  if (current) {
+    return {
+      error: { code: 40920, message: '采购入库请求内容已变化', data: {} },
+    }
+  }
+  const data = create()
+  attempts.set(attemptKey, { signature, data })
+  return { data }
+}
 
 export async function installFactRpcMocks(page, context) {
   const { adminProfile, effectiveSession, nowUnix, resolveDelayFromReferer } =
@@ -275,7 +299,7 @@ export async function installFactRpcMocks(page, context) {
 
   const purchaseReceiptItem = {
     id: 602,
-    purchase_receipt_id: 601,
+    receipt_id: 601,
     source_line_no: '入库行 1',
     material_id: 1,
     material_name_snapshot: '样式材料',
@@ -318,7 +342,7 @@ export async function installFactRpcMocks(page, context) {
         {
           ...purchaseReceiptItem,
           id: 604,
-          purchase_receipt_id: 603,
+          receipt_id: 603,
           source_line_no: '草稿入库行 1',
           quantity: '12',
           amount: '42.00',
@@ -341,6 +365,7 @@ export async function installFactRpcMocks(page, context) {
       updated_at: nowUnix(),
     },
   ]
+  const purchaseReceiptMutationAttempts = new Map()
 
   await page.route('**/rpc/purchase', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -361,6 +386,7 @@ export async function installFactRpcMocks(page, context) {
     }
 
     let data = {}
+    let rpcResult = null
     switch (method) {
       case 'list_purchase_receipts':
         {
@@ -415,6 +441,42 @@ export async function installFactRpcMocks(page, context) {
         }
         nextPurchaseReceiptId += 1
         break
+      case 'create_purchase_receipt_from_purchase_order':
+        {
+          const purchaseOrderID = Number(params.purchase_order_id || 0)
+          const mutation = purchaseReceiptMutationResult(
+            purchaseReceiptMutationAttempts,
+            `create-from-order:${purchaseOrderID}`,
+            params,
+            () => {
+              const receiptId = nextPurchaseReceiptId
+              nextPurchaseReceiptId += 1
+              const itemId = nextPurchaseReceiptItemId
+              nextPurchaseReceiptItemId += 1
+              const item = {
+                ...purchaseReceiptItem,
+                id: itemId,
+                receipt_id: receiptId,
+                warehouse_id: Number(params.warehouse_id || 1),
+              }
+              const receipt = {
+                ...purchaseReceipts[1],
+                ...params,
+                id: receiptId,
+                receipt_no: String(params.receipt_no || '').trim(),
+                status: 'DRAFT',
+                items: [item],
+                created_at: nowUnix(),
+                updated_at: nowUnix(),
+              }
+              purchaseReceipts.unshift(receipt)
+              return { purchase_receipt: receipt }
+            }
+          )
+          data = mutation.data || {}
+          rpcResult = mutation.error || null
+        }
+        break
       case 'post_purchase_receipt':
         {
           const receipt = purchaseReceipts.find(
@@ -447,27 +509,33 @@ export async function installFactRpcMocks(page, context) {
         break
       case 'add_purchase_receipt_item':
         {
+          const receiptID = Number(params.receipt_id || 0)
           const receipt = purchaseReceipts.find(
-            (item) =>
-              Number(item.id) ===
-              Number(params.receipt_id || params.purchase_receipt_id)
+            (item) => Number(item.id) === receiptID
           )
-          const item = {
-            ...purchaseReceiptItem,
-            ...params,
-            purchase_receipt_id: Number(
-              params.receipt_id || params.purchase_receipt_id
-            ),
-            id: nextPurchaseReceiptItemId,
-            created_at: nowUnix(),
-            updated_at: nowUnix(),
-          }
-          nextPurchaseReceiptItemId += 1
-          if (receipt) {
-            receipt.items = [...(receipt.items || []), item]
-            receipt.updated_at = nowUnix()
-          }
-          data = { purchase_receipt_item: item }
+          const mutation = purchaseReceiptMutationResult(
+            purchaseReceiptMutationAttempts,
+            `add-item:${receiptID}`,
+            params,
+            () => {
+              const item = {
+                ...purchaseReceiptItem,
+                ...params,
+                receipt_id: receiptID,
+                id: nextPurchaseReceiptItemId,
+                created_at: nowUnix(),
+                updated_at: nowUnix(),
+              }
+              nextPurchaseReceiptItemId += 1
+              if (receipt) {
+                receipt.items = [...(receipt.items || []), item]
+                receipt.updated_at = nowUnix()
+              }
+              return { purchase_receipt_item: item }
+            }
+          )
+          data = mutation.data || {}
+          rpcResult = mutation.error || null
         }
         break
       default:
@@ -481,7 +549,7 @@ export async function installFactRpcMocks(page, context) {
       body: JSON.stringify({
         jsonrpc: '2.0',
         id,
-        result: styleRpcResult(data),
+        result: rpcResult || styleRpcResult(data),
       }),
     })
   })
@@ -641,7 +709,6 @@ export async function installFactRpcMocks(page, context) {
     }
     switch (method) {
       case 'list_inventory_balances':
-      case 'listInventoryBalances':
         {
           const inventoryBalances =
             (!params.subject_type ||
@@ -671,7 +738,6 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'list_inventory_lots':
-      case 'listInventoryLots':
         {
           const inventoryLots = [inventoryLot, skuInventoryLot].filter(
             (item) =>
@@ -699,7 +765,6 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'list_inventory_txns':
-      case 'listInventoryTxns':
         {
           const inventoryTxns =
             (!params.subject_type ||
@@ -749,6 +814,7 @@ export async function installFactRpcMocks(page, context) {
     complete_task_action: 'complete',
     block_task_action: 'block',
     reject_task_action: 'reject',
+    resume_task_action: 'resume',
     urge_task: 'urge',
   }
   const cloneWorkflowTask = (task) => JSON.parse(JSON.stringify(task))
@@ -899,6 +965,82 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       }
+      case 'list_role_tasks': {
+        if (
+          !workflowMockPermissionAllowed(
+            adminProfile,
+            effectiveSession,
+            'workflow.task.read'
+          )
+        ) {
+          fail('当前账号缺少查看协同任务权限')
+          break
+        }
+        const listDelayMs = resolveDelayFromReferer(
+          route.request(),
+          '__style_l1_workflow_list_delay'
+        )
+        if (listDelayMs > 0) {
+          await delay(listDelayMs)
+        }
+        const roleKey = String(params.role_key || '').trim()
+        const viewKey = String(params.view_key || '').trim()
+        const limit = Math.min(Math.max(Number(params.limit || 50), 1), 100)
+        const beforeID = params.cursor ? Number(params.cursor) : 0
+        const terminalStatuses = new Set([
+          'done',
+          'rejected',
+          'cancelled',
+          'closed',
+        ])
+        const isRiskTask = (task) =>
+          task.task_status_key === 'blocked' ||
+          (Number(task.due_at || 0) > 0 &&
+            Number(task.due_at) < Number(nowUnix())) ||
+          Number(task.priority || 0) >= 3 ||
+          task.critical_path === true ||
+          Number(task.urge_count || 0) > 0 ||
+          Boolean(task.escalated_at) ||
+          task.payload?.critical_path === true
+        const crossRoleRisk =
+          viewKey === 'risk' && ['pmc', 'boss'].includes(roleKey)
+        const matchingTasks = workflowTasks
+          .filter((task) => {
+            const terminal = terminalStatuses.has(task.task_status_key)
+            const assignedToCurrentAdmin =
+              Number(task.assignee_id || 0) > 0 &&
+              Number(task.assignee_id) === Number(adminProfile?.id || 0)
+            const roleMatched =
+              crossRoleRisk ||
+              task.owner_role_key === roleKey ||
+              assignedToCurrentAdmin
+            const viewMatched =
+              viewKey === 'history'
+                ? terminal
+                : viewKey === 'risk'
+                  ? !terminal && isRiskTask(task)
+                  : !terminal
+            return (
+              roleMatched &&
+              viewMatched &&
+              (!beforeID || task.id < beforeID) &&
+              workflowMockCanViewTask(adminProfile, effectiveSession, task)
+            )
+          })
+          .sort((left, right) => right.id - left.id)
+        const items = matchingTasks.slice(0, limit)
+        const hasMore = matchingTasks.length > limit
+        data = {
+          items,
+          next_cursor:
+            hasMore && items.length > 0
+              ? String(items[items.length - 1].id)
+              : '',
+          has_more: hasMore,
+          server_time: Number(nowUnix()),
+        }
+        break
+      }
       case 'get_task_board': {
         if (
           !workflowMockPermissionAllowed(
@@ -946,7 +1088,7 @@ export async function installFactRpcMocks(page, context) {
           assignee_id: createParams.assignee_id || '',
           priority: createParams.priority,
           due_at: createParams.due_at || null,
-          blocked_reason: createParams.blocked_reason || '',
+          blocked_reason: '',
           version: 1,
           payload: createParams.payload,
           created_at: nowUnix(),
@@ -958,20 +1100,25 @@ export async function installFactRpcMocks(page, context) {
       }
       case 'complete_task_action':
       case 'block_task_action':
-      case 'reject_task_action': {
+      case 'reject_task_action':
+      case 'resume_task_action': {
         const request = resolveWorkflowMutationRequest(method, params)
         const nextStatusKey =
           method === 'complete_task_action'
             ? 'done'
             : method === 'block_task_action'
               ? 'blocked'
-              : 'rejected'
+              : method === 'reject_task_action'
+                ? 'rejected'
+                : 'ready'
         const actionKey =
           method === 'complete_task_action'
             ? 'complete'
             : method === 'block_task_action'
               ? 'block'
-              : 'reject'
+              : method === 'reject_task_action'
+                ? 'reject'
+                : 'resume'
         const decision = request.errorCode
           ? null
           : workflowMockActionDecision({
@@ -1015,6 +1162,10 @@ export async function installFactRpcMocks(page, context) {
           } else if (nextStatusKey === 'rejected') {
             task.payload.rejected_reason = mutationParams.reason
             delete task.payload.blocked_reason
+          } else if (nextStatusKey === 'ready') {
+            delete task.payload.blocked_reason
+            delete task.payload.rejected_reason
+            task.completed_at = null
           } else {
             delete task.payload.blocked_reason
             delete task.payload.rejected_reason
@@ -1107,7 +1258,7 @@ export async function installFactRpcMocks(page, context) {
           break
         }
         const ownerRoleKey = task?.owner_role_key || ''
-        const actions = ['complete', 'block', 'reject', 'urge'].map(
+        const actions = ['complete', 'block', 'reject', 'resume', 'urge'].map(
           (actionKey) => {
             const decision = workflowMockActionDecision({
               actionKey,

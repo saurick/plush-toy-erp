@@ -7,6 +7,7 @@ import (
 	"testing"
 	"time"
 
+	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
 
@@ -32,7 +33,30 @@ func newCustomerConfigTestDispatcherWithOperationalFactRepo(admin *biz.AdminUser
 	return newCustomerConfigTestDispatcherWithRepos(admin, roleKeys, newServiceSalesOrderRepo(nil), nil, operationalFactRepo)
 }
 
+func newCustomerConfigTestDispatcherWithRuntimeRepo(admin *biz.AdminUser, roleKeys []string) (*jsonrpcDispatcher, *serviceProcessRuntimeRepo) {
+	return newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, newServiceSalesOrderRepo(nil), nil, nil)
+}
+
+func newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
+	admin *biz.AdminUser,
+	roleKeys []string,
+	operationalFactRepo biz.OperationalFactRepo,
+) (*jsonrpcDispatcher, *serviceProcessRuntimeRepo) {
+	return newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, newServiceSalesOrderRepo(nil), nil, operationalFactRepo)
+}
+
 func newCustomerConfigTestDispatcherWithRepos(admin *biz.AdminUser, roleKeys []string, salesOrderRepo *serviceSalesOrderRepo, inventoryRepo biz.InventoryRepo, operationalFactRepo biz.OperationalFactRepo) *jsonrpcDispatcher {
+	dispatcher, _ := newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, salesOrderRepo, inventoryRepo, operationalFactRepo)
+	return dispatcher
+}
+
+func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
+	admin *biz.AdminUser,
+	roleKeys []string,
+	salesOrderRepo *serviceSalesOrderRepo,
+	inventoryRepo biz.InventoryRepo,
+	operationalFactRepo biz.OperationalFactRepo,
+) (*jsonrpcDispatcher, *serviceProcessRuntimeRepo) {
 	adminRepo := newMemAdminManageRepoForData()
 	if admin == nil {
 		admin = &biz.AdminUser{
@@ -46,7 +70,8 @@ func newCustomerConfigTestDispatcherWithRepos(admin *biz.AdminUser, roleKeys []s
 	adminRepo.applyAdminRoles(adminRepo.admins[admin.ID], roleKeys)
 	logger := log.NewStdLogger(io.Discard)
 	customerConfigUC := biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo())
-	processRuntimeUC := biz.NewProcessRuntimeUsecase(newServiceProcessRuntimeRepo(), newServiceWorkflowRepo(), customerConfigUC)
+	processRuntimeRepo := newServiceProcessRuntimeRepo()
+	processRuntimeUC := biz.NewProcessRuntimeUsecase(processRuntimeRepo, newServiceWorkflowRepo(), customerConfigUC)
 	salesOrderUC := biz.NewSalesOrderUsecase(salesOrderRepo)
 	if err := biz.RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC, salesOrderUC); err != nil {
 		panic(err)
@@ -83,7 +108,7 @@ func newCustomerConfigTestDispatcherWithRepos(admin *biz.AdminUser, roleKeys []s
 		inventoryUC:       inventoryUC,
 		operationalFactUC: operationalFactUC,
 		adminReader:       adminRepo,
-	}
+	}, processRuntimeRepo
 }
 
 type serviceCustomerConfigRepo struct {
@@ -166,12 +191,255 @@ func TestMapCustomerConfigError_IdempotencyConflict(t *testing.T) {
 	}
 }
 
+func TestMapCustomerConfigError_RevisionImmutable(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrCustomerConfigRevisionImmutable)
+	if result.Code != errcode.IdempotencyConflict.Code || result.Message != "客户配置版本已存在且内容不同，请使用新版本号发布" {
+		t.Fatalf("unexpected immutable revision result: %#v", result)
+	}
+}
+
+func TestMapCustomerConfigError_TransitionConflicts(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	for _, tc := range []struct {
+		name    string
+		err     error
+		message string
+	}{
+		{name: "active revision changed", err: biz.ErrCustomerConfigActiveRevisionChanged, message: "当前激活版本已变化，请重新检查后再执行"},
+		{name: "product version mismatch", err: biz.ErrCustomerConfigProductVersionMismatch, message: "产品版本已变化，请重新校验后再执行"},
+		{name: "transition blocked", err: biz.ErrCustomerConfigTransitionBlocked, message: "客户配置切换存在运行中阻塞，请先查看切换检查结果"},
+		{name: "hash mismatch", err: biz.ErrCustomerConfigHashMismatch, message: "客户配置内容已变化，请重新校验后再激活"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			result := dispatcher.mapCustomerConfigError(context.Background(), tc.err)
+			if result.Code != errcode.IdempotencyConflict.Code || result.Message != tc.message {
+				t.Fatalf("transition conflict result = %#v", result)
+			}
+		})
+	}
+}
+
 func TestMapCustomerConfigError_ProcessDomainCommandRecoveryRequired(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
 	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrProcessDomainCommandRecoveryRequired)
 	if result.Code != errcode.ProcessDomainCommandRecoveryRequired.Code || result.Message != errcode.ProcessDomainCommandRecoveryRequired.Message {
 		t.Fatalf("unexpected process recovery result: %#v", result)
+	}
+}
+
+func TestCustomerConfigPublishInputFromParamsMergesFormalManifestMetadata(t *testing.T) {
+	snapshot := map[string]any{
+		"customer": map[string]any{"key": "yoyoosun"},
+		"runtimeProcessSelections": []any{
+			map[string]any{
+				"process_key":       biz.ProcessKeySalesOrderAcceptance,
+				"process_version":   "v1",
+				"variant_key":       biz.CustomerProcessVariantSalesApprovalPMC,
+				"business_ref_type": "sales_order",
+			},
+		},
+	}
+	in, ok := customerConfigPublishInputFromParams(map[string]any{
+		"customer_key":             "yoyoosun",
+		"revision":                 "yoyoosun-v1",
+		"product_version":          "product-v1",
+		"manifest_schema_version":  biz.CustomerConfigManifestSchemaVersionCurrent,
+		"process_contract_version": biz.CustomerProcessContractVersionCurrent,
+		"manifest_status":          "runtime_compile_ready",
+		"runtime_enabled":          true,
+		"publishable":              true,
+		"compiled_snapshot":        snapshot,
+	})
+	if !ok {
+		t.Fatal("customerConfigPublishInputFromParams rejected formal manifest")
+	}
+	for key, want := range map[string]any{
+		"manifest_schema_version":  biz.CustomerConfigManifestSchemaVersionCurrent,
+		"process_contract_version": biz.CustomerProcessContractVersionCurrent,
+		"manifest_status":          "runtime_compile_ready",
+		"runtime_enabled":          true,
+		"publishable":              true,
+	} {
+		if got := in.CompiledSnapshot[key]; got != want {
+			t.Fatalf("compiled snapshot %s = %#v, want %#v", key, got, want)
+		}
+		if _, exists := snapshot[key]; exists {
+			t.Fatalf("request snapshot was mutated for %s", key)
+		}
+	}
+}
+
+func TestCustomerConfigPublishInputFromParamsRejectsSnapshotManifestMetadata(t *testing.T) {
+	_, ok := customerConfigPublishInputFromParams(map[string]any{
+		"customer_key":             "yoyoosun",
+		"revision":                 "yoyoosun-v1",
+		"product_version":          "product-v1",
+		"manifest_schema_version":  biz.CustomerConfigManifestSchemaVersionCurrent,
+		"process_contract_version": biz.CustomerProcessContractVersionCurrent,
+		"manifest_status":          "runtime_compile_ready",
+		"runtime_enabled":          true,
+		"publishable":              true,
+		"compiled_snapshot": map[string]any{
+			"customer":                map[string]any{"key": "yoyoosun"},
+			"manifest_schema_version": biz.CustomerConfigManifestSchemaVersionCurrent,
+		},
+	})
+	if ok {
+		t.Fatal("manifest metadata must be supplied only at the top level")
+	}
+}
+
+func TestCustomerConfigPublishInputFromParamsRequiresTopLevelManifestMetadata(t *testing.T) {
+	_, ok := customerConfigPublishInputFromParams(map[string]any{
+		"customer_key":    "yoyoosun",
+		"revision":        "yoyoosun-v1",
+		"product_version": "product-v1",
+		"compiled_snapshot": map[string]any{
+			"customer": map[string]any{"key": "yoyoosun"},
+		},
+	})
+	if ok {
+		t.Fatal("formal manifest metadata must be present at the top level")
+	}
+}
+
+func TestCustomerConfigPublishInputFromParamsRejectsEmptyProductVersion(t *testing.T) {
+	_, ok := customerConfigPublishInputFromParams(map[string]any{
+		"customer_key":    "yoyoosun",
+		"revision":        "yoyoosun-v1",
+		"product_version": "  ",
+		"compiled_snapshot": map[string]any{
+			"customer": map[string]any{"key": "yoyoosun"},
+		},
+	})
+	if ok {
+		t.Fatal("empty product_version must be rejected before immutable publish")
+	}
+}
+
+func TestCustomerConfigPublishInputFromParamsRejectsCanonicalLookingLegacyGraph(t *testing.T) {
+	snapshot := map[string]any{
+		"customer": map[string]any{"key": "yoyoosun"},
+		"processDefinitions": map[string]any{
+			biz.ProcessKeySalesOrderAcceptance: map[string]any{
+				"process_key":     biz.ProcessKeySalesOrderAcceptance,
+				"process_version": "v1",
+				"variant_key":     biz.CustomerProcessVariantSalesApprovalPMC,
+				"nodes":           []any{map[string]any{"node_key": "end", "node_type": biz.ProcessNodeTypeEnd}},
+			},
+		},
+	}
+	_, ok := customerConfigPublishInputFromParams(map[string]any{
+		"customer_key":      "yoyoosun",
+		"revision":          "yoyoosun-v1",
+		"product_version":   "product-v1",
+		"compiled_snapshot": snapshot,
+	})
+	if ok {
+		t.Fatal("JSON-RPC input must reject a caller-supplied process graph even when it looks canonical")
+	}
+}
+
+func TestCustomerConfigPublishInputFromParamsRejectsLegacyAndUnknownShapes(t *testing.T) {
+	valid := map[string]any{
+		"customer_key":    "yoyoosun",
+		"revision":        "yoyoosun-v1",
+		"product_version": "product-v1",
+		"compiled_snapshot": map[string]any{
+			"customer": map[string]any{"key": "yoyoosun"},
+		},
+	}
+	for _, tc := range []struct {
+		name   string
+		params map[string]any
+	}{
+		{
+			name:   "nested candidate revision",
+			params: map[string]any{"candidate_revision": valid},
+		},
+		{
+			name: "camel case aliases",
+			params: map[string]any{
+				"customerKey":      "yoyoosun",
+				"revision":         "yoyoosun-v1",
+				"productVersion":   "product-v1",
+				"compiledSnapshot": valid["compiled_snapshot"],
+			},
+		},
+		{
+			name: "unknown top level field",
+			params: func() map[string]any {
+				params := make(map[string]any, len(valid)+1)
+				for key, value := range valid {
+					params[key] = value
+				}
+				params["product_verison"] = "typo-must-fail"
+				return params
+			}(),
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, ok := customerConfigPublishInputFromParams(tc.params); ok {
+				t.Fatal("legacy or unknown customer config input must be rejected")
+			}
+		})
+	}
+}
+
+func TestCustomerConfigJSONRPCValidateAndPublishRejectNonCanonicalManifestShape(t *testing.T) {
+	dispatcher := newCustomerConfigTestDispatcher(
+		&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		[]string{biz.AdminRoleKey},
+	)
+	ctx := customerConfigAdminCtx(1, "admin")
+	for _, method := range []string{"validate_customer_config", "publish_customer_config"} {
+		for _, tc := range []struct {
+			name   string
+			mutate func(map[string]any)
+		}{
+			{
+				name: "unknown top level field",
+				mutate: func(payload map[string]any) {
+					payload["unexpected_field"] = true
+				},
+			},
+			{
+				name: "snapshot only manifest metadata",
+				mutate: func(payload map[string]any) {
+					snapshot := payload["compiled_snapshot"].(map[string]any)
+					for _, key := range []string{
+						"manifest_schema_version",
+						"process_contract_version",
+						"manifest_status",
+						"runtime_enabled",
+						"publishable",
+					} {
+						snapshot[key] = payload[key]
+						delete(payload, key)
+					}
+				},
+			},
+		} {
+			t.Run(method+"/"+tc.name, func(t *testing.T) {
+				payload := customerConfigPublishParams(t).AsMap()
+				tc.mutate(payload)
+				params, err := structpb.NewStruct(payload)
+				if err != nil {
+					t.Fatalf("NewStruct error = %v", err)
+				}
+				_, res, err := dispatcher.handleCustomerConfig(ctx, method, method, params)
+				if err != nil {
+					t.Fatalf("handleCustomerConfig error = %v", err)
+				}
+				if res.Code != errcode.InvalidParam.Code {
+					t.Fatalf("code = %d, want invalid param", res.Code)
+				}
+			})
+		}
 	}
 }
 
@@ -296,7 +564,123 @@ func (r *serviceProcessRuntimeRepo) ClaimProcessNodeDomainCommand(_ context.Cont
 		return nil, biz.ErrIdempotencyConflict
 	}
 	fingerprint := in.DomainCommandFingerprint
+	protocolVersion := biz.ProcessDomainCommandProtocolVersionCurrent
 	item.DomainCommandFingerprint = &fingerprint
+	item.DomainCommandProtocolVersion = &protocolVersion
+	return cloneServiceProcessNodeInstance(item), nil
+}
+
+func (r *serviceProcessRuntimeRepo) GetProcessNodeDomainCommandResult(
+	_ context.Context,
+	processInstanceID int,
+	processNodeInstanceID int,
+	fingerprint string,
+) (*biz.ProcessNodeInstance, bool, error) {
+	item := r.nodes[processNodeInstanceID]
+	if item == nil {
+		return nil, false, biz.ErrProcessNodeInstanceNotFound
+	}
+	if item.ProcessInstanceID != processInstanceID || item.NodeType != biz.ProcessNodeTypeDomainCommand {
+		return nil, false, biz.ErrBadParam
+	}
+	if item.DomainCommandFingerprint == nil {
+		return cloneServiceProcessNodeInstance(item), false, nil
+	}
+	if *item.DomainCommandFingerprint != fingerprint {
+		return nil, false, biz.ErrIdempotencyConflict
+	}
+	if item.DomainCommandProtocolVersion == nil || *item.DomainCommandProtocolVersion != biz.ProcessDomainCommandProtocolVersionCurrent {
+		return nil, false, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	if item.DomainCommandResultHash == nil {
+		return cloneServiceProcessNodeInstance(item), false, nil
+	}
+	if item.DomainCommandResultState == nil || item.DomainCommandEffectState == nil || item.DomainCommandResult == nil || item.DomainCommandResultRecordedAt == nil {
+		return nil, false, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	return cloneServiceProcessNodeInstance(item), true, nil
+}
+
+func (r *serviceProcessRuntimeRepo) RecordProcessNodeDomainCommandResult(
+	_ context.Context,
+	in *biz.ProcessNodeDomainCommandResultRecord,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	item := r.nodes[in.ProcessNodeInstanceID]
+	if item == nil {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if item.ProcessInstanceID != in.ProcessInstanceID || item.NodeType != biz.ProcessNodeTypeDomainCommand ||
+		item.Status != biz.ProcessNodeStatusActive || item.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if item.DomainCommandFingerprint == nil || *item.DomainCommandFingerprint != in.DomainCommandFingerprint {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	if item.DomainCommandProtocolVersion == nil || *item.DomainCommandProtocolVersion != in.ProtocolVersion {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	if item.DomainCommandResultHash != nil {
+		if *item.DomainCommandResultHash != in.ResultHash {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		return cloneServiceProcessNodeInstance(item), nil
+	}
+	now := time.Now()
+	resultState := in.ResultState
+	resultHash := in.ResultHash
+	effectState := in.EffectState
+	item.DomainCommandResultState = &resultState
+	item.DomainCommandResult = cloneServiceAnyMap(in.Result)
+	item.DomainCommandResultHash = &resultHash
+	item.DomainCommandEffectState = &effectState
+	item.DomainCommandEffectRefType = in.EffectRefType
+	item.DomainCommandEffectRefID = in.EffectRefID
+	item.DomainCommandResultRecordedAt = &now
+	if actorID > 0 {
+		recordedBy := actorID
+		item.DomainCommandResultRecordedBy = &recordedBy
+	}
+	return cloneServiceProcessNodeInstance(item), nil
+}
+
+func (r *serviceProcessRuntimeRepo) MarkProcessNodeDomainCommandCompensated(
+	_ context.Context,
+	in *biz.ProcessNodeDomainCommandCompensationMark,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if in == nil {
+		return nil, biz.ErrBadParam
+	}
+	item := r.nodes[in.ProcessNodeInstanceID]
+	if item == nil {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	if item.ProcessInstanceID != in.ProcessInstanceID || item.Version != in.ExpectedVersion ||
+		item.DomainCommandFingerprint == nil || *item.DomainCommandFingerprint != in.DomainCommandFingerprint ||
+		item.DomainCommandResultHash == nil || *item.DomainCommandResultHash != in.ExpectedResultHash {
+		return nil, biz.ErrIdempotencyConflict
+	}
+	if item.DomainCommandCompensationHash != nil {
+		if *item.DomainCommandCompensationHash != in.CompensationHash {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		return cloneServiceProcessNodeInstance(item), nil
+	}
+	now := time.Now()
+	effectState := biz.ProcessDomainCommandEffectStateCompensated
+	compensationHash := in.CompensationHash
+	item.DomainCommandEffectState = &effectState
+	item.DomainCommandCompensation = cloneServiceAnyMap(in.Compensation)
+	item.DomainCommandCompensationHash = &compensationHash
+	item.DomainCommandCompensatedAt = &now
+	if actorID > 0 {
+		compensatedBy := actorID
+		item.DomainCommandCompensatedBy = &compensatedBy
+	}
 	return cloneServiceProcessNodeInstance(item), nil
 }
 
@@ -374,6 +758,10 @@ func (r *serviceProcessRuntimeRepo) RecordProcessInstanceLinkedBusinessRef(_ con
 }
 
 func (r *serviceProcessRuntimeRepo) BlockProcessNodeInstance(context.Context, *biz.ProcessNodeInstanceBlock, int) (*biz.ProcessNodeInstance, error) {
+	return nil, biz.ErrBadParam
+}
+
+func (r *serviceProcessRuntimeRepo) BlockProcessNodeAndInstance(context.Context, *biz.ProcessNodeInstanceBlock, int) (*biz.ProcessNodeInstance, error) {
 	return nil, biz.ErrBadParam
 }
 
@@ -652,13 +1040,21 @@ func cloneServiceProcessNodeInstance(item *biz.ProcessNodeInstance) *biz.Process
 		return nil
 	}
 	cloned := *item
-	if item.PolicySnapshot != nil {
-		cloned.PolicySnapshot = map[string]any{}
-		for key, value := range item.PolicySnapshot {
-			cloned.PolicySnapshot[key] = value
-		}
-	}
+	cloned.PolicySnapshot = cloneServiceAnyMap(item.PolicySnapshot)
+	cloned.DomainCommandResult = cloneServiceAnyMap(item.DomainCommandResult)
+	cloned.DomainCommandCompensation = cloneServiceAnyMap(item.DomainCommandCompensation)
 	return &cloned
+}
+
+func cloneServiceAnyMap(item map[string]any) map[string]any {
+	if item == nil {
+		return nil
+	}
+	cloned := make(map[string]any, len(item))
+	for key, value := range item {
+		cloned[key] = value
+	}
+	return cloned
 }
 
 func cloneServiceWorkflowTask(item *biz.WorkflowTask) *biz.WorkflowTask {
@@ -702,20 +1098,28 @@ func (r *serviceCustomerConfigRepo) GetActiveCustomerConfigRevision(_ context.Co
 }
 
 func (r *serviceCustomerConfigRepo) PublishCustomerConfig(_ context.Context, in biz.CustomerConfigPublishInput, configHash string, publishedBy int, publishedAt time.Time) (*biz.CustomerConfigRevision, error) {
-	item := &biz.CustomerConfigRevision{
-		ID:               len(r.revisions) + 1,
-		CustomerKey:      in.CustomerKey,
-		Revision:         in.Revision,
-		ProductVersion:   in.ProductVersion,
-		ConfigHash:       configHash,
-		Status:           biz.CustomerConfigStatusPublished,
-		CompiledSnapshot: in.CompiledSnapshot,
-		PublishedBy:      &publishedBy,
-		PublishedAt:      &publishedAt,
-		CreatedAt:        publishedAt,
-		UpdatedAt:        publishedAt,
-	}
 	key := serviceCustomerConfigKey(in.CustomerKey, in.Revision)
+	if existing := r.revisions[key]; existing != nil {
+		if existing.ConfigHash != configHash || existing.ConfigHashVersion != biz.CustomerConfigHashVersion || existing.ProductVersion != in.ProductVersion {
+			return nil, biz.ErrCustomerConfigRevisionImmutable
+		}
+		cloned := *existing
+		return &cloned, nil
+	}
+	item := &biz.CustomerConfigRevision{
+		ID:                len(r.revisions) + 1,
+		CustomerKey:       in.CustomerKey,
+		Revision:          in.Revision,
+		ProductVersion:    in.ProductVersion,
+		ConfigHash:        configHash,
+		ConfigHashVersion: biz.CustomerConfigHashVersion,
+		Status:            biz.CustomerConfigStatusPublished,
+		CompiledSnapshot:  in.CompiledSnapshot,
+		PublishedBy:       &publishedBy,
+		PublishedAt:       &publishedAt,
+		CreatedAt:         publishedAt,
+		UpdatedAt:         publishedAt,
+	}
 	r.revisions[key] = item
 	r.modules[key] = append([]biz.DeploymentModuleStateInput(nil), in.ModuleStates...)
 	r.profiles[key] = append([]biz.RoleProfileInput(nil), in.RoleProfiles...)
@@ -726,18 +1130,47 @@ func (r *serviceCustomerConfigRepo) PublishCustomerConfig(_ context.Context, in 
 	return &cloned, nil
 }
 
-func (r *serviceCustomerConfigRepo) ActivateCustomerConfig(_ context.Context, customerKey, revision string, activatedBy int, activatedAt time.Time) (*biz.CustomerConfigRevision, error) {
-	return r.switchActiveCustomerConfigRevision(customerKey, revision, activatedBy, activatedAt)
+func (r *serviceCustomerConfigRepo) ActivateCustomerConfig(_ context.Context, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, activatedBy int, activatedAt time.Time) (*biz.CustomerConfigRevision, error) {
+	return r.switchActiveCustomerConfigRevision(biz.CustomerConfigTransitionActivate, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision, activatedBy, activatedAt)
 }
 
-func (r *serviceCustomerConfigRepo) RollbackCustomerConfig(_ context.Context, customerKey, targetRevision string, actorID int, rolledBackAt time.Time) (*biz.CustomerConfigRevision, error) {
-	return r.switchActiveCustomerConfigRevision(customerKey, targetRevision, actorID, rolledBackAt)
+func (r *serviceCustomerConfigRepo) RollbackCustomerConfig(_ context.Context, customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, actorID int, rolledBackAt time.Time) (*biz.CustomerConfigRevision, error) {
+	return r.switchActiveCustomerConfigRevision(biz.CustomerConfigTransitionRollback, customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision, actorID, rolledBackAt)
 }
 
-func (r *serviceCustomerConfigRepo) switchActiveCustomerConfigRevision(customerKey, revision string, actorID int, activatedAt time.Time) (*biz.CustomerConfigRevision, error) {
+func (r *serviceCustomerConfigRepo) switchActiveCustomerConfigRevision(action, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, actorID int, activatedAt time.Time) (*biz.CustomerConfigRevision, error) {
 	target := r.revisions[serviceCustomerConfigKey(customerKey, revision)]
 	if target == nil {
 		return nil, biz.ErrCustomerConfigNotFound
+	}
+	activeRevision := ""
+	for _, item := range r.revisions {
+		if item.CustomerKey == customerKey && item.Status == biz.CustomerConfigStatusActive {
+			activeRevision = item.Revision
+			break
+		}
+	}
+	if activeRevision != expectedActiveRevision {
+		return nil, biz.ErrCustomerConfigActiveRevisionChanged
+	}
+	if target.ConfigHash != expectedConfigHash {
+		return nil, biz.ErrCustomerConfigHashMismatch
+	}
+	if target.ProductVersion != expectedProductVersion {
+		return nil, biz.ErrCustomerConfigProductVersionMismatch
+	}
+	if err := biz.ValidateCustomerConfigModuleClosure(r.modules[serviceCustomerConfigKey(customerKey, revision)]); err != nil {
+		return nil, err
+	}
+	if action == biz.CustomerConfigTransitionActivate && target.Status == biz.CustomerConfigStatusActive && target.ActivatedAt != nil {
+		cloned := *target
+		return &cloned, nil
+	}
+	if action == biz.CustomerConfigTransitionRollback && (target.Status != biz.CustomerConfigStatusSuperseded || target.ActivatedAt == nil) {
+		return nil, biz.ErrCustomerConfigTransitionBlocked
+	}
+	if action == biz.CustomerConfigTransitionActivate && target.Status != biz.CustomerConfigStatusPublished {
+		return nil, biz.ErrBadParam
 	}
 	for _, item := range r.revisions {
 		if item.CustomerKey == customerKey && item.Status == biz.CustomerConfigStatusActive && item.Revision != revision {
@@ -808,6 +1241,26 @@ func (r *serviceCustomerConfigRepo) ListWorkPoolMembershipsByPools(_ context.Con
 	return out, nil
 }
 
+func (r *serviceCustomerConfigRepo) ListWorkflowTaskAuthorizationRevisions(_ context.Context, customerKey string) ([]biz.WorkflowTaskAuthorizationRevision, error) {
+	out := []biz.WorkflowTaskAuthorizationRevision{}
+	for _, revision := range r.revisions {
+		if revision.CustomerKey != customerKey ||
+			(revision.Status != biz.CustomerConfigStatusActive && revision.Status != biz.CustomerConfigStatusSuperseded) {
+			continue
+		}
+		key := serviceCustomerConfigKey(customerKey, revision.Revision)
+		out = append(out, biz.WorkflowTaskAuthorizationRevision{
+			CustomerKey:         customerKey,
+			Revision:            revision.Revision,
+			Status:              revision.Status,
+			RoleProfiles:        append([]biz.RoleProfileInput(nil), r.profiles[key]...),
+			AccessEntitlements:  append([]biz.AccessEntitlementInput(nil), r.entitlements[key]...),
+			WorkPoolMemberships: append([]biz.WorkPoolMembershipInput(nil), r.memberships[key]...),
+		})
+	}
+	return out, nil
+}
+
 func (r *serviceCustomerConfigRepo) CountInFlightProcessInstances(context.Context, string, string, []string) (int, error) {
 	return 0, nil
 }
@@ -830,6 +1283,41 @@ func customerConfigAdminCtx(adminID int, username string) context.Context {
 
 func customerConfigPublishParams(t *testing.T) *structpb.Struct {
 	return customerConfigPublishParamsForRevision(t, "2026.06.28.1")
+}
+
+func activatePublishedCustomerConfigForTest(
+	t *testing.T,
+	uc *biz.CustomerConfigUsecase,
+	in biz.CustomerConfigPublishInput,
+	published *biz.CustomerConfigRevision,
+	actorID int,
+) {
+	t.Helper()
+	if uc == nil || published == nil {
+		t.Fatalf("customer config activation input missing")
+	}
+	ctx := context.Background()
+	check, err := uc.CheckCustomerConfigTransition(ctx, biz.CustomerConfigTransitionCheckInput{
+		Action:                 biz.CustomerConfigTransitionActivate,
+		CustomerKey:            in.CustomerKey,
+		TargetRevision:         in.Revision,
+		ExpectedConfigHash:     published.ConfigHash,
+		ExpectedProductVersion: published.ProductVersion,
+	})
+	if err != nil {
+		t.Fatalf("check customer config %s activation err = %v", in.Revision, err)
+	}
+	if _, err := uc.ActivateCustomerConfig(
+		ctx,
+		in.CustomerKey,
+		in.Revision,
+		published.ConfigHash,
+		published.ProductVersion,
+		check.ObservedActiveRevision,
+		actorID,
+	); err != nil {
+		t.Fatalf("activate customer config %s err = %v", in.Revision, err)
+	}
 }
 
 func customerConfigPublishParamsWithRevisionAndModuleState(t *testing.T, params *structpb.Struct, revision string, moduleKey string, state string) *structpb.Struct {
@@ -903,8 +1391,11 @@ func publishAndActivateCustomerConfigForTest(t *testing.T, dispatcher *jsonrpcDi
 		t.Fatalf("publish %s code = %d msg=%s", revision, publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     revision,
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 revision,
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": payload["product_version"],
+		"expected_active_revision": customerConfigActiveRevisionForTest(t, dispatcher, ctx),
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate-"+revision, activateParams)
 	if err != nil {
@@ -913,6 +1404,53 @@ func publishAndActivateCustomerConfigForTest(t *testing.T, dispatcher *jsonrpcDi
 	if activateRes.Code != errcode.OK.Code {
 		t.Fatalf("activate %s code = %d msg=%s", revision, activateRes.Code, activateRes.Message)
 	}
+}
+
+func publishAndActivateCustomerConfigUsecaseForTest(t *testing.T, dispatcher *jsonrpcDispatcher, params *structpb.Struct, actorID int) {
+	t.Helper()
+	if dispatcher == nil || dispatcher.customerConfigUC == nil || params == nil {
+		t.Fatal("customer config usecase fixture missing")
+	}
+	in, ok := customerConfigPublishInputFromParams(params.AsMap())
+	if !ok {
+		t.Fatalf("customer config publish params invalid: %#v", params.AsMap())
+	}
+	published, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, actorID)
+	if err != nil {
+		t.Fatalf("publish customer config %s err = %v", in.Revision, err)
+	}
+	activatePublishedCustomerConfigForTest(t, dispatcher.customerConfigUC, in, published, actorID)
+}
+
+func customerConfigActiveRevisionForTest(t *testing.T, dispatcher *jsonrpcDispatcher, ctx context.Context) string {
+	t.Helper()
+	params, _ := structpb.NewStruct(map[string]any{"customer_key": biz.DefaultCustomerKey})
+	_, result, err := dispatcher.handleCustomerConfig(ctx, "get_effective_session", "active-revision", params)
+	if err != nil || result.Code != errcode.OK.Code {
+		t.Fatalf("get active customer config revision err=%v result=%#v", err, result)
+	}
+	session, ok := result.Data.AsMap()["session"].(map[string]any)
+	if !ok {
+		t.Fatalf("effective session missing: %#v", result.Data.AsMap())
+	}
+	revision, _ := session["configRevision"].(string)
+	return revision
+}
+
+func customerConfigHashFromPublishResult(t *testing.T, result *v1.JsonrpcResult) string {
+	t.Helper()
+	if result == nil || result.Data == nil {
+		t.Fatalf("publish result data missing: %#v", result)
+	}
+	revision, ok := result.Data.AsMap()["revision"].(map[string]any)
+	if !ok {
+		t.Fatalf("published revision missing: %#v", result.Data.AsMap())
+	}
+	configHash, _ := revision["config_hash"].(string)
+	if configHash == "" {
+		t.Fatalf("published config hash missing: %#v", revision)
+	}
+	return configHash
 }
 
 func customerConfigPublishParamsForRevision(t *testing.T, revision string) *structpb.Struct {
@@ -935,9 +1473,14 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 		}
 	}
 	params, err := structpb.NewStruct(map[string]any{
-		"customer_key":    biz.DefaultCustomerKey,
-		"revision":        revision,
-		"product_version": "test",
+		"manifest_schema_version":  biz.CustomerConfigManifestSchemaVersionCurrent,
+		"process_contract_version": biz.CustomerProcessContractVersionCurrent,
+		"manifest_status":          "runtime_compile_ready",
+		"runtime_enabled":          true,
+		"publishable":              true,
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 revision,
+		"product_version":          "test",
 		"compiled_snapshot": map[string]any{
 			"customer": map[string]any{"key": biz.DefaultCustomerKey, "name": "永绅"},
 			"pages":    []any{"global-dashboard", "permission-center", "sales-orders"},
@@ -1008,53 +1551,7 @@ func customerConfigPublishParamsWithSalesOrderAcceptanceProcess(t *testing.T) *s
 	if !ok {
 		t.Fatalf("compiled_snapshot missing: %#v", payload)
 	}
-	snapshot["processDefinitions"] = map[string]any{
-		biz.ProcessKeySalesOrderAcceptance: map[string]any{
-			"process_key":            biz.ProcessKeySalesOrderAcceptance,
-			"process_version":        "v1",
-			"variant_key":            "default",
-			"manifest_status":        "runtime_loader_ready",
-			"runtime_loader_enabled": true,
-			"business_ref_type":      "sales_order",
-			"domain_boundary":        "source_document_command_only",
-			"fact_boundary":          "no_fact_posting",
-			"source_workflow_key":    "sales_order_approval",
-			"nodes": []any{
-				map[string]any{
-					"node_key":                "submit_sales_order",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"required_capability_key": biz.PermissionSalesOrderSubmit,
-					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandSalesOrderSubmit,
-						"source_command_key":       "submit_sales_order",
-						"handler":                  "SalesOrderUsecase.SubmitSalesOrder",
-						"idempotency_key_required": true,
-						"writes_fact":              false,
-					},
-				},
-				map[string]any{
-					"node_key":                "order_approval",
-					"node_type":               biz.ProcessNodeTypeApproval,
-					"owner_pool_key":          "order_approval",
-					"required_capability_key": biz.PermissionWorkflowTaskApprove,
-					"form_profile_key":        "sales_order_approval.default",
-					"action_set_key":          "sales_order_approval",
-				},
-				map[string]any{
-					"node_key":                "order_review",
-					"node_type":               biz.ProcessNodeTypeHumanTask,
-					"owner_pool_key":          "order_review",
-					"required_capability_key": biz.PermissionWorkflowTaskComplete,
-					"form_profile_key":        "sales_order_review.default",
-					"action_set_key":          "sales_order_review",
-				},
-				map[string]any{
-					"node_key":  "end",
-					"node_type": biz.ProcessNodeTypeEnd,
-				},
-			},
-		},
-	}
+	setFormalRuntimeProcessSelection(snapshot, biz.ProcessKeySalesOrderAcceptance, "v1", biz.CustomerProcessVariantSalesApprovalPMC, "sales_order")
 	payload["work_pools"] = append(payload["work_pools"].([]any),
 		map[string]any{"pool_key": "order_approval", "module_key": "sales_orders", "display_name": "订单审批"},
 		map[string]any{"pool_key": "order_review", "module_key": "sales_orders", "display_name": "订单评审"},
@@ -1070,6 +1567,17 @@ func customerConfigPublishParamsWithSalesOrderAcceptanceProcess(t *testing.T) *s
 	return params
 }
 
+func setFormalRuntimeProcessSelection(snapshot map[string]any, processKey, processVersion, variantKey, businessRefType string) {
+	snapshot["runtimeProcessSelections"] = []any{
+		map[string]any{
+			"process_key":       processKey,
+			"process_version":   processVersion,
+			"variant_key":       variantKey,
+			"business_ref_type": businessRefType,
+		},
+	}
+}
+
 func customerConfigPublishParamsWithMaterialSupplyRuntimeProcess(t *testing.T) *structpb.Struct {
 	t.Helper()
 	params := customerConfigPublishParams(t)
@@ -1078,47 +1586,7 @@ func customerConfigPublishParamsWithMaterialSupplyRuntimeProcess(t *testing.T) *
 	if !ok {
 		t.Fatalf("compiled_snapshot missing: %#v", payload)
 	}
-	snapshot["processDefinitions"] = map[string]any{
-		biz.ProcessKeyMaterialSupply: map[string]any{
-			"process_key":            biz.ProcessKeyMaterialSupply,
-			"process_version":        "v1",
-			"variant_key":            "purchase_receipt_iqc_inbound",
-			"manifest_status":        "runtime_loader_ready",
-			"runtime_loader_enabled": true,
-			"business_ref_type":      "purchase_receipt",
-			"domain_boundary":        "explicit_fact_command_api",
-			"fact_boundary":          "no_fact_posting",
-			"source_status":          "explicit_api_only",
-			"nodes": []any{
-				map[string]any{
-					"node_key":                "incoming_qc",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"required_capability_key": biz.PermissionQualityInspectionUpdate,
-					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandIncomingQualityGate,
-						"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
-						"idempotency_key_required": true,
-						"writes_fact":              false,
-					},
-				},
-				map[string]any{
-					"node_key":                "warehouse_inbound",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"required_capability_key": biz.PermissionWarehouseInboundConfirm,
-					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandInventoryPostInbound,
-						"handler":                  "InventoryUsecase.PostPurchaseReceipt",
-						"idempotency_key_required": true,
-						"writes_fact":              false,
-					},
-				},
-				map[string]any{
-					"node_key":  "end",
-					"node_type": biz.ProcessNodeTypeEnd,
-				},
-			},
-		},
-	}
+	setFormalRuntimeProcessSelection(snapshot, biz.ProcessKeyMaterialSupply, "v1", biz.CustomerProcessVariantMaterialReceiptIQCInbound, "purchase_order")
 	params, err := structpb.NewStruct(payload)
 	if err != nil {
 		t.Fatalf("NewStruct error = %v", err)
@@ -1134,108 +1602,7 @@ func customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t *testing.T
 	if !ok {
 		t.Fatalf("compiled_snapshot missing: %#v", payload)
 	}
-	blockers := []any{
-		"domain_command_handler_not_registered",
-		"target_evidence_missing",
-	}
-	shipmentExecutionBlockers := []any{
-		"target_evidence_missing",
-	}
-	registeredHandlerBlockers := []any{
-		"target_evidence_missing",
-	}
-	snapshot["processDefinitions"] = map[string]any{
-		biz.ProcessKeyFinishedGoodsDelivery: map[string]any{
-			"process_key":            biz.ProcessKeyFinishedGoodsDelivery,
-			"process_version":        "v1",
-			"variant_key":            "quality_finance_ship_receivable",
-			"manifest_status":        "runtime_loader_start_ready",
-			"runtime_loader_enabled": true,
-			"business_ref_type":      "shipment",
-			"domain_boundary":        "contract_preflight_only",
-			"fact_boundary":          "no_fact_posting",
-			"source_workflow_key":    "finished_goods_delivery",
-			"source_status":          "workflow_preview",
-			"nodes": []any{
-				map[string]any{
-					"node_key":                "finished_goods_quality",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"owner_pool_key":          "finished_goods_quality",
-					"required_capability_key": biz.PermissionQualityInspectionUpdate,
-					"policy_snapshot": map[string]any{
-						"command_key": "finished_goods_quality.decide",
-						"writes_fact": false,
-					},
-					"fact_command_contract": map[string]any{
-						"command_key":                        "finished_goods_quality.decide",
-						"runtime_binding_status":             "contract_preflight_only",
-						"process_runtime_handler_registered": false,
-						"runtime_loader_blockers":            []any{},
-						"runtime_execute_blockers":           blockers,
-						"writes_fact":                        false,
-					},
-				},
-				map[string]any{
-					"node_key":                "shipment_finance_release",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"owner_pool_key":          "shipment_finance_release",
-					"required_capability_key": biz.PermissionFinanceReceivableConfirm,
-					"policy_snapshot": map[string]any{
-						"command_key": "shipment.finance_release",
-						"writes_fact": false,
-					},
-					"fact_command_contract": map[string]any{
-						"command_key":                        "shipment.finance_release",
-						"runtime_binding_status":             "process_runtime_handler_registered",
-						"process_runtime_handler_registered": true,
-						"runtime_loader_blockers":            []any{},
-						"runtime_execute_blockers":           registeredHandlerBlockers,
-						"writes_fact":                        false,
-					},
-				},
-				map[string]any{
-					"node_key":                "shipment_execution",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"owner_pool_key":          "shipment_execution",
-					"required_capability_key": biz.PermissionShipmentShip,
-					"policy_snapshot": map[string]any{
-						"command_key": "shipment.ship",
-						"writes_fact": false,
-					},
-					"fact_command_contract": map[string]any{
-						"command_key":                        "shipment.ship",
-						"runtime_binding_status":             "process_runtime_handler_registered",
-						"process_runtime_handler_registered": true,
-						"runtime_loader_blockers":            []any{},
-						"runtime_execute_blockers":           shipmentExecutionBlockers,
-						"writes_fact":                        false,
-					},
-				},
-				map[string]any{
-					"node_key":                "receivable_lead",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"owner_pool_key":          "receivable_lead",
-					"required_capability_key": biz.PermissionFinanceReceivableConfirm,
-					"policy_snapshot": map[string]any{
-						"command_key": "finance.receivable_lead",
-						"writes_fact": false,
-					},
-					"fact_command_contract": map[string]any{
-						"command_key":                        "finance.receivable_lead",
-						"runtime_binding_status":             "process_runtime_handler_registered",
-						"process_runtime_handler_registered": true,
-						"runtime_loader_blockers":            []any{},
-						"runtime_execute_blockers":           registeredHandlerBlockers,
-						"writes_fact":                        false,
-					},
-				},
-				map[string]any{
-					"node_key":  "end",
-					"node_type": biz.ProcessNodeTypeEnd,
-				},
-			},
-		},
-	}
+	setFormalRuntimeProcessSelection(snapshot, biz.ProcessKeyFinishedGoodsDelivery, "v1", biz.CustomerProcessVariantFinishedGoodsDelivery, "shipment")
 	params, err := structpb.NewStruct(payload)
 	if err != nil {
 		t.Fatalf("NewStruct error = %v", err)
@@ -1251,58 +1618,7 @@ func customerConfigPublishParamsWithMaterialSupplyPurchaseOrderRuntimeProcess(t 
 	if !ok {
 		t.Fatalf("compiled_snapshot missing: %#v", payload)
 	}
-	snapshot["processDefinitions"] = map[string]any{
-		biz.ProcessKeyMaterialSupply: map[string]any{
-			"process_key":            biz.ProcessKeyMaterialSupply,
-			"process_version":        "v1",
-			"variant_key":            "purchase_order_receipt_iqc_inbound",
-			"manifest_status":        "runtime_loader_ready",
-			"runtime_loader_enabled": true,
-			"business_ref_type":      "purchase_order",
-			"domain_boundary":        "explicit_fact_command_api",
-			"fact_boundary":          "no_fact_posting",
-			"source_status":          "explicit_api_only",
-			"nodes": []any{
-				map[string]any{
-					"node_key":                "purchase_receipt_source",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"required_capability_key": biz.PermissionPurchaseReceiptCreate,
-					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandPurchaseReceiptCreate,
-						"handler":                  "InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder",
-						"idempotency_key_required": true,
-						"writes_fact":              false,
-					},
-				},
-				map[string]any{
-					"node_key":                "incoming_qc",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"required_capability_key": biz.PermissionQualityInspectionUpdate,
-					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandIncomingQualityGate,
-						"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
-						"idempotency_key_required": true,
-						"writes_fact":              false,
-					},
-				},
-				map[string]any{
-					"node_key":                "warehouse_inbound",
-					"node_type":               biz.ProcessNodeTypeDomainCommand,
-					"required_capability_key": biz.PermissionWarehouseInboundConfirm,
-					"policy_snapshot": map[string]any{
-						"command_key":              biz.ProcessDomainCommandInventoryPostInbound,
-						"handler":                  "InventoryUsecase.PostPurchaseReceipt",
-						"idempotency_key_required": true,
-						"writes_fact":              false,
-					},
-				},
-				map[string]any{
-					"node_key":  "end",
-					"node_type": biz.ProcessNodeTypeEnd,
-				},
-			},
-		},
-	}
+	setFormalRuntimeProcessSelection(snapshot, biz.ProcessKeyMaterialSupply, "v1", biz.CustomerProcessVariantMaterialReceiptIQCInbound, "purchase_order")
 	out, err := structpb.NewStruct(payload)
 	if err != nil {
 		t.Fatalf("NewStruct error = %v", err)
@@ -1424,9 +1740,17 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 	if publishRes.Code != errcode.OK.Code {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
+	publishedRevision, ok := publishRes.Data.AsMap()["revision"].(map[string]any)
+	if !ok || publishedRevision["config_hash_version"] != float64(biz.CustomerConfigHashVersion) {
+		t.Fatalf("published revision hash contract = %#v", publishedRevision)
+	}
+	publishedHash := customerConfigHashFromPublishResult(t, publishRes)
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     publishedHash,
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "2", activateParams)
 	if err != nil {
@@ -1451,6 +1775,12 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 	if session["configRevision"] != "2026.06.28.1" {
 		t.Fatalf("configRevision = %#v", session["configRevision"])
 	}
+	if session["configHashVersion"] != float64(biz.CustomerConfigHashVersion) {
+		t.Fatalf("configHashVersion = %#v", session["configHashVersion"])
+	}
+	if session["configHash"] != publishedHash {
+		t.Fatalf("configHash = %#v, want published hash %q", session["configHash"], publishedHash)
+	}
 	if session["source"] != "active_customer_config_revision" {
 		t.Fatalf("source = %#v", session["source"])
 	}
@@ -1460,6 +1790,43 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 	}
 	if printDefaults["sales_order_print_template_enabled"] != false {
 		t.Fatalf("sales order print template must stay disabled: %#v", printDefaults)
+	}
+}
+
+func TestCustomerConfigJSONRPCPublishRevisionIsIdempotentAndImmutable(t *testing.T) {
+	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
+	ctx := customerConfigAdminCtx(1, "admin")
+	params := customerConfigPublishParams(t)
+
+	_, firstRes, err := dispatcher.handleCustomerConfig(ctx, "publish_customer_config", "first", params)
+	if err != nil || firstRes.Code != errcode.OK.Code {
+		t.Fatalf("first publish err=%v result=%#v", err, firstRes)
+	}
+	_, replayRes, err := dispatcher.handleCustomerConfig(ctx, "publish_customer_config", "replay", params)
+	if err != nil || replayRes.Code != errcode.OK.Code {
+		t.Fatalf("same identity replay err=%v result=%#v", err, replayRes)
+	}
+	firstRevision, _ := firstRes.Data.AsMap()["revision"].(map[string]any)
+	replayedRevision, _ := replayRes.Data.AsMap()["revision"].(map[string]any)
+	for _, key := range []string{"id", "status", "published_by", "published_at", "created_at", "updated_at", "config_hash", "product_version"} {
+		if firstRevision[key] != replayedRevision[key] {
+			t.Fatalf("replay changed %s: first=%#v replayed=%#v", key, firstRevision[key], replayedRevision[key])
+		}
+	}
+
+	changedPayload := customerConfigPublishParams(t).AsMap()
+	changedSnapshot, _ := changedPayload["compiled_snapshot"].(map[string]any)
+	changedSnapshot["customer"] = map[string]any{"key": biz.DefaultCustomerKey, "name": "不同客户配置内容"}
+	changedParams, err := structpb.NewStruct(changedPayload)
+	if err != nil {
+		t.Fatalf("NewStruct changed params: %v", err)
+	}
+	_, conflictRes, err := dispatcher.handleCustomerConfig(ctx, "publish_customer_config", "conflict", changedParams)
+	if err != nil {
+		t.Fatalf("conflicting publish transport err=%v", err)
+	}
+	if conflictRes.Code != errcode.IdempotencyConflict.Code || conflictRes.Message != "客户配置版本已存在且内容不同，请使用新版本号发布" {
+		t.Fatalf("conflicting publish result=%#v", conflictRes)
 	}
 }
 
@@ -1521,8 +1888,11 @@ func TestCustomerConfigJSONRPCExplainModuleStatus(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "2", activateParams)
 	if err != nil {
@@ -1584,8 +1954,11 @@ func TestCustomerConfigJSONRPCExplainProcessDefinitionFinishedGoodsDelivery(t *t
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "2", activateParams)
 	if err != nil {
@@ -1612,29 +1985,18 @@ func TestCustomerConfigJSONRPCExplainProcessDefinitionFinishedGoodsDelivery(t *t
 		t.Fatalf("process_definition missing: %#v", data)
 	}
 	if definition["process_key"] != biz.ProcessKeyFinishedGoodsDelivery ||
-		definition["manifest_status"] != "runtime_loader_start_ready" ||
+		definition["manifest_status"] != "runtime_loader_ready" ||
 		definition["runtime_loader_enabled"] != true ||
 		definition["can_start_runtime"] != true ||
-		definition["can_execute_runtime_commands"] != false {
+		definition["can_execute_runtime_commands"] != true {
 		t.Fatalf("definition = %#v", definition)
 	}
 	nodes, ok := definition["nodes"].([]any)
 	if !ok || len(nodes) != 5 {
 		t.Fatalf("nodes = %#v", definition["nodes"])
 	}
-	reasons := map[string]bool{}
-	for _, raw := range definition["execute_blocked_reasons"].([]any) {
-		if text, ok := raw.(string); ok {
-			reasons[text] = true
-		}
-	}
-	for _, want := range []string{"domain_command_handler_not_registered", "target_evidence_missing"} {
-		if !reasons[want] {
-			t.Fatalf("missing execute blocked reason %q in %#v", want, definition["execute_blocked_reasons"])
-		}
-	}
-	if reasons["explicit_runtime_execute_api_not_implemented"] {
-		t.Fatalf("execute blocked reasons should not keep explicit API blocker after all finished goods delivery guard APIs exist: %#v", definition["execute_blocked_reasons"])
+	if reasons, ok := definition["execute_blocked_reasons"].([]any); !ok || len(reasons) != 0 {
+		t.Fatalf("canonical Product Core definition must not carry preview blockers: %#v", definition["execute_blocked_reasons"])
 	}
 }
 
@@ -1661,8 +2023,11 @@ func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryProcess(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -1732,8 +2097,11 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideGuardedBy
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -1822,8 +2190,11 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegis
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -1897,17 +2268,60 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegis
 	}
 }
 
+func createFinishedGoodsDeliveryPermissionFixture(
+	t *testing.T,
+	runtimeRepo *serviceProcessRuntimeRepo,
+	ctx context.Context,
+	nodeKey string,
+	commandKey string,
+) (*biz.ProcessInstance, *biz.ProcessNodeInstance) {
+	t.Helper()
+	instance, nodes, err := runtimeRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:             biz.ProcessKeyFinishedGoodsDelivery,
+		ProcessVersion:         "v1",
+		VariantKey:             optionalRPCStringPointer("quality_finance_ship_receivable"),
+		ConfigRevision:         "2026.06.28.1",
+		DefinitionHash:         "finished-goods-delivery-permission-test",
+		ModuleContractSnapshot: map[string]any{"source": "test", "customer_key": biz.DefaultCustomerKey},
+		BusinessRefType:        "shipment",
+		BusinessRefID:          9001,
+		BusinessRefNo:          optionalRPCStringPointer("SHIP-9001"),
+		IdempotencyKey:         "finished-goods-delivery/SHIP-9001/permission-" + nodeKey,
+		Status:                 biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{{
+			NodeKey:  nodeKey,
+			NodeType: biz.ProcessNodeTypeDomainCommand,
+			Status:   biz.ProcessNodeStatusActive,
+			PolicySnapshot: map[string]any{
+				"command_key": commandKey,
+				"writes_fact": false,
+			},
+		}},
+	}, 1)
+	if err != nil {
+		t.Fatalf("seed permission process fixture err = %v", err)
+	}
+	if len(nodes) != 1 {
+		t.Fatalf("permission process nodes = %#v", nodes)
+	}
+	return instance, nodes[0]
+}
+
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRequiresQualityPermission(t *testing.T) {
-	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "warehouse", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.WarehouseRoleKey})
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(&biz.AdminUser{ID: 1, Username: "warehouse", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.WarehouseRoleKey})
+	ctx := customerConfigAdminCtx(1, "warehouse")
+	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
+	instance, node := createFinishedGoodsDeliveryPermissionFixture(t, runtimeRepo, ctx, "finished_goods_quality", biz.ProcessDomainCommandFinishedGoodsQualityDecide)
 	params, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      float64(1),
-		"process_node_instance_id": float64(1),
-		"expected_version":         float64(1),
+		"process_instance_id":      float64(instance.ID),
+		"process_node_instance_id": float64(node.ID),
+		"expected_version":         float64(node.Version),
 		"shipment_id":              float64(9001),
+		"quality_inspection_id":    float64(8001),
 		"result":                   "PASS",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/quality/PASS",
 	})
-	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "warehouse"), "execute_finished_goods_delivery_quality_decide", "execute", params)
+	_, res, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_quality_decide", "execute", params)
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
 	}
@@ -1971,15 +2385,15 @@ func (r *serviceFinishedGoodsQualityInventoryRepoStub) RejectQualityInspection(_
 	}, nil
 }
 
-func createFinishedGoodsDeliveryFinanceReleaseActiveFixture(t *testing.T, dispatcher *jsonrpcDispatcher, ctx context.Context) (*biz.ProcessInstance, []*biz.ProcessNodeInstance) {
+func createFinishedGoodsDeliveryFinanceReleaseActiveFixture(t *testing.T, runtimeRepo *serviceProcessRuntimeRepo, ctx context.Context) (*biz.ProcessInstance, []*biz.ProcessNodeInstance) {
 	t.Helper()
-	instance, nodes, err := dispatcher.processRuntimeUC.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+	instance, nodes, err := runtimeRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
 		ProcessKey:             biz.ProcessKeyFinishedGoodsDelivery,
 		ProcessVersion:         "v1",
 		VariantKey:             optionalRPCStringPointer("quality_finance_ship_receivable"),
 		ConfigRevision:         "2026.06.28.1",
 		DefinitionHash:         "finished-goods-delivery-test",
-		ModuleContractSnapshot: map[string]any{"source": "test"},
+		ModuleContractSnapshot: map[string]any{"source": "test", "customer_key": biz.DefaultCustomerKey},
 		BusinessRefType:        "shipment",
 		BusinessRefID:          9001,
 		BusinessRefNo:          optionalRPCStringPointer("SHIP-9001"),
@@ -2046,14 +2460,14 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryFinanceReleaseRunsRegi
 			Status:     biz.ShipmentStatusDraft,
 		},
 	}
-	dispatcher := newCustomerConfigTestDispatcherWithOperationalFactRepo(
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "finance", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		[]string{biz.AdminRoleKey, biz.FinanceRoleKey},
 		operationalFactRepo,
 	)
 	ctx := customerConfigAdminCtx(1, "finance")
 	publishAndActivateCustomerConfigForTest(t, dispatcher, ctx, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t))
-	instance, nodes := createFinishedGoodsDeliveryFinanceReleaseActiveFixture(t, dispatcher, ctx)
+	instance, nodes := createFinishedGoodsDeliveryFinanceReleaseActiveFixture(t, runtimeRepo, ctx)
 	financeNode := nodes[1]
 
 	executeParams, _ := structpb.NewStruct(map[string]any{
@@ -2104,15 +2518,18 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryFinanceReleaseRunsRegi
 }
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryFinanceReleaseRequiresFinancePermission(t *testing.T) {
-	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "quality", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.QualityRoleKey})
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(&biz.AdminUser{ID: 1, Username: "quality", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.QualityRoleKey})
+	ctx := customerConfigAdminCtx(1, "quality")
+	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
+	instance, node := createFinishedGoodsDeliveryPermissionFixture(t, runtimeRepo, ctx, "shipment_finance_release", biz.ProcessDomainCommandShipmentFinanceRelease)
 	params, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      float64(1),
-		"process_node_instance_id": float64(2),
-		"expected_version":         float64(1),
+		"process_instance_id":      float64(instance.ID),
+		"process_node_instance_id": float64(node.ID),
+		"expected_version":         float64(node.Version),
 		"shipment_id":              float64(9001),
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/finance-release",
 	})
-	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "quality"), "execute_finished_goods_delivery_finance_release", "execute", params)
+	_, res, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_finance_release", "execute", params)
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
 	}
@@ -2121,15 +2538,15 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryFinanceReleaseRequires
 	}
 }
 
-func createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t *testing.T, dispatcher *jsonrpcDispatcher, ctx context.Context) (*biz.ProcessInstance, []*biz.ProcessNodeInstance) {
+func createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t *testing.T, runtimeRepo *serviceProcessRuntimeRepo, ctx context.Context) (*biz.ProcessInstance, []*biz.ProcessNodeInstance) {
 	t.Helper()
-	instance, nodes, err := dispatcher.processRuntimeUC.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+	instance, nodes, err := runtimeRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
 		ProcessKey:             biz.ProcessKeyFinishedGoodsDelivery,
 		ProcessVersion:         "v1",
 		VariantKey:             optionalRPCStringPointer("quality_finance_ship_receivable"),
 		ConfigRevision:         "2026.06.28.1",
 		DefinitionHash:         "finished-goods-delivery-test",
-		ModuleContractSnapshot: map[string]any{"source": "test"},
+		ModuleContractSnapshot: map[string]any{"source": "test", "customer_key": biz.DefaultCustomerKey},
 		BusinessRefType:        "shipment",
 		BusinessRefID:          9001,
 		BusinessRefNo:          optionalRPCStringPointer("SHIP-9001"),
@@ -2192,14 +2609,14 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegist
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
 		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
 	}
-	dispatcher := newCustomerConfigTestDispatcherWithOperationalFactRepo(
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		[]string{},
 		operationalFactRepo,
 	)
 	ctx := customerConfigAdminCtx(1, "admin")
 	publishAndActivateCustomerConfigForTest(t, dispatcher, ctx, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t))
-	instance, nodes := createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t, dispatcher, ctx)
+	instance, nodes := createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t, runtimeRepo, ctx)
 	shipmentNode := nodes[2]
 
 	executeParams, _ := structpb.NewStruct(map[string]any{
@@ -2253,18 +2670,18 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRunsRegist
 	}
 }
 
-func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresEnabledModules(t *testing.T) {
+func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipUsesInstanceRevisionAfterActiveConfigChanges(t *testing.T) {
 	operationalFactRepo := &customerConfigShipmentOperationalFactRepo{
 		shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusShipped},
 	}
-	dispatcher := newCustomerConfigTestDispatcherWithOperationalFactRepo(
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		[]string{},
 		operationalFactRepo,
 	)
 	ctx := customerConfigAdminCtx(1, "admin")
 	publishAndActivateCustomerConfigForTest(t, dispatcher, ctx, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t))
-	instance, nodes := createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t, dispatcher, ctx)
+	instance, nodes := createFinishedGoodsDeliveryShipmentExecutionActiveFixture(t, runtimeRepo, ctx)
 	shipmentNode := nodes[2]
 
 	disabledParams := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -2287,11 +2704,11 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresEn
 	if err != nil {
 		t.Fatalf("execute err = %v", err)
 	}
-	if executeRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("execute code = %d msg=%s, want invalid param", executeRes.Code, executeRes.Message)
+	if executeRes.Code != errcode.OK.Code {
+		t.Fatalf("execute code = %d msg=%s, want success from the immutable process revision", executeRes.Code, executeRes.Message)
 	}
-	if operationalFactRepo.shippedShipmentID != 0 {
-		t.Fatalf("shipment usecase should not be called when module is disabled, got shipment id %d", operationalFactRepo.shippedShipmentID)
+	if operationalFactRepo.shippedShipmentID != 9001 {
+		t.Fatalf("shipment usecase should follow the process instance revision, got shipment id %d", operationalFactRepo.shippedShipmentID)
 	}
 }
 
@@ -2324,8 +2741,8 @@ func TestCustomerConfigJSONRPCEveryCustomerScopedEntryRejectsRuntimeCustomerOver
 	}{
 		{method: "validate_customer_config", payload: publishPayload},
 		{method: "publish_customer_config", payload: publishPayload},
-		{method: "activate_customer_config", payload: map[string]any{"customer_key": "demo", "revision": "v1"}},
-		{method: "rollback_customer_config", payload: map[string]any{"customer_key": "demo", "target_revision": "v1"}},
+		{method: "activate_customer_config", payload: map[string]any{"customer_key": "demo", "revision": "v1", "expected_config_hash": "hash", "expected_product_version": "test", "expected_active_revision": ""}},
+		{method: "rollback_customer_config", payload: map[string]any{"customer_key": "demo", "target_revision": "v1", "expected_config_hash": "hash", "expected_product_version": "test", "expected_active_revision": ""}},
 		{method: "get_effective_session", payload: map[string]any{"customer_key": "demo"}},
 		{method: "explain_module_status", payload: map[string]any{"customer_key": "demo", "module_key": "sales_orders"}},
 		{method: "explain_process_definition", payload: map[string]any{"customer_key": "demo", "process_key": biz.ProcessKeySalesOrderAcceptance}},
@@ -2353,15 +2770,18 @@ func TestCustomerConfigJSONRPCEveryCustomerScopedEntryRejectsRuntimeCustomerOver
 }
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryShipmentShipRequiresShipmentPermission(t *testing.T) {
-	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "quality", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.QualityRoleKey})
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(&biz.AdminUser{ID: 1, Username: "quality", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.QualityRoleKey})
+	ctx := customerConfigAdminCtx(1, "quality")
+	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
+	instance, node := createFinishedGoodsDeliveryPermissionFixture(t, runtimeRepo, ctx, "shipment_execution", biz.ProcessDomainCommandShipmentShip)
 	params, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      float64(1),
-		"process_node_instance_id": float64(3),
-		"expected_version":         float64(1),
+		"process_instance_id":      float64(instance.ID),
+		"process_node_instance_id": float64(node.ID),
+		"expected_version":         float64(node.Version),
 		"shipment_id":              float64(9001),
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/shipment-ship",
 	})
-	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "quality"), "execute_finished_goods_delivery_shipment_ship", "execute", params)
+	_, res, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_shipment_ship", "execute", params)
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
 	}
@@ -2440,15 +2860,15 @@ func (r *customerConfigShipmentOperationalFactRepo) CancelPostedFinanceFact(_ co
 	return nil, biz.ErrBadParam
 }
 
-func createFinishedGoodsDeliveryReceivableLeadActiveFixture(t *testing.T, dispatcher *jsonrpcDispatcher, ctx context.Context) (*biz.ProcessInstance, []*biz.ProcessNodeInstance) {
+func createFinishedGoodsDeliveryReceivableLeadActiveFixture(t *testing.T, runtimeRepo *serviceProcessRuntimeRepo, ctx context.Context) (*biz.ProcessInstance, []*biz.ProcessNodeInstance) {
 	t.Helper()
-	instance, nodes, err := dispatcher.processRuntimeUC.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+	instance, nodes, err := runtimeRepo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
 		ProcessKey:             biz.ProcessKeyFinishedGoodsDelivery,
 		ProcessVersion:         "v1",
 		VariantKey:             optionalRPCStringPointer("quality_finance_ship_receivable"),
 		ConfigRevision:         "2026.06.28.1",
 		DefinitionHash:         "finished-goods-delivery-test",
-		ModuleContractSnapshot: map[string]any{"source": "test"},
+		ModuleContractSnapshot: map[string]any{"source": "test", "customer_key": biz.DefaultCustomerKey},
 		BusinessRefType:        "shipment",
 		BusinessRefID:          9001,
 		BusinessRefNo:          optionalRPCStringPointer("SHIP-9001"),
@@ -2516,14 +2936,14 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesD
 			Status:     biz.ShipmentStatusShipped,
 		},
 	}
-	dispatcher := newCustomerConfigTestDispatcherWithOperationalFactRepo(
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "finance", CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		[]string{biz.AdminRoleKey, biz.FinanceRoleKey},
 		operationalFactRepo,
 	)
 	ctx := customerConfigAdminCtx(1, "finance")
 	publishAndActivateCustomerConfigForTest(t, dispatcher, ctx, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t))
-	instance, nodes := createFinishedGoodsDeliveryReceivableLeadActiveFixture(t, dispatcher, ctx)
+	instance, nodes := createFinishedGoodsDeliveryReceivableLeadActiveFixture(t, runtimeRepo, ctx)
 	receivableNode := nodes[3]
 
 	executeParams, _ := structpb.NewStruct(map[string]any{
@@ -2595,15 +3015,21 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadCreatesD
 }
 
 func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryReceivableLeadRequiresFinancePermission(t *testing.T) {
-	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "warehouse", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.WarehouseRoleKey})
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(&biz.AdminUser{ID: 1, Username: "warehouse", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.WarehouseRoleKey})
+	ctx := customerConfigAdminCtx(1, "warehouse")
+	publishAndActivateCustomerConfigUsecaseForTest(t, dispatcher, customerConfigPublishParamsWithFinishedGoodsDeliveryStartReady(t), 1)
+	instance, node := createFinishedGoodsDeliveryPermissionFixture(t, runtimeRepo, ctx, "receivable_lead", biz.ProcessDomainCommandFinanceReceivableLead)
 	params, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      float64(1),
-		"process_node_instance_id": float64(4),
-		"expected_version":         float64(1),
+		"process_instance_id":      float64(instance.ID),
+		"process_node_instance_id": float64(node.ID),
+		"expected_version":         float64(node.Version),
 		"shipment_id":              float64(9001),
+		"receivable_source_no":     "AR-LEAD-9001",
+		"currency":                 "CNY",
+		"expected_amount":          "12888.00",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/receivable-lead",
 	})
-	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "warehouse"), "execute_finished_goods_delivery_receivable_lead", "execute", params)
+	_, res, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_receivable_lead", "execute", params)
 	if err != nil {
 		t.Fatalf("handleCustomerConfig err = %v", err)
 	}
@@ -2635,8 +3061,11 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -2752,8 +3181,11 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -2857,7 +3289,7 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmit(t *testing.T) {
 	}
 }
 
-func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmitRequiresEnabledModules(t *testing.T) {
+func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmitUsesInstanceRevisionAfterActiveConfigChanges(t *testing.T) {
 	salesOrderRepo := newServiceSalesOrderRepo(map[int]*biz.SalesOrder{
 		42: {ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusDraft},
 	})
@@ -2902,11 +3334,11 @@ func TestCustomerConfigJSONRPCExecuteSalesOrderAcceptanceSubmitRequiresEnabledMo
 	if err != nil {
 		t.Fatalf("execute err = %v", err)
 	}
-	if executeRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("execute code = %d msg=%s, want invalid param", executeRes.Code, executeRes.Message)
+	if executeRes.Code != errcode.OK.Code {
+		t.Fatalf("execute code = %d msg=%s, want success from the immutable process revision", executeRes.Code, executeRes.Message)
 	}
-	if salesOrderRepo.nextStatus != "" {
-		t.Fatalf("sales order usecase should not be called when module is read_only, got %q", salesOrderRepo.nextStatus)
+	if salesOrderRepo.nextStatus != biz.SalesOrderStatusSubmitted {
+		t.Fatalf("sales order usecase should follow the process instance revision, got %q", salesOrderRepo.nextStatus)
 	}
 }
 
@@ -2926,7 +3358,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcessRequiresSubmitPerm
 	}
 }
 
-func TestCustomerConfigJSONRPCStartMaterialSupplyProcess(t *testing.T) {
+func TestCustomerConfigJSONRPCRejectsUnselectedDirectReceiptMaterialSupplyProcess(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcherWithInventoryRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		[]string{},
@@ -2941,8 +3373,11 @@ func TestCustomerConfigJSONRPCStartMaterialSupplyProcess(t *testing.T) {
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -2962,175 +3397,8 @@ func TestCustomerConfigJSONRPCStartMaterialSupplyProcess(t *testing.T) {
 	if err != nil {
 		t.Fatalf("start err = %v", err)
 	}
-	if startRes.Code != errcode.OK.Code {
-		t.Fatalf("start code = %d msg=%s", startRes.Code, startRes.Message)
-	}
-	data := startRes.Data.AsMap()
-	instance, ok := data["process_instance"].(map[string]any)
-	if !ok {
-		t.Fatalf("process_instance missing: %#v", data)
-	}
-	if instance["process_key"] != biz.ProcessKeyMaterialSupply ||
-		instance["business_ref_type"] != "purchase_receipt" ||
-		instance["business_ref_id"] != float64(6001) {
-		t.Fatalf("process_instance = %#v", instance)
-	}
-	startedNode, ok := data["started_node"].(map[string]any)
-	if !ok {
-		t.Fatalf("started_node missing: %#v", data)
-	}
-	if startedNode["node_key"] != "incoming_qc" ||
-		startedNode["node_type"] != biz.ProcessNodeTypeDomainCommand ||
-		startedNode["status"] != biz.ProcessNodeStatusActive {
-		t.Fatalf("started_node = %#v", startedNode)
-	}
-	boundary, ok := data["runtime_boundary"].(map[string]any)
-	if !ok {
-		t.Fatalf("runtime_boundary missing: %#v", data)
-	}
-	if boundary["executes_domain_command"] != false ||
-		boundary["writes_quality_or_inventory_fact"] != false ||
-		boundary["workflow_task_done_posts_fact"] != false {
-		t.Fatalf("runtime_boundary = %#v", boundary)
-	}
-	nodes, ok := data["nodes"].([]any)
-	if !ok || len(nodes) != 3 {
-		t.Fatalf("nodes = %#v", data["nodes"])
-	}
-	firstNode, ok := nodes[0].(map[string]any)
-	if !ok || firstNode["status"] != biz.ProcessNodeStatusActive {
-		t.Fatalf("first node = %#v", nodes[0])
-	}
-	secondNode, ok := nodes[1].(map[string]any)
-	if !ok || secondNode["status"] != biz.ProcessNodeStatusWaiting {
-		t.Fatalf("second node = %#v", nodes[1])
-	}
-}
-
-func TestCustomerConfigJSONRPCExecuteMaterialSupplyQualityAndInbound(t *testing.T) {
-	inventoryRepo := &serviceMaterialSupplyInventoryRepo{
-		qualityGate: &biz.PurchaseReceiptQualityGate{
-			PurchaseReceiptID: 6001,
-			Outcome:           biz.PurchaseReceiptQualityGateReady,
-			TotalLines:        1,
-			PassedLines:       1,
-		},
-		postedReceipt: &biz.PurchaseReceipt{ID: 6001, ReceiptNo: "PR-6001", Status: biz.PurchaseReceiptStatusDraft},
-	}
-	dispatcher := newCustomerConfigTestDispatcherWithInventoryRepo(
-		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		[]string{},
-		inventoryRepo,
-	)
-	ctx := customerConfigAdminCtx(1, "admin")
-	_, publishRes, err := dispatcher.handleCustomerConfig(ctx, "publish_customer_config", "publish", customerConfigPublishParamsWithMaterialSupplyRuntimeProcess(t))
-	if err != nil {
-		t.Fatalf("publish err = %v", err)
-	}
-	if publishRes.Code != errcode.OK.Code {
-		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
-	}
-	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
-	})
-	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
-	if err != nil {
-		t.Fatalf("activate err = %v", err)
-	}
-	if activateRes.Code != errcode.OK.Code {
-		t.Fatalf("activate code = %d msg=%s", activateRes.Code, activateRes.Message)
-	}
-	startParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":        biz.DefaultCustomerKey,
-		"purchase_receipt_id": float64(6001),
-		"business_ref_no":     "PR-6001",
-		"idempotency_key":     "material-supply/PR-6001",
-	})
-	_, startRes, err := dispatcher.handleCustomerConfig(ctx, "start_material_supply_process", "start", startParams)
-	if err != nil {
-		t.Fatalf("start err = %v", err)
-	}
-	if startRes.Code != errcode.OK.Code {
-		t.Fatalf("start code = %d msg=%s", startRes.Code, startRes.Message)
-	}
-	startData := startRes.Data.AsMap()
-	instance := startData["process_instance"].(map[string]any)
-	startedNode := startData["started_node"].(map[string]any)
-
-	qualityParams, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      instance["id"],
-		"process_node_instance_id": startedNode["id"],
-		"expected_version":         startedNode["version"],
-		"purchase_receipt_id":      float64(6001),
-		"idempotency_key":          "material-supply/PR-6001/iqc",
-	})
-	_, qualityRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_quality_gate", "quality", qualityParams)
-	if err != nil {
-		t.Fatalf("quality err = %v", err)
-	}
-	if qualityRes.Code != errcode.OK.Code {
-		t.Fatalf("quality code = %d msg=%s", qualityRes.Code, qualityRes.Message)
-	}
-	qualityData := qualityRes.Data.AsMap()
-	completedQualityNode, ok := qualityData["evaluated_node"].(map[string]any)
-	if !ok ||
-		completedQualityNode["node_key"] != "incoming_qc" ||
-		completedQualityNode["outcome"] != biz.IncomingQualityGateProcessCommandOutcomePassed {
-		t.Fatalf("evaluated quality node = %#v", qualityData["evaluated_node"])
-	}
-	qualityNodes, ok := qualityData["nodes"].([]any)
-	if !ok || len(qualityNodes) != 3 {
-		t.Fatalf("quality nodes = %#v", qualityData["nodes"])
-	}
-	inboundNode, ok := qualityNodes[1].(map[string]any)
-	if !ok ||
-		inboundNode["node_key"] != "warehouse_inbound" ||
-		inboundNode["status"] != biz.ProcessNodeStatusActive {
-		t.Fatalf("inbound node = %#v", qualityNodes[1])
-	}
-	qualityBoundary := qualityData["runtime_boundary"].(map[string]any)
-	if qualityBoundary["writes_quality_decision"] != false || qualityBoundary["writes_inventory_fact"] != false {
-		t.Fatalf("quality boundary = %#v", qualityBoundary)
-	}
-
-	inboundParams, _ := structpb.NewStruct(map[string]any{
-		"process_instance_id":      instance["id"],
-		"process_node_instance_id": inboundNode["id"],
-		"expected_version":         inboundNode["version"],
-		"purchase_receipt_id":      float64(6001),
-		"idempotency_key":          "material-supply/PR-6001/inbound",
-	})
-	_, inboundRes, err := dispatcher.handleCustomerConfig(ctx, "execute_material_supply_post_inbound", "inbound", inboundParams)
-	if err != nil {
-		t.Fatalf("inbound err = %v", err)
-	}
-	if inboundRes.Code != errcode.OK.Code {
-		t.Fatalf("inbound code = %d msg=%s", inboundRes.Code, inboundRes.Message)
-	}
-	if inventoryRepo.postedReceiptID != 6001 {
-		t.Fatalf("posted receipt id = %d", inventoryRepo.postedReceiptID)
-	}
-	inboundData := inboundRes.Data.AsMap()
-	completedInboundNode, ok := inboundData["completed_node"].(map[string]any)
-	if !ok ||
-		completedInboundNode["node_key"] != "warehouse_inbound" ||
-		completedInboundNode["outcome"] != biz.InventoryProcessCommandOutcomeInboundPosted {
-		t.Fatalf("completed inbound node = %#v", inboundData["completed_node"])
-	}
-	inboundNodes, ok := inboundData["nodes"].([]any)
-	if !ok || len(inboundNodes) != 3 {
-		t.Fatalf("inbound nodes = %#v", inboundData["nodes"])
-	}
-	endNode, ok := inboundNodes[2].(map[string]any)
-	if !ok || endNode["status"] != biz.ProcessNodeStatusCompleted {
-		t.Fatalf("end node = %#v", inboundNodes[2])
-	}
-	inboundBoundary := inboundData["runtime_boundary"].(map[string]any)
-	if inboundBoundary["writes_inventory_fact"] != true ||
-		inboundBoundary["writes_shipment_or_finance_fact"] != false ||
-		inboundBoundary["workflow_task_done_posts_fact"] != false {
-		t.Fatalf("inbound boundary = %#v", inboundBoundary)
+	if startRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("unselected purchase-receipt start code = %d msg=%s, want invalid param", startRes.Code, startRes.Message)
 	}
 }
 
@@ -3172,8 +3440,11 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
 	}
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
+		"expected_product_version": "test",
+		"expected_active_revision": "",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -3344,6 +3615,7 @@ func TestCustomerConfigJSONRPCRollbackUsesTargetRevision(t *testing.T) {
 	dispatcher := newCustomerConfigTestDispatcher(&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()}, []string{biz.AdminRoleKey})
 	ctx := customerConfigAdminCtx(1, "admin")
 
+	configHashes := map[string]string{}
 	for _, revision := range []string{"2026.06.28.1", "2026.06.28.2"} {
 		_, publishRes, err := dispatcher.handleCustomerConfig(ctx, "publish_customer_config", "publish-"+revision, customerConfigPublishParamsForRevision(t, revision))
 		if err != nil {
@@ -3352,11 +3624,30 @@ func TestCustomerConfigJSONRPCRollbackUsesTargetRevision(t *testing.T) {
 		if publishRes.Code != errcode.OK.Code {
 			t.Fatalf("publish %s code = %d msg=%s", revision, publishRes.Code, publishRes.Message)
 		}
+		configHashes[revision] = customerConfigHashFromPublishResult(t, publishRes)
+	}
+
+	firstActivateParams, _ := structpb.NewStruct(map[string]any{
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.1",
+		"expected_config_hash":     configHashes["2026.06.28.1"],
+		"expected_product_version": "test",
+		"expected_active_revision": "",
+	})
+	_, firstActivateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate-first", firstActivateParams)
+	if err != nil {
+		t.Fatalf("activate first err = %v", err)
+	}
+	if firstActivateRes.Code != errcode.OK.Code {
+		t.Fatalf("activate first code = %d msg=%s", firstActivateRes.Code, firstActivateRes.Message)
 	}
 
 	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key": biz.DefaultCustomerKey,
-		"revision":     "2026.06.28.2",
+		"customer_key":             biz.DefaultCustomerKey,
+		"revision":                 "2026.06.28.2",
+		"expected_config_hash":     configHashes["2026.06.28.2"],
+		"expected_product_version": "test",
+		"expected_active_revision": "2026.06.28.1",
 	})
 	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
 	if err != nil {
@@ -3367,8 +3658,11 @@ func TestCustomerConfigJSONRPCRollbackUsesTargetRevision(t *testing.T) {
 	}
 
 	rollbackParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":    biz.DefaultCustomerKey,
-		"target_revision": "2026.06.28.1",
+		"customer_key":             biz.DefaultCustomerKey,
+		"target_revision":          "2026.06.28.1",
+		"expected_config_hash":     configHashes["2026.06.28.1"],
+		"expected_product_version": "test",
+		"expected_active_revision": "2026.06.28.2",
 	})
 	_, rollbackRes, err := dispatcher.handleCustomerConfig(ctx, "rollback_customer_config", "rollback", rollbackParams)
 	if err != nil {

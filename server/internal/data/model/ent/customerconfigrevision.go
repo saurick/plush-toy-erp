@@ -24,9 +24,11 @@ type CustomerConfigRevision struct {
 	Revision string `json:"revision,omitempty"`
 	// 发布该客户配置时对应的产品版本
 	ProductVersion string `json:"product_version,omitempty"`
-	// compiled_snapshot 的稳定 hash
+	// 完整规范化发布载荷的 SHA-256 hash
 	ConfigHash string `json:"config_hash,omitempty"`
-	// published / active / superseded / rolled_back
+	// 客户配置 hash 算法版本；当前且唯一正式版本为 1
+	ConfigHashVersion int16 `json:"config_hash_version,omitempty"`
+	// 事务内 building，以及 published / active / superseded
 	Status string `json:"status,omitempty"`
 	// 编译后的有效配置快照，不保存 secret 或客户原始资料
 	CompiledSnapshot map[string]interface{} `json:"compiled_snapshot,omitempty"`
@@ -52,7 +54,7 @@ func (*CustomerConfigRevision) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case customerconfigrevision.FieldCompiledSnapshot:
 			values[i] = new([]byte)
-		case customerconfigrevision.FieldID, customerconfigrevision.FieldPublishedBy, customerconfigrevision.FieldActivatedBy:
+		case customerconfigrevision.FieldID, customerconfigrevision.FieldConfigHashVersion, customerconfigrevision.FieldPublishedBy, customerconfigrevision.FieldActivatedBy:
 			values[i] = new(sql.NullInt64)
 		case customerconfigrevision.FieldCustomerKey, customerconfigrevision.FieldRevision, customerconfigrevision.FieldProductVersion, customerconfigrevision.FieldConfigHash, customerconfigrevision.FieldStatus:
 			values[i] = new(sql.NullString)
@@ -102,6 +104,12 @@ func (_m *CustomerConfigRevision) assignValues(columns []string, values []any) e
 				return fmt.Errorf("unexpected type %T for field config_hash", values[i])
 			} else if value.Valid {
 				_m.ConfigHash = value.String
+			}
+		case customerconfigrevision.FieldConfigHashVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field config_hash_version", values[i])
+			} else if value.Valid {
+				_m.ConfigHashVersion = int16(value.Int64)
 			}
 		case customerconfigrevision.FieldStatus:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -204,6 +212,9 @@ func (_m *CustomerConfigRevision) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("config_hash=")
 	builder.WriteString(_m.ConfigHash)
+	builder.WriteString(", ")
+	builder.WriteString("config_hash_version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.ConfigHashVersion))
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)

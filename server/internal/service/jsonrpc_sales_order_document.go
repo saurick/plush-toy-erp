@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "save_sales_order_with_items", "saveSalesOrderWithItems":
+	case "save_sales_order_with_items":
 		orderID := getInt(pm, "id", 0)
 		orderPermission := biz.PermissionSalesOrderCreate
 		if orderID > 0 {
@@ -26,23 +26,32 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "sales_orders"); res != nil {
 			return id, res, nil
 		}
+		expectedVersion := 0
+		if orderID > 0 {
+			var ok bool
+			expectedVersion, ok = getRequiredJSONRPCPositiveInt(pm, "expected_version")
+			if !ok {
+				return id, invalidParamResult(), nil
+			}
+		}
 		in, ok := salesOrderMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		in.ExpectedVersion = expectedVersion
 		items, ok := salesOrderItemSaveMutationsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
 		result, err := d.salesOrderUC.SaveSalesOrderWithItems(ctx, orderID, in, items)
 		return id, salesOrderWithItemsMutationResult(ctx, d, result, err), nil
-	case "get_sales_order", "getSalesOrder":
+	case "get_sales_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.salesOrderUC.GetSalesOrder(ctx, getInt(pm, "id", 0))
 		return id, salesOrderMutationResult(ctx, d, item, err), nil
-	case "list_sales_orders", "listSalesOrders":
+	case "list_sales_orders":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderRead); res != nil {
 			return id, res, nil
 		}

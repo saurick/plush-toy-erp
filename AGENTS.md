@@ -53,7 +53,9 @@
 - 当前不实现 `tenant_id`、SaaS 多租户、license server、套餐计费或客户工单系统，除非用户明确要求且先完成正式评审。
 - 客户差异优先放在 config、feature flag、初始化/角色/权限模板、打印模板、字段显示/必填、编号规则、菜单开关或 customer extension。
 - 不把客户公司名、logo、特殊流程、字段、报表或资料硬编码进核心 usecase。
-- 客户资料进入 `docs/customers/<customer-key>/`、客户配置、seed/demo、打印模板或导入适配；移动现有资料前先评审引用、入口、测试和回滚。
+- 经审查、可进入产品仓的客户资料只保留脱敏业务分类、配置、seed/demo、打印模板或导入适配；真实 Excel、PDF、图片、私密 manifest 和评审信息进入每客户专属 Private 仓库或经客户确认的等价受控存储。永绅原件与 manifest 的当前真源是 `plush-toy-erp-customer-yoyoosun-private`。
+- Product Core 的普通构建、测试、CI、源码包和镜像不得依赖客户私有仓库、客户访问凭据或真实原件；客户私有仓库通过固定产品版本在兄弟目录或 CI multi-checkout 中校验，不作为 Product Core 的 submodule / subtree。
+- 移动现有客户资料前先评审引用、入口、测试、备份和回滚；未完成目标私有仓提交推送、远端回读、完整性校验和私有 manifest 验证时，不得宣称原件已完成外置。
 - 权限码表达业务能力和敏感动作，不扩成字段/文案配置系统；字段显示和低风险称谓差异优先使用配置。
 
 ## 系统分层与 Workflow / Fact
@@ -151,3 +153,6 @@
 
 - 旧项目只能作迁移背景，不是 plush 字段、流程、页面、测试或文案真源；运行时用户界面不出现旧项目名或“对齐旧项目”说明。
 - GPT/ChatGPT 会话只作输入。执行前核对本文件、README、正式 docs、代码、migration、测试和 worktree；冲突时按仓库真源收窄。
+- 本项目是新系统。以前 AI 草稿、本地实验、未发布的 schema、API、状态、字段、别名、mock 或 fixture 都不是兼容对象，不能因代码、常量或测试曾经存在就进入正式设计。
+- 未进入正式目标设计的旧路径必须从代码、目标 Schema、seed/fixture、API、UI、文档和测试全链删除；已落库的 schema 或数据残留通过新的正式 migration 一次性清理，不改写已执行 migration。禁止保留 alias、fallback、双写、兼容读取、退出路径或仅为旧测试继续通过的分支。
+- 一次性 migration 或数据清理、正式业务事实与审计记录留存、网络重试和幂等 receipt replay 是当前系统正确性要求，不属于历史兼容；不得借“禁止兼容”绕过数据完整性、事务、迁移可追溯性和审计边界。

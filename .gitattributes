@@ -1,3 +1,2 @@
 docs/customers/** export-ignore
-docs/customers/*/raw-source-files/** -diff -text
 config/customers/*/assets/** export-ignore

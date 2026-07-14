@@ -4,14 +4,19 @@ import '../mobileRoleTasks.css'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { useERPWorkspace } from '../../context/ERPWorkspaceProvider'
-import { listWorkflowTasks } from '../../api/workflowApi.mjs'
+import { listWorkflowRoleTasks } from '../../api/workflowApi.mjs'
 import {
   buildMobileTaskListForRole,
   buildMobileTaskSummary,
 } from '../../utils/mobileTaskView.mjs'
 import {
-  buildMobileWorkflowTaskQueryPlan,
-  mergeWorkflowTaskResults,
+  MOBILE_ROLE_TASK_VIEW_KEYS,
+  buildMobileRoleTaskQuery,
+  createMobileRoleTaskScopeState,
+  readMobileRoleTaskScopeState,
+  resolveMobileRoleTaskViewKey,
+  resolveMobileRoleTaskViewState,
+  settleMobileRoleTaskRequest,
 } from '../../utils/mobileTaskQueries.mjs'
 import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
 import MobileTaskDetailScreen from '../components/MobileTaskDetailScreen.jsx'
@@ -32,7 +37,7 @@ import {
   isTaskDueSoon,
   isTaskHighPriority,
   isTaskOverdue,
-  isTaskPendingProgress,
+  isTaskReadyProgress,
   isTaskRisk,
   resolveLatestTaskTime,
 } from '../utils/mobileRoleTaskModel.mjs'
@@ -41,10 +46,7 @@ export default function MobileRoleTasksPage() {
   const { activeRoleKey } = useERPWorkspace()
   const { adminProfile, handleLogout, loggingOut } = useOutletContext() || {}
   const scrollContainerRef = useRef(null)
-  const taskLoadRequestSeqRef = useRef(0)
-  const [tasks, setTasks] = useState([])
-  const [loading, setLoading] = useState(false)
-  const [hasLoadedOnce, setHasLoadedOnce] = useState(false)
+  const taskLoadRequestSeqRef = useRef({ todo: 0, history: 0, risk: 0 })
   const [showScrollTopButton, setShowScrollTopButton] = useState(false)
   const [activeMainTabKey, setActiveMainTabKey] = useState(
     MOBILE_MAIN_TAB_KEYS.TODO
@@ -56,86 +58,144 @@ export default function MobileRoleTasksPage() {
   const [selectedTaskID, setSelectedTaskID] = useState(null)
   const [detailAction, setDetailAction] = useState(null)
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
+  const customerKey = String(
+    adminProfile?.effective_session?.customer?.key || ''
+  ).trim()
+  const customerConfigRevision = String(
+    adminProfile?.effective_session?.config_revision || ''
+  ).trim()
+  const taskScopeKey = `${activeRoleKey}|${customerKey}|${customerConfigRevision}|${canMountCustomerTasks ? 'ready' : 'blocked'}`
+  const [taskScopeState, setTaskScopeState] = useState(() =>
+    createMobileRoleTaskScopeState(taskScopeKey)
+  )
+  const taskScopeKeyRef = useRef(taskScopeKey)
+  taskScopeKeyRef.current = taskScopeKey
+  const visibleTaskScopeState = readMobileRoleTaskScopeState(
+    taskScopeState,
+    taskScopeKey
+  )
+  const taskScopeStateRef = useRef(visibleTaskScopeState)
+  taskScopeStateRef.current = visibleTaskScopeState
+  const taskSlots = visibleTaskScopeState.slots
+  const activeTaskViewKey = useMemo(
+    () =>
+      resolveMobileRoleTaskViewKey({
+        mainTabKey: activeMainTabKey,
+        filterKey: activeFilterKey,
+      }),
+    [activeFilterKey, activeMainTabKey]
+  )
 
-  const taskViews = useMemo(
-    () => buildMobileTaskListForRole(tasks, activeRoleKey),
-    [activeRoleKey, tasks]
+  const todoTaskViews = useMemo(
+    () =>
+      buildMobileTaskListForRole(
+        taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].items,
+        activeRoleKey
+      ),
+    [activeRoleKey, taskSlots]
+  )
+  const historyTaskViews = useMemo(
+    () =>
+      buildMobileTaskListForRole(
+        taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY].items,
+        activeRoleKey
+      ),
+    [activeRoleKey, taskSlots]
+  )
+  const riskTaskViews = useMemo(
+    () =>
+      buildMobileTaskListForRole(
+        taskSlots[MOBILE_ROLE_TASK_VIEW_KEYS.RISK].items,
+        activeRoleKey
+      ),
+    [activeRoleKey, taskSlots]
   )
   const activeTasks = useMemo(
     () =>
-      taskViews.filter(
+      todoTaskViews.filter(
         (task) => !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
       ),
-    [taskViews]
+    [todoTaskViews]
   )
   const doneTasks = useMemo(
     () =>
-      taskViews.filter((task) =>
+      historyTaskViews.filter((task) =>
         TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
       ),
-    [taskViews]
-  )
-  const warningTasks = useMemo(
-    () => activeTasks.filter((task) => isTaskAlerted(task)),
-    [activeTasks]
-  )
-  const overdueTasks = useMemo(
-    () => activeTasks.filter((task) => isTaskOverdue(task)),
-    [activeTasks]
+    [historyTaskViews]
   )
   const riskTasks = useMemo(
-    () => activeTasks.filter((task) => isTaskRisk(task)),
-    [activeTasks]
+    () =>
+      riskTaskViews.filter(
+        (task) => !TERMINAL_TASK_STATUS_KEYS.has(task.task_status_key)
+      ),
+    [riskTaskViews]
   )
-  const noticeTasks = useMemo(() => activeTasks, [activeTasks])
+  const warningTasks = useMemo(
+    () => riskTasks.filter((task) => isTaskAlerted(task)),
+    [riskTasks]
+  )
+  const overdueTasks = useMemo(
+    () => riskTasks.filter((task) => isTaskOverdue(task)),
+    [riskTasks]
+  )
+  const noticeTasks = useMemo(() => riskTasks, [riskTasks])
   const taskSummary = useMemo(
-    () => buildMobileTaskSummary(taskViews),
-    [taskViews]
+    () => buildMobileTaskSummary([...activeTasks, ...doneTasks]),
+    [activeTasks, doneTasks]
   )
   const progressTotal =
-    taskSummary.pending +
-    taskSummary.processing +
-    taskSummary.blockedProgress +
-    taskSummary.done
+    taskSummary.ready + taskSummary.blocked + taskSummary.done
   const progressPercent =
     progressTotal === 0
       ? 0
       : Math.round((taskSummary.done / progressTotal) * 100)
+  const activeTaskViewState = useMemo(
+    () =>
+      resolveMobileRoleTaskViewState({
+        viewKey: activeTaskViewKey,
+        todoTasks: activeTasks,
+        historyTasks: doneTasks,
+        riskTasks,
+        selectedTaskID,
+      }),
+    [activeTaskViewKey, activeTasks, doneTasks, riskTasks, selectedTaskID]
+  )
+  const filterSourceTasks = activeTaskViewState.tasks
   const filteredTasks = useMemo(() => {
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.RISK) {
-      return activeTasks.filter((task) => isTaskRisk(task))
+      return filterSourceTasks.filter((task) => isTaskRisk(task))
     }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.ALERT) {
-      return activeTasks.filter((task) => isTaskAlerted(task))
+      return filterSourceTasks.filter((task) => isTaskAlerted(task))
     }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.OVERDUE) {
-      return activeTasks.filter((task) => isTaskOverdue(task))
+      return filterSourceTasks.filter((task) => isTaskOverdue(task))
     }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.DUE_SOON) {
-      return activeTasks.filter((task) => isTaskDueSoon(task))
+      return filterSourceTasks.filter((task) => isTaskDueSoon(task))
     }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.MINE) {
-      return activeTasks.filter((task) => canOperateTask(activeRoleKey, task))
+      return filterSourceTasks.filter((task) =>
+        canOperateTask(activeRoleKey, task)
+      )
     }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.HIGH_PRIORITY) {
-      return activeTasks.filter((task) => isTaskHighPriority(task))
+      return filterSourceTasks.filter((task) => isTaskHighPriority(task))
     }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.BLOCKED) {
-      return activeTasks.filter((task) => isTaskBlockedProgress(task))
+      return filterSourceTasks.filter((task) => isTaskBlockedProgress(task))
     }
     if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.BLOCKED_OR_HIGH_PRIORITY) {
-      return activeTasks.filter(
+      return filterSourceTasks.filter(
         (task) => isTaskBlockedProgress(task) || isTaskHighPriority(task)
       )
     }
-    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.PENDING) {
-      return activeTasks.filter((task) => isTaskPendingProgress(task))
+    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.READY) {
+      return filterSourceTasks.filter((task) => isTaskReadyProgress(task))
     }
-    if (activeFilterKey === MOBILE_TASK_FILTER_KEYS.PROCESSING) {
-      return activeTasks.filter((task) => task.task_status_key === 'processing')
-    }
-    return activeTasks
-  }, [activeFilterKey, activeRoleKey, activeTasks])
+    return filterSourceTasks
+  }, [activeFilterKey, activeRoleKey, filterSourceTasks])
   const filterItems = useMemo(
     () => [
       {
@@ -162,16 +222,13 @@ export default function MobileRoleTasksPage() {
     ],
     [activeRoleKey, activeTasks, overdueTasks.length, riskTasks.length]
   )
-  const selectedTask = useMemo(
-    () =>
-      activeTasks.find((task) => String(task.id) === String(selectedTaskID)) ||
-      null,
-    [activeTasks, selectedTaskID]
-  )
+  const { selectedTask } = activeTaskViewState
+  const selectedTaskActionsEnabled =
+    canMountCustomerTasks && activeTaskViewState.actionsEnabled
   const selectedTaskActionAccess = useWorkflowTaskActionAccess({
     adminProfile,
-    task: selectedTask,
-    enabled: canMountCustomerTasks && Boolean(selectedTask),
+    task: selectedTaskActionsEnabled ? selectedTask : null,
+    enabled: selectedTaskActionsEnabled,
   })
 
   useEffect(() => {
@@ -199,63 +256,193 @@ export default function MobileRoleTasksPage() {
     setDetailAction(null)
   }, [activeMainTabKey])
 
-  const loadTasks = useCallback(
-    async ({ showRefreshFeedback = false } = {}) => {
-      const requestSeq = taskLoadRequestSeqRef.current + 1
-      taskLoadRequestSeqRef.current = requestSeq
-      if (!canMountCustomerTasks) {
-        setTasks([])
-        setHasLoadedOnce(true)
-        setLoading(false)
-        return true
+  const loadTaskView = useCallback(
+    async (
+      viewKey,
+      {
+        append = false,
+        showRefreshFeedback = false,
+        rejectOnError = false,
+      } = {}
+    ) => {
+      if (!canMountCustomerTasks) return false
+
+      const requestScopeKey = taskScopeKey
+      const currentScopeState = readMobileRoleTaskScopeState(
+        taskScopeStateRef.current,
+        requestScopeKey
+      )
+      const currentSlot = currentScopeState.slots[viewKey]
+      if (
+        !currentSlot ||
+        (append && (!currentSlot.has_more || currentSlot.loading))
+      ) {
+        return false
       }
-      setLoading(true)
+      const requestSeq = (taskLoadRequestSeqRef.current[viewKey] || 0) + 1
+      taskLoadRequestSeqRef.current[viewKey] = requestSeq
+      const loadingState = {
+        ...currentScopeState,
+        slots: {
+          ...currentScopeState.slots,
+          [viewKey]: {
+            ...currentSlot,
+            loading: true,
+            error: '',
+          },
+        },
+      }
+      taskScopeStateRef.current = loadingState
+      setTaskScopeState(loadingState)
       try {
-        const queryResults = await Promise.all(
-          buildMobileWorkflowTaskQueryPlan(activeRoleKey).map((query) =>
-            listWorkflowTasks(query)
-          )
+        const response = await listWorkflowRoleTasks(
+          buildMobileRoleTaskQuery({
+            roleKey: activeRoleKey,
+            viewKey,
+            cursor: append ? currentSlot.next_cursor : '',
+          })
         )
-        if (taskLoadRequestSeqRef.current !== requestSeq) {
-          return
+        if (
+          taskScopeKeyRef.current !== requestScopeKey ||
+          taskLoadRequestSeqRef.current[viewKey] !== requestSeq
+        ) {
+          return false
         }
-        setTasks(mergeWorkflowTaskResults(queryResults))
+        const settledState = settleMobileRoleTaskRequest(
+          taskScopeStateRef.current,
+          {
+            currentScopeKey: taskScopeKeyRef.current,
+            requestScopeKey,
+            viewKey,
+            currentRequestSeq: taskLoadRequestSeqRef.current[viewKey],
+            requestSeq,
+            response,
+            append,
+          }
+        )
+        if (settledState === taskScopeStateRef.current) return false
+        taskScopeStateRef.current = settledState
+        setTaskScopeState(settledState)
         if (showRefreshFeedback) {
           message.success('数据已刷新')
         }
+        return true
       } catch (error) {
-        if (taskLoadRequestSeqRef.current !== requestSeq) {
-          return
+        if (
+          taskScopeKeyRef.current !== requestScopeKey ||
+          taskLoadRequestSeqRef.current[viewKey] !== requestSeq
+        ) {
+          return false
         }
-        message.error(
-          getActionErrorMessage(
-            error,
-            showRefreshFeedback
-              ? '刷新任务失败，已保留上次数据'
-              : '加载任务失败，请稍后重试'
-          )
+        const errorMessage = getActionErrorMessage(
+          error,
+          showRefreshFeedback
+            ? '刷新任务失败，已保留上次数据'
+            : '加载任务失败，请稍后重试'
         )
-      } finally {
-        if (taskLoadRequestSeqRef.current === requestSeq) {
-          setHasLoadedOnce(true)
-          setLoading(false)
-        }
+        const settledState = settleMobileRoleTaskRequest(
+          taskScopeStateRef.current,
+          {
+            currentScopeKey: taskScopeKeyRef.current,
+            requestScopeKey,
+            viewKey,
+            currentRequestSeq: taskLoadRequestSeqRef.current[viewKey],
+            requestSeq,
+            errorMessage,
+          }
+        )
+        if (settledState === taskScopeStateRef.current) return false
+        taskScopeStateRef.current = settledState
+        setTaskScopeState(settledState)
+        if (rejectOnError) throw error
+        message.error(errorMessage)
+        return false
       }
     },
-    [activeRoleKey, canMountCustomerTasks]
+    [activeRoleKey, canMountCustomerTasks, taskScopeKey]
   )
 
   useEffect(() => {
-    setHasLoadedOnce(false)
-    setTasks([])
+    for (const viewKey of Object.values(MOBILE_ROLE_TASK_VIEW_KEYS)) {
+      taskLoadRequestSeqRef.current[viewKey] =
+        (taskLoadRequestSeqRef.current[viewKey] || 0) + 1
+    }
+    const nextState = createMobileRoleTaskScopeState(taskScopeKey)
+    taskScopeStateRef.current = nextState
+    setTaskScopeState(nextState)
     setSelectedTaskID(null)
     setDetailAction(null)
-    loadTasks()
-  }, [loadTasks])
+  }, [taskScopeKey])
+
+  const activeTaskSlot = taskSlots[activeTaskViewKey]
+
+  useEffect(() => {
+    if (
+      canMountCustomerTasks &&
+      !activeTaskSlot.loaded &&
+      !activeTaskSlot.loading &&
+      !activeTaskSlot.error
+    ) {
+      loadTaskView(activeTaskViewKey)
+    }
+  }, [
+    activeTaskSlot.loaded,
+    activeTaskSlot.loading,
+    activeTaskSlot.error,
+    activeTaskViewKey,
+    canMountCustomerTasks,
+    loadTaskView,
+  ])
+
+  const loadTasks = useCallback(
+    (options = {}) => {
+      const normalizedOptions =
+        options && typeof options === 'object' ? options : {}
+      return loadTaskView(activeTaskViewKey, {
+        showRefreshFeedback: normalizedOptions.showRefreshFeedback === true,
+      })
+    },
+    [activeTaskViewKey, loadTaskView]
+  )
+
+  const loadMoreActiveTaskView = useCallback(
+    () => loadTaskView(activeTaskViewKey, { append: true }),
+    [activeTaskViewKey, loadTaskView]
+  )
+
+  const refreshTasksAfterMutation = useCallback(() => {
+    const currentState = readMobileRoleTaskScopeState(
+      taskScopeStateRef.current,
+      taskScopeKey
+    )
+    const currentSlots = currentState.slots
+    const nextSlots = Object.fromEntries(
+      Object.entries(currentSlots).map(([viewKey, slot]) => [
+        viewKey,
+        viewKey === activeTaskViewKey
+          ? slot
+          : {
+              ...slot,
+              loaded: false,
+              error: '',
+            },
+      ])
+    )
+    const nextState = { ...currentState, slots: nextSlots }
+    taskScopeStateRef.current = nextState
+    setTaskScopeState(nextState)
+    return loadTaskView(activeTaskViewKey, { rejectOnError: true })
+  }, [activeTaskViewKey, loadTaskView, taskScopeKey])
 
   const roleLabel = getMobileRoleLabel(activeRoleKey)
-  const initialLoading = loading && !hasLoadedOnce && tasks.length === 0
-  const latestSync = resolveLatestTaskTime(activeTasks)
+  const { loading } = activeTaskSlot
+  const initialLoading =
+    loading && !activeTaskSlot.loaded && activeTaskSlot.items.length === 0
+  const latestSync = resolveLatestTaskTime([
+    ...activeTasks,
+    ...doneTasks,
+    ...riskTasks,
+  ])
   const selectedSeverity = selectedTask
     ? getTaskSeverityView(selectedTask)
     : null
@@ -269,6 +456,7 @@ export default function MobileRoleTasksPage() {
     selectedCanComplete,
     selectedCanOperate,
     selectedCanReject,
+    selectedCanResume,
     selectedCanUrge,
     submitDetailAction,
     updateDetailReason,
@@ -278,7 +466,7 @@ export default function MobileRoleTasksPage() {
   } = useMobileRoleTaskActions({
     activeRoleKey,
     detailAction,
-    loadTasks,
+    loadTasks: refreshTasksAfterMutation,
     selectedTask,
     taskActionAccess: selectedTaskActionAccess,
     setDetailAction,
@@ -314,6 +502,7 @@ export default function MobileRoleTasksPage() {
         selectedCanComplete={selectedCanComplete}
         selectedCanOperate={selectedCanOperate}
         selectedCanReject={selectedCanReject}
+        selectedCanResume={selectedCanResume}
         selectedCanUrge={selectedCanUrge}
         selectedSeverity={selectedSeverity}
         selectedTask={selectedTask}
@@ -333,6 +522,8 @@ export default function MobileRoleTasksPage() {
       activeFilterKey={activeFilterKey}
       activeMainTabKey={activeMainTabKey}
       activeMessageTabKey={activeMessageTabKey}
+      activeViewHasData={activeTaskSlot.items.length > 0}
+      activeViewHasMore={activeTaskSlot.has_more}
       activeTasks={activeTasks}
       adminProfile={adminProfile}
       doneTasks={doneTasks}
@@ -342,8 +533,11 @@ export default function MobileRoleTasksPage() {
       handleMainScroll={handleMainScroll}
       initialLoading={initialLoading}
       latestSync={latestSync}
+      loadError={activeTaskSlot.error}
       loadTasks={loadTasks}
+      loadMoreActiveView={loadMoreActiveTaskView}
       loading={loading}
+      loadingMore={loading && activeTaskSlot.items.length > 0}
       loggingOut={loggingOut}
       noticeTasks={noticeTasks}
       overdueTasks={overdueTasks}

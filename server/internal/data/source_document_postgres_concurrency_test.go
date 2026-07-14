@@ -104,9 +104,10 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 		saveErr := make(chan error, 1)
 		go func() {
 			_, err := pausedUC.SaveSalesOrderWithItems(ctx, created.Order.ID, &biz.SalesOrderMutation{
-				OrderNo:    "SO-PG-MUTATED-" + suffix,
-				CustomerID: customer.ID,
-				OrderDate:  orderDate,
+				OrderNo:         "SO-PG-MUTATED-" + suffix,
+				CustomerID:      customer.ID,
+				OrderDate:       orderDate,
+				ExpectedVersion: created.Order.Version,
 			}, []*biz.SalesOrderItemSaveMutation{{
 				ID: created.Items[0].ID,
 				SalesOrderItemMutation: biz.SalesOrderItemMutation{
@@ -182,6 +183,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				PurchaseOrderNo: "PO-PG-MUTATED-" + suffix,
 				SupplierID:      supplier.ID,
 				PurchaseDate:    purchaseDate,
+				ExpectedVersion: created.Order.Version,
 			}, []*biz.PurchaseOrderItemSaveMutation{{
 				ID: created.Items[0].ID,
 				PurchaseOrderItemMutation: biz.PurchaseOrderItemMutation{
@@ -267,6 +269,7 @@ func TestSourceDocumentPostgresSaveSubmitConcurrency(t *testing.T) {
 				OutsourcingOrderNo: "OUT-PG-MUTATED-" + suffix,
 				SupplierID:         supplier.ID,
 				OrderDate:          orderDate,
+				ExpectedVersion:    created.Order.Version,
 			}, []*biz.OutsourcingOrderItemSaveMutation{{
 				ID: created.Items[0].ID,
 				OutsourcingOrderItemMutation: biz.OutsourcingOrderItemMutation{

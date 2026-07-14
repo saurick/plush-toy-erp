@@ -58,14 +58,10 @@ type WorkflowStateOption struct {
 }
 
 var workflowTaskStates = []WorkflowStateOption{
-	{Key: "pending", Label: "待开始", Summary: "任务已创建，但前置条件还没齐，暂时不能开工。"},
 	{Key: "ready", Label: "可执行", Summary: "上游单据、资料或齐套条件已满足，可以正式开始。"},
-	{Key: "processing", Label: "处理中", Summary: "已有责任人接手，当前任务正在推进。"},
 	{Key: "blocked", Label: "阻塞", Summary: "被缺料、缺资料、未放行或异常等外部条件卡住。"},
 	{Key: "done", Label: "已完成", Summary: "当前任务的完成条件已经达到，可进入下游节点。"},
 	{Key: "rejected", Label: "已退回", Summary: "审批、检验或确认动作未通过，需要回退上一责任人。"},
-	{Key: "cancelled", Label: "已取消", Summary: "因订单取消、方案切换或需求撤销而失效。"},
-	{Key: "closed", Label: "已关闭", Summary: "主链闭环后归档关闭，不再继续推进。"},
 }
 
 var workflowBusinessStates = []WorkflowStateOption{
@@ -91,23 +87,12 @@ var workflowBusinessStates = []WorkflowStateOption{
 	{Key: "closed", Label: "业务归档", Summary: "主链已完成并归档，保留历史快照与追溯记录。"},
 }
 
-var workflowPlanningPhases = []WorkflowStateOption{
-	{Key: "source_locked", Label: "真源已收口", Summary: "先明确当前唯一真源字段、单据和业务节点。"},
-	{Key: "page_defined", Label: "页面已收口", Summary: "菜单、角色入口和工作台卡片范围已确定。"},
-	{Key: "status_defined", Label: "状态已统一", Summary: "任务状态、业务状态和阻塞原因已形成统一字典。"},
-	{Key: "schema_v1_ready", Label: "Schema v1 已落地", Summary: "workflow、V1 主数据和事实层表已通过 Ent + Atlas 管理；旧通用业务记录表族已删除。"},
-	{Key: "api_v1_ready", Label: "API v1 已接通", Summary: "workflow 与 business JSON-RPC 已支持当前表格、弹窗和任务池主路径。"},
-	{Key: "save_link_v1_ready", Label: "保存链路 v1 已接通", Summary: "正式 V1 页面写对应领域表；Workflow 只写协同任务和状态投影，不再写旧通用业务记录。"},
-}
-
 var (
 	workflowTaskStateSet      = buildWorkflowStateSet(workflowTaskStates)
 	workflowBusinessStateSet  = buildWorkflowStateSet(workflowBusinessStates)
 	workflowTaskTransitionSet = map[string]map[string]struct{}{
-		"pending":    buildWorkflowTransitionSet("pending", "ready", "processing", "blocked", "done", "rejected", "cancelled", "closed"),
-		"ready":      buildWorkflowTransitionSet("ready", "processing", "blocked", "done", "rejected", "cancelled", "closed"),
-		"processing": buildWorkflowTransitionSet("processing", "blocked", "done", "rejected", "cancelled", "closed"),
-		"blocked":    buildWorkflowTransitionSet("ready", "processing", "blocked", "done", "rejected", "cancelled", "closed"),
+		"ready":   buildWorkflowTransitionSet("blocked", "done", "rejected"),
+		"blocked": buildWorkflowTransitionSet("ready"),
 	}
 	workflowTaskUrgeActionSet = map[string]struct{}{
 		"urge_task":        {},
@@ -146,15 +131,13 @@ func WorkflowBusinessStates() []WorkflowStateOption {
 	return out
 }
 
-func WorkflowPlanningPhases() []WorkflowStateOption {
-	out := make([]WorkflowStateOption, len(workflowPlanningPhases))
-	copy(out, workflowPlanningPhases)
-	return out
-}
-
-func IsValidWorkflowTaskState(key string) bool {
+func IsKnownWorkflowTaskState(key string) bool {
 	_, ok := workflowTaskStateSet[strings.TrimSpace(key)]
 	return ok
+}
+
+func IsCreatableWorkflowTaskState(key string) bool {
+	return strings.TrimSpace(key) == "ready"
 }
 
 func IsValidWorkflowBusinessState(key string) bool {
@@ -169,11 +152,15 @@ func IsValidWorkflowTaskUrgeAction(action string) bool {
 
 func IsTerminalWorkflowTaskStatus(statusKey string) bool {
 	switch strings.TrimSpace(statusKey) {
-	case "done", "rejected", "cancelled", "closed":
+	case "done", "rejected":
 		return true
 	default:
 		return false
 	}
+}
+
+func WorkflowTerminalTaskStatusKeys() []string {
+	return []string{"done", "rejected"}
 }
 
 func CanTransitionWorkflowTaskStatus(fromStatusKey, toStatusKey string) bool {
@@ -205,11 +192,8 @@ func CanAdminHandleWorkflowTask(admin *AdminUser, task *WorkflowTask, nextStatus
 	if admin == nil || admin.Disabled || task == nil {
 		return false
 	}
-	if IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
-		return false
-	}
 	nextStatusKey = strings.TrimSpace(nextStatusKey)
-	if nextStatusKey == "" || !IsValidWorkflowTaskState(nextStatusKey) {
+	if !CanTransitionWorkflowTaskStatus(task.TaskStatusKey, nextStatusKey) {
 		return false
 	}
 	if task.AssigneeID != nil {
@@ -222,7 +206,9 @@ func CanAdminUrgeWorkflowTask(admin *AdminUser, task *WorkflowTask) bool {
 	if admin == nil || admin.Disabled || task == nil {
 		return false
 	}
-	if IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
+	switch strings.TrimSpace(task.TaskStatusKey) {
+	case "ready", "blocked":
+	default:
 		return false
 	}
 	if admin.IsSuperAdmin || AdminHasRole(admin, PMCRoleKey) || AdminHasRole(admin, BossRoleKey) {

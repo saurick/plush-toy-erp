@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_purchase_receipt_draft", "createPurchaseReceiptDraft":
+	case "create_purchase_receipt_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
 			return id, res, nil
 		}
@@ -27,7 +27,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptDraft(ctx, in)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
-	case "create_purchase_receipt_with_items", "createPurchaseReceiptWithItems":
+	case "create_purchase_receipt_with_items":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
 			return id, res, nil
 		}
@@ -44,7 +44,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptWithItems(ctx, in, items)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
-	case "create_purchase_receipt_from_purchase_order", "createPurchaseReceiptFromPurchaseOrder":
+	case "create_purchase_receipt_from_purchase_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
 			return id, res, nil
 		}
@@ -57,12 +57,12 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		}
 		item, err := d.inventoryUC.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
-	case "add_purchase_receipt_item", "addPurchaseReceiptItem":
+	case "add_purchase_receipt_item":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
 			return id, res, nil
 		}
 		in, ok := purchaseReceiptItemCreateFromParams(pm)
-		if !ok {
+		if !ok || in.IdempotencyKey == "" {
 			return id, invalidParamResult(), nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {
@@ -70,7 +70,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		}
 		item, err := d.inventoryUC.AddPurchaseReceiptItem(ctx, in)
 		return id, purchaseReceiptItemResult(ctx, d, item, err), nil
-	case "post_purchase_receipt", "postPurchaseReceipt":
+	case "post_purchase_receipt":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptCreate, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
@@ -79,7 +79,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		}
 		item, err := d.inventoryUC.PostPurchaseReceipt(ctx, getInt(pm, "id", 0))
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
-	case "cancel_purchase_receipt", "cancelPurchaseReceipt":
+	case "cancel_purchase_receipt":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptCreate, biz.PermissionWarehouseInboundConfirm); res != nil {
 			return id, res, nil
 		}
@@ -88,13 +88,13 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 		}
 		item, err := d.inventoryUC.CancelPostedPurchaseReceiptWithActor(ctx, getInt(pm, "id", 0), actorID)
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
-	case "get_purchase_receipt", "getPurchaseReceipt":
+	case "get_purchase_receipt":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.GetPurchaseReceipt(ctx, getInt(pm, "id", 0))
 		return id, purchaseReceiptResult(ctx, d, item, err), nil
-	case "list_purchase_receipts", "listPurchaseReceipts":
+	case "list_purchase_receipts":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPurchaseReceiptRead, biz.PermissionWarehouseInboundRead); res != nil {
 			return id, res, nil
 		}

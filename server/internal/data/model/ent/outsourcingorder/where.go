@@ -90,6 +90,11 @@ func LifecycleStatus(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldLifecycleStatus, v))
 }
 
+// Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
+func Version(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldVersion, v))
+}
+
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldNote, v))
@@ -488,6 +493,46 @@ func LifecycleStatusEqualFold(v string) predicate.OutsourcingOrder {
 // LifecycleStatusContainsFold applies the ContainsFold predicate on the "lifecycle_status" field.
 func LifecycleStatusContainsFold(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldLifecycleStatus, v))
+}
+
+// VersionEQ applies the EQ predicate on the "version" field.
+func VersionEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldEQ(FieldVersion, v))
+}
+
+// VersionNEQ applies the NEQ predicate on the "version" field.
+func VersionNEQ(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldVersion, v))
+}
+
+// VersionIn applies the In predicate on the "version" field.
+func VersionIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldIn(FieldVersion, vs...))
+}
+
+// VersionNotIn applies the NotIn predicate on the "version" field.
+func VersionNotIn(vs ...int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldVersion, vs...))
+}
+
+// VersionGT applies the GT predicate on the "version" field.
+func VersionGT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGT(FieldVersion, v))
+}
+
+// VersionGTE applies the GTE predicate on the "version" field.
+func VersionGTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldGTE(FieldVersion, v))
+}
+
+// VersionLT applies the LT predicate on the "version" field.
+func VersionLT(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLT(FieldVersion, v))
+}
+
+// VersionLTE applies the LTE predicate on the "version" field.
+func VersionLTE(v int) predicate.OutsourcingOrder {
+	return predicate.OutsourcingOrder(sql.FieldLTE(FieldVersion, v))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

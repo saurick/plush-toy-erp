@@ -20,7 +20,7 @@ const ARRIVAL_SOURCE_TYPE_KEYS = new Set([
   ACCESSORIES_PURCHASE_MODULE_KEY,
   INBOUND_MODULE_KEY,
 ])
-const ACTIVE_TASK_STATUS_KEYS = new Set(['pending', 'ready', 'processing'])
+const ACTIVE_TASK_STATUS_KEYS = new Set(['ready', 'blocked'])
 const DEFAULT_PRIORITY = 2
 const HIGH_PRIORITY = 3
 const URGENT_PRIORITY = 4

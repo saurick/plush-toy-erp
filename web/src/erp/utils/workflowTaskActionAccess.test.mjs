@@ -78,6 +78,12 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
         reason: '可退回',
       },
       {
+        action_key: 'resume',
+        allowed: false,
+        reason_code: 'status_transition_not_allowed',
+        reason: '当前任务不需要解除阻塞',
+      },
+      {
         action_key: 'urge',
         allowed: true,
         reason: '可催办',
@@ -120,6 +126,8 @@ test('workflowTaskActionAccess: normalizes backend explain actions', () => {
   assert.equal(normalized.block.allowed, false)
   assert.equal(normalized.block.reasonCode, 'missing_permission')
   assert.equal(normalized.reject.allowed, true)
+  assert.equal(normalized.resume.allowed, false)
+  assert.equal(normalized.resume.reasonCode, 'status_transition_not_allowed')
   assert.equal(normalized.urge.allowed, true)
   assert.equal(normalized.custom_backend_action_key, undefined)
 })
@@ -128,6 +136,7 @@ test('workflowTaskActionAccess: accepts formal action modes only', () => {
   assert.equal(normalizeWorkflowActionMode('complete'), 'complete')
   assert.equal(normalizeWorkflowActionMode('block'), 'block')
   assert.equal(normalizeWorkflowActionMode('reject'), 'reject')
+  assert.equal(normalizeWorkflowActionMode('resume'), 'resume')
   assert.equal(normalizeWorkflowActionMode('urge'), 'urge')
   assert.equal(normalizeWorkflowActionMode('done'), '')
   assert.equal(normalizeWorkflowActionMode('blocked'), '')
@@ -168,7 +177,7 @@ test('workflowTaskActionAccess: explain params allow an omitted action key and r
     requireWorkflowTaskExplainParams({ task_id: 42 }, { allowActionKey: true }),
     { taskID: 42, actionKey: '' }
   )
-  for (const actionKey of ['complete', 'block', 'reject', 'urge']) {
+  for (const actionKey of ['complete', 'block', 'reject', 'resume', 'urge']) {
     assert.deepEqual(
       requireWorkflowTaskExplainParams(
         { task_id: 42, action_key: actionKey },

@@ -67,11 +67,3 @@ message Trace {
 message Log {
   bool debug = 1;
 }
-
-message Notify {
-  message Telegram {
-    string apiToken = 1;
-    int64 chatId = 2;
-  }
-  Telegram telegram = 1;
-}

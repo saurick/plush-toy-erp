@@ -34,7 +34,7 @@ func loadAdminRBAC(ctx context.Context, db *sql.DB, admin *biz.AdminUser) error 
 
 func loadAdminRoles(ctx context.Context, db *sql.DB, adminID int) ([]biz.AdminRole, error) {
 	rows, err := db.QueryContext(ctx, `
-SELECT r.id, r.role_key, r.name, r.description, r.builtin, r.disabled, r.sort_order
+SELECT r.id, r.role_key, r.name, r.description, r.builtin, r.role_type, r.disabled, r.sort_order, r.version
 FROM admin_user_roles aur
 JOIN roles r ON r.id = aur.role_id
 WHERE aur.admin_user_id = $1
@@ -49,10 +49,11 @@ ORDER BY r.sort_order ASC, r.id ASC`, adminID)
 	out := []biz.AdminRole{}
 	for rows.Next() {
 		var item biz.AdminRole
-		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Builtin, &item.Disabled, &item.SortOrder); err != nil {
+		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Builtin, &item.Type, &item.Disabled, &item.SortOrder, &item.Version); err != nil {
 			return nil, err
 		}
 		item.Key = biz.NormalizeRoleKey(item.Key)
+		item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
 		out = append(out, item)
 	}
 	return out, rows.Err()

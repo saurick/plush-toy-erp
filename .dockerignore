@@ -5,6 +5,8 @@
 docs
 deployments
 config/customers/**/assets
+.customer-sources
+docs/customers/*/raw-source-files
 
 # 本机运行配置和私有 registry 配置不得进入镜像构建上下文。
 **/.env

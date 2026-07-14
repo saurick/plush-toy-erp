@@ -138,13 +138,14 @@ func recordAppliedProcessCommandEffect(
 		ProcessKey: "compensation_actor", ProcessVersion: "v1", ConfigRevision: "test", DefinitionHash: "sha256:test",
 		BusinessRefType: refType, BusinessRefID: refID, IdempotencyKey: "compensation-actor:" + seed, Status: biz.ProcessStatusActive,
 		Nodes: []biz.ProcessNodeInstanceCreate{{
-			NodeKey: "command", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Status: biz.ProcessNodeStatusActive,
+			NodeKey: "command", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Status: biz.ProcessNodeStatusWaiting,
 			PolicySnapshot: map[string]any{"command_key": commandKey},
 		}},
 	}, 7)
 	if err != nil {
 		t.Fatalf("create process command effect: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	node, err := repo.ClaimProcessNodeDomainCommand(ctx, &biz.ProcessNodeDomainCommandClaim{
 		ProcessInstanceID: instance.ID, ProcessNodeInstanceID: nodes[0].ID,
 		ExpectedVersion: nodes[0].Version, DomainCommandFingerprint: fingerprint,

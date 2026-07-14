@@ -18,6 +18,7 @@ type stubWorkflowRepo struct {
 	currentTask      *WorkflowTask
 	taskByCode       *WorkflowTask
 	createTaskErr    error
+	getByCodeErr     error
 	getTaskCalled    bool
 	getByCodeCalled  bool
 	listTaskCalled   bool
@@ -49,6 +50,8 @@ func updateWorkflowTaskStatusForTest(
 			in.CommandKey = "block_task_action"
 		case "rejected":
 			in.CommandKey = "reject_task_action"
+		case "ready":
+			in.CommandKey = "resume_task_action"
 		default:
 			in.CommandKey = "test_task_status_action"
 		}
@@ -83,6 +86,9 @@ func (s *stubWorkflowRepo) GetWorkflowTask(_ context.Context, id int) (*Workflow
 
 func (s *stubWorkflowRepo) GetWorkflowTaskByTaskCode(_ context.Context, taskCode string) (*WorkflowTask, error) {
 	s.getByCodeCalled = true
+	if s.getByCodeErr != nil {
+		return nil, s.getByCodeErr
+	}
 	if s.taskByCode != nil {
 		return s.taskByCode, nil
 	}
@@ -102,6 +108,11 @@ func (s *stubWorkflowRepo) CreateWorkflowTask(_ context.Context, in *WorkflowTas
 	}
 	return &WorkflowTask{
 		TaskCode:              in.TaskCode,
+		TaskGroup:             in.TaskGroup,
+		TaskName:              in.TaskName,
+		SourceType:            in.SourceType,
+		SourceID:              in.SourceID,
+		SourceNo:              in.SourceNo,
 		TaskStatusKey:         in.TaskStatusKey,
 		OwnerRoleKey:          in.OwnerRoleKey,
 		OwnerPoolKey:          in.OwnerPoolKey,
@@ -109,6 +120,9 @@ func (s *stubWorkflowRepo) CreateWorkflowTask(_ context.Context, in *WorkflowTas
 		ConfigRevision:        in.ConfigRevision,
 		ProcessInstanceID:     in.ProcessInstanceID,
 		ProcessNodeInstanceID: in.ProcessNodeInstanceID,
+		Priority:              in.Priority,
+		CriticalPath:          in.CriticalPath,
+		DueAt:                 in.DueAt,
 		Payload:               in.Payload,
 	}, nil
 }
@@ -162,7 +176,7 @@ func (s *stubWorkflowRepo) UpsertWorkflowBusinessState(_ context.Context, in *Wo
 	}, nil
 }
 
-func TestWorkflowUsecase_CreateTaskDefaultsPending(t *testing.T) {
+func TestWorkflowUsecase_CreateTaskDefaultsReady(t *testing.T) {
 	repo := &stubWorkflowRepo{}
 	uc := NewWorkflowUsecase(repo)
 
@@ -177,8 +191,8 @@ func TestWorkflowUsecase_CreateTaskDefaultsPending(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if task.TaskStatusKey != "pending" {
-		t.Fatalf("expected pending, got %q", task.TaskStatusKey)
+	if task.TaskStatusKey != "ready" {
+		t.Fatalf("expected ready, got %q", task.TaskStatusKey)
 	}
 	if repo.createTaskInput == nil {
 		t.Fatalf("expected repo input")
@@ -192,6 +206,49 @@ func TestWorkflowUsecase_CreateTaskDefaultsPending(t *testing.T) {
 	if repo.createTaskInput.RequiredCapabilityKey == nil || *repo.createTaskInput.RequiredCapabilityKey != PermissionWorkflowTaskComplete {
 		t.Fatalf("expected required capability default complete, got %#v", repo.createTaskInput.RequiredCapabilityKey)
 	}
+}
+
+func TestWorkflowUsecase_CreateTaskOnlyAllowsReady(t *testing.T) {
+	for _, statusKey := range []string{"blocked", "done", "rejected", "unknown"} {
+		t.Run(statusKey, func(t *testing.T) {
+			repo := &stubWorkflowRepo{}
+			uc := NewWorkflowUsecase(repo)
+			_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+				TaskCode:      "T-CREATE-" + statusKey,
+				TaskGroup:     "generic",
+				TaskName:      "普通协同任务",
+				SourceType:    "generic-source",
+				SourceID:      1,
+				TaskStatusKey: statusKey,
+				OwnerRoleKey:  SalesRoleKey,
+			}, 7)
+			if !errors.Is(err, ErrBadParam) {
+				t.Fatalf("create status %q error = %v, want ErrBadParam", statusKey, err)
+			}
+			if repo.createTaskInput != nil {
+				t.Fatalf("invalid create status %q must not reach repo", statusKey)
+			}
+		})
+	}
+
+	t.Run("ready with blocked reason", func(t *testing.T) {
+		reason := "不应在创建时写入"
+		repo := &stubWorkflowRepo{}
+		uc := NewWorkflowUsecase(repo)
+		_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+			TaskCode:      "T-CREATE-READY-REASON",
+			TaskGroup:     "generic",
+			TaskName:      "普通协同任务",
+			SourceType:    "generic-source",
+			SourceID:      1,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  SalesRoleKey,
+			BlockedReason: &reason,
+		}, 7)
+		if !errors.Is(err, ErrBadParam) || repo.createTaskInput != nil {
+			t.Fatalf("ready create with blocked reason must fail before repo, input=%#v err=%v", repo.createTaskInput, err)
+		}
+	})
 }
 
 func TestWorkflowUsecase_CreateTaskPreservesRuntimeAnchors(t *testing.T) {
@@ -440,8 +497,8 @@ func TestWorkflowBusinessStatesAcceptShipmentStatusKeys(t *testing.T) {
 }
 
 func TestWorkflowStatusActionPermissionMapsUpdateCompleteApproveReject(t *testing.T) {
-	if got := WorkflowStatusActionPermission("processing", &WorkflowTask{TaskGroup: "generic"}); got != PermissionWorkflowTaskUpdate {
-		t.Fatalf("processing should require update, got %s", got)
+	if got := WorkflowStatusActionPermission("ready", &WorkflowTask{TaskGroup: "generic"}); got != PermissionWorkflowTaskUpdate {
+		t.Fatalf("ready should require update, got %s", got)
 	}
 	if got := WorkflowStatusActionPermission("blocked", &WorkflowTask{TaskGroup: "generic"}); got != PermissionWorkflowTaskUpdate {
 		t.Fatalf("blocked should require update, got %s", got)
@@ -511,13 +568,15 @@ func TestWorkflowTaskTransitionContract(t *testing.T) {
 		to   string
 		want bool
 	}{
-		{from: "pending", to: "ready", want: true},
-		{from: "ready", to: "ready", want: true},
-		{from: "ready", to: "processing", want: true},
-		{from: "processing", to: "blocked", want: true},
-		{from: "blocked", to: "blocked", want: true},
-		{from: "blocked", to: "done", want: true},
-		{from: "ready", to: "pending", want: false},
+		{from: "ready", to: "ready", want: false},
+		{from: "ready", to: "blocked", want: true},
+		{from: "ready", to: "done", want: true},
+		{from: "ready", to: "rejected", want: true},
+		{from: "blocked", to: "ready", want: true},
+		{from: "blocked", to: "blocked", want: false},
+		{from: "blocked", to: "done", want: false},
+		{from: "blocked", to: "rejected", want: false},
+		{from: "ready", to: "unknown", want: false},
 		{from: "done", to: "ready", want: false},
 		{from: "unknown", to: "done", want: false},
 	}
@@ -552,7 +611,7 @@ func TestWorkflowUsecaseRejectsStaleExpectedVersionBeforeSideEffects(t *testing.
 	}
 }
 
-func TestWorkflowUsecaseStatusPayloadIsPatchAndClearsStaleReasons(t *testing.T) {
+func TestWorkflowUsecaseResumeTaskPreservesPatchReasonAndClearsStaleReasons(t *testing.T) {
 	repo := &stubWorkflowRepo{currentTask: &WorkflowTask{
 		ID:            1,
 		TaskStatusKey: "blocked",
@@ -570,21 +629,25 @@ func TestWorkflowUsecaseStatusPayloadIsPatchAndClearsStaleReasons(t *testing.T) 
 	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:              1,
 		ExpectedVersion: 3,
-		TaskStatusKey:   "done",
-		Payload:         map[string]any{"completion_evidence": "已复核"},
+		TaskStatusKey:   "ready",
+		Reason:          "资料已补齐",
+		Payload:         map[string]any{"resume_evidence": "已复核"},
 	}, 7, QualityRoleKey)
 	if err != nil {
-		t.Fatalf("complete blocked generic task: %v", err)
+		t.Fatalf("resume blocked generic task: %v", err)
 	}
 	payload := repo.updateTaskInput.Payload
-	if payload["customer_name"] != "模拟客户" || payload["planned_quantity"] != 120 || payload["completion_evidence"] != "已复核" {
+	if payload["customer_name"] != "模拟客户" || payload["planned_quantity"] != 120 || payload["resume_evidence"] != "已复核" {
 		t.Fatalf("status action must merge the client patch into the task snapshot, got %#v", payload)
 	}
+	if repo.updateTaskInput.Reason != "资料已补齐" {
+		t.Fatalf("resume action must retain its audit reason, got %q", repo.updateTaskInput.Reason)
+	}
 	if _, exists := payload["blocked_reason"]; exists {
-		t.Fatalf("done transition must clear stale blocked reason, got %#v", payload)
+		t.Fatalf("resume transition must clear stale blocked reason, got %#v", payload)
 	}
 	if _, exists := payload["rejected_reason"]; exists {
-		t.Fatalf("done transition must clear stale rejected reason, got %#v", payload)
+		t.Fatalf("resume transition must clear stale rejected reason, got %#v", payload)
 	}
 }
 
@@ -631,12 +694,19 @@ func TestCanAdminHandleWorkflowTaskEnforcesOwnerAssigneeAndStatus(t *testing.T) 
 	}
 	task.AssigneeID = nil
 	task.TaskStatusKey = "done"
-	if CanAdminHandleWorkflowTask(qualityAdmin, task, "processing") {
+	if CanAdminHandleWorkflowTask(qualityAdmin, task, "ready") {
 		t.Fatalf("terminal current task must not be handled")
 	}
 	task.TaskStatusKey = "ready"
 	if CanAdminHandleWorkflowTask(qualityAdmin, task, "unknown") {
 		t.Fatalf("invalid next status must not be handled")
+	}
+	task.TaskStatusKey = "blocked"
+	if CanAdminHandleWorkflowTask(qualityAdmin, task, "done") {
+		t.Fatalf("blocked task must not be completed before resume")
+	}
+	if !CanAdminHandleWorkflowTask(qualityAdmin, task, "ready") {
+		t.Fatalf("owner role should be able to resume blocked task")
 	}
 }
 
@@ -711,7 +781,7 @@ func TestWorkflowUsecase_AcceptsPurchaseInboundBusinessStatuses(t *testing.T) {
 
 			_, err = updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 				ID:                1,
-				TaskStatusKey:     "ready",
+				TaskStatusKey:     "done",
 				BusinessStatusKey: statusKey,
 			}, 7, "quality")
 			if err != nil {
@@ -761,7 +831,7 @@ func TestWorkflowUsecase_AcceptsShipmentPendingBusinessStatus(t *testing.T) {
 
 	_, err = updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
 		ID:                1,
-		TaskStatusKey:     "ready",
+		TaskStatusKey:     "done",
 		BusinessStatusKey: statusKey,
 	}, 7, "warehouse")
 	if err != nil {

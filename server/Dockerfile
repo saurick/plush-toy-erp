@@ -103,6 +103,9 @@ RUN apt-get update && \
     test "$installed_chromium_common_version" = "$CHROMIUM_VERSION" && \
     rm -rf /var/lib/apt/lists/*
 
+RUN groupadd --system --gid 10001 app && \
+    useradd --system --uid 10001 --gid app --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin app
+
 ARG GIT_SHA
 ARG GIT_SHA_SHORT
 ARG BUILD_TIME
@@ -121,6 +124,8 @@ COPY --from=web-builder /web/build /app/public
 
 EXPOSE 8300
 EXPOSE 9300
+
+USER app
 
 # 默认用 /app/configs （里面只有 prod/config.yaml）
 CMD ["/app/server", "-conf", "/app/configs"]

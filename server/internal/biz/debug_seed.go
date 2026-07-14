@@ -414,17 +414,18 @@ func DebugDocumentPrefix(debugRunID string, scenarioKey string) (string, error) 
 }
 
 func debugSeedAllowed(config DebugSafetyConfig) bool {
-	return config.SeedEnabled
+	return config.SeedEnabled && RoleAssignmentEnvironmentAllowsDebug(config.Environment)
 }
 
 func debugCleanupAllowed(config DebugSafetyConfig) bool {
 	return config.CleanupEnabled &&
+		RoleAssignmentEnvironmentAllowsDebug(config.Environment) &&
 		config.CleanupScope == DebugDefaultCleanupScope
 }
 
 func debugBusinessDataClearAllowed(config DebugSafetyConfig) bool {
 	return config.BusinessDataClearEnabled &&
-		(config.Environment == "local" || config.Environment == "dev")
+		RoleAssignmentEnvironmentAllowsDebug(config.Environment)
 }
 
 func debugSeedDisabledReason(config DebugSafetyConfig) string {
@@ -433,6 +434,9 @@ func debugSeedDisabledReason(config DebugSafetyConfig) string {
 	}
 	if !config.SeedEnabled {
 		return "后端未开启生成调试数据开关 ERP_DEBUG_SEED_ENABLED"
+	}
+	if !RoleAssignmentEnvironmentAllowsDebug(config.Environment) {
+		return fmt.Sprintf("生成调试数据只允许 local/dev，当前环境为 %s", config.Environment)
 	}
 	return "生成调试数据能力不可用"
 }
@@ -443,6 +447,9 @@ func debugCleanupDisabledReason(config DebugSafetyConfig) string {
 	}
 	if !config.CleanupEnabled {
 		return "后端未开启清理调试数据开关 ERP_DEBUG_CLEANUP_ENABLED"
+	}
+	if !RoleAssignmentEnvironmentAllowsDebug(config.Environment) {
+		return fmt.Sprintf("清理调试数据只允许 local/dev，当前环境为 %s", config.Environment)
 	}
 	if config.CleanupScope != DebugDefaultCleanupScope {
 		return fmt.Sprintf("清理范围 %s 不受支持，只允许 %s", config.CleanupScope, DebugDefaultCleanupScope)
@@ -636,7 +643,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "purchase", suffix: "IQC", group: "purchase_iqc", name: "辅材来料 IQC", statusKey: "ready", businessStatusKey: "iqc_pending", ownerRoleKey: "quality", priority: 2, dueOffsetDays: 1},
-			{recordRef: "inbound", suffix: "IN", group: "warehouse_inbound", name: "确认辅材入库", statusKey: "pending", businessStatusKey: "warehouse_inbound_pending", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 3},
+			{recordRef: "inbound", suffix: "IN", group: "warehouse_inbound", name: "确认辅材入库", statusKey: "ready", businessStatusKey: "warehouse_inbound_pending", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 3},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "purchase", statusKey: "iqc_pending", ownerRoleKey: "quality"},
@@ -662,7 +669,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "contract", suffix: "OQC", group: "outsource_return_qc", name: "委外回货检验", statusKey: "ready", businessStatusKey: "qc_pending", ownerRoleKey: "quality", priority: 2, dueOffsetDays: 1},
-			{recordRef: "inbound", suffix: "OIN", group: "warehouse_inbound", name: "委外回货入库", statusKey: "pending", businessStatusKey: "warehouse_inbound_pending", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 2},
+			{recordRef: "inbound", suffix: "OIN", group: "warehouse_inbound", name: "委外回货入库", statusKey: "ready", businessStatusKey: "warehouse_inbound_pending", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 2},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "contract", statusKey: "qc_pending", ownerRoleKey: "quality"},
@@ -690,7 +697,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		tasks: []debugTaskTemplate{
 			{recordRef: "progress", suffix: "FQC", group: "finished_goods_qc", name: "成品抽检", statusKey: "ready", businessStatusKey: "qc_pending", ownerRoleKey: "quality", priority: 2, dueOffsetDays: 1},
 			{recordRef: "shipping", suffix: "SHIP", group: "shipment_release", name: "出货放行确认", statusKey: "ready", businessStatusKey: "shipping_released", ownerRoleKey: "sales", priority: 2, dueOffsetDays: 3},
-			{recordRef: "outbound", suffix: "OUT", group: "warehouse_outbound", name: "仓库出库确认", statusKey: "pending", businessStatusKey: "shipped", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 4},
+			{recordRef: "outbound", suffix: "OUT", group: "warehouse_outbound", name: "仓库出库确认", statusKey: "ready", businessStatusKey: "shipped", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 4},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "progress", statusKey: "qc_pending", ownerRoleKey: "quality"},
@@ -718,7 +725,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "receivable", suffix: "AR", group: "receivable_registration", name: "登记应收", statusKey: "ready", businessStatusKey: "reconciling", ownerRoleKey: "finance", priority: 2, dueOffsetDays: 1},
-			{recordRef: "invoice", suffix: "INV", group: "invoice_registration", name: "登记开票", statusKey: "pending", businessStatusKey: "reconciling", ownerRoleKey: "finance", priority: 1, dueOffsetDays: 3},
+			{recordRef: "invoice", suffix: "INV", group: "invoice_registration", name: "登记开票", statusKey: "ready", businessStatusKey: "reconciling", ownerRoleKey: "finance", priority: 1, dueOffsetDays: 3},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "outbound", statusKey: "shipped", ownerRoleKey: "warehouse"},
@@ -745,7 +752,7 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "payable", suffix: "AP", group: "purchase_payable_registration", name: "登记采购/委外应付", statusKey: "ready", businessStatusKey: "reconciling", ownerRoleKey: "finance", priority: 2, dueOffsetDays: 1},
-			{recordRef: "reconciliation", suffix: "REC", group: "purchase_reconciliation", name: "核对供应商账单", statusKey: "pending", businessStatusKey: "reconciling", ownerRoleKey: "finance", priority: 1, dueOffsetDays: 4},
+			{recordRef: "reconciliation", suffix: "REC", group: "purchase_reconciliation", name: "核对供应商账单", statusKey: "ready", businessStatusKey: "reconciling", ownerRoleKey: "finance", priority: 1, dueOffsetDays: 4},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "payable", statusKey: "reconciling", ownerRoleKey: "finance"},

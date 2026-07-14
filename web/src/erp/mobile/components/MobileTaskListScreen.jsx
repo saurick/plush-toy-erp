@@ -4,12 +4,12 @@ import {
   ArrowUpOutlined,
   BellOutlined,
   CheckSquareOutlined,
-  ClockCircleOutlined,
   FileTextOutlined,
   InboxOutlined,
   LogoutOutlined,
   PauseOutlined,
   ReloadOutlined,
+  RollbackOutlined,
   UserOutlined,
 } from '@ant-design/icons'
 import ERPThemeToggle from '@/common/components/theme/ERPThemeToggle'
@@ -45,6 +45,8 @@ export default function MobileTaskListScreen({
   activeFilterKey,
   activeMainTabKey,
   activeMessageTabKey,
+  activeViewHasData,
+  activeViewHasMore,
   activeTasks,
   adminProfile,
   doneTasks,
@@ -54,8 +56,11 @@ export default function MobileTaskListScreen({
   handleMainScroll,
   initialLoading,
   latestSync,
+  loadError,
   loadTasks,
+  loadMoreActiveView,
   loading,
+  loadingMore,
   loggingOut,
   noticeTasks,
   overdueTasks,
@@ -138,6 +143,26 @@ export default function MobileTaskListScreen({
     )
   }
 
+  const renderServerPageControl = (listKey, noun = '任务') => {
+    if (!activeViewHasMore) return null
+    return (
+      <div className="mobile-role-list-control">
+        <button
+          type="button"
+          data-testid={`mobile-role-server-load-more-${listKey}`}
+          className="mobile-role-list-control__button"
+          onClick={loadMoreActiveView}
+          disabled={loadingMore}
+        >
+          <span>{loadingMore ? '加载中' : `继续加载${noun}`}</span>
+          <span className="mobile-role-list-control__hint">
+            当前只显示已加载内容
+          </span>
+        </button>
+      </div>
+    )
+  }
+
   const openTaskBucket = ({
     mainTabKey = MOBILE_MAIN_TAB_KEYS.TODO,
     filterKey = MOBILE_TASK_FILTER_KEYS.ALL,
@@ -187,7 +212,7 @@ export default function MobileTaskListScreen({
   const renderProgressPanel = () => (
     <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-center justify-between gap-3">
-        <h2 className="text-lg font-semibold text-slate-950">进度</h2>
+        <h2 className="text-lg font-semibold text-slate-950">已加载任务进度</h2>
         <span className="text-sm text-slate-500">{progressPercent}%</span>
       </div>
       <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-100">
@@ -200,24 +225,24 @@ export default function MobileTaskListScreen({
         {[
           {
             label: '待处理',
-            value: taskSummary.pending,
+            value: taskSummary.ready,
             Icon: FileTextOutlined,
-            tone: 'pending',
-            testID: 'mobile-role-progress-pending',
-          },
-          {
-            label: '处理中',
-            value: taskSummary.processing,
-            Icon: ClockCircleOutlined,
-            tone: 'processing',
-            testID: 'mobile-role-progress-processing',
+            tone: 'ready',
+            testID: 'mobile-role-progress-ready',
           },
           {
             label: '卡住',
-            value: taskSummary.blockedProgress,
+            value: taskSummary.blocked,
             Icon: PauseOutlined,
             tone: 'blocked',
             testID: 'mobile-role-progress-blocked',
+          },
+          {
+            label: '已退回',
+            value: taskSummary.rejected,
+            Icon: RollbackOutlined,
+            tone: 'rejected',
+            testID: 'mobile-role-progress-rejected',
           },
           {
             label: '完成',
@@ -293,11 +318,9 @@ export default function MobileTaskListScreen({
 
   const renderTabSummary = () => {
     const summaryByTab = {
-      [MOBILE_MAIN_TAB_KEYS.TODO]: `共 ${activeTasks.length} 条待处理`,
-      [MOBILE_MAIN_TAB_KEYS.DONE]: `共 ${doneTasks.length} 条已办`,
-      [MOBILE_MAIN_TAB_KEYS.MESSAGES]: `共 ${
-        warningTasks.length + noticeTasks.length
-      } 条消息`,
+      [MOBILE_MAIN_TAB_KEYS.TODO]: `已加载 ${activeTasks.length} 条待处理`,
+      [MOBILE_MAIN_TAB_KEYS.DONE]: `已加载 ${doneTasks.length} 条已办`,
+      [MOBILE_MAIN_TAB_KEYS.MESSAGES]: `已加载 ${riskTasks.length} 条任务提醒`,
       [MOBILE_MAIN_TAB_KEYS.MINE]: `${roleLabel}任务端`,
     }
     return summaryByTab[activeMainTabKey] || summaryByTab.todo
@@ -395,6 +418,7 @@ export default function MobileTaskListScreen({
               </div>
             )}
           </div>
+          {renderServerPageControl(MOBILE_LIST_KEYS.TODO)}
         </section>
       </>
     )
@@ -446,6 +470,7 @@ export default function MobileTaskListScreen({
             </>
           )}
         </div>
+        {renderServerPageControl(MOBILE_LIST_KEYS.DONE, '已办任务')}
       </section>
     </section>
   )
@@ -459,7 +484,7 @@ export default function MobileTaskListScreen({
       },
       {
         key: MOBILE_MESSAGE_TAB_KEYS.NOTICE,
-        label: '通知',
+        label: '提醒',
         count: noticeTasks.length,
       },
     ]
@@ -537,16 +562,17 @@ export default function MobileTaskListScreen({
           </>
         )}
       </div>
+      {renderServerPageControl(MOBILE_LIST_KEYS.WARNING, '风险任务')}
     </section>
   )
 
   const renderNoticeMessages = () => (
     <section className="mobile-role-message-section mobile-role-message-section--notice erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4">
-      <h2 className="text-lg font-semibold text-slate-950">通知</h2>
+      <h2 className="text-lg font-semibold text-slate-950">任务提醒</h2>
       <div className="mt-3 space-y-2">
         {noticeTasks.length === 0 ? (
           <div className="mobile-role-message-empty rounded-xl border border-dashed border-slate-200 px-3 py-4 text-center text-sm text-slate-500">
-            暂无通知
+            暂无任务提醒
           </div>
         ) : (
           <>
@@ -570,11 +596,12 @@ export default function MobileTaskListScreen({
             {renderListLimitControl(
               noticeTasks,
               MOBILE_LIST_KEYS.NOTICE,
-              '条通知'
+              '条提醒'
             )}
           </>
         )}
       </div>
+      {renderServerPageControl(MOBILE_LIST_KEYS.NOTICE, '提醒任务')}
     </section>
   )
 
@@ -783,6 +810,29 @@ export default function MobileTaskListScreen({
           <span className="text-slate-300">|</span>
           <span>{renderTabSummary()}</span>
         </div>
+
+        {loadError ? (
+          <section
+            className="mobile-role-load-error mx-5 mt-4 rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-red-800"
+            role="alert"
+          >
+            <strong className="block text-base">任务加载失败</strong>
+            <p className="mt-1 text-sm leading-6">
+              {loadError}。
+              {activeViewHasData
+                ? '当前保留上次已加载内容。'
+                : '当前没有可确认的任务数据，请重试。'}
+            </p>
+            <button
+              type="button"
+              className="mt-3 min-h-11 rounded-xl border border-red-300 bg-white px-4 text-sm font-semibold text-red-700"
+              onClick={() => loadTasks()}
+              disabled={loading}
+            >
+              {loading ? '重新加载中' : '重新加载'}
+            </button>
+          </section>
+        ) : null}
 
         {renderActiveTabPanel()}
       </div>

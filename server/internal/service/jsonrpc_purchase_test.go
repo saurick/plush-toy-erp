@@ -133,15 +133,26 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
 		t.Fatalf("draft purchase receipt must not write inventory txns, got %d", count)
 	}
+	_, missingItemKeyRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2-missing-key", mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":   float64(receiptID),
+		"material_id":  float64(fixtures.materialID),
+		"warehouse_id": float64(fixtures.warehouseID),
+		"unit_id":      float64(fixtures.unitID),
+		"quantity":     "8.5",
+	}))
+	if err != nil || missingItemKeyRes == nil || missingItemKeyRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected missing receipt item idempotency key rejected, result=%#v err=%v", missingItemKeyRes, err)
+	}
 
 	_, itemRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":     float64(receiptID),
-		"material_id":    float64(fixtures.materialID),
-		"warehouse_id":   float64(fixtures.warehouseID),
-		"unit_id":        float64(fixtures.unitID),
-		"lot_no":         "JSONRPC-LOT-001",
-		"quantity":       "8.5",
-		"source_line_no": "1",
+		"receipt_id":      float64(receiptID),
+		"material_id":     float64(fixtures.materialID),
+		"warehouse_id":    float64(fixtures.warehouseID),
+		"unit_id":         float64(fixtures.unitID),
+		"lot_no":          "JSONRPC-LOT-001",
+		"quantity":        "8.5",
+		"source_line_no":  "1",
+		"idempotency_key": "jsonrpc-receipt-item-attempt-1",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -149,14 +160,70 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if itemRes == nil || itemRes.Code != errcode.OK.Code {
 		t.Fatalf("expected add item OK, got %#v", itemRes)
 	}
-	itemID := jsonRPCInt(t, jsonRPCNestedMap(t, itemRes, "purchase_receipt_item"), "id")
+	itemPayload := jsonRPCNestedMap(t, itemRes, "purchase_receipt_item")
+	itemID := jsonRPCInt(t, itemPayload, "id")
+	for field, want := range map[string]int{
+		"receipt_id":   receiptID,
+		"material_id":  fixtures.materialID,
+		"warehouse_id": fixtures.warehouseID,
+		"unit_id":      fixtures.unitID,
+	} {
+		if got := jsonRPCInt(t, itemPayload, field); got != want {
+			t.Fatalf("purchase receipt item %s=%d, want %d", field, got, want)
+		}
+	}
+	if lotID := jsonRPCInt(t, itemPayload, "lot_id"); lotID <= 0 {
+		t.Fatalf("purchase receipt item lot_id=%d, want positive binding", lotID)
+	}
+	itemCount := client.PurchaseReceiptItem.Query().CountX(ctx)
+	lotCount := client.InventoryLot.Query().CountX(ctx)
+	inspectionCount := client.QualityInspection.Query().CountX(ctx)
+	_, replayRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2-replay", mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":      float64(receiptID),
+		"material_id":     float64(fixtures.materialID),
+		"warehouse_id":    float64(fixtures.warehouseID),
+		"unit_id":         float64(fixtures.unitID),
+		"lot_no":          "JSONRPC-LOT-001",
+		"quantity":        "8.5000",
+		"source_line_no":  "1",
+		"idempotency_key": "jsonrpc-receipt-item-attempt-1",
+	}))
+	if err != nil || replayRes == nil || replayRes.Code != errcode.OK.Code {
+		t.Fatalf("expected exact receipt item replay OK, result=%#v err=%v", replayRes, err)
+	}
+	if replayID := jsonRPCInt(t, jsonRPCNestedMap(t, replayRes, "purchase_receipt_item"), "id"); replayID != itemID {
+		t.Fatalf("receipt item replay id=%d, want %d", replayID, itemID)
+	}
+	if got := client.PurchaseReceiptItem.Query().CountX(ctx); got != itemCount {
+		t.Fatalf("receipt item replay changed item count: %d -> %d", itemCount, got)
+	}
+	if got := client.InventoryLot.Query().CountX(ctx); got != lotCount {
+		t.Fatalf("receipt item replay changed lot count: %d -> %d", lotCount, got)
+	}
+	if got := client.QualityInspection.Query().CountX(ctx); got != inspectionCount {
+		t.Fatalf("receipt item replay changed inspection count: %d -> %d", inspectionCount, got)
+	}
+	_, conflictRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2-conflict", mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":      float64(receiptID),
+		"material_id":     float64(fixtures.materialID),
+		"warehouse_id":    float64(fixtures.warehouseID),
+		"unit_id":         float64(fixtures.unitID),
+		"lot_no":          "JSONRPC-LOT-001",
+		"quantity":        "9",
+		"source_line_no":  "1",
+		"idempotency_key": "jsonrpc-receipt-item-attempt-1",
+	}))
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.IdempotencyConflict.Code {
+		t.Fatalf("expected receipt item idempotency conflict, result=%#v err=%v", conflictRes, err)
+	}
 
 	_, invalidLineRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "invalid-line", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":   float64(receiptID),
-		"material_id":  float64(fixtures.materialID),
-		"warehouse_id": float64(fixtures.warehouseID),
-		"unit_id":      float64(fixtures.unitID),
-		"quantity":     "0",
+		"receipt_id":      float64(receiptID),
+		"material_id":     float64(fixtures.materialID),
+		"warehouse_id":    float64(fixtures.warehouseID),
+		"unit_id":         float64(fixtures.unitID),
+		"quantity":        "0",
+		"idempotency_key": "jsonrpc-receipt-item-invalid-quantity",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err adding invalid line, got %v", err)
@@ -346,6 +413,45 @@ func TestPurchaseReceiptFilterFromParamsForwardsContextFilters(t *testing.T) {
 	}
 }
 
+func TestPurchaseReceiptRetrySafeParamsRejectClientPayloadHash(t *testing.T) {
+	fromOrder := map[string]any{
+		"purchase_order_id":        float64(1),
+		"receipt_no":               "PR-CLIENT-HASH",
+		"warehouse_id":             float64(2),
+		"idempotency_key":          "receipt-attempt-1",
+		"idempotency_payload_hash": "client-controlled",
+	}
+	if _, ok := purchaseReceiptFromPurchaseOrderCreateFromParams(fromOrder); ok {
+		t.Fatal("create-from-order must reject client idempotency_payload_hash")
+	}
+
+	item := map[string]any{
+		"receipt_id":               float64(1),
+		"material_id":              float64(2),
+		"warehouse_id":             float64(3),
+		"unit_id":                  float64(4),
+		"quantity":                 "1",
+		"idempotency_key":          "item-attempt-1",
+		"idempotency_payload_hash": "client-controlled",
+	}
+	if _, ok := purchaseReceiptItemCreateFromParams(item); ok {
+		t.Fatal("add receipt item must reject client idempotency_payload_hash")
+	}
+
+	batch := map[string]any{
+		"items": []any{map[string]any{
+			"material_id":     float64(2),
+			"warehouse_id":    float64(3),
+			"unit_id":         float64(4),
+			"quantity":        "1",
+			"idempotency_key": "item-attempt-1",
+		}},
+	}
+	if _, ok := purchaseReceiptItemsCreateFromParams(batch); ok {
+		t.Fatal("atomic batch items must not accept the public append retry key")
+	}
+}
+
 func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnly(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt_from_order")
@@ -411,6 +517,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 		"purchase_order_item_id": float64(saved.Items[0].ID),
 		"quantity":               "2",
 		"source_line_no":         "stale-client-line",
+		"idempotency_key":        "jsonrpc-manual-po-line-attempt-1",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err adding manual source line, got %v", err)
@@ -419,12 +526,22 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if got := manualLine["source_line_no"]; got != "1" {
 		t.Fatalf("expected source_line_no to be overwritten from purchase order line, got %#v", got)
 	}
+	_, missingReceiptKeyRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "missing-key", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(saved.Order.ID),
+		"receipt_no":        "PR-FROM-PO-MISSING-KEY",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"received_at":       "2026-06-17",
+	}))
+	if err != nil || missingReceiptKeyRes == nil || missingReceiptKeyRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected missing create-from-order idempotency key rejected, result=%#v err=%v", missingReceiptKeyRes, err)
+	}
 
 	_, receiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
 		"receipt_no":        "PR-FROM-PO-001",
 		"warehouse_id":      float64(fixtures.warehouseID),
 		"received_at":       "2026-06-17",
+		"idempotency_key":   "jsonrpc-create-receipt-from-po-attempt-1",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -447,17 +564,32 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
 		t.Fatalf("create from order must keep inventory untouched before post, got txns=%d", count)
 	}
+	receiptID := jsonRPCInt(t, receipt, "id")
+	_, replayReceiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1-replay", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(saved.Order.ID),
+		"receipt_no":        "PR-FROM-PO-001",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"received_at":       "2026-06-17",
+		"idempotency_key":   "jsonrpc-create-receipt-from-po-attempt-1",
+	}))
+	if err != nil || replayReceiptRes == nil || replayReceiptRes.Code != errcode.OK.Code {
+		t.Fatalf("expected create-from-order replay OK, result=%#v err=%v", replayReceiptRes, err)
+	}
+	if replayID := jsonRPCInt(t, jsonRPCNestedMap(t, replayReceiptRes, "purchase_receipt"), "id"); replayID != receiptID {
+		t.Fatalf("create-from-order replay id=%d, want %d", replayID, receiptID)
+	}
 
 	_, duplicateRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "2", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
 		"receipt_no":        "PR-FROM-PO-002",
 		"warehouse_id":      float64(fixtures.warehouseID),
+		"idempotency_key":   "jsonrpc-create-receipt-from-po-attempt-1",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err on duplicate attempt, got %v", err)
 	}
-	if duplicateRes == nil || duplicateRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected duplicate attempt rejected, got %#v", duplicateRes)
+	if duplicateRes == nil || duplicateRes.Code != errcode.IdempotencyConflict.Code {
+		t.Fatalf("expected changed intent with reused key rejected, got %#v", duplicateRes)
 	}
 }
 
@@ -535,12 +667,13 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	}
 	receiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id")
 	_, itemRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "enabled-line", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":   float64(receiptID),
-		"material_id":  float64(fixtures.materialID),
-		"warehouse_id": float64(fixtures.warehouseID),
-		"unit_id":      float64(fixtures.unitID),
-		"lot_no":       "PR-MODULE-ENABLED-LOT",
-		"quantity":     "2",
+		"receipt_id":      float64(receiptID),
+		"material_id":     float64(fixtures.materialID),
+		"warehouse_id":    float64(fixtures.warehouseID),
+		"unit_id":         float64(fixtures.unitID),
+		"lot_no":          "PR-MODULE-ENABLED-LOT",
+		"quantity":        "2",
+		"idempotency_key": "jsonrpc-module-enabled-line",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -605,12 +738,11 @@ func activatePurchaseTestCustomerConfig(t *testing.T, dispatcher *jsonrpcDispatc
 	if !ok {
 		t.Fatalf("invalid customer config params: %#v", params.AsMap())
 	}
-	if _, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1); err != nil {
+	published, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1)
+	if err != nil {
 		t.Fatalf("publish customer config %s err = %v", in.Revision, err)
 	}
-	if _, err := dispatcher.customerConfigUC.ActivateCustomerConfig(context.Background(), in.CustomerKey, in.Revision, 1); err != nil {
-		t.Fatalf("activate customer config %s err = %v", in.Revision, err)
-	}
+	activatePublishedCustomerConfigForTest(t, dispatcher.customerConfigUC, in, published, 1)
 }
 
 func jsonRPCNestedMap(t *testing.T, res *v1.JsonrpcResult, key string) map[string]any {

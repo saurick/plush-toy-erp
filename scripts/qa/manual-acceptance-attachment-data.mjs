@@ -68,6 +68,14 @@ export function buildAttachmentTargets({ sourceReport, factReport, workflowTask 
   ];
 }
 
+export function selectAttachmentWorkflowTask(tasks = []) {
+  return (Array.isArray(tasks) ? tasks : []).find(
+    (item) =>
+      item.task_group === "production_scheduling" &&
+      item.task_status_key === "ready",
+  );
+}
+
 async function rpc({ backendURL, domain, method, params = {}, token = "" }) {
   const response = await fetch(`${backendURL}/rpc/${domain}`, {
     method: "POST",
@@ -114,11 +122,7 @@ export async function applyAttachmentData({ backendURL, password, sourceReportPa
   }
   const taskReport = readJSON(taskReportPath);
   const taskList = await rpc({ backendURL, domain: "workflow", method: "list_tasks", params: { source_type: taskReport.sourceType, source_id: taskReport.sourceID, limit: 200 }, token: actorTokens.workflow_task });
-  const workflowTask = taskList.tasks?.find(
-    (item) =>
-      item.task_group === "production_scheduling" &&
-      ["ready", "processing"].includes(item.task_status_key),
-  );
+  const workflowTask = selectAttachmentWorkflowTask(taskList.tasks);
   const targets = buildAttachmentTargets({ sourceReport: readJSON(sourceReportPath), factReport: readJSON(factReportPath), workflowTask });
   const fixtures = buildAttachmentFixtures();
   const steps = [];

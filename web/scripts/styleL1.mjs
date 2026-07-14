@@ -53,6 +53,7 @@ const scenarioFilter = new Set(
 const scenarioMaxAttempts = 2
 
 let devServerProcess = null
+let devServerProcessGroupID = null
 let devServerLogs = ''
 
 const assertAntdModalCentered = (...args) =>
@@ -208,8 +209,16 @@ async function main() {
 
   try {
     if (!externalBaseURL) {
+      await assertPortAvailable(devServerPort)
+      console.log(
+        `[style:l1] target=self-host worktree=${webDir} port=${devServerPort}`
+      )
       devServerProcess = startDevServer()
+      devServerProcessGroupID = await verifyDevServerProcessGroup()
       await waitForServer(baseURL)
+      await assertDevServerPortOwnership(devServerProcessGroupID)
+    } else {
+      console.log(`[style:l1] target=external base_url=${externalBaseURL}`)
     }
 
     const browser = await chromium.launch({
@@ -277,72 +286,127 @@ async function stopDevServer() {
     return
   }
 
-  const devServerPID = devServerProcess.pid
-  const killDevServer = (signal) => {
-    if (!devServerPID) return
-    try {
-      process.kill(-devServerPID, signal)
-    } catch {
-      // Fall through to direct child kill when the process group is gone.
-    }
-    try {
-      process.kill(devServerPID, signal)
-    } catch {
-      // The process already exited.
-    }
-    try {
-      devServerProcess.kill(signal)
-    } catch {
-      // The child handle is already closed.
-    }
-  }
-
-  if (devServerProcess.exitCode === null) {
-    killDevServer('SIGTERM')
+  if (devServerProcessGroupID) {
+    await terminateOwnedProcessGroup(devServerProcessGroupID)
+  } else if (devServerProcess.exitCode === null) {
+    // Group ownership is not yet verified only when startup failed before the
+    // detached child could be inspected. In that narrow path, kill the direct
+    // child only; never infer ownership from a port or an unverified PID.
+    devServerProcess.kill('SIGTERM')
     await Promise.race([
       new Promise((resolve) => devServerProcess.once('exit', resolve)),
       delay(3000),
     ])
-  }
-
-  if (devServerProcess.exitCode === null) {
-    killDevServer('SIGKILL')
-    await delay(500)
+    if (devServerProcess.exitCode === null) {
+      devServerProcess.kill('SIGKILL')
+      await delay(500)
+    }
   }
 
   devServerProcess.stdout?.destroy()
   devServerProcess.stderr?.destroy()
   devServerProcess.unref()
   devServerProcess = null
-  await killDevServerPortListeners()
+  devServerProcessGroupID = null
 }
 
-async function killDevServerPortListeners() {
-  const pids = await listDevServerPortPIDs()
-  await Promise.all(
-    pids.map(async (pid) => {
-      try {
-        process.kill(pid, 'SIGTERM')
-      } catch {
-        return
-      }
-      await delay(300)
-      try {
-        process.kill(pid, 0)
-      } catch {
-        return
-      }
-      try {
-        process.kill(pid, 'SIGKILL')
-      } catch {
-        // The process exited between checks.
-      }
+function signalOwnedProcessGroup(
+  processGroupID,
+  signal,
+  { permissionDeniedIsGone = false } = {}
+) {
+  try {
+    process.kill(-processGroupID, signal)
+    return true
+  } catch (error) {
+    if (error?.code === 'ESRCH') return false
+    // After a successful signal, macOS can report EPERM while the terminated
+    // group is being reaped. At that point the verified group is no longer
+    // ours to signal; treating it as gone also prevents hitting a reused PGID.
+    if (permissionDeniedIsGone && error?.code === 'EPERM') return false
+    throw error
+  }
+}
+
+export function isOwnedProcessGroupAlive(processGroupID) {
+  assert(
+    Number.isInteger(processGroupID) && processGroupID > 0,
+    `[style:l1] invalid owned process group: ${processGroupID}`
+  )
+  return signalOwnedProcessGroup(processGroupID, 0)
+}
+
+async function waitForOwnedProcessGroupExit(
+  processGroupID,
+  { timeoutMs, pollIntervalMs }
+) {
+  const deadline = Date.now() + timeoutMs
+  while (
+    signalOwnedProcessGroup(processGroupID, 0, {
+      permissionDeniedIsGone: true,
     })
+  ) {
+    if (Date.now() >= deadline) return false
+    await delay(Math.min(pollIntervalMs, Math.max(1, deadline - Date.now())))
+  }
+  return true
+}
+
+export async function terminateOwnedProcessGroup(
+  processGroupID,
+  { termGraceMs = 3000, killGraceMs = 1000, pollIntervalMs = 25 } = {}
+) {
+  if (!isOwnedProcessGroupAlive(processGroupID)) {
+    return { signal: null }
+  }
+
+  signalOwnedProcessGroup(processGroupID, 'SIGTERM')
+  if (
+    await waitForOwnedProcessGroupExit(processGroupID, {
+      timeoutMs: termGraceMs,
+      pollIntervalMs,
+    })
+  ) {
+    return { signal: 'SIGTERM' }
+  }
+
+  signalOwnedProcessGroup(processGroupID, 'SIGKILL')
+  if (
+    await waitForOwnedProcessGroupExit(processGroupID, {
+      timeoutMs: killGraceMs,
+      pollIntervalMs,
+    })
+  ) {
+    return { signal: 'SIGKILL' }
+  }
+
+  throw new Error(
+    `[style:l1] owned process group ${processGroupID} survived SIGKILL`
   )
 }
 
+function assertPortAvailable(port) {
+  return new Promise((resolve, reject) => {
+    const server = net.createServer()
+    server.unref()
+    server.once('error', (error) => {
+      reject(
+        new Error(
+          `[style:l1] self-host port ${port} is unavailable before Vite start: ${error.message}`
+        )
+      )
+    })
+    server.listen(port, '127.0.0.1', () => {
+      server.close((error) => {
+        if (error) reject(error)
+        else resolve()
+      })
+    })
+  })
+}
+
 function listDevServerPortPIDs() {
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const child = spawn('lsof', [
       `-tiTCP:${String(devServerPort)}`,
       '-sTCP:LISTEN',
@@ -351,8 +415,12 @@ function listDevServerPortPIDs() {
     child.stdout.on('data', (chunk) => {
       output += chunk.toString()
     })
-    child.once('error', () => resolve([]))
-    child.once('close', () => {
+    child.once('error', reject)
+    child.once('close', (code) => {
+      if (code !== 0 && code !== 1) {
+        reject(new Error(`lsof exited with code ${code}`))
+        return
+      }
       resolve(
         output
           .split('\n')
@@ -361,6 +429,60 @@ function listDevServerPortPIDs() {
       )
     })
   })
+}
+
+function processGroupID(pid) {
+  return new Promise((resolve, reject) => {
+    const child = spawn('ps', ['-o', 'pgid=', '-p', String(pid)])
+    let output = ''
+    child.stdout.on('data', (chunk) => {
+      output += chunk.toString()
+    })
+    child.once('error', reject)
+    child.once('close', (code) => {
+      const value = Number(output.trim())
+      if (code !== 0 || !Number.isInteger(value) || value <= 0) {
+        reject(new Error(`cannot resolve process group for pid ${pid}`))
+        return
+      }
+      resolve(value)
+    })
+  })
+}
+
+async function verifyDevServerProcessGroup() {
+  const expectedGroup = devServerProcess?.pid
+  assert(
+    Number.isInteger(expectedGroup) && expectedGroup > 0,
+    '[style:l1] self-host child PID is unavailable'
+  )
+  const childGroup = await processGroupID(expectedGroup)
+  assert.equal(
+    childGroup,
+    expectedGroup,
+    `[style:l1] self-host child is not the leader of its detached process group: pid=${expectedGroup} pgid=${childGroup}`
+  )
+  return expectedGroup
+}
+
+async function assertDevServerPortOwnership(expectedGroup) {
+  const listenerPIDs = await listDevServerPortPIDs()
+  assert(
+    listenerPIDs.length > 0,
+    `[style:l1] no listener found for self-host port ${devServerPort}`
+  )
+  const listenerGroups = await Promise.all(
+    listenerPIDs.map((pid) => processGroupID(pid))
+  )
+  assert(
+    listenerGroups.every((group) => group === expectedGroup),
+    `[style:l1] self-host port ownership mismatch: expected pgid=${expectedGroup}, listeners=${listenerPIDs
+      .map((pid, index) => `${pid}:${listenerGroups[index]}`)
+      .join(',')}`
+  )
+  console.log(
+    `[style:l1] self-host ownership verified pid=${expectedGroup} port=${devServerPort}`
+  )
 }
 
 async function waitForServer(url) {
@@ -1527,7 +1649,7 @@ async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
   let failedOnce = false
   await page.route('**/rpc/workflow', async (route) => {
     const body = route.request().postDataJSON() || {}
-    if (!failedOnce && body.method === 'list_tasks') {
+    if (!failedOnce && body.method === 'list_role_tasks') {
       failedOnce = true
       await route.fulfill({
         status: 200,
@@ -3288,11 +3410,21 @@ async function assertAdminLoginSmsCodeErrorHintSpacing(page, { scenarioName }) {
 
 async function assertAppAlertDialogLayout(
   page,
-  { scenarioName, expectedMessage = '请先登录' }
+  {
+    scenarioName,
+    expectedMessage = '请先登录',
+    exerciseEscape = false,
+  }
 ) {
-  await page
-    .locator('.app-alert-dialog')
-    .waitFor({ state: 'visible', timeout: 10_000 })
+  const surface = page.locator('.app-alert-dialog').last()
+  const semanticDialog = page.getByRole('alertdialog').last()
+  await surface.waitFor({ state: 'visible', timeout: 10_000 })
+  await semanticDialog.waitFor({ state: 'visible', timeout: 10_000 })
+  await page.waitForFunction(() => {
+    const dialog = document.querySelector('[role="alertdialog"]')
+    const confirm = dialog?.querySelector('[data-app-alert-confirm]')
+    return Boolean(confirm && document.activeElement === confirm)
+  })
 
   const metrics = await page.evaluate(() => {
     const parseRgb = (value) => {
@@ -3342,7 +3474,10 @@ async function assertAppAlertDialogLayout(
       }) || null
 
     const dialog = visibleElement('.app-alert-dialog')
-    const overlay = dialog?.parentElement || null
+    const semanticDialog = dialog?.closest('[role="alertdialog"]') || null
+    const modalRoot = semanticDialog?.closest('.ant-modal-root') || null
+    const overlay = modalRoot?.querySelector('.ant-modal-wrap') || null
+    const mask = modalRoot?.querySelector('.ant-modal-mask') || null
     const title = dialog?.querySelector('[data-app-alert-title]') || null
     const message = dialog?.querySelector('[data-app-alert-message]') || null
     const confirm = dialog?.querySelector('[data-app-alert-confirm]') || null
@@ -3351,6 +3486,8 @@ async function assertAppAlertDialogLayout(
     const messageStyle = message ? window.getComputedStyle(message) : null
     const confirmStyle = confirm ? window.getComputedStyle(confirm) : null
     const backgroundColor = parseRgb(dialogStyle?.backgroundColor)
+    const outsideHitTarget = document.elementFromPoint(8, 8)
+    const appRoot = document.getElementById('root')
 
     return {
       viewport: {
@@ -3361,6 +3498,31 @@ async function assertAppAlertDialogLayout(
         position: overlay ? window.getComputedStyle(overlay).position : '',
         width: overlay?.getBoundingClientRect().width || 0,
         height: overlay?.getBoundingClientRect().height || 0,
+        pointerEvents: overlay
+          ? window.getComputedStyle(overlay).pointerEvents
+          : '',
+        hasMask: Boolean(mask),
+        outsideHitIsIsolated: Boolean(
+          outsideHitTarget && modalRoot?.contains(outsideHitTarget)
+        ),
+      },
+      background: {
+        inert: appRoot?.hasAttribute('inert') === true,
+        ariaHidden: appRoot?.getAttribute('aria-hidden') || '',
+      },
+      semantics: {
+        role: semanticDialog?.getAttribute('role') || '',
+        ariaModal: semanticDialog?.getAttribute('aria-modal') || '',
+        labelledBy: semanticDialog?.getAttribute('aria-labelledby') || '',
+        describedBy: semanticDialog?.getAttribute('aria-describedby') || '',
+        titleId: title?.id || '',
+        messageId: message?.id || '',
+        activeIsConfirm: document.activeElement === confirm,
+        nestedDialogCount: semanticDialog
+          ? semanticDialog.querySelectorAll(
+              '[role="dialog"], [role="alertdialog"]'
+            ).length
+          : 0,
       },
       dialog: rectOf(dialog),
       title: {
@@ -3398,6 +3560,24 @@ async function assertAppAlertDialogLayout(
     metrics.dialog,
     `${scenarioName} 缺少通用提示弹窗: ${JSON.stringify(metrics)}`
   )
+  assert.deepEqual(
+    metrics.semantics,
+    {
+      role: 'alertdialog',
+      ariaModal: 'true',
+      labelledBy: metrics.semantics.titleId,
+      describedBy: metrics.semantics.messageId,
+      titleId: metrics.semantics.titleId,
+      messageId: metrics.semantics.messageId,
+      activeIsConfirm: true,
+      nestedDialogCount: 0,
+    },
+    `${scenarioName} 通用提示弹窗缺少 alertdialog 语义或初始焦点: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.semantics.titleId && metrics.semantics.messageId,
+    `${scenarioName} 通用提示弹窗标题和说明必须有可关联 id: ${JSON.stringify(metrics)}`
+  )
   assert(
     metrics.title.rect && metrics.message.rect && metrics.confirm.rect,
     `${scenarioName} 通用提示弹窗内部元素缺失: ${JSON.stringify(metrics)}`
@@ -3414,6 +3594,17 @@ async function assertAppAlertDialogLayout(
     metrics.overlay.width >= metrics.viewport.width &&
       metrics.overlay.height >= metrics.viewport.height,
     `${scenarioName} 遮罩层未覆盖移动视口: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.overlay.hasMask &&
+      metrics.overlay.pointerEvents !== 'none' &&
+      metrics.overlay.outsideHitIsIsolated,
+    `${scenarioName} 弹窗背景仍可能接收点击: ${JSON.stringify(metrics)}`
+  )
+  assert.deepEqual(
+    metrics.background,
+    { inert: true, ariaHidden: 'true' },
+    `${scenarioName} 弹窗背景缺少 inert/aria-hidden 隔离: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.dialog.width >= 320 &&
@@ -3460,6 +3651,36 @@ async function assertAppAlertDialogLayout(
       metrics.message.rect.bottom < metrics.confirm.rect.top,
     `${scenarioName} 弹窗内部文字和按钮发生重叠: ${JSON.stringify(metrics)}`
   )
+
+  for (const key of ['Tab', 'Shift+Tab', 'Tab']) {
+    await page.keyboard.press(key)
+    const focusIsContained = await semanticDialog.evaluate(
+      (node) =>
+        document.activeElement instanceof Element &&
+        node.contains(document.activeElement)
+    )
+    assert(
+      focusIsContained,
+      `${scenarioName} ${key} 后焦点逃出提示弹窗`
+    )
+  }
+
+  if (exerciseEscape) {
+    await page.keyboard.press('Escape')
+    await semanticDialog.waitFor({ state: 'hidden', timeout: 10_000 })
+    await page.waitForFunction(
+      () => {
+        const appRoot = document.getElementById('root')
+        return (
+          appRoot &&
+          !appRoot.hasAttribute('inert') &&
+          !appRoot.hasAttribute('aria-hidden')
+        )
+      },
+      undefined,
+      { timeout: 10_000 }
+    )
+  }
 }
 
 async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
@@ -8018,4 +8239,6 @@ function tailLogs(text) {
   return text.trim().split('\n').slice(-20).join('\n')
 }
 
-await main()
+if (process.argv[1] && path.resolve(process.argv[1]) === import.meta.filename) {
+  await main()
+}

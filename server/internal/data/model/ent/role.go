@@ -25,10 +25,14 @@ type Role struct {
 	Description string `json:"description,omitempty"`
 	// Builtin holds the value of the "builtin" field.
 	Builtin bool `json:"builtin,omitempty"`
+	// RoleType holds the value of the "role_type" field.
+	RoleType role.RoleType `json:"role_type,omitempty"`
 	// Disabled holds the value of the "disabled" field.
 	Disabled bool `json:"disabled,omitempty"`
 	// SortOrder holds the value of the "sort_order" field.
 	SortOrder int `json:"sort_order,omitempty"`
+	// Version holds the value of the "version" field.
+	Version int `json:"version,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -43,9 +47,9 @@ func (*Role) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case role.FieldBuiltin, role.FieldDisabled:
 			values[i] = new(sql.NullBool)
-		case role.FieldID, role.FieldSortOrder:
+		case role.FieldID, role.FieldSortOrder, role.FieldVersion:
 			values[i] = new(sql.NullInt64)
-		case role.FieldRoleKey, role.FieldName, role.FieldDescription:
+		case role.FieldRoleKey, role.FieldName, role.FieldDescription, role.FieldRoleType:
 			values[i] = new(sql.NullString)
 		case role.FieldCreatedAt, role.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -94,6 +98,12 @@ func (_m *Role) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Builtin = value.Bool
 			}
+		case role.FieldRoleType:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field role_type", values[i])
+			} else if value.Valid {
+				_m.RoleType = role.RoleType(value.String)
+			}
 		case role.FieldDisabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
 				return fmt.Errorf("unexpected type %T for field disabled", values[i])
@@ -105,6 +115,12 @@ func (_m *Role) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field sort_order", values[i])
 			} else if value.Valid {
 				_m.SortOrder = int(value.Int64)
+			}
+		case role.FieldVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field version", values[i])
+			} else if value.Valid {
+				_m.Version = int(value.Int64)
 			}
 		case role.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -166,11 +182,17 @@ func (_m *Role) String() string {
 	builder.WriteString("builtin=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Builtin))
 	builder.WriteString(", ")
+	builder.WriteString("role_type=")
+	builder.WriteString(fmt.Sprintf("%v", _m.RoleType))
+	builder.WriteString(", ")
 	builder.WriteString("disabled=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Disabled))
 	builder.WriteString(", ")
 	builder.WriteString("sort_order=")
 	builder.WriteString(fmt.Sprintf("%v", _m.SortOrder))
+	builder.WriteString(", ")
+	builder.WriteString("version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.Version))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

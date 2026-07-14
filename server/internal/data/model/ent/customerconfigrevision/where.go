@@ -74,6 +74,11 @@ func ConfigHash(v string) predicate.CustomerConfigRevision {
 	return predicate.CustomerConfigRevision(sql.FieldEQ(FieldConfigHash, v))
 }
 
+// ConfigHashVersion applies equality check predicate on the "config_hash_version" field. It's identical to ConfigHashVersionEQ.
+func ConfigHashVersion(v int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldEQ(FieldConfigHashVersion, v))
+}
+
 // Status applies equality check predicate on the "status" field. It's identical to StatusEQ.
 func Status(v string) predicate.CustomerConfigRevision {
 	return predicate.CustomerConfigRevision(sql.FieldEQ(FieldStatus, v))
@@ -367,6 +372,46 @@ func ConfigHashEqualFold(v string) predicate.CustomerConfigRevision {
 // ConfigHashContainsFold applies the ContainsFold predicate on the "config_hash" field.
 func ConfigHashContainsFold(v string) predicate.CustomerConfigRevision {
 	return predicate.CustomerConfigRevision(sql.FieldContainsFold(FieldConfigHash, v))
+}
+
+// ConfigHashVersionEQ applies the EQ predicate on the "config_hash_version" field.
+func ConfigHashVersionEQ(v int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldEQ(FieldConfigHashVersion, v))
+}
+
+// ConfigHashVersionNEQ applies the NEQ predicate on the "config_hash_version" field.
+func ConfigHashVersionNEQ(v int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldNEQ(FieldConfigHashVersion, v))
+}
+
+// ConfigHashVersionIn applies the In predicate on the "config_hash_version" field.
+func ConfigHashVersionIn(vs ...int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldIn(FieldConfigHashVersion, vs...))
+}
+
+// ConfigHashVersionNotIn applies the NotIn predicate on the "config_hash_version" field.
+func ConfigHashVersionNotIn(vs ...int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldNotIn(FieldConfigHashVersion, vs...))
+}
+
+// ConfigHashVersionGT applies the GT predicate on the "config_hash_version" field.
+func ConfigHashVersionGT(v int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldGT(FieldConfigHashVersion, v))
+}
+
+// ConfigHashVersionGTE applies the GTE predicate on the "config_hash_version" field.
+func ConfigHashVersionGTE(v int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldGTE(FieldConfigHashVersion, v))
+}
+
+// ConfigHashVersionLT applies the LT predicate on the "config_hash_version" field.
+func ConfigHashVersionLT(v int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldLT(FieldConfigHashVersion, v))
+}
+
+// ConfigHashVersionLTE applies the LTE predicate on the "config_hash_version" field.
+func ConfigHashVersionLTE(v int16) predicate.CustomerConfigRevision {
+	return predicate.CustomerConfigRevision(sql.FieldLTE(FieldConfigHashVersion, v))
 }
 
 // StatusEQ applies the EQ predicate on the "status" field.

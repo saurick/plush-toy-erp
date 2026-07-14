@@ -13,7 +13,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_production_fact", "createProductionFact":
+	case "create_production_fact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanCreate, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
@@ -26,7 +26,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		}
 		item, err := d.operationalFactUC.CreateProductionFactDraft(ctx, in)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
-	case "post_production_fact", "postProductionFact":
+	case "post_production_fact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
@@ -35,7 +35,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		}
 		item, err := d.operationalFactUC.PostProductionFact(ctx, getInt(pm, "id", 0))
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
-	case "cancel_production_fact", "cancelProductionFact":
+	case "cancel_production_fact":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanUpdate, biz.PermissionWarehouseAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
@@ -44,7 +44,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		}
 		item, err := d.operationalFactUC.CancelPostedProductionFact(ctx, getInt(pm, "id", 0))
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
-	case "list_production_facts", "listProductionFacts":
+	case "list_production_facts":
 		if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}

@@ -23,6 +23,8 @@ type stubPurchaseOrderJSONRPCRepo struct {
 	unitActive     bool
 	lastFilter     biz.PurchaseOrderFilter
 	lifecycleCalls int
+	saveErr        error
+	saveCalls      int
 }
 
 func newStubPurchaseOrderJSONRPCRepo() *stubPurchaseOrderJSONRPCRepo {
@@ -128,6 +130,10 @@ func (s *stubPurchaseOrderJSONRPCRepo) ListPurchaseOrderItems(_ context.Context,
 }
 
 func (s *stubPurchaseOrderJSONRPCRepo) SavePurchaseOrderWithItems(_ context.Context, id int, order *biz.PurchaseOrderMutation, items []*biz.PurchaseOrderItemSaveMutation) (*biz.PurchaseOrderWithItems, error) {
+	s.saveCalls++
+	if s.saveErr != nil {
+		return nil, s.saveErr
+	}
 	orderID := id
 	if orderID == 0 {
 		orderID = s.nextOrderID
@@ -207,6 +213,9 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	}
 	order := jsonRPCNestedMap(t, saveRes, "purchase_order")
 	orderID := jsonRPCInt(t, order, "id")
+	if version := jsonRPCInt(t, order, "version"); version != 1 {
+		t.Fatalf("created purchase order version = %d, want 1", version)
+	}
 	if status := order["lifecycle_status"]; status != biz.PurchaseOrderStatusDraft {
 		t.Fatalf("expected draft purchase order, got %#v", status)
 	}
@@ -361,6 +370,74 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions(t *testing.
 	}
 }
 
+func TestJsonrpcDispatcher_PurchaseOrderDraftVersionContract(t *testing.T) {
+	repo := newStubPurchaseOrderJSONRPCRepo()
+	j := newPurchaseOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseOrderUpdate,
+	))
+	ctx := workflowJSONRPCAdminContext()
+	repo.orders[1] = &biz.PurchaseOrder{
+		ID:              1,
+		PurchaseOrderNo: "PO-VERSION-CONTRACT",
+		SupplierID:      1,
+		PurchaseDate:    time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC),
+		LifecycleStatus: biz.PurchaseOrderStatusDraft,
+		Version:         1,
+	}
+	repo.items[1] = &biz.PurchaseOrderItem{
+		ID:                1,
+		PurchaseOrderID:   1,
+		LineNo:            1,
+		MaterialID:        1,
+		UnitID:            1,
+		PurchasedQuantity: mustDecimal(t, "1"),
+		LineStatus:        biz.PurchaseOrderItemStatusOpen,
+	}
+	paramsForAttempt := func() map[string]any {
+		return map[string]any{
+			"id":                float64(1),
+			"purchase_order_no": "PO-VERSION-CONTRACT",
+			"supplier_id":       float64(1),
+			"purchase_date":     "2026-07-14",
+			"items": []any{map[string]any{
+				"id":                 float64(1),
+				"line_no":            float64(1),
+				"material_id":        float64(1),
+				"unit_id":            float64(1),
+				"purchased_quantity": "1",
+			}},
+		}
+	}
+
+	for name, value := range map[string]any{"missing": nil, "zero": float64(0), "fraction": float64(1.5), "string": "1"} {
+		params := paramsForAttempt()
+		if value != nil {
+			params["expected_version"] = value
+		}
+		_, res, err := j.handlePurchaseOrder(ctx, "save_purchase_order_with_items", name, mustJSONRPCStruct(t, params))
+		if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.saveCalls != 0 {
+			t.Fatalf("%s expected_version must fail before save: res=%#v err=%v orders=%#v", name, res, err, repo.orders)
+		}
+	}
+
+	update := paramsForAttempt()
+	update["expected_version"] = float64(1)
+	_, updateRes, err := j.handlePurchaseOrder(ctx, "save_purchase_order_with_items", "update", mustJSONRPCStruct(t, update))
+	if err != nil || updateRes == nil || updateRes.Code != errcode.OK.Code {
+		t.Fatalf("positive expected_version must update purchase order: res=%#v err=%v", updateRes, err)
+	}
+	if version := jsonRPCInt(t, jsonRPCNestedMap(t, updateRes, "purchase_order"), "version"); version != 2 {
+		t.Fatalf("updated purchase order version = %d, want 2", version)
+	}
+
+	repo.saveErr = biz.ErrPurchaseOrderConflict
+	_, conflictRes, err := j.handlePurchaseOrder(ctx, "save_purchase_order_with_items", "conflict", mustJSONRPCStruct(t, update))
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.ResourceVersionConflict.Code {
+		t.Fatalf("purchase version conflict must map to 40922: res=%#v err=%v", conflictRes, err)
+	}
+}
+
 func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresEnabledModule(t *testing.T) {
 	repo := newStubPurchaseOrderJSONRPCRepo()
 	j := newPurchaseOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
@@ -499,6 +576,10 @@ func purchaseOrderJSONRPCParams(t *testing.T) *structpb.Struct {
 }
 
 func purchaseOrderFromMutation(id int, status string, in *biz.PurchaseOrderMutation) *biz.PurchaseOrder {
+	version := 1
+	if in.ExpectedVersion > 0 {
+		version = in.ExpectedVersion + 1
+	}
 	return &biz.PurchaseOrder{
 		ID:                      id,
 		PurchaseOrderNo:         in.PurchaseOrderNo,
@@ -509,6 +590,7 @@ func purchaseOrderFromMutation(id int, status string, in *biz.PurchaseOrderMutat
 		PurchaseDate:            in.PurchaseDate,
 		ExpectedArrivalDate:     in.ExpectedArrivalDate,
 		LifecycleStatus:         status,
+		Version:                 version,
 		Note:                    in.Note,
 		CreatedAt:               time.Unix(1, 0),
 		UpdatedAt:               time.Unix(1, 0),

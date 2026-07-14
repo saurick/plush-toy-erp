@@ -43,7 +43,7 @@ server/deploy/compose/prod
 - 包含手机号、地址、价格、订单明细、token 或完整连接串的日志。
 - 长期有效下载链接、对象存储 access key、备份加密 key。
 
-客户原始资料仍归档在 `docs/customers/yoyoosun/raw-source-files/` 并按客户资料边界管理；真实备份、生产 `.env` 和签署文件应放受控外部存储。
+客户原始资料与私密 manifest 的当前真源是专属 Private 仓库 `plush-toy-erp-customer-yoyoosun-private`；Product Core 当前工作树不再归档这些原件。生产 `.env`、数据库备份和签署后的正式交付文件仍应按各自安全边界放入受控存储，不进入本部署资料目录。
 
 ## 常用入口 / Common Entrypoints
 

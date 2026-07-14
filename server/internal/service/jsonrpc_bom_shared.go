@@ -160,6 +160,8 @@ func (d *jsonrpcDispatcher) mapBOMError(ctx context.Context, err error) *v1.Json
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "BOM 明细不存在"}
 	case errors.Is(err, biz.ErrBOMActiveImmutable):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "已激活 BOM 不允许直接修改，请复制新版本"}
+	case errors.Is(err, biz.ErrBOMActiveConflict):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "同一产品已有其他激活 BOM 版本，请刷新后重试"}
 	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该产品已停用，不能用于新 BOM 版本；历史 BOM 仍保留原引用"}
 	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):

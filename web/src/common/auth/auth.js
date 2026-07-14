@@ -20,12 +20,6 @@ const META_KEYS = [
   'erp_preferences',
 ]
 
-// 仅用于清理旧登录态残留；RBAC 权限恢复只读取 roles / permissions / menus。
-const LEGACY_META_KEYS = [
-  'admin_level',
-  'menu_permissions',
-  'mobile_role_permissions',
-]
 const JSON_META_KEYS = new Set([
   'roles',
   'permissions',
@@ -90,14 +84,10 @@ function setScopedMeta(scope, data) {
       removeStorageItem(localStorage, storageKey)
     }
   })
-  LEGACY_META_KEYS.forEach((key) => {
-    removeStorageItem(localStorage, getScopedMetaKey(scope, key))
-  })
 }
 
 function clearScopedMeta(scope) {
-  const keys = [...META_KEYS, ...LEGACY_META_KEYS]
-  keys.forEach((key) => {
+  META_KEYS.forEach((key) => {
     removeStorageItem(localStorage, getScopedMetaKey(scope, key))
   })
 }

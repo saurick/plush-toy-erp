@@ -1,34 +1,31 @@
-# 永绅 raw-source-files 到表单映射
+# 永绅 raw-source 到表单映射
 
-> 本文把 `docs/customers/yoyoosun/raw-source-files` 中的来源文件映射到当前产品核心表单、实体和打印草稿。它是导入前证据和 dry-run 依据，不是导入批准。
+> 本文只保留永绅来源资料“类别”到 Product Core 表单、实体和打印草稿的脱敏映射。具体文件名、sourceId、hash、大小和私有相对路径由客户私有仓库 manifest 管理，不复制进 Product Core。它是导入前分类依据，不是导入批准。
 
 ## 总边界
 
-- raw source 文件不直接写 runtime。
-- raw source 文件不写 Workflow、库存、出货、财务或其他 Fact。
+- 客户专属 Private 仓库保存来源级 inventory、原件和私密 manifest；Product Core 只认识经审查的来源类别和通用校验合同。
+- 来源文件不直接写 runtime，也不写 Workflow、库存、质检、出货、财务或其他 Fact。
 - 图片 / PDF 不做 OCR 自动导入，只作人工核对线索。
-- Excel 来源只能进入 dry-run / preview，必须经过字段覆盖检查、人工 review、release evidence 后才能考虑真实导入。
-- 合同照片和合同模板只能约束打印字段与纸面样式，不覆盖 Product Core 模板结构和业务 usecase。
+- Excel 只能进入只读 extract、dry-run / preview 和人工 review；真实导入必须另行实现通用批次 usecase、RBAC、审计、幂等和回滚。
+- 合同照片与模板样本只能约束打印字段和纸面样式，不覆盖 Product Core 模板结构或业务 usecase。
 
-## 映射表
+## 脱敏类别映射
 
-| Source ID | 来源文件 | 目标表单 | 目标实体 | 当前状态 | 关键边界 |
-| --- | --- | --- | --- | --- | --- |
-| `yoyoosun-raw-material-purchase-summary-20260602` | 辅材、包材 成慧怡.xlsx | SupplierForm / MaterialForm / PurchaseOrderForm / MaterialPurchaseContractPrintDraft | suppliers / materials / units / purchase_orders / purchase_order_items | dry_run_ready | 只生成供应商、材料、单位和采购源单候选；不写采购入库、库存或应付事实 |
-| `yoyoosun-raw-outsourcing-summary-20260602` | 加工 成慧怡.xlsx | SupplierForm / ContactForm / OutsourcingOrderForm / ProcessingContractPrintDraft | suppliers / contacts / outsourcing_orders / outsourcing_order_items | dry_run_ready | 只生成委外源单和加工合同草稿候选；不写委外回货、应付、付款或库存事实 |
-| `yoyoosun-raw-bom-26029-20260119` | 26029#夜樱烬色才料明细表2026-1-19.xlsx | ProductForm / ProductSKUForm / MaterialForm / BOMVersionForm | products / product_skus / materials / units / bom_versions / bom_items | dry_run_ready | 只生成产品、SKU、材料和 BOM 候选；不写采购、库存、生产或成本事实 |
-| `yoyoosun-raw-bom-26204-20260410` | 26204#抱抱猴子材料明细表2026-4-10.xlsx | ProductForm / ProductSKUForm / MaterialForm / BOMVersionForm | products / product_skus / materials / units / bom_versions / bom_items | dry_run_ready | 只生成产品、SKU、材料和 BOM 候选；不写采购、库存、生产或成本事实 |
-| `yoyoosun-raw-contract-template-material-outsourcing` | 模板-材料与加工合同.xlsx | MaterialPurchaseContractPrintDraft / ProcessingContractPrintDraft | print_template_defaults / purchase_orders / outsourcing_orders | manual_reference | 只作字段和纸面样式来源；不作为运行时 Excel 母版 |
-| `yoyoosun-raw-outsourcing-contract-pdf-zichun` | 9.3加工合同-子淳.pdf | ProcessingContractPrintDraft / OutsourcingOrderForm | outsourcing_orders / outsourcing_order_items / print_template_defaults | manual_reference | 只作人工核对来源，不做 OCR，不自动生成委外、应付、付款或库存事实 |
-| `yoyoosun-raw-formal-mobile-report-v3` | plush_factory_formal_report_v3_mobile.pdf | MobileRoleTasksPage / WorkflowTaskActionDrawer | workflow_tasks / workflow_task_events | manual_reference | 只作页面观感和交付线索，不生成结构化导入行或 Workflow runtime 状态 |
-| `yoyoosun-raw-mobile-report-screenshot-20260420` | yoyoosun-report-mobile-screenshot-20260420.png | MobileRoleTasksPage | workflow_tasks | manual_reference | 只作人工 UI 核对线索，不能作为唯一字段、流程或事实真源 |
-| `yoyoosun-raw-role-workflow-v3-20260413` | yoyoosun-role-workflow-v3-20260413.png | CustomerConfigPreview / WorkflowRuntimeLedger / MobileRoleTasksPage | role_profiles / work_pools / workflow_tasks / process_definitions | manual_reference | 只作角色与流程边界线索，不自动升级为 Product Core runtime 流程真源 |
-| `yoyoosun-raw-purchase-contract-photo-20260421-jpeg` | yoyoosun-purchase-contract-order-photo-20260421.jpeg | MaterialPurchaseContractPrintDraft / PurchaseOrderForm | purchase_orders / purchase_order_items / print_template_defaults | manual_reference | 只作人工字段和版式线索，不做 OCR，不重复计为独立业务单据 |
-| `yoyoosun-raw-purchase-contract-photo-20260421-source-copy-jpg` | yoyoosun-purchase-contract-order-photo-20260421-source-copy.jpg | MaterialPurchaseContractPrintDraft / PurchaseOrderForm | purchase_orders / purchase_order_items / print_template_defaults | manual_reference | 与主 .jpeg 为同组副本，不重复计为独立业务单据 |
+| 来源类别 | 目标表单 / 工作台 | 目标领域 | 当前状态 | 关键边界 |
+| --- | --- | --- | --- | --- |
+| 材料 / 包材采购汇总 | SupplierForm / MaterialForm / PurchaseOrderForm / MaterialPurchaseContractPrintDraft | suppliers / materials / units / purchase source documents | dry-run category | 只生成供应商、材料、单位和采购源单候选；不写采购入库、库存或应付事实 |
+| 委外加工汇总 | SupplierForm / ContactForm / OutsourcingOrderForm / ProcessingContractPrintDraft | suppliers / contacts / outsourcing source documents | dry-run category | 产品 / 材料主体必须人工确认；不写回货、质检、库存、应付或付款事实 |
+| 材料分析 / BOM | ProductForm / MaterialForm / BOMVersionForm | products / materials / units / BOM | dry-run category | 只生成主数据和 BOM 候选；不写采购、生产、库存或成本事实 |
+| 采购 / 加工合同模板 | MaterialPurchaseContractPrintDraft / ProcessingContractPrintDraft | print inputs / source documents | manual reference | 只作字段与版式参考，不作为运行时 Excel 母版 |
+| 已签或纸面合同 | 对应合同打印草稿与源单据表单 | purchase / outsourcing / print | manual reference | 不做 OCR，不自动生成结算、付款、入库或库存事实 |
+| 页面 / 移动端汇报材料 | MobileRoleTasksPage / 相关业务页面 | UI / delivery review | manual reference | 只作观感与交付线索，不生成结构化行或 runtime 状态 |
+| 岗位 / 流程图 | CustomerConfigPreview / Workflow review | role / workflow review | manual reference | 只作角色与流程边界线索，不自动升级为 Product Core runtime 流程 |
 
 ## 测试锚点
 
 - `config/customers/yoyoosun/rawSourceFormMap.mjs`
 - `scripts/qa/yoyoosun-customer-closure.test.mjs`
+- `scripts/import/fixtures/synthetic/`
 
-测试必须确保：每个 source-manifest 来源都有映射；映射不指向禁用 runtime Fact 表；试用 fixture 的关键打印字段不为空。
+Product Core 测试只应锁住类别映射、禁用 Fact 目标和合成 fixture 的通用合同。私有 manifest 是否覆盖真实来源、hash / size 是否匹配，由客户私有仓库验证；缺少私有资料不能导致普通 Product Core CI 失败。

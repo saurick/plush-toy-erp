@@ -266,7 +266,7 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 		}
 		if node.DomainCommandResultHash == nil {
 			// A submitted order alone cannot prove that this exact command caused
-			// the transition; legacy result-missing rows require explicit review.
+			// the transition; result-missing rows require explicit review.
 			return nil, biz.ErrProcessDomainCommandRecoveryRequired
 		}
 	}
@@ -464,12 +464,14 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			Where(
 				salesorder.ID(id),
 				salesorder.LifecycleStatus(biz.SalesOrderStatusDraft),
+				salesorder.Version(in.ExpectedVersion),
 			).
 			SetOrderNo(in.OrderNo).
 			SetCustomerID(in.CustomerID).
 			SetCustomerSnapshot(in.CustomerSnapshot).
 			SetContactSnapshot(in.ContactSnapshot).
-			SetOrderDate(in.OrderDate)
+			SetOrderDate(in.OrderDate).
+			SetVersion(in.ExpectedVersion + 1)
 		if in.CustomerOrderNo == nil {
 			update.ClearCustomerOrderNo()
 		} else {
@@ -510,13 +512,20 @@ func (r *salesOrderRepo) SaveSalesOrderWithItems(ctx context.Context, id int, in
 			return nil, err
 		}
 		if affected == 0 {
-			if _, err := tx.SalesOrder.Get(ctx, id); err != nil {
+			current, err := tx.SalesOrder.Get(ctx, id)
+			if err != nil {
 				if ent.IsNotFound(err) {
 					return nil, biz.ErrSalesOrderNotFound
 				}
 				return nil, err
 			}
-			return nil, biz.ErrBadParam
+			if current.LifecycleStatus != biz.SalesOrderStatusDraft {
+				return nil, biz.ErrBadParam
+			}
+			if current.Version != in.ExpectedVersion {
+				return nil, biz.ErrSalesOrderConflict
+			}
+			return nil, biz.ErrSalesOrderConflict
 		}
 		orderRow, err = tx.SalesOrder.Get(ctx, id)
 		if err != nil {
@@ -765,6 +774,7 @@ func entSalesOrderToBiz(row *ent.SalesOrder) *biz.SalesOrder {
 		OrderDate:           row.OrderDate,
 		PlannedDeliveryDate: row.PlannedDeliveryDate,
 		LifecycleStatus:     row.LifecycleStatus,
+		Version:             row.Version,
 		Note:                row.Note,
 		CreatedAt:           row.CreatedAt,
 		UpdatedAt:           row.UpdatedAt,

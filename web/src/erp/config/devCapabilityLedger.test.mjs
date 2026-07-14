@@ -162,6 +162,17 @@ test('devCapabilityLedger: 只通过开发态独立路径暴露四份只读真�
   assert(!DEV_CAPABILITY_LEDGER_ROUTE.startsWith('/erp/'))
 })
 
+test('devCapabilityLedger: 页面构建不静态或动态读取 export-ignore Markdown', () => {
+  assert.doesNotMatch(capabilityPageSource, /\.md\?raw/u)
+  assert.doesNotMatch(capabilityPageSource, /import\.meta\.glob/u)
+  assert.doesNotMatch(capabilityPageSource, /fetch\([^)]*\.md/u)
+  assert.doesNotMatch(
+    capabilityPageSource,
+    /from ['"]\.\.\/\.\.\/\.\.\/\.\.\/docs\//u
+  )
+  assert.match(capabilityPageSource, /build-safe, non-authoritative/u)
+})
+
 test('devCapabilityLedger: 按当前表头签名解析能力快查并精确连接证据详情', () => {
   const result = parseCapabilityLedgerMarkdown(ledgerMarkdown, evidenceMarkdown)
   const { items } = result

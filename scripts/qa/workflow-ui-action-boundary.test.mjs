@@ -219,14 +219,16 @@ test("mobile role labels use shared role display names", () => {
   );
 });
 
-test("mobile task visibility explanations hide raw workflow field names", () => {
+test("mobile task visibility copy stays readable and role task query uses server cursor contract", () => {
   const taskViewPath = path.join(erpSourceRoot, "utils/mobileTaskView.mjs");
   const taskQueriesPath = path.join(
     erpSourceRoot,
     "utils/mobileTaskQueries.mjs",
   );
+  const workflowApiPath = path.join(erpSourceRoot, "api/workflowApi.mjs");
   const taskViewSource = readFileSync(taskViewPath, "utf8");
   const taskQueriesSource = readFileSync(taskQueriesPath, "utf8");
+  const workflowApiSource = readFileSync(workflowApiPath, "utf8");
   const forbiddenVisibleSnippets = [
     "未选择 role_key",
     "task_status_key 是终态",
@@ -260,9 +262,27 @@ test("mobile task visibility explanations hide raw workflow field names", () => 
     taskViewSource.includes("未选择岗位，无法判断岗位任务端可见性。"),
     "mobileTaskView must explain missing role in business-readable copy",
   );
+  for (const contractSnippet of [
+    "view_key: normalizedViewKey",
+    "role_key: normalizedRoleKey",
+    "...(normalizedCursor ? { cursor: normalizedCursor } : {})",
+    "next_cursor: response.next_cursor || ''",
+    "has_more: response.has_more === true",
+    "server_time: response.server_time || 0",
+  ]) {
+    assert(
+      taskQueriesSource.includes(contractSnippet),
+      `mobileTaskQueries must preserve the server role-task cursor contract: ${contractSnippet}`,
+    );
+  }
   assert(
-    taskQueriesSource.includes("按主责岗位直查任务池"),
-    "mobileTaskQueries must explain owner-pool lookup as 主责岗位",
+    workflowApiSource.includes("workflowRpc.call('list_role_tasks', query)"),
+    "mobile role tasks must query the backend list_role_tasks projection",
+  );
+  assert(
+    !taskQueriesSource.includes("limit: 200") &&
+      !taskQueriesSource.includes("按主责岗位直查任务池"),
+    "mobile role tasks must not restore the old capped client-side owner-pool query",
   );
 });
 
@@ -492,7 +512,7 @@ test("mobile task actions explain backend access before submitting actions", () 
   assert.match(
     source,
     /if \(!canRunMobileTaskAction\(task, taskStatusKey\)\)/u,
-    "mobile complete/block/reject submit path must re-check the selected backend projection before fresh explain",
+    "mobile status-action submit path must re-check the selected backend projection before fresh explain",
   );
   assert.match(
     source,
@@ -505,13 +525,14 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     source,
-    /rejected_reason:\s*[\s\S]*taskStatusKey === 'rejected'[\s\S]*\?\s*actionReason/u,
-    "mobile rejected action payload must always carry the rejected reason for rejected actions",
+    /const actionParams\s*=\s*\{[\s\S]*reason:\s*reasonRequired\s*\?\s*actionReason\s*:\s*''[\s\S]*payload,/u,
+    "mobile status actions must submit the canonical top-level reason beside allowlisted evidence",
   );
-  assert.match(
-    source,
-    /blocked_reason:\s*[\s\S]*taskStatusKey === 'blocked'[\s\S]*\?\s*actionReason/u,
-    "mobile blocked action payload must carry the blocked reason only for blocked actions",
+  assert(
+    !source.includes("rejected_reason:") &&
+      !source.includes("blocked_reason:") &&
+      !source.includes("business_status_key:"),
+    "mobile status actions must not replay client-derived lifecycle fields in payload",
   );
   assert.match(
     submitGuardSource,
@@ -520,7 +541,7 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     submitGuardSource,
-    /REASON_REQUIRED_ACTION_MODES[\s\S]*block[\s\S]*reject[\s\S]*urge/u,
+    /REASON_REQUIRED_ACTION_MODES[\s\S]*block[\s\S]*reject[\s\S]*resume[\s\S]*urge/u,
     "shared submit guard must centralize reason-required workflow actions",
   );
   assert.match(
@@ -622,6 +643,7 @@ test("desktop workflow task actions explain backend access before submitting act
         "completeWorkflowTaskAction",
         "blockWorkflowTaskAction",
         "rejectWorkflowTaskAction",
+        "resumeWorkflowTaskAction",
         "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*selectedTask\.id,/mu,
@@ -632,6 +654,7 @@ test("desktop workflow task actions explain backend access before submitting act
         "completeWorkflowTaskAction",
         "blockWorkflowTaskAction",
         "rejectWorkflowTaskAction",
+        "resumeWorkflowTaskAction",
         "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
@@ -643,6 +666,7 @@ test("desktop workflow task actions explain backend access before submitting act
         "completeWorkflowTaskAction",
         "blockWorkflowTaskAction",
         "rejectWorkflowTaskAction",
+        "resumeWorkflowTaskAction",
         "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
@@ -654,6 +678,7 @@ test("desktop workflow task actions explain backend access before submitting act
         "completeWorkflowTaskAction",
         "blockWorkflowTaskAction",
         "rejectWorkflowTaskAction",
+        "resumeWorkflowTaskAction",
         "urgeWorkflowTask",
       ],
       forbiddenLegacyIDPattern: /^\s*id:\s*task\.id,/mu,
@@ -731,19 +756,19 @@ test("workflow task post-success refresh failures stay separate from mutation re
     {
       relativePath: "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
       refreshCall: "loadWorkflowTasks()",
-      expectedCount: 4,
+      expectedCount: 5,
     },
     {
       relativePath:
         "web/src/erp/components/purchase-orders/usePurchaseOrderWorkflowActions.mjs",
       refreshCall: "loadWorkflowTasks()",
-      expectedCount: 4,
+      expectedCount: 5,
     },
     {
       relativePath:
         "web/src/erp/components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs",
       refreshCall: "loadWorkflowTasks()",
-      expectedCount: 4,
+      expectedCount: 5,
     },
   ];
 
@@ -931,7 +956,10 @@ test("purchase order page keeps write buttons behind projected actions", () => {
   );
   assert(
     panelSource.includes("disabled={!canCreate}") &&
-      panelSource.includes("disabled={!selectedOrderCanEdit}") &&
+      panelSource.includes("loading={itemsLoading}") &&
+      panelSource.includes(
+        "disabled={!selectedOrderCanEdit || itemsLoading}",
+      ) &&
       panelSource.includes(
         "disabled={\n                !canGenerateInboundDraft",
       ),

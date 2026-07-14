@@ -11,6 +11,7 @@ const migrateScript = path.join(
   "server/deploy/compose/prod/migrate_online.sh",
 );
 const systemFlock = findCommand("flock");
+const perl = findCommand("perl");
 
 function findCommand(command) {
   const result = spawnSync("sh", ["-c", `command -v ${command}`], {
@@ -51,6 +52,12 @@ if [ "$1" = "compose" ] && [ "$2" = "version" ]; then
   exit 0
 fi
 case " $* " in
+  *" ps -q app-server "*)
+    if [ -n "\${APP_SERVER_CID:-}" ]; then
+      printf '%s\n' "$APP_SERVER_CID"
+    fi
+    exit 0
+    ;;
   *" ps -q "*)
     printf '%s\n' 'postgres-test-cid'
     exit 0
@@ -88,6 +95,23 @@ printf '%s end %s\n' "\${RUN_LABEL:-run}" "$phase" >> "$EVENT_LOG"
       `#!/bin/sh
 printf '%s\n' "$*" >> "$FLOCK_LOG"
 exit 0
+`,
+    );
+  } else if (!systemFlock) {
+    assert(
+      perl,
+      "the portable flock fixture requires Perl when flock is unavailable",
+    );
+    writeExecutable(
+      path.join(binDir, "flock"),
+      `#!${perl}
+use strict;
+use warnings;
+use Fcntl qw(LOCK_EX);
+my $fd = shift @ARGV;
+die "missing file descriptor\\n" unless defined $fd && $fd =~ /^\\d+$/;
+open(my $lock_handle, ">&=$fd") or die "dup fd $fd failed: $!\\n";
+flock($lock_handle, LOCK_EX) or die "flock fd $fd failed: $!\\n";
 `,
     );
   }
@@ -136,14 +160,26 @@ function runMigration(fixture, args = [], extraEnv = {}) {
   return spawnSync("sh", [migrateScript, ...args], {
     cwd: repoRoot,
     encoding: "utf8",
-    env: { ...fixture.env, ...extraEnv },
+    env: {
+      ...fixture.env,
+      ...(args.includes("--apply")
+        ? { MIGRATION_MAINTENANCE_CONFIRMED: "1" }
+        : {}),
+      ...extraEnv,
+    },
   });
 }
 
 function spawnMigration(fixture, args = [], extraEnv = {}) {
   const child = spawn("sh", [migrateScript, ...args], {
     cwd: repoRoot,
-    env: { ...fixture.env, ...extraEnv },
+    env: {
+      ...fixture.env,
+      ...(args.includes("--apply")
+        ? { MIGRATION_MAINTENANCE_CONFIRMED: "1" }
+        : {}),
+      ...extraEnv,
+    },
   });
   let stdout = "";
   let stderr = "";
@@ -204,6 +240,34 @@ test("migrate_online dry-run 失败时不执行 apply", () => {
     assert.equal(result.status, 42, `${result.stdout}\n${result.stderr}`);
     assert.deepEqual(atlasPhases(fixture.atlasLog), ["status", "dry-run"]);
     assert.deepEqual(readLines(fixture.flockLog), ["9"]);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online 正式 apply 必须显式确认停写维护窗口", () => {
+  const fixture = createFixture();
+  try {
+    const result = runMigration(fixture, ["--apply"], {
+      MIGRATION_MAINTENANCE_CONFIRMED: "",
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /MIGRATION_MAINTENANCE_CONFIRMED=1/);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), []);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online 正式 apply 在 app-server 运行时 fail closed", () => {
+  const fixture = createFixture();
+  try {
+    const result = runMigration(fixture, ["--apply"], {
+      APP_SERVER_CID: "running-app-server",
+    });
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /后端服务仍在运行/);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), []);
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }
@@ -312,44 +376,40 @@ test("migrate_online 拒绝符号链接锁目录", () => {
   }
 });
 
-test(
-  "migrate_online 并发运行时串行化整段 migration",
-  { skip: systemFlock ? false : "local flock is unavailable" },
-  async () => {
-    const fixture = createFixture({ useSystemFlock: true });
-    try {
-      const first = spawnMigration(fixture, ["--apply"], {
-        RUN_LABEL: "first",
-        ATLAS_SLEEP_PHASE: "status",
-        ATLAS_SLEEP_SECONDS: "1",
-      });
-      await waitForLine(fixture.eventLog, "first start status");
-      const second = spawnMigration(fixture, ["--status-only"], {
-        RUN_LABEL: "second",
-      });
-      const [firstResult, secondResult] = await Promise.all([first, second]);
-      assert.equal(
-        firstResult.status,
-        0,
-        `${firstResult.stdout}\n${firstResult.stderr}`,
-      );
-      assert.equal(
-        secondResult.status,
-        0,
-        `${secondResult.stdout}\n${secondResult.stderr}`,
-      );
+test("migrate_online 并发运行时串行化整段 migration", async () => {
+  const fixture = createFixture({ useSystemFlock: true });
+  try {
+    const first = spawnMigration(fixture, ["--apply"], {
+      RUN_LABEL: "first",
+      ATLAS_SLEEP_PHASE: "status",
+      ATLAS_SLEEP_SECONDS: "1",
+    });
+    await waitForLine(fixture.eventLog, "first start status");
+    const second = spawnMigration(fixture, ["--status-only"], {
+      RUN_LABEL: "second",
+    });
+    const [firstResult, secondResult] = await Promise.all([first, second]);
+    assert.equal(
+      firstResult.status,
+      0,
+      `${firstResult.stdout}\n${firstResult.stderr}`,
+    );
+    assert.equal(
+      secondResult.status,
+      0,
+      `${secondResult.stdout}\n${secondResult.stderr}`,
+    );
 
-      const events = readLines(fixture.eventLog);
-      const firstApplyEnd = events.indexOf("first end apply");
-      const secondStatusStart = events.indexOf("second start status");
-      assert.notEqual(firstApplyEnd, -1, events.join("\n"));
-      assert.notEqual(secondStatusStart, -1, events.join("\n"));
-      assert.ok(
-        secondStatusStart > firstApplyEnd,
-        `second run entered Atlas before first sequence completed:\n${events.join("\n")}`,
-      );
-    } finally {
-      fs.rmSync(fixture.root, { recursive: true, force: true });
-    }
-  },
-);
+    const events = readLines(fixture.eventLog);
+    const firstApplyEnd = events.indexOf("first end apply");
+    const secondStatusStart = events.indexOf("second start status");
+    assert.notEqual(firstApplyEnd, -1, events.join("\n"));
+    assert.notEqual(secondStatusStart, -1, events.join("\n"));
+    assert.ok(
+      secondStatusStart > firstApplyEnd,
+      `second run entered Atlas before first sequence completed:\n${events.join("\n")}`,
+    );
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});

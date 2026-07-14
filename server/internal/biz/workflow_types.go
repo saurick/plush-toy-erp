@@ -34,10 +34,15 @@ type WorkflowTask struct {
 	AssigneeID            *int
 	Priority              int16
 	BlockedReason         *string
+	CriticalPath          bool
+	UrgeCount             int
+	LastUrgedAt           *time.Time
+	LastUrgedBy           *int
+	LastUrgedByRoleKey    *string
+	EscalatedAt           *time.Time
+	EscalateTargetRoleKey *string
 	DueAt                 *time.Time
-	StartedAt             *time.Time
 	CompletedAt           *time.Time
-	ClosedAt              *time.Time
 	Payload               map[string]any
 	Version               int
 	CreatedBy             *int
@@ -52,6 +57,7 @@ type WorkflowTaskFilter struct {
 	OwnerRoleKey         string
 	VisibleOwnerRoleKeys []string
 	VisibleAssigneeID    *int
+	VisibilityScope      *WorkflowTaskVisibilityScope
 	TaskStatusKey        string
 	TaskGroup            string
 	SourceType           string
@@ -69,6 +75,7 @@ type WorkflowTaskBoardQuery struct {
 	Offset               int
 	VisibleOwnerRoleKeys []string
 	VisibleAssigneeID    *int
+	VisibilityScope      *WorkflowTaskVisibilityScope
 	SnapshotAt           time.Time
 }
 
@@ -113,6 +120,7 @@ type WorkflowTaskCreate struct {
 	AssigneeID            *int
 	Priority              int16
 	BlockedReason         *string
+	CriticalPath          bool
 	DueAt                 *time.Time
 	Payload               map[string]any
 }

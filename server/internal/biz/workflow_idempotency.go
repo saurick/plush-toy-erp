@@ -28,6 +28,7 @@ var workflowTaskIntentTopLevelIgnoredKeys = map[string]struct{}{
 	"outsourcing_order_page_action": {},
 	"purchase_order_page_action":    {},
 	"rejected_reason":               {},
+	"surface_key":                   {},
 	"workflow_page_action":          {},
 	"workflow_page_scope":           {},
 }
@@ -100,7 +101,7 @@ func prepareWorkflowTaskStatusMutation(in *WorkflowTaskStatusUpdate, actorID int
 		in.Payload = map[string]any{}
 	}
 	if in.ID <= 0 || in.ExpectedVersion <= 0 || actorID <= 0 || in.IdempotencyKey == "" ||
-		!IsValidWorkflowTaskState(in.TaskStatusKey) || in.CommandKey == "" ||
+		!IsKnownWorkflowTaskState(in.TaskStatusKey) || in.CommandKey == "" ||
 		utf8.RuneCountInString(in.CommandKey) > workflowTaskCommandKeyMaxLength ||
 		utf8.RuneCountInString(in.IdempotencyKey) > workflowTaskIdempotencyKeyMaxLength {
 		return ErrBadParam
@@ -108,7 +109,7 @@ func prepareWorkflowTaskStatusMutation(in *WorkflowTaskStatusUpdate, actorID int
 	if in.BusinessStatusKey != "" && !IsValidWorkflowBusinessState(in.BusinessStatusKey) {
 		return ErrBadParam
 	}
-	if in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected" {
+	if in.TaskStatusKey == "ready" || in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected" {
 		in.Reason = workflowTransitionReason(in, in.TaskStatusKey)
 		if in.Reason == "" {
 			return ErrBadParam
@@ -220,7 +221,11 @@ func workflowTaskSemanticMap(input map[string]any, parentKey string) map[string]
 		if workflowTaskIntentKeyIgnored(parentKey, rawKey) {
 			continue
 		}
-		out[rawKey] = workflowTaskSemanticValue(rawValue, rawKey)
+		semanticValue := workflowTaskSemanticValue(rawValue, rawKey)
+		if workflowTaskIntentValueEmpty(rawKey, semanticValue) {
+			continue
+		}
+		out[rawKey] = semanticValue
 	}
 	return out
 }
@@ -238,8 +243,26 @@ func workflowTaskSemanticValue(value any, key string) any {
 			return workflowTaskSortedUniqueStrings(items)
 		}
 		return items
+	case string:
+		if key == "feedback" {
+			return strings.TrimSpace(typed)
+		}
+		return typed
 	default:
 		return typed
+	}
+}
+
+func workflowTaskIntentValueEmpty(key string, value any) bool {
+	switch {
+	case key == "feedback":
+		text, ok := value.(string)
+		return ok && text == ""
+	case workflowTaskEvidenceRefsKey(key):
+		items, ok := value.([]any)
+		return ok && len(items) == 0
+	default:
+		return false
 	}
 }
 

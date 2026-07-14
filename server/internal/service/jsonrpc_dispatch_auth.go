@@ -56,7 +56,11 @@ func (d *jsonrpcDispatcher) handleAuth(
 
 		challenge, err := d.adminAuthUC.RequestSMSLoginCode(ctx, phone, mobileRoleKey)
 		if err != nil {
-			return id, d.mapAuthError(ctx, err), nil
+			return id, d.mapAdminLoginError(ctx, err), nil
+		}
+		mockCode := ""
+		if d.authSMS.MockDelivery {
+			mockCode = challenge.MockCode
 		}
 
 		return id, &v1.JsonrpcResult{
@@ -66,8 +70,8 @@ func (d *jsonrpcDispatcher) handleAuth(
 				"phone":         challenge.Phone,
 				"expires_at":    challenge.ExpiresAt.Unix(),
 				"resend_after":  challenge.ResendAfter.Unix(),
-				"mock_delivery": challenge.MockDelivery,
-				"mock_code":     challenge.MockCode,
+				"mock_delivery": d.authSMS.MockDelivery,
+				"mock_code":     mockCode,
 			}),
 		}, nil
 
@@ -95,7 +99,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 
 		token, expireAt, admin, err := d.adminAuthUC.LoginWithSMSCode(ctx, phone, code, mobileRoleKey)
 		if err != nil {
-			return id, d.mapAuthError(ctx, err), nil
+			return id, d.mapAdminLoginError(ctx, err), nil
 		}
 
 		return id, &v1.JsonrpcResult{
@@ -119,7 +123,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 
 		token, expireAt, admin, err := d.adminAuthUC.Login(ctx, username, password)
 		if err != nil {
-			return id, d.mapAuthError(ctx, err), nil
+			return id, d.mapAdminLoginError(ctx, err), nil
 		}
 
 		return id, &v1.JsonrpcResult{
@@ -141,6 +145,9 @@ func (d *jsonrpcDispatcher) handleAuth(
 				return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 			}
 			d.log.WithContext(ctx).Infof("[auth] user logout uid=%d id=%s", claims.UserID, id)
+		} else if biz.AuthStateFrom(ctx) == biz.AuthUnavailable {
+			d.log.WithContext(ctx).Errorf("[auth] logout rejected because authentication backend is unavailable id=%s", id)
+			return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 		} else {
 			d.log.WithContext(ctx).Warnf("[auth] user logout without claims id=%s", id)
 		}
@@ -177,6 +184,37 @@ func (d *jsonrpcDispatcher) handleAuth(
 			Code:    errcode.UnknownMethod.Code,
 			Message: fmt.Sprintf("auth: 未知方法=%s", method),
 		}, nil
+	}
+}
+
+func (d *jsonrpcDispatcher) mapAdminLoginError(ctx context.Context, err error) *v1.JsonrpcResult {
+	reason := ""
+	switch {
+	case errors.Is(err, biz.ErrUserNotFound):
+		reason = "account_not_found"
+	case errors.Is(err, biz.ErrInvalidPassword):
+		reason = "password_invalid"
+	case errors.Is(err, biz.ErrUserDisabled):
+		reason = "account_inactive"
+	case errors.Is(err, biz.ErrPhoneNotBound):
+		reason = "phone_not_bound"
+	case errors.Is(err, biz.ErrMobileRoleDenied):
+		reason = "mobile_role_denied"
+	case errors.Is(err, biz.ErrAuthVersionStale):
+		reason = "credentials_changed"
+	case errors.Is(err, biz.ErrSMSCodeNotFound),
+		errors.Is(err, biz.ErrSMSCodeExpired),
+		errors.Is(err, biz.ErrSMSCodeInvalid),
+		errors.Is(err, biz.ErrSMSCodeAttemptsExceeded):
+		reason = "sms_verification_failed"
+	}
+	if reason == "" {
+		return d.mapAuthError(ctx, err)
+	}
+	d.log.WithContext(ctx).Warnf("[auth] admin login rejected reason=%s", reason)
+	return &v1.JsonrpcResult{
+		Code:    errcode.AuthLoginRejected.Code,
+		Message: errcode.AuthLoginRejected.Message,
 	}
 }
 

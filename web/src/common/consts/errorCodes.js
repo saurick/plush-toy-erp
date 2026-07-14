@@ -52,6 +52,7 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
     '短信服务暂不可用，请稍后再试或联系管理员',
   [RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED]:
     '短信服务额度已用完，请联系管理员处理',
+  [RpcErrorCode.AUTH_LOGIN_REJECTED]: '登录信息不正确或账号不可用',
   [RpcErrorCode.ADMIN_EXISTS]: '账号已存在',
   [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他账号',
   [RpcErrorCode.IDEMPOTENCY_CONFLICT]:

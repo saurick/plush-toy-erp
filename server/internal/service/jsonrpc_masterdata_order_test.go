@@ -294,6 +294,7 @@ type stubSalesOrderJSONRPCRepo struct {
 	lifecycleStatus      string
 	cancelActorID        int
 	lastSalesOrderFilter biz.SalesOrderFilter
+	saveErr              error
 }
 
 func (s *stubSalesOrderJSONRPCRepo) CreateSalesOrder(_ context.Context, in *biz.SalesOrderMutation) (*biz.SalesOrder, error) {
@@ -307,7 +308,7 @@ func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrder(_ context.Context, id int, 
 }
 
 func (s *stubSalesOrderJSONRPCRepo) GetSalesOrder(_ context.Context, id int) (*biz.SalesOrder, error) {
-	return &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft}, nil
+	return &biz.SalesOrder{ID: id, OrderNo: "SO001", CustomerID: 1, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft, Version: 1}, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) ListSalesOrders(_ context.Context, filter biz.SalesOrderFilter) ([]*biz.SalesOrder, int, error) {
@@ -353,12 +354,19 @@ func (s *stubSalesOrderJSONRPCRepo) ListSalesOrderItems(context.Context, biz.Sal
 func (s *stubSalesOrderJSONRPCRepo) SaveSalesOrderWithItems(_ context.Context, id int, in *biz.SalesOrderMutation, items []*biz.SalesOrderItemSaveMutation) (*biz.SalesOrderWithItems, error) {
 	s.savedOrder = in
 	s.savedItems = items
+	if s.saveErr != nil {
+		return nil, s.saveErr
+	}
 	orderID := id
 	if orderID <= 0 {
 		orderID = 1
 	}
+	version := 1
+	if id > 0 {
+		version = in.ExpectedVersion + 1
+	}
 	out := &biz.SalesOrderWithItems{
-		Order: &biz.SalesOrder{ID: orderID, OrderNo: in.OrderNo, CustomerID: in.CustomerID, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft},
+		Order: &biz.SalesOrder{ID: orderID, OrderNo: in.OrderNo, CustomerID: in.CustomerID, SalesOwner: in.SalesOwner, ContactSnapshot: in.ContactSnapshot, PaymentMethod: in.PaymentMethod, PaymentTermDays: in.PaymentTermDays, PriceConditionNote: in.PriceConditionNote, OrderDate: in.OrderDate, LifecycleStatus: biz.SalesOrderStatusDraft, Version: version},
 		Items: make([]*biz.SalesOrderItem, 0, len(items)),
 	}
 	for idx, item := range items {
@@ -1440,10 +1448,11 @@ func TestJsonrpcDispatcher_SaveExistingSalesOrderDoesNotRequireRemovedItemWriteP
 		biz.PermissionSalesOrderUpdate,
 	))
 	params := mustJSONRPCStruct(t, map[string]any{
-		"id":          float64(1),
-		"order_no":    "SO-TX-JSONRPC-UPDATE",
-		"customer_id": float64(1),
-		"order_date":  "2026-06-15",
+		"id":               float64(1),
+		"expected_version": float64(1),
+		"order_no":         "SO-TX-JSONRPC-UPDATE",
+		"customer_id":      float64(1),
+		"order_date":       "2026-06-15",
 		"items": []any{map[string]any{
 			"id":               float64(1),
 			"line_no":          float64(1),
@@ -1462,6 +1471,70 @@ func TestJsonrpcDispatcher_SaveExistingSalesOrderDoesNotRequireRemovedItemWriteP
 	}
 	if repo.savedOrder == nil || repo.savedOrder.OrderNo != "SO-TX-JSONRPC-UPDATE" || len(repo.savedItems) != 1 {
 		t.Fatalf("expected aggregate update usecase call, order=%#v items=%#v", repo.savedOrder, repo.savedItems)
+	}
+}
+
+func TestJsonrpcDispatcher_SalesOrderDraftVersionContract(t *testing.T) {
+	repo := &stubSalesOrderJSONRPCRepo{customerActive: true, productActive: true, unitActive: true}
+	j := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderCreate,
+		biz.PermissionSalesOrderUpdate,
+	))
+	ctx := workflowJSONRPCAdminContext()
+	paramsForAttempt := func() map[string]any {
+		return map[string]any{
+			"order_no":    "SO-VERSION-CONTRACT",
+			"customer_id": float64(1),
+			"order_date":  "2026-07-14",
+			"items": []any{map[string]any{
+				"id":               float64(1),
+				"line_no":          float64(1),
+				"product_id":       float64(1),
+				"unit_id":          float64(1),
+				"ordered_quantity": "1",
+			}},
+		}
+	}
+
+	create := paramsForAttempt()
+	delete(create["items"].([]any)[0].(map[string]any), "id")
+	_, createRes, err := j.handleSalesOrder(ctx, "save_sales_order_with_items", "create", mustJSONRPCStruct(t, create))
+	if err != nil || createRes == nil || createRes.Code != errcode.OK.Code {
+		t.Fatalf("create without expected_version must succeed: res=%#v err=%v", createRes, err)
+	}
+	if version := jsonRPCInt(t, jsonRPCNestedMap(t, createRes, "sales_order"), "version"); version != 1 {
+		t.Fatalf("created sales order version = %d, want 1", version)
+	}
+
+	for name, value := range map[string]any{"missing": nil, "zero": float64(0), "fraction": float64(1.5), "string": "1"} {
+		params := paramsForAttempt()
+		params["id"] = float64(1)
+		if value != nil {
+			params["expected_version"] = value
+		}
+		repo.savedOrder = nil
+		_, res, callErr := j.handleSalesOrder(ctx, "save_sales_order_with_items", name, mustJSONRPCStruct(t, params))
+		if callErr != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.savedOrder != nil {
+			t.Fatalf("%s expected_version must fail before save: res=%#v err=%v saved=%#v", name, res, callErr, repo.savedOrder)
+		}
+	}
+
+	update := paramsForAttempt()
+	update["id"] = float64(1)
+	update["expected_version"] = float64(1)
+	_, updateRes, err := j.handleSalesOrder(ctx, "save_sales_order_with_items", "update", mustJSONRPCStruct(t, update))
+	if err != nil || updateRes == nil || updateRes.Code != errcode.OK.Code || repo.savedOrder == nil || repo.savedOrder.ExpectedVersion != 1 {
+		t.Fatalf("positive expected_version must reach save: res=%#v err=%v saved=%#v", updateRes, err, repo.savedOrder)
+	}
+	if version := jsonRPCInt(t, jsonRPCNestedMap(t, updateRes, "sales_order"), "version"); version != 2 {
+		t.Fatalf("updated sales order version = %d, want 2", version)
+	}
+
+	repo.saveErr = biz.ErrSalesOrderConflict
+	_, conflictRes, err := j.handleSalesOrder(ctx, "save_sales_order_with_items", "conflict", mustJSONRPCStruct(t, update))
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.ResourceVersionConflict.Code {
+		t.Fatalf("sales version conflict must map to 40922: res=%#v err=%v", conflictRes, err)
 	}
 }
 

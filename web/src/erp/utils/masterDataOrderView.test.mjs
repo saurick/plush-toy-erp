@@ -1378,12 +1378,12 @@ test('FL_material_purchase_print_dates__keeps_string_date_snapshots masterDataOr
   const draft = completeMaterialPurchaseContractDraft(
     buildMaterialPurchaseContractDraftFromPurchaseOrder(
       {
-        purchase_order_no: 'PO-YOYO-DATE',
+        purchase_order_no: 'SIM-PO-DATE',
         supplier_snapshot: {
-          name: '永绅供应商',
-          contact_name: '供应商联系人',
+          name: '合成材料供应商',
+          contact_name: '合成供应商联系人',
           contact_phone: '13800000000',
-          address: '东莞茶山',
+          address: '合成地址-材料区A',
         },
         purchase_date: '2026-06-13',
         expected_arrival_date: '2026-06-24',
@@ -1391,9 +1391,9 @@ test('FL_material_purchase_print_dates__keeps_string_date_snapshots masterDataOr
       [
         {
           material_name_snapshot: '辅材',
-          product_order_no_snapshot: 'SO-YOYO-DATE',
-          product_no_snapshot: '26029',
-          product_name_snapshot: '夜樱烬色玩偶',
+          product_order_no_snapshot: 'SIM-SO-DATE',
+          product_no_snapshot: 'SIM-PROD-001',
+          product_name_snapshot: '合成玩偶甲',
           unit_name_snapshot: '米',
           purchased_quantity: '1',
           unit_price: '2',

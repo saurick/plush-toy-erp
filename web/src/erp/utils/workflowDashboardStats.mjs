@@ -1,6 +1,5 @@
 import { normalizeRoleKey } from './roleKeys.mjs'
 import { formatWorkflowTaskSource } from './dashboardTaskDisplay.mjs'
-import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 
 export {
   isTerminalWorkflowTask,
@@ -9,8 +8,9 @@ export {
 
 export const DUE_SOON_MS = 24 * 60 * 60 * 1000
 
-export const PENDING_TASK_STATUS_KEYS = new Set(['pending', 'ready'])
-export const RISK_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
+export const ACTIONABLE_TASK_STATUS_KEYS = new Set(['ready'])
+export const ACTIVE_TASK_STATUS_KEYS = new Set(['ready', 'blocked'])
+export const RISK_TASK_STATUS_KEYS = new Set(['blocked'])
 export const FINANCE_MODULE_KEYS = new Set([
   'reconciliation',
   'payables',
@@ -44,6 +44,59 @@ export const FINANCE_TASK_GROUP_KEYS = new Set([
   'outsource_reconciliation',
 ])
 
+export function getWorkflowWorkbenchRoleKeys(adminProfile = {}) {
+  const effectiveRoles = adminProfile?.effective_session?.roles
+  const hasEffectiveRoleProjection = Array.isArray(effectiveRoles)
+  const roleEntries = hasEffectiveRoleProjection
+    ? effectiveRoles
+    : Array.isArray(adminProfile?.roles)
+      ? adminProfile.roles
+      : []
+  return [
+    ...new Set(
+      roleEntries
+        .map((role) => {
+          if (hasEffectiveRoleProjection) {
+            return typeof role === 'string' ? role.trim() : ''
+          }
+          return String(role?.role_key || '').trim()
+        })
+        .filter(Boolean)
+    ),
+  ]
+}
+
+export function getWorkflowWorkbenchScopeKey(
+  adminProfile = {},
+  roleKeys = getWorkflowWorkbenchRoleKeys(adminProfile)
+) {
+  const customerKey = String(
+    adminProfile?.effective_session?.customer?.key || ''
+  ).trim()
+  const configRevision = String(
+    adminProfile?.effective_session?.config_revision || ''
+  ).trim()
+  const normalizedRoleKeys = [...new Set(roleKeys)].sort()
+  return JSON.stringify([customerKey, configRevision, normalizedRoleKeys])
+}
+
+export function createWorkflowWorkbenchSnapshot(
+  scopeKey = '',
+  { tasks = [], riskTaskIDs = [] } = {}
+) {
+  return {
+    scopeKey: String(scopeKey || ''),
+    tasks: Array.isArray(tasks) ? tasks : [],
+    riskTaskIDs: new Set(riskTaskIDs instanceof Set ? riskTaskIDs : riskTaskIDs),
+  }
+}
+
+export function readWorkflowWorkbenchSnapshot(snapshot, scopeKey = '') {
+  const normalizedScopeKey = String(scopeKey || '')
+  if (snapshot?.scopeKey === normalizedScopeKey) return snapshot
+  return createWorkflowWorkbenchSnapshot(normalizedScopeKey)
+}
+
 function normalizeTaskStatusKey(task = {}) {
   return String(task.task_status_key || '').trim()
 }
@@ -68,7 +121,7 @@ export function getWorkflowTaskDueAtMs(task = {}) {
 }
 
 export function getWorkflowTaskDueStatus(task = {}, nowMs = Date.now()) {
-  if (isTerminalWorkflowTask(task)) return 'none'
+  if (!ACTIVE_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))) return 'none'
   const dueAtMs = getWorkflowTaskDueAtMs(task)
   if (!dueAtMs) return 'none'
   if (dueAtMs < nowMs) return 'overdue'
@@ -86,30 +139,17 @@ export function isCriticalPathWorkflowTask(task = {}) {
 }
 
 export function isUrgedWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
   return Boolean(
-    payload.urged === true ||
-      Number(payload.urge_count || 0) > 0 ||
-      payload.last_urge_at
+    Number(task.urge_count || 0) > 0 || Number(task.last_urged_at || 0) > 0
   )
 }
 
 export function isEscalatedWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
-  const lastAction = String(payload.last_urge_action || '').trim()
-  return Boolean(
-    payload.escalated === true ||
-      payload.alert_type === 'urgent_escalation' ||
-      ['escalate_to_pmc', 'escalate_to_boss'].includes(lastAction)
-  )
+  return Number(task.escalated_at || 0) > 0
 }
 
 export function isEscalatedToBossWorkflowTask(task = {}) {
-  const payload = payloadOf(task)
-  return (
-    String(payload.escalate_target_role_key || '').trim() === 'boss' ||
-    String(payload.last_urge_action || '').trim() === 'escalate_to_boss'
-  )
+  return String(task.escalate_target_role_key || '').trim() === 'boss'
 }
 
 export function isFinanceWorkflowTask(task = {}) {
@@ -316,7 +356,12 @@ export function isApprovalWorkflowTask(task = {}) {
 }
 
 export function buildWorkflowTaskAlert(task = {}, options = {}) {
-  if (!task || isTerminalWorkflowTask(task)) return null
+  if (
+    !task ||
+    !ACTIVE_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))
+  ) {
+    return null
+  }
 
   const nowMs = Number(options.nowMs || Date.now())
   const dueStatus = getWorkflowTaskDueStatus(task, nowMs)
@@ -569,25 +614,6 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
     }
   }
 
-  if (normalizeTaskStatusKey(task) === 'rejected') {
-    if (isFinanceWorkflowTask(task)) {
-      return {
-        ...base,
-        notification_type: 'finance_pending',
-        alert_type: 'finance_pending',
-        alert_level: 'warning',
-        alert_label: '财务任务退回',
-      }
-    }
-    return {
-      ...base,
-      notification_type: 'task_rejected',
-      alert_type: 'approval_pending',
-      alert_level: 'warning',
-      alert_label: '任务退回',
-    }
-  }
-
   if (isHighPriorityWorkflowTask(task)) {
     return {
       ...base,
@@ -610,7 +636,7 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
 
   if (
     isFinanceWorkflowTask(task) &&
-    PENDING_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))
+    ACTIONABLE_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))
   ) {
     return {
       ...base,
@@ -659,8 +685,8 @@ function isBossFocusTask(task = {}, alert = null) {
 export function buildWorkflowDashboardStats(tasks = [], options = {}) {
   const nowMs = Number(options.nowMs || Date.now())
   const normalizedTasks = Array.isArray(tasks) ? tasks : []
-  const activeTasks = normalizedTasks.filter(
-    (task) => !isTerminalWorkflowTask(task)
+  const activeTasks = normalizedTasks.filter((task) =>
+    ACTIVE_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))
   )
   const alerts = activeTasks
     .map((task) => buildWorkflowTaskAlert(task, { nowMs }))
@@ -670,16 +696,11 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
     (accumulator, task) => {
       const statusKey = normalizeTaskStatusKey(task)
       accumulator.total += 1
-      if (statusKey === 'pending' || statusKey === 'ready') {
-        accumulator.pending += 1
-      }
-      if (statusKey === 'processing') accumulator.processing += 1
+      if (statusKey === 'ready') accumulator.ready += 1
       if (statusKey === 'blocked') accumulator.blocked += 1
       if (statusKey === 'rejected') accumulator.rejected += 1
       if (statusKey === 'done') accumulator.done += 1
-      if (statusKey === 'closed') accumulator.closed += 1
-      if (statusKey === 'cancelled') accumulator.cancelled += 1
-      if (!isTerminalWorkflowTask(task)) {
+      if (ACTIVE_TASK_STATUS_KEYS.has(statusKey)) {
         const dueStatus = getWorkflowTaskDueStatus(task, nowMs)
         if (dueStatus === 'overdue') accumulator.overdue += 1
         if (dueStatus === 'due_soon') accumulator.dueSoon += 1
@@ -691,15 +712,12 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
     },
     {
       total: 0,
-      pending: 0,
-      processing: 0,
+      ready: 0,
       blocked: 0,
       rejected: 0,
       overdue: 0,
       dueSoon: 0,
       done: 0,
-      closed: 0,
-      cancelled: 0,
       highPriority: 0,
       urged: 0,
       escalated: 0,

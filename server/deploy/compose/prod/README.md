@@ -52,7 +52,7 @@ export TRACE_ENDPOINT=jaeger:4318
 export TRACE_RATIO=0.1
 export WEB_API_ORIGIN=http://app-server:8300
 export ERP_PDF_CHROME_PATH=/usr/bin/chromium
-export ERP_PDF_RENDER_CONCURRENCY=2
+export ERP_PDF_RENDER_CONCURRENCY=4
 export ERP_PDF_WARMUP=async
 export APP_JWT_SECRET='replace-with-runtime-secret'
 export APP_AUTH_SMS_MODE=disabled
@@ -106,7 +106,8 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`
 - 如果后续要重新开放公网域名或网关入口，必须先补新的正式部署方案，再更新本 README、Compose 环境说明和对应 smoke；不要沿用已经撤销的阿里云 / Cloudflare 旧口径。
 - PDF 运行依赖：服务端镜像内置 Debian `chromium` 与 `fonts-noto-cjk`，默认浏览器路径为 `/usr/bin/chromium`。Chromium 包固定为已在目标宿主验证的 `150.0.7871.100-1~deb12u1`，构建时会校验实际安装版本；升级时必须显式修改 pin，并重新执行容器 CDP、warmup 和真实 PDF smoke，不能让 `apt-get` 静默漂移浏览器版本。
-- PDF 资源建议：默认 `APP_MEM_LIMIT=896m`、`ERP_PDF_RENDER_CONCURRENCY=2`，正式发布使用 `ERP_PDF_WARMUP=async`。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed` 口径；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于短时故障隔离，不是 release-ready 状态；正式 smoke 还必须用受控 token 调真实 `/templates/render-pdf` 并校验非空 PDF。
+- PDF 容器安全：服务端镜像固定以 `app`（uid / gid `10001`）运行，Chrome 参数保留 sandbox。`production-preflight.sh --runtime` 会拒绝 root app-server；目标环境还必须验证 Chromium 能在该容器安全上下文正常启动，不能仅凭 Dockerfile 静态断言判定完成。
+- PDF 资源建议：通用 Compose 默认 `APP_MEM_LIMIT=2g`、`APP_MEM_RESERVATION=768m`、`ERP_PDF_RENDER_CONCURRENCY=4`；确认宿主机资源充足的客户实例可使用 `APP_MEM_LIMIT=4g`、`APP_MEM_RESERVATION=1g`、`ERP_PDF_RENDER_CONCURRENCY=8`。正式发布使用 `ERP_PDF_WARMUP=async`。服务启动后异步预热共享 Chromium 和 CJK 字体，日志使用 `template pdf warmup started / success / failed` 口径；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于短时故障隔离，不是 release-ready 状态；正式 smoke 还必须用受控管理员 token 调真实 `/templates/render-pdf`，请求不得携带 `customer_key` / `base_url`，并校验非空 PDF。并发和内存必须成对调整，低配实例优先降低并发，不能只扩大请求预算。
 
 ## 镜像构建
 
@@ -214,7 +215,7 @@ open http://127.0.0.1:16687
 cd /Users/simon/projects/plush-toy-erp/server/deploy/compose/prod
 sh migrate_online.sh --status-only
 sh migrate_online.sh
-sh migrate_online.sh --apply
+MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 ```
 
 常用覆盖项：

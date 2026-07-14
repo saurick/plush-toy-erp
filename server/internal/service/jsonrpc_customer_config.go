@@ -78,20 +78,58 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data:    newDataStruct(map[string]any{"revision": customerConfigRevisionToMap(revision)}),
 		}, nil
 
+	case "check_customer_config_transition":
+		in, ok := customerConfigTransitionCheckInputFromParams(pm)
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		permission := biz.PermissionCustomerConfigActivate
+		if in.Action == biz.CustomerConfigTransitionRollback {
+			permission = biz.PermissionCustomerConfigRollback
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
+			return id, res, nil
+		}
+		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		in.CustomerKey = resolvedCustomerKey
+		check, err := d.customerConfigUC.CheckCustomerConfigTransition(ctx, in)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(map[string]any{"transition": customerConfigTransitionCheckToMap(check)}),
+		}, nil
+
 	case "activate_customer_config":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigActivate); res != nil {
 			return id, res, nil
+		}
+		identity, ok := customerConfigTransitionMutationIdentityFromParams(pm, biz.CustomerConfigTransitionActivate)
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
 		}
-		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		customerKey, err := runtimeCustomerKey(identity.CustomerKey)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		revision := getString(pm, "revision")
-		item, err := d.customerConfigUC.ActivateCustomerConfig(ctx, customerKey, revision, admin.ID)
+		item, err := d.customerConfigUC.ActivateCustomerConfig(
+			ctx,
+			customerKey,
+			identity.TargetRevision,
+			identity.ExpectedConfigHash,
+			identity.ExpectedProductVersion,
+			identity.ExpectedActiveRevision,
+			admin.ID,
+		)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -105,19 +143,27 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRollback); res != nil {
 			return id, res, nil
 		}
+		identity, ok := customerConfigTransitionMutationIdentityFromParams(pm, biz.CustomerConfigTransitionRollback)
+		if !ok {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
 		}
-		customerKey, err := runtimeCustomerKey(getString(pm, "customer_key"))
+		customerKey, err := runtimeCustomerKey(identity.CustomerKey)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		targetRevision := getString(pm, "target_revision")
-		if strings.TrimSpace(targetRevision) == "" {
-			targetRevision = getString(pm, "revision")
-		}
-		item, err := d.customerConfigUC.RollbackCustomerConfig(ctx, customerKey, targetRevision, admin.ID)
+		item, err := d.customerConfigUC.RollbackCustomerConfig(
+			ctx,
+			customerKey,
+			identity.TargetRevision,
+			identity.ExpectedConfigHash,
+			identity.ExpectedProductVersion,
+			identity.ExpectedActiveRevision,
+			admin.ID,
+		)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -238,9 +284,6 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_sales_order_acceptance_submit":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderSubmit); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -249,7 +292,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -266,8 +310,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{
 				"completed_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                             "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                        biz.ProcessKeySalesOrderAcceptance,
 					"command_key":                        biz.ProcessDomainCommandSalesOrderSubmit,
 					"executes_domain_command":            true,
@@ -275,7 +318,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_inventory_or_quality_fact":   false,
 					"writes_shipment_or_finance_fact":    false,
 					"creates_next_linked_task":           true,
-				},
+				}),
 			}),
 		}, nil
 
@@ -442,9 +485,6 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_finished_goods_delivery_quality_decide":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -453,7 +493,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -470,8 +511,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{
 				"completed_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                          "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                     biz.ProcessKeyFinishedGoodsDelivery,
 					"command_key":                     biz.ProcessDomainCommandFinishedGoodsQualityDecide,
 					"executes_domain_command":         true,
@@ -479,14 +519,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_shipment_or_finance_fact": false,
 					"workflow_task_done_posts_fact":   false,
 					"scope":                           "shipment_finished_goods_quality_decide",
-				},
+				}),
 			}),
 		}, nil
 
 	case "execute_finished_goods_delivery_finance_release":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReceivableConfirm); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -495,7 +532,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -512,8 +550,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{
 				"completed_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                            "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                       biz.ProcessKeyFinishedGoodsDelivery,
 					"command_key":                       biz.ProcessDomainCommandShipmentFinanceRelease,
 					"executes_domain_command":           true,
@@ -521,14 +558,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_shipment_or_inventory_fact": false,
 					"workflow_task_done_posts_fact":     false,
 					"scope":                             "shipment_finance_release_domain_command",
-				},
+				}),
 			}),
 		}, nil
 
 	case "execute_finished_goods_delivery_shipment_ship":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -537,7 +571,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -554,8 +589,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{
 				"completed_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                        "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                   biz.ProcessKeyFinishedGoodsDelivery,
 					"command_key":                   biz.ProcessDomainCommandShipmentShip,
 					"executes_domain_command":       true,
@@ -564,14 +598,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_finance_fact":           false,
 					"workflow_task_done_posts_fact": false,
 					"scope":                         "shipment_execution_domain_command",
-				},
+				}),
 			}),
 		}, nil
 
 	case "execute_finished_goods_delivery_receivable_lead":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReceivableConfirm); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -580,7 +611,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -597,8 +629,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{
 				"completed_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                        "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                   biz.ProcessKeyFinishedGoodsDelivery,
 					"command_key":                   biz.ProcessDomainCommandFinanceReceivableLead,
 					"executes_domain_command":       true,
@@ -607,14 +638,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_finance_fact":           true,
 					"workflow_task_done_posts_fact": false,
 					"scope":                         "receivable_lead_domain_command",
-				},
+				}),
 			}),
 		}, nil
 
 	case "execute_material_supply_purchase_receipt_create":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -623,7 +651,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -645,8 +674,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 				"process_instance": processInstanceToMap(instance),
 				"completed_node":   processNodeInstanceToMap(completedNode),
 				"nodes":            processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                                "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                           biz.ProcessKeyMaterialSupply,
 					"command_key":                           biz.ProcessDomainCommandPurchaseReceiptCreate,
 					"executes_domain_command":               true,
@@ -658,14 +686,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_shipment_or_finance_fact":       false,
 					"workflow_task_done_posts_fact":         false,
 					"linked_business_ref_source":            "process_runtime_result",
-				},
+				}),
 			}),
 		}, nil
 
 	case "execute_material_supply_quality_gate":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -674,7 +699,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -691,8 +717,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{
 				"evaluated_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                             "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                        biz.ProcessKeyMaterialSupply,
 					"command_key":                        biz.ProcessDomainCommandIncomingQualityGate,
 					"executes_domain_command":            true,
@@ -701,14 +726,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_inventory_fact":              false,
 					"writes_shipment_or_finance_fact":    false,
 					"workflow_task_done_posts_fact":      false,
-				},
+				}),
 			}),
 		}, nil
 
 	case "execute_material_supply_post_inbound":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInboundConfirm); res != nil {
-			return id, res, nil
-		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -717,7 +739,8 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := d.requireCustomerConfigDomainCommandModulesEnabled(ctx, getString(pm, "customer_key"), in); res != nil {
+		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
+		if res != nil {
 			return id, res, nil
 		}
 		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
@@ -734,8 +757,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data: newDataStruct(map[string]any{
 				"completed_node": processNodeInstanceToMap(completedNode),
 				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                             "active_customer_config",
+				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
 					"process_key":                        biz.ProcessKeyMaterialSupply,
 					"command_key":                        biz.ProcessDomainCommandInventoryPostInbound,
 					"executes_domain_command":            true,
@@ -744,7 +766,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 					"writes_inventory_fact":              true,
 					"writes_shipment_or_finance_fact":    false,
 					"workflow_task_done_posts_fact":      false,
-				},
+				}),
 			}),
 		}, nil
 
@@ -756,18 +778,54 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 	}
 }
 
-func (d *jsonrpcDispatcher) requireCustomerConfigDomainCommandModulesEnabled(ctx context.Context, customerKey string, in *biz.ProcessDomainCommandExecution) *v1.JsonrpcResult {
-	if in == nil {
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+func (d *jsonrpcDispatcher) requireCustomerConfigProcessDomainCommandAllowed(
+	ctx context.Context,
+	requestedCustomerKey string,
+	in *biz.ProcessDomainCommandExecution,
+	admin *biz.AdminUser,
+) (string, *v1.JsonrpcResult) {
+	if d == nil || d.customerConfigUC == nil || d.processRuntimeUC == nil || in == nil || admin == nil {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
-	resolvedCustomerKey, err := runtimeCustomerKey(customerKey)
+	instance, err := d.processRuntimeUC.GetProcessInstance(ctx, in.ProcessInstanceID)
 	if err != nil {
-		return d.mapCustomerConfigError(ctx, err)
+		return "", d.mapCustomerConfigError(ctx, err)
 	}
-	if err := d.customerConfigUC.EnsureProcessDomainCommandModulesEnabled(ctx, resolvedCustomerKey, in.CommandKey); err != nil {
-		return d.mapCustomerConfigError(ctx, err)
+	if instance == nil || instance.ID != in.ProcessInstanceID || strings.TrimSpace(instance.ConfigRevision) == "" {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
-	return nil
+	instanceCustomerKey, _ := instance.ModuleContractSnapshot["customer_key"].(string)
+	instanceCustomerKey = biz.NormalizeCustomerKey(instanceCustomerKey)
+	if instanceCustomerKey == "" {
+		return "", &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	resolvedCustomerKey, err := runtimeCustomerKey(instanceCustomerKey)
+	if err != nil {
+		return "", d.mapCustomerConfigError(ctx, err)
+	}
+	requestedCustomerKey = biz.NormalizeCustomerKey(requestedCustomerKey)
+	if requestedCustomerKey != "" && requestedCustomerKey != resolvedCustomerKey {
+		return "", d.mapCustomerConfigError(ctx, biz.ErrForbidden)
+	}
+	if err := d.customerConfigUC.EnsureProcessDomainCommandAllowedAtRevision(
+		ctx,
+		resolvedCustomerKey,
+		instance.ConfigRevision,
+		admin,
+		in.CommandKey,
+	); err != nil {
+		return "", d.mapCustomerConfigError(ctx, err)
+	}
+	return instance.ConfigRevision, nil
+}
+
+func customerConfigProcessRuntimeBoundary(revision string, boundary map[string]any) map[string]any {
+	if boundary == nil {
+		boundary = map[string]any{}
+	}
+	boundary["source"] = "process_instance_config_revision"
+	boundary["config_revision"] = strings.TrimSpace(revision)
+	return boundary
 }
 
 func (d *jsonrpcDispatcher) requireCustomerConfigModulesEnabled(ctx context.Context, customerKey string, moduleKeys ...string) *v1.JsonrpcResult {
@@ -833,9 +891,21 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionRequired):
 		l.Warnf("[customer_config] active revision required for fixed customer runtime err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前部署客户尚未激活配置，业务权限已关闭"}
-	case errors.Is(err, biz.ErrCustomerConfigActiveRevision):
-		l.Warnf("[customer_config] active revision overwrite rejected err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "已激活客户配置版本不能被覆盖发布"}
+	case errors.Is(err, biz.ErrCustomerConfigRevisionImmutable):
+		l.Warnf("[customer_config] immutable revision overwrite rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置版本已存在且内容不同，请使用新版本号发布"}
+	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionChanged):
+		l.Warnf("[customer_config] active revision compare-and-swap rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "当前激活版本已变化，请重新检查后再执行"}
+	case errors.Is(err, biz.ErrCustomerConfigProductVersionMismatch):
+		l.Warnf("[customer_config] expected product version mismatch err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "产品版本已变化，请重新校验后再执行"}
+	case errors.Is(err, biz.ErrCustomerConfigTransitionBlocked):
+		l.Warnf("[customer_config] transition preflight blocked err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置切换存在运行中阻塞，请先查看切换检查结果"}
+	case errors.Is(err, biz.ErrCustomerConfigHashMismatch):
+		l.Warnf("[customer_config] expected config hash mismatch err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置内容已变化，请重新校验后再激活"}
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		l.Warnf("[customer_config] idempotency payload conflict err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
@@ -1206,13 +1276,49 @@ func optionalRPCStringPointer(value string) *string {
 }
 
 func customerConfigPublishInputFromParams(pm map[string]any) (biz.CustomerConfigPublishInput, bool) {
-	raw := pm
-	if nested := getMap(pm, "candidate_revision"); len(nested) > 0 {
-		raw = nested
+	allowedKeys := map[string]struct{}{
+		"manifest_schema_version":  {},
+		"process_contract_version": {},
+		"manifest_status":          {},
+		"runtime_enabled":          {},
+		"publishable":              {},
+		"customer_key":             {},
+		"revision":                 {},
+		"product_version":          {},
+		"compiled_snapshot":        {},
+		"module_states":            {},
+		"role_profiles":            {},
+		"access_entitlements":      {},
+		"work_pools":               {},
+		"work_pool_memberships":    {},
 	}
+	for key := range pm {
+		if _, ok := allowedKeys[key]; !ok {
+			return biz.CustomerConfigPublishInput{}, false
+		}
+	}
+	raw := pm
 	snapshot := getMap(raw, "compiled_snapshot")
-	if len(snapshot) == 0 {
-		snapshot = getMap(raw, "compiledSnapshot")
+	for _, key := range []string{
+		"manifest_schema_version",
+		"process_contract_version",
+		"manifest_status",
+		"runtime_enabled",
+		"publishable",
+	} {
+		if _, exists := raw[key]; !exists {
+			return biz.CustomerConfigPublishInput{}, false
+		}
+		if _, exists := snapshot[key]; exists {
+			return biz.CustomerConfigPublishInput{}, false
+		}
+	}
+	snapshot = cloneCustomerConfigSnapshot(snapshot)
+	if _, suppliedGraph := snapshot["processDefinitions"]; suppliedGraph {
+		return biz.CustomerConfigPublishInput{}, false
+	}
+	if !mergeCustomerConfigManifestMetadata(raw, snapshot) {
+		return biz.CustomerConfigPublishInput{}, false
 	}
 	if roleProfilesContainRemovedGrants(raw["role_profiles"]) {
 		return biz.CustomerConfigPublishInput{}, false
@@ -1228,16 +1334,58 @@ func customerConfigPublishInputFromParams(pm map[string]any) (biz.CustomerConfig
 		WorkPools:           workPoolsFromAny(raw["work_pools"]),
 		WorkPoolMemberships: workPoolMembershipsFromAny(raw["work_pool_memberships"]),
 	}
-	if in.CustomerKey == "" {
-		in.CustomerKey = getString(raw, "customerKey")
-	}
-	if in.ProductVersion == "" {
-		in.ProductVersion = getString(raw, "productVersion")
-	}
-	if in.CustomerKey == "" || in.Revision == "" || len(in.CompiledSnapshot) == 0 {
+	if in.CustomerKey == "" || in.Revision == "" || strings.TrimSpace(in.ProductVersion) == "" || len(in.CompiledSnapshot) == 0 {
 		return biz.CustomerConfigPublishInput{}, false
 	}
 	return in, true
+}
+
+func cloneCustomerConfigSnapshot(snapshot map[string]any) map[string]any {
+	out := make(map[string]any, len(snapshot)+5)
+	for key, value := range snapshot {
+		out[key] = value
+	}
+	return out
+}
+
+func mergeCustomerConfigManifestMetadata(raw, snapshot map[string]any) bool {
+	for _, key := range []string{
+		"manifest_schema_version",
+		"process_contract_version",
+		"manifest_status",
+	} {
+		value, exists := raw[key]
+		if !exists {
+			continue
+		}
+		text, ok := value.(string)
+		text = strings.TrimSpace(text)
+		if !ok || text == "" {
+			return false
+		}
+		if existing, exists := snapshot[key]; exists && strings.TrimSpace(fmt.Sprint(existing)) != text {
+			return false
+		}
+		snapshot[key] = text
+	}
+	for _, key := range []string{"runtime_enabled", "publishable"} {
+		value, exists := raw[key]
+		if !exists {
+			continue
+		}
+		enabled, ok := value.(bool)
+		if !ok {
+			return false
+		}
+		if existing, exists := snapshot[key]; exists {
+			existingEnabled, ok := existing.(bool)
+			if !ok || existingEnabled != enabled {
+				return false
+			}
+		}
+		snapshot[key] = enabled
+	}
+	return true
 }
 
 func moduleStatesFromAny(value any) []biz.DeploymentModuleStateInput {
@@ -1366,6 +1514,7 @@ func customerConfigValidationToMap(result *biz.CustomerConfigValidationResult) m
 		"customer_key":         result.CustomerKey,
 		"revision":             result.Revision,
 		"config_hash":          result.ConfigHash,
+		"config_hash_version":  result.ConfigHashVersion,
 		"module_state_count":   result.ModuleStateCount,
 		"role_profile_count":   result.RoleProfileCount,
 		"entitlement_count":    result.EntitlementCount,
@@ -1380,19 +1529,20 @@ func customerConfigRevisionToMap(item *biz.CustomerConfigRevision) map[string]an
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                item.ID,
-		"customer_key":      item.CustomerKey,
-		"revision":          item.Revision,
-		"product_version":   item.ProductVersion,
-		"config_hash":       item.ConfigHash,
-		"status":            item.Status,
-		"published_by":      optionalIntValue(item.PublishedBy),
-		"published_at":      optionalTimeUnix(item.PublishedAt),
-		"activated_by":      optionalIntValue(item.ActivatedBy),
-		"activated_at":      optionalTimeUnix(item.ActivatedAt),
-		"created_at":        item.CreatedAt.Unix(),
-		"updated_at":        item.UpdatedAt.Unix(),
-		"compiled_snapshot": item.CompiledSnapshot,
+		"id":                  item.ID,
+		"customer_key":        item.CustomerKey,
+		"revision":            item.Revision,
+		"product_version":     item.ProductVersion,
+		"config_hash":         item.ConfigHash,
+		"config_hash_version": item.ConfigHashVersion,
+		"status":              item.Status,
+		"published_by":        optionalIntValue(item.PublishedBy),
+		"published_at":        optionalTimeUnix(item.PublishedAt),
+		"activated_by":        optionalIntValue(item.ActivatedBy),
+		"activated_at":        optionalTimeUnix(item.ActivatedAt),
+		"created_at":          item.CreatedAt.Unix(),
+		"updated_at":          item.UpdatedAt.Unix(),
+		"compiled_snapshot":   item.CompiledSnapshot,
 	}
 }
 
@@ -1401,8 +1551,9 @@ func effectiveSessionToMap(session *biz.EffectiveSession) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"configRevision": session.ConfigRevision,
-		"configHash":     session.ConfigHash,
+		"configRevision":    session.ConfigRevision,
+		"configHash":        session.ConfigHash,
+		"configHashVersion": session.ConfigHashVersion,
 		"customer": map[string]any{
 			"key":  session.Customer.Key,
 			"name": session.Customer.Name,

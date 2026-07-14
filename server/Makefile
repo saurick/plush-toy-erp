@@ -210,10 +210,10 @@ db_create:
 		psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "CREATE DATABASE \"$$DBNAME\"" 2>/dev/null || psql "$$ADMIN_URL" -v ON_ERROR_STOP=1 -c "SELECT 1 FROM pg_database WHERE datname = '$$DBNAME'" >/dev/null; \
 	}
 
-INVENTORY_PG_DB_URL ?= postgres://postgres:inventory-local-password@127.0.0.1:55432/plush_erp_inventory_test?sslmode=disable
-BOM_LOT_PG_DB_URL ?= postgres://postgres:bom-lot-local-password@127.0.0.1:55432/plush_erp_bom_lot_test?sslmode=disable
+INVENTORY_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_inventory_test?sslmode=disable
+BOM_LOT_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_bom_lot_test?sslmode=disable
 PURCHASE_RECEIPT_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable
-PURCHASE_RETURN_PG_DB_URL ?= postgres://postgres:purchase-return-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable
+PURCHASE_RETURN_PG_DB_URL ?= postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable
 
 .PHONY: inventory_pg_createdb inventory_migrate_status inventory_migrate_apply inventory_pg_test inventory_pg_dropdb
 inventory_pg_createdb:
@@ -390,7 +390,7 @@ image_gc:
 # 部署时就可以一直写 plush-toy-erp-server:dev（或 :latest）
 FIXED_TAG ?= dev
 NODE_BUILDER_IMAGE ?= node:24.14.0
-GO_BUILDER_IMAGE ?= golang:1.26.2
+GO_BUILDER_IMAGE ?= golang:1.26.4
 RUNTIME_BASE_IMAGE ?= debian:bookworm-slim
 
 # 构建服务器镜像（在 server/ 目录执行）

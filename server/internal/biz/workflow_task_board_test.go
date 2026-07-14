@@ -37,15 +37,13 @@ func TestClassifyWorkflowTaskBoardLaneIsMutuallyExclusive(t *testing.T) {
 		dueAt  *time.Time
 		want   string
 	}{
-		{name: "pending without due", status: "pending", want: WorkflowTaskBoardLaneActionable},
+		{name: "ready without due", status: "ready", want: WorkflowTaskBoardLaneActionable},
 		{name: "ready after due window", status: "ready", dueAt: &normalDue, want: WorkflowTaskBoardLaneActionable},
-		{name: "processing overdue", status: "processing", dueAt: &overdue, want: WorkflowTaskBoardLaneDue},
+		{name: "ready overdue", status: "ready", dueAt: &overdue, want: WorkflowTaskBoardLaneDue},
 		{name: "ready at due boundary", status: "ready", dueAt: &dueSoon, want: WorkflowTaskBoardLaneDue},
 		{name: "blocked overdue stays exception", status: "blocked", dueAt: &overdue, want: WorkflowTaskBoardLaneException},
-		{name: "rejected is settled but stays exception", status: "rejected", dueAt: &overdue, want: WorkflowTaskBoardLaneException},
+		{name: "rejected is settled and stays finished", status: "rejected", dueAt: &overdue, want: WorkflowTaskBoardLaneFinished},
 		{name: "done overdue stays finished", status: "done", dueAt: &overdue, want: WorkflowTaskBoardLaneFinished},
-		{name: "closed", status: "closed", want: WorkflowTaskBoardLaneFinished},
-		{name: "cancelled", status: "cancelled", want: WorkflowTaskBoardLaneFinished},
 	}
 
 	for _, tt := range tests {

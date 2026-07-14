@@ -173,6 +173,11 @@ test('workflowTaskBoard: 任务编号缺失时不拼内部 ID', () => {
 })
 
 test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', () => {
+  const boardTask = (id, taskStatusKey) => ({
+    id,
+    version: 1,
+    task_status_key: taskStatusKey,
+  })
   const response = {
     snapshot_at: now,
     total: 12,
@@ -183,28 +188,34 @@ test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', (
         total: 6,
         limit: 5,
         offset: 0,
-        tasks: Array.from({ length: 5 }, (_, index) => ({ id: index + 1 })),
+        tasks: Array.from({ length: 5 }, (_, index) =>
+          boardTask(index + 1, 'ready')
+        ),
       },
       {
         key: 'exception',
         total: 2,
         limit: 5,
         offset: 0,
-        tasks: [{ id: 7 }, { id: 8 }],
+        tasks: [boardTask(7, 'blocked'), boardTask(8, 'blocked')],
       },
       {
         key: 'due',
         total: 3,
         limit: 5,
         offset: 0,
-        tasks: [{ id: 9 }, { id: 10 }, { id: 11 }],
+        tasks: [
+          boardTask(9, 'ready'),
+          boardTask(10, 'ready'),
+          boardTask(11, 'ready'),
+        ],
       },
       {
         key: 'finished',
         total: 1,
         limit: 5,
         offset: 0,
-        tasks: [{ id: 12 }],
+        tasks: [boardTask(12, 'rejected')],
       },
     ],
     source_types: ['inbound', 'project-orders'],
@@ -258,6 +269,10 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
     readWorkflowTaskBoardFiltersFromSearch('?role=engineering').role,
     'engineering'
   )
+  assert.equal(
+    readWorkflowTaskBoardFiltersFromSearch('?status=pending').status,
+    'all'
+  )
 })
 
 test('workflowTaskBoard: 写入 URL 时保留上下文并规范 lane/page', () => {
@@ -292,7 +307,7 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset
   assert.deepEqual(
     buildWorkflowTaskBoardRequest({
       keyword: ' 包装 ',
-      status: 'pending',
+      status: 'ready',
       role: 'warehouse',
       due: 'dueSoon',
       sourceType: 'inbound',
@@ -301,7 +316,7 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset
     }),
     {
       keyword: '包装',
-      status: 'pending',
+      status: 'ready',
       owner_role_key: 'warehouse',
       due: 'dueSoon',
       source_type: 'inbound',
@@ -491,6 +506,36 @@ test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', 
   assert.match(
     getWorkflowTaskReadonlyReason(salesAdmin, warehouseTask),
     /不属于仓库责任角色/
+  )
+
+  assert.deepEqual(
+    getWorkflowTaskAllowedActionModes(warehouseAdmin, {
+      ...warehouseTask,
+      task_status_key: 'blocked',
+    }),
+    ['resume', 'urge']
+  )
+  assert.deepEqual(
+    getWorkflowTaskAllowedActionModes(warehouseAdmin, {
+      ...warehouseTask,
+      task_status_key: 'pending',
+    }),
+    []
+  )
+  assert.deepEqual(
+    getWorkflowTaskAllowedActionModes(warehouseAdmin, {
+      ...warehouseTask,
+      task_status_key: 'unknown',
+    }),
+    []
+  )
+  assert.equal(
+    canRunWorkflowTaskAction(
+      warehouseAdmin,
+      { ...warehouseTask, task_status_key: 'blocked' },
+      'complete'
+    ),
+    false
   )
 })
 

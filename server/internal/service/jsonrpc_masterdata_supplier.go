@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "save_supplier_with_contacts", "saveSupplierWithContacts":
+	case "save_supplier_with_contacts":
 		ownerID := getInt(pm, "id", 0)
 		if ownerID > 0 {
 			if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierUpdate); res != nil {
@@ -35,7 +35,7 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		}
 		item, err := d.masterDataUC.SaveSupplierWithContacts(ctx, ownerID, supplierMutationFromParams(pm), contacts)
 		return id, supplierWithContactsMutationResult(ctx, d, item, err), nil
-	case "create_supplier", "createSupplier":
+	case "create_supplier":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierCreate); res != nil {
 			return id, res, nil
 		}
@@ -44,7 +44,7 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		}
 		item, err := d.masterDataUC.CreateSupplier(ctx, supplierMutationFromParams(pm))
 		return id, supplierMutationResult(ctx, d, item, err), nil
-	case "update_supplier", "updateSupplier":
+	case "update_supplier":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierUpdate); res != nil {
 			return id, res, nil
 		}
@@ -53,13 +53,13 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		}
 		item, err := d.masterDataUC.UpdateSupplier(ctx, getInt(pm, "id", 0), supplierMutationFromParams(pm))
 		return id, supplierMutationResult(ctx, d, item, err), nil
-	case "get_supplier", "getSupplier":
+	case "get_supplier":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.GetSupplier(ctx, getInt(pm, "id", 0))
 		return id, supplierMutationResult(ctx, d, item, err), nil
-	case "list_suppliers", "listSuppliers":
+	case "list_suppliers":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierRead); res != nil {
 			return id, res, nil
 		}
@@ -73,7 +73,7 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 			"limit":     normalizedLimit(pm),
 			"offset":    normalizedOffset(pm),
 		})}, nil
-	case "set_supplier_active", "setSupplierActive":
+	case "set_supplier_active":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierDisable); res != nil {
 			return id, res, nil
 		}

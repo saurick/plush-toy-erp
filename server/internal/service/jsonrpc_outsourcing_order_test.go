@@ -27,6 +27,8 @@ type stubOutsourcingOrderJSONRPCRepo struct {
 	lastFilter         biz.OutsourcingOrderFilter
 	lastItemFilter     biz.OutsourcingOrderItemFilter
 	lifecycleCalls     int
+	saveErr            error
+	saveCalls          int
 }
 
 func newStubOutsourcingOrderJSONRPCRepo() *stubOutsourcingOrderJSONRPCRepo {
@@ -73,6 +75,10 @@ func (s *stubOutsourcingOrderJSONRPCRepo) UpdateOutsourcingOrderLifecycle(_ cont
 }
 
 func (s *stubOutsourcingOrderJSONRPCRepo) SaveOutsourcingOrderWithItems(_ context.Context, id int, order *biz.OutsourcingOrderMutation, items []*biz.OutsourcingOrderItemSaveMutation) (*biz.OutsourcingOrderWithItems, error) {
+	s.saveCalls++
+	if s.saveErr != nil {
+		return nil, s.saveErr
+	}
 	orderID := id
 	if orderID == 0 {
 		orderID = s.nextOrderID
@@ -183,6 +189,9 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 	order := jsonRPCNestedMap(t, saveRes, "outsourcing_order")
 	orderID := jsonRPCInt(t, order, "id")
+	if version := jsonRPCInt(t, order, "version"); version != 1 {
+		t.Fatalf("created outsourcing order version = %d, want 1", version)
+	}
 	if status := order["lifecycle_status"]; status != biz.OutsourcingOrderStatusDraft {
 		t.Fatalf("expected draft outsourcing order, got %#v", status)
 	}
@@ -348,6 +357,79 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesMaterialSubjectAndRequiresMat
 	}
 }
 
+func TestJsonrpcDispatcher_OutsourcingOrderDraftVersionContract(t *testing.T) {
+	repo := newStubOutsourcingOrderJSONRPCRepo()
+	j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionOutsourcingOrderUpdate,
+	))
+	ctx := workflowJSONRPCAdminContext()
+	repo.orders[1] = &biz.OutsourcingOrder{
+		ID:                 1,
+		OutsourcingOrderNo: "OUT-VERSION-CONTRACT",
+		SupplierID:         1,
+		OrderDate:          time.Date(2026, 7, 14, 0, 0, 0, 0, time.UTC),
+		LifecycleStatus:    biz.OutsourcingOrderStatusDraft,
+		Version:            1,
+	}
+	productID := 2
+	repo.items[1] = &biz.OutsourcingOrderItem{
+		ID:                  1,
+		OutsourcingOrderID:  1,
+		LineNo:              1,
+		SubjectType:         biz.OutsourcingOrderSubjectProduct,
+		ProductID:           &productID,
+		ProcessID:           3,
+		UnitID:              4,
+		OutsourcingQuantity: mustDecimal(t, "1"),
+		LineStatus:          biz.OutsourcingOrderItemStatusOpen,
+	}
+	paramsForAttempt := func() map[string]any {
+		return map[string]any{
+			"id":                   float64(1),
+			"outsourcing_order_no": "OUT-VERSION-CONTRACT",
+			"supplier_id":          float64(1),
+			"order_date":           "2026-07-14",
+			"items": []any{map[string]any{
+				"id":                   float64(1),
+				"line_no":              float64(1),
+				"subject_type":         biz.OutsourcingOrderSubjectProduct,
+				"product_id":           float64(2),
+				"process_id":           float64(3),
+				"unit_id":              float64(4),
+				"outsourcing_quantity": "1",
+			}},
+		}
+	}
+
+	for name, value := range map[string]any{"missing": nil, "zero": float64(0), "fraction": float64(1.5), "string": "1"} {
+		params := paramsForAttempt()
+		if value != nil {
+			params["expected_version"] = value
+		}
+		_, res, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", name, mustJSONRPCStruct(t, params))
+		if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || repo.saveCalls != 0 {
+			t.Fatalf("%s expected_version must fail before save: res=%#v err=%v calls=%d", name, res, err, repo.saveCalls)
+		}
+	}
+
+	update := paramsForAttempt()
+	update["expected_version"] = float64(1)
+	_, updateRes, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "update", mustJSONRPCStruct(t, update))
+	if err != nil || updateRes == nil || updateRes.Code != errcode.OK.Code {
+		t.Fatalf("positive expected_version must update outsourcing order: res=%#v err=%v", updateRes, err)
+	}
+	if version := jsonRPCInt(t, jsonRPCNestedMap(t, updateRes, "outsourcing_order"), "version"); version != 2 {
+		t.Fatalf("updated outsourcing order version = %d, want 2", version)
+	}
+
+	repo.saveErr = biz.ErrOutsourcingOrderConflict
+	_, conflictRes, err := j.handleOutsourcingOrder(ctx, "save_outsourcing_order_with_items", "conflict", mustJSONRPCStruct(t, update))
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.ResourceVersionConflict.Code {
+		t.Fatalf("outsourcing version conflict must map to 40922: res=%#v err=%v", conflictRes, err)
+	}
+}
+
 func TestJsonrpcDispatcher_OutsourcingOrderAPIRequiresEnabledModule(t *testing.T) {
 	repo := newStubOutsourcingOrderJSONRPCRepo()
 	j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
@@ -510,6 +592,10 @@ func outsourcingOrderMaterialJSONRPCSaveParams(t *testing.T, orderNo string) *st
 }
 
 func outsourcingOrderFromMutation(id int, status string, in *biz.OutsourcingOrderMutation) *biz.OutsourcingOrder {
+	version := 1
+	if in.ExpectedVersion > 0 {
+		version = in.ExpectedVersion + 1
+	}
 	return &biz.OutsourcingOrder{
 		ID:                    id,
 		OutsourcingOrderNo:    in.OutsourcingOrderNo,
@@ -521,6 +607,7 @@ func outsourcingOrderFromMutation(id int, status string, in *biz.OutsourcingOrde
 		OrderDate:             in.OrderDate,
 		ExpectedReturnDate:    in.ExpectedReturnDate,
 		LifecycleStatus:       status,
+		Version:               version,
 		Note:                  in.Note,
 		CreatedAt:             time.Unix(1, 0),
 		UpdatedAt:             time.Unix(1, 0),

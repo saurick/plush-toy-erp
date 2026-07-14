@@ -308,7 +308,7 @@
         z-index: 6;
         top: calc(100% + 6px);
         right: 0;
-        display: grid;
+        display: none;
         min-width: 132px;
         gap: 3px;
         border: 1px solid var(--line-strong);
@@ -316,6 +316,10 @@
         background: var(--panel);
         box-shadow: var(--shadow);
         padding: 6px;
+      }
+
+      .status-action-popover:not([hidden]) {
+        display: grid;
       }
 
       .status-action-popover strong {
@@ -339,6 +343,7 @@
         color: var(--red);
       }
 
+      .mobile-menu-item,
       .selection-row:not(.has-selection) .status-action-popover {
         display: none;
       }
@@ -566,31 +571,25 @@
         line-height: 1;
       }
 
-      .modal-layer {
-        position: fixed;
-        inset: 0;
-        z-index: 30;
-        display: none;
-        align-items: center;
-        justify-content: center;
-        background: var(--overlay);
-        padding: 24px;
-      }
-
-      body.show-lifecycle .modal-layer {
-        display: flex;
-      }
-
       .lifecycle-modal {
-        display: grid;
         width: min(980px, calc(100vw - 48px));
         max-height: calc(100vh - 64px);
-        grid-template-rows: auto auto minmax(0, 1fr);
         overflow: hidden;
         border: 1px solid var(--line);
         border-radius: 10px;
         background: var(--panel);
+        color: var(--text);
+        padding: 0;
         box-shadow: 0 18px 48px rgb(15 23 42 / 18%);
+      }
+
+      .lifecycle-modal[open] {
+        display: grid;
+        grid-template-rows: auto auto minmax(0, 1fr);
+      }
+
+      .lifecycle-modal::backdrop {
+        background: var(--overlay);
       }
 
       .modal-head {
@@ -712,22 +711,39 @@
         }
 
         .selection-actions {
-          flex-wrap: nowrap;
+          flex-wrap: wrap;
           max-width: 100%;
-          overflow-x: auto;
-          padding-bottom: 2px;
+          justify-content: flex-end;
+          overflow: visible;
+        }
+
+        .selection-actions > #clearSelection,
+        .selection-actions > .secondary-action {
+          display: none;
+        }
+
+        .mobile-menu-item {
+          display: flex;
+        }
+
+        .status-action-popover {
+          position: fixed;
+          top: auto;
+          right: 12px;
+          bottom: 12px;
+          left: 12px;
+          max-height: min(70vh, 520px);
+          min-width: 0;
+          overflow-y: auto;
+          padding: 10px;
         }
 
         .workbench-filters {
           grid-template-columns: 1fr;
         }
 
-        .modal-layer {
-          padding: 12px;
-        }
-
         .lifecycle-modal {
-          width: 100%;
+          width: calc(100vw - 24px);
           max-height: calc(100vh - 24px);
         }
       }
@@ -786,7 +802,7 @@
             </div>
             <div class="stats" aria-label="页面摘要">
               <div class="stat"><span>当前结果</span><strong>3</strong></div>
-              <div class="stat"><span>金额合计</span><strong>4,500</strong></div>
+              <div class="stat"><span>待到货</span><strong>2</strong></div>
             </div>
           </div>
         </section>
@@ -795,10 +811,10 @@
           <div class="workbench-filters">
             <label class="search">
               <span aria-hidden="true">⌕</span>
-              <input value="" placeholder="搜编号/名称/客户/合同" />
+              <input value="" placeholder="搜采购单号/供应商" />
             </label>
             <div class="select">
-              <span>签约日期</span>
+              <span>下单日期</span>
               <span aria-hidden="true">⌄</span>
             </div>
             <div class="date-input">
@@ -837,20 +853,61 @@
             </div>
             <div class="selection-actions">
               <button class="btn link small" id="clearSelection">清空已选</button>
-              <button class="btn small action-button">编辑</button>
-              <button class="btn small action-button">相关单据 ⌄</button>
-              <div class="status-action-menu" aria-label="更多操作下拉示意">
-                <button class="btn small action-button" type="button">更多操作 ⌄</button>
-                <div class="status-action-popover" role="menu" aria-label="状态变更">
+              <button
+                class="btn small action-button secondary-action"
+                data-requires-open-record
+              >
+                编辑
+              </button>
+              <button class="btn small action-button secondary-action">相关单据 ⌄</button>
+              <div class="status-action-menu">
+                <button
+                  class="btn small action-button"
+                  id="moreActionsButton"
+                  type="button"
+                  aria-haspopup="menu"
+                  aria-expanded="false"
+                  aria-controls="statusActionMenu"
+                >
+                  更多操作 ⌄
+                </button>
+                <div
+                  class="status-action-popover"
+                  id="statusActionMenu"
+                  role="menu"
+                  aria-label="更多操作"
+                  hidden
+                >
+                  <button
+                    class="mobile-menu-item"
+                    type="button"
+                    role="menuitem"
+                    data-requires-open-record
+                  >编辑</button>
+                  <button class="mobile-menu-item" type="button" role="menuitem">相关单据</button>
+                  <button class="mobile-menu-item" type="button" role="menuitem">复制</button>
+                  <button class="mobile-menu-item" type="button" role="menuitem">打印采购合同</button>
+                  <button class="mobile-menu-item" data-clear-selection type="button" role="menuitem">清空选择</button>
                   <strong>状态变更</strong>
-                  <button type="button" role="menuitem">关闭</button>
-                  <button class="danger" type="button" role="menuitem">取消</button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    data-requires-open-record
+                  >关闭</button>
+                  <button
+                    class="danger"
+                    type="button"
+                    role="menuitem"
+                    data-requires-open-record
+                  >取消</button>
                 </div>
               </div>
-              <button class="btn small action-button">复制</button>
-              <button class="btn small primary action-button">生成入库通知</button>
-              <button class="btn small action-button">打印采购合同</button>
-              <button class="btn small danger action-button">关闭 / 取消</button>
+              <button class="btn small action-button secondary-action">复制</button>
+              <button
+                class="btn small primary action-button primary-action"
+                data-requires-open-record
+              >生成入库草稿</button>
+              <button class="btn small action-button secondary-action">打印采购合同</button>
             </div>
           </div>
         </section>
@@ -860,47 +917,19 @@
             <table>
               <thead>
                 <tr>
-                  <th style="width: 52px">选中</th>
+                  <th style="width: 52px">选择</th>
                   <th style="width: 150px">
                     <span class="th-inner">
-                      <span class="th-title">采购编号</span>
-                      <button class="column-menu" type="button" aria-label="调整采购编号列顺序">⋮</button>
-                      <span class="sort-stack" aria-label="按采购编号排序"></span>
+                      <span class="th-title">采购单号</span>
+                      <button class="column-menu" type="button" aria-label="调整采购单号列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按采购单号排序"></span>
                     </span>
                   </th>
                   <th>
                     <span class="th-inner">
-                      <span class="th-title">材料品名</span>
-                      <button class="column-menu" type="button" aria-label="调整材料品名列顺序">⋮</button>
-                      <span class="sort-stack" aria-label="按材料品名排序"></span>
-                    </span>
-                  </th>
-                  <th style="width: 130px">
-                    <span class="th-inner">
-                      <span class="th-title">规格</span>
-                      <button class="column-menu" type="button" aria-label="调整规格列顺序">⋮</button>
-                      <span class="sort-stack" aria-label="按规格排序"></span>
-                    </span>
-                  </th>
-                  <th style="width: 110px">
-                    <span class="th-inner">
-                      <span class="th-title">数量</span>
-                      <button class="column-menu" type="button" aria-label="调整数量列顺序">⋮</button>
-                      <span class="sort-stack" aria-label="按数量排序"></span>
-                    </span>
-                  </th>
-                  <th style="width: 120px">
-                    <span class="th-inner">
-                      <span class="th-title">单价</span>
-                      <button class="column-menu" type="button" aria-label="调整单价列顺序">⋮</button>
-                      <span class="sort-stack" aria-label="按单价排序"></span>
-                    </span>
-                  </th>
-                  <th style="width: 130px">
-                    <span class="th-inner">
-                      <span class="th-title">回货日期</span>
-                      <button class="column-menu" type="button" aria-label="调整回货日期列顺序">⋮</button>
-                      <span class="sort-stack" aria-label="按回货日期排序"></span>
+                      <span class="th-title">供应商</span>
+                      <button class="column-menu" type="button" aria-label="调整供应商列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按供应商排序"></span>
                     </span>
                   </th>
                   <th style="width: 120px">
@@ -910,11 +939,18 @@
                       <span class="sort-stack" aria-label="按状态排序"></span>
                     </span>
                   </th>
-                  <th style="width: 150px">
+                  <th style="width: 140px">
                     <span class="th-inner">
-                      <span class="th-title">当前任务</span>
-                      <button class="column-menu" type="button" aria-label="调整当前任务列顺序">⋮</button>
-                      <span class="sort-stack" aria-label="按当前任务排序"></span>
+                      <span class="th-title">下单日期</span>
+                      <button class="column-menu" type="button" aria-label="调整下单日期列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按下单日期排序"></span>
+                    </span>
+                  </th>
+                  <th style="width: 160px">
+                    <span class="th-inner">
+                      <span class="th-title">预计到货日期</span>
+                      <button class="column-menu" type="button" aria-label="调整预计到货日期列顺序">⋮</button>
+                      <span class="sort-stack" aria-label="按预计到货日期排序"></span>
                     </span>
                   </th>
                 </tr>
@@ -935,14 +971,19 @@
       </div>
     </main>
 
-    <div class="modal-layer" role="presentation">
-      <section class="lifecycle-modal" role="dialog" aria-modal="true" aria-labelledby="lifecycleTitle">
+    <dialog
+      class="lifecycle-modal"
+      id="lifecycleDialog"
+      aria-modal="true"
+      aria-labelledby="lifecycleTitle"
+      aria-describedby="lifecycleDescription"
+    >
         <header class="modal-head">
           <h2 class="modal-title" id="lifecycleTitle">状态动作说明</h2>
-          <button class="modal-close" id="closeLifecycle" type="button" aria-label="关闭">×</button>
+          <button class="modal-close" id="closeLifecycle" type="button" aria-label="关闭" data-initial-focus>×</button>
         </header>
         <div class="modal-toolbar">
-          <span class="muted">本样板不提供通用删除 / 回收站；按对象类型展示真实状态动作。</span>
+          <span class="muted" id="lifecycleDescription">本页面不提供通用删除或回收站；不同对象只展示适用的状态动作。</span>
         </div>
         <div class="modal-body">
           <div class="table-wrap">
@@ -973,45 +1014,35 @@
               </tbody>
             </table>
           </div>
-          <div class="empty-lifecycle">只有完成后端 usecase、RBAC、审计和引用检查的对象，才可单独评审删除 / 恢复。</div>
+          <div class="empty-lifecycle">只有具备完整业务规则和历史记录保护的对象，才会单独提供删除或恢复入口。</div>
         </div>
-      </section>
-    </div>
+    </dialog>
 
     <script>
       const records = [
         {
-          no: "KSC260404001",
-          name: "双层防潮袋",
-          spec: "680 x 920",
-          qty: "1,200",
-          price: "1.80",
-          date: "2026-06-18",
-          status: "跟催中",
+          no: "PO-202607-001",
+          supplier: "星河辅料",
+          status: "待到货",
           statusTone: "amber",
-          task: "供应商确认",
+          orderDate: "2026-07-01",
+          expectedArrivalDate: "2026-07-15",
         },
         {
-          no: "KSC260404002",
-          name: "五层外箱",
-          spec: "60 x 45 x 38",
-          qty: "600",
-          price: "4.20",
-          date: "2026-06-20",
-          status: "待回货",
+          no: "PO-202607-002",
+          supplier: "佳美包装",
+          status: "部分到货",
           statusTone: "green",
-          task: "回货跟进",
+          orderDate: "2026-07-03",
+          expectedArrivalDate: "2026-07-18",
         },
         {
-          no: "KSC260404003",
-          name: "吊牌棉绳",
-          spec: "本白 2mm",
-          qty: "3,000",
-          price: "0.32",
-          date: "2026-06-22",
-          status: "阻塞",
+          no: "PO-202607-003",
+          supplier: "恒丰纺织",
+          status: "已关闭",
           statusTone: "red",
-          task: "单价复核",
+          orderDate: "2026-06-28",
+          expectedArrivalDate: "2026-07-10",
         },
       ];
 
@@ -1020,9 +1051,52 @@
       const selectedSummary = document.querySelector("#selectedSummary");
       const clearSelection = document.querySelector("#clearSelection");
       const actionButtons = document.querySelectorAll(".action-button");
+      const lifecycleSensitiveActions = document.querySelectorAll(
+        "[data-requires-open-record]",
+      );
+      const moreActionsButton = document.querySelector("#moreActionsButton");
+      const statusActionMenu = document.querySelector("#statusActionMenu");
       const openLifecycle = document.querySelector("#openLifecycle");
       const closeLifecycle = document.querySelector("#closeLifecycle");
-      let selectedIndex = 0;
+      const lifecycleDialog = document.querySelector("#lifecycleDialog");
+      const lifecycleFocusableSelector = [
+        "button:not([disabled])",
+        "a[href]",
+        "input:not([disabled])",
+        "select:not([disabled])",
+        "textarea:not([disabled])",
+        '[tabindex]:not([tabindex="-1"])',
+      ].join(",");
+      let selectedIndex = -1;
+      let lifecycleTrigger = openLifecycle;
+
+      function closeMoreActions({ restoreFocus = false } = {}) {
+        if (statusActionMenu.hidden) return;
+        statusActionMenu.hidden = true;
+        moreActionsButton.setAttribute("aria-expanded", "false");
+        if (restoreFocus && !moreActionsButton.disabled) {
+          moreActionsButton.focus({ preventScroll: true });
+        }
+      }
+
+      function openMoreActions() {
+        if (moreActionsButton.disabled) return;
+        statusActionMenu.hidden = false;
+        moreActionsButton.setAttribute("aria-expanded", "true");
+        statusActionMenu.querySelector('[role="menuitem"]')?.focus({
+          preventScroll: true,
+        });
+      }
+
+      function getLifecycleFocusableElements() {
+        return Array.from(
+          lifecycleDialog.querySelectorAll(lifecycleFocusableSelector),
+        ).filter((element) => element.getClientRects().length > 0);
+      }
+
+      function closeLifecycleDialog() {
+        if (lifecycleDialog.open) lifecycleDialog.close();
+      }
 
       function renderRows() {
         rows.innerHTML = "";
@@ -1031,15 +1105,12 @@
           const selected = index === selectedIndex;
           tr.className = selected ? "selected" : "";
           tr.innerHTML = `
-            <td><input type="checkbox" ${selected ? "checked" : ""} aria-label="选择 ${record.no}" /></td>
+            <td><input type="radio" name="purchaseOrderSelection" value="${record.no}" ${selected ? "checked" : ""} aria-label="选择采购单 ${record.no}" /></td>
             <td>${record.no}</td>
-            <td>${record.name}</td>
-            <td>${record.spec}</td>
-            <td>${record.qty}</td>
-            <td>${record.price}</td>
-            <td>${record.date}</td>
+            <td>${record.supplier}</td>
             <td><span class="status ${record.statusTone}">${record.status}</span></td>
-            <td>${record.task}</td>
+            <td>${record.orderDate}</td>
+            <td>${record.expectedArrivalDate}</td>
           `;
           tr.addEventListener("click", () => {
             selectedIndex = index;
@@ -1052,10 +1123,16 @@
 
       function syncSelection() {
         const hasSelection = selectedIndex >= 0;
+        const record = hasSelection ? records[selectedIndex] : null;
+        const isClosed = record?.status === "已关闭";
+        if (!hasSelection) closeMoreActions();
         selectionBar.classList.toggle("has-selection", hasSelection);
         selectedSummary.classList.toggle("empty", !hasSelection);
         actionButtons.forEach((button) => {
           button.disabled = !hasSelection;
+        });
+        lifecycleSensitiveActions.forEach((button) => {
+          button.disabled = !hasSelection || isClosed;
         });
         clearSelection.disabled = !hasSelection;
 
@@ -1064,8 +1141,9 @@
           return;
         }
 
-        const record = records[selectedIndex];
-        selectedSummary.textContent = record.no;
+        selectedSummary.textContent = isClosed
+          ? `${record.no}（已关闭，仅可查看、复制或打印）`
+          : record.no;
       }
 
       clearSelection.addEventListener("click", () => {
@@ -1074,12 +1152,81 @@
         syncSelection();
       });
 
-      openLifecycle.addEventListener("click", () => {
-        document.body.classList.add("show-lifecycle");
+      moreActionsButton.addEventListener("click", (event) => {
+        event.stopPropagation();
+        if (statusActionMenu.hidden) {
+          openMoreActions();
+        } else {
+          closeMoreActions({ restoreFocus: true });
+        }
       });
 
-      closeLifecycle.addEventListener("click", () => {
-        document.body.classList.remove("show-lifecycle");
+      statusActionMenu.addEventListener("click", (event) => {
+        const menuItem = event.target.closest('[role="menuitem"]');
+        if (!menuItem) return;
+        if (menuItem.hasAttribute("data-clear-selection")) {
+          clearSelection.click();
+          return;
+        }
+        closeMoreActions({ restoreFocus: true });
+      });
+
+      document.addEventListener("click", (event) => {
+        if (!event.target.closest(".status-action-menu")) closeMoreActions();
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && !statusActionMenu.hidden) {
+          event.preventDefault();
+          closeMoreActions({ restoreFocus: true });
+        }
+      });
+
+      openLifecycle.addEventListener("click", (event) => {
+        if (lifecycleDialog.open) return;
+        lifecycleTrigger = event.currentTarget;
+        lifecycleDialog.showModal();
+        requestAnimationFrame(() => {
+          lifecycleDialog.querySelector("[data-initial-focus]")?.focus({
+            preventScroll: true,
+          });
+        });
+      });
+
+      closeLifecycle.addEventListener("click", closeLifecycleDialog);
+      lifecycleDialog.addEventListener("cancel", (event) => {
+        event.preventDefault();
+        closeLifecycleDialog();
+      });
+      lifecycleDialog.addEventListener("close", () => {
+        requestAnimationFrame(() =>
+          lifecycleTrigger?.focus({ preventScroll: true }),
+        );
+      });
+      lifecycleDialog.addEventListener("keydown", (event) => {
+        if (event.key !== "Tab") return;
+        const focusableElements = getLifecycleFocusableElements();
+        if (!focusableElements.length) {
+          event.preventDefault();
+          lifecycleDialog.focus();
+          return;
+        }
+        const firstFocusable = focusableElements[0];
+        const lastFocusable = focusableElements[focusableElements.length - 1];
+        if (
+          event.shiftKey &&
+          (document.activeElement === firstFocusable ||
+            !lifecycleDialog.contains(document.activeElement))
+        ) {
+          event.preventDefault();
+          lastFocusable.focus();
+        } else if (
+          !event.shiftKey &&
+          document.activeElement === lastFocusable
+        ) {
+          event.preventDefault();
+          firstFocusable.focus();
+        }
       });
 
       renderRows();

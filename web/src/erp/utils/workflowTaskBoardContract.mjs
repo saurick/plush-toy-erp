@@ -5,6 +5,13 @@ export const WORKFLOW_TASK_BOARD_LANE_KEYS = Object.freeze([
   'finished',
 ])
 
+const WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE = Object.freeze({
+  actionable: new Set(['ready']),
+  exception: new Set(['blocked']),
+  due: new Set(['ready']),
+  finished: new Set(['done', 'rejected']),
+})
+
 function isNonNegativeSafeInteger(value) {
   return Number.isSafeInteger(value) && value >= 0
 }
@@ -76,9 +83,18 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
         lane.offset !== expectedOffset) ||
       !Array.isArray(lane.tasks) ||
       lane.tasks.length > lane.limit ||
-      lane.tasks.some(
-        (task) => !task || typeof task !== 'object' || Array.isArray(task)
-      )
+      lane.tasks.some((task) => {
+        if (!task || typeof task !== 'object' || Array.isArray(task)) return true
+        return (
+          !Number.isSafeInteger(task.id) ||
+          task.id <= 0 ||
+          !Number.isSafeInteger(task.version) ||
+          task.version <= 0 ||
+          !WORKFLOW_TASK_BOARD_STATUS_KEYS_BY_LANE[key].has(
+            task.task_status_key
+          )
+        )
+      })
     ) {
       return invalidTaskBoardResponse()
     }

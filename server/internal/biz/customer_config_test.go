@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 )
@@ -61,20 +62,28 @@ func (r *memCustomerConfigRepo) GetActiveCustomerConfigRevision(_ context.Contex
 }
 
 func (r *memCustomerConfigRepo) PublishCustomerConfig(_ context.Context, in CustomerConfigPublishInput, configHash string, publishedBy int, publishedAt time.Time) (*CustomerConfigRevision, error) {
-	item := &CustomerConfigRevision{
-		ID:               len(r.revisions) + 1,
-		CustomerKey:      in.CustomerKey,
-		Revision:         in.Revision,
-		ProductVersion:   in.ProductVersion,
-		ConfigHash:       configHash,
-		Status:           CustomerConfigStatusPublished,
-		CompiledSnapshot: in.CompiledSnapshot,
-		PublishedBy:      &publishedBy,
-		PublishedAt:      &publishedAt,
-		CreatedAt:        publishedAt,
-		UpdatedAt:        publishedAt,
-	}
 	key := customerRevisionKey(in.CustomerKey, in.Revision)
+	if existing := r.revisions[key]; existing != nil {
+		if existing.ConfigHash != configHash || existing.ConfigHashVersion != CustomerConfigHashVersion || existing.ProductVersion != in.ProductVersion {
+			return nil, ErrCustomerConfigRevisionImmutable
+		}
+		cloned := *existing
+		return &cloned, nil
+	}
+	item := &CustomerConfigRevision{
+		ID:                len(r.revisions) + 1,
+		CustomerKey:       in.CustomerKey,
+		Revision:          in.Revision,
+		ProductVersion:    in.ProductVersion,
+		ConfigHash:        configHash,
+		ConfigHashVersion: CustomerConfigHashVersion,
+		Status:            CustomerConfigStatusPublished,
+		CompiledSnapshot:  in.CompiledSnapshot,
+		PublishedBy:       &publishedBy,
+		PublishedAt:       &publishedAt,
+		CreatedAt:         publishedAt,
+		UpdatedAt:         publishedAt,
+	}
 	r.revisions[key] = item
 	r.modules[key] = append([]DeploymentModuleStateInput(nil), in.ModuleStates...)
 	r.roles[key] = append([]RoleProfileInput(nil), in.RoleProfiles...)
@@ -85,18 +94,47 @@ func (r *memCustomerConfigRepo) PublishCustomerConfig(_ context.Context, in Cust
 	return &cloned, nil
 }
 
-func (r *memCustomerConfigRepo) ActivateCustomerConfig(_ context.Context, customerKey, revision string, activatedBy int, activatedAt time.Time) (*CustomerConfigRevision, error) {
-	return r.switchActiveCustomerConfigRevision(customerKey, revision, activatedBy, activatedAt)
+func (r *memCustomerConfigRepo) ActivateCustomerConfig(_ context.Context, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, activatedBy int, activatedAt time.Time) (*CustomerConfigRevision, error) {
+	return r.switchActiveCustomerConfigRevision(CustomerConfigTransitionActivate, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision, activatedBy, activatedAt)
 }
 
-func (r *memCustomerConfigRepo) RollbackCustomerConfig(_ context.Context, customerKey, targetRevision string, actorID int, rolledBackAt time.Time) (*CustomerConfigRevision, error) {
-	return r.switchActiveCustomerConfigRevision(customerKey, targetRevision, actorID, rolledBackAt)
+func (r *memCustomerConfigRepo) RollbackCustomerConfig(_ context.Context, customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, actorID int, rolledBackAt time.Time) (*CustomerConfigRevision, error) {
+	return r.switchActiveCustomerConfigRevision(CustomerConfigTransitionRollback, customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision, actorID, rolledBackAt)
 }
 
-func (r *memCustomerConfigRepo) switchActiveCustomerConfigRevision(customerKey, revision string, actorID int, activatedAt time.Time) (*CustomerConfigRevision, error) {
+func (r *memCustomerConfigRepo) switchActiveCustomerConfigRevision(action, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, actorID int, activatedAt time.Time) (*CustomerConfigRevision, error) {
 	target := r.revisions[customerRevisionKey(customerKey, revision)]
 	if target == nil {
 		return nil, ErrCustomerConfigNotFound
+	}
+	activeRevision := ""
+	for _, item := range r.revisions {
+		if item.CustomerKey == customerKey && item.Status == CustomerConfigStatusActive {
+			activeRevision = item.Revision
+			break
+		}
+	}
+	if activeRevision != expectedActiveRevision {
+		return nil, ErrCustomerConfigActiveRevisionChanged
+	}
+	if target.ConfigHash != expectedConfigHash {
+		return nil, ErrCustomerConfigHashMismatch
+	}
+	if target.ProductVersion != expectedProductVersion {
+		return nil, ErrCustomerConfigProductVersionMismatch
+	}
+	if err := ValidateCustomerConfigModuleClosure(r.modules[customerRevisionKey(customerKey, revision)]); err != nil {
+		return nil, err
+	}
+	if action == CustomerConfigTransitionActivate && target.Status == CustomerConfigStatusActive && target.ActivatedAt != nil {
+		cloned := *target
+		return &cloned, nil
+	}
+	if action == CustomerConfigTransitionRollback && (target.Status != CustomerConfigStatusSuperseded || target.ActivatedAt == nil) {
+		return nil, ErrCustomerConfigTransitionBlocked
+	}
+	if action == CustomerConfigTransitionActivate && target.Status != CustomerConfigStatusPublished {
+		return nil, ErrBadParam
 	}
 	for _, item := range r.revisions {
 		if item.CustomerKey == customerKey && item.Status == CustomerConfigStatusActive && item.Revision != revision {
@@ -108,6 +146,32 @@ func (r *memCustomerConfigRepo) switchActiveCustomerConfigRevision(customerKey, 
 	target.ActivatedAt = &activatedAt
 	cloned := *target
 	return &cloned, nil
+}
+
+func activateCustomerConfigForTest(ctx context.Context, uc *CustomerConfigUsecase, repo *memCustomerConfigRepo, customerKey, revision string, actorID int) (*CustomerConfigRevision, error) {
+	item, err := repo.GetCustomerConfigRevision(ctx, customerKey, revision)
+	if err != nil {
+		return nil, err
+	}
+	expectedActiveRevision := ""
+	if active, activeErr := repo.GetActiveCustomerConfigRevision(ctx, customerKey); activeErr == nil {
+		expectedActiveRevision = active.Revision
+	} else if !errors.Is(activeErr, ErrCustomerConfigNotFound) {
+		return nil, activeErr
+	}
+	return uc.ActivateCustomerConfig(ctx, customerKey, revision, item.ConfigHash, item.ProductVersion, expectedActiveRevision, actorID)
+}
+
+func rollbackCustomerConfigForTest(ctx context.Context, uc *CustomerConfigUsecase, repo *memCustomerConfigRepo, customerKey, revision string, actorID int) (*CustomerConfigRevision, error) {
+	item, err := repo.GetCustomerConfigRevision(ctx, customerKey, revision)
+	if err != nil {
+		return nil, err
+	}
+	active, err := repo.GetActiveCustomerConfigRevision(ctx, customerKey)
+	if err != nil {
+		return nil, err
+	}
+	return uc.RollbackCustomerConfig(ctx, customerKey, revision, item.ConfigHash, item.ProductVersion, active.Revision, actorID)
 }
 
 func (r *memCustomerConfigRepo) ListDeploymentModuleStates(_ context.Context, customerKey, revision string) ([]DeploymentModuleStateInput, error) {
@@ -161,6 +225,25 @@ func (r *memCustomerConfigRepo) ListWorkPoolMembershipsByPools(_ context.Context
 		if _, ok := allowed[item.PoolKey]; ok {
 			out = append(out, item)
 		}
+	}
+	return out, nil
+}
+
+func (r *memCustomerConfigRepo) ListWorkflowTaskAuthorizationRevisions(_ context.Context, customerKey string) ([]WorkflowTaskAuthorizationRevision, error) {
+	out := []WorkflowTaskAuthorizationRevision{}
+	for _, revision := range r.revisions {
+		if revision.CustomerKey != customerKey || !customerConfigRevisionCanAuthorizeRuntimeTask(revision.Status) {
+			continue
+		}
+		key := customerRevisionKey(customerKey, revision.Revision)
+		out = append(out, WorkflowTaskAuthorizationRevision{
+			CustomerKey:         customerKey,
+			Revision:            revision.Revision,
+			Status:              revision.Status,
+			RoleProfiles:        append([]RoleProfileInput(nil), r.roles[key]...),
+			AccessEntitlements:  append([]AccessEntitlementInput(nil), r.entitlements[key]...),
+			WorkPoolMemberships: append([]WorkPoolMembershipInput(nil), r.memberships[key]...),
+		})
 	}
 	return out, nil
 }
@@ -272,259 +355,98 @@ func validCustomerConfigInput() CustomerConfigPublishInput {
 	}
 }
 
-func validSalesOrderAcceptanceProcessDefinition() map[string]any {
-	return map[string]any{
-		"process_key":            ProcessKeySalesOrderAcceptance,
-		"process_version":        "v1",
-		"variant_key":            "default",
-		"manifest_status":        "runtime_loader_ready",
-		"runtime_loader_enabled": true,
-		"business_ref_type":      "sales_order",
-		"domain_boundary":        "source_document_command_only",
-		"fact_boundary":          "no_fact_posting",
-		"config_revision_source": "runtime_manifest",
-		"definition_hash_source": "compiled_customer_package",
-		"source_workflow_key":    "sales_order_approval",
-		"source_status":          "workflow_only",
-		"guardrail":              "test process definition must not post facts",
-		"nodes": []any{
-			map[string]any{
-				"node_key":                "submit_sales_order",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"source_owner_pool_key":   "sales",
-				"required_capability_key": PermissionSalesOrderSubmit,
-				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandSalesOrderSubmit,
-					"source_command_key":       "submit_sales_order",
-					"handler":                  "SalesOrderUsecase.SubmitSalesOrder",
-					"idempotency_key_required": true,
-					"writes_fact":              false,
-				},
-			},
-			map[string]any{
-				"node_key":                "order_approval",
-				"node_type":               ProcessNodeTypeApproval,
-				"source_owner_pool_key":   "boss",
-				"owner_pool_key":          "order_approval",
-				"required_capability_key": PermissionWorkflowTaskApprove,
-				"form_profile_key":        "sales_order_approval.default",
-				"action_set_key":          "sales_order_approval",
-			},
-			map[string]any{
-				"node_key":                "order_review",
-				"node_type":               ProcessNodeTypeHumanTask,
-				"source_owner_pool_key":   "pmc",
-				"owner_pool_key":          "order_review",
-				"required_capability_key": PermissionWorkflowTaskComplete,
-				"form_profile_key":        "sales_order_review.default",
-				"action_set_key":          "sales_order_review",
-			},
-			map[string]any{
-				"node_key":  "end",
-				"node_type": ProcessNodeTypeEnd,
-			},
-		},
+func TestHashCustomerConfigPublishInputCoversFullImmutablePayload(t *testing.T) {
+	base := validCustomerConfigInput()
+	want, err := HashCustomerConfigPublishInput(base)
+	if err != nil {
+		t.Fatalf("HashCustomerConfigPublishInput base error = %v", err)
+	}
+
+	reordered := validCustomerConfigInput()
+	slices.Reverse(reordered.ModuleStates)
+	slices.Reverse(reordered.RoleProfiles)
+	slices.Reverse(reordered.AccessEntitlements)
+	slices.Reverse(reordered.WorkPools)
+	slices.Reverse(reordered.WorkPoolMemberships)
+	got, err := HashCustomerConfigPublishInput(reordered)
+	if err != nil {
+		t.Fatalf("HashCustomerConfigPublishInput reordered error = %v", err)
+	}
+	if got != want {
+		t.Fatalf("equivalent list order changed hash: got %s want %s", got, want)
+	}
+
+	mutations := []struct {
+		name   string
+		mutate func(*CustomerConfigPublishInput)
+	}{
+		{name: "product version", mutate: func(in *CustomerConfigPublishInput) { in.ProductVersion = "next-product" }},
+		{name: "compiled snapshot", mutate: func(in *CustomerConfigPublishInput) {
+			in.CompiledSnapshot["customer"] = map[string]any{"key": "yoyoosun", "name": "changed"}
+		}},
+		{name: "module state", mutate: func(in *CustomerConfigPublishInput) { in.ModuleStates[0].Reason = "changed" }},
+		{name: "role profile", mutate: func(in *CustomerConfigPublishInput) { in.RoleProfiles[0].DisplayName = "changed" }},
+		{name: "access entitlement", mutate: func(in *CustomerConfigPublishInput) { in.AccessEntitlements[0].Enabled = false }},
+		{name: "work pool", mutate: func(in *CustomerConfigPublishInput) { in.WorkPools[0].Description = "changed" }},
+		{name: "work pool membership", mutate: func(in *CustomerConfigPublishInput) { in.WorkPoolMemberships[0].Priority = 10 }},
+	}
+	for _, mutation := range mutations {
+		t.Run(mutation.name, func(t *testing.T) {
+			changed := validCustomerConfigInput()
+			mutation.mutate(&changed)
+			got, err := HashCustomerConfigPublishInput(changed)
+			if err != nil {
+				t.Fatalf("HashCustomerConfigPublishInput error = %v", err)
+			}
+			if got == want {
+				t.Fatalf("immutable %s change did not change hash %s", mutation.name, got)
+			}
+		})
 	}
 }
 
-func validMaterialSupplyRuntimeProcessDefinition() map[string]any {
-	return map[string]any{
-		"process_key":            ProcessKeyMaterialSupply,
-		"process_version":        "v1",
-		"variant_key":            "purchase_receipt_iqc_inbound",
-		"manifest_status":        "runtime_loader_ready",
-		"runtime_loader_enabled": true,
-		"business_ref_type":      "purchase_receipt",
-		"domain_boundary":        "explicit_fact_command_api",
-		"fact_boundary":          "no_fact_posting",
-		"config_revision_source": "runtime_manifest",
-		"definition_hash_source": "compiled_customer_package",
-		"source_status":          "explicit_api_only",
-		"nodes": []any{
-			map[string]any{
-				"node_key":                "incoming_qc",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"required_capability_key": PermissionQualityInspectionUpdate,
-				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandIncomingQualityGate,
-					"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
-					"idempotency_key_required": true,
-					"writes_fact":              false,
-				},
-			},
-			map[string]any{
-				"node_key":                "warehouse_inbound",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"required_capability_key": PermissionWarehouseInboundConfirm,
-				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandInventoryPostInbound,
-					"handler":                  "InventoryUsecase.PostPurchaseReceipt",
-					"idempotency_key_required": true,
-					"writes_fact":              false,
-				},
-			},
-			map[string]any{
-				"node_key":  "end",
-				"node_type": ProcessNodeTypeEnd,
-			},
-		},
+func TestValidateCustomerConfigUsesSingleCanonicalHashContract(t *testing.T) {
+	in := validCustomerConfigInput()
+	wantHash, err := HashCustomerConfigPublishInput(in)
+	if err != nil {
+		t.Fatalf("HashCustomerConfigPublishInput error = %v", err)
+	}
+	result, err := NewCustomerConfigUsecase(nil).ValidateCustomerConfig(context.Background(), in)
+	if err != nil {
+		t.Fatalf("ValidateCustomerConfig error = %v", err)
+	}
+	if result.ConfigHash != wantHash || result.ConfigHashVersion != CustomerConfigHashVersion {
+		t.Fatalf("hash contract = (%s, %d), want (%s, %d)", result.ConfigHash, result.ConfigHashVersion, wantHash, CustomerConfigHashVersion)
+	}
+	if CustomerConfigHashVersion != 1 {
+		t.Fatalf("first formal hash contract version = %d, want 1", CustomerConfigHashVersion)
 	}
 }
 
-func validMaterialSupplyPurchaseOrderRuntimeProcessDefinition() map[string]any {
-	return map[string]any{
-		"process_key":            ProcessKeyMaterialSupply,
-		"process_version":        "v1",
-		"variant_key":            "purchase_order_receipt_iqc_inbound",
-		"manifest_status":        "runtime_loader_ready",
-		"runtime_loader_enabled": true,
-		"business_ref_type":      "purchase_order",
-		"domain_boundary":        "explicit_fact_command_api",
-		"fact_boundary":          "no_fact_posting",
-		"config_revision_source": "runtime_manifest",
-		"definition_hash_source": "compiled_customer_package",
-		"source_status":          "explicit_api_only",
-		"nodes": []any{
-			map[string]any{
-				"node_key":                "purchase_receipt_source",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"required_capability_key": PermissionPurchaseReceiptCreate,
-				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandPurchaseReceiptCreate,
-					"handler":                  "InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder",
-					"idempotency_key_required": true,
-					"writes_fact":              false,
-				},
-			},
-			map[string]any{
-				"node_key":                "incoming_qc",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"required_capability_key": PermissionQualityInspectionUpdate,
-				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandIncomingQualityGate,
-					"handler":                  "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
-					"idempotency_key_required": true,
-					"writes_fact":              false,
-				},
-			},
-			map[string]any{
-				"node_key":                "warehouse_inbound",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"required_capability_key": PermissionWarehouseInboundConfirm,
-				"policy_snapshot": map[string]any{
-					"command_key":              ProcessDomainCommandInventoryPostInbound,
-					"handler":                  "InventoryUsecase.PostPurchaseReceipt",
-					"idempotency_key_required": true,
-					"writes_fact":              false,
-				},
-			},
-			map[string]any{
-				"node_key":  "end",
-				"node_type": ProcessNodeTypeEnd,
-			},
-		},
+func TestCustomerConfigValidateAndPublishRejectEmptyProductVersion(t *testing.T) {
+	in := validCustomerConfigInput()
+	in.ProductVersion = "  "
+	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
+	if _, err := uc.ValidateCustomerConfig(context.Background(), in); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("ValidateCustomerConfig error = %v, want ErrBadParam", err)
+	}
+	if _, err := uc.PublishCustomerConfig(context.Background(), in, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("PublishCustomerConfig error = %v, want ErrBadParam", err)
 	}
 }
 
-func validFinishedGoodsDeliveryStartReadyProcessDefinition() map[string]any {
-	blockers := []any{
-		"domain_command_handler_not_registered",
-		"target_evidence_missing",
-	}
-	shipmentExecutionBlockers := []any{
-		"target_evidence_missing",
-	}
-	registeredHandlerBlockers := []any{
-		"target_evidence_missing",
-	}
-	return map[string]any{
-		"process_key":            ProcessKeyFinishedGoodsDelivery,
-		"process_version":        "v1",
-		"variant_key":            "quality_finance_ship_receivable",
-		"manifest_status":        "runtime_loader_start_ready",
-		"runtime_loader_enabled": true,
-		"business_ref_type":      "shipment",
-		"domain_boundary":        "contract_preflight_only",
-		"fact_boundary":          "no_fact_posting",
-		"source_workflow_key":    "finished_goods_delivery",
-		"source_status":          "workflow_preview",
-		"nodes": []any{
-			map[string]any{
-				"node_key":                "finished_goods_quality",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"owner_pool_key":          "finished_goods_quality",
-				"required_capability_key": PermissionQualityInspectionUpdate,
-				"policy_snapshot": map[string]any{
-					"command_key": "finished_goods_quality.decide",
-					"writes_fact": false,
-				},
-				"fact_command_contract": map[string]any{
-					"command_key":                        "finished_goods_quality.decide",
-					"runtime_binding_status":             "contract_preflight_only",
-					"process_runtime_handler_registered": false,
-					"runtime_loader_blockers":            []any{},
-					"runtime_execute_blockers":           blockers,
-					"writes_fact":                        false,
-				},
-			},
-			map[string]any{
-				"node_key":                "shipment_finance_release",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"owner_pool_key":          "shipment_finance_release",
-				"required_capability_key": PermissionFinanceReceivableConfirm,
-				"policy_snapshot": map[string]any{
-					"command_key": "shipment.finance_release",
-					"writes_fact": false,
-				},
-				"fact_command_contract": map[string]any{
-					"command_key":                        "shipment.finance_release",
-					"runtime_binding_status":             "process_runtime_handler_registered",
-					"process_runtime_handler_registered": true,
-					"runtime_loader_blockers":            []any{},
-					"runtime_execute_blockers":           registeredHandlerBlockers,
-					"writes_fact":                        false,
-				},
-			},
-			map[string]any{
-				"node_key":                "shipment_execution",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"owner_pool_key":          "shipment_execution",
-				"required_capability_key": PermissionShipmentShip,
-				"policy_snapshot": map[string]any{
-					"command_key": "shipment.ship",
-					"writes_fact": false,
-				},
-				"fact_command_contract": map[string]any{
-					"command_key":                        "shipment.ship",
-					"runtime_binding_status":             "process_runtime_handler_registered",
-					"process_runtime_handler_registered": true,
-					"runtime_loader_blockers":            []any{},
-					"runtime_execute_blockers":           shipmentExecutionBlockers,
-					"writes_fact":                        false,
-				},
-			},
-			map[string]any{
-				"node_key":                "receivable_lead",
-				"node_type":               ProcessNodeTypeDomainCommand,
-				"owner_pool_key":          "receivable_lead",
-				"required_capability_key": PermissionFinanceReceivableConfirm,
-				"policy_snapshot": map[string]any{
-					"command_key": "finance.receivable_lead",
-					"writes_fact": false,
-				},
-				"fact_command_contract": map[string]any{
-					"command_key":                        "finance.receivable_lead",
-					"runtime_binding_status":             "contract_preflight_only",
-					"process_runtime_handler_registered": false,
-					"runtime_loader_blockers":            []any{},
-					"runtime_execute_blockers":           blockers,
-					"writes_fact":                        false,
-				},
-			},
-			map[string]any{
-				"node_key":  "end",
-				"node_type": ProcessNodeTypeEnd,
-			},
+func addRuntimeProcessSelection(in *CustomerConfigPublishInput, processKey, processVersion, variantKey, businessRefType string) {
+	in.CompiledSnapshot["manifest_schema_version"] = CustomerConfigManifestSchemaVersionCurrent
+	in.CompiledSnapshot["process_contract_version"] = CustomerProcessContractVersionCurrent
+	in.CompiledSnapshot["manifest_status"] = "runtime_compile_ready"
+	in.CompiledSnapshot["runtime_enabled"] = true
+	in.CompiledSnapshot["publishable"] = true
+	in.CompiledSnapshot["runtimeProcessSelections"] = []any{
+		map[string]any{
+			"process_key":       processKey,
+			"process_version":   processVersion,
+			"variant_key":       variantKey,
+			"business_ref_type": businessRefType,
 		},
 	}
 }
@@ -541,7 +463,7 @@ func TestCustomerConfigUsecasePublishActivateAndEffectiveSession(t *testing.T) {
 	if published.Status != CustomerConfigStatusPublished {
 		t.Fatalf("published status = %s", published.Status)
 	}
-	activated, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99)
+	activated, err := activateCustomerConfigForTest(ctx, uc, repo, "yoyoosun", "2026.06.28.1", 99)
 	if err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
@@ -597,6 +519,65 @@ func TestCustomerConfigUsecasePublishActivateAndEffectiveSession(t *testing.T) {
 	}
 }
 
+func TestCustomerConfigUsecaseReferenceRevisionProjectsSupplierFieldPolicy(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	in.CustomerKey = "reference-customer"
+	in.Revision = "reference-customer-package-v1.runtime-manifest-v1"
+	in.CompiledSnapshot["customer"] = map[string]any{
+		"key":  "reference-customer",
+		"name": "标准样例毛绒制造有限公司（工程参考）",
+	}
+	in.CompiledSnapshot["pages"] = []any{"suppliers"}
+	in.CompiledSnapshot["fieldPolicies"] = map[string]any{
+		"suppliers.default": map[string]any{
+			"supplier_code": map[string]any{"visible": true},
+			"supplier_type": map[string]any{"visible": false},
+		},
+	}
+	in.RoleProfiles = []RoleProfileInput{
+		{RoleKey: PurchaseRoleKey, DisplayName: "采购"},
+	}
+	in.AccessEntitlements = []AccessEntitlementInput{
+		{RoleKey: PurchaseRoleKey, CapabilityKey: PermissionSupplierRead, Enabled: true},
+	}
+	in.WorkPools = []WorkPoolInput{
+		{PoolKey: "purchase", ModuleKey: "purchase_orders", DisplayName: "采购池"},
+	}
+	in.WorkPoolMemberships = []WorkPoolMembershipInput{
+		{PoolKey: "purchase", RoleKey: PurchaseRoleKey, Enabled: true},
+	}
+
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("PublishCustomerConfig error = %v", err)
+	}
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
+		t.Fatalf("ActivateCustomerConfig error = %v", err)
+	}
+
+	session, err := uc.GetEffectiveSession(ctx, in.CustomerKey, &AdminUser{
+		ID:          7,
+		Roles:       []AdminRole{{Key: PurchaseRoleKey}},
+		Permissions: []string{PermissionSupplierRead},
+	})
+	if err != nil {
+		t.Fatalf("GetEffectiveSession error = %v", err)
+	}
+	if session.ConfigRevision != in.Revision || session.Customer.Key != in.CustomerKey {
+		t.Fatalf("effective session identity = %#v", session)
+	}
+	policies, ok := session.FieldPolicies["suppliers.default"].(map[string]any)
+	if !ok {
+		t.Fatalf("supplier field policies missing: %#v", session.FieldPolicies)
+	}
+	supplierType, ok := policies["supplier_type"].(map[string]any)
+	if !ok || supplierType["visible"] != false {
+		t.Fatalf("supplier_type policy = %#v", policies["supplier_type"])
+	}
+}
+
 func TestCustomerConfigUsecaseEffectiveSessionAppliesEntitlementAndRoleRevokeWithinRBAC(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
@@ -612,7 +593,7 @@ func TestCustomerConfigUsecaseEffectiveSessionAppliesEntitlementAndRoleRevokeWit
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, "yoyoosun", "2026.06.28.1", 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 	session, err := uc.GetEffectiveSession(ctx, "yoyoosun", &AdminUser{
@@ -655,7 +636,7 @@ func TestCustomerConfigUsecaseEffectiveActionEntitlementsLeaveModuleStateToDomai
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 	admin := &AdminUser{
@@ -703,7 +684,7 @@ func TestCustomerConfigUsecaseEffectiveSessionRevokesStayWithinTheirRole(t *test
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, "yoyoosun", "2026.06.28.1", 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 	session, err := uc.GetEffectiveSession(ctx, "yoyoosun", &AdminUser{
@@ -732,7 +713,7 @@ func TestCustomerConfigUsecaseEffectiveSessionDisablesCustomerRoleProjection(t *
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, "yoyoosun", "2026.06.28.1", 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 	session, err := uc.GetEffectiveSession(ctx, "yoyoosun", &AdminUser{
@@ -783,7 +764,7 @@ func TestCustomerConfigUsecaseEffectiveSessionNarrowsReferenceReadsToRolePages(t
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 	session, err := uc.GetEffectiveSession(ctx, in.CustomerKey, &AdminUser{
@@ -881,7 +862,7 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, "yoyoosun", "2026.06.28.1", 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, "yoyoosun", "2026.06.28.1", 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -932,13 +913,11 @@ func TestCustomerConfigUsecaseBuildsProcessInstanceCreateFromActiveProcessDefini
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
-	in.CompiledSnapshot["processDefinitions"] = map[string]any{
-		ProcessKeySalesOrderAcceptance: validSalesOrderAcceptanceProcessDefinition(),
-	}
+	addRuntimeProcessSelection(&in, ProcessKeySalesOrderAcceptance, "v1", CustomerProcessVariantSalesApprovalPMC, "sales_order")
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -991,51 +970,14 @@ func TestCustomerConfigUsecaseBuildsProcessInstanceCreateFromActiveProcessDefini
 	}
 }
 
-func TestCustomerConfigUsecaseBuildsMaterialSupplyProcessInstanceCreateFromActiveProcessDefinition(t *testing.T) {
+func TestCustomerConfigUsecaseRejectsUnregisteredMaterialSupplyBusinessRefSelection(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
-	in.CompiledSnapshot["processDefinitions"] = map[string]any{
-		ProcessKeyMaterialSupply: validMaterialSupplyRuntimeProcessDefinition(),
-	}
-	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
-		t.Fatalf("PublishCustomerConfig error = %v", err)
-	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
-		t.Fatalf("ActivateCustomerConfig error = %v", err)
-	}
-
-	refNo := "PR-6001"
-	create, err := uc.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, ProcessInstanceFromCustomerConfigInput{
-		CustomerKey:     in.CustomerKey,
-		ProcessKey:      ProcessKeyMaterialSupply,
-		BusinessRefType: "purchase_receipt",
-		BusinessRefID:   6001,
-		BusinessRefNo:   &refNo,
-		IdempotencyKey:  "purchase_receipt:6001:material_supply:v1",
-	})
-	if err != nil {
-		t.Fatalf("BuildProcessInstanceCreateFromActiveCustomerConfig error = %v", err)
-	}
-	if create.ProcessKey != ProcessKeyMaterialSupply || create.ProcessVersion != "v1" {
-		t.Fatalf("process identity = %#v", create)
-	}
-	if create.BusinessRefType != "purchase_receipt" || create.BusinessRefID != 6001 {
-		t.Fatalf("business ref = %#v", create)
-	}
-	if len(create.Nodes) != 3 {
-		t.Fatalf("nodes = %#v", create.Nodes)
-	}
-	if create.Nodes[0].NodeKey != "incoming_qc" ||
-		create.Nodes[0].NodeType != ProcessNodeTypeDomainCommand ||
-		create.Nodes[0].PolicySnapshot["command_key"] != ProcessDomainCommandIncomingQualityGate {
-		t.Fatalf("incoming qc node = %#v", create.Nodes[0])
-	}
-	if create.Nodes[1].NodeKey != "warehouse_inbound" ||
-		create.Nodes[1].NodeType != ProcessNodeTypeDomainCommand ||
-		create.Nodes[1].PolicySnapshot["command_key"] != ProcessDomainCommandInventoryPostInbound {
-		t.Fatalf("warehouse inbound node = %#v", create.Nodes[1])
+	addRuntimeProcessSelection(&in, ProcessKeyMaterialSupply, "v1", CustomerProcessVariantMaterialReceiptIQCInbound, "purchase_receipt")
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("unregistered material supply business ref error = %v, want ErrBadParam", err)
 	}
 }
 
@@ -1044,13 +986,11 @@ func TestCustomerConfigUsecaseBuildsMaterialSupplyPurchaseOrderProcessInstanceCr
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
-	in.CompiledSnapshot["processDefinitions"] = map[string]any{
-		ProcessKeyMaterialSupply: validMaterialSupplyPurchaseOrderRuntimeProcessDefinition(),
-	}
+	addRuntimeProcessSelection(&in, ProcessKeyMaterialSupply, "v1", CustomerProcessVariantMaterialReceiptIQCInbound, "purchase_order")
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1090,114 +1030,22 @@ func TestCustomerConfigUsecaseBuildsMaterialSupplyPurchaseOrderProcessInstanceCr
 	}
 }
 
-func TestCustomerConfigUsecaseRejectsUnsafeMaterialSupplyProcessDefinitionLoader(t *testing.T) {
+func TestCustomerConfigUsecaseRejectsCustomerSuppliedProcessDefinitions(t *testing.T) {
 	ctx := context.Background()
-	tests := []struct {
-		name   string
-		mutate func(map[string]any)
-	}{
-		{
-			name: "purchase receipt create not accepted inside purchase receipt process",
-			mutate: func(definition map[string]any) {
-				nodes := definition["nodes"].([]any)
-				first := nodes[0].(map[string]any)
-				first["node_key"] = "purchase_receipt_source"
-				policy := first["policy_snapshot"].(map[string]any)
-				policy["command_key"] = ProcessDomainCommandPurchaseReceiptCreate
-			},
-		},
-		{
-			name: "purchase order process cannot skip purchase receipt source node",
-			mutate: func(definition map[string]any) {
-				definition["business_ref_type"] = "purchase_order"
-			},
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	addRuntimeProcessSelection(&in, ProcessKeySalesOrderAcceptance, "v1", CustomerProcessVariantSalesApprovalPMC, "sales_order")
+	in.CompiledSnapshot["processDefinitions"] = map[string]any{
+		ProcessKeySalesOrderAcceptance: map[string]any{
+			"process_key":     ProcessKeySalesOrderAcceptance,
+			"process_version": "v1",
+			"variant_key":     CustomerProcessVariantSalesApprovalPMC,
+			"nodes":           []any{map[string]any{"node_key": "end", "node_type": ProcessNodeTypeEnd}},
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := newMemCustomerConfigRepo()
-			uc := NewCustomerConfigUsecase(repo)
-			in := validCustomerConfigInput()
-			definition := validMaterialSupplyRuntimeProcessDefinition()
-			tt.mutate(definition)
-			in.CompiledSnapshot["processDefinitions"] = map[string]any{
-				ProcessKeyMaterialSupply: definition,
-			}
-			if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
-				t.Fatalf("PublishCustomerConfig error = %v", err)
-			}
-			if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
-				t.Fatalf("ActivateCustomerConfig error = %v", err)
-			}
-			_, err := uc.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, ProcessInstanceFromCustomerConfigInput{
-				CustomerKey:     in.CustomerKey,
-				ProcessKey:      ProcessKeyMaterialSupply,
-				BusinessRefType: getStringFromAnyMap(definition, "business_ref_type"),
-				BusinessRefID:   6001,
-				IdempotencyKey:  "purchase_receipt:6001:material_supply:v1",
-			})
-			if !errors.Is(err, ErrBadParam) {
-				t.Fatalf("expected ErrBadParam, got %v", err)
-			}
-		})
-	}
-}
-
-func TestCustomerConfigUsecaseRejectsUnsafeActiveProcessDefinitionLoader(t *testing.T) {
-	ctx := context.Background()
-	tests := []struct {
-		name   string
-		mutate func(map[string]any)
-	}{
-		{
-			name: "runtime loader disabled",
-			mutate: func(definition map[string]any) {
-				definition["runtime_loader_enabled"] = false
-			},
-		},
-		{
-			name: "fact boundary changed",
-			mutate: func(definition map[string]any) {
-				definition["fact_boundary"] = "fact_posting"
-			},
-		},
-		{
-			name: "unknown command key",
-			mutate: func(definition map[string]any) {
-				nodes := definition["nodes"].([]any)
-				first := nodes[0].(map[string]any)
-				policy := first["policy_snapshot"].(map[string]any)
-				policy["command_key"] = "inventory.post"
-			},
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			repo := newMemCustomerConfigRepo()
-			uc := NewCustomerConfigUsecase(repo)
-			in := validCustomerConfigInput()
-			definition := validSalesOrderAcceptanceProcessDefinition()
-			tt.mutate(definition)
-			in.CompiledSnapshot["processDefinitions"] = map[string]any{
-				ProcessKeySalesOrderAcceptance: definition,
-			}
-			if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
-				t.Fatalf("PublishCustomerConfig error = %v", err)
-			}
-			if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
-				t.Fatalf("ActivateCustomerConfig error = %v", err)
-			}
-			_, err := uc.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, ProcessInstanceFromCustomerConfigInput{
-				CustomerKey:     in.CustomerKey,
-				ProcessKey:      ProcessKeySalesOrderAcceptance,
-				BusinessRefType: "sales_order",
-				BusinessRefID:   1001,
-				IdempotencyKey:  "sales_order:1001:sales_order_acceptance:v1",
-			})
-			if !errors.Is(err, ErrBadParam) {
-				t.Fatalf("expected ErrBadParam, got %v", err)
-			}
-		})
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("customer-supplied process graph error = %v, want ErrBadParam", err)
 	}
 }
 
@@ -1255,13 +1103,11 @@ func TestCustomerConfigUsecaseRejectsProcessStartWhenReferencedModuleNotEnabled(
 			uc := NewCustomerConfigUsecase(repo)
 			in := validCustomerConfigInput()
 			in.ModuleStates = tt.mutateModules(in.ModuleStates)
-			in.CompiledSnapshot["processDefinitions"] = map[string]any{
-				ProcessKeySalesOrderAcceptance: validSalesOrderAcceptanceProcessDefinition(),
-			}
+			addRuntimeProcessSelection(&in, ProcessKeySalesOrderAcceptance, "v1", CustomerProcessVariantSalesApprovalPMC, "sales_order")
 			if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 				t.Fatalf("PublishCustomerConfig error = %v", err)
 			}
-			if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+			if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 				t.Fatalf("ActivateCustomerConfig error = %v", err)
 			}
 			_, err := uc.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, ProcessInstanceFromCustomerConfigInput{
@@ -1334,7 +1180,7 @@ func TestCustomerConfigUsecaseExplainModuleStatus(t *testing.T) {
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1396,7 +1242,7 @@ func TestCustomerConfigUsecaseExplainModuleStatusCountsRuntimeGuards(t *testing.
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1429,18 +1275,16 @@ func TestCustomerConfigUsecaseExplainModuleStatusCountsRuntimeGuards(t *testing.
 	}
 }
 
-func TestCustomerConfigUsecaseExplainProcessDefinitionFinishedGoodsDeliveryStartReady(t *testing.T) {
+func TestCustomerConfigUsecaseExplainProductCoreFinishedGoodsDeliveryDefinition(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
-	in.CompiledSnapshot["processDefinitions"] = map[string]any{
-		ProcessKeyFinishedGoodsDelivery: validFinishedGoodsDeliveryStartReadyProcessDefinition(),
-	}
+	addRuntimeProcessSelection(&in, ProcessKeyFinishedGoodsDelivery, "v1", CustomerProcessVariantFinishedGoodsDelivery, "shipment")
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1449,15 +1293,15 @@ func TestCustomerConfigUsecaseExplainProcessDefinitionFinishedGoodsDeliveryStart
 		t.Fatalf("ExplainProcessDefinition error = %v", err)
 	}
 	if explanation.ProcessKey != ProcessKeyFinishedGoodsDelivery ||
-		explanation.VariantKey != "quality_finance_ship_receivable" ||
-		explanation.ManifestStatus != "runtime_loader_start_ready" {
+		explanation.VariantKey != CustomerProcessVariantFinishedGoodsDelivery ||
+		explanation.ManifestStatus != "runtime_loader_ready" {
 		t.Fatalf("definition identity = %#v", explanation)
 	}
 	if !explanation.RuntimeLoaderEnabled || !explanation.CanStartRuntime {
-		t.Fatalf("finished_goods_delivery must be start-ready: %#v", explanation)
+		t.Fatalf("finished_goods_delivery must be runtime-loader ready: %#v", explanation)
 	}
-	if explanation.CanExecuteRuntimeCommands {
-		t.Fatalf("finished_goods_delivery commands must remain execute-blocked: %#v", explanation)
+	if !explanation.CanExecuteRuntimeCommands {
+		t.Fatalf("Product Core registered command contracts must be executable: %#v", explanation)
 	}
 	if len(explanation.Nodes) != 5 {
 		t.Fatalf("nodes = %#v", explanation.Nodes)
@@ -1472,35 +1316,21 @@ func TestCustomerConfigUsecaseExplainProcessDefinitionFinishedGoodsDeliveryStart
 		!shipmentNode.ProcessRuntimeHandlerRegistered {
 		t.Fatalf("shipment node = %#v", shipmentNode)
 	}
-	if len(explanation.StartBlockedReasons) != 0 {
-		t.Fatalf("start blocked reasons = %#v", explanation.StartBlockedReasons)
-	}
-	executeReasons := map[string]bool{}
-	for _, reason := range explanation.ExecuteBlockedReasons {
-		executeReasons[reason] = true
-	}
-	for _, want := range []string{
-		"domain_command_handler_not_registered",
-		"target_evidence_missing",
-	} {
-		if !executeReasons[want] {
-			t.Fatalf("missing execute blocked reason %q in %#v", want, explanation.ExecuteBlockedReasons)
-		}
+	if len(explanation.StartBlockedReasons) != 0 || len(explanation.ExecuteBlockedReasons) != 0 {
+		t.Fatalf("canonical Product Core definition blockers: start=%#v execute=%#v", explanation.StartBlockedReasons, explanation.ExecuteBlockedReasons)
 	}
 }
 
-func TestCustomerConfigUsecaseBuildFinishedGoodsDeliveryStartOnlyProcess(t *testing.T) {
+func TestCustomerConfigUsecaseBuildFinishedGoodsDeliveryProcess(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
-	in.CompiledSnapshot["processDefinitions"] = map[string]any{
-		ProcessKeyFinishedGoodsDelivery: validFinishedGoodsDeliveryStartReadyProcessDefinition(),
-	}
+	addRuntimeProcessSelection(&in, ProcessKeyFinishedGoodsDelivery, "v1", CustomerProcessVariantFinishedGoodsDelivery, "shipment")
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1537,7 +1367,7 @@ func TestCustomerConfigUsecaseBuildFinishedGoodsDeliveryStartOnlyProcess(t *test
 	}
 }
 
-func TestCustomerConfigUsecaseActivationRejectsMissingModuleDependencies(t *testing.T) {
+func TestCustomerConfigUsecasePublishRejectsMissingModuleDependencies(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
@@ -1549,15 +1379,12 @@ func TestCustomerConfigUsecaseActivationRejectsMissingModuleDependencies(t *test
 		}
 	}
 	in.ModuleStates = moduleStates
-	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
-		t.Fatalf("PublishCustomerConfig error = %v", err)
-	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); !errors.Is(err, ErrBadParam) {
-		t.Fatalf("activation must reject missing sales order dependencies, got %v", err)
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("publish must reject missing sales order dependencies, got %v", err)
 	}
 }
 
-func TestCustomerConfigUsecaseActivationRejectsReadOnlyDependencyForWritableModule(t *testing.T) {
+func TestCustomerConfigUsecasePublishRejectsReadOnlyDependencyForWritableModule(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
@@ -1568,15 +1395,12 @@ func TestCustomerConfigUsecaseActivationRejectsReadOnlyDependencyForWritableModu
 			in.ModuleStates[index].Reason = "historical customer records only"
 		}
 	}
-	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
-		t.Fatalf("PublishCustomerConfig error = %v", err)
-	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); !errors.Is(err, ErrBadParam) {
-		t.Fatalf("activation must reject read-only dependency for writable sales orders, got %v", err)
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("publish must reject read-only dependency for writable sales orders, got %v", err)
 	}
 }
 
-func TestCustomerConfigUsecaseActivationRejectsPurchaseReceiptWithoutQualityOrInventory(t *testing.T) {
+func TestCustomerConfigUsecasePublishRejectsPurchaseReceiptWithoutQualityOrInventory(t *testing.T) {
 	for _, missingModuleKey := range []string{"quality_inspections", "inventory"} {
 		t.Run(missingModuleKey, func(t *testing.T) {
 			ctx := context.Background()
@@ -1588,11 +1412,8 @@ func TestCustomerConfigUsecaseActivationRejectsPurchaseReceiptWithoutQualityOrIn
 					in.ModuleStates[index].State = "disabled"
 				}
 			}
-			if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
-				t.Fatalf("PublishCustomerConfig error = %v", err)
-			}
-			if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); !errors.Is(err, ErrBadParam) {
-				t.Fatalf("activation must reject purchase_receipts without %s, got %v", missingModuleKey, err)
+			if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("publish must reject purchase_receipts without %s, got %v", missingModuleKey, err)
 			}
 		})
 	}
@@ -1632,7 +1453,7 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersLegacyFieldPolicies(t *test
 			"style_no": map[string]any{"visible": true},
 		},
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1669,7 +1490,7 @@ func TestCustomerConfigUsecaseEffectiveSessionDoesNotFallbackToRBACWhenLegacyPag
 	}
 	key := customerRevisionKey(in.CustomerKey, in.Revision)
 	delete(repo.revisions[key].CompiledSnapshot, "pages")
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1686,7 +1507,7 @@ func TestCustomerConfigUsecaseEffectiveSessionDoesNotFallbackToRBACWhenLegacyPag
 	}
 }
 
-func TestCustomerConfigUsecaseRejectsForbiddenPayloadAndActiveOverwrite(t *testing.T) {
+func TestCustomerConfigUsecaseRejectsForbiddenPayloadAndRevisionMutation(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
@@ -1700,11 +1521,25 @@ func TestCustomerConfigUsecaseRejectsForbiddenPayloadAndActiveOverwrite(t *testi
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
-	if _, err := uc.PublishCustomerConfig(ctx, in, 99); !errors.Is(err, ErrCustomerConfigActiveRevision) {
-		t.Fatalf("active overwrite error = %v", err)
+	original, err := repo.GetCustomerConfigRevision(ctx, in.CustomerKey, in.Revision)
+	if err != nil {
+		t.Fatalf("GetCustomerConfigRevision error = %v", err)
+	}
+	replayed, err := uc.PublishCustomerConfig(ctx, in, 100)
+	if err != nil {
+		t.Fatalf("same revision replay error = %v", err)
+	}
+	if replayed.ID != original.ID || replayed.Status != CustomerConfigStatusActive || replayed.PublishedBy == nil || original.PublishedBy == nil || *replayed.PublishedBy != *original.PublishedBy || replayed.PublishedAt == nil || original.PublishedAt == nil || !replayed.PublishedAt.Equal(*original.PublishedAt) {
+		t.Fatalf("same revision replay must return original record: original=%#v replayed=%#v", original, replayed)
+	}
+
+	changed := validCustomerConfigInput()
+	changed.CompiledSnapshot["customer"] = map[string]any{"key": "yoyoosun", "name": "永绅新名称"}
+	if _, err := uc.PublishCustomerConfig(ctx, changed, 100); !errors.Is(err, ErrCustomerConfigRevisionImmutable) {
+		t.Fatalf("immutable revision error = %v", err)
 	}
 }
 
@@ -1728,11 +1563,14 @@ func TestCustomerConfigUsecaseRollbackActivatesTargetRevision(t *testing.T) {
 	if _, err := uc.PublishCustomerConfig(ctx, second, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig second error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, second.CustomerKey, second.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, first.CustomerKey, first.Revision, 99); err != nil {
+		t.Fatalf("ActivateCustomerConfig first error = %v", err)
+	}
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, second.CustomerKey, second.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
-	rolledBack, err := uc.RollbackCustomerConfig(ctx, first.CustomerKey, first.Revision, 99)
+	rolledBack, err := rollbackCustomerConfigForTest(ctx, uc, repo, first.CustomerKey, first.Revision, 99)
 	if err != nil {
 		t.Fatalf("RollbackCustomerConfig error = %v", err)
 	}
@@ -1804,7 +1642,7 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysIncludesWorkPoolMember
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1859,7 +1697,7 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysRequiresTaskEntitlemen
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1900,7 +1738,7 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysRequiresMatchingEntitl
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 
@@ -1980,7 +1818,7 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysComposesProfilesEntitl
 			if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 				t.Fatalf("PublishCustomerConfig error = %v", err)
 			}
-			if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+			if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 				t.Fatalf("ActivateCustomerConfig error = %v", err)
 			}
 
@@ -2031,6 +1869,81 @@ func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysFixedCustomerFailsClos
 	}
 }
 
+func TestCustomerConfigUsecaseWorkflowVisibleOwnerRoleKeysAtStoredRevisionIgnoresNewActiveRevision(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+
+	first := validCustomerConfigInput()
+	first.Revision = "2026.06.28.r1"
+	first.RoleProfiles = append(first.RoleProfiles, RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"})
+	first.AccessEntitlements = append(first.AccessEntitlements, AccessEntitlementInput{
+		RoleKey: WarehouseRoleKey, CapabilityKey: PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: first.CustomerKey, Enabled: true,
+	})
+	second := validCustomerConfigInput()
+	second.Revision = "2026.06.28.r2"
+	second.RoleProfiles = append(second.RoleProfiles, RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"})
+
+	if _, err := uc.PublishCustomerConfig(ctx, first, 99); err != nil {
+		t.Fatalf("publish R1: %v", err)
+	}
+	if _, err := uc.PublishCustomerConfig(ctx, second, 99); err != nil {
+		t.Fatalf("publish R2: %v", err)
+	}
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, first.CustomerKey, first.Revision, 99); err != nil {
+		t.Fatalf("activate R1: %v", err)
+	}
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, second.CustomerKey, second.Revision, 99); err != nil {
+		t.Fatalf("activate R2: %v", err)
+	}
+
+	admin := &AdminUser{ID: 7, Roles: []AdminRole{{Key: WarehouseRoleKey}}}
+	activeRoleKeys, err := uc.WorkflowVisibleOwnerRoleKeys(ctx, second.CustomerKey, admin, PermissionWorkflowTaskRead)
+	if err != nil {
+		t.Fatalf("resolve active R2: %v", err)
+	}
+	if len(activeRoleKeys) != 0 {
+		t.Fatalf("active R2 must not inherit R1 entitlement, got %#v", activeRoleKeys)
+	}
+	storedRoleKeys, err := uc.WorkflowVisibleOwnerRoleKeysAtRevision(ctx, first.CustomerKey, first.Revision, admin, PermissionWorkflowTaskRead)
+	if err != nil {
+		t.Fatalf("resolve stored R1: %v", err)
+	}
+	if len(storedRoleKeys) != 1 || storedRoleKeys[0] != WarehouseRoleKey {
+		t.Fatalf("stored R1 responsibility = %#v, want warehouse", storedRoleKeys)
+	}
+}
+
+func TestCustomerConfigUsecaseAtRevisionAuthorizationRejectsNeverActivatedRevision(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+	in := validCustomerConfigInput()
+	in.Revision = "2026.06.28.published-only"
+	in.RoleProfiles = append(in.RoleProfiles, RoleProfileInput{RoleKey: WarehouseRoleKey, DisplayName: "仓库"})
+	in.WorkPools = append(in.WorkPools, WorkPoolInput{PoolKey: "warehouse", ModuleKey: "inventory", DisplayName: "仓库池"})
+	in.WorkPoolMemberships = append(in.WorkPoolMemberships, WorkPoolMembershipInput{PoolKey: "warehouse", RoleKey: WarehouseRoleKey, Enabled: true})
+	in.AccessEntitlements = append(in.AccessEntitlements, AccessEntitlementInput{
+		RoleKey: WarehouseRoleKey, CapabilityKey: PermissionWorkflowTaskRead, ScopeType: "customer", ScopeValue: in.CustomerKey, Enabled: true,
+	})
+	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
+		t.Fatalf("publish: %v", err)
+	}
+	admin := &AdminUser{ID: 7, Roles: []AdminRole{{Key: WarehouseRoleKey}}}
+
+	for _, status := range []string{CustomerConfigStatusPublished, "preview"} {
+		repo.revisions[customerRevisionKey(in.CustomerKey, in.Revision)].Status = status
+		roleKeys, err := uc.WorkflowVisibleOwnerRoleKeysAtRevision(ctx, in.CustomerKey, in.Revision, admin, PermissionWorkflowTaskRead)
+		if !errors.Is(err, ErrCustomerConfigNotFound) || len(roleKeys) != 0 {
+			t.Fatalf("status %s role visibility=%#v err=%v", status, roleKeys, err)
+		}
+		explanation, err := uc.WorkflowCandidateOwnerRoleKeysAtRevision(ctx, in.CustomerKey, in.Revision, "warehouse", PermissionWorkflowTaskRead)
+		if !errors.Is(err, ErrCustomerConfigNotFound) || explanation != nil {
+			t.Fatalf("status %s candidate=%#v err=%v", status, explanation, err)
+		}
+	}
+}
+
 func TestCustomerConfigUsecaseWorkflowCandidateOwnerRoleKeysRequiresCapabilityAndScope(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
@@ -2050,7 +1963,7 @@ func TestCustomerConfigUsecaseWorkflowCandidateOwnerRoleKeysRequiresCapabilityAn
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(ctx, in.CustomerKey, in.Revision, 99); err != nil {
+	if _, err := activateCustomerConfigForTest(ctx, uc, repo, in.CustomerKey, in.Revision, 99); err != nil {
 		t.Fatalf("ActivateCustomerConfig error = %v", err)
 	}
 

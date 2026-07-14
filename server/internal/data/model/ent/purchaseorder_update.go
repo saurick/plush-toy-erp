@@ -150,6 +150,27 @@ func (_u *PurchaseOrderUpdate) SetNillableLifecycleStatus(v *string) *PurchaseOr
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *PurchaseOrderUpdate) SetVersion(v int) *PurchaseOrderUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *PurchaseOrderUpdate) SetNillableVersion(v *int) *PurchaseOrderUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *PurchaseOrderUpdate) AddVersion(v int) *PurchaseOrderUpdate {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *PurchaseOrderUpdate) SetNote(v string) *PurchaseOrderUpdate {
 	_u.mutation.SetNote(v)
@@ -286,6 +307,11 @@ func (_u *PurchaseOrderUpdate) check() error {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.lifecycle_status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := purchaseorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := purchaseorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.note": %w`, err)}
@@ -341,6 +367,12 @@ func (_u *PurchaseOrderUpdate) sqlSave(ctx context.Context) (_node int, err erro
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(purchaseorder.FieldLifecycleStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(purchaseorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(purchaseorder.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchaseorder.FieldNote, field.TypeString, value)
@@ -565,6 +597,27 @@ func (_u *PurchaseOrderUpdateOne) SetNillableLifecycleStatus(v *string) *Purchas
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *PurchaseOrderUpdateOne) SetVersion(v int) *PurchaseOrderUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *PurchaseOrderUpdateOne) SetNillableVersion(v *int) *PurchaseOrderUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *PurchaseOrderUpdateOne) AddVersion(v int) *PurchaseOrderUpdateOne {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *PurchaseOrderUpdateOne) SetNote(v string) *PurchaseOrderUpdateOne {
 	_u.mutation.SetNote(v)
@@ -714,6 +767,11 @@ func (_u *PurchaseOrderUpdateOne) check() error {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.lifecycle_status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := purchaseorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := purchaseorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "PurchaseOrder.note": %w`, err)}
@@ -786,6 +844,12 @@ func (_u *PurchaseOrderUpdateOne) sqlSave(ctx context.Context) (_node *PurchaseO
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(purchaseorder.FieldLifecycleStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(purchaseorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(purchaseorder.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(purchaseorder.FieldNote, field.TypeString, value)

@@ -37,6 +37,10 @@ const (
 	FieldAmount = "amount"
 	// FieldSourceLineNo holds the string denoting the source_line_no field in the database.
 	FieldSourceLineNo = "source_line_no"
+	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
+	FieldIdempotencyKey = "idempotency_key"
+	// FieldIdempotencyPayloadHash holds the string denoting the idempotency_payload_hash field in the database.
+	FieldIdempotencyPayloadHash = "idempotency_payload_hash"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -142,6 +146,8 @@ var Columns = []string{
 	FieldUnitPrice,
 	FieldAmount,
 	FieldSourceLineNo,
+	FieldIdempotencyKey,
+	FieldIdempotencyPayloadHash,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -180,6 +186,10 @@ var (
 	LotNoValidator func(string) error
 	// SourceLineNoValidator is a validator for the "source_line_no" field. It is called by the builders before save.
 	SourceLineNoValidator func(string) error
+	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
+	IdempotencyKeyValidator func(string) error
+	// IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
+	IdempotencyPayloadHashValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -251,6 +261,16 @@ func ByAmount(opts ...sql.OrderTermOption) OrderOption {
 // BySourceLineNo orders the results by the source_line_no field.
 func BySourceLineNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceLineNo, opts...).ToFunc()
+}
+
+// ByIdempotencyKey orders the results by the idempotency_key field.
+func ByIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyKey, opts...).ToFunc()
+}
+
+// ByIdempotencyPayloadHash orders the results by the idempotency_payload_hash field.
+func ByIdempotencyPayloadHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldIdempotencyPayloadHash, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

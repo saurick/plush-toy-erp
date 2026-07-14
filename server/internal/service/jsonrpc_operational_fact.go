@@ -27,30 +27,30 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 	}
 
 	switch method {
-	case "create_production_fact", "createProductionFact",
-		"post_production_fact", "postProductionFact",
-		"cancel_production_fact", "cancelProductionFact",
-		"list_production_facts", "listProductionFacts":
+	case "create_production_fact",
+		"post_production_fact",
+		"cancel_production_fact",
+		"list_production_facts":
 		return d.handleOperationalFactProduction(ctx, method, id, pm)
-	case "create_outsourcing_fact", "createOutsourcingFact",
-		"post_outsourcing_fact", "postOutsourcingFact",
-		"cancel_outsourcing_fact", "cancelOutsourcingFact",
-		"list_outsourcing_facts", "listOutsourcingFacts":
+	case "create_outsourcing_fact",
+		"post_outsourcing_fact",
+		"cancel_outsourcing_fact",
+		"list_outsourcing_facts":
 		return d.handleOperationalFactOutsourcing(ctx, method, id, pm)
-	case "create_shipment_with_items", "createShipmentWithItems",
-		"ship_shipment", "shipShipment",
-		"cancel_shipment", "cancelShipment",
-		"list_shipments", "listShipments":
+	case "create_shipment_with_items",
+		"ship_shipment",
+		"cancel_shipment",
+		"list_shipments":
 		return d.handleOperationalFactShipment(ctx, method, id, pm, claims.UserID)
-	case "create_stock_reservation", "createStockReservation",
-		"release_stock_reservation", "releaseStockReservation",
-		"list_stock_reservations", "listStockReservations":
+	case "create_stock_reservation",
+		"release_stock_reservation",
+		"list_stock_reservations":
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
-	case "create_finance_fact", "createFinanceFact",
-		"post_finance_fact", "postFinanceFact",
-		"settle_finance_fact", "settleFinanceFact",
-		"cancel_finance_fact", "cancelFinanceFact",
-		"list_finance_facts", "listFinanceFacts":
+	case "create_finance_fact",
+		"post_finance_fact",
+		"settle_finance_fact",
+		"cancel_finance_fact",
+		"list_finance_facts":
 		return d.handleOperationalFactFinance(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownOperationalFactResult(method), nil

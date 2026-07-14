@@ -8,7 +8,11 @@ import {
 import { getBusinessStatusLabel } from '../config/workflowStatus.mjs'
 import { hasActionPermission } from './masterDataOrderView.mjs'
 import { getRoleDisplayName } from './roleKeys.mjs'
-import { getWorkflowTaskActionPermission } from './workflowTaskActionContract.mjs'
+import {
+  canWorkflowTaskStatusRunAction,
+  getWorkflowTaskActionPermission,
+  getWorkflowTaskStatusActionModes,
+} from './workflowTaskActionContract.mjs'
 import {
   WORKFLOW_TASK_BOARD_LANE_KEYS,
   requireWorkflowTaskBoardResponse,
@@ -18,8 +22,7 @@ export { getWorkflowTaskActionPermission }
 
 export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
   { value: 'all', label: '全部状态' },
-  { value: 'pending', label: '待处理' },
-  { value: 'processing', label: '处理中' },
+  { value: 'ready', label: '可执行' },
   { value: 'blocked', label: '阻塞' },
   { value: 'rejected', label: '退回' },
   { value: 'overdue', label: '已超时' },
@@ -69,9 +72,9 @@ export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
   },
   {
     key: 'exception',
-    title: '阻塞 / 退回',
-    description: '当前阻塞或已经退回的任务，优先补齐原因和责任交接。',
-    actionLabel: '查看全部阻塞和退回任务',
+    title: '阻塞',
+    description: '当前阻塞的任务，优先补齐原因和责任交接。',
+    actionLabel: '查看全部阻塞任务',
     tagColor: 'red',
   },
   {
@@ -84,7 +87,7 @@ export const TASK_BOARD_LANE_DEFINITIONS = Object.freeze([
   {
     key: 'finished',
     title: '已结束',
-    description: '已完成、已关闭或已取消，只保留查看和追溯。',
+    description: '已完成或已退回的任务只保留查看和追溯。',
     actionLabel: '查看全部已结束任务',
     tagColor: 'green',
   },
@@ -112,14 +115,10 @@ const DUE_FILTER_VALUES = new Set(
 const LANE_FILTER_VALUES = new Set(['all', ...WORKFLOW_TASK_BOARD_LANE_KEYS])
 
 const TASK_STATUS_META = Object.freeze({
-  pending: { label: '待处理', color: 'blue' },
   ready: { label: '可执行', color: 'blue' },
-  processing: { label: '处理中', color: 'processing' },
   blocked: { label: '阻塞', color: 'red' },
   rejected: { label: '退回', color: 'orange' },
   done: { label: '已完成', color: 'green' },
-  closed: { label: '已关闭', color: 'default' },
-  cancelled: { label: '已取消', color: 'default' },
 })
 
 function payloadOf(task = {}) {
@@ -202,6 +201,7 @@ export function canRunWorkflowTaskAction(
   actionMode = ''
 ) {
   if (!task || !actionMode || isTerminalWorkflowTask(task)) return false
+  if (!canWorkflowTaskStatusRunAction(task, actionMode)) return false
 
   const permissionKey = getWorkflowTaskActionPermission(actionMode, task)
   if (!hasActionPermission(admin, permissionKey)) return false
@@ -213,7 +213,7 @@ export function canRunWorkflowTaskAction(
 }
 
 export function getWorkflowTaskAllowedActionModes(admin = {}, task = {}) {
-  return ['complete', 'block', 'reject', 'urge'].filter((actionMode) =>
+  return getWorkflowTaskStatusActionModes(task).filter((actionMode) =>
     canRunWorkflowTaskAction(admin, task, actionMode)
   )
 }

@@ -44,9 +44,9 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsScopedOverview(t *testing.
 			Counts:     biz.WorkflowTaskBoardCounts{Actionable: 144, Exception: 110, Due: 143, Finished: 81},
 			Lanes: []biz.WorkflowTaskBoardLane{
 				{Key: biz.WorkflowTaskBoardLaneActionable, Total: 144, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 1, TaskStatusKey: "ready", Payload: map[string]any{}}}},
-				{Key: biz.WorkflowTaskBoardLaneException, Total: 110, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 2, TaskStatusKey: "rejected", Payload: map[string]any{}}}},
-				{Key: biz.WorkflowTaskBoardLaneDue, Total: 143, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 3, TaskStatusKey: "processing", Payload: map[string]any{}}}},
-				{Key: biz.WorkflowTaskBoardLaneFinished, Total: 81, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 4, TaskStatusKey: "done", Payload: map[string]any{}}}},
+				{Key: biz.WorkflowTaskBoardLaneException, Total: 110, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 2, TaskStatusKey: "blocked", Payload: map[string]any{}}}},
+				{Key: biz.WorkflowTaskBoardLaneDue, Total: 143, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 3, TaskStatusKey: "ready", Payload: map[string]any{}}}},
+				{Key: biz.WorkflowTaskBoardLaneFinished, Total: 81, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 4, TaskStatusKey: "rejected", Payload: map[string]any{}}}},
 			},
 			SourceTypes: []string{"project-orders", "shipping-release"},
 		},
@@ -63,7 +63,7 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsScopedOverview(t *testing.
 		"board-overview",
 		mustJSONRPCStruct(t, map[string]any{
 			"keyword":        " 工程 ",
-			"status":         "pending",
+			"status":         "ready",
 			"owner_role_key": biz.SalesRoleKey,
 			"due":            "noDue",
 			"source_type":    "project-orders",
@@ -76,14 +76,15 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsScopedOverview(t *testing.
 	if res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("get task board response=%#v", res)
 	}
-	if repo.query.Keyword != "工程" || repo.query.Status != "pending" || repo.query.OwnerRoleKey != biz.SalesRoleKey || repo.query.Due != "noDue" || repo.query.SourceType != "project-orders" {
+	if repo.query.Keyword != "工程" || repo.query.Status != "ready" || repo.query.OwnerRoleKey != biz.SalesRoleKey || repo.query.Due != "noDue" || repo.query.SourceType != "project-orders" {
 		t.Fatalf("unexpected board query %#v", repo.query)
 	}
-	if len(repo.query.VisibleOwnerRoleKeys) != 1 || repo.query.VisibleOwnerRoleKeys[0] != biz.SalesRoleKey {
-		t.Fatalf("board must reuse visible owner role scope, got %#v", repo.query.VisibleOwnerRoleKeys)
+	visibilityScope := repo.query.VisibilityScope
+	if visibilityScope == nil || len(visibilityScope.StandaloneVisibleOwnerRoleKeys) != 1 || visibilityScope.StandaloneVisibleOwnerRoleKeys[0] != biz.SalesRoleKey {
+		t.Fatalf("board must reuse visible owner role scope, got %#v", visibilityScope)
 	}
-	if repo.query.VisibleAssigneeID == nil || *repo.query.VisibleAssigneeID != 7 {
-		t.Fatalf("board must include self-assignee scope, got %#v", repo.query.VisibleAssigneeID)
+	if visibilityScope.VisibleAssigneeID == nil || *visibilityScope.VisibleAssigneeID != 7 {
+		t.Fatalf("board must include self-assignee scope, got %#v", visibilityScope.VisibleAssigneeID)
 	}
 	data := res.Data.AsMap()
 	if data["snapshot_at"] != float64(snapshotAt.Unix()) || data["total"] != float64(478) {
@@ -143,8 +144,8 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsFocusedPageAndCapsLimit(t 
 	if repo.query.LaneKey != biz.WorkflowTaskBoardLaneException || repo.query.Limit != 50 || repo.query.Offset != 20 {
 		t.Fatalf("unexpected focused board query %#v", repo.query)
 	}
-	if repo.query.VisibleAssigneeID != nil || len(repo.query.VisibleOwnerRoleKeys) != 0 {
-		t.Fatalf("super admin board must not receive row scope %#v", repo.query)
+	if repo.query.VisibilityScope == nil || !repo.query.VisibilityScope.StandaloneAllowAllOwnerRoles || repo.query.VisibilityScope.VisibleAssigneeID != nil {
+		t.Fatalf("super admin board must receive strict valid-anchor scope %#v", repo.query)
 	}
 	lanes, ok := res.Data.AsMap()["lanes"].([]any)
 	if !ok || len(lanes) != 1 {
@@ -161,6 +162,10 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardRejectsInvalidContract(t *testing
 		{name: "non string keyword", params: map[string]any{"keyword": float64(1)}},
 		{name: "oversized keyword", params: map[string]any{"keyword": strings.Repeat("长", 201)}},
 		{name: "invalid status", params: map[string]any{"status": "unknown"}},
+		{name: "non target pending status", params: map[string]any{"status": "pending"}},
+		{name: "non target processing status", params: map[string]any{"status": "processing"}},
+		{name: "non target cancelled status", params: map[string]any{"status": "cancelled"}},
+		{name: "non target closed status", params: map[string]any{"status": "closed"}},
 		{name: "invalid owner role", params: map[string]any{"owner_role_key": "unknown"}},
 		{name: "invalid due", params: map[string]any{"due": "tomorrow"}},
 		{name: "invalid lane", params: map[string]any{"lane_key": "unknown"}},

@@ -9551,27 +9551,29 @@ func (m *CustomerMutation) ResetEdge(name string) error {
 // CustomerConfigRevisionMutation represents an operation that mutates the CustomerConfigRevision nodes in the graph.
 type CustomerConfigRevisionMutation struct {
 	config
-	op                Op
-	typ               string
-	id                *int
-	customer_key      *string
-	revision          *string
-	product_version   *string
-	config_hash       *string
-	status            *string
-	compiled_snapshot *map[string]interface{}
-	published_by      *int
-	addpublished_by   *int
-	published_at      *time.Time
-	activated_by      *int
-	addactivated_by   *int
-	activated_at      *time.Time
-	created_at        *time.Time
-	updated_at        *time.Time
-	clearedFields     map[string]struct{}
-	done              bool
-	oldValue          func(context.Context) (*CustomerConfigRevision, error)
-	predicates        []predicate.CustomerConfigRevision
+	op                     Op
+	typ                    string
+	id                     *int
+	customer_key           *string
+	revision               *string
+	product_version        *string
+	config_hash            *string
+	config_hash_version    *int16
+	addconfig_hash_version *int16
+	status                 *string
+	compiled_snapshot      *map[string]interface{}
+	published_by           *int
+	addpublished_by        *int
+	published_at           *time.Time
+	activated_by           *int
+	addactivated_by        *int
+	activated_at           *time.Time
+	created_at             *time.Time
+	updated_at             *time.Time
+	clearedFields          map[string]struct{}
+	done                   bool
+	oldValue               func(context.Context) (*CustomerConfigRevision, error)
+	predicates             []predicate.CustomerConfigRevision
 }
 
 var _ ent.Mutation = (*CustomerConfigRevisionMutation)(nil)
@@ -9814,6 +9816,62 @@ func (m *CustomerConfigRevisionMutation) OldConfigHash(ctx context.Context) (v s
 // ResetConfigHash resets all changes to the "config_hash" field.
 func (m *CustomerConfigRevisionMutation) ResetConfigHash() {
 	m.config_hash = nil
+}
+
+// SetConfigHashVersion sets the "config_hash_version" field.
+func (m *CustomerConfigRevisionMutation) SetConfigHashVersion(i int16) {
+	m.config_hash_version = &i
+	m.addconfig_hash_version = nil
+}
+
+// ConfigHashVersion returns the value of the "config_hash_version" field in the mutation.
+func (m *CustomerConfigRevisionMutation) ConfigHashVersion() (r int16, exists bool) {
+	v := m.config_hash_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldConfigHashVersion returns the old "config_hash_version" field's value of the CustomerConfigRevision entity.
+// If the CustomerConfigRevision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *CustomerConfigRevisionMutation) OldConfigHashVersion(ctx context.Context) (v int16, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldConfigHashVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldConfigHashVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldConfigHashVersion: %w", err)
+	}
+	return oldValue.ConfigHashVersion, nil
+}
+
+// AddConfigHashVersion adds i to the "config_hash_version" field.
+func (m *CustomerConfigRevisionMutation) AddConfigHashVersion(i int16) {
+	if m.addconfig_hash_version != nil {
+		*m.addconfig_hash_version += i
+	} else {
+		m.addconfig_hash_version = &i
+	}
+}
+
+// AddedConfigHashVersion returns the value that was added to the "config_hash_version" field in this mutation.
+func (m *CustomerConfigRevisionMutation) AddedConfigHashVersion() (r int16, exists bool) {
+	v := m.addconfig_hash_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetConfigHashVersion resets all changes to the "config_hash_version" field.
+func (m *CustomerConfigRevisionMutation) ResetConfigHashVersion() {
+	m.config_hash_version = nil
+	m.addconfig_hash_version = nil
 }
 
 // SetStatus sets the "status" field.
@@ -10245,7 +10303,7 @@ func (m *CustomerConfigRevisionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *CustomerConfigRevisionMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.customer_key != nil {
 		fields = append(fields, customerconfigrevision.FieldCustomerKey)
 	}
@@ -10257,6 +10315,9 @@ func (m *CustomerConfigRevisionMutation) Fields() []string {
 	}
 	if m.config_hash != nil {
 		fields = append(fields, customerconfigrevision.FieldConfigHash)
+	}
+	if m.config_hash_version != nil {
+		fields = append(fields, customerconfigrevision.FieldConfigHashVersion)
 	}
 	if m.status != nil {
 		fields = append(fields, customerconfigrevision.FieldStatus)
@@ -10298,6 +10359,8 @@ func (m *CustomerConfigRevisionMutation) Field(name string) (ent.Value, bool) {
 		return m.ProductVersion()
 	case customerconfigrevision.FieldConfigHash:
 		return m.ConfigHash()
+	case customerconfigrevision.FieldConfigHashVersion:
+		return m.ConfigHashVersion()
 	case customerconfigrevision.FieldStatus:
 		return m.Status()
 	case customerconfigrevision.FieldCompiledSnapshot:
@@ -10331,6 +10394,8 @@ func (m *CustomerConfigRevisionMutation) OldField(ctx context.Context, name stri
 		return m.OldProductVersion(ctx)
 	case customerconfigrevision.FieldConfigHash:
 		return m.OldConfigHash(ctx)
+	case customerconfigrevision.FieldConfigHashVersion:
+		return m.OldConfigHashVersion(ctx)
 	case customerconfigrevision.FieldStatus:
 		return m.OldStatus(ctx)
 	case customerconfigrevision.FieldCompiledSnapshot:
@@ -10383,6 +10448,13 @@ func (m *CustomerConfigRevisionMutation) SetField(name string, value ent.Value) 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetConfigHash(v)
+		return nil
+	case customerconfigrevision.FieldConfigHashVersion:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetConfigHashVersion(v)
 		return nil
 	case customerconfigrevision.FieldStatus:
 		v, ok := value.(string)
@@ -10448,6 +10520,9 @@ func (m *CustomerConfigRevisionMutation) SetField(name string, value ent.Value) 
 // this mutation.
 func (m *CustomerConfigRevisionMutation) AddedFields() []string {
 	var fields []string
+	if m.addconfig_hash_version != nil {
+		fields = append(fields, customerconfigrevision.FieldConfigHashVersion)
+	}
 	if m.addpublished_by != nil {
 		fields = append(fields, customerconfigrevision.FieldPublishedBy)
 	}
@@ -10462,6 +10537,8 @@ func (m *CustomerConfigRevisionMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *CustomerConfigRevisionMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case customerconfigrevision.FieldConfigHashVersion:
+		return m.AddedConfigHashVersion()
 	case customerconfigrevision.FieldPublishedBy:
 		return m.AddedPublishedBy()
 	case customerconfigrevision.FieldActivatedBy:
@@ -10475,6 +10552,13 @@ func (m *CustomerConfigRevisionMutation) AddedField(name string) (ent.Value, boo
 // type.
 func (m *CustomerConfigRevisionMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case customerconfigrevision.FieldConfigHashVersion:
+		v, ok := value.(int16)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddConfigHashVersion(v)
+		return nil
 	case customerconfigrevision.FieldPublishedBy:
 		v, ok := value.(int)
 		if !ok {
@@ -10560,6 +10644,9 @@ func (m *CustomerConfigRevisionMutation) ResetField(name string) error {
 		return nil
 	case customerconfigrevision.FieldConfigHash:
 		m.ResetConfigHash()
+		return nil
+	case customerconfigrevision.FieldConfigHashVersion:
+		m.ResetConfigHashVersion()
 		return nil
 	case customerconfigrevision.FieldStatus:
 		m.ResetStatus()
@@ -11344,46 +11431,44 @@ func (m *DeploymentModuleStateMutation) ResetEdge(name string) error {
 // FinanceFactMutation represents an operation that mutates the FinanceFact nodes in the graph.
 type FinanceFactMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *int
-	fact_no                 *string
-	fact_type               *string
-	status                  *string
-	counterparty_type       *string
-	counterparty_id         *int
-	addcounterparty_id      *int
-	amount                  *decimal.Decimal
-	fee_amount              *decimal.Decimal
-	currency                *string
-	collection_type         *string
-	payment_term            *string
-	payment_term_days       *int
-	addpayment_term_days    *int
-	invoice_category        *string
-	source_type             *string
-	source_id               *int
-	addsource_id            *int
-	source_line_id          *int
-	addsource_line_id       *int
-	idempotency_key         *string
-	occurred_at             *time.Time
-	occurred_at_specified   *bool
-	posted_at               *time.Time
-	settled_at              *time.Time
-	cancelled_at            *time.Time
-	cancel_reason           *string
-	cancel_audit_version    *int
-	addcancel_audit_version *int
-	note                    *string
-	created_at              *time.Time
-	updated_at              *time.Time
-	clearedFields           map[string]struct{}
-	canceller               *int
-	clearedcanceller        bool
-	done                    bool
-	oldValue                func(context.Context) (*FinanceFact, error)
-	predicates              []predicate.FinanceFact
+	op                    Op
+	typ                   string
+	id                    *int
+	fact_no               *string
+	fact_type             *string
+	status                *string
+	counterparty_type     *string
+	counterparty_id       *int
+	addcounterparty_id    *int
+	amount                *decimal.Decimal
+	fee_amount            *decimal.Decimal
+	currency              *string
+	collection_type       *string
+	payment_term          *string
+	payment_term_days     *int
+	addpayment_term_days  *int
+	invoice_category      *string
+	source_type           *string
+	source_id             *int
+	addsource_id          *int
+	source_line_id        *int
+	addsource_line_id     *int
+	idempotency_key       *string
+	occurred_at           *time.Time
+	occurred_at_specified *bool
+	posted_at             *time.Time
+	settled_at            *time.Time
+	cancelled_at          *time.Time
+	cancel_reason         *string
+	note                  *string
+	created_at            *time.Time
+	updated_at            *time.Time
+	clearedFields         map[string]struct{}
+	canceller             *int
+	clearedcanceller      bool
+	done                  bool
+	oldValue              func(context.Context) (*FinanceFact, error)
+	predicates            []predicate.FinanceFact
 }
 
 var _ ent.Mutation = (*FinanceFactMutation)(nil)
@@ -12565,62 +12650,6 @@ func (m *FinanceFactMutation) ResetCancelReason() {
 	delete(m.clearedFields, financefact.FieldCancelReason)
 }
 
-// SetCancelAuditVersion sets the "cancel_audit_version" field.
-func (m *FinanceFactMutation) SetCancelAuditVersion(i int) {
-	m.cancel_audit_version = &i
-	m.addcancel_audit_version = nil
-}
-
-// CancelAuditVersion returns the value of the "cancel_audit_version" field in the mutation.
-func (m *FinanceFactMutation) CancelAuditVersion() (r int, exists bool) {
-	v := m.cancel_audit_version
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldCancelAuditVersion returns the old "cancel_audit_version" field's value of the FinanceFact entity.
-// If the FinanceFact object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *FinanceFactMutation) OldCancelAuditVersion(ctx context.Context) (v int, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldCancelAuditVersion is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldCancelAuditVersion requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldCancelAuditVersion: %w", err)
-	}
-	return oldValue.CancelAuditVersion, nil
-}
-
-// AddCancelAuditVersion adds i to the "cancel_audit_version" field.
-func (m *FinanceFactMutation) AddCancelAuditVersion(i int) {
-	if m.addcancel_audit_version != nil {
-		*m.addcancel_audit_version += i
-	} else {
-		m.addcancel_audit_version = &i
-	}
-}
-
-// AddedCancelAuditVersion returns the value that was added to the "cancel_audit_version" field in this mutation.
-func (m *FinanceFactMutation) AddedCancelAuditVersion() (r int, exists bool) {
-	v := m.addcancel_audit_version
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// ResetCancelAuditVersion resets all changes to the "cancel_audit_version" field.
-func (m *FinanceFactMutation) ResetCancelAuditVersion() {
-	m.cancel_audit_version = nil
-	m.addcancel_audit_version = nil
-}
-
 // SetNote sets the "note" field.
 func (m *FinanceFactMutation) SetNote(s string) {
 	m.note = &s
@@ -12816,7 +12845,7 @@ func (m *FinanceFactMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *FinanceFactMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 26)
 	if m.fact_no != nil {
 		fields = append(fields, financefact.FieldFactNo)
 	}
@@ -12886,9 +12915,6 @@ func (m *FinanceFactMutation) Fields() []string {
 	if m.cancel_reason != nil {
 		fields = append(fields, financefact.FieldCancelReason)
 	}
-	if m.cancel_audit_version != nil {
-		fields = append(fields, financefact.FieldCancelAuditVersion)
-	}
 	if m.note != nil {
 		fields = append(fields, financefact.FieldNote)
 	}
@@ -12952,8 +12978,6 @@ func (m *FinanceFactMutation) Field(name string) (ent.Value, bool) {
 		return m.CancelledBy()
 	case financefact.FieldCancelReason:
 		return m.CancelReason()
-	case financefact.FieldCancelAuditVersion:
-		return m.CancelAuditVersion()
 	case financefact.FieldNote:
 		return m.Note()
 	case financefact.FieldCreatedAt:
@@ -13015,8 +13039,6 @@ func (m *FinanceFactMutation) OldField(ctx context.Context, name string) (ent.Va
 		return m.OldCancelledBy(ctx)
 	case financefact.FieldCancelReason:
 		return m.OldCancelReason(ctx)
-	case financefact.FieldCancelAuditVersion:
-		return m.OldCancelAuditVersion(ctx)
 	case financefact.FieldNote:
 		return m.OldNote(ctx)
 	case financefact.FieldCreatedAt:
@@ -13193,13 +13215,6 @@ func (m *FinanceFactMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCancelReason(v)
 		return nil
-	case financefact.FieldCancelAuditVersion:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetCancelAuditVersion(v)
-		return nil
 	case financefact.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -13241,9 +13256,6 @@ func (m *FinanceFactMutation) AddedFields() []string {
 	if m.addsource_line_id != nil {
 		fields = append(fields, financefact.FieldSourceLineID)
 	}
-	if m.addcancel_audit_version != nil {
-		fields = append(fields, financefact.FieldCancelAuditVersion)
-	}
 	return fields
 }
 
@@ -13260,8 +13272,6 @@ func (m *FinanceFactMutation) AddedField(name string) (ent.Value, bool) {
 		return m.AddedSourceID()
 	case financefact.FieldSourceLineID:
 		return m.AddedSourceLineID()
-	case financefact.FieldCancelAuditVersion:
-		return m.AddedCancelAuditVersion()
 	}
 	return nil, false
 }
@@ -13298,13 +13308,6 @@ func (m *FinanceFactMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddSourceLineID(v)
-		return nil
-	case financefact.FieldCancelAuditVersion:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddCancelAuditVersion(v)
 		return nil
 	}
 	return fmt.Errorf("unknown FinanceFact numeric field %s", name)
@@ -13488,9 +13491,6 @@ func (m *FinanceFactMutation) ResetField(name string) error {
 		return nil
 	case financefact.FieldCancelReason:
 		m.ResetCancelReason()
-		return nil
-	case financefact.FieldCancelAuditVersion:
-		m.ResetCancelAuditVersion()
 		return nil
 	case financefact.FieldNote:
 		m.ResetNote()
@@ -21818,6 +21818,8 @@ type OutsourcingOrderMutation struct {
 	order_date               *time.Time
 	expected_return_date     *time.Time
 	lifecycle_status         *string
+	version                  *int
+	addversion               *int
 	note                     *string
 	created_at               *time.Time
 	updated_at               *time.Time
@@ -22340,6 +22342,62 @@ func (m *OutsourcingOrderMutation) ResetLifecycleStatus() {
 	m.lifecycle_status = nil
 }
 
+// SetVersion sets the "version" field.
+func (m *OutsourcingOrderMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *OutsourcingOrderMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the OutsourcingOrder entity.
+// If the OutsourcingOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingOrderMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *OutsourcingOrderMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *OutsourcingOrderMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *OutsourcingOrderMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
 // SetNote sets the "note" field.
 func (m *OutsourcingOrderMutation) SetNote(s string) {
 	m.note = &s
@@ -22576,7 +22634,7 @@ func (m *OutsourcingOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingOrderMutation) Fields() []string {
-	fields := make([]string, 0, 12)
+	fields := make([]string, 0, 13)
 	if m.outsourcing_order_no != nil {
 		fields = append(fields, outsourcingorder.FieldOutsourcingOrderNo)
 	}
@@ -22603,6 +22661,9 @@ func (m *OutsourcingOrderMutation) Fields() []string {
 	}
 	if m.lifecycle_status != nil {
 		fields = append(fields, outsourcingorder.FieldLifecycleStatus)
+	}
+	if m.version != nil {
+		fields = append(fields, outsourcingorder.FieldVersion)
 	}
 	if m.note != nil {
 		fields = append(fields, outsourcingorder.FieldNote)
@@ -22639,6 +22700,8 @@ func (m *OutsourcingOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.ExpectedReturnDate()
 	case outsourcingorder.FieldLifecycleStatus:
 		return m.LifecycleStatus()
+	case outsourcingorder.FieldVersion:
+		return m.Version()
 	case outsourcingorder.FieldNote:
 		return m.Note()
 	case outsourcingorder.FieldCreatedAt:
@@ -22672,6 +22735,8 @@ func (m *OutsourcingOrderMutation) OldField(ctx context.Context, name string) (e
 		return m.OldExpectedReturnDate(ctx)
 	case outsourcingorder.FieldLifecycleStatus:
 		return m.OldLifecycleStatus(ctx)
+	case outsourcingorder.FieldVersion:
+		return m.OldVersion(ctx)
 	case outsourcingorder.FieldNote:
 		return m.OldNote(ctx)
 	case outsourcingorder.FieldCreatedAt:
@@ -22750,6 +22815,13 @@ func (m *OutsourcingOrderMutation) SetField(name string, value ent.Value) error 
 		}
 		m.SetLifecycleStatus(v)
 		return nil
+	case outsourcingorder.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
 	case outsourcingorder.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -22782,6 +22854,9 @@ func (m *OutsourcingOrderMutation) AddedFields() []string {
 	if m.addsource_sales_order_id != nil {
 		fields = append(fields, outsourcingorder.FieldSourceSalesOrderID)
 	}
+	if m.addversion != nil {
+		fields = append(fields, outsourcingorder.FieldVersion)
+	}
 	return fields
 }
 
@@ -22792,6 +22867,8 @@ func (m *OutsourcingOrderMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case outsourcingorder.FieldSourceSalesOrderID:
 		return m.AddedSourceSalesOrderID()
+	case outsourcingorder.FieldVersion:
+		return m.AddedVersion()
 	}
 	return nil, false
 }
@@ -22807,6 +22884,13 @@ func (m *OutsourcingOrderMutation) AddField(name string, value ent.Value) error 
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddSourceSalesOrderID(v)
+		return nil
+	case outsourcingorder.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
 		return nil
 	}
 	return fmt.Errorf("unknown OutsourcingOrder numeric field %s", name)
@@ -22900,6 +22984,9 @@ func (m *OutsourcingOrderMutation) ResetField(name string) error {
 		return nil
 	case outsourcingorder.FieldLifecycleStatus:
 		m.ResetLifecycleStatus()
+		return nil
+	case outsourcingorder.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case outsourcingorder.FieldNote:
 		m.ResetNote()
@@ -26898,6 +26985,9 @@ type ProcessInstanceMutation struct {
 	nodes                    map[int]struct{}
 	removednodes             map[int]struct{}
 	clearednodes             bool
+	workflow_tasks           map[int]struct{}
+	removedworkflow_tasks    map[int]struct{}
+	clearedworkflow_tasks    bool
 	done                     bool
 	oldValue                 func(context.Context) (*ProcessInstance, error)
 	predicates               []predicate.ProcessInstance
@@ -27856,6 +27946,60 @@ func (m *ProcessInstanceMutation) ResetNodes() {
 	m.removednodes = nil
 }
 
+// AddWorkflowTaskIDs adds the "workflow_tasks" edge to the WorkflowTask entity by ids.
+func (m *ProcessInstanceMutation) AddWorkflowTaskIDs(ids ...int) {
+	if m.workflow_tasks == nil {
+		m.workflow_tasks = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.workflow_tasks[ids[i]] = struct{}{}
+	}
+}
+
+// ClearWorkflowTasks clears the "workflow_tasks" edge to the WorkflowTask entity.
+func (m *ProcessInstanceMutation) ClearWorkflowTasks() {
+	m.clearedworkflow_tasks = true
+}
+
+// WorkflowTasksCleared reports if the "workflow_tasks" edge to the WorkflowTask entity was cleared.
+func (m *ProcessInstanceMutation) WorkflowTasksCleared() bool {
+	return m.clearedworkflow_tasks
+}
+
+// RemoveWorkflowTaskIDs removes the "workflow_tasks" edge to the WorkflowTask entity by IDs.
+func (m *ProcessInstanceMutation) RemoveWorkflowTaskIDs(ids ...int) {
+	if m.removedworkflow_tasks == nil {
+		m.removedworkflow_tasks = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.workflow_tasks, ids[i])
+		m.removedworkflow_tasks[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedWorkflowTasks returns the removed IDs of the "workflow_tasks" edge to the WorkflowTask entity.
+func (m *ProcessInstanceMutation) RemovedWorkflowTasksIDs() (ids []int) {
+	for id := range m.removedworkflow_tasks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// WorkflowTasksIDs returns the "workflow_tasks" edge IDs in the mutation.
+func (m *ProcessInstanceMutation) WorkflowTasksIDs() (ids []int) {
+	for id := range m.workflow_tasks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetWorkflowTasks resets all changes to the "workflow_tasks" edge.
+func (m *ProcessInstanceMutation) ResetWorkflowTasks() {
+	m.workflow_tasks = nil
+	m.clearedworkflow_tasks = false
+	m.removedworkflow_tasks = nil
+}
+
 // Where appends a list predicates to the ProcessInstanceMutation builder.
 func (m *ProcessInstanceMutation) Where(ps ...predicate.ProcessInstance) {
 	m.predicates = append(m.predicates, ps...)
@@ -28362,9 +28506,12 @@ func (m *ProcessInstanceMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProcessInstanceMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.nodes != nil {
 		edges = append(edges, processinstance.EdgeNodes)
+	}
+	if m.workflow_tasks != nil {
+		edges = append(edges, processinstance.EdgeWorkflowTasks)
 	}
 	return edges
 }
@@ -28379,15 +28526,24 @@ func (m *ProcessInstanceMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case processinstance.EdgeWorkflowTasks:
+		ids := make([]ent.Value, 0, len(m.workflow_tasks))
+		for id := range m.workflow_tasks {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProcessInstanceMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.removednodes != nil {
 		edges = append(edges, processinstance.EdgeNodes)
+	}
+	if m.removedworkflow_tasks != nil {
+		edges = append(edges, processinstance.EdgeWorkflowTasks)
 	}
 	return edges
 }
@@ -28402,15 +28558,24 @@ func (m *ProcessInstanceMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case processinstance.EdgeWorkflowTasks:
+		ids := make([]ent.Value, 0, len(m.removedworkflow_tasks))
+		for id := range m.removedworkflow_tasks {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProcessInstanceMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearednodes {
 		edges = append(edges, processinstance.EdgeNodes)
+	}
+	if m.clearedworkflow_tasks {
+		edges = append(edges, processinstance.EdgeWorkflowTasks)
 	}
 	return edges
 }
@@ -28421,6 +28586,8 @@ func (m *ProcessInstanceMutation) EdgeCleared(name string) bool {
 	switch name {
 	case processinstance.EdgeNodes:
 		return m.clearednodes
+	case processinstance.EdgeWorkflowTasks:
+		return m.clearedworkflow_tasks
 	}
 	return false
 }
@@ -28439,6 +28606,9 @@ func (m *ProcessInstanceMutation) ResetEdge(name string) error {
 	switch name {
 	case processinstance.EdgeNodes:
 		m.ResetNodes()
+		return nil
+	case processinstance.EdgeWorkflowTasks:
+		m.ResetWorkflowTasks()
 		return nil
 	}
 	return fmt.Errorf("unknown ProcessInstance edge %s", name)
@@ -28489,6 +28659,9 @@ type ProcessNodeInstanceMutation struct {
 	clearedFields                        map[string]struct{}
 	process_instance                     *int
 	clearedprocess_instance              bool
+	workflow_tasks                       map[int]struct{}
+	removedworkflow_tasks                map[int]struct{}
+	clearedworkflow_tasks                bool
 	done                                 bool
 	oldValue                             func(context.Context) (*ProcessNodeInstance, error)
 	predicates                           []predicate.ProcessNodeInstance
@@ -30158,6 +30331,60 @@ func (m *ProcessNodeInstanceMutation) ResetProcessInstance() {
 	m.clearedprocess_instance = false
 }
 
+// AddWorkflowTaskIDs adds the "workflow_tasks" edge to the WorkflowTask entity by ids.
+func (m *ProcessNodeInstanceMutation) AddWorkflowTaskIDs(ids ...int) {
+	if m.workflow_tasks == nil {
+		m.workflow_tasks = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.workflow_tasks[ids[i]] = struct{}{}
+	}
+}
+
+// ClearWorkflowTasks clears the "workflow_tasks" edge to the WorkflowTask entity.
+func (m *ProcessNodeInstanceMutation) ClearWorkflowTasks() {
+	m.clearedworkflow_tasks = true
+}
+
+// WorkflowTasksCleared reports if the "workflow_tasks" edge to the WorkflowTask entity was cleared.
+func (m *ProcessNodeInstanceMutation) WorkflowTasksCleared() bool {
+	return m.clearedworkflow_tasks
+}
+
+// RemoveWorkflowTaskIDs removes the "workflow_tasks" edge to the WorkflowTask entity by IDs.
+func (m *ProcessNodeInstanceMutation) RemoveWorkflowTaskIDs(ids ...int) {
+	if m.removedworkflow_tasks == nil {
+		m.removedworkflow_tasks = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.workflow_tasks, ids[i])
+		m.removedworkflow_tasks[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedWorkflowTasks returns the removed IDs of the "workflow_tasks" edge to the WorkflowTask entity.
+func (m *ProcessNodeInstanceMutation) RemovedWorkflowTasksIDs() (ids []int) {
+	for id := range m.removedworkflow_tasks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// WorkflowTasksIDs returns the "workflow_tasks" edge IDs in the mutation.
+func (m *ProcessNodeInstanceMutation) WorkflowTasksIDs() (ids []int) {
+	for id := range m.workflow_tasks {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetWorkflowTasks resets all changes to the "workflow_tasks" edge.
+func (m *ProcessNodeInstanceMutation) ResetWorkflowTasks() {
+	m.workflow_tasks = nil
+	m.clearedworkflow_tasks = false
+	m.removedworkflow_tasks = nil
+}
+
 // Where appends a list predicates to the ProcessNodeInstanceMutation builder.
 func (m *ProcessNodeInstanceMutation) Where(ps ...predicate.ProcessNodeInstance) {
 	m.predicates = append(m.predicates, ps...)
@@ -31017,9 +31244,12 @@ func (m *ProcessNodeInstanceMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *ProcessNodeInstanceMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.process_instance != nil {
 		edges = append(edges, processnodeinstance.EdgeProcessInstance)
+	}
+	if m.workflow_tasks != nil {
+		edges = append(edges, processnodeinstance.EdgeWorkflowTasks)
 	}
 	return edges
 }
@@ -31032,27 +31262,47 @@ func (m *ProcessNodeInstanceMutation) AddedIDs(name string) []ent.Value {
 		if id := m.process_instance; id != nil {
 			return []ent.Value{*id}
 		}
+	case processnodeinstance.EdgeWorkflowTasks:
+		ids := make([]ent.Value, 0, len(m.workflow_tasks))
+		for id := range m.workflow_tasks {
+			ids = append(ids, id)
+		}
+		return ids
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *ProcessNodeInstanceMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
+	if m.removedworkflow_tasks != nil {
+		edges = append(edges, processnodeinstance.EdgeWorkflowTasks)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *ProcessNodeInstanceMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case processnodeinstance.EdgeWorkflowTasks:
+		ids := make([]ent.Value, 0, len(m.removedworkflow_tasks))
+		for id := range m.removedworkflow_tasks {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *ProcessNodeInstanceMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 2)
 	if m.clearedprocess_instance {
 		edges = append(edges, processnodeinstance.EdgeProcessInstance)
+	}
+	if m.clearedworkflow_tasks {
+		edges = append(edges, processnodeinstance.EdgeWorkflowTasks)
 	}
 	return edges
 }
@@ -31063,6 +31313,8 @@ func (m *ProcessNodeInstanceMutation) EdgeCleared(name string) bool {
 	switch name {
 	case processnodeinstance.EdgeProcessInstance:
 		return m.clearedprocess_instance
+	case processnodeinstance.EdgeWorkflowTasks:
+		return m.clearedworkflow_tasks
 	}
 	return false
 }
@@ -31084,6 +31336,9 @@ func (m *ProcessNodeInstanceMutation) ResetEdge(name string) error {
 	switch name {
 	case processnodeinstance.EdgeProcessInstance:
 		m.ResetProcessInstance()
+		return nil
+	case processnodeinstance.EdgeWorkflowTasks:
+		m.ResetWorkflowTasks()
 		return nil
 	}
 	return fmt.Errorf("unknown ProcessNodeInstance edge %s", name)
@@ -40593,6 +40848,8 @@ type PurchaseOrderMutation struct {
 	purchase_date              *time.Time
 	expected_arrival_date      *time.Time
 	lifecycle_status           *string
+	version                    *int
+	addversion                 *int
 	note                       *string
 	created_at                 *time.Time
 	updated_at                 *time.Time
@@ -41045,6 +41302,62 @@ func (m *PurchaseOrderMutation) ResetLifecycleStatus() {
 	m.lifecycle_status = nil
 }
 
+// SetVersion sets the "version" field.
+func (m *PurchaseOrderMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *PurchaseOrderMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the PurchaseOrder entity.
+// If the PurchaseOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseOrderMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *PurchaseOrderMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *PurchaseOrderMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *PurchaseOrderMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
 // SetNote sets the "note" field.
 func (m *PurchaseOrderMutation) SetNote(s string) {
 	m.note = &s
@@ -41281,7 +41594,7 @@ func (m *PurchaseOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseOrderMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.purchase_order_no != nil {
 		fields = append(fields, purchaseorder.FieldPurchaseOrderNo)
 	}
@@ -41305,6 +41618,9 @@ func (m *PurchaseOrderMutation) Fields() []string {
 	}
 	if m.lifecycle_status != nil {
 		fields = append(fields, purchaseorder.FieldLifecycleStatus)
+	}
+	if m.version != nil {
+		fields = append(fields, purchaseorder.FieldVersion)
 	}
 	if m.note != nil {
 		fields = append(fields, purchaseorder.FieldNote)
@@ -41339,6 +41655,8 @@ func (m *PurchaseOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.ExpectedArrivalDate()
 	case purchaseorder.FieldLifecycleStatus:
 		return m.LifecycleStatus()
+	case purchaseorder.FieldVersion:
+		return m.Version()
 	case purchaseorder.FieldNote:
 		return m.Note()
 	case purchaseorder.FieldCreatedAt:
@@ -41370,6 +41688,8 @@ func (m *PurchaseOrderMutation) OldField(ctx context.Context, name string) (ent.
 		return m.OldExpectedArrivalDate(ctx)
 	case purchaseorder.FieldLifecycleStatus:
 		return m.OldLifecycleStatus(ctx)
+	case purchaseorder.FieldVersion:
+		return m.OldVersion(ctx)
 	case purchaseorder.FieldNote:
 		return m.OldNote(ctx)
 	case purchaseorder.FieldCreatedAt:
@@ -41441,6 +41761,13 @@ func (m *PurchaseOrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLifecycleStatus(v)
 		return nil
+	case purchaseorder.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
 	case purchaseorder.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -41470,6 +41797,9 @@ func (m *PurchaseOrderMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *PurchaseOrderMutation) AddedFields() []string {
 	var fields []string
+	if m.addversion != nil {
+		fields = append(fields, purchaseorder.FieldVersion)
+	}
 	return fields
 }
 
@@ -41478,6 +41808,8 @@ func (m *PurchaseOrderMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *PurchaseOrderMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case purchaseorder.FieldVersion:
+		return m.AddedVersion()
 	}
 	return nil, false
 }
@@ -41487,6 +41819,13 @@ func (m *PurchaseOrderMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *PurchaseOrderMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case purchaseorder.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
+		return nil
 	}
 	return fmt.Errorf("unknown PurchaseOrder numeric field %s", name)
 }
@@ -41570,6 +41909,9 @@ func (m *PurchaseOrderMutation) ResetField(name string) error {
 		return nil
 	case purchaseorder.FieldLifecycleStatus:
 		m.ResetLifecycleStatus()
+		return nil
+	case purchaseorder.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case purchaseorder.FieldNote:
 		m.ResetNote()
@@ -47070,6 +47412,8 @@ type PurchaseReceiptItemMutation struct {
 	unit_price                               *decimal.Decimal
 	amount                                   *decimal.Decimal
 	source_line_no                           *string
+	idempotency_key                          *string
+	idempotency_payload_hash                 *string
 	note                                     *string
 	created_at                               *time.Time
 	updated_at                               *time.Time
@@ -47672,6 +48016,104 @@ func (m *PurchaseReceiptItemMutation) ResetSourceLineNo() {
 	delete(m.clearedFields, purchasereceiptitem.FieldSourceLineNo)
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (m *PurchaseReceiptItemMutation) SetIdempotencyKey(s string) {
+	m.idempotency_key = &s
+}
+
+// IdempotencyKey returns the value of the "idempotency_key" field in the mutation.
+func (m *PurchaseReceiptItemMutation) IdempotencyKey() (r string, exists bool) {
+	v := m.idempotency_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyKey returns the old "idempotency_key" field's value of the PurchaseReceiptItem entity.
+// If the PurchaseReceiptItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptItemMutation) OldIdempotencyKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyKey: %w", err)
+	}
+	return oldValue.IdempotencyKey, nil
+}
+
+// ClearIdempotencyKey clears the value of the "idempotency_key" field.
+func (m *PurchaseReceiptItemMutation) ClearIdempotencyKey() {
+	m.idempotency_key = nil
+	m.clearedFields[purchasereceiptitem.FieldIdempotencyKey] = struct{}{}
+}
+
+// IdempotencyKeyCleared returns if the "idempotency_key" field was cleared in this mutation.
+func (m *PurchaseReceiptItemMutation) IdempotencyKeyCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptitem.FieldIdempotencyKey]
+	return ok
+}
+
+// ResetIdempotencyKey resets all changes to the "idempotency_key" field.
+func (m *PurchaseReceiptItemMutation) ResetIdempotencyKey() {
+	m.idempotency_key = nil
+	delete(m.clearedFields, purchasereceiptitem.FieldIdempotencyKey)
+}
+
+// SetIdempotencyPayloadHash sets the "idempotency_payload_hash" field.
+func (m *PurchaseReceiptItemMutation) SetIdempotencyPayloadHash(s string) {
+	m.idempotency_payload_hash = &s
+}
+
+// IdempotencyPayloadHash returns the value of the "idempotency_payload_hash" field in the mutation.
+func (m *PurchaseReceiptItemMutation) IdempotencyPayloadHash() (r string, exists bool) {
+	v := m.idempotency_payload_hash
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldIdempotencyPayloadHash returns the old "idempotency_payload_hash" field's value of the PurchaseReceiptItem entity.
+// If the PurchaseReceiptItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseReceiptItemMutation) OldIdempotencyPayloadHash(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldIdempotencyPayloadHash is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldIdempotencyPayloadHash requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldIdempotencyPayloadHash: %w", err)
+	}
+	return oldValue.IdempotencyPayloadHash, nil
+}
+
+// ClearIdempotencyPayloadHash clears the value of the "idempotency_payload_hash" field.
+func (m *PurchaseReceiptItemMutation) ClearIdempotencyPayloadHash() {
+	m.idempotency_payload_hash = nil
+	m.clearedFields[purchasereceiptitem.FieldIdempotencyPayloadHash] = struct{}{}
+}
+
+// IdempotencyPayloadHashCleared returns if the "idempotency_payload_hash" field was cleared in this mutation.
+func (m *PurchaseReceiptItemMutation) IdempotencyPayloadHashCleared() bool {
+	_, ok := m.clearedFields[purchasereceiptitem.FieldIdempotencyPayloadHash]
+	return ok
+}
+
+// ResetIdempotencyPayloadHash resets all changes to the "idempotency_payload_hash" field.
+func (m *PurchaseReceiptItemMutation) ResetIdempotencyPayloadHash() {
+	m.idempotency_payload_hash = nil
+	delete(m.clearedFields, purchasereceiptitem.FieldIdempotencyPayloadHash)
+}
+
 // SetNote sets the "note" field.
 func (m *PurchaseReceiptItemMutation) SetNote(s string) {
 	m.note = &s
@@ -48164,7 +48606,7 @@ func (m *PurchaseReceiptItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseReceiptItemMutation) Fields() []string {
-	fields := make([]string, 0, 14)
+	fields := make([]string, 0, 16)
 	if m.receipt != nil {
 		fields = append(fields, purchasereceiptitem.FieldReceiptID)
 	}
@@ -48197,6 +48639,12 @@ func (m *PurchaseReceiptItemMutation) Fields() []string {
 	}
 	if m.source_line_no != nil {
 		fields = append(fields, purchasereceiptitem.FieldSourceLineNo)
+	}
+	if m.idempotency_key != nil {
+		fields = append(fields, purchasereceiptitem.FieldIdempotencyKey)
+	}
+	if m.idempotency_payload_hash != nil {
+		fields = append(fields, purchasereceiptitem.FieldIdempotencyPayloadHash)
 	}
 	if m.note != nil {
 		fields = append(fields, purchasereceiptitem.FieldNote)
@@ -48237,6 +48685,10 @@ func (m *PurchaseReceiptItemMutation) Field(name string) (ent.Value, bool) {
 		return m.Amount()
 	case purchasereceiptitem.FieldSourceLineNo:
 		return m.SourceLineNo()
+	case purchasereceiptitem.FieldIdempotencyKey:
+		return m.IdempotencyKey()
+	case purchasereceiptitem.FieldIdempotencyPayloadHash:
+		return m.IdempotencyPayloadHash()
 	case purchasereceiptitem.FieldNote:
 		return m.Note()
 	case purchasereceiptitem.FieldCreatedAt:
@@ -48274,6 +48726,10 @@ func (m *PurchaseReceiptItemMutation) OldField(ctx context.Context, name string)
 		return m.OldAmount(ctx)
 	case purchasereceiptitem.FieldSourceLineNo:
 		return m.OldSourceLineNo(ctx)
+	case purchasereceiptitem.FieldIdempotencyKey:
+		return m.OldIdempotencyKey(ctx)
+	case purchasereceiptitem.FieldIdempotencyPayloadHash:
+		return m.OldIdempotencyPayloadHash(ctx)
 	case purchasereceiptitem.FieldNote:
 		return m.OldNote(ctx)
 	case purchasereceiptitem.FieldCreatedAt:
@@ -48366,6 +48822,20 @@ func (m *PurchaseReceiptItemMutation) SetField(name string, value ent.Value) err
 		}
 		m.SetSourceLineNo(v)
 		return nil
+	case purchasereceiptitem.FieldIdempotencyKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyKey(v)
+		return nil
+	case purchasereceiptitem.FieldIdempotencyPayloadHash:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetIdempotencyPayloadHash(v)
+		return nil
 	case purchasereceiptitem.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -48438,6 +48908,12 @@ func (m *PurchaseReceiptItemMutation) ClearedFields() []string {
 	if m.FieldCleared(purchasereceiptitem.FieldSourceLineNo) {
 		fields = append(fields, purchasereceiptitem.FieldSourceLineNo)
 	}
+	if m.FieldCleared(purchasereceiptitem.FieldIdempotencyKey) {
+		fields = append(fields, purchasereceiptitem.FieldIdempotencyKey)
+	}
+	if m.FieldCleared(purchasereceiptitem.FieldIdempotencyPayloadHash) {
+		fields = append(fields, purchasereceiptitem.FieldIdempotencyPayloadHash)
+	}
 	if m.FieldCleared(purchasereceiptitem.FieldNote) {
 		fields = append(fields, purchasereceiptitem.FieldNote)
 	}
@@ -48472,6 +48948,12 @@ func (m *PurchaseReceiptItemMutation) ClearField(name string) error {
 		return nil
 	case purchasereceiptitem.FieldSourceLineNo:
 		m.ClearSourceLineNo()
+		return nil
+	case purchasereceiptitem.FieldIdempotencyKey:
+		m.ClearIdempotencyKey()
+		return nil
+	case purchasereceiptitem.FieldIdempotencyPayloadHash:
+		m.ClearIdempotencyPayloadHash()
 		return nil
 	case purchasereceiptitem.FieldNote:
 		m.ClearNote()
@@ -48516,6 +48998,12 @@ func (m *PurchaseReceiptItemMutation) ResetField(name string) error {
 		return nil
 	case purchasereceiptitem.FieldSourceLineNo:
 		m.ResetSourceLineNo()
+		return nil
+	case purchasereceiptitem.FieldIdempotencyKey:
+		m.ResetIdempotencyKey()
+		return nil
+	case purchasereceiptitem.FieldIdempotencyPayloadHash:
+		m.ResetIdempotencyPayloadHash()
 		return nil
 	case purchasereceiptitem.FieldNote:
 		m.ResetNote()
@@ -53020,9 +53508,12 @@ type RoleMutation struct {
 	name          *string
 	description   *string
 	builtin       *bool
+	role_type     *role.RoleType
 	disabled      *bool
 	sort_order    *int
 	addsort_order *int
+	version       *int
+	addversion    *int
 	created_at    *time.Time
 	updated_at    *time.Time
 	clearedFields map[string]struct{}
@@ -53273,6 +53764,42 @@ func (m *RoleMutation) ResetBuiltin() {
 	m.builtin = nil
 }
 
+// SetRoleType sets the "role_type" field.
+func (m *RoleMutation) SetRoleType(rt role.RoleType) {
+	m.role_type = &rt
+}
+
+// RoleType returns the value of the "role_type" field in the mutation.
+func (m *RoleMutation) RoleType() (r role.RoleType, exists bool) {
+	v := m.role_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRoleType returns the old "role_type" field's value of the Role entity.
+// If the Role object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleMutation) OldRoleType(ctx context.Context) (v role.RoleType, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRoleType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRoleType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRoleType: %w", err)
+	}
+	return oldValue.RoleType, nil
+}
+
+// ResetRoleType resets all changes to the "role_type" field.
+func (m *RoleMutation) ResetRoleType() {
+	m.role_type = nil
+}
+
 // SetDisabled sets the "disabled" field.
 func (m *RoleMutation) SetDisabled(b bool) {
 	m.disabled = &b
@@ -53363,6 +53890,62 @@ func (m *RoleMutation) AddedSortOrder() (r int, exists bool) {
 func (m *RoleMutation) ResetSortOrder() {
 	m.sort_order = nil
 	m.addsort_order = nil
+}
+
+// SetVersion sets the "version" field.
+func (m *RoleMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *RoleMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the Role entity.
+// If the Role object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *RoleMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *RoleMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *RoleMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
 }
 
 // SetCreatedAt sets the "created_at" field.
@@ -53471,7 +54054,7 @@ func (m *RoleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RoleMutation) Fields() []string {
-	fields := make([]string, 0, 8)
+	fields := make([]string, 0, 10)
 	if m.role_key != nil {
 		fields = append(fields, role.FieldRoleKey)
 	}
@@ -53484,11 +54067,17 @@ func (m *RoleMutation) Fields() []string {
 	if m.builtin != nil {
 		fields = append(fields, role.FieldBuiltin)
 	}
+	if m.role_type != nil {
+		fields = append(fields, role.FieldRoleType)
+	}
 	if m.disabled != nil {
 		fields = append(fields, role.FieldDisabled)
 	}
 	if m.sort_order != nil {
 		fields = append(fields, role.FieldSortOrder)
+	}
+	if m.version != nil {
+		fields = append(fields, role.FieldVersion)
 	}
 	if m.created_at != nil {
 		fields = append(fields, role.FieldCreatedAt)
@@ -53512,10 +54101,14 @@ func (m *RoleMutation) Field(name string) (ent.Value, bool) {
 		return m.Description()
 	case role.FieldBuiltin:
 		return m.Builtin()
+	case role.FieldRoleType:
+		return m.RoleType()
 	case role.FieldDisabled:
 		return m.Disabled()
 	case role.FieldSortOrder:
 		return m.SortOrder()
+	case role.FieldVersion:
+		return m.Version()
 	case role.FieldCreatedAt:
 		return m.CreatedAt()
 	case role.FieldUpdatedAt:
@@ -53537,10 +54130,14 @@ func (m *RoleMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldDescription(ctx)
 	case role.FieldBuiltin:
 		return m.OldBuiltin(ctx)
+	case role.FieldRoleType:
+		return m.OldRoleType(ctx)
 	case role.FieldDisabled:
 		return m.OldDisabled(ctx)
 	case role.FieldSortOrder:
 		return m.OldSortOrder(ctx)
+	case role.FieldVersion:
+		return m.OldVersion(ctx)
 	case role.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case role.FieldUpdatedAt:
@@ -53582,6 +54179,13 @@ func (m *RoleMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetBuiltin(v)
 		return nil
+	case role.FieldRoleType:
+		v, ok := value.(role.RoleType)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRoleType(v)
+		return nil
 	case role.FieldDisabled:
 		v, ok := value.(bool)
 		if !ok {
@@ -53595,6 +54199,13 @@ func (m *RoleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetSortOrder(v)
+		return nil
+	case role.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
 		return nil
 	case role.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -53621,6 +54232,9 @@ func (m *RoleMutation) AddedFields() []string {
 	if m.addsort_order != nil {
 		fields = append(fields, role.FieldSortOrder)
 	}
+	if m.addversion != nil {
+		fields = append(fields, role.FieldVersion)
+	}
 	return fields
 }
 
@@ -53631,6 +54245,8 @@ func (m *RoleMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case role.FieldSortOrder:
 		return m.AddedSortOrder()
+	case role.FieldVersion:
+		return m.AddedVersion()
 	}
 	return nil, false
 }
@@ -53646,6 +54262,13 @@ func (m *RoleMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddSortOrder(v)
+		return nil
+	case role.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
 		return nil
 	}
 	return fmt.Errorf("unknown Role numeric field %s", name)
@@ -53686,11 +54309,17 @@ func (m *RoleMutation) ResetField(name string) error {
 	case role.FieldBuiltin:
 		m.ResetBuiltin()
 		return nil
+	case role.FieldRoleType:
+		m.ResetRoleType()
+		return nil
 	case role.FieldDisabled:
 		m.ResetDisabled()
 		return nil
 	case role.FieldSortOrder:
 		m.ResetSortOrder()
+		return nil
+	case role.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case role.FieldCreatedAt:
 		m.ResetCreatedAt()
@@ -56134,6 +56763,8 @@ type SalesOrderMutation struct {
 	order_date                *time.Time
 	planned_delivery_date     *time.Time
 	lifecycle_status          *string
+	version                   *int
+	addversion                *int
 	note                      *string
 	created_at                *time.Time
 	updated_at                *time.Time
@@ -56809,6 +57440,62 @@ func (m *SalesOrderMutation) ResetLifecycleStatus() {
 	m.lifecycle_status = nil
 }
 
+// SetVersion sets the "version" field.
+func (m *SalesOrderMutation) SetVersion(i int) {
+	m.version = &i
+	m.addversion = nil
+}
+
+// Version returns the value of the "version" field in the mutation.
+func (m *SalesOrderMutation) Version() (r int, exists bool) {
+	v := m.version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldVersion returns the old "version" field's value of the SalesOrder entity.
+// If the SalesOrder object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *SalesOrderMutation) OldVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldVersion: %w", err)
+	}
+	return oldValue.Version, nil
+}
+
+// AddVersion adds i to the "version" field.
+func (m *SalesOrderMutation) AddVersion(i int) {
+	if m.addversion != nil {
+		*m.addversion += i
+	} else {
+		m.addversion = &i
+	}
+}
+
+// AddedVersion returns the value that was added to the "version" field in this mutation.
+func (m *SalesOrderMutation) AddedVersion() (r int, exists bool) {
+	v := m.addversion
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetVersion resets all changes to the "version" field.
+func (m *SalesOrderMutation) ResetVersion() {
+	m.version = nil
+	m.addversion = nil
+}
+
 // SetNote sets the "note" field.
 func (m *SalesOrderMutation) SetNote(s string) {
 	m.note = &s
@@ -57153,7 +57840,7 @@ func (m *SalesOrderMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *SalesOrderMutation) Fields() []string {
-	fields := make([]string, 0, 15)
+	fields := make([]string, 0, 16)
 	if m.order_no != nil {
 		fields = append(fields, salesorder.FieldOrderNo)
 	}
@@ -57189,6 +57876,9 @@ func (m *SalesOrderMutation) Fields() []string {
 	}
 	if m.lifecycle_status != nil {
 		fields = append(fields, salesorder.FieldLifecycleStatus)
+	}
+	if m.version != nil {
+		fields = append(fields, salesorder.FieldVersion)
 	}
 	if m.note != nil {
 		fields = append(fields, salesorder.FieldNote)
@@ -57231,6 +57921,8 @@ func (m *SalesOrderMutation) Field(name string) (ent.Value, bool) {
 		return m.PlannedDeliveryDate()
 	case salesorder.FieldLifecycleStatus:
 		return m.LifecycleStatus()
+	case salesorder.FieldVersion:
+		return m.Version()
 	case salesorder.FieldNote:
 		return m.Note()
 	case salesorder.FieldCreatedAt:
@@ -57270,6 +57962,8 @@ func (m *SalesOrderMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldPlannedDeliveryDate(ctx)
 	case salesorder.FieldLifecycleStatus:
 		return m.OldLifecycleStatus(ctx)
+	case salesorder.FieldVersion:
+		return m.OldVersion(ctx)
 	case salesorder.FieldNote:
 		return m.OldNote(ctx)
 	case salesorder.FieldCreatedAt:
@@ -57369,6 +58063,13 @@ func (m *SalesOrderMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetLifecycleStatus(v)
 		return nil
+	case salesorder.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetVersion(v)
+		return nil
 	case salesorder.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -57401,6 +58102,9 @@ func (m *SalesOrderMutation) AddedFields() []string {
 	if m.addpayment_term_days != nil {
 		fields = append(fields, salesorder.FieldPaymentTermDays)
 	}
+	if m.addversion != nil {
+		fields = append(fields, salesorder.FieldVersion)
+	}
 	return fields
 }
 
@@ -57411,6 +58115,8 @@ func (m *SalesOrderMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case salesorder.FieldPaymentTermDays:
 		return m.AddedPaymentTermDays()
+	case salesorder.FieldVersion:
+		return m.AddedVersion()
 	}
 	return nil, false
 }
@@ -57426,6 +58132,13 @@ func (m *SalesOrderMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPaymentTermDays(v)
+		return nil
+	case salesorder.FieldVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddVersion(v)
 		return nil
 	}
 	return fmt.Errorf("unknown SalesOrder numeric field %s", name)
@@ -57546,6 +58259,9 @@ func (m *SalesOrderMutation) ResetField(name string) error {
 		return nil
 	case salesorder.FieldLifecycleStatus:
 		m.ResetLifecycleStatus()
+		return nil
+	case salesorder.FieldVersion:
+		m.ResetVersion()
 		return nil
 	case salesorder.FieldNote:
 		m.ResetNote()
@@ -70654,51 +71370,58 @@ func (m *WorkflowBusinessStateMutation) ResetEdge(name string) error {
 // WorkflowTaskMutation represents an operation that mutates the WorkflowTask nodes in the graph.
 type WorkflowTaskMutation struct {
 	config
-	op                          Op
-	typ                         string
-	id                          *int
-	task_code                   *string
-	task_group                  *string
-	task_name                   *string
-	source_type                 *string
-	source_id                   *int
-	addsource_id                *int
-	source_no                   *string
-	business_status_key         *string
-	task_status_key             *string
-	owner_role_key              *string
-	owner_pool_key              *string
-	required_capability_key     *string
-	config_revision             *string
-	process_instance_id         *int
-	addprocess_instance_id      *int
-	process_node_instance_id    *int
-	addprocess_node_instance_id *int
-	assignee_id                 *int
-	addassignee_id              *int
-	priority                    *int16
-	addpriority                 *int16
-	blocked_reason              *string
-	due_at                      *time.Time
-	started_at                  *time.Time
-	completed_at                *time.Time
-	closed_at                   *time.Time
-	payload                     *map[string]interface{}
-	version                     *int
-	addversion                  *int
-	created_by                  *int
-	addcreated_by               *int
-	updated_by                  *int
-	addupdated_by               *int
-	created_at                  *time.Time
-	updated_at                  *time.Time
-	clearedFields               map[string]struct{}
-	events                      map[int]struct{}
-	removedevents               map[int]struct{}
-	clearedevents               bool
-	done                        bool
-	oldValue                    func(context.Context) (*WorkflowTask, error)
-	predicates                  []predicate.WorkflowTask
+	op                           Op
+	typ                          string
+	id                           *int
+	task_code                    *string
+	task_group                   *string
+	task_name                    *string
+	source_type                  *string
+	source_id                    *int
+	addsource_id                 *int
+	source_no                    *string
+	business_status_key          *string
+	task_status_key              *string
+	owner_role_key               *string
+	owner_pool_key               *string
+	required_capability_key      *string
+	config_revision              *string
+	assignee_id                  *int
+	addassignee_id               *int
+	priority                     *int16
+	addpriority                  *int16
+	blocked_reason               *string
+	due_at                       *time.Time
+	completed_at                 *time.Time
+	critical_path                *bool
+	urge_count                   *int
+	addurge_count                *int
+	last_urged_at                *time.Time
+	last_urged_by                *int
+	addlast_urged_by             *int
+	last_urged_by_role_key       *string
+	escalated_at                 *time.Time
+	escalate_target_role_key     *string
+	payload                      *map[string]interface{}
+	version                      *int
+	addversion                   *int
+	created_by                   *int
+	addcreated_by                *int
+	updated_by                   *int
+	addupdated_by                *int
+	created_at                   *time.Time
+	updated_at                   *time.Time
+	clearedFields                map[string]struct{}
+	events                       map[int]struct{}
+	removedevents                map[int]struct{}
+	clearedevents                bool
+	process_instance             *int
+	clearedprocess_instance      bool
+	process_node_instance        *int
+	clearedprocess_node_instance bool
+	done                         bool
+	oldValue                     func(context.Context) (*WorkflowTask, error)
+	predicates                   []predicate.WorkflowTask
 }
 
 var _ ent.Mutation = (*WorkflowTaskMutation)(nil)
@@ -71318,13 +72041,12 @@ func (m *WorkflowTaskMutation) ResetConfigRevision() {
 
 // SetProcessInstanceID sets the "process_instance_id" field.
 func (m *WorkflowTaskMutation) SetProcessInstanceID(i int) {
-	m.process_instance_id = &i
-	m.addprocess_instance_id = nil
+	m.process_instance = &i
 }
 
 // ProcessInstanceID returns the value of the "process_instance_id" field in the mutation.
 func (m *WorkflowTaskMutation) ProcessInstanceID() (r int, exists bool) {
-	v := m.process_instance_id
+	v := m.process_instance
 	if v == nil {
 		return
 	}
@@ -71348,28 +72070,9 @@ func (m *WorkflowTaskMutation) OldProcessInstanceID(ctx context.Context) (v *int
 	return oldValue.ProcessInstanceID, nil
 }
 
-// AddProcessInstanceID adds i to the "process_instance_id" field.
-func (m *WorkflowTaskMutation) AddProcessInstanceID(i int) {
-	if m.addprocess_instance_id != nil {
-		*m.addprocess_instance_id += i
-	} else {
-		m.addprocess_instance_id = &i
-	}
-}
-
-// AddedProcessInstanceID returns the value that was added to the "process_instance_id" field in this mutation.
-func (m *WorkflowTaskMutation) AddedProcessInstanceID() (r int, exists bool) {
-	v := m.addprocess_instance_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ClearProcessInstanceID clears the value of the "process_instance_id" field.
 func (m *WorkflowTaskMutation) ClearProcessInstanceID() {
-	m.process_instance_id = nil
-	m.addprocess_instance_id = nil
+	m.process_instance = nil
 	m.clearedFields[workflowtask.FieldProcessInstanceID] = struct{}{}
 }
 
@@ -71381,20 +72084,18 @@ func (m *WorkflowTaskMutation) ProcessInstanceIDCleared() bool {
 
 // ResetProcessInstanceID resets all changes to the "process_instance_id" field.
 func (m *WorkflowTaskMutation) ResetProcessInstanceID() {
-	m.process_instance_id = nil
-	m.addprocess_instance_id = nil
+	m.process_instance = nil
 	delete(m.clearedFields, workflowtask.FieldProcessInstanceID)
 }
 
 // SetProcessNodeInstanceID sets the "process_node_instance_id" field.
 func (m *WorkflowTaskMutation) SetProcessNodeInstanceID(i int) {
-	m.process_node_instance_id = &i
-	m.addprocess_node_instance_id = nil
+	m.process_node_instance = &i
 }
 
 // ProcessNodeInstanceID returns the value of the "process_node_instance_id" field in the mutation.
 func (m *WorkflowTaskMutation) ProcessNodeInstanceID() (r int, exists bool) {
-	v := m.process_node_instance_id
+	v := m.process_node_instance
 	if v == nil {
 		return
 	}
@@ -71418,28 +72119,9 @@ func (m *WorkflowTaskMutation) OldProcessNodeInstanceID(ctx context.Context) (v 
 	return oldValue.ProcessNodeInstanceID, nil
 }
 
-// AddProcessNodeInstanceID adds i to the "process_node_instance_id" field.
-func (m *WorkflowTaskMutation) AddProcessNodeInstanceID(i int) {
-	if m.addprocess_node_instance_id != nil {
-		*m.addprocess_node_instance_id += i
-	} else {
-		m.addprocess_node_instance_id = &i
-	}
-}
-
-// AddedProcessNodeInstanceID returns the value that was added to the "process_node_instance_id" field in this mutation.
-func (m *WorkflowTaskMutation) AddedProcessNodeInstanceID() (r int, exists bool) {
-	v := m.addprocess_node_instance_id
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
 // ClearProcessNodeInstanceID clears the value of the "process_node_instance_id" field.
 func (m *WorkflowTaskMutation) ClearProcessNodeInstanceID() {
-	m.process_node_instance_id = nil
-	m.addprocess_node_instance_id = nil
+	m.process_node_instance = nil
 	m.clearedFields[workflowtask.FieldProcessNodeInstanceID] = struct{}{}
 }
 
@@ -71451,8 +72133,7 @@ func (m *WorkflowTaskMutation) ProcessNodeInstanceIDCleared() bool {
 
 // ResetProcessNodeInstanceID resets all changes to the "process_node_instance_id" field.
 func (m *WorkflowTaskMutation) ResetProcessNodeInstanceID() {
-	m.process_node_instance_id = nil
-	m.addprocess_node_instance_id = nil
+	m.process_node_instance = nil
 	delete(m.clearedFields, workflowtask.FieldProcessNodeInstanceID)
 }
 
@@ -71680,55 +72361,6 @@ func (m *WorkflowTaskMutation) ResetDueAt() {
 	delete(m.clearedFields, workflowtask.FieldDueAt)
 }
 
-// SetStartedAt sets the "started_at" field.
-func (m *WorkflowTaskMutation) SetStartedAt(t time.Time) {
-	m.started_at = &t
-}
-
-// StartedAt returns the value of the "started_at" field in the mutation.
-func (m *WorkflowTaskMutation) StartedAt() (r time.Time, exists bool) {
-	v := m.started_at
-	if v == nil {
-		return
-	}
-	return *v, true
-}
-
-// OldStartedAt returns the old "started_at" field's value of the WorkflowTask entity.
-// If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
-// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WorkflowTaskMutation) OldStartedAt(ctx context.Context) (v *time.Time, err error) {
-	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldStartedAt is only allowed on UpdateOne operations")
-	}
-	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldStartedAt requires an ID field in the mutation")
-	}
-	oldValue, err := m.oldValue(ctx)
-	if err != nil {
-		return v, fmt.Errorf("querying old value for OldStartedAt: %w", err)
-	}
-	return oldValue.StartedAt, nil
-}
-
-// ClearStartedAt clears the value of the "started_at" field.
-func (m *WorkflowTaskMutation) ClearStartedAt() {
-	m.started_at = nil
-	m.clearedFields[workflowtask.FieldStartedAt] = struct{}{}
-}
-
-// StartedAtCleared returns if the "started_at" field was cleared in this mutation.
-func (m *WorkflowTaskMutation) StartedAtCleared() bool {
-	_, ok := m.clearedFields[workflowtask.FieldStartedAt]
-	return ok
-}
-
-// ResetStartedAt resets all changes to the "started_at" field.
-func (m *WorkflowTaskMutation) ResetStartedAt() {
-	m.started_at = nil
-	delete(m.clearedFields, workflowtask.FieldStartedAt)
-}
-
 // SetCompletedAt sets the "completed_at" field.
 func (m *WorkflowTaskMutation) SetCompletedAt(t time.Time) {
 	m.completed_at = &t
@@ -71778,53 +72410,362 @@ func (m *WorkflowTaskMutation) ResetCompletedAt() {
 	delete(m.clearedFields, workflowtask.FieldCompletedAt)
 }
 
-// SetClosedAt sets the "closed_at" field.
-func (m *WorkflowTaskMutation) SetClosedAt(t time.Time) {
-	m.closed_at = &t
+// SetCriticalPath sets the "critical_path" field.
+func (m *WorkflowTaskMutation) SetCriticalPath(b bool) {
+	m.critical_path = &b
 }
 
-// ClosedAt returns the value of the "closed_at" field in the mutation.
-func (m *WorkflowTaskMutation) ClosedAt() (r time.Time, exists bool) {
-	v := m.closed_at
+// CriticalPath returns the value of the "critical_path" field in the mutation.
+func (m *WorkflowTaskMutation) CriticalPath() (r bool, exists bool) {
+	v := m.critical_path
 	if v == nil {
 		return
 	}
 	return *v, true
 }
 
-// OldClosedAt returns the old "closed_at" field's value of the WorkflowTask entity.
+// OldCriticalPath returns the old "critical_path" field's value of the WorkflowTask entity.
 // If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
 // An error is returned if the mutation operation is not UpdateOne, or the database query fails.
-func (m *WorkflowTaskMutation) OldClosedAt(ctx context.Context) (v *time.Time, err error) {
+func (m *WorkflowTaskMutation) OldCriticalPath(ctx context.Context) (v bool, err error) {
 	if !m.op.Is(OpUpdateOne) {
-		return v, errors.New("OldClosedAt is only allowed on UpdateOne operations")
+		return v, errors.New("OldCriticalPath is only allowed on UpdateOne operations")
 	}
 	if m.id == nil || m.oldValue == nil {
-		return v, errors.New("OldClosedAt requires an ID field in the mutation")
+		return v, errors.New("OldCriticalPath requires an ID field in the mutation")
 	}
 	oldValue, err := m.oldValue(ctx)
 	if err != nil {
-		return v, fmt.Errorf("querying old value for OldClosedAt: %w", err)
+		return v, fmt.Errorf("querying old value for OldCriticalPath: %w", err)
 	}
-	return oldValue.ClosedAt, nil
+	return oldValue.CriticalPath, nil
 }
 
-// ClearClosedAt clears the value of the "closed_at" field.
-func (m *WorkflowTaskMutation) ClearClosedAt() {
-	m.closed_at = nil
-	m.clearedFields[workflowtask.FieldClosedAt] = struct{}{}
+// ResetCriticalPath resets all changes to the "critical_path" field.
+func (m *WorkflowTaskMutation) ResetCriticalPath() {
+	m.critical_path = nil
 }
 
-// ClosedAtCleared returns if the "closed_at" field was cleared in this mutation.
-func (m *WorkflowTaskMutation) ClosedAtCleared() bool {
-	_, ok := m.clearedFields[workflowtask.FieldClosedAt]
+// SetUrgeCount sets the "urge_count" field.
+func (m *WorkflowTaskMutation) SetUrgeCount(i int) {
+	m.urge_count = &i
+	m.addurge_count = nil
+}
+
+// UrgeCount returns the value of the "urge_count" field in the mutation.
+func (m *WorkflowTaskMutation) UrgeCount() (r int, exists bool) {
+	v := m.urge_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUrgeCount returns the old "urge_count" field's value of the WorkflowTask entity.
+// If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkflowTaskMutation) OldUrgeCount(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUrgeCount is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUrgeCount requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUrgeCount: %w", err)
+	}
+	return oldValue.UrgeCount, nil
+}
+
+// AddUrgeCount adds i to the "urge_count" field.
+func (m *WorkflowTaskMutation) AddUrgeCount(i int) {
+	if m.addurge_count != nil {
+		*m.addurge_count += i
+	} else {
+		m.addurge_count = &i
+	}
+}
+
+// AddedUrgeCount returns the value that was added to the "urge_count" field in this mutation.
+func (m *WorkflowTaskMutation) AddedUrgeCount() (r int, exists bool) {
+	v := m.addurge_count
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetUrgeCount resets all changes to the "urge_count" field.
+func (m *WorkflowTaskMutation) ResetUrgeCount() {
+	m.urge_count = nil
+	m.addurge_count = nil
+}
+
+// SetLastUrgedAt sets the "last_urged_at" field.
+func (m *WorkflowTaskMutation) SetLastUrgedAt(t time.Time) {
+	m.last_urged_at = &t
+}
+
+// LastUrgedAt returns the value of the "last_urged_at" field in the mutation.
+func (m *WorkflowTaskMutation) LastUrgedAt() (r time.Time, exists bool) {
+	v := m.last_urged_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastUrgedAt returns the old "last_urged_at" field's value of the WorkflowTask entity.
+// If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkflowTaskMutation) OldLastUrgedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastUrgedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastUrgedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastUrgedAt: %w", err)
+	}
+	return oldValue.LastUrgedAt, nil
+}
+
+// ClearLastUrgedAt clears the value of the "last_urged_at" field.
+func (m *WorkflowTaskMutation) ClearLastUrgedAt() {
+	m.last_urged_at = nil
+	m.clearedFields[workflowtask.FieldLastUrgedAt] = struct{}{}
+}
+
+// LastUrgedAtCleared returns if the "last_urged_at" field was cleared in this mutation.
+func (m *WorkflowTaskMutation) LastUrgedAtCleared() bool {
+	_, ok := m.clearedFields[workflowtask.FieldLastUrgedAt]
 	return ok
 }
 
-// ResetClosedAt resets all changes to the "closed_at" field.
-func (m *WorkflowTaskMutation) ResetClosedAt() {
-	m.closed_at = nil
-	delete(m.clearedFields, workflowtask.FieldClosedAt)
+// ResetLastUrgedAt resets all changes to the "last_urged_at" field.
+func (m *WorkflowTaskMutation) ResetLastUrgedAt() {
+	m.last_urged_at = nil
+	delete(m.clearedFields, workflowtask.FieldLastUrgedAt)
+}
+
+// SetLastUrgedBy sets the "last_urged_by" field.
+func (m *WorkflowTaskMutation) SetLastUrgedBy(i int) {
+	m.last_urged_by = &i
+	m.addlast_urged_by = nil
+}
+
+// LastUrgedBy returns the value of the "last_urged_by" field in the mutation.
+func (m *WorkflowTaskMutation) LastUrgedBy() (r int, exists bool) {
+	v := m.last_urged_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastUrgedBy returns the old "last_urged_by" field's value of the WorkflowTask entity.
+// If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkflowTaskMutation) OldLastUrgedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastUrgedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastUrgedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastUrgedBy: %w", err)
+	}
+	return oldValue.LastUrgedBy, nil
+}
+
+// AddLastUrgedBy adds i to the "last_urged_by" field.
+func (m *WorkflowTaskMutation) AddLastUrgedBy(i int) {
+	if m.addlast_urged_by != nil {
+		*m.addlast_urged_by += i
+	} else {
+		m.addlast_urged_by = &i
+	}
+}
+
+// AddedLastUrgedBy returns the value that was added to the "last_urged_by" field in this mutation.
+func (m *WorkflowTaskMutation) AddedLastUrgedBy() (r int, exists bool) {
+	v := m.addlast_urged_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearLastUrgedBy clears the value of the "last_urged_by" field.
+func (m *WorkflowTaskMutation) ClearLastUrgedBy() {
+	m.last_urged_by = nil
+	m.addlast_urged_by = nil
+	m.clearedFields[workflowtask.FieldLastUrgedBy] = struct{}{}
+}
+
+// LastUrgedByCleared returns if the "last_urged_by" field was cleared in this mutation.
+func (m *WorkflowTaskMutation) LastUrgedByCleared() bool {
+	_, ok := m.clearedFields[workflowtask.FieldLastUrgedBy]
+	return ok
+}
+
+// ResetLastUrgedBy resets all changes to the "last_urged_by" field.
+func (m *WorkflowTaskMutation) ResetLastUrgedBy() {
+	m.last_urged_by = nil
+	m.addlast_urged_by = nil
+	delete(m.clearedFields, workflowtask.FieldLastUrgedBy)
+}
+
+// SetLastUrgedByRoleKey sets the "last_urged_by_role_key" field.
+func (m *WorkflowTaskMutation) SetLastUrgedByRoleKey(s string) {
+	m.last_urged_by_role_key = &s
+}
+
+// LastUrgedByRoleKey returns the value of the "last_urged_by_role_key" field in the mutation.
+func (m *WorkflowTaskMutation) LastUrgedByRoleKey() (r string, exists bool) {
+	v := m.last_urged_by_role_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldLastUrgedByRoleKey returns the old "last_urged_by_role_key" field's value of the WorkflowTask entity.
+// If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkflowTaskMutation) OldLastUrgedByRoleKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldLastUrgedByRoleKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldLastUrgedByRoleKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldLastUrgedByRoleKey: %w", err)
+	}
+	return oldValue.LastUrgedByRoleKey, nil
+}
+
+// ClearLastUrgedByRoleKey clears the value of the "last_urged_by_role_key" field.
+func (m *WorkflowTaskMutation) ClearLastUrgedByRoleKey() {
+	m.last_urged_by_role_key = nil
+	m.clearedFields[workflowtask.FieldLastUrgedByRoleKey] = struct{}{}
+}
+
+// LastUrgedByRoleKeyCleared returns if the "last_urged_by_role_key" field was cleared in this mutation.
+func (m *WorkflowTaskMutation) LastUrgedByRoleKeyCleared() bool {
+	_, ok := m.clearedFields[workflowtask.FieldLastUrgedByRoleKey]
+	return ok
+}
+
+// ResetLastUrgedByRoleKey resets all changes to the "last_urged_by_role_key" field.
+func (m *WorkflowTaskMutation) ResetLastUrgedByRoleKey() {
+	m.last_urged_by_role_key = nil
+	delete(m.clearedFields, workflowtask.FieldLastUrgedByRoleKey)
+}
+
+// SetEscalatedAt sets the "escalated_at" field.
+func (m *WorkflowTaskMutation) SetEscalatedAt(t time.Time) {
+	m.escalated_at = &t
+}
+
+// EscalatedAt returns the value of the "escalated_at" field in the mutation.
+func (m *WorkflowTaskMutation) EscalatedAt() (r time.Time, exists bool) {
+	v := m.escalated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEscalatedAt returns the old "escalated_at" field's value of the WorkflowTask entity.
+// If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkflowTaskMutation) OldEscalatedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEscalatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEscalatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEscalatedAt: %w", err)
+	}
+	return oldValue.EscalatedAt, nil
+}
+
+// ClearEscalatedAt clears the value of the "escalated_at" field.
+func (m *WorkflowTaskMutation) ClearEscalatedAt() {
+	m.escalated_at = nil
+	m.clearedFields[workflowtask.FieldEscalatedAt] = struct{}{}
+}
+
+// EscalatedAtCleared returns if the "escalated_at" field was cleared in this mutation.
+func (m *WorkflowTaskMutation) EscalatedAtCleared() bool {
+	_, ok := m.clearedFields[workflowtask.FieldEscalatedAt]
+	return ok
+}
+
+// ResetEscalatedAt resets all changes to the "escalated_at" field.
+func (m *WorkflowTaskMutation) ResetEscalatedAt() {
+	m.escalated_at = nil
+	delete(m.clearedFields, workflowtask.FieldEscalatedAt)
+}
+
+// SetEscalateTargetRoleKey sets the "escalate_target_role_key" field.
+func (m *WorkflowTaskMutation) SetEscalateTargetRoleKey(s string) {
+	m.escalate_target_role_key = &s
+}
+
+// EscalateTargetRoleKey returns the value of the "escalate_target_role_key" field in the mutation.
+func (m *WorkflowTaskMutation) EscalateTargetRoleKey() (r string, exists bool) {
+	v := m.escalate_target_role_key
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldEscalateTargetRoleKey returns the old "escalate_target_role_key" field's value of the WorkflowTask entity.
+// If the WorkflowTask object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *WorkflowTaskMutation) OldEscalateTargetRoleKey(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldEscalateTargetRoleKey is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldEscalateTargetRoleKey requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldEscalateTargetRoleKey: %w", err)
+	}
+	return oldValue.EscalateTargetRoleKey, nil
+}
+
+// ClearEscalateTargetRoleKey clears the value of the "escalate_target_role_key" field.
+func (m *WorkflowTaskMutation) ClearEscalateTargetRoleKey() {
+	m.escalate_target_role_key = nil
+	m.clearedFields[workflowtask.FieldEscalateTargetRoleKey] = struct{}{}
+}
+
+// EscalateTargetRoleKeyCleared returns if the "escalate_target_role_key" field was cleared in this mutation.
+func (m *WorkflowTaskMutation) EscalateTargetRoleKeyCleared() bool {
+	_, ok := m.clearedFields[workflowtask.FieldEscalateTargetRoleKey]
+	return ok
+}
+
+// ResetEscalateTargetRoleKey resets all changes to the "escalate_target_role_key" field.
+func (m *WorkflowTaskMutation) ResetEscalateTargetRoleKey() {
+	m.escalate_target_role_key = nil
+	delete(m.clearedFields, workflowtask.FieldEscalateTargetRoleKey)
 }
 
 // SetPayload sets the "payload" field.
@@ -72198,6 +73139,60 @@ func (m *WorkflowTaskMutation) ResetEvents() {
 	m.removedevents = nil
 }
 
+// ClearProcessInstance clears the "process_instance" edge to the ProcessInstance entity.
+func (m *WorkflowTaskMutation) ClearProcessInstance() {
+	m.clearedprocess_instance = true
+	m.clearedFields[workflowtask.FieldProcessInstanceID] = struct{}{}
+}
+
+// ProcessInstanceCleared reports if the "process_instance" edge to the ProcessInstance entity was cleared.
+func (m *WorkflowTaskMutation) ProcessInstanceCleared() bool {
+	return m.ProcessInstanceIDCleared() || m.clearedprocess_instance
+}
+
+// ProcessInstanceIDs returns the "process_instance" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProcessInstanceID instead. It exists only for internal usage by the builders.
+func (m *WorkflowTaskMutation) ProcessInstanceIDs() (ids []int) {
+	if id := m.process_instance; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProcessInstance resets all changes to the "process_instance" edge.
+func (m *WorkflowTaskMutation) ResetProcessInstance() {
+	m.process_instance = nil
+	m.clearedprocess_instance = false
+}
+
+// ClearProcessNodeInstance clears the "process_node_instance" edge to the ProcessNodeInstance entity.
+func (m *WorkflowTaskMutation) ClearProcessNodeInstance() {
+	m.clearedprocess_node_instance = true
+	m.clearedFields[workflowtask.FieldProcessNodeInstanceID] = struct{}{}
+}
+
+// ProcessNodeInstanceCleared reports if the "process_node_instance" edge to the ProcessNodeInstance entity was cleared.
+func (m *WorkflowTaskMutation) ProcessNodeInstanceCleared() bool {
+	return m.ProcessNodeInstanceIDCleared() || m.clearedprocess_node_instance
+}
+
+// ProcessNodeInstanceIDs returns the "process_node_instance" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ProcessNodeInstanceID instead. It exists only for internal usage by the builders.
+func (m *WorkflowTaskMutation) ProcessNodeInstanceIDs() (ids []int) {
+	if id := m.process_node_instance; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetProcessNodeInstance resets all changes to the "process_node_instance" edge.
+func (m *WorkflowTaskMutation) ResetProcessNodeInstance() {
+	m.process_node_instance = nil
+	m.clearedprocess_node_instance = false
+}
+
 // Where appends a list predicates to the WorkflowTaskMutation builder.
 func (m *WorkflowTaskMutation) Where(ps ...predicate.WorkflowTask) {
 	m.predicates = append(m.predicates, ps...)
@@ -72232,7 +73227,7 @@ func (m *WorkflowTaskMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *WorkflowTaskMutation) Fields() []string {
-	fields := make([]string, 0, 27)
+	fields := make([]string, 0, 32)
 	if m.task_code != nil {
 		fields = append(fields, workflowtask.FieldTaskCode)
 	}
@@ -72269,10 +73264,10 @@ func (m *WorkflowTaskMutation) Fields() []string {
 	if m.config_revision != nil {
 		fields = append(fields, workflowtask.FieldConfigRevision)
 	}
-	if m.process_instance_id != nil {
+	if m.process_instance != nil {
 		fields = append(fields, workflowtask.FieldProcessInstanceID)
 	}
-	if m.process_node_instance_id != nil {
+	if m.process_node_instance != nil {
 		fields = append(fields, workflowtask.FieldProcessNodeInstanceID)
 	}
 	if m.assignee_id != nil {
@@ -72287,14 +73282,29 @@ func (m *WorkflowTaskMutation) Fields() []string {
 	if m.due_at != nil {
 		fields = append(fields, workflowtask.FieldDueAt)
 	}
-	if m.started_at != nil {
-		fields = append(fields, workflowtask.FieldStartedAt)
-	}
 	if m.completed_at != nil {
 		fields = append(fields, workflowtask.FieldCompletedAt)
 	}
-	if m.closed_at != nil {
-		fields = append(fields, workflowtask.FieldClosedAt)
+	if m.critical_path != nil {
+		fields = append(fields, workflowtask.FieldCriticalPath)
+	}
+	if m.urge_count != nil {
+		fields = append(fields, workflowtask.FieldUrgeCount)
+	}
+	if m.last_urged_at != nil {
+		fields = append(fields, workflowtask.FieldLastUrgedAt)
+	}
+	if m.last_urged_by != nil {
+		fields = append(fields, workflowtask.FieldLastUrgedBy)
+	}
+	if m.last_urged_by_role_key != nil {
+		fields = append(fields, workflowtask.FieldLastUrgedByRoleKey)
+	}
+	if m.escalated_at != nil {
+		fields = append(fields, workflowtask.FieldEscalatedAt)
+	}
+	if m.escalate_target_role_key != nil {
+		fields = append(fields, workflowtask.FieldEscalateTargetRoleKey)
 	}
 	if m.payload != nil {
 		fields = append(fields, workflowtask.FieldPayload)
@@ -72358,12 +73368,22 @@ func (m *WorkflowTaskMutation) Field(name string) (ent.Value, bool) {
 		return m.BlockedReason()
 	case workflowtask.FieldDueAt:
 		return m.DueAt()
-	case workflowtask.FieldStartedAt:
-		return m.StartedAt()
 	case workflowtask.FieldCompletedAt:
 		return m.CompletedAt()
-	case workflowtask.FieldClosedAt:
-		return m.ClosedAt()
+	case workflowtask.FieldCriticalPath:
+		return m.CriticalPath()
+	case workflowtask.FieldUrgeCount:
+		return m.UrgeCount()
+	case workflowtask.FieldLastUrgedAt:
+		return m.LastUrgedAt()
+	case workflowtask.FieldLastUrgedBy:
+		return m.LastUrgedBy()
+	case workflowtask.FieldLastUrgedByRoleKey:
+		return m.LastUrgedByRoleKey()
+	case workflowtask.FieldEscalatedAt:
+		return m.EscalatedAt()
+	case workflowtask.FieldEscalateTargetRoleKey:
+		return m.EscalateTargetRoleKey()
 	case workflowtask.FieldPayload:
 		return m.Payload()
 	case workflowtask.FieldVersion:
@@ -72421,12 +73441,22 @@ func (m *WorkflowTaskMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldBlockedReason(ctx)
 	case workflowtask.FieldDueAt:
 		return m.OldDueAt(ctx)
-	case workflowtask.FieldStartedAt:
-		return m.OldStartedAt(ctx)
 	case workflowtask.FieldCompletedAt:
 		return m.OldCompletedAt(ctx)
-	case workflowtask.FieldClosedAt:
-		return m.OldClosedAt(ctx)
+	case workflowtask.FieldCriticalPath:
+		return m.OldCriticalPath(ctx)
+	case workflowtask.FieldUrgeCount:
+		return m.OldUrgeCount(ctx)
+	case workflowtask.FieldLastUrgedAt:
+		return m.OldLastUrgedAt(ctx)
+	case workflowtask.FieldLastUrgedBy:
+		return m.OldLastUrgedBy(ctx)
+	case workflowtask.FieldLastUrgedByRoleKey:
+		return m.OldLastUrgedByRoleKey(ctx)
+	case workflowtask.FieldEscalatedAt:
+		return m.OldEscalatedAt(ctx)
+	case workflowtask.FieldEscalateTargetRoleKey:
+		return m.OldEscalateTargetRoleKey(ctx)
 	case workflowtask.FieldPayload:
 		return m.OldPayload(ctx)
 	case workflowtask.FieldVersion:
@@ -72574,13 +73604,6 @@ func (m *WorkflowTaskMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetDueAt(v)
 		return nil
-	case workflowtask.FieldStartedAt:
-		v, ok := value.(time.Time)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.SetStartedAt(v)
-		return nil
 	case workflowtask.FieldCompletedAt:
 		v, ok := value.(time.Time)
 		if !ok {
@@ -72588,12 +73611,54 @@ func (m *WorkflowTaskMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetCompletedAt(v)
 		return nil
-	case workflowtask.FieldClosedAt:
+	case workflowtask.FieldCriticalPath:
+		v, ok := value.(bool)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCriticalPath(v)
+		return nil
+	case workflowtask.FieldUrgeCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUrgeCount(v)
+		return nil
+	case workflowtask.FieldLastUrgedAt:
 		v, ok := value.(time.Time)
 		if !ok {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
-		m.SetClosedAt(v)
+		m.SetLastUrgedAt(v)
+		return nil
+	case workflowtask.FieldLastUrgedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastUrgedBy(v)
+		return nil
+	case workflowtask.FieldLastUrgedByRoleKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetLastUrgedByRoleKey(v)
+		return nil
+	case workflowtask.FieldEscalatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEscalatedAt(v)
+		return nil
+	case workflowtask.FieldEscalateTargetRoleKey:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetEscalateTargetRoleKey(v)
 		return nil
 	case workflowtask.FieldPayload:
 		v, ok := value.(map[string]interface{})
@@ -72648,17 +73713,17 @@ func (m *WorkflowTaskMutation) AddedFields() []string {
 	if m.addsource_id != nil {
 		fields = append(fields, workflowtask.FieldSourceID)
 	}
-	if m.addprocess_instance_id != nil {
-		fields = append(fields, workflowtask.FieldProcessInstanceID)
-	}
-	if m.addprocess_node_instance_id != nil {
-		fields = append(fields, workflowtask.FieldProcessNodeInstanceID)
-	}
 	if m.addassignee_id != nil {
 		fields = append(fields, workflowtask.FieldAssigneeID)
 	}
 	if m.addpriority != nil {
 		fields = append(fields, workflowtask.FieldPriority)
+	}
+	if m.addurge_count != nil {
+		fields = append(fields, workflowtask.FieldUrgeCount)
+	}
+	if m.addlast_urged_by != nil {
+		fields = append(fields, workflowtask.FieldLastUrgedBy)
 	}
 	if m.addversion != nil {
 		fields = append(fields, workflowtask.FieldVersion)
@@ -72679,14 +73744,14 @@ func (m *WorkflowTaskMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
 	case workflowtask.FieldSourceID:
 		return m.AddedSourceID()
-	case workflowtask.FieldProcessInstanceID:
-		return m.AddedProcessInstanceID()
-	case workflowtask.FieldProcessNodeInstanceID:
-		return m.AddedProcessNodeInstanceID()
 	case workflowtask.FieldAssigneeID:
 		return m.AddedAssigneeID()
 	case workflowtask.FieldPriority:
 		return m.AddedPriority()
+	case workflowtask.FieldUrgeCount:
+		return m.AddedUrgeCount()
+	case workflowtask.FieldLastUrgedBy:
+		return m.AddedLastUrgedBy()
 	case workflowtask.FieldVersion:
 		return m.AddedVersion()
 	case workflowtask.FieldCreatedBy:
@@ -72709,20 +73774,6 @@ func (m *WorkflowTaskMutation) AddField(name string, value ent.Value) error {
 		}
 		m.AddSourceID(v)
 		return nil
-	case workflowtask.FieldProcessInstanceID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddProcessInstanceID(v)
-		return nil
-	case workflowtask.FieldProcessNodeInstanceID:
-		v, ok := value.(int)
-		if !ok {
-			return fmt.Errorf("unexpected type %T for field %s", value, name)
-		}
-		m.AddProcessNodeInstanceID(v)
-		return nil
 	case workflowtask.FieldAssigneeID:
 		v, ok := value.(int)
 		if !ok {
@@ -72736,6 +73787,20 @@ func (m *WorkflowTaskMutation) AddField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddPriority(v)
+		return nil
+	case workflowtask.FieldUrgeCount:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddUrgeCount(v)
+		return nil
+	case workflowtask.FieldLastUrgedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddLastUrgedBy(v)
 		return nil
 	case workflowtask.FieldVersion:
 		v, ok := value.(int)
@@ -72796,14 +73861,23 @@ func (m *WorkflowTaskMutation) ClearedFields() []string {
 	if m.FieldCleared(workflowtask.FieldDueAt) {
 		fields = append(fields, workflowtask.FieldDueAt)
 	}
-	if m.FieldCleared(workflowtask.FieldStartedAt) {
-		fields = append(fields, workflowtask.FieldStartedAt)
-	}
 	if m.FieldCleared(workflowtask.FieldCompletedAt) {
 		fields = append(fields, workflowtask.FieldCompletedAt)
 	}
-	if m.FieldCleared(workflowtask.FieldClosedAt) {
-		fields = append(fields, workflowtask.FieldClosedAt)
+	if m.FieldCleared(workflowtask.FieldLastUrgedAt) {
+		fields = append(fields, workflowtask.FieldLastUrgedAt)
+	}
+	if m.FieldCleared(workflowtask.FieldLastUrgedBy) {
+		fields = append(fields, workflowtask.FieldLastUrgedBy)
+	}
+	if m.FieldCleared(workflowtask.FieldLastUrgedByRoleKey) {
+		fields = append(fields, workflowtask.FieldLastUrgedByRoleKey)
+	}
+	if m.FieldCleared(workflowtask.FieldEscalatedAt) {
+		fields = append(fields, workflowtask.FieldEscalatedAt)
+	}
+	if m.FieldCleared(workflowtask.FieldEscalateTargetRoleKey) {
+		fields = append(fields, workflowtask.FieldEscalateTargetRoleKey)
 	}
 	if m.FieldCleared(workflowtask.FieldPayload) {
 		fields = append(fields, workflowtask.FieldPayload)
@@ -72858,14 +73932,23 @@ func (m *WorkflowTaskMutation) ClearField(name string) error {
 	case workflowtask.FieldDueAt:
 		m.ClearDueAt()
 		return nil
-	case workflowtask.FieldStartedAt:
-		m.ClearStartedAt()
-		return nil
 	case workflowtask.FieldCompletedAt:
 		m.ClearCompletedAt()
 		return nil
-	case workflowtask.FieldClosedAt:
-		m.ClearClosedAt()
+	case workflowtask.FieldLastUrgedAt:
+		m.ClearLastUrgedAt()
+		return nil
+	case workflowtask.FieldLastUrgedBy:
+		m.ClearLastUrgedBy()
+		return nil
+	case workflowtask.FieldLastUrgedByRoleKey:
+		m.ClearLastUrgedByRoleKey()
+		return nil
+	case workflowtask.FieldEscalatedAt:
+		m.ClearEscalatedAt()
+		return nil
+	case workflowtask.FieldEscalateTargetRoleKey:
+		m.ClearEscalateTargetRoleKey()
 		return nil
 	case workflowtask.FieldPayload:
 		m.ClearPayload()
@@ -72938,14 +74021,29 @@ func (m *WorkflowTaskMutation) ResetField(name string) error {
 	case workflowtask.FieldDueAt:
 		m.ResetDueAt()
 		return nil
-	case workflowtask.FieldStartedAt:
-		m.ResetStartedAt()
-		return nil
 	case workflowtask.FieldCompletedAt:
 		m.ResetCompletedAt()
 		return nil
-	case workflowtask.FieldClosedAt:
-		m.ResetClosedAt()
+	case workflowtask.FieldCriticalPath:
+		m.ResetCriticalPath()
+		return nil
+	case workflowtask.FieldUrgeCount:
+		m.ResetUrgeCount()
+		return nil
+	case workflowtask.FieldLastUrgedAt:
+		m.ResetLastUrgedAt()
+		return nil
+	case workflowtask.FieldLastUrgedBy:
+		m.ResetLastUrgedBy()
+		return nil
+	case workflowtask.FieldLastUrgedByRoleKey:
+		m.ResetLastUrgedByRoleKey()
+		return nil
+	case workflowtask.FieldEscalatedAt:
+		m.ResetEscalatedAt()
+		return nil
+	case workflowtask.FieldEscalateTargetRoleKey:
+		m.ResetEscalateTargetRoleKey()
 		return nil
 	case workflowtask.FieldPayload:
 		m.ResetPayload()
@@ -72971,9 +74069,15 @@ func (m *WorkflowTaskMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *WorkflowTaskMutation) AddedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.events != nil {
 		edges = append(edges, workflowtask.EdgeEvents)
+	}
+	if m.process_instance != nil {
+		edges = append(edges, workflowtask.EdgeProcessInstance)
+	}
+	if m.process_node_instance != nil {
+		edges = append(edges, workflowtask.EdgeProcessNodeInstance)
 	}
 	return edges
 }
@@ -72988,13 +74092,21 @@ func (m *WorkflowTaskMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case workflowtask.EdgeProcessInstance:
+		if id := m.process_instance; id != nil {
+			return []ent.Value{*id}
+		}
+	case workflowtask.EdgeProcessNodeInstance:
+		if id := m.process_node_instance; id != nil {
+			return []ent.Value{*id}
+		}
 	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *WorkflowTaskMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.removedevents != nil {
 		edges = append(edges, workflowtask.EdgeEvents)
 	}
@@ -73017,9 +74129,15 @@ func (m *WorkflowTaskMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *WorkflowTaskMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 1)
+	edges := make([]string, 0, 3)
 	if m.clearedevents {
 		edges = append(edges, workflowtask.EdgeEvents)
+	}
+	if m.clearedprocess_instance {
+		edges = append(edges, workflowtask.EdgeProcessInstance)
+	}
+	if m.clearedprocess_node_instance {
+		edges = append(edges, workflowtask.EdgeProcessNodeInstance)
 	}
 	return edges
 }
@@ -73030,6 +74148,10 @@ func (m *WorkflowTaskMutation) EdgeCleared(name string) bool {
 	switch name {
 	case workflowtask.EdgeEvents:
 		return m.clearedevents
+	case workflowtask.EdgeProcessInstance:
+		return m.clearedprocess_instance
+	case workflowtask.EdgeProcessNodeInstance:
+		return m.clearedprocess_node_instance
 	}
 	return false
 }
@@ -73038,6 +74160,12 @@ func (m *WorkflowTaskMutation) EdgeCleared(name string) bool {
 // if that edge is not defined in the schema.
 func (m *WorkflowTaskMutation) ClearEdge(name string) error {
 	switch name {
+	case workflowtask.EdgeProcessInstance:
+		m.ClearProcessInstance()
+		return nil
+	case workflowtask.EdgeProcessNodeInstance:
+		m.ClearProcessNodeInstance()
+		return nil
 	}
 	return fmt.Errorf("unknown WorkflowTask unique edge %s", name)
 }
@@ -73048,6 +74176,12 @@ func (m *WorkflowTaskMutation) ResetEdge(name string) error {
 	switch name {
 	case workflowtask.EdgeEvents:
 		m.ResetEvents()
+		return nil
+	case workflowtask.EdgeProcessInstance:
+		m.ResetProcessInstance()
+		return nil
+	case workflowtask.EdgeProcessNodeInstance:
+		m.ResetProcessNodeInstance()
 		return nil
 	}
 	return fmt.Errorf("unknown WorkflowTask edge %s", name)

@@ -423,6 +423,15 @@ func workflowPayloadString(payload map[string]any, key string) string {
 	return strings.TrimSpace(fmt.Sprint(value))
 }
 
+func workflowPayloadBool(payload map[string]any, key string) bool {
+	value, ok := payload[key]
+	if !ok {
+		return false
+	}
+	result, ok := value.(bool)
+	return ok && result
+}
+
 func workflowPayloadValue(payload map[string]any, key string) any {
 	if payload == nil {
 		return ""

@@ -360,7 +360,21 @@ test('finishedGoodsFlow: 已存在未完成任务时按记录去重', () => {
   )
   assert.equal(
     hasActiveFinishedGoodsQcTaskForRecord(
+      [{ ...qcTask, task_status_key: 'blocked' }],
+      record
+    ),
+    true
+  )
+  assert.equal(
+    hasActiveFinishedGoodsQcTaskForRecord(
       [{ ...qcTask, task_status_key: 'done' }],
+      record
+    ),
+    false
+  )
+  assert.equal(
+    hasActiveFinishedGoodsQcTaskForRecord(
+      [{ ...qcTask, task_status_key: 'rejected' }],
       record
     ),
     false

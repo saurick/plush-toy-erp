@@ -9,6 +9,7 @@ SERVER_ROOT=$(CDPATH='' cd -- "$SCRIPT_DIR/../../.." && pwd)
 MIG_DIR="${MIG_DIR:-$SERVER_ROOT/internal/data/model/migrate}"
 ATLAS_BIN="${ATLAS_BIN:-/usr/local/bin/atlas}"
 POSTGRES_SERVICE="${POSTGRES_SERVICE:-postgres}"
+APP_SERVICE="${APP_SERVICE:-app-server}"
 POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 MIGRATION_LOCK_FILE="${MIGRATION_LOCK_FILE:-/run/lock/plush-toy-erp/atlas-migrate.lock}"
 
@@ -29,12 +30,15 @@ usage() {
   COMPOSE_FILE   compose 文件路径（默认同目录 compose.yml）
   MIG_DIR        迁移目录（默认 server/internal/data/model/migrate）
   POSTGRES_SERVICE  compose 里的 Postgres 服务名（默认 postgres）
+  APP_SERVICE    compose 里的后端服务名（默认 app-server）；正式 apply 时必须已停止
   ATLAS_BIN      宿主机 Atlas 二进制路径（默认 /usr/local/bin/atlas）
   POSTGRES_HOST  宿主机访问 PostgreSQL 的地址（默认 127.0.0.1）
   POSTGRES_HOST_PORT  宿主机映射的 PostgreSQL 端口（未设置时从容器端口绑定推导）
   MIGRATION_LOCK_FILE 迁移整段串行锁文件（默认 /run/lock/plush-toy-erp/atlas-migrate.lock）
                       必须使用绝对路径，其父目录专用于迁移锁且不得为符号链接
   DB_URL         手动覆盖数据库连接串（未设置时自动从 Postgres 容器和宿主机端口推导）
+  MIGRATION_MAINTENANCE_CONFIRMED
+                 正式 apply 必须显式设为 1，确认已进入停写维护窗口
 EOF
 }
 
@@ -204,6 +208,19 @@ compose() {
 	echo "ERROR: 未找到 docker compose / docker-compose" >&2
 	exit 1
 }
+
+if [ "$APPLY_MODE" -eq 1 ]; then
+	if [ "${MIGRATION_MAINTENANCE_CONFIRMED:-}" != "1" ]; then
+		echo "ERROR: 正式 migration apply 必须先停止业务写入，并设置 MIGRATION_MAINTENANCE_CONFIRMED=1。" >&2
+		exit 1
+	fi
+	APP_CID=$(compose ps -q "$APP_SERVICE" 2>/dev/null | head -n1 || true)
+	if [ -n "${APP_CID:-}" ]; then
+		echo "ERROR: 后端服务仍在运行（service=${APP_SERVICE}, container=${APP_CID}），拒绝 migration apply。" >&2
+		echo "请先停止 app-server，保持 PostgreSQL 运行，再重新执行。" >&2
+		exit 1
+	fi
+fi
 
 urlencode() {
 	input=$1

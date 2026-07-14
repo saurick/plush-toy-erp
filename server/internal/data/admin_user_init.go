@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/biz"
 	"server/internal/conf"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -18,14 +19,15 @@ import (
 )
 
 const (
-	adminBootstrapMarkerKey       = "admin_bootstrap.completed"
-	adminBootstrapAuditSource     = "server_bootstrap"
-	adminBootstrapEventCompleted  = "admin_bootstrap.completed"
-	adminBootstrapEventBlocked    = "admin_bootstrap.blocked"
-	adminBootstrapReasonNoFlag    = "missing_bootstrap_admin_once"
-	adminBootstrapReasonCompleted = "bootstrap_already_completed"
-	adminBootstrapReasonExists    = "admin_username_already_exists"
-	adminBootstrapReasonMissing   = "missing_bootstrap_credentials"
+	adminBootstrapMarkerKey          = "admin_bootstrap.completed"
+	adminBootstrapAuditSource        = "server_bootstrap"
+	adminBootstrapEventCompleted     = "admin_bootstrap.completed"
+	adminBootstrapEventBlocked       = "admin_bootstrap.blocked"
+	adminBootstrapReasonNoFlag       = "missing_bootstrap_admin_once"
+	adminBootstrapReasonCompleted    = "bootstrap_already_completed"
+	adminBootstrapReasonExists       = "admin_username_already_exists"
+	adminBootstrapReasonMissing      = "missing_bootstrap_credentials"
+	adminBootstrapReasonWeakPassword = "bootstrap_password_policy_rejected"
 )
 
 type adminBootstrapOptions struct {
@@ -61,6 +63,18 @@ func initAdminUsersIfNeeded(ctx context.Context, d *Data, cfg *conf.Data, l *log
 			return errors.New("production admin bootstrap requires APP_ADMIN_USERNAME and APP_ADMIN_PASSWORD when BOOTSTRAP_ADMIN_ONCE=true")
 		}
 		return nil
+	}
+	if err := biz.ValidateAdminPassword(password); err != nil {
+		if opts.production {
+			if auditErr := writeAdminBootstrapAudit(ctx, d.sqldb, adminBootstrapEventBlocked, adminBootstrapReasonWeakPassword, username, nil, time.Now()); auditErr != nil {
+				return fmt.Errorf("admin bootstrap password policy rejected and audit failed: %w", auditErr)
+			}
+		}
+		return fmt.Errorf(
+			"admin bootstrap password must contain at least %d characters and no more than %d bytes",
+			biz.AdminPasswordMinLength,
+			biz.AdminPasswordMaxBytes,
+		)
 	}
 
 	if opts.production && !opts.once {

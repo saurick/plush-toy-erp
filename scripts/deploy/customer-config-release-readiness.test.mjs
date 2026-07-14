@@ -8,7 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
-import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
 import {
   buildCustomerConfigReadbackPreflightReport,
   buildInputTemplate,
@@ -91,7 +91,7 @@ function writeRuntimeManifest(root) {
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   fs.writeFileSync(
     manifestPath,
-    JSON.stringify(buildRuntimeManifest(yoyoosunCustomerPackage), null, 2),
+    JSON.stringify(buildRuntimeManifest(releaseReadyYoyoosunCustomerPackage), null, 2),
   );
   return "output/customers/yoyoosun/customer-config-runtime-manifest.json";
 }

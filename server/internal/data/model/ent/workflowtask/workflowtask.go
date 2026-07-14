@@ -50,12 +50,22 @@ const (
 	FieldBlockedReason = "blocked_reason"
 	// FieldDueAt holds the string denoting the due_at field in the database.
 	FieldDueAt = "due_at"
-	// FieldStartedAt holds the string denoting the started_at field in the database.
-	FieldStartedAt = "started_at"
 	// FieldCompletedAt holds the string denoting the completed_at field in the database.
 	FieldCompletedAt = "completed_at"
-	// FieldClosedAt holds the string denoting the closed_at field in the database.
-	FieldClosedAt = "closed_at"
+	// FieldCriticalPath holds the string denoting the critical_path field in the database.
+	FieldCriticalPath = "critical_path"
+	// FieldUrgeCount holds the string denoting the urge_count field in the database.
+	FieldUrgeCount = "urge_count"
+	// FieldLastUrgedAt holds the string denoting the last_urged_at field in the database.
+	FieldLastUrgedAt = "last_urged_at"
+	// FieldLastUrgedBy holds the string denoting the last_urged_by field in the database.
+	FieldLastUrgedBy = "last_urged_by"
+	// FieldLastUrgedByRoleKey holds the string denoting the last_urged_by_role_key field in the database.
+	FieldLastUrgedByRoleKey = "last_urged_by_role_key"
+	// FieldEscalatedAt holds the string denoting the escalated_at field in the database.
+	FieldEscalatedAt = "escalated_at"
+	// FieldEscalateTargetRoleKey holds the string denoting the escalate_target_role_key field in the database.
+	FieldEscalateTargetRoleKey = "escalate_target_role_key"
 	// FieldPayload holds the string denoting the payload field in the database.
 	FieldPayload = "payload"
 	// FieldVersion holds the string denoting the version field in the database.
@@ -70,6 +80,10 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeEvents holds the string denoting the events edge name in mutations.
 	EdgeEvents = "events"
+	// EdgeProcessInstance holds the string denoting the process_instance edge name in mutations.
+	EdgeProcessInstance = "process_instance"
+	// EdgeProcessNodeInstance holds the string denoting the process_node_instance edge name in mutations.
+	EdgeProcessNodeInstance = "process_node_instance"
 	// Table holds the table name of the workflowtask in the database.
 	Table = "workflow_tasks"
 	// EventsTable is the table that holds the events relation/edge.
@@ -79,6 +93,20 @@ const (
 	EventsInverseTable = "workflow_task_events"
 	// EventsColumn is the table column denoting the events relation/edge.
 	EventsColumn = "task_id"
+	// ProcessInstanceTable is the table that holds the process_instance relation/edge.
+	ProcessInstanceTable = "workflow_tasks"
+	// ProcessInstanceInverseTable is the table name for the ProcessInstance entity.
+	// It exists in this package in order to avoid circular dependency with the "processinstance" package.
+	ProcessInstanceInverseTable = "process_instances"
+	// ProcessInstanceColumn is the table column denoting the process_instance relation/edge.
+	ProcessInstanceColumn = "process_instance_id"
+	// ProcessNodeInstanceTable is the table that holds the process_node_instance relation/edge.
+	ProcessNodeInstanceTable = "workflow_tasks"
+	// ProcessNodeInstanceInverseTable is the table name for the ProcessNodeInstance entity.
+	// It exists in this package in order to avoid circular dependency with the "processnodeinstance" package.
+	ProcessNodeInstanceInverseTable = "process_node_instances"
+	// ProcessNodeInstanceColumn is the table column denoting the process_node_instance relation/edge.
+	ProcessNodeInstanceColumn = "process_node_instance_id"
 )
 
 // Columns holds all SQL columns for workflowtask fields.
@@ -102,9 +130,14 @@ var Columns = []string{
 	FieldPriority,
 	FieldBlockedReason,
 	FieldDueAt,
-	FieldStartedAt,
 	FieldCompletedAt,
-	FieldClosedAt,
+	FieldCriticalPath,
+	FieldUrgeCount,
+	FieldLastUrgedAt,
+	FieldLastUrgedBy,
+	FieldLastUrgedByRoleKey,
+	FieldEscalatedAt,
+	FieldEscalateTargetRoleKey,
 	FieldPayload,
 	FieldVersion,
 	FieldCreatedBy,
@@ -158,6 +191,18 @@ var (
 	DefaultPriority int16
 	// BlockedReasonValidator is a validator for the "blocked_reason" field. It is called by the builders before save.
 	BlockedReasonValidator func(string) error
+	// DefaultCriticalPath holds the default value on creation for the "critical_path" field.
+	DefaultCriticalPath bool
+	// DefaultUrgeCount holds the default value on creation for the "urge_count" field.
+	DefaultUrgeCount int
+	// UrgeCountValidator is a validator for the "urge_count" field. It is called by the builders before save.
+	UrgeCountValidator func(int) error
+	// LastUrgedByValidator is a validator for the "last_urged_by" field. It is called by the builders before save.
+	LastUrgedByValidator func(int) error
+	// LastUrgedByRoleKeyValidator is a validator for the "last_urged_by_role_key" field. It is called by the builders before save.
+	LastUrgedByRoleKeyValidator func(string) error
+	// EscalateTargetRoleKeyValidator is a validator for the "escalate_target_role_key" field. It is called by the builders before save.
+	EscalateTargetRoleKeyValidator func(string) error
 	// DefaultVersion holds the default value on creation for the "version" field.
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
@@ -272,19 +317,44 @@ func ByDueAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDueAt, opts...).ToFunc()
 }
 
-// ByStartedAt orders the results by the started_at field.
-func ByStartedAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldStartedAt, opts...).ToFunc()
-}
-
 // ByCompletedAt orders the results by the completed_at field.
 func ByCompletedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCompletedAt, opts...).ToFunc()
 }
 
-// ByClosedAt orders the results by the closed_at field.
-func ByClosedAt(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldClosedAt, opts...).ToFunc()
+// ByCriticalPath orders the results by the critical_path field.
+func ByCriticalPath(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCriticalPath, opts...).ToFunc()
+}
+
+// ByUrgeCount orders the results by the urge_count field.
+func ByUrgeCount(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUrgeCount, opts...).ToFunc()
+}
+
+// ByLastUrgedAt orders the results by the last_urged_at field.
+func ByLastUrgedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastUrgedAt, opts...).ToFunc()
+}
+
+// ByLastUrgedBy orders the results by the last_urged_by field.
+func ByLastUrgedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastUrgedBy, opts...).ToFunc()
+}
+
+// ByLastUrgedByRoleKey orders the results by the last_urged_by_role_key field.
+func ByLastUrgedByRoleKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldLastUrgedByRoleKey, opts...).ToFunc()
+}
+
+// ByEscalatedAt orders the results by the escalated_at field.
+func ByEscalatedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEscalatedAt, opts...).ToFunc()
+}
+
+// ByEscalateTargetRoleKey orders the results by the escalate_target_role_key field.
+func ByEscalateTargetRoleKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldEscalateTargetRoleKey, opts...).ToFunc()
 }
 
 // ByVersion orders the results by the version field.
@@ -325,10 +395,38 @@ func ByEvents(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newEventsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByProcessInstanceField orders the results by process_instance field.
+func ByProcessInstanceField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProcessInstanceStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByProcessNodeInstanceField orders the results by process_node_instance field.
+func ByProcessNodeInstanceField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProcessNodeInstanceStep(), sql.OrderByField(field, opts...))
+	}
+}
 func newEventsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(EventsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, EventsTable, EventsColumn),
+	)
+}
+func newProcessInstanceStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProcessInstanceInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProcessInstanceTable, ProcessInstanceColumn),
+	)
+}
+func newProcessNodeInstanceStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProcessNodeInstanceInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProcessNodeInstanceTable, ProcessNodeInstanceColumn),
 	)
 }

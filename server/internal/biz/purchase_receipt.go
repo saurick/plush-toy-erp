@@ -67,18 +67,20 @@ type PurchaseReceiptFromPurchaseOrderCreate struct {
 }
 
 type PurchaseReceiptItemCreate struct {
-	ReceiptID           int
-	MaterialID          int
-	WarehouseID         int
-	UnitID              int
-	LotID               *int
-	PurchaseOrderItemID *int
-	LotNo               *string
-	Quantity            decimal.Decimal
-	UnitPrice           *decimal.Decimal
-	Amount              *decimal.Decimal
-	SourceLineNo        *string
-	Note                *string
+	ReceiptID              int
+	MaterialID             int
+	WarehouseID            int
+	UnitID                 int
+	LotID                  *int
+	PurchaseOrderItemID    *int
+	LotNo                  *string
+	Quantity               decimal.Decimal
+	UnitPrice              *decimal.Decimal
+	Amount                 *decimal.Decimal
+	SourceLineNo           *string
+	Note                   *string
+	IdempotencyKey         string
+	IdempotencyPayloadHash string
 }
 
 type PurchaseReceiptFilter struct {
@@ -162,6 +164,13 @@ func (uc *InventoryUsecase) AddPurchaseReceiptItem(ctx context.Context, in *Purc
 	normalized, err := normalizePurchaseReceiptItemCreate(*in)
 	if err != nil {
 		return nil, err
+	}
+	replayed, found, err := uc.repo.ResolvePurchaseReceiptItemReplay(ctx, &normalized)
+	if err != nil {
+		return nil, err
+	}
+	if found {
+		return replayed, nil
 	}
 	if err := uc.validatePurchaseReceiptItemActiveReferences(ctx, &normalized); err != nil {
 		return nil, err
@@ -281,7 +290,63 @@ func purchaseReceiptFromPurchaseOrderPayloadHash(in PurchaseReceiptFromPurchaseO
 }
 
 func normalizePurchaseReceiptItemCreate(in PurchaseReceiptItemCreate) (PurchaseReceiptItemCreate, error) {
-	return normalizePurchaseReceiptItemCreateForReceipt(in, true)
+	normalized, err := normalizePurchaseReceiptItemCreateForReceipt(in, true)
+	if err != nil {
+		return PurchaseReceiptItemCreate{}, err
+	}
+	normalized.IdempotencyKey = strings.TrimSpace(normalized.IdempotencyKey)
+	normalized.IdempotencyPayloadHash = ""
+	if normalized.IdempotencyKey == "" || len(normalized.IdempotencyKey) > 128 {
+		return PurchaseReceiptItemCreate{}, ErrBadParam
+	}
+	// The linked purchase-order line owns source_line_no. Ignore a stale or
+	// forged client snapshot when binding the append intent.
+	if normalized.PurchaseOrderItemID != nil {
+		normalized.SourceLineNo = nil
+	}
+	normalized.IdempotencyPayloadHash = purchaseReceiptItemPayloadHash(normalized)
+	return normalized, nil
+}
+
+func purchaseReceiptItemPayloadHash(in PurchaseReceiptItemCreate) string {
+	payload := struct {
+		ReceiptID           int     `json:"receipt_id"`
+		MaterialID          int     `json:"material_id"`
+		WarehouseID         int     `json:"warehouse_id"`
+		UnitID              int     `json:"unit_id"`
+		LotID               *int    `json:"lot_id"`
+		PurchaseOrderItemID *int    `json:"purchase_order_item_id"`
+		LotNo               *string `json:"lot_no"`
+		Quantity            string  `json:"quantity"`
+		UnitPrice           *string `json:"unit_price"`
+		Amount              *string `json:"amount"`
+		SourceLineNo        *string `json:"source_line_no"`
+		Note                *string `json:"note"`
+	}{
+		ReceiptID:           in.ReceiptID,
+		MaterialID:          in.MaterialID,
+		WarehouseID:         in.WarehouseID,
+		UnitID:              in.UnitID,
+		LotID:               in.LotID,
+		PurchaseOrderItemID: in.PurchaseOrderItemID,
+		LotNo:               in.LotNo,
+		Quantity:            in.Quantity.String(),
+		UnitPrice:           canonicalOptionalDecimal(in.UnitPrice),
+		Amount:              canonicalOptionalDecimal(in.Amount),
+		SourceLineNo:        in.SourceLineNo,
+		Note:                in.Note,
+	}
+	encoded, _ := json.Marshal(payload)
+	sum := sha256.Sum256(encoded)
+	return hex.EncodeToString(sum[:])
+}
+
+func canonicalOptionalDecimal(value *decimal.Decimal) *string {
+	if value == nil {
+		return nil
+	}
+	text := value.String()
+	return &text
 }
 
 func normalizePurchaseReceiptItemCreateForReceipt(in PurchaseReceiptItemCreate, requireReceiptID bool) (PurchaseReceiptItemCreate, error) {

@@ -1,12 +1,40 @@
 package data
 
 import (
+	"context"
 	"crypto/sha256"
 	"encoding/hex"
 	"strings"
+	"testing"
 
 	"server/internal/biz"
 )
+
+func resumeWorkflowTaskForNextRound(
+	t *testing.T,
+	ctx context.Context,
+	uc *biz.WorkflowUsecase,
+	taskID int,
+	expectedVersion int,
+	receiptKey string,
+	actorID int,
+	actorRoleKey string,
+) *biz.WorkflowTask {
+	t.Helper()
+	resumed, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID:              taskID,
+		ExpectedVersion: expectedVersion,
+		CommandKey:      "resume_task_action",
+		IdempotencyKey:  receiptKey,
+		TaskStatusKey:   "ready",
+		Reason:          "问题已处理，恢复任务后进入下一轮",
+		Payload:         map[string]any{"resume_evidence": "data-test"},
+	}, actorID, actorRoleKey)
+	if err != nil {
+		t.Fatalf("resume task for next round: %v", err)
+	}
+	return resumed
+}
 
 func workflowRepoTestStatusMutation(
 	taskID int,

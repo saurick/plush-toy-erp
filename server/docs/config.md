@@ -166,8 +166,10 @@ ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
 | 环境变量 | 默认值 | 说明 |
 | --- | --- | --- |
 | `ERP_PDF_CHROME_PATH` | `/usr/bin/chromium` | Chrome / Chromium 可执行文件路径；本地开发可留空由服务自动探测系统 Chrome |
-| `ERP_PDF_RENDER_CONCURRENCY` | `2` | 同时渲染 PDF 的上限；低配服务器优先通过降低并发控制内存峰值 |
+| `ERP_PDF_RENDER_CONCURRENCY` | `4` | 同时渲染 PDF 的服务端默认上限；通用 Compose 使用 4，高配客户实例可配 8，并同步提高 `APP_MEM_LIMIT` |
 | `ERP_PDF_WARMUP` | `async` | 正式发布预热开关；服务启动后异步跑一次中文合同 PDF 渲染，提前启动共享 Chromium 并加载 CJK 字体；`/readyz` 在预热完成前或预热失败后保持未就绪。`off` 只用于临时故障隔离，会被 production preflight 判为非 release-ready，且不能替代真实 PDF smoke |
+
+生产镜像固定以 `app`（uid / gid `10001`）运行，Chrome 参数不允许 `--no-sandbox` 或 `--disable-setuid-sandbox`。`production-preflight --runtime` 会同时拒绝 root app-server、非 `async` warmup 和偏离 Docker exact pin 的 Chromium；静态配置绿色仍不能替代容器内 sandbox 启动和受控 token 的真实 PDF smoke。
 安全边界：
 
 - seed、debugRunId cleanup 和全量业务数据清空默认关闭，必须分别显式启用；开启 scoped cleanup 不会隐式开启全量清空。

@@ -27,6 +27,7 @@ const (
 var (
 	ErrPurchaseOrderNotFound     = errors.New("purchase order not found")
 	ErrPurchaseOrderItemNotFound = errors.New("purchase order item not found")
+	ErrPurchaseOrderConflict     = errors.New("purchase order version conflict")
 	ErrMaterialInactive          = errors.New("material inactive")
 	ErrSupplierInactive          = errors.New("supplier inactive")
 )
@@ -41,6 +42,7 @@ type PurchaseOrder struct {
 	PurchaseDate            time.Time
 	ExpectedArrivalDate     *time.Time
 	LifecycleStatus         string
+	Version                 int
 	Note                    *string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
@@ -69,6 +71,7 @@ type PurchaseOrderItem struct {
 }
 
 type PurchaseOrderMutation struct {
+	ExpectedVersion         int
 	PurchaseOrderNo         string
 	SupplierID              int
 	SupplierPurchaseOrderNo *string
@@ -297,6 +300,9 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 		return nil, ErrBadParam
 	}
 	if id > 0 {
+		if order.ExpectedVersion <= 0 {
+			return nil, ErrBadParam
+		}
 		current, err := uc.repo.GetPurchaseOrder(ctx, id)
 		if err != nil {
 			return nil, err
@@ -304,6 +310,9 @@ func (uc *PurchaseOrderUsecase) SavePurchaseOrderWithItems(ctx context.Context, 
 		if !corestatus.IsPurchaseOrderEditable(current.LifecycleStatus) {
 			return nil, ErrBadParam
 		}
+	}
+	if id == 0 {
+		order.ExpectedVersion = 0
 	}
 	normalizedOrder, err := normalizePurchaseOrderMutation(*order)
 	if err != nil {

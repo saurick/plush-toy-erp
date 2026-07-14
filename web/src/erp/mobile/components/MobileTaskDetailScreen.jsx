@@ -9,6 +9,7 @@ import {
   LeftOutlined,
   LinkOutlined,
   PauseOutlined,
+  RedoOutlined,
 } from '@ant-design/icons'
 import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
 import {
@@ -46,6 +47,7 @@ export default function MobileTaskDetailScreen({
   selectedCanComplete,
   selectedCanOperate,
   selectedCanReject,
+  selectedCanResume,
   selectedCanUrge,
   selectedSeverity,
   selectedTask,
@@ -369,33 +371,50 @@ export default function MobileTaskDetailScreen({
             {actionGuidance}
           </div>
         ) : null}
-        <button
-          type="button"
-          className="mobile-role-action-bar__button mobile-role-action-bar__button--blocked rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-          disabled={!selectedCanBlock || isActionPending}
-          onClick={() => handleTaskAction(selectedTask, 'blocked')}
-        >
-          <PauseOutlined className="mr-2" />
-          阻塞
-        </button>
-        <button
-          type="button"
-          className="mobile-role-action-bar__button mobile-role-action-bar__button--done rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-          disabled={!selectedCanComplete || isActionPending}
-          onClick={() => handleTaskAction(selectedTask, 'done')}
-        >
-          <CheckOutlined className="mr-2" />
-          完成
-        </button>
-        <button
-          type="button"
-          className="mobile-role-action-bar__button mobile-role-action-bar__button--urge rounded-xl border border-slate-200 bg-white px-3 py-4 text-lg font-semibold text-slate-700 disabled:opacity-50"
-          disabled={!selectedCanUrge || isActionPending}
-          onClick={() => handleTaskAction(selectedTask, 'urge')}
-        >
-          <BellOutlined className="mr-2" />
-          催办
-        </button>
+        {selectedCanBlock ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--blocked rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            disabled={isActionPending}
+            onClick={() => handleTaskAction(selectedTask, 'blocked')}
+          >
+            <PauseOutlined className="mr-2" />
+            阻塞
+          </button>
+        ) : null}
+        {selectedCanComplete ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--done rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            disabled={isActionPending}
+            onClick={() => handleTaskAction(selectedTask, 'done')}
+          >
+            <CheckOutlined className="mr-2" />
+            完成
+          </button>
+        ) : null}
+        {selectedCanResume ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--resume rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
+            disabled={isActionPending}
+            onClick={() => handleTaskAction(selectedTask, 'resume')}
+          >
+            <RedoOutlined className="mr-2" />
+            解除阻塞
+          </button>
+        ) : null}
+        {selectedCanUrge ? (
+          <button
+            type="button"
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--urge rounded-xl border border-slate-200 bg-white px-3 py-4 text-lg font-semibold text-slate-700 disabled:opacity-50"
+            disabled={isActionPending}
+            onClick={() => handleTaskAction(selectedTask, 'urge')}
+          >
+            <BellOutlined className="mr-2" />
+            催办
+          </button>
+        ) : null}
         {showRejected ? (
           <button
             type="button"

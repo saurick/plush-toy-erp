@@ -4,6 +4,8 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { yoyoosunTrialDataFixture } from "../../config/customers/yoyoosun/trialDataFixture.mjs";
+
 const currentFile = fileURLToPath(import.meta.url);
 const repoRoot = path.resolve(path.dirname(currentFile), "..", "..");
 
@@ -17,6 +19,66 @@ const NO_FORMAL_FACT_SQL_PATTERN =
   /INSERT\s+INTO\s+(customers|suppliers|contacts|sales_orders|business_records|inventory_txns|shipments?|finance_facts)\b/iu;
 const NO_DIRECT_DB_PATTERN =
   /\b(sql\.Open|pgx|POSTGRES_DSN|INSERT\s+INTO|UPDATE\s+[A-Za-z_]+\s+SET|DELETE\s+FROM)\b/iu;
+
+const TRIAL_FIXTURE_BEHAVIOR_RULES = Object.freeze([
+  {
+    message: "yoyoosun trial fixture must remain preview-only",
+    verify: (fixture) => fixture?.status === "preview_only",
+  },
+  {
+    message:
+      "yoyoosun trial fixture must use one synthetic source identity for every top-level record",
+    verify: (fixture) => {
+      const fixtureKey = String(fixture?.fixtureKey || "").trim();
+      if (!fixtureKey.startsWith("__synthetic_") || !fixtureKey.endsWith("__")) {
+        return false;
+      }
+      return Object.values(fixture || {})
+        .filter(Array.isArray)
+        .flat()
+        .every(
+          (record) =>
+            Array.isArray(record?.sourceIds) &&
+            record.sourceIds.length === 1 &&
+            record.sourceIds[0] === fixtureKey,
+        );
+    },
+  },
+  {
+    message: "yoyoosun trial fixture must cover a cancelled sales order",
+    verify: (fixture) =>
+      fixture?.salesOrders?.some(
+        (order) => order.lifecycleStatus === "cancelled",
+      ) === true,
+  },
+  {
+    message: "yoyoosun trial fixture must cover a rejected quality inspection",
+    verify: (fixture) =>
+      fixture?.qualityInspections?.some(
+        (inspection) => inspection.result === "rejected",
+      ) === true,
+  },
+  {
+    message: "yoyoosun trial fixture must cover a cancelled shipment",
+    verify: (fixture) =>
+      fixture?.shipments?.some((shipment) => shipment.status === "cancelled") ===
+      true,
+  },
+  {
+    message: "yoyoosun trial fixture must cover a boss-owned workflow task",
+    verify: (fixture) =>
+      fixture?.workflowTasks?.some((task) => task.ownerRoleKey === "boss") ===
+      true,
+  },
+]);
+
+export function trialFixtureCoverageViolations(
+  fixture = yoyoosunTrialDataFixture,
+) {
+  return TRIAL_FIXTURE_BEHAVIOR_RULES.filter(
+    (rule) => !rule.verify(fixture),
+  ).map((rule) => rule.message);
+}
 
 export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
   {
@@ -150,44 +212,12 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     required: Object.freeze([
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
-        pattern: /fixtureKey:\s*"yoyoosun-trial-data-fixture-v1"/u,
-        message: "yoyoosun trial fixture must keep a stable fixture key",
-      },
-      {
-        path: "config/customers/yoyoosun/trialDataFixture.mjs",
-        pattern: /status:\s*"preview_only"/u,
-        message: "yoyoosun trial fixture must remain preview_only",
-      },
-      {
-        path: "config/customers/yoyoosun/trialDataFixture.mjs",
         pattern: /must not be applied to customer production data/u,
         message:
           "yoyoosun trial fixture must keep the production-data boundary",
       },
-      {
-        path: "config/customers/yoyoosun/trialDataFixture.mjs",
-        pattern: /SO-YOYO-TRIAL-003/u,
-        message:
-          "yoyoosun trial fixture must include cancelled sales order coverage",
-      },
-      {
-        path: "config/customers/yoyoosun/trialDataFixture.mjs",
-        pattern: /QI-YOYO-TRIAL-003/u,
-        message:
-          "yoyoosun trial fixture must include rejected quality coverage",
-      },
-      {
-        path: "config/customers/yoyoosun/trialDataFixture.mjs",
-        pattern: /SH-YOYO-TRIAL-003/u,
-        message:
-          "yoyoosun trial fixture must include cancelled shipment coverage",
-      },
-      {
-        path: "config/customers/yoyoosun/trialDataFixture.mjs",
-        pattern: /WF-YOYO-TRIAL-BOSS-001/u,
-        message: "yoyoosun trial fixture must include boss workflow coverage",
-      },
     ]),
+    behavior: Object.freeze(TRIAL_FIXTURE_BEHAVIOR_RULES),
     forbidden: Object.freeze([
       {
         path: "config/customers/yoyoosun/trialDataFixture.mjs",
@@ -962,9 +992,43 @@ async function evaluateRuleGroup({ root, check, type, rules, cache }) {
   return violations;
 }
 
+function evaluateBehaviorGroup({ check, rules, trialFixture }) {
+  const violations = [];
+  for (const rule of rules || []) {
+    try {
+      if (rule.verify(trialFixture)) continue;
+      violations.push(
+        buildViolation({
+          check,
+          type: "behavior",
+          rule: {
+            path: "config/customers/yoyoosun/trialDataFixture.mjs",
+            message: rule.message,
+          },
+          reason: "fixture behavior not covered",
+        }),
+      );
+    } catch (error) {
+      violations.push(
+        buildViolation({
+          check,
+          type: "behavior",
+          rule: {
+            path: "config/customers/yoyoosun/trialDataFixture.mjs",
+            message: rule.message,
+          },
+          reason: `fixture behavior check failed: ${error.message}`,
+        }),
+      );
+    }
+  }
+  return violations;
+}
+
 export async function buildTestDataIsolationReport({
   root = repoRoot,
   checks = DEFAULT_TEST_DATA_ISOLATION_CHECKS,
+  trialFixture = yoyoosunTrialDataFixture,
 } = {}) {
   const absoluteRoot = path.resolve(root);
   const cache = new Map();
@@ -987,6 +1051,11 @@ export async function buildTestDataIsolationReport({
         rules: check.forbidden,
         cache,
       })),
+      ...evaluateBehaviorGroup({
+        check,
+        rules: check.behavior,
+        trialFixture,
+      }),
     ];
     violations.push(...checkViolations);
     checkReports.push({

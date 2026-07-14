@@ -4,12 +4,22 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
 
 type WorkflowBusinessState struct {
 	ent.Schema
+}
+
+func (WorkflowBusinessState) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"workflow_business_states_status_allowed": "business_status_key IN ('project_pending', 'project_approved', 'engineering_preparing', 'material_preparing', 'production_ready', 'production_processing', 'qc_pending', 'iqc_pending', 'qc_failed', 'warehouse_processing', 'warehouse_inbound_pending', 'inbound_done', 'shipment_pending', 'shipping_released', 'shipped', 'reconciling', 'settled', 'blocked', 'cancelled', 'closed')",
+		}},
+	}
 }
 
 func (WorkflowBusinessState) Fields() []ent.Field {

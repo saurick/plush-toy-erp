@@ -97,12 +97,14 @@ test('mobileTaskView: 未知到期状态不透出内部 key', () => {
 test('mobileTaskView: alert_level / alert_label 和 payload 字段读取正确', () => {
   const view = buildMobileTaskView(
     task({
+      urge_count: 1,
+      last_urged_at: NOW_SEC,
+      last_urged_by: 7,
+      last_urged_by_role_key: 'pmc',
       payload: {
         qc_result: 'failed',
         complete_condition: '返工复检通过后放行',
         related_documents: ['IN000001', 'PO000001'],
-        urge_count: 1,
-        last_urge_at: NOW_SEC,
         last_urge_reason: '请今天复核',
         last_urge_action: 'urge_task',
       },
@@ -760,10 +762,11 @@ test('mobileTaskView: 催办和升级任务进入 PMC / 老板关注', () => {
       owner_role_key: 'warehouse',
       source_type: 'shipping-release',
       task_group: 'shipment_release',
+      urge_count: 3,
+      last_urged_at: NOW_SEC,
+      last_urged_by: 7,
+      last_urged_by_role_key: 'pmc',
       payload: {
-        urged: true,
-        urge_count: 3,
-        last_urge_at: NOW_SEC,
         last_urge_reason: '客户催交',
         last_urge_action: 'urge_task',
       },
@@ -773,14 +776,14 @@ test('mobileTaskView: 催办和升级任务进入 PMC / 老板关注', () => {
       owner_role_key: 'finance',
       source_type: 'payables',
       task_group: 'purchase_reconciliation',
+      urge_count: 1,
+      last_urged_at: NOW_SEC,
+      last_urged_by: 8,
+      last_urged_by_role_key: 'boss',
+      escalated_at: NOW_SEC,
+      escalate_target_role_key: 'boss',
       payload: {
-        urged: true,
-        escalated: true,
-        last_urge_at: NOW_SEC,
         last_urge_action: 'escalate_to_boss',
-        escalate_target_role_key: 'boss',
-        alert_type: 'urgent_escalation',
-        notification_type: 'urgent_escalation',
       },
     }),
   ]
@@ -970,38 +973,24 @@ test('mobileTaskView: 岗位处理 evidence 支持照片附件引用和去重', 
   )
 
   const payload = buildMobileTaskActionEvidence({
-    roleKey: 'warehouse',
-    actionKey: 'done',
     evidenceText: 'PHOTO-001\nATT-002',
-    nowSec: NOW_SEC,
   })
 
-  assert.equal(payload.mobile_action.role_key, 'warehouse')
-  assert.equal(payload.mobile_action.action_key, 'done')
-  assert.equal(payload.mobile_action.action_label, '完成')
-  assert.equal(payload.mobile_action.recorded_at, NOW_SEC)
-  assert.deepEqual(payload.mobile_action_evidence_refs, [
-    'PHOTO-001',
-    'ATT-002',
-  ])
+  assert.deepEqual(payload, {
+    evidence_refs: ['PHOTO-001', 'ATT-002'],
+    surface_key: 'mobile_role_tasks',
+  })
 })
 
-test('mobileTaskView: blocked / rejected 移动处理生成异常上报快照', () => {
+test('mobileTaskView: 移动动作只提交证据和界面上下文', () => {
   const payload = buildMobileTaskActionEvidence({
-    roleKey: 'quality',
-    actionKey: 'blocked',
-    reason: '成品抽检发现色差',
     evidenceRefs: ['QC-PHOTO-001'],
-    nowSec: NOW_SEC,
   })
 
-  assert.equal(payload.mobile_exception_report.role_key, 'quality')
-  assert.equal(payload.mobile_exception_report.action_key, 'blocked')
-  assert.equal(payload.mobile_exception_report.action_label, '阻塞')
-  assert.equal(payload.mobile_exception_report.reason, '成品抽检发现色差')
-  assert.deepEqual(payload.mobile_exception_report.evidence_refs, [
-    'QC-PHOTO-001',
-  ])
+  assert.deepEqual(payload, {
+    evidence_refs: ['QC-PHOTO-001'],
+    surface_key: 'mobile_role_tasks',
+  })
 
   const view = buildMobileTaskView(
     task({
@@ -1010,18 +999,12 @@ test('mobileTaskView: blocked / rejected 移动处理生成异常上报快照', 
     { nowMs: NOW_MS }
   )
 
-  assert.deepEqual(view.mobile_action.evidence_refs, ['QC-PHOTO-001'])
+  assert.equal(view.mobile_action, null)
   assert.deepEqual(view.mobile_action_evidence_refs, ['QC-PHOTO-001'])
-  assert.equal(view.mobile_exception_report.reason, '成品抽检发现色差')
-  assert.equal(view.mobile_exception_report.action_label, '阻塞')
-  assert.doesNotMatch(
-    [
-      view.mobile_action.action_label,
-      view.mobile_exception_report.action_label,
-      view.last_urge_action_label,
-    ].join('\n'),
-    /urge_task|escalate_to_boss|blocked/u
-  )
+  assert.equal(view.mobile_exception_report, null)
+  assert.equal(Object.hasOwn(payload, 'role_key'), false)
+  assert.equal(Object.hasOwn(payload, 'recorded_at'), false)
+  assert.equal(Object.hasOwn(payload, 'action_key'), false)
 })
 
 test('mobileTaskView: 旧 mobile_action 只有 action_key 时补中文标签', () => {

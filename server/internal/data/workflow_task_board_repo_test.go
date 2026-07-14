@@ -34,17 +34,17 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	staleReason := "不应泄露的历史原因"
 
 	fixtures := []biz.WorkflowTaskCreate{
-		{TaskCode: "BOARD-A-1", TaskName: "常规待办一", SourceType: "alpha", TaskStatusKey: "pending", OwnerRoleKey: biz.SalesRoleKey, Payload: map[string]any{"record_title": "客户特殊款"}},
+		{TaskCode: "BOARD-A-1", TaskName: "常规待办一", SourceType: "alpha", TaskStatusKey: "ready", OwnerRoleKey: biz.SalesRoleKey, Payload: map[string]any{"record_title": "客户特殊款"}},
 		{TaskCode: "BOARD-A-2", TaskName: "常规待办二", SourceType: "beta", TaskStatusKey: "ready", OwnerRoleKey: biz.SalesRoleKey, DueAt: &future},
-		{TaskCode: "BOARD-A-3", TaskName: "常规待办三", SourceType: "gamma", TaskStatusKey: "processing", OwnerRoleKey: biz.QualityRoleKey, DueAt: &future},
+		{TaskCode: "BOARD-A-3", TaskName: "常规待办三", SourceType: "gamma", TaskStatusKey: "ready", OwnerRoleKey: biz.QualityRoleKey, DueAt: &future},
 		{TaskCode: "BOARD-E-1", TaskName: "阻塞任务", SourceType: "alpha", TaskStatusKey: "blocked", OwnerRoleKey: biz.SalesRoleKey, DueAt: &overdue, BlockedReason: &staleReason},
 		{TaskCode: "BOARD-E-2", TaskName: "退回任务", SourceType: "beta", TaskStatusKey: "rejected", OwnerRoleKey: biz.SalesRoleKey, DueAt: &overdue, BlockedReason: &staleReason},
-		{TaskCode: "BOARD-D-1", TaskName: "逾期待办", SourceType: "alpha", TaskStatusKey: "pending", OwnerRoleKey: biz.SalesRoleKey, DueAt: &overdue},
+		{TaskCode: "BOARD-D-1", TaskName: "逾期待办", SourceType: "alpha", TaskStatusKey: "ready", OwnerRoleKey: biz.SalesRoleKey, DueAt: &overdue},
 		{TaskCode: "BOARD-D-2", TaskName: "即将到期待办", SourceType: "beta", TaskStatusKey: "ready", OwnerRoleKey: biz.SalesRoleKey, DueAt: &dueSoon},
-		{TaskCode: "BOARD-D-3", TaskName: "边界到期待办", SourceType: "gamma", TaskStatusKey: "processing", OwnerRoleKey: biz.QualityRoleKey, DueAt: &dueBoundary},
+		{TaskCode: "BOARD-D-3", TaskName: "边界到期待办", SourceType: "gamma", TaskStatusKey: "ready", OwnerRoleKey: biz.QualityRoleKey, DueAt: &dueBoundary},
 		{TaskCode: "BOARD-F-1", TaskName: "已完成任务", SourceType: "alpha", TaskStatusKey: "done", OwnerRoleKey: biz.SalesRoleKey, DueAt: &overdue, BlockedReason: &staleReason, Payload: map[string]any{"blocked_reason": staleReason, "rejected_reason": staleReason}},
-		{TaskCode: "BOARD-F-2", TaskName: "已关闭任务", SourceType: "beta", TaskStatusKey: "closed", OwnerRoleKey: biz.SalesRoleKey},
-		{TaskCode: "BOARD-F-3", TaskName: "已取消任务", SourceType: "gamma", TaskStatusKey: "cancelled", OwnerRoleKey: biz.QualityRoleKey},
+		{TaskCode: "BOARD-F-2", TaskName: "已完成任务二", SourceType: "beta", TaskStatusKey: "done", OwnerRoleKey: biz.SalesRoleKey},
+		{TaskCode: "BOARD-F-3", TaskName: "已完成任务三", SourceType: "gamma", TaskStatusKey: "done", OwnerRoleKey: biz.QualityRoleKey},
 	}
 	createdIDs := make(map[string]int, len(fixtures))
 	for index := range fixtures {
@@ -54,9 +54,20 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 		if fixture.Payload == nil {
 			fixture.Payload = map[string]any{}
 		}
-		created, err := repo.CreateWorkflowTask(ctx, &fixture, 7)
+		created, err := client.WorkflowTask.Create().
+			SetTaskCode(fixture.TaskCode).
+			SetTaskGroup(fixture.TaskGroup).
+			SetTaskName(fixture.TaskName).
+			SetSourceType(fixture.SourceType).
+			SetSourceID(fixture.SourceID).
+			SetTaskStatusKey(fixture.TaskStatusKey).
+			SetOwnerRoleKey(fixture.OwnerRoleKey).
+			SetNillableDueAt(fixture.DueAt).
+			SetNillableBlockedReason(fixture.BlockedReason).
+			SetPayload(fixture.Payload).
+			Save(ctx)
 		if err != nil {
-			t.Fatalf("create fixture %s: %v", fixture.TaskCode, err)
+			t.Fatalf("persist board fixture %s: %v", fixture.TaskCode, err)
 		}
 		createdIDs[fixture.TaskCode] = created.ID
 	}
@@ -65,7 +76,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	if err != nil {
 		t.Fatalf("get board: %v", err)
 	}
-	if board.Total != 11 || board.Counts != (biz.WorkflowTaskBoardCounts{Actionable: 3, Exception: 2, Due: 3, Finished: 3}) {
+	if board.Total != 11 || board.Counts != (biz.WorkflowTaskBoardCounts{Actionable: 3, Exception: 1, Due: 3, Finished: 4}) {
 		t.Fatalf("unexpected board total/counts total=%d counts=%#v", board.Total, board.Counts)
 	}
 	if len(board.Lanes) != 4 {
@@ -115,12 +126,12 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 		t.Fatalf("historical done projection leaked payload rejected reason %#v", historicalDone.Payload)
 	}
 
-	filtered, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Status: "pending", Limit: 5, SnapshotAt: snapshotAt})
+	filtered, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Status: "ready", Limit: 5, SnapshotAt: snapshotAt})
 	if err != nil {
 		t.Fatalf("get filtered board: %v", err)
 	}
-	if filtered.Total != 4 || filtered.Counts.Actionable != 2 || filtered.Counts.Due != 2 {
-		t.Fatalf("pending filter must apply before classification, total=%d counts=%#v", filtered.Total, filtered.Counts)
+	if filtered.Total != 6 || filtered.Counts.Actionable != 3 || filtered.Counts.Due != 3 {
+		t.Fatalf("ready filter must apply before classification, total=%d counts=%#v", filtered.Total, filtered.Counts)
 	}
 	if fmt.Sprint(filtered.SourceTypes) != "[alpha beta gamma]" {
 		t.Fatalf("status filter must not collapse visible source facets, got %v", filtered.SourceTypes)
@@ -129,7 +140,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	if err != nil || keywordBoard.Total != 1 || keywordBoard.Counts.Actionable != 1 {
 		t.Fatalf("payload record title must remain searchable, board=%#v err=%v", keywordBoard, err)
 	}
-	facetFiltered, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Keyword: "客户特殊款", Status: "pending", Due: "noDue", SourceType: "alpha", Limit: 5, SnapshotAt: snapshotAt})
+	facetFiltered, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Keyword: "客户特殊款", Status: "ready", Due: "noDue", SourceType: "alpha", Limit: 5, SnapshotAt: snapshotAt})
 	if err != nil || facetFiltered.Total != 1 {
 		t.Fatalf("get fully filtered board: board=%#v err=%v", facetFiltered, err)
 	}
@@ -137,7 +148,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 		t.Fatalf("keyword/status/due/source filters must not collapse visible source facets, got %v", facetFiltered.SourceTypes)
 	}
 	reasonBoard, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Keyword: staleReason, Limit: 5, SnapshotAt: snapshotAt})
-	if err != nil || reasonBoard.Total != 2 || reasonBoard.Counts.Exception != 2 {
+	if err != nil || reasonBoard.Total != 2 || reasonBoard.Counts.Exception != 1 || reasonBoard.Counts.Finished != 1 {
 		t.Fatalf("historical finished reasons must not affect search, board=%#v err=%v", reasonBoard, err)
 	}
 
@@ -145,7 +156,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	if err != nil {
 		t.Fatalf("get focused board: %v", err)
 	}
-	if len(focused.Lanes) != 1 || focused.Lanes[0].Key != biz.WorkflowTaskBoardLaneFinished || focused.Lanes[0].Total != 3 || len(focused.Lanes[0].Tasks) != 1 {
+	if len(focused.Lanes) != 1 || focused.Lanes[0].Key != biz.WorkflowTaskBoardLaneFinished || focused.Lanes[0].Total != 4 || len(focused.Lanes[0].Tasks) != 1 {
 		t.Fatalf("unexpected focused lane %#v", focused.Lanes)
 	}
 	if focused.Total != board.Total || focused.Counts != board.Counts || fmt.Sprint(focused.SourceTypes) != fmt.Sprint(board.SourceTypes) {
@@ -153,7 +164,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	}
 }
 
-func TestWorkflowRepo_GetWorkflowTaskBoardAppliesVisibilityAndFailsOnUnknownStatus(t *testing.T) {
+func TestWorkflowRepo_GetWorkflowTaskBoardAppliesVisibilityAndRejectsRemovedStatuses(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_visibility?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
@@ -203,16 +214,27 @@ func TestWorkflowRepo_GetWorkflowTaskBoardAppliesVisibilityAndFailsOnUnknownStat
 		t.Fatalf("source facets must honor owner and self-assignee scope, got %v", ownerFiltered.SourceTypes)
 	}
 
-	unknown := biz.WorkflowTaskCreate{TaskCode: "BOARD-UNKNOWN", TaskGroup: "board-visibility", TaskName: "未知状态", SourceType: "sales-source", SourceID: 4, TaskStatusKey: "unknown", OwnerRoleKey: biz.SalesRoleKey, Payload: map[string]any{}}
-	if _, err := repo.CreateWorkflowTask(ctx, &unknown, 7); err != nil {
-		t.Fatalf("create unknown fixture: %v", err)
+	for _, status := range []string{"pending", "processing", "cancelled", "closed"} {
+		if _, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Status: status, Limit: 5, SnapshotAt: snapshotAt}); !errors.Is(err, biz.ErrBadParam) {
+			t.Fatalf("removed status filter %q must be rejected, got %v", status, err)
+		}
 	}
-	if _, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Limit: 5, SnapshotAt: snapshotAt}); !errors.Is(err, biz.ErrWorkflowTaskBoardStatus) {
-		t.Fatalf("unknown persisted status must fail closed, got %v", err)
+
+	if _, err := client.WorkflowTask.Create().
+		SetTaskCode("BOARD-UNKNOWN").
+		SetTaskGroup("board-visibility").
+		SetTaskName("未知状态").
+		SetSourceType("sales-source").
+		SetSourceID(4).
+		SetTaskStatusKey("unknown").
+		SetOwnerRoleKey(biz.SalesRoleKey).
+		SetPayload(map[string]any{}).
+		Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("unknown workflow task status must be rejected by schema, got %v", err)
 	}
 }
 
-func TestWorkflowRepo_GetWorkflowTaskBoardCountsAllTasksBeyondLegacyPageLimit(t *testing.T) {
+func TestWorkflowRepo_GetWorkflowTaskBoardCountsAllTasksBeyondPageLimit(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_478?mode=memory&cache=shared&_fk=1")
 	defer mustCloseEntClient(t, client)
@@ -228,9 +250,10 @@ func TestWorkflowRepo_GetWorkflowTaskBoardCountsAllTasksBeyondLegacyPageLimit(t 
 	}
 	fixtures := []laneFixture{
 		{count: 144, status: "ready", dueAt: &future},
-		{count: 110, status: "rejected", dueAt: &overdue},
-		{count: 143, status: "processing", dueAt: &overdue},
-		{count: 81, status: "done", dueAt: &overdue},
+		{count: 110, status: "blocked", dueAt: &overdue},
+		{count: 143, status: "ready", dueAt: &overdue},
+		{count: 80, status: "done", dueAt: &overdue},
+		{count: 1, status: "rejected", dueAt: &overdue},
 	}
 	builders := make([]*ent.WorkflowTaskCreate, 0, 478)
 	sequence := 0
@@ -259,7 +282,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardCountsAllTasksBeyondLegacyPageLimit(t 
 	}
 	wantCounts := biz.WorkflowTaskBoardCounts{Actionable: 144, Exception: 110, Due: 143, Finished: 81}
 	if board.Total != 478 || board.Counts != wantCounts {
-		t.Fatalf("legacy page limit must not cap board totals, total=%d counts=%#v", board.Total, board.Counts)
+		t.Fatalf("page limit must not cap board totals, total=%d counts=%#v", board.Total, board.Counts)
 	}
 	if board.Counts.Actionable+board.Counts.Exception+board.Counts.Due+board.Counts.Finished != board.Total {
 		t.Fatalf("lane totals must exhaust total, board=%#v", board)
@@ -314,7 +337,7 @@ func TestWorkflowRepo_GetWorkflowTaskBoardUsesDistinctFacetAndBoundedQueries(t *
 	builders := []*ent.WorkflowTaskCreate{
 		client.WorkflowTask.Create().SetTaskCode("BOARD-SHAPE-A").SetTaskGroup("shape").SetTaskName("常规").SetSourceType("same-source").SetSourceID(1).SetTaskStatusKey("ready").SetOwnerRoleKey(biz.SalesRoleKey).SetPayload(map[string]any{}),
 		client.WorkflowTask.Create().SetTaskCode("BOARD-SHAPE-E").SetTaskGroup("shape").SetTaskName("异常").SetSourceType("same-source").SetSourceID(2).SetTaskStatusKey("blocked").SetOwnerRoleKey(biz.SalesRoleKey).SetPayload(map[string]any{}),
-		client.WorkflowTask.Create().SetTaskCode("BOARD-SHAPE-D").SetTaskGroup("shape").SetTaskName("到期").SetSourceType("same-source").SetSourceID(3).SetTaskStatusKey("processing").SetOwnerRoleKey(biz.SalesRoleKey).SetDueAt(overdue).SetPayload(map[string]any{}),
+		client.WorkflowTask.Create().SetTaskCode("BOARD-SHAPE-D").SetTaskGroup("shape").SetTaskName("到期").SetSourceType("same-source").SetSourceID(3).SetTaskStatusKey("ready").SetOwnerRoleKey(biz.SalesRoleKey).SetDueAt(overdue).SetPayload(map[string]any{}),
 		client.WorkflowTask.Create().SetTaskCode("BOARD-SHAPE-F").SetTaskGroup("shape").SetTaskName("结束").SetSourceType("same-source").SetSourceID(4).SetTaskStatusKey("done").SetOwnerRoleKey(biz.SalesRoleKey).SetPayload(map[string]any{}),
 	}
 	if _, err := client.WorkflowTask.CreateBulk(builders...).Save(ctx); err != nil {
@@ -376,12 +399,12 @@ func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t
 	suffix := postgresTestSuffix()
 	sourceType := "board-capacity-" + strings.ToLower(suffix)
 	reasonSource := sourceType + "-reason"
-	legacySource := sourceType + "-legacy"
+	projectionSource := sourceType + "-projection"
 	t.Cleanup(func() {
 		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cleanupCancel()
-		_, _ = data.sqldb.ExecContext(cleanupCtx, `DELETE FROM workflow_task_events WHERE task_id IN (SELECT id FROM workflow_tasks WHERE source_type IN ($1, $2, $3))`, sourceType, reasonSource, legacySource)
-		_, _ = data.sqldb.ExecContext(cleanupCtx, `DELETE FROM workflow_tasks WHERE source_type IN ($1, $2, $3)`, sourceType, reasonSource, legacySource)
+		_, _ = data.sqldb.ExecContext(cleanupCtx, `DELETE FROM workflow_task_events WHERE task_id IN (SELECT id FROM workflow_tasks WHERE source_type IN ($1, $2, $3))`, sourceType, reasonSource, projectionSource)
+		_, _ = data.sqldb.ExecContext(cleanupCtx, `DELETE FROM workflow_tasks WHERE source_type IN ($1, $2, $3)`, sourceType, reasonSource, projectionSource)
 	})
 
 	type laneFixture struct {
@@ -391,9 +414,10 @@ func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t
 	}
 	fixtures := []laneFixture{
 		{count: 144, status: "ready", dueAt: &future},
-		{count: 110, status: "rejected", dueAt: &overdue},
-		{count: 143, status: "processing", dueAt: &overdue},
-		{count: 81, status: "done", dueAt: &overdue},
+		{count: 110, status: "blocked", dueAt: &overdue},
+		{count: 143, status: "ready", dueAt: &overdue},
+		{count: 80, status: "done", dueAt: &overdue},
+		{count: 1, status: "rejected", dueAt: &overdue},
 	}
 	builders := make([]*ent.WorkflowTaskCreate, 0, 478)
 	sequence := 0
@@ -438,48 +462,48 @@ func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t
 		t.Fatalf("postgres source types must be SELECT DISTINCT, got %#v", board.SourceTypes)
 	}
 
-	legacyReason := "历史原因-" + suffix
-	legacyBuilders := make([]*ent.WorkflowTaskCreate, 0, 5)
-	for index, status := range []string{"done", "closed", "cancelled", "blocked", "rejected"} {
-		legacyBuilders = append(legacyBuilders, client.WorkflowTask.Create().
-			SetTaskCode(fmt.Sprintf("WF-BOARD-LEGACY-%s-%d", suffix, index)).
-			SetTaskGroup("board-legacy-reason").
-			SetTaskName("历史原因兼容验证").
-			SetSourceType(legacySource).
+	projectionReason := "状态原因-" + suffix
+	projectionBuilders := make([]*ent.WorkflowTaskCreate, 0, 5)
+	for index, status := range []string{"done", "done", "done", "blocked", "rejected"} {
+		projectionBuilders = append(projectionBuilders, client.WorkflowTask.Create().
+			SetTaskCode(fmt.Sprintf("WF-BOARD-PROJECTION-%s-%d", suffix, index)).
+			SetTaskGroup("board-status-reason-projection").
+			SetTaskName("状态原因投影验证").
+			SetSourceType(projectionSource).
 			SetSourceID(index+1).
 			SetTaskStatusKey(status).
 			SetOwnerRoleKey(biz.AdminRoleKey).
-			SetBlockedReason(legacyReason).
-			SetPayload(map[string]any{"blocked_reason": legacyReason, "rejected_reason": legacyReason}))
+			SetBlockedReason(projectionReason).
+			SetPayload(map[string]any{"blocked_reason": projectionReason, "rejected_reason": projectionReason}))
 	}
-	if _, err := client.WorkflowTask.CreateBulk(legacyBuilders...).Save(ctx); err != nil {
-		t.Fatalf("create postgres legacy reason fixtures: %v", err)
+	if _, err := client.WorkflowTask.CreateBulk(projectionBuilders...).Save(ctx); err != nil {
+		t.Fatalf("create postgres status reason fixtures: %v", err)
 	}
-	legacyBoard, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{SourceType: legacySource, Limit: 5, SnapshotAt: snapshotAt})
+	projectionBoard, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{SourceType: projectionSource, Limit: 5, SnapshotAt: snapshotAt})
 	if err != nil {
-		t.Fatalf("get postgres legacy board: %v", err)
+		t.Fatalf("get postgres status projection board: %v", err)
 	}
-	if legacyBoard.Total != 5 || legacyBoard.Counts.Exception != 2 || legacyBoard.Counts.Finished != 3 {
-		t.Fatalf("legacy reasons must not change lane classification, total=%d counts=%#v", legacyBoard.Total, legacyBoard.Counts)
+	if projectionBoard.Total != 5 || projectionBoard.Counts.Exception != 1 || projectionBoard.Counts.Finished != 4 {
+		t.Fatalf("status reasons must not change lane classification, total=%d counts=%#v", projectionBoard.Total, projectionBoard.Counts)
 	}
-	legacyReasonBoard, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{SourceType: legacySource, Keyword: legacyReason, Limit: 5, SnapshotAt: snapshotAt})
+	projectionReasonBoard, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{SourceType: projectionSource, Keyword: projectionReason, Limit: 5, SnapshotAt: snapshotAt})
 	if err != nil {
-		t.Fatalf("search postgres legacy reason: %v", err)
+		t.Fatalf("search postgres status reason: %v", err)
 	}
-	if legacyReasonBoard.Total != 2 || legacyReasonBoard.Counts.Exception != 2 || legacyReasonBoard.Counts.Finished != 0 {
-		t.Fatalf("legacy reason search must only match blocked/rejected tasks, total=%d counts=%#v", legacyReasonBoard.Total, legacyReasonBoard.Counts)
+	if projectionReasonBoard.Total != 2 || projectionReasonBoard.Counts.Exception != 1 || projectionReasonBoard.Counts.Finished != 1 {
+		t.Fatalf("status reason search must only match blocked/rejected tasks, total=%d counts=%#v", projectionReasonBoard.Total, projectionReasonBoard.Counts)
 	}
-	for _, lane := range legacyBoard.Lanes {
+	for _, lane := range projectionBoard.Lanes {
 		for _, task := range lane.Tasks {
 			if lane.Key == biz.WorkflowTaskBoardLaneFinished {
 				if task.BlockedReason != nil {
-					t.Fatalf("finished legacy projection leaked blocked reason %#v", task.BlockedReason)
+					t.Fatalf("finished projection leaked blocked reason %#v", task.BlockedReason)
 				}
 				if _, exists := task.Payload["blocked_reason"]; exists {
-					t.Fatalf("finished legacy projection leaked payload blocked reason %#v", task.Payload)
+					t.Fatalf("finished projection leaked payload blocked reason %#v", task.Payload)
 				}
 				if _, exists := task.Payload["rejected_reason"]; exists {
-					t.Fatalf("finished legacy projection leaked payload rejected reason %#v", task.Payload)
+					t.Fatalf("finished projection leaked payload rejected reason %#v", task.Payload)
 				}
 			}
 		}

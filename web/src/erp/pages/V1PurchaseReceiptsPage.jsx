@@ -60,6 +60,10 @@ import {
   formatQuantity,
 } from '../utils/businessLineItems.mjs'
 import {
+  createPurchaseReceiptMutationAttemptStore,
+  isPurchaseReceiptMutationResultUnknown,
+} from '../utils/purchaseReceiptMutation.mjs'
+import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -448,6 +452,9 @@ export default function V1PurchaseReceiptsPage() {
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
+  const mutationAttemptsRef = useRef(
+    createPurchaseReceiptMutationAttemptStore()
+  )
   const routePurchaseOrderID = searchParamPositiveIntText(
     searchParams,
     'purchase_order_id'
@@ -698,16 +705,30 @@ export default function V1PurchaseReceiptsPage() {
     async (values) => {
       const receipt = itemEditorReceipt
       if (!receipt?.id) return
+      const scope = `add-item:${receipt.id}`
+      let attempt
       setSaving(true)
       try {
-        await addPurchaseReceiptItem(
+        attempt = mutationAttemptsRef.current.prepare(
+          scope,
           buildPurchaseReceiptItemParams(receipt.id, values)
         )
+        await addPurchaseReceiptItem(attempt.params)
+        mutationAttemptsRef.current.settle(scope, attempt)
         message.success('入库明细已添加')
         closeItemEditor()
         await loadRows()
       } catch (error) {
-        message.error(getActionErrorMessage(error, '添加入库明细'))
+        const retained = attempt
+          ? mutationAttemptsRef.current.settle(scope, attempt, error)
+          : isPurchaseReceiptMutationResultUnknown(error)
+        if (retained) {
+          message.warning(
+            '入库明细添加结果尚未确认，系统将使用原请求核对，请不要重复添加。'
+          )
+        } else {
+          message.error(getActionErrorMessage(error, '添加入库明细'))
+        }
       } finally {
         setSaving(false)
       }

@@ -632,36 +632,46 @@ test('engineeringPrintEditor: 客户样例覆盖 Sheet1 文本但不预置作业
       draftPatch: {
         companyName: '东莞市永绅玩具有限公司',
         productName: '猴子抱抱-头',
-        sewingTitle: '车缝：     针型号:12#针   每英寸:10-11 针',
-        sewingNote: '注：车缝止口均匀，头车5mm止口。进出针倒针牢固！！',
-        sewingIntroRows: [
-          {
-            text: '止口必须一致，不能松线、跳针、断线，起皱。',
-            heightMm: 10.6,
-          },
-        ],
         rows: [
           {
+            type: WORK_INSTRUCTION_ROW_TYPES.title,
+            text: '车缝：     针型号:12#针   每英寸:10-11 针',
+          },
+          {
+            type: WORK_INSTRUCTION_ROW_TYPES.step,
+            text: '止口必须一致，不能松线、跳针、断线，起皱。',
+            heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+          },
+          {
+            type: WORK_INSTRUCTION_ROW_TYPES.text,
+            text: '注：车缝止口均匀，头车5mm止口。进出针倒针牢固！！',
+          },
+          {
+            type: WORK_INSTRUCTION_ROW_TYPES.step,
             no: '1',
             text: '面打折：折位对齐打折，打折拖圆顺，不可起角。',
             heightMm: 11.6,
           },
           {
+            type: WORK_INSTRUCTION_ROW_TYPES.step,
             no: '2',
             text: '面部打好折之后，然后才能去打鼻子、眼睛。',
             heightMm: 11.6,
           },
           {
+            type: WORK_INSTRUCTION_ROW_TYPES.step,
             no: '3',
             text: '打眼鼻：按样板核对眼鼻配件、位置和方向。',
             heightMm: 11.6,
           },
           {
+            type: WORK_INSTRUCTION_ROW_TYPES.step,
             no: '4',
             text: '上后头：左/右后头对齐脸片点位车。',
             heightMm: 11.6,
           },
           {
+            type: WORK_INSTRUCTION_ROW_TYPES.step,
             no: '5',
             text: '头下面折边：向内折8mm，压4mm止口明线。',
             heightMm: 11.6,

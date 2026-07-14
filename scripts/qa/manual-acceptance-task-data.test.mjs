@@ -175,6 +175,7 @@ function createMockRuntime(options = {}) {
     if (body.method === "create_task") {
       createCount += 1;
       assert.equal(actorRole, "pmc");
+      assert.equal(params.task_status_key, "ready");
       for (const forbiddenKey of [
         "config_revision",
         "process_instance_id",
@@ -307,12 +308,10 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
   assert.equal(plan.tasks.length, TOTAL_TASKS);
   assert.equal(plan.summary.total, 180);
   assert.deepEqual(plan.summary.byStatus, {
-    pending: 36,
-    ready: 36,
-    processing: 36,
+    ready: 121,
     blocked: 27,
-    done: 27,
-    rejected: 18,
+    done: 24,
+    rejected: 8,
   });
   assert.deepEqual(plan.summary.dueScenarios, {
     overdue: 45,
@@ -340,16 +339,12 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     const tasks = plan.tasks.filter((task) => task.roleKey === roleKey);
     assert.equal(tasks.length, TASKS_PER_ROLE);
     assert.equal(
-      tasks.filter((task) => task.targetStatus === "pending").length,
-      4,
-    );
-    assert.equal(
       tasks.filter((task) => task.targetStatus === "ready").length,
-      4,
-    );
-    assert.equal(
-      tasks.filter((task) => task.targetStatus === "processing").length,
-      4,
+      roleKey === "boss"
+        ? 15
+        : ["warehouse", "finance", "quality"].includes(roleKey)
+          ? 12
+          : 14,
     );
     assert.equal(
       tasks.filter((task) => task.targetStatus === "blocked").length,
@@ -357,15 +352,37 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     );
     assert.equal(
       tasks.filter((task) => task.targetStatus === "done").length,
-      3,
+      roleKey === "boss" ? 0 : 3,
     );
     assert.equal(
       tasks.filter((task) => task.targetStatus === "rejected").length,
-      2,
+      ["boss", "warehouse", "finance", "quality"].includes(roleKey)
+        ? 2
+        : 0,
     );
     assert.equal(
       tasks.filter((task) => task.assignmentMode === "role_account").length,
       10,
+    );
+    assert.equal(
+      tasks.every((task) => task.createParams.task_status_key === "ready"),
+      true,
+    );
+    assert.equal(
+      tasks
+        .filter((task) =>
+          ["blocked", "done", "rejected"].includes(task.targetStatus),
+        )
+        .every((task) => task.action),
+      true,
+    );
+    assert.equal(
+      tasks.every((task) =>
+        ["ready", "blocked", "done", "rejected"].includes(
+          task.targetStatus,
+        ),
+      ),
+      true,
     );
   }
 
@@ -700,7 +717,7 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   const mock = createMockRuntime();
   const actionSeed = plan.tasks.find((task) => task.action);
   const directSeed = plan.tasks.find(
-    (task) => !task.action && task.targetStatus === "pending",
+    (task) => !task.action && task.targetStatus === "ready",
   );
   mock.seedPlannedTask(plan, actionSeed);
   mock.seedPlannedTask(plan, directSeed, { final: true });

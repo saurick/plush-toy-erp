@@ -64,9 +64,11 @@ type ProcessInstance struct {
 type ProcessInstanceEdges struct {
 	// Nodes holds the value of the nodes edge.
 	Nodes []*ProcessNodeInstance `json:"nodes,omitempty"`
+	// WorkflowTasks holds the value of the workflow_tasks edge.
+	WorkflowTasks []*WorkflowTask `json:"workflow_tasks,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // NodesOrErr returns the Nodes value or an error if the edge
@@ -76,6 +78,15 @@ func (e ProcessInstanceEdges) NodesOrErr() ([]*ProcessNodeInstance, error) {
 		return e.Nodes, nil
 	}
 	return nil, &NotLoadedError{edge: "nodes"}
+}
+
+// WorkflowTasksOrErr returns the WorkflowTasks value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProcessInstanceEdges) WorkflowTasksOrErr() ([]*WorkflowTask, error) {
+	if e.loadedTypes[1] {
+		return e.WorkflowTasks, nil
+	}
+	return nil, &NotLoadedError{edge: "workflow_tasks"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -244,6 +255,11 @@ func (_m *ProcessInstance) Value(name string) (ent.Value, error) {
 // QueryNodes queries the "nodes" edge of the ProcessInstance entity.
 func (_m *ProcessInstance) QueryNodes() *ProcessNodeInstanceQuery {
 	return NewProcessInstanceClient(_m.config).QueryNodes(_m)
+}
+
+// QueryWorkflowTasks queries the "workflow_tasks" edge of the ProcessInstance entity.
+func (_m *ProcessInstance) QueryWorkflowTasks() *WorkflowTaskQuery {
+	return NewProcessInstanceClient(_m.config).QueryWorkflowTasks(_m)
 }
 
 // Update returns a builder for updating this ProcessInstance.

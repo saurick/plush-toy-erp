@@ -10,7 +10,7 @@ import { chromium } from 'playwright'
 import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
 import { mobileRoleDefinitions } from '../src/erp/config/appRegistry.mjs'
 import { getRoleWorkbench } from '../src/erp/config/seedData.mjs'
-import { shouldLoadAllWorkflowTasksForRole } from '../src/erp/utils/mobileTaskQueries.mjs'
+import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../src/erp/utils/mobileTaskQueries.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
@@ -534,24 +534,18 @@ async function runMobileAuthScenario(
       return
     }
 
-    if (shouldLoadAllWorkflowTasksForRole(role.roleKey)) {
-      assert.equal(
-        params.owner_role_key,
-        undefined,
-        `${role.roleKey} workflow 全量加载角色不应携带 owner_role_key`
-      )
-      assert.equal(
-        params.limit,
-        200,
-        `${role.roleKey} workflow 全量加载应限制 200 条`
-      )
-    } else {
-      assert.equal(
-        params.owner_role_key,
-        role.roleKey,
-        `${role.roleKey} workflow 请求应携带当前角色 owner_role_key`
-      )
-    }
+    assert.equal(method, 'list_role_tasks')
+    assert.equal(
+      params.role_key,
+      role.roleKey,
+      `${role.roleKey} workflow 请求应携带当前角色 role_key`
+    )
+    assert.equal(params.limit, MOBILE_ROLE_TASK_PAGE_LIMIT)
+    assert.equal(params.cursor, undefined)
+    assert(
+      ['todo', 'history', 'risk'].includes(params.view_key),
+      `${role.roleKey} workflow 请求应携带正式 view_key`
+    )
 
     if (authorization === `Bearer ${staleToken}`) {
       await route.fulfill({
@@ -574,7 +568,68 @@ async function runMobileAuthScenario(
       authedWorkflowCalls += 1
     }
 
-    assert.equal(method, 'list_tasks')
+    const serverTime = Math.floor(Date.now() / 1000)
+    const tasks = [
+      {
+        id: 1,
+        version: 1,
+        task_code: `${role.roleKey}-auth-smoke-task`,
+        task_name: '登录回跳验证任务',
+        source_type: 'project-orders',
+        source_id: 1,
+        source_no: 'STYLE-001',
+        business_status_key: 'project_pending',
+        task_status_key: 'ready',
+        owner_role_key: role.roleKey,
+        blocked_reason: '',
+        payload: {},
+        created_at: serverTime,
+        updated_at: serverTime,
+      },
+      {
+        id: 2,
+        version: 1,
+        task_code: `${role.roleKey}-warning-smoke-task`,
+        task_name:
+          '回签跟进ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        source_type: 'processing-contracts',
+        source_id: 2,
+        source_no:
+          'OUT-001-LONG-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
+        business_status_key: 'blocked',
+        task_status_key: 'blocked',
+        owner_role_key: role.roleKey,
+        blocked_reason: '供应商延期',
+        due_at: serverTime - 3600,
+        payload: {},
+        created_at: serverTime - 7200,
+        updated_at: serverTime - 1800,
+      },
+      {
+        id: 3,
+        version: 1,
+        task_code: `${role.roleKey}-done-smoke-task`,
+        task_name: '完成进度样本',
+        source_type: 'project-orders',
+        source_id: 3,
+        source_no: 'DONE-001',
+        business_status_key: 'project_approved',
+        task_status_key: 'done',
+        owner_role_key: role.roleKey,
+        blocked_reason: '',
+        payload: {},
+        created_at: serverTime - 10_800,
+        updated_at: serverTime - 900,
+      },
+    ]
+    const items =
+      params.view_key === 'history'
+        ? tasks.filter((task) => task.task_status_key === 'done')
+        : params.view_key === 'risk'
+          ? tasks.filter((task) => task.task_status_key === 'blocked')
+          : tasks.filter((task) =>
+              ['ready', 'blocked'].includes(task.task_status_key)
+            )
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -585,59 +640,10 @@ async function runMobileAuthScenario(
           code: 0,
           message: 'OK',
           data: {
-            tasks: [
-              {
-                id: 1,
-                task_code: `${role.roleKey}-auth-smoke-task`,
-                task_name: '登录回跳验证任务',
-                source_type: 'project-orders',
-                source_id: 1,
-                source_no: 'STYLE-001',
-                business_status_key: 'project_pending',
-                task_status_key: 'ready',
-                owner_role_key: role.roleKey,
-                blocked_reason: '',
-                payload: {},
-                created_at: Math.floor(Date.now() / 1000),
-                updated_at: Math.floor(Date.now() / 1000),
-              },
-              {
-                id: 2,
-                task_code: `${role.roleKey}-warning-smoke-task`,
-                task_name:
-                  '回签跟进ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-                source_type: 'processing-contracts',
-                source_id: 2,
-                source_no:
-                  'OUT-001-LONG-ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ',
-                business_status_key: 'blocked',
-                task_status_key: 'blocked',
-                owner_role_key: role.roleKey,
-                blocked_reason: '供应商延期',
-                due_at: Math.floor(Date.now() / 1000) - 3600,
-                payload: {},
-                created_at: Math.floor(Date.now() / 1000) - 7200,
-                updated_at: Math.floor(Date.now() / 1000) - 1800,
-              },
-              {
-                id: 3,
-                task_code: `${role.roleKey}-done-smoke-task`,
-                task_name: '完成进度样本',
-                source_type: 'project-orders',
-                source_id: 3,
-                source_no: 'DONE-001',
-                business_status_key: 'project_approved',
-                task_status_key: 'done',
-                owner_role_key: role.roleKey,
-                blocked_reason: '',
-                payload: {},
-                created_at: Math.floor(Date.now() / 1000) - 10_800,
-                updated_at: Math.floor(Date.now() / 1000) - 900,
-              },
-            ],
-            total: 3,
-            limit: 100,
-            offset: 0,
+            items,
+            next_cursor: '',
+            has_more: false,
+            server_time: serverTime,
           },
         },
       }),

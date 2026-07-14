@@ -83,12 +83,10 @@ function taskReport(overrides = {}) {
         engineering: 20,
       },
       byStatus: {
-        pending: 36,
-        ready: 36,
-        processing: 36,
+        ready: 121,
         blocked: 27,
-        done: 27,
-        rejected: 18,
+        done: 24,
+        rejected: 8,
       },
     },
     ...overrides,
@@ -107,14 +105,19 @@ function records(count, field, values, identityField, identityPrefix) {
   }));
 }
 
-const TASK_STATUSES = Object.freeze([
-  ...Array(4).fill("pending"),
-  ...Array(4).fill("ready"),
-  ...Array(4).fill("processing"),
-  ...Array(3).fill("blocked"),
-  ...Array(3).fill("done"),
-  ...Array(2).fill("rejected"),
-]);
+function taskStatusesForRole(roleKey) {
+  const canReject = ["boss", "warehouse", "finance", "quality"].includes(
+    roleKey,
+  );
+  return Object.freeze([
+    ...Array(roleKey === "boss" ? 15 : canReject ? 12 : 14).fill("ready"),
+    ...Array(3).fill("blocked"),
+    ...Array(roleKey === "boss" ? 0 : 3).fill("done"),
+    ...Array(canReject ? 2 : 0).fill("rejected"),
+  ]);
+}
+
+const TASK_STATUSES = taskStatusesForRole("sales");
 
 function okResponse(data) {
   return {
@@ -256,7 +259,9 @@ function createReadinessFetch(runtimeOptions = {}) {
       });
     }
     if (body.method === "list_tasks") {
-      const statuses = runtimeOptions.taskStatuses || TASK_STATUSES;
+      const statuses =
+        runtimeOptions.taskStatuses ||
+        taskStatusesForRole(body.params.owner_role_key);
       const count = runtimeOptions.taskCount ?? statuses.length;
       return okResponse({
         tasks: records(count, "task_status_key", statuses).map(
@@ -545,26 +550,16 @@ test("dataset evaluation requires the named state set and only counts this batch
   assert.deepEqual(wrongSecondaryKinds.missingSecondaryKinds, ["REWORK"]);
 });
 
-test("task evidence requires exact source, role, prefix, count, and six-state distribution", () => {
+test("task evidence requires exact source, role, prefix, count, and canonical status distribution", () => {
   const probe = {
     id: "mobile-tasks:sales",
     listKey: "tasks",
     statusField: "task_status_key",
-    requiredStatuses: [
-      "PENDING",
-      "READY",
-      "PROCESSING",
-      "BLOCKED",
-      "DONE",
-      "REJECTED",
-    ],
+    requiredStatuses: ["READY", "BLOCKED", "DONE"],
     requiredStatusCounts: {
-      PENDING: 4,
-      READY: 4,
-      PROCESSING: 4,
+      READY: 14,
       BLOCKED: 3,
       DONE: 3,
-      REJECTED: 2,
     },
     expectedMinimum: 20,
     expectedExact: 20,
@@ -610,7 +605,7 @@ test("task evidence requires exact source, role, prefix, count, and six-state di
 
   const wrongDistribution = batchTasks.map((item, index) => ({
     ...item,
-    task_status_key: index === 3 ? "ready" : item.task_status_key,
+    task_status_key: index === 14 ? "ready" : item.task_status_key,
   }));
   const distributionFailure = evaluateManualAcceptanceDataset(probe, {
     tasks: wrongDistribution,
@@ -619,8 +614,8 @@ test("task evidence requires exact source, role, prefix, count, and six-state di
   assert.equal(distributionFailure.status, "fail");
   assert.deepEqual(distributionFailure.missingStatuses, []);
   assert.deepEqual(distributionFailure.mismatchedStatusCounts, {
-    PENDING: { expected: 4, actual: 3 },
-    READY: { expected: 4, actual: 5 },
+    READY: { expected: 14, actual: 15 },
+    BLOCKED: { expected: 3, actual: 2 },
   });
 
   const countFailure = evaluateManualAcceptanceDataset(probe, {
@@ -689,7 +684,17 @@ test("explicit verification reports page data, nine role totals, and honest manu
       (item) =>
         item.status === "pass" &&
         item.actual === 20 &&
-        item.statusKinds === 6 &&
+        item.statusKinds ===
+          (item.id === "mobile-tasks:boss" ||
+          [
+            "mobile-tasks:sales",
+            "mobile-tasks:purchase",
+            "mobile-tasks:production",
+            "mobile-tasks:pmc",
+            "mobile-tasks:engineering",
+          ].includes(item.id)
+            ? 3
+            : 4) &&
         Object.keys(item.mismatchedStatusCounts).length === 0,
     ),
   );

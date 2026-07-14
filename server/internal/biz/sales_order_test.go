@@ -24,7 +24,7 @@ type salesOrderRepoStub struct {
 
 type salesOrderAcceptanceProcessOwnerResolver struct{}
 
-func (r *salesOrderAcceptanceProcessOwnerResolver) WorkflowCandidateOwnerRoleKeys(ctx context.Context, customerKey string, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
+func (r *salesOrderAcceptanceProcessOwnerResolver) WorkflowCandidateOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
 	candidateRoleKey := ""
 	switch ownerPoolKey {
 	case "order_approval":
@@ -34,19 +34,19 @@ func (r *salesOrderAcceptanceProcessOwnerResolver) WorkflowCandidateOwnerRoleKey
 	}
 	if candidateRoleKey == "" {
 		return &WorkflowTaskCandidateExplanation{
-			ConfigRevision:         "yoyoosun-rev-1",
+			ConfigRevision:         revision,
 			OwnerPoolKey:           ownerPoolKey,
 			RequiredCapabilities:   requiredCapabilities,
 			CandidateOwnerRoleKeys: nil,
-			Source:                 "active_customer_config",
+			Source:                 "customer_config_revision",
 		}, nil
 	}
 	return &WorkflowTaskCandidateExplanation{
-		ConfigRevision:         "yoyoosun-rev-1",
+		ConfigRevision:         revision,
 		OwnerPoolKey:           ownerPoolKey,
 		RequiredCapabilities:   requiredCapabilities,
 		CandidateOwnerRoleKeys: []string{candidateRoleKey},
-		Source:                 "active_customer_config",
+		Source:                 "customer_config_revision",
 	}, nil
 }
 
@@ -552,9 +552,10 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 	qty := decimal.NewFromInt(6)
 
 	result, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{
-		OrderNo:    " SO-TX-001 ",
-		CustomerID: 1000,
-		OrderDate:  orderDate,
+		OrderNo:         " SO-TX-001 ",
+		CustomerID:      1000,
+		OrderDate:       orderDate,
+		ExpectedVersion: 1,
 	}, []*SalesOrderItemSaveMutation{
 		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
 	})
@@ -568,13 +569,16 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 		t.Fatalf("expected item bound to order 1, got %#v", repo.savedItems)
 	}
 
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-NO-VERSION", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected missing version rejected, got %v", err)
+	}
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 2, &SalesOrderMutation{OrderNo: "SO-CLOSED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected closed order save rejected, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 3, &SalesOrderMutation{OrderNo: "SO-SUBMITTED", CustomerID: 1000, OrderDate: orderDate}, nil); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 3, &SalesOrderMutation{OrderNo: "SO-SUBMITTED", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, nil); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected submitted sales order to be frozen, got %v", err)
 	}
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-WRONG-ITEM", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-WRONG-ITEM", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, []*SalesOrderItemSaveMutation{
 		{ID: 20, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty}},
 	}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected foreign order item rejected, got %v", err)
@@ -585,7 +589,7 @@ func TestSalesOrderUsecaseSaveWithItemsGuardsAndNormalizes(t *testing.T) {
 		t.Fatalf("expected existing item on new order rejected, got %v", err)
 	}
 	beforeOrderDate := orderDate.AddDate(0, 0, -1)
-	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-BAD-LINE-DATE", CustomerID: 1000, OrderDate: orderDate}, []*SalesOrderItemSaveMutation{
+	if _, err := uc.SaveSalesOrderWithItems(ctx, 1, &SalesOrderMutation{OrderNo: "SO-BAD-LINE-DATE", CustomerID: 1000, OrderDate: orderDate, ExpectedVersion: 1}, []*SalesOrderItemSaveMutation{
 		{ID: 10, SalesOrderItemMutation: SalesOrderItemMutation{LineNo: 1, ProductID: 100, UnitID: 200, OrderedQuantity: qty, PlannedDeliveryDate: &beforeOrderDate}},
 	}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected line planned delivery before order date rejected, got %v", err)

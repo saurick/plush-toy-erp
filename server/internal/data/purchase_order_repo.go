@@ -337,12 +337,14 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			Where(
 				purchaseorder.ID(id),
 				purchaseorder.LifecycleStatus(biz.PurchaseOrderStatusDraft),
+				purchaseorder.Version(in.ExpectedVersion),
 			).
 			SetPurchaseOrderNo(in.PurchaseOrderNo).
 			SetSupplierID(in.SupplierID).
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
-			SetPurchaseDate(in.PurchaseDate)
+			SetPurchaseDate(in.PurchaseDate).
+			SetVersion(in.ExpectedVersion + 1)
 		if in.SupplierPurchaseOrderNo == nil {
 			update.ClearSupplierPurchaseOrderNo()
 		} else {
@@ -363,13 +365,20 @@ func (r *purchaseOrderRepo) SavePurchaseOrderWithItems(ctx context.Context, id i
 			return nil, err
 		}
 		if affected == 0 {
-			if _, err := tx.PurchaseOrder.Get(ctx, id); err != nil {
+			current, err := tx.PurchaseOrder.Get(ctx, id)
+			if err != nil {
 				if ent.IsNotFound(err) {
 					return nil, biz.ErrPurchaseOrderNotFound
 				}
 				return nil, err
 			}
-			return nil, biz.ErrBadParam
+			if current.LifecycleStatus != biz.PurchaseOrderStatusDraft {
+				return nil, biz.ErrBadParam
+			}
+			if current.Version != in.ExpectedVersion {
+				return nil, biz.ErrPurchaseOrderConflict
+			}
+			return nil, biz.ErrPurchaseOrderConflict
 		}
 		orderRow, err = tx.PurchaseOrder.Get(ctx, id)
 		if err != nil {
@@ -611,6 +620,7 @@ func entPurchaseOrderToBiz(row *ent.PurchaseOrder) *biz.PurchaseOrder {
 		PurchaseDate:            row.PurchaseDate,
 		ExpectedArrivalDate:     row.ExpectedArrivalDate,
 		LifecycleStatus:         row.LifecycleStatus,
+		Version:                 row.Version,
 		Note:                    row.Note,
 		CreatedAt:               row.CreatedAt,
 		UpdatedAt:               row.UpdatedAt,

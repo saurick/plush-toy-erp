@@ -81,7 +81,7 @@ test('workflow mock authorization constrains super admin and keeps urge diagnost
     roles: [],
     superAdmin: true,
   })
-  for (const actionKey of ['complete', 'block', 'reject', 'urge']) {
+  for (const actionKey of ['complete', 'block', 'reject', 'resume', 'urge']) {
     assert.equal(
       workflowMockActionDecision({
         actionKey,
@@ -165,6 +165,15 @@ test('workflow mock authorization rejects terminal, disabled and missing create 
     }).reasonCode,
     'terminal_task'
   )
+  assert.equal(
+    workflowMockActionDecision({
+      actionKey: 'complete',
+      adminProfile: admin,
+      effectiveSession: admin.effective_session,
+      task: task({ task_status_key: 'rejected' }),
+    }).reasonCode,
+    'terminal_task'
+  )
   assert.equal(workflowMockCanCreateTask(admin, admin.effective_session), true)
   const disabled = profile({
     actions: ['workflow.task.create'],
@@ -179,6 +188,49 @@ test('workflow mock authorization rejects terminal, disabled and missing create 
     workflowMockCanCreateTask(noCreate, noCreate.effective_session),
     false
   )
+})
+
+test('workflow mock authorization follows the backend status action matrix', () => {
+  const admin = profile({
+    actions: [
+      'workflow.task.complete',
+      'workflow.task.update',
+      'workflow.task.reject',
+    ],
+  })
+  assert.equal(
+    workflowMockActionDecision({
+      actionKey: 'complete',
+      adminProfile: admin,
+      effectiveSession: admin.effective_session,
+      task: task({ task_status_key: 'blocked' }),
+    }).reasonCode,
+    'status_transition_not_allowed'
+  )
+  assert.equal(
+    workflowMockActionDecision({
+      actionKey: 'resume',
+      adminProfile: admin,
+      effectiveSession: admin.effective_session,
+      task: task({ task_status_key: 'blocked' }),
+    }).allowed,
+    true
+  )
+  for (const removedStatusKey of [
+    'pending',
+    'processing',
+    'cancelled',
+    'closed',
+  ]) {
+    const decision = workflowMockActionDecision({
+      actionKey: 'block',
+      adminProfile: admin,
+      effectiveSession: admin.effective_session,
+      task: task({ task_status_key: removedStatusKey }),
+    })
+    assert.equal(decision.allowed, false)
+    assert.equal(decision.reasonCode, 'status_transition_not_allowed')
+  }
 })
 
 test('workflow mock authorization scopes each capability to effective owner roles', () => {

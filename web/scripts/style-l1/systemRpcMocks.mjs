@@ -352,7 +352,8 @@ export async function installSystemRpcMocks(page, context) {
       typeof payload.html !== 'string' ||
       !payload.html.includes('<!doctype html>') ||
       typeof payload.template_key !== 'string' ||
-      String(payload.base_url || '').trim() !== baseURL
+      Object.hasOwn(payload, 'base_url') ||
+      Object.hasOwn(payload, 'customer_key')
     ) {
       await route.fulfill({
         status: 400,

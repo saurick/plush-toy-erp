@@ -22,8 +22,8 @@
 | `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
 | `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出试用模拟 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |
 | `scripts/seed-trial-sim-masterdata.sh`                | 显式生成试用模拟产品 / 单位主数据，供模拟销售订单行引用                                                          | 试用环境模拟演练前                                         |
-| `scripts/import/customerSourceManifestCheck.mjs`       | 校验永绅 yoyoosun tracked source manifest、原始文件 sha256 / 大小和未登记来源文件                                | yoyoosun 原始文件进入导入前 evidence 前                    |
-| `scripts/import/customerSourceExtract.mjs`             | 按永绅 yoyoosun source manifest 只读提取允许结构化的原始 Excel，生成本地 source snapshot、空 existing preview、配置候选和报告 | yoyoosun 原始文件整理成导入前 evidence                     |
+| `scripts/import/customerSourceManifestCheck.mjs`       | 显式读取外部客户 manifest 与 raw dir，校验 customer、相对路径、sha256 / 大小、重复项、未登记文件和目录逃逸 | 客户私有工作区进入导入前 evidence 前 |
+| `scripts/import/customerSourceExtract.mjs`             | 按显式客户 manifest 只读提取允许结构化的 Excel，生成 ignored source snapshot、空 existing preview、配置候选和报告 | 客户私有工作区整理导入前 evidence |
 | `scripts/import/customerSourceSnapshotFreezeCheck.mjs` | customer source snapshot freeze checker，只读取 JSON snapshot 并生成 freeze evidence                              | yoyoosun 导入前 source freeze / 人工 review evidence       |
 | `scripts/import/customerImportDryRun.mjs`              | 永绅 yoyoosun 客户导入 dry-run CLI，只读取 JSON snapshot 并生成预览包                                             | yoyoosun 导入前人工 review / 数据映射检查                  |
 | `scripts/qa/test-data-isolation-boundary.mjs`          | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备是否分桶隔离，并锁住 dry-run 不具备执行能力 | 调整 seed、fixture、模拟数据或导入准备工具后                  |
@@ -39,8 +39,9 @@
 | `scripts/qa/industry-template-boundaries.mjs`          | 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                              | 行业模板调整后                                             |
 | `scripts/qa/industry-template-closure.mjs`      | 行业模板模拟闭环入口，只读取候选配置并生成 evidence 报告                                                        | 行业模板回归 / 目标环境发布前                              |
 | `scripts/qa/private-deployment-boundaries.mjs`         | 多客户私有化复制边界检查，确保客户包模板不变成 SaaS、tenant、代码分叉或真实导入入口                             | 私有化客户包模板调整后                                     |
-| `scripts/qa/private-deployment-package-closure.mjs`     | 多客户私有化复制模拟闭环入口，只读取模板并生成 evidence 报告                                                   | 私有化客户包回归 / 目标环境发布前                          |
+| `scripts/qa/private-deployment-package-closure.mjs`     | 多客户私有化模板边界报告入口；只读取模板并明确 delivery / evidence / acceptance 仍未完成                      | 私有化客户包模板调整后                                     |
 | `scripts/deploy/deployment-package-lint.mjs`           | 客户私有化部署资料包检查，确保 `deployments/yoyoosun` 必需文件齐全且不含真实 env、备份、raw files 或 secret       | 调整客户部署资料包后                                       |
+| `scripts/deploy/source-archive-release-check.mjs`       | 从 committed Git ref 生成临时源码包并检查完整构建输入；默认 plan、`--light` 验证解包与客户 Web overlay，`--execute` 仅在 clean worktree 通过 `scripts/lib/pnpm.sh` 使用仓库锁定 Node / pnpm 运行独立 T8 source-package release check，不冒充 full / strict 或目标环境 evidence | 调整源码包、构建输入或客户 Web overlay 后                  |
 | `scripts/deploy/image-digests-evidence.mjs`            | 生成 `image-digests.txt`，并在同目录 release evidence 已填 digest 时校验 server / web digest 一致，不构建镜像或访问 registry | 发布 evidence 填充 image digest 时                         |
 | `scripts/deploy/immutable-version-evidence.mjs`        | 用显式 release batch 输入更新 `release-evidence.md` 的不可变版本字段，并写入匹配的 `image-digests.txt`；支持 `--print-input-template` 只读输出同批次输入模板；不构建镜像、不访问 registry、不读 `.env`、不执行目标动作 | 补 immutable-version evidence 时                           |
 | `scripts/deploy/release-evidence-gate.mjs`             | yoyoosun 发布证据门禁，检查本次 release evidence 的 Git commit 和 image digest 可追溯、`image-digests.txt` 与 release evidence 的 server / web digest 一致、production preflight report、绑定本次 releaseVersion / environment / backupId 且 `migrationVersion=migrationBefore` 的 pre-migration backup、ISO backupTime、正数 backup size、通过态 restore / smoke、带恢复目标 / 命令摘要 / 备份 hash / pre-apply migration artifact / post-apply migration artifact / 无 pending migration 且 restore migration version 匹配 `migrationAfter` 的 backup restore、migration status、非空且全通过 smoke、客户配置 smoke 对应的 `customer-config-manifest-evidence.json`、rollback / forward-fix plan、rollback rehearsal report 和绑定本次 releaseVersion / environment / backupId 的 sign-off 已脱敏填齐，并强制 releaseVersion、environment、backupId、databaseBackupHash、migration version 和客户配置 revision 跨证据一致；支持 `--json` 输出 evidence-only scope，明确 gate 只校验证据、不执行目标动作 | 客户试用或交付前                                           |
@@ -51,7 +52,7 @@
 | `scripts/deploy/rollback-rehearsal-report.mjs`         | 从真实 rollback / forward-fix 演练步骤和非空全通过 post-smoke report 生成脱敏 `rollback-rehearsal-report.json` | 发布回滚 / 前向修复演练后                                  |
 | `scripts/deploy/customer-config-manifest-evidence.mjs` | 生成客户配置 runtime manifest fingerprint evidence，写入已有 release evidence 目录                              | 客户配置 revision 激活前                                   |
 | `scripts/deploy/customer-config-activation-gate.mjs`   | 客户配置激活前门禁，组合检查 runtime manifest 与 release evidence；支持 `--json` 输出 evidence-only scope，失败时会带 release evidence status / closeout next actions；不执行后端激活、migration 或导入 | 客户配置 revision 准备激活前                               |
-| `scripts/deploy/customer-config-release-execute.mjs`   | 客户配置发布执行器，默认只出报告；支持 `--print-input-template` 输出 publish / activate / get_effective_session 读回输入模板；显式确认后才通过 JSON-RPC validate / publish / activate / rollback | 客户配置 revision 发布 / 激活 / 受控回滚执行前              |
+| `scripts/deploy/customer-config-release-execute.mjs`   | 客户配置发布执行器，默认只出报告；支持 `--print-input-template` 输出 validate / publish / transition check / activate 或 rollback / effective-session 读回输入模板；显式确认后才执行，切换 mutation 复用后端校验 hash、产品版本和观测 active revision 的 CAS identity | 客户配置 revision 发布 / 激活 / 受控回滚执行前              |
 | `scripts/deploy/customer-config-release-readiness.mjs` | 客户配置发布就绪聚合门禁，复核 manifest、manifest evidence、release evidence、activation gate 和可选执行报告；支持 `--print-input-template` 输出 active revision 读回证据前置清单，支持 `--readback-preflight-report` 写 no-write 读回缺口报告，支持 `--json` 输出 evidence-only scope，失败时会带 release evidence status / closeout next actions，明确 readiness 只聚合证据、不执行发布或后端写入 | 客户配置 revision 发布前或执行后声明 ready 前              |
 | `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、PDF async warmup / 固定 Chromium、Compose、migration 脚本、PostgreSQL / 后端 / Jaeger loopback 和低配部署边界；对应测试已接入 fast / strict | 每次生产发布 / 部署后运行态复核前                          |
 | `scripts/deploy/migrate-online.test.mjs`                | 用 fake Docker / Atlas 锁住线上 migration 的 `status -> dry-run -> apply` 顺序、dry-run 失败不 apply 和整段 `flock` 串行；本机无 `flock` 时仅跳过并发行为断言 | 调整 `migrate_online.sh` 后                              |
@@ -70,9 +71,9 @@
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、SKU、预留、出货、冲正和并发边界        |
 | `scripts/bom-lot-pg.sh`                                | BOM 与批次库存本地 PostgreSQL migration / 集成测试防呆入口                                                       | 验证 BOM schema 和批次库存行为                            |
 | `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 全链关键事务并发测试防呆入口                                                  | 验证采购、库存/出货、ProcessRuntime、源单及 Workflow CAS / receipt 并发 |
-| `scripts/purchase-return-pg.sh`                        | 采购退货本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
+| `scripts/purchase-return-pg.sh`                        | 采购退货当前完整 PostgreSQL migration / 集成测试防呆入口；使用与关键事务矩阵一致的 schema，不保留旧 migration 上限兼容分支 | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
-| `scripts/qa/fast.sh`                                   | 高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界 | 日常开发                                                   |
+| `scripts/qa/fast.sh`                                   | 高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界；server quick 过滤由 full 单独执行的 PostgreSQL 与 Chromium PDF 集成用例，其余 Go 用例仍要求非零执行且零 skip | 日常开发                                                   |
 | `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界；`--preflight-report` 会先写本地 no-write 前置报告，核对后端健康、密码 env 和静态角色投影；真实运行可选 `--report` 写本地脱敏报告，不保存密码或 token | 生成试用 / 演示账号后                                      |
 | `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界，并扫描后端 Product Core 运行时代码没有嵌入 yoyoosun / 永绅客户专属规则 | 调整客户配置草案、客户配置 runtime 或后端客户差异边界后 |
 | `scripts/qa/customer-config-effective-session-probe.mjs` | 无 Authorization 的 `customer_config.get_effective_session` 本地只读探针；可写 `output/customers/yoyoosun/customer-config-effective-session-probe/current.json`，确认本地后端可达和 `40302 未登录` / 缺真实登录证据边界，不读取 token、不证明 active revision | yoyoosun 本地入口已命中但还没有演示密码 / token，需要解释为什么不能证明后端 active revision 时 |
@@ -80,7 +81,7 @@
 | `scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住 yoyoosun 客户包 `businessFlows / stateMachines / processPolicies` 仍为 preview-only，不执行 runtime command、不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 | `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、`sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义、preview-only 打印 party defaults snapshot 和 forbidden payload；只允许白名单 ProcessRuntime 读取，不写 Fact，不声明销售订单打印模板启用 | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`、secrets、前端 test / build、本地 PostgreSQL 关键事务门禁和服务端 test / build，最后运行外部网络型 govulncheck | 提交前 / 推送前                                            |
+| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`、secrets、前端 test / build、本地 PostgreSQL 关键事务门禁、Chromium PDF 安全集成和剩余服务端 test / build；服务端全包复跑过滤已由专用矩阵真实执行的 PostgreSQL 用例，所有实际选中的测试仍要求零 skip；最后运行外部网络型 govulncheck | 提交前 / 推送前                                            |
 | `scripts/qa/strict.sh`                                 | 严格检查，在 fast 边界上补零 warning、完整前后端构建和本地 PostgreSQL 关键事务门禁 | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/agents-size.sh`                            | 扫描全部 AGENTS.md；16 KiB 预警、超过 24 KiB 阻断，不自动改写                                                     | 修改长期协作规则后                                         |
@@ -115,20 +116,25 @@ pnpm smoke:processing-contract-real-login
 
 ### 0. 导入冻结与 dry-run 工具 / Import freeze and dry-run tooling
 
-customer source manifest checker 只使用 tracked manifest 和本地原始文件，校验 `docs/customers/yoyoosun/source-manifest.json` 中的 path、sha256、size、可结构化提取标记与 `docs/customers/yoyoosun/raw-source-files/` 下的原件一致；不解析 PDF/OCR，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
+customer source manifest checker 显式读取客户私有仓库 manifest 与 ignored raw dir，校验 customer key、相对路径、sha256、size、可结构化提取标记、重复项、未登记文件和目录逃逸；不解析 PDF/OCR，不连接数据库、不读取 server config、不调用 web runtime、不写正式表、不写 `business_records`，也不执行真实导入。
 
 ```bash
+export CUSTOMER_PRIVATE_ROOT=/Users/simon/projects/plush-toy-erp-customer-yoyoosun-private
 node scripts/import/customerSourceManifestCheck.mjs \
-  --manifest docs/customers/yoyoosun/source-manifest.json \
-  --raw-dir docs/customers/yoyoosun/raw-source-files
+  --customer yoyoosun \
+  --manifest "$CUSTOMER_PRIVATE_ROOT/manifests/source-manifest.json" \
+  --raw-dir "$CUSTOMER_PRIVATE_ROOT/work/raw" \
+  --out "$CUSTOMER_PRIVATE_ROOT/output/source-check"
 ```
 
-customer source extractor 只按 source manifest 中 `structuredExtract.enabled=true` 的 Excel 来源提取本地 evidence；PDF / 图片仍只是人工来源引用，不做 OCR，不从 `raw-source-files/*.xlsx` 直接 glob 作为正式主路径。
+customer source extractor 只按显式 source manifest 中 `structuredExtract.enabled=true` 的 Excel 来源提取本地 evidence；PDF / 图片仍只是人工来源引用，不做 OCR，也不直接 glob 任意 raw 目录作为正式主路径。
 
 ```bash
 node scripts/import/customerSourceExtract.mjs \
-  --manifest docs/customers/yoyoosun/source-manifest.json \
-  --out output/customers/yoyoosun/source-extract
+  --customer yoyoosun \
+  --manifest "$CUSTOMER_PRIVATE_ROOT/manifests/source-manifest.json" \
+  --raw-dir "$CUSTOMER_PRIVATE_ROOT/work/raw" \
+  --out "$CUSTOMER_PRIVATE_ROOT/output/source-extract"
 ```
 
 输出目录会生成：
@@ -141,7 +147,7 @@ extraction-summary.json
 extraction-report.md
 ```
 
-`source-snapshot.extracted.json` 会记录本次使用的 `sourceManifest.path` 和 `sourceManifest.sha256`。`existing-v1.empty-preview.json` 只是本地空快照，方便先跑 dry-run preview；真实 sign-off 前必须替换为已 review 的 V1 / formal model existing snapshot。该提取输出仍是本地 evidence，不纳入 git，不是真实 import approval。人工收口后的 tracked 客户配置草案是 `config/customers/yoyoosun/importConfig.mjs`，它只记录统计、字段分组、review queue 和 forbidden targets，不嵌入 raw rows，也不接 runtime loader。
+`source-snapshot.extracted.json` 会包含 sourceId、manifest / 文件 hash，以及原工作簿名、sheet、行号和提取出的候选字段；它是不脱敏的客户私密 evidence，不是普通 CI artifact。工具不会把 MinIO 凭据、长期 URL 或本机绝对路径写入报告，但这不等于输出已脱敏。`existing-v1.empty-preview.json` 只是本地空快照，方便先跑 dry-run preview；真实 sign-off 前必须替换为已 review 的 formal model existing snapshot。所有提取输出只能留在客户私有 ignored `output/`，不得纳入 Git、源码包或普通 CI artifact，也不是真实 import approval。人工收口后的 tracked 客户配置草案是 `config/customers/yoyoosun/importConfig.mjs`，它只记录脱敏字段分组、review queue 和 forbidden targets，不嵌入私有 inventory、真实统计或 raw rows，也不接 runtime loader。
 
 提取后可直接接 dry-run preview 和 freeze check：
 
@@ -382,7 +388,7 @@ node scripts/qa/industry-template-closure.mjs \
   --out output/customers/yoyoosun/industry-template-closure
 ```
 
-多客户私有化复制包只允许模拟闭环验收，不创建真实客户目录，不执行真实客户数据导入，不复制核心 schema / migration / usecase / RBAC，也不在目标服务器构建。先运行边界守卫：
+多客户私有化复制模板只做边界检查，不创建 reference 部署目录，不执行真实客户数据导入，不复制核心 schema / migration / usecase / RBAC，也不在目标服务器构建。先运行边界守卫：
 
 ```bash
 node scripts/qa/private-deployment-boundaries.mjs
@@ -395,14 +401,14 @@ node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
 node --test scripts/deploy/deployment-package-lint.test.mjs
 ```
 
-再生成本地 evidence 报告：
+再生成本地边界报告：
 
 ```bash
 node scripts/qa/private-deployment-package-closure.mjs \
-  --out output/customers/yoyoosun/private-deployment-package-closure
+  --out output/private-deployment-template-boundary
 ```
 
-`SIM-PRIVATE-DEPLOYMENT` 只是模拟 customer key，不得创建为正式 `docs/customers/`、`config/customers/` 或 `deployments/` 目录。真实新增客户前必须先确认稳定 customer key、客户资料入仓边界、导入 dry-run / unresolved queue、部署地址、备份恢复和验收清单。
+`boundariesSatisfied=true` 只证明模板禁止项和最小清单成立，`deliveryCompleted`、`releaseEvidencePresent`、`customerAccepted` 必须保持 `false`。`SIM-PRIVATE-DEPLOYMENT` 只是模拟 customer key，不得创建为正式客户目录；`reference-customer` 也只作为 draft/preview 工程参考，不建立 `deployments/reference-customer/`。
 
 ### 1. 初始化环境
 
@@ -601,9 +607,10 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-boundaries.m
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer demo
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer demo --mode compile
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer reference-customer
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile
-node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --customer demo --mode compile
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --all
 node --test /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-preview-boundary.test.mjs
 ```
 
@@ -613,16 +620,15 @@ node --test /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-prev
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-package-preview.json
 ```
 
-该脚本只读取 `config/catalog/customerPackageCatalog.mjs`、`config/schemas/customerPackageSchema.mjs` 和受控 `config/customers/<customer>/customerPackage.mjs`，当前登记 `demo` 与 `yoyoosun` 两个包；其中 `demo` 只证明配置包编译不是单客户硬编码，`yoyoosun` 承接永绅资料边界。脚本验证客户包仍为 `runtimeEnabled=false`、`previewOnly=true`，且不 publish、不 activate、不 rollback、不写 DB、不改 RBAC、schema、migration、Workflow / Fact。可以重复传入 `--customer` 一次性校验多个客户包，输出会逐客户打印；`activate` / `rollback` 模式当前会直接失败；`--out` 只能在 `--mode preview` 下写入 `output/`，且只支持单客户预览，报告不纳入 git。
+该脚本只读取 `config/catalog/customerPackageCatalog.mjs`、`config/schemas/customerPackageSchema.mjs` 和构建期索引登记的客户包；`demo` 是最小 smoke fixture，`reference-customer` 是 draft/preview 工程参考，`yoyoosun` 承接当前真实客户边界。脚本验证 raw 包不直接 publish、activate、rollback，不写 DB，不改 RBAC、schema、migration 或 Workflow / Fact。可重复传入 `--customer` 或使用 `--all` 校验全部登记包；`--out` 仅在单客户 `preview` 模式写入 ignored `output/`。
 
-从已跟踪客户包生成后端 `customer_config.validate_customer_config / publish_customer_config` 可接收的 runtime manifest 时，执行：
+从已跟踪 draft 客户包生成仅供评审、不可发布的 runtime preview manifest 时，执行：
 
 ```bash
-node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer demo
-node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode compile
-node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun
-node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile
-node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --customer demo --mode compile
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode preview
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer reference-customer --mode preview
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview
+node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview
 ```
 
 如需生成人工 review 用的本地 manifest JSON：
@@ -631,7 +637,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
 node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 ```
 
-该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime；它只把 tracked catalog / schema / package 编译为受控 JSON-RPC payload 形状，锁住后端角色 key 映射、模块状态、页面投影、字段策略、打印默认值、授权和责任池输入。可以重复传入 `--customer` 一次性编译多个 runtime manifest，输出会逐客户打印；`--out` 只能在 `--mode preview` 下写入 `output/`，且只支持单客户 manifest，不能用一个文件覆盖多个客户结果。客户包可选 `moduleStates` 只允许 catalog 内模块和 `enabled / read_only / disabled`，非 `enabled` 必须写 reason；编译器会把它转成后端 `module_states`，但不提供运行时安装 / 卸载模块，也不证明完整模块关闭已 ready。`demo` manifest 的 entitlement `scope_value` 必须保持 `demo`，不能串到 `yoyoosun`；`yoyoosun` manifest 仍用于永绅受控发布链路。`demo` 包可以通过受控 `workPoolRoleOverrides` 证明同一 runtime 责任池在不同客户配置中映射给不同角色，例如 `order_review -> sales`，而 yoyoosun 仍保持 `order_review -> pmc`；流程定义仍引用同一个 `owner_pool_key`，差异只落在编译后的 `work_pool_memberships`，不 fork 核心代码、不复制流程、不扩大后端 RBAC。页面投影必须来自已登记正式菜单 key，manifest 编译器和后端 `validate_customer_config / publish_customer_config` 都会拒绝缺失、空列表或未知 page key 的 `compiled_snapshot.pages`，`get_effective_session` 对旧 revision 缺 pages 或无有效 pages 不回退 RBAC 全量页面。字段策略只发布 `customers.default`、`suppliers.default` 和 `sales_orders.default`，且仅包含前端列表 / CSV 导出实际消费的 `visible`；当前 manifest 对 demo / yoyoosun 都使用 Product Core catalog 的 `visible=true` 默认值，不等于已存在客户专属字段差异。BOM、采购、委外、质检、库存、出货和财务字段只保留为正式业务字段合同，不进入 active field policy；款式 / 颜色尺码仍是导入 / 客户评审草案。`printTemplateDefaults` 只允许登记当前正式 `material-purchase-contract / processing-contract` 的甲方 party defaults，编译后通过 active revision 的 `get_effective_session` 受控投影；当前正式前端消费采购订单页 `material-purchase-contract` 和委外订单页 `processing-contract` 的买方 / 委托方默认值，不启用销售订单打印，也不允许 supplier defaults 覆盖业务快照。后端 `validate_customer_config / publish_customer_config` 会拒绝其他 field surface / field key，`get_effective_session` 会过滤旧 revision 中的非法字段策略。
+该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime。当前已跟踪包均为 draft / preview-only，不能直接生成正式发布 payload；只有完成受控评审并显式进入 `release_ready`、启用 runtime / publish 的配置输入，才允许走正式编译和后端发布链路。可重复传入 `--customer` 或使用 `--all` 预览全部登记包；`--out` 只能在单客户 `preview` 模式写入 ignored `output/`。页面、字段、权限、责任池和打印投影都必须来自 catalog 白名单并经后端再次校验；reference 仅用 `suppliers.default.supplier_type visible=false` 验证已有低风险列表/CSV consumer，不扩展到表单 label、editable 或 required。
 
 客户配置 revision 进入 release evidence 前，先生成 manifest fingerprint evidence：
 
@@ -707,7 +713,7 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/customer-config-release-
 
 执行后声明 publish 已完成时追加 `--require-executed`；声明 active revision 已生效时追加 `--require-activated`；声明受控 revision rollback 已完成时追加 `--require-rollback`。`--require-activated` 和 `--require-rollback` 会同时要求两类证据：执行器报告中包含 `get_effective_session` 读回投影验证，确认 active revision、非空页面投影和字段策略 surface 与 manifest 对齐；release evidence 的 `smoke-test-report.json` 包含目标环境 `customer-config-effective-session` 检查，且 `expectedRevision` 等于当前 manifest revision、`target=jsonrpc:customer_config.get_effective_session`、`responseBodyStored=false`。执行器报告的 `backendEndpointAlias` 还必须与目标 smoke report 的 `backendEndpointAlias` 一致，避免用本地执行报告拼接目标环境 smoke。该 readiness gate 只聚合证据，不调用后端、不执行 migration、不恢复备份、不导入业务数据，也不能替代目标环境真实发布、恢复演练和 smoke；需要机器读取时使用 `--json`，成功输出会包含 `ok=true`、`scope.evidenceOnly`、`readyMeaning` 和 `notProvenByThisGate`，失败输出会包含 `ok=false`、错误列表和 `releaseEvidenceStatus`，其中可读取 `closeoutSummary` / `closeoutNextActions` 继续补证据。目标环境发布后如果本次包含客户配置激活，`deployments/yoyoosun/scripts/run-smoke.sh` 还应追加 `--customer-config-revision <revision> --admin-token-env <token-env>`，用目标后端 `customer_config.get_effective_session` 再读回 active revision 投影；报告只保存检查目标、期望 revision、token 来源 env 名和 `responseBodyStored=false`，不保存 token 或响应正文；执行器报告的 `backendEndpointAlias`、目标 smoke report 的 `backendEndpointAlias`、`--endpoint` / `--backend-url` 和写入 smoke report 的 endpoint alias / check target 均不得包含 URL 账号密码。
 
-发布或激活受控 revision 时，使用默认 report-only 的执行器先生成计划；报告会输出 `manifestSha256`，应写入本次 `customer-config-manifest-evidence.json`：
+发布或激活受控 revision 时，使用默认 report-only 的执行器先生成计划；报告会输出原始 manifest 文件指纹 `manifestSha256`，应写入本次 `customer-config-manifest-evidence.json`。显式执行后，报告还会保存后端 validate 返回并经身份核对的 `validatedConfigIdentity.configHash / configHashVersion / productVersion`；该 canonical payload hash 与文件指纹是两类证据，不能互相替代：
 
 还没有 manifest、evidence、目标后端或管理员凭据时，先打印输入模板。该模式只输出所需输入、确认短语和后续命令，不读取 manifest、不检查 release evidence、不调用后端、不写数据库，也不证明 active revision 已读回：
 
@@ -761,7 +767,7 @@ CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
     --activate-only
 ```
 
-如果需要把 active customer config 回滚到当前 manifest 指向的已发布 revision，使用单独的 `--rollback` 模式。回滚仍必须带 release evidence、管理员 token、目标后端和专用确认短语；它只调用 `rollback_customer_config(target_revision=manifest.revision)`，不执行 raw 包回滚、真实导入失败恢复、备份恢复或生产回滚演练：
+如果需要把 active customer config 回滚到当前 manifest 指向的已发布 revision，使用单独的 `--rollback` 模式。回滚仍必须带 release evidence、管理员 token、目标后端和专用确认短语；执行器先 validate manifest，最多两次调用 `check_customer_config_transition` 确认目标身份、blocker 和 observed active revision，再以同一 canonical hash v1、产品版本和 active revision CAS 调用 `rollback_customer_config(target_revision=manifest.revision)`，最后读回 effective session。它不执行 raw 包回滚、真实导入失败恢复、备份恢复或生产回滚演练：
 
 ```bash
 CUSTOMER_CONFIG_CONFIRM=ROLLBACK_YOYOOSUN_CONFIG \
@@ -775,7 +781,7 @@ CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
     --rollback
 ```
 
-该执行器只调用已有 `customer_config` JSON-RPC usecase，不上传 raw 客户文件、不直写数据库、不生成 migration、不导入业务数据、不写 Workflow / Fact runtime；没有 `--execute` 时不会访问后端。执行器会拒绝带账号密码的 `--backend-url`，并在 `customer-config-release-report.json` 写入脱敏 `backendEndpointAlias`；`--execute --activate`、`--execute --activate-only` 或 `--execute --rollback` 成功后会继续调用 `get_effective_session`，写入 `effectiveSessionVerification`，用于后续 readiness gate 判断“active revision 已能被正式前端投影消费”。
+该执行器只调用已有 `customer_config` JSON-RPC usecase，不上传 raw 客户文件、不直写数据库、不生成 migration、不导入业务数据、不写 Workflow / Fact runtime；没有 `--execute` 时不会访问后端。执行器会拒绝带账号密码的 `--backend-url`，并在 `customer-config-release-report.json` 写入脱敏 `backendEndpointAlias`、`validatedConfigIdentity` 与 `transitionCheck`；validate、publish、transition、mutation 响应身份不一致，blocker 结构异常，二次 active revision 漂移或 mutation CAS 冲突都会立即停止，不循环重试或 fallback。`--execute --activate`、`--execute --activate-only` 或 `--execute --rollback` 成功后会继续调用 `get_effective_session`，只接受正式 `{session}` 响应，并按 customer、revision、hash、hash version 与来源写入 `effectiveSessionVerification`，用于后续 readiness gate 判断“active revision 已能被正式前端投影消费”。
 
 ### 2C. Core 产品规则层边界检查
 

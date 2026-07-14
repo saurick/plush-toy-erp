@@ -79,6 +79,30 @@ export const customerPackageCatalog = Object.freeze({
     { key: "style_no", module: "sales_order_items", label: "款式编号" },
     { key: "color_size", module: "sales_order_items", label: "颜色 / 尺寸" },
   ]),
+  fieldPolicySurfaces: Object.freeze([
+    Object.freeze({
+      key: "customers.default",
+      moduleKey: "customers",
+      fieldKeys: Object.freeze(["customer_code", "display_name"]),
+      protectedVisible: Object.freeze(["customer_code", "display_name"]),
+    }),
+    Object.freeze({
+      key: "suppliers.default",
+      moduleKey: "suppliers",
+      fieldKeys: Object.freeze(["supplier_code", "supplier_type"]),
+      protectedVisible: Object.freeze(["supplier_code"]),
+    }),
+    Object.freeze({
+      key: "sales_orders.default",
+      moduleKey: "sales_orders",
+      fieldKeys: Object.freeze([
+        "order_no",
+        "source_no",
+        "expected_ship_date",
+      ]),
+      protectedVisible: Object.freeze(["order_no"]),
+    }),
+  ]),
   workPools: Object.freeze([
     { key: "boss", label: "老板 / 管理层" },
     { key: "sales", label: "业务" },

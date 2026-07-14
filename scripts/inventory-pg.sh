@@ -7,7 +7,7 @@ if [ -z "$cmd" ]; then
   exit 2
 fi
 
-INVENTORY_PG_DB_URL="${INVENTORY_PG_DB_URL:-postgres://postgres:inventory-local-password@127.0.0.1:55432/plush_erp_inventory_test?sslmode=disable}"
+INVENTORY_PG_DB_URL="${INVENTORY_PG_DB_URL:-postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_inventory_test?sslmode=disable}"
 
 parse_output="$(
   python3 - "$INVENTORY_PG_DB_URL" <<'PY'

@@ -31,8 +31,13 @@ var _ biz.ProcessRuntimeRepo = (*processRuntimeRepo)(nil)
 var _ biz.ProcessRuntimeDomainCommandResultRepo = (*processRuntimeRepo)(nil)
 
 func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
-	if in == nil {
+	if in == nil || !biz.IsCreatableProcessStatus(in.Status) {
 		return nil, nil, biz.ErrBadParam
+	}
+	for i := range in.Nodes {
+		if !biz.IsCreatableProcessNodeStatus(in.Nodes[i].Status) {
+			return nil, nil, biz.ErrBadParam
+		}
 	}
 	existing, existingNodes, err := r.getProcessInstanceByBusinessRef(ctx, in.ProcessKey, in.BusinessRefType, in.BusinessRefID)
 	if err == nil {
@@ -222,7 +227,7 @@ func processInstanceStatusCanEvolveFrom(initial string, current string) bool {
 		return true
 	}
 	return initial == biz.ProcessStatusActive &&
-		(current == biz.ProcessStatusCompleted || current == biz.ProcessStatusCancelled || current == biz.ProcessStatusBlocked)
+		(current == biz.ProcessStatusCompleted || current == biz.ProcessStatusBlocked)
 }
 
 func processNodeStatusCanEvolveFrom(initial string, current string) bool {
@@ -233,13 +238,9 @@ func processNodeStatusCanEvolveFrom(initial string, current string) bool {
 	case biz.ProcessNodeStatusWaiting:
 		return current == biz.ProcessNodeStatusActive ||
 			current == biz.ProcessNodeStatusCompleted ||
-			current == biz.ProcessNodeStatusSkipped ||
-			current == biz.ProcessNodeStatusFailed ||
 			current == biz.ProcessNodeStatusBlocked
 	case biz.ProcessNodeStatusActive:
 		return current == biz.ProcessNodeStatusCompleted ||
-			current == biz.ProcessNodeStatusSkipped ||
-			current == biz.ProcessNodeStatusFailed ||
 			current == biz.ProcessNodeStatusBlocked
 	default:
 		return false
@@ -612,6 +613,7 @@ func (r *processRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in
 		Where(
 			processnodeinstance.ID(in.ID),
 			processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+			processnodeinstance.Status(biz.ProcessNodeStatusActive),
 			processnodeinstance.Version(in.ExpectedVersion),
 		).
 		SetStatus(biz.ProcessNodeStatusCompleted).
@@ -641,8 +643,23 @@ func (r *processRuntimeRepo) CompleteProcessNodeInstance(ctx context.Context, in
 		return nil, err
 	}
 	if affected == 0 {
-		if _, err := r.GetProcessNodeInstance(ctx, in.ID); err != nil {
+		current, err := r.GetProcessNodeInstance(ctx, in.ID)
+		if err != nil {
 			return nil, err
+		}
+		if current.ProcessInstanceID != in.ProcessInstanceID {
+			return nil, biz.ErrProcessNodeInstanceConflict
+		}
+		if current.Version != in.ExpectedVersion {
+			return nil, biz.ErrProcessNodeInstanceConflict
+		}
+		if current.Status != biz.ProcessNodeStatusActive {
+			switch current.Status {
+			case biz.ProcessNodeStatusCompleted:
+				return nil, biz.ErrProcessNodeInstanceSettled
+			default:
+				return nil, biz.ErrProcessNodeInstanceNotActive
+			}
 		}
 		return nil, biz.ErrProcessNodeInstanceConflict
 	}
@@ -720,7 +737,7 @@ func (r *processRuntimeRepo) RecordProcessInstanceLinkedBusinessRef(ctx context.
 	return nil, biz.ErrProcessNodeInstanceConflict
 }
 
-func (r *processRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in *biz.ProcessNodeInstanceBlock, actorID int) (*biz.ProcessNodeInstance, error) {
+func blockProcessNodeInstanceWithClient(ctx context.Context, client *ent.Client, in *biz.ProcessNodeInstanceBlock) (*biz.ProcessNodeInstance, error) {
 	if in == nil || in.ProcessNodeInstanceID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 {
 		return nil, biz.ErrBadParam
 	}
@@ -728,7 +745,7 @@ func (r *processRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in *b
 	if outcome == "" {
 		outcome = in.Reason
 	}
-	update := r.data.postgres.ProcessNodeInstance.Update().
+	update := client.ProcessNodeInstance.Update().
 		Where(
 			processnodeinstance.ID(in.ProcessNodeInstanceID),
 			processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
@@ -751,12 +768,59 @@ func (r *processRuntimeRepo) BlockProcessNodeInstance(ctx context.Context, in *b
 		return nil, err
 	}
 	if affected == 0 {
-		if _, err := r.GetProcessNodeInstance(ctx, in.ProcessNodeInstanceID); err != nil {
+		if _, err := getProcessNodeInstanceWithClient(ctx, client, in.ProcessNodeInstanceID); err != nil {
 			return nil, err
 		}
 		return nil, biz.ErrProcessNodeInstanceConflict
 	}
-	return r.GetProcessNodeInstance(ctx, in.ProcessNodeInstanceID)
+	return getProcessNodeInstanceWithClient(ctx, client, in.ProcessNodeInstanceID)
+}
+
+func (r *processRuntimeRepo) BlockProcessNodeAndInstance(ctx context.Context, in *biz.ProcessNodeInstanceBlock, actorID int) (*biz.ProcessNodeInstance, error) {
+	if in == nil || in.ProcessNodeInstanceID <= 0 || in.ProcessInstanceID <= 0 || in.ExpectedVersion <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+
+	blockedNode, err := blockProcessNodeInstanceWithClient(ctx, tx.Client(), in)
+	if err != nil {
+		return nil, err
+	}
+	update := tx.ProcessInstance.Update().
+		Where(
+			processinstance.ID(in.ProcessInstanceID),
+			processinstance.Status(biz.ProcessStatusActive),
+		).
+		SetStatus(biz.ProcessStatusBlocked)
+	if actorID > 0 {
+		update.SetUpdatedBy(actorID)
+	}
+	affected, err := update.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		row, getErr := tx.ProcessInstance.Get(ctx, in.ProcessInstanceID)
+		if getErr != nil {
+			if ent.IsNotFound(getErr) {
+				return nil, biz.ErrProcessInstanceNotFound
+			}
+			return nil, getErr
+		}
+		if row.Status != biz.ProcessStatusActive {
+			return nil, biz.ErrProcessInstanceSettled
+		}
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return blockedNode, nil
 }
 
 func (r *processRuntimeRepo) BlockProcessInstance(ctx context.Context, in *biz.ProcessInstanceBlock, actorID int) (*biz.ProcessInstance, error) {

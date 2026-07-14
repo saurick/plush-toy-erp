@@ -200,46 +200,18 @@ export function normalizeMobileActionEvidenceRefs(value) {
 }
 
 export function buildMobileTaskActionEvidence({
-  roleKey = '',
-  actionKey = '',
-  reason = '',
   evidenceText = '',
   evidenceRefs,
-  nowSec = Math.floor(Date.now() / 1000),
 } = {}) {
   const normalizedEvidenceRefs = normalizeMobileActionEvidenceRefs(
     evidenceRefs || evidenceText
   )
-  const normalizedRoleKey = normalizeRoleKey(roleKey)
-  const normalizedActionKey = String(actionKey || '').trim()
-  const normalizedReason = String(reason || '').trim()
-  const mobileAction = {
-    role_key: normalizedRoleKey,
-    action_key: normalizedActionKey,
-    action_label: mobileTaskActionLabel(normalizedActionKey),
-    reason: normalizedReason,
-    evidence_refs: normalizedEvidenceRefs,
-    recorded_at: nowSec,
-    simulated_only: false,
+  return {
+    ...(normalizedEvidenceRefs.length
+      ? { evidence_refs: normalizedEvidenceRefs }
+      : {}),
+    surface_key: 'mobile_role_tasks',
   }
-  const payload = {
-    mobile_action: mobileAction,
-    mobile_action_evidence_refs: normalizedEvidenceRefs,
-    mobile_action_recorded_at: nowSec,
-    mobile_action_role_key: normalizedRoleKey,
-    mobile_action_key: normalizedActionKey,
-  }
-  if (['blocked', 'rejected'].includes(normalizedActionKey)) {
-    payload.mobile_exception_report = {
-      role_key: normalizedRoleKey,
-      action_key: normalizedActionKey,
-      action_label: mobileTaskActionLabel(normalizedActionKey),
-      reason: normalizedReason,
-      evidence_refs: normalizedEvidenceRefs,
-      reported_at: nowSec,
-    }
-  }
-  return payload
 }
 
 export function buildMobileTaskView(task = {}, options = {}) {
@@ -285,14 +257,14 @@ export function buildMobileTaskView(task = {}, options = {}) {
     alert_type: alert?.alert_type || '',
     notification_type: alert?.notification_type || '',
     is_urged: isUrgedWorkflowTask(task),
-    urge_count: Number(payload.urge_count || 0),
-    last_urge_at: Number(payload.last_urge_at || 0),
-    last_urge_at_label: formatMobileTaskTime(payload.last_urge_at),
+    urge_count: Number(task.urge_count || 0),
+    last_urge_at: Number(task.last_urged_at || 0),
+    last_urge_at_label: formatMobileTaskTime(task.last_urged_at),
     last_urge_reason: payload.last_urge_reason || '',
     last_urge_action: payload.last_urge_action || '',
     last_urge_action_label: mobileTaskActionLabel(payload.last_urge_action),
     is_escalated: isEscalatedWorkflowTask(task),
-    escalate_target_role_key: payload.escalate_target_role_key || '',
+    escalate_target_role_key: task.escalate_target_role_key || '',
     complete_condition: payload.complete_condition || '',
     related_documents: normalizeRelatedDocuments(payload.related_documents),
     mobile_action: mobileAction,
@@ -655,17 +627,12 @@ export function buildMobileTaskSummary(taskViews = []) {
       if (taskView.is_urged) summary.urged += 1
       if (taskView.is_escalated) summary.escalated += 1
 
-      if (
-        taskView.task_status_key === 'done' ||
-        taskView.task_status_key === 'closed'
-      ) {
+      if (taskView.task_status_key === 'done') {
         summary.done += 1
-      } else if (taskView.task_status_key === 'processing') {
-        summary.processing += 1
-      } else if (['blocked', 'rejected'].includes(taskView.task_status_key)) {
-        summary.blockedProgress += 1
-      } else if (taskView.task_status_key !== 'cancelled') {
-        summary.pending += 1
+      } else if (taskView.task_status_key === 'rejected') {
+        summary.rejected += 1
+      } else if (taskView.task_status_key === 'ready') {
+        summary.ready += 1
       }
       return summary
     },
@@ -678,9 +645,8 @@ export function buildMobileTaskSummary(taskViews = []) {
       highPriority: 0,
       urged: 0,
       escalated: 0,
-      pending: 0,
-      processing: 0,
-      blockedProgress: 0,
+      ready: 0,
+      rejected: 0,
       done: 0,
     }
   )

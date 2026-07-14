@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -41,6 +42,22 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	if header.Status != biz.BOMStatusDraft {
 		t.Fatalf("expected draft bom header, got %s", header.Status)
 	}
+	defaultDraft, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
+		ProductID: fixtures.productID,
+		Version:   "DEFAULT-DRAFT",
+	})
+	if err != nil || defaultDraft.Status != biz.BOMStatusDraft {
+		t.Fatalf("expected omitted BOM status to default to DRAFT, header=%#v err=%v", defaultDraft, err)
+	}
+	for index, status := range []string{biz.BOMStatusActive, biz.BOMStatusArchived, "DISABLED", "UNKNOWN"} {
+		if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
+			ProductID: fixtures.productID,
+			Version:   "NON-DRAFT-" + string(rune('A'+index)),
+			Status:    status,
+		}); !errors.Is(err, biz.ErrBadParam) {
+			t.Fatalf("expected normal BOM create with status %s rejected, got %v", status, err)
+		}
+	}
 	if header.SourceOrderNo == nil || *header.SourceOrderNo != "WL260102" || header.Designer == nil || *header.Designer != "罗伟" {
 		t.Fatalf("expected BOM engineering header fields, got %#v", header)
 	}
@@ -59,7 +76,6 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected draft BOM with different version to be allowed, got %v", err)
 	}
-
 	position := "face"
 	item, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
 		BOMHeaderID:        header.ID,
@@ -89,12 +105,8 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	if activated.Header.Status != biz.BOMStatusActive || len(activated.Items) != 1 {
 		t.Fatalf("expected active bom with one item, got %#v", activated)
 	}
-	if _, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
-		ProductID: fixtures.productID,
-		Version:   "V3",
-		Status:    biz.BOMStatusActive,
-	}); !ent.IsConstraintError(err) {
-		t.Fatalf("expected one ACTIVE BOM per product constraint, got %v", err)
+	if replayed, err := uc.ActivateBOMVersion(ctx, header.ID); err != nil || replayed.Header.ID != header.ID || replayed.Header.Status != biz.BOMStatusActive {
+		t.Fatalf("expected activating ACTIVE BOM to be idempotent, detail=%#v err=%v", replayed, err)
 	}
 	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
 		BOMHeaderID: header.ID,
@@ -120,6 +132,38 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].ID != item.ID {
 		t.Fatalf("expected one active bom item id=%d, got %#v", item.ID, items)
+	}
+
+	lifecycleProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-BOM-LIFECYCLE")
+	lifecycleHeader, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
+		ProductID: lifecycleProduct.ID,
+		Version:   "V1",
+	})
+	if err != nil {
+		t.Fatalf("create lifecycle BOM draft: %v", err)
+	}
+	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
+		BOMHeaderID: lifecycleHeader.ID,
+		MaterialID:  fixtures.materialID,
+		Quantity:    mustDecimal(t, "1"),
+		UnitID:      fixtures.unitID,
+		LossRate:    decimal.Zero,
+	}); err != nil {
+		t.Fatalf("create lifecycle BOM item: %v", err)
+	}
+	archivedDraft, err := uc.ArchiveBOMVersion(ctx, lifecycleHeader.ID)
+	if err != nil || archivedDraft.Status != biz.BOMStatusArchived {
+		t.Fatalf("expected DRAFT to archive, header=%#v err=%v", archivedDraft, err)
+	}
+	if replayed, err := uc.ArchiveBOMVersion(ctx, lifecycleHeader.ID); err != nil || replayed.Status != biz.BOMStatusArchived {
+		t.Fatalf("expected archiving ARCHIVED BOM to be idempotent, header=%#v err=%v", replayed, err)
+	}
+	reactivated, err := uc.ActivateBOMVersion(ctx, lifecycleHeader.ID)
+	if err != nil || reactivated.Header.Status != biz.BOMStatusActive {
+		t.Fatalf("expected ARCHIVED BOM to reactivate, detail=%#v err=%v", reactivated, err)
+	}
+	if archivedActive, err := uc.ArchiveBOMVersion(ctx, lifecycleHeader.ID); err != nil || archivedActive.Status != biz.BOMStatusArchived {
+		t.Fatalf("expected ACTIVE BOM to archive, header=%#v err=%v", archivedActive, err)
 	}
 
 	if _, err := uc.CreateBOMItem(ctx, &biz.BOMItemCreate{
@@ -179,6 +223,24 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 		SetLossRate(mustDecimal(t, "-0.01")).
 		Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected DB check constraint for loss_rate >= 0, got %v", err)
+	}
+	if _, err := client.BOMHeader.Create().
+		SetProductID(fixtures.productID).
+		SetVersion("UNKNOWN-STATUS").
+		SetStatus("UNKNOWN").
+		Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected DB check constraint for known BOM status, got %v", err)
+	}
+	from := time.Date(2026, 7, 2, 0, 0, 0, 0, time.UTC)
+	to := from.Add(-24 * time.Hour)
+	if _, err := client.BOMHeader.Create().
+		SetProductID(fixtures.productID).
+		SetVersion("INVALID-DATES").
+		SetStatus(biz.BOMStatusDraft).
+		SetEffectiveFrom(from).
+		SetEffectiveTo(to).
+		Save(ctx); !ent.IsConstraintError(err) {
+		t.Fatalf("expected DB check constraint for ordered BOM effective dates, got %v", err)
 	}
 }
 

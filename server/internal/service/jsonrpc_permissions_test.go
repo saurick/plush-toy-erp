@@ -28,21 +28,45 @@ func TestMenuOptionsExposeExplicitAnyAndAllRequirements(t *testing.T) {
 	if got := menu["required_all"].([]any); len(got) != 1 {
 		t.Fatalf("required_all = %#v", got)
 	}
-	if got := menu["required_permissions"].([]any); len(got) != 3 {
-		t.Fatalf("legacy required_permissions = %#v", got)
+	if _, exists := menu["required_permissions"]; exists {
+		t.Fatalf("non-contract required_permissions must not be exposed: %#v", menu)
 	}
 }
 
-func TestPermissionUsageExplainsPageAndControlImpact(t *testing.T) {
+func TestPermissionUsageUsesExplicitRegisteredSurface(t *testing.T) {
 	usage := permissionUsageToMap(biz.AdminPermission{
-		Key: biz.PermissionPurchaseOrderCreate, Name: "创建采购订单", Action: "create",
+		Key: biz.PermissionSystemUserRoleAssign,
 	})
-	if usage["control_type"] != "新建按钮和表单" {
-		t.Fatalf("control_type = %#v", usage["control_type"])
+	pages := usage["pages"].([]any)
+	if len(pages) != 1 {
+		t.Fatalf("pages = %#v", pages)
 	}
-	menus := usage["menus"].([]any)
-	if len(menus) != 1 || menus[0].(map[string]any)["key"] != "accessories-purchase" {
-		t.Fatalf("related menus = %#v", menus)
+	page := pages[0].(map[string]any)
+	if page["key"] != "permission-center" ||
+		page["section_key"] != "admin-accounts" ||
+		page["control_key"] != "assign-admin-roles" ||
+		page["control_name"] != "分配业务角色" {
+		t.Fatalf("registered page surface = %#v", page)
+	}
+	methods := page["backend_methods"].([]any)
+	if len(methods) != 1 || methods[0].(map[string]any)["domain"] != "admin" || methods[0].(map[string]any)["method"] != "set_roles" {
+		t.Fatalf("registered backend methods = %#v", methods)
+	}
+	if _, exists := usage["menus"]; exists {
+		t.Fatalf("usage must not fall back to suffix-derived legacy menus: %#v", usage)
+	}
+}
+
+func TestPermissionUsageKeepsBackendOnlyPermissionsOutOfPageProjection(t *testing.T) {
+	usage := permissionUsageToMap(biz.AdminPermission{Key: biz.PermissionCustomerConfigRead})
+	if usage["backend_only"] != true {
+		t.Fatalf("backend_only = %#v", usage["backend_only"])
+	}
+	if pages := usage["pages"].([]any); len(pages) != 0 {
+		t.Fatalf("backend-only pages = %#v", pages)
+	}
+	if methods := usage["backend_methods"].([]any); len(methods) == 0 {
+		t.Fatalf("backend-only methods = %#v", methods)
 	}
 }
 
@@ -66,12 +90,11 @@ func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *te
 	if !ok {
 		t.Fatal("customer config test payload must parse")
 	}
-	if _, err := uc.PublishCustomerConfig(t.Context(), in, 1); err != nil {
+	published, err := uc.PublishCustomerConfig(t.Context(), in, 1)
+	if err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
 	}
-	if _, err := uc.ActivateCustomerConfig(t.Context(), in.CustomerKey, in.Revision, 1); err != nil {
-		t.Fatalf("ActivateCustomerConfig error = %v", err)
-	}
+	activatePublishedCustomerConfigForTest(t, uc, in, published, 1)
 
 	newDispatcher := func(roleKey string) *jsonrpcDispatcher {
 		return &jsonrpcDispatcher{
@@ -90,6 +113,10 @@ func TestRequireAdminPermissionIntersectsRBACWithActiveCustomerEntitlement(t *te
 	ctx := withAdminPermissionCache(workflowJSONRPCAdminContext())
 	if got := newDispatcher(biz.PurchaseRoleKey).RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderConfirm); got == nil || got.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("purchase RBAC must be narrowed by active customer entitlement, got %#v", got)
+	}
+	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
+	if got := newDispatcher(biz.PurchaseRoleKey).RequireAdminRBACPermission(ctx, biz.PermissionOutsourcingOrderConfirm); got != nil {
+		t.Fatalf("revision-aware workflow guard must preserve the RBAC upper bound before applying its immutable revision, got %#v", got)
 	}
 	ctx = withAdminPermissionCache(workflowJSONRPCAdminContext())
 	if got := newDispatcher(biz.ProductionRoleKey).RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderConfirm); got != nil {

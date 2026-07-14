@@ -1,0 +1,136 @@
+name: CI
+
+"on":
+  pull_request:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CI: "true"
+  PURCHASE_RECEIPT_PG_DB_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable
+  PURCHASE_RETURN_PG_DB_URL: postgres://postgres:ci-local-password@127.0.0.1:55432/plush_erp_purchase_return_test?sslmode=disable
+
+jobs:
+  strict:
+    name: Strict repository gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    services:
+      postgres:
+        image: postgres:18.1
+        env:
+          POSTGRES_PASSWORD: ci-local-password
+        ports:
+          - 55432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+    steps:
+      - name: Check out the complete comparison history
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Set up Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version-file: .n-node-version
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c
+        with:
+          go-version-file: server/go.mod
+          cache-dependency-path: server/go.sum
+      - name: Set up pinned Atlas
+        uses: ariga/setup-atlas@2f3c785c89a15e1c0d07bcae3900fb5feb969eea
+        with:
+          version: v0.38.0
+      - name: Install gate dependencies
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes lsof postgresql-client ripgrep shellcheck yamllint
+          npm install --global pnpm@10.13.1
+          go install github.com/zricethezav/gitleaks/v8@v8.30.1
+          go install golang.org/x/vuln/cmd/govulncheck@v1.6.0
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.1
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+      - name: Install Web dependencies and Chromium
+        working-directory: web
+        run: |
+          set -euo pipefail
+          pnpm install --frozen-lockfile
+          pnpm exec playwright install --with-deps chromium
+          chrome_path="$(node -e 'const { chromium } = require("playwright"); process.stdout.write(chromium.executablePath())')"
+          if [[ ! -x "$chrome_path" ]]; then
+            echo "[ci] Playwright Chromium is not executable: $chrome_path"
+            exit 1
+          fi
+          echo "ERP_PDF_CHROME_PATH=$chrome_path" >> "$GITHUB_ENV"
+      - name: Resolve and validate the exact Git comparison range
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PUSH_BEFORE_SHA: ${{ github.event.before }}
+        run: |
+          set -euo pipefail
+          zero=0000000000000000000000000000000000000000
+          empty_tree="$(git hash-object -t tree /dev/null)"
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            range="$PR_BASE_SHA...HEAD"
+            history_range="$(git merge-base "$PR_BASE_SHA" HEAD)..HEAD"
+          elif [[ "$EVENT_NAME" == "push" ]]; then
+            if [[ "$PUSH_BEFORE_SHA" == "$zero" ]]; then
+              range="$empty_tree..HEAD"
+              history_range="$range"
+            elif git cat-file -e "$PUSH_BEFORE_SHA^{commit}"; then
+              range="$PUSH_BEFORE_SHA..HEAD"
+              history_range="$range"
+            else
+              echo "[ci] push before SHA is unavailable: $PUSH_BEFORE_SHA"
+              exit 1
+            fi
+          elif git rev-parse --verify 'HEAD^' >/dev/null 2>&1; then
+            range="HEAD^..HEAD"
+            history_range="$range"
+          else
+            range="$empty_tree..HEAD"
+            history_range="$range"
+          fi
+          git diff --check "$range"
+          git log --check --format= "$history_range"
+          echo "QA_BASE_RANGE=$range" >> "$GITHUB_ENV"
+          echo "comparison_range=$range"
+      - name: Prove Ent and Atlas generation has zero drift
+        working-directory: server
+        run: |
+          set -euo pipefail
+          make data
+          status="$(git status --porcelain --untracked-files=all)"
+          if [[ -n "$status" ]]; then
+            printf '%s\n' "$status"
+            echo "[ci] make data changed the committed tree"
+            exit 1
+          fi
+      - name: Run the repository strict gate
+        run: bash scripts/qa/strict.sh
+      - name: Validate the committed source archive
+        run: |
+          set -euo pipefail
+          node scripts/deploy/source-archive-release-check.mjs --light --ref HEAD
+          status="$(git status --porcelain --untracked-files=all)"
+          if [[ -n "$status" ]]; then
+            printf '%s\n' "$status"
+            echo "[ci] strict gate changed the committed tree"
+            exit 1
+          fi

@@ -203,7 +203,7 @@ report_required \
   "$DEPLOY_HITS"
 
 DOC_HITS="$(
-  scan_pattern '本模板|派生项目|模板默认|初始化后建议替换' \
+  scan_pattern '本模板(默认|用于|包含)|派生项目(请|应|需要).*(修改|替换)|模板默认(值为|提供|生成|填充|启用|包含|使用)|初始化后(建议|请|需要)替换' \
     AGENTS.md \
     README.md \
     docs/README.md \

@@ -5,8 +5,10 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
 import { customerPackageSchema } from "../../config/schemas/customerPackageSchema.mjs";
-import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
-import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import {
+  getCustomerPackage,
+  listCustomerPackageKeys,
+} from "../../config/customers/index.mjs";
 import {
   buildPreview,
   validateCatalog,
@@ -16,12 +18,9 @@ import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 
-const CUSTOMER_PACKAGES = Object.freeze({
-  demo: demoCustomerPackage,
-  yoyoosun: yoyoosunCustomerPackage,
-});
-
 const ALLOWED_MODES = Object.freeze(["validate", "compile", "preview"]);
+const MANIFEST_SCHEMA_VERSION = "customer-config-manifest/v1";
+const PROCESS_CONTRACT_VERSION = "customer-process-contract/v1";
 
 const ROLE_KEY_BY_POOL = Object.freeze({
   boss: "boss",
@@ -263,21 +262,6 @@ function collectRuntimePageKeys() {
 }
 
 const RUNTIME_PAGE_KEYS = Object.freeze(collectRuntimePageKeys());
-
-const RUNTIME_FIELD_POLICY_SURFACES = Object.freeze({
-  customers: Object.freeze({
-    surfaceKey: "customers.default",
-    fieldKeys: Object.freeze(["customer_code", "display_name"]),
-  }),
-  suppliers: Object.freeze({
-    surfaceKey: "suppliers.default",
-    fieldKeys: Object.freeze(["supplier_code", "supplier_type"]),
-  }),
-  sales_orders: Object.freeze({
-    surfaceKey: "sales_orders.default",
-    fieldKeys: Object.freeze(["order_no", "source_no", "expected_ship_date"]),
-  }),
-});
 
 const RUNTIME_DOMAIN_COMMAND_KEYS = Object.freeze([
   "sales_order.submit",
@@ -584,33 +568,11 @@ function assert(condition, message) {
   }
 }
 
-function materialSupplyFactCommandContract(nodeKey) {
-  const contract = MATERIAL_SUPPLY_FACT_COMMAND_CONTRACTS[nodeKey];
-  assert(contract, `material_supply fact command contract missing for ${nodeKey}`);
-  return {
-    ...contract,
-    jsonrpc_allowed_permission_keys: [...contract.jsonrpc_allowed_permission_keys],
-    required_test_anchors: [...contract.required_test_anchors],
-    runtime_loader_blockers: [...contract.runtime_loader_blockers],
-    runtime_execute_blockers: [...contract.runtime_execute_blockers],
-  };
-}
-
-function finishedGoodsDeliveryFactCommandContract(nodeKey) {
-  const contract = FINISHED_GOODS_DELIVERY_FACT_COMMAND_CONTRACTS[nodeKey];
-  assert(contract, `finished_goods_delivery fact command contract missing for ${nodeKey}`);
-  return {
-    ...contract,
-    jsonrpc_allowed_permission_keys: [...contract.jsonrpc_allowed_permission_keys],
-    required_test_anchors: [...contract.required_test_anchors],
-    runtime_loader_blockers: [...contract.runtime_loader_blockers],
-  };
-}
-
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {
     customer: "yoyoosun",
     customers: [],
+    all: false,
     mode: "",
     out: "",
   };
@@ -621,6 +583,8 @@ function parseArgs(argv = process.argv.slice(2)) {
       args.customer = customerKey;
       args.customers.push(customerKey);
       index += 1;
+    } else if (arg === "--all") {
+      args.all = true;
     } else if (arg === "--mode") {
       args.mode = argv[index + 1] || "";
       index += 1;
@@ -633,7 +597,11 @@ function parseArgs(argv = process.argv.slice(2)) {
       throw new Error(`unsupported argument: ${arg}`);
     }
   }
-  if (args.customers.length === 0) {
+  assert(
+    !(args.all && args.customers.length > 0),
+    "--all and --customer are mutually exclusive",
+  );
+  if (!args.all && args.customers.length === 0) {
     args.customers = [args.customer];
   }
   return args;
@@ -641,10 +609,9 @@ function parseArgs(argv = process.argv.slice(2)) {
 
 function printHelp() {
   console.log(`Usage:
-  node scripts/qa/customer-config-runtime-manifest.mjs --customer demo
-  node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --customer yoyoosun
-  node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun
-  node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile
+  node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode preview
+  node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --customer yoyoosun --mode preview
+  node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview
   node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json
 
 Modes:
@@ -652,10 +619,10 @@ Modes:
   compile   validate and return the manifest in-process for tests
   preview   validate and optionally write JSON under output/
 
-This tool compiles a tracked customer package into the JSON-RPC payload shape
-accepted by customer_config.validate_customer_config / publish_customer_config.
-It does not upload files, call the backend, activate a revision, import business
-data, or write Workflow / Fact runtime state.`);
+Tracked draft packages must use preview mode. Formal validate / compile only
+accepts an explicitly reviewed release-ready input. This tool does not upload
+files, call the backend, activate a revision, import business data, or write
+Workflow / Fact runtime state.`);
 }
 
 function uniqueSorted(values) {
@@ -796,26 +763,44 @@ function roleProfilesFromPackage(config, catalog) {
   });
 }
 
-function processWorkPoolsFromDefinitions(processDefinitions = {}) {
+function selectedProcessPoolDefinitions(runtimeProcessSelections = []) {
   const processPools = [];
-  if (processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY]) {
-    const runtimePoolKeys = new Set(
-      processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY].nodes
-        .map((node) => node.owner_pool_key)
-        .filter(Boolean),
-    );
+  const salesSelection = runtimeProcessSelections.find(
+    (selection) => selection.process_key === SALES_ORDER_ACCEPTANCE_PROCESS_KEY,
+  );
+  if (salesSelection) {
+    const runtimePoolKeys = new Set([
+      "order_approval",
+      "order_review",
+      ...(salesSelection.variant_key === "approval_engineering_pmc"
+        ? ["engineering_data"]
+        : []),
+    ]);
     processPools.push(
       ...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.filter((pool) =>
         runtimePoolKeys.has(pool.pool_key),
       ),
     );
   }
-  if (processDefinitions[MATERIAL_SUPPLY_PROCESS_KEY]) {
+  if (
+    runtimeProcessSelections.some(
+      (selection) => selection.process_key === MATERIAL_SUPPLY_PROCESS_KEY,
+    )
+  ) {
     processPools.push(...MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS);
   }
-  if (processDefinitions[FINISHED_GOODS_DELIVERY_PROCESS_KEY]) {
+  if (
+    runtimeProcessSelections.some(
+      (selection) => selection.process_key === FINISHED_GOODS_DELIVERY_PROCESS_KEY,
+    )
+  ) {
     processPools.push(...FINISHED_GOODS_DELIVERY_EVIDENCE_OWNER_POOLS);
   }
+  return processPools;
+}
+
+function processWorkPoolsFromSelections(runtimeProcessSelections = []) {
+  const processPools = selectedProcessPoolDefinitions(runtimeProcessSelections);
   return processPools.map((pool) => ({
     pool_key: pool.pool_key,
     module_key: pool.module_key,
@@ -825,7 +810,7 @@ function processWorkPoolsFromDefinitions(processDefinitions = {}) {
   }));
 }
 
-function workPoolsFromCatalog(catalog, processDefinitions = {}) {
+function workPoolsFromCatalog(catalog, runtimeProcessSelections = []) {
   const catalogPools = catalog.workPools.map((pool) => {
     const moduleKey = MODULE_KEY_BY_POOL[pool.key];
     assert(moduleKey, `work pool ${pool.key} does not have a module key mapping`);
@@ -836,33 +821,18 @@ function workPoolsFromCatalog(catalog, processDefinitions = {}) {
       description: "compiled responsibility pool from tracked customer package catalog",
     };
   });
-  return [...catalogPools, ...processWorkPoolsFromDefinitions(processDefinitions)];
+  return [
+    ...catalogPools,
+    ...processWorkPoolsFromSelections(runtimeProcessSelections),
+  ];
 }
 
-function processWorkPoolMembershipsFromDefinitions(
-  processDefinitions = {},
+function processWorkPoolMembershipsFromSelections(
+  runtimeProcessSelections = [],
   priorityOffset = 0,
   overrides = {},
 ) {
-  const processPools = [];
-  if (processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY]) {
-    const runtimePoolKeys = new Set(
-      processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY].nodes
-        .map((node) => node.owner_pool_key)
-        .filter(Boolean),
-    );
-    processPools.push(
-      ...SALES_ORDER_ACCEPTANCE_RUNTIME_OWNER_POOLS.filter((pool) =>
-        runtimePoolKeys.has(pool.pool_key),
-      ),
-    );
-  }
-  if (processDefinitions[MATERIAL_SUPPLY_PROCESS_KEY]) {
-    processPools.push(...MATERIAL_SUPPLY_EVIDENCE_OWNER_POOLS);
-  }
-  if (processDefinitions[FINISHED_GOODS_DELIVERY_PROCESS_KEY]) {
-    processPools.push(...FINISHED_GOODS_DELIVERY_EVIDENCE_OWNER_POOLS);
-  }
+  const processPools = selectedProcessPoolDefinitions(runtimeProcessSelections);
   return processPools.map((pool, index) => {
     const roleKey = roleKeyForPool(pool.pool_key, overrides) || roleKeyForPool(pool.source_pool_key, overrides);
     assert(
@@ -880,7 +850,11 @@ function processWorkPoolMembershipsFromDefinitions(
   });
 }
 
-function workPoolMembershipsFromCatalog(catalog, processDefinitions = {}, overrides = {}) {
+function workPoolMembershipsFromCatalog(
+  catalog,
+  runtimeProcessSelections = [],
+  overrides = {},
+) {
   const catalogMemberships = catalog.workPools.map((pool, index) => ({
     pool_key: pool.key,
     role_key: roleKeyForPool(pool.key, overrides),
@@ -891,8 +865,8 @@ function workPoolMembershipsFromCatalog(catalog, processDefinitions = {}, overri
   }));
   return [
     ...catalogMemberships,
-    ...processWorkPoolMembershipsFromDefinitions(
-      processDefinitions,
+    ...processWorkPoolMembershipsFromSelections(
+      runtimeProcessSelections,
       catalogMemberships.length,
       overrides,
     ),
@@ -919,18 +893,28 @@ function accessEntitlementsFromPackage(config, catalog, customerKey) {
   });
 }
 
-function fieldPoliciesFromCatalog(catalog) {
+function fieldPoliciesFromCatalog(catalog, config = {}) {
+  const overrides = new Map(
+    (Array.isArray(config.fieldPolicyOverrides)
+      ? config.fieldPolicyOverrides
+      : []
+    ).map((override) => [
+      `${override.surfaceKey}.${override.fieldKey}`,
+      override,
+    ]),
+  );
   const policies = {};
-  for (const field of catalog.fields) {
-    const runtimeSurface = RUNTIME_FIELD_POLICY_SURFACES[field.module];
-    if (!runtimeSurface || !runtimeSurface.fieldKeys.includes(field.key)) {
-      continue;
+  for (const surface of [...catalog.fieldPolicySurfaces].sort((left, right) =>
+    left.key.localeCompare(right.key),
+  )) {
+    const fieldPolicies = {};
+    for (const fieldKey of [...surface.fieldKeys].sort()) {
+      const override = overrides.get(`${surface.key}.${fieldKey}`);
+      fieldPolicies[fieldKey] = {
+        visible: override?.visible ?? true,
+      };
     }
-    const surfaceKey = runtimeSurface.surfaceKey;
-    policies[surfaceKey] = policies[surfaceKey] || {};
-    policies[surfaceKey][field.key] = {
-      visible: true,
-    };
+    policies[surface.key] = fieldPolicies;
   }
   return policies;
 }
@@ -939,344 +923,13 @@ function runtimePagesFromCatalog(catalog) {
   return catalog.pages.map((item) => item.key);
 }
 
-function findWorkflow(config, predicate, label) {
-  const workflow = (Array.isArray(config.workflows) ? config.workflows : []).find(predicate);
-  assert(workflow, `${config.customerKey} customer package must include ${label}`);
-  return workflow;
-}
-
-function findWorkflowNode(workflow, predicate, label) {
-  const node = (Array.isArray(workflow.nodes) ? workflow.nodes : []).find(predicate);
-  assert(node, `${workflow.key} workflow must include ${label}`);
-  return node;
-}
-
-function salesOrderAcceptanceProcessDefinitionFromPackage(config) {
-  const workflow = findWorkflow(
-    config,
-    (item) =>
-      item.key === "sales_order_approval" ||
-      (item.sourceModules?.includes("sales_orders") &&
-        item.ownerPools?.includes("sales") &&
-        item.ownerPools?.includes("boss") &&
-        item.ownerPools?.includes("pmc")),
-    "a sales order acceptance workflow source",
-  );
-  assert(workflow.factBoundary === "workflow_only", "sales order acceptance source workflow must stay workflow_only");
-  for (const poolKey of ["sales", "boss", "pmc"]) {
-    assert(
-      workflow.ownerPools.includes(poolKey),
-      `sales order acceptance source workflow must include ${poolKey} owner pool`,
-    );
-  }
-  const submitNode = findWorkflowNode(
-    workflow,
-    (node) => node.command === "submit_sales_order" && node.ownerPool === "sales",
-    "sales submit node",
-  );
-  const approvalNode = findWorkflowNode(
-    workflow,
-    (node) => node.type === "approval" && node.ownerPool === "boss",
-    "boss approval node",
-  );
-  const engineeringNode = (Array.isArray(workflow.nodes) ? workflow.nodes : []).find(
-    (node) => node.type === "human_task" && node.ownerPool === "engineering",
-  );
-  if (workflow.ownerPools.includes("engineering")) {
-    assert(engineeringNode, "sales order acceptance engineering owner pool must have an engineering task node");
-  }
-  const reviewNode = findWorkflowNode(
-    workflow,
-    (node) => node.type === "human_task" && node.ownerPool === "pmc",
-    "PMC review node",
-  );
-  const endNode = findWorkflowNode(
-    workflow,
-    (node) => node.type === "end",
-    "end node",
-  );
-  return {
-    process_key: SALES_ORDER_ACCEPTANCE_PROCESS_KEY,
-    process_version: "v1",
-    variant_key: "default",
-    source_workflow_key: workflow.key,
-    source_status: workflow.status,
-    manifest_status: "runtime_loader_ready",
-    runtime_loader_enabled: true,
-    business_ref_type: "sales_order",
-    domain_boundary: "source_document_command_only",
-    fact_boundary: "no_fact_posting",
-    config_revision_source: "runtime_manifest",
-    definition_hash_source: "compiled_customer_package",
-    nodes: [
-      {
-        node_key: "submit_sales_order",
-        source_node_key: submitNode.key,
-        node_type: "domain_command",
-        source_owner_pool_key: "sales",
-        required_capability_key: "sales_order.submit",
-        policy_snapshot: {
-          command_key: "sales_order.submit",
-          source_command_key: "submit_sales_order",
-          handler: "SalesOrderUsecase.SubmitSalesOrder",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-      },
-      {
-        node_key: "order_approval",
-        source_node_key: approvalNode.key,
-        node_type: "approval",
-        source_owner_pool_key: "boss",
-        owner_pool_key: "order_approval",
-        required_capability_key: "workflow.task.approve",
-        form_profile_key: "sales_order_approval.default",
-        action_set_key: "sales_order_approval",
-      },
-      ...(engineeringNode
-        ? [
-            {
-              node_key: "engineering_data",
-              source_node_key: engineeringNode.key,
-              node_type: "human_task",
-              source_owner_pool_key: "engineering",
-              owner_pool_key: "engineering_data",
-              required_capability_key: "workflow.task.complete",
-              form_profile_key: "engineering_data.default",
-              action_set_key: "engineering_data",
-            },
-          ]
-        : []),
-      {
-        node_key: "order_review",
-        source_node_key: reviewNode.key,
-        node_type: "human_task",
-        source_owner_pool_key: "pmc",
-        owner_pool_key: "order_review",
-        required_capability_key: "workflow.task.complete",
-        form_profile_key: "sales_order_review.default",
-        action_set_key: "sales_order_review",
-      },
-      {
-        node_key: "end",
-        source_node_key: endNode.key,
-        node_type: "end",
-      },
-    ],
-    guardrail:
-      "Controlled runtime loader ready: sales_order_acceptance may submit the sales order source document, then create the configured approval, engineering-data and PMC review tasks; it does not post inventory, shipment, quality or finance facts.",
-  };
-}
-
-function materialSupplyProcessDefinitionFromPackage(config) {
-  const workflow = findWorkflow(
-    config,
-    (item) =>
-      item.key === "material_supply" ||
-      item.key === "purchase_order_approval" ||
-      item.key === "demo_material_supply_review" ||
-      (item.sourceModules?.includes("purchase_orders") &&
-        item.ownerPools?.includes("purchase") &&
-        item.ownerPools?.includes("warehouse") &&
-        item.ownerPools?.includes("quality")),
-    "a material supply workflow source",
-  );
-  assert(workflow.factBoundary === "workflow_only", "material supply source workflow must stay workflow_only");
-  for (const poolKey of ["purchase", "warehouse", "quality"]) {
-    assert(
-      workflow.ownerPools.includes(poolKey),
-      `material supply source workflow must include ${poolKey} owner pool`,
-    );
-  }
-  return {
-    process_key: MATERIAL_SUPPLY_PROCESS_KEY,
-    process_version: "v1",
-    variant_key: "purchase_receipt_iqc_inbound",
-    source_workflow_key: workflow.key,
-    source_status: workflow.status,
-    manifest_status: "runtime_loader_ready",
-    runtime_loader_enabled: true,
-    business_ref_type: "purchase_order",
-    domain_boundary: "explicit_fact_command_api",
-    fact_boundary: "no_fact_posting",
-    config_revision_source: "runtime_manifest",
-    definition_hash_source: "compiled_customer_package",
-    nodes: [
-      {
-        node_key: "purchase_receipt_source",
-        node_type: "domain_command",
-        source_owner_pool_key: "purchase",
-        owner_pool_key: "purchase_receipt_source",
-        required_capability_key: "purchase.receipt.create",
-        form_profile_key: "purchase_receipt_source.default",
-        action_set_key: "purchase_receipt_source",
-        policy_snapshot: {
-          command_key: "purchase_receipt.create",
-          handler: "InventoryUsecase.CreatePurchaseReceiptFromPurchaseOrder",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-        fact_command_contract: materialSupplyFactCommandContract("purchase_receipt_source"),
-      },
-      {
-        node_key: "incoming_qc",
-        node_type: "domain_command",
-        source_owner_pool_key: "quality",
-        owner_pool_key: "incoming_qc",
-        required_capability_key: "quality.inspection.update",
-        form_profile_key: "incoming_qc.default",
-        action_set_key: "incoming_qc",
-        policy_snapshot: {
-          command_key: "quality_inspection.aggregate_gate",
-          handler: "InventoryUsecase.EvaluatePurchaseReceiptQualityGate",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-        fact_command_contract: materialSupplyFactCommandContract("incoming_qc"),
-      },
-      {
-        node_key: "warehouse_inbound",
-        node_type: "domain_command",
-        source_owner_pool_key: "warehouse",
-        owner_pool_key: "warehouse_inbound",
-        required_capability_key: "warehouse.inbound.confirm",
-        form_profile_key: "warehouse_inbound.default",
-        action_set_key: "warehouse_inbound",
-        policy_snapshot: {
-          command_key: "inventory.post_inbound",
-          handler: "InventoryUsecase.PostPurchaseReceipt",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-        fact_command_contract: materialSupplyFactCommandContract("warehouse_inbound"),
-      },
-      {
-        node_key: "end",
-        node_type: "end",
-      },
-    ],
-    guardrail:
-      "Runtime loader ready: material_supply can construct purchase_order process instances with explicit domain_command nodes; incoming_qc only aggregates formal line decisions, and Workflow task completion still cannot create purchase_receipts, decide quality_inspections or post inventory_txns.",
-  };
-}
-
-function finishedGoodsDeliveryProcessDefinitionFromPackage(config) {
-  const workflow = findWorkflow(
-    config,
-    (item) =>
-      item.key === "finished_goods_delivery" ||
-      item.key === "demo_finished_goods_delivery" ||
-      (item.sourceModules?.includes("shipments") &&
-        item.sourceModules?.includes("finance") &&
-        item.ownerPools?.includes("quality") &&
-        item.ownerPools?.includes("finance") &&
-        item.ownerPools?.includes("warehouse")),
-    "a finished goods delivery workflow source",
-  );
-  assert(workflow.factBoundary === "workflow_only", "finished goods delivery source workflow must stay workflow_only");
-  for (const poolKey of ["quality", "finance", "warehouse"]) {
-    assert(
-      workflow.ownerPools.includes(poolKey),
-      `finished goods delivery source workflow must include ${poolKey} owner pool`,
-    );
-  }
-  return {
-    process_key: FINISHED_GOODS_DELIVERY_PROCESS_KEY,
-    process_version: "v1",
-    variant_key: "quality_finance_ship_receivable",
-    source_workflow_key: workflow.key,
-    source_status: workflow.status,
-    manifest_status: "runtime_loader_start_ready",
-    runtime_loader_enabled: true,
-    business_ref_type: "shipment",
-    domain_boundary: "contract_preflight_only",
-    fact_boundary: "no_fact_posting",
-    config_revision_source: "runtime_manifest",
-    definition_hash_source: "compiled_customer_package",
-    nodes: [
-      {
-        node_key: "finished_goods_quality",
-        node_type: "domain_command",
-        source_owner_pool_key: "quality",
-        owner_pool_key: "finished_goods_quality",
-        required_capability_key: "quality.inspection.update",
-        form_profile_key: "finished_goods_quality.default",
-        action_set_key: "finished_goods_quality",
-        policy_snapshot: {
-          command_key: "finished_goods_quality.decide",
-          handler: "InventoryUsecase.PassQualityInspection/RejectQualityInspection",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-        fact_command_contract: finishedGoodsDeliveryFactCommandContract("finished_goods_quality"),
-      },
-      {
-        node_key: "shipment_finance_release",
-        node_type: "domain_command",
-        source_owner_pool_key: "finance",
-        owner_pool_key: "shipment_finance_release",
-        required_capability_key: "finance.receivable.confirm",
-        form_profile_key: "shipment_finance_release.default",
-        action_set_key: "shipment_finance_release",
-        policy_snapshot: {
-          command_key: "shipment.finance_release",
-          handler: "OperationalFactUsecase.GetShipment",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-        fact_command_contract: finishedGoodsDeliveryFactCommandContract("shipment_finance_release"),
-      },
-      {
-        node_key: "shipment_execution",
-        node_type: "domain_command",
-        source_owner_pool_key: "warehouse",
-        owner_pool_key: "shipment_execution",
-        required_capability_key: "shipment.ship",
-        form_profile_key: "shipment_execution.default",
-        action_set_key: "shipment_execution",
-        policy_snapshot: {
-          command_key: "shipment.ship",
-          handler: "OperationalFactUsecase.ShipShipment",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-        fact_command_contract: finishedGoodsDeliveryFactCommandContract("shipment_execution"),
-      },
-      {
-        node_key: "receivable_lead",
-        node_type: "domain_command",
-        source_owner_pool_key: "finance",
-        owner_pool_key: "receivable_lead",
-        required_capability_key: "finance.receivable.confirm",
-        form_profile_key: "receivable_lead.default",
-        action_set_key: "receivable_lead",
-        policy_snapshot: {
-          command_key: "finance.receivable_lead",
-          handler: "OperationalFactUsecase.CreateFinanceFactDraft",
-          idempotency_key_required: true,
-          writes_fact: false,
-        },
-        fact_command_contract: finishedGoodsDeliveryFactCommandContract("receivable_lead"),
-      },
-      {
-        node_key: "end",
-        node_type: "end",
-      },
-    ],
-    guardrail:
-      "Start-only loader: finished_goods_delivery can create and start a ProcessInstance; finished_goods_quality, shipment_finance_release, shipment_execution, and receivable_lead now have explicit handlers, and target evidence is still required before release readiness.",
-  };
-}
-
-function processDefinitionsFromPackage(config) {
-  return {
-    [SALES_ORDER_ACCEPTANCE_PROCESS_KEY]:
-      salesOrderAcceptanceProcessDefinitionFromPackage(config),
-    [MATERIAL_SUPPLY_PROCESS_KEY]:
-      materialSupplyProcessDefinitionFromPackage(config),
-    [FINISHED_GOODS_DELIVERY_PROCESS_KEY]:
-      finishedGoodsDeliveryProcessDefinitionFromPackage(config),
-  };
+function runtimeProcessSelectionsFromPackage(config) {
+  return (config.runtimeProcessSelections || []).map((selection) => ({
+    process_key: selection.processKey,
+    process_version: selection.processVersion,
+    variant_key: selection.variantKey,
+    business_ref_type: selection.businessRefType,
+  }));
 }
 
 function flowCatalogFromPackage(config) {
@@ -1389,7 +1042,11 @@ function printTemplateDefaultsFromPackage(config) {
   };
 }
 
-function compiledSnapshotFromPackage(config, catalog, processDefinitions = {}) {
+function compiledSnapshotFromPackage(
+  config,
+  catalog,
+  runtimeProcessSelections = [],
+) {
   return {
     customer: {
       key: config.customerKey,
@@ -1399,8 +1056,9 @@ function compiledSnapshotFromPackage(config, catalog, processDefinitions = {}) {
     package: {
       key: config.packageKey,
       status: config.status,
-      runtimeEnabled: false,
-      previewOnly: true,
+      runtimeEnabled: config.runtimeEnabled,
+      previewOnly: config.sourcePolicy.previewOnly,
+      publishEnabled: config.sourcePolicy.publishEnabled,
     },
     pages: runtimePagesFromCatalog(catalog),
     rolePageProjections: rolePageProjectionsFromPackage(config, catalog),
@@ -1409,9 +1067,9 @@ function compiledSnapshotFromPackage(config, catalog, processDefinitions = {}) {
       label: item.label,
       layer: item.layer,
     })),
-    fieldPolicies: fieldPoliciesFromCatalog(catalog),
+    fieldPolicies: fieldPoliciesFromCatalog(catalog, config),
     workPoolRoleOverrides: customerWorkPoolRoleOverrides(config, catalog),
-    processDefinitions,
+    runtimeProcessSelections,
     flowCatalog: flowCatalogFromPackage(config),
     policyCatalog: policyCatalogFromPackage(config),
     extensionPointCatalog: extensionPointCatalogFromPackage(config),
@@ -1420,24 +1078,59 @@ function compiledSnapshotFromPackage(config, catalog, processDefinitions = {}) {
   };
 }
 
-function buildRuntimeManifest(config, catalog = customerPackageCatalog) {
-  validateCatalog(catalog);
-  validatePackage(config, catalog);
-  const processDefinitions = processDefinitionsFromPackage(config);
+function buildManifestProjection(config, catalog, { publishable }) {
+  const runtimeProcessSelections = runtimeProcessSelectionsFromPackage(config);
   const workPoolRoleOverrides = customerWorkPoolRoleOverrides(config, catalog);
   const manifest = {
+    manifest_schema_version: MANIFEST_SCHEMA_VERSION,
+    process_contract_version: PROCESS_CONTRACT_VERSION,
+    manifest_status: publishable ? "runtime_compile_ready" : "preview_only",
+    runtime_enabled: publishable,
+    publishable,
     customer_key: config.customerKey,
     revision: packageRevision(config),
     product_version: "local-customer-package",
-    compiled_snapshot: compiledSnapshotFromPackage(config, catalog, processDefinitions),
+    compiled_snapshot: compiledSnapshotFromPackage(
+      config,
+      catalog,
+      runtimeProcessSelections,
+    ),
     module_states: moduleStatesFromCatalog(catalog, config),
     role_profiles: roleProfilesFromPackage(config, catalog),
     access_entitlements: accessEntitlementsFromPackage(config, catalog, config.customerKey),
-    work_pools: workPoolsFromCatalog(catalog, processDefinitions),
-    work_pool_memberships: workPoolMembershipsFromCatalog(catalog, processDefinitions, workPoolRoleOverrides),
+    work_pools: workPoolsFromCatalog(catalog, runtimeProcessSelections),
+    work_pool_memberships: workPoolMembershipsFromCatalog(
+      catalog,
+      runtimeProcessSelections,
+      workPoolRoleOverrides,
+    ),
   };
-  validateRuntimeManifest(manifest);
+  validateRuntimeManifest(manifest, { publishable });
   return manifest;
+}
+
+function buildRuntimeManifest(config, catalog = customerPackageCatalog) {
+  validateCatalog(catalog);
+  validatePackage(config, catalog, customerPackageSchema, {
+    allowReleaseReady: true,
+  });
+  assert(
+    config.status === "release_ready" &&
+      config.runtimeEnabled === true &&
+      config.sourcePolicy.previewOnly === false &&
+      config.sourcePolicy.publishEnabled === true,
+    "formal runtime compile requires a release-ready package with runtime and publish enabled",
+  );
+  return buildManifestProjection(config, catalog, { publishable: true });
+}
+
+function buildRuntimePreviewManifest(
+  config,
+  catalog = customerPackageCatalog,
+) {
+  validateCatalog(catalog);
+  validatePackage(config, catalog);
+  return buildManifestProjection(config, catalog, { publishable: false });
 }
 
 function assertNoForbiddenKeys(value, currentPath = "runtimeManifest") {
@@ -1463,358 +1156,13 @@ function roleHasCapability(manifest, roleKey, capabilityKey) {
   );
 }
 
-function validateProcessDefinitions(manifest, { workPoolKeys } = {}) {
-  const processDefinitions = manifest.compiled_snapshot.processDefinitions;
-  assert(
-    processDefinitions && typeof processDefinitions === "object" && !Array.isArray(processDefinitions),
-    "compiled_snapshot.processDefinitions must be an object",
-  );
-  const salesOrderProcess = processDefinitions[SALES_ORDER_ACCEPTANCE_PROCESS_KEY];
-  assert(salesOrderProcess, "processDefinitions must include sales_order_acceptance");
-  const materialSupplyProcess = processDefinitions[MATERIAL_SUPPLY_PROCESS_KEY];
-  assert(materialSupplyProcess, "processDefinitions must include material_supply");
-  const finishedGoodsDeliveryProcess = processDefinitions[FINISHED_GOODS_DELIVERY_PROCESS_KEY];
-  assert(finishedGoodsDeliveryProcess, "processDefinitions must include finished_goods_delivery");
-  assert(
-    salesOrderProcess.process_key === SALES_ORDER_ACCEPTANCE_PROCESS_KEY,
-    "sales_order_acceptance.process_key must match its manifest key",
-  );
-  assert(salesOrderProcess.process_version === "v1", "sales_order_acceptance.process_version must be v1");
-  assert(salesOrderProcess.variant_key === "default", "sales_order_acceptance.variant_key must be default");
-  assert(salesOrderProcess.manifest_status === "runtime_loader_ready", "sales_order_acceptance must be marked runtime loader ready");
-  assert(salesOrderProcess.runtime_loader_enabled === true, "sales_order_acceptance must explicitly enable the controlled runtime loader");
-  assert(salesOrderProcess.business_ref_type === "sales_order", "sales_order_acceptance must stay bound to sales_order refs");
-  assert(salesOrderProcess.fact_boundary === "no_fact_posting", "sales_order_acceptance must not post domain facts");
-  assert(Array.isArray(salesOrderProcess.nodes), "sales_order_acceptance.nodes must be an array");
-  const salesNodeKeys = salesOrderProcess.nodes.map((node) => node.node_key);
-  const allowedSalesChains = [
-    ["submit_sales_order", "order_approval", "order_review", "end"],
-    ["submit_sales_order", "order_approval", "engineering_data", "order_review", "end"],
-  ];
-  assert(
-    allowedSalesChains.some((candidate) => JSON.stringify(candidate) === JSON.stringify(salesNodeKeys)),
-    "sales_order_acceptance nodes must match the reviewed base chain or customer engineering-data variant",
-  );
-  const roleByRuntimePool = new Map(
-    manifest.work_pool_memberships.map((membership) => [
-      membership.pool_key,
-      membership.role_key,
-    ]),
-  );
-  for (const node of salesOrderProcess.nodes) {
-    assert(PROCESS_DEFINITION_NODE_TYPES.includes(node.node_type), `unsupported process node type: ${node.node_type}`);
-    if (node.node_type === "end") {
-      assert(!node.owner_pool_key, "end node must not own a work pool");
-      continue;
-    }
-    assert(
-      typeof node.required_capability_key === "string" && node.required_capability_key.trim() !== "",
-      `${node.node_key}.required_capability_key must be set`,
-    );
-    if (node.node_type === "domain_command") {
-      assert(
-        RUNTIME_DOMAIN_COMMAND_KEYS.includes(node.policy_snapshot?.command_key),
-        `${node.node_key}.policy_snapshot.command_key must be a registered runtime domain command`,
-      );
-      assert(node.policy_snapshot?.writes_fact === false, `${node.node_key} must not post facts`);
-      const sourceRoleKey = ROLE_KEY_BY_POOL[node.source_owner_pool_key];
-      assert(sourceRoleKey, `${node.node_key}.source_owner_pool_key must map to a role key`);
-      assert(
-        roleHasCapability(manifest, sourceRoleKey, node.required_capability_key),
-        `${node.node_key} source role ${sourceRoleKey} must have ${node.required_capability_key}`,
-      );
-      continue;
-    }
-    assert(workPoolKeys.has(node.owner_pool_key), `${node.node_key}.owner_pool_key must be a runtime work pool`);
-    const roleKey = roleByRuntimePool.get(node.owner_pool_key);
-    assert(roleKey, `${node.node_key}.owner_pool_key must have a membership`);
-    assert(
-      roleHasCapability(manifest, roleKey, node.required_capability_key),
-      `${node.node_key} mapped role ${roleKey} must have ${node.required_capability_key}`,
-    );
-  }
-  assert(
-    materialSupplyProcess.process_key === MATERIAL_SUPPLY_PROCESS_KEY,
-    "material_supply.process_key must match its manifest key",
-  );
-  assert(materialSupplyProcess.process_version === "v1", "material_supply.process_version must be v1");
-  assert(
-    materialSupplyProcess.variant_key === "purchase_receipt_iqc_inbound",
-    "material_supply.variant_key must identify the reviewed material supply chain",
-  );
-  assert(
-    materialSupplyProcess.manifest_status === "runtime_loader_ready",
-    "material_supply must be loader ready after explicit process APIs are implemented",
-  );
-  assert(materialSupplyProcess.runtime_loader_enabled === true, "material_supply runtime loader must stay enabled");
-  assert(materialSupplyProcess.business_ref_type === "purchase_order", "material_supply must start from purchase order refs");
-  assert(materialSupplyProcess.fact_boundary === "no_fact_posting", "material_supply must not post facts from the manifest");
-  assert(Array.isArray(materialSupplyProcess.nodes), "material_supply.nodes must be an array");
-  assert(
-    JSON.stringify(materialSupplyProcess.nodes.map((node) => node.node_key)) ===
-      JSON.stringify(["purchase_receipt_source", "incoming_qc", "warehouse_inbound", "end"]),
-    "material_supply nodes must match the reviewed purchase receipt -> IQC -> inbound chain",
-  );
-  const expectedMaterialSupplyCommandKeys = new Map([
-    ["purchase_receipt_source", "purchase_receipt.create"],
-    ["incoming_qc", "quality_inspection.aggregate_gate"],
-    ["warehouse_inbound", "inventory.post_inbound"],
-  ]);
-  for (const node of materialSupplyProcess.nodes) {
-    assert(PROCESS_DEFINITION_NODE_TYPES.includes(node.node_type), `unsupported process node type: ${node.node_type}`);
-    if (node.node_type === "end") {
-      assert(!node.owner_pool_key, "material_supply end node must not own a work pool");
-      continue;
-    }
-    assert(node.node_type === "domain_command", "material_supply runtime nodes must be explicit domain_command nodes");
-    assert(workPoolKeys.has(node.owner_pool_key), `${node.node_key}.owner_pool_key must be a runtime work pool`);
-    const roleKey = roleByRuntimePool.get(node.owner_pool_key);
-    assert(roleKey, `${node.node_key}.owner_pool_key must have a membership`);
-    assert(
-      roleHasCapability(manifest, roleKey, node.required_capability_key),
-      `${node.node_key} mapped role ${roleKey} must have ${node.required_capability_key}`,
-    );
-    assert(
-      node.fact_command_contract?.required_before_runtime_loader === false,
-      `${node.node_key} fact command contract must be satisfied before enabling runtime loader`,
-    );
-    assert(
-      node.policy_snapshot?.command_key === expectedMaterialSupplyCommandKeys.get(node.node_key),
-      `${node.node_key}.policy_snapshot.command_key must match reviewed material supply command`,
-    );
-    assert(
-      node.policy_snapshot?.writes_fact === false,
-      `${node.node_key}.policy_snapshot must not claim manifest-level fact posting`,
-    );
-    assert(
-      node.fact_command_contract?.writes_fact === false,
-      `${node.node_key} manifest contract must not claim fact posting`,
-    );
-    assert(
-      node.fact_command_contract?.command_key === expectedMaterialSupplyCommandKeys.get(node.node_key),
-      `${node.node_key}.fact_command_contract.command_key must match reviewed material supply command`,
-    );
-    const handlerRegisteredNodeKeys = new Set(["purchase_receipt_source", "incoming_qc", "warehouse_inbound"]);
-    const expectedRuntimeBindingStatus = handlerRegisteredNodeKeys.has(node.node_key)
-      ? "process_runtime_handler_registered"
-      : "contract_preflight_only";
-    assert(
-      node.fact_command_contract?.runtime_binding_status === expectedRuntimeBindingStatus,
-      `${node.node_key}.fact_command_contract.runtime_binding_status must stay ${expectedRuntimeBindingStatus}`,
-    );
-    assert(
-      Boolean(node.fact_command_contract?.process_runtime_handler_registered) ===
-        handlerRegisteredNodeKeys.has(node.node_key),
-      `${node.node_key}.fact_command_contract.process_runtime_handler_registered must match current handler registration`,
-    );
-    assert(
-      node.fact_command_contract?.required_permission_key === node.required_capability_key,
-      `${node.node_key}.fact_command_contract.required_permission_key must match node capability`,
-    );
-    for (const field of [
-      "domain_owner",
-      "domain_usecase_binding",
-      "jsonrpc_method",
-      "stable_business_ref",
-      "idempotency_boundary",
-    ]) {
-      assert(
-        typeof node.fact_command_contract?.[field] === "string" &&
-          node.fact_command_contract[field].trim() !== "",
-        `${node.node_key}.fact_command_contract.${field} must be documented before runtime loader`,
-      );
-    }
-    assert(
-      Array.isArray(node.fact_command_contract?.jsonrpc_allowed_permission_keys) &&
-        node.fact_command_contract.jsonrpc_allowed_permission_keys.includes(node.required_capability_key),
-      `${node.node_key}.fact_command_contract must list the required JSON-RPC permission`,
-    );
-    assert(
-      Array.isArray(node.fact_command_contract?.required_test_anchors) &&
-        node.fact_command_contract.required_test_anchors.length >= 2,
-      `${node.node_key}.fact_command_contract.required_test_anchors must reference existing tests`,
-    );
-    assert(Array.isArray(node.fact_command_contract?.runtime_loader_blockers), `${node.node_key}.fact_command_contract.runtime_loader_blockers must be an array`);
-    assert(Array.isArray(node.fact_command_contract?.runtime_execute_blockers), `${node.node_key}.fact_command_contract.runtime_execute_blockers must be an array`);
-    if (handlerRegisteredNodeKeys.has(node.node_key)) {
-      assert(
-        !node.fact_command_contract.runtime_loader_blockers.includes("domain_command_handler_not_registered") &&
-          node.fact_command_contract.runtime_loader_blockers.length === 0,
-        `${node.node_key}.fact_command_contract must not keep loader blockers after explicit APIs are implemented`,
-      );
-      assert(
-        node.fact_command_contract.runtime_execute_blockers.length === 0,
-        `${node.node_key}.fact_command_contract must not keep execute blockers after explicit APIs are implemented`,
-      );
-    } else {
-      assert(
-        node.fact_command_contract.runtime_loader_blockers.includes("domain_command_handler_not_registered"),
-        `${node.node_key}.fact_command_contract must keep handler registration as a loader blocker`,
-      );
-    }
-  }
-  assert(
-    finishedGoodsDeliveryProcess.process_key === FINISHED_GOODS_DELIVERY_PROCESS_KEY,
-    "finished_goods_delivery.process_key must match its manifest key",
-  );
-  assert(finishedGoodsDeliveryProcess.process_version === "v1", "finished_goods_delivery.process_version must be v1");
-  assert(
-    finishedGoodsDeliveryProcess.variant_key === "quality_finance_ship_receivable",
-    "finished_goods_delivery.variant_key must identify the reviewed finished goods delivery chain",
-  );
-  assert(
-    finishedGoodsDeliveryProcess.manifest_status === "runtime_loader_start_ready",
-    "finished_goods_delivery must be start-ready before execute handlers exist",
-  );
-  assert(
-    finishedGoodsDeliveryProcess.runtime_loader_enabled === true,
-    "finished_goods_delivery runtime loader must allow start-only instances",
-  );
-  assert(finishedGoodsDeliveryProcess.business_ref_type === "shipment", "finished_goods_delivery must start from shipment refs");
-  assert(finishedGoodsDeliveryProcess.fact_boundary === "no_fact_posting", "finished_goods_delivery must not post facts from the manifest");
-  assert(Array.isArray(finishedGoodsDeliveryProcess.nodes), "finished_goods_delivery.nodes must be an array");
-  assert(
-    JSON.stringify(finishedGoodsDeliveryProcess.nodes.map((node) => node.node_key)) ===
-      JSON.stringify([
-        "finished_goods_quality",
-        "shipment_finance_release",
-        "shipment_execution",
-        "receivable_lead",
-        "end",
-      ]),
-    "finished_goods_delivery nodes must match the reviewed quality -> finance -> shipment -> receivable chain",
-  );
-  const expectedFinishedGoodsCommandKeys = new Map([
-    ["finished_goods_quality", "finished_goods_quality.decide"],
-    ["shipment_finance_release", "shipment.finance_release"],
-    ["shipment_execution", "shipment.ship"],
-    ["receivable_lead", "finance.receivable_lead"],
-  ]);
-  const finishedGoodsHandlerRegisteredNodeKeys = new Set([
-    "finished_goods_quality",
-    "shipment_finance_release",
-    "shipment_execution",
-    "receivable_lead",
-  ]);
-  for (const node of finishedGoodsDeliveryProcess.nodes) {
-    assert(PROCESS_DEFINITION_NODE_TYPES.includes(node.node_type), `unsupported process node type: ${node.node_type}`);
-    if (node.node_type === "end") {
-      assert(!node.owner_pool_key, "finished_goods_delivery end node must not own a work pool");
-      continue;
-    }
-    assert(node.node_type === "domain_command", "finished_goods_delivery runtime candidates must be explicit domain_command nodes");
-    assert(workPoolKeys.has(node.owner_pool_key), `${node.node_key}.owner_pool_key must be a runtime work pool`);
-    const roleKey = roleByRuntimePool.get(node.owner_pool_key);
-    assert(roleKey, `${node.node_key}.owner_pool_key must have a membership`);
-    assert(
-      roleHasCapability(manifest, roleKey, node.required_capability_key),
-      `${node.node_key} mapped role ${roleKey} must have ${node.required_capability_key}`,
-    );
-    assert(
-      node.fact_command_contract?.required_before_runtime_loader === false,
-      `${node.node_key} fact command contract must not block start-only loader`,
-    );
-    assert(
-      node.fact_command_contract?.required_before_runtime_execute === true,
-      `${node.node_key} fact command contract must block execute until handler and explicit API exist`,
-    );
-    assert(
-      REVIEWED_CONTRACT_COMMAND_KEYS.includes(node.policy_snapshot?.command_key),
-      `${node.node_key}.policy_snapshot.command_key must be a reviewed contract command`,
-    );
-    assert(
-      node.policy_snapshot?.command_key === expectedFinishedGoodsCommandKeys.get(node.node_key),
-      `${node.node_key}.policy_snapshot.command_key must match reviewed finished goods delivery command`,
-    );
-    assert(
-      node.policy_snapshot?.writes_fact === false,
-      `${node.node_key}.policy_snapshot must not claim manifest-level fact posting`,
-    );
-    assert(
-      node.fact_command_contract?.writes_fact === false,
-      `${node.node_key} manifest contract must not claim fact posting`,
-    );
-    assert(
-      node.fact_command_contract?.command_key === expectedFinishedGoodsCommandKeys.get(node.node_key),
-      `${node.node_key}.fact_command_contract.command_key must match reviewed finished goods delivery command`,
-    );
-    const expectedRuntimeBindingStatus = finishedGoodsHandlerRegisteredNodeKeys.has(node.node_key)
-      ? "process_runtime_handler_registered"
-      : "contract_preflight_only";
-    assert(
-      node.fact_command_contract?.runtime_binding_status === expectedRuntimeBindingStatus,
-      `${node.node_key}.fact_command_contract.runtime_binding_status must stay ${expectedRuntimeBindingStatus}`,
-    );
-    assert(
-      Boolean(node.fact_command_contract?.process_runtime_handler_registered) ===
-        finishedGoodsHandlerRegisteredNodeKeys.has(node.node_key),
-      `${node.node_key}.fact_command_contract.process_runtime_handler_registered must match current handler registration`,
-    );
-    assert(
-      node.fact_command_contract?.required_permission_key === node.required_capability_key,
-      `${node.node_key}.fact_command_contract.required_permission_key must match node capability`,
-    );
-    for (const field of [
-      "domain_owner",
-      "domain_usecase_binding",
-      "jsonrpc_method",
-      "stable_business_ref",
-      "idempotency_boundary",
-    ]) {
-      assert(
-        typeof node.fact_command_contract?.[field] === "string" &&
-          node.fact_command_contract[field].trim() !== "",
-        `${node.node_key}.fact_command_contract.${field} must be documented before runtime loader`,
-      );
-    }
-    assert(
-      Array.isArray(node.fact_command_contract?.jsonrpc_allowed_permission_keys) &&
-        node.fact_command_contract.jsonrpc_allowed_permission_keys.includes(node.required_capability_key),
-      `${node.node_key}.fact_command_contract must list the required JSON-RPC permission`,
-    );
-    assert(
-      Array.isArray(node.fact_command_contract?.required_test_anchors) &&
-        node.fact_command_contract.required_test_anchors.length >= 2,
-      `${node.node_key}.fact_command_contract.required_test_anchors must reference existing tests`,
-    );
-    if (finishedGoodsHandlerRegisteredNodeKeys.has(node.node_key)) {
-      assert(
-        !node.fact_command_contract.runtime_execute_blockers.includes("domain_command_handler_not_registered"),
-        `${node.node_key}.fact_command_contract must not keep handler registration as an execute blocker after registration`,
-      );
-    } else {
-      assert(
-        node.fact_command_contract.runtime_execute_blockers.includes("domain_command_handler_not_registered"),
-        `${node.node_key}.fact_command_contract must keep handler registration as an execute blocker`,
-      );
-    }
-    if (
-      !String(node.fact_command_contract.jsonrpc_method || "").startsWith(
-        "customer_config.",
-      )
-    ) {
-      assert(
-        node.fact_command_contract.runtime_execute_blockers.includes("explicit_runtime_execute_api_not_implemented"),
-        `${node.node_key}.fact_command_contract must keep explicit runtime execute API as a blocker until a customer_config execute API exists`,
-      );
-    } else {
-      assert(
-        !node.fact_command_contract.runtime_execute_blockers.includes("explicit_runtime_execute_api_not_implemented"),
-        `${node.node_key}.fact_command_contract must remove explicit runtime execute API blocker once jsonrpc_method is registered`,
-      );
-    }
-  }
-}
-
 function validateFlowAndPolicyCatalogs(manifest) {
   const flowCatalog = manifest.compiled_snapshot.flowCatalog;
   assert(flowCatalog && typeof flowCatalog === "object", "compiled_snapshot.flowCatalog must exist");
   assert(flowCatalog.runtime_enabled === false, "flowCatalog must not enable runtime flow execution");
   assert(flowCatalog.catalog_status === "preview_only", "flowCatalog must stay preview_only");
   assert(Array.isArray(flowCatalog.business_flows), "flowCatalog.business_flows must be an array");
-  assert(flowCatalog.business_flows.length >= 4, "flowCatalog must include the reviewed business flows");
   assert(Array.isArray(flowCatalog.state_machines), "flowCatalog.state_machines must be an array");
-  assert(flowCatalog.state_machines.length >= 3, "flowCatalog must include reviewed state machine previews");
   for (const stateMachine of flowCatalog.state_machines) {
     assert(stateMachine.status === "preview_only", `${stateMachine.key}.status must stay preview_only`);
     assert(Array.isArray(stateMachine.states) && stateMachine.states.length > 0, `${stateMachine.key}.states must not be empty`);
@@ -1826,7 +1174,6 @@ function validateFlowAndPolicyCatalogs(manifest) {
   assert(policyCatalog.runtime_enabled === false, "policyCatalog must not enable arbitrary policy execution");
   assert(policyCatalog.catalog_status === "preview_only", "policyCatalog must stay preview_only");
   assert(Array.isArray(policyCatalog.process_policies), "policyCatalog.process_policies must be an array");
-  assert(policyCatalog.process_policies.length >= 3, "policyCatalog must include reviewed process policy previews");
   const allowedPolicyKeys = new Set(customerPackageCatalog.policies.map((policy) => policy.key));
   for (const policy of policyCatalog.process_policies) {
     assert(allowedPolicyKeys.has(policy.key), `policyCatalog references unknown policy: ${policy.key}`);
@@ -1926,12 +1273,107 @@ function validateFlowAndPolicyCatalogs(manifest) {
   }
 }
 
-function validateRuntimeManifest(manifest) {
+function validateRuntimeProcessSelections(manifest) {
+  assert(
+    manifest.compiled_snapshot.processDefinitions == null,
+    "compiled_snapshot must not publish customer-defined process node graphs",
+  );
+  const selections = manifest.compiled_snapshot.runtimeProcessSelections;
+  assert(
+    Array.isArray(selections),
+    "compiled_snapshot.runtimeProcessSelections must be an array",
+  );
+  const allowedContracts = new Map(
+    customerPackageSchema.allowedRuntimeProcessSelections.map((selection) => [
+      `${selection.processKey}/${selection.processVersion}`,
+      selection,
+    ]),
+  );
+  const selectedProcessKeys = new Set();
+  for (const [index, selection] of selections.entries()) {
+    const selectionPath = `compiled_snapshot.runtimeProcessSelections[${index}]`;
+    assert(
+      selection && typeof selection === "object" && !Array.isArray(selection),
+      `${selectionPath} must be an object`,
+    );
+    assert(
+      JSON.stringify(Object.keys(selection).sort()) ===
+        JSON.stringify([
+          "business_ref_type",
+          "process_key",
+          "process_version",
+          "variant_key",
+        ]),
+      `${selectionPath} must contain selection identifiers only`,
+    );
+    assert(
+      !selectedProcessKeys.has(selection.process_key),
+      `${selectionPath}.process_key must not be duplicated`,
+    );
+    selectedProcessKeys.add(selection.process_key);
+    const contract = allowedContracts.get(
+      `${selection.process_key}/${selection.process_version}`,
+    );
+    assert(
+      contract,
+      `${selectionPath} must select a registered process/version`,
+    );
+    assert(
+      contract.variantKeys.includes(selection.variant_key),
+      `${selectionPath}.variant_key is not registered`,
+    );
+    assert(
+      selection.business_ref_type === contract.businessRefType,
+      `${selectionPath}.business_ref_type must be ${contract.businessRefType}`,
+    );
+  }
+}
+
+function assertNoLegacyRuntimeGraphMetadata(
+  value,
+  currentPath = "runtimeManifest",
+) {
+  if (!value || typeof value !== "object") {
+    return;
+  }
+  for (const [key, nestedValue] of Object.entries(value)) {
+    assert(
+      key !== "processDefinitions" && !key.startsWith("runtime_loader"),
+      `${currentPath}.${key} must not publish customer-defined runtime graph metadata`,
+    );
+    assert(
+      nestedValue !== "runtime_loader_ready" &&
+        nestedValue !== "runtime_loader_start_ready",
+      `${currentPath}.${key} must not claim runtime loader readiness`,
+    );
+    assertNoLegacyRuntimeGraphMetadata(nestedValue, `${currentPath}.${key}`);
+  }
+}
+
+function validateRuntimeManifest(manifest, { publishable = true } = {}) {
+  assert(
+    manifest.manifest_schema_version === MANIFEST_SCHEMA_VERSION,
+    `manifest_schema_version must be ${MANIFEST_SCHEMA_VERSION}`,
+  );
+  assert(
+    manifest.process_contract_version === PROCESS_CONTRACT_VERSION,
+    `process_contract_version must be ${PROCESS_CONTRACT_VERSION}`,
+  );
+  assert(manifest.publishable === publishable, "publishable must match compile mode");
+  assert(manifest.runtime_enabled === publishable, "runtime_enabled must match compile mode");
+  assert(
+    manifest.manifest_status ===
+      (publishable ? "runtime_compile_ready" : "preview_only"),
+    "manifest_status must match compile mode",
+  );
   assert(typeof manifest.customer_key === "string" && manifest.customer_key.trim() !== "", "customer_key must be set");
   assert(typeof manifest.revision === "string" && manifest.revision.trim() !== "", "revision must be set");
   assert(
-    manifest.revision.startsWith(`${manifest.customer_key}-customer-package-`),
-    "revision must be namespaced by customer_key",
+    manifest.revision.startsWith(`${manifest.customer_key}-`) &&
+      /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*\.runtime-manifest-v1$/u.test(
+        manifest.revision,
+      ),
+    "revision must be namespaced by customer_key and derive from a versioned package key",
   );
   assert(manifest.product_version === "local-customer-package", "product_version must identify local package compile");
   assert(manifest.compiled_snapshot && typeof manifest.compiled_snapshot === "object", "compiled_snapshot must exist");
@@ -2042,7 +1484,7 @@ function validateRuntimeManifest(manifest) {
     "fieldPolicies must not publish sales order item draft fields before a runtime surface consumes them",
   );
   validateFlowAndPolicyCatalogs(manifest);
-  validateProcessDefinitions(manifest, { workPoolKeys });
+  validateRuntimeProcessSelections(manifest);
   const printTemplateDefaults = manifest.compiled_snapshot.printTemplateDefaults;
   assert(
     printTemplateDefaults && typeof printTemplateDefaults === "object" && !Array.isArray(printTemplateDefaults),
@@ -2081,6 +1523,7 @@ function validateRuntimeManifest(manifest) {
     assert(typeof item.guardrail === "string" && item.guardrail.trim() !== "", `${item.template_key} guardrail must be set`);
   }
   assertNoForbiddenKeys(manifest);
+  assertNoLegacyRuntimeGraphMetadata(manifest);
 }
 
 function writeManifest(outPath, manifest) {
@@ -2097,10 +1540,13 @@ function runCustomerConfigRuntimeManifest(args) {
   const mode = args.mode || (args.out ? "preview" : "validate");
   assert(ALLOWED_MODES.includes(mode), `unsupported mode: ${mode}`);
   assert(!args.out || mode === "preview", "--out requires --mode preview");
-  const config = CUSTOMER_PACKAGES[args.customer];
+  const config = getCustomerPackage(args.customer);
   assert(config, `unknown customer package: ${args.customer}`);
   assert(existsSync(path.join(repoRoot, "server/internal/biz/customer_config.go")), "customer_config usecase must exist");
-  const manifest = buildRuntimeManifest(config);
+  const manifest =
+    mode === "preview"
+      ? buildRuntimePreviewManifest(config)
+      : buildRuntimeManifest(config);
   if (mode === "preview" && args.out) {
     writeManifest(args.out, manifest);
   }
@@ -2111,6 +1557,13 @@ function runCustomerConfigRuntimeManifest(args) {
 }
 
 function normalizeCustomerKeys(args) {
+  if (args.all === true) {
+    assert(
+      !Array.isArray(args.customers) || args.customers.length === 0,
+      "--all and --customer are mutually exclusive",
+    );
+    return listCustomerPackageKeys();
+  }
   const requestedCustomers =
     Array.isArray(args.customers) && args.customers.length > 0
       ? args.customers
@@ -2164,6 +1617,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 export {
   RUNTIME_PAGE_KEYS,
   buildRuntimeManifest,
+  buildRuntimePreviewManifest,
   runCustomerConfigRuntimeManifest,
   runCustomerConfigRuntimeManifestMany,
   validateRuntimeManifest,

@@ -109,8 +109,7 @@ export const MOBILE_TASK_FILTER_KEYS = Object.freeze({
   HIGH_PRIORITY: 'high_priority',
   BLOCKED: 'blocked',
   BLOCKED_OR_HIGH_PRIORITY: 'blocked_or_high_priority',
-  PENDING: 'pending',
-  PROCESSING: 'processing',
+  READY: 'ready',
 })
 
 export const MOBILE_LIST_KEYS = Object.freeze({
@@ -281,6 +280,7 @@ export function resolveDetailActionLabel(action) {
   if (action === 'done') return '完成说明（可选）'
   if (action === 'blocked') return '阻塞原因（必填）'
   if (action === 'rejected') return '退回原因（必填）'
+  if (action === 'resume') return '阻塞解除说明（必填）'
   if (action === 'urge') return '催办原因（必填）'
   return '处理原因'
 }
@@ -293,6 +293,7 @@ export function resolveMobileActionLabel(action) {
   if (action === 'blocked' || action === 'block') return '阻塞'
   if (action === 'done' || action === 'complete') return '完成'
   if (action === 'rejected' || action === 'reject') return '退回'
+  if (action === 'resume') return '解除阻塞'
   if (action === 'urge') return '催办'
   return '移动处理'
 }
@@ -312,6 +313,7 @@ export function normalizeMobileTaskActionKey(action) {
   if (action === 'block') return 'blocked'
   if (action === 'reject') return 'rejected'
   if (action === 'complete') return 'done'
+  if (action === 'resume') return 'resume'
   if (action === 'urge') return 'urge'
   return String(action || '').trim()
 }
@@ -453,7 +455,11 @@ export function canOpenMobileTaskDetailAction(roleKey, task, action) {
       canOperateTask(roleKey, task) && supportsRejectedAction(roleKey, task)
     )
   }
-  if (normalizedAction === 'done' || normalizedAction === 'blocked') {
+  if (
+    normalizedAction === 'done' ||
+    normalizedAction === 'blocked' ||
+    normalizedAction === 'resume'
+  ) {
     return canOperateTask(roleKey, task)
   }
   return false
@@ -596,10 +602,8 @@ export function isTaskHighPriority(task) {
   return Number(task.priority || 0) >= 3
 }
 
-export function isTaskPendingProgress(task) {
-  return ['pending', 'ready'].includes(
-    String(task.task_status_key || '').trim()
-  )
+export function isTaskReadyProgress(task) {
+  return String(task.task_status_key || '').trim() === 'ready'
 }
 
 export function isTaskBlockedProgress(task) {

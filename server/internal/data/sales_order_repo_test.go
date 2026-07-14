@@ -330,9 +330,10 @@ func TestSalesOrderRepoSaveWithItemsUpdatesAndCancelsMissingOpenLines(t *testing
 
 	updatedQty := decimal.NewFromInt(12)
 	result, err := uc.SaveSalesOrderWithItems(ctx, order.Order.ID, &biz.SalesOrderMutation{
-		OrderNo:    "SO-TX-UPDATE-A",
-		CustomerID: customer.ID,
-		OrderDate:  orderDate,
+		OrderNo:         "SO-TX-UPDATE-A",
+		CustomerID:      customer.ID,
+		OrderDate:       orderDate,
+		ExpectedVersion: order.Order.Version,
 	}, []*biz.SalesOrderItemSaveMutation{
 		{ID: order.Items[0].ID, SalesOrderItemMutation: biz.SalesOrderItemMutation{LineNo: 1, ProductID: product.ID, UnitID: unit.ID, OrderedQuantity: updatedQty}},
 	})
@@ -341,6 +342,9 @@ func TestSalesOrderRepoSaveWithItemsUpdatesAndCancelsMissingOpenLines(t *testing
 	}
 	if result.Order.OrderNo != "SO-TX-UPDATE-A" || len(result.Items) != 2 {
 		t.Fatalf("expected updated order and two historical lines, got %#v", result)
+	}
+	if result.Order.Version != 2 {
+		t.Fatalf("expected updated order version 2, got %#v", result.Order)
 	}
 	if result.Items[0].LineStatus != biz.SalesOrderItemStatusOpen || !result.Items[0].OrderedQuantity.Equal(updatedQty) {
 		t.Fatalf("expected first line updated and open, got %#v", result.Items[0])

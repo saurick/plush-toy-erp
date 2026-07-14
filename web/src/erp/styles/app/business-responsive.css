@@ -3,6 +3,98 @@
   cursor: ns-resize;
 }
 
+.erp-business-selection-action-bar__actions--compact {
+  display: flex;
+  width: 100%;
+  min-width: 0;
+  flex: 1 1 auto;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+.erp-business-selection-action-bar__compact-context {
+  display: flex;
+  min-width: 0;
+  flex: 0 1 auto;
+  align-items: center;
+}
+
+.erp-business-selection-action-bar__compact-visible {
+  display: flex;
+  min-width: 0;
+  flex: 1 1 0;
+  align-items: stretch;
+  gap: 8px;
+}
+
+.erp-business-selection-action-drawer .ant-drawer-body {
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+.erp-business-selection-action-drawer__list {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-business-selection-action-drawer__item {
+  display: grid;
+  min-height: 44px;
+}
+
+.erp-business-selection-action-drawer__item .ant-btn {
+  width: 100%;
+  min-height: 44px;
+  justify-content: flex-start;
+  white-space: normal;
+}
+
+.erp-business-selection-action-bar__actions--compact
+  .erp-business-selection-action-bar__compact-visible
+  > * {
+  min-width: 44px;
+  flex: 1 1 0;
+}
+
+.erp-business-selection-action-bar__actions--compact
+  .erp-business-selection-action-bar__compact-visible
+  .ant-btn,
+.erp-business-selection-action-bar__actions--compact
+  .erp-business-selection-action-bar__compact-more.ant-btn {
+  min-height: 44px;
+  white-space: nowrap;
+}
+
+.erp-business-selection-action-bar__actions--compact
+  .erp-business-selection-action-bar__compact-visible
+  .ant-btn {
+  width: 100%;
+  min-width: 44px;
+  flex: 1 1 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.erp-business-selection-action-bar__actions--compact
+  .erp-business-selection-action-bar__compact-more.ant-btn {
+  width: auto;
+  min-width: 112px;
+  flex: 0 0 auto;
+}
+
+@media screen and (max-width: 480px) {
+  .erp-business-selection-action-bar__compact-context {
+    display: none;
+  }
+
+  .erp-business-selection-action-bar__actions--compact
+    .erp-business-selection-action-bar__compact-more.ant-btn {
+    min-width: 104px;
+    padding-inline: 12px;
+  }
+}
+
 .erp-business-collaboration-task-panel__grip-bar {
   width: 64px;
   height: 5px;

@@ -42,14 +42,11 @@ const (
 
 	ProcessStatusActive    = "active"
 	ProcessStatusCompleted = "completed"
-	ProcessStatusCancelled = "cancelled"
 	ProcessStatusBlocked   = "blocked"
 
 	ProcessNodeStatusWaiting   = "waiting"
 	ProcessNodeStatusActive    = "active"
 	ProcessNodeStatusCompleted = "completed"
-	ProcessNodeStatusSkipped   = "skipped"
-	ProcessNodeStatusFailed    = "failed"
 	ProcessNodeStatusBlocked   = "blocked"
 
 	ProcessNodeTypeHumanTask     = "human_task"
@@ -351,7 +348,7 @@ type ProcessRuntimeRepo interface {
 	CompleteProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceComplete, actorID int) (*ProcessNodeInstance, error)
 	CompleteProcessInstance(ctx context.Context, in *ProcessInstanceComplete, actorID int) (*ProcessInstance, error)
 	RecordProcessInstanceLinkedBusinessRef(ctx context.Context, in *ProcessInstanceLinkedBusinessRefRecord, actorID int) (*ProcessInstance, error)
-	BlockProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceBlock, actorID int) (*ProcessNodeInstance, error)
+	BlockProcessNodeAndInstance(ctx context.Context, in *ProcessNodeInstanceBlock, actorID int) (*ProcessNodeInstance, error)
 	BlockProcessInstance(ctx context.Context, in *ProcessInstanceBlock, actorID int) (*ProcessInstance, error)
 	ActivateProcessNodeInstance(ctx context.Context, in *ProcessNodeInstanceActivate, actorID int) (*ProcessNodeInstance, error)
 	CreateProcessNodeInstanceAttempt(ctx context.Context, in *ProcessNodeInstanceAttemptCreate, actorID int) (*ProcessNodeInstance, error)
@@ -368,7 +365,7 @@ type ProcessRuntimeDomainCommandResultRepo interface {
 }
 
 type ProcessRuntimeOwnerRoleResolver interface {
-	WorkflowCandidateOwnerRoleKeys(ctx context.Context, customerKey string, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error)
+	WorkflowCandidateOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error)
 }
 
 type ProcessDomainCommandHandler interface {
@@ -444,9 +441,6 @@ func (uc *ProcessRuntimeUsecase) StartProcessInstance(ctx context.Context, in *P
 	if err != nil {
 		return nil, err
 	}
-	if instance.Status != "" && instance.Status != ProcessStatusActive {
-		return nil, ErrProcessInstanceSettled
-	}
 	nodes, err := uc.repo.ListProcessNodeInstances(ctx, instance.ID)
 	if err != nil {
 		return nil, err
@@ -458,24 +452,66 @@ func (uc *ProcessRuntimeUsecase) StartProcessInstance(ctx context.Context, in *P
 	if firstNode.ProcessInstanceID != instance.ID {
 		return nil, ErrBadParam
 	}
-	if firstNode.Status == ProcessNodeStatusActive {
-		return firstNode, nil
+	if instance.Status == ProcessStatusCompleted {
+		if firstNode.NodeType == ProcessNodeTypeEnd && firstNode.Status == ProcessNodeStatusCompleted {
+			return firstNode, nil
+		}
+		return nil, ErrProcessInstanceSettled
 	}
-	if firstNode.Status != ProcessNodeStatusWaiting {
+	if firstNode.NodeType == ProcessNodeTypeDomainCommand &&
+		(firstNode.Status == ProcessNodeStatusCompleted || firstNode.Status == ProcessNodeStatusBlocked) {
+		if instance.Status != "" && instance.Status != ProcessStatusActive &&
+			(firstNode.Status != ProcessNodeStatusBlocked || instance.Status != ProcessStatusBlocked) {
+			return nil, ErrProcessInstanceSettled
+		}
+		if firstNode.Version <= 1 || firstNode.DomainCommandFingerprint == nil {
+			return nil, ErrProcessDomainCommandRecoveryRequired
+		}
+		return uc.reconcileSettledDomainCommandNode(
+			ctx,
+			firstNode,
+			firstNode.Version-1,
+			*firstNode.DomainCommandFingerprint,
+			actorID,
+		)
+	}
+	if instance.Status != "" && instance.Status != ProcessStatusActive {
+		return nil, ErrProcessInstanceSettled
+	}
+
+	switch firstNode.Status {
+	case ProcessNodeStatusWaiting:
+		activatedNode, err := uc.reconcileProcessNodeActivation(ctx, firstNode, actorID)
+		if err != nil {
+			return nil, err
+		}
+		if err := uc.reconcileActivatedSequentialNode(ctx, activatedNode, actorID); err != nil {
+			return nil, err
+		}
+		return activatedNode, nil
+	case ProcessNodeStatusActive:
+		switch firstNode.NodeType {
+		case ProcessNodeTypeHumanTask, ProcessNodeTypeApproval, ProcessNodeTypeEnd:
+			if err := uc.reconcileActivatedSequentialNode(ctx, firstNode, actorID); err != nil {
+				return nil, err
+			}
+			return firstNode, nil
+		case ProcessNodeTypeDomainCommand, ProcessNodeTypeWaitEvent:
+			return firstNode, nil
+		default:
+			return nil, ErrProcessNodeInstanceConflict
+		}
+	case ProcessNodeStatusCompleted:
+		if firstNode.NodeType != ProcessNodeTypeEnd {
+			return nil, ErrProcessNodeInstanceConflict
+		}
+		if err := uc.ensureProcessInstanceCompleted(ctx, firstNode.ProcessInstanceID, actorID); err != nil {
+			return nil, err
+		}
+		return firstNode, nil
+	default:
 		return nil, ErrProcessNodeInstanceConflict
 	}
-	activatedNode, err := uc.repo.ActivateProcessNodeInstance(ctx, &ProcessNodeInstanceActivate{
-		ID:                firstNode.ID,
-		ProcessInstanceID: firstNode.ProcessInstanceID,
-		ExpectedVersion:   firstNode.Version,
-	}, actorID)
-	if err != nil {
-		return nil, err
-	}
-	if err := uc.handleActivatedSequentialNode(ctx, activatedNode, actorID); err != nil {
-		return nil, err
-	}
-	return activatedNode, nil
 }
 
 func (uc *ProcessRuntimeUsecase) GetProcessInstance(ctx context.Context, id int) (*ProcessInstance, error) {
@@ -573,9 +609,9 @@ func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, i
 	}
 	existing, getErr := uc.workflowRepo.GetWorkflowTaskByTaskCode(ctx, workflowTask.TaskCode)
 	if getErr != nil {
-		return nil, err
+		return nil, getErr
 	}
-	if !workflowTaskMatchesProcessNode(existing, instance.ID, node.ID) {
+	if !workflowTaskMatchesProcessNode(existing, &workflowTask) {
 		return nil, ErrWorkflowTaskExists
 	}
 	return existing, nil
@@ -591,14 +627,18 @@ func (uc *ProcessRuntimeUsecase) resolveLinkedWorkflowTaskOwnerRole(ctx context.
 		return "", ErrProcessTaskOwnerRoleNotFound
 	}
 	customerKey := processInstanceCustomerKey(instance)
-	explanation, err := uc.ownerResolver.WorkflowCandidateOwnerRoleKeys(ctx, customerKey, *node.OwnerPoolKey, *node.RequiredCapabilityKey)
+	configRevision := strings.TrimSpace(instance.ConfigRevision)
+	if configRevision == "" {
+		return "", ErrProcessTaskOwnerRoleNotFound
+	}
+	explanation, err := uc.ownerResolver.WorkflowCandidateOwnerRoleKeysAtRevision(ctx, customerKey, configRevision, *node.OwnerPoolKey, *node.RequiredCapabilityKey)
 	if err != nil {
 		return "", err
 	}
 	if explanation == nil {
 		return "", ErrProcessTaskOwnerRoleNotFound
 	}
-	if explanation.ConfigRevision != "" && instance.ConfigRevision != "" && explanation.ConfigRevision != instance.ConfigRevision {
+	if explanation.ConfigRevision != configRevision {
 		return "", ErrProcessTaskOwnerRoleNotFound
 	}
 	candidates := NormalizeAdminRoleKeys(explanation.CandidateOwnerRoleKeys)
@@ -1604,10 +1644,11 @@ func (uc *ProcessRuntimeUsecase) reconcileSettledDomainCommandNode(ctx context.C
 	if node.DomainCommandFingerprint == nil || *node.DomainCommandFingerprint != domainCommandFingerprint {
 		return nil, ErrIdempotencyConflict
 	}
-	if _, durableResultProtocol := uc.repo.(ProcessRuntimeDomainCommandResultRepo); durableResultProtocol {
-		if err := validateSettledProcessDomainCommandProtocol(node, domainCommandFingerprint); err != nil {
-			return nil, err
-		}
+	if _, durableResultProtocol := uc.repo.(ProcessRuntimeDomainCommandResultRepo); !durableResultProtocol {
+		return nil, ErrProcessDomainCommandRecoveryRequired
+	}
+	if err := validateSettledProcessDomainCommandProtocol(node, domainCommandFingerprint); err != nil {
+		return nil, err
 	}
 	if node.Status == ProcessNodeStatusCompleted && node.NodeType == ProcessNodeTypeDomainCommand &&
 		((node.DomainCommandEffectState != nil && *node.DomainCommandEffectState == ProcessDomainCommandEffectStateCompensated) ||
@@ -1727,7 +1768,7 @@ func (uc *ProcessRuntimeUsecase) EscalateDueProcessNode(ctx context.Context, in 
 	if outcome == "" {
 		outcome = "due_at_overdue"
 	}
-	blockedNode, err := uc.repo.BlockProcessNodeInstance(ctx, &ProcessNodeInstanceBlock{
+	blockedNode, err := uc.repo.BlockProcessNodeAndInstance(ctx, &ProcessNodeInstanceBlock{
 		ProcessInstanceID:     instance.ID,
 		ProcessNodeInstanceID: node.ID,
 		ExpectedVersion:       node.Version,
@@ -1735,9 +1776,6 @@ func (uc *ProcessRuntimeUsecase) EscalateDueProcessNode(ctx context.Context, in 
 		Outcome:               outcome,
 	}, actorID)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := uc.repo.BlockProcessInstance(ctx, &ProcessInstanceBlock{ID: instance.ID}, actorID); err != nil {
 		return nil, err
 	}
 	return blockedNode, nil
@@ -1748,7 +1786,7 @@ func (uc *ProcessRuntimeUsecase) blockActiveProcessNodeInstance(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
-	blockedNode, err := uc.repo.BlockProcessNodeInstance(ctx, &ProcessNodeInstanceBlock{
+	blockedNode, err := uc.repo.BlockProcessNodeAndInstance(ctx, &ProcessNodeInstanceBlock{
 		ProcessInstanceID:        instance.ID,
 		ProcessNodeInstanceID:    node.ID,
 		ExpectedVersion:          node.Version,
@@ -1757,9 +1795,6 @@ func (uc *ProcessRuntimeUsecase) blockActiveProcessNodeInstance(ctx context.Cont
 		DomainCommandFingerprint: in.DomainCommandFingerprint,
 	}, actorID)
 	if err != nil {
-		return nil, err
-	}
-	if _, err := uc.repo.BlockProcessInstance(ctx, &ProcessInstanceBlock{ID: instance.ID}, actorID); err != nil {
 		return nil, err
 	}
 	return blockedNode, nil
@@ -2222,7 +2257,7 @@ func normalizeProcessLinkedWorkflowTaskCreate(in ProcessLinkedWorkflowTaskCreate
 	if in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 {
 		return ProcessLinkedWorkflowTaskCreate{}, ErrBadParam
 	}
-	if in.TaskStatusKey != "" && !IsValidWorkflowTaskState(in.TaskStatusKey) {
+	if in.TaskStatusKey != "" && !IsCreatableWorkflowTaskState(in.TaskStatusKey) {
 		return ProcessLinkedWorkflowTaskCreate{}, ErrBadParam
 	}
 	if in.Payload == nil {
@@ -2763,12 +2798,53 @@ func collectJoinRouteNodes(nodes []*ProcessNodeInstance, processInstanceID int, 
 	return sourceStatuses, targetNode, nil
 }
 
-func workflowTaskMatchesProcessNode(task *WorkflowTask, processInstanceID int, processNodeInstanceID int) bool {
-	return task != nil &&
-		task.ProcessInstanceID != nil &&
-		*task.ProcessInstanceID == processInstanceID &&
-		task.ProcessNodeInstanceID != nil &&
-		*task.ProcessNodeInstanceID == processNodeInstanceID
+func workflowTaskMatchesProcessNode(task *WorkflowTask, expected *WorkflowTaskCreate) bool {
+	return task != nil && expected != nil &&
+		task.TaskCode == expected.TaskCode &&
+		task.TaskGroup == expected.TaskGroup &&
+		task.TaskName == expected.TaskName &&
+		task.SourceType == expected.SourceType &&
+		task.SourceID == expected.SourceID &&
+		processOptionalStringPointerMatches(task.SourceNo, expected.SourceNo) &&
+		task.OwnerRoleKey == expected.OwnerRoleKey &&
+		processOptionalStringPointerMatches(task.OwnerPoolKey, expected.OwnerPoolKey) &&
+		processOptionalStringPointerMatches(task.RequiredCapabilityKey, expected.RequiredCapabilityKey) &&
+		processOptionalStringPointerMatches(task.ConfigRevision, expected.ConfigRevision) &&
+		processOptionalIntPointerMatches(task.ProcessInstanceID, expected.ProcessInstanceID) &&
+		processOptionalIntPointerMatches(task.ProcessNodeInstanceID, expected.ProcessNodeInstanceID) &&
+		task.Priority == expected.Priority &&
+		task.CriticalPath == expected.CriticalPath &&
+		processOptionalTimePointerMatches(task.DueAt, expected.DueAt) &&
+		workflowTaskPayloadContainsExpectedIntent(task.Payload, expected.Payload)
+}
+
+func workflowTaskPayloadContainsExpectedIntent(actual map[string]any, expected map[string]any) bool {
+	projected := make(map[string]any, len(expected))
+	for key := range expected {
+		value, ok := actual[key]
+		if !ok {
+			return false
+		}
+		projected[key] = value
+	}
+	actualHash, actualErr := processCanonicalSHA256(projected)
+	expectedHash, expectedErr := processCanonicalSHA256(expected)
+	return actualErr == nil && expectedErr == nil && actualHash == expectedHash
+}
+
+func processOptionalStringPointerMatches(actual *string, expected *string) bool {
+	return actual == nil && expected == nil ||
+		actual != nil && expected != nil && *actual == *expected
+}
+
+func processOptionalIntPointerMatches(actual *int, expected *int) bool {
+	return actual == nil && expected == nil ||
+		actual != nil && expected != nil && *actual == *expected
+}
+
+func processOptionalTimePointerMatches(actual *time.Time, expected *time.Time) bool {
+	return actual == nil && expected == nil ||
+		actual != nil && expected != nil && actual.Equal(*expected)
 }
 
 func normalizeProcessInstanceCreate(in ProcessInstanceCreate) (ProcessInstanceCreate, error) {
@@ -2786,7 +2862,7 @@ func normalizeProcessInstanceCreate(in ProcessInstanceCreate) (ProcessInstanceCr
 		in.BusinessRefType == "" ||
 		in.BusinessRefID <= 0 ||
 		in.IdempotencyKey == "" ||
-		!isValidProcessStatus(in.Status) {
+		!IsCreatableProcessStatus(in.Status) {
 		return ProcessInstanceCreate{}, ErrBadParam
 	}
 	if in.ModuleContractSnapshot == nil {
@@ -2811,7 +2887,7 @@ func normalizeProcessNodeInstanceCreate(in ProcessNodeInstanceCreate) (ProcessNo
 	}
 	if in.NodeKey == "" ||
 		!isValidProcessNodeType(in.NodeType) ||
-		!isValidProcessNodeStatus(in.Status) {
+		!IsCreatableProcessNodeStatus(in.Status) {
 		return ProcessNodeInstanceCreate{}, ErrBadParam
 	}
 	if in.PolicySnapshot == nil {
@@ -2837,12 +2913,20 @@ func normalizeProcessStatus(status string) string {
 }
 
 func isValidProcessStatus(status string) bool {
+	return IsKnownProcessStatus(status)
+}
+
+func IsKnownProcessStatus(status string) bool {
 	switch status {
-	case ProcessStatusActive, ProcessStatusCompleted, ProcessStatusCancelled, ProcessStatusBlocked:
+	case ProcessStatusActive, ProcessStatusCompleted, ProcessStatusBlocked:
 		return true
 	default:
 		return false
 	}
+}
+
+func IsCreatableProcessStatus(status string) bool {
+	return strings.TrimSpace(status) == ProcessStatusActive
 }
 
 func normalizeProcessNodeStatus(status string) string {
@@ -2854,17 +2938,25 @@ func normalizeProcessNodeStatus(status string) string {
 }
 
 func isValidProcessNodeStatus(status string) bool {
+	return IsKnownProcessNodeStatus(status)
+}
+
+func IsKnownProcessNodeStatus(status string) bool {
 	switch status {
-	case ProcessNodeStatusWaiting, ProcessNodeStatusActive, ProcessNodeStatusCompleted, ProcessNodeStatusSkipped, ProcessNodeStatusFailed, ProcessNodeStatusBlocked:
+	case ProcessNodeStatusWaiting, ProcessNodeStatusActive, ProcessNodeStatusCompleted, ProcessNodeStatusBlocked:
 		return true
 	default:
 		return false
 	}
 }
 
+func IsCreatableProcessNodeStatus(status string) bool {
+	return strings.TrimSpace(status) == ProcessNodeStatusWaiting
+}
+
 func isSettledProcessNodeStatus(status string) bool {
 	switch status {
-	case ProcessNodeStatusCompleted, ProcessNodeStatusSkipped, ProcessNodeStatusFailed:
+	case ProcessNodeStatusCompleted:
 		return true
 	default:
 		return false

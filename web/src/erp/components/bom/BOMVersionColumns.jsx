@@ -12,21 +12,18 @@ export const BOM_STATUS_OPTIONS = [
   { label: '草稿', value: 'DRAFT' },
   { label: '已激活', value: 'ACTIVE' },
   { label: '历史版本', value: 'ARCHIVED' },
-  { label: '已停用', value: 'DISABLED' },
 ]
 
 export const BOM_STATUS_LABELS = {
   DRAFT: '草稿',
   ACTIVE: '已激活',
   ARCHIVED: '历史版本',
-  DISABLED: '已停用',
 }
 
 const BOM_STATUS_COLORS = {
   DRAFT: 'gold',
   ACTIVE: 'green',
   ARCHIVED: 'default',
-  DISABLED: 'red',
 }
 
 export function bomStatusText(status) {

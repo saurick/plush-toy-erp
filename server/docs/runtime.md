@@ -49,7 +49,11 @@ go run ./cmd/server -conf ./configs/dev/config.yaml
 - `/readyz`
   - 就绪检查，当前检查 PostgreSQL 连通性和 PDF 启动预热状态；成功返回 `ready`
 - `/templates/render-pdf`
-  - 在线 PDF 渲染入口，使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`，并精确固定经目标宿主验证的 Debian 包版本。`ERP_PDF_RENDER_CONCURRENCY` 限制并发；正式发布使用 `ERP_PDF_WARMUP=async` 异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前或失败后保持未就绪。`off` 只用于临时故障隔离，发布 smoke 仍必须真实生成非空 PDF
+  - 在线 PDF 渲染入口，请求体只接受 `title`、`file_name`、`template_key`、`html`；客户 key 读取部署环境，客户端不能提交 `customer_key` 或 `base_url`
+  - 路由复用统一管理员认证 middleware；每个请求以实时 session / RBAC 和同一次 active customer revision effective session 检查打印 action 与模板 module
+  - HTML / CSS 只接受静态 allowlist、文档内锚点和受限内嵌位图；Chromium 禁用脚本与缓存、阻断 `data:` / `about:blank` 之外的请求，并为每次渲染创建独立 browser context
+  - 内嵌图片不设独立张数或单图上限，整份图片解码后最多 64 MiB，HTML 最多 96 MiB，请求体最多 128 MiB
+  - 使用共享 Headless Chromium 进程生成 PDF；生产镜像默认内置 `/usr/bin/chromium`、以非 root 用户运行且不关闭 sandbox，并精确固定经目标宿主验证的 Debian 包版本。服务端默认并发为 4；通用 Compose 使用 2 GiB / 并发 4，高配客户实例可使用 4 GiB / 并发 8。`ERP_PDF_RENDER_CONCURRENCY` 限制并发；正式发布使用 `ERP_PDF_WARMUP=async` 异步执行一次中文合同 PDF 预热，`/readyz` 在预热完成前或失败后保持未就绪。`off` 只用于临时故障隔离，发布 smoke 仍必须用受控管理员 token 真实生成非空 PDF
 
 如果容器内存在静态目录，还会挂载前端静态资源：
 

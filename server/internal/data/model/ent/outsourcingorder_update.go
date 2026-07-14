@@ -177,6 +177,27 @@ func (_u *OutsourcingOrderUpdate) SetNillableLifecycleStatus(v *string) *Outsour
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *OutsourcingOrderUpdate) SetVersion(v int) *OutsourcingOrderUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdate) SetNillableVersion(v *int) *OutsourcingOrderUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *OutsourcingOrderUpdate) AddVersion(v int) *OutsourcingOrderUpdate {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *OutsourcingOrderUpdate) SetNote(v string) *OutsourcingOrderUpdate {
 	_u.mutation.SetNote(v)
@@ -318,6 +339,11 @@ func (_u *OutsourcingOrderUpdate) check() error {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.lifecycle_status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := outsourcingorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := outsourcingorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.note": %w`, err)}
@@ -382,6 +408,12 @@ func (_u *OutsourcingOrderUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(outsourcingorder.FieldLifecycleStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(outsourcingorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(outsourcingorder.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(outsourcingorder.FieldNote, field.TypeString, value)
@@ -633,6 +665,27 @@ func (_u *OutsourcingOrderUpdateOne) SetNillableLifecycleStatus(v *string) *Outs
 	return _u
 }
 
+// SetVersion sets the "version" field.
+func (_u *OutsourcingOrderUpdateOne) SetVersion(v int) *OutsourcingOrderUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *OutsourcingOrderUpdateOne) SetNillableVersion(v *int) *OutsourcingOrderUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *OutsourcingOrderUpdateOne) AddVersion(v int) *OutsourcingOrderUpdateOne {
+	_u.mutation.AddVersion(v)
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *OutsourcingOrderUpdateOne) SetNote(v string) *OutsourcingOrderUpdateOne {
 	_u.mutation.SetNote(v)
@@ -787,6 +840,11 @@ func (_u *OutsourcingOrderUpdateOne) check() error {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.lifecycle_status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := outsourcingorder.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.version": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := outsourcingorder.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.note": %w`, err)}
@@ -868,6 +926,12 @@ func (_u *OutsourcingOrderUpdateOne) sqlSave(ctx context.Context) (_node *Outsou
 	}
 	if value, ok := _u.mutation.LifecycleStatus(); ok {
 		_spec.SetField(outsourcingorder.FieldLifecycleStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(outsourcingorder.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(outsourcingorder.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(outsourcingorder.FieldNote, field.TypeString, value)

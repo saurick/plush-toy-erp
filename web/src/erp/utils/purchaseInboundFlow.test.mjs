@@ -277,7 +277,21 @@ test('purchaseInboundFlow: 已存在未完成 IQC 任务时可识别并避免重
   }
 
   assert.equal(hasActiveIqcTaskForRecord([activeTask], record), true)
+  assert.equal(
+    hasActiveIqcTaskForRecord(
+      [{ ...activeTask, task_status_key: 'blocked' }],
+      record
+    ),
+    true
+  )
   assert.equal(hasActiveIqcTaskForRecord([doneTask], record), false)
+  assert.equal(
+    hasActiveIqcTaskForRecord(
+      [{ ...activeTask, task_status_key: 'rejected' }],
+      record
+    ),
+    false
+  )
   assert.equal(
     hasActiveIqcTaskForRecord([activeTask], { ...record, id: 67 }),
     false

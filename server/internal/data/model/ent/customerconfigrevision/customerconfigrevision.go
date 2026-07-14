@@ -21,6 +21,8 @@ const (
 	FieldProductVersion = "product_version"
 	// FieldConfigHash holds the string denoting the config_hash field in the database.
 	FieldConfigHash = "config_hash"
+	// FieldConfigHashVersion holds the string denoting the config_hash_version field in the database.
+	FieldConfigHashVersion = "config_hash_version"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
 	// FieldCompiledSnapshot holds the string denoting the compiled_snapshot field in the database.
@@ -48,6 +50,7 @@ var Columns = []string{
 	FieldRevision,
 	FieldProductVersion,
 	FieldConfigHash,
+	FieldConfigHashVersion,
 	FieldStatus,
 	FieldCompiledSnapshot,
 	FieldPublishedBy,
@@ -79,6 +82,8 @@ var (
 	ProductVersionValidator func(string) error
 	// ConfigHashValidator is a validator for the "config_hash" field. It is called by the builders before save.
 	ConfigHashValidator func(string) error
+	// DefaultConfigHashVersion holds the default value on creation for the "config_hash_version" field.
+	DefaultConfigHashVersion int16
 	// DefaultStatus holds the default value on creation for the "status" field.
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -121,6 +126,11 @@ func ByProductVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByConfigHash orders the results by the config_hash field.
 func ByConfigHash(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldConfigHash, opts...).ToFunc()
+}
+
+// ByConfigHashVersion orders the results by the config_hash_version field.
+func ByConfigHashVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldConfigHashVersion, opts...).ToFunc()
 }
 
 // ByStatus orders the results by the status field.

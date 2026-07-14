@@ -119,7 +119,7 @@ const PRODUCT_CORE_ACTION_KEYS = new Set([
   'supplier.read',
   'supplier.update',
   'system.audit.read',
-  'system.permission.manage',
+  'system.role.permission.manage',
   'system.permission.read',
   'system.role.read',
   'system.user.create',

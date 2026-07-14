@@ -60,6 +60,20 @@ func (_c *RoleCreate) SetNillableBuiltin(v *bool) *RoleCreate {
 	return _c
 }
 
+// SetRoleType sets the "role_type" field.
+func (_c *RoleCreate) SetRoleType(v role.RoleType) *RoleCreate {
+	_c.mutation.SetRoleType(v)
+	return _c
+}
+
+// SetNillableRoleType sets the "role_type" field if the given value is not nil.
+func (_c *RoleCreate) SetNillableRoleType(v *role.RoleType) *RoleCreate {
+	if v != nil {
+		_c.SetRoleType(*v)
+	}
+	return _c
+}
+
 // SetDisabled sets the "disabled" field.
 func (_c *RoleCreate) SetDisabled(v bool) *RoleCreate {
 	_c.mutation.SetDisabled(v)
@@ -84,6 +98,20 @@ func (_c *RoleCreate) SetSortOrder(v int) *RoleCreate {
 func (_c *RoleCreate) SetNillableSortOrder(v *int) *RoleCreate {
 	if v != nil {
 		_c.SetSortOrder(*v)
+	}
+	return _c
+}
+
+// SetVersion sets the "version" field.
+func (_c *RoleCreate) SetVersion(v int) *RoleCreate {
+	_c.mutation.SetVersion(v)
+	return _c
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_c *RoleCreate) SetNillableVersion(v *int) *RoleCreate {
+	if v != nil {
+		_c.SetVersion(*v)
 	}
 	return _c
 }
@@ -159,6 +187,10 @@ func (_c *RoleCreate) defaults() {
 		v := role.DefaultBuiltin
 		_c.mutation.SetBuiltin(v)
 	}
+	if _, ok := _c.mutation.RoleType(); !ok {
+		v := role.DefaultRoleType
+		_c.mutation.SetRoleType(v)
+	}
 	if _, ok := _c.mutation.Disabled(); !ok {
 		v := role.DefaultDisabled
 		_c.mutation.SetDisabled(v)
@@ -166,6 +198,10 @@ func (_c *RoleCreate) defaults() {
 	if _, ok := _c.mutation.SortOrder(); !ok {
 		v := role.DefaultSortOrder
 		_c.mutation.SetSortOrder(v)
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		v := role.DefaultVersion
+		_c.mutation.SetVersion(v)
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := role.DefaultCreatedAt()
@@ -206,11 +242,27 @@ func (_c *RoleCreate) check() error {
 	if _, ok := _c.mutation.Builtin(); !ok {
 		return &ValidationError{Name: "builtin", err: errors.New(`ent: missing required field "Role.builtin"`)}
 	}
+	if _, ok := _c.mutation.RoleType(); !ok {
+		return &ValidationError{Name: "role_type", err: errors.New(`ent: missing required field "Role.role_type"`)}
+	}
+	if v, ok := _c.mutation.RoleType(); ok {
+		if err := role.RoleTypeValidator(v); err != nil {
+			return &ValidationError{Name: "role_type", err: fmt.Errorf(`ent: validator failed for field "Role.role_type": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Disabled(); !ok {
 		return &ValidationError{Name: "disabled", err: errors.New(`ent: missing required field "Role.disabled"`)}
 	}
 	if _, ok := _c.mutation.SortOrder(); !ok {
 		return &ValidationError{Name: "sort_order", err: errors.New(`ent: missing required field "Role.sort_order"`)}
+	}
+	if _, ok := _c.mutation.Version(); !ok {
+		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "Role.version"`)}
+	}
+	if v, ok := _c.mutation.Version(); ok {
+		if err := role.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Role.version": %w`, err)}
+		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		return &ValidationError{Name: "created_at", err: errors.New(`ent: missing required field "Role.created_at"`)}
@@ -260,6 +312,10 @@ func (_c *RoleCreate) createSpec() (*Role, *sqlgraph.CreateSpec) {
 		_spec.SetField(role.FieldBuiltin, field.TypeBool, value)
 		_node.Builtin = value
 	}
+	if value, ok := _c.mutation.RoleType(); ok {
+		_spec.SetField(role.FieldRoleType, field.TypeEnum, value)
+		_node.RoleType = value
+	}
 	if value, ok := _c.mutation.Disabled(); ok {
 		_spec.SetField(role.FieldDisabled, field.TypeBool, value)
 		_node.Disabled = value
@@ -267,6 +323,10 @@ func (_c *RoleCreate) createSpec() (*Role, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.SortOrder(); ok {
 		_spec.SetField(role.FieldSortOrder, field.TypeInt, value)
 		_node.SortOrder = value
+	}
+	if value, ok := _c.mutation.Version(); ok {
+		_spec.SetField(role.FieldVersion, field.TypeInt, value)
+		_node.Version = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(role.FieldCreatedAt, field.TypeTime, value)

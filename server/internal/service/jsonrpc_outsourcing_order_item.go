@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderItem(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "list_outsourcing_order_items", "listOutsourcingOrderItems":
+	case "list_outsourcing_order_items":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingOrderRead); res != nil {
 			return id, res, nil
 		}

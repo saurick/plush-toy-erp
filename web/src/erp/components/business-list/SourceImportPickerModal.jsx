@@ -79,6 +79,7 @@ export default function SourceImportPickerModal({
   loading = false,
   importText = '导入',
   cancelText = '取消',
+  selectedNoun = '来源',
   emptyDescription = '暂无可导入记录',
   getSearchText,
   getSelectedLabel,
@@ -303,7 +304,7 @@ export default function SourceImportPickerModal({
                     }
                   >
                     <Tag
-                      aria-label={`显示全部已选来源，共 ${selectedSummaryItems.length} 条`}
+                      aria-label={`显示全部已选${selectedNoun}，共 ${selectedSummaryItems.length} 条`}
                       className="erp-source-import-picker__selection-tag erp-source-import-picker__selection-more"
                       role="button"
                       tabIndex={0}
@@ -317,7 +318,7 @@ export default function SourceImportPickerModal({
                 ) : null}
               </>
             ) : (
-              <Text type="secondary">未选择来源</Text>
+              <Text type="secondary">未选择{selectedNoun}</Text>
             )}
           </div>
           {selectedSummaryItems.length > 0 ? (

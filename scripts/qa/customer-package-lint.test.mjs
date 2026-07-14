@@ -3,6 +3,7 @@ import test from "node:test";
 
 import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
 import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
+import { referenceCustomerPackage } from "../../config/customers/reference-customer/customerPackage.mjs";
 import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
 import {
   buildPreview,
@@ -56,6 +57,26 @@ test("customer-package-lint: demo package proves customer package validation is 
   validatePreview(result.preview);
 });
 
+test("customer-package-lint: reference package stays minimal and declarative", () => {
+  validateCatalog(customerPackageCatalog);
+  validatePackage(referenceCustomerPackage);
+
+  const result = runCustomerPackageLint({
+    customer: "reference-customer",
+    mode: "compile",
+    out: "",
+  });
+  assert.equal(result.preview.identity.packageKey, "reference-customer-package-v1");
+  assert.equal(result.preview.workflows.length, 1);
+  assert.equal(result.preview.businessFlows.length, 0);
+  assert.equal(result.preview.stateMachines.length, 0);
+  assert.equal(result.preview.processPolicies.length, 0);
+  assert.equal(result.preview.printTemplateDefaults.length, 2);
+  const serializedReference = JSON.stringify(referenceCustomerPackage);
+  assert.match(serializedReference, /SIM-REF-/u);
+  assert.match(serializedReference, /\.example\.invalid/u);
+});
+
 test("customer-package-lint: repeated customer flags validate every requested package", () => {
   const results = runCustomerPackageLintMany({
     customers: ["yoyoosun", "demo"],
@@ -72,6 +93,20 @@ test("customer-package-lint: repeated customer flags validate every requested pa
     ["compile", "compile"],
   );
   results.forEach((result) => validatePreview(result.preview));
+});
+
+test("customer-package-lint: --all follows the customer package index", () => {
+  const results = runCustomerPackageLintMany({
+    all: true,
+    customers: [],
+    mode: "compile",
+    out: "",
+  });
+
+  assert.deepEqual(
+    results.map((result) => result.config.customerKey),
+    ["demo", "reference-customer", "yoyoosun"],
+  );
 });
 
 test("customer-package-lint: multi-customer preview output must use separate files", () => {
@@ -114,18 +149,114 @@ test("customer-package-lint: compile mode returns bounded preview only", () => {
     "identity",
     "printTemplateDefaults",
     "processPolicies",
+    "runtimeProcessSelections",
     "stateMachines",
     "workflows",
   ]);
 });
 
 test("customer-package-lint: package key must be namespaced by customer key", () => {
+  validatePackage(referenceCustomerPackage);
   assert.throws(
     () => validatePackage({
       ...demoCustomerPackage,
       packageKey: "yoyoosun-customer-package-v1",
     }),
     /packageKey must be namespaced by customerKey/,
+  );
+  assert.throws(
+    () =>
+      validatePackage({
+        ...demoCustomerPackage,
+        packageKey: "demo-package-v0",
+      }),
+    /end with package-v<positive integer>/,
+  );
+});
+
+test("customer-package-lint: field visibility overrides stay catalog-bound", () => {
+  const validateOverride = (override) =>
+    validatePackage({
+      ...referenceCustomerPackage,
+      fieldPolicyOverrides: [override],
+    });
+
+  validateOverride({
+    surfaceKey: "suppliers.default",
+    fieldKey: "supplier_type",
+    visible: false,
+    reason: "低风险字段隐藏",
+  });
+  assert.throws(
+    () =>
+      validateOverride({
+        surfaceKey: "unknown.default",
+        fieldKey: "supplier_type",
+        visible: false,
+        reason: "无效 surface",
+      }),
+    /contains unknown surface unknown\.default/,
+  );
+  assert.throws(
+    () =>
+      validateOverride({
+        surfaceKey: "suppliers.default",
+        fieldKey: "unknown_field",
+        visible: false,
+        reason: "无效字段",
+      }),
+    /contains unknown field unknown_field/,
+  );
+  assert.throws(
+    () =>
+      validatePackage({
+        ...referenceCustomerPackage,
+        fieldPolicyOverrides: [
+          referenceCustomerPackage.fieldPolicyOverrides[0],
+          referenceCustomerPackage.fieldPolicyOverrides[0],
+        ],
+      }),
+    /duplicates suppliers\.default\.supplier_type/,
+  );
+  assert.throws(
+    () =>
+      validateOverride({
+        surfaceKey: "suppliers.default",
+        fieldKey: "supplier_type",
+        visible: "false",
+        reason: "错误类型",
+      }),
+    /\.visible must be a boolean/,
+  );
+  assert.throws(
+    () =>
+      validateOverride({
+        surfaceKey: "suppliers.default",
+        fieldKey: "supplier_code",
+        visible: false,
+        reason: "不得隐藏保护字段",
+      }),
+    /must not hide protected field suppliers\.default\.supplier_code/,
+  );
+  assert.throws(
+    () =>
+      validateOverride({
+        surfaceKey: "suppliers.default",
+        fieldKey: "supplier_type",
+        visible: false,
+      }),
+    /\.reason must be a non-empty string/,
+  );
+  assert.throws(
+    () =>
+      validateOverride({
+        surfaceKey: "suppliers.default",
+        fieldKey: "supplier_type",
+        visible: false,
+        reason: "不允许 label",
+        label: "供应商类型",
+      }),
+    /\.label is not allowed/,
   );
 });
 

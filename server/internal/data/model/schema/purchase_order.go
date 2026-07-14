@@ -20,6 +20,7 @@ func (PurchaseOrder) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"purchase_orders_lifecycle_status_allowed": "lifecycle_status IN ('draft', 'submitted', 'approved', 'closed', 'canceled')",
+				"purchase_orders_version_positive":         "version > 0",
 			},
 		},
 	}
@@ -49,6 +50,9 @@ func (PurchaseOrder) Fields() []ent.Field {
 			NotEmpty().
 			Default("draft").
 			MaxLen(32),
+		field.Int("version").
+			Positive().
+			Default(1),
 		field.String("note").
 			Optional().
 			Nillable().

@@ -1,54 +1,38 @@
 # 客户私有化部署资料 / Customer Private Deployments
 
-本目录只保存客户私有化部署实例资料、runbook 和 evidence 索引，不是第二套部署主路径。
-
-当前唯一部署真源仍是：
+本目录只保存真实客户私有化实例的脱敏 runbook、检查清单和 evidence 索引。唯一部署真源始终是：
 
 ```text
 server/deploy/compose/prod
 ```
 
-## 客户私有化复制规则
+## 当前目录
 
-新增客户时，客户包应至少具备：
+| 路径 | 当前用途 |
+| --- | --- |
+| `yoyoosun/` | 当前真实客户的 env/override 示例、runbook、checklist、evidence 与薄脚本 |
 
-- `docs/customers/<customer-key>/`
-- `config/customers/<customer-key>/`
-- `deployments/<customer-key>/`
-- 数据导入 dry-run / freeze / unresolved queue 说明。
-- 客户差异台账。
-- 低配服务器发布 runbook。
-- 备份、恢复、健康检查和验收清单。
+`reference-customer` 是 draft/preview 工程参考，不创建 `deployments/reference-customer/`。它的最小参数示例、首次部署/升级/回滚/恢复边界统一放在 `config/private-deployment-template/`，避免复制第二套部署架构或生成虚假 evidence。
+
+## 新增真实客户
+
+1. 先在 `docs/customers/<customer-key>/` 完成差异、资料授权和验收边界。
+2. 在 `config/customers/<customer-key>/` 维护声明式客户配置，不复制 Product Core。
+3. 从 `config/private-deployment-template/` 准备受控 env；只在确有客户运维/evidence 资料时建立 `deployments/<customer-key>/`。
+4. 使用独立数据库/账号、文件、日志、备份、恢复权限和 secrets；固定 `ERP_CUSTOMER_KEY`，不增加 `tenant_id`。
+5. 目标机只加载固定 tag/digest 制品，执行受控 migration、health/ready/smoke，并保存回滚点。
 
 ## 禁止项
 
-- 不按客户 fork 代码。
-- 不按客户复制核心 schema、migration、usecase 或 RBAC 真源。
-- 不在低配目标服务器执行 `docker build`、`pnpm build`、`go build` 或 `make build_server`。
-- 不执行真实客户数据导入；没有审批和备份 evidence 时只能本地模拟。
-- 不新增 `tenant_id`、SaaS、多租户、license 或 billing。
+- 不按客户 fork 代码、schema、migration、RBAC、usecase 或前端应用。
+- 不在目标机执行 `docker build`、`pnpm build`、`go build` 或 `make build_server`。
+- 没有来源授权、dry-run、备份、审批和对账时，不执行真实导入。
+- 不把模板检查、本地绿色或历史 evidence 写成当前目标环境已发布或客户已签收。
 
-## 当前 yoyoosun 资料包
-
-`deployments/yoyoosun/` 已按私有化交付资料包维护：
-
-- `env/`：环境变量和服务配置样例，只允许 placeholder。
-- `compose/`：参考 Compose / Nginx 样例，不替代 `server/deploy/compose/prod`。
-- `runbooks/`：首次部署、升级、回滚、备份恢复、migration、导入边界、故障处理和巡检。
-- `checklists/`：部署、smoke、安全、备份恢复、升级、回滚和巡检清单。
-- `evidence/`：发布、migration、备份和 smoke evidence 模板。
-- `scripts/`：薄脚本，只做资料包 env / smoke / evidence / backup evidence 检查。
-
-调整后执行：
+当前真实 yoyoosun 资料包校验：
 
 ```bash
 node scripts/deploy/deployment-package-lint.mjs --customer yoyoosun
 ```
 
-实际发布或客户试用交付前，再对本次已填 evidence 目录执行：
-
-```bash
-node scripts/deploy/release-evidence-gate.mjs \
-  --customer yoyoosun \
-  --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
-```
+真实发布签核仍应对当次 evidence 目录执行项目 release evidence gate；模板目录本身不生成 release evidence。

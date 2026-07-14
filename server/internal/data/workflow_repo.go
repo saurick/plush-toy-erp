@@ -48,10 +48,15 @@ type workflowTaskMutationResultTaskV1 struct {
 	AssigneeID            *int           `json:"assignee_id,omitempty"`
 	Priority              int16          `json:"priority"`
 	BlockedReason         *string        `json:"blocked_reason,omitempty"`
+	CriticalPath          bool           `json:"critical_path"`
+	UrgeCount             int            `json:"urge_count"`
+	LastUrgedAt           *time.Time     `json:"last_urged_at,omitempty"`
+	LastUrgedBy           *int           `json:"last_urged_by,omitempty"`
+	LastUrgedByRoleKey    *string        `json:"last_urged_by_role_key,omitempty"`
+	EscalatedAt           *time.Time     `json:"escalated_at,omitempty"`
+	EscalateTargetRoleKey *string        `json:"escalate_target_role_key,omitempty"`
 	DueAt                 *time.Time     `json:"due_at,omitempty"`
-	StartedAt             *time.Time     `json:"started_at,omitempty"`
 	CompletedAt           *time.Time     `json:"completed_at,omitempty"`
-	ClosedAt              *time.Time     `json:"closed_at,omitempty"`
 	Payload               map[string]any `json:"payload"`
 	Version               int            `json:"version"`
 	CreatedBy             *int           `json:"created_by,omitempty"`
@@ -128,7 +133,9 @@ func (r *workflowRepo) ResolveWorkflowTaskMutation(
 
 func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.WorkflowTaskFilter) ([]*biz.WorkflowTask, int, error) {
 	query := r.data.postgres.WorkflowTask.Query()
-	if scopePredicate := workflowTaskVisibilityPredicate(filter); scopePredicate != nil {
+	if filter.VisibilityScope != nil {
+		query = query.Where(workflowTaskRevisionVisibilityPredicate(filter.VisibilityScope, filter.OwnerRoleKey))
+	} else if scopePredicate := workflowTaskVisibilityPredicate(filter); scopePredicate != nil {
 		query = query.Where(scopePredicate)
 	} else if filter.OwnerRoleKey != "" {
 		query = query.Where(workflowtask.OwnerRoleKey(filter.OwnerRoleKey))
@@ -197,6 +204,10 @@ func workflowTaskVisibilityPredicate(filter biz.WorkflowTaskFilter) predicate.Wo
 }
 
 func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowTaskCreate, actorID int) (*biz.WorkflowTask, error) {
+	if in == nil || in.TaskStatusKey != strings.TrimSpace(in.TaskStatusKey) ||
+		!biz.IsCreatableWorkflowTaskState(in.TaskStatusKey) || in.BlockedReason != nil {
+		return nil, biz.ErrBadParam
+	}
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
@@ -221,6 +232,7 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 		SetNillableAssigneeID(in.AssigneeID).
 		SetPriority(in.Priority).
 		SetNillableBlockedReason(in.BlockedReason).
+		SetCriticalPath(in.CriticalPath).
 		SetNillableDueAt(in.DueAt).
 		SetPayload(in.Payload)
 	if actorID > 0 {
@@ -280,6 +292,19 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	if current.Version != expectedVersion {
 		return nil, workflowTaskMutationConflict(current.TaskStatusKey)
 	}
+	if biz.IsTerminalWorkflowTaskStatus(current.TaskStatusKey) {
+		return nil, biz.ErrWorkflowTaskSettled
+	}
+	if !biz.CanTransitionWorkflowTaskStatus(current.TaskStatusKey, in.TaskStatusKey) {
+		return nil, biz.ErrBadParam
+	}
+	if (in.TaskStatusKey == "ready" || in.TaskStatusKey == "blocked" || in.TaskStatusKey == "rejected") && strings.TrimSpace(in.Reason) == "" {
+		return nil, biz.ErrBadParam
+	}
+	resumePreservesBusinessProjection := current.TaskStatusKey == "blocked" && in.TaskStatusKey == "ready"
+	if resumePreservesBusinessProjection && (strings.TrimSpace(in.BusinessStatusKey) != "" || in.SideEffects != nil) {
+		return nil, biz.ErrBadParam
+	}
 
 	now := time.Now()
 	update := tx.WorkflowTask.Update().
@@ -287,7 +312,7 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 			workflowtask.IDEQ(in.ID),
 			workflowtask.VersionEQ(expectedVersion),
 			workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
-			workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected"),
 		).
 		SetTaskStatusKey(in.TaskStatusKey).
 		SetPayload(in.Payload).
@@ -295,19 +320,15 @@ func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.Wor
 	if actorID > 0 {
 		update.SetUpdatedBy(actorID)
 	}
-	if in.BusinessStatusKey != "" {
+	// Resuming a collaboration task never invents a previous business phase. The
+	// source usecase must move the business projection in a later explicit action.
+	if !resumePreservesBusinessProjection && in.BusinessStatusKey != "" {
 		update.SetBusinessStatusKey(in.BusinessStatusKey)
 	}
 
 	switch in.TaskStatusKey {
-	case "processing":
-		if current.StartedAt == nil {
-			update.SetStartedAt(now)
-		}
 	case "done", "rejected":
 		update.SetCompletedAt(now)
-	case "closed":
-		update.SetClosedAt(now)
 	}
 
 	switch in.TaskStatusKey {
@@ -436,8 +457,9 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 	for key, value := range in.Payload {
 		nextPayload[key] = value
 	}
-	urgeCount := workflowPayloadInt(nextPayload, "urge_count") + 1
-	trimmedActorRoleKey := strings.TrimSpace(actorRoleKey)
+	urgeCount := current.UrgeCount + 1
+	trimmedActorRoleKey := biz.NormalizeRoleKey(actorRoleKey)
+	targetRoleKey := workflowEscalationTarget(in.Action)
 
 	nextPayload["urged"] = true
 	nextPayload["urge_count"] = urgeCount
@@ -448,7 +470,7 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 	nextPayload["notification_type"] = "task_urged"
 	nextPayload["alert_type"] = "urged_task"
 
-	if targetRoleKey := workflowEscalationTarget(in.Action); targetRoleKey != "" {
+	if targetRoleKey != "" {
 		nextPayload["escalated"] = true
 		nextPayload["escalate_target_role_key"] = targetRoleKey
 		nextPayload["notification_type"] = "urgent_escalation"
@@ -460,10 +482,21 @@ func (r *workflowRepo) UrgeWorkflowTask(ctx context.Context, in *biz.WorkflowTas
 			workflowtask.IDEQ(in.ID),
 			workflowtask.VersionEQ(expectedVersion),
 			workflowtask.TaskStatusKeyEQ(current.TaskStatusKey),
-			workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected"),
 		).
 		SetPayload(nextPayload).
+		AddUrgeCount(1).
+		SetLastUrgedAt(now).
+		SetLastUrgedBy(actorID).
 		AddVersion(1)
+	if trimmedActorRoleKey != "" {
+		update.SetLastUrgedByRoleKey(trimmedActorRoleKey)
+	} else {
+		update.ClearLastUrgedByRoleKey()
+	}
+	if targetRoleKey != "" {
+		update.SetEscalatedAt(now).SetEscalateTargetRoleKey(targetRoleKey)
+	}
 	if actorID > 0 {
 		update.SetUpdatedBy(actorID)
 	}
@@ -583,7 +616,7 @@ func workflowTaskMutationReceiptResult(event *ent.WorkflowTaskEvent, intentHash 
 		return nil, false, fmt.Errorf("workflow task mutation receipt identity is inconsistent")
 	}
 	storedStatusKey := *event.ToStatusKey
-	if storedStatusKey != strings.TrimSpace(storedStatusKey) || !biz.IsValidWorkflowTaskState(storedStatusKey) {
+	if storedStatusKey != strings.TrimSpace(storedStatusKey) || !biz.IsKnownWorkflowTaskState(storedStatusKey) {
 		return nil, false, fmt.Errorf("workflow task mutation receipt status is invalid")
 	}
 	task, err := workflowTaskMutationResultFromMap(event.MutationResult)
@@ -692,10 +725,15 @@ func workflowTaskMutationResultTaskV1FromBiz(task *biz.WorkflowTask) *workflowTa
 		AssigneeID:            task.AssigneeID,
 		Priority:              task.Priority,
 		BlockedReason:         task.BlockedReason,
+		CriticalPath:          task.CriticalPath,
+		UrgeCount:             task.UrgeCount,
+		LastUrgedAt:           task.LastUrgedAt,
+		LastUrgedBy:           task.LastUrgedBy,
+		LastUrgedByRoleKey:    task.LastUrgedByRoleKey,
+		EscalatedAt:           task.EscalatedAt,
+		EscalateTargetRoleKey: task.EscalateTargetRoleKey,
 		DueAt:                 task.DueAt,
-		StartedAt:             task.StartedAt,
 		CompletedAt:           task.CompletedAt,
-		ClosedAt:              task.ClosedAt,
 		Payload:               payload,
 		Version:               task.Version,
 		CreatedBy:             task.CreatedBy,
@@ -710,7 +748,7 @@ func (task workflowTaskMutationResultTaskV1) toBiz() (*biz.WorkflowTask, error) 
 	if task.ID <= 0 || task.Version <= 0 || task.SourceID <= 0 ||
 		strings.TrimSpace(task.TaskCode) == "" || strings.TrimSpace(task.TaskGroup) == "" ||
 		strings.TrimSpace(task.TaskName) == "" || strings.TrimSpace(task.SourceType) == "" ||
-		task.TaskStatusKey != taskStatusKey || !biz.IsValidWorkflowTaskState(taskStatusKey) || strings.TrimSpace(task.OwnerRoleKey) == "" ||
+		task.TaskStatusKey != taskStatusKey || !biz.IsKnownWorkflowTaskState(taskStatusKey) || strings.TrimSpace(task.OwnerRoleKey) == "" ||
 		task.CreatedAt.IsZero() || task.UpdatedAt.IsZero() {
 		return nil, fmt.Errorf("workflow task mutation result is invalid")
 	}
@@ -745,10 +783,15 @@ func (task workflowTaskMutationResultTaskV1) toBiz() (*biz.WorkflowTask, error) 
 		AssigneeID:            task.AssigneeID,
 		Priority:              task.Priority,
 		BlockedReason:         task.BlockedReason,
+		CriticalPath:          task.CriticalPath,
+		UrgeCount:             task.UrgeCount,
+		LastUrgedAt:           task.LastUrgedAt,
+		LastUrgedBy:           task.LastUrgedBy,
+		LastUrgedByRoleKey:    task.LastUrgedByRoleKey,
+		EscalatedAt:           task.EscalatedAt,
+		EscalateTargetRoleKey: task.EscalateTargetRoleKey,
 		DueAt:                 task.DueAt,
-		StartedAt:             task.StartedAt,
 		CompletedAt:           task.CompletedAt,
-		ClosedAt:              task.ClosedAt,
 		Payload:               payload,
 		Version:               task.Version,
 		CreatedBy:             task.CreatedBy,
@@ -947,7 +990,7 @@ func ensureActiveWorkflowTaskInTx(
 			workflowtask.SourceID(in.SourceID),
 			workflowtask.TaskGroup(in.TaskGroup),
 			workflowtask.OwnerRoleKey(in.OwnerRoleKey),
-			workflowtask.TaskStatusKeyNotIn("done", "rejected", "closed", "cancelled"),
+			workflowtask.TaskStatusKeyNotIn("done", "rejected"),
 		).
 		Order(ent.Asc(workflowtask.FieldID)).
 		First(ctx)
@@ -961,7 +1004,7 @@ func ensureActiveWorkflowTaskInTx(
 					workflowtask.IDEQ(existing.ID),
 					workflowtask.VersionEQ(existing.Version),
 					workflowtask.TaskStatusKeyEQ(existing.TaskStatusKey),
-					workflowtask.TaskStatusKeyNotIn("done", "rejected", "cancelled", "closed"),
+					workflowtask.TaskStatusKeyNotIn("done", "rejected"),
 				).
 				SetPayload(in.Payload).
 				SetNillableOwnerPoolKey(in.OwnerPoolKey).
@@ -1026,6 +1069,7 @@ func ensureActiveWorkflowTaskInTx(
 		SetNillableAssigneeID(in.AssigneeID).
 		SetPriority(in.Priority).
 		SetNillableBlockedReason(in.BlockedReason).
+		SetCriticalPath(in.CriticalPath).
 		SetNillableDueAt(in.DueAt).
 		SetPayload(in.Payload)
 	if actorID > 0 {
@@ -1093,10 +1137,15 @@ func entWorkflowTaskToBiz(row *ent.WorkflowTask) *biz.WorkflowTask {
 		AssigneeID:            row.AssigneeID,
 		Priority:              row.Priority,
 		BlockedReason:         blockedReason,
+		CriticalPath:          row.CriticalPath,
+		UrgeCount:             row.UrgeCount,
+		LastUrgedAt:           row.LastUrgedAt,
+		LastUrgedBy:           row.LastUrgedBy,
+		LastUrgedByRoleKey:    biz.NormalizeOptionalRoleKey(row.LastUrgedByRoleKey),
+		EscalatedAt:           row.EscalatedAt,
+		EscalateTargetRoleKey: biz.NormalizeOptionalRoleKey(row.EscalateTargetRoleKey),
 		DueAt:                 row.DueAt,
-		StartedAt:             row.StartedAt,
 		CompletedAt:           row.CompletedAt,
-		ClosedAt:              row.ClosedAt,
 		Payload:               payload,
 		Version:               row.Version,
 		CreatedBy:             row.CreatedBy,

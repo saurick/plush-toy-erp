@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -11,6 +13,15 @@ import (
 
 type ProcessInstance struct {
 	ent.Schema
+}
+
+func (ProcessInstance) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"process_instances_status_allowed":   "status IN ('active', 'completed', 'blocked')",
+			"process_instances_lifecycle_bundle": "((status = 'completed' AND completed_at IS NOT NULL) OR (status IN ('active', 'blocked') AND completed_at IS NULL))",
+		}},
+	}
 }
 
 func (ProcessInstance) Fields() []ent.Field {
@@ -79,6 +90,8 @@ func (ProcessInstance) Fields() []ent.Field {
 func (ProcessInstance) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("nodes", ProcessNodeInstance.Type),
+		edge.To("workflow_tasks", WorkflowTask.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

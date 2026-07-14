@@ -31,7 +31,21 @@ const FORBIDDEN_RAW_DATA_KEYS = new Set([
   "rawValues",
   "records",
   "sources",
+  "globalScan",
+  "extractedSourceStats",
+  "dryRunPreview",
+  "freezeCheck",
+  "evidenceCount",
+  "sourceRows",
+  "workbooks",
+  "sheets",
+  "sensitiveFieldCount",
 ]);
+const FORBIDDEN_PRIVATE_SOURCE_PATH_MARKERS = [
+  "docs/customers/yoyoosun/raw-source-files",
+  "docs/customers/yoyoosun/source-manifest.json",
+  "output/customers/yoyoosun/source-extract",
+];
 const PRODUCT_RUNTIME_FILES = [
   "web/src/common/consts/brand.js",
   "web/src/erp/config/customerMenuConfig.mjs",
@@ -55,7 +69,8 @@ const BACKEND_ALLOWED_CUSTOMER_REFERENCES = [
   {
     path: "server/internal/biz/customer_config.go",
     pattern: /^\s*DefaultCustomerKey\s*=\s*"demo"\s*$/,
-    reason: "neutral customer config fallback; private customer packages must be selected explicitly",
+    reason:
+      "neutral customer config fallback; private customer packages must be selected explicitly",
   },
 ];
 const CUSTOMER_ASSET_ROOT = "/customer-assets/yoyoosun/";
@@ -86,7 +101,29 @@ function assertStringList(values, path) {
   });
 }
 
+function assertExternalCliInput(input, pathName, expectedFlag) {
+  assert(input && typeof input === "object", `${pathName} must be an object`);
+  assert(
+    input.cliFlag === expectedFlag,
+    `${pathName}.cliFlag must stay ${expectedFlag}`,
+  );
+  assertNonEmptyString(input.location, `${pathName}.location`);
+  assert(
+    input.location.startsWith("external_"),
+    `${pathName}.location must stay outside the product repository`,
+  );
+}
+
 function assertNoRawDataPayload(value, path = "importConfig") {
+  if (typeof value === "string") {
+    for (const marker of FORBIDDEN_PRIVATE_SOURCE_PATH_MARKERS) {
+      assert(
+        !value.includes(marker),
+        `${path} must not embed private source path ${marker}`,
+      );
+    }
+    return;
+  }
   if (!value || typeof value !== "object") {
     return;
   }
@@ -121,11 +158,15 @@ function validateProductRuntimeDoesNotBundleCustomerPackages() {
     "web/public must not include yoyoosun-specific favicon in the default product package",
   );
   assert(
-    existsSync(repoPath("config/customers/yoyoosun/customer-config.example.js")),
+    existsSync(
+      repoPath("config/customers/yoyoosun/customer-config.example.js"),
+    ),
     "yoyoosun customer package must keep a deployment injection example",
   );
   assert(
-    existsSync(repoPath("config/customers/yoyoosun/public-assets/favicon-yoyoosun.svg")),
+    existsSync(
+      repoPath("config/customers/yoyoosun/public-assets/favicon-yoyoosun.svg"),
+    ),
     "yoyoosun customer favicon must stay in the explicit public customer assets",
   );
 }
@@ -136,7 +177,7 @@ function toRepoRelativePath(filePath) {
 
 function shouldSkipBackendProductCorePath(relativePath) {
   return BACKEND_PRODUCT_CORE_EXCLUDED_PREFIXES.some((prefix) =>
-    relativePath.startsWith(prefix)
+    relativePath.startsWith(prefix),
   );
 }
 
@@ -169,8 +210,9 @@ function collectBackendProductCoreRuntimeFiles() {
 }
 
 function isAllowedBackendCustomerReference(relativePath, line) {
-  return BACKEND_ALLOWED_CUSTOMER_REFERENCES.some((allowance) =>
-    allowance.path === relativePath && allowance.pattern.test(line)
+  return BACKEND_ALLOWED_CUSTOMER_REFERENCES.some(
+    (allowance) =>
+      allowance.path === relativePath && allowance.pattern.test(line),
   );
 }
 
@@ -182,7 +224,9 @@ function validateBackendProductCoreDoesNotEmbedCustomerSpecificRules() {
     const source = readFileSync(repoPath(relativePath), "utf8");
     const lines = source.split(/\r?\n/);
     lines.forEach((line, index) => {
-      if (!BACKEND_CUSTOMER_SPECIFIC_TERMS.some((term) => line.includes(term))) {
+      if (
+        !BACKEND_CUSTOMER_SPECIFIC_TERMS.some((term) => line.includes(term))
+      ) {
         return;
       }
       if (isAllowedBackendCustomerReference(relativePath, line)) {
@@ -197,6 +241,178 @@ function validateBackendProductCoreDoesNotEmbedCustomerSpecificRules() {
     `Product Core backend runtime must not embed yoyoosun/永绅/customer package rules outside customer config boundaries:\n${violations.join("\n")}`,
   );
   return files.length;
+}
+
+function validateBackendProcessContractOwnership() {
+  const contractPath = "server/internal/biz/customer_process_contracts.go";
+  const contractSource = readFileSync(repoPath(contractPath), "utf8");
+  assert(
+    !contractSource.includes('"reflect"'),
+    `${contractPath} must not compare and accept caller-owned runtime graphs`,
+  );
+  assert(
+    contractSource.includes(
+      'if _, suppliedGraph := snapshot["processDefinitions"]; suppliedGraph {',
+    ),
+    `${contractPath} must fail closed whenever input supplies processDefinitions`,
+  );
+  assert(
+    contractSource.includes('out["processDefinitions"] = canonicalDefinitions'),
+    `${contractPath} must generate processDefinitions only as Product Core output`,
+  );
+  assert(
+    (contractSource.match(/processDefinitions/g) || []).length === 2,
+    `${contractPath} must keep exactly one input rejection and one canonical output assignment for processDefinitions`,
+  );
+
+  const servicePath = "server/internal/service/jsonrpc_customer_config.go";
+  const serviceSource = readFileSync(repoPath(servicePath), "utf8");
+  assert(
+    serviceSource.includes(
+      'if _, suppliedGraph := snapshot["processDefinitions"]; suppliedGraph {',
+    ),
+    `${servicePath} must reject legacy processDefinitions before manifest metadata merge`,
+  );
+  assert(
+    (serviceSource.match(/processDefinitions/g) || []).length === 1,
+    `${servicePath} must not merge, forward or fall back to a legacy process graph`,
+  );
+  for (const legacyPublishInput of [
+    '"candidate_revision"',
+    '"compiledSnapshot"',
+    'getString(raw, "customerKey")',
+    'getString(raw, "productVersion")',
+  ]) {
+    assert(
+      !serviceSource.includes(legacyPublishInput),
+      `${servicePath} must not accept legacy customer config input ${legacyPublishInput}`,
+    );
+  }
+  assert(
+    serviceSource.includes("for key := range pm") &&
+      serviceSource.includes("if _, ok := allowedKeys[key]; !ok"),
+    `${servicePath} validate/publish input must fail closed on unknown top-level fields`,
+  );
+  assert(
+    serviceSource.includes("if _, exists := raw[key]; !exists") &&
+      serviceSource.includes("if _, exists := snapshot[key]; exists"),
+    `${servicePath} formal manifest metadata must have one top-level input source`,
+  );
+}
+
+function validateWorkflowTaskRevisionVisibilityContract() {
+  const servicePath = "server/internal/service/jsonrpc_workflow_task.go";
+  const serviceSource = readFileSync(repoPath(servicePath), "utf8");
+  assert(
+    (serviceSource.match(/workflowTaskQueryVisibilityScope\(/g) || [])
+      .length === 3,
+    `${servicePath} list, role-view and board entry points must share the revision-aware query scope`,
+  );
+  for (const legacyActiveFilter of [
+    "filter.VisibleOwnerRoleKeys = d.workflowVisibleOwnerRoleKeys(",
+    "visibleRoleKeys := d.workflowVisibleOwnerRoleKeys(",
+    "query.VisibleOwnerRoleKeys = d.workflowVisibleOwnerRoleKeys(",
+  ]) {
+    assert(
+      !serviceSource.includes(legacyActiveFilter),
+      `${servicePath} must not flatten the current active revision into a query-level role list`,
+    );
+  }
+
+  const predicatePath =
+    "server/internal/data/workflow_task_revision_visibility.go";
+  const predicateSource = readFileSync(repoPath(predicatePath), "utf8");
+  assert(
+    (
+      predicateSource.match(
+        /workflowtask\.ConfigRevisionEQ\(revision\.ConfigRevision\)/g,
+      ) || []
+    ).length === 2,
+    `${predicatePath} list/board and role-view predicates must pair each role scope with its own revision`,
+  );
+  assert(
+    (
+      predicateSource.match(
+        /workflowTaskPositiveRuntimeIDPredicate\(workflowtask\.FieldProcessInstanceID\)/g,
+      ) || []
+    ).length === 2 &&
+      (
+        predicateSource.match(
+          /workflowTaskPositiveRuntimeIDPredicate\(workflowtask\.FieldProcessNodeInstanceID\)/g,
+        ) || []
+      ).length === 2,
+    `${predicatePath} formal tasks must require both positive ProcessRuntime anchors`,
+  );
+  for (const legacyNullCheck of [
+    "workflowtask.ConfigRevisionIsNil()",
+    "workflowtask.ProcessInstanceIDIsNil()",
+    "workflowtask.ProcessNodeInstanceIDIsNil()",
+  ]) {
+    assert(
+      (
+        predicateSource.match(
+          new RegExp(legacyNullCheck.replace(/[()]/g, "\\$&"), "g"),
+        ) || []
+      ).length === 2,
+      `${predicatePath} legacy visibility must require all runtime anchors to be absent`,
+    );
+  }
+
+  const customerConfigPath = "server/internal/biz/customer_config.go";
+  const customerConfigSource = readFileSync(
+    repoPath(customerConfigPath),
+    "utf8",
+  );
+  assert(
+    (
+      customerConfigSource.match(
+        /customerConfigRevisionCanAuthorizeRuntimeTask\(stored\.Status\)/g,
+      ) || []
+    ).length === 2,
+    `${customerConfigPath} visible-role and candidate-role lookups must reject non-runtime revisions`,
+  );
+
+  const bulkRepoPath =
+    "server/internal/data/customer_config_workflow_visibility.go";
+  const bulkRepoSource = readFileSync(repoPath(bulkRepoPath), "utf8");
+  assert(
+    bulkRepoSource.includes("status IN ($2, $3)") &&
+      bulkRepoSource.includes("biz.CustomerConfigStatusActive") &&
+      bulkRepoSource.includes("biz.CustomerConfigStatusSuperseded"),
+    `${bulkRepoPath} must load only active/superseded revision scopes in one bulk projection`,
+  );
+}
+
+function validateCustomerConfigRepositoryContract() {
+  const bizPath = "server/internal/biz/customer_config.go";
+  const bizSource = readFileSync(repoPath(bizPath), "utf8");
+  assert(
+    /CustomerConfigHashVersion\s*=\s*1\b/.test(bizSource) &&
+      !bizSource.includes("CustomerConfigHashVersionFullPayload") &&
+      !bizSource.includes("CustomerConfigHashVersionLegacySnapshot"),
+    `${bizPath} must keep one full-payload hash v1 truth`,
+  );
+
+  const repoPathName = "server/internal/data/customer_config_repo.go";
+  const repoSource = readFileSync(repoPath(repoPathName), "utf8");
+  const openTaskCounter = repoSource.match(
+    /func \(r \*customerConfigRepo\) CountOpenWorkflowTasksByPools[\s\S]*?\n}\n/,
+  )?.[0];
+  assert(
+    openTaskCounter?.includes("task_status_key IN ('ready', 'blocked')"),
+    `${repoPathName} open workflow blocker count must use the ready/blocked contract`,
+  );
+  for (const legacyStatus of ["pending", "processing", "cancelled"]) {
+    assert(
+      !openTaskCounter.includes(`'${legacyStatus}'`),
+      `${repoPathName} open workflow blocker count must not restore ${legacyStatus}`,
+    );
+  }
+  assert(
+    repoSource.includes("ON CONFLICT (customer_key, revision) DO NOTHING") &&
+      !repoSource.includes("ON CONFLICT (customer_key, revision) DO UPDATE"),
+    `${repoPathName} publish must remain INSERT-only`,
+  );
 }
 
 function cloneJSON(value) {
@@ -242,21 +458,33 @@ function validateYoyoosunRuntimeInjectionExample() {
   const faviconAssetName = faviconHref.slice(CUSTOMER_ASSET_ROOT.length);
   assertNonEmptyString(faviconAssetName, "brand.faviconHref asset name");
   assert(
-    existsSync(repoPath(path.join("config/customers/yoyoosun/public-assets", faviconAssetName))),
+    existsSync(
+      repoPath(
+        path.join("config/customers/yoyoosun/public-assets", faviconAssetName),
+      ),
+    ),
     "customer favicon asset referenced by runtime config must exist",
   );
 
   assert(
-    !Object.prototype.hasOwnProperty.call(exampleConfig, "engineeringPrintSamples"),
+    !Object.prototype.hasOwnProperty.call(
+      exampleConfig,
+      "engineeringPrintSamples",
+    ),
     "public customer config must not expose engineering samples or source data",
   );
 }
 
 function validateCustomerConfigReleaseOverlay() {
-  assert(
-    existsSync(repoPath("scripts/build/apply-customer-web-config.mjs")),
-    "customer web config overlay script must exist",
-  );
+  for (const requiredPath of [
+    "scripts/build/apply-customer-web-config.mjs",
+    "scripts/build/apply-customer-web-config.test.mjs",
+  ]) {
+    assert(
+      existsSync(repoPath(requiredPath)),
+      `customer web config release boundary requires ${requiredPath}`,
+    );
+  }
   const dockerignore = readFileSync(repoPath(".dockerignore"), "utf8");
   const dockerignoreEntries = new Set(
     dockerignore
@@ -316,12 +544,16 @@ function validateCustomerConfigReleaseOverlay() {
     );
   }
 
-  const viteSharedSource = readFileSync(repoPath("web/vite.shared.mjs"), "utf8");
+  const viteSharedSource = readFileSync(
+    repoPath("web/vite.shared.mjs"),
+    "utf8",
+  );
   const viteRootImports = Array.from(
     viteSharedSource.matchAll(/from\s+['"]\.\/([^'"]+\.mjs)['"]/g),
     (match) => match[1],
-  ).filter((importPath) =>
-    !importPath.startsWith("vite.") && !importPath.includes("/")
+  ).filter(
+    (importPath) =>
+      !importPath.startsWith("vite.") && !importPath.includes("/"),
   );
   const serverDockerfile = readFileSync(repoPath("server/Dockerfile"), "utf8");
   for (const importPath of viteRootImports) {
@@ -434,18 +666,53 @@ function validateYoyoosunFieldNumberingConfig(config) {
 }
 
 function validateYoyoosunImportConfig(config) {
-  assert(config.customerKey === "yoyoosun", "importConfig customerKey must stay yoyoosun");
+  assert(
+    config.customerKey === "yoyoosun",
+    "importConfig customerKey must stay yoyoosun",
+  );
   assert(config.status === "draft", "importConfig status must stay draft");
-  assert(config.runtimeEnabled === false, "importConfig must not be runtime-enabled");
+  assert(
+    config.runtimeEnabled === false,
+    "importConfig must not be runtime-enabled",
+  );
   assertNoRawDataPayload(config);
 
   const sourcePolicy = config.sourcePolicy;
   assert(sourcePolicy, "importConfig.sourcePolicy must be present");
-  assertNonEmptyString(sourcePolicy.rawSourceRoot, "sourcePolicy.rawSourceRoot");
-  assertNonEmptyString(
-    sourcePolicy.extractedEvidenceRoot,
-    "sourcePolicy.extractedEvidenceRoot",
+  assertExternalCliInput(
+    sourcePolicy.manifestInput,
+    "sourcePolicy.manifestInput",
+    "--manifest",
   );
+  assert(
+    sourcePolicy.manifestInput.required === true,
+    "sourcePolicy.manifestInput must be required",
+  );
+  assertExternalCliInput(
+    sourcePolicy.rawSourceInput,
+    "sourcePolicy.rawSourceInput",
+    "--raw-dir",
+  );
+  assert(
+    sourcePolicy.rawSourceInput.required === true,
+    "sourcePolicy.rawSourceInput must be required",
+  );
+  assertExternalCliInput(
+    sourcePolicy.extractOutput,
+    "sourcePolicy.extractOutput",
+    "--out",
+  );
+  assertNonEmptyString(
+    sourcePolicy.extractOutput.location,
+    "sourcePolicy.extractOutput.location",
+  );
+  for (const key of [
+    "productRepositoryStoresManifest",
+    "productRepositoryStoresRawSources",
+    "productCiRequiresPrivateSources",
+  ]) {
+    assert(sourcePolicy[key] === false, `sourcePolicy.${key} must stay false`);
+  }
   assert(
     sourcePolicy.noRawRowsInConfig === true,
     "sourcePolicy.noRawRowsInConfig must stay true",
@@ -485,58 +752,48 @@ function validateYoyoosunImportConfig(config) {
     "createsProductSkus",
     "createsPurchaseOrderRuntime",
   ]) {
-    assert(config.boundaries?.[key] === false, `importConfig.boundaries.${key} must stay false`);
-  }
-
-  const stats = config.globalScan?.extractedSourceStats;
-  assert(stats, "globalScan.extractedSourceStats must be present");
-  assert(stats.workbooks === 5, "extractedSourceStats.workbooks must stay 5");
-  assert(stats.sheets === 20, "extractedSourceStats.sheets must stay 20");
-  assert(stats.sourceRows === 5800, "extractedSourceStats.sourceRows must stay 5800");
-  assert(
-    stats.sourceTypes?.dataImportSource === 5794,
-    "extractedSourceStats.sourceTypes.dataImportSource must stay 5794",
-  );
-  assert(
-    stats.sourceTypes?.printTemplateInput === 6,
-    "extractedSourceStats.sourceTypes.printTemplateInput must stay 6",
-  );
-  for (const [domain, count] of Object.entries({
-    products: 369,
-    units: 11,
-    materials: 438,
-    bom: 91,
-    purchase_orders: 1971,
-    suppliers: 970,
-    outsourcing: 1266,
-    contacts: 684,
-  })) {
     assert(
-      stats.countsByDomain?.[domain] === count,
-      `extractedSourceStats.countsByDomain.${domain} must stay ${count}`,
+      config.boundaries?.[key] === false,
+      `importConfig.boundaries.${key} must stay false`,
     );
   }
 
-  const dryRun = config.globalScan?.dryRunPreview;
-  assert(dryRun, "globalScan.dryRunPreview must be present");
-  assert(dryRun.totalSources === 5800, "dryRunPreview.totalSources must stay 5800");
-  assert(dryRun.normalizedRows === 5800, "dryRunPreview.normalizedRows must stay 5800");
-  assert(dryRun.canExecuteRealImport === false, "dryRunPreview.canExecuteRealImport must stay false");
-  assert(dryRun.canProceedToManualReview === true, "dryRunPreview.canProceedToManualReview must stay true");
-  assert(dryRun.blockerCount === 969, "dryRunPreview.blockerCount must stay 969");
-  assert(dryRun.forbiddenCount === 6, "dryRunPreview.forbiddenCount must stay 6");
-  assert(dryRun.candidateCountsByAction?.defer === 3231, "dryRunPreview defer count must stay 3231");
-  assert(dryRun.unresolvedCountsBySeverity?.block === 963, "dryRunPreview block count must stay 963");
-
-  const freeze = config.globalScan?.freezeCheck;
-  assert(freeze, "globalScan.freezeCheck must be present");
-  assert(freeze.valid === true, "freezeCheck.valid must stay true");
-  assert(freeze.sourceCount === 5800, "freezeCheck.sourceCount must stay 5800");
-  assert(freeze.blockerCount === 0, "freezeCheck.blockerCount must stay 0");
-  assert(freeze.sensitiveFieldCount === 4417, "freezeCheck.sensitiveFieldCount must stay 4417");
+  const privateValidation = config.privateValidation;
+  assert(privateValidation, "privateValidation must be present");
+  assert(
+    privateValidation.status === "external_required",
+    "privateValidation.status must stay external_required",
+  );
+  assertNonEmptyString(
+    privateValidation.runLocation,
+    "privateValidation.runLocation",
+  );
+  assert(
+    privateValidation.productCiMode === "not_required",
+    "privateValidation must not be part of product CI",
+  );
+  assert(
+    privateValidation.requiresManifestHashAndSourceChecksum === true,
+    "private validation must verify manifest and source checksums",
+  );
+  assert(
+    privateValidation.requiresHumanApprovalForRealImport === true,
+    "real import must keep human approval",
+  );
+  assert(
+    privateValidation.evidenceSummaryMayEnterProductRepository === false,
+    "private validation evidence must stay outside the product repository",
+  );
+  assert(
+    privateValidation.canExecuteRealImport === false,
+    "private validation config must not execute real import",
+  );
 
   assert(Array.isArray(config.configItems), "configItems must be an array");
-  assert(config.configItems.length >= 9, "configItems must cover core customer config groups");
+  assert(
+    config.configItems.length >= 9,
+    "configItems must cover core customer config groups",
+  );
   const itemIds = new Set();
   const itemGroups = new Set();
   for (const [index, item] of config.configItems.entries()) {
@@ -578,8 +835,13 @@ function validateYoyoosunImportConfig(config) {
     assert(itemGroups.has(group), `configItems must include ${group}`);
   }
 
-  assert(Array.isArray(config.sourceSheetGroups), "sourceSheetGroups must be an array");
-  const sheetGroupKeys = new Set(config.sourceSheetGroups.map((item) => item.key));
+  assert(
+    Array.isArray(config.sourceSheetGroups),
+    "sourceSheetGroups must be an array",
+  );
+  const sheetGroupKeys = new Set(
+    config.sourceSheetGroups.map((item) => item.key),
+  );
   for (const key of [
     "material_bom_analysis",
     "purchase_material_summary",
@@ -636,15 +898,27 @@ function validateYoyoosunImportConfig(config) {
   for (const [index, item] of config.reviewQueues.entries()) {
     const itemPath = `reviewQueues[${index}]`;
     assertNonEmptyString(item.key, `${itemPath}.key`);
-    assert(["block", "review"].includes(item.severity), `${itemPath}.severity must be block or review`);
+    assert(
+      ["block", "review"].includes(item.severity),
+      `${itemPath}.severity must be block or review`,
+    );
     assertStringList(item.domains, `${itemPath}.domains`);
-    assert(Number.isInteger(item.evidenceCount) && item.evidenceCount > 0, `${itemPath}.evidenceCount must be positive`);
-    assert(item.decision === "review_required", `${itemPath}.decision must stay review_required`);
+    assert(
+      item.evidenceRequired === true,
+      `${itemPath}.evidenceRequired must stay true`,
+    );
+    assert(
+      item.decision === "review_required",
+      `${itemPath}.decision must stay review_required`,
+    );
     assertNonEmptyString(item.owner, `${itemPath}.owner`);
     assertNonEmptyString(item.note, `${itemPath}.note`);
   }
 
-  assertStringList(config.forbiddenAutoImportTargets, "forbiddenAutoImportTargets");
+  assertStringList(
+    config.forbiddenAutoImportTargets,
+    "forbiddenAutoImportTargets",
+  );
   for (const forbidden of [
     "tenant_id",
     "business_records",
@@ -673,10 +947,14 @@ function validateYoyoosunImportConfig(config) {
 validateYoyoosunFieldNumberingConfig(yoyoosunFieldNumberingConfig);
 validateYoyoosunImportConfig(yoyoosunImportConfig);
 validateProductRuntimeDoesNotBundleCustomerPackages();
-const backendProductCoreRuntimeFileCount = validateBackendProductCoreDoesNotEmbedCustomerSpecificRules();
+const backendProductCoreRuntimeFileCount =
+  validateBackendProductCoreDoesNotEmbedCustomerSpecificRules();
+validateBackendProcessContractOwnership();
+validateWorkflowTaskRevisionVisibilityContract();
+validateCustomerConfigRepositoryContract();
 validateYoyoosunRuntimeInjectionExample();
 validateCustomerConfigReleaseOverlay();
 
 console.log(
-  `customer config boundaries ok: ${yoyoosunFieldNumberingConfig.customerKey}, field modules=${yoyoosunFieldNumberingConfig.fieldDisplayReview.length}, numbering rules=${yoyoosunFieldNumberingConfig.numberingRuleReview.length}, import config items=${yoyoosunImportConfig.configItems.length}, extracted rows=${yoyoosunImportConfig.globalScan.extractedSourceStats.sourceRows}, backend runtime files=${backendProductCoreRuntimeFileCount}`,
+  `customer config boundaries ok: ${yoyoosunFieldNumberingConfig.customerKey}, field modules=${yoyoosunFieldNumberingConfig.fieldDisplayReview.length}, numbering rules=${yoyoosunFieldNumberingConfig.numberingRuleReview.length}, import config items=${yoyoosunImportConfig.configItems.length}, private validation=${yoyoosunImportConfig.privateValidation.status}, backend runtime files=${backendProductCoreRuntimeFileCount}`,
 );

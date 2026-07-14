@@ -56,12 +56,13 @@ func TestProcessRuntimePostgresConcurrentDomainCommandClaimHasOneIntent(t *testi
 		Status:          biz.ProcessStatusActive,
 		Nodes: []biz.ProcessNodeInstanceCreate{{
 			NodeKey: "post_fact", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1,
-			Status: biz.ProcessNodeStatusActive, PolicySnapshot: map[string]any{"command_key": "claim_test.post"},
+			Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{"command_key": "claim_test.post"},
 		}},
 	}, 7)
 	if err != nil {
 		t.Fatalf("create process runtime claim fixture: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 
 	fingerprints := []string{
 		"0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
@@ -154,12 +155,13 @@ func TestProcessRuntimePostgresConcurrentSameIntentExecutionReconcilesOneTermina
 		Status:          biz.ProcessStatusActive,
 		Nodes: []biz.ProcessNodeInstanceCreate{{
 			NodeKey: "post_fact", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1,
-			Status: biz.ProcessNodeStatusActive, PolicySnapshot: map[string]any{"command_key": "claim_test.post"},
+			Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{"command_key": "claim_test.post"},
 		}},
 	}, 7)
 	if err != nil {
 		t.Fatalf("create process runtime execution fixture: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	handler := &postgresBarrierDomainCommandHandler{
 		entered: make(chan struct{}, 2),
 		release: make(chan struct{}),
@@ -295,5 +297,59 @@ func TestProcessRuntimePostgresConcurrentLinkedBusinessRefsAreNotLost(t *testing
 		if !found {
 			t.Fatalf("missing concurrent linked ref %q in %#v", refType, items)
 		}
+	}
+}
+
+func TestProcessRuntimePostgresAtomicBlockRollsBackNodeWhenProcessSettled(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, _ := openPurchaseReceiptPostgresTestData(t)
+	repo := NewProcessRuntimeRepo(data, log.NewStdLogger(io.Discard))
+	suffix := postgresTestSuffix()
+	instance, nodes, err := repo.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:      "atomic_block_rollback_" + suffix,
+		ProcessVersion:  "v1",
+		ConfigRevision:  "atomic-block-revision",
+		DefinitionHash:  "sha256:atomic-block-" + suffix,
+		BusinessRefType: "atomic_block_test",
+		BusinessRefID:   workflowPostgresSourceID(),
+		IdempotencyKey:  "atomic-block/" + suffix,
+		Status:          biz.ProcessStatusActive,
+		Nodes: []biz.ProcessNodeInstanceCreate{{
+			NodeKey: "human_review", NodeType: biz.ProcessNodeTypeHumanTask, Attempt: 1,
+			Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{},
+		}},
+	}, 7)
+	if err != nil {
+		t.Fatalf("create atomic block fixture: %v", err)
+	}
+	activeNode := activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
+	if _, err := repo.CompleteProcessInstance(ctx, &biz.ProcessInstanceComplete{ID: instance.ID}, 7); err != nil {
+		t.Fatalf("settle process before atomic block: %v", err)
+	}
+
+	if _, err := repo.BlockProcessNodeAndInstance(ctx, &biz.ProcessNodeInstanceBlock{
+		ProcessInstanceID:     instance.ID,
+		ProcessNodeInstanceID: activeNode.ID,
+		ExpectedVersion:       activeNode.Version,
+		Reason:                "must roll back",
+		Outcome:               "blocked",
+	}, 7); !errors.Is(err, biz.ErrProcessInstanceSettled) {
+		t.Fatalf("atomic block against settled process must fail: %v", err)
+	}
+
+	persistedNode, err := repo.GetProcessNodeInstance(ctx, activeNode.ID)
+	if err != nil {
+		t.Fatalf("reload process node after rollback: %v", err)
+	}
+	persistedProcess, err := repo.GetProcessInstance(ctx, instance.ID)
+	if err != nil {
+		t.Fatalf("reload process after rollback: %v", err)
+	}
+	if persistedNode.Status != biz.ProcessNodeStatusActive || persistedNode.Version != activeNode.Version || persistedNode.Outcome != nil {
+		t.Fatalf("PostgreSQL transaction did not roll back node mutation: before=%#v after=%#v", activeNode, persistedNode)
+	}
+	if persistedProcess.Status != biz.ProcessStatusCompleted {
+		t.Fatalf("settled process status changed during failed block: %#v", persistedProcess)
 	}
 }

@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useMemo, useRef, useState } from 'react'
 
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
@@ -7,6 +7,10 @@ import {
   listPurchaseReceipts,
 } from '../../api/purchaseApi.mjs'
 import { V1_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
+import {
+  createPurchaseReceiptMutationAttemptStore,
+  isPurchaseReceiptMutationResultUnknown,
+} from '../../utils/purchaseReceiptMutation.mjs'
 import { routeWithQuery } from '../../utils/routeQuery.mjs'
 import {
   buildInboundDraftPreviewRows,
@@ -26,6 +30,9 @@ export function usePurchaseOrderInboundDraft({
   const [inboundDraftPreviewLoading, setInboundDraftPreviewLoading] =
     useState(false)
   const [inboundDraftPreviewRows, setInboundDraftPreviewRows] = useState([])
+  const mutationAttemptsRef = useRef(
+    createPurchaseReceiptMutationAttemptStore()
+  )
 
   const closeInboundDraftModal = useCallback(() => {
     setInboundDraftModalOpen(false)
@@ -82,17 +89,24 @@ export function usePurchaseOrderInboundDraft({
     if (!selectedOrder) {
       return
     }
+    const scope = `create-from-purchase-order:${selectedOrder.id}`
+    let attempt
     try {
       const values = await form.validateFields()
-      setGeneratingInboundDraft(true)
-      const receipt = await createPurchaseReceiptFromPurchaseOrder({
+      const payload = {
         purchase_order_id: selectedOrder.id,
         receipt_no: values.receipt_no,
         warehouse_id: Number(values.warehouse_id || 0),
         received_at: values.received_at,
         note: values.note || undefined,
-      })
-      setInboundDraftModalOpen(false)
+      }
+      attempt = mutationAttemptsRef.current.prepare(scope, payload)
+      setGeneratingInboundDraft(true)
+      const receipt = await createPurchaseReceiptFromPurchaseOrder(
+        attempt.params
+      )
+      mutationAttemptsRef.current.settle(scope, attempt)
+      closeInboundDraftModal()
       message.success('采购入库草稿已生成')
       navigate(
         routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
@@ -102,11 +116,20 @@ export function usePurchaseOrderInboundDraft({
       )
     } catch (error) {
       if (error?.errorFields) return
-      message.error(getActionErrorMessage(error, '生成采购入库草稿失败'))
+      const retained = attempt
+        ? mutationAttemptsRef.current.settle(scope, attempt, error)
+        : isPurchaseReceiptMutationResultUnknown(error)
+      if (retained) {
+        message.warning(
+          '入库草稿生成结果尚未确认，系统将使用原请求核对，请不要重复生成。'
+        )
+      } else {
+        message.error(getActionErrorMessage(error, '生成采购入库草稿失败'))
+      }
     } finally {
       setGeneratingInboundDraft(false)
     }
-  }, [form, navigate, selectedOrder])
+  }, [closeInboundDraftModal, form, navigate, selectedOrder])
 
   const hasInboundDraftRemaining = useMemo(
     () => inboundDraftPreviewRows.some((row) => row.remainingQuantity > 0),

@@ -410,12 +410,11 @@ func activateQualityTestCustomerConfig(t *testing.T, dispatcher *jsonrpcDispatch
 	if !ok {
 		t.Fatalf("invalid customer config params: %#v", params.AsMap())
 	}
-	if _, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1); err != nil {
+	published, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1)
+	if err != nil {
 		t.Fatalf("publish customer config %s err = %v", in.Revision, err)
 	}
-	if _, err := dispatcher.customerConfigUC.ActivateCustomerConfig(context.Background(), in.CustomerKey, in.Revision, 1); err != nil {
-		t.Fatalf("activate customer config %s err = %v", in.Revision, err)
-	}
+	activatePublishedCustomerConfigForTest(t, dispatcher.customerConfigUC, in, published, 1)
 }
 
 func createPostedQualityReceipt(t *testing.T, ctx context.Context, uc *biz.InventoryUsecase, fixtures inventoryTestFixtures, receiptNo, lotNo string) (*biz.PurchaseReceipt, *biz.PurchaseReceiptItem, int) {
@@ -428,12 +427,13 @@ func createPostedQualityReceipt(t *testing.T, ctx context.Context, uc *biz.Inven
 		t.Fatalf("create receipt %s failed: %v", receiptNo, err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   receipt.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		LotNo:       stringPtr(lotNo),
-		Quantity:    mustDecimal(t, "10"),
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		LotNo:          stringPtr(lotNo),
+		Quantity:       mustDecimal(t, "10"),
+		IdempotencyKey: "test:quality-receipt:" + receiptNo,
 	}); err != nil {
 		t.Fatalf("add receipt item %s failed: %v", receiptNo, err)
 	}

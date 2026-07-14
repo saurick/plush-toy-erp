@@ -110,6 +110,8 @@ func outsourcingOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.Outs
 func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrOutsourcingOrderConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[outsourcing_order] invalid param err=%v", err)
 		return invalidParamResult()
@@ -165,6 +167,7 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"order_date":              item.OrderDate.Unix(),
 		"expected_return_date":    optionalUnix(item.ExpectedReturnDate),
 		"lifecycle_status":        item.LifecycleStatus,
+		"version":                 item.Version,
 		"note":                    optionalStringValue(item.Note),
 		"created_at":              item.CreatedAt.Unix(),
 		"updated_at":              item.UpdatedAt.Unix(),

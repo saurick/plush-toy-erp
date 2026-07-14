@@ -11,7 +11,7 @@
 | `scripts/` | 本地环境初始化、质量门禁和 Git hooks |
 | [`.agents/skills/`](.agents/skills/README.md) | Codex 项目专项 SOP：代码审查、文档、领域边界、页面、打印模板、seed/import、测试和统一 operations；通用提示词与 Git 收口使用全局 skills |
 | `docs/` | 仓库级约定、流程、数据模型、产品化架构、架构评审和部署文档 |
-| `config/` | 行业模板、客户配置包、客户配置 catalog / schema 和私有化复制模板落点；当前已有 yoyoosun 前端品牌 / 桌面菜单展示配置源、部署注入示例、字段 / 编号 / 导入草案和流程结构 preview，默认产品前端包不静态打包具体客户配置；后端只接收受控编译后的客户配置 revision 并生成 effective session，不代表 SaaS tenant，也不改变 Workflow / Fact 真源，内部目录职责见 [`config/README.md`](config/README.md) |
+| `config/` | 行业模板、客户配置包、客户配置 catalog / schema 和私有化复制模板落点；`demo` 是最小 smoke fixture，`reference-customer` 是 draft/preview 工程参考，`yoyoosun` 是当前真实客户配置；默认产品前端包不静态打包具体客户配置，后端只接收受控编译后的 revision 并生成 effective session，不代表 SaaS tenant，也不改变 Workflow / Fact 真源，内部目录职责见 [`config/README.md`](config/README.md) |
 | `deployments/` | 客户私有化部署实例资料落点；当前唯一部署真源仍在 `server/deploy/compose/prod`，私有化模板不创建第二套部署主路径 |
 
 ## 当前边界
@@ -150,6 +150,7 @@ pnpm style:l1
 - 正式产品入口与菜单配置计划：[docs/product/正式产品入口与菜单配置计划.md](docs/product/正式产品入口与菜单配置计划.md)
 - 产品台账索引：[docs/product/产品台账索引.md](docs/product/产品台账索引.md)
 - 产品能力进度台账：[docs/product/产品能力进度台账.md](docs/product/产品能力进度台账.md)
+- 标准样例客户工程参考：[docs/customers/reference-customer/README.md](docs/customers/reference-customer/README.md)
 - 永绅 yoyoosun 客户交付矩阵：[docs/customers/yoyoosun/客户交付矩阵.md](docs/customers/yoyoosun/客户交付矩阵.md)
 - 永绅 yoyoosun 客户差异台账：[docs/customers/yoyoosun/客户差异台账.md](docs/customers/yoyoosun/客户差异台账.md)
 - 状态 / Workflow / Fact 边界：[docs/architecture/状态工作流事实边界.md](docs/architecture/状态工作流事实边界.md)

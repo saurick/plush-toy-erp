@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"sort"
+	"strings"
 )
 
 // GetEffectiveActionEntitlements returns the active customer revision's
@@ -58,6 +59,97 @@ func (uc *CustomerConfigUsecase) getEffectiveActionEntitlements(ctx context.Cont
 		return nil, err
 	}
 	return sortedPermissionKeys(customerConfigRoleActionSet(baseActions, roleKeys, roleProfiles, entitlements, customerKey, nil)), nil
+}
+
+// EnsureProcessDomainCommandAllowedAtRevision authorizes a running process
+// against the immutable customer revision captured when that process started.
+// Backend RBAC remains the upper bound; customer entitlements and module state
+// can only narrow it at the same formally activated revision.
+func (uc *CustomerConfigUsecase) EnsureProcessDomainCommandAllowedAtRevision(
+	ctx context.Context,
+	customerKey string,
+	revision string,
+	admin *AdminUser,
+	commandKey string,
+) error {
+	if uc == nil || uc.repo == nil || admin == nil || !admin.IsActive() {
+		return ErrForbidden
+	}
+	customerKey = NormalizeCustomerKey(customerKey)
+	if customerKey == "" {
+		customerKey = DefaultCustomerKey
+	}
+	revision = strings.TrimSpace(revision)
+	commandKey = strings.TrimSpace(commandKey)
+	permissionKey := processDomainCommandRequiredPermission(commandKey)
+	if revision == "" || permissionKey == "" {
+		return ErrBadParam
+	}
+	if !AdminHasPermission(admin, permissionKey) {
+		return ErrNoPermission
+	}
+	stored, err := uc.repo.GetCustomerConfigRevision(ctx, customerKey, revision)
+	if err != nil {
+		return err
+	}
+	if stored == nil || stored.CustomerKey != customerKey || stored.Revision != revision ||
+		stored.ActivatedAt == nil || !customerConfigRevisionCanAuthorizeRuntimeTask(stored.Status) {
+		return ErrCustomerConfigNotFound
+	}
+	modules, err := uc.repo.ListDeploymentModuleStates(ctx, customerKey, revision)
+	if err != nil {
+		return err
+	}
+	requiredModules := processDomainCommandReferencedModuleKeys(commandKey)
+	if len(requiredModules) == 0 {
+		return ErrBadParam
+	}
+	if err := ensureCustomerConfigModuleKeysEnabled(requiredModules, modules); err != nil {
+		return err
+	}
+	if admin.IsSuperAdmin {
+		return nil
+	}
+	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, revision)
+	if err != nil {
+		return err
+	}
+	roleKeys := enabledCustomerRoleKeys(AdminRoleKeys(admin), roleProfiles)
+	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, revision, roleKeys)
+	if err != nil {
+		return err
+	}
+	actions := customerConfigRoleActionSet(
+		PermissionKeySet(effectiveActionKeys(admin)),
+		roleKeys,
+		roleProfiles,
+		entitlements,
+		customerKey,
+		nil,
+	)
+	if !PermissionSetHasAny(actions, permissionKey) {
+		return ErrNoPermission
+	}
+	return nil
+}
+
+func processDomainCommandRequiredPermission(commandKey string) string {
+	switch strings.TrimSpace(commandKey) {
+	case ProcessDomainCommandSalesOrderSubmit:
+		return PermissionSalesOrderSubmit
+	case ProcessDomainCommandPurchaseReceiptCreate:
+		return PermissionPurchaseReceiptCreate
+	case ProcessDomainCommandIncomingQualityGate, ProcessDomainCommandFinishedGoodsQualityDecide:
+		return PermissionQualityInspectionUpdate
+	case ProcessDomainCommandInventoryPostInbound:
+		return PermissionWarehouseInboundConfirm
+	case ProcessDomainCommandShipmentFinanceRelease, ProcessDomainCommandFinanceReceivableLead:
+		return PermissionFinanceReceivableConfirm
+	case ProcessDomainCommandShipmentShip:
+		return PermissionShipmentShip
+	default:
+		return ""
+	}
 }
 
 func customerConfigRoleActionSet(

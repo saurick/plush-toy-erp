@@ -201,7 +201,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 			has: []string{
 				PermissionSystemUserRead,
 				PermissionSystemRoleRead,
-				PermissionSystemPermissionManage,
+				PermissionSystemRolePermissionManage,
 				PermissionSystemAuditRead,
 			},
 			omits: []string{PermissionWorkflowTaskComplete, PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
@@ -463,29 +463,6 @@ func TestAdminMenusOmitRetiredFrontendDocsAndQAPaths(t *testing.T) {
 	}
 }
 
-func TestNormalizeAdminMenuPermissionsRedirectsRetiredFrontendPaths(t *testing.T) {
-	normalized := NormalizeAdminMenuPermissions([]string{
-		"/erp/help-center",
-		"/erp/docs/operation-guide",
-		"/erp/qa/business-chain-debug",
-	})
-
-	if len(normalized) != 1 || normalized[0] != "/erp/dashboard" {
-		t.Fatalf("expected retired paths to normalize to dashboard, got %#v", normalized)
-	}
-}
-
-func TestNormalizeAdminMenuPermissionsDropsLegacyBusinessRecordEntries(t *testing.T) {
-	normalized := NormalizeAdminMenuPermissions([]string{
-		"/erp/master/partners",
-		"/erp/sales/project-orders",
-	})
-
-	if len(normalized) != 0 {
-		t.Fatalf("expected legacy business record paths to be dropped, got %#v", normalized)
-	}
-}
-
 func TestAdminCanAccessMobileRoleUsesPermissionCode(t *testing.T) {
 	admin := &AdminUser{
 		ID:          2,
@@ -498,5 +475,47 @@ func TestAdminCanAccessMobileRoleUsesPermissionCode(t *testing.T) {
 	}
 	if AdminCanAccessMobileRole(admin, WarehouseRoleKey) {
 		t.Fatalf("warehouse mobile access must require its own permission")
+	}
+}
+
+func TestPermissionDefinitionsSeparateDelegableAndControlPlaneCapabilities(t *testing.T) {
+	business, ok := PermissionDefinitionByKey(PermissionWarehouseInventoryRead)
+	if !ok || business.Class != PermissionClassBusiness || !business.Assignable || business.NonProductionOnly {
+		t.Fatalf("unexpected business permission metadata: %#v ok=%t", business, ok)
+	}
+	controlPlane, ok := PermissionDefinitionByKey(PermissionSystemUserRead)
+	if !ok || controlPlane.Class != PermissionClassControlPlane || controlPlane.Assignable || controlPlane.NonProductionOnly {
+		t.Fatalf("unexpected control-plane permission metadata: %#v ok=%t", controlPlane, ok)
+	}
+	debug, ok := PermissionDefinitionByKey(PermissionDebugBusinessClear)
+	if !ok || debug.Class != PermissionClassDebug || debug.Assignable || !debug.NonProductionOnly {
+		t.Fatalf("unexpected debug permission metadata: %#v ok=%t", debug, ok)
+	}
+}
+
+func TestNormalizeRoleTypeKeepsReservedRolesSystemManaged(t *testing.T) {
+	for _, roleKey := range []string{AdminRoleKey, DebugOperatorRoleKey} {
+		if got := NormalizeRoleType(RoleTypeCustom, roleKey, false); got != RoleTypeSystem {
+			t.Fatalf("NormalizeRoleType(custom, %q) = %q, want system", roleKey, got)
+		}
+	}
+	if got := NormalizeRoleType("", WarehouseRoleKey, true); got != RoleTypeBusinessDefault {
+		t.Fatalf("builtin business role type = %q, want business_default", got)
+	}
+	if got := NormalizeRoleType("", "sample_room_manager", false); got != RoleTypeCustom {
+		t.Fatalf("custom role type = %q, want custom", got)
+	}
+}
+
+func TestRoleAssignmentEnvironmentAllowsDebugOnlyInExplicitNonProduction(t *testing.T) {
+	for _, environment := range []string{"local", "localhost", "dev", "development"} {
+		if !RoleAssignmentEnvironmentAllowsDebug(environment) {
+			t.Fatalf("expected %q to allow debug role assignment", environment)
+		}
+	}
+	for _, environment := range []string{"", "sql", "qa", "test", "shared", "staging", "prod", "production", "remote"} {
+		if RoleAssignmentEnvironmentAllowsDebug(environment) {
+			t.Fatalf("expected %q to reject debug role assignment", environment)
+		}
 	}
 }

@@ -89,7 +89,7 @@ services:
       TZ: "${TZ:-Asia/Shanghai}"
       ERP_CUSTOMER_KEY: "${ERP_CUSTOMER_KEY:-demo}"
       ERP_PDF_CHROME_PATH: "${ERP_PDF_CHROME_PATH:-/usr/bin/chromium}"
-      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
+      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-4}"
       ERP_PDF_WARMUP: "${ERP_PDF_WARMUP:-}"
       # 设计意图：默认 DSN 必须与本项目 prod 配置保持一致，避免 .env 未显式覆盖时误连占位库名或占位密码。
       POSTGRES_DSN: "${POSTGRES_DSN:-postgres://postgres:change-this-prod-postgres-password@postgres:5432/plush_erp?sslmode=disable}"
@@ -112,8 +112,8 @@ services:
       ERP_DEBUG_CLEANUP_ENABLED: "${ERP_DEBUG_CLEANUP_ENABLED:-false}"
       ERP_DEBUG_BUSINESS_CLEAR_ENABLED: "${ERP_DEBUG_BUSINESS_CLEAR_ENABLED:-false}"
       ERP_DEBUG_CLEANUP_SCOPE: "${ERP_DEBUG_CLEANUP_SCOPE:-debug_run}"
-    mem_limit: "${APP_MEM_LIMIT:-896m}"
-    mem_reservation: "${APP_MEM_RESERVATION:-384m}"
+    mem_limit: "${APP_MEM_LIMIT:-2g}"
+    mem_reservation: "${APP_MEM_RESERVATION:-768m}"
     networks: {}
 
   web-desktop:

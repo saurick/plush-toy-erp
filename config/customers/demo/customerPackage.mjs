@@ -30,6 +30,26 @@ export const demoCustomerPackage = Object.freeze({
     writesShipmentFacts: false,
     writesFinanceFacts: false,
   }),
+  runtimeProcessSelections: Object.freeze([
+    Object.freeze({
+      processKey: "sales_order_acceptance",
+      processVersion: "v1",
+      variantKey: "approval_pmc",
+      businessRefType: "sales_order",
+    }),
+    Object.freeze({
+      processKey: "material_supply",
+      processVersion: "v1",
+      variantKey: "purchase_receipt_iqc_inbound",
+      businessRefType: "purchase_order",
+    }),
+    Object.freeze({
+      processKey: "finished_goods_delivery",
+      processVersion: "v1",
+      variantKey: "quality_finance_ship_receivable",
+      businessRefType: "shipment",
+    }),
+  ]),
   workPoolRoleOverrides: Object.freeze({
     order_review: "sales",
   }),

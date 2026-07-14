@@ -563,26 +563,28 @@ export function SalesOrderItemsFormSection({
             <div className="erp-line-items-form__import-row">
               <div className="erp-line-items-form__import-copy">
                 <strong>从 SKU 添加明细</strong>
-                <span>从业务来源导入；数量、单价和交期回到订单行维护。</span>
+                <span>从 SKU 库添加；数量、单价和交期回到订单行维护。</span>
               </div>
               <Button
                 className="erp-line-items-form__import-button"
                 disabled={!canCreateItem}
                 onClick={() => setSkuImportOpen(true)}
               >
-                从 SKU 库导入
+                从 SKU 库添加
               </Button>
             </div>
             <SourceImportPickerModal
               open={skuImportOpen}
-              title="从 SKU 库导入订单行"
-              description="这里只选择来源记录；数量、单价和交期仍在主弹窗订单行里维护。"
+              title="选择 SKU 添加订单行"
+              description="这里只选择 SKU 档案；数量、单价和交期仍在主弹窗订单行里维护。"
               rows={productSKUs}
               columns={skuImportColumns}
               getSelectedLabel={skuLabel}
               searchPlaceholder="搜索 SKU"
               searchHint="可搜索：SKU 编码、名称、颜色、包装"
-              emptyDescription="暂无可导入 SKU"
+              importText="添加到订单行"
+              selectedNoun="SKU"
+              emptyDescription="暂无可选 SKU"
               onCancel={() => setSkuImportOpen(false)}
               onImport={(selectedSKUs) => {
                 const currentLines = form.getFieldValue('items') || []

@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
-	"os"
 	"strings"
 	"sync"
 	"testing"
@@ -539,6 +538,108 @@ func TestWorkflowPostgresMigrationShape(t *testing.T) {
 		t.Fatalf("workflow receipt constraint must be a CHECK, got %s", constraintDefinition)
 	}
 
+	for constraintName, requiredParts := range map[string][]string{
+		"workflow_tasks_status_allowed": {
+			"ready", "blocked", "done", "rejected",
+		},
+		"workflow_tasks_process_anchors_paired": {
+			"process_instance_id", "process_node_instance_id",
+		},
+	} {
+		if err := data.sqldb.QueryRowContext(ctx, `
+			SELECT pg_get_constraintdef(oid)
+			FROM pg_constraint
+			WHERE conrelid = 'public.workflow_tasks'::regclass AND conname = $1
+		`, constraintName).Scan(&constraintDefinition); err != nil {
+			t.Fatalf("query workflow task constraint %s: %v", constraintName, err)
+		}
+		for _, part := range requiredParts {
+			if !strings.Contains(constraintDefinition, part) {
+				t.Fatalf("workflow task constraint %s missing %q: %s", constraintName, part, constraintDefinition)
+			}
+		}
+		if constraintName == "workflow_tasks_status_allowed" &&
+			(strings.Contains(constraintDefinition, "pending") || strings.Contains(constraintDefinition, "processing")) {
+			t.Fatalf("workflow task status CHECK must be target-only: %s", constraintDefinition)
+		}
+	}
+
+	for _, constraintName := range []string{
+		"workflow_tasks_process_instances_workflow_tasks",
+		"workflow_tasks_process_node_instances_workflow_tasks",
+	} {
+		var foreignConstraintCount int
+		if err := data.sqldb.QueryRowContext(ctx, `
+			SELECT count(*)
+			FROM pg_constraint
+			WHERE conrelid = 'public.workflow_tasks'::regclass
+			  AND conname = $1
+			  AND contype = 'f'
+		`, constraintName).Scan(&foreignConstraintCount); err != nil {
+			t.Fatalf("query workflow task FK %s: %v", constraintName, err)
+		}
+		if foreignConstraintCount != 1 {
+			t.Fatalf("workflow task FK %s count=%d, want 1", constraintName, foreignConstraintCount)
+		}
+	}
+
+	var anchorTriggerCount int
+	if err := data.sqldb.QueryRowContext(ctx, `
+		SELECT count(*)
+		FROM pg_trigger
+		WHERE tgrelid = 'public.workflow_tasks'::regclass
+		  AND tgname = 'workflow_task_process_anchor_match'
+		  AND NOT tgisinternal
+	`).Scan(&anchorTriggerCount); err != nil {
+		t.Fatalf("query workflow task anchor trigger: %v", err)
+	}
+	if anchorTriggerCount != 1 {
+		t.Fatalf("workflow task anchor trigger count=%d, want 1", anchorTriggerCount)
+	}
+
+	processSuffix := strings.ToLower(postgresTestSuffix())
+	var processA, processB, nodeB int
+	for processKey, target := range map[string]*int{
+		"anchor-a-" + processSuffix: &processA,
+		"anchor-b-" + processSuffix: &processB,
+	} {
+		if err := data.sqldb.QueryRowContext(ctx, `
+			INSERT INTO process_instances (
+				process_key, process_version, definition_hash, config_revision,
+				business_ref_type, business_ref_id, status, idempotency_key,
+				started_at, created_at, updated_at
+			)
+			VALUES ($1, 'v1', $2, 'config-test', 'workflow-anchor-test', $3, 'active', $4, NOW(), NOW(), NOW())
+			RETURNING id
+		`, processKey, strings.Repeat("a", 64), workflowPostgresSourceID(), "idem-"+processKey).Scan(target); err != nil {
+			t.Fatalf("create process anchor fixture %s: %v", processKey, err)
+		}
+	}
+	if err := data.sqldb.QueryRowContext(ctx, `
+		INSERT INTO process_node_instances (
+			process_instance_id, node_key, node_type, attempt, status,
+			created_at, updated_at
+		)
+		VALUES ($1, 'node-b', 'human_task', 1, 'waiting', NOW(), NOW())
+		RETURNING id
+	`, processB).Scan(&nodeB); err != nil {
+		t.Fatalf("create process node anchor fixture: %v", err)
+	}
+	_, anchorInsertErr := data.sqldb.ExecContext(ctx, `
+		INSERT INTO workflow_tasks (
+			task_code, task_group, task_name, source_type, source_id,
+			task_status_key, owner_role_key, process_instance_id,
+			process_node_instance_id, created_at, updated_at
+		)
+		VALUES ($1, 'anchor_contract', '跨流程锚点负例', 'workflow-anchor-test', $2,
+			'ready', 'boss', $3, $4, NOW(), NOW())
+	`, "WF-ANCHOR-MISMATCH-"+processSuffix, workflowPostgresSourceID(), processA, nodeB)
+	var anchorErr *pgconn.PgError
+	if !errors.As(anchorInsertErr, &anchorErr) || anchorErr.Code != "23514" ||
+		!strings.Contains(anchorErr.Message, "does not belong") {
+		t.Fatalf("cross-process workflow anchors must be rejected, err=%v", anchorInsertErr)
+	}
+
 	repo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	task := createWorkflowPostgresConcurrencyTask(t, ctx, repo, "RECEIPT-CHECK", suffix, workflowPostgresSourceID())
@@ -799,14 +900,11 @@ func TestWorkflowPostgresMigrationShape(t *testing.T) {
 	}
 }
 
-func TestWorkflowPostgresShipmentReminderMigrationNormalizesBusinessStatus(t *testing.T) {
+func TestWorkflowPostgresBusinessStateRejectsRemovedShipmentReleasePendingStatus(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	data, client := openPurchaseReceiptPostgresTestData(t)
-	repo := NewWorkflowRepo(data, log.NewStdLogger(io.Discard))
-	suffix := postgresTestSuffix()
 	sourceID := workflowPostgresSourceID()
-	task := createWorkflowPostgresConcurrencyTask(t, ctx, repo, "SHIPMENT-STATUS-MIGRATION", suffix, sourceID)
 	state, err := client.WorkflowBusinessState.Create().
 		SetSourceType("shipping-release").
 		SetSourceID(sourceID).
@@ -814,30 +912,19 @@ func TestWorkflowPostgresShipmentReminderMigrationNormalizesBusinessStatus(t *te
 		SetPayload(map[string]any{}).
 		Save(ctx)
 	if err != nil {
-		t.Fatalf("create workflow business state for migration: %v", err)
+		t.Fatalf("create current workflow business state: %v", err)
 	}
-	if _, err := data.sqldb.ExecContext(ctx, `UPDATE workflow_tasks SET business_status_key = 'shipment_release_pending' WHERE id = $1`, task.ID); err != nil {
-		t.Fatalf("prepare this project's pre-migration workflow task: %v", err)
+	_, err = data.sqldb.ExecContext(ctx, `UPDATE workflow_business_states SET business_status_key = 'shipment_release_pending' WHERE id = $1`, state.ID)
+	var constraintErr *pgconn.PgError
+	if !errors.As(err, &constraintErr) || constraintErr.Code != "23514" || constraintErr.ConstraintName != "workflow_business_states_status_allowed" {
+		t.Fatalf("removed business status must fail closed with target-only CHECK, got %v", err)
 	}
-	if _, err := data.sqldb.ExecContext(ctx, `UPDATE workflow_business_states SET business_status_key = 'shipment_release_pending' WHERE id = $1`, state.ID); err != nil {
-		t.Fatalf("prepare this project's pre-migration workflow business state: %v", err)
-	}
-	migrationSQL, err := os.ReadFile("model/migrate/20260711204000_migrate.sql")
-	if err != nil {
-		t.Fatalf("read shipment reminder migration: %v", err)
-	}
-	if _, err := data.sqldb.ExecContext(ctx, string(migrationSQL)); err != nil {
-		t.Fatalf("execute shipment reminder migration: %v", err)
-	}
-	var taskStatus, stateStatus string
-	if err := data.sqldb.QueryRowContext(ctx, `SELECT business_status_key FROM workflow_tasks WHERE id = $1`, task.ID).Scan(&taskStatus); err != nil {
-		t.Fatalf("read migrated workflow task status: %v", err)
-	}
+	var stateStatus string
 	if err := data.sqldb.QueryRowContext(ctx, `SELECT business_status_key FROM workflow_business_states WHERE id = $1`, state.ID).Scan(&stateStatus); err != nil {
-		t.Fatalf("read migrated workflow business state: %v", err)
+		t.Fatalf("read current workflow business state: %v", err)
 	}
-	if taskStatus != "shipment_pending" || stateStatus != "shipment_pending" {
-		t.Fatalf("shipment reminder migration must normalize both projections, task=%q state=%q", taskStatus, stateStatus)
+	if stateStatus != "shipment_pending" {
+		t.Fatalf("failed legacy write must preserve canonical status, got %q", stateStatus)
 	}
 }
 

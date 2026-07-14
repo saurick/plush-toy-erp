@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -14,6 +15,30 @@ import (
 
 type PurchaseReceipt struct {
 	ent.Schema
+}
+
+func (PurchaseReceipt) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"purchase_receipts_idempotency_bundle_complete": `
+(
+  (
+    idempotency_key IS NULL
+    AND idempotency_payload_hash IS NULL
+    AND idempotency_item_count IS NULL
+  )
+  OR
+  (
+    idempotency_key IS NOT NULL
+    AND length(trim(idempotency_key)) BETWEEN 1 AND 128
+    AND idempotency_payload_hash IS NOT NULL
+    AND length(idempotency_payload_hash) = 64
+    AND idempotency_item_count IS NOT NULL
+    AND idempotency_item_count > 0
+  )
+)`,
+		}},
+	}
 }
 
 var purchaseReceiptLockedFields = map[string]struct{}{

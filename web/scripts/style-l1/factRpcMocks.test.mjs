@@ -72,6 +72,118 @@ async function workflowMockHarness(
   }
 }
 
+async function purchaseMockHarness() {
+  const handlers = new Map()
+  const page = {
+    async route(pattern, handler) {
+      handlers.set(pattern, handler)
+    },
+  }
+  await installFactRpcMocks(page, {
+    adminProfile: {
+      id: 1,
+      is_super_admin: true,
+      roles: [{ role_key: 'purchase' }],
+      permissions: ['purchase.receipt.create'],
+      effective_session: { actions: ['purchase.receipt.create'] },
+    },
+    effectiveSession: { actions: ['purchase.receipt.create'] },
+    nowUnix: () => 1_750_000_000,
+    resolveDelayFromReferer: () => 0,
+  })
+  const handler = handlers.get('**/rpc/purchase')
+  assert.equal(typeof handler, 'function')
+
+  return async function call(method, params = {}) {
+    let responseBody = null
+    const request = {
+      postDataJSON: () => ({
+        jsonrpc: '2.0',
+        id: method,
+        method,
+        params,
+      }),
+    }
+    await handler({
+      request: () => request,
+      fulfill: async ({ body }) => {
+        responseBody = JSON.parse(body)
+      },
+    })
+    return responseBody
+  }
+}
+
+test('style-l1 purchase mock enforces retry-safe receipt mutations', async () => {
+  const call = await purchaseMockHarness()
+  const addParams = {
+    receipt_id: 603,
+    material_id: 1,
+    warehouse_id: 1,
+    unit_id: 1,
+    lot_id: 401,
+    quantity: '2.0000',
+    idempotency_key: 'style-l1-add-receipt-item',
+  }
+
+  const missingKey = await call('add_purchase_receipt_item', {
+    ...addParams,
+    idempotency_key: '',
+  })
+  assert.equal(missingKey.result.code, 40010)
+
+  const first = await call('add_purchase_receipt_item', addParams)
+  const replay = await call('add_purchase_receipt_item', {
+    idempotency_key: addParams.idempotency_key,
+    quantity: addParams.quantity,
+    lot_id: addParams.lot_id,
+    unit_id: addParams.unit_id,
+    warehouse_id: addParams.warehouse_id,
+    material_id: addParams.material_id,
+    receipt_id: addParams.receipt_id,
+  })
+  assert.equal(first.result.code, 0)
+  assert.equal(
+    replay.result.data.purchase_receipt_item.id,
+    first.result.data.purchase_receipt_item.id
+  )
+  assert.equal(first.result.data.purchase_receipt_item.receipt_id, 603)
+
+  const conflict = await call('add_purchase_receipt_item', {
+    ...addParams,
+    quantity: '3.0000',
+  })
+  assert.equal(conflict.result.code, 40920)
+
+  const listed = await call('list_purchase_receipts')
+  const draft = listed.result.data.purchase_receipts.find(
+    (receipt) => receipt.id === 603
+  )
+  assert.equal(draft.items.length, 2)
+
+  const createParams = {
+    purchase_order_id: 7,
+    receipt_no: 'IN-PO-7',
+    warehouse_id: 1,
+    received_at: '2026-07-14',
+    idempotency_key: 'style-l1-create-receipt',
+  }
+  const created = await call(
+    'create_purchase_receipt_from_purchase_order',
+    createParams
+  )
+  const createdReplay = await call(
+    'create_purchase_receipt_from_purchase_order',
+    { ...createParams }
+  )
+  assert.equal(created.result.code, 0)
+  assert.equal(
+    createdReplay.result.data.purchase_receipt.id,
+    created.result.data.purchase_receipt.id
+  )
+  assert.equal(created.result.data.purchase_receipt.items.length, 1)
+})
+
 test('style-l1 workflow mock keeps explain_action_access params canonical', async () => {
   const call = await workflowMockHarness()
   const unknownMethod = await call('unknown_workflow_method')
@@ -188,7 +300,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
 
   const defaultStatusCreated = await call('create_task', validCreateParams)
   assert.equal(defaultStatusCreated.result.code, 0)
-  assert.equal(defaultStatusCreated.result.data.task.task_status_key, 'pending')
+  assert.equal(defaultStatusCreated.result.data.task.task_status_key, 'ready')
 
   const created = await call('create_task', {
     task_code: 'STYLE-L1-EXPLAIN-CONTRACT',
@@ -222,7 +334,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
   assert.equal(allActions.result.code, 0)
   assert.deepEqual(
     allActions.result.data.actions.map((item) => item.action_key),
-    ['complete', 'block', 'reject', 'urge']
+    ['complete', 'block', 'reject', 'resume', 'urge']
   )
   assert.equal(
     allActions.result.data.actions.find((item) => item.action_key === 'reject')
@@ -235,7 +347,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
     ''
   )
 
-  for (const actionKey of ['complete', 'block', 'reject', 'urge']) {
+  for (const actionKey of ['complete', 'block', 'reject', 'resume', 'urge']) {
     const exact = await call('explain_action_access', {
       task_id: taskID,
       action_key: actionKey,
@@ -280,6 +392,102 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
     assert.equal(action.reason_code, 'terminal_task')
     assert.equal(action.reason, '该任务已结束，只能查看上下文。')
   }
+})
+
+test('style-l1 workflow role task view mock applies role, view and cursor boundaries', async () => {
+  const call = await workflowMockHarness()
+  const createTask = (params) =>
+    call('create_task', {
+      task_group: 'workflow-contract',
+      source_type: 'workflow-contract',
+      priority: 1,
+      ...params,
+    })
+
+  const todoA = await createTask({
+    task_code: 'STYLE-L1-ROLE-TODO-A',
+    task_name: '销售待办 A',
+    source_id: 101,
+    task_status_key: 'ready',
+    owner_role_key: 'sales',
+  })
+  const todoRisk = await createTask({
+    task_code: 'STYLE-L1-ROLE-RISK',
+    task_name: '销售风险任务',
+    source_id: 102,
+    task_status_key: 'ready',
+    owner_role_key: 'sales',
+    priority: 3,
+  })
+  const historyCreated = await createTask({
+    task_code: 'STYLE-L1-ROLE-HISTORY',
+    task_name: '销售已办任务',
+    source_id: 103,
+    task_status_key: 'ready',
+    owner_role_key: 'sales',
+  })
+  const history = await call('complete_task_action', {
+    task_id: historyCreated.result.data.task.id,
+    expected_version: 1,
+    idempotency_key: 'style-l1-role-history',
+    action_key: 'complete',
+  })
+  assert.equal(history.result.code, 0)
+  await createTask({
+    task_code: 'STYLE-L1-ROLE-OTHER',
+    task_name: '老板已办任务',
+    source_id: 104,
+    task_status_key: 'ready',
+    owner_role_key: 'boss',
+  })
+
+  const firstTodoPage = await call('list_role_tasks', {
+    view_key: 'todo',
+    role_key: 'sales',
+    limit: 1,
+  })
+  assert.equal(firstTodoPage.result.code, 0)
+  assert.equal(firstTodoPage.result.data.items.length, 1)
+  assert.equal(
+    firstTodoPage.result.data.items[0].id,
+    todoRisk.result.data.task.id
+  )
+  assert.equal(firstTodoPage.result.data.has_more, true)
+  assert.equal(typeof firstTodoPage.result.data.next_cursor, 'string')
+  assert.equal(firstTodoPage.result.data.server_time, 1_750_000_000)
+
+  const secondTodoPage = await call('list_role_tasks', {
+    view_key: 'todo',
+    role_key: 'sales',
+    limit: 1,
+    cursor: firstTodoPage.result.data.next_cursor,
+  })
+  assert.deepEqual(
+    secondTodoPage.result.data.items.map((task) => task.id),
+    [todoA.result.data.task.id]
+  )
+  assert.equal(secondTodoPage.result.data.has_more, false)
+  assert.equal(secondTodoPage.result.data.next_cursor, '')
+
+  const riskPage = await call('list_role_tasks', {
+    view_key: 'risk',
+    role_key: 'sales',
+    limit: 50,
+  })
+  assert.deepEqual(
+    riskPage.result.data.items.map((task) => task.id),
+    [todoRisk.result.data.task.id]
+  )
+
+  const historyPage = await call('list_role_tasks', {
+    view_key: 'history',
+    role_key: 'sales',
+    limit: 50,
+  })
+  assert.deepEqual(
+    historyPage.result.data.items.map((task) => task.id),
+    [history.result.data.task.id]
+  )
 })
 
 test('style-l1 workflow mock serves the dedicated task board projection', async () => {
@@ -454,12 +662,15 @@ test('style-l1 workflow explain mock fails closed on permission and owner mismat
     deniedByEffectiveSession.result.data.actions.some((item) => item.allowed),
     false
   )
-  assert.equal(
-    deniedByEffectiveSession.result.data.actions.every(
-      (item) => item.reason_code === 'missing_permission'
-    ),
-    true
-  )
+  for (const action of deniedByEffectiveSession.result.data.actions) {
+    assert.equal(action.allowed, false)
+    assert.equal(
+      action.reason_code,
+      action.action_key === 'resume'
+        ? 'status_transition_not_allowed'
+        : 'missing_permission'
+    )
+  }
 })
 
 test('style-l1 workflow mutation routes enforce the same permission, owner and assignee decisions', async () => {
@@ -684,6 +895,59 @@ test('style-l1 workflow mutations replay exact receipts before terminal and CAS 
       item.method
     )
   }
+})
+
+test('style-l1 workflow resume is a reasoned blocked-to-ready mutation with exact replay', async () => {
+  const call = await workflowMockHarness()
+  const created = await call('create_task', {
+    task_code: 'STYLE-L1-RESUME-REPLAY',
+    task_group: 'workflow-contract',
+    task_name: '解除阻塞精确重放',
+    source_type: 'workflow-contract',
+    source_id: 905,
+    task_status_key: 'ready',
+    owner_role_key: 'sales',
+  })
+  const blocked = await call('block_task_action', {
+    task_id: created.result.data.task.id,
+    expected_version: 1,
+    idempotency_key: 'style-l1-resume-precondition',
+    action_key: 'block',
+    reason: '等待客户补齐资料',
+  })
+  assert.equal(blocked.result.code, 0)
+  assert.equal(blocked.result.data.task.task_status_key, 'blocked')
+
+  const params = {
+    task_id: created.result.data.task.id,
+    expected_version: blocked.result.data.task.version,
+    idempotency_key: 'style-l1-resume-replay',
+    action_key: 'resume',
+    reason: '客户资料已经补齐',
+  }
+  const resumed = await call('resume_task_action', params)
+  assert.equal(resumed.result.code, 0)
+  assert.equal(resumed.result.data.task.task_status_key, 'ready')
+  assert.equal(resumed.result.data.task.blocked_reason, '')
+
+  const replay = await call('resume_task_action', {
+    ...params,
+    expected_version: 999,
+  })
+  assert.equal(replay.result.code, 0)
+  assert.deepEqual(replay.result.data.task, resumed.result.data.task)
+
+  const changedIntent = await call('resume_task_action', {
+    ...params,
+    reason: '另一个解除说明',
+  })
+  assert.equal(changedIntent.result.code, 40920)
+
+  const newIntentAfterReady = await call('resume_task_action', {
+    ...params,
+    idempotency_key: 'style-l1-resume-new-intent',
+  })
+  assert.equal(newIntentAfterReady.result.code, 40010)
 })
 
 test('style-l1 workflow mutation accepts action capability without read capability', async () => {

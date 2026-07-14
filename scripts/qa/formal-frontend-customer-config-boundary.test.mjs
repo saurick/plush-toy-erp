@@ -3,6 +3,17 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import path from "node:path";
 import test from "node:test";
 
+import {
+  buildAssignableRoleOptions,
+  getRolePermissionReadOnlyReason,
+} from "../../web/src/erp/utils/permissionCenterAccess.mjs";
+import {
+  MOBILE_ROLE_TASK_VIEW_KEYS,
+  createMobileRoleTaskScopeState,
+  readMobileRoleTaskScopeState,
+  settleMobileRoleTaskRequest,
+} from "../../web/src/erp/utils/mobileTaskQueries.mjs";
+
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const erpSourceRoot = path.join(repoRoot, "web/src/erp");
 
@@ -186,7 +197,67 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(mobileTasksSource.includes("canMountCustomerRuntime"));
   assert(mobileTasksSource.includes("canMountCustomerTasks"));
   assert(mobileTasksSource.includes("if (!canMountCustomerTasks)"));
-  assert(mobileTasksSource.includes("setTasks([])"));
+  assert.match(
+    mobileTasksSource,
+    /const taskScopeKey = `\$\{activeRoleKey\}\|\$\{customerKey\}\|\$\{customerConfigRevision\}\|/u,
+    "role, customer, revision, or runtime access changes must invalidate the visible task scope",
+  );
+  assert.match(
+    mobileTasksSource,
+    /taskLoadRequestSeqRef\.current\[viewKey\] !== requestSeq/u,
+    "stale task responses must be ignored",
+  );
+  for (const helperCall of [
+    "createMobileRoleTaskScopeState(taskScopeKey)",
+    "readMobileRoleTaskScopeState(",
+    "settleMobileRoleTaskRequest(",
+  ]) {
+    assert(
+      mobileTasksSource.includes(helperCall),
+      `mobile task page must use ${helperCall}`,
+    );
+  }
+
+  const originalScopeKey = "sales|customer-a|revision-1|ready";
+  const originalScope = createMobileRoleTaskScopeState(originalScopeKey);
+  originalScope.slots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO] = {
+    ...originalScope.slots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO],
+    items: [{ id: "old-task" }],
+    loaded: true,
+  };
+  const replacementScope = readMobileRoleTaskScopeState(
+    originalScope,
+    "quality|customer-b|revision-2|ready",
+  );
+  assert.deepEqual(
+    Object.values(replacementScope.slots).flatMap((slot) => slot.items),
+    [],
+    "a changed role/customer/revision scope must not retain old tasks",
+  );
+
+  const staleResult = settleMobileRoleTaskRequest(originalScope, {
+    currentScopeKey: "quality|customer-b|revision-2|ready",
+    requestScopeKey: originalScopeKey,
+    viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO,
+    currentRequestSeq: 1,
+    requestSeq: 1,
+    response: { items: [{ id: "stale-task" }] },
+  });
+  assert.equal(staleResult, originalScope, "a stale response must not refill a new scope");
+
+  const refreshFailure = settleMobileRoleTaskRequest(originalScope, {
+    currentScopeKey: originalScopeKey,
+    requestScopeKey: originalScopeKey,
+    viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO,
+    currentRequestSeq: 2,
+    requestSeq: 2,
+    errorMessage: "refresh failed",
+  });
+  assert.deepEqual(
+    refreshFailure.slots[MOBILE_ROLE_TASK_VIEW_KEYS.TODO].items,
+    [{ id: "old-task" }],
+    "refresh failures must preserve previously loaded task data",
+  );
 
   const actionSource = readRelative(
     "web/src/erp/utils/masterDataOrderView.mjs",
@@ -256,11 +327,63 @@ test("formal customer frontend copy uses the current account and business perspe
   const permissionSource = readRelative(
     "web/src/erp/pages/PermissionCenterPage.jsx",
   );
-  assert(permissionSource.includes("自定义模板"));
+  const permissionBackendSource = readRelative(
+    "server/internal/service/jsonrpc_permissions.go",
+  );
+  assert(permissionSource.includes("buildAssignableRoleOptions(roles"));
+  assert(permissionSource.includes("getRolePermissionReadOnlyReason("));
+  assert(permissionBackendSource.includes('mapped["assignable_by_current_admin"]'));
   assert(
-    permissionSource.includes(
-      "按岗位职责维护角色名称和默认权限组合",
+    permissionBackendSource.includes(
+      'mapped["permissions_editable_by_current_admin"]',
     ),
+  );
+
+  const roleFixtures = [
+    {
+      role_key: "admin",
+      name: "系统管理员",
+      role_type: "system",
+      assignable_by_current_admin: true,
+      permissions_editable_by_current_admin: false,
+      version: 1,
+    },
+    {
+      role_key: "debug_operator",
+      role_type: "system",
+      assignable_by_current_admin: false,
+      permissions_editable_by_current_admin: false,
+      version: 1,
+    },
+    {
+      role_key: "sales",
+      name: "业务员",
+      role_type: "business_default",
+      assignable_by_current_admin: true,
+      permissions_editable_by_current_admin: true,
+      version: 1,
+    },
+    {
+      role_key: "quality_custom",
+      name: "品质复核",
+      role_type: "custom",
+      assignable_by_current_admin: false,
+      permissions_editable_by_current_admin: false,
+      version: 1,
+    },
+  ];
+  assert.deepEqual(buildAssignableRoleOptions(roleFixtures), [
+    { label: "系统管理员", value: "admin" },
+    { label: "业务员", value: "sales" },
+  ]);
+  assert.match(
+    getRolePermissionReadOnlyReason(roleFixtures[0]),
+    /系统统一维护/u,
+  );
+  assert.equal(getRolePermissionReadOnlyReason(roleFixtures[2]), "");
+  assert.match(
+    getRolePermissionReadOnlyReason(roleFixtures[3]),
+    /只能查看/u,
   );
 
   const printCenterSource = readRelative(

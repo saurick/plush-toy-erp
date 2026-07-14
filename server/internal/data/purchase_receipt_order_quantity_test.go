@@ -85,11 +85,12 @@ func TestCreatePurchaseReceiptFromPurchaseOrderIdempotencyReturnsOriginalFacts(t
 	originalInspectionID := created.QualityInspections[0].ID
 	originalInspection := created.QualityInspections[0]
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   created.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    mustDecimal(t, "1"),
+		ReceiptID:      created.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:receipt-order:append-later-line",
 	}); err != nil {
 		t.Fatalf("append later draft line failed: %v", err)
 	}
@@ -604,6 +605,7 @@ func createLinkedPurchaseReceiptDraftForTest(
 		UnitID:              fixtures.unitID,
 		PurchaseOrderItemID: &orderItemID,
 		Quantity:            quantity,
+		IdempotencyKey:      "test:linked-receipt:" + receiptNo,
 	}); err != nil {
 		t.Fatalf("add linked purchase receipt item failed: %v", err)
 	}
@@ -629,11 +631,12 @@ func createUnlinkedPurchaseReceiptDraftForTest(
 		t.Fatalf("create unlinked purchase receipt draft failed: %v", err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   receipt.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    quantity,
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       quantity,
+		IdempotencyKey: "test:unlinked-receipt:" + receiptNo,
 	}); err != nil {
 		t.Fatalf("add unlinked purchase receipt item failed: %v", err)
 	}

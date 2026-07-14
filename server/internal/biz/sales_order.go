@@ -27,6 +27,7 @@ const (
 var (
 	ErrSalesOrderNotFound     = errors.New("sales order not found")
 	ErrSalesOrderItemNotFound = errors.New("sales order item not found")
+	ErrSalesOrderConflict     = errors.New("sales order version conflict")
 	ErrProductNotFound        = errors.New("product not found")
 	ErrProductInactive        = errors.New("product inactive")
 	ErrUnitNotFound           = errors.New("unit not found")
@@ -48,6 +49,7 @@ type SalesOrder struct {
 	OrderDate           time.Time
 	PlannedDeliveryDate *time.Time
 	LifecycleStatus     string
+	Version             int
 	Note                *string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
@@ -74,6 +76,7 @@ type SalesOrderItem struct {
 }
 
 type SalesOrderMutation struct {
+	ExpectedVersion     int
 	OrderNo             string
 	CustomerID          int
 	CustomerOrderNo     *string
@@ -329,6 +332,9 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 		return nil, ErrBadParam
 	}
 	if id > 0 {
+		if order.ExpectedVersion <= 0 {
+			return nil, ErrBadParam
+		}
 		current, err := uc.repo.GetSalesOrder(ctx, id)
 		if err != nil {
 			return nil, err
@@ -336,6 +342,9 @@ func (uc *SalesOrderUsecase) SaveSalesOrderWithItems(ctx context.Context, id int
 		if !corestatus.IsSalesOrderEditable(current.LifecycleStatus) {
 			return nil, ErrBadParam
 		}
+	}
+	if id == 0 {
+		order.ExpectedVersion = 0
 	}
 	normalizedOrder, err := normalizeSalesOrderMutation(*order)
 	if err != nil {

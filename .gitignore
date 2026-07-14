@@ -18,3 +18,8 @@ web/.vite-cache/
 server/bin/
 output/
 .playwright-cli/
+
+# 客户真实原件只允许 materialize 到 ignored 私有工作区，不能进入 Product Core。
+.customer-sources/
+docs/customers/*/raw-source-files/
+output/customers/*/private-source-*/

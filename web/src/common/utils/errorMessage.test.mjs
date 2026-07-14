@@ -113,6 +113,16 @@ test('errorMessage: 已知错误码优先走现有中文码表', () => {
     ),
     '此前业务处理结果需要人工核对，当前流程暂时无法继续，请联系管理员'
   )
+  assert.equal(
+    getActionErrorMessage(
+      {
+        message: '记录已被其他操作更新，请刷新后重试',
+        code: RpcErrorCode.RESOURCE_VERSION_CONFLICT,
+      },
+      '加载单据明细失败'
+    ),
+    '记录已被其他操作更新，请刷新后重试'
+  )
 })
 
 test('errorMessage: 短信登录错误码显示精确中文提示', () => {

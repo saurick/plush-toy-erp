@@ -480,12 +480,13 @@ func createAndPostPurchaseReceipt(t *testing.T, ctx context.Context, uc *biz.Inv
 		t.Fatalf("create purchase receipt %s failed: %v", receiptNo, err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   receipt.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		LotNo:       lotNo,
-		Quantity:    quantity,
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		LotNo:          lotNo,
+		Quantity:       quantity,
+		IdempotencyKey: "test:create-and-post:" + receiptNo,
 	}); err != nil {
 		t.Fatalf("add purchase receipt %s item failed: %v", receiptNo, err)
 	}

@@ -197,20 +197,3 @@ func TestWorkflowUsecase_PurchaseIQCRejectedDerivesQualityExceptionTask(t *testi
 	}
 	assertPurchaseQualityExceptionTask(t, effects.DerivedTask, "rejected", "来料尺寸不符")
 }
-
-func TestWorkflowUsecase_PurchaseIQCNonDerivedStatusKeepsOriginalBehavior(t *testing.T) {
-	repo := &stubWorkflowRepo{currentTask: purchaseIQCWorkflowTask()}
-	uc := NewWorkflowUsecase(repo)
-
-	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
-		ID:            501,
-		TaskStatusKey: "processing",
-		Payload:       map[string]any{},
-	}, 7, "quality")
-	if err != nil {
-		t.Fatalf("processing should keep original behavior, got %v", err)
-	}
-	if repo.updateTaskInput.SideEffects != nil {
-		t.Fatalf("processing should not derive side effects")
-	}
-}

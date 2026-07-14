@@ -145,10 +145,18 @@ if [[ "\${1:-}" == "compose" ]]; then
   exit 0
 fi
 if [[ "\${1:-}" == "inspect" ]]; then
-  printf 'ERP_PDF_WARMUP=%s\n' "\${FAKE_RUNTIME_PDF_WARMUP:-async}"
+  if [[ "$*" == *'.Config.User'* ]]; then
+    printf '%s\n' "\${FAKE_RUNTIME_APP_USER:-app}"
+  else
+    printf 'ERP_PDF_WARMUP=%s\n' "\${FAKE_RUNTIME_PDF_WARMUP:-async}"
+  fi
   exit 0
 fi
 if [[ "\${1:-}" == "exec" ]]; then
+  if [[ "$*" == *' id -u' ]]; then
+    printf '%s\n' "\${FAKE_RUNTIME_APP_UID:-10001}"
+    exit 0
+  fi
   package="\${@: -1}"
   if [[ "$package" == "chromium-common" ]]; then
     printf '%s\n' "\${FAKE_CHROMIUM_COMMON_VERSION:-150.0.7871.100-1~deb12u1}"
@@ -261,9 +269,42 @@ test("production preflight verifies the runtime Chromium package exact pin", () 
   assert.match(result.stdout, /运行态 ERP_PDF_WARMUP=async/);
   assert.match(
     result.stdout,
+    /运行态 app-server 使用非 root 用户: app \(uid=10001\)/,
+  );
+  assert.match(
+    result.stdout,
     /运行态 Chromium \/ chromium-common 版本与 Docker exact pin 一致: 150\.0\.7871\.100-1~deb12u1/,
   );
   assert.match(result.stdout, /healthz \/ readyz 通过/);
+});
+
+test("production preflight rejects a root app-server runtime", () => {
+  const fixture = writeFixture();
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  const result = runPreflight(fixture, ["--runtime"], {
+    env: {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      FAKE_RUNTIME_APP_USER: "0:0",
+    },
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /app-server 运行态禁止使用 root/);
+});
+
+test("production preflight rejects a named runtime user mapped to uid 0", () => {
+  const fixture = writeFixture();
+  const fakeBin = createFakeRuntimeBin(fixture.root);
+  const result = runPreflight(fixture, ["--runtime"], {
+    env: {
+      PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
+      FAKE_RUNTIME_APP_USER: "app",
+      FAKE_RUNTIME_APP_UID: "0",
+    },
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /app-server 运行态 uid 必须是非 root 数字/);
 });
 
 test("production preflight rejects runtime PDF warmup fault-isolation mode", () => {
@@ -382,6 +423,8 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
       'test "$installed_chromium_common_version" = "$CHROMIUM_VERSION"',
     ),
   );
+  assert.match(dockerfile, /^USER app$/m);
+  assert.match(dockerfile, /useradd --system --uid 10001 --gid app/);
   for (const envExample of [prodEnv, customerEnv]) {
     assert.match(envExample, /^ERP_PDF_WARMUP=async$/m);
     assert.doesNotMatch(envExample, /ERP_PDF_WARMUP_ENABLED/);

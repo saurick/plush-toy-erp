@@ -26,10 +26,10 @@ export function createMobileTaskAssertions(deps) {
       `${scenarioName} 退出登录不应出现在待办分区: ${JSON.stringify(todoMetrics)}`
     )
     assert(
-      !todoMetrics.sectionHeadings.includes('进度') &&
-        !todoMetrics.sectionHeadings.includes('通知') &&
+      !todoMetrics.sectionHeadings.includes('已加载任务进度') &&
+        !todoMetrics.sectionHeadings.includes('任务提醒') &&
         !todoMetrics.sectionHeadings.includes('预警'),
-      `${scenarioName} 待办分区仍混入旧进度/预警/通知区块: ${JSON.stringify(todoMetrics)}`
+      `${scenarioName} 待办分区仍混入进度/预警/提醒区块: ${JSON.stringify(todoMetrics)}`
     )
     await assertMobileTaskListToggle(page, {
       scenarioName,
@@ -49,8 +49,8 @@ export function createMobileTaskAssertions(deps) {
     assertMobileTaskBottomNavLayout(messageMetrics, scenarioName)
     assert(
       messageMetrics.sectionHeadings.includes('预警') &&
-        !messageMetrics.sectionHeadings.includes('通知'),
-      `${scenarioName} 消息分区默认应先显示预警且不把通知压在预警列表后: ${JSON.stringify(messageMetrics)}`
+        !messageMetrics.sectionHeadings.includes('任务提醒'),
+      `${scenarioName} 消息分区默认应先显示预警且不把提醒压在预警列表后: ${JSON.stringify(messageMetrics)}`
     )
     await assertMobileTaskMessageTabsSwitch(page, { scenarioName })
     await assertMobileTaskDarkMessagesReadable(page, { scenarioName })
@@ -63,7 +63,7 @@ export function createMobileTaskAssertions(deps) {
     const doneMetrics = await readMobileTaskLayoutMetrics(page)
     assertMobileTaskBottomNavLayout(doneMetrics, scenarioName)
     assert(
-      doneMetrics.sectionHeadings.includes('进度') &&
+      doneMetrics.sectionHeadings.includes('已加载任务进度') &&
         doneMetrics.sectionHeadings.includes('已办任务'),
       `${scenarioName} 已办分区应承载进度和已办任务: ${JSON.stringify(doneMetrics)}`
     )
@@ -154,16 +154,16 @@ export function createMobileTaskAssertions(deps) {
 
   async function assertMobileTaskProgressSummary(page, { scenarioName }) {
     const expectedToneByTestID = {
-      'mobile-role-progress-pending': 'pending',
-      'mobile-role-progress-processing': 'processing',
+      'mobile-role-progress-ready': 'ready',
       'mobile-role-progress-blocked': 'blocked',
+      'mobile-role-progress-rejected': 'rejected',
       'mobile-role-progress-done': 'done',
     }
     const metrics = await page.evaluate(() =>
       [
-        'mobile-role-progress-pending',
-        'mobile-role-progress-processing',
+        'mobile-role-progress-ready',
         'mobile-role-progress-blocked',
+        'mobile-role-progress-rejected',
         'mobile-role-progress-done',
       ].map((testID) => {
         const node = document.querySelector(`[data-testid="${testID}"]`)
@@ -179,6 +179,7 @@ export function createMobileTaskAssertions(deps) {
           ariaPressed: node?.getAttribute('aria-pressed'),
           className: node?.className || '',
           text: node?.textContent?.replace(/\s+/g, ' ').trim() || '',
+          valueText: value?.textContent?.trim() || '',
           valueColor: valueStyle?.color || '',
           labelColor: labelStyle?.color || '',
           width: rect?.width || 0,
@@ -202,6 +203,11 @@ export function createMobileTaskAssertions(deps) {
       assert(
         item.scrollWidth <= item.clientWidth + 1,
         `${scenarioName} 进度摘要出现横向溢出: ${JSON.stringify(metrics)}`
+      )
+      assert.match(
+        item.valueText,
+        /^\d+$/u,
+        `${scenarioName} 进度摘要必须显示服务端状态计数: ${JSON.stringify(metrics)}`
       )
       assert(
         String(item.className).includes(
@@ -597,6 +603,7 @@ export function createMobileTaskAssertions(deps) {
     { scenarioName, listKey, itemSelector, collapsedMax }
   ) {
     const toggle = page.getByTestId(`mobile-role-list-toggle-${listKey}`)
+    await toggle.waitFor({ state: 'visible', timeout: 10_000 })
     const toggleCount = await toggle.count()
     assert.equal(
       toggleCount,
@@ -799,17 +806,17 @@ export function createMobileTaskAssertions(deps) {
       const headings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('通知') && !headings.includes('预警')
+      return headings.includes('任务提醒') && !headings.includes('预警')
     })
 
     const noticeMetrics = await readMobileTaskMessageTabMetrics(page)
     assert(
-      noticeMetrics.activeTab === '通知',
-      `${scenarioName} 点击通知后未激活通知 tab: ${JSON.stringify(noticeMetrics)}`
+      noticeMetrics.activeTab === '提醒',
+      `${scenarioName} 点击提醒后未激活提醒 tab: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.tabsClassName.includes('mobile-role-message-tabs--notice'),
-      `${scenarioName} 通知 tab 缺少滑动选中态类名: ${JSON.stringify(noticeMetrics)}`
+      `${scenarioName} 提醒 tab 缺少滑动选中态类名: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.tabsThumbContent !== 'none' &&
@@ -824,8 +831,8 @@ export function createMobileTaskAssertions(deps) {
     )
     assert(
       noticeMetrics.sectionHeadings.length === 1 &&
-        noticeMetrics.sectionHeadings[0] === '通知',
-      `${scenarioName} 通知 tab 不应继续被预警列表挤到下方: ${JSON.stringify(noticeMetrics)}`
+        noticeMetrics.sectionHeadings[0] === '任务提醒',
+      `${scenarioName} 提醒 tab 不应继续被预警列表挤到下方: ${JSON.stringify(noticeMetrics)}`
     )
     assert(
       noticeMetrics.tabsSticky &&
@@ -839,7 +846,7 @@ export function createMobileTaskAssertions(deps) {
         noticeMetrics.cards.every(
           (card) => card.width > 280 && card.scrollWidth <= card.clientWidth + 1
         ),
-      `${scenarioName} 通知卡片出现横向溢出: ${JSON.stringify(noticeMetrics)}`
+      `${scenarioName} 提醒卡片出现横向溢出: ${JSON.stringify(noticeMetrics)}`
     )
     await assertMobileTaskListToggle(page, {
       scenarioName,
@@ -853,7 +860,7 @@ export function createMobileTaskAssertions(deps) {
       const headings = Array.from(
         document.querySelectorAll('.mobile-role-tasks-page h2')
       ).map((heading) => heading.textContent?.trim() || '')
-      return headings.includes('预警') && !headings.includes('通知')
+      return headings.includes('预警') && !headings.includes('任务提醒')
     })
     const warningMetrics = await readMobileTaskMessageTabMetrics(page)
     assert(
@@ -1183,6 +1190,11 @@ export function createMobileTaskAssertions(deps) {
 
     await gotoScenarioPath(page, '/m/boss/tasks', {
       waitUntil: 'domcontentloaded',
+    })
+    await page.getByTestId('mobile-role-nav-messages').click()
+    await page.waitForFunction(() => {
+      const heading = document.querySelector('.mobile-role-tasks-page h1')
+      return heading?.textContent?.trim() === '消息'
     })
     await expectText(page, '暗色任务验证')
     await page

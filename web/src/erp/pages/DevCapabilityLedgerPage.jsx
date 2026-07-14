@@ -39,10 +39,60 @@ import DevPageNav from '../components/dev/DevPageNav.jsx'
 import DevTaskNav from '../components/dev/DevTaskNav.jsx'
 import { formatDevEnglishAnchor } from '../config/devVisibleLabels.mjs'
 
-import deltaLedgerSource from '../../../../docs/customers/yoyoosun/客户差异台账.md?raw'
-import deliveryMatrixSource from '../../../../docs/customers/yoyoosun/客户交付矩阵.md?raw'
-import capabilityEvidenceSource from '../../../../docs/product/产品能力证据详情.md?raw'
-import capabilityLedgerSource from '../../../../docs/product/产品能力进度台账.md?raw'
+// This dev-only page deliberately carries a small, non-authoritative summary.
+// Production/source-archive builds must not need export-ignored Markdown.
+const capabilityLedgerSource = `
+# 能力边界摘要 / Capability Boundary Summary
+
+| 能力 | 所属层 | 成熟度 | 客户可见性 | 下一步 |
+| --- | --- | ---: | --- | --- |
+| Customer Config 发布边界 | Product Core | L3 | 不可试用；不承诺 | 通过开发文档入口核对当前正式台账 |
+
+## 能力成熟度定义
+
+| 等级 | 名称 | 含义 | 是否可对客户承诺 |
+| ---: | --- | --- | --- |
+| L0 | Not Started | 未开始，只在路线图里 | 否 |
+| L1 | Discussed | 已讨论，有初步口径 | 否 |
+| L2 | Reviewed | 已做架构 / 业务评审 | 否 |
+| L3 | Drafted | 有设计草案或配置草案 | 否 |
+| L4 | Schema Ready | schema / migration / generated code 已完成 | 否 |
+| L5 | Runtime Ready | repo / usecase 已完成，后端核心逻辑可测 | 内部可测 |
+| L6 | API Ready | API / RBAC 已完成 | 内部可联调 |
+| L7 | UI Ready | 前端页面可操作 | 可试用，但需标边界 |
+| L8 | Delivery Ready | 交付闭环完整 | 可对客户承诺 |
+`
+
+const capabilityEvidenceSource = `
+# 能力边界摘要证据 / Capability Boundary Summary Evidence
+
+### Customer Config 发布边界
+
+- 所属层 / 业务域：Product Core / Architecture / Workflow
+- 当前成熟度：L3
+- 当前结果：开发页只保留非权威短摘要，构建产物不读取正式 Markdown
+- 当前不包含：不代表客户配置已发布、已激活或已验收
+- 证据：构建覆盖与边界测试
+- 下一步：通过开发文档入口核对当前正式台账
+- 风险：不能把短摘要当作当前交付真源
+- 客户试用 / 交付承诺：否 / 否
+`
+
+const deliveryMatrixSource = `
+# 客户交付边界摘要 / Customer Delivery Boundary Summary
+
+| 模块 / 能力 | 当前状态 | 客户可见承诺 | 验收证据 | 风险 / 下一步 |
+| --- | --- | --- | --- | --- |
+| 客户配置发布边界 | 内部可用 | 本摘要不构成发布或交付承诺 | 构建边界测试 | 目标环境证据与客户签收仍以正式台账为准 |
+`
+
+const deltaLedgerSource = `
+# 客户差异边界摘要 / Customer Delta Boundary Summary
+
+| Delta ID | Customer | 差异/需求 | 来源 | 分类 | 当前判断 | 是否进入 Product Core | 处理方式 | 前置条件 | 风险 | 下一步 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| DELTA-SUMMARY-001 | yoyoosun | 客户差异台账不进入生产构建 | 构建边界 | Customer Material | 只保留开发态导航摘要 | 否 | 正式内容留在受控文档边界 | 打开开发文档入口 | 摘要被误当交付事实 | 核对正式客户差异台账 |
+`
 
 const { Paragraph, Text, Title } = Typography
 
@@ -804,9 +854,9 @@ export default function DevCapabilityLedgerPage() {
             <Tag color="green">仅开发环境 / DEV ONLY</Tag>
           </Space>
           <Paragraph className="erp-dev-capability-summary">
-            只读解析能力快查、能力证据详情、yoyoosun 客户交付矩阵和客户差异台账
-            / read-only ledger visualization；不进入 ERP 菜单、权限、后端业务
-            API 或产品文档 registry。
+            只显示构建安全的非权威短摘要 / build-safe, non-authoritative
+            summaries；正式能力、交付和客户差异仍通过开发文档入口核对，不进入
+            ERP 菜单、权限或后端业务 API。
           </Paragraph>
           <DevTaskNav
             compact
@@ -824,7 +874,9 @@ export default function DevCapabilityLedgerPage() {
               {sourcePath}
             </Link>
           ))}
-          <Text type="secondary">联动读取 4 份 Markdown / 4 linked docs</Text>
+          <Text type="secondary">
+            不读取或打包正式 Markdown / summaries only
+          </Text>
         </div>
       </header>
 
@@ -1082,7 +1134,7 @@ export default function DevCapabilityLedgerPage() {
                     : `${filteredDeltaItems.length} / ${deltaItems.length}`}
               </Text>
             </div>
-            <Text type="secondary">Markdown 派生，只读展示</Text>
+            <Text type="secondary">构建内短摘要，只读展示</Text>
           </div>
           {activeView === VIEW_CAPABILITIES ? (
             <CapabilityList

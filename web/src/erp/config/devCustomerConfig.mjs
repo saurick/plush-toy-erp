@@ -941,10 +941,91 @@ export function buildFieldNumberingDraftSummary(
   }
 }
 
-export function buildImportToolingSummary(
-  customerKey = DEFAULT_DEV_CUSTOMER_KEY
+function resolveCustomerConfigTestApplyAvailability(
+  customerKey,
+  customerPackageSummary
 ) {
   const normalizedCustomerKey = normalizeCustomerKey(customerKey)
+  if (!normalizedCustomerKey) {
+    return {
+      canApply: false,
+      blockedReasons: ['customer_not_selected'],
+      note: '请先选择已登记客户配置包；当前不会发布或激活任何配置。',
+    }
+  }
+  if (
+    !customerPackageSummary ||
+    normalizeCustomerKey(customerPackageSummary.customerKey) !==
+      normalizedCustomerKey
+  ) {
+    return {
+      canApply: false,
+      blockedReasons: ['customer_package_not_loaded'],
+      note: '当前客户配置包未登记或未加载，不能应用到后端。',
+    }
+  }
+
+  const checks = [
+    {
+      code: 'package_not_release_ready',
+      blocked: customerPackageSummary.status !== 'release_ready',
+      message:
+        customerPackageSummary.status === 'draft'
+          ? '配置包仍是草案'
+          : '配置包尚未进入发布就绪状态',
+    },
+    {
+      code: 'preview_only',
+      blocked: customerPackageSummary.previewOnly !== false,
+      message: '当前配置只供预览',
+    },
+    {
+      code: 'runtime_disabled',
+      blocked: customerPackageSummary.runtimeEnabled !== true,
+      message: '运行时编译未开放',
+    },
+    {
+      code: 'publish_disabled',
+      blocked: customerPackageSummary.publishEnabled !== true,
+      message: '发布未开放',
+    },
+    {
+      code: 'activate_disabled',
+      blocked: customerPackageSummary.activateEnabled !== true,
+      message: '激活未开放',
+    },
+  ]
+  const blockers = checks.filter((item) => item.blocked)
+  if (blockers.length === 0) {
+    return {
+      canApply: true,
+      blockedReasons: [],
+      note: '当前配置包已满足测试应用门禁；操作只写客户配置控制面，不导入业务数据。',
+    }
+  }
+  return {
+    canApply: false,
+    blockedReasons: blockers.map((item) => item.code),
+    note: `当前配置包不可应用：${blockers
+      .map((item) => item.message)
+      .join('；')}。可继续做只读预览和试跑，不能发布或激活。`,
+  }
+}
+
+export function buildImportToolingSummary(
+  customerKey = DEFAULT_DEV_CUSTOMER_KEY,
+  customerPackageSummary = null
+) {
+  const normalizedCustomerKey = normalizeCustomerKey(customerKey)
+  const resolvedCustomerPackageSummary =
+    customerPackageSummary ||
+    (normalizedCustomerKey === 'yoyoosun'
+      ? buildCustomerPackagePreviewSummary()
+      : null)
+  const testApplyAvailability = resolveCustomerConfigTestApplyAvailability(
+    normalizedCustomerKey,
+    resolvedCustomerPackageSummary
+  )
   const fixtureBasePath = `scripts/import/fixtures/customers/${normalizedCustomerKey}`
   const outputBasePath = `output/customers/${normalizedCustomerKey}`
   const uiDryRunOut = `${outputBasePath}/ui-import-dry-run`
@@ -959,7 +1040,7 @@ export function buildImportToolingSummary(
     uiReleaseBatchesApiPath: DEV_CUSTOMER_CONFIG_RELEASE_BATCHES_API,
     uiReleaseReadinessApiPath: DEV_CUSTOMER_CONFIG_RELEASE_READINESS_API,
     canRunUiDryRun: normalizedCustomerKey === 'yoyoosun',
-    canApplyTestConfig: normalizedCustomerKey === 'yoyoosun',
+    canApplyTestConfig: testApplyAvailability.canApply,
     canCheckReleaseReadiness: normalizedCustomerKey === 'yoyoosun',
     canExecuteRealImport: false,
     writesBusinessData: false,
@@ -992,7 +1073,7 @@ export function buildImportToolingSummary(
         label: '配置控制面写入',
         value: true,
         valueLabel: '允许受控写入',
-        status: 'test_apply_ready',
+        status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
       },
       {
         key: 'executionBoundary',
@@ -1006,8 +1087,7 @@ export function buildImportToolingSummary(
     testApply: {
       key: 'test-config-apply',
       label: '本地/测试后端应用',
-      status:
-        normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
+      status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
       target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
       writes:
         'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
@@ -1016,10 +1096,14 @@ export function buildImportToolingSummary(
         'compile_runtime_manifest',
         'validate_customer_config',
         'publish_customer_config',
+        'check_customer_config_transition',
         'activate_customer_config',
         'get_effective_session',
       ],
-      note: '使用当前管理员登录态，通过 Vite /rpc 固定代理 http://127.0.0.1:8300 调用客户配置接口；成功后后台和岗位任务端读取有效配置版本的测试投影。正式目标环境不从此按钮选择。',
+      blockedReasons: testApplyAvailability.blockedReasons,
+      note: testApplyAvailability.canApply
+        ? '使用当前管理员登录态，通过 Vite /rpc 固定代理 http://127.0.0.1:8300 调用客户配置接口；成功后后台和岗位任务端读取有效配置版本的测试投影。正式目标环境不从此按钮选择。'
+        : testApplyAvailability.note,
       noBusinessDataImport: true,
     },
     releaseApply: {
@@ -1127,8 +1211,7 @@ export function buildImportToolingSummary(
         key: 'import-draft-revision',
         step: '5',
         title: '应用测试配置',
-        status:
-          normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
+        status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
         outcome: '校验并发布受控配置版本',
         target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
         writesDatabase: true,
@@ -1173,8 +1256,7 @@ export function buildImportToolingSummary(
       withWriteBoundaryLabels({
         key: 'test-config-apply',
         label: '本地/测试后端应用',
-        status:
-          normalizedCustomerKey === 'yoyoosun' ? 'test_apply_ready' : 'blocked',
+        status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
         target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
         writes:
           'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
@@ -1287,8 +1369,10 @@ export function buildImportToolingSummary(
       {
         key: 'draft-before-active',
         label: '草稿先行',
-        status: 'test_apply_ready',
-        note: '发布写入受控版本，激活单独切换有效版本；发布失败不影响旧版本。',
+        status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
+        note: testApplyAvailability.canApply
+          ? '发布写入受控版本，激活单独切换有效版本；发布失败不影响旧版本。'
+          : testApplyAvailability.note,
       },
       {
         key: 'rollback-control',
@@ -1387,18 +1471,25 @@ export function buildCustomerPackageConsoleSummary({
   const boundaryFailedCount = (customerPackageSummary?.boundaries || []).filter(
     (item) => !item.ok
   ).length
+  const canApplyTestConfig = importSummary?.canApplyTestConfig === true
+  const testApplyNote =
+    importSummary?.testApply?.note || '当前配置包不可应用到后端。'
 
   return {
     primaryStatus: boundaryOk ? 'PREVIEW_READY' : 'BLOCKED',
     packageLabel: customerPackageSummary?.label || '未登记客户配置包',
     reviewDecision: {
       status: boundaryOk ? 'REVIEW_READY' : 'BLOCKED',
-      title: boundaryOk ? '可以进入人工评审' : '先修复配置包阻塞项',
+      title: boundaryOk ? '可以继续预览评审' : '先修复配置包阻塞项',
       summary: boundaryOk
-        ? '结构与禁止项已通过检查；页面可做本地/测试后端配置应用，正式发布必须先通过发布证据门禁。'
+        ? canApplyTestConfig
+          ? '结构与禁止项已通过检查；当前配置包已满足测试应用门禁，正式发布仍须通过发布证据门禁。'
+          : `结构与禁止项已通过检查，但当前配置包仍是草案且仅供预览。${testApplyNote}`
         : `配置包存在 ${boundaryFailedCount} 个阻塞项；修复后重新运行 lint。`,
       nextAction: boundaryOk
-        ? '先做试跑和本地/测试后端配置应用；正式版进入发布门禁检查。'
+        ? canApplyTestConfig
+          ? '先做试跑和本地/测试后端配置应用；正式版进入发布门禁检查。'
+          : '继续只读预览和试跑；完成正式评审并开放运行时、发布与激活后再应用。'
         : '先修复 failed boundary，再重新运行客户包 lint。',
     },
     decisionCards: [
@@ -1425,10 +1516,14 @@ export function buildCustomerPackageConsoleSummary({
       {
         key: 'publish-runtime',
         label: '发布 / 激活',
-        status: 'release_gate_required',
-        outcome: '门禁后可执行',
-        note: '发布版必须先通过清单指纹、发布证据和管理员确认。',
-        nextAction: '在预检与发布工作台检查发布门禁；通过后再发布到正式版。',
+        status: canApplyTestConfig ? 'release_gate_required' : 'blocked',
+        outcome: canApplyTestConfig ? '门禁后可执行' : '当前未开放',
+        note: canApplyTestConfig
+          ? '发布版必须先通过清单指纹、发布证据和管理员确认。'
+          : testApplyNote,
+        nextAction: canApplyTestConfig
+          ? '在预检与发布工作台检查发布门禁；通过后再发布到正式版。'
+          : '先完成客户配置包正式评审并开放运行时、发布与激活。',
       },
     ],
     preflightStages: [
@@ -1459,8 +1554,10 @@ export function buildCustomerPackageConsoleSummary({
       {
         key: 'publish',
         label: '发布与回滚',
-        status: 'release_gate_required',
-        note: '发布 / 激活 / 回滚都必须走发布证据；页面只提供命令复核，不提供裸回滚按钮。',
+        status: canApplyTestConfig ? 'release_gate_required' : 'blocked',
+        note: canApplyTestConfig
+          ? '发布 / 激活 / 回滚都必须走发布证据；页面只提供命令复核，不提供裸回滚按钮。'
+          : testApplyNote,
       },
     ],
     reviewChecklist: [
@@ -1525,10 +1622,12 @@ export function buildCustomerPackageConsoleSummary({
         key: 'runtime-publish',
         label: '发布生效',
         role: '发布负责人',
-        status: 'release_gate_required',
+        status: canApplyTestConfig ? 'release_gate_required' : 'blocked',
         sourcePath: customerPackageSummary?.sourcePath,
         sourceLabel: customerPackageSummary?.sourceLabel,
-        nextAction: '先跑发布就绪门禁，通过后才可发布 / 激活。',
+        nextAction: canApplyTestConfig
+          ? '先跑发布就绪门禁，通过后才可发布 / 激活。'
+          : testApplyNote,
       },
     ],
     qaCommands: [
@@ -1852,8 +1951,10 @@ export function buildCustomerPackageConsoleSummary({
       {
         key: 'draft-before-active',
         label: '草稿先行',
-        status: 'test_apply_ready',
-        note: '发布先写入受控版本，激活单独切换有效版本；发布失败不影响旧版本。',
+        status: canApplyTestConfig ? 'test_apply_ready' : 'blocked',
+        note: canApplyTestConfig
+          ? '发布先写入受控版本，激活单独切换有效版本；发布失败不影响旧版本。'
+          : testApplyNote,
       },
       {
         key: 'rollback-control',
@@ -2003,7 +2104,10 @@ export function buildCustomerConfigDevOverview({
     packageConfig.customerPackageSourcePath
   )
   const printTemplateSummary = buildPrintTemplateFieldSummary()
-  const importSummary = buildImportToolingSummary(packageConfig.customerKey)
+  const importSummary = buildImportToolingSummary(
+    packageConfig.customerKey,
+    customerPackageSummary
+  )
   const packageConsoleSummary = buildCustomerPackageConsoleSummary({
     menuSummary,
     fieldNumberingSummary,

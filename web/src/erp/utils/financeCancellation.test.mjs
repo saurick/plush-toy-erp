@@ -23,16 +23,9 @@ test('finance cancellation request requires a positive id and trimmed bounded re
   }
 })
 
-test('finance cancellation audit copy distinguishes current and pre-cutover history without guessing', () => {
+test('finance cancellation audit copy requires the canonical complete audit bundle', () => {
   const format = (value) => `时间${value}`
   assert.equal(financeCancelAuditText({ status: 'POSTED' }, format), '-')
-  assert.equal(
-    financeCancelAuditText(
-      { status: 'CANCELLED', cancel_audit_legacy: true },
-      format
-    ),
-    '历史记录，取消审计信息缺失'
-  )
   assert.equal(
     financeCancelAuditText(
       {
@@ -59,7 +52,6 @@ test('finance cancellation result is bound to the request and complete audit pro
     cancelled_at: 1_700_000_000,
     cancelled_by_name: '财务主管',
     cancel_reason: '客户撤销账款',
-    cancel_audit_legacy: false,
   }
   assert.equal(validateFinanceCancellationResult(valid, request), valid)
   for (const changed of [
@@ -69,7 +61,6 @@ test('finance cancellation result is bound to the request and complete audit pro
     { ...valid, cancelled_at: null },
     { ...valid, cancelled_by_name: '' },
     { ...valid, cancel_reason: '' },
-    { ...valid, cancel_audit_legacy: true },
   ]) {
     assert.throws(
       () => validateFinanceCancellationResult(changed, request),

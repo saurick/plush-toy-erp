@@ -5,12 +5,22 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	entschema "entgo.io/ent/schema"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 )
 
 type CustomerConfigRevision struct {
 	ent.Schema
+}
+
+func (CustomerConfigRevision) Annotations() []entschema.Annotation {
+	return []entschema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"customer_config_revisions_hash_version":   "config_hash_version = 1",
+			"customer_config_revisions_status_allowed": "status IN ('building', 'published', 'active', 'superseded')",
+		}},
+	}
 }
 
 func (CustomerConfigRevision) Fields() []ent.Field {
@@ -30,12 +40,16 @@ func (CustomerConfigRevision) Fields() []ent.Field {
 		field.String("config_hash").
 			NotEmpty().
 			MaxLen(128).
-			Comment("compiled_snapshot 的稳定 hash"),
+			Comment("完整规范化发布载荷的 SHA-256 hash"),
+		field.Int16("config_hash_version").
+			Default(1).
+			Immutable().
+			Comment("客户配置 hash 算法版本；当前且唯一正式版本为 1"),
 		field.String("status").
 			NotEmpty().
 			Default("published").
 			MaxLen(32).
-			Comment("published / active / superseded / rolled_back"),
+			Comment("事务内 building，以及 published / active / superseded"),
 		field.JSON("compiled_snapshot", map[string]any{}).
 			Optional().
 			Comment("编译后的有效配置快照，不保存 secret 或客户原始资料"),

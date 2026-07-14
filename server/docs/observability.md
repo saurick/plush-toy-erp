@@ -10,7 +10,7 @@
 - `service`、`biz`、`data` 层默认都会打日志
 - HTTP 层已内置 `request_id` 过滤器，日志会自动带上 `request_id`
 - 日志会额外输出 `trace_sampled`；只有 trace 真正被采样时才输出 `trace_link_id`，供 Loki 安全跳转 Jaeger
-- 关键鉴权与后台账号链路已保留成功 / 失败日志
+- 关键鉴权与后台账号链路已保留成功 / 失败日志；匿名管理员登录失败只记录稳定 reason，不记录原始用户名、密码、token 或 session key
 
 ### Trace 链路追踪 / Trace
 
@@ -42,7 +42,7 @@
 ### 运行时与系统控制面审计
 
 - 新库首次生产 bootstrap 管理员时会写入 `runtime_markers` 和 `runtime_audit_events`，用于记录一次性初始化是否完成、重复初始化或同名账号拒绝原因。
-- 管理员创建、角色绑定、账号启停、重置密码和角色权限变更会追加 `runtime_audit_events`，`payload` 只保存 actor、target、before / after 的非敏感摘要，不保存密码、token 或密码 hash。
+- 管理员创建、角色绑定、手机号调整、账号启停 / 注销、重置密码和角色权限变更会与 `runtime_audit_events` 在同一事务提交。手机号只保存掩码；会话失效只记录数量和稳定原因；不保存密码、token、密码 hash 或 session key。账号状态原因保留在账号状态记录和受 `system.audit.read` 保护的控制面审计中，不复制到通用 Workflow payload 或入口日志。
 - 后台只读入口为 `admin.audit_logs` JSON-RPC 和 `/erp/system/audit-logs` 页面，受 `system.audit.read` 权限控制。
 - `runtime_audit_events` 和 `runtime_markers` 通过 Ent hook 拒绝普通 update / delete；更正只能追加新的受控事件或通过后续专门恢复流程处理。
 - 这组表只承接服务启动安全审计和系统控制面审计，不是采购、库存、质检、出货、财务等业务动作的通用 `audit_events` 事实表。
@@ -54,6 +54,7 @@
 - `/readyz` 失败时虽然已有结构化日志，但响应体仍是简单文本
 - JSON-RPC 入口日志仍以文本 `Infof/Warnf` 为主，字段化程度一般
 - 当前 `request_id` 自动生成只覆盖 HTTP 链路，gRPC 和异步任务还没有统一 request id 策略
+- HTTP / gRPC 已有服务级 BBR 限流，但密码登录尚无按账号 fingerprint 和可信来源的共享限速；多副本部署不能把单进程内存计数器当成完整防爆破能力
 
 ## 对当前部署路径的影响
 

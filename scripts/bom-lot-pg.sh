@@ -7,7 +7,7 @@ if [ -z "$cmd" ]; then
   exit 2
 fi
 
-BOM_LOT_PG_DB_URL="${BOM_LOT_PG_DB_URL:-postgres://postgres:bom-lot-local-password@127.0.0.1:55432/plush_erp_bom_lot_test?sslmode=disable}"
+BOM_LOT_PG_DB_URL="${BOM_LOT_PG_DB_URL:-postgres://postgres:purchase-receipt-local-password@127.0.0.1:55432/plush_erp_bom_lot_test?sslmode=disable}"
 
 parse_output="$(
   python3 - "$BOM_LOT_PG_DB_URL" <<'PY'

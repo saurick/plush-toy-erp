@@ -145,19 +145,44 @@ func DueAt(v time.Time) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldDueAt, v))
 }
 
-// StartedAt applies equality check predicate on the "started_at" field. It's identical to StartedAtEQ.
-func StartedAt(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldEQ(FieldStartedAt, v))
-}
-
 // CompletedAt applies equality check predicate on the "completed_at" field. It's identical to CompletedAtEQ.
 func CompletedAt(v time.Time) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldCompletedAt, v))
 }
 
-// ClosedAt applies equality check predicate on the "closed_at" field. It's identical to ClosedAtEQ.
-func ClosedAt(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldEQ(FieldClosedAt, v))
+// CriticalPath applies equality check predicate on the "critical_path" field. It's identical to CriticalPathEQ.
+func CriticalPath(v bool) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldCriticalPath, v))
+}
+
+// UrgeCount applies equality check predicate on the "urge_count" field. It's identical to UrgeCountEQ.
+func UrgeCount(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldUrgeCount, v))
+}
+
+// LastUrgedAt applies equality check predicate on the "last_urged_at" field. It's identical to LastUrgedAtEQ.
+func LastUrgedAt(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldLastUrgedAt, v))
+}
+
+// LastUrgedBy applies equality check predicate on the "last_urged_by" field. It's identical to LastUrgedByEQ.
+func LastUrgedBy(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldLastUrgedBy, v))
+}
+
+// LastUrgedByRoleKey applies equality check predicate on the "last_urged_by_role_key" field. It's identical to LastUrgedByRoleKeyEQ.
+func LastUrgedByRoleKey(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldLastUrgedByRoleKey, v))
+}
+
+// EscalatedAt applies equality check predicate on the "escalated_at" field. It's identical to EscalatedAtEQ.
+func EscalatedAt(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldEscalatedAt, v))
+}
+
+// EscalateTargetRoleKey applies equality check predicate on the "escalate_target_role_key" field. It's identical to EscalateTargetRoleKeyEQ.
+func EscalateTargetRoleKey(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldEscalateTargetRoleKey, v))
 }
 
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
@@ -1010,26 +1035,6 @@ func ProcessInstanceIDNotIn(vs ...int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldNotIn(FieldProcessInstanceID, vs...))
 }
 
-// ProcessInstanceIDGT applies the GT predicate on the "process_instance_id" field.
-func ProcessInstanceIDGT(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGT(FieldProcessInstanceID, v))
-}
-
-// ProcessInstanceIDGTE applies the GTE predicate on the "process_instance_id" field.
-func ProcessInstanceIDGTE(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGTE(FieldProcessInstanceID, v))
-}
-
-// ProcessInstanceIDLT applies the LT predicate on the "process_instance_id" field.
-func ProcessInstanceIDLT(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLT(FieldProcessInstanceID, v))
-}
-
-// ProcessInstanceIDLTE applies the LTE predicate on the "process_instance_id" field.
-func ProcessInstanceIDLTE(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLTE(FieldProcessInstanceID, v))
-}
-
 // ProcessInstanceIDIsNil applies the IsNil predicate on the "process_instance_id" field.
 func ProcessInstanceIDIsNil() predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldIsNull(FieldProcessInstanceID))
@@ -1058,26 +1063,6 @@ func ProcessNodeInstanceIDIn(vs ...int) predicate.WorkflowTask {
 // ProcessNodeInstanceIDNotIn applies the NotIn predicate on the "process_node_instance_id" field.
 func ProcessNodeInstanceIDNotIn(vs ...int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldNotIn(FieldProcessNodeInstanceID, vs...))
-}
-
-// ProcessNodeInstanceIDGT applies the GT predicate on the "process_node_instance_id" field.
-func ProcessNodeInstanceIDGT(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGT(FieldProcessNodeInstanceID, v))
-}
-
-// ProcessNodeInstanceIDGTE applies the GTE predicate on the "process_node_instance_id" field.
-func ProcessNodeInstanceIDGTE(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGTE(FieldProcessNodeInstanceID, v))
-}
-
-// ProcessNodeInstanceIDLT applies the LT predicate on the "process_node_instance_id" field.
-func ProcessNodeInstanceIDLT(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLT(FieldProcessNodeInstanceID, v))
-}
-
-// ProcessNodeInstanceIDLTE applies the LTE predicate on the "process_node_instance_id" field.
-func ProcessNodeInstanceIDLTE(v int) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLTE(FieldProcessNodeInstanceID, v))
 }
 
 // ProcessNodeInstanceIDIsNil applies the IsNil predicate on the "process_node_instance_id" field.
@@ -1305,56 +1290,6 @@ func DueAtNotNil() predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldNotNull(FieldDueAt))
 }
 
-// StartedAtEQ applies the EQ predicate on the "started_at" field.
-func StartedAtEQ(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldEQ(FieldStartedAt, v))
-}
-
-// StartedAtNEQ applies the NEQ predicate on the "started_at" field.
-func StartedAtNEQ(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldNEQ(FieldStartedAt, v))
-}
-
-// StartedAtIn applies the In predicate on the "started_at" field.
-func StartedAtIn(vs ...time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldIn(FieldStartedAt, vs...))
-}
-
-// StartedAtNotIn applies the NotIn predicate on the "started_at" field.
-func StartedAtNotIn(vs ...time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldNotIn(FieldStartedAt, vs...))
-}
-
-// StartedAtGT applies the GT predicate on the "started_at" field.
-func StartedAtGT(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGT(FieldStartedAt, v))
-}
-
-// StartedAtGTE applies the GTE predicate on the "started_at" field.
-func StartedAtGTE(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGTE(FieldStartedAt, v))
-}
-
-// StartedAtLT applies the LT predicate on the "started_at" field.
-func StartedAtLT(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLT(FieldStartedAt, v))
-}
-
-// StartedAtLTE applies the LTE predicate on the "started_at" field.
-func StartedAtLTE(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLTE(FieldStartedAt, v))
-}
-
-// StartedAtIsNil applies the IsNil predicate on the "started_at" field.
-func StartedAtIsNil() predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldIsNull(FieldStartedAt))
-}
-
-// StartedAtNotNil applies the NotNil predicate on the "started_at" field.
-func StartedAtNotNil() predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldNotNull(FieldStartedAt))
-}
-
 // CompletedAtEQ applies the EQ predicate on the "completed_at" field.
 func CompletedAtEQ(v time.Time) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldCompletedAt, v))
@@ -1405,54 +1340,354 @@ func CompletedAtNotNil() predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldNotNull(FieldCompletedAt))
 }
 
-// ClosedAtEQ applies the EQ predicate on the "closed_at" field.
-func ClosedAtEQ(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldEQ(FieldClosedAt, v))
+// CriticalPathEQ applies the EQ predicate on the "critical_path" field.
+func CriticalPathEQ(v bool) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldCriticalPath, v))
 }
 
-// ClosedAtNEQ applies the NEQ predicate on the "closed_at" field.
-func ClosedAtNEQ(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldNEQ(FieldClosedAt, v))
+// CriticalPathNEQ applies the NEQ predicate on the "critical_path" field.
+func CriticalPathNEQ(v bool) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldCriticalPath, v))
 }
 
-// ClosedAtIn applies the In predicate on the "closed_at" field.
-func ClosedAtIn(vs ...time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldIn(FieldClosedAt, vs...))
+// UrgeCountEQ applies the EQ predicate on the "urge_count" field.
+func UrgeCountEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldUrgeCount, v))
 }
 
-// ClosedAtNotIn applies the NotIn predicate on the "closed_at" field.
-func ClosedAtNotIn(vs ...time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldNotIn(FieldClosedAt, vs...))
+// UrgeCountNEQ applies the NEQ predicate on the "urge_count" field.
+func UrgeCountNEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldUrgeCount, v))
 }
 
-// ClosedAtGT applies the GT predicate on the "closed_at" field.
-func ClosedAtGT(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGT(FieldClosedAt, v))
+// UrgeCountIn applies the In predicate on the "urge_count" field.
+func UrgeCountIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldUrgeCount, vs...))
 }
 
-// ClosedAtGTE applies the GTE predicate on the "closed_at" field.
-func ClosedAtGTE(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldGTE(FieldClosedAt, v))
+// UrgeCountNotIn applies the NotIn predicate on the "urge_count" field.
+func UrgeCountNotIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldUrgeCount, vs...))
 }
 
-// ClosedAtLT applies the LT predicate on the "closed_at" field.
-func ClosedAtLT(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLT(FieldClosedAt, v))
+// UrgeCountGT applies the GT predicate on the "urge_count" field.
+func UrgeCountGT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldUrgeCount, v))
 }
 
-// ClosedAtLTE applies the LTE predicate on the "closed_at" field.
-func ClosedAtLTE(v time.Time) predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldLTE(FieldClosedAt, v))
+// UrgeCountGTE applies the GTE predicate on the "urge_count" field.
+func UrgeCountGTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldUrgeCount, v))
 }
 
-// ClosedAtIsNil applies the IsNil predicate on the "closed_at" field.
-func ClosedAtIsNil() predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldIsNull(FieldClosedAt))
+// UrgeCountLT applies the LT predicate on the "urge_count" field.
+func UrgeCountLT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldUrgeCount, v))
 }
 
-// ClosedAtNotNil applies the NotNil predicate on the "closed_at" field.
-func ClosedAtNotNil() predicate.WorkflowTask {
-	return predicate.WorkflowTask(sql.FieldNotNull(FieldClosedAt))
+// UrgeCountLTE applies the LTE predicate on the "urge_count" field.
+func UrgeCountLTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldUrgeCount, v))
+}
+
+// LastUrgedAtEQ applies the EQ predicate on the "last_urged_at" field.
+func LastUrgedAtEQ(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldLastUrgedAt, v))
+}
+
+// LastUrgedAtNEQ applies the NEQ predicate on the "last_urged_at" field.
+func LastUrgedAtNEQ(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldLastUrgedAt, v))
+}
+
+// LastUrgedAtIn applies the In predicate on the "last_urged_at" field.
+func LastUrgedAtIn(vs ...time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldLastUrgedAt, vs...))
+}
+
+// LastUrgedAtNotIn applies the NotIn predicate on the "last_urged_at" field.
+func LastUrgedAtNotIn(vs ...time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldLastUrgedAt, vs...))
+}
+
+// LastUrgedAtGT applies the GT predicate on the "last_urged_at" field.
+func LastUrgedAtGT(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldLastUrgedAt, v))
+}
+
+// LastUrgedAtGTE applies the GTE predicate on the "last_urged_at" field.
+func LastUrgedAtGTE(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldLastUrgedAt, v))
+}
+
+// LastUrgedAtLT applies the LT predicate on the "last_urged_at" field.
+func LastUrgedAtLT(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldLastUrgedAt, v))
+}
+
+// LastUrgedAtLTE applies the LTE predicate on the "last_urged_at" field.
+func LastUrgedAtLTE(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldLastUrgedAt, v))
+}
+
+// LastUrgedAtIsNil applies the IsNil predicate on the "last_urged_at" field.
+func LastUrgedAtIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldLastUrgedAt))
+}
+
+// LastUrgedAtNotNil applies the NotNil predicate on the "last_urged_at" field.
+func LastUrgedAtNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldLastUrgedAt))
+}
+
+// LastUrgedByEQ applies the EQ predicate on the "last_urged_by" field.
+func LastUrgedByEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldLastUrgedBy, v))
+}
+
+// LastUrgedByNEQ applies the NEQ predicate on the "last_urged_by" field.
+func LastUrgedByNEQ(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldLastUrgedBy, v))
+}
+
+// LastUrgedByIn applies the In predicate on the "last_urged_by" field.
+func LastUrgedByIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldLastUrgedBy, vs...))
+}
+
+// LastUrgedByNotIn applies the NotIn predicate on the "last_urged_by" field.
+func LastUrgedByNotIn(vs ...int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldLastUrgedBy, vs...))
+}
+
+// LastUrgedByGT applies the GT predicate on the "last_urged_by" field.
+func LastUrgedByGT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldLastUrgedBy, v))
+}
+
+// LastUrgedByGTE applies the GTE predicate on the "last_urged_by" field.
+func LastUrgedByGTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldLastUrgedBy, v))
+}
+
+// LastUrgedByLT applies the LT predicate on the "last_urged_by" field.
+func LastUrgedByLT(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldLastUrgedBy, v))
+}
+
+// LastUrgedByLTE applies the LTE predicate on the "last_urged_by" field.
+func LastUrgedByLTE(v int) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldLastUrgedBy, v))
+}
+
+// LastUrgedByIsNil applies the IsNil predicate on the "last_urged_by" field.
+func LastUrgedByIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldLastUrgedBy))
+}
+
+// LastUrgedByNotNil applies the NotNil predicate on the "last_urged_by" field.
+func LastUrgedByNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldLastUrgedBy))
+}
+
+// LastUrgedByRoleKeyEQ applies the EQ predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyNEQ applies the NEQ predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyIn applies the In predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldLastUrgedByRoleKey, vs...))
+}
+
+// LastUrgedByRoleKeyNotIn applies the NotIn predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldLastUrgedByRoleKey, vs...))
+}
+
+// LastUrgedByRoleKeyGT applies the GT predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyGTE applies the GTE predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyLT applies the LT predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyLTE applies the LTE predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyContains applies the Contains predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyHasPrefix applies the HasPrefix predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyHasSuffix applies the HasSuffix predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyIsNil applies the IsNil predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldLastUrgedByRoleKey))
+}
+
+// LastUrgedByRoleKeyNotNil applies the NotNil predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldLastUrgedByRoleKey))
+}
+
+// LastUrgedByRoleKeyEqualFold applies the EqualFold predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldLastUrgedByRoleKey, v))
+}
+
+// LastUrgedByRoleKeyContainsFold applies the ContainsFold predicate on the "last_urged_by_role_key" field.
+func LastUrgedByRoleKeyContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldLastUrgedByRoleKey, v))
+}
+
+// EscalatedAtEQ applies the EQ predicate on the "escalated_at" field.
+func EscalatedAtEQ(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldEscalatedAt, v))
+}
+
+// EscalatedAtNEQ applies the NEQ predicate on the "escalated_at" field.
+func EscalatedAtNEQ(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldEscalatedAt, v))
+}
+
+// EscalatedAtIn applies the In predicate on the "escalated_at" field.
+func EscalatedAtIn(vs ...time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldEscalatedAt, vs...))
+}
+
+// EscalatedAtNotIn applies the NotIn predicate on the "escalated_at" field.
+func EscalatedAtNotIn(vs ...time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldEscalatedAt, vs...))
+}
+
+// EscalatedAtGT applies the GT predicate on the "escalated_at" field.
+func EscalatedAtGT(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldEscalatedAt, v))
+}
+
+// EscalatedAtGTE applies the GTE predicate on the "escalated_at" field.
+func EscalatedAtGTE(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldEscalatedAt, v))
+}
+
+// EscalatedAtLT applies the LT predicate on the "escalated_at" field.
+func EscalatedAtLT(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldEscalatedAt, v))
+}
+
+// EscalatedAtLTE applies the LTE predicate on the "escalated_at" field.
+func EscalatedAtLTE(v time.Time) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldEscalatedAt, v))
+}
+
+// EscalatedAtIsNil applies the IsNil predicate on the "escalated_at" field.
+func EscalatedAtIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldEscalatedAt))
+}
+
+// EscalatedAtNotNil applies the NotNil predicate on the "escalated_at" field.
+func EscalatedAtNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldEscalatedAt))
+}
+
+// EscalateTargetRoleKeyEQ applies the EQ predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyNEQ applies the NEQ predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyIn applies the In predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldEscalateTargetRoleKey, vs...))
+}
+
+// EscalateTargetRoleKeyNotIn applies the NotIn predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldEscalateTargetRoleKey, vs...))
+}
+
+// EscalateTargetRoleKeyGT applies the GT predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyGTE applies the GTE predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyLT applies the LT predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyLTE applies the LTE predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyContains applies the Contains predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyHasPrefix applies the HasPrefix predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyHasSuffix applies the HasSuffix predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyIsNil applies the IsNil predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldEscalateTargetRoleKey))
+}
+
+// EscalateTargetRoleKeyNotNil applies the NotNil predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldEscalateTargetRoleKey))
+}
+
+// EscalateTargetRoleKeyEqualFold applies the EqualFold predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldEscalateTargetRoleKey, v))
+}
+
+// EscalateTargetRoleKeyContainsFold applies the ContainsFold predicate on the "escalate_target_role_key" field.
+func EscalateTargetRoleKeyContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldEscalateTargetRoleKey, v))
 }
 
 // PayloadIsNil applies the IsNil predicate on the "payload" field.
@@ -1700,6 +1935,52 @@ func HasEvents() predicate.WorkflowTask {
 func HasEventsWith(preds ...predicate.WorkflowTaskEvent) predicate.WorkflowTask {
 	return predicate.WorkflowTask(func(s *sql.Selector) {
 		step := newEventsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProcessInstance applies the HasEdge predicate on the "process_instance" edge.
+func HasProcessInstance() predicate.WorkflowTask {
+	return predicate.WorkflowTask(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProcessInstanceTable, ProcessInstanceColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProcessInstanceWith applies the HasEdge predicate on the "process_instance" edge with a given conditions (other predicates).
+func HasProcessInstanceWith(preds ...predicate.ProcessInstance) predicate.WorkflowTask {
+	return predicate.WorkflowTask(func(s *sql.Selector) {
+		step := newProcessInstanceStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProcessNodeInstance applies the HasEdge predicate on the "process_node_instance" edge.
+func HasProcessNodeInstance() predicate.WorkflowTask {
+	return predicate.WorkflowTask(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProcessNodeInstanceTable, ProcessNodeInstanceColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProcessNodeInstanceWith applies the HasEdge predicate on the "process_node_instance" edge with a given conditions (other predicates).
+func HasProcessNodeInstanceWith(preds ...predicate.ProcessNodeInstance) predicate.WorkflowTask {
+	return predicate.WorkflowTask(func(s *sql.Selector) {
+		step := newProcessNodeInstanceStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

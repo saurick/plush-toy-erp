@@ -44,12 +44,11 @@ func activateOperationalFactTestCustomerConfig(t *testing.T, dispatcher *jsonrpc
 	if !ok {
 		t.Fatalf("invalid customer config params: %#v", params.AsMap())
 	}
-	if _, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1); err != nil {
+	published, err := dispatcher.customerConfigUC.PublishCustomerConfig(context.Background(), in, 1)
+	if err != nil {
 		t.Fatalf("publish customer config %s err = %v", in.Revision, err)
 	}
-	if _, err := dispatcher.customerConfigUC.ActivateCustomerConfig(context.Background(), in.CustomerKey, in.Revision, 1); err != nil {
-		t.Fatalf("activate customer config %s err = %v", in.Revision, err)
-	}
+	activatePublishedCustomerConfigForTest(t, dispatcher.customerConfigUC, in, published, 1)
 }
 
 func TestMapOperationalFactError_IdempotencyConflict(t *testing.T) {
@@ -519,6 +518,130 @@ func TestJsonrpcDispatcher_CancelFinanceFactAuthAndPermissions(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_FinanceFactCreateRequiresTypeScopedPermission(t *testing.T) {
+	repo := &financeModuleGateOperationalFactRepo{}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.FinanceRoleKey},
+		biz.PermissionFinancePayableConfirm,
+	)
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+	activateOperationalFactTestCustomerConfig(
+		t,
+		j,
+		customerConfigPublishParamsForRevision(t, "2026.07.14.finance-create-scope"),
+	)
+
+	_, res, err := j.handleOperationalFact(
+		workflowJSONRPCAdminContext(),
+		"create_finance_fact",
+		"finance-create-scope",
+		financeFactModuleGateParams(t),
+	)
+	if err != nil {
+		t.Fatalf("unexpected transport error: %v", err)
+	}
+	if res == nil || res.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("payable-only admin created receivable fact: %#v", res)
+	}
+	if repo.createFinanceFactCalls != 0 {
+		t.Fatalf("unauthorized create reached repo, calls=%d", repo.createFinanceFactCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_FinanceFactMutationsRequireTargetTypePermission(t *testing.T) {
+	for _, method := range []string{"post_finance_fact", "settle_finance_fact", "cancel_finance_fact"} {
+		t.Run(method, func(t *testing.T) {
+			repo := &financeModuleGateOperationalFactRepo{financeFactType: biz.FinanceFactReceivable}
+			admin := workflowJSONRPCAdmin(
+				[]string{biz.FinanceRoleKey},
+				biz.PermissionFinancePayableConfirm,
+			)
+			j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+			activateOperationalFactTestCustomerConfig(
+				t,
+				j,
+				customerConfigPublishParamsForRevision(t, "2026.07.14.finance-mutation-scope-"+method),
+			)
+			params := map[string]any{"id": 300}
+			if method == "cancel_finance_fact" {
+				params["reason"] = "客户账款已撤销"
+			}
+
+			_, res, err := j.handleOperationalFact(
+				workflowJSONRPCAdminContext(),
+				method,
+				"finance-mutation-scope",
+				mustJSONRPCStruct(t, params),
+			)
+			if err != nil {
+				t.Fatalf("unexpected transport error: %v", err)
+			}
+			if res == nil || res.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("payable-only admin mutated receivable fact: %#v", res)
+			}
+			if repo.getFinanceFactCalls != 1 {
+				t.Fatalf("target fact must be read exactly once, calls=%d", repo.getFinanceFactCalls)
+			}
+			if repo.postFinanceFactCalls != 0 || repo.settleFinanceFactCalls != 0 || repo.cancelFinanceFactCalls != 0 {
+				t.Fatalf(
+					"unauthorized mutation reached repo: post=%d settle=%d cancel=%d",
+					repo.postFinanceFactCalls,
+					repo.settleFinanceFactCalls,
+					repo.cancelFinanceFactCalls,
+				)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_FinanceFactListUsesReadScope(t *testing.T) {
+	repo := &financeModuleGateOperationalFactRepo{}
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.FinanceRoleKey},
+		biz.PermissionFinanceReceivableRead,
+	)
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+
+	_, res, err := j.handleOperationalFact(
+		workflowJSONRPCAdminContext(),
+		"list_finance_facts",
+		"finance-list-scope",
+		mustJSONRPCStruct(t, map[string]any{"limit": 20}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected transport error: %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("receivable list failed: %#v", res)
+	}
+	for _, factType := range []string{
+		biz.FinanceFactReceivable,
+		biz.FinanceFactInvoice,
+		biz.FinanceFactPayment,
+		biz.FinanceFactReconciliation,
+	} {
+		if !repo.listFinanceAccess.AllowsType(factType) {
+			t.Errorf("receivable read scope must allow %s: %#v", factType, repo.listFinanceAccess)
+		}
+	}
+	if repo.listFinanceAccess.AllowsType(biz.FinanceFactPayable) {
+		t.Errorf("receivable read scope must reject payable facts: %#v", repo.listFinanceAccess)
+	}
+
+	_, denied, err := j.handleOperationalFact(
+		workflowJSONRPCAdminContext(),
+		"list_finance_facts",
+		"finance-list-payable-denied",
+		mustJSONRPCStruct(t, map[string]any{"fact_type": biz.FinanceFactPayable}),
+	)
+	if err != nil {
+		t.Fatalf("unexpected transport error: %v", err)
+	}
+	if denied == nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("receivable-only admin listed payable facts: %#v", denied)
+	}
+}
+
 func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) {
 	ctx := workflowJSONRPCAdminContext()
 	admin := workflowJSONRPCAdmin(
@@ -898,9 +1021,10 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidEnums(t *testing.T) 
 	j := newOperationalFactJSONRPCTestData(t, admin)
 
 	for _, tc := range []struct {
-		name   string
-		method string
-		params map[string]any
+		name                 string
+		method               string
+		params               map[string]any
+		wantPermissionDenied bool
 	}{
 		{name: "production invalid status", method: "list_production_facts", params: map[string]any{"status": "settled"}},
 		{name: "production invalid fact type", method: "list_production_facts", params: map[string]any{"fact_type": "receivable"}},
@@ -911,7 +1035,7 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidEnums(t *testing.T) 
 		{name: "stock reservation invalid status", method: "list_stock_reservations", params: map[string]any{"status": "posted"}},
 		{name: "stock reservation invalid date field", method: "list_stock_reservations", params: map[string]any{"date_field": "occurred_at", "date_from": "2026-06-01"}},
 		{name: "finance invalid status", method: "list_finance_facts", params: map[string]any{"status": "active"}},
-		{name: "finance invalid fact type", method: "list_finance_facts", params: map[string]any{"fact_type": "output"}},
+		{name: "finance cross-domain fact type does not expose type oracle", method: "list_finance_facts", params: map[string]any{"fact_type": "output"}, wantPermissionDenied: true},
 		{name: "finance invalid date field", method: "list_finance_facts", params: map[string]any{"date_field": "reserved_at", "date_from": "2026-06-01"}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -919,8 +1043,12 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidEnums(t *testing.T) 
 			if err != nil {
 				t.Fatalf("expected nil err, got %v", err)
 			}
-			if res == nil || res.Code != errcode.InvalidParam.Code {
-				t.Fatalf("expected invalid param for bad operational fact filter, got %#v", res)
+			wantCode := errcode.InvalidParam.Code
+			if tc.wantPermissionDenied {
+				wantCode = errcode.PermissionDenied.Code
+			}
+			if res == nil || res.Code != wantCode {
+				t.Fatalf("expected code %d for bad operational fact filter, got %#v", wantCode, res)
 			}
 		})
 	}
@@ -1025,8 +1153,11 @@ type financeModuleGateOperationalFactRepo struct {
 	postFinanceFactCalls     int
 	settleFinanceFactCalls   int
 	cancelFinanceFactCalls   int
+	getFinanceFactCalls      int
 	cancelFinanceFactActorID int
 	cancelFinanceFactReason  string
+	financeFactType          string
+	listFinanceAccess        biz.FinanceFactAccessScope
 }
 
 func (r *financeModuleGateOperationalFactRepo) GetShipment(_ context.Context, shipmentID int) (*biz.Shipment, error) {
@@ -1111,6 +1242,36 @@ func (r *financeModuleGateOperationalFactRepo) CancelPostedFinanceFact(_ context
 		CreatedAt:        now,
 		UpdatedAt:        now,
 	}, nil
+}
+
+func (r *financeModuleGateOperationalFactRepo) GetFinanceFact(_ context.Context, id int) (*biz.FinanceFact, error) {
+	r.getFinanceFactCalls++
+	factType := r.financeFactType
+	if factType == "" {
+		factType = biz.FinanceFactReceivable
+	}
+	now := time.Now()
+	return &biz.FinanceFact{
+		ID:               id,
+		FactNo:           "FIN-MODULE-GATE",
+		FactType:         factType,
+		Status:           biz.OperationalFactStatusPosted,
+		CounterpartyType: biz.FinanceCounterpartyCustomer,
+		Amount:           decimal.RequireFromString("128.50"),
+		Currency:         biz.FinanceCurrencyCNY,
+		OccurredAt:       now,
+		CreatedAt:        now,
+		UpdatedAt:        now,
+	}, nil
+}
+
+func (r *financeModuleGateOperationalFactRepo) ListFinanceFactsForAccess(
+	_ context.Context,
+	_ biz.OperationalFactFilter,
+	scope biz.FinanceFactAccessScope,
+) ([]*biz.FinanceFact, int, error) {
+	r.listFinanceAccess = scope
+	return []*biz.FinanceFact{}, 0, nil
 }
 
 func stockReservationModuleGateParams(t *testing.T) *structpb.Struct {
@@ -1461,5 +1622,8 @@ func TestFinanceFactCreateFromParamsParsesFeeAndCurrency(t *testing.T) {
 	}
 	if output["invoice_category"] != biz.FinanceInvoiceCategoryVATSpecial13 {
 		t.Fatalf("expected response invoice category, got %#v", output)
+	}
+	if _, exists := output["cancel_audit_legacy"]; exists {
+		t.Fatalf("removed legacy cancellation flag must not remain in finance response: %#v", output)
 	}
 }

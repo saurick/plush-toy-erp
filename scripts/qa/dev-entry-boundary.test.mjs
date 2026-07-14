@@ -753,7 +753,7 @@ test("dev entry boundary: dev testing indexes only current maintained docs", () 
   );
   assertIncludes(
     buildDevTestingCopyPresetSource(customerConfigRuntimePreset),
-    "customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile",
+    "customer-config-runtime-manifest.mjs --all --mode preview",
     "customer config runtime preset",
   );
   assertIncludes(
@@ -1031,10 +1031,17 @@ test("dev entry boundary: customer config console stays preview or gated apply o
       "passed",
       "preview_only",
       "preview_only",
-      "test_apply_ready",
+      "blocked",
       "release_gate_required",
     ],
   );
+  assert.deepEqual(summary.testApply.blockedReasons, [
+    "package_not_release_ready",
+    "preview_only",
+    "runtime_disabled",
+    "publish_disabled",
+    "activate_disabled",
+  ]);
   assert(
     summary.formalGates.some(
       (item) =>
@@ -1081,8 +1088,8 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   );
   assertIncludes(
     pageSource,
-    "assertCustomerConfigReadbackRevision(effectiveSession, manifest.revision)",
-    "test apply authenticated revision readback",
+    "assertEffectiveCustomerConfigIdentity(",
+    "test apply authenticated identity readback",
   );
   assert(
     !pageSource.includes("requestApplyReleaseConfig") &&

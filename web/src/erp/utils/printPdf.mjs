@@ -29,10 +29,12 @@ export const PDF_ACTION_UI_STALE_TIMEOUT_MS =
   SERVER_PDF_REQUEST_TIMEOUT_MS + 5_000
 const SERVER_PDF_TARGET_ATTRIBUTE = 'data-server-pdf-root'
 const SERVER_PDF_PREVIEW_SNAPSHOT_MODE = 'preview'
-const PREVIEW_SNAPSHOT_IMAGE_INLINE_TIMEOUT_MS = 8_000
+const SERVER_PDF_SNAPSHOT_IMAGE_INLINE_TIMEOUT_MS = 8_000
 const PREVIEW_SNAPSHOT_IMAGE_MAX_DIMENSION_PX = 960
 const PREVIEW_SNAPSHOT_IMAGE_JPEG_QUALITY = 0.72
 const PREVIEW_SNAPSHOT_IMAGE_MIN_DATA_URL_LENGTH = 180_000
+const SERVER_PDF_RASTER_DATA_URL_PATTERN =
+  /^data:image\/(?:png|jpe?g|webp|gif);/i
 const SERVER_PDF_SELECTION_CLASS_NAMES = [
   'erp-material-contract-table__row-selected',
   'erp-processing-contract-table__row--selected',
@@ -557,6 +559,25 @@ function shouldOptimizeServerPdfImageSource(src, options = {}) {
     return false
   }
 
+  const lowerSrc = normalizedSrc.toLowerCase()
+  // The backend deliberately rejects SVG payloads. Rasterize them in every
+  // output mode so existing engineering attachments stay printable without
+  // carrying active SVG content into Chromium.
+  if (lowerSrc.startsWith('data:image/svg+xml')) {
+    return true
+  }
+  if (
+    lowerSrc.startsWith('data:') &&
+    !SERVER_PDF_RASTER_DATA_URL_PATTERN.test(normalizedSrc)
+  ) {
+    return true
+  }
+  // Server PDF rendering is network-isolated, so non-data images must be
+  // fetched by the authenticated page and converted to an inline raster first.
+  if (!lowerSrc.startsWith('data:')) {
+    return true
+  }
+
   if (
     normalizeServerPdfSnapshotOptions(options).snapshotMode !==
     SERVER_PDF_PREVIEW_SNAPSHOT_MODE
@@ -564,14 +585,7 @@ function shouldOptimizeServerPdfImageSource(src, options = {}) {
     return false
   }
 
-  const lowerSrc = normalizedSrc.toLowerCase()
-  if (lowerSrc.startsWith('data:image/svg+xml')) {
-    return false
-  }
-  if (lowerSrc.startsWith('data:')) {
-    return normalizedSrc.length >= PREVIEW_SNAPSHOT_IMAGE_MIN_DATA_URL_LENGTH
-  }
-  return true
+  return normalizedSrc.length >= PREVIEW_SNAPSHOT_IMAGE_MIN_DATA_URL_LENGTH
 }
 
 function buildSnapshotAssetTimeoutError(scene = '请求资源') {
@@ -684,11 +698,7 @@ async function compressSnapshotRasterImage(src, snapshotDocument) {
 }
 
 async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
-  if (
-    !clonedRoot?.querySelectorAll ||
-    normalizeServerPdfSnapshotOptions(options).snapshotMode !==
-      SERVER_PDF_PREVIEW_SNAPSHOT_MODE
-  ) {
+  if (!clonedRoot?.querySelectorAll) {
     return
   }
 
@@ -709,10 +719,10 @@ async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
         if (!rawSrc.toLowerCase().startsWith('data:')) {
           const response = await fetchSnapshotAssetWithTimeout(
             resolveSnapshotAssetURL(rawSrc, baseURL),
-            PREVIEW_SNAPSHOT_IMAGE_INLINE_TIMEOUT_MS
+            SERVER_PDF_SNAPSHOT_IMAGE_INLINE_TIMEOUT_MS
           )
           if (!response.ok) {
-            return
+            throw new Error('打印图片加载失败。')
           }
           const blob = await response.blob()
           if (
@@ -720,16 +730,17 @@ async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
               .toLowerCase()
               .startsWith('image/')
           ) {
-            return
+            throw new Error('打印图片格式不受支持。')
           }
           sourceToCompress = await readBlobAsDataURL(blob)
         }
 
-        const lowerSource = sourceToCompress.toLowerCase()
-        if (lowerSource.startsWith('data:image/svg+xml')) {
-          if (sourceToCompress !== rawSrc) {
-            imageElement.setAttribute('src', sourceToCompress)
-          }
+        if (
+          normalizeServerPdfSnapshotOptions(options).snapshotMode !==
+            SERVER_PDF_PREVIEW_SNAPSHOT_MODE &&
+          SERVER_PDF_RASTER_DATA_URL_PATTERN.test(sourceToCompress)
+        ) {
+          imageElement.setAttribute('src', sourceToCompress)
           return
         }
 
@@ -737,11 +748,14 @@ async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
           sourceToCompress,
           snapshotDocument
         )
-        if (optimizedSource) {
-          imageElement.setAttribute('src', optimizedSource)
+        if (!SERVER_PDF_RASTER_DATA_URL_PATTERN.test(optimizedSource)) {
+          throw new Error('打印图片无法转换为安全的内嵌图片。')
         }
+        imageElement.setAttribute('src', optimizedSource)
       } catch {
-        // 图片降载失败时保留原图，不阻断 PDF 预览主链路。
+        throw new Error(
+          '打印图片无法安全转换，请重新上传 PNG、JPEG、WebP 或 GIF 后重试。'
+        )
       }
     })
   )
@@ -768,6 +782,18 @@ function normalizeServerPdfSnapshotRuntimeState(clonedRoot) {
     if (rel === 'stylesheet' || rel === 'modulepreload' || rel === 'preload') {
       node.remove()
     }
+  })
+  ;[
+    'accept',
+    'autocomplete',
+    'contenteditable',
+    'inputmode',
+    'spellcheck',
+    'tabindex',
+  ].forEach((attributeName) => {
+    clonedRoot
+      .querySelectorAll(`[${attributeName}]`)
+      .forEach((node) => node.removeAttribute(attributeName))
   })
 
   const classNamesToClear = [
@@ -804,8 +830,7 @@ function readServerPdfStylesheetText(sourceDocument) {
       return
     }
 
-    const href = String(styleSheet.href || '').trim()
-    chunks.push(href ? `/* ${href} */\n${cssText}` : cssText)
+    chunks.push(cssText)
   })
 
   return chunks.join('\n\n')
@@ -942,7 +967,7 @@ function createMinimalServerPdfSnapshotRoot(element) {
   return snapshotRoot
 }
 
-function createLegacyServerPdfSnapshotRoot(element) {
+function createSourceDocumentServerPdfSnapshotRoot(element) {
   const sourceDocument = element?.ownerDocument
   if (!sourceDocument?.documentElement) {
     return null
@@ -1036,7 +1061,7 @@ async function buildServerPdfSnapshotHTMLFromElement(element, options = {}) {
 
   const clonedRoot =
     createMinimalServerPdfSnapshotRoot(element) ||
-    createLegacyServerPdfSnapshotRoot(element)
+    createSourceDocumentServerPdfSnapshotRoot(element)
   if (!clonedRoot) {
     throw new Error('未找到可导出的打印区域。')
   }
@@ -1071,7 +1096,7 @@ function getServerPdfErrorMessage(response) {
 }
 
 async function requestServerPdfBlob(snapshotHTML, options = {}) {
-  const { title, fileName, templateKey, customerKey, timeoutMs } =
+  const { title, fileName, templateKey, timeoutMs } =
     normalizeServerPdfRequestOptions(options)
 
   const adminToken = getToken(AUTH_SCOPE.ADMIN)
@@ -1097,9 +1122,7 @@ async function requestServerPdfBlob(snapshotHTML, options = {}) {
         title,
         file_name: fileName,
         template_key: templateKey,
-        customer_key: customerKey || undefined,
         html: snapshotHTML,
-        base_url: window.location.origin,
       }),
       signal: controller?.signal,
     })

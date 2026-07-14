@@ -5,6 +5,8 @@ package ent
 import (
 	"encoding/json"
 	"fmt"
+	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/workflowtask"
 	"strings"
 	"time"
@@ -54,12 +56,22 @@ type WorkflowTask struct {
 	BlockedReason *string `json:"blocked_reason,omitempty"`
 	// DueAt holds the value of the "due_at" field.
 	DueAt *time.Time `json:"due_at,omitempty"`
-	// StartedAt holds the value of the "started_at" field.
-	StartedAt *time.Time `json:"started_at,omitempty"`
 	// CompletedAt holds the value of the "completed_at" field.
 	CompletedAt *time.Time `json:"completed_at,omitempty"`
-	// ClosedAt holds the value of the "closed_at" field.
-	ClosedAt *time.Time `json:"closed_at,omitempty"`
+	// CriticalPath holds the value of the "critical_path" field.
+	CriticalPath bool `json:"critical_path,omitempty"`
+	// UrgeCount holds the value of the "urge_count" field.
+	UrgeCount int `json:"urge_count,omitempty"`
+	// LastUrgedAt holds the value of the "last_urged_at" field.
+	LastUrgedAt *time.Time `json:"last_urged_at,omitempty"`
+	// LastUrgedBy holds the value of the "last_urged_by" field.
+	LastUrgedBy *int `json:"last_urged_by,omitempty"`
+	// LastUrgedByRoleKey holds the value of the "last_urged_by_role_key" field.
+	LastUrgedByRoleKey *string `json:"last_urged_by_role_key,omitempty"`
+	// EscalatedAt holds the value of the "escalated_at" field.
+	EscalatedAt *time.Time `json:"escalated_at,omitempty"`
+	// EscalateTargetRoleKey holds the value of the "escalate_target_role_key" field.
+	EscalateTargetRoleKey *string `json:"escalate_target_role_key,omitempty"`
 	// Payload holds the value of the "payload" field.
 	Payload map[string]interface{} `json:"payload,omitempty"`
 	// Version holds the value of the "version" field.
@@ -82,9 +94,13 @@ type WorkflowTask struct {
 type WorkflowTaskEdges struct {
 	// Events holds the value of the events edge.
 	Events []*WorkflowTaskEvent `json:"events,omitempty"`
+	// ProcessInstance holds the value of the process_instance edge.
+	ProcessInstance *ProcessInstance `json:"process_instance,omitempty"`
+	// ProcessNodeInstance holds the value of the process_node_instance edge.
+	ProcessNodeInstance *ProcessNodeInstance `json:"process_node_instance,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [3]bool
 }
 
 // EventsOrErr returns the Events value or an error if the edge
@@ -96,6 +112,28 @@ func (e WorkflowTaskEdges) EventsOrErr() ([]*WorkflowTaskEvent, error) {
 	return nil, &NotLoadedError{edge: "events"}
 }
 
+// ProcessInstanceOrErr returns the ProcessInstance value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e WorkflowTaskEdges) ProcessInstanceOrErr() (*ProcessInstance, error) {
+	if e.ProcessInstance != nil {
+		return e.ProcessInstance, nil
+	} else if e.loadedTypes[1] {
+		return nil, &NotFoundError{label: processinstance.Label}
+	}
+	return nil, &NotLoadedError{edge: "process_instance"}
+}
+
+// ProcessNodeInstanceOrErr returns the ProcessNodeInstance value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e WorkflowTaskEdges) ProcessNodeInstanceOrErr() (*ProcessNodeInstance, error) {
+	if e.ProcessNodeInstance != nil {
+		return e.ProcessNodeInstance, nil
+	} else if e.loadedTypes[2] {
+		return nil, &NotFoundError{label: processnodeinstance.Label}
+	}
+	return nil, &NotLoadedError{edge: "process_node_instance"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*WorkflowTask) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -103,11 +141,13 @@ func (*WorkflowTask) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case workflowtask.FieldPayload:
 			values[i] = new([]byte)
-		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldProcessInstanceID, workflowtask.FieldProcessNodeInstanceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldVersion, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
+		case workflowtask.FieldCriticalPath:
+			values[i] = new(sql.NullBool)
+		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldProcessInstanceID, workflowtask.FieldProcessNodeInstanceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldUrgeCount, workflowtask.FieldLastUrgedBy, workflowtask.FieldVersion, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
-		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason:
+		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason, workflowtask.FieldLastUrgedByRoleKey, workflowtask.FieldEscalateTargetRoleKey:
 			values[i] = new(sql.NullString)
-		case workflowtask.FieldDueAt, workflowtask.FieldStartedAt, workflowtask.FieldCompletedAt, workflowtask.FieldClosedAt, workflowtask.FieldCreatedAt, workflowtask.FieldUpdatedAt:
+		case workflowtask.FieldDueAt, workflowtask.FieldCompletedAt, workflowtask.FieldLastUrgedAt, workflowtask.FieldEscalatedAt, workflowtask.FieldCreatedAt, workflowtask.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -248,13 +288,6 @@ func (_m *WorkflowTask) assignValues(columns []string, values []any) error {
 				_m.DueAt = new(time.Time)
 				*_m.DueAt = value.Time
 			}
-		case workflowtask.FieldStartedAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field started_at", values[i])
-			} else if value.Valid {
-				_m.StartedAt = new(time.Time)
-				*_m.StartedAt = value.Time
-			}
 		case workflowtask.FieldCompletedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
 				return fmt.Errorf("unexpected type %T for field completed_at", values[i])
@@ -262,12 +295,52 @@ func (_m *WorkflowTask) assignValues(columns []string, values []any) error {
 				_m.CompletedAt = new(time.Time)
 				*_m.CompletedAt = value.Time
 			}
-		case workflowtask.FieldClosedAt:
-			if value, ok := values[i].(*sql.NullTime); !ok {
-				return fmt.Errorf("unexpected type %T for field closed_at", values[i])
+		case workflowtask.FieldCriticalPath:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field critical_path", values[i])
 			} else if value.Valid {
-				_m.ClosedAt = new(time.Time)
-				*_m.ClosedAt = value.Time
+				_m.CriticalPath = value.Bool
+			}
+		case workflowtask.FieldUrgeCount:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field urge_count", values[i])
+			} else if value.Valid {
+				_m.UrgeCount = int(value.Int64)
+			}
+		case workflowtask.FieldLastUrgedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field last_urged_at", values[i])
+			} else if value.Valid {
+				_m.LastUrgedAt = new(time.Time)
+				*_m.LastUrgedAt = value.Time
+			}
+		case workflowtask.FieldLastUrgedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field last_urged_by", values[i])
+			} else if value.Valid {
+				_m.LastUrgedBy = new(int)
+				*_m.LastUrgedBy = int(value.Int64)
+			}
+		case workflowtask.FieldLastUrgedByRoleKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field last_urged_by_role_key", values[i])
+			} else if value.Valid {
+				_m.LastUrgedByRoleKey = new(string)
+				*_m.LastUrgedByRoleKey = value.String
+			}
+		case workflowtask.FieldEscalatedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field escalated_at", values[i])
+			} else if value.Valid {
+				_m.EscalatedAt = new(time.Time)
+				*_m.EscalatedAt = value.Time
+			}
+		case workflowtask.FieldEscalateTargetRoleKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field escalate_target_role_key", values[i])
+			} else if value.Valid {
+				_m.EscalateTargetRoleKey = new(string)
+				*_m.EscalateTargetRoleKey = value.String
 			}
 		case workflowtask.FieldPayload:
 			if value, ok := values[i].(*[]byte); !ok {
@@ -325,6 +398,16 @@ func (_m *WorkflowTask) Value(name string) (ent.Value, error) {
 // QueryEvents queries the "events" edge of the WorkflowTask entity.
 func (_m *WorkflowTask) QueryEvents() *WorkflowTaskEventQuery {
 	return NewWorkflowTaskClient(_m.config).QueryEvents(_m)
+}
+
+// QueryProcessInstance queries the "process_instance" edge of the WorkflowTask entity.
+func (_m *WorkflowTask) QueryProcessInstance() *ProcessInstanceQuery {
+	return NewWorkflowTaskClient(_m.config).QueryProcessInstance(_m)
+}
+
+// QueryProcessNodeInstance queries the "process_node_instance" edge of the WorkflowTask entity.
+func (_m *WorkflowTask) QueryProcessNodeInstance() *ProcessNodeInstanceQuery {
+	return NewWorkflowTaskClient(_m.config).QueryProcessNodeInstance(_m)
 }
 
 // Update returns a builder for updating this WorkflowTask.
@@ -424,19 +507,40 @@ func (_m *WorkflowTask) String() string {
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
-	if v := _m.StartedAt; v != nil {
-		builder.WriteString("started_at=")
-		builder.WriteString(v.Format(time.ANSIC))
-	}
-	builder.WriteString(", ")
 	if v := _m.CompletedAt; v != nil {
 		builder.WriteString("completed_at=")
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
-	if v := _m.ClosedAt; v != nil {
-		builder.WriteString("closed_at=")
+	builder.WriteString("critical_path=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CriticalPath))
+	builder.WriteString(", ")
+	builder.WriteString("urge_count=")
+	builder.WriteString(fmt.Sprintf("%v", _m.UrgeCount))
+	builder.WriteString(", ")
+	if v := _m.LastUrgedAt; v != nil {
+		builder.WriteString("last_urged_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.LastUrgedBy; v != nil {
+		builder.WriteString("last_urged_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.LastUrgedByRoleKey; v != nil {
+		builder.WriteString("last_urged_by_role_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.EscalatedAt; v != nil {
+		builder.WriteString("escalated_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.EscalateTargetRoleKey; v != nil {
+		builder.WriteString("escalate_target_role_key=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	builder.WriteString("payload=")

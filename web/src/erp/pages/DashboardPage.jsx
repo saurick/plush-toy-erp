@@ -37,8 +37,9 @@ import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
   getWorkflowTaskBoard,
-  listWorkflowTasks,
+  listAllWorkflowRoleTasks,
   rejectWorkflowTaskAction,
+  resumeWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import useWorkflowTaskActionAccess from '../hooks/useWorkflowTaskActionAccess.js'
@@ -47,7 +48,13 @@ import {
   getWorkflowTaskSourceTypeLabel,
   resolveWorkflowTaskEntryPath,
 } from '../utils/dashboardTaskDisplay.mjs'
-import { getWorkflowTaskDueStatus } from '../utils/workflowDashboardStats.mjs'
+import {
+  createWorkflowWorkbenchSnapshot,
+  getWorkflowTaskDueStatus,
+  getWorkflowWorkbenchRoleKeys,
+  getWorkflowWorkbenchScopeKey,
+  readWorkflowWorkbenchSnapshot,
+} from '../utils/workflowDashboardStats.mjs'
 import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../utils/workflowTaskActionSubmitGuard.mjs'
 import {
@@ -110,7 +117,6 @@ const EXCEPTION_FLOW_STEPS = Object.freeze([
 const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'actionable', label: '待我处理', hint: '当前可推进' },
   { key: 'risk', label: '阻塞/逾期', hint: '先补原因' },
-  { key: 'waiting', label: '等待交接', hint: '非终态任务' },
 ])
 
 const WORKBENCH_QUEUE_PAGE_SIZE = 8
@@ -498,7 +504,9 @@ function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
 
 export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
-  const [workflowTasks, setWorkflowTasks] = useState([])
+  const [workflowWorkbenchSnapshot, setWorkflowWorkbenchSnapshot] = useState(
+    () => createWorkflowWorkbenchSnapshot()
+  )
   const [taskBoardResponseState, setTaskBoardResponseState] = useState(null)
   const [taskBoardKeywordDraft, setTaskBoardKeywordDraft] = useState('')
   const [selectedTask, setSelectedTask] = useState(null)
@@ -538,6 +546,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     initialView === 'workbench' &&
     adminProfile?.is_super_admin === true &&
     !effectiveSessionCustomerKey
+  const workflowWorkbenchRoleKeys = useMemo(
+    () => getWorkflowWorkbenchRoleKeys(adminProfile),
+    [adminProfile]
+  )
+  const workflowWorkbenchScopeKey = useMemo(
+    () =>
+      getWorkflowWorkbenchScopeKey(adminProfile, workflowWorkbenchRoleKeys),
+    [adminProfile, workflowWorkbenchRoleKeys]
+  )
+  const workflowWorkbenchScopeKeyRef = useRef(workflowWorkbenchScopeKey)
+  workflowWorkbenchScopeKeyRef.current = workflowWorkbenchScopeKey
+  const visibleWorkflowWorkbenchSnapshot = readWorkflowWorkbenchSnapshot(
+    workflowWorkbenchSnapshot,
+    workflowWorkbenchScopeKey
+  )
+  const workflowTasks = visibleWorkflowWorkbenchSnapshot.tasks
+  const workflowRiskTaskIDs =
+    visibleWorkflowWorkbenchSnapshot.riskTaskIDs
   const filters = useMemo(
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
@@ -555,8 +581,11 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const loadDashboardStats = useCallback(async () => {
     const requestSeq = dashboardLoadRequestSeqRef.current + 1
     dashboardLoadRequestSeqRef.current = requestSeq
+    const requestWorkbenchScopeKey = workflowWorkbenchScopeKey
     if (shouldShowProductCoreDashboard) {
-      setWorkflowTasks([])
+      setWorkflowWorkbenchSnapshot(
+        createWorkflowWorkbenchSnapshot(requestWorkbenchScopeKey)
+      )
       setLoading(false)
       return true
     }
@@ -573,7 +602,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         const taskBoardResult = await getWorkflowTaskBoard(taskBoardRequest)
         if (
           mountedRef.current &&
-          dashboardLoadRequestSeqRef.current === requestSeq
+          dashboardLoadRequestSeqRef.current === requestSeq &&
+          workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
         ) {
           setTaskBoardResponseState({
             requestKey: taskBoardRequestKey,
@@ -582,19 +612,45 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           })
         }
       } else {
-        const workflowResult = await listWorkflowTasks({ limit: 200 })
+        const roleTaskViews = await Promise.all(
+          workflowWorkbenchRoleKeys.flatMap((roleKey) =>
+            ['todo', 'risk'].map(async (viewKey) => ({
+              viewKey,
+              response: await listAllWorkflowRoleTasks({
+                view_key: viewKey,
+                role_key: roleKey,
+                limit: 100,
+              }),
+            }))
+          )
+        )
         if (
           mountedRef.current &&
-          dashboardLoadRequestSeqRef.current === requestSeq
+          dashboardLoadRequestSeqRef.current === requestSeq &&
+          workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
         ) {
-          setWorkflowTasks(workflowResult?.tasks || [])
+          const tasksByID = new Map()
+          const riskTaskIDs = new Set()
+          for (const { response, viewKey } of roleTaskViews) {
+            for (const task of response.items) {
+              tasksByID.set(task.id, task)
+              if (viewKey === 'risk') riskTaskIDs.add(task.id)
+            }
+          }
+          setWorkflowWorkbenchSnapshot(
+            createWorkflowWorkbenchSnapshot(requestWorkbenchScopeKey, {
+              tasks: [...tasksByID.values()],
+              riskTaskIDs,
+            })
+          )
         }
       }
       return true
     } catch (error) {
       if (
         mountedRef.current &&
-        dashboardLoadRequestSeqRef.current === requestSeq
+        dashboardLoadRequestSeqRef.current === requestSeq &&
+        workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
       ) {
         const fallback = isTaskBoardView ? '加载任务看板失败' : '加载工作台失败'
         const errorMessage = getActionErrorMessage(error, fallback)
@@ -611,7 +667,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     } finally {
       if (
         mountedRef.current &&
-        dashboardLoadRequestSeqRef.current === requestSeq
+        dashboardLoadRequestSeqRef.current === requestSeq &&
+        workflowWorkbenchScopeKeyRef.current === requestWorkbenchScopeKey
       ) {
         setLoading(false)
       }
@@ -621,6 +678,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     shouldShowProductCoreDashboard,
     taskBoardRequest,
     taskBoardRequestKey,
+    workflowWorkbenchRoleKeys,
+    workflowWorkbenchScopeKey,
   ])
 
   useEffect(() => {
@@ -684,8 +743,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         .filter((task) => {
           const statusKey = getTaskStatusKey(task)
           return (
-            ['blocked', 'rejected'].includes(statusKey) ||
-            Boolean(getWorkflowTaskReason(task))
+            !isTerminalWorkflowTask(task) &&
+            (statusKey === 'blocked' || Boolean(getWorkflowTaskReason(task)))
           )
         })
         .slice(0, 8),
@@ -794,30 +853,26 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     const groups = {
       actionable: [],
       risk: [],
-      waiting: [],
-      closed: [],
     }
     workflowTasks.forEach((task) => {
       const statusKey = getTaskStatusKey(task)
       const dueStatus = getWorkflowTaskDueStatus(task)
       const hasReason = Boolean(getWorkflowTaskReason(task))
       if (isTerminalWorkflowTask(task)) {
-        groups.closed.push(task)
         return
       }
       if (
-        ['blocked', 'rejected'].includes(statusKey) ||
+        workflowRiskTaskIDs.has(task.id) ||
+        statusKey === 'blocked' ||
         dueStatus === 'overdue' ||
         hasReason
       ) {
         groups.risk.push(task)
         return
       }
-      if (['pending', 'ready', 'processing'].includes(statusKey)) {
+      if (statusKey === 'ready') {
         groups.actionable.push(task)
-        return
       }
-      groups.waiting.push(task)
     })
 
     Object.values(groups).forEach((items) => {
@@ -831,7 +886,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       })
     })
     return groups
-  }, [workflowTasks])
+  }, [workflowRiskTaskIDs, workflowTasks])
   const workbenchQueueTasks =
     workbenchQueueGroups[workbenchQueueKey] || workbenchQueueGroups.actionable
   const activeWorkbenchQueueOption =
@@ -1032,7 +1087,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
           ? completeWorkflowTaskAction
           : actionMode === 'block'
             ? blockWorkflowTaskAction
-            : rejectWorkflowTaskAction
+            : actionMode === 'reject'
+              ? rejectWorkflowTaskAction
+              : resumeWorkflowTaskAction
     const params =
       actionMode === 'urge'
         ? {
@@ -1041,7 +1098,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             action: 'urge_task',
             reason,
             payload: {
-              entry: 'desktop_task_board',
+              surface_key: 'desktop_task_board',
             },
           }
         : {
@@ -1050,9 +1107,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             action_key: actionMode,
             reason,
             payload: {
-              desktop_task_board_action: actionMode,
-              blocked_reason: actionMode === 'block' ? reason : undefined,
-              rejected_reason: actionMode === 'reject' ? reason : undefined,
+              surface_key: 'desktop_task_board',
             },
           }
     const inFlightLease = mutationInFlightRef.current.acquire(
@@ -1432,6 +1487,19 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                             退回任务
                           </Button>
                         ) : null}
+                        {!selectedWorkbenchTaskAccess.loading &&
+                        selectedWorkbenchTaskAccess.allowedModes.includes(
+                          'resume'
+                        ) ? (
+                          <Button
+                            type="primary"
+                            onClick={() =>
+                              openTaskDrawer(selectedWorkbenchTask, 'resume')
+                            }
+                          >
+                            解除阻塞
+                          </Button>
+                        ) : null}
                         {showSelectedWorkbenchTaskReadonlyAction ? (
                           <Button
                             title={selectedWorkbenchTaskAccess.readonlyReason}
@@ -1506,7 +1574,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     onClick={() => selectTaskBoardLane('actionable')}
                   />
                   <TaskMetricAction
-                    label="阻塞 / 退回"
+                    label="阻塞"
                     value={
                       taskBoardReady ? taskBoardModel.counts.exception : '-'
                     }
@@ -1623,6 +1691,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           }
                         >
                           退回任务
+                        </Button>
+                      ) : null}
+                      {!taskCenterCurrentTaskAccess.loading &&
+                      taskCenterCurrentTaskAccess.allowedModes.includes(
+                        'resume'
+                      ) ? (
+                        <Button
+                          size="small"
+                          type="primary"
+                          onClick={() =>
+                            openTaskDrawer(taskCenterCurrentTask, 'resume')
+                          }
+                        >
+                          解除阻塞
                         </Button>
                       ) : null}
                       {!taskCenterCurrentTaskAccess.loading &&

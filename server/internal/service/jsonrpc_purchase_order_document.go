@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "save_purchase_order_with_items", "savePurchaseOrderWithItems":
+	case "save_purchase_order_with_items":
 		orderID := getInt(pm, "id", 0)
 		orderPermission := biz.PermissionPurchaseOrderCreate
 		if orderID > 0 {
@@ -26,23 +26,32 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderDocument(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_orders"); res != nil {
 			return id, res, nil
 		}
+		expectedVersion := 0
+		if orderID > 0 {
+			var ok bool
+			expectedVersion, ok = getRequiredJSONRPCPositiveInt(pm, "expected_version")
+			if !ok {
+				return id, invalidParamResult(), nil
+			}
+		}
 		in, ok := purchaseOrderMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		in.ExpectedVersion = expectedVersion
 		items, ok := purchaseOrderItemSaveMutationsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
 		result, err := d.purchaseOrderUC.SavePurchaseOrderWithItems(ctx, orderID, in, items)
 		return id, purchaseOrderWithItemsMutationResult(ctx, d, result, err), nil
-	case "get_purchase_order", "getPurchaseOrder":
+	case "get_purchase_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.purchaseOrderUC.GetPurchaseOrder(ctx, getInt(pm, "id", 0))
 		return id, purchaseOrderMutationResult(ctx, d, item, err), nil
-	case "list_purchase_orders", "listPurchaseOrders":
+	case "list_purchase_orders":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseOrderRead); res != nil {
 			return id, res, nil
 		}

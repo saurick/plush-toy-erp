@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -35,8 +36,15 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 	if _, ok := pm["business_record_id"]; ok {
 		return nil, false
 	}
+	if _, ok := pm["idempotency_payload_hash"]; ok {
+		return nil, false
+	}
 	receivedAt, ok := getOptionalJSONRPCTime(pm, "received_at")
 	if !ok {
+		return nil, false
+	}
+	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
+	if idempotencyKey == "" {
 		return nil, false
 	}
 	return &biz.PurchaseReceiptFromPurchaseOrderCreate{
@@ -45,10 +53,14 @@ func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.P
 		WarehouseID:     getInt(pm, "warehouse_id", 0),
 		ReceivedAt:      optionalTimeValue(receivedAt),
 		Note:            getWorkflowStringPtr(pm, "note"),
+		IdempotencyKey:  idempotencyKey,
 	}, true
 }
 
 func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptItemCreate, bool) {
+	if _, ok := pm["idempotency_payload_hash"]; ok {
+		return nil, false
+	}
 	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
 	if !ok {
 		return nil, false
@@ -74,6 +86,7 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 		Amount:              amount,
 		SourceLineNo:        getWorkflowStringPtr(pm, "source_line_no"),
 		Note:                getWorkflowStringPtr(pm, "note"),
+		IdempotencyKey:      strings.TrimSpace(getString(pm, "idempotency_key")),
 	}, true
 }
 
@@ -90,6 +103,14 @@ func purchaseReceiptItemsCreateFromParams(pm map[string]any) ([]*biz.PurchaseRec
 	for _, rawItem := range rawItems {
 		itemMap, ok := rawItem.(map[string]any)
 		if !ok {
+			return nil, false
+		}
+		// The atomic batch path is an internal create boundary, not a per-line
+		// replay contract. Keep both server-owned retry fields out of this input.
+		if _, ok := itemMap["idempotency_key"]; ok {
+			return nil, false
+		}
+		if _, ok := itemMap["idempotency_payload_hash"]; ok {
 			return nil, false
 		}
 		item, ok := purchaseReceiptItemCreateFromParams(itemMap)
@@ -143,6 +164,8 @@ func purchaseReceiptItemResult(ctx context.Context, d *jsonrpcDispatcher, item *
 func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[purchase] invalid param err=%v", err)
 		return invalidParamResult()

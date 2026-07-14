@@ -2,6 +2,11 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 
+import {
+  listAllSourceDocumentItems,
+  listSourceDocumentItemsAtVersion,
+} from '../utils/sourceDocumentPagination.mjs'
+
 const masterDataRpc = new JsonRpc({
   url: 'masterdata',
   basePath: ADMIN_BASE_PATH,
@@ -28,6 +33,38 @@ const outsourcingOrderRpc = new JsonRpc({
 
 function dataOf(result) {
   return result?.data || {}
+}
+
+function invalidSourceDocumentMutationResponse() {
+  const error = new Error('服务器返回的单据信息不完整，请核对后重试')
+  error.isInvalidResponse = true
+  return error
+}
+
+function validateSourceDocumentMutationResult(
+  result,
+  params,
+  orderKey,
+  itemKey
+) {
+  const data = dataOf(result)
+  const order = data?.[orderKey]
+  const expectedID = Number(params?.id || 0)
+  if (
+    !data ||
+    typeof data !== 'object' ||
+    !order ||
+    typeof order !== 'object' ||
+    !Number.isSafeInteger(order.id) ||
+    order.id <= 0 ||
+    !Number.isSafeInteger(order.version) ||
+    order.version <= 0 ||
+    (expectedID > 0 && order.id !== expectedID) ||
+    !Array.isArray(data[itemKey])
+  ) {
+    throw invalidSourceDocumentMutationResponse()
+  }
+  return data
 }
 
 export async function listCustomers(params = {}, options = {}) {
@@ -246,11 +283,16 @@ export async function updateSalesOrder(params = {}) {
 
 export async function saveSalesOrderWithItems(params = {}) {
   const result = await salesOrderRpc.call('save_sales_order_with_items', params)
-  return dataOf(result)
+  return validateSourceDocumentMutationResult(
+    result,
+    params,
+    'sales_order',
+    'sales_order_items'
+  )
 }
 
-export async function getSalesOrder(params = {}) {
-  const result = await salesOrderRpc.call('get_sales_order', params)
+export async function getSalesOrder(params = {}, options = {}) {
+  const result = await salesOrderRpc.call('get_sales_order', params, options)
   return dataOf(result)?.sales_order || null
 }
 
@@ -274,9 +316,32 @@ export async function cancelSalesOrder(params = {}) {
   return dataOf(result)?.sales_order || null
 }
 
-export async function listSalesOrderItems(params = {}) {
-  const result = await salesOrderRpc.call('list_sales_order_items', params)
+export async function listSalesOrderItems(params = {}, options = {}) {
+  const result = await salesOrderRpc.call(
+    'list_sales_order_items',
+    params,
+    options
+  )
   return dataOf(result)
+}
+
+export async function listAllSalesOrderItems(params = {}, options = {}) {
+  const itemParams = { ...params }
+  delete itemParams.expected_version
+  return listSourceDocumentItemsAtVersion({
+    expectedDocument: {
+      id: params.sales_order_id,
+      version: params.expected_version,
+    },
+    getDocument: () => getSalesOrder({ id: params.sales_order_id }, options),
+    listItems: () =>
+      listAllSourceDocumentItems(
+        listSalesOrderItems,
+        itemParams,
+        'sales_order_items',
+        options
+      ),
+  })
 }
 
 export async function addSalesOrderItem(params = {}) {
@@ -308,11 +373,20 @@ export async function savePurchaseOrderWithItems(params = {}) {
     'save_purchase_order_with_items',
     params
   )
-  return dataOf(result)
+  return validateSourceDocumentMutationResult(
+    result,
+    params,
+    'purchase_order',
+    'purchase_order_items'
+  )
 }
 
-export async function getPurchaseOrder(params = {}) {
-  const result = await purchaseOrderRpc.call('get_purchase_order', params)
+export async function getPurchaseOrder(params = {}, options = {}) {
+  const result = await purchaseOrderRpc.call(
+    'get_purchase_order',
+    params,
+    options
+  )
   return dataOf(result)?.purchase_order || null
 }
 
@@ -336,12 +410,33 @@ export async function cancelPurchaseOrder(params = {}) {
   return dataOf(result)?.purchase_order || null
 }
 
-export async function listPurchaseOrderItems(params = {}) {
+export async function listPurchaseOrderItems(params = {}, options = {}) {
   const result = await purchaseOrderRpc.call(
     'list_purchase_order_items',
-    params
+    params,
+    options
   )
   return dataOf(result)
+}
+
+export async function listAllPurchaseOrderItems(params = {}, options = {}) {
+  const itemParams = { ...params }
+  delete itemParams.expected_version
+  return listSourceDocumentItemsAtVersion({
+    expectedDocument: {
+      id: params.purchase_order_id,
+      version: params.expected_version,
+    },
+    getDocument: () =>
+      getPurchaseOrder({ id: params.purchase_order_id }, options),
+    listItems: () =>
+      listAllSourceDocumentItems(
+        listPurchaseOrderItems,
+        itemParams,
+        'purchase_order_items',
+        options
+      ),
+  })
 }
 
 export async function listOutsourcingOrders(params = {}, options = {}) {
@@ -353,8 +448,12 @@ export async function listOutsourcingOrders(params = {}, options = {}) {
   return dataOf(result)
 }
 
-export async function getOutsourcingOrder(params = {}) {
-  const result = await outsourcingOrderRpc.call('get_outsourcing_order', params)
+export async function getOutsourcingOrder(params = {}, options = {}) {
+  const result = await outsourcingOrderRpc.call(
+    'get_outsourcing_order',
+    params,
+    options
+  )
   return dataOf(result)?.outsourcing_order || null
 }
 
@@ -363,7 +462,12 @@ export async function saveOutsourcingOrderWithItems(params = {}) {
     'save_outsourcing_order_with_items',
     params
   )
-  return dataOf(result)
+  return validateSourceDocumentMutationResult(
+    result,
+    params,
+    'outsourcing_order',
+    'outsourcing_order_items'
+  )
 }
 
 export async function submitOutsourcingOrder(params = {}) {
@@ -398,10 +502,31 @@ export async function cancelOutsourcingOrder(params = {}) {
   return dataOf(result)?.outsourcing_order || null
 }
 
-export async function listOutsourcingOrderItems(params = {}) {
+export async function listOutsourcingOrderItems(params = {}, options = {}) {
   const result = await outsourcingOrderRpc.call(
     'list_outsourcing_order_items',
-    params
+    params,
+    options
   )
   return dataOf(result)
+}
+
+export async function listAllOutsourcingOrderItems(params = {}, options = {}) {
+  const itemParams = { ...params }
+  delete itemParams.expected_version
+  return listSourceDocumentItemsAtVersion({
+    expectedDocument: {
+      id: params.outsourcing_order_id,
+      version: params.expected_version,
+    },
+    getDocument: () =>
+      getOutsourcingOrder({ id: params.outsourcing_order_id }, options),
+    listItems: () =>
+      listAllSourceDocumentItems(
+        listOutsourcingOrderItems,
+        itemParams,
+        'outsourcing_order_items',
+        options
+      ),
+  })
 }

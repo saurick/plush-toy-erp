@@ -14,12 +14,24 @@ import {
   workflowMockPermissionAllowed,
 } from './workflowTaskMockAuthorization.mjs'
 import { buildWorkflowTaskBoardMock } from './workflowTaskBoardMock.mjs'
+import { buildWorkflowRoleTaskPageMock } from './workflowRoleTaskMock.mjs'
 
 let originalFetch = null
 let mockWorkflowTaskID = 1
 const mockWorkflowTasks = []
 const mockWorkflowBusinessStates = []
 const mockWorkflowMutationReceipts = new Map()
+
+function emptyWorkflowTaskUrgeFields() {
+  return {
+    urge_count: 0,
+    last_urged_at: null,
+    last_urged_by: null,
+    last_urged_by_role_key: null,
+    escalated_at: null,
+    escalate_target_role_key: null,
+  }
+}
 const mockProductionOrder = {
   id: 71,
   order_no: 'MO-MOCK-20260713',
@@ -102,7 +114,7 @@ const mockPermissions = [
   },
   { permission_key: 'system.role.read', name: '查看角色', module: 'system' },
   {
-    permission_key: 'system.permission.manage',
+    permission_key: 'system.role.permission.manage',
     name: '管理角色权限',
     module: 'system',
   },
@@ -205,19 +217,22 @@ const mockMenus = [
     key: 'global-dashboard',
     label: '任务看板',
     path: '/erp/dashboard',
-    required_permissions: ['erp.dashboard.read'],
+    required_any: ['erp.dashboard.read'],
+    required_all: [],
   },
   {
     key: 'production-orders',
     label: '生产订单',
     path: '/erp/production/orders',
-    required_permissions: ['pmc.plan.read'],
+    required_any: ['pmc.plan.read'],
+    required_all: [],
   },
   {
     key: 'permission-center',
     label: '权限管理',
     path: '/erp/system/permissions',
-    required_permissions: ['system.user.read', 'system.role.read'],
+    required_any: ['system.user.read', 'system.role.read'],
+    required_all: [],
   },
 ]
 
@@ -260,14 +275,10 @@ const mockSuperAdminProfile = {
 }
 
 const mockTaskStates = [
-  { key: 'pending', label: '待开始', summary: '任务已创建，等待前置条件。' },
   { key: 'ready', label: '可执行', summary: '前置条件已满足。' },
-  { key: 'processing', label: '处理中', summary: '任务正在推进。' },
   { key: 'blocked', label: '阻塞', summary: '被缺料、缺资料或异常卡住。' },
   { key: 'done', label: '已完成', summary: '完成条件已达到。' },
   { key: 'rejected', label: '已退回', summary: '需要回退处理。' },
-  { key: 'cancelled', label: '已取消', summary: '任务已取消。' },
-  { key: 'closed', label: '已关闭', summary: '任务已归档。' },
 ]
 
 const mockBusinessStates = [
@@ -298,6 +309,12 @@ const mockBusinessStates = [
     summary: '已进入生产执行。',
   },
   { key: 'qc_pending', label: '待检验', summary: '等待检验确认。' },
+  { key: 'iqc_pending', label: 'IQC 待检', summary: '等待品质做来料检验。' },
+  {
+    key: 'qc_failed',
+    label: '质检不合格',
+    summary: '等待责任角色处理退货、返工、补做或让步接收。',
+  },
   {
     key: 'warehouse_processing',
     label: '待入库 / 待出货',
@@ -307,6 +324,21 @@ const mockBusinessStates = [
     key: 'shipping_released',
     label: '已放行待出库',
     summary: '等待仓库出库。',
+  },
+  {
+    key: 'warehouse_inbound_pending',
+    label: '待确认入库',
+    summary: '等待仓库确认入库数量、库位和经手人。',
+  },
+  {
+    key: 'inbound_done',
+    label: '入库协同已完成',
+    summary: '实际库存以入库单过账结果为准。',
+  },
+  {
+    key: 'shipment_pending',
+    label: '待出货',
+    summary: '等待出货准备、装箱、唛头和出库确认。',
   },
   {
     key: 'shipped',
@@ -411,9 +443,7 @@ function seedMockMobileWorkflowTasks() {
           priority: 1,
           blocked_reason: '',
           due_at: now + (index + 2) * 86_400,
-          started_at: null,
           completed_at: null,
-          closed_at: null,
           version: 1,
           payload: {
             customer_name: `${roleLabel}长列表客户 ${number}`,
@@ -440,9 +470,7 @@ function seedMockMobileWorkflowTasks() {
           priority: 3,
           blocked_reason: `${roleLabel}预警样本阻塞原因 ${number}`,
           due_at: now - (index + 1) * 86_400,
-          started_at: null,
           completed_at: null,
-          closed_at: null,
           version: 1,
           payload: {
             alert_type: 'debug_warning',
@@ -471,9 +499,7 @@ function seedMockMobileWorkflowTasks() {
           priority: 1,
           blocked_reason: '',
           due_at: now - (index + 2) * 86_400,
-          started_at: now - (index + 2) * 86_400,
           completed_at: now - (index + 1) * 86_400,
-          closed_at: null,
           version: 1,
           payload: {
             customer_name: `${roleLabel}已办客户 ${number}`,
@@ -504,6 +530,43 @@ function matchWorkflowFilter(item, params) {
   )
 }
 
+function upsertMockWorkflowBusinessProjection(
+  task,
+  businessStatusKey,
+  blockedReason = ''
+) {
+  const existingIndex = mockWorkflowBusinessStates.findIndex(
+    (item) =>
+      item.source_type === task.source_type &&
+      Number(item.source_id) === Number(task.source_id)
+  )
+  const existing =
+    existingIndex >= 0 ? mockWorkflowBusinessStates[existingIndex] : null
+  const changedAt = nowUnix()
+  const projection = {
+    id: existing?.id || task.id,
+    source_type: task.source_type,
+    source_id: task.source_id,
+    source_no: task.source_no || null,
+    order_id: existing?.order_id || null,
+    batch_id: existing?.batch_id || null,
+    business_status_key: businessStatusKey,
+    owner_role_key: task.owner_role_key || null,
+    blocked_reason: blockedReason || null,
+    status_changed_at: changedAt,
+    payload: existing?.payload || {},
+    created_at: existing?.created_at || changedAt,
+    updated_at: changedAt,
+  }
+  task.business_status_key = businessStatusKey
+  if (existingIndex >= 0) {
+    mockWorkflowBusinessStates[existingIndex] = projection
+  } else {
+    mockWorkflowBusinessStates.push(projection)
+  }
+  return projection
+}
+
 function buildBusinessDashboardProjectionStats() {
   return mockBusinessDashboardProjectionModuleKeys.map((moduleKey) => ({
     module_key: moduleKey,
@@ -513,9 +576,7 @@ function buildBusinessDashboardProjectionStats() {
 }
 
 function isMockTerminalWorkflowTask(task = {}) {
-  return ['done', 'rejected', 'closed', 'cancelled'].includes(
-    String(task.task_status_key || '').trim()
-  )
+  return ['done', 'rejected'].includes(String(task.task_status_key || '').trim())
 }
 
 const mockProductionOrderParamKeys = {
@@ -676,6 +737,7 @@ function mockWorkflowMutationOperation(method = '') {
   if (method === 'complete_task_action') return 'complete'
   if (method === 'block_task_action') return 'block'
   if (method === 'reject_task_action') return 'reject'
+  if (method === 'resume_task_action') return 'resume'
   if (method === 'urge_task') return 'urge'
   return ''
 }
@@ -1165,7 +1227,6 @@ export function setupJsonRpcMockServer() {
           result: makeBizResult({
             task_states: mockTaskStates,
             business_states: mockBusinessStates,
-            planning_phases: [],
           }),
           error: '',
         }
@@ -1205,6 +1266,53 @@ export function setupJsonRpcMockServer() {
               offset,
             }),
             error: '',
+          }
+        }
+      } else if (method === 'list_role_tasks') {
+        if (
+          !workflowMockPermissionAllowed(
+            mockSuperAdminProfile,
+            mockSuperAdminProfile.effective_session,
+            'workflow.task.read'
+          )
+        ) {
+          responseBody = makeJsonRpcBizError(
+            id,
+            40010,
+            '当前账号缺少查看协同任务权限'
+          )
+        } else {
+          try {
+            const roleKeys = new Set(
+              (mockSuperAdminProfile.roles || []).map((role) => role.role_key)
+            )
+            responseBody = {
+              jsonrpc: '2.0',
+              id,
+              result: makeBizResult(
+                buildWorkflowRoleTaskPageMock({
+                  tasks: mockWorkflowTasks,
+                  params,
+                  snapshotAt: nowUnix(),
+                  adminID:
+                    mockSuperAdminProfile.is_super_admin === true
+                      ? 0
+                      : mockSuperAdminProfile.id,
+                  crossRoleRiskAllowed:
+                    params.view_key === 'risk' &&
+                    (mockSuperAdminProfile.is_super_admin === true ||
+                      roleKeys.has('pmc') ||
+                      roleKeys.has('boss')),
+                })
+              ),
+              error: '',
+            }
+          } catch (error) {
+            responseBody = makeJsonRpcBizError(
+              id,
+              40010,
+              error?.message || '岗位任务查询参数无效'
+            )
           }
         }
       } else if (method === 'get_task_board') {
@@ -1264,9 +1372,13 @@ export function setupJsonRpcMockServer() {
             '当前账号无权查看该协同任务'
           )
         } else {
-          const actions = ['complete', 'block', 'reject', 'urge'].map((item) =>
-            buildMockWorkflowActionExplain(request.task, item)
-          )
+          const actions = [
+            'complete',
+            'block',
+            'reject',
+            'resume',
+            'urge',
+          ].map((item) => buildMockWorkflowActionExplain(request.task, item))
           responseBody = {
             jsonrpc: '2.0',
             id,
@@ -1305,7 +1417,7 @@ export function setupJsonRpcMockServer() {
           )
         } else {
           const { task } = request
-          const decisions = ['complete', 'block', 'reject', 'urge'].map(
+          const decisions = ['complete', 'block', 'reject', 'resume', 'urge'].map(
             (actionKey) =>
               workflowMockActionDecision({
                 actionKey,
@@ -1410,11 +1522,10 @@ export function setupJsonRpcMockServer() {
             owner_role_key: createParams.owner_role_key,
             assignee_id: createParams.assignee_id || null,
             priority: createParams.priority,
-            blocked_reason: createParams.blocked_reason || '',
+            blocked_reason: '',
+            ...emptyWorkflowTaskUrgeFields(),
             due_at: createParams.due_at || null,
-            started_at: null,
             completed_at: null,
-            closed_at: null,
             version: 1,
             payload: createParams.payload,
             created_by: 1,
@@ -1505,15 +1616,26 @@ export function setupJsonRpcMockServer() {
         }
       } else if (
         method === 'block_task_action' ||
-        method === 'reject_task_action'
+        method === 'reject_task_action' ||
+        method === 'resume_task_action'
       ) {
         const request = resolveMockWorkflowMutationRequest(method, params)
         const nextStatusKey =
-          method === 'block_task_action' ? 'blocked' : 'rejected'
+          method === 'block_task_action'
+            ? 'blocked'
+            : method === 'reject_task_action'
+              ? 'rejected'
+              : 'ready'
+        const actionKey =
+          method === 'block_task_action'
+            ? 'block'
+            : method === 'reject_task_action'
+              ? 'reject'
+              : 'resume'
         const decision = request.error
           ? null
           : workflowMockActionDecision({
-              actionKey: method === 'block_task_action' ? 'block' : 'reject',
+              actionKey,
               adminProfile: mockSuperAdminProfile,
               effectiveSession: mockSuperAdminProfile.effective_session,
               task: request.task,
@@ -1572,11 +1694,21 @@ export function setupJsonRpcMockServer() {
           if (method === 'block_task_action') {
             task.payload.blocked_reason = mutationParams.reason
             delete task.payload.rejected_reason
-          } else {
+            task.blocked_reason = mutationParams.reason
+            upsertMockWorkflowBusinessProjection(
+              task,
+              'blocked',
+              mutationParams.reason
+            )
+          } else if (method === 'reject_task_action') {
             task.payload.rejected_reason = mutationParams.reason
             delete task.payload.blocked_reason
+            task.blocked_reason = mutationParams.reason
+          } else {
+            delete task.payload.blocked_reason
+            delete task.payload.rejected_reason
+            task.blocked_reason = ''
           }
-          task.blocked_reason = mutationParams.reason
           task.version += 1
           saveMockWorkflowMutationReceipt(receipt, task)
           responseBody = {
@@ -1637,16 +1769,45 @@ export function setupJsonRpcMockServer() {
           )
         } else {
           const { mutationParams, receipt, task } = request
-          const urgeCount = Number(task.payload?.urge_count || 0) + 1
+          const urgedAt = nowUnix()
+          const urgeCount = Number(task.urge_count || 0) + 1
+          const actorRoleKey = decision.ownerRoleMatched
+            ? task.owner_role_key
+            : 'admin'
+          const escalationTarget = mutationParams.action.startsWith(
+            'escalate_to_'
+          )
+            ? mutationParams.action.slice('escalate_to_'.length)
+            : ''
+          task.urge_count = urgeCount
+          task.last_urged_at = urgedAt
+          task.last_urged_by = mockSuperAdminProfile.id
+          task.last_urged_by_role_key = actorRoleKey
+          if (escalationTarget) {
+            task.escalated_at = urgedAt
+            task.escalate_target_role_key = escalationTarget
+          }
           task.payload = {
             ...(task.payload || {}),
             ...mutationParams.payload,
             urged: true,
             urge_count: urgeCount,
+            last_urge_at: urgedAt,
             last_urge_action: mutationParams.action,
             last_urge_reason: mutationParams.reason,
+            last_urge_actor_role_key: actorRoleKey,
+            notification_type: escalationTarget
+              ? 'urgent_escalation'
+              : 'task_urged',
+            alert_type: escalationTarget ? 'urgent_escalation' : 'urged_task',
+            ...(escalationTarget
+              ? {
+                  escalated: true,
+                  escalate_target_role_key: escalationTarget,
+                }
+              : {}),
           }
-          task.updated_at = nowUnix()
+          task.updated_at = urgedAt
           task.version += 1
           saveMockWorkflowMutationReceipt(receipt, task)
           responseBody = {

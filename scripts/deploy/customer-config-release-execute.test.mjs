@@ -8,7 +8,7 @@ import path from "node:path";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
-import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
 import {
   buildInputTemplate,
   parseCliArgs,
@@ -26,7 +26,11 @@ function writeRuntimeManifest(root) {
   fs.mkdirSync(path.dirname(manifestPath), { recursive: true });
   fs.writeFileSync(
     manifestPath,
-    JSON.stringify(buildRuntimeManifest(yoyoosunCustomerPackage), null, 2),
+    JSON.stringify(
+      buildRuntimeManifest(releaseReadyYoyoosunCustomerPackage),
+      null,
+      2,
+    ),
   );
   return "output/customers/yoyoosun/customer-config-runtime-manifest.json";
 }
@@ -44,7 +48,8 @@ function effectiveSessionPayload(root, manifest) {
   );
   return {
     configRevision: payload.revision,
-    configHash: `sha256:${manifestSha256(root, manifest)}`,
+    configHash: manifestSha256(root, manifest),
+    configHashVersion: 1,
     customer: {
       key: payload.customer_key,
       name: "永绅 yoyoosun",
@@ -56,6 +61,54 @@ function effectiveSessionPayload(root, manifest) {
     workPools: ["boss"],
     fieldPolicies: payload.compiled_snapshot.fieldPolicies,
     source: "active_customer_config_revision",
+  };
+}
+
+function successfulCustomerConfigRpcData(root, manifestPath, body) {
+  const manifest = JSON.parse(
+    fs.readFileSync(path.join(root, manifestPath), "utf8"),
+  );
+  const configHash = manifestSha256(root, manifestPath);
+  if (body.method === "validate_customer_config") {
+    return {
+      validation: {
+        customer_key: manifest.customer_key,
+        revision: manifest.revision,
+        config_hash: configHash,
+        config_hash_version: 1,
+        compiled_snapshot_ok: true,
+      },
+    };
+  }
+  if (body.method === "check_customer_config_transition") {
+    return {
+      transition: {
+        action: body.params.action,
+        customer_key: manifest.customer_key,
+        target_revision: manifest.revision,
+        target_config_hash: configHash,
+        target_product_version: manifest.product_version,
+        expected_active_revision: body.params.expected_active_revision,
+        observed_active_revision: "",
+        allowed: true,
+        noop: false,
+        blockers: [],
+      },
+    };
+  }
+  if (body.method === "get_effective_session") {
+    return { session: effectiveSessionPayload(root, manifestPath) };
+  }
+  return {
+    revision: {
+      customer_key: manifest.customer_key,
+      revision: manifest.revision,
+      product_version: manifest.product_version,
+      config_hash: configHash,
+      config_hash_version: 1,
+      status:
+        body.method === "publish_customer_config" ? "published" : "active",
+    },
   };
 }
 
@@ -680,7 +733,7 @@ test("rollback 不能和 activate 合并", async () => {
   }
 });
 
-test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", async () => {
+test("execute activate 通过 JSON-RPC 调用 validate、publish、transition check、activate", async () => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "customer-config-release-"),
   );
@@ -705,34 +758,10 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", as
     return {
       ok: true,
       async json() {
-        if (body.method === "validate_customer_config") {
-          return {
-            result: {
-              code: 0,
-              data: { validation: { revision: body.params.revision } },
-            },
-          };
-        }
-        if (body.method === "get_effective_session") {
-          return {
-            result: {
-              code: 0,
-              data: { session: effectiveSessionPayload(root, manifest) },
-            },
-          };
-        }
         return {
           result: {
             code: 0,
-            data: {
-              revision: {
-                revision: body.params.revision,
-                status:
-                  body.method === "activate_customer_config"
-                    ? "active"
-                    : "published",
-              },
-            },
+            data: successfulCustomerConfigRpcData(root, manifest, body),
           },
         };
       },
@@ -758,18 +787,60 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", as
       [
         "validate_customer_config",
         "publish_customer_config",
+        "check_customer_config_transition",
         "activate_customer_config",
         "get_effective_session",
       ],
     );
     assert.equal(calls[0].url, "http://127.0.0.1:8300/rpc/customer_config");
     assert.equal(calls[0].auth, "Bearer test-token");
-    assert.equal(
-      calls[2].params.revision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+    assert.deepEqual(
+      Object.keys(calls[2].params).sort(),
+      [
+        "action",
+        "customer_key",
+        "expected_active_revision",
+        "expected_config_hash",
+        "expected_product_version",
+        "target_revision",
+      ].sort(),
     );
+    assert.equal(calls[2].params.action, "activate");
+    assert.equal(calls[2].params.expected_active_revision, "");
+    assert.deepEqual(
+      Object.keys(calls[3].params).sort(),
+      [
+        "customer_key",
+        "expected_active_revision",
+        "expected_config_hash",
+        "expected_product_version",
+        "revision",
+      ].sort(),
+    );
+    assert.equal(calls[3].params.revision, report.revision);
+    assert.equal(
+      calls[3].params.expected_config_hash,
+      calls[2].params.expected_config_hash,
+    );
+    assert.equal(
+      calls[3].params.expected_product_version,
+      calls[2].params.expected_product_version,
+    );
+    assert.equal(calls[3].params.expected_active_revision, "");
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
+    assert.equal(report.transitionCheck.allowed, true);
+    assert.equal(report.transitionCheck.attempts, 1);
+    assert.equal(
+      report.validatedConfigIdentity.configHash,
+      calls[3].params.expected_config_hash,
+    );
+    assert.equal(report.validatedConfigIdentity.configHashVersion, 1);
     assert.equal(report.effectiveSessionVerification.status, "verified");
+    assert.equal(
+      report.effectiveSessionVerification.configHash,
+      calls[3].params.expected_config_hash,
+    );
+    assert.equal(report.effectiveSessionVerification.configHashVersion, 1);
     assert.equal(
       report.effectiveSessionVerification.configRevision,
       "yoyoosun-customer-package-v7.runtime-manifest-v1",
@@ -790,7 +861,7 @@ test("execute activate 通过 JSON-RPC 调用 validate、publish、activate", as
   }
 });
 
-test("execute rollback 只调用 rollback_customer_config", async () => {
+test("execute rollback 先 validate 和 transition check 再调用 rollback", async () => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "customer-config-release-"),
   );
@@ -815,23 +886,10 @@ test("execute rollback 只调用 rollback_customer_config", async () => {
     return {
       ok: true,
       async json() {
-        if (body.method === "get_effective_session") {
-          return {
-            result: {
-              code: 0,
-              data: { session: effectiveSessionPayload(root, manifest) },
-            },
-          };
-        }
         return {
           result: {
             code: 0,
-            data: {
-              revision: {
-                revision: body.params.target_revision,
-                status: "active",
-              },
-            },
+            data: successfulCustomerConfigRpcData(root, manifest, body),
           },
         };
       },
@@ -854,11 +912,29 @@ test("execute rollback 只调用 rollback_customer_config", async () => {
     assert.equal(report.rollback, true);
     assert.deepEqual(
       calls.map((call) => call.method),
-      ["rollback_customer_config", "get_effective_session"],
+      [
+        "validate_customer_config",
+        "check_customer_config_transition",
+        "rollback_customer_config",
+        "get_effective_session",
+      ],
     );
+    assert.equal(calls[1].params.action, "rollback");
+    assert.deepEqual(
+      Object.keys(calls[2].params).sort(),
+      [
+        "customer_key",
+        "expected_active_revision",
+        "expected_config_hash",
+        "expected_product_version",
+        "target_revision",
+      ].sort(),
+    );
+    assert.equal(calls[2].params.target_revision, report.revision);
+    assert.equal("revision" in calls[2].params, false);
     assert.equal(
-      calls[0].params.target_revision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      calls[2].params.expected_config_hash,
+      calls[1].params.expected_config_hash,
     );
     assert.equal(calls[0].auth, "Bearer test-token");
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
@@ -879,7 +955,7 @@ test("execute rollback 只调用 rollback_customer_config", async () => {
   }
 });
 
-test("execute activate-only 只调用 activate_customer_config", async () => {
+test("execute activate-only 先 validate 和 transition check 再调用 activate", async () => {
   const root = await mkdtemp(
     path.join(os.tmpdir(), "customer-config-release-"),
   );
@@ -904,23 +980,10 @@ test("execute activate-only 只调用 activate_customer_config", async () => {
     return {
       ok: true,
       async json() {
-        if (body.method === "get_effective_session") {
-          return {
-            result: {
-              code: 0,
-              data: { session: effectiveSessionPayload(root, manifest) },
-            },
-          };
-        }
         return {
           result: {
             code: 0,
-            data: {
-              revision: {
-                revision: body.params.revision,
-                status: "active",
-              },
-            },
+            data: successfulCustomerConfigRpcData(root, manifest, body),
           },
         };
       },
@@ -944,11 +1007,19 @@ test("execute activate-only 只调用 activate_customer_config", async () => {
     assert.equal(report.activateOnly, true);
     assert.deepEqual(
       calls.map((call) => call.method),
-      ["activate_customer_config", "get_effective_session"],
+      [
+        "validate_customer_config",
+        "check_customer_config_transition",
+        "activate_customer_config",
+        "get_effective_session",
+      ],
     );
+    assert.equal(calls[1].params.action, "activate");
+    assert.equal(calls[2].params.revision, report.revision);
+    assert.equal(calls[2].params.expected_active_revision, "");
     assert.equal(
-      calls[0].params.revision,
-      "yoyoosun-customer-package-v7.runtime-manifest-v1",
+      calls[2].params.expected_config_hash,
+      calls[1].params.expected_config_hash,
     );
     assert.equal(report.backendEndpointAlias, "http://127.0.0.1:8300");
     assert.equal(report.effectiveSessionVerification.status, "verified");
@@ -965,5 +1036,412 @@ test("execute activate-only 只调用 activate_customer_config", async () => {
       process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = originalToken;
     }
     await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("transition preflight 只用首次观测 active revision 再确认一次", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
+  const manifest = writeRuntimeManifest(root);
+  const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
+  writeReleaseEvidence(path.join(root, evidenceDir));
+  writeManifestEvidence(root, evidenceDir, manifest);
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  const originalConfirm = process.env.CUSTOMER_CONFIG_CONFIRM;
+  const originalToken = process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+  process.env.CUSTOMER_CONFIG_CONFIRM = "ACTIVATE_YOYOOSUN_CONFIG";
+  process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = "test-token";
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push({ method: body.method, params: body.params });
+    let data = successfulCustomerConfigRpcData(root, manifest, body);
+    if (body.method === "check_customer_config_transition") {
+      const confirmed = body.params.expected_active_revision === "active-v1";
+      data = {
+        transition: {
+          ...data.transition,
+          observed_active_revision: "active-v1",
+          allowed: confirmed,
+          blockers: confirmed ? [] : [{ code: "active_revision_changed" }],
+        },
+      };
+    }
+    return {
+      ok: true,
+      async json() {
+        return { result: { code: 0, data } };
+      },
+    };
+  };
+
+  try {
+    const report = await runCustomerConfigRelease(
+      {
+        manifest,
+        evidenceDir,
+        out: path.join(root, "out"),
+        backendURL: "http://127.0.0.1:8300",
+        execute: true,
+        activate: true,
+        activateOnly: true,
+      },
+      { repoRoot: root },
+    );
+    assert.deepEqual(
+      calls.map((call) => call.method),
+      [
+        "validate_customer_config",
+        "check_customer_config_transition",
+        "check_customer_config_transition",
+        "activate_customer_config",
+        "get_effective_session",
+      ],
+    );
+    assert.equal(calls[1].params.expected_active_revision, "");
+    assert.equal(calls[2].params.expected_active_revision, "active-v1");
+    assert.equal(calls[3].params.expected_active_revision, "active-v1");
+    assert.equal(report.transitionCheck.attempts, 2);
+    assert.equal(report.transitionCheck.observedActiveRevision, "active-v1");
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalConfirm === undefined) {
+      delete process.env.CUSTOMER_CONFIG_CONFIRM;
+    } else {
+      process.env.CUSTOMER_CONFIG_CONFIRM = originalConfirm;
+    }
+    if (originalToken === undefined) {
+      delete process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+    } else {
+      process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = originalToken;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("transition blocker fail closed 且不调用 mutation 或 effective readback", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
+  const manifest = writeRuntimeManifest(root);
+  const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
+  writeReleaseEvidence(path.join(root, evidenceDir));
+  writeManifestEvidence(root, evidenceDir, manifest);
+  const calls = [];
+  const originalFetch = globalThis.fetch;
+  const originalConfirm = process.env.CUSTOMER_CONFIG_CONFIRM;
+  const originalToken = process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+  process.env.CUSTOMER_CONFIG_CONFIRM = "ACTIVATE_YOYOOSUN_CONFIG";
+  process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = "test-token";
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    calls.push(body.method);
+    const data = successfulCustomerConfigRpcData(root, manifest, body);
+    if (body.method === "check_customer_config_transition") {
+      data.transition.allowed = false;
+      data.transition.blockers = [{ code: "target_module_closure_invalid" }];
+    }
+    return {
+      ok: true,
+      async json() {
+        return { result: { code: 0, data } };
+      },
+    };
+  };
+
+  try {
+    await assert.rejects(
+      () =>
+        runCustomerConfigRelease(
+          {
+            manifest,
+            evidenceDir,
+            out: path.join(root, "out"),
+            backendURL: "http://127.0.0.1:8300",
+            execute: true,
+            activate: true,
+            activateOnly: true,
+          },
+          { repoRoot: root },
+        ),
+      /transition blocked: target_module_closure_invalid/,
+    );
+    assert.deepEqual(calls, [
+      "validate_customer_config",
+      "check_customer_config_transition",
+    ]);
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalConfirm === undefined) {
+      delete process.env.CUSTOMER_CONFIG_CONFIRM;
+    } else {
+      process.env.CUSTOMER_CONFIG_CONFIRM = originalConfirm;
+    }
+    if (originalToken === undefined) {
+      delete process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+    } else {
+      process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = originalToken;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("executor 对 malformed validate 和 publish identity fail closed", async (t) => {
+  const cases = [
+    {
+      name: "unexpected hash version",
+      mutate(method, data) {
+        if (method === "validate_customer_config") {
+          data.validation.config_hash_version = 2;
+        }
+      },
+      wantCalls: ["validate_customer_config"],
+      wantError: /validate_customer_config response does not prove/,
+    },
+    {
+      name: "publish hash mismatch",
+      mutate(method, data) {
+        if (method === "publish_customer_config") {
+          data.revision.config_hash = "b".repeat(64);
+        }
+      },
+      wantCalls: ["validate_customer_config", "publish_customer_config"],
+      wantError: /publish_customer_config response does not match/,
+    },
+  ];
+
+  for (const testCase of cases) {
+    await t.test(testCase.name, async () => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), "customer-config-release-"),
+      );
+      const manifest = writeRuntimeManifest(root);
+      const calls = [];
+      const originalFetch = globalThis.fetch;
+      const originalConfirm = process.env.CUSTOMER_CONFIG_CONFIRM;
+      const originalToken = process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+      process.env.CUSTOMER_CONFIG_CONFIRM = "PUBLISH_YOYOOSUN_CONFIG";
+      process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = "test-token";
+      globalThis.fetch = async (_url, init) => {
+        const body = JSON.parse(init.body);
+        calls.push(body.method);
+        const data = successfulCustomerConfigRpcData(root, manifest, body);
+        testCase.mutate(body.method, data);
+        return {
+          ok: true,
+          async json() {
+            return { result: { code: 0, data } };
+          },
+        };
+      };
+
+      try {
+        await assert.rejects(
+          () =>
+            runCustomerConfigRelease(
+              {
+                manifest,
+                out: path.join(root, "out"),
+                backendURL: "http://127.0.0.1:8300",
+                execute: true,
+              },
+              { repoRoot: root },
+            ),
+          testCase.wantError,
+        );
+        assert.deepEqual(calls, testCase.wantCalls);
+      } finally {
+        globalThis.fetch = originalFetch;
+        if (originalConfirm === undefined) {
+          delete process.env.CUSTOMER_CONFIG_CONFIRM;
+        } else {
+          process.env.CUSTOMER_CONFIG_CONFIRM = originalConfirm;
+        }
+        if (originalToken === undefined) {
+          delete process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+        } else {
+          process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = originalToken;
+        }
+        await rm(root, { recursive: true, force: true });
+      }
+    });
+  }
+});
+
+test("publish-only 报告记录后端 canonical hash identity", async () => {
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "customer-config-release-"),
+  );
+  const manifest = writeRuntimeManifest(root);
+  const originalFetch = globalThis.fetch;
+  const originalConfirm = process.env.CUSTOMER_CONFIG_CONFIRM;
+  const originalToken = process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+  process.env.CUSTOMER_CONFIG_CONFIRM = "PUBLISH_YOYOOSUN_CONFIG";
+  process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = "test-token";
+  globalThis.fetch = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    return {
+      ok: true,
+      async json() {
+        return {
+          result: {
+            code: 0,
+            data: successfulCustomerConfigRpcData(root, manifest, body),
+          },
+        };
+      },
+    };
+  };
+
+  try {
+    const report = await runCustomerConfigRelease(
+      {
+        manifest,
+        out: path.join(root, "out"),
+        backendURL: "http://127.0.0.1:8300",
+        execute: true,
+      },
+      { repoRoot: root },
+    );
+    assert.equal(report.transitionCheck, null);
+    assert.equal(report.effectiveSessionVerification, null);
+    assert.equal(
+      report.validatedConfigIdentity.configHash,
+      manifestSha256(root, manifest),
+    );
+    assert.equal(report.validatedConfigIdentity.configHashVersion, 1);
+    assert.equal(
+      report.validatedConfigIdentity.productVersion,
+      JSON.parse(fs.readFileSync(path.join(root, manifest), "utf8"))
+        .product_version,
+    );
+  } finally {
+    globalThis.fetch = originalFetch;
+    if (originalConfirm === undefined) {
+      delete process.env.CUSTOMER_CONFIG_CONFIRM;
+    } else {
+      process.env.CUSTOMER_CONFIG_CONFIRM = originalConfirm;
+    }
+    if (originalToken === undefined) {
+      delete process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+    } else {
+      process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = originalToken;
+    }
+    await rm(root, { recursive: true, force: true });
+  }
+});
+
+test("executor 对 malformed transition、mutation 和 effective response fail closed", async (t) => {
+  const cases = [
+    {
+      name: "blocker without code",
+      transform(method, data) {
+        if (method === "check_customer_config_transition") {
+          data.transition.allowed = true;
+          data.transition.blockers = [{}];
+        }
+        return data;
+      },
+      wantCalls: [
+        "validate_customer_config",
+        "check_customer_config_transition",
+      ],
+      wantError: /transition response does not match/,
+    },
+    {
+      name: "mutation identity mismatch",
+      transform(method, data) {
+        if (method === "activate_customer_config") {
+          data.revision.config_hash = "b".repeat(64);
+        }
+        return data;
+      },
+      wantCalls: [
+        "validate_customer_config",
+        "check_customer_config_transition",
+        "activate_customer_config",
+      ],
+      wantError: /activate_customer_config response does not match/,
+    },
+    {
+      name: "bare effective session shape",
+      transform(method, data) {
+        if (method === "get_effective_session") {
+          return data.session;
+        }
+        return data;
+      },
+      wantCalls: [
+        "validate_customer_config",
+        "check_customer_config_transition",
+        "activate_customer_config",
+        "get_effective_session",
+      ],
+      wantError: /required session object/,
+    },
+  ];
+
+  for (const testCase of cases) {
+    await t.test(testCase.name, async () => {
+      const root = await mkdtemp(
+        path.join(os.tmpdir(), "customer-config-release-"),
+      );
+      const manifest = writeRuntimeManifest(root);
+      const evidenceDir = "deployments/yoyoosun/evidence/releases/2026-06-28";
+      writeReleaseEvidence(path.join(root, evidenceDir));
+      writeManifestEvidence(root, evidenceDir, manifest);
+      const calls = [];
+      const originalFetch = globalThis.fetch;
+      const originalConfirm = process.env.CUSTOMER_CONFIG_CONFIRM;
+      const originalToken = process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+      process.env.CUSTOMER_CONFIG_CONFIRM = "ACTIVATE_YOYOOSUN_CONFIG";
+      process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = "test-token";
+      globalThis.fetch = async (_url, init) => {
+        const body = JSON.parse(init.body);
+        calls.push(body.method);
+        let data = successfulCustomerConfigRpcData(root, manifest, body);
+        data = testCase.transform(body.method, data);
+        return {
+          ok: true,
+          async json() {
+            return { result: { code: 0, data } };
+          },
+        };
+      };
+
+      try {
+        await assert.rejects(
+          () =>
+            runCustomerConfigRelease(
+              {
+                manifest,
+                evidenceDir,
+                out: path.join(root, "out"),
+                backendURL: "http://127.0.0.1:8300",
+                execute: true,
+                activate: true,
+                activateOnly: true,
+              },
+              { repoRoot: root },
+            ),
+          testCase.wantError,
+        );
+        assert.deepEqual(calls, testCase.wantCalls);
+      } finally {
+        globalThis.fetch = originalFetch;
+        if (originalConfirm === undefined) {
+          delete process.env.CUSTOMER_CONFIG_CONFIRM;
+        } else {
+          process.env.CUSTOMER_CONFIG_CONFIRM = originalConfirm;
+        }
+        if (originalToken === undefined) {
+          delete process.env.CUSTOMER_CONFIG_ADMIN_TOKEN;
+        } else {
+          process.env.CUSTOMER_CONFIG_ADMIN_TOKEN = originalToken;
+        }
+        await rm(root, { recursive: true, force: true });
+      }
+    });
   }
 });

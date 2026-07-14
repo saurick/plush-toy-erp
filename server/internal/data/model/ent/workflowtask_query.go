@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
 
@@ -20,11 +22,13 @@ import (
 // WorkflowTaskQuery is the builder for querying WorkflowTask entities.
 type WorkflowTaskQuery struct {
 	config
-	ctx        *QueryContext
-	order      []workflowtask.OrderOption
-	inters     []Interceptor
-	predicates []predicate.WorkflowTask
-	withEvents *WorkflowTaskEventQuery
+	ctx                     *QueryContext
+	order                   []workflowtask.OrderOption
+	inters                  []Interceptor
+	predicates              []predicate.WorkflowTask
+	withEvents              *WorkflowTaskEventQuery
+	withProcessInstance     *ProcessInstanceQuery
+	withProcessNodeInstance *ProcessNodeInstanceQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -76,6 +80,50 @@ func (_q *WorkflowTaskQuery) QueryEvents() *WorkflowTaskEventQuery {
 			sqlgraph.From(workflowtask.Table, workflowtask.FieldID, selector),
 			sqlgraph.To(workflowtaskevent.Table, workflowtaskevent.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, workflowtask.EventsTable, workflowtask.EventsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProcessInstance chains the current query on the "process_instance" edge.
+func (_q *WorkflowTaskQuery) QueryProcessInstance() *ProcessInstanceQuery {
+	query := (&ProcessInstanceClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(workflowtask.Table, workflowtask.FieldID, selector),
+			sqlgraph.To(processinstance.Table, processinstance.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, workflowtask.ProcessInstanceTable, workflowtask.ProcessInstanceColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProcessNodeInstance chains the current query on the "process_node_instance" edge.
+func (_q *WorkflowTaskQuery) QueryProcessNodeInstance() *ProcessNodeInstanceQuery {
+	query := (&ProcessNodeInstanceClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(workflowtask.Table, workflowtask.FieldID, selector),
+			sqlgraph.To(processnodeinstance.Table, processnodeinstance.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, workflowtask.ProcessNodeInstanceTable, workflowtask.ProcessNodeInstanceColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -270,12 +318,14 @@ func (_q *WorkflowTaskQuery) Clone() *WorkflowTaskQuery {
 		return nil
 	}
 	return &WorkflowTaskQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]workflowtask.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.WorkflowTask{}, _q.predicates...),
-		withEvents: _q.withEvents.Clone(),
+		config:                  _q.config,
+		ctx:                     _q.ctx.Clone(),
+		order:                   append([]workflowtask.OrderOption{}, _q.order...),
+		inters:                  append([]Interceptor{}, _q.inters...),
+		predicates:              append([]predicate.WorkflowTask{}, _q.predicates...),
+		withEvents:              _q.withEvents.Clone(),
+		withProcessInstance:     _q.withProcessInstance.Clone(),
+		withProcessNodeInstance: _q.withProcessNodeInstance.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -290,6 +340,28 @@ func (_q *WorkflowTaskQuery) WithEvents(opts ...func(*WorkflowTaskEventQuery)) *
 		opt(query)
 	}
 	_q.withEvents = query
+	return _q
+}
+
+// WithProcessInstance tells the query-builder to eager-load the nodes that are connected to
+// the "process_instance" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WorkflowTaskQuery) WithProcessInstance(opts ...func(*ProcessInstanceQuery)) *WorkflowTaskQuery {
+	query := (&ProcessInstanceClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProcessInstance = query
+	return _q
+}
+
+// WithProcessNodeInstance tells the query-builder to eager-load the nodes that are connected to
+// the "process_node_instance" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *WorkflowTaskQuery) WithProcessNodeInstance(opts ...func(*ProcessNodeInstanceQuery)) *WorkflowTaskQuery {
+	query := (&ProcessNodeInstanceClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProcessNodeInstance = query
 	return _q
 }
 
@@ -371,8 +443,10 @@ func (_q *WorkflowTaskQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 	var (
 		nodes       = []*WorkflowTask{}
 		_spec       = _q.querySpec()
-		loadedTypes = [1]bool{
+		loadedTypes = [3]bool{
 			_q.withEvents != nil,
+			_q.withProcessInstance != nil,
+			_q.withProcessNodeInstance != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -397,6 +471,18 @@ func (_q *WorkflowTaskQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]
 		if err := _q.loadEvents(ctx, query, nodes,
 			func(n *WorkflowTask) { n.Edges.Events = []*WorkflowTaskEvent{} },
 			func(n *WorkflowTask, e *WorkflowTaskEvent) { n.Edges.Events = append(n.Edges.Events, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProcessInstance; query != nil {
+		if err := _q.loadProcessInstance(ctx, query, nodes, nil,
+			func(n *WorkflowTask, e *ProcessInstance) { n.Edges.ProcessInstance = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProcessNodeInstance; query != nil {
+		if err := _q.loadProcessNodeInstance(ctx, query, nodes, nil,
+			func(n *WorkflowTask, e *ProcessNodeInstance) { n.Edges.ProcessNodeInstance = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -433,6 +519,70 @@ func (_q *WorkflowTaskQuery) loadEvents(ctx context.Context, query *WorkflowTask
 	}
 	return nil
 }
+func (_q *WorkflowTaskQuery) loadProcessInstance(ctx context.Context, query *ProcessInstanceQuery, nodes []*WorkflowTask, init func(*WorkflowTask), assign func(*WorkflowTask, *ProcessInstance)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*WorkflowTask)
+	for i := range nodes {
+		if nodes[i].ProcessInstanceID == nil {
+			continue
+		}
+		fk := *nodes[i].ProcessInstanceID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(processinstance.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "process_instance_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *WorkflowTaskQuery) loadProcessNodeInstance(ctx context.Context, query *ProcessNodeInstanceQuery, nodes []*WorkflowTask, init func(*WorkflowTask), assign func(*WorkflowTask, *ProcessNodeInstance)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*WorkflowTask)
+	for i := range nodes {
+		if nodes[i].ProcessNodeInstanceID == nil {
+			continue
+		}
+		fk := *nodes[i].ProcessNodeInstanceID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(processnodeinstance.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "process_node_instance_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
 
 func (_q *WorkflowTaskQuery) sqlCount(ctx context.Context) (int, error) {
 	_spec := _q.querySpec()
@@ -458,6 +608,12 @@ func (_q *WorkflowTaskQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != workflowtask.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withProcessInstance != nil {
+			_spec.Node.AddColumnOnce(workflowtask.FieldProcessInstanceID)
+		}
+		if _q.withProcessNodeInstance != nil {
+			_spec.Node.AddColumnOnce(workflowtask.FieldProcessNodeInstanceID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

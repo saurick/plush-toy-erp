@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
@@ -12,6 +13,7 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/qualityinspection"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -33,12 +35,17 @@ func TestPurchaseReceiptPostgresMigrationShape(t *testing.T) {
 	assertPostgresColumnExists(t, data.sqldb, "purchase_receipts", "idempotency_key")
 	assertPostgresColumnExists(t, data.sqldb, "purchase_receipts", "idempotency_payload_hash")
 	assertPostgresColumnExists(t, data.sqldb, "purchase_receipts", "idempotency_item_count")
+	assertPostgresColumnExists(t, data.sqldb, "purchase_receipt_items", "idempotency_key")
+	assertPostgresColumnExists(t, data.sqldb, "purchase_receipt_items", "idempotency_payload_hash")
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipts", "purchasereceipt_receipt_no")
 	assertPostgresUniqueIndex(t, data.sqldb, "purchase_receipts", "purchasereceipt_idempotency_key")
+	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_receipt_items", "purchasereceiptitem_receipt_id_idempotency_key", "idempotency_key IS NOT NULL AND idempotency_key <> ''")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "purchase_receipt_items", "purchasereceiptitem_receipt_id_source_line_no", "source_line_no IS NOT NULL AND source_line_no <> ''")
+	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipts", "purchase_receipts_idempotency_bundle_complete", "idempotency_item_count > 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_quantity_positive", "quantity > 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_unit_price_non_negative", "unit_price IS NULL OR unit_price >= 0")
 	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_amount_non_negative", "amount IS NULL OR amount >= 0")
+	assertPostgresCheckConstraint(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_idempotency_bundle_complete", "length(idempotency_payload_hash) = 64")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "purchase_receipt_items", "purchase_receipt_items_inventory_lots_purchase_receipt_items", "NO ACTION")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id", "lot_id IS NULL")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "inventory_balances", "inventorybalance_subject_type_subject_id_warehouse_id_unit_id_l", "lot_id IS NOT NULL")
@@ -67,22 +74,24 @@ func TestPurchaseReceiptPostgresMigrationShape(t *testing.T) {
 		t.Fatalf("expected postgres receipt_no unique constraint, got %v", err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:    receipt.ID,
-		MaterialID:   fixtures.materialID,
-		WarehouseID:  fixtures.warehouseID,
-		UnitID:       fixtures.unitID,
-		Quantity:     mustDecimal(t, "1"),
-		SourceLineNo: stringPtr("same-line"),
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		SourceLineNo:   stringPtr("same-line"),
+		IdempotencyKey: "test:postgres:source-line:first:" + fixtures.suffix,
 	}); err != nil {
 		t.Fatalf("create postgres source line item failed: %v", err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:    receipt.ID,
-		MaterialID:   fixtures.materialID,
-		WarehouseID:  fixtures.warehouseID,
-		UnitID:       fixtures.unitID,
-		Quantity:     mustDecimal(t, "1"),
-		SourceLineNo: stringPtr("same-line"),
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		SourceLineNo:   stringPtr("same-line"),
+		IdempotencyKey: "test:postgres:source-line:second:" + fixtures.suffix,
 	}); !ent.IsConstraintError(err) {
 		t.Fatalf("expected postgres receipt source_line_no unique constraint, got %v", err)
 	}
@@ -163,11 +172,12 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 	}
 	assertOptionalIntEqual(t, inboundTxn.LotID, *lotID)
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   posted.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    mustDecimal(t, "1"),
+		ReceiptID:      posted.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:postgres:posted-reject:" + fixtures.suffix,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected postgres posted receipt item add to be rejected, got %v", err)
 	}
@@ -245,11 +255,12 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 		t.Fatalf("expected postgres cancelled receipt post to be rejected, got %v", err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   posted.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    mustDecimal(t, "1"),
+		ReceiptID:      posted.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:postgres:cancelled-reject:" + fixtures.suffix,
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected postgres cancelled receipt item add to be rejected, got %v", err)
 	}
@@ -334,6 +345,132 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 	}
 	if reversalCount != 1 {
 		t.Fatalf("expected one postgres reversal after repeat cancel, got %d", reversalCount)
+	}
+}
+
+func TestPurchaseReceiptPostgresConcurrentItemReplayReturnsOneFactSet(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	fixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	receipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PG-PR-ITEM-IDEMPOTENCY-" + fixtures.suffix,
+		SupplierName: "PG幂等供应商",
+		ReceivedAt:   time.Now().UTC().Truncate(time.Microsecond),
+	})
+	if err != nil {
+		t.Fatalf("create postgres receipt draft failed: %v", err)
+	}
+	lotCountBefore := client.InventoryLot.Query().CountX(ctx)
+	inspectionCountBefore := client.QualityInspection.Query().CountX(ctx)
+	input := biz.PurchaseReceiptItemCreate{
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		LotNo:          stringPtr("PG-IDEMPOTENT-LOT-" + fixtures.suffix),
+		Quantity:       mustDecimal(t, "5"),
+		SourceLineNo:   stringPtr("PG-IDEMPOTENT-LINE"),
+		IdempotencyKey: "test:postgres:purchase-receipt-item:" + fixtures.suffix,
+	}
+
+	type addResult struct {
+		item *biz.PurchaseReceiptItem
+		err  error
+	}
+	start := make(chan struct{})
+	results := make(chan addResult, 2)
+	var ready sync.WaitGroup
+	ready.Add(2)
+	for range 2 {
+		go func() {
+			ready.Done()
+			<-start
+			attempt := input
+			item, err := uc.AddPurchaseReceiptItem(ctx, &attempt)
+			results <- addResult{item: item, err: err}
+		}()
+	}
+	ready.Wait()
+	close(start)
+	first := <-results
+	second := <-results
+	if first.err != nil || second.err != nil {
+		t.Fatalf("concurrent idempotent append errors: first=%v second=%v", first.err, second.err)
+	}
+	if first.item == nil || second.item == nil || first.item.ID != second.item.ID {
+		t.Fatalf("concurrent idempotent append results differ: first=%#v second=%#v", first.item, second.item)
+	}
+	if got := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).CountX(ctx); got != 1 {
+		t.Fatalf("concurrent idempotent append item count=%d, want 1", got)
+	}
+	if got := client.InventoryLot.Query().CountX(ctx); got != lotCountBefore+1 {
+		t.Fatalf("concurrent idempotent append lot count=%d, want %d", got, lotCountBefore+1)
+	}
+	if got := client.QualityInspection.Query().CountX(ctx); got != inspectionCountBefore+1 {
+		t.Fatalf("concurrent idempotent append inspection count=%d, want %d", got, inspectionCountBefore+1)
+	}
+}
+
+func TestPurchaseReceiptPostgresConcurrentCreateFromOrderReturnsOneFactSet(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	postgresFixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	fixtures := inventoryTestFixtures{
+		unitID:      postgresFixtures.unitID,
+		materialID:  postgresFixtures.materialID,
+		productID:   postgresFixtures.productID,
+		warehouseID: postgresFixtures.warehouseID,
+	}
+	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "PG-CREATE-IDEMPOTENCY-"+postgresFixtures.suffix, mustDecimal(t, "7"))
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	input := biz.PurchaseReceiptFromPurchaseOrderCreate{
+		PurchaseOrderID: orderItem.PurchaseOrderID,
+		ReceiptNo:       "PG-PR-CREATE-IDEMPOTENCY-" + postgresFixtures.suffix,
+		WarehouseID:     fixtures.warehouseID,
+		ReceivedAt:      time.Now().UTC().Truncate(time.Microsecond),
+		IdempotencyKey:  "test:postgres:purchase-receipt-create:" + postgresFixtures.suffix,
+	}
+
+	type createResult struct {
+		receipt *biz.PurchaseReceipt
+		err     error
+	}
+	start := make(chan struct{})
+	results := make(chan createResult, 2)
+	var ready sync.WaitGroup
+	ready.Add(2)
+	for range 2 {
+		go func() {
+			ready.Done()
+			<-start
+			attempt := input
+			receipt, err := uc.CreatePurchaseReceiptFromPurchaseOrder(ctx, &attempt)
+			results <- createResult{receipt: receipt, err: err}
+		}()
+	}
+	ready.Wait()
+	close(start)
+	first, second := <-results, <-results
+	if first.err != nil || second.err != nil {
+		t.Fatalf("concurrent idempotent receipt creation errors: first=%v second=%v", first.err, second.err)
+	}
+	if first.receipt == nil || second.receipt == nil || first.receipt.ID != second.receipt.ID {
+		t.Fatalf("concurrent idempotent receipt results differ: first=%#v second=%#v", first.receipt, second.receipt)
+	}
+	receiptID := first.receipt.ID
+	if got := client.PurchaseReceipt.Query().Where(purchasereceipt.IdempotencyKey(input.IdempotencyKey)).CountX(ctx); got != 1 {
+		t.Fatalf("concurrent idempotent receipt count=%d, want 1", got)
+	}
+	items, err := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receiptID)).All(ctx)
+	if err != nil {
+		t.Fatalf("load generated receipt items: %v", err)
+	}
+	if len(items) != 1 || items[0].LotID == nil {
+		t.Fatalf("generated receipt fact boundary is incomplete: %#v", items)
+	}
+	if got := client.QualityInspection.Query().Where(qualityinspection.PurchaseReceiptID(receiptID)).CountX(ctx); got != 1 {
+		t.Fatalf("concurrent idempotent initial inspection count=%d, want 1", got)
 	}
 }
 

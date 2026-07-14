@@ -52,7 +52,7 @@ import {
   renderOutsourcingOrderStatusTag,
 } from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
 import {
-  listOutsourcingOrderItems,
+  listAllOutsourcingOrderItems,
   listOutsourcingOrders,
   listMaterials,
   listProcesses,
@@ -85,6 +85,16 @@ import {
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
+import {
+  buildSourceDocumentItemSaveParams,
+  commitSourceDocumentSaveResult,
+  createSourceDocumentOpenEditController,
+  isMutationResultUnknown,
+  isResourceVersionConflict,
+  openSourceDocumentEditWithAccessGate,
+  selectOpenSourceDocumentItems,
+  settleSourceDocumentPostSaveEffect,
+} from '../utils/sourceDocumentMutation.mjs'
 import {
   applyModuleColumnOrder,
   sanitizeModuleColumnOrder,
@@ -134,6 +144,7 @@ export default function V1OutsourcingOrdersPage() {
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [itemsLoading, setItemsLoading] = useState(false)
   const [printingAction, setPrintingAction] = useState('')
   const [workflowTasks, setWorkflowTasks] = useState([])
   const [columnOrder, setColumnOrder] = useState(null)
@@ -158,6 +169,14 @@ export default function V1OutsourcingOrdersPage() {
   const [processes, setProcesses] = useState([])
   const [units, setUnits] = useState([])
   const beginLatestRequest = useLatestRequestCoordinator()
+  const sourceDocumentOpenEditController = useMemo(
+    () =>
+      createSourceDocumentOpenEditController({
+        beginLatestRequest,
+        setLoading: setItemsLoading,
+      }),
+    [beginLatestRequest]
+  )
 
   const supplierOptions = useMemo(
     () =>
@@ -293,13 +312,18 @@ export default function V1OutsourcingOrdersPage() {
     supplierFilter,
   ])
 
-  const loadOrderItems = useCallback(async (order) => {
-    if (!order?.id) return []
-    const data = await listOutsourcingOrderItems({
-      outsourcing_order_id: order.id,
-      limit: 200,
-    })
-    return data?.outsourcing_order_items || []
+  const loadOrderItems = useCallback(async (order, options = {}) => {
+    if (!order?.id) {
+      throw new Error('缺少加工合同，无法加载明细')
+    }
+    const data = await listAllOutsourcingOrderItems(
+      {
+        outsourcing_order_id: order.id,
+        expected_version: order.version,
+      },
+      options
+    )
+    return data.outsourcing_order_items
   }, [])
 
   useEffect(() => {
@@ -340,6 +364,7 @@ export default function V1OutsourcingOrdersPage() {
   )
 
   const openCreate = () => {
+    sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingRow(null)
     form.setFieldsValue({
@@ -362,38 +387,63 @@ export default function V1OutsourcingOrdersPage() {
   }
 
   const openEdit = async (record) => {
-    if (!record) return
-    orderAttachmentRef.current?.clearPendingAttachments()
-    setSaving(true)
-    try {
-      const items = await loadOrderItems(record)
-      setEditingRow(record)
-      form.setFieldsValue({
-        ...record,
-        order_date: unixToDateInputValue(record.order_date),
-        expected_return_date: unixToDateInputValue(record.expected_return_date),
-        contract_party_snapshot:
-          record.contract_party_snapshot &&
-          typeof record.contract_party_snapshot === 'object'
-            ? record.contract_party_snapshot
-            : contractPartySnapshotFromPrintTemplateDefaults(
-                processingPrintTemplateDefaults,
-                PROCESSING_CONTRACT_TEMPLATE_KEY
+    const editResult = await openSourceDocumentEditWithAccessGate({
+      canUpdate,
+      document: record,
+      invalidatePending: () => sourceDocumentOpenEditController.invalidate(),
+      isEditable: canEditOutsourcingOrder,
+      open: () =>
+        sourceDocumentOpenEditController.open({
+          loadItems: ({ signal }) => loadOrderItems(record, { signal }),
+          enterEditing: (items) => {
+            const openItems = selectOpenSourceDocumentItems(items)
+            orderAttachmentRef.current?.clearPendingAttachments()
+            setEditingRow(record)
+            form.setFieldsValue({
+              ...record,
+              order_date: unixToDateInputValue(record.order_date),
+              expected_return_date: unixToDateInputValue(
+                record.expected_return_date
               ),
-        items:
-          items.length > 0
-            ? items.map((item) => normalizeOutsourcingLineFormValue(item))
-            : [createBlankOutsourcingLine(1)],
-      })
-      setModalOpen(true)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '加载加工合同明细失败'))
-    } finally {
-      setSaving(false)
+              contract_party_snapshot:
+                record.contract_party_snapshot &&
+                typeof record.contract_party_snapshot === 'object'
+                  ? record.contract_party_snapshot
+                  : contractPartySnapshotFromPrintTemplateDefaults(
+                      processingPrintTemplateDefaults,
+                      PROCESSING_CONTRACT_TEMPLATE_KEY
+                    ),
+              items:
+                openItems.length > 0
+                  ? openItems.map((item) =>
+                      normalizeOutsourcingLineFormValue(item)
+                    )
+                  : [createBlankOutsourcingLine(1)],
+            })
+            setModalOpen(true)
+          },
+        }),
+    })
+    if (editResult.status === 'blocked') {
+      if (editResult.reason === 'forbidden') {
+        message.warning('当前账号没有编辑加工合同的权限。')
+      } else if (editResult.reason === 'not_editable') {
+        message.warning('加工合同提交后已冻结，不能继续编辑。')
+      }
+      return
+    }
+    if (editResult.status === 'load_failed') {
+      message.error(
+        `${getActionErrorMessage(
+          editResult.error,
+          '加载加工合同明细失败'
+        )}，未进入编辑`
+      )
     }
   }
 
   const closeModal = () => {
+    sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setModalOpen(false)
     setEditingRow(null)
@@ -527,32 +577,74 @@ export default function V1OutsourcingOrdersPage() {
   const submitForm = async () => {
     setSaving(true)
     try {
-      const values = await form.validateFields()
-      const supplier = suppliers.find((item) => item.id === values.supplier_id)
-      const supplierSnapshot = await resolveSupplierSnapshot(supplier, {
-        notifyOnError: true,
-      })
-      const payload = buildOutsourcingOrderParams(
-        {
-          ...values,
-          supplier_snapshot: supplierSnapshot,
-        },
-        {
-          id: editingRow?.id || undefined,
-          items: (values.items || []).map((item, index) =>
-            buildOutsourcingOrderItemParams(item, {
-              line_no: index + 1,
-            })
-          ),
+      let payload
+      try {
+        const values = await form.validateFields()
+        const supplier = suppliers.find(
+          (item) => item.id === values.supplier_id
+        )
+        const supplierSnapshot = await resolveSupplierSnapshot(supplier, {
+          notifyOnError: true,
+        })
+        payload = buildOutsourcingOrderParams(
+          {
+            ...values,
+            supplier_snapshot: supplierSnapshot,
+          },
+          {
+            id: editingRow?.id || undefined,
+            expected_version: editingRow?.id ? editingRow.version : undefined,
+            items: buildSourceDocumentItemSaveParams(
+              values.items,
+              buildOutsourcingOrderItemParams
+            ),
+          }
+        )
+      } catch (error) {
+        if (!error?.errorFields) {
+          message.error(getActionErrorMessage(error, '准备加工合同保存'))
         }
+        return
+      }
+
+      const saveResult = await commitSourceDocumentSaveResult({
+        save: async () => {
+          const result = await saveOutsourcingOrderWithItems(payload)
+          return result.outsourcing_order
+        },
+        bindSaved: (savedOrder) => {
+          setEditingRow(savedOrder)
+          setSelectedRow(savedOrder)
+        },
+      })
+      if (saveResult.status === 'save_failed') {
+        const saveError = saveResult.error
+        if (isResourceVersionConflict(saveError)) {
+          message.warning(
+            '该单据已被其他人更新，本次内容没有覆盖最新数据。请核对最新单据后再保存。'
+          )
+        } else if (isMutationResultUnknown(saveError)) {
+          message.warning(
+            '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。'
+          )
+        } else {
+          message.error(getActionErrorMessage(saveError, '保存加工合同失败'))
+        }
+        return
+      }
+
+      const { saved: savedOrder } = saveResult
+      const attachmentEffect = await settleSourceDocumentPostSaveEffect(() =>
+        orderAttachmentRef.current?.flushPendingAttachments(savedOrder.id)
       )
-      const saved = await saveOutsourcingOrderWithItems(payload)
-      const savedOrder = saved?.outsourcing_order || null
       const attachmentSaved =
-        (await orderAttachmentRef.current?.flushPendingAttachments(
-          savedOrder?.id
-        )) !== false
-      setSelectedRow(savedOrder)
+        attachmentEffect.status === 'fulfilled' &&
+        attachmentEffect.value !== false
+      if (attachmentEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(attachmentEffect.error, '上传加工合同附件')
+        )
+      }
       message.success(
         attachmentSaved
           ? editingRow
@@ -561,10 +653,17 @@ export default function V1OutsourcingOrdersPage() {
           : '加工合同已保存，未上传的附件请重新选择'
       )
       closeModal()
-      await Promise.all([loadOrders(), loadWorkflowTasks()])
-    } catch (error) {
-      if (error?.errorFields) return
-      message.error(getActionErrorMessage(error, '保存加工合同失败'))
+      const refreshEffect = await settleSourceDocumentPostSaveEffect(() =>
+        Promise.all([loadOrders(), loadWorkflowTasks()])
+      )
+      if (refreshEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(
+            refreshEffect.error,
+            '刷新加工合同列表和协同任务'
+          )
+        )
+      }
     } finally {
       setSaving(false)
     }
@@ -686,6 +785,7 @@ export default function V1OutsourcingOrdersPage() {
     blockWorkflowTask,
     completeWorkflowTask,
     rejectWorkflowTask,
+    resumeWorkflowTask,
     urgeOutsourcingWorkflowTask,
   } = useOutsourcingOrderWorkflowActions({ loadWorkflowTasks })
 
@@ -1007,10 +1107,12 @@ export default function V1OutsourcingOrdersPage() {
           <Button
             size="small"
             icon={<EditOutlined />}
+            loading={itemsLoading}
             disabled={
               !selectedRow ||
               !canUpdate ||
-              !canEditOutsourcingOrder(selectedRow)
+              !canEditOutsourcingOrder(selectedRow) ||
+              itemsLoading
             }
             onClick={() => openEdit(selectedRow)}
           >
@@ -1128,6 +1230,7 @@ export default function V1OutsourcingOrdersPage() {
         }
         onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
         onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
+        onResumeTask={canUpdateWorkflowTasks ? resumeWorkflowTask : undefined}
         onUrgeTask={
           canUpdateWorkflowTasks ? urgeOutsourcingWorkflowTask : undefined
         }

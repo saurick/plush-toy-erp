@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/processinstance"
+	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/workflowtask"
 	"server/internal/data/model/ent/workflowtaskevent"
 	"time"
@@ -217,20 +219,6 @@ func (_c *WorkflowTaskCreate) SetNillableDueAt(v *time.Time) *WorkflowTaskCreate
 	return _c
 }
 
-// SetStartedAt sets the "started_at" field.
-func (_c *WorkflowTaskCreate) SetStartedAt(v time.Time) *WorkflowTaskCreate {
-	_c.mutation.SetStartedAt(v)
-	return _c
-}
-
-// SetNillableStartedAt sets the "started_at" field if the given value is not nil.
-func (_c *WorkflowTaskCreate) SetNillableStartedAt(v *time.Time) *WorkflowTaskCreate {
-	if v != nil {
-		_c.SetStartedAt(*v)
-	}
-	return _c
-}
-
 // SetCompletedAt sets the "completed_at" field.
 func (_c *WorkflowTaskCreate) SetCompletedAt(v time.Time) *WorkflowTaskCreate {
 	_c.mutation.SetCompletedAt(v)
@@ -245,16 +233,100 @@ func (_c *WorkflowTaskCreate) SetNillableCompletedAt(v *time.Time) *WorkflowTask
 	return _c
 }
 
-// SetClosedAt sets the "closed_at" field.
-func (_c *WorkflowTaskCreate) SetClosedAt(v time.Time) *WorkflowTaskCreate {
-	_c.mutation.SetClosedAt(v)
+// SetCriticalPath sets the "critical_path" field.
+func (_c *WorkflowTaskCreate) SetCriticalPath(v bool) *WorkflowTaskCreate {
+	_c.mutation.SetCriticalPath(v)
 	return _c
 }
 
-// SetNillableClosedAt sets the "closed_at" field if the given value is not nil.
-func (_c *WorkflowTaskCreate) SetNillableClosedAt(v *time.Time) *WorkflowTaskCreate {
+// SetNillableCriticalPath sets the "critical_path" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableCriticalPath(v *bool) *WorkflowTaskCreate {
 	if v != nil {
-		_c.SetClosedAt(*v)
+		_c.SetCriticalPath(*v)
+	}
+	return _c
+}
+
+// SetUrgeCount sets the "urge_count" field.
+func (_c *WorkflowTaskCreate) SetUrgeCount(v int) *WorkflowTaskCreate {
+	_c.mutation.SetUrgeCount(v)
+	return _c
+}
+
+// SetNillableUrgeCount sets the "urge_count" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableUrgeCount(v *int) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetUrgeCount(*v)
+	}
+	return _c
+}
+
+// SetLastUrgedAt sets the "last_urged_at" field.
+func (_c *WorkflowTaskCreate) SetLastUrgedAt(v time.Time) *WorkflowTaskCreate {
+	_c.mutation.SetLastUrgedAt(v)
+	return _c
+}
+
+// SetNillableLastUrgedAt sets the "last_urged_at" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableLastUrgedAt(v *time.Time) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetLastUrgedAt(*v)
+	}
+	return _c
+}
+
+// SetLastUrgedBy sets the "last_urged_by" field.
+func (_c *WorkflowTaskCreate) SetLastUrgedBy(v int) *WorkflowTaskCreate {
+	_c.mutation.SetLastUrgedBy(v)
+	return _c
+}
+
+// SetNillableLastUrgedBy sets the "last_urged_by" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableLastUrgedBy(v *int) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetLastUrgedBy(*v)
+	}
+	return _c
+}
+
+// SetLastUrgedByRoleKey sets the "last_urged_by_role_key" field.
+func (_c *WorkflowTaskCreate) SetLastUrgedByRoleKey(v string) *WorkflowTaskCreate {
+	_c.mutation.SetLastUrgedByRoleKey(v)
+	return _c
+}
+
+// SetNillableLastUrgedByRoleKey sets the "last_urged_by_role_key" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableLastUrgedByRoleKey(v *string) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetLastUrgedByRoleKey(*v)
+	}
+	return _c
+}
+
+// SetEscalatedAt sets the "escalated_at" field.
+func (_c *WorkflowTaskCreate) SetEscalatedAt(v time.Time) *WorkflowTaskCreate {
+	_c.mutation.SetEscalatedAt(v)
+	return _c
+}
+
+// SetNillableEscalatedAt sets the "escalated_at" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableEscalatedAt(v *time.Time) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetEscalatedAt(*v)
+	}
+	return _c
+}
+
+// SetEscalateTargetRoleKey sets the "escalate_target_role_key" field.
+func (_c *WorkflowTaskCreate) SetEscalateTargetRoleKey(v string) *WorkflowTaskCreate {
+	_c.mutation.SetEscalateTargetRoleKey(v)
+	return _c
+}
+
+// SetNillableEscalateTargetRoleKey sets the "escalate_target_role_key" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableEscalateTargetRoleKey(v *string) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetEscalateTargetRoleKey(*v)
 	}
 	return _c
 }
@@ -350,6 +422,16 @@ func (_c *WorkflowTaskCreate) AddEvents(v ...*WorkflowTaskEvent) *WorkflowTaskCr
 	return _c.AddEventIDs(ids...)
 }
 
+// SetProcessInstance sets the "process_instance" edge to the ProcessInstance entity.
+func (_c *WorkflowTaskCreate) SetProcessInstance(v *ProcessInstance) *WorkflowTaskCreate {
+	return _c.SetProcessInstanceID(v.ID)
+}
+
+// SetProcessNodeInstance sets the "process_node_instance" edge to the ProcessNodeInstance entity.
+func (_c *WorkflowTaskCreate) SetProcessNodeInstance(v *ProcessNodeInstance) *WorkflowTaskCreate {
+	return _c.SetProcessNodeInstanceID(v.ID)
+}
+
 // Mutation returns the WorkflowTaskMutation object of the builder.
 func (_c *WorkflowTaskCreate) Mutation() *WorkflowTaskMutation {
 	return _c.mutation
@@ -388,6 +470,14 @@ func (_c *WorkflowTaskCreate) defaults() {
 	if _, ok := _c.mutation.Priority(); !ok {
 		v := workflowtask.DefaultPriority
 		_c.mutation.SetPriority(v)
+	}
+	if _, ok := _c.mutation.CriticalPath(); !ok {
+		v := workflowtask.DefaultCriticalPath
+		_c.mutation.SetCriticalPath(v)
+	}
+	if _, ok := _c.mutation.UrgeCount(); !ok {
+		v := workflowtask.DefaultUrgeCount
+		_c.mutation.SetUrgeCount(v)
 	}
 	if _, ok := _c.mutation.Version(); !ok {
 		v := workflowtask.DefaultVersion
@@ -509,6 +599,32 @@ func (_c *WorkflowTaskCreate) check() error {
 			return &ValidationError{Name: "blocked_reason", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.blocked_reason": %w`, err)}
 		}
 	}
+	if _, ok := _c.mutation.CriticalPath(); !ok {
+		return &ValidationError{Name: "critical_path", err: errors.New(`ent: missing required field "WorkflowTask.critical_path"`)}
+	}
+	if _, ok := _c.mutation.UrgeCount(); !ok {
+		return &ValidationError{Name: "urge_count", err: errors.New(`ent: missing required field "WorkflowTask.urge_count"`)}
+	}
+	if v, ok := _c.mutation.UrgeCount(); ok {
+		if err := workflowtask.UrgeCountValidator(v); err != nil {
+			return &ValidationError{Name: "urge_count", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.urge_count": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.LastUrgedBy(); ok {
+		if err := workflowtask.LastUrgedByValidator(v); err != nil {
+			return &ValidationError{Name: "last_urged_by", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.last_urged_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.LastUrgedByRoleKey(); ok {
+		if err := workflowtask.LastUrgedByRoleKeyValidator(v); err != nil {
+			return &ValidationError{Name: "last_urged_by_role_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.last_urged_by_role_key": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.EscalateTargetRoleKey(); ok {
+		if err := workflowtask.EscalateTargetRoleKeyValidator(v); err != nil {
+			return &ValidationError{Name: "escalate_target_role_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.escalate_target_role_key": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Version(); !ok {
 		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "WorkflowTask.version"`)}
 	}
@@ -607,14 +723,6 @@ func (_c *WorkflowTaskCreate) createSpec() (*WorkflowTask, *sqlgraph.CreateSpec)
 		_spec.SetField(workflowtask.FieldConfigRevision, field.TypeString, value)
 		_node.ConfigRevision = &value
 	}
-	if value, ok := _c.mutation.ProcessInstanceID(); ok {
-		_spec.SetField(workflowtask.FieldProcessInstanceID, field.TypeInt, value)
-		_node.ProcessInstanceID = &value
-	}
-	if value, ok := _c.mutation.ProcessNodeInstanceID(); ok {
-		_spec.SetField(workflowtask.FieldProcessNodeInstanceID, field.TypeInt, value)
-		_node.ProcessNodeInstanceID = &value
-	}
 	if value, ok := _c.mutation.AssigneeID(); ok {
 		_spec.SetField(workflowtask.FieldAssigneeID, field.TypeInt, value)
 		_node.AssigneeID = &value
@@ -631,17 +739,37 @@ func (_c *WorkflowTaskCreate) createSpec() (*WorkflowTask, *sqlgraph.CreateSpec)
 		_spec.SetField(workflowtask.FieldDueAt, field.TypeTime, value)
 		_node.DueAt = &value
 	}
-	if value, ok := _c.mutation.StartedAt(); ok {
-		_spec.SetField(workflowtask.FieldStartedAt, field.TypeTime, value)
-		_node.StartedAt = &value
-	}
 	if value, ok := _c.mutation.CompletedAt(); ok {
 		_spec.SetField(workflowtask.FieldCompletedAt, field.TypeTime, value)
 		_node.CompletedAt = &value
 	}
-	if value, ok := _c.mutation.ClosedAt(); ok {
-		_spec.SetField(workflowtask.FieldClosedAt, field.TypeTime, value)
-		_node.ClosedAt = &value
+	if value, ok := _c.mutation.CriticalPath(); ok {
+		_spec.SetField(workflowtask.FieldCriticalPath, field.TypeBool, value)
+		_node.CriticalPath = value
+	}
+	if value, ok := _c.mutation.UrgeCount(); ok {
+		_spec.SetField(workflowtask.FieldUrgeCount, field.TypeInt, value)
+		_node.UrgeCount = value
+	}
+	if value, ok := _c.mutation.LastUrgedAt(); ok {
+		_spec.SetField(workflowtask.FieldLastUrgedAt, field.TypeTime, value)
+		_node.LastUrgedAt = &value
+	}
+	if value, ok := _c.mutation.LastUrgedBy(); ok {
+		_spec.SetField(workflowtask.FieldLastUrgedBy, field.TypeInt, value)
+		_node.LastUrgedBy = &value
+	}
+	if value, ok := _c.mutation.LastUrgedByRoleKey(); ok {
+		_spec.SetField(workflowtask.FieldLastUrgedByRoleKey, field.TypeString, value)
+		_node.LastUrgedByRoleKey = &value
+	}
+	if value, ok := _c.mutation.EscalatedAt(); ok {
+		_spec.SetField(workflowtask.FieldEscalatedAt, field.TypeTime, value)
+		_node.EscalatedAt = &value
+	}
+	if value, ok := _c.mutation.EscalateTargetRoleKey(); ok {
+		_spec.SetField(workflowtask.FieldEscalateTargetRoleKey, field.TypeString, value)
+		_node.EscalateTargetRoleKey = &value
 	}
 	if value, ok := _c.mutation.Payload(); ok {
 		_spec.SetField(workflowtask.FieldPayload, field.TypeJSON, value)
@@ -681,6 +809,40 @@ func (_c *WorkflowTaskCreate) createSpec() (*WorkflowTask, *sqlgraph.CreateSpec)
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProcessInstanceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   workflowtask.ProcessInstanceTable,
+			Columns: []string{workflowtask.ProcessInstanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(processinstance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProcessInstanceID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProcessNodeInstanceIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   workflowtask.ProcessNodeInstanceTable,
+			Columns: []string{workflowtask.ProcessNodeInstanceColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(processnodeinstance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProcessNodeInstanceID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

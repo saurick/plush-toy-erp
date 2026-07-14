@@ -155,6 +155,32 @@ test('formal workflow action surfaces use a synchronous task-level in-flight gua
   )
 })
 
+test('formal workflow action surfaces submit only canonical payload fields', () => {
+  const dashboard = read('../pages/DashboardPage.jsx')
+  const workflowPage = read('../pages/WorkflowBusinessModulePage.jsx')
+  const mobile = read('../mobile/hooks/useMobileRoleTaskActions.js')
+  const purchase = read(
+    '../components/purchase-orders/usePurchaseOrderWorkflowActions.mjs'
+  )
+  const outsourcing = read(
+    '../components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs'
+  )
+
+  assert.match(dashboard, /surface_key:\s*'desktop_task_board'/u)
+  assert.doesNotMatch(dashboard, /desktop_task_board_action/u)
+  assert.match(workflowPage, /surface_key:\s*'workflow_business_module'/u)
+  assert.doesNotMatch(workflowPage, /workflow_page_(?:action|scope)/u)
+  assert.match(mobile, /buildMobileTaskActionEvidence/u)
+  assert.doesNotMatch(
+    mobile,
+    /mobile_role_key|mobile_action_(?:key|recorded_at|role_key)|(?:approval|qc|shipment_release|receivable|invoice|payable|reconciliation)_result/u
+  )
+  assert.match(purchase, /surface_key:\s*'purchase_orders'/u)
+  assert.doesNotMatch(purchase, /purchase_order_page_action/u)
+  assert.match(outsourcing, /surface_key:\s*'outsourcing_orders'/u)
+  assert.doesNotMatch(outsourcing, /outsourcing_order_page_action/u)
+})
+
 test('workflow task mutation params require the exact versioned command contract', () => {
   const valid = requireWorkflowTaskMutationParams(
     'complete',
@@ -164,7 +190,12 @@ test('workflow task mutation params require the exact versioned command contract
       idempotency_key: '  workflow-complete-42  ',
       action_key: 'complete',
       reason: '  已核对  ',
-      payload: { decision: 'approve' },
+      payload: {
+        feedback: '  已复核  ',
+        evidence_refs: [' proof-b ', 'proof-a', 'proof-a'],
+        surface_key: '  desktop_task_board  ',
+        entry_path: '  /erp/task-board  ',
+      },
     },
     { requireIdempotencyKey: true }
   )
@@ -173,6 +204,12 @@ test('workflow task mutation params require the exact versioned command contract
   assert.equal(valid.idempotency_key, 'workflow-complete-42')
   assert.equal(valid.action_key, 'complete')
   assert.equal(valid.reason, '已核对')
+  assert.deepEqual(valid.payload, {
+    feedback: '已复核',
+    evidence_refs: ['proof-a', 'proof-b'],
+    surface_key: 'desktop_task_board',
+    entry_path: '/erp/task-board',
+  })
 
   const base = {
     task_id: 42,
@@ -198,11 +235,43 @@ test('workflow task mutation params require the exact versioned command contract
     { ...base, payload: { source_type: 'purchase_order' } },
     { ...base, payload: { command_key: 'inventory.post' } },
     { ...base, payload: { idempotency_key: 'nested-key' } },
+    { ...base, payload: { blocked_reason: '等待资料' } },
+    { ...base, payload: { rejected_reason: '资料不全' } },
+    { ...base, payload: { mobile_role_key: 'quality' } },
+    { ...base, payload: { mobile_action_recorded_at: 100 } },
+    { ...base, payload: { qc_result: 'pass' } },
+    { ...base, payload: { urge_count: 99 } },
+    { ...base, payload: { notification_type: 'qc_pending' } },
+    { ...base, payload: { feedback: 42 } },
+    { ...base, payload: { evidence_refs: 'proof-a' } },
+    { ...base, payload: { evidence_refs: ['proof-a', 42] } },
+    { ...base, payload: { surface_key: 42 } },
+    { ...base, payload: { entry_path: [] } },
+    { ...base, payload: { ' surface_key ': 'desktop_task_board' } },
   ]) {
     assert.throws(
       () =>
         requireWorkflowTaskMutationParams('complete', invalid, {
           requireIdempotencyKey: true,
+        }),
+      /页面已更新/u
+    )
+  }
+
+  for (const [operation, actionParams] of [
+    ['block', { action_key: 'block', reason: '等待资料' }],
+    ['reject', { action_key: 'reject', reason: '资料不完整' }],
+    ['resume', { action_key: 'resume', reason: '阻塞已解除' }],
+    ['urge', { action: 'urge_task', reason: '请尽快处理' }],
+  ]) {
+    assert.throws(
+      () =>
+        requireWorkflowTaskMutationParams(operation, {
+          task_id: 42,
+          expected_version: 7,
+          idempotency_key: `workflow-${operation}-42`,
+          ...actionParams,
+          payload: { feedback: '只允许完成动作提交反馈' },
         }),
       /页面已更新/u
     )
@@ -287,6 +356,32 @@ test('workflow task mutation keys and urge actions fail closed', () => {
       /页面已更新/u
     )
   }
+})
+
+test('workflow task resume requires the versioned action contract and an unblock reason', () => {
+  const base = {
+    task_id: 42,
+    expected_version: 7,
+    idempotency_key: 'workflow-resume-42',
+    action_key: 'resume',
+    reason: '  物料已补齐  ',
+    payload: { surface_key: 'desktop_task_board' },
+  }
+  const normalized = requireWorkflowTaskMutationParams('resume', base, {
+    requireIdempotencyKey: true,
+  })
+  assert.equal(normalized.reason, '物料已补齐')
+  assert.equal(normalized.action_key, 'resume')
+
+  assert.throws(
+    () =>
+      requireWorkflowTaskMutationParams(
+        'resume',
+        { ...base, reason: '   ' },
+        { requireIdempotencyKey: true }
+      ),
+    /页面已更新/u
+  )
 })
 
 test('workflow task mutation attempt rejects invalid identity before creating a key or calling mutate', async () => {
@@ -379,12 +474,9 @@ test('workflow task mutation attempt reuses one frozen request across unknown-re
     action_key: 'complete',
     reason: '',
     payload: {
-      mobile_action: {
-        action_key: 'done',
-        recorded_at: 100,
-        evidence_refs: ['photo-b', 'photo-a'],
-      },
-      qc_result: 'pass',
+      feedback: '已完成检验',
+      evidence_refs: ['photo-b', 'photo-a'],
+      surface_key: 'mobile_role_tasks',
     },
   }
   const mutate = async (params) => {
@@ -421,13 +513,9 @@ test('workflow task mutation attempt reuses one frozen request across unknown-re
       ...firstParams,
       expected_version: 99,
       payload: {
-        desktop_task_board_action: 'complete',
-        qc_result: 'pass',
-        mobile_action: {
-          action_key: 'complete',
-          recorded_at: 999,
-          evidence_refs: ['photo-a', 'photo-b'],
-        },
+        feedback: '已完成检验',
+        evidence_refs: ['photo-a', 'photo-b'],
+        surface_key: 'desktop_task_board',
       },
     },
     mutate,
@@ -436,7 +524,8 @@ test('workflow task mutation attempt reuses one frozen request across unknown-re
   assert.equal(requests.length, 3)
   assert.equal(requests[0], requests[2])
   assert.equal(requests[2].expected_version, 5)
-  assert.equal(requests[2].payload.mobile_action.recorded_at, 100)
+  assert.equal(requests[2].payload.surface_key, 'mobile_role_tasks')
+  assert.deepEqual(requests[2].payload.evidence_refs, ['photo-a', 'photo-b'])
   assert.equal(
     store.hasRetainedAttempt({
       scope: '42:complete',
@@ -456,7 +545,7 @@ test('workflow task mutation retained attempt bypasses a terminal preflight and 
     expected_version: 3,
     action_key: 'complete',
     reason: '',
-    payload: { decision: 'approve' },
+    payload: { feedback: '已同意' },
   }
   const receipt = { task: { id: 9, task_status_key: 'done', version: 4 } }
   let mutationCalls = 0
@@ -552,7 +641,7 @@ test('workflow task mutation attempt creates a new key when meaningful intent ch
     expected_version: 1,
     action_key: 'block',
     reason: '等待资料',
-    payload: { decision: 'wait' },
+    payload: { surface_key: 'desktop_task_board' },
   }
   await assert.rejects(
     store.run({
@@ -596,7 +685,7 @@ test('workflow task mutation attempt completion cannot delete a newer same-scope
         task_id: 7,
         expected_version: 1,
         action_key: 'complete',
-        payload: { decision: 'first' },
+        payload: { feedback: '第一份反馈' },
       }
       const firstRun = store.run({
         scope: '7:complete',
@@ -623,7 +712,7 @@ test('workflow task mutation attempt completion cannot delete a newer same-scope
       })
       const secondParams = {
         ...firstParams,
-        payload: { decision: 'second' },
+        payload: { feedback: '第二份反馈' },
       }
       let secondCalls = 0
       const unknownError = Object.assign(new Error('response lost'), {
@@ -680,9 +769,9 @@ test('workflow task semantic signature ignores transport copies but keeps busine
     expected_version: 1,
     action_key: 'complete',
     payload: {
-      workflow_page_scope: 'quality',
-      qc_result: 'pass',
-      mobile_action_recorded_at: 100,
+      feedback: '已通过',
+      evidence_refs: ['proof-b', 'proof-a'],
+      surface_key: 'mobile_role_tasks',
     },
   })
   const same = workflowTaskMutationSignature('complete', {
@@ -690,16 +779,17 @@ test('workflow task semantic signature ignores transport copies but keeps busine
     expected_version: 999,
     action_key: 'complete',
     payload: {
-      desktop_task_board_action: 'complete',
-      qc_result: 'pass',
-      mobile_action_recorded_at: 999,
+      feedback: '已通过',
+      evidence_refs: ['proof-a', 'proof-b'],
+      surface_key: 'desktop_task_board',
+      entry_path: '/erp/task-board',
     },
   })
   const changed = workflowTaskMutationSignature('complete', {
     task_id: 5,
     expected_version: 1,
     action_key: 'complete',
-    payload: { qc_result: 'reject' },
+    payload: { feedback: '需要复检', evidence_refs: ['proof-a'] },
   })
   assert.equal(first, same)
   assert.notEqual(first, changed)

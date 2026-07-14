@@ -26,17 +26,17 @@ func (d *jsonrpcDispatcher) handleBOM(
 	}
 
 	switch method {
-	case "list_bom_versions", "listBOMVersions",
-		"get_bom_version", "getBOMVersion",
-		"create_bom_draft", "createBOMDraft",
-		"update_bom_draft", "updateBOMDraft",
-		"copy_bom_version", "copyBOMVersion",
-		"activate_bom_version", "activateBOMVersion",
-		"archive_bom_version", "archiveBOMVersion":
+	case "list_bom_versions",
+		"get_bom_version",
+		"create_bom_draft",
+		"update_bom_draft",
+		"copy_bom_version",
+		"activate_bom_version",
+		"archive_bom_version":
 		return d.handleBOMVersion(ctx, method, id, pm)
-	case "add_bom_item", "addBOMItem",
-		"update_bom_item", "updateBOMItem",
-		"delete_bom_item", "deleteBOMItem":
+	case "add_bom_item",
+		"update_bom_item",
+		"delete_bom_item":
 		return d.handleBOMItem(ctx, method, id, pm)
 	default:
 		return id, unknownBOMResult(method), nil

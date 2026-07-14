@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"slices"
 	"strings"
 	"time"
 
@@ -180,6 +179,23 @@ func (d *jsonrpcDispatcher) RequireAdminPermission(ctx context.Context, permissi
 	return nil
 }
 
+// RequireAdminRBACPermission checks only the authenticated administrator's
+// backend RBAC upper bound. Callers must apply their own narrower customer
+// contract after this check. Workflow task endpoints use it because formal
+// process tasks retain the immutable customer-config revision that authorized
+// their owner and action roles; applying only the currently active revision
+// here would incorrectly hide or strand older in-flight tasks.
+func (d *jsonrpcDispatcher) RequireAdminRBACPermission(ctx context.Context, permissionKey string) *v1.JsonrpcResult {
+	permissions, res := d.CurrentAdminPermissions(ctx)
+	if res != nil {
+		return res
+	}
+	if !biz.PermissionSetHasAny(biz.PermissionKeySet(permissions), permissionKey) {
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	}
+	return nil
+}
+
 func (d *jsonrpcDispatcher) RequireAdminAnyPermission(ctx context.Context, permissionKeys ...string) *v1.JsonrpcResult {
 	permissions, res := d.CurrentEffectiveAdminPermissions(ctx)
 	if res != nil {
@@ -211,15 +227,7 @@ func adminRolesToAny(admin *biz.AdminUser) []any {
 		if role.Disabled {
 			continue
 		}
-		out = append(out, map[string]any{
-			"id":          role.ID,
-			"role_key":    role.Key,
-			"name":        role.Name,
-			"description": role.Description,
-			"builtin":     role.Builtin,
-			"disabled":    role.Disabled,
-			"sort_order":  role.SortOrder,
-		})
+		out = append(out, adminRoleToMap(role, false))
 	}
 	return out
 }
@@ -228,14 +236,12 @@ func adminMenusToAny(admin *biz.AdminUser) []any {
 	menus := biz.AdminVisibleMenus(admin)
 	out := make([]any, 0, len(menus))
 	for _, menu := range menus {
-		requiredPermissions := append(append([]string(nil), menu.RequiredAny...), menu.RequiredAll...)
 		out = append(out, map[string]any{
-			"key":                  menu.Key,
-			"label":                menu.Label,
-			"path":                 menu.Path,
-			"required_any":         toAnySliceString(menu.RequiredAny),
-			"required_all":         toAnySliceString(menu.RequiredAll),
-			"required_permissions": toAnySliceString(requiredPermissions),
+			"key":          menu.Key,
+			"label":        menu.Label,
+			"path":         menu.Path,
+			"required_any": toAnySliceString(menu.RequiredAny),
+			"required_all": toAnySliceString(menu.RequiredAll),
 		})
 	}
 	return out
@@ -279,43 +285,75 @@ func adminListItemToMap(admin *biz.AdminUser) map[string]any {
 	if admin == nil {
 		return map[string]any{}
 	}
-	lastLogin := int64(0)
-	if admin.LastLoginAt != nil {
-		lastLogin = admin.LastLoginAt.Unix()
+	permissionCount := len(biz.NormalizePermissionKeys(admin.Permissions))
+	if admin.IsSuperAdmin {
+		permissionCount = len(biz.AllPermissionKeys())
 	}
 	return map[string]any{
-		"id":                admin.ID,
-		"username":          admin.Username,
-		"phone":             admin.Phone,
-		"is_super_admin":    admin.IsSuperAdmin,
-		"disabled":          admin.Disabled,
-		"account_status":    string(admin.AccountStatus()),
-		"revoked_at":        optionalTimeUnix(admin.RevokedAt),
-		"status_reason":     admin.StatusReason,
-		"status_changed_at": optionalTimeUnix(admin.StatusChangedAt),
-		"status_changed_by": optionalIntValue(admin.StatusChangedBy),
-		"last_login_at":     lastLogin,
-		"created_at":        admin.CreatedAt.Unix(),
-		"updated_at":        admin.UpdatedAt.Unix(),
-		"roles":             adminRolesToAny(admin),
-		"permissions":       adminPermissionsToAny(admin),
-		"menus":             adminMenusToAny(admin),
+		"id":               admin.ID,
+		"username":         admin.Username,
+		"phone":            admin.Phone,
+		"is_super_admin":   admin.IsSuperAdmin,
+		"account_status":   string(admin.AccountStatus()),
+		"status_reason":    admin.StatusReason,
+		"roles":            adminListRolesToAny(admin),
+		"permission_count": permissionCount,
 	}
 }
 
-func roleOptionsToAny(items []biz.AdminRole) []any {
+func adminListRolesToAny(admin *biz.AdminUser) []any {
+	if admin == nil {
+		return []any{}
+	}
+	out := make([]any, 0, len(admin.Roles))
+	for _, role := range admin.Roles {
+		if role.Disabled {
+			continue
+		}
+		out = append(out, map[string]any{
+			"role_key": role.Key,
+			"name":     role.Name,
+		})
+	}
+	return out
+}
+
+func roleOptionsToAny(items []biz.AdminRole, accessByRoleKey map[string]biz.AdminRoleAccess) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
-		out = append(out, map[string]any{
-			"id":          item.ID,
-			"role_key":    item.Key,
-			"name":        item.Name,
-			"description": item.Description,
-			"builtin":     item.Builtin,
-			"disabled":    item.Disabled,
-			"sort_order":  item.SortOrder,
-			"permissions": toAnySliceString(item.Permissions),
-		})
+		mapped := adminRoleToMap(item, true)
+		access := accessByRoleKey[biz.NormalizeRoleKey(item.Key)]
+		mapped["assignable"] = access.Assignable
+		mapped["assignable_by_current_admin"] = access.Assignable
+		mapped["assignment_blocked_reason"] = access.AssignmentBlockedReason
+		mapped["permissions_editable"] = access.PermissionsEditable
+		mapped["permissions_editable_by_current_admin"] = access.PermissionsEditable
+		mapped["permissions_edit_blocked_reason"] = access.PermissionsEditBlockedReason
+		out = append(out, mapped)
+	}
+	return out
+}
+
+func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any {
+	item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
+	isDebugRole := biz.IsDebugRole(item)
+	isSystemRole := biz.IsSystemManagedRole(item)
+	out := map[string]any{
+		"id":                   item.ID,
+		"role_key":             item.Key,
+		"name":                 item.Name,
+		"description":          item.Description,
+		"builtin":              item.Builtin,
+		"disabled":             item.Disabled,
+		"sort_order":           item.SortOrder,
+		"role_type":            string(item.Type),
+		"version":              item.Version,
+		"permissions_editable": !item.Disabled && !isSystemRole,
+		"assignable":           !item.Disabled && (!isSystemRole || isDebugRole),
+		"non_production_only":  isDebugRole,
+	}
+	if includePermissions {
+		out["permissions"] = toAnySliceString(item.Permissions)
 	}
 	return out
 }
@@ -323,82 +361,91 @@ func roleOptionsToAny(items []biz.AdminRole) []any {
 func permissionOptionsToAny(items []biz.AdminPermission) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
+		if definition, ok := biz.PermissionDefinitionByKey(item.Key); ok {
+			item.Class = definition.Class
+			item.Assignable = definition.Assignable
+			item.NonProductionOnly = definition.NonProductionOnly
+		}
 		out = append(out, map[string]any{
-			"id":             item.ID,
-			"permission_key": item.Key,
-			"name":           item.Name,
-			"description":    item.Description,
-			"module":         item.Module,
-			"action":         item.Action,
-			"resource":       item.Resource,
-			"builtin":        item.Builtin,
-			"usage":          permissionUsageToMap(item),
+			"id":                  item.ID,
+			"permission_key":      item.Key,
+			"name":                item.Name,
+			"description":         item.Description,
+			"module":              item.Module,
+			"action":              item.Action,
+			"resource":            item.Resource,
+			"builtin":             item.Builtin,
+			"class":               string(item.Class),
+			"assignable":          item.Assignable,
+			"non_production_only": item.NonProductionOnly,
+			"usage":               permissionUsageToMap(item),
 		})
 	}
 	return out
 }
 
 func permissionUsageToMap(permission biz.AdminPermission) map[string]any {
-	readKey := permission.Key
-	if index := strings.LastIndex(readKey, "."); index > 0 {
-		readKey = readKey[:index] + ".read"
-	}
-	relatedMenus := make([]any, 0)
-	for _, menu := range biz.BuiltinAdminMenus() {
-		requirements := append(append([]string(nil), menu.RequiredAny...), menu.RequiredAll...)
-		if slices.Contains(requirements, permission.Key) || slices.Contains(requirements, readKey) {
-			relatedMenus = append(relatedMenus, map[string]any{
-				"key": menu.Key, "label": menu.Label, "path": menu.Path,
-			})
+	usage, ok := biz.PermissionUsageFor(permission.Key)
+	if !ok {
+		return map[string]any{
+			"pages":           []any{},
+			"backend_only":    false,
+			"backend_methods": []any{},
+			"required_any":    []any{},
+			"required_all":    []any{},
+			"conditions":      []any{},
 		}
 	}
-	if strings.HasPrefix(permission.Key, "mobile.") && strings.HasSuffix(permission.Key, ".access") {
-		roleKey := strings.TrimSuffix(strings.TrimPrefix(permission.Key, "mobile."), ".access")
-		relatedMenus = append(relatedMenus, map[string]any{
-			"key": "mobile-" + roleKey + "-tasks", "label": permission.Name, "path": "/m/" + roleKey + "/tasks",
+
+	pages := make([]any, 0, len(usage.Surfaces))
+	backendMethods := make([]any, 0)
+	requiredAny := make([]string, 0)
+	requiredAll := make([]string, 0)
+	conditions := make([]string, 0)
+	for _, surface := range usage.Surfaces {
+		methods := permissionBackendMethodsToAny(surface.BackendMethods)
+		backendMethods = append(backendMethods, methods...)
+		requiredAny = append(requiredAny, surface.RequiredAny...)
+		requiredAll = append(requiredAll, surface.RequiredAll...)
+		conditions = append(conditions, surface.Conditions...)
+		if strings.TrimSpace(surface.PageKey) == "" {
+			continue
+		}
+		pages = append(pages, map[string]any{
+			"key":             surface.PageKey,
+			"name":            surface.PageLabel,
+			"path":            surface.PagePath,
+			"section_key":     surface.SectionKey,
+			"section_name":    surface.SectionLabel,
+			"control_key":     surface.ControlKey,
+			"control_name":    surface.ControlLabel,
+			"control_type":    surface.ControlType,
+			"effect":          surface.Effect,
+			"backend_methods": methods,
+			"required_any":    toAnySliceString(surface.RequiredAny),
+			"required_all":    toAnySliceString(surface.RequiredAll),
+			"conditions":      toAnySliceString(surface.Conditions),
 		})
 	}
-	if strings.HasPrefix(permission.Key, "contact.") {
-		for _, menu := range biz.BuiltinAdminMenus() {
-			if menu.Key == "customers" || menu.Key == "suppliers" {
-				relatedMenus = append(relatedMenus, map[string]any{
-					"key": menu.Key, "label": menu.Label, "path": menu.Path,
-				})
-			}
-		}
-	}
-	controlType := "操作按钮"
-	effect := "显示并允许执行"
-	condition := "仍受客户模块状态、业务状态和任务归属限制"
-	switch permission.Action {
-	case "read", "access":
-		controlType = "页面入口和内容"
-		effect = "允许进入并查看"
-	case "create":
-		controlType = "新建按钮和表单"
-	case "update", "manage":
-		controlType = "编辑按钮和表单"
-	case "disable":
-		controlType = "启用/停用开关"
-	case "revoke":
-		controlType = "离职注销按钮"
-	}
-	switch permission.Module {
-	case "system":
-		condition = "仍受超级管理员保护、禁止自我停用或注销等安全规则限制"
-	case "customer_config":
-		condition = "仍受客户配置版本状态、发布流程和部署客户边界限制"
-	case "mobile":
-		condition = "进入后仍只显示当前岗位或指定给本人的任务"
-	case "debug":
-		condition = "仅在明确开启的本地或测试环境可用，生产环境默认拒绝"
-	}
 	return map[string]any{
-		"menus":        relatedMenus,
-		"control_type": controlType,
-		"effect":       effect,
-		"condition":    condition,
+		"pages":           pages,
+		"backend_only":    usage.BackendOnly,
+		"backend_methods": backendMethods,
+		"required_any":    toAnySliceString(requiredAny),
+		"required_all":    toAnySliceString(requiredAll),
+		"conditions":      toAnySliceString(conditions),
 	}
+}
+
+func permissionBackendMethodsToAny(items []biz.PermissionBackendMethod) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, map[string]any{
+			"domain": item.Domain,
+			"method": item.Method,
+		})
+	}
+	return out
 }
 
 func runtimeAuditEventsToAny(items []biz.RuntimeAuditEvent) []any {
@@ -426,14 +473,12 @@ func runtimeAuditEventsToAny(items []biz.RuntimeAuditEvent) []any {
 func menuOptionsToAny(items []biz.AdminMenu) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
-		requiredPermissions := append(append([]string(nil), item.RequiredAny...), item.RequiredAll...)
 		out = append(out, map[string]any{
-			"key":                  item.Key,
-			"label":                item.Label,
-			"path":                 item.Path,
-			"required_any":         toAnySliceString(item.RequiredAny),
-			"required_all":         toAnySliceString(item.RequiredAll),
-			"required_permissions": toAnySliceString(requiredPermissions),
+			"key":          item.Key,
+			"label":        item.Label,
+			"path":         item.Path,
+			"required_any": toAnySliceString(item.RequiredAny),
+			"required_all": toAnySliceString(item.RequiredAll),
 		})
 	}
 	return out

@@ -279,20 +279,3 @@ func TestWorkflowUsecase_SameNameNonBossApprovalTaskDoesNotDerive(t *testing.T) 
 		})
 	}
 }
-
-func TestWorkflowUsecase_BossApprovalNonDerivedStatusKeepsOriginalBehavior(t *testing.T) {
-	repo := &stubWorkflowRepo{currentTask: bossApprovalWorkflowTask()}
-	uc := NewWorkflowUsecase(repo)
-
-	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
-		ID:            101,
-		TaskStatusKey: "processing",
-		Payload:       map[string]any{},
-	}, 7, "boss")
-	if err != nil {
-		t.Fatalf("processing should keep original behavior, got %v", err)
-	}
-	if repo.updateTaskInput.SideEffects != nil {
-		t.Fatalf("processing should not derive side effects")
-	}
-}

@@ -15,7 +15,7 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_contact", "createContact":
+	case "create_contact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactCreate); res != nil {
 			return id, res, nil
 		}
@@ -24,7 +24,7 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 		}
 		item, err := d.masterDataUC.CreateContact(ctx, contactMutationFromParams(pm))
 		return id, contactMutationResult(ctx, d, item, err), nil
-	case "update_contact", "updateContact":
+	case "update_contact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactUpdate); res != nil {
 			return id, res, nil
 		}
@@ -33,13 +33,13 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 		}
 		item, err := d.masterDataUC.UpdateContact(ctx, getInt(pm, "id", 0), contactMutationFromParams(pm))
 		return id, contactMutationResult(ctx, d, item, err), nil
-	case "get_contact", "getContact":
+	case "get_contact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.GetContact(ctx, getInt(pm, "id", 0))
 		return id, contactMutationResult(ctx, d, item, err), nil
-	case "list_contacts_by_owner", "listContactsByOwner":
+	case "list_contacts_by_owner":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactRead); res != nil {
 			return id, res, nil
 		}
@@ -59,7 +59,7 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 			"limit":    normalizedLimit(pm),
 			"offset":   normalizedOffset(pm),
 		})}, nil
-	case "set_primary_contact", "setPrimaryContact":
+	case "set_primary_contact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactSetPrimary); res != nil {
 			return id, res, nil
 		}
@@ -68,7 +68,7 @@ func (d *jsonrpcDispatcher) handleMasterDataContact(
 		}
 		item, err := d.masterDataUC.SetPrimaryContact(ctx, getInt(pm, "id", 0))
 		return id, contactMutationResult(ctx, d, item, err), nil
-	case "disable_contact", "disableContact":
+	case "disable_contact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionContactDisable); res != nil {
 			return id, res, nil
 		}

@@ -375,7 +375,21 @@ test('payableReconciliationFlow: 已存在未完成应付或对账任务时按�
   )
   assert.equal(
     hasActivePayableRegistrationTaskForRecord(
+      [{ ...payableTask, task_status_key: 'blocked' }],
+      record
+    ),
+    true
+  )
+  assert.equal(
+    hasActivePayableRegistrationTaskForRecord(
       [{ ...payableTask, task_status_key: 'done' }],
+      record
+    ),
+    false
+  )
+  assert.equal(
+    hasActivePayableRegistrationTaskForRecord(
+      [{ ...payableTask, task_status_key: 'rejected' }],
       record
     ),
     false

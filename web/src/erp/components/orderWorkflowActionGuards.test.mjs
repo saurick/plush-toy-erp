@@ -23,6 +23,7 @@ function loadOrderWorkflowHook({
   relativePath,
   completeWorkflowTaskAction,
   blockWorkflowTaskAction,
+  resumeWorkflowTaskAction,
   verifyWorkflowTaskActionAccessBeforeSubmit,
 }) {
   const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
@@ -57,6 +58,7 @@ function loadOrderWorkflowHook({
         blockWorkflowTaskAction,
         completeWorkflowTaskAction,
         rejectWorkflowTaskAction: async () => {},
+        resumeWorkflowTaskAction,
         urgeWorkflowTask: async () => {},
       },
       '../../utils/workflowTaskActionSubmitGuard.mjs': {
@@ -125,6 +127,58 @@ test('purchase and outsourcing hooks synchronously block another action for the 
       assert.equal(blockCalls, 0)
       assert.equal(completeParams.expected_version, 7)
       assert.match(completeParams.idempotency_key, /^wf:42:complete:/u)
+    })
+  }
+})
+
+test('purchase and outsourcing hooks submit blocked-to-ready resume through the shared guard', async (t) => {
+  for (const config of [
+    {
+      exportName: 'usePurchaseOrderWorkflowActions',
+      relativePath: './purchase-orders/usePurchaseOrderWorkflowActions.mjs',
+      surfaceKey: 'purchase_orders',
+    },
+    {
+      exportName: 'useOutsourcingOrderWorkflowActions',
+      relativePath:
+        './outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs',
+      surfaceKey: 'outsourcing_orders',
+    },
+  ]) {
+    await t.test(config.exportName, async () => {
+      const submitted = []
+      const verified = []
+      const hook = loadOrderWorkflowHook({
+        ...config,
+        blockWorkflowTaskAction: async () => {},
+        completeWorkflowTaskAction: async () => {},
+        resumeWorkflowTaskAction: async (params) => submitted.push(params),
+        verifyWorkflowTaskActionAccessBeforeSubmit: async (input) => {
+          verified.push(input)
+          return true
+        },
+      })
+      const actions = hook({ loadWorkflowTasks: async () => {} })
+      const task = { id: 42, task_status_key: 'blocked', version: 7 }
+
+      assert.equal(
+        await actions.resumeWorkflowTask(task, {
+          reason: '资料已补齐，可以继续处理',
+        }),
+        true
+      )
+      assert.equal(verified.length, 1)
+      assert.equal(verified[0].actionKey, 'resume')
+      assert.equal(verified[0].reason, '资料已补齐，可以继续处理')
+      assert.equal(submitted.length, 1)
+      assert.equal(submitted[0].task_id, 42)
+      assert.equal(submitted[0].expected_version, 7)
+      assert.equal(submitted[0].action_key, 'resume')
+      assert.equal(submitted[0].reason, '资料已补齐，可以继续处理')
+      assert.match(submitted[0].idempotency_key, /^wf:42:resume:/u)
+      assert.deepEqual(submitted[0].payload, {
+        surface_key: config.surfaceKey,
+      })
     })
   }
 })

@@ -52,6 +52,7 @@ import {
   openPrintWorkspaceWindow,
 } from '../utils/printWorkspace.js'
 import { buildProcessingContractDraftFromOutsourcingFact } from '../data/processingContractTemplate.mjs'
+import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
 import {
   hasAnyPermission,
   selectedLabelForKey,
@@ -177,10 +178,13 @@ export function OperationalFactWorkspace({
     activeConfig.defaultDateField ||
     'occurred_at'
   const activeDateRange = dateRangeByKey[currentActiveKey] || ['', '']
-  const canWriteActive = hasAnyPermission(
-    adminProfile,
-    activeConfig.writePermissions
-  )
+  const canWriteActive =
+    currentActiveKey === 'finance'
+      ? canConfirmFinanceFact(
+          adminProfile,
+          activeConfig.initialValues?.fact_type
+        )
+      : hasAnyPermission(adminProfile, activeConfig.writePermissions)
 
   const resetPaginationForKey = useCallback(
     (key = currentActiveKey) => {
@@ -381,10 +385,13 @@ export function OperationalFactWorkspace({
       rows: activeRows,
     })
   }, [activeRows, currentActiveKey, toolbarModuleKey, visibleColumns])
-  const canConfirmActive = hasAnyPermission(
-    adminProfile,
-    activeConfig.confirmPermissions || activeConfig.writePermissions
-  )
+  const canConfirmActive =
+    currentActiveKey === 'finance'
+      ? canConfirmFinanceFact(adminProfile, activeSelectedRow?.fact_type)
+      : hasAnyPermission(
+          adminProfile,
+          activeConfig.confirmPermissions || activeConfig.writePermissions
+        )
   const selectedLabel = selectedLabelForKey(currentActiveKey, activeSelectedRow)
   const activeAttachmentOwnerType =
     getOperationalFactAttachmentOwnerType(currentActiveKey)
@@ -768,9 +775,7 @@ export function OperationalFactWorkspace({
               </Button>
             </Popconfirm>
           ) : null}
-          {['production', 'outsourcing', 'finance'].includes(
-            currentActiveKey
-          ) ? (
+          {['production', 'outsourcing'].includes(currentActiveKey) ? (
             <Popconfirm
               title="确认取消并按系统规则生成冲正记录？"
               onConfirm={() =>

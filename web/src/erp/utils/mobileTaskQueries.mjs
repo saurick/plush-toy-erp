@@ -1,83 +1,209 @@
-import { getRoleDisplayName, normalizeRoleKey } from './roleKeys.mjs'
+import { normalizeRoleKey } from './roleKeys.mjs'
 
-const LOAD_ALL_ROLE_KEYS = new Set(['pmc', 'boss', 'production', 'sales'])
+export const MOBILE_ROLE_TASK_PAGE_LIMIT = 50
 
-const LOAD_ALL_ROLE_REASON = Object.freeze({
-  pmc: 'PMC 需要在全量任务里筛选阻塞、超时、关键路径、催办和升级关注项。',
-  boss: '老板需要在全量任务里筛选高优先级、审批、出货风险、财务高风险和升级关注项。',
-  production:
-    '生产经理需要在全量任务里筛选委外、成品返工和生产相关任务，不只看主责岗位任务池。',
-  sales: '业务需要在全量任务里筛选出货确认、业务确认和自己主责的任务。',
+export const MOBILE_ROLE_TASK_VIEW_KEYS = Object.freeze({
+  TODO: 'todo',
+  HISTORY: 'history',
+  RISK: 'risk',
 })
 
-function normalizeTaskArray(result) {
-  if (Array.isArray(result)) return result
-  if (Array.isArray(result?.tasks)) return result.tasks
-  return []
-}
+const MOBILE_ROLE_TASK_VIEW_KEY_SET = new Set(
+  Object.values(MOBILE_ROLE_TASK_VIEW_KEYS)
+)
 
-export function shouldLoadAllWorkflowTasksForRole(roleKey) {
-  return LOAD_ALL_ROLE_KEYS.has(normalizeRoleKey(roleKey))
-}
+const RISK_FILTER_KEYS = new Set([
+  'risk',
+  'alert',
+  'overdue',
+  'due_soon',
+  'high_priority',
+  'blocked',
+  'blocked_or_high_priority',
+])
 
-export function buildMobileWorkflowTaskQueryPlan(roleKey) {
-  const normalizedRoleKey = normalizeRoleKey(roleKey)
-  if (shouldLoadAllWorkflowTasksForRole(normalizedRoleKey)) {
-    return [{ limit: 200 }]
+export function createMobileRoleTaskSlot() {
+  return {
+    items: [],
+    next_cursor: '',
+    has_more: false,
+    server_time: 0,
+    loaded: false,
+    loading: false,
+    error: '',
   }
-  if (!normalizedRoleKey) return [{ limit: 200 }]
-  return [{ owner_role_key: normalizedRoleKey, limit: 200 }]
 }
 
-export function explainMobileTaskQueryPlan(roleKey) {
+export function createMobileRoleTaskSlots() {
+  return Object.fromEntries(
+    Object.values(MOBILE_ROLE_TASK_VIEW_KEYS).map((viewKey) => [
+      viewKey,
+      createMobileRoleTaskSlot(),
+    ])
+  )
+}
+
+export function createMobileRoleTaskScopeState(scopeKey = '') {
+  return {
+    scopeKey: String(scopeKey || ''),
+    slots: createMobileRoleTaskSlots(),
+  }
+}
+
+export function readMobileRoleTaskScopeState(state, scopeKey = '') {
+  const normalizedScopeKey = String(scopeKey || '')
+  if (
+    state &&
+    typeof state === 'object' &&
+    state.scopeKey === normalizedScopeKey &&
+    state.slots &&
+    typeof state.slots === 'object'
+  ) {
+    return state
+  }
+  return createMobileRoleTaskScopeState(normalizedScopeKey)
+}
+
+export function settleMobileRoleTaskRequest(
+  state,
+  {
+    currentScopeKey,
+    requestScopeKey,
+    viewKey,
+    currentRequestSeq,
+    requestSeq,
+    response,
+    append = false,
+    errorMessage,
+  } = {}
+) {
+  if (
+    !state ||
+    state.scopeKey !== requestScopeKey ||
+    currentScopeKey !== requestScopeKey ||
+    currentRequestSeq !== requestSeq ||
+    !MOBILE_ROLE_TASK_VIEW_KEY_SET.has(viewKey)
+  ) {
+    return state
+  }
+  const currentSlot = state.slots[viewKey]
+  const nextSlot =
+    errorMessage === undefined
+      ? mergeMobileRoleTaskPage(currentSlot, response, { append })
+      : {
+          ...currentSlot,
+          loaded: currentSlot.loaded || currentSlot.items.length > 0,
+          loading: false,
+          error: errorMessage,
+        }
+  return {
+    ...state,
+    slots: {
+      ...state.slots,
+      [viewKey]: nextSlot,
+    },
+  }
+}
+
+export function buildMobileRoleTaskQuery({
+  roleKey,
+  viewKey,
+  cursor = '',
+  limit = MOBILE_ROLE_TASK_PAGE_LIMIT,
+} = {}) {
   const normalizedRoleKey = normalizeRoleKey(roleKey)
-  const queries = buildMobileWorkflowTaskQueryPlan(normalizedRoleKey)
-  const loadsFullList = shouldLoadAllWorkflowTasksForRole(normalizedRoleKey)
+  const normalizedViewKey = String(viewKey || '').trim()
+  const normalizedCursor = String(cursor || '').trim()
 
   if (!normalizedRoleKey) {
-    return {
-      role_key: '',
-      strategy: 'full_list',
-      loads_full_list: true,
-      queries,
-      reason:
-        '未选择角色时只能读取最近 200 条任务用于诊断，不代表任何角色任务池。',
-    }
+    throw new TypeError('移动岗位任务查询缺少岗位')
   }
-
-  if (loadsFullList) {
-    return {
-      role_key: normalizedRoleKey,
-      strategy: 'full_list',
-      loads_full_list: true,
-      queries,
-      reason:
-        LOAD_ALL_ROLE_REASON[normalizedRoleKey] ||
-        '该角色需要先加载最近 200 条任务，再按移动端可见性规则过滤。',
-    }
+  if (!MOBILE_ROLE_TASK_VIEW_KEY_SET.has(normalizedViewKey)) {
+    throw new TypeError('移动岗位任务查询视图无效')
+  }
+  if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+    throw new TypeError('移动岗位任务查询分页大小无效')
   }
 
   return {
+    view_key: normalizedViewKey,
     role_key: normalizedRoleKey,
-    strategy: 'owner_role_key',
-    loads_full_list: false,
-    queries,
-    reason: `${getRoleDisplayName(normalizedRoleKey, '该岗位')}按主责岗位直查任务池，扩展可见性不额外加载全量任务。`,
+    limit,
+    ...(normalizedCursor ? { cursor: normalizedCursor } : {}),
   }
 }
 
-export function mergeWorkflowTaskResults(results = []) {
-  const merged = []
-  const seenIDs = new Set()
+export function resolveMobileRoleTaskViewKey({ mainTabKey, filterKey } = {}) {
+  if (mainTabKey === 'done') {
+    return MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY
+  }
+  if (mainTabKey === 'messages' || RISK_FILTER_KEYS.has(filterKey)) {
+    return MOBILE_ROLE_TASK_VIEW_KEYS.RISK
+  }
+  return MOBILE_ROLE_TASK_VIEW_KEYS.TODO
+}
 
-  for (const result of Array.isArray(results) ? results : []) {
-    for (const task of normalizeTaskArray(result)) {
-      const id = String(task?.id ?? '').trim()
-      if (!id || seenIDs.has(id)) continue
-      seenIDs.add(id)
-      merged.push(task)
-    }
+export function resolveMobileRoleTaskViewState({
+  viewKey,
+  todoTasks = [],
+  historyTasks = [],
+  riskTasks = [],
+  selectedTaskID = null,
+} = {}) {
+  const tasksByView = {
+    [MOBILE_ROLE_TASK_VIEW_KEYS.TODO]: todoTasks,
+    [MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY]: historyTasks,
+    [MOBILE_ROLE_TASK_VIEW_KEYS.RISK]: riskTasks,
+  }
+  const tasks = Array.isArray(tasksByView[viewKey])
+    ? tasksByView[viewKey]
+    : []
+  const selectedTask =
+    selectedTaskID === null || selectedTaskID === undefined
+      ? null
+      : tasks.find(
+          (task) => String(task?.id) === String(selectedTaskID)
+        ) || null
+
+  return {
+    tasks,
+    selectedTask,
+    actionsEnabled:
+      Boolean(selectedTask) && viewKey !== MOBILE_ROLE_TASK_VIEW_KEYS.HISTORY,
+  }
+}
+
+export function mergeMobileRoleTaskPage(
+  currentSlot = createMobileRoleTaskSlot(),
+  response = {},
+  { append = false } = {}
+) {
+  if (append && currentSlot.server_time !== response.server_time) {
+    throw Object.assign(
+      new Error('移动岗位任务分页快照已失效，请刷新后重试'),
+      { isInvalidResponse: true }
+    )
   }
 
-  return merged
+  const items = append ? [...(currentSlot.items || [])] : []
+  const seenIDs = new Set(
+    items.map((task) => String(task?.id ?? '').trim()).filter(Boolean)
+  )
+
+  for (const task of Array.isArray(response.items) ? response.items : []) {
+    const id = String(task?.id ?? '').trim()
+    if (!id || seenIDs.has(id)) continue
+    seenIDs.add(id)
+    items.push(task)
+  }
+
+  return {
+    items,
+    next_cursor: response.next_cursor || '',
+    has_more: response.has_more === true,
+    server_time: response.server_time || 0,
+    loaded: true,
+    loading: false,
+    error: '',
+  }
 }

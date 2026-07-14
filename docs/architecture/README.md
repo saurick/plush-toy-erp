@@ -6,7 +6,7 @@
 
 | 任务 | 先读 | 再核对 |
 | --- | --- | --- |
-| 设计状态顶层架构，或查询状态 key、成熟度和唯一真源 | `状态字典与生命周期索引.md` | 对应代码、Schema、migration、tests 与正式演进评审 |
+| 设计状态顶层架构，或分别查询目标状态、实现证据和未来方向 | `状态字典与生命周期索引.md` | 对应代码、Schema、migration、tests 与正式演进评审 |
 | 判断 Workflow / Fact 边界 | `状态工作流事实边界.md` | `状态字典与生命周期索引.md`、`../workflow/业务与协同流程地图.md`、对应 usecase / tests |
 | 判断各类“流”如何按 plush 实际建模 | `各类流程建模边界评审.md` | `状态工作流事实边界.md`、`../workflow/业务与协同流程地图.md`、`业务主链路数据流向与字段来源规则.md` |
 | 判断 MasterData / Source Document / Fact 分层 | `主数据源单据事实边界评审.md` | `docs/product/领域模型第一版.md`、当前 schema / repo |

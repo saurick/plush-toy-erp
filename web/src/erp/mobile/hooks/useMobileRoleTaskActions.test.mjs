@@ -32,6 +32,48 @@ test('mobile task page uses backend action projection and does not restore local
   assert.doesNotMatch(hookSource, /canRunWorkflowTaskAction/u)
 })
 
+test('mobile task page keeps load failures explicit and invalidates inactive views after mutation', () => {
+  const pageSource = readFileSync(
+    new URL('../pages/MobileRoleTasksPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const listSource = readFileSync(
+    new URL('../components/MobileTaskListScreen.jsx', import.meta.url),
+    'utf8'
+  )
+  const querySource = readFileSync(
+    new URL('../../utils/mobileTaskQueries.mjs', import.meta.url),
+    'utf8'
+  )
+
+  assert.match(pageSource, /settleMobileRoleTaskRequest/u)
+  assert.match(querySource, /error: errorMessage/u)
+  assert.match(pageSource, /!activeTaskSlot\.error/u)
+  assert.match(pageSource, /const refreshTasksAfterMutation = useCallback/u)
+  assert.match(pageSource, /viewKey === activeTaskViewKey/u)
+  assert.match(pageSource, /loaded: false,[\s\S]*?error: ''/u)
+  assert.match(pageSource, /rejectOnError = false/u)
+  assert.match(pageSource, /if \(rejectOnError\) throw error/u)
+  assert.match(
+    pageSource,
+    /loadTaskView\(activeTaskViewKey, \{ rejectOnError: true \}\)/u
+  )
+  assert.match(pageSource, /loadTasks: refreshTasksAfterMutation/u)
+  assert.match(listSource, /role="alert"/u)
+  assert.match(listSource, /当前没有可确认的任务数据，请重试/u)
+  assert.match(listSource, /onClick=\{\(\) => loadTasks\(\)\}/u)
+  assert.match(listSource, /taskSummary\.ready/u)
+  assert.match(listSource, /taskSummary\.blocked/u)
+  assert.match(listSource, /taskSummary\.rejected/u)
+  assert.match(listSource, /taskSummary\.done/u)
+  assert.doesNotMatch(
+    listSource,
+    /taskSummary\.(?:pending|processing|blockedProgress)/u
+  )
+  assert.match(listSource, /任务提醒/u)
+  assert.match(listSource, /条提醒/u)
+})
+
 function createDeferred() {
   let resolve
   let reject
@@ -81,6 +123,7 @@ function createReactHookRuntime() {
 
 function loadMobileActionHook({
   completeWorkflowTaskAction = async () => {},
+  resumeWorkflowTaskAction = async () => {},
   urgeWorkflowTask = async () => {},
   verifyWorkflowTaskActionAccessBeforeSubmit = async () => true,
   messages = { errors: [], successes: [], warnings: [] },
@@ -124,10 +167,20 @@ module.exports = { useMobileRoleTaskActions }`,
           blockWorkflowTaskAction: completeWorkflowTaskAction,
           completeWorkflowTaskAction,
           rejectWorkflowTaskAction: completeWorkflowTaskAction,
+          resumeWorkflowTaskAction,
           urgeWorkflowTask,
         },
         '../../utils/mobileTaskView.mjs': {
-          buildMobileTaskActionEvidence: () => ({}),
+          buildMobileTaskActionEvidence: ({ evidenceText = '' } = {}) => {
+            const evidenceRefs = String(evidenceText)
+              .split(/[\n,，;；]/u)
+              .map((item) => item.trim())
+              .filter(Boolean)
+            return {
+              ...(evidenceRefs.length ? { evidence_refs: evidenceRefs } : {}),
+              surface_key: 'mobile_role_tasks',
+            }
+          },
           normalizeMobileActionEvidenceRefs: () => [],
         },
         '../../utils/orderApprovalFlow.mjs': {
@@ -246,6 +299,44 @@ test('useMobileRoleTaskActions: backend action projection is the local execution
   assert.deepEqual(messages.warnings, ['当前角色不能done该任务'])
 })
 
+test('useMobileRoleTaskActions: resume requires an explanation and uses the resume action', async () => {
+  const messages = { errors: [], successes: [], warnings: [] }
+  const submitted = []
+  const harness = createHookHarness({
+    allowedActionModes: ['resume'],
+    detailAction: 'resume',
+    messages,
+    resumeWorkflowTaskAction: async (params) => submitted.push(params),
+    selectedTask: {
+      id: 42,
+      owner_role_key: 'warehouse',
+      task_status_key: 'blocked',
+      version: 5,
+    },
+  })
+
+  let view = harness.render()
+  assert.equal(view.selectedCanResume, true)
+  await view.submitDetailAction()
+  assert.deepEqual(submitted, [])
+  assert.deepEqual(messages.warnings, ['请先填写阻塞解除说明'])
+
+  view.updateDetailReason('资料已补齐，可以继续处理')
+  view = harness.render()
+  await view.submitDetailAction()
+
+  assert.equal(submitted.length, 1)
+  assert.equal(submitted[0].task_id, 42)
+  assert.equal(submitted[0].expected_version, 5)
+  assert.equal(submitted[0].action_key, 'resume')
+  assert.equal(submitted[0].reason, '资料已补齐，可以继续处理')
+  assert.match(submitted[0].idempotency_key, /^wf:42:resume:/u)
+  assert.deepEqual(submitted[0].payload, {
+    surface_key: 'mobile_role_tasks',
+  })
+  assert.deepEqual(harness.loadCalls, [42])
+})
+
 test('useMobileRoleTaskActions: rapid double submit runs one preflight and one action', async () => {
   const preflight = createDeferred()
   const action = createDeferred()
@@ -280,6 +371,9 @@ test('useMobileRoleTaskActions: rapid double submit runs one preflight and one a
   assert.equal(actionCalls, 1)
   assert.equal(actionParams.expected_version, 5)
   assert.match(actionParams.idempotency_key, /^wf:42:complete:/u)
+  assert.deepEqual(actionParams.payload, {
+    surface_key: 'mobile_role_tasks',
+  })
 
   action.resolve()
   await firstSubmit
@@ -357,6 +451,9 @@ test('useMobileRoleTaskActions: failed urge preflight releases lock for retry', 
   assert.equal(urgeCalls, 1)
   assert.equal(urgeParams.expected_version, 5)
   assert.match(urgeParams.idempotency_key, /^wf:42:urge:/u)
+  assert.deepEqual(urgeParams.payload, {
+    surface_key: 'mobile_role_tasks',
+  })
   assert.deepEqual(harness.loadCalls, [42])
 })
 
@@ -375,11 +472,17 @@ test('useMobileRoleTaskActions: unknown network result reuses frozen key and pay
   })
 
   let view = harness.render()
+  view.updateEvidenceText('PHOTO-B\nPHOTO-A')
+  view = harness.render()
   await view.submitDetailAction()
   view = harness.render()
   assert.equal(submitted.length, 2)
   assert.equal(submitted[0].idempotency_key, submitted[1].idempotency_key)
   assert.deepEqual(submitted[0], submitted[1])
+  assert.deepEqual(submitted[0].payload, {
+    evidence_refs: ['PHOTO-A', 'PHOTO-B'],
+    surface_key: 'mobile_role_tasks',
+  })
   assert.deepEqual(harness.loadCalls, [])
   assert.deepEqual(messages.warnings, [
     '提交结果暂未确认，已保留原因和证据，可直接重试',

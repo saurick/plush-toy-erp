@@ -2,7 +2,10 @@ package service
 
 import (
 	"context"
+	"encoding/base64"
 	"math"
+	"sort"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -14,24 +17,6 @@ import (
 
 const workflowBreakGlassMaxDuration = 2 * time.Hour
 const workflowTaskBoardMaxOffset = 2_147_483_647
-
-var workflowTaskActionPayloadSystemKeys = map[string]struct{}{
-	"business_status_key": {},
-	"command_key":         {},
-	"domain_command":      {},
-	"domain_command_key":  {},
-	"owner_role_key":      {},
-	"source_id":           {},
-	"source_line_id":      {},
-	"source_no":           {},
-	"source_type":         {},
-	"task_status_key":     {},
-	"version":             {},
-	"expected_version":    {},
-	"idempotency_key":     {},
-	"intent_hash":         {},
-	"task_version":        {},
-}
 
 var workflowTaskCreateProcessRuntimeAnchorKeys = []string{
 	"config_revision",
@@ -53,7 +38,6 @@ var workflowTaskCreatePublicParamKeys = map[string]struct{}{
 	"required_capability_key": {},
 	"assignee_id":             {},
 	"priority":                {},
-	"blocked_reason":          {},
 	"due_at":                  {},
 	"payload":                 {},
 }
@@ -66,7 +50,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "list_tasks":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
 		}
 		admin, adminRes := d.CurrentAdmin(ctx)
@@ -84,10 +68,11 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			SourceType:    getString(pm, "source_type"),
 			SourceID:      getInt(pm, "source_id", 0),
 		}
-		if !admin.IsSuperAdmin {
-			filter.VisibleOwnerRoleKeys = d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskRead)
-			filter.VisibleAssigneeID = &admin.ID
+		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
+		if visibilityErr != nil {
+			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
 		}
+		filter.VisibilityScope = visibilityScope
 		tasks, total, err := d.workflowUC.ListTasks(ctx, filter)
 		if err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
@@ -102,8 +87,76 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 				"offset": offset,
 			}),
 		}, nil
+	case "list_role_tasks":
+		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownWorkflowTaskParams(pm, method, "view_key", "role_key", "limit", "cursor"); res != nil {
+			return id, res, nil
+		}
+		viewKey := strings.TrimSpace(getString(pm, "view_key"))
+		roleKey := biz.NormalizeRoleKey(getString(pm, "role_key"))
+		if viewKey == "" || roleKey == "" {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "岗位任务视图参数不完整"}, nil
+		}
+		limit, limitRes := getWorkflowRoleTaskViewLimit(pm)
+		if limitRes != nil {
+			return id, limitRes, nil
+		}
+		cursor := ""
+		if rawCursor, exists := pm["cursor"]; exists {
+			value, ok := rawCursor.(string)
+			if !ok {
+				return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 必须是文本"}, nil
+			}
+			cursor = value
+		}
+		beforeID, snapshotAt, cursorRes := decodeWorkflowRoleTaskViewCursor(cursor)
+		if cursorRes != nil {
+			return id, cursorRes, nil
+		}
+		admin, adminRes := d.CurrentAdmin(ctx)
+		if adminRes != nil {
+			return id, adminRes, nil
+		}
+		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
+		if visibilityErr != nil {
+			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
+		}
+		if !admin.IsSuperAdmin && (!biz.AdminHasRole(admin, roleKey) || !biz.WorkflowTaskVisibilityScopeIncludesRole(visibilityScope, roleKey)) {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
+		crossRoleRisk := viewKey == biz.WorkflowRoleTaskViewRisk &&
+			(admin.IsSuperAdmin || biz.AdminHasRole(admin, biz.PMCRoleKey) || biz.AdminHasRole(admin, biz.BossRoleKey))
+		query := biz.WorkflowRoleTaskViewQuery{
+			ViewKey:              viewKey,
+			RoleKey:              roleKey,
+			Limit:                limit,
+			BeforeID:             beforeID,
+			CrossRoleRiskAllowed: crossRoleRisk,
+			SnapshotAt:           snapshotAt,
+			VisibilityScope:      visibilityScope,
+		}
+		page, err := d.workflowUC.ListRoleTaskView(ctx, query)
+		if err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
+		}
+		nextCursor := ""
+		if page.HasMore && page.NextID > 0 {
+			nextCursor = encodeWorkflowRoleTaskViewCursor(page.NextID, page.SnapshotAt)
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"items":       workflowTasksToAny(page.Items),
+				"next_cursor": nextCursor,
+				"has_more":    page.HasMore,
+				"server_time": page.SnapshotAt.Unix(),
+			}),
+		}, nil
 	case "get_task_board":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
 		}
 		if res := rejectUnknownWorkflowTaskParams(
@@ -128,10 +181,11 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		if !admin.IsSuperAdmin {
-			query.VisibleOwnerRoleKeys = d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskRead)
-			query.VisibleAssigneeID = &admin.ID
+		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
+		if visibilityErr != nil {
+			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
 		}
+		query.VisibilityScope = visibilityScope
 		board, err := d.workflowUC.GetTaskBoard(ctx, query)
 		if err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
@@ -174,7 +228,6 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			RequiredCapabilityKey: getWorkflowStringPtr(pm, "required_capability_key"),
 			AssigneeID:            getWorkflowPositiveIntPtr(pm, "assignee_id"),
 			Priority:              priority,
-			BlockedReason:         getWorkflowStringPtr(pm, "blocked_reason"),
 			DueAt:                 dueAt,
 			Payload:               payload,
 		}, actorID)
@@ -213,6 +266,15 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			InvalidActionMsg: "reject_task_action 仅支持退回动作",
 			RequireReason:    true,
 		})
+	case "resume_task_action":
+		return d.handleWorkflowTaskStatusAction(ctx, id, pm, actorID, workflowTaskActionContract{
+			Method:           "resume_task_action",
+			StatusKey:        "ready",
+			AllowedActions:   []string{"resume"},
+			SuccessMessage:   "任务已解除阻塞，可继续处理",
+			InvalidActionMsg: "resume_task_action 仅支持解除阻塞动作",
+			RequireReason:    true,
+		})
 	case "urge_task":
 		if res := validateWorkflowTaskWritePublicParams(method, pm); res != nil {
 			return id, res, nil
@@ -238,7 +300,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if reasonResult != nil {
 			return id, reasonResult, nil
 		}
-		if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskUpdate); res != nil {
+		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskUpdate); res != nil {
 			return id, res, nil
 		}
 		currentTask, err := d.workflowUC.GetTask(ctx, taskID)
@@ -249,13 +311,18 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskUpdate)
+		visibility := d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskUpdate)
+		if !visibility.Valid {
+			return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+		}
+		visibleOwnerRoleKeys := visibility.RoleKeys
 		payload, ok := getWorkflowPayload(pm, "payload")
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
 		}
-		if res := validateWorkflowTaskActionPayload(payload); res != nil {
-			return id, res, nil
+		payload, payloadRes := normalizeWorkflowTaskActionPayload(method, payload)
+		if payloadRes != nil {
+			return id, payloadRes, nil
 		}
 		actorRoleKey := workflowActorRoleKeyForAdminInScope(admin, currentTask, visibleOwnerRoleKeys)
 		urge := &biz.WorkflowTaskUrge{
@@ -441,7 +508,7 @@ func validateWorkflowTaskWritePublicParams(method string, pm map[string]any) *v1
 	switch method {
 	case "create_task":
 		return validateWorkflowTaskCreatePublicParams(pm)
-	case "complete_task_action", "block_task_action", "reject_task_action":
+	case "complete_task_action", "block_task_action", "reject_task_action", "resume_task_action":
 		return rejectUnknownWorkflowTaskParams(
 			pm,
 			method,
@@ -512,8 +579,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	if !ok {
 		return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "payload 必须是对象"}, nil
 	}
-	if res := validateWorkflowTaskActionPayload(payload); res != nil {
-		return id, res, nil
+	payload, payloadRes := normalizeWorkflowTaskActionPayload(contract.Method, payload)
+	if payloadRes != nil {
+		return id, payloadRes, nil
 	}
 	reason := ""
 	if rawReason, exists := pm["reason"]; exists {
@@ -535,14 +603,18 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 		return id, d.mapWorkflowError(ctx, err), nil
 	}
 	actionPermission := biz.WorkflowStatusActionPermission(contract.StatusKey, currentTask)
-	if res := d.RequireAdminPermission(ctx, actionPermission); res != nil {
+	if res := d.RequireAdminRBACPermission(ctx, actionPermission); res != nil {
 		return id, res, nil
 	}
 	admin, adminRes := d.CurrentAdmin(ctx)
 	if adminRes != nil {
 		return id, adminRes, nil
 	}
-	visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, actionPermission)
+	visibility := d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, actionPermission)
+	if !visibility.Valid {
+		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+	}
+	visibleOwnerRoleKeys := visibility.RoleKeys
 	statusUpdate := &biz.WorkflowTaskStatusUpdate{
 		ID:                taskID,
 		ExpectedVersion:   expectedVersion,
@@ -579,6 +651,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	}
 	if biz.IsTerminalWorkflowTaskStatus(currentTask.TaskStatusKey) {
 		return id, d.mapWorkflowError(ctx, biz.ErrWorkflowTaskSettled), nil
+	}
+	if !biz.CanTransitionWorkflowTaskStatus(currentTask.TaskStatusKey, contract.StatusKey) {
+		return id, d.mapWorkflowError(ctx, biz.ErrBadParam), nil
 	}
 	canHandle := workflowAdminCanHandleTask(admin, currentTask, contract.StatusKey, visibleOwnerRoleKeys)
 	useBreakGlass := false
@@ -626,13 +701,63 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskStatusAction(
 	}, nil
 }
 
-func validateWorkflowTaskActionPayload(payload map[string]any) *v1.JsonrpcResult {
-	for key := range payload {
-		if _, blocked := workflowTaskActionPayloadSystemKeys[strings.TrimSpace(key)]; blocked {
-			return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务动作参数包含系统字段，请刷新后重试"}
+func normalizeWorkflowTaskActionPayload(method string, payload map[string]any) (map[string]any, *v1.JsonrpcResult) {
+	invalid := func() (map[string]any, *v1.JsonrpcResult) {
+		return nil, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "任务动作参数不符合约定，请刷新后重试"}
+	}
+	normalized := make(map[string]any, len(payload))
+	for key, value := range payload {
+		switch key {
+		case "feedback":
+			if method != "complete_task_action" {
+				return invalid()
+			}
+			text, ok := value.(string)
+			if !ok {
+				return invalid()
+			}
+			if text = strings.TrimSpace(text); text != "" {
+				normalized[key] = text
+			}
+		case "surface_key", "entry_path":
+			text, ok := value.(string)
+			if !ok {
+				return invalid()
+			}
+			if text = strings.TrimSpace(text); text != "" {
+				normalized[key] = text
+			}
+		case "evidence_refs":
+			rawRefs, ok := value.([]any)
+			if !ok {
+				return invalid()
+			}
+			seen := make(map[string]struct{}, len(rawRefs))
+			refs := make([]string, 0, len(rawRefs))
+			for _, rawRef := range rawRefs {
+				ref, ok := rawRef.(string)
+				if !ok {
+					return invalid()
+				}
+				ref = strings.TrimSpace(ref)
+				if ref == "" {
+					continue
+				}
+				if _, exists := seen[ref]; exists {
+					continue
+				}
+				seen[ref] = struct{}{}
+				refs = append(refs, ref)
+			}
+			if len(refs) > 0 {
+				sort.Strings(refs)
+				normalized[key] = refs
+			}
+		default:
+			return invalid()
 		}
 	}
-	return nil
+	return normalized, nil
 }
 
 func getRequiredWorkflowTaskID(pm map[string]any) (int, *v1.JsonrpcResult) {
@@ -703,6 +828,47 @@ func rejectUnknownWorkflowTaskParams(pm map[string]any, method string, allowedKe
 		}
 	}
 	return nil
+}
+
+func getWorkflowRoleTaskViewLimit(pm map[string]any) (int, *v1.JsonrpcResult) {
+	raw, exists := pm["limit"]
+	if !exists {
+		return 50, nil
+	}
+	value, ok := raw.(float64)
+	if !ok || value < 1 || value > 100 || value != math.Trunc(value) {
+		return 0, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "limit 必须是 1 到 100 的整数"}
+	}
+	return int(value), nil
+}
+
+func encodeWorkflowRoleTaskViewCursor(beforeID int, snapshotAt time.Time) string {
+	if beforeID <= 0 || snapshotAt.IsZero() {
+		return ""
+	}
+	raw := strconv.Itoa(beforeID) + ":" + strconv.FormatInt(snapshotAt.Unix(), 10)
+	return base64.RawURLEncoding.EncodeToString([]byte(raw))
+}
+
+func decodeWorkflowRoleTaskViewCursor(cursor string) (int, time.Time, *v1.JsonrpcResult) {
+	cursor = strings.TrimSpace(cursor)
+	if cursor == "" {
+		return 0, time.Now(), nil
+	}
+	raw, err := base64.RawURLEncoding.DecodeString(cursor)
+	if err != nil {
+		return 0, time.Time{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 已失效，请重新加载"}
+	}
+	beforeRaw, snapshotRaw, ok := strings.Cut(string(raw), ":")
+	if !ok {
+		return 0, time.Time{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 已失效，请重新加载"}
+	}
+	beforeID, beforeErr := strconv.Atoi(beforeRaw)
+	snapshotUnix, snapshotErr := strconv.ParseInt(snapshotRaw, 10, 64)
+	if beforeErr != nil || snapshotErr != nil || beforeID <= 0 || snapshotUnix <= 0 {
+		return 0, time.Time{}, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "cursor 已失效，请重新加载"}
+	}
+	return beforeID, time.Unix(snapshotUnix, 0), nil
 }
 
 func (d *jsonrpcDispatcher) settleLinkedProcessNodeAfterTask(ctx context.Context, task *biz.WorkflowTask, actorID int) *v1.JsonrpcResult {
@@ -803,11 +969,8 @@ func workflowAdminCanUseBreakGlass(admin *biz.AdminUser, task *biz.WorkflowTask,
 	if admin == nil || admin.Disabled || !admin.IsSuperAdmin || task == nil {
 		return false
 	}
-	if biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
-		return false
-	}
 	nextStatusKey = strings.TrimSpace(nextStatusKey)
-	return nextStatusKey != "" && biz.IsValidWorkflowTaskState(nextStatusKey)
+	return biz.CanTransitionWorkflowTaskStatus(task.TaskStatusKey, nextStatusKey)
 }
 
 func actionKeyForBreakGlass(actionKey string) string {
@@ -899,7 +1062,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskActionExplain(
 	if res := rejectUnknownWorkflowTaskParams(pm, "explain_action_access", "task_id", "action_key"); res != nil {
 		return id, res, nil
 	}
-	if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+	if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 		return id, res, nil
 	}
 	taskID, taskIDRes := getRequiredWorkflowTaskID(pm)
@@ -914,14 +1077,18 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskActionExplain(
 	if adminRes != nil {
 		return id, adminRes, nil
 	}
-	readVisibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskRead)
+	readVisibility := d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskRead)
+	if !readVisibility.Valid {
+		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+	}
+	readVisibleOwnerRoleKeys := readVisibility.RoleKeys
 	if !workflowAdminCanViewTask(admin, currentTask, readVisibleOwnerRoleKeys) {
 		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 	}
 
 	rawActionKey, hasActionKey := pm["action_key"]
 	if !hasActionKey {
-		actions := make([]any, 0, 4)
+		actions := make([]any, 0, 5)
 		for _, contract := range workflowTaskActionExplainContracts(currentTask) {
 			actions = append(actions, d.workflowTaskActionAccessToMap(ctx, admin, currentTask, contract))
 		}
@@ -958,7 +1125,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 	if res := rejectUnknownWorkflowTaskParams(pm, "explain_task_assignment", "task_id"); res != nil {
 		return id, res, nil
 	}
-	if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
+	if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 		return id, res, nil
 	}
 	taskID, taskIDRes := getRequiredWorkflowTaskID(pm)
@@ -973,7 +1140,11 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 	if adminRes != nil {
 		return id, adminRes, nil
 	}
-	readVisibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskRead)
+	readVisibility := d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskRead)
+	if !readVisibility.Valid {
+		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
+	}
+	readVisibleOwnerRoleKeys := readVisibility.RoleKeys
 	if !workflowAdminCanViewTask(admin, currentTask, readVisibleOwnerRoleKeys) {
 		return id, &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}, nil
 	}
@@ -981,10 +1152,11 @@ func (d *jsonrpcDispatcher) handleWorkflowTaskAssignmentExplain(
 	assigned := workflowTaskAssignedToAdmin(admin, currentTask)
 	ownerMatched := workflowEffectiveOwnerRoleMatched(admin, currentTask, readVisibleOwnerRoleKeys)
 	workPoolMatched := workflowWorkPoolEntitlementMatched(admin, currentTask, readVisibleOwnerRoleKeys)
-	canHandle := workflowAdminCanHandleTask(admin, currentTask, "done", d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.WorkflowStatusActionPermission("done", currentTask))) ||
-		workflowAdminCanHandleTask(admin, currentTask, "blocked", d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.WorkflowStatusActionPermission("blocked", currentTask))) ||
-		workflowAdminCanHandleTask(admin, currentTask, "rejected", d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.WorkflowStatusActionPermission("rejected", currentTask)))
-	canUrge := workflowAdminCanUrgeTask(admin, currentTask, d.workflowVisibleOwnerRoleKeys(ctx, admin, biz.PermissionWorkflowTaskUpdate))
+	canHandle := workflowAdminCanHandleTask(admin, currentTask, "done", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("done", currentTask)).RoleKeys) ||
+		workflowAdminCanHandleTask(admin, currentTask, "blocked", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("blocked", currentTask)).RoleKeys) ||
+		workflowAdminCanHandleTask(admin, currentTask, "rejected", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.WorkflowStatusActionPermission("rejected", currentTask)).RoleKeys) ||
+		workflowAdminCanHandleTask(admin, currentTask, "ready", d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskUpdate).RoleKeys)
+	canUrge := workflowAdminCanUrgeTask(admin, currentTask, d.workflowTaskRoleVisibilityForTask(ctx, admin, currentTask, biz.PermissionWorkflowTaskUpdate).RoleKeys)
 	reasonCode := "not_assigned_or_owner"
 	reason := "当前账号不是该任务的指定处理人，也不属于任务责任角色。"
 	if biz.IsTerminalWorkflowTaskStatus(currentTask.TaskStatusKey) {
@@ -1063,6 +1235,11 @@ func workflowTaskActionExplainContracts(task *biz.WorkflowTask) []workflowTaskAc
 			RequiredPermission: biz.WorkflowStatusActionPermission("rejected", task),
 		},
 		{
+			ActionKey:          "resume",
+			StatusKey:          "ready",
+			RequiredPermission: biz.PermissionWorkflowTaskUpdate,
+		},
+		{
 			ActionKey:          "urge",
 			RequiredPermission: biz.PermissionWorkflowTaskUpdate,
 			Urge:               true,
@@ -1079,18 +1256,12 @@ func workflowTaskActionRequiredPermissionsMap(task *biz.WorkflowTask) map[string
 }
 
 func workflowTaskActionExplainContractFor(actionKey string, task *biz.WorkflowTask) (workflowTaskActionExplainContract, bool) {
-	switch actionKey {
-	case "complete":
-		return workflowTaskActionExplainContracts(task)[0], true
-	case "block":
-		return workflowTaskActionExplainContracts(task)[1], true
-	case "reject":
-		return workflowTaskActionExplainContracts(task)[2], true
-	case "urge":
-		return workflowTaskActionExplainContracts(task)[3], true
-	default:
-		return workflowTaskActionExplainContract{}, false
+	for _, contract := range workflowTaskActionExplainContracts(task) {
+		if contract.ActionKey == actionKey {
+			return contract, true
+		}
 	}
+	return workflowTaskActionExplainContract{}, false
 }
 
 func (d *jsonrpcDispatcher) workflowTaskActionAccessToMap(
@@ -1099,9 +1270,10 @@ func (d *jsonrpcDispatcher) workflowTaskActionAccessToMap(
 	task *biz.WorkflowTask,
 	contract workflowTaskActionExplainContract,
 ) map[string]any {
-	visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, contract.RequiredPermission)
+	visibility := d.workflowTaskRoleVisibilityForTask(ctx, admin, task, contract.RequiredPermission)
+	visibleOwnerRoleKeys := visibility.RoleKeys
 	permissionAllowed, permissionResult := d.AdminHasPermission(ctx, contract.RequiredPermission)
-	if permissionResult != nil {
+	if permissionResult != nil || !visibility.Valid {
 		permissionAllowed = false
 	}
 	allowed, reasonCode, reason := workflowTaskActionAccessDecision(admin, task, contract, visibleOwnerRoleKeys, permissionAllowed)
@@ -1142,7 +1314,7 @@ func (d *jsonrpcDispatcher) workflowTaskActionAccessToMap(
 func (d *jsonrpcDispatcher) workflowTaskActionCandidateOwnerRoleKeysMap(ctx context.Context, admin *biz.AdminUser, task *biz.WorkflowTask) map[string]any {
 	out := map[string]any{}
 	for _, contract := range workflowTaskActionExplainContracts(task) {
-		out[contract.ActionKey] = toAnySliceString(d.workflowVisibleOwnerRoleKeys(ctx, admin, contract.RequiredPermission))
+		out[contract.ActionKey] = toAnySliceString(d.workflowTaskRoleVisibilityForTask(ctx, admin, task, contract.RequiredPermission).RoleKeys)
 	}
 	return out
 }
@@ -1250,6 +1422,7 @@ func (d *jsonrpcDispatcher) workflowTaskConfiguredCandidateExplanation(ctx conte
 	ownerPoolKey := workflowTaskOwnerPoolKey(task)
 	capabilityKey := workflowTaskRequiredCapabilityForExplain(task, requiredCapability)
 	out := &biz.WorkflowTaskCandidateExplanation{
+		ConfigRevision:         strings.TrimSpace(workflowTaskConfigRevision(task)),
 		OwnerPoolKey:           ownerPoolKey,
 		RequiredCapabilities:   []string{capabilityKey},
 		CandidateOwnerRoleKeys: []string{},
@@ -1265,9 +1438,22 @@ func (d *jsonrpcDispatcher) workflowTaskConfiguredCandidateExplanation(ctx conte
 		return out
 	}
 	customerKey, _ := runtimeCustomerKey("")
-	explanation, err := d.customerConfigUC.WorkflowCandidateOwnerRoleKeys(ctx, customerKey, ownerPoolKey, capabilityKey)
+	revision, hasRuntimeAnchor, completeRuntimeAnchor := workflowTaskRuntimeConfigRevision(task)
+	if hasRuntimeAnchor && !completeRuntimeAnchor {
+		out.Source = "missing_config_revision"
+		return out
+	}
+	var explanation *biz.WorkflowTaskCandidateExplanation
+	var err error
+	if completeRuntimeAnchor {
+		explanation, err = d.customerConfigUC.WorkflowCandidateOwnerRoleKeysAtRevision(ctx, customerKey, revision, ownerPoolKey, capabilityKey)
+	} else {
+		explanation, err = d.customerConfigUC.WorkflowCandidateOwnerRoleKeys(ctx, customerKey, ownerPoolKey, capabilityKey)
+	}
 	if err != nil {
-		d.log.WithContext(ctx).Warnf("[workflow] configured candidate explain fallback owner_pool_key=%s capability=%s err=%v", ownerPoolKey, capabilityKey, err)
+		if d.log != nil {
+			d.log.WithContext(ctx).Warnf("[workflow] configured candidate explain failed owner_pool_key=%s capability=%s config_revision=%s err=%v", ownerPoolKey, capabilityKey, revision, err)
+		}
 		out.Source = "customer_config_error"
 		return out
 	}
@@ -1301,7 +1487,7 @@ func workflowTaskRequiredCapabilityForExplain(task *biz.WorkflowTask, fallback s
 func (d *jsonrpcDispatcher) workflowTaskActionWorkPoolScopeMatchesMap(ctx context.Context, admin *biz.AdminUser, task *biz.WorkflowTask) map[string]any {
 	out := map[string]any{}
 	for _, contract := range workflowTaskActionExplainContracts(task) {
-		visibleOwnerRoleKeys := d.workflowVisibleOwnerRoleKeys(ctx, admin, contract.RequiredPermission)
+		visibleOwnerRoleKeys := d.workflowTaskRoleVisibilityForTask(ctx, admin, task, contract.RequiredPermission).RoleKeys
 		out[contract.ActionKey] = workflowWorkPoolEntitlementMatched(admin, task, visibleOwnerRoleKeys)
 	}
 	return out
@@ -1335,6 +1521,9 @@ func workflowTaskActionAccessDecision(
 	}
 	if biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
 		return false, "terminal_task", "该任务已结束，只能查看上下文。"
+	}
+	if !contract.Urge && !biz.CanTransitionWorkflowTaskStatus(task.TaskStatusKey, contract.StatusKey) {
+		return false, "transition_not_allowed", "当前任务状态不允许执行该动作。"
 	}
 	if !permissionAllowed {
 		return false, "missing_permission", "当前账号缺少执行该动作所需权限。"
@@ -1372,11 +1561,8 @@ func workflowAdminCanHandleTask(admin *biz.AdminUser, task *biz.WorkflowTask, ne
 	if admin == nil || admin.Disabled || task == nil {
 		return false
 	}
-	if biz.IsTerminalWorkflowTaskStatus(task.TaskStatusKey) {
-		return false
-	}
 	nextStatusKey = strings.TrimSpace(nextStatusKey)
-	if nextStatusKey == "" || !biz.IsValidWorkflowTaskState(nextStatusKey) {
+	if !biz.CanTransitionWorkflowTaskStatus(task.TaskStatusKey, nextStatusKey) {
 		return false
 	}
 	if task.AssigneeID != nil {

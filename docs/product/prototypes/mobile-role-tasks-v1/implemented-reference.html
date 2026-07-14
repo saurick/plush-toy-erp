@@ -768,6 +768,39 @@
         color: var(--muted);
       }
 
+      .reason-actions {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 14px;
+      }
+
+      .reason-actions button {
+        min-height: 44px;
+      }
+
+      .action-feedback {
+        display: none;
+        margin-top: 12px;
+        border-radius: 12px;
+        padding: 10px 12px;
+        font-weight: 700;
+      }
+
+      .action-feedback.visible {
+        display: block;
+      }
+
+      .action-feedback.error {
+        background: #fef2f2;
+        color: var(--red);
+      }
+
+      .action-feedback.success {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
       .action-bar {
         display: grid;
         flex: 0 0 auto;
@@ -869,14 +902,14 @@
           <header class="detail-header">
             <div class="detail-top">
               <button class="back" id="backButton">‹ 任务列表</button>
-              <div class="detail-title">成品返工处理</div>
+              <div class="detail-title" id="detailTitle">成品返工处理</div>
               <div style="text-align: right">
-                <span class="badge overdue">超时</span>
+                <span class="badge overdue" id="detailBadge">超时</span>
               </div>
             </div>
             <div class="detail-source">
               <span>▤</span>
-              <span>来源：DBG-RUN-20260425T161301-F6D947-PROSHIP-01</span>
+              <span id="detailSourceText">来源：SO-202607-018</span>
             </div>
           </header>
 
@@ -886,20 +919,20 @@
                 <h2>▤ 任务关键信息</h2>
                 <span class="detail-meta">摘要</span>
               </div>
-              <div class="fact-grid">
+              <div class="fact-grid" id="detailFacts">
                 <div class="fact"><label>状态</label><strong>待处理</strong></div>
                 <div class="fact"><label>业务</label><strong>质检不合格</strong></div>
-                <div class="fact"><label>客户</label><strong>调试客户 B</strong></div>
-                <div class="fact"><label>款式</label><strong>调试款毛绒狗</strong></div>
+                <div class="fact"><label>客户</label><strong>星河礼品</strong></div>
+                <div class="fact"><label>款式</label><strong>云朵小熊</strong></div>
                 <div class="fact"><label>数量</label><strong>600 只</strong></div>
-                <div class="fact"><label>截止</label><strong>2026-04-28</strong></div>
+                <div class="fact"><label>截止</label><strong>04/25 18:00</strong></div>
               </div>
             </section>
 
-            <section class="risk-box">! 质检不合格 · 需要确认后继续流转</section>
+            <section class="risk-box" id="detailRisk">! 质检不合格 · 需要确认后继续流转</section>
             <section class="exception-box">
               <strong>异常上报</strong>
-              <div style="margin-top: 6px; font-weight: 500">生产确认返工完成后重新提交成品抽检。</div>
+              <div id="detailException" style="margin-top: 6px; font-weight: 500">生产确认返工完成后重新提交成品抽检。</div>
             </section>
 
             <section class="panel" style="margin: 14px 0 0">
@@ -907,7 +940,7 @@
                 <h2>◇ 关联来源（1）</h2>
                 <span class="detail-meta">来源</span>
               </div>
-              <div class="done-card">来源：DBG-RUN-20260425T161301-F6D947-PROSHIP-01</div>
+              <div class="done-card" id="detailLinkedSource">来源：SO-202607-018</div>
             </section>
 
             <section class="panel" style="margin: 14px 0 0">
@@ -940,22 +973,27 @@
                 <h2 id="reasonTitle">阻塞原因（必填） ·</h2>
                 <button class="refresh" id="closeReasonButton">收起 ^</button>
               </div>
-              <textarea class="textarea" placeholder="请填写原因，说明卡点、退回依据或催办诉求"></textarea>
-              <div style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
+              <textarea class="textarea" id="reasonInput" maxlength="500" placeholder="请填写原因，说明卡点、退回依据或催办诉求"></textarea>
+              <div id="reasonCount" style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
               <div style="margin-top: 12px; color: var(--muted)">快捷选择（可选）</div>
               <div class="quick-reasons">
-                <button>材料不足</button>
-                <button>产能不足</button>
-                <button>工艺/模具问题</button>
-                <button>信息不清</button>
+                <button type="button" data-quick-reason="材料不足">材料不足</button>
+                <button type="button" data-quick-reason="产能不足">产能不足</button>
+                <button type="button" data-quick-reason="工艺/模具问题">工艺/模具问题</button>
+                <button type="button" data-quick-reason="信息不清">信息不清</button>
+              </div>
+              <div class="action-feedback" id="actionFeedback" role="status" aria-live="polite"></div>
+              <div class="reason-actions">
+                <button class="refresh" id="cancelReasonButton" type="button">取消</button>
+                <button class="action done" id="submitReasonButton" type="button">提交</button>
               </div>
             </section>
           </main>
 
           <div class="action-bar">
-            <button class="action block" data-action="阻塞原因（必填）">Ⅱ 阻塞</button>
-            <button class="action done" data-action="处理原因">✓ 完成</button>
-            <button class="action urge" data-action="催办原因（必填）">◔ 催办</button>
+            <button class="action block" data-action="blocked" data-action-label="阻塞原因（必填）" aria-expanded="false">Ⅱ 阻塞</button>
+            <button class="action done" data-action="done" data-action-label="完成反馈（必填）" aria-expanded="false">✓ 完成</button>
+            <button class="action urge" data-action="urge" data-action-label="催办原因（必填）" aria-expanded="false">◔ 催办</button>
           </div>
         </section>
       </section>
@@ -964,58 +1002,84 @@
     <script>
       const tasks = [
         {
+          id: "task-rework-018",
           title: "成品返工处理",
-          source: "DBG-RUN-20260425T161301-F6D947-01",
-          meta: "客户：调试客户 B ｜ 款式：调试款毛绒狗 ｜ 数量：600只",
+          source: "SO-202607-018",
+          meta: "客户：星河礼品 ｜ 款式：云朵小熊 ｜ 数量：600只",
           badge: "超时",
           tone: "overdue",
           chip: "质检不合格",
+          status: "已阻塞",
           due: "04/25 18:00",
+          mine: true,
+          risk: "质检不合格 · 已超时",
+          blockedReason: "生产确认返工完成，重新提交成品抽检",
+          exception: "生产确认返工完成后重新提交成品抽检。",
         },
         {
+          id: "task-rework-021",
           title: "成品返工处理",
-          source: "DBG-RUN-20260425T161301-F6D947-02",
-          meta: "客户：调试客户 B ｜ 款式：调试款毛绒狗 ｜ 数量：600只",
+          source: "SO-202607-021",
+          meta: "客户：星河礼品 ｜ 款式：云朵小熊 ｜ 数量：600只",
           badge: "预警",
           tone: "alert",
           chip: "生产确认返工完成",
+          status: "待处理",
           due: "04/27 15:00",
+          mine: true,
+          risk: "生产确认返工完成 · 需尽快确认",
         },
         {
+          id: "task-receivable-006",
           title: "财务已超时-应收登记",
-          source: "DBG-RUN-20260425T161301-F6D947-03",
-          meta: "客户：调试客户 B ｜ 款式：毛绒狗 ｜ 数量：600只",
+          source: "AR-202607-006",
+          meta: "客户：晨光百货 ｜ 款式：毛绒狗 ｜ 数量：600只",
           badge: "预警",
           tone: "alert",
           chip: "应收登记",
+          status: "待处理",
           due: "04/24 17:30",
+          mine: false,
+          risk: "应收登记已超时",
         },
         {
+          id: "task-quality-011",
           title: "成品抽检待处理",
-          source: "DBG-RUN-20260425T161301-F6D947-04",
-          meta: "客户：调试客户 B ｜ 款式：毛绒狗 ｜ 数量：600只",
+          source: "QI-202607-011",
+          meta: "客户：晨光百货 ｜ 款式：毛绒狗 ｜ 数量：600只",
           badge: "预警",
           tone: "alert",
           chip: "生产抽检",
+          status: "待处理",
           due: "04/28 10:00",
+          mine: false,
+          risk: "成品抽检即将到期",
         },
         {
+          id: "task-inbound-028",
           title: "物料入库确认",
-          source: "DBG-RUN-20260425T161301-F6D947-05",
+          source: "PO-202607-028",
           meta: "物料：PP棉 ｜ 规格：1kg/包 ｜ 数量：120包",
           badge: "普通",
           tone: "",
           chip: "待入库确认",
+          status: "待处理",
           due: "04/29 09:30",
+          mine: true,
+          risk: "",
         },
         {
+          id: "task-picking-014",
           title: "生产领料审核",
-          source: "DBG-RUN-20260425T090201-F3C84E-PICKMTL-02",
+          source: "MO-202607-014",
           meta: "产品：泰迪熊 ｜ 规格：35cm ｜ 数量：1,000只",
           badge: "普通",
           tone: "",
           chip: "待领料审核",
+          status: "待处理",
           due: "04/29 11:00",
+          mine: true,
+          risk: "",
         },
       ];
 
@@ -1051,50 +1115,128 @@
       const scrollTopButton = document.querySelector("#scrollTopButton");
       const reasonSheet = document.querySelector("#reasonSheet");
       const reasonTitle = document.querySelector("#reasonTitle");
+      const reasonInput = document.querySelector("#reasonInput");
+      const reasonCount = document.querySelector("#reasonCount");
+      const actionFeedback = document.querySelector("#actionFeedback");
+      const submitReasonButton = document.querySelector("#submitReasonButton");
+      const detailTitle = document.querySelector("#detailTitle");
+      const detailBadge = document.querySelector("#detailBadge");
+      const detailSourceText = document.querySelector("#detailSourceText");
+      const detailFacts = document.querySelector("#detailFacts");
+      const detailRisk = document.querySelector("#detailRisk");
+      const detailException = document.querySelector("#detailException");
+      const detailLinkedSource = document.querySelector("#detailLinkedSource");
+      const backButton = document.querySelector("#backButton");
+      let activeTaskTrigger = null;
+      let activeFilter = "all";
+      let visibleTaskLimit = 4;
+      let activeActionButton = null;
+      let activeTask = null;
+      let actionSubmitting = false;
+
+      function renderTaskDetail(task) {
+        activeTask = task;
+        const metadataFacts = task.meta.split(" ｜ ").map((item) => {
+          const [label, ...valueParts] = item.split("：");
+          return [label, valueParts.join("：")];
+        });
+        const factRows = [
+          ["状态", task.status],
+          ["业务", task.chip],
+          ...metadataFacts,
+          ["截止", task.due],
+        ];
+
+        detailTitle.textContent = task.title;
+        detailBadge.textContent = task.badge;
+        detailBadge.className = `badge ${task.tone}`.trim();
+        detailSourceText.textContent = `来源：${task.source}`;
+        detailLinkedSource.textContent = `来源：${task.source}`;
+        detailRisk.hidden = !task.risk;
+        detailRisk.textContent = task.risk ? `! ${task.risk}` : "";
+        detailException.textContent =
+          task.exception || "请按当前任务要求处理，并在提交前核对业务信息。";
+        document.querySelectorAll("[data-action]").forEach((button) => {
+          button.disabled = Boolean(task.actionLocked);
+        });
+        detailFacts.replaceChildren(
+          ...factRows.map(([label, value]) => {
+            const item = document.createElement("div");
+            const itemLabel = document.createElement("label");
+            const itemValue = document.createElement("strong");
+            item.className = "fact";
+            itemLabel.textContent = label;
+            itemValue.textContent = value;
+            item.append(itemLabel, itemValue);
+            return item;
+          }),
+        );
+      }
+
+      function filteredTasks() {
+        if (activeFilter === "risk") return tasks.filter((task) => task.tone);
+        if (activeFilter === "overdue") {
+          return tasks.filter((task) => task.tone === "overdue");
+        }
+        if (activeFilter === "mine") return tasks.filter((task) => task.mine);
+        return tasks;
+      }
 
       function renderTaskRows() {
+        const matchingTasks = filteredTasks();
+        const visibleTasks = matchingTasks.slice(0, visibleTaskLimit);
+        const remainingCount = Math.max(
+          0,
+          matchingTasks.length - visibleTasks.length,
+        );
         return `
           <div class="list-head">
             <span>任务信息</span>
             <span style="text-align:right">业务状态 / 截止时间</span>
           </div>
           <div class="task-list">
-            ${tasks
+            ${visibleTasks
               .map(
-                (task, index) => `
-                <button class="task-row ${task.tone}" data-open-detail="${index}">
+                (task) => {
+                  const taskIndex = tasks.indexOf(task);
+                  return `
+                <button class="task-row ${task.tone}" data-open-detail="${taskIndex}">
                   <div><span class="badge ${task.tone}">${task.badge}</span></div>
                   <div>
                     <div class="task-title">${task.title}</div>
                     <div class="task-source">${task.source}</div>
                     <div class="task-meta">♙ ${task.meta}</div>
-                    ${index === 0 ? '<div class="task-blocked">阻塞：生产确认返工完成，重新提交成品抽检</div>' : ''}
+                    ${task.blockedReason ? `<div class="task-blocked">阻塞：${task.blockedReason}</div>` : ""}
                   </div>
                   <div class="right">
                     <span class="chip">${task.chip}</span>
                     <div class="due ${task.tone}">${task.due}</div>
                   </div>
-                </button>`
+                </button>`;
+                },
               )
               .join("")}
           </div>
-          <button class="list-more">展开更多任务 <span style="color:var(--muted);font-size:12px">剩余 12 条</span></button>
+          ${matchingTasks.length > 4 ? `<button class="list-more" data-list-more>${remainingCount > 0 ? `展开更多任务 <span style="color:var(--muted);font-size:12px">剩余 ${remainingCount} 条</span>` : "收起任务"}</button>` : ""}
         `;
       }
 
       function renderTodo() {
+        const riskCount = tasks.filter((task) => task.risk).length;
+        const overdueCount = tasks.filter((task) => task.tone === "overdue").length;
+        const blockedCount = tasks.filter((task) => task.status === "已阻塞").length;
         return `
           <section class="metrics">
-            <div class="metric"><strong style="color:var(--orange)">9</strong><span>风险</span></div>
-            <div class="metric"><strong style="color:var(--red)">8</strong><span>已超时</span></div>
+            <div class="metric"><strong style="color:var(--orange)">${riskCount}</strong><span>风险</span></div>
+            <div class="metric"><strong style="color:var(--red)">${overdueCount}</strong><span>已超时</span></div>
             <div class="metric"><strong>0</strong><span>即将超时</span></div>
-            <div class="metric"><strong style="color:var(--red)">0/1</strong><span>阻塞/高优先</span></div>
+            <div class="metric"><strong style="color:var(--red)">${blockedCount}</strong><span>阻塞/高优先</span></div>
           </section>
           <div class="filters">
-            <button class="filter active">全部(18)</button>
-            <button class="filter">风险(9)</button>
-            <button class="filter">超时(8)</button>
-            <button class="filter">我负责(6)</button>
+            <button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">全部(${tasks.length})</button>
+            <button class="filter ${activeFilter === "risk" ? "active" : ""}" data-filter="risk">风险(${tasks.filter((task) => task.tone).length})</button>
+            <button class="filter ${activeFilter === "overdue" ? "active" : ""}" data-filter="overdue">超时(${tasks.filter((task) => task.tone === "overdue").length})</button>
+            <button class="filter ${activeFilter === "mine" ? "active" : ""}" data-filter="mine">我负责(${tasks.filter((task) => task.mine).length})</button>
           </div>
           ${renderTaskRows()}
         `;
@@ -1178,7 +1320,7 @@
           </section>
           <section class="panel">
             <h2>预警</h2>
-            <div class="message-card warning"><strong>已超时</strong><br>成品返工处理<br><span style="color:var(--muted)">DBG-RUN-20260425T161301-F6D947-01</span></div>
+            <div class="message-card warning"><strong>已超时</strong><br>成品返工处理<br><span style="color:var(--muted)">SO-202607-018</span></div>
             <div class="message-card warning"><strong>阻塞任务</strong><br>成品入库登记<br><span style="color:var(--red)">生产确认返工完成，重新提交成品抽检</span></div>
           </section>
         `;
@@ -1189,7 +1331,7 @@
           <section class="panel">
             <div style="display:flex;gap:12px;align-items:center">
               <span style="display:grid;place-items:center;width:56px;height:56px;border-radius:16px;background:var(--green-soft);color:var(--green);font-size:28px">♙</span>
-              <div><h2>demo_warehouse</h2><p style="color:var(--muted)">仓库任务端</p></div>
+              <div><h2>仓库值班员</h2><p style="color:var(--muted)">仓库任务端</p></div>
             </div>
             <div class="mine-card"><span style="color:var(--muted)">账号角色</span><br><strong>仓库</strong></div>
           </section>
@@ -1209,9 +1351,16 @@
       function setTab(tab, options = {}) {
         const data = tabData[tab] || tabData.todo;
         pageTitle.textContent = data.title;
-        tabSummary.textContent = options.loading ? "正在加载任务" : data.summary;
-        tabContent.innerHTML =
-          options.loading && tab === "todo" ? renderLoading() : data.content;
+        tabSummary.textContent = options.loading
+          ? "正在加载任务"
+          : tab === "todo"
+            ? `共 ${tasks.length} 条待处理`
+            : data.summary;
+        tabContent.innerHTML = options.loading && tab === "todo"
+          ? renderLoading()
+          : tab === "todo"
+            ? renderTodo()
+            : data.content;
         mainScroll.setAttribute("aria-busy", options.loading ? "true" : "false");
         document.querySelectorAll("[data-tab]").forEach((button) => {
           button.classList.toggle("active", button.dataset.tab === tab);
@@ -1224,27 +1373,146 @@
       });
 
       tabContent.addEventListener("click", (event) => {
-        if (event.target.closest("[data-open-detail]")) {
-          listScreen.classList.remove("active");
-          detailScreen.classList.add("active");
+        const filterButton = event.target.closest("[data-filter]");
+        if (filterButton) {
+          activeFilter = filterButton.dataset.filter;
+          visibleTaskLimit = 4;
+          setTab("todo");
+          return;
         }
+        if (event.target.closest("[data-list-more]")) {
+          visibleTaskLimit = visibleTaskLimit > 4 ? 4 : filteredTasks().length;
+          setTab("todo");
+          return;
+        }
+        const taskButton = event.target.closest("[data-open-detail]");
+        if (!taskButton) return;
+        const task = tasks[Number(taskButton.dataset.openDetail)];
+        if (!task) return;
+        activeTaskTrigger = taskButton;
+        renderTaskDetail(task);
+        listScreen.classList.remove("active");
+        detailScreen.classList.add("active");
+        requestAnimationFrame(() => backButton.focus({ preventScroll: true }));
       });
 
-      document.querySelector("#backButton").addEventListener("click", () => {
+      backButton.addEventListener("click", () => {
+        if (actionSubmitting) return;
         detailScreen.classList.remove("active");
         listScreen.classList.add("active");
-        reasonSheet.classList.remove("visible");
+        closeReasonSheet();
+        requestAnimationFrame(() =>
+          activeTaskTrigger?.focus({ preventScroll: true }),
+        );
       });
 
       document.querySelectorAll("[data-action]").forEach((button) => {
         button.addEventListener("click", () => {
-          reasonTitle.textContent = `${button.dataset.action} ·`;
+          if (actionSubmitting || button.disabled || activeTask?.actionLocked) return;
+          activeActionButton = button;
+          reasonTitle.textContent = `${button.dataset.actionLabel} ·`;
+          reasonInput.value = "";
+          reasonCount.textContent = "0/500";
+          actionFeedback.className = "action-feedback";
+          actionFeedback.textContent = "";
           reasonSheet.classList.add("visible");
+          button.setAttribute("aria-expanded", "true");
+          requestAnimationFrame(() =>
+            reasonInput.focus({ preventScroll: true }),
+          );
         });
       });
 
-      document.querySelector("#closeReasonButton").addEventListener("click", () => {
+      function closeReasonSheet({ restoreFocus = false } = {}) {
         reasonSheet.classList.remove("visible");
+        activeActionButton?.setAttribute("aria-expanded", "false");
+        if (restoreFocus) {
+          requestAnimationFrame(() =>
+            activeActionButton?.focus({ preventScroll: true }),
+          );
+        }
+      }
+
+      document.querySelector("#closeReasonButton").addEventListener(
+        "click",
+        () => closeReasonSheet({ restoreFocus: true }),
+      );
+      document.querySelector("#cancelReasonButton").addEventListener(
+        "click",
+        () => closeReasonSheet({ restoreFocus: true }),
+      );
+      reasonInput.addEventListener("input", () => {
+        reasonCount.textContent = `${reasonInput.value.length}/500`;
+      });
+      reasonSheet.addEventListener("click", (event) => {
+        const quickReason = event.target.closest("[data-quick-reason]");
+        if (!quickReason) return;
+        reasonInput.value = [
+          reasonInput.value.trim(),
+          quickReason.dataset.quickReason,
+        ]
+          .filter(Boolean)
+          .join("；")
+          .slice(0, 500);
+        reasonCount.textContent = `${reasonInput.value.length}/500`;
+        reasonInput.focus();
+      });
+
+      function setActionSubmitting(submitting) {
+        actionSubmitting = submitting;
+        reasonInput.disabled = submitting;
+        submitReasonButton.disabled = submitting;
+        document
+          .querySelectorAll("[data-action]")
+          .forEach((button) => {
+            button.disabled = submitting || Boolean(activeTask?.actionLocked);
+          });
+        document
+          .querySelectorAll("[data-quick-reason], #cancelReasonButton, #closeReasonButton")
+          .forEach((button) => {
+            button.disabled = submitting;
+          });
+        submitReasonButton.textContent = submitting ? "提交中" : "提交";
+      }
+
+      submitReasonButton.addEventListener("click", () => {
+        if (!activeActionButton || !activeTask || actionSubmitting) return;
+        const submittedActionButton = activeActionButton;
+        const submittedTask = activeTask;
+        const action = activeActionButton.dataset.action;
+        const reason = reasonInput.value.trim();
+        if (!reason) {
+          actionFeedback.className = "action-feedback visible error";
+          actionFeedback.textContent = "请先填写本次处理说明再提交。";
+          reasonInput.focus();
+          return;
+        }
+        const submittedActionLabel = submittedActionButton.textContent.trim();
+        setActionSubmitting(true);
+        window.setTimeout(() => {
+          submittedTask.actionLocked = true;
+          if (action === "blocked") {
+            submittedTask.status = "已阻塞";
+            submittedTask.blockedReason = reason;
+            submittedTask.risk = `${submittedTask.chip} · 已阻塞`;
+            submittedTask.badge = "阻塞";
+            submittedTask.tone = "alert";
+          } else if (action === "done") {
+            const submittedTaskIndex = tasks.indexOf(submittedTask);
+            if (submittedTaskIndex >= 0) tasks.splice(submittedTaskIndex, 1);
+          }
+          setActionSubmitting(false);
+          closeReasonSheet();
+          detailScreen.classList.remove("active");
+          listScreen.classList.add("active");
+          setTab("todo");
+          tabSummary.textContent = `${submittedActionLabel}已提交，任务列表已刷新`;
+          activeTask = null;
+          activeActionButton = null;
+          requestAnimationFrame(() =>
+            document.querySelector("[data-open-detail]")?.focus({ preventScroll: true }),
+          );
+        }, 500);
       });
 
       mainScroll.addEventListener("scroll", () => {
@@ -1263,6 +1531,7 @@
         }, 700);
       });
 
+      renderTaskDetail(tasks[0]);
       setTab("todo", { loading: true });
       window.setTimeout(() => setTab("todo"), 700);
     </script>

@@ -52,6 +52,20 @@ func (_c *CustomerConfigRevisionCreate) SetConfigHash(v string) *CustomerConfigR
 	return _c
 }
 
+// SetConfigHashVersion sets the "config_hash_version" field.
+func (_c *CustomerConfigRevisionCreate) SetConfigHashVersion(v int16) *CustomerConfigRevisionCreate {
+	_c.mutation.SetConfigHashVersion(v)
+	return _c
+}
+
+// SetNillableConfigHashVersion sets the "config_hash_version" field if the given value is not nil.
+func (_c *CustomerConfigRevisionCreate) SetNillableConfigHashVersion(v *int16) *CustomerConfigRevisionCreate {
+	if v != nil {
+		_c.SetConfigHashVersion(*v)
+	}
+	return _c
+}
+
 // SetStatus sets the "status" field.
 func (_c *CustomerConfigRevisionCreate) SetStatus(v string) *CustomerConfigRevisionCreate {
 	_c.mutation.SetStatus(v)
@@ -195,6 +209,10 @@ func (_c *CustomerConfigRevisionCreate) defaults() {
 		v := customerconfigrevision.DefaultProductVersion
 		_c.mutation.SetProductVersion(v)
 	}
+	if _, ok := _c.mutation.ConfigHashVersion(); !ok {
+		v := customerconfigrevision.DefaultConfigHashVersion
+		_c.mutation.SetConfigHashVersion(v)
+	}
 	if _, ok := _c.mutation.Status(); !ok {
 		v := customerconfigrevision.DefaultStatus
 		_c.mutation.SetStatus(v)
@@ -242,6 +260,9 @@ func (_c *CustomerConfigRevisionCreate) check() error {
 		if err := customerconfigrevision.ConfigHashValidator(v); err != nil {
 			return &ValidationError{Name: "config_hash", err: fmt.Errorf(`ent: validator failed for field "CustomerConfigRevision.config_hash": %w`, err)}
 		}
+	}
+	if _, ok := _c.mutation.ConfigHashVersion(); !ok {
+		return &ValidationError{Name: "config_hash_version", err: errors.New(`ent: missing required field "CustomerConfigRevision.config_hash_version"`)}
 	}
 	if _, ok := _c.mutation.Status(); !ok {
 		return &ValidationError{Name: "status", err: errors.New(`ent: missing required field "CustomerConfigRevision.status"`)}
@@ -308,6 +329,10 @@ func (_c *CustomerConfigRevisionCreate) createSpec() (*CustomerConfigRevision, *
 	if value, ok := _c.mutation.ConfigHash(); ok {
 		_spec.SetField(customerconfigrevision.FieldConfigHash, field.TypeString, value)
 		_node.ConfigHash = value
+	}
+	if value, ok := _c.mutation.ConfigHashVersion(); ok {
+		_spec.SetField(customerconfigrevision.FieldConfigHashVersion, field.TypeInt16, value)
+		_node.ConfigHashVersion = value
 	}
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(customerconfigrevision.FieldStatus, field.TypeString, value)

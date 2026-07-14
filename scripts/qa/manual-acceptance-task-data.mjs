@@ -42,14 +42,43 @@ export const ROLE_USERS = Object.freeze({
   engineering: "demo_engineering",
 });
 
-const STATUS_DISTRIBUTION = Object.freeze([
-  ["pending", 4],
-  ["ready", 4],
-  ["processing", 4],
-  ["blocked", 3],
-  ["done", 3],
-  ["rejected", 2],
+export const TASK_STATUS_KEYS = Object.freeze([
+  "ready",
+  "blocked",
+  "done",
+  "rejected",
 ]);
+const REJECT_ACTION_ROLES = new Set([
+  "boss",
+  "warehouse",
+  "finance",
+  "quality",
+]);
+const ACTIONABLE_STATUS_COUNTS = Object.freeze({
+  ready: 12,
+  blocked: 3,
+  done: 3,
+  rejected: 2,
+});
+const NON_REJECT_STATUS_COUNTS = Object.freeze({
+  ready: 14,
+  blocked: 3,
+  done: 3,
+  rejected: 0,
+});
+const BOSS_STATUS_COUNTS = Object.freeze({
+  ready: 15,
+  blocked: 3,
+  done: 0,
+  rejected: 2,
+});
+
+export function getManualAcceptanceTaskStatusCounts(roleKey) {
+  if (roleKey === "boss") return BOSS_STATUS_COUNTS;
+  return REJECT_ACTION_ROLES.has(roleKey)
+    ? ACTIONABLE_STATUS_COUNTS
+    : NON_REJECT_STATUS_COUNTS;
+}
 const ACTION_METHOD_BY_STATUS = Object.freeze({
   blocked: "block_task_action",
   done: "complete_task_action",
@@ -60,12 +89,6 @@ const ACTION_KEY_BY_STATUS = Object.freeze({
   done: "complete",
   rejected: "reject",
 });
-const REJECT_ACTION_ROLES = new Set([
-  "boss",
-  "warehouse",
-  "finance",
-  "quality",
-]);
 const ACTION_PAYLOAD_SYSTEM_KEYS = new Set([
   "business_status_key",
   "command_key",
@@ -436,9 +459,11 @@ function stablePositiveSourceID(runId) {
   return (hash % 2_000_000_000) + 1;
 }
 
-function targetStatusAt(index) {
+function targetStatusAt(roleKey, index) {
   let consumed = 0;
-  for (const [status, count] of STATUS_DISTRIBUTION) {
+  for (const [status, count] of Object.entries(
+    getManualAcceptanceTaskStatusCounts(roleKey),
+  )) {
     consumed += count;
     if (index <= consumed) return status;
   }
@@ -495,7 +520,7 @@ function actionFor(roleKey, targetStatus, runId, index, profile) {
 
 function buildRoleTask({ roleKey, index, runId, prefix, sourceID, nowSec }) {
   const profile = ROLE_SCENARIOS[roleKey];
-  const targetStatus = targetStatusAt(index);
+  const targetStatus = targetStatusAt(roleKey, index);
   const action = actionFor(roleKey, targetStatus, runId, index, profile);
   const due = dueAtFor(index, nowSec);
   const assignmentMode = index % 2 === 0 ? "role_account" : "owner_pool";
@@ -527,13 +552,6 @@ function buildRoleTask({ roleKey, index, runId, prefix, sourceID, nowSec }) {
             : "信息确认无误后继续推进。",
     ...profile.context,
   };
-  const directReason =
-    targetStatus === "rejected" && !action ? profile.rejectedReason : "";
-  if (directReason) payload.rejected_reason = directReason;
-  if (targetStatus === "done" && !action) {
-    payload.completion_summary = `已按${profile.label}任务说明完成核对并记录结果。`;
-  }
-
   return {
     key: `${roleKey}-${pad(index)}`,
     roleKey,
@@ -550,7 +568,8 @@ function buildRoleTask({ roleKey, index, runId, prefix, sourceID, nowSec }) {
       source_id: sourceID,
       source_no: sourceNo,
       business_status_key: profile.businessStatus,
-      task_status_key: action ? "ready" : targetStatus,
+      // create_task 只接受 ready；blocked/done/rejected 必须由正式动作产生。
+      task_status_key: "ready",
       owner_role_key: roleKey,
       owner_pool_key: roleKey,
       required_capability_key: profile.requiredCapability,
@@ -563,9 +582,7 @@ function buildRoleTask({ roleKey, index, runId, prefix, sourceID, nowSec }) {
 
 function summarizePlanTasks(tasks) {
   const byRole = Object.fromEntries(TASK_ROLES.map((roleKey) => [roleKey, 0]));
-  const byStatus = Object.fromEntries(
-    STATUS_DISTRIBUTION.map(([status]) => [status, 0]),
-  );
+  const byStatus = Object.fromEntries(TASK_STATUS_KEYS.map((status) => [status, 0]));
   const dueScenarios = {};
   let assigned = 0;
   let actionCount = 0;
@@ -647,7 +664,7 @@ export function validateManualAcceptanceTaskPlan(plan) {
       throw new CliError(`${roleKey} must contain ${TASKS_PER_ROLE} tasks`);
     }
     const statusCounts = Object.fromEntries(
-      STATUS_DISTRIBUTION.map(([status]) => [status, 0]),
+      TASK_STATUS_KEYS.map((status) => [status, 0]),
     );
     for (const task of roleTasks) {
       const params = task.createParams || {};
@@ -693,10 +710,10 @@ export function validateManualAcceptanceTaskPlan(plan) {
           `${task.key} due_at must be a positive Unix timestamp`,
         );
       }
+      if (params.task_status_key !== "ready") {
+        throw new CliError(`${task.key} create seed must start from ready`);
+      }
       if (task.action) {
-        if (params.task_status_key !== "ready") {
-          throw new CliError(`${task.key} action seed must start from ready`);
-        }
         if (
           !task.action.reason.trim() ||
           !task.action.idempotencyKey.trim() ||
@@ -722,9 +739,9 @@ export function validateManualAcceptanceTaskPlan(plan) {
             );
           }
         }
-      } else if (params.task_status_key !== task.targetStatus) {
+      } else if (task.targetStatus !== "ready") {
         throw new CliError(
-          `${task.key} direct task status does not match target`,
+          `${task.key} terminal target must use a formal workflow action`,
         );
       }
       if (
@@ -748,7 +765,9 @@ export function validateManualAcceptanceTaskPlan(plan) {
         }
       }
     }
-    for (const [status, expected] of STATUS_DISTRIBUTION) {
+    for (const [status, expected] of Object.entries(
+      getManualAcceptanceTaskStatusCounts(roleKey),
+    )) {
       if (statusCounts[status] !== expected) {
         throw new CliError(
           `${roleKey} ${status} expected ${expected}, got ${statusCounts[status]}`,

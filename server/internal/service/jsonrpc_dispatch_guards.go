@@ -20,6 +20,8 @@ func (d *jsonrpcDispatcher) requireLogin(ctx context.Context) (*biz.AuthClaims, 
 		return nil, &v1.JsonrpcResult{Code: errcode.AuthExpired.Code, Message: errcode.AuthExpired.Message}
 	case biz.AuthInvalid:
 		return nil, &v1.JsonrpcResult{Code: errcode.AuthInvalid.Code, Message: errcode.AuthInvalid.Message}
+	case biz.AuthUnavailable:
+		return nil, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	default:
 		return nil, &v1.JsonrpcResult{Code: errcode.AuthRequired.Code, Message: errcode.AuthRequired.Message}
 	}
@@ -54,6 +56,12 @@ func (d *jsonrpcDispatcher) requireAdmin(ctx context.Context) (*biz.AuthClaims, 
 func (d *jsonrpcDispatcher) getCurrentAdmin(ctx context.Context, claims *biz.AuthClaims) (*biz.AdminUser, error) {
 	if claims == nil {
 		return nil, errors.New("missing auth claims")
+	}
+	if admin, ok := biz.GetCurrentAdminFromContext(ctx); ok {
+		if admin.ID != claims.UserID {
+			return nil, errors.New("verified admin does not match auth claims")
+		}
+		return admin, nil
 	}
 	if d.adminReader == nil {
 		return nil, errors.New("admin reader is nil")

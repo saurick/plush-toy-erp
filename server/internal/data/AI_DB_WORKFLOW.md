@@ -3,8 +3,10 @@
 **STOP! 在修改数据库或创建 `.sql` 文件之前，请务必阅读本指南。**
 
 本项目使用 **Ent** 和 **Atlas** 进行版本化的数据库迁移。
-**严禁** 在 `migrate/` 目录下手动编写 `.sql` 文件。
-**严禁** 手动执行 `ALTER TABLE` 或 `CREATE TABLE` 语句。
+**严禁** 绕过 Atlas 直接创建或改写结构迁移，也严禁手动执行
+`ALTER TABLE` / `CREATE TABLE`。Ent 无法表达的一次性数据回填或
+PostgreSQL trigger 必须走下文的受控 Atlas custom migration，不得混入
+普通结构迁移或直接写目标数据库。
 
 ## 🟢 正确的工作流 (HOW TO DO IT)
 
@@ -26,6 +28,24 @@
     ```
     *解释：此命令会将生成的 SQL 应用到实际数据库，并更新 `atlas_schema_revisions` 表。*
 
+4. **Ent 无法表达的 data / trigger migration**:
+   先完成结构 schema 与 `make data`，再由单一 migration owner 创建空的
+   Atlas migration：
+   ```bash
+   atlas migrate new <name> --dir file://internal/data/model/migrate
+   ```
+   该 migration 只允许承载已评审的一次性 `UPDATE` / `DELETE` 数据转换或
+   Ent / Atlas schema provider 无法表达的 function / trigger；不得在这里
+   手写 `CREATE TABLE` / `ALTER TABLE` 来替代 Ent。完成后必须运行：
+   ```bash
+   make migrate_hash
+   make data
+   git diff --exit-code -- internal/data/model/ent internal/data/model/migrate
+   ```
+   并补 fresh、upgrade、失败数据 fail-closed 与数据库负向测试。Atlas OSS
+   schema inspect 不会覆盖 function / trigger，因此零结构漂移不能替代这些
+   PostgreSQL 行为测试。
+
 4.  **只补齐当前开发库已有迁移时的做法**:
     如果问题已经明确定位为“代码和迁移文件都已存在，但当前开发库还没 apply 到最新版本”，不要重新生成 migration，也不要手动改库；直接在 `server/` 目录执行：
     ```bash
@@ -42,7 +62,9 @@
 
 ## 🔴 严格禁止的操作 (WHAT NOT TO DO)
 
-*   ❌ **绝对不要** 手动创建类似 `2024..._migrate.sql` 的文件。这会破坏 checksum 哈希校验 (`atlas.sum`)。
+*   ❌ **绝对不要** 用编辑器自行命名并创建 migration；普通结构迁移使用
+    `make data`，上述 data / trigger 例外使用 `atlas migrate new` 并重新计算
+    checksum。
 *   ❌ **绝对不要** 试图通过 `INSERT INTO` 或 `ALTER TABLE` 直接“修复”数据库结构而不走迁移流程。Atlas 会检测到结构漂移 (drift) 并报错。
 *   ❌ **绝对不要** 随意删除迁移文件，除非你完全理解后果（这会破坏迁移历史图谱）。
 

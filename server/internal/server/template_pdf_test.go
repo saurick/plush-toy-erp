@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -13,12 +14,16 @@ import (
 	"time"
 
 	"server/internal/biz"
+
+	"github.com/go-kratos/kratos/v2/log"
+	"github.com/go-kratos/kratos/v2/middleware"
+	httpx "github.com/go-kratos/kratos/v2/transport/http"
 )
 
 func TestParseRenderTemplatePDFRequest(t *testing.T) {
 	t.Parallel()
 
-	body := `{"title":"采购合同","file_name":"purchase.pdf","template_key":"material-purchase-contract","customer_key":" yoyoosun ","html":"<html><body>ok</body></html>","base_url":"http://localhost:5173/erp/print-workspace/material-purchase-contract"}`
+	body := `{"title":"采购合同","file_name":"purchase.pdf","template_key":"material-purchase-contract","html":"<html><body>ok</body></html>"}`
 	req := httptest.NewRequest("POST", "/templates/render-pdf", bytes.NewBufferString(body))
 
 	parsed, err := parseRenderTemplatePDFRequest(req)
@@ -26,47 +31,42 @@ func TestParseRenderTemplatePDFRequest(t *testing.T) {
 		t.Fatalf("parseRenderTemplatePDFRequest() error = %v", err)
 	}
 
-	if parsed.BaseURL != "http://localhost:5173/erp/print-workspace/material-purchase-contract/" {
-		t.Fatalf("BaseURL = %q", parsed.BaseURL)
-	}
 	if parsed.TemplateKey != "material-purchase-contract" {
 		t.Fatalf("TemplateKey = %q", parsed.TemplateKey)
 	}
-	if parsed.CustomerKey != "yoyoosun" {
-		t.Fatalf("CustomerKey = %q", parsed.CustomerKey)
+}
+
+func TestParseRenderTemplatePDFRequestRejectsTransportCustomerAndBaseURL(t *testing.T) {
+	t.Parallel()
+
+	for _, body := range []string{
+		`{"html":"<html><body>ok</body></html>","customer_key":"yoyoosun"}`,
+		`{"html":"<html><body>ok</body></html>","base_url":"https://example.invalid"}`,
+	} {
+		req := httptest.NewRequest("POST", "/templates/render-pdf", bytes.NewBufferString(body))
+		if _, err := parseRenderTemplatePDFRequest(req); err == nil {
+			t.Fatalf("expected removed transport field to be rejected: %s", body)
+		}
 	}
 }
 
-func TestParseRenderTemplatePDFRequestInvalidBaseURL(t *testing.T) {
+func TestReadTemplatePDFRequestBodyRejectsTooLargePayload(t *testing.T) {
 	t.Parallel()
 
-	body := `{"html":"<html><body>ok</body></html>","base_url":"file:///tmp/test.html"}`
-	req := httptest.NewRequest("POST", "/templates/render-pdf", bytes.NewBufferString(body))
-
-	_, err := parseRenderTemplatePDFRequest(req)
-	if err == nil || err.Error() != "base_url 非法" && err.Error() != "base_url 仅支持 http/https" {
-		t.Fatalf("expected base_url error, got %v", err)
-	}
-}
-
-func TestParseRenderTemplatePDFRequestTooLargePayload(t *testing.T) {
-	t.Parallel()
-
-	tooLargeBody := strings.Repeat("a", maxTemplatePDFRequestBody+8)
-	req := httptest.NewRequest("POST", "/templates/render-pdf", bytes.NewBufferString(tooLargeBody))
-
-	_, err := parseRenderTemplatePDFRequest(req)
+	_, err := readTemplatePDFRequestBody(strings.NewReader(strings.Repeat("a", 33)), 32)
 	if !errors.Is(err, errTemplatePDFPayloadTooLarge) {
 		t.Fatalf("expected errTemplatePDFPayloadTooLarge, got %v", err)
 	}
 }
 
-func TestInjectTemplatePDFBaseTag(t *testing.T) {
+func TestParseRenderTemplatePDFRequestAllowsLargeImageSnapshotPayload(t *testing.T) {
 	t.Parallel()
 
-	got := injectTemplatePDFBaseTag("<html><head><title>x</title></head><body>ok</body></html>", "http://localhost:5173/")
-	if !strings.Contains(got, `<base href="http://localhost:5173/">`) {
-		t.Fatalf("injectTemplatePDFBaseTag() missing base tag: %s", got)
+	body := `{"html":"<html><body>` + strings.Repeat("a", 4<<20) + `</body></html>"}`
+	req := httptest.NewRequest("POST", "/templates/render-pdf", bytes.NewBufferString(body))
+
+	if _, err := parseRenderTemplatePDFRequest(req); err != nil {
+		t.Fatalf("payload above the former 3 MiB limit should pass: %v", err)
 	}
 }
 
@@ -91,14 +91,15 @@ func TestBuildRenderPDFFilename(t *testing.T) {
 
 type stubTemplatePDFModuleGuard struct {
 	customerKey string
-	moduleKeys  []string
+	session     *biz.EffectiveSession
 	err         error
+	strictCalls int
 }
 
-func (g *stubTemplatePDFModuleGuard) EnsureModuleKeysEnabled(_ context.Context, customerKey string, moduleKeys ...string) error {
+func (g *stubTemplatePDFModuleGuard) GetEffectiveSessionRequiringActiveRevision(_ context.Context, customerKey string, _ *biz.AdminUser) (*biz.EffectiveSession, error) {
 	g.customerKey = customerKey
-	g.moduleKeys = append([]string(nil), moduleKeys...)
-	return g.err
+	g.strictCalls++
+	return g.session, g.err
 }
 
 func TestTemplatePDFReferencedModuleKeys(t *testing.T) {
@@ -125,70 +126,101 @@ func TestTemplatePDFReferencedModuleKeys(t *testing.T) {
 	}
 }
 
-func TestNormalizeTemplatePDFCustomerKeyDefaultsOnlyWhenMissing(t *testing.T) {
-	t.Parallel()
-
-	if got := normalizeTemplatePDFCustomerKey(" yoyoosun "); got != "yoyoosun" {
-		t.Fatalf("customer key = %q", got)
-	}
-	if got := normalizeTemplatePDFCustomerKey(""); got != biz.DefaultCustomerKey {
-		t.Fatalf("empty customer key should default, got %q", got)
+func TestRuntimeTemplatePDFCustomerKeyUsesDeploymentConfiguration(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", " yoyoosun ")
+	if got := runtimeTemplatePDFCustomerKey(); got != "yoyoosun" {
+		t.Fatalf("runtime customer key = %q", got)
 	}
 }
 
 func TestEnforceTemplatePDFModulesEnabled(t *testing.T) {
 	t.Parallel()
 
-	guard := &stubTemplatePDFModuleGuard{}
-	if err := enforceTemplatePDFModulesEnabled(
-		context.Background(),
-		guard,
-		"",
-		"material-purchase-contract",
-	); err != nil {
+	session := &biz.EffectiveSession{Modules: map[string]string{"purchase_orders": "enabled"}}
+	if err := enforceTemplatePDFModulesEnabled(session, "material-purchase-contract"); err != nil {
 		t.Fatalf("enforceTemplatePDFModulesEnabled() error = %v", err)
 	}
-	if guard.customerKey != biz.DefaultCustomerKey {
-		t.Fatalf("customerKey = %q, want default", guard.customerKey)
-	}
-	if strings.Join(guard.moduleKeys, ",") != "purchase_orders" {
-		t.Fatalf("moduleKeys = %#v", guard.moduleKeys)
+
+	disabledSession := &biz.EffectiveSession{Modules: map[string]string{"outsourcing_orders": "disabled"}}
+	if err := enforceTemplatePDFModulesEnabled(disabledSession, "processing-contract"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("expected ErrForbidden for disabled module, got %v", err)
 	}
 
-	disabledGuard := &stubTemplatePDFModuleGuard{err: biz.ErrBadParam}
-	if err := enforceTemplatePDFModulesEnabled(
-		context.Background(),
-		disabledGuard,
-		"yoyoosun",
-		"processing-contract",
-	); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("expected ErrBadParam for disabled module, got %v", err)
-	}
-	if strings.Join(disabledGuard.moduleKeys, ",") != "outsourcing_orders" {
-		t.Fatalf("moduleKeys = %#v", disabledGuard.moduleKeys)
+	if err := enforceTemplatePDFModulesEnabled(nil, "material-purchase-contract"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("nil session must fail closed, got %v", err)
 	}
 
-	noGuardErr := enforceTemplatePDFModulesEnabled(
-		context.Background(),
-		nil,
-		"yoyoosun",
-		"material-purchase-contract",
-	)
-	if noGuardErr != nil {
-		t.Fatalf("nil guard should not block legacy tests, got %v", noGuardErr)
-	}
-
-	unknownGuard := &stubTemplatePDFModuleGuard{err: biz.ErrBadParam}
-	if err := enforceTemplatePDFModulesEnabled(
-		context.Background(),
-		unknownGuard,
-		"yoyoosun",
-		"unknown-template",
-	); !errors.Is(err, biz.ErrBadParam) {
+	if err := enforceTemplatePDFModulesEnabled(session, "unknown-template"); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("unknown template should be rejected, got %v", err)
 	}
-	if len(unknownGuard.moduleKeys) != 0 {
-		t.Fatalf("unknown template should fail before guard, got %#v", unknownGuard.moduleKeys)
+}
+
+func TestAuthorizeTemplatePDFRequestRequiresRealtimePermissionEffectiveActionAndModule(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
+	admin := &biz.AdminUser{Permissions: []string{biz.PermissionERPPrintTemplateRead}}
+
+	allowed := &stubTemplatePDFModuleGuard{session: &biz.EffectiveSession{
+		Actions: []string{biz.PermissionERPPrintTemplateRead},
+		Modules: map[string]string{"purchase_orders": "enabled"},
+	}}
+	if err := authorizeTemplatePDFRequest(context.Background(), allowed, admin, biz.DefaultCustomerKey, "material-purchase-contract"); err != nil {
+		t.Fatalf("authorizeTemplatePDFRequest() error = %v", err)
+	}
+	if allowed.strictCalls != 1 {
+		t.Fatalf("strict entitlement calls = %d, want 1", allowed.strictCalls)
+	}
+
+	missingRBAC := &biz.AdminUser{}
+	if err := authorizeTemplatePDFRequest(context.Background(), allowed, missingRBAC, biz.DefaultCustomerKey, "material-purchase-contract"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("missing RBAC permission should fail closed, got %v", err)
+	}
+
+	missingActiveRevision := &stubTemplatePDFModuleGuard{}
+	if err := authorizeTemplatePDFRequest(context.Background(), missingActiveRevision, admin, biz.DefaultCustomerKey, "material-purchase-contract"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("demo without active revision entitlement should fail closed, got %v", err)
+	}
+
+	disabledModule := &stubTemplatePDFModuleGuard{session: &biz.EffectiveSession{
+		Actions: []string{biz.PermissionERPPrintTemplateRead},
+		Modules: map[string]string{"purchase_orders": "disabled"},
+	}}
+	if err := authorizeTemplatePDFRequest(context.Background(), disabledModule, admin, biz.DefaultCustomerKey, "material-purchase-contract"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("disabled module should fail closed, got %v", err)
+	}
+}
+
+func TestRegisterTemplatePDFHandlerRunsKratosAuthenticationMiddleware(t *testing.T) {
+	t.Parallel()
+
+	middlewareCalls := 0
+	srv := httpx.NewServer(httpx.Middleware(func(next middleware.Handler) middleware.Handler {
+		return func(ctx context.Context, req any) (any, error) {
+			middlewareCalls++
+			ctx = biz.WithCurrentAdmin(ctx, &biz.AdminUser{ID: 1})
+			return next(ctx, req)
+		}
+	}))
+	registerTemplatePDFHandler(
+		srv,
+		log.NewStdLogger(io.Discard),
+		nil,
+		nil,
+		&stubTemplatePDFModuleGuard{},
+	)
+
+	req := httptest.NewRequest(
+		"POST",
+		"/templates/render-pdf",
+		bytes.NewBufferString(`{"template_key":"material-purchase-contract","html":"<html><body>ok</body></html>"}`),
+	)
+	res := httptest.NewRecorder()
+	srv.ServeHTTP(res, req)
+
+	if middlewareCalls != 1 {
+		t.Fatalf("Kratos authentication middleware calls = %d, want 1", middlewareCalls)
+	}
+	if res.Code != 403 {
+		t.Fatalf("session-validated admin without print permission status = %d, want 403", res.Code)
 	}
 }
 
@@ -203,12 +235,30 @@ func TestResolveTemplatePDFRenderConcurrency(t *testing.T) {
 		{raw: "abc", want: defaultTemplatePDFRenderConcurrency},
 		{raw: "0", want: defaultTemplatePDFRenderConcurrency},
 		{raw: "4", want: 4},
+		{raw: "8", want: 8},
 	}
 
 	for _, tc := range testCases {
 		if got := resolveTemplatePDFRenderConcurrency(tc.raw); got != tc.want {
 			t.Fatalf("resolveTemplatePDFRenderConcurrency(%q) = %d, want %d", tc.raw, got, tc.want)
 		}
+	}
+}
+
+func TestTemplatePDFResourceBudgetContract(t *testing.T) {
+	t.Parallel()
+
+	if maxTemplatePDFRequestBody != 128<<20 {
+		t.Fatalf("request body budget = %d, want 128 MiB", maxTemplatePDFRequestBody)
+	}
+	if maxTemplateHTMLSize != 96<<20 {
+		t.Fatalf("HTML budget = %d, want 96 MiB", maxTemplateHTMLSize)
+	}
+	if maxTemplatePDFEmbeddedTotalBytes != 64<<20 {
+		t.Fatalf("embedded image budget = %d, want 64 MiB", maxTemplatePDFEmbeddedTotalBytes)
+	}
+	if defaultTemplatePDFRenderConcurrency != 4 {
+		t.Fatalf("default render concurrency = %d, want 4", defaultTemplatePDFRenderConcurrency)
 	}
 }
 
@@ -278,6 +328,16 @@ func TestTemplatePDFWarmupStateFailedAndDisabled(t *testing.T) {
 	}
 }
 
+type templatePDFDoneObservedContext struct {
+	context.Context
+	doneObserved chan struct{}
+}
+
+func (c *templatePDFDoneObservedContext) Done() <-chan struct{} {
+	close(c.doneObserved)
+	return c.Context.Done()
+}
+
 func TestTemplatePDFWarmupStateWaitIfRunning(t *testing.T) {
 	t.Parallel()
 
@@ -289,13 +349,23 @@ func TestTemplatePDFWarmupStateWaitIfRunning(t *testing.T) {
 	if !state.beginRun() {
 		t.Fatal("beginRun() = false, want true")
 	}
+	waitCtx, cancel := context.WithTimeout(context.Background(), time.Second)
+	defer cancel()
+	observedCtx := &templatePDFDoneObservedContext{
+		Context:      waitCtx,
+		doneObserved: make(chan struct{}),
+	}
 	done := make(chan error, 1)
 	go func() {
-		_, err := state.WaitIfRunning(context.Background())
+		_, err := state.WaitIfRunning(observedCtx)
 		done <- err
 	}()
 
-	time.Sleep(10 * time.Millisecond)
+	select {
+	case <-observedCtx.doneObserved:
+	case <-waitCtx.Done():
+		t.Fatal("WaitIfRunning() did not start waiting")
+	}
 	state.finishRun(templatePDFWarmupReady, nil)
 
 	select {
@@ -461,20 +531,8 @@ func TestTemplatePDFChromeManagerCloseClearsRuntime(t *testing.T) {
 		t.Fatalf("Acquire() error = %v", err)
 	}
 
-	done := make(chan struct{})
-	go func() {
-		manager.Close()
-		close(done)
-	}()
-
-	time.Sleep(10 * time.Millisecond)
 	close(runtime.exited)
-
-	select {
-	case <-done:
-	case <-time.After(time.Second):
-		t.Fatal("Close() did not finish")
-	}
+	manager.Close()
 
 	if manager.runtime != nil {
 		t.Fatal("Close() should clear cached runtime")
@@ -487,26 +545,39 @@ func TestTemplatePDFChromeManagerCloseClearsRuntime(t *testing.T) {
 	}
 }
 
-func TestAdminRequestVerifierRequiresValidatedAdminClaims(t *testing.T) {
+func TestAuthorizeTemplatePDFRequestDoesNotTrustClaimsWithoutCurrentAdmin(t *testing.T) {
 	t.Parallel()
 
-	verifier := newAdminRequestVerifier(nil)
-
-	req := httptest.NewRequest("POST", "/templates/render-pdf", nil)
-	req = req.WithContext(
-		biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+	ctx := biz.NewContextWithClaims(
+		context.Background(),
+		&biz.AuthClaims{
 			UserID:   1,
 			Username: "admin",
 			Role:     biz.RoleAdmin,
-		}),
+		},
 	)
-	if !verifier.IsAdminRequest(req) {
-		t.Fatal("expected admin claims request to pass verifier")
+	if _, ok := biz.GetCurrentAdminFromContext(ctx); ok {
+		t.Fatal("claims-only context must not contain a session-validated admin")
 	}
 
-	bearerReq := httptest.NewRequest("POST", "/templates/render-pdf", nil)
-	bearerReq.Header.Set("Authorization", "Bearer signed-but-not-session-validated")
-	if verifier.IsAdminRequest(bearerReq) {
-		t.Fatal("raw bearer token must not bypass server-side session validation")
+	guard := &stubTemplatePDFModuleGuard{session: &biz.EffectiveSession{
+		Actions: []string{biz.PermissionERPPrintTemplateRead},
+		Modules: map[string]string{"purchase_orders": "enabled"},
+	}}
+	if err := authorizeTemplatePDFRequest(ctx, guard, nil, biz.DefaultCustomerKey, "material-purchase-contract"); !errors.Is(err, biz.ErrForbidden) {
+		t.Fatalf("claims-only context must fail closed, got %v", err)
+	}
+}
+
+func TestTemplatePDFChromeArgsKeepSandboxEnabled(t *testing.T) {
+	t.Parallel()
+
+	args := templatePDFChromeArgs("/tmp/plush-pdf-profile", 9222)
+	joined := strings.Join(args, "\n")
+	if strings.Contains(joined, "--no-sandbox") || strings.Contains(joined, "--disable-setuid-sandbox") {
+		t.Fatalf("Chrome sandbox must stay enabled: %v", args)
+	}
+	if !strings.Contains(joined, "--remote-debugging-address=127.0.0.1") {
+		t.Fatalf("Chrome debugging must stay loopback-only: %v", args)
 	}
 }

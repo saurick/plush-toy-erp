@@ -13,7 +13,7 @@ func (d *jsonrpcDispatcher) handleBOMItem(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "add_bom_item", "addBOMItem":
+	case "add_bom_item":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
 			return id, res, nil
 		}
@@ -26,7 +26,7 @@ func (d *jsonrpcDispatcher) handleBOMItem(
 		}
 		item, err := d.inventoryUC.CreateBOMItem(ctx, in)
 		return id, bomItemResult(ctx, d, item, err), nil
-	case "update_bom_item", "updateBOMItem":
+	case "update_bom_item":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
 			return id, res, nil
 		}
@@ -39,7 +39,7 @@ func (d *jsonrpcDispatcher) handleBOMItem(
 		}
 		item, err := d.inventoryUC.UpdateBOMDraftItem(ctx, getInt(pm, "id", 0), in)
 		return id, bomItemResult(ctx, d, item, err), nil
-	case "delete_bom_item", "deleteBOMItem":
+	case "delete_bom_item":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
 			return id, res, nil
 		}

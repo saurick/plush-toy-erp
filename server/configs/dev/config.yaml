@@ -51,8 +51,3 @@ data:
     admin:
       username: "admin"
       password: "change-this-dev-admin-password"
-
-# notify:
-#   telegram:
-#     apiToken: "change-this-telegram-token"
-#     chatId: 0

@@ -78,6 +78,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeProcessInstance holds the string denoting the process_instance edge name in mutations.
 	EdgeProcessInstance = "process_instance"
+	// EdgeWorkflowTasks holds the string denoting the workflow_tasks edge name in mutations.
+	EdgeWorkflowTasks = "workflow_tasks"
 	// Table holds the table name of the processnodeinstance in the database.
 	Table = "process_node_instances"
 	// ProcessInstanceTable is the table that holds the process_instance relation/edge.
@@ -87,6 +89,13 @@ const (
 	ProcessInstanceInverseTable = "process_instances"
 	// ProcessInstanceColumn is the table column denoting the process_instance relation/edge.
 	ProcessInstanceColumn = "process_instance_id"
+	// WorkflowTasksTable is the table that holds the workflow_tasks relation/edge.
+	WorkflowTasksTable = "workflow_tasks"
+	// WorkflowTasksInverseTable is the table name for the WorkflowTask entity.
+	// It exists in this package in order to avoid circular dependency with the "workflowtask" package.
+	WorkflowTasksInverseTable = "workflow_tasks"
+	// WorkflowTasksColumn is the table column denoting the workflow_tasks relation/edge.
+	WorkflowTasksColumn = "process_node_instance_id"
 )
 
 // Columns holds all SQL columns for processnodeinstance fields.
@@ -346,10 +355,31 @@ func ByProcessInstanceField(field string, opts ...sql.OrderTermOption) OrderOpti
 		sqlgraph.OrderByNeighborTerms(s, newProcessInstanceStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByWorkflowTasksCount orders the results by workflow_tasks count.
+func ByWorkflowTasksCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newWorkflowTasksStep(), opts...)
+	}
+}
+
+// ByWorkflowTasks orders the results by workflow_tasks terms.
+func ByWorkflowTasks(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newWorkflowTasksStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newProcessInstanceStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(ProcessInstanceInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, ProcessInstanceTable, ProcessInstanceColumn),
+	)
+}
+func newWorkflowTasksStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(WorkflowTasksInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, WorkflowTasksTable, WorkflowTasksColumn),
 	)
 }

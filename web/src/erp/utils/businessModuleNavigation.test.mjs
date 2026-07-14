@@ -106,7 +106,8 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     'blockWorkflowTaskAction',
     'urgeWorkflowTask',
     "taskGroup: 'shipment_release'",
-    'workflow_page_scope',
+    "surface_key: 'workflow_business_module'",
+    "entry_path: moduleItem?.path || ''",
     'BusinessListToolbarActions',
     '当前页面只处理协同任务，暂不提供业务数据导出。',
     '当前操作只更新协同任务；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。',
@@ -128,6 +129,14 @@ test('workflow business modules: 三页不冒充事实写入', () => {
       workflowApiSource.includes(text),
       true,
       `workflow API client should expose backend explain contract: ${text}`
+    )
+  }
+
+  for (const text of ['workflow_page_action', 'workflow_page_scope']) {
+    assert.equal(
+      source.includes(text),
+      false,
+      `workflow V1 page should not submit retired payload field: ${text}`
     )
   }
 

@@ -140,6 +140,69 @@ WHERE r.role_key = $1`, biz.SalesRoleKey)
 	}
 }
 
+func TestSeedBuiltinRBACReconcilesSystemRoleAndBumpsVersionOnlyOnChange(t *testing.T) {
+	ctx := context.Background()
+	db := openRBACPermissionTestDB(t, "admin_rbac_reconcile_system_role")
+	defer func() {
+		if err := db.Close(); err != nil {
+			t.Fatalf("close sqlite failed: %v", err)
+		}
+	}()
+	createRBACPermissionTestSchema(t, ctx, db)
+
+	if err := SeedBuiltinRBACIfNeeded(ctx, db, nil); err != nil {
+		t.Fatalf("first SeedBuiltinRBACIfNeeded() error = %v", err)
+	}
+	if _, err := db.ExecContext(ctx, `
+DELETE FROM role_permissions
+WHERE role_id = (SELECT id FROM roles WHERE role_key = $1)
+  AND permission_id = (SELECT id FROM permissions WHERE permission_key = $2)`,
+		biz.AdminRoleKey,
+		biz.PermissionSystemAuditRead,
+	); err != nil {
+		t.Fatalf("remove system role permission failed: %v", err)
+	}
+	if _, err := db.ExecContext(ctx, "UPDATE roles SET version = 5 WHERE role_key = $1", biz.AdminRoleKey); err != nil {
+		t.Fatalf("set system role version failed: %v", err)
+	}
+
+	if err := SeedBuiltinRBACIfNeeded(ctx, db, nil); err != nil {
+		t.Fatalf("second SeedBuiltinRBACIfNeeded() error = %v", err)
+	}
+	var version int
+	if err := db.QueryRowContext(ctx, "SELECT version FROM roles WHERE role_key = $1", biz.AdminRoleKey).Scan(&version); err != nil {
+		t.Fatalf("load system role version failed: %v", err)
+	}
+	if version != 6 {
+		t.Fatalf("reconciled system role version = %d, want 6", version)
+	}
+	var restored int
+	if err := db.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM role_permissions rp
+JOIN roles r ON r.id = rp.role_id
+JOIN permissions p ON p.id = rp.permission_id
+WHERE r.role_key = $1 AND p.permission_key = $2`,
+		biz.AdminRoleKey,
+		biz.PermissionSystemAuditRead,
+	).Scan(&restored); err != nil {
+		t.Fatalf("count restored system permission failed: %v", err)
+	}
+	if restored != 1 {
+		t.Fatalf("restored system permission count = %d, want 1", restored)
+	}
+
+	if err := SeedBuiltinRBACIfNeeded(ctx, db, nil); err != nil {
+		t.Fatalf("third SeedBuiltinRBACIfNeeded() error = %v", err)
+	}
+	if err := db.QueryRowContext(ctx, "SELECT version FROM roles WHERE role_key = $1", biz.AdminRoleKey).Scan(&version); err != nil {
+		t.Fatalf("reload system role version failed: %v", err)
+	}
+	if version != 6 {
+		t.Fatalf("unchanged system role version = %d, want 6", version)
+	}
+}
+
 func openRBACPermissionTestDB(t *testing.T, name string) *sql.DB {
 	t.Helper()
 	db, err := sql.Open("sqlite3", "file:"+name+"?mode=memory&cache=shared")
@@ -170,8 +233,10 @@ func createRBACPermissionTestSchema(t *testing.T, ctx context.Context, db *sql.D
 			name text not null default '',
 			description text not null default '',
 			builtin boolean not null default false,
+			role_type text not null default 'custom',
 			disabled boolean not null default false,
 			sort_order integer not null default 0,
+			version integer not null default 1,
 			created_at timestamp null,
 			updated_at timestamp null
 		)`,

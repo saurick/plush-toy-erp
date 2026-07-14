@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	stdhttp "net/http"
-	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -25,6 +24,8 @@ import (
 	"server/internal/errcode"
 
 	"github.com/chromedp/cdproto/emulation"
+	"github.com/chromedp/cdproto/fetch"
+	"github.com/chromedp/cdproto/network"
 	"github.com/chromedp/cdproto/page"
 	"github.com/chromedp/chromedp"
 	"github.com/go-kratos/kratos/v2/log"
@@ -36,13 +37,11 @@ import (
 )
 
 const (
-	maxTemplatePDFRequestBody           = 3 << 20 // 3MB
-	maxTemplateHTMLSize                 = 2 << 20 // 2MB
-	defaultTemplatePDFRenderConcurrency = 2
+	maxTemplatePDFRequestBody           = 128 << 20 // 128 MiB
+	maxTemplateHTMLSize                 = 96 << 20  // 96 MiB
+	defaultTemplatePDFRenderConcurrency = 4
 	templatePDFRenderTimeout            = 30 * time.Second
 	templatePDFQueueWaitTimeout         = 15 * time.Second
-	templatePDFAssetWaitMax             = 350 * time.Millisecond
-	templatePDFAssetPollStep            = 25 * time.Millisecond
 	templatePDFWarmupTimeout            = 15 * time.Second
 	templatePDFWarmupWaitTimeout        = 15 * time.Second
 	templatePDFViewportWidth            = 1440
@@ -57,14 +56,6 @@ var (
 var sharedTemplatePDFChromeManager = newTemplatePDFChromeManager(launchTemplatePDFChrome)
 var sharedTemplatePDFRenderGate = newTemplatePDFRenderGate(resolveTemplatePDFRenderConcurrency(os.Getenv("ERP_PDF_RENDER_CONCURRENCY")))
 var sharedTemplatePDFWarmupState = newTemplatePDFWarmupState()
-
-const templatePDFReadyCheckJS = `(function () {
-  var imagesReady = Array.from(document.images || []).every(function (img) {
-    return !!img.complete;
-  });
-  var fontsReady = !document.fonts || document.fonts.status === 'loaded';
-  return document.readyState === 'complete' && imagesReady && fontsReady;
-})()`
 
 const templatePDFWarmupHTML = `<!doctype html>
 <html lang="zh-CN">
@@ -109,16 +100,12 @@ type renderTemplatePDFRequest struct {
 	Title       string `json:"title"`
 	FileName    string `json:"file_name"`
 	TemplateKey string `json:"template_key"`
-	CustomerKey string `json:"customer_key"`
 	HTML        string `json:"html"`
-	BaseURL     string `json:"base_url"`
 }
 
-type templatePDFModuleGuard interface {
-	EnsureModuleKeysEnabled(ctx context.Context, customerKey string, moduleKeys ...string) error
+type templatePDFAccessGuard interface {
+	GetEffectiveSessionRequiringActiveRevision(ctx context.Context, customerKey string, admin *biz.AdminUser) (*biz.EffectiveSession, error)
 }
-
-type adminRequestVerifier struct{}
 
 type templatePDFRenderGate struct {
 	slots chan struct{}
@@ -315,19 +302,6 @@ func (s *templatePDFWarmupState) WaitIfRunning(ctx context.Context) (time.Durati
 	}
 }
 
-func newAdminRequestVerifier(_ *conf.Data) *adminRequestVerifier {
-	return &adminRequestVerifier{}
-}
-
-func (v *adminRequestVerifier) IsAdminRequest(r *stdhttp.Request) bool {
-	if r == nil {
-		return false
-	}
-
-	claims, ok := biz.GetClaimsFromContext(r.Context())
-	return ok && claims != nil && claims.IsAdmin()
-}
-
 func newTemplatePDFRenderGate(limit int) *templatePDFRenderGate {
 	if limit < 1 {
 		limit = defaultTemplatePDFRenderConcurrency
@@ -396,7 +370,7 @@ func warmupTemplatePDFResources(ctx context.Context) error {
 	}
 	defer releaseRenderSlot()
 
-	_, err = renderTemplateHTMLToPDF(ctx, templatePDFWarmupHTML, "", 1)
+	_, err = renderTemplateHTMLToPDF(ctx, templatePDFWarmupHTML, 1)
 	return err
 }
 
@@ -404,19 +378,19 @@ func registerTemplatePDFHandler(
 	srv *httpx.Server,
 	logger log.Logger,
 	tp *sdktrace.TracerProvider,
-	dc *conf.Data,
-	moduleGuard templatePDFModuleGuard,
+	_ *conf.Data,
+	accessGuard templatePDFAccessGuard,
 ) {
 	helper := log.NewHelper(log.With(logger, "logger.name", "server.template_pdf"))
-	adminVerifier := newAdminRequestVerifier(dc)
 
-	srv.Handle("/templates/render-pdf", newObservedHTTPHandler(logger, tp, "server.http.template_pdf.render", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
+	handler := newObservedHTTPHandler(logger, tp, "server.http.template_pdf.render", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		l := helper.WithContext(ctx)
 		requestID := requestIDFromRequest(r)
 		traceID := traceIDFromContext(ctx)
 		span := oteltrace.SpanFromContext(ctx)
 
-		if !adminVerifier.IsAdminRequest(r) {
+		admin, adminOK := biz.GetCurrentAdminFromContext(ctx)
+		if !adminOK || admin == nil || !admin.IsActive() {
 			span.SetStatus(codes.Error, "admin required")
 			l.Warnw(
 				"msg", "template pdf render denied",
@@ -475,22 +449,23 @@ func registerTemplatePDFHandler(
 			return
 		}
 
-		if err := enforceTemplatePDFModulesEnabled(ctx, moduleGuard, req.CustomerKey, req.TemplateKey); err != nil {
+		customerKey := runtimeTemplatePDFCustomerKey()
+		if err := authorizeTemplatePDFRequest(ctx, accessGuard, admin, customerKey, req.TemplateKey); err != nil {
 			span.RecordError(err)
-			span.SetStatus(codes.Error, "template module disabled")
+			span.SetStatus(codes.Error, "template pdf permission denied")
 			l.Warnw(
-				"msg", "template pdf render module disabled",
+				"msg", "template pdf render denied",
 				"path", r.URL.Path,
 				"method", r.Method,
 				"request_id", requestID,
 				"trace_id", traceID,
 				"template_key", req.TemplateKey,
-				"customer_key", normalizeTemplatePDFCustomerKey(req.CustomerKey),
+				"customer_key", customerKey,
 				"err", err.Error(),
 			)
-			writeJSON(w, stdhttp.StatusBadRequest, map[string]any{
-				"code":    errcode.InvalidParam.Code,
-				"message": "当前客户配置未启用该打印模板所属模块，不能生成 PDF",
+			writeJSON(w, stdhttp.StatusForbidden, map[string]any{
+				"code":    errcode.PermissionDenied.Code,
+				"message": errcode.PermissionDenied.Message,
 			})
 			return
 		}
@@ -548,7 +523,6 @@ func registerTemplatePDFHandler(
 		pdfBytes, err := renderTemplateHTMLToPDF(
 			renderCtx,
 			req.HTML,
-			req.BaseURL,
 			resolveTemplatePDFScale(req.TemplateKey),
 		)
 		if err != nil {
@@ -592,7 +566,22 @@ func registerTemplatePDFHandler(
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(stdhttp.StatusOK)
 		_, _ = w.Write(pdfBytes)
-	}))
+	})
+
+	// Custom net/http handlers registered through Server.Handle do not execute Kratos
+	// service middleware. Route through Context.Middleware so PDF authentication uses
+	// the same server-side session and RBAC chain as JSON-RPC.
+	router := srv.Route("")
+	router.POST("/templates/render-pdf", func(httpCtx httpx.Context) error {
+		httpx.SetOperation(httpCtx, "server.http.template_pdf.render")
+		chain := httpCtx.Middleware(func(ctx context.Context, _ any) (any, error) {
+			req := httpCtx.Request().WithContext(ctx)
+			handler.ServeHTTP(httpCtx.Response(), req)
+			return nil, nil
+		})
+		_, err := chain(httpCtx, nil)
+		return err
+	})
 }
 
 func parseRenderTemplatePDFRequest(r *stdhttp.Request) (*renderTemplatePDFRequest, error) {
@@ -600,19 +589,18 @@ func parseRenderTemplatePDFRequest(r *stdhttp.Request) (*renderTemplatePDFReques
 		_ = r.Body.Close()
 	}()
 
-	body, err := io.ReadAll(io.LimitReader(r.Body, maxTemplatePDFRequestBody+1))
+	body, err := readTemplatePDFRequestBody(r.Body, maxTemplatePDFRequestBody)
 	if err != nil {
-		return nil, errors.New("读取请求体失败")
-	}
-	if len(body) == 0 {
-		return nil, errors.New("请求体为空")
-	}
-	if len(body) > maxTemplatePDFRequestBody {
-		return nil, errTemplatePDFPayloadTooLarge
+		return nil, err
 	}
 
 	var req renderTemplatePDFRequest
-	if err := json.Unmarshal(body, &req); err != nil {
+	decoder := json.NewDecoder(bytes.NewReader(body))
+	decoder.DisallowUnknownFields()
+	if err := decoder.Decode(&req); err != nil {
+		return nil, errors.New("请求 JSON 非法")
+	}
+	if err := decoder.Decode(&struct{}{}); !errors.Is(err, io.EOF) {
 		return nil, errors.New("请求 JSON 非法")
 	}
 
@@ -624,21 +612,32 @@ func parseRenderTemplatePDFRequest(r *stdhttp.Request) (*renderTemplatePDFReques
 		return nil, errors.New("html 内容过大，请精简模板后重试")
 	}
 
-	baseURL, err := normalizeTemplatePDFBaseURL(req.BaseURL)
-	if err != nil {
+	if err := validateTemplatePDFHTML(req.HTML); err != nil {
 		return nil, err
 	}
-	req.BaseURL = baseURL
 	req.Title = strings.TrimSpace(req.Title)
 	req.FileName = strings.TrimSpace(req.FileName)
 	req.TemplateKey = strings.TrimSpace(req.TemplateKey)
-	req.CustomerKey = normalizeTemplatePDFCustomerKey(req.CustomerKey)
 
 	return &req, nil
 }
 
-func normalizeTemplatePDFCustomerKey(raw string) string {
-	value := biz.NormalizeCustomerKey(raw)
+func readTemplatePDFRequestBody(reader io.Reader, maxBytes int64) ([]byte, error) {
+	body, err := io.ReadAll(io.LimitReader(reader, maxBytes+1))
+	if err != nil {
+		return nil, errors.New("读取请求体失败")
+	}
+	if len(body) == 0 {
+		return nil, errors.New("请求体为空")
+	}
+	if int64(len(body)) > maxBytes {
+		return nil, errTemplatePDFPayloadTooLarge
+	}
+	return body, nil
+}
+
+func runtimeTemplatePDFCustomerKey() string {
+	value := biz.NormalizeCustomerKey(os.Getenv("ERP_CUSTOMER_KEY"))
 	if value == "" {
 		return biz.DefaultCustomerKey
 	}
@@ -662,57 +661,47 @@ func templatePDFReferencedModuleKeys(templateKey string) ([]string, bool) {
 	}
 }
 
-func enforceTemplatePDFModulesEnabled(
-	ctx context.Context,
-	guard templatePDFModuleGuard,
-	customerKey string,
-	templateKey string,
-) error {
+func enforceTemplatePDFModulesEnabled(session *biz.EffectiveSession, templateKey string) error {
 	moduleKeys, ok := templatePDFReferencedModuleKeys(templateKey)
 	if !ok {
 		return fmt.Errorf("%w: 未登记的 PDF 模板", biz.ErrBadParam)
 	}
-	if len(moduleKeys) == 0 || guard == nil {
-		return nil
+	if len(moduleKeys) == 0 || session == nil {
+		return biz.ErrForbidden
 	}
-	return guard.EnsureModuleKeysEnabled(
-		ctx,
-		normalizeTemplatePDFCustomerKey(customerKey),
-		moduleKeys...,
-	)
+	for _, moduleKey := range moduleKeys {
+		if strings.TrimSpace(session.Modules[moduleKey]) != "enabled" {
+			return biz.ErrForbidden
+		}
+	}
+	return nil
 }
 
-func normalizeTemplatePDFBaseURL(raw string) (string, error) {
-	value := strings.TrimSpace(raw)
-	if value == "" {
-		return "", nil
+func authorizeTemplatePDFRequest(
+	ctx context.Context,
+	guard templatePDFAccessGuard,
+	admin *biz.AdminUser,
+	customerKey string,
+	templateKey string,
+) error {
+	if guard == nil || !biz.AdminHasPermission(admin, biz.PermissionERPPrintTemplateRead) {
+		return biz.ErrForbidden
 	}
-
-	parsed, err := url.Parse(value)
-	if err != nil || parsed.Scheme == "" || parsed.Host == "" {
-		return "", errors.New("base_url 非法")
+	session, err := guard.GetEffectiveSessionRequiringActiveRevision(ctx, customerKey, admin)
+	if err != nil {
+		return err
 	}
-	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", errors.New("base_url 仅支持 http/https")
+	if session == nil || !biz.PermissionSetHasAny(biz.PermissionKeySet(session.Actions), biz.PermissionERPPrintTemplateRead) {
+		return biz.ErrForbidden
 	}
-
-	parsed.RawQuery = ""
-	parsed.Fragment = ""
-	if parsed.Path == "" {
-		parsed.Path = "/"
-	}
-	if !strings.HasSuffix(parsed.Path, "/") {
-		parsed.Path += "/"
-	}
-	return parsed.String(), nil
+	return enforceTemplatePDFModulesEnabled(session, templateKey)
 }
 
 func resolveTemplatePDFScale(templateKey string) float64 {
 	return 1
 }
 
-func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, baseURL string, printScale float64) ([]byte, error) {
-	htmlDoc = injectTemplatePDFBaseTag(htmlDoc, baseURL)
+func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, printScale float64) ([]byte, error) {
 	dataURL := "data:text/html;base64," + base64.StdEncoding.EncodeToString([]byte(htmlDoc))
 
 	chromeExecPath, err := resolveTemplatePDFChromeExecPath(os.Getenv("ERP_PDF_CHROME_PATH"), exec.LookPath)
@@ -728,8 +717,9 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, baseURL string
 	allocCtx, cancelAllocator := chromedp.NewRemoteAllocator(ctx, wsURL)
 	defer cancelAllocator()
 
-	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx)
+	browserCtx, cancelBrowser := chromedp.NewContext(allocCtx, chromedp.WithNewBrowserContext())
 	defer cancelBrowser()
+	installTemplatePDFNetworkGuard(browserCtx)
 
 	if printScale <= 0 {
 		printScale = 1
@@ -739,6 +729,18 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, baseURL string
 	if err := chromedp.Run(
 		browserCtx,
 		chromedp.ActionFunc(func(ctx context.Context) error {
+			if err := network.Enable().Do(ctx); err != nil {
+				return err
+			}
+			if err := network.SetCacheDisabled(true).Do(ctx); err != nil {
+				return err
+			}
+			if err := fetch.Enable().Do(ctx); err != nil {
+				return err
+			}
+			return emulation.SetScriptExecutionDisabled(true).Do(ctx)
+		}),
+		chromedp.ActionFunc(func(ctx context.Context) error {
 			return emulation.SetDeviceMetricsOverride(
 				templatePDFViewportWidth,
 				templatePDFViewportHeight,
@@ -747,12 +749,8 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, baseURL string
 			).Do(ctx)
 		}),
 		chromedp.Navigate(dataURL),
-		chromedp.WaitReady("body", chromedp.ByQuery),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			return emulation.SetEmulatedMedia().WithMedia("print").Do(ctx)
-		}),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			return waitTemplatePDFAssetsReady(ctx)
 		}),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			buf, _, err := page.PrintToPDF().
@@ -780,6 +778,28 @@ func renderTemplateHTMLToPDF(ctx context.Context, htmlDoc string, baseURL string
 		return nil, errors.New("生成结果为空")
 	}
 	return pdfBytes, nil
+}
+
+func installTemplatePDFNetworkGuard(ctx context.Context) {
+	chromedp.ListenTarget(ctx, func(event any) {
+		paused, ok := event.(*fetch.EventRequestPaused)
+		if !ok || paused == nil || paused.Request == nil {
+			return
+		}
+		go func() {
+			_ = chromedp.Run(ctx, chromedp.ActionFunc(func(actionCtx context.Context) error {
+				if templatePDFNetworkURLAllowed(paused.Request.URL) {
+					return fetch.ContinueRequest(paused.RequestID).Do(actionCtx)
+				}
+				return fetch.FailRequest(paused.RequestID, network.ErrorReasonBlockedByClient).Do(actionCtx)
+			}))
+		}()
+	})
+}
+
+func templatePDFNetworkURLAllowed(rawURL string) bool {
+	value := strings.ToLower(strings.TrimSpace(rawURL))
+	return value == "about:blank" || strings.HasPrefix(value, "data:")
 }
 
 func newTemplatePDFChromeManager(launch templatePDFChromeLauncher) *templatePDFChromeManager {
@@ -842,18 +862,7 @@ func launchTemplatePDFChrome(ctx context.Context, chromeExecPath string) (*templ
 		return nil, "", fmt.Errorf("创建 Chrome 临时目录失败: %w", err)
 	}
 
-	args := []string{
-		"--headless",
-		"--disable-gpu",
-		"--hide-scrollbars",
-		"--mute-audio",
-		"--disable-dev-shm-usage",
-		"--no-sandbox",
-		"--remote-debugging-address=127.0.0.1",
-		fmt.Sprintf("--remote-debugging-port=%d", debugPort),
-		fmt.Sprintf("--user-data-dir=%s", userDataDir),
-		"about:blank",
-	}
+	args := templatePDFChromeArgs(userDataDir, debugPort)
 
 	cmd := exec.Command(chromeExecPath, args...)
 	cmd.Stdout = io.Discard
@@ -881,6 +890,27 @@ func launchTemplatePDFChrome(ctx context.Context, chromeExecPath string) (*templ
 		return nil, "", err
 	}
 	return runtime, wsURL, nil
+}
+
+func templatePDFChromeArgs(userDataDir string, debugPort int) []string {
+	return []string{
+		"--headless",
+		"--disable-gpu",
+		"--hide-scrollbars",
+		"--mute-audio",
+		"--disable-dev-shm-usage",
+		"--disable-background-networking",
+		"--disable-component-update",
+		"--disable-default-apps",
+		"--disable-extensions",
+		"--disable-sync",
+		"--metrics-recording-only",
+		"--no-first-run",
+		"--remote-debugging-address=127.0.0.1",
+		fmt.Sprintf("--remote-debugging-port=%d", debugPort),
+		fmt.Sprintf("--user-data-dir=%s", userDataDir),
+		"about:blank",
+	}
 }
 
 func (r *templatePDFChromeRuntime) Close() {
@@ -1012,61 +1042,6 @@ func fetchTemplatePDFChromeWebSocketURL(client *stdhttp.Client, endpoint string)
 	return wsURL, nil
 }
 
-func waitTemplatePDFAssetsReady(ctx context.Context) error {
-	return waitTemplatePDFCondition(
-		ctx,
-		templatePDFAssetWaitMax,
-		templatePDFAssetPollStep,
-		func(checkCtx context.Context) (bool, error) {
-			var ready bool
-			if err := chromedp.Evaluate(templatePDFReadyCheckJS, &ready).Do(checkCtx); err != nil {
-				return false, err
-			}
-			return ready, nil
-		},
-	)
-}
-
-func waitTemplatePDFCondition(
-	ctx context.Context,
-	maxWait time.Duration,
-	pollStep time.Duration,
-	check func(context.Context) (bool, error),
-) error {
-	if check == nil || maxWait <= 0 {
-		return nil
-	}
-	if pollStep <= 0 {
-		pollStep = templatePDFAssetPollStep
-	}
-
-	deadline := time.Now().Add(maxWait)
-	for {
-		ready, err := check(ctx)
-		if err != nil {
-			return err
-		}
-		if ready {
-			return nil
-		}
-
-		remaining := time.Until(deadline)
-		if remaining <= 0 {
-			return nil
-		}
-		waitStep := pollStep
-		if remaining < waitStep {
-			waitStep = remaining
-		}
-
-		select {
-		case <-ctx.Done():
-			return ctx.Err()
-		case <-time.After(waitStep):
-		}
-	}
-}
-
 func resolveTemplatePDFChromeExecPath(rawEnv string, lookPath func(file string) (string, error)) (string, error) {
 	if lookPath == nil {
 		return "", errors.New("浏览器路径解析器未初始化")
@@ -1142,32 +1117,6 @@ func resolveTemplatePDFPlaywrightChromeExecPath() (string, error) {
 	return "", errors.New("未找到 Playwright Chromium")
 }
 
-func injectTemplatePDFBaseTag(htmlDoc string, baseURL string) string {
-	if strings.TrimSpace(baseURL) == "" {
-		return htmlDoc
-	}
-
-	lower := strings.ToLower(htmlDoc)
-	if strings.Contains(lower, "<base ") {
-		return htmlDoc
-	}
-
-	baseTag := `<base href="` + escapeHTMLAttr(baseURL) + `">`
-	if headIdx := strings.Index(lower, "<head"); headIdx >= 0 {
-		if end := strings.Index(lower[headIdx:], ">"); end >= 0 {
-			insertPos := headIdx + end + 1
-			return htmlDoc[:insertPos] + baseTag + htmlDoc[insertPos:]
-		}
-	}
-	if htmlIdx := strings.Index(lower, "<html"); htmlIdx >= 0 {
-		if end := strings.Index(lower[htmlIdx:], ">"); end >= 0 {
-			insertPos := htmlIdx + end + 1
-			return htmlDoc[:insertPos] + "<head>" + baseTag + "</head>" + htmlDoc[insertPos:]
-		}
-	}
-	return "<!doctype html><html><head>" + baseTag + "</head><body>" + htmlDoc + "</body></html>"
-}
-
 func buildRenderPDFFilename(rawName string, title string) string {
 	name := strings.TrimSpace(rawName)
 	if strings.EqualFold(filepathExt(name), ".pdf") {
@@ -1218,16 +1167,6 @@ func filepathExt(name string) string {
 		return ""
 	}
 	return trimmed[lastDot:]
-}
-
-func escapeHTMLAttr(raw string) string {
-	replacer := strings.NewReplacer(
-		"&", "&amp;",
-		`"`, "&quot;",
-		"<", "&lt;",
-		">", "&gt;",
-	)
-	return replacer.Replace(raw)
 }
 
 func writeJSON(w stdhttp.ResponseWriter, status int, payload map[string]any) {

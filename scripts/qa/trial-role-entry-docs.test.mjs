@@ -175,8 +175,8 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     strictQa,
-    "realLoginSmokeShared.test.mjs",
-    "strict QA real login smoke shared URL guard",
+    "scripts/qa/full.sh",
+    "strict QA full superset composition",
   );
   assertIncludes(
     testStrategyDoc,
@@ -356,16 +356,12 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "模拟数据不等于真实 import",
     "yoyoosun trial runbook simulated data boundary",
   );
-  for (const [scriptSource, context] of [
-    [fastQa, "qa fast trial account syntax check"],
-    [strictQa, "qa strict trial account syntax check"],
-  ]) {
-    assertIncludes(scriptSource, "trial-account-rbac.test.mjs", context);
-    assertIncludes(scriptSource, "trialDemoAccountBrowserSmoke.test.mjs", context);
-    assertIncludes(scriptSource, "trial-account-rbac.mjs", context);
-    assertIncludes(scriptSource, "trialDemoAccountBrowserSmoke.mjs", context);
-    assertIncludes(scriptSource, "node --check", context);
-  }
+  assertIncludes(fastQa, "run-node-tests.mjs", "qa fast automatic scripts test discovery");
+  assertIncludes(fastQa, "trial-account-rbac.mjs", "qa fast trial account syntax check");
+  assertIncludes(fastQa, "trialDemoAccountBrowserSmoke.mjs", "qa fast trial browser syntax check");
+  assertIncludes(fastQa, "node --check", "qa fast executable script syntax check");
+  assertIncludes(strictQa, "scripts/qa/full.sh", "qa strict full superset composition");
+  assertIncludes(strictQa, "QA_BROWSER_SCENARIOS", "qa strict expanded browser gate");
   assertIncludes(trialAccountAuditTest, "expected single role", "trial account RBAC unit test");
   assertIncludes(trialAccountAuditTest, "expected single mobile permission", "trial account RBAC unit test");
   assertIncludes(trialAccountAuditTest, "unexpected debug permissions", "trial account RBAC unit test");

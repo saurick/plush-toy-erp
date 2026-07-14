@@ -171,11 +171,6 @@ func CancelReason(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldCancelReason, v))
 }
 
-// CancelAuditVersion applies equality check predicate on the "cancel_audit_version" field. It's identical to CancelAuditVersionEQ.
-func CancelAuditVersion(v int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldEQ(FieldCancelAuditVersion, v))
-}
-
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldEQ(FieldNote, v))
@@ -1464,46 +1459,6 @@ func CancelReasonEqualFold(v string) predicate.FinanceFact {
 // CancelReasonContainsFold applies the ContainsFold predicate on the "cancel_reason" field.
 func CancelReasonContainsFold(v string) predicate.FinanceFact {
 	return predicate.FinanceFact(sql.FieldContainsFold(FieldCancelReason, v))
-}
-
-// CancelAuditVersionEQ applies the EQ predicate on the "cancel_audit_version" field.
-func CancelAuditVersionEQ(v int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldEQ(FieldCancelAuditVersion, v))
-}
-
-// CancelAuditVersionNEQ applies the NEQ predicate on the "cancel_audit_version" field.
-func CancelAuditVersionNEQ(v int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldNEQ(FieldCancelAuditVersion, v))
-}
-
-// CancelAuditVersionIn applies the In predicate on the "cancel_audit_version" field.
-func CancelAuditVersionIn(vs ...int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldIn(FieldCancelAuditVersion, vs...))
-}
-
-// CancelAuditVersionNotIn applies the NotIn predicate on the "cancel_audit_version" field.
-func CancelAuditVersionNotIn(vs ...int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldNotIn(FieldCancelAuditVersion, vs...))
-}
-
-// CancelAuditVersionGT applies the GT predicate on the "cancel_audit_version" field.
-func CancelAuditVersionGT(v int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldGT(FieldCancelAuditVersion, v))
-}
-
-// CancelAuditVersionGTE applies the GTE predicate on the "cancel_audit_version" field.
-func CancelAuditVersionGTE(v int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldGTE(FieldCancelAuditVersion, v))
-}
-
-// CancelAuditVersionLT applies the LT predicate on the "cancel_audit_version" field.
-func CancelAuditVersionLT(v int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldLT(FieldCancelAuditVersion, v))
-}
-
-// CancelAuditVersionLTE applies the LTE predicate on the "cancel_audit_version" field.
-func CancelAuditVersionLTE(v int) predicate.FinanceFact {
-	return predicate.FinanceFact(sql.FieldLTE(FieldCancelAuditVersion, v))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

@@ -5,6 +5,7 @@ import {
   ClockCircleOutlined,
   ExclamationCircleOutlined,
   LinkOutlined,
+  RedoOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { Alert, Button, Drawer, Input, Space, Tag, Typography } from 'antd'
@@ -43,6 +44,12 @@ export const TASK_ACTION_META = Object.freeze({
     successMessage: '退回原因已记录',
     requireReason: true,
   },
+  resume: {
+    title: '解除阻塞',
+    buttonLabel: '确认恢复待处理',
+    successMessage: '任务已解除阻塞',
+    requireReason: true,
+  },
   urge: {
     title: '催办',
     buttonLabel: '提交催办',
@@ -60,7 +67,7 @@ const TASK_DRAWER_STEPS = Object.freeze([
   {
     key: 'action',
     title: '选择动作',
-    description: '完成、阻塞、退回或催办，只记录协同任务处理结果。',
+    description: '完成、阻塞、解除阻塞、退回或催办，只记录协同任务处理结果。',
   },
   {
     key: 'submit',
@@ -79,6 +86,9 @@ export function getTaskActionDescription(actionMode = '') {
   if (actionMode === 'reject') {
     return '请写清退回依据、需补齐事项和下一责任岗位；退回只记录协同状态，不会撤销已完成的业务处理。'
   }
+  if (actionMode === 'resume') {
+    return '请说明阻塞如何解除；确认后任务恢复为可执行，不会自动产生库存、出货或财务事实。'
+  }
   if (actionMode === 'urge') {
     return '请写清催办对象和需要补齐的事项，避免只留下无上下文提醒。'
   }
@@ -89,6 +99,7 @@ function getTaskActionTone(actionMode = '') {
   if (actionMode === 'complete') return 'success'
   if (actionMode === 'block') return 'danger'
   if (actionMode === 'reject') return 'danger'
+  if (actionMode === 'resume') return 'success'
   if (actionMode === 'urge') return 'warning'
   return 'neutral'
 }
@@ -203,6 +214,15 @@ export default function WorkflowTaskActionDrawer({
                       退回任务
                     </Button>
                   ) : null}
+                  {allowedActionModeSet.has('resume') ? (
+                    <Button
+                      type="primary"
+                      icon={<RedoOutlined />}
+                      onClick={() => selectAction('resume', '')}
+                    >
+                      解除阻塞
+                    </Button>
+                  ) : null}
                   {allowedActionModeSet.has('urge') ? (
                     <Button
                       icon={<ClockCircleOutlined />}
@@ -295,7 +315,7 @@ export default function WorkflowTaskActionDrawer({
               <AlertOutlined aria-hidden="true" />
               <span>
                 <strong>处理范围：</strong>
-                完成、阻塞、退回和催办只处理协同任务；库存、出货、应收、开票和付款仍需进入对应业务模块处理。
+                完成、阻塞、解除阻塞、退回和催办只处理协同任务；库存、出货、应收、开票和付款仍需进入对应业务模块处理。
               </span>
             </div>
           </section>

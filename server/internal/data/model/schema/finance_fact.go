@@ -42,7 +42,6 @@ var financeFactLockedFields = map[string]struct{}{
 	"cancelled_at":          {},
 	"cancelled_by":          {},
 	"cancel_reason":         {},
-	"cancel_audit_version":  {},
 }
 
 func (FinanceFact) Hooks() []ent.Hook {
@@ -76,13 +75,9 @@ func (FinanceFact) Annotations() []schema.Annotation {
 				"finance_facts_payment_term_allowed":     "payment_term IS NULL OR payment_term IN ('CASH_ON_SHIPMENT', 'EOM_30', 'EOM_45')",
 				"finance_facts_payment_term_days_check":  "payment_term_days IS NULL OR payment_term_days >= 0",
 				"finance_facts_invoice_category_allowed": "invoice_category IS NULL OR invoice_category IN ('NONE', 'EXPORT_GENERAL', 'VAT_GENERAL_1', 'VAT_SPECIAL_3', 'VAT_SPECIAL_13')",
-				"finance_facts_cancel_audit_version":     "cancel_audit_version IN (0, 1)",
 				"finance_facts_cancel_audit_bundle": `
 (
-  (status = 'CANCELLED' AND cancel_audit_version = 0
-    AND cancelled_at IS NULL AND cancelled_by IS NULL AND cancel_reason IS NULL)
-  OR
-  (status = 'CANCELLED' AND cancel_audit_version = 1
+  (status = 'CANCELLED'
     AND cancelled_at IS NOT NULL AND cancelled_by IS NOT NULL
     AND cancel_reason IS NOT NULL AND length(trim(cancel_reason)) BETWEEN 1 AND 255)
   OR
@@ -121,9 +116,6 @@ func (FinanceFact) Fields() []ent.Field {
 		field.Time("cancelled_at").Optional().Nillable(),
 		field.Int("cancelled_by").Optional().Nillable().Positive(),
 		field.String("cancel_reason").Optional().Nillable().MaxLen(255),
-		// Version 0 identifies only this project's pre-cutover CANCELLED rows whose
-		// original cancellation actor, time and reason cannot be reconstructed.
-		field.Int("cancel_audit_version").Default(1).Immutable(),
 		field.String("note").Optional().Nillable().MaxLen(255),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),

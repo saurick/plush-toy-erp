@@ -25,18 +25,14 @@ var workflowTaskBoardLaneKeys = []string{
 }
 
 var workflowTaskBoardFilterStatuses = map[string]struct{}{
-	"":           {},
-	"all":        {},
-	"pending":    {},
-	"ready":      {},
-	"processing": {},
-	"blocked":    {},
-	"rejected":   {},
-	"done":       {},
-	"closed":     {},
-	"cancelled":  {},
-	"overdue":    {},
-	"dueSoon":    {},
+	"":         {},
+	"all":      {},
+	"ready":    {},
+	"blocked":  {},
+	"rejected": {},
+	"done":     {},
+	"overdue":  {},
+	"dueSoon":  {},
 }
 
 var workflowTaskBoardDueFilters = map[string]struct{}{
@@ -59,11 +55,11 @@ func ClassifyWorkflowTaskBoardLane(task *WorkflowTask, snapshotAt time.Time) (st
 	}
 	status := strings.TrimSpace(task.TaskStatusKey)
 	switch status {
-	case "blocked", "rejected":
+	case "blocked":
 		return WorkflowTaskBoardLaneException, nil
-	case "done", "closed", "cancelled":
+	case "done", "rejected":
 		return WorkflowTaskBoardLaneFinished, nil
-	case "pending", "ready", "processing":
+	case "ready":
 		if task.DueAt != nil && !task.DueAt.After(snapshotAt.Add(WorkflowTaskBoardDueWindow)) {
 			return WorkflowTaskBoardLaneDue, nil
 		}
@@ -92,6 +88,7 @@ func normalizeWorkflowTaskBoardQuery(query WorkflowTaskBoardQuery) (WorkflowTask
 	query.SourceType = strings.TrimSpace(query.SourceType)
 	query.LaneKey = strings.TrimSpace(query.LaneKey)
 	query.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(query.VisibleOwnerRoleKeys)
+	query.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(query.VisibilityScope)
 
 	if query.OwnerRoleKey == "all" {
 		query.OwnerRoleKey = ""

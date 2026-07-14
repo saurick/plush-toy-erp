@@ -7,6 +7,10 @@ import { fileURLToPath } from "node:url";
 
 import { expectedAccounts } from "./trial-account-rbac.mjs";
 import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
+import {
+  TASK_STATUS_KEYS,
+  getManualAcceptanceTaskStatusCounts,
+} from "./manual-acceptance-task-data.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/readiness";
@@ -17,22 +21,38 @@ const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const SAFE_ENVIRONMENTS = new Set(["local", "dev"]);
 const RUNTIME_PREFLIGHT_USERNAME = "admin";
 const TASK_SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
-const TASK_STATUS_COUNTS_PER_ROLE = Object.freeze({
-  PENDING: 4,
-  READY: 4,
-  PROCESSING: 4,
-  BLOCKED: 3,
-  DONE: 3,
-  REJECTED: 2,
-});
 const TASK_REQUIRED_STATUSES = Object.freeze(
-  Object.keys(TASK_STATUS_COUNTS_PER_ROLE),
+  TASK_STATUS_KEYS.map((status) => status.toUpperCase()),
 );
 const TASK_ROLE_KEYS = Object.freeze(
   expectedAccounts
     .filter(([, , mobilePermission]) => Boolean(mobilePermission))
     .map(([, roleKey]) => roleKey),
 );
+
+function taskStatusCountsForRole(roleKey) {
+  return Object.fromEntries(
+    Object.entries(getManualAcceptanceTaskStatusCounts(roleKey))
+      .filter(([, count]) => count > 0)
+      .map(([status, count]) => [status.toUpperCase(), count]),
+  );
+}
+
+function taskRequiredStatusesForRole(roleKey) {
+  return Object.keys(taskStatusCountsForRole(roleKey));
+}
+
+function totalTaskStatusCounts() {
+  const totals = Object.fromEntries(TASK_STATUS_KEYS.map((status) => [status, 0]));
+  for (const roleKey of TASK_ROLE_KEYS) {
+    for (const [status, count] of Object.entries(
+      getManualAcceptanceTaskStatusCounts(roleKey),
+    )) {
+      totals[status] += count;
+    }
+  }
+  return totals;
+}
 
 const DESKTOP_DATASET_BY_PAGE = Object.freeze({
   customers: "customers",
@@ -414,17 +434,16 @@ function validateTaskReport(report) {
   const prefix = String(report.prefix || "").trim();
   const byRole = report.summary?.byRole || {};
   const byStatus = report.summary?.byStatus || {};
+  const expectedStatusTotals = totalTaskStatusCounts();
   const rolesAreExact =
     Object.keys(byRole).length === TASK_ROLE_KEYS.length &&
     TASK_ROLE_KEYS.every(
       (roleKey) => Number(byRole[roleKey]) === MOBILE_TASKS_PER_ROLE,
     );
   const statusesAreExact =
-    Object.keys(byStatus).length === TASK_REQUIRED_STATUSES.length &&
-    TASK_REQUIRED_STATUSES.every(
-      (status) =>
-        Number(byStatus[status.toLowerCase()]) ===
-        TASK_STATUS_COUNTS_PER_ROLE[status] * TASK_ROLE_KEYS.length,
+    Object.keys(byStatus).length === TASK_STATUS_KEYS.length &&
+    TASK_STATUS_KEYS.every(
+      (status) => Number(byStatus[status]) === expectedStatusTotals[status],
     );
   if (
     report.mode !== "apply" ||
@@ -639,8 +658,8 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
     method: "list_tasks",
     listKey: "tasks",
     statusField: "task_status_key",
-    requiredStatuses: [...TASK_REQUIRED_STATUSES],
-    requiredStatusCounts: { ...TASK_STATUS_COUNTS_PER_ROLE },
+    requiredStatuses: taskRequiredStatusesForRole("boss"),
+    requiredStatusCounts: taskStatusCountsForRole("boss"),
     expectedMinimum: MOBILE_TASKS_PER_ROLE,
     expectedExact: MOBILE_TASKS_PER_ROLE,
     declaredMinimum: null,
@@ -675,8 +694,8 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       method: "list_tasks",
       listKey: "tasks",
       statusField: "task_status_key",
-      requiredStatuses: [...TASK_REQUIRED_STATUSES],
-      requiredStatusCounts: { ...TASK_STATUS_COUNTS_PER_ROLE },
+      requiredStatuses: taskRequiredStatusesForRole(roleKey),
+      requiredStatusCounts: taskStatusCountsForRole(roleKey),
       expectedMinimum: MOBILE_TASKS_PER_ROLE,
       expectedExact: MOBILE_TASKS_PER_ROLE,
       declaredMinimum: null,
@@ -1223,14 +1242,7 @@ function mobileTotalResult(mobileResults) {
     0,
   );
   const counts = mergeStatusCounts(mobileResults);
-  const requiredStatuses = [
-    "PENDING",
-    "READY",
-    "PROCESSING",
-    "BLOCKED",
-    "DONE",
-    "REJECTED",
-  ];
+  const requiredStatuses = [...TASK_REQUIRED_STATUSES];
   const missingStatuses = requiredStatuses.filter((item) => !counts[item]);
   const allRolesPass = mobileResults.every((item) => item.status === "pass");
   return {

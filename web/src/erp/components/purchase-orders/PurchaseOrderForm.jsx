@@ -362,28 +362,30 @@ export function PurchaseOrderFormFields({
           <>
             <div className="erp-line-items-form__import-row">
               <div className="erp-line-items-form__import-copy">
-                <strong>导入材料</strong>
+                <strong>从材料库添加明细</strong>
                 <span>
-                  从业务来源导入；数量、单价和预计到货日期回到采购明细维护。
+                  从材料库添加；数量、单价和预计到货日期回到采购明细维护。
                 </span>
               </div>
               <Button
                 className="erp-line-items-form__import-button"
                 onClick={() => setMaterialImportOpen(true)}
               >
-                从材料库导入
+                从材料库添加
               </Button>
             </div>
             <SourceImportPickerModal
               open={materialImportOpen}
-              title="从材料库导入采购明细"
-              description="这里只选择材料来源；数量、单价和预计到货日期仍在主弹窗采购明细里维护。"
+              title="选择材料添加采购明细"
+              description="这里只选择材料档案；数量、单价和预计到货日期仍在主弹窗采购明细里维护。"
               rows={materials}
               columns={materialImportColumns}
               getSelectedLabel={materialLabel}
               searchPlaceholder="搜索材料"
               searchHint="可搜索：材料编码、名称、分类、规格、颜色"
-              emptyDescription="暂无可导入材料"
+              importText="添加到采购明细"
+              selectedNoun="材料"
+              emptyDescription="暂无可选材料"
               onCancel={() => setMaterialImportOpen(false)}
               onImport={(selectedMaterials) => {
                 const currentLines = form.getFieldValue('items') || []

@@ -58,6 +58,14 @@ import {
   buildBOMVersionColumns,
 } from '../components/bom/BOMVersionColumns.jsx'
 import {
+  canActivateBOM,
+  canArchiveBOM,
+  canCopyBOM,
+  canEditBOM,
+  canRequestBOMArchive,
+  runBOMArchiveBatch,
+} from '../components/bom/bomLifecycle.mjs'
+import {
   BOMHeaderFormFields,
   buildHeaderParams,
   buildItemParams,
@@ -734,14 +742,16 @@ export default function BOMVersionsPage() {
   const singleSelectedVersion =
     selectedRowKeys.length === 1 ? selectedVersions[0] || selectedVersion : null
   const activeActionVersion = singleSelectedVersion
-  const activeActionCanEdit =
-    activeActionVersion?.status === 'DRAFT' && canUpdate
+  const activeActionCanEdit = canEditBOM(activeActionVersion) && canUpdate
   const modalActionVersion = selectedVersion || activeActionVersion
   const modalActionCanEdit =
-    headerMode === 'edit' && modalActionVersion?.status === 'DRAFT' && canUpdate
-  const archivableSelectedVersions = selectedVersions.filter(
-    (record) => record?.status !== 'ARCHIVED'
+    headerMode === 'edit' && canEditBOM(modalActionVersion) && canUpdate
+  const archivableSelectedVersions = selectedVersions.filter((record) =>
+    canArchiveBOM(record)
   )
+  const canRequestSelectedArchive =
+    selectedVersions.length > 0 &&
+    selectedVersions.every((record) => canRequestBOMArchive(record))
   const selectedLabel =
     selectedVersions.length === 1
       ? selectedVersions[0]?.version || '已选择 1 条 BOM'
@@ -861,7 +871,7 @@ export default function BOMVersionsPage() {
   }
 
   const openEdit = async (record = selectedVersion) => {
-    if (!record?.id) return
+    if (!record?.id || !canEditBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
     setRemovedItemIDs([])
     applySelectedRowKeys([record.id])
@@ -873,7 +883,7 @@ export default function BOMVersionsPage() {
   }
 
   const openCopy = (record = selectedVersion) => {
-    if (!record?.id) return
+    if (!record?.id || !canCopyBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
     setRemovedItemIDs([])
     applySelectedRowKeys([record.id])
@@ -981,7 +991,13 @@ export default function BOMVersionsPage() {
   }
 
   const activateSelected = async () => {
-    if (!activeActionVersion?.id || selectedRowKeys.length !== 1) return
+    if (
+      !activeActionVersion?.id ||
+      selectedRowKeys.length !== 1 ||
+      !canActivateBOM(activeActionVersion)
+    ) {
+      return
+    }
     setSaving(true)
     try {
       const next = await activateBOMVersion({ id: activeActionVersion.id })
@@ -996,20 +1012,35 @@ export default function BOMVersionsPage() {
   }
 
   const archiveSelected = async () => {
-    if (archivableSelectedVersions.length === 0) return
+    if (!canRequestSelectedArchive || archivableSelectedVersions.length === 0) {
+      return
+    }
     setSaving(true)
     try {
-      for (const record of archivableSelectedVersions) {
-        await archiveBOMVersion({ id: record.id })
+      const { archivedCount, archiveError, refreshError } =
+        await runBOMArchiveBatch({
+          records: archivableSelectedVersions,
+          archive: (record) => archiveBOMVersion({ id: record.id }),
+          refresh: loadVersions,
+        })
+      if (archiveError) {
+        const errorMessage = getActionErrorMessage(archiveError, '设为历史版本')
+        message.error(
+          archivedCount > 0
+            ? `已完成 ${archivedCount} 个，后续操作失败：${errorMessage}`
+            : errorMessage
+        )
+        return
+      }
+      if (refreshError) {
+        message.warning('归档已完成，但列表刷新失败，请手动刷新')
+        return
       }
       message.success(
-        archivableSelectedVersions.length > 1
-          ? `已将 ${archivableSelectedVersions.length} 个 BOM 版本设为历史版本`
+        archivedCount > 1
+          ? `已将 ${archivedCount} 个 BOM 版本设为历史版本`
           : 'BOM 版本已设为历史版本'
       )
-      await loadVersions()
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '设为历史版本'))
     } finally {
       setSaving(false)
     }
@@ -1193,6 +1224,7 @@ export default function BOMVersionsPage() {
           selectedCount={selectedRowKeys.length}
           selectedLabel={selectedLabel}
           selectedItems={selectedItems}
+          boundaryText="已激活版本需复制为新草稿后修改；历史版本可以重新激活。"
         >
           <Button
             type="link"
@@ -1224,7 +1256,11 @@ export default function BOMVersionsPage() {
           <Button
             size="small"
             icon={<CopyOutlined />}
-            disabled={selectedRowKeys.length !== 1 || !canCreate}
+            disabled={
+              selectedRowKeys.length !== 1 ||
+              !canCreate ||
+              !canCopyBOM(activeActionVersion)
+            }
             onClick={() => openCopy(activeActionVersion)}
           >
             复制新版本
@@ -1281,7 +1317,7 @@ export default function BOMVersionsPage() {
                 selectedRowKeys.length !== 1 ||
                 !activeActionVersion ||
                 !canActivate ||
-                activeActionVersion.status === 'ACTIVE'
+                !canActivateBOM(activeActionVersion)
               }
             >
               激活
@@ -1299,6 +1335,7 @@ export default function BOMVersionsPage() {
               disabled={
                 selectedRowKeys.length === 0 ||
                 !canUpdate ||
+                !canRequestSelectedArchive ||
                 archivableSelectedVersions.length === 0
               }
             >

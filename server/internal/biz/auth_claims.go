@@ -20,6 +20,8 @@ type AuthClaims struct {
 
 type ctxKeyClaims struct{}
 
+type ctxKeyCurrentAdmin struct{}
+
 func NewContextWithClaims(ctx context.Context, c *AuthClaims) context.Context {
 	return context.WithValue(ctx, ctxKeyClaims{}, c)
 }
@@ -27,6 +29,18 @@ func NewContextWithClaims(ctx context.Context, c *AuthClaims) context.Context {
 func GetClaimsFromContext(ctx context.Context) (*AuthClaims, bool) {
 	c, ok := ctx.Value(ctxKeyClaims{}).(*AuthClaims)
 	return c, ok
+}
+
+// WithCurrentAdmin stores the administrator identity that has already passed
+// the shared token, session, account-state, auth-version, and RBAC checks.
+// HTTP handlers must not construct this value from unverified token claims.
+func WithCurrentAdmin(ctx context.Context, admin *AdminUser) context.Context {
+	return context.WithValue(ctx, ctxKeyCurrentAdmin{}, admin)
+}
+
+func GetCurrentAdminFromContext(ctx context.Context) (*AdminUser, bool) {
+	admin, ok := ctx.Value(ctxKeyCurrentAdmin{}).(*AdminUser)
+	return admin, ok && admin != nil
 }
 
 func (c *AuthClaims) IsAdmin() bool {

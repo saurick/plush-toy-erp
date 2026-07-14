@@ -1,29 +1,30 @@
 #!/usr/bin/env node
 
 import { createHash } from 'node:crypto'
-import { mkdir, readFile, writeFile } from 'node:fs/promises'
+import { mkdir, readFile, stat } from 'node:fs/promises'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { inflateRawSync } from 'node:zlib'
 
 import {
-  DEFAULT_RAW_SOURCE_DIR,
-  DEFAULT_SOURCE_MANIFEST,
   loadAndValidateSourceManifest,
+  resolveSafeEvidenceOutputDirectory,
   selectStructuredExtractSources,
+  writePrivateEvidenceFile,
 } from './customerSourceManifestCheck.mjs'
 
-const USAGE = `Yoyoosun customer source extractor
+const USAGE = `Customer source extractor
 
 Usage:
   node scripts/import/customerSourceExtract.mjs \\
-    --manifest docs/customers/yoyoosun/source-manifest.json \\
-    --out output/customers/yoyoosun/source-extract
+    --manifest <source-manifest.json> \\
+    --raw-dir <materialized-source-directory> \\
+    --out <local-output-directory>
 
 Options:
-  --customer <key>    Optional. Defaults to yoyoosun.
-  --manifest <path>   Optional. Defaults to docs/customers/yoyoosun/source-manifest.json.
-  --raw-dir <path>    Optional. Raw source directory cross-check for the manifest.
+  --customer <key>    Optional. Require the manifest customerKey to match this key.
+  --manifest <path>   Required. Manifest v2 file; relative paths resolve from cwd.
+  --raw-dir <path>    Required. Materialized source root; relative paths resolve from cwd.
   --out <path>        Required. Output directory for extracted local evidence.
   --help              Print this help.
 
@@ -37,11 +38,13 @@ export const OUTPUT_FILES = [
   'extraction-report.md',
 ]
 
-const DEFAULT_CUSTOMER = 'yoyoosun'
-
 const ZIP_EOCD_SIGNATURE = 0x06054b50
 const ZIP_CENTRAL_SIGNATURE = 0x02014b50
 const ZIP_LOCAL_SIGNATURE = 0x04034b50
+const MAX_XLSX_FILE_BYTES = 128 * 1024 * 1024
+const MAX_XLSX_ZIP_ENTRIES = 4096
+const MAX_XLSX_ENTRY_BYTES = 64 * 1024 * 1024
+const MAX_XLSX_TOTAL_UNCOMPRESSED_BYTES = 256 * 1024 * 1024
 
 const XLSX_EXTENSIONS = new Set(['.xlsx'])
 
@@ -97,12 +100,7 @@ class CliError extends Error {
 }
 
 export function parseCliArgs(argv) {
-  const options = {
-    customer: DEFAULT_CUSTOMER,
-    manifest: DEFAULT_SOURCE_MANIFEST,
-    rawDir: DEFAULT_RAW_SOURCE_DIR,
-    help: false,
-  }
+  const options = { help: false }
 
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index]
@@ -118,10 +116,10 @@ export function parseCliArgs(argv) {
     const key = token.slice(2, equalIndex === -1 ? undefined : equalIndex)
     const inlineValue = equalIndex === -1 ? undefined : token.slice(equalIndex + 1)
     const value = inlineValue ?? argv[index + 1]
-    if (inlineValue === undefined) {
+    if (inlineValue === undefined && value !== undefined && !value.startsWith('--')) {
       index += 1
     }
-    if (value === undefined || value.startsWith('--')) {
+    if (value === undefined || value === '' || value.startsWith('--')) {
       throw new CliError(`Missing value for --${key}`, 2)
     }
 
@@ -141,24 +139,34 @@ export function parseCliArgs(argv) {
   if (options.help) {
     return options
   }
-  if (!options.out) {
-    throw new CliError('Missing required --out', 2)
-  }
+  requireOption(options.manifest, '--manifest')
+  requireOption(options.rawDir, '--raw-dir')
+  requireOption(options.out, '--out')
   return options
 }
 
-export async function runExtraction(options) {
-  const customerKey = options.customer ?? DEFAULT_CUSTOMER
-  const manifestPath = options.manifest ?? DEFAULT_SOURCE_MANIFEST
-  const rawDir = options.rawDir ?? DEFAULT_RAW_SOURCE_DIR
-  const outDir = options.out
+export async function runExtraction(options = {}) {
+  const baseDir = resolveBaseDir(options.baseDir)
+  const manifestPath = options.manifest ?? options.manifestPath
+  requireOption(manifestPath, '--manifest')
+  requireOption(options.rawDir, '--raw-dir')
+  requireOption(options.out, '--out')
   const manifestResult = await loadAndValidateSourceManifest({
     manifestPath,
-    rawDir,
+    rawDir: options.rawDir,
+    customer: options.customer,
+    baseDir,
   })
+  const outDir = await resolveSafeEvidenceOutputDirectory({
+    outputDir: options.out,
+    baseDir,
+    manifestResult,
+    outputFiles: OUTPUT_FILES,
+  })
+  const customerKey = manifestResult.manifest.customerKey
   const workbooks = await readManifestWorkbooks(manifestResult)
   const extraction = extractSourcesFromWorkbooks(workbooks, { customerKey })
-  const generatedAt = new Date().toISOString()
+  const generatedAt = resolveGeneratedAt(options.generatedAt)
   const sourceSnapshot = {
     version: 1,
     generatedAt,
@@ -180,7 +188,6 @@ export async function runExtraction(options) {
     customerKey,
     generatedAt,
     manifestResult,
-    outDir,
     workbooks,
     extraction,
   })
@@ -196,7 +203,7 @@ export async function runExtraction(options) {
   await writeJson(path.join(outDir, 'existing-v1.empty-preview.json'), existingPreview)
   await writeJson(path.join(outDir, 'customer-import-config.candidate.json'), importConfig)
   await writeJson(path.join(outDir, 'extraction-summary.json'), summary)
-  await writeFile(path.join(outDir, 'extraction-report.md'), report)
+  await writePrivateEvidenceFile(path.join(outDir, 'extraction-report.md'), report)
 
   return {
     sourceSnapshot,
@@ -209,18 +216,21 @@ export async function runExtraction(options) {
 
 async function readManifestWorkbooks(manifestResult) {
   const sourceEntries = selectStructuredExtractSources(manifestResult.sources)
-    .filter((source) => XLSX_EXTENSIONS.has(path.extname(source.path).toLowerCase()))
+    .filter((source) => XLSX_EXTENSIONS.has(path.extname(source.relativePath).toLowerCase()))
 
   if (sourceEntries.length === 0) {
-    throw new CliError(`No structured .xlsx sources found in ${manifestResult.summary.manifestPath}`, 2)
+    throw new CliError('No structured .xlsx sources found in the source manifest', 2)
   }
 
   const workbooks = []
   for (const sourceEntry of sourceEntries) {
     const workbook = await readXlsxWorkbook(sourceEntry.absolutePath)
+    if (workbook.sha256 !== sourceEntry.sha256 || workbook.sizeBytes !== sourceEntry.actualSizeBytes) {
+      throw new CliError('source file changed after manifest validation', 2)
+    }
     workbook.sourceManifest = {
       sourceId: sourceEntry.sourceId,
-      path: sourceEntry.path,
+      relativePath: sourceEntry.relativePath,
       sha256: sourceEntry.sha256,
       sourceTypes: sourceEntry.sourceTypes,
       domains: sourceEntry.domains,
@@ -231,7 +241,8 @@ async function readManifestWorkbooks(manifestResult) {
 }
 
 export function extractSourcesFromWorkbooks(workbooks, options = {}) {
-  const collector = createCollector(options.customerKey ?? DEFAULT_CUSTOMER, { workbooks })
+  requireOption(options.customerKey, 'customerKey')
+  const collector = createCollector(options.customerKey, { workbooks })
   for (const workbook of workbooks) {
     for (const sheet of workbook.sheets) {
       if (isMaterialSummarySheet(sheet.name)) {
@@ -309,7 +320,7 @@ function createCollector(customerKey, options = {}) {
         sourceKind: input.sourceKind ?? 'xlsx_sheet',
         moduleKey: input.moduleKey ?? 'unknown',
         sourceManifestId: workbookSourceIndex.get(input.fileName)?.sourceId ?? null,
-        sourceManifestPath: workbookSourceIndex.get(input.fileName)?.path ?? null,
+        sourceManifestPath: workbookSourceIndex.get(input.fileName)?.relativePath ?? null,
         sourceFileSha256: workbookSourceIndex.get(input.fileName)?.sha256 ?? null,
         fileName: input.fileName,
         sheetName: input.sheetName,
@@ -1042,19 +1053,19 @@ function buildMapping(workbook, sheet, headerRow, domain, fields) {
 
 function buildSourceManifestReference(manifestResult) {
   return {
-    path: manifestResult.summary.manifestPath,
+    path: manifestResult.summary.manifestName,
     sha256: manifestResult.manifestSha256,
     version: manifestResult.summary.version,
     sourceCount: manifestResult.summary.sourceCount,
     structuredExtractCount: manifestResult.summary.structuredExtractCount,
-    rawDir: manifestResult.summary.rawDir,
+    rawDir: 'materialized-source-directory',
   }
 }
 
 function buildImportConfigCandidate({ customerKey, generatedAt, manifestResult, workbooks, extraction }) {
   return {
     customerKey,
-    label: '永绅 yoyoosun 客户导入配置候选',
+    label: `${customerKey} 客户导入配置候选`,
     status: 'draft',
     runtimeEnabled: false,
     generatedAt,
@@ -1072,7 +1083,7 @@ function buildImportConfigCandidate({ customerKey, generatedAt, manifestResult, 
     sourceManifest: buildSourceManifestReference(manifestResult),
     sourceFiles: workbooks.map((workbook) => ({
       sourceManifestId: workbook.sourceManifest?.sourceId ?? null,
-      sourceManifestPath: workbook.sourceManifest?.path ?? null,
+      sourceManifestPath: workbook.sourceManifest?.relativePath ?? null,
       sourceManifestSha256: workbook.sourceManifest?.sha256 ?? null,
       fileName: workbook.fileName,
       sheetCount: workbook.sheets.length,
@@ -1136,13 +1147,12 @@ function buildImportConfigCandidate({ customerKey, generatedAt, manifestResult, 
   }
 }
 
-function buildExtractionSummary({ customerKey, generatedAt, manifestResult, outDir, workbooks, extraction }) {
+function buildExtractionSummary({ customerKey, generatedAt, manifestResult, workbooks, extraction }) {
   return {
     customerKey,
     generatedAt,
     sourceManifest: buildSourceManifestReference(manifestResult),
-    rawDir: manifestResult.summary.rawDir,
-    outDir,
+    outDir: 'local-ignored-directory',
     workbookCount: workbooks.length,
     sheetCount: workbooks.reduce((sum, workbook) => sum + workbook.sheets.length, 0),
     sourceCount: extraction.sources.length,
@@ -1229,7 +1239,26 @@ function buildEmptyExistingPreview(generatedAt, customerKey) {
 }
 
 export async function readXlsxWorkbook(filePath) {
-  const buffer = await readFile(filePath)
+  let fileStat
+  let buffer
+  try {
+    fileStat = await stat(filePath)
+    if (!fileStat.isFile()) {
+      throw new Error('not a file')
+    }
+    if (fileStat.size > MAX_XLSX_FILE_BYTES) {
+      throw new CliError('XLSX file exceeds the extraction size limit', 2)
+    }
+    buffer = await readFile(filePath)
+  } catch (error) {
+    if (error instanceof CliError) {
+      throw error
+    }
+    throw new CliError('Cannot read xlsx source file', 2)
+  }
+  if (buffer.length > MAX_XLSX_FILE_BYTES) {
+    throw new CliError('XLSX file exceeds the extraction size limit', 2)
+  }
   const zip = parseZip(buffer)
   const workbookXml = readZipText(zip, 'xl/workbook.xml')
   const relsXml = readZipText(zip, 'xl/_rels/workbook.xml.rels')
@@ -1263,35 +1292,88 @@ export async function readXlsxWorkbook(filePath) {
 
 function parseZip(buffer) {
   const eocdOffset = findEndOfCentralDirectory(buffer)
+  assertBufferRange(buffer, eocdOffset, 22, 'Invalid xlsx zip end record')
+  const diskNumber = buffer.readUInt16LE(eocdOffset + 4)
+  const centralDiskNumber = buffer.readUInt16LE(eocdOffset + 6)
+  const diskEntryCount = buffer.readUInt16LE(eocdOffset + 8)
   const entryCount = buffer.readUInt16LE(eocdOffset + 10)
+  const centralSize = buffer.readUInt32LE(eocdOffset + 12)
   const centralOffset = buffer.readUInt32LE(eocdOffset + 16)
+  const commentLength = buffer.readUInt16LE(eocdOffset + 20)
+  if (
+    diskNumber !== 0 ||
+    centralDiskNumber !== 0 ||
+    diskEntryCount !== entryCount ||
+    entryCount > MAX_XLSX_ZIP_ENTRIES
+  ) {
+    throw new CliError('Unsupported xlsx zip disk or entry layout', 2)
+  }
+  if (eocdOffset + 22 + commentLength !== buffer.length) {
+    throw new CliError('Invalid xlsx zip end record length', 2)
+  }
+  if (centralOffset + centralSize > eocdOffset) {
+    throw new CliError('Invalid xlsx zip central directory bounds', 2)
+  }
+  assertBufferRange(buffer, centralOffset, centralSize, 'Invalid xlsx zip central directory bounds')
+  const centralEnd = centralOffset + centralSize
   const entries = new Map()
+  let totalUncompressedBytes = 0
   let offset = centralOffset
   for (let index = 0; index < entryCount; index += 1) {
+    assertBufferRange(buffer, offset, 46, 'Invalid xlsx zip central directory entry')
     if (buffer.readUInt32LE(offset) !== ZIP_CENTRAL_SIGNATURE) {
       throw new CliError('Invalid xlsx zip central directory', 2)
     }
+    const flags = buffer.readUInt16LE(offset + 8)
     const method = buffer.readUInt16LE(offset + 10)
+    const checksum = buffer.readUInt32LE(offset + 16)
     const compressedSize = buffer.readUInt32LE(offset + 20)
     const uncompressedSize = buffer.readUInt32LE(offset + 24)
     const nameLength = buffer.readUInt16LE(offset + 28)
     const extraLength = buffer.readUInt16LE(offset + 30)
     const commentLength = buffer.readUInt16LE(offset + 32)
     const localHeaderOffset = buffer.readUInt32LE(offset + 42)
+    const entryEnd = offset + 46 + nameLength + extraLength + commentLength
+    if (entryEnd > centralEnd) {
+      throw new CliError('Invalid xlsx zip central directory entry bounds', 2)
+    }
     const name = buffer.toString('utf8', offset + 46, offset + 46 + nameLength)
+    validateZipEntryName(name)
+    if ((flags & 1) !== 0) {
+      throw new CliError('Encrypted xlsx zip entries are not supported', 2)
+    }
+    if (compressedSize > MAX_XLSX_FILE_BYTES || uncompressedSize > MAX_XLSX_ENTRY_BYTES) {
+      throw new CliError('XLSX zip entry exceeds the extraction size limit', 2)
+    }
+    totalUncompressedBytes += uncompressedSize
+    if (totalUncompressedBytes > MAX_XLSX_TOTAL_UNCOMPRESSED_BYTES) {
+      throw new CliError('XLSX zip exceeds the total extraction size limit', 2)
+    }
+    if (entries.has(name)) {
+      throw new CliError('XLSX zip contains duplicate entry names', 2)
+    }
+    assertBufferRange(buffer, localHeaderOffset, 30, 'Invalid xlsx zip local header bounds')
     entries.set(name, {
       name,
+      flags,
       method,
+      checksum,
       compressedSize,
       uncompressedSize,
       localHeaderOffset,
     })
-    offset += 46 + nameLength + extraLength + commentLength
+    offset = entryEnd
   }
-  return { buffer, entries }
+  if (offset !== centralEnd) {
+    throw new CliError('Invalid xlsx zip central directory size', 2)
+  }
+  return { buffer, centralOffset, entries }
 }
 
 function findEndOfCentralDirectory(buffer) {
+  if (buffer.length < 22) {
+    throw new CliError('Invalid xlsx zip: end of central directory not found', 2)
+  }
   const minOffset = Math.max(0, buffer.length - 65557)
   for (let offset = buffer.length - 22; offset >= minOffset; offset -= 1) {
     if (buffer.readUInt32LE(offset) === ZIP_EOCD_SIGNATURE) {
@@ -1305,28 +1387,103 @@ function readZipText(zip, name) {
   if (!zip.entries.has(name)) {
     throw new CliError(`XLSX entry not found: ${name}`, 2)
   }
-  return extractZipEntry(zip, name).toString('utf8')
+  const data = extractZipEntry(zip, name)
+  if (data.length > MAX_XLSX_ENTRY_BYTES) {
+    throw new CliError('XLSX XML entry exceeds the extraction size limit', 2)
+  }
+  return data.toString('utf8')
 }
 
 function extractZipEntry(zip, name) {
   const entry = zip.entries.get(name)
   const { buffer } = zip
   const offset = entry.localHeaderOffset
+  assertBufferRange(buffer, offset, 30, 'Invalid xlsx zip local header bounds')
   if (buffer.readUInt32LE(offset) !== ZIP_LOCAL_SIGNATURE) {
-    throw new CliError(`Invalid xlsx zip local header: ${name}`, 2)
+    throw new CliError('Invalid xlsx zip local header', 2)
   }
+  const localFlags = buffer.readUInt16LE(offset + 6)
   const nameLength = buffer.readUInt16LE(offset + 26)
   const extraLength = buffer.readUInt16LE(offset + 28)
   const dataStart = offset + 30 + nameLength + extraLength
-  const compressed = buffer.subarray(dataStart, dataStart + entry.compressedSize)
+  const dataEnd = dataStart + entry.compressedSize
+  if (localFlags !== entry.flags || dataEnd > zip.centralOffset) {
+    throw new CliError('Invalid xlsx zip local entry bounds', 2)
+  }
+  assertBufferRange(buffer, dataStart, entry.compressedSize, 'Invalid xlsx zip local entry bounds')
+  const localName = buffer.toString('utf8', offset + 30, offset + 30 + nameLength)
+  if (localName !== entry.name) {
+    throw new CliError('XLSX zip local and central entry names differ', 2)
+  }
+  const compressed = buffer.subarray(dataStart, dataEnd)
+  let output
   if (entry.method === 0) {
-    return compressed
+    if (entry.compressedSize !== entry.uncompressedSize) {
+      throw new CliError('Invalid stored xlsx zip entry size', 2)
+    }
+    output = compressed
+  } else if (entry.method === 8) {
+    try {
+      output = inflateRawSync(compressed, {
+        finishFlush: 2,
+        maxOutputLength: Math.max(1, entry.uncompressedSize),
+      })
+    } catch {
+      throw new CliError('Invalid or oversized xlsx zip entry data', 2)
+    }
+  } else {
+    throw new CliError(`Unsupported xlsx zip compression method ${entry.method}`, 2)
   }
-  if (entry.method === 8) {
-    return inflateRawSync(compressed, { finishFlush: 2 })
+  if (output.length !== entry.uncompressedSize) {
+    throw new CliError('XLSX zip entry size does not match its directory record', 2)
   }
-  throw new CliError(`Unsupported xlsx zip compression method ${entry.method}: ${name}`, 2)
+  if (crc32(output) !== entry.checksum) {
+    throw new CliError('XLSX zip entry checksum mismatch', 2)
+  }
+  return output
 }
+
+function assertBufferRange(buffer, offset, length, message) {
+  if (
+    !Number.isSafeInteger(offset) ||
+    !Number.isSafeInteger(length) ||
+    offset < 0 ||
+    length < 0 ||
+    offset + length > buffer.length
+  ) {
+    throw new CliError(message, 2)
+  }
+}
+
+function validateZipEntryName(name) {
+  if (typeof name !== 'string' || name === '' || name.includes('\\') || path.posix.isAbsolute(name)) {
+    throw new CliError('Invalid xlsx zip entry name', 2)
+  }
+  const normalizedName = name.endsWith('/') ? name.slice(0, -1) : name
+  if (
+    normalizedName === '' ||
+    normalizedName.split('/').some((segment) => segment === '' || segment === '.' || segment === '..') ||
+    path.posix.normalize(normalizedName) !== normalizedName
+  ) {
+    throw new CliError('Invalid xlsx zip entry name', 2)
+  }
+}
+
+function crc32(buffer) {
+  let crc = 0xffffffff
+  for (const byte of buffer) {
+    crc = CRC32_TABLE[(crc ^ byte) & 0xff] ^ (crc >>> 8)
+  }
+  return (crc ^ 0xffffffff) >>> 0
+}
+
+const CRC32_TABLE = Uint32Array.from({ length: 256 }, (_, value) => {
+  let entry = value
+  for (let bit = 0; bit < 8; bit += 1) {
+    entry = (entry >>> 1) ^ (0xedb88320 & -(entry & 1))
+  }
+  return entry >>> 0
+})
 
 function parseRelationships(xml) {
   const map = new Map()
@@ -1354,11 +1511,20 @@ function parseWorkbookSheets(xml) {
 }
 
 function normalizeWorkbookTarget(target) {
-  const normalized = target.replace(/^\/+/, '')
-  if (normalized.startsWith('xl/')) {
-    return normalized
+  if (typeof target !== 'string' || target.includes('\\') || target.includes('://')) {
+    throw new CliError('Invalid xlsx workbook relationship target', 2)
   }
-  return path.posix.normalize(`xl/${normalized}`)
+  const withoutLeadingSlash = target.replace(/^\/+/, '')
+  const candidate = withoutLeadingSlash.startsWith('xl/')
+    ? withoutLeadingSlash
+    : `xl/${withoutLeadingSlash}`
+  if (
+    candidate.split('/').some((segment) => segment === '' || segment === '.' || segment === '..') ||
+    path.posix.normalize(candidate) !== candidate
+  ) {
+    throw new CliError('Invalid xlsx workbook relationship target', 2)
+  }
+  return candidate
 }
 
 function parseSharedStrings(xml) {
@@ -1518,7 +1684,41 @@ function buildSourceId(input) {
 }
 
 async function writeJson(filePath, value) {
-  await writeFile(filePath, `${JSON.stringify(value, null, 2)}\n`)
+  await writePrivateEvidenceFile(filePath, `${JSON.stringify(value, null, 2)}\n`)
+}
+
+function requireOption(value, optionName) {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new CliError(`Missing required ${optionName}`, 2)
+  }
+}
+
+function resolveGeneratedAt(value) {
+  if (value === undefined) {
+    return new Date().toISOString()
+  }
+  if (typeof value !== 'string') {
+    throw new CliError('generatedAt must be an ISO-8601 timestamp', 2)
+  }
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime()) || parsed.toISOString() !== value) {
+    throw new CliError('generatedAt must be an ISO-8601 timestamp', 2)
+  }
+  return value
+}
+
+function resolveBaseDir(baseDir) {
+  if (baseDir === undefined) {
+    return process.cwd()
+  }
+  if (typeof baseDir !== 'string' || baseDir.trim() === '') {
+    throw new CliError('baseDir must be a non-empty string', 2)
+  }
+  return path.resolve(process.cwd(), baseDir)
+}
+
+function resolveInputPath(filePath, baseDir) {
+  return path.isAbsolute(filePath) ? path.resolve(filePath) : path.resolve(baseDir, filePath)
 }
 
 async function main() {
@@ -1529,16 +1729,16 @@ async function main() {
       return
     }
     const result = await runExtraction(options)
-    console.log(
-      `Extracted ${result.summary.sourceCount} source row(s) from ${result.summary.workbookCount} workbook(s). Output: ${options.out}`,
-    )
+    console.log(`Extracted ${result.summary.sourceCount} source row(s) from ${result.summary.workbookCount} workbook(s).`)
+    console.log(`Wrote ${OUTPUT_FILES.length} local evidence file(s).`)
   } catch (error) {
     if (error instanceof CliError) {
       console.error(error.message)
       process.exitCode = error.exitCode
       return
     }
-    throw error
+    console.error('Customer source extraction failed unexpectedly')
+    process.exitCode = 1
   }
 }
 

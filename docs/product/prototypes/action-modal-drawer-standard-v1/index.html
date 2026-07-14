@@ -188,26 +188,25 @@
       }
 
       .overlay {
-        position: fixed;
-        inset: 0;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        background: var(--overlay);
-        padding: 28px;
+        display: contents;
       }
 
       .modal,
       .popover {
         display: none;
+        margin: auto;
+        color: var(--text);
+        padding: 0;
       }
 
-      body[data-modal="form"] .modal.form,
-      body[data-modal="import"] .modal.import,
-      body[data-modal="lifecycle"] .modal.lifecycle,
-      body[data-modal="columns"] .modal.columns,
-      body[data-modal="confirm"] .popover.confirm {
+      .modal[open],
+      .popover[open] {
         display: grid;
+      }
+
+      .modal::backdrop,
+      .popover::backdrop {
+        background: var(--overlay);
       }
 
       .modal {
@@ -609,7 +608,9 @@
       .popover {
         position: fixed;
         right: 32px;
+        left: auto;
         top: 410px;
+        bottom: auto;
         width: 176px;
         min-height: 100px;
         border: 1px solid var(--line);
@@ -651,11 +652,6 @@
       }
 
       @media (max-width: 980px) {
-        .overlay {
-          align-items: stretch;
-          padding: 14px;
-        }
-
         .modal.form,
         .modal.import,
         .modal.lifecycle,
@@ -688,20 +684,21 @@
           top: auto;
           bottom: 24px;
           width: auto;
+          margin: 0;
         }
       }
     </style>
   </head>
-  <body data-modal="form">
+  <body>
     <nav class="switcher" aria-label="弹窗状态">
-      <button type="button" data-target="form">单据补录</button>
-      <button type="button" data-target="import">来源选择器</button>
-      <button type="button" data-target="lifecycle">状态动作</button>
-      <button type="button" data-target="columns">列顺序</button>
-      <button type="button" data-target="confirm">危险动作确认</button>
+      <button type="button" data-target="form" aria-haspopup="dialog" aria-controls="formDialog">单据补录</button>
+      <button type="button" data-target="import" aria-haspopup="dialog" aria-controls="importDialog">选择来源明细</button>
+      <button type="button" data-target="lifecycle" aria-haspopup="dialog" aria-controls="lifecycleDialog">状态动作</button>
+      <button type="button" data-target="columns" aria-haspopup="dialog" aria-controls="columnsDialog">列顺序</button>
+      <button type="button" data-target="confirm" aria-haspopup="dialog" aria-controls="confirmDialog">危险动作确认</button>
     </nav>
 
-    <main class="shell" aria-hidden="true">
+    <main class="shell">
       <div class="mock-page">
         <section class="mock-panel mock-toolbar">
           <div>
@@ -711,18 +708,16 @@
           <div class="mock-actions">
             <button class="btn ghost">导出当前筛选</button>
             <button class="btn">列顺序</button>
-            <button class="btn">状态规则</button>
-            <button class="btn primary">新建记录</button>
+            <button class="btn">状态说明</button>
+            <button class="btn primary">新建出货单</button>
           </div>
         </section>
         <section class="mock-panel mock-toolbar">
           <strong>当前操作</strong>
           <div class="mock-actions">
-            <button class="btn">编辑</button>
-            <button class="btn">流转</button>
-            <button class="btn">生成出库</button>
-            <button class="btn">打印商业发票</button>
-            <button class="btn danger">取消 / 冲正</button>
+            <button class="btn">查看详情</button>
+            <button class="btn primary">确认出货</button>
+            <button class="btn danger">取消出货</button>
           </div>
         </section>
         <section class="mock-panel mock-table"></section>
@@ -730,142 +725,59 @@
     </main>
 
     <div class="overlay">
-      <section class="modal form" role="dialog" aria-modal="true" aria-labelledby="formTitle">
+      <dialog id="formDialog" class="modal form" aria-modal="true" aria-labelledby="formTitle" aria-describedby="formDescription">
         <header class="modal-head">
           <div>
-            <h2 class="modal-title" id="formTitle">补录：出货单局部动作</h2>
-            <p class="modal-subtitle">已关联来源单据，只补录当前动作需要的运输、收货和明细行信息；业务对象新建 / 编辑回到业务表单弹窗样板。</p>
+            <h2 class="modal-title" id="formTitle">补录出货信息</h2>
+            <p class="modal-subtitle" id="formDescription">从销售订单带入客户、产品和剩余可出货数量，再补齐计划日期、仓库、批次和本次出货数量。</p>
           </div>
-          <button class="close" type="button" aria-label="关闭">×</button>
+          <button class="close" type="button" aria-label="关闭" data-dialog-close>×</button>
         </header>
 
         <div class="modal-body">
           <div class="form-grid">
             <div class="field">
-              <label>从来源单据导入</label>
+              <label>从销售订单导入</label>
               <div class="source-row">
-                <button class="btn" type="button">从来源单据导入</button>
+                <button class="btn" type="button" data-initial-focus>选择销售订单行</button>
                 <span class="status-pill">已关联来源</span>
               </div>
               <span class="source-note">SO-202606-018</span>
             </div>
             <div class="field">
-              <label>客户名称</label>
-              <input value="上海样品客户" disabled />
+              <label>出货单号（自动）</label>
+              <input value="保存时自动生成" disabled />
             </div>
             <div class="field">
-              <label>币种（跟随来源）</label>
-              <input value="USD" disabled />
-            </div>
-
-            <div class="field">
-              <label><span class="required">*</span> 起运地</label>
-              <div class="select-like">宁波仓 <span>⌄</span></div>
+              <label>客户</label>
+              <input value="样例客户 A" disabled />
             </div>
             <div class="field">
-              <label><span class="required">*</span> 目的地</label>
-              <div class="select-like">客户指定仓 <span>⌄</span></div>
+              <label>单据客户名称</label>
+              <input value="样例客户 A" disabled />
             </div>
             <div class="field">
-              <label>目的港（CFR/CIF）</label>
-              <input />
+              <label>计划出货日期</label>
+              <div class="select-like">2026/06/20 <span>▣</span></div>
             </div>
-
             <div class="field full">
-              <label><span class="required">*</span> 收货地址（SHIP TO）</label>
-              <textarea>SAME AS SOLD TO</textarea>
-              <span class="count">15 / 300</span>
-            </div>
-
-            <div class="field">
-              <label>Incoterms</label>
-              <div class="select-like">请选择或输入 <span>⌄</span></div>
-            </div>
-            <div class="field">
-              <label>付款方式</label>
-              <div class="select-like">请选择或输入 <span>⌄</span></div>
-            </div>
-            <div class="field">
-              <label><span class="required">*</span> 运输方式</label>
-              <div class="select-like">快递 <span>⌄</span></div>
-            </div>
-
-            <div class="field">
-              <label>快件付款方式</label>
-              <div class="select-like"><span></span><span>⌄</span></div>
-            </div>
-            <div class="field">
-              <label>到付账号</label>
-              <div class="select-like">请选择或输入 <span>⌄</span></div>
-            </div>
-            <div class="field">
-              <label><span class="required">*</span> 运抵国</label>
-              <div class="select-like">请选择或输入 <span>⌄</span></div>
-            </div>
-
-            <div class="field">
-              <label><span class="required">*</span> 业务员</label>
-              <div class="select-like">业务员03 <span>⌄</span></div>
-            </div>
-            <div class="field">
-              <label>客户是否长期拖欠货款</label>
-              <div class="select-like">否 <span>⌄</span></div>
-            </div>
-            <div class="field">
-              <label>是否报关</label>
-              <div class="select-like">否 <span>⌄</span></div>
-            </div>
-
-            <div class="field">
-              <label>提单/运单号</label>
-              <input />
-            </div>
-            <div class="field">
-              <label>提单/运单日期</label>
-              <div class="select-like">yyyy/mm/dd <span>▣</span></div>
-            </div>
-            <div class="field">
-              <label>进仓发货日期</label>
-              <div class="select-like">yyyy/mm/dd <span>▣</span></div>
-            </div>
-
-            <div class="field">
-              <label>总件数（纸箱数）</label>
-              <div class="unit-input"><input value="14" /><span class="unit">箱</span></div>
-            </div>
-            <div class="field">
-              <label>总净重</label>
-              <div class="unit-input"><input /><span class="unit">KGS</span></div>
-            </div>
-            <div class="field">
-              <label>总毛重</label>
-              <div class="unit-input"><input /><span class="unit">KGS</span></div>
-            </div>
-
-            <div class="field">
-              <label>总体积</label>
-              <div class="unit-input"><input /><span class="unit">M3</span></div>
-            </div>
-            <div class="field">
-              <label>运费</label>
-              <div class="unit-input"><input /><span class="unit">USD</span></div>
-            </div>
-            <div class="field">
-              <label>附件（进仓通知 / 随货发票）</label>
-              <button class="btn" type="button">上传附件</button>
-            </div>
-
-            <div class="field full">
-              <label>备注（收件人详细信息）</label>
-              <textarea></textarea>
+              <label>备注</label>
+              <textarea placeholder="填写本次出货需要说明的事项"></textarea>
               <span class="count">0 / 300</span>
+            </div>
+            <div class="field full">
+              <label>出货附件</label>
+              <div class="source-row">
+                <button class="btn" type="button">上传附件</button>
+                <span class="source-note">可上传装箱照片、物流单或签收回单</span>
+              </div>
             </div>
           </div>
 
           <div class="section-head">
             <div>
               <h3 class="section-title"><span class="required">*</span> 明细行（产品 / 物料）</h3>
-              <p class="hint">按单据类型显示产品、物料、仓库或批次字段，只保留当前动作必要列。</p>
+              <p class="hint">来源产品、SKU 和单位随销售订单行带入；本次补齐仓库、批次和出货数量。</p>
             </div>
             <button class="btn" type="button">添加明细行</button>
           </div>
@@ -875,35 +787,35 @@
             <div class="line-grid">
               <div class="field">
                 <label>来源行</label>
-                <input value="SO-202606-018 / 1" />
+                <input value="SO-202606-018 / 第 1 行" disabled />
               </div>
               <div class="field">
                 <label>产品 / 物料</label>
-                <input value="毛绒挂件 A" />
+                <input value="毛绒挂件 A" disabled />
               </div>
               <div class="field">
                 <label>规格 / SKU</label>
-                <input value="12cm / 白色" />
+                <input value="12cm / 白色" disabled />
               </div>
               <div class="field">
                 <label>单位</label>
-                <input value="个" />
+                <input value="个" disabled />
               </div>
               <div class="field">
-                <label>数量</label>
+                <label><span class="required">*</span> 仓库</label>
+                <div class="select-like">成品仓 <span>⌄</span></div>
+              </div>
+              <div class="field">
+                <label>批次</label>
+                <div class="select-like">待分配 <span>⌄</span></div>
+              </div>
+              <div class="field">
+                <label><span class="required">*</span> 本次出货数量</label>
                 <input value="120" />
               </div>
               <div class="field">
-                <label>单价</label>
-                <input value="18.00" />
-              </div>
-              <div class="field">
-                <label>金额</label>
-                <input value="2160.00" />
-              </div>
-              <div class="field">
-                <label>仓库 / 批次</label>
-                <input value="成品仓 / 待分配" />
+                <label>明细备注</label>
+                <input placeholder="可选" />
               </div>
             </div>
           </div>
@@ -912,41 +824,40 @@
             <div class="totals">
               <span class="status-pill">明细 1 行</span>
               <span class="status-pill">数量合计 120</span>
-              <span class="status-pill">金额合计 2,160.00</span>
             </div>
             <div class="field" style="min-width: 220px">
-              <label>状态箱</label>
-              <div class="select-like">草稿箱 <span>⌄</span></div>
+              <label>保存状态</label>
+              <input value="草稿" disabled />
             </div>
           </div>
         </div>
 
         <footer class="modal-foot">
-          <button class="btn" type="button">取消</button>
-          <button class="btn primary" type="button">确定</button>
+          <button class="btn" type="button" data-dialog-close>取消</button>
+          <button class="btn primary" type="button">保存补录</button>
         </footer>
-      </section>
+      </dialog>
 
-      <section class="modal import" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+      <dialog id="importDialog" class="modal import" aria-modal="true" aria-labelledby="importTitle" aria-describedby="importDescription">
         <header class="modal-head">
           <div>
-            <h2 class="modal-title" id="importTitle">来源选择器：导入明细</h2>
-            <p class="modal-subtitle">
-              第二层只选择当前动作需要的来源行；导入后回到父弹窗维护数量、仓库、批次和收货信息。
+            <h2 class="modal-title" id="importTitle">从销售订单导入出货明细</h2>
+            <p class="modal-subtitle" id="importDescription">
+              选择仍有剩余可出货数量的销售订单行；导入后补齐仓库、批次和本次出货数量。
             </p>
           </div>
-          <button class="close" type="button" aria-label="关闭">×</button>
+          <button class="close" type="button" aria-label="关闭" data-dialog-close>×</button>
         </header>
         <div class="modal-body">
-          <div class="picker-rules" aria-label="来源选择器规则">
-            <span class="rule-chip">第 2 层弹窗</span>
-            <span class="rule-chip">只筛选和选择来源</span>
-            <span class="rule-chip">不编辑本单字段</span>
-            <span class="rule-chip">不再弹第 3 层</span>
+          <div class="picker-rules" aria-label="销售订单来源规则">
+            <span class="rule-chip">仅显示销售订单行</span>
+            <span class="rule-chip">同一出货单选择同一张订单</span>
+            <span class="rule-chip">不可用行说明原因</span>
+            <span class="rule-chip">导入后补齐仓库和批次</span>
           </div>
           <div class="search-row">
-            <input placeholder="搜索要导入的记录" />
-            <button class="btn" type="button">查看计算口径</button>
+            <input placeholder="搜索销售订单号、客户或产品" data-initial-focus />
+            <button class="btn" type="button">查看剩余量说明</button>
           </div>
           <div class="picker-selection">
             <div class="picker-selection-items">
@@ -961,40 +872,40 @@
                 <tr>
                   <th></th>
                   <th>来源单号</th>
-                  <th>业务对象</th>
-                  <th>客户 / 供应商</th>
-                  <th>明细行</th>
-                  <th>可导入数量</th>
-                  <th>限制说明</th>
+                  <th>来源行</th>
+                  <th>客户</th>
+                  <th>产品 / SKU</th>
+                  <th>订单数量</th>
+                  <th>已出货</th>
+                  <th>剩余可出货</th>
+                  <th>状态</th>
+                  <th>不可用原因</th>
                 </tr>
               </thead>
               <tbody>
                 <tr>
                   <td><input type="checkbox" disabled /></td>
                   <td>SO-202606-016</td>
-                  <td>销售订单</td>
-                  <td>上海样品客户</td>
-                  <td>3</td>
+                  <td>第 3 行</td>
+                  <td>样例客户 A</td>
+                  <td>毛绒挂件 B / 蓝色</td>
+                  <td>80</td>
+                  <td>80</td>
                   <td>0</td>
-                  <td>已全部生成出货</td>
+                  <td>已出完</td>
+                  <td>剩余数量为 0</td>
                 </tr>
                 <tr>
                   <td><input type="checkbox" /></td>
                   <td>SO-202606-018</td>
-                  <td>销售订单</td>
-                  <td>上海样品客户</td>
-                  <td>1</td>
+                  <td>第 1 行</td>
+                  <td>样例客户 A</td>
+                  <td>毛绒挂件 A / 白色</td>
+                  <td>200</td>
+                  <td>80</td>
                   <td>120</td>
+                  <td>可出货</td>
                   <td>-</td>
-                </tr>
-                <tr>
-                  <td><input type="checkbox" disabled /></td>
-                  <td>PR-202606-003</td>
-                  <td>采购入库</td>
-                  <td>辅料供应商 A</td>
-                  <td>2</td>
-                  <td>待质检</td>
-                  <td>当前动作不可导入</td>
                 </tr>
               </tbody>
             </table>
@@ -1013,24 +924,24 @@
           </div>
         </div>
         <footer class="modal-foot">
-          <button class="btn" type="button">取消</button>
+          <button class="btn" type="button" data-dialog-close>取消</button>
           <button class="btn primary" type="button">导入</button>
         </footer>
-      </section>
+      </dialog>
 
-      <section class="modal lifecycle" role="dialog" aria-modal="true" aria-labelledby="lifecycleTitle">
+      <dialog id="lifecycleDialog" class="modal lifecycle" aria-modal="true" aria-labelledby="lifecycleTitle" aria-describedby="lifecycleDescription">
         <header class="modal-head">
           <div>
             <h2 class="modal-title" id="lifecycleTitle">状态动作说明</h2>
-            <p class="modal-subtitle">本样板不提供通用删除 / 回收站，只说明对象应使用的真实状态动作。</p>
+            <p class="modal-subtitle" id="lifecycleDescription">本样板不提供通用删除 / 回收站，只说明对象应使用的真实状态动作。</p>
           </div>
-          <button class="close" type="button" aria-label="关闭">×</button>
+          <button class="close" type="button" aria-label="关闭" data-dialog-close data-initial-focus>×</button>
         </header>
         <div class="modal-body">
           <div class="compact-toolbar" style="margin-bottom: 12px">
             <button class="btn" disabled type="button">查看引用</button>
             <button class="btn danger" type="button">按对象专项评审后启用</button>
-            <span class="source-note">未完成后端 usecase / RBAC / 审计 / 引用检查时，不展示删除入口。</span>
+            <span class="source-note">未完成操作权限、历史引用和留痕检查时，不展示删除入口。</span>
           </div>
           <div class="table-wrap">
             <table>
@@ -1060,15 +971,15 @@
           </div>
           <div class="pagination">删除 / 恢复只允许在对象专项闭环后另行设计。</div>
         </div>
-      </section>
+      </dialog>
 
-      <section class="modal columns" role="dialog" aria-modal="true" aria-labelledby="columnsTitle">
+      <dialog id="columnsDialog" class="modal columns" aria-modal="true" aria-labelledby="columnsTitle" aria-describedby="columnsDescription">
         <header class="modal-head">
           <div>
             <h2 class="modal-title" id="columnsTitle">调整列表列顺序</h2>
-            <p class="modal-subtitle">当前模块列顺序跟随管理员账号保存，表头菜单也可快捷调整。</p>
+            <p class="modal-subtitle" id="columnsDescription">当前模块列顺序跟随管理员账号保存，表头菜单也可快捷调整。</p>
           </div>
-          <button class="close" type="button" aria-label="关闭">×</button>
+          <button class="close" type="button" aria-label="关闭" data-dialog-close data-initial-focus>×</button>
         </header>
         <div class="modal-body">
           <div class="order-list">
@@ -1082,7 +993,7 @@
             </div>
             <div class="order-row">
               <span class="order-index">2</span>
-              <strong>报关编号</strong>
+              <strong>销售订单</strong>
               <button class="btn" type="button">移到最前</button>
               <button class="btn" type="button">上移</button>
               <button class="btn" type="button">下移</button>
@@ -1116,26 +1027,94 @@
         </div>
         <footer class="modal-foot">
           <button class="btn" type="button">恢复默认</button>
-          <button class="btn primary" type="button">完成</button>
+          <button class="btn primary" type="button" data-dialog-close>完成</button>
         </footer>
-      </section>
+      </dialog>
 
-      <div class="popover confirm" role="tooltip">
-        <p class="popover-title">确认执行该危险动作？</p>
+      <dialog id="confirmDialog" class="popover confirm" role="alertdialog" aria-modal="true" aria-labelledby="confirmTitle" aria-describedby="confirmDescription">
+        <p class="popover-title" id="confirmTitle">确认执行该危险动作？</p>
+        <p class="modal-subtitle" id="confirmDescription">该动作会改变当前业务对象状态，请确认对象和影响后继续。</p>
         <div class="popover-actions">
-          <button class="btn" type="button">取消</button>
-          <button class="btn danger" type="button">继续执行</button>
+          <button class="btn" type="button" data-dialog-close data-initial-focus>取消</button>
+          <button class="btn danger" type="button" data-dialog-close>继续执行</button>
         </div>
-      </div>
+      </dialog>
     </div>
 
     <script>
-      const buttons = document.querySelectorAll(".switcher [data-target]");
+      const switcher = document.querySelector(".switcher");
+      const shell = document.querySelector(".shell");
+      const buttons = Array.from(
+        document.querySelectorAll(".switcher [data-target]"),
+      );
+      const dialogs = new Map(
+        buttons.map((button) => [
+          button.dataset.target,
+          document.getElementById(button.getAttribute("aria-controls")),
+        ]),
+      );
+      let activeDialog = null;
+      let lastTrigger = null;
+
+      function setBackgroundInert(blocked) {
+        [switcher, shell].forEach((element) => {
+          element.inert = blocked;
+          if (blocked) {
+            element.setAttribute("aria-hidden", "true");
+          } else {
+            element.removeAttribute("aria-hidden");
+          }
+        });
+      }
+
+      function closeDialog(dialog = activeDialog) {
+        if (dialog?.open) dialog.close();
+      }
+
+      function openDialog(target, trigger) {
+        const dialog = dialogs.get(target);
+        if (!dialog || dialog.open) return;
+        activeDialog = dialog;
+        lastTrigger = trigger;
+        document.body.dataset.modal = target;
+        dialog.showModal();
+        setBackgroundInert(true);
+        requestAnimationFrame(() => {
+          const initialFocus = dialog.querySelector(
+            "[data-initial-focus], button:not([disabled]), input:not([disabled]), textarea:not([disabled])",
+          );
+          initialFocus?.focus({ preventScroll: true });
+        });
+      }
+
       buttons.forEach((button) => {
         button.addEventListener("click", () => {
-          document.body.dataset.modal = button.dataset.target;
+          openDialog(button.dataset.target, button);
         });
       });
+
+      dialogs.forEach((dialog) => {
+        dialog.querySelectorAll("[data-dialog-close]").forEach((button) => {
+          button.addEventListener("click", () => closeDialog(dialog));
+        });
+        dialog.addEventListener("cancel", (event) => {
+          event.preventDefault();
+          closeDialog(dialog);
+        });
+        dialog.addEventListener("close", () => {
+          if (activeDialog !== dialog) return;
+          activeDialog = null;
+          setBackgroundInert(false);
+          document.body.removeAttribute("data-modal");
+          const trigger = lastTrigger;
+          lastTrigger = null;
+          requestAnimationFrame(() =>
+            trigger?.focus({ preventScroll: true }),
+          );
+        });
+      });
+
+      openDialog("form", buttons[0]);
     </script>
   </body>
 </html>

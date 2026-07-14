@@ -28,6 +28,9 @@ const (
 )
 
 func NewToken(cfg Config, userID int, sessionKey string, authVersion int64, issuedAt, requestedExpiry time.Time) (string, time.Time, error) {
+	if len(cfg.Secret) == 0 {
+		return "", time.Time{}, errors.New("jwt secret is required")
+	}
 	if userID <= 0 || sessionKey == "" || authVersion <= 0 {
 		return "", time.Time{}, errors.New("invalid admin token input")
 	}
@@ -38,14 +41,19 @@ func NewToken(cfg Config, userID int, sessionKey string, authVersion int64, issu
 	if expireAt.IsZero() {
 		expireAt = issuedAt.Add(cfg.ExpireDuration)
 	}
+	issuedAtClaim := jwt.NewNumericDate(issuedAt)
+	expiresAtClaim := jwt.NewNumericDate(expireAt)
+	if !expiresAtClaim.After(issuedAtClaim.Time) {
+		return "", time.Time{}, errors.New("jwt expiry must be after issued at")
+	}
 
 	claims := &Claims{
 		UserID:      userID,
 		SessionKey:  sessionKey,
 		AuthVersion: authVersion,
 		RegisteredClaims: jwt.RegisteredClaims{
-			ExpiresAt: jwt.NewNumericDate(expireAt),
-			IssuedAt:  jwt.NewNumericDate(issuedAt),
+			ExpiresAt: expiresAtClaim,
+			IssuedAt:  issuedAtClaim,
 			Issuer:    adminTokenIssuer,
 			Audience:  jwt.ClaimStrings{adminTokenAudience},
 			Subject:   adminTokenSubject,
@@ -58,10 +66,13 @@ func NewToken(cfg Config, userID int, sessionKey string, authVersion int64, issu
 	if err != nil {
 		return "", time.Time{}, err
 	}
-	return signed, expireAt, nil
+	return signed, expiresAtClaim.Time, nil
 }
 
 func ParseToken(secret []byte, tokenStr string) (*Claims, error) {
+	if len(secret) == 0 {
+		return nil, errors.New("jwt secret is required")
+	}
 	token, err := jwt.ParseWithClaims(tokenStr, &Claims{}, func(t *jwt.Token) (interface{}, error) {
 		if t.Method != jwt.SigningMethodHS256 {
 			return nil, jwt.ErrSignatureInvalid
@@ -71,8 +82,14 @@ func ParseToken(secret []byte, tokenStr string) (*Claims, error) {
 	if err != nil {
 		return nil, err
 	}
-	if claims, ok := token.Claims.(*Claims); ok && token.Valid && claims.UserID > 0 && claims.SessionKey != "" && claims.ID == claims.SessionKey && claims.AuthVersion > 0 {
+	if claims, ok := token.Claims.(*Claims); ok && token.Valid && validAdminTokenClaims(claims) {
 		return claims, nil
 	}
 	return nil, jwt.ErrTokenInvalidClaims
+}
+
+func validAdminTokenClaims(claims *Claims) bool {
+	return claims != nil &&
+		claims.IssuedAt != nil && claims.ExpiresAt != nil && claims.ExpiresAt.After(claims.IssuedAt.Time) &&
+		claims.UserID > 0 && claims.SessionKey != "" && claims.ID == claims.SessionKey && claims.AuthVersion > 0
 }

@@ -4,10 +4,11 @@ set -euo pipefail
 print_help() {
   cat <<'USAGE'
 用法:
-  bash scripts/qa/shellcheck.sh
+  bash scripts/qa/shellcheck.sh [shell 文件...]
 
 作用:
-  对 scripts 与 .githooks 下的 shell 脚本执行 shellcheck 静态检查
+  - 传入参数：仅检查指定 shell 文件
+  - 不传参数：检查 scripts 与 .githooks 下的全部 shell 文件
 
 环境变量:
   SKIP_SHELLCHECK=1     跳过检查
@@ -18,12 +19,6 @@ USAGE
 if [[ "${1:-}" == "-h" || "${1:-}" == "--help" ]]; then
   print_help
   exit 0
-fi
-
-if [[ $# -gt 0 ]]; then
-  echo "[qa:shellcheck] 不支持的参数: $*"
-  print_help
-  exit 1
 fi
 
 ROOT_DIR="$(git rev-parse --show-toplevel)"
@@ -44,9 +39,24 @@ if ! command -v shellcheck >/dev/null 2>&1; then
 fi
 
 files=()
-while IFS= read -r -d '' f; do
-  files+=("$f")
-done < <(find scripts .githooks -type f \( -name '*.sh' -o -name 'pre-commit' -o -name 'pre-push' -o -name 'commit-msg' \) -print0)
+if [[ $# -gt 0 ]]; then
+  for f in "$@"; do
+    [[ -f "$f" ]] || continue
+    case "$f" in
+    *.sh | .githooks/pre-commit | .githooks/pre-push | .githooks/commit-msg)
+      files+=("$f")
+      ;;
+    *)
+      echo "[qa:shellcheck] 不是受支持的 shell 文件: $f"
+      exit 1
+      ;;
+    esac
+  done
+else
+  while IFS= read -r -d '' f; do
+    files+=("$f")
+  done < <(find scripts .githooks -type f \( -name '*.sh' -o -name 'pre-commit' -o -name 'pre-push' -o -name 'commit-msg' \) -print0)
+fi
 
 if [[ "${#files[@]}" -eq 0 ]]; then
   echo "[qa:shellcheck] 未发现可检查脚本"

@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
+	"server/internal/data/model/ent/workflowtask"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -315,6 +316,21 @@ func (_u *ProcessInstanceUpdate) AddNodes(v ...*ProcessNodeInstance) *ProcessIns
 	return _u.AddNodeIDs(ids...)
 }
 
+// AddWorkflowTaskIDs adds the "workflow_tasks" edge to the WorkflowTask entity by IDs.
+func (_u *ProcessInstanceUpdate) AddWorkflowTaskIDs(ids ...int) *ProcessInstanceUpdate {
+	_u.mutation.AddWorkflowTaskIDs(ids...)
+	return _u
+}
+
+// AddWorkflowTasks adds the "workflow_tasks" edges to the WorkflowTask entity.
+func (_u *ProcessInstanceUpdate) AddWorkflowTasks(v ...*WorkflowTask) *ProcessInstanceUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWorkflowTaskIDs(ids...)
+}
+
 // Mutation returns the ProcessInstanceMutation object of the builder.
 func (_u *ProcessInstanceUpdate) Mutation() *ProcessInstanceMutation {
 	return _u.mutation
@@ -339,6 +355,27 @@ func (_u *ProcessInstanceUpdate) RemoveNodes(v ...*ProcessNodeInstance) *Process
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveNodeIDs(ids...)
+}
+
+// ClearWorkflowTasks clears all "workflow_tasks" edges to the WorkflowTask entity.
+func (_u *ProcessInstanceUpdate) ClearWorkflowTasks() *ProcessInstanceUpdate {
+	_u.mutation.ClearWorkflowTasks()
+	return _u
+}
+
+// RemoveWorkflowTaskIDs removes the "workflow_tasks" edge to WorkflowTask entities by IDs.
+func (_u *ProcessInstanceUpdate) RemoveWorkflowTaskIDs(ids ...int) *ProcessInstanceUpdate {
+	_u.mutation.RemoveWorkflowTaskIDs(ids...)
+	return _u
+}
+
+// RemoveWorkflowTasks removes "workflow_tasks" edges to WorkflowTask entities.
+func (_u *ProcessInstanceUpdate) RemoveWorkflowTasks(v ...*WorkflowTask) *ProcessInstanceUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWorkflowTaskIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -575,6 +612,51 @@ func (_u *ProcessInstanceUpdate) sqlSave(ctx context.Context) (_node int, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(processnodeinstance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.WorkflowTasksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   processinstance.WorkflowTasksTable,
+			Columns: []string{processinstance.WorkflowTasksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWorkflowTasksIDs(); len(nodes) > 0 && !_u.mutation.WorkflowTasksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   processinstance.WorkflowTasksTable,
+			Columns: []string{processinstance.WorkflowTasksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WorkflowTasksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   processinstance.WorkflowTasksTable,
+			Columns: []string{processinstance.WorkflowTasksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -888,6 +970,21 @@ func (_u *ProcessInstanceUpdateOne) AddNodes(v ...*ProcessNodeInstance) *Process
 	return _u.AddNodeIDs(ids...)
 }
 
+// AddWorkflowTaskIDs adds the "workflow_tasks" edge to the WorkflowTask entity by IDs.
+func (_u *ProcessInstanceUpdateOne) AddWorkflowTaskIDs(ids ...int) *ProcessInstanceUpdateOne {
+	_u.mutation.AddWorkflowTaskIDs(ids...)
+	return _u
+}
+
+// AddWorkflowTasks adds the "workflow_tasks" edges to the WorkflowTask entity.
+func (_u *ProcessInstanceUpdateOne) AddWorkflowTasks(v ...*WorkflowTask) *ProcessInstanceUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWorkflowTaskIDs(ids...)
+}
+
 // Mutation returns the ProcessInstanceMutation object of the builder.
 func (_u *ProcessInstanceUpdateOne) Mutation() *ProcessInstanceMutation {
 	return _u.mutation
@@ -912,6 +1009,27 @@ func (_u *ProcessInstanceUpdateOne) RemoveNodes(v ...*ProcessNodeInstance) *Proc
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveNodeIDs(ids...)
+}
+
+// ClearWorkflowTasks clears all "workflow_tasks" edges to the WorkflowTask entity.
+func (_u *ProcessInstanceUpdateOne) ClearWorkflowTasks() *ProcessInstanceUpdateOne {
+	_u.mutation.ClearWorkflowTasks()
+	return _u
+}
+
+// RemoveWorkflowTaskIDs removes the "workflow_tasks" edge to WorkflowTask entities by IDs.
+func (_u *ProcessInstanceUpdateOne) RemoveWorkflowTaskIDs(ids ...int) *ProcessInstanceUpdateOne {
+	_u.mutation.RemoveWorkflowTaskIDs(ids...)
+	return _u
+}
+
+// RemoveWorkflowTasks removes "workflow_tasks" edges to WorkflowTask entities.
+func (_u *ProcessInstanceUpdateOne) RemoveWorkflowTasks(v ...*WorkflowTask) *ProcessInstanceUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWorkflowTaskIDs(ids...)
 }
 
 // Where appends a list predicates to the ProcessInstanceUpdate builder.
@@ -1178,6 +1296,51 @@ func (_u *ProcessInstanceUpdateOne) sqlSave(ctx context.Context) (_node *Process
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(processnodeinstance.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.WorkflowTasksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   processinstance.WorkflowTasksTable,
+			Columns: []string{processinstance.WorkflowTasksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWorkflowTasksIDs(); len(nodes) > 0 && !_u.mutation.WorkflowTasksCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   processinstance.WorkflowTasksTable,
+			Columns: []string{processinstance.WorkflowTasksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WorkflowTasksIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   processinstance.WorkflowTasksTable,
+			Columns: []string{processinstance.WorkflowTasksColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(workflowtask.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

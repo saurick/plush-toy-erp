@@ -19,6 +19,7 @@ var (
 	ErrBOMHeaderNotFound                     = errors.New("bom header not found")
 	ErrBOMItemNotFound                       = errors.New("bom item not found")
 	ErrBOMActiveImmutable                    = errors.New("active bom must be copied before edit")
+	ErrBOMActiveConflict                     = errors.New("another bom version is active")
 	ErrPurchaseReceiptNotFound               = errors.New("purchase receipt not found")
 	ErrPurchaseReceiptItemNotFound           = errors.New("purchase receipt item not found")
 	ErrPurchaseReturnNotFound                = errors.New("purchase return not found")
@@ -53,7 +54,6 @@ const (
 	BOMStatusDraft    = "DRAFT"
 	BOMStatusActive   = "ACTIVE"
 	BOMStatusArchived = "ARCHIVED"
-	BOMStatusDisabled = "DISABLED"
 
 	PurchaseReceiptSourceType      = "PURCHASE_RECEIPT"
 	PurchaseReceiptStatusDraft     = corestatus.PurchaseReceiptDraft
@@ -96,7 +96,6 @@ var (
 		BOMStatusDraft:    {},
 		BOMStatusActive:   {},
 		BOMStatusArchived: {},
-		BOMStatusDisabled: {},
 	}
 	purchaseReceiptAdjustmentTypes = map[string]struct{}{
 		PurchaseReceiptAdjustmentQuantityIncrease:       {},
@@ -389,6 +388,7 @@ type InventoryRepo interface {
 	CreatePurchaseReceiptWithItems(ctx context.Context, in *PurchaseReceiptCreate, items []*PurchaseReceiptItemCreate) (*PurchaseReceipt, error)
 	ResolvePurchaseReceiptFromPurchaseOrderReplay(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, bool, error)
 	CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *PurchaseReceiptFromPurchaseOrderCreate) (*PurchaseReceipt, error)
+	ResolvePurchaseReceiptItemReplay(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, bool, error)
 	AddPurchaseReceiptItem(ctx context.Context, in *PurchaseReceiptItemCreate) (*PurchaseReceiptItem, error)
 	PostPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
 	CancelPostedPurchaseReceipt(ctx context.Context, receiptID int) (*PurchaseReceipt, error)
@@ -658,6 +658,12 @@ func (uc *InventoryUsecase) ActivateBOMVersion(ctx context.Context, id int) (*BO
 	if detail == nil || detail.Header == nil || len(detail.Items) == 0 {
 		return nil, ErrBadParam
 	}
+	if detail.Header.Status == BOMStatusActive {
+		return detail, nil
+	}
+	if !CanTransitionBOMStatus(detail.Header.Status, BOMStatusActive) {
+		return nil, ErrBadParam
+	}
 	if err := requireActiveReference(ctx, detail.Header.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
 		return nil, err
 	}
@@ -674,6 +680,16 @@ func (uc *InventoryUsecase) ActivateBOMVersion(ctx context.Context, id int) (*BO
 
 func (uc *InventoryUsecase) ArchiveBOMVersion(ctx context.Context, id int) (*BOMHeader, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
+		return nil, ErrBadParam
+	}
+	header, err := uc.repo.GetBOMHeader(ctx, id)
+	if err != nil {
+		return nil, err
+	}
+	if header.Status == BOMStatusArchived {
+		return header, nil
+	}
+	if !CanTransitionBOMStatus(header.Status, BOMStatusArchived) {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ArchiveBOMVersion(ctx, id)
@@ -850,8 +866,31 @@ func IsInventoryLotStatusTransitionAllowed(currentStatus, newStatus string, hasP
 }
 
 func IsValidBOMStatus(value string) bool {
+	return IsKnownBOMStatus(value)
+}
+
+func IsKnownBOMStatus(value string) bool {
 	_, ok := bomStatuses[strings.ToUpper(strings.TrimSpace(value))]
 	return ok
+}
+
+func IsCreatableBOMStatus(value string) bool {
+	return strings.ToUpper(strings.TrimSpace(value)) == BOMStatusDraft
+}
+
+func CanTransitionBOMStatus(currentStatus, newStatus string) bool {
+	currentStatus = strings.ToUpper(strings.TrimSpace(currentStatus))
+	newStatus = strings.ToUpper(strings.TrimSpace(newStatus))
+	switch currentStatus {
+	case BOMStatusDraft:
+		return newStatus == BOMStatusActive || newStatus == BOMStatusArchived
+	case BOMStatusActive:
+		return newStatus == BOMStatusArchived
+	case BOMStatusArchived:
+		return newStatus == BOMStatusActive
+	default:
+		return false
+	}
 }
 
 func (uc *InventoryUsecase) validateBOMItemActiveReferences(ctx context.Context, materialID int, unitID int) error {
@@ -890,7 +929,7 @@ func normalizeBOMHeaderCreate(in BOMHeaderCreate) (BOMHeaderCreate, error) {
 	in.HairDirection = normalizeOptionalString(in.HairDirection)
 	if in.ProductID <= 0 ||
 		in.Version == "" ||
-		!IsValidBOMStatus(in.Status) {
+		!IsCreatableBOMStatus(in.Status) {
 		return BOMHeaderCreate{}, ErrBadParam
 	}
 	if in.EffectiveFrom != nil && in.EffectiveTo != nil && !in.EffectiveFrom.Before(*in.EffectiveTo) {

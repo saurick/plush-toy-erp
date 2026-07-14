@@ -37,7 +37,7 @@ import {
   listCustomers,
   listContactsByOwner,
   listProductSKUs,
-  listSalesOrderItems,
+  listAllSalesOrderItems,
   listSalesOrders,
   listUnits,
   saveSalesOrderWithItems,
@@ -49,7 +49,6 @@ import {
 import SalesOrderBusinessModal from '../components/sales-orders/SalesOrderBusinessModal.jsx'
 import { buildSalesOrderColumns } from '../components/sales-orders/salesOrderColumns.jsx'
 import {
-  OPEN_SALES_ORDER_LINE_STATUS,
   SALES_ORDER_DATE_FILTER_OPTIONS,
   SALES_ORDER_LIFECYCLE_ACTIONS,
   SALES_ORDER_SORT_FILTER_OPTIONS,
@@ -81,6 +80,15 @@ import {
   writeStoredColumnOrder,
 } from '../utils/businessTableActions.mjs'
 import { isDraftSourceDocument } from '../utils/sourceDocumentEditing.mjs'
+import {
+  commitSourceDocumentSaveResult,
+  createSourceDocumentOpenEditController,
+  isMutationResultUnknown,
+  isResourceVersionConflict,
+  openSourceDocumentEditWithAccessGate,
+  selectOpenSourceDocumentItems,
+  settleSourceDocumentPostSaveEffect,
+} from '../utils/sourceDocumentMutation.mjs'
 import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
@@ -161,6 +169,14 @@ export default function V1SalesOrdersPage() {
   const orderAttachmentRef = useRef(null)
   const contactLoadSeqRef = useRef(0)
   const beginLatestRequest = useLatestRequestCoordinator()
+  const sourceDocumentOpenEditController = useMemo(
+    () =>
+      createSourceDocumentOpenEditController({
+        beginLatestRequest,
+        setLoading: setItemLoading,
+      }),
+    [beginLatestRequest]
+  )
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
@@ -365,6 +381,7 @@ export default function V1SalesOrdersPage() {
   }, [loadOrders, outletContext])
 
   const openCreateOrder = () => {
+    sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
     setCustomerContacts([])
@@ -384,81 +401,134 @@ export default function V1SalesOrdersPage() {
   }
 
   const openEditOrder = async (order) => {
-    if (!order?.id) return
-    if (!isDraftSourceDocument(order)) {
-      message.warning('订单提交后已冻结；如需调整，请取消后重新建立订单。')
+    const editResult = await openSourceDocumentEditWithAccessGate({
+      canUpdate: canUpdateOrder,
+      document: order,
+      invalidatePending: () => sourceDocumentOpenEditController.invalidate(),
+      isEditable: isDraftSourceDocument,
+      open: () =>
+        sourceDocumentOpenEditController.open({
+          loadItems: async ({ signal }) => {
+            const result = await listAllSalesOrderItems(
+              {
+                sales_order_id: order.id,
+                expected_version: order.version,
+              },
+              { signal }
+            )
+            return result?.sales_order_items
+          },
+          enterEditing: (nextItems) => {
+            const openItems = selectOpenSourceDocumentItems(nextItems)
+            orderAttachmentRef.current?.clearPendingAttachments()
+            setSelectedOrder(order)
+            setEditingOrder(order)
+            orderForm.setFieldsValue({
+              ...order,
+              order_date: unixToDateInputValue(order.order_date),
+              planned_delivery_date: unixToDateInputValue(
+                order.planned_delivery_date
+              ),
+              ...buildSalesOrderContactFormValues(order),
+              items: openItems.map(normalizeSalesOrderItemFormValue),
+            })
+            rememberPaymentCondition(order)
+            loadCustomerContacts(order.customer_id)
+            setOrderModalOpen(true)
+          },
+        }),
+    })
+    if (editResult.status === 'blocked') {
+      if (editResult.reason === 'forbidden') {
+        message.warning('当前账号没有编辑销售订单的权限。')
+      } else if (editResult.reason === 'not_editable') {
+        message.warning('订单提交后已冻结；如需调整，请取消后重新建立订单。')
+      }
       return
     }
-    orderAttachmentRef.current?.clearPendingAttachments()
-    setSelectedOrder(order)
-    setEditingOrder(order)
-    orderForm.setFieldsValue({
-      ...order,
-      order_date: unixToDateInputValue(order.order_date),
-      planned_delivery_date: unixToDateInputValue(order.planned_delivery_date),
-      ...buildSalesOrderContactFormValues(order),
-      items: [],
-    })
-    rememberPaymentCondition(order)
-    loadCustomerContacts(order.customer_id)
-    setOrderModalOpen(true)
-    setItemLoading(true)
-    try {
-      const result = await listSalesOrderItems({
-        sales_order_id: order.id,
-        limit: 200,
-      })
-      const nextItems = Array.isArray(result?.sales_order_items)
-        ? result.sales_order_items
-        : []
-      const openItems = nextItems.filter(
-        (item) => String(item?.line_status) === OPEN_SALES_ORDER_LINE_STATUS
+    if (editResult.status === 'load_failed') {
+      message.error(
+        `${getActionErrorMessage(
+          editResult.error,
+          '加载销售订单明细失败'
+        )}，未进入编辑`
       )
-      orderForm.setFieldsValue({
-        ...order,
-        order_date: unixToDateInputValue(order.order_date),
-        planned_delivery_date: unixToDateInputValue(
-          order.planned_delivery_date
-        ),
-        ...buildSalesOrderContactFormValues(order),
-        items: openItems.map(normalizeSalesOrderItemFormValue),
-      })
-      rememberPaymentCondition(order)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '加载订单行'))
-    } finally {
-      setItemLoading(false)
     }
   }
 
   const saveOrder = async () => {
     const values = await orderForm.validateFields()
     const customer = customers.find((item) => item.id === values.customer_id)
-    setSaving(true)
+    let params
     try {
-      const params = buildSalesOrderParams(
+      params = buildSalesOrderParams(
         {
           ...values,
           ...buildSalesOrderCustomerSourceValues(customer),
           contact_snapshot: buildOrderContactSnapshot(values),
         },
-        editingOrder?.id ? { id: editingOrder.id } : {}
+        editingOrder?.id
+          ? {
+              id: editingOrder.id,
+              expected_version: editingOrder.version,
+            }
+          : {}
       )
-      const result = await saveSalesOrderWithItems({
-        ...params,
-        items: (Array.isArray(values.items) ? values.items : []).map(
-          (item, index) =>
-            buildSalesOrderItemParams(item, {
-              ...(item?.id ? { id: item.id } : {}),
-              line_no: index + 1,
-            })
-        ),
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '准备销售订单保存'))
+      return
+    }
+    setSaving(true)
+    try {
+      const saveResult = await commitSourceDocumentSaveResult({
+        save: async () => {
+          const result = await saveSalesOrderWithItems({
+            ...params,
+            items: (Array.isArray(values.items) ? values.items : []).map(
+              (item, index) =>
+                buildSalesOrderItemParams(item, {
+                  ...(item?.id ? { id: item.id } : {}),
+                  line_no: index + 1,
+                })
+            ),
+          })
+          return result.sales_order
+        },
+        bindSaved: (savedOrder) => {
+          setEditingOrder(savedOrder)
+          setSelectedOrder(savedOrder)
+        },
       })
-      const saved = result?.sales_order || null
+      if (saveResult.status === 'save_failed') {
+        const saveError = saveResult.error
+        if (isResourceVersionConflict(saveError)) {
+          message.warning(
+            '该单据已被其他人更新，本次内容没有覆盖最新数据。请核对最新单据后再保存。'
+          )
+        } else if (isMutationResultUnknown(saveError)) {
+          message.warning(
+            '保存结果尚未确认，请先核对该单据的最新状态，不要连续重复提交。'
+          )
+        } else {
+          message.error(
+            getActionErrorMessage(saveError, '保存销售订单与订单行')
+          )
+        }
+        return
+      }
+
+      const { saved } = saveResult
+      const attachmentEffect = await settleSourceDocumentPostSaveEffect(() =>
+        orderAttachmentRef.current?.flushPendingAttachments(saved.id)
+      )
       const attachmentSaved =
-        (await orderAttachmentRef.current?.flushPendingAttachments(
-          saved?.id
-        )) !== false
+        attachmentEffect.status === 'fulfilled' &&
+        attachmentEffect.value !== false
+      if (attachmentEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(attachmentEffect.error, '上传销售订单附件')
+        )
+      }
       message.success(
         attachmentSaved
           ? editingOrder?.id
@@ -468,14 +538,12 @@ export default function V1SalesOrdersPage() {
       )
       orderAttachmentRef.current?.clearPendingAttachments()
       setOrderModalOpen(false)
-      setSelectedOrder(saved || selectedOrder)
-      try {
-        await loadOrders()
-      } catch (refreshError) {
-        message.warning(getActionErrorMessage(refreshError, '刷新销售订单列表'))
+      const refreshEffect = await settleSourceDocumentPostSaveEffect(loadOrders)
+      if (refreshEffect.status === 'rejected') {
+        message.warning(
+          getActionErrorMessage(refreshEffect.error, '刷新销售订单列表')
+        )
       }
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '保存销售订单与订单行'))
     } finally {
       setSaving(false)
     }
@@ -842,7 +910,8 @@ export default function V1SalesOrdersPage() {
             <Button
               size="small"
               icon={<EditOutlined />}
-              disabled={!selectedOrderCanEdit}
+              loading={itemLoading}
+              disabled={!selectedOrderCanEdit || itemLoading}
               onClick={() => openEditOrder(selectedOrder)}
             >
               编辑订单
@@ -914,11 +983,7 @@ export default function V1SalesOrdersPage() {
         }
         onRow={(record) => ({
           onClick: () => setSelectedOrder(record),
-          onDoubleClick: () => {
-            if (canUpdateOrder && isDraftSourceDocument(record)) {
-              openEditOrder(record)
-            }
-          },
+          onDoubleClick: () => openEditOrder(record),
         })}
       />
 
@@ -965,6 +1030,7 @@ export default function V1SalesOrdersPage() {
         canCancelItem={canCancelItem}
         onOk={saveOrder}
         onCancel={() => {
+          sourceDocumentOpenEditController.invalidate()
           orderAttachmentRef.current?.clearPendingAttachments()
           setOrderModalOpen(false)
         }}

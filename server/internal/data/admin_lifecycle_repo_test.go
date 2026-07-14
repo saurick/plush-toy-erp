@@ -16,7 +16,7 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
-func TestAdminManageRepoUpdateRolesRejectsRevokedAccountWithoutClearingRoles(t *testing.T) {
+func TestAdminManageRepoSetRolesRejectsRevokedAccountWithoutClearingRoles(t *testing.T) {
 	ctx := context.Background()
 	dsn := "file:admin_roles_revoked?mode=memory&cache=shared&_fk=1"
 	client := enttest.Open(t, dialect.SQLite, dsn)
@@ -26,6 +26,7 @@ func TestAdminManageRepoUpdateRolesRejectsRevokedAccountWithoutClearingRoles(t *
 	}
 	t.Cleanup(func() { _ = sqldb.Close() })
 	repo := &adminManageRepo{data: &Data{postgres: client, sqldb: sqldb, sqlDialect: dialect.SQLite}}
+	operator := client.AdminUser.Create().SetUsername("root_roles").SetPasswordHash("hash").SetIsSuperAdmin(true).SaveX(ctx)
 	admin := client.AdminUser.Create().SetUsername("leaver_roles").SetPasswordHash("hash").SaveX(ctx)
 	client.Role.Create().SetRoleKey("sales").SetName("业务").SaveX(ctx)
 	client.Role.Create().SetRoleKey("purchase").SetName("采购").SaveX(ctx)
@@ -37,7 +38,9 @@ func TestAdminManageRepoUpdateRolesRejectsRevokedAccountWithoutClearingRoles(t *
 		t.Fatalf("visible role count = %d, want 2", visibleRoleCount)
 	}
 
-	if err := repo.UpdateAdminRoles(ctx, admin.ID, []string{"sales"}); err != nil {
+	if _, err := repo.SetAdminRolesWithAudit(ctx, &biz.AdminRolesChange{
+		AdminID: admin.ID, OperatorID: operator.ID, RoleKeys: []string{"sales"},
+	}); err != nil {
 		t.Fatalf("set initial roles: %v", err)
 	}
 	var initialRoleCount int
@@ -55,7 +58,9 @@ func TestAdminManageRepoUpdateRolesRejectsRevokedAccountWithoutClearingRoles(t *
 		SetStatusChangedAt(changedAt).
 		SetStatusChangedBy(admin.ID).
 		SaveX(ctx)
-	if err := repo.UpdateAdminRoles(ctx, admin.ID, []string{"purchase"}); err != biz.ErrAdminRevoked {
+	if _, err := repo.SetAdminRolesWithAudit(ctx, &biz.AdminRolesChange{
+		AdminID: admin.ID, OperatorID: operator.ID, RoleKeys: []string{"purchase"},
+	}); err != biz.ErrAdminRevoked {
 		t.Fatalf("update revoked roles error = %v, want ErrAdminRevoked", err)
 	}
 
@@ -74,25 +79,35 @@ WHERE aur.admin_user_id = $1`, admin.ID).Scan(&roleKey); err != nil {
 
 func TestAdminManageRepoRevokeIsTransactionalAndReleasesActiveTasks(t *testing.T) {
 	ctx := context.Background()
-	client := enttest.Open(t, dialect.SQLite, "file:admin_lifecycle_revoke?mode=memory&cache=shared&_fk=1")
-	repo := &adminManageRepo{data: &Data{postgres: client}}
+	dsn := "file:admin_lifecycle_revoke?mode=memory&cache=shared&_fk=1"
+	client := enttest.Open(t, dialect.SQLite, dsn)
+	sqldb, err := sql.Open("sqlite3", dsn)
+	if err != nil {
+		t.Fatalf("open sqlite: %v", err)
+	}
+	t.Cleanup(func() { _ = sqldb.Close() })
+	repo := &adminManageRepo{data: &Data{postgres: client, sqldb: sqldb, sqlDialect: dialect.SQLite}}
 	operator := client.AdminUser.Create().
 		SetUsername("root").SetPasswordHash("hash").SetIsSuperAdmin(true).SaveX(ctx)
 	target := client.AdminUser.Create().
 		SetUsername("leaver").SetPasswordHash("hash").SaveX(ctx)
 	task := client.WorkflowTask.Create().
 		SetTaskCode("LEAVE-001").SetTaskGroup("sales").SetTaskName("待跟进订单").
-		SetSourceType("sales_order").SetSourceID(1).SetTaskStatusKey("processing").
+		SetSourceType("sales_order").SetSourceID(1).SetTaskStatusKey("ready").
 		SetOwnerRoleKey("sales").SetAssigneeID(target.ID).SaveX(ctx)
-	if _, err := repo.ChangeAdminLifecycle(ctx, &biz.AdminLifecycleChange{
+	if _, err := sqldb.ExecContext(ctx, `
+CREATE TRIGGER reject_admin_lifecycle_audit
+BEFORE INSERT ON runtime_audit_events
+BEGIN
+  SELECT RAISE(ABORT, 'forced audit failure');
+END`); err != nil {
+		t.Fatalf("create audit failure trigger: %v", err)
+	}
+	if _, _, err := repo.ChangeAdminLifecycle(ctx, &biz.AdminLifecycleChange{
 		AdminID: target.ID, OperatorID: operator.ID, Disabled: true, Revoke: true,
 		Reason: "员工离职",
-		AuditEvent: &biz.RuntimeAuditEventCreate{
-			EventType: "admin_control_plane", EventKey: "admin_user.revoked", Source: "admin_manage",
-			Payload: map[string]any{"invalid": make(chan struct{})},
-		},
 	}); err == nil {
-		t.Fatal("invalid audit payload must roll back lifecycle transaction")
+		t.Fatal("audit write failure must roll back lifecycle transaction")
 	}
 	if rolledBackAdmin := client.AdminUser.GetX(ctx, target.ID); rolledBackAdmin.Disabled || rolledBackAdmin.RevokedAt != nil {
 		t.Fatalf("account change survived audit rollback: %#v", rolledBackAdmin)
@@ -100,20 +115,22 @@ func TestAdminManageRepoRevokeIsTransactionalAndReleasesActiveTasks(t *testing.T
 	if rolledBackTask := client.WorkflowTask.GetX(ctx, task.ID); rolledBackTask.AssigneeID == nil || *rolledBackTask.AssigneeID != target.ID {
 		t.Fatalf("task change survived audit rollback: %#v", rolledBackTask)
 	}
+	if _, err := sqldb.ExecContext(ctx, "DROP TRIGGER reject_admin_lifecycle_audit"); err != nil {
+		t.Fatalf("drop audit failure trigger: %v", err)
+	}
 
-	released, err := repo.ChangeAdminLifecycle(ctx, &biz.AdminLifecycleChange{
+	updated, released, err := repo.ChangeAdminLifecycle(ctx, &biz.AdminLifecycleChange{
 		AdminID: target.ID, OperatorID: operator.ID, Disabled: true, Revoke: true,
 		Reason: "员工离职",
-		AuditEvent: &biz.RuntimeAuditEventCreate{
-			EventType: "admin_control_plane", EventKey: "admin_user.revoked", Source: "admin_manage",
-			Payload: map[string]any{"target": map[string]any{"id": target.ID}},
-		},
 	})
 	if err != nil {
 		t.Fatalf("ChangeAdminLifecycle() error = %v", err)
 	}
 	if released != 1 {
 		t.Fatalf("released task count = %d, want 1", released)
+	}
+	if updated == nil || updated.ID != target.ID || updated.AccountStatus() != biz.AdminAccountStatusRevoked {
+		t.Fatalf("returned admin snapshot = %#v", updated)
 	}
 	updatedAdmin := client.AdminUser.GetX(ctx, target.ID)
 	if !updatedAdmin.Disabled || updatedAdmin.RevokedAt == nil || updatedAdmin.StatusReason == nil || *updatedAdmin.StatusReason != "员工离职" {
@@ -125,6 +142,13 @@ func TestAdminManageRepoRevokeIsTransactionalAndReleasesActiveTasks(t *testing.T
 	}
 	if count := client.WorkflowTaskEvent.Query().Where(workflowtaskevent.TaskID(task.ID), workflowtaskevent.EventType("unassigned")).CountX(ctx); count != 1 {
 		t.Fatalf("unassignment event count = %d, want 1", count)
+	}
+	event := client.WorkflowTaskEvent.Query().Where(workflowtaskevent.TaskID(task.ID), workflowtaskevent.EventType("unassigned")).OnlyX(ctx)
+	if event.Payload["account_lifecycle_action"] != adminSessionRevokeReasonAccountRevoked {
+		t.Fatalf("unassignment lifecycle action = %#v", event.Payload)
+	}
+	if _, ok := event.Payload["account_status_reason"]; ok {
+		t.Fatalf("unassignment event leaked account reason: %#v", event.Payload)
 	}
 	if count := client.RuntimeAuditEvent.Query().Where(runtimeauditevent.EventKey("admin_user.revoked")).CountX(ctx); count != 1 {
 		t.Fatalf("audit event count = %d, want 1", count)
@@ -140,16 +164,12 @@ func TestAdminManageRepoRejectsInvalidRevokeCommandBeforeWriting(t *testing.T) {
 	repo := &adminManageRepo{data: &Data{postgres: client}}
 	operator := client.AdminUser.Create().SetUsername("root_invalid").SetPasswordHash("hash").SetIsSuperAdmin(true).SaveX(ctx)
 	target := client.AdminUser.Create().SetUsername("leaver_invalid").SetPasswordHash("hash").SaveX(ctx)
-	event := &biz.RuntimeAuditEventCreate{
-		EventType: "admin_control_plane", EventKey: "admin_user.revoked", Source: "admin_manage",
-		Payload: map[string]any{"target": map[string]any{"id": target.ID}},
-	}
 
 	for _, change := range []*biz.AdminLifecycleChange{
-		{AdminID: target.ID, OperatorID: operator.ID, Disabled: false, Revoke: true, Reason: "员工离职", AuditEvent: event},
-		{AdminID: target.ID, OperatorID: operator.ID, Disabled: true, Revoke: true, Reason: " ", AuditEvent: event},
+		{AdminID: target.ID, OperatorID: operator.ID, Disabled: false, Revoke: true, Reason: "员工离职"},
+		{AdminID: target.ID, OperatorID: operator.ID, Disabled: true, Revoke: true, Reason: " "},
 	} {
-		if _, err := repo.ChangeAdminLifecycle(ctx, change); err != biz.ErrBadParam {
+		if _, _, err := repo.ChangeAdminLifecycle(ctx, change); err != biz.ErrBadParam {
 			t.Fatalf("invalid revoke error = %v, want ErrBadParam", err)
 		}
 	}

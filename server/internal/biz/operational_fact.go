@@ -201,7 +201,6 @@ type FinanceFact struct {
 	CancelledBy       *int
 	CancelledByName   *string
 	CancelReason      *string
-	CancelAuditLegacy bool
 	Note              *string
 	CreatedAt         time.Time
 	UpdatedAt         time.Time

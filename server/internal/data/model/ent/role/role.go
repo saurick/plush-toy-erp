@@ -3,6 +3,7 @@
 package role
 
 import (
+	"fmt"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -21,10 +22,14 @@ const (
 	FieldDescription = "description"
 	// FieldBuiltin holds the string denoting the builtin field in the database.
 	FieldBuiltin = "builtin"
+	// FieldRoleType holds the string denoting the role_type field in the database.
+	FieldRoleType = "role_type"
 	// FieldDisabled holds the string denoting the disabled field in the database.
 	FieldDisabled = "disabled"
 	// FieldSortOrder holds the string denoting the sort_order field in the database.
 	FieldSortOrder = "sort_order"
+	// FieldVersion holds the string denoting the version field in the database.
+	FieldVersion = "version"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -40,8 +45,10 @@ var Columns = []string{
 	FieldName,
 	FieldDescription,
 	FieldBuiltin,
+	FieldRoleType,
 	FieldDisabled,
 	FieldSortOrder,
+	FieldVersion,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -71,6 +78,10 @@ var (
 	DefaultDisabled bool
 	// DefaultSortOrder holds the default value on creation for the "sort_order" field.
 	DefaultSortOrder int
+	// DefaultVersion holds the default value on creation for the "version" field.
+	DefaultVersion int
+	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
+	VersionValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -78,6 +89,33 @@ var (
 	// UpdateDefaultUpdatedAt holds the default value on update for the "updated_at" field.
 	UpdateDefaultUpdatedAt func() time.Time
 )
+
+// RoleType defines the type for the "role_type" enum field.
+type RoleType string
+
+// RoleTypeCustom is the default value of the RoleType enum.
+const DefaultRoleType = RoleTypeCustom
+
+// RoleType values.
+const (
+	RoleTypeSystem          RoleType = "system"
+	RoleTypeBusinessDefault RoleType = "business_default"
+	RoleTypeCustom          RoleType = "custom"
+)
+
+func (rt RoleType) String() string {
+	return string(rt)
+}
+
+// RoleTypeValidator is a validator for the "role_type" field enum values. It is called by the builders before save.
+func RoleTypeValidator(rt RoleType) error {
+	switch rt {
+	case RoleTypeSystem, RoleTypeBusinessDefault, RoleTypeCustom:
+		return nil
+	default:
+		return fmt.Errorf("role: invalid enum value for role_type field: %q", rt)
+	}
+}
 
 // OrderOption defines the ordering options for the Role queries.
 type OrderOption func(*sql.Selector)
@@ -107,6 +145,11 @@ func ByBuiltin(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBuiltin, opts...).ToFunc()
 }
 
+// ByRoleType orders the results by the role_type field.
+func ByRoleType(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRoleType, opts...).ToFunc()
+}
+
 // ByDisabled orders the results by the disabled field.
 func ByDisabled(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDisabled, opts...).ToFunc()
@@ -115,6 +158,11 @@ func ByDisabled(opts ...sql.OrderTermOption) OrderOption {
 // BySortOrder orders the results by the sort_order field.
 func BySortOrder(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSortOrder, opts...).ToFunc()
+}
+
+// ByVersion orders the results by the version field.
+func ByVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldVersion, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

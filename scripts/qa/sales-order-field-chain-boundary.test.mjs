@@ -21,6 +21,19 @@ function assertNotIncludes(source, token, context) {
   assert(!source.includes(token), `${context} must not include ${token}`);
 }
 
+function releaseReadyPackage(customerPackage) {
+  return {
+    ...customerPackage,
+    status: "release_ready",
+    runtimeEnabled: true,
+    sourcePolicy: {
+      ...customerPackage.sourcePolicy,
+      previewOnly: false,
+      publishEnabled: true,
+    },
+  };
+}
+
 test("sales order field policy controls both visible columns and CSV export", () => {
   const salesOrderPage = read("web/src/erp/pages/V1SalesOrdersPage.jsx");
   const columns = read("web/src/erp/components/sales-orders/salesOrderColumns.jsx");
@@ -360,15 +373,9 @@ test("sales order print boundary stays explicit until a mapper is implemented", 
 });
 
 test("sales order item field policy remains unpublished until detail and print chain are complete", () => {
-  const runtimeManifestTest = read("scripts/qa/customer-config-runtime-manifest.test.mjs");
   const customerConfigBiz = read("server/internal/biz/customer_config.go");
   const printDoc = read("docs/打印模板字段与编辑行为清单.md");
 
-  assertIncludes(
-    runtimeManifestTest,
-    'assert.equal(fieldPolicies["sales_order_items.default"], undefined)',
-    "customer config runtime manifest test"
-  );
   assertIncludes(
     customerConfigBiz,
     "runtimeFieldPolicySurfaceKeys",
@@ -393,7 +400,9 @@ test("sales order item field policy remains unpublished until detail and print c
 
 test("compiled customer packages expose only the three current runtime visibility surfaces", () => {
   for (const customerPackage of [yoyoosunCustomerPackage, demoCustomerPackage]) {
-    const manifest = buildRuntimeManifest(customerPackage);
+    assert.equal(customerPackage.status, "draft");
+    assert.equal(customerPackage.runtimeEnabled, false);
+    const manifest = buildRuntimeManifest(releaseReadyPackage(customerPackage));
     const fieldPolicies = manifest.compiled_snapshot.fieldPolicies;
 
     assert.deepEqual(

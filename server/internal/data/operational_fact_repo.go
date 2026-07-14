@@ -1377,8 +1377,47 @@ func (r *operationalFactRepo) CancelPostedFinanceFact(ctx context.Context, id in
 	return r.cancelPostedFinanceFact(ctx, id, actorID, reason)
 }
 
+func (r *operationalFactRepo) GetFinanceFact(ctx context.Context, id int) (*biz.FinanceFact, error) {
+	if id <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	row, err := r.data.postgres.FinanceFact.Query().
+		Where(financefact.ID(id)).
+		WithCanceller().
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrFinanceFactNotFound
+		}
+		return nil, err
+	}
+	return entFinanceFactToBiz(row), nil
+}
+
 func (r *operationalFactRepo) ListFinanceFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.FinanceFact, int, error) {
+	return r.listFinanceFacts(ctx, filter, nil)
+}
+
+func (r *operationalFactRepo) ListFinanceFactsForAccess(
+	ctx context.Context,
+	filter biz.OperationalFactFilter,
+	scope biz.FinanceFactAccessScope,
+) ([]*biz.FinanceFact, int, error) {
+	if scope.Empty() {
+		return []*biz.FinanceFact{}, 0, nil
+	}
+	return r.listFinanceFacts(ctx, filter, &scope)
+}
+
+func (r *operationalFactRepo) listFinanceFacts(
+	ctx context.Context,
+	filter biz.OperationalFactFilter,
+	scope *biz.FinanceFactAccessScope,
+) ([]*biz.FinanceFact, int, error) {
 	q := r.data.postgres.FinanceFact.Query()
+	if scope != nil {
+		q = q.Where(financefact.FactTypeIn(scope.AllowedTypes()...))
+	}
 	if filter.Status != "" {
 		q = q.Where(financefact.Status(filter.Status))
 	}
@@ -2260,7 +2299,7 @@ func (r *operationalFactRepo) cancelPostedFinanceFact(ctx context.Context, id in
 		return nil, err
 	}
 	if row.Status == biz.OperationalFactStatusCancelled {
-		if row.CancelAuditVersion != 1 || row.CancelledBy == nil || row.CancelReason == nil ||
+		if row.CancelledBy == nil || row.CancelReason == nil ||
 			*row.CancelledBy != actorID || *row.CancelReason != reason {
 			return nil, biz.ErrIdempotencyConflict
 		}
@@ -2518,7 +2557,7 @@ func updateFinanceFactCancellation(ctx context.Context, tx *inventoryDBTx, id in
 	p := inventorySQLPlaceholders(tx.dialect, 6)
 	query := fmt.Sprintf(`UPDATE finance_facts
 SET status = %s, cancelled_at = %s, cancelled_by = %s, cancel_reason = %s,
-    cancel_audit_version = 1, updated_at = %s
+    updated_at = %s
 WHERE id = %s AND status = 'POSTED'`, p[0], p[1], p[2], p[3], p[4], p[5])
 	result, err := tx.sqlTx.ExecContext(ctx, query, biz.OperationalFactStatusCancelled, cancelledAt, actorID, reason, time.Now(), id)
 	if err != nil {
@@ -2618,5 +2657,5 @@ func entFinanceFactToBiz(row *ent.FinanceFact) *biz.FinanceFact {
 		name := canceller.Username
 		cancellerName = &name
 	}
-	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, SettledAt: row.SettledAt, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, CancelAuditLegacy: row.Status == biz.OperationalFactStatusCancelled && row.CancelAuditVersion == 0, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.FinanceFact{ID: row.ID, FactNo: row.FactNo, FactType: row.FactType, Status: row.Status, CounterpartyType: row.CounterpartyType, CounterpartyID: row.CounterpartyID, Amount: row.Amount, FeeAmount: row.FeeAmount, Currency: row.Currency, CollectionType: row.CollectionType, PaymentTerm: row.PaymentTerm, PaymentTermDays: row.PaymentTermDays, InvoiceCategory: row.InvoiceCategory, SourceType: row.SourceType, SourceID: row.SourceID, SourceLineID: row.SourceLineID, IdempotencyKey: row.IdempotencyKey, OccurredAt: row.OccurredAt, PostedAt: row.PostedAt, SettledAt: row.SettledAt, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelledByName: cancellerName, CancelReason: row.CancelReason, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }

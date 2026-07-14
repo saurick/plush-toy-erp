@@ -2406,6 +2406,14 @@
     0 12px 28px rgb(15 23 42 / 0.05);
 }
 
+.erp-audit-detail--drawer {
+  position: static;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .erp-audit-detail__head {
   display: grid;
   gap: 6px;
@@ -2465,13 +2473,13 @@
   font-size: 12px;
 }
 
-@media (max-width: 1180px) {
+@media (max-width: 991px) {
   .erp-audit-workspace {
     grid-template-columns: 1fr;
   }
 
-  .erp-audit-detail {
-    position: static;
+  .erp-audit-workspace > .erp-audit-detail {
+    display: none;
   }
 }
 

@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -11,6 +13,17 @@ import (
 
 type ProcessNodeInstance struct {
 	ent.Schema
+}
+
+func (ProcessNodeInstance) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{Checks: map[string]string{
+			"process_node_instances_type_allowed":     "node_type IN ('human_task', 'approval', 'domain_command', 'wait_event', 'end')",
+			"process_node_instances_status_allowed":   "status IN ('waiting', 'active', 'completed', 'blocked')",
+			"process_node_instances_version_positive": "version > 0",
+			"process_node_instances_lifecycle_bundle": "((status = 'waiting' AND started_at IS NULL AND completed_at IS NULL) OR (status = 'active' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'completed' AND started_at IS NOT NULL AND completed_at IS NOT NULL) OR (status = 'blocked' AND started_at IS NOT NULL AND completed_at IS NULL))",
+		}},
+	}
 }
 
 func (ProcessNodeInstance) Fields() []ent.Field {
@@ -133,6 +146,8 @@ func (ProcessNodeInstance) Edges() []ent.Edge {
 			Field("process_instance_id").
 			Required().
 			Unique(),
+		edge.To("workflow_tasks", WorkflowTask.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

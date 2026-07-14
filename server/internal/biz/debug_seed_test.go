@@ -173,6 +173,16 @@ func TestDebugUsecase_SeedReturnsScenarioRunRecordsAndTasks(t *testing.T) {
 	}
 }
 
+func TestDebugBusinessChainScenariosOnlyUseCanonicalTaskStatuses(t *testing.T) {
+	for scenarioKey, scenario := range debugBusinessChainScenarios {
+		for _, task := range scenario.tasks {
+			if !IsKnownWorkflowTaskState(task.statusKey) {
+				t.Fatalf("scenario %s task %s uses unsupported task status %q", scenarioKey, task.name, task.statusKey)
+			}
+		}
+	}
+}
+
 func TestDebugUsecase_ClearBusinessDataUsesIndependentGuard(t *testing.T) {
 	repo := &fakeDebugRepo{}
 	uc := NewDebugUsecase(repo, DebugSafetyConfig{
@@ -221,6 +231,36 @@ func TestDebugUsecase_ClearBusinessDataOnlyAllowsLocalAndDev(t *testing.T) {
 			}
 			if !repo.cleared || !result.DryRun || result.DeletedTotal != 0 || result.MatchedTotal != 1 {
 				t.Fatalf("unexpected %s dry run result %#v", environment, result)
+			}
+		})
+	}
+}
+
+func TestDebugUsecase_SeedAndCleanupOnlyAllowLocalAndDev(t *testing.T) {
+	for _, environment := range []string{"shared", "qa", "test", "remote", "prod", "sql"} {
+		t.Run(environment, func(t *testing.T) {
+			repo := &fakeDebugRepo{}
+			uc := NewDebugUsecase(repo, DebugSafetyConfig{
+				Environment:    environment,
+				SeedEnabled:    true,
+				CleanupEnabled: true,
+				CleanupScope:   DebugDefaultCleanupScope,
+			})
+			if _, err := uc.SeedBusinessChainScenario(context.Background(), DebugBusinessChainSeedInput{
+				ScenarioKey: "purchase_iqc_inbound",
+				DebugRunID:  "RUN-ENV01",
+			}, 7); !errors.Is(err, ErrDebugSeedDisabled) {
+				t.Fatalf("%s seed error = %v, want ErrDebugSeedDisabled", environment, err)
+			}
+			if _, err := uc.CleanupBusinessChainScenario(context.Background(), DebugBusinessChainCleanupInput{
+				DebugRunID: "RUN-ENV01",
+				DryRun:     true,
+			}); !errors.Is(err, ErrDebugCleanupDisabled) {
+				t.Fatalf("%s cleanup error = %v, want ErrDebugCleanupDisabled", environment, err)
+			}
+			capabilities := uc.Capabilities()
+			if capabilities.SeedAllowed || capabilities.CleanupAllowed {
+				t.Fatalf("%s capabilities expose debug mutations: %#v", environment, capabilities)
 			}
 		})
 	}

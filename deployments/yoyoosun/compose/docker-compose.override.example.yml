@@ -2,7 +2,7 @@
 services:
   app-server:
     environment:
-      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-2}"
+      ERP_PDF_RENDER_CONCURRENCY: "${ERP_PDF_RENDER_CONCURRENCY:-8}"
     volumes:
       - "${FILE_STORAGE_DIR:-/data/plush-toy-erp-yoyoosun/files}:/app/files"
 

@@ -1,6 +1,7 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { buildCustomerConfigMutationPayload } from './customerConfigTransition.mjs'
 
 const customerConfigRpc = new JsonRpc({
   url: 'customer_config',
@@ -33,10 +34,18 @@ export async function publishCustomerConfig(manifest) {
   return dataOf(result)?.revision || null
 }
 
+export async function checkCustomerConfigTransition(params = {}) {
+  const result = await customerConfigRpc.call(
+    'check_customer_config_transition',
+    params
+  )
+  return dataOf(result)?.transition || null
+}
+
 export async function activateCustomerConfig(params = {}) {
   const result = await customerConfigRpc.call(
     'activate_customer_config',
-    params
+    buildCustomerConfigMutationPayload('activate', params)
   )
   return dataOf(result)?.revision || null
 }
@@ -44,7 +53,7 @@ export async function activateCustomerConfig(params = {}) {
 export async function rollbackCustomerConfig(params = {}) {
   const result = await customerConfigRpc.call(
     'rollback_customer_config',
-    params
+    buildCustomerConfigMutationPayload('rollback', params)
   )
   return dataOf(result)?.revision || null
 }

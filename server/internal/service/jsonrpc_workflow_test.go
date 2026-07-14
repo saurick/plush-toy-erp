@@ -80,12 +80,11 @@ func workflowCustomerConfigUCWithWorkflowTasksState(t *testing.T, state string) 
 	if !ok {
 		t.Fatalf("invalid workflow customer config params")
 	}
-	if _, err := uc.PublishCustomerConfig(context.Background(), in, 1); err != nil {
+	published, err := uc.PublishCustomerConfig(context.Background(), in, 1)
+	if err != nil {
 		t.Fatalf("publish workflow customer config %s err = %v", in.Revision, err)
 	}
-	if _, err := uc.ActivateCustomerConfig(context.Background(), in.CustomerKey, in.Revision, 1); err != nil {
-		t.Fatalf("activate workflow customer config %s err = %v", in.Revision, err)
-	}
+	activatePublishedCustomerConfigForTest(t, uc, in, published, 1)
 	return uc
 }
 
@@ -238,7 +237,7 @@ func (s *stubProcessRuntimeJSONRPCRepo) CompleteProcessNodeInstance(_ context.Co
 	if s.node == nil || s.node.ID != in.ID {
 		return nil, biz.ErrProcessNodeInstanceNotFound
 	}
-	if s.node.Version != in.ExpectedVersion {
+	if s.node.Status != biz.ProcessNodeStatusActive || s.node.Version != in.ExpectedVersion {
 		return nil, biz.ErrProcessNodeInstanceConflict
 	}
 	out := *s.node
@@ -280,6 +279,15 @@ func (s *stubProcessRuntimeJSONRPCRepo) BlockProcessNodeInstance(_ context.Conte
 	out.DomainCommandFingerprint = in.DomainCommandFingerprint
 	s.node = &out
 	return &out, nil
+}
+
+func (s *stubProcessRuntimeJSONRPCRepo) BlockProcessNodeAndInstance(ctx context.Context, in *biz.ProcessNodeInstanceBlock, actorID int) (*biz.ProcessNodeInstance, error) {
+	blockedNode, err := s.BlockProcessNodeInstance(ctx, in, actorID)
+	if err != nil {
+		return nil, err
+	}
+	s.blockedProcess = &biz.ProcessInstanceBlock{ID: in.ProcessInstanceID}
+	return blockedNode, nil
 }
 
 func (s *stubProcessRuntimeJSONRPCRepo) BlockProcessInstance(_ context.Context, in *biz.ProcessInstanceBlock, actorID int) (*biz.ProcessInstance, error) {
@@ -618,7 +626,9 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRecordsEventIntent(t *testing.T) {
 		"action":           "urge_task",
 		"reason":           "请今天确认",
 		"payload": map[string]any{
-			"entry": "mobile_role_task",
+			"entry_path":    " /erp/mobile/tasks ",
+			"evidence_refs": []any{" proof-b ", "proof-a", "proof-a", " "},
+			"surface_key":   " mobile_role_tasks ",
 		},
 	})
 	if err != nil {
@@ -640,6 +650,13 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRecordsEventIntent(t *testing.T) {
 	}
 	if repo.urgeInput.Reason != "请今天确认" {
 		t.Fatalf("expected reason, got %q", repo.urgeInput.Reason)
+	}
+	if repo.urgeInput.Payload["entry_path"] != "/erp/mobile/tasks" || repo.urgeInput.Payload["surface_key"] != "mobile_role_tasks" {
+		t.Fatalf("expected normalized workflow context, got %#v", repo.urgeInput.Payload)
+	}
+	refs, ok := repo.urgeInput.Payload["evidence_refs"].([]string)
+	if !ok || len(refs) != 2 || refs[0] != "proof-a" || refs[1] != "proof-b" {
+		t.Fatalf("expected sorted unique evidence refs, got %#v", repo.urgeInput.Payload["evidence_refs"])
 	}
 	if repo.urgeActorID != 7 || repo.urgeActorRoleKey != "pmc" {
 		t.Fatalf("expected actor 7/pmc, got %d/%q", repo.urgeActorID, repo.urgeActorRoleKey)
@@ -745,6 +762,55 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsClientControlledSystemFields(t
 				},
 			},
 		},
+		{
+			name: "rejects payload risk fields",
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"payload": map[string]any{
+					"critical_path": true,
+					"urge_count":    float64(999),
+				},
+			},
+		},
+		{
+			name: "rejects payload notification fields",
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"payload": map[string]any{
+					"notification_type": "urgent_escalation",
+				},
+			},
+		},
+		{
+			name: "rejects nested evidence objects",
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"payload": map[string]any{
+					"evidence_refs": []any{"proof-a", map[string]any{"ref": "proof-b"}},
+				},
+			},
+		},
+		{
+			name: "rejects complete feedback on urge",
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action":           "urge_task",
+				"reason":           "请今天确认",
+				"payload": map[string]any{
+					"feedback": "客户端不能把催办反馈当完成结果",
+				},
+			},
+		},
 	}
 
 	for _, tt := range tests {
@@ -817,11 +883,12 @@ func TestJsonrpcDispatcher_WorkflowListTasksPassesTaskGroupFilter(t *testing.T) 
 	if repo.listTaskFilter.Limit != 25 {
 		t.Fatalf("expected limit 25, got %d", repo.listTaskFilter.Limit)
 	}
-	if len(repo.listTaskFilter.VisibleOwnerRoleKeys) != 1 || repo.listTaskFilter.VisibleOwnerRoleKeys[0] != biz.WarehouseRoleKey {
-		t.Fatalf("expected warehouse visibility scope, got %#v", repo.listTaskFilter.VisibleOwnerRoleKeys)
+	visibilityScope := repo.listTaskFilter.VisibilityScope
+	if visibilityScope == nil || len(visibilityScope.StandaloneVisibleOwnerRoleKeys) != 1 || visibilityScope.StandaloneVisibleOwnerRoleKeys[0] != biz.WarehouseRoleKey {
+		t.Fatalf("expected warehouse visibility scope, got %#v", visibilityScope)
 	}
-	if repo.listTaskFilter.VisibleAssigneeID == nil || *repo.listTaskFilter.VisibleAssigneeID != 7 {
-		t.Fatalf("expected assignee visibility scope for admin 7, got %#v", repo.listTaskFilter.VisibleAssigneeID)
+	if visibilityScope.VisibleAssigneeID == nil || *visibilityScope.VisibleAssigneeID != 7 {
+		t.Fatalf("expected assignee visibility scope for admin 7, got %#v", visibilityScope.VisibleAssigneeID)
 	}
 }
 
@@ -1116,11 +1183,11 @@ func TestJsonrpcDispatcher_WorkflowListTasksIncludesCustomerWorkPoolScope(t *tes
 		t.Fatalf("expected OK response, got %#v", res)
 	}
 	got := map[string]bool{}
-	for _, roleKey := range repo.listTaskFilter.VisibleOwnerRoleKeys {
+	for _, roleKey := range repo.listTaskFilter.VisibilityScope.StandaloneVisibleOwnerRoleKeys {
 		got[roleKey] = true
 	}
 	if !got[biz.SalesRoleKey] || !got[biz.WarehouseRoleKey] {
-		t.Fatalf("expected sales and warehouse visibility, got %#v", repo.listTaskFilter.VisibleOwnerRoleKeys)
+		t.Fatalf("expected sales and warehouse visibility, got %#v", repo.listTaskFilter.VisibilityScope)
 	}
 	if got[biz.FinanceRoleKey] {
 		t.Fatalf("finance visibility must not be added without matching responsibility pool")
@@ -1156,11 +1223,11 @@ func TestJsonrpcDispatcher_WorkflowListTasksRequiresCustomerWorkPoolReadEntitlem
 		t.Fatalf("expected OK response, got %#v", res)
 	}
 	got := map[string]bool{}
-	for _, roleKey := range repo.listTaskFilter.VisibleOwnerRoleKeys {
+	for _, roleKey := range repo.listTaskFilter.VisibilityScope.StandaloneVisibleOwnerRoleKeys {
 		got[roleKey] = true
 	}
 	if got[biz.WarehouseRoleKey] {
-		t.Fatalf("warehouse visibility must require same-role same-scope workflow.task.read entitlement, got %#v", repo.listTaskFilter.VisibleOwnerRoleKeys)
+		t.Fatalf("warehouse visibility must require same-role same-scope workflow.task.read entitlement, got %#v", repo.listTaskFilter.VisibilityScope)
 	}
 }
 
@@ -1275,7 +1342,7 @@ func TestJsonrpcDispatcher_WorkflowUrgeTaskRejectsEmptyReason(t *testing.T) {
 		"action":           "urge_task",
 		"reason":           " \t ",
 		"payload": map[string]any{
-			"source_no": "SHIP-001",
+			"surface_key": "mobile_role_tasks",
 		},
 	})
 	if err != nil {
@@ -1360,7 +1427,10 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionUsesDoneAndServerActorRole(
 		"idempotency_key":  "workflow-complete-role-42",
 		"action_key":       "complete",
 		"payload": map[string]any{
-			"entry": "mobile_role_task",
+			"entry_path":    " /erp/mobile/tasks ",
+			"evidence_refs": []any{" proof-b ", "proof-a", "proof-a"},
+			"feedback":      " 已完成复核 ",
+			"surface_key":   " mobile_role_tasks ",
 		},
 	})
 	if err != nil {
@@ -1380,8 +1450,14 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionUsesDoneAndServerActorRole(
 	if repo.updateInput.BusinessStatusKey != "" {
 		t.Fatalf("expected empty business status by default, got %q", repo.updateInput.BusinessStatusKey)
 	}
-	if repo.updateInput.Payload["entry"] != "mobile_role_task" {
-		t.Fatalf("expected mobile payload to pass through, got %#v", repo.updateInput.Payload)
+	if repo.updateInput.Payload["feedback"] != "已完成复核" ||
+		repo.updateInput.Payload["entry_path"] != "/erp/mobile/tasks" ||
+		repo.updateInput.Payload["surface_key"] != "mobile_role_tasks" {
+		t.Fatalf("expected normalized completion payload, got %#v", repo.updateInput.Payload)
+	}
+	refs, ok := repo.updateInput.Payload["evidence_refs"].([]string)
+	if !ok || len(refs) != 2 || refs[0] != "proof-a" || refs[1] != "proof-b" {
+		t.Fatalf("expected sorted unique completion evidence refs, got %#v", repo.updateInput.Payload["evidence_refs"])
 	}
 	if repo.updateActorRoleKey != biz.QualityRoleKey {
 		t.Fatalf("expected server-derived actor role %q, got %q", biz.QualityRoleKey, repo.updateActorRoleKey)
@@ -1575,6 +1651,7 @@ func TestWorkflowTaskToMapIncludesInternalConcurrencyVersion(t *testing.T) {
 func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(t *testing.T) {
 	processID := 10
 	nodeID := 20
+	configRevision := "2026.06.30.workflow-tasks-enabled"
 	repo := &stubWorkflowJSONRPCRepo{
 		currentTask: &biz.WorkflowTask{
 			ID:                    42,
@@ -1583,6 +1660,7 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 			SourceID:              1001,
 			TaskStatusKey:         "ready",
 			OwnerRoleKey:          biz.EngineeringRoleKey,
+			ConfigRevision:        &configRevision,
 			ProcessInstanceID:     &processID,
 			ProcessNodeInstanceID: &nodeID,
 			Payload:               map[string]any{},
@@ -1610,7 +1688,7 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 		"idempotency_key":  "workflow-linked-complete-42",
 		"action_key":       "complete",
 		"payload": map[string]any{
-			"outcome": "ENGINEERING_DATA_READY",
+			"feedback": "工程资料已齐套",
 		},
 	})
 	if err != nil {
@@ -1633,14 +1711,15 @@ func TestJsonrpcDispatcher_WorkflowCompleteTaskActionCompletesLinkedProcessNode(
 	if processRepo.completedNode.ExpectedVersion != 4 {
 		t.Fatalf("expected version 4, got %#v", processRepo.completedNode)
 	}
-	if processRepo.completedNode.Outcome != "ENGINEERING_DATA_READY" {
-		t.Fatalf("expected payload outcome copied, got %q", processRepo.completedNode.Outcome)
+	if processRepo.completedNode.Outcome != "" {
+		t.Fatalf("client feedback must not control the process outcome, got %q", processRepo.completedNode.Outcome)
 	}
 }
 
 func TestJsonrpcDispatcher_WorkflowRejectTaskActionSettlesLinkedProcessNode(t *testing.T) {
 	processID := 10
 	nodeID := 20
+	configRevision := "2026.06.30.workflow-tasks-enabled"
 	repo := &stubWorkflowJSONRPCRepo{currentTask: &biz.WorkflowTask{
 		ID:                    42,
 		TaskGroup:             "order_approval",
@@ -1648,6 +1727,7 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionSettlesLinkedProcessNode(t *t
 		SourceID:              1001,
 		TaskStatusKey:         "ready",
 		OwnerRoleKey:          biz.BossRoleKey,
+		ConfigRevision:        &configRevision,
 		ProcessInstanceID:     &processID,
 		ProcessNodeInstanceID: &nodeID,
 		Payload:               map[string]any{},
@@ -1694,6 +1774,7 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionRetryReconcilesWithoutTaskRew
 	processID := 10
 	nodeID := 20
 	reason := "客户交期尚未确认"
+	configRevision := "2026.06.30.workflow-tasks-enabled"
 	repo := &stubWorkflowJSONRPCRepo{currentTask: &biz.WorkflowTask{
 		ID:                    42,
 		TaskGroup:             "order_approval",
@@ -1702,6 +1783,7 @@ func TestJsonrpcDispatcher_WorkflowRejectTaskActionRetryReconcilesWithoutTaskRew
 		TaskStatusKey:         "rejected",
 		OwnerRoleKey:          biz.BossRoleKey,
 		BlockedReason:         &reason,
+		ConfigRevision:        &configRevision,
 		ProcessInstanceID:     &processID,
 		ProcessNodeInstanceID: &nodeID,
 		Payload:               map[string]any{"rejected_reason": reason},
@@ -1833,7 +1915,8 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsUseServerStatusAndActorR
 				"action_key":       tt.actionKey,
 				"reason":           tt.reason,
 				"payload": map[string]any{
-					"entry": "mobile_role_task",
+					"entry_path":  "/erp/mobile/tasks",
+					"surface_key": "mobile_role_tasks",
 				},
 			})
 			if err != nil {
@@ -1856,13 +1939,97 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsUseServerStatusAndActorR
 			if repo.updateInput.Reason != strings.TrimSpace(tt.reason) {
 				t.Fatalf("expected trimmed reason, got %q", repo.updateInput.Reason)
 			}
-			if repo.updateInput.Payload["entry"] != "mobile_role_task" {
-				t.Fatalf("expected mobile payload to pass through, got %#v", repo.updateInput.Payload)
+			if repo.updateInput.Payload["entry_path"] != "/erp/mobile/tasks" || repo.updateInput.Payload["surface_key"] != "mobile_role_tasks" {
+				t.Fatalf("expected controlled action context to pass through, got %#v", repo.updateInput.Payload)
 			}
 			if repo.updateActorRoleKey != biz.QualityRoleKey {
 				t.Fatalf("expected server-derived actor role %q, got %q", biz.QualityRoleKey, repo.updateActorRoleKey)
 			}
 		})
+	}
+}
+
+func TestJsonrpcDispatcher_WorkflowResumeTaskActionReplaysReceiptAndRejectsNewAttempt(t *testing.T) {
+	receiptKey := "workflow-resume-receipt-44"
+	businessStatusKey := "blocked"
+	resumedTask := &biz.WorkflowTask{
+		ID:                44,
+		TaskGroup:         "generic",
+		SourceType:        "generic-source",
+		SourceID:          1,
+		TaskStatusKey:     "ready",
+		OwnerRoleKey:      biz.QualityRoleKey,
+		BusinessStatusKey: &businessStatusKey,
+		Payload:           map[string]any{"surface_key": "mobile_role_tasks"},
+		Version:           2,
+	}
+	var storedIntentHash string
+	repo := &stubWorkflowJSONRPCRepo{currentTask: resumedTask}
+	repo.resolveMutation = func(_ int, idempotencyKey string, intentHash string) (*biz.WorkflowTask, bool, error) {
+		if idempotencyKey != receiptKey {
+			return nil, false, nil
+		}
+		if storedIntentHash == "" {
+			storedIntentHash = intentHash
+		}
+		if intentHash != storedIntentHash {
+			return nil, false, biz.ErrIdempotencyConflict
+		}
+		return resumedTask, true, nil
+	}
+	j := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.QualityRoleKey}, biz.PermissionWorkflowTaskUpdate)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params := map[string]any{
+		"task_id":          float64(44),
+		"expected_version": float64(1),
+		"idempotency_key":  receiptKey,
+		"action_key":       "resume",
+		"reason":           "阻塞资料已补齐",
+		"payload":          map[string]any{"surface_key": "mobile_role_tasks"},
+	}
+
+	for attempt := 1; attempt <= 2; attempt++ {
+		_, res, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "resume_task_action", "resume-replay", mustJSONRPCStruct(t, params))
+		if err != nil {
+			t.Fatalf("resume receipt replay %d transport error: %v", attempt, err)
+		}
+		if res == nil || res.Code != errcode.OK.Code {
+			t.Fatalf("resume receipt replay %d must succeed, got %#v", attempt, res)
+		}
+	}
+
+	changedIntent := map[string]any{}
+	for key, value := range params {
+		changedIntent[key] = value
+	}
+	changedIntent["reason"] = "另一个解除阻塞原因"
+	_, conflictRes, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "resume_task_action", "resume-conflict", mustJSONRPCStruct(t, changedIntent))
+	if err != nil {
+		t.Fatalf("resume receipt conflict transport error: %v", err)
+	}
+	if conflictRes == nil || conflictRes.Code != errcode.IdempotencyConflict.Code {
+		t.Fatalf("same resume receipt with changed intent must conflict, got %#v", conflictRes)
+	}
+
+	newReceipt := map[string]any{}
+	for key, value := range params {
+		newReceipt[key] = value
+	}
+	newReceipt["idempotency_key"] = "workflow-resume-new-receipt-44"
+	newReceipt["expected_version"] = float64(2)
+	_, settledRes, err := j.handleWorkflow(workflowJSONRPCAdminContext(), "resume_task_action", "resume-new-receipt", mustJSONRPCStruct(t, newReceipt))
+	if err != nil {
+		t.Fatalf("new resume receipt transport error: %v", err)
+	}
+	if settledRes == nil || settledRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("new receipt must not resume an already ready task, got %#v", settledRes)
+	}
+	if repo.updateCalls != 0 {
+		t.Fatalf("receipt replay and invalid new attempt must not rewrite the task, got %d writes", repo.updateCalls)
 	}
 }
 
@@ -2018,6 +2185,46 @@ func TestJsonrpcDispatcher_WorkflowControlledTaskActionsRejectRawStatusActorRole
 				"action_key":       "complete",
 				"payload": map[string]any{
 					"command_key": "inventory.post_inbound",
+				},
+			},
+		},
+		{
+			name:       "complete rejects payload domain result",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "complete",
+				"payload": map[string]any{
+					"outcome": "ENGINEERING_DATA_READY",
+				},
+			},
+		},
+		{
+			name:       "complete rejects non string context",
+			method:     "complete_task_action",
+			permission: biz.PermissionWorkflowTaskComplete,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "complete",
+				"payload": map[string]any{
+					"surface_key": map[string]any{"value": "mobile_role_tasks"},
+				},
+			},
+		},
+		{
+			name:       "reject rejects completion feedback",
+			method:     "reject_task_action",
+			permission: biz.PermissionWorkflowTaskReject,
+			params: map[string]any{
+				"task_id":          float64(1),
+				"expected_version": float64(1),
+				"action_key":       "reject",
+				"reason":           "资料不全",
+				"payload": map[string]any{
+					"feedback": "伪造完成结果",
 				},
 			},
 		},
@@ -2359,8 +2566,8 @@ func TestJsonrpcDispatcher_WorkflowExplainActionAccessUsesOptionalCanonicalActio
 		t.Fatalf("missing action_key must return all actions, got %#v", allRes)
 	}
 	actions, ok := allRes.Data.AsMap()["actions"].([]any)
-	if !ok || len(actions) != 4 {
-		t.Fatalf("missing action_key must return four actions, got %#v", allRes.Data.AsMap()["actions"])
+	if !ok || len(actions) != 5 {
+		t.Fatalf("missing action_key must return five actions, got %#v", allRes.Data.AsMap()["actions"])
 	}
 
 	tests := []struct {

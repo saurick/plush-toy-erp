@@ -394,8 +394,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 页面一级任务固定为总览、配置预检、差异、界面配置和执行发布。配置预检不再一次渲染全部对象，而是通过 `section=package|runtime|flow|evidence` 分成包结构、运行投影、流程策略和验证证据；执行发布通过 `action=dry-run|test-apply|release` 分开试跑证据、测试配置应用和正式发布检查。默认值省略 query，非法或跨视图残留参数会被清理。
 - 配置预检和执行发布的当前任务导航在长页面滚动时保持可见；每次只渲染当前任务对应模块，避免把边界、模块、流程、命令和发布操作堆在同一阅读流中。
 - 页面只读取已登记 customer package，不提供 raw package、任意代码、SQL 或脚本上传。可视内容包括品牌 / 桌面菜单 runtime、字段和编号草案、流程 preview、`moduleStates`、打印模板字段、差异与版本门禁。
-- UI Dry Run 只调用 `scripts/import/customerImportDryRun.mjs` 生成 ignored `output/customers/<customer-key>/ui-import-dry-run` 证据，不写数据库。测试配置应用会编译受控 runtime manifest，并用当前管理员登录态通过 Vite `/rpc` 固定代理 `http://127.0.0.1:8300` 调用后端校验、发布、激活和有效配置读回接口；写入期间客户包和视图会锁定，离开页面不代表已发请求被撤销。
-- 测试配置应用不直写业务数据、不导入真实客户业务数据，也不绕过后端 RBAC；重复 revision 只在有效配置读回确认完全一致后按已激活处理，不依赖中文错误文案。
+- UI Dry Run 只调用 `scripts/import/customerImportDryRun.mjs` 生成 ignored `output/customers/<customer-key>/ui-import-dry-run` 证据，不写数据库。当前登记的 yoyoosun 包仍是 draft / preview-only，`runtimeEnabled / publishEnabled / activateEnabled` 均未开放，因此“测试配置应用”按钮和 handler 都失败关闭，只允许预览和试跑；页面不会把 preview manifest 送入正式编译或发布链路。
+- 只有受控配置包明确进入 `release_ready`，同时开放 runtime / publish / activate 后，测试配置应用才会用当前管理员登录态通过 Vite `/rpc` 固定代理 `http://127.0.0.1:8300` 调用后端校验、发布、切换检查、激活和有效配置读回接口。该路径不直写业务数据、不导入真实客户业务数据，也不绕过后端 RBAC；后端以 canonical hash 判断同 revision 幂等或冲突，前端不吞发布错误，并把同一 hash、产品版本和观测到的 active revision 作为 CAS 条件提交，最后按 customer、revision、hash、hash version 和来源读回确认。写入期间客户包和视图会锁定，离开页面不代表已发请求被撤销。
 - `moduleStates` 只是控制面输入预览，不安装或卸载模块。`printTemplateDefaults` 只声明甲方 / 委托方默认字段；当前正式消费方是采购订单 `material-purchase-contract` 和委外订单 `processing-contract`，不覆盖供应商 / 加工方业务快照，也不启用销售订单打印模板。
 - release readiness 必须显式选择 `deployments/<customer-key>/evidence/releases/<release-batch>` 的已登记批次，不猜 `latest`、不接受父目录或路径穿越。页面只做只读门禁并复制 `customer-config-release-readiness.mjs --print-input-template` 或统一 `customer-config-release-execute.mjs --print-input-template`；备用命令不拼未替换的 `<release-batch>` 或旧 manifest 路径，不再从浏览器直接发布 / 激活“正式版”。正式执行器继续要求目标端点、令牌、确认短语、release report 和 authenticated readback。
 - `rollback_customer_config` 只回滚已发布 compiled revision 并记录独立审计，不是 raw 包回滚或业务导入失败恢复；页面不提供裸回滚按钮。
@@ -425,7 +425,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 ## 桌面业务弹窗约定
 
-- 项目弹窗默认上下左右居中：JSX 版 `antd Modal` 由根 `ConfigProvider` 统一启用 `centered`，命令式 `modal.confirm/info/success/warning/error` 由 `AntdAppBridge` 的消费层统一补齐居中配置，自研 `AppModal` 保持固定遮罩内 flex 居中。
+- 项目弹窗默认上下左右居中：JSX 版 `antd Modal` 由根 `ConfigProvider` 统一启用 `centered`，命令式 `modal.confirm/info/success/warning/error` 由 `AntdAppBridge` 的消费层统一补齐居中配置；`AppModal` 复用 Ant Design 的遮罩、键盘、焦点圈定和触发点恢复，并只补充业务面板外观与可访问名称。
 - 业务记录的新建 / 编辑优先使用业务表单弹窗；详情抽屉只用于显式只读核对。生产排程、生产异常和出货放行当前只允许创建和处理 Workflow 协同任务，不能把协同任务写成生产订单、生产异常事实、出货单、库存、财务或发票事实；来源、打印、删除等未接入真实 usecase 的动作不能写成真实业务动作。
 - 桌面端业务录入弹窗默认按紧凑自适应栅格排布：文本字段在可用宽度内多列展示，数量类短字段进一步收口，备注、边界说明和明细区保留整行。
 - V1 主数据和销售订单表单弹窗宽度基线为 `min(960px, calc(100vw - 96px))`；Workflow V1 协同创建弹窗使用当前共享业务弹窗约束，不恢复 formal-shell 字段预览弹窗主路径。

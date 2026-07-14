@@ -61,6 +61,20 @@ eval "$parse_output"
 echo "purchase receipt target host=${PURCHASE_RECEIPT_PG_DB_HOST} db=${PURCHASE_RECEIPT_PG_DB_NAME}"
 echo "purchase receipt target dsn=${PURCHASE_RECEIPT_PG_DB_SAFE_URL}"
 
+run_verified_go_test() {
+  local required_prefix="$1"
+  shift
+  local report_file
+  report_file="$(mktemp)"
+  (
+    trap 'rm -f "$report_file"' EXIT
+    "$@" | tee "$report_file"
+    node ../scripts/qa/verify-go-test-json.mjs \
+      --report "$report_file" \
+      --require-prefix "$required_prefix"
+  )
+}
+
 case "$cmd" in
 createdb)
   psql "$PURCHASE_RECEIPT_PG_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_database WHERE datname = '${PURCHASE_RECEIPT_PG_DB_NAME}'" | grep -q 1 ||
@@ -73,17 +87,44 @@ apply)
   atlas migrate apply --dir "file://internal/data/model/migrate" --url "$PURCHASE_RECEIPT_PG_DB_URL"
   ;;
 test)
-  PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" go test ./internal/data -run TestPurchaseReceiptPostgres -count=1
+  run_verified_go_test TestPurchaseReceiptPostgres \
+    env PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
+    go test -json ./internal/data -run '^TestPurchaseReceiptPostgres' -count=1
   ;;
 test-workflow)
-  PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" go test ./internal/data -run '^TestWorkflowPostgres' -count=1
+  run_verified_go_test TestWorkflowPostgres \
+    env PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
+    go test -json ./internal/data -run '^TestWorkflowPostgres' -count=1
   ;;
 test-critical)
+  report_file="$(mktemp)"
+  trap 'rm -f "$report_file"' EXIT
   PURCHASE_RECEIPT_PG_TEST=1 PURCHASE_RECEIPT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
     INVENTORY_PG_TEST=1 INVENTORY_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
-    go test ./internal/data \
-    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestWorkflowPostgres|TestCustomerConfigPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestOperationalFactPostgres|TestProcessRuntimePostgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)' \
-    -count=1
+    BOM_LOT_PG_TEST=1 BOM_LOT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
+    PURCHASE_RETURN_PG_TEST=1 PURCHASE_RETURN_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
+    go test -json ./internal/data \
+    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestPurchaseReturnPostgres|TestQualityInspectionPostgres|TestWorkflowPostgres|TestCustomerConfigPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestInventoryLotPostgres|TestBOMPostgres|TestOperationalFactPostgres|TestProcessRuntimePostgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)' \
+    -count=1 | tee "$report_file"
+  node ../scripts/qa/verify-go-test-json.mjs \
+    --report "$report_file" \
+    --require-prefix TestPurchaseReceiptPostgres \
+    --require-prefix TestPurchaseReceiptAdjustmentPostgres \
+    --require-prefix TestPurchaseReturnPostgres \
+    --require-prefix TestQualityInspectionPostgres \
+    --require-prefix TestWorkflowPostgres \
+    --require-prefix TestCustomerConfigPostgres \
+    --require-prefix TestProductionOrderSchemaPostgres \
+    --require-prefix TestProductionOrderPostgres \
+    --require-prefix TestSourceDocumentPostgres \
+    --require-prefix TestInventoryPostgres \
+    --require-prefix TestInventoryLotPostgres \
+    --require-prefix TestBOMPostgres \
+    --require-prefix TestOperationalFactPostgres \
+    --require-prefix TestProcessRuntimePostgres \
+    --require-prefix TestFinanceFactCancelAuditPostgres \
+    --require-prefix TestFinanceProcessCommandPostgres \
+    --require-prefix TestSalesProcessCommandPostgres
   ;;
 dropdb)
   psql "$PURCHASE_RECEIPT_PG_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS \"${PURCHASE_RECEIPT_PG_DB_NAME}\" WITH (FORCE)"

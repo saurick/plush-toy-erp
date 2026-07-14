@@ -35,9 +35,8 @@ if [ -f "$ROOT_DIR/scripts/qa/customer-package-lint.mjs" ]; then
 fi
 
 if [ -f "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" ]; then
-  echo "[qa:yoyoosun] 运行永绅客户配置 runtime manifest 检查"
-  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer yoyoosun
-  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer yoyoosun --mode compile
+  echo "[qa:yoyoosun] 运行永绅客户配置 preview manifest 检查"
+  node "$ROOT_DIR/scripts/qa/customer-config-runtime-manifest.mjs" --customer yoyoosun --mode preview
 fi
 
 echo "[qa:yoyoosun] 运行后端客户配置字段投影测试"

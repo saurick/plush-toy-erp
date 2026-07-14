@@ -13,7 +13,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "list_bom_versions", "listBOMVersions":
+	case "list_bom_versions":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMRead); res != nil {
 			return id, res, nil
 		}
@@ -27,13 +27,13 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 			"limit":        normalizedLimit(pm),
 			"offset":       normalizedOffset(pm),
 		}), nil
-	case "get_bom_version", "getBOMVersion":
+	case "get_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.GetBOMVersion(ctx, getInt(pm, "id", 0))
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
-	case "create_bom_draft", "createBOMDraft":
+	case "create_bom_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
 			return id, res, nil
 		}
@@ -50,7 +50,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 			return id, d.mapBOMError(ctx, err), nil
 		}
 		return id, okData(map[string]any{"bom_version": bomVersionDetailToAny(&biz.BOMVersionDetail{Header: item})}), nil
-	case "update_bom_draft", "updateBOMDraft":
+	case "update_bom_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
 			return id, res, nil
 		}
@@ -67,7 +67,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		}
 		detail, err := d.inventoryUC.GetBOMVersion(ctx, item.ID)
 		return id, bomVersionDetailResult(ctx, d, detail, err), nil
-	case "copy_bom_version", "copyBOMVersion":
+	case "copy_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
 			return id, res, nil
 		}
@@ -80,7 +80,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		}
 		item, err := d.inventoryUC.CopyBOMVersion(ctx, getInt(pm, "source_id", 0), in)
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
-	case "activate_bom_version", "activateBOMVersion":
+	case "activate_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMActivate); res != nil {
 			return id, res, nil
 		}
@@ -89,7 +89,7 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		}
 		item, err := d.inventoryUC.ActivateBOMVersion(ctx, getInt(pm, "id", 0))
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
-	case "archive_bom_version", "archiveBOMVersion":
+	case "archive_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
 			return id, res, nil
 		}

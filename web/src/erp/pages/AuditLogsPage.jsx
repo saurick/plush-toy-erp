@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   KeyOutlined,
   SafetyCertificateOutlined,
@@ -8,8 +8,11 @@ import {
 } from '@ant-design/icons'
 import { useOutletContext } from 'react-router-dom'
 import {
+  Alert,
   Button,
+  Drawer,
   Empty,
+  Grid,
   Input,
   Pagination,
   Segmented,
@@ -25,13 +28,15 @@ import {
   getActionErrorMessage,
   getUserFacingErrorMessage,
 } from '@/common/utils/errorMessage'
-import { JsonRpc } from '@/common/utils/jsonRpc'
+import { isRpcAbortError, JsonRpc } from '@/common/utils/jsonRpc'
 import { DateInput } from '../components/business-list/BusinessListLayout.jsx'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { buildAuditLogParams } from '../utils/auditLogParams.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
 const DEFAULT_PAGE_SIZE = 20
+const DRAWER_FOCUS_RESTORE_FALLBACK_MS = 600
 const PAGE_SIZE_OPTIONS = ['10', '20', '50', '100']
 
 const riskLabelMap = {
@@ -394,8 +399,59 @@ function getEventDomId(event = {}) {
   return event.id || `${event.event_key || 'event'}-${event.created_at || ''}`
 }
 
+function AuditEventDetail({ event }) {
+  if (!event) {
+    return (
+      <Empty
+        description="选择一条审计日志后查看定位详情"
+        image={Empty.PRESENTED_IMAGE_SIMPLE}
+      />
+    )
+  }
+
+  return (
+    <>
+      <div className="erp-audit-detail__head">
+        <Tag color={riskColorMap[getActionMeta(event).risk]}>
+          {riskLabelMap[getActionMeta(event).risk]}
+        </Tag>
+        <Title level={5}>{buildAuditConclusion(event)}</Title>
+        <Text type="secondary">{formatTime(event)}</Text>
+      </div>
+      <div className="erp-audit-next-step">
+        <Text type="secondary">下一步</Text>
+        <Paragraph>{getActionMeta(event).next}</Paragraph>
+      </div>
+      <div className="erp-audit-facts">
+        <div>
+          <span>操作者</span>
+          <strong>{getEventActorText(event)}</strong>
+        </div>
+        <div>
+          <span>对象</span>
+          <strong>{getEventTargetText(event)}</strong>
+          <em>{getEventTargetTypeText(event)}</em>
+        </div>
+        <div>
+          <span>来源</span>
+          <strong>{getSourceLabel(event.source)}</strong>
+        </div>
+        <div>
+          <span>变化</span>
+          <strong>{summarizeChange(event.payload)}</strong>
+        </div>
+      </div>
+    </>
+  )
+}
+
 export default function AuditLogsPage() {
   const outletContext = useOutletContext()
+  const beginLatestRequest = useLatestRequestCoordinator()
+  const screens = Grid.useBreakpoint()
+  const compactAuditLayout = !screens.lg
+  const eventTriggerRef = useRef(null)
+  const focusRestoreTimerRef = useRef(null)
   const adminRpc = useMemo(
     () =>
       new JsonRpc({
@@ -407,6 +463,7 @@ export default function AuditLogsPage() {
   )
 
   const [loading, setLoading] = useState(false)
+  const [loadError, setLoadError] = useState('')
   const [events, setEvents] = useState([])
   const [total, setTotal] = useState(0)
   const [source, setSource] = useState('')
@@ -416,6 +473,7 @@ export default function AuditLogsPage() {
   const [createdFrom, setCreatedFrom] = useState('')
   const [createdTo, setCreatedTo] = useState('')
   const [selectedEventId, setSelectedEventId] = useState(null)
+  const [detailDrawerOpen, setDetailDrawerOpen] = useState(false)
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: DEFAULT_PAGE_SIZE,
@@ -440,8 +498,45 @@ export default function AuditLogsPage() {
     [filteredEvents, selectedEventId]
   )
 
+  const restoreEventTriggerFocus = useCallback(() => {
+    const trigger = eventTriggerRef.current?.isConnected
+      ? eventTriggerRef.current
+      : document.querySelector('.erp-audit-event--selected')
+    const { activeElement } = document
+    if (
+      !trigger ||
+      (activeElement &&
+        activeElement !== document.body &&
+        activeElement !== trigger &&
+        activeElement.isConnected)
+    ) {
+      return false
+    }
+    trigger.focus({ preventScroll: true })
+    return document.activeElement === trigger
+  }, [])
+
+  const clearFocusRestoreTimer = useCallback(() => {
+    if (focusRestoreTimerRef.current !== null) {
+      window.clearTimeout(focusRestoreTimerRef.current)
+      focusRestoreTimerRef.current = null
+    }
+  }, [])
+
+  const closeDetailDrawer = useCallback(() => {
+    setDetailDrawerOpen(false)
+    clearFocusRestoreTimer()
+    // Drawer 销毁路径若未交付动画回调，仍在关闭截止后恢复触发点。
+    focusRestoreTimerRef.current = window.setTimeout(() => {
+      focusRestoreTimerRef.current = null
+      restoreEventTriggerFocus()
+    }, DRAWER_FOCUS_RESTORE_FALLBACK_MS)
+  }, [clearFocusRestoreTimer, restoreEventTriggerFocus])
+
   const loadData = useCallback(async () => {
+    const request = beginLatestRequest('audit-logs')
     setLoading(true)
+    setLoadError('')
     try {
       const offset = (pagination.current - 1) * pagination.pageSize
       const result = await adminRpc.call(
@@ -454,18 +549,43 @@ export default function AuditLogsPage() {
           createdTo,
           pageSize: pagination.pageSize,
           offset,
-        })
+        }),
+        { signal: request.signal }
       )
+      if (!request.isCurrent()) {
+        return false
+      }
       setEvents(normalizeAuditEvents(result?.data?.events))
       setTotal(Number(result?.data?.total || 0))
       return true
     } catch (err) {
-      message.error(getActionErrorMessage(err, '加载审计日志'))
+      if (isRpcAbortError(err) || !request.isCurrent()) {
+        return false
+      }
+      const errorMessage = getActionErrorMessage(err, '加载审计日志')
+      setEvents([])
+      setTotal(0)
+      setSelectedEventId(null)
+      setDetailDrawerOpen(false)
+      setLoadError(errorMessage)
+      message.error(errorMessage)
       return false
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
-  }, [adminRpc, createdFrom, createdTo, eventKey, keyword, pagination, source])
+  }, [
+    adminRpc,
+    beginLatestRequest,
+    createdFrom,
+    createdTo,
+    eventKey,
+    keyword,
+    pagination,
+    source,
+  ])
 
   useEffect(() => {
     loadData()
@@ -489,6 +609,14 @@ export default function AuditLogsPage() {
       )
     }
   }, [filteredEvents, selectedEventId])
+
+  useEffect(() => {
+    if (!compactAuditLayout || !selectedEvent) {
+      setDetailDrawerOpen(false)
+    }
+  }, [compactAuditLayout, selectedEvent])
+
+  useEffect(() => clearFocusRestoreTimer, [clearFocusRestoreTimer])
 
   const segmentedOptions = riskOptions.map((option) => ({
     value: option.value,
@@ -621,6 +749,20 @@ export default function AuditLogsPage() {
         </div>
       </section>
 
+      {loadError ? (
+        <Alert
+          type="error"
+          showIcon
+          message="审计日志加载失败"
+          description={`${loadError}。当前不展示上一次筛选结果，请重试。`}
+          action={
+            <Button size="small" onClick={loadData} disabled={loading}>
+              重新加载
+            </Button>
+          }
+        />
+      ) : null}
+
       <div className="erp-audit-workspace">
         <section className="erp-audit-feed" aria-label="审计事件列表">
           <div className="erp-audit-feed__head">
@@ -644,7 +786,13 @@ export default function AuditLogsPage() {
                     ]
                       .filter(Boolean)
                       .join(' ')}
-                    onClick={() => setSelectedEventId(eventDomId)}
+                    onClick={(event) => {
+                      setSelectedEventId(eventDomId)
+                      if (compactAuditLayout) {
+                        eventTriggerRef.current = event.currentTarget
+                        setDetailDrawerOpen(true)
+                      }
+                    }}
                   >
                     <span className="erp-audit-event__risk">
                       {riskLabelMap[meta.risk]}
@@ -690,47 +838,34 @@ export default function AuditLogsPage() {
         </section>
 
         <aside className="erp-audit-detail" aria-label="审计事件定位详情">
-          {selectedEvent ? (
-            <>
-              <div className="erp-audit-detail__head">
-                <Tag color={riskColorMap[getActionMeta(selectedEvent).risk]}>
-                  {riskLabelMap[getActionMeta(selectedEvent).risk]}
-                </Tag>
-                <Title level={5}>{buildAuditConclusion(selectedEvent)}</Title>
-                <Text type="secondary">{formatTime(selectedEvent)}</Text>
-              </div>
-              <div className="erp-audit-next-step">
-                <Text type="secondary">下一步</Text>
-                <Paragraph>{getActionMeta(selectedEvent).next}</Paragraph>
-              </div>
-              <div className="erp-audit-facts">
-                <div>
-                  <span>操作者</span>
-                  <strong>{getEventActorText(selectedEvent)}</strong>
-                </div>
-                <div>
-                  <span>对象</span>
-                  <strong>{getEventTargetText(selectedEvent)}</strong>
-                  <em>{getEventTargetTypeText(selectedEvent)}</em>
-                </div>
-                <div>
-                  <span>来源</span>
-                  <strong>{getSourceLabel(selectedEvent.source)}</strong>
-                </div>
-                <div>
-                  <span>变化</span>
-                  <strong>{summarizeChange(selectedEvent.payload)}</strong>
-                </div>
-              </div>
-            </>
-          ) : (
-            <Empty
-              description="选择一条审计日志后查看定位详情"
-              image={Empty.PRESENTED_IMAGE_SIMPLE}
-            />
-          )}
+          <AuditEventDetail event={selectedEvent} />
         </aside>
       </div>
+      <Drawer
+        rootClassName="erp-audit-detail-drawer"
+        title="审计事件详情"
+        width={screens.md ? 560 : '100%'}
+        open={compactAuditLayout && detailDrawerOpen && Boolean(selectedEvent)}
+        keyboard
+        maskClosable
+        destroyOnHidden
+        onClose={closeDetailDrawer}
+        afterOpenChange={(open) => {
+          if (!open) {
+            window.requestAnimationFrame(() => {
+              window.requestAnimationFrame(() => {
+                if (restoreEventTriggerFocus()) {
+                  clearFocusRestoreTimer()
+                }
+              })
+            })
+          }
+        }}
+      >
+        <div className="erp-audit-detail erp-audit-detail--drawer">
+          <AuditEventDetail event={selectedEvent} />
+        </div>
+      </Drawer>
     </div>
   )
 }

@@ -27,7 +27,7 @@ const FINISHED_GOODS_SOURCE_TYPE_KEYS = new Set([
   INBOUND_MODULE_KEY,
   SHIPPING_RELEASE_MODULE_KEY,
 ])
-const ACTIVE_TASK_STATUS_KEYS = new Set(['pending', 'ready', 'processing'])
+const ACTIVE_TASK_STATUS_KEYS = new Set(['ready', 'blocked'])
 const DEFAULT_PRIORITY = 2
 const HIGH_PRIORITY = 3
 const URGENT_PRIORITY = 4

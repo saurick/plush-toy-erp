@@ -267,7 +267,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
   assert.equal(summary.notBusinessDataImport, true)
   assert.equal(summary.writesDatabase, true)
   assert.equal(summary.canRunUiDryRun, true)
-  assert.equal(summary.canApplyTestConfig, true)
+  assert.equal(summary.canApplyTestConfig, false)
   assert.equal(summary.canCheckReleaseReadiness, true)
   assert.equal(summary.uiDryRunApiPath, '/__dev/api/customer-import/dry-run')
   assert.equal(
@@ -282,19 +282,29 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     summary.uiReleaseReadinessApiPath,
     '/__dev/api/customer-config/release-readiness'
   )
-  assert.equal(summary.testApply.status, 'test_apply_ready')
+  assert.equal(summary.testApply.status, 'blocked')
+  assert.deepEqual(summary.testApply.blockedReasons, [
+    'package_not_release_ready',
+    'preview_only',
+    'runtime_disabled',
+    'publish_disabled',
+    'activate_disabled',
+  ])
+  assert.match(summary.testApply.note, /仍是草案/)
+  assert.match(summary.testApply.note, /只供预览/)
+  assert.match(summary.testApply.note, /运行时编译未开放/)
+  assert.match(summary.testApply.note, /发布未开放/)
+  assert.match(summary.testApply.note, /激活未开放/)
   assert.equal(
     summary.testApply.target,
     '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）'
   )
-  assert.match(summary.testApply.note, /Vite \/rpc/)
-  assert.match(summary.testApply.note, /127\.0\.0\.1:8300/)
-  assert.match(summary.testApply.note, /正式目标环境不从此按钮选择/)
   assert.equal(summary.testApply.noBusinessDataImport, true)
   assert.deepEqual(summary.testApply.operations, [
     'compile_runtime_manifest',
     'validate_customer_config',
     'publish_customer_config',
+    'check_customer_config_transition',
     'activate_customer_config',
     'get_effective_session',
   ])
@@ -342,7 +352,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
       'passed',
       'preview_only',
       'preview_only',
-      'test_apply_ready',
+      'blocked',
       'release_gate_required',
     ]
   )
@@ -377,7 +387,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     summary.databaseTargets.map((item) => item.status),
     [
       'no_write',
-      'test_apply_ready',
+      'blocked',
       'release_gate_required',
       'release_gate_required',
       'separate_task_required',
@@ -455,12 +465,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
   )
   assert.deepEqual(
     summary.versionAuditSupport.map((item) => item.status),
-    [
-      'snapshot_supported',
-      'test_apply_ready',
-      'rollback_supported',
-      'audit_supported',
-    ]
+    ['snapshot_supported', 'blocked', 'rollback_supported', 'audit_supported']
   )
   assert.deepEqual(
     summary.tools.map((item) => item.status),
@@ -1110,20 +1115,15 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
 
   assert.equal(summary.primaryStatus, 'PREVIEW_READY')
   assert.equal(summary.reviewDecision.status, 'REVIEW_READY')
-  assert.match(summary.reviewDecision.summary, /正式发布必须先通过/)
+  assert.match(summary.reviewDecision.summary, /草案且仅供预览/)
+  assert.match(summary.reviewDecision.nextAction, /只读预览和试跑/)
   assert.deepEqual(
     summary.decisionCards.map((item) => item.status),
-    ['REVIEW_READY', 'blocked_by_design', 'release_gate_required']
+    ['REVIEW_READY', 'blocked_by_design', 'blocked']
   )
   assert.deepEqual(
     summary.preflightStages.map((item) => item.status),
-    [
-      'passed',
-      'passed',
-      'preview_only',
-      'preview_only',
-      'release_gate_required',
-    ]
+    ['passed', 'passed', 'preview_only', 'preview_only', 'blocked']
   )
   assert.deepEqual(
     summary.assetSummary.map((item) => item.status),
@@ -1243,12 +1243,7 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
   assert.doesNotMatch(visibleTexts, /handler/)
   assert.deepEqual(
     summary.versionAuditSupport.map((item) => item.status),
-    [
-      'snapshot_supported',
-      'test_apply_ready',
-      'rollback_supported',
-      'audit_supported',
-    ]
+    ['snapshot_supported', 'blocked', 'rollback_supported', 'audit_supported']
   )
   assert.deepEqual(
     summary.reviewChecklist.map((item) => item.status),
@@ -1259,7 +1254,7 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
       'source_grounded',
       'preview_only',
       'report_gate_only',
-      'release_gate_required',
+      'blocked',
     ]
   )
   assert(

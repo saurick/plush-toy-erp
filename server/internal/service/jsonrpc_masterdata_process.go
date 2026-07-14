@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_process", "createProcess":
+	case "create_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessCreate); res != nil {
 			return id, res, nil
 		}
@@ -23,7 +23,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		}
 		item, err := d.masterDataUC.CreateProcess(ctx, processMutationFromParams(pm))
 		return id, processMutationResult(ctx, d, item, err), nil
-	case "update_process", "updateProcess":
+	case "update_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessUpdate); res != nil {
 			return id, res, nil
 		}
@@ -32,13 +32,13 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 		}
 		item, err := d.masterDataUC.UpdateProcess(ctx, getInt(pm, "id", 0), processMutationFromParams(pm))
 		return id, processMutationResult(ctx, d, item, err), nil
-	case "get_process", "getProcess":
+	case "get_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.GetProcess(ctx, getInt(pm, "id", 0))
 		return id, processMutationResult(ctx, d, item, err), nil
-	case "list_processes", "listProcesses":
+	case "list_processes":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRead); res != nil {
 			return id, res, nil
 		}
@@ -52,7 +52,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProcess(
 			"limit":     normalizedLimit(pm),
 			"offset":    normalizedOffset(pm),
 		})}, nil
-	case "set_process_active", "setProcessActive":
+	case "set_process_active":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessDisable); res != nil {
 			return id, res, nil
 		}

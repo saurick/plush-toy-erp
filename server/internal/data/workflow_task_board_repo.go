@@ -138,7 +138,13 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		}
 		tasks := make([]*biz.WorkflowTask, 0, len(rows))
 		for _, row := range rows {
-			tasks = append(tasks, entWorkflowTaskToBiz(row))
+			task := entWorkflowTaskToBiz(row)
+			if laneKey == biz.WorkflowTaskBoardLaneFinished {
+				task.BlockedReason = nil
+				delete(task.Payload, "blocked_reason")
+				delete(task.Payload, "rejected_reason")
+			}
+			tasks = append(tasks, task)
 		}
 		lanes = append(lanes, biz.WorkflowTaskBoardLane{
 			Key:    laneKey,
@@ -159,6 +165,9 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 }
 
 func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) *ent.WorkflowTaskQuery {
+	if filter.VisibilityScope != nil {
+		return query.Where(workflowTaskRevisionVisibilityPredicate(filter.VisibilityScope, filter.OwnerRoleKey))
+	}
 	visibilityFilter := biz.WorkflowTaskFilter{
 		OwnerRoleKey:         filter.OwnerRoleKey,
 		VisibleOwnerRoleKeys: filter.VisibleOwnerRoleKeys,
@@ -227,8 +236,6 @@ func workflowTaskBoardStatusFilterPredicate(filter biz.WorkflowTaskBoardQuery) (
 	switch filter.Status {
 	case "", "all":
 		return nil, nil
-	case "pending":
-		return workflowtask.TaskStatusKeyIn("pending", "ready"), nil
 	case "overdue":
 		return workflowtask.And(
 			workflowTaskBoardUnsettledStatusPredicate(),
@@ -240,7 +247,7 @@ func workflowTaskBoardStatusFilterPredicate(filter biz.WorkflowTaskBoardQuery) (
 			workflowtask.DueAtGTE(filter.SnapshotAt),
 			workflowtask.DueAtLTE(filter.SnapshotAt.Add(biz.WorkflowTaskBoardDueWindow)),
 		), nil
-	case "ready", "processing", "blocked", "rejected", "done", "closed", "cancelled":
+	case "ready", "blocked", "rejected", "done":
 		return workflowtask.TaskStatusKey(filter.Status), nil
 	default:
 		return nil, biz.ErrBadParam
@@ -272,17 +279,17 @@ func workflowTaskBoardDueFilterPredicate(filter biz.WorkflowTaskBoardQuery) (pre
 func workflowTaskBoardLanePredicate(laneKey string, query biz.WorkflowTaskBoardQuery) (predicate.WorkflowTask, error) {
 	switch laneKey {
 	case biz.WorkflowTaskBoardLaneException:
-		return workflowtask.TaskStatusKeyIn("blocked", "rejected"), nil
+		return workflowtask.TaskStatusKey("blocked"), nil
 	case biz.WorkflowTaskBoardLaneFinished:
-		return workflowtask.TaskStatusKeyIn("done", "closed", "cancelled"), nil
+		return workflowtask.TaskStatusKeyIn("done", "rejected"), nil
 	case biz.WorkflowTaskBoardLaneDue:
 		return workflowtask.And(
-			workflowtask.TaskStatusKeyIn("pending", "ready", "processing"),
+			workflowtask.TaskStatusKey("ready"),
 			workflowtask.DueAtLTE(query.SnapshotAt.Add(biz.WorkflowTaskBoardDueWindow)),
 		), nil
 	case biz.WorkflowTaskBoardLaneActionable:
 		return workflowtask.And(
-			workflowtask.TaskStatusKeyIn("pending", "ready", "processing"),
+			workflowtask.TaskStatusKey("ready"),
 			workflowtask.Or(
 				workflowtask.DueAtIsNil(),
 				workflowtask.DueAtGT(query.SnapshotAt.Add(biz.WorkflowTaskBoardDueWindow)),
@@ -294,7 +301,7 @@ func workflowTaskBoardLanePredicate(laneKey string, query biz.WorkflowTaskBoardQ
 }
 
 func workflowTaskBoardUnsettledStatusPredicate() predicate.WorkflowTask {
-	return workflowtask.TaskStatusKeyIn("pending", "ready", "processing", "blocked")
+	return workflowtask.TaskStatusKeyIn("ready", "blocked")
 }
 
 func setWorkflowTaskBoardLaneCount(counts *biz.WorkflowTaskBoardCounts, laneKey string, count int) {

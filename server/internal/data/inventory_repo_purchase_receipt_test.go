@@ -39,24 +39,26 @@ func TestInventoryRepo_PurchaseReceiptLifecycle(t *testing.T) {
 	}
 
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   receipt.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		LotNo:       stringPtr("LOT-A"),
-		Quantity:    decimal.Zero,
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		LotNo:          stringPtr("LOT-A"),
+		Quantity:       decimal.Zero,
+		IdempotencyKey: "test:purchase-receipt:invalid-quantity",
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected quantity <= 0 to be rejected, got %v", err)
 	}
 
 	item, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:    receipt.ID,
-		MaterialID:   fixtures.materialID,
-		WarehouseID:  fixtures.warehouseID,
-		UnitID:       fixtures.unitID,
-		LotNo:        stringPtr("LOT-A"),
-		Quantity:     mustDecimal(t, "10"),
-		SourceLineNo: stringPtr("1"),
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		LotNo:          stringPtr("LOT-A"),
+		Quantity:       mustDecimal(t, "10"),
+		SourceLineNo:   stringPtr("1"),
+		IdempotencyKey: "test:purchase-receipt:line-1",
 	})
 	if err != nil {
 		t.Fatalf("add purchase receipt item failed: %v", err)
@@ -186,6 +188,92 @@ func TestInventoryRepo_PurchaseReceiptLifecycle(t *testing.T) {
 	}
 }
 
+func TestInventoryRepo_PurchaseReceiptItemIdempotencyReplaysOneFactSet(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_receipt_item_idempotency")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+
+	receipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-ITEM-IDEMPOTENCY",
+		SupplierName: "幂等供应商",
+		ReceivedAt:   time.Date(2026, 7, 14, 9, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create receipt draft failed: %v", err)
+	}
+	input := &biz.PurchaseReceiptItemCreate{
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		LotNo:          stringPtr("IDEMPOTENT-SUPPLIER-LOT"),
+		Quantity:       mustDecimal(t, "3"),
+		SourceLineNo:   stringPtr("IDEMPOTENT-LINE-1"),
+		IdempotencyKey: "test:purchase-receipt-item:replay",
+	}
+	created, err := uc.AddPurchaseReceiptItem(ctx, input)
+	if err != nil {
+		t.Fatalf("create receipt item failed: %v", err)
+	}
+	itemCount := client.PurchaseReceiptItem.Query().CountX(ctx)
+	lotCount := client.InventoryLot.Query().CountX(ctx)
+	inspectionCount := client.QualityInspection.Query().CountX(ctx)
+
+	conflicting := *input
+	conflicting.Quantity = mustDecimal(t, "4")
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &conflicting); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed payload with reused key error = %v, want ErrIdempotencyConflict", err)
+	}
+
+	lotCountBeforeFailedAppend := client.InventoryLot.Query().CountX(ctx)
+	failedAppend := *input
+	failedAppend.IdempotencyKey = "test:purchase-receipt-item:source-line-conflict"
+	if _, err := uc.AddPurchaseReceiptItem(ctx, &failedAppend); err == nil {
+		t.Fatal("duplicate source line must fail")
+	}
+	if got := client.InventoryLot.Query().CountX(ctx); got != lotCountBeforeFailedAppend {
+		t.Fatalf("failed item append leaked lot: %d -> %d", lotCountBeforeFailedAppend, got)
+	}
+
+	if _, err := client.Material.UpdateOneID(fixtures.materialID).SetIsActive(false).Save(ctx); err != nil {
+		t.Fatalf("disable material after original write failed: %v", err)
+	}
+	replayed, err := uc.AddPurchaseReceiptItem(ctx, input)
+	if err != nil {
+		t.Fatalf("replay after material state changed failed: %v", err)
+	}
+	if replayed.ID != created.ID {
+		t.Fatalf("replayed item id=%d, want %d", replayed.ID, created.ID)
+	}
+	if got := client.PurchaseReceiptItem.Query().CountX(ctx); got != itemCount {
+		t.Fatalf("replay changed item count: %d -> %d", itemCount, got)
+	}
+	if got := client.InventoryLot.Query().CountX(ctx); got != lotCount {
+		t.Fatalf("replay changed lot count: %d -> %d", lotCount, got)
+	}
+	if got := client.QualityInspection.Query().CountX(ctx); got != inspectionCount {
+		t.Fatalf("replay changed inspection count: %d -> %d", inspectionCount, got)
+	}
+
+	extraWarehouse := createTestWarehouse(t, ctx, client, "IDEMPOTENCY-CORRUPT-WH")
+	if _, err := data.sqldb.ExecContext(ctx, "UPDATE quality_inspections SET warehouse_id = ? WHERE purchase_receipt_item_id = ?", extraWarehouse.ID, created.ID); err != nil {
+		t.Fatalf("corrupt replay inspection association: %v", err)
+	}
+	if _, err := uc.AddPurchaseReceiptItem(ctx, input); err == nil {
+		t.Fatal("replay with a corrupted inspection association must fail closed")
+	}
+	if _, err := data.sqldb.ExecContext(ctx, "UPDATE quality_inspections SET warehouse_id = ? WHERE purchase_receipt_item_id = ?", fixtures.warehouseID, created.ID); err != nil {
+		t.Fatalf("restore replay inspection association: %v", err)
+	}
+	if _, err := data.sqldb.ExecContext(ctx, "UPDATE purchase_receipt_items SET lot_id = NULL WHERE id = ?", created.ID); err != nil {
+		t.Fatalf("corrupt replay lot binding: %v", err)
+	}
+	if _, err := uc.AddPurchaseReceiptItem(ctx, input); err == nil {
+		t.Fatal("replay with a missing lot binding must fail closed")
+	}
+}
+
 func TestInventoryUsecase_PurchaseReceiptRejectsInactiveNewReferencesAndKeepsCancelAllowed(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "inventory_repo_purchase_receipt_inactive_refs")
@@ -211,11 +299,12 @@ func TestInventoryUsecase_PurchaseReceiptRejectsInactiveNewReferencesAndKeepsCan
 		t.Fatalf("create receipt draft failed: %v", err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   draft.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    mustDecimal(t, "1"),
+		ReceiptID:      draft.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:purchase-receipt:inactive-material",
 	}); !errors.Is(err, biz.ErrMaterialInactive) {
 		t.Fatalf("expected inactive material rejected for new receipt item, got %v", err)
 	}
@@ -225,11 +314,12 @@ func TestInventoryUsecase_PurchaseReceiptRejectsInactiveNewReferencesAndKeepsCan
 		t.Fatalf("disable warehouse failed: %v", err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   draft.ID,
-		MaterialID:  activeMaterial.ID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    mustDecimal(t, "1"),
+		ReceiptID:      draft.ID,
+		MaterialID:     activeMaterial.ID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:purchase-receipt:inactive-warehouse",
 	}); !errors.Is(err, biz.ErrWarehouseInactive) {
 		t.Fatalf("expected inactive warehouse rejected for new receipt item, got %v", err)
 	}
@@ -254,13 +344,14 @@ func TestInventoryRepo_PurchaseReceiptTraceProtection(t *testing.T) {
 		t.Fatalf("create trace receipt failed: %v", err)
 	}
 	item, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:    receipt.ID,
-		MaterialID:   fixtures.materialID,
-		WarehouseID:  fixtures.warehouseID,
-		UnitID:       fixtures.unitID,
-		LotNo:        stringPtr("TRACE-LOT-001"),
-		Quantity:     mustDecimal(t, "6"),
-		SourceLineNo: stringPtr("TRACE-LINE-001"),
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		LotNo:          stringPtr("TRACE-LOT-001"),
+		Quantity:       mustDecimal(t, "6"),
+		SourceLineNo:   stringPtr("TRACE-LINE-001"),
+		IdempotencyKey: "test:purchase-receipt:trace-line",
 	})
 	if err != nil {
 		t.Fatalf("add trace receipt item failed: %v", err)
@@ -283,11 +374,12 @@ func TestInventoryRepo_PurchaseReceiptTraceProtection(t *testing.T) {
 	}
 
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   receipt.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    mustDecimal(t, "1"),
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:purchase-receipt:posted-reject",
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("posted receipt must reject new item, got %v", err)
 	}
@@ -321,11 +413,12 @@ func TestInventoryRepo_PurchaseReceiptTraceProtection(t *testing.T) {
 		t.Fatalf("cancelled receipt must not be posted again, got %v", err)
 	}
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
-		ReceiptID:   receipt.ID,
-		MaterialID:  fixtures.materialID,
-		WarehouseID: fixtures.warehouseID,
-		UnitID:      fixtures.unitID,
-		Quantity:    mustDecimal(t, "1"),
+		ReceiptID:      receipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:purchase-receipt:cancelled-reject",
 	}); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("cancelled receipt must reject new item, got %v", err)
 	}

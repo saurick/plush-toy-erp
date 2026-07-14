@@ -33,7 +33,7 @@ func TestFinanceFactCancelAuditPostgresPreservesPostingAndReplaysExactly(t *test
 	}
 	if cancelled.CancelledAt == nil || cancelled.CancelledBy == nil || *cancelled.CancelledBy != actor.ID ||
 		cancelled.CancelReason == nil || *cancelled.CancelReason != "客户确认账款作废" ||
-		cancelled.CancelledByName == nil || *cancelled.CancelledByName != actor.Username || cancelled.CancelAuditLegacy {
+		cancelled.CancelledByName == nil || *cancelled.CancelledByName != actor.Username {
 		t.Fatalf("unexpected cancellation audit: %#v", cancelled)
 	}
 	replayed, err := repo.CancelPostedFinanceFact(ctx, fact.ID, actor.ID, "客户确认账款作废")
@@ -145,31 +145,24 @@ func TestFinanceFactCancelAuditPostgresConcurrentExactReplayReturnsOneAudit(t *t
 	}
 }
 
-func TestFinanceFactCancelAuditPostgresConstraintAndHistoricalProjection(t *testing.T) {
+func TestFinanceFactCancelAuditPostgresConstraintRequiresCompleteAudit(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	suffix := postgresTestSuffix()
 	actor := client.AdminUser.Create().SetUsername("finance-shape-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 	fact := createPostedFinanceFactForCancelAudit(t, ctx, repo, suffix)
-	var columnDefault string
-	if err := data.sqldb.QueryRowContext(ctx, `SELECT column_default FROM information_schema.columns WHERE table_schema='public' AND table_name='finance_facts' AND column_name='cancel_audit_version'`).Scan(&columnDefault); err != nil {
-		t.Fatalf("read cancel audit default: %v", err)
-	}
-	if columnDefault != "1" {
-		t.Fatalf("cancel_audit_version default=%q, want 1", columnDefault)
-	}
 	var constraintCount int
-	if err := data.sqldb.QueryRowContext(ctx, `SELECT count(*) FROM pg_constraint WHERE conrelid='finance_facts'::regclass AND conname IN ('finance_facts_cancel_audit_bundle','finance_facts_cancel_audit_version')`).Scan(&constraintCount); err != nil {
+	if err := data.sqldb.QueryRowContext(ctx, `SELECT count(*) FROM pg_constraint WHERE conrelid='finance_facts'::regclass AND conname = 'finance_facts_cancel_audit_bundle'`).Scan(&constraintCount); err != nil {
 		t.Fatalf("read cancel audit constraints: %v", err)
 	}
-	if constraintCount != 2 {
-		t.Fatalf("cancel audit constraints=%d, want 2", constraintCount)
+	if constraintCount != 1 {
+		t.Fatalf("cancel audit constraints=%d, want 1", constraintCount)
 	}
 
 	badStatements := []string{
-		`UPDATE finance_facts SET status='CANCELLED', cancel_audit_version=1, cancelled_at=now(), cancelled_by=$1, cancel_reason=NULL WHERE id=$2`,
-		`UPDATE finance_facts SET status='CANCELLED', cancel_audit_version=1, cancelled_at=now(), cancelled_by=$1, cancel_reason='   ' WHERE id=$2`,
+		`UPDATE finance_facts SET status='CANCELLED', cancelled_at=now(), cancelled_by=$1, cancel_reason=NULL WHERE id=$2`,
+		`UPDATE finance_facts SET status='CANCELLED', cancelled_at=now(), cancelled_by=$1, cancel_reason='   ' WHERE id=$2`,
 		`UPDATE finance_facts SET status='POSTED', cancelled_at=now(), cancelled_by=$1, cancel_reason='越界审计' WHERE id=$2`,
 	}
 	for _, statement := range badStatements {
@@ -177,22 +170,6 @@ func TestFinanceFactCancelAuditPostgresConstraintAndHistoricalProjection(t *test
 			t.Fatalf("database accepted invalid cancellation bundle: %s", statement)
 		}
 	}
-	if _, err := data.sqldb.ExecContext(ctx, `UPDATE finance_facts SET status='CANCELLED', cancel_audit_version=0 WHERE id=$1`, fact.ID); err != nil {
-		t.Fatalf("create pre-cutover historical row: %v", err)
-	}
-	items, _, err := repo.ListFinanceFacts(ctx, biz.OperationalFactFilter{Status: biz.OperationalFactStatusCancelled, Limit: 100})
-	if err != nil {
-		t.Fatalf("list historical finance facts: %v", err)
-	}
-	for _, item := range items {
-		if item.ID == fact.ID {
-			if !item.CancelAuditLegacy || item.CancelledAt != nil || item.CancelledBy != nil || item.CancelReason != nil {
-				t.Fatalf("historical audit must remain explicitly missing: %#v", item)
-			}
-			return
-		}
-	}
-	t.Fatalf("historical finance fact %d not returned", fact.ID)
 }
 
 func TestFinanceFactCancelAuditPostgresRollsBackWhenCompensationFails(t *testing.T) {

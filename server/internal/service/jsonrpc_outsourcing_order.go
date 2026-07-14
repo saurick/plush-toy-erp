@@ -26,16 +26,16 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrder(
 	}
 
 	switch method {
-	case "save_outsourcing_order_with_items", "saveOutsourcingOrderWithItems",
-		"get_outsourcing_order", "getOutsourcingOrder",
-		"list_outsourcing_orders", "listOutsourcingOrders":
+	case "save_outsourcing_order_with_items",
+		"get_outsourcing_order",
+		"list_outsourcing_orders":
 		return d.handleOutsourcingOrderDocument(ctx, method, id, pm)
-	case "submit_outsourcing_order", "submitOutsourcingOrder",
-		"confirm_outsourcing_order", "confirmOutsourcingOrder",
-		"close_outsourcing_order", "closeOutsourcingOrder",
-		"cancel_outsourcing_order", "cancelOutsourcingOrder":
+	case "submit_outsourcing_order",
+		"confirm_outsourcing_order",
+		"close_outsourcing_order",
+		"cancel_outsourcing_order":
 		return d.handleOutsourcingOrderLifecycle(ctx, method, id, pm)
-	case "list_outsourcing_order_items", "listOutsourcingOrderItems":
+	case "list_outsourcing_order_items":
 		return d.handleOutsourcingOrderItem(ctx, method, id, pm)
 	default:
 		return id, unknownOutsourcingOrderResult(method), nil

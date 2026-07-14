@@ -26,11 +26,11 @@ test('菜单投影分别执行 ANY 与 ALL 权限合同', () => {
   )
 })
 
-test('旧 required_permissions 仍按 ANY 兼容', () => {
+test('非合同字段不参与菜单权限投影', () => {
   assert.equal(
     isMenuVisibleForPermissionKeys(
       { required_permissions: ['system.user.read', 'system.role.read'] },
-      ['system.role.read']
+      []
     ),
     true
   )

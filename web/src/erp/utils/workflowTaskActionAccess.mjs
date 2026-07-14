@@ -8,6 +8,7 @@ export const DEFAULT_WORKFLOW_ACTION_MODES = Object.freeze([
   'complete',
   'block',
   'reject',
+  'resume',
   'urge',
 ])
 

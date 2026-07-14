@@ -50,6 +50,19 @@ test('customerConfigApi: sales order acceptance submit uses explicit start and d
   )
 })
 
+test('customerConfigApi: customer config transitions use strict shared payload builders', () => {
+  assert.match(customerConfigApiSource, /check_customer_config_transition/)
+  assert.match(customerConfigApiSource, /checkCustomerConfigTransition/)
+  assert.match(
+    customerConfigApiSource,
+    /buildCustomerConfigMutationPayload\('activate', params\)/
+  )
+  assert.match(
+    customerConfigApiSource,
+    /buildCustomerConfigMutationPayload\('rollback', params\)/
+  )
+})
+
 test('V1SalesOrdersPage: sales order submit action enters acceptance workflow', () => {
   assert.match(salesOrderPageConfigSource, /submitSalesOrderAcceptanceProcess/)
   assert.match(

@@ -120,6 +120,32 @@ func TestInitAdminUsersIfNeededProductionRequiresOnceFlag(t *testing.T) {
 	}
 }
 
+func TestInitAdminUsersIfNeededRejectsWeakBootstrapPassword(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	config := testAdminInitConfig()
+	config.Auth.Admin.Password = "1234567"
+	mock.ExpectClose()
+
+	err = initAdminUsersIfNeeded(
+		context.Background(),
+		&Data{sqldb: db},
+		config,
+		log.NewHelper(log.NewStdLogger(io.Discard)),
+		adminBootstrapOptions{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "at least 8 characters") {
+		t.Fatalf("expected bootstrap password policy error, got %v", err)
+	}
+	mustCloseDB(t, db)
+
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
 func TestInitAdminUsersIfNeededProductionOnceCreatesMarkerAndAudit(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {

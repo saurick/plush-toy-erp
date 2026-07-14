@@ -994,6 +994,9 @@ WHERE subject_type = %s AND subject_id = %s AND warehouse_id = %s AND unit_id = 
 }
 
 func (r *inventoryRepo) CreateBOMHeader(ctx context.Context, in *biz.BOMHeaderCreate) (*biz.BOMHeader, error) {
+	if in == nil || !biz.IsCreatableBOMStatus(in.Status) {
+		return nil, biz.ErrBadParam
+	}
 	if _, err := r.data.postgres.Product.Get(ctx, in.ProductID); err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrBadParam
@@ -1344,6 +1347,12 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 		}
 		return nil, err
 	}
+	if !biz.IsKnownBOMStatus(source.Status) {
+		return nil, biz.ErrBadParam
+	}
+	if in == nil || !biz.IsCreatableBOMStatus(in.Status) {
+		return nil, biz.ErrBadParam
+	}
 	if in.ProductID != source.ProductID {
 		return nil, biz.ErrBadParam
 	}
@@ -1446,7 +1455,7 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (*biz.BO
 		}
 		return nil, err
 	}
-	if target.Status == biz.BOMStatusDisabled {
+	if target.Status != biz.BOMStatusActive && !biz.CanTransitionBOMStatus(target.Status, biz.BOMStatusActive) {
 		return nil, biz.ErrBadParam
 	}
 	items, err := tx.BOMItem.Query().
@@ -1474,10 +1483,16 @@ func (r *inventoryRepo) ActivateBOMVersion(ctx context.Context, id int) (*biz.BO
 			SetStatus(biz.BOMStatusActive).
 			Save(ctx)
 		if err != nil {
+			if ent.IsConstraintError(err) {
+				return nil, biz.ErrBOMActiveConflict
+			}
 			return nil, err
 		}
 	}
 	if err := tx.Commit(); err != nil {
+		if ent.IsConstraintError(err) {
+			return nil, biz.ErrBOMActiveConflict
+		}
 		return nil, err
 	}
 	tx = nil
@@ -1496,11 +1511,11 @@ func (r *inventoryRepo) ArchiveBOMVersion(ctx context.Context, id int) (*biz.BOM
 		}
 		return nil, err
 	}
-	if row.Status == biz.BOMStatusDisabled {
-		return nil, biz.ErrBadParam
-	}
 	if row.Status == biz.BOMStatusArchived {
 		return entBOMHeaderToBiz(row), nil
+	}
+	if !biz.CanTransitionBOMStatus(row.Status, biz.BOMStatusArchived) {
+		return nil, biz.ErrBadParam
 	}
 	row, err = r.data.postgres.BOMHeader.UpdateOneID(id).
 		SetStatus(biz.BOMStatusArchived).

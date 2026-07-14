@@ -4347,6 +4347,22 @@ func (c *ProcessInstanceClient) QueryNodes(_m *ProcessInstance) *ProcessNodeInst
 	return query
 }
 
+// QueryWorkflowTasks queries the workflow_tasks edge of a ProcessInstance.
+func (c *ProcessInstanceClient) QueryWorkflowTasks(_m *ProcessInstance) *WorkflowTaskQuery {
+	query := (&WorkflowTaskClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(processinstance.Table, processinstance.FieldID, id),
+			sqlgraph.To(workflowtask.Table, workflowtask.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, processinstance.WorkflowTasksTable, processinstance.WorkflowTasksColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *ProcessInstanceClient) Hooks() []Hook {
 	return c.hooks.ProcessInstance
@@ -4489,6 +4505,22 @@ func (c *ProcessNodeInstanceClient) QueryProcessInstance(_m *ProcessNodeInstance
 			sqlgraph.From(processnodeinstance.Table, processnodeinstance.FieldID, id),
 			sqlgraph.To(processinstance.Table, processinstance.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, processnodeinstance.ProcessInstanceTable, processnodeinstance.ProcessInstanceColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryWorkflowTasks queries the workflow_tasks edge of a ProcessNodeInstance.
+func (c *ProcessNodeInstanceClient) QueryWorkflowTasks(_m *ProcessNodeInstance) *WorkflowTaskQuery {
+	query := (&WorkflowTaskClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(processnodeinstance.Table, processnodeinstance.FieldID, id),
+			sqlgraph.To(workflowtask.Table, workflowtask.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, processnodeinstance.WorkflowTasksTable, processnodeinstance.WorkflowTasksColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -10824,6 +10856,38 @@ func (c *WorkflowTaskClient) QueryEvents(_m *WorkflowTask) *WorkflowTaskEventQue
 			sqlgraph.From(workflowtask.Table, workflowtask.FieldID, id),
 			sqlgraph.To(workflowtaskevent.Table, workflowtaskevent.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, workflowtask.EventsTable, workflowtask.EventsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProcessInstance queries the process_instance edge of a WorkflowTask.
+func (c *WorkflowTaskClient) QueryProcessInstance(_m *WorkflowTask) *ProcessInstanceQuery {
+	query := (&ProcessInstanceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(workflowtask.Table, workflowtask.FieldID, id),
+			sqlgraph.To(processinstance.Table, processinstance.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, workflowtask.ProcessInstanceTable, workflowtask.ProcessInstanceColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProcessNodeInstance queries the process_node_instance edge of a WorkflowTask.
+func (c *WorkflowTaskClient) QueryProcessNodeInstance(_m *WorkflowTask) *ProcessNodeInstanceQuery {
+	query := (&ProcessNodeInstanceClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(workflowtask.Table, workflowtask.FieldID, id),
+			sqlgraph.To(processnodeinstance.Table, processnodeinstance.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, workflowtask.ProcessNodeInstanceTable, workflowtask.ProcessNodeInstanceColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil

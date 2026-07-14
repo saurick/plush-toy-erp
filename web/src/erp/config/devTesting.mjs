@@ -191,7 +191,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'customer-config-package-runtime',
     label: '客户配置包运行时 / Customer Config Runtime',
     description:
-      '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；只做本地 validate / compile、输入模板和无后端测试，不发布、不激活、不调用后端；release readiness 必须在 /__dev/customer-config 显式选择证据批次后检查。',
+      '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；tracked draft 只做本地 preview、输入模板和无后端测试，不发布、不激活、不调用后端；release readiness 必须在 /__dev/customer-config 显式选择证据批次后检查。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web start:yoyoosun -- --print-plan',
@@ -201,10 +201,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer demo --mode compile',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer demo',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer demo --mode compile',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun',
-      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode compile',
+      'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --all --mode preview',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-runtime-manifest.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-config-runtime-manifest.json',
       'PATH=/usr/local/bin:$PATH node scripts/qa/customer-config-effective-session-probe.mjs --json --report output/customers/yoyoosun/customer-config-effective-session-probe/current.json',
       'PATH=/usr/local/bin:$PATH node scripts/deploy/customer-config-release-execute.mjs --print-input-template',

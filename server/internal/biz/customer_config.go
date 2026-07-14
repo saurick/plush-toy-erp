@@ -14,6 +14,9 @@ import (
 
 const (
 	DefaultCustomerKey = "demo"
+	// CustomerConfigHashVersion identifies SHA-256 over the complete normalized
+	// publish payload. This is the first and only formal hash contract.
+	CustomerConfigHashVersion = 1
 
 	CustomerConfigStatusPublished  = "published"
 	CustomerConfigStatusActive     = "active"
@@ -22,7 +25,8 @@ const (
 
 var (
 	ErrCustomerConfigNotFound               = errors.New("customer config not found")
-	ErrCustomerConfigActiveRevision         = errors.New("customer config active revision cannot be overwritten")
+	ErrCustomerConfigRevisionImmutable      = errors.New("customer config revision is immutable")
+	ErrCustomerConfigHashMismatch           = errors.New("customer config hash mismatch")
 	ErrCustomerConfigActiveRevisionRequired = errors.New("customer config active revision required")
 )
 
@@ -43,19 +47,20 @@ var runtimeFieldPolicySurfaceKeys = map[string]map[string]struct{}{
 }
 
 type CustomerConfigRevision struct {
-	ID               int
-	CustomerKey      string
-	Revision         string
-	ProductVersion   string
-	ConfigHash       string
-	Status           string
-	CompiledSnapshot map[string]any
-	PublishedBy      *int
-	PublishedAt      *time.Time
-	ActivatedBy      *int
-	ActivatedAt      *time.Time
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                int
+	CustomerKey       string
+	Revision          string
+	ProductVersion    string
+	ConfigHash        string
+	ConfigHashVersion int
+	Status            string
+	CompiledSnapshot  map[string]any
+	PublishedBy       *int
+	PublishedAt       *time.Time
+	ActivatedBy       *int
+	ActivatedAt       *time.Time
+	CreatedAt         time.Time
+	UpdatedAt         time.Time
 }
 
 type DeploymentModuleStateInput struct {
@@ -114,6 +119,7 @@ type CustomerConfigValidationResult struct {
 	CustomerKey        string
 	Revision           string
 	ConfigHash         string
+	ConfigHashVersion  int
 	ModuleStateCount   int
 	RoleProfileCount   int
 	EntitlementCount   int
@@ -126,6 +132,7 @@ type CustomerConfigValidationResult struct {
 type EffectiveSession struct {
 	ConfigRevision        string
 	ConfigHash            string
+	ConfigHashVersion     int
 	Customer              EffectiveSessionCustomer
 	Modules               map[string]string
 	Roles                 []string
@@ -213,14 +220,15 @@ type CustomerConfigRepo interface {
 	GetCustomerConfigRevision(ctx context.Context, customerKey, revision string) (*CustomerConfigRevision, error)
 	GetActiveCustomerConfigRevision(ctx context.Context, customerKey string) (*CustomerConfigRevision, error)
 	PublishCustomerConfig(ctx context.Context, in CustomerConfigPublishInput, configHash string, publishedBy int, publishedAt time.Time) (*CustomerConfigRevision, error)
-	ActivateCustomerConfig(ctx context.Context, customerKey, revision string, activatedBy int, activatedAt time.Time) (*CustomerConfigRevision, error)
-	RollbackCustomerConfig(ctx context.Context, customerKey, targetRevision string, actorID int, rolledBackAt time.Time) (*CustomerConfigRevision, error)
+	ActivateCustomerConfig(ctx context.Context, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, activatedBy int, activatedAt time.Time) (*CustomerConfigRevision, error)
+	RollbackCustomerConfig(ctx context.Context, customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, actorID int, rolledBackAt time.Time) (*CustomerConfigRevision, error)
 	ListDeploymentModuleStates(ctx context.Context, customerKey, revision string) ([]DeploymentModuleStateInput, error)
 	ListRoleProfiles(ctx context.Context, customerKey, revision string) ([]RoleProfileInput, error)
 	ListAccessEntitlements(ctx context.Context, customerKey, revision string, roleKeys []string) ([]AccessEntitlementInput, error)
 	ListWorkPools(ctx context.Context, customerKey, revision string) ([]WorkPoolInput, error)
 	ListWorkPoolMemberships(ctx context.Context, customerKey, revision string, roleKeys []string, userID int) ([]WorkPoolMembershipInput, error)
 	ListWorkPoolMembershipsByPools(ctx context.Context, customerKey, revision string, poolKeys []string) ([]WorkPoolMembershipInput, error)
+	ListWorkflowTaskAuthorizationRevisions(ctx context.Context, customerKey string) ([]WorkflowTaskAuthorizationRevision, error)
 	CountInFlightProcessInstances(ctx context.Context, customerKey, revision string, processKeys []string) (int, error)
 	CountOpenWorkflowTasksByPools(ctx context.Context, customerKey, revision string, poolKeys []string) (int, error)
 	CountOpenBusinessDocumentsByModules(ctx context.Context, customerKey string, moduleKeys []string) (int, error)
@@ -239,7 +247,7 @@ func (uc *CustomerConfigUsecase) ValidateCustomerConfig(_ context.Context, in Cu
 	if err != nil {
 		return nil, err
 	}
-	hash, err := HashCompiledCustomerConfig(normalized.CompiledSnapshot)
+	hash, err := hashNormalizedCustomerConfigPublishInput(normalized)
 	if err != nil {
 		return nil, err
 	}
@@ -247,6 +255,7 @@ func (uc *CustomerConfigUsecase) ValidateCustomerConfig(_ context.Context, in Cu
 		CustomerKey:        normalized.CustomerKey,
 		Revision:           normalized.Revision,
 		ConfigHash:         hash,
+		ConfigHashVersion:  CustomerConfigHashVersion,
 		ModuleStateCount:   len(normalized.ModuleStates),
 		RoleProfileCount:   len(normalized.RoleProfiles),
 		EntitlementCount:   len(normalized.AccessEntitlements),
@@ -267,59 +276,71 @@ func (uc *CustomerConfigUsecase) PublishCustomerConfig(ctx context.Context, in C
 	if publishedBy <= 0 {
 		return nil, ErrBadParam
 	}
-	existing, err := uc.repo.GetCustomerConfigRevision(ctx, normalized.CustomerKey, normalized.Revision)
-	if err != nil && !errors.Is(err, ErrCustomerConfigNotFound) {
-		return nil, err
-	}
-	if existing != nil && existing.Status == CustomerConfigStatusActive {
-		return nil, ErrCustomerConfigActiveRevision
-	}
-	hash, err := HashCompiledCustomerConfig(normalized.CompiledSnapshot)
+	hash, err := hashNormalizedCustomerConfigPublishInput(normalized)
 	if err != nil {
 		return nil, err
 	}
 	return uc.repo.PublishCustomerConfig(ctx, normalized, hash, publishedBy, time.Now())
 }
 
-func (uc *CustomerConfigUsecase) ActivateCustomerConfig(ctx context.Context, customerKey, revision string, activatedBy int) (*CustomerConfigRevision, error) {
-	if uc == nil || uc.repo == nil {
+func (uc *CustomerConfigUsecase) ActivateCustomerConfig(ctx context.Context, customerKey, revision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, activatedBy int) (*CustomerConfigRevision, error) {
+	if activatedBy <= 0 {
 		return nil, ErrBadParam
 	}
-	customerKey = NormalizeCustomerKey(customerKey)
-	revision = strings.TrimSpace(revision)
-	if customerKey == "" || revision == "" || activatedBy <= 0 {
-		return nil, ErrBadParam
-	}
-	if err := uc.validateCustomerConfigModuleClosure(ctx, customerKey, revision); err != nil {
-		return nil, err
-	}
-	return uc.repo.ActivateCustomerConfig(ctx, customerKey, revision, activatedBy, time.Now())
-}
-
-func (uc *CustomerConfigUsecase) RollbackCustomerConfig(ctx context.Context, customerKey, targetRevision string, actorID int) (*CustomerConfigRevision, error) {
-	if uc == nil || uc.repo == nil {
-		return nil, ErrBadParam
-	}
-	customerKey = NormalizeCustomerKey(customerKey)
-	targetRevision = strings.TrimSpace(targetRevision)
-	if customerKey == "" || targetRevision == "" || actorID <= 0 {
-		return nil, ErrBadParam
-	}
-	if err := uc.validateCustomerConfigModuleClosure(ctx, customerKey, targetRevision); err != nil {
-		return nil, err
-	}
-	return uc.repo.RollbackCustomerConfig(ctx, customerKey, targetRevision, actorID, time.Now())
-}
-
-func (uc *CustomerConfigUsecase) validateCustomerConfigModuleClosure(ctx context.Context, customerKey, revision string) error {
-	if _, err := uc.repo.GetCustomerConfigRevision(ctx, customerKey, revision); err != nil {
-		return err
-	}
-	modules, err := uc.repo.ListDeploymentModuleStates(ctx, customerKey, revision)
+	check, err := uc.CheckCustomerConfigTransition(ctx, CustomerConfigTransitionCheckInput{
+		Action:                 CustomerConfigTransitionActivate,
+		CustomerKey:            customerKey,
+		TargetRevision:         revision,
+		ExpectedConfigHash:     expectedConfigHash,
+		ExpectedProductVersion: expectedProductVersion,
+		ExpectedActiveRevision: expectedActiveRevision,
+	})
 	if err != nil {
-		return err
+		return nil, err
 	}
-	return validateCustomerConfigModuleClosure(modules)
+	if !check.Allowed {
+		return nil, ErrCustomerConfigTransitionBlocked
+	}
+	return uc.repo.ActivateCustomerConfig(
+		ctx,
+		check.CustomerKey,
+		check.TargetRevision,
+		check.TargetConfigHash,
+		check.TargetProductVersion,
+		check.ExpectedActiveRevision,
+		activatedBy,
+		time.Now(),
+	)
+}
+
+func (uc *CustomerConfigUsecase) RollbackCustomerConfig(ctx context.Context, customerKey, targetRevision, expectedConfigHash, expectedProductVersion, expectedActiveRevision string, actorID int) (*CustomerConfigRevision, error) {
+	if actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	check, err := uc.CheckCustomerConfigTransition(ctx, CustomerConfigTransitionCheckInput{
+		Action:                 CustomerConfigTransitionRollback,
+		CustomerKey:            customerKey,
+		TargetRevision:         targetRevision,
+		ExpectedConfigHash:     expectedConfigHash,
+		ExpectedProductVersion: expectedProductVersion,
+		ExpectedActiveRevision: expectedActiveRevision,
+	})
+	if err != nil {
+		return nil, err
+	}
+	if !check.Allowed {
+		return nil, ErrCustomerConfigTransitionBlocked
+	}
+	return uc.repo.RollbackCustomerConfig(
+		ctx,
+		check.CustomerKey,
+		check.TargetRevision,
+		check.TargetConfigHash,
+		check.TargetProductVersion,
+		check.ExpectedActiveRevision,
+		actorID,
+		time.Now(),
+	)
 }
 
 func (uc *CustomerConfigUsecase) GetEffectiveSession(ctx context.Context, customerKey string, admin *AdminUser) (*EffectiveSession, error) {
@@ -444,7 +465,7 @@ func (uc *CustomerConfigUsecase) BuildProcessInstanceCreateFromActiveCustomerCon
 	if err := ensureCustomerConfigProcessModulesEnabledForStart(processKey, businessRefType, definition, active.CompiledSnapshot, modules); err != nil {
 		return nil, err
 	}
-	definitionHash, err := HashCompiledCustomerConfig(map[string]any{"process_definition": definition})
+	definitionHash, err := hashCanonicalJSON(map[string]any{"process_definition": definition})
 	if err != nil {
 		return nil, err
 	}
@@ -726,6 +747,32 @@ func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeysRequiringActiveRevi
 	return uc.workflowVisibleOwnerRoleKeys(ctx, customerKey, admin, false, requiredCapabilities...)
 }
 
+// WorkflowVisibleOwnerRoleKeysAtRevision resolves task responsibility from the
+// immutable revision stored on a formal ProcessRuntime task. It never consults
+// the current active revision and never falls back to builtin roles.
+func (uc *CustomerConfigUsecase) WorkflowVisibleOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision string, admin *AdminUser, requiredCapabilities ...string) ([]string, error) {
+	if admin == nil || admin.Disabled || uc == nil || uc.repo == nil {
+		return []string{}, ErrForbidden
+	}
+	customerKey = NormalizeCustomerKey(customerKey)
+	if customerKey == "" {
+		customerKey = DefaultCustomerKey
+	}
+	revision = strings.TrimSpace(revision)
+	if revision == "" {
+		return []string{}, ErrBadParam
+	}
+	stored, err := uc.repo.GetCustomerConfigRevision(ctx, customerKey, revision)
+	if err != nil {
+		return []string{}, err
+	}
+	if stored == nil || stored.CustomerKey != customerKey || stored.Revision != revision ||
+		!customerConfigRevisionCanAuthorizeRuntimeTask(stored.Status) {
+		return []string{}, ErrCustomerConfigNotFound
+	}
+	return uc.workflowVisibleOwnerRoleKeysAtRevision(ctx, customerKey, revision, admin, requiredCapabilities...)
+}
+
 func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeys(ctx context.Context, customerKey string, admin *AdminUser, allowBuiltinFallback bool, requiredCapabilities ...string) ([]string, error) {
 	if admin == nil || admin.Disabled {
 		return []string{}, ErrForbidden
@@ -751,12 +798,17 @@ func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeys(ctx context.Contex
 		}
 		return []string{}, err
 	}
-	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, active.Revision)
+	return uc.workflowVisibleOwnerRoleKeysAtRevision(ctx, customerKey, active.Revision, admin, requiredCapabilities...)
+}
+
+func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision string, admin *AdminUser, requiredCapabilities ...string) ([]string, error) {
+	baseRoleKeys := AdminRoleKeys(admin)
+	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, revision)
 	if err != nil {
 		return []string{}, err
 	}
 	enabledBaseRoleKeys := enabledCustomerRoleKeys(baseRoleKeys, roleProfiles)
-	memberships, err := uc.repo.ListWorkPoolMemberships(ctx, customerKey, active.Revision, enabledBaseRoleKeys, admin.ID)
+	memberships, err := uc.repo.ListWorkPoolMemberships(ctx, customerKey, revision, enabledBaseRoleKeys, admin.ID)
 	if err != nil {
 		return []string{}, err
 	}
@@ -771,7 +823,7 @@ func (uc *CustomerConfigUsecase) workflowVisibleOwnerRoleKeys(ctx context.Contex
 	}
 	requiredCapabilities = normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities)
 	candidateRoleKeys := enabledCustomerRoleKeys(append(enabledBaseRoleKeys, membershipRoleKeys...), roleProfiles)
-	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, active.Revision, candidateRoleKeys)
+	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, revision, candidateRoleKeys)
 	if err != nil {
 		return []string{}, err
 	}
@@ -801,37 +853,71 @@ func (uc *CustomerConfigUsecase) WorkflowCandidateOwnerRoleKeys(ctx context.Cont
 	if customerKey == "" {
 		customerKey = DefaultCustomerKey
 	}
+	if uc == nil || uc.repo == nil {
+		return &WorkflowTaskCandidateExplanation{
+			CustomerKey:          customerKey,
+			OwnerPoolKey:         strings.TrimSpace(ownerPoolKey),
+			RequiredCapabilities: normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities),
+			Source:               "customer_config_unavailable",
+		}, nil
+	}
+	active, err := uc.repo.GetActiveCustomerConfigRevision(ctx, customerKey)
+	if err != nil {
+		if errors.Is(err, ErrCustomerConfigNotFound) {
+			return &WorkflowTaskCandidateExplanation{
+				CustomerKey:          customerKey,
+				OwnerPoolKey:         strings.TrimSpace(ownerPoolKey),
+				RequiredCapabilities: normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities),
+				Source:               "no_active_customer_config",
+			}, nil
+		}
+		return nil, err
+	}
+	return uc.workflowCandidateOwnerRoleKeysAtRevision(ctx, customerKey, active.Revision, ownerPoolKey, "active_customer_config", requiredCapabilities...)
+}
+
+func (uc *CustomerConfigUsecase) WorkflowCandidateOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision, ownerPoolKey string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	customerKey = NormalizeCustomerKey(customerKey)
+	if customerKey == "" {
+		customerKey = DefaultCustomerKey
+	}
+	revision = strings.TrimSpace(revision)
+	if revision == "" {
+		return nil, ErrBadParam
+	}
+	stored, err := uc.repo.GetCustomerConfigRevision(ctx, customerKey, revision)
+	if err != nil {
+		return nil, err
+	}
+	if stored == nil || stored.CustomerKey != customerKey || stored.Revision != revision ||
+		!customerConfigRevisionCanAuthorizeRuntimeTask(stored.Status) {
+		return nil, ErrCustomerConfigNotFound
+	}
+	return uc.workflowCandidateOwnerRoleKeysAtRevision(ctx, customerKey, revision, ownerPoolKey, "customer_config_revision", requiredCapabilities...)
+}
+
+func (uc *CustomerConfigUsecase) workflowCandidateOwnerRoleKeysAtRevision(ctx context.Context, customerKey, revision, ownerPoolKey, source string, requiredCapabilities ...string) (*WorkflowTaskCandidateExplanation, error) {
 	ownerPoolKey = strings.TrimSpace(ownerPoolKey)
 	out := &WorkflowTaskCandidateExplanation{
 		CustomerKey:          customerKey,
+		ConfigRevision:       revision,
 		OwnerPoolKey:         ownerPoolKey,
 		RequiredCapabilities: normalizeWorkflowTaskRequiredCapabilities(requiredCapabilities),
-		Source:               "active_customer_config",
+		Source:               source,
 	}
 	if ownerPoolKey == "" {
 		out.Source = "missing_owner_pool_key"
 		return out, nil
 	}
-	if uc == nil || uc.repo == nil {
-		out.Source = "customer_config_unavailable"
-		return out, nil
-	}
-	active, err := uc.repo.GetActiveCustomerConfigRevision(ctx, customerKey)
-	if err != nil {
-		if errors.Is(err, ErrCustomerConfigNotFound) {
-			out.Source = "no_active_customer_config"
-			return out, nil
-		}
-		out.Source = "customer_config_error"
-		return out, err
-	}
-	out.ConfigRevision = active.Revision
-	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, active.Revision)
+	roleProfiles, err := uc.repo.ListRoleProfiles(ctx, customerKey, revision)
 	if err != nil {
 		out.Source = "customer_config_error"
 		return out, err
 	}
-	memberships, err := uc.repo.ListWorkPoolMembershipsByPools(ctx, customerKey, active.Revision, []string{ownerPoolKey})
+	memberships, err := uc.repo.ListWorkPoolMembershipsByPools(ctx, customerKey, revision, []string{ownerPoolKey})
 	if err != nil {
 		out.Source = "customer_config_error"
 		return out, err
@@ -846,7 +932,7 @@ func (uc *CustomerConfigUsecase) WorkflowCandidateOwnerRoleKeys(ctx context.Cont
 		}
 	}
 	out.MembershipRoleKeys = enabledCustomerRoleKeys(membershipRoleKeys, roleProfiles)
-	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, active.Revision, out.MembershipRoleKeys)
+	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, revision, out.MembershipRoleKeys)
 	if err != nil {
 		out.Source = "customer_config_error"
 		return out, err
@@ -952,6 +1038,13 @@ func validateCustomerConfigModuleClosure(modules []DeploymentModuleStateInput) e
 		}
 	}
 	return nil
+}
+
+// ValidateCustomerConfigModuleClosure exposes the pure module dependency rule
+// so repository-owned activation transactions can validate the exact rows they
+// have locked and read.
+func ValidateCustomerConfigModuleClosure(modules []DeploymentModuleStateInput) error {
+	return validateCustomerConfigModuleClosure(modules)
 }
 
 func normalizeWorkflowTaskRequiredCapabilities(values []string) []string {
@@ -1064,14 +1157,14 @@ func NormalizeCustomerKey(value string) string {
 	return strings.ToLower(strings.TrimSpace(value))
 }
 
-func HashCompiledCustomerConfig(snapshot map[string]any) (string, error) {
-	if len(snapshot) == 0 {
+func hashCanonicalJSON(value map[string]any) (string, error) {
+	if len(value) == 0 {
 		return "", ErrBadParam
 	}
-	if containsForbiddenCustomerConfigPayload(snapshot) {
+	if containsForbiddenCustomerConfigPayload(value) {
 		return "", ErrBadParam
 	}
-	payload, err := json.Marshal(snapshot)
+	payload, err := json.Marshal(value)
 	if err != nil {
 		return "", err
 	}
@@ -1079,16 +1172,107 @@ func HashCompiledCustomerConfig(snapshot map[string]any) (string, error) {
 	return hex.EncodeToString(sum[:]), nil
 }
 
+// HashCustomerConfigPublishInput normalizes the caller-owned selection payload
+// and fingerprints every immutable part of the resulting canonical revision.
+// Customer key and revision identify the record; they are intentionally not
+// part of its content hash.
+func HashCustomerConfigPublishInput(in CustomerConfigPublishInput) (string, error) {
+	normalized, err := normalizeCustomerConfigPublishInput(in)
+	if err != nil {
+		return "", err
+	}
+	return hashNormalizedCustomerConfigPublishInput(normalized)
+}
+
+func hashNormalizedCustomerConfigPublishInput(in CustomerConfigPublishInput) (string, error) {
+	if len(in.CompiledSnapshot) == 0 || containsForbiddenCustomerConfigPayload(in.CompiledSnapshot) {
+		return "", ErrBadParam
+	}
+	moduleStates, err := canonicalCustomerConfigList(in.ModuleStates)
+	if err != nil {
+		return "", err
+	}
+	roleProfiles, err := canonicalCustomerConfigList(in.RoleProfiles)
+	if err != nil {
+		return "", err
+	}
+	accessEntitlements, err := canonicalCustomerConfigList(in.AccessEntitlements)
+	if err != nil {
+		return "", err
+	}
+	workPools, err := canonicalCustomerConfigList(in.WorkPools)
+	if err != nil {
+		return "", err
+	}
+	workPoolMemberships, err := canonicalCustomerConfigList(in.WorkPoolMemberships)
+	if err != nil {
+		return "", err
+	}
+	payload, err := json.Marshal(struct {
+		ProductVersion      string            `json:"product_version"`
+		CompiledSnapshot    map[string]any    `json:"compiled_snapshot"`
+		ModuleStates        []json.RawMessage `json:"module_states"`
+		RoleProfiles        []json.RawMessage `json:"role_profiles"`
+		AccessEntitlements  []json.RawMessage `json:"access_entitlements"`
+		WorkPools           []json.RawMessage `json:"work_pools"`
+		WorkPoolMemberships []json.RawMessage `json:"work_pool_memberships"`
+	}{
+		ProductVersion:      in.ProductVersion,
+		CompiledSnapshot:    in.CompiledSnapshot,
+		ModuleStates:        moduleStates,
+		RoleProfiles:        roleProfiles,
+		AccessEntitlements:  accessEntitlements,
+		WorkPools:           workPools,
+		WorkPoolMemberships: workPoolMemberships,
+	})
+	if err != nil {
+		return "", err
+	}
+	sum := sha256.Sum256(payload)
+	return hex.EncodeToString(sum[:]), nil
+}
+
+func canonicalCustomerConfigList[T any](items []T) ([]json.RawMessage, error) {
+	out := make([]json.RawMessage, 0, len(items))
+	for _, item := range items {
+		payload, err := json.Marshal(item)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, payload)
+	}
+	sort.Slice(out, func(i, j int) bool {
+		return string(out[i]) < string(out[j])
+	})
+	return out, nil
+}
+
+func normalizeCustomerConfigHash(value string) (string, error) {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if len(value) != sha256.Size*2 {
+		return "", ErrBadParam
+	}
+	if _, err := hex.DecodeString(value); err != nil {
+		return "", ErrBadParam
+	}
+	return value, nil
+}
+
 func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (CustomerConfigPublishInput, error) {
 	in.CustomerKey = NormalizeCustomerKey(in.CustomerKey)
 	in.Revision = strings.TrimSpace(in.Revision)
 	in.ProductVersion = strings.TrimSpace(in.ProductVersion)
-	if in.CustomerKey == "" || in.Revision == "" || len(in.CompiledSnapshot) == 0 {
-		return CustomerConfigPublishInput{}, fmt.Errorf("%w: customer key, revision and compiled snapshot are required", ErrBadParam)
+	if in.CustomerKey == "" || in.Revision == "" || in.ProductVersion == "" || len(in.CompiledSnapshot) == 0 {
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: customer key, revision, product version and compiled snapshot are required", ErrBadParam)
 	}
 	if containsForbiddenCustomerConfigPayload(in.CompiledSnapshot) {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot contains forbidden payload", ErrBadParam)
 	}
+	compiledSnapshot, err := normalizeCustomerProcessContracts(in.CompiledSnapshot)
+	if err != nil {
+		return CustomerConfigPublishInput{}, err
+	}
+	in.CompiledSnapshot = compiledSnapshot
 	if !compiledSnapshotPagesAreAllowed(in.CompiledSnapshot) {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot pages are invalid", ErrBadParam)
 	}
@@ -1156,6 +1340,9 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 		if !builtinRoleHasPermission(item.RoleKey, item.CapabilityKey) {
 			return CustomerConfigPublishInput{}, fmt.Errorf("%w: role %s does not own capability %s", ErrBadParam, item.RoleKey, item.CapabilityKey)
 		}
+		if item.Constraints == nil {
+			item.Constraints = map[string]any{}
+		}
 	}
 	workPoolKeys := map[string]struct{}{}
 	for index := range in.WorkPools {
@@ -1191,6 +1378,9 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 				return CustomerConfigPublishInput{}, fmt.Errorf("%w: membership role profile %s is missing", ErrBadParam, item.RoleKey)
 			}
 		}
+	}
+	if err := validateCustomerConfigModuleClosure(in.ModuleStates); err != nil {
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: invalid module dependency closure", err)
 	}
 	return in, nil
 }
@@ -1505,8 +1695,9 @@ func buildEffectiveSessionFromRevision(
 		pages = effectivePageKeysForRoles(pages, revision.CompiledSnapshot, roleKeys)
 	}
 	return &EffectiveSession{
-		ConfigRevision: revision.Revision,
-		ConfigHash:     revision.ConfigHash,
+		ConfigRevision:    revision.Revision,
+		ConfigHash:        revision.ConfigHash,
+		ConfigHashVersion: revision.ConfigHashVersion,
 		Customer: EffectiveSessionCustomer{
 			Key:  customerKey,
 			Name: customerName,

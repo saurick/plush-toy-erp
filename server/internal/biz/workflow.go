@@ -5,8 +5,8 @@ import (
 	"strings"
 )
 
-func (uc *WorkflowUsecase) Metadata() (taskStates, businessStates, planningPhases []WorkflowStateOption) {
-	return WorkflowTaskStates(), WorkflowBusinessStates(), WorkflowPlanningPhases()
+func (uc *WorkflowUsecase) Metadata() (taskStates, businessStates []WorkflowStateOption) {
+	return WorkflowTaskStates(), WorkflowBusinessStates()
 }
 
 func (uc *WorkflowUsecase) ListTasks(ctx context.Context, filter WorkflowTaskFilter) ([]*WorkflowTask, int, error) {
@@ -14,7 +14,7 @@ func (uc *WorkflowUsecase) ListTasks(ctx context.Context, filter WorkflowTaskFil
 		return nil, 0, ErrBadParam
 	}
 	filter = normalizeWorkflowTaskFilter(filter)
-	if filter.TaskStatusKey != "" && !IsValidWorkflowTaskState(filter.TaskStatusKey) {
+	if filter.TaskStatusKey != "" && !IsKnownWorkflowTaskState(filter.TaskStatusKey) {
 		return nil, 0, ErrBadParam
 	}
 	return uc.repo.ListWorkflowTasks(ctx, filter)
@@ -739,6 +739,7 @@ func (uc *WorkflowUsecase) UpsertBusinessState(ctx context.Context, in *Workflow
 func normalizeWorkflowTaskFilter(filter WorkflowTaskFilter) WorkflowTaskFilter {
 	filter.OwnerRoleKey = NormalizeRoleKey(filter.OwnerRoleKey)
 	filter.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(filter.VisibleOwnerRoleKeys)
+	filter.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(filter.VisibilityScope)
 	filter.TaskStatusKey = strings.TrimSpace(filter.TaskStatusKey)
 	filter.TaskGroup = strings.TrimSpace(filter.TaskGroup)
 	filter.SourceType = strings.TrimSpace(filter.SourceType)
@@ -807,18 +808,19 @@ func normalizeWorkflowTaskCreate(in WorkflowTaskCreate) (WorkflowTaskCreate, err
 		return WorkflowTaskCreate{}, ErrBadParam
 	}
 	if in.TaskStatusKey == "" {
-		in.TaskStatusKey = "pending"
+		in.TaskStatusKey = "ready"
 	}
 	if in.Payload == nil {
 		in.Payload = map[string]any{}
 	}
+	in.CriticalPath = in.CriticalPath || workflowPayloadBool(in.Payload, "critical_path")
 	if workflowCreateHasNumberedPhaseLabel(in) {
 		return WorkflowTaskCreate{}, ErrNumberedImplementationStageLabel
 	}
 	if in.TaskCode == "" || in.TaskGroup == "" || in.TaskName == "" || in.SourceType == "" || in.SourceID <= 0 || in.OwnerRoleKey == "" {
 		return WorkflowTaskCreate{}, ErrBadParam
 	}
-	if !IsValidWorkflowTaskState(in.TaskStatusKey) {
+	if !IsCreatableWorkflowTaskState(in.TaskStatusKey) || in.BlockedReason != nil {
 		return WorkflowTaskCreate{}, ErrBadParam
 	}
 	if in.BusinessStatusKey != nil {

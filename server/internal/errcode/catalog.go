@@ -46,6 +46,7 @@ var (
 	AuthSMSLoginDisabled                 = Definition{Name: "AuthSMSLoginDisabled", Code: 10014, Message: "当前部署未启用短信登录"}
 	AuthSMSServiceUnavailable            = Definition{Name: "AuthSMSServiceUnavailable", Code: 10015, Message: "短信服务暂不可用，请稍后再试或联系管理员"}
 	AuthSMSServiceQuotaExceeded          = Definition{Name: "AuthSMSServiceQuotaExceeded", Code: 10016, Message: "短信服务额度已用完，请联系管理员处理"}
+	AuthLoginRejected                    = Definition{Name: "AuthLoginRejected", Code: 10017, Message: "登录信息不正确或账号不可用"}
 	AdminExists                          = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
 	AdminPhoneExists                     = Definition{Name: "AdminPhoneExists", Code: 40911, Message: "手机号已绑定其他管理员"}
 	AdminAccountRevoked                  = Definition{Name: "AdminAccountRevoked", Code: 40912, Message: "账号已正式注销，不能通过普通启用恢复"}
@@ -92,6 +93,7 @@ var definitions = []Definition{
 	AuthSMSLoginDisabled,
 	AuthSMSServiceUnavailable,
 	AuthSMSServiceQuotaExceeded,
+	AuthLoginRejected,
 	AdminExists,
 	AdminPhoneExists,
 	AdminAccountRevoked,

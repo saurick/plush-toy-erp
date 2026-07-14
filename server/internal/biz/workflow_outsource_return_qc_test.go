@@ -608,20 +608,3 @@ func TestWorkflowUsecase_OutsourceReworkBlockedWritesQCFailedState(t *testing.T)
 		t.Fatalf("expected outsource rework blocked state payload, got %#v", effects.BusinessState.Payload)
 	}
 }
-
-func TestWorkflowUsecase_OutsourceReturnQCNonDerivedStatusKeepsOriginalBehavior(t *testing.T) {
-	repo := &stubWorkflowRepo{currentTask: outsourceReturnQCWorkflowTask()}
-	uc := NewWorkflowUsecase(repo)
-
-	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
-		ID:            901,
-		TaskStatusKey: "processing",
-		Payload:       map[string]any{},
-	}, 7, "quality")
-	if err != nil {
-		t.Fatalf("processing should keep original behavior, got %v", err)
-	}
-	if repo.updateTaskInput.SideEffects != nil {
-		t.Fatalf("processing should not derive side effects")
-	}
-}

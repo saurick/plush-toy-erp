@@ -2,10 +2,13 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"testing"
 	"time"
 
+	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/errcode"
 
@@ -92,6 +95,103 @@ func TestJsonrpcDispatcher_AuthSMSLogin_AdminOK(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_SMSIdentityResponsesPreventEnumeration(t *testing.T) {
+	repo := newMemAdminAuthRepoForData()
+	for _, account := range []struct {
+		username string
+		phone    string
+		disabled bool
+	}{
+		{username: "eligible", phone: "13800138000"},
+		{username: "disabled", phone: "13900139000", disabled: true},
+		{username: "no-role", phone: "13700137000"},
+	} {
+		if err := repo.putAdmin(account.username, account.phone, "secret", account.disabled); err != nil {
+			t.Fatalf("put admin %s: %v", account.username, err)
+		}
+	}
+	repo.byUsername["no-role"].IsSuperAdmin = false
+	provider := &recordingSMSLoginCodeProvider{delegate: biz.NewLocalSMSLoginCodeProvider("admin")}
+	d := &jsonrpcDispatcher{
+		log:         log.NewHelper(log.NewStdLogger(io.Discard)),
+		adminAuthUC: newAdminAuthUsecaseForTestWithSMSProvider(repo, provider),
+		authSMS:     normalizeAuthSMSRuntimeConfig(authSMSModeMock),
+	}
+
+	phones := []string{"13800138000", "13600136000", "13900139000", "13700137000"}
+	codes := make(map[string]string, len(phones))
+	for index, phone := range phones {
+		_, result, err := d.handleAuth(context.Background(), "send_sms_code", fmt.Sprint(index+1), mustAuthStruct(t, map[string]any{
+			"phone":           phone,
+			"scope":           "admin",
+			"mobile_role_key": "purchase",
+		}))
+		if err != nil {
+			t.Fatalf("send_sms_code(%s): %v", phone, err)
+		}
+		assertExactSMSSendAcceptedResponse(t, result, phone)
+		codes[phone] = getNestedString(result.Data.AsMap(), "mock_code")
+	}
+	if len(provider.requestPhones) != 1 || provider.requestPhones[0] != "13800138000" {
+		t.Fatalf("actual SMS delivery requests = %#v, want eligible phone only", provider.requestPhones)
+	}
+
+	validCode := codes["13800138000"]
+	wrongCode := "000000"
+	if validCode == wrongCode {
+		wrongCode = "000001"
+	}
+	failures := []struct {
+		name  string
+		phone string
+		code  string
+	}{
+		{name: "unknown phone", phone: "13600136000", code: codes["13600136000"]},
+		{name: "disabled account", phone: "13900139000", code: codes["13900139000"]},
+		{name: "missing mobile role", phone: "13700137000", code: codes["13700137000"]},
+		{name: "eligible account wrong code", phone: "13800138000", code: wrongCode},
+	}
+	for index, failure := range failures {
+		t.Run(failure.name, func(t *testing.T) {
+			_, result, err := d.handleAuth(context.Background(), "sms_login", fmt.Sprintf("f-%d", index), mustAuthStruct(t, map[string]any{
+				"phone":           failure.phone,
+				"code":            failure.code,
+				"scope":           "admin",
+				"mobile_role_key": "purchase",
+			}))
+			if err != nil {
+				t.Fatalf("sms_login: %v", err)
+			}
+			assertExactSMSIdentityFailureResponse(t, result)
+		})
+	}
+
+	expiredDispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.NewStdLogger(io.Discard)),
+		adminAuthUC: newAdminAuthUsecaseForTestWithSMSProvider(repo, unavailableSMSLoginCodeProvider{
+			err: biz.ErrSMSCodeExpired,
+		}),
+		authSMS: normalizeAuthSMSRuntimeConfig(authSMSModeProvider),
+	}
+	_, expiredResult, err := expiredDispatcher.handleAuth(context.Background(), "sms_login", "expired", mustAuthStruct(t, map[string]any{
+		"phone": "13800138000", "code": "123456", "scope": "admin", "mobile_role_key": "purchase",
+	}))
+	if err != nil {
+		t.Fatalf("expired sms_login: %v", err)
+	}
+	assertExactSMSIdentityFailureResponse(t, expiredResult)
+
+	_, success, err := d.handleAuth(context.Background(), "sms_login", "success", mustAuthStruct(t, map[string]any{
+		"phone": "13800138000", "code": validCode, "scope": "admin", "mobile_role_key": "purchase",
+	}))
+	if err != nil {
+		t.Fatalf("successful sms_login: %v", err)
+	}
+	if success == nil || success.Code != errcode.OK.Code || success.Message != "登录成功" || getNestedString(success.Data.AsMap(), "access_token") == "" {
+		t.Fatalf("unexpected successful sms response: %#v", success)
+	}
+}
+
 func TestJsonrpcDispatcher_AuthMe_StaleUserTokenRejected(t *testing.T) {
 	d := &jsonrpcDispatcher{log: log.NewHelper(log.DefaultLogger)}
 	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
@@ -106,6 +206,29 @@ func TestJsonrpcDispatcher_AuthMe_StaleUserTokenRejected(t *testing.T) {
 	}
 	if res == nil || res.Code != errcode.AuthRequired.Code {
 		t.Fatalf("expected stale user token rejected, got %+v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_LogoutFailsWhenAuthenticationBackendIsUnavailable(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.DefaultLogger)}
+	ctx := biz.WithAuthState(context.Background(), biz.AuthUnavailable)
+
+	_, res, err := d.handleAuth(ctx, "logout", "1", nil)
+	if err != nil {
+		t.Fatalf("handle auth.logout: %v", err)
+	}
+	if res == nil || res.Code != errcode.Internal.Code {
+		t.Fatalf("authentication backend failure must not report logout success: %+v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_ProtectedRequestFailsRetryablyWhenAuthenticationBackendIsUnavailable(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.DefaultLogger)}
+	ctx := biz.WithAuthState(context.Background(), biz.AuthUnavailable)
+
+	claims, res := d.requireLogin(ctx)
+	if claims != nil || res == nil || res.Code != errcode.Internal.Code {
+		t.Fatalf("authentication backend failure must not be downgraded to login required: claims=%#v result=%#v", claims, res)
 	}
 }
 
@@ -127,30 +250,22 @@ func TestJsonrpcDispatcher_AuthSMSLogin_DisabledByConfig(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_AuthSMSSendProviderErrors(t *testing.T) {
+func TestJsonrpcDispatcher_AuthSMSSendProviderErrorsAreSuppressed(t *testing.T) {
 	tests := []struct {
-		name    string
-		err     error
-		code    int32
-		message string
+		name string
+		err  error
 	}{
 		{
-			name:    "cooldown",
-			err:     fmt.Errorf("wrapped provider error: %w", biz.ErrSMSCodeCooldown),
-			code:    errcode.AuthSMSCodeTooFrequent.Code,
-			message: errcode.AuthSMSCodeTooFrequent.Message,
+			name: "cooldown",
+			err:  fmt.Errorf("wrapped provider error: %w", biz.ErrSMSCodeCooldown),
 		},
 		{
-			name:    "quota exceeded",
-			err:     fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceQuotaExceeded),
-			code:    errcode.AuthSMSServiceQuotaExceeded.Code,
-			message: errcode.AuthSMSServiceQuotaExceeded.Message,
+			name: "quota exceeded",
+			err:  fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceQuotaExceeded),
 		},
 		{
-			name:    "service unavailable",
-			err:     fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceUnavailable),
-			code:    errcode.AuthSMSServiceUnavailable.Code,
-			message: errcode.AuthSMSServiceUnavailable.Message,
+			name: "service unavailable",
+			err:  fmt.Errorf("wrapped provider error: %w", biz.ErrSMSServiceUnavailable),
 		},
 	}
 
@@ -175,14 +290,82 @@ func TestJsonrpcDispatcher_AuthSMSSendProviderErrors(t *testing.T) {
 			if err != nil {
 				t.Fatalf("handle auth.send_sms_code: %v", err)
 			}
-			if res == nil || res.Code != tt.code {
-				t.Fatalf("expected code %d, got %+v", tt.code, res)
+			if res == nil || res.Code != errcode.OK.Code || res.Message != "验证码已发送" {
+				t.Fatalf("provider error leaked through public response: %+v", res)
 			}
-			if res.Message != tt.message {
-				t.Fatalf("unexpected message: %q", res.Message)
+			data := res.Data.AsMap()
+			if data["mock_delivery"] != false || getNestedString(data, "mock_code") != "" {
+				t.Fatalf("provider response exposed mock details: %+v", data)
 			}
 		})
 	}
+}
+
+func TestJsonrpcDispatcher_AdminLoginIdentityFailuresUseSingleExternalContract(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
+
+	for _, err := range []error{
+		biz.ErrUserNotFound,
+		biz.ErrInvalidPassword,
+		biz.ErrUserDisabled,
+		biz.ErrPhoneNotBound,
+		biz.ErrMobileRoleDenied,
+		biz.ErrAuthVersionStale,
+		biz.ErrSMSCodeNotFound,
+		biz.ErrSMSCodeInvalid,
+		biz.ErrSMSCodeExpired,
+		biz.ErrSMSCodeAttemptsExceeded,
+	} {
+		result := d.mapAdminLoginError(context.Background(), fmt.Errorf("wrapped: %w", err))
+		if result.Code != errcode.AuthLoginRejected.Code || result.Message != errcode.AuthLoginRejected.Message {
+			t.Fatalf("mapAdminLoginError(%v) = %#v", err, result)
+		}
+	}
+
+	storageErr := errors.New("authentication storage unavailable")
+	result := d.mapAdminLoginError(context.Background(), storageErr)
+	if result.Code != errcode.Internal.Code || result.Message != errcode.Internal.Message {
+		t.Fatalf("storage error must remain internal: %#v", result)
+	}
+}
+
+func assertExactSMSSendAcceptedResponse(t *testing.T, result *v1.JsonrpcResult, phone string) {
+	t.Helper()
+	if result == nil || result.Code != errcode.OK.Code || result.Message != "验证码已发送" || result.Data == nil {
+		t.Fatalf("unexpected send response: %#v", result)
+	}
+	data := result.Data.AsMap()
+	if len(data) != 5 || getNestedString(data, "phone") != phone || data["mock_delivery"] != true {
+		t.Fatalf("unexpected send response data: %#v", data)
+	}
+	if expiresAt, ok := data["expires_at"].(float64); !ok || expiresAt <= 0 {
+		t.Fatalf("invalid expires_at: %#v", data["expires_at"])
+	}
+	if resendAfter, ok := data["resend_after"].(float64); !ok || resendAfter <= 0 {
+		t.Fatalf("invalid resend_after: %#v", data["resend_after"])
+	}
+	code := getNestedString(data, "mock_code")
+	if len(code) != smsLoginCodeDigitsForContract || !isASCIIDigits(code) {
+		t.Fatalf("invalid mock code contract: %q", code)
+	}
+}
+
+func assertExactSMSIdentityFailureResponse(t *testing.T, result *v1.JsonrpcResult) {
+	t.Helper()
+	if result == nil || result.Code != errcode.AuthLoginRejected.Code || result.Message != errcode.AuthLoginRejected.Message || result.Data != nil {
+		t.Fatalf("unexpected SMS identity failure response: %#v", result)
+	}
+}
+
+const smsLoginCodeDigitsForContract = 6
+
+func isASCIIDigits(value string) bool {
+	for _, char := range value {
+		if char < '0' || char > '9' {
+			return false
+		}
+	}
+	return value != ""
 }
 
 func mustAuthStruct(t *testing.T, values map[string]any) *structpb.Struct {
@@ -220,6 +403,20 @@ func newAdminAuthUsecaseForTestWithSMSProvider(repo *memAdminAuthRepoForData, sm
 
 type unavailableSMSLoginCodeProvider struct {
 	err error
+}
+
+type recordingSMSLoginCodeProvider struct {
+	delegate      biz.SMSLoginCodeProvider
+	requestPhones []string
+}
+
+func (p *recordingSMSLoginCodeProvider) Request(ctx context.Context, phone string) (*biz.SMSLoginChallenge, error) {
+	p.requestPhones = append(p.requestPhones, phone)
+	return p.delegate.Request(ctx, phone)
+}
+
+func (p *recordingSMSLoginCodeProvider) Verify(ctx context.Context, phone, code string) (string, error) {
+	return p.delegate.Verify(ctx, phone, code)
 }
 
 func (p unavailableSMSLoginCodeProvider) Request(context.Context, string) (*biz.SMSLoginChallenge, error) {
@@ -276,7 +473,7 @@ func (r *memAdminAuthRepoForData) GetAdminByID(_ context.Context, id int) (*biz.
 	return nil, biz.ErrUserNotFound
 }
 
-func (r *memAdminAuthRepoForData) CreateAdminSession(_ context.Context, session *biz.AdminSession) error {
+func (r *memAdminAuthRepoForData) CreateAdminSession(_ context.Context, session *biz.AdminSession, _ biz.AdminSessionIssueConstraint) error {
 	cp := *session
 	r.sessions[session.SessionKey] = &cp
 	return nil

@@ -224,16 +224,13 @@ func TestNormalizePurchaseReceiptFromPurchaseOrderCreateIdempotencyPayload(t *te
 	if err != nil {
 		t.Fatalf("normalize first server-time payload failed: %v", err)
 	}
-	time.Sleep(time.Millisecond)
-	secondDefaulted, err := normalizePurchaseReceiptFromPurchaseOrderCreate(withoutReceivedAt)
-	if err != nil {
-		t.Fatalf("normalize second server-time payload failed: %v", err)
+	if firstDefaulted.ReceivedAt.IsZero() {
+		t.Fatal("omitted received_at must still receive a server-generated timestamp")
 	}
-	if firstDefaulted.ReceivedAt.Equal(secondDefaulted.ReceivedAt) {
-		t.Fatal("test requires distinct server-generated received_at values")
-	}
-	if firstDefaulted.IdempotencyPayloadHash != secondDefaulted.IdempotencyPayloadHash {
-		t.Fatal("omitted received_at must keep a stable idempotency payload hash")
+	expectedIntent := firstDefaulted
+	expectedIntent.ReceivedAt = time.Time{}
+	if firstDefaulted.IdempotencyPayloadHash != purchaseReceiptFromPurchaseOrderPayloadHash(expectedIntent) {
+		t.Fatal("server-generated received_at must not enter the idempotency payload hash")
 	}
 }
 

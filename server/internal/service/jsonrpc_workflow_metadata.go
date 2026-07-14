@@ -12,14 +12,13 @@ func (d *jsonrpcDispatcher) handleWorkflowMetadata(ctx context.Context, id strin
 	if res := d.RequireAdminPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 		return id, res, nil
 	}
-	taskStates, businessStates, planningPhases := d.workflowUC.Metadata()
+	taskStates, businessStates := d.workflowUC.Metadata()
 	return id, &v1.JsonrpcResult{
 		Code:    errcode.OK.Code,
 		Message: errcode.OK.Message,
-		Data: newDataStruct(map[string]any{
-			"task_states":     workflowStateOptionsToAny(taskStates),
-			"business_states": workflowStateOptionsToAny(businessStates),
-			"planning_phases": workflowStateOptionsToAny(planningPhases),
-		}),
+			Data: newDataStruct(map[string]any{
+				"task_states":     workflowStateOptionsToAny(taskStates),
+				"business_states": workflowStateOptionsToAny(businessStates),
+			}),
 	}, nil
 }

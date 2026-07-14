@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "save_customer_with_contacts", "saveCustomerWithContacts":
+	case "save_customer_with_contacts":
 		ownerID := getInt(pm, "id", 0)
 		if ownerID > 0 {
 			if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerUpdate); res != nil {
@@ -35,7 +35,7 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		}
 		item, err := d.masterDataUC.SaveCustomerWithContacts(ctx, ownerID, customerMutationFromParams(pm), contacts)
 		return id, customerWithContactsMutationResult(ctx, d, item, err), nil
-	case "create_customer", "createCustomer":
+	case "create_customer":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerCreate); res != nil {
 			return id, res, nil
 		}
@@ -44,7 +44,7 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		}
 		item, err := d.masterDataUC.CreateCustomer(ctx, customerMutationFromParams(pm))
 		return id, customerMutationResult(ctx, d, item, err), nil
-	case "update_customer", "updateCustomer":
+	case "update_customer":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerUpdate); res != nil {
 			return id, res, nil
 		}
@@ -53,13 +53,13 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 		}
 		item, err := d.masterDataUC.UpdateCustomer(ctx, getInt(pm, "id", 0), customerMutationFromParams(pm))
 		return id, customerMutationResult(ctx, d, item, err), nil
-	case "get_customer", "getCustomer":
+	case "get_customer":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.GetCustomer(ctx, getInt(pm, "id", 0))
 		return id, customerMutationResult(ctx, d, item, err), nil
-	case "list_customers", "listCustomers":
+	case "list_customers":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerRead); res != nil {
 			return id, res, nil
 		}
@@ -73,7 +73,7 @@ func (d *jsonrpcDispatcher) handleMasterDataCustomer(
 			"limit":     normalizedLimit(pm),
 			"offset":    normalizedOffset(pm),
 		})}, nil
-	case "set_customer_active", "setCustomerActive":
+	case "set_customer_active":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerDisable); res != nil {
 			return id, res, nil
 		}

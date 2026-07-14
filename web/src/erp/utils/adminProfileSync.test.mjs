@@ -5,6 +5,8 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import { RpcErrorCode } from '../../common/consts/errorCodes.js'
+import { referenceCustomerPackage } from '../../../../config/customers/reference-customer/customerPackage.mjs'
+import { buildRuntimePreviewManifest } from '../../../../scripts/qa/customer-config-runtime-manifest.mjs'
 import {
   attachEffectiveSessionToAdminProfile,
   attachUnavailableEffectiveSessionToAdminProfile,
@@ -933,6 +935,37 @@ test('adminProfileSync: master data field policy 可映射客户和供应商页�
       'suppliers.default'
     ).map((column) => column.dataIndex),
     ['code', 'tax_no']
+  )
+})
+
+test('adminProfileSync: reference preview manifest 字段投影进入供应商列表消费且不冒充已激活', () => {
+  const manifest = buildRuntimePreviewManifest(referenceCustomerPackage)
+  const adminProfile = attachEffectiveSessionToAdminProfile(
+    { is_super_admin: false },
+    {
+      customer: manifest.compiled_snapshot.customer,
+      pages: manifest.compiled_snapshot.pages,
+      fieldPolicies: manifest.compiled_snapshot.fieldPolicies,
+      source: 'preview_only_reference_manifest',
+    }
+  )
+  const columns = [
+    { dataIndex: 'code', effectiveFieldKey: 'supplier_code' },
+    { dataIndex: 'supplier_type', effectiveFieldKey: 'supplier_type' },
+  ]
+
+  assert.deepEqual(
+    filterColumnsByEffectiveFieldPolicy(
+      columns,
+      adminProfile,
+      'suppliers.default'
+    ).map((column) => column.dataIndex),
+    ['code']
+  )
+  assert.equal(columns.length, 2)
+  assert.equal(
+    adminProfile.effective_session.source,
+    'preview_only_reference_manifest'
   )
 })
 

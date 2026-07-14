@@ -6,9 +6,23 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import { collectGitChangedFiles } from "./lib/git-range.mjs";
+
 const SCRIPT_DIR = path.dirname(fileURLToPath(import.meta.url));
 const DEFAULT_ROOT = path.resolve(SCRIPT_DIR, "../..");
 const LEVEL_ORDER = ["T0", "T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8"];
+const CUSTOMER_SOURCE_BOUNDARY_TEST =
+  "scripts/qa/customer-source-repository-boundary.test.mjs";
+const PRIVATE_SOURCE_EXTENSIONS = new Set([
+  ".doc",
+  ".docx",
+  ".jpeg",
+  ".jpg",
+  ".pdf",
+  ".png",
+  ".xls",
+  ".xlsx",
+]);
 
 const FIXED_COMMANDS = {
   diff: command("diff-check", "T0", "检查当前 diff 格式", "git", [
@@ -230,10 +244,32 @@ function isDocumentation(file) {
   );
 }
 
+function isCustomerPrivateSourcePath(file) {
+  const segments = file.split("/");
+  const extension = path.posix.extname(file).toLowerCase();
+  const isPublicAsset = segments.includes("public-assets");
+  if (/^docs\/customers\/[^/]+\/raw-source-files(?:\/|$)/u.test(file)) {
+    return true;
+  }
+  if (file.startsWith("docs/customers/")) {
+    return (
+      extension === ".json" ||
+      (!isPublicAsset && PRIVATE_SOURCE_EXTENSIONS.has(extension))
+    );
+  }
+  if (file.startsWith("config/customers/")) {
+    return !isPublicAsset && PRIVATE_SOURCE_EXTENSIONS.has(extension);
+  }
+  return (
+    file.startsWith("deployments/") &&
+    PRIVATE_SOURCE_EXTENSIONS.has(extension)
+  );
+}
+
 function isBusinessFactPath(file) {
   return (
     /^server\/internal\/(?:biz|data)\//u.test(file) &&
-    /(?:inventory|purchase|quality|shipment|finance|operational_fact|process_runtime|process_domain_command|sales_order|stock_reservation|production|outsourcing|finished_goods)/u.test(
+    /(?:inventory|purchase|quality|shipment|finance|operational_fact|process_runtime|process_domain_command|sales_order|stock_reservation|production|outsourcing|finished_goods|workflow|customer_config|source_document)/u.test(
       file,
     )
   );
@@ -254,6 +290,14 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   addFixed(state, "diff", "所有改动");
 
   for (const file of changedFiles) {
+    if (isCustomerPrivateSourcePath(file)) {
+      addNodeTests(
+        state,
+        [CUSTOMER_SOURCE_BOUNDARY_TEST],
+        file,
+        "T6",
+      );
+    }
     if (isDocumentation(file)) {
       addFixed(state, "docs", file);
       if (file.startsWith(".agents/skills/")) {
@@ -277,6 +321,18 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     ) {
       state.requiresFull = true;
       addReason(state, "full", file);
+      continue;
+    }
+
+    if (file.startsWith(".github/workflows/")) {
+      directTests.add("scripts/qa/ci-workflow.test.mjs");
+      addFollowUp(
+        state,
+        "remote-ci-enforcement",
+        "T8",
+        "确认本次 GitHub Actions 运行成功；仓库 workflow 只证明 CI 定义存在，branch protection / required check 仍需独立远端设置证据。",
+        file,
+      );
       continue;
     }
 
@@ -306,7 +362,8 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
 
     if (
       file.startsWith("server/internal/data/model/schema/") ||
-      file.startsWith("server/internal/data/model/migrate/")
+      file.startsWith("server/internal/data/model/migrate/") ||
+      file.startsWith("server/internal/data/model/ent/")
     ) {
       addFixed(state, "dbGuard", file);
       addFixed(state, "serverData", file);
@@ -351,6 +408,10 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       const suite = file.startsWith("scripts/import/")
         ? listTests(root, "scripts/import")
         : [
+            "config/customers/index.test.mjs",
+            "scripts/build/apply-customer-web-config.test.mjs",
+            "scripts/qa/private-deployment-boundaries.test.mjs",
+            "scripts/qa/private-deployment-package-closure.test.mjs",
             "scripts/qa/customer-package-lint.test.mjs",
             "scripts/qa/customer-config-runtime-manifest.test.mjs",
             "scripts/qa/test-data-isolation-boundary.test.mjs",
@@ -441,6 +502,23 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       continue;
     }
 
+    if (file.startsWith("scripts/qa/experimental/")) {
+      if (file.endsWith(".mjs")) addSyntaxCheck(state, file);
+      addFollowUp(
+        state,
+        "experimental-canonical-audit",
+        "T1",
+        "可显式运行 canonical runtime experimental audit；其 broad keyword 命中只作只读审查线索，不阻断 affected/fast，也不代表产品缺陷。",
+        file,
+      );
+      continue;
+    }
+
+    if (file === "scripts/qa/ci-workflow-yaml-check.go") {
+      directTests.add("scripts/qa/ci-workflow.test.mjs");
+      continue;
+    }
+
     if (file.startsWith("scripts/qa/")) {
       if (file.endsWith(".test.mjs")) {
         if (fs.existsSync(path.join(root, file))) {
@@ -462,6 +540,13 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
         }
       } else if (file.endsWith(".sh")) {
         addShellCheck(state, file);
+        const sibling = file.replace(/\.sh$/u, ".test.mjs");
+        if (fs.existsSync(path.join(root, sibling))) {
+          directTests.add(sibling);
+        } else {
+          state.requiresFull = true;
+          addReason(state, "full", file);
+        }
       }
       continue;
     }
@@ -482,8 +567,14 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
 
   if (state.requiresFull) {
     const fullReasons = [...(state.reasons.get("full") || [])];
-    state.commands = new Map([[FIXED_COMMANDS.diff.id, FIXED_COMMANDS.diff]]);
-    state.reasons = new Map([[FIXED_COMMANDS.diff.id, new Set(["所有改动"])]]);
+    const retainedCommands = [...state.commands].filter(
+      ([, selected]) => selected.level === "T0",
+    );
+    const retainedReasons = new Map(
+      retainedCommands.map(([id]) => [id, new Set(state.reasons.get(id) || [])]),
+    );
+    state.commands = new Map(retainedCommands);
+    state.reasons = retainedReasons;
     addFixed(
       state,
       "full",
@@ -532,34 +623,21 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
   };
 }
 
-function readNullDelimited(output) {
-  return output.toString("utf8").split("\0").map(normalizeFile).filter(Boolean);
-}
-
-function gitFiles(root, args) {
-  return readNullDelimited(execFileSync("git", args, { cwd: root }));
-}
-
 export function collectChangedFiles({
   root = DEFAULT_ROOT,
   base,
   staged = false,
 } = {}) {
-  const files = [];
-  if (base) {
-    const range = base.includes("..") ? base : `${base}...HEAD`;
-    files.push(...gitFiles(root, ["diff", "--name-only", "-z", range]));
-  }
-  if (staged) {
-    files.push(...gitFiles(root, ["diff", "--cached", "--name-only", "-z"]));
-  } else {
-    files.push(...gitFiles(root, ["diff", "--name-only", "-z"]));
-    files.push(...gitFiles(root, ["diff", "--cached", "--name-only", "-z"]));
-    files.push(
-      ...gitFiles(root, ["ls-files", "--others", "--exclude-standard", "-z"]),
-    );
-  }
-  return uniqueSorted(files);
+  const range = base ? (base.includes("..") ? base : `${base}...HEAD`) : "";
+  return uniqueSorted(
+    collectGitChangedFiles({
+      root,
+      range,
+      includeWorktree: !staged,
+      includeStaged: true,
+      includeUntracked: !staged,
+    }).map(normalizeFile),
+  );
 }
 
 function shellQuote(value) {

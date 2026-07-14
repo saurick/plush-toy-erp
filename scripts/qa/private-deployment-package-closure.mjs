@@ -34,7 +34,7 @@ function printHelp() {
   node scripts/qa/private-deployment-package-closure.mjs [--out <dir>]
 
 Purpose:
-  Generate private deployment package simulation evidence.
+  Generate a private deployment template boundary report.
 
 Boundaries:
   - reads only private deployment and industry template configs
@@ -81,7 +81,7 @@ function createReport(packageTemplate, industryTemplate) {
       customerConfigFiles: packageTemplate.requiredCustomerConfigFiles,
       deploymentDocs: packageTemplate.requiredDeploymentDocs,
       reusableSources: packageTemplate.reusableSources,
-      simulatedAcceptanceChecks: packageTemplate.simulatedAcceptanceChecks,
+      boundaryReviewChecks: packageTemplate.boundaryReviewChecks,
     },
     summary: {
       packageRoots: packageTemplate.requiredPackageRoots.length,
@@ -92,10 +92,13 @@ function createReport(packageTemplate, industryTemplate) {
       industryRoles: industryTemplate.defaultRoles.length,
       industryMenuSections: industryTemplate.desktopMenuTemplate.sections.length,
     },
-    simulatedAcceptance: acceptance,
+    boundaryChecks: acceptance,
     finalDecision: {
-      closedBySimulation: Object.values(acceptance).every(Boolean),
-      nextStep: "post-delivery customer usage feedback or SaaS review only after private deployments mature",
+      boundariesSatisfied: Object.values(acceptance).every(Boolean),
+      deliveryCompleted: false,
+      releaseEvidencePresent: false,
+      customerAccepted: false,
+      nextStep: "review the real customer key, source authorization, target environment and acceptance plan",
       stillNotAllowed: [
         "real customer data import",
         "tenant_id",
@@ -110,11 +113,11 @@ function createReport(packageTemplate, industryTemplate) {
 }
 
 function renderMarkdown(report) {
-  const acceptanceRows = Object.entries(report.simulatedAcceptance)
+  const acceptanceRows = Object.entries(report.boundaryChecks)
     .map(([key, value]) => `| ${key} | ${value ? "PASS" : "FAIL"} |`)
     .join("\n");
 
-  return `# 多客户私有化复制模拟闭环报告 / Private Deployment Package Simulation Report
+  return `# 多客户私有化模板边界报告 / Private Deployment Template Boundary Report
 
 ## 摘要
 
@@ -131,7 +134,9 @@ function renderMarkdown(report) {
 | deploymentDocs | ${report.summary.deploymentDocs} |
 | reusableSources | ${report.summary.reusableSources} |
 
-## 模拟验收
+本报告只证明模板边界检查通过；交付完成、发布证据和客户签收均保持为 false。
+
+## 边界检查
 
 | 检查 | 结果 |
 | --- | --- |
@@ -141,7 +146,7 @@ ${acceptanceRows}
 
 ${report.packageChecklist.packageRoots.map((item) => `- ${item}`).join("\n")}
 
-## 部署包必备文档
+## 最小部署资料
 
 ${report.packageChecklist.deploymentDocs.map((item) => `- ${item}`).join("\n")}
 
@@ -180,7 +185,7 @@ if (isCli) {
     }
     const result = runPrivateDeploymentPackageClosure(options);
     console.log(
-      `private deployment package closure ok: ${result.report.templateKey}, packageRoots=${result.report.summary.packageRoots}, simulatedKey=${result.report.simulatedCustomerKey}, out=${result.outDir}`,
+      `private deployment template boundaries ok: ${result.report.templateKey}, packageRoots=${result.report.summary.packageRoots}, simulatedKey=${result.report.simulatedCustomerKey}, out=${result.outDir}`,
     );
   } catch (error) {
     console.error(`[private-deployment-package-closure] ${error.message}`);

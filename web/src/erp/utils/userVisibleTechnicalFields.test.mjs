@@ -351,6 +351,87 @@ test('权限中心权限名称不把 permission key 当用户可见 fallback', (
   assert.doesNotMatch(content, /搜索管理员账号、手机号、角色或权限码/u)
   assert.doesNotMatch(content, /角色名称可按岗位调整，职责权限保持统一/u)
   assert.match(content, /搜索功能名称或业务模块/u)
+  assert.match(
+    content,
+    /const ASSIGN_USER_ROLE_PERMISSION = 'system\.user\.role\.assign'/u
+  )
+  assert.match(
+    content,
+    /const MANAGE_ROLE_PERMISSION = 'system\.role\.permission\.manage'/u
+  )
+  assert.doesNotMatch(
+    content,
+    /const MANAGE_ROLE_PERMISSION = 'system\.permission\.manage'/u
+  )
+  assert.match(
+    content,
+    /role_keys: canAssignUserRoles\s*\?\s*normalizeStringList/u
+  )
+  assert.doesNotMatch(
+    content,
+    /role_keys: canManageUsers\s*\?\s*normalizeStringList/u
+  )
+})
+
+test('权限中心功能影响只展示业务页面、区域、动作和限制', () => {
+  const filePath = join(rootDir, 'pages/PermissionCenterPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  for (const visibleTechnicalDetail of [
+    '技术详情',
+    '权限标识：',
+    '页面路径：',
+    '接口定位：',
+    '满足任一：',
+    '必须同时满足：',
+  ]) {
+    assert.doesNotMatch(content, new RegExp(visibleTechnicalDetail, 'u'))
+  }
+  assert.doesNotMatch(content, /record\.key\}.*<\/Text>/u)
+  assert.match(content, /rowKey="rowID"/u)
+  assert.doesNotMatch(content, /rowKey="key"/u)
+  assert.doesNotMatch(content, /\.pagePath\b/u)
+  assert.doesNotMatch(content, /\.backendMethods\b/u)
+  assert.doesNotMatch(content, /\.requiredAny\b/u)
+  assert.doesNotMatch(content, /\.requiredAll\b/u)
+  assert.match(content, /title: '适用页面'/u)
+  assert.match(content, /title: '页面区域'/u)
+  assert.match(content, /title: '可用操作'/u)
+  assert.match(content, /title: '使用限制'/u)
+  assert.match(content, /label: '功能影响'/u)
+})
+
+test('权限中心账号动作统一 account_status 三态并提供可聚焦受限原因', () => {
+  const filePath = join(rootDir, 'pages/PermissionCenterPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /dataIndex: 'account_status'/u)
+  assert.doesNotMatch(content, /dataIndex: 'disabled'/u)
+  assert.match(content, /ADMIN_ACCOUNT_STATUS\.ACTIVE/u)
+  assert.match(content, /ADMIN_ACCOUNT_STATUS\.SUSPENDED/u)
+  assert.match(content, /ADMIN_ACCOUNT_STATUS\.REVOKED/u)
+  assert.match(content, /操作受限：\{operationBlockReasons\.join\('；'\)\}/u)
+  assert.match(content, /role="note" tabIndex=\{0\}/u)
+  assert.doesNotMatch(content, /title=\{roleBlockReason/u)
+  assert.match(content, /注销不可恢复/u)
+  assert.match(content, /必须创建新账号/u)
+})
+
+test('权限中心按后端业务元数据收窄角色权限并保留并发冲突草稿', () => {
+  const filePath = join(rootDir, 'pages/PermissionCenterPage.jsx')
+  const content = readFileSync(filePath, 'utf8')
+
+  assert.match(content, /buildAssignableRoleOptions/u)
+  assert.match(content, /filterAssignableBusinessPermissions/u)
+  assert.match(content, /getRolePermissionReadOnlyReason/u)
+  assert.match(content, /expected_version: expectedVersion/u)
+  assert.match(content, /RpcErrorCode\.RESOURCE_VERSION_CONFLICT/u)
+  assert.match(content, /当前勾选已保留/u)
+  assert.match(content, /刷新并保留当前勾选/u)
+  assert.match(
+    content,
+    /roleSaveConflict\?\.roleKey === selectedRoleKey/u
+  )
 })
 
 test('BOM 页面导出和选中项不把内部 ID 当业务字段', () => {
@@ -1253,8 +1334,9 @@ test('权限中心模块标签不把未知 module key 当可见 fallback', () =>
 
   assert.match(
     content,
-    /return label \? `\$\{label\} \(\$\{normalizedKey\}\)` : '未登记权限模块'/u
+    /return label \|\| '未登记权限模块'/u
   )
+  assert.doesNotMatch(content, /\$\{normalizedKey\}/u)
   assert.doesNotMatch(content, /:\s*normalizedKey/u)
 })
 

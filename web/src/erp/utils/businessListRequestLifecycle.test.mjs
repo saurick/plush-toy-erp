@@ -171,6 +171,48 @@ for (const pageCase of pageCases) {
   })
 }
 
+test('business list request lifecycle: 审计日志只应用最新响应并正确收口 loading', () => {
+  const source = readSource('../pages/AuditLogsPage.jsx')
+  const loaderStart = source.indexOf('const loadData = useCallback(async () =>')
+
+  assert.ok(loaderStart >= 0, 'AuditLogsPage must keep its list loader')
+  const loaderSource = source.slice(loaderStart)
+
+  assert.match(
+    source,
+    /import useLatestRequestCoordinator from ['"]\.\.\/hooks\/useLatestRequestCoordinator\.js['"]/
+  )
+  assert.match(
+    source,
+    /import \{ isRpcAbortError, JsonRpc \} from ['"]@\/common\/utils\/jsonRpc['"]/
+  )
+  assert.match(
+    source,
+    /const beginLatestRequest = useLatestRequestCoordinator\(\)/
+  )
+  assert.match(
+    loaderSource,
+    /const request = beginLatestRequest\('audit-logs'\)/
+  )
+  assert.match(
+    loaderSource,
+    /adminRpc\.call\([\s\S]*?'audit_logs'[\s\S]*?\{ signal: request\.signal \}\s*\)/u
+  )
+  assert.match(
+    loaderSource,
+    /if \(!request\.isCurrent\(\)\) \{\s*return false/u
+  )
+  assert.match(
+    loaderSource,
+    /if \(isRpcAbortError\(err\) \|\| !request\.isCurrent\(\)\) \{\s*return false/u
+  )
+  assert.match(
+    loaderSource,
+    /finally \{\s*if \(request\.isCurrent\(\)\) \{\s*setLoading\(false\)\s*request\.finish\(\)/u
+  )
+  assert.match(loaderSource, /\[\s*adminRpc,\s*beginLatestRequest,/u)
+})
+
 test('business list request lifecycle: list API wrappers forward abort options to JSON-RPC', () => {
   const apiCases = [
     {

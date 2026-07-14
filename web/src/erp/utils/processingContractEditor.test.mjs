@@ -13,15 +13,15 @@ import {
 
 const sampleLines = [
   {
-    contractNo: 'B25060808',
+    contractNo: 'SIM-OS-001',
     processName: '面*1',
-    quantity: '9024',
+    quantity: '100',
     unitPrice: '0.2',
   },
   {
-    contractNo: 'B25060808',
+    contractNo: 'SIM-OS-001',
     processName: '耳*2',
-    quantity: '9024',
+    quantity: '100',
     unitPrice: '0.1',
   },
 ]
@@ -30,7 +30,7 @@ test('FL_processing_contract_editor__clears_blank_inserted_lines processingContr
   const inserted = insertProcessingContractLine({
     lines: sampleLines,
     selectedLineIndex: 0,
-    contractNo: 'B25060808',
+    contractNo: 'SIM-OS-001',
     position: 'after',
   })
 
@@ -47,7 +47,7 @@ test('FL_processing_contract_editor__clears_blank_inserted_lines processingContr
 
 test('processingContractEditor: 手签留白只清空签字人并保留日期', () => {
   const cleared = clearProcessingContractSignatureDraft({
-    contractNo: 'B25060808',
+    contractNo: 'SIM-OS-001',
     buyerCompany: '本公司',
     buyerSigner: '签字人',
     supplierSigner: '受托方签字人',
@@ -64,7 +64,7 @@ test('processingContractEditor: 手签留白只清空签字人并保留日期', 
     },
   })
 
-  assert.equal(cleared.contractNo, 'B25060808')
+  assert.equal(cleared.contractNo, 'SIM-OS-001')
   assert.equal(cleared.buyerCompany, '本公司')
   assert.equal(cleared.lines, sampleLines)
   assert.deepEqual(cleared.clauses.delivery, ['来货要求'])
@@ -79,7 +79,7 @@ test('processingContractEditor: 达到 300 行后不允许继续插入', () => {
   const fullLines = Array.from(
     { length: PROCESSING_CONTRACT_MAX_ROWS },
     () => ({
-      contractNo: 'B25060808',
+      contractNo: 'SIM-OS-001',
       processName: '电绣',
       quantity: '1',
       unitPrice: '1',
@@ -89,7 +89,7 @@ test('processingContractEditor: 达到 300 行后不允许继续插入', () => {
   const inserted = insertProcessingContractLine({
     lines: fullLines,
     selectedLineIndex: PROCESSING_CONTRACT_MAX_ROWS - 1,
-    contractNo: 'B25060808',
+    contractNo: 'SIM-OS-001',
     position: 'after',
   })
 
@@ -101,7 +101,7 @@ test('FL_processing_contract_editor__clears_deleted_last_line processingContract
   const deleted = deleteProcessingContractLine({
     lines: [sampleLines[0]],
     selectedLineIndex: 0,
-    contractNo: 'B25060808',
+    contractNo: 'SIM-OS-001',
   })
 
   assert.equal(deleted.ok, true)
@@ -137,7 +137,7 @@ test('FL_processing_contract_editor__clears_covered_cell_stale_value processingC
   })
 
   assert.equal(merged.ok, true)
-  assert.equal(merged.lines[0].contractNo, 'B25060808')
+  assert.equal(merged.lines[0].contractNo, 'SIM-OS-001')
   assert.equal(merged.lines[0].productOrderNo, '')
   assert.equal(merged.merges.length, 1)
 

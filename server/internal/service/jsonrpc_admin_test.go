@@ -18,18 +18,23 @@ import (
 )
 
 type memAdminManageRepoForData struct {
-	admins          map[int]*biz.AdminUser
-	rolePerms       map[string][]string
-	auditLogs       []biz.RuntimeAuditEvent
-	lastAuditFilter biz.RuntimeAuditEventListFilter
-	lifecycleErr    error
+	admins                    map[int]*biz.AdminUser
+	rolePerms                 map[string][]string
+	roleVersions              map[string]int
+	lastRolePermissionsChange *biz.RolePermissionsChange
+	auditLogs                 []biz.RuntimeAuditEvent
+	lastAuditFilter           biz.RuntimeAuditEventListFilter
+	lifecycleErr              error
 }
+
+var _ biz.AdminManageRepo = (*memAdminManageRepoForData)(nil)
 
 func newMemAdminManageRepoForData() *memAdminManageRepoForData {
 	return &memAdminManageRepoForData{
-		admins:    map[int]*biz.AdminUser{},
-		rolePerms: map[string][]string{},
-		auditLogs: []biz.RuntimeAuditEvent{},
+		admins:       map[int]*biz.AdminUser{},
+		rolePerms:    map[string][]string{},
+		roleVersions: map[string]int{},
+		auditLogs:    []biz.RuntimeAuditEvent{},
 	}
 }
 
@@ -52,6 +57,10 @@ func (r *memAdminManageRepoForData) roleByKey(roleKey string) biz.AdminRole {
 			if permissions == nil {
 				permissions = role.Permissions
 			}
+			version := r.roleVersions[role.Key]
+			if version <= 0 {
+				version = role.Version
+			}
 			return biz.AdminRole{
 				Key:         role.Key,
 				Name:        role.Name,
@@ -59,6 +68,8 @@ func (r *memAdminManageRepoForData) roleByKey(roleKey string) biz.AdminRole {
 				Builtin:     role.Builtin,
 				Disabled:    role.Disabled,
 				SortOrder:   role.SortOrder,
+				Type:        role.Type,
+				Version:     version,
 				Permissions: biz.NormalizePermissionKeys(permissions),
 			}
 		}
@@ -148,6 +159,13 @@ func (r *memAdminManageRepoForData) CreateAdmin(_ context.Context, admin *biz.Ad
 	return r.clone(created), nil
 }
 
+func (r *memAdminManageRepoForData) CreateAdminWithAudit(ctx context.Context, command *biz.AdminCreateCommand) (*biz.AdminUser, error) {
+	if command == nil || command.Admin == nil {
+		return nil, biz.ErrBadParam
+	}
+	return r.CreateAdmin(ctx, command.Admin)
+}
+
 func (r *memAdminManageRepoForData) UpdateAdminRoles(_ context.Context, id int, roleKeys []string) error {
 	admin, ok := r.admins[id]
 	if !ok {
@@ -155,6 +173,16 @@ func (r *memAdminManageRepoForData) UpdateAdminRoles(_ context.Context, id int, 
 	}
 	r.applyAdminRoles(admin, roleKeys)
 	return nil
+}
+
+func (r *memAdminManageRepoForData) SetAdminRolesWithAudit(ctx context.Context, change *biz.AdminRolesChange) (*biz.AdminUser, error) {
+	if change == nil {
+		return nil, biz.ErrBadParam
+	}
+	if err := r.UpdateAdminRoles(ctx, change.AdminID, change.RoleKeys); err != nil {
+		return nil, err
+	}
+	return r.GetAdminByID(ctx, change.AdminID)
 }
 
 func (r *memAdminManageRepoForData) ListRoles(_ context.Context) ([]biz.AdminRole, error) {
@@ -171,13 +199,16 @@ func (r *memAdminManageRepoForData) ListPermissions(_ context.Context) ([]biz.Ad
 	out := make([]biz.AdminPermission, 0, len(defs))
 	for _, permission := range defs {
 		out = append(out, biz.AdminPermission{
-			Key:         permission.Key,
-			Name:        permission.Name,
-			Description: permission.Description,
-			Module:      permission.Module,
-			Action:      permission.Action,
-			Resource:    permission.Resource,
-			Builtin:     permission.Builtin,
+			Key:               permission.Key,
+			Name:              permission.Name,
+			Description:       permission.Description,
+			Module:            permission.Module,
+			Action:            permission.Action,
+			Resource:          permission.Resource,
+			Builtin:           permission.Builtin,
+			Class:             permission.Class,
+			Assignable:        permission.Assignable,
+			NonProductionOnly: permission.NonProductionOnly,
 		})
 	}
 	return out, nil
@@ -207,6 +238,28 @@ func (r *memAdminManageRepoForData) UpdateRolePermissions(_ context.Context, rol
 	return nil
 }
 
+func (r *memAdminManageRepoForData) SetRolePermissionsWithAudit(ctx context.Context, change *biz.RolePermissionsChange) (*biz.AdminRole, error) {
+	if change == nil || change.ExpectedVersion <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	role := r.roleByKey(change.RoleKey)
+	if role.Key == "" {
+		return nil, biz.ErrRoleNotFound
+	}
+	if role.Version != change.ExpectedVersion {
+		return nil, biz.ErrRoleVersionConflict
+	}
+	cloned := *change
+	cloned.PermissionKeys = append([]string(nil), change.PermissionKeys...)
+	r.lastRolePermissionsChange = &cloned
+	if err := r.UpdateRolePermissions(ctx, change.RoleKey, change.PermissionKeys); err != nil {
+		return nil, err
+	}
+	r.roleVersions[role.Key] = role.Version + 1
+	updated := r.roleByKey(role.Key)
+	return &updated, nil
+}
+
 func (r *memAdminManageRepoForData) UpdateAdminPhone(_ context.Context, id int, phone string) error {
 	admin, ok := r.admins[id]
 	if !ok {
@@ -214,6 +267,16 @@ func (r *memAdminManageRepoForData) UpdateAdminPhone(_ context.Context, id int, 
 	}
 	admin.Phone = phone
 	return nil
+}
+
+func (r *memAdminManageRepoForData) SetAdminPhoneWithAudit(ctx context.Context, change *biz.AdminPhoneChange) (*biz.AdminUser, error) {
+	if change == nil {
+		return nil, biz.ErrBadParam
+	}
+	if err := r.UpdateAdminPhone(ctx, change.AdminID, change.Phone); err != nil {
+		return nil, err
+	}
+	return r.GetAdminByID(ctx, change.AdminID)
 }
 
 func (r *memAdminManageRepoForData) UpdateAdminERPColumnOrder(_ context.Context, id int, moduleKey string, order []string) error {
@@ -235,16 +298,16 @@ func (r *memAdminManageRepoForData) UpdateAdminERPColumnOrder(_ context.Context,
 	return nil
 }
 
-func (r *memAdminManageRepoForData) ChangeAdminLifecycle(_ context.Context, change *biz.AdminLifecycleChange) (int, error) {
+func (r *memAdminManageRepoForData) ChangeAdminLifecycle(_ context.Context, change *biz.AdminLifecycleChange) (*biz.AdminUser, int, error) {
 	if change == nil {
-		return 0, biz.ErrBadParam
+		return nil, 0, biz.ErrBadParam
 	}
 	if r.lifecycleErr != nil {
-		return 0, r.lifecycleErr
+		return nil, 0, r.lifecycleErr
 	}
 	admin, ok := r.admins[change.AdminID]
 	if !ok {
-		return 0, biz.ErrAdminNotFound
+		return nil, 0, biz.ErrAdminNotFound
 	}
 	admin.Disabled = change.Disabled
 	admin.StatusReason = change.Reason
@@ -254,7 +317,7 @@ func (r *memAdminManageRepoForData) ChangeAdminLifecycle(_ context.Context, chan
 	if change.Revoke {
 		admin.RevokedAt = &now
 	}
-	return 0, nil
+	return r.clone(admin), 0, nil
 }
 
 func (r *memAdminManageRepoForData) UpdateAdminPasswordHash(_ context.Context, id int, passwordHash string) error {
@@ -264,6 +327,16 @@ func (r *memAdminManageRepoForData) UpdateAdminPasswordHash(_ context.Context, i
 	}
 	admin.PasswordHash = passwordHash
 	return nil
+}
+
+func (r *memAdminManageRepoForData) ResetAdminPasswordWithAudit(ctx context.Context, reset *biz.AdminPasswordReset) (*biz.AdminUser, error) {
+	if reset == nil {
+		return nil, biz.ErrBadParam
+	}
+	if err := r.UpdateAdminPasswordHash(ctx, reset.AdminID, reset.PasswordHash); err != nil {
+		return nil, err
+	}
+	return r.GetAdminByID(ctx, reset.AdminID)
 }
 
 func (r *memAdminManageRepoForData) RecordRuntimeAuditEvent(_ context.Context, event *biz.RuntimeAuditEventCreate) error {
@@ -397,6 +470,90 @@ func TestJsonrpcDispatcher_AdminMe_ReturnsERPPreferences(t *testing.T) {
 	}
 }
 
+func TestJsonrpcDispatcher_AdminListUsesMinimalAccountProjection(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID: 1, Username: "root", IsSuperAdmin: true, CreatedAt: now, UpdatedAt: now,
+	}
+	repo.admins[2] = &biz.AdminUser{
+		ID:           2,
+		Username:     "worker",
+		Phone:        "13800138000",
+		PasswordHash: "sentinel-password-hash",
+		AuthVersion:  88,
+		StatusReason: "临时离岗",
+		Roles: []biz.AdminRole{{
+			Key: biz.SalesRoleKey, Name: "业务员", Type: biz.RoleTypeBusinessDefault,
+			Version: 7, Permissions: []string{biz.PermissionCustomerRead},
+		}},
+		Permissions: []string{biz.PermissionCustomerRead, biz.PermissionSystemAuditRead},
+		ERPPreferences: biz.AdminERPPreferences{
+			ColumnOrders: map[string][]string{"sentinel-module": {"sentinel-column"}},
+		},
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+		UserID: 1, Username: "root", Role: biz.RoleAdmin,
+	})
+
+	_, result, err := dispatcher.handleAdmin(ctx, "list", "minimal", nil)
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
+		t.Fatalf("admin.list result=%#v err=%v", result, err)
+	}
+	var worker map[string]any
+	for _, raw := range result.Data.AsMap()["admins"].([]any) {
+		item := raw.(map[string]any)
+		if item["username"] == "worker" {
+			worker = item
+			break
+		}
+	}
+	if worker == nil {
+		t.Fatal("worker projection not found")
+	}
+	wantKeys := map[string]struct{}{
+		"id": {}, "username": {}, "phone": {}, "is_super_admin": {},
+		"account_status": {}, "status_reason": {}, "roles": {}, "permission_count": {},
+	}
+	if len(worker) != len(wantKeys) {
+		t.Fatalf("admin.list keys = %#v, want exact minimal projection", worker)
+	}
+	for key := range worker {
+		if _, ok := wantKeys[key]; !ok {
+			t.Fatalf("admin.list exposed unexpected key %q: %#v", key, worker)
+		}
+	}
+	if worker["permission_count"] != float64(2) {
+		t.Fatalf("permission_count = %#v, want 2", worker["permission_count"])
+	}
+	roles := worker["roles"].([]any)
+	if len(roles) != 1 {
+		t.Fatalf("roles = %#v, want one role", roles)
+	}
+	role := roles[0].(map[string]any)
+	if len(role) != 2 || role["role_key"] != biz.SalesRoleKey || role["name"] != "业务员" {
+		t.Fatalf("role projection = %#v", role)
+	}
+	serialized := fmt.Sprint(result.Data.AsMap())
+	for _, forbidden := range []string{
+		"sentinel-password-hash", "sentinel-module", "sentinel-column",
+		biz.PermissionCustomerRead, biz.PermissionSystemAuditRead,
+	} {
+		if strings.Contains(serialized, forbidden) {
+			t.Fatalf("admin.list exposed forbidden value %q: %s", forbidden, serialized)
+		}
+	}
+}
+
 func TestJsonrpcDispatcher_AdminResetPassword(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()
@@ -491,7 +648,7 @@ func TestJsonrpcDispatcher_AdminRevokeMapsConcurrentTaskChange(t *testing.T) {
 	}
 }
 
-func TestJsonrpcDispatcher_AdminCreateWithRolesRequiresUpdatePermission(t *testing.T) {
+func TestJsonrpcDispatcher_AdminCreateWithRolesRequiresRoleAssignPermission(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()
 	repo.admins[1] = &biz.AdminUser{
@@ -539,13 +696,230 @@ func TestJsonrpcDispatcher_AdminCreateWithRolesRequiresUpdatePermission(t *testi
 		t.Fatalf("expected create without roles to succeed, got %+v", res)
 	}
 
-	repo.admins[1].Permissions = append(repo.admins[1].Permissions, biz.PermissionSystemUserUpdate)
+	repo.admins[1].Permissions = append(repo.admins[1].Permissions, biz.PermissionSystemUserRoleAssign)
 	_, res, err = j.handleAdmin(ctx, "create", "3", withRoleParams)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
 	if res == nil || res.Code != errcode.OK.Code {
-		t.Fatalf("expected create with roles to succeed after update permission, got %+v", res)
+		t.Fatalf("expected create with roles to succeed after role assignment permission, got %+v", res)
+	}
+}
+
+func TestJsonrpcDispatcher_AdminSetRolesRequiresRoleAssignPermission(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID: 1, Username: "operator", Permissions: []string{biz.PermissionSystemUserUpdate}, CreatedAt: now, UpdatedAt: now,
+	}
+	repo.admins[2] = &biz.AdminUser{ID: 2, Username: "worker", CreatedAt: now, UpdatedAt: now}
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin})
+	params, _ := structpb.NewStruct(map[string]any{"id": 2, "role_keys": []any{biz.SalesRoleKey}})
+
+	_, denied, err := dispatcher.handleAdmin(ctx, "set_roles", "1", params)
+	if err != nil || denied.Code != errcode.PermissionDenied.Code || len(repo.admins[2].Roles) != 0 {
+		t.Fatalf("set roles with legacy update permission = %#v err=%v admin=%#v", denied, err, repo.admins[2])
+	}
+	repo.admins[1].Permissions = append(repo.admins[1].Permissions, biz.PermissionSystemUserRoleAssign)
+	_, allowed, err := dispatcher.handleAdmin(ctx, "set_roles", "2", params)
+	if err != nil || allowed.Code != errcode.OK.Code || len(repo.admins[2].Roles) != 1 || repo.admins[2].Roles[0].Key != biz.SalesRoleKey {
+		t.Fatalf("set roles with assignment permission = %#v err=%v admin=%#v", allowed, err, repo.admins[2])
+	}
+}
+
+func TestJsonrpcDispatcher_AdminSetRolePermissionsRequiresDedicatedPermissionAndVersion(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID:          1,
+		Username:    "operator",
+		Roles:       []biz.AdminRole{{Key: biz.AdminRoleKey}},
+		Permissions: []string{"system.permission.manage"},
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin})
+	validParams := map[string]any{
+		"role_key":         biz.WarehouseRoleKey,
+		"permission_keys":  []any{biz.PermissionWarehouseInventoryRead},
+		"expected_version": float64(1),
+	}
+	params, _ := structpb.NewStruct(validParams)
+
+	_, denied, err := dispatcher.handleAdmin(ctx, "set_role_permissions", "1", params)
+	if err != nil || denied.Code != errcode.PermissionDenied.Code || repo.lastRolePermissionsChange != nil {
+		t.Fatalf("set role permissions with legacy permission = %#v err=%v change=%#v", denied, err, repo.lastRolePermissionsChange)
+	}
+	repo.admins[1].Permissions = append(repo.admins[1].Permissions, biz.PermissionSystemRolePermissionManage)
+
+	invalidVersions := []struct {
+		name    string
+		present bool
+		value   any
+	}{
+		{name: "missing"},
+		{name: "zero", present: true, value: float64(0)},
+		{name: "negative", present: true, value: float64(-1)},
+		{name: "fraction", present: true, value: float64(1.5)},
+		{name: "string", present: true, value: "1"},
+	}
+	for _, tt := range invalidVersions {
+		t.Run(tt.name, func(t *testing.T) {
+			payload := map[string]any{
+				"role_key":        biz.WarehouseRoleKey,
+				"permission_keys": []any{biz.PermissionWarehouseInventoryRead},
+			}
+			if tt.present {
+				payload["expected_version"] = tt.value
+			}
+			invalidParams, paramErr := structpb.NewStruct(payload)
+			if paramErr != nil {
+				t.Fatalf("params error = %v", paramErr)
+			}
+			_, result, callErr := dispatcher.handleAdmin(ctx, "set_role_permissions", tt.name, invalidParams)
+			if callErr != nil || result.Code != errcode.InvalidParam.Code || repo.lastRolePermissionsChange != nil {
+				t.Fatalf("version %s result=%#v err=%v change=%#v", tt.name, result, callErr, repo.lastRolePermissionsChange)
+			}
+		})
+	}
+
+	_, allowed, err := dispatcher.handleAdmin(ctx, "set_role_permissions", "2", params)
+	if err != nil || allowed.Code != errcode.OK.Code || repo.lastRolePermissionsChange == nil || repo.lastRolePermissionsChange.ExpectedVersion != 1 {
+		t.Fatalf("set role permissions with version = %#v err=%v change=%#v", allowed, err, repo.lastRolePermissionsChange)
+	}
+	role := allowed.Data.AsMap()["role"].(map[string]any)
+	if role["version"] != float64(2) || role["permissions_editable"] != true || role["assignable"] != true {
+		t.Fatalf("updated role metadata = %#v", role)
+	}
+
+	_, conflict, err := dispatcher.handleAdmin(ctx, "set_role_permissions", "3", params)
+	if err != nil || conflict.Code != errcode.ResourceVersionConflict.Code {
+		t.Fatalf("stale role version = %#v err=%v", conflict, err)
+	}
+}
+
+func TestJsonrpcDispatcher_AdminRBACOptionsExposeRoleAndPermissionMetadata(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{ID: 1, Username: "root", IsSuperAdmin: true, CreatedAt: now, UpdatedAt: now}
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "root", Role: biz.RoleAdmin})
+
+	_, result, err := dispatcher.handleAdmin(ctx, "rbac_options", "1", nil)
+	if err != nil || result.Code != errcode.OK.Code {
+		t.Fatalf("rbac_options = %#v err=%v", result, err)
+	}
+	data := result.Data.AsMap()
+	find := func(items []any, keyField string, key string) map[string]any {
+		t.Helper()
+		for _, raw := range items {
+			item := raw.(map[string]any)
+			if item[keyField] == key {
+				return item
+			}
+		}
+		t.Fatalf("%s=%q not found", keyField, key)
+		return nil
+	}
+	roles := data["role_options"].([]any)
+	sales := find(roles, "role_key", biz.SalesRoleKey)
+	if sales["role_type"] != string(biz.RoleTypeBusinessDefault) || sales["version"] != float64(1) || sales["permissions_editable_by_current_admin"] != true || sales["assignable_by_current_admin"] != true {
+		t.Fatalf("sales role metadata = %#v", sales)
+	}
+	admin := find(roles, "role_key", biz.AdminRoleKey)
+	if admin["role_type"] != string(biz.RoleTypeSystem) || admin["permissions_editable_by_current_admin"] != false || admin["assignable_by_current_admin"] != true {
+		t.Fatalf("admin role metadata = %#v", admin)
+	}
+	debugRole := find(roles, "role_key", biz.DebugOperatorRoleKey)
+	if debugRole["role_type"] != string(biz.RoleTypeSystem) || debugRole["permissions_editable_by_current_admin"] != false || debugRole["assignable_by_current_admin"] != false || debugRole["non_production_only"] != true || strings.TrimSpace(fmt.Sprint(debugRole["assignment_blocked_reason"])) == "" {
+		t.Fatalf("debug role metadata = %#v", debugRole)
+	}
+
+	permissions := data["permission_options"].([]any)
+	for _, permissionKey := range []string{biz.PermissionSystemUserRoleAssign, biz.PermissionSystemRolePermissionManage} {
+		permission := find(permissions, "permission_key", permissionKey)
+		if permission["class"] != string(biz.PermissionClassControlPlane) || permission["assignable"] != false {
+			t.Fatalf("control-plane permission metadata for %s = %#v", permissionKey, permission)
+		}
+	}
+	businessPermission := find(permissions, "permission_key", biz.PermissionWarehouseInventoryRead)
+	if businessPermission["class"] != string(biz.PermissionClassBusiness) || businessPermission["assignable"] != true || businessPermission["non_production_only"] != false {
+		t.Fatalf("business permission metadata = %#v", businessPermission)
+	}
+	debugPermission := find(permissions, "permission_key", biz.PermissionDebugSeed)
+	if debugPermission["class"] != string(biz.PermissionClassDebug) || debugPermission["assignable"] != false || debugPermission["non_production_only"] != true {
+		t.Fatalf("debug permission metadata = %#v", debugPermission)
+	}
+}
+
+func TestJsonrpcDispatcher_AdminRBACOptionsRequireRoleAndPermissionRead(t *testing.T) {
+	for _, permissions := range [][]string{
+		{biz.PermissionSystemRoleRead},
+		{biz.PermissionSystemPermissionRead},
+	} {
+		t.Run(strings.Join(permissions, "+"), func(t *testing.T) {
+			repo := newMemAdminManageRepoForData()
+			now := time.Now()
+			repo.admins[1] = &biz.AdminUser{
+				ID: 1, Username: "reader", Permissions: permissions, CreatedAt: now, UpdatedAt: now,
+			}
+			logger := log.NewStdLogger(io.Discard)
+			dispatcher := &jsonrpcDispatcher{
+				log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+				adminReader:   repo,
+				adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+			}
+			ctx := biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{UserID: 1, Username: "reader", Role: biz.RoleAdmin})
+
+			_, result, err := dispatcher.handleAdmin(ctx, "rbac_options", "1", nil)
+			if err != nil || result.Code != errcode.PermissionDenied.Code {
+				t.Fatalf("single read permission exposed complete RBAC options: result=%#v err=%v", result, err)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_AdminManageErrorsMapToExplicitContracts(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(log.With(logger, "module", "service.jsonrpc.test"))}
+	tests := []struct {
+		name string
+		err  error
+		code int32
+	}{
+		{name: "self role", err: biz.ErrAdminSelfRoleChangeForbidden, code: errcode.PermissionDenied.Code},
+		{name: "own role permissions", err: biz.ErrAdminSelfRolePermissionForbidden, code: errcode.PermissionDenied.Code},
+		{name: "privileged role", err: biz.ErrPrivilegedRoleAssignmentForbidden, code: errcode.PermissionDenied.Code},
+		{name: "privileged target", err: biz.ErrPrivilegedAdminTargetForbidden, code: errcode.PermissionDenied.Code},
+		{name: "system role", err: biz.ErrSystemRoleImmutable, code: errcode.PermissionDenied.Code},
+		{name: "permission not delegable", err: biz.ErrPermissionNotDelegable, code: errcode.InvalidParam.Code},
+		{name: "debug role environment", err: biz.ErrDebugRoleProductionForbidden, code: errcode.InvalidParam.Code},
+		{name: "role version", err: biz.ErrRoleVersionConflict, code: errcode.ResourceVersionConflict.Code},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := dispatcher.mapAdminManageError(context.Background(), tt.err)
+			if result.Code != tt.code || strings.TrimSpace(result.Message) == "" {
+				t.Fatalf("mapped result = %#v, want code %d", result, tt.code)
+			}
+		})
 	}
 }
 
@@ -726,7 +1100,7 @@ func TestJsonrpcDispatcher_AdminMutationsRejectUnknownParams(t *testing.T) {
 	}{
 		{method: "create", params: map[string]any{"username": "worker", "password": "123456", "actor_id": 9}},
 		{method: "set_roles", params: map[string]any{"id": 2, "role_keys": []any{"sales"}, "permissions": []any{"system.audit.read"}}},
-		{method: "set_role_permissions", params: map[string]any{"role_key": "sales", "permission_keys": []any{}, "customer_key": "other"}},
+		{method: "set_role_permissions", params: map[string]any{"role_key": "sales", "permission_keys": []any{}, "expected_version": 1, "customer_key": "other"}},
 		{method: "set_disabled", params: map[string]any{"id": 2, "disabled": true, "reason": "离岗", "revoked_at": now.Format(time.RFC3339)}},
 		{method: "revoke", params: map[string]any{"id": 2, "reason": "离职", "released_task_count": 999}},
 		{method: "reset_password", params: map[string]any{"id": 2, "password": "123456", "auth_version": 999}},

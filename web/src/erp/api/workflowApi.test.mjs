@@ -55,6 +55,12 @@ function validTask(overrides = {}) {
     id: 42,
     version: 8,
     task_status_key: 'done',
+    urge_count: 1,
+    last_urged_at: 1_720_000_000,
+    last_urged_by: 7,
+    last_urged_by_role_key: 'pmc',
+    escalated_at: null,
+    escalate_target_role_key: null,
     ...overrides,
   }
 }
@@ -93,6 +99,17 @@ const mutationCases = [
     },
   },
   {
+    exportName: 'resumeWorkflowTaskAction',
+    method: 'resume_task_action',
+    params: {
+      task_id: 42,
+      expected_version: 7,
+      idempotency_key: 'workflow-resume-42',
+      action_key: 'resume',
+      reason: '阻塞事项已处理',
+    },
+  },
+  {
     exportName: 'urgeWorkflowTask',
     method: 'urge_task',
     params: {
@@ -101,6 +118,11 @@ const mutationCases = [
       idempotency_key: 'workflow-urge-42',
       action: 'urge_task',
       reason: '请尽快处理',
+      payload: {
+        evidence_refs: ['proof-b', 'proof-a'],
+        surface_key: 'desktop_task_board',
+        entry_path: '/erp/dashboard',
+      },
     },
   },
 ]
@@ -133,7 +155,7 @@ test('workflowApi: task board uses the dedicated server projection contract', as
   })
   const params = {
     keyword: '包装',
-    status: 'pending',
+    status: 'ready',
     owner_role_key: 'warehouse',
     due: 'dueSoon',
     source_type: 'inbound',
@@ -163,6 +185,223 @@ test('workflowApi: task board rejects malformed successful responses', async () 
   )
 })
 
+test('workflowApi: role task view uses the strict server cursor contract', async () => {
+  const calls = []
+  const response = {
+    items: [
+      {
+        id: 42,
+        version: 3,
+        task_name: '关键路径跟进',
+        task_status_key: 'ready',
+      },
+    ],
+    next_cursor: 'opaque-page-2',
+    has_more: true,
+    server_time: 1_720_000_000,
+  }
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return { data: response }
+  })
+
+  assert.equal(
+    await api.listWorkflowRoleTasks({
+      view_key: 'risk',
+      role_key: 'pmc',
+      limit: 50,
+      cursor: 'opaque-page-1',
+    }),
+    response
+  )
+  assert.deepEqual(calls, [
+    {
+      method: 'list_role_tasks',
+      params: {
+        view_key: 'risk',
+        role_key: 'pmc',
+        limit: 50,
+        cursor: 'opaque-page-1',
+      },
+    },
+  ])
+})
+
+test('workflowApi: all role task pages keep one snapshot and exceed the old 200 row cap', async () => {
+  const calls = []
+  const pageSizes = [100, 100, 100, 50]
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    const pageIndex = calls.length - 1
+    const size = pageSizes[pageIndex]
+    const startID = 350 - pageIndex * 100
+    return {
+      data: {
+        items: Array.from({ length: size }, (_, index) => ({
+          id: startID - index,
+          version: 1,
+          task_status_key: 'ready',
+        })),
+        next_cursor: pageIndex < 3 ? `opaque-page-${pageIndex + 2}` : '',
+        has_more: pageIndex < 3,
+        server_time: 1_720_000_000,
+      },
+    }
+  })
+
+  const result = await api.listAllWorkflowRoleTasks({
+    view_key: 'todo',
+    role_key: 'sales',
+    limit: 100,
+  })
+  assert.equal(result.items.length, 350)
+  assert.equal(result.items[0].id, 350)
+  assert.equal(result.items.at(-1).id, 1)
+  assert.equal(result.has_more, false)
+  assert.equal(result.server_time, 1_720_000_000)
+  assert.equal(calls.length, 4)
+  assert.deepEqual(
+    calls.map((call) => call.params.cursor || ''),
+    ['', 'opaque-page-2', 'opaque-page-3', 'opaque-page-4']
+  )
+})
+
+test('workflowApi: all role task pages fail closed on cursor or snapshot drift', async () => {
+  let callCount = 0
+  const repeatedCursorApi = await loadWorkflowApi(async () => {
+    callCount += 1
+    return {
+      data: {
+        items: [
+          {
+            id: 10 - callCount,
+            version: 1,
+            task_status_key: 'ready',
+          },
+        ],
+        next_cursor: 'repeated-cursor',
+        has_more: true,
+        server_time: 1_720_000_000,
+      },
+    }
+  })
+  await assert.rejects(
+    repeatedCursorApi.listAllWorkflowRoleTasks({
+      view_key: 'todo',
+      role_key: 'sales',
+      limit: 50,
+    }),
+    (error) => error.isInvalidResponse === true
+  )
+
+  callCount = 0
+  const driftedSnapshotApi = await loadWorkflowApi(async () => {
+    callCount += 1
+    return {
+      data: {
+        items: [
+          {
+            id: 20 - callCount,
+            version: 1,
+            task_status_key: 'ready',
+          },
+        ],
+        next_cursor: callCount === 1 ? 'page-2' : '',
+        has_more: callCount === 1,
+        server_time: 1_720_000_000 + callCount,
+      },
+    }
+  })
+  await assert.rejects(
+    driftedSnapshotApi.listAllWorkflowRoleTasks({
+      view_key: 'todo',
+      role_key: 'sales',
+      limit: 50,
+    }),
+    (error) => error.isInvalidResponse === true
+  )
+})
+
+test('workflowApi: role task view rejects invalid queries before RPC', async () => {
+  const calls = []
+  const api = await loadWorkflowApi(async (method, params) => {
+    calls.push({ method, params })
+    return { data: {} }
+  })
+
+  for (const params of [
+    {},
+    { view_key: 'all', role_key: 'pmc', limit: 50 },
+    { view_key: 'todo', role_key: '', limit: 50 },
+    { view_key: 'todo', role_key: 'pmc', limit: 101 },
+    { view_key: 'todo', role_key: 'pmc', limit: 50, cursor: '' },
+    { view_key: 'todo', role_key: 'pmc', limit: 50, offset: 0 },
+  ]) {
+    await assert.rejects(api.listWorkflowRoleTasks(params), /查询参数无效/u)
+  }
+  assert.equal(calls.length, 0)
+})
+
+test('workflowApi: role task view rejects malformed successful responses', async () => {
+  let response
+  const api = await loadWorkflowApi(async () => ({ data: response }))
+  const params = { view_key: 'todo', role_key: 'sales', limit: 50 }
+
+  for (const malformed of [
+    null,
+    {},
+    { items: null, next_cursor: '', has_more: false, server_time: 1 },
+    { items: [], next_cursor: 2, has_more: false, server_time: 1 },
+    { items: [], next_cursor: '', has_more: 'false', server_time: 1 },
+    { items: [], next_cursor: '', has_more: false, server_time: 0 },
+    { items: [], next_cursor: '', has_more: true, server_time: 1 },
+    {
+      items: [],
+      next_cursor: 'page-2',
+      has_more: true,
+      server_time: 1,
+    },
+    {
+      items: [{ id: '42' }],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1,
+    },
+    {
+      items: [{ id: 42 }],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1,
+    },
+    {
+      items: [{ id: 42, version: 0, task_status_key: 'ready' }],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1,
+    },
+    {
+      items: [{ id: 42, version: 1, task_status_key: 'rejected' }],
+      next_cursor: '',
+      has_more: false,
+      server_time: 1,
+    },
+    ...['pending', 'processing', 'cancelled', 'closed'].map(
+      (taskStatusKey) => ({
+        items: [{ id: 42, version: 1, task_status_key: taskStatusKey }],
+        next_cursor: '',
+        has_more: false,
+        server_time: 1,
+      })
+    ),
+  ]) {
+    response = malformed
+    await assert.rejects(
+      api.listWorkflowRoleTasks(params),
+      (error) => error.isInvalidResponse === true
+    )
+  }
+})
+
 test('workflowApi: all public task mutations validate params before RPC', async () => {
   const calls = []
   const api = await loadWorkflowApi(async (method, params) => {
@@ -171,6 +410,7 @@ test('workflowApi: all public task mutations validate params before RPC', async 
       complete_task_action: 'done',
       block_task_action: 'blocked',
       reject_task_action: 'rejected',
+      resume_task_action: 'ready',
       urge_task: 'ready',
     }
     return {
@@ -205,6 +445,16 @@ test('workflowApi: all public task mutations validate params before RPC', async 
     assert.equal(task.id, 42)
     assert.equal(calls.at(-1).method, entry.method)
   }
+
+  const callCount = calls.length
+  await assert.rejects(
+    api.urgeWorkflowTask({
+      ...mutationCases.find((entry) => entry.method === 'urge_task').params,
+      payload: { urge_count: 99 },
+    }),
+    /页面已更新/u
+  )
+  assert.equal(calls.length, callCount)
 })
 
 test('workflowApi: every public task mutation rejects malformed successful responses', async () => {
@@ -222,6 +472,7 @@ test('workflowApi: every public task mutation rejects malformed successful respo
     complete_task_action: 'done',
     block_task_action: 'blocked',
     reject_task_action: 'rejected',
+    resume_task_action: 'ready',
     urge_task: 'ready',
   }
   for (const entry of mutationCases) {
@@ -231,7 +482,12 @@ test('workflowApi: every public task mutation rejects malformed successful respo
         task_status_key: statusByMethod[entry.method],
       }),
       validTask({
-        task_status_key: entry.method === 'urge_task' ? 'done' : 'ready',
+        task_status_key:
+          entry.method === 'urge_task'
+            ? 'done'
+            : entry.method === 'resume_task_action'
+              ? 'blocked'
+              : 'ready',
       }),
     ]) {
       response = { data: { task } }
@@ -274,11 +530,64 @@ test('workflowApi: every public task mutation rejects malformed successful respo
   assert.equal(
     (
       await api.urgeWorkflowTask({
-        ...mutationCases[3].params,
+        ...mutationCases.find((entry) => entry.method === 'urge_task').params,
         expected_version: 999,
       })
     ).version,
     2
+  )
+
+  for (const taskStatusKey of [
+    'pending',
+    'processing',
+    'cancelled',
+    'closed',
+  ]) {
+    response = {
+      data: { task: validTask({ version: 2, task_status_key: taskStatusKey }) },
+    }
+    await assert.rejects(
+      api.urgeWorkflowTask(
+        mutationCases.find((entry) => entry.method === 'urge_task').params
+      ),
+      (error) => error.isInvalidResponse === true
+    )
+  }
+
+  response = {
+    data: {
+      task: validTask({
+        version: 2,
+        task_status_key: 'ready',
+        urge_count: 0,
+      }),
+    },
+  }
+  await assert.rejects(
+    api.urgeWorkflowTask(
+      mutationCases.find((entry) => entry.method === 'urge_task').params
+    ),
+    (error) => error.isInvalidResponse === true
+  )
+
+  response = {
+    data: {
+      task: validTask({
+        version: 3,
+        task_status_key: 'blocked',
+        escalated_at: 1_720_000_001,
+        escalate_target_role_key: 'boss',
+      }),
+    },
+  }
+  assert.equal(
+    (
+      await api.urgeWorkflowTask({
+        ...mutationCases.find((entry) => entry.method === 'urge_task').params,
+        action: 'escalate_to_boss',
+      })
+    ).version,
+    3
   )
   response = { data: { task: validTask({ version: 2 }) } }
   assert.equal(
@@ -354,6 +663,19 @@ test('workflow task callers own a frozen user-intent attempt store', () => {
       `${path} must bypass repeated preflight only for an exact retained attempt`
     )
   }
+})
+
+test('workflow dashboard consumes complete server role views without the old capped waiting pool', () => {
+  const source = read('../pages/DashboardPage.jsx')
+  const statsSource = read('../utils/workflowDashboardStats.mjs')
+  assert.match(statsSource, /effective_session\?\.roles/u)
+  assert.match(statsSource, /hasEffectiveRoleProjection/u)
+  assert.match(source, /listAllWorkflowRoleTasks/u)
+  assert.match(source, /\['todo', 'risk'\]/u)
+  assert.match(source, /workflowRiskTaskIDs\.has\(task\.id\)/u)
+  assert.doesNotMatch(source, /listWorkflowTasks/u)
+  assert.doesNotMatch(source, /limit:\s*200/u)
+  assert.doesNotMatch(source, /key:\s*'waiting'/u)
 })
 
 test('workflow task request IDs stay cryptographically strong on non-secure HTTP targets', () => {

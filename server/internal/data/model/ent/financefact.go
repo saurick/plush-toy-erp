@@ -65,8 +65,6 @@ type FinanceFact struct {
 	CancelledBy *int `json:"cancelled_by,omitempty"`
 	// CancelReason holds the value of the "cancel_reason" field.
 	CancelReason *string `json:"cancel_reason,omitempty"`
-	// CancelAuditVersion holds the value of the "cancel_audit_version" field.
-	CancelAuditVersion int `json:"cancel_audit_version,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -108,7 +106,7 @@ func (*FinanceFact) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case financefact.FieldOccurredAtSpecified:
 			values[i] = new(sql.NullBool)
-		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID, financefact.FieldCancelledBy, financefact.FieldCancelAuditVersion:
+		case financefact.FieldID, financefact.FieldCounterpartyID, financefact.FieldPaymentTermDays, financefact.FieldSourceID, financefact.FieldSourceLineID, financefact.FieldCancelledBy:
 			values[i] = new(sql.NullInt64)
 		case financefact.FieldFactNo, financefact.FieldFactType, financefact.FieldStatus, financefact.FieldCounterpartyType, financefact.FieldCurrency, financefact.FieldCollectionType, financefact.FieldPaymentTerm, financefact.FieldInvoiceCategory, financefact.FieldSourceType, financefact.FieldIdempotencyKey, financefact.FieldCancelReason, financefact.FieldNote:
 			values[i] = new(sql.NullString)
@@ -286,12 +284,6 @@ func (_m *FinanceFact) assignValues(columns []string, values []any) error {
 				_m.CancelReason = new(string)
 				*_m.CancelReason = value.String
 			}
-		case financefact.FieldCancelAuditVersion:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field cancel_audit_version", values[i])
-			} else if value.Valid {
-				_m.CancelAuditVersion = int(value.Int64)
-			}
 		case financefact.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field note", values[i])
@@ -446,9 +438,6 @@ func (_m *FinanceFact) String() string {
 		builder.WriteString("cancel_reason=")
 		builder.WriteString(*v)
 	}
-	builder.WriteString(", ")
-	builder.WriteString("cancel_audit_version=")
-	builder.WriteString(fmt.Sprintf("%v", _m.CancelAuditVersion))
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {
 		builder.WriteString("note=")

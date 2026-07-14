@@ -717,6 +717,7 @@ func TestPurchaseReceiptPostgresProcessCommandRollsBackPostOnResultConflict(t *t
 		ReceiptID: receipt.ID, MaterialID: fixtures.materialID,
 		WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
 		LotNo: stringPtr("LOT-ATOMIC-POST-" + fixtures.suffix), Quantity: quantity,
+		IdempotencyKey: "test:atomic-post:" + fixtures.suffix,
 	})
 	if err != nil {
 		t.Fatalf("add purchase receipt item: %v", err)
@@ -794,11 +795,12 @@ func claimedPostgresProcessCommandForBusinessRef(
 		ProcessKey: "atomic_result_" + suffix, ProcessVersion: "v1", ConfigRevision: "atomic-result-test",
 		DefinitionHash: "sha256:atomic-result-" + suffix, BusinessRefType: businessRefType, BusinessRefID: businessRefID,
 		IdempotencyKey: "atomic-process/" + suffix, Status: biz.ProcessStatusActive,
-		Nodes: []biz.ProcessNodeInstanceCreate{{NodeKey: "command", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Status: biz.ProcessNodeStatusActive, PolicySnapshot: map[string]any{"command_key": commandKey}}},
+		Nodes: []biz.ProcessNodeInstanceCreate{{NodeKey: "command", NodeType: biz.ProcessNodeTypeDomainCommand, Attempt: 1, Status: biz.ProcessNodeStatusWaiting, PolicySnapshot: map[string]any{"command_key": commandKey}}},
 	}, 7)
 	if err != nil {
 		t.Fatalf("create process command fixture: %v", err)
 	}
+	nodes[0] = activateProcessNodeForTest(t, ctx, repo, instance, nodes[0])
 	fingerprint := postgresProcessCommandFingerprint(t, commandKey, idempotencyKey, payload)
 	node, err := repo.ClaimProcessNodeDomainCommand(ctx, &biz.ProcessNodeDomainCommandClaim{
 		ProcessInstanceID: instance.ID, ProcessNodeInstanceID: nodes[0].ID, ExpectedVersion: nodes[0].Version, DomainCommandFingerprint: fingerprint,

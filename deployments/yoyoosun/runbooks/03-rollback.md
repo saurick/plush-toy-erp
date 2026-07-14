@@ -19,6 +19,8 @@
 
 ## 应用版本回滚
 
+只有确认本轮没有执行 migration，或数据库仍与旧镜像合同一致时，才允许单独回滚应用版本。migration 已成功 apply 后，旧镜像可能写入已删除字段或违反新约束，必须恢复升级前数据库备份并同时恢复旧镜像，或走已评审的 forward-fix；不得 image-only rollback。
+
 ```bash
 cd /opt/plush-toy-erp/current/server/deploy/compose/prod
 # 在受控 .env 中恢复上一版 APP_IMAGE / WEB_IMAGE
@@ -36,6 +38,8 @@ docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env ps
 - 恢复目标库。
 - 恢复后 migration version。
 - 恢复后 smoke 结果。
+
+恢复期间保持 `app-server` 和 Web 停止。恢复完成后先核对 migration version 与旧镜像合同，再同时启动旧后端和 Web；不得把新 schema 与旧镜像混用。
 
 ## 禁止
 

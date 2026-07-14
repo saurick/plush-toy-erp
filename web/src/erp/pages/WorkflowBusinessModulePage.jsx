@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   ExclamationCircleOutlined,
+  RedoOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { Button, Input, Modal, Space, Tag } from 'antd'
@@ -14,6 +15,7 @@ import {
   completeWorkflowTaskAction,
   listWorkflowTasks,
   rejectWorkflowTaskAction,
+  resumeWorkflowTaskAction,
   urgeWorkflowTask,
 } from '../api/workflowApi.mjs'
 import {
@@ -70,14 +72,10 @@ function workflowRoleOption(value) {
 
 const TASK_STATUS_OPTIONS = Object.freeze([
   { label: '全部状态', value: '' },
-  { label: '待处理', value: 'pending' },
   { label: '可执行', value: 'ready' },
-  { label: '处理中', value: 'processing' },
   { label: '阻塞', value: 'blocked' },
   { label: '退回', value: 'rejected' },
   { label: '已完成', value: 'done' },
-  { label: '已关闭', value: 'closed' },
-  { label: '已取消', value: 'cancelled' },
 ])
 const DUE_DATE_FILTER_OPTIONS = Object.freeze([
   { label: '到期日期', value: 'due_at' },
@@ -314,6 +312,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('block')
   const canRejectSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('reject')
+  const canResumeSelected =
+    Boolean(selectedTask) && selectedTaskActionAccess.canRun('resume')
   const canUrgeSelected =
     Boolean(selectedTask) && selectedTaskActionAccess.canRun('urge')
 
@@ -346,8 +346,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         action_key: operation,
         reason: '',
         payload: {
-          workflow_page_action: operation,
-          workflow_page_scope: config.payloadScope,
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
         },
       }
       return runMutationInFlight(`task:${task.id}`, async () => {
@@ -387,7 +387,13 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         }
       })
     },
-    [config, loadWorkflowTasks, runMutationInFlight, verifyMutationAccess]
+    [
+      config,
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
   )
 
   const blockWorkflowTask = useCallback(
@@ -400,9 +406,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         action_key: operation,
         reason,
         payload: {
-          blocked_reason: reason,
-          workflow_page_action: operation,
-          workflow_page_scope: config.payloadScope,
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
         },
       }
       return runMutationInFlight(`task:${task.id}`, async () => {
@@ -443,7 +448,12 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         }
       })
     },
-    [config, loadWorkflowTasks, runMutationInFlight, verifyMutationAccess]
+    [
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
   )
 
   const rejectWorkflowTask = useCallback(
@@ -456,9 +466,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         action_key: operation,
         reason,
         payload: {
-          rejected_reason: reason,
-          workflow_page_action: operation,
-          workflow_page_scope: config.payloadScope,
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
         },
       }
       return runMutationInFlight(`task:${task.id}`, async () => {
@@ -499,7 +508,72 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         }
       })
     },
-    [config, loadWorkflowTasks, runMutationInFlight, verifyMutationAccess]
+    [
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
+  )
+
+  const resumeWorkflowTask = useCallback(
+    async (task, { reason = '' } = {}) => {
+      const scope = `${task.id}:resume`
+      const operation = 'resume'
+      const params = {
+        task_id: task.id,
+        expected_version: task.version,
+        action_key: operation,
+        reason,
+        payload: {
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
+        },
+      }
+      return runMutationInFlight(`task:${task.id}`, async () => {
+        const accessVerified = await verifyMutationAccess({
+          task,
+          actionKey: operation,
+          reason,
+          scope,
+          operation,
+          params,
+        })
+        if (!accessVerified) return false
+        setTaskActionLoadingID(getTaskID(task))
+        try {
+          await mutationAttemptsRef.current.run({
+            scope,
+            operation,
+            mutate: resumeWorkflowTaskAction,
+            params,
+          })
+          message.success('任务已解除阻塞')
+          try {
+            await loadWorkflowTasks()
+          } catch {
+            message.warning('操作已成功但列表刷新失败，请手动刷新')
+          }
+          return true
+        } catch (error) {
+          if (isWorkflowTaskMutationResultUnknown(error)) {
+            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+          } else {
+            message.error(getActionErrorMessage(error, '解除任务阻塞失败'))
+            await loadWorkflowTasks().catch(() => {})
+          }
+          return false
+        } finally {
+          setTaskActionLoadingID(0)
+        }
+      })
+    },
+    [
+      loadWorkflowTasks,
+      moduleItem?.path,
+      runMutationInFlight,
+      verifyMutationAccess,
+    ]
   )
 
   const urgeWorkflowTaskFromPage = useCallback(
@@ -512,8 +586,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         action: 'urge_task',
         reason,
         payload: {
-          entry_path: moduleItem?.path,
-          workflow_page_scope: config.payloadScope,
+          entry_path: moduleItem?.path || '',
+          surface_key: 'workflow_business_module',
         },
       }
       return runMutationInFlight(`task:${task.id}`, async () => {
@@ -555,7 +629,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       })
     },
     [
-      config,
       loadWorkflowTasks,
       moduleItem?.path,
       runMutationInFlight,
@@ -583,6 +656,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       succeeded = await blockWorkflowTask(selectedTask, { reason })
     } else if (taskReasonModal.mode === 'reject') {
       succeeded = await rejectWorkflowTask(selectedTask, { reason })
+    } else if (taskReasonModal.mode === 'resume') {
+      succeeded = await resumeWorkflowTask(selectedTask, { reason })
     } else if (taskReasonModal.mode === 'urge') {
       succeeded = await urgeWorkflowTaskFromPage(selectedTask, { reason })
     }
@@ -591,6 +666,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     blockWorkflowTask,
     closeTaskReasonModal,
     rejectWorkflowTask,
+    resumeWorkflowTask,
     selectedTask,
     taskReasonModal,
     urgeWorkflowTaskFromPage,
@@ -791,59 +867,62 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           >
             清空已选
           </Button>
-          <Button
-            size="small"
-            type="primary"
-            icon={<CheckCircleOutlined />}
-            loading={taskActionLoadingID === selectedTask?.id}
-            disabled={
-              selectedTaskActionAccess.loading ||
-              !canCompleteSelected ||
-              taskActionLoadingID > 0
-            }
-            onClick={() => completeWorkflowTask(selectedTask)}
-          >
-            完成协同
-          </Button>
-          <Button
-            size="small"
-            danger
-            icon={<ExclamationCircleOutlined />}
-            disabled={
-              selectedTaskActionAccess.loading ||
-              !canBlockSelected ||
-              taskActionLoadingID > 0
-            }
-            onClick={() => openTaskReasonModal('block')}
-          >
-            标记阻塞
-          </Button>
-          <Button
-            size="small"
-            danger
-            icon={<ExclamationCircleOutlined />}
-            disabled={
-              selectedTaskActionAccess.loading ||
-              !canRejectSelected ||
-              taskActionLoadingID > 0
-            }
-            onClick={() => openTaskReasonModal('reject')}
-          >
-            退回任务
-          </Button>
-          <Button
-            size="small"
-            icon={<SendOutlined />}
-            loading={urgingTaskID === selectedTask?.id}
-            disabled={
-              selectedTaskActionAccess.loading ||
-              !canUrgeSelected ||
-              urgingTaskID > 0
-            }
-            onClick={() => openTaskReasonModal('urge')}
-          >
-            催办
-          </Button>
+          {canCompleteSelected ? (
+            <Button
+              size="small"
+              type="primary"
+              icon={<CheckCircleOutlined />}
+              loading={taskActionLoadingID === selectedTask?.id}
+              disabled={taskActionLoadingID > 0}
+              onClick={() => completeWorkflowTask(selectedTask)}
+            >
+              完成协同
+            </Button>
+          ) : null}
+          {canBlockSelected ? (
+            <Button
+              size="small"
+              danger
+              icon={<ExclamationCircleOutlined />}
+              disabled={taskActionLoadingID > 0}
+              onClick={() => openTaskReasonModal('block')}
+            >
+              标记阻塞
+            </Button>
+          ) : null}
+          {canRejectSelected ? (
+            <Button
+              size="small"
+              danger
+              icon={<ExclamationCircleOutlined />}
+              disabled={taskActionLoadingID > 0}
+              onClick={() => openTaskReasonModal('reject')}
+            >
+              退回任务
+            </Button>
+          ) : null}
+          {canResumeSelected ? (
+            <Button
+              size="small"
+              type="primary"
+              icon={<RedoOutlined />}
+              disabled={taskActionLoadingID > 0}
+              onClick={() => openTaskReasonModal('resume')}
+            >
+              解除阻塞
+            </Button>
+          ) : null}
+          {canUrgeSelected ? (
+            <Button
+              size="small"
+              icon={<SendOutlined />}
+              loading={urgingTaskID === selectedTask?.id}
+              disabled={urgingTaskID > 0}
+              onClick={() => openTaskReasonModal('urge')}
+            >
+              催办
+            </Button>
+          ) : null}
           <BusinessAttachmentModalButton
             ownerType="workflow_task"
             ownerId={selectedTask?.id}
@@ -902,6 +981,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         }
         onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
         onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
+        onResumeTask={canUpdateWorkflowTasks ? resumeWorkflowTask : undefined}
         onUrgeTask={
           canUpdateWorkflowTasks ? urgeWorkflowTaskFromPage : undefined
         }
@@ -917,7 +997,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             ? '标记阻塞'
             : taskReasonModal?.mode === 'reject'
               ? '退回任务'
-              : '催办协同',
+              : taskReasonModal?.mode === 'resume'
+                ? '解除阻塞'
+                : '催办协同',
           selectedTaskLabel
         )}
         open={Boolean(taskReasonModal)}
@@ -928,7 +1010,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             ? '确认阻塞'
             : taskReasonModal?.mode === 'reject'
               ? '确认退回'
-              : '确认催办'
+              : taskReasonModal?.mode === 'resume'
+                ? '确认恢复'
+                : '确认催办'
         }
         confirmLoading={taskActionLoadingID > 0 || urgingTaskID > 0}
         destroyOnHidden
@@ -943,7 +1027,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               ? '填写阻塞原因；只更新当前协同任务状态。'
               : taskReasonModal?.mode === 'reject'
                 ? '填写退回原因；只更新当前协同任务状态。'
-                : '填写催办原因；只记录协同事件。'
+                : taskReasonModal?.mode === 'resume'
+                  ? '填写阻塞解除说明；任务将恢复为可执行。'
+                  : '填写催办原因；只记录协同事件。'
           }
           value={taskReasonModal?.reason || ''}
           onChange={(event) =>

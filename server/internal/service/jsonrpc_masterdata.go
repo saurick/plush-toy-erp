@@ -27,52 +27,52 @@ func (d *jsonrpcDispatcher) handleMasterData(
 	}
 
 	switch method {
-	case "save_customer_with_contacts", "saveCustomerWithContacts",
-		"create_customer", "createCustomer",
-		"update_customer", "updateCustomer",
-		"get_customer", "getCustomer",
-		"list_customers", "listCustomers",
-		"set_customer_active", "setCustomerActive":
+	case "save_customer_with_contacts",
+		"create_customer",
+		"update_customer",
+		"get_customer",
+		"list_customers",
+		"set_customer_active":
 		return d.handleMasterDataCustomer(ctx, method, id, pm)
-	case "save_supplier_with_contacts", "saveSupplierWithContacts",
-		"create_supplier", "createSupplier",
-		"update_supplier", "updateSupplier",
-		"get_supplier", "getSupplier",
-		"list_suppliers", "listSuppliers",
-		"set_supplier_active", "setSupplierActive":
+	case "save_supplier_with_contacts",
+		"create_supplier",
+		"update_supplier",
+		"get_supplier",
+		"list_suppliers",
+		"set_supplier_active":
 		return d.handleMasterDataSupplier(ctx, method, id, pm)
-	case "create_material", "createMaterial",
-		"update_material", "updateMaterial",
-		"get_material", "getMaterial",
-		"list_materials", "listMaterials",
-		"set_material_active", "setMaterialActive":
+	case "create_material",
+		"update_material",
+		"get_material",
+		"list_materials",
+		"set_material_active":
 		return d.handleMasterDataMaterial(ctx, method, id, pm)
-	case "create_process", "createProcess",
-		"update_process", "updateProcess",
-		"get_process", "getProcess",
-		"list_processes", "listProcesses",
-		"set_process_active", "setProcessActive":
+	case "create_process",
+		"update_process",
+		"get_process",
+		"list_processes",
+		"set_process_active":
 		return d.handleMasterDataProcess(ctx, method, id, pm)
-	case "create_product", "createProduct",
-		"update_product", "updateProduct",
-		"get_product", "getProduct",
-		"list_products", "listProducts",
-		"set_product_active", "setProductActive",
-		"create_product_sku", "createProductSKU",
-		"update_product_sku", "updateProductSKU",
-		"get_product_sku", "getProductSKU",
-		"list_product_skus", "listProductSKUs",
-		"set_product_sku_active", "setProductSKUActive":
+	case "create_product",
+		"update_product",
+		"get_product",
+		"list_products",
+		"set_product_active",
+		"create_product_sku",
+		"update_product_sku",
+		"get_product_sku",
+		"list_product_skus",
+		"set_product_sku_active":
 		return d.handleMasterDataProduct(ctx, method, id, pm)
-	case "create_contact", "createContact",
-		"update_contact", "updateContact",
-		"get_contact", "getContact",
-		"list_contacts_by_owner", "listContactsByOwner",
-		"set_primary_contact", "setPrimaryContact",
-		"disable_contact", "disableContact":
+	case "create_contact",
+		"update_contact",
+		"get_contact",
+		"list_contacts_by_owner",
+		"set_primary_contact",
+		"disable_contact":
 		return d.handleMasterDataContact(ctx, method, id, pm)
-	case "list_units", "listUnits",
-		"list_warehouses", "listWarehouses":
+	case "list_units",
+		"list_warehouses":
 		return d.handleMasterDataReference(ctx, method, id, pm)
 	default:
 		return id, &v1.JsonrpcResult{

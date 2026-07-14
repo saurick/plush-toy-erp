@@ -6,7 +6,10 @@ import path from "node:path";
 import test from "node:test";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
-const scriptPath = path.join(repoRoot, "deployments/yoyoosun/scripts/run-smoke.sh");
+const scriptPath = path.join(
+  repoRoot,
+  "deployments/yoyoosun/scripts/run-smoke.sh",
+);
 
 function runScript(args = []) {
   return spawnSync("bash", [scriptPath, ...args], {
@@ -49,6 +52,7 @@ set -euo pipefail
 url="\${@: -1}"
 output_file=""
 write_out=""
+request_data=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     -o)
@@ -57,6 +61,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     -w)
       write_out="\${2:-}"
+      shift 2
+      ;;
+    -d)
+      request_data="\${2:-}"
       shift 2
       ;;
     *)
@@ -74,6 +82,9 @@ case "$url" in
 JSON
     ;;
   */templates/render-pdf)
+    if [[ -n "\${FAKE_PDF_PAYLOAD_OUT:-}" ]]; then
+      printf '%s' "$request_data" >"$FAKE_PDF_PAYLOAD_OUT"
+    fi
     if [[ "\${FAKE_PDF_MODE:-ok}" == "ok" ]]; then
       [[ -z "$output_file" ]] || printf '%%PDF-1.4\nrelease-smoke\n%%%%EOF\n' >"$output_file"
       [[ -z "$write_out" ]] || printf '200|application/pdf'
@@ -87,7 +98,7 @@ JSON
     ;;
 esac
 `,
-    "utf8"
+    "utf8",
   );
   fs.chmodSync(curlPath, 0o755);
   return binDir;
@@ -116,12 +127,34 @@ test("run smoke input template is no-write and does not require endpoint", () =>
   assert.equal(template.callsBackend, false);
   assert.equal(template.callsCustomerConfig, false);
   assert.equal(template.readsAdminToken, false);
-  assert(template.checks.includes("customer-config-effective-session when --customer-config-revision is provided"));
-  assert(template.checks.includes("template-pdf-render when --customer-config-revision and an admin token are provided"));
-  assert(template.requiredReadbackEvidence.includes("target=jsonrpc:customer_config.get_effective_session"));
-  assert(template.requiredReadbackEvidence.some((item) => item.includes("HTTP 200 with application/pdf")));
-  assert.match(template.commands.join("\n"), /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/);
-  assert.match(template.commands.join("\n"), /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
+  assert(
+    template.checks.includes(
+      "customer-config-effective-session when --customer-config-revision is provided",
+    ),
+  );
+  assert(
+    template.checks.includes(
+      "template-pdf-render when --customer-config-revision and an admin token are provided",
+    ),
+  );
+  assert(
+    template.requiredReadbackEvidence.includes(
+      "target=jsonrpc:customer_config.get_effective_session",
+    ),
+  );
+  assert(
+    template.requiredReadbackEvidence.some((item) =>
+      item.includes("HTTP 200 with application/pdf"),
+    ),
+  );
+  assert.match(
+    template.commands.join("\n"),
+    /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/,
+  );
+  assert.match(
+    template.commands.join("\n"),
+    /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/,
+  );
   assert.match(template.boundary, /does not call endpoints/);
   assert.match(template.boundary, /does not .*write smoke-test-report\.json/);
   assert.match(template.boundary, /does not .*prove active revision readback/);
@@ -136,6 +169,7 @@ test("run smoke writes release-gate compatible report", async () => {
   fs.mkdirSync(tempDir);
   const endpoint = "http://127.0.0.1:19090";
   const backendUrl = "http://127.0.0.1:18300";
+  const pdfPayloadPath = path.join(root, "pdf-request.json");
 
   const result = await runScriptAsync(
     [
@@ -158,9 +192,10 @@ test("run smoke writes release-gate compatible report", async () => {
       env: {
         PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}`,
         SMOKE_ADMIN_TOKEN: "test-token",
+        FAKE_PDF_PAYLOAD_OUT: pdfPayloadPath,
         TMPDIR: tempDir,
       },
-    }
+    },
   );
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -185,12 +220,22 @@ test("run smoke writes release-gate compatible report", async () => {
       assert.match(String(check.httpCode), /^(200|302|401|403)$/);
     }
   }
-  const customerConfigCheck = report.checks.find((check) => check.name === "customer-config-effective-session");
-  assert.equal(customerConfigCheck.target, "jsonrpc:customer_config.get_effective_session");
-  assert.equal(customerConfigCheck.expectedRevision, "yoyoosun-customer-package-v7.runtime-manifest-v1");
+  const customerConfigCheck = report.checks.find(
+    (check) => check.name === "customer-config-effective-session",
+  );
+  assert.equal(
+    customerConfigCheck.target,
+    "jsonrpc:customer_config.get_effective_session",
+  );
+  assert.equal(
+    customerConfigCheck.expectedRevision,
+    "yoyoosun-customer-package-v7.runtime-manifest-v1",
+  );
   assert.equal(customerConfigCheck.tokenSourceEnv, "SMOKE_ADMIN_TOKEN");
   assert.equal(customerConfigCheck.responseBodyStored, false);
-  const pdfCheck = report.checks.find((check) => check.name === "template-pdf-render");
+  const pdfCheck = report.checks.find(
+    (check) => check.name === "template-pdf-render",
+  );
   assert.equal(pdfCheck.target, "/templates/render-pdf");
   assert.equal(pdfCheck.httpCode, "200");
   assert.equal(pdfCheck.contentType, "application/pdf");
@@ -198,6 +243,10 @@ test("run smoke writes release-gate compatible report", async () => {
   assert(pdfCheck.sizeBytes > 4);
   assert.equal(pdfCheck.tokenSourceEnv, "SMOKE_ADMIN_TOKEN");
   assert.equal(pdfCheck.responseBodyStored, false);
+  const pdfPayload = JSON.parse(fs.readFileSync(pdfPayloadPath, "utf8"));
+  assert.equal(pdfPayload.template_key, "material-purchase-contract");
+  assert.equal(Object.hasOwn(pdfPayload, "customer_key"), false);
+  assert.equal(Object.hasOwn(pdfPayload, "base_url"), false);
   assert.doesNotMatch(JSON.stringify(report), /test-token|%PDF|release-smoke/);
   assert.deepEqual(fs.readdirSync(tempDir), []);
   assert.equal(report.redaction.containsSecrets, false);
@@ -240,7 +289,9 @@ test("run smoke fails authenticated release smoke for a non-PDF response", async
 
   assert.notEqual(result.status, 0);
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
-  const pdfCheck = report.checks.find((check) => check.name === "template-pdf-render");
+  const pdfCheck = report.checks.find(
+    (check) => check.name === "template-pdf-render",
+  );
   assert.equal(pdfCheck.status, "fail");
   assert.equal(pdfCheck.httpCode, "200");
   assert.equal(pdfCheck.contentType, "application/pdf");
@@ -269,7 +320,7 @@ test("run smoke keeps backend checks optional", async () => {
       "--report",
       reportPath,
     ],
-    { env: { PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}` } }
+    { env: { PATH: `${fakeCurlBin}:${process.env.PATH ?? ""}` } },
   );
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
@@ -287,7 +338,9 @@ test("run smoke keeps backend checks optional", async () => {
 });
 
 test("run smoke rejects credentialed endpoint URL before writing report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-credentialed-endpoint-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "run-smoke-credentialed-endpoint-"),
+  );
   const reportPath = path.join(root, "smoke-test-report.json");
 
   const result = runScript([
@@ -302,12 +355,17 @@ test("run smoke rejects credentialed endpoint URL before writing report", () => 
   ]);
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stdout + result.stderr, /--endpoint must not contain username or password/);
+  assert.match(
+    result.stdout + result.stderr,
+    /--endpoint must not contain username or password/,
+  );
   assert.equal(fs.existsSync(reportPath), false);
 });
 
 test("run smoke rejects credentialed backend URL before writing report", () => {
-  const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-credentialed-backend-"));
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "run-smoke-credentialed-backend-"),
+  );
   const reportPath = path.join(root, "smoke-test-report.json");
 
   const result = runScript([
@@ -324,6 +382,9 @@ test("run smoke rejects credentialed backend URL before writing report", () => {
   ]);
 
   assert.notEqual(result.status, 0);
-  assert.match(result.stdout + result.stderr, /--backend-url must not contain username or password/);
+  assert.match(
+    result.stdout + result.stderr,
+    /--backend-url must not contain username or password/,
+  );
   assert.equal(fs.existsSync(reportPath), false);
 });

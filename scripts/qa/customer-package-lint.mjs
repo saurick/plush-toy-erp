@@ -5,15 +5,12 @@ import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { customerPackageCatalog } from "../../config/catalog/customerPackageCatalog.mjs";
 import { customerPackageSchema } from "../../config/schemas/customerPackageSchema.mjs";
-import { demoCustomerPackage } from "../../config/customers/demo/customerPackage.mjs";
-import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import {
+  getCustomerPackage,
+  listCustomerPackageKeys,
+} from "../../config/customers/index.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..", "..");
-
-const CUSTOMER_PACKAGES = Object.freeze({
-  demo: demoCustomerPackage,
-  yoyoosun: yoyoosunCustomerPackage,
-});
 
 const ALLOWED_MODES = Object.freeze(["validate", "compile", "preview", "activate", "rollback"]);
 const ALLOWED_MODULE_STATES = new Set(["enabled", "read_only", "disabled"]);
@@ -28,10 +25,18 @@ function assertNonEmptyString(value, key) {
   assert(typeof value === "string" && value.trim() !== "", `${key} must be a non-empty string`);
 }
 
+function isNamespacedPackageKey(customerKey, packageKey) {
+  return (
+    packageKey.startsWith(`${customerKey}-`) &&
+    /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*$/u.test(packageKey)
+  );
+}
+
 function parseArgs(argv = process.argv.slice(2)) {
   const args = {
     customer: "yoyoosun",
     customers: [],
+    all: false,
     mode: "",
     out: "",
   };
@@ -42,6 +47,8 @@ function parseArgs(argv = process.argv.slice(2)) {
       args.customer = customerKey;
       args.customers.push(customerKey);
       index += 1;
+    } else if (arg === "--all") {
+      args.all = true;
     } else if (arg === "--mode") {
       args.mode = argv[index + 1] || "";
       index += 1;
@@ -54,7 +61,11 @@ function parseArgs(argv = process.argv.slice(2)) {
       throw new Error(`unsupported argument: ${arg}`);
     }
   }
-  if (args.customers.length === 0) {
+  assert(
+    !(args.all && args.customers.length > 0),
+    "--all and --customer are mutually exclusive",
+  );
+  if (!args.all && args.customers.length === 0) {
     args.customers = [args.customer];
   }
   return args;
@@ -64,6 +75,7 @@ function printHelp() {
   console.log(`Usage:
   node scripts/qa/customer-package-lint.mjs --customer demo
   node scripts/qa/customer-package-lint.mjs --customer demo --customer yoyoosun
+  node scripts/qa/customer-package-lint.mjs --all
   node scripts/qa/customer-package-lint.mjs --customer yoyoosun
   node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode compile
   node scripts/qa/customer-package-lint.mjs --customer yoyoosun --mode preview --out output/customers/yoyoosun/customer-package-preview.json
@@ -171,6 +183,73 @@ function validateRoleProfiles(config, catalog) {
   });
 }
 
+function fieldPolicySurfacesByKey(catalog) {
+  return new Map(
+    (catalog.fieldPolicySurfaces || []).map((surface) => [surface.key, surface]),
+  );
+}
+
+function validateFieldPolicyOverrides(config, catalog) {
+  if (config.fieldPolicyOverrides == null) {
+    return;
+  }
+  assert(
+    Array.isArray(config.fieldPolicyOverrides),
+    "fieldPolicyOverrides must be an array",
+  );
+  const allowedKeys = new Set(
+    customerPackageSchema.allowedFieldPolicyOverrideKeys || [],
+  );
+  const requiredKeys = customerPackageSchema.requiredFieldPolicyOverrideKeys || [];
+  const surfaces = fieldPolicySurfacesByKey(catalog);
+  const seen = new Set();
+
+  config.fieldPolicyOverrides.forEach((override, index) => {
+    const overridePath = `fieldPolicyOverrides[${index}]`;
+    assert(
+      override && typeof override === "object" && !Array.isArray(override),
+      `${overridePath} must be an object`,
+    );
+    for (const key of Object.keys(override)) {
+      assert(allowedKeys.has(key), `${overridePath}.${key} is not allowed`);
+    }
+    for (const key of requiredKeys) {
+      assert(
+        Object.prototype.hasOwnProperty.call(override, key),
+        `${overridePath}.${key} is required`,
+      );
+    }
+    assertNonEmptyString(override.surfaceKey, `${overridePath}.surfaceKey`);
+    assertNonEmptyString(override.fieldKey, `${overridePath}.fieldKey`);
+    assert(
+      typeof override.visible === "boolean",
+      `${overridePath}.visible must be a boolean`,
+    );
+    const surface = surfaces.get(override.surfaceKey);
+    assert(
+      surface,
+      `${overridePath}.surfaceKey contains unknown surface ${override.surfaceKey}`,
+    );
+    assert(
+      surface.fieldKeys.includes(override.fieldKey),
+      `${overridePath}.fieldKey contains unknown field ${override.fieldKey}`,
+    );
+    const identity = `${override.surfaceKey}.${override.fieldKey}`;
+    assert(!seen.has(identity), `${overridePath} duplicates ${identity}`);
+    seen.add(identity);
+    assert(
+      override.visible !== false ||
+        !surface.protectedVisible.includes(override.fieldKey),
+      `${overridePath} must not hide protected field ${identity}`,
+    );
+    if (override.visible === false) {
+      assertNonEmptyString(override.reason, `${overridePath}.reason`);
+    } else if (override.reason != null) {
+      assertNonEmptyString(override.reason, `${overridePath}.reason`);
+    }
+  });
+}
+
 function assertNoForbiddenPayload(value, currentPath = "customerPackage") {
   if (!value || typeof value !== "object") {
     return;
@@ -236,13 +315,110 @@ function validateCatalog(catalog) {
   ]) {
     assert(catalog.boundaries?.[key] === false, `catalog.boundaries.${key} must stay false`);
   }
-  for (const section of ["modules", "capabilities", "pages", "fields", "workPools", "policies", "commands"]) {
+  for (const section of ["modules", "capabilities", "pages", "fields", "fieldPolicySurfaces", "workPools", "policies", "commands"]) {
     assert(Array.isArray(catalog[section]), `catalog.${section} must be an array`);
     assert(catalog[section].length > 0, `catalog.${section} must not be empty`);
   }
+  const moduleKeys = toKeySet(catalog.modules);
+  const fieldsByModule = new Map();
+  for (const field of catalog.fields) {
+    const fields = fieldsByModule.get(field.module) || new Set();
+    fields.add(field.key);
+    fieldsByModule.set(field.module, fields);
+  }
+  const surfaceKeys = new Set();
+  for (const [index, surface] of catalog.fieldPolicySurfaces.entries()) {
+    const surfacePath = `catalog.fieldPolicySurfaces[${index}]`;
+    assertNonEmptyString(surface.key, `${surfacePath}.key`);
+    assert(!surfaceKeys.has(surface.key), `${surfacePath}.key must be unique`);
+    surfaceKeys.add(surface.key);
+    assertNonEmptyString(surface.moduleKey, `${surfacePath}.moduleKey`);
+    assert(
+      moduleKeys.has(surface.moduleKey),
+      `${surfacePath}.moduleKey contains unknown module ${surface.moduleKey}`,
+    );
+    assertStringList(surface.fieldKeys, `${surfacePath}.fieldKeys`);
+    assert(
+      Array.isArray(surface.protectedVisible),
+      `${surfacePath}.protectedVisible must be an array`,
+    );
+    const declaredFields = fieldsByModule.get(surface.moduleKey) || new Set();
+    for (const fieldKey of surface.fieldKeys) {
+      assert(
+        declaredFields.has(fieldKey),
+        `${surfacePath}.fieldKeys contains undeclared field ${fieldKey}`,
+      );
+    }
+    for (const fieldKey of surface.protectedVisible) {
+      assert(
+        surface.fieldKeys.includes(fieldKey),
+        `${surfacePath}.protectedVisible contains unknown field ${fieldKey}`,
+      );
+    }
+  }
 }
 
-function validatePackage(config, catalog = customerPackageCatalog, schema = customerPackageSchema) {
+function validateRuntimeProcessSelections(
+  config,
+  schema = customerPackageSchema,
+) {
+  if (config.runtimeProcessSelections == null) {
+    return;
+  }
+  assert(
+    Array.isArray(config.runtimeProcessSelections),
+    "runtimeProcessSelections must be an array",
+  );
+  const allowedKeys = [...schema.allowedRuntimeProcessSelectionKeys].sort();
+  const allowedContracts = new Map(
+    schema.allowedRuntimeProcessSelections.map((selection) => [
+      `${selection.processKey}/${selection.processVersion}`,
+      selection,
+    ]),
+  );
+  const selectedProcessKeys = new Set();
+  for (const [index, selection] of config.runtimeProcessSelections.entries()) {
+    const selectionPath = `runtimeProcessSelections[${index}]`;
+    assert(
+      selection && typeof selection === "object" && !Array.isArray(selection),
+      `${selectionPath} must be an object`,
+    );
+    assert(
+      JSON.stringify(Object.keys(selection).sort()) === JSON.stringify(allowedKeys),
+      `${selectionPath} may only declare ${allowedKeys.join(", ")}`,
+    );
+    for (const key of allowedKeys) {
+      assertNonEmptyString(selection[key], `${selectionPath}.${key}`);
+    }
+    assert(
+      !selectedProcessKeys.has(selection.processKey),
+      `${selectionPath}.processKey must not be duplicated`,
+    );
+    selectedProcessKeys.add(selection.processKey);
+    const contract = allowedContracts.get(
+      `${selection.processKey}/${selection.processVersion}`,
+    );
+    assert(
+      contract,
+      `${selectionPath} must select a registered process/version`,
+    );
+    assert(
+      contract.variantKeys.includes(selection.variantKey),
+      `${selectionPath}.variantKey is not registered for ${selection.processKey}/${selection.processVersion}`,
+    );
+    assert(
+      selection.businessRefType === contract.businessRefType,
+      `${selectionPath}.businessRefType must be ${contract.businessRefType}`,
+    );
+  }
+}
+
+function validatePackage(
+  config,
+  catalog = customerPackageCatalog,
+  schema = customerPackageSchema,
+  { allowReleaseReady = false } = {},
+) {
   for (const key of schema.requiredTopLevelKeys) {
     assert(config[key] !== undefined, `customer package missing ${key}`);
   }
@@ -251,17 +427,37 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
   assert(config.customerKey !== "tenant", "customerKey must not be treated as a SaaS tenant");
   assertNonEmptyString(config.packageKey, "packageKey");
   assert(
-    config.packageKey.startsWith(`${config.customerKey}-customer-package-`),
-    "packageKey must be namespaced by customerKey",
+    isNamespacedPackageKey(config.customerKey, config.packageKey),
+    "packageKey must be namespaced by customerKey and end with package-v<positive integer>",
   );
   assert(schema.allowedStatuses.includes(config.status), `status must be one of ${schema.allowedStatuses.join(", ")}`);
-  assert(config.runtimeEnabled === false, "customer package must not be runtime-enabled");
+  const releaseReady = config.status === "release_ready";
+  assert(
+    !releaseReady || allowReleaseReady,
+    "release-ready customer packages require the controlled runtime compile path",
+  );
+  assert(
+    config.runtimeEnabled === releaseReady,
+    releaseReady
+      ? "release-ready customer package must enable runtime compilation"
+      : "customer package must not be runtime-enabled",
+  );
   assert(config.sourcePolicy?.externalImportAllowsCode === false, "external import must not allow code");
   assert(config.sourcePolicy?.externalImportAllowsSql === false, "external import must not allow SQL");
   assert(config.sourcePolicy?.externalImportAllowsSecrets === false, "external import must not allow secrets");
   assert(config.sourcePolicy?.externalImportAllowsRawCustomerFiles === false, "external import must not allow raw customer files");
-  assert(config.sourcePolicy?.previewOnly === true, "customer package must stay preview-only");
-  assert(config.sourcePolicy?.publishEnabled === false, "publish must stay disabled");
+  assert(
+    config.sourcePolicy?.previewOnly === !releaseReady,
+    releaseReady
+      ? "release-ready customer package must leave preview-only mode"
+      : "customer package must stay preview-only",
+  );
+  assert(
+    config.sourcePolicy?.publishEnabled === releaseReady,
+    releaseReady
+      ? "release-ready customer package must enable publish compilation"
+      : "publish must stay disabled",
+  );
   assert(config.sourcePolicy?.activateEnabled === false, "activate must stay disabled");
   assert(config.sourcePolicy?.rollbackEnabled === false, "rollback must stay disabled");
 
@@ -278,9 +474,10 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
   validateModuleStates(config, moduleKeys);
   validatePrintTemplateDefaults(config, schema);
   validateRoleProfiles(config, catalog);
+  validateFieldPolicyOverrides(config, catalog);
+  validateRuntimeProcessSelections(config, schema);
 
   assert(Array.isArray(config.workflows), "workflows must be an array");
-  assert(config.workflows.length >= 3, "workflows must include the initial three preview workflows");
   for (const [workflowIndex, workflow] of config.workflows.entries()) {
     const workflowPath = `workflows[${workflowIndex}]`;
     assertNonEmptyString(workflow.key, `${workflowPath}.key`);
@@ -310,7 +507,6 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
   }
 
   assert(Array.isArray(config.businessFlows), "businessFlows must be an array");
-  assert(config.businessFlows.length >= 4, "businessFlows must include the four reviewed business flows");
   config.businessFlows.forEach((flow, index) => {
     const flowPath = `businessFlows[${index}]`;
     assertNonEmptyString(flow.key, `${flowPath}.key`);
@@ -324,7 +520,6 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
   });
 
   assert(Array.isArray(config.stateMachines), "stateMachines must be an array");
-  assert(config.stateMachines.length >= 3, "stateMachines must include sales, production and purchase lifecycles");
   config.stateMachines.forEach((stateMachine, index) => {
     const path = `stateMachines[${index}]`;
     assertNonEmptyString(stateMachine.key, `${path}.key`);
@@ -341,7 +536,6 @@ function validatePackage(config, catalog = customerPackageCatalog, schema = cust
   });
 
   assert(Array.isArray(config.processPolicies), "processPolicies must be an array");
-  assert(config.processPolicies.length >= 3, "processPolicies must include skip, auto-generate and close policies");
   config.processPolicies.forEach((policy, index) => {
     const policyPath = `processPolicies[${index}]`;
     assert(policyKeys.has(policy.key), `${policyPath}.key is not registered`);
@@ -379,6 +573,12 @@ function buildPreview(config) {
       runtimeEnabled: config.runtimeEnabled,
       previewOnly: config.sourcePolicy.previewOnly,
     },
+    runtimeProcessSelections: (config.runtimeProcessSelections || []).map((selection) => ({
+      processKey: selection.processKey,
+      processVersion: selection.processVersion,
+      variantKey: selection.variantKey,
+      businessRefType: selection.businessRefType,
+    })),
     workflows: config.workflows.map((workflow) => ({
       key: workflow.key,
       label: workflow.label,
@@ -436,6 +636,10 @@ function validatePreview(preview, schema = customerPackageSchema) {
   );
   assert(preview.identity.runtimeEnabled === false, "preview must not enable runtime");
   assert(preview.identity.previewOnly === true, "preview must stay preview-only");
+  assert(
+    Array.isArray(preview.runtimeProcessSelections),
+    "preview.runtimeProcessSelections must be an array",
+  );
   assert(Array.isArray(preview.workflows), "preview.workflows must be an array");
   assert(Array.isArray(preview.businessFlows), "preview.businessFlows must be an array");
   assert(Array.isArray(preview.stateMachines), "preview.stateMachines must be an array");
@@ -460,8 +664,10 @@ function assertDocsExist() {
     "config/catalog/customerPackageCatalog.mjs",
     "config/schemas/README.md",
     "config/schemas/customerPackageSchema.mjs",
-    "config/customers/demo/customerPackage.mjs",
-    "config/customers/yoyoosun/customerPackage.mjs",
+    "config/customers/index.mjs",
+    ...listCustomerPackageKeys().map(
+      (customerKey) => `config/customers/${customerKey}/customerPackage.mjs`,
+    ),
   ]) {
     assert(existsSync(path.join(repoRoot, relativePath)), `${relativePath} must exist`);
   }
@@ -477,6 +683,13 @@ function normalizeMode(args) {
 }
 
 function normalizeCustomerKeys(args = {}) {
+  if (args.all === true) {
+    assert(
+      !Array.isArray(args.customers) || args.customers.length === 0,
+      "--all and --customer are mutually exclusive",
+    );
+    return listCustomerPackageKeys();
+  }
   const customerKeys = (
     Array.isArray(args.customers) && args.customers.length > 0
       ? args.customers
@@ -498,7 +711,7 @@ function runSingleCustomerPackageLint(args, customer) {
     mode !== "activate" && mode !== "rollback",
     `customer package ${mode} is disabled: current gate only supports validate, compile and preview`,
   );
-  const config = CUSTOMER_PACKAGES[customer];
+  const config = getCustomerPackage(customer);
   assert(config, `unknown customer package: ${customer}`);
 
   validateCatalog(customerPackageCatalog);

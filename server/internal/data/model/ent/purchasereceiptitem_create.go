@@ -144,6 +144,34 @@ func (_c *PurchaseReceiptItemCreate) SetNillableSourceLineNo(v *string) *Purchas
 	return _c
 }
 
+// SetIdempotencyKey sets the "idempotency_key" field.
+func (_c *PurchaseReceiptItemCreate) SetIdempotencyKey(v string) *PurchaseReceiptItemCreate {
+	_c.mutation.SetIdempotencyKey(v)
+	return _c
+}
+
+// SetNillableIdempotencyKey sets the "idempotency_key" field if the given value is not nil.
+func (_c *PurchaseReceiptItemCreate) SetNillableIdempotencyKey(v *string) *PurchaseReceiptItemCreate {
+	if v != nil {
+		_c.SetIdempotencyKey(*v)
+	}
+	return _c
+}
+
+// SetIdempotencyPayloadHash sets the "idempotency_payload_hash" field.
+func (_c *PurchaseReceiptItemCreate) SetIdempotencyPayloadHash(v string) *PurchaseReceiptItemCreate {
+	_c.mutation.SetIdempotencyPayloadHash(v)
+	return _c
+}
+
+// SetNillableIdempotencyPayloadHash sets the "idempotency_payload_hash" field if the given value is not nil.
+func (_c *PurchaseReceiptItemCreate) SetNillableIdempotencyPayloadHash(v *string) *PurchaseReceiptItemCreate {
+	if v != nil {
+		_c.SetIdempotencyPayloadHash(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *PurchaseReceiptItemCreate) SetNote(v string) *PurchaseReceiptItemCreate {
 	_c.mutation.SetNote(v)
@@ -386,6 +414,16 @@ func (_c *PurchaseReceiptItemCreate) check() error {
 			return &ValidationError{Name: "source_line_no", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.source_line_no": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.IdempotencyKey(); ok {
+		if err := purchasereceiptitem.IdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.IdempotencyPayloadHash(); ok {
+		if err := purchasereceiptitem.IdempotencyPayloadHashValidator(v); err != nil {
+			return &ValidationError{Name: "idempotency_payload_hash", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.idempotency_payload_hash": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := purchasereceiptitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "PurchaseReceiptItem.note": %w`, err)}
@@ -454,6 +492,14 @@ func (_c *PurchaseReceiptItemCreate) createSpec() (*PurchaseReceiptItem, *sqlgra
 	if value, ok := _c.mutation.SourceLineNo(); ok {
 		_spec.SetField(purchasereceiptitem.FieldSourceLineNo, field.TypeString, value)
 		_node.SourceLineNo = &value
+	}
+	if value, ok := _c.mutation.IdempotencyKey(); ok {
+		_spec.SetField(purchasereceiptitem.FieldIdempotencyKey, field.TypeString, value)
+		_node.IdempotencyKey = &value
+	}
+	if value, ok := _c.mutation.IdempotencyPayloadHash(); ok {
+		_spec.SetField(purchasereceiptitem.FieldIdempotencyPayloadHash, field.TypeString, value)
+		_node.IdempotencyPayloadHash = &value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(purchasereceiptitem.FieldNote, field.TypeString, value)

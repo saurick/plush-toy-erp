@@ -20,14 +20,14 @@ import {
 } from '../../web/src/erp/utils/contractPrintDraftCompleteness.mjs'
 import { buildMaterialPurchaseContractDraftFromPurchaseOrder } from '../../web/src/erp/utils/masterDataOrderView.mjs'
 
-const sourceManifest = JSON.parse(
-  readFileSync('docs/customers/yoyoosun/source-manifest.json', 'utf8')
-)
-
-const manifestSourceIds = new Set(
-  sourceManifest.sources.map((source) => source.sourceId)
-)
-const syntheticSourceIds = new Set(['__synthetic_yoyoosun_trial__'])
+const syntheticSourceId = '__synthetic_yoyoosun_trial__'
+const requiredSourceCategories = new Set([
+  'purchase_material_summary',
+  'outsourcing_summary',
+  'bom_workbook',
+  'contract_print_reference',
+  'workflow_ui_reference',
+])
 const forbiddenRuntimeFactCommitClaims =
   /自动过账|直接过账|直接写库存|直接写出货|直接写财务/
 
@@ -39,14 +39,12 @@ function assertNoPositiveRuntimeFactCommitClaim(text, context) {
   assert.doesNotMatch(normalizedText, forbiddenRuntimeFactCommitClaims, context)
 }
 
-function assertKnownSourceIds(sourceIds, context) {
-  assert.ok(Array.isArray(sourceIds) && sourceIds.length > 0, `${context} sourceIds required`)
-  for (const sourceId of sourceIds) {
-    assert.ok(
-      manifestSourceIds.has(sourceId) || syntheticSourceIds.has(sourceId),
-      `${context} references unknown sourceId ${sourceId}`
-    )
-  }
+function assertSyntheticSourceIds(sourceIds, context) {
+  assert.deepEqual(
+    sourceIds,
+    [syntheticSourceId],
+    `${context} must be marked as synthetic trial data only`
+  )
 }
 
 function buildYoyoosunPrintTemplateDefaults() {
@@ -297,19 +295,29 @@ function buildRuntimeBOMVersionFromFixture(bomVersion, lookups) {
   }
 }
 
-test('yoyoosun raw source form map covers every source manifest entry', () => {
-  assert.equal(yoyoosunRawSourceFormMap.customerKey, sourceManifest.customerKey)
-  const mapped = new Map(
-    yoyoosunRawSourceFormMap.entries.map((entry) => [entry.sourceId, entry])
-  )
+test('yoyoosun product config maps private sources by category only', () => {
+  assert.equal(yoyoosunRawSourceFormMap.customerKey, 'yoyoosun')
+  assert.equal(yoyoosunRawSourceFormMap.status, 'source_category_mapping_only')
+  assert.equal(yoyoosunRawSourceFormMap.privateValidation.status, 'external_required')
+  assert.equal(yoyoosunRawSourceFormMap.privateValidation.bundledInProductRepository, false)
+  assert.equal(yoyoosunRawSourceFormMap.privateValidation.productQaRequiresPrivateManifest, false)
 
-  for (const source of sourceManifest.sources) {
-    const mapping = mapped.get(source.sourceId)
-    assert.ok(mapping, `${source.sourceId} must have form mapping`)
-    assert.ok(mapping.targetForms.length > 0, `${source.sourceId} targetForms required`)
-    assert.ok(mapping.targetEntities.length > 0, `${source.sourceId} targetEntities required`)
-    assert.ok(mapping.fieldCoverage.length > 0, `${source.sourceId} fieldCoverage required`)
-    assert.match(mapping.boundary, /不|不能|只|dry-run|人工|候选/)
+  const categories = new Set(
+    yoyoosunRawSourceFormMap.entries.map((entry) => entry.categoryKey)
+  )
+  assert.deepEqual(categories, requiredSourceCategories)
+
+  for (const entry of yoyoosunRawSourceFormMap.entries) {
+    assert.ok(entry.categoryKey, 'categoryKey required')
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(entry, 'sourceId'),
+      false,
+      `${entry.categoryKey} must not retain private sourceId`
+    )
+    assert.ok(entry.targetForms.length > 0, `${entry.categoryKey} targetForms required`)
+    assert.ok(entry.targetEntities.length > 0, `${entry.categoryKey} targetEntities required`)
+    assert.ok(entry.fieldCoverage.length > 0, `${entry.categoryKey} fieldCoverage required`)
+    assert.match(entry.boundary, /不|不能|不得|只|人工|候选/)
   }
 })
 
@@ -321,16 +329,20 @@ test('yoyoosun raw source form map does not target runtime fact tables directly'
     'finance_facts.posted',
     'workflow_done_to_fact_posted',
     'business_records',
+    'purchase_receipts',
+    'quality_inspections',
+    'outsourcing_facts',
+    'inventory_lots',
   ])
 
   for (const entry of yoyoosunRawSourceFormMap.entries) {
     assert.notEqual(entry.status, 'runtime_enabled')
     for (const target of entry.targetEntities) {
-      assert.ok(!forbiddenTargets.has(target), `${entry.sourceId} targets forbidden runtime table ${target}`)
+      assert.ok(!forbiddenTargets.has(target), `${entry.categoryKey} targets forbidden runtime table ${target}`)
     }
     assertNoPositiveRuntimeFactCommitClaim(
       entry.boundary,
-      `${entry.sourceId} boundary must not promise runtime fact commits`
+      `${entry.categoryKey} boundary must not promise runtime fact commits`
     )
   }
 })
@@ -609,7 +621,7 @@ test('yoyoosun trial fixture covers core and customer flow domains', () => {
     const records = yoyoosunTrialDataFixture[collectionKey]
     assert.ok(Array.isArray(records) && records.length >= minCount, `${collectionKey} fixture should have at least ${minCount} records`)
     records.forEach((record, index) =>
-      assertKnownSourceIds(record.sourceIds, `${collectionKey}[${index}]`)
+      assertSyntheticSourceIds(record.sourceIds, `${collectionKey}[${index}]`)
     )
   }
 })
@@ -709,7 +721,7 @@ test('yoyoosun warehouse fixture uses typed master data and valid references', (
   assert.equal(
     warehouseByCode.get(
       yoyoosunTrialDataFixture.inventoryLots.find(
-        (lot) => lot.materialCode === 'MAT-26204-CARTON'
+        (lot) => lot.materialCode === 'SIM-MAT-CARTON-001'
       )?.warehouseCode
     )?.warehouseType,
     'OTHER'

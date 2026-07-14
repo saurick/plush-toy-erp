@@ -27,14 +27,14 @@ func (d *jsonrpcDispatcher) handlePurchase(
 	}
 
 	switch method {
-	case "create_purchase_receipt_draft", "createPurchaseReceiptDraft",
-		"create_purchase_receipt_with_items", "createPurchaseReceiptWithItems",
-		"create_purchase_receipt_from_purchase_order", "createPurchaseReceiptFromPurchaseOrder",
-		"add_purchase_receipt_item", "addPurchaseReceiptItem",
-		"post_purchase_receipt", "postPurchaseReceipt",
-		"cancel_purchase_receipt", "cancelPurchaseReceipt",
-		"get_purchase_receipt", "getPurchaseReceipt",
-		"list_purchase_receipts", "listPurchaseReceipts":
+	case "create_purchase_receipt_draft",
+		"create_purchase_receipt_with_items",
+		"create_purchase_receipt_from_purchase_order",
+		"add_purchase_receipt_item",
+		"post_purchase_receipt",
+		"cancel_purchase_receipt",
+		"get_purchase_receipt",
+		"list_purchase_receipts":
 		return d.handlePurchaseReceipt(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownPurchaseResult(method), nil

@@ -84,6 +84,20 @@ func (_u *RoleUpdate) SetNillableBuiltin(v *bool) *RoleUpdate {
 	return _u
 }
 
+// SetRoleType sets the "role_type" field.
+func (_u *RoleUpdate) SetRoleType(v role.RoleType) *RoleUpdate {
+	_u.mutation.SetRoleType(v)
+	return _u
+}
+
+// SetNillableRoleType sets the "role_type" field if the given value is not nil.
+func (_u *RoleUpdate) SetNillableRoleType(v *role.RoleType) *RoleUpdate {
+	if v != nil {
+		_u.SetRoleType(*v)
+	}
+	return _u
+}
+
 // SetDisabled sets the "disabled" field.
 func (_u *RoleUpdate) SetDisabled(v bool) *RoleUpdate {
 	_u.mutation.SetDisabled(v)
@@ -116,6 +130,27 @@ func (_u *RoleUpdate) SetNillableSortOrder(v *int) *RoleUpdate {
 // AddSortOrder adds value to the "sort_order" field.
 func (_u *RoleUpdate) AddSortOrder(v int) *RoleUpdate {
 	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
+// SetVersion sets the "version" field.
+func (_u *RoleUpdate) SetVersion(v int) *RoleUpdate {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *RoleUpdate) SetNillableVersion(v *int) *RoleUpdate {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *RoleUpdate) AddVersion(v int) *RoleUpdate {
+	_u.mutation.AddVersion(v)
 	return _u
 }
 
@@ -183,6 +218,16 @@ func (_u *RoleUpdate) check() error {
 			return &ValidationError{Name: "description", err: fmt.Errorf(`ent: validator failed for field "Role.description": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RoleType(); ok {
+		if err := role.RoleTypeValidator(v); err != nil {
+			return &ValidationError{Name: "role_type", err: fmt.Errorf(`ent: validator failed for field "Role.role_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := role.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Role.version": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -210,6 +255,9 @@ func (_u *RoleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if value, ok := _u.mutation.Builtin(); ok {
 		_spec.SetField(role.FieldBuiltin, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.RoleType(); ok {
+		_spec.SetField(role.FieldRoleType, field.TypeEnum, value)
+	}
 	if value, ok := _u.mutation.Disabled(); ok {
 		_spec.SetField(role.FieldDisabled, field.TypeBool, value)
 	}
@@ -218,6 +266,12 @@ func (_u *RoleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedSortOrder(); ok {
 		_spec.AddField(role.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(role.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(role.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(role.FieldUpdatedAt, field.TypeTime, value)
@@ -298,6 +352,20 @@ func (_u *RoleUpdateOne) SetNillableBuiltin(v *bool) *RoleUpdateOne {
 	return _u
 }
 
+// SetRoleType sets the "role_type" field.
+func (_u *RoleUpdateOne) SetRoleType(v role.RoleType) *RoleUpdateOne {
+	_u.mutation.SetRoleType(v)
+	return _u
+}
+
+// SetNillableRoleType sets the "role_type" field if the given value is not nil.
+func (_u *RoleUpdateOne) SetNillableRoleType(v *role.RoleType) *RoleUpdateOne {
+	if v != nil {
+		_u.SetRoleType(*v)
+	}
+	return _u
+}
+
 // SetDisabled sets the "disabled" field.
 func (_u *RoleUpdateOne) SetDisabled(v bool) *RoleUpdateOne {
 	_u.mutation.SetDisabled(v)
@@ -330,6 +398,27 @@ func (_u *RoleUpdateOne) SetNillableSortOrder(v *int) *RoleUpdateOne {
 // AddSortOrder adds value to the "sort_order" field.
 func (_u *RoleUpdateOne) AddSortOrder(v int) *RoleUpdateOne {
 	_u.mutation.AddSortOrder(v)
+	return _u
+}
+
+// SetVersion sets the "version" field.
+func (_u *RoleUpdateOne) SetVersion(v int) *RoleUpdateOne {
+	_u.mutation.ResetVersion()
+	_u.mutation.SetVersion(v)
+	return _u
+}
+
+// SetNillableVersion sets the "version" field if the given value is not nil.
+func (_u *RoleUpdateOne) SetNillableVersion(v *int) *RoleUpdateOne {
+	if v != nil {
+		_u.SetVersion(*v)
+	}
+	return _u
+}
+
+// AddVersion adds value to the "version" field.
+func (_u *RoleUpdateOne) AddVersion(v int) *RoleUpdateOne {
+	_u.mutation.AddVersion(v)
 	return _u
 }
 
@@ -410,6 +499,16 @@ func (_u *RoleUpdateOne) check() error {
 			return &ValidationError{Name: "description", err: fmt.Errorf(`ent: validator failed for field "Role.description": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.RoleType(); ok {
+		if err := role.RoleTypeValidator(v); err != nil {
+			return &ValidationError{Name: "role_type", err: fmt.Errorf(`ent: validator failed for field "Role.role_type": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.Version(); ok {
+		if err := role.VersionValidator(v); err != nil {
+			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Role.version": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -454,6 +553,9 @@ func (_u *RoleUpdateOne) sqlSave(ctx context.Context) (_node *Role, err error) {
 	if value, ok := _u.mutation.Builtin(); ok {
 		_spec.SetField(role.FieldBuiltin, field.TypeBool, value)
 	}
+	if value, ok := _u.mutation.RoleType(); ok {
+		_spec.SetField(role.FieldRoleType, field.TypeEnum, value)
+	}
 	if value, ok := _u.mutation.Disabled(); ok {
 		_spec.SetField(role.FieldDisabled, field.TypeBool, value)
 	}
@@ -462,6 +564,12 @@ func (_u *RoleUpdateOne) sqlSave(ctx context.Context) (_node *Role, err error) {
 	}
 	if value, ok := _u.mutation.AddedSortOrder(); ok {
 		_spec.AddField(role.FieldSortOrder, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.Version(); ok {
+		_spec.SetField(role.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedVersion(); ok {
+		_spec.AddField(role.FieldVersion, field.TypeInt, value)
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(role.FieldUpdatedAt, field.TypeTime, value)

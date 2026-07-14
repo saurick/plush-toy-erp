@@ -1304,6 +1304,8 @@ WHERE conrelid = $1::regclass AND conname = $2 AND contype = 'c'`,
 	normalizedExpression := strings.NewReplacer("(", "", ")", "", "\"", "").Replace(strings.ToUpper(expression))
 	normalizedDef = strings.ReplaceAll(normalizedDef, "::NUMERIC", "")
 	normalizedExpression = strings.ReplaceAll(normalizedExpression, "::NUMERIC", "")
+	normalizedDef = strings.ReplaceAll(normalizedDef, "::TEXT", "")
+	normalizedExpression = strings.ReplaceAll(normalizedExpression, "::TEXT", "")
 	if !strings.Contains(normalizedDef, normalizedExpression) {
 		t.Fatalf("expected postgres check %s.%s expression %q, got %s", table, constraintName, expression, constraintDef)
 	}

@@ -4,14 +4,24 @@ const TASK_BOARD_LANE_KEYS = Object.freeze([
   'due',
   'finished',
 ])
-const UNSETTLED_TASK_STATUS_KEYS = new Set([
-  'pending',
+const UNSETTLED_TASK_STATUS_KEYS = new Set(['ready', 'blocked'])
+const ACTIVE_TASK_STATUS_KEYS = new Set(['ready'])
+const FINISHED_TASK_STATUS_KEYS = new Set(['done', 'rejected'])
+const TASK_BOARD_STATUS_FILTER_KEYS = new Set([
+  'all',
   'ready',
-  'processing',
   'blocked',
+  'rejected',
+  'done',
+  'overdue',
+  'dueSoon',
 ])
-const ACTIVE_TASK_STATUS_KEYS = new Set(['pending', 'ready', 'processing'])
-const FINISHED_TASK_STATUS_KEYS = new Set(['done', 'closed', 'cancelled'])
+const TASK_BOARD_DUE_FILTER_KEYS = new Set([
+  'all',
+  'overdue',
+  'dueSoon',
+  'noDue',
+])
 const DUE_SOON_SECONDS = 24 * 60 * 60
 
 function normalizeText(value) {
@@ -96,34 +106,28 @@ function matchesKeyword(task = {}, keyword = '') {
 }
 
 function matchesStatus(task, status, snapshotAt) {
-  const normalizedStatus = normalizeText(status) || 'all'
   const statusKey = taskStatus(task)
-  if (normalizedStatus === 'all') return true
-  if (normalizedStatus === 'pending') {
-    return ['pending', 'ready'].includes(statusKey)
-  }
-  if (normalizedStatus === 'overdue') {
+  if (status === 'all') return true
+  if (status === 'overdue') {
     return isTaskOverdue(task, snapshotAt)
   }
-  if (normalizedStatus === 'dueSoon') {
+  if (status === 'dueSoon') {
     return isTaskDueSoon(task, snapshotAt)
   }
-  return statusKey === normalizedStatus
+  return statusKey === status
 }
 
 function matchesDue(task, due, snapshotAt) {
-  const normalizedDue = normalizeText(due) || 'all'
-  if (normalizedDue === 'all') return true
-  if (normalizedDue === 'overdue') return isTaskOverdue(task, snapshotAt)
-  if (normalizedDue === 'dueSoon') return isTaskDueSoon(task, snapshotAt)
-  if (normalizedDue === 'noDue') return taskDueAt(task) === null
-  return false
+  if (due === 'all') return true
+  if (due === 'overdue') return isTaskOverdue(task, snapshotAt)
+  if (due === 'dueSoon') return isTaskDueSoon(task, snapshotAt)
+  return due === 'noDue' && taskDueAt(task) === null
 }
 
 export function classifyWorkflowTaskBoardMockLane(task, snapshotAtValue) {
   const snapshotAt = normalizeSnapshotAt(snapshotAtValue)
   const statusKey = taskStatus(task)
-  if (['blocked', 'rejected'].includes(statusKey)) return 'exception'
+  if (statusKey === 'blocked') return 'exception'
   if (FINISHED_TASK_STATUS_KEYS.has(statusKey)) return 'finished'
   if (ACTIVE_TASK_STATUS_KEYS.has(statusKey)) {
     const dueAt = taskDueAt(task)
@@ -149,6 +153,14 @@ export function buildWorkflowTaskBoardMock({
   snapshotAt,
 } = {}) {
   const normalizedSnapshotAt = normalizeSnapshotAt(snapshotAt)
+  const status = normalizeText(params.status) || 'all'
+  const due = normalizeText(params.due) || 'all'
+  if (!TASK_BOARD_STATUS_FILTER_KEYS.has(status)) {
+    throw new TypeError(`unsupported workflow task board status: ${status}`)
+  }
+  if (!TASK_BOARD_DUE_FILTER_KEYS.has(due)) {
+    throw new TypeError(`unsupported workflow task board due filter: ${due}`)
+  }
   const ownerRoleKey = normalizeText(params.owner_role_key)
   const visibleTasks = (Array.isArray(tasks) ? tasks : []).filter(
     (task) =>
@@ -166,8 +178,8 @@ export function buildWorkflowTaskBoardMock({
     .filter(
       (task) =>
         matchesKeyword(task, params.keyword) &&
-        matchesStatus(task, params.status, normalizedSnapshotAt) &&
-        matchesDue(task, params.due, normalizedSnapshotAt) &&
+        matchesStatus(task, status, normalizedSnapshotAt) &&
+        matchesDue(task, due, normalizedSnapshotAt) &&
         (!sourceType || normalizeText(task.source_type) === sourceType)
     )
     .sort(compareTaskIDDescending)

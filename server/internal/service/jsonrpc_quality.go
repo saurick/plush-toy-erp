@@ -30,7 +30,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 	}
 
 	switch method {
-	case "create_quality_inspection_draft", "createQualityInspectionDraft":
+	case "create_quality_inspection_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
 			return id, res, nil
 		}
@@ -40,7 +40,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		}
 		item, err := d.inventoryUC.CreateQualityInspectionDraft(ctx, in)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
-	case "create_finished_goods_quality_inspection_draft", "createFinishedGoodsQualityInspectionDraft":
+	case "create_finished_goods_quality_inspection_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
 			return id, res, nil
 		}
@@ -50,7 +50,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		}
 		item, err := d.inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, in)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
-	case "submit_quality_inspection", "submitQualityInspection":
+	case "submit_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
@@ -59,7 +59,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		}
 		item, err := d.inventoryUC.SubmitQualityInspection(ctx, getInt(pm, "id", 0))
 		return id, qualityInspectionResult(ctx, d, item, err), nil
-	case "pass_quality_inspection", "passQualityInspection":
+	case "pass_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
@@ -72,7 +72,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		}
 		item, err := d.inventoryUC.PassQualityInspection(ctx, in)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
-	case "reject_quality_inspection", "rejectQualityInspection":
+	case "reject_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
@@ -85,7 +85,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 		}
 		item, err := d.inventoryUC.RejectQualityInspection(ctx, in)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
-	case "cancel_quality_inspection", "cancelQualityInspection":
+	case "cancel_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionUpdate); res != nil {
 			return id, res, nil
 		}
@@ -94,13 +94,13 @@ func (d *jsonrpcDispatcher) handleQuality(
 		}
 		item, err := d.inventoryUC.CancelQualityInspection(ctx, getInt(pm, "id", 0), getWorkflowStringPtr(pm, "decision_note"))
 		return id, qualityInspectionResult(ctx, d, item, err), nil
-	case "get_quality_inspection", "getQualityInspection":
+	case "get_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.GetQualityInspection(ctx, getInt(pm, "id", 0))
 		return id, qualityInspectionResult(ctx, d, item, err), nil
-	case "list_quality_inspections", "listQualityInspections":
+	case "list_quality_inspections":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
 		}
@@ -118,7 +118,7 @@ func (d *jsonrpcDispatcher) handleQuality(
 			"limit":               normalizedLimit(pm),
 			"offset":              normalizedOffset(pm),
 		}), nil
-	case "list_finished_goods_quality_inspections", "listFinishedGoodsQualityInspections":
+	case "list_finished_goods_quality_inspections":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
 		}

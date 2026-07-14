@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_product", "createProduct":
+	case "create_product":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductCreate); res != nil {
 			return id, res, nil
 		}
@@ -23,7 +23,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		}
 		item, err := d.masterDataUC.CreateProduct(ctx, productMutationFromParams(pm))
 		return id, productMutationResult(ctx, d, item, err), nil
-	case "update_product", "updateProduct":
+	case "update_product":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductUpdate); res != nil {
 			return id, res, nil
 		}
@@ -32,13 +32,13 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		}
 		item, err := d.masterDataUC.UpdateProduct(ctx, getInt(pm, "id", 0), productMutationFromParams(pm))
 		return id, productMutationResult(ctx, d, item, err), nil
-	case "get_product", "getProduct":
+	case "get_product":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductRead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.GetProduct(ctx, getInt(pm, "id", 0))
 		return id, productMutationResult(ctx, d, item, err), nil
-	case "list_products", "listProducts":
+	case "list_products":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductRead); res != nil {
 			return id, res, nil
 		}
@@ -52,7 +52,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 			"limit":    normalizedLimit(pm),
 			"offset":   normalizedOffset(pm),
 		})}, nil
-	case "set_product_active", "setProductActive":
+	case "set_product_active":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductDisable); res != nil {
 			return id, res, nil
 		}
@@ -61,7 +61,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		}
 		item, err := d.masterDataUC.SetProductActive(ctx, getInt(pm, "id", 0), getBool(pm, "active", true))
 		return id, productMutationResult(ctx, d, item, err), nil
-	case "create_product_sku", "createProductSKU":
+	case "create_product_sku":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUCreate); res != nil {
 			return id, res, nil
 		}
@@ -70,7 +70,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		}
 		item, err := d.masterDataUC.CreateProductSKU(ctx, productSKUMutationFromParams(pm))
 		return id, productSKUMutationResult(ctx, d, item, err), nil
-	case "update_product_sku", "updateProductSKU":
+	case "update_product_sku":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUUpdate); res != nil {
 			return id, res, nil
 		}
@@ -79,13 +79,13 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		}
 		item, err := d.masterDataUC.UpdateProductSKU(ctx, getInt(pm, "id", 0), productSKUMutationFromParams(pm))
 		return id, productSKUMutationResult(ctx, d, item, err), nil
-	case "get_product_sku", "getProductSKU":
+	case "get_product_sku":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKURead); res != nil {
 			return id, res, nil
 		}
 		item, err := d.masterDataUC.GetProductSKU(ctx, getInt(pm, "id", 0))
 		return id, productSKUMutationResult(ctx, d, item, err), nil
-	case "list_product_skus", "listProductSKUs":
+	case "list_product_skus":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKURead); res != nil {
 			return id, res, nil
 		}
@@ -99,7 +99,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 			"limit":        normalizedLimit(pm),
 			"offset":       normalizedOffset(pm),
 		})}, nil
-	case "set_product_sku_active", "setProductSKUActive":
+	case "set_product_sku_active":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUDisable); res != nil {
 			return id, res, nil
 		}

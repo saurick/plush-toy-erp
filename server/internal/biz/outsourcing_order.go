@@ -29,6 +29,7 @@ const (
 var (
 	ErrOutsourcingOrderNotFound     = errors.New("outsourcing order not found")
 	ErrOutsourcingOrderItemNotFound = errors.New("outsourcing order item not found")
+	ErrOutsourcingOrderConflict     = errors.New("outsourcing order version conflict")
 	ErrProcessInactive              = errors.New("process inactive")
 	ErrProcessNotOutsourcingEnabled = errors.New("process is not outsourcing enabled")
 )
@@ -44,6 +45,7 @@ type OutsourcingOrder struct {
 	OrderDate             time.Time
 	ExpectedReturnDate    *time.Time
 	LifecycleStatus       string
+	Version               int
 	Note                  *string
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
@@ -77,6 +79,7 @@ type OutsourcingOrderItem struct {
 }
 
 type OutsourcingOrderMutation struct {
+	ExpectedVersion       int
 	OutsourcingOrderNo    string
 	SupplierID            int
 	SupplierSnapshot      map[string]any
@@ -187,6 +190,9 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 		return nil, ErrBadParam
 	}
 	if id > 0 {
+		if order.ExpectedVersion <= 0 {
+			return nil, ErrBadParam
+		}
 		current, err := uc.repo.GetOutsourcingOrder(ctx, id)
 		if err != nil {
 			return nil, err
@@ -194,6 +200,9 @@ func (uc *OutsourcingOrderUsecase) SaveOutsourcingOrderWithItems(ctx context.Con
 		if !isOutsourcingOrderEditable(current.LifecycleStatus) {
 			return nil, ErrBadParam
 		}
+	}
+	if id == 0 {
+		order.ExpectedVersion = 0
 	}
 	normalizedOrder, err := normalizeOutsourcingOrderMutation(*order)
 	if err != nil {

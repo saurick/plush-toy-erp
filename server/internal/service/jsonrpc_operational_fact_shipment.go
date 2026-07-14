@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_shipment_with_items", "createShipmentWithItems":
+	case "create_shipment_with_items":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
 		}
@@ -27,7 +27,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		}
 		item, err := d.operationalFactUC.CreateShipmentDraftWithItems(ctx, in)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
-	case "ship_shipment", "shipShipment":
+	case "ship_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
 			return id, res, nil
 		}
@@ -36,7 +36,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		}
 		item, err := d.operationalFactUC.ShipShipment(ctx, getInt(pm, "id", 0))
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
-	case "cancel_shipment", "cancelShipment":
+	case "cancel_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCancel); res != nil {
 			return id, res, nil
 		}
@@ -45,7 +45,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		}
 		item, err := d.operationalFactUC.CancelShippedShipmentWithActor(ctx, getInt(pm, "id", 0), actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
-	case "list_shipments", "listShipments":
+	case "list_shipments":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
 			return id, res, nil
 		}

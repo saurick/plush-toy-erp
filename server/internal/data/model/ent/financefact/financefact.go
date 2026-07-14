@@ -62,8 +62,6 @@ const (
 	FieldCancelledBy = "cancelled_by"
 	// FieldCancelReason holds the string denoting the cancel_reason field in the database.
 	FieldCancelReason = "cancel_reason"
-	// FieldCancelAuditVersion holds the string denoting the cancel_audit_version field in the database.
-	FieldCancelAuditVersion = "cancel_audit_version"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -109,7 +107,6 @@ var Columns = []string{
 	FieldCancelledAt,
 	FieldCancelledBy,
 	FieldCancelReason,
-	FieldCancelAuditVersion,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -174,8 +171,6 @@ var (
 	CancelledByValidator func(int) error
 	// CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	CancelReasonValidator func(string) error
-	// DefaultCancelAuditVersion holds the default value on creation for the "cancel_audit_version" field.
-	DefaultCancelAuditVersion int
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -307,11 +302,6 @@ func ByCancelledBy(opts ...sql.OrderTermOption) OrderOption {
 // ByCancelReason orders the results by the cancel_reason field.
 func ByCancelReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCancelReason, opts...).ToFunc()
-}
-
-// ByCancelAuditVersion orders the results by the cancel_audit_version field.
-func ByCancelAuditVersion(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldCancelAuditVersion, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

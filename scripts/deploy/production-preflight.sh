@@ -329,6 +329,17 @@ if [[ "$runtime_check" -eq 1 ]]; then
   [[ "$runtime_pdf_warmup" == "async" ]] || fail "app-server 运行态 ERP_PDF_WARMUP 必须为 async：runtime=${runtime_pdf_warmup:-missing}"
   ok "运行态 ERP_PDF_WARMUP=async"
 
+  runtime_app_user="$(docker inspect --format '{{.Config.User}}' "$app_cid" 2>/dev/null || true)"
+  runtime_app_user="$(trim "$runtime_app_user")"
+  [[ -n "$runtime_app_user" ]] || fail "app-server 运行态未声明非 root 用户"
+  if [[ "$runtime_app_user" == "0" || "$runtime_app_user" == 0:* || "$runtime_app_user" == "root" || "$runtime_app_user" == root:* ]]; then
+    fail "app-server 运行态禁止使用 root: runtime_user=$runtime_app_user"
+  fi
+  runtime_app_uid="$(docker exec "$app_cid" id -u 2>/dev/null || true)"
+  runtime_app_uid="$(trim "$runtime_app_uid")"
+  [[ "$runtime_app_uid" =~ ^[1-9][0-9]*$ ]] || fail "app-server 运行态 uid 必须是非 root 数字：runtime_uid=${runtime_app_uid:-missing}"
+  ok "运行态 app-server 使用非 root 用户: $runtime_app_user (uid=$runtime_app_uid)"
+
   chromium_dockerfile="$root_dir/server/Dockerfile"
   [[ -f "$chromium_dockerfile" ]] || fail "缺少 Chromium 版本真源: $chromium_dockerfile"
   expected_chromium_version="$(sed -nE 's/^ARG CHROMIUM_VERSION=([^[:space:]]+)$/\1/p' "$chromium_dockerfile" | head -n1)"

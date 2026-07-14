@@ -13,13 +13,13 @@ func (d *jsonrpcDispatcher) handleOutsourcingOrderLifecycle(
 	pm map[string]any,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "submit_outsourcing_order", "submitOutsourcingOrder":
+	case "submit_outsourcing_order":
 		return d.handleOutsourcingOrderLifecycleAction(ctx, id, pm, biz.PermissionOutsourcingOrderUpdate, d.outsourcingOrderUC.SubmitOutsourcingOrder)
-	case "confirm_outsourcing_order", "confirmOutsourcingOrder":
+	case "confirm_outsourcing_order":
 		return d.handleOutsourcingOrderLifecycleAction(ctx, id, pm, biz.PermissionOutsourcingOrderConfirm, d.outsourcingOrderUC.ConfirmOutsourcingOrder)
-	case "close_outsourcing_order", "closeOutsourcingOrder":
+	case "close_outsourcing_order":
 		return d.handleOutsourcingOrderLifecycleAction(ctx, id, pm, biz.PermissionOutsourcingOrderUpdate, d.outsourcingOrderUC.CloseOutsourcingOrder)
-	case "cancel_outsourcing_order", "cancelOutsourcingOrder":
+	case "cancel_outsourcing_order":
 		return d.handleOutsourcingOrderLifecycleAction(ctx, id, pm, biz.PermissionOutsourcingOrderUpdate, d.outsourcingOrderUC.CancelOutsourcingOrder)
 	default:
 		return id, unknownOutsourcingOrderResult(method), nil

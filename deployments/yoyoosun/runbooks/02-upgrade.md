@@ -24,16 +24,55 @@ sh migrate_online.sh --status-only
 1. `docker load` 新镜像。
 2. 更新受控 `.env` 中 `APP_IMAGE` 和 `WEB_IMAGE`。
 3. 再次执行 `verify-env.sh`。
-4. 执行 migration status；如有 pending，确认备份 evidence 后执行 apply。
-5. 重启服务：
+4. 进入已通知客户的停写维护窗口，停止旧后端和 Web；PostgreSQL、备份和 tracing 服务保持运行：
+
+```bash
+docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env stop app-server web-desktop
+```
+
+5. 再次确认 `docker compose ps app-server` 没有运行中的容器。执行 migration status；如有 pending，确认备份 evidence 后显式确认维护窗口并执行 apply：
+
+```bash
+MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
+```
+
+`migrate_online.sh` 会再次检查 `app-server` 已停止；旧服务仍运行或没有维护确认时必须 fail closed。
+
+6. 只启动新版本后端，等待 `/healthz`、`/readyz` 通过：
+
+```bash
+docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d app-server
+```
+
+7. 本 release 的 Customer Config hash cutover 会清空未发布系统中的旧 revision 与五类 compiled projection。开放 Web 前，必须在受信发布工作站用已审查 manifest 执行 `validate -> publish -> activate -> get_effective_session`，并让 readiness 同时核对执行报告和目标 smoke：
+
+```bash
+CUSTOMER_CONFIG_CONFIRM=ACTIVATE_YOYOOSUN_CONFIG \
+CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' \
+node scripts/deploy/customer-config-release-execute.mjs \
+  --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
+  --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
+  --out output/customers/yoyoosun/customer-config-release \
+  --backend-url https://<target-backend> --execute --activate
+
+node scripts/deploy/customer-config-release-readiness.mjs \
+  --manifest output/customers/yoyoosun/customer-config-runtime-manifest.json \
+  --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD> \
+  --release-report output/customers/yoyoosun/customer-config-release/customer-config-release-report.json \
+  --require-executed --require-activated
+```
+
+执行报告必须证明 active revision 与 manifest identity 一致，`get_effective_session` 的 source 为 `active_customer_config_revision`，且页面投影非空；任一项失败都不得开放业务。
+
+8. Customer Config 读回通过后启动 Web 和其余服务：
 
 ```bash
 docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remove-orphans
 ```
 
-6. 执行 smoke 和日志检查。
-7. 写入 upgrade evidence。
-8. 客户试用或交付前执行 release evidence gate：
+9. 执行 smoke 和日志检查。
+10. 写入 upgrade evidence。
+11. 客户试用或交付前执行 release evidence gate：
 
 ```bash
 node scripts/deploy/release-evidence-gate.mjs \
@@ -43,9 +82,11 @@ node scripts/deploy/release-evidence-gate.mjs \
 
 ## 失败处理
 
-- 业务镜像启动失败：优先回滚镜像 tag，不动数据库。
+- migration 尚未 apply 时业务镜像启动失败：可恢复上一版镜像 tag；先确认数据库 migration version 未变化。
+- migration 已 apply 后旧镜像不再兼容：禁止只回滚镜像。保持停写，按 `03-rollback.md` 恢复升级前数据库备份并同时恢复旧镜像，或执行已评审的 forward-fix。
 - migration apply 失败：停止业务写入，保留日志摘要，按 `03-rollback.md` 判断恢复备份或 forward-fix。
-- smoke 失败但健康检查通过：保留服务，暂停客户使用确认，定位具体页面 / API。
+- Customer Config publish / activate / effective-session 读回失败：保持 Web 停止，恢复数据库备份或 forward-fix，不得用默认配置冒充已激活客户配置。
+- smoke 失败但健康检查通过：保持客户入口关闭，定位具体页面 / API。
 - 配置错误：恢复上一版受控 `.env`，重新 `up -d`。
 
 ## 验收

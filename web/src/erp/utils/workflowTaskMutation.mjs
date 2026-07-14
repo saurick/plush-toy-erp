@@ -1,32 +1,17 @@
-const WORKFLOW_TASK_INTENT_IGNORED_TOP_LEVEL_KEYS = new Set([
-  'blocked_reason',
-  'desktop_task_board_action',
-  'entry',
+const WORKFLOW_TASK_ACTION_PAYLOAD_KEYS = new Set([
   'entry_path',
-  'mobile_action_key',
-  'mobile_action_recorded_at',
-  'mobile_action_role_key',
-  'mobile_role_key',
-  'outsourcing_order_page_action',
-  'purchase_order_page_action',
-  'rejected_reason',
-  'workflow_page_action',
-  'workflow_page_scope',
+  'evidence_refs',
+  'feedback',
+  'surface_key',
 ])
 
-const WORKFLOW_TASK_MOBILE_DUPLICATE_KEYS = new Set([
-  'action_key',
-  'action_label',
-  'reason',
-  'recorded_at',
-  'reported_at',
-  'role_key',
-])
+const WORKFLOW_TASK_INTENT_CONTEXT_KEYS = new Set(['entry_path', 'surface_key'])
 
 const WORKFLOW_TASK_MUTATION_OPERATIONS = new Set([
   'complete',
   'block',
   'reject',
+  'resume',
   'urge',
 ])
 
@@ -59,24 +44,6 @@ const WORKFLOW_TASK_URGE_MUTATION_KEYS = new Set([
   'task_id',
 ])
 
-const WORKFLOW_TASK_ACTION_PAYLOAD_SYSTEM_KEYS = new Set([
-  'business_status_key',
-  'command_key',
-  'domain_command',
-  'domain_command_key',
-  'expected_version',
-  'idempotency_key',
-  'intent_hash',
-  'owner_role_key',
-  'source_id',
-  'source_line_id',
-  'source_no',
-  'source_type',
-  'task_status_key',
-  'task_version',
-  'version',
-])
-
 const WORKFLOW_TASK_MUTATION_INVALID_MESSAGE = '页面已更新，请刷新后重新操作'
 const WORKFLOW_TASK_IDEMPOTENCY_KEY_MAX_LENGTH = 128
 
@@ -92,15 +59,40 @@ function plainObject(value) {
   return Boolean(value && typeof value === 'object' && !Array.isArray(value))
 }
 
-function requireWorkflowTaskActionPayload(value) {
+function requireWorkflowTaskActionPayload(operation, value) {
   if (value === undefined || value === null) return {}
   if (!plainObject(value)) throw workflowTaskMutationInvalid()
   for (const key of Object.keys(value)) {
-    if (WORKFLOW_TASK_ACTION_PAYLOAD_SYSTEM_KEYS.has(key.trim())) {
+    if (!WORKFLOW_TASK_ACTION_PAYLOAD_KEYS.has(key)) {
       throw workflowTaskMutationInvalid()
     }
   }
-  return value
+  if (operation !== 'complete' && Object.hasOwn(value, 'feedback')) {
+    throw workflowTaskMutationInvalid()
+  }
+
+  const normalized = {}
+  for (const key of ['feedback', 'surface_key', 'entry_path']) {
+    if (!Object.hasOwn(value, key)) continue
+    if (typeof value[key] !== 'string') throw workflowTaskMutationInvalid()
+    const text = value[key].trim()
+    if (text) normalized[key] = text
+  }
+  if (Object.hasOwn(value, 'evidence_refs')) {
+    if (
+      !Array.isArray(value.evidence_refs) ||
+      !value.evidence_refs.every((item) => typeof item === 'string')
+    ) {
+      throw workflowTaskMutationInvalid()
+    }
+    const evidenceRefs = [
+      ...new Set(
+        value.evidence_refs.map((item) => item.trim()).filter(Boolean)
+      ),
+    ].sort()
+    if (evidenceRefs.length) normalized.evidence_refs = evidenceRefs
+  }
+  return normalized
 }
 
 export function requireWorkflowTaskIdempotencyKey(value) {
@@ -138,7 +130,10 @@ export function requireWorkflowTaskMutationParams(
     ...params,
     task_id: params.task_id,
     expected_version: params.expected_version,
-    payload: requireWorkflowTaskActionPayload(params.payload),
+    payload: requireWorkflowTaskActionPayload(
+      normalizedOperation,
+      params.payload
+    ),
   }
   if (normalizedOperation === 'urge') {
     if (Object.hasOwn(params, 'action_key')) {
@@ -164,7 +159,7 @@ export function requireWorkflowTaskMutationParams(
   }
   normalized.reason = String(params.reason || '').trim()
   if (
-    ['block', 'reject', 'urge'].includes(normalizedOperation) &&
+    ['block', 'reject', 'resume', 'urge'].includes(normalizedOperation) &&
     !normalized.reason
   ) {
     throw workflowTaskMutationInvalid()
@@ -231,32 +226,11 @@ function stableValue(value) {
   )
 }
 
-function semanticPayload(value, parentKey = '') {
-  if (Array.isArray(value)) {
-    const items = value.map((item) => semanticPayload(item, parentKey))
-    if (
-      ['evidence_refs', 'mobile_action_evidence_refs'].includes(parentKey) &&
-      value.every((item) => typeof item === 'string')
-    ) {
-      return [
-        ...new Set(value.map((item) => item.trim()).filter(Boolean)),
-      ].sort()
-    }
-    return items
-  }
-  if (!value || typeof value !== 'object') return value
+function semanticPayload(value) {
   return Object.fromEntries(
-    Object.entries(value)
-      .filter(([key]) => {
-        if (!parentKey) {
-          return !WORKFLOW_TASK_INTENT_IGNORED_TOP_LEVEL_KEYS.has(key)
-        }
-        if (['mobile_action', 'mobile_exception_report'].includes(parentKey)) {
-          return !WORKFLOW_TASK_MOBILE_DUPLICATE_KEYS.has(key)
-        }
-        return true
-      })
-      .map(([key, item]) => [key, semanticPayload(item, key)])
+    Object.entries(value).filter(
+      ([key]) => !WORKFLOW_TASK_INTENT_CONTEXT_KEYS.has(key)
+    )
   )
 }
 

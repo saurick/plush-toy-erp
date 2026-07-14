@@ -41,6 +41,12 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
   setupJsonRpcMockServer()
 
   try {
+    const metadata = await workflowCall('metadata', {})
+    assert.deepEqual(
+      metadata.result.data.task_states.map((item) => item.key),
+      ['ready', 'blocked', 'done', 'rejected']
+    )
+
     const taskBoard = await workflowCall('get_task_board', {
       owner_role_key: 'sales',
       lane_key: 'actionable',
@@ -57,6 +63,42 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
         0
       ),
       taskBoard.result.data.total
+    )
+
+    const firstRoleTaskPage = await workflowCall('list_role_tasks', {
+      view_key: 'todo',
+      role_key: 'sales',
+      limit: 20,
+    })
+    assert.equal(firstRoleTaskPage.result.code, 0)
+    assert.equal(firstRoleTaskPage.result.data.items.length, 20)
+    assert.equal(firstRoleTaskPage.result.data.has_more, true)
+    assert(firstRoleTaskPage.result.data.next_cursor)
+    assert(
+      firstRoleTaskPage.result.data.items.every(
+        (task) =>
+          task.owner_role_key === 'sales' &&
+          ['ready', 'blocked'].includes(task.task_status_key)
+      )
+    )
+    const secondRoleTaskPage = await workflowCall('list_role_tasks', {
+      view_key: 'todo',
+      role_key: 'sales',
+      limit: 20,
+      cursor: firstRoleTaskPage.result.data.next_cursor,
+    })
+    assert.equal(secondRoleTaskPage.result.code, 0)
+    assert.equal(
+      secondRoleTaskPage.result.data.server_time,
+      firstRoleTaskPage.result.data.server_time
+    )
+    const firstPageIDs = new Set(
+      firstRoleTaskPage.result.data.items.map((task) => task.id)
+    )
+    assert(
+      secondRoleTaskPage.result.data.items.every(
+        (task) => !firstPageIDs.has(task.id)
+      )
     )
 
     const validCreateParams = {
@@ -178,7 +220,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     assert.equal(defaultStatusCreated.result.code, 0)
     assert.equal(
       defaultStatusCreated.result.data.task.task_status_key,
-      'pending'
+      'ready'
     )
 
     const completedTask = await createTask('MOCK-CAS-DONE')
@@ -252,6 +294,81 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     assert.notEqual(stale.result.code, 0)
     assert.match(stale.result.message, /刷新后重试/u)
 
+    const resumeTask = await createTask('MOCK-CAS-RESUME')
+    const blockedForResume = await workflowCall('block_task_action', {
+      task_id: resumeTask.id,
+      expected_version: resumeTask.version,
+      idempotency_key: 'mock-resume-precondition',
+      action_key: 'block',
+      reason: '等待客户补齐资料',
+    })
+    assert.equal(blockedForResume.result.code, 0)
+    assert.equal(blockedForResume.result.data.task.task_status_key, 'blocked')
+    assert.equal(
+      blockedForResume.result.data.task.business_status_key,
+      'blocked'
+    )
+    const blockedProjection = await workflowCall('list_business_states', {
+      source_type: resumeTask.source_type,
+      source_id: resumeTask.source_id,
+    })
+    assert.equal(blockedProjection.result.code, 0)
+    assert.equal(blockedProjection.result.data.total, 1)
+    const blockedBusinessState =
+      blockedProjection.result.data.business_states[0]
+    assert.equal(blockedBusinessState.business_status_key, 'blocked')
+    assert.equal(blockedBusinessState.blocked_reason, '等待客户补齐资料')
+    assert(Number.isSafeInteger(blockedBusinessState.status_changed_at))
+
+    const resumeParams = {
+      task_id: resumeTask.id,
+      expected_version: blockedForResume.result.data.task.version,
+      idempotency_key: 'mock-resume-task',
+      action_key: 'resume',
+      reason: '客户资料已经补齐',
+    }
+    const resumed = await workflowCall('resume_task_action', resumeParams)
+    assert.equal(resumed.result.code, 0)
+    assert.equal(resumed.result.data.task.task_status_key, 'ready')
+    assert.equal(resumed.result.data.task.blocked_reason, '')
+    assert.equal(resumed.result.data.task.business_status_key, 'blocked')
+    const resumedProjection = await workflowCall('list_business_states', {
+      source_type: resumeTask.source_type,
+      source_id: resumeTask.source_id,
+    })
+    assert.equal(resumedProjection.result.code, 0)
+    assert.equal(resumedProjection.result.data.total, 1)
+    const resumedBusinessState =
+      resumedProjection.result.data.business_states[0]
+    assert.equal(resumedBusinessState.business_status_key, 'blocked')
+    assert.equal(resumedBusinessState.blocked_reason, '等待客户补齐资料')
+    assert.equal(
+      resumedBusinessState.status_changed_at,
+      blockedBusinessState.status_changed_at
+    )
+
+    const resumedReplay = await workflowCall('resume_task_action', {
+      ...resumeParams,
+      expected_version: 999,
+    })
+    assert.equal(resumedReplay.result.code, 0)
+    assert.deepEqual(resumedReplay.result.data.task, resumed.result.data.task)
+
+    const changedResumeIntent = await workflowCall('resume_task_action', {
+      ...resumeParams,
+      reason: '另一个解除说明',
+    })
+    assert.equal(changedResumeIntent.result.code, 40920)
+
+    const newResumeIntentAfterReady = await workflowCall(
+      'resume_task_action',
+      {
+        ...resumeParams,
+        idempotency_key: 'mock-resume-new-intent',
+      }
+    )
+    assert.equal(newResumeIntentAfterReady.result.code, 40010)
+
     const rejectedTask = await createTask('MOCK-CAS-REJECTED')
     const rejected = await workflowCall('reject_task_action', {
       task_id: rejectedTask.id,
@@ -270,7 +387,6 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       idempotency_key: 'mock-reject-task',
       action_key: 'reject',
       reason: '资料不完整',
-      payload: { workflow_page_scope: 'another-ui-entry' },
     })
     assert.equal(rejectedRetry.result.code, 0)
     assert.equal(rejectedRetry.result.data.task.version, 2)
@@ -278,6 +394,19 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       rejectedRetry.result.data.task.payload.rejected_reason,
       '资料不完整'
     )
+
+    const rejectedRetryWithClientLifecyclePayload = await workflowCall(
+      'reject_task_action',
+      {
+        task_id: rejectedTask.id,
+        expected_version: 99,
+        idempotency_key: 'mock-reject-task',
+        action_key: 'reject',
+        reason: '资料不完整',
+        payload: { workflow_page_scope: 'another-ui-entry' },
+      }
+    )
+    assert.equal(rejectedRetryWithClientLifecyclePayload.result.code, 40010)
 
     const changedIntent = await workflowCall('reject_task_action', {
       task_id: rejectedTask.id,
@@ -305,8 +434,11 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     })
     assert.equal(urged.result.code, 0)
     assert.equal(urgedRetry.result.code, 0)
-    assert.equal(urged.result.data.task.payload.urge_count, 1)
-    assert.equal(urgedRetry.result.data.task.payload.urge_count, 1)
+    assert.equal(urged.result.data.task.urge_count, 1)
+    assert.equal(urgedRetry.result.data.task.urge_count, 1)
+    assert(Number.isSafeInteger(urged.result.data.task.last_urged_at))
+    assert.equal(urged.result.data.task.last_urged_by, 1)
+    assert.equal(urged.result.data.task.last_urged_by_role_key, 'sales')
     assert.equal(urgedRetry.result.data.task.version, 2)
 
     const missingKeyTask = await createTask('MOCK-MISSING-KEY')
@@ -396,7 +528,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     assert.equal(allActionsExplain.result.data.task_id, urgeStrictTask.id)
     assert.deepEqual(
       allActionsExplain.result.data.actions.map((item) => item.action_key),
-      ['complete', 'block', 'reject', 'urge']
+      ['complete', 'block', 'reject', 'resume', 'urge']
     )
     for (const invalidParams of [
       { id: urgeStrictTask.id, action_key: 'urge' },

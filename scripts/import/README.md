@@ -1,42 +1,67 @@
 # 导入准备脚本 / Import Preparation
 
-本目录只负责客户资料的来源登记、只读提取、快照冻结和 dry-run。当前仓库没有真实客户数据导入执行器，也不授权把模拟数据写成客户真实数据。
+本目录只负责通用客户来源 manifest 校验、只读提取、快照冻结和 dry-run。Product Core 不保存真实客户原件或私密 manifest；永绅原件与 manifest 已进入客户专属 Private 仓库，当前工作树已移除旧副本。仓库没有真实客户数据导入执行器。
 
 ## 主路径
 
 | 目的 | 脚本 | 边界 |
 | --- | --- | --- |
-| 来源清单校验 | `customerSourceManifestCheck.mjs` | 校验路径、hash、大小和未登记文件 |
-| 结构化提取 | `customerSourceExtract.mjs` | 只提取 manifest 允许的 Excel，PDF / 图片保留人工复核 |
-| 快照冻结 | `customerSourceSnapshotFreezeCheck.mjs` | 生成可复查的 freeze evidence |
-| 导入预演 | `customerImportDryRun.mjs` | 输出候选、重复、冲突、未决项和禁止自动导入项 |
+| 来源清单校验 | `customerSourceManifestCheck.mjs` | 显式读取外部 manifest 与 raw dir，校验 customer、相对路径、hash、大小、重复项和目录逃逸 |
+| 结构化提取 | `customerSourceExtract.mjs` | 只提取 manifest 允许的 Excel；PDF / 图片保留人工复核，不做 OCR |
+| 快照冻结 | `customerSourceSnapshotFreezeCheck.mjs` | 只读取 JSON snapshot，生成可复查的 freeze evidence |
+| 导入预演 | `customerImportDryRun.mjs` | 输出候选、重复、冲突、未决项和禁止自动导入项；`canExecuteRealImport=false` |
 
-这些脚本都不得连接后端或数据库，不写正式表，不生成 migration，不创建库存、出货、财务或 Workflow 事实。输出写入 ignored 的 `output/customers/<customer-key>/`；原始客户行、凭据和 DSN 不得进入仓库。
+这些脚本不得连接后端或数据库，不写正式表，不生成 migration，不创建库存、质检、出货、财务或 Workflow 事实。Product Core 普通测试只使用 `scripts/import/fixtures/synthetic/` 及其他明确标记为 synthetic / sanitized 的 fixture，不访问客户私有仓库。
+
+## 客户私有验证
+
+永绅客户明确使用专属 Private Git 仓库保存真实原件、私密 manifest 和验证入口。客户仓库与 Product Core 使用兄弟目录或 CI multi-checkout，不使用 submodule；Product Core 只提供客户无关的通用校验与提取工具。
+
+```bash
+cd /Users/simon/projects/plush-toy-erp-customer-yoyoosun-private
+PRODUCT_ROOT=/Users/simon/projects/plush-toy-erp bash scripts/validate.sh
+```
+
+直接调用时必须显式传入所有路径：
+
+```bash
+export PRODUCT_ROOT=/Users/simon/projects/plush-toy-erp
+export CUSTOMER_PRIVATE_ROOT=/Users/simon/projects/plush-toy-erp-customer-yoyoosun-private
+
+node "$PRODUCT_ROOT/scripts/import/customerSourceManifestCheck.mjs" \
+  --customer yoyoosun \
+  --manifest "$CUSTOMER_PRIVATE_ROOT/manifests/source-manifest.json" \
+  --raw-dir "$CUSTOMER_PRIVATE_ROOT/sources" \
+  --out "$CUSTOMER_PRIVATE_ROOT/output/source-check"
+
+node "$PRODUCT_ROOT/scripts/import/customerSourceExtract.mjs" \
+  --customer yoyoosun \
+  --manifest "$CUSTOMER_PRIVATE_ROOT/manifests/source-manifest.json" \
+  --raw-dir "$CUSTOMER_PRIVATE_ROOT/sources" \
+  --out "$CUSTOMER_PRIVATE_ROOT/output/source-extract"
+```
+
+工具不默认搜索 Product Core 客户目录或兄弟仓库。输出不得包含客户访问凭据、长期 URL 或本机绝对路径；但 source snapshot 和报告仍含原工作簿名、sheet、行号及候选业务字段，属于未脱敏客户私密数据，只能留在客户私有 ignored `output/`，不得上传为普通 CI artifact。
+
+## 当前永绅状态
+
+- 永绅专属 Private 仓库已以提交 `75423d0` 推送 17 个来源、v2 manifest 和验证入口；远端新 clone 后 hash / size、5 个结构化来源、12 个人工参考、5800 行提取和 no-real-import 校验通过。
+- Product Core 当前工作树已移除旧原件目录和真实 manifest；Git 历史仍含旧副本，历史清理不属于普通功能提交。
+- `product.lock.json` 仍等待 Product Core v2 来源工具形成可锁定提交，因此正式 pin 验证尚未完成。
 
 ## 真实导入边界
 
-以后拿到经客户确认的真实数据时，应单独评审通用导入批次能力：通过正式 usecase/API 写入，具备幂等批次、逐行结果、失败恢复、审计和导入后对账。它不能在本目录以某个客户名硬编码，也不能由 dry-run 参数偷偷开启。
-
-## 常用命令
-
-```bash
-node scripts/import/customerSourceManifestCheck.mjs \
-  --manifest docs/customers/yoyoosun/source-manifest.json \
-  --raw-dir docs/customers/yoyoosun/raw-source-files
-
-node scripts/import/customerImportDryRun.mjs \
-  --source scripts/import/fixtures/customers/yoyoosun/source-snapshot.sample.json \
-  --existing scripts/import/fixtures/customers/yoyoosun/existing-v1.sample.json \
-  --out output/customers/yoyoosun/import-dry-run \
-  --format json,md
-```
+以后拿到经客户确认的真实数据时，应单独评审通用导入批次能力：通过正式 usecase/API 写入，具备 RBAC、事务、幂等批次、逐行结果、失败恢复、审计和导入后对账。它不能在本目录以某个客户名硬编码，也不能由 dry-run 参数偷偷开启。
 
 ## 验证
 
 ```bash
-node --test scripts/import/customerSourceManifestCheck.test.mjs \
+node --test \
+  scripts/import/customerSourceManifestCheck.test.mjs \
   scripts/import/customerSourceExtract.test.mjs \
   scripts/import/customerSourceSnapshotFreezeCheck.test.mjs \
   scripts/import/customerImportDryRun.test.mjs
 node --test scripts/qa/test-data-isolation-boundary.test.mjs
 ```
+
+私有仓远端回读只证明资料存储和来源完整性；它不等于真实导入批准、Product Core 正式版本固定、Git 历史清理或客户交付签收。

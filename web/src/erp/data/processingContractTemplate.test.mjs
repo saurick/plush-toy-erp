@@ -612,8 +612,9 @@ test('FL_processing_contract_print_lines__filters_canceled_outsourcing_items pro
 test('FL_processing_contract_amount__derives_default_line_amount_snapshot processingContractTemplate: 默认金额会按数量和单价写入合同快照', () => {
   const draft = createProcessingContractDraft()
 
-  assert.equal(draft.lines[0].amount, '1804.8')
-  assert.equal(draft.lines[1].amount, '902.4')
+  assert.equal(draft.lines[0].amount, '20')
+  assert.equal(draft.lines[1].amount, '10')
+  assert.equal(draft.lines[2].amount, '15')
 })
 
 test('FL_processing_contract_amount__keeps_manual_line_amount_snapshot processingContractTemplate: 已有委托加工金额快照时优先保留手工值', () => {

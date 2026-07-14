@@ -68,38 +68,38 @@ test('contractPrintDraftCompleteness: live master snapshot only fills blank snap
 
 test('contractPrintDraftCompleteness: configured party fields stay visible after completion', () => {
   const purchaseDraft = completeMaterialPurchaseContractDraft({
-    contractNo: 'PO-YOYO-CONFIG',
-    supplierName: '振鼎包装材料',
-    supplierContact: '叶先生',
-    supplierPhone: '13802376786',
-    supplierAddress: '东莞虎门富民皮料市场A216号',
-    buyerCompany: '永绅',
-    buyerContact: '试用采购负责人',
+    contractNo: 'SIM-PO-CONFIG',
+    supplierName: '合成材料供应商',
+    supplierContact: '合成供应商联系人',
+    supplierPhone: '13900000001',
+    supplierAddress: '合成地址-材料区A',
+    buyerCompany: '合成试用工厂',
+    buyerContact: '合成采购负责人',
     buyerPhone: '0769-00000001',
-    buyerAddress: '东莞-茶山',
-    buyerSigner: '试用采购负责人',
+    buyerAddress: '合成地址-采购部',
+    buyerSigner: '合成采购负责人',
   })
-  assert.equal(purchaseDraft.buyerContact, '试用采购负责人')
+  assert.equal(purchaseDraft.buyerContact, '合成采购负责人')
   assert.equal(purchaseDraft.buyerPhone, '0769-00000001')
-  assert.equal(purchaseDraft.buyerAddress, '东莞-茶山')
-  assert.equal(purchaseDraft.buyerSigner, '试用采购负责人')
-  assert.equal(purchaseDraft.supplierAddress, '东莞虎门富民皮料市场A216号')
+  assert.equal(purchaseDraft.buyerAddress, '合成地址-采购部')
+  assert.equal(purchaseDraft.buyerSigner, '合成采购负责人')
+  assert.equal(purchaseDraft.supplierAddress, '合成地址-材料区A')
 
   const processingDraft = completeProcessingContractDraft({
-    contractNo: 'OUT-YOYO-CONFIG',
-    supplierName: '东莞市茶山富尔达电脑绣花店',
-    supplierContact: '黄先生',
-    supplierPhone: '0769-86862121',
-    supplierAddress: '东莞市茶山镇',
-    buyerCompany: '永绅',
-    buyerContact: '试用委外负责人',
+    contractNo: 'SIM-OS-CONFIG',
+    supplierName: '合成委外加工商',
+    supplierContact: '合成委外联系人',
+    supplierPhone: '13900000002',
+    supplierAddress: '合成地址-加工区B',
+    buyerCompany: '合成试用工厂',
+    buyerContact: '合成委外负责人',
     buyerPhone: '0769-00000002',
-    buyerAddress: '东莞茶山',
-    buyerSigner: '试用委外负责人',
+    buyerAddress: '合成地址-委外部',
+    buyerSigner: '合成委外负责人',
   })
-  assert.equal(processingDraft.buyerContact, '试用委外负责人')
+  assert.equal(processingDraft.buyerContact, '合成委外负责人')
   assert.equal(processingDraft.buyerPhone, '0769-00000002')
-  assert.equal(processingDraft.buyerAddress, '东莞茶山')
-  assert.equal(processingDraft.buyerSigner, '试用委外负责人')
-  assert.equal(processingDraft.supplierAddress, '东莞市茶山镇')
+  assert.equal(processingDraft.buyerAddress, '合成地址-委外部')
+  assert.equal(processingDraft.buyerSigner, '合成委外负责人')
+  assert.equal(processingDraft.supplierAddress, '合成地址-加工区B')
 })
