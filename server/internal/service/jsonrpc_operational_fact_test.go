@@ -86,9 +86,11 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 }
 
 func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T) {
+	manualTotalNetWeightKg := decimal.RequireFromString("12.345600")
 	aggregate, ok := shipmentCreateWithItemsFromParams(map[string]any{
-		"shipment_no":     "SHP-SKU-TRACE",
-		"idempotency_key": "SHP-SKU-TRACE",
+		"shipment_no":         "SHP-SKU-TRACE",
+		"idempotency_key":     "SHP-SKU-TRACE",
+		"total_net_weight_kg": manualTotalNetWeightKg.StringFixed(6),
 		"items": []any{map[string]any{
 			"sales_order_item_id": float64(31),
 			"product_id":          float64(7),
@@ -105,19 +107,117 @@ func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T)
 	if in.ProductSkuID == nil || *in.ProductSkuID != 11 {
 		t.Fatalf("expected product sku id 11, got %#v", in.ProductSkuID)
 	}
+	if aggregate.Shipment.TotalNetWeightKg == nil || !aggregate.Shipment.TotalNetWeightKg.Equal(manualTotalNetWeightKg) {
+		t.Fatalf("expected manual shipment total net weight, got %#v", aggregate.Shipment.TotalNetWeightKg)
+	}
 
+	snapshot := decimal.RequireFromString("0.425000")
 	out := shipmentItemToAny(&biz.ShipmentItem{
-		ID:               1,
-		ShipmentID:       9,
-		SalesOrderItemID: in.SalesOrderItemID,
-		ProductID:        in.ProductID,
-		ProductSkuID:     in.ProductSkuID,
-		WarehouseID:      in.WarehouseID,
-		UnitID:           in.UnitID,
-		Quantity:         in.Quantity,
+		ID:                      1,
+		ShipmentID:              9,
+		SalesOrderItemID:        in.SalesOrderItemID,
+		ProductID:               in.ProductID,
+		ProductSkuID:            in.ProductSkuID,
+		WarehouseID:             in.WarehouseID,
+		UnitID:                  in.UnitID,
+		Quantity:                in.Quantity,
+		UnitNetWeightKgSnapshot: &snapshot,
 	})
 	if !reflect.DeepEqual(out["product_sku_id"], 11) {
 		t.Fatalf("expected product_sku_id in response, got %#v", out)
+	}
+	if out["unit_net_weight_kg_snapshot"] != "0.425" {
+		t.Fatalf("expected shipment item net weight snapshot decimal string, got %#v", out)
+	}
+
+	shipmentOut := shipmentToAny(&biz.Shipment{TotalNetWeightKg: &manualTotalNetWeightKg})
+	if shipmentOut["total_net_weight_kg"] != "12.3456" {
+		t.Fatalf("expected shipment total net weight decimal string, got %#v", shipmentOut)
+	}
+	if _, exposed := shipmentOut["requested_total_net_weight_kg"]; exposed {
+		t.Fatalf("internal create-intent weight must not be exposed: %#v", shipmentOut)
+	}
+	if shipmentToAny(&biz.Shipment{})["total_net_weight_kg"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["unit_net_weight_kg_snapshot"] != nil {
+		t.Fatal("expected unknown shipment weights to serialize as null")
+	}
+
+	for _, quantity := range []string{"0.0000001", "100000000000000", "1e-2147483648", strings.Repeat("9", 1<<20)} {
+		if parsed, ok := shipmentCreateWithItemsFromParams(map[string]any{
+			"shipment_no":     "SHP-INVALID-QUANTITY",
+			"idempotency_key": "SHP-INVALID-QUANTITY",
+			"items": []any{map[string]any{
+				"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": quantity,
+			}},
+		}); ok || parsed != nil {
+			t.Fatalf("invalid shipment quantity parsed: ok=%t", ok)
+		}
+	}
+	if parsed, ok := shipmentCreateWithItemsFromParams(map[string]any{
+		"shipment_no":     "SHP-NUMBER-QUANTITY",
+		"idempotency_key": "SHP-NUMBER-QUANTITY",
+		"items": []any{map[string]any{
+			"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": float64(1.25),
+		}},
+	}); !ok || parsed == nil || !parsed.Items[0].Quantity.Equal(decimal.RequireFromString("1.25")) {
+		t.Fatalf("shipment JSON-number quantity compatibility parse = %#v ok=%t", parsed, ok)
+	}
+}
+
+func TestJsonrpcDispatcher_ShipmentManualTotalNetWeightContract(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	admin := workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionShipmentCreate)
+	repo := &shipmentModuleGateOperationalFactRepo{}
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+
+	params := func(no string, weight any) *structpb.Struct {
+		return mustJSONRPCStruct(t, map[string]any{
+			"shipment_no":         no,
+			"idempotency_key":     no,
+			"total_net_weight_kg": weight,
+			"items": []any{map[string]any{
+				"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": "1",
+			}},
+		})
+	}
+
+	_, res, err := j.handleOperationalFact(ctx, "create_shipment_with_items", "valid-total-weight", params("SHP-WEIGHT-VALID", "12.345600"))
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("create shipment with manual total: result=%#v err=%v", res, err)
+	}
+	if repo.lastShipmentCreate == nil || repo.lastShipmentCreate.Shipment.TotalNetWeightKg == nil || !repo.lastShipmentCreate.Shipment.TotalNetWeightKg.Equal(decimal.RequireFromString("12.3456")) {
+		t.Fatalf("manual total not forwarded to usecase repo: %#v", repo.lastShipmentCreate)
+	}
+	shipmentData := res.Data.AsMap()["shipment"].(map[string]any)
+	if shipmentData["total_net_weight_kg"] != "12.3456" {
+		t.Fatalf("manual total response = %#v, want decimal string", shipmentData["total_net_weight_kg"])
+	}
+
+	for _, tc := range []struct {
+		name   string
+		weight any
+	}{
+		{name: "not-a-number", weight: "not-a-number"},
+		{name: "zero", weight: "0"},
+		{name: "over-precision", weight: "0.0000001"},
+		{name: "overflow", weight: "100000000000000"},
+		{name: "json-number", weight: float64(12.3456)},
+		{name: "large-json-number", weight: float64(99999999999999.99)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			callsBefore := repo.createShipmentWithItemsCalls
+			_, invalidRes, handleErr := j.handleOperationalFact(ctx, "create_shipment_with_items", tc.name, params("SHP-WEIGHT-"+strings.ToUpper(tc.name), tc.weight))
+			if handleErr != nil || invalidRes == nil || invalidRes.Code != errcode.InvalidParam.Code {
+				t.Fatalf("invalid total result=%#v err=%v", invalidRes, handleErr)
+			}
+			if repo.createShipmentWithItemsCalls != callsBefore {
+				t.Fatalf("invalid total reached repo, calls=%d want %d", repo.createShipmentWithItemsCalls, callsBefore)
+			}
+		})
+	}
+
+	parsed, ok := shipmentCreateWithItemsFromParams(params("SHP-WEIGHT-NULL", nil).AsMap())
+	if !ok || parsed.Shipment.TotalNetWeightKg != nil {
+		t.Fatalf("explicit null total parse = %#v ok=%t, want nil true", parsed, ok)
 	}
 }
 
@@ -1057,6 +1157,7 @@ func TestJsonrpcDispatcher_OperationalFactListsRejectInvalidEnums(t *testing.T) 
 type shipmentModuleGateOperationalFactRepo struct {
 	stubBusinessDashboardOperationalFactRepo
 	createShipmentWithItemsCalls int
+	lastShipmentCreate           *biz.ShipmentCreateWithItems
 	shipShipmentCalls            int
 	cancelShipmentCalls          int
 	cancelShipmentActorID        int
@@ -1076,14 +1177,16 @@ func (r *shipmentModuleGateOperationalFactRepo) WarehouseIsActive(context.Contex
 
 func (r *shipmentModuleGateOperationalFactRepo) CreateShipmentDraftWithItems(_ context.Context, in *biz.ShipmentCreateWithItems) (*biz.Shipment, error) {
 	r.createShipmentWithItemsCalls++
+	r.lastShipmentCreate = in
 	now := time.Now()
 	out := &biz.Shipment{
-		ID:             101,
-		ShipmentNo:     in.Shipment.ShipmentNo,
-		Status:         biz.ShipmentStatusDraft,
-		IdempotencyKey: in.Shipment.IdempotencyKey,
-		CreatedAt:      now,
-		UpdatedAt:      now,
+		ID:               101,
+		ShipmentNo:       in.Shipment.ShipmentNo,
+		Status:           biz.ShipmentStatusDraft,
+		IdempotencyKey:   in.Shipment.IdempotencyKey,
+		TotalNetWeightKg: in.Shipment.TotalNetWeightKg,
+		CreatedAt:        now,
+		UpdatedAt:        now,
 	}
 	for idx, item := range in.Items {
 		out.Items = append(out.Items, &biz.ShipmentItem{

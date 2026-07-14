@@ -5,6 +5,7 @@ import test from 'node:test'
 import {
   AUTH_SCOPE,
   getAuthMeta,
+  getCurrentUser,
   getStoredAdminProfile,
   logout,
   persistAuth,
@@ -55,14 +56,60 @@ function installStorage(options) {
 
 function createMockAdminToken(username) {
   const header = { alg: 'none', typ: 'JWT' }
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const sessionKey = `session-${username}`
   const payload = {
     uid: 1,
-    uname: username,
-    role: 1,
-    exp: Math.floor(Date.now() / 1000) + 3600,
+    sid: sessionKey,
+    auth_version: 1,
+    iss: 'plush-toy-erp',
+    aud: ['plush-toy-erp-admin'],
+    sub: 'admin_access_token',
+    jti: sessionKey,
+    iat: issuedAt,
+    exp: issuedAt + 3600,
   }
   return `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.signature`
 }
+
+test('auth: 新版 session token 不依赖已移除的 uname 与 role claim', () => {
+  installStorage()
+
+  persistAuth(
+    {
+      access_token: createMockAdminToken('root'),
+      username: 'root',
+      is_super_admin: true,
+    },
+    AUTH_SCOPE.ADMIN
+  )
+
+  const currentUser = getCurrentUser(AUTH_SCOPE.ADMIN)
+  assert.equal(currentUser?.id, 1)
+  assert.equal(currentUser?.username, 'root')
+  assert.equal(currentUser?.role, 'admin')
+  assert(currentUser?.exp > Math.floor(Date.now() / 1000))
+  assert.equal(getStoredAdminProfile().role, 'admin')
+})
+
+test('auth: 旧 uname/role token 不会被当作新版管理员 session', () => {
+  installStorage()
+  const issuedAt = Math.floor(Date.now() / 1000)
+  const token = `${base64UrlEncode({ alg: 'none', typ: 'JWT' })}.${base64UrlEncode(
+    {
+      uid: 1,
+      uname: 'legacy-admin',
+      role: 1,
+      iat: issuedAt,
+      exp: issuedAt + 3600,
+    }
+  )}.signature`
+
+  persistAuth({ access_token: token, username: 'legacy-admin' })
+
+  assert.equal(getCurrentUser(AUTH_SCOPE.ADMIN), null)
+  assert.equal(localStorage.getItem('admin_access_token'), null)
+})
 
 function base64UrlEncode(value) {
   return Buffer.from(JSON.stringify(value), 'utf8')

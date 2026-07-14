@@ -45,6 +45,7 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessLineItemsFooter from '../components/business-list/BusinessLineItemsFooter.jsx'
+import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import {
   compactParams,
   formatUnixDate,
@@ -133,98 +134,6 @@ function receiptQuantityTotal(receipt = {}) {
     (total, item) => total + decimalNumber(item?.quantity),
     0
   )
-}
-
-function PurchaseReceiptItemsList({
-  inventoryLotOptions = [],
-  items = [],
-  materialOptions = [],
-  unitOptions = [],
-  warehouseOptions = [],
-}) {
-  if (!items.length) {
-    return (
-      <div className="erp-purchase-receipt-items-list">
-        <div className="erp-purchase-receipt-items-list__empty">暂无明细</div>
-      </div>
-    )
-  }
-
-  return (
-    <div className="erp-purchase-receipt-items-list" aria-label="入库明细">
-      {items.map((item, index) => {
-        const fields = [
-          {
-            label: '材料',
-            value: referenceLabel(materialOptions, item.material_id, '材料'),
-            wide: true,
-          },
-          {
-            label: '仓库',
-            value: referenceLabel(warehouseOptions, item.warehouse_id, '仓库'),
-          },
-          {
-            label: '单位',
-            value: referenceLabel(unitOptions, item.unit_id, '单位'),
-          },
-          {
-            label: '批次',
-            value: referenceLabel(inventoryLotOptions, item.lot_id, '批次'),
-            wide: true,
-          },
-          { label: '批次号', value: optionalText(item.lot_no) },
-          {
-            label: '数量',
-            value: formatQuantity(decimalNumber(item.quantity)),
-          },
-          { label: '单价', value: optionalText(item.unit_price) },
-          { label: '金额', value: optionalText(item.amount) },
-          {
-            label: '采购订单行',
-            value: item.purchase_order_item_id
-              ? item.source_line_no
-                ? `来源行 ${item.source_line_no}`
-                : '已关联采购来源行'
-              : '-',
-          },
-          { label: '来源行号', value: optionalText(item.source_line_no) },
-          { label: '备注', value: optionalText(item.note), wide: true },
-        ]
-        return (
-          <article
-            className="erp-purchase-receipt-item-card"
-            key={item.id || `${item.material_id || 'item'}-${index}`}
-          >
-            <div className="erp-purchase-receipt-item-card__head">
-              <strong>{`明细 ${index + 1}`}</strong>
-              <span>
-                {`数量 ${formatQuantity(decimalNumber(item.quantity))} / 金额 ${optionalText(item.amount)}`}
-              </span>
-            </div>
-            <dl className="erp-purchase-receipt-item-card__grid">
-              {fields.map((field) => (
-                <div
-                  className={
-                    field.wide
-                      ? 'erp-purchase-receipt-item-card__field erp-purchase-receipt-item-card__field--wide'
-                      : 'erp-purchase-receipt-item-card__field'
-                  }
-                  key={field.label}
-                >
-                  <dt>{field.label}</dt>
-                  <dd>{field.value}</dd>
-                </div>
-              ))}
-            </dl>
-          </article>
-        )
-      })}
-    </div>
-  )
-}
-
-function canExpandPurchaseReceiptRow(record) {
-  return receiptItemCount(record) > 0
 }
 
 function formListName(field, name) {
@@ -506,18 +415,73 @@ export default function V1PurchaseReceiptsPage() {
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
   )
-  const renderExpandedPurchaseReceiptItems = useCallback(
-    (record) => (
-      <PurchaseReceiptItemsList
-        inventoryLotOptions={inventoryLotOptions}
-        items={record.items || []}
-        materialOptions={materialOptions}
-        unitOptions={unitOptions}
-        warehouseOptions={warehouseOptions}
-      />
-    ),
-    [inventoryLotOptions, materialOptions, unitOptions, warehouseOptions]
-  )
+  const receiptItemsPreview = useBusinessRowItemsPreview({
+    records: rows,
+    getEmbeddedItems: (record) => record?.items,
+    rowExpandable: (record) => receiptItemCount(record) > 0,
+    getRecordLabel: (record) => record?.receipt_no || '当前采购入库单',
+    getItemKey: (item) => item?.id,
+    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
+    getItemSummary: (item) =>
+      `数量 ${formatQuantity(decimalNumber(item?.quantity))} / 金额 ${optionalText(item?.amount)}`,
+    getItemFields: (item) => [
+      {
+        key: 'material',
+        label: '材料',
+        value: referenceLabel(materialOptions, item?.material_id, '材料'),
+        wide: true,
+      },
+      {
+        key: 'warehouse',
+        label: '仓库',
+        value: referenceLabel(warehouseOptions, item?.warehouse_id, '仓库'),
+      },
+      {
+        key: 'unit',
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      {
+        key: 'lot',
+        label: '批次',
+        value: referenceLabel(inventoryLotOptions, item?.lot_id, '批次'),
+        wide: true,
+      },
+      { key: 'lot_no', label: '批次号', value: optionalText(item?.lot_no) },
+      {
+        key: 'quantity',
+        label: '数量',
+        value: formatQuantity(decimalNumber(item?.quantity)),
+      },
+      {
+        key: 'unit_price',
+        label: '单价',
+        value: optionalText(item?.unit_price),
+      },
+      { key: 'amount', label: '金额', value: optionalText(item?.amount) },
+      {
+        key: 'purchase_order_item',
+        label: '采购订单行',
+        value: item?.purchase_order_item_id
+          ? item?.source_line_no
+            ? `来源第 ${item.source_line_no} 行`
+            : '已关联采购订单行'
+          : '-',
+      },
+      {
+        key: 'source_line_no',
+        label: '来源行号',
+        value: optionalText(item?.source_line_no),
+      },
+      {
+        key: 'note',
+        label: '备注',
+        value: optionalText(item?.note),
+        wide: true,
+      },
+    ],
+    modalTitle: '采购入库单完整明细',
+  })
 
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
@@ -1196,13 +1160,10 @@ export default function V1PurchaseReceiptsPage() {
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
         })}
-        expandable={{
-          columnTitle: '明细',
-          expandedRowRender: renderExpandedPurchaseReceiptItems,
-          rowExpandable: canExpandPurchaseReceiptRow,
-        }}
+        expandable={receiptItemsPreview.expandable}
         emptyDescription="暂无采购入库单"
       />
+      {receiptItemsPreview.modal}
       {columnOrderModal}
     </BusinessPageLayout>
   )

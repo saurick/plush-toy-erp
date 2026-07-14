@@ -22,6 +22,7 @@ import {
   contractPartySnapshotFromPrintTemplateDefaults,
   buildProcessParams,
   buildProductParams,
+  buildProductSKUParams,
   formatProductUnitNetWeight,
   buildSalesOrderCustomerSourceValues,
   buildSalesOrderItemSourceValuesFromSKU,
@@ -854,6 +855,35 @@ test('masterDataOrderView: blank product unit net weight is an explicit null', (
   )
 })
 
+test('masterDataOrderView: SKU unit net weight remains a decimal string and blank clears it explicitly', () => {
+  assert.deepEqual(
+    buildProductSKUParams({
+      product_id: '7',
+      sku_code: ' SKU-WEIGHT-001 ',
+      default_unit_id: '2',
+      unit_net_weight_kg: ' 0.375000 ',
+    }),
+    {
+      product_id: 7,
+      sku_code: 'SKU-WEIGHT-001',
+      default_unit_id: 2,
+      unit_net_weight_kg: '0.375000',
+    }
+  )
+  assert.deepEqual(
+    buildProductSKUParams({
+      product_id: '7',
+      sku_code: 'SKU-WEIGHT-001',
+      unit_net_weight_kg: ' ',
+    }),
+    {
+      product_id: 7,
+      sku_code: 'SKU-WEIGHT-001',
+      unit_net_weight_kg: null,
+    }
+  )
+})
+
 test('masterDataOrderView: product unit net weight uses the selected default unit label', () => {
   assert.equal(
     formatProductUnitNetWeight('0.425', '件（PCS）'),
@@ -1108,7 +1138,7 @@ test('FL_shipment_ship_date__retains_planned_and_actual_ship_dates masterDataOrd
   )
   assert.match(
     shipmentsPageSource,
-    /function buildShipmentWithItemsParams\(values = \{\}\)[\s\S]*\.\.\.buildShipmentParams\(values\)/u
+    /function buildShipmentWithItemsParams\(values = \{\}, references = \{\}\)[\s\S]*\.\.\.buildShipmentParams\(values, references\)/u
   )
   assert.match(
     shipmentColumnsSource,

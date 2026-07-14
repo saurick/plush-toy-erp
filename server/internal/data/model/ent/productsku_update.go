@@ -22,6 +22,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/shopspring/decimal"
 )
 
 // ProductSKUUpdate is the builder for updating ProductSKU entities.
@@ -208,6 +209,26 @@ func (_u *ProductSKUUpdate) SetNillableDefaultUnitID(v *int) *ProductSKUUpdate {
 // ClearDefaultUnitID clears the value of the "default_unit_id" field.
 func (_u *ProductSKUUpdate) ClearDefaultUnitID() *ProductSKUUpdate {
 	_u.mutation.ClearDefaultUnitID()
+	return _u
+}
+
+// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
+func (_u *ProductSKUUpdate) SetUnitNetWeightKg(v decimal.Decimal) *ProductSKUUpdate {
+	_u.mutation.SetUnitNetWeightKg(v)
+	return _u
+}
+
+// SetNillableUnitNetWeightKg sets the "unit_net_weight_kg" field if the given value is not nil.
+func (_u *ProductSKUUpdate) SetNillableUnitNetWeightKg(v *decimal.Decimal) *ProductSKUUpdate {
+	if v != nil {
+		_u.SetUnitNetWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearUnitNetWeightKg clears the value of the "unit_net_weight_kg" field.
+func (_u *ProductSKUUpdate) ClearUnitNetWeightKg() *ProductSKUUpdate {
+	_u.mutation.ClearUnitNetWeightKg()
 	return _u
 }
 
@@ -680,6 +701,12 @@ func (_u *ProductSKUUpdate) sqlSave(ctx context.Context) (_node int, err error) 
 	}
 	if _u.mutation.PackagingVersionCleared() {
 		_spec.ClearField(productsku.FieldPackagingVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.UnitNetWeightKg(); ok {
+		_spec.SetField(productsku.FieldUnitNetWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.UnitNetWeightKgCleared() {
+		_spec.ClearField(productsku.FieldUnitNetWeightKg, field.TypeOther)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(productsku.FieldIsActive, field.TypeBool, value)
@@ -1270,6 +1297,26 @@ func (_u *ProductSKUUpdateOne) ClearDefaultUnitID() *ProductSKUUpdateOne {
 	return _u
 }
 
+// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
+func (_u *ProductSKUUpdateOne) SetUnitNetWeightKg(v decimal.Decimal) *ProductSKUUpdateOne {
+	_u.mutation.SetUnitNetWeightKg(v)
+	return _u
+}
+
+// SetNillableUnitNetWeightKg sets the "unit_net_weight_kg" field if the given value is not nil.
+func (_u *ProductSKUUpdateOne) SetNillableUnitNetWeightKg(v *decimal.Decimal) *ProductSKUUpdateOne {
+	if v != nil {
+		_u.SetUnitNetWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearUnitNetWeightKg clears the value of the "unit_net_weight_kg" field.
+func (_u *ProductSKUUpdateOne) ClearUnitNetWeightKg() *ProductSKUUpdateOne {
+	_u.mutation.ClearUnitNetWeightKg()
+	return _u
+}
+
 // SetIsActive sets the "is_active" field.
 func (_u *ProductSKUUpdateOne) SetIsActive(v bool) *ProductSKUUpdateOne {
 	_u.mutation.SetIsActive(v)
@@ -1769,6 +1816,12 @@ func (_u *ProductSKUUpdateOne) sqlSave(ctx context.Context) (_node *ProductSKU, 
 	}
 	if _u.mutation.PackagingVersionCleared() {
 		_spec.ClearField(productsku.FieldPackagingVersion, field.TypeString)
+	}
+	if value, ok := _u.mutation.UnitNetWeightKg(); ok {
+		_spec.SetField(productsku.FieldUnitNetWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.UnitNetWeightKgCleared() {
+		_spec.ClearField(productsku.FieldUnitNetWeightKg, field.TypeOther)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(productsku.FieldIsActive, field.TypeBool, value)

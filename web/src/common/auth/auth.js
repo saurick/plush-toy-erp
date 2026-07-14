@@ -1,4 +1,5 @@
 import { jwtDecode } from 'jwt-decode'
+import { isValidAdminSessionClaims } from './adminTokenContract.mjs'
 
 export const AUTH_SCOPE = {
   ADMIN: 'admin',
@@ -153,14 +154,15 @@ export function getCurrentUser(scope = AUTH_SCOPE.ADMIN) {
   if (!token) return null
   try {
     const claims = jwtDecode(token)
-    if (isExpired(claims)) {
+    if (!isValidAdminSessionClaims(claims) || isExpired(claims)) {
       logout(normalizedScope)
       return null
     }
     return {
-      id: claims.uid,
-      username: claims.uname,
-      role: Number(claims.role) === 1 ? 'admin' : 'user',
+      id: Number(claims.uid),
+      username: String(getAuthMeta(normalizedScope, 'username') || ''),
+      // 当前 token 只存在于 admin scope；真正授权仍由后端 session、账号状态与 RBAC 校验。
+      role: 'admin',
       exp: claims.exp, // 秒级时间戳
     }
   } catch {

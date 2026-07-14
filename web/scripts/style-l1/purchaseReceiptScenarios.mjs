@@ -151,18 +151,20 @@ export function createPurchaseReceiptScenarios(deps) {
       .filter({ has: page.getByText(receiptNo, { exact: true }) })
       .first()
     await row.scrollIntoViewIfNeeded()
-    await row.locator('button').first().click()
+    await row
+      .getByRole('button', { name: new RegExp(`展开${receiptNo}明细`) })
+      .click()
     await page
-      .locator('.erp-purchase-receipt-items-list')
+      .locator('.erp-business-row-items-preview')
       .waitFor({ state: 'visible', timeout: 10_000 })
     const metrics = await page.evaluate(() => {
-      const list = document.querySelector('.erp-purchase-receipt-items-list')
+      const list = document.querySelector('.erp-business-row-items-preview')
       const cards = list
-        ? Array.from(list.querySelectorAll('.erp-purchase-receipt-item-card'))
+        ? Array.from(list.querySelectorAll('.erp-business-row-item-card'))
         : []
       const fields = list
         ? Array.from(
-            list.querySelectorAll('.erp-purchase-receipt-item-card__field')
+            list.querySelectorAll('.erp-business-row-item-card__field')
           ).map((node) => {
             const valueNode = node.querySelector('dd')
             const valueStyle = valueNode
@@ -397,6 +399,25 @@ export function createPurchaseReceiptScenarios(deps) {
         await expectText(page, 'PR-STYLE-L1-DRAFT')
         await assertTextAbsent(page, '维护明细')
 
+        const draftRow = page
+          .getByRole('row')
+          .filter({
+            has: page.getByText('PR-STYLE-L1-DRAFT', { exact: true }),
+          })
+          .first()
+        await draftRow
+          .getByRole('button', { name: '展开PR-STYLE-L1-DRAFT明细' })
+          .click()
+        const draftPreview = page.getByRole('region', {
+          name: '明细快速预览',
+        })
+        await draftPreview.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await draftPreview.locator('.erp-business-row-item-card').count(),
+          1
+        )
+        await expectText(page, '已显示 1 / 1 条')
+
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
         await assertPurchaseReceiptActionButtonState(page, {
           name: '添加明细',
@@ -437,6 +458,13 @@ export function createPurchaseReceiptScenarios(deps) {
         await expectText(page, '入库明细已添加')
         await editor.waitFor({ state: 'hidden', timeout: 10_000 })
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 2)
+        await draftPreview.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await draftPreview.locator('.erp-business-row-item-card').count(),
+          2,
+          '主表版本不变时，展开区也必须同步新增后的嵌入明细'
+        )
+        await expectText(page, '已显示 2 / 2 条')
         await assertNoHorizontalOverflow(
           page,
           'purchase-receipt-add-item-inline-draft-desktop-recovery'

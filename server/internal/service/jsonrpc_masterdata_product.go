@@ -76,7 +76,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.CreateProductSKU(ctx, productSKUMutationFromParams(pm))
+		mutation, ok := productSKUMutationFromParams(pm)
+		if !ok {
+			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
+		}
+		item, err := d.masterDataUC.CreateProductSKU(ctx, mutation)
 		return id, productSKUMutationResult(ctx, d, item, err), nil
 	case "update_product_sku":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKUUpdate); res != nil {
@@ -85,7 +89,11 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeyProducts); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.UpdateProductSKU(ctx, getInt(pm, "id", 0), productSKUMutationFromParams(pm))
+		mutation, ok := productSKUMutationFromParams(pm)
+		if !ok {
+			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
+		}
+		item, err := d.masterDataUC.UpdateProductSKU(ctx, getInt(pm, "id", 0), mutation)
 		return id, productSKUMutationResult(ctx, d, item, err), nil
 	case "get_product_sku":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductSKURead); res != nil {
@@ -122,7 +130,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 }
 
 func productMutationFromParams(pm map[string]any) (*biz.ProductMutation, bool) {
-	unitNetWeightKg, ok := getOptionalJSONRPCDecimal(pm, "unit_net_weight_kg")
+	unitNetWeightKg, ok := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_kg")
 	if !ok {
 		return nil, false
 	}
@@ -136,7 +144,11 @@ func productMutationFromParams(pm map[string]any) (*biz.ProductMutation, bool) {
 	}, true
 }
 
-func productSKUMutationFromParams(pm map[string]any) *biz.ProductSKUMutation {
+func productSKUMutationFromParams(pm map[string]any) (*biz.ProductSKUMutation, bool) {
+	unitNetWeightKg, ok := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_kg")
+	if !ok {
+		return nil, false
+	}
 	return &biz.ProductSKUMutation{
 		ProductID:        getInt(pm, "product_id", 0),
 		SKUCode:          getString(pm, "sku_code"),
@@ -148,7 +160,8 @@ func productSKUMutationFromParams(pm map[string]any) *biz.ProductSKUMutation {
 		Size:             getWorkflowStringPtr(pm, "size"),
 		PackagingVersion: getWorkflowStringPtr(pm, "packaging_version"),
 		DefaultUnitID:    getOptionalPositiveIntPtr(pm, "default_unit_id"),
-	}
+		UnitNetWeightKg:  unitNetWeightKg,
+	}, true
 }
 
 func productSKUFilterFromParams(pm map[string]any) biz.ProductSKUFilter {
@@ -206,20 +219,21 @@ func productSKUToMap(item *biz.ProductSKU) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                item.ID,
-		"product_id":        item.ProductID,
-		"sku_code":          item.SKUCode,
-		"sku_name":          optionalStringValue(item.SKUName),
-		"barcode":           optionalStringValue(item.Barcode),
-		"customer_sku":      optionalStringValue(item.CustomerSKU),
-		"color":             optionalStringValue(item.Color),
-		"color_no":          optionalStringValue(item.ColorNo),
-		"size":              optionalStringValue(item.Size),
-		"packaging_version": optionalStringValue(item.PackagingVersion),
-		"default_unit_id":   optionalIntValue(item.DefaultUnitID),
-		"is_active":         item.IsActive,
-		"created_at":        item.CreatedAt.Unix(),
-		"updated_at":        item.UpdatedAt.Unix(),
+		"id":                 item.ID,
+		"product_id":         item.ProductID,
+		"sku_code":           item.SKUCode,
+		"sku_name":           optionalStringValue(item.SKUName),
+		"barcode":            optionalStringValue(item.Barcode),
+		"customer_sku":       optionalStringValue(item.CustomerSKU),
+		"color":              optionalStringValue(item.Color),
+		"color_no":           optionalStringValue(item.ColorNo),
+		"size":               optionalStringValue(item.Size),
+		"packaging_version":  optionalStringValue(item.PackagingVersion),
+		"default_unit_id":    optionalIntValue(item.DefaultUnitID),
+		"unit_net_weight_kg": optionalDecimalString(item.UnitNetWeightKg),
+		"is_active":          item.IsActive,
+		"created_at":         item.CreatedAt.Unix(),
+		"updated_at":         item.UpdatedAt.Unix(),
 	}
 }
 

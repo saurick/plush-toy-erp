@@ -55,6 +55,7 @@ export async function installFactRpcMocks(page, context) {
       unit_id: 1,
       lot_id: 1,
       quantity: '10',
+      unit_net_weight_kg_snapshot: null,
       note: '样式出货明细',
       created_at: nowUnix(),
       updated_at: nowUnix(),
@@ -68,6 +69,7 @@ export async function installFactRpcMocks(page, context) {
       customer_snapshot: '暗色客户',
       planned_ship_at: nowUnix() + 86_400,
       shipped_at: null,
+      total_net_weight_kg: null,
       note: '样式回归出货单',
       items: [shipmentItem],
       created_at: nowUnix(),
@@ -529,7 +531,6 @@ export async function installFactRpcMocks(page, context) {
               nextPurchaseReceiptItemId += 1
               if (receipt) {
                 receipt.items = [...(receipt.items || []), item]
-                receipt.updated_at = nowUnix()
               }
               return { purchase_receipt_item: item }
             }

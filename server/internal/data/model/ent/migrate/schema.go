@@ -1370,6 +1370,7 @@ var (
 		{Name: "color_no", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "size", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "packaging_version", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "unit_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -1384,13 +1385,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "product_skus_products_product_skus",
-				Columns:    []*schema.Column{ProductSkusColumns[12]},
+				Columns:    []*schema.Column{ProductSkusColumns[13]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "product_skus_units_product_skus",
-				Columns:    []*schema.Column{ProductSkusColumns[13]},
+				Columns:    []*schema.Column{ProductSkusColumns[14]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -1404,7 +1405,7 @@ var (
 			{
 				Name:    "productsku_product_id_sku_code",
 				Unique:  true,
-				Columns: []*schema.Column{ProductSkusColumns[12], ProductSkusColumns[1]},
+				Columns: []*schema.Column{ProductSkusColumns[13], ProductSkusColumns[1]},
 			},
 			{
 				Name:    "productsku_barcode",
@@ -1417,7 +1418,7 @@ var (
 			{
 				Name:    "productsku_product_id_is_active",
 				Unique:  false,
-				Columns: []*schema.Column{ProductSkusColumns[12], ProductSkusColumns[9]},
+				Columns: []*schema.Column{ProductSkusColumns[13], ProductSkusColumns[10]},
 			},
 			{
 				Name:    "productsku_customer_sku",
@@ -2777,6 +2778,8 @@ var (
 		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
 		{Name: "planned_ship_at", Type: field.TypeTime, Nullable: true},
 		{Name: "shipped_at", Type: field.TypeTime, Nullable: true},
+		{Name: "total_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "requested_total_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -2791,13 +2794,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipments_customers_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[10]},
+				Columns:    []*schema.Column{ShipmentsColumns[12]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipments_sales_orders_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[11]},
+				Columns:    []*schema.Column{ShipmentsColumns[13]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -2816,12 +2819,12 @@ var (
 			{
 				Name:    "shipment_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[11]},
+				Columns: []*schema.Column{ShipmentsColumns[13]},
 			},
 			{
 				Name:    "shipment_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[10]},
+				Columns: []*schema.Column{ShipmentsColumns[12]},
 			},
 			{
 				Name:    "shipment_status",
@@ -2834,6 +2837,7 @@ var (
 	ShipmentItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_net_weight_kg_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -2853,43 +2857,43 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipment_items_inventory_lots_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[5]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[6]},
 				RefColumns: []*schema.Column{InventoryLotsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_products_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[6]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[7]},
 				RefColumns: []*schema.Column{ProductsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_product_skus_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[7]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[8]},
 				RefColumns: []*schema.Column{ProductSkusColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_sales_order_items_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[8]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
 				RefColumns: []*schema.Column{SalesOrderItemsColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipment_items_shipments_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[9]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
 				RefColumns: []*schema.Column{ShipmentsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_units_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[10]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[11]},
 				RefColumns: []*schema.Column{UnitsColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
 			{
 				Symbol:     "shipment_items_warehouses_shipment_items",
-				Columns:    []*schema.Column{ShipmentItemsColumns[11]},
+				Columns:    []*schema.Column{ShipmentItemsColumns[12]},
 				RefColumns: []*schema.Column{WarehousesColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -2898,22 +2902,22 @@ var (
 			{
 				Name:    "shipmentitem_shipment_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[9]},
+				Columns: []*schema.Column{ShipmentItemsColumns[10]},
 			},
 			{
 				Name:    "shipmentitem_sales_order_item_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[8]},
+				Columns: []*schema.Column{ShipmentItemsColumns[9]},
 			},
 			{
 				Name:    "shipmentitem_product_sku_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[7]},
+				Columns: []*schema.Column{ShipmentItemsColumns[8]},
 			},
 			{
 				Name:    "shipmentitem_product_id_warehouse_id_lot_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentItemsColumns[6], ShipmentItemsColumns[11], ShipmentItemsColumns[5]},
+				Columns: []*schema.Column{ShipmentItemsColumns[7], ShipmentItemsColumns[12], ShipmentItemsColumns[6]},
 			},
 		},
 	}
@@ -3586,6 +3590,10 @@ func init() {
 	ProductSkusTable.Annotation = &entsql.Annotation{
 		Table: "product_skus",
 	}
+	ProductSkusTable.Annotation.Checks = map[string]string{
+		"product_skus_unit_net_weight_kg_positive":              "unit_net_weight_kg IS NULL OR unit_net_weight_kg > 0",
+		"product_skus_unit_net_weight_kg_requires_default_unit": "unit_net_weight_kg IS NULL OR default_unit_id IS NOT NULL",
+	}
 	ProductionFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ProductionFactsTable.ForeignKeys[1].RefTable = ProductSkusTable
 	ProductionFactsTable.ForeignKeys[2].RefTable = UnitsTable
@@ -3735,7 +3743,9 @@ func init() {
 	ShipmentsTable.ForeignKeys[1].RefTable = SalesOrdersTable
 	ShipmentsTable.Annotation = &entsql.Annotation{}
 	ShipmentsTable.Annotation.Checks = map[string]string{
-		"shipments_status_allowed": "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+		"shipments_requested_total_net_weight_kg_positive": "requested_total_net_weight_kg IS NULL OR requested_total_net_weight_kg > 0",
+		"shipments_status_allowed":                         "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+		"shipments_total_net_weight_kg_positive":           "total_net_weight_kg IS NULL OR total_net_weight_kg > 0",
 	}
 	ShipmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ShipmentItemsTable.ForeignKeys[1].RefTable = ProductsTable
@@ -3746,7 +3756,8 @@ func init() {
 	ShipmentItemsTable.ForeignKeys[6].RefTable = WarehousesTable
 	ShipmentItemsTable.Annotation = &entsql.Annotation{}
 	ShipmentItemsTable.Annotation.Checks = map[string]string{
-		"shipment_items_quantity_positive": "quantity > 0",
+		"shipment_items_quantity_positive":                    "quantity > 0",
+		"shipment_items_unit_net_weight_kg_snapshot_positive": "unit_net_weight_kg_snapshot IS NULL OR unit_net_weight_kg_snapshot > 0",
 	}
 	StockReservationsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	StockReservationsTable.ForeignKeys[1].RefTable = ProductsTable

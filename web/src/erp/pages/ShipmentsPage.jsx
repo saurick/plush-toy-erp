@@ -42,6 +42,7 @@ import {
   downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
+import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import ShipmentBusinessModal, {
   salesOrderCustomerText,
   sourceLineProductText,
@@ -77,6 +78,7 @@ import {
   inventoryLotOption,
   productOption,
   productSKUOption,
+  referenceLabel,
   salesOrderItemOption,
   salesOrderOption,
   uniqueReferenceOptions,
@@ -87,6 +89,15 @@ import {
   searchParamPositiveIntText,
   searchParamText,
 } from '../utils/routeQuery.mjs'
+import {
+  calculateShipmentLineNetWeightKg,
+  hasFinalShipmentWeight,
+  listAllShipmentWeightReferenceRecords,
+  normalizeShipmentQuantity,
+  resolveShipmentSubmittedTotalNetWeight,
+  resolveShipmentWeightPreview,
+  shipmentWeightReferenceOption,
+} from '../utils/shipmentWeight.mjs'
 
 const { Text } = Typography
 
@@ -94,7 +105,16 @@ function idempotencyKey(prefix) {
   return `${prefix}-${Date.now()}`
 }
 
-function buildShipmentParams(values = {}) {
+function buildShipmentParams(
+  values = {},
+  { products = [], productSKUs = [] } = {}
+) {
+  const items = Array.isArray(values.items) ? values.items : []
+  const weightPreview = resolveShipmentWeightPreview({
+    items,
+    products,
+    productSKUs,
+  })
   return compactParams({
     shipment_no: trimOptional(values.shipment_no),
     sales_order_id: positiveInt(values.sales_order_id),
@@ -102,14 +122,23 @@ function buildShipmentParams(values = {}) {
     customer_snapshot: trimOptional(values.customer_snapshot),
     idempotency_key: trimOptional(values.idempotency_key),
     planned_ship_at: trimOptional(values.planned_ship_at),
+    total_net_weight_kg: resolveShipmentSubmittedTotalNetWeight({
+      preview: weightPreview,
+      manualValue: values.total_net_weight_kg,
+      manualItemsSignature: values.total_net_weight_items_signature,
+      items,
+    }),
     note: trimOptional(values.note),
   })
 }
 
-function buildShipmentWithItemsParams(values = {}) {
+function buildShipmentWithItemsParams(values = {}, references = {}) {
   return {
-    ...buildShipmentParams(values),
-    items: (values.items || []).map((item) => buildShipmentItemParams(item)),
+    ...buildShipmentParams(values, references),
+    items: (values.items || []).map((item) => ({
+      ...buildShipmentItemParams(item),
+      quantity: normalizeShipmentQuantity(item?.quantity),
+    })),
   }
 }
 
@@ -125,6 +154,7 @@ function shipmentFormValues(shipment = {}) {
       plannedShipAt > 0
         ? new Date(plannedShipAt * 1000).toISOString().slice(0, 10)
         : '',
+    total_net_weight_kg: shipment.total_net_weight_kg,
     note: shipment.note || '',
   }
 }
@@ -187,11 +217,17 @@ export default function ShipmentsPage() {
     [inventoryLots]
   )
   const productOptions = useMemo(
-    () => uniqueReferenceOptions(products, productOption),
+    () =>
+      uniqueReferenceOptions(products, (product) =>
+        shipmentWeightReferenceOption(product, productOption)
+      ),
     [products]
   )
   const productSKUOptions = useMemo(
-    () => uniqueReferenceOptions(productSKUs, productSKUOption),
+    () =>
+      uniqueReferenceOptions(productSKUs, (sku) =>
+        shipmentWeightReferenceOption(sku, productSKUOption)
+      ),
     [productSKUs]
   )
   const salesOrderOptions = useMemo(
@@ -228,6 +264,89 @@ export default function ShipmentsPage() {
       ),
     [inventoryLots, rows]
   )
+  const shipmentItemsPreview = useBusinessRowItemsPreview({
+    records: rows,
+    getEmbeddedItems: (record) => record?.items,
+    rowExpandable: (record) =>
+      Array.isArray(record?.items) && record.items.length > 0,
+    getRecordLabel: (record) => record?.shipment_no || '当前出货单',
+    getItemKey: (item) => item?.id,
+    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
+    getItemSummary: (item) => `数量 ${formatQuantity(item?.quantity)}`,
+    getItemFields: (item, { record, view }) => [
+      {
+        key: 'sales_order_item',
+        label: '销售订单行',
+        value: referenceLabel(
+          salesOrderItemOptions,
+          item?.sales_order_item_id,
+          '销售订单行'
+        ),
+        wide: true,
+      },
+      {
+        key: 'product',
+        label: '产品',
+        value: referenceLabel(productOptions, item?.product_id, '产品'),
+      },
+      {
+        key: 'product_sku',
+        label: 'SKU',
+        value: referenceLabel(productSKUOptions, item?.product_sku_id, 'SKU'),
+      },
+      {
+        key: 'warehouse',
+        label: '仓库',
+        value: referenceLabel(warehouseOptions, item?.warehouse_id, '仓库'),
+      },
+      {
+        key: 'lot',
+        label: '批次',
+        value: referenceLabel(inventoryLotOptions, item?.lot_id, '批次'),
+      },
+      {
+        key: 'unit',
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      { key: 'quantity', label: '数量', value: formatQuantity(item?.quantity) },
+      ...(hasFinalShipmentWeight(record?.status)
+        ? [
+            {
+              key: 'confirmed_unit_net_weight',
+              label: '确认出货单重（kg）',
+              value: item?.unit_net_weight_kg_snapshot
+                ? `${item.unit_net_weight_kg_snapshot} kg / ${referenceLabel(
+                    unitOptions,
+                    item?.unit_id,
+                    '单位'
+                  )}`
+                : '-',
+            },
+            {
+              key: 'line_net_weight',
+              label: '行净重（kg）',
+              value:
+                calculateShipmentLineNetWeightKg(
+                  item?.quantity,
+                  item?.unit_net_weight_kg_snapshot
+                ) || '-',
+            },
+          ]
+        : []),
+      ...(view === 'modal'
+        ? [
+            {
+              key: 'note',
+              label: '备注',
+              value: item?.note || '-',
+              wide: true,
+            },
+          ]
+        : []),
+    ],
+    modalTitle: '出货单完整明细',
+  })
 
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
@@ -312,15 +431,15 @@ export default function ShipmentsPage() {
       const [
         customerResult,
         lotResult,
-        productResult,
-        skuResult,
+        nextProducts,
+        nextProductSKUs,
         salesOrderResult,
         unitResult,
       ] = await Promise.all([
         listCustomers({ limit: 500, active_only: true }),
         listInventoryLots({ limit: 500 }),
-        listProducts({ limit: 500, active_only: true }),
-        listProductSKUs({ limit: 500, active_only: true }),
+        listAllShipmentWeightReferenceRecords(listProducts, 'products'),
+        listAllShipmentWeightReferenceRecords(listProductSKUs, 'product_skus'),
         listSalesOrders({ limit: 500 }),
         listUnits({ limit: 500 }),
       ])
@@ -330,12 +449,8 @@ export default function ShipmentsPage() {
       setInventoryLots(
         Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
       )
-      setProducts(
-        Array.isArray(productResult?.products) ? productResult.products : []
-      )
-      setProductSKUs(
-        Array.isArray(skuResult?.product_skus) ? skuResult.product_skus : []
-      )
+      setProducts(nextProducts)
+      setProductSKUs(nextProductSKUs)
       setSalesOrders(
         Array.isArray(salesOrderResult?.sales_orders)
           ? salesOrderResult.sales_orders
@@ -640,7 +755,7 @@ export default function ShipmentsPage() {
       const values = await shipmentForm.validateFields()
       setSaving(true)
       const savedShipment = await createShipmentWithItems(
-        buildShipmentWithItemsParams(values)
+        buildShipmentWithItemsParams(values, { products, productSKUs })
       )
       const attachmentSaved =
         (await shipmentAttachmentRef.current?.flushPendingAttachments(
@@ -954,7 +1069,7 @@ export default function ShipmentsPage() {
           onChange: (current, pageSize) => setPagination({ current, pageSize }),
         })}
         emptyDescription="暂无出货单"
-        scroll={{ x: 1320 }}
+        scroll={{ x: 1510 }}
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selectedRow ? [selectedRow.id] : [],
@@ -964,10 +1079,12 @@ export default function ShipmentsPage() {
         rowClassName={(record) =>
           record.id === selectedRow?.id ? 'ant-table-row-selected' : ''
         }
+        expandable={shipmentItemsPreview.expandable}
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
         })}
       />
+      {shipmentItemsPreview.modal}
       {columnOrderModal}
 
       <ShipmentBusinessModal

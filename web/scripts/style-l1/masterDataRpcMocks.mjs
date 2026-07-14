@@ -56,6 +56,7 @@ export async function installMasterDataRpcMocks(page, context) {
       size: 'M',
       packaging_version: '基础包装',
       default_unit_id: 1,
+      unit_net_weight_kg: '0.375',
       is_active: true,
       note: '',
       created_at: nowUnix(),

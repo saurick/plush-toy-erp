@@ -1,15 +1,25 @@
 #!/usr/bin/env node
 import { spawn } from 'node:child_process'
+import { existsSync, readFileSync, statSync } from 'node:fs'
+import path from 'node:path'
 import process from 'node:process'
+import { pathToFileURL } from 'node:url'
 
 import { normalizeDevCustomerKey } from '../devCustomerConfigPlugin.mjs'
 import { resolveAvailablePort } from './localPort.mjs'
+import {
+  normalizeAPIOrigin,
+  runWebRuntimePreflight,
+} from '../../scripts/local-runtime-preflight.mjs'
+
+const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 
 function parseArgs(argv) {
   const options = {
     customer: process.env.ERP_CUSTOMER_KEY || 'yoyoosun',
     port: process.env.PORT || '5176',
     apiOrigin: process.env.API_ORIGIN || 'http://127.0.0.1:8300',
+    frontendOnly: false,
     printPlan: false,
   }
 
@@ -30,6 +40,8 @@ function parseArgs(argv) {
       index += 1
     } else if (arg === '--print-plan') {
       options.printPlan = true
+    } else if (arg === '--frontend-only') {
+      options.frontendOnly = true
     } else {
       throw new Error(`Unknown argument: ${arg}`)
     }
@@ -37,9 +49,7 @@ function parseArgs(argv) {
 
   options.customer = normalizeDevCustomerKey(options.customer)
   options.port = String(options.port || '').trim()
-  options.apiOrigin = String(options.apiOrigin || '')
-    .trim()
-    .replace(/\/+$/, '')
+  options.apiOrigin = normalizeAPIOrigin(options.apiOrigin)
 
   if (!options.customer) {
     throw new Error('customer is required')
@@ -49,11 +59,35 @@ function parseArgs(argv) {
     throw new Error(`port must be a number: ${options.port}`)
   }
 
-  if (!options.apiOrigin) {
-    throw new Error('api origin is required')
+  return options
+}
+
+export function checkDevCustomerPackage(customer, projectRoot = repoRoot) {
+  const customerKey = normalizeDevCustomerKey(customer)
+  const customerDir = path.join(projectRoot, 'config', 'customers', customerKey)
+  const configPath = path.join(customerDir, 'customer-config.example.js')
+  const faviconPath = path.join(
+    customerDir,
+    'public-assets',
+    `favicon-${customerKey}.svg`
+  )
+
+  if (!existsSync(configPath)) {
+    throw new Error(
+      `客户配置源不存在：config/customers/${customerKey}/customer-config.example.js`
+    )
+  }
+  const configSource = readFileSync(configPath, 'utf8')
+  if (!configSource.includes(`customerKey: "${customerKey}"`)) {
+    throw new Error(`客户配置源未声明 customerKey=${customerKey}`)
+  }
+  if (!existsSync(faviconPath) || statSync(faviconPath).size <= 0) {
+    throw new Error(
+      `客户公开资源不存在：public-assets/favicon-${customerKey}.svg`
+    )
   }
 
-  return options
+  return { customerKey, configPath, faviconPath }
 }
 
 function printPlan(options) {
@@ -78,6 +112,11 @@ function printPlan(options) {
       portNote,
       `[${label}] url=http://localhost:${options.port}/erp`,
       `[${label}] backend=${options.apiOrigin}`,
+      `[${label}] preflight=${
+        options.frontendOnly
+          ? 'frontend-only (database/backend explicitly skipped; non-green)'
+          : 'database migration + backend health/ready + customer config/assets'
+      }`,
       `[${label}] mode=vite dev server with HMR`,
       `[${label}] customer_config publish/activate is not executed`,
       ...verificationLines,
@@ -85,7 +124,8 @@ function printPlan(options) {
         `ERP_DEV_CUSTOMER_KEY=${options.customer}`,
         `ERP_VITE_PORT=${options.port}`,
         `ERP_VITE_HMR_CLIENT_PORT=${options.port}`,
-        'pnpm start',
+        `API_ORIGIN=${options.apiOrigin}`,
+        'pnpm start:yoyoosun',
       ].join(' '),
       '',
     ].join('\n')
@@ -93,12 +133,13 @@ function printPlan(options) {
 }
 
 function runVite(options) {
-  const child = spawn('pnpm', ['start'], {
+  const child = spawn('pnpm', ['exec', 'vite', '--config', 'vite.config.mjs'], {
     env: {
       ...process.env,
       ERP_DEV_CUSTOMER_KEY: options.customer,
       ERP_VITE_PORT: options.port,
       ERP_VITE_HMR_CLIENT_PORT: options.port,
+      API_ORIGIN: options.apiOrigin,
     },
     stdio: 'inherit',
   })
@@ -110,7 +151,8 @@ function runVite(options) {
 
   child.on('exit', (code, signal) => {
     if (signal) {
-      process.exit(0)
+      process.kill(process.pid, signal)
+      return
     }
     process.exit(code || 0)
   })
@@ -127,10 +169,21 @@ async function main() {
     return
   }
 
+  await runWebRuntimePreflight(options)
+  checkDevCustomerPackage(options.customer)
+  process.stdout.write(
+    `[start-yoyoosun] 客户配置与公开资源预检通过：${options.customer}\n`
+  )
   runVite(options)
 }
 
-main().catch((error) => {
-  process.stderr.write(`[start-yoyoosun] ${error.message}\n`)
-  process.exit(1)
-})
+const isDirectRun =
+  process.argv[1] &&
+  pathToFileURL(path.resolve(process.argv[1])).href === import.meta.url
+
+if (isDirectRun) {
+  main().catch((error) => {
+    process.stderr.write(`[start-yoyoosun] ${error.message}\n`)
+    process.exit(1)
+  })
+}

@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/shopspring/decimal"
 )
 
 // Shipment is the model entity for the Shipment schema.
@@ -35,6 +36,10 @@ type Shipment struct {
 	PlannedShipAt *time.Time `json:"planned_ship_at,omitempty"`
 	// ShippedAt holds the value of the "shipped_at" field.
 	ShippedAt *time.Time `json:"shipped_at,omitempty"`
+	// TotalNetWeightKg holds the value of the "total_net_weight_kg" field.
+	TotalNetWeightKg *decimal.Decimal `json:"total_net_weight_kg,omitempty"`
+	// RequestedTotalNetWeightKg holds the value of the "requested_total_net_weight_kg" field.
+	RequestedTotalNetWeightKg *decimal.Decimal `json:"requested_total_net_weight_kg,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -96,6 +101,8 @@ func (*Shipment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case shipment.FieldTotalNetWeightKg, shipment.FieldRequestedTotalNetWeightKg:
+			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID:
 			values[i] = new(sql.NullInt64)
 		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldIdempotencyKey, shipment.FieldNote:
@@ -175,6 +182,20 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ShippedAt = new(time.Time)
 				*_m.ShippedAt = value.Time
+			}
+		case shipment.FieldTotalNetWeightKg:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field total_net_weight_kg", values[i])
+			} else if value.Valid {
+				_m.TotalNetWeightKg = new(decimal.Decimal)
+				*_m.TotalNetWeightKg = *value.S.(*decimal.Decimal)
+			}
+		case shipment.FieldRequestedTotalNetWeightKg:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field requested_total_net_weight_kg", values[i])
+			} else if value.Valid {
+				_m.RequestedTotalNetWeightKg = new(decimal.Decimal)
+				*_m.RequestedTotalNetWeightKg = *value.S.(*decimal.Decimal)
 			}
 		case shipment.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -278,6 +299,16 @@ func (_m *Shipment) String() string {
 	if v := _m.ShippedAt; v != nil {
 		builder.WriteString("shipped_at=")
 		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.TotalNetWeightKg; v != nil {
+		builder.WriteString("total_net_weight_kg=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.RequestedTotalNetWeightKg; v != nil {
+		builder.WriteString("requested_total_net_weight_kg=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {

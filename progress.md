@@ -2,6 +2,42 @@
 
 本文件只保留当前活跃事项、最近完成记录和归档索引；历史流水已归档到 `docs/archive/`。`progress.md` 是过程交接线索，不是正式需求、数据模型或部署真源。
 
+## 2026-07-14 本地启动、登录与冻结树门禁收口
+
+完成：定位登录后空白页和 `Maximum update depth exceeded` 为已进入 `origin/main` 的认证合同漂移，而不是其他运行会话临时改写。服务端管理员 JWT 已改用 `uid / sid / auth_version / iss / aud / sub / jti / iat / exp`，前端却继续读取已移除的 `uname / role`，导致有效管理员被投影为普通用户并在 dashboard 与登录页之间循环导航。前端现按新版会话 claims fail closed，用户名使用登录后持久化元数据，管理员身份只作为前端 scope；真实会话、RBAC 和 `auth_version` 仍由后端判定。Style L1 与移动端 smoke 统一复用 canonical mock token，并用跨 Go / JS 合同测试阻断再次漂移。
+
+完成：新增共享只读本地 runtime preflight，覆盖 `make dev_restart`、`pnpm start` 和 `pnpm start:yoyoosun`。启动前强制检查工作树 schema / versioned migration、一致的 Atlas migration 状态，以及前端目标后端的 `/healthz`、`/readyz`；本地 API 的预检地址与 Vite RPC / template 代理使用同一 `API_ORIGIN`。预检不会自动 apply migration，普通入口不能被遗留环境变量静默降级；只有显式 `start:frontend-only` 可跳过数据库和后端检查，并明确标记为非绿色证据。`dev_restart` 在预检成功后才停止旧服务，失败时不会先破坏现有运行态。
+
+验证：共享开发库由 67 / 68 安全升级到 68 / 68，真实 `make dev_restart` 完成构建、PDF warmup、RBAC seed，并由 8300 / 9300 提供 `healthz=ok`、`readyz=ready`；原 `roles.role_type` 缺列 panic 不再出现。真实 `pnpm start` 与 `pnpm start:yoyoosun` 均在预检后启动本轮 Vite 并返回页面，甲方入口同时通过客户配置与 public assets 静态检查。隔离浏览器实测管理员登录只导航一次到 dashboard，控制台 0 error / 0 warning；既有 `business-menu-groups-desktop` Style L1 也通过。冻结树 `full.sh` 完整通过：Node 自动发现 866 / 866、web 1054 / 1054、server quick 1790 / 1790、server all 1815 / 1815、critical PostgreSQL 133 / 133、真实 self-host Chromium、构建、secrets 和 govulncheck 均为 0 skip；首次 strict 的一次 Node 失败无法单独复现，随后 Node 866 / 866 和第二次完整 `strict.sh` 均通过，shellcheck、shfmt、yamllint 与零 warning 检查无剩余阻断。
+
+下一步：提交推送后若要在 192.168.0.133 发布，仍须按正式发布流程绑定新 commit / image、执行目标 migration、health / smoke、回滚点和客户验收；本地开发库绿色不能替代目标环境证据。yoyoosun 客户业务页仍要求正式 customer config revision 完成评审、publish / activate 和会话读回，不能用内置 RBAC fallback 伪装已激活。
+
+阻塞/风险：本轮未部署或激活客户配置。共享预检能证明当前工作树 migration、所检查开发库和目标 HTTP 服务分别就绪，但 `/healthz` / `/readyz` 尚未暴露可核对的工作树 build identity；若另一个健康后端进程占用相同端口，仍需结合启动日志和进程归属确认。该边界不影响本次已定位的前端 JWT 循环根因，也不把本地结果表述为发布证据。
+
+## 2026-07-14 SKU 单重与出货总净重闭环
+
+完成：在既有产品单重真源上新增可空 SKU 单重，统一为 `numeric(20,6)` kg；SKU 填写单重时必须同时维护显式默认单位，未填 SKU 单重时才允许按产品默认单位回退产品单重。产品 / SKU / 出货重量 JSON-RPC 使用有界十进制字符串 / NULL，解析前拒绝指数、超长、超精度和 JSON number 重量输入；出货数量在 Biz 创建边界同步限制为正数、最多 6 位小数和 `numeric(20,6)` 上限。
+
+完成：新增唯一 Atlas migration `20260714103721_migrate.sql`，包含 SKU 单重、出货行 `unit_net_weight_kg_snapshot`、出货单 `total_net_weight_kg` 和内部不可变 `requested_total_net_weight_kg`。确认 `DRAFT -> SHIPPED` 时，后端在同一事务锁定产品 / SKU，按 SKU 显式覆盖、否则产品回退解析并冻结可得行快照；只有全部行可解析时才按高精度 decimal 累加并在整单末次四舍五入后覆盖总净重，缺值或单位不匹配不做部分合计，可保留人工整单实际净重且不阻断出货。库存或总重失败会整笔回滚；重复确认不重算，取消保留快照和总净重；创建意图快照保证 SHIPPED / CANCELLED 后同请求仍可幂等重放，不同人工总重继续冲突。历史记录保持 NULL，不回填。
+
+完成：SKU 表单、列表和 CSV 已展示单重；出货新建弹窗按完整产品 / SKU 引用计算预计总净重，自动计算不可得时才开放人工实际总净重，并把人工值绑定到产品、SKU、单位、数量和行集合签名，明细变化或自动计算恢复时清空残值。产品 / SKU 引用按每页 200 完整分页并包含停用历史记录，停用项可回显但不可新选。前端计算完全使用 ES2018 可运行的十进制定点字符串乘加，不依赖 BigInt 或浮点；列表、CSV、草稿详情、SHIPPED / CANCELLED 最终总净重、确认单重快照和行净重均已接通。
+
+验证：两个隔离 PostgreSQL 空库均 fresh apply 68 个 migration / 451 statements 到 `20260714103721`；`make inventory_pg_test` 为 `ok server/internal/data 54.983s`，critical PostgreSQL 为 `run=133 pass=133 skip=0 fail=0`。`go test ./...`、`go build ./...` 通过；二次 `make data` 报告 migration directory synced，生成前后 diff SHA256 均为 `e311731668d981e497f1ce6a51903f30227e41f35ddf059a9355de6c9a78323f`。Node 24.14.0 下净重相关 153 / 153、前端 lint、CSS、Vite production build（3257 modules）和专用 `shipment-net-weight-desktop` Chromium 场景 1 / 1 通过；当前截图为 `web/output/playwright/style-l1/shipment-net-weight-predicted.png`、`shipment-net-weight-incomplete.png` 和 `shipment-net-weight-desktop.png`。
+
+下一步：用真实客户产品 / SKU 和出货数据确认单重维护责任、人工称重使用频率及列表 / 导出文案；毛重、单位换算、装箱 / 物流、打印、报关和提单继续单独评审，不从净重快照倒推。
+
+阻塞/风险：本轮未部署目标环境，未取得 migration apply、health / smoke、rollback、真实客户验收或发布证据；未运行共享 dirty worktree 的最终 `full.sh / strict.sh`，不能把定向绿色表述为整仓冻结门禁。其他会话的明细展开、认证 / 本地运行、样式和文档现场均保留；本轮未 stage、commit 或 push。
+
+## 2026-07-14 客户配置 fallback 误挂载业务页修复
+
+完成：修复永绅本地入口在客户配置 revision 为空时仍挂载生产订单等客户业务页的问题。`adminProfileSync` 现在只有在 effective session 同时包含非空 customer key 且来源为 `active_customer_config_revision` 时才判定客户运行态可用；`builtin_rbac_fallback` 只保留权限 / Product Core 诊断能力，不再冒充已激活客户配置，也不会触发生产订单严格模块 API 后再显示“客户配置版本不存在”。同一共享 guard 同步收紧桌面客户入口和岗位任务端，不修改生产订单后端 active module 门禁。
+
+验证：`adminProfileSync.test.mjs` 31 / 31 通过，新增永绅 key + builtin fallback 必须拒绝桌面客户运行态和移动任务挂载的回归断言；目标文件 ESLint 与 `git diff --check` 通过。复用 Chrome 现有 admin 登录态访问 `http://127.0.0.1:5177/erp/production/orders`，页面进入“暂时无法进入工作台”安全阻断态，未挂载生产订单列表。全量前端 lint 被任务外 `shipmentWeight.mjs` 的 2 个 error 阻断，并另报告 `ShipmentBusinessModal.jsx` 的 2 个 warning；本轮未改这些共享 WIP。
+
+下一步：客户业务页要恢复真实读写，仍需按正式客户配置评审、publish / activate 和有效会话读回流程补齐 yoyoosun active revision；不能用内置 RBAC fallback 或前端静态品牌配置替代。目标环境部署、migration、release evidence 和客户签收均未执行。
+
+阻塞/风险：当前修复解决错误页面挂载与误导性 toast，不生成或激活客户配置版本；因此在 revision 为空的数据库上，业务页会安全阻断而不是展示空列表。共享工作树存在其他会话改动，本轮只新增 `adminProfileSync` guard、测试与本条进度记录，未提交、未推送。
+
 ## 2026-07-14 远端 CI Chromium 沙箱收口
 
 完成：主仓产品单重提交 `6b0ac4e4` 推送后，GitHub Actions run `29318178284` 只在真实 Chromium PDF 安全集成启动阶段失败；Ubuntu 24.04 拒绝 Playwright 下载版 Chromium 使用 user namespace sandbox，测试体尚未执行。CI 改为从同一 Playwright Chromium 发行包安装独立 `chrome_sandbox` helper 到 `/usr/local/sbin/chrome-devel-sandbox`，强制 `root:root` 与 `4755` 后通过 `CHROME_DEVEL_SANDBOX` 绑定。产品代码和 Chromium 参数未加入 `--no-sandbox` 或 `--disable-setuid-sandbox`，不会为适配 CI 降低 PDF 渲染安全边界。
@@ -217,3 +253,15 @@
 下一步：只有当 `internal/server` 的中间件、健康检查、静态资源和 PDF 入口形成独立高频维护面时，再评审是否增加一份薄 README；当前继续由 `server/README.md` 统一导航。
 
 阻塞/风险：本轮仅更新说明层，不改变 runtime、schema、migration、API、RBAC、部署或客户资料；共享工作树中既有并行改动继续保留，未 stage、commit、push 或部署。
+
+## 2026-07-14 单据明细快速展开统一
+
+完成：新增共享的表格行明细预览能力，并接入销售订单、采购订单、委外订单、采购入库、出货单、生产订单和 BOM 七类真实“主单 + 明细”页面。首列统一使用方向箭头而不是“+”；同时只展开一行，展开不改变当前单选，也不触发行双击编辑。展开区只读并默认展示前 5 条，完整明细进入只读分页 Modal，不承载编辑、过账或状态动作。
+
+完成：销售、采购、委外的首次展开按 `id + version` 做版本围栏懒加载和缓存，整页加载不预取明细；生产订单与 BOM 复用各自聚合详情真源，采购入库与出货复用列表内嵌明细。共享缓存额外处理父单版本未变化但嵌入子行已更新的场景，只刷新已经读取过的 entry，并中止同 key 旧请求，避免入库新增明细后继续显示旧数量。移动端展开内容以表格可视滚动窗为宽度容器，390px 下不再按整张宽表宽度渲染。
+
+验证：Node 24.14.0 下共享工具、七页合同和源单 API 定向测试 38/38 通过，目标 ESLint、Stylelint、MJS 语法检查与本轮文件 diff-check 通过。`style:l1` 四场景 4/4 通过，覆盖销售订单 0 预取、首次读取与缓存、展开按钮双击隔离，生产订单 5/22 预览与完整只读 Modal，入库双行互斥与 390px 暗色布局，以及主单版本不变时新增子行后展开区从 1 条同步到 2 条。当前工作树 production Vite build 完成 3257 modules transform。
+
+下一步：在最终冻结工作树按项目统一门禁继续跑全量浏览器 / full / strict，并由目标岗位做七类页面的业务字段扫读验收；共享组件的加载失败后重试仍只由实现和静态检查覆盖，尚未单列浏览器故障注入场景。
+
+阻塞/风险：本轮不改变 schema、migration、后端 Fact / Workflow、RBAC、客户配置或部署。共享工作树仍有认证启动、净重与服务端 schema 等并行改动，本轮未 stage、commit、push 或部署，也未把代表性浏览器绿色写成七页全量验收。

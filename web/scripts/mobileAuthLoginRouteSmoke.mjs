@@ -11,6 +11,7 @@ import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
 import { mobileRoleDefinitions } from '../src/erp/config/appRegistry.mjs'
 import { getRoleWorkbench } from '../src/erp/config/seedData.mjs'
 import { MOBILE_ROLE_TASK_PAGE_LIMIT } from '../src/erp/utils/mobileTaskQueries.mjs'
+import { createMockAdminSessionToken } from './mockAdminSessionToken.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
@@ -1149,14 +1150,10 @@ async function waitForPath(page, expectedPath) {
 }
 
 function createMockAdminToken(username) {
-  const header = { alg: 'none', typ: 'JWT' }
-  const payload = {
-    uid: 1,
-    uname: username,
-    role: 1,
-    exp: Math.floor(Date.now() / 1000) + 3600,
-  }
-  return `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.signature`
+  return createMockAdminSessionToken({
+    userID: 1,
+    sessionKey: `mobile-auth-${username}`,
+  })
 }
 
 function createMockAdminLoginData({ role, token, username, menus } = {}) {
@@ -1172,14 +1169,6 @@ function createMockAdminLoginData({ role, token, username, menus } = {}) {
     menus: Array.isArray(menus) ? menus : [],
     erp_preferences: { column_orders: {} },
   }
-}
-
-function base64UrlEncode(value) {
-  return Buffer.from(JSON.stringify(value), 'utf8')
-    .toString('base64')
-    .replaceAll('+', '-')
-    .replaceAll('/', '_')
-    .replaceAll('=', '')
 }
 
 function tailLogs(logs, maxLength = 4000) {

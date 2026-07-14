@@ -31,6 +31,10 @@ const (
 	FieldPlannedShipAt = "planned_ship_at"
 	// FieldShippedAt holds the string denoting the shipped_at field in the database.
 	FieldShippedAt = "shipped_at"
+	// FieldTotalNetWeightKg holds the string denoting the total_net_weight_kg field in the database.
+	FieldTotalNetWeightKg = "total_net_weight_kg"
+	// FieldRequestedTotalNetWeightKg holds the string denoting the requested_total_net_weight_kg field in the database.
+	FieldRequestedTotalNetWeightKg = "requested_total_net_weight_kg"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -79,6 +83,8 @@ var Columns = []string{
 	FieldIdempotencyKey,
 	FieldPlannedShipAt,
 	FieldShippedAt,
+	FieldTotalNetWeightKg,
+	FieldRequestedTotalNetWeightKg,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -171,6 +177,16 @@ func ByPlannedShipAt(opts ...sql.OrderTermOption) OrderOption {
 // ByShippedAt orders the results by the shipped_at field.
 func ByShippedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldShippedAt, opts...).ToFunc()
+}
+
+// ByTotalNetWeightKg orders the results by the total_net_weight_kg field.
+func ByTotalNetWeightKg(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldTotalNetWeightKg, opts...).ToFunc()
+}
+
+// ByRequestedTotalNetWeightKg orders the results by the requested_total_net_weight_kg field.
+func ByRequestedTotalNetWeightKg(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRequestedTotalNetWeightKg, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

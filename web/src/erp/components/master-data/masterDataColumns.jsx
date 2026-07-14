@@ -186,6 +186,16 @@ function productSKUColumns({ productOptions, unitDisplay }) {
       render: (value) => value || '-',
     },
     unitColumn(unitDisplay),
+    {
+      title: 'SKU 单重（净重）',
+      exportTitle: 'SKU 单重（kg / SKU 默认单位）',
+      dataIndex: 'unit_net_weight_kg',
+      width: 200,
+      sortable: false,
+      render: (value, record) =>
+        formatProductUnitNetWeight(value, unitDisplay(record?.default_unit_id)),
+      exportValue: (record) => String(record?.unit_net_weight_kg ?? '').trim(),
+    },
     statusColumn(),
   ]
 }

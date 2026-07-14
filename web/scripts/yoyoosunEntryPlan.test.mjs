@@ -6,6 +6,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 import { canListenOnPort } from './localPort.mjs'
+import { checkDevCustomerPackage } from './startYoyoosunDev.mjs'
 import {
   buildYoyoosunLocalEntryAudit,
   classifyAssetResponse,
@@ -15,7 +16,7 @@ import {
 const repoRoot = path.resolve(import.meta.dirname, '..', '..')
 const webRoot = path.join(repoRoot, 'web')
 
-function runScript(scriptName) {
+function runScript(scriptName, env = {}) {
   return spawnSync(
     process.execPath,
     [
@@ -34,6 +35,8 @@ function runScript(scriptName) {
         ERP_CUSTOMER_KEY: '',
         PORT: '',
         API_ORIGIN: '',
+        ERP_FRONTEND_ONLY: '',
+        ...env,
       },
     }
   )
@@ -95,9 +98,32 @@ test('start:yoyoosun print-plan describes dev injection without publishing custo
   assert.equal(result.status, 0, result.stderr)
   assertCommonYoyoosunPlan(result.stdout, 'start-yoyoosun')
   assert.match(result.stdout, /mode=vite dev server with HMR/u)
+  assert.match(
+    result.stdout,
+    /preflight=database migration \+ backend health\/ready \+ customer config\/assets/u
+  )
   assert.match(result.stdout, /ERP_DEV_CUSTOMER_KEY=yoyoosun/u)
   assert.match(result.stdout, /ERP_VITE_PORT=\d+/u)
-  assert.match(result.stdout, /pnpm start/u)
+  assert.match(result.stdout, /pnpm start:yoyoosun/u)
+})
+
+test('start:yoyoosun statically verifies the dev customer config and public asset sources', () => {
+  const result = checkDevCustomerPackage('yoyoosun', repoRoot)
+  assert.equal(result.customerKey, 'yoyoosun')
+  assert.match(result.configPath, /customer-config\.example\.js$/u)
+  assert.match(result.faviconPath, /favicon-yoyoosun\.svg$/u)
+})
+
+test('start:yoyoosun ignores ambient frontend-only environment state', () => {
+  const result = runScript('startYoyoosunDev.mjs', {
+    ERP_FRONTEND_ONLY: '1',
+  })
+  assert.equal(result.status, 0, result.stderr)
+  assert.match(
+    result.stdout,
+    /preflight=database migration \+ backend health\/ready \+ customer config\/assets/u
+  )
+  assert.doesNotMatch(result.stdout, /frontend-only/u)
 })
 
 test('preview:yoyoosun print-plan describes static package injection without publishing customer config', () => {

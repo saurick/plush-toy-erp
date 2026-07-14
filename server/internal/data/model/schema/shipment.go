@@ -18,12 +18,14 @@ type Shipment struct {
 }
 
 var shipmentLockedFields = map[string]struct{}{
-	"shipment_no":     {},
-	"sales_order_id":  {},
-	"customer_id":     {},
-	"status":          {},
-	"idempotency_key": {},
-	"shipped_at":      {},
+	"shipment_no":                   {},
+	"sales_order_id":                {},
+	"customer_id":                   {},
+	"status":                        {},
+	"idempotency_key":               {},
+	"shipped_at":                    {},
+	"total_net_weight_kg":           {},
+	"requested_total_net_weight_kg": {},
 }
 
 func (Shipment) Hooks() []ent.Hook {
@@ -47,7 +49,9 @@ func (Shipment) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"shipments_status_allowed": "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+				"shipments_status_allowed":                         "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+				"shipments_total_net_weight_kg_positive":           "total_net_weight_kg IS NULL OR total_net_weight_kg > 0",
+				"shipments_requested_total_net_weight_kg_positive": "requested_total_net_weight_kg IS NULL OR requested_total_net_weight_kg > 0",
 			},
 		},
 	}
@@ -64,6 +68,9 @@ func (Shipment) Fields() []ent.Field {
 		field.String("idempotency_key").NotEmpty().MaxLen(128),
 		field.Time("planned_ship_at").Optional().Nillable(),
 		field.Time("shipped_at").Optional().Nillable(),
+		optionalDecimalField("total_net_weight_kg"),
+		// Internal immutable create-intent snapshot used only for idempotency comparison.
+		optionalDecimalField("requested_total_net_weight_kg"),
 		field.String("note").Optional().Nillable().MaxLen(255),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),

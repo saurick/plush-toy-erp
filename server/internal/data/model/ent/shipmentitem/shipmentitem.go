@@ -31,6 +31,8 @@ const (
 	FieldLotID = "lot_id"
 	// FieldQuantity holds the string denoting the quantity field in the database.
 	FieldQuantity = "quantity"
+	// FieldUnitNetWeightKgSnapshot holds the string denoting the unit_net_weight_kg_snapshot field in the database.
+	FieldUnitNetWeightKgSnapshot = "unit_net_weight_kg_snapshot"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -115,6 +117,7 @@ var Columns = []string{
 	FieldUnitID,
 	FieldLotID,
 	FieldQuantity,
+	FieldUnitNetWeightKgSnapshot,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -207,6 +210,11 @@ func ByLotID(opts ...sql.OrderTermOption) OrderOption {
 // ByQuantity orders the results by the quantity field.
 func ByQuantity(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldQuantity, opts...).ToFunc()
+}
+
+// ByUnitNetWeightKgSnapshot orders the results by the unit_net_weight_kg_snapshot field.
+func ByUnitNetWeightKgSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUnitNetWeightKgSnapshot, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

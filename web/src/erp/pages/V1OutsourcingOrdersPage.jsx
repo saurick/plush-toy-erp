@@ -32,6 +32,7 @@ import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import {
   downloadBusinessCSV,
   getPreferredColumnOrder,
@@ -53,6 +54,7 @@ import {
 } from '../components/outsourcing-orders/outsourcingOrderColumns.jsx'
 import {
   listAllOutsourcingOrderItems,
+  listOutsourcingOrderItemsPreview,
   listOutsourcingOrders,
   listMaterials,
   listProcesses,
@@ -66,6 +68,7 @@ import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
   OUTSOURCING_ORDER_STATUS_LABELS,
+  OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
   OUTSOURCING_ORDER_SUBJECT_TYPES,
   buildOutsourcingOrderItemSourceValuesFromMaterial,
   buildOutsourcingOrderItemSourceValuesFromProduct,
@@ -78,12 +81,14 @@ import {
   buildSupplierSnapshot,
   buildSupplierSnapshotWithContacts,
   canRunOutsourcingOrderLifecycleAction,
+  formatUnixDate,
   hasActionPermission,
   normalizeOutsourcingLineFormValue,
   SUPPLIER_CONTACT_OWNER_TYPE,
   statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
+import { referenceLabel } from '../utils/referenceSelectOptions.mjs'
 import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
 import {
   buildSourceDocumentItemSaveParams,
@@ -338,6 +343,7 @@ export default function V1OutsourcingOrdersPage() {
     adminProfile,
     'outsourcing.order.create'
   )
+  const canRead = hasActionPermission(adminProfile, 'outsourcing.order.read')
   const canUpdate = hasActionPermission(
     adminProfile,
     'outsourcing.order.update'
@@ -354,6 +360,112 @@ export default function V1OutsourcingOrdersPage() {
     adminProfile,
     'workflow.task.complete'
   )
+  const getOutsourcingOrderItemFields = useCallback(
+    (item, { view }) => {
+      const isMaterial =
+        item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+      return [
+        {
+          label: '加工对象类型',
+          value: isMaterial ? '材料' : '产品 / 半成品',
+        },
+        ...(isMaterial
+          ? [
+              { label: '材料编码', value: item?.material_code_snapshot },
+              { label: '材料名称', value: item?.material_name_snapshot },
+            ]
+          : [
+              {
+                label: '产品订单编号',
+                value: item?.product_order_no_snapshot,
+              },
+              { label: '产品编号', value: item?.product_no_snapshot },
+              { label: '产品名称', value: item?.product_name_snapshot },
+            ]),
+        { label: '工序', value: item?.process_name_snapshot },
+        { label: '工序分类', value: item?.process_category_snapshot },
+        { label: '加工数量', value: item?.outsourcing_quantity },
+        {
+          label: '单位',
+          value:
+            item?.unit_name_snapshot ||
+            referenceLabel(unitOptions, item?.unit_id, '单位'),
+        },
+        { label: '单价', value: item?.unit_price },
+        { label: '金额', value: item?.amount },
+        {
+          label: '预计回货日期',
+          value: formatUnixDate(item?.expected_return_date),
+        },
+        {
+          label: '行状态',
+          value: statusText(
+            item?.line_status,
+            OUTSOURCING_ORDER_ITEM_STATUS_LABELS,
+            '明细状态待核对'
+          ),
+        },
+        ...(view === 'modal'
+          ? [{ label: '备注', value: item?.note, wide: true }]
+          : []),
+      ]
+    },
+    [unitOptions]
+  )
+  const loadOutsourcingOrderItemsPreview = useCallback(
+    async (order, { signal }) => {
+      const data = await listOutsourcingOrderItemsPreview(
+        {
+          outsourcing_order_id: order.id,
+          expected_version: order.version,
+        },
+        { signal }
+      )
+      return {
+        items: data?.outsourcing_order_items,
+        total: data?.total,
+      }
+    },
+    []
+  )
+  const loadAllOutsourcingOrderItemsForPreview = useCallback(
+    async (order, { signal }) => {
+      const data = await listAllOutsourcingOrderItems(
+        {
+          outsourcing_order_id: order.id,
+          expected_version: order.version,
+        },
+        { signal }
+      )
+      return {
+        items: data?.outsourcing_order_items,
+        total: data?.total,
+      }
+    },
+    []
+  )
+  const outsourcingOrderItemsPreview = useBusinessRowItemsPreview({
+    records: rows,
+    rowExpandable: (order) =>
+      canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
+    loadPreview: loadOutsourcingOrderItemsPreview,
+    loadAll: loadAllOutsourcingOrderItemsForPreview,
+    getItemFields: getOutsourcingOrderItemFields,
+    getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
+    getItemSummary: (item) => {
+      const isMaterial =
+        item?.subject_type === OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+      const subject = isMaterial
+        ? [item?.material_code_snapshot, item?.material_name_snapshot]
+        : [item?.product_no_snapshot, item?.product_name_snapshot]
+      return [...subject, item?.process_name_snapshot]
+        .filter(Boolean)
+        .join(' / ')
+    },
+    getRecordLabel: (order) => order?.outsourcing_order_no || '当前加工合同',
+    modalTitle: '加工合同全部明细',
+    emptyDescription: '当前加工合同暂无明细',
+  })
   const processingPrintTemplateDefaults = useMemo(
     () =>
       getEffectivePrintTemplateDefaults(
@@ -1192,6 +1304,7 @@ export default function V1OutsourcingOrdersPage() {
         columns={columns}
         dataSource={rows}
         loading={loading}
+        expandable={outsourcingOrderItemsPreview.expandable}
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selectedRow ? [selectedRow.id] : [],
@@ -1217,6 +1330,8 @@ export default function V1OutsourcingOrdersPage() {
         }}
         scroll={{ x: 1220 }}
       />
+
+      {outsourcingOrderItemsPreview.modal}
 
       <CollaborationTaskPanel
         tasks={workflowTasks}

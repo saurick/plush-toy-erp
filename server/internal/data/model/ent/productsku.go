@@ -12,6 +12,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/shopspring/decimal"
 )
 
 // ProductSKU is the model entity for the ProductSKU schema.
@@ -39,6 +40,8 @@ type ProductSKU struct {
 	PackagingVersion *string `json:"packaging_version,omitempty"`
 	// DefaultUnitID holds the value of the "default_unit_id" field.
 	DefaultUnitID *int `json:"default_unit_id,omitempty"`
+	// UnitNetWeightKg holds the value of the "unit_net_weight_kg" field.
+	UnitNetWeightKg *decimal.Decimal `json:"unit_net_weight_kg,omitempty"`
 	// IsActive holds the value of the "is_active" field.
 	IsActive bool `json:"is_active,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -177,6 +180,8 @@ func (*ProductSKU) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case productsku.FieldUnitNetWeightKg:
+			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case productsku.FieldIsActive:
 			values[i] = new(sql.NullBool)
 		case productsku.FieldID, productsku.FieldProductID, productsku.FieldDefaultUnitID:
@@ -273,6 +278,13 @@ func (_m *ProductSKU) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.DefaultUnitID = new(int)
 				*_m.DefaultUnitID = int(value.Int64)
+			}
+		case productsku.FieldUnitNetWeightKg:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field unit_net_weight_kg", values[i])
+			} else if value.Valid {
+				_m.UnitNetWeightKg = new(decimal.Decimal)
+				*_m.UnitNetWeightKg = *value.S.(*decimal.Decimal)
 			}
 		case productsku.FieldIsActive:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -421,6 +433,11 @@ func (_m *ProductSKU) String() string {
 	builder.WriteString(", ")
 	if v := _m.DefaultUnitID; v != nil {
 		builder.WriteString("default_unit_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.UnitNetWeightKg; v != nil {
+		builder.WriteString("unit_net_weight_kg=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

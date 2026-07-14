@@ -2436,15 +2436,15 @@ func init() {
 	// productsku.DefaultUnitIDValidator is a validator for the "default_unit_id" field. It is called by the builders before save.
 	productsku.DefaultUnitIDValidator = productskuDescDefaultUnitID.Validators[0].(func(int) error)
 	// productskuDescIsActive is the schema descriptor for is_active field.
-	productskuDescIsActive := productskuFields[10].Descriptor()
+	productskuDescIsActive := productskuFields[11].Descriptor()
 	// productsku.DefaultIsActive holds the default value on creation for the is_active field.
 	productsku.DefaultIsActive = productskuDescIsActive.Default.(bool)
 	// productskuDescCreatedAt is the schema descriptor for created_at field.
-	productskuDescCreatedAt := productskuFields[11].Descriptor()
+	productskuDescCreatedAt := productskuFields[12].Descriptor()
 	// productsku.DefaultCreatedAt holds the default value on creation for the created_at field.
 	productsku.DefaultCreatedAt = productskuDescCreatedAt.Default.(func() time.Time)
 	// productskuDescUpdatedAt is the schema descriptor for updated_at field.
-	productskuDescUpdatedAt := productskuFields[12].Descriptor()
+	productskuDescUpdatedAt := productskuFields[13].Descriptor()
 	// productsku.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	productsku.DefaultUpdatedAt = productskuDescUpdatedAt.Default.(func() time.Time)
 	// productsku.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -4003,15 +4003,15 @@ func init() {
 		}
 	}()
 	// shipmentDescNote is the schema descriptor for note field.
-	shipmentDescNote := shipmentFields[8].Descriptor()
+	shipmentDescNote := shipmentFields[10].Descriptor()
 	// shipment.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	shipment.NoteValidator = shipmentDescNote.Validators[0].(func(string) error)
 	// shipmentDescCreatedAt is the schema descriptor for created_at field.
-	shipmentDescCreatedAt := shipmentFields[9].Descriptor()
+	shipmentDescCreatedAt := shipmentFields[11].Descriptor()
 	// shipment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shipment.DefaultCreatedAt = shipmentDescCreatedAt.Default.(func() time.Time)
 	// shipmentDescUpdatedAt is the schema descriptor for updated_at field.
-	shipmentDescUpdatedAt := shipmentFields[10].Descriptor()
+	shipmentDescUpdatedAt := shipmentFields[12].Descriptor()
 	// shipment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	shipment.DefaultUpdatedAt = shipmentDescUpdatedAt.Default.(func() time.Time)
 	// shipment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -4049,15 +4049,15 @@ func init() {
 	// shipmentitem.LotIDValidator is a validator for the "lot_id" field. It is called by the builders before save.
 	shipmentitem.LotIDValidator = shipmentitemDescLotID.Validators[0].(func(int) error)
 	// shipmentitemDescNote is the schema descriptor for note field.
-	shipmentitemDescNote := shipmentitemFields[8].Descriptor()
+	shipmentitemDescNote := shipmentitemFields[9].Descriptor()
 	// shipmentitem.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	shipmentitem.NoteValidator = shipmentitemDescNote.Validators[0].(func(string) error)
 	// shipmentitemDescCreatedAt is the schema descriptor for created_at field.
-	shipmentitemDescCreatedAt := shipmentitemFields[9].Descriptor()
+	shipmentitemDescCreatedAt := shipmentitemFields[10].Descriptor()
 	// shipmentitem.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shipmentitem.DefaultCreatedAt = shipmentitemDescCreatedAt.Default.(func() time.Time)
 	// shipmentitemDescUpdatedAt is the schema descriptor for updated_at field.
-	shipmentitemDescUpdatedAt := shipmentitemFields[10].Descriptor()
+	shipmentitemDescUpdatedAt := shipmentitemFields[11].Descriptor()
 	// shipmentitem.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	shipmentitem.DefaultUpdatedAt = shipmentitemDescUpdatedAt.Default.(func() time.Time)
 	// shipmentitem.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

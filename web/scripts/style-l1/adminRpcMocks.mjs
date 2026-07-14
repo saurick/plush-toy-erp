@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
+import { createMockAdminSessionToken } from '../mockAdminSessionToken.mjs'
 
 import { installFactRpcMocks } from './factRpcMocks.mjs'
 import { installMasterDataRpcMocks } from './masterDataRpcMocks.mjs'
@@ -352,16 +353,8 @@ export async function installAdminDisabledRpcMocks(page) {
 }
 
 export function createMockAdminToken() {
-  const header = encodeBase64URL({ alg: 'none', typ: 'JWT' })
-  const payload = encodeBase64URL({
-    uid: 1,
-    uname: 'style-l1-admin',
-    role: 1,
-    exp: Math.floor(Date.now() / 1000) + 3600,
+  return createMockAdminSessionToken({
+    userID: 1,
+    sessionKey: 'style-l1-admin-session',
   })
-  return `${header}.${payload}.stylel1`
-}
-
-function encodeBase64URL(value) {
-  return Buffer.from(JSON.stringify(value)).toString('base64url')
 }

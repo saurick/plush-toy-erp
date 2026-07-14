@@ -3,6 +3,7 @@ import { Tag } from 'antd'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
+import { hasFinalShipmentWeight } from '../../utils/shipmentWeight.mjs'
 
 export const SHIPMENTS_MODULE_KEY = 'shipments'
 
@@ -103,6 +104,25 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       sortValue: (record) => record.items?.length || 0,
       render: (_, record) => record.items?.length || 0,
       exportValue: (record) => record.items?.length || 0,
+    },
+    {
+      title: '实际 / 最终总净重（kg）',
+      exportTitle: '总净重（kg）',
+      dataIndex: 'total_net_weight_kg',
+      width: 190,
+      sortable: false,
+      render: (value, record) => {
+        const weight = String(value ?? '').trim()
+        if (!weight) {
+          if (record?.status === 'DRAFT') return '待确认'
+          if (hasFinalShipmentWeight(record?.status)) return '未记录'
+          return '-'
+        }
+        if (hasFinalShipmentWeight(record?.status)) return `最终 ${weight} kg`
+        if (record?.status === 'DRAFT') return `实际 ${weight} kg`
+        return `${weight} kg`
+      },
+      exportValue: (record) => String(record?.total_net_weight_kg ?? '').trim(),
     },
     {
       title: '计划出货日期 / 实际出货日期',

@@ -12,6 +12,7 @@ import {
 } from 'antd'
 
 import { paymentConditionCompleteness } from '../../utils/masterDataOrderView.mjs'
+import { normalizeNetWeightKg } from '../../utils/shipmentWeight.mjs'
 import {
   optionalContactEmailRule,
   optionalContactPhoneRule,
@@ -20,15 +21,39 @@ import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScrol
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 
-function DefaultUnitSelect({ required = false, unitOptions, unitLoading }) {
+function DefaultUnitSelect({
+  form,
+  required = false,
+  requiredWhenWeightField,
+  unitOptions,
+  unitLoading,
+}) {
+  const rules = required
+    ? [{ required: true, message: '请选择默认单位' }]
+    : requiredWhenWeightField
+      ? [
+          {
+            validator: async (_, value) => {
+              const weight = form?.getFieldValue(requiredWhenWeightField)
+              if (
+                weight !== undefined &&
+                weight !== null &&
+                weight !== '' &&
+                !value
+              ) {
+                throw new Error('填写 SKU 单重时必须选择 SKU 默认单位')
+              }
+            },
+          },
+        ]
+      : undefined
   return (
     <Form.Item
       className="erp-business-action-form__field"
+      dependencies={requiredWhenWeightField ? [requiredWhenWeightField] : []}
       label="默认单位"
       name="default_unit_id"
-      rules={
-        required ? [{ required: true, message: '请选择默认单位' }] : undefined
-      }
+      rules={rules}
     >
       <Select
         allowClear={!required}
@@ -61,9 +86,64 @@ function ProductUnitNetWeightField({ form, unitOptions }) {
             if (value === undefined || value === null || value === '') {
               return
             }
-            const numeric = Number(value)
-            if (!Number.isFinite(numeric) || numeric <= 0) {
-              throw new Error('产品单重必须大于 0')
+            if (!normalizeNetWeightKg(value)) {
+              throw new Error('产品单重必须大于 0，且最多保留 6 位小数')
+            }
+          },
+        },
+      ]}
+    >
+      <FieldWithUnitSuffix
+        control={
+          <InputNumber
+            max="99999999999999.999999"
+            min="0.000001"
+            precision={6}
+            stringMode
+            style={{ width: '100%' }}
+          />
+        }
+        unitText={`kg / ${defaultUnitLabel}`}
+      />
+    </Form.Item>
+  )
+}
+
+function SKUUnitNetWeightField({ form, products, unitOptions }) {
+  const productID = Form.useWatch('product_id', form)
+  const defaultUnitID = Form.useWatch('default_unit_id', form)
+  const selectedProduct = products.find(
+    (product) => String(product?.id || '') === String(productID || '')
+  )
+  const defaultUnitLabel =
+    unitOptions.find(
+      (option) => String(option?.value || '') === String(defaultUnitID || '')
+    )?.label || 'SKU 默认单位'
+  const productDefaultUnitLabel =
+    unitOptions.find(
+      (option) =>
+        String(option?.value || '') ===
+        String(selectedProduct?.default_unit_id || '')
+    )?.label || '产品默认单位'
+
+  return (
+    <Form.Item
+      className="erp-business-action-form__field"
+      extra={`未知时可留空；出货仅在 SKU 未填单重且单位为${productDefaultUnitLabel}时回退产品单重。`}
+      label="SKU 单重（净重）"
+      name="unit_net_weight_kg"
+      dependencies={['default_unit_id']}
+      rules={[
+        {
+          validator: async (_, value) => {
+            if (value === undefined || value === null || value === '') {
+              return
+            }
+            if (!form?.getFieldValue('default_unit_id')) {
+              throw new Error('请先选择 SKU 默认单位')
+            }
+            if (!normalizeNetWeightKg(value)) {
+              throw new Error('SKU 单重必须大于 0，且最多保留 6 位小数')
             }
           },
         },
@@ -168,6 +248,7 @@ function paymentConditionRule({ form, methodField, termDaysField, field }) {
 export function MasterDataFormFields({
   form,
   type,
+  products = [],
   productOptions = [],
   unitOptions = [],
   unitLoading = false,
@@ -217,6 +298,7 @@ export function MasterDataFormFields({
           <Input allowClear autoComplete="off" />
         </Form.Item>
         <DefaultUnitSelect
+          form={form}
           required
           unitOptions={unitOptions}
           unitLoading={unitLoading}
@@ -305,8 +387,15 @@ export function MasterDataFormFields({
           <Input allowClear autoComplete="off" />
         </Form.Item>
         <DefaultUnitSelect
+          form={form}
+          requiredWhenWeightField="unit_net_weight_kg"
           unitOptions={unitOptions}
           unitLoading={unitLoading}
+        />
+        <SKUUnitNetWeightField
+          form={form}
+          products={products}
+          unitOptions={unitOptions}
         />
       </>
     )

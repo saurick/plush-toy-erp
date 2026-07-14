@@ -19,6 +19,7 @@ import {
   SearchInput,
   SelectionActionBar,
 } from '../components/business-list/BusinessListLayout.jsx'
+import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import ProductionOrderFormModal from '../components/production-orders/ProductionOrderFormModal.jsx'
 import {
   cancelProductionOrder,
@@ -87,6 +88,23 @@ function optionIDs(items, key) {
         .filter((value) => Number.isSafeInteger(value) && value > 0)
     ),
   ]
+}
+
+function productionOptionLabel(options, value, fallback) {
+  if (!value) return '-'
+  const matched = (Array.isArray(options) ? options : []).find(
+    (option) => Number(option?.value) === Number(value)
+  )
+  return matched?.label || `${fallback}已关联`
+}
+
+function productionSnapshotLabel(values, fallback) {
+  return (
+    values
+      .map((value) => String(value || '').trim())
+      .filter(Boolean)
+      .join(' / ') || fallback
+  )
 }
 
 function aggregateToForm(aggregate) {
@@ -215,7 +233,7 @@ export default function V1ProductionOrdersPage() {
     reasonForm.resetFields()
   }, [reasonAction, reasonForm])
 
-  const loadHistoricalOptions = async (items) => {
+  const loadHistoricalOptions = useCallback(async (items, options = {}) => {
     const definitions = [
       ['product', 'product_id'],
       ['product_sku', 'product_sku_id'],
@@ -227,20 +245,109 @@ export default function V1ProductionOrdersPage() {
       definitions.map(async ([type, key]) => {
         const ids = optionIDs(items, key)
         if (ids.length === 0) return [type, []]
-        const data = await listProductionOrderReferenceOptions(type, {
-          selected_ids: ids,
-        })
+        const data = await listProductionOrderReferenceOptions(
+          type,
+          { selected_ids: ids },
+          options
+        )
         return [type, data.options]
       })
     )
     setOptionsByType(Object.fromEntries(pairs))
-  }
+  }, [])
+
+  const productionItemsPreview = useBusinessRowItemsPreview({
+    records: orders,
+    getRecordLabel: (record) => record?.order_no || '当前生产订单',
+    loadPreview: async (record, { signal }) => {
+      const nextAggregate = await getProductionOrder(record.id, { signal })
+      return {
+        items: nextAggregate.items,
+        total: nextAggregate.items.length,
+      }
+    },
+    getItemKey: (item) => item?.id,
+    getItemLabel: (item, { index }) =>
+      item?.line_no ? `第 ${item.line_no} 行` : `明细 ${index + 1}`,
+    getItemSummary: (item) => `计划数量 ${item?.planned_quantity || '-'}`,
+    getItemFields: (item, { view }) => [
+      {
+        key: 'product',
+        label: '产品',
+        value: productionSnapshotLabel(
+          [item?.product_code_snapshot, item?.product_name_snapshot],
+          productionOptionLabel(optionsByType.product, item?.product_id, '产品')
+        ),
+        wide: true,
+      },
+      {
+        key: 'product_sku',
+        label: '规格',
+        value: productionSnapshotLabel(
+          [item?.sku_code_snapshot],
+          productionOptionLabel(
+            optionsByType.product_sku,
+            item?.product_sku_id,
+            '规格'
+          )
+        ),
+      },
+      {
+        key: 'unit',
+        label: '单位',
+        value:
+          item?.unit_name_snapshot ||
+          productionOptionLabel(optionsByType.unit, item?.unit_id, '单位'),
+      },
+      {
+        key: 'quantity',
+        label: '计划数量',
+        value: item?.planned_quantity || '-',
+      },
+      {
+        key: 'sales_order_item',
+        label: '销售订单行',
+        value: productionOptionLabel(
+          optionsByType.sales_order_item,
+          item?.sales_order_item_id,
+          '销售订单行'
+        ),
+        wide: true,
+      },
+      {
+        key: 'bom',
+        label: 'BOM 版本',
+        value:
+          item?.bom_version_snapshot ||
+          productionOptionLabel(
+            optionsByType.active_bom,
+            item?.bom_header_id,
+            'BOM 版本'
+          ),
+      },
+      ...(view === 'modal'
+        ? [
+            {
+              key: 'note',
+              label: '备注',
+              value: item?.note || '-',
+              wide: true,
+            },
+          ]
+        : []),
+    ],
+    modalTitle: '生产订单完整明细',
+  })
 
   const loadDetail = async (record, mode = 'view') => {
     setDetailLoading(true)
     try {
       const nextAggregate = await getProductionOrder(record.id)
       await loadHistoricalOptions(nextAggregate.items)
+      productionItemsPreview.prime(nextAggregate.order, {
+        items: nextAggregate.items,
+        total: nextAggregate.items.length,
+      })
       setAggregate(nextAggregate)
       setSelected(nextAggregate.order)
       setFormValues(aggregateToForm(nextAggregate))
@@ -261,6 +368,10 @@ export default function V1ProductionOrdersPage() {
         signal: request.signal,
       })
       if (request.isCurrent() && nextAggregate.order.id === record.id) {
+        productionItemsPreview.prime(nextAggregate.order, {
+          items: nextAggregate.items,
+          total: nextAggregate.items.length,
+        })
         setAggregate(nextAggregate)
         setSelected(nextAggregate.order)
       }
@@ -303,6 +414,10 @@ export default function V1ProductionOrdersPage() {
       const result = await execute(attempt.params)
       attemptsRef.current.finish(scope, attempt)
       message.success(successText)
+      productionItemsPreview.prime(result.order, {
+        items: result.items,
+        total: result.items.length,
+      })
       setAggregate(result)
       setSelected(result.order)
       return true
@@ -588,10 +703,12 @@ export default function V1ProductionOrdersPage() {
           onChange: (page, pageSize) =>
             writeQuery({ page, page_size: pageSize }),
         }}
+        expandable={productionItemsPreview.expandable}
         emptyDescription={
           canCreate ? '暂无生产订单，可新建生产计划单' : '暂无可查看的生产订单'
         }
       />
+      {productionItemsPreview.modal}
 
       <ProductionOrderFormModal
         form={form}

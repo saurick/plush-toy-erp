@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useEffect } from 'react'
 import { DeleteOutlined } from '@ant-design/icons'
 import {
   Alert,
@@ -6,6 +6,7 @@ import {
   Empty,
   Form,
   Input,
+  InputNumber,
   Select,
   Space,
   Table,
@@ -30,8 +31,18 @@ import {
   formatQuantity,
 } from '../../utils/businessLineItems.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
+import {
+  calculateShipmentLineNetWeightKg,
+  hasFinalShipmentWeight,
+  normalizeNetWeightKg,
+  normalizeShipmentQuantity,
+  resolveShipmentWeightPreview,
+  shipmentWeightItemsSignature,
+} from '../../utils/shipmentWeight.mjs'
+import { message } from '@/common/utils/antdApp'
 
 const { Text } = Typography
+const EMPTY_SHIPMENT_ITEMS = Object.freeze([])
 
 export function salesOrderCustomerText(order = {}) {
   const snapshot = order.customer_snapshot
@@ -212,6 +223,168 @@ function ShipmentSelectedSourceAlert({
   )
 }
 
+function shipmentWeightText(value, emptyText = '待补齐') {
+  const text = String(value ?? '').trim()
+  return text ? `${text} kg` : emptyText
+}
+
+function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
+  const items = Form.useWatch('items', form) || EMPTY_SHIPMENT_ITEMS
+  const manualWeight = Form.useWatch('total_net_weight_kg', form)
+  const manualItemsSignature = Form.useWatch(
+    'total_net_weight_items_signature',
+    form
+  )
+  const itemsSignature = shipmentWeightItemsSignature(items)
+  const preview = resolveShipmentWeightPreview({ items, products, productSKUs })
+
+  useEffect(() => {
+    const hasManualWeight = String(manualWeight ?? '').trim() !== ''
+    if (!hasManualWeight) return
+    if (preview.complete) {
+      form.setFieldsValue({
+        total_net_weight_kg: undefined,
+        total_net_weight_items_signature: undefined,
+      })
+      message.info('当前明细已可自动计算，旧人工总净重已清空')
+      return
+    }
+    if (!manualItemsSignature) {
+      form.setFieldValue('total_net_weight_items_signature', itemsSignature)
+      return
+    }
+    if (manualItemsSignature !== itemsSignature) {
+      form.setFieldsValue({
+        total_net_weight_kg: undefined,
+        total_net_weight_items_signature: undefined,
+      })
+      message.warning('出货明细已变更，旧人工总净重已清空，请重新填写')
+    }
+  }, [
+    form,
+    itemsSignature,
+    manualItemsSignature,
+    manualWeight,
+    preview.complete,
+  ])
+
+  return (
+    <section className="erp-master-contact-list erp-shipment-weight-summary">
+      <Form.Item name="total_net_weight_items_signature" hidden>
+        <Input />
+      </Form.Item>
+      {preview.complete ? (
+        <Alert
+          showIcon
+          type="info"
+          message={`预计总净重：${preview.totalNetWeightKg} kg`}
+          description="按当前明细和产品 / SKU 单重计算；保存草稿时不提交人工总重，确认出货后的最终总净重以系统确认结果为准。"
+        />
+      ) : (
+        <>
+          <Alert
+            showIcon
+            type="warning"
+            message="预计总净重暂不可计算"
+            description={`${
+              preview.issues[0]?.message || '当前明细缺少可用单重'
+            }。系统不会显示或提交部分合计；可补齐产品档案，或按整单实际称重填写下方总净重。`}
+          />
+          <Form.Item
+            className="erp-business-action-form__field"
+            extra="选填。该数值与当前整组出货明细绑定；产品、SKU、单位、数量、增删行或重新导入后需要重新填写。"
+            label="实际总净重（kg）"
+            name="total_net_weight_kg"
+            rules={[
+              {
+                validator: async (_, value) => {
+                  if (value === undefined || value === null || value === '') {
+                    return
+                  }
+                  if (!normalizeNetWeightKg(value)) {
+                    throw new Error('实际总净重必须大于 0，且最多保留 6 位小数')
+                  }
+                },
+              },
+            ]}
+          >
+            <InputNumber
+              max="99999999999999.999999"
+              min="0.000001"
+              precision={6}
+              stringMode
+              style={{ width: '100%' }}
+              onChange={(value) =>
+                form.setFieldValue(
+                  'total_net_weight_items_signature',
+                  String(value ?? '').trim() ? itemsSignature : undefined
+                )
+              }
+            />
+          </Form.Item>
+        </>
+      )}
+    </section>
+  )
+}
+
+function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
+  const status = String(shipment?.status || '').toUpperCase()
+  if (hasFinalShipmentWeight(status)) {
+    const finalWeight = String(shipment?.total_net_weight_kg ?? '').trim()
+    return (
+      <Alert
+        showIcon
+        type={finalWeight ? 'success' : 'warning'}
+        message={`最终总净重：${finalWeight ? `${finalWeight} kg` : '未记录'}`}
+        description={
+          finalWeight
+            ? '这是确认出货时形成的整单净重；下方明细同时显示确认出货单重和行净重。'
+            : '确认出货时单重信息不完整且未填实际总净重，因此未生成部分合计。'
+        }
+      />
+    )
+  }
+  if (status === 'DRAFT') {
+    const preview = resolveShipmentWeightPreview({
+      items: shipment?.items || [],
+      products,
+      productSKUs,
+    })
+    if (preview.complete) {
+      return (
+        <Alert
+          showIcon
+          type="info"
+          message={`预计总净重：${preview.totalNetWeightKg} kg`}
+          description="当前仍是草稿，数值按现有明细和主数据计算，尚不是最终出货结果。"
+        />
+      )
+    }
+    return (
+      <Alert
+        showIcon
+        type={shipment?.total_net_weight_kg ? 'warning' : 'info'}
+        message={
+          shipment?.total_net_weight_kg
+            ? `实际总净重：${shipmentWeightText(shipment.total_net_weight_kg)}`
+            : '预计总净重：待补齐'
+        }
+        description="当前仍是草稿；单重信息不完整时仅显示人工填写的整单实际净重，不显示部分合计。"
+      />
+    )
+  }
+  return (
+    <Alert
+      showIcon
+      type="info"
+      message={`出货记录总净重：${shipmentWeightText(
+        shipment?.total_net_weight_kg
+      )}`}
+    />
+  )
+}
+
 function ShipmentItemFormFields({
   field,
   form,
@@ -359,7 +532,17 @@ function ShipmentItemFormFields({
         className="erp-business-action-form__field"
         label="数量"
         name={fieldName('quantity')}
-        rules={[{ required: true, message: '请填写数量' }]}
+        rules={[
+          { required: true, message: '请填写数量' },
+          {
+            validator: async (_, value) => {
+              if (value === undefined || value === null || value === '') return
+              if (!normalizeShipmentQuantity(value)) {
+                throw new Error('数量必须大于 0，且最多保留 6 位小数')
+              }
+            },
+          },
+        ]}
       >
         <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
       </Form.Item>
@@ -385,6 +568,7 @@ function ShipmentItemsTable({
   productOptions = [],
   productSKUOptions = [],
   salesOrderItemOptions = [],
+  status = '',
   unitOptions = [],
   warehouseOptions = [],
 }) {
@@ -395,7 +579,7 @@ function ShipmentItemsTable({
       dataSource={items}
       pagination={false}
       locale={{ emptyText: <Empty description="暂无出货明细" /> }}
-      scroll={{ x: 760 }}
+      scroll={{ x: hasFinalShipmentWeight(status) ? 1060 : 760 }}
       columns={[
         {
           title: '销售订单行',
@@ -427,6 +611,35 @@ function ShipmentItemsTable({
             ].join(' / '),
         },
         { title: '数量', dataIndex: 'quantity', width: 120 },
+        ...(hasFinalShipmentWeight(status)
+          ? [
+              {
+                title: '确认出货单重（kg）',
+                dataIndex: 'unit_net_weight_kg_snapshot',
+                width: 180,
+                render: (value, record) => {
+                  const weight = String(value ?? '').trim()
+                  if (!weight) return '-'
+                  return `${weight} kg / ${referenceLabel(
+                    unitOptions,
+                    record.unit_id,
+                    '单位'
+                  )}`
+                },
+              },
+              {
+                title: '行净重（kg）',
+                width: 140,
+                render: (_, record) => {
+                  const lineWeight = calculateShipmentLineNetWeightKg(
+                    record.quantity,
+                    record.unit_net_weight_kg_snapshot
+                  )
+                  return lineWeight ? `${lineWeight} kg` : '-'
+                },
+              },
+            ]
+          : []),
         { title: '备注', dataIndex: 'note' },
       ]}
     />
@@ -468,6 +681,15 @@ export default function ShipmentBusinessModal({
 }) {
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
+  const clearStaleManualWeight = () => {
+    const currentWeight = form?.getFieldValue('total_net_weight_kg')
+    if (String(currentWeight ?? '').trim() === '') return
+    form.setFieldsValue({
+      total_net_weight_kg: undefined,
+      total_net_weight_items_signature: undefined,
+    })
+    message.warning('出货来源或明细已变更，旧人工总净重已清空，请重新填写')
+  }
 
   return (
     <BusinessFormModal
@@ -491,7 +713,10 @@ export default function ShipmentBusinessModal({
         <ShipmentFormFields
           customerOptions={customerOptions}
           disabled={!isCreateModal}
-          onSalesOrderChange={onSalesOrderChange}
+          onSalesOrderChange={(nextSalesOrderID) => {
+            clearStaleManualWeight()
+            onSalesOrderChange?.(nextSalesOrderID)
+          }}
           salesOrderOptions={salesOrderOptions}
           sourceLocked={Boolean(selectedSalesOrder)}
         />
@@ -513,6 +738,11 @@ export default function ShipmentBusinessModal({
         ) : null}
         {modalSelectedShipment ? (
           <section className="erp-master-contact-list erp-shipment-modal-items">
+            <ShipmentWeightDetailSummary
+              shipment={modalSelectedShipment}
+              products={products}
+              productSKUs={productSKUs}
+            />
             <div className="erp-master-contact-list__head">
               <div>
                 <strong>已保存出货明细</strong>
@@ -526,6 +756,7 @@ export default function ShipmentBusinessModal({
               productOptions={productOptions}
               productSKUOptions={productSKUOptions}
               salesOrderItemOptions={salesOrderItemOptions}
+              status={modalSelectedShipment.status}
               unitOptions={unitOptions}
               warehouseOptions={warehouseOptions}
             />
@@ -578,7 +809,10 @@ export default function ShipmentBusinessModal({
                   searchHint="可搜索：销售订单号、客户订单号、客户、产品"
                   emptyDescription="暂无可导入销售订单行"
                   onCancel={() => setSalesOrderImportOpen(false)}
-                  onImport={importSalesOrderToShipment}
+                  onImport={(sourceItems) => {
+                    clearStaleManualWeight()
+                    return importSalesOrderToShipment?.(sourceItems)
+                  }}
                 />
                 <div className="erp-master-contact-list__items">
                   {fields.map((field, index) => (
@@ -636,6 +870,13 @@ export default function ShipmentBusinessModal({
               </section>
             )}
           </Form.List>
+        ) : null}
+        {isCreateModal ? (
+          <ShipmentWeightCreateSummary
+            form={form}
+            products={products}
+            productSKUs={productSKUs}
+          />
         ) : null}
       </Form>
     </BusinessFormModal>

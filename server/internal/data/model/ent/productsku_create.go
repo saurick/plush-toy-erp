@@ -21,6 +21,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/shopspring/decimal"
 )
 
 // ProductSKUCreate is the builder for creating a ProductSKU entity.
@@ -150,6 +151,20 @@ func (_c *ProductSKUCreate) SetDefaultUnitID(v int) *ProductSKUCreate {
 func (_c *ProductSKUCreate) SetNillableDefaultUnitID(v *int) *ProductSKUCreate {
 	if v != nil {
 		_c.SetDefaultUnitID(*v)
+	}
+	return _c
+}
+
+// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
+func (_c *ProductSKUCreate) SetUnitNetWeightKg(v decimal.Decimal) *ProductSKUCreate {
+	_c.mutation.SetUnitNetWeightKg(v)
+	return _c
+}
+
+// SetNillableUnitNetWeightKg sets the "unit_net_weight_kg" field if the given value is not nil.
+func (_c *ProductSKUCreate) SetNillableUnitNetWeightKg(v *decimal.Decimal) *ProductSKUCreate {
+	if v != nil {
+		_c.SetUnitNetWeightKg(*v)
 	}
 	return _c
 }
@@ -502,6 +517,10 @@ func (_c *ProductSKUCreate) createSpec() (*ProductSKU, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.PackagingVersion(); ok {
 		_spec.SetField(productsku.FieldPackagingVersion, field.TypeString, value)
 		_node.PackagingVersion = &value
+	}
+	if value, ok := _c.mutation.UnitNetWeightKg(); ok {
+		_spec.SetField(productsku.FieldUnitNetWeightKg, field.TypeOther, value)
+		_node.UnitNetWeightKg = &value
 	}
 	if value, ok := _c.mutation.IsActive(); ok {
 		_spec.SetField(productsku.FieldIsActive, field.TypeBool, value)

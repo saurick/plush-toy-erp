@@ -33,11 +33,13 @@ import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import {
   listCustomers,
   listContactsByOwner,
   listProductSKUs,
   listAllSalesOrderItems,
+  listSalesOrderItemsPreview,
   listSalesOrders,
   listUnits,
   saveSalesOrderWithItems,
@@ -65,7 +67,10 @@ import {
   canRunSalesOrderLifecycleAction,
   buildSalesOrderItemParams,
   buildSalesOrderParams,
+  formatUnixDate,
   hasActionPermission,
+  SALES_ORDER_ITEM_STATUS_LABELS,
+  statusText,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import {
@@ -100,6 +105,7 @@ import {
 } from '../utils/routeQuery.mjs'
 import {
   customerOption,
+  referenceLabel,
   uniqueReferenceOptions,
   unitOption,
 } from '../utils/referenceSelectOptions.mjs'
@@ -180,6 +186,11 @@ export default function V1SalesOrdersPage() {
 
   const canCreateOrder = hasActionPermission(adminProfile, 'sales_order.create')
   const canUpdateOrder = hasActionPermission(adminProfile, 'sales_order.update')
+  const canReadOrder = hasActionPermission(adminProfile, 'sales_order.read')
+  const canReadOrderItems = hasActionPermission(
+    adminProfile,
+    'sales_order_item.read'
+  )
   const selectedOrderCanEdit = Boolean(
     canUpdateOrder && isDraftSourceDocument(selectedOrder)
   )
@@ -195,6 +206,84 @@ export default function V1SalesOrdersPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
+  const getSalesOrderItemFields = useCallback(
+    (item, { view }) => [
+      { label: '产品编号', value: item?.product_code_snapshot },
+      { label: '产品名称', value: item?.product_name_snapshot },
+      { label: '颜色', value: item?.color_snapshot },
+      { label: '订单数量', value: item?.ordered_quantity },
+      {
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      { label: '单价', value: item?.unit_price },
+      { label: '金额', value: item?.amount },
+      {
+        label: '计划交付日期',
+        value: formatUnixDate(item?.planned_delivery_date),
+      },
+      {
+        label: '行状态',
+        value: statusText(
+          item?.line_status,
+          SALES_ORDER_ITEM_STATUS_LABELS,
+          '明细状态待核对'
+        ),
+      },
+      ...(view === 'modal'
+        ? [{ label: '备注', value: item?.note, wide: true }]
+        : []),
+    ],
+    [unitOptions]
+  )
+  const loadSalesOrderItemsPreview = useCallback(async (order, { signal }) => {
+    const data = await listSalesOrderItemsPreview(
+      {
+        sales_order_id: order.id,
+        expected_version: order.version,
+      },
+      { signal }
+    )
+    return {
+      items: data?.sales_order_items,
+      total: data?.total,
+    }
+  }, [])
+  const loadAllSalesOrderItemsForPreview = useCallback(
+    async (order, { signal }) => {
+      const data = await listAllSalesOrderItems(
+        {
+          sales_order_id: order.id,
+          expected_version: order.version,
+        },
+        { signal }
+      )
+      return {
+        items: data?.sales_order_items,
+        total: data?.total,
+      }
+    },
+    []
+  )
+  const salesOrderItemsPreview = useBusinessRowItemsPreview({
+    records: orders,
+    rowExpandable: (order) =>
+      canReadOrder &&
+      canReadOrderItems &&
+      Number(order?.id || 0) > 0 &&
+      Number(order?.version || 0) > 0,
+    loadPreview: loadSalesOrderItemsPreview,
+    loadAll: loadAllSalesOrderItemsForPreview,
+    getItemFields: getSalesOrderItemFields,
+    getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
+    getItemSummary: (item) =>
+      [item?.product_code_snapshot, item?.product_name_snapshot]
+        .filter(Boolean)
+        .join(' / '),
+    getRecordLabel: (order) => order?.order_no || '当前销售订单',
+    modalTitle: '销售订单全部明细',
+    emptyDescription: '当前销售订单暂无明细',
+  })
   const {
     applyCustomerPaymentDefaults,
     applyPaymentMethodTermDays,
@@ -965,6 +1054,7 @@ export default function V1SalesOrdersPage() {
         loading={loading}
         columns={orderColumns}
         dataSource={orders}
+        expandable={salesOrderItemsPreview.expandable}
         scroll={{ x: 1560 }}
         pagination={createBusinessTablePagination({
           pagination,
@@ -986,6 +1076,8 @@ export default function V1SalesOrdersPage() {
           onDoubleClick: () => openEditOrder(record),
         })}
       />
+
+      {salesOrderItemsPreview.modal}
 
       <CollaborationTaskPanel
         tasks={[]}

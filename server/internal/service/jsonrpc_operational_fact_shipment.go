@@ -63,8 +63,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 	}
 }
 
-func shipmentCreateFromParams(pm map[string]any) *biz.ShipmentCreate {
+func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
 	plannedShipAt, _ := getOptionalJSONRPCTime(pm, "planned_ship_at")
+	totalNetWeightKg, ok := getOptionalJSONRPCDecimalString(pm, "total_net_weight_kg")
+	if !ok {
+		return nil, false
+	}
 	return &biz.ShipmentCreate{
 		ShipmentNo:       getString(pm, "shipment_no"),
 		SalesOrderID:     getOptionalInt(pm, "sales_order_id"),
@@ -72,12 +76,13 @@ func shipmentCreateFromParams(pm map[string]any) *biz.ShipmentCreate {
 		CustomerSnapshot: getWorkflowStringPtr(pm, "customer_snapshot"),
 		IdempotencyKey:   getString(pm, "idempotency_key"),
 		PlannedShipAt:    plannedShipAt,
+		TotalNetWeightKg: totalNetWeightKg,
 		Note:             getWorkflowStringPtr(pm, "note"),
-	}
+	}, true
 }
 
 func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, bool) {
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}
@@ -110,8 +115,12 @@ func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWi
 		}
 		items = append(items, item)
 	}
+	shipment, ok := shipmentCreateFromParams(pm)
+	if !ok {
+		return nil, false
+	}
 	return &biz.ShipmentCreateWithItems{
-		Shipment: shipmentCreateFromParams(pm),
+		Shipment: shipment,
 		Items:    items,
 	}, true
 }
@@ -139,12 +148,12 @@ func shipmentToAny(item *biz.Shipment) map[string]any {
 	for _, line := range item.Items {
 		lines = append(lines, shipmentItemToAny(line))
 	}
-	return map[string]any{"id": item.ID, "shipment_no": item.ShipmentNo, "sales_order_id": optionalIntToAny(item.SalesOrderID), "customer_id": optionalIntToAny(item.CustomerID), "customer_snapshot": optionalStringToAny(item.CustomerSnapshot), "status": item.Status, "idempotency_key": item.IdempotencyKey, "planned_ship_at": optionalUnix(item.PlannedShipAt), "shipped_at": optionalUnix(item.ShippedAt), "note": optionalStringToAny(item.Note), "items": lines, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "shipment_no": item.ShipmentNo, "sales_order_id": optionalIntToAny(item.SalesOrderID), "customer_id": optionalIntToAny(item.CustomerID), "customer_snapshot": optionalStringToAny(item.CustomerSnapshot), "status": item.Status, "idempotency_key": item.IdempotencyKey, "planned_ship_at": optionalUnix(item.PlannedShipAt), "shipped_at": optionalUnix(item.ShippedAt), "total_net_weight_kg": optionalDecimalString(item.TotalNetWeightKg), "note": optionalStringToAny(item.Note), "items": lines, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }
 
 func shipmentItemToAny(item *biz.ShipmentItem) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{"id": item.ID, "shipment_id": item.ShipmentID, "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "shipment_id": item.ShipmentID, "sales_order_item_id": optionalIntToAny(item.SalesOrderItemID), "product_id": item.ProductID, "product_sku_id": optionalIntToAny(item.ProductSkuID), "warehouse_id": item.WarehouseID, "unit_id": item.UnitID, "lot_id": optionalIntToAny(item.LotID), "quantity": item.Quantity.String(), "unit_net_weight_kg_snapshot": optionalDecimalString(item.UnitNetWeightKgSnapshot), "note": optionalStringToAny(item.Note), "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }

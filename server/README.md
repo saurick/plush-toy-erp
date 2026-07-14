@@ -156,6 +156,8 @@ make init
 make run
 ```
 
+`make run` 和 `make dev_restart` 都会先执行共享的本地启动预检：先运行 `db-guard` 核对 Ent schema 与 versioned migration，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision 且 pending 为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 `migrate apply`；失败时应先审查并完成 migration，不应绕过。
+
 ## 常用命令
 
 ```bash

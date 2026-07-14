@@ -50,6 +50,8 @@ pnpm start
 
 默认地址：`http://127.0.0.1:5175`。开发服务器会把 `http://localhost:5175` 自动规范到同一 IPv4 地址。
 
+`pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，但仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
+
 桌面构建提供单端口岗位任务端主路径：
 
 ```text
@@ -229,7 +231,7 @@ pnpm start:yoyoosun --print-plan
 pnpm start:yoyoosun
 ```
 
-`start:yoyoosun` 同样从 `5176` 起自动顺延端口，保留 HMR；它只注入前端静态客户配置，不会激活后端 yoyoosun `customer_config` revision。登录后页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`。
+`start:yoyoosun` 同样从 `5176` 起自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。它只注入前端静态客户配置，不会发布或激活后端 yoyoosun `customer_config` revision。登录后页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
 
 `start:yoyoosun --print-plan` 也会输出同一组按实际端口生成的 `curl` 验证命令；端口被占用时不要按 `5176` 手工猜测，以终端输出的 `url=` 和验证命令为准。
 

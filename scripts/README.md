@@ -18,6 +18,7 @@
 | ------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
 | `scripts/bootstrap.sh`                                 | 安装依赖、启用 hooks、跑快速自检                                                                                  | 新机器 / 首次拉仓库                                        |
 | `scripts/project-scan.sh`                              | 扫描项目名、默认密钥、部署地址和页面文案残留                                                                      | 改名后 / 配置收口后                                        |
+| `scripts/local-runtime-preflight.mjs`                  | 只读核对工作区 schema / versioned migration、当前 dev 库 Atlas status 与后端 health / ready；被 `make run / dev_restart`、`pnpm start / start:yoyoosun` 共用，不自动 apply migration | 启动本地后端或需要登录 / RPC 的前端前 |
 | `scripts/build/apply-customer-web-config.mjs`          | 本地 / CI 构建后按 `ERP_CUSTOMER_KEY` 发布经过审查的 `customer-config.js`，并且只复制客户 `public-assets/` 到前端静态产物 | 构建客户私有化前端或服务端镜像时                            |
 | `scripts/seed-role-demo-admins.sh`                     | 显式生成 dev/test/demo 角色演示管理员账号，绑定真实 RBAC 角色                                                     | 需要多角色登录 / 岗位任务端验收                            |
 | `scripts/seed-core-demo-data.sh`                       | 显式生成核心产品模拟基础资料：单位、材料、产品、仓库和 BOM，并输出试用模拟 / 业务事实模拟可复用 ID                | 需要产品主数据、BOM 或业务事实前置 ID 的本地 / 试用演练前 |

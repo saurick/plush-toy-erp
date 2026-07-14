@@ -254,13 +254,17 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 	}
 
 	plannedShipAt := time.Date(2026, 7, 10, 12, 34, 56, 123456789, time.FixedZone("UTC+8", 8*60*60))
-	shipment := &ShipmentCreate{ShipmentNo: "SHIP-1", IdempotencyKey: "  SHIPMENT:1:create  ", PlannedShipAt: &plannedShipAt}
+	manualTotalNetWeightKg := decimal.RequireFromString("12.345600")
+	shipment := &ShipmentCreate{ShipmentNo: "SHIP-1", IdempotencyKey: "  SHIPMENT:1:create  ", PlannedShipAt: &plannedShipAt, TotalNetWeightKg: &manualTotalNetWeightKg}
 	normalizedShipment, err := normalizeShipmentCreate(shipment)
 	if err != nil {
 		t.Fatalf("normalizeShipmentCreate() error = %v", err)
 	}
 	if normalizedShipment.IdempotencyKey != "SHIPMENT:1:create" {
 		t.Fatalf("expected shipment idempotency key trimmed, got %q", normalizedShipment.IdempotencyKey)
+	}
+	if normalizedShipment.TotalNetWeightKg == nil || !normalizedShipment.TotalNetWeightKg.Equal(manualTotalNetWeightKg) {
+		t.Fatalf("expected shipment manual total net weight retained, got %#v", normalizedShipment.TotalNetWeightKg)
 	}
 	expectedPlannedShipAt := plannedShipAt.UTC().Truncate(time.Microsecond)
 	if normalizedShipment.PlannedShipAt == nil || normalizedShipment.PlannedShipAt.Location() != time.UTC || !normalizedShipment.PlannedShipAt.Equal(expectedPlannedShipAt) || normalizedShipment.PlannedShipAt.Nanosecond()%1000 != 0 {
@@ -270,9 +274,30 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 	if _, err := normalizeShipmentCreate(shipment); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected blank shipment idempotency key rejected, got %v", err)
 	}
+	shipment.IdempotencyKey = "SHIPMENT:1:create"
+	for _, invalidWeight := range []decimal.Decimal{
+		decimal.Zero,
+		decimal.RequireFromString("0.0000001"),
+		decimal.RequireFromString("100000000000000"),
+	} {
+		shipment.TotalNetWeightKg = &invalidWeight
+		if _, err := normalizeShipmentCreate(shipment); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("expected invalid shipment total net weight %s rejected, got %v", invalidWeight, err)
+		}
+	}
 
-	if _, err := normalizeShipmentItemCreate(&ShipmentItemCreate{ProductID: 2, WarehouseID: 3, UnitID: 4, Quantity: decimal.Zero}); !errors.Is(err, ErrBadParam) {
-		t.Fatalf("expected zero shipment item quantity rejected, got %v", err)
+	for _, invalidQuantity := range []decimal.Decimal{
+		decimal.Zero,
+		decimal.RequireFromString("0.0000001"),
+		decimal.RequireFromString("100000000000000"),
+	} {
+		if _, err := normalizeShipmentItemCreate(&ShipmentItemCreate{ProductID: 2, WarehouseID: 3, UnitID: 4, Quantity: invalidQuantity}); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("expected invalid shipment item quantity %s rejected, got %v", invalidQuantity, err)
+		}
+	}
+	trailingZeroQuantity := decimal.RequireFromString("1.2300000")
+	if normalized, err := normalizeShipmentItemCreate(&ShipmentItemCreate{ProductID: 2, WarehouseID: 3, UnitID: 4, Quantity: trailingZeroQuantity}); err != nil || !normalized.Quantity.Equal(decimal.RequireFromString("1.23")) {
+		t.Fatalf("expected trailing-zero shipment quantity retained, got %#v err=%v", normalized, err)
 	}
 
 	reservation := &StockReservationCreate{

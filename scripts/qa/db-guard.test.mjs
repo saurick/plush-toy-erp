@@ -244,6 +244,54 @@ test("db guard requires added named checks in the versioned DDL", async () => {
   });
 });
 
+test("db guard ignores unchanged table and check formatting", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Annotations() []schema.Annotation {",
+        "  return []schema.Annotation{entsql.Annotation{Table: \"items\", Checks: map[string]string{",
+        "    \"items_status_allowed\": \"status IN ('active')\",",
+        "  }}}",
+        "}",
+        "func (Item) Fields() []ent.Field { return nil }",
+        "",
+      ].join("\n"),
+    );
+    commitAll(root, "table and check baseline");
+
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Annotations() []schema.Annotation {",
+        "  return []schema.Annotation{entsql.Annotation{",
+        "    Table: \"items\",",
+        "    Checks: map[string]string{",
+        "      \"items_status_allowed\": \"status IN ('active')\",",
+        "      \"items_weight_positive\": \"weight > 0\",",
+        "    },",
+        "  }}",
+        "}",
+        "func (Item) Fields() []ent.Field { return nil }",
+        "",
+      ].join("\n"),
+    );
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      "ALTER TABLE items ADD CONSTRAINT items_weight_positive CHECK (weight > 0);\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(result.ok, true);
+  });
+});
+
 test("db guard rejects changing an old migration from a file to a symlink", async () => {
   await withRepository(async (root) => {
     const migration = path.join(

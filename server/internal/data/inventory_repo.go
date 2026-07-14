@@ -1565,6 +1565,13 @@ func sameOptionalString(a, b *string) bool {
 	return *a == *b
 }
 
+func sameOptionalDecimal(a, b *decimal.Decimal) bool {
+	if a == nil || b == nil {
+		return a == nil && b == nil
+	}
+	return a.Equal(*b)
+}
+
 func sameOptionalTime(a, b *time.Time) bool {
 	if a == nil || b == nil {
 		return a == nil && b == nil

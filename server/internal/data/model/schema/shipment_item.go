@@ -18,14 +18,15 @@ type ShipmentItem struct {
 }
 
 var shipmentItemLockedFields = map[string]struct{}{
-	"shipment_id":         {},
-	"sales_order_item_id": {},
-	"product_id":          {},
-	"product_sku_id":      {},
-	"warehouse_id":        {},
-	"unit_id":             {},
-	"lot_id":              {},
-	"quantity":            {},
+	"shipment_id":                 {},
+	"sales_order_item_id":         {},
+	"product_id":                  {},
+	"product_sku_id":              {},
+	"warehouse_id":                {},
+	"unit_id":                     {},
+	"lot_id":                      {},
+	"quantity":                    {},
+	"unit_net_weight_kg_snapshot": {},
 }
 
 func (ShipmentItem) Hooks() []ent.Hook {
@@ -49,7 +50,8 @@ func (ShipmentItem) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"shipment_items_quantity_positive": "quantity > 0",
+				"shipment_items_quantity_positive":                    "quantity > 0",
+				"shipment_items_unit_net_weight_kg_snapshot_positive": "unit_net_weight_kg_snapshot IS NULL OR unit_net_weight_kg_snapshot > 0",
 			},
 		},
 	}
@@ -66,6 +68,7 @@ func (ShipmentItem) Fields() []ent.Field {
 		field.Int("unit_id").Positive(),
 		field.Int("lot_id").Optional().Nillable().Positive(),
 		decimalQuantityField("quantity"),
+		optionalDecimalField("unit_net_weight_kg_snapshot"),
 		field.String("note").Optional().Nillable().MaxLen(255),
 		field.Time("created_at").Default(time.Now).Immutable(),
 		field.Time("updated_at").Default(time.Now).UpdateDefault(time.Now),

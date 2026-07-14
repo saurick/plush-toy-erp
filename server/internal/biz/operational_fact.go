@@ -134,6 +134,7 @@ type Shipment struct {
 	IdempotencyKey   string
 	PlannedShipAt    *time.Time
 	ShippedAt        *time.Time
+	TotalNetWeightKg *decimal.Decimal
 	Note             *string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -141,18 +142,19 @@ type Shipment struct {
 }
 
 type ShipmentItem struct {
-	ID               int
-	ShipmentID       int
-	SalesOrderItemID *int
-	ProductID        int
-	ProductSkuID     *int
-	WarehouseID      int
-	UnitID           int
-	LotID            *int
-	Quantity         decimal.Decimal
-	Note             *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
+	ID                      int
+	ShipmentID              int
+	SalesOrderItemID        *int
+	ProductID               int
+	ProductSkuID            *int
+	WarehouseID             int
+	UnitID                  int
+	LotID                   *int
+	Quantity                decimal.Decimal
+	UnitNetWeightKgSnapshot *decimal.Decimal
+	Note                    *string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 type StockReservation struct {
@@ -177,33 +179,33 @@ type StockReservation struct {
 }
 
 type FinanceFact struct {
-	ID                int
-	FactNo            string
-	FactType          string
-	Status            string
-	CounterpartyType  string
-	CounterpartyID    *int
-	Amount            decimal.Decimal
-	FeeAmount         decimal.Decimal
-	Currency          string
-	CollectionType    *string
-	PaymentTerm       *string
-	PaymentTermDays   *int
-	InvoiceCategory   *string
-	SourceType        *string
-	SourceID          *int
-	SourceLineID      *int
-	IdempotencyKey    string
-	OccurredAt        time.Time
-	PostedAt          *time.Time
-	SettledAt         *time.Time
-	CancelledAt       *time.Time
-	CancelledBy       *int
-	CancelledByName   *string
-	CancelReason      *string
-	Note              *string
-	CreatedAt         time.Time
-	UpdatedAt         time.Time
+	ID               int
+	FactNo           string
+	FactType         string
+	Status           string
+	CounterpartyType string
+	CounterpartyID   *int
+	Amount           decimal.Decimal
+	FeeAmount        decimal.Decimal
+	Currency         string
+	CollectionType   *string
+	PaymentTerm      *string
+	PaymentTermDays  *int
+	InvoiceCategory  *string
+	SourceType       *string
+	SourceID         *int
+	SourceLineID     *int
+	IdempotencyKey   string
+	OccurredAt       time.Time
+	PostedAt         *time.Time
+	SettledAt        *time.Time
+	CancelledAt      *time.Time
+	CancelledBy      *int
+	CancelledByName  *string
+	CancelReason     *string
+	Note             *string
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
 }
 
 type OperationalFactMutation struct {
@@ -234,6 +236,7 @@ type ShipmentCreate struct {
 	CustomerSnapshot *string
 	IdempotencyKey   string
 	PlannedShipAt    *time.Time
+	TotalNetWeightKg *decimal.Decimal
 	Note             *string
 }
 
@@ -743,6 +746,9 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	out.ShipmentNo = strings.TrimSpace(out.ShipmentNo)
 	out.CustomerSnapshot = normalizeOptionalString(out.CustomerSnapshot)
 	out.Note = normalizeOptionalString(out.Note)
+	if !validNetWeightKg(out.TotalNetWeightKg) {
+		return nil, ErrBadParam
+	}
 	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)
 	if err != nil {
 		return nil, ErrBadParam
@@ -782,7 +788,7 @@ func normalizeShipmentItemCreate(in *ShipmentItemCreate) (*ShipmentItemCreate, e
 	if out.ProductID <= 0 || out.WarehouseID <= 0 || out.UnitID <= 0 {
 		return nil, ErrBadParam
 	}
-	if _, err := value.NewPositiveQuantity(out.Quantity); err != nil {
+	if !validShipmentNetWeightQuantity(out.Quantity) {
 		return nil, ErrBadParam
 	}
 	return &out, nil

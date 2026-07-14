@@ -1,6 +1,7 @@
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
+import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
 
@@ -571,6 +572,16 @@ export function createStyleL1Scenarios(deps) {
   })
 
   return [
+    ...createBusinessRowItemsPreviewScenarios({
+      assert,
+      assertDarkThemeContrast,
+      assertNoHorizontalOverflow,
+      customerRuntimeEffectiveSession,
+      expectHeading,
+      expectText,
+      outputDir,
+      path,
+    }),
     {
       name: 'root-redirect-desktop',
       path: '/',

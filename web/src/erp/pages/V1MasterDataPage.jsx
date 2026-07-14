@@ -235,9 +235,17 @@ export default function V1MasterDataPage({ type }) {
   )
   const handleRecordValuesChange = useCallback(
     (changedValues) => {
+      const defaultUnitChanged = Object.prototype.hasOwnProperty.call(
+        changedValues,
+        'default_unit_id'
+      )
+      const skuProductChanged =
+        effectiveType === 'product_skus' &&
+        Object.prototype.hasOwnProperty.call(changedValues, 'product_id')
       if (
-        effectiveType !== 'products' ||
-        !Object.prototype.hasOwnProperty.call(changedValues, 'default_unit_id')
+        (effectiveType !== 'products' || !defaultUnitChanged) &&
+        (effectiveType !== 'product_skus' ||
+          (!defaultUnitChanged && !skuProductChanged))
       ) {
         return
       }
@@ -250,7 +258,11 @@ export default function V1MasterDataPage({ type }) {
         return
       }
       recordForm.setFieldValue('unit_net_weight_kg', undefined)
-      message.info('默认单位已变更，产品单重已清空，请重新确认')
+      message.info(
+        effectiveType === 'product_skus'
+          ? '所属产品或 SKU 默认单位已变更，SKU 单重已清空，请重新确认'
+          : '默认单位已变更，产品单重已清空，请重新确认'
+      )
     },
     [effectiveType, recordForm]
   )
@@ -954,6 +966,7 @@ export default function V1MasterDataPage({ type }) {
           <MasterDataFormFields
             form={recordForm}
             type={effectiveType}
+            products={productReferences}
             productOptions={productOptions}
             unitOptions={unitOptions}
             unitLoading={unitLoading}

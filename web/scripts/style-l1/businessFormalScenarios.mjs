@@ -904,6 +904,72 @@ export function createBusinessFormalScenarios(deps) {
       }
     })(),
     {
+      name: 'shipment-net-weight-desktop',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectText(page, '出货单')
+        await expectButton(page, '新建草稿')
+        await page
+          .locator('.erp-business-data-table-card .ant-table-content')
+          .first()
+          .evaluate((element) => {
+            element.scrollLeft = element.scrollWidth
+          })
+        await expectText(page, 'SHIP-STYLE-L1')
+        const weightColumnMetrics = await page
+          .locator('.erp-business-data-table-card')
+          .first()
+          .evaluate((element) => ({
+            headers: Array.from(element.querySelectorAll('th')).map((node) =>
+              String(node.textContent || '')
+                .replace(/\s+/gu, '')
+                .trim()
+            ),
+            text: String(element.textContent || '')
+              .replace(/\s+/gu, '')
+              .trim(),
+          }))
+        assert(
+          weightColumnMetrics.headers.includes('总净重（kg）') &&
+            weightColumnMetrics.text.includes('待确认'),
+          `出货列表应显示总净重列和草稿待确认状态: ${JSON.stringify(
+            weightColumnMetrics
+          )}`
+        )
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建草稿',
+          titleText: '新建出货单',
+          minFieldCount: 12,
+          screenshotName: 'shipment-net-weight-incomplete',
+          expectedTexts: [
+            '出货明细',
+            '从销售订单导入',
+            '预计总净重暂不可计算',
+            '实际总净重（kg）',
+          ],
+          afterOpen: async (modal) => {
+            await modal.getByLabel('产品').click()
+            await page.getByText('PROD-STYLE-L1').last().click()
+            await modal.getByLabel('数量').fill('10')
+            await expectText(page, '预计总净重：4.25 kg')
+            await modal.screenshot({
+              path: path.join(outputDir, 'shipment-net-weight-predicted.png'),
+            })
+            await assertLineItemAddActionScrollsToNewRow(modal, {
+              scenarioName: 'shipment-net-weight-incomplete',
+              targetRowCount: 5,
+              listSelector: '.erp-master-contact-list__items',
+              rowSelector: '.erp-master-contact-list__row',
+            })
+          },
+        })
+        await assertNoHorizontalOverflow(page, 'shipment-net-weight-desktop')
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
@@ -1229,6 +1295,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectButton(page, '新建产品规格')
         await expectText(page, 'SKU-STYLE-L1')
+        await expectText(page, '0.375 kg / 件（PCS）')
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-standard-product-skus',
         })
@@ -1236,6 +1303,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '新建产品规格')
         await expectText(page, 'SKU 编号')
         await expectText(page, '产品')
+        await expectText(page, 'SKU 单重（净重）')
         await closeBusinessFormModal(
           page,
           page
@@ -2164,6 +2232,8 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '新建草稿')
         await expectText(page, '计划出货日期')
         await expectText(page, '实际出货日期')
+        await expectText(page, '总净重（kg）')
+        await expectText(page, '待确认')
         await expectText(page, 'SHIP-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
           scenarioName: 'business-v1-shipments',
@@ -2250,7 +2320,14 @@ export function createBusinessFormalScenarios(deps) {
           titleText: '新建出货单',
           minFieldCount: 12,
           screenshotName: 'business-v1-shipment-create-form-modal',
-          expectedTexts: ['出货明细', '从销售订单导入', '产品', '仓库'],
+          expectedTexts: [
+            '出货明细',
+            '从销售订单导入',
+            '产品',
+            '仓库',
+            '预计总净重暂不可计算',
+            '实际总净重（kg）',
+          ],
           afterOpen: async (modal) => {
             await verifySourceImportPicker(page, {
               parentModal: modal,
@@ -2270,6 +2347,13 @@ export function createBusinessFormalScenarios(deps) {
               scenarioName: 'shipment-source-import-picker',
             })
             await assertTextAbsent(page, 'sales_order_item_id 追溯')
+            await expectText(page, '预计总净重：4.25 kg')
+            await modal.screenshot({
+              path: path.join(
+                outputDir,
+                'business-v1-shipment-create-predicted-weight.png'
+              ),
+            })
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-shipment-create-form-modal',
               targetRowCount: 5,

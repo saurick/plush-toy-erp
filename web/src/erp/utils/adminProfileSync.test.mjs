@@ -267,11 +267,26 @@ test('adminProfileSync: effective session customer key 不 fallback 到种子客
 test('adminProfileSync: 客户运行态必须匹配当前静态客户入口', () => {
   const yoyoosunProfile = attachEffectiveSessionToAdminProfile(
     { id: 1, username: 'admin' },
-    { customer: { key: 'yoyoosun' } }
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'active_customer_config_revision',
+    }
+  )
+
+  const builtinFallbackProfile = attachEffectiveSessionToAdminProfile(
+    { id: 2, username: 'admin' },
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'builtin_rbac_fallback',
+    }
   )
 
   assert.equal(hasExpectedCustomerRuntime(yoyoosunProfile, 'yoyoosun'), true)
   assert.equal(hasExpectedCustomerRuntime(yoyoosunProfile, 'demo'), false)
+  assert.equal(
+    hasExpectedCustomerRuntime(builtinFallbackProfile, 'yoyoosun'),
+    false
+  )
   assert.equal(hasExpectedCustomerRuntime({ id: 1 }, 'yoyoosun'), false)
   assert.equal(hasExpectedCustomerRuntime({ id: 1 }, ''), true)
 })
@@ -571,8 +586,23 @@ test('adminProfileSync: 岗位任务端挂载只认客户运行态 customer key'
   )
   assert.equal(canMountCustomerRuntime(customerRuntimeProfile), true)
 
+  const builtinFallbackProfile = attachEffectiveSessionToAdminProfile(
+    {
+      id: 2,
+      username: 'admin',
+      permissions: ['mobile.boss.access'],
+    },
+    {
+      customer: { key: 'yoyoosun', name: '永绅' },
+      pages: ['global-dashboard'],
+      actions: ['workflow.task.read'],
+      source: 'builtin_rbac_fallback',
+    }
+  )
+  assert.equal(canMountCustomerRuntime(builtinFallbackProfile), false)
+
   const productCoreProfile = attachUnavailableEffectiveSessionToAdminProfile({
-    id: 2,
+    id: 3,
     username: 'admin',
     is_super_admin: true,
     permissions: ['mobile.boss.access'],
@@ -580,7 +610,7 @@ test('adminProfileSync: 岗位任务端挂载只认客户运行态 customer key'
   assert.equal(canMountCustomerRuntime(productCoreProfile), false)
   assert.equal(
     canMountCustomerRuntime({
-      id: 3,
+      id: 4,
       username: 'demo_boss',
       permissions: ['mobile.boss.access'],
     }),

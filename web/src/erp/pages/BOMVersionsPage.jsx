@@ -50,6 +50,7 @@ import {
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import BusinessLineItemsSection from '../components/business-list/BusinessLineItemsSection.jsx'
+import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import { useLineItemAppendScroll } from '../components/business-list/useLineItemAppendScroll.mjs'
 import {
   BOM_MODULE_KEY,
@@ -514,6 +515,7 @@ export default function BOMVersionsPage() {
   const [selectedVersion, setSelectedVersion] = useState(null)
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
   const selectedRowKeysRef = useRef([])
+  const itemsPreviewGenerationRef = useRef(0)
   const headerAttachmentRef = useRef(null)
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
@@ -558,6 +560,74 @@ export default function BOMVersionsPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
+  const bomItemsPreview = useBusinessRowItemsPreview({
+    records: versions,
+    getCacheKey: (record) =>
+      `${record?.id}:${record?.version || record?.updated_at || 'current'}:${itemsPreviewGenerationRef.current}`,
+    getRecordLabel: (record) =>
+      record?.version ? `BOM ${record.version}` : '当前 BOM 版本',
+    loadPreview: async (record) => {
+      const detail = await getBOMVersion({ id: record.id })
+      const items = Array.isArray(detail?.items) ? detail.items : []
+      return { items, total: items.length }
+    },
+    getItemKey: (item) => item?.id,
+    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
+    getItemSummary: (item) =>
+      `用量 ${item?.quantity || '-'} ${referenceLabel(unitOptions, item?.unit_id, '单位')}`,
+    getItemFields: (item, { view }) => [
+      {
+        key: 'material',
+        label: '材料',
+        value: referenceLabel(materialOptions, item?.material_id, '材料'),
+        wide: true,
+      },
+      {
+        key: 'quantity',
+        label: '材料用量',
+        value: item?.quantity || '-',
+      },
+      {
+        key: 'unit',
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      {
+        key: 'loss_rate',
+        label: '损耗率',
+        value: item?.loss_rate || '0',
+      },
+      { key: 'position', label: '部位', value: item?.position || '-' },
+      { key: 'piece_count', label: '片数', value: item?.piece_count || '-' },
+      {
+        key: 'total_usage',
+        label: '总用量',
+        value: item?.total_usage_snapshot || '-',
+      },
+      {
+        key: 'process_base',
+        label: '加工基础',
+        value: item?.process_base || '-',
+      },
+      {
+        key: 'process_method',
+        label: '加工方式',
+        value: item?.process_method || '-',
+      },
+      ...(view === 'modal'
+        ? [
+            {
+              key: 'note',
+              label: '备注',
+              value: item?.note || '-',
+              wide: true,
+            },
+          ]
+        : []),
+    ],
+    modalTitle: 'BOM 完整明细',
+  })
+  const primeBOMItemsPreview = bomItemsPreview.prime
   const headerVersionSuggestion = useMemo(() => {
     if (!headerVersionCandidates.loaded) return ''
     return suggestNextBOMVersion(
@@ -580,20 +650,27 @@ export default function BOMVersionsPage() {
     setSelectedRowKeys(normalizedKeys)
   }, [])
 
-  const loadDetail = useCallback(async (id) => {
-    if (!id) return null
-    setDetailLoading(true)
-    try {
-      const detail = await getBOMVersion({ id })
-      setSelectedVersion(detail)
-      return detail
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '加载 BOM 详情'))
-      return null
-    } finally {
-      setDetailLoading(false)
-    }
-  }, [])
+  const loadDetail = useCallback(
+    async (id) => {
+      if (!id) return null
+      setDetailLoading(true)
+      try {
+        const detail = await getBOMVersion({ id })
+        const items = Array.isArray(detail?.items) ? detail.items : []
+        if (detail?.id) {
+          primeBOMItemsPreview(detail, { items, total: items.length })
+        }
+        setSelectedVersion(detail)
+        return detail
+      } catch (error) {
+        message.error(getActionErrorMessage(error, '加载 BOM 详情'))
+        return null
+      } finally {
+        setDetailLoading(false)
+      }
+    },
+    [primeBOMItemsPreview]
+  )
 
   const loadVersions = useCallback(async () => {
     if (!canRead) {
@@ -613,6 +690,7 @@ export default function BOMVersionsPage() {
       const nextVersions = Array.isArray(result?.bom_versions)
         ? result.bom_versions
         : []
+      itemsPreviewGenerationRef.current += 1
       setVersions(nextVersions)
       setTotal(Number(result?.total || nextVersions.length || 0))
       const validKeys = selectedRowKeysRef.current.filter((key) =>
@@ -1379,6 +1457,7 @@ export default function BOMVersionsPage() {
         rowClassName={(record) =>
           selectedRowKeys.includes(record?.id) ? 'ant-table-row-selected' : ''
         }
+        expandable={bomItemsPreview.expandable}
         onRow={(record) => ({
           onClick: (event) => {
             if (
@@ -1399,6 +1478,7 @@ export default function BOMVersionsPage() {
           },
         })}
       />
+      {bomItemsPreview.modal}
 
       <CollaborationTaskPanel
         tasks={[]}

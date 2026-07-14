@@ -16,6 +16,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/shopspring/decimal"
 )
 
 // ShipmentUpdate is the builder for updating Shipment entities.
@@ -170,6 +171,46 @@ func (_u *ShipmentUpdate) SetNillableShippedAt(v *time.Time) *ShipmentUpdate {
 // ClearShippedAt clears the value of the "shipped_at" field.
 func (_u *ShipmentUpdate) ClearShippedAt() *ShipmentUpdate {
 	_u.mutation.ClearShippedAt()
+	return _u
+}
+
+// SetTotalNetWeightKg sets the "total_net_weight_kg" field.
+func (_u *ShipmentUpdate) SetTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetTotalNetWeightKg(v)
+	return _u
+}
+
+// SetNillableTotalNetWeightKg sets the "total_net_weight_kg" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetTotalNetWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearTotalNetWeightKg clears the value of the "total_net_weight_kg" field.
+func (_u *ShipmentUpdate) ClearTotalNetWeightKg() *ShipmentUpdate {
+	_u.mutation.ClearTotalNetWeightKg()
+	return _u
+}
+
+// SetRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field.
+func (_u *ShipmentUpdate) SetRequestedTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetRequestedTotalNetWeightKg(v)
+	return _u
+}
+
+// SetNillableRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableRequestedTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdate {
+	if v != nil {
+		_u.SetRequestedTotalNetWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearRequestedTotalNetWeightKg clears the value of the "requested_total_net_weight_kg" field.
+func (_u *ShipmentUpdate) ClearRequestedTotalNetWeightKg() *ShipmentUpdate {
+	_u.mutation.ClearRequestedTotalNetWeightKg()
 	return _u
 }
 
@@ -382,6 +423,18 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ShippedAtCleared() {
 		_spec.ClearField(shipment.FieldShippedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TotalNetWeightKg(); ok {
+		_spec.SetField(shipment.FieldTotalNetWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.TotalNetWeightKgCleared() {
+		_spec.ClearField(shipment.FieldTotalNetWeightKg, field.TypeOther)
+	}
+	if value, ok := _u.mutation.RequestedTotalNetWeightKg(); ok {
+		_spec.SetField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.RequestedTotalNetWeightKgCleared() {
+		_spec.ClearField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipment.FieldNote, field.TypeString, value)
@@ -657,6 +710,46 @@ func (_u *ShipmentUpdateOne) ClearShippedAt() *ShipmentUpdateOne {
 	return _u
 }
 
+// SetTotalNetWeightKg sets the "total_net_weight_kg" field.
+func (_u *ShipmentUpdateOne) SetTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetTotalNetWeightKg(v)
+	return _u
+}
+
+// SetNillableTotalNetWeightKg sets the "total_net_weight_kg" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetTotalNetWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearTotalNetWeightKg clears the value of the "total_net_weight_kg" field.
+func (_u *ShipmentUpdateOne) ClearTotalNetWeightKg() *ShipmentUpdateOne {
+	_u.mutation.ClearTotalNetWeightKg()
+	return _u
+}
+
+// SetRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field.
+func (_u *ShipmentUpdateOne) SetRequestedTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetRequestedTotalNetWeightKg(v)
+	return _u
+}
+
+// SetNillableRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableRequestedTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetRequestedTotalNetWeightKg(*v)
+	}
+	return _u
+}
+
+// ClearRequestedTotalNetWeightKg clears the value of the "requested_total_net_weight_kg" field.
+func (_u *ShipmentUpdateOne) ClearRequestedTotalNetWeightKg() *ShipmentUpdateOne {
+	_u.mutation.ClearRequestedTotalNetWeightKg()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *ShipmentUpdateOne) SetNote(v string) *ShipmentUpdateOne {
 	_u.mutation.SetNote(v)
@@ -896,6 +989,18 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	}
 	if _u.mutation.ShippedAtCleared() {
 		_spec.ClearField(shipment.FieldShippedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.TotalNetWeightKg(); ok {
+		_spec.SetField(shipment.FieldTotalNetWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.TotalNetWeightKgCleared() {
+		_spec.ClearField(shipment.FieldTotalNetWeightKg, field.TypeOther)
+	}
+	if value, ok := _u.mutation.RequestedTotalNetWeightKg(); ok {
+		_spec.SetField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther, value)
+	}
+	if _u.mutation.RequestedTotalNetWeightKgCleared() {
+		_spec.ClearField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipment.FieldNote, field.TypeString, value)

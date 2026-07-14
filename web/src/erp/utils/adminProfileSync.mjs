@@ -1,6 +1,7 @@
 import { isAdminSessionUnavailableCode } from '../../common/consts/errorCodes.js'
 
 const EFFECTIVE_SESSION_SYNC_FAILED_SOURCE = 'effective_session_sync_failed'
+const ACTIVE_CUSTOMER_CONFIG_SOURCE = 'active_customer_config_revision'
 const VISIBILITY_MODE_SUPER_ADMIN_PRODUCT_CORE = 'super_admin_product_core'
 const VISIBILITY_MODE_LOCAL_DEV_SYNC_FAILED = 'local_dev_sync_failed_diagnostic'
 const VISIBILITY_MODE_LOCAL_DEV_CUSTOMER_CONFIG =
@@ -200,7 +201,11 @@ function resolveEffectiveSessionDataRuntimeScope({
   source = '',
   isSuperAdmin = false,
 } = {}) {
-  if (typeof customerKey === 'string' && customerKey.trim()) {
+  if (
+    typeof customerKey === 'string' &&
+    customerKey.trim() &&
+    source === ACTIVE_CUSTOMER_CONFIG_SOURCE
+  ) {
     return DATA_RUNTIME_SCOPE_CUSTOMER
   }
   if (source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE) {
@@ -307,7 +312,11 @@ export function shouldGuardCustomerBusinessPageRuntime({
 
 export function canMountCustomerRuntime(adminProfile) {
   const customerKey = adminProfile?.effective_session?.customer?.key
-  return typeof customerKey === 'string' && customerKey.trim().length > 0
+  return Boolean(
+    typeof customerKey === 'string' &&
+      customerKey.trim().length > 0 &&
+      adminProfile?.effective_session?.source === ACTIVE_CUSTOMER_CONFIG_SOURCE
+  )
 }
 
 export function hasExpectedCustomerRuntime(
@@ -319,8 +328,10 @@ export function hasExpectedCustomerRuntime(
   if (!expectedKey) {
     return true
   }
-  const customerKey = adminProfile?.effective_session?.customer?.key
-  return typeof customerKey === 'string' && customerKey.trim() === expectedKey
+  return (
+    canMountCustomerRuntime(adminProfile) &&
+    adminProfile.effective_session.customer.key.trim() === expectedKey
+  )
 }
 
 export function attachEffectiveSessionToAdminProfile(

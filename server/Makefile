@@ -306,7 +306,11 @@ ARGS ?=
 # 当前项目本地 dev 会占用的端口；dev_stop/dev_restart 只清理这些端口，避免误杀别的项目。
 DEV_PORTS ?= 8300 9300
 
-.PHONY: dev_build
+.PHONY: dev_preflight dev_build
+# fail closed before stopping or starting a local server; this check never applies migrations.
+dev_preflight:
+	@node ../scripts/local-runtime-preflight.mjs --mode database
+
 # build dev binary (stable path)
 dev_build:
 	@mkdir -p $(dir $(DEV_BIN))
@@ -315,7 +319,7 @@ dev_build:
 
 .PHONY: run
 # run dev binary (stable path)
-run: dev_build
+run: dev_preflight dev_build
 	@echo ">>> running: $(DEV_BIN) $(ARGS)"
 	@$(DEV_BIN) $(ARGS)
 
@@ -355,7 +359,11 @@ dev_stop:
 
 .PHONY: dev_restart
 # restart local dev binary after clearing stale listeners
-dev_restart: dev_stop dev
+dev_restart: dev_preflight
+	@$(MAKE) dev_stop
+	@$(MAKE) dev_build
+	@echo ">>> running: $(DEV_BIN) $(ARGS)"
+	@$(DEV_BIN) $(ARGS)
 
 .PHONY: clean_dev
 # clean dev binary

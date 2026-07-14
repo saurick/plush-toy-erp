@@ -1115,3 +1115,41 @@ test("dev entry boundary: customer config console stays preview or gated apply o
     "release readiness result must not be published directly by the browser page",
   );
 });
+
+
+test("dev entry boundary: make dev_restart 先预检再停服并且不自动执行 migration", () => {
+  const makefile = read("server/Makefile");
+  const target = makefile.match(
+    /^dev_restart:\s*dev_preflight\n(?<recipe>(?:\t.*\n)+)/mu,
+  );
+  assert(target?.groups?.recipe, "dev_restart 必须显式依赖 dev_preflight");
+  const recipe = target.groups.recipe;
+  assert(
+    recipe.indexOf("$(MAKE) dev_stop") < recipe.indexOf("$(MAKE) dev_build"),
+  );
+  assert(recipe.indexOf("$(MAKE) dev_build") < recipe.indexOf("$(DEV_BIN)"));
+
+  const preflight = read("scripts/local-runtime-preflight.mjs");
+  assert.doesNotMatch(preflight, /migrate\s+apply/u);
+  assert.match(preflight, /\[\s*["']migrate["'],\s*["']status["']/u);
+});
+
+test("dev entry boundary: Product Core 与客户开发入口共用同一 web preflight", () => {
+  const packageJSON = JSON.parse(read("web/package.json"));
+  assert.equal(packageJSON.scripts.start, "node ./scripts/startWebDev.mjs");
+  assert.equal(
+    packageJSON.scripts["start:frontend-only"],
+    "node ./scripts/startWebDev.mjs --frontend-only",
+  );
+  assert.equal(
+    packageJSON.scripts["start:yoyoosun"],
+    "node ./scripts/startYoyoosunDev.mjs",
+  );
+
+  for (const script of [
+    "web/scripts/startWebDev.mjs",
+    "web/scripts/startYoyoosunDev.mjs",
+  ]) {
+    assert.match(read(script), /runWebRuntimePreflight/u, script);
+  }
+});

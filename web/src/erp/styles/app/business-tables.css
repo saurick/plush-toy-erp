@@ -639,35 +639,103 @@
   color: #9ca3af;
 }
 
-.erp-purchase-receipt-items-list {
+.erp-business-row-expand-button {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #cbd9ce;
+  border-radius: 7px;
+  background: #fff;
+  color: #2b6f3e;
+  cursor: pointer;
+}
+
+.erp-business-row-expand-button:hover {
+  border-color: #8fbaa0;
+  background: #f1f8f3;
+}
+
+.erp-business-row-expand-button:focus-visible {
+  outline: 2px solid #2f855a;
+  outline-offset: 2px;
+}
+
+.erp-business-row-expand-placeholder {
+  display: inline-block;
+  width: 28px;
+  height: 28px;
+}
+
+.erp-business-row-items-preview,
+.erp-business-row-items-modal {
   display: grid;
   max-width: 100%;
   min-width: 0;
   gap: 8px;
-  overflow: hidden;
   padding: 8px 10px 10px;
 }
 
-.erp-purchase-receipt-items-list__empty,
-.erp-purchase-receipt-item-card {
+.erp-business-row-items-preview {
+  overflow: hidden;
+}
+
+.erp-business-row-items-modal {
+  max-height: 68vh;
+  overflow: auto;
+  padding: 4px 2px 8px;
+}
+
+.erp-business-row-items-preview__items {
+  display: grid;
+  min-width: 0;
+  gap: 8px;
+}
+
+.erp-business-row-items-preview__empty,
+.erp-business-row-items-preview__loading,
+.erp-business-row-item-card {
   min-width: 0;
   border: 1px solid #dfe9e1;
   border-radius: 8px;
   background: #fbfdfb;
 }
 
-.erp-purchase-receipt-items-list__empty {
+.erp-business-row-items-preview__empty,
+.erp-business-row-items-preview__loading {
   color: #64748b;
   padding: 10px 12px;
 }
 
-.erp-purchase-receipt-item-card {
+.erp-business-row-items-preview__loading {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-business-row-items-preview__footer {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  color: #64748b;
+  font-size: 12px;
+}
+
+.erp-business-row-items-preview__footer .ant-btn-link {
+  height: 28px;
+  padding-inline: 4px;
+}
+
+.erp-business-row-item-card {
   display: grid;
   gap: 8px;
   padding: 10px 12px;
 }
 
-.erp-purchase-receipt-item-card__head {
+.erp-business-row-item-card__head {
   display: flex;
   min-width: 0;
   flex-wrap: wrap;
@@ -678,13 +746,13 @@
   padding-bottom: 8px;
 }
 
-.erp-purchase-receipt-item-card__head strong {
+.erp-business-row-item-card__head strong {
   color: #17231c;
   font-size: 14px;
   line-height: 1.35;
 }
 
-.erp-purchase-receipt-item-card__head span {
+.erp-business-row-item-card__head span {
   min-width: 0;
   color: #64748b;
   font-size: 12px;
@@ -692,32 +760,32 @@
   overflow-wrap: anywhere;
 }
 
-.erp-purchase-receipt-item-card__grid {
+.erp-business-row-item-card__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 8px 12px;
   margin: 0;
 }
 
-.erp-purchase-receipt-item-card__field {
+.erp-business-row-item-card__field {
   min-width: 0;
   margin: 0;
   border-left: 2px solid #d7e4d9;
   padding-left: 8px;
 }
 
-.erp-purchase-receipt-item-card__field--wide {
+.erp-business-row-item-card__field--wide {
   grid-column: span 2;
 }
 
-.erp-purchase-receipt-item-card__field dt {
+.erp-business-row-item-card__field dt {
   margin: 0 0 3px;
   color: #64748b;
   font-size: 12px;
   line-height: 1.3;
 }
 
-.erp-purchase-receipt-item-card__field dd {
+.erp-business-row-item-card__field dd {
   margin: 0;
   color: #1f2937;
   line-height: 1.45;
@@ -727,7 +795,35 @@
 }
 
 @media screen and (max-width: 760px) {
-  .erp-purchase-receipt-item-card__field--wide {
+  .erp-business-module-table-card .ant-table-content,
+  .erp-business-module-table-card .ant-table-body {
+    container-type: inline-size;
+  }
+
+  .erp-business-row-expand-button,
+  .erp-business-row-expand-placeholder {
+    width: 36px;
+    height: 36px;
+  }
+
+  .erp-business-row-items-preview,
+  .erp-business-row-items-modal {
+    padding-inline: 0;
+  }
+
+  .erp-business-module-table-card .erp-business-row-items-preview {
+    position: sticky;
+    left: 0;
+    box-sizing: border-box;
+    width: 100cqw;
+    max-width: 100cqw;
+  }
+
+  .erp-business-row-items-preview__footer .ant-btn-link {
+    min-height: 36px;
+  }
+
+  .erp-business-row-item-card__field--wide {
     grid-column: auto;
   }
 }
@@ -1455,27 +1551,41 @@
   outline-offset: 2px;
 }
 
-[data-erp-theme='dark'] .erp-purchase-receipt-items-list__empty,
-[data-erp-theme='dark'] .erp-purchase-receipt-item-card {
+[data-erp-theme='dark'] .erp-business-row-expand-button {
+  border-color: #475569;
+  background: #111827;
+  color: #86c99a;
+}
+
+[data-erp-theme='dark'] .erp-business-row-expand-button:hover {
+  border-color: #6b8f77;
+  background: #16241c;
+}
+
+[data-erp-theme='dark'] .erp-business-row-items-preview__empty,
+[data-erp-theme='dark'] .erp-business-row-items-preview__loading,
+[data-erp-theme='dark'] .erp-business-row-item-card {
   border-color: #334155;
   background: #111827;
 }
 
-[data-erp-theme='dark'] .erp-purchase-receipt-item-card__head {
+[data-erp-theme='dark'] .erp-business-row-item-card__head {
   border-bottom-color: #334155;
 }
 
-[data-erp-theme='dark'] .erp-purchase-receipt-item-card__head strong,
-[data-erp-theme='dark'] .erp-purchase-receipt-item-card__field dd {
+[data-erp-theme='dark'] .erp-business-row-item-card__head strong,
+[data-erp-theme='dark'] .erp-business-row-item-card__field dd {
   color: #e5e7eb;
 }
 
-[data-erp-theme='dark'] .erp-purchase-receipt-items-list__empty,
-[data-erp-theme='dark'] .erp-purchase-receipt-item-card__head span,
-[data-erp-theme='dark'] .erp-purchase-receipt-item-card__field dt {
+[data-erp-theme='dark'] .erp-business-row-items-preview__empty,
+[data-erp-theme='dark'] .erp-business-row-items-preview__loading,
+[data-erp-theme='dark'] .erp-business-row-items-preview__footer,
+[data-erp-theme='dark'] .erp-business-row-item-card__head span,
+[data-erp-theme='dark'] .erp-business-row-item-card__field dt {
   color: #94a3b8;
 }
 
-[data-erp-theme='dark'] .erp-purchase-receipt-item-card__field {
+[data-erp-theme='dark'] .erp-business-row-item-card__field {
   border-left-color: #334155;
 }

@@ -19,6 +19,7 @@ import {
   ColumnOrderHeaderMenu,
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
+import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import {
   createBlankPurchaseLine,
   normalizePurchaseLineFormValue,
@@ -31,6 +32,7 @@ import {
   listMaterials,
   listContactsByOwner,
   listAllPurchaseOrderItems,
+  listPurchaseOrderItemsPreview,
   listPurchaseOrders,
   listSuppliers,
   listUnits,
@@ -63,7 +65,10 @@ import {
   buildSupplierSnapshot,
   buildSupplierSnapshotWithContacts,
   canRunPurchaseOrderLifecycleAction,
+  formatUnixDate,
   hasActionPermission,
+  PURCHASE_ORDER_ITEM_STATUS_LABELS,
+  statusText,
   SUPPLIER_CONTACT_OWNER_TYPE,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
@@ -88,6 +93,7 @@ import {
   writeStoredColumnOrder,
 } from '../utils/businessTableActions.mjs'
 import {
+  referenceLabel,
   supplierOption,
   uniqueReferenceOptions,
   unitOption,
@@ -114,6 +120,7 @@ export default function V1PurchaseOrdersPage() {
   )
   const [form] = Form.useForm()
   const [inboundDraftForm] = Form.useForm()
+  const canRead = hasActionPermission(adminProfile, 'purchase.order.read')
   const canCreate = hasActionPermission(adminProfile, 'purchase.order.create')
   const canUpdate = hasActionPermission(adminProfile, 'purchase.order.update')
   const canCreatePurchaseReceipt = hasActionPermission(
@@ -189,6 +196,87 @@ export default function V1PurchaseOrdersPage() {
     () => uniqueReferenceOptions(units, unitOption),
     [units]
   )
+  const getPurchaseOrderItemFields = useCallback(
+    (item, { view }) => [
+      { label: '下单材料编码', value: item?.material_code_snapshot },
+      { label: '下单材料名称', value: item?.material_name_snapshot },
+      { label: '下单颜色', value: item?.color_snapshot },
+      { label: '产品订单编号', value: item?.product_order_no_snapshot },
+      { label: '产品编号', value: item?.product_no_snapshot },
+      { label: '产品名称', value: item?.product_name_snapshot },
+      { label: '采购数量', value: item?.purchased_quantity },
+      {
+        label: '单位',
+        value: referenceLabel(unitOptions, item?.unit_id, '单位'),
+      },
+      { label: '单价', value: item?.unit_price },
+      { label: '金额', value: item?.amount },
+      {
+        label: '预计到货日期',
+        value: formatUnixDate(item?.expected_arrival_date),
+      },
+      {
+        label: '行状态',
+        value: statusText(
+          item?.line_status,
+          PURCHASE_ORDER_ITEM_STATUS_LABELS,
+          '明细状态待核对'
+        ),
+      },
+      ...(view === 'modal'
+        ? [{ label: '备注', value: item?.note, wide: true }]
+        : []),
+    ],
+    [unitOptions]
+  )
+  const loadPurchaseOrderItemsPreview = useCallback(
+    async (order, { signal }) => {
+      const data = await listPurchaseOrderItemsPreview(
+        {
+          purchase_order_id: order.id,
+          expected_version: order.version,
+        },
+        { signal }
+      )
+      return {
+        items: data?.purchase_order_items,
+        total: data?.total,
+      }
+    },
+    []
+  )
+  const loadAllPurchaseOrderItemsForPreview = useCallback(
+    async (order, { signal }) => {
+      const data = await listAllPurchaseOrderItems(
+        {
+          purchase_order_id: order.id,
+          expected_version: order.version,
+        },
+        { signal }
+      )
+      return {
+        items: data?.purchase_order_items,
+        total: data?.total,
+      }
+    },
+    []
+  )
+  const purchaseOrderItemsPreview = useBusinessRowItemsPreview({
+    records: orders,
+    rowExpandable: (order) =>
+      canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
+    loadPreview: loadPurchaseOrderItemsPreview,
+    loadAll: loadAllPurchaseOrderItemsForPreview,
+    getItemFields: getPurchaseOrderItemFields,
+    getItemLabel: (item, { index }) => `明细 ${item?.line_no || index + 1}`,
+    getItemSummary: (item) =>
+      [item?.material_code_snapshot, item?.material_name_snapshot]
+        .filter(Boolean)
+        .join(' / '),
+    getRecordLabel: (order) => order?.purchase_order_no || '当前采购订单',
+    modalTitle: '采购订单全部明细',
+    emptyDescription: '当前采购订单暂无明细',
+  })
   const warehouseOptions = useMemo(
     () => uniqueReferenceOptions(inventoryLots, warehouseOptionFromRecord),
     [inventoryLots]
@@ -957,6 +1045,7 @@ export default function V1PurchaseOrdersPage() {
         rowKey="id"
         columns={columns}
         dataSource={orders}
+        expandable={purchaseOrderItemsPreview.expandable}
         scroll={{ x: 1200 }}
         rowSelection={{
           type: 'radio',
@@ -997,6 +1086,8 @@ export default function V1PurchaseOrdersPage() {
         }}
         emptyDescription="暂无采购订单"
       />
+
+      {purchaseOrderItemsPreview.modal}
 
       <CollaborationTaskPanel
         tasks={workflowTasks}

@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url'
 import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
 import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
+import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
 
 const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
 const DEV_HOST = '127.0.0.1'
@@ -54,6 +55,9 @@ export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
   const serverPort = Number(process.env.ERP_VITE_PORT || app.port)
   const hmrClientPort = Number(process.env.ERP_VITE_HMR_CLIENT_PORT || app.port)
+  const apiOrigin = normalizeAPIOrigin(
+    process.env.API_ORIGIN || 'http://127.0.0.1:8300'
+  )
 
   return defineConfig(({ command, mode }) => {
     const env = loadEnv(mode, process.cwd(), '')
@@ -134,11 +138,11 @@ export function createERPViteConfig(appId) {
         },
         proxy: {
           '/rpc': {
-            target: 'http://127.0.0.1:8300',
+            target: apiOrigin,
             changeOrigin: true,
           },
           '/templates': {
-            target: 'http://127.0.0.1:8300',
+            target: apiOrigin,
             changeOrigin: true,
           },
         },

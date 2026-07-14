@@ -32650,6 +32650,7 @@ type ProductSKUMutation struct {
 	color_no                  *string
 	size                      *string
 	packaging_version         *string
+	unit_net_weight_kg        *decimal.Decimal
 	is_active                 *bool
 	created_at                *time.Time
 	updated_at                *time.Time
@@ -33247,6 +33248,55 @@ func (m *ProductSKUMutation) DefaultUnitIDCleared() bool {
 func (m *ProductSKUMutation) ResetDefaultUnitID() {
 	m.default_unit = nil
 	delete(m.clearedFields, productsku.FieldDefaultUnitID)
+}
+
+// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
+func (m *ProductSKUMutation) SetUnitNetWeightKg(d decimal.Decimal) {
+	m.unit_net_weight_kg = &d
+}
+
+// UnitNetWeightKg returns the value of the "unit_net_weight_kg" field in the mutation.
+func (m *ProductSKUMutation) UnitNetWeightKg() (r decimal.Decimal, exists bool) {
+	v := m.unit_net_weight_kg
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitNetWeightKg returns the old "unit_net_weight_kg" field's value of the ProductSKU entity.
+// If the ProductSKU object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductSKUMutation) OldUnitNetWeightKg(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitNetWeightKg is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitNetWeightKg requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitNetWeightKg: %w", err)
+	}
+	return oldValue.UnitNetWeightKg, nil
+}
+
+// ClearUnitNetWeightKg clears the value of the "unit_net_weight_kg" field.
+func (m *ProductSKUMutation) ClearUnitNetWeightKg() {
+	m.unit_net_weight_kg = nil
+	m.clearedFields[productsku.FieldUnitNetWeightKg] = struct{}{}
+}
+
+// UnitNetWeightKgCleared returns if the "unit_net_weight_kg" field was cleared in this mutation.
+func (m *ProductSKUMutation) UnitNetWeightKgCleared() bool {
+	_, ok := m.clearedFields[productsku.FieldUnitNetWeightKg]
+	return ok
+}
+
+// ResetUnitNetWeightKg resets all changes to the "unit_net_weight_kg" field.
+func (m *ProductSKUMutation) ResetUnitNetWeightKg() {
+	m.unit_net_weight_kg = nil
+	delete(m.clearedFields, productsku.FieldUnitNetWeightKg)
 }
 
 // SetIsActive sets the "is_active" field.
@@ -33877,7 +33927,7 @@ func (m *ProductSKUMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductSKUMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 14)
 	if m.product != nil {
 		fields = append(fields, productsku.FieldProductID)
 	}
@@ -33907,6 +33957,9 @@ func (m *ProductSKUMutation) Fields() []string {
 	}
 	if m.default_unit != nil {
 		fields = append(fields, productsku.FieldDefaultUnitID)
+	}
+	if m.unit_net_weight_kg != nil {
+		fields = append(fields, productsku.FieldUnitNetWeightKg)
 	}
 	if m.is_active != nil {
 		fields = append(fields, productsku.FieldIsActive)
@@ -33945,6 +33998,8 @@ func (m *ProductSKUMutation) Field(name string) (ent.Value, bool) {
 		return m.PackagingVersion()
 	case productsku.FieldDefaultUnitID:
 		return m.DefaultUnitID()
+	case productsku.FieldUnitNetWeightKg:
+		return m.UnitNetWeightKg()
 	case productsku.FieldIsActive:
 		return m.IsActive()
 	case productsku.FieldCreatedAt:
@@ -33980,6 +34035,8 @@ func (m *ProductSKUMutation) OldField(ctx context.Context, name string) (ent.Val
 		return m.OldPackagingVersion(ctx)
 	case productsku.FieldDefaultUnitID:
 		return m.OldDefaultUnitID(ctx)
+	case productsku.FieldUnitNetWeightKg:
+		return m.OldUnitNetWeightKg(ctx)
 	case productsku.FieldIsActive:
 		return m.OldIsActive(ctx)
 	case productsku.FieldCreatedAt:
@@ -34065,6 +34122,13 @@ func (m *ProductSKUMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetDefaultUnitID(v)
 		return nil
+	case productsku.FieldUnitNetWeightKg:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitNetWeightKg(v)
+		return nil
 	case productsku.FieldIsActive:
 		v, ok := value.(bool)
 		if !ok {
@@ -34143,6 +34207,9 @@ func (m *ProductSKUMutation) ClearedFields() []string {
 	if m.FieldCleared(productsku.FieldDefaultUnitID) {
 		fields = append(fields, productsku.FieldDefaultUnitID)
 	}
+	if m.FieldCleared(productsku.FieldUnitNetWeightKg) {
+		fields = append(fields, productsku.FieldUnitNetWeightKg)
+	}
 	return fields
 }
 
@@ -34181,6 +34248,9 @@ func (m *ProductSKUMutation) ClearField(name string) error {
 	case productsku.FieldDefaultUnitID:
 		m.ClearDefaultUnitID()
 		return nil
+	case productsku.FieldUnitNetWeightKg:
+		m.ClearUnitNetWeightKg()
+		return nil
 	}
 	return fmt.Errorf("unknown ProductSKU nullable field %s", name)
 }
@@ -34218,6 +34288,9 @@ func (m *ProductSKUMutation) ResetField(name string) error {
 		return nil
 	case productsku.FieldDefaultUnitID:
 		m.ResetDefaultUnitID()
+		return nil
+	case productsku.FieldUnitNetWeightKg:
+		m.ResetUnitNetWeightKg()
 		return nil
 	case productsku.FieldIsActive:
 		m.ResetIsActive()
@@ -60193,29 +60266,31 @@ func (m *SalesOrderItemMutation) ResetEdge(name string) error {
 // ShipmentMutation represents an operation that mutates the Shipment nodes in the graph.
 type ShipmentMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	shipment_no        *string
-	customer_snapshot  *string
-	status             *string
-	idempotency_key    *string
-	planned_ship_at    *time.Time
-	shipped_at         *time.Time
-	note               *string
-	created_at         *time.Time
-	updated_at         *time.Time
-	clearedFields      map[string]struct{}
-	sales_order        *int
-	clearedsales_order bool
-	customer           *int
-	clearedcustomer    bool
-	items              map[int]struct{}
-	removeditems       map[int]struct{}
-	cleareditems       bool
-	done               bool
-	oldValue           func(context.Context) (*Shipment, error)
-	predicates         []predicate.Shipment
+	op                            Op
+	typ                           string
+	id                            *int
+	shipment_no                   *string
+	customer_snapshot             *string
+	status                        *string
+	idempotency_key               *string
+	planned_ship_at               *time.Time
+	shipped_at                    *time.Time
+	total_net_weight_kg           *decimal.Decimal
+	requested_total_net_weight_kg *decimal.Decimal
+	note                          *string
+	created_at                    *time.Time
+	updated_at                    *time.Time
+	clearedFields                 map[string]struct{}
+	sales_order                   *int
+	clearedsales_order            bool
+	customer                      *int
+	clearedcustomer               bool
+	items                         map[int]struct{}
+	removeditems                  map[int]struct{}
+	cleareditems                  bool
+	done                          bool
+	oldValue                      func(context.Context) (*Shipment, error)
+	predicates                    []predicate.Shipment
 }
 
 var _ ent.Mutation = (*ShipmentMutation)(nil)
@@ -60669,6 +60744,104 @@ func (m *ShipmentMutation) ResetShippedAt() {
 	delete(m.clearedFields, shipment.FieldShippedAt)
 }
 
+// SetTotalNetWeightKg sets the "total_net_weight_kg" field.
+func (m *ShipmentMutation) SetTotalNetWeightKg(d decimal.Decimal) {
+	m.total_net_weight_kg = &d
+}
+
+// TotalNetWeightKg returns the value of the "total_net_weight_kg" field in the mutation.
+func (m *ShipmentMutation) TotalNetWeightKg() (r decimal.Decimal, exists bool) {
+	v := m.total_net_weight_kg
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldTotalNetWeightKg returns the old "total_net_weight_kg" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldTotalNetWeightKg(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldTotalNetWeightKg is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldTotalNetWeightKg requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldTotalNetWeightKg: %w", err)
+	}
+	return oldValue.TotalNetWeightKg, nil
+}
+
+// ClearTotalNetWeightKg clears the value of the "total_net_weight_kg" field.
+func (m *ShipmentMutation) ClearTotalNetWeightKg() {
+	m.total_net_weight_kg = nil
+	m.clearedFields[shipment.FieldTotalNetWeightKg] = struct{}{}
+}
+
+// TotalNetWeightKgCleared returns if the "total_net_weight_kg" field was cleared in this mutation.
+func (m *ShipmentMutation) TotalNetWeightKgCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldTotalNetWeightKg]
+	return ok
+}
+
+// ResetTotalNetWeightKg resets all changes to the "total_net_weight_kg" field.
+func (m *ShipmentMutation) ResetTotalNetWeightKg() {
+	m.total_net_weight_kg = nil
+	delete(m.clearedFields, shipment.FieldTotalNetWeightKg)
+}
+
+// SetRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field.
+func (m *ShipmentMutation) SetRequestedTotalNetWeightKg(d decimal.Decimal) {
+	m.requested_total_net_weight_kg = &d
+}
+
+// RequestedTotalNetWeightKg returns the value of the "requested_total_net_weight_kg" field in the mutation.
+func (m *ShipmentMutation) RequestedTotalNetWeightKg() (r decimal.Decimal, exists bool) {
+	v := m.requested_total_net_weight_kg
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRequestedTotalNetWeightKg returns the old "requested_total_net_weight_kg" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldRequestedTotalNetWeightKg(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRequestedTotalNetWeightKg is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRequestedTotalNetWeightKg requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRequestedTotalNetWeightKg: %w", err)
+	}
+	return oldValue.RequestedTotalNetWeightKg, nil
+}
+
+// ClearRequestedTotalNetWeightKg clears the value of the "requested_total_net_weight_kg" field.
+func (m *ShipmentMutation) ClearRequestedTotalNetWeightKg() {
+	m.requested_total_net_weight_kg = nil
+	m.clearedFields[shipment.FieldRequestedTotalNetWeightKg] = struct{}{}
+}
+
+// RequestedTotalNetWeightKgCleared returns if the "requested_total_net_weight_kg" field was cleared in this mutation.
+func (m *ShipmentMutation) RequestedTotalNetWeightKgCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldRequestedTotalNetWeightKg]
+	return ok
+}
+
+// ResetRequestedTotalNetWeightKg resets all changes to the "requested_total_net_weight_kg" field.
+func (m *ShipmentMutation) ResetRequestedTotalNetWeightKg() {
+	m.requested_total_net_weight_kg = nil
+	delete(m.clearedFields, shipment.FieldRequestedTotalNetWeightKg)
+}
+
 // SetNote sets the "note" field.
 func (m *ShipmentMutation) SetNote(s string) {
 	m.note = &s
@@ -60932,7 +61105,7 @@ func (m *ShipmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShipmentMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 13)
 	if m.shipment_no != nil {
 		fields = append(fields, shipment.FieldShipmentNo)
 	}
@@ -60956,6 +61129,12 @@ func (m *ShipmentMutation) Fields() []string {
 	}
 	if m.shipped_at != nil {
 		fields = append(fields, shipment.FieldShippedAt)
+	}
+	if m.total_net_weight_kg != nil {
+		fields = append(fields, shipment.FieldTotalNetWeightKg)
+	}
+	if m.requested_total_net_weight_kg != nil {
+		fields = append(fields, shipment.FieldRequestedTotalNetWeightKg)
 	}
 	if m.note != nil {
 		fields = append(fields, shipment.FieldNote)
@@ -60990,6 +61169,10 @@ func (m *ShipmentMutation) Field(name string) (ent.Value, bool) {
 		return m.PlannedShipAt()
 	case shipment.FieldShippedAt:
 		return m.ShippedAt()
+	case shipment.FieldTotalNetWeightKg:
+		return m.TotalNetWeightKg()
+	case shipment.FieldRequestedTotalNetWeightKg:
+		return m.RequestedTotalNetWeightKg()
 	case shipment.FieldNote:
 		return m.Note()
 	case shipment.FieldCreatedAt:
@@ -61021,6 +61204,10 @@ func (m *ShipmentMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldPlannedShipAt(ctx)
 	case shipment.FieldShippedAt:
 		return m.OldShippedAt(ctx)
+	case shipment.FieldTotalNetWeightKg:
+		return m.OldTotalNetWeightKg(ctx)
+	case shipment.FieldRequestedTotalNetWeightKg:
+		return m.OldRequestedTotalNetWeightKg(ctx)
 	case shipment.FieldNote:
 		return m.OldNote(ctx)
 	case shipment.FieldCreatedAt:
@@ -61092,6 +61279,20 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetShippedAt(v)
 		return nil
+	case shipment.FieldTotalNetWeightKg:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetTotalNetWeightKg(v)
+		return nil
+	case shipment.FieldRequestedTotalNetWeightKg:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRequestedTotalNetWeightKg(v)
+		return nil
 	case shipment.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -61161,6 +61362,12 @@ func (m *ShipmentMutation) ClearedFields() []string {
 	if m.FieldCleared(shipment.FieldShippedAt) {
 		fields = append(fields, shipment.FieldShippedAt)
 	}
+	if m.FieldCleared(shipment.FieldTotalNetWeightKg) {
+		fields = append(fields, shipment.FieldTotalNetWeightKg)
+	}
+	if m.FieldCleared(shipment.FieldRequestedTotalNetWeightKg) {
+		fields = append(fields, shipment.FieldRequestedTotalNetWeightKg)
+	}
 	if m.FieldCleared(shipment.FieldNote) {
 		fields = append(fields, shipment.FieldNote)
 	}
@@ -61192,6 +61399,12 @@ func (m *ShipmentMutation) ClearField(name string) error {
 		return nil
 	case shipment.FieldShippedAt:
 		m.ClearShippedAt()
+		return nil
+	case shipment.FieldTotalNetWeightKg:
+		m.ClearTotalNetWeightKg()
+		return nil
+	case shipment.FieldRequestedTotalNetWeightKg:
+		m.ClearRequestedTotalNetWeightKg()
 		return nil
 	case shipment.FieldNote:
 		m.ClearNote()
@@ -61227,6 +61440,12 @@ func (m *ShipmentMutation) ResetField(name string) error {
 		return nil
 	case shipment.FieldShippedAt:
 		m.ResetShippedAt()
+		return nil
+	case shipment.FieldTotalNetWeightKg:
+		m.ResetTotalNetWeightKg()
+		return nil
+	case shipment.FieldRequestedTotalNetWeightKg:
+		m.ResetRequestedTotalNetWeightKg()
 		return nil
 	case shipment.FieldNote:
 		m.ResetNote()
@@ -61364,31 +61583,32 @@ func (m *ShipmentMutation) ResetEdge(name string) error {
 // ShipmentItemMutation represents an operation that mutates the ShipmentItem nodes in the graph.
 type ShipmentItemMutation struct {
 	config
-	op                      Op
-	typ                     string
-	id                      *int
-	quantity                *decimal.Decimal
-	note                    *string
-	created_at              *time.Time
-	updated_at              *time.Time
-	clearedFields           map[string]struct{}
-	shipment                *int
-	clearedshipment         bool
-	sales_order_item        *int
-	clearedsales_order_item bool
-	product                 *int
-	clearedproduct          bool
-	product_sku             *int
-	clearedproduct_sku      bool
-	warehouse               *int
-	clearedwarehouse        bool
-	unit                    *int
-	clearedunit             bool
-	inventory_lot           *int
-	clearedinventory_lot    bool
-	done                    bool
-	oldValue                func(context.Context) (*ShipmentItem, error)
-	predicates              []predicate.ShipmentItem
+	op                          Op
+	typ                         string
+	id                          *int
+	quantity                    *decimal.Decimal
+	unit_net_weight_kg_snapshot *decimal.Decimal
+	note                        *string
+	created_at                  *time.Time
+	updated_at                  *time.Time
+	clearedFields               map[string]struct{}
+	shipment                    *int
+	clearedshipment             bool
+	sales_order_item            *int
+	clearedsales_order_item     bool
+	product                     *int
+	clearedproduct              bool
+	product_sku                 *int
+	clearedproduct_sku          bool
+	warehouse                   *int
+	clearedwarehouse            bool
+	unit                        *int
+	clearedunit                 bool
+	inventory_lot               *int
+	clearedinventory_lot        bool
+	done                        bool
+	oldValue                    func(context.Context) (*ShipmentItem, error)
+	predicates                  []predicate.ShipmentItem
 }
 
 var _ ent.Mutation = (*ShipmentItemMutation)(nil)
@@ -61816,6 +62036,55 @@ func (m *ShipmentItemMutation) ResetQuantity() {
 	m.quantity = nil
 }
 
+// SetUnitNetWeightKgSnapshot sets the "unit_net_weight_kg_snapshot" field.
+func (m *ShipmentItemMutation) SetUnitNetWeightKgSnapshot(d decimal.Decimal) {
+	m.unit_net_weight_kg_snapshot = &d
+}
+
+// UnitNetWeightKgSnapshot returns the value of the "unit_net_weight_kg_snapshot" field in the mutation.
+func (m *ShipmentItemMutation) UnitNetWeightKgSnapshot() (r decimal.Decimal, exists bool) {
+	v := m.unit_net_weight_kg_snapshot
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUnitNetWeightKgSnapshot returns the old "unit_net_weight_kg_snapshot" field's value of the ShipmentItem entity.
+// If the ShipmentItem object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentItemMutation) OldUnitNetWeightKgSnapshot(ctx context.Context) (v *decimal.Decimal, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUnitNetWeightKgSnapshot is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUnitNetWeightKgSnapshot requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUnitNetWeightKgSnapshot: %w", err)
+	}
+	return oldValue.UnitNetWeightKgSnapshot, nil
+}
+
+// ClearUnitNetWeightKgSnapshot clears the value of the "unit_net_weight_kg_snapshot" field.
+func (m *ShipmentItemMutation) ClearUnitNetWeightKgSnapshot() {
+	m.unit_net_weight_kg_snapshot = nil
+	m.clearedFields[shipmentitem.FieldUnitNetWeightKgSnapshot] = struct{}{}
+}
+
+// UnitNetWeightKgSnapshotCleared returns if the "unit_net_weight_kg_snapshot" field was cleared in this mutation.
+func (m *ShipmentItemMutation) UnitNetWeightKgSnapshotCleared() bool {
+	_, ok := m.clearedFields[shipmentitem.FieldUnitNetWeightKgSnapshot]
+	return ok
+}
+
+// ResetUnitNetWeightKgSnapshot resets all changes to the "unit_net_weight_kg_snapshot" field.
+func (m *ShipmentItemMutation) ResetUnitNetWeightKgSnapshot() {
+	m.unit_net_weight_kg_snapshot = nil
+	delete(m.clearedFields, shipmentitem.FieldUnitNetWeightKgSnapshot)
+}
+
 // SetNote sets the "note" field.
 func (m *ShipmentItemMutation) SetNote(s string) {
 	m.note = &s
@@ -62173,7 +62442,7 @@ func (m *ShipmentItemMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShipmentItemMutation) Fields() []string {
-	fields := make([]string, 0, 11)
+	fields := make([]string, 0, 12)
 	if m.shipment != nil {
 		fields = append(fields, shipmentitem.FieldShipmentID)
 	}
@@ -62197,6 +62466,9 @@ func (m *ShipmentItemMutation) Fields() []string {
 	}
 	if m.quantity != nil {
 		fields = append(fields, shipmentitem.FieldQuantity)
+	}
+	if m.unit_net_weight_kg_snapshot != nil {
+		fields = append(fields, shipmentitem.FieldUnitNetWeightKgSnapshot)
 	}
 	if m.note != nil {
 		fields = append(fields, shipmentitem.FieldNote)
@@ -62231,6 +62503,8 @@ func (m *ShipmentItemMutation) Field(name string) (ent.Value, bool) {
 		return m.LotID()
 	case shipmentitem.FieldQuantity:
 		return m.Quantity()
+	case shipmentitem.FieldUnitNetWeightKgSnapshot:
+		return m.UnitNetWeightKgSnapshot()
 	case shipmentitem.FieldNote:
 		return m.Note()
 	case shipmentitem.FieldCreatedAt:
@@ -62262,6 +62536,8 @@ func (m *ShipmentItemMutation) OldField(ctx context.Context, name string) (ent.V
 		return m.OldLotID(ctx)
 	case shipmentitem.FieldQuantity:
 		return m.OldQuantity(ctx)
+	case shipmentitem.FieldUnitNetWeightKgSnapshot:
+		return m.OldUnitNetWeightKgSnapshot(ctx)
 	case shipmentitem.FieldNote:
 		return m.OldNote(ctx)
 	case shipmentitem.FieldCreatedAt:
@@ -62333,6 +62609,13 @@ func (m *ShipmentItemMutation) SetField(name string, value ent.Value) error {
 		}
 		m.SetQuantity(v)
 		return nil
+	case shipmentitem.FieldUnitNetWeightKgSnapshot:
+		v, ok := value.(decimal.Decimal)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUnitNetWeightKgSnapshot(v)
+		return nil
 	case shipmentitem.FieldNote:
 		v, ok := value.(string)
 		if !ok {
@@ -62396,6 +62679,9 @@ func (m *ShipmentItemMutation) ClearedFields() []string {
 	if m.FieldCleared(shipmentitem.FieldLotID) {
 		fields = append(fields, shipmentitem.FieldLotID)
 	}
+	if m.FieldCleared(shipmentitem.FieldUnitNetWeightKgSnapshot) {
+		fields = append(fields, shipmentitem.FieldUnitNetWeightKgSnapshot)
+	}
 	if m.FieldCleared(shipmentitem.FieldNote) {
 		fields = append(fields, shipmentitem.FieldNote)
 	}
@@ -62421,6 +62707,9 @@ func (m *ShipmentItemMutation) ClearField(name string) error {
 		return nil
 	case shipmentitem.FieldLotID:
 		m.ClearLotID()
+		return nil
+	case shipmentitem.FieldUnitNetWeightKgSnapshot:
+		m.ClearUnitNetWeightKgSnapshot()
 		return nil
 	case shipmentitem.FieldNote:
 		m.ClearNote()
@@ -62456,6 +62745,9 @@ func (m *ShipmentItemMutation) ResetField(name string) error {
 		return nil
 	case shipmentitem.FieldQuantity:
 		m.ResetQuantity()
+		return nil
+	case shipmentitem.FieldUnitNetWeightKgSnapshot:
+		m.ResetUnitNetWeightKgSnapshot()
 		return nil
 	case shipmentitem.FieldNote:
 		m.ResetNote()

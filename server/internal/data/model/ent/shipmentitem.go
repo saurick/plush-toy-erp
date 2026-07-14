@@ -41,6 +41,8 @@ type ShipmentItem struct {
 	LotID *int `json:"lot_id,omitempty"`
 	// Quantity holds the value of the "quantity" field.
 	Quantity decimal.Decimal `json:"quantity,omitempty"`
+	// UnitNetWeightKgSnapshot holds the value of the "unit_net_weight_kg_snapshot" field.
+	UnitNetWeightKgSnapshot *decimal.Decimal `json:"unit_net_weight_kg_snapshot,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -156,6 +158,8 @@ func (*ShipmentItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case shipmentitem.FieldUnitNetWeightKgSnapshot:
+			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case shipmentitem.FieldQuantity:
 			values[i] = new(decimal.Decimal)
 		case shipmentitem.FieldID, shipmentitem.FieldShipmentID, shipmentitem.FieldSalesOrderItemID, shipmentitem.FieldProductID, shipmentitem.FieldProductSkuID, shipmentitem.FieldWarehouseID, shipmentitem.FieldUnitID, shipmentitem.FieldLotID:
@@ -235,6 +239,13 @@ func (_m *ShipmentItem) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field quantity", values[i])
 			} else if value != nil {
 				_m.Quantity = *value
+			}
+		case shipmentitem.FieldUnitNetWeightKgSnapshot:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field unit_net_weight_kg_snapshot", values[i])
+			} else if value.Valid {
+				_m.UnitNetWeightKgSnapshot = new(decimal.Decimal)
+				*_m.UnitNetWeightKgSnapshot = *value.S.(*decimal.Decimal)
 			}
 		case shipmentitem.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -355,6 +366,11 @@ func (_m *ShipmentItem) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("quantity=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Quantity))
+	builder.WriteString(", ")
+	if v := _m.UnitNetWeightKgSnapshot; v != nil {
+		builder.WriteString("unit_net_weight_kg_snapshot=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.Note; v != nil {
 		builder.WriteString("note=")

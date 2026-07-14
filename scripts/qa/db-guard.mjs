@@ -406,14 +406,43 @@ function builderChain(hunk, changedIndex) {
     .join("\n");
 }
 
-function explicitTableNames(lines) {
-  const names = { added: new Set(), removed: new Set() };
-  for (const line of lines) {
-    const match = line.slice(1).match(/\bTable:\s*"([a-z0-9_]+)"/u);
-    if (!match) continue;
-    names[line[0] === "+" ? "added" : "removed"].add(match[1]);
+function namedCheckExpressions(source) {
+  const expressions = new Map();
+  for (const match of source.matchAll(
+    /"([a-z0-9_]+)"\s*:\s*"((?:\\.|[^"\\])*)"/gu,
+  )) {
+    expressions.set(match[1], match[2]);
   }
-  return names;
+  return expressions;
+}
+
+function dropUnchangedCheckOperations(
+  root,
+  baselineFile,
+  currentFile,
+  range,
+  tokenOperations,
+) {
+  const baselineChecks = namedCheckExpressions(
+    baselineSource(root, baselineFile, range),
+  );
+  const currentChecks = namedCheckExpressions(
+    readFileSync(path.join(root, currentFile), "utf8"),
+  );
+  for (const [key, item] of tokenOperations) {
+    if (
+      item.kind !== "check" ||
+      !item.operations.has("add") ||
+      !item.operations.has("drop")
+    ) {
+      continue;
+    }
+    const baseline = baselineChecks.get(item.token);
+    const current = currentChecks.get(item.token);
+    if (baseline !== undefined && baseline === current) {
+      tokenOperations.delete(key);
+    }
+  }
 }
 
 function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
@@ -480,11 +509,19 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
   const deleted = statusEntries.some(
     (entry) => entry.status === "D" && entry.path === file,
   );
+  let baselineFile = file;
   if (!newlyAdded && !deleted) {
-    const baselineFile =
+    baselineFile =
       statusEntries.find((entry) => entry.path === file && entry.oldPath)
         ?.oldPath || file;
     dropUnchangedColumnOperations(
+      root,
+      baselineFile,
+      file,
+      range,
+      tokenOperations,
+    );
+    dropUnchangedCheckOperations(
       root,
       baselineFile,
       file,
@@ -516,15 +553,15 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
     return requirements;
   }
 
-  const tableNames = explicitTableNames(changedLines);
-  if (tableNames.added.size > 0 || tableNames.removed.size > 0) {
+  const baselineTable = schemaTableName(
+    baselineSource(root, baselineFile, range),
+    baselineFile,
+  );
+  if (baselineTable !== table) {
     requirements.push({
       operation: "rename-table",
       kind: "table",
-      tokens: [
-        ...tableNames.removed,
-        ...tableNames.added,
-      ].sort(),
+      tokens: [baselineTable, table],
       detail: "Ent table annotation changed",
     });
   }

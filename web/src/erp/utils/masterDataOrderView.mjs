@@ -930,6 +930,9 @@ export function buildProductSKUParams(values = {}, extra = {}) {
       values.default_unit_id === undefined || values.default_unit_id === null
         ? undefined
         : Number(values.default_unit_id || 0),
+    unit_net_weight_kg: normalizeOptionalDecimalString(
+      values.unit_net_weight_kg
+    ),
   })
 }
 

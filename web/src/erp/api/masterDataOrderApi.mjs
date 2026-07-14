@@ -5,6 +5,7 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
   listAllSourceDocumentItems,
   listSourceDocumentItemsAtVersion,
+  listSourceDocumentItemsPreview,
 } from '../utils/sourceDocumentPagination.mjs'
 
 const masterDataRpc = new JsonRpc({
@@ -344,6 +345,25 @@ export async function listAllSalesOrderItems(params = {}, options = {}) {
   })
 }
 
+export async function listSalesOrderItemsPreview(params = {}, options = {}) {
+  const itemParams = { ...params }
+  delete itemParams.expected_version
+  return listSourceDocumentItemsAtVersion({
+    expectedDocument: {
+      id: params.sales_order_id,
+      version: params.expected_version,
+    },
+    getDocument: () => getSalesOrder({ id: params.sales_order_id }, options),
+    listItems: () =>
+      listSourceDocumentItemsPreview(
+        listSalesOrderItems,
+        itemParams,
+        'sales_order_items',
+        options
+      ),
+  })
+}
+
 export async function addSalesOrderItem(params = {}) {
   const result = await salesOrderRpc.call('add_sales_order_item', params)
   return dataOf(result)?.sales_order_item || null
@@ -439,6 +459,26 @@ export async function listAllPurchaseOrderItems(params = {}, options = {}) {
   })
 }
 
+export async function listPurchaseOrderItemsPreview(params = {}, options = {}) {
+  const itemParams = { ...params }
+  delete itemParams.expected_version
+  return listSourceDocumentItemsAtVersion({
+    expectedDocument: {
+      id: params.purchase_order_id,
+      version: params.expected_version,
+    },
+    getDocument: () =>
+      getPurchaseOrder({ id: params.purchase_order_id }, options),
+    listItems: () =>
+      listSourceDocumentItemsPreview(
+        listPurchaseOrderItems,
+        itemParams,
+        'purchase_order_items',
+        options
+      ),
+  })
+}
+
 export async function listOutsourcingOrders(params = {}, options = {}) {
   const result = await outsourcingOrderRpc.call(
     'list_outsourcing_orders',
@@ -523,6 +563,29 @@ export async function listAllOutsourcingOrderItems(params = {}, options = {}) {
       getOutsourcingOrder({ id: params.outsourcing_order_id }, options),
     listItems: () =>
       listAllSourceDocumentItems(
+        listOutsourcingOrderItems,
+        itemParams,
+        'outsourcing_order_items',
+        options
+      ),
+  })
+}
+
+export async function listOutsourcingOrderItemsPreview(
+  params = {},
+  options = {}
+) {
+  const itemParams = { ...params }
+  delete itemParams.expected_version
+  return listSourceDocumentItemsAtVersion({
+    expectedDocument: {
+      id: params.outsourcing_order_id,
+      version: params.expected_version,
+    },
+    getDocument: () =>
+      getOutsourcingOrder({ id: params.outsourcing_order_id }, options),
+    listItems: () =>
+      listSourceDocumentItemsPreview(
         listOutsourcingOrderItems,
         itemParams,
         'outsourcing_order_items',

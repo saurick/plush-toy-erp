@@ -7,6 +7,12 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+const (
+	jsonRPCNumeric20Scale6MaxIntegerDigits  = 14
+	jsonRPCNumeric20Scale6MaxFractionDigits = 6
+	jsonRPCNumeric20Scale6MaxTextBytes      = 1 + jsonRPCNumeric20Scale6MaxIntegerDigits + 1 + jsonRPCNumeric20Scale6MaxFractionDigits
+)
+
 func getMap(pm map[string]any, key string) map[string]any {
 	raw, ok := pm[key]
 	if !ok || raw == nil {
@@ -103,6 +109,20 @@ func getRequiredJSONRPCDecimal(pm map[string]any, key string) (decimal.Decimal, 
 	return parseJSONRPCDecimal(pm[key])
 }
 
+// getRequiredJSONRPCNumeric20Scale6 bounds string inputs before constructing a
+// decimal. JSON numbers retain the existing compatibility contract and are
+// subsequently validated by the owning usecase.
+func getRequiredJSONRPCNumeric20Scale6(pm map[string]any, key string) (decimal.Decimal, bool) {
+	raw, ok := pm[key]
+	if !ok {
+		return decimal.Zero, false
+	}
+	if value, ok := raw.(string); ok {
+		return parseJSONRPCNumeric20Scale6String(value)
+	}
+	return parseJSONRPCDecimal(raw)
+}
+
 func getOptionalJSONRPCDecimal(pm map[string]any, key string) (*decimal.Decimal, bool) {
 	raw, ok := pm[key]
 	if !ok || raw == nil {
@@ -113,6 +133,69 @@ func getOptionalJSONRPCDecimal(pm map[string]any, key string) (*decimal.Decimal,
 		return nil, false
 	}
 	return &parsed, true
+}
+
+// getOptionalJSONRPCDecimalString preserves decimal precision for fields whose
+// public contract is string-or-null. It deliberately rejects JSON numbers.
+func getOptionalJSONRPCDecimalString(pm map[string]any, key string) (*decimal.Decimal, bool) {
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return nil, true
+	}
+	text, ok := raw.(string)
+	if !ok {
+		return nil, false
+	}
+	parsed, ok := parseJSONRPCNumeric20Scale6String(text)
+	if !ok {
+		return nil, false
+	}
+	return &parsed, true
+}
+
+func parseJSONRPCNumeric20Scale6String(value string) (decimal.Decimal, bool) {
+	if value == "" || len(value) > jsonRPCNumeric20Scale6MaxTextBytes {
+		return decimal.Zero, false
+	}
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return decimal.Zero, false
+	}
+
+	index := 0
+	if text[index] == '-' {
+		index++
+		if index == len(text) {
+			return decimal.Zero, false
+		}
+	}
+	integerDigits := 0
+	for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+		integerDigits++
+		index++
+	}
+	if integerDigits == 0 || integerDigits > jsonRPCNumeric20Scale6MaxIntegerDigits {
+		return decimal.Zero, false
+	}
+	if index < len(text) {
+		if text[index] != '.' {
+			return decimal.Zero, false
+		}
+		index++
+		fractionDigits := 0
+		for index < len(text) && text[index] >= '0' && text[index] <= '9' {
+			fractionDigits++
+			index++
+		}
+		if fractionDigits == 0 || fractionDigits > jsonRPCNumeric20Scale6MaxFractionDigits {
+			return decimal.Zero, false
+		}
+	}
+	if index != len(text) {
+		return decimal.Zero, false
+	}
+	parsed, err := decimal.NewFromString(text)
+	return parsed, err == nil
 }
 
 func parseJSONRPCDecimal(raw any) (decimal.Decimal, bool) {

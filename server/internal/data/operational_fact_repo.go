@@ -661,6 +661,8 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 		SetStatus(biz.ShipmentStatusDraft).
 		SetIdempotencyKey(in.Shipment.IdempotencyKey).
 		SetNillablePlannedShipAt(in.Shipment.PlannedShipAt).
+		SetNillableTotalNetWeightKg(in.Shipment.TotalNetWeightKg).
+		SetNillableRequestedTotalNetWeightKg(in.Shipment.TotalNetWeightKg).
 		SetNillableNote(in.Shipment.Note).
 		Save(ctx)
 	if err != nil {
@@ -753,6 +755,7 @@ func shipmentMatchesCreate(row *ent.Shipment, in *biz.ShipmentCreate) bool {
 		sameOptionalString(row.CustomerSnapshot, in.CustomerSnapshot) &&
 		row.IdempotencyKey == in.IdempotencyKey &&
 		sameOptionalTime(row.PlannedShipAt, in.PlannedShipAt) &&
+		sameOptionalDecimal(row.RequestedTotalNetWeightKg, in.TotalNetWeightKg) &&
 		sameOptionalString(row.Note, in.Note)
 }
 
@@ -1737,6 +1740,9 @@ func (r *operationalFactRepo) shipShipment(
 		if err != nil {
 			return nil, err
 		}
+		if err := freezeShipmentNetWeights(ctx, tx, items); err != nil {
+			return nil, err
+		}
 		if err := prepareShipmentReservationsAndAvailability(ctx, tx, parent, items, sourceQuantity); err != nil {
 			return nil, err
 		}
@@ -1772,6 +1778,137 @@ func (r *operationalFactRepo) shipShipment(
 		}
 	}
 	return commitShipment(ctx, tx, parent)
+}
+
+func freezeShipmentNetWeights(ctx context.Context, tx *inventoryDBTx, items []*ent.ShipmentItem) error {
+	if tx == nil || tx.client == nil || tx.sqlTx == nil || len(items) == 0 {
+		return biz.ErrBadParam
+	}
+
+	productIDs := make([]int, 0, len(items))
+	productSkuIDs := make([]int, 0, len(items))
+	seenProducts := make(map[int]struct{}, len(items))
+	seenProductSKUs := make(map[int]struct{}, len(items))
+	for _, item := range items {
+		if item == nil || item.ProductID <= 0 || item.UnitID <= 0 || !item.Quantity.IsPositive() {
+			return biz.ErrBadParam
+		}
+		if _, ok := seenProducts[item.ProductID]; !ok {
+			seenProducts[item.ProductID] = struct{}{}
+			productIDs = append(productIDs, item.ProductID)
+		}
+		if item.ProductSkuID != nil {
+			if *item.ProductSkuID <= 0 {
+				return biz.ErrBadParam
+			}
+			if _, ok := seenProductSKUs[*item.ProductSkuID]; !ok {
+				seenProductSKUs[*item.ProductSkuID] = struct{}{}
+				productSkuIDs = append(productSkuIDs, *item.ProductSkuID)
+			}
+		}
+	}
+	sort.Ints(productIDs)
+	sort.Ints(productSkuIDs)
+
+	productsByID := make(map[int]*biz.Product, len(productIDs))
+	for _, productID := range productIDs {
+		if err := lockOperationalFactRow(ctx, tx, "products", productID, biz.ErrBadParam); err != nil {
+			return err
+		}
+		row, err := tx.client.Product.Get(ctx, productID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrBadParam
+			}
+			return err
+		}
+		productsByID[productID] = entProductToBiz(row)
+	}
+
+	productSKUsByID := make(map[int]*biz.ProductSKU, len(productSkuIDs))
+	for _, productSkuID := range productSkuIDs {
+		if err := lockOperationalFactRow(ctx, tx, "product_skus", productSkuID, biz.ErrBadParam); err != nil {
+			return err
+		}
+		row, err := tx.client.ProductSKU.Get(ctx, productSkuID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrBadParam
+			}
+			return err
+		}
+		productSKUsByID[productSkuID] = entProductSKUToBiz(row)
+	}
+
+	type resolvedShipmentItemNetWeight struct {
+		itemID          int
+		unitNetWeightKg *decimal.Decimal
+	}
+	resolved := make([]resolvedShipmentItemNetWeight, 0, len(items))
+	lines := make([]biz.ShipmentNetWeightLine, 0, len(items))
+	for _, item := range items {
+		var sku *biz.ProductSKU
+		if item.ProductSkuID != nil {
+			sku = productSKUsByID[*item.ProductSkuID]
+		}
+		unitNetWeightKg, err := biz.ResolveShipmentItemUnitNetWeightKg(item.UnitID, productsByID[item.ProductID], sku)
+		if err != nil {
+			return err
+		}
+		resolved = append(resolved, resolvedShipmentItemNetWeight{itemID: item.ID, unitNetWeightKg: unitNetWeightKg})
+		lines = append(lines, biz.ShipmentNetWeightLine{Quantity: item.Quantity, UnitNetWeightKg: unitNetWeightKg})
+	}
+
+	totalNetWeightKg, complete, err := biz.CalculateShipmentTotalNetWeightKg(lines)
+	if err != nil {
+		return err
+	}
+	for _, item := range resolved {
+		if item.unitNetWeightKg == nil {
+			continue
+		}
+		if err := updateShipmentItemNetWeightSnapshot(ctx, tx, item.itemID, *item.unitNetWeightKg); err != nil {
+			return err
+		}
+	}
+	if complete {
+		return updateShipmentTotalNetWeight(ctx, tx, items[0].ShipmentID, *totalNetWeightKg)
+	}
+	return nil
+}
+
+func updateShipmentItemNetWeightSnapshot(ctx context.Context, tx *inventoryDBTx, itemID int, unitNetWeightKg decimal.Decimal) error {
+	p := inventorySQLPlaceholders(tx.dialect, 3)
+	query := fmt.Sprintf(`UPDATE shipment_items SET unit_net_weight_kg_snapshot = %s, updated_at = %s WHERE id = %s`, p[0], p[1], p[2])
+	result, err := tx.sqlTx.ExecContext(ctx, query, unitNetWeightKg, time.Now(), itemID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func updateShipmentTotalNetWeight(ctx context.Context, tx *inventoryDBTx, shipmentID int, totalNetWeightKg decimal.Decimal) error {
+	p := inventorySQLPlaceholders(tx.dialect, 3)
+	query := fmt.Sprintf(`UPDATE shipments SET total_net_weight_kg = %s, updated_at = %s WHERE id = %s`, p[0], p[1], p[2])
+	result, err := tx.sqlTx.ExecContext(ctx, query, totalNetWeightKg, time.Now(), shipmentID)
+	if err != nil {
+		return err
+	}
+	rows, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if rows != 1 {
+		return biz.ErrBadParam
+	}
+	return nil
 }
 
 func verifyShipmentInventoryEvidence(
@@ -2631,14 +2768,14 @@ func entShipmentToBiz(row *ent.Shipment, itemRows []*ent.ShipmentItem) *biz.Ship
 	for _, item := range itemRows {
 		items = append(items, entShipmentItemToBiz(item))
 	}
-	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, SalesOrderID: row.SalesOrderID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
+	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, SalesOrderID: row.SalesOrderID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightKg: row.TotalNetWeightKg, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
 }
 
 func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {
 	if row == nil {
 		return nil
 	}
-	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
+	return &biz.ShipmentItem{ID: row.ID, ShipmentID: row.ShipmentID, SalesOrderItemID: row.SalesOrderItemID, ProductID: row.ProductID, ProductSkuID: row.ProductSkuID, WarehouseID: row.WarehouseID, UnitID: row.UnitID, LotID: row.LotID, Quantity: row.Quantity, UnitNetWeightKgSnapshot: row.UnitNetWeightKgSnapshot, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt}
 }
 
 func entStockReservationToBiz(row *ent.StockReservation) *biz.StockReservation {
