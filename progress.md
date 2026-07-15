@@ -7,6 +7,16 @@
 - 当前只收口上述真实缺口；不得回退其它已完成任务，也不把旧审查中的过期 / 超范围建议重新扩成产品功能。
 - 发布目标是内网测试机 `192.168.0.133`；低配目标只加载本地 fixed revision 构建产物、执行 migration、Compose 重启和部署后回归。
 
+## 2026-07-15 密码登录精确提示部署收口
+
+完成：commit `56ecf873` 已推送并以本地构建的 amd64 server/web 镜像加载到 `192.168.0.133`。目标应用数据库已显式核对为 `plush_erp_uat_20260715`，Atlas 为 75 / 75、pending 0；UAT 备份、镜像 digest、旧 release `929ec0b3` 回滚点均已保留。客户试用配置通过标准 validate / publish / activate / effective-session readback 升级到 v3，未直接写配置内容。`admin` 已设置新的生产强密码、撤销既有活动会话，密码只存 macOS Keychain；应用 JWT 签名密钥已轮换并同步当前与回滚 release。
+
+验证：新镜像冷启动、生产预检、health / ready、客户配置读取均通过，最终复核 server/web restart count 为 0、web healthy，公网 health 返回 `ok`。公网 API 已分别确认不存在账号返回 10001 / `账号不存在`、旧开发默认密码返回 10002 / `密码错误`、新密码返回业务码 0 且签发 token；真实 Chromium 页面确认前两类提示与 API 一致。完整操作证据见 `deployments/yoyoosun/evidence/releases/2026-07-15/deployment-operation-evidence.md`。
+
+下一步：由甲方使用实际岗位账号完成业务人工验收；账号所有者在阿里云控制台轮换短信 AccessKey 后，再更新目标环境密钥并复核短信登录。
+
+阻塞/风险：代码、制品、migration、客户试用配置、管理员密码登录和公网提示已闭环；正式客户签收尚未发生。阿里云 AccessKey 属于外部账号资源，本轮无法代替账号所有者完成控制台轮换，不得将其写成已处置。
+
 ## 2026-07-15 密码登录错误精确化
 
 完成：线上只读复现确认 `admin.yoyoosun.net` 服务健康，`admin` 使用本地开发默认密码登录失败的内部原因为 `password_invalid`；生产账号不继承本地开发默认密码，且启动不会覆盖已有账号密码。密码登录现按账号不存在、密码错误、账号停用、账号注销和核验期间账号信息变化返回独立错误码与岗位语言提示；短信登录继续保留防手机号枚举合同。未重置或读取线上真实密码，未改目标数据库、配置、账号或会话。
