@@ -58,6 +58,17 @@ test("affected: docs-only changes stay at T1", () => {
   assert.equal(plan.requiresFull, false);
 });
 
+test("affected: project skill changes run the repository skill health gate", () => {
+  const plan = buildAffectedPlan(
+    [".agents/skills/plush-test-governance/SKILL.md"],
+    { root: ROOT },
+  );
+
+  assert.deepEqual(ids(plan), ["diff-check", "docs-inventory", "skill-health"]);
+  assert.equal(plan.followUps.length, 0);
+  assert.equal(plan.highestLevel, "T1");
+});
+
 test("affected: customer raw-source README selects the fail-closed privacy boundary", () => {
   const plan = buildAffectedPlan(
     ["docs/customers/yoyoosun/raw-source-files/README.md"],

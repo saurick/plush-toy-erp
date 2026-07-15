@@ -1,4 +1,4 @@
 interface:
   display_name: "Plush Operations Governance"
   short_description: "运行诊断、可观测、安全与发布 Operations"
-  default_prompt: "Use $plush-operations-governance 诊断或执行 plush 运行与发布任务，并给出环境、证据、验证和回滚边界。"
+  default_prompt: "Use $plush-operations-governance 路由 plush 的诊断、错误/可观测、安全隐私、发布迁移或回滚恢复任务，先固定目标与写入权限，再给出分层证据和停止条件。"

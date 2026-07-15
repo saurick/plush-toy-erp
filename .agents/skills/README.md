@@ -4,12 +4,14 @@
 
 | Skill | 适用范围 |
 | --- | --- |
+| `$plush-capability-evidence-audit` | 只读审计“做到哪、还缺什么、能否发布/交付”，分开代码、本地 QA、运行态、目标发布、恢复和客户验收 |
 | `$plush-code-review-governance` | review diff/commit/worktree；按触达面路由到领域、页面、打印和测试检查 |
 | `$plush-docs-governance` | 当前真源、文档清单、中文文件名、读者路径和 `progress.md` |
 | `$plush-domain-boundary-governance` | Workflow / Fact、Product Core、客户差异、schema/usecase/API/RBAC 和字段真源 |
 | `$plush-page-design-governance` | 页面业务语义、字段/动作/状态、原型和浏览器回归 |
 | `$plush-print-template-source-governance` | 客户 Excel/PDF/图片源、模板意图、字段映射、编辑与 PDF/打印验证 |
 | `$plush-seed-import-governance` | seed、fixture、模拟试用、import dry-run、cleanup 和真实客户数据边界 |
+| `$plush-manual-acceptance-governance` | 人工验收目录、模拟数据、岗位账号/任务、浏览器/PDF、目标试用、签收与退出清理 |
 | `$plush-test-governance` | T0-T8、测试形态、PostgreSQL/migration、browser、release evidence |
 | `$plush-operations-governance` | runtime 诊断、可观测/错误、安全/隐私、发布、迁移和回滚 |
 

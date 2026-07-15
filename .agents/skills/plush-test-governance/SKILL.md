@@ -5,25 +5,11 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 
 # Plush Test Governance
 
-阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
-
 用这份 skill 把 plush-toy-erp 的测试选择、执行和汇报收口到项目真实边界。它不是“多跑命令越好”，而是按改动影响面选出足够但不过度的验证组合。
 
 `T0-T8` 是验证层级，不是项目架构分层。Workflow / Fact / RBAC / API/UI 这类架构层级用于判断系统责任和风险边界；验证层级用于判断本轮测到哪里；测试形态用于说明测试证明了什么。
 
-## 测试质量门禁 Test Quality Gate
-
-测试治理不是“跑得越多越好”，也不是用一个全量命令替代关键场景：
-
-### 结构质量检查 Structure Quality Checks
-
-- 边界清晰、合理严谨：说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
-- 语义清晰：测试名称、fixture、断言和报告必须说明验证的业务语义、合同和证据环境，避免只证明命令跑过。
-- 职业任务文案：涉及用户可见文案时，测试或审查要覆盖业务岗位语言和裸工程术语泄漏，不只断言字符串存在。
-- 模块化：测试按单元、集成、契约、浏览器回归、发布验证等风险层分工，不用一个大命令掩盖关键断言缺失。
-- 高内聚：同一业务规则的样本、fixture、helper 和断言尽量收口，避免不同测试文件维护近似但冲突的口径。
-- 低耦合：测试不依赖脆弱顺序、真实外部服务或无关全局状态；需要真实环境时显式声明 target 和证据。
-- 单一职责：每个测试说明它证明什么；验证报告区分已覆盖、未覆盖和不适合本轮覆盖的风险。
+## 项目测试门禁 Project Test Gates
 
 - 足够但不过度：按改动影响面选择最小必要验证组合；docs/skill-only 不机械跑全量，业务真源、RBAC、migration、页面交互或发布链路必须升级验证。
 - 证明真实风险：测试要覆盖本轮最可能出错的合同、状态、权限、旧数据、边界值、浏览器状态或目标环境；不能只证明 happy path。
@@ -41,8 +27,9 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
    - 常用入口：`README.md`、`docs/当前真源与交接顺序.md`、`docs/product/自动化测试策略.md`、`server/README.md`、`web/README.md`、`scripts/README.md`。
    - 不把历史 changes、聊天规划或单个测试名当成测试范围真源。
 3. 按影响面选择验证层级 T0-T8，不用一个固定清单套所有任务。
-4. 执行前检查工作区状态；执行后记录命令、结果、未覆盖项和剩余风险。
-5. 有文件改动时，按项目约定更新 `progress.md`。
+4. 开发期先用 `bash scripts/qa/affected.sh --plan` 核对自动选择、required follow-up 与保守升级；确认计划后再用 `--run`。`affected` 不替代 pre-push `full.sh` 或发布前 `strict.sh`。
+5. 执行前检查工作区状态；执行后记录命令、实际测试数、pass/fail/skip、未覆盖项和剩余风险。缺 summary、`0 tests executed` 或 skip 必须按 fail-closed 报告，不能写成通过。
+6. 有文件改动时，按项目约定更新 `progress.md`。
 
 ## Terms
 
@@ -63,9 +50,9 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 | T3 Usecase / Repo / Core | Inventory/Purchase/Quality/Shipment/Finance/Workflow 事实或业务逻辑 | `cd server && go test ./internal/core/... ./internal/biz ./internal/data`，按域收窄或扩大 |
 | T4 API / RBAC / JSON-RPC | JSON-RPC handler、权限码、角色、错误码、鉴权 | `cd server && go test ./internal/biz ./internal/data ./internal/service ./internal/server`，错误码同步脚本 |
 | T5 Frontend / Page | 页面、表单、样式、表格、导航、交互态 | `cd web && pnpm lint`、`pnpm css`、`pnpm test`、`pnpm style:l1`，必要时真实浏览器脚本 |
-| T6 Import / Seed / Fixture | 客户导入、source snapshot、模拟数据、初始化模板 | `node --test scripts/import/*.test.mjs`、相关 dry-run / freeze 检查 |
-| T7 Real-write / Business E2E | 采购入库、库存、出货、加工、真实后端读写闭环 | `node scripts/qa/*real-write*.mjs`、`cd web && pnpm smoke:*real-write*`、`node scripts/qa/mvp-closure.mjs` |
-| T8 Release / Deploy | 镜像、低配服务器、migration、健康检查、回滚 | `bash scripts/qa/full.sh` 或 `strict.sh`，再按 `server/deploy/README.md` 做发布前后检查 |
+| T6 Config / Seed / Import | 客户配置、seed/fixture、source snapshot、模拟数据、导入预演 | 配置 manifest/边界测试、`node --test scripts/import/*.test.mjs`、相关 dry-run / freeze 检查 |
+| T7 Business Integration / E2E | 隔离 PostgreSQL 关键事务、JSON-RPC/RBAC、真实浏览器业务闭环 | 项目关键 PostgreSQL gate、定向 JSON-RPC/浏览器 E2E；必须实际执行且 fail/skip 为 0 |
+| T8 Release / Deploy | 冻结树门禁、制品、migration、目标运行态、恢复与回滚 | `full.sh` / `strict.sh` + production preflight + 固定 image + migration lock + target health/smoke + backup/restore/rollback evidence |
 
 ## Test Shapes
 
@@ -87,6 +74,7 @@ description: 项目测试治理（plush-toy-erp）。Use when choosing, running,
 - 页面治理改动至少覆盖默认态、交互态、恢复态、相邻区域、长文本/大数字/多标签等边界样本；`style:l1` 是浏览器级回归，不替代真实后端读写回归。
 - Import / Seed 改动必须区分 dry-run、fixture、模拟客户数据和真实客户数据；当前没有可直接执行的真实客户数据导入。
 - 部署测试默认不在低配服务器构建；远端只做加载制品、migration、启动、健康检查和必要 smoke。
+- `full.sh` / `strict.sh` 绿色只证明对应当前树的本地门禁；没有目标环境 release、migration、health/smoke、恢复与回滚证据时，不能写成已发布或已交付。
 
 ## Reporting Standard
 

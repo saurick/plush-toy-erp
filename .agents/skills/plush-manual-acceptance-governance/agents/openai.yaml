@@ -1,0 +1,4 @@
+interface:
+  display_name: "Plush Manual Acceptance Governance"
+  short_description: "治理人工验收数据、浏览器检查、PDF证据、签收与安全清理"
+  default_prompt: "Use $plush-manual-acceptance-governance 规划或执行 plush 人工验收流程，标明写入边界、证据层级与清理步骤。"

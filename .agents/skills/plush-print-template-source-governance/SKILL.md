@@ -5,7 +5,7 @@ description: 项目打印模板源治理（plush-toy-erp）。Use when turning c
 
 # Plush Print Template Source Governance
 
-阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文。本 skill 负责 plush-toy-erp 打印模板从客户源文件到运行时模板的识别、边界、交互和验证治理。若只做通用判断，先用全局 `$erp-print-template-source-governance`；落到本仓库实现时使用本 skill。
+本 skill 负责 plush-toy-erp 打印模板从客户源文件到运行时模板的识别、边界、交互和验证治理。若只做通用判断，先用全局 `$erp-print-template-source-governance`；落到本仓库实现时使用本 skill。
 
 ## Truth Chain / 必读真源
 
@@ -18,18 +18,17 @@ description: 项目打印模板源治理（plush-toy-erp）。Use when turning c
 - `/Users/simon/projects/plush-toy-erp/docs/打印模板字段与编辑行为清单.md`
 - `/Users/simon/projects/plush-toy-erp/docs/打印模板实现原理.md`
 - `/Users/simon/projects/plush-toy-erp/docs/product/prototypes/README.md`；涉及 UI / prototype intent 时再读对应 prototype README
-- `/Users/simon/projects/plush-toy-erp/docs/customers/<customer-key>/source-manifest.json`；客户专属任务同时读 raw source files
-- `/Users/simon/projects/plush-toy-erp/scripts/import/customerSourceManifestCheck.mjs` 和 `scripts/import/README.md`；校验 yoyoosun raw source registration、checksum、size 或 structured extraction boundary 时必读
+- `/Users/simon/projects/plush-toy-erp/scripts/import/README.md` 和 `scripts/import/customerSourceManifestCheck.mjs`；涉及客户原件时，由客户 Private 仓库显式传入 `<private-root>/manifests/source-manifest.json` 与 `<private-root>/sources`，不在 Product Core 猜测路径
 - `/Users/simon/projects/plush-toy-erp/config/customers/<customer-key>/README.md`；涉及 runtime samples、extracted image assets 或 `printTemplateDefaults` 时必读
 - 当前代码真源，重点是 `web/src/erp/pages/PrintCenterPage.jsx`、`web/src/erp/config/printTemplates.mjs`、`web/src/erp/data/engineeringPrintTemplates.mjs`、`web/src/erp/pages/EngineeringPrintWorkspacePage.jsx`、`web/src/erp/utils/engineeringPrintEditor.mjs`、`web/src/erp/utils/printWorkspace.js` 以及相关 print components / styles / tests
 
 ## Project Rules / 项目边界
 
 - 当前正式模板包括 `采购合同`、`加工合同`、`物料分析明细表`、`色卡`、`作业指导书`。新增或改变正式模板时，必须同步检查 `fieldRequirements`、`moduleKeys`、`factBoundary: read_snapshot_only` 和服务端 PDF 模块门禁。
-- yoyoosun raw sources 必须先走 `docs/customers/yoyoosun/source-manifest.json`：path、sha256、size、media type、source kind、structuredExtract policy 和 duplicate group 都是 source-boundary evidence。不要直接 glob `raw-source-files/*.xlsx`，也不要把截图当正式 source chain。
+- yoyoosun raw sources 的当前真源在兄弟 Private 仓库 `plush-toy-erp-customer-yoyoosun-private`。必须先按其 `manifests/source-manifest.json` 核对 path、sha256、size、media type、source kind、structuredExtract policy 和 duplicate group，并向 Product Core 工具显式传 `--manifest`、`--raw-dir`；不要 glob 私有 sources，也不要把截图当正式 source chain。
 - 打印输出真源是当前独立打印窗口里的右侧纸面 DOM；左侧字段面板、附件上传条和工具栏只是编辑入口，不是第二套模板。
 - 打印模板只读业务快照和当前窗口草稿，不创建、确认、过账或反写采购、委外、生产、库存、质检、出货或财务事实。
-- 客户源文件、客户公司名、真实联系人、真实电话、真实签字人、客户图片和原始资料路径不能自动进入 Product Core 默认样例。客户专属内容应留在 `docs/customers/<customer-key>/`、客户配置包、客户打印模板、assets 或交付资料边界。
+- 客户源文件、私密 manifest、客户公司名、真实联系人、真实电话、真实签字人、客户图片和原始资料路径不能自动进入 Product Core 默认样例。真实原件及未脱敏提取物留在客户 Private 仓库；仅经评审的脱敏配置、模板与 public assets 才进入 Product Core 对应客户配置边界。
 - 客户源文件里的轻微干扰和噪点不能照着实现：扫描污点、截图边缘、临时批注、手工审阅痕迹、重复拼接缝、Excel 临时辅助行、偶发错位或孤立格式异常，默认先归为 source noise，除非能证明它是稳定模板结构、客户固定要求或可编辑业务元素。
 - 噪点分级：source noise 是源文件污点 / 临时痕迹 / 偶发错位；rendering noise 是截图压缩、抗锯齿、字体 hinting 或 1px 内 subpixel 差；runtime product noise 是真实 UI / PDF 错位、遮挡、缺字、误高亮、错误焦点或业务误导。前两类通常记录或排除，第三类必须修或列为 remaining risk。
 - 噪点只有在重复出现、锚定到 workbook / PDF 结构、有业务含义、影响阅读/操作/打印，或被客户 / 用户明确确认时，才升级为模板元素、客户配置或测试断言。

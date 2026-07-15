@@ -33,6 +33,13 @@ const FIXED_COMMANDS = {
     "--test",
     "scripts/qa/docs-inventory.test.mjs",
   ]),
+  skillHealth: command(
+    "skill-health",
+    "T1",
+    "检查项目 skill 结构、metadata、索引和引用",
+    "node",
+    ["scripts/qa/skill-health.mjs"],
+  ),
   dbGuard: command("db-guard", "T2", "检查 schema 与 migration 同步", "bash", [
     "scripts/qa/db-guard.sh",
   ]),
@@ -301,13 +308,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
     if (isDocumentation(file)) {
       addFixed(state, "docs", file);
       if (file.startsWith(".agents/skills/")) {
-        addFollowUp(
-          state,
-          "skill-validation",
-          "T1",
-          "按对应 skill 运行 quick_validate.py、YAML 解析和 metadata 扫描。",
-          file,
-        );
+        addFixed(state, "skillHealth", file);
       }
       continue;
     }

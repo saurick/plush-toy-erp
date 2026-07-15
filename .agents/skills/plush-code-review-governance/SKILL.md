@@ -5,8 +5,6 @@ description: 项目代码审查治理（plush-toy-erp）。Use when reviewing pl
 
 # Plush 代码审查治理 Code Review Governance
 
-阅读口径：正文默认中文主线 + English anchors；`name` / `display_name` 保持英文，`Workflow / Fact / RBAC / API / migration / runtime` 等术语按需保留，方便触发、检索和跨工具引用。
-
 用这个 skill 审查 `/Users/simon/projects/plush-toy-erp` 的代码和正式文档改动。默认只审查，不改代码。
 
 ## 范围解析 Scope
@@ -53,19 +51,7 @@ git -C /Users/simon/projects/plush-toy-erp diff --stat
 - 错误码：新增/修改错误码必须保持服务端真源、前端生成码表、消费层和测试同步。
 - 文档漂移：代码能力层级、菜单、API、部署、产品状态、真源变了，要检查相关 README、当前真源、产品/架构文档和 `progress.md`。
 
-## 工程质量门禁 Engineering Quality Gate
-
-review 不能只找“会不会报错”。要把可维护性、可扩展性、复杂度预算和长期真源稳定性当成一等审查目标：
-
-### 结构质量检查 Structure Quality Checks
-
-- 边界清晰、合理严谨：说明本轮管什么、不管什么、依赖哪个真源，以及为什么当前拆分、抽象和验证足够但不过度。
-- 语义清晰：review 要识别同词多义、近义重复、职责含糊和行为后果不明的代码、文档和测试，不只看语法和 happy path。
-- 职业任务文案：review 用户可见页面、帮助、错误提示、导出/打印和业务文档时，检查是否把开发术语暴露给业务用户；应改成岗位能理解的任务、影响和下一步。
-- 模块化：按真实业务/技术职责拆分；只有能降低理解、测试或变更成本时才拆，不做空壳转发或为拆而拆。
-- 高内聚：同一业务规则、字段真源、错误/权限判断、数据转换或状态推进尽量收口到同一 usecase/helper/config/test source。
-- 低耦合：页面不偷做后端事实逻辑，usecase 不管展示细节，repo 不承载业务决策；跨层依赖要有清楚方向和合同。
-- 单一职责：一个模块不要同时处理展示、权限、数据派生、保存、副作用和兜底；如果必须临时承载，说明边界和退出路径。
+## 项目审查门禁 Project Review Gates
 
 - 复用优先：新增 helper、组件、schema、migration、API、RBAC 权限、Workflow 规则、客户配置、QA 脚本或部署步骤时，检查现有能力是否可以承接；如果新增复杂度没有清晰收益，应作为风险指出。
 - 主路径优先：警惕为通过当前页面或当前测试而加入局部 fallback、重复派生、页面私有真源、宽松校验、隐藏兼容分支或后处理补丁。
