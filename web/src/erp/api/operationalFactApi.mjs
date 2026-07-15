@@ -32,6 +32,7 @@ import {
   normalizeOutsourcingSourceFactCreateRequest,
   validateOutsourcingSourceFactResult,
 } from '../utils/outsourcingOrderFactAction.mjs'
+import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const operationalFactRpc = new JsonRpc({
   url: 'operational_fact',
@@ -113,9 +114,26 @@ export async function cancelProductionFact(params = {}) {
   return dataOf(result)?.production_fact || null
 }
 
-export async function listOutsourcingFacts(params = {}) {
-  const result = await operationalFactRpc.call('list_outsourcing_facts', params)
+export async function listOutsourcingFacts(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_outsourcing_facts',
+    params,
+    options
+  )
   return dataOf(result)
+}
+
+export async function listAllOutsourcingFacts(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listOutsourcingFacts,
+    params,
+    'outsourcing_facts',
+    options,
+    {
+      invalidResponseMessage:
+        '服务器返回的委外业务记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function createOutsourcingMaterialIssueFromOrder(params = {}) {

@@ -117,29 +117,32 @@ type ProductionFact struct {
 }
 
 type OutsourcingFact struct {
-	ID             int
-	FactNo         string
-	FactType       string
-	Status         string
-	SubjectType    string
-	SubjectID      int
-	ProductSkuID   *int
-	WarehouseID    int
-	UnitID         int
-	LotID          *int
-	Quantity       decimal.Decimal
-	SupplierID     *int
-	SupplierName   *string
-	SourceType     *string
-	SourceID       *int
-	SourceNo       *string
-	SourceLineID   *int
-	IdempotencyKey string
-	OccurredAt     time.Time
-	PostedAt       *time.Time
-	Note           *string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID           int
+	FactNo       string
+	FactType     string
+	Status       string
+	SubjectType  string
+	SubjectID    int
+	ProductSkuID *int
+	// SKUCodeSnapshot is a read projection from the immutable source order line.
+	// It is not persisted on outsourcing_facts and must not be inferred from an ID.
+	SKUCodeSnapshot *string
+	WarehouseID     int
+	UnitID          int
+	LotID           *int
+	Quantity        decimal.Decimal
+	SupplierID      *int
+	SupplierName    *string
+	SourceType      *string
+	SourceID        *int
+	SourceNo        *string
+	SourceLineID    *int
+	IdempotencyKey  string
+	OccurredAt      time.Time
+	PostedAt        *time.Time
+	Note            *string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 type Shipment struct {

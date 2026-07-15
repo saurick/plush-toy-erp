@@ -567,6 +567,20 @@ export function createStyleL1Scenarios(deps) {
     workPools: [],
     source: 'active_customer_config_revision',
   })
+  const localCustomerDesktopPreviewEffectiveSession = Object.freeze({
+    configRevision: '',
+    configHash: '',
+    customer: { key: 'yoyoosun', name: '永绅' },
+    pages: ['global-dashboard'],
+    actions: ['erp.dashboard.read', 'workflow.task.read'],
+    workflow_visible_owner_role_keys_by_capability: {
+      'workflow.task.read': ['boss'],
+    },
+    fieldPolicies: {},
+    workPools: [],
+    source: 'builtin_rbac_fallback',
+  })
+  let localCustomerDesktopPreviewWorkflowRequests = 0
 
   return [
     ...createBusinessRowItemsPreviewScenarios({
@@ -1551,6 +1565,79 @@ export function createStyleL1Scenarios(deps) {
         await expectHeading(page, '权限管理')
         await expectText(page, '角色模板')
         await assertTextAbsent(page, '当前账号暂无可见后台入口')
+      },
+    },
+    {
+      name: 'erp-effective-session-configured-customer-builtin-fallback-local-preview',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      adminProfile: {
+        username: 'style-l1-yoyo-preview-boss',
+        is_super_admin: false,
+        roles: [{ role_key: 'boss', name: '老板' }],
+        permissions: ['erp.dashboard.read', 'workflow.task.read'],
+        menus: [
+          {
+            key: 'global-dashboard',
+            label: '全局看板',
+            path: '/erp/dashboard',
+            required_any: ['erp.dashboard.read'],
+            required_all: [],
+          },
+        ],
+      },
+      customerKey: 'yoyoosun',
+      effectiveSession: localCustomerDesktopPreviewEffectiveSession,
+      expectPath: '/erp/dashboard',
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        localCustomerDesktopPreviewWorkflowRequests = 0
+        page.on('request', (request) => {
+          if (new URL(request.url()).pathname === '/rpc/workflow') {
+            localCustomerDesktopPreviewWorkflowRequests += 1
+          }
+        })
+      },
+      verify: async (page) => {
+        await page.locator('.erp-admin-shell').waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await expectText(page, '工作台 能力审阅')
+        await expectText(page, '本地客户预览')
+        await expectText(page, '当前后端尚未激活客户配置版本')
+        await expectText(page, '工作台、任务看板及客户业务数据均不加载')
+        await assertTextAbsent(page, '暂时无法进入工作台')
+        await assertTextAbsent(page, '优先处理队列')
+
+        const shellMetrics = await page.evaluate(() => {
+          const shell = document.querySelector('.erp-admin-shell')
+          const previewNotice = document.querySelector(
+            '[data-local-customer-desktop-preview="true"]'
+          )
+          return {
+            source: shell?.getAttribute('data-effective-session-source') || '',
+            dataRuntimeScope:
+              shell?.getAttribute('data-effective-session-data-scope') || '',
+            hasPreviewNotice: Boolean(previewNotice),
+            hasBusinessDataGuard: Boolean(
+              document.querySelector(
+                '[data-product-core-business-data-guard="true"]'
+              )
+            ),
+          }
+        })
+        assert.deepEqual(shellMetrics, {
+          source: 'builtin_rbac_fallback',
+          dataRuntimeScope: 'customer_runtime_missing',
+          hasPreviewNotice: true,
+          hasBusinessDataGuard: true,
+        })
+        assert.equal(
+          localCustomerDesktopPreviewWorkflowRequests,
+          0,
+          '本地客户预览不得读取或写入 Workflow 任务'
+        )
       },
     },
     {
@@ -12718,6 +12805,34 @@ export function createStyleL1Scenarios(deps) {
             await assertOutsourcingProcessSelectOptions(page, modal, {
               scenarioName: 'processing-contract-form-modal-title-desktop',
             })
+            const productInput = modal
+              .locator('input[id$="_product_id"]')
+              .first()
+            await productInput.click()
+            await productInput.press('ArrowDown')
+            await productInput.press('Enter')
+            const productSKUInput = modal
+              .locator('input[id$="_product_sku_id"]')
+              .first()
+            await productSKUInput.click()
+            await productSKUInput.fill('SKU-OUTSOURCE-CATALOG-L1')
+            const secondPageSKUOption = page
+              .locator(
+                '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
+              )
+              .filter({ hasText: 'SKU-OUTSOURCE-CATALOG-L1' })
+              .first()
+            await secondPageSKUOption.waitFor({
+              state: 'visible',
+              timeout: 10_000,
+            })
+            assert(
+              String((await secondPageSKUOption.innerText()) || '').includes(
+                'SKU-OUTSOURCE-CATALOG-L1'
+              ),
+              '加工合同表单必须读到第二页的产品规格选项'
+            )
+            await productSKUInput.press('Escape')
             const subjectTypeField = modal
               .locator('.ant-form-item')
               .filter({ hasText: '加工对象类型' })
@@ -12725,7 +12840,7 @@ export function createStyleL1Scenarios(deps) {
             const subjectTypeInput = subjectTypeField.locator(
               '.ant-select-selection-search-input'
             )
-            await subjectTypeInput.click()
+            await subjectTypeField.locator('.ant-select-selector').click()
             await subjectTypeInput.press('ArrowDown')
             await subjectTypeInput.press('Enter')
             const materialInput = modal

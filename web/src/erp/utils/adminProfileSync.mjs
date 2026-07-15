@@ -2,6 +2,7 @@ import { isAdminSessionUnavailableCode } from '../../common/consts/errorCodes.js
 
 const EFFECTIVE_SESSION_SYNC_FAILED_SOURCE = 'effective_session_sync_failed'
 const ACTIVE_CUSTOMER_CONFIG_SOURCE = 'active_customer_config_revision'
+const BUILTIN_RBAC_FALLBACK_SOURCE = 'builtin_rbac_fallback'
 const VISIBILITY_MODE_SUPER_ADMIN_PRODUCT_CORE = 'super_admin_product_core'
 const VISIBILITY_MODE_LOCAL_DEV_SYNC_FAILED = 'local_dev_sync_failed_diagnostic'
 const VISIBILITY_MODE_LOCAL_DEV_CUSTOMER_CONFIG =
@@ -347,6 +348,41 @@ export function hasExpectedCustomerRuntime(
   return (
     canMountCustomerRuntime(adminProfile) &&
     adminProfile.effective_session.customer.key.trim() === expectedKey
+  )
+}
+
+export function isLocalCustomerDesktopPreviewSession(
+  adminProfile,
+  expectedCustomerKey = ''
+) {
+  const expectedKey =
+    typeof expectedCustomerKey === 'string' ? expectedCustomerKey.trim() : ''
+  const customerKey = adminProfile?.effective_session?.customer?.key
+  if (
+    !expectedKey ||
+    typeof customerKey !== 'string' ||
+    !customerKey.trim() ||
+    adminProfile?.effective_session?.source !== BUILTIN_RBAC_FALLBACK_SOURCE
+  ) {
+    return false
+  }
+  return customerKey.trim() === expectedKey
+}
+
+export function hasExpectedDesktopCustomerSession(
+  adminProfile,
+  expectedCustomerKey = '',
+  { isLocalDev = false } = {}
+) {
+  const expectedKey =
+    typeof expectedCustomerKey === 'string' ? expectedCustomerKey.trim() : ''
+  if (!expectedKey) {
+    return true
+  }
+  return Boolean(
+    hasExpectedCustomerRuntime(adminProfile, expectedKey) ||
+      (isLocalDev &&
+        isLocalCustomerDesktopPreviewSession(adminProfile, expectedKey))
   )
 }
 

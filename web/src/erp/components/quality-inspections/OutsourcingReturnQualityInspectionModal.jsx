@@ -5,14 +5,7 @@ import {
   sourceBusinessActionNo,
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
-import { productSKUOption } from '../../utils/referenceSelectOptions.mjs'
-
-function productSKUText(productSKUs, productSKUID) {
-  const sku = (Array.isArray(productSKUs) ? productSKUs : []).find(
-    (item) => Number(item?.id || 0) === Number(productSKUID || 0)
-  )
-  return productSKUOption(sku)?.label || (productSKUID ? '产品规格已关联' : '-')
-}
+import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
 
 function formattedDateTime(value) {
   const timestamp = Number(value || 0)
@@ -31,7 +24,6 @@ export default function OutsourcingReturnQualityInspectionModal({
   open,
   order,
   fact,
-  productSKUs = [],
   loading = false,
   onCancel,
   onSubmit,
@@ -108,7 +100,7 @@ export default function OutsourcingReturnQualityInspectionModal({
           {
             key: 'product_sku',
             label: '产品规格',
-            children: productSKUText(productSKUs, fact?.product_sku_id),
+            children: outsourcingFactProductSKUText(fact),
           },
           {
             key: 'occurred_at',

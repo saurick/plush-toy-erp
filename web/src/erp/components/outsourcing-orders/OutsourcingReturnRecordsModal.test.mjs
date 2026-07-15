@@ -15,8 +15,9 @@ test('related outsourcing records only project return receipts', () => {
   assert.doesNotMatch(source, /dataIndex:\s*'source_/u)
   assert.doesNotMatch(source, /dataIndex:\s*'idempotency_key'/u)
   assert.match(source, /title: '产品规格'/u)
-  assert.match(source, /dataIndex: 'product_sku_id'/u)
-  assert.match(source, /productSKUOption/u)
+  assert.match(source, /outsourcingFactProductSKUText\(fact\)/u)
+  assert.doesNotMatch(source, /productSKUOption/u)
+  assert.doesNotMatch(source, /productSKUs/u)
 })
 
 test('payable and quality actions fail closed on posted and accepted quality state', () => {

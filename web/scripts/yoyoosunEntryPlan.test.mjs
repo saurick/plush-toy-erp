@@ -103,6 +103,10 @@ test('start:yoyoosun print-plan describes dev injection without publishing custo
     /preflight=database migration \+ backend health\/ready \+ customer config\/assets/u
   )
   assert.match(result.stdout, /ERP_DEV_CUSTOMER_KEY=yoyoosun/u)
+  assert.match(
+    result.stdout,
+    /\[start-yoyoosun\] desktop fallback=same-key builtin RBAC is local preview only; customer business pages still require an active revision/u
+  )
   assert.match(result.stdout, /ERP_VITE_PORT=\d+/u)
   assert.match(result.stdout, /pnpm start:yoyoosun/u)
 })

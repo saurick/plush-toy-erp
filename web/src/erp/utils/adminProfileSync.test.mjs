@@ -20,8 +20,10 @@ import {
   getEffectiveFieldPolicy,
   getEffectivePrintTemplateDefaults,
   getAdminProfileSyncErrorAction,
+  hasExpectedDesktopCustomerSession,
   hasExpectedCustomerRuntime,
   hasEffectiveSessionAction,
+  isLocalCustomerDesktopPreviewSession,
   resolveDefaultFieldPolicySurface,
   resolveEffectiveSessionCustomerKey,
   resolveEffectiveSessionPageAccess,
@@ -133,6 +135,22 @@ test('ERPLayout: 客户构建在有效会话完成前不渲染产品核心页面
   assert.match(
     source,
     /if \(customerRuntimeUnavailable\) \{[\s\S]*?<CustomerRuntimeUnavailable/u
+  )
+  assert.match(
+    source,
+    /hasExpectedDesktopCustomerSession\([\s\S]*?isLocalDev: import\.meta\.env\.DEV === true/u
+  )
+  assert.match(
+    source,
+    /data-local-customer-desktop-preview="true"[\s\S]*?本地客户预览/u
+  )
+  assert.match(
+    source,
+    /LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS = new Set\(\[[\s\S]*?'global-dashboard'[\s\S]*?'task-board'/u
+  )
+  assert.match(
+    source,
+    /isLocalCustomerDesktopPreview &&[\s\S]*?LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS\.has/u
   )
 })
 
@@ -289,6 +307,75 @@ test('adminProfileSync: 客户运行态必须匹配当前静态客户入口', ()
   )
   assert.equal(hasExpectedCustomerRuntime({ id: 1 }, 'yoyoosun'), false)
   assert.equal(hasExpectedCustomerRuntime({ id: 1 }, ''), true)
+})
+
+test('adminProfileSync: 本地桌面预览可使用同客户内置投影但不冒充客户运行态', () => {
+  const builtinFallbackProfile = attachEffectiveSessionToAdminProfile(
+    { id: 1, username: 'admin' },
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'builtin_rbac_fallback',
+    }
+  )
+
+  assert.equal(
+    isLocalCustomerDesktopPreviewSession(
+      builtinFallbackProfile,
+      'yoyoosun'
+    ),
+    true
+  )
+  assert.equal(
+    isLocalCustomerDesktopPreviewSession(builtinFallbackProfile, 'demo'),
+    false
+  )
+  assert.equal(
+    isLocalCustomerDesktopPreviewSession(builtinFallbackProfile, ''),
+    false
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(builtinFallbackProfile, 'yoyoosun'),
+    false
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(builtinFallbackProfile, 'yoyoosun', {
+      isLocalDev: true,
+    }),
+    true
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(builtinFallbackProfile, 'demo', {
+      isLocalDev: true,
+    }),
+    false
+  )
+  assert.equal(canMountCustomerRuntime(builtinFallbackProfile), false)
+
+  const activeRevisionProfile = attachEffectiveSessionToAdminProfile(
+    { id: 2, username: 'admin' },
+    {
+      customer: { key: 'yoyoosun' },
+      source: 'active_customer_config_revision',
+    }
+  )
+  assert.equal(
+    hasExpectedDesktopCustomerSession(activeRevisionProfile, 'yoyoosun'),
+    true
+  )
+
+  const diagnostic = buildEffectiveSessionDiagnosticSummary({
+    adminProfile: builtinFallbackProfile,
+    allowedMenuPaths: ['/erp/dashboard'],
+    visibleSections: [
+      {
+        title: '工作台',
+        items: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
+      },
+    ],
+    isLocalDev: true,
+  })
+  assert.equal(diagnostic.dataRuntimeScope, 'customer_runtime_missing')
+  assert.equal(diagnostic.canMountCustomerBusinessPages, false)
 })
 
 test('adminProfileSync: 打印默认值只从 effective session 投影读取', () => {

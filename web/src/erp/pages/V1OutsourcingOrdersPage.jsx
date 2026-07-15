@@ -68,7 +68,7 @@ import {
   listMaterials,
   listProcesses,
   listProducts,
-  listProductSKUs,
+  listAllProductSKUs,
   listContactsByOwner,
   listSuppliers,
   listUnits,
@@ -79,7 +79,7 @@ import {
   createOutsourcingMaterialIssueFromOrder,
   createOutsourcingReturnReceiptFromOrder,
   createPayableFromOutsourcingReturn,
-  listOutsourcingFacts,
+  listAllOutsourcingFacts,
 } from '../api/operationalFactApi.mjs'
 import { listInventoryLots } from '../api/inventoryApi.mjs'
 import {
@@ -350,7 +350,7 @@ export default function V1OutsourcingOrdersPage() {
       ] = await Promise.all([
         listSuppliers({ active_only: true, limit: 200 }),
         listProducts({ active_only: true, limit: 200 }),
-        listProductSKUs({ limit: 500 }),
+        listAllProductSKUs(),
         listMaterials({ active_only: true, limit: 200 }),
         listProcesses({ active_only: true, limit: 200 }),
         listUnits({ limit: 200 }),
@@ -520,10 +520,9 @@ export default function V1OutsourcingOrdersPage() {
       if (!canReadOutsourcingFacts || Number(orderID || 0) <= 0) {
         return []
       }
-      const data = await listOutsourcingFacts({
+      const data = await listAllOutsourcingFacts({
         source_type: 'OUTSOURCING_ORDER',
         source_id: Number(orderID),
-        limit: 500,
       })
       return Array.isArray(data?.outsourcing_facts)
         ? data.outsourcing_facts
@@ -2124,7 +2123,6 @@ export default function V1OutsourcingOrdersPage() {
         open={returnRecordsOpen}
         order={returnRecordsOrder}
         facts={relatedReturnFacts}
-        productSKUs={productSKUs}
         loading={returnRecordsLoading}
         canCreateQualityInspection={canCreateQualityInspection}
         qualityInspectionByFactID={qualityInspectionByFactID}
@@ -2140,7 +2138,6 @@ export default function V1OutsourcingOrdersPage() {
         open={Boolean(qualitySourceFact)}
         order={returnRecordsOrder}
         fact={qualitySourceFact}
-        productSKUs={productSKUs}
         loading={qualitySourceLoading}
         onCancel={closeOutsourcingReturnQualityInspection}
         onSubmit={submitOutsourcingReturnQualityInspection}
@@ -2150,7 +2147,6 @@ export default function V1OutsourcingOrdersPage() {
         action={FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE}
         open={Boolean(financeSourceFact)}
         source={financeSourceFact}
-        productSKUs={productSKUs}
         initialValues={financeSourceInitialValues}
         loading={financeSourceLoading}
         onCancel={closeOutsourcingReturnPayable}

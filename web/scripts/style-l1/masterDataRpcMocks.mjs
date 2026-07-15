@@ -62,6 +62,24 @@ export async function installMasterDataRpcMocks(page, context) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const outsourcingTargetProductSKU = {
+      ...productSKU,
+      id: 201,
+      sku_code: 'SKU-OUTSOURCE-CATALOG-L1',
+      sku_name: '委外第二页产品规格',
+      barcode: '690000000201',
+    }
+    const productSKUs = [
+      productSKU,
+      ...Array.from({ length: 199 }, (_, index) => ({
+        ...productSKU,
+        id: index + 2,
+        sku_code: `SKU-PAGE-L1-${String(index + 2).padStart(3, '0')}`,
+        sku_name: `分页样例规格 ${index + 2}`,
+        barcode: `690000000${String(index + 2).padStart(3, '0')}`,
+      })),
+      outsourcingTargetProductSKU,
+    ]
     const product = {
       id: 1,
       code: 'PROD-STYLE-L1',
@@ -180,7 +198,26 @@ export async function installMasterDataRpcMocks(page, context) {
         data = { products: [product], total: 1, limit: 100, offset: 0 }
         break
       case 'list_product_skus':
-        data = { product_skus: [productSKU], total: 1, limit: 100, offset: 0 }
+        {
+          const requestedLimit = Number(params.limit || 50)
+          const limit =
+            Number.isInteger(requestedLimit) &&
+            requestedLimit > 0 &&
+            requestedLimit <= 200
+              ? requestedLimit
+              : 50
+          const requestedOffset = Number(params.offset || 0)
+          const offset =
+            Number.isInteger(requestedOffset) && requestedOffset >= 0
+              ? requestedOffset
+              : 0
+          data = {
+            product_skus: productSKUs.slice(offset, offset + limit),
+            total: productSKUs.length,
+            limit,
+            offset,
+          }
+        }
         break
       case 'list_processes':
         data = {

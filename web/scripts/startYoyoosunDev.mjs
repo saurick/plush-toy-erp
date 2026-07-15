@@ -119,6 +119,7 @@ function printPlan(options) {
       }`,
       `[${label}] mode=vite dev server with HMR`,
       `[${label}] customer_config publish/activate is not executed`,
+      `[${label}] desktop fallback=same-key builtin RBAC is local preview only; customer business pages still require an active revision`,
       ...verificationLines,
       [
         `ERP_DEV_CUSTOMER_KEY=${options.customer}`,

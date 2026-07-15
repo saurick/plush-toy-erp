@@ -7,7 +7,7 @@ import {
   localFinanceDateTimeInputValue,
   suggestedFinanceBusinessNo,
 } from '../../utils/financeBusinessSourceAction.mjs'
-import { productSKUOption } from '../../utils/referenceSelectOptions.mjs'
+import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
 
 const FINANCE_FACT_TYPE_LABELS = Object.freeze({
   RECEIVABLE: '应收',
@@ -36,7 +36,7 @@ function sourcePartner(action, source = {}) {
   return '往来方已关联'
 }
 
-function sourceSummaryItems(action, source = {}, productSKUs = []) {
+function sourceSummaryItems(action, source = {}) {
   const record = source && typeof source === 'object' ? source : {}
   const items = [
     {
@@ -76,16 +76,11 @@ function sourceSummaryItems(action, source = {}, productSKUs = []) {
   } else if (
     action === FINANCE_BUSINESS_SOURCE_ACTIONS.OUTSOURCING_RETURN_PAYABLE
   ) {
-    const sku = productSKUs.find(
-      (item) => Number(item?.id || 0) === Number(record.product_sku_id || 0)
-    )
     items.push(
       {
         key: 'product_sku',
         label: '产品规格',
-        children:
-          productSKUOption(sku)?.label ||
-          (record.product_sku_id ? '产品规格已关联' : '-'),
+        children: outsourcingFactProductSKUText(record),
       },
       {
         key: 'quantity',
@@ -101,7 +96,6 @@ export default function FinanceBusinessSourceModal({
   action,
   open,
   source,
-  productSKUs = [],
   initialValues,
   loading = false,
   onCancel,
@@ -164,7 +158,7 @@ export default function FinanceBusinessSourceModal({
         size="small"
         column={1}
         style={{ marginTop: 16, marginBottom: 8 }}
-        items={sourceSummaryItems(effectiveAction, source, productSKUs)}
+        items={sourceSummaryItems(effectiveAction, source)}
       />
       <Form
         key={`${effectiveAction}:${source?.id || 'closed'}`}

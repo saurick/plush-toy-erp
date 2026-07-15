@@ -327,7 +327,8 @@ export async function installFactRpcMocks(page, context) {
       status: 'POSTED',
       subject_type: 'PRODUCT',
       subject_id: 1,
-      product_sku_id: 1,
+      product_sku_id: 201,
+      sku_code_snapshot: 'SKU-OUTSOURCE-SNAPSHOT-L1',
       lot_id: 402,
       quantity: '2',
       source_type: 'OUTSOURCING_ORDER',
@@ -336,6 +337,24 @@ export async function installFactRpcMocks(page, context) {
       idempotency_key: 'OUT-RR-POSTED-L1',
       note: '已过账委外回货',
     }
+    const paginatedOutsourcingReturns = Array.from(
+      { length: 200 },
+      (_, index) => ({
+        ...postedOutsourcingReturn,
+        id: 10_200 - index,
+        fact_no: `OUT-RR-PAGE-L1-${String(index + 1).padStart(3, '0')}`,
+        status: 'DRAFT',
+        source_line_id: 20_000 + index,
+        sku_code_snapshot: `SKU-OUTSOURCE-PAGE-L1-${String(
+          index + 1
+        ).padStart(3, '0')}`,
+        idempotency_key: `OUT-RR-PAGE-L1-${String(index + 1).padStart(
+          3,
+          '0'
+        )}`,
+        note: '委外回货分页样例',
+      })
+    )
     const stockReservation = {
       id: 1,
       reservation_no: 'RSV-STYLE-L1',
@@ -653,7 +672,11 @@ export async function installFactRpcMocks(page, context) {
         break
       case 'list_outsourcing_facts':
         {
+          const includePaginatedReturns =
+            params.source_type === 'OUTSOURCING_ORDER' &&
+            Number(params.source_id || 0) === 1
           const facts = [
+            ...(includePaginatedReturns ? paginatedOutsourcingReturns : []),
             outsourcingFact,
             postedOutsourcingReturn,
             ...createdOutsourcingFacts,
@@ -667,11 +690,13 @@ export async function installFactRpcMocks(page, context) {
                 Number(fact.source_line_id || 0) ===
                   Number(params.source_line_id))
           )
+          const limit = Number(params.limit || 50)
+          const offset = Number(params.offset || 0)
           data = {
-            outsourcing_facts: facts,
+            outsourcing_facts: facts.slice(offset, offset + limit),
             total: facts.length,
-            limit: Number(params.limit || 100),
-            offset: Number(params.offset || 0),
+            limit,
+            offset,
           }
         }
         break
@@ -730,7 +755,7 @@ export async function installFactRpcMocks(page, context) {
             status: 'DRAFT',
             subject_type: isMaterialIssue ? 'MATERIAL' : 'PRODUCT',
             subject_id: 1,
-            product_sku_id: isMaterialIssue ? null : 1,
+            product_sku_id: isMaterialIssue ? null : 201,
             warehouse_id: Number(params.warehouse_id),
             lot_id: Number(params.lot_id || 482),
             quantity: params.quantity,

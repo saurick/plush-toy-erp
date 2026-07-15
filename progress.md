@@ -319,3 +319,15 @@
 下一步：提交后仍须以该 commit / image 为目标环境发布真源，串行执行发布 migration、health / ready、业务 smoke、回滚点记录、yoyoosun 配置发布 / 激活以及真实岗位人工验收。
 
 阻塞/风险：本地代码、migration、运行预检和自动化门禁已闭环，但本轮没有部署目标环境、没有发布或激活 yoyoosun draft config，也没有取得客户签收。12 个来源驱动浏览器场景使用 current-worktree mock RPC，不能替代真实岗位账号对 13 个后端方法的持久写入 E2E。完整付款 / 核销、多单对账、总账、税控、完整 MRP / APS / MES、任意库存调整和 WMS 仍为明确非目标。
+
+## 2026-07-15 委外 SKU 与本地客户工作台收口
+
+完成：委外回货事实现在由后端按完整来源元组 `OUTSOURCING_ORDER + source_id + source_line_id + product_sku_id` 批量读取委外订单来源行的 `sku_code_snapshot`；来源类型非规范、缺少父单或行、跨单同 SKU、SKU 不一致及历史快照缺失均 fail closed，不回填当前主数据，也不串用其他来源行。列表、首次创建、幂等重放、并发重放、过账和取消响应统一复用该只读投影。回货记录、回货质检和应付来源弹窗统一消费冻结快照；SKU 参照与委外相关事实均改为严格的 200 条完整分页收集，第二页记录不会再因后端默认上限丢失。
+
+完成：修复 `start:yoyoosun` 与桌面客户门禁的开发态合同错位。前端 DEV 构建在后端成功返回同 customer key 的 `builtin_rbac_fallback` 时只挂载带明确警示的本地桌面预览壳，避免把成功登录误报为“暂时无法进入工作台”；fallback 仍不属于 active customer runtime，工作台、任务看板和客户业务数据页只显示零 Workflow RPC 的 Product Core 能力审阅，移动岗位端和正式构建仍只接受 `active_customer_config_revision`。真实 5177 登录态复核中 `admin.me` 与 `get_effective_session` 均为 HTTP / 业务成功，`/erp/dashboard` 显示“工作台 能力审阅”、不显示任务队列，且没有客户运行态不可用页。委外开单的材料 / 产品条件选择器增加稳定组件身份，消除相同数值 ID 在条件切换时复用旧 label 的 Ant Select 控制台告警。
+
+验证：本轮追加前 `progress.md` 为 321 行 / 65,188 bytes，未达到 600 行或 80 KiB 归档阈值。Node 24.14.0 下 `go test -count=1 ./internal/biz ./internal/data ./internal/service ./internal/server` 通过；Web 全量测试 1219 / 1219、lint 和 production build 3283 modules 通过；docs inventory 与 dev-entry boundary 9 / 9 通过。合并 Style L1 6 / 6 通过，覆盖本地 fallback 工作台、持续同步失败 fail closed、委外开单第二页 SKU、委外来源回货、回货质检和应付来源；fallback 场景另断言 Workflow 请求数为 0，委外开单场景控制台无 warning / error。`local-runtime-preflight` 通过 schema / migration guard、开发库 75 / 75 pending 0、backend health / ready。
+
+下一步：yoyoosun 客户配置包仍是 draft / preview-only；正式或静态预览环境必须完成受控 manifest 评审、publish / activate、effective session 读回及岗位人工验收，不能依赖本地 builtin fallback。目标环境发布仍需绑定本次 commit / image、migration、health / ready、业务 smoke 和回滚点。
+
+阻塞/风险：本轮没有新增或改写 schema / migration，没有发布或激活客户配置，没有目标环境部署或客户签收。SKU Style L1 使用 mock RPC；后端来源投影与写入响应一致性由 repo / service 测试证明，尚未用真实岗位账号写入新的委外回货记录做浏览器 E2E。另一任务的时区、存量升级和客户版本锁治理已迁到独立 detached worktree，不纳入本轮提交或成果口径。

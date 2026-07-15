@@ -66,7 +66,8 @@ import {
   buildEffectiveSessionDiagnosticSummary,
   filterNavigationSectionsByAdminProfile,
   getAdminProfileSyncErrorAction,
-  hasExpectedCustomerRuntime,
+  hasExpectedDesktopCustomerSession,
+  isLocalCustomerDesktopPreviewSession,
   resolveEffectiveSessionCustomerKey,
   shouldRedirectFromCurrentNavigation,
   shouldGuardCustomerBusinessPageRuntime,
@@ -236,6 +237,10 @@ const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   '/erp/system/permissions',
   '/erp/system/audit-logs',
 ])
+const LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS = new Set([
+  'global-dashboard',
+  'task-board',
+])
 
 function normalizeMenuPaths(menus = []) {
   if (!Array.isArray(menus)) {
@@ -301,16 +306,20 @@ export default function ERPLayout() {
     typeof adminProfile?.effective_session?.customer?.key === 'string'
       ? adminProfile.effective_session.customer.key.trim()
       : ''
-  const hasConfiguredCustomerRuntime = hasExpectedCustomerRuntime(
+  const hasConfiguredCustomerDesktopSession = hasExpectedDesktopCustomerSession(
     adminProfile,
-    configuredCustomerKey
+    configuredCustomerKey,
+    { isLocalDev: import.meta.env.DEV === true }
   )
+  const isLocalCustomerDesktopPreview =
+    import.meta.env.DEV === true &&
+    isLocalCustomerDesktopPreviewSession(adminProfile, configuredCustomerKey)
   const customerRuntimeBootstrapPending =
     requiresConfiguredCustomerRuntime && !profileSyncCompleted
   const customerRuntimeUnavailable =
     requiresConfiguredCustomerRuntime &&
     profileSyncCompleted &&
-    !hasConfiguredCustomerRuntime
+    !hasConfiguredCustomerDesktopSession
   const shouldUseProductCoreNavigation =
     isSuperAdmin &&
     !requiresConfiguredCustomerRuntime &&
@@ -779,7 +788,11 @@ export default function ERPLayout() {
       isCustomerBusinessDataPage: isCustomerBusinessDataPageKey(
         currentNavigationEntry.pageKey
       ),
-    })
+    }) ||
+    (isLocalCustomerDesktopPreview &&
+      LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS.has(
+        currentNavigationEntry.pageKey
+      ))
 
   if (profileLoading && !adminProfile) {
     return (
@@ -886,6 +899,16 @@ export default function ERPLayout() {
               ]}
             />
           </div>
+
+          {isLocalCustomerDesktopPreview ? (
+            <Alert
+              type="warning"
+              showIcon
+              data-local-customer-desktop-preview="true"
+              message="本地客户预览"
+              description="当前后端尚未激活客户配置版本，只展示页面能力和权限范围；工作台、任务看板及客户业务数据均不加载，正式使用仍需激活客户配置。"
+            />
+          ) : null}
 
           {!hidePageHead ? (
             <div className="erp-admin-page-head">

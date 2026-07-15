@@ -2140,6 +2140,8 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
   ]) {
     assert.match(formSource, new RegExp(`'${fieldName}'`, 'u'))
   }
+  assert.match(formSource, /key="product-source"/u)
+  assert.match(formSource, /key="material-source"/u)
   assert.match(formSource, /<Input\s+readOnly/u)
   assert.doesNotMatch(formSource, /name=\{\[field\.name, 'amount'\]\}/u)
 })

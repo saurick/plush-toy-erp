@@ -7,6 +7,7 @@ import {
   listSourceDocumentItemsAtVersion,
   listSourceDocumentItemsPreview,
 } from '../utils/sourceDocumentPagination.mjs'
+import { listAllReferenceRecords } from '../utils/referencePagination.mjs'
 
 const masterDataRpc = new JsonRpc({
   url: 'masterdata',
@@ -216,6 +217,15 @@ export async function setProductActive(params = {}) {
 export async function listProductSKUs(params = {}, options = {}) {
   const result = await masterDataRpc.call('list_product_skus', params, options)
   return dataOf(result)
+}
+
+export async function listAllProductSKUs(params = {}, options = {}) {
+  return listAllReferenceRecords(
+    listProductSKUs,
+    params,
+    'product_skus',
+    options
+  )
 }
 
 export async function createProductSKU(params = {}) {

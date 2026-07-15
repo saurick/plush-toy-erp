@@ -25,8 +25,9 @@ test('outsourcing return quality modal exposes only operator-owned business fiel
   }
   assert.match(source, /产品、仓库、批次和委外来源由已过账回货记录确定/u)
   assert.match(source, /label: '产品规格'/u)
-  assert.match(source, /fact\?\.product_sku_id/u)
-  assert.match(source, /productSKUOption/u)
+  assert.match(source, /outsourcingFactProductSKUText\(fact\)/u)
+  assert.doesNotMatch(source, /productSKUOption/u)
+  assert.doesNotMatch(source, /productSKUs/u)
 })
 
 test('outsourcing return quality modal resets and freezes during submission', () => {

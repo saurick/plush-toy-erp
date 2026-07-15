@@ -370,6 +370,7 @@ export default function OutsourcingOrderForm({
                   ) {
                     return (
                       <Form.Item
+                        key="material-source"
                         className="erp-line-item-field erp-line-item-field--source"
                         name={[field.name, 'material_id']}
                         label="材料"
@@ -388,6 +389,7 @@ export default function OutsourcingOrderForm({
                   }
                   return (
                     <Form.Item
+                      key="product-source"
                       className="erp-line-item-field erp-line-item-field--source"
                       name={[field.name, 'product_id']}
                       label="产品 / 半成品"

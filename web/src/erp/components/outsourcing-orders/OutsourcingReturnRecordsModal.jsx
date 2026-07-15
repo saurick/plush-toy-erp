@@ -5,7 +5,7 @@ import {
   OUTSOURCING_RETURN_QUALITY_GATE_STATES,
   resolveOutsourcingReturnQualityGate,
 } from '../../utils/qualityInspectionSourceAction.mjs'
-import { productSKUOption } from '../../utils/referenceSelectOptions.mjs'
+import { outsourcingFactProductSKUText } from '../../utils/outsourcingFactDisplay.mjs'
 
 const STATUS_LABELS = Object.freeze({
   DRAFT: '草稿',
@@ -57,18 +57,10 @@ function qualityGateTag(gate) {
   return <Tag color={colors[gate.state] || 'default'}>{gate.label}</Tag>
 }
 
-function productSKUText(productSKUs, productSKUID) {
-  const sku = (Array.isArray(productSKUs) ? productSKUs : []).find(
-    (item) => Number(item?.id || 0) === Number(productSKUID || 0)
-  )
-  return productSKUOption(sku)?.label || (productSKUID ? '产品规格已关联' : '-')
-}
-
 export default function OutsourcingReturnRecordsModal({
   open,
   order,
   facts = [],
-  productSKUs = [],
   loading = false,
   canCreatePayable = false,
   canViewPayable = false,
@@ -147,9 +139,9 @@ export default function OutsourcingReturnRecordsModal({
     },
     {
       title: '产品规格',
-      dataIndex: 'product_sku_id',
+      key: 'product_sku',
       width: 180,
-      render: (value) => productSKUText(productSKUs, value),
+      render: (_value, fact) => outsourcingFactProductSKUText(fact),
     },
     {
       title: '发生时间',

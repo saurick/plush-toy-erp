@@ -1212,11 +1212,7 @@ func (r *operationalFactRepo) createOutsourcingFactFromOrder(ctx context.Context
 		if !operationalFactMutationMatchesOutsourcing(current, resolved) {
 			return nil, biz.ErrIdempotencyConflict
 		}
-		if err := tx.sqlTx.Commit(); err != nil {
-			return nil, err
-		}
-		tx = nil
-		return entOutsourcingFactToBiz(current), nil
+		return commitOutsourcingFact(ctx, tx, current)
 	}
 	if raced, racedFound, replayErr := findOutsourcingFactFromOrderIntent(ctx, tx.client, factType, in); replayErr != nil || racedFound {
 		if replayErr != nil {
@@ -1235,11 +1231,7 @@ func (r *operationalFactRepo) createOutsourcingFactFromOrder(ctx context.Context
 		if !operationalFactMutationMatchesOutsourcing(current, resolved) {
 			return nil, biz.ErrIdempotencyConflict
 		}
-		if err := tx.sqlTx.Commit(); err != nil {
-			return nil, err
-		}
-		tx = nil
-		return entOutsourcingFactToBiz(current), nil
+		return commitOutsourcingFact(ctx, tx, current)
 	}
 	if err := validateOutsourcingOrderFactQuantity(ctx, tx.client, item, factType, resolved.Quantity); err != nil {
 		return nil, err
@@ -1262,16 +1254,12 @@ func (r *operationalFactRepo) createOutsourcingFactFromOrder(ctx context.Context
 				if !operationalFactMutationMatchesOutsourcing(replay, resolved) {
 					return nil, biz.ErrIdempotencyConflict
 				}
-				return entOutsourcingFactToBiz(replay), nil
+				return outsourcingFactWithSourceSKUProjection(ctx, r.data.postgres, replay)
 			}
 		}
 		return nil, err
 	}
-	if err := tx.sqlTx.Commit(); err != nil {
-		return nil, err
-	}
-	tx = nil
-	return entOutsourcingFactToBiz(row), nil
+	return commitOutsourcingFact(ctx, tx, row)
 }
 
 func resolveOutsourcingOrderFactMutation(ctx context.Context, client *ent.Client, factType string, in *biz.OutsourcingFactFromOrderCreate, requireActive bool) (*biz.OperationalFactMutation, *ent.OutsourcingOrderItem, error) {
@@ -1469,19 +1457,29 @@ func (r *operationalFactRepo) CreateOutsourcingFactDraft(ctx context.Context, in
 	if err := validateOperationalFactSKUAndLot(ctx, r.data.postgres, in.SubjectType, in.SubjectID, in.ProductSkuID, in.LotID); err != nil {
 		return nil, err
 	}
-	if replay, found, err := findOutsourcingFactReplay(ctx, r.data.postgres, in); err != nil || found {
-		return replay, err
+	if replay, found, err := findOutsourcingFactReplay(ctx, r.data.postgres, in); err != nil {
+		return nil, err
+	} else if found {
+		if err := hydrateOutsourcingFactSourceSKUProjections(ctx, r.data.postgres, []*biz.OutsourcingFact{replay}); err != nil {
+			return nil, err
+		}
+		return replay, nil
 	}
 	row, err := createOutsourcingFactDraftWithClient(ctx, r.data.postgres, in)
 	if err != nil {
 		if ent.IsConstraintError(err) {
-			if replay, found, replayErr := findOutsourcingFactReplay(ctx, r.data.postgres, in); replayErr != nil || found {
-				return replay, replayErr
+			if replay, found, replayErr := findOutsourcingFactReplay(ctx, r.data.postgres, in); replayErr != nil {
+				return nil, replayErr
+			} else if found {
+				if hydrateErr := hydrateOutsourcingFactSourceSKUProjections(ctx, r.data.postgres, []*biz.OutsourcingFact{replay}); hydrateErr != nil {
+					return nil, hydrateErr
+				}
+				return replay, nil
 			}
 		}
 		return nil, err
 	}
-	return entOutsourcingFactToBiz(row), nil
+	return outsourcingFactWithSourceSKUProjection(ctx, r.data.postgres, row)
 }
 
 func (r *operationalFactRepo) PostOutsourcingFact(ctx context.Context, id int) (*biz.OutsourcingFact, error) {
@@ -1557,6 +1555,13 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	if err != nil {
 		return nil, 0, err
 	}
+	out := make([]*biz.OutsourcingFact, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entOutsourcingFactToBiz(row))
+	}
+	if err := hydrateOutsourcingFactSourceSKUProjections(ctx, r.data.postgres, out); err != nil {
+		return nil, 0, err
+	}
 	references := make([]businessSourceReference, 0, len(rows))
 	for _, row := range rows {
 		references = append(references, businessSourceReference{sourceType: row.SourceType, sourceID: row.SourceID})
@@ -1565,13 +1570,111 @@ func (r *operationalFactRepo) ListOutsourcingFacts(ctx context.Context, filter b
 	if err != nil {
 		return nil, 0, err
 	}
-	out := make([]*biz.OutsourcingFact, 0, len(rows))
-	for _, row := range rows {
-		item := entOutsourcingFactToBiz(row)
+	for index, row := range rows {
+		item := out[index]
 		item.SourceNo = businessSourceNo(sourceNos, row.SourceType, row.SourceID)
-		out = append(out, item)
 	}
 	return out, total, nil
+}
+
+type outsourcingFactSourceSKUKey struct {
+	sourceID     int
+	sourceLineID int
+	productSkuID int
+}
+
+type outsourcingFactSourceSKUProjection struct {
+	skuCodeSnapshot *string
+}
+
+func hydrateOutsourcingFactSourceSKUProjections(
+	ctx context.Context,
+	client *ent.Client,
+	items []*biz.OutsourcingFact,
+) error {
+	projections, err := resolveOutsourcingFactSourceSKUSnapshots(ctx, client, items)
+	if err != nil {
+		return err
+	}
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		item.SKUCodeSnapshot = nil
+		key, ok := outsourcingFactSourceSKUKeyFromFact(item)
+		if !ok {
+			continue
+		}
+		if projection, found := projections[key]; found {
+			item.SKUCodeSnapshot = projection.skuCodeSnapshot
+		}
+	}
+	return nil
+}
+
+func outsourcingFactSourceSKUKeyFromFact(item *biz.OutsourcingFact) (outsourcingFactSourceSKUKey, bool) {
+	if item == nil || item.SourceType == nil || *item.SourceType != biz.OutsourcingOrderSourceType ||
+		item.SourceID == nil || *item.SourceID <= 0 || item.SourceLineID == nil || *item.SourceLineID <= 0 ||
+		item.ProductSkuID == nil || *item.ProductSkuID <= 0 {
+		return outsourcingFactSourceSKUKey{}, false
+	}
+	return outsourcingFactSourceSKUKey{
+		sourceID:     *item.SourceID,
+		sourceLineID: *item.SourceLineID,
+		productSkuID: *item.ProductSkuID,
+	}, true
+}
+
+func resolveOutsourcingFactSourceSKUSnapshots(
+	ctx context.Context,
+	client *ent.Client,
+	items []*biz.OutsourcingFact,
+) (map[outsourcingFactSourceSKUKey]outsourcingFactSourceSKUProjection, error) {
+	sourceLineIDs := make(map[int]struct{})
+	for _, item := range items {
+		key, ok := outsourcingFactSourceSKUKeyFromFact(item)
+		if !ok {
+			continue
+		}
+		sourceLineIDs[key.sourceLineID] = struct{}{}
+	}
+	if len(sourceLineIDs) == 0 {
+		return map[outsourcingFactSourceSKUKey]outsourcingFactSourceSKUProjection{}, nil
+	}
+
+	ids := make([]int, 0, len(sourceLineIDs))
+	for id := range sourceLineIDs {
+		ids = append(ids, id)
+	}
+	sort.Ints(ids)
+	sourceRows, err := client.OutsourcingOrderItem.Query().
+		Where(outsourcingorderitem.IDIn(ids...)).
+		Select(
+			outsourcingorderitem.FieldID,
+			outsourcingorderitem.FieldOutsourcingOrderID,
+			outsourcingorderitem.FieldProductSkuID,
+			outsourcingorderitem.FieldSkuCodeSnapshot,
+		).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	resolved := make(map[outsourcingFactSourceSKUKey]outsourcingFactSourceSKUProjection, len(sourceRows))
+	for _, row := range sourceRows {
+		if row.ProductSkuID == nil || row.SkuCodeSnapshot == nil || strings.TrimSpace(*row.SkuCodeSnapshot) == "" {
+			continue
+		}
+		key := outsourcingFactSourceSKUKey{
+			sourceID:     row.OutsourcingOrderID,
+			sourceLineID: row.ID,
+			productSkuID: *row.ProductSkuID,
+		}
+		resolved[key] = outsourcingFactSourceSKUProjection{
+			skuCodeSnapshot: row.SkuCodeSnapshot,
+		}
+	}
+	return resolved, nil
 }
 
 func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, in *biz.ShipmentCreateWithItems) (*biz.Shipment, error) {
@@ -4592,11 +4695,26 @@ func commitProductionFact(ctx context.Context, tx *inventoryDBTx, row *ent.Produ
 }
 
 func commitOutsourcingFact(ctx context.Context, tx *inventoryDBTx, row *ent.OutsourcingFact) (*biz.OutsourcingFact, error) {
+	item, err := outsourcingFactWithSourceSKUProjection(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if err := tx.sqlTx.Commit(); err != nil {
 		return nil, err
 	}
 	tx.sqlTx = nil
-	return entOutsourcingFactToBiz(row), nil
+	return item, nil
+}
+
+func outsourcingFactWithSourceSKUProjection(ctx context.Context, client *ent.Client, row *ent.OutsourcingFact) (*biz.OutsourcingFact, error) {
+	item := entOutsourcingFactToBiz(row)
+	if item == nil {
+		return nil, nil
+	}
+	if err := hydrateOutsourcingFactSourceSKUProjections(ctx, client, []*biz.OutsourcingFact{item}); err != nil {
+		return nil, err
+	}
+	return item, nil
 }
 
 func commitShipment(ctx context.Context, tx *inventoryDBTx, row *ent.Shipment) (*biz.Shipment, error) {

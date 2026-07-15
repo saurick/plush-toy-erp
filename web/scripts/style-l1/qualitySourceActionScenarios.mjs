@@ -481,6 +481,12 @@ export function createQualitySourceActionScenarios(deps) {
             .first()
           await postedRow.waitFor({ state: 'visible', timeout: 10_000 })
           assert(
+            String((await postedRow.innerText()) || '').includes(
+              'SKU-OUTSOURCE-SNAPSHOT-L1'
+            ),
+            '委外回货记录必须显示来源行冻结的产品规格'
+          )
+          assert(
             String((await postedRow.innerText()) || '').includes('待发起质检'),
             '未发起质检的委外回货必须显示待质检状态'
           )
@@ -511,6 +517,7 @@ export function createQualitySourceActionScenarios(deps) {
             'OUT-RR-POSTED-L1',
             '已过账',
             '回货数量',
+            'SKU-OUTSOURCE-SNAPSHOT-L1',
             '质检单号（自动）',
             '送检备注',
           ]) {

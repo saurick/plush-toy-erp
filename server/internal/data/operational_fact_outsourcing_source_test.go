@@ -27,7 +27,16 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "outsourcing_fact_source_derivation")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
-	source := createOutsourcingFactSourceFixture(t, ctx, client, fixtures, "DERIVE", decimal.NewFromInt(8))
+	productSKU, err := client.ProductSKU.Create().
+		SetProductID(fixtures.productID).
+		SetSkuCode("SKU-OUT-DERIVE").
+		SetSkuName("委外来源规格").
+		SetDefaultUnitID(fixtures.unitID).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create product SKU: %v", err)
+	}
+	source := createOutsourcingFactSourceFixtureWithSKU(t, ctx, client, fixtures, "DERIVE", decimal.NewFromInt(8), &productSKU.ID)
 	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
 
 	issueIn := &biz.OutsourcingFactFromOrderCreate{
@@ -86,6 +95,22 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 		t.Fatalf("create sourced return receipt: %v", err)
 	}
 	assertOutsourcingFactSource(t, receipt, biz.OutsourcingFactReturnReceipt, biz.InventorySubjectProduct, fixtures.productID, source)
+	assertOutsourcingFactSKUSnapshot(t, receipt, productSKU.SkuCode)
+	replayedReceipt, err := uc.CreateOutsourcingReturnReceiptFromOrder(ctx, receiptIn)
+	if err != nil || replayedReceipt.ID != receipt.ID {
+		t.Fatalf("same-intent return replay = %#v, err=%v", replayedReceipt, err)
+	}
+	assertOutsourcingFactSKUSnapshot(t, replayedReceipt, productSKU.SkuCode)
+	postedReceipt, err := uc.PostOutsourcingFact(ctx, receipt.ID)
+	if err != nil {
+		t.Fatalf("post sourced return receipt: %v", err)
+	}
+	assertOutsourcingFactSKUSnapshot(t, postedReceipt, productSKU.SkuCode)
+	cancelledReceipt, err := uc.CancelPostedOutsourcingFact(ctx, receipt.ID)
+	if err != nil {
+		t.Fatalf("cancel sourced return receipt: %v", err)
+	}
+	assertOutsourcingFactSKUSnapshot(t, cancelledReceipt, productSKU.SkuCode)
 	listed, total, err := uc.ListOutsourcingFacts(ctx, biz.OperationalFactFilter{
 		SourceType: biz.OutsourcingOrderSourceType,
 		SourceID:   source.order.ID,
@@ -98,6 +123,157 @@ func TestOutsourcingFactFromOrderDerivesSourceAndRestrictsLineTypes(t *testing.T
 			t.Fatalf("listed outsourcing source number = %#v, want %q", item.SourceNo, source.order.OutsourcingOrderNo)
 		}
 	}
+	assertListedSnapshot := func(rows []*biz.OutsourcingFact, factID int, want *string) {
+		t.Helper()
+		for _, item := range rows {
+			if item.ID != factID {
+				continue
+			}
+			if want == nil {
+				if item.SKUCodeSnapshot != nil {
+					t.Fatalf("historical missing source SKU snapshot = %#v, want nil", item.SKUCodeSnapshot)
+				}
+				return
+			}
+			if item.SKUCodeSnapshot == nil || *item.SKUCodeSnapshot != *want {
+				t.Fatalf("return source SKU snapshot = %#v, want %q", item.SKUCodeSnapshot, *want)
+			}
+			return
+		}
+		t.Fatalf("outsourcing fact %d not found in list", factID)
+	}
+	assertListedSnapshot(listed, receipt.ID, &productSKU.SkuCode)
+
+	if _, err := client.ProductSKU.UpdateOneID(productSKU.ID).SetSkuCode("SKU-OUT-DERIVE-RENAMED").Save(ctx); err != nil {
+		t.Fatalf("rename product SKU: %v", err)
+	}
+	listed, _, err = uc.ListOutsourcingFacts(ctx, biz.OperationalFactFilter{SourceType: biz.OutsourcingOrderSourceType, SourceID: source.order.ID})
+	if err != nil {
+		t.Fatalf("list after SKU rename: %v", err)
+	}
+	assertListedSnapshot(listed, receipt.ID, &productSKU.SkuCode)
+
+	if _, err := client.OutsourcingOrderItem.UpdateOneID(source.productLine.ID).ClearSkuCodeSnapshot().Save(ctx); err != nil {
+		t.Fatalf("clear historical source SKU snapshot: %v", err)
+	}
+	listed, _, err = uc.ListOutsourcingFacts(ctx, biz.OperationalFactFilter{SourceType: biz.OutsourcingOrderSourceType, SourceID: source.order.ID})
+	if err != nil {
+		t.Fatalf("list after clearing source SKU snapshot: %v", err)
+	}
+	assertListedSnapshot(listed, receipt.ID, nil)
+
+	if _, err := client.OutsourcingOrderItem.UpdateOneID(source.productLine.ID).SetSkuCodeSnapshot(productSKU.SkuCode).Save(ctx); err != nil {
+		t.Fatalf("restore source SKU snapshot: %v", err)
+	}
+	otherSKU, err := client.ProductSKU.Create().
+		SetProductID(fixtures.productID).
+		SetSkuCode("SKU-OUT-DERIVE-OTHER").
+		SetDefaultUnitID(fixtures.unitID).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create mismatched product SKU: %v", err)
+	}
+	mismatched, err := client.OutsourcingFact.Create().
+		SetFactNo("OUT-RECEIPT-DERIVE-MISMATCH").
+		SetFactType(biz.OutsourcingFactReturnReceipt).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetSubjectType(biz.InventorySubjectProduct).
+		SetSubjectID(fixtures.productID).
+		SetProductSkuID(otherSKU.ID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(decimal.NewFromInt(1)).
+		SetSupplierID(source.order.SupplierID).
+		SetSourceType(biz.OutsourcingOrderSourceType).
+		SetSourceID(source.order.ID).
+		SetSourceLineID(source.productLine.ID).
+		SetIdempotencyKey("OUT-RECEIPT-DERIVE-MISMATCH").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create mismatched historical outsourcing fact: %v", err)
+	}
+	listed, _, err = uc.ListOutsourcingFacts(ctx, biz.OperationalFactFilter{SourceType: biz.OutsourcingOrderSourceType, SourceID: source.order.ID})
+	if err != nil {
+		t.Fatalf("list mismatched source SKU fact: %v", err)
+	}
+	foundMismatched := false
+	for _, item := range listed {
+		if item.ID != mismatched.ID {
+			continue
+		}
+		foundMismatched = true
+		if item.SKUCodeSnapshot != nil {
+			t.Fatalf("mismatched source SKU snapshot = %#v, want nil", item.SKUCodeSnapshot)
+		}
+	}
+	if !foundMismatched {
+		t.Fatalf("mismatched outsourcing fact %d not found in list", mismatched.ID)
+	}
+
+	otherSource := createOutsourcingFactSourceFixtureWithSKU(t, ctx, client, fixtures, "DERIVE-OTHER-ORDER", decimal.NewFromInt(2), &productSKU.ID)
+	crossOrder, err := client.OutsourcingFact.Create().
+		SetFactNo("OUT-RECEIPT-DERIVE-CROSS-ORDER").
+		SetFactType(biz.OutsourcingFactReturnReceipt).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetSubjectType(biz.InventorySubjectProduct).
+		SetSubjectID(fixtures.productID).
+		SetProductSkuID(productSKU.ID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(decimal.NewFromInt(1)).
+		SetSupplierID(source.order.SupplierID).
+		SetSourceType(biz.OutsourcingOrderSourceType).
+		SetSourceID(source.order.ID).
+		SetSourceLineID(otherSource.productLine.ID).
+		SetIdempotencyKey("OUT-RECEIPT-DERIVE-CROSS-ORDER").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create cross-order historical outsourcing fact: %v", err)
+	}
+	missingSourceID, err := client.OutsourcingFact.Create().
+		SetFactNo("OUT-RECEIPT-DERIVE-MISSING-SOURCE-ID").
+		SetFactType(biz.OutsourcingFactReturnReceipt).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetSubjectType(biz.InventorySubjectProduct).
+		SetSubjectID(fixtures.productID).
+		SetProductSkuID(productSKU.ID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(decimal.NewFromInt(1)).
+		SetSupplierID(source.order.SupplierID).
+		SetSourceType(biz.OutsourcingOrderSourceType).
+		SetSourceLineID(source.productLine.ID).
+		SetIdempotencyKey("OUT-RECEIPT-DERIVE-MISSING-SOURCE-ID").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create missing-source-id historical outsourcing fact: %v", err)
+	}
+	nonCanonicalSourceType, err := client.OutsourcingFact.Create().
+		SetFactNo("OUT-RECEIPT-DERIVE-NON-CANONICAL-SOURCE-TYPE").
+		SetFactType(biz.OutsourcingFactReturnReceipt).
+		SetStatus(biz.OperationalFactStatusDraft).
+		SetSubjectType(biz.InventorySubjectProduct).
+		SetSubjectID(fixtures.productID).
+		SetProductSkuID(productSKU.ID).
+		SetWarehouseID(fixtures.warehouseID).
+		SetUnitID(fixtures.unitID).
+		SetQuantity(decimal.NewFromInt(1)).
+		SetSupplierID(source.order.SupplierID).
+		SetSourceType("outsourcing_order").
+		SetSourceID(source.order.ID).
+		SetSourceLineID(source.productLine.ID).
+		SetIdempotencyKey("OUT-RECEIPT-DERIVE-NON-CANONICAL-SOURCE-TYPE").
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create non-canonical-source-type historical outsourcing fact: %v", err)
+	}
+	listed, _, err = uc.ListOutsourcingFacts(ctx, biz.OperationalFactFilter{})
+	if err != nil {
+		t.Fatalf("list strict source SKU projection cases: %v", err)
+	}
+	assertListedSnapshot(listed, crossOrder.ID, nil)
+	assertListedSnapshot(listed, missingSourceID.ID, nil)
+	assertListedSnapshot(listed, nonCanonicalSourceType.ID, nil)
 }
 
 func TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReversal(t *testing.T) {
@@ -293,6 +469,13 @@ func assertOutsourcingFactSource(t *testing.T, fact *biz.OutsourcingFact, factTy
 	}
 	if fact.SupplierName == nil || *fact.SupplierName != fmt.Sprintf("委外加工厂 %s", sourceSuffix(source.order.OutsourcingOrderNo)) {
 		t.Fatalf("supplier snapshot not derived: %#v", fact.SupplierName)
+	}
+}
+
+func assertOutsourcingFactSKUSnapshot(t *testing.T, fact *biz.OutsourcingFact, want string) {
+	t.Helper()
+	if fact == nil || fact.SKUCodeSnapshot == nil || *fact.SKUCodeSnapshot != want {
+		t.Fatalf("outsourcing fact SKU snapshot = %#v, want %q", fact, want)
 	}
 }
 

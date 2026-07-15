@@ -1,10 +1,12 @@
 package service
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	"server/internal/biz"
+	"server/internal/errcode"
 
 	"github.com/shopspring/decimal"
 )
@@ -52,11 +54,66 @@ func TestOperationalFactJSONRPCSKUInputAndResponses(t *testing.T) {
 	}
 
 	now := time.Now()
+	skuCodeSnapshot := "SKU-SNAPSHOT-52"
 	if got := productionFactToAny(&biz.ProductionFact{ProductSkuID: intPtr(skuID), Quantity: decimal.NewFromInt(1), OccurredAt: now, CreatedAt: now, UpdatedAt: now})["product_sku_id"]; got != skuID {
 		t.Fatalf("production response SKU=%v, want %d", got, skuID)
 	}
-	if got := outsourcingFactToAny(&biz.OutsourcingFact{ProductSkuID: intPtr(skuID), Quantity: decimal.NewFromInt(1), OccurredAt: now, CreatedAt: now, UpdatedAt: now})["product_sku_id"]; got != skuID {
+	outsourcingResponse := outsourcingFactToAny(&biz.OutsourcingFact{ProductSkuID: intPtr(skuID), SKUCodeSnapshot: &skuCodeSnapshot, Quantity: decimal.NewFromInt(1), OccurredAt: now, CreatedAt: now, UpdatedAt: now})
+	if got := outsourcingResponse["product_sku_id"]; got != skuID {
 		t.Fatalf("outsourcing response SKU=%v, want %d", got, skuID)
+	}
+	if got := outsourcingResponse["sku_code_snapshot"]; got != skuCodeSnapshot {
+		t.Fatalf("outsourcing response SKU snapshot=%v, want %q", got, skuCodeSnapshot)
+	}
+}
+
+type outsourcingFactSKUSnapshotJSONRPCRepo struct {
+	stubBusinessDashboardOperationalFactRepo
+	fact *biz.OutsourcingFact
+}
+
+func (r *outsourcingFactSKUSnapshotJSONRPCRepo) ListOutsourcingFacts(context.Context, biz.OperationalFactFilter) ([]*biz.OutsourcingFact, int, error) {
+	return []*biz.OutsourcingFact{r.fact}, 1, nil
+}
+
+func TestOperationalFactJSONRPCListCarriesRepoSKUSnapshot(t *testing.T) {
+	now := time.Now()
+	skuID := 53
+	skuCodeSnapshot := "SKU-SNAPSHOT-53"
+	repo := &outsourcingFactSKUSnapshotJSONRPCRepo{fact: &biz.OutsourcingFact{
+		ID:              530,
+		FactNo:          "OUT-SKU-SNAPSHOT-53",
+		FactType:        biz.OutsourcingFactReturnReceipt,
+		Status:          biz.OperationalFactStatusDraft,
+		SubjectType:     biz.InventorySubjectProduct,
+		SubjectID:       7,
+		ProductSkuID:    &skuID,
+		SKUCodeSnapshot: &skuCodeSnapshot,
+		WarehouseID:     8,
+		UnitID:          9,
+		Quantity:        decimal.NewFromInt(1),
+		OccurredAt:      now,
+		CreatedAt:       now,
+		UpdatedAt:       now,
+	}}
+	admin := workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionOutsourcingFactRead)
+	dispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+	_, result, err := dispatcher.handleOperationalFact(
+		workflowJSONRPCAdminContext(),
+		"list_outsourcing_facts",
+		"sku-snapshot-list",
+		mustJSONRPCStruct(t, map[string]any{"limit": float64(20)}),
+	)
+	if err != nil || result == nil || result.Code != errcode.OK.Code {
+		t.Fatalf("list outsourcing facts result=%#v err=%v", result, err)
+	}
+	rows, ok := result.Data.AsMap()["outsourcing_facts"].([]any)
+	if !ok || len(rows) != 1 {
+		t.Fatalf("outsourcing fact rows = %#v", result.Data.AsMap()["outsourcing_facts"])
+	}
+	row, ok := rows[0].(map[string]any)
+	if !ok || row["product_sku_id"] != float64(skuID) || row["sku_code_snapshot"] != skuCodeSnapshot {
+		t.Fatalf("outsourcing fact SKU response = %#v", rows[0])
 	}
 }
 

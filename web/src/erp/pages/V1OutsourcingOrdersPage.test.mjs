@@ -52,7 +52,13 @@ test('outsourcing order source modal uses retry-safe attempts and clears closed 
   assert.match(source, /sourceFactRequestRef\.current \+= 1/u)
   assert.match(source, /setSourceFactContext\(EMPTY_SOURCE_FACT_CONTEXT\)/u)
   assert.match(source, /<OutsourcingOrderSourceFactModal/u)
-  assert.match(source, /listProductSKUs/u)
+  assert.match(source, /listAllProductSKUs/u)
+  assert.doesNotMatch(source, /listProductSKUs\(\{ limit: 500 \}\)/u)
+  assert.match(source, /listAllOutsourcingFacts\(\{/u)
+  assert.doesNotMatch(
+    source,
+    /listOutsourcingFacts\([\s\S]{0,160}limit:\s*500/u
+  )
   assert.match(source, /productSKUs=\{productSKUs\}/u)
   assert.match(source, /handleProductSKUChange/u)
   assert.match(source, /sku_code_snapshot/u)

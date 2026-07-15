@@ -73,6 +73,13 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
   }
 })
 
+test('operationalFactApi: outsourcing related records use strict complete pagination', () => {
+  assert.match(
+    source,
+    /export async function listAllOutsourcingFacts\([\s\S]*?listAllPaginatedRecords\(\s*listOutsourcingFacts,\s*params,\s*'outsourcing_facts'/u
+  )
+})
+
 test('operationalFactApi: production material issue uses strict source contracts', () => {
   assert.match(
     source,

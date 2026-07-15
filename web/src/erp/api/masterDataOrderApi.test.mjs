@@ -32,6 +32,13 @@ const masterDataPageConfigSource = readFileSync(
   'utf8'
 )
 
+test('product SKU reference loading uses complete 200-row pagination', () => {
+  assert.match(
+    source,
+    /export async function listAllProductSKUs\([\s\S]*?listAllReferenceRecords\(\s*listProductSKUs,\s*params,\s*'product_skus'/u
+  )
+})
+
 function sourceDocumentItems(start, count) {
   return Array.from({ length: count }, (_unused, index) => ({
     id: start + index,

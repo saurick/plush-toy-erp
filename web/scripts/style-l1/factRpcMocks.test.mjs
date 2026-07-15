@@ -551,7 +551,7 @@ test('style-l1 operational fact mock only accepts source-bound outsourcing field
     returnReceipt.result.data.outsourcing_fact.subject_type,
     'PRODUCT'
   )
-  assert.equal(returnReceipt.result.data.outsourcing_fact.product_sku_id, 1)
+  assert.equal(returnReceipt.result.data.outsourcing_fact.product_sku_id, 201)
   assert.equal(materialIssue.result.data.outsourcing_fact.product_sku_id, null)
 
   const changedIntent = await call(

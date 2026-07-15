@@ -278,6 +278,9 @@ export function createFinanceBusinessSourceScenarios(deps) {
           .filter({ hasText: 'OUT-RR-POSTED-L1' })
           .first()
         await postedRow.waitFor({ state: 'visible', timeout: 10_000 })
+        await postedRow
+          .getByText('质检合格', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
         assert(
           String((await postedRow.innerText()) || '').includes('质检合格'),
           '委外回货应付入口必须展示当前合格质检状态'
@@ -293,6 +296,12 @@ export function createFinanceBusinessSourceScenarios(deps) {
           title: '从委外回货生成应付',
           sourceNo: 'OUT-RR-POSTED-L1',
         })
+        assert(
+          String((await sourceModal.innerText()) || '').includes(
+            'SKU-OUTSOURCE-SNAPSHOT-L1'
+          ),
+          '委外回货应付弹窗必须显示来源行冻结的产品规格'
+        )
         await sourceModal.getByLabel('备注').fill('委外回货应付核对')
         await sourceModal.getByRole('button', { name: '生成应付草稿' }).click()
         await expectText(page, '应付草稿已生成，请到应付管理核对并确认')

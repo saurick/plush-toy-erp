@@ -24,8 +24,9 @@ test('finance source modal exposes only operator-owned business fields', () => {
   assert.match(source, /来源、供应商、金额和币种由系统核算/u)
   assert.match(source, /不是多单据核销/u)
   assert.match(source, /label: '产品规格'/u)
-  assert.match(source, /record\.product_sku_id/u)
-  assert.match(source, /productSKUOption/u)
+  assert.match(source, /outsourcingFactProductSKUText\(record\)/u)
+  assert.doesNotMatch(source, /productSKUOption/u)
+  assert.doesNotMatch(source, /productSKUs/u)
 })
 
 test('finance source modal resets on open and after close', () => {

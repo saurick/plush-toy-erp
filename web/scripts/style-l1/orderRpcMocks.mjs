@@ -215,14 +215,16 @@ export async function installOrderRpcMocks(page, context) {
       updated_at: nowUnix(),
     }
     const outsourcingOrderItem = {
-      id: 1,
+      id: 12,
       outsourcing_order_id: 1,
       line_no: 1,
       subject_type: 'PRODUCT',
       product_id: 1,
+      product_sku_id: 201,
       process_id: 1,
       unit_id: 1,
       product_no_snapshot: 'PROD-STYLE-L1',
+      sku_code_snapshot: 'SKU-OUTSOURCE-SNAPSHOT-L1',
       product_name_snapshot: '样式产品',
       process_name_snapshot: '车缝',
       process_category_snapshot: '委外车缝',
