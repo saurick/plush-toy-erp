@@ -186,7 +186,7 @@ test('shipmentWeight: incomplete reference pagination fails closed instead of re
       }),
       'product_skus'
     ),
-    /产品净重引用数据不完整/u
+    /产品净重资料不完整/u
   )
 })
 

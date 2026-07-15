@@ -107,6 +107,15 @@ test('start:yoyoosun print-plan describes dev injection without publishing custo
     result.stdout,
     /\[start-yoyoosun\] desktop fallback=same-key builtin RBAC is local preview only; customer business pages still require an active revision/u
   )
+  assert.match(result.stdout, /make dev_restart/u)
+  assert.match(result.stdout, /local default=yoyoosun/u)
+  assert.match(result.stdout, /local-test gate enabled/u)
+  assert.match(result.stdout, /explicit demo override remains available/u)
+  assert.match(
+    result.stdout,
+    /\/__dev\/customer-config\?customer=yoyoosun&view=import&action=test-apply/u
+  )
+  assert.match(result.stdout, /login, review, then apply explicitly/u)
   assert.match(result.stdout, /ERP_VITE_PORT=\d+/u)
   assert.match(result.stdout, /pnpm start:yoyoosun/u)
 })

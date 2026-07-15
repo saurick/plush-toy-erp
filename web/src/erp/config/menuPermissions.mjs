@@ -5,21 +5,22 @@ import { normalizeRoleKey } from '../utils/roleKeys.mjs'
 export const PERMISSION_CENTER_PATH = '/erp/system/permissions'
 export const SYSTEM_AUDIT_LOGS_PATH = '/erp/system/audit-logs'
 
-const BUSINESS_SECTION_TITLES = Object.freeze([
-  '主数据',
-  '销售管理',
-  '产品工程',
-  '采购管理',
-  '质检管理',
-  '库存管理',
-  '委外管理',
-  '生产管理',
-  '出货管理',
-  '财务业务',
+const BUSINESS_SECTION_KEYS = Object.freeze([
+  'master',
+  'sales',
+  'engineering',
+  'purchase',
+  'quality',
+  'warehouse',
+  'outsourcing',
+  'production',
+  'shipment',
+  'finance',
 ])
 
 const rawPermissionGroups = getNavigationSections()
   .map((section) => ({
+    key: section.key,
     title: section.title,
     items: (section.items || []).map((item) => ({
       key: item.path,
@@ -44,7 +45,7 @@ export const ERP_MOBILE_ROLE_PERMISSION_OPTIONS = Object.freeze(
 const sectionPathMap = Object.freeze(
   Object.fromEntries(
     ERP_MENU_PERMISSION_GROUPS.map((section) => [
-      section.title,
+      section.key,
       section.items.map((item) => item.key),
     ])
   )
@@ -54,23 +55,23 @@ function uniquePaths(paths = []) {
   return [...new Set((paths || []).filter(Boolean))]
 }
 
-function collectSectionPaths(sectionTitles = []) {
+function collectSectionPaths(sectionKeys = []) {
   return uniquePaths(
-    sectionTitles.flatMap((title) => sectionPathMap[title] || [])
+    sectionKeys.flatMap((key) => sectionPathMap[key] || [])
   )
 }
 
-const masterModulePaths = collectSectionPaths(['主数据'])
-const salesModulePaths = collectSectionPaths(['销售管理'])
-const engineeringModulePaths = collectSectionPaths(['产品工程'])
-const purchaseModulePaths = collectSectionPaths(['采购管理'])
-const qualityModulePaths = collectSectionPaths(['质检管理'])
-const warehouseModulePaths = collectSectionPaths(['库存管理'])
-const outsourcingModulePaths = collectSectionPaths(['委外管理'])
-const productionModulePaths = collectSectionPaths(['生产管理'])
-const shipmentModulePaths = collectSectionPaths(['出货管理'])
-const financeModulePaths = collectSectionPaths(['财务业务'])
-const businessModulePaths = collectSectionPaths(BUSINESS_SECTION_TITLES)
+const masterModulePaths = collectSectionPaths(['master'])
+const salesModulePaths = collectSectionPaths(['sales'])
+const engineeringModulePaths = collectSectionPaths(['engineering'])
+const purchaseModulePaths = collectSectionPaths(['purchase'])
+const qualityModulePaths = collectSectionPaths(['quality'])
+const warehouseModulePaths = collectSectionPaths(['warehouse'])
+const outsourcingModulePaths = collectSectionPaths(['outsourcing'])
+const productionModulePaths = collectSectionPaths(['production'])
+const shipmentModulePaths = collectSectionPaths(['shipment'])
+const financeModulePaths = collectSectionPaths(['finance'])
+const businessModulePaths = collectSectionPaths(BUSINESS_SECTION_KEYS)
 
 function buildPreset(paths = []) {
   return uniquePaths(paths).filter((path) =>
@@ -105,7 +106,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'sales',
     label: '业务',
     description:
-      '保留主数据、销售订单、出货放行、应收跟进、任务看板、业务看板、异常闭环和打印中心。',
+      '可使用基础资料、销售订单、出货放行、应收跟进、任务看板、业务看板、异常处理和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['sales']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -125,7 +126,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'pmc',
     label: 'PMC',
     description:
-      '保留任务看板、业务看板、主数据、产品工程、采购、库存、生产、委外、出货和异常闭环。',
+      '可使用任务看板、业务看板、基础资料、产品工程、采购、库存、生产、委外、出货和异常处理。',
     mobileRolePermissions: buildMobileRolePreset(['pmc']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -145,7 +146,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'production',
     label: '生产经理',
     description:
-      '保留任务看板、业务看板、主数据、产品工程、委外、生产、质检和异常闭环。',
+      '可使用任务看板、业务看板、基础资料、产品工程、委外、生产、质检和异常处理。',
     mobileRolePermissions: buildMobileRolePreset(['production']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -163,7 +164,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'purchase',
     label: '采购',
     description:
-      '保留任务看板、业务看板、主数据、产品工程、采购、入库、来料质检、委外和打印中心。',
+      '可使用任务看板、业务看板、基础资料、产品工程、采购、入库、来料质检、委外和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['purchase']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -183,7 +184,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'engineering',
     label: '工程',
     description:
-      '保留任务看板、业务看板、主数据、产品工程和工程岗位任务端，不含采购、库存、生产、财务和权限管理。',
+      '可使用任务看板、业务看板、基础资料、产品工程和工程手机待办，不含采购、库存、生产、财务和权限管理。',
     mobileRolePermissions: buildMobileRolePreset(['engineering']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -197,7 +198,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'warehouse',
     label: '仓库',
     description:
-      '保留任务看板、业务看板、主数据、入库、库存、出货、出库、来料质检和异常闭环。',
+      '可使用任务看板、业务看板、基础资料、入库、库存、出货、出库、来料质检和异常处理。',
     mobileRolePermissions: buildMobileRolePreset(['warehouse']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -214,7 +215,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'quality',
     label: '品质',
     description:
-      '保留任务看板、业务看板、主数据、入库、来料质检、生产异常、出货放行和异常闭环。',
+      '可使用任务看板、业务看板、基础资料、入库、来料质检、生产异常、出货放行和异常处理。',
     mobileRolePermissions: buildMobileRolePreset(['quality']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -232,7 +233,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'finance',
     label: '财务',
     description:
-      '保留任务看板、业务看板、主数据、委外、出货、财务业务、异常闭环和打印中心。',
+      '可使用任务看板、业务看板、基础资料、委外、出货、财务管理、异常处理和打印中心。',
     mobileRolePermissions: buildMobileRolePreset(['finance']),
     permissions: buildPreset([
       '/erp/dashboard',
@@ -250,7 +251,7 @@ export const ERP_PERMISSION_PRESETS = Object.freeze([
     key: 'admin',
     label: '系统管理员',
     description:
-      '只保留权限管理和审计日志入口；该角色不是 super admin，不天然拥有业务事实处理权。',
+      '只可使用权限管理和操作日志；系统管理员不会自动获得采购、库存、出货或财务办理权限。',
     mobileRolePermissions: buildMobileRolePreset([]),
     permissions: buildPreset([PERMISSION_CENTER_PATH, SYSTEM_AUDIT_LOGS_PATH]),
   },

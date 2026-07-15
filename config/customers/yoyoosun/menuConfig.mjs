@@ -4,7 +4,7 @@ export const yoyoosunMenuConfig = Object.freeze({
   brand: {
     brandMark: "永",
     companyName: "东莞市永绅玩具有限公司",
-    systemName: "毛绒 ERP 管理后台",
+    systemName: "业务管理",
     faviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun.svg",
   },
   desktopMenu: {
@@ -19,7 +19,7 @@ export const yoyoosunMenuConfig = Object.freeze({
         items: ["global-dashboard", "task-board", "business-dashboard"],
       },
       {
-        title: "主数据",
+        title: "基础资料",
         items: ["customers", "suppliers", "products", "materials"],
       },
       {
@@ -60,7 +60,7 @@ export const yoyoosunMenuConfig = Object.freeze({
         items: ["shipping-release", "outbound", "shipments"],
       },
       {
-        title: "财务业务",
+        title: "财务管理",
         items: ["reconciliation", "payables", "receivables", "invoices"],
       },
       {

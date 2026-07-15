@@ -212,6 +212,36 @@ test('printTemplates: 打印中心模板选择以 URL 为单一真源', () => {
   assert.doesNotMatch(printCenterPage, /setActiveKey\(/u)
 })
 
+test('printTemplates: 正式打印入口使用岗位可理解的说明和中文文件名', () => {
+  const printCenterPage = read('web/src/erp/pages/PrintCenterPage.jsx')
+  const printWorkspaceShell = read(
+    'web/src/erp/components/print/PrintWorkspaceShell.jsx'
+  )
+  const engineeringWorkspace = read(
+    'web/src/erp/pages/EngineeringPrintWorkspacePage.jsx'
+  )
+  const processingWorkspace = read(
+    'web/src/erp/pages/ProcessingContractPrintWorkspacePage.jsx'
+  )
+
+  assert.match(printCenterPage, /选择模板、预览内容并打开打印窗口/u)
+  assert.doesNotMatch(printCenterPage, /业务带值|轻量工作台/u)
+  assert.match(printWorkspaceShell, /<h3>打印内容<\/h3>/u)
+  assert.doesNotMatch(printWorkspaceShell, /当前记录字段|字段名或字段值/u)
+  assert.match(
+    engineeringWorkspace,
+    /const pdfFileName = `\$\{template\.title\}\.pdf`/u
+  )
+  assert.doesNotMatch(
+    engineeringWorkspace,
+    /fileName: `\$\{template\.key\}\.pdf`/u
+  )
+  assert.match(processingWorkspace, /`加工合同-\$\{stamp\}\.pdf`/u)
+  assert.doesNotMatch(processingWorkspace, /processing-contract_\$\{stamp\}/u)
+  assert.match(processingWorkspace, /打印窗口已准备好，可以开始编辑/u)
+  assert.doesNotMatch(processingWorkspace, /主工作流/u)
+})
+
 test('FL_print_templates_output_zero__does_not_use_falsy_fallback_for_paper_values printTemplates: 纸面输出层不使用 falsy fallback 吞掉 0 值', () => {
   const renderer = read(
     'web/src/erp/components/print/PrintTemplateRenderer.jsx'

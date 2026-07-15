@@ -5,6 +5,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const DEFAULT_CUSTOMER = "yoyoosun";
+const POPULATED_UPGRADE_AUDIT_VERSION = "20260714055504";
+const CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION = "20260714055825";
 const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE =
   "customer-config-manifest-evidence.json";
 
@@ -273,6 +275,8 @@ function validateReleaseEvidence(content, errors) {
   const gitCommit = findMarkdownField(content, "gitCommit");
   const serverImageDigest = findMarkdownField(content, "serverImageDigest");
   const webImageDigest = findMarkdownField(content, "webImageDigest");
+  const migrationBefore = findMarkdownField(content, "migrationBefore");
+  const migrationAfter = findMarkdownField(content, "migrationAfter");
   assert(
     findMarkdownField(content, "customerCode") === DEFAULT_CUSTOMER,
     `${REQUIRED_FILES.release} customerCode must be ${DEFAULT_CUSTOMER}`,
@@ -293,6 +297,23 @@ function validateReleaseEvidence(content, errors) {
     `${REQUIRED_FILES.release} webImageDigest must be sha256:<64-hex>`,
     errors,
   );
+  assert(
+    /^\d{14}$/u.test(migrationBefore),
+    `${REQUIRED_FILES.release} migrationBefore must be a 14-digit Atlas version`,
+    errors,
+  );
+  assert(
+    /^\d{14}$/u.test(migrationAfter),
+    `${REQUIRED_FILES.release} migrationAfter must be a 14-digit Atlas version`,
+    errors,
+  );
+  if (/^\d{14}$/u.test(migrationBefore) && /^\d{14}$/u.test(migrationAfter)) {
+    assert(
+      migrationBefore <= migrationAfter,
+      `${REQUIRED_FILES.release} migrationBefore must not be newer than migrationAfter`,
+      errors,
+    );
+  }
 }
 
 function validatePreflightReport(content, errors) {
@@ -585,6 +606,15 @@ function validateBackupRestoreReport(content, errors, absoluteDir) {
   );
 }
 
+function crossesMigrationVersion(before, after, version) {
+  return (
+    /^\d{14}$/u.test(before) &&
+    /^\d{14}$/u.test(after) &&
+    before < version &&
+    after >= version
+  );
+}
+
 function parseJsonEvidence(fileName, content, errors) {
   try {
     return JSON.parse(content);
@@ -873,6 +903,82 @@ function validateEvidenceConsistency(
       assert(
         new RegExp(stepName, "i").test(commandSummarySteps),
         `${REQUIRED_FILES.backupRestore} artifacts.commandSummary steps must mention ${stepName}`,
+        errors,
+      );
+    }
+    if (
+      crossesMigrationVersion(
+        migrationBefore,
+        migrationAfter,
+        POPULATED_UPGRADE_AUDIT_VERSION,
+      )
+    ) {
+      assert(
+        findMarkdownField(backupContent, "populatedUpgradeAuditStatus") ===
+          "passed",
+        `${REQUIRED_FILES.backup} populatedUpgradeAuditStatus must be passed when crossing ${POPULATED_UPGRADE_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        backupRestoreReport.restore?.populatedUpgradeAuditStatus === "passed",
+        `${REQUIRED_FILES.backupRestore} restore.populatedUpgradeAuditStatus must be passed when crossing ${POPULATED_UPGRADE_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        backupRestoreReport.summary?.populatedUpgradeAuditStatus === "passed",
+        `${REQUIRED_FILES.backupRestore} summary.populatedUpgradeAuditStatus must be passed when crossing ${POPULATED_UPGRADE_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        findKeyValueField(
+          commandSummaryContent,
+          "populatedUpgradeAuditStatus",
+        ) === "passed",
+        `${REQUIRED_FILES.backupRestore} artifacts.commandSummary populatedUpgradeAuditStatus must be passed when crossing ${POPULATED_UPGRADE_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        /populated upgrade read-only audit/iu.test(commandSummarySteps),
+        `${REQUIRED_FILES.backupRestore} artifacts.commandSummary steps must mention populated upgrade read-only audit when crossing ${POPULATED_UPGRADE_AUDIT_VERSION}`,
+        errors,
+      );
+    }
+    if (
+      crossesMigrationVersion(
+        migrationBefore,
+        migrationAfter,
+        CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION,
+      )
+    ) {
+      assert(
+        findMarkdownField(backupContent, "customerConfigCutoverAuditStatus") ===
+          "passed",
+        `${REQUIRED_FILES.backup} customerConfigCutoverAuditStatus must be passed when crossing ${CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        backupRestoreReport.restore?.customerConfigCutoverAuditStatus ===
+          "passed",
+        `${REQUIRED_FILES.backupRestore} restore.customerConfigCutoverAuditStatus must be passed when crossing ${CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        backupRestoreReport.summary?.customerConfigCutoverAuditStatus ===
+          "passed",
+        `${REQUIRED_FILES.backupRestore} summary.customerConfigCutoverAuditStatus must be passed when crossing ${CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        findKeyValueField(
+          commandSummaryContent,
+          "customerConfigCutoverAuditStatus",
+        ) === "passed",
+        `${REQUIRED_FILES.backupRestore} artifacts.commandSummary customerConfigCutoverAuditStatus must be passed when crossing ${CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION}`,
+        errors,
+      );
+      assert(
+        /customer config cutover read-only audit/iu.test(commandSummarySteps),
+        `${REQUIRED_FILES.backupRestore} artifacts.commandSummary steps must mention customer config cutover read-only audit when crossing ${CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION}`,
         errors,
       );
     }

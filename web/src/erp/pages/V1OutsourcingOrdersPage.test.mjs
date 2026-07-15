@@ -40,6 +40,15 @@ test('outsourcing order source actions stay on the matching confirmed open line'
   assert.match(source, /filterOutsourcingSourceActionLots/u)
 })
 
+test('outsourcing page explains follow-up work in business language', () => {
+  assert.match(source, /发料、质检、应付分开办理/u)
+  assert.match(
+    source,
+    /确认下单只确认加工合同，不会同时完成发料、回货、质检或应付/u
+  )
+  assert.doesNotMatch(source, /不直接写质检 \/ 库存 \/ 应付/u)
+})
+
 test('outsourcing order source modal uses retry-safe attempts and clears closed context', () => {
   assert.match(source, /createSourceBusinessActionAttemptStore/u)
   assert.match(source, /sourceBusinessActionNo/u)
@@ -47,7 +56,7 @@ test('outsourcing order source modal uses retry-safe attempts and clears closed 
   assert.match(source, /sourceFactAttemptsRef\.current\.settle/u)
   assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
   assert.match(source, /findOutsourcingSourceFactResult/u)
-  assert.match(source, /委外业务生成结果仍无法确认/u)
+  assert.match(source, /保持内容不变后重试，避免重复记录/u)
   assert.match(source, /已重新读取并确认委外回货草稿/u)
   assert.match(source, /sourceFactRequestRef\.current \+= 1/u)
   assert.match(source, /setSourceFactContext\(EMPTY_SOURCE_FACT_CONTEXT\)/u)

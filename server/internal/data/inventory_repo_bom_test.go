@@ -42,6 +42,9 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	if header.Status != biz.BOMStatusDraft {
 		t.Fatalf("expected draft bom header, got %s", header.Status)
 	}
+	if header.ItemCount != nil {
+		t.Fatalf("create response must not report an unloaded list item count: %#v", header.ItemCount)
+	}
 	defaultDraft, err := uc.CreateBOMHeader(ctx, &biz.BOMHeaderCreate{
 		ProductID: fixtures.productID,
 		Version:   "DEFAULT-DRAFT",
@@ -96,6 +99,20 @@ func TestInventoryRepo_BOMHeaderAndItems(t *testing.T) {
 	assertDecimalEqual(t, item.LossRate, "0.100000")
 	if item.PieceCount == nil || *item.PieceCount != "2" || item.ProcessMethod == nil || *item.ProcessMethod != "热裁" {
 		t.Fatalf("expected BOM engineering item fields, got %#v", item)
+	}
+	headers, total, err := uc.ListBOMHeaders(ctx, biz.BOMHeaderFilter{ProductID: fixtures.productID, Limit: 20})
+	if err != nil || total != 3 || len(headers) != 3 {
+		t.Fatalf("list BOM headers=%#v total=%d err=%v", headers, total, err)
+	}
+	counts := make(map[int]int, len(headers))
+	for _, listed := range headers {
+		if listed.ItemCount == nil {
+			t.Fatalf("list BOM header %d has unknown item count", listed.ID)
+		}
+		counts[listed.ID] = *listed.ItemCount
+	}
+	if counts[header.ID] != 1 || counts[defaultDraft.ID] != 0 || counts[draftHeader.ID] != 0 {
+		t.Fatalf("list BOM item counts=%#v, want populated=1 and empty drafts=0", counts)
 	}
 
 	activated, err := uc.ActivateBOMVersion(ctx, header.ID)

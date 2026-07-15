@@ -38,7 +38,7 @@ function normalizeList(values = []) {
 function getRoleVisibleName(role = {}) {
   const name = String(role?.name || '').trim()
   if (name) return name
-  return getRoleDisplayName(role?.role_key || role?.key, '已配置角色')
+  return getRoleDisplayName(role?.role_key || role?.key, '已配置岗位')
 }
 
 export function getAdminAccountStatus(admin = {}) {
@@ -49,7 +49,7 @@ export function getAdminAccountStatus(admin = {}) {
 
 function getAdminStatusText(admin = {}) {
   if (admin.is_super_admin === true) {
-    return '超级管理员 始终启用 启用 全部角色 全部权限'
+    return '超级管理员 始终启用 启用 全部岗位 全部权限'
   }
   switch (getAdminAccountStatus(admin)) {
     case ADMIN_ACCOUNT_STATUS.ACTIVE:
@@ -96,7 +96,7 @@ export function matchesAdminKeyword(admin = {}, keyword = '') {
   const roles = normalizeList(admin.roles)
   const menus = normalizeList(admin.menus)
   const roleDisplayText =
-    admin.is_super_admin === true || roles.length > 0 ? '' : '未分配角色'
+    admin.is_super_admin === true || roles.length > 0 ? '' : '未分配岗位'
 
   return includesKeyword(
     [

@@ -693,6 +693,8 @@ export function buildCustomerPackagePreviewSummary(
     publishEnabled: config.sourcePolicy?.publishEnabled === true,
     activateEnabled: config.sourcePolicy?.activateEnabled === true,
     rollbackEnabled: config.sourcePolicy?.rollbackEnabled === true,
+    localTestApplyEnabled:
+      config.sourcePolicy?.localTestApplyEnabled === true,
     workflowCount: workflows.length,
     workflowNodeCount: countPackageNodes(workflows),
     workflows: workflows.map((workflow) => ({
@@ -967,32 +969,50 @@ function resolveCustomerConfigTestApplyAvailability(
 
   const checks = [
     {
-      code: 'package_not_release_ready',
-      blocked: customerPackageSummary.status !== 'release_ready',
-      message:
-        customerPackageSummary.status === 'draft'
-          ? '配置包仍是草案'
-          : '配置包尚未进入发布就绪状态',
+      code: 'local_test_apply_disabled',
+      blocked: customerPackageSummary.localTestApplyEnabled !== true,
+      message: '客户包未显式开放本地测试应用',
     },
     {
-      code: 'preview_only',
-      blocked: customerPackageSummary.previewOnly !== false,
-      message: '当前配置只供预览',
+      code: 'package_not_tracked_draft',
+      blocked: customerPackageSummary.status !== 'draft',
+      message: '本地测试应用只接受已跟踪的草案包',
     },
     {
-      code: 'runtime_disabled',
-      blocked: customerPackageSummary.runtimeEnabled !== true,
-      message: '运行时编译未开放',
+      code: 'draft_boundary_invalid',
+      blocked:
+        customerPackageSummary.previewOnly !== true ||
+        customerPackageSummary.runtimeEnabled !== false ||
+        customerPackageSummary.publishEnabled !== false ||
+        customerPackageSummary.activateEnabled !== false,
+      message: '草案预览边界不完整',
     },
     {
-      code: 'publish_disabled',
-      blocked: customerPackageSummary.publishEnabled !== true,
-      message: '发布未开放',
+      code: 'package_boundary_invalid',
+      blocked: customerPackageSummary.boundaryOk !== true,
+      message: '客户包安全边界检查未通过',
     },
     {
-      code: 'activate_disabled',
-      blocked: customerPackageSummary.activateEnabled !== true,
-      message: '激活未开放',
+      code: 'workflow_structure_invalid',
+      blocked:
+        Number(customerPackageSummary.missingWorkflowEndCount || 0) > 0 ||
+        Number(customerPackageSummary.missingWorkflowRoleCount || 0) > 0 ||
+        Number(customerPackageSummary.illegalStateTransitionCount || 0) > 0,
+      message: '流程结构或状态转换检查未通过',
+    },
+    {
+      code: 'registry_binding_invalid',
+      blocked:
+        Number(customerPackageSummary.unregisteredPolicyBindingCount || 0) >
+          0 ||
+        Number(customerPackageSummary.unregisteredCommandBindingCount || 0) >
+          0 ||
+        Number(
+          customerPackageSummary.unregisteredExtensionBindingCount || 0
+        ) > 0 ||
+        Number(customerPackageSummary.moduleStateUnknownOverrideCount || 0) >
+          0,
+      message: '策略、命令、扩展点或模块登记检查未通过',
     },
   ]
   const blockers = checks.filter((item) => item.blocked)
@@ -1000,15 +1020,15 @@ function resolveCustomerConfigTestApplyAvailability(
     return {
       canApply: true,
       blockedReasons: [],
-      note: '当前配置包已满足测试应用门禁；操作只写客户配置控制面，不导入业务数据。',
+      note: '当前草案已满足本地测试应用门禁；操作只向当前 Vite 代理的 loopback 后端写客户配置控制面，不导入业务数据，也不改变正式发布状态。',
     }
   }
   return {
     canApply: false,
     blockedReasons: blockers.map((item) => item.code),
-    note: `当前配置包不可应用：${blockers
+    note: `当前配置包不可用于本地测试应用：${blockers
       .map((item) => item.message)
-      .join('；')}。可继续做只读预览和试跑，不能发布或激活。`,
+      .join('；')}。可继续做只读预览和试跑。`,
   }
 }
 
@@ -1088,7 +1108,7 @@ export function buildImportToolingSummary(
       key: 'test-config-apply',
       label: '本地/测试后端应用',
       status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
-      target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
+      target: '当前 Vite /rpc 代理后端',
       writes:
         'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
       writesLabel: '客户配置版本、模块状态、角色画像、授权、责任池和审计记录',
@@ -1102,7 +1122,7 @@ export function buildImportToolingSummary(
       ],
       blockedReasons: testApplyAvailability.blockedReasons,
       note: testApplyAvailability.canApply
-        ? '使用当前管理员登录态，通过 Vite /rpc 固定代理 http://127.0.0.1:8300 调用客户配置接口；成功后后台和岗位任务端读取有效配置版本的测试投影。正式目标环境不从此按钮选择。'
+        ? '使用当前管理员登录态，通过 Vite /rpc 的 loopback 后端调用客户配置接口；生成的内容寻址版本只用于当前已登记的本地开发库。成功后后台和岗位任务端读取有效配置版本，正式目标环境不接受该本地测试版本。'
         : testApplyAvailability.note,
       noBusinessDataImport: true,
     },
@@ -1213,7 +1233,7 @@ export function buildImportToolingSummary(
         title: '应用测试配置',
         status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
         outcome: '校验并发布受控配置版本',
-        target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
+        target: '当前 Vite /rpc 代理后端',
         writesDatabase: true,
         writesConfigControl: true,
         writesBusinessData: false,
@@ -1257,7 +1277,7 @@ export function buildImportToolingSummary(
         key: 'test-config-apply',
         label: '本地/测试后端应用',
         status: testApplyAvailability.canApply ? 'test_apply_ready' : 'blocked',
-        target: '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）',
+        target: '当前 Vite /rpc 代理后端',
         writes:
           'customer_config_revisions / deployment_module_states / role_profiles / access_entitlements / work_pools / work_pool_memberships / runtime_audit_events',
         writeClass: 'test_config_control_write',
@@ -1267,7 +1287,7 @@ export function buildImportToolingSummary(
         requiresAdminConfirmation: true,
         requiresSeparateTask: false,
         reason:
-          '这是当前 Vite /rpc 固定代理 http://127.0.0.1:8300 的客户配置控制面写入；登录后的后台和岗位任务端通过客户配置接口读取有效版本。正式目标环境由统一执行器显式确认。',
+          '这是当前 Vite /rpc 代理后端的客户配置控制面写入；登录后的后台和岗位任务端通过客户配置接口读取有效版本。正式目标环境由统一执行器显式确认。',
       }),
       withWriteBoundaryLabels({
         key: 'customer-config-publish',

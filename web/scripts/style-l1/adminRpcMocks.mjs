@@ -105,37 +105,37 @@ export async function installAdminRpcMocks(
     { permission_key: 'erp.dashboard.read', name: '查看看板', module: 'erp' },
     {
       permission_key: 'workflow.task.read',
-      name: '查看协同任务',
+      name: '查看任务',
       module: 'workflow',
     },
     {
       permission_key: 'workflow.task.create',
-      name: '创建协同任务',
+      name: '创建任务',
       module: 'workflow',
     },
     {
       permission_key: 'workflow.task.update',
-      name: '更新协同任务',
+      name: '更新任务',
       module: 'workflow',
     },
     {
       permission_key: 'workflow.task.complete',
-      name: '完成协同任务',
+      name: '完成任务',
       module: 'workflow',
     },
     {
       permission_key: 'workflow.task.approve',
-      name: '审批协同任务',
+      name: '审批任务',
       module: 'workflow',
     },
     {
       permission_key: 'workflow.task.reject',
-      name: '驳回协同任务',
+      name: '退回任务',
       module: 'workflow',
     },
     {
       permission_key: 'mobile.sales.access',
-      name: '进入业务岗位任务端',
+      name: '进入岗位任务页面',
       module: 'mobile',
     },
   ].map((item) => {
@@ -158,6 +158,9 @@ export async function installAdminRpcMocks(
     ]
     return {
       ...item,
+      permission_class:
+        item.module === 'system' ? 'control_plane' : 'business',
+      assignable: item.module !== 'system',
       usage: {
         pages: menus.map((menu) => ({
           key: menu.key,
@@ -193,6 +196,10 @@ export async function installAdminRpcMocks(
     name: '业务',
     description: '销售 / 业务跟进',
     builtin: true,
+    role_type: 'business_default',
+    version: 1,
+    assignable_by_current_admin: true,
+    permissions_editable_by_current_admin: true,
     disabled: false,
     sort_order: 20,
     permissions: [
@@ -204,8 +211,12 @@ export async function installAdminRpcMocks(
   const adminRole = {
     role_key: 'admin',
     name: '系统管理员',
-    description: '系统账号、角色和权限管理',
+    description: '员工账号、岗位和功能权限管理',
     builtin: true,
+    role_type: 'system',
+    version: 1,
+    assignable_by_current_admin: false,
+    permissions_editable_by_current_admin: false,
     disabled: false,
     sort_order: 80,
     permissions: allPermissionKeys.filter((key) => key.startsWith('system.')),

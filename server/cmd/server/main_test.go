@@ -3,9 +3,13 @@ package main
 import (
 	"context"
 	"math"
+	"strings"
 	"testing"
 
+	"server/internal/admincredential"
+	"server/internal/biz"
 	"server/internal/conf"
+	"server/internal/customertrialconfig"
 
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	oteltrace "go.opentelemetry.io/otel/trace"
@@ -98,6 +102,82 @@ func productionConfigTestEnv(overrides map[string]string) func(string) string {
 	}
 }
 
+func productionConfigTestJWTSecret() string {
+	return strings.Repeat("unit", 8)
+}
+
+func TestApplyLocalAdminCredentialDefaults(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+	}}
+	applyLocalAdminCredentialDefaults("./configs/dev/config.yaml", cfg, func(string) string { return "" })
+	if cfg.Auth == nil || cfg.Auth.Admin == nil {
+		t.Fatal("expected local admin config to be initialized")
+	}
+	if cfg.Auth.Admin.Username != admincredential.DefaultLocalUsername {
+		t.Fatalf("username = %q, want local default", cfg.Auth.Admin.Username)
+	}
+	if cfg.Auth.Admin.Password != admincredential.DefaultLocalPassword {
+		t.Fatal("password did not use the local default")
+	}
+}
+
+func TestApplyLocalAdminCredentialDefaultsPreservesExplicitValues(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{
+			Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		},
+		Auth: &conf.Data_Auth{Admin: &conf.Data_Auth_Admin{
+			Username: "local-operator",
+			Password: "explicit-local-password",
+		}},
+	}
+	applyLocalAdminCredentialDefaults("./configs/dev/config.yaml", cfg, func(string) string { return "" })
+	if cfg.Auth.Admin.Username != "local-operator" || cfg.Auth.Admin.Password != "explicit-local-password" {
+		t.Fatalf("explicit local credentials were overwritten: %#v", cfg.Auth.Admin)
+	}
+}
+
+func TestApplyLocalAdminCredentialDefaultsSkipsProduction(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+	}}
+	applyLocalAdminCredentialDefaults("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil))
+	if cfg.Auth != nil {
+		t.Fatalf("production config unexpectedly received local defaults: %#v", cfg.Auth)
+	}
+}
+
+func TestApplyLocalAdminCredentialDefaultsSkipsRemoteTarget(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://postgres:secret@192.168.0.133:5435/plush_erp_uat_20260715?sslmode=disable",
+	}}
+	applyLocalAdminCredentialDefaults("./configs/dev/config.yaml", cfg, func(string) string { return "" })
+	if cfg.Auth != nil {
+		t.Fatalf("remote target unexpectedly received local defaults: %#v", cfg.Auth)
+	}
+}
+
+func TestApplyLocalAdminCredentialDefaultsSkipsProductionEnvironment(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+	}}
+	applyLocalAdminCredentialDefaults("./configs/dev/config.yaml", cfg, productionConfigTestEnv(nil))
+	if cfg.Auth != nil {
+		t.Fatalf("production environment unexpectedly received local defaults: %#v", cfg.Auth)
+	}
+}
+
 func TestValidateProductionBootstrapConfigRejectsPlaceholders(t *testing.T) {
 	t.Parallel()
 
@@ -119,12 +199,57 @@ func TestValidateProductionBootstrapConfigAllowsBlankBootstrapAdminPassword(t *t
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
 	}
 	if err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil)); err != nil {
 		t.Fatalf("expected production config with blank bootstrap admin password to pass, got %v", err)
+	}
+}
+
+func TestValidateProductionBootstrapConfigRejectsLocalTestCustomerConfigFlag(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: productionConfigTestJWTSecret(),
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		biz.CustomerConfigLocalTestAllowEnv: "1",
+	}))
+	if err == nil || !strings.Contains(err.Error(), biz.CustomerConfigLocalTestAllowEnv) {
+		t.Fatalf("expected production local-test flag to be rejected, got %v", err)
+	}
+}
+
+func TestValidateCustomerConfigLocalTestDatabaseBindsSharedDevelopmentDatabase(t *testing.T) {
+	t.Parallel()
+
+	enabled := func(key string) string {
+		if key == biz.CustomerConfigLocalTestAllowEnv {
+			return "1"
+		}
+		return ""
+	}
+	valid := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+	}}
+	if err := validateCustomerConfigLocalTestDatabase(valid, enabled); err != nil {
+		t.Fatalf("expected shared development database to pass, got %v", err)
+	}
+
+	target := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://postgres:secret@192.168.0.133:5435/plush_erp?sslmode=disable",
+	}}
+	if err := validateCustomerConfigLocalTestDatabase(target, enabled); err == nil {
+		t.Fatal("expected target database to fail when local-test gate is enabled")
+	}
+	if err := validateCustomerConfigLocalTestDatabase(target, func(string) string { return "" }); err != nil {
+		t.Fatalf("disabled local-test gate must leave target database handling to release config, got %v", err)
 	}
 }
 
@@ -134,7 +259,7 @@ func TestValidateProductionBootstrapConfigRequiresOnceFlagForAdminPassword(t *te
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: "runtime-admin-password"},
 		},
 	}
@@ -149,7 +274,7 @@ func TestValidateProductionBootstrapConfigRequiresAdminPasswordWhenOnceEnabled(t
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
 	}
@@ -166,7 +291,7 @@ func TestValidateProductionBootstrapConfigAllowsAdminPasswordWithOnceFlag(t *tes
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: "runtime-admin-password"},
 		},
 	}
@@ -177,13 +302,31 @@ func TestValidateProductionBootstrapConfigAllowsAdminPasswordWithOnceFlag(t *tes
 	}
 }
 
+func TestValidateProductionBootstrapConfigRejectsKnownLocalAdminPassword(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: productionConfigTestJWTSecret(),
+			Admin:     &conf.Data_Auth_Admin{Username: admincredential.DefaultLocalUsername, Password: admincredential.DefaultLocalPassword},
+		},
+	}
+	err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(map[string]string{
+		"BOOTSTRAP_ADMIN_ONCE": "true",
+	}))
+	if err == nil || !strings.Contains(err.Error(), "known local development default") {
+		t.Fatalf("expected production local-default password rejection, got %v", err)
+	}
+}
+
 func TestValidateProductionBootstrapConfigRejectsMockSMS(t *testing.T) {
 	t.Parallel()
 
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Sms:       &conf.Data_Auth_SMS{Mode: "mock"},
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
@@ -199,7 +342,7 @@ func TestValidateProductionBootstrapConfigRequiresAliyunProviderSecrets(t *testi
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Sms:       &conf.Data_Auth_SMS{Mode: "provider"},
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
@@ -215,7 +358,7 @@ func TestValidateProductionBootstrapConfigAllowsAliyunProviderSecrets(t *testing
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Sms:       &conf.Data_Auth_SMS{Mode: "provider"},
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
@@ -236,7 +379,7 @@ func TestValidateProductionBootstrapConfigRequiresDebugMutationFlagsDisabled(t *
 	cfg := &conf.Data{
 		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
 		Auth: &conf.Data_Auth{
-			JwtSecret: "0123456789abcdef0123456789abcdef",
+			JwtSecret: productionConfigTestJWTSecret(),
 			Sms:       &conf.Data_Auth_SMS{Mode: "disabled"},
 			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
 		},
@@ -270,6 +413,67 @@ func TestValidateProductionBootstrapConfigSkipsDevConfig(t *testing.T) {
 	}
 	if err := validateProductionBootstrapConfig("./configs/dev/config.yaml", cfg, func(string) string { return "" }); err != nil {
 		t.Fatalf("expected dev config to skip production gate, got %v", err)
+	}
+}
+
+func TestValidateCustomerTrialConfigRuntimeDefaultsClosed(t *testing.T) {
+	t.Parallel()
+
+	getenv := func(key string) string {
+		switch key {
+		case customertrialconfig.AllowEnv:
+			return "0"
+		case customertrialconfig.DebugEnv:
+			return "prod"
+		default:
+			return ""
+		}
+	}
+	if err := validateCustomerTrialConfigRuntime(nil, getenv); err != nil {
+		t.Fatalf("disabled customer trial config gate returned error: %v", err)
+	}
+}
+
+func TestValidateCustomerTrialConfigRuntimeAcceptsRegisteredTarget(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_uat_20260715?sslmode=disable",
+	}}
+	getenv := func(key string) string {
+		switch key {
+		case customertrialconfig.AllowEnv:
+			return "1"
+		case customertrialconfig.TargetEnv:
+			return customertrialconfig.ExpectedTarget
+		case customertrialconfig.DebugEnv:
+			return "prod"
+		default:
+			return ""
+		}
+	}
+	if err := validateCustomerTrialConfigRuntime(cfg, getenv); err != nil {
+		t.Fatalf("registered customer trial config gate returned error: %v", err)
+	}
+}
+
+func TestValidateCustomerTrialConfigRuntimeRejectsPartialOptIn(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp_uat_20260715?sslmode=disable",
+	}}
+	getenv := func(key string) string {
+		if key == customertrialconfig.TargetEnv {
+			return customertrialconfig.ExpectedTarget
+		}
+		if key == customertrialconfig.DebugEnv {
+			return "prod"
+		}
+		return ""
+	}
+	if err := validateCustomerTrialConfigRuntime(cfg, getenv); err == nil {
+		t.Fatal("partial customer trial config opt-in was accepted")
 	}
 }
 

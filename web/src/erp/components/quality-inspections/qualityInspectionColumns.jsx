@@ -235,8 +235,8 @@ export function buildQualityInspectionExportColumns({
         ].join(' / '),
     },
     {
-      title: '检验对象',
-      exportTitle: '检验对象',
+      title: '产品 / 材料',
+      exportTitle: '产品 / 材料',
       dataIndex: 'subject_type',
       width: 220,
       exportValue: (record) =>
@@ -357,8 +357,8 @@ export function buildQualityInspectionDataColumns({
         ].join(' / '),
     },
     {
-      title: '检验对象 / 批次',
-      exportTitle: '检验对象 / 批次',
+      title: '产品 / 材料及批次',
+      exportTitle: '产品 / 材料及批次',
       dataIndex: 'inventory_lot_id',
       width: 260,
       sortType: 'number',

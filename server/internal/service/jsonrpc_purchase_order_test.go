@@ -69,6 +69,13 @@ func (s *stubPurchaseOrderJSONRPCRepo) ListPurchaseOrders(_ context.Context, fil
 	s.lastFilter = filter
 	out := make([]*biz.PurchaseOrder, 0, len(s.orders))
 	for _, order := range s.orders {
+		count := 0
+		for _, item := range s.items {
+			if item.PurchaseOrderID == order.ID {
+				count++
+			}
+		}
+		order.ItemCount = &count
 		out = append(out, order)
 	}
 	return out, len(out), nil
@@ -219,6 +226,9 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	if status := order["lifecycle_status"]; status != biz.PurchaseOrderStatusDraft {
 		t.Fatalf("expected draft purchase order, got %#v", status)
 	}
+	if _, exists := order["item_count"]; exists {
+		t.Fatalf("save response must not claim an unloaded purchase order item count, got %#v", order)
+	}
 	partySnapshot, ok := order["contract_party_snapshot"].(map[string]any)
 	if !ok || partySnapshot["buyerCompany"] != "永绅" || partySnapshot["buyerContact"] != "采购负责人" {
 		t.Fatalf("expected contract party snapshot on purchase order, got %#v", order["contract_party_snapshot"])
@@ -255,6 +265,10 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 	}
 	if total := jsonRPCInt(t, listRes.Data.AsMap(), "total"); total != 1 {
 		t.Fatalf("expected one purchase order in list, got %d", total)
+	}
+	listedOrders := listRes.Data.AsMap()["purchase_orders"].([]any)
+	if itemCount := jsonRPCInt(t, listedOrders[0].(map[string]any), "item_count"); itemCount != 1 {
+		t.Fatalf("expected purchase order item_count 1, got %d", itemCount)
 	}
 	if repo.lastFilter.DateField != "purchase_date" || repo.lastFilter.Keyword != "PO-JSONRPC" {
 		t.Fatalf("expected purchase order filter to be mapped, got %#v", repo.lastFilter)

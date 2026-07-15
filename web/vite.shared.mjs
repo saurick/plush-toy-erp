@@ -77,6 +77,8 @@ export function createERPViteConfig(appId) {
         isDev
           ? createDevCustomerImportDryRunPlugin({
               projectRoot: resolve(ROOT_DIR, '..'),
+              apiOrigin,
+              devCustomerKey: process.env.ERP_DEV_CUSTOMER_KEY || '',
             })
           : null,
         isDev

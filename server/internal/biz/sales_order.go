@@ -53,6 +53,9 @@ type SalesOrder struct {
 	Note                *string
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	// ItemCount is populated only by the list read model. Nil means the
+	// repository did not load the detail count for this response.
+	ItemCount *int
 }
 
 type SalesOrderItem struct {

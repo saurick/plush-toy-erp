@@ -224,6 +224,7 @@ export default function ShipmentsPage() {
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
+  const canRead = hasActionPermission(adminProfile, 'shipment.read')
   const canCreate = hasActionPermission(adminProfile, 'shipment.create')
   const canShip = hasActionPermission(adminProfile, 'shipment.ship')
   const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')
@@ -288,8 +289,10 @@ export default function ShipmentsPage() {
   const shipmentItemsPreview = useBusinessRowItemsPreview({
     records: rows,
     getEmbeddedItems: (record) => record?.items,
+    getItemTotal: (record) =>
+      Array.isArray(record?.items) ? record.items.length : undefined,
     rowExpandable: (record) =>
-      Array.isArray(record?.items) && record.items.length > 0,
+      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
     getRecordLabel: (record) => record?.shipment_no || '当前出货单',
     getItemKey: (item) => item?.id,
     getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
@@ -479,7 +482,7 @@ export default function ShipmentsPage() {
       )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载出货引用数据'))
+      message.error(getActionErrorMessage(error, '加载出货相关资料'))
       setCustomers([])
       setInventoryLots([])
       setProducts([])
@@ -891,7 +894,7 @@ export default function ShipmentsPage() {
       )
       if (retained) {
         message.warning(
-          '财务记录生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+          '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
         )
       } else {
         message.error(getActionErrorMessage(error, config.title))
@@ -906,8 +909,12 @@ export default function ShipmentsPage() {
     () => buildShipmentColumns({ salesOrdersByID }),
     [salesOrdersByID]
   )
-  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
-    useBusinessColumnOrder({
+  const {
+    tableColumns,
+    exportColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
       adminProfile,
       moduleKey: SHIPMENTS_MODULE_KEY,
       moduleTitle: '出货单',
@@ -915,11 +922,11 @@ export default function ShipmentsPage() {
     })
   const exportRows = useCallback(() => {
     downloadBusinessListCSV({
-      filename: 'shipments.csv',
-      columns: visibleColumns,
+      filename: `出货单-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns: exportColumns,
       rows,
     })
-  }, [rows, visibleColumns])
+  }, [exportColumns, rows])
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       statusFilter ||
@@ -968,7 +975,7 @@ export default function ShipmentsPage() {
         ]}
         stats={[
           { key: 'total', label: '总出货单', value: total },
-          { key: 'current', label: '当前结果', value: rows.length },
+          { key: 'current', label: '本页显示', value: rows.length },
           {
             key: 'draft',
             label: '草稿',
@@ -1120,7 +1127,7 @@ export default function ShipmentsPage() {
             查看明细
           </Button>
           <Popconfirm
-            title="确认出货并写库存 OUT？"
+            title="确认出货并扣减相应库存？"
             onConfirm={() =>
               runShipmentAction(selectedRow, shipShipment, '确认出货')
             }
@@ -1142,7 +1149,7 @@ export default function ShipmentsPage() {
             </Button>
           </Popconfirm>
           <Popconfirm
-            title="确认取消并写出库冲正？"
+            title="确认取消出库并恢复相应库存？"
             onConfirm={() =>
               runShipmentAction(selectedRow, cancelShipment, '取消出货')
             }

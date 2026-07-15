@@ -2121,7 +2121,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
   }
 
   for (const visibleText of [
-    '加工对象类型',
+    '加工内容类型',
     '产品 / 半成品（车缝、手工等）',
     '材料（布料加工等）',
     '金额预览',

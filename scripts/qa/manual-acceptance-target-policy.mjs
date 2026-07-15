@@ -1,0 +1,415 @@
+const DEFAULT_LOCAL_BACKEND_URL = "http://127.0.0.1:8300";
+const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
+const EXPLICIT_LOCAL_ENVIRONMENTS = new Set(["local", "dev"]);
+const SAFE_DATA_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/u;
+const SAFE_RUN_ID = /^[A-Z0-9][A-Z0-9_-]{0,31}$/u;
+const SAFE_ATTESTED_REVISION = /^[A-Za-z0-9][A-Za-z0-9._:@/+\-]{0,127}$/u;
+
+export const LOCAL_DEV_TARGET = "local-dev";
+export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
+// Customer-trial writes carry administrator credentials and bearer tokens. Keep
+// the registered endpoint on loopback so callers must reach 133 through an SSH
+// tunnel instead of sending those secrets over plaintext LAN HTTP.
+export const CUSTOMER_TRIAL_133_ORIGIN = "http://127.0.0.1:18375";
+export const MANUAL_ACCEPTANCE_DATASET_KEY = "yoyoosun-manual-acceptance";
+
+export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
+  [CUSTOMER_TRIAL_133_TARGET]: Object.freeze({
+    target: CUSTOMER_TRIAL_133_TARGET,
+    origin: CUSTOMER_TRIAL_133_ORIGIN,
+    environment: "prod",
+    customerKey: "yoyoosun",
+    requireActiveCustomerConfigRevision: true,
+    requireDebugMutationsDisabled: true,
+  }),
+});
+
+export class ManualAcceptanceTargetPolicyError extends Error {
+  constructor(message, exitCode = 2) {
+    super(message);
+    this.name = "ManualAcceptanceTargetPolicyError";
+    this.exitCode = exitCode;
+  }
+}
+
+function optionalText(value) {
+  const text = String(value ?? "").trim();
+  return text || undefined;
+}
+
+function requiredIdentity(value, name, pattern, description) {
+  const text = optionalText(value);
+  if (!text || !pattern.test(text)) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${name} must be ${description}`,
+    );
+  }
+  return text;
+}
+
+export function normalizeManualAcceptanceBackendURL(
+  value = DEFAULT_LOCAL_BACKEND_URL,
+) {
+  let url;
+  try {
+    url = new URL(String(value || DEFAULT_LOCAL_BACKEND_URL).trim());
+  } catch {
+    throw new ManualAcceptanceTargetPolicyError("backend URL is invalid");
+  }
+  if (url.username || url.password) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "backend URL must not contain credentials",
+    );
+  }
+  if (!new Set(["http:", "https:"]).has(url.protocol)) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "backend URL must use http or https",
+    );
+  }
+  url.pathname = url.pathname.replace(/\/+$/u, "");
+  url.search = "";
+  url.hash = "";
+  return url.toString().replace(/\/+$/u, "");
+}
+
+export function resolveManualAcceptanceTarget({
+  backendURL = DEFAULT_LOCAL_BACKEND_URL,
+  target,
+  datasetKey = MANUAL_ACCEPTANCE_DATASET_KEY,
+  dataVersion,
+  runId,
+} = {}) {
+  const normalizedBackendURL = normalizeManualAcceptanceBackendURL(backendURL);
+  const url = new URL(normalizedBackendURL);
+  const hostname = url.hostname.replace(/^\[|\]$/gu, "");
+  const requestedTarget = optionalText(target);
+  if (datasetKey !== MANUAL_ACCEPTANCE_DATASET_KEY) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `datasetKey must be ${MANUAL_ACCEPTANCE_DATASET_KEY}`,
+    );
+  }
+
+  if (
+    normalizedBackendURL === CUSTOMER_TRIAL_133_ORIGIN &&
+    requestedTarget !== CUSTOMER_TRIAL_133_TARGET
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${CUSTOMER_TRIAL_133_ORIGIN} is reserved for --target ${CUSTOMER_TRIAL_133_TARGET}`,
+    );
+  }
+
+  if (
+    requestedTarget === CUSTOMER_TRIAL_133_TARGET &&
+    normalizedBackendURL === CUSTOMER_TRIAL_133_ORIGIN
+  ) {
+    return Object.freeze({
+      target: CUSTOMER_TRIAL_133_TARGET,
+      datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+      backendURL: normalizedBackendURL,
+      origin: url.origin,
+      dataVersion: requiredIdentity(
+        dataVersion,
+        "dataVersion",
+        SAFE_DATA_VERSION,
+        "an explicit 1-48 character version identifier",
+      ),
+      runId: requiredIdentity(
+        runId,
+        "runId",
+        SAFE_RUN_ID,
+        "an explicit 1-32 character uppercase run identifier",
+      ),
+      external: true,
+      transport: "ssh-tunnel",
+    });
+  }
+
+  if (LOCAL_HOSTS.has(hostname)) {
+    if (requestedTarget && requestedTarget !== LOCAL_DEV_TARGET) {
+      throw new ManualAcceptanceTargetPolicyError(
+        `${requestedTarget} must use its registered SSH tunnel origin`,
+      );
+    }
+    return Object.freeze({
+      target: LOCAL_DEV_TARGET,
+      datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+      backendURL: normalizedBackendURL,
+      origin: url.origin,
+      dataVersion: optionalText(dataVersion) || optionalText(runId),
+      runId: optionalText(runId),
+      external: false,
+    });
+  }
+
+  if (requestedTarget !== CUSTOMER_TRIAL_133_TARGET) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `refuse external backend ${url.origin}; ${CUSTOMER_TRIAL_133_TARGET} writes require the registered SSH tunnel origin`,
+    );
+  }
+  if (normalizedBackendURL !== CUSTOMER_TRIAL_133_ORIGIN) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${CUSTOMER_TRIAL_133_TARGET} requires registered SSH tunnel origin ${CUSTOMER_TRIAL_133_ORIGIN}`,
+    );
+  }
+
+  return Object.freeze({
+    target: CUSTOMER_TRIAL_133_TARGET,
+    datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+    backendURL: normalizedBackendURL,
+    origin: url.origin,
+    dataVersion: requiredIdentity(
+      dataVersion,
+      "dataVersion",
+      SAFE_DATA_VERSION,
+      "an explicit 1-48 character version identifier",
+    ),
+    runId: requiredIdentity(
+      runId,
+      "runId",
+      SAFE_RUN_ID,
+      "an explicit 1-32 character uppercase run identifier",
+    ),
+    external: true,
+  });
+}
+
+export function manualAcceptanceTargetConfirmation(policy) {
+  const resolved = resolveManualAcceptanceTarget(policy);
+  if (!resolved.external) return undefined;
+  return `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:${resolved.target}:${resolved.dataVersion}:${resolved.runId}`;
+}
+
+export function assertManualAcceptanceMutationTarget(
+  policy,
+  { confirmation } = {},
+) {
+  const resolved = resolveManualAcceptanceTarget(policy);
+  if (!resolved.external) return resolved;
+  const expected = manualAcceptanceTargetConfirmation(resolved);
+  if (confirmation !== expected) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `external apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM=${expected}`,
+    );
+  }
+  return resolved;
+}
+
+const REMOTE_DEBUG_FALSE_FIELDS = Object.freeze([
+  "seedEnabled",
+  "seedAllowed",
+  "cleanupEnabled",
+  "cleanupAllowed",
+  "businessDataClearEnabled",
+  "businessDataClearAllowed",
+]);
+const REMOTE_ATTESTATION_FIELDS = Object.freeze([
+  "target",
+  "origin",
+  "customerKey",
+  "environment",
+  "release",
+  "migration",
+  "debug",
+]);
+
+function assertExactObjectKeys(value, allowedKeys, name) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new ManualAcceptanceTargetPolicyError(`${name} must be an object`);
+  }
+  const unexpected = Object.keys(value).filter(
+    (key) => !allowedKeys.includes(key),
+  );
+  if (unexpected.length > 0) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${name} contains unexpected fields: ${unexpected.join(", ")}`,
+    );
+  }
+}
+
+export function parseManualAcceptanceTargetAttestation(value) {
+  if (value == null || value === "") return undefined;
+  if (typeof value === "object") return structuredClone(value);
+  try {
+    const parsed = JSON.parse(String(value));
+    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+      throw new Error("attestation must be an object");
+    }
+    return parsed;
+  } catch (error) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON is invalid: ${error?.message || error}`,
+    );
+  }
+}
+
+export function assertManualAcceptanceTargetAttestation({
+  policy,
+  attestation,
+} = {}) {
+  const resolved = resolveManualAcceptanceTarget(policy);
+  if (resolved.target !== CUSTOMER_TRIAL_133_TARGET) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "out-of-band target attestation is only valid for customer-trial-133",
+    );
+  }
+  const value = parseManualAcceptanceTargetAttestation(attestation);
+  if (!value) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "customer-trial-133 target attestation is required when live capabilities are unavailable",
+    );
+  }
+  assertExactObjectKeys(
+    value,
+    REMOTE_ATTESTATION_FIELDS,
+    "customer-trial-133 attestation",
+  );
+  if (
+    value.target !== resolved.target ||
+    value.origin !== resolved.origin ||
+    value.customerKey !== "yoyoosun" ||
+    value.environment !== "prod"
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "customer-trial-133 attestation target/origin/customer/environment mismatch",
+    );
+  }
+  const release = requiredIdentity(
+    value.release,
+    "attestation.release",
+    SAFE_ATTESTED_REVISION,
+    "an explicit immutable release identifier",
+  );
+  const migration = requiredIdentity(
+    value.migration,
+    "attestation.migration",
+    SAFE_ATTESTED_REVISION,
+    "an explicit migration revision",
+  );
+  const debug = value.debug;
+  assertExactObjectKeys(
+    debug,
+    REMOTE_DEBUG_FALSE_FIELDS,
+    "customer-trial-133 attestation.debug",
+  );
+  const unsafeDebugFields = REMOTE_DEBUG_FALSE_FIELDS.filter(
+    (key) => debug?.[key] !== false,
+  );
+  if (unsafeDebugFields.length > 0) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `customer-trial-133 attestation requires debug seed, cleanup, and business clear disabled; unsafe fields: ${unsafeDebugFields.join(", ")}`,
+    );
+  }
+  return Object.freeze({
+    target: value.target,
+    origin: value.origin,
+    customerKey: value.customerKey,
+    environment: value.environment,
+    release,
+    migration,
+    debug: Object.freeze(
+      Object.fromEntries(
+        REMOTE_DEBUG_FALSE_FIELDS.map((key) => [key, false]),
+      ),
+    ),
+  });
+}
+
+export function assertManualAcceptanceCapabilitiesPolicy({
+  policy,
+  capabilities,
+} = {}) {
+  const resolved = resolveManualAcceptanceTarget(policy);
+  const environment = optionalText(capabilities?.environment);
+
+  if (resolved.target === LOCAL_DEV_TARGET) {
+    if (EXPLICIT_LOCAL_ENVIRONMENTS.has(environment)) {
+      return Object.freeze({ resolved, environment });
+    }
+    if (environment === "sql") {
+      const unsafeDebugFields = REMOTE_DEBUG_FALSE_FIELDS.filter(
+        (key) => capabilities?.[key] !== false,
+      );
+      if (unsafeDebugFields.length === 0) {
+        return Object.freeze({
+          resolved,
+          environment,
+          debugMutationsDisabled: true,
+        });
+      }
+      throw new ManualAcceptanceTargetPolicyError(
+        `local-dev environment=sql requires every debug mutation disabled; unsafe fields: ${unsafeDebugFields.join(", ")}`,
+      );
+    }
+    {
+      throw new ManualAcceptanceTargetPolicyError(
+        `refuse manual acceptance writes in environment=${environment || "unknown"}`,
+      );
+    }
+  }
+
+  const profile = MANUAL_ACCEPTANCE_TARGET_PROFILES[resolved.target];
+  if (environment !== profile.environment) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${resolved.target} requires runtime environment=${profile.environment}, got ${environment || "unknown"}`,
+    );
+  }
+  const unsafeDebugFields = REMOTE_DEBUG_FALSE_FIELDS.filter(
+    (key) => capabilities?.[key] !== false,
+  );
+  if (unsafeDebugFields.length > 0) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${resolved.target} requires debug seed, cleanup, and business clear disabled; unsafe fields: ${unsafeDebugFields.join(", ")}`,
+    );
+  }
+  return Object.freeze({ resolved, environment });
+}
+
+export function assertManualAcceptanceRuntimePolicy({
+  policy,
+  capabilities,
+  session,
+  requiredModules = [],
+  customerKey = "yoyoosun",
+} = {}) {
+  const { resolved, environment } = assertManualAcceptanceCapabilitiesPolicy({
+    policy,
+    capabilities,
+  });
+
+  const configRevision = optionalText(
+    session?.configRevision || session?.config_revision,
+  );
+  if (
+    session?.customer?.key !== customerKey ||
+    session?.source !== "active_customer_config_revision" ||
+    !configRevision
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `refuse writes: ${customerKey} active customer configuration is not the current runtime source`,
+    );
+  }
+  const modules = session.modules || {};
+  const unavailableModules = requiredModules.filter(
+    (key) => modules[key] !== "enabled",
+  );
+  if (unavailableModules.length > 0) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `refuse writes: required modules are not enabled: ${unavailableModules.join(", ")}`,
+    );
+  }
+
+  return Object.freeze({
+    target: resolved.target,
+    origin: resolved.origin,
+    datasetKey: resolved.datasetKey,
+    dataVersion: resolved.dataVersion,
+    runId: resolved.runId,
+    environment,
+    customerKey: session.customer.key,
+    configRevision,
+    source: session.source,
+    requiredModules: [...requiredModules],
+    debugMutationsDisabled:
+      resolved.target === CUSTOMER_TRIAL_133_TARGET ? true : undefined,
+  });
+}

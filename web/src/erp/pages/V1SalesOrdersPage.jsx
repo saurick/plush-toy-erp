@@ -358,6 +358,7 @@ export default function V1SalesOrdersPage() {
   )
   const salesOrderItemsPreview = useBusinessRowItemsPreview({
     records: orders,
+    getItemTotal: (order) => order?.item_count,
     rowExpandable: (order) =>
       canReadOrder &&
       canReadOrderItems &&
@@ -718,7 +719,7 @@ export default function V1SalesOrdersPage() {
       setReservationOpen(true)
     } catch (error) {
       if (reservationContextRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载库存预留上下文'))
+        message.error(getActionErrorMessage(error, '加载库存预留详情'))
       }
     } finally {
       if (reservationContextRequestRef.current === requestID) {
@@ -743,7 +744,7 @@ export default function V1SalesOrdersPage() {
         customer_key: activeCustomerKey || undefined,
       }
     } catch (error) {
-      message.error(error.message)
+      message.error(getActionErrorMessage(error, '创建库存预留'))
       return
     }
     const scope = `sales-order-reservation:${reservationContext.order.id}:${payload.sales_order_item_id}`
@@ -780,7 +781,7 @@ export default function V1SalesOrdersPage() {
       )
       if (retained) {
         message.warning(
-          '库存预留结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+          '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
         )
       } else {
         message.error(getActionErrorMessage(error, '创建库存预留'))
@@ -1087,7 +1088,7 @@ export default function V1SalesOrdersPage() {
   const exportOrders = useCallback(() => {
     if (orders.length === 0) return
     downloadCSV({
-      filename: `sales-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      filename: `销售订单-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: visibleOrderDataColumns,
       rows: orders,
     })
@@ -1181,10 +1182,10 @@ export default function V1SalesOrdersPage() {
       <PageHeaderCard
         compact
         title="销售订单"
-        description="维护客户订单承诺和订单行；生效订单可在此预留库存，出货、应收、发票和收款仍在对应业务模块处理。"
+        description="维护客户订单承诺和订单明细；生效订单可在此预留库存，出货、应收、发票和收款仍需到对应业务页面处理。"
         stats={[
           { key: 'total', label: '总订单', value: total },
-          { key: 'current', label: '当前结果', value: orders.length },
+          { key: 'current', label: '本页显示', value: orders.length },
           { key: 'active', label: '已生效', value: activeOrderCount },
         ]}
       />

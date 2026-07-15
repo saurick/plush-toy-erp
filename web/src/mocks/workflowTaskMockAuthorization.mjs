@@ -185,7 +185,7 @@ export function workflowMockActionDecision({
     reason = '任务不存在。'
   } else if (terminal) {
     reasonCode = 'terminal_task'
-    reason = '该任务已结束，只能查看上下文。'
+    reason = '该任务已结束，只能查看任务详情。'
   } else if (!canWorkflowTaskStatusRunAction(task, action)) {
     reasonCode = 'status_transition_not_allowed'
     reason = '当前任务状态不允许执行该动作。'

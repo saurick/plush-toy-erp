@@ -116,7 +116,7 @@ test('FL_workflow_business_status__retains_business_status_snapshot workflowTask
   assert.equal(getWorkflowTaskBusinessStatusLabel({}), '业务状态未记录')
 })
 
-test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_key', () => {
+test('workflowTaskBoard: 负责岗位展示和只读原因不透出 owner_role_key', () => {
   const warehouseTask = {
     id: 20,
     task_status_key: 'ready',
@@ -146,18 +146,18 @@ test('workflowTaskBoard: 责任角色展示和只读原因不透出 owner_role_k
       ...warehouseTask,
       owner_role_key: 'unknown_role_key',
     }),
-    '责任岗位'
+    '负责岗位'
   )
 
   const readonlyReason = getWorkflowTaskReadonlyReason(
     salesAdmin,
     warehouseTask
   )
-  assert.match(readonlyReason, /仓库责任角色/)
+  assert.match(readonlyReason, /不属于仓库/)
   assert.doesNotMatch(readonlyReason, /warehouse/)
 })
 
-test('workflowTaskBoard: 角色筛选包含工程岗位', () => {
+test('workflowTaskBoard: 岗位筛选包含工程岗位', () => {
   assert.deepEqual(
     TASK_BOARD_ROLE_OPTIONS.find((item) => item.value === 'engineering'),
     { value: 'engineering', label: '工程' }
@@ -505,7 +505,7 @@ test('workflowTaskBoard: 任务处理动作按权限码和 owner 角色收口', 
   )
   assert.match(
     getWorkflowTaskReadonlyReason(salesAdmin, warehouseTask),
-    /不属于仓库责任角色/
+    /不属于仓库/
   )
 
   assert.deepEqual(

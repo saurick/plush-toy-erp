@@ -10,13 +10,13 @@ const RAW_ERROR_MESSAGE_MAP = Object.freeze({
   'business error': '请求失败，请稍后重试',
   expired: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_EXPIRED],
   forbidden: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED],
-  'invalid json response from server': '服务器返回异常，请稍后重试',
+  'invalid json response from server': '系统暂时不可用，请稍后重试',
   'json-rpc error': '请求失败，请稍后重试',
   'network error': '网络错误，请稍后重试',
   'request failed': '请求失败，请稍后重试',
   'request failed, network error': '网络错误，请稍后重试',
   'rpc error': '请求失败，请稍后重试',
-  'server error': '服务器异常，请稍后重试',
+  'server error': '系统暂时不可用，请稍后重试',
   'session expired': DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_REQUIRED],
   'token expired': DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_EXPIRED],
   unauthorized: DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_REQUIRED],
@@ -32,18 +32,31 @@ const RAW_ERROR_PATTERNS = Object.freeze([
     /^http error 403$/iu,
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.PERMISSION_DENIED],
   ],
-  [/^http error \d+$/iu, '服务请求失败，请稍后重试'],
+  [/^http error \d+$/iu, '系统暂时不可用，请稍后重试'],
 ])
 
 const TECHNICAL_ERROR_MESSAGE_PATTERN =
-  /\b(?:expected_version|idempotency_key|intent_hash|task_version|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
+  /(?:\b(?:api|decimal|exception|fact|hold|http|json|migration|out|panic|payload|rbac|revision|rpc|runtime|schema|shipped|sql|stack|usecase|workflow)\b|\b[a-z][a-z0-9]*(?:_[a-z0-9]+)+\b|\b[a-z][a-z0-9]*(?:Id|Key|Payload|Revision|Status|Type|Version)\b|业务源单|事实记录|对象族|数据口径|业务口径|权限码|运行态|运行时|投影|上下文|泳道|前端|后端|服务端|客户端|服务器|数据库|数据表|请求体|响应体|请求参数|响应无效|安全请求标识|请求信息不完整|批次参数|不允许的字段|接口)/iu
+
+const TECHNICAL_ERROR_LOCATION_PATTERNS = Object.freeze([
+  /(?:^|[\s"'(:：[（【])(?:file|webpack|vite):\/\/[^\s，。；）)\]}]+/iu,
+  /(?:^|[\s"'(:：[（【])[a-z]:[\\/][^\s，。；）)\]}]+/iu,
+  /(?:^|[\s"'(:：[（【])\/(?:Users|home|root|private|var|tmp|opt|app|workspace|srv|usr|go|build|runner|mnt|Volumes|code|src|server|web|internal|node_modules|scripts|data)(?:[\\/][^\s，。；）)\]}]*)?/iu,
+  /(?:^|[\s"'(:：[（【])(?:web[\\/]src|server[\\/](?:internal|cmd|pkg)|internal[\\/](?:biz|data|service|pkg)|src[\\/](?:components|pages|utils|services)|node_modules[\\/]|scripts[\\/])[^\s，。；）)\]}]*/iu,
+  /\b(?:node:internal[\\/][^\s，。；）)\]}]+|[a-z0-9_.-]+\.(?:go|js|jsx|mjs|cjs|ts|tsx|java|py|rb|php|rs|cs|c|cc|cpp|h|hpp):\d+(?::\d+)?)\b/iu,
+  /(?:^|[\s:：])(?:goroutine\s+\d+\s+\[[^\]]+\]:|at\s+(?:async\s+)?(?:new\s+)?[-\w$.<>[\]]+(?:\s+\(|\s*$))/iu,
+])
 
 function containsCjk(text) {
   return /[\u3400-\u9fff]/u.test(String(text || ''))
 }
 
 function containsTechnicalErrorText(text) {
-  return TECHNICAL_ERROR_MESSAGE_PATTERN.test(String(text || ''))
+  const value = String(text || '')
+  return (
+    TECHNICAL_ERROR_MESSAGE_PATTERN.test(value) ||
+    TECHNICAL_ERROR_LOCATION_PATTERNS.some((pattern) => pattern.test(value))
+  )
 }
 
 function normalizeErrorText(message) {
@@ -97,8 +110,9 @@ export function getUserFacingErrorMessage(
   fallback = '请求失败，请稍后重试'
 ) {
   const code = Number(err?.code)
-  if (DEFAULT_RPC_ERROR_MESSAGES[code]) {
-    return DEFAULT_RPC_ERROR_MESSAGES[code]
+  const mappedCodeMessage = DEFAULT_RPC_ERROR_MESSAGES[code]
+  if (mappedCodeMessage && !containsTechnicalErrorText(mappedCodeMessage)) {
+    return mappedCodeMessage
   }
   if (err?.isNetworkError) {
     return '网络错误，请稍后重试'

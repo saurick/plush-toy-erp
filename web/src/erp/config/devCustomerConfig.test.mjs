@@ -112,7 +112,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
     summary.sections.map((section) => section.title),
     [
       '看板中心',
-      '主数据',
+      '基础资料',
       '销售管理',
       '产品工程',
       '采购管理',
@@ -121,7 +121,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
       '委外管理',
       '生产管理',
       '出货管理',
-      '财务业务',
+      '财务管理',
       '运营工具',
       '系统管理',
     ]
@@ -131,7 +131,7 @@ test('devCustomerConfig: 汇总已接前端运行时的 yoyoosun 菜单配置', 
   assert(
     summary.sections.some(
       (section) =>
-        section.title === '主数据' && section.items.includes('materials')
+        section.title === '基础资料' && section.items.includes('materials')
     )
   )
   assert(
@@ -274,7 +274,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
   assert.equal(summary.notBusinessDataImport, true)
   assert.equal(summary.writesDatabase, true)
   assert.equal(summary.canRunUiDryRun, true)
-  assert.equal(summary.canApplyTestConfig, false)
+  assert.equal(summary.canApplyTestConfig, true)
   assert.equal(summary.canCheckReleaseReadiness, true)
   assert.equal(summary.uiDryRunApiPath, '/__dev/api/customer-import/dry-run')
   assert.equal(
@@ -289,22 +289,14 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     summary.uiReleaseReadinessApiPath,
     '/__dev/api/customer-config/release-readiness'
   )
-  assert.equal(summary.testApply.status, 'blocked')
-  assert.deepEqual(summary.testApply.blockedReasons, [
-    'package_not_release_ready',
-    'preview_only',
-    'runtime_disabled',
-    'publish_disabled',
-    'activate_disabled',
-  ])
-  assert.match(summary.testApply.note, /仍是草案/)
-  assert.match(summary.testApply.note, /只供预览/)
-  assert.match(summary.testApply.note, /运行时编译未开放/)
-  assert.match(summary.testApply.note, /发布未开放/)
-  assert.match(summary.testApply.note, /激活未开放/)
+  assert.equal(summary.testApply.status, 'test_apply_ready')
+  assert.deepEqual(summary.testApply.blockedReasons, [])
+  assert.match(summary.testApply.note, /loopback/)
+  assert.match(summary.testApply.note, /已登记的本地开发库/)
+  assert.match(summary.testApply.note, /正式目标环境不接受/)
   assert.equal(
     summary.testApply.target,
-    '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）'
+    '当前 Vite /rpc 代理后端'
   )
   assert.equal(summary.testApply.noBusinessDataImport, true)
   assert.deepEqual(summary.testApply.operations, [
@@ -359,7 +351,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
       'passed',
       'preview_only',
       'preview_only',
-      'blocked',
+      'test_apply_ready',
       'release_gate_required',
     ]
   )
@@ -394,7 +386,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     summary.databaseTargets.map((item) => item.status),
     [
       'no_write',
-      'blocked',
+      'test_apply_ready',
       'release_gate_required',
       'release_gate_required',
       'separate_task_required',
@@ -404,7 +396,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
     summary.databaseTargets.some(
       (item) =>
         item.key === 'test-config-apply' &&
-        item.target === '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）' &&
+        item.target === '当前 Vite /rpc 代理后端' &&
         item.writeClass === 'test_config_control_write' &&
         item.writeClassLabel === '写当前后端配置控制面' &&
         item.writesLabel ===
@@ -416,7 +408,7 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
         item.writesConfigControlLabel === '写客户配置控制面' &&
         item.requiresReleaseEvidence === false &&
         item.requiresAdminConfirmation === true &&
-        item.reason.includes('127.0.0.1:8300') &&
+        item.reason.includes('当前 Vite /rpc 代理后端') &&
         item.reason.includes('正式目标环境由统一执行器显式确认')
     )
   )
@@ -472,7 +464,12 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
   )
   assert.deepEqual(
     summary.versionAuditSupport.map((item) => item.status),
-    ['snapshot_supported', 'blocked', 'rollback_supported', 'audit_supported']
+    [
+      'snapshot_supported',
+      'test_apply_ready',
+      'rollback_supported',
+      'audit_supported',
+    ]
   )
   assert.deepEqual(
     summary.tools.map((item) => item.status),
@@ -522,6 +519,39 @@ test('devCustomerConfig: 导入工具只作为 evidence / report gate', () => {
         !item.command.includes('<release-batch>') &&
         !item.command.includes('CUSTOMER_CONFIG_ADMIN_TOKEN') &&
         !item.command.includes('--execute')
+    )
+  )
+})
+
+test('devCustomerConfig: 本地测试应用仍对客户包边界失败关闭', () => {
+  const packageSummary = buildCustomerPackagePreviewSummary()
+  assert.equal(packageSummary.localTestApplyEnabled, true)
+  assert.equal(
+    buildImportToolingSummary('yoyoosun', packageSummary)
+      .canApplyTestConfig,
+    true
+  )
+
+  const unsafeBoundary = {
+    ...packageSummary,
+    boundaryOk: false,
+  }
+  const boundaryResult = buildImportToolingSummary(
+    'yoyoosun',
+    unsafeBoundary
+  )
+  assert.equal(boundaryResult.canApplyTestConfig, false)
+  assert(boundaryResult.testApply.blockedReasons.includes('package_boundary_invalid'))
+
+  const disabled = {
+    ...packageSummary,
+    localTestApplyEnabled: false,
+  }
+  const disabledResult = buildImportToolingSummary('yoyoosun', disabled)
+  assert.equal(disabledResult.canApplyTestConfig, false)
+  assert(
+    disabledResult.testApply.blockedReasons.includes(
+      'local_test_apply_disabled'
     )
   )
 })
@@ -1110,7 +1140,7 @@ test('devCustomerConfig: 规则策略和打印默认方提供业务可读投影 
   )
 })
 
-test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门禁', () => {
+test('devCustomerConfig: 配置包预检控制台区分本地测试应用与正式发布门禁', () => {
   const overview = buildCustomerConfigDevOverview({ customerKey: 'yoyoosun' })
   const summary = buildCustomerPackageConsoleSummary({
     menuSummary: overview.menuSummary,
@@ -1122,15 +1152,22 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
 
   assert.equal(summary.primaryStatus, 'PREVIEW_READY')
   assert.equal(summary.reviewDecision.status, 'REVIEW_READY')
-  assert.match(summary.reviewDecision.summary, /草案且仅供预览/)
-  assert.match(summary.reviewDecision.nextAction, /只读预览和试跑/)
+  assert.match(summary.reviewDecision.summary, /已满足测试应用门禁/)
+  assert.match(summary.reviewDecision.summary, /正式发布仍须/)
+  assert.match(summary.reviewDecision.nextAction, /本地\/测试后端配置应用/)
   assert.deepEqual(
     summary.decisionCards.map((item) => item.status),
-    ['REVIEW_READY', 'blocked_by_design', 'blocked']
+    ['REVIEW_READY', 'blocked_by_design', 'release_gate_required']
   )
   assert.deepEqual(
     summary.preflightStages.map((item) => item.status),
-    ['passed', 'passed', 'preview_only', 'preview_only', 'blocked']
+    [
+      'passed',
+      'passed',
+      'preview_only',
+      'preview_only',
+      'release_gate_required',
+    ]
   )
   assert.deepEqual(
     summary.assetSummary.map((item) => item.status),
@@ -1250,7 +1287,12 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
   assert.doesNotMatch(visibleTexts, /handler/)
   assert.deepEqual(
     summary.versionAuditSupport.map((item) => item.status),
-    ['snapshot_supported', 'blocked', 'rollback_supported', 'audit_supported']
+    [
+      'snapshot_supported',
+      'test_apply_ready',
+      'rollback_supported',
+      'audit_supported',
+    ]
   )
   assert.deepEqual(
     summary.reviewChecklist.map((item) => item.status),
@@ -1261,7 +1303,7 @@ test('devCustomerConfig: 配置包预检控制台只展示 preview / blocked 门
       'source_grounded',
       'preview_only',
       'report_gate_only',
-      'blocked',
+      'release_gate_required',
     ]
   )
   assert(

@@ -273,6 +273,46 @@ func TestCustomerConfigPublishInputFromParamsMergesFormalManifestMetadata(t *tes
 	}
 }
 
+func TestLocalTestCustomerConfigBoundaryDefaultsClosedAndRequiresExplicitLocalFlag(t *testing.T) {
+	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "")
+	if res := localTestCustomerConfigBoundaryResult("product-v1", map[string]any{}); res != nil {
+		t.Fatalf("formal customer config must remain available: %#v", res)
+	}
+	for _, testCase := range []struct {
+		name             string
+		productVersion   string
+		compiledSnapshot map[string]any
+	}{
+		{
+			name:             "manifest marker",
+			productVersion:   biz.CustomerConfigLocalTestProductVersion,
+			compiledSnapshot: map[string]any{"applyPurpose": biz.CustomerConfigLocalTestApplyPurpose},
+		},
+		{
+			name:           "transition product identity",
+			productVersion: biz.CustomerConfigLocalTestProductVersion,
+		},
+	} {
+		t.Run(testCase.name, func(t *testing.T) {
+			res := localTestCustomerConfigBoundaryResult(testCase.productVersion, testCase.compiledSnapshot)
+			if res == nil || res.Code != errcode.InvalidParam.Code {
+				t.Fatalf("local test boundary result = %#v, want invalid param", res)
+			}
+		})
+	}
+
+	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "1")
+	if res := localTestCustomerConfigBoundaryResult(
+		biz.CustomerConfigLocalTestProductVersion,
+		map[string]any{"applyPurpose": biz.CustomerConfigLocalTestApplyPurpose},
+	); res != nil {
+		t.Fatalf("explicit local flag must allow local test manifest: %#v", res)
+	}
+	if res := localTestCustomerConfigBoundaryResult(biz.CustomerConfigLocalTestProductVersion, nil); res != nil {
+		t.Fatalf("explicit local flag must allow local test transition: %#v", res)
+	}
+}
+
 func TestCustomerConfigPublishInputFromParamsRejectsSnapshotManifestMetadata(t *testing.T) {
 	_, ok := customerConfigPublishInputFromParams(map[string]any{
 		"customer_key":             "yoyoosun",
@@ -1344,6 +1384,7 @@ func customerConfigPublishParamsWithRevisionAndModuleState(t *testing.T, params 
 		"suppliers":           {"purchase_orders", "outsourcing_orders"},
 		"products":            {"material_bom", "sales_orders"},
 		"materials":           {"material_bom", "purchase_orders"},
+		"material_bom":        {"production_orders"},
 		"processes":           {"outsourcing_orders"},
 		"sales_orders":        {"shipments"},
 		"purchase_orders":     {"purchase_receipts"},
@@ -1517,6 +1558,7 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 			map[string]any{"module_key": "products", "state": "enabled"},
 			map[string]any{"module_key": "materials", "state": "enabled"},
 			map[string]any{"module_key": "processes", "state": "enabled"},
+			map[string]any{"module_key": "material_bom", "state": "enabled"},
 			map[string]any{"module_key": "sales_orders", "state": "enabled"},
 			map[string]any{"module_key": "workflow_tasks", "state": "enabled"},
 			map[string]any{"module_key": "purchase_orders", "state": "enabled"},
@@ -1525,6 +1567,7 @@ func customerConfigPublishParamsForRevision(t *testing.T, revision string) *stru
 			map[string]any{"module_key": "inventory", "state": "enabled"},
 			map[string]any{"module_key": "shipments", "state": "enabled"},
 			map[string]any{"module_key": "finance", "state": "enabled"},
+			map[string]any{"module_key": "production_orders", "state": "enabled"},
 		},
 		"role_profiles":       roleProfiles,
 		"access_entitlements": accessEntitlements,
@@ -1624,6 +1667,47 @@ func customerConfigPublishParamsWithMaterialSupplyPurchaseOrderRuntimeProcess(t 
 		t.Fatalf("NewStruct error = %v", err)
 	}
 	return out
+}
+
+func TestCustomerConfigJSONRPCLocalTestManifestRequiresExplicitBackendFlag(t *testing.T) {
+	payload := customerConfigPublishParams(t).AsMap()
+	payload["product_version"] = biz.CustomerConfigLocalTestProductVersion
+	snapshot, ok := payload["compiled_snapshot"].(map[string]any)
+	if !ok {
+		t.Fatalf("compiled_snapshot missing: %#v", payload)
+	}
+	snapshot["applyPurpose"] = biz.CustomerConfigLocalTestApplyPurpose
+	params, err := structpb.NewStruct(payload)
+	if err != nil {
+		t.Fatalf("NewStruct error = %v", err)
+	}
+	dispatcher := newCustomerConfigTestDispatcher(
+		&biz.AdminUser{ID: 1, Username: "admin", CreatedAt: time.Now(), UpdatedAt: time.Now()},
+		[]string{biz.AdminRoleKey},
+	)
+	ctx := customerConfigAdminCtx(1, "admin")
+
+	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "")
+	for _, method := range []string{"validate_customer_config", "publish_customer_config"} {
+		_, res, err := dispatcher.handleCustomerConfig(ctx, method, method+"-blocked", params)
+		if err != nil {
+			t.Fatalf("%s err = %v", method, err)
+		}
+		if res.Code != errcode.InvalidParam.Code {
+			t.Fatalf("%s result = %#v, want invalid param", method, res)
+		}
+	}
+
+	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "1")
+	for _, method := range []string{"validate_customer_config", "publish_customer_config"} {
+		_, res, err := dispatcher.handleCustomerConfig(ctx, method, method+"-allowed", params)
+		if err != nil {
+			t.Fatalf("%s err = %v", method, err)
+		}
+		if res.Code != errcode.OK.Code {
+			t.Fatalf("%s result = %#v, want OK", method, res)
+		}
+	}
 }
 
 func TestCustomerConfigJSONRPCRequiresPublishPermission(t *testing.T) {
@@ -1840,6 +1924,9 @@ func TestCustomerConfigJSONRPCEffectiveSessionRequiresActiveRevisionForFixedReal
 	}
 	if res.Code != errcode.PermissionDenied.Code || res.Message != "当前部署客户尚未激活配置，业务权限已关闭" {
 		t.Fatalf("fixed customer missing active revision result = %#v", res)
+	}
+	if res.Data == nil || res.Data.AsMap()["reason"] != customerConfigErrorReasonActiveRevisionRequired {
+		t.Fatalf("fixed customer missing active revision reason = %#v", res.Data)
 	}
 }
 

@@ -820,7 +820,7 @@ export default function V1OutsourcingOrdersPage() {
         )
         if (retained) {
           message.warning(
-            '应付生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
         } else {
           message.error(getActionErrorMessage(error, '生成应付'))
@@ -897,7 +897,7 @@ export default function V1OutsourcingOrdersPage() {
         setSourceFactOpen(true)
       } catch (error) {
         if (sourceFactRequestRef.current === requestID) {
-          message.error(getActionErrorMessage(error, '加载委外办理上下文'))
+          message.error(getActionErrorMessage(error, '加载委外办理详情'))
         }
       } finally {
         if (sourceFactRequestRef.current === requestID) {
@@ -964,7 +964,7 @@ export default function V1OutsourcingOrdersPage() {
       const sourceAction = renderOutsourcingSourceFactAction(record, item)
       return [
         {
-          label: '加工对象类型',
+          label: '加工内容类型',
           value: isMaterial ? '材料' : '产品 / 半成品',
         },
         ...(isMaterial
@@ -1048,6 +1048,7 @@ export default function V1OutsourcingOrdersPage() {
   )
   const outsourcingOrderItemsPreview = useBusinessRowItemsPreview({
     records: rows,
+    getItemTotal: (order) => order?.item_count,
     rowExpandable: (order) =>
       canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
     loadPreview: loadOutsourcingOrderItemsPreview,
@@ -1167,7 +1168,7 @@ export default function V1OutsourcingOrdersPage() {
           if (!result) {
             sourceFactAttemptsRef.current.settle(scope, attempt, error)
             message.warning(
-              '委外业务生成结果仍无法确认，已保留本次请求，请使用相同内容重试'
+              '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
             )
             return
           }
@@ -1317,7 +1318,7 @@ export default function V1OutsourcingOrdersPage() {
       setWorkflowTasks(data?.tasks || [])
     } catch (error) {
       setWorkflowTasks([])
-      message.error(getActionErrorMessage(error, '加载委外协同任务失败'))
+      message.error(getActionErrorMessage(error, '加载委外相关任务'))
     }
   }, [canReadWorkflowTasks])
 
@@ -1535,7 +1536,7 @@ export default function V1OutsourcingOrdersPage() {
         message.warning(
           getActionErrorMessage(
             refreshEffect.error,
-            '刷新加工合同列表和协同任务'
+            '刷新加工合同列表和相关任务'
           )
         )
       }
@@ -1762,7 +1763,7 @@ export default function V1OutsourcingOrdersPage() {
   const exportOrders = useCallback(() => {
     if (rows.length === 0) return
     downloadBusinessCSV({
-      filename: `outsourcing-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      filename: `委外订单-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: visibleDataColumns,
       rows,
     })
@@ -1845,7 +1846,7 @@ export default function V1OutsourcingOrdersPage() {
       <PageHeaderCard
         compact
         title="委外订单"
-        description="维护加工合同、工序明细、加工厂承诺和打印内容；已确认合同可从对应明细发起发料或回货草稿，过账、质检和应付仍在对应业务模块处理。"
+        description="维护加工合同、工序明细、加工厂承诺和打印内容；已确认合同可从对应明细登记发料或回货草稿，之后请分别到委外记录、质量检验和应付页面继续办理。"
         tags={[
           <Tag color="blue" key="source">
             业务单据：加工合同
@@ -1857,7 +1858,7 @@ export default function V1OutsourcingOrdersPage() {
             查货只是工序候选
           </Tag>,
           <Tag color="gold" key="fact">
-            不直接写质检 / 库存 / 应付
+            发料、质检、应付分开办理
           </Tag>,
         ]}
         stats={pageStats}
@@ -1966,7 +1967,7 @@ export default function V1OutsourcingOrdersPage() {
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedLabel}
           selectedItems={selectedItems}
-          boundaryText="加工合同只确认委外承诺和打印内容；查货只作为工序候选，判定结果在质检模块处理；确认下单不会自动更新库存、质检、应付或协同任务状态。"
+          boundaryText="确认下单只确认加工合同，不会同时完成发料、回货、质检或应付；这些事项请到对应页面继续办理。"
         >
           <Button
             type="link"

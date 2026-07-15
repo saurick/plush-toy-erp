@@ -56,7 +56,8 @@
 | `scripts/deploy/customer-config-release-execute.mjs`   | 客户配置发布执行器，默认只出报告；支持 `--print-input-template` 输出 validate / publish / transition check / activate 或 rollback / effective-session 读回输入模板；显式确认后才执行，切换 mutation 复用后端校验 hash、产品版本和观测 active revision 的 CAS identity | 客户配置 revision 发布 / 激活 / 受控回滚执行前              |
 | `scripts/deploy/customer-config-release-readiness.mjs` | 客户配置发布就绪聚合门禁，复核 manifest、manifest evidence、release evidence、activation gate 和可选执行报告；支持 `--print-input-template` 输出 active revision 读回证据前置清单，支持 `--readback-preflight-report` 写 no-write 读回缺口报告，支持 `--json` 输出 evidence-only scope，失败时会带 release evidence status / closeout next actions，明确 readiness 只聚合证据、不执行发布或后端写入 | 客户配置 revision 发布前或执行后声明 ready 前              |
 | `scripts/deploy/production-preflight.sh`                | 产品级生产发布前门禁，检查运行时 env、一次性 admin bootstrap、固定镜像 tag、SMS mock、debug 写入开关、PDF async warmup / 固定 Chromium、Compose、migration 脚本、PostgreSQL / 后端 / Jaeger loopback 和低配部署边界；对应测试已接入 fast / strict | 每次生产发布 / 部署后运行态复核前                          |
-| `scripts/deploy/migrate-online.test.mjs`                | 用 fake Docker / Atlas 锁住线上 migration 的 `status -> dry-run -> apply` 顺序、dry-run 失败不 apply 和整段 `flock` 串行；本机无 `flock` 时仅跳过并发行为断言 | 调整 `migrate_online.sh` 后                              |
+| `scripts/qa/populated-upgrade-preflight.sh`             | 以固定 `--audit` allowlist 选择 `20260714055504` populated upgrade 或 `20260714055825` customer config cutover read-only 审计；不执行 migration、不自动 DML、不输出 DSN | 现存数据库升级或 restored DB 演练 apply 前                 |
+| `scripts/deploy/migrate-online.test.mjs`                | 用 fake Docker / psql / Atlas 锁住线上 migration 的 `status -> populated upgrade 审计 -> customer config cutover 审计 -> dry-run -> apply` 顺序、任一审计或 dry-run 失败不 apply 和整段 `flock` 串行；本机无 `flock` 时仅跳过并发行为断言 | 调整 `migrate_online.sh` 后                              |
 | `scripts/qa/core-boundary.test.mjs`                    | 自动扫描 `server/internal/core`，防止纯产品规则层 import `biz/data/service`、Ent、SQL、HTTP、配置或文件系统依赖 | 调整 `server/internal/core` 后                              |
 | `scripts/qa/workflow-fact-boundary.test.mjs`           | 自动扫描 Workflow runtime，防止任务完成链路直接引用 Operational Fact、库存、出货或财务事实写入口               | 调整 Workflow usecase、repo 或 JSON-RPC 后                  |
 | `scripts/qa/formal-frontend-customer-config-boundary.test.mjs` | 自动扫描正式前端 runtime，防止业务页面直接消费 raw 客户配置包，并锁住页面 / 动作 / 字段策略必须来自 `get_effective_session` 投影 | 调整客户配置运行时投影、正式菜单、字段策略或业务页面动作权限后 |
@@ -80,7 +81,7 @@
 | `scripts/qa/customer-config-effective-session-probe.mjs` | 无 Authorization 的 `customer_config.get_effective_session` 本地只读探针；可写 `output/customers/yoyoosun/customer-config-effective-session-probe/current.json`，确认本地后端可达和 `40302 未登录` / 缺真实登录证据边界，不读取 token、不证明 active revision | yoyoosun 本地入口已命中但还没有演示密码 / token，需要解释为什么不能证明后端 active revision 时 |
 | `scripts/qa/customer-package-lint.mjs`                 | 验证客户配置包结构、流程预览、状态机预览、策略预览和 preview-only 打印 party defaults 仍只做 lint / preview，不接 Workflow / Fact runtime，不覆盖供应商业务快照 | 调整 `config/catalog`、`config/schemas` 或客户包流程 / 打印配置草案后 |
 | `scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住 yoyoosun 客户包 `businessFlows / stateMachines / processPolicies` 仍为 preview-only，不执行 runtime command、不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
-| `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、`sales_order_acceptance` 受控 `runtime_loader_ready` 流程定义、preview-only 打印 party defaults snapshot 和 forbidden payload；只允许白名单 ProcessRuntime 读取，不写 Fact，不声明销售订单打印模板启用 | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
+| `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、受控流程定义、打印 snapshot 和 forbidden payload；正式编译与 `local_test_apply` 分开校验，revision 长度不超过 64，只允许白名单 ProcessRuntime 读取，不写 Fact | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
 | `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`、secrets、前端 test / build、本地 PostgreSQL 关键事务门禁、Chromium PDF 安全集成和剩余服务端 test / build；服务端全包复跑过滤已由专用矩阵真实执行的 PostgreSQL 用例，所有实际选中的测试仍要求零 skip；最后运行外部网络型 govulncheck | 提交前 / 推送前                                            |
 | `scripts/qa/strict.sh`                                 | 严格检查，在 fast 边界上补零 warning、完整前后端构建和本地 PostgreSQL 关键事务门禁 | 发版前                                                     |
@@ -430,6 +431,8 @@ bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 
 默认不生成 `debug_operator` 账号；如确需调试权限账号，必须显式加 `--include-debug`，此时会额外生成 `demo_debug`。
 
+`demo_admin` 是普通演示角色账号，不是稳定超级管理员 `admin`。角色演示账号的 seed / reset 只处理 `demo_*`，不得顺带重置稳定管理员。
+
 ```bash
 ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
   bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
@@ -621,6 +624,8 @@ node /Users/simon/projects/plush-toy-erp/scripts/qa/customer-config-runtime-mani
 ```
 
 该脚本不读取 raw 客户文件、不上传文件、不调用后端、不 activate、不 rollback、不导入业务数据，也不写 Workflow / Fact runtime。当前已跟踪包均为 draft / preview-only，不能直接生成正式发布 payload；只有完成受控评审并显式进入 `release_ready`、启用 runtime / publish 的配置输入，才允许走正式编译和后端发布链路。可重复传入 `--customer` 或使用 `--all` 预览全部登记包；`--out` 只能在单客户 `preview` 模式写入 ignored `output/`。页面、字段、权限、责任池和打印投影都必须来自 catalog 白名单并经后端再次校验；reference 仅用 `suppliers.default.supplier_type visible=false` 验证已有低风险列表/CSV consumer，不扩展到表单 label、editable 或 required。
+
+永绅本地联调不通过上述 CLI 放开 draft 包。`pnpm start:yoyoosun` 本身只预检并启动 Vite；登录后须在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认，dev-only middleware 才会为匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN` 生成内容寻址、长度不超过 64 的 `local_test_apply` revision，并沿现有 validate / publish / transition / active readback 链写入共享开发 PostgreSQL 客户配置控制面。后端默认拒绝该 manifest 及其切换，只有本地 `make run / make dev_restart` 显式开放 gate；gate 开启时按 pgx 最终连接配置只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，133、query override、multi-host fallback 和 loopback tunnel 均拒绝，production 配置携带此开关也会启动失败。active 切换对其他共享库使用者可见；正式 validator / executor 同样拒绝该 marker，正式 publish / activate、目标环境部署和客户签收仍需独立完成。
 
 客户配置 revision 进入 release evidence 前，先生成 manifest fingerprint evidence：
 
@@ -887,6 +892,34 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 ```
 
 不写 evidence 的发布前 env-only 预检可以不带 `--runtime`；但正式 release evidence 必须在部署后带 `--runtime`，同时记录 Compose 服务、容器实际 `ERP_PDF_WARMUP=async`、Chromium / chromium-common exact pin 和 `/healthz` / `/readyz`。
+
+产品级 production preflight 只核配置与部署边界，不读取业务行。现存数据库升级链在 apply 前必须依次完成两项独立只读审计：`20260714055504_migrate.sql` 的 populated upgrade 边界，以及 `20260714055825_customer_config_append_only_and_role_backfill.sql` 的 customer config cutover 边界。`migrate_online.sh` 的非 `--status-only` 路径会在 Atlas status 后按此顺序调用；任一失败都不会进入 dry-run 或 apply。需要单独复核时，使用固定 `--audit` 值，并通过容器模式或环境变量名传入 DSN，不能把连接串直接写进命令或报告：
+
+```bash
+sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+  --audit populated-upgrade \
+  --docker-container <postgres-container> \
+  --database <database> \
+  --username <username>
+
+sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+  --audit customer-config-cutover \
+  --docker-container <postgres-container> \
+  --database <database> \
+  --username <username>
+
+# POPULATED_UPGRADE_DATABASE_URL 先由受控运行环境注入，不在命令行赋值或输出
+sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+  --audit populated-upgrade \
+  --database-url-env POPULATED_UPGRADE_DATABASE_URL
+
+sh /Users/simon/projects/plush-toy-erp/scripts/qa/populated-upgrade-preflight.sh \
+  --audit customer-config-cutover \
+  --database-url-env POPULATED_UPGRADE_DATABASE_URL
+```
+
+两项审计都以 `BEGIN TRANSACTION READ ONLY` 执行，只报告 blocker。发现不兼容存量行、遗留流程实例或任务配置 revision 锚点后应停止 apply，由人工治理任务明确数据映射、审计、备份与回滚点；不得向审计、migration 或发布脚本补自动 `INSERT / UPDATE / DELETE`。fresh schema、静态 DDL、Ent 零漂移、Atlas validate 或空库迁移不能替代存量升级证明。备份恢复演练同样先恢复 dump、记录 pre-apply status、依次运行两项审计，再允许 Atlas apply。
+
 `scripts/deploy/deployment-package-lint.test.mjs` 会锁住 yoyoosun 部署资料包结构、敏感文件排除，以及 release evidence 模板必须包含 gate 需要的 `backupId`、`image-digests.txt`、preflight / backup / pre-apply migration / migration / smoke / restore / rollback evidence 文件名和 backup restore artifact 字段；同时锁住 backup evidence 模板必须包含 backup id / 时间 / release / migration version / 备份大小 / hash / 恢复与 smoke 状态，migration evidence 模板必须包含 `migrationBefore` / `migrationAfter`、`Current Version:`、`Pending Files:` 和脱敏边界，release sign-off 模板必须包含结论字段和必选确认，rollback / forward-fix plan 模板必须包含处置字段、runbook 和必选确认，smoke report example 必须保持非空 checks、必填 `endpointAlias`、可选且脱敏的 `backendEndpointAlias`、summary 数量一致、全通过状态、每项 target、URL / path 检查的 httpCode、无 URL 账号密码和脱敏声明，避免长期模板或样例落后于实际 release gate。
 `scripts/deploy/run-smoke-script.test.mjs` 会用本地 fake curl 锁住 `deployments/yoyoosun/scripts/run-smoke.sh` 的 CLI、`--print-input-template` 和输出结构。输入模板只打印目标 smoke 所需 endpoint、backend URL、releaseVersion、environment、report、客户配置 revision 和 token env 名，不触网、不读取 token、不写 `smoke-test-report.json`、不证明 active revision 已读回。真实 smoke report 必须带 `releaseVersion` / `environment`、必填 endpoint alias、可选 backend endpoint alias、非空全通过 checks、URL target 的 httpCode、summary 数量一致和脱敏声明，并提前拒绝带 URL 账号密码的 `--endpoint` / `--backend-url`，避免凭据进入 endpoint alias 或 check target；当提供 `--backend-url` 时，会生成 `server-healthz` / `server-readyz` 检查；当提供 `--customer-config-revision` 时，还会锁住 `customer-config-effective-session` 和真实 `template-pdf-render` 检查。web-only 报告仍可用于诊断，但 release gate 必须看到 PDF 的 `200`、`application/pdf`、64 位 hex SHA-256、正数 `sizeBytes` 和 `responseBodyStored=false` 才会接受。
 `scripts/deploy/production-preflight.test.mjs` 已接入 `fast.sh` / `strict.sh`，用于锁住合规 env 可通过、浮动镜像 tag 被拒绝、生产 Compose 不允许 `build:`、`--out` 只写脱敏检查报告且要求输出目录已存在，以及 `--runtime` 从容器实际 env 拒绝 `ERP_PDF_WARMUP=off`、校验 Chromium exact pin 和 health / ready 的门禁；测试通过 fake Docker / curl 锁定结构，不连接目标服务器。
@@ -897,7 +930,7 @@ bash /Users/simon/projects/plush-toy-erp/scripts/deploy/production-preflight.sh 
 `scripts/deploy/image-digests-evidence.test.mjs` 已接入 `fast.sh`，用于锁住 `image-digests-evidence.mjs` 的 CLI、digest 格式、`image-digests.txt` key-value 输出和与已填 `release-evidence.md` 的 digest 一致性；该生成器只写脱敏 artifact，不构建镜像、不访问 registry、不读取 `.env`。
 
 `scripts/deploy/immutable-version-evidence.test.mjs` 已接入 `fast.sh` 和 `strict.sh`，用于锁住 `immutable-version-evidence.mjs` 的 CLI、release batch 字段校验、Atlas migration version 格式、只更新 `release-evidence.md` 第一组基本信息字段，以及同步写入 `image-digests.txt`。该写入器只消费显式传入的 releaseVersion、environment、operatorRole、gitCommit、server / web image ref、sha256 digest、migrationBefore、migrationAfter 和 backupId；`--print-input-template` 只打印这些输入的 shell 模板和写入命令，不要求 evidence 目录存在，也不写 evidence。它不构建镜像、不访问 registry、不读取 `.env`、不执行 migration、不跑 smoke、不恢复备份、不接触目标环境。
-`scripts/deploy/backup-restore-rehearsal-script.test.mjs` 也已接入 `fast.sh` / `strict.sh`，用于锁住恢复演练脚本的 help、缺少 source DSN 时提前拒绝、目标库 DSN 默认防呆、`--backup-purpose` 必须是 pre-migration / pre-deploy / 发布前 / migration 前语义、`--evidence-dir` 必须指向已存在 release evidence 目录、恢复后会先记录 `migration-status-before-apply.txt`、执行 `atlas migrate apply`，以及 `backup-restore-report.json` 中 release evidence gate 需要的脱敏字段；提供 `--evidence-dir` 时脚本只会复制 `backup-evidence.md`、`migration-status-before-apply.txt`、`migration-status.txt`、`command-summary.txt` 和 `backup-restore-report.json`，不会复制 dump。release evidence gate 会进一步要求 `backup-restore-report.json` 里的 `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus` 和 `artifacts.commandSummary` 是当前 evidence 目录内真实存在的相对路径且文件内容不含完整 DSN / secret，并会解析 pre / post migration artifact 的 `Current Version` 和 `Pending Files`，以及 command summary 的 `backupId / releaseVersion / sourceAlias / restoreTarget / steps`，避免引用外部目录、绝对路径、完整 DSN、不存在的命令摘要、不同批次或不同恢复目标的命令摘要、缺少 pg_dump / restore / atlas / smoke 步骤，或与 release migration 不一致的 artifact；该测试不启动 Docker、不执行 `pg_dump`、不恢复数据库。
+`scripts/qa/populated-upgrade-preflight.test.mjs` 会锁住两份审计 SQL 使用 read-only 事务、固定 audit allowlist、`20260714055504` 数据边界和 `20260714055825` cutover 前置条件，并禁止 DDL / DML；同时覆盖容器、命名 DSN 环境变量、缺输入和审计失败传播。`scripts/deploy/backup-restore-rehearsal-script.test.mjs` 也已接入 `fast.sh` / `strict.sh`，用于锁住恢复演练脚本的 help、缺少 source DSN 时提前拒绝、目标库 DSN 默认防呆、`--backup-purpose` 必须是 pre-migration / pre-deploy / 发布前 / migration 前语义、`--evidence-dir` 必须指向已存在 release evidence 目录、恢复后会先记录 `migration-status-before-apply.txt`、依次运行两项只读审计、全部通过才执行 `atlas migrate apply`，以及 `backup-restore-report.json` 中 release evidence gate 需要的脱敏字段；提供 `--evidence-dir` 时脚本只会复制 `backup-evidence.md`、`migration-status-before-apply.txt`、`migration-status.txt`、`command-summary.txt` 和 `backup-restore-report.json`，不会复制 dump。release evidence gate 会进一步要求 `backup-restore-report.json` 里的 `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus` 和 `artifacts.commandSummary` 是当前 evidence 目录内真实存在的相对路径且文件内容不含完整 DSN / secret，并会解析 pre / post migration artifact 的 `Current Version` 和 `Pending Files`，以及 command summary 的 `backupId / releaseVersion / sourceAlias / restoreTarget / steps`。恢复链跨越 `20260714055504` 时，四处必须记录 `populatedUpgradeAuditStatus=passed`；跨越 `20260714055825` 时，四处必须记录 `customerConfigCutoverAuditStatus=passed`；command summary 步骤必须包含对应 read-only audit。任一缺失都不能形成完整发布证据。静态测试不启动 Docker、不执行 `pg_dump`、不恢复数据库，真实通过仍须来自本次恢复库上的实际审计和 apply。
 rollback / forward-fix 演练完成并取得 post-smoke report 后，用报告生成器收口 release gate 需要的 JSON：
 
 ```bash

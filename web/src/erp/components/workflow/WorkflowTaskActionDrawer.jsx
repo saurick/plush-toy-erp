@@ -61,38 +61,38 @@ export const TASK_ACTION_META = Object.freeze({
 const TASK_DRAWER_STEPS = Object.freeze([
   {
     key: 'context',
-    title: '核对上下文',
-    description: '确认任务、来源、责任角色和到期状态。',
+    title: '查看任务详情',
+    description: '确认任务、相关单据、负责岗位和截止时间。',
   },
   {
     key: 'action',
-    title: '选择动作',
-    description: '完成、阻塞、解除阻塞、退回或催办，只记录协同任务处理结果。',
+    title: '选择处理方式',
+    description: '选择完成、阻塞、解除阻塞、退回或催办。',
   },
   {
     key: 'submit',
-    title: '提交回队列',
+    title: '提交处理结果',
     description: '刷新任务列表，不自动处理库存、出货或财务业务。',
   },
 ])
 
 export function getTaskActionDescription(actionMode = '') {
   if (actionMode === 'complete') {
-    return '确认后只完成当前协同任务；库存、出货、财务、开票或付款仍需进入对应业务模块处理。'
+    return '确认后只完成当前任务；库存、出货、财务、开票或付款仍需进入对应业务页面处理。'
   }
   if (actionMode === 'block') {
-    return '请写清卡点原因、影响范围和下一责任人，后续角色才能接续处理。'
+    return '请写清卡点原因、影响范围和下一位接手人，便于后续继续处理。'
   }
   if (actionMode === 'reject') {
-    return '请写清退回依据、需补齐事项和下一责任岗位；退回只记录协同状态，不会撤销已完成的业务处理。'
+    return '请写清退回依据、需补齐事项和下一负责岗位；退回不会撤销已经完成的业务处理。'
   }
   if (actionMode === 'resume') {
-    return '请说明阻塞如何解除；确认后任务恢复为可执行，不会自动产生库存、出货或财务事实。'
+    return '请说明阻塞如何解除；确认后任务恢复为可办理，不会自动产生库存、出货或财务记录。'
   }
   if (actionMode === 'urge') {
-    return '请写清催办对象和需要补齐的事项，避免只留下无上下文提醒。'
+    return '请写清催办接收人和需要补齐的事项，便于对方了解原因。'
   }
-  return '先选择一个处理动作；任务上下文只用于核对，不直接生成或修改业务记录。'
+  return '先选择处理方式；任务详情只用于核对，不会直接生成或修改业务记录。'
 }
 
 function getTaskActionTone(actionMode = '') {
@@ -145,7 +145,7 @@ export default function WorkflowTaskActionDrawer({
       title={
         <div className="erp-task-action-drawer__title">
           <span>任务处理</span>
-          <strong>{actionMeta?.title || '查看任务上下文'}</strong>
+          <strong>{actionMeta?.title || '查看任务详情'}</strong>
         </div>
       }
       width="min(640px, calc(100vw - 24px))"
@@ -172,7 +172,7 @@ export default function WorkflowTaskActionDrawer({
               {actionMeta ? (
                 <>
                   <Button disabled={actionSaving} onClick={clearAction}>
-                    返回动作选择
+                    返回处理方式
                   </Button>
                   <Button
                     type="primary"
@@ -262,7 +262,7 @@ export default function WorkflowTaskActionDrawer({
                 <strong>{formatWorkflowTaskSource(task)}</strong>
               </div>
               <div>
-                <span>负责角色</span>
+                <span>负责岗位</span>
                 <strong>{ownerRoleLabel || '-'}</strong>
               </div>
               <div>
@@ -315,7 +315,7 @@ export default function WorkflowTaskActionDrawer({
               <AlertOutlined aria-hidden="true" />
               <span>
                 <strong>处理范围：</strong>
-                完成、阻塞、解除阻塞、退回和催办只处理协同任务；库存、出货、应收、开票和付款仍需进入对应业务模块处理。
+                完成、阻塞、解除阻塞、退回和催办只更新当前任务；库存、出货、应收、开票和付款仍需进入对应业务页面处理。
               </span>
             </div>
           </section>
@@ -329,7 +329,7 @@ export default function WorkflowTaskActionDrawer({
             >
               <div className="erp-task-action-drawer__action-head">
                 <div>
-                  <span>当前动作</span>
+                  <span>当前操作</span>
                   <strong>{actionMeta.title}</strong>
                 </div>
                 <Tag color={actionMeta.requireReason ? 'orange' : 'green'}>
@@ -343,9 +343,9 @@ export default function WorkflowTaskActionDrawer({
                 <Alert
                   type="warning"
                   showIcon
-                  message="当前账号不能提交这个动作"
+                  message="当前账号不能提交这项操作"
                   description={
-                    readonlyReason || '请确认任务状态、处理角色和权限。'
+                    readonlyReason || '请确认任务状态、负责岗位和可用操作。'
                   }
                 />
               ) : null}
@@ -365,7 +365,7 @@ export default function WorkflowTaskActionDrawer({
                 <div className="erp-task-action-drawer__confirm-copy">
                   <CheckCircleOutlined aria-hidden="true" />
                   <span>
-                    提交后任务会回到已完成队列；真实业务对象是否继续处理，仍以关联模块为准。
+                    提交后任务会进入已完成；相关业务是否办结，请到对应业务页面确认。
                   </span>
                 </div>
               )}
@@ -373,7 +373,7 @@ export default function WorkflowTaskActionDrawer({
           ) : (
             <section className="erp-task-action-drawer__action-prompt">
               <strong>
-                {canChooseActions ? '选择一个处理动作' : '只读任务上下文'}
+                {canChooseActions ? '选择处理方式' : '查看任务详情'}
               </strong>
               <span>
                 {canChooseActions

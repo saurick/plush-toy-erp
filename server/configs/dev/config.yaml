@@ -42,12 +42,12 @@ data:
   etcd:
     hosts:
       - etcd:2379
-  # 认证相关：仓库只保留公开占位值，真实私钥/密码请在本地覆盖。
+  # 认证相关：JWT 密钥必须在本地覆盖；管理员留空时由 dev runtime 使用本地开发默认值。
   auth:
     jwtSecret: "change-this-dev-jwt-secret"
     jwtExpireSeconds: 604800 # 7 days
     sms:
       mode: "mock"
     admin:
-      username: "admin"
-      password: "change-this-dev-admin-password"
+      username: ""
+      password: ""

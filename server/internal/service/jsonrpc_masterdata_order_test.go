@@ -316,7 +316,8 @@ func (s *stubSalesOrderJSONRPCRepo) ListSalesOrders(_ context.Context, filter bi
 	paymentMethod := "30天月结"
 	paymentTermDays := 30
 	salesOwner := "张三"
-	return []*biz.SalesOrder{{ID: 1, OrderNo: "SO001", CustomerID: 1, SalesOwner: &salesOwner, ContactSnapshot: map[string]any{"name": "李四"}, PaymentMethod: &paymentMethod, PaymentTermDays: &paymentTermDays, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft}}, 1, nil
+	itemCount := 3
+	return []*biz.SalesOrder{{ID: 1, OrderNo: "SO001", CustomerID: 1, SalesOwner: &salesOwner, ContactSnapshot: map[string]any{"name": "李四"}, PaymentMethod: &paymentMethod, PaymentTermDays: &paymentTermDays, OrderDate: time.Unix(1, 0), LifecycleStatus: biz.SalesOrderStatusDraft, ItemCount: &itemCount}}, 1, nil
 }
 
 func (s *stubSalesOrderJSONRPCRepo) UpdateSalesOrderLifecycle(_ context.Context, id int, lifecycleStatus string) (*biz.SalesOrder, error) {
@@ -1333,6 +1334,9 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresPermissionAndRejectsShipmentVerb
 	if orderData["sales_owner"] != "张三" || orderData["contact_snapshot"] == nil {
 		t.Fatalf("expected owner and contact snapshot in response, got %#v", orderData)
 	}
+	if _, exists := orderData["item_count"]; exists {
+		t.Fatalf("save response must not claim an unloaded sales order item count, got %#v", orderData)
+	}
 
 	for _, removedMethod := range []string{
 		"create_sales_order",
@@ -1377,12 +1381,36 @@ func TestJsonrpcDispatcher_SalesOrderListAcceptsDateAndSortFilters(t *testing.T)
 	if res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("expected OK, got %#v", res)
 	}
+	orders, ok := res.Data.AsMap()["sales_orders"].([]any)
+	if !ok || len(orders) != 1 {
+		t.Fatalf("expected one sales order, got %#v", res.Data.AsMap()["sales_orders"])
+	}
+	if _, leaked := orders[0].(map[string]any)["item_count"]; leaked {
+		t.Fatalf("sales order list must omit detail count without sales item read permission, got %#v", orders[0])
+	}
 	if repo.lastSalesOrderFilter.DateField != "order_date" ||
 		repo.lastSalesOrderFilter.DateFrom == nil ||
 		repo.lastSalesOrderFilter.DateTo == nil ||
 		repo.lastSalesOrderFilter.SortBy != "order_date" ||
 		repo.lastSalesOrderFilter.SortDirection != "asc" {
 		t.Fatalf("expected date and sort filters forwarded, got %#v", repo.lastSalesOrderFilter)
+	}
+
+	itemReadDispatcher := newSalesOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderRead,
+		biz.PermissionSalesOrderItemRead,
+	))
+	_, itemReadRes, err := itemReadDispatcher.handleSalesOrder(workflowJSONRPCAdminContext(), "list_sales_orders", "item-count", params)
+	if err != nil {
+		t.Fatalf("expected nil err with detail read permission, got %v", err)
+	}
+	if itemReadRes == nil || itemReadRes.Code != errcode.OK.Code {
+		t.Fatalf("expected OK with detail read permission, got %#v", itemReadRes)
+	}
+	itemReadOrders := itemReadRes.Data.AsMap()["sales_orders"].([]any)
+	if itemCount := jsonRPCInt(t, itemReadOrders[0].(map[string]any), "item_count"); itemCount != 3 {
+		t.Fatalf("expected sales order item_count 3, got %d", itemCount)
 	}
 
 	_, invalidRes, err := j.handleSalesOrder(

@@ -69,17 +69,17 @@ const VIEW_TXNS = 'txns'
 const VIEW_ITEMS = [
   { key: VIEW_BALANCES, label: '库存余额', children: null },
   { key: VIEW_LOTS, label: '库存批次', children: null },
-  { key: VIEW_TXNS, label: '库存流水', children: null },
+  { key: VIEW_TXNS, label: '库存变动记录', children: null },
 ]
 
 const VIEW_LABELS = Object.freeze({
   [VIEW_BALANCES]: '库存余额',
   [VIEW_LOTS]: '库存批次',
-  [VIEW_TXNS]: '库存流水',
+  [VIEW_TXNS]: '库存变动记录',
 })
 
 const SUBJECT_TYPE_OPTIONS = [
-  { label: '全部对象', value: '' },
+  { label: '全部存货类型', value: '' },
   { label: '材料', value: 'MATERIAL' },
   { label: '成品', value: 'PRODUCT' },
 ]
@@ -93,14 +93,14 @@ const LOT_STATUS_OPTIONS = [
 ]
 
 const TXN_TYPE_OPTIONS = [
-  { label: '全部流水类型', value: '' },
+  { label: '全部变动类型', value: '' },
   { label: '入库', value: 'IN' },
   { label: '出库', value: 'OUT' },
   { label: '调增', value: 'ADJUST_IN' },
   { label: '调减', value: 'ADJUST_OUT' },
   { label: '调拨入', value: 'TRANSFER_IN' },
   { label: '调拨出', value: 'TRANSFER_OUT' },
-  { label: '冲正', value: 'REVERSAL' },
+  { label: '撤销调整', value: 'REVERSAL' },
 ]
 
 const SOURCE_TYPE_OPTIONS = [
@@ -122,15 +122,15 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
 })
 
 const SEARCH_PLACEHOLDERS = Object.freeze({
-  [VIEW_BALANCES]: '搜索对象类型',
+  [VIEW_BALANCES]: '搜索存货类型',
   [VIEW_LOTS]: '搜索批次',
-  [VIEW_TXNS]: '搜索流水',
+  [VIEW_TXNS]: '搜索库存变动',
 })
 
 const SEARCH_HINTS = Object.freeze({
-  [VIEW_BALANCES]: '可搜索：对象类型',
+  [VIEW_BALANCES]: '可搜索：存货类型',
   [VIEW_LOTS]: '可搜索：批次号、供应商批次、色号',
-  [VIEW_TXNS]: '可搜索：流水类型、来源、备注',
+  [VIEW_TXNS]: '可搜索：变动类型、来源、备注',
 })
 
 const LOT_STATUS_LABELS = Object.freeze({
@@ -154,7 +154,7 @@ const TXN_TYPE_LABELS = Object.freeze({
   ADJUST_OUT: '调减',
   TRANSFER_IN: '调拨入',
   TRANSFER_OUT: '调拨出',
-  REVERSAL: '冲正',
+  REVERSAL: '撤销调整',
 })
 
 const TXN_TYPE_COLORS = Object.freeze({
@@ -183,12 +183,12 @@ function dash(value) {
 function subjectTypeTag(value) {
   const key = String(value || '').trim()
   if (!key) return '-'
-  return <Tag>{SUBJECT_TYPE_LABELS[key] || '对象'}</Tag>
+  return <Tag>{SUBJECT_TYPE_LABELS[key] || '其他存货'}</Tag>
 }
 
 function subjectTypeText(value) {
   const key = String(value || '').trim()
-  return SUBJECT_TYPE_LABELS[key] || (key ? '对象' : '')
+  return SUBJECT_TYPE_LABELS[key] || (key ? '其他存货' : '')
 }
 
 function lotStatusTag(value) {
@@ -211,14 +211,14 @@ function txnTypeTag(value) {
   if (!key) return '-'
   return (
     <Tag color={TXN_TYPE_COLORS[key] || 'default'}>
-      {TXN_TYPE_LABELS[key] || '库存流水'}
+      {TXN_TYPE_LABELS[key] || '库存变动'}
     </Tag>
   )
 }
 
 function txnTypeText(value) {
   const key = String(value || '').trim()
-  return TXN_TYPE_LABELS[key] || (key ? '库存流水' : '')
+  return TXN_TYPE_LABELS[key] || (key ? '库存变动' : '')
 }
 
 function sourceTypeText(value) {
@@ -291,7 +291,7 @@ function selectedLabelFor(view, row) {
     }`
   }
   if (view === VIEW_TXNS) {
-    return `流水 ${sourceTypeText(row.source_type) || txnTypeText(row.txn_type) || '已登记流水'}`
+    return `库存变动 ${sourceTypeText(row.source_type) || txnTypeText(row.txn_type) || '已记录'}`
   }
   return `库存项已登记 / 批次 ${row.lot_no || (row.lot_id ? '已关联批次' : '-')}`
 }
@@ -572,7 +572,7 @@ export default function V1InventoryLedgerPage() {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
       }
-      message.error(getActionErrorMessage(error, '加载库存筛选引用数据'))
+      message.error(getActionErrorMessage(error, '加载库存筛选资料'))
       setMaterials([])
       setProducts([])
       setProductSKUs([])
@@ -638,7 +638,7 @@ export default function V1InventoryLedgerPage() {
         return referenceLabel(materialOptions, value, '材料')
       }
       return linkedBusinessRef(
-        subjectTypeText(record?.subject_type) || '对象',
+        subjectTypeText(record?.subject_type) || '存货',
         value
       )
     },
@@ -667,10 +667,9 @@ export default function V1InventoryLedgerPage() {
 
   const stats = useMemo(
     () => [
-      { key: 'view', label: '当前视图', value: activeLabel },
-      { key: 'total', label: '匹配记录', value: total },
-      { key: 'current', label: '当前页', value: rows.length },
-      { key: 'mode', label: '页面模式', value: '只读' },
+      { key: 'view', label: '查看内容', value: activeLabel },
+      { key: 'total', label: '筛选结果', value: total },
+      { key: 'current', label: '本页显示', value: rows.length },
     ],
     [activeLabel, rows.length, total]
   )
@@ -685,15 +684,15 @@ export default function V1InventoryLedgerPage() {
           render: (value, record) => value || (record.id ? '已登记批次' : '-'),
         },
         {
-          title: '对象',
-          exportTitle: '对象',
+          title: '存货类型',
+          exportTitle: '存货类型',
           dataIndex: 'subject_type',
           width: 110,
           render: subjectTypeTag,
           exportValue: (record) => subjectTypeText(record?.subject_type),
         },
         {
-          title: '对象',
+          title: '材料 / 产品',
           dataIndex: 'subject_id',
           width: 220,
           render: renderSubjectReference,
@@ -744,11 +743,11 @@ export default function V1InventoryLedgerPage() {
     if (activeView === VIEW_TXNS) {
       return [
         {
-          title: '流水',
+          title: '变动记录',
           dataIndex: 'id',
           width: 130,
-          render: (value) => (value ? '已登记流水' : '-'),
-          exportValue: (record) => (record?.id ? '已登记流水' : ''),
+          render: (value) => (value ? '已记录' : '-'),
+          exportValue: (record) => (record?.id ? '已记录' : ''),
         },
         {
           title: '类型',
@@ -767,15 +766,15 @@ export default function V1InventoryLedgerPage() {
           exportValue: (record) => directionText(record?.direction),
         },
         {
-          title: '对象',
-          exportTitle: '对象',
+          title: '存货类型',
+          exportTitle: '存货类型',
           dataIndex: 'subject_type',
           width: 110,
           render: subjectTypeTag,
           exportValue: (record) => subjectTypeText(record?.subject_type),
         },
         {
-          title: '对象',
+          title: '材料 / 产品',
           dataIndex: 'subject_id',
           width: 220,
           render: renderSubjectReference,
@@ -836,20 +835,20 @@ export default function V1InventoryLedgerPage() {
           exportValue: formatSourceDocumentRef,
         },
         {
-          title: '来源行关联',
+          title: '来源明细',
           dataIndex: 'source_line_id',
           width: 130,
-          render: (value) => relationRef('来源行', value),
+          render: (value) => relationRef('来源明细', value),
           exportValue: (record) =>
-            relationRef('来源行', record?.source_line_id),
+            relationRef('来源明细', record?.source_line_id),
         },
         {
-          title: '冲正关系',
+          title: '原库存变动记录',
           dataIndex: 'reversal_of_txn_id',
           width: 130,
-          render: (value) => relationRef('原流水', value),
+          render: (value) => relationRef('原库存变动记录', value),
           exportValue: (record) =>
-            relationRef('原流水', record?.reversal_of_txn_id),
+            relationRef('原库存变动记录', record?.reversal_of_txn_id),
         },
         {
           title: '发生时间',
@@ -872,15 +871,15 @@ export default function V1InventoryLedgerPage() {
         exportValue: (record) => (record?.id ? '已登记库存' : ''),
       },
       {
-        title: '对象',
-        exportTitle: '对象',
+        title: '存货类型',
+        exportTitle: '存货类型',
         dataIndex: 'subject_type',
         width: 110,
         render: subjectTypeTag,
         exportValue: (record) => subjectTypeText(record?.subject_type),
       },
       {
-        title: '对象',
+        title: '材料 / 产品',
         dataIndex: 'subject_id',
         width: 220,
         render: renderSubjectReference,
@@ -959,11 +958,11 @@ export default function V1InventoryLedgerPage() {
     })
   const exportRows = useCallback(() => {
     downloadBusinessListCSV({
-      filename: `inventory-${activeView}.csv`,
+      filename: `库存明细-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: visibleColumns,
       rows,
     })
-  }, [activeView, rows, visibleColumns])
+  }, [rows, visibleColumns])
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
@@ -1001,7 +1000,7 @@ export default function V1InventoryLedgerPage() {
       <PageHeaderCard
         compact
         title="库存台账"
-        description="按余额、批次、流水三种视图追溯库存；批次按仓库筛选只看当前有余额批次，历史发生记录进入流水视图追溯，本页只用于查询和追溯。"
+        description="可分别查看库存余额、库存批次和库存变动记录；按仓库筛选批次时只显示当前有余额的批次，历史变动请到库存变动记录中查询。本页只用于查询和追溯。"
         tags={[
           <Tag color="blue" key="balances">
             余额只读
@@ -1010,9 +1009,9 @@ export default function V1InventoryLedgerPage() {
             批次追溯
           </Tag>,
           <Tag color="green" key="txns">
-            流水审计
+            变动追溯
           </Tag>,
-          <Tag key="mode">不写入库存</Tag>,
+          <Tag key="mode">不会改变库存</Tag>,
         ]}
         stats={stats}
       />
@@ -1056,10 +1055,10 @@ export default function V1InventoryLedgerPage() {
               className="erp-business-filter-control--status"
               value={subjectID}
               options={[
-                { label: '全部具体对象', value: '' },
+                { label: '全部材料或产品', value: '' },
                 ...subjectOptions,
               ]}
-              placeholder={subjectType ? '全部具体对象' : '先选对象类型'}
+              placeholder={subjectType ? '全部材料或产品' : '先选存货类型'}
               disabled={!subjectType}
               showSearch
               optionFilterProp="label"
@@ -1203,7 +1202,7 @@ export default function V1InventoryLedgerPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedLabelFor(activeView, selectedRow)}
-          boundaryText="当前页只读；余额、批次和流水只用于查询 / 追溯，不提供库存写入、盘点调整、出库确认、批次状态变更或预留自动消耗。"
+          boundaryText="当前页仅供查询和追溯；不能在这里更改库存、进行盘点调整、确认出库、修改批次状态或自动扣减预留数量。"
         >
           <Button
             type="link"

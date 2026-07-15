@@ -637,7 +637,7 @@ export default function MobileTaskListScreen({
           </div>
           <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-xl bg-slate-50 px-3 py-3">
-              <div className="text-slate-500">账号角色</div>
+              <div className="text-slate-500">账号岗位</div>
               <div className="mt-1 min-w-0 break-words font-semibold text-slate-950">
                 {roleNames || '-'}
               </div>

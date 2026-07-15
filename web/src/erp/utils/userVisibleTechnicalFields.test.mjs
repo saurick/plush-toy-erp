@@ -1,10 +1,12 @@
 import assert from 'node:assert/strict'
 import { readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join, relative } from 'node:path'
+import { basename, dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 const rootDir = dirname(dirname(fileURLToPath(import.meta.url)))
+const projectRoot = resolve(rootDir, '../../..')
+const webSourceRoot = resolve(rootDir, '..')
 
 const scanDirs = ['pages', 'components', 'mobile'].map((dir) =>
   join(rootDir, dir)
@@ -25,6 +27,39 @@ const businessVisibleConfigFiles = [
   'config/businessModules.mjs',
   'config/devPrototypes.mjs',
 ].map((file) => join(rootDir, file))
+const formalVisibleConfigFiles = [
+  'config/businessModules.mjs',
+  'config/commandCenter.mjs',
+  'config/dashboardModules.mjs',
+  'config/printTemplates.mjs',
+  'config/seedData.mjs',
+].map((file) => join(rootDir, file))
+const formalVisibleUtilityFiles = [
+  'utils/businessDashboardContract.mjs',
+  'utils/financeBusinessSourceAction.mjs',
+  'utils/outsourcingOrderFactAction.mjs',
+  'utils/productionCompletionAction.mjs',
+  'utils/productionMaterialIssueAction.mjs',
+  'utils/productionOrderModel.mjs',
+  'utils/productionReworkAction.mjs',
+  'utils/purchaseReceiptMutation.mjs',
+  'utils/shipmentWeight.mjs',
+  'utils/sourceBusinessAction.mjs',
+].map((file) => join(rootDir, file))
+const formalOutsideErpVisibleDirs = [join(webSourceRoot, 'pages/AdminLogin')]
+const formalOutsideErpVisibleFiles = [
+  join(webSourceRoot, 'App.jsx'),
+  join(webSourceRoot, 'common/consts/brand.js'),
+  join(webSourceRoot, 'common/consts/errorCodes.js'),
+]
+const errorCodeVisibleFile = join(
+  webSourceRoot,
+  'common/consts/errorCodes.js'
+)
+const currentCustomerVisibleConfigFiles = [
+  'config/customers/yoyoosun/menuConfig.mjs',
+  'config/customers/yoyoosun/customer-config.example.js',
+].map((file) => join(projectRoot, file))
 const forbiddenUserVisibleText = [
   '幂等键',
   '内部引用',
@@ -69,9 +104,111 @@ const forbiddenBusinessSystemTimestampText = [
   '更新日期',
 ]
 const visibleStringAttributePattern =
-  /\b(?:label|placeholder|title|exportTitle|createLabel|description|aria-label|message)\s*(?:=|:)\s*(['"`])([^'"`]*?)\1/giu
+  /\b(?:label|shortLabel|title|shortTitle|placeholder|exportTitle|createLabel|description|summary|scene|layout|output|boundary|formBoundary|boundaryText|selectionBoundaryText|pageSummary|searchHint|hint|note|emptyText|panelDescription|emptyDescription|missingOwnerDescription|missingOwnerEmptyText|brandMark|companyName|systemName|aria-label|message)\s*(?:=|:)\s*(['"`])([^'"`]*?)\1/giu
 const technicalSnakeCasePattern =
   /\b(?:expected_version|idempotency_key|intent_hash|task_version|owner_role_key|task_status_key|source_type|source_id|source_line_id|payload|[a-z][a-z0-9]*_(?:id|key))\b/iu
+const visibleArrayPropertyPattern =
+  /\b(?:currentScope|helpNotes|notes|previewLines|tags)\s*:\s*\[([\s\S]*?)\]/giu
+const quotedStringPattern = /(['"`])([^'"`]*?)\1/gu
+const jsxTextPattern = />\s*([^<>{}]*[\u3400-\u9fff][^<>{}]*)\s*</gu
+const returnStringPattern = /\breturn\s+(['"`])([^'"`]*?)\1/gu
+const errorStringPattern =
+  /\b(?:new\s+)?(?:Error|TypeError)\s*\(\s*(['"`])([^'"`]*?)\1/gu
+const userFeedbackStringPattern =
+  /\bmessage\.(?:error|warning|success|info)\s*\(\s*(['"`])([^'"`]*?)\1/gu
+const actionErrorFallbackPattern =
+  /\bgetActionErrorMessage\s*\(\s*[^,\n]+,\s*(['"`])([^'"`]*?)\1/gu
+const userFacingErrorFallbackPattern =
+  /\bgetUserFacingErrorMessage\s*\(\s*[^,\n]+,\s*(['"`])([^'"`]*?)\1/gu
+const userStateFeedbackStringPattern =
+  /\bset(?:Error|SmsHint)\s*\(\s*(['"`])([^'"`]*?)\1/gu
+const brandConstantStringPattern =
+  /\b(?:ERP_BRAND_MARK|ERP_COMPANY_NAME|ERP_ADMIN_SYSTEM_NAME)\s*=\s*(['"`])([^'"`]*?)\1/gu
+const invalidFeedbackStringPattern =
+  /\b(?:invalidContract|invalidResponse|invalidSelection)\s*\(\s*(['"`])([^'"`]*?)\1/gu
+const invalidFeedbackDefaultPattern =
+  /\bfunction\s+(?:invalidContract|invalidResponse|invalidSelection)\s*\([^)]*=\s*(['"`])([^'"`]*?)\1/gu
+const mappedErrorMessagePattern =
+  /\[[^\]\n]+\]\s*:\s*(['"`])([^'"`]*?)\1/gu
+const formalFeedbackStringPatterns = Object.freeze([
+  returnStringPattern,
+  errorStringPattern,
+  userFeedbackStringPattern,
+  actionErrorFallbackPattern,
+  userFacingErrorFallbackPattern,
+  userStateFeedbackStringPattern,
+  brandConstantStringPattern,
+  invalidFeedbackStringPattern,
+  invalidFeedbackDefaultPattern,
+])
+const forbiddenFormalVisibleCopyPatterns = Object.freeze([
+  ['OUT', /\bOUT\b/u],
+  ['HOLD', /\bHOLD\b/u],
+  ['SHIPPED', /\bSHIPPED\b/u],
+  ['decimal', /\bdecimal\b/iu],
+  ['RBAC', /\bRBAC\b/iu],
+  ['Workflow', /\bWorkflow\b/iu],
+  ['Fact', /\bFact\b/iu],
+  ['业务源单', /业务源单/u],
+  ['事实记录', /事实记录/u],
+  ['对象族', /对象族/u],
+  ['数据口径', /数据口径/u],
+  ['业务口径', /业务口径/u],
+  ['权限码', /权限码/u],
+  ['运行态', /运行态/u],
+  ['投影', /投影/u],
+  ['上下文', /上下文/u],
+  ['泳道', /泳道/u],
+  ['服务端', /服务端/u],
+  ['Product Core', /Product Core/iu],
+  ['customer key', /customer key/iu],
+  ['客户运行态', /客户运行态/u],
+  ['控制面', /控制面/u],
+  ['主数据', /主数据/u],
+  ['协同任务', /协同任务/u],
+  ['业务事实', /业务事实/u],
+  ['财务事实', /财务事实/u],
+  ['业务对象', /业务对象/u],
+  ['核心对象', /核心对象/u],
+  ['对象类型', /对象类型/u],
+  ['关联对象', /关联对象/u],
+  ['当前结果', /当前结果/u],
+  ['责任角色', /责任角色/u],
+  ['SLA', /\bSLA\b/iu],
+  ['数据真源', /数据真源/u],
+  ['快照', /快照/u],
+  ['主链路', /主链路/u],
+  ['前端', /前端/u],
+  ['后端', /后端/u],
+  ['API', /\bAPI\b/u],
+  ['usecase', /\busecase\b/iu],
+  ['payload', /\bpayload\b/iu],
+  ['schema', /\bschema\b/iu],
+  ['runtime', /\bruntime\b/iu],
+  ['revision', /\brevision\b/iu],
+  ['fallback', /\bfallback\b/iu],
+  ['请求参数', /(?:请求|操作|批次)参数/u],
+  ['响应无效', /响应无效/u],
+  ['安全请求标识', /安全请求标识/u],
+  ['不允许的字段', /不允许的字段/u],
+  ['引用数据', /引用数据/u],
+  ['保留本次请求', /已保留本次请求/u],
+  ['使用原请求', /使用原请求核对|保留原请求/u],
+  ['写库存', /(?:不写|会写|才会写|并写|后写)库存/u],
+  ['写入库存', /写入库存|库存写入/u],
+  ['库存流水', /库存流水/u],
+  ['状态动作', /状态动作/u],
+  ['对应业务模块', /对应业务模块/u],
+  ['当前接入', /当前接入/u],
+  ['抽象对象称谓', /(?:加工|领料|返工|质检|检验)对象/u],
+  ['角色', /角色/u],
+  ['动作', /动作/u],
+  ['队列', /队列/u],
+  ['兜底', /兜底/u],
+  ['派生', /派生/u],
+  ['收口', /收口/u],
+  ['链路', /链路/u],
+])
 
 function isSourceFile(filePath) {
   return [...sourceExtensions].some((extension) => filePath.endsWith(extension))
@@ -89,6 +226,44 @@ function collectSourceFiles(dir) {
     }
     return [path]
   })
+}
+
+function isDevOnlySource(filePath) {
+  const relativePath = relative(rootDir, filePath).replaceAll('\\', '/')
+  return (
+    basename(filePath).startsWith('Dev') ||
+    relativePath.startsWith('config/dev') ||
+    relativePath.includes('/dev-only/')
+  )
+}
+
+function collectFormalVisibleText(
+  content,
+  { includeMappedErrorMessages = false } = {}
+) {
+  const visibleText = []
+  for (const match of content.matchAll(visibleStringAttributePattern)) {
+    visibleText.push(match[2])
+  }
+  for (const match of content.matchAll(visibleArrayPropertyPattern)) {
+    for (const stringMatch of match[1].matchAll(quotedStringPattern)) {
+      visibleText.push(stringMatch[2])
+    }
+  }
+  for (const match of content.matchAll(jsxTextPattern)) {
+    visibleText.push(match[1].replace(/\s+/gu, ' ').trim())
+  }
+  for (const pattern of formalFeedbackStringPatterns) {
+    for (const match of content.matchAll(pattern)) {
+      visibleText.push(match[2])
+    }
+  }
+  if (includeMappedErrorMessages) {
+    for (const match of content.matchAll(mappedErrorMessagePattern)) {
+      visibleText.push(match[2])
+    }
+  }
+  return visibleText.filter(Boolean)
 }
 
 test('业务前端页面不暴露技术实现字段文案', () => {
@@ -115,6 +290,93 @@ test('业务前端页面不暴露技术实现字段文案', () => {
   }
 
   assert.deepEqual(violations, [])
+})
+
+test('正式页面可见文案不暴露开发实现和分析口径术语', () => {
+  const files = new Set([
+    ...formalVisibleConfigFiles,
+    ...formalVisibleUtilityFiles,
+    ...formalOutsideErpVisibleFiles,
+    ...currentCustomerVisibleConfigFiles,
+    ...scanFiles,
+  ])
+  for (const dir of [...scanDirs, ...formalOutsideErpVisibleDirs]) {
+    if (!statSync(dir, { throwIfNoEntry: false })?.isDirectory()) continue
+    for (const filePath of collectSourceFiles(dir)) {
+      if (!isDevOnlySource(filePath)) files.add(filePath)
+    }
+  }
+
+  const violations = []
+  for (const filePath of files) {
+    if (!statSync(filePath, { throwIfNoEntry: false })?.isFile()) continue
+    const content = readFileSync(filePath, 'utf8')
+    for (const visibleText of
+      collectFormalVisibleText(content, {
+        includeMappedErrorMessages: filePath === errorCodeVisibleFile,
+      })) {
+      for (const [term, pattern] of forbiddenFormalVisibleCopyPatterns) {
+        if (pattern.test(visibleText)) {
+          violations.push(
+            `${relative(rootDir, filePath)}: ${term} -> ${visibleText}`
+          )
+        }
+      }
+    }
+  }
+
+  assert.deepEqual(violations, [])
+})
+
+test('正式文案扫描覆盖外层入口、异常反馈和当前客户配置', () => {
+  const sample = `
+    function fallback() { return '业务看板响应无效' }
+    const first = new Error('当前浏览器无法生成安全请求标识')
+    message.warning('已保留本次请求，请使用相同内容重试')
+    message.error(getActionErrorMessage(error, '加载库存引用数据'))
+    setError('后台响应无效，请稍后重试')
+    getUserFacingErrorMessage(error, '登录接口暂时不可用')
+    const ERP_COMPANY_NAME = 'Product Core 运行态品牌'
+    function invalidContract(message = '完工入库请求参数无效') {}
+    throw invalidContract('完工入库请求包含不允许的字段')
+    const messages = { [RpcErrorCode.INTERNAL]: '服务器运行时异常' }
+  `
+  const visibleText = collectFormalVisibleText(sample, {
+    includeMappedErrorMessages: true,
+  })
+
+  for (const expected of [
+    '业务看板响应无效',
+    '当前浏览器无法生成安全请求标识',
+    '已保留本次请求，请使用相同内容重试',
+    '加载库存引用数据',
+    '后台响应无效，请稍后重试',
+    '登录接口暂时不可用',
+    'Product Core 运行态品牌',
+    '完工入库请求参数无效',
+    '完工入库请求包含不允许的字段',
+    '服务器运行时异常',
+  ]) {
+    assert.ok(visibleText.includes(expected), `未扫描到：${expected}`)
+  }
+  for (const customerConfigFile of currentCustomerVisibleConfigFiles) {
+    assert.ok(
+      statSync(customerConfigFile, { throwIfNoEntry: false })?.isFile(),
+      `缺少当前客户可见配置：${relative(projectRoot, customerConfigFile)}`
+    )
+  }
+  for (const filePath of formalOutsideErpVisibleFiles) {
+    assert.ok(
+      statSync(filePath, { throwIfNoEntry: false })?.isFile(),
+      `缺少外层可见文案文件：${relative(webSourceRoot, filePath)}`
+    )
+  }
+  for (const dir of formalOutsideErpVisibleDirs) {
+    assert.ok(
+      statSync(dir, { throwIfNoEntry: false })?.isDirectory(),
+      `缺少外层可见文案目录：${relative(webSourceRoot, dir)}`
+    )
+  }
 })
 
 test('业务事实选中标签不把内部 ID 当业务编号 fallback', () => {
@@ -276,7 +538,7 @@ test('业务事实对象和往来方列不把内部 ID 当排序或导出值', (
   assert.match(pageConfig, /const SUBJECT_TYPE_LABELS/u)
   assert.match(
     pageConfig,
-    /SUBJECT_TYPE_LABELS\[record\.subject_type\]\s*\|\|\s*'业务对象'/u
+    /SUBJECT_TYPE_LABELS\[record\.subject_type\]\s*\|\|\s*'业务记录'/u
   )
   assert.doesNotMatch(
     pageConfig,
@@ -330,13 +592,18 @@ test('权限中心角色展示不把 role_key 当用户可见 fallback', () => {
   assert.match(content, /function getRoleVisibleName/u)
   assert.match(
     content,
-    /getRoleDisplayName\(getRoleKey\(role\), '已配置角色'\)/u
+    /getRoleDisplayName\(getRoleKey\(role\), '已配置岗位'\)/u
   )
   assert.doesNotMatch(content, /role\.name\s*\|\|\s*getRoleKey\(role\)/u)
   assert.doesNotMatch(content, /role\.name\s*\|\|\s*roleKey/u)
   assert.doesNotMatch(content, /selectedRole\.name\s*\|\|\s*selectedRoleKey/u)
   assert.doesNotMatch(content, /<Text type="secondary">\{roleKey\}<\/Text>/u)
   assert.doesNotMatch(content, /<Tag>\{selectedRoleKey\}<\/Tag>/u)
+  assert.match(
+    content,
+    /该岗位决定可使用的页面、手机待办和业务操作/u
+  )
+  assert.doesNotMatch(content, /岗位任务端/u)
 })
 
 test('权限中心权限名称不把 permission key 当用户可见 fallback', () => {
@@ -344,13 +611,13 @@ test('权限中心权限名称不把 permission key 当用户可见 fallback', (
   const content = readFileSync(filePath, 'utf8')
 
   assert.match(content, /function getPermissionVisibleName/u)
-  assert.match(content, /return name \|\| '未登记权限'/u)
+  assert.match(content, /return name \|\| '其他功能'/u)
   assert.doesNotMatch(content, /label:\s*permission\.name \|\| permissionKey/u)
   assert.doesNotMatch(content, /erp-permission-option__key/u)
   assert.doesNotMatch(content, /搜索权限码/u)
   assert.doesNotMatch(content, /搜索管理员账号、手机号、角色或权限码/u)
   assert.doesNotMatch(content, /角色名称可按岗位调整，职责权限保持统一/u)
-  assert.match(content, /搜索功能名称或业务模块/u)
+  assert.match(content, /搜索功能名称或业务分类/u)
   assert.match(
     content,
     /const ASSIGN_USER_ROLE_PERMISSION = 'system\.user\.role\.assign'/u
@@ -640,9 +907,9 @@ test('库存台账引用列不把内部 ID 当来源单号或对象编号 fallba
   assert.match(content, /function canOpenSourceDocument/u)
   assert.match(
     content,
-    /linkedBusinessRef\(\s*subjectTypeText\(record\?\.subject_type\) \|\| '对象'/u
+    /linkedBusinessRef\(\s*subjectTypeText\(record\?\.subject_type\) \|\| '存货'/u
   )
-  assert.match(content, /relationRef\('来源行', record\?\.source_line_id\)/u)
+  assert.match(content, /relationRef\('来源明细', record\?\.source_line_id\)/u)
 })
 
 test('库存台账按真实 SKU grain 查询并区分未分规格库存', () => {
@@ -903,14 +1170,14 @@ test('正式业务边界文案不展示后端实现术语', () => {
   }
 
   for (const readableText of [
-    '账号通过角色获得对应的菜单',
+    '根据已选功能预览这个岗位可进入的页面',
     '系统按业务规则',
     '正式业务记录',
-    '系统过账 / 冲正',
+    '系统过账 / 撤销调整',
     '业务单据：加工合同',
     '实际出货记录',
     '库存出库记录',
-    '协同任务：入库跟进',
+    '待办任务：入库跟进',
     '入库单：正式入库记录',
     '本页只用于查询和追溯',
     '单据客户名称',
@@ -961,9 +1228,9 @@ test('出货和入库正式页头不展示底层表名或状态 key', () => {
   }
   for (const readablePurchaseReceiptHeaderText of [
     '入库管理维护采购入库草稿和明细',
-    '协同任务：入库跟进',
+    '待办任务：入库跟进',
     '入库单：正式入库记录',
-    '过账后写库存流水',
+    '过账后更新库存记录',
   ]) {
     assert.match(
       purchaseReceiptPageContent,
@@ -995,7 +1262,7 @@ test('正式质量页和业务模块文案不暴露内部表名', () => {
   }
 
   for (const readableQualityHeaderText of [
-    '质量检验统一承接采购来料',
+    '质量检验用于处理采购来料',
     '已提交：批次冻结',
     '通过：批次可用',
     '不合格：批次不可用',
@@ -1161,29 +1428,32 @@ test('审计日志页使用业务可读摘要，不展示原始事件结构', ()
     content,
     /return isTechnicalAuditValueKey\(key\) \? '已记录' : String\(value\)/u
   )
-  assert.match(content, /变化摘要和下一步/u)
-  assert.match(content, /placeholder="操作者、对象、动作或摘要"/u)
+  assert.match(content, /<Text type="secondary">下一步<\/Text>/u)
+  assert.match(
+    content,
+    /placeholder="操作人、相关账号或岗位、操作类型或说明"/u
+  )
   assert.match(content, /<span>\{meta\.label\}<\/span>/u)
   assert.match(content, /event\.target_label \|\| event\.target_name/u)
   assert.match(content, /fieldLabelMap\[key\] \|\| '字段变更'/u)
   assert.match(content, /return '已记录'/u)
 })
 
-test('后台布局角色标签不把 role key 当用户可见文案', () => {
+test('后台布局岗位标签不把 role key 当用户可见文案', () => {
   const filePath = join(rootDir, 'components/ERPLayout.jsx')
   const content = readFileSync(filePath, 'utf8')
 
   assert.match(content, /role\?\.name \|\|/u)
-  assert.match(content, /'已配置角色'/u)
+  assert.match(content, /'已配置岗位'/u)
   assert.doesNotMatch(content, /role\?\.name \|\| role\?\.role_key/u)
   assert.doesNotMatch(content, /role\?\.name \|\| role\?\.key/u)
 })
 
-test('角色展示 helper 默认不把未知 role key 当用户可见 fallback', () => {
+test('岗位展示 helper 默认不把未知 role key 当用户可见 fallback', () => {
   const filePath = join(rootDir, 'utils/roleKeys.mjs')
   const content = readFileSync(filePath, 'utf8')
 
-  assert.match(content, /return normalized \? '已配置角色' : ''/u)
+  assert.match(content, /return normalized \? '已配置岗位' : ''/u)
   assert.doesNotMatch(content, /fallback \|\| normalized/u)
 })
 
@@ -1329,7 +1599,7 @@ test('权限中心模块标签不把未知 module key 当可见 fallback', () =>
     'utf8'
   )
 
-  assert.match(content, /return label \|\| '未登记权限模块'/u)
+  assert.match(content, /return label \|\| '其他功能'/u)
   assert.doesNotMatch(content, /\$\{normalizedKey\}/u)
   assert.doesNotMatch(content, /:\s*normalizedKey/u)
 })
@@ -1473,7 +1743,7 @@ test('业务状态和类型列不把未知枚举 raw key 作为用户可见 fall
     '发票类别',
     '对象',
     '批次状态',
-    '库存流水',
+    '库存变动',
     '入库状态',
     'BOM 状态',
     '质检状态',
@@ -1549,10 +1819,10 @@ test('加工合同打印追溯不把底层 type 和内部 ID 当可见备注', (
     content,
     /PROCESSING_FACT_TYPE_LABELS\[factType\] \|\| '业务来源已关联'/u
   )
-  assert.match(content, /subjectNo \|\| '加工对象已关联'/u)
+  assert.match(content, /subjectNo \|\| '已关联'/u)
   assert.match(content, /sourceNo \|\| '来源单据已关联'/u)
   assert.match(content, /业务来源:/u)
-  assert.match(content, /加工对象:/u)
+  assert.match(content, /产品 \/ 材料：/u)
   assert.match(content, /来源单据:/u)
 })
 

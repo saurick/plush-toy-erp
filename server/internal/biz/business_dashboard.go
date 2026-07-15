@@ -2,6 +2,6 @@ package biz
 
 type BusinessDashboardModuleStats struct {
 	ModuleKey    string
+	Available    bool
 	TotalRecords int
-	StatusCounts map[string]int
 }

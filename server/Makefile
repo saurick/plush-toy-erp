@@ -161,6 +161,14 @@ print_db_url:
 seed_role_demo_admins:
 	go run ./cmd/seed-role-demo-admins -conf ./configs/dev/config.yaml
 
+.PHONY: reset_local_admin_password
+# 只修复登记开发库中的稳定管理员；显式 APP_ADMIN_* 会覆盖本地默认值。
+reset_local_admin_password:
+	@username="$${APP_ADMIN_USERNAME:-admin}"; \
+	go run ./cmd/reset-local-admin-password \
+		-conf ./configs/dev/config.yaml \
+		-confirm "RESET_LOCAL_ADMIN_PASSWORD:$$username"
+
 .PHONY: migrate_status
 migrate_status:
 	@URL=$$(go run ./cmd/dburl -conf ./configs/dev/config.yaml); \
@@ -252,9 +260,13 @@ purchase_receipt_pg_dropdb:
 	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh dropdb
 
 # Reuse the guarded local transactional test database for workflow terminal-race tests.
-.PHONY: workflow_pg_test critical_transactions_pg_test
+.PHONY: workflow_pg_test populated_upgrade_pg_test critical_transactions_pg_test
 workflow_pg_test:
 	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test-workflow
+
+# Exercise a real populated history checkpoint in a unique disposable database.
+populated_upgrade_pg_test:
+	@PURCHASE_RECEIPT_PG_DB_URL="$(PURCHASE_RECEIPT_PG_DB_URL)" bash ../scripts/purchase-receipt-pg.sh test-populated-upgrade
 
 # Mandatory transaction/concurrency gate for Source Documents, purchase receipts,
 # receipt adjustments, source-driven production/outsourcing/quality/finance facts,
@@ -318,11 +330,17 @@ dev_build:
 	@echo ">>> building $(DEV_BIN) from $(MAIN_PKG)"
 	@go build -ldflags "-X main.Version=$(VERSION)" -o $(DEV_BIN) $(MAIN_PKG)
 
-.PHONY: run
+.PHONY: run run_yoyoosun
 # run dev binary (stable path)
+run: export ERP_CUSTOMER_KEY ?= yoyoosun
+run: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 run: dev_preflight dev_build
 	@echo ">>> running: $(DEV_BIN) $(ARGS)"
 	@$(DEV_BIN) $(ARGS)
+
+# run the local backend with the stable yoyoosun customer context.
+run_yoyoosun: export ERP_CUSTOMER_KEY := yoyoosun
+run_yoyoosun: run
 
 .PHONY: dev
 # alias of run
@@ -358,13 +376,19 @@ dev_stop:
 		fi; \
 	done
 
-.PHONY: dev_restart
+.PHONY: dev_restart dev_restart_yoyoosun
 # restart local dev binary after clearing stale listeners
+dev_restart: export ERP_CUSTOMER_KEY ?= yoyoosun
+dev_restart: export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1
 dev_restart: dev_preflight
 	@$(MAKE) dev_stop
 	@$(MAKE) dev_build
 	@echo ">>> running: $(DEV_BIN) $(ARGS)"
 	@$(DEV_BIN) $(ARGS)
+
+# restart the local backend with the stable yoyoosun customer context.
+dev_restart_yoyoosun: export ERP_CUSTOMER_KEY := yoyoosun
+dev_restart_yoyoosun: dev_restart
 
 .PHONY: clean_dev
 # clean dev binary

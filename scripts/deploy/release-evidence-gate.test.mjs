@@ -307,6 +307,54 @@ function writeCustomerConfigManifestEvidence(
   );
 }
 
+function setMigrationEvidenceRange(dir, migrationBefore, migrationAfter) {
+  const releasePath = path.join(dir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace(
+        "migrationBefore | 20260601000000",
+        `migrationBefore | ${migrationBefore}`,
+      )
+      .replace(
+        "migrationAfter | 20260616000000",
+        `migrationAfter | ${migrationAfter}`,
+      ),
+  );
+
+  const backupPath = path.join(dir, "backup-evidence.md");
+  fs.writeFileSync(
+    backupPath,
+    fs
+      .readFileSync(backupPath, "utf8")
+      .replace(
+        "migrationVersion | 20260601000000",
+        `migrationVersion | ${migrationBefore}`,
+      ),
+  );
+
+  const restorePath = path.join(dir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.backup.migrationVersion = migrationBefore;
+  restoreReport.restore.migrationBeforeApply = migrationBefore;
+  restoreReport.restore.restoreMigrationVersion = migrationAfter;
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status-before-apply.txt"),
+    `Current Version: ${migrationBefore}\nPending Files: 1\n`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "artifacts/migration-status.txt"),
+    `Current Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+  fs.writeFileSync(
+    path.join(dir, "migration-status.txt"),
+    `Migration Status: OK\nCurrent Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+}
+
 test("release evidence gate accepts filled yoyoosun evidence", () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "release-evidence-gate-"));
   const evidenceDir = path.join(
@@ -436,6 +484,61 @@ test("release evidence gate rejects invalid release image digest", () => {
       }),
     /release-evidence\.md serverImageDigest must be sha256:<64-hex>/,
   );
+});
+
+test("release evidence gate rejects malformed and descending migration versions", () => {
+  for (const [name, before, after, expected] of [
+    [
+      "malformed-before",
+      "2026-06-01",
+      "20260616000000",
+      /migrationBefore must be a 14-digit Atlas version/,
+    ],
+    [
+      "malformed-after",
+      "20260601000000",
+      "latest",
+      /migrationAfter must be a 14-digit Atlas version/,
+    ],
+    [
+      "descending",
+      "20260616000000",
+      "20260601000000",
+      /migrationBefore must not be newer than migrationAfter/,
+    ],
+  ]) {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), `release-evidence-gate-${name}-`),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    const releasePath = path.join(evidenceDir, "release-evidence.md");
+    fs.writeFileSync(
+      releasePath,
+      fs
+        .readFileSync(releasePath, "utf8")
+        .replace(
+          "| migrationBefore | 20260601000000 |",
+          `| migrationBefore | ${before} |`,
+        )
+        .replace(
+          "| migrationAfter | 20260616000000 |",
+          `| migrationAfter | ${after} |`,
+        ),
+    );
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expected,
+    );
+  }
 });
 
 test("release evidence gate rejects missing production preflight report", () => {
@@ -927,6 +1030,234 @@ test("release evidence gate rejects missing restore rehearsal success", () => {
       }),
     /summary\.restoreCompleted must be true/,
   );
+});
+
+test("release evidence gate requires populated upgrade audit when migration crosses 20260714055504", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-populated-upgrade-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  const migrationBefore = "20260710150001";
+  const migrationAfter = "20260714055504";
+  writeValidEvidence(evidenceDir);
+
+  const releasePath = path.join(evidenceDir, "release-evidence.md");
+  fs.writeFileSync(
+    releasePath,
+    fs
+      .readFileSync(releasePath, "utf8")
+      .replace(
+        "migrationBefore | 20260601000000",
+        `migrationBefore | ${migrationBefore}`,
+      )
+      .replace(
+        "migrationAfter | 20260616000000",
+        `migrationAfter | ${migrationAfter}`,
+      ),
+  );
+  const backupPath = path.join(evidenceDir, "backup-evidence.md");
+  fs.writeFileSync(
+    backupPath,
+    fs
+      .readFileSync(backupPath, "utf8")
+      .replace(
+        "migrationVersion | 20260601000000",
+        `migrationVersion | ${migrationBefore}`,
+      ),
+  );
+  const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+  const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+  restoreReport.backup.migrationVersion = migrationBefore;
+  restoreReport.restore.migrationBeforeApply = migrationBefore;
+  restoreReport.restore.restoreMigrationVersion = migrationAfter;
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/migration-status-before-apply.txt"),
+    `Current Version: ${migrationBefore}\nPending Files: 1\n`,
+  );
+  fs.writeFileSync(
+    path.join(evidenceDir, "artifacts/migration-status.txt"),
+    `Current Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+  fs.writeFileSync(
+    path.join(evidenceDir, "migration-status.txt"),
+    `Migration Status: OK\nCurrent Version: ${migrationAfter}\nPending Files: 0\n`,
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /restore\.populatedUpgradeAuditStatus must be passed/,
+  );
+
+  restoreReport.restore.populatedUpgradeAuditStatus = "passed";
+  restoreReport.summary.populatedUpgradeAuditStatus = "passed";
+  fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+  const commandSummaryPath = path.join(
+    evidenceDir,
+    "artifacts/command-summary.txt",
+  );
+  fs.writeFileSync(
+    commandSummaryPath,
+    fs
+      .readFileSync(commandSummaryPath, "utf8")
+      .replace(
+        "steps=pg_dump",
+        "populatedUpgradeAuditStatus=passed\nsteps=populated upgrade read-only audit -> pg_dump",
+      ),
+  );
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /backup-evidence\.md populatedUpgradeAuditStatus must be passed/,
+  );
+
+  fs.appendFileSync(backupPath, "| populatedUpgradeAuditStatus | passed |\n");
+
+  assert.doesNotThrow(() =>
+    validateReleaseEvidenceGate({
+      repoRoot: root,
+      evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+    }),
+  );
+});
+
+test("release evidence gate requires every customer config cutover audit surface when migration crosses 20260714055825", () => {
+  const mutations = [
+    {
+      name: "backup-evidence",
+      expected:
+        /backup-evidence\.md customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "backup-evidence.md");
+        fs.writeFileSync(
+          file,
+          fs
+            .readFileSync(file, "utf8")
+            .replace(
+              "| customerConfigCutoverAuditStatus | passed |",
+              "| customerConfigCutoverAuditStatus | failed |",
+            ),
+        );
+      },
+    },
+    {
+      name: "restore-report",
+      expected: /restore\.customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "backup-restore-report.json");
+        const report = JSON.parse(fs.readFileSync(file, "utf8"));
+        delete report.restore.customerConfigCutoverAuditStatus;
+        fs.writeFileSync(file, JSON.stringify(report, null, 2));
+      },
+    },
+    {
+      name: "summary-report",
+      expected: /summary\.customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "backup-restore-report.json");
+        const report = JSON.parse(fs.readFileSync(file, "utf8"));
+        report.summary.customerConfigCutoverAuditStatus = "failed";
+        fs.writeFileSync(file, JSON.stringify(report, null, 2));
+      },
+    },
+    {
+      name: "command-summary-status",
+      expected:
+        /artifacts\.commandSummary customerConfigCutoverAuditStatus must be passed/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "artifacts/command-summary.txt");
+        fs.writeFileSync(
+          file,
+          fs
+            .readFileSync(file, "utf8")
+            .replace(
+              "customerConfigCutoverAuditStatus=passed",
+              "customerConfigCutoverAuditStatus=failed",
+            ),
+        );
+      },
+    },
+    {
+      name: "command-summary-step",
+      expected: /steps must mention customer config cutover read-only audit/,
+      mutate(evidenceDir) {
+        const file = path.join(evidenceDir, "artifacts/command-summary.txt");
+        fs.writeFileSync(
+          file,
+          fs
+            .readFileSync(file, "utf8")
+            .replace(
+              "customer config cutover read-only audit",
+              "customer config cutover unavailable",
+            ),
+        );
+      },
+    },
+  ];
+
+  for (const { name, expected, mutate } of mutations) {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), `release-evidence-gate-cutover-${name}-`),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    setMigrationEvidenceRange(evidenceDir, "20260714055504", "20260714055825");
+
+    fs.appendFileSync(
+      path.join(evidenceDir, "backup-evidence.md"),
+      "| customerConfigCutoverAuditStatus | passed |\n",
+    );
+    const restorePath = path.join(evidenceDir, "backup-restore-report.json");
+    const restoreReport = JSON.parse(fs.readFileSync(restorePath, "utf8"));
+    restoreReport.restore.customerConfigCutoverAuditStatus = "passed";
+    restoreReport.summary.customerConfigCutoverAuditStatus = "passed";
+    fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
+    const commandSummaryPath = path.join(
+      evidenceDir,
+      "artifacts/command-summary.txt",
+    );
+    fs.writeFileSync(
+      commandSummaryPath,
+      fs
+        .readFileSync(commandSummaryPath, "utf8")
+        .replace(
+          "steps=pg_dump",
+          "customerConfigCutoverAuditStatus=passed\nsteps=customer config cutover read-only audit -> pg_dump",
+        ),
+    );
+
+    assert.doesNotThrow(() =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    );
+
+    mutate(evidenceDir);
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expected,
+    );
+  }
 });
 
 test("release evidence gate rejects invalid backup evidence time", () => {

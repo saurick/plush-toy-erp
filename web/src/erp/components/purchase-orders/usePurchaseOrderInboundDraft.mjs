@@ -121,7 +121,7 @@ export function usePurchaseOrderInboundDraft({
         : isPurchaseReceiptMutationResultUnknown(error)
       if (retained) {
         message.warning(
-          '入库草稿生成结果尚未确认，系统将使用原请求核对，请不要重复生成。'
+          '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
         )
       } else {
         message.error(getActionErrorMessage(error, '生成采购入库草稿失败'))

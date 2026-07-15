@@ -54,16 +54,23 @@ function getPreferredColumnOrder({
   localOrder,
 }) {
   applyEffectiveFieldPolicyFlags({ adminProfile, moduleKey, columns })
+  const orderableColumns = columns.filter((column) => column?.hidden !== true)
   if (Array.isArray(localOrder)) {
-    return sanitizeModuleColumnOrder(localOrder, columns)
+    return sanitizeModuleColumnOrder(localOrder, orderableColumns)
   }
 
   const accountOrder = adminProfile?.erp_preferences?.column_orders?.[moduleKey]
-  const sanitizedAccountOrder = sanitizeModuleColumnOrder(accountOrder, columns)
+  const sanitizedAccountOrder = sanitizeModuleColumnOrder(
+    accountOrder,
+    orderableColumns
+  )
   if (sanitizedAccountOrder.length > 0) {
     return sanitizedAccountOrder
   }
-  return sanitizeModuleColumnOrder(readStoredColumnOrder(moduleKey), columns)
+  return sanitizeModuleColumnOrder(
+    readStoredColumnOrder(moduleKey),
+    orderableColumns
+  )
 }
 
 function csvEscape(value) {
@@ -125,6 +132,10 @@ export function useBusinessColumnOrder({
   const [localOrder, setLocalOrder] = useState(null)
   const [panelOpen, setPanelOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const orderableColumns = useMemo(
+    () => normalizedColumns.filter((column) => column?.hidden !== true),
+    [normalizedColumns]
+  )
 
   const effectiveOrder = useMemo(
     () =>
@@ -138,15 +149,31 @@ export function useBusinessColumnOrder({
   )
 
   const visibleColumns = useMemo(
-    () => applyModuleColumnOrder(normalizedColumns, effectiveOrder),
-    [effectiveOrder, normalizedColumns]
+    () => applyModuleColumnOrder(orderableColumns, effectiveOrder),
+    [effectiveOrder, orderableColumns]
   )
+
+  const exportColumns = useMemo(() => {
+    applyEffectiveFieldPolicyFlags({
+      adminProfile,
+      moduleKey,
+      columns: normalizedColumns,
+    })
+    return [
+      ...visibleColumns,
+      ...normalizedColumns.filter(
+        (column) =>
+          column?.hidden === true &&
+          column?.hiddenByEffectiveFieldPolicy !== true
+      ),
+    ]
+  }, [adminProfile, moduleKey, normalizedColumns, visibleColumns])
 
   const persistColumnOrder = useCallback(
     async (nextOrder) => {
       const sanitizedOrder = sanitizeModuleColumnOrder(
         nextOrder,
-        normalizedColumns
+        orderableColumns
       )
       writeStoredColumnOrder(moduleKey, sanitizedOrder)
       setLocalOrder(sanitizedOrder)
@@ -170,7 +197,7 @@ export function useBusinessColumnOrder({
         setSaving(false)
       }
     },
-    [moduleKey, normalizedColumns]
+    [moduleKey, orderableColumns]
   )
 
   const tableColumns = useMemo(
@@ -180,7 +207,7 @@ export function useBusinessColumnOrder({
         title: (
           <ColumnOrderHeaderMenu
             column={column}
-            columns={normalizedColumns}
+            columns={orderableColumns}
             order={effectiveOrder}
             saving={saving}
             onChange={persistColumnOrder}
@@ -190,7 +217,7 @@ export function useBusinessColumnOrder({
       })),
     [
       effectiveOrder,
-      normalizedColumns,
+      orderableColumns,
       persistColumnOrder,
       saving,
       visibleColumns,
@@ -199,6 +226,7 @@ export function useBusinessColumnOrder({
 
   return {
     effectiveOrder,
+    exportColumns,
     saving,
     visibleColumns,
     tableColumns,
@@ -206,7 +234,7 @@ export function useBusinessColumnOrder({
     columnOrderModal: (
       <ColumnOrderModal
         open={panelOpen}
-        columns={normalizedColumns}
+        columns={orderableColumns}
         order={effectiveOrder}
         saving={saving}
         moduleTitle={moduleTitle}

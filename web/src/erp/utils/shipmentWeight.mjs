@@ -157,7 +157,7 @@ function recordByID(records, id) {
 }
 
 function invalidShipmentWeightReferenceResponse() {
-  const error = new Error('服务器返回的产品净重引用数据不完整，请刷新后重试')
+  const error = new Error('产品净重资料不完整，请刷新后重试')
   error.isInvalidResponse = true
   return error
 }

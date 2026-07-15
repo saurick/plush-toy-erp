@@ -322,7 +322,7 @@ test("mobile workflow runtime browser smoke input template is no-write", () => {
     template.simulatedTaskPlanSummary.some(
       (item) =>
         item.ownerRole === "仓库" &&
-        item.taskGroupLabel === "采购入库协同" &&
+        item.taskGroupLabel === "采购入库" &&
         item.actionLabel === "完成采购入库任务" &&
         item.simulatedOnly === true,
     ),
@@ -331,7 +331,7 @@ test("mobile workflow runtime browser smoke input template is no-write", () => {
     template.simulatedTaskPlanSummary.some(
       (item) =>
         item.ownerRole === "品质" &&
-        item.taskGroupLabel === "成品质检协同" &&
+        item.taskGroupLabel === "成品质检" &&
         item.actionLabel === "完成成品质检任务" &&
         item.simulatedOnly === true,
     ),
@@ -866,15 +866,15 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
       ["boss-block", "老板", "销售订单受理", "已阻塞", "标记阻塞"],
       ["boss-complete", "老板", "销售订单受理", "已完成", "完成任务"],
       ["boss-reject", "老板", "销售订单受理", "已退回", "退回任务"],
-      ["quality-complete", "品质", "成品质检协同", "已完成", "完成任务"],
+      ["quality-complete", "品质", "成品质检", "已完成", "完成任务"],
       [
         "warehouse-inbound-complete",
         "仓库",
-        "采购入库协同",
+        "采购入库",
         "已完成",
         "完成任务",
       ],
-      ["warehouse-urge", "仓库", "出货放行协同", "待处理", "催办协同"],
+      ["warehouse-urge", "仓库", "出货放行", "待处理", "催办协同"],
     ],
   );
   assert.doesNotMatch(serialized, /Bearer/u);

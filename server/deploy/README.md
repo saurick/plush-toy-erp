@@ -4,7 +4,9 @@
 
 部署构建边界：目标服务器配置较低，只负责加载已构建镜像、启动 Compose、执行 migration 和部署后检查；服务端/前端镜像必须先在本地或 CI 构建完成，再上传到服务器。不要在服务器上执行 `docker build`、`pnpm build`、`go build`、`make build_server` 等重构建步骤。
 
-Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/bin/atlas`。不要拉起 `arigaio/atlas:*` 临时容器，也不要把 Atlas 增加到 Compose；迁移脚本应使用宿主机可达的 PostgreSQL 端口，并在同一个私有 `flock /run/lock/plush-toy-erp/atlas-migrate.lock` 锁内完成 `status -> dry-run -> apply`，避免并发发布在步骤之间穿插。
+Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/bin/atlas`。不要拉起 `arigaio/atlas:*` 临时容器，也不要把 Atlas 增加到 Compose；迁移脚本应使用宿主机可达的 PostgreSQL 端口，并在同一个私有 `flock /run/lock/plush-toy-erp/atlas-migrate.lock` 锁内完成 `status -> 20260714055504 存量升级只读审计 -> 20260714055825 客户配置切换只读审计 -> dry-run -> apply`，避免并发发布在步骤之间穿插。`--status-only` 只查看状态，不执行后续步骤。
+
+升级链跨越 `20260714055504` 或 `20260714055825` 时，必须在 apply 前分别通过 `scripts/qa/populated-upgrade-preflight.sh --audit populated-upgrade` 和 `--audit customer-config-cutover`。两项审计只读检查现存行，不执行 migration，也不自动 `INSERT / UPDATE / DELETE`；发现阻断数据后应停止发布，按单独评审的人工治理方案处理并保留审计与回滚证据。fresh schema、静态 DDL 或空库 Atlas 通过只能证明迁移链可执行，不能替代 populated upgrade 证据；备份恢复演练也必须在 restored DB 上先审计、再 apply。
 
 ## 目录职责
 
@@ -42,7 +44,7 @@ Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/
 - `ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false`
 - 任何默认 JWT 密钥；新库首次初始化 bootstrap 管理员时再临时注入 `APP_ADMIN_PASSWORD`
 
-说明：生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder，并拒绝 SMS mock、未显式关闭的 debug seed、按 run cleanup 和全量业务清空。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。
+说明：生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder，拒绝已知本地开发默认密码，并拒绝 SMS mock、未显式关闭的 debug seed、按 run cleanup 和全量业务清空。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。
 
 建议先执行：
 

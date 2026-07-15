@@ -95,7 +95,7 @@ const EXCEPTION_FLOW_STEPS = Object.freeze([
   {
     key: 'assign',
     title: '责任分派',
-    description: '按责任角色或具体负责人接收。',
+    description: '按负责岗位或具体负责人接收。',
   },
   {
     key: 'follow',
@@ -105,12 +105,12 @@ const EXCEPTION_FLOW_STEPS = Object.freeze([
   {
     key: 'verify',
     title: '验证恢复',
-    description: '确认协同任务可以继续推进。',
+    description: '确认任务可以继续推进。',
   },
   {
     key: 'close',
     title: '关闭归档',
-    description: '只关闭当前协同异常，不会改变相关业务记录。',
+    description: '只关闭当前异常任务，不会改变相关业务记录。',
   },
 ])
 
@@ -141,58 +141,58 @@ function scrollTaskBoardLanesToStart(lanesElement) {
 
 const PRODUCT_CORE_METRICS = Object.freeze([
   {
-    label: '业务内核',
+    label: '业务功能',
     value: '11',
-    note: '主数据、销售、采购、BOM、库存、质检、出货、财务等核心域',
+    note: '基础资料、销售、采购、物料清单、库存、质检、出货和财务',
   },
   {
-    label: '控制面',
+    label: '系统设置',
     value: '4',
-    note: '权限、审计、打印模板、客户配置发布门禁',
+    note: '员工权限、操作记录、打印模板和客户业务设置',
   },
   {
-    label: '客户运行态',
-    value: '隔离',
-    note: '无 customer key 不读取客户订单、库存、Workflow 或财务事实',
+    label: '业务数据',
+    value: '未连接',
+    note: '当前不读取客户订单、库存、待办任务或财务记录',
   },
 ])
 
 const PRODUCT_CORE_REVIEW_ENTRIES = Object.freeze([
   {
     key: 'business-dashboard',
-    title: '业务看板能力',
+    title: '业务看板',
     path: '/erp/business-dashboard',
-    description: '审阅指标、风险和业务运行总览的能力边界。',
+    description: '查看业务数量、办理情况和需要关注的事项。',
   },
   {
     key: 'sales-orders',
-    title: '销售订单核心',
+    title: '销售订单',
     path: '/erp/sales/project-orders/sales-orders',
-    description: '审阅源单据业务状态、权限、动作和字段边界。',
+    description: '查看销售订单状态、可用操作和填写内容。',
   },
   {
     key: 'bom',
-    title: 'BOM / 产品工程',
+    title: '物料清单（BOM）/ 产品工程',
     path: '/erp/purchase/material-bom',
-    description: '审阅产品结构、用量、损耗和生效边界。',
+    description: '查看产品结构、材料用量、损耗和版本状态。',
   },
   {
     key: 'purchase',
     title: '采购与入库',
     path: '/erp/purchase/accessories',
-    description: '审阅采购 source document 与入库事实进入条件。',
+    description: '查看采购订单与入库办理条件。',
   },
   {
     key: 'outsourcing',
     title: '委外加工',
     path: '/erp/outsourcing/orders',
-    description: '审阅加工合同、工序、回货和质检衔接能力。',
+    description: '查看加工合同、工序、回货和质检的衔接方式。',
   },
   {
     key: 'shipment',
     title: '出货与库存',
     path: '/erp/warehouse/shipments',
-    description: '审阅放行、出库、库存和应收前置边界。',
+    description: '查看出货放行、出库、库存和应收的办理顺序。',
   },
 ])
 
@@ -201,19 +201,19 @@ const PRODUCT_CORE_CONTROL_ENTRIES = Object.freeze([
     key: 'print',
     title: '模板打印中心',
     path: '/erp/print-center',
-    description: '查看 Product Core 已登记打印模板和客户默认值投影边界。',
+    description: '查看可用打印模板和客户默认内容。',
   },
   {
     key: 'permissions',
     title: '权限管理',
     path: '/erp/system/permissions',
-    description: '维护角色、权限码和管理员账号；后端 RBAC 仍是真门禁。',
+    description: '维护员工账号、岗位和功能权限。',
   },
   {
     key: 'audit',
-    title: '审计日志',
+    title: '系统操作记录',
     path: '/erp/system/audit-logs',
-    description: '查看客户配置发布、激活、回滚和系统管理审计。',
+    description: '查看客户业务设置变更和系统管理操作记录。',
   },
 ])
 
@@ -226,20 +226,18 @@ function ProductCoreDashboard({ onNavigate }) {
     >
       <div className="erp-product-core-dashboard__hero">
         <div>
-          <Text type="secondary">Product Core</Text>
+          <Text type="secondary">功能预览</Text>
           <Title level={3} className="erp-command-center-hero-title">
-            产品核心总览
+            系统功能总览
           </Title>
           <Paragraph className="erp-dashboard-summary">
-            这里审阅通用 ERP
-            内核、控制面和客户配置进入条件；不加载客户订单、库存、Workflow
-            任务或财务事实。
+            这里用于查看系统已配置的功能和设置。当前尚未连接客户业务数据，因此不会显示订单、库存、待办任务或财务记录。
           </Paragraph>
         </div>
         <Space wrap>
-          <Tag color="blue">不挂载客户业务数据</Tag>
-          <Tag color="green">能力审阅</Tag>
-          <Tag>无 customer key</Tag>
+          <Tag color="blue">不显示客户业务数据</Tag>
+          <Tag color="green">功能预览</Tag>
+          <Tag>尚未连接客户环境</Tag>
         </Space>
       </div>
 
@@ -256,9 +254,9 @@ function ProductCoreDashboard({ onNavigate }) {
       <div className="erp-product-core-dashboard__grid">
         <section className="erp-product-core-panel">
           <div className="erp-product-core-panel__head">
-            <Title level={5}>能力审阅入口</Title>
+            <Title level={5}>业务功能</Title>
             <Text type="secondary">
-              进入后只看页面能力、字段、动作和边界；不会读取客户业务记录。
+              可查看页面说明、填写内容和可用操作；不会读取客户业务记录。
             </Text>
           </div>
           <div className="erp-product-core-entry-grid">
@@ -278,9 +276,9 @@ function ProductCoreDashboard({ onNavigate }) {
 
         <section className="erp-product-core-panel">
           <div className="erp-product-core-panel__head">
-            <Title level={5}>控制面</Title>
+            <Title level={5}>系统设置</Title>
             <Text type="secondary">
-              控制面只管理配置、权限和审计，不替代客户运行态业务处理。
+              这里管理客户业务设置、员工权限和操作记录，不办理具体业务。
             </Text>
           </div>
           <Space direction="vertical" size={10} className="erp-dashboard-block">
@@ -312,7 +310,7 @@ function buildSourceOptions(values = []) {
   ].sort((left, right) => left.localeCompare(right))
 
   return [
-    { value: 'all', label: '全部模块' },
+    { value: 'all', label: '全部业务' },
     ...sourceTypes.map((sourceType) => ({
       value: sourceType,
       label: getWorkflowTaskSourceTypeLabel(sourceType),
@@ -488,7 +486,7 @@ function TaskMetricAction({
 function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
   const description = fallbackOption
     ? `${activeOption.label}暂无任务，可切到${fallbackOption.label}继续处理。`
-    : '当前没有需要处理的协同任务。'
+    : '当前没有需要处理的任务。'
 
   return (
     <div className="erp-workbench-queue-empty">
@@ -1126,7 +1124,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             return false
           }
           if (actionDrawerAccess.loading) {
-            message.warning('正在核对任务动作权限，请稍后再提交')
+            message.warning('正在确认这项操作是否可用，请稍后再提交')
             return false
           }
           if (!actionDrawerAccess.canRun(actionMode)) {
@@ -1205,7 +1203,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       },
     },
     {
-      title: '任务 / 业务对象',
+      title: '任务 / 相关单据',
       dataIndex: 'task_name',
       render: (value, record) => (
         <div className="erp-workbench-task-cell">
@@ -1221,7 +1219,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
     },
     {
-      title: '到期 / SLA',
+      title: '截止时间',
       dataIndex: 'due_at',
       width: 132,
       render: (_, record) => {
@@ -1284,14 +1282,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   工作台
                 </Title>
                 <Paragraph className="erp-dashboard-summary">
-                  登录后先看今天该处理什么，再进入关联业务对象。
+                  登录后先看今天该处理什么，再进入相关业务页面继续办理。
                 </Paragraph>
               </div>
             </div>
 
             <div
               className="erp-workbench-queue-filter-strip"
-              aria-label="工作台队列筛选"
+              aria-label="工作台任务筛选"
             >
               {WORKBENCH_QUEUE_OPTIONS.map((option) => {
                 const count = workbenchQueueGroups[option.key]?.length || 0
@@ -1323,13 +1321,13 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             <div className="erp-workbench-main-grid">
               <section
                 className="erp-workbench-panel erp-workbench-queue-panel"
-                aria-label="优先处理队列"
+                aria-label="优先处理"
               >
                 <div className="erp-workbench-panel-head">
                   <div>
-                    <Title level={5}>优先处理队列</Title>
+                    <Title level={5}>优先处理</Title>
                     <Text type="secondary">
-                      按到期时间分批展示；选中任务后在右侧核对上下文。
+                      按截止时间排列；选中任务后可在右侧查看详情。
                     </Text>
                   </div>
                   <Tag
@@ -1402,12 +1400,12 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               <aside className="erp-workbench-side-stack">
                 <section
                   className="erp-workbench-panel erp-workbench-task-detail"
-                  aria-label="当前任务上下文"
+                  aria-label="任务详情"
                 >
                   <div className="erp-workbench-panel-head">
                     <div>
-                      <Title level={5}>当前任务上下文</Title>
-                      <Text type="secondary">只展示当前队列选中的协同任务</Text>
+                      <Title level={5}>任务详情</Title>
+                      <Text type="secondary">当前选中的任务</Text>
                     </div>
                     {selectedWorkbenchStatusMeta ? (
                       <Tag color={selectedWorkbenchStatusMeta.color}>
@@ -1430,7 +1428,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         <Descriptions.Item label="来源">
                           {formatWorkflowTaskSource(selectedWorkbenchTask)}
                         </Descriptions.Item>
-                        <Descriptions.Item label="负责角色">
+                        <Descriptions.Item label="负责岗位">
                           {getWorkflowTaskOwnerRoleLabel(selectedWorkbenchTask)}
                         </Descriptions.Item>
                         <Descriptions.Item label="到期">
@@ -1446,7 +1444,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                       </Descriptions>
                       <Space wrap className="erp-workbench-detail-actions">
                         {selectedWorkbenchTaskAccess.loading ? (
-                          <Button disabled>核对权限中</Button>
+                          <Button disabled>正在确认可用操作</Button>
                         ) : null}
                         {!selectedWorkbenchTaskAccess.loading &&
                         selectedWorkbenchTaskAccess.allowedModes.includes(
@@ -1507,14 +1505,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                               openTaskDrawer(selectedWorkbenchTask)
                             }
                           >
-                            查看上下文
+                            查看详情
                           </Button>
                         ) : null}
                         {selectedWorkbenchEntryPath ? (
                           <Button
                             onClick={() => openTaskEntry(selectedWorkbenchTask)}
                           >
-                            关联记录
+                            查看相关单据
                           </Button>
                         ) : null}
                       </Space>
@@ -1525,7 +1523,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         image={Empty.PRESENTED_IMAGE_SIMPLE}
                         description={
                           fallbackWorkbenchQueueOption
-                            ? `当前队列暂无任务，可切到${fallbackWorkbenchQueueOption.label}。`
+                            ? `当前任务列表暂无任务，可切到${fallbackWorkbenchQueueOption.label}。`
                             : '暂无可处理任务'
                         }
                       />
@@ -1648,7 +1646,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     <Space wrap className="erp-task-center-current-actions">
                       {taskCenterCurrentTaskAccess.loading ? (
                         <Button size="small" disabled>
-                          核对权限中
+                          正在确认可用操作
                         </Button>
                       ) : null}
                       {!taskCenterCurrentTaskAccess.loading &&
@@ -1714,7 +1712,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           title={taskCenterCurrentTaskAccess.readonlyReason}
                           onClick={() => openTaskDrawer(taskCenterCurrentTask)}
                         >
-                          查看上下文
+                          查看详情
                         </Button>
                       ) : null}
                       {taskCenterCurrentEntryPath ? (
@@ -1722,7 +1720,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           size="small"
                           onClick={() => openTaskEntry(taskCenterCurrentTask)}
                         >
-                          关联对象
+                          查看相关单据
                         </Button>
                       ) : null}
                     </Space>
@@ -1775,7 +1773,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               </Button>
               <div className="erp-task-board-filter-summary" aria-live="polite">
                 <Text type="secondary">
-                  当前结果 {taskBoardReady ? taskBoardModel.total : '-'} 条
+                  筛选结果 {taskBoardReady ? taskBoardModel.total : '-'} 条
                 </Text>
                 {taskBoardModel.focused ? (
                   <Button
@@ -1783,7 +1781,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     size="small"
                     onClick={() => selectTaskBoardLane('all')}
                   >
-                    返回全部泳道
+                    查看全部分类
                   </Button>
                 ) : null}
               </div>
@@ -1801,7 +1799,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 className={`erp-task-board-lanes${
                   taskBoardModel.focused ? ' erp-task-board-lanes--focused' : ''
                 }`}
-                aria-label="任务看板泳道"
+                aria-label="任务看板分类"
               >
                 {taskLanes.map((lane) => (
                   <TaskLane
@@ -1836,11 +1834,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             variant="borderless"
           >
             <Title level={3} className="erp-command-center-hero-title">
-              异常 / 阻塞闭环
+              异常处理
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
-              定义阻塞、责任分派、处理跟进、验证恢复和关闭归档的用户路径；所有状态更新仍通过
-              协同任务处理完成。
+              按“登记原因—分派负责人—跟进处理—确认恢复—关闭”的步骤处理异常。
             </Paragraph>
             <div className="erp-exception-flow-steps">
               {EXCEPTION_FLOW_STEPS.map((step, index) => (
@@ -1879,7 +1876,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     type="warning"
                     showIcon
                     message={activeExceptionStep.description}
-                    description="这里处理的是协同异常，不代表库存、出货、应收、开票、付款或凭证事实已经完成。"
+                    description="这里处理的是异常任务，不代表库存、出货、应收、开票、付款或会计凭证已经完成。"
                   />
                   <Descriptions size="small" column={1} bordered>
                     <Descriptions.Item label="阻塞任务">
@@ -1888,7 +1885,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     <Descriptions.Item label="今日/超时任务">
                       {dueTasks.length}
                     </Descriptions.Item>
-                    <Descriptions.Item label="建议动作">
+                    <Descriptions.Item label="建议处理方式">
                       选择一条任务后登记原因、催办、完成或进入关联记录核对。
                     </Descriptions.Item>
                   </Descriptions>
@@ -1899,7 +1896,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               <Card
                 className="erp-dashboard-card"
                 variant="borderless"
-                title="闭环队列"
+                title="异常任务列表"
               >
                 <Space
                   direction="vertical"

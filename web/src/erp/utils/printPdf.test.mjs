@@ -1093,7 +1093,7 @@ test('printPdf: 预览窗口被拦截时返回统一错误文案', async () => {
   }
 })
 
-test('printPdf: 预览生成失败时在线预览页展示真实错误', async () => {
+test('printPdf: 预览生成失败时在线预览页展示可执行提示', async () => {
   const originalWindow = globalThis.window
   const storage = new Map()
   let restoreCalls = 0
@@ -1153,7 +1153,8 @@ test('printPdf: 预览生成失败时在线预览页展示真实错误', async (
 
     const payload = JSON.parse(Array.from(storage.values())[0])
     assert.match(payload.html, /采购合同 PDF 预览/)
-    assert.match(payload.html, /服务器生成 PDF 超时，请稍后重试。/)
+    assert.match(payload.html, /生成 PDF 预览失败，请稍后重试/)
+    assert.doesNotMatch(payload.html, /服务器生成 PDF 超时/u)
     assert.doesNotMatch(payload.html, /<iframe/)
   } finally {
     if (typeof originalWindow === 'undefined') {

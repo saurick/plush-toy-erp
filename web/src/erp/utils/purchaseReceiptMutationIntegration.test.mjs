@@ -39,7 +39,7 @@ test('purchase order inbound draft keeps unknown results in the current modal', 
   assert.match(mutation, /settle\(scope, attempt, error\)/u)
   assert.match(
     mutation,
-    /入库草稿生成结果尚未确认，系统将使用原请求核对，请不要重复生成。/u
+    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
   )
   const catchBody = mutation.match(
     /catch \(error\) \{([\s\S]*?)\n {4}\} finally/u
@@ -71,7 +71,7 @@ test('purchase receipt add-item keeps unknown results in the current editor', ()
   assert.match(mutation, /settle\(scope, attempt, error\)/u)
   assert.match(
     mutation,
-    /入库明细添加结果尚未确认，系统将使用原请求核对，请不要重复添加。/u
+    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
   )
   const catchBody = mutation.match(
     /catch \(error\) \{([\s\S]*?)\n {6}\} finally/u

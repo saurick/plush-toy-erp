@@ -36,7 +36,7 @@ export function getRoleDisplayName(roleKey, fallback = '') {
   const normalized = normalizeRoleKey(roleKey)
   if (ROLE_DISPLAY_NAMES[normalized]) return ROLE_DISPLAY_NAMES[normalized]
   if (fallback) return fallback
-  return normalized ? '已配置角色' : ''
+  return normalized ? '已配置岗位' : ''
 }
 
 export function normalizeRolePayload(payload = {}) {

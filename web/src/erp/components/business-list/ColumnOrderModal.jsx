@@ -218,9 +218,7 @@ export function ColumnOrderModal({
       title={
         <div className="erp-business-action-modal__title">
           <span>调整列表列顺序</span>
-          <small>
-            在面板中调整后点击完成保存；表头菜单快捷调整会直接保存到当前管理员账号，本地缓存只作兜底。
-          </small>
+          <small>调整后的列顺序会保存到当前账号，下次打开仍会保留。</small>
         </div>
       }
       open={open}

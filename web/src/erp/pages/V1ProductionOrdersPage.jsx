@@ -385,6 +385,9 @@ export default function V1ProductionOrdersPage() {
 
   const productionItemsPreview = useBusinessRowItemsPreview({
     records: orders,
+    getItemTotal: (record) => record?.item_count,
+    rowExpandable: (record) =>
+      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
     getRecordLabel: (record) => record?.order_no || '当前生产订单',
     loadPreview: async (record, { signal }) => {
       const nextAggregate = await getProductionOrder(record.id, { signal })
@@ -700,7 +703,7 @@ export default function V1ProductionOrdersPage() {
       setMaterialIssueOpen(true)
     } catch (error) {
       if (!isRpcAbortError(error) && request.isCurrent()) {
-        message.error(getActionErrorMessage(error, '加载生产领料上下文'))
+        message.error(getActionErrorMessage(error, '加载生产领料详情'))
       }
     } finally {
       if (
@@ -853,7 +856,7 @@ export default function V1ProductionOrdersPage() {
         if (!result) {
           materialIssueAttemptsRef.current.settle(scope, attempt, error)
           message.warning(
-            '领料记录生成结果仍无法确认，已保留本次请求，请使用相同内容重试'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
           return
         }
@@ -934,7 +937,7 @@ export default function V1ProductionOrdersPage() {
       setCompletionOpen(true)
     } catch (error) {
       if (completionContextRequestRef.current === requestID) {
-        message.error(getActionErrorMessage(error, '加载完工入库上下文'))
+        message.error(getActionErrorMessage(error, '加载完工入库详情'))
       }
     } finally {
       if (completionContextRequestRef.current === requestID) {
@@ -960,7 +963,7 @@ export default function V1ProductionOrdersPage() {
         customer_key: activeCustomerKey || undefined,
       }
     } catch (error) {
-      message.error(error.message)
+      message.error(getActionErrorMessage(error, '办理完工入库'))
       return
     }
     const orderItem = completionContext.items.find(
@@ -1011,7 +1014,7 @@ export default function V1ProductionOrdersPage() {
         if (!result) {
           completionAttemptsRef.current.settle(scope, attempt, error)
           message.warning(
-            '完工记录生成结果仍无法确认，已保留本次请求，请使用相同内容重试'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
           return
         }
@@ -1082,7 +1085,7 @@ export default function V1ProductionOrdersPage() {
         )
       } else {
         message.warning(
-          '操作结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+          '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
         )
       }
       return false
@@ -1190,7 +1193,7 @@ export default function V1ProductionOrdersPage() {
     <BusinessPageLayout>
       <PageHeaderCard
         title="生产订单"
-        description="维护生产计划源单；已发布订单可从冻结需求登记领料或登记完工草稿，核对、过账及库存结果仍在生产记录中办理。"
+        description="维护生产计划单；已发布订单可按已确认需求登记领料或完工草稿，核对、过账及库存结果仍在生产记录中办理。"
         stats={[{ key: 'total', label: '符合条件', value: total }]}
       />
       <BusinessOperationPanel

@@ -1,321 +1,1433 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
-  MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE,
+  MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES,
+  MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
+  SOURCE_DRIVEN_FACT_REPORT_CONTRACT,
+  assertManualAcceptanceAdminProfile,
+  applyManualAcceptanceFinanceLifecycle,
   applyManualAcceptanceFactPlan,
   buildManualAcceptanceFactPlan,
+  ensureReceiptQualities,
+  manualAcceptanceFactRPCCall,
+  manualAcceptanceFactRole,
+  manualAcceptanceFactRPCParams,
+  mergeManualAcceptanceFactReferences,
+  readManualAcceptanceFinalInventoryReferences,
   parseManualAcceptanceFactArgs,
+  readPurchaseReceiptQualities,
+  reuseOrApplyManualAcceptanceFactPhase,
+  sourceDrivenPhaseIdentitySpecs,
+  validatePurchaseCorrectionRecord,
+  validateSalesPhaseRecords,
+  verifyReceiptQualities,
+  verifyManualAcceptanceFactPlan,
 } from "./manual-acceptance-fact-data.mjs";
+import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
 
-function sourceReport({ skuCount = 54 } = {}) {
-  const list = (count, prefix) =>
-    Array.from({ length: count }, (_, offset) => ({
-      code: `${prefix}-${offset + 1}`,
-      id: offset + 1,
-      name: `【试用】${prefix} ${offset + 1}`,
-    }));
-  const customers = list(55, "C");
-  const skus = Array.from({ length: skuCount }, (_, offset) => ({
-    code: `SKU-${offset + 1}`,
-    id: 1000 + offset,
-    productCode: `P-${(offset % 18) + 1}`,
-    productId: (offset % 18) + 1,
-  }));
-  return {
-    mode: "apply",
-    simulatedOnly: true,
-    realCustomerImport: false,
-    runId: "LOCAL-UAT",
-    prefix: "SIM-YOYOOSUN-UAT-LOCAL-UAT",
-    backendURL: "http://127.0.0.1:8300",
-    scale: {
-      customers: 60,
-      suppliers: 60,
-      materials: 80,
-      products: 20,
-      skusPerProduct: 3,
-      processes: 30,
-      salesOrders: 45,
-      purchaseOrders: 45,
-      outsourcingOrders: 45,
-      bomVersions: 45,
+const DATA_VERSION = "2026.07.15-v3";
+const RUN_ID = "20260715-V3";
+const DATASET_KEY = "yoyoosun-manual-acceptance";
+
+test("runtime admin guard consumes the formal top-level auth.me profile", () => {
+  assert.deepEqual(
+    assertManualAcceptanceAdminProfile({
+      id: 1,
+      username: "admin",
+      is_super_admin: true,
+      disabled: false,
+    }),
+    {
+      id: 1,
+      username: "admin",
+      is_super_admin: true,
+      disabled: false,
     },
-    referenceRecords: {
-      unit: { id: 101, code: "PCS", name: "个" },
-      warehouse: { id: 201, code: "FG", name: "成品仓" },
-      warehouses: [
-        { id: 201, code: "FG", name: "成品仓" },
-        { id: 202, code: "RM", name: "材料仓" },
-        { id: 203, code: "WIP", name: "在制仓" },
-        { id: 204, code: "SAMPLE", name: "样品仓" },
-      ],
-      customers,
-      suppliers: list(55, "S"),
-      materials: list(74, "M"),
-      products: list(18, "P"),
-      skus,
-      processes: list(27, "PROC"),
-      salesOrders: [
+  );
+  for (const profile of [
+    { username: "admin", is_super_admin: false, disabled: false },
+    { username: "admin", is_super_admin: true, disabled: true },
+    { admin: { username: "admin", is_super_admin: true, disabled: false } },
+  ]) {
+    assert.throws(
+      () => assertManualAcceptanceAdminProfile(profile),
+      /enabled local super admin/u,
+    );
+  }
+});
+
+test("RPC retries only bounded HTTP 429 responses and honors Retry-After", async () => {
+  let calls = 0;
+  const waits = [];
+  const result = await manualAcceptanceFactRPCCall({
+    backendURL: "http://127.0.0.1:8300",
+    domain: "operational_fact",
+    method: "list_production_facts",
+    fetchImpl: async () => {
+      calls += 1;
+      if (calls === 1) {
+        return {
+          status: 429,
+          ok: false,
+          redirected: false,
+          headers: { get: () => "0.1" },
+        };
+      }
+      if (calls === 2) {
+        return {
+          status: 429,
+          ok: false,
+          redirected: false,
+          headers: { get: () => null },
+        };
+      }
+      return {
+        status: 200,
+        ok: true,
+        redirected: false,
+        headers: { get: () => null },
+        json: async () => ({ result: { code: 0, data: { total: 0 } } }),
+      };
+    },
+    sleep: async (milliseconds) => {
+      waits.push(milliseconds);
+    },
+  });
+  assert.deepEqual(result, { total: 0 });
+  assert.equal(calls, 3);
+  assert.deepEqual(waits, [100, 500]);
+});
+
+test("RPC does not retry non-throttle HTTP failures", async () => {
+  let calls = 0;
+  await assert.rejects(
+    () =>
+      manualAcceptanceFactRPCCall({
+        backendURL: "http://127.0.0.1:8300",
+        domain: "operational_fact",
+        method: "list_production_facts",
+        fetchImpl: async () => {
+          calls += 1;
+          return {
+            status: 500,
+            ok: false,
+            redirected: false,
+            headers: { get: () => null },
+          };
+        },
+        sleep: async () => {
+          throw new Error("non-throttle failures must not sleep");
+        },
+      }),
+    /HTTP 500/u,
+  );
+  assert.equal(calls, 1);
+});
+
+function sourceReport({ remote = false } = {}) {
+  const material = { id: 101, code: "MAT-101", name: "米白短毛绒" };
+  const productionCandidate = {
+    salesOrder: {
+      id: 501,
+      orderNo: "SO-501",
+      status: "ACTIVE",
+      customerId: 601,
+      customerSnapshot: "东莞美悦礼品",
+    },
+    item: {
+      id: 701,
+      productId: 801,
+      productSkuId: 901,
+      unitId: 1001,
+      orderedQuantity: "300",
+    },
+    bom: {
+      id: 1101,
+      version: "BOM-01",
+      status: "ACTIVE",
+      items: [
         {
-          id: 501,
-          orderNo: "SO-RICH",
-          customerId: customers[0].id,
-          customerName: customers[0].name,
-          items: skus.slice(0, 25).map((item, offset) => ({
-            salesOrderItemId: 5000 + offset,
-            productId: item.productId,
-            productSkuId: item.id,
-            quantity: "1",
-          })),
+          id: 1201,
+          materialId: material.id,
+          unitId: 1001,
+          quantity: "1",
+          lossRate: "0",
         },
       ],
     },
   };
+  const outsourcingMaterialCandidate = {
+    order: { id: 1301, orderNo: "OS-1301", status: "CONFIRMED" },
+    item: {
+      outsourcingOrderItemId: 1401,
+      subjectType: "MATERIAL",
+      subjectId: material.id,
+      materialId: material.id,
+      unitId: 1001,
+      quantity: "300",
+    },
+  };
+  const outsourcingProductCandidate = {
+    order: { id: 1301, orderNo: "OS-1301", status: "CONFIRMED" },
+    item: {
+      outsourcingOrderItemId: 1402,
+      subjectType: "PRODUCT",
+      subjectId: productionCandidate.item.productId,
+      productId: productionCandidate.item.productId,
+      productSkuId: productionCandidate.item.productSkuId,
+      unitId: 1001,
+      quantity: "300",
+    },
+  };
+  return {
+    mode: "apply",
+    simulatedOnly: true,
+    realCustomerImport: false,
+    datasetKey: DATASET_KEY,
+    dataVersion: DATA_VERSION,
+    runId: RUN_ID,
+    target: remote ? "customer-trial-133" : "local-dev",
+    backendURL: remote ? "http://127.0.0.1:18375" : "http://127.0.0.1:8300",
+    semanticDigest: "digest-v2",
+    prefix: `SIM-YOYOOSUN-UAT-${RUN_ID}`,
+    anchorDate: "2026-07-15",
+    runtime: {
+      target: remote ? "customer-trial-133" : "local-dev",
+      environment: remote ? "prod" : "dev",
+      customerKey: "yoyoosun",
+      configRevision: "runtime-v2",
+      ...(remote
+        ? {
+            targetAttestation: {
+              source: "out-of-band",
+              release: "release-v2",
+              migration: "migration-v2",
+            },
+          }
+        : {}),
+    },
+    referenceRecords: {
+      materials: [material],
+      suppliers: [{ id: 201, code: "SUP-201", name: "嘉顺布行" }],
+      warehouses: [
+        { id: 301, code: "RM", name: "材料仓" },
+        { id: 302, code: "FG", name: "成品仓" },
+      ],
+      purchaseOrders: Array.from({ length: 9 }, (_, offset) => ({
+        id: 400 + offset,
+        orderNo: `PO-${offset + 1}`,
+        status: "APPROVED",
+        supplierId: 201,
+        supplierName: "嘉顺布行",
+        items: [
+          {
+            purchaseOrderItemId: 500 + offset,
+            materialId: material.id,
+            unitId: 1001,
+            quantity: "100",
+          },
+        ],
+      })),
+      sourceDrivenFacts: {
+        datasetKey: DATASET_KEY,
+        dataVersion: DATA_VERSION,
+        runId: RUN_ID,
+        sourceCandidates: {
+          productionCandidates: [productionCandidate],
+          outsourcingCandidates: [
+            outsourcingMaterialCandidate,
+            outsourcingProductCandidate,
+          ],
+          salesCandidates: [
+            { order: productionCandidate.salesOrder, item: productionCandidate.item },
+          ],
+          purchaseCandidates: [],
+          warehouses: [
+            { id: 301, code: "RM", name: "材料仓" },
+            { id: 302, code: "FG", name: "成品仓" },
+          ],
+        },
+        phaseReadiness: {
+          production: { status: "blocked", reason: "awaiting posted material lot" },
+          outsourcing: { status: "blocked", reason: "awaiting posted material lot" },
+          sales: { status: "blocked", reason: "awaiting completion lot" },
+          purchase: { status: "unsupported", reason: "awaiting posted receipt" },
+        },
+      },
+    },
+  };
 }
 
-test("fact plan creates enough linked data for every fact list page", () => {
-  const plan = buildManualAcceptanceFactPlan(sourceReport(), {
-    runId: "LOCAL-UAT-FACTS",
-  });
+function fakeRecords(count, start, fields = {}) {
+  return Array.from({ length: count }, (_, offset) => ({
+    id: start + offset,
+    ...fields,
+  }));
+}
 
-  assert.equal(plan.simulatedOnly, true);
-  assert.equal(plan.realCustomerImport, false);
-  assert.equal(plan.directSQL, false);
-  assert.equal(plan.applySupported, false);
-  assert.equal(
-    plan.applyRetiredReason,
-    MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE,
-  );
-  assert.deepEqual(plan.requiredApplyInputs, []);
-  assert.equal(plan.operational.length, 45);
-  assert.equal(plan.purchaseQuality.length, 9);
-  assert.equal(plan.expectedMinimums.production, 45);
-  assert.equal(plan.expectedMinimums.inventoryBalances, 45);
-  assert.equal(plan.expectedMinimums.payables, 45);
-  assert.equal(plan.expectedMinimums.purchaseReceipts, 54);
-  assert.equal(plan.expectedMinimums.qualityInspections, 63);
-
-  assert.equal(
-    new Set(plan.operational.map((item) => item.ids.productSkuId)).size,
-    45,
-  );
-  assert.equal(
-    new Set(plan.operational.map((item) => item.ids.warehouseId)).size,
-    4,
-  );
-  assert.equal(plan.operational.at(-1).records.shipmentItems.length, 25);
-  assert.equal(plan.operational.at(-1).records.shipment.sales_order_id, 501);
-  assert.equal(
-    plan.operational.at(-1).records.stockReservationRelease.sales_order_item_id,
-    5000,
-  );
-  assert.equal(
-    plan.operational.at(-1).records.shipmentItems[0].sales_order_item_id,
-    5000,
-  );
-  assert.equal(
-    plan.operational.at(-1).ids.productSkuId,
-    plan.operational.at(-1).records.shipmentItems[0].product_sku_id,
-  );
-  assert.deepEqual(
-    [
-      ...new Set(
-        plan.operational.map(
-          (item) => item.records.financePayable.target_status,
-        ),
-      ),
-    ].sort(),
-    ["CANCELLED", "DRAFT", "POSTED", "SETTLED"],
-  );
-  for (const recordKey of [
-    "financeReconciliation",
-    "financeSettle",
-    "financeCancel",
-  ]) {
-    assert.deepEqual(
-      [
-        ...new Set(
-          plan.operational.map((item) => item.records[recordKey].target_status),
-        ),
-      ].sort(),
-      ["CANCELLED", "DRAFT", "POSTED", "SETTLED"],
-    );
-  }
-  assert.ok(
-    plan.operational.every(
-      (item) => item.records.financePayable.fact_type === "PAYABLE",
-    ),
-  );
-  assert.match(
-    plan.operational[0].records.shipment.customer_snapshot,
-    /^【试用】C/u,
-  );
-  assert.match(
-    plan.operational[0].records.outsourcingIssue.supplier_name,
-    /^【试用】S/u,
-  );
-  assert.match(plan.purchaseQuality[0].names.material, /^【试用】M/u);
-  const stockedMaterialIds = new Set(
-    plan.purchaseQuality.map((item) => item.ids.materialId),
-  );
-  const stockedMaterialLocations = new Set(
-    plan.purchaseQuality.map(
-      (item) => `${item.ids.materialId}:${item.ids.warehouseId}`,
-    ),
-  );
-  assert.ok(
-    plan.operational.every((item) =>
-      stockedMaterialIds.has(item.records.outsourcingIssue.subject_id),
-    ),
-  );
-  assert.ok(
-    plan.operational.every(
-      (item) =>
-        item.records.outsourcingIssue.subject_type === "MATERIAL" &&
-        item.records.outsourcingIssue.product_sku_id === undefined &&
-        stockedMaterialLocations.has(
-          `${item.ids.materialId}:${item.ids.warehouseId}`,
-        ),
-    ),
-  );
-  const warehouseBySkuId = new Map(
-    plan.operational.map((item) => [
-      item.ids.productSkuId,
-      item.ids.warehouseId,
+function purchaseStage() {
+  const receiptStatuses = ["DRAFT", "POSTED", "CANCELLED"];
+  const qualityStatuses = ["DRAFT", "SUBMITTED", "PASSED", "REJECTED", "CANCELLED"];
+  const correctionStatuses = ["DRAFT", "POSTED", "CANCELLED"];
+  return {
+    purchaseReceipts: fakeRecords(54, 1000).map((item, offset) => ({
+      ...item,
+      receipt_no: `PR-${offset}`,
+      status: receiptStatuses[offset % receiptStatuses.length],
+    })),
+    purchaseReturns: fakeRecords(12, 2000).map((item, offset) => ({
+      ...item,
+      return_no: `RET-${offset}`,
+      status: correctionStatuses[offset % correctionStatuses.length],
+    })),
+    purchaseReceiptAdjustments: fakeRecords(12, 3000).map((item, offset) => ({
+      ...item,
+      adjustment_no: `ADJ-${offset}`,
+      status: correctionStatuses[offset % correctionStatuses.length],
+      items: [
+        {
+          adjust_type: offset % 2 === 0 ? "QUANTITY_INCREASE" : "QUANTITY_DECREASE",
+        },
+      ],
+    })),
+    qualityInspections: fakeRecords(60, 4000).map((item, offset) => ({
+      ...item,
+      inspection_no: `QI-${offset}`,
+      status: qualityStatuses[offset % qualityStatuses.length],
+      source_type: "PURCHASE_RECEIPT",
+      source_id: 1000 + (offset % 54),
+    })),
+    inventoryLots: fakeRecords(45, 5000).map((item, offset) => ({
+      ...item,
+      lot_no: `LOT-${offset}`,
+      status: ["HOLD", "ACTIVE", "REJECTED"][offset % 3],
+      subject_type: "MATERIAL",
+      subject_id: 101,
+    })),
+    inventoryBalances: fakeRecords(45, 6000, {
+      subject_type: "MATERIAL",
+      subject_id: 101,
+      warehouse_id: 301,
+      unit_id: 1001,
+      quantity: "500",
+    }),
+    inventoryTxns: fakeRecords(45, 7000).map((item, offset) => ({
+      ...item,
+      txn_type: ["IN", "OUT", "REVERSAL"][offset % 3],
+      source_type: "PURCHASE_RECEIPT",
+      source_id: 1000,
+    })),
+    materialStock: new Map([
+      ["101:1001", { materialId: 101, unitId: 1001, warehouseId: 301, lotId: 5000 }],
     ]),
-  );
-  for (const shipmentItem of plan.operational.at(-1).records.shipmentItems) {
-    assert.equal(
-      shipmentItem.warehouse_id,
-      warehouseBySkuId.get(shipmentItem.product_sku_id),
-    );
-  }
-  for (const item of plan.operational) {
-    const sample = item.records.productionDraftSample;
-    if (sample.fact_type === "MATERIAL_ISSUE") {
-      assert.equal(sample.subject_type, "MATERIAL");
-      assert.equal(sample.product_sku_id, undefined);
-    } else {
-      assert.equal(sample.subject_type, "PRODUCT");
-      assert.equal(sample.product_sku_id, item.ids.productSkuId);
+  };
+}
+
+function factStage() {
+  const productionOrderStatuses = ["DRAFT", "RELEASED", "CLOSED", "CANCELLED"];
+  const productionStatuses = ["DRAFT", "POSTED", "CANCELLED"];
+  const productionTypes = ["MATERIAL_ISSUE", "FINISHED_GOODS_RECEIPT", "REWORK"];
+  const shipmentStatuses = ["DRAFT", "SHIPPED", "CANCELLED"];
+  const reservationStatuses = ["ACTIVE", "RELEASED"];
+  const finance = [];
+  let id = 20000;
+  for (const type of ["PAYABLE", "RECEIVABLE", "RECONCILIATION"]) {
+    for (let offset = 0; offset < 48; offset += 1) {
+      finance.push({
+        id: id++,
+        fact_no: `${type}-${offset}`,
+        fact_type: type,
+        status: ["DRAFT", "POSTED", "SETTLED", "CANCELLED"][offset % 4],
+        source_type: type === "RECONCILIATION" ? "FINANCE_FACT" : "SHIPMENT",
+        source_id: 9000 + offset,
+      });
     }
   }
+  for (let offset = 0; offset < 48; offset += 1) {
+    finance.push({
+      id: id++,
+      fact_no: `INVOICE-${offset}`,
+      fact_type: "INVOICE",
+      status: ["DRAFT", "POSTED", "CANCELLED"][offset % 3],
+      source_type: "SHIPMENT",
+      source_id: 10000 + offset,
+    });
+  }
+  return {
+    productionOrders: fakeRecords(48, 8000).map((item, offset) => ({
+      ...item,
+      order_no: `MO-${offset}`,
+      status: productionOrderStatuses[offset % productionOrderStatuses.length],
+    })),
+    productionFacts: fakeRecords(90, 9000).map((item, offset) => ({
+      ...item,
+      fact_no: `PF-${offset}`,
+      status: productionStatuses[offset % productionStatuses.length],
+      fact_type: productionTypes[offset % productionTypes.length],
+      source_type: "PRODUCTION_ORDER",
+      source_id: 8000 + (offset % 48),
+    })),
+    outsourcingFacts: fakeRecords(90, 11000, {
+      fact_no: "OF",
+      status: "POSTED",
+      fact_type: "MATERIAL_ISSUE",
+      source_type: "OUTSOURCING_ORDER",
+      source_id: 1301,
+    }),
+    qualityInspections: fakeRecords(45, 12000, {
+      inspection_no: "OQI",
+      status: "PASSED",
+      source_type: "OUTSOURCING_FACT",
+      source_id: 11000,
+    }),
+    inventoryLots: fakeRecords(45, 13000, {
+      lot_no: "FG",
+      status: "ACTIVE",
+      subject_type: "PRODUCT",
+      subject_id: 801,
+    }),
+    inventoryBalances: fakeRecords(45, 14000, {
+      subject_type: "PRODUCT",
+      subject_id: 801,
+      product_sku_id: 901,
+      warehouse_id: 302,
+      unit_id: 1001,
+      quantity: "2",
+    }),
+    inventoryTxns: fakeRecords(90, 15000).map((item, offset) => ({
+      ...item,
+      txn_type: offset % 2 === 0 ? "IN" : "OUT",
+      source_type: "PRODUCTION_FACT",
+      source_id: 9000 + offset,
+    })),
+    stockReservations: fakeRecords(47, 17000).map((item, offset) => ({
+      ...item,
+      reservation_no: `RSV-${offset}`,
+      status: reservationStatuses[offset % reservationStatuses.length],
+      source_type: "SALES_ORDER",
+      source_id: 501,
+    })),
+    shipments: fakeRecords(47, 18000).map((item, offset) => ({
+      ...item,
+      shipment_no: `SHP-${offset}`,
+      status: shipmentStatuses[offset % shipmentStatuses.length],
+    })),
+    financeFacts: finance,
+  };
+}
+
+const runtime = Object.freeze({
+  target: "local-dev",
+  environment: "dev",
+  customerKey: "yoyoosun",
+  configRevision: "runtime-v2",
+  source: "active_customer_config_revision",
+});
+
+test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact runs", () => {
+  const plan = buildManualAcceptanceFactPlan(sourceReport());
+  assert.equal(plan.datasetKey, DATASET_KEY);
+  assert.equal(plan.dataVersion, DATA_VERSION);
+  assert.equal(plan.runId, RUN_ID);
+  assert.equal(plan.target, "local-dev");
+  assert.equal(plan.semanticDigest, "digest-v2");
+  assert.equal(plan.directSQL, false);
+  assert.equal(plan.retiredGenericFactWriter, false);
+  assert.equal(plan.receipts.length, 54);
+  assert.equal(plan.corrections.length, 12);
+  assert.ok(
+    plan.corrections.every((correction) => {
+      const receipt = plan.receipts[correction.receiptIndex];
+      return receipt?.status === "POSTED" && receipt.linkedPurchaseOrder === undefined;
+    }),
+  );
+  assert.equal(plan.productionCandidates.length, 45);
+  assert.equal(plan.outsourcingCandidates.length, 45);
+  assert.ok(
+    plan.outsourcingCandidates.every(
+      (candidate) =>
+        candidate.issue.order.id === candidate.return.order.id &&
+        candidate.issue.item.subjectType === "MATERIAL" &&
+        candidate.return.item.subjectType === "PRODUCT",
+    ),
+  );
+  assert.ok(MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("purchase_orders"));
+  assert.ok(MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("outsourcing_orders"));
   assert.deepEqual(
-    [
-      ...new Set(
-        plan.operational.map(
-          (item) => item.records.productionDraftSample.fact_type,
-        ),
-      ),
-    ].sort(),
-    ["FINISHED_GOODS_RECEIPT", "MATERIAL_ISSUE", "REWORK"],
+    [...new Set(plan.receipts.map((item) => item.status))].sort(),
+    ["CANCELLED", "DRAFT", "POSTED"],
+  );
+  assert.equal(plan.receipts[9].items[0].materialName, "米白短毛绒");
+  assert.doesNotMatch(JSON.stringify(plan), /【试用】|workflow|generic operational/iu);
+});
+
+test("CLI supports mutually exclusive apply/verify and staged execution", () => {
+  assert.deepEqual(
+    parseManualAcceptanceFactArgs([
+      "--apply",
+      "--source-report",
+      "source.json",
+      "--phase",
+      "facts",
+    ]).phase,
+    "facts",
+  );
+  assert.throws(
+    () => parseManualAcceptanceFactArgs(["--apply", "--verify"]),
+    /mutually exclusive/u,
+  );
+  assert.throws(
+    () => parseManualAcceptanceFactArgs(["--phase", "unknown"]),
+    /--phase must be/u,
+  );
+});
+
+test("strict RPC params follow endpoint allowlists without broad customer injection", () => {
+  assert.deepEqual(
+    manualAcceptanceFactRPCParams("production_order", "create_production_order", { order_no: "MO-1" }),
+    { order_no: "MO-1" },
   );
   assert.deepEqual(
-    [
-      ...new Set(
-        plan.operational.map((item) => item.records.financeSettle.payment_term),
-      ),
-    ].sort(),
-    ["CASH_ON_SHIPMENT", "EOM_30", "EOM_45"],
+    manualAcceptanceFactRPCParams("operational_fact", "cancel_finance_fact", {
+      id: 1,
+      reason: "本笔取消",
+    }),
+    { id: 1, reason: "本笔取消" },
+  );
+  assert.deepEqual(
+    manualAcceptanceFactRPCParams("operational_fact", "post_finance_fact", { id: 1 }),
+    { customer_key: "yoyoosun", id: 1 },
+  );
+  for (const method of [
+    "list_purchase_returns",
+    "list_purchase_receipt_adjustments",
+  ]) {
+    assert.deepEqual(
+      manualAcceptanceFactRPCParams("purchase", method, { keyword: "SIM" }),
+      { keyword: "SIM" },
+    );
+  }
+  for (const method of [
+    "list_purchase_returns",
+    "create_purchase_return_from_receipt",
+    "post_purchase_return",
+    "cancel_purchase_return",
+    "list_purchase_receipt_adjustments",
+    "create_purchase_receipt_adjustment_from_receipt",
+    "post_purchase_receipt_adjustment",
+    "cancel_purchase_receipt_adjustment",
+  ]) {
+    assert.equal(manualAcceptanceFactRole("purchase", method), "admin");
+  }
+  assert.equal(manualAcceptanceFactRole("purchase", "list_purchase_receipts"), "purchase");
+  assert.equal(
+    manualAcceptanceFactRole("production_order", "create_production_order"),
+    "admin",
   );
   assert.equal(
-    new Set(
-      plan.operational.map(
-        (item) => item.records.financeCancel.invoice_category,
-      ),
-    ).size,
-    5,
+    manualAcceptanceFactRole("operational_fact", "list_production_facts"),
+    "admin",
+  );
+  assert.equal(
+    manualAcceptanceFactRole("operational_fact", "create_receivable_from_shipment"),
+    "admin",
   );
 });
 
-test("fact plan refuses missing source references and external targets", () => {
-  assert.throws(
-    () =>
-      buildManualAcceptanceFactPlan(sourceReport({ skuCount: 20 }), {
-        runId: "TOO-FEW",
-        operationalRuns: 45,
-      }),
-    /active SKUs, need 45/u,
-  );
-  assert.throws(
-    () =>
-      buildManualAcceptanceFactPlan(sourceReport(), {
-        runId: "EXTERNAL",
-        backendURL: "https://example.invalid",
-      }),
-    /refuse external backend/u,
-  );
-  const singleWarehouse = sourceReport();
-  singleWarehouse.referenceRecords.warehouses = [
-    singleWarehouse.referenceRecords.warehouse,
+test("receipt quality readback uses the formal quality list instead of an empty receipt embed", async () => {
+  const receipt = { id: 41, items: [{ id: 51 }] };
+  const inspection = {
+    id: 61,
+    inspection_no: "IQC-PR-41-ITEM-51",
+    purchase_receipt_id: 41,
+    purchase_receipt_item_id: 51,
+    source_type: "PURCHASE_RECEIPT",
+    inspection_type: "INCOMING",
+    status: "SUBMITTED",
+  };
+  const result = await readPurchaseReceiptQualities(async (request) => {
+    assert.deepEqual(request, {
+      domain: "quality",
+      method: "list_quality_inspections",
+      params: {
+        purchase_receipt_id: 41,
+        source_type: "PURCHASE_RECEIPT",
+        inspection_type: "INCOMING",
+        limit: 200,
+        offset: 0,
+      },
+    });
+    return { quality_inspections: [inspection], total: 1 };
+  }, receipt);
+  assert.deepEqual(result.generated, [inspection]);
+  assert.deepEqual(result.inspections, [inspection]);
+});
+
+test("DRAFT quality sample cancels the generated inspection and reuses one replacement", async () => {
+  const receipt = { id: 41, items: [{ id: 51 }] };
+  const generated = {
+    id: 61,
+    inspection_no: "IQC-PR-41-ITEM-51",
+    purchase_receipt_id: 41,
+    purchase_receipt_item_id: 51,
+    source_type: "PURCHASE_RECEIPT",
+    inspection_type: "INCOMING",
+    status: "SUBMITTED",
+  };
+  const inspections = [generated];
+  let mutations = 0;
+  const rpc = async ({ domain, method, params }) => {
+    assert.equal(domain, "quality");
+    if (method === "list_quality_inspections" && params.purchase_receipt_id === 41) {
+      return { quality_inspections: structuredClone(inspections), total: inspections.length };
+    }
+    if (method === "list_quality_inspections") {
+      return {
+        quality_inspections: inspections.filter(
+          (item) => item.inspection_no === params.keyword,
+        ),
+      };
+    }
+    if (method === "cancel_quality_inspection") {
+      mutations += 1;
+      generated.status = "CANCELLED";
+      return { quality_inspection: structuredClone(generated) };
+    }
+    if (method === "create_quality_inspection_draft") {
+      mutations += 1;
+      inspections.push({
+        id: 62,
+        inspection_no: params.inspection_no,
+        purchase_receipt_id: params.purchase_receipt_id,
+        purchase_receipt_item_id: params.purchase_receipt_item_id,
+        source_type: "PURCHASE_RECEIPT",
+        inspection_type: "INCOMING",
+        status: "DRAFT",
+      });
+      return { quality_inspection: structuredClone(inspections.at(-1)) };
+    }
+    throw new Error(`unexpected RPC ${domain}.${method}`);
+  };
+  const receiptPlan = {
+    receiptNo: "PR-001",
+    status: "DRAFT",
+    qualityTarget: "DRAFT",
+    qualityDraftNo: "TEST-YS-260715V3-ZJ901",
+  };
+  const first = await ensureReceiptQualities(rpc, receipt, receiptPlan, {
+    anchorDate: "2026-07-15",
+  });
+  assert.deepEqual(first.map((item) => item.status).sort(), ["CANCELLED", "DRAFT"]);
+  assert.equal(mutations, 2);
+  const second = await ensureReceiptQualities(rpc, receipt, receiptPlan, {
+    anchorDate: "2026-07-15",
+  });
+  assert.deepEqual(second.map((item) => item.status).sort(), ["CANCELLED", "DRAFT"]);
+  assert.equal(mutations, 2);
+});
+
+test("receipt quality verification reads exact persisted states without mutation", async () => {
+  const receipt = { id: 41, items: [{ id: 51 }] };
+  const inspections = [
+    {
+      id: 61,
+      inspection_no: "IQC-PR-41-ITEM-51",
+      purchase_receipt_id: 41,
+      purchase_receipt_item_id: 51,
+      source_type: "PURCHASE_RECEIPT",
+      inspection_type: "INCOMING",
+      status: "CANCELLED",
+    },
+    {
+      id: 62,
+      inspection_no: "TEST-YS-260715V3-ZJ901",
+      purchase_receipt_id: 41,
+      purchase_receipt_item_id: 51,
+      source_type: "PURCHASE_RECEIPT",
+      inspection_type: "INCOMING",
+      status: "DRAFT",
+    },
   ];
-  assert.throws(
-    () =>
-      buildManualAcceptanceFactPlan(singleWarehouse, {
-        runId: "ONE-WAREHOUSE",
-      }),
-    /at least four distinct active warehouses/u,
+  let calls = 0;
+  const result = await verifyReceiptQualities(
+    async ({ method, params }) => {
+      calls += 1;
+      assert.equal(method, "list_quality_inspections");
+      assert.equal(params.purchase_receipt_id, 41);
+      return { quality_inspections: structuredClone(inspections), total: inspections.length };
+    },
+    receipt,
+    {
+      receiptNo: "PR-001",
+      status: "DRAFT",
+      qualityTarget: "DRAFT",
+      qualityDraftNo: "TEST-YS-260715V3-ZJ901",
+    },
+  );
+  assert.deepEqual(result, inspections);
+  assert.equal(calls, 1);
+});
+
+test("authoritative lifecycle records win over stale source readback", () => {
+  assert.deepEqual(
+    mergeManualAcceptanceFactReferences(
+      [{ id: 1, order_no: "MO-1", status: "RELEASED" }],
+      [{ id: 1, order_no: "MO-1", status: "CLOSED" }],
+    ),
+    [{ id: 1, order_no: "MO-1", status: "CLOSED" }],
   );
 });
 
-test("fact CLI parses explicit scale without enabling writes by default", () => {
-  const parsed = parseManualAcceptanceFactArgs([
-    "--source-report",
-    "output/source.json",
-    "--run-id",
-    "LOCAL-UAT-FACTS",
-    "--operational-runs",
-    "45",
-    "--purchase-quality-runs",
-    "9",
-    "--json",
+test("final inventory readback runs after all facts and rejects truncated pages", async () => {
+  const calls = [];
+  const rpc = async ({ method, params }) => {
+    calls.push({ method, params });
+    if (method === "list_inventory_balances") {
+      return {
+        inventory_balances: [{ id: params.lot_id * 10, lot_id: params.lot_id }],
+        total: 1,
+      };
+    }
+    if (method === "list_inventory_txns") {
+      return {
+        inventory_txns: [{ id: params.lot_id * 100, lot_id: params.lot_id }],
+        total: 1,
+      };
+    }
+    throw new Error(`unexpected method ${method}`);
+  };
+  const result = await readManualAcceptanceFinalInventoryReferences(rpc, [
+    { id: 2, lot_no: "LOT-2" },
+    { id: 1, lot_no: "LOT-1" },
+    { id: 2, lot_no: "LOT-2" },
   ]);
-  assert.equal(parsed.apply, false);
-  assert.equal(parsed.operationalRuns, 45);
-  assert.equal(parsed.purchaseQualityRuns, 9);
-  assert.equal(parsed.json, true);
+  assert.deepEqual(result.inventoryLots.map((item) => item.id), [2, 1]);
+  assert.deepEqual(result.inventoryBalances.map((item) => item.id), [20, 10]);
+  assert.deepEqual(result.inventoryTxns.map((item) => item.id), [200, 100]);
+  assert.equal(calls.length, 4);
+
+  await assert.rejects(
+    readManualAcceptanceFinalInventoryReferences(async ({ method }) => {
+      if (method === "list_inventory_balances") {
+        return { inventory_balances: [{ id: 10 }], total: 2 };
+      }
+      return { inventory_txns: [], total: 0 };
+    }, [{ id: 1 }]),
+    /balance readback was truncated/u,
+  );
 });
 
-test("fact apply is retired before reading plans, reports, credentials, or dependencies", async () => {
-  const report = sourceReport();
-  const plan = buildManualAcceptanceFactPlan(report, { runId: "RETIRED" });
-  let dependencyCalls = 0;
+test("partial source-driven phase fails before replay mutation", async () => {
+  let mutations = 0;
+  let reads = 0;
+  const rows = new Map([["ONE", { id: 1, fact_no: "ONE", status: "POSTED" }]]);
   await assert.rejects(
     () =>
-      applyManualAcceptanceFactPlan(
-        new Proxy(plan, {
-          get() {
-            dependencyCalls += 1;
-            throw new Error("plan must not be read");
-          },
-        }),
-        new Proxy(report, {
-          get() {
-            dependencyCalls += 1;
-            throw new Error("source report must not be read");
-          },
-        }),
-        {
-          fetchImpl: async () => {
-            dependencyCalls += 1;
-            throw new Error("network must not run");
-          },
+      reuseOrApplyManualAcceptanceFactPhase({
+        phase: "production PROD-001",
+        apply: true,
+        rpc: async ({ params }) => ({ records: rows.has(params.keyword) ? [rows.get(params.keyword)] : [] }),
+        specs: ["ONE", "TWO"].map((businessNo) => ({
+          domain: "test",
+          method: "list",
+          listKey: "records",
+          businessField: "fact_no",
+          businessNo,
+          statuses: new Set(["POSTED"]),
+        })),
+        mutate: async () => {
+          mutations += 1;
         },
-      ),
-    new RegExp(MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE, "u"),
+        readComplete: async () => {
+          reads += 1;
+        },
+      }),
+    /phase is partial/u,
   );
-  assert.equal(dependencyCalls, 0);
+  assert.equal(mutations, 0);
+  assert.equal(reads, 0);
 });
 
-test("fact CLI parser rejects apply before a source report can be read", () => {
+test("verified contiguous partial phase resumes and reaches an exact complete readback", async () => {
+  let mutations = 0;
+  let reads = 0;
+  let partialValidations = 0;
+  const rows = new Map([["ONE", { id: 1, fact_no: "ONE", status: "POSTED" }]]);
+  const specs = ["ONE", "TWO"].map((businessNo) => ({
+    domain: "test",
+    method: "list",
+    listKey: "records",
+    businessField: "fact_no",
+    businessNo,
+    statuses: new Set(["POSTED"]),
+  }));
+  const result = await reuseOrApplyManualAcceptanceFactPhase({
+    phase: "outsourcing OUT-RECOVER",
+    apply: true,
+    rpc: async ({ params }) => ({
+      records: rows.has(params.keyword) ? [rows.get(params.keyword)] : [],
+    }),
+    specs,
+    allowVerifiedPartialResume: true,
+    validatePartialRecords: async (records) => {
+      partialValidations += 1;
+      assert.deepEqual(records.map((record) => record.fact_no), ["ONE"]);
+    },
+    mutate: async () => {
+      mutations += 1;
+      rows.set("TWO", { id: 2, fact_no: "TWO", status: "POSTED" });
+    },
+    readComplete: async () => {
+      reads += 1;
+      return { complete: true };
+    },
+  });
+  assert.deepEqual(result, { complete: true });
+  assert.equal(partialValidations, 1);
+  assert.equal(mutations, 1);
+  assert.equal(reads, 1);
+});
+
+test("verified partial resume still rejects semantic drift before mutation", async () => {
+  let mutations = 0;
+  await assert.rejects(
+    () =>
+      reuseOrApplyManualAcceptanceFactPhase({
+        phase: "outsourcing OUT-CONFLICT",
+        apply: true,
+        rpc: async ({ params }) => ({
+          records:
+            params.keyword === "ONE"
+              ? [{ id: 1, fact_no: "ONE", status: "POSTED" }]
+              : [],
+        }),
+        specs: ["ONE", "TWO"].map((businessNo) => ({
+          domain: "test",
+          method: "list",
+          listKey: "records",
+          businessField: "fact_no",
+          businessNo,
+          statuses: new Set(["POSTED"]),
+        })),
+        allowVerifiedPartialResume: true,
+        validatePartialRecords: async () => {
+          throw new Error("partial source grain conflicts");
+        },
+        mutate: async () => {
+          mutations += 1;
+        },
+        readComplete: async () => ({ complete: true }),
+      }),
+    /partial source grain conflicts/u,
+  );
+  assert.equal(mutations, 0);
+});
+
+test("same-number semantic collision fails before replay mutation", async () => {
+  let mutations = 0;
+  let reads = 0;
+  await assert.rejects(
+    () =>
+      reuseOrApplyManualAcceptanceFactPhase({
+        phase: "sales SALE-SEMANTIC",
+        apply: true,
+        specs: [
+          {
+            domain: "operational_fact",
+            method: "list_stock_reservations",
+            listKey: "stock_reservations",
+            businessField: "reservation_no",
+            businessNo: "RSV-SAME",
+            statuses: new Set(["ACTIVE"]),
+          },
+        ],
+        rpc: async () => ({
+          stock_reservations: [{ id: 1, reservation_no: "RSV-SAME", status: "ACTIVE" }],
+        }),
+        mutate: async () => {
+          mutations += 1;
+        },
+        validateRecords: async () => {
+          throw new Error("reservation source grain conflicts");
+        },
+        readComplete: async () => {
+          reads += 1;
+        },
+      }),
+    /source grain conflicts/u,
+  );
+  assert.equal(mutations, 0);
+  assert.equal(reads, 0);
+});
+
+test("sales phase semantic validator rejects an exact number bound to the wrong source", () => {
+  const report = sourceReport();
+  const candidate = buildManualAcceptanceFactPlan(report).productionCandidates[0];
+  const sourcePlan = buildSourceDrivenFactPlan(report, {
+    instanceKey: "SALE-SEMANTIC",
+    enabledPhases: ["sales"],
+    sales: {
+      order: candidate.salesOrder,
+      item: candidate.item,
+      inventory: { warehouseId: 302, lotId: 13000, quantity: "1" },
+    },
+  });
+  const identity = sourcePlan.identities.sales;
+  const reservation = {
+    id: 1,
+    status: "ACTIVE",
+    sales_order_id: candidate.salesOrder.id,
+    sales_order_item_id: candidate.item.id,
+    product_id: candidate.item.productId,
+    product_sku_id: candidate.item.productSkuId ?? null,
+    warehouse_id: 302,
+    unit_id: candidate.item.unitId,
+    lot_id: 13000,
+    quantity: "1",
+    idempotency_key: identity.reservation.idempotencyKey,
+  };
+  const shipment = {
+    id: 2,
+    status: "SHIPPED",
+    sales_order_id: candidate.salesOrder.id,
+    customer_id: candidate.salesOrder.customerId,
+    customer_snapshot: candidate.salesOrder.customerSnapshot,
+    idempotency_key: identity.shipment.idempotencyKey,
+    items: [
+      {
+        sales_order_item_id: candidate.item.id,
+        product_id: candidate.item.productId,
+        product_sku_id: candidate.item.productSkuId ?? null,
+        warehouse_id: 302,
+        unit_id: candidate.item.unitId,
+        lot_id: 13000,
+        quantity: "1",
+      },
+    ],
+  };
+  const receivable = {
+    id: 3,
+    fact_type: "RECEIVABLE",
+    source_type: "SHIPMENT",
+    source_id: shipment.id,
+    idempotency_key: identity.receivable.idempotencyKey,
+  };
+  const receivableReconciliation = {
+    id: 4,
+    fact_type: "RECONCILIATION",
+    source_type: "FINANCE_FACT",
+    source_id: receivable.id,
+    idempotency_key: identity.receivableReconciliation.idempotencyKey,
+  };
+  const invoice = {
+    id: 5,
+    fact_type: "INVOICE",
+    source_type: "SHIPMENT",
+    source_id: shipment.id,
+    idempotency_key: identity.invoice.idempotencyKey,
+  };
+  const invoiceReconciliation = {
+    id: 6,
+    fact_type: "RECONCILIATION",
+    source_type: "FINANCE_FACT",
+    source_id: invoice.id,
+    idempotency_key: identity.invoiceReconciliation.idempotencyKey,
+  };
+  validateSalesPhaseRecords(sourcePlan, [
+    reservation,
+    shipment,
+    receivable,
+    receivableReconciliation,
+    invoice,
+    invoiceReconciliation,
+  ]);
   assert.throws(
     () =>
-      parseManualAcceptanceFactArgs([
-        "--apply",
-        "--source-report",
-        "/path/that/must/not/be/read.json",
+      validateSalesPhaseRecords(sourcePlan, [
+        { ...reservation, sales_order_id: candidate.salesOrder.id + 1 },
+        shipment,
+        receivable,
+        receivableReconciliation,
+        invoice,
+        invoiceReconciliation,
       ]),
-    new RegExp(MANUAL_ACCEPTANCE_FACT_APPLY_RETIRED_MESSAGE, "u"),
+    /conflicting sales_order_id/u,
   );
+});
+
+test("purchase correction validator rejects an existing number linked to another receipt", () => {
+  assert.throws(
+    () =>
+      validatePurchaseCorrectionRecord(
+        "adjustment",
+        {
+          id: 9,
+          purchase_receipt_id: 100,
+          items: [
+            {
+              purchase_receipt_item_id: 201,
+              adjust_type: "QUANTITY_INCREASE",
+              quantity: "1",
+            },
+          ],
+        },
+        { id: 101 },
+        { id: 201 },
+        { adjustType: "QUANTITY_INCREASE" },
+      ),
+    /conflicting purchase_receipt_id/u,
+  );
+});
+
+test("complete sales phase with a consumed reservation replays without mutation", async () => {
+  const report = sourceReport();
+  const plan = buildManualAcceptanceFactPlan(report);
+  const candidate = plan.productionCandidates[0];
+  const sourcePlan = buildSourceDrivenFactPlan(report, {
+    instanceKey: "SALE-REPLAY",
+    enabledPhases: ["sales"],
+    sales: {
+      order: candidate.salesOrder,
+      item: candidate.item,
+      inventory: { warehouseId: 302, lotId: 13000, quantity: "1" },
+    },
+  });
+  const specs = sourceDrivenPhaseIdentitySpecs(sourcePlan, "sales");
+  const stored = new Map(
+    specs.map((spec, index) => [
+      spec.businessNo,
+      {
+        spec,
+        record: {
+          id: 60000 + index,
+          [spec.businessField]: spec.businessNo,
+          status:
+            spec.listKey === "stock_reservations"
+              ? "CONSUMED"
+              : spec.listKey === "shipments"
+                ? "SHIPPED"
+                : "POSTED",
+        },
+      },
+    ]),
+  );
+  let mutations = 0;
+  let reads = 0;
+  const replay = () =>
+    reuseOrApplyManualAcceptanceFactPhase({
+      phase: "sales SALE-REPLAY",
+      apply: true,
+      specs,
+      rpc: async ({ params }) => {
+        const value = stored.get(params.keyword);
+        return { [value.spec.listKey]: [value.record] };
+      },
+      mutate: async () => {
+        mutations += 1;
+      },
+      readComplete: async () => {
+        reads += 1;
+        return { complete: true };
+      },
+    });
+  await replay();
+  await replay();
+  assert.equal(mutations, 0);
+  assert.equal(reads, 2);
+});
+
+test("finance lifecycle uses stable business numbers and second apply is a no-op", async () => {
+  const records = new Map();
+  const baseIDs = new Set();
+  let nextID = 50000;
+  let mutations = 0;
+  let creations = 0;
+  const add = (record, base = true) => {
+    const item = { id: nextID++, ...record };
+    records.set(item.id, item);
+    if (base) baseIDs.add(item.id);
+    return item;
+  };
+  for (const type of ["PAYABLE", "RECEIVABLE", "INVOICE"]) {
+    for (const suffix of ["04", "01", "03", "02"]) {
+      const source = add({
+        fact_no: `${type}-${suffix}`,
+        fact_type: type,
+        status: "POSTED",
+        source_type: type === "PAYABLE" ? "OUTSOURCING_FACT" : "SHIPMENT",
+        source_id: 70000 + nextID,
+        source_no: `SOURCE-${type}-${suffix}`,
+      });
+      add({
+        fact_no:
+          type === "PAYABLE" && suffix === "01"
+            ? "RECON-00-POSTED-PARENT"
+            : type === "PAYABLE" && suffix === "02"
+              ? "RECON-01-SETTLED-PARENT"
+              : `RECON-${type}-${suffix}`,
+        fact_type: "RECONCILIATION",
+        status: "POSTED",
+        source_type: "FINANCE_FACT",
+        source_id: source.id,
+        source_no: source.fact_no,
+      });
+    }
+  }
+  const rpc = async ({ method, params }) => {
+    if (method === "list_finance_facts") {
+      return {
+        finance_facts: [...records.values()].filter(
+          (item) => item.fact_no === params.keyword,
+        ),
+      };
+    }
+    if (method === "settle_finance_fact" || method === "cancel_finance_fact") {
+      const current = records.get(params.id);
+      assert.equal(current.status, "POSTED");
+      const updated = {
+        ...current,
+        status: method === "settle_finance_fact" ? "SETTLED" : "CANCELLED",
+      };
+      records.set(updated.id, updated);
+      mutations += 1;
+      const response = { ...updated };
+      delete response.source_no;
+      return { finance_fact: response };
+    }
+    const typeByMethod = {
+      create_payable_from_outsourcing_return: "PAYABLE",
+      create_receivable_from_shipment: "RECEIVABLE",
+      create_invoice_from_shipment: "INVOICE",
+      create_reconciliation_from_finance_fact: "RECONCILIATION",
+    };
+    const factType = typeByMethod[method];
+    assert.ok(factType, `unexpected method ${method}`);
+    if (factType === "RECONCILIATION") {
+      assert.equal(records.get(params.finance_fact_id)?.status, "POSTED");
+    }
+    const created = add(
+      {
+        fact_no: params.fact_no,
+        fact_type: factType,
+        status: "DRAFT",
+        source_type:
+          factType === "RECONCILIATION"
+            ? "FINANCE_FACT"
+            : params.outsourcing_fact_id
+              ? "OUTSOURCING_FACT"
+              : "SHIPMENT",
+        source_id:
+          params.finance_fact_id ||
+          params.outsourcing_fact_id ||
+          params.shipment_id,
+        source_no: `SOURCE-${params.fact_no}`,
+        idempotency_key: params.idempotency_key,
+      },
+      false,
+    );
+    creations += 1;
+    const response = { ...created };
+    delete response.source_no;
+    return { finance_fact: response };
+  };
+  const plan = { prefix: "SIM-YOYOOSUN-UAT-REPLAY", dataVersion: DATA_VERSION };
+  const currentBase = () => [...baseIDs].map((id) => ({ ...records.get(id) }));
+  const first = await applyManualAcceptanceFinanceLifecycle({
+    rpc,
+    plan,
+    financeFacts: currentBase(),
+    apply: true,
+  });
+  assert.ok(first.every((item) => item.source_no));
+  const firstMutationCount = mutations;
+  const firstCreationCount = creations;
+  const firstStates = [...records.values()].map(({ id, fact_no, status }) => ({
+    id,
+    fact_no,
+    status,
+  }));
+  const second = await applyManualAcceptanceFinanceLifecycle({
+    rpc,
+    plan,
+    financeFacts: currentBase(),
+    apply: true,
+  });
+  assert.equal(mutations, firstMutationCount);
+  assert.equal(creations, firstCreationCount);
+  assert.deepEqual(
+    [...records.values()].map(({ id, fact_no, status }) => ({ id, fact_no, status })),
+    firstStates,
+  );
+  assert.deepEqual(
+    second.map(({ id, status }) => ({ id, status })),
+    first.map(({ id, status }) => ({ id, status })),
+  );
+  const verified = await applyManualAcceptanceFinanceLifecycle({
+    rpc,
+    plan,
+    financeFacts: currentBase(),
+    apply: false,
+  });
+  assert.equal(mutations, firstMutationCount);
+  assert.equal(creations, firstCreationCount);
+  assert.deepEqual(
+    verified.map(({ id, status }) => ({ id, status })),
+    first.map(({ id, status }) => ({ id, status })),
+  );
+});
+
+test("apply emits the exact readiness contract and complete lifecycle matrices", async () => {
+  const report = sourceReport();
+  const plan = buildManualAcceptanceFactPlan(report);
+  const result = await applyManualAcceptanceFactPlan(plan, report, {
+    confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
+    executionContext: { rpc: async () => ({}), runtime },
+    purchaseStage: async () => purchaseStage(),
+    factStage: async () => factStage(),
+  });
+  assert.equal(result.reportContract, SOURCE_DRIVEN_FACT_REPORT_CONTRACT);
+  assert.equal(result.mode, "apply");
+  assert.equal(result.semanticDigest, report.semanticDigest);
+  assert.equal(result.referenceRecords.purchaseReceipts.length, 54);
+  assert.ok(
+    result.referenceRecords.purchaseReceiptAdjustments.every(
+      (item) =>
+        item.adjust_type === "QUANTITY_INCREASE" ||
+        item.adjust_type === "QUANTITY_DECREASE",
+    ),
+  );
+  assert.ok(result.referenceRecords.productionFacts.length >= 45);
+  assert.ok(
+    result.referenceRecords.stockReservations.every(
+      (item) => item.source_type === "SALES_ORDER" && item.source_id > 0,
+    ),
+  );
+  assert.ok(result.referenceRecords.financeFacts.length >= 180);
+  assert.ok(result.referenceRecords.attachmentOwners.productionFactId > 0);
+  assert.ok(result.referenceRecords.attachmentOwners.financeFactId > 0);
+  assert.deepEqual(Object.keys(result.statusCounts.productionOrders).sort(), [
+    "CANCELLED",
+    "CLOSED",
+    "DRAFT",
+    "RELEASED",
+  ]);
+});
+
+test("runtime revision drift fails before purchase or fact mutation", async () => {
+  const report = sourceReport();
+  const plan = buildManualAcceptanceFactPlan(report);
+  let stageCalls = 0;
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceFactPlan(plan, report, {
+        confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
+        executionContext: {
+          rpc: async () => ({}),
+          runtime: { ...runtime, configRevision: "runtime-other" },
+        },
+        purchaseStage: async () => {
+          stageCalls += 1;
+          return purchaseStage();
+        },
+      }),
+    /configRevision does not match/u,
+  );
+  assert.equal(stageCalls, 0);
+});
+
+test("verify is read-only and uses the same exact report contract", async () => {
+  const report = sourceReport();
+  const plan = buildManualAcceptanceFactPlan(report);
+  let writes = 0;
+  const result = await verifyManualAcceptanceFactPlan(plan, report, {
+    executionContext: {
+      rpc: async () => {
+        writes += 1;
+        throw new Error("unexpected rpc");
+      },
+      runtime,
+    },
+    verifyPurchaseStage: async () => purchaseStage(),
+    factStage: async (_plan, _source, _purchase, options) => {
+      assert.equal(options.apply, false);
+      return factStage();
+    },
+  });
+  assert.equal(writes, 0);
+  assert.equal(result.mode, "verify");
+  assert.equal(result.reportContract, SOURCE_DRIVEN_FACT_REPORT_CONTRACT);
+});
+
+test("facts-only apply verifies the purchase prerequisite without rewriting it", async () => {
+  const report = sourceReport();
+  const plan = buildManualAcceptanceFactPlan(report);
+  let purchaseWrites = 0;
+  let purchaseVerifies = 0;
+  await applyManualAcceptanceFactPlan(plan, report, {
+    phase: "facts",
+    confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
+    executionContext: { rpc: async () => ({}), runtime },
+    purchaseStage: async () => {
+      purchaseWrites += 1;
+      return purchaseStage();
+    },
+    verifyPurchaseStage: async () => {
+      purchaseVerifies += 1;
+      return purchaseStage();
+    },
+    factStage: async () => factStage(),
+  });
+  assert.equal(purchaseWrites, 0);
+  assert.equal(purchaseVerifies, 1);
+});
+
+function attestation() {
+  return {
+    target: "customer-trial-133",
+    origin: "http://127.0.0.1:18375",
+    customerKey: "yoyoosun",
+    environment: "prod",
+    release: "release-v2",
+    migration: "migration-v2",
+    debug: {
+      seedEnabled: false,
+      seedAllowed: false,
+      cleanupEnabled: false,
+      cleanupAllowed: false,
+      businessDataClearEnabled: false,
+      businessDataClearAllowed: false,
+    },
+  };
+}
+
+test("remote apply rejects missing target confirmation and attestation before execution", async () => {
+  const report = sourceReport({ remote: true });
+  const plan = buildManualAcceptanceFactPlan(report);
+  let executionCalls = 0;
+  const options = {
+    confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
+    executionContext: {
+      rpc: async () => ({}),
+      runtime: {
+        ...runtime,
+        target: "customer-trial-133",
+        targetAttestation: {
+          source: "out-of-band",
+          release: "release-v2",
+          migration: "migration-v2",
+        },
+      },
+    },
+    purchaseStage: async () => {
+      executionCalls += 1;
+      return purchaseStage();
+    },
+    factStage: async () => factStage(),
+  };
+  await assert.rejects(
+    () => applyManualAcceptanceFactPlan(plan, report, options),
+    /external apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
+  );
+  assert.equal(executionCalls, 0);
+  const targetConfirmation =
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v3:20260715-V3";
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceFactPlan(plan, report, {
+        ...options,
+        targetConfirmation,
+      }),
+    /attestation is required/u,
+  );
+  assert.equal(executionCalls, 0);
+  const result = await applyManualAcceptanceFactPlan(plan, report, {
+    ...options,
+    targetConfirmation,
+    targetAttestation: attestation(),
+  });
+  assert.equal(result.target, "customer-trial-133");
+  assert.equal(executionCalls, 1);
+});
+
+test("remote runtime release drift fails before any fact stage", async () => {
+  const report = sourceReport({ remote: true });
+  const plan = buildManualAcceptanceFactPlan(report);
+  let stageCalls = 0;
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceFactPlan(plan, report, {
+        confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
+        targetConfirmation:
+          "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v3:20260715-V3",
+        targetAttestation: attestation(),
+        executionContext: {
+          rpc: async () => ({}),
+          runtime: {
+            ...runtime,
+            target: "customer-trial-133",
+            targetAttestation: {
+              source: "out-of-band",
+              release: "release-other",
+              migration: "migration-v2",
+            },
+          },
+        },
+        purchaseStage: async () => {
+          stageCalls += 1;
+          return purchaseStage();
+        },
+      }),
+    /attestation release does not match/u,
+  );
+  assert.equal(stageCalls, 0);
+});
+
+test("remote runtime rejects missing attestation before login or any network request", async () => {
+  const report = sourceReport({ remote: true });
+  const plan = buildManualAcceptanceFactPlan(report);
+  let networkCalls = 0;
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceFactPlan(plan, report, {
+        fetchImpl: async () => {
+          networkCalls += 1;
+          throw new Error("network must not run");
+        },
+      }),
+    /attestation is required/u,
+  );
+  assert.equal(networkCalls, 0);
+});
+
+test("local apply forbids remote attestation before any stage runs", async () => {
+  const report = sourceReport();
+  const plan = buildManualAcceptanceFactPlan(report);
+  let stageCalls = 0;
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceFactPlan(plan, report, {
+        confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
+        targetAttestation: attestation(),
+        executionContext: { rpc: async () => ({}), runtime },
+        purchaseStage: async () => {
+          stageCalls += 1;
+          return purchaseStage();
+        },
+      }),
+    /attestation is forbidden for local/u,
+  );
+  assert.equal(stageCalls, 0);
+});
+
+test("source contains no direct SQL or retired generic writer import", async () => {
+  const source = await readFile(
+    new URL("./manual-acceptance-fact-data.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.doesNotMatch(source, /operational-fact-simulated-closure|purchase-quality-simulated-matrix/u);
+  assert.doesNotMatch(source, /\b(?:SELECT|INSERT|UPDATE|DELETE)\s+(?:FROM|INTO|SET)\b/iu);
+  assert.match(source, /applySourceDrivenFactPlan/u);
+  assert.match(source, /assertManualAcceptanceTargetAttestation/u);
 });

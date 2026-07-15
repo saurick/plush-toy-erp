@@ -31,7 +31,7 @@ function customerConfigIdentity(manifest, validation) {
     validation?.revision !== revision ||
     validation?.compiled_snapshot_ok !== true
   ) {
-    throw new Error('后端校验结果与当前运行时清单不一致')
+    throw new Error('客户业务设置校验结果不一致，请刷新后重试')
   }
   return { customerKey, revision, productVersion, configHash }
 }
@@ -50,7 +50,7 @@ function assertExactKeys(value, allowedKeys, label) {
 
 export function buildCustomerConfigMutationPayload(action, params) {
   if (!TRANSITION_ACTIONS.has(action)) {
-    throw new Error('客户配置切换动作无效')
+    throw new Error('当前客户业务设置无法切换，请刷新后重试')
   }
   const revisionKey = action === 'rollback' ? 'target_revision' : 'revision'
   const allowedKeys = [
@@ -101,6 +101,17 @@ export function assertPublishedCustomerConfigIdentity(
     throw new Error('发布结果与已校验的客户配置不一致')
   }
   return identity
+}
+
+export function resolveCustomerConfigApplyTransitionAction(published) {
+  const status = String(published?.status || '').trim()
+  if (status === 'superseded') {
+    return 'rollback'
+  }
+  if (status === 'published' || status === 'active') {
+    return 'activate'
+  }
+  throw new Error('客户配置版本状态不支持本地应用')
 }
 
 function transitionOf(response, expected) {

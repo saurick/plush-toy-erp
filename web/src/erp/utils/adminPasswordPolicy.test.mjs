@@ -13,6 +13,9 @@ test('adminPasswordPolicy: 与后端字符数和 bcrypt 字节上限一致', () 
   assert.match(getAdminPasswordPolicyError('1234567'), /至少 8 位/u)
   assert.equal(getAdminPasswordPolicyError('12345678'), '')
   assert.equal(getAdminPasswordPolicyError('毛绒玩具权限管理安全密码'), '')
-  assert.match(getAdminPasswordPolicyError('毛'.repeat(25)), /不能超过 72 字节/u)
+  assert.equal(
+    getAdminPasswordPolicyError('毛'.repeat(25)),
+    '密码过长，请减少字符后重试'
+  )
   assert.equal(getAdminPasswordPolicyError('🧸'.repeat(8)), '')
 })

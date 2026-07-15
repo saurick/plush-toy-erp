@@ -132,7 +132,7 @@ export async function installSystemRpcMocks(page, context) {
               created_at: nowUnix() - 300,
               actor_key: 'style-l1-admin',
               target_key: 'assistant-admin',
-              target_type: '管理员账号',
+              target_type: '员工账号',
               payload: {
                 actor: { id: 1, username: 'style-l1-admin' },
                 target: {

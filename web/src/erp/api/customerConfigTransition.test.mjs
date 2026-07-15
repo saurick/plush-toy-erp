@@ -6,6 +6,7 @@ import {
   assertPublishedCustomerConfigIdentity,
   buildCustomerConfigMutationPayload,
   confirmCustomerConfigTransition,
+  resolveCustomerConfigApplyTransitionAction,
 } from './customerConfigTransition.mjs'
 
 const configHash = 'a'.repeat(64)
@@ -192,6 +193,46 @@ test('publish 与 effective readback 必须匹配 canonical identity', () => {
     ).configRevision,
     'rev-2'
   )
+})
+
+test('内容寻址版本 A-B-A 回切时 superseded 版本必须走 rollback', async () => {
+  assert.equal(
+    resolveCustomerConfigApplyTransitionAction({ status: 'published' }),
+    'activate'
+  )
+  assert.equal(
+    resolveCustomerConfigApplyTransitionAction({ status: 'active' }),
+    'activate'
+  )
+  assert.equal(
+    resolveCustomerConfigApplyTransitionAction({ status: 'superseded' }),
+    'rollback'
+  )
+  assert.throws(
+    () => resolveCustomerConfigApplyTransitionAction({ status: 'draft' }),
+    /状态不支持/
+  )
+
+  const result = await confirmCustomerConfigTransition({
+    action: 'rollback',
+    manifest,
+    validation,
+    check: async (params) => {
+      const confirmed = params.expected_active_revision === 'rev-3'
+      return transition(params, {
+        observed_active_revision: 'rev-3',
+        allowed: confirmed,
+        blockers: confirmed ? [] : [{ code: 'active_revision_changed' }],
+      })
+    },
+  })
+  assert.deepEqual(result.mutationPayload, {
+    customer_key: 'yoyoosun',
+    target_revision: 'rev-2',
+    expected_config_hash: configHash,
+    expected_product_version: 'product-v1',
+    expected_active_revision: 'rev-3',
+  })
 })
 
 test('effective readback 的客户身份不一致时 fail closed', () => {

@@ -22,6 +22,10 @@ const REPORT_ROOT = path.resolve(
   REPO_ROOT,
   "output/qa/manual-acceptance/browser",
 );
+const INPUT_REPORT_ROOT = path.resolve(
+  REPO_ROOT,
+  "output/qa/manual-acceptance",
+);
 const DEFAULT_SOURCE_REPORT_PATH = path.resolve(
   REPO_ROOT,
   "output/qa/manual-acceptance/source-data/apply-report.json",
@@ -34,7 +38,7 @@ const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
   "source-driven-operational-facts-v1";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const COMPANY_NAME = "东莞市永绅玩具有限公司";
-const SYSTEM_NAME = "毛绒 ERP 管理后台";
+const SYSTEM_NAME = "业务管理";
 const CUSTOMER_KEY = "yoyoosun";
 const LOGIN_TIMEOUT_MS = 20_000;
 const PAGE_TIMEOUT_MS = 25_000;
@@ -148,6 +152,21 @@ export function resolveManualAcceptanceBrowserReportPath(value = "") {
   return target;
 }
 
+export function resolveManualAcceptanceBrowserInputReportPath(value, label) {
+  const target = path.resolve(REPO_ROOT, requiredText(value, label));
+  const relative = path.relative(INPUT_REPORT_ROOT, target);
+  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+    throw new BrowserAcceptanceError(
+      `${label} must stay under output/qa/manual-acceptance`,
+      2,
+    );
+  }
+  if (path.extname(target).toLowerCase() !== ".json") {
+    throw new BrowserAcceptanceError(`${label} must point to a .json file`, 2);
+  }
+  return target;
+}
+
 function flattenCatalogTargets(catalog) {
   return [
     ["entries", catalog.technicalManifest.entries],
@@ -225,6 +244,8 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
     baseURL: "",
     backendURL: "",
     reportPath: DEFAULT_REPORT_PATH,
+    sourceReportPath: DEFAULT_SOURCE_REPORT_PATH,
+    factReportPath: DEFAULT_FACT_REPORT_PATH,
     headed: false,
     plan: false,
     help: false,
@@ -264,6 +285,20 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
       options.reportPath = resolveManualAcceptanceBrowserReportPath(value);
       continue;
     }
+    if (key === "source-report") {
+      options.sourceReportPath = resolveManualAcceptanceBrowserInputReportPath(
+        value,
+        "--source-report",
+      );
+      continue;
+    }
+    if (key === "fact-report") {
+      options.factReportPath = resolveManualAcceptanceBrowserInputReportPath(
+        value,
+        "--fact-report",
+      );
+      continue;
+    }
     throw new BrowserAcceptanceError(`不支持的参数：--${key}`, 2);
   }
   if (!options.help) {
@@ -280,7 +315,9 @@ export function getManualAcceptanceBrowserHelp() {
   return `用法：
   MANUAL_ACCEPTANCE_PASSWORD='<本地试用密码>' node scripts/qa/manual-acceptance-browser.mjs \\
     --base-url http://127.0.0.1:5177 \\
-    --backend-url http://127.0.0.1:8300
+    --backend-url http://127.0.0.1:8300 \
+    --source-report output/qa/manual-acceptance/source-data/apply-report.json \
+    --fact-report output/qa/manual-acceptance/fact-data/apply-report.json
   node scripts/qa/manual-acceptance-browser.mjs --plan \\
     --base-url http://127.0.0.1:5177 \\
     --backend-url http://127.0.0.1:8300
@@ -428,7 +465,8 @@ async function waitForReadablePage(page) {
 }
 
 async function selectLoginEntry(page, entryTarget) {
-  const label = entryTarget === "mobile" ? "岗位任务端" : "后台管理";
+  const label =
+    entryTarget === "mobile" ? "手机端待办" : "电脑端业务管理";
   const entry = page
     .locator(".ant-segmented-item")
     .filter({ hasText: label })
@@ -553,7 +591,7 @@ async function readVisibleTextSummary(page) {
       textSample: text.slice(0, 240),
       heading: heading.slice(0, 120),
       companyVisible: text.includes("东莞市永绅玩具有限公司"),
-      systemNameVisible: text.includes("毛绒 ERP 管理后台"),
+      systemNameVisible: text.includes("业务管理"),
     };
   });
 }
@@ -571,6 +609,7 @@ export function readBusinessSummaryTotal(targetKey, bodyText = "") {
   const patterns = {
     "task-board": [/全部任务\s*(\d+)/u],
     products: [/总产品\s*(\d+)/u],
+    "production-orders": [/符合条件\s*(\d+)/u],
     "accessories-purchase": [/总订单\s*(\d+)/u],
     "permission-center": [/管理员账号\s*(\d+)/u, /角色模板\s*(\d+)/u],
   };
@@ -578,7 +617,28 @@ export function readBusinessSummaryTotal(targetKey, bodyText = "") {
     const match = String(bodyText).match(pattern);
     return match ? [Number(match[1])] : [];
   });
+  if (targetKey === "task-board") {
+    const boardCounts = ["常规待办", "阻塞", "到期提醒", "已结束"].map(
+      (label) => {
+        const match = String(bodyText).match(
+          new RegExp(`${label}\\s*(\\d+)`, "u"),
+        );
+        return match ? Number(match[1]) : null;
+      },
+    );
+    if (boardCounts.every(Number.isInteger)) {
+      values.push(boardCounts.reduce((total, value) => total + value, 0));
+    }
+  }
   return values.length ? Math.max(...values) : 0;
+}
+
+export function readMobileLoadedTaskCount(tabKey, bodyText = "") {
+  const label = tabKey === "done" ? "已办" : "待处理";
+  const match = String(bodyText).match(
+    new RegExp(`已加载\\s*(\\d+)\\s*条${label}`, "u"),
+  );
+  return match ? Number(match[1]) : 0;
 }
 
 async function readMobileTaskEvidence(page, minimumRecords) {
@@ -586,7 +646,20 @@ async function readMobileTaskEvidence(page, minimumRecords) {
     state: "visible",
     timeout: PAGE_TIMEOUT_MS,
   });
-  const readCurrentTotal = async () => {
+  const waitForActiveViewLoaded = () =>
+    page.waitForFunction(
+      () =>
+        document
+          .querySelector('[data-testid="mobile-role-scroll"]')
+          ?.getAttribute("aria-busy") === "false",
+      null,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
+  await waitForActiveViewLoaded();
+  const readCurrentTotal = async (tabKey) => {
+    const bodyText = await page.locator("body").innerText();
+    const loadedCount = readMobileLoadedTaskCount(tabKey, bodyText);
+    if (loadedCount > 0) return loadedCount;
     const toggle = page
       .locator('[data-testid^="mobile-role-list-toggle-"]')
       .first();
@@ -595,9 +668,9 @@ async function readMobileTaskEvidence(page, minimumRecords) {
       .then((value) => Number(value || 0))
       .catch(() => 0);
     if (attributeTotal > 0) return attributeTotal;
-    return largestTotalFromTexts([await page.locator("body").innerText()]);
+    return largestTotalFromTexts([bodyText]);
   };
-  const todoCount = await readCurrentTotal();
+  const todoCount = await readCurrentTotal("todo");
   await page.getByTestId("mobile-role-nav-done").click();
   await page.waitForFunction(
     () =>
@@ -607,7 +680,20 @@ async function readMobileTaskEvidence(page, minimumRecords) {
     null,
     { timeout: PAGE_TIMEOUT_MS },
   );
-  const doneCount = await readCurrentTotal();
+  await waitForActiveViewLoaded();
+  await page.waitForFunction(
+    ({ loadedTodoCount, requiredMinimum }) => {
+      const match = (document.body?.innerText || "").match(
+        /已加载\s*(\d+)\s*条已办/u,
+      );
+      return (
+        match && loadedTodoCount + Number(match[1] || 0) >= requiredMinimum
+      );
+    },
+    { loadedTodoCount: todoCount, requiredMinimum: minimumRecords },
+    { timeout: PAGE_TIMEOUT_MS },
+  );
+  const doneCount = await readCurrentTotal("done");
   await page.getByTestId("mobile-role-nav-todo").click();
   const observedTotal = todoCount + doneCount;
   return {
@@ -698,28 +784,64 @@ async function readListEvidence(page, target) {
   };
 }
 
-async function loadBoundSimulatedPrintInput() {
-  const [sourceRaw, factRaw] = await Promise.all([
-    fs.readFile(DEFAULT_SOURCE_REPORT_PATH, "utf8"),
-    fs.readFile(DEFAULT_FACT_REPORT_PATH, "utf8"),
-  ]);
-  const source = JSON.parse(sourceRaw);
-  const fact = JSON.parse(factRaw);
+export function assertBoundSimulatedPrintReports(source, fact) {
   const sourceRunId = requiredText(source?.runId, "source report runId");
+  const identityFields = [
+    "datasetKey",
+    "dataVersion",
+    "runId",
+    "target",
+    "backendURL",
+    "semanticDigest",
+  ];
+  const identityMatches = identityFields.every(
+    (field) =>
+      requiredText(source?.[field], `source report ${field}`) ===
+      requiredText(fact?.[field], `fact report ${field}`),
+  );
+  const runtimeMatches =
+    requiredText(
+      source?.runtime?.configRevision,
+      "source report configRevision",
+    ) ===
+    requiredText(fact?.runtime?.configRevision, "fact report configRevision");
   if (
+    source?.mode !== "apply" ||
+    fact?.mode !== "apply" ||
     source?.simulatedOnly !== true ||
     fact?.simulatedOnly !== true ||
+    source?.realCustomerImport !== false ||
+    fact?.realCustomerImport !== false ||
     fact?.reportContract !== SOURCE_DRIVEN_FACT_REPORT_CONTRACT ||
-    fact?.sourceRunId !== sourceRunId
+    !identityMatches ||
+    !runtimeMatches
   ) {
     throw new BrowserAcceptanceError(
-      "打印验收只接受同一批次的本机模拟业务记录",
+      "打印验收只接受同一批次、同一运行配置的本机模拟业务记录",
     );
   }
   return {
     sourceRunId,
     factRunId: requiredText(fact?.runId, "fact report runId"),
     sourcePrefix: requiredText(source?.prefix, "source report prefix"),
+  };
+}
+
+async function loadBoundSimulatedPrintInput({
+  sourceReportPath,
+  factReportPath,
+}) {
+  const [sourceRaw, factRaw] = await Promise.all([
+    fs.readFile(sourceReportPath, "utf8"),
+    fs.readFile(factReportPath, "utf8"),
+  ]);
+  const source = JSON.parse(sourceRaw);
+  const fact = JSON.parse(factRaw);
+  const identity = assertBoundSimulatedPrintReports(source, fact);
+  return {
+    ...identity,
+    sourceReportPath: path.relative(REPO_ROOT, sourceReportPath),
+    factReportPath: path.relative(REPO_ROOT, factReportPath),
     sourceReportSHA256: createHash("sha256").update(sourceRaw).digest("hex"),
     factReportSHA256: createHash("sha256").update(factRaw).digest("hex"),
   };
@@ -754,6 +876,32 @@ async function readPDFPreviewEvidence(workspace, preview) {
       magic: String.fromCharCode(...bytes.slice(0, 4)),
     };
   }, blobURL);
+}
+
+export async function assertPDFRenderResponse(response, templateKey) {
+  const headers = response.headers();
+  const status = response.status();
+  const contentType = String(headers["content-type"] || "").toLowerCase();
+  if (!response.ok()) {
+    let reason = "";
+    try {
+      const payload = await response.json();
+      reason = sanitizeDiagnostic(payload?.message || payload?.error?.message);
+    } catch {
+      // HTTP status remains the authoritative failure evidence when the body
+      // is absent or not JSON.
+    }
+    throw new BrowserAcceptanceError(
+      `${templateKey} PDF HTTP ${status}${reason ? `：${reason}` : ""}`,
+    );
+  }
+  const requestID = requiredText(headers["x-request-id"], "PDF request_id");
+  if (!/application\/pdf/u.test(contentType)) {
+    throw new BrowserAcceptanceError(
+      `${templateKey} PDF Content-Type 非 application/pdf`,
+    );
+  }
+  return { status, contentType, requestID };
 }
 
 async function verifyBusinessPrintTemplate(browser, options) {
@@ -857,12 +1005,11 @@ async function verifyBusinessPrintTemplate(browser, options) {
       .click();
     const response = await responsePromise;
     preview = await popupPromise;
+    const responseEvidence = await assertPDFRenderResponse(
+      response,
+      templateKey,
+    );
     const pdf = await readPDFPreviewEvidence(workspace, preview);
-    const headers = response.headers();
-    const requestID = requiredText(headers["x-request-id"], "PDF request_id");
-    const contentType = String(headers["content-type"] || "").toLowerCase();
-    assert.ok(response.ok(), `${templateKey} PDF HTTP ${response.status()}`);
-    assert.match(contentType, /application\/pdf/u);
     assert.ok(pdf.byteLength > 100, `${templateKey} PDF 内容为空`);
     assert.equal(pdf.magic, "%PDF");
     return {
@@ -873,10 +1020,10 @@ async function verifyBusinessPrintTemplate(browser, options) {
       recordQuery,
       workspaceSource: "business",
       workspacePath: new URL(workspace.url()).pathname,
-      status: response.status(),
-      contentType,
+      status: responseEvidence.status,
+      contentType: responseEvidence.contentType,
       byteLength: pdf.byteLength,
-      requestID,
+      requestID: responseEvidence.requestID,
       passed: true,
     };
   } catch (error) {
@@ -1270,7 +1417,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
     baseURL,
     username: "demo_uat_disabled",
     password,
-    expectedText: "账号已停用",
+    expectedText: "登录信息不正确或账号不可用",
   });
 
   await wait(AUTH_PACE_MS);
@@ -1376,6 +1523,8 @@ export async function runManualAcceptanceBrowser(
     backendURL,
     password = "",
     reportPath = DEFAULT_REPORT_PATH,
+    sourceReportPath = DEFAULT_SOURCE_REPORT_PATH,
+    factReportPath = DEFAULT_FACT_REPORT_PATH,
     headed = false,
   } = {},
   runtime = {},
@@ -1388,6 +1537,16 @@ export async function runManualAcceptanceBrowser(
   const normalizedReportPath = resolveManualAcceptanceBrowserReportPath(
     path.relative(REPO_ROOT, reportPath),
   );
+  const normalizedSourceReportPath =
+    resolveManualAcceptanceBrowserInputReportPath(
+      path.relative(REPO_ROOT, sourceReportPath),
+      "--source-report",
+    );
+  const normalizedFactReportPath =
+    resolveManualAcceptanceBrowserInputReportPath(
+      path.relative(REPO_ROOT, factReportPath),
+      "--fact-report",
+    );
   const secret = String(password || "").trim();
   if (!secret) {
     throw new BrowserAcceptanceError(
@@ -1406,7 +1565,10 @@ export async function runManualAcceptanceBrowser(
     backendURL: normalizedBackendURL,
     fetchImpl,
   });
-  const printInput = await loadBoundSimulatedPrintInput();
+  const printInput = await loadBoundSimulatedPrintInput({
+    sourceReportPath: normalizedSourceReportPath,
+    factReportPath: normalizedFactReportPath,
+  });
   const chromium =
     runtime.chromium || (await (runtime.loadChromium || loadChromium)());
   const browser = await chromium.launch({ headless: !headed });

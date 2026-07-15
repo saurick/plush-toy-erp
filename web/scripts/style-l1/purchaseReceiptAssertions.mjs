@@ -53,15 +53,14 @@ export function createPurchaseReceiptAssertions(deps) {
       .filter({ has: page.getByText(receiptNo, { exact: true }) })
       .first()
     await row.waitFor({ state: 'visible', timeout: 10_000 })
-    const metrics = await row.evaluate((node) => ({
-      text: node.textContent?.replace(/\s+/g, ' ').trim() || '',
-      cells: Array.from(node.querySelectorAll('td')).map((cell) =>
-        cell.textContent?.replace(/\s+/g, ' ').trim()
-      ),
-    }))
-    assert(
-      metrics.cells.includes(String(expectedCount)),
-      `${receiptNo} 明细行数未刷新为 ${expectedCount}: ${JSON.stringify(metrics)}`
+    const count = row.locator(
+      '.erp-business-row-expand-button, .erp-business-row-item-count'
+    )
+    await count.waitFor({ state: 'visible', timeout: 10_000 })
+    assert.equal(
+      String((await count.innerText()) || '').replace(/\s+/gu, ''),
+      `${expectedCount}条`,
+      `${receiptNo} 明细条数未刷新为 ${expectedCount}条`
     )
   }
 

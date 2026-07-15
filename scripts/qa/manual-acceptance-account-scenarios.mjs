@@ -4,14 +4,33 @@ import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
+import {
+  assertManualAcceptanceRuntimePolicy,
+  resolveManualAcceptanceTarget,
+} from "./manual-acceptance-target-policy.mjs";
+import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlowMatrix.mjs";
+
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const CUSTOMER_KEY = "yoyoosun";
 const BUSINESS_ADMIN_USERNAME = "demo_admin";
 const GUARD_ADMIN_USERNAME = "admin";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
-const SAFE_ENVIRONMENTS = new Set(["local", "dev"]);
+const ACCOUNT_DATA_VERSION = "2026.07.15-v3";
+const ACCOUNT_RUN_ID = "20260715-V3";
 const MANAGED_ROLE_KEYS = new Set(["sales", "purchase"]);
+const MAX_AUDIT_MINIMUM = 200;
+
+export const MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE = Object.freeze(
+  yoyoosunRoleFlowMatrix.roles.map((profile) =>
+    Object.freeze({
+      roleKey: profile.roleKey,
+      capabilityKeys: Object.freeze(
+        [...new Set(profile.capabilityKeys)].sort(),
+      ),
+    }),
+  ),
+);
 
 export const FORMAL_DEMO_ACCOUNTS = Object.freeze([
   "demo_boss",
@@ -32,6 +51,7 @@ export const MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS = Object.freeze([
     username: "demo_uat_disabled",
     title: "已停用账号",
     instruction: "核对停用后的账号不能进入系统，已有业务资料仍然保留。",
+    disabledReason: "验收时暂时停用",
     roleKeys: Object.freeze(["sales"]),
     positions: Object.freeze(["业务"]),
     disabled: true,
@@ -75,6 +95,21 @@ function requiredText(value, name) {
   return text;
 }
 
+function normalizeAuditMinimum(value = 0) {
+  const number = Number(value);
+  if (
+    !Number.isSafeInteger(number) ||
+    number < 0 ||
+    number > MAX_AUDIT_MINIMUM
+  ) {
+    throw new CliError(
+      `--audit-minimum must be an integer between 0 and ${MAX_AUDIT_MINIMUM}`,
+      2,
+    );
+  }
+  return number;
+}
+
 export function normalizeAccountScenarioBackendURL(value) {
   let url;
   try {
@@ -113,6 +148,67 @@ function normalizeRoleKeys(roles, context) {
   return [...new Set(keys)].sort();
 }
 
+function normalizePermissionKeys(values, context) {
+  if (!Array.isArray(values)) {
+    throw new CliError(`${context} response missing permissions`);
+  }
+  const keys = values.map((value, index) =>
+    requiredText(value, `${context} permissions[${index}]`),
+  );
+  return [...new Set(keys)].sort();
+}
+
+function requireAdminRoleRecord(value, context) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CliError(`${context} response missing role`);
+  }
+  const roleKey = requiredText(value.role_key, `${context}.role_key`);
+  const version = Number(value.version);
+  if (!Number.isSafeInteger(version) || version <= 0) {
+    throw new CliError(`${context} response missing role version`);
+  }
+  if (typeof value.disabled !== "boolean") {
+    throw new CliError(`${context} response missing role status`);
+  }
+  const roleType = requiredText(value.role_type, `${context}.role_type`);
+  const permissionsEditable =
+    value.permissions_editable_by_current_admin ?? value.permissions_editable;
+  if (typeof permissionsEditable !== "boolean") {
+    throw new CliError(`${context} response missing permission edit status`);
+  }
+  return {
+    roleKey,
+    roleType,
+    version,
+    disabled: value.disabled,
+    permissionsEditable,
+    permissionKeys: normalizePermissionKeys(value.permissions, context),
+  };
+}
+
+function requirePermissionOption(value, context) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    throw new CliError(`${context} response missing permission`);
+  }
+  const permissionKey = requiredText(
+    value.permission_key,
+    `${context}.permission_key`,
+  );
+  const permissionClass = requiredText(value.class, `${context}.class`);
+  if (
+    typeof value.assignable !== "boolean" ||
+    typeof value.non_production_only !== "boolean"
+  ) {
+    throw new CliError(`${context} response missing permission metadata`);
+  }
+  return {
+    permissionKey,
+    permissionClass,
+    assignable: value.assignable,
+    nonProductionOnly: value.non_production_only,
+  };
+}
+
 export function requireAdminAccountRecord(value, context = "admin") {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
     throw new CliError(`${context} response missing admin account`);
@@ -122,8 +218,23 @@ export function requireAdminAccountRecord(value, context = "admin") {
     throw new CliError(`${context} response missing admin id`);
   }
   const username = requiredText(value.username, `${context}.username`);
-  if (typeof value.disabled !== "boolean") {
-    throw new CliError(`${context} response missing disabled status`);
+  const rawAccountStatus = optionalText(value.account_status);
+  const accountStatusFromDisabled =
+    typeof value.disabled === "boolean"
+      ? value.disabled
+        ? "suspended"
+        : "active"
+      : "";
+  const accountStatus = rawAccountStatus || accountStatusFromDisabled;
+  if (!new Set(["active", "suspended", "revoked"]).has(accountStatus)) {
+    throw new CliError(`${context} response missing valid account status`);
+  }
+  const disabled = accountStatus !== "active";
+  if (
+    typeof value.disabled === "boolean" &&
+    value.disabled !== disabled
+  ) {
+    throw new CliError(`${context} response contains conflicting account status`);
   }
   if (typeof value.is_super_admin !== "boolean") {
     throw new CliError(`${context} response missing super-admin status`);
@@ -132,7 +243,8 @@ export function requireAdminAccountRecord(value, context = "admin") {
     id,
     username,
     phone: String(value.phone ?? "").trim(),
-    disabled: value.disabled,
+    accountStatus,
+    disabled,
     isSuperAdmin: value.is_super_admin,
     roleKeys: normalizeRoleKeys(value.roles, context),
   };
@@ -158,6 +270,11 @@ function assertOwnedScenarioAccount(account, scenario) {
   if (account.isSuperAdmin || account.phone) {
     throw new CliError(
       `${scenario.title}: same-name account cannot be safely identified as a simulated acceptance account`,
+    );
+  }
+  if (account.accountStatus === "revoked") {
+    throw new CliError(
+      `${scenario.title}: same-name account has been revoked and will not be changed`,
     );
   }
   const unmanagedRole = account.roleKeys.find(
@@ -198,6 +315,7 @@ function accountSnapshot(account) {
   return {
     id: account.id,
     username: account.username,
+    accountStatus: account.accountStatus,
     disabled: account.disabled,
     isSuperAdmin: account.isSuperAdmin,
     roleKeys: account.roleKeys,
@@ -238,20 +356,39 @@ function assertFormalAccountsUnchanged(before, afterAccounts) {
 
 export function buildManualAcceptanceAccountScenarioPlan({
   backendURL = DEFAULT_BACKEND_URL,
+  auditMinimum = 0,
 } = {}) {
+  const target = resolveManualAcceptanceTarget({
+    backendURL: normalizeAccountScenarioBackendURL(backendURL),
+    target: "local-dev",
+    dataVersion: ACCOUNT_DATA_VERSION,
+    runId: ACCOUNT_RUN_ID,
+  });
   return {
     mode: "report-only",
-    backendURL: normalizeAccountScenarioBackendURL(backendURL),
+    backendURL: target.backendURL,
+    target: target.target,
+    datasetKey: target.datasetKey,
+    dataVersion: target.dataVersion,
+    runId: target.runId,
     loginAccount: BUSINESS_ADMIN_USERNAME,
     simulatedOnly: true,
     realCustomerImport: false,
     directSQL: false,
+    auditMinimum: normalizeAuditMinimum(auditMinimum),
+    roleCapabilityBaseline: MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.map(
+      (item) => ({
+        roleKey: item.roleKey,
+        capabilityKeys: [...item.capabilityKeys],
+      }),
+    ),
     protectedAccounts: [...FORMAL_DEMO_ACCOUNTS],
     scenarios: MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.map((scenario) => ({
       key: scenario.key,
       username: scenario.username,
       title: scenario.title,
       instruction: scenario.instruction,
+      disabledReason: scenario.disabledReason || "",
       positions: [...scenario.positions],
       roleKeys: [...scenario.roleKeys],
       disabled: scenario.disabled,
@@ -348,11 +485,12 @@ async function loginAdmin({
 }
 
 async function assertSafeRuntime({
-  backendURL,
+  policy,
   guardToken,
   sessionToken,
   fetchImpl,
 }) {
+  const backendURL = policy.backendURL;
   const capabilities = await rpcCall({
     backendURL,
     domain: "debug",
@@ -360,14 +498,6 @@ async function assertSafeRuntime({
     token: guardToken,
     fetchImpl,
   });
-  const environment = String(capabilities.environment || "")
-    .trim()
-    .toLowerCase();
-  if (!SAFE_ENVIRONMENTS.has(environment)) {
-    throw new CliError(
-      `refuse account scenario writes in environment=${environment || "unknown"}`,
-    );
-  }
   const sessionData = await rpcCall({
     backendURL,
     domain: "customer_config",
@@ -376,24 +506,13 @@ async function assertSafeRuntime({
     fetchImpl,
   });
   const session = sessionData.session || {};
-  const revision = optionalText(
-    session.configRevision || session.config_revision,
-  );
-  if (
-    session?.customer?.key !== CUSTOMER_KEY ||
-    session.source !== "active_customer_config_revision" ||
-    !revision
-  ) {
-    throw new CliError(
-      "refuse account scenario writes: active yoyoosun configuration revision is unavailable",
-    );
-  }
-  return {
-    environment,
+  return assertManualAcceptanceRuntimePolicy({
+    policy,
+    capabilities,
+    session,
+    requiredModules: [],
     customerKey: CUSTOMER_KEY,
-    source: session.source,
-    configRevision: revision,
-  };
+  });
 }
 
 async function listAdmins({ backendURL, token, fetchImpl }) {
@@ -410,6 +529,156 @@ async function listAdmins({ backendURL, token, fetchImpl }) {
   return data.admins.map((admin, index) =>
     requireAdminAccountRecord(admin, `admin.list admins[${index}]`),
   );
+}
+
+async function readRoleControlPlane({ backendURL, token, fetchImpl }) {
+  const data = await rpcCall({
+    backendURL,
+    domain: "admin",
+    method: "rbac_options",
+    token,
+    fetchImpl,
+  });
+  if (!Array.isArray(data.roles) || !Array.isArray(data.permissions)) {
+    throw new CliError("admin.rbac_options response is incomplete");
+  }
+  const roles = new Map();
+  for (const [index, value] of data.roles.entries()) {
+    const role = requireAdminRoleRecord(
+      value,
+      `admin.rbac_options roles[${index}]`,
+    );
+    if (roles.has(role.roleKey)) {
+      throw new CliError(`admin.rbac_options returned duplicate role ${role.roleKey}`);
+    }
+    roles.set(role.roleKey, role);
+  }
+  const permissions = new Map();
+  for (const [index, value] of data.permissions.entries()) {
+    const permission = requirePermissionOption(
+      value,
+      `admin.rbac_options permissions[${index}]`,
+    );
+    if (permissions.has(permission.permissionKey)) {
+      throw new CliError(
+        `admin.rbac_options returned duplicate permission ${permission.permissionKey}`,
+      );
+    }
+    permissions.set(permission.permissionKey, permission);
+  }
+  return { roles, permissions };
+}
+
+function preflightRoleCapabilityBaseline(controlPlane, baseline) {
+  const roleKeys = new Set();
+  return baseline.map((expected) => {
+    if (roleKeys.has(expected.roleKey)) {
+      throw new CliError(`验收权限基线包含重复岗位 ${expected.roleKey}`);
+    }
+    roleKeys.add(expected.roleKey);
+    const role = controlPlane.roles.get(expected.roleKey);
+    if (
+      !role ||
+      role.disabled ||
+      role.roleType !== "business_default" ||
+      !role.permissionsEditable
+    ) {
+      throw new CliError(
+        `岗位 ${expected.roleKey} 当前不是可维护的预设业务岗位`,
+      );
+    }
+    const desired = [
+      ...new Set([...role.permissionKeys, ...expected.capabilityKeys]),
+    ].sort();
+    for (const key of desired) {
+      const permission = controlPlane.permissions.get(key);
+      if (
+        !permission ||
+        !permission.assignable ||
+        permission.permissionClass !== "business" ||
+        permission.nonProductionOnly
+      ) {
+        throw new CliError(`岗位 ${role.roleKey} 包含不可用于验收的权限 ${key}`);
+      }
+    }
+    return {
+      role,
+      desired,
+      missing: expected.capabilityKeys.filter(
+        (key) => !role.permissionKeys.includes(key),
+      ),
+    };
+  });
+}
+
+async function alignAcceptanceRoleCapabilities({
+  backendURL,
+  token,
+  fetchImpl,
+  baseline,
+}) {
+  const controlPlane = await readRoleControlPlane({
+    backendURL,
+    token,
+    fetchImpl,
+  });
+  const planned = preflightRoleCapabilityBaseline(controlPlane, baseline);
+  const actions = [];
+  for (const item of planned) {
+    let { role } = item;
+    const { desired, missing } = item;
+    if (missing.length === 0) {
+      actions.push({ roleKey: role.roleKey, action: "unchanged", added: [] });
+      continue;
+    }
+    const updatedData = await rpcCall({
+      backendURL,
+      domain: "admin",
+      method: "set_role_permissions",
+      params: {
+        role_key: role.roleKey,
+        permission_keys: desired,
+        expected_version: role.version,
+      },
+      token,
+      fetchImpl,
+    });
+    const updated = requireAdminRoleRecord(
+      updatedData.role,
+      `admin.set_role_permissions ${role.roleKey}`,
+    );
+    if (
+      updated.roleKey !== role.roleKey ||
+      updated.version <= role.version ||
+      desired.some((key) => !updated.permissionKeys.includes(key))
+    ) {
+      throw new CliError(`岗位 ${role.roleKey} 权限补齐结果不完整`);
+    }
+    role = updated;
+    actions.push({ roleKey: role.roleKey, action: "updated", added: missing });
+  }
+  const readback = await readRoleControlPlane({
+    backendURL,
+    token,
+    fetchImpl,
+  });
+  for (const item of planned) {
+    const role = readback.roles.get(item.role.roleKey);
+    if (
+      !role ||
+      role.disabled ||
+      role.roleType !== "business_default" ||
+      item.desired.some((key) => !role.permissionKeys.includes(key))
+    ) {
+      throw new CliError(`岗位 ${item.role.roleKey} 最终权限读回不完整`);
+    }
+  }
+  return {
+    source: "yoyoosun-role-flow-matrix",
+    updated: actions.filter((item) => item.action === "updated").length,
+    unchanged: actions.filter((item) => item.action === "unchanged").length,
+    actions,
+  };
 }
 
 async function mutateAdmin({
@@ -431,12 +700,96 @@ async function mutateAdmin({
   return requireAdminAccountRecord(data.admin, context);
 }
 
+async function readAuditTotal({ backendURL, token, fetchImpl }) {
+  const data = await rpcCall({
+    backendURL,
+    domain: "admin",
+    method: "audit_logs",
+    params: { limit: 1, offset: 0 },
+    token,
+    fetchImpl,
+  });
+  const total = Number(data.total);
+  if (!Number.isSafeInteger(total) || total < 0) {
+    throw new CliError("admin.audit_logs response missing total");
+  }
+  return total;
+}
+
+async function fillAuditEvidence({
+  backendURL,
+  token,
+  fetchImpl,
+  account,
+  minimum,
+  total,
+}) {
+  const expectedRoleKeys = ["sales"];
+  let current = account;
+  let currentTotal = total;
+  let mutations = 0;
+  const mutationLimit = Math.max(4, (minimum - total + 2) * 2);
+  while (currentTotal < minimum && mutations < mutationLimit) {
+    const nextRoleKeys = current.roleKeys.length > 0 ? [] : expectedRoleKeys;
+    current = await mutateAdmin({
+      backendURL,
+      token,
+      fetchImpl,
+      method: "set_roles",
+      params: { id: current.id, role_keys: nextRoleKeys },
+      context: `admin.set_roles audit sample ${current.username}`,
+    });
+    if (!current.disabled || current.isSuperAdmin || current.phone) {
+      throw new CliError(
+        "已停用账号在准备审计样例时出现了不安全的状态变化",
+      );
+    }
+    const nextTotal = await readAuditTotal({
+      backendURL,
+      token,
+      fetchImpl,
+    });
+    if (nextTotal <= currentTotal) {
+      throw new CliError("账号岗位变更没有生成可读的审计记录");
+    }
+    currentTotal = nextTotal;
+    mutations += 1;
+  }
+  if (!sameStringList(current.roleKeys, expectedRoleKeys)) {
+    current = await mutateAdmin({
+      backendURL,
+      token,
+      fetchImpl,
+      method: "set_roles",
+      params: { id: current.id, role_keys: expectedRoleKeys },
+      context: `admin.set_roles restore ${current.username}`,
+    });
+    currentTotal = await readAuditTotal({
+      backendURL,
+      token,
+      fetchImpl,
+    });
+    mutations += 1;
+  }
+  if (currentTotal < minimum) {
+    throw new CliError(
+      `审计记录只有 ${currentTotal} 条，未达到 ${minimum} 条验收要求`,
+    );
+  }
+  const disabledScenario = MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.find(
+    (scenario) => scenario.key === "disabled-account",
+  );
+  assertScenarioState(current, disabledScenario);
+  return { account: current, total: currentTotal, mutations };
+}
+
 export async function applyManualAcceptanceAccountScenarios(
   plan,
   { password, adminPassword, fetchImpl = fetch } = {},
 ) {
   const safePlan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: plan?.backendURL,
+    auditMinimum: plan?.auditMinimum,
   });
   if (process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM !== CONFIRM_PHRASE) {
     throw new CliError(
@@ -476,10 +829,16 @@ export async function applyManualAcceptanceAccountScenarios(
     fetchImpl,
   });
   const runtime = await assertSafeRuntime({
-    backendURL: safePlan.backendURL,
+    policy: safePlan,
     guardToken,
     sessionToken: token,
     fetchImpl,
+  });
+  const roleCapabilityBaseline = await alignAcceptanceRoleCapabilities({
+    backendURL: safePlan.backendURL,
+    token,
+    fetchImpl,
+    baseline: safePlan.roleCapabilityBaseline,
   });
   const beforeAccounts = await listAdmins({
     backendURL: safePlan.backendURL,
@@ -490,6 +849,14 @@ export async function applyManualAcceptanceAccountScenarios(
   const beforeByUsername = new Map(
     beforeAccounts.map((account) => [account.username, account]),
   );
+  const auditBefore =
+    safePlan.auditMinimum > 0
+      ? await readAuditTotal({
+          backendURL: safePlan.backendURL,
+          token,
+          fetchImpl,
+        })
+      : null;
 
   for (const scenario of MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS) {
     const existing = beforeByUsername.get(scenario.username);
@@ -553,7 +920,11 @@ export async function applyManualAcceptanceAccountScenarios(
         token,
         fetchImpl,
         method: "set_disabled",
-        params: { id: account.id, disabled: scenario.disabled },
+        params: {
+          id: account.id,
+          disabled: scenario.disabled,
+          reason: scenario.disabled ? scenario.disabledReason : "",
+        },
         context: `admin.set_disabled ${scenario.username}`,
       });
       assertScenarioState(account, scenario);
@@ -583,6 +954,43 @@ export async function applyManualAcceptanceAccountScenarios(
       username: scenario.username,
       action: "password-reset",
     });
+  }
+
+  let auditAfter = auditBefore;
+  let auditFillMutations = 0;
+  if (safePlan.auditMinimum > 0) {
+    auditAfter = await readAuditTotal({
+      backendURL: safePlan.backendURL,
+      token,
+      fetchImpl,
+    });
+    if (auditAfter < safePlan.auditMinimum) {
+      const disabledScenario = MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.find(
+        (scenario) => scenario.key === "disabled-account",
+      );
+      const currentAccounts = await listAdmins({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+      });
+      const disabledAccount = currentAccounts.find(
+        (account) => account.username === disabledScenario.username,
+      );
+      if (!disabledAccount) {
+        throw new CliError("已停用账号不存在，不能准备审计样例");
+      }
+      assertScenarioState(disabledAccount, disabledScenario);
+      const filled = await fillAuditEvidence({
+        backendURL: safePlan.backendURL,
+        token,
+        fetchImpl,
+        account: disabledAccount,
+        minimum: safePlan.auditMinimum,
+        total: auditAfter,
+      });
+      auditAfter = filled.total;
+      auditFillMutations = filled.mutations;
+    }
   }
 
   const afterAccounts = await listAdmins({
@@ -631,15 +1039,30 @@ export async function applyManualAcceptanceAccountScenarios(
     mode: "apply",
     generatedAt: new Date().toISOString(),
     backendURL: safePlan.backendURL,
+    target: safePlan.target,
+    datasetKey: safePlan.datasetKey,
+    dataVersion: safePlan.dataVersion,
+    runId: safePlan.runId,
     simulatedOnly: true,
     realCustomerImport: false,
     directSQL: false,
     loginAccount: accountSnapshot(profile),
     runtime,
+    roleCapabilityBaseline,
     protectedAccounts: formalBefore,
     scenarios,
     actions,
     summary,
+    audit:
+      safePlan.auditMinimum > 0
+        ? {
+            minimum: safePlan.auditMinimum,
+            before: auditBefore,
+            after: auditAfter,
+            added: auditAfter - auditBefore,
+            fillMutations: auditFillMutations,
+          }
+        : null,
     ready: true,
   };
 }
@@ -648,6 +1071,7 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
   const options = {
     backendURL: DEFAULT_BACKEND_URL,
     apply: false,
+    auditMinimum: 0,
     json: false,
     help: false,
   };
@@ -658,6 +1082,10 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
     else if (token === "--help" || token === "-h") options.help = true;
     else if (token === "--backend-url") {
       options.backendURL = requiredText(argv[++index], "--backend-url");
+    } else if (token === "--audit-minimum") {
+      options.auditMinimum = normalizeAuditMinimum(
+        requiredText(argv[++index], "--audit-minimum"),
+      );
     } else {
       throw new CliError(`unknown option ${token}`, 2);
     }
@@ -676,7 +1104,7 @@ function usage() {
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE} \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-super-admin-password>' \\
-    node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --json
+    node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --audit-minimum 30 --json
 
 本入口保留现有十个正式试用账号，只准备“已停用”“业务与采购兼任”
 和“未分配岗位”三个补充验收账号。`;

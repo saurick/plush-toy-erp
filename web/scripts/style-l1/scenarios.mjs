@@ -126,6 +126,90 @@ export function createStyleL1Scenarios(deps) {
       `effective session 诊断模式应为 ${mode}`
     )
   }
+  const assertBusinessDashboardCountStates = async (page, scenarioName) => {
+    await page
+      .getByRole('button', { name: '查看客户', exact: true })
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    const metrics = await page.evaluate(() => {
+      const sourceItems = Array.from(
+        document.querySelectorAll('.erp-business-board-source-item')
+      )
+      const sourceCount = (label) => {
+        const entry = document.querySelector(`[aria-label="查看${label}"]`)
+        return String(
+          entry
+            ?.closest('.erp-business-board-source-item')
+            ?.querySelector('.erp-business-board-source-count')?.textContent ||
+            ''
+        ).trim()
+      }
+      const summaryCard = (title) => {
+        const card = Array.from(
+          document.querySelectorAll('.erp-business-board-summary-card')
+        ).find((node) =>
+          String(node.getAttribute('aria-label') || '').startsWith(title)
+        )
+        return {
+          ariaLabel: String(card?.getAttribute('aria-label') || ''),
+          text: String(card?.textContent || '')
+            .replace(/\s+/gu, ' ')
+            .trim(),
+        }
+      }
+      const laneCounts = Object.fromEntries(
+        Array.from(
+          document.querySelectorAll('.erp-business-board-alert-item')
+        ).map((node) => [
+          String(
+            node.querySelector('.ant-typography')?.textContent || ''
+          ).trim(),
+          String(
+            node.querySelector('.erp-business-board-alert-count')
+              ?.textContent || ''
+          ).trim(),
+        ])
+      )
+      return {
+        sourceItemCount: sourceItems.length,
+        sourceItemsWithEntry: sourceItems.filter((node) =>
+          node.querySelector('.erp-business-board-source-entry')
+        ).length,
+        customer: sourceCount('客户'),
+        productionException: sourceCount('生产异常'),
+        invoice: sourceCount('发票记录'),
+        masterSummary: summaryCard('基础资料'),
+        sourceSummary: summaryCard('业务单据'),
+        factSummary: summaryCard('办理结果'),
+        riskSummary: summaryCard('需要关注'),
+        laneCounts,
+      }
+    })
+
+    assert.equal(
+      metrics.sourceItemCount,
+      20,
+      `${scenarioName} 应展示 20 个独立对象统计: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.sourceItemsWithEntry,
+      metrics.sourceItemCount,
+      `${scenarioName} 每个对象统计都应有独立入口: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(metrics.customer, '60')
+    assert.equal(metrics.productionException, '20')
+    assert.equal(metrics.invoice, '0')
+    assert(metrics.masterSummary.text.includes('191'))
+    assert(metrics.sourceSummary.text.includes('135'))
+    assert(metrics.factSummary.text.includes('0'))
+    assert(!metrics.factSummary.ariaLabel.includes('暂不可用'))
+    assert(metrics.riskSummary.text.includes('93'))
+    assert.deepEqual(metrics.laneCounts, {
+      常规待办: '55',
+      阻塞: '27',
+      到期提醒: '66',
+      已结束: '32',
+    })
+  }
   const assertResponsiveSelectionActionBar = async (
     page,
     { scenarioName, maxVisibleActions }
@@ -581,6 +665,8 @@ export function createStyleL1Scenarios(deps) {
     source: 'builtin_rbac_fallback',
   })
   let localCustomerDesktopPreviewWorkflowRequests = 0
+  let transientProfileSyncCustomerConfigRequests = 0
+  let transientProfileSyncAdminMeRequests = 0
 
   return [
     ...createBusinessRowItemsPreviewScenarios({
@@ -599,9 +685,9 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒 ERP 管理后台')
+        await expectHeading(page, '业务管理')
         await expectButton(page, /^登\s*录$/)
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await assertAdminLoginLayout(page, { minCardWidth: 520 })
       },
     },
@@ -611,9 +697,9 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '毛绒 ERP 管理后台')
+        await expectHeading(page, '业务管理')
         await expectButton(page, /^登\s*录$/)
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await assertAdminLoginLayout(page, { minCardWidth: 320 })
       },
     },
@@ -623,9 +709,9 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await expectButton(page, /^登\s*录$/)
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await assertAdminLoginLayout(page, { minCardWidth: 320 })
       },
     },
@@ -635,7 +721,7 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await assertERPThemeMode(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
           expectedMode: 'system',
@@ -654,7 +740,7 @@ export function createStyleL1Scenarios(deps) {
         await assertLoginSegmentedReadable(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
         })
-        await page.getByText('岗位任务端', { exact: true }).click()
+        await page.getByText('手机端待办', { exact: true }).click()
         await assertLoginSegmentedReadable(page, {
           scenarioName: 'admin-login-theme-modes-desktop-entry-switch',
         })
@@ -707,8 +793,8 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          persistedLoginState.selectedTexts.includes('岗位任务端'),
-          `登录入口刷新后未保持岗位任务端: ${JSON.stringify(
+          persistedLoginState.selectedTexts.includes('手机端待办'),
+          `工作方式刷新后未保持手机端待办: ${JSON.stringify(
             persistedLoginState
           )}`
         )
@@ -752,7 +838,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await clickERPThemeOption(page, '暗色')
         await page.reload({ waitUntil: 'domcontentloaded' })
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await assertERPThemeMode(page, {
           scenarioName: 'admin-login-theme-modes-desktop',
           expectedMode: 'dark',
@@ -773,13 +859,13 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
-        await page.getByText('后台管理', { exact: true }).click()
+        await expectText(page, '业务管理')
+        await page.getByText('电脑端业务管理', { exact: true }).click()
         await page.getByLabel('账号').fill('style-l1-admin')
         await page.locator('#password').fill('style-l1-password')
         await page.getByRole('button', { name: /^登\s*录$/ }).click()
         await waitForPath(page, '/erp/dashboard')
-        await expectHeading(page, '产品核心总览')
+        await expectHeading(page, '系统功能总览')
 
         const rememberedEntry = await page.evaluate(() =>
           window.localStorage.getItem('erp:last_entry_target')
@@ -797,7 +883,7 @@ export function createStyleL1Scenarios(deps) {
       mockAdminRpc: true,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         const focusOrigin = page
           .getByRole('button', { name: /^登\s*录$/ })
           .first()
@@ -896,7 +982,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
       },
     },
     {
@@ -916,7 +1002,7 @@ export function createStyleL1Scenarios(deps) {
         await assertTextAbsent(page, '待我处理')
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
       },
     },
     {
@@ -944,7 +1030,7 @@ export function createStyleL1Scenarios(deps) {
         await assertTextAbsent(page, '待我处理')
         await page.getByRole('button', { name: '重新登录' }).click()
         await waitForPath(page, '/admin-login')
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
       },
     },
     {
@@ -952,7 +1038,7 @@ export function createStyleL1Scenarios(deps) {
       path: '/erp/dashboard',
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await expectButton(page, /^登\s*录$/)
         await assertAdminLoginLayout(page, { minCardWidth: 520 })
       },
@@ -963,14 +1049,14 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await expectText(page, '超级管理员')
         await expectText(page, 'style-l1-admin')
-        await expectText(page, '产品核心')
-        await expectHeading(page, '产品核心总览')
-        await expectText(page, '能力审阅入口')
+        await expectText(page, '功能预览')
+        await expectHeading(page, '系统功能总览')
+        await expectText(page, '业务功能')
         await expectText(page, '销售订单核心')
-        await expectText(page, '客户运行态')
+        await expectText(page, '尚未连接客户环境')
         await assertTextAbsent(page, '内部来源')
         await assertTextAbsent(page, '优先处理队列')
         await assertTextAbsent(page, '当前任务上下文')
@@ -1030,9 +1116,9 @@ export function createStyleL1Scenarios(deps) {
         )
         await page.getByRole('button', { name: /销售订单核心/ }).click()
         await waitForPath(page, '/erp/sales/project-orders/sales-orders')
-        await expectText(page, '销售订单 能力审阅')
+        await expectText(page, '销售订单 功能预览')
         await page.goBack({ waitUntil: 'domcontentloaded' })
-        await expectHeading(page, '产品核心总览')
+        await expectHeading(page, '系统功能总览')
       },
     },
     {
@@ -1094,8 +1180,8 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '待我处理')
         await expectText(page, '阻塞/逾期')
         await expectText(page, '等待交接')
-        await expectText(page, '优先处理队列')
-        await expectText(page, '当前任务上下文')
+        await expectText(page, '优先处理')
+        await expectText(page, '任务详情')
         for (const engineeringText of [
           'Product Core',
           'customer key',
@@ -1406,7 +1492,7 @@ export function createStyleL1Scenarios(deps) {
       expectPath: '/erp/warehouse/shipments',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await expectText(page, 'style-l1-admin')
         await expectText(page, '出货单')
         await expectText(page, 'SHIP-STYLE-L1')
@@ -1463,11 +1549,11 @@ export function createStyleL1Scenarios(deps) {
       expectPath: '/erp/business-dashboard',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await expectText(page, '超级管理员')
-        await expectText(page, '业务看板 能力审阅')
-        await expectText(page, 'Product Core')
-        await expectText(page, 'business.dashboard_stats')
+        await expectText(page, '业务看板 功能预览')
+        await expectText(page, '功能说明')
+        await expectText(page, '尚未连接客户环境')
         await assertTextAbsent(page, '产品核心评审不读取客户业务数据')
         await assertTextAbsent(page, '业务对象')
         await assertTextAbsent(page, '对象总量')
@@ -1502,8 +1588,8 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(pageMetrics.hasBusinessDashboard, false)
         assert.equal(pageMetrics.hasTable, false)
         assert(
-          pageMetrics.menuText.includes('产品核心') &&
-            pageMetrics.menuText.includes('控制面') &&
+          pageMetrics.menuText.includes('系统功能总览') &&
+            pageMetrics.menuText.includes('系统设置') &&
             pageMetrics.menuText.includes('模板打印中心') &&
             pageMetrics.menuText.includes('权限管理'),
           `无客户 Product Core 侧栏应显示控制面导航: ${JSON.stringify(
@@ -1557,7 +1643,7 @@ export function createStyleL1Scenarios(deps) {
       expectPath: '/erp/system/permissions',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await expectEffectiveSessionMode(
           page,
           'local_dev_customer_config_diagnostic'
@@ -1603,10 +1689,10 @@ export function createStyleL1Scenarios(deps) {
           state: 'visible',
           timeout: 10_000,
         })
-        await expectText(page, '工作台 能力审阅')
-        await expectText(page, '本地客户预览')
-        await expectText(page, '当前后端尚未激活客户配置版本')
-        await expectText(page, '工作台、任务看板及客户业务数据均不加载')
+        await expectText(page, '工作台 功能预览')
+        await expectText(page, '本地功能预览')
+        await expectText(page, '当前尚未启用客户业务设置')
+        await expectText(page, '工作台、任务看板和业务数据暂时不能使用')
         await assertTextAbsent(page, '暂时无法进入工作台')
         await assertTextAbsent(page, '优先处理队列')
 
@@ -1636,7 +1722,85 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(
           localCustomerDesktopPreviewWorkflowRequests,
           0,
-          '本地客户预览不得读取或写入 Workflow 任务'
+          '本地功能预览不得读取或写入 Workflow 任务'
+        )
+      },
+    },
+    {
+      name: 'erp-effective-session-configured-customer-transient-sync-recovers',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false,
+        permissions: ['erp.dashboard.read', 'workflow.task.read'],
+        menus: [
+          { key: 'global-dashboard', path: '/erp/dashboard' },
+        ],
+      },
+      customerKey: 'yoyoosun',
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        transientProfileSyncCustomerConfigRequests = 0
+        transientProfileSyncAdminMeRequests = 0
+        page.on('request', (request) => {
+          if (new URL(request.url()).pathname !== '/rpc/admin') {
+            return
+          }
+          const body = request.postDataJSON() || {}
+          if (body.method === 'me') {
+            transientProfileSyncAdminMeRequests += 1
+          }
+        })
+        await page.unroute('**/rpc/customer_config')
+        await page.route('**/rpc/customer_config', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          const { id = 'mock-id', method } = body
+          transientProfileSyncCustomerConfigRequests += 1
+          const result =
+            method === 'get_effective_session' &&
+            transientProfileSyncCustomerConfigRequests <= 2
+              ? {
+                  code: RpcErrorCode.INTERNAL,
+                  message: '客户有效配置读取暂时不可用',
+                  data: {},
+                }
+              : {
+                  code: 0,
+                  message: 'OK',
+                  data: {
+                    session: {
+                      configRevision: 'style-l1-transient-recovery',
+                      configHash: 'style-l1-transient-recovery-hash',
+                      customer: { key: 'yoyoosun', name: '永绅' },
+                      pages: ['global-dashboard'],
+                      actions: ['erp.dashboard.read', 'workflow.task.read'],
+                      fieldPolicies: {},
+                      workPools: [],
+                      source: 'active_customer_config_revision',
+                    },
+                  },
+                }
+
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({ jsonrpc: '2.0', id, result }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectHeading(page, '工作台')
+        await expectText(page, '优先处理')
+        await assertTextAbsent(page, '暂时无法进入工作台')
+        assert.equal(
+          transientProfileSyncCustomerConfigRequests,
+          3,
+          '首次进入工作台应在两次瞬时失败后恢复，不要求用户手动重试'
+        )
+        assert.equal(
+          transientProfileSyncAdminMeRequests,
+          1,
+          'React StrictMode 首次挂载必须复用同一个 profile single-flight'
         )
       },
     },
@@ -1755,7 +1919,7 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await expectEffectiveSessionMode(
           page,
           'local_dev_customer_config_diagnostic'
@@ -2008,7 +2172,7 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await expectText(page, '超级管理员')
         await expectText(page, 'style-l1-admin')
         await expectText(page, '看板中心')
@@ -2458,16 +2622,16 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await expectText(page, '超级管理员')
         await expectText(page, '运营工具')
-        await expectHeading(page, '异常 / 阻塞闭环')
+        await expectHeading(page, '异常处理')
         await expectText(page, '阻塞记录')
         await expectText(page, '责任分派')
         await expectText(page, '处理跟进')
         await expectText(page, '验证恢复')
         await expectText(page, '关闭归档')
-        await expectText(page, '闭环队列')
+        await expectText(page, '异常任务列表')
         await expectNoButton(page, '回任务看板')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-exception-flow-desktop',
@@ -2484,18 +2648,21 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒玩具 ERP')
+        await expectText(page, '毛绒玩具管理系统')
         await expectText(page, '超级管理员')
         await expectText(page, '看板中心')
         await expectHeading(page, '业务看板')
-        await expectText(page, '业务对象')
-        await expectText(page, '当前风险')
-        await expectText(page, '状态分布')
-        await expectText(page, '核心链路健康')
+        await expectText(page, '基础资料')
+        await expectText(page, '业务单据')
+        await expectText(page, '办理结果')
+        await expectText(page, '需要关注')
+        await expectText(page, '数字说明')
+        await expectText(page, '待办概览')
+        await expectText(page, '各类业务数据')
         await assertTextAbsent(page, '内部来源')
-        await expectText(page, '对象族')
+        await expectText(page, '业务分类')
         await expectText(page, '采购/入库')
-        await expectText(page, '记录数')
+        await expectText(page, '数据明细')
         await expectNoButton(page, '任务看板')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-business-dashboard-desktop',
@@ -2511,6 +2678,17 @@ export function createStyleL1Scenarios(deps) {
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-business-dashboard-desktop',
         })
+        await assertBusinessDashboardCountStates(
+          page,
+          'erp-business-dashboard-desktop'
+        )
+        await page
+          .getByRole('button', { name: '查看客户', exact: true })
+          .click()
+        await waitForPath(page, '/erp/master/partners/customers')
+        await page.goBack()
+        await waitForPath(page, '/erp/business-dashboard')
+        await expectHeading(page, '业务看板')
       },
     },
     {
@@ -2524,12 +2702,12 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await expectHeading(page, '业务看板')
-        await expectText(page, '业务对象')
-        await expectText(page, '核心链路健康')
-        await expectText(page, '状态分布')
-        await expectText(page, '当前风险')
+        await expectText(page, '基础资料')
+        await expectText(page, '各类业务数据')
+        await expectText(page, '数字说明')
+        await expectText(page, '待办概览')
         await assertERPThemeMode(page, {
           scenarioName: 'erp-business-dashboard-dark-desktop',
           expectedMode: 'dark',
@@ -2554,7 +2732,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertThemeReadable(page, {
           scenarioName: 'erp-business-dashboard-dark-desktop',
-          selector: '.erp-business-board-status-row',
+          selector: '.erp-business-board-boundary-row',
         })
         await assertThemeReadable(page, {
           scenarioName: 'erp-business-dashboard-dark-desktop',
@@ -2564,6 +2742,110 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'erp-business-dashboard-dark-desktop',
           selector: '.erp-business-dashboard-page',
         })
+      },
+    },
+    {
+      name: 'erp-business-dashboard-stats-unavailable-desktop',
+      path: '/erp/business-dashboard?__style_l1_business_dashboard_stats_unavailable=1',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: ['workflow.task.read'],
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '业务看板')
+        await expectText(page, '业务统计暂不可用')
+        await page
+          .locator('[aria-label^="需要关注 93"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const customerCount = await page
+          .getByRole('button', { name: '查看客户', exact: true })
+          .locator('xpath=..')
+          .locator('.erp-business-board-source-count')
+          .textContent()
+        assert.equal(String(customerCount || '').trim(), '暂不可用')
+        await assertTextAbsent(page, '待办概览暂不可用')
+        await assertTextAbsent(page, '当前页面数据已刷新')
+        await page
+          .locator('.erp-admin-header button')
+          .filter({ hasText: '刷新当前页' })
+          .click()
+        await expectText(page, '当前页面数据已刷新')
+        await page.waitForFunction(
+          () =>
+            String(
+              document
+                .querySelector('[aria-label="查看客户"]')
+                ?.closest('.erp-business-board-source-item')
+                ?.querySelector('.erp-business-board-source-count')
+                ?.textContent || ''
+            ).trim() === '60',
+          undefined,
+          { timeout: 10_000 }
+        )
+        await page
+          .locator('.erp-business-board-inline-alert')
+          .filter({ hasText: '业务统计暂不可用' })
+          .waitFor({ state: 'detached', timeout: 10_000 })
+        await page
+          .locator('.ant-message-notice')
+          .last()
+          .waitFor({ state: 'detached', timeout: 10_000 })
+      },
+    },
+    {
+      name: 'erp-business-dashboard-workflow-unavailable-desktop',
+      path: '/erp/business-dashboard?__style_l1_business_dashboard_workflow_unavailable=1',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: ['workflow.task.read'],
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '业务看板')
+        await expectText(page, '待办概览暂不可用')
+        await expectText(page, '60')
+        await page
+          .locator('[aria-label^="需要关注 暂不可用"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await assertTextAbsent(page, '业务统计暂不可用')
+        await assertTextAbsent(page, '当前页面数据已刷新')
+        await page
+          .locator('.erp-admin-header button')
+          .filter({ hasText: '刷新当前页' })
+          .click()
+        await expectText(page, '当前页面数据已刷新')
+        await page
+          .locator('[aria-label^="需要关注 93"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page
+          .locator('.erp-business-board-inline-alert')
+          .filter({ hasText: '待办概览暂不可用' })
+          .waitFor({ state: 'detached', timeout: 10_000 })
+        await page
+          .locator('.ant-message-notice')
+          .last()
+          .waitFor({ state: 'detached', timeout: 10_000 })
+      },
+    },
+    {
+      name: 'erp-business-dashboard-large-count-desktop',
+      path: '/erp/business-dashboard?__style_l1_business_dashboard_large=1',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: ['workflow.task.read'],
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '业务看板')
+        await expectText(page, '1,234,567')
+        await expectText(page, '1,234,698')
+        await page
+          .getByRole('button', { name: '查看客户', exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
       },
     },
     {
@@ -2616,10 +2898,10 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectText(page, '超级管理员')
-        await expectText(page, '毛绒 ERP 管理后台')
-        await expectText(page, '产品核心总览')
-        await expectText(page, '能力审阅入口')
-        await expectText(page, '控制面')
+        await expectText(page, '业务管理')
+        await expectText(page, '系统功能总览')
+        await expectText(page, '业务功能')
+        await expectText(page, '系统设置')
         await assertTextAbsent(page, '内部来源')
         await assertTextAbsent(page, '优先处理队列')
         await assertNoDuplicatedAdminPageTitle(page, {
@@ -2638,7 +2920,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectText(page, '超级管理员')
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await expectText(page, '任务看板')
         await expectText(page, '常规待办')
         await expectText(page, '到期提醒')
@@ -2659,10 +2941,10 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
-        await expectText(page, '产品核心总览')
-        await expectText(page, '能力审阅入口')
-        await expectText(page, '不挂载客户业务数据')
+        await expectText(page, '业务管理')
+        await expectText(page, '系统功能总览')
+        await expectText(page, '业务功能')
+        await expectText(page, '不显示客户业务数据')
         await assertTextAbsent(page, '优先处理队列')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-dashboard-dark-desktop',
@@ -2713,7 +2995,7 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 2048, height: 1024 },
       verify: async (page) => {
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await expectText(page, '任务看板')
         await expectText(page, '常规待办')
         await assertTextAbsent(page, '内部来源')
@@ -7212,10 +7494,11 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectText(page, '超级管理员')
-        await expectText(page, '毛绒 ERP 管理后台')
+        await expectText(page, '业务管理')
         await expectText(page, '业务看板')
-        await expectText(page, '核心链路健康')
-        await expectText(page, '状态分布')
+        await expectText(page, '各类业务数据')
+        await expectText(page, '数字说明')
+        await expectText(page, '待办概览')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-business-dashboard-mobile',
         })
@@ -7262,30 +7545,30 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '权限管理')
-        await expectText(page, '角色模板')
-        await expectText(page, '管理员账号')
+        await expectText(page, '岗位设置')
+        await expectText(page, '员工账号')
         await expectText(page, '先设置岗位，再分配账号')
         await expectText(page, '已分配账号')
-        await expectText(page, '功能权限')
+        await expectText(page, '可用功能')
         await expectText(page, '数据范围')
         await expectText(page, '敏感字段')
-        await expectText(page, '权限地图')
+        await expectText(page, '功能影响')
         await expectText(page, '选择这个岗位可以使用的功能')
         await page.getByRole('tab', { name: '数据范围' }).click()
-        await expectText(page, '业务数据范围尚未开放配置')
-        await expectText(page, '协同任务')
+        await expectText(page, '数据查看范围暂不可设置')
+        await expectText(page, '任务')
         await page.getByRole('tab', { name: '敏感字段' }).click()
-        await expectText(page, '角色级敏感字段策略尚未接入')
+        await expectText(page, '敏感信息权限暂不可单独设置')
         await expectText(page, '成本与毛利')
         await page.waitForTimeout(350)
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-policy-tabs.png',
           fullPage: true,
         })
-        await page.getByRole('tab', { name: '权限地图' }).click()
-        await expectText(page, '这里解释权限会影响什么，不会额外授予页面权限')
-        await expectText(page, '影响页面')
-        await expectText(page, '影响控件')
+        await page.getByRole('tab', { name: '功能影响' }).click()
+        await expectText(page, '这里按业务页面说明每项功能的影响范围')
+        await expectText(page, '适用页面')
+        await expectText(page, '可用操作')
         const permissionMapMetrics = await page.evaluate(() => {
           const table = document.querySelector(
             '.erp-role-policy-tabs .ant-table'
@@ -7308,18 +7591,18 @@ export function createStyleL1Scenarios(deps) {
           path: 'output/playwright/style-l1/permission-center-permission-map.png',
           fullPage: true,
         })
-        await expectText(page, '这个岗位能看到什么、能做什么')
-        await expectText(page, '可以进入的菜单')
-        await expectText(page, '暂不可进入的菜单')
-        await expectText(page, '字段显示不是岗位权限')
-        await page.getByRole('tab', { name: '功能权限' }).click()
+        await expectText(page, '可使用的页面')
+        await expectText(page, '可以使用')
+        await expectText(page, '暂不可使用')
+        await expectText(page, '最终可用页面以公司当前设置为准')
+        await page.getByRole('tab', { name: '可用功能' }).click()
         await assertTextAbsent(page, '当前角色权限尚未保存')
         await assertTextAbsent(page, '角色名称可按岗位调整，职责权限保持统一')
         await assertTextAbsent(page, 'system.role.permission.manage')
         await assertTextAbsent(page, '当前客户角色模板')
         await assertTextAbsent(page, '客户模板')
         await assertTextAbsent(page, '不同甲方')
-        await expectText(page, '保存角色权限')
+        await expectText(page, '保存岗位设置')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'permission-center-desktop',
         })
@@ -7381,10 +7664,10 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          roleCenterMetrics.activeTabText.includes('角色模板') &&
+          roleCenterMetrics.activeTabText.includes('岗位设置') &&
             roleCenterMetrics.hasRoleSection &&
             roleCenterMetrics.roleHeight > 0,
-          `权限管理默认应先显示角色模板 tab: ${JSON.stringify(roleCenterMetrics)}`
+          `权限管理默认应先显示岗位设置 tab: ${JSON.stringify(roleCenterMetrics)}`
         )
         assert(
           String(roleCenterMetrics.activeTabTransitionDuration)
@@ -7420,20 +7703,26 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'permission-center-desktop',
         })
         await expectText(page, '只看已选')
-        await page.getByRole('button', { name: '全选本组' }).first().click()
+        await page
+          .locator(
+            '.erp-permission-checklist__actions button:not([disabled])'
+          )
+          .filter({ hasText: '全选本组' })
+          .first()
+          .click()
         await expectText(page, '有未保存调整')
         const roleCards = page.locator('.erp-role-template-card')
         if ((await roleCards.count()) > 1) {
           await roleCards.nth(1).click()
-          await expectText(page, '放弃未保存的角色权限调整？')
+          await expectText(page, '放弃未保存的岗位调整？')
           await page.getByRole('button', { name: '继续编辑' }).click()
           await expectText(page, '有未保存调整')
         }
-        await page.getByRole('tab', { name: /管理员账号/ }).click()
+        await page.getByRole('tab', { name: /员工账号/ }).click()
         await expectText(page, '切换页面前要放弃未保存的修改吗？')
         await page.getByRole('button', { name: '放弃修改' }).click()
-        await expectText(page, '管理员与角色')
-        await expectText(page, '创建管理员')
+        await expectText(page, '员工账号与岗位')
+        await expectText(page, '创建员工账号')
         await expectText(page, '超级管理员')
         const adminTabMetrics = await page.evaluate(() => {
           const activeTab = document.querySelector(
@@ -7458,20 +7747,20 @@ export function createStyleL1Scenarios(deps) {
           }
         })
         assert(
-          adminTabMetrics.activeTabText.includes('管理员账号') &&
+          adminTabMetrics.activeTabText.includes('员工账号') &&
             adminTabMetrics.hasAdminSection &&
             adminTabMetrics.adminHeight > 0,
-          `权限管理切换管理员账号 tab 后应显示账号表: ${JSON.stringify(adminTabMetrics)}`
+          `权限管理切换员工账号 tab 后应显示账号表: ${JSON.stringify(adminTabMetrics)}`
         )
         assert(
           adminTabMetrics.documentScrollWidth <=
             adminTabMetrics.documentClientWidth + 1,
-          `权限管理管理员账号 tab 出现横向溢出: ${JSON.stringify(adminTabMetrics)}`
+          `权限管理员工账号 tab 出现横向溢出: ${JSON.stringify(adminTabMetrics)}`
         )
         const adminSearch =
-          page.getByPlaceholder('搜索管理员账号、手机号或岗位角色')
+          page.getByPlaceholder('搜索员工账号、手机号或岗位')
         await adminSearch.fill('assistant')
-        await expectText(page, '命中 1/2 个管理员')
+        await expectText(page, '命中 1/2 个员工账号')
         const filteredTableText = await page
           .locator('.erp-permission-section--admins .ant-table-tbody')
           .innerText()
@@ -7481,7 +7770,7 @@ export function createStyleL1Scenarios(deps) {
           `权限管理搜索结果不符合预期: ${filteredTableText}`
         )
         await adminSearch.fill('')
-        await expectText(page, '共 2 个管理员')
+        await expectText(page, '共 2 个员工账号')
         await assertPaginationSizeChangerFocusStyle(page, {
           scenarioName: 'permission-center-desktop',
         })
@@ -7491,19 +7780,19 @@ export function createStyleL1Scenarios(deps) {
         })
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '当前页面数据已刷新')
-        await page.getByRole('button', { name: '创建管理员' }).click()
-        await expectText(page, '创建管理员')
+        await page.getByRole('button', { name: '创建员工账号' }).click()
+        await expectText(page, '创建员工账号')
         await expectText(page, '初始密码')
-        await expectText(page, '角色')
-        await expectText(page, '选择一个或多个角色')
+        await expectText(page, '岗位')
+        await expectText(page, '选择一个或多个岗位')
         await assertAdminRoleModalLayout(page, {
           scenarioName: 'permission-center-create-modal',
-          title: '创建管理员',
+          title: '创建员工账号',
         })
         await assertTextAbsent(page, '搜索菜单权限名称或路径')
         await page
           .locator('.ant-modal-content')
-          .filter({ hasText: '创建管理员' })
+          .filter({ hasText: '创建员工账号' })
           .last()
           .locator('.ant-modal-footer button')
           .first()
@@ -7528,12 +7817,12 @@ export function createStyleL1Scenarios(deps) {
           .getByRole('button', { name: /重\s*置/ })
           .last()
           .click()
-        await expectText(page, '已重置管理员 assistant-admin 的密码')
+        await expectText(page, '已重置员工账号 assistant-admin 的密码')
         await page
           .getByRole('row', { name: /assistant-admin/ })
           .getByRole('button', { name: '离职注销' })
           .click()
-        await expectText(page, '未完成的个人待办将退回原岗位任务池')
+        await expectText(page, '未完成的个人待办将退回原负责岗位')
         await expectText(page, '注销原因')
         await page
           .locator('.ant-modal-content')
@@ -7566,8 +7855,8 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '审计日志')
-        await expectText(page, '账号角色变更')
+        await expectHeading(page, '系统操作记录')
+        await expectText(page, '员工岗位变更')
         await assertAuditLogsCompactDetailDrawer(page, {
           scenarioName: 'system-audit-logs-phone-390',
           expectedPanelWidth: 390,
@@ -7580,8 +7869,8 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       viewport: { width: 820, height: 1180 },
       verify: async (page) => {
-        await expectHeading(page, '审计日志')
-        await expectText(page, '账号角色变更')
+        await expectHeading(page, '系统操作记录')
+        await expectText(page, '员工岗位变更')
         await assertAuditLogsCompactDetailDrawer(page, {
           scenarioName: 'system-audit-logs-tablet-820',
           expectedPanelWidth: 560,
@@ -7594,15 +7883,17 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '审计日志')
+        await expectHeading(page, '系统操作记录')
         await expectText(
           page,
-          '系统管理操作记录。先看风险、对象、变化摘要和下一步。'
+          '查看员工账号、岗位和系统设置的操作记录，需要时按风险和操作类型筛选。'
         )
-        await expectText(page, '账号角色变更')
-        await expectText(page, '目标已关联')
+        await expectText(page, '员工岗位变更')
+        await expectText(page, '员工账号已记录')
+        await expectText(page, '系统准备未完成，请联系管理员检查系统设置')
         await expectText(page, '下一步')
         await expectText(page, '变化')
+        await assertTextAbsent(page, '生产环境缺少显式初始化确认')
         await assertTextAbsent(page, '原始 payload')
         await assertTextAbsent(page, 'assistant-admin')
         await assertTextAbsent(page, 'admin_user.roles.set')
@@ -12261,18 +12552,18 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectButton(page, '新建订单')
         await expectText(page, '当前操作')
-        await expectText(page, '订单行')
+        await expectText(page, '订单明细')
         await expectText(page, '工作台')
         await expectText(page, '任务看板')
         await expectText(page, '业务看板')
-        await expectText(page, '主数据')
+        await expectText(page, '基础资料')
         await expectText(page, '客户档案')
         await expectText(page, '供应商档案')
         await expectText(page, '产品档案')
         await expectText(page, '销售管理')
         await expectText(page, '销售订单')
         await expectText(page, '产品工程')
-        await expectText(page, 'BOM 管理')
+        await expectText(page, '物料清单（BOM）')
         await expectText(page, '采购管理')
         await expectText(page, '采购订单')
         await expectText(page, '质检管理')
@@ -12286,13 +12577,13 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '生产排程')
         await expectText(page, '出货管理')
         await expectText(page, '出货放行')
-        await expectText(page, '财务业务')
+        await expectText(page, '财务管理')
         await expectText(page, '应收管理')
         await expectText(page, '导出筛选结果')
         await expectText(page, '列顺序')
         await expectText(page, '运营工具')
         await expectText(page, '模板打印中心')
-        await expectText(page, '异常 / 阻塞闭环')
+        await expectText(page, '异常处理')
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'sales-orders',
           heading: '销售订单',
@@ -12467,7 +12758,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'material-master-header-desktop',
-          expectedLabels: ['总材料', '当前结果', '启用材料'],
+          expectedLabels: ['总材料', '本页显示', '启用材料'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'material-master-header-desktop',
@@ -12556,7 +12847,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
-          expectedLabels: ['总订单', '当前结果', '已审核'],
+          expectedLabels: ['总订单', '本页显示', '已审核'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
@@ -12927,7 +13218,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         await page
           .locator('.ant-table-row')
           .filter({ hasText: '样式供应商' })
@@ -12962,7 +13253,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await expectHeading(page, '采购订单')
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         const purchaseOrderRow = page
           .locator('.erp-business-data-table-card .ant-table-tbody tr')
           .filter({ hasText: 'PO-STYLE-L1' })
@@ -13004,7 +13295,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'shipment-date-filter-desktop',
-          expectedLabels: ['总出货单', '当前结果', '草稿'],
+          expectedLabels: ['总出货单', '本页显示', '草稿'],
         })
         await assertBusinessMainTableHasNoOperationColumn(page, {
           scenarioName: 'shipment-date-filter-desktop',
@@ -13086,7 +13377,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         await page
           .locator('.ant-table-row')
           .filter({ hasText: '样式供应商' })

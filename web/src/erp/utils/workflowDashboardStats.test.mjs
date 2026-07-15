@@ -120,8 +120,8 @@ test('dashboardTaskDisplay: 看板任务来源回显不直接露出内部来源�
     task: task({ source_id: 12 }),
   })
 
-  assert.equal(sourceLabel, '出货放行协同 / 已关联业务来源')
-  assert.equal(alertSourceLabel, '委外协同 / 已关联业务来源')
+  assert.equal(sourceLabel, '出货放行 / 已关联业务来源')
+  assert.equal(alertSourceLabel, '委外订单 / 已关联业务来源')
   assert(!sourceLabel.includes('shipping-release'))
   assert(!alertSourceLabel.includes('processing-contracts'))
   assert(!sourceLabel.includes('内部来源'))
@@ -152,9 +152,9 @@ test('workflowDashboardStats: alert 暴露业务来源标签而不是内部 sour
 
   assert.equal(
     internalTaskNoAlert.source_label,
-    '出货放行协同 / 已关联业务来源'
+    '出货放行 / 已关联业务来源'
   )
-  assert.equal(hashIdFallbackAlert.source_label, '委外协同 / 已关联业务来源')
+  assert.equal(hashIdFallbackAlert.source_label, '委外订单 / 已关联业务来源')
   assert(!internalTaskNoAlert.source_label.includes('TASK-9'))
   assert(!hashIdFallbackAlert.source_label.includes('#10'))
   assert(!internalTaskNoAlert.source_label.includes('shipping-release'))
@@ -418,7 +418,7 @@ test('workflowDashboardStats: 预警等级覆盖 blocked due_soon qc shipment pr
       buildWorkflowTaskAlert(iqcPending, { nowMs: NOW_MS })?.alert_type,
       buildWorkflowTaskAlert(iqcPending, { nowMs: NOW_MS })?.alert_label,
     ],
-    ['qc_pending', 'IQC 待检']
+    ['qc_pending', '来料检验（IQC）待处理']
   )
   assert.deepEqual(
     [

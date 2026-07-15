@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"server/internal/biz"
@@ -74,7 +75,47 @@ func (r *outsourcingOrderRepo) ListOutsourcingOrders(ctx context.Context, filter
 	if err != nil {
 		return nil, 0, err
 	}
-	return entOutsourcingOrdersToBiz(rows), total, nil
+	orders := entOutsourcingOrdersToBiz(rows)
+	if err := r.populateOutsourcingOrderItemCounts(ctx, orders); err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
+}
+
+func (r *outsourcingOrderRepo) populateOutsourcingOrderItemCounts(ctx context.Context, orders []*biz.OutsourcingOrder) error {
+	orderIDs := make([]int, 0, len(orders))
+	byID := make(map[int]*biz.OutsourcingOrder, len(orders))
+	for _, order := range orders {
+		if order == nil {
+			continue
+		}
+		count := 0
+		order.ItemCount = &count
+		orderIDs = append(orderIDs, order.ID)
+		byID[order.ID] = order
+	}
+	if len(orderIDs) == 0 {
+		return nil
+	}
+
+	var counts []struct {
+		OutsourcingOrderID int `json:"outsourcing_order_id,omitempty"`
+		Count              int `json:"count,omitempty"`
+	}
+	if err := r.data.postgres.OutsourcingOrderItem.Query().
+		Where(outsourcingorderitem.OutsourcingOrderIDIn(orderIDs...)).
+		GroupBy(outsourcingorderitem.FieldOutsourcingOrderID).
+		Aggregate(ent.Count()).
+		Scan(ctx, &counts); err != nil {
+		return err
+	}
+	for _, count := range counts {
+		if order := byID[count.OutsourcingOrderID]; order != nil {
+			itemCount := count.Count
+			order.ItemCount = &itemCount
+		}
+	}
+	return nil
 }
 
 func applyOutsourcingOrderDateRange(query *ent.OutsourcingOrderQuery, filter biz.OutsourcingOrderFilter) *ent.OutsourcingOrderQuery {
@@ -420,7 +461,7 @@ func setCanonicalOutsourcingOrderItemSnapshots(ctx context.Context, tx *ent.Tx, 
 		if !productRow.IsActive {
 			return biz.ErrProductInactive
 		}
-		in.ProductNoSnapshot = outsourcingSnapshotString(productRow.Code)
+		in.ProductNoSnapshot = outsourcingProductNoSnapshot(productRow)
 		in.ProductNameSnapshot = outsourcingSnapshotString(productRow.Name)
 		if in.ProductSKUID == nil {
 			in.SKUCodeSnapshot = nil
@@ -471,6 +512,18 @@ func setCanonicalOutsourcingOrderItemSnapshots(ctx context.Context, tx *ent.Tx, 
 
 func outsourcingSnapshotString(value string) *string {
 	return &value
+}
+
+func outsourcingProductNoSnapshot(productRow *ent.Product) *string {
+	if productRow != nil && productRow.StyleNo != nil {
+		if styleNo := strings.TrimSpace(*productRow.StyleNo); styleNo != "" {
+			return outsourcingSnapshotString(styleNo)
+		}
+	}
+	if productRow == nil {
+		return nil
+	}
+	return outsourcingSnapshotString(productRow.Code)
 }
 
 func (r *outsourcingOrderRepo) ListOutsourcingOrderItems(ctx context.Context, filter biz.OutsourcingOrderItemFilter) ([]*biz.OutsourcingOrderItem, int, error) {

@@ -18,7 +18,7 @@ const CREATE_REQUEST_KEYS = new Set([
   'note',
 ])
 
-function invalidContract(message = '生产领料请求信息不完整') {
+function invalidContract(message = '生产领料内容不完整，请重新核对') {
   const error = new Error(message)
   error.isInvalidResponse = true
   return error
@@ -26,7 +26,7 @@ function invalidContract(message = '生产领料请求信息不完整') {
 
 function requirePlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw invalidContract('生产领料请求参数无效')
+    throw invalidContract('生产领料内容有误，请刷新页面后重新填写')
   }
   return value
 }
@@ -34,7 +34,7 @@ function requirePlainObject(value) {
 function requireAllowedKeys(value, allowed) {
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
-      throw invalidContract('生产领料请求包含不允许的字段')
+      throw invalidContract('生产领料内容有误，请刷新页面后重新填写')
     }
   }
 }

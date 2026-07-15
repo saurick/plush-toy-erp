@@ -48,12 +48,13 @@ test('production material issue is fail-closed outside a READY released requirem
 })
 
 test('production material issue payload derives source identity and excludes forged truth fields', () => {
+  const occurredAtInput = '2026-07-14T09:30'
   const payload = buildProductionMaterialIssuePayload(
     {
       warehouse_id: 2,
       lot_id: 41,
       quantity: '2.500000',
-      occurred_at: '2026-07-14T09:30',
+      occurred_at: occurredAtInput,
       note: '  首批领料  ',
       material_id: 999,
       unit_id: 999,
@@ -71,7 +72,7 @@ test('production material issue payload derives source identity and excludes for
     warehouse_id: 2,
     lot_id: 41,
     quantity: '2.5',
-    occurred_at: '2026-07-14T01:30:00.000Z',
+    occurred_at: new Date(occurredAtInput).toISOString(),
     note: '首批领料',
   })
   for (const field of [

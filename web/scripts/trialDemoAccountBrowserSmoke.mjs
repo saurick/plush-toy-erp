@@ -150,7 +150,7 @@ const desktopAccounts = [
       '销售订单',
       '采购订单',
       '模板打印中心',
-      '异常 / 阻塞闭环',
+      '异常处理',
     ],
   },
 ]
@@ -244,7 +244,7 @@ function buildMobileDeniedAccountSummary({ verified } = {}) {
     mobileTaskEntry: buildMobileTaskEntryLabel('sales'),
     expectedDenied: true,
     ...(verified === undefined ? {} : { verified }),
-    expectedMessage: '该账号暂无当前入口权限，请联系管理员。',
+    expectedMessage: '当前账号不能使用所选工作方式，请联系系统管理员。',
   }
 }
 
@@ -367,7 +367,8 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
         account.username === 'demo_admin' &&
         account.role === getTrialRoleLabel('sales') &&
         account.mobileTaskEntry === buildMobileTaskEntryLabel('sales') &&
-        account.expectedMessage === '该账号暂无当前入口权限，请联系管理员。'
+        account.expectedMessage ===
+          '当前账号不能使用所选工作方式，请联系系统管理员。'
     ),
     coversCustomerHiddenMenus:
       plan.customerHiddenMenuLabels.length > 0 &&
@@ -1194,10 +1195,12 @@ async function verifyMobileDeniedAccount(browser) {
       fromPath: '/m/sales/tasks',
       expectSuccess: false,
     })
-    await page.getByText('该账号暂无当前入口权限，请联系管理员。').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
+    await page
+      .getByText('当前账号不能使用所选工作方式，请联系系统管理员。')
+      .waitFor({
+        state: 'visible',
+        timeout: 15_000,
+      })
     assert.equal(
       new URL(page.url()).pathname,
       '/admin-login',
@@ -1231,7 +1234,7 @@ async function login(
     })
   }
   await ensureLoginFormReady(page, { username, fromPath })
-  const entryLabel = entry === 'mobile' ? '岗位任务端' : '后台管理'
+  const entryLabel = entry === 'mobile' ? '手机端待办' : '电脑端业务管理'
   const entryButton = page
     .locator('.ant-segmented-item')
     .filter({ hasText: entryLabel })

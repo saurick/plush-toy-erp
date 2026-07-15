@@ -1,4 +1,8 @@
-import { isAdminSessionUnavailableCode } from '../../common/consts/errorCodes.js'
+import {
+  RpcErrorCode,
+  isAdminSessionUnavailableCode,
+  isAuthFailureCode,
+} from '../../common/consts/errorCodes.js'
 
 const EFFECTIVE_SESSION_SYNC_FAILED_SOURCE = 'effective_session_sync_failed'
 const ACTIVE_CUSTOMER_CONFIG_SOURCE = 'active_customer_config_revision'
@@ -778,4 +782,61 @@ export function getAdminProfileSyncErrorAction(
     return 'silent'
   }
   return 'notify'
+}
+
+export function isTransientProfileSyncError(error) {
+  if (error?.isAbortError) {
+    return false
+  }
+  const code = Number(error?.code)
+  if (
+    isAuthFailureCode(code) ||
+    isAdminSessionUnavailableCode(code) ||
+    code === RpcErrorCode.PERMISSION_DENIED
+  ) {
+    return false
+  }
+  const httpStatus = Number(error?.httpStatus)
+  const hasHttpStatus = Number.isFinite(httpStatus) && httpStatus > 0
+  return Boolean(
+    error?.isNetworkError ||
+      (error?.isInvalidResponse &&
+        (!hasHttpStatus || httpStatus < 400 || httpStatus >= 500)) ||
+      (hasHttpStatus && httpStatus >= 500) ||
+      code === RpcErrorCode.INTERNAL
+  )
+}
+
+export async function loadProfileSyncReadWithRetry(
+  load,
+  {
+    retryDelaysMs = [],
+    wait = (delayMs) =>
+      new Promise((resolve) => globalThis.setTimeout(resolve, delayMs)),
+  } = {}
+) {
+  if (typeof load !== 'function') {
+    throw new TypeError('profile sync loader must be a function')
+  }
+  const delays = Array.isArray(retryDelaysMs)
+    ? retryDelaysMs.filter(
+        (delayMs) => Number.isFinite(delayMs) && delayMs >= 0
+      )
+    : []
+  let retryIndex = 0
+  while (true) {
+    try {
+      return await load()
+    } catch (error) {
+      if (
+        !isTransientProfileSyncError(error) ||
+        retryIndex >= delays.length
+      ) {
+        throw error
+      }
+      const delayMs = delays[retryIndex]
+      retryIndex += 1
+      await wait(delayMs)
+    }
+  }
 }

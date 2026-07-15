@@ -642,6 +642,45 @@ test('yoyoosun processing-contract fixture covers sewing fabric and handwork sub
   assert.ok(handwork?.productNo)
 })
 
+test('yoyoosun trial fixture uses short anonymized business copy and keeps SIM identities', () => {
+  const visibleCopy = JSON.stringify(yoyoosunTrialDataFixture)
+
+  assert.doesNotMatch(
+    visibleCopy,
+    /【试用】|合成(?:试用|玩偶|客户|材料供应商)|联系人[甲乙]|委外加工商/u
+  )
+  assert.deepEqual(
+    yoyoosunTrialDataFixture.customers.map((customer) => customer.displayName),
+    ['样例·美悦礼品', '样例·森野文创']
+  )
+  assert.deepEqual(
+    yoyoosunTrialDataFixture.products.map((product) => product.productName),
+    ['云朵小熊', '星星挂兔', '云朵小熊大号']
+  )
+  assert.ok(
+    yoyoosunTrialDataFixture.suppliers.every(
+      (supplier) =>
+        supplier.supplierCode.startsWith('SIM-') &&
+        supplier.displayName.startsWith('样例·')
+    )
+  )
+  assert.ok(
+    yoyoosunTrialDataFixture.products.every((product) =>
+      product.productNo.startsWith('SIM-')
+    )
+  )
+  assert.ok(
+    yoyoosunTrialDataFixture.materials.every((material) =>
+      material.materialCode.startsWith('SIM-')
+    )
+  )
+  assert.ok(
+    yoyoosunTrialDataFixture.outsourcingOrders
+      .flatMap((order) => order.lines)
+      .some((line) => line.processName === '裁片检验')
+  )
+})
+
 test('yoyoosun trial fixture covers manual regression states without claiming real import', () => {
   assert.equal(yoyoosunTrialDataFixture.status, 'preview_only')
   assert.match(

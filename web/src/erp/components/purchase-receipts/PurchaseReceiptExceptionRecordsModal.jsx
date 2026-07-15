@@ -186,11 +186,11 @@ export default function PurchaseReceiptExceptionRecordsModal({
         message.success(
           action === 'post'
             ? kind === 'return'
-              ? '采购退货已过账'
-              : '入库调整已过账'
+              ? '采购退货已确认'
+              : '入库调整已确认'
             : kind === 'return'
-              ? '采购退货已取消并冲正'
-              : '入库调整已取消并冲正'
+              ? '采购退货已取消，库存已恢复到退货前'
+              : '入库调整已取消，库存已恢复到调整前'
         )
         await loadRecords()
         await onChanged?.()
@@ -229,8 +229,8 @@ export default function PurchaseReceiptExceptionRecordsModal({
             <Popconfirm
               title={
                 kind === 'return'
-                  ? '确认退货并写库存出库？'
-                  : '确认调整并写差额库存流水？'
+                  ? '确认这笔退货？确认后相应库存会同步扣减。'
+                  : '确认这笔入库调整？确认后库存数量会按调整内容同步更新。'
               }
               okText="确认"
               cancelText="取消"
@@ -242,16 +242,16 @@ export default function PurchaseReceiptExceptionRecordsModal({
                 loading={savingKey === `${kind}:post:${record.id}`}
                 disabled={Boolean(savingKey)}
               >
-                过账
+                确认
               </Button>
             </Popconfirm>
           )
         }
         if (record?.status === 'POSTED') {
-          if (!permissions.cancel) return <span>已过账</span>
+          if (!permissions.cancel) return <span>已确认</span>
           return (
             <Popconfirm
-              title="确认取消并按原业务来源写库存冲正？"
+              title="确认取消？取消后库存会恢复到这笔操作前。"
               okText="确认取消"
               cancelText="暂不取消"
               onConfirm={() => runAction({ kind, action: 'cancel', record })}
@@ -262,7 +262,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
                 loading={savingKey === `${kind}:cancel:${record.id}`}
                 disabled={Boolean(savingKey)}
               >
-                取消并冲正
+                取消并恢复库存
               </Button>
             </Popconfirm>
           )
@@ -397,7 +397,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
       <Alert
         type="info"
         showIcon
-        message="草稿过账后才影响库存；已过账记录取消时保留原记录，并生成反向库存流水。"
+        message="确认草稿后库存会同步更新；取消已确认记录时会保留原记录，并将库存恢复到操作前。"
         style={{ marginBottom: 16 }}
       />
       {tabItems.length > 0 ? (

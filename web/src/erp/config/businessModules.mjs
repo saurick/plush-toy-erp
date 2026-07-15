@@ -1,5 +1,5 @@
 const businessSectionMeta = Object.freeze([
-  { key: 'master', title: '主数据' },
+  { key: 'master', title: '基础资料' },
   { key: 'sales', title: '销售管理' },
   { key: 'engineering', title: '产品工程' },
   { key: 'purchase', title: '采购管理' },
@@ -8,7 +8,7 @@ const businessSectionMeta = Object.freeze([
   { key: 'outsourcing', title: '委外管理' },
   { key: 'production', title: '生产管理' },
   { key: 'shipment', title: '出货管理' },
-  { key: 'finance', title: '财务业务' },
+  { key: 'finance', title: '财务管理' },
 ])
 
 const businessSectionTitleMap = new Map(
@@ -24,10 +24,10 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/master/partners/customers',
     shortLabel: '客户',
     pageKind: 'formal-v1',
-    description: '客户档案入口只维护客户交易主体；联系人随客户详情维护。',
+    description: '客户档案用于维护客户交易主体；联系人请在客户详情中维护。',
     primaryEntity: 'customers',
     boundary:
-      '客户档案只维护交易主体资料；销售订单、出货、应收和收款需在对应模块处理。',
+      '客户档案只维护交易主体资料；销售订单、出货、应收和收款需到对应页面处理。',
   },
   {
     key: 'suppliers',
@@ -38,10 +38,10 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '供应商',
     pageKind: 'formal-v1',
     description:
-      '供应商档案入口只维护供应商 / 加工厂交易主体；联系人随供应商详情维护。',
+      '供应商档案用于维护供应商和加工厂交易主体；联系人请在供应商详情中维护。',
     primaryEntity: 'suppliers',
     boundary:
-      '供应商和加工厂档案只维护交易主体资料；采购、委外和应付需在对应模块处理。',
+      '供应商和加工厂档案只维护交易主体资料；采购、委外和应付需到对应页面处理。',
   },
   {
     key: 'products',
@@ -52,11 +52,11 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '产品',
     pageKind: 'formal-v1',
     description:
-      '产品规格 / SKU 主数据入口；SKU 归属产品，维护颜色、尺码、条码、客户 SKU 和包装版本。',
+      '维护产品规格（SKU）、颜色、尺码、条码、客户规格编号和包装版本。',
     primaryEntity: 'product_skus',
     factSource: 'product_skus',
     boundary:
-      '产品档案只维护产品和规格资料；库存、BOM、订单、生产和出货需在对应模块处理。',
+      '产品档案只维护产品和规格资料；库存、物料清单、订单、生产和出货需到对应页面处理。',
     sourceRefs: ['products', 'product_skus'],
     currentScope: [
       'SKU 编号、条码、客户 SKU、颜色、色号、尺码、包装版本',
@@ -73,16 +73,16 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '材料',
     pageKind: 'formal-v1',
     description:
-      '材料档案入口只维护材料主数据；采购、库存、质检和 BOM 用量在对应模块处理。',
+      '维护材料基础资料；采购、库存、质检和物料清单用量请到对应页面处理。',
     primaryEntity: 'materials',
     factSource: 'materials',
     boundary:
-      '材料档案只维护材料资料；采购订单、库存余额、来料质检和 BOM 用量需在对应模块处理。',
+      '材料档案只维护材料资料；采购订单、库存余额、来料质检和物料清单用量需到对应页面处理。',
     sourceRefs: ['materials', 'units'],
     currentScope: [
       '材料编号、名称、分类、规格、颜色',
       '默认单位和启停状态',
-      '采购、库存、质检、BOM 只引用材料主数据',
+      '采购、库存、质检和物料清单使用这里的材料资料',
     ],
   },
   {
@@ -94,26 +94,26 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '销售订单',
     pageKind: 'formal-v1',
     description:
-      '销售订单记录客户订单承诺；出货、库存和财务处理在对应模块完成。',
+      '销售订单记录客户订单承诺；出货、库存和财务处理请到对应页面完成。',
     primaryEntity: 'sales_orders',
     boundary: '销售订单不会自动生成出货单、库存变动、应收、发票或收付款记录。',
   },
   {
     key: 'material-bom',
     sectionKey: 'engineering',
-    label: 'BOM 管理',
-    title: 'BOM 管理',
+    label: '物料清单（BOM）',
+    title: '物料清单（BOM）',
     path: '/erp/purchase/material-bom',
-    shortLabel: 'BOM',
+    shortLabel: '物料清单',
     pageKind: 'formal-v1',
     description:
-      'BOM 是产品结构和材料用量的正式依据，用于维护材料、损耗和版本状态。',
+      '物料清单（BOM）用于维护产品结构、材料用量、损耗和版本状态。',
     primaryEntity: 'bom_headers / bom_items',
     factSource: 'bom_headers, bom_items, materials',
     boundary:
-      'BOM 管理不会直接生成采购需求、采购入库或库存余额；同一产品只能保留一个当前生效版本。',
+      '维护物料清单不会直接生成采购需求、采购入库或库存数量；同一产品只能保留一个当前生效版本。',
     sourceRefs: ['bom_headers', 'bom_items', 'materials', 'products'],
-    currentScope: ['产品结构版本', '材料用量和损耗率', 'BOM 状态与生效边界'],
+    currentScope: ['产品结构版本', '材料用量和损耗率', '物料清单状态和生效规则'],
   },
   {
     key: 'processes',
@@ -146,7 +146,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '采购',
     pageKind: 'formal-v1',
     description:
-      '采购订单维护供应商采购承诺和采购明细；入库、批次和财务处理在对应模块完成。',
+      '采购订单维护供应商采购承诺和采购明细；入库、批次和财务处理请到对应页面完成。',
     primaryEntity: 'purchase_orders / purchase_order_items',
     factSource: 'purchase_orders, purchase_order_items',
     boundary: '采购订单不会自动生成采购收货、入库、退货或应付记录。',
@@ -161,7 +161,7 @@ export const businessModuleDefinitions = Object.freeze([
     currentScope: [
       '采购订单和供应商信息',
       '采购订单明细、材料、数量、单价和预计到货日期',
-      '提交、审核、关闭、取消状态动作',
+      '提交、审核、关闭、取消等状态操作',
       '采购入库行可选关联采购订单行做追溯',
     ],
   },
@@ -178,7 +178,7 @@ export const businessModuleDefinitions = Object.freeze([
     primaryEntity: 'purchase_receipts / purchase_receipt_items',
     factSource: 'purchase_receipts, purchase_receipt_items, inventory_txns',
     boundary:
-      '入库通知、检验和入库确认是流程视角；协同任务完成不等于采购入库已过账。',
+      '任务标记为完成不等于采购入库已经过账；请以入库单状态为准。',
     sourceRefs: [
       'purchase_receipts',
       'purchase_returns',
@@ -196,10 +196,10 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '质检',
     pageKind: 'formal-v1',
     description:
-      '质量检验用于采购来料、委外回货等来源的检验判定和批次状态处理；完成协同任务不会代替质检判定。',
+      '质量检验用于采购来料、委外回货等业务的检验判定和批次状态处理；任务完成不能代替质检判定。',
     primaryEntity: 'quality_inspections',
     factSource: 'quality_inspections, inventory_lots',
-    boundary: '质检状态变化不直接写库存流水；不合格退供应商仍走采购退货。',
+    boundary: '质检状态变化不会增减库存总量；不合格退供应商仍需办理采购退货。',
     sourceRefs: [
       'quality_inspections',
       'inventory_lots',
@@ -222,7 +222,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '库存',
     pageKind: 'formal-v1',
     description:
-      '库存台账统一查看库存余额、已预留、可用量、批次和流水；库存数量以已过账流水、余额、批次状态和有效预留为准。',
+      '库存台账统一查看库存余额、已预留、可用量、批次和变动记录；库存数量以已确认的入库、出库和调整记录为准。',
     primaryEntity: 'inventory_balances / inventory_txns / inventory_lots',
     factSource:
       'inventory_txns, inventory_balances, inventory_lots, stock_reservations',
@@ -238,8 +238,8 @@ export const businessModuleDefinitions = Object.freeze([
       '库存余额',
       '已预留 / 可用量只读',
       '库存批次',
-      '库存流水',
-      '盘点 / 调整边界',
+      '库存变动记录',
+      '盘点 / 调整规则',
     ],
   },
   {
@@ -256,7 +256,7 @@ export const businessModuleDefinitions = Object.freeze([
     factSource:
       'outsourcing_orders, outsourcing_order_items, outsourcing_facts, quality_inspections, finance_facts',
     boundary:
-      '确认加工合同只表示委外承诺已确认；发料和回货必须由本页显式办理并在委外记录中过账，回货质检和应付继续使用正式来源动作。',
+      '确认加工合同只表示双方约定已确认；发料和回货仍需在本页办理并过账，回货质检和应付请到对应页面继续处理。',
     sourceRefs: [
       'outsourcing_orders',
       'outsourcing_order_items',
@@ -272,8 +272,8 @@ export const businessModuleDefinitions = Object.freeze([
       '工序明细',
       '草稿 / 提交 / 确认 / 关闭 / 取消状态',
       '加工合同打印内容',
-      '导出筛选结果 / 列顺序 / 本页协同',
-      '单位主数据可读选择',
+      '导出筛选结果 / 列顺序 / 相关任务',
+      '选择计量单位',
       '从已确认合同行生成委外发料 / 回货草稿',
       '从已过账回货发起质检 / 合格后生成应付',
     ],
@@ -287,12 +287,12 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '生产订单',
     pageKind: 'formal-v1',
     description:
-      '生产订单维护生产计划源单的草稿、发布、关闭和取消；已发布订单可在本页从冻结需求办理领料或完工入库草稿。',
+      '生产订单维护生产计划的草稿、发布、关闭和取消；已发布订单可在本页按已确认需求办理领料或完工入库草稿。',
     primaryEntity: 'production_orders / production_order_items',
     factSource:
       'production_orders, production_order_items, production_order_material_requirements, production_facts',
     boundary:
-      '生产订单只表达计划承诺；领料和完工必须由本页显式办理，草稿仍需在生产记录中过账后才会形成库存流水。',
+      '生产订单只表达计划承诺；领料和完工必须由本页办理，草稿仍需在生产记录中确认后才会形成库存变动记录。',
     sourceRefs: [
       'production_orders',
       'production_order_items',
@@ -306,7 +306,7 @@ export const businessModuleDefinitions = Object.freeze([
     ],
     currentScope: [
       '生产计划草稿与明细',
-      '发布、关闭和取消状态动作',
+      '发布、关闭和取消等状态操作',
       '销售来源与当前生效 BOM 可读选择',
       '从冻结物料需求生成领料草稿',
       '从已发布订单行生成完工入库草稿',
@@ -321,15 +321,15 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '排程',
     pageKind: 'formal-v1',
     description:
-      '生产排程用于创建、筛选、完成、阻塞和催办协同任务；不会自动登记生产完工、领料或成品入库。',
+      '生产排程用于创建、筛选、完成、阻塞和催办排程任务；不会自动登记生产完工、领料或成品入库。',
     primaryEntity: 'workflow_tasks',
     factSource: 'workflow_tasks 当前承载，生产排程事实规则待评审',
     boundary:
-      '生产排程只管理计划和协同任务；完工、领料和成品入库需在对应业务入口登记。',
+      '生产排程只管理计划和待办任务；完工、领料和成品入库需到对应页面登记。',
     sourceRefs: ['workflow_tasks', 'sales_orders', 'bom_headers'],
     currentScope: [
-      '生产排程协同任务',
-      '责任角色',
+      '生产排程任务',
+      '负责岗位',
       '到期跟进',
       '完成 / 阻塞 / 催办',
     ],
@@ -347,13 +347,13 @@ export const businessModuleDefinitions = Object.freeze([
     primaryEntity: 'production_facts',
     factSource: 'production_facts, inventory_txns',
     boundary:
-      '完成协同任务不会自动生成生产发料、成品入库或返工记录；生产排程和异常也不会自动生成出货、应收或发票记录。',
+      '任务标记为完成不会自动生成生产发料、成品入库或返工记录；生产排程和异常也不会自动生成出货、应收或发票记录。',
     sourceRefs: ['production_facts', 'inventory_txns', 'workflow_tasks'],
     currentScope: [
       '生产发料',
       '成品入库',
       '返工',
-      '过账后更新库存流水，取消后生成冲正记录',
+      '确认后更新库存，取消后生成撤销调整记录',
     ],
   },
   {
@@ -364,11 +364,11 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/production/exceptions',
     shortLabel: '异常',
     pageKind: 'formal-v1',
-    description: '生产异常用于登记、筛选、完成、阻塞和催办协同任务。',
+    description: '生产异常用于登记、筛选、完成、阻塞和催办异常任务。',
     primaryEntity: 'workflow_tasks / workflow_task_events',
     factSource: 'workflow_tasks, workflow_task_events',
     boundary:
-      '异常处理只更新协同任务；不会直接修改生产、库存、出货或财务记录，也不新增独立客户工单。',
+      '异常处理只更新当前任务；不会直接修改生产、库存、出货或财务记录，也不会新增客户工单。',
     sourceRefs: [
       'workflow_tasks',
       'workflow_task_events',
@@ -411,7 +411,7 @@ export const businessModuleDefinitions = Object.freeze([
     primaryEntity: 'shipments / shipment_items / stock_reservations',
     factSource: 'shipments, shipment_items, stock_reservations, inventory_txns',
     boundary:
-      '出货放行和完成任务不等于出库；释放预留不会写库存流水，确认出货才消耗预留，取消已发货由系统生成冲正追溯。',
+      '出货放行和完成任务不等于出库；释放预留不会增减库存总量，确认出货才消耗预留，取消已发货后系统会保留调整记录。',
     sourceRefs: [
       'shipments',
       'shipment_items',
@@ -420,8 +420,8 @@ export const businessModuleDefinitions = Object.freeze([
     ],
     currentScope: [
       '出货单草稿和发货',
-      '库存预留创建 / 释放与出货同步消耗',
-      '出货取消冲正边界',
+      '库存预留创建 / 释放，以及确认出货时自动扣减预留',
+      '出货取消后的库存恢复规则',
     ],
   },
   {
@@ -433,7 +433,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '出货',
     pageKind: 'formal-v1',
     description:
-      '出货单维护出货信息和明细；确认出货后更新库存，取消已出货会生成冲正追溯。',
+      '出货单维护出货信息和明细；确认出货后更新库存，取消已出货会保留原记录并恢复相应库存。',
     primaryEntity: 'shipments / shipment_items',
     factSource: 'shipments, shipment_items, inventory_txns',
     boundary:
@@ -516,11 +516,11 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '发票',
     pageKind: 'formal-v1',
     description:
-      '发票管理记录已出货业务的开票事实；业务记录不等于税控开票完成。',
+      '发票管理记录已出货业务的开票情况；系统中的发票记录不等于税控开票已经完成。',
     primaryEntity: 'finance_facts.INVOICE',
     factSource: 'finance_facts',
     boundary:
-      '发票记录只从已出货出货单生成，不提供结清动作，也不替代税控、发票查验、纳税申报、附件归档或会计凭证。',
+      '发票记录只从已出货出货单生成，不提供结清操作，也不替代税控、发票查验、纳税申报、附件归档或会计凭证。',
     sourceRefs: ['finance_facts', 'shipments'],
     currentScope: ['从已出货出货单生成发票记录', '过账', '取消'],
   },

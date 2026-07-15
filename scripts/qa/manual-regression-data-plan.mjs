@@ -5,14 +5,17 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { yoyoosunTrialDataFixture } from "../../config/customers/yoyoosun/trialDataFixture.mjs";
-import { buildInputTemplate as buildMobileWorkflowInputTemplate } from "./mobile-workflow-simulated-closure.mjs";
-import { buildInputTemplate as buildOperationalFactInputTemplate } from "./operational-fact-simulated-closure.mjs";
-import { buildInputTemplate as buildTrialSimulatedDataInputTemplate } from "./trial-simulated-data.mjs";
+import {
+  DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  deriveManualAcceptanceDatasetIdentity,
+} from "./manual-acceptance-dataset.mjs";
+import {
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
+} from "./manual-acceptance-target-policy.mjs";
 
 const currentFile = fileURLToPath(import.meta.url);
 const DEFAULT_OUT_DIR = "output/qa/manual-regression-data-plan";
-const TRIAL_SIM_CONFIRM = "APPLY_SIMULATED_TRIAL_DATA";
-const MOBILE_WORKFLOW_SIM_CONFIRM = "APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS";
 
 const COUNT_FIELDS = Object.freeze([
   "units",
@@ -113,74 +116,72 @@ function buildProductCorePlan() {
       "bom",
     ],
     boundary:
-      "Product Core demo seed is neutral local master data. It must not contain yoyoosun customer records, sales orders, inventory, shipment, finance, or real import approval.",
+      "这批 Product Core 基础资料只供本地开发复用，不包含永绅客户记录、订单、库存、出货、财务或真实导入授权。",
   };
 }
 
 function buildYoyoosunPlan() {
-  const trialTemplate = buildTrialSimulatedDataInputTemplate({
-    productId: 1,
-    unitId: 1,
-  });
-  const operationalTemplate = buildOperationalFactInputTemplate({
-    productId: 1,
-    unitId: 1,
-    warehouseId: 1,
-    runId: "DEV-TESTING-REPORT",
-  });
-  const mobileWorkflowTemplate = buildMobileWorkflowInputTemplate({
-    runId: "DEV-TESTING-REPORT",
-  });
+  const identity = deriveManualAcceptanceDatasetIdentity(
+    DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  );
 
   return {
     customerKey: yoyoosunTrialDataFixture.customerKey,
+    datasetKey: identity.datasetKey,
+    dataVersion: identity.dataVersion,
+    runId: identity.runId,
     fixtureKey: yoyoosunTrialDataFixture.fixtureKey,
     fixtureStatus: yoyoosunTrialDataFixture.status,
     simulatedOnly: true,
     realCustomerImport: false,
     writesBusinessRecordsDirectly: false,
-    applyConfirmations: {
-      trialMasterData: TRIAL_SIM_CONFIRM,
-      mobileWorkflow: MOBILE_WORKFLOW_SIM_CONFIRM,
+    currentContract: {
+      version: identity.dataVersion,
+      runId: identity.runId,
+      targets: ["local", CUSTOMER_TRIAL_133_TARGET],
+      sameBusinessMeaning: true,
+      sharedDatabaseIds: false,
+      factsContract: "source-driven-operational-facts-v1",
+      formalBusinessAPIsOnly: true,
+      purchaseQualityHandledByFacts: true,
     },
-    retiredApplyPaths: {
-      operationalFacts:
-        "The generic operational fact simulator apply path is retired until a source-driven fixture replaces it.",
+    targetRules: {
+      local: {
+        backendURL: "http://127.0.0.1:8300",
+        coreAndRole: "seed-or-verify",
+      },
+      [CUSTOMER_TRIAL_133_TARGET]: {
+        backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+        coreAndRole: "verify-or-reuse-only",
+        remoteSeedAllowed: false,
+        releaseAndMigrationAttestationRequired: true,
+      },
     },
-    simulationPrefixes: {
-      trialMasterData: "SIM-YOYOOSUN-TRIAL",
-      operationalFacts: "SIM-YOYOOSUN-OPFACT",
-      mobileWorkflow: "SIM-YOYOOSUN-MOBILE-WORKFLOW",
-    },
+    simulationPrefixes: { ...identity.prefixes },
     fixtureBoundary: yoyoosunTrialDataFixture.boundary,
     fixtureCounts: countFixtureRecords(yoyoosunTrialDataFixture),
     fixtureStateCoverage: buildYoyoosunStateCoverage(yoyoosunTrialDataFixture),
     fixtureSourceIds: collectFixtureSourceIds(yoyoosunTrialDataFixture),
     manualRegressionFlows: [
-      "customer and supplier master data",
-      "sales order draft, active, and cancelled states",
-      "material purchase and outsourcing contract print data",
-      "purchase receipt draft and posted states",
-      "quality pending, passed, and rejected states",
-      "inventory pending, qc hold, and available lot states",
-      "shipment draft, shipped, and cancelled states",
-      "finance receivable/payable draft and posted preview states",
-      "workflow sales, purchase, boss, quality, and warehouse task roles",
+      "客户、供应商、材料和产品都能查到",
+      "销售、采购和委外订单有常用状态可看",
+      "收货、检验、库存和生产前后能连起来",
+      "预留、出货和财务页面有同批业务记录",
+      "九个岗位都有待办、已办和异常示例",
+      "采购合同、加工合同和产品资料可以带值打印",
     ],
     commands: {
       fixtureBoundary:
         "PATH=/usr/local/bin:$PATH node --test scripts/qa/yoyoosun-customer-closure.test.mjs",
-      trialReportOnly: trialTemplate.commands.reportOnly,
-      trialApplySimulated: trialTemplate.commands.applySimulated,
-      operationalInputTemplate: operationalTemplate.commands.printInputTemplate,
-      operationalReportOnly: operationalTemplate.commands.reportOnly,
-      mobileWorkflowReportOnly: mobileWorkflowTemplate.commands.reportOnly,
-      mobileWorkflowApplySimulated:
-        mobileWorkflowTemplate.commands.applySimulated,
-      purchaseQualityReportOnly:
-        "PATH=/usr/local/bin:$PATH node scripts/qa/purchase-quality-simulated-matrix.mjs --supplier-id <active_supplier_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
-      purchaseQualityApplySimulated:
-        "PURCHASE_QUALITY_SIM_CONFIRM=APPLY_SIMULATED_PURCHASE_QUALITY_MATRIX PURCHASE_QUALITY_SIM_PASSWORD='<local-demo-password>' PATH=/usr/local/bin:$PATH node scripts/qa/purchase-quality-simulated-matrix.mjs --apply --backend-url http://127.0.0.1:8300 --supplier-id <active_supplier_id> --material-id <active_material_id> --unit-id <active_unit_id> --warehouse-id <active_warehouse_id>",
+      datasetPlan:
+        "PATH=/usr/local/bin:$PATH node scripts/qa/manual-acceptance-dataset.mjs",
+      sourcePlan:
+        `PATH=/usr/local/bin:$PATH node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version ${identity.dataVersion} --run-id ${identity.runId} --json`,
+      factsEntrypoint: "scripts/qa/manual-acceptance-fact-data.mjs",
+      factsHelper:
+        "scripts/qa/manual-acceptance-source-driven-facts.mjs",
+      readinessPlan:
+        "PATH=/usr/local/bin:$PATH node scripts/qa/manual-acceptance-readiness.mjs",
     },
   };
 }
@@ -209,39 +210,40 @@ export function buildManualRegressionDataPlan() {
       },
     ],
     boundaries: [
-      "This plan is read-only and does not write database rows.",
-      "Product Core seed remains neutral SIM-PLUSH-CORE master data.",
-      "yoyoosun fixture and simulation scripts remain simulated test data.",
-      "Real customer import is not executed and requires the separate approved import executor.",
-      "No tenant_id, SaaS tenant split, business_records write, shipment/inventory/finance direct SQL, or Product Core customer hard-code is introduced.",
+      "本计划只整理验收范围，不连接系统，也不写数据库。",
+      "SIM-PLUSH-CORE 只用于本地基础资料；133 只能核对或复用，不远程 seed。",
+      "永绅数据全部是模拟测试数据，不代表客户已确认或真实发生。",
+      "正式部署默认不造数据；133 试用写入必须绑定明确版本、迁移和带外证明。",
+      "所有业务事实只走正式 API，不直接写 SQL，不把 Workflow 当成库存、出货或财务事实。",
     ],
   };
 }
 
 export function formatManualRegressionDataPlan(plan) {
   const lines = [
-    "manual regression data plan",
+    "手工回归数据计划",
     `scope=${plan.scope}`,
     `readOnly=${plan.readOnly}`,
     `writesDatabase=${plan.writesDatabase}`,
     `realCustomerImport=${plan.realCustomerImport}`,
     "",
-    "Product Core",
-    `- prefix: ${plan.productCore.prefix}`,
-    `- seed: ${plan.productCore.seedCommand}`,
-    `- coverage: ${Object.entries(plan.productCore.expectedCoverage)
+    "本地通用基础资料",
+    `- 编号前缀: ${plan.productCore.prefix}`,
+    `- 本地准备命令: ${plan.productCore.seedCommand}`,
+    `- 覆盖数量: ${Object.entries(plan.productCore.expectedCoverage)
       .map(([key, value]) => `${key}=${value}`)
       .join(", ")}`,
     "",
-    "yoyoosun",
-    `- fixture: ${plan.yoyoosun.fixtureKey} (${plan.yoyoosun.fixtureStatus})`,
-    `- counts: ${Object.entries(plan.yoyoosun.fixtureCounts)
+    "永绅模拟验收数据",
+    `- 当前版本: ${plan.yoyoosun.dataVersion} / ${plan.yoyoosun.runId}`,
+    `- 参考样例: ${plan.yoyoosun.fixtureKey} (${plan.yoyoosun.fixtureStatus})`,
+    `- 样例数量: ${Object.entries(plan.yoyoosun.fixtureCounts)
       .map(([key, value]) => `${key}=${value}`)
       .join(", ")}`,
-    `- sales statuses: ${plan.yoyoosun.fixtureStateCoverage.salesOrderLifecycleStatuses.join(", ")}`,
-    `- workflow roles: ${plan.yoyoosun.fixtureStateCoverage.workflowOwnerRoles.join(", ")}`,
+    `- 销售订单状态: ${plan.yoyoosun.fixtureStateCoverage.salesOrderLifecycleStatuses.join(", ")}`,
+    `- 待办岗位: ${plan.yoyoosun.fixtureStateCoverage.workflowOwnerRoles.join(", ")}`,
     "",
-    "review passes",
+    "核对命令",
     ...plan.reviewPasses.map((pass) => `- ${pass.id}: ${pass.command}`),
     "",
   ];

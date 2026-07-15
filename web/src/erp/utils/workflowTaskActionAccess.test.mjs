@@ -282,7 +282,7 @@ test('workflowTaskActionAccess: fallback keeps local owner and terminal reasons'
     task: task({ task_status_key: 'done' }),
   })
   assert.equal(terminal.canRun('complete'), false)
-  assert.equal(terminal.readonlyReason, '该任务已结束，只能查看上下文。')
+  assert.equal(terminal.readonlyReason, '该任务已结束，只能查看任务详情。')
 })
 
 test('workflowTaskActionAccess: missing backend explain does not expose local fallback actions', () => {

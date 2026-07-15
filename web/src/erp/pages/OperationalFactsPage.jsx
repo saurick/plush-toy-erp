@@ -525,7 +525,7 @@ export function OperationalFactWorkspace({
         if (!result) {
           productionReworkAttemptsRef.current.settle(scope, attempt, error)
           message.warning(
-            '返工草稿生成结果仍无法确认，已保留本次请求，请使用相同内容重试'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
           return
         }
@@ -622,7 +622,7 @@ export function OperationalFactWorkspace({
       )
       if (retained) {
         message.warning(
-          '财务记录生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+          '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
         )
       } else {
         message.error(getActionErrorMessage(error, config.title))
@@ -667,7 +667,7 @@ export function OperationalFactWorkspace({
   )
   const activeBoundaryText =
     activeConfig.selectionBoundaryText ||
-    '当前操作由系统按业务规则校验和处理；不会直接修改其他模块的库存、出货、财务记录或协同任务。'
+    '当前操作由系统按业务规则校验和处理；不会直接修改其他业务页面的库存、出货、财务记录或待办任务。'
   const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
@@ -677,11 +677,11 @@ export function OperationalFactWorkspace({
     })
   const exportRows = useCallback(() => {
     downloadBusinessListCSV({
-      filename: `${toolbarModuleKey}-${currentActiveKey}.csv`,
+      filename: `业务记录-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: visibleColumns,
       rows: activeRows,
     })
-  }, [activeRows, currentActiveKey, toolbarModuleKey, visibleColumns])
+  }, [activeRows, visibleColumns])
   const canFinanceAction =
     currentActiveKey === 'finance'
       ? canConfirmFinanceFact(adminProfile, activeSelectedRow?.fact_type)
@@ -842,10 +842,10 @@ export function OperationalFactWorkspace({
             正式业务记录
           </Tag>,
           <Tag color="green" key="backend">
-            系统过账 / 冲正
+            系统过账 / 撤销调整
           </Tag>,
           <Tag color="gold" key="boundary">
-            协同完成不等于过账
+            任务完成不等于过账
           </Tag>,
         ]}
         stats={pageStats}
@@ -1109,7 +1109,7 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'shipments' ? (
             <Popconfirm
-              title="确认发货并写出库流水？"
+              title="确认发货并扣减相应库存？"
               onConfirm={() =>
                 runRowAction(activeConfig, activeSelectedRow, 'post', '发货')
               }
@@ -1189,7 +1189,7 @@ export function OperationalFactWorkspace({
           ) : null}
           {['production', 'outsourcing'].includes(currentActiveKey) ? (
             <Popconfirm
-              title="确认取消并按系统规则生成冲正记录？"
+              title="确认取消并按系统规则生成撤销调整记录？"
               onConfirm={() =>
                 runRowAction(activeConfig, activeSelectedRow, 'cancel', '取消')
               }
@@ -1213,7 +1213,7 @@ export function OperationalFactWorkspace({
           ) : null}
           {currentActiveKey === 'shipments' ? (
             <Popconfirm
-              title="确认取消并写出库冲正？"
+              title="确认取消出库并恢复相应库存？"
               onConfirm={() =>
                 runRowAction(
                   activeConfig,

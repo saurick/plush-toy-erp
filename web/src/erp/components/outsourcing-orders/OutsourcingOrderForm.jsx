@@ -285,7 +285,7 @@ export default function OutsourcingOrderForm({
 
       <BusinessLineItemsSection
         title="加工明细"
-        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。布料等材料加工可将加工对象切换为“材料”。"
+        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。加工布料等材料时，可将加工内容类型切换为“材料”。"
         emptyDescription="暂无加工明细"
         renderRow={({ add, field, fields, index, remove }) => (
           <div
@@ -335,8 +335,8 @@ export default function OutsourcingOrderForm({
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
                 name={[field.name, 'subject_type']}
-                label="加工对象类型"
-                rules={[{ required: true, message: '请选择加工对象类型' }]}
+                label="加工内容类型"
+                rules={[{ required: true, message: '请选择加工内容类型' }]}
               >
                 <Select
                   options={[

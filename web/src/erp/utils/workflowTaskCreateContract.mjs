@@ -50,36 +50,36 @@ const WORKFLOW_BUSINESS_STATE_KEYS = new Set([
 function normalizedOptionalString(params, key) {
   if (!Object.hasOwn(params, key) || params[key] === null) return null
   if (typeof params[key] !== 'string') {
-    throw new TypeError(`${key} 必须是字符串`)
+    throw new TypeError('任务资料格式不正确，请刷新后重试')
   }
   return params[key].trim() || null
 }
 
 export function requireWorkflowTaskCreateParams(params = {}) {
   if (!params || typeof params !== 'object' || Array.isArray(params)) {
-    throw new TypeError('create_task 参数必须是对象')
+    throw new TypeError('任务资料格式不正确，请刷新后重试')
   }
   for (const key of Object.keys(params)) {
     if (!WORKFLOW_TASK_CREATE_PUBLIC_PARAM_KEYS.has(key)) {
-      throw new TypeError(`create_task 不接收参数 ${key}`)
+      throw new TypeError('任务资料包含无法识别的内容，请刷新后重试')
     }
   }
 
   const normalized = { ...params }
   for (const key of WORKFLOW_TASK_CREATE_REQUIRED_STRING_KEYS) {
     if (typeof params[key] !== 'string' || !params[key].trim()) {
-      throw new TypeError(`${key} 必须是非空字符串`)
+      throw new TypeError('任务必填资料不完整，请补充后重试')
     }
     normalized[key] = params[key].trim()
   }
   if (!Number.isSafeInteger(params.source_id) || params.source_id <= 0) {
-    throw new TypeError('source_id 必须是安全正整数')
+    throw new TypeError('关联业务单据无效，请重新选择')
   }
 
   const taskStatusKey = normalizedOptionalString(params, 'task_status_key')
   normalized.task_status_key = taskStatusKey || 'ready'
   if (normalized.task_status_key !== 'ready') {
-    throw new TypeError('普通创建只支持 ready 状态')
+    throw new TypeError('新建任务只能从待处理状态开始')
   }
 
   const businessStatusKey = normalizedOptionalString(
@@ -90,7 +90,7 @@ export function requireWorkflowTaskCreateParams(params = {}) {
     businessStatusKey &&
     !WORKFLOW_BUSINESS_STATE_KEYS.has(businessStatusKey)
   ) {
-    throw new TypeError('business_status_key 不支持')
+    throw new TypeError('当前业务状态暂不支持，请重新选择')
   }
   normalized.business_status_key = businessStatusKey
 
@@ -100,13 +100,13 @@ export function requireWorkflowTaskCreateParams(params = {}) {
       typeof params.payload !== 'object' ||
       Array.isArray(params.payload))
   ) {
-    throw new TypeError('payload 必须是对象')
+    throw new TypeError('任务补充资料格式不正确，请刷新后重试')
   }
   normalized.payload = params.payload || {}
 
   const priority = Object.hasOwn(params, 'priority') ? params.priority : 0
   if (!Number.isInteger(priority) || priority < -32768 || priority > 32767) {
-    throw new TypeError('priority 超出范围')
+    throw new TypeError('任务优先级设置无效，请重新选择')
   }
   normalized.priority = priority
 
@@ -115,7 +115,7 @@ export function requireWorkflowTaskCreateParams(params = {}) {
     params.assignee_id !== null &&
     (!Number.isSafeInteger(params.assignee_id) || params.assignee_id <= 0)
   ) {
-    throw new TypeError('assignee_id 必须是安全正整数')
+    throw new TypeError('指定处理人无效，请重新选择')
   }
 
   if (!Object.hasOwn(params, 'due_at') || params.due_at === null) {
@@ -125,7 +125,7 @@ export function requireWorkflowTaskCreateParams(params = {}) {
     params.due_at <= 0 ||
     params.due_at > 9_224_318_015_999
   ) {
-    throw new TypeError('due_at 必须是 PostgreSQL 可表示的 Unix 秒正整数')
+    throw new TypeError('截止时间设置无效，请重新选择')
   } else {
     normalized.due_at = params.due_at
   }

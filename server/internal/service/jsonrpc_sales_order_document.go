@@ -78,8 +78,12 @@ func (d *jsonrpcDispatcher) handleSalesOrderDocument(
 		if err != nil {
 			return id, d.mapSalesOrderError(ctx, err), nil
 		}
+		includeItemCount, permissionResult := d.AdminHasPermission(ctx, biz.PermissionSalesOrderItemRead)
+		if permissionResult != nil {
+			return id, permissionResult, nil
+		}
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
-			"sales_orders": salesOrdersToAny(items),
+			"sales_orders": salesOrdersToAny(items, includeItemCount),
 			"total":        total,
 			"limit":        normalizedLimit(pm),
 			"offset":       normalizedOffset(pm),

@@ -1,7 +1,11 @@
 import { execFile } from 'node:child_process'
 import { mkdir, readFile, readdir, writeFile } from 'node:fs/promises'
 import path from 'node:path'
+import { pathToFileURL } from 'node:url'
 import { promisify } from 'node:util'
+
+import { getCustomerPackage } from '../config/customers/index.mjs'
+import { isLoopbackAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
 
 const execFileAsync = promisify(execFile)
 
@@ -174,16 +178,49 @@ async function runDryRun(projectRoot, customerKey) {
 }
 
 async function compileRuntimeManifest(projectRoot, customerKey) {
-  return compileRuntimeManifestTo(
-    projectRoot,
+  const outPath = path.join(
+    'output',
+    'customers',
     customerKey,
-    path.join(
-      'output',
-      'customers',
-      customerKey,
-      'customer-config-runtime-manifest.ui-test.json'
-    )
+    'customer-config-runtime-manifest.ui-local-test.json'
   )
+  const absoluteOutPath = path.join(projectRoot, outPath)
+  const config = getCustomerPackage(customerKey)
+  if (!config) {
+    throw new Error(`Unknown customer package: ${customerKey}`)
+  }
+  const compilerModuleURL = pathToFileURL(
+    path.join(
+      projectRoot,
+      'scripts',
+      'qa',
+      'customer-config-runtime-manifest.mjs'
+    )
+  ).href
+  const { buildLocalTestApplyRuntimeManifest } = await import(
+    compilerModuleURL
+  )
+  const manifest = buildLocalTestApplyRuntimeManifest(config)
+  await mkdir(path.dirname(absoluteOutPath), { recursive: true })
+  await writeFile(absoluteOutPath, `${JSON.stringify(manifest, null, 2)}\n`)
+  return {
+    customerKey,
+    status: 'success',
+    manifest,
+    manifestPath: outPath,
+    generatedAt: new Date().toISOString(),
+    summary: {
+      revision: manifest.revision,
+      productVersion: manifest.product_version,
+      applyPurpose: manifest.compiled_snapshot.applyPurpose,
+      moduleStateCount: manifest.module_states.length,
+      roleProfileCount: manifest.role_profiles.length,
+      entitlementCount: manifest.access_entitlements.length,
+      workPoolCount: manifest.work_pools.length,
+      membershipCount: manifest.work_pool_memberships.length,
+      pageCount: manifest.compiled_snapshot.pages.length,
+    },
+  }
 }
 
 async function compileRuntimeManifestTo(projectRoot, customerKey, outPath) {
@@ -289,6 +326,9 @@ async function runReleaseReadiness(projectRoot, customerKey, releaseBatch) {
 
 export function createDevCustomerImportDryRunPlugin({
   projectRoot = path.resolve(process.cwd(), '..'),
+  apiOrigin = process.env.API_ORIGIN || 'http://127.0.0.1:8300',
+  devCustomerKey = process.env.ERP_DEV_CUSTOMER_KEY || '',
+  runtimeManifestCompiler = compileRuntimeManifest,
   releaseBatchLister = listReleaseBatches,
   releaseReadinessRunner = runReleaseReadiness,
 } = {}) {
@@ -348,7 +388,30 @@ export function createDevCustomerImportDryRunPlugin({
             return
           }
 
-          const payload = await compileRuntimeManifest(projectRoot, customerKey)
+          if (!isLoopbackAPIOrigin(apiOrigin)) {
+            sendJson(res, 403, {
+              status: 'error',
+              message:
+                '本地测试配置只允许写入 loopback 后端；当前 API_ORIGIN 不是本机地址。',
+            })
+            return
+          }
+          if (
+            !normalizeCustomerKey(devCustomerKey) ||
+            normalizeCustomerKey(devCustomerKey) !== customerKey
+          ) {
+            sendJson(res, 403, {
+              status: 'error',
+              message:
+                '本地测试配置只允许从 start:yoyoosun 对应的客户开发入口生成。',
+            })
+            return
+          }
+
+          const payload = await runtimeManifestCompiler(
+            projectRoot,
+            customerKey
+          )
           sendJson(res, 200, payload)
         } catch (error) {
           sendJson(res, 500, {

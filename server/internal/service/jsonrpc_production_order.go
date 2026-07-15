@@ -16,7 +16,7 @@ import (
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
-const productionOrderModuleKey = "production"
+const productionOrderModuleKey = "production_orders"
 
 func (d *jsonrpcDispatcher) handleProductionOrder(ctx context.Context, method, id string, params *structpb.Struct) (string, *v1.JsonrpcResult, error) {
 	if _, res := d.requireAdmin(ctx); res != nil {
@@ -526,7 +526,7 @@ func productionOrderToMap(order *biz.ProductionOrder) map[string]any {
 	if order == nil {
 		return map[string]any{}
 	}
-	return map[string]any{
+	out := map[string]any{
 		"id": order.ID, "order_no": order.OrderNo, "status": order.Status, "version": order.Version,
 		"planned_start_at": optionalTimeUnix(order.PlannedStartAt), "planned_end_at": optionalTimeUnix(order.PlannedEndAt), "note": optionalStringValue(order.Note),
 		"close_reason": optionalStringValue(order.CloseReason), "cancel_reason": optionalStringValue(order.CancelReason), "created_by": order.CreatedBy,
@@ -534,6 +534,10 @@ func productionOrderToMap(order *biz.ProductionOrder) map[string]any {
 		"released_at": optionalTimeUnix(order.ReleasedAt), "closed_at": optionalTimeUnix(order.ClosedAt), "cancelled_at": optionalTimeUnix(order.CancelledAt),
 		"created_at": order.CreatedAt.Unix(), "updated_at": order.UpdatedAt.Unix(),
 	}
+	if order.ItemCount != nil {
+		out["item_count"] = *order.ItemCount
+	}
+	return out
 }
 
 func productionOrderItemToMap(item *biz.ProductionOrderItem) map[string]any {

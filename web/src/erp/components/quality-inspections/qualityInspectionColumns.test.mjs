@@ -14,7 +14,7 @@ test('quality inspection columns distinguish business source and subject grain',
   assert.match(source, /subjectType === 'PRODUCT'/u)
   assert.match(source, /productOptions/u)
   assert.match(source, /title: '检验来源'/u)
-  assert.match(source, /title: '检验对象 \/ 批次'/u)
+  assert.match(source, /title: '产品 \/ 材料及批次'/u)
   assert.doesNotMatch(source, /title: '采购来源'/u)
   assert.doesNotMatch(source, /title: '物料批次'/u)
 })

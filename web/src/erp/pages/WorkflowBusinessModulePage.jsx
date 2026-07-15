@@ -85,8 +85,8 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-scheduling': {
     taskGroup: 'production_scheduling',
     completionMessage:
-      '排程协同任务已完成，领料、完工和入库仍需到对应业务页面办理。',
-    emptyText: '暂无生产排程协同任务。',
+      '排程任务已完成，领料、完工和入库仍需到对应业务页面办理。',
+    emptyText: '暂无生产排程任务。',
     ownerRoleOptions: [
       workflowRoleOption('pmc'),
       workflowRoleOption('production'),
@@ -97,8 +97,8 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'production-exceptions': {
     taskGroup: 'production_exception',
     completionMessage:
-      '异常协同任务已完成，返工、报废或库存调整仍需到对应业务页面办理。',
-    emptyText: '暂无生产异常协同任务。',
+      '异常任务已完成，返工、报废或库存调整仍需到对应业务页面办理。',
+    emptyText: '暂无生产异常任务。',
     ownerRoleOptions: [
       workflowRoleOption('production'),
       workflowRoleOption('pmc'),
@@ -110,8 +110,8 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   'shipping-release': {
     taskGroup: 'shipment_release',
     completionMessage:
-      '出货放行协同任务已完成，真实出货仍需出货单进入 SHIPPED。',
-    emptyText: '暂无出货放行协同任务。',
+      '出货放行任务已完成，实际出货仍需在出货单中确认完成。',
+    emptyText: '暂无出货放行任务。',
     ownerRoleOptions: [
       workflowRoleOption('warehouse'),
       workflowRoleOption('sales'),
@@ -213,7 +213,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       message.error(
         getActionErrorMessage(
           error,
-          `加载${moduleItem?.title || '协同'}协同任务失败`
+          `加载${moduleItem?.title || '当前页面'}任务失败`
         )
       )
       return false
@@ -231,7 +231,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     return outletContext?.registerPageRefresh?.(async () => {
       const refreshed = await loadWorkflowTasks()
       if (refreshed) {
-        message.success(`${moduleItem.title}协同任务已刷新`)
+        message.success(`${moduleItem.title}任务已刷新`)
       }
       return false
     })
@@ -274,10 +274,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       ['blocked', 'rejected'].includes(task.task_status_key)
     ).length
     return [
-      { key: 'total', label: '协同任务', value: tasks.length },
+      { key: 'total', label: '任务总数', value: tasks.length },
       { key: 'active', label: '待处理', value: activeCount },
       { key: 'blocked', label: '阻塞 / 退回', value: blockedCount },
-      { key: 'shown', label: '当前结果', value: filteredTasks.length },
+      { key: 'shown', label: '筛选结果', value: filteredTasks.length },
     ]
   }, [filteredTasks.length, tasks])
 
@@ -285,7 +285,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     ? `${getWorkflowTaskCodeLabel(selectedTask)} / ${
         selectedTask.task_name || '未填写任务名称'
       }`
-    : `请先选择一条${moduleItem?.shortLabel || ''}协同任务`
+    : `请先选择一条${moduleItem?.shortLabel || ''}任务`
   const selectedTaskItems = selectedTask
     ? [
         {
@@ -378,7 +378,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           if (isWorkflowTaskMutationResultUnknown(error)) {
             message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
           } else {
-            message.error(getActionErrorMessage(error, '完成协同任务失败'))
+            message.error(getActionErrorMessage(error, '完成任务失败'))
             await loadWorkflowTasks().catch(() => {})
           }
           return false
@@ -499,7 +499,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           if (isWorkflowTaskMutationResultUnknown(error)) {
             message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
           } else {
-            message.error(getActionErrorMessage(error, '退回协同任务失败'))
+            message.error(getActionErrorMessage(error, '退回任务失败'))
             await loadWorkflowTasks().catch(() => {})
           }
           return false
@@ -619,7 +619,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           if (isWorkflowTaskMutationResultUnknown(error)) {
             message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
           } else {
-            message.error(getActionErrorMessage(error, '催办协同任务失败'))
+            message.error(getActionErrorMessage(error, '催办任务失败'))
             await loadWorkflowTasks().catch(() => {})
           }
           return false
@@ -711,8 +711,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           exportValue: (record) => getWorkflowTaskStatusMeta(record).label,
         },
         {
-          title: '责任角色',
-          exportTitle: '责任角色',
+          title: '负责岗位',
+          exportTitle: '负责岗位',
           key: 'owner_role',
           width: 120,
           render: (_, record) => getWorkflowTaskOwnerRoleLabel(record),
@@ -734,7 +734,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           key: 'reason',
           width: 340,
           render: (_, record) =>
-            getWorkflowTaskReason(record) || '按当前协同任务要求处理',
+            getWorkflowTaskReason(record) || '按当前任务要求处理',
           exportValue: (record) => getWorkflowTaskReason(record),
         },
       ]),
@@ -744,7 +744,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     useBusinessColumnOrder({
       adminProfile,
       moduleKey,
-      moduleTitle: moduleItem?.title || '模块未登记',
+      moduleTitle: moduleItem?.title || '页面暂不可用',
       columns,
     })
   const hasActiveFilters = Boolean(
@@ -762,9 +762,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     return (
       <BusinessPageLayout>
         <PageHeaderCard
-          title="模块未登记"
+          title="页面暂不可用"
           description="当前页面暂不可用，请返回工作台或联系管理员。"
-          tags={<Tag color="red">未登记</Tag>}
+          tags={<Tag color="red">暂不可用</Tag>}
         />
       </BusinessPageLayout>
     )
@@ -777,7 +777,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         description={moduleItem.description}
         tags={
           <Space size={6} wrap>
-            <Tag color="blue">协同任务</Tag>
+            <Tag color="blue">待办任务</Tag>
             <Tag color="gold">业务处理分开完成</Tag>
           </Space>
         }
@@ -792,7 +792,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         filters={
           <>
             <SearchInput
-              aria-label="搜索协同任务"
+              aria-label="搜索待办任务"
               placeholder="搜索任务"
               searchHint="可搜索：任务、来源号、原因"
               value={keyword}
@@ -805,10 +805,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               onChange={setStatus}
             />
             <SelectFilter
-              aria-label="责任角色"
+              aria-label="负责岗位"
               value={ownerRoleKey}
               options={[
-                { label: '全部角色', value: '' },
+                { label: '全部岗位', value: '' },
                 ...config.ownerRoleOptions,
               ]}
               onChange={setOwnerRoleKey}
@@ -827,7 +827,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           <BusinessListToolbarActions
             moduleTitle={moduleItem.title}
             exportDisabled
-            exportDisabledReason="当前页面只处理协同任务，暂不提供业务数据导出。"
+            exportDisabledReason="当前页面只用于处理任务，暂不提供业务数据导出。"
             onOpenColumnOrder={openColumnOrder}
           />
         }
@@ -856,7 +856,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           }
           boundaryText={
             selectedTaskReadonlyReason ||
-            '当前操作只更新协同任务；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。'
+            '当前操作只更新任务状态；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。'
           }
         >
           <Button
@@ -876,7 +876,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               disabled={taskActionLoadingID > 0}
               onClick={() => completeWorkflowTask(selectedTask)}
             >
-              完成协同
+              完成任务
             </Button>
           ) : null}
           {canBlockSelected ? (
@@ -927,13 +927,13 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
             ownerType="workflow_task"
             ownerId={selectedTask?.id}
             ownerVersion={selectedTask?.version}
-            modalTitle="协同任务附件"
-            panelTitle="协同任务附件"
+            modalTitle="任务附件"
+            panelTitle="任务附件"
             description="上传现场照片、异常截图或任务处理证据；附件不代表任务已完成，也不会改变相关业务记录。"
             canUpload={canUpdateWorkflowTasks || canCompleteWorkflowTasks}
             canDelete={canUpdateWorkflowTasks}
             disabled={!selectedTask}
-            disabledReason="请先选择一条协同任务"
+            disabledReason="请先选择一条任务"
           />
         </SelectionActionBar>
       </BusinessOperationPanel>
@@ -947,7 +947,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         emptyDescription={
           canReadWorkflowTasks
             ? config.emptyText
-            : '当前账号不能查看此类协同任务。'
+            : '当前账号不能查看此类任务。'
         }
         rowSelection={{
           type: 'radio',
@@ -973,7 +973,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         selectedTasks={selectedTasks}
         selectedRecordLabel={
           selectedTasks[0]?.task_name ||
-          `请先选择一条${moduleItem.shortLabel}协同`
+          `请先选择一条${moduleItem.shortLabel}任务`
         }
         adminProfile={adminProfile}
         onCompleteTask={
@@ -999,7 +999,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               ? '退回任务'
               : taskReasonModal?.mode === 'resume'
                 ? '解除阻塞'
-                : '催办协同',
+                : '催办任务',
           selectedTaskLabel
         )}
         open={Boolean(taskReasonModal)}
@@ -1024,12 +1024,12 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           autoFocus
           placeholder={
             taskReasonModal?.mode === 'block'
-              ? '填写阻塞原因；只更新当前协同任务状态。'
+              ? '填写阻塞原因；提交后只更新当前任务状态。'
               : taskReasonModal?.mode === 'reject'
-                ? '填写退回原因；只更新当前协同任务状态。'
+                ? '填写退回原因；提交后只更新当前任务状态。'
                 : taskReasonModal?.mode === 'resume'
                   ? '填写阻塞解除说明；任务将恢复为可执行。'
-                  : '填写催办原因；只记录协同事件。'
+                  : '填写催办原因；只保存本次催办记录。'
           }
           value={taskReasonModal?.reason || ''}
           onChange={(event) =>

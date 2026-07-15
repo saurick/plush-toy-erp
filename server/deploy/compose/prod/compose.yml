@@ -77,6 +77,10 @@ services:
     image: "${APP_IMAGE:-plush-toy-erp-server:dev}"
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-server"
     restart: always
+    # Chromium 保持 sandbox；仅在 Moby 默认 seccomp v0.2.3 基础上放行
+    # user-namespace 所需的 clone / clone3 / unshare，不授予额外 capability。
+    security_opt:
+      - "seccomp=./chromium-seccomp.json"
     depends_on:
       postgres:
         condition: service_healthy
@@ -112,6 +116,9 @@ services:
       ERP_DEBUG_CLEANUP_ENABLED: "${ERP_DEBUG_CLEANUP_ENABLED:-false}"
       ERP_DEBUG_BUSINESS_CLEAR_ENABLED: "${ERP_DEBUG_BUSINESS_CLEAR_ENABLED:-false}"
       ERP_DEBUG_CLEANUP_SCOPE: "${ERP_DEBUG_CLEANUP_SCOPE:-debug_run}"
+      # 仅 customer-trial-133 的隔离验收库可显式开启；正式部署保持 0 + 空 target。
+      ERP_ALLOW_CUSTOMER_TRIAL_CONFIG: "${ERP_ALLOW_CUSTOMER_TRIAL_CONFIG:-0}"
+      ERP_CUSTOMER_TRIAL_TARGET: "${ERP_CUSTOMER_TRIAL_TARGET:-}"
     mem_limit: "${APP_MEM_LIMIT:-2g}"
     mem_reservation: "${APP_MEM_RESERVATION:-768m}"
     networks: {}

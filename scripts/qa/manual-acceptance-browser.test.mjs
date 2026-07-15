@@ -9,14 +9,18 @@ import {
   EXCEPTION_BROWSER_ACCOUNTS,
   FORMAL_BROWSER_ACCOUNTS,
   MANUAL_ACCEPTANCE_BROWSER_BOUNDARY,
+  assertPDFRenderResponse,
+  assertBoundSimulatedPrintReports,
   buildManualAcceptanceBrowserPlan,
   normalizeLocalBrowserURL,
   partitionTargetRuntimeEvents,
   summarizeManualAcceptance,
   parseManualAcceptanceBrowserArgs,
   resolveManualAcceptanceBrowserReportPath,
+  resolveManualAcceptanceBrowserInputReportPath,
   runManualAcceptanceBrowser,
   readBusinessSummaryTotal,
+  readMobileLoadedTaskCount,
 } from "./manual-acceptance-browser.mjs";
 
 const repoRoot = path.resolve(
@@ -136,10 +140,16 @@ test("CLI requires explicit local frontend and backend origins", () => {
     "--base-url=http://127.0.0.1:5177",
     "--backend-url",
     "http://127.0.0.1:8300",
+    "--source-report",
+    "output/qa/manual-acceptance/datasets/v3/source/apply-report.json",
+    "--fact-report",
+    "output/qa/manual-acceptance/datasets/v3/facts/apply-report.json",
   ]);
   assert.equal(parsed.plan, true);
   assert.equal(parsed.baseURL, "http://127.0.0.1:5177");
   assert.equal(parsed.backendURL, "http://127.0.0.1:8300");
+  assert.match(parsed.sourceReportPath, /datasets\/v3\/source\/apply-report\.json$/u);
+  assert.match(parsed.factReportPath, /datasets\/v3\/facts\/apply-report\.json$/u);
 });
 
 test("report output cannot leave the manual acceptance browser directory", () => {
@@ -159,6 +169,57 @@ test("report output cannot leave the manual acceptance browser directory", () =>
         "output/qa/manual-acceptance/browser/report.txt",
       ),
     /\.json file/,
+  );
+});
+
+test("bound print inputs stay in the acceptance report root and match the current batch", () => {
+  assert.match(
+    resolveManualAcceptanceBrowserInputReportPath(
+      "output/qa/manual-acceptance/datasets/v3/source/apply-report.json",
+      "--source-report",
+    ),
+    /datasets\/v3\/source\/apply-report\.json$/u,
+  );
+  assert.throws(
+    () =>
+      resolveManualAcceptanceBrowserInputReportPath(
+        "output/qa/other/apply-report.json",
+        "--source-report",
+      ),
+    /must stay under/u,
+  );
+
+  const runtime = { configRevision: "customer-config-v3" };
+  const source = {
+    mode: "apply",
+    simulatedOnly: true,
+    realCustomerImport: false,
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.15-v3",
+    runId: "20260715-V3",
+    target: "local-dev",
+    backendURL: "http://127.0.0.1:8310",
+    semanticDigest: "digest-v3",
+    prefix: "SIM-YOYOOSUN-UAT-20260715-V3",
+    runtime,
+  };
+  const fact = {
+    ...source,
+    reportContract: "source-driven-operational-facts-v1",
+  };
+  assert.deepEqual(assertBoundSimulatedPrintReports(source, fact), {
+    sourceRunId: "20260715-V3",
+    factRunId: "20260715-V3",
+    sourcePrefix: "SIM-YOYOOSUN-UAT-20260715-V3",
+  });
+  assert.throws(
+    () =>
+      assertBoundSimulatedPrintReports(source, {
+        ...fact,
+        runId: "20260715-OLD",
+        sourceRunId: source.runId,
+      }),
+    /同一批次/u,
   );
 });
 
@@ -195,6 +256,13 @@ test("fresh print workspaces never hide render-pdf failures by route or status",
 test("business summary totals use the visible client-facing counters", () => {
   assert.equal(readBusinessSummaryTotal("task-board", "全部任务 20"), 20);
   assert.equal(
+    readBusinessSummaryTotal(
+      "task-board",
+      "常规待办 6 阻塞 3 到期提醒 8 已结束 3",
+    ),
+    20,
+  );
+  assert.equal(
     readBusinessSummaryTotal("products", "总产品 34 当前结果 20"),
     34,
   );
@@ -206,6 +274,72 @@ test("business summary totals use the visible client-facing counters", () => {
     readBusinessSummaryTotal("permission-center", "角色模板 11 管理员账号 22"),
     22,
   );
+  assert.equal(
+    readBusinessSummaryTotal("production-orders", "符合条件 47 当前页 20"),
+    47,
+  );
+});
+
+test("mobile task totals use the active tab's loaded summary even without a collapse toggle", () => {
+  assert.equal(readMobileLoadedTaskCount("todo", "已加载 18 条待处理"), 18);
+  assert.equal(readMobileLoadedTaskCount("done", "已加载 2 条已办"), 2);
+  assert.equal(readMobileLoadedTaskCount("done", "已加载 18 条待处理"), 0);
+});
+
+test("mobile task evidence waits for each lazy-loaded tab before reading zero", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  assert.match(source, /mobile-role-scroll/u);
+  assert.match(source, /getAttribute\("aria-busy"\) === "false"/u);
+  assert.match(
+    source,
+    /mobile-role-nav-done[\s\S]{0,900}waitForActiveViewLoaded\(\)[\s\S]{0,500}readCurrentTotal\("done"\)/u,
+  );
+  assert.match(
+    source,
+    /loadedTodoCount \+ Number\(match\[1\] \|\| 0\) >= requiredMinimum/u,
+  );
+});
+
+test("PDF response failures surface before blob preview polling", async () => {
+  await assert.rejects(
+    () =>
+      assertPDFRenderResponse(
+        {
+          headers: () => ({ "content-type": "application/json" }),
+          status: () => 400,
+          ok: () => false,
+          json: async () => ({
+            message: "html 样式包含不允许的外部资源或动态表达式",
+          }),
+        },
+        "material-purchase-contract",
+      ),
+    /PDF HTTP 400.*html 样式/u,
+  );
+  assert.deepEqual(
+    await assertPDFRenderResponse(
+      {
+        headers: () => ({
+          "content-type": "application/pdf; charset=binary",
+          "x-request-id": "req-print-1",
+        }),
+        status: () => 200,
+        ok: () => true,
+      },
+      "material-purchase-contract",
+    ),
+    {
+      status: 200,
+      contentType: "application/pdf; charset=binary",
+      requestID: "req-print-1",
+    },
+  );
+});
+
+test("disabled login keeps the non-enumerating user-visible message", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  assert.match(source, /expectedText:\s*"登录信息不正确或账号不可用"/u);
+  assert.doesNotMatch(source, /expectedText:\s*"账号已停用"/u);
 });
 
 test("business print proof searches canonical current-batch records before exact actions", async () => {

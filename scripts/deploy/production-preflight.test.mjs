@@ -54,6 +54,8 @@ function writeFixture({
       "ERP_DEBUG_CLEANUP_ENABLED=false",
       "ERP_DEBUG_BUSINESS_CLEAR_ENABLED=false",
       "ERP_DEBUG_CLEANUP_SCOPE=none",
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0",
+      "ERP_CUSTOMER_TRIAL_TARGET=",
       "ERP_PDF_WARMUP=async",
       "JAEGER_BIND_ADDR=127.0.0.1",
       "",
@@ -75,6 +77,8 @@ function writeFixture({
       '      - "${JAEGER_BIND_ADDR:-127.0.0.1}:16686:16686"',
       "  app-server:",
       composeBuild ? "    build: ." : "    image: ${APP_IMAGE}",
+      "    security_opt:",
+      '      - "seccomp=./chromium-seccomp.json"',
       "    ports:",
       '      - "${APP_HTTP_BIND_ADDR:-127.0.0.1}:8300:8300"',
       '      - "${APP_GRPC_BIND_ADDR:-127.0.0.1}:9300:9300"',
@@ -83,6 +87,13 @@ function writeFixture({
       "",
     ].join("\n"),
     "utf8",
+  );
+  fs.copyFileSync(
+    path.join(
+      repoRoot,
+      "server/deploy/compose/prod/chromium-seccomp.json",
+    ),
+    path.join(composeDir, "chromium-seccomp.json"),
   );
 
   const migrateScript = path.join(composeDir, "migrate_online.sh");
@@ -147,6 +158,8 @@ fi
 if [[ "\${1:-}" == "inspect" ]]; then
   if [[ "$*" == *'.Config.User'* ]]; then
     printf '%s\n' "\${FAKE_RUNTIME_APP_USER:-app}"
+  elif [[ "$*" == *'.HostConfig.SecurityOpt'* ]]; then
+    printf '%s\n' "\${FAKE_RUNTIME_SECURITY_OPT:-[\"seccomp=/fixture/chromium-seccomp.json\"]}"
   else
     printf 'ERP_PDF_WARMUP=%s\n' "\${FAKE_RUNTIME_PDF_WARMUP:-async}"
   fi
@@ -185,6 +198,22 @@ test("production preflight accepts a prepared runtime env without docker config"
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /all checks passed/);
+});
+
+test("production preflight rejects the known local admin password", () => {
+  const fixture = writeFixture();
+  const env = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace(
+      "APP_ADMIN_USERNAME=admin",
+      "APP_ADMIN_USERNAME=admin\nAPP_ADMIN_PASSWORD=adminadmin",
+    )
+    .replace("BOOTSTRAP_ADMIN_ONCE=false", "BOOTSTRAP_ADMIN_ONCE=true");
+  fs.writeFileSync(fixture.envFile, env, "utf8");
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /不得使用已知的本地开发默认密码/u);
 });
 
 test("production preflight writes sanitized report to out file", () => {
@@ -384,6 +413,120 @@ test("production preflight rejects build sections in production compose", () => 
   assert.match(result.stderr, /生产 Compose 不允许包含 build:/);
 });
 
+test("production preflight allows the exact isolated customer-trial-133 database", () => {
+  const fixture = writeFixture();
+  const env = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace("ERP_CUSTOMER_KEY=demo", "ERP_CUSTOMER_KEY=yoyoosun")
+    .replace(
+      /^POSTGRES_DSN=.*$/m,
+      "POSTGRES_DSN=postgres://postgres:test-production-password@postgres:5432/plush_erp_uat_20260715?sslmode=disable",
+    )
+    .replace("POSTGRES_DB=plush_erp", "POSTGRES_DB=plush_erp_uat_20260715")
+    .replace(
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0",
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=1",
+    )
+    .replace(
+      "ERP_CUSTOMER_TRIAL_TARGET=",
+      "ERP_CUSTOMER_TRIAL_TARGET=customer-trial-133",
+    );
+  fs.writeFileSync(fixture.envFile, env, "utf8");
+
+  const result = runPreflight(fixture);
+  assert.equal(result.status, 0, result.stderr);
+});
+
+test("production preflight rejects customer-trial opt-in outside its exact database", () => {
+  const fixture = writeFixture();
+  const env = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace("ERP_CUSTOMER_KEY=demo", "ERP_CUSTOMER_KEY=yoyoosun")
+    .replace(
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0",
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=1",
+    )
+    .replace(
+      "ERP_CUSTOMER_TRIAL_TARGET=",
+      "ERP_CUSTOMER_TRIAL_TARGET=customer-trial-133",
+    );
+  fs.writeFileSync(fixture.envFile, env, "utf8");
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /POSTGRES_DSN 必须精确指向单一/);
+});
+
+test("production preflight rejects extra customer-trial DSN query options", () => {
+  const fixture = writeFixture();
+  const env = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace("ERP_CUSTOMER_KEY=demo", "ERP_CUSTOMER_KEY=yoyoosun")
+    .replace(
+      /^POSTGRES_DSN=.*$/m,
+      "POSTGRES_DSN=postgres://postgres:test-production-password@postgres:5432/plush_erp_uat_20260715?sslmode=disable&target_session_attrs=read-write",
+    )
+    .replace("POSTGRES_DB=plush_erp", "POSTGRES_DB=plush_erp_uat_20260715")
+    .replace(
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=0",
+      "ERP_ALLOW_CUSTOMER_TRIAL_CONFIG=1",
+    )
+    .replace(
+      "ERP_CUSTOMER_TRIAL_TARGET=",
+      "ERP_CUSTOMER_TRIAL_TARGET=customer-trial-133",
+    );
+  fs.writeFileSync(fixture.envFile, env, "utf8");
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /POSTGRES_DSN 必须精确指向单一/);
+});
+
+test("production preflight rejects a target marker while customer-trial is disabled", () => {
+  const fixture = writeFixture();
+  const env = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace(
+      "ERP_CUSTOMER_TRIAL_TARGET=",
+      "ERP_CUSTOMER_TRIAL_TARGET=customer-trial-133",
+    );
+  fs.writeFileSync(fixture.envFile, env, "utf8");
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /ERP_CUSTOMER_TRIAL_TARGET 必须为空/);
+});
+
+test("production preflight rejects an unconfined Chromium runtime", () => {
+  const fixture = writeFixture();
+  const composePath = path.join(fixture.composeDir, "compose.yml");
+  fs.writeFileSync(
+    composePath,
+    fs
+      .readFileSync(composePath, "utf8")
+      .replace(
+        'seccomp=./chromium-seccomp.json',
+        "seccomp=unconfined",
+      ),
+  );
+  const result = runPreflight(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /必须使用固定 Chromium seccomp profile/);
+});
+
+test("production preflight rejects Chromium seccomp profile drift", () => {
+  const fixture = writeFixture();
+  fs.appendFileSync(
+    path.join(fixture.composeDir, "chromium-seccomp.json"),
+    "\n",
+  );
+  const result = runPreflight(fixture);
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Chromium seccomp profile 已漂移/);
+});
+
 test("production artifacts pin the verified Chromium build and async warmup", () => {
   const dockerfile = fs.readFileSync(
     path.join(repoRoot, "server/Dockerfile"),
@@ -403,6 +546,19 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
       "deployments/yoyoosun/compose/docker-compose.example.yml",
     ),
     "utf8",
+  );
+  const productionCompose = fs.readFileSync(
+    path.join(repoRoot, "server/deploy/compose/prod/compose.yml"),
+    "utf8",
+  );
+  const chromiumSeccomp = JSON.parse(
+    fs.readFileSync(
+      path.join(
+        repoRoot,
+        "server/deploy/compose/prod/chromium-seccomp.json",
+      ),
+      "utf8",
+    ),
   );
 
   assert.match(
@@ -424,7 +580,23 @@ test("production artifacts pin the verified Chromium build and async warmup", ()
     ),
   );
   assert.match(dockerfile, /^USER app$/m);
+  assert.match(
+    dockerfile,
+    /useradd --system --uid 10001 --gid app --create-home --home-dir \/home\/app/u,
+  );
+  assert.match(dockerfile, /^ENV HOME=\/home\/app$/mu);
   assert.match(dockerfile, /useradd --system --uid 10001 --gid app/);
+  assert.match(productionCompose, /seccomp=\.\/chromium-seccomp\.json/);
+  assert.doesNotMatch(
+    productionCompose,
+    /seccomp[=:]\s*unconfined|apparmor[=:]\s*unconfined|SYS_ADMIN|privileged:\s*true/,
+  );
+  assert.deepEqual(chromiumSeccomp.syscalls[0], {
+    names: ["clone", "clone3", "unshare"],
+    action: "SCMP_ACT_ALLOW",
+    comment:
+      "Chromium user-namespace sandbox; all other rules are Moby seccomp v0.2.3 defaults",
+  });
   for (const envExample of [prodEnv, customerEnv]) {
     assert.match(envExample, /^ERP_PDF_WARMUP=async$/m);
     assert.doesNotMatch(envExample, /ERP_PDF_WARMUP_ENABLED/);

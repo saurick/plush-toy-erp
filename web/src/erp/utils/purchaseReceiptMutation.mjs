@@ -35,7 +35,7 @@ function deepFreeze(value) {
 
 function payloadWithoutIdempotencyKey(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
-    throw new Error('采购入库操作参数无效')
+    throw new Error('采购入库内容有误，请刷新页面后重新填写')
   }
   const normalized = { ...payload }
   delete normalized.idempotency_key
@@ -62,7 +62,7 @@ export function purchaseReceiptMutationUUID(
       hex.slice(10).join(''),
     ].join('-')
   }
-  throw new Error('当前浏览器无法生成安全请求标识，请刷新或升级浏览器后重试')
+  throw new Error('当前浏览器暂时无法安全提交，请刷新或升级浏览器后重试')
 }
 
 export function purchaseReceiptMutationSignature(payload) {
@@ -71,11 +71,11 @@ export function purchaseReceiptMutationSignature(payload) {
 
 export function requirePurchaseReceiptIdempotencyKey(value) {
   if (typeof value !== 'string') {
-    throw new Error('采购入库操作参数无效')
+    throw new Error('采购入库内容有误，请刷新页面后重新填写')
   }
   const key = value.trim()
   if (!key || [...key].length > MAX_IDEMPOTENCY_KEY_LENGTH) {
-    throw new Error('采购入库操作参数无效')
+    throw new Error('采购入库内容有误，请刷新页面后重新填写')
   }
   return key
 }
@@ -108,7 +108,7 @@ export function createPurchaseReceiptMutationAttemptStore({
       )
       if (typeof idempotencyKey !== 'string') {
         throw new Error(
-          '当前浏览器无法生成安全请求标识，请刷新或升级浏览器后重试'
+          '当前浏览器暂时无法安全提交，请刷新或升级浏览器后重试'
         )
       }
       let normalizedIdempotencyKey
@@ -117,7 +117,7 @@ export function createPurchaseReceiptMutationAttemptStore({
           requirePurchaseReceiptIdempotencyKey(idempotencyKey)
       } catch {
         throw new Error(
-          '当前浏览器无法生成安全请求标识，请刷新或升级浏览器后重试'
+          '当前浏览器暂时无法安全提交，请刷新或升级浏览器后重试'
         )
       }
       const attempt = deepFreeze({

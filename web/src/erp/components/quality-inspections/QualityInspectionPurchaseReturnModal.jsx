@@ -68,7 +68,7 @@ export default function QualityInspectionPurchaseReturnModal({
       <Alert
         type="warning"
         showIcon
-        message="供应商、材料、仓库、批次和单位由不合格质检来源确定；生成草稿不会立即扣减库存，确认退货后才写库存出库。"
+        message="供应商、材料、仓库、批次和单位会根据这次不合格检验自动带入。保存草稿时库存不变；确认退货后，相应批次的库存会同步扣减。"
       />
       <Descriptions
         size="small"

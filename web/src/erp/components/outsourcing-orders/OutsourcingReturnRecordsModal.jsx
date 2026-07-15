@@ -199,7 +199,7 @@ export default function OutsourcingReturnRecordsModal({
       <Alert
         type="info"
         showIcon
-        message="已过账回货需先完成质检，判定合格或让步接收后才能生成应付；质检对象、仓库和批次，以及应付供应商、金额和币种，均由系统根据本次回货确定。"
+        message="已过账回货需先完成质检，判定合格或让步接收后才能生成应付；待检产品或材料、仓库、批次，以及应付供应商、金额和币种，均由系统根据本次回货确定。"
         style={{ marginBottom: 12 }}
       />
       <Table

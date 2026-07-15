@@ -52,7 +52,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     nextStatus: 'closed',
     confirmTitle: '确认关闭销售订单',
     confirmContent:
-      '关闭只会停止这张销售订单继续执行；已经生成的出货、库存、财务记录或协同任务不会自动改变。',
+      '关闭只会停止这张销售订单继续执行；已经生成的出货、库存、财务记录或相关任务不会自动改变。',
     okText: '确认关闭',
     run: closeSalesOrder,
   },
@@ -64,7 +64,7 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消销售订单',
     confirmContent:
-      '取消只会终止这张销售订单本身；已经生成的出货、库存、财务记录或协同任务不会自动取消或冲正。',
+      '取消只会终止这张销售订单本身；已经生成的出货、库存、财务记录或相关任务不会自动取消或撤销。',
     okText: '确认取消',
     run: cancelSalesOrder,
   },

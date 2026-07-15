@@ -1,6 +1,7 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { requireBusinessDashboardStatsResponse } from '../utils/businessDashboardContract.mjs'
 
 const businessRpc = new JsonRpc({
   url: 'business',
@@ -14,5 +15,5 @@ function dataOf(result) {
 
 export async function getBusinessDashboardStats(params = {}) {
   const result = await businessRpc.call('dashboard_stats', params)
-  return dataOf(result)
+  return requireBusinessDashboardStatsResponse(dataOf(result))
 }

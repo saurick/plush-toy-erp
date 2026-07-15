@@ -58,6 +58,13 @@ func (s *stubOutsourcingOrderJSONRPCRepo) ListOutsourcingOrders(_ context.Contex
 	s.lastFilter = filter
 	out := make([]*biz.OutsourcingOrder, 0, len(s.orders))
 	for _, order := range s.orders {
+		count := 0
+		for _, item := range s.items {
+			if item.OutsourcingOrderID == order.ID {
+				count++
+			}
+		}
+		order.ItemCount = &count
 		out = append(out, order)
 	}
 	return out, len(out), nil
@@ -200,6 +207,9 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	if status := order["lifecycle_status"]; status != biz.OutsourcingOrderStatusDraft {
 		t.Fatalf("expected draft outsourcing order, got %#v", status)
 	}
+	if _, exists := order["item_count"]; exists {
+		t.Fatalf("save response must not claim an unloaded outsourcing order item count, got %#v", order)
+	}
 	partySnapshot, ok := order["contract_party_snapshot"].(map[string]any)
 	if !ok || partySnapshot["buyerCompany"] != "永绅" || partySnapshot["buyerContact"] != "委外负责人" {
 		t.Fatalf("expected contract party snapshot on outsourcing order, got %#v", order["contract_party_snapshot"])
@@ -235,6 +245,10 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 	if total := jsonRPCInt(t, listRes.Data.AsMap(), "total"); total != 1 {
 		t.Fatalf("expected one outsourcing order in list, got %d", total)
+	}
+	listedOrders := listRes.Data.AsMap()["outsourcing_orders"].([]any)
+	if itemCount := jsonRPCInt(t, listedOrders[0].(map[string]any), "item_count"); itemCount != 1 {
+		t.Fatalf("expected outsourcing order item_count 1, got %d", itemCount)
 	}
 	if repo.lastFilter.DateField != "order_date" ||
 		repo.lastFilter.Keyword != "OUT-JSONRPC" ||

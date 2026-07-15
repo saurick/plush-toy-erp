@@ -173,7 +173,11 @@ func purchaseOrderToMap(item *biz.PurchaseOrder) map[string]any {
 func purchaseOrdersToAny(items []*biz.PurchaseOrder) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
-		out = append(out, purchaseOrderToMap(item))
+		mapped := purchaseOrderToMap(item)
+		if item != nil && item.ItemCount != nil {
+			mapped["item_count"] = *item.ItemCount
+		}
+		out = append(out, mapped)
 	}
 	return out
 }

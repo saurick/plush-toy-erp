@@ -4,7 +4,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
   brand: Object.freeze({
     brandMark: "永",
     companyName: "东莞市永绅玩具有限公司",
-    systemName: "毛绒 ERP 管理后台",
+    systemName: "业务管理",
     faviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun.svg",
   }),
   desktopMenu: Object.freeze({
@@ -19,7 +19,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         items: Object.freeze(["global-dashboard", "task-board", "business-dashboard"]),
       }),
       Object.freeze({
-        title: "主数据",
+        title: "基础资料",
         items: Object.freeze(["customers", "suppliers", "products", "materials"]),
       }),
       Object.freeze({ title: "销售管理", items: Object.freeze(["sales-orders"]) }),
@@ -45,7 +45,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         items: Object.freeze(["shipping-release", "outbound", "shipments"]),
       }),
       Object.freeze({
-        title: "财务业务",
+        title: "财务管理",
         items: Object.freeze(["reconciliation", "payables", "receivables", "invoices"]),
       }),
       Object.freeze({ title: "运营工具", items: Object.freeze(["print-center", "exception-flow"]) }),

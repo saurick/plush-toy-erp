@@ -1,6 +1,26 @@
 export const BUSINESS_ROW_ITEMS_PREVIEW_LIMIT = 5
 export const BUSINESS_ROW_ITEMS_MODAL_PAGE_SIZE = 20
 
+export function normalizeBusinessRowItemsTotal(value) {
+  return Number.isSafeInteger(value) && value >= 0 ? value : undefined
+}
+
+export function resolveBusinessRowItemsTotal({
+  cachedTotal,
+  getItemTotal,
+  record,
+} = {}) {
+  const normalizedCachedTotal = normalizeBusinessRowItemsTotal(cachedTotal)
+  if (normalizedCachedTotal !== undefined) return normalizedCachedTotal
+  if (typeof getItemTotal !== 'function') return undefined
+
+  try {
+    return normalizeBusinessRowItemsTotal(getItemTotal(record))
+  } catch {
+    return undefined
+  }
+}
+
 function invalidPreviewData() {
   const error = new Error('服务器返回的明细数据不完整，请核对后重试')
   error.isInvalidResponse = true
@@ -54,7 +74,8 @@ export function businessRowEmbeddedItemsSnapshot(
   items,
   previewLimit = BUSINESS_ROW_ITEMS_PREVIEW_LIMIT
 ) {
-  const all = normalizeBusinessRowItemsResult(Array.isArray(items) ? items : [])
+  if (!Array.isArray(items)) throw invalidPreviewData()
+  const all = normalizeBusinessRowItemsResult(items)
   const limit =
     Number.isSafeInteger(previewLimit) && previewLimit > 0
       ? previewLimit

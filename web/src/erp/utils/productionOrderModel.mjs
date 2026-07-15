@@ -32,7 +32,7 @@ export function positiveSafeInteger(value) {
 
 export function productionOrderUUID(cryptoProvider = globalThis.crypto) {
   if (typeof cryptoProvider?.randomUUID !== 'function') {
-    throw new Error('当前浏览器无法生成安全请求标识，请刷新或升级浏览器后重试')
+    throw new Error('当前浏览器暂时无法安全提交，请刷新或升级浏览器后重试')
   }
   return cryptoProvider.randomUUID()
 }
@@ -197,6 +197,8 @@ export function validateProductionOrderList(data) {
       !positiveSafeInteger(order?.version) ||
       typeof order?.order_no !== 'string' ||
       !order.order_no.trim() ||
+      !Number.isSafeInteger(order?.item_count) ||
+      order.item_count < 0 ||
       !Object.hasOwn(PRODUCTION_ORDER_STATUS_META, order.status)
     ) {
       throw invalidResponse()

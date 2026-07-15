@@ -347,7 +347,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if dashboardRes == nil || dashboardRes.Code != errcode.OK.Code {
 		t.Fatalf("expected dashboard OK, got %#v", dashboardRes)
 	}
-	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, 2, 1)
+	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, 2)
 
 	_, cancelledRes, err := j.handlePurchase(adminCtx, "cancel_purchase_receipt", "7", mustJSONRPCStruct(t, map[string]any{"id": float64(receiptID)}))
 	if err != nil {
@@ -819,7 +819,7 @@ func jsonRPCInt(t *testing.T, data map[string]any, key string) int {
 	}
 }
 
-func assertDashboardInboundPurchaseReceiptProjection(t *testing.T, res *v1.JsonrpcResult, wantTotal, wantPosted int) {
+func assertDashboardInboundPurchaseReceiptProjection(t *testing.T, res *v1.JsonrpcResult, wantTotal int) {
 	t.Helper()
 	if res == nil || res.Data == nil {
 		t.Fatalf("expected dashboard data, got %#v", res)
@@ -836,12 +836,11 @@ func assertDashboardInboundPurchaseReceiptProjection(t *testing.T, res *v1.Jsonr
 		if total := jsonRPCInt(t, module, "total"); total != wantTotal {
 			t.Fatalf("expected inbound total=%d, got %d", wantTotal, total)
 		}
-		counts, ok := module["status_counts"].(map[string]any)
-		if !ok {
-			t.Fatalf("expected inbound status counts, got %#v", module["status_counts"])
+		if available, ok := module["available"].(bool); !ok || !available {
+			t.Fatalf("expected inbound projection available, got %#v", module["available"])
 		}
-		if posted := jsonRPCInt(t, counts, biz.PurchaseReceiptStatusPosted); posted != wantPosted {
-			t.Fatalf("expected inbound posted=%d, got %d", wantPosted, posted)
+		if _, exists := module["status_counts"]; exists {
+			t.Fatalf("dashboard module must not expose status_counts: %#v", module)
 		}
 		return
 	}

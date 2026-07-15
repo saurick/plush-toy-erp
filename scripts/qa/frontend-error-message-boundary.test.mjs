@@ -19,11 +19,11 @@ const devUserVisibleAllowlist = Object.freeze(
 );
 
 const rawMessagePatterns = Object.freeze([
-  /message\.(error|warning|success|info)\([^)]*(error|err)\?\.\s*message/iu,
-  /const\s+\w*(?:error|message)\w*\s*=\s*(error|err)\?\.\s*message\s*\|\|/iu,
-  /String\(\s*(error|err)\?\.\s*message\s*\|\|/iu,
+  /message\.(error|warning|success|info)\([^)]*(error|err)(?:\?\.|\.)\s*message/iu,
+  /const\s+\w*(?:error|message)\w*\s*=\s*(error|err)(?:\?\.|\.)\s*message\s*\|\|/iu,
+  /String\(\s*(error|err)(?:\?\.|\.)\s*message\s*\|\|/iu,
   /error\s+instanceof\s+Error\s*&&\s*error\.message/iu,
-  /set\w*State\(\{[^}]*error:\s*(error|err)\?\.\s*message\s*\|\|/isu,
+  /set\w*State\(\{[^}]*error:\s*(error|err)(?:\?\.|\.)\s*message\s*\|\|/isu,
 ]);
 
 function listSourceFiles(dir) {
@@ -50,6 +50,20 @@ function isFormalUserVisibleSource(relativePath) {
   if (/^Dev/u.test(fileName)) return false;
   return true;
 }
+
+test("frontend error message boundary: direct and optional raw messages are both rejected", () => {
+  for (const source of [
+    "message.error(error.message)",
+    "message.warning(err?.message)",
+    "const errorText = error.message || '保存失败'",
+    "String(err?.message || '加载失败')",
+  ]) {
+    assert(
+      rawMessagePatterns.some((pattern) => pattern.test(source)),
+      `raw error message pattern did not reject: ${source}`,
+    );
+  }
+});
 
 test("frontend error message boundary: formal pages and components use user-facing helpers", () => {
   const offenders = scannedRoots
@@ -154,10 +168,10 @@ test("frontend error message boundary: shared helper blocks technical fields eve
 
   assert(source.includes("TECHNICAL_ERROR_MESSAGE_PATTERN"));
   assert(source.includes("containsTechnicalErrorText(normalized)"));
-  assert.match(source, /owner_role_key/u);
-  assert.match(source, /task_status_key/u);
-  assert.match(source, /source_type/u);
-  assert.match(source, /payload/u);
+  assert.match(source, /\(\?:_\[a-z0-9\]\+\)\+/u);
+  assert.match(source, /Id\|Key\|Payload\|Revision/u);
+  assert.match(source, /workflow/iu);
+  assert.match(source, /服务端/u);
   assert.match(
     source,
     /if\s*\(\s*containsTechnicalErrorText\(normalized\)\s*\)\s*return ''/u,
@@ -170,8 +184,14 @@ test("frontend error message boundary: audit log visible fallbacks do not expose
     "utf8",
   );
 
-  assert(source.includes("getVisibleAuditReason"));
-  assert(source.includes("getUserFacingErrorMessage"));
+  assert(source.includes("getAuditChangeSummary"));
+  assert(source.includes("visibleAuditChangeKeys"));
+  assert(source.includes("return '本次操作已记录'"));
+  assert(source.includes("return '系统设置需要管理员检查'"));
+  assert(!source.includes("getVisibleAuditReason"));
+  assert(!source.includes("getUserFacingErrorMessage"));
+  assert(!source.includes("payload.reason"));
+  assert(!source.includes("event.summary"));
   assert(!source.includes("return typeMap[target.type] || target.type || '-'"));
   assert(!source.includes("event.event_key || '未知动作'"));
   assert(!source.includes("return event.actor_key ||"));
@@ -188,6 +208,6 @@ test("frontend error message boundary: audit log visible fallbacks do not expose
   assert(source.includes("return '已记录'"));
   assert.match(
     source,
-    /return typeMap\[target\.type\] \|\| '对象'/u,
+    /return typeMap\[target\.type\] \|\| '相关内容'/u,
   );
 });

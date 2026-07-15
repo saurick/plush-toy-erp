@@ -9,12 +9,21 @@ import {
   ROLE_USERS,
   buildManualAcceptanceSourceDataPlan,
 } from "./manual-acceptance-source-data.mjs";
+import {
+  CUSTOMER_TRIAL_133_TARGET,
+  assertManualAcceptanceCapabilitiesPolicy,
+  assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimePolicy,
+  assertManualAcceptanceTargetAttestation,
+  normalizeManualAcceptanceBackendURL,
+  parseManualAcceptanceTargetAttestation,
+  resolveManualAcceptanceTarget,
+} from "./manual-acceptance-target-policy.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-retire";
 const CUSTOMER_KEY = "yoyoosun";
 const CONFIRM_PHRASE = "RETIRE_SIMULATED_MANUAL_ACCEPTANCE_SOURCE_DATA";
-const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const REQUIRED_RETIREMENT_MODULES = Object.freeze([
   "customers",
   "suppliers",
@@ -189,20 +198,7 @@ function requiredText(value, name) {
 }
 
 function normalizeBackendURL(value) {
-  const url = new URL(String(value || DEFAULT_BACKEND_URL).trim());
-  if (url.username || url.password) {
-    throw new CliError("backend URL must not contain credentials", 2);
-  }
-  if (!LOCAL_HOSTS.has(url.hostname)) {
-    throw new CliError(
-      `refuse external backend ${url.origin}; source retirement is local-only`,
-      2,
-    );
-  }
-  url.pathname = url.pathname.replace(/\/+$/u, "");
-  url.search = "";
-  url.hash = "";
-  return url.toString().replace(/\/+$/u, "");
+  return normalizeManualAcceptanceBackendURL(value || DEFAULT_BACKEND_URL);
 }
 
 function rpcURL(backendURL, domain) {
@@ -275,7 +271,7 @@ async function loginRoles({
         throw new CliError(`${username}: login response missing token`);
       if (username === ROLE_USERS.seedAdmin && data.is_super_admin !== true) {
         throw new CliError(
-          `${username}: manual acceptance retirement writer must be a local super admin`,
+          `${username}: manual acceptance retirement writer must be a runtime super admin`,
         );
       }
       return [role, token];
@@ -284,55 +280,64 @@ async function loginRoles({
   return Object.fromEntries(entries);
 }
 
-async function assertSafeRuntime({ backendURL, tokens, fetchImpl }) {
-  const capabilities = await rpcCall({
-    backendURL,
-    domain: "debug",
-    method: "capabilities",
-    token: tokens.seedAdmin || tokens.sales,
-    fetchImpl,
-  });
-  if (!new Set(["local", "dev"]).has(capabilities.environment)) {
-    throw new CliError(
-      `refuse source retirement in environment=${capabilities.environment || "unknown"}`,
-    );
+function resolveRetirementTargetAttestation(policy, value) {
+  const parsed = parseManualAcceptanceTargetAttestation(value);
+  if (policy.target === CUSTOMER_TRIAL_133_TARGET) {
+    return assertManualAcceptanceTargetAttestation({
+      policy,
+      attestation: parsed,
+    });
   }
+  if (parsed) {
+    assertManualAcceptanceTargetAttestation({
+      policy,
+      attestation: parsed,
+    });
+  }
+  return undefined;
+}
+
+async function assertSafeRuntime({
+  plan,
+  tokens,
+  targetAttestation,
+  fetchImpl,
+}) {
+  const capabilities = targetAttestation
+    ? { environment: targetAttestation.environment, ...targetAttestation.debug }
+    : await rpcCall({
+        backendURL: plan.backendURL,
+        domain: "debug",
+        method: "capabilities",
+        token: tokens.seedAdmin || tokens.sales,
+        fetchImpl,
+      });
+  assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const data = await rpcCall({
-    backendURL,
+    backendURL: plan.backendURL,
     domain: "customer_config",
     method: "get_effective_session",
     token: tokens.sales,
     fetchImpl,
   });
   const session = data.session || {};
-  const configRevision = String(
-    session.configRevision || session.config_revision || "",
-  ).trim();
-  if (
-    session?.customer?.key !== CUSTOMER_KEY ||
-    session.source !== "active_customer_config_revision" ||
-    !configRevision
-  ) {
-    throw new CliError(
-      "refuse source retirement: yoyoosun active customer configuration is not current",
-    );
-  }
-  const modules = session.modules || {};
-  const unavailableModules = REQUIRED_RETIREMENT_MODULES.filter(
-    (key) => modules[key] !== "enabled",
-  );
-  if (unavailableModules.length > 0) {
-    throw new CliError(
-      `refuse source retirement: required modules are not enabled: ${unavailableModules.join(", ")}`,
-    );
-  }
-  return {
-    environment: capabilities.environment,
-    customerKey: session.customer.key,
-    configRevision,
-    source: session.source,
+  const runtime = assertManualAcceptanceRuntimePolicy({
+    policy: plan,
+    capabilities,
+    session,
     requiredModules: REQUIRED_RETIREMENT_MODULES,
-  };
+    customerKey: CUSTOMER_KEY,
+  });
+  return targetAttestation
+    ? {
+        ...runtime,
+        targetAttestation: {
+          source: "out-of-band",
+          release: targetAttestation.release,
+          migration: targetAttestation.migration,
+        },
+      }
+    : runtime;
 }
 
 function upper(value) {
@@ -429,14 +434,36 @@ function summarize(snapshot, actions) {
 
 export async function retireManualAcceptanceSourceData(
   plan,
-  { apply = false, password, adminPassword, fetchImpl = fetch } = {},
+  {
+    apply = false,
+    password,
+    adminPassword,
+    retireConfirm = process.env.MANUAL_ACCEPTANCE_RETIRE_CONFIRM,
+    targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    fetchImpl = fetch,
+  } = {},
 ) {
   const backendURL = normalizeBackendURL(plan?.backendURL);
-  const safePlan = { ...plan, backendURL };
-  if (
-    apply &&
-    process.env.MANUAL_ACCEPTANCE_RETIRE_CONFIRM !== CONFIRM_PHRASE
-  ) {
+  const targetPolicy = resolveManualAcceptanceTarget({ ...plan, backendURL });
+  const safePlan = {
+    ...plan,
+    backendURL: targetPolicy.backendURL,
+    target: targetPolicy.target,
+    datasetKey: targetPolicy.datasetKey,
+    dataVersion: targetPolicy.dataVersion,
+    runId: targetPolicy.runId || plan?.runId,
+  };
+  if (apply) {
+    assertManualAcceptanceMutationTarget(safePlan, {
+      confirmation: targetConfirmation,
+    });
+  }
+  const parsedTargetAttestation = resolveRetirementTargetAttestation(
+    targetPolicy,
+    targetAttestation,
+  );
+  if (apply && retireConfirm !== CONFIRM_PHRASE) {
     throw new CliError(
       `apply requires MANUAL_ACCEPTANCE_RETIRE_CONFIRM=${CONFIRM_PHRASE}`,
       2,
@@ -456,15 +483,16 @@ export async function retireManualAcceptanceSourceData(
       )
     : undefined;
   const tokens = await loginRoles({
-    backendURL,
+    backendURL: safePlan.backendURL,
     password: effectivePassword,
     seedAdminPassword: effectiveAdminPassword,
     includeSeedAdmin: apply,
     fetchImpl,
   });
   const runtime = await assertSafeRuntime({
-    backendURL,
+    plan: safePlan,
     tokens,
+    targetAttestation: parsedTargetAttestation,
     fetchImpl,
   });
   const snapshot = await loadSnapshot({ plan: safePlan, tokens, fetchImpl });
@@ -474,7 +502,7 @@ export async function retireManualAcceptanceSourceData(
   if (apply) {
     for (const action of actions) {
       await rpcCall({
-        backendURL,
+        backendURL: safePlan.backendURL,
         domain: action.domain,
         method: action.method,
         params: action.params,
@@ -499,8 +527,11 @@ export async function retireManualAcceptanceSourceData(
     mode: apply ? "apply" : "dry-run",
     generatedAt: new Date().toISOString(),
     runId: safePlan.runId,
+    target: safePlan.target,
+    datasetKey: safePlan.datasetKey,
+    dataVersion: safePlan.dataVersion,
     prefix: safePlan.prefix,
-    backendURL,
+    backendURL: safePlan.backendURL,
     simulatedOnly: true,
     physicalDelete: false,
     runtime,
@@ -520,6 +551,8 @@ export function parseManualAcceptanceRetireArgs(argv) {
     json: false,
     backendURL:
       process.env.MANUAL_ACCEPTANCE_BACKEND_URL || DEFAULT_BACKEND_URL,
+    target: process.env.MANUAL_ACCEPTANCE_TARGET,
+    dataVersion: process.env.MANUAL_ACCEPTANCE_DATA_VERSION,
     out: DEFAULT_OUT_DIR,
     runId: process.env.MANUAL_ACCEPTANCE_RUN_ID || "LOCAL-UAT",
   };
@@ -549,6 +582,12 @@ export function parseManualAcceptanceRetireArgs(argv) {
       case "--backend-url":
         options.backendURL = value;
         break;
+      case "--target":
+        options.target = value;
+        break;
+      case "--data-version":
+        options.dataVersion = value;
+        break;
       case "--out":
         options.out = value;
         break;
@@ -559,7 +598,15 @@ export function parseManualAcceptanceRetireArgs(argv) {
         throw new CliError(`unknown option ${token}`, 2);
     }
   }
-  options.backendURL = normalizeBackendURL(options.backendURL);
+  const targetPolicy = resolveManualAcceptanceTarget({
+    backendURL: normalizeBackendURL(options.backendURL),
+    target: options.target,
+    dataVersion: options.dataVersion,
+    runId: options.runId,
+  });
+  options.backendURL = targetPolicy.backendURL;
+  options.target = targetPolicy.target;
+  options.dataVersion = targetPolicy.dataVersion;
   return options;
 }
 
@@ -568,6 +615,8 @@ function markdown(report) {
     "# 试用源数据退出报告",
     "",
     `- 模式：${report.mode === "apply" ? "已执行" : "仅预览"}`,
+    `- 目标：${report.target}`,
+    `- 数据版本：${report.dataVersion}`,
     `- 试用批次：${report.runId}`,
     `- 编号前缀：${report.prefix}`,
     `- 预计处理：${report.summary.totalActions}`,
@@ -611,7 +660,14 @@ function usage() {
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-source-retire.mjs --apply --run-id LOCAL-UAT
 
-本入口只允许 localhost。默认仅预览，不物理删除历史记录；已过账记录不在本入口处理。`;
+133 客户试用环境必须通过已登记的 SSH 隧道，并额外提供：
+  --target customer-trial-133 --backend-url http://127.0.0.1:18375 \\
+  --data-version 2026.07.15-v3 --run-id 20260715-V3
+以及绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
+和包含精确 origin/customer/release/migration/debug=false 的
+MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
+
+默认仅预览，不物理删除历史记录；已过账记录不在本入口处理。`;
 }
 
 export async function runManualAcceptanceRetireCli(argv, deps = {}) {
@@ -620,6 +676,8 @@ export async function runManualAcceptanceRetireCli(argv, deps = {}) {
   const plan = buildManualAcceptanceSourceDataPlan({
     runId: options.runId,
     backendURL: options.backendURL,
+    target: options.target,
+    dataVersion: options.dataVersion,
   });
   const report = await retireManualAcceptanceSourceData(plan, {
     ...deps,

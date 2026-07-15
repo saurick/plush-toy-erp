@@ -7,7 +7,7 @@ const PAGE_CONFIGS = Object.freeze({
     initialActiveKey: 'production',
     enabledViews: ['production'],
     pageSummary:
-      '生产进度当前接入生产发料、成品入库和返工记录；页面只提交正式业务操作，完成协同任务不会自动修改库存或出货记录。',
+      '生产进度当前可查看和处理生产发料、成品入库和返工记录；任务标记为完成不会自动修改库存或出货记录。',
     viewOverrides: {
       production: {
         title: '生产发料 / 入库记录',
@@ -50,7 +50,7 @@ const PAGE_CONFIGS = Object.freeze({
       finance: {
         title: '应付记录',
         selectionBoundaryText:
-          '结清只关闭当前应付记录，不代表付款审批、付款流水、核销或总账已经完成。',
+          '结清只关闭当前应付记录，不代表付款审批、付款记录、核销或总账已经完成。',
         listParams: { fact_type: 'PAYABLE' },
       },
     },
@@ -65,7 +65,7 @@ const PAGE_CONFIGS = Object.freeze({
       finance: {
         title: '发票记录',
         selectionBoundaryText:
-          '取消当前业务发票记录不等于税控红冲、作废、查验、纳税或总账动作。',
+          '取消当前业务发票记录不等于税控红冲、作废、查验、纳税或总账处理。',
         listParams: { fact_type: 'INVOICE' },
       },
     },

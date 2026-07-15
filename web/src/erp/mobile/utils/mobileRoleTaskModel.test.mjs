@@ -356,8 +356,8 @@ test('mobileRoleTaskModel: 岗位标签复用共享角色显示口径', () => {
 })
 
 test('mobileRoleTaskModel: 任务摘要和事实行不透出技术 task_group', () => {
-  assert.equal(getMobileTaskGroupLabel('shipment_release'), '出货放行协同')
-  assert.equal(getMobileTaskGroupLabel('unknown_task_group'), '业务协同')
+  assert.equal(getMobileTaskGroupLabel('shipment_release'), '出货放行')
+  assert.equal(getMobileTaskGroupLabel('unknown_task_group'), '业务任务')
 
   const unknownGroupTask = task({
     task_group: 'unknown_task_group',
@@ -372,7 +372,7 @@ test('mobileRoleTaskModel: 任务摘要和事实行不透出技术 task_group', 
   })
 
   assert.equal(listMeta.includes('unknown_task_group'), false)
-  assert.equal(listMeta.includes('任务：业务协同'), true)
+  assert.equal(listMeta.includes('任务：业务任务'), true)
   assert.equal(
     factRows.some(([label]) => label === '分组'),
     false
@@ -381,7 +381,7 @@ test('mobileRoleTaskModel: 任务摘要和事实行不透出技术 task_group', 
     factRows.some(
       ([label, value]) =>
         label === '任务类型' &&
-        value.includes('业务协同') &&
+        value.includes('业务任务') &&
         !value.includes('unknown_task_group')
     )
   )

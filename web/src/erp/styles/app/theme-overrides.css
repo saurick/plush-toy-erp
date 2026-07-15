@@ -167,7 +167,8 @@
 [data-erp-theme='dark'] .erp-business-module-variant-metric,
 [data-erp-theme='dark'] .erp-business-board-mini-chart,
 [data-erp-theme='dark'] .erp-business-board-summary-card,
-[data-erp-theme='dark'] .erp-business-board-status-row,
+[data-erp-theme='dark'] .erp-business-board-source-item,
+[data-erp-theme='dark'] .erp-business-board-boundary-row,
 [data-erp-theme='dark'] .erp-business-board-alert-item,
 [data-erp-theme='dark'] .erp-exception-flow-step,
 [data-erp-theme='dark'] .erp-task-board-lane.ant-card,
@@ -201,6 +202,8 @@
 
 [data-erp-theme='dark'] .erp-metric-readonly-card__badge,
 [data-erp-theme='dark'] .erp-business-board-summary-card .ant-typography,
+[data-erp-theme='dark'] .erp-business-board-source-item .ant-typography,
+[data-erp-theme='dark'] .erp-business-board-boundary-row .ant-typography,
 [data-erp-theme='dark'] .erp-business-board-alert-item .ant-typography,
 [data-erp-theme='dark']
   .erp-workbench-task-detail
@@ -209,8 +212,7 @@
 }
 
 [data-erp-theme='dark'] .erp-business-board-summary-card strong,
-[data-erp-theme='dark'] .erp-business-board-status-row span,
-[data-erp-theme='dark'] .erp-business-board-status-row strong,
+[data-erp-theme='dark'] .erp-business-board-source-count,
 [data-erp-theme='dark'] .erp-business-board-alert-item strong,
 [data-erp-theme='dark'] .erp-task-center-metric__icon {
   color: var(--erp-text);
@@ -220,7 +222,8 @@
 [data-erp-theme='dark'] .erp-workbench-role-row,
 [data-erp-theme='dark'] .erp-metric-readonly-card__badge,
 [data-erp-theme='dark'] .erp-business-board-summary-card,
-[data-erp-theme='dark'] .erp-business-board-status-row,
+[data-erp-theme='dark'] .erp-business-board-source-item,
+[data-erp-theme='dark'] .erp-business-board-boundary-row,
 [data-erp-theme='dark'] .erp-business-board-alert-item {
   border-color: var(--erp-border);
 }
@@ -440,10 +443,6 @@
 [data-erp-theme='dark'] .erp-business-board-mini-bar {
   color: #dcfce7;
   background: linear-gradient(180deg, #166534, #14532d);
-}
-
-[data-erp-theme='dark'] .erp-business-board-status-row i {
-  background: rgb(74 222 128 / 0.16);
 }
 
 [data-erp-theme='dark'] .erp-task-board-lane .ant-card-head,

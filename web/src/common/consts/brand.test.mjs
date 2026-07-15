@@ -39,8 +39,8 @@ test('brand: 默认品牌保持产品中性，不包含客户公司名', () => {
       systemName: ERP_ADMIN_SYSTEM_NAME,
     })
     assert.equal(ERP_BRAND_MARK, '绒')
-    assert.equal(ERP_COMPANY_NAME, '毛绒玩具 ERP')
-    assert.equal(ERP_ADMIN_SYSTEM_NAME, '毛绒 ERP 管理后台')
+    assert.equal(ERP_COMPANY_NAME, '毛绒玩具管理系统')
+    assert.equal(ERP_ADMIN_SYSTEM_NAME, '业务管理')
   } finally {
     if (previousWindow === undefined) {
       delete global.window

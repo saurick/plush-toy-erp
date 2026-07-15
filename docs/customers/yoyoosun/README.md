@@ -60,7 +60,9 @@ flowchart TD
 
 客户资料可以进入脱敏客户文档、客户配置草案、模拟 seed、培训验收或模板候选。进入 Product Core 前必须有通用性依据、对应实现评审和测试同步。当前 yoyoosun 没有可直接执行的客户真实数据；真实导入、库存、出货、预留、财务事实、`tenant_id` 或 SaaS runtime tenant 都不能由本目录材料自动生成。
 
-当前外置状态必须分层理解：客户专属 Private 仓库提交 `75423d0` 已推送，远端新 clone 后 17 个来源的 hash / size、5 个结构化来源、12 个人工参考、5800 行提取与 no-real-import 边界均复验通过；Product Core 当前工作树已移除旧原件、真实 manifest 和客户工程指导图片。但 Product Core 正式版本 pin 与既有 Git 历史治理仍未闭环。因此可以确认当前树客户原件隔离完成，不能写成历史泄露已清理、真实导入已批准或客户已签收。
+当前外置状态必须分层理解：Product Core 当前提交树与索引已移除旧原件、真实 manifest 和客户工程指导图片，这只证明当前树客户原件隔离完成。客户原件数量、hash / size、结构化提取、远端回读与当前私有仓版本以客户专属 Private 仓库的 manifest、README 和正式验证记录为准，本目录不复写易漂移的客户仓提交号。
+
+可变产品版本锁定只以客户私有仓 `product.lock.json` 为真源；Product Core `HEAD` 每次推进后，均需在两边已提交且工作树清洁时重新锁定，并以 `FORMAL_PRODUCT_PIN=1` 执行私有仓 `scripts/validate.sh`。既有 Git 历史中的旧副本治理、真实导入批准和客户签收仍是独立未完成项，不能由当前树隔离或一次私有仓验证替代。
 
 `config/customers/yoyoosun/` 与 `deployments/yoyoosun/` 仍是当前产品仓内的非原件配置 / 部署资料，本轮不迁出。客户私有仓库通过兄弟目录或 CI multi-checkout 固定产品版本做验证，不作为 Product Core submodule。
 

@@ -59,7 +59,7 @@ const RESERVED_DATE_FILTER_OPTIONS = [
 ]
 
 export const DEFAULT_OPERATIONAL_FACT_SUMMARY =
-  '统一处理生产、委外、出货、库存预留和财务业务记录。页面提交操作后，系统按业务规则更新状态、库存流水或冲正记录。'
+  '统一处理生产、委外、出货、库存预留和财务记录。确认后系统会更新相应状态和库存；取消已确认记录时会保留原记录并作撤销调整。'
 export const EMPTY_VIEW_OVERRIDES = Object.freeze({})
 
 export const financeCancelAuditText = (record) =>
@@ -149,7 +149,7 @@ const SUBJECT_TYPE_LABELS = Object.freeze({
   PRODUCT: '产品',
   PRODUCT_SKU: '产品规格',
   PROCESS: '工序',
-  OTHER: '业务对象',
+  OTHER: '其他业务',
 })
 
 function readableRef(label, value) {
@@ -181,7 +181,7 @@ function sourceColumnText(record = {}) {
 
 function subjectColumnText(record = {}) {
   return safeRefText(
-    SUBJECT_TYPE_LABELS[record.subject_type] || '业务对象',
+    SUBJECT_TYPE_LABELS[record.subject_type] || '业务记录',
     record.subject_id || record.product_id
   )
 }
@@ -316,8 +316,8 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
 
   const quantityColumns = [
     {
-      title: '对象',
-      exportTitle: '对象',
+      title: '产品 / 材料',
+      exportTitle: '产品 / 材料',
       width: 150,
       sortValue: subjectColumnText,
       render: (_, record) => subjectColumnText(record),
@@ -563,7 +563,7 @@ export function buildOperationalFactStats({
 
   return [
     { key: 'total', label: '总记录', value: activeTotal },
-    { key: 'current', label: '当前结果', value: activeRows.length },
+    { key: 'current', label: '本页显示', value: activeRows.length },
     { key: 'draft', label: '草稿', value: activeDraftCount },
     { key: 'posted', label: '已生效', value: postedCount },
   ]

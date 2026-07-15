@@ -1,3 +1,5 @@
+import { styleRpcResult } from './rpcMockResult.mjs'
+
 export function createBusinessRowItemsPreviewScenarios(deps) {
   const {
     assert,
@@ -25,6 +27,65 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           itemReadParams = []
           await page.route('**/rpc/sales_order', async (route) => {
             const body = route.request().postDataJSON() || {}
+            if (body.method === 'list_sales_orders') {
+              const now = Math.floor(Date.now() / 1000)
+              const baseOrder = {
+                id: 1,
+                order_no: 'SO-STYLE-L1',
+                customer_id: 1,
+                customer_snapshot: {
+                  id: 1,
+                  code: 'CUS-STYLE-L1',
+                  name: '暗色客户',
+                },
+                customer_order_no: 'PO-STYLE-L1',
+                title: '样式销售订单',
+                order_date: now,
+                expected_ship_date: now + 86_400,
+                lifecycle_status: 'draft',
+                version: 1,
+                item_count: 1,
+                note: '',
+                created_at: now,
+                updated_at: now,
+              }
+              const salesOrders = [
+                baseOrder,
+                {
+                  ...baseOrder,
+                  id: 2,
+                  order_no: 'SO-COUNT-ZERO',
+                  item_count: 0,
+                },
+                {
+                  ...baseOrder,
+                  id: 3,
+                  order_no: 'SO-COUNT-UNKNOWN',
+                  item_count: undefined,
+                },
+                {
+                  ...baseOrder,
+                  id: 4,
+                  order_no: 'SO-COUNT-LARGE',
+                  item_count: Number.MAX_SAFE_INTEGER,
+                },
+              ]
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: body.id || 'mock-id',
+                  result: styleRpcResult({
+                    sales_orders: salesOrders,
+                    total: salesOrders.length,
+                    limit: Number(body.params?.limit || 20),
+                    offset: Number(body.params?.offset || 0),
+                  }),
+                }),
+              })
+              return
+            }
             if (body.method === 'list_sales_order_items') {
               itemReadCalls += 1
               itemReadParams.push(body.params || {})
@@ -43,9 +104,61 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           assert.equal(await selection.isChecked(), false)
           assert.equal(itemReadCalls, 0, '列表加载不得预取销售订单明细')
 
-          const expand = row.getByRole('button', {
-            name: '展开SO-STYLE-L1明细',
+          const zeroRow = page
+            .getByRole('row')
+            .filter({ has: page.getByText('SO-COUNT-ZERO', { exact: true }) })
+            .first()
+          const unknownRow = page
+            .getByRole('row')
+            .filter({
+              has: page.getByText('SO-COUNT-UNKNOWN', { exact: true }),
+            })
+            .first()
+          const largeRow = page
+            .getByRole('row')
+            .filter({ has: page.getByText('SO-COUNT-LARGE', { exact: true }) })
+            .first()
+          await zeroRow.getByText('0条', { exact: true }).waitFor()
+          assert.equal(
+            await zeroRow.locator('.erp-business-row-expand-button').count(),
+            0,
+            '精确 0 条必须显示为被动文本，不能提供展开动作'
+          )
+          const unknownExpand = unknownRow.getByRole('button', {
+            name: '展开SO-COUNT-UNKNOWN明细，查看',
+            exact: true,
           })
+          assert.equal(await unknownExpand.innerText(), '查看')
+          const largeCountMetrics = await largeRow
+            .locator('.erp-business-row-expand-button')
+            .evaluate((button) => {
+              const cell = button.closest('td')
+              const box = button.getBoundingClientRect()
+              const cellBox = cell?.getBoundingClientRect()
+              return {
+                buttonWidth: box.width,
+                cellWidth: cellBox?.width || 0,
+                overflow: button.scrollWidth - button.clientWidth,
+              }
+            })
+          assert(
+            largeCountMetrics.buttonWidth <= 73 &&
+              largeCountMetrics.cellWidth <= 105 &&
+              largeCountMetrics.buttonWidth <= largeCountMetrics.cellWidth + 1,
+            `大条数控件不得溢出明细列: ${JSON.stringify(largeCountMetrics)}`
+          )
+          await page.locator('.erp-business-data-table-card').screenshot({
+            path: path.join(
+              outputDir,
+              'business-row-items-counts-default.png'
+            ),
+          })
+
+          const expand = row.getByRole('button', {
+            name: '展开SO-STYLE-L1明细，共 1 条',
+            exact: true,
+          })
+          assert.equal(await expand.innerText(), '1条')
           await expand.click()
           await page
             .locator('.erp-business-row-items-preview')
@@ -65,12 +178,18 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
             false
           )
           const collapse = row.getByRole('button', {
-            name: '收起SO-STYLE-L1明细',
+            name: '收起SO-STYLE-L1明细，共 1 条',
+            exact: true,
           })
           assert.equal(await collapse.getAttribute('aria-expanded'), 'true')
 
           await collapse.click()
-          await row.getByRole('button', { name: '展开SO-STYLE-L1明细' }).focus()
+          await row
+            .getByRole('button', {
+              name: '展开SO-STYLE-L1明细，共 1 条',
+              exact: true,
+            })
+            .focus()
           await page.keyboard.press('Enter')
           await page
             .locator('.erp-business-row-items-preview')
@@ -85,6 +204,27 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
           )
           assert.equal(itemReadCalls, 1, '双击展开按钮也应复用明细缓存')
           assert.equal(await selection.isChecked(), false)
+
+          await unknownExpand.click()
+          await page
+            .getByRole('region', { name: '明细快速预览' })
+            .waitFor({ state: 'visible', timeout: 10_000 })
+          const loadedUnknown = unknownRow.getByRole('button', {
+            name: '收起SO-COUNT-UNKNOWN明细，共 1 条',
+            exact: true,
+          })
+          assert.equal(await loadedUnknown.innerText(), '1条')
+          assert.equal(
+            itemReadCalls,
+            2,
+            '未知条数只应在用户展开后读取一次明细并更新缓存 total'
+          )
+          await page.locator('.erp-business-data-table-card').screenshot({
+            path: path.join(
+              outputDir,
+              'business-row-items-unknown-loaded.png'
+            ),
+          })
           await assertNoHorizontalOverflow(
             page,
             'business-row-items-source-document-cache-desktop'
@@ -92,6 +232,50 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
         },
       }
     })(),
+    {
+      name: 'business-row-items-permission-hidden-desktop',
+      path: '/erp/sales/project-orders/sales-orders',
+      auth: 'admin',
+      adminProfile: {
+        is_super_admin: false,
+        permissions: ['sales_order.read'],
+      },
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: ['sales-orders'],
+        actions: ['sales_order.read'],
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '销售订单')
+        const row = page
+          .getByRole('row')
+          .filter({ has: page.getByText('SO-STYLE-L1', { exact: true }) })
+          .first()
+        await row.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await row.locator('.erp-business-row-expand-button').count(),
+          0,
+          '没有明细读取权限时不得显示展开动作'
+        )
+        assert.equal(
+          await row.locator('.erp-business-row-item-count').count(),
+          0,
+          '没有明细读取权限时不得泄露条数'
+        )
+        assert.equal(
+          await row.locator('.erp-business-row-expand-placeholder').count(),
+          1,
+          '无权限行应仅保留对齐占位'
+        )
+        await row.screenshot({
+          path: path.join(
+            outputDir,
+            'business-row-items-permission-hidden.png'
+          ),
+        })
+      },
+    },
     (() => {
       let detailReads = 0
       return {
@@ -273,6 +457,9 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
         )
         assert.equal(await selection.isChecked(), false)
         assert.equal(await nextSelection.isChecked(), false)
+        await preview.screenshot({
+          path: path.join(outputDir, 'business-row-items-mobile-dark.png'),
+        })
         await assertDarkThemeContrast(page, {
           scenarioName: 'business-row-items-mobile-dark',
           selector: '.erp-business-row-items-preview',

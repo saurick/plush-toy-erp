@@ -727,16 +727,19 @@ func TestJsonrpcDispatcher_FinanceFactSourceMethodsOwnFactFields(t *testing.T) {
 func TestJsonrpcDispatcher_FinanceFactSourceMethodsRequireExactFamilyPermission(t *testing.T) {
 	tests := []struct {
 		name       string
+		revision   string
 		permission string
 		method     string
 	}{
 		{
 			name:       "receivable permission cannot create invoice",
+			revision:   "2026.07.15.finance-receivable-exact",
 			permission: biz.PermissionFinanceReceivableConfirm,
 			method:     "create_invoice_from_shipment",
 		},
 		{
 			name:       "invoice permission cannot create receivable",
+			revision:   "2026.07.15.finance-invoice-exact",
 			permission: biz.PermissionFinanceInvoiceConfirm,
 			method:     "create_receivable_from_shipment",
 		},
@@ -749,7 +752,7 @@ func TestJsonrpcDispatcher_FinanceFactSourceMethodsRequireExactFamilyPermission(
 			activateOperationalFactTestCustomerConfig(
 				t,
 				j,
-				customerConfigPublishParamsForRevision(t, "2026.07.14.finance-exact-source-permission-"+tt.permission),
+				customerConfigPublishParamsForRevision(t, tt.revision),
 			)
 			params := financeFactModuleGateParams(t).AsMap()
 			if tt.method == "create_invoice_from_shipment" {

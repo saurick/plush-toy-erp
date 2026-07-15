@@ -5,16 +5,29 @@ import { fileURLToPath } from "node:url";
 
 import {
   applyManualAcceptanceTaskData,
+  buildLegacyManualAcceptanceTaskBatchReference,
   buildManualAcceptanceTaskDataPlan,
   CONFIRM_PHRASE,
   normalizeLocalBackendURL,
   parseArgs,
+  manualAcceptanceTaskRetireConfirmation,
   ROLE_USERS,
   TASK_ROLES,
+  TASK_COPY_REVISION,
   TASKS_PER_ROLE,
   TOTAL_TASKS,
+  retireLegacyManualAcceptanceTaskBatch,
   validateManualAcceptanceTaskPlan,
+  WORKFLOW_TASK_CAS_MIGRATION,
+  WORKFLOW_TASK_CAS_RELEASE,
 } from "./manual-acceptance-task-data.mjs";
+import { buildManualAcceptanceSourceDataPlan } from "./manual-acceptance-source-data.mjs";
+import {
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
+  MANUAL_ACCEPTANCE_DATASET_KEY,
+  manualAcceptanceTargetConfirmation,
+} from "./manual-acceptance-target-policy.mjs";
 
 const NOW_SEC = 1_800_000_000;
 const SCRIPT_PATH = fileURLToPath(
@@ -26,6 +39,26 @@ const ROLE_IDS = Object.freeze(
     Object.keys(ROLE_USERS).map((roleKey, offset) => [roleKey, 101 + offset]),
   ),
 );
+
+function customerTrial133Attestation(overrides = {}) {
+  return {
+    target: CUSTOMER_TRIAL_133_TARGET,
+    origin: CUSTOMER_TRIAL_133_ORIGIN,
+    customerKey: "yoyoosun",
+    environment: "prod",
+    release: WORKFLOW_TASK_CAS_RELEASE,
+    migration: WORKFLOW_TASK_CAS_MIGRATION,
+    debug: {
+      seedEnabled: false,
+      seedAllowed: false,
+      cleanupEnabled: false,
+      cleanupAllowed: false,
+      businessDataClearEnabled: false,
+      businessDataClearAllowed: false,
+    },
+    ...overrides,
+  };
+}
 
 function jsonResponse(data, code = 0, message = "OK") {
   return {
@@ -121,6 +154,7 @@ function createMockRuntime(options = {}) {
       assert.equal(actorRole, "runtime_admin");
       return jsonResponse({
         environment: options.environment || "local",
+        ...(options.capabilities || {}),
       });
     }
 
@@ -217,6 +251,7 @@ function createMockRuntime(options = {}) {
       block_task_action: ["block", "blocked"],
       complete_task_action: ["complete", "done"],
       reject_task_action: ["reject", "rejected"],
+      resume_task_action: ["resume", "ready"],
     };
     const contract = actionContracts[body.method];
     assert.ok(contract, `unexpected workflow method ${body.method}`);
@@ -228,7 +263,13 @@ function createMockRuntime(options = {}) {
     assert.ok(params.idempotency_key.trim());
     assert.equal(typeof params.reason, "string");
     assert.ok(params.reason.trim());
-    assert.equal(params.payload.handling_note, params.reason);
+    assert.deepEqual(
+      Object.keys(params.payload),
+      targetStatus === "done" ? ["feedback"] : [],
+    );
+    if (targetStatus === "done") {
+      assert.equal(params.payload.feedback, params.reason);
+    }
     const task = [...tasks.values()].find((item) => item.id === params.task_id);
     assert.ok(task, `missing task ${params.task_id}`);
     assert.equal(actorRole, task.owner_role_key);
@@ -305,6 +346,9 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     nowSec: NOW_SEC,
   });
 
+  assert.equal(plan.target, "local-dev");
+  assert.equal(plan.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
+  assert.equal(plan.dataVersion, "PLAN-COVERAGE");
   assert.equal(plan.tasks.length, TOTAL_TASKS);
   assert.equal(plan.summary.total, 180);
   assert.deepEqual(plan.summary.byStatus, {
@@ -404,6 +448,112 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
   );
 });
 
+test("uses short yoyoosun-style copy while keeping every task visibly synthetic", () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    runId: "COPY-SIMPLIFIED",
+    dataVersion: "2026.07.15-v3",
+    nowSec: NOW_SEC,
+  });
+  const visibleText = plan.tasks.flatMap((task) => [
+    task.createParams.task_name,
+    task.createParams.source_no,
+    task.action?.reason,
+    ...Object.values(task.createParams.payload).filter(
+      (value) => typeof value === "string",
+    ),
+  ]);
+
+  assert.equal(
+    plan.tasks.every(
+      (task) =>
+        task.createParams.task_code.startsWith(
+          `SIM-YOYOOSUN-UAT-TASK-COPY-SIMPLIFIED-${TASK_COPY_REVISION}-`,
+        ) &&
+        task.createParams.source_type ===
+          "simulated-manual-acceptance-task-batch" &&
+        task.createParams.source_no.startsWith("样例-") &&
+        task.createParams.payload.simulated_only === true &&
+        task.createParams.payload.real_customer_data === false,
+    ),
+    true,
+  );
+  assert.equal(
+    plan.tasks.every((task) => task.createParams.task_name.length <= 16),
+    true,
+  );
+  assert.equal(
+    visibleText.some((value) =>
+      /【试用】|合成(?:试用|玩偶|客户|材料供应商)|任务说明|明确下一步负责人|资料完整性|跨部门优先事项|供应商回签|交付风险|批次标签信息|外观问题分布|下一岗位|\bPMC\b|物料清单|抽检|排产|往来单位|库位数量/iu.test(
+        String(value || ""),
+      ),
+    ),
+    false,
+  );
+  assert.equal(
+    plan.tasks.some(
+      (task) =>
+        task.createParams.payload.style_no === "27001#" &&
+        task.createParams.payload.product_name === "云朵小熊",
+    ),
+    true,
+  );
+  assert.equal(
+    plan.tasks.some(
+      (task) => task.createParams.task_name.startsWith("确认材料齐不齐"),
+    ),
+    true,
+  );
+  assert.equal(
+    plan.tasks.every((task) => {
+      const style = task.createParams.payload.style_no;
+      const product = task.createParams.payload.product_name;
+      if (!style || !product) return true;
+      return new Map([
+        ["27001#", "云朵小熊"],
+        ["27002#", "星星挂兔"],
+        ["27003#", "奶油小狗"],
+      ]).get(style) === product;
+    }),
+    true,
+  );
+
+  const source = buildManualAcceptanceSourceDataPlan({
+    runId: "20260715-V3",
+    dataVersion: "2026.07.15-v3",
+  });
+  const sourceProducts = new Set(
+    source.records.products.map(
+      (product) => `${product.style_no}\u001f${product.name}`,
+    ),
+  );
+  const sourceMaterials = new Set(
+    source.records.materials.map(
+      (material) => `${material.name}\u001f${material.spec}`,
+    ),
+  );
+  const sourceSuppliers = new Set(
+    source.records.suppliers.map((supplier) => supplier.name),
+  );
+  for (const task of plan.tasks) {
+    const payload = task.createParams.payload;
+    if (payload.style_no || payload.product_name) {
+      assert.equal(
+        sourceProducts.has(`${payload.style_no}\u001f${payload.product_name}`),
+        true,
+      );
+    }
+    if (payload.material_name || payload.spec) {
+      assert.equal(
+        sourceMaterials.has(`${payload.material_name}\u001f${payload.spec}`),
+        true,
+      );
+    }
+    if (payload.supplier_name) {
+      assert.equal(sourceSuppliers.has(payload.supplier_name), true);
+    }
+  }
+});
+
 test("rejects developer-facing copy in a business-visible task field", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     runId: "COPY-GUARD",
@@ -419,11 +569,11 @@ test("rejects developer-facing copy in a business-visible task field", () => {
 test("CLI and exported URL normalization fail closed for external backends", async () => {
   assert.throws(
     () => parseArgs(["--backend-url", "https://erp.example.com"]),
-    /local-only/u,
+    /refuse external backend/u,
   );
   assert.throws(
     () => normalizeLocalBackendURL("http://192.168.0.133:8300"),
-    /local-only/u,
+    /refuse external backend/u,
   );
 
   const plan = buildManualAcceptanceTaskDataPlan({
@@ -443,7 +593,7 @@ test("CLI and exported URL normalization fail closed for external backends", asy
           throw new Error("must not fetch");
         },
       }),
-    /local-only/u,
+    /registered external origin|refuse external backend/u,
   );
   assert.equal(fetched, false);
 });
@@ -528,7 +678,11 @@ test("CLI documents and parses the output report boundary", () => {
     help: false,
     out: "output/custom-task-data",
     backendURL: "http://localhost:8300",
+    target: "local-dev",
+    dataVersion: "LOCAL-UAT-20260711",
     runId: "LOCAL-UAT-20260711",
+    retireLegacyRunId: "",
+    retireLegacyCopyRevision: "",
   });
 
   const help = spawnSync(process.execPath, [SCRIPT_PATH, "--help"], {
@@ -536,11 +690,23 @@ test("CLI documents and parses the output report boundary", () => {
   });
   assert.equal(help.status, 0, help.stderr);
   assert.match(help.stdout, /--out <directory>/u);
+  assert.match(help.stdout, /--retire-legacy-run-id/u);
+  assert.match(help.stdout, /--retire-legacy-copy-revision/u);
   assert.match(help.stdout, /<out>\/apply-report\.json/u);
   assert.match(help.stdout, /sourceType, and sourceID/u);
   assert.match(help.stdout, /--run-id LOCAL-UAT-20260711/u);
   assert.match(help.stdout, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u);
   assert.match(help.stdout, /used only for debug\.capabilities/u);
+
+  assert.throws(
+    () =>
+      parseArgs([
+        "--apply",
+        "--retire-legacy-copy-revision",
+        "PLAIN2",
+      ]),
+    /requires --retire-legacy-run-id/u,
+  );
 });
 
 test("exported apply requires the exact confirmation before login", async () => {
@@ -700,7 +866,7 @@ test("requires the workflow task module before any task read or write", async ()
         adminPassword: "admin-password",
         fetchImpl: mock.fetchImpl,
       }),
-    /workflow_tasks is not enabled/u,
+    /required modules are not enabled: workflow_tasks/u,
   );
   assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
   assert.equal(
@@ -732,6 +898,7 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   assert.equal(report.summary.persisted, 180);
   assert.equal(report.runId, plan.runId);
   assert.equal(report.prefix, plan.prefix);
+  assert.equal(report.copyRevision, TASK_COPY_REVISION);
   assert.equal(report.sourceType, plan.sourceType);
   assert.equal(report.sourceID, plan.sourceID);
   assert.doesNotMatch(JSON.stringify(report), /local-password|admin-password/u);
@@ -784,6 +951,201 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   assert.equal(replayReport.summary.reusedFinal, 180);
   assert.equal(replayReport.summary.actionsApplied, 0);
   assert.deepEqual(mock.counts(), countsBeforeReplay);
+});
+
+test("retires an exact legacy batch only after the plain-copy keep batch is complete", async () => {
+  const keepPlan = buildManualAcceptanceTaskDataPlan({
+    runId: "RETIRE-KEEP",
+    nowSec: NOW_SEC,
+  });
+  const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
+    runId: "RETIRE-OLD",
+    copyRevision: "PLAIN2",
+    backendURL: keepPlan.backendURL,
+  });
+  const mock = createMockRuntime();
+  for (const task of keepPlan.tasks) {
+    mock.seedPlannedTask(keepPlan, task, { final: true });
+    const legacyTask = structuredClone(task);
+    legacyTask.createParams.task_code = `${legacyBatch.prefix}-${task.roleKey.toUpperCase()}-${String(task.index).padStart(2, "0")}`;
+    legacyTask.createParams.source_id = legacyBatch.sourceID;
+    legacyTask.createParams.task_name = `【试用】${task.roleKey}：旧任务（${String(task.index).padStart(2, "0")}）`;
+    legacyTask.createParams.source_no = `试用任务单-${task.roleKey}-${task.index}`;
+    mock.seedPlannedTask(keepPlan, legacyTask, { final: true });
+  }
+
+  const report = await retireLegacyManualAcceptanceTaskBatch(keepPlan, {
+    retireRunId: legacyBatch.runId,
+    retireCopyRevision: legacyBatch.copyRevision,
+    confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+      keepPlan,
+      legacyBatch,
+    ),
+    password: "local-password",
+    adminPassword: "admin-password",
+    fetchImpl: mock.fetchImpl,
+  });
+
+  assert.deepEqual(report.summary, {
+    total: 180,
+    activeBefore: 148,
+    alreadyTerminal: 32,
+    resumed: 27,
+    terminalized: 148,
+    actionsApplied: 175,
+    finalDone: 109,
+    finalRejected: 71,
+  });
+  assert.equal(report.cleanup.physicalDelete, false);
+  assert.equal(report.keepBatch.copyRevision, TASK_COPY_REVISION);
+  assert.equal(report.retiredBatch.sourceID, legacyBatch.sourceID);
+  assert.equal(
+    [...mock.tasks.values()]
+      .filter((task) => task.source_id === legacyBatch.sourceID)
+      .every((task) => ["done", "rejected"].includes(task.task_status_key)),
+    true,
+  );
+  const countsAfterFirst = mock.counts();
+  assert.deepEqual(countsAfterFirst, { createCount: 0, actionCount: 175 });
+
+  const replay = await retireLegacyManualAcceptanceTaskBatch(keepPlan, {
+    retireRunId: legacyBatch.runId,
+    retireCopyRevision: legacyBatch.copyRevision,
+    confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+      keepPlan,
+      legacyBatch,
+    ),
+    password: "local-password",
+    adminPassword: "admin-password",
+    fetchImpl: mock.fetchImpl,
+  });
+  assert.equal(replay.summary.activeBefore, 0);
+  assert.equal(replay.summary.alreadyTerminal, 180);
+  assert.equal(replay.summary.actionsApplied, 0);
+  assert.deepEqual(mock.counts(), countsAfterFirst);
+});
+
+test("customer-trial-133 task apply uses exact attestation without debug admin and keeps the same dataset identity", async () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    target: CUSTOMER_TRIAL_133_TARGET,
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    dataVersion: "2026.07.15-v1",
+    runId: "20260715-V1",
+    nowSec: NOW_SEC,
+  });
+  const mock = createMockRuntime({ environment: "prod" });
+  const report = await applyManualAcceptanceTaskData(plan, {
+    confirmPhrase: CONFIRM_PHRASE,
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    targetAttestation: customerTrial133Attestation(),
+    password: "local-password",
+    fetchImpl: mock.fetchImpl,
+  });
+
+  assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
+  assert.equal(report.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
+  assert.equal(report.dataVersion, "2026.07.15-v1");
+  assert.equal(report.runId, "20260715-V1");
+  assert.equal(report.summary.persisted, 180);
+  assert.deepEqual(report.runtime.targetAttestation, {
+    source: "out-of-band",
+    release: WORKFLOW_TASK_CAS_RELEASE,
+    migration: WORKFLOW_TASK_CAS_MIGRATION,
+  });
+  assert.equal(
+    mock.calls.some(
+      (call) => call.domain === "debug" || call.actorRole === "runtime_admin",
+    ),
+    false,
+  );
+});
+
+test("customer-trial-133 rejects an old Workflow release before login or write", async () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    target: CUSTOMER_TRIAL_133_TARGET,
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    dataVersion: "2026.07.15-v1",
+    runId: "20260715-V1",
+    nowSec: NOW_SEC,
+  });
+  let fetchCount = 0;
+
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceTaskData(plan, {
+        confirmPhrase: CONFIRM_PHRASE,
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        targetAttestation: customerTrial133Attestation({
+          release: "20c96d3819429361a35d2551b63b211f055de37e",
+        }),
+        password: "must-not-be-used",
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error("must not fetch");
+        },
+      }),
+    new RegExp(
+      `requires the reviewed Workflow task CAS release ${WORKFLOW_TASK_CAS_RELEASE}`,
+      "u",
+    ),
+  );
+  assert.equal(fetchCount, 0);
+});
+
+test("customer-trial-133 rejects an old Workflow migration before login or write", async () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    target: CUSTOMER_TRIAL_133_TARGET,
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    dataVersion: "2026.07.15-v1",
+    runId: "20260715-V1",
+    nowSec: NOW_SEC,
+  });
+  let fetchCount = 0;
+
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceTaskData(plan, {
+        confirmPhrase: CONFIRM_PHRASE,
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        targetAttestation: customerTrial133Attestation({
+          migration: "20260710150001",
+        }),
+        password: "must-not-be-used",
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error("must not fetch");
+        },
+      }),
+    new RegExp(
+      `requires Workflow task CAS migration >= ${WORKFLOW_TASK_CAS_MIGRATION}`,
+      "u",
+    ),
+  );
+  assert.equal(fetchCount, 0);
+});
+
+test("local task apply rejects out-of-band target attestation before login or write", async () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    runId: "LOCAL-ATTESTATION",
+    nowSec: NOW_SEC,
+  });
+  let fetchCount = 0;
+
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceTaskData(plan, {
+        confirmPhrase: CONFIRM_PHRASE,
+        targetAttestation: customerTrial133Attestation(),
+        password: "must-not-be-used",
+        adminPassword: "must-not-be-used",
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error("must not fetch");
+        },
+      }),
+    /target attestation is only valid for customer-trial-133/u,
+  );
+  assert.equal(fetchCount, 0);
 });
 
 test("fails when create_task success omits the current version required by CAS", async () => {

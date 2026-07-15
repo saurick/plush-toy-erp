@@ -37,7 +37,7 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
     navigationSections.map((section) => section.title),
     [
       '看板中心',
-      '主数据',
+      '基础资料',
       '销售管理',
       '产品工程',
       '采购管理',
@@ -46,7 +46,7 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
       '委外管理',
       '生产管理',
       '出货管理',
-      '财务业务',
+      '财务管理',
       '运营工具',
       '系统管理',
     ]
@@ -94,7 +94,7 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(navLabels.includes('产品档案'))
   assert(navLabels.includes('材料档案'))
   assert(navLabels.includes('销售订单'))
-  assert(navLabels.includes('BOM 管理'))
+  assert(navLabels.includes('物料清单（BOM）'))
   assert(navLabels.includes('加工环节'))
   assert(navLabels.includes('采购订单'))
   assert(navLabels.includes('入库管理'))
@@ -132,7 +132,7 @@ test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文
   assert(!navPaths.includes('/erp/sales/project-orders'))
 })
 
-test('businessModules: Product Core 评审态阻断客户业务数据页', () => {
+test('businessModules: 功能预览态阻断客户业务数据页', () => {
   assert.equal(isCustomerBusinessDataPageKey('business-dashboard'), true)
   assert.equal(isCustomerBusinessDataPageKey('processing-contracts'), true)
   assert.equal(isCustomerBusinessDataPageKey('shipments'), true)
@@ -145,7 +145,7 @@ test('businessModules: Product Core 评审态阻断客户业务数据页', () =>
   assert.equal(isCustomerBusinessDataPageKey('system-audit-logs'), false)
 })
 
-test('seedData: Product Core 无客户态只显示控制面导航', () => {
+test('seedData: 未连接客户环境时只显示功能预览和系统设置', () => {
   const productCoreSections = getProductCoreNavigationSections()
   const productCorePaths = productCoreSections.flatMap((section) =>
     section.items.map((item) => item.path)
@@ -156,7 +156,7 @@ test('seedData: Product Core 无客户态只显示控制面导航', () => {
 
   assert.deepEqual(
     productCoreSections.map((section) => section.title),
-    ['产品核心', '控制面']
+    ['功能预览', '系统设置']
   )
   assert.deepEqual(productCorePaths, [
     '/erp/dashboard',
@@ -164,11 +164,11 @@ test('seedData: Product Core 无客户态只显示控制面导航', () => {
     '/erp/system/permissions',
     '/erp/system/audit-logs',
   ])
-  assert(productCoreLabels.includes('产品核心总览'))
+  assert(productCoreLabels.includes('系统功能总览'))
   assert(!productCoreLabels.includes('工作台'))
   assert(productCoreLabels.includes('模板打印中心'))
   assert(productCoreLabels.includes('权限管理'))
-  assert(productCoreLabels.includes('审计日志'))
+  assert(productCoreLabels.includes('系统操作记录'))
   assert(!productCorePaths.includes('/erp/business-dashboard'))
   assert(!productCorePaths.includes('/erp/task-board'))
   assert(!productCorePaths.includes('/erp/purchase/material-bom'))

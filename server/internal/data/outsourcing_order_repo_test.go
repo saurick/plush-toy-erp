@@ -175,3 +175,19 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 		t.Fatalf("expected database exactly-one check to reject both subject ids, got %v", err)
 	}
 }
+
+func TestOutsourcingProductNoSnapshotPrefersStyleNo(t *testing.T) {
+	styleNo := " 27001# "
+	withStyle := outsourcingProductNoSnapshot(&ent.Product{
+		Code:    "PRODUCT-INTERNAL-001",
+		StyleNo: &styleNo,
+	})
+	if withStyle == nil || *withStyle != "27001#" {
+		t.Fatalf("outsourcingProductNoSnapshot() = %v, want trimmed style no", withStyle)
+	}
+
+	withoutStyle := outsourcingProductNoSnapshot(&ent.Product{Code: "PRODUCT-002"})
+	if withoutStyle == nil || *withoutStyle != "PRODUCT-002" {
+		t.Fatalf("outsourcingProductNoSnapshot() = %v, want product code fallback", withoutStyle)
+	}
+}

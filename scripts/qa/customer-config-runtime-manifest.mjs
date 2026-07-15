@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { existsSync, mkdirSync, writeFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -21,6 +22,9 @@ const repoRoot = path.resolve(import.meta.dirname, "..", "..");
 const ALLOWED_MODES = Object.freeze(["validate", "compile", "preview"]);
 const MANIFEST_SCHEMA_VERSION = "customer-config-manifest/v1";
 const PROCESS_CONTRACT_VERSION = "customer-process-contract/v1";
+const FORMAL_PRODUCT_VERSION = "local-customer-package";
+const LOCAL_TEST_PRODUCT_VERSION = "local-customer-package-test-apply";
+const LOCAL_TEST_APPLY_PURPOSE = "local_test_apply";
 
 const ROLE_KEY_BY_POOL = Object.freeze({
   boss: "boss",
@@ -665,6 +669,18 @@ function packageRevision(config) {
   return `${config.packageKey}.runtime-manifest-v1`;
 }
 
+function localTestApplyRevision(config, manifest) {
+  const fingerprintSource = {
+    ...manifest,
+    revision: "",
+  };
+  const fingerprint = createHash("sha256")
+    .update(JSON.stringify(fingerprintSource))
+    .digest("hex")
+    .slice(0, 16);
+  return `${config.packageKey}.local-${fingerprint}.runtime-v1`;
+}
+
 function moduleStateOverridesFromPackage(config, catalog) {
   const moduleKeys = new Set(catalog.modules.map((item) => item.key));
   const overrides = new Map();
@@ -1078,8 +1094,9 @@ function compiledSnapshotFromPackage(
   config,
   catalog,
   runtimeProcessSelections = [],
+  { applyPurpose = "" } = {},
 ) {
-  return {
+  const snapshot = {
     customer: {
       key: config.customerKey,
       name: config.label,
@@ -1108,12 +1125,24 @@ function compiledSnapshotFromPackage(
     printTemplateDefaults: printTemplateDefaultsFromPackage(config),
     preview: buildPreview(config),
   };
+  if (applyPurpose) {
+    snapshot.applyPurpose = applyPurpose;
+  }
+  return snapshot;
 }
 
-function buildManifestProjection(config, catalog, { publishable }) {
+function createManifestProjection(
+  config,
+  catalog,
+  {
+    publishable,
+    productVersion = FORMAL_PRODUCT_VERSION,
+    applyPurpose = "",
+  },
+) {
   const runtimeProcessSelections = runtimeProcessSelectionsFromPackage(config);
   const workPoolRoleOverrides = customerWorkPoolRoleOverrides(config, catalog);
-  const manifest = {
+  return {
     manifest_schema_version: MANIFEST_SCHEMA_VERSION,
     process_contract_version: PROCESS_CONTRACT_VERSION,
     manifest_status: publishable ? "runtime_compile_ready" : "preview_only",
@@ -1121,11 +1150,12 @@ function buildManifestProjection(config, catalog, { publishable }) {
     publishable,
     customer_key: config.customerKey,
     revision: packageRevision(config),
-    product_version: "local-customer-package",
+    product_version: productVersion,
     compiled_snapshot: compiledSnapshotFromPackage(
       config,
       catalog,
       runtimeProcessSelections,
+      { applyPurpose },
     ),
     module_states: moduleStatesFromCatalog(catalog, config),
     role_profiles: roleProfilesFromPackage(config, catalog),
@@ -1137,7 +1167,11 @@ function buildManifestProjection(config, catalog, { publishable }) {
       workPoolRoleOverrides,
     ),
   };
-  validateRuntimeManifest(manifest, { publishable });
+}
+
+function buildManifestProjection(config, catalog, { publishable }) {
+  const manifest = createManifestProjection(config, catalog, { publishable });
+  validateRuntimeManifest(manifest, { publishable, purpose: "formal" });
   return manifest;
 }
 
@@ -1163,6 +1197,29 @@ function buildRuntimePreviewManifest(
   validateCatalog(catalog);
   validatePackage(config, catalog);
   return buildManifestProjection(config, catalog, { publishable: false });
+}
+
+function buildLocalTestApplyRuntimeManifest(
+  config,
+  catalog = customerPackageCatalog,
+) {
+  validateCatalog(catalog);
+  validatePackage(config, catalog);
+  assert(
+    config.sourcePolicy?.localTestApplyEnabled === true,
+    "local test apply requires an explicitly enabled tracked customer package",
+  );
+  const manifest = createManifestProjection(config, catalog, {
+    publishable: true,
+    productVersion: LOCAL_TEST_PRODUCT_VERSION,
+    applyPurpose: LOCAL_TEST_APPLY_PURPOSE,
+  });
+  manifest.revision = localTestApplyRevision(config, manifest);
+  validateRuntimeManifest(manifest, {
+    publishable: true,
+    purpose: LOCAL_TEST_APPLY_PURPOSE,
+  });
+  return manifest;
 }
 
 function assertNoForbiddenKeys(value, currentPath = "runtimeManifest") {
@@ -1382,7 +1439,14 @@ function assertNoLegacyRuntimeGraphMetadata(
   }
 }
 
-function validateRuntimeManifest(manifest, { publishable = true } = {}) {
+function validateRuntimeManifest(
+  manifest,
+  { publishable = true, purpose = "formal" } = {},
+) {
+  assert(
+    purpose === "formal" || purpose === LOCAL_TEST_APPLY_PURPOSE,
+    "runtime manifest validation purpose is unsupported",
+  );
   assert(
     manifest.manifest_schema_version === MANIFEST_SCHEMA_VERSION,
     `manifest_schema_version must be ${MANIFEST_SCHEMA_VERSION}`,
@@ -1400,19 +1464,65 @@ function validateRuntimeManifest(manifest, { publishable = true } = {}) {
   );
   assert(typeof manifest.customer_key === "string" && manifest.customer_key.trim() !== "", "customer_key must be set");
   assert(typeof manifest.revision === "string" && manifest.revision.trim() !== "", "revision must be set");
+  const formalRevisionPattern =
+    /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*\.runtime-manifest-v1$/u;
+  const localTestRevisionPattern =
+    /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*\.local-[a-f0-9]{16}\.runtime-v1$/u;
+  assert(
+    manifest.revision.length <= 64,
+    "revision must fit the customer_config_revisions schema limit",
+  );
   assert(
     manifest.revision.startsWith(`${manifest.customer_key}-`) &&
-      /^[a-z0-9]+(?:-[a-z0-9]+)*-package-v[1-9][0-9]*\.runtime-manifest-v1$/u.test(
-        manifest.revision,
-      ),
-    "revision must be namespaced by customer_key and derive from a versioned package key",
+      (purpose === LOCAL_TEST_APPLY_PURPOSE
+        ? localTestRevisionPattern.test(manifest.revision)
+        : formalRevisionPattern.test(manifest.revision)),
+    "revision must be namespaced by customer_key and derive from the expected versioned package identity",
   );
-  assert(manifest.product_version === "local-customer-package", "product_version must identify local package compile");
+  assert(
+    manifest.product_version ===
+      (purpose === LOCAL_TEST_APPLY_PURPOSE
+        ? LOCAL_TEST_PRODUCT_VERSION
+        : FORMAL_PRODUCT_VERSION),
+    "product_version must match the runtime manifest purpose",
+  );
   assert(manifest.compiled_snapshot && typeof manifest.compiled_snapshot === "object", "compiled_snapshot must exist");
   assert(
     manifest.compiled_snapshot.customer?.key === manifest.customer_key,
     "compiled_snapshot.customer.key must match customer_key",
   );
+  const packageSnapshot = manifest.compiled_snapshot.package;
+  assert(
+    packageSnapshot && typeof packageSnapshot === "object",
+    "compiled_snapshot.package must exist",
+  );
+  if (purpose === LOCAL_TEST_APPLY_PURPOSE) {
+    assert(
+      manifest.compiled_snapshot.applyPurpose === LOCAL_TEST_APPLY_PURPOSE,
+      "local test manifest must declare its apply purpose",
+    );
+    assert(
+      packageSnapshot.status !== "release_ready" &&
+        packageSnapshot.runtimeEnabled === false &&
+        packageSnapshot.previewOnly === true &&
+        packageSnapshot.publishEnabled === false,
+      "local test manifest must preserve the tracked draft package boundary",
+    );
+  } else {
+    assert(
+      manifest.compiled_snapshot.applyPurpose == null,
+      "formal runtime manifest must not carry a local test apply purpose",
+    );
+    if (publishable) {
+      assert(
+        packageSnapshot.status === "release_ready" &&
+          packageSnapshot.runtimeEnabled === true &&
+          packageSnapshot.previewOnly === false &&
+          packageSnapshot.publishEnabled === true,
+        "formal publishable manifest requires a release-ready package snapshot",
+      );
+    }
+  }
   assert(Array.isArray(manifest.compiled_snapshot.pages), "compiled_snapshot.pages must be an array");
   const pageKeys = uniqueSorted(manifest.compiled_snapshot.pages);
   assert(pageKeys.length > 0, "compiled_snapshot.pages must not be empty");
@@ -1647,7 +1757,9 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
 }
 
 export {
+  LOCAL_TEST_APPLY_PURPOSE,
   RUNTIME_PAGE_KEYS,
+  buildLocalTestApplyRuntimeManifest,
   buildRuntimeManifest,
   buildRuntimePreviewManifest,
   runCustomerConfigRuntimeManifest,

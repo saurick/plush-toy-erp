@@ -44,6 +44,43 @@ test("test-data-isolation-boundary: current repo keeps test data buckets isolate
   }
 });
 
+test("test-data-isolation-boundary: v3 target checks stay atomic and fail closed", () => {
+  const ids = DEFAULT_TEST_DATA_ISOLATION_CHECKS.map((check) => check.id);
+  assert.equal(new Set(ids).size, ids.length);
+
+  const dataset = DEFAULT_TEST_DATA_ISOLATION_CHECKS.find(
+    (check) =>
+      check.id === "manual-acceptance-dataset-keeps-one-current-v3-contract",
+  );
+  assert(dataset);
+  assert(
+    dataset.required.some((rule) =>
+      rule.pattern.test(
+        'export const DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION = "2026.07.15-v3";',
+      ),
+    ),
+  );
+  assert(
+    dataset.forbidden.some((rule) =>
+      rule.pattern.test('const legacy = "2026.07.15-v1";'),
+    ),
+  );
+
+  const retirement = DEFAULT_TEST_DATA_ISOLATION_CHECKS.find(
+    (check) => check.id === "manual-acceptance-retirement-keeps-history",
+  );
+  assert(
+    retirement.required.some((rule) =>
+      rule.message.includes("attestation for customer-trial-133"),
+    ),
+  );
+  assert(
+    retirement.forbidden.some((rule) =>
+      rule.message.includes("physical deletion"),
+    ),
+  );
+});
+
 test("test-data-isolation-boundary: trial fixture coverage follows behavior, not record IDs", () => {
   assert.deepEqual(trialFixtureCoverageViolations(), []);
 

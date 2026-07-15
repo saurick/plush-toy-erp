@@ -52,6 +52,7 @@ test('production completion choices use posted facts as the remaining truth', ()
 })
 
 test('production completion payload only submits source action fields', () => {
+  const occurredAtInput = '2026-07-14T09:30'
   const payload = buildProductionCompletionPayload(
     {
       production_order_item_id: 11,
@@ -59,7 +60,7 @@ test('production completion payload only submits source action fields', () => {
       lot_selection: SOURCE_INBOUND_LOT_SELECTION.EXISTING,
       lot_id: 3,
       quantity: '2.5000',
-      occurred_at: '2026-07-14T09:30',
+      occurred_at: occurredAtInput,
       note: '  完工复核  ',
       subject_id: 999,
       unit_id: 888,
@@ -73,7 +74,7 @@ test('production completion payload only submits source action fields', () => {
     warehouse_id: 7,
     lot_id: 3,
     quantity: '2.5',
-    occurred_at: '2026-07-14T01:30:00.000Z',
+    occurred_at: new Date(occurredAtInput).toISOString(),
     note: '完工复核',
   })
   assert.equal(Object.hasOwn(payload, 'subject_id'), false)

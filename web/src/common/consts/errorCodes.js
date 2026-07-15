@@ -44,19 +44,20 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
   [RpcErrorCode.AUTH_SMS_CODE_TOO_FREQUENT]: '验证码发送过于频繁，请稍后再试',
   [RpcErrorCode.AUTH_SMS_CODE_ATTEMPTS_EXCEEDED]:
     '验证码错误次数过多，请重新获取',
-  [RpcErrorCode.AUTH_PHONE_NOT_BOUND]: '该手机号未开通登录权限，请联系管理员',
+  [RpcErrorCode.AUTH_PHONE_NOT_BOUND]:
+    '该手机号暂不能用于登录，请联系系统管理员',
   [RpcErrorCode.AUTH_MOBILE_ROLE_DENIED]:
-    '该账号暂无当前岗位任务端登录权限，请联系管理员',
+    '当前账号不能使用手机端待办，请联系系统管理员',
   [RpcErrorCode.AUTH_SMS_LOGIN_DISABLED]: '短信登录暂未开通，请使用密码登录',
   [RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE]:
-    '短信服务暂不可用，请稍后再试或联系管理员',
+    '暂时无法发送验证码，请稍后再试或联系系统管理员',
   [RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED]:
-    '短信服务额度已用完，请联系管理员处理',
+    '暂时无法发送验证码，请联系系统管理员',
   [RpcErrorCode.AUTH_LOGIN_REJECTED]: '登录信息不正确或账号不可用',
   [RpcErrorCode.ADMIN_EXISTS]: '账号已存在',
   [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他账号',
   [RpcErrorCode.IDEMPOTENCY_CONFLICT]:
-    '重复请求内容与首次提交不一致，请刷新后重试',
+    '本次操作内容与刚才提交的不一致，请刷新页面后重新办理',
   [RpcErrorCode.PROCESS_DOMAIN_COMMAND_RECOVERY_REQUIRED]:
     '此前业务处理结果需要人工核对，当前流程暂时无法继续，请联系管理员',
   [RpcErrorCode.RESOURCE_VERSION_CONFLICT]:

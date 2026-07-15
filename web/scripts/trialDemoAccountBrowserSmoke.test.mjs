@@ -225,7 +225,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
       `${account.username} must not expect yoyoosun hidden business dashboard`
     )
     assert(
-      !account.expectedMenus.includes('异常 / 阻塞闭环'),
+      !account.expectedMenus.includes('异常处理'),
       `${account.username} must not expect yoyoosun hidden exception flow`
     )
   }
@@ -236,7 +236,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     '产品档案',
     '材料档案',
     '加工环节',
-    'BOM 管理',
+    '物料清单（BOM）',
     '任务看板',
     '模板打印中心',
   ])
@@ -341,7 +341,7 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
       `${account.username} must not configure yoyoosun hidden business dashboard as expected`
     )
     assert(
-      !account.configuredExpectedMenus.includes('异常 / 阻塞闭环'),
+      !account.configuredExpectedMenus.includes('异常处理'),
       `${account.username} must not configure yoyoosun hidden exception flow as expected`
     )
   }
@@ -627,5 +627,5 @@ test('trial demo account browser smoke source keeps no-write template before run
     /accountInput\.isVisible\(\{ timeout: 8_000 \}\)/u
   )
   assert.match(source, /URL must not contain username or password/u)
-  assert.match(source, /该账号暂无当前入口权限，请联系管理员。/u)
+  assert.match(source, /当前账号不能使用所选工作方式，请联系系统管理员。/u)
 })

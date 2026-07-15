@@ -104,7 +104,7 @@ export default function ProductionCompletionModal({
       <Alert
         type="info"
         showIcon
-        message="完工数量、产品、规格和单位由生产订单明细校验；过账后才会写入库存。"
+        message="系统会按生产订单明细核对完工数量、产品、规格和单位；过账后才会更新库存。"
       />
       <Descriptions
         size="small"

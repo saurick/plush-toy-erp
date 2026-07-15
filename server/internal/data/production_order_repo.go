@@ -208,9 +208,33 @@ func (r *productionOrderRepo) ListProductionOrders(ctx context.Context, filter b
 	if err != nil {
 		return nil, 0, err
 	}
+	orderIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		orderIDs = append(orderIDs, row.ID)
+	}
+	itemCounts := make(map[int]int, len(orderIDs))
+	if len(orderIDs) > 0 {
+		var groupedCounts []struct {
+			ProductionOrderID int `json:"production_order_id"`
+			Count             int `json:"count"`
+		}
+		if err := r.data.postgres.ProductionOrderItem.Query().
+			Where(productionorderitem.ProductionOrderIDIn(orderIDs...)).
+			GroupBy(productionorderitem.FieldProductionOrderID).
+			Aggregate(ent.Count()).
+			Scan(ctx, &groupedCounts); err != nil {
+			return nil, 0, err
+		}
+		for _, grouped := range groupedCounts {
+			itemCounts[grouped.ProductionOrderID] = grouped.Count
+		}
+	}
 	items := make([]*biz.ProductionOrder, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, entProductionOrderToBiz(row))
+		item := entProductionOrderToBiz(row)
+		itemCount := itemCounts[row.ID]
+		item.ItemCount = &itemCount
+		items = append(items, item)
 	}
 	return items, total, nil
 }

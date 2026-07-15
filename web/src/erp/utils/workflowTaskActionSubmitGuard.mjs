@@ -8,8 +8,8 @@ import {
   normalizeWorkflowActionMode,
 } from './workflowTaskActionAccess.mjs'
 
-const DEFAULT_DENIED_FALLBACK = '当前账号不能提交这个任务动作'
-const DEFAULT_ERROR_FALLBACK = '核对任务动作权限失败'
+const DEFAULT_DENIED_FALLBACK = '当前账号不能提交这项操作'
+const DEFAULT_ERROR_FALLBACK = '暂时无法确认这项操作是否可用，请稍后重试'
 const REASON_REQUIRED_ACTION_MODES = new Set([
   'block',
   'reject',
@@ -41,7 +41,7 @@ export async function verifyWorkflowTaskActionAccessBeforeSubmit({
   const taskID = getPositiveTaskID(task)
   const normalizedActionKey = normalizeWorkflowActionMode(actionKey)
   if (!taskID || !normalizedActionKey) {
-    onWarning?.('当前任务动作缺少必要参数，请刷新后重试')
+    onWarning?.('当前操作暂时无法提交，请刷新后重试')
     return false
   }
   if (

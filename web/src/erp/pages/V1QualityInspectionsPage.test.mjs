@@ -29,7 +29,10 @@ test('quality rejection return retries safely and validates the returned source 
   assert.match(action, /quality_inspection_id/u)
   assert.match(action, /created\?\.status/u)
   assert.match(action, /await loadRows\(\)/u)
-  assert.match(action, /已保留本次请求，请使用相同内容重试/u)
+  assert.match(
+    action,
+    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
+  )
 })
 
 test('incoming quality create submits only source selectors and customer context', () => {

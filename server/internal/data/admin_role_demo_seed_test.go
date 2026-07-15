@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"database/sql/driver"
 	"errors"
 	"io"
 	"regexp"
@@ -12,7 +13,15 @@ import (
 
 	"github.com/DATA-DOG/go-sqlmock"
 	"github.com/go-kratos/kratos/v2/log"
+	"golang.org/x/crypto/bcrypt"
 )
+
+type bcryptHashMatcher string
+
+func (expected bcryptHashMatcher) Match(value driver.Value) bool {
+	hash, ok := value.(string)
+	return ok && bcrypt.CompareHashAndPassword([]byte(hash), []byte(expected)) == nil
+}
 
 func TestDefaultRoleDemoAdminAccountsExcludeDebugByDefault(t *testing.T) {
 	accounts := DefaultRoleDemoAdminAccounts(false)
@@ -116,17 +125,28 @@ func TestSeedRoleDemoAdminAccountsRejectsMissingPassword(t *testing.T) {
 	}
 }
 
-func TestResetRoleDemoAdminPasswordsOnlyUpdatesPassword(t *testing.T) {
+func TestResetRoleDemoAdminPasswordsBumpsAuthVersionAndRevokesSessions(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New() error = %v", err)
 	}
-	mock.ExpectExec(regexp.QuoteMeta(`
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`
 UPDATE admin_users
-SET password_hash = $2, updated_at = $3
-WHERE username = $1`)).
-		WithArgs("demo_uat_disabled", sqlmock.AnyArg(), sqlmock.AnyArg()).
-		WillReturnResult(sqlmock.NewResult(0, 1))
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id`)).
+		WithArgs("demo_uat_disabled", bcryptHashMatcher("manual-acceptance-password"), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(101))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+		WithArgs(101, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+		WillReturnResult(sqlmock.NewResult(0, 2))
+	mock.ExpectCommit()
 	mock.ExpectClose()
 
 	err = ResetRoleDemoAdminPasswords(
@@ -137,6 +157,225 @@ WHERE username = $1`)).
 	)
 	if err != nil {
 		t.Fatalf("ResetRoleDemoAdminPasswords() error = %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestResetRoleDemoAdminPasswordsProtectsStableAdminBeforeTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectClose()
+
+	err = ResetRoleDemoAdminPasswords(
+		context.Background(),
+		db,
+		[]string{" admin "},
+		"manual-acceptance-password",
+	)
+	if !errors.Is(err, ErrStableAdminProtected) {
+		t.Fatalf("ResetRoleDemoAdminPasswords() error = %v, want ErrStableAdminProtected", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestSeedRoleDemoAdminAccountsProtectsStableAdminBeforeTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectClose()
+
+	_, err = SeedRoleDemoAdminAccounts(context.Background(), db, RoleDemoAdminSeedOptions{
+		Password: "manual-acceptance-password",
+		Accounts: []RoleDemoAdminAccountSpec{
+			{Username: "ADMIN", RoleKey: biz.AdminRoleKey},
+		},
+	})
+	if !errors.Is(err, ErrStableAdminProtected) {
+		t.Fatalf("SeedRoleDemoAdminAccounts() error = %v, want ErrStableAdminProtected", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestResetManualAcceptancePasswordsRotatesAdminAndDemoInOneTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectBegin()
+	accounts := []struct {
+		username string
+		password string
+		adminID  int
+		sessions int64
+	}{
+		{username: "admin", password: "independent-admin-password", adminID: 1, sessions: 2},
+		{username: "demo_sales", password: "independent-demo-password", adminID: 2, sessions: 1},
+	}
+	for _, account := range accounts {
+		mock.ExpectQuery(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id`)).
+			WithArgs(account.username, bcryptHashMatcher(account.password), sqlmock.AnyArg()).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(account.adminID))
+		mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+			WithArgs(account.adminID, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+			WillReturnResult(sqlmock.NewResult(0, account.sessions))
+	}
+	mock.ExpectCommit()
+	mock.ExpectClose()
+
+	err = ResetManualAcceptancePasswords(
+		context.Background(),
+		db,
+		[]string{"admin"},
+		"independent-admin-password",
+		[]string{"demo_sales"},
+		"independent-demo-password",
+	)
+	if err != nil {
+		t.Fatalf("ResetManualAcceptancePasswords() error = %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestResetManualAcceptancePasswordsRejectsSharedPasswordBeforeTransaction(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectClose()
+
+	err = ResetManualAcceptancePasswords(
+		context.Background(),
+		db,
+		[]string{"admin"},
+		"shared-password",
+		[]string{"demo_sales"},
+		"shared-password",
+	)
+	if err == nil || !strings.Contains(err.Error(), "must differ") {
+		t.Fatalf("ResetManualAcceptancePasswords() error = %v, want independent password failure", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestResetRoleDemoAdminPasswordsRollsBackPartialUpdate(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id`)).
+		WithArgs("demo_sales", bcryptHashMatcher("manual-acceptance-password"), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(201))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+		WithArgs(201, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+		WillReturnResult(sqlmock.NewResult(0, 1))
+	mock.ExpectQuery(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id`)).
+		WithArgs("demo_purchase", bcryptHashMatcher("manual-acceptance-password"), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	err = ResetRoleDemoAdminPasswords(
+		context.Background(),
+		db,
+		[]string{"demo_sales", "demo_purchase"},
+		"manual-acceptance-password",
+	)
+	if err == nil || !strings.Contains(err.Error(), "demo_purchase") {
+		t.Fatalf("ResetRoleDemoAdminPasswords() error = %v, want missing second account", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestResetManualAcceptancePasswordsRollsBackWhenSessionRevocationFails(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	mock.ExpectBegin()
+	mock.ExpectQuery(regexp.QuoteMeta(`
+UPDATE admin_users
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id`)).
+		WithArgs("admin", bcryptHashMatcher("independent-admin-password"), sqlmock.AnyArg()).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(301))
+	mock.ExpectExec(regexp.QuoteMeta(`
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`)).
+		WithArgs(301, sqlmock.AnyArg(), adminSessionRevokeReasonPasswordReset).
+		WillReturnError(errors.New("session storage unavailable"))
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	err = ResetManualAcceptancePasswords(
+		context.Background(),
+		db,
+		[]string{"admin"},
+		"independent-admin-password",
+		nil,
+		"",
+	)
+	if err == nil || !strings.Contains(err.Error(), "session storage unavailable") {
+		t.Fatalf("ResetManualAcceptancePasswords() error = %v, want session revocation failure", err)
 	}
 	if err := db.Close(); err != nil {
 		t.Fatalf("db.Close() error = %v", err)

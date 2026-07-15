@@ -11,7 +11,10 @@ import (
 	"strconv"
 	"strings"
 
+	"server/internal/admincredential"
+	"server/internal/biz"
 	"server/internal/conf"
+	"server/internal/customertrialconfig"
 	"server/internal/devdbguard"
 	appserver "server/internal/server"
 	"server/pkg/logger"
@@ -147,6 +150,30 @@ func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) {
 	}
 }
 
+// applyLocalAdminCredentialDefaults only fills missing bootstrap credentials
+// for the registered development database. Production, remote targets and
+// explicitly configured values remain untouched.
+func applyLocalAdminCredentialDefaults(confPath string, dataCfg *conf.Data, getenv func(string) string) {
+	if dataCfg == nil || dataCfg.Postgres == nil || isProductionRuntime(confPath, getenv) || !devdbguard.IsDevConfigPath(confPath) {
+		return
+	}
+	if err := devdbguard.RequireCustomerConfigLocalTestDSN(dataCfg.Postgres.Dsn); err != nil {
+		return
+	}
+	if dataCfg.Auth == nil {
+		dataCfg.Auth = &conf.Data_Auth{}
+	}
+	if dataCfg.Auth.Admin == nil {
+		dataCfg.Auth.Admin = &conf.Data_Auth_Admin{}
+	}
+	if strings.TrimSpace(dataCfg.Auth.Admin.Username) == "" {
+		dataCfg.Auth.Admin.Username = admincredential.DefaultLocalUsername
+	}
+	if strings.TrimSpace(dataCfg.Auth.Admin.Password) == "" {
+		dataCfg.Auth.Admin.Password = admincredential.DefaultLocalPassword
+	}
+}
+
 func isProductionRuntime(confPath string, getenv func(string) string) bool {
 	normalizedPath := filepath.ToSlash(filepath.Clean(strings.TrimSpace(confPath)))
 	if strings.Contains(normalizedPath, "/configs/prod/") || strings.HasPrefix(normalizedPath, "configs/prod/") {
@@ -228,6 +255,9 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	if !isProductionRuntime(confPath, getenv) {
 		return nil
 	}
+	if strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv)) != "" {
+		return fmt.Errorf("production preflight failed: %s must be unset", biz.CustomerConfigLocalTestAllowEnv)
+	}
 	if dataCfg == nil {
 		return fmt.Errorf("production preflight failed: data config is nil")
 	}
@@ -259,6 +289,9 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	if dataCfg.Auth.Admin != nil {
 		adminPassword = strings.TrimSpace(dataCfg.Auth.Admin.Password)
 	}
+	if adminPassword == admincredential.DefaultLocalPassword {
+		return fmt.Errorf("production preflight failed: APP_ADMIN_PASSWORD must not use the known local development default")
+	}
 	bootstrapAdminOnce := strings.ToLower(strings.TrimSpace(getenv("BOOTSTRAP_ADMIN_ONCE")))
 	if bootstrapAdminOnce != "" && bootstrapAdminOnce != "true" && bootstrapAdminOnce != "false" {
 		return fmt.Errorf("production preflight failed: BOOTSTRAP_ADMIN_ONCE must be true or false")
@@ -283,6 +316,31 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 		return fmt.Errorf("production preflight failed: ERP_DEBUG_BUSINESS_CLEAR_ENABLED must be false")
 	}
 	return nil
+}
+
+func validateCustomerConfigLocalTestDatabase(dataCfg *conf.Data, getenv func(string) string) error {
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+	if strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv)) != "1" {
+		return nil
+	}
+	if dataCfg == nil || dataCfg.Postgres == nil || strings.TrimSpace(dataCfg.Postgres.Dsn) == "" {
+		return fmt.Errorf("customer config local-test preflight failed: POSTGRES_DSN is required")
+	}
+	if err := devdbguard.RequireCustomerConfigLocalTestDSN(dataCfg.Postgres.Dsn); err != nil {
+		return fmt.Errorf("customer config local-test preflight failed: %w", err)
+	}
+	return nil
+}
+
+func validateCustomerTrialConfigRuntime(dataCfg *conf.Data, getenv func(string) string) error {
+	dsn := ""
+	if dataCfg != nil && dataCfg.Postgres != nil {
+		dsn = dataCfg.Postgres.Dsn
+	}
+	_, err := customertrialconfig.ResolveGate(dsn, getenv)
+	return err
 }
 
 func buildConfigSources(confPath string) []config.Source {
@@ -479,6 +537,7 @@ func main() {
 		panic(fmt.Errorf("bootstrap data config is nil, please check %s", confPath))
 	}
 	overrideFromEnv(dataCfg, logger)
+	applyLocalAdminCredentialDefaults(confPath, dataCfg, os.Getenv)
 	if dataCfg.Postgres == nil {
 		panic(fmt.Errorf("bootstrap data postgres config is nil, please check %s", confPath))
 	}
@@ -486,6 +545,12 @@ func main() {
 		panic(err)
 	}
 	if err := validateProductionBootstrapConfig(confPath, dataCfg, os.Getenv); err != nil {
+		panic(err)
+	}
+	if err := validateCustomerConfigLocalTestDatabase(dataCfg, os.Getenv); err != nil {
+		panic(err)
+	}
+	if err := validateCustomerTrialConfigRuntime(dataCfg, os.Getenv); err != nil {
 		panic(err)
 	}
 

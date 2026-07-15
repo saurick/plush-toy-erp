@@ -42,7 +42,7 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
     ERP_MENU_PERMISSION_GROUPS.map((section) => section.title),
     [
       '看板中心',
-      '主数据',
+      '基础资料',
       '销售管理',
       '产品工程',
       '采购管理',
@@ -51,7 +51,7 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
       '委外管理',
       '生产管理',
       '出货管理',
-      '财务业务',
+      '财务管理',
       '运营工具',
       '系统管理',
     ]
@@ -76,12 +76,12 @@ test('menuPermissions: 权限分组顺序跟随当前桌面菜单顺序', () => 
   )
 })
 
-test('menuPermissions: 默认权限不包含系统控制面入口', () => {
+test('menuPermissions: 默认权限不包含系统设置入口', () => {
   assert(!defaultMenuPermissions().includes(PERMISSION_CENTER_PATH))
   assert(!defaultMenuPermissions().includes(SYSTEM_AUDIT_LOGS_PATH))
 })
 
-test('menuPermissions: 岗位任务端角色权限只保留有效角色并保持端口顺序', () => {
+test('menuPermissions: 手机待办岗位权限只保留有效岗位并保持顺序', () => {
   assert(
     ERP_MOBILE_ROLE_PERMISSION_OPTIONS.some((item) => item.key === 'sales')
   )
@@ -160,7 +160,7 @@ test('menuPermissions: 旧帮助、文档和验收路径不再映射到正式权
   assert.equal(resolveMenuPermissionKey('/erp/qa/reports'), '')
 })
 
-test('menuPermissions: 主数据与正式业务入口纳入角色预设', () => {
+test('menuPermissions: 基础资料与正式业务入口纳入角色预设', () => {
   const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
   assert(permissionKeys.includes('/erp/master/partners/customers'))
   assert(permissionKeys.includes('/erp/master/partners/suppliers'))
@@ -210,6 +210,8 @@ test('menuPermissions: 前端角色预设覆盖工程和系统管理员', () => 
   const engineeringPreset = ERP_PERMISSION_PRESETS.find(
     (preset) => preset.key === 'engineering'
   )
+  assert.match(engineeringPreset.description, /工程手机待办/u)
+  assert.doesNotMatch(engineeringPreset.description, /岗位任务端/u)
   assert.deepEqual(engineeringPreset.mobileRolePermissions, ['engineering'])
   assert(engineeringPreset.permissions.includes('/erp/task-board'))
   assert(engineeringPreset.permissions.includes('/erp/business-dashboard'))

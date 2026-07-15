@@ -259,7 +259,7 @@ test("mobile task visibility copy stays readable and role task query uses server
     );
   }
   assert(
-    taskViewSource.includes("未选择岗位，无法判断岗位任务端可见性。"),
+    taskViewSource.includes("请先选择查看任务的岗位。"),
     "mobileTaskView must explain missing role in business-readable copy",
   );
   for (const contractSnippet of [
@@ -1073,7 +1073,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "selectedRow.status !== 'DRAFT' ||\n              !canCreate",
         "selectedRow.status !== 'DRAFT' ||\n                !canPost",
         "selectedRow.status !== 'POSTED' ||\n                !canPost",
-        "过账和取消均由系统按采购入库规则更新库存或生成冲正记录",
+        "过账和取消均由系统按采购入库规则更新库存或生成撤销调整记录",
       ],
     },
     {
@@ -1088,7 +1088,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||\n              !canUpdate",
         "canUpload={canCreate || canUpdate}",
         "canDelete={canUpdate}",
-        "不会绕过规则直接修改批次状态或库存流水",
+        "不会绕过规则直接修改批次状态或库存数量",
       ],
     },
   ];
@@ -1153,7 +1153,7 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
             "出货",
             "库存",
             "财务",
-            "协同任务",
+            "相关任务",
           ],
         },
         {
@@ -1164,7 +1164,7 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
             "出货",
             "库存",
             "财务",
-            "协同任务",
+            "相关任务",
           ],
         },
       ],
@@ -1189,7 +1189,7 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
           key: "cancel",
           requiredTokens: [
             "采购订单本身",
-            "不会自动冲正",
+            "不会自动撤销",
             "入库",
             "质检",
             "库存",
@@ -1218,7 +1218,7 @@ test("source document lifecycle confirmations keep fact boundaries visible", () 
           key: "cancel",
           requiredTokens: [
             "加工合同本身",
-            "不会自动冲正",
+            "不会自动撤销",
             "发料",
             "回货",
             "财务记录",

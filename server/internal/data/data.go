@@ -5,10 +5,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"os"
 	"time"
 
 	"server/internal/biz"
 	"server/internal/conf"
+	"server/internal/customertrialconfig"
 	"server/internal/data/model/ent"
 	_ "server/internal/data/model/ent/runtime"
 	entLogger "server/pkg/logger"
@@ -160,6 +162,16 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		return nil, nil, err
 	}
 	l.Info("init postgres(otelsql) done")
+
+	trialConfigEnabled, err := customertrialconfig.ResolveGate(c.Postgres.Dsn, os.Getenv)
+	if err != nil {
+		_ = db.Close()
+		return nil, nil, err
+	}
+	if err := validateActiveCustomerTrialConfig(context.Background(), db, trialConfigEnabled); err != nil {
+		_ = db.Close()
+		return nil, nil, err
+	}
 
 	postgresClient := ent.NewClient(
 		ent.Log(entLogger.NewEntLogger(logger)),

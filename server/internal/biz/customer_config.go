@@ -21,6 +21,13 @@ const (
 	CustomerConfigStatusPublished  = "published"
 	CustomerConfigStatusActive     = "active"
 	CustomerConfigStatusSuperseded = "superseded"
+
+	CustomerConfigLocalTestApplyPurpose   = "local_test_apply"
+	CustomerConfigLocalTestProductVersion = "local-customer-package-test-apply"
+	CustomerConfigLocalTestAllowEnv       = "ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG"
+
+	CustomerConfigTrialApplyPurpose   = "customer_trial_test_apply"
+	CustomerConfigTrialProductVersion = "customer-trial-133-test-2026.07.15-v3"
 )
 
 var (
@@ -972,6 +979,7 @@ var productModuleCatalog = map[string]productModuleCatalogItem{
 	"purchase_receipts":   {Name: "采购入库", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"purchase_orders", "quality_inspections", "inventory"}, PageKeys: []string{"inbound"}},
 	"quality_inspections": {Name: "质检", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"inventory"}, PageKeys: []string{"quality-inspections"}},
 	"outsourcing_orders":  {Name: "委外订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"suppliers", "processes"}, PageKeys: []string{"processing-contracts"}},
+	"production_orders":   {Name: "生产订单", Layer: "SourceDocument", Maturity: "runtime_v1", Dependencies: []string{"products", "material_bom"}, PageKeys: []string{"production-orders"}},
 	"inventory":           {Name: "库存台账", Layer: "FactReadModel", Maturity: "runtime_v1", PageKeys: []string{"inventory", "inbound", "outbound"}},
 	"shipments":           {Name: "出货单", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"sales_orders", "inventory"}, PageKeys: []string{"shipments", "outbound"}},
 	"finance":             {Name: "财务业务", Layer: "FactCandidate", Maturity: "workflow_assisted", PageKeys: []string{"finance-dashboard", "payable-reconciliation", "shipment-finance"}},
@@ -1264,6 +1272,33 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 	in.ProductVersion = strings.TrimSpace(in.ProductVersion)
 	if in.CustomerKey == "" || in.Revision == "" || in.ProductVersion == "" || len(in.CompiledSnapshot) == 0 {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: customer key, revision, product version and compiled snapshot are required", ErrBadParam)
+	}
+	if len(in.CustomerKey) > 64 || len(in.Revision) > 64 || len(in.ProductVersion) > 128 {
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: customer key, revision or product version exceeds schema limits", ErrBadParam)
+	}
+	applyPurpose := ""
+	if rawApplyPurpose, exists := in.CompiledSnapshot["applyPurpose"]; exists {
+		text, ok := rawApplyPurpose.(string)
+		if !ok {
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot apply purpose is invalid", ErrBadParam)
+		}
+		applyPurpose = strings.TrimSpace(text)
+		if applyPurpose == "" {
+			return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot apply purpose is invalid", ErrBadParam)
+		}
+	}
+	localPurpose := applyPurpose == CustomerConfigLocalTestApplyPurpose
+	localProduct := in.ProductVersion == CustomerConfigLocalTestProductVersion
+	trialPurpose := applyPurpose == CustomerConfigTrialApplyPurpose
+	trialProduct := in.ProductVersion == CustomerConfigTrialProductVersion
+	trialProductNamespace := strings.HasPrefix(in.ProductVersion, "customer-trial-")
+	_, hasDatasetVersion := in.CompiledSnapshot["datasetVersion"]
+	_, hasTarget := in.CompiledSnapshot["target"]
+	localIdentityHasRemoteMarker := localPurpose && localProduct && (hasDatasetVersion || hasTarget)
+	validTestIdentity := (localPurpose && localProduct) || (trialPurpose && trialProduct)
+	if (applyPurpose != "" && !validTestIdentity) ||
+		(applyPurpose == "" && (localProduct || trialProductNamespace)) || localIdentityHasRemoteMarker {
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: test apply purpose and product version must match", ErrBadParam)
 	}
 	if containsForbiddenCustomerConfigPayload(in.CompiledSnapshot) {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot contains forbidden payload", ErrBadParam)

@@ -31,7 +31,7 @@ export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
 ])
 
 export const TASK_BOARD_ROLE_OPTIONS = Object.freeze([
-  { value: 'all', label: '全部角色' },
+  { value: 'all', label: '全部岗位' },
   { value: 'boss', label: '老板' },
   { value: 'sales', label: '业务' },
   { value: 'purchase', label: '采购' },
@@ -44,7 +44,7 @@ export const TASK_BOARD_ROLE_OPTIONS = Object.freeze([
 ])
 
 export const TASK_BOARD_DUE_OPTIONS = Object.freeze([
-  { value: 'all', label: '全部到期' },
+  { value: 'all', label: '全部截止时间' },
   { value: 'overdue', label: '已超时' },
   { value: 'dueSoon', label: '即将到期' },
   { value: 'noDue', label: '未设置到期' },
@@ -121,6 +121,13 @@ const TASK_STATUS_META = Object.freeze({
   done: { label: '已完成', color: 'green' },
 })
 
+const BUSINESS_STATUS_VISIBLE_LABEL_OVERRIDES = Object.freeze({
+  'IQC 待检': '来料检验（IQC）待处理',
+  入库协同已完成: '入库跟进已完成',
+  出货协同已完成: '出货跟进已完成',
+  结算协同已完成: '结算跟进已完成',
+})
+
 function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
@@ -135,7 +142,7 @@ export function getTaskOwnerRoleKey(task = {}) {
 
 export function getWorkflowTaskOwnerRoleLabel(task = {}) {
   const ownerRoleKey = getTaskOwnerRoleKey(task)
-  return getRoleDisplayName(ownerRoleKey, '责任岗位')
+  return getRoleDisplayName(ownerRoleKey, '负责岗位')
 }
 
 export function getWorkflowTaskBusinessStatusLabel(task = {}) {
@@ -147,7 +154,9 @@ export function getWorkflowTaskBusinessStatusLabel(task = {}) {
       payload.business_status_text ||
       ''
   ).trim()
-  if (explicitLabel) return explicitLabel
+  if (explicitLabel) {
+    return BUSINESS_STATUS_VISIBLE_LABEL_OVERRIDES[explicitLabel] || explicitLabel
+  }
 
   const businessStatusKey = String(task.business_status_key || '').trim()
   if (!businessStatusKey) return '业务状态未记录'
@@ -221,7 +230,7 @@ export function getWorkflowTaskAllowedActionModes(admin = {}, task = {}) {
 export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
   if (!task) return ''
   if (isTerminalWorkflowTask(task)) {
-    return '该任务已结束，只能查看上下文。'
+    return '该任务已结束，只能查看任务详情。'
   }
 
   const ownerRoleKey = getTaskOwnerRoleKey(task)
@@ -235,9 +244,9 @@ export function getWorkflowTaskReadonlyReason(admin = {}, task = {}) {
     return '当前账号只有查看任务权限，没有完成、阻塞或催办权限。'
   }
   if (ownerRoleKey && !canHandleTaskByOwner(admin, task)) {
-    return `当前账号不属于${getWorkflowTaskOwnerRoleLabel(task)}责任角色，也不是该任务的指定处理人。`
+    return `当前账号不属于${getWorkflowTaskOwnerRoleLabel(task)}，也不是该任务的指定处理人。`
   }
-  return '当前账号没有可执行的任务处理动作。'
+  return '当前账号没有可用的任务处理方式。'
 }
 
 export function getWorkflowTaskStatusMeta(task = {}) {

@@ -357,7 +357,7 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
           showIcon
           type="info"
           message={`预计总净重：${preview.totalNetWeightKg} kg`}
-          description="当前仍是草稿，数值按现有明细和主数据计算，尚不是最终出货结果。"
+          description="当前仍是草稿，数值按现有明细和基础资料计算，尚不是最终出货结果。"
         />
       )
     }
@@ -544,7 +544,7 @@ function ShipmentItemFormFields({
           },
         ]}
       >
-        <Input allowClear autoComplete="off" placeholder="decimal，如 120.5" />
+        <Input allowClear autoComplete="off" placeholder="例如：120.5" />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field erp-business-action-form__field--full"
@@ -725,7 +725,7 @@ export default function ShipmentBusinessModal({
           ownerType="shipment"
           ownerId={modalSelectedShipment?.id}
           title="出货附件"
-          description="上传装箱照片、物流单、签收回单、交付或出口凭证；附件不替代确认出货动作。"
+          description="上传装箱照片、物流单、签收回单、交付或出口凭证；上传附件后仍需单独确认出货。"
           canUpload={isCreateModal && canCreate}
           canDelete={isCreateModal && canCreate}
           variant="inline"
@@ -770,8 +770,7 @@ export default function ShipmentBusinessModal({
                   <div>
                     <strong>出货明细</strong>
                     <span>
-                      明细随当前弹窗保存；可从销售订单导入来源，库存 OUT
-                      仍由确认出货动作写入。
+                      明细随当前弹窗保存；可从销售订单导入来源，确认出货时才会扣减相应库存。
                     </span>
                   </div>
                 </div>

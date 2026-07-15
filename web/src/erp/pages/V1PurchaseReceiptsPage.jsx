@@ -408,6 +408,7 @@ export default function V1PurchaseReceiptsPage() {
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
+  const canRead = hasActionPermission(adminProfile, 'purchase.receipt.read')
   const canCreate = hasActionPermission(adminProfile, 'purchase.receipt.create')
   const canPost =
     canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')
@@ -488,7 +489,10 @@ export default function V1PurchaseReceiptsPage() {
   const receiptItemsPreview = useBusinessRowItemsPreview({
     records: rows,
     getEmbeddedItems: (record) => record?.items,
-    rowExpandable: (record) => receiptItemCount(record) > 0,
+    getItemTotal: (record) =>
+      Array.isArray(record?.items) ? record.items.length : undefined,
+    rowExpandable: (record) =>
+      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
     getRecordLabel: (record) => record?.receipt_no || '当前采购入库单',
     getItemKey: (item) => item?.id,
     getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
@@ -709,7 +713,7 @@ export default function V1PurchaseReceiptsPage() {
         Array.isArray(lotResult?.inventory_lots) ? lotResult.inventory_lots : []
       )
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载入库引用数据'))
+      message.error(getActionErrorMessage(error, '加载入库相关资料'))
       setMaterials([])
       setSuppliers([])
       setUnits([])
@@ -758,7 +762,7 @@ export default function V1PurchaseReceiptsPage() {
           : isPurchaseReceiptMutationResultUnknown(error)
         if (retained) {
           message.warning(
-            '入库明细添加结果尚未确认，系统将使用原请求核对，请不要重复添加。'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
         } else {
           message.error(getActionErrorMessage(error, '添加入库明细'))
@@ -851,7 +855,7 @@ export default function V1PurchaseReceiptsPage() {
           : isSourceBusinessActionResultUnknown(error)
         if (retained) {
           message.warning(
-            '操作结果尚未确认，系统已保留原请求；请用相同内容重试，不要新建重复记录。'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
         } else {
           message.error(
@@ -945,7 +949,7 @@ export default function V1PurchaseReceiptsPage() {
         )
         if (retained) {
           message.warning(
-            '应付生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
         } else {
           message.error(getActionErrorMessage(error, '生成应付'))
@@ -1026,6 +1030,7 @@ export default function V1PurchaseReceiptsPage() {
           title: '明细行数',
           exportTitle: '明细行数',
           key: 'item_count',
+          hidden: true,
           width: 100,
           sortValue: receiptItemCount,
           render: (_, record) => receiptItemCount(record),
@@ -1050,8 +1055,12 @@ export default function V1PurchaseReceiptsPage() {
       ]),
     []
   )
-  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
-    useBusinessColumnOrder({
+  const {
+    tableColumns,
+    exportColumns,
+    openColumnOrder,
+    columnOrderModal,
+  } = useBusinessColumnOrder({
       adminProfile,
       moduleKey: 'inbound',
       moduleTitle: '入库管理',
@@ -1059,11 +1068,11 @@ export default function V1PurchaseReceiptsPage() {
     })
   const exportRows = useCallback(() => {
     downloadBusinessListCSV({
-      filename: 'purchase-receipts.csv',
-      columns: visibleColumns,
+      filename: `采购入库-${new Date().toISOString().slice(0, 10)}.csv`,
+      columns: exportColumns,
       rows,
     })
-  }, [rows, visibleColumns])
+  }, [exportColumns, rows])
   const hasActiveFilters = Boolean(
     keyword.trim() ||
       statusFilter ||
@@ -1094,21 +1103,21 @@ export default function V1PurchaseReceiptsPage() {
       <PageHeaderCard
         compact
         title="入库管理"
-        description="入库管理维护采购入库草稿和明细；确认过账后系统会更新库存流水、余额和批次，完成入库跟进任务不等于采购入库已经过账。"
+        description="入库管理维护采购入库草稿和明细；确认过账后系统会更新库存数量、余额和批次，完成入库跟进任务不等于采购入库已经过账。"
         tags={[
           <Tag color="gold" key="workflow">
-            协同任务：入库跟进
+            待办任务：入库跟进
           </Tag>,
           <Tag color="blue" key="receipt">
             入库单：正式入库记录
           </Tag>,
           <Tag color="green" key="inventory">
-            过账后写库存流水
+            过账后更新库存记录
           </Tag>,
         ]}
         stats={[
           { key: 'total', label: '总入库单', value: total },
-          { key: 'current', label: '当前结果', value: rows.length },
+          { key: 'current', label: '本页显示', value: rows.length },
           {
             key: 'draft',
             label: '草稿',
@@ -1251,7 +1260,7 @@ export default function V1PurchaseReceiptsPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedRowLabel}
-          boundaryText="过账和取消均由系统按采购入库规则更新库存或生成冲正记录；页面不会绕过这些规则直接修改库存。"
+          boundaryText="过账和取消均由系统按采购入库规则更新库存或生成撤销调整记录；页面不会绕过这些规则直接修改库存。"
         >
           <Button
             type="link"
@@ -1283,7 +1292,7 @@ export default function V1PurchaseReceiptsPage() {
             ownerId={selectedRow?.id}
             modalTitle="入库附件"
             panelTitle="入库附件"
-            description="上传送货单、物流单、仓库收货照片或异常说明；附件不替代过账和库存流水。"
+            description="上传送货单、物流单、仓库收货照片或异常说明；附件不能代替入库确认。"
             canUpload={canCreate || canPost}
             canDelete={canCreate || canPost}
             disabled={!selectedRow}
@@ -1367,7 +1376,7 @@ export default function V1PurchaseReceiptsPage() {
             </Button>
           </Popconfirm>
           <Popconfirm
-            title="确认取消已过账入库并写库存冲正？"
+            title="确认取消已过账入库并同步冲减相应库存？"
             onConfirm={() =>
               runReceiptAction(
                 selectedRow,

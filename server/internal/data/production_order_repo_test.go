@@ -356,6 +356,9 @@ func TestProductionOrderRepoGetAndListUseControlledAggregateRead(t *testing.T) {
 		t.Fatalf("create first: %v", err)
 	}
 	secondDraft := f.draft("MO-READ-002", 20)
+	secondDraft.Items = append(secondDraft.Items, biz.ProductionOrderDraftItem{
+		LineNo: 2, ProductID: f.productID, UnitID: f.unitID, PlannedQuantity: decimal.NewFromInt(1),
+	})
 	note := "第二张生产订单"
 	secondDraft.Note = &note
 	second, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: secondDraft, ActorID: f.actorID, IdempotencyKey: "read-create-2"})
@@ -370,7 +373,7 @@ func TestProductionOrderRepoGetAndListUseControlledAggregateRead(t *testing.T) {
 		t.Fatalf("missing get error=%v", err)
 	}
 	items, total, err := f.uc.List(ctx, biz.ProductionOrderFilter{Keyword: "第二张", Status: biz.ProductionOrderStatusDraft, SortBy: "order_no", SortDirection: "desc", Limit: 20})
-	if err != nil || total != 1 || len(items) != 1 || items[0].ID != second.Order.ID {
+	if err != nil || total != 1 || len(items) != 1 || items[0].ID != second.Order.ID || items[0].ItemCount == nil || *items[0].ItemCount != 2 {
 		t.Fatalf("filtered list items=%#v total=%d err=%v", items, total, err)
 	}
 	items, total, err = f.uc.List(ctx, biz.ProductionOrderFilter{SortBy: "order_no", SortDirection: "asc", Limit: 1, Offset: 1})

@@ -10,7 +10,9 @@ import {
   businessRowItemsCacheKey,
   businessRowEmbeddedItemsSnapshot,
   businessRowItemsModalPage,
+  normalizeBusinessRowItemsTotal,
   normalizeBusinessRowItemsResult,
+  resolveBusinessRowItemsTotal,
 } from '../../utils/businessRowItemsPreview.mjs'
 
 const IDLE_LOAD_STATE = Object.freeze({ status: 'idle' })
@@ -186,14 +188,16 @@ function BusinessRowItemsPanel({
 }
 
 function BusinessRowExpandButton({
+  available,
   expanded,
   expandable,
   getRecordLabel,
+  itemTotal,
   onExpand,
   record,
   recordCacheKey,
 }) {
-  if (!expandable) {
+  if (!available) {
     return (
       <span
         aria-hidden="true"
@@ -203,13 +207,38 @@ function BusinessRowExpandButton({
   }
 
   const recordLabel = getRecordLabel?.(record) || '当前单据'
+  if (itemTotal === 0) {
+    return (
+      <span
+        aria-label={`${recordLabel}明细，共 0 条`}
+        className="erp-business-row-item-count"
+        title="0条"
+      >
+        0条
+      </span>
+    )
+  }
+
+  if (!expandable) {
+    return (
+      <span
+        aria-hidden="true"
+        className="erp-business-row-expand-placeholder"
+      />
+    )
+  }
+
   const action = expanded ? '收起' : '展开'
+  const totalLabel = itemTotal === undefined ? '查看' : `${itemTotal}条`
+  const accessibleTotal =
+    itemTotal === undefined ? '查看' : `共 ${itemTotal} 条`
   return (
     <button
       aria-controls={`erp-business-row-items-${recordCacheKey.replace(/[^a-zA-Z0-9_-]/g, '-')}`}
       aria-expanded={expanded}
-      aria-label={`${action}${recordLabel}明细`}
+      aria-label={`${action}${recordLabel}明细，${accessibleTotal}`}
       className="erp-business-row-expand-button"
+      title={totalLabel}
       type="button"
       onClick={(event) => {
         event.stopPropagation()
@@ -219,6 +248,9 @@ function BusinessRowExpandButton({
       onKeyDown={(event) => event.stopPropagation()}
     >
       {expanded ? <DownOutlined /> : <RightOutlined />}
+      <span className="erp-business-row-expand-button__label">
+        {totalLabel}
+      </span>
     </button>
   )
 }
@@ -231,6 +263,7 @@ export function useBusinessRowItemsPreview({
   getItemKey,
   getItemLabel,
   getItemSummary,
+  getItemTotal,
   getRecordKey = (record) => record?.id,
   getRecordLabel,
   loadAll,
@@ -251,6 +284,7 @@ export function useBusinessRowItemsPreview({
   configRef.current = {
     getCacheKey,
     getEmbeddedItems,
+    getItemTotal,
     getRecordKey,
     loadAll,
     loadPreview,
@@ -347,6 +381,17 @@ export function useBusinessRowItemsPreview({
             }
             return nextEntry
           })
+          if (data.total === 0) {
+            let recordKey
+            try {
+              recordKey = configRef.current.getRecordKey(record)
+            } catch {
+              recordKey = null
+            }
+            setExpandedRowKey((current) =>
+              current !== null && current === recordKey ? null : current
+            )
+          }
           return data
         })
         .catch((error) => {
@@ -438,10 +483,19 @@ export function useBusinessRowItemsPreview({
         }
         const currentEntry = nextEntries.get(key)
         if (!currentEntry) continue
-        const snapshot = businessRowEmbeddedItemsSnapshot(
-          configRef.current.getEmbeddedItems(record),
-          configRef.current.previewLimit
-        )
+        let snapshot
+        try {
+          snapshot = businessRowEmbeddedItemsSnapshot(
+            configRef.current.getEmbeddedItems(record),
+            configRef.current.previewLimit
+          )
+        } catch {
+          abortRequest(`${key}:preview`)
+          abortRequest(`${key}:all`)
+          nextEntries.delete(key)
+          entriesChanged = true
+          continue
+        }
         if (
           currentEntry.all?.status === 'success' &&
           currentEntry.all.data.items === snapshot.all.items &&
@@ -528,9 +582,38 @@ export function useBusinessRowItemsPreview({
     ? getRecordLabel?.(modalRecord) || ''
     : ''
 
+  const resolveRecordDisclosure = (record) => {
+    try {
+      const available = Boolean(configRef.current.rowExpandable(record))
+      if (!available) {
+        return { available: false, expandable: false, itemTotal: undefined }
+      }
+      const recordCacheKey = configRef.current.getCacheKey(record)
+      const entry = entries.get(recordCacheKey)
+      const previewTotal = normalizeBusinessRowItemsTotal(
+        entry?.preview?.data?.total
+      )
+      const cachedTotal =
+        previewTotal ?? normalizeBusinessRowItemsTotal(entry?.all?.data?.total)
+      const itemTotal = resolveBusinessRowItemsTotal({
+        cachedTotal,
+        getItemTotal: configRef.current.getItemTotal,
+        record,
+      })
+      return {
+        available: true,
+        expandable: itemTotal !== 0,
+        itemTotal,
+        recordCacheKey,
+      }
+    } catch {
+      return { available: false, expandable: false, itemTotal: undefined }
+    }
+  }
+
   const expandable = {
     columnTitle: '明细',
-    columnWidth: 56,
+    columnWidth: 96,
     expandedRowKeys: expandedRowKey === null ? [] : [expandedRowKey],
     expandRowByClick: false,
     onExpand: (expanded, record) => {
@@ -538,22 +621,19 @@ export function useBusinessRowItemsPreview({
         expanded ? configRef.current.getRecordKey(record) : null
       )
     },
-    rowExpandable: (record) => Boolean(configRef.current.rowExpandable(record)),
+    rowExpandable: (record) => resolveRecordDisclosure(record).expandable,
     expandIcon: (props) => {
-      let recordCacheKey = 'unavailable'
-      try {
-        recordCacheKey = configRef.current.getCacheKey(props.record)
-      } catch {
-        // The placeholder keeps the control column aligned for malformed rows.
-      }
+      const disclosure = resolveRecordDisclosure(props.record)
       return (
         <BusinessRowExpandButton
+          available={disclosure.available}
           expanded={props.expanded}
-          expandable={props.expandable}
+          expandable={disclosure.expandable && props.expandable}
           getRecordLabel={getRecordLabel}
+          itemTotal={disclosure.itemTotal}
           onExpand={props.onExpand}
           record={props.record}
-          recordCacheKey={recordCacheKey}
+          recordCacheKey={disclosure.recordCacheKey || 'unavailable'}
         />
       )
     },

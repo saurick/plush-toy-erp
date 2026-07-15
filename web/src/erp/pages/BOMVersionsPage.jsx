@@ -562,6 +562,9 @@ export default function BOMVersionsPage() {
   )
   const bomItemsPreview = useBusinessRowItemsPreview({
     records: versions,
+    getItemTotal: (record) => record?.item_count,
+    rowExpandable: (record) =>
+      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
     getCacheKey: (record) =>
       `${record?.id}:${record?.version || record?.updated_at || 'current'}:${itemsPreviewGenerationRef.current}`,
     getRecordLabel: (record) =>
@@ -734,7 +737,7 @@ export default function BOMVersionsPage() {
       )
       setUnits(Array.isArray(unitResult?.units) ? unitResult.units : [])
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载 BOM 引用数据'))
+      message.error(getActionErrorMessage(error, '加载物料清单相关资料'))
       setProducts([])
       setMaterials([])
       setUnits([])
@@ -994,7 +997,7 @@ export default function BOMVersionsPage() {
   const syncBOMItems = async ({ bomHeaderID, items = [], removedIDs = [] }) => {
     const normalizedBOMHeaderID = Number(bomHeaderID || 0)
     if (!Number.isFinite(normalizedBOMHeaderID) || normalizedBOMHeaderID <= 0) {
-      throw new Error('缺少 BOM 草稿编号，无法同步 BOM 明细')
+      throw new Error('缺少物料清单草稿编号，无法保存材料明细')
     }
     const uniqueRemovedIDs = Array.from(
       new Set(
@@ -1210,14 +1213,14 @@ export default function BOMVersionsPage() {
     <BusinessPageLayout>
       <PageHeaderCard
         compact
-        title="BOM 管理"
-        description="维护产品工程资料版本、材料用量、损耗率和生效边界。"
+        title="物料清单（BOM）"
+        description="维护产品工程资料版本、材料用量、损耗率和生效规则。"
         stats={[
-          { key: 'total', label: '总BOM', value: total },
-          { key: 'current', label: '当前结果', value: versions.length },
+          { key: 'total', label: '物料清单总数', value: total },
+          { key: 'current', label: '本页显示', value: versions.length },
           {
             key: 'active',
-            label: '已激活',
+            label: '已生效',
             value: versions.filter((item) => item.status === 'ACTIVE').length,
           },
         ]}
@@ -1269,7 +1272,7 @@ export default function BOMVersionsPage() {
               disabled={versions.length === 0}
               onClick={() =>
                 downloadCSV({
-                  filename: 'bom-versions.csv',
+                  filename: `物料清单-${new Date().toISOString().slice(0, 10)}.csv`,
                   rows: versions,
                   productOptions,
                 })
@@ -1591,7 +1594,7 @@ export default function BOMVersionsPage() {
         columns={dataColumns}
         order={preferredColumnOrder}
         saving={columnOrderSaving}
-        moduleTitle="BOM 管理列表"
+        moduleTitle="物料清单列表"
         onChange={(nextOrder) => persistColumnOrder(nextOrder, dataColumns)}
         onClose={() => setColumnOrderOpen(false)}
       />

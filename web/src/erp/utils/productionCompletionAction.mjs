@@ -26,7 +26,7 @@ function decimalNumber(value) {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function invalidContract(message = '完工入库请求信息不完整') {
+function invalidContract(message = '完工入库内容不完整，请重新核对') {
   const error = new Error(message)
   error.isInvalidResponse = true
   return error
@@ -34,7 +34,7 @@ function invalidContract(message = '完工入库请求信息不完整') {
 
 function requirePlainObject(value) {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw invalidContract('完工入库请求参数无效')
+    throw invalidContract('完工入库内容有误，请刷新页面后重新填写')
   }
   return value
 }
@@ -42,7 +42,7 @@ function requirePlainObject(value) {
 function requireAllowedKeys(value, allowed) {
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
-      throw invalidContract('完工入库请求包含不允许的字段')
+      throw invalidContract('完工入库内容有误，请刷新页面后重新填写')
     }
   }
 }
@@ -196,7 +196,7 @@ export function normalizeProductionCompletionCreateRequest(params = {}) {
   try {
     lotFields = normalizeSourceInboundLotRequestFields(source)
   } catch {
-    throw invalidContract('完工入库批次参数无效')
+    throw invalidContract('完工入库批次有误，请重新选择或填写')
   }
   return {
     ...(customerKey ? { customer_key: customerKey } : {}),

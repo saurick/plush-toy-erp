@@ -63,7 +63,7 @@ export const OUTSOURCING_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消加工合同',
     confirmContent:
-      '取消只会终止这张加工合同本身；已登记的发料、回货或财务记录不会自动冲正。',
+      '取消只会终止这张加工合同本身；已登记的发料、回货或财务记录不会自动撤销。',
     okText: '确认取消',
     run: cancelOutsourcingOrder,
   },
@@ -106,7 +106,7 @@ export function buildOutsourcingOrderStats({ rows = [], total = 0 }) {
 
   return [
     { key: 'total', label: '总记录', value: total },
-    { key: 'current', label: '当前结果', value: activeRows },
+    { key: 'current', label: '本页显示', value: activeRows },
     { key: 'draft', label: '草稿', value: draftCount },
     { key: 'confirmed', label: '已确认', value: confirmedCount },
   ]

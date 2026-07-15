@@ -617,9 +617,9 @@ export default function V1MasterDataPage({ type }) {
       message.success(
         attachmentSaved
           ? editingRecord?.id
-            ? '主数据已更新'
-            : '主数据已创建'
-          : '主数据已保存，未上传的附件请重新选择'
+            ? `${entityLabel}已更新`
+            : `${entityLabel}已创建`
+          : `${entityLabel}已保存，未上传的附件请重新选择`
       )
       skuAttachmentRef.current?.clearPendingAttachments()
       setRecordModalOpen(false)
@@ -629,7 +629,7 @@ export default function V1MasterDataPage({ type }) {
       }
       await loadRecords()
     } catch (error) {
-      message.error(getActionErrorMessage(error, '保存主数据'))
+      message.error(getActionErrorMessage(error, `保存${entityLabel}`))
     } finally {
       setSaving(false)
     }
@@ -750,7 +750,7 @@ export default function V1MasterDataPage({ type }) {
   }, [effectiveType, entityLabel, selectedRecord])
   const exportRecords = () => {
     downloadBusinessCSV({
-      filename: `${effectiveType}-current-results.csv`,
+      filename: `${config.title}-筛选结果-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: orderedRecordColumns,
       rows: records,
     })
@@ -767,7 +767,7 @@ export default function V1MasterDataPage({ type }) {
             ? []
             : [
                 { key: 'total', label: `总${entityLabel}`, value: total },
-                { key: 'current', label: '当前结果', value: records.length },
+                { key: 'current', label: '本页显示', value: records.length },
                 {
                   key: 'active',
                   label: `启用${entityLabel}`,
@@ -983,8 +983,8 @@ export default function V1MasterDataPage({ type }) {
               ref={skuAttachmentRef}
               ownerType="product_sku"
               ownerId={editingRecord?.id}
-              title="SKU 附件"
-              description="上传产品图、样品图、包装图或客户款式确认资料；附件不改变 SKU 主数据启停状态。"
+              title="产品规格附件"
+              description="上传产品图、样品图、包装图或客户款式确认资料；附件不会改变产品规格的启用状态。"
               canUpload={canCreate || canUpdate}
               canDelete={canUpdate}
               variant="inline"

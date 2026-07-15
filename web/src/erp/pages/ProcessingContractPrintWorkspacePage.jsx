@@ -198,17 +198,17 @@ function formatExportFileName() {
   ).padStart(2, '0')}_${String(now.getHours()).padStart(2, '0')}${String(
     now.getMinutes()
   ).padStart(2, '0')}${String(now.getSeconds()).padStart(2, '0')}`
-  return `processing-contract_${stamp}.pdf`
+  return `加工合同-${stamp}.pdf`
 }
 
 function resolveRestoredToolbarStatus(resetDraftOnOpen, sourceTag) {
   if (resetDraftOnOpen) {
-    return '已按菜单入口恢复默认加工合同样例。'
+    return '已恢复默认加工合同示例。'
   }
-  if (sourceTag === '业务记录带值') {
-    return '已从业务页带入加工合同草稿，可继续核对并打印。'
+  if (sourceTag === '来自业务页面') {
+    return '已从业务页面带入加工合同内容，可继续核对并打印。'
   }
-  return '顶部工具栏已接入当前打印窗口主工作流。'
+  return '打印窗口已准备好，可以开始编辑。'
 }
 
 export default function ProcessingContractPrintWorkspacePage() {
@@ -228,7 +228,7 @@ export default function ProcessingContractPrintWorkspacePage() {
   const entrySource = resolvePrintWorkspaceEntrySource(searchParams)
   const sourceTag =
     entrySource === PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS
-      ? '业务记录带值'
+      ? '来自业务页面'
       : '使用默认模板'
   const resetDraftOnOpen =
     resolvePrintWorkspaceDraftMode(searchParams) ===
@@ -686,7 +686,7 @@ export default function ProcessingContractPrintWorkspacePage() {
           [slot.key]: snapshot,
         },
       }))
-      setToolbarStatus(`已同步${slot.title}到右侧附件位：${file.name}`)
+      setToolbarStatus(`已将${slot.title}添加到右侧附件区：${file.name}`)
     } catch (error) {
       setToolbarStatus(`上传${slot.title}失败。`)
       message.error(getActionErrorMessage(error, `处理${slot.title}`))
@@ -718,7 +718,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     modal.confirm({
       title: '生成空白加工合同',
       content:
-        '将清空当前窗口中的字段值、明细和附件，保留模板结构与合同条款。此操作不会修改业务记录。',
+        '将清空当前窗口中的合同内容、明细和附件，保留模板结构与合同条款。此操作不会修改业务记录。',
       okText: '生成空白模板',
       cancelText: '取消',
       onOk: () => {
@@ -869,8 +869,8 @@ export default function ProcessingContractPrintWorkspacePage() {
   const attachmentUploadBar = (
     <section className="erp-processing-contract-upload-bar">
       <div className="erp-processing-contract-upload-bar__copy">
-        纸样 / 图样附件通过左侧按钮独立上传，会同步进入右侧页底附件位，并随 PDF
-        / 打印一起输出。
+        纸样 / 图样附件通过左侧按钮上传，会显示在右侧页底附件区，并随 PDF /
+        打印一起输出。
       </div>
       <div className="erp-processing-contract-upload-bar__actions">
         {processingContractAttachmentSlots.map((slot) => {
@@ -918,7 +918,7 @@ export default function ProcessingContractPrintWorkspacePage() {
                 title={attachmentSnapshot?.name || slot.title}
               >
                 {hasAttachment
-                  ? `已同步：${attachmentSnapshot.name}`
+                  ? `已添加：${attachmentSnapshot.name}`
                   : '未上传'}
               </span>
             </div>
@@ -1024,7 +1024,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             ? '正在下载 PDF...'
             : toolbarStatus
       }
-      panelTip="提示：左侧字段与右侧加工合同固定版式双向同步，右侧表格和条款区可直接编辑，打印时仅输出右侧模板。"
+      panelTip="左侧修改会立即显示在右侧合同中；右侧表格和条款可直接编辑，打印时只输出右侧合同。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
       panelActions={attachmentUploadBar}
       detailEditor={detailEditor}
@@ -1040,7 +1040,7 @@ export default function ProcessingContractPrintWorkspacePage() {
             <span>
               3.
               如合同中已有确认金额，可直接改写委托加工金额；未手工改写时会继续按数量
-              × 单价带值。
+              × 单价自动计算。
             </span>
           </>
         ) : null

@@ -21,6 +21,18 @@ func TestValidateTemplatePDFHTMLAllowsStaticDocumentAndEmbeddedImage(t *testing.
 	}
 }
 
+func TestValidateTemplatePDFHTMLAllowsCSSPropertyNamesEndingInWS(t *testing.T) {
+	t.Parallel()
+
+	htmlDocument := `<html><head><style>
+		.meta { display: grid; grid-auto-rows: minmax(8mm, auto); }
+	</style></head><body><div class="meta">合同</div></body></html>`
+
+	if err := validateTemplatePDFHTML(htmlDocument); err != nil {
+		t.Fatalf("static grid row CSS must not be mistaken for a ws URL scheme: %v", err)
+	}
+}
+
 func TestValidateTemplatePDFHTMLRejectsActiveAndExternalContent(t *testing.T) {
 	t.Parallel()
 

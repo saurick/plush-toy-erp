@@ -130,7 +130,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     trialBrowserSmoke,
-    "该账号暂无当前入口权限，请联系管理员。",
+    "当前账号不能使用所选工作方式，请联系系统管理员。",
     "trial browser smoke admin denial",
   );
   assertIncludes(

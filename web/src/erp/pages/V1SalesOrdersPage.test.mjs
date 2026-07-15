@@ -58,7 +58,10 @@ test('reservation submit owns its number and safe retry identity', () => {
   assert.doesNotMatch(page, /createStockReservation\(params\)/u)
   assert.match(page, /result\.status !== 'ACTIVE'/u)
   assert.match(page, /customer_key: activeCustomerKey \|\| undefined/u)
-  assert.match(page, /已保留本次请求，请使用相同内容重试/u)
+  assert.match(
+    page,
+    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
+  )
   assert.match(page, /V1_ROUTE_PATHS\.outbound/u)
   assert.doesNotMatch(page, /consumeStockReservation|shipShipment/u)
 })
@@ -77,7 +80,7 @@ test('reservation form keeps source and stock identities out of visible copy', (
     assert.equal(modal.includes(`>${forbiddenCopy}<`), false)
   }
   assert.match(modal, /disabled=\{loading\}/u)
-  assert.match(modal, /预留只锁定可用库存，不写出库流水/u)
+  assert.match(modal, /预留只会锁定可用库存/u)
   assert.match(modal, /label: '产品'/u)
   assert.match(modal, /label: 'SKU \/ 规格'/u)
   assert.match(modal, /label: '单位'/u)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"time"
 )
@@ -326,6 +327,7 @@ func validCustomerConfigInput() CustomerConfigPublishInput {
 			{ModuleKey: "suppliers", State: "enabled"},
 			{ModuleKey: "products", State: "enabled"},
 			{ModuleKey: "materials", State: "enabled"},
+			{ModuleKey: "material_bom", State: "enabled"},
 			{ModuleKey: "sales_orders", State: "enabled"},
 			{ModuleKey: "workflow_tasks", State: "enabled"},
 			{ModuleKey: "purchase_orders", State: "enabled"},
@@ -334,6 +336,7 @@ func validCustomerConfigInput() CustomerConfigPublishInput {
 			{ModuleKey: "inventory", State: "enabled"},
 			{ModuleKey: "shipments", State: "enabled"},
 			{ModuleKey: "finance", State: "enabled"},
+			{ModuleKey: "production_orders", State: "enabled"},
 			{ModuleKey: "production", State: "read_only"},
 		},
 		RoleProfiles: []RoleProfileInput{
@@ -432,6 +435,103 @@ func TestCustomerConfigValidateAndPublishRejectEmptyProductVersion(t *testing.T)
 	}
 	if _, err := uc.PublishCustomerConfig(context.Background(), in, 99); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("PublishCustomerConfig error = %v, want ErrBadParam", err)
+	}
+}
+
+func TestCustomerConfigValidateAndPublishRejectSchemaLengthOverflow(t *testing.T) {
+	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
+	mutations := []struct {
+		name   string
+		mutate func(*CustomerConfigPublishInput)
+	}{
+		{name: "customer key", mutate: func(in *CustomerConfigPublishInput) { in.CustomerKey = strings.Repeat("a", 65) }},
+		{name: "revision", mutate: func(in *CustomerConfigPublishInput) { in.Revision = strings.Repeat("r", 65) }},
+		{name: "product version", mutate: func(in *CustomerConfigPublishInput) { in.ProductVersion = strings.Repeat("p", 129) }},
+	}
+	for _, mutation := range mutations {
+		t.Run(mutation.name, func(t *testing.T) {
+			in := validCustomerConfigInput()
+			mutation.mutate(&in)
+			if _, err := uc.ValidateCustomerConfig(context.Background(), in); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("ValidateCustomerConfig error = %v, want ErrBadParam", err)
+			}
+			if _, err := uc.PublishCustomerConfig(context.Background(), in, 99); !errors.Is(err, ErrBadParam) {
+				t.Fatalf("PublishCustomerConfig error = %v, want ErrBadParam", err)
+			}
+		})
+	}
+}
+
+func TestCustomerConfigLocalTestIdentityMustStayPaired(t *testing.T) {
+	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
+	for _, mutation := range []func(*CustomerConfigPublishInput){
+		func(in *CustomerConfigPublishInput) {
+			in.ProductVersion = CustomerConfigLocalTestProductVersion
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigLocalTestApplyPurpose
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.CompiledSnapshot["applyPurpose"] = "unknown_apply_purpose"
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.CompiledSnapshot["applyPurpose"] = true
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.CompiledSnapshot["applyPurpose"] = "  "
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.ProductVersion = CustomerConfigLocalTestProductVersion
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigLocalTestApplyPurpose
+			in.CompiledSnapshot["datasetVersion"] = "2026.07.15-v3"
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.ProductVersion = CustomerConfigLocalTestProductVersion
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigLocalTestApplyPurpose
+			in.CompiledSnapshot["target"] = "customer-trial-133"
+		},
+	} {
+		in := validCustomerConfigInput()
+		mutation(&in)
+		if _, err := uc.ValidateCustomerConfig(context.Background(), in); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("ValidateCustomerConfig error = %v, want ErrBadParam", err)
+		}
+	}
+
+	valid := validCustomerConfigInput()
+	valid.ProductVersion = CustomerConfigLocalTestProductVersion
+	valid.CompiledSnapshot["applyPurpose"] = CustomerConfigLocalTestApplyPurpose
+	if _, err := uc.ValidateCustomerConfig(context.Background(), valid); err != nil {
+		t.Fatalf("paired local test identity must remain structurally valid: %v", err)
+	}
+}
+
+func TestCustomerConfigTrialIdentityMustStayPaired(t *testing.T) {
+	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
+	for _, mutation := range []func(*CustomerConfigPublishInput){
+		func(in *CustomerConfigPublishInput) {
+			in.ProductVersion = CustomerConfigTrialProductVersion
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.ProductVersion = "customer-trial-133-test-2026.07.15-v1"
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+		},
+	} {
+		in := validCustomerConfigInput()
+		mutation(&in)
+		if _, err := uc.ValidateCustomerConfig(context.Background(), in); !errors.Is(err, ErrBadParam) {
+			t.Fatalf("ValidateCustomerConfig error = %v, want ErrBadParam", err)
+		}
+	}
+
+	valid := validCustomerConfigInput()
+	valid.ProductVersion = CustomerConfigTrialProductVersion
+	valid.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+	if _, err := uc.ValidateCustomerConfig(context.Background(), valid); err != nil {
+		t.Fatalf("paired customer trial identity must remain structurally valid: %v", err)
 	}
 }
 

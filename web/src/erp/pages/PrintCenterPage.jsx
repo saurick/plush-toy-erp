@@ -19,7 +19,7 @@ const { Paragraph, Text, Title } = Typography
 function buildTemplateNavItems() {
   return printTemplateCatalog.map((template) => ({
     ...template,
-    stateText: '正式模板 / 已启用',
+    stateText: '可使用',
     enabled: true,
   }))
 }
@@ -105,7 +105,7 @@ export default function PrintCenterPage() {
               模板打印中心
             </Title>
             <Paragraph className="erp-print-center-nav-description">
-              轻量工作台：模板选择、纸面预览和打印窗口入口。
+              选择模板、预览内容并打开打印窗口。
             </Paragraph>
           </div>
           <Space wrap>
@@ -119,14 +119,14 @@ export default function PrintCenterPage() {
           </Space>
         </div>
         <Text className="erp-print-center-workbench-note">
-          打印预览固定浅色；业务带值从对应业务页选中记录后进入，打印中心只展示默认样例。
+          如需打印真实业务内容，请从对应订单或业务页面进入；从打印中心打开时显示示例内容。
         </Text>
         <div className="erp-print-center-workbench">
           <div className="erp-print-center-nav-panel">
             <div className="erp-print-center-nav-header">
               <Text className="erp-print-center-nav-title">模板</Text>
               <Text className="erp-print-center-nav-description">
-                当前仅开放已启用的正式模板。
+                选择需要使用的模板。
               </Text>
             </div>
             <div
@@ -169,7 +169,7 @@ export default function PrintCenterPage() {
             <div className="erp-print-center-nav-header">
               <Text className="erp-print-center-nav-title">纸面预览</Text>
               <Text className="erp-print-center-nav-description">
-                当前显示默认示例，实际输出以独立打印窗口中的内容为准。
+                打印前请在打开的窗口中核对最终内容。
               </Text>
             </div>
             <div className="erp-print-center-paper-preview">
@@ -190,11 +190,11 @@ export default function PrintCenterPage() {
               ) : null}
               {activeSample.lines?.[0]?.quantity ? (
                 <div className="erp-print-center-paper-line">
-                  数量 / 金额：{activeSample.lines[0].quantity} / 默认样例
+                  数量：{activeSample.lines[0].quantity}（示例）
                 </div>
               ) : null}
               <div className="erp-print-center-paper-line">
-                备注：字段来自当前模板样例或业务页选中记录，仅用于打印预览。
+                当前显示示例内容；从业务页面进入时会带入所选记录。
               </div>
               <div className="erp-print-center-paper-section">
                 {activePreviewLines.length > 0

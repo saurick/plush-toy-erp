@@ -89,7 +89,12 @@ export default function EntrySelectionPage() {
           </Title>
 
           {!hasAnyEntry ? (
-            <Alert type="warning" showIcon message="当前账号暂无可用入口权限" />
+            <Alert
+              type="warning"
+              showIcon
+              message="当前账号暂无可用入口"
+              description="请联系管理员设置岗位和可用页面。"
+            />
           ) : null}
 
           {desktopVisible ? (
@@ -100,7 +105,7 @@ export default function EntrySelectionPage() {
               onClick={enterDesktop}
               className="erp-entry-card__button"
             >
-              后台管理
+              电脑端
             </Button>
           ) : null}
 
@@ -112,7 +117,7 @@ export default function EntrySelectionPage() {
               onClick={enterMobileTasks}
               className="erp-entry-card__button"
             >
-              岗位任务端
+              手机待办
             </Button>
           ) : null}
         </Space>

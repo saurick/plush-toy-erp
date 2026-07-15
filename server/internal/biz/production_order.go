@@ -60,6 +60,7 @@ type ProductionOrder struct {
 	OrderNo        string     `json:"order_no"`
 	Status         string     `json:"status"`
 	Version        int        `json:"version"`
+	ItemCount      *int       `json:"item_count,omitempty"` // List-only projection; nil when the count was not loaded.
 	PlannedStartAt *time.Time `json:"planned_start_at,omitempty"`
 	PlannedEndAt   *time.Time `json:"planned_end_at,omitempty"`
 	Note           *string    `json:"note,omitempty"`

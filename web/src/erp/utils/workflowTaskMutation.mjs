@@ -213,7 +213,7 @@ export function workflowTaskMutationUUID(cryptoProvider = globalThis.crypto) {
       .slice(8, 10)
       .join('')}-${hex.slice(10).join('')}`
   }
-  throw new Error('当前浏览器无法生成安全请求标识，请刷新或升级浏览器后重试')
+  throw new Error('当前浏览器暂时无法提交任务，请刷新或升级浏览器后重试')
 }
 
 function stableValue(value) {
@@ -318,7 +318,7 @@ export function createTaskMutationAttemptStore({
     },
     async run({ scope, operation, params, mutate }) {
       if (!scope || typeof mutate !== 'function') {
-        throw new Error('Workflow 任务动作参数不完整')
+        throw new Error('任务操作暂时无法提交，请刷新后重试')
       }
       const normalizedParams = requireWorkflowTaskMutationParams(
         operation,
@@ -374,7 +374,7 @@ export async function verifyNewWorkflowTaskMutationAttempt({
   verify,
 }) {
   if (!attemptStore || typeof verify !== 'function') {
-    throw new Error('Workflow 任务动作预检参数不完整')
+    throw new Error('任务操作暂时无法确认，请刷新后重试')
   }
   if (attemptStore.hasRetainedAttempt({ scope, operation, params })) {
     return true

@@ -67,7 +67,7 @@ export default function ProductionReworkModal({
       <Alert
         type="info"
         showIcon
-        message="返工对象、仓库、单位和批次由原完工记录锁定；返工草稿过账后才会写入对应库存流水。"
+        message="返工产品、仓库、单位和批次由原完工记录确定；返工草稿过账后才会更新对应库存记录。"
       />
       <Descriptions
         size="small"

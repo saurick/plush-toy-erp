@@ -122,7 +122,7 @@ export default function PrintWorkspaceShell({
       <main className="erp-print-shell__content">
         <aside className="erp-print-shell__panel">
           <section className="erp-print-shell__record-panel">
-            <h3>当前记录字段（可编辑）</h3>
+            <h3>打印内容</h3>
             <p>{panelTip}</p>
             <div className="erp-print-shell__search">
               <input
@@ -130,7 +130,7 @@ export default function PrintWorkspaceShell({
                 type="search"
                 value={searchText}
                 onChange={(event) => setSearchText(event.target.value)}
-                placeholder="搜索字段名或字段值"
+                placeholder="搜索打印内容"
               />
             </div>
 
@@ -145,8 +145,8 @@ export default function PrintWorkspaceShell({
             <table className="erp-print-shell__record-table">
               <thead>
                 <tr>
-                  <th>字段</th>
-                  <th>值</th>
+                  <th>项目</th>
+                  <th>内容</th>
                 </tr>
               </thead>
               <tbody>
@@ -186,7 +186,7 @@ export default function PrintWorkspaceShell({
                 ) : (
                   <tr>
                     <td colSpan={2} className="erp-print-shell__empty-row">
-                      未找到匹配字段
+                      未找到匹配内容
                     </td>
                   </tr>
                 )}

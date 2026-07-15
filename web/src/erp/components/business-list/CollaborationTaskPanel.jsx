@@ -129,8 +129,8 @@ export function CollaborationPanelResizeHandle({
           ? 'erp-business-collaboration-task-panel__resize-handle--dragging'
           : ''
       )}
-      aria-label="拖动调整本页协同高度"
-      title="拖动调整本页协同高度"
+      aria-label="拖动调整相关任务区域高度"
+      title="拖动调整相关任务区域高度"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={finishDrag}
@@ -209,7 +209,7 @@ export function CollaborationTaskPanel({
         label: '本页待办',
         count: taskPanelModel.pageTaskCount,
         items: taskPanelModel.pageTasks,
-        emptyText: '本页暂无待处理协同任务。',
+        emptyText: '本页暂无待处理任务。',
       },
       {
         key: 'current',
@@ -217,15 +217,15 @@ export function CollaborationTaskPanel({
         count: taskPanelModel.currentRecordTaskCount,
         items: taskPanelModel.currentRecordTasks,
         emptyText: selectedRecordLabel
-          ? '当前记录暂无协同任务。'
-          : '先选择一条业务记录，再查看当前记录协同。',
+          ? '当前记录暂无相关任务。'
+          : '先选择一条业务记录，再查看相关任务。',
       },
       {
         key: 'blocked',
         label: '阻塞异常',
         count: taskPanelModel.blockedTaskCount,
         items: taskPanelModel.blockedTasks,
-        emptyText: '暂无阻塞或退回的协同任务。',
+        emptyText: '暂无阻塞或退回的任务。',
       },
     ],
     [selectedRecordLabel, taskPanelModel]
@@ -350,13 +350,13 @@ export function CollaborationTaskPanel({
     const actionMeta = TASK_ACTION_META[actionDrawerMode]
     if (!actionMeta) return
     if (actionDrawerAccess.loading) {
-      message.warning('正在核对任务动作权限，请稍后再提交')
+      message.warning('正在确认这项操作是否可用，请稍后再提交')
       return
     }
     if (!actionDrawerAllowedModes.includes(actionDrawerMode)) {
       message.warning(
         actionDrawerAccess.getReason(actionDrawerMode) ||
-          '当前账号不能提交这个任务动作'
+          '当前账号不能提交这项操作'
       )
       return
     }
@@ -520,9 +520,9 @@ export function CollaborationTaskPanel({
           ) : null}
           <div className="erp-business-collaboration-task-panel__head erp-business-module-task-card__head">
             <div className="erp-business-collaboration-task-panel__title-line">
-              <strong>本页协同</strong>
+              <strong>相关任务</strong>
               <Text type="secondary">
-                这里只处理协同任务；库存、出货、财务、开票和收付款仍需在对应业务页面完成。
+                这里只处理待办任务；库存、出货、财务、开票和收付款仍需在对应业务页面完成。
               </Text>
               {!expanded ? (
                 <span
@@ -566,7 +566,7 @@ export function CollaborationTaskPanel({
               <div
                 className="erp-business-collaboration-task-panel__tabs"
                 role="tablist"
-                aria-label="本页协同任务分类"
+                aria-label="相关任务分类"
               >
                 {tabItems.map((item) => (
                   <button

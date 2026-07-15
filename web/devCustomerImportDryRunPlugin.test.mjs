@@ -168,3 +168,88 @@ test('release readiness API requires a registered batch and forwards the exact v
     },
   ])
 })
+
+test('local test manifest API only compiles for the matching loopback customer entry', async () => {
+  const calls = []
+  const handlers = collectHandlers({
+    projectRoot: '/workspace',
+    apiOrigin: 'http://127.0.0.1:8300',
+    devCustomerKey: 'yoyoosun',
+    runtimeManifestCompiler: async (projectRoot, customerKey) => {
+      calls.push({ projectRoot, customerKey })
+      return {
+        status: 'success',
+        customerKey,
+        manifest: {
+          customer_key: customerKey,
+          revision:
+            'yoyoosun-customer-package-v7.local-0123456789abcdef.runtime-v1',
+        },
+      }
+    },
+  })
+  const handler = handlers.get(
+    '/__dev/api/customer-config/runtime-manifest'
+  )
+
+  const response = await invoke(handler, {
+    method: 'POST',
+    body: { customerKey: 'yoyoosun' },
+  })
+
+  assert.equal(response.statusCode, 200)
+  assert.equal(response.body.manifest.customer_key, 'yoyoosun')
+  assert.deepEqual(calls, [
+    { projectRoot: '/workspace', customerKey: 'yoyoosun' },
+  ])
+})
+
+test('local test manifest API fails closed before compile for external backends', async () => {
+  let compileCalls = 0
+  const handlers = collectHandlers({
+    projectRoot: '/workspace',
+    apiOrigin: 'https://erp.example.com',
+    devCustomerKey: 'yoyoosun',
+    runtimeManifestCompiler: async () => {
+      compileCalls += 1
+      return { status: 'success' }
+    },
+  })
+  const handler = handlers.get(
+    '/__dev/api/customer-config/runtime-manifest'
+  )
+
+  const response = await invoke(handler, {
+    method: 'POST',
+    body: { customerKey: 'yoyoosun' },
+  })
+
+  assert.equal(response.statusCode, 403)
+  assert.match(response.body.message, /loopback/u)
+  assert.equal(compileCalls, 0)
+})
+
+test('local test manifest API requires start:yoyoosun customer context', async () => {
+  let compileCalls = 0
+  const handlers = collectHandlers({
+    projectRoot: '/workspace',
+    apiOrigin: 'http://localhost:8300',
+    devCustomerKey: '',
+    runtimeManifestCompiler: async () => {
+      compileCalls += 1
+      return { status: 'success' }
+    },
+  })
+  const handler = handlers.get(
+    '/__dev/api/customer-config/runtime-manifest'
+  )
+
+  const response = await invoke(handler, {
+    method: 'POST',
+    body: { customerKey: 'yoyoosun' },
+  })
+
+  assert.equal(response.statusCode, 403)
+  assert.match(response.body.message, /start:yoyoosun/u)
+  assert.equal(compileCalls, 0)
+})

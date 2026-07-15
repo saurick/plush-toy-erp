@@ -66,6 +66,9 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if draft["source_order_no"] != "WL260102" || draft["designer"] != "罗伟" {
 		t.Fatalf("expected engineering header fields in BOM draft, got %#v", draft)
 	}
+	if _, exists := draft["item_count"]; exists {
+		t.Fatalf("create response must not report an unloaded list item count: %#v", draft)
+	}
 
 	_, itemRes, err := j.handleBOM(adminCtx, "add_bom_item", "2", mustJSONRPCStruct(t, map[string]any{
 		"bom_header_id":        float64(headerID),
@@ -163,6 +166,10 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	}
 	if total := jsonRPCInt(t, listRes.Data.AsMap(), "total"); total != 1 {
 		t.Fatalf("expected one active BOM, got %d", total)
+	}
+	listedVersions := listRes.Data.AsMap()["bom_versions"].([]any)
+	if len(listedVersions) != 1 || listedVersions[0].(map[string]any)["item_count"] != float64(1) {
+		t.Fatalf("expected active BOM item_count=1, got %#v", listedVersions)
 	}
 }
 

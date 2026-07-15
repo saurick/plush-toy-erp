@@ -231,7 +231,11 @@ pnpm start:yoyoosun --print-plan
 pnpm start:yoyoosun
 ```
 
-`start:yoyoosun` 同样从 `5176` 起自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。它只注入前端静态客户配置，不会发布或激活后端 yoyoosun `customer_config` revision。登录后若后端只返回同 key 的 `builtin_rbac_fallback`，DEV 桌面端会进入带警示的本地预览壳，避免把成功登录误报成工作台故障；该 fallback 不视为 active revision，工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端仍 fail closed。页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
+本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
+
+`start:yoyoosun` 同样从 `5176` 起自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
+
+未显式应用时，后端若只返回同 key 的 `builtin_rbac_fallback`，DEV 桌面端会进入带警示的本地预览壳，避免把成功登录误报成工作台故障；该 fallback 不视为 active revision，工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端仍 fail closed。页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
 
 `start:yoyoosun --print-plan` 也会输出同一组按实际端口生成的 `curl` 验证命令；端口被占用时不要按 `5176` 手工猜测，以终端输出的 `url=` 和验证命令为准。
 

@@ -254,6 +254,7 @@ type BOMHeader struct {
 	ProductID     int
 	Version       string
 	Status        string
+	ItemCount     *int // List-only projection; nil when the count was not loaded.
 	EffectiveFrom *time.Time
 	EffectiveTo   *time.Time
 	SourceOrderNo *string

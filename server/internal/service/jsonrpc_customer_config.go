@@ -9,10 +9,28 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	"server/internal/customertrialconfig"
 	"server/internal/errcode"
 
 	"google.golang.org/protobuf/types/known/structpb"
 )
+
+const customerConfigErrorReasonActiveRevisionRequired = "customer_config_active_revision_required"
+
+func localTestCustomerConfigBoundaryResult(productVersion string, compiledSnapshot map[string]any) *v1.JsonrpcResult {
+	applyPurpose := ""
+	if value, ok := compiledSnapshot["applyPurpose"].(string); ok {
+		applyPurpose = strings.TrimSpace(value)
+	}
+	isLocalTest := strings.TrimSpace(productVersion) == biz.CustomerConfigLocalTestProductVersion || applyPurpose == biz.CustomerConfigLocalTestApplyPurpose
+	if !isLocalTest || strings.TrimSpace(os.Getenv(biz.CustomerConfigLocalTestAllowEnv)) == "1" {
+		return nil
+	}
+	return &v1.JsonrpcResult{
+		Code:    errcode.InvalidParam.Code,
+		Message: "当前后端未开放本地测试客户配置应用",
+	}
+}
 
 func (d *jsonrpcDispatcher) handleCustomerConfig(
 	ctx context.Context,
@@ -35,6 +53,12 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		in, ok := customerConfigPublishInputFromParams(pm)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if res := localTestCustomerConfigBoundaryResult(in.ProductVersion, in.CompiledSnapshot); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerTrialConfigManifest(in); res != nil {
+			return id, res, nil
 		}
 		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
 		if err != nil {
@@ -63,6 +87,12 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
+		if res := localTestCustomerConfigBoundaryResult(in.ProductVersion, in.CompiledSnapshot); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerTrialConfigManifest(in); res != nil {
+			return id, res, nil
+		}
 		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -90,6 +120,12 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
 		}
+		if res := localTestCustomerConfigBoundaryResult(in.ExpectedProductVersion, nil); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerTrialConfigProductVersion(in.ExpectedProductVersion); res != nil {
+			return id, res, nil
+		}
 		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
@@ -112,6 +148,12 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		identity, ok := customerConfigTransitionMutationIdentityFromParams(pm, biz.CustomerConfigTransitionActivate)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerTrialConfigProductVersion(identity.ExpectedProductVersion); res != nil {
+			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
@@ -146,6 +188,12 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		identity, ok := customerConfigTransitionMutationIdentityFromParams(pm, biz.CustomerConfigTransitionRollback)
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerTrialConfigProductVersion(identity.ExpectedProductVersion); res != nil {
+			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
@@ -778,6 +826,35 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 	}
 }
 
+func (d *jsonrpcDispatcher) requireCustomerTrialConfigManifest(in biz.CustomerConfigPublishInput) *v1.JsonrpcResult {
+	trial, err := customertrialconfig.ClassifyManifest(in.ProductVersion, in.CompiledSnapshot)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	if trial && (d == nil || !d.trialConfigEnabled) {
+		return customerTrialConfigDisabledResult()
+	}
+	return nil
+}
+
+func (d *jsonrpcDispatcher) requireCustomerTrialConfigProductVersion(productVersion string) *v1.JsonrpcResult {
+	trial, err := customertrialconfig.ClassifyProductVersion(productVersion)
+	if err != nil {
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
+	}
+	if trial && (d == nil || !d.trialConfigEnabled) {
+		return customerTrialConfigDisabledResult()
+	}
+	return nil
+}
+
+func customerTrialConfigDisabledResult() *v1.JsonrpcResult {
+	return &v1.JsonrpcResult{
+		Code:    errcode.PermissionDenied.Code,
+		Message: "当前运行环境未开放客户试用配置应用",
+	}
+}
+
 func (d *jsonrpcDispatcher) requireCustomerConfigProcessDomainCommandAllowed(
 	ctx context.Context,
 	requestedCustomerKey string,
@@ -890,7 +967,13 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户配置版本不存在"}
 	case errors.Is(err, biz.ErrCustomerConfigActiveRevisionRequired):
 		l.Warnf("[customer_config] active revision required for fixed customer runtime err=%v", err)
-		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: "当前部署客户尚未激活配置，业务权限已关闭"}
+		return &v1.JsonrpcResult{
+			Code:    errcode.PermissionDenied.Code,
+			Message: "当前部署客户尚未激活配置，业务权限已关闭",
+			Data: newDataStruct(map[string]any{
+				"reason": customerConfigErrorReasonActiveRevisionRequired,
+			}),
+		}
 	case errors.Is(err, biz.ErrCustomerConfigRevisionImmutable):
 		l.Warnf("[customer_config] immutable revision overwrite rejected err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "客户配置版本已存在且内容不同，请使用新版本号发布"}

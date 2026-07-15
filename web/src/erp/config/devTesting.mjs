@@ -190,7 +190,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     key: 'customer-config-package-runtime',
     label: '客户配置包运行时 / Customer Config Runtime',
     description:
-      '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；tracked draft 只做本地 preview、输入模板和无后端测试，不发布、不激活、不调用后端；release readiness 必须在 /__dev/customer-config 显式选择证据批次后检查。',
+      '客户配置包结构、moduleStates、角色池、页面 / 字段投影、runtime manifest 或 active revision 读回前置改动时复制；永绅 tracked draft 只可在 start:yoyoosun + loopback 后端下显式应用内容寻址的本地测试版本。正式 manifest 仍要求 release-ready；本预设只生成输入模板，不发布、不激活、不调用后端，release readiness 必须在 /__dev/customer-config 显式选择证据批次后检查。',
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH /usr/local/bin/pnpm --dir web start:yoyoosun -- --print-plan',

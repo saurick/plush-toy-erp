@@ -25,7 +25,7 @@ function AppContent() {
   const navigate = useNavigate()
   const { appConfig, isMobileExperience } = useERPWorkspace()
   const appTitle =
-    appConfig.title || import.meta.env.VITE_APP_TITLE || 'Plush Toy ERP'
+    appConfig.title || import.meta.env.VITE_APP_TITLE || '毛绒玩具管理系统'
   const documentTitle = resolveDevPageTitle(location.pathname, appTitle)
   const activeBrand = getActiveERPBrand()
 

@@ -86,7 +86,45 @@ test('audit logs request failure clears stale facts and exposes a retry state', 
   assert.match(pageSource, /setTotal\(0\)/u)
   assert.match(pageSource, /setSelectedEventId\(null\)/u)
   assert.match(pageSource, /setDetailDrawerOpen\(false\)/u)
-  assert.match(pageSource, /message="审计日志加载失败"/u)
+  assert.match(pageSource, /message="操作记录加载失败"/u)
   assert.match(pageSource, /当前不展示上一次筛选结果，请重试/u)
   assert.match(pageSource, /onClick=\{loadData\}/u)
+})
+
+test('audit logs visible summary uses registered business copy and never renders raw event summary', () => {
+  const pageSource = readSource('../pages/AuditLogsPage.jsx')
+
+  assert.match(
+    pageSource,
+    /const registeredMeta = actionMetaMap\[event\.event_key\]/u
+  )
+  assert.match(pageSource, /label: '其他系统操作'/u)
+  assert.match(pageSource, /intent: '系统记录了一项管理操作'/u)
+  for (const eventKey of [
+    'admin_user.revoked',
+    'customer_config.publish',
+    'customer_config.activate',
+    'customer_config.rollback',
+    'workflow_task.break_glass',
+  ]) {
+    assert.match(pageSource, new RegExp(`'${eventKey.replaceAll('.', '\\.')}':`, 'u'))
+  }
+  assert.match(
+    pageSource,
+    /return '系统准备未完成，请联系管理员检查系统设置'/u
+  )
+  assert.match(pageSource, /return '系统设置需要管理员检查'/u)
+  assert.match(pageSource, /return '本次操作已记录'/u)
+  assert.match(pageSource, /visibleAuditChangeKeys\.has\(key\)/u)
+  assert.match(pageSource, /accountStatusLabelMap/u)
+  assert.match(pageSource, /roleTypeLabelMap/u)
+  assert.match(pageSource, /getAuditChangeSummary\(event\)/u)
+  assert.match(pageSource, /getAuditChangeSummary\(record\)/u)
+  assert.doesNotMatch(
+    pageSource,
+    /admin_bootstrap\.blocked'[\s\S]{0,180}event\.payload\?\.reason/u
+  )
+  assert.doesNotMatch(pageSource, /payload\.reason/u)
+  assert.doesNotMatch(pageSource, /getVisibleAuditText\(event\.summary/u)
+  assert.doesNotMatch(pageSource, /return event\.summary/u)
 })

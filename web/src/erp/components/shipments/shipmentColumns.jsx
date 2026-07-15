@@ -100,6 +100,7 @@ export function buildShipmentColumns({ salesOrdersByID }) {
     {
       title: '明细行',
       exportTitle: '明细行',
+      hidden: true,
       width: 90,
       sortValue: (record) => record.items?.length || 0,
       render: (_, record) => record.items?.length || 0,

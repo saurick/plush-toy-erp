@@ -5,10 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/conf"
+	"server/internal/customertrialconfig"
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -34,6 +36,7 @@ type jsonrpcDispatcher struct {
 	attachmentUC       *biz.BusinessAttachmentUsecase
 	customerConfigUC   *biz.CustomerConfigUsecase
 	authSMS            authSMSRuntimeConfig
+	trialConfigEnabled bool
 
 	adminReader biz.AdminAccountReader
 }
@@ -122,6 +125,14 @@ func newJSONRPCDispatcher(
 	if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register finance process command handlers: %v", err))
 	}
+	trialDSN := ""
+	if c != nil && c.Postgres != nil {
+		trialDSN = c.Postgres.Dsn
+	}
+	trialConfigEnabled, err := customertrialconfig.ResolveGate(trialDSN, os.Getenv)
+	if err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: customer trial config gate: %v", err))
+	}
 	authSMS := newAuthSMSRuntimeConfig(c)
 
 	helper.Info("jsonrpcDispatcher created")
@@ -143,6 +154,7 @@ func newJSONRPCDispatcher(
 		attachmentUC:       attachmentUC,
 		customerConfigUC:   customerConfigUC,
 		authSMS:            authSMS,
+		trialConfigEnabled: trialConfigEnabled,
 		adminReader:        adminReader,
 	}
 }

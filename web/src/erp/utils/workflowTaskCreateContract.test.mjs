@@ -43,7 +43,7 @@ test('workflow task public create rejects non-initial states and lifecycle reaso
         requireWorkflowTaskCreateParams(
           baseParams({ task_status_key: taskStatusKey })
         ),
-      /普通创建只支持 ready 状态/u
+      /新建任务只能从待处理状态开始/u
     )
   }
 
@@ -52,6 +52,6 @@ test('workflow task public create rejects non-initial states and lifecycle reaso
       requireWorkflowTaskCreateParams(
         baseParams({ blocked_reason: '不应由创建入口写入' })
       ),
-    /create_task 不接收参数 blocked_reason/u
+    /任务资料包含无法识别的内容/u
   )
 })

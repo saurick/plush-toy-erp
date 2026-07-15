@@ -3,9 +3,43 @@
 import fs from "node:fs";
 import path from "node:path";
 
+import {
+  CUSTOMER_TRIAL_133_TARGET,
+  assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimePolicy,
+  assertManualAcceptanceTargetAttestation,
+  parseManualAcceptanceTargetAttestation,
+  resolveManualAcceptanceTarget,
+} from "./manual-acceptance-target-policy.mjs";
+
 export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS";
+export const ATTACHMENT_NOTE = "样例附件，只用于查看和下载。";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1", "[::1]"]);
 const CUSTOMER_KEY = "yoyoosun";
+const FACT_REFERENCE_KEYS = Object.freeze([
+  "productionOrders",
+  "productionFacts",
+  "purchaseReceipts",
+  "purchaseReturns",
+  "purchaseReceiptAdjustments",
+  "qualityInspections",
+  "inventoryLots",
+  "inventoryBalances",
+  "inventoryTxns",
+  "stockReservations",
+  "shipments",
+  "financeFacts",
+]);
+const ATTACHMENT_REQUIRED_MODULES = Object.freeze([
+  "production_orders",
+  "production",
+  "inventory",
+  "shipments",
+  "finance",
+  "purchase_receipts",
+  "quality_inspections",
+  "workflow_tasks",
+]);
 export const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
   "source-driven-operational-facts-v1";
 
@@ -23,15 +57,15 @@ function fixture(name, mimeType, content, sizeClass = "small") {
 
 export function buildAttachmentFixtures({ includeNearLimit = true } = {}) {
   const fixtures = [
-    fixture("试用-客户确认的订单要求.pdf", "application/pdf", Buffer.from("%PDF-1.4\n% simulated acceptance evidence\n%%EOF\n")),
-    fixture("试用-产品正面参考图.png", "image/png", Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")),
-    fixture("试用-包装与唛头参考图.jpg", "image/jpeg", Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==", "base64")),
-    fixture("试用-数量与交期核对表.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("PK\u0003\u0004simulated-xlsx-acceptance-sheet")),
+    fixture("订单要求.pdf", "application/pdf", Buffer.from("%PDF-1.4\n% simulated acceptance evidence\n%%EOF\n")),
+    fixture("产品正面图.png", "image/png", Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")),
+    fixture("包装唛头.jpg", "image/jpeg", Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==", "base64")),
+    fixture("数量交期表.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("PK\u0003\u0004simulated-xlsx-acceptance-sheet")),
   ];
   if (includeNearLimit) {
     fixtures.push(
       fixture(
-        "试用-补充说明-名称较长用于检查完整显示与下载.xlsx",
+        "补充说明-云朵小熊大号礼盒装数量与交期.xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         Buffer.concat([Buffer.from("PK\u0003\u0004"), Buffer.alloc(4_500_000, 0x41)]),
         "near-limit",
@@ -57,11 +91,177 @@ function sourceDrivenFactOwnerID(report, key) {
       `fact report must use ${SOURCE_DRIVEN_FACT_REPORT_CONTRACT}`,
     );
   }
-  const id = Number(report?.attachmentOwners?.[key]);
+  const id = Number(report?.referenceRecords?.attachmentOwners?.[key]);
   if (!Number.isSafeInteger(id) || id <= 0) {
-    throw new Error(`fact report is missing attachmentOwners.${key}`);
+    throw new Error(`fact report is missing referenceRecords.attachmentOwners.${key}`);
+  }
+  const listKey = key === "productionFactId" ? "productionFacts" : "financeFacts";
+  const record = report?.referenceRecords?.[listKey]?.find(
+    (item) => Number(item?.id) === id,
+  );
+  if (!record || String(record.status || "").toUpperCase() !== "POSTED") {
+    throw new Error(
+      `referenceRecords.attachmentOwners.${key} must reference a POSTED ${listKey} record from this batch`,
+    );
   }
   return id;
+}
+
+function requiredReportText(value, name) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) throw new Error(`${name} is required`);
+  return normalized;
+}
+
+export function resolveAttachmentCredentials({
+  attestation,
+  adminPassword,
+  rolePassword,
+  password,
+  env = process.env,
+} = {}) {
+  const effectiveRolePassword =
+    rolePassword || env.MANUAL_ACCEPTANCE_PASSWORD;
+  if (typeof effectiveRolePassword !== "string" || !effectiveRolePassword) {
+    throw new Error("MANUAL_ACCEPTANCE_PASSWORD is required");
+  }
+  const effectiveAdminPassword =
+    adminPassword || password || env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD;
+  if (typeof effectiveAdminPassword !== "string" || !effectiveAdminPassword) {
+    throw new Error("MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required");
+  }
+  if (effectiveAdminPassword === effectiveRolePassword) {
+    throw new Error(
+      "manual acceptance admin and role passwords must be independent",
+    );
+  }
+  return {
+    adminPassword: effectiveAdminPassword,
+    rolePassword: effectiveRolePassword,
+  };
+}
+
+function validateAttachmentFactReport(report) {
+  if (
+    report?.reportContract !== SOURCE_DRIVEN_FACT_REPORT_CONTRACT ||
+    report?.mode !== "apply" ||
+    report?.simulatedOnly !== true ||
+    report?.realCustomerImport !== false
+  ) {
+    throw new Error(
+      `fact report must use ${SOURCE_DRIVEN_FACT_REPORT_CONTRACT} apply contract`,
+    );
+  }
+  for (const key of [
+    "datasetKey",
+    "dataVersion",
+    "runId",
+    "target",
+    "backendURL",
+    "semanticDigest",
+  ]) {
+    requiredReportText(report[key], `fact report ${key}`);
+  }
+  if (
+    !report.runtime ||
+    !requiredReportText(report.runtime.environment, "fact report runtime.environment") ||
+    report.runtime.customerKey !== CUSTOMER_KEY ||
+    !requiredReportText(report.runtime.configRevision, "fact report runtime.configRevision") ||
+    report.runtime.source !== "active_customer_config_revision"
+  ) {
+    throw new Error("fact report runtime is invalid");
+  }
+  for (const key of FACT_REFERENCE_KEYS) {
+    const items = report.referenceRecords?.[key];
+    if (!Array.isArray(items) || items.length === 0) {
+      throw new Error(`fact report referenceRecords.${key} is required`);
+    }
+    for (const [index, item] of items.entries()) {
+      if (!Number.isSafeInteger(Number(item?.id)) || Number(item.id) <= 0) {
+        throw new Error(`fact report referenceRecords.${key}[${index}].id is invalid`);
+      }
+    }
+  }
+  sourceDrivenFactOwnerID(report, "productionFactId");
+  sourceDrivenFactOwnerID(report, "financeFactId");
+  return report;
+}
+
+function validateAttachmentInputReport(report, name) {
+  if (
+    report?.mode !== "apply" ||
+    report?.simulatedOnly !== true ||
+    report?.realCustomerImport !== false
+  ) {
+    throw new Error(`${name} is not a simulated apply report`);
+  }
+  for (const key of ["datasetKey", "dataVersion", "runId", "target", "backendURL"]) {
+    requiredReportText(report[key], `${name}.${key}`);
+  }
+  return report;
+}
+
+export function validateAttachmentReportBatch({
+  backendURL,
+  sourceReport,
+  factReport,
+  taskReport,
+  targetConfirmation,
+  targetAttestation,
+}) {
+  validateAttachmentInputReport(sourceReport, "source report");
+  validateAttachmentFactReport(factReport);
+  validateAttachmentInputReport(taskReport, "task report");
+  for (const key of ["datasetKey", "dataVersion", "runId", "target", "backendURL"]) {
+    const values = [sourceReport, factReport, taskReport].map((report) =>
+      String(report[key] || "").trim(),
+    );
+    if (new Set(values).size !== 1) {
+      throw new Error("source, fact, and task reports must use the same dataset batch");
+    }
+  }
+  let policy;
+  try {
+    policy = resolveManualAcceptanceTarget({
+      backendURL,
+      target: factReport.target,
+      datasetKey: factReport.datasetKey,
+      dataVersion: factReport.dataVersion,
+      runId: factReport.runId,
+    });
+    if (policy.backendURL !== factReport.backendURL) {
+      throw new Error("backendURL must exactly match the bound fact report");
+    }
+    assertManualAcceptanceMutationTarget(policy, {
+      confirmation:
+        targetConfirmation || process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    });
+    const parsed = parseManualAcceptanceTargetAttestation(
+      targetAttestation ??
+        process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    );
+    if (policy.target === CUSTOMER_TRIAL_133_TARGET) {
+      const attestation = assertManualAcceptanceTargetAttestation({
+        policy,
+        attestation: parsed,
+      });
+      if (
+        factReport.runtime.environment !== "prod" ||
+        factReport.runtime.targetAttestation?.source !== "out-of-band" ||
+        factReport.runtime.targetAttestation?.release !== attestation.release ||
+        factReport.runtime.targetAttestation?.migration !== attestation.migration
+      ) {
+        throw new Error("fact report runtime attestation does not match customer-trial-133");
+      }
+      return { policy, attestation };
+    }
+    if (parsed) {
+      throw new Error("target attestation is only valid for customer-trial-133");
+    }
+    return { policy, attestation: undefined };
+  } catch (error) {
+    throw new Error(String(error?.message || error));
+  }
 }
 
 export function buildAttachmentTargets({ sourceReport, factReport, workflowTask }) {
@@ -107,13 +307,37 @@ async function rpc({ backendURL, domain, method, params = {}, token = "" }) {
   return body.result.data || {};
 }
 
-export async function applyAttachmentData({ backendURL, password, sourceReportPath, factReportPath, taskReportPath, confirm }) {
+export async function applyAttachmentData({
+  backendURL,
+  password,
+  adminPassword,
+  rolePassword,
+  sourceReportPath,
+  factReportPath,
+  taskReportPath,
+  confirm,
+  targetConfirmation,
+  targetAttestation,
+}) {
   if (confirm !== CONFIRM_PHRASE) throw new Error(`confirmation must equal ${CONFIRM_PHRASE}`);
-  backendURL = normalizeLocalBackendURL(backendURL);
-  if (!password) throw new Error("MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required");
   const sourceReport = readJSON(sourceReportPath);
   const factReport = readJSON(factReportPath);
   const taskReport = readJSON(taskReportPath);
+  const { policy, attestation } = validateAttachmentReportBatch({
+    backendURL,
+    sourceReport,
+    factReport,
+    taskReport,
+    targetConfirmation,
+    targetAttestation,
+  });
+  const credentials = resolveAttachmentCredentials({
+    attestation,
+    adminPassword,
+    rolePassword,
+    password,
+  });
+  backendURL = policy.backendURL;
   buildAttachmentTargets({
     sourceReport,
     factReport,
@@ -126,31 +350,81 @@ export async function applyAttachmentData({ backendURL, password, sourceReportPa
   ) {
     throw new Error("task report is missing a stable source reference");
   }
-  const login = await rpc({ backendURL, domain: "auth", method: "admin_login", params: { username: "admin", password } });
-  if (login.is_super_admin !== true) throw new Error("admin must be a local super admin");
-  const token = login.access_token || login.token;
-  if (!token) throw new Error("admin login response is missing access token");
-  const capabilities = await rpc({ backendURL, domain: "debug", method: "capabilities", token });
-  if (!new Set(["local", "dev"]).has(capabilities.environment)) throw new Error(`unsafe environment=${capabilities.environment || "unknown"}`);
-  const sessionData = await rpc({ backendURL, domain: "customer_config", method: "get_effective_session", params: { customer_key: CUSTOMER_KEY }, token });
-  const session = sessionData.session || {};
-  if (session.source !== "active_customer_config_revision" || session.customer?.key !== CUSTOMER_KEY || !session.configRevision) {
-    throw new Error("active yoyoosun revision is required");
+  const adminLogin = await rpc({
+    backendURL,
+    domain: "auth",
+    method: "admin_login",
+    params: { username: "admin", password: credentials.adminPassword },
+  });
+  if (adminLogin.is_super_admin !== true) {
+    throw new Error("admin must be a local super admin");
   }
-  const actorUsers = {
-    sales_order: "demo_sales",
-    purchase_order: "demo_purchase",
-    outsourcing_order: "demo_production",
-    bom_header: "demo_engineering",
-    production_fact: "demo_production",
-    finance_fact: "demo_finance",
-    workflow_task: "demo_pmc",
+  const runtimeAdminToken = adminLogin.access_token || adminLogin.token;
+  if (!runtimeAdminToken) {
+    throw new Error("admin login response is missing access token");
+  }
+  const capabilities = attestation
+    ? { environment: attestation.environment, ...attestation.debug }
+    : await rpc({
+        backendURL,
+        domain: "debug",
+        method: "capabilities",
+        token: runtimeAdminToken,
+      });
+  const pmcLogin = await rpc({
+    backendURL,
+    domain: "auth",
+    method: "admin_login",
+    params: { username: "demo_pmc", password: credentials.rolePassword },
+  });
+  const pmcToken = pmcLogin.access_token || pmcLogin.token;
+  if (!pmcToken) throw new Error("demo_pmc login response is missing access token");
+  const actorTokens = {
+    sales_order: runtimeAdminToken,
+    purchase_order: runtimeAdminToken,
+    outsourcing_order: runtimeAdminToken,
+    bom_header: runtimeAdminToken,
+    production_fact: runtimeAdminToken,
+    finance_fact: runtimeAdminToken,
+    workflow_task: pmcToken,
   };
-  const actorTokens = {};
-  for (const [ownerType, username] of Object.entries(actorUsers)) {
-    const actorLogin = await rpc({ backendURL, domain: "auth", method: "admin_login", params: { username, password } });
-    actorTokens[ownerType] = actorLogin.access_token || actorLogin.token;
-    if (!actorTokens[ownerType]) throw new Error(`${username} login response is missing access token`);
+  const sessionData = await rpc({
+    backendURL,
+    domain: "customer_config",
+    method: "get_effective_session",
+    params: { customer_key: CUSTOMER_KEY },
+    token: runtimeAdminToken,
+  });
+  const session = sessionData.session || {};
+  let runtime;
+  try {
+    runtime = assertManualAcceptanceRuntimePolicy({
+      policy,
+      capabilities,
+      session,
+      requiredModules: ATTACHMENT_REQUIRED_MODULES,
+      customerKey: CUSTOMER_KEY,
+    });
+  } catch (error) {
+    throw new Error(String(error?.message || error));
+  }
+  if (
+    runtime.environment !== factReport.runtime.environment ||
+    runtime.customerKey !== factReport.runtime.customerKey ||
+    runtime.configRevision !== factReport.runtime.configRevision ||
+    runtime.source !== factReport.runtime.source
+  ) {
+    throw new Error("current runtime does not match the bound fact report");
+  }
+  if (attestation) {
+    runtime = {
+      ...runtime,
+      targetAttestation: {
+        source: "out-of-band",
+        release: attestation.release,
+        migration: attestation.migration,
+      },
+    };
   }
   const taskList = await rpc({ backendURL, domain: "workflow", method: "list_tasks", params: { source_type: taskReport.sourceType, source_id: taskReport.sourceID, limit: 200 }, token: actorTokens.workflow_task });
   const workflowTask = selectAttachmentWorkflowTask(taskList.tasks);
@@ -176,7 +450,7 @@ export async function applyAttachmentData({ backendURL, password, sourceReportPa
             file_name: item.file_name,
             mime_type: item.mime_type,
             content_base64: item.content.toString("base64"),
-            note: "【试用】用于甲方手工验收附件列表、预览和下载。",
+            note: ATTACHMENT_NOTE,
           }, token: actorToken });
         } catch (error) {
           throw new Error(`${target.owner_type}:${target.owner_id} upload ${item.file_name} failed: ${error.message}`);
@@ -186,21 +460,31 @@ export async function applyAttachmentData({ backendURL, password, sourceReportPa
       }
       const downloaded = await rpc({ backendURL, domain: "attachment", method: "download_attachment", params: { id: attachment.id }, token: actorToken });
       if (!downloaded.attachment?.content_base64) throw new Error(`attachment ${attachment.id} download is empty`);
-      steps.push({ ownerType: target.owner_type, ownerId: target.owner_id, attachmentId: attachment.id, fileName: item.file_name, sizeClass: item.sizeClass, operation });
+      steps.push({
+        ownerType: target.owner_type,
+        ownerId: target.owner_id,
+        attachmentId: attachment.id,
+        fileName: item.file_name,
+        sizeClass: item.sizeClass,
+        operation,
+        actor:
+          target.owner_type === "workflow_task" ? "demo_pmc" : "admin",
+      });
     }
     const verified = await rpc({ backendURL, domain: "attachment", method: "list_attachments", params: { owner_type: target.owner_type, owner_id: target.owner_id }, token: actorToken });
     if ((verified.attachments || []).filter((item) => fixtures.some((fixtureItem) => fixtureItem.file_name === item.file_name)).length < target.files) {
       throw new Error(`${target.owner_type}:${target.owner_id} attachment readback is incomplete`);
     }
   }
-  return { scope: "manual-acceptance-attachment-data", customerKey: CUSTOMER_KEY, simulatedOnly: true, runtime: { environment: capabilities.environment, configRevision: session.configRevision }, summary: { targets: targets.length, attachments: steps.length, uploaded: steps.filter((item) => item.operation === "upload").length, reused: steps.filter((item) => item.operation === "reuse").length }, steps };
+  return { scope: "manual-acceptance-attachment-data", customerKey: CUSTOMER_KEY, simulatedOnly: true, datasetKey: factReport.datasetKey, dataVersion: factReport.dataVersion, runId: factReport.runId, target: factReport.target, semanticDigest: factReport.semanticDigest, runtime, actorPolicy: { crossDomainSeed: "admin", workflowTask: "demo_pmc", rolePageAccessVerifiedElsewhere: true }, summary: { targets: targets.length, attachments: steps.length, uploaded: steps.filter((item) => item.operation === "upload").length, reused: steps.filter((item) => item.operation === "reuse").length }, steps };
 }
 
 async function main() {
   const args = new Map(process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]));
   const report = await applyAttachmentData({
     backendURL: args.get("--backend-url") || "http://127.0.0.1:8300",
-    password: process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    adminPassword: process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    rolePassword: process.env.MANUAL_ACCEPTANCE_PASSWORD,
     confirm: process.env.MANUAL_ACCEPTANCE_ATTACHMENT_CONFIRM,
     sourceReportPath: args.get("--source-report") || "output/qa/manual-acceptance/source-data/apply-report.json",
     factReportPath: args.get("--fact-report") || "output/qa/manual-acceptance/fact-data/apply-report.json",

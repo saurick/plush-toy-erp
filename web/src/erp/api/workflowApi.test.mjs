@@ -337,7 +337,10 @@ test('workflowApi: role task view rejects invalid queries before RPC', async () 
     { view_key: 'todo', role_key: 'pmc', limit: 50, cursor: '' },
     { view_key: 'todo', role_key: 'pmc', limit: 50, offset: 0 },
   ]) {
-    await assert.rejects(api.listWorkflowRoleTasks(params), /查询参数无效/u)
+    await assert.rejects(
+      api.listWorkflowRoleTasks(params),
+      /任务查询条件有误/u
+    )
   }
   assert.equal(calls.length, 0)
 })

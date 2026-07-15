@@ -73,7 +73,7 @@ const PERMISSION_CENTER_TAB_KEYS = {
 const adminStatusOptions = [
   { label: '全部状态', value: ADMIN_STATUS_FILTERS.ALL },
   { label: '启用', value: ADMIN_STATUS_FILTERS.ACTIVE },
-  { label: '临时禁用', value: ADMIN_STATUS_FILTERS.SUSPENDED },
+  { label: '临时停用', value: ADMIN_STATUS_FILTERS.SUSPENDED },
   { label: '已注销', value: ADMIN_STATUS_FILTERS.REVOKED },
   { label: '超级管理员', value: ADMIN_STATUS_FILTERS.SUPER },
 ]
@@ -97,7 +97,7 @@ function getRoleVisibleName(role = {}) {
   if (name) {
     return name
   }
-  return getRoleDisplayName(getRoleKey(role), '已配置角色')
+  return getRoleDisplayName(getRoleKey(role), '已配置岗位')
 }
 
 function getPermissionKey(permission = {}) {
@@ -108,7 +108,7 @@ function getPermissionKey(permission = {}) {
 
 function getPermissionVisibleName(permission = {}) {
   const name = String(permission?.name || '').trim()
-  return name || '未登记权限'
+  return name || '其他功能'
 }
 
 function roleKeysForAdmin(admin = {}) {
@@ -202,19 +202,19 @@ function RoleCapabilityOverview({ menus = [], permissionKeys = [] }) {
       <div className="erp-role-capability-overview__head">
         <div>
           <Text strong id="erp-role-capability-overview-title">
-            岗位权限候选入口
+            可使用的页面
           </Text>
           <Paragraph type="secondary">
-            这里只按岗位功能预览候选入口；最终可见范围还会被当前客户启用的模块和页面配置继续收窄。
+            根据已选功能预览这个岗位可进入的页面，实际页面以公司当前启用功能为准。
           </Paragraph>
         </div>
-        <Tag color="green">{visibleMenus.length} 个候选入口</Tag>
+        <Tag color="green">{visibleMenus.length} 个页面</Tag>
       </div>
 
       <div className="erp-role-capability-overview__grid">
         <div className="erp-role-capability-card erp-role-capability-card--enabled">
           <div className="erp-role-capability-card__title">
-            <Text strong>岗位权限已覆盖的候选入口</Text>
+            <Text strong>可以使用</Text>
             <Tag color="green">{visibleMenus.length}</Tag>
           </div>
           <div className="erp-role-capability-card__items">
@@ -225,21 +225,21 @@ function RoleCapabilityOverview({ menus = [], permissionKeys = [] }) {
                 </Tag>
               ))
             ) : (
-              <Text type="secondary">当前岗位权限还未覆盖桌面入口</Text>
+              <Text type="secondary">当前岗位还没有可使用的页面</Text>
             )}
           </div>
         </div>
 
         <div className="erp-role-capability-card">
           <div className="erp-role-capability-card__title">
-            <Text strong>岗位权限尚未覆盖的入口</Text>
+            <Text strong>暂不可使用</Text>
             <Tag>{hiddenMenus.length}</Tag>
           </div>
           <div className="erp-role-capability-card__items erp-role-capability-card__items--muted">
             {hiddenMenus.length > 0 ? (
               hiddenMenus.map((menu) => <Tag key={menu.key}>{menu.label}</Tag>)
             ) : (
-              <Text type="secondary">当前岗位权限已覆盖全部候选入口</Text>
+              <Text type="secondary">当前岗位已可使用全部页面</Text>
             )}
           </div>
         </div>
@@ -248,8 +248,8 @@ function RoleCapabilityOverview({ menus = [], permissionKeys = [] }) {
       <Alert
         type="info"
         showIcon
-        message="候选入口不等于最终可进入页面"
-        description="当前客户配置只能继续隐藏模块、页面和操作，不能扩大岗位权限。普通字段按现有页面规则统一显示；列表和导出范围可以继续收窄，敏感信息暂不支持按角色单独开放。"
+        message="最终可用页面以公司当前设置为准"
+        description="公司可关闭暂不使用的页面和操作；岗位设置不会因此扩大。"
       />
     </section>
   )
@@ -279,7 +279,7 @@ function PermissionImpactMap({
         type="info"
         showIcon
         message="这里按业务页面说明每项功能的影响范围"
-        description="实际可用范围还会受当前客户配置、单据状态和任务归属进一步限制。"
+        description="实际能否使用，还要看公司当前启用范围、单据状态和任务负责人。"
       />
       <Table
         rowKey="rowID"
@@ -334,7 +334,7 @@ function PermissionImpactMap({
               return (
                 actionLabels.join('、') ||
                 record.usage?.defaultActionLabel ||
-                '随页面入口生效'
+                '进入页面后可使用'
               )
             },
           },
@@ -344,7 +344,7 @@ function PermissionImpactMap({
               <Text type="secondary">
                 {record.usage?.restrictions?.length > 0
                   ? record.usage.restrictions.join('；')
-                  : '以当前客户配置、业务状态和任务归属为准'}
+                  : '以公司当前设置、业务状态和任务负责人为准'}
               </Text>
             ),
           },
@@ -361,29 +361,29 @@ function DataScopeOverview() {
       <Alert
         type="warning"
         showIcon
-        message="业务数据范围尚未开放配置"
-        description="协同任务已经按责任岗位、当前处理人和任务状态限制；客户、订单、仓库、采购和财务资料暂不支持按本人、指定范围或全部资料细分。查询、修改和导出使用同一套范围规则前，这里不会提供只改变页面显示的开关。"
+        message="数据查看范围暂不可设置"
+        description="目前岗位按功能控制；客户、订单、仓库、采购和财务资料还不能按本人、负责人或指定范围细分。"
       />
       <div className="erp-role-policy-boundary__grid">
         <div>
-          <Text strong>协同任务</Text>
-          <Tag color="green">已按任务责任限制</Tag>
+          <Text strong>任务</Text>
+          <Tag color="green">按负责人限制</Tag>
           <Text type="secondary">责任岗位或指定处理人</Text>
         </div>
         <div>
           <Text strong>业务单据</Text>
-          <Tag color="gold">按功能权限</Tag>
-          <Text type="secondary">尚未按负责人或指定业务范围隔离</Text>
+          <Tag color="gold">按可用功能</Tag>
+          <Text type="secondary">暂不能按负责人或指定范围细分</Text>
         </div>
         <div>
           <Text strong>仓库数据</Text>
-          <Tag color="gold">按功能权限</Tag>
-          <Text type="secondary">尚未按指定仓库隔离</Text>
+          <Tag color="gold">按可用功能</Tag>
+          <Text type="secondary">暂不能按指定仓库细分</Text>
         </div>
         <div>
           <Text strong>财务数据</Text>
-          <Tag color="gold">按功能权限</Tag>
-          <Text type="secondary">尚未拆分摘要与完整范围</Text>
+          <Tag color="gold">按可用功能</Tag>
+          <Text type="secondary">暂不能按查看范围细分</Text>
         </div>
       </div>
     </div>
@@ -396,8 +396,8 @@ function SensitiveFieldOverview() {
       <Alert
         type="warning"
         showIcon
-        message="角色级敏感字段策略尚未接入"
-        description="当前客户字段设置只收窄少量已登记的列表和导出列，不会改变字段名称、必填或可编辑规则。成本、结算账户、联系方式等敏感内容只有在查询、修改、导出和打印都按同一规则校验后，才能在这里授权。"
+        message="敏感信息权限暂不可单独设置"
+        description="成本、结算账户和联系方式等内容目前不能按岗位分别开放，系统会按现有页面规则统一显示或隐藏。"
       />
       <div className="erp-role-policy-boundary__grid">
         <div>
@@ -530,7 +530,7 @@ function PermissionChecklist({
           allowClear
           className="erp-permission-checklist-search"
           value={keyword}
-          placeholder="搜索功能名称或业务模块"
+          placeholder="搜索功能名称或业务分类"
           onChange={(event) => setKeyword(event.target.value)}
         />
         <label className="erp-permission-checklist-filter">
@@ -772,7 +772,7 @@ export default function PermissionCenterPage() {
       new Promise((resolve) => {
         confirmDiscardRoleChanges({
           title: '离开前要放弃未保存的修改吗？',
-          content: '离开权限管理后，当前角色尚未保存的功能调整会丢失。',
+          content: '离开权限管理后，当前岗位尚未保存的功能调整会丢失。',
           onDiscard: () => resolve(true),
           onKeepEditing: () => resolve(false),
         })
@@ -838,14 +838,14 @@ export default function PermissionCenterPage() {
   const selectedRoleConflict =
     roleSaveConflict?.roleKey === selectedRoleKey ? roleSaveConflict : null
   const permissionWarningMessages = [
-    !canReadRoleTemplates ? '您不能查看岗位角色设置' : '',
-    !canReadUsers ? '缺少查看管理员权限，不能查看管理员账号' : '',
-    !canManageRolePermissions ? '您不能调整岗位角色的可用功能' : '',
-    !canAssignUserRoles ? '您不能给管理员分配岗位角色' : '',
-    !canManageUsers ? '缺少更新管理员权限，不能修改手机号或重置密码' : '',
-    !canDisableUsers ? '缺少启停管理员权限，不能启用或禁用管理员' : '',
-    !canRevokeUsers ? '缺少注销管理员权限，不能办理员工账号正式退出' : '',
-    !canCreateUsers ? '缺少创建管理员权限，不能新增账号' : '',
+    !canReadRoleTemplates ? '您不能查看岗位设置' : '',
+    !canReadUsers ? '您不能查看员工账号' : '',
+    !canManageRolePermissions ? '您不能调整岗位的可用功能' : '',
+    !canAssignUserRoles ? '您不能给员工账号分配岗位' : '',
+    !canManageUsers ? '您不能修改手机号或重置密码' : '',
+    !canDisableUsers ? '您不能启用或停用员工账号' : '',
+    !canRevokeUsers ? '您不能办理员工账号离职注销' : '',
+    !canCreateUsers ? '您不能创建员工账号' : '',
   ].filter(Boolean)
   const filteredAdmins = useMemo(
     () =>
@@ -899,7 +899,7 @@ export default function PermissionCenterPage() {
       setSelectedRoleKey((current) => current || getRoleKey(nextRoles[0]))
       return true
     } catch (err) {
-      message.error(getActionErrorMessage(err, '加载权限数据'))
+      message.error(getActionErrorMessage(err, '加载岗位设置'))
       return false
     } finally {
       setLoading(false)
@@ -912,9 +912,9 @@ export default function PermissionCenterPage() {
       return
     }
     confirmDiscardRoleChanges({
-      title: '放弃未保存的角色权限调整？',
+      title: '放弃未保存的岗位调整？',
       content:
-        '切换角色会丢弃当前未保存的勾选结果。请先保存，或确认放弃本次调整。',
+        '切换岗位会丢弃当前未保存的勾选结果。请先保存，或确认放弃本次调整。',
       onDiscard: () => {
         setRoleSaveConflict(null)
         setSelectedRoleKey(nextRoleKey)
@@ -939,7 +939,7 @@ export default function PermissionCenterPage() {
     }
     confirmDiscardRoleChanges({
       title: '切换页面前要放弃未保存的修改吗？',
-      content: '切换到管理员账号后，当前角色尚未保存的功能调整会丢失。',
+      content: '切换到员工账号后，当前岗位尚未保存的功能调整会丢失。',
       onDiscard: () => setActiveTabKey(nextTabKey),
     })
   }
@@ -949,7 +949,7 @@ export default function PermissionCenterPage() {
       new Promise((resolve) => {
         confirmDiscardRoleChanges({
           title: '刷新前要放弃未保存的修改吗？',
-          content: '刷新会重新加载权限数据，当前角色尚未保存的功能调整会丢失。',
+          content: '刷新会重新加载权限数据，当前岗位尚未保存的功能调整会丢失。',
           onDiscard: async () => resolve(await loadData()),
           onKeepEditing: () => resolve(false),
         })
@@ -1045,7 +1045,7 @@ export default function PermissionCenterPage() {
           roles,
           isProduction: IS_PRODUCTION_BUILD,
         })
-      : '当前账号不能分配岗位角色'
+      : '当前账号不能分配岗位'
     if (blockReason) {
       message.info(blockReason)
       return
@@ -1148,13 +1148,13 @@ export default function PermissionCenterPage() {
       const createdAdmin = result?.data?.admin
       message.success(
         createdAdmin?.username
-          ? `管理员 ${createdAdmin.username} 已创建`
-          : '管理员已创建'
+          ? `员工账号 ${createdAdmin.username} 已创建`
+          : '员工账号已创建'
       )
       closeCreateModal()
       await loadData()
     } catch (err) {
-      message.error(getActionErrorMessage(err, '创建管理员'))
+      message.error(getActionErrorMessage(err, '创建员工账号'))
     } finally {
       setCreating(false)
     }
@@ -1171,7 +1171,7 @@ export default function PermissionCenterPage() {
           roles,
           isProduction: IS_PRODUCTION_BUILD,
         })
-      : '当前账号不能分配岗位角色'
+      : '当前账号不能分配岗位'
     if (blockReason) {
       message.info(blockReason)
       return
@@ -1182,11 +1182,11 @@ export default function PermissionCenterPage() {
         id: editingAdmin.id,
         role_keys: normalizeStringList(selectedRoleKeys),
       })
-      message.success('用户角色已更新')
+      message.success('员工岗位已更新')
       closeEditModal()
       await loadData()
     } catch (err) {
-      message.error(getActionErrorMessage(err, '更新用户角色'))
+      message.error(getActionErrorMessage(err, '更新员工岗位'))
     } finally {
       setSaving(false)
     }
@@ -1241,7 +1241,7 @@ export default function PermissionCenterPage() {
         permission_keys: normalizeStringList(selectedRolePermissionKeys),
         expected_version: expectedVersion,
       })
-      message.success('角色权限已更新')
+      message.success('岗位可用功能已更新')
       setRoleSaveConflict(null)
       await loadData()
     } catch (err) {
@@ -1251,11 +1251,11 @@ export default function PermissionCenterPage() {
           refreshed: false,
         })
         message.warning(
-          '该角色已被其他管理员修改，当前勾选已保留，请刷新最新角色后核对再保存'
+          '该岗位已被其他人修改，当前勾选已保留，请刷新最新岗位后核对再保存'
         )
         return
       }
-      message.error(getActionErrorMessage(err, '更新角色权限'))
+      message.error(getActionErrorMessage(err, '更新岗位可用功能'))
     } finally {
       setSaving(false)
     }
@@ -1273,7 +1273,7 @@ export default function PermissionCenterPage() {
       isSameAdminAccount(currentAdmin, admin)
     ) {
       if (isSameAdminAccount(currentAdmin, admin)) {
-        message.info('当前登录账号不能临时禁用自己')
+        message.info('当前登录账号不能临时停用自己')
       }
       return
     }
@@ -1296,15 +1296,15 @@ export default function PermissionCenterPage() {
       })
       message.success(
         disabled
-          ? `已临时禁用管理员 ${admin.username}`
-          : `已启用管理员 ${admin.username}`
+          ? `已临时停用员工账号 ${admin.username}`
+          : `已启用员工账号 ${admin.username}`
       )
       await loadData()
       setStatusModalOpen(false)
       setStatusActionAdmin(null)
       statusForm.resetFields()
     } catch (err) {
-      message.error(getActionErrorMessage(err, '更新管理员状态'))
+      message.error(getActionErrorMessage(err, '更新员工账号状态'))
     } finally {
       setStatusUpdatingAdminID(null)
     }
@@ -1325,11 +1325,11 @@ export default function PermissionCenterPage() {
         id: resettingAdmin.id,
         password: values.password,
       })
-      message.success(`已重置管理员 ${resettingAdmin.username} 的密码`)
+      message.success(`已重置员工账号 ${resettingAdmin.username} 的密码`)
       closeResetModal()
       await loadData()
     } catch (err) {
-      message.error(getActionErrorMessage(err, '重置管理员密码'))
+      message.error(getActionErrorMessage(err, '重置员工账号密码'))
     } finally {
       setSaving(false)
     }
@@ -1351,7 +1351,7 @@ export default function PermissionCenterPage() {
       return
     }
     if (isSameAdminAccount(currentAdmin, admin)) {
-      message.info('当前登录账号不能临时禁用自己')
+      message.info('当前登录账号不能临时停用自己')
       return
     }
     const nextDisabled = !checkedEnabled
@@ -1398,7 +1398,7 @@ export default function PermissionCenterPage() {
       revokeForm.resetFields()
       await loadData()
     } catch (err) {
-      message.error(getActionErrorMessage(err, '注销管理员账号'))
+      message.error(getActionErrorMessage(err, '注销员工账号'))
     } finally {
       setSaving(false)
     }
@@ -1406,7 +1406,7 @@ export default function PermissionCenterPage() {
 
   const columns = [
     {
-      title: '管理员',
+      title: '员工账号',
       dataIndex: 'username',
       width: 180,
     },
@@ -1417,7 +1417,7 @@ export default function PermissionCenterPage() {
       render: (phone) => phone || <Text type="secondary">未录入</Text>,
     },
     {
-      title: '角色',
+      title: '岗位',
       dataIndex: 'roles',
       render: (_, record) => {
         if (record.is_super_admin) {
@@ -1425,7 +1425,7 @@ export default function PermissionCenterPage() {
         }
         const assignedRoles = Array.isArray(record.roles) ? record.roles : []
         if (assignedRoles.length === 0) {
-          return <Tag color="default">未分配角色</Tag>
+          return <Tag color="default">未分配岗位</Tag>
         }
         return (
           <Space wrap size={[4, 6]}>
@@ -1437,12 +1437,12 @@ export default function PermissionCenterPage() {
       },
     },
     {
-      title: '权限',
+      title: '可用功能',
       dataIndex: 'permission_count',
       width: 120,
       render: (_, record) => {
         if (record.is_super_admin) {
-          return <Tag color="gold">全部权限</Tag>
+          return <Tag color="gold">全部功能</Tag>
         }
         const rawCount = Number(record.permission_count)
         const count =
@@ -1450,7 +1450,7 @@ export default function PermissionCenterPage() {
         return count > 0 ? (
           <Tag color="blue">{count} 项</Tag>
         ) : (
-          <Tag color="default">无权限</Tag>
+          <Tag color="default">暂无功能</Tag>
         )
       },
     },
@@ -1495,10 +1495,10 @@ export default function PermissionCenterPage() {
           return (
             <Space direction="vertical" size={2}>
               <Tag color={suspended ? 'red' : 'green'}>
-                {suspended ? '临时禁用' : '启用'}
+                {suspended ? '临时停用' : '启用'}
               </Tag>
               <Text type="secondary" role="note" tabIndex={0}>
-                当前账号没有启停管理员的权限
+                您不能启用或停用员工账号
               </Text>
             </Space>
           )
@@ -1514,7 +1514,7 @@ export default function PermissionCenterPage() {
             <Switch
               checked={accountStatus === ADMIN_ACCOUNT_STATUS.ACTIVE}
               checkedChildren="启用"
-              unCheckedChildren="临时禁用"
+              unCheckedChildren="临时停用"
               loading={statusUpdatingAdminID === record.id}
               disabled={currentAccount || Boolean(controlTargetBlockReason)}
               onChange={(checked) => onToggleAdminStatus(record, checked)}
@@ -1559,7 +1559,7 @@ export default function PermissionCenterPage() {
           roles,
         })
         const roleBlockReason = !canAssignUserRoles
-          ? '当前账号不能分配岗位角色'
+          ? '当前账号不能分配岗位'
           : getRoleAssignmentBlockReason({
               currentAdmin,
               targetAdmin: record,
@@ -1597,7 +1597,7 @@ export default function PermissionCenterPage() {
                 disabled={Boolean(roleBlockReason)}
                 onClick={() => openEditModal(record)}
               >
-                分配角色
+                分配岗位
               </Button>
               <Button
                 size="small"
@@ -1641,16 +1641,16 @@ export default function PermissionCenterPage() {
   const emptyText = loading ? (
     <Empty description="加载中..." />
   ) : hasAdminFilter ? (
-    <Empty description="没有匹配的管理员" />
+    <Empty description="没有匹配的员工账号" />
   ) : (
-    <Empty description="暂无管理员数据" />
+    <Empty description="暂无员工账号" />
   )
 
   if (loading && admins.length === 0 && !currentAdmin) {
     return (
       <Loading
-        title="权限加载中"
-        description="正在加载账号和岗位角色，请稍候..."
+        title="岗位设置加载中"
+        description="正在加载员工账号和岗位，请稍候..."
       />
     )
   }
@@ -1664,21 +1664,21 @@ export default function PermissionCenterPage() {
         <div>
           <Text className="erp-permission-section__eyebrow">岗位权限</Text>
           <Title level={5} style={{ margin: 0 }}>
-            角色模板
+            岗位设置
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            按岗位职责维护可编辑角色的默认权限组合，用于统一分配菜单、岗位任务端入口和操作权限。
+            设置这个岗位可使用的页面和操作，保存后可分配给员工账号。
           </Paragraph>
         </div>
         <Tag color="blue">先设置岗位，再分配账号</Tag>
       </div>
 
       <div className="erp-role-center-layout">
-        <aside className="erp-role-center-sidebar" aria-label="角色模板列表">
+        <aside className="erp-role-center-sidebar" aria-label="岗位列表">
           {roles.length === 0 ? (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="暂无角色模板"
+              description="暂无岗位"
             />
           ) : (
             roles.map((role) => {
@@ -1698,9 +1698,7 @@ export default function PermissionCenterPage() {
                   <span className="erp-role-template-card__main">
                     <Text strong>{getRoleVisibleName(role)}</Text>
                     <Text type="secondary">
-                      {role.disabled
-                        ? '已停用角色模板'
-                        : getRoleTypeLabel(role)}
+                      {role.disabled ? '已停用岗位' : getRoleTypeLabel(role)}
                     </Text>
                   </span>
                   <span className="erp-role-template-card__meta">
@@ -1739,12 +1737,12 @@ export default function PermissionCenterPage() {
                   </Space>
                   <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
                     {selectedRole.description ||
-                      '该角色决定可使用的菜单、岗位任务端入口和业务操作。'}
+                      '该岗位决定可使用的页面、手机待办和业务操作。'}
                   </Paragraph>
                 </div>
                 <div className="erp-role-center-actions">
                   <Tag color={rolePermissionsDirty ? 'orange' : 'green'}>
-                    {rolePermissionsDirty ? '有未保存调整' : '已同步'}
+                    {rolePermissionsDirty ? '有未保存调整' : '已保存'}
                   </Tag>
                   <Button
                     type="primary"
@@ -1757,7 +1755,7 @@ export default function PermissionCenterPage() {
                     }
                     onClick={saveRolePermissions}
                   >
-                    保存角色权限
+                    保存岗位设置
                   </Button>
                 </div>
               </div>
@@ -1768,13 +1766,13 @@ export default function PermissionCenterPage() {
                   showIcon
                   message={
                     selectedRoleConflict.refreshed
-                      ? '已载入最新角色，当前勾选仍为你的草稿'
-                      : '该角色已被其他管理员修改'
+                      ? '已载入最新岗位，当前勾选仍为你的草稿'
+                      : '该岗位已被其他人修改'
                   }
                   description={
                     selectedRoleConflict.refreshed
-                      ? '请核对当前勾选与最新角色权限差异，确认后可再次保存；页面没有覆盖你的草稿。'
-                      : '当前勾选已经保留。请先刷新最新角色资料，再核对并重新保存，避免覆盖他人的调整。'
+                      ? '请核对当前勾选与最新岗位设置的差异，确认后可再次保存；页面没有覆盖你的草稿。'
+                      : '当前勾选已经保留。请先刷新最新岗位资料，再核对并重新保存，避免覆盖他人的调整。'
                   }
                   action={
                     <Button size="small" onClick={refreshConflictedRole}>
@@ -1794,7 +1792,7 @@ export default function PermissionCenterPage() {
                   <strong>{selectedRoleAdmins.length}</strong>
                 </div>
                 <div>
-                  <Text type="secondary">岗位入口</Text>
+                  <Text type="secondary">任务端功能</Text>
                   <strong>
                     {selectedRolePermissionSummary.mobileAccessCount}
                   </strong>
@@ -1818,7 +1816,7 @@ export default function PermissionCenterPage() {
                         </Tag>
                       ))
                     ) : (
-                      <Text type="secondary">暂无账号绑定该角色</Text>
+                      <Text type="secondary">暂无账号分配到该岗位</Text>
                     )}
                   </div>
                 </div>
@@ -1832,7 +1830,9 @@ export default function PermissionCenterPage() {
                         </Tag>
                       ))
                     ) : (
-                      <Text type="secondary">未包含岗位入口或重要管理功能</Text>
+                      <Text type="secondary">
+                        未包含任务端功能或重要管理功能
+                      </Text>
                     )}
                   </div>
                 </div>
@@ -1844,8 +1844,8 @@ export default function PermissionCenterPage() {
                   showIcon
                   message={
                     selectedRole.role_type === 'system'
-                      ? '产品系统角色只能查看'
-                      : '当前角色只能查看'
+                      ? '系统内置岗位只能查看'
+                      : '当前岗位只能查看'
                   }
                   description={selectedRoleReadOnlyReason}
                 />
@@ -1857,7 +1857,7 @@ export default function PermissionCenterPage() {
                 items={[
                   {
                     key: 'functions',
-                    label: '功能权限',
+                    label: '可用功能',
                     children: (
                       <div className="erp-role-policy-tab-content">
                         <div className="erp-permission-checklist-heading">
@@ -1911,7 +1911,7 @@ export default function PermissionCenterPage() {
           ) : (
             <Empty
               image={Empty.PRESENTED_IMAGE_SIMPLE}
-              description="请选择一个角色模板"
+              description="请选择一个岗位"
             />
           )}
         </section>
@@ -1932,20 +1932,20 @@ export default function PermissionCenterPage() {
         <div>
           <Text className="erp-permission-section__eyebrow">账号分配</Text>
           <Title level={5} style={{ margin: 0 }}>
-            管理员与角色
+            员工账号与岗位
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            新账号默认不能进入业务页面，分配角色后才能使用相应功能。
+            新账号默认不能进入业务页面，分配岗位后才能使用相应功能。
           </Paragraph>
         </div>
         <Space size={8} wrap>
-          <Tag color="green">共 {admins.length} 个管理员</Tag>
+          <Tag color="green">共 {admins.length} 个员工账号</Tag>
           <Button
             type="primary"
             disabled={!canCreateUsers}
             onClick={openCreateModal}
           >
-            创建管理员
+            创建员工账号
           </Button>
         </Space>
       </Space>
@@ -1956,7 +1956,7 @@ export default function PermissionCenterPage() {
             allowClear
             className="erp-permission-list-toolbar__search"
             value={adminSearchKeyword}
-            placeholder="搜索管理员账号、手机号或岗位角色"
+            placeholder="搜索员工账号、手机号或岗位"
             onChange={(event) => {
               setAdminSearchKeyword(event.target.value)
               setTablePagination((prev) => ({ ...prev, current: 1 }))
@@ -1973,8 +1973,8 @@ export default function PermissionCenterPage() {
         </div>
         <Text type="secondary">
           {hasAdminFilter
-            ? `命中 ${filteredAdmins.length}/${admins.length} 个管理员`
-            : `共 ${admins.length} 个管理员`}
+            ? `命中 ${filteredAdmins.length}/${admins.length} 个员工账号`
+            : `共 ${admins.length} 个员工账号`}
         </Text>
       </div>
       <Table
@@ -2008,10 +2008,10 @@ export default function PermissionCenterPage() {
               type="secondary"
               style={{ marginTop: 8, marginBottom: 0 }}
             >
-              账号通过角色获得对应的菜单、岗位任务端入口和业务操作权限。
+              先设置岗位可使用的功能，再把岗位分配给员工账号。
             </Paragraph>
           </div>
-          <Tag color="blue">默认先维护角色模板</Tag>
+          <Tag color="blue">先设置岗位</Tag>
         </div>
       </Card>
 
@@ -2020,7 +2020,7 @@ export default function PermissionCenterPage() {
           type="warning"
           showIcon
           message="当前账号部分操作受限"
-          description={`${permissionWarningMessages.join('；')}。超级管理员账号不能在此页面被普通管理员修改。`}
+          description={`${permissionWarningMessages.join('；')}。超级管理员账号只能由超级管理员维护。`}
         />
       ) : null}
 
@@ -2032,7 +2032,7 @@ export default function PermissionCenterPage() {
             key: PERMISSION_CENTER_TAB_KEYS.ROLES,
             label: (
               <span className="erp-permission-tabs__label">
-                角色模板
+                岗位设置
                 <Tag color="blue">{roles.length}</Tag>
               </span>
             ),
@@ -2042,7 +2042,7 @@ export default function PermissionCenterPage() {
             key: PERMISSION_CENTER_TAB_KEYS.ADMINS,
             label: (
               <span className="erp-permission-tabs__label">
-                管理员账号
+                员工账号
                 <Tag color="green">{admins.length}</Tag>
               </span>
             ),
@@ -2053,7 +2053,7 @@ export default function PermissionCenterPage() {
       />
 
       <Modal
-        title="创建管理员"
+        title="创建员工账号"
         className="erp-permission-modal"
         open={createModalOpen}
         onCancel={closeCreateModal}
@@ -2070,12 +2070,12 @@ export default function PermissionCenterPage() {
             label="账号"
             name="username"
             rules={[
-              { required: true, message: '请输入管理员账号' },
+              { required: true, message: '请输入员工账号' },
               {
                 validator: (_, value) =>
                   String(value || '').trim()
                     ? Promise.resolve()
-                    : Promise.reject(new Error('请输入管理员账号')),
+                    : Promise.reject(new Error('请输入员工账号')),
               },
             ]}
           >
@@ -2098,15 +2098,15 @@ export default function PermissionCenterPage() {
           >
             <Input.Password autoComplete="new-password" />
           </Form.Item>
-          <Form.Item label="角色" name="role_keys">
+          <Form.Item label="岗位" name="role_keys">
             <Select
               mode="multiple"
               allowClear
               disabled={!canAssignUserRoles}
               placeholder={
                 canAssignUserRoles
-                  ? '选择一个或多个角色'
-                  : '当前账号只能创建无角色账号'
+                  ? '选择一个或多个岗位'
+                  : '当前账号只能创建未分配岗位的账号'
               }
               options={roleOptions}
             />
@@ -2115,8 +2115,8 @@ export default function PermissionCenterPage() {
             <Alert
               type="info"
               showIcon
-              message="创建后暂不分配角色"
-              description="当前账号没有分配岗位角色的权限，只能创建无角色账号；后续需由有权限的管理员完成授权。"
+              message="创建后暂不分配岗位"
+              description="当前账号不能分配岗位，只能创建未分配岗位的账号；后续请联系账号负责人完成设置。"
             />
           ) : null}
         </Form>
@@ -2126,8 +2126,8 @@ export default function PermissionCenterPage() {
         className="erp-permission-modal"
         title={
           editingAdmin?.username
-            ? `分配角色：${editingAdmin.username}`
-            : '分配角色'
+            ? `分配岗位：${editingAdmin.username}`
+            : '分配岗位'
         }
         open={editModalOpen}
         onCancel={closeEditModal}
@@ -2143,17 +2143,17 @@ export default function PermissionCenterPage() {
           <Alert
             type="info"
             showIcon
-            message="这里只调整岗位角色"
-            description="登录手机号已拆分为独立操作，避免其中一项失败时另一项已经生效。"
+            message="仅修改岗位"
+            description="修改登录手机号请使用账号列表中的“修改手机号”。"
           />
           <label>
-            <Text strong>岗位角色</Text>
+            <Text strong>岗位</Text>
             <Select
               mode="multiple"
               allowClear
               value={selectedRoleKeys}
               options={roleOptions}
-              placeholder="选择一个或多个可分配角色"
+              placeholder="选择一个或多个可分配岗位"
               style={{ width: '100%', marginTop: 8 }}
               onChange={setSelectedRoleKeys}
             />
@@ -2183,7 +2183,7 @@ export default function PermissionCenterPage() {
             type="info"
             showIcon
             message="修改后用于该账号的短信登录"
-            description="岗位角色不会随本次操作改变。留空表示解除当前登录手机号。"
+            description="岗位不会随本次操作改变。留空表示解除当前登录手机号。"
           />
           <label>
             <Text strong>登录手机号</Text>
@@ -2230,7 +2230,7 @@ export default function PermissionCenterPage() {
 
       <Modal
         className="erp-permission-modal"
-        title={statusActionDisabled ? '临时禁用账号' : '恢复账号使用'}
+        title={statusActionDisabled ? '临时停用账号' : '恢复账号使用'}
         open={statusModalOpen}
         onCancel={() => {
           setStatusModalOpen(false)
@@ -2239,7 +2239,7 @@ export default function PermissionCenterPage() {
         }}
         onOk={() => statusForm.submit()}
         confirmLoading={statusUpdatingAdminID === statusActionAdmin?.id}
-        okText={statusActionDisabled ? '确认临时禁用' : '确认启用'}
+        okText={statusActionDisabled ? '确认临时停用' : '确认启用'}
         cancelText="取消"
         centered
         forceRender
@@ -2250,7 +2250,7 @@ export default function PermissionCenterPage() {
           message={
             statusActionDisabled
               ? `${statusActionAdmin?.username || '该账号'} 将立即无法继续访问后台`
-              : `${statusActionAdmin?.username || '该账号'} 将恢复登录和原有角色权限`
+              : `${statusActionAdmin?.username || '该账号'} 将恢复登录和原有岗位功能`
           }
           style={{ marginBottom: 16 }}
         />
@@ -2260,7 +2260,7 @@ export default function PermissionCenterPage() {
             name="reason"
             rules={
               statusActionDisabled
-                ? [{ required: true, message: '请填写临时禁用原因' }]
+                ? [{ required: true, message: '请填写临时停用原因' }]
                 : []
             }
           >
@@ -2295,7 +2295,7 @@ export default function PermissionCenterPage() {
           type="warning"
           showIcon
           message={`将正式注销 ${revokingAdmin?.username || '该账号'}`}
-          description="账号和历史操作记录会保留，未完成的个人待办将退回原岗位任务池。注销不可恢复；如需该人员重新使用系统，必须创建新账号。"
+          description="账号和历史操作记录会保留，未完成的个人待办将退回原负责岗位，供该岗位其他人员继续处理。注销不可恢复；如需该人员重新使用系统，必须创建新账号。"
           style={{ marginBottom: 16 }}
         />
         <Form form={revokeForm} layout="vertical" onFinish={revokeAdminAccount}>

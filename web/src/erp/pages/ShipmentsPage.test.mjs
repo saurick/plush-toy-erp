@@ -37,7 +37,10 @@ test('shipment finance submit uses source-owned APIs without frontend money fiel
 test('shipment finance unknown results retain the request and success refreshes', () => {
   assert.match(source, /createSourceBusinessActionAttemptStore/u)
   assert.match(source, /financeSourceAttemptsRef\.current\.settle/u)
-  assert.match(source, /已保留本次请求，请使用相同内容重试/u)
+  assert.match(
+    source,
+    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
+  )
   assert.match(source, /setFinanceSourceAction\(null\)[\s\S]*message\.success/u)
   assert.match(
     source,

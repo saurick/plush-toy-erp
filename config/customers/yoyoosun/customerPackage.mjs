@@ -16,6 +16,7 @@ export const yoyoosunCustomerPackage = Object.freeze({
     publishEnabled: false,
     activateEnabled: false,
     rollbackEnabled: false,
+    localTestApplyEnabled: true,
   }),
   boundaries: Object.freeze({
     createsTenant: false,

@@ -17,11 +17,12 @@
 - [ ] 恢复目标是隔离测试库或明确恢复窗口。
 - [ ] 恢复前确认 backup id 和 hash。
 - [ ] 已执行 `run-backup-restore-rehearsal.sh` 或等价真实恢复命令。
+- [ ] 已在 restored DB 上依次执行 populated upgrade 与 customer config cutover read-only audit；任一审计失败时未执行 migration apply。
 - [ ] 恢复后 migration status 正常。
 - [ ] 恢复后 smoke query 通过。
 - [ ] 恢复后 web / server 健康检查通过。
 - [ ] `command-summary.txt` 已生成，只记录脱敏命令摘要，不包含完整 DSN、secret、dump 内容或客户 raw rows。
-- [ ] `backup-restore-report.json` 已生成，并声明 `backupCreated=true`、`restoreCompleted=true`、`migrationStatus=ok`、`smokeQueryStatus=passed`，且 `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus`、`artifacts.commandSummary` 指向当前 evidence 目录内真实存在的相对路径。
+- [ ] `backup-restore-report.json` 已生成，并声明 `backupCreated=true`、`restoreCompleted=true`、`migrationStatus=ok`、`smokeQueryStatus=passed`；跨越 `20260714055504` 时四处 `populatedUpgradeAuditStatus` 均为 `passed`，跨越 `20260714055825` 时四处 `customerConfigCutoverAuditStatus` 均为 `passed`，步骤含对应 read-only audit；且 `artifacts.backupEvidence`、`artifacts.preMigrationStatus`、`artifacts.migrationStatus`、`artifacts.commandSummary` 指向当前 evidence 目录内真实存在的相对路径。
 
 ## 收口
 

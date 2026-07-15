@@ -68,6 +68,7 @@ import {
   getAdminProfileSyncErrorAction,
   hasExpectedDesktopCustomerSession,
   isLocalCustomerDesktopPreviewSession,
+  loadProfileSyncReadWithRetry,
   resolveEffectiveSessionCustomerKey,
   shouldRedirectFromCurrentNavigation,
   shouldGuardCustomerBusinessPageRuntime,
@@ -76,6 +77,7 @@ import {
 const { Content, Header, Sider } = Layout
 const { Paragraph, Text } = Typography
 const PROFILE_SYNC_INTERVAL_MS = 60 * 1000
+const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
 
 const navIconRegistry = {
   'workspace-home': <AppstoreOutlined />,
@@ -110,20 +112,17 @@ const navIconRegistry = {
 const productCoreReviewFallbackByPageKey = {
   'business-dashboard': {
     title: '业务看板',
-    description: '业务看板汇总客户运行态的订单、库存、协同、出货和财务指标。',
-    primaryEntity: 'dashboard_stats',
-    factSource: 'business.dashboard_stats',
-    currentScope: ['看板入口', '菜单权限', '指标分组', '客户运行态读模型边界'],
+    description: '业务看板汇总订单、库存、待办、出货和财务等业务数量。',
+    currentScope: ['看板入口', '页面权限', '数字分类', '客户数据连接状态'],
     boundary:
-      'Product Core 只审阅看板能力和指标边界，不在无客户态读取 dashboard_stats。',
+      '当前只显示看板功能说明；连接客户业务数据后才会显示实际数字。',
   },
   'exception-flow': {
-    title: '异常 / 阻塞闭环',
-    description: '异常闭环承接客户运行态的阻塞任务、处理动作、原因和后续跟进。',
-    primaryEntity: 'workflow_tasks / workflow_task_events',
-    factSource: 'workflow runtime',
-    currentScope: ['异常入口', '责任角色', '阻塞状态', '处理动作边界'],
-    boundary: 'Workflow 任务处理不等于库存、出货、财务或其他 Fact posted。',
+    title: '异常处理',
+    description: '异常处理用于查看阻塞任务、登记原因、分派负责人并跟进处理。',
+    currentScope: ['异常入口', '负责岗位', '阻塞状态', '可用操作'],
+    boundary:
+      '任务状态只代表异常事项的处理进度；库存、出货和财务结果请以对应业务页面为准。',
   },
 }
 
@@ -140,14 +139,10 @@ function ProductCoreCapabilityReview({ currentEntry }) {
     Array.isArray(moduleDefinition?.currentScope) &&
     moduleDefinition.currentScope.length > 0
       ? moduleDefinition.currentScope
-      : ['菜单入口', '权限码', '字段策略', '动作边界']
-  const sourceText =
-    moduleDefinition?.factSource ||
-    moduleDefinition?.primaryEntity ||
-    '客户运行态业务 API'
+      : ['菜单入口', '功能权限', '字段设置', '可用操作']
   const boundaryText =
     moduleDefinition?.boundary ||
-    'Product Core 只审阅页面能力、权限、字段和动作边界；客户业务记录需在客户运行态查看。'
+    '当前只显示页面功能说明；连接客户业务数据后才能查看和办理实际业务。'
 
   return (
     <div
@@ -157,42 +152,40 @@ function ProductCoreCapabilityReview({ currentEntry }) {
     >
       <div className="erp-product-core-capability-review__header">
         <div>
-          <Text type="secondary">Product Core</Text>
-          <h2>{pageLabel} 能力审阅</h2>
+          <Text type="secondary">功能预览</Text>
+          <h2>{pageLabel} 功能预览</h2>
           <Paragraph>
             {moduleDefinition?.description ||
-              `${pageLabel} 当前作为产品核心已登记页面参与菜单、权限、字段和动作边界审阅。`}
+              `${pageLabel} 已配置页面入口、功能权限、字段和可用操作。`}
           </Paragraph>
         </div>
         <Space size={8} wrap>
-          <Tag color="blue">能力定义</Tag>
-          <Tag color="geekblue">不挂载客户数据</Tag>
-          <Tag>无客户运行态</Tag>
+          <Tag color="blue">功能说明</Tag>
+          <Tag color="geekblue">不显示客户数据</Tag>
+          <Tag>尚未连接客户环境</Tag>
         </Space>
       </div>
 
       <div className="erp-product-core-capability-review__grid">
         <div className="erp-product-core-capability-review__panel">
-          <Text type="secondary">当前模块</Text>
+          <Text type="secondary">当前功能</Text>
           <strong>{pageLabel}</strong>
-          <span>{moduleDefinition?.sectionTitle || '产品核心能力目录'}</span>
+          <span>{moduleDefinition?.sectionTitle || '系统功能目录'}</span>
         </div>
         <div className="erp-product-core-capability-review__panel">
-          <Text type="secondary">数据真源</Text>
-          <strong>{sourceText}</strong>
-          <span>客户订单、库存、协同任务和财务记录只在客户运行态读取。</span>
+          <Text type="secondary">数据状态</Text>
+          <strong>尚未连接客户业务数据</strong>
+          <span>连接后才能查看客户订单、库存、待办任务和财务记录。</span>
         </div>
         <div className="erp-product-core-capability-review__panel erp-product-core-capability-review__panel--wide">
-          <Text type="secondary">边界说明</Text>
+          <Text type="secondary">使用说明</Text>
           <strong>{boundaryText}</strong>
-          <span>
-            要查看真实业务记录，请切换到带 customer key 的客户运行环境。
-          </span>
+          <span>要查看实际业务记录，请进入已经连接客户数据的环境。</span>
         </div>
       </div>
 
       <div className="erp-product-core-capability-review__scope">
-        <Text type="secondary">已登记审阅范围</Text>
+        <Text type="secondary">可查看内容</Text>
         <Space size={8} wrap>
           {currentScope.map((item) => (
             <Tag key={item}>{item}</Tag>
@@ -273,6 +266,8 @@ export default function ERPLayout() {
   const [profileSyncCompleted, setProfileSyncCompleted] = useState(false)
   const adminProfileRef = useRef(adminProfile)
   const profileSyncInFlightRef = useRef(null)
+  const profileSyncActiveRef = useRef(false)
+  const profileInitialSyncStartedRef = useRef(false)
   const profileSyncErrorNotifiedRef = useRef(false)
   const profileSessionUnavailableHandledRef = useRef(false)
   const [refreshingCurrentPage, setRefreshingCurrentPage] = useState(false)
@@ -351,13 +346,35 @@ export default function ERPLayout() {
         return profileSyncInFlightRef.current
       }
 
+      const isCurrentSync = () => profileSyncActiveRef.current
+      const loadCurrentSyncRead = (load, retryDelaysMs) =>
+        loadProfileSyncReadWithRetry(
+          () => {
+            if (!isCurrentSync()) {
+              throw Object.assign(new Error('Profile sync inactive'), {
+                isAbortError: true,
+              })
+            }
+            return load()
+          },
+          { retryDelaysMs }
+        )
       const syncPromise = (async () => {
         if (showLoading) {
           setProfileSyncCompleted(false)
           setProfileLoading(true)
         }
         try {
-          const result = await adminRpc.call('me', {})
+          const bootstrapRetryDelays = showLoading
+            ? PROFILE_BOOTSTRAP_RETRY_DELAYS_MS
+            : []
+          const result = await loadCurrentSyncRead(
+            () => adminRpc.call('me', {}),
+            bootstrapRetryDelays
+          )
+          if (!isCurrentSync()) {
+            return
+          }
           let nextProfile = result?.data || null
           if (nextProfile) {
             try {
@@ -367,15 +384,25 @@ export default function ERPLayout() {
                 nextProfile =
                   attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
               } else {
-                const effectiveSession = await getEffectiveSession({
-                  customer_key: effectiveSessionCustomerKey,
-                })
+                const effectiveSession = await loadCurrentSyncRead(
+                  () =>
+                    getEffectiveSession({
+                      customer_key: effectiveSessionCustomerKey,
+                    }),
+                  bootstrapRetryDelays
+                )
+                if (!isCurrentSync()) {
+                  return
+                }
                 nextProfile = attachEffectiveSessionToAdminProfile(
                   nextProfile,
                   effectiveSession
                 )
               }
             } catch (sessionError) {
+              if (!isCurrentSync()) {
+                return
+              }
               const syncErrorAction = getAdminProfileSyncErrorAction(
                 sessionError,
                 {
@@ -405,6 +432,9 @@ export default function ERPLayout() {
                 : attachUnavailableEffectiveSessionToAdminProfile(nextProfile)
             }
           }
+          if (!isCurrentSync()) {
+            return
+          }
           if (nextProfile) {
             persistAuthMeta(
               {
@@ -424,6 +454,9 @@ export default function ERPLayout() {
           setAdminProfile(nextProfile)
           profileSyncErrorNotifiedRef.current = false
         } catch (error) {
+          if (!isCurrentSync()) {
+            return
+          }
           const syncErrorAction = getAdminProfileSyncErrorAction(error, {
             hasCachedProfile: Boolean(adminProfileRef.current),
             alreadyNotified: profileSyncErrorNotifiedRef.current,
@@ -441,7 +474,7 @@ export default function ERPLayout() {
                 search: window.location.search,
                 hash: window.location.hash,
               },
-              message: getActionErrorMessage(error, '同步管理员权限'),
+              message: getActionErrorMessage(error, '加载账号权限'),
               loginPath: getLoginPath(AUTH_SCOPE.ADMIN),
             })
             return
@@ -455,13 +488,15 @@ export default function ERPLayout() {
           }
           if (!isAuthFailureCode(error?.code)) {
             profileSyncErrorNotifiedRef.current = true
-            message.error(getActionErrorMessage(error, '同步管理员权限'))
+            message.error(getActionErrorMessage(error, '加载账号权限'))
           }
         } finally {
-          if (showLoading) {
-            setProfileLoading(false)
+          if (isCurrentSync()) {
+            if (showLoading) {
+              setProfileLoading(false)
+            }
+            setProfileSyncCompleted(true)
           }
-          setProfileSyncCompleted(true)
           if (profileSyncInFlightRef.current === syncPromise) {
             profileSyncInFlightRef.current = null
           }
@@ -475,7 +510,11 @@ export default function ERPLayout() {
   )
 
   useEffect(() => {
-    loadProfile({ showLoading: true })
+    profileSyncActiveRef.current = true
+    if (!profileInitialSyncStartedRef.current) {
+      profileInitialSyncStartedRef.current = true
+      loadProfile({ showLoading: true })
+    }
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
@@ -491,6 +530,7 @@ export default function ERPLayout() {
     }, PROFILE_SYNC_INTERVAL_MS)
 
     return () => {
+      profileSyncActiveRef.current = false
       document.removeEventListener('visibilitychange', handleVisibilityChange)
       window.clearInterval(profileSyncTimer)
     }
@@ -773,7 +813,7 @@ export default function ERPLayout() {
     : (adminProfile?.roles || [])
         .map(
           (role) =>
-            role?.name || (role?.role_key || role?.key ? '已配置角色' : '')
+            role?.name || (role?.role_key || role?.key ? '已配置岗位' : '')
         )
         .filter(Boolean)
         .slice(0, 2)
@@ -797,7 +837,7 @@ export default function ERPLayout() {
   if (profileLoading && !adminProfile) {
     return (
       <Loading
-        title="管理员权限同步中"
+        title="账号权限加载中"
         description="正在确认当前账号的菜单和访问范围，请稍候..."
         fullscreen
         className="loading-page--erp"
@@ -861,7 +901,7 @@ export default function ERPLayout() {
                 onClick={() => setMobileNavOpen(true)}
               />
               <div>
-                <div className="erp-admin-header__title">毛绒 ERP 管理后台</div>
+                <div className="erp-admin-header__title">业务管理</div>
               </div>
             </Space>
 
@@ -894,7 +934,7 @@ export default function ERPLayout() {
           <div className="erp-admin-breadcrumb">
             <Breadcrumb
               items={[
-                { title: 'ERP' },
+                { title: '业务管理' },
                 { title: currentEntry?.label || DEFAULT_DESKTOP_ENTRY.label },
               ]}
             />
@@ -905,8 +945,8 @@ export default function ERPLayout() {
               type="warning"
               showIcon
               data-local-customer-desktop-preview="true"
-              message="本地客户预览"
-              description="当前后端尚未激活客户配置版本，只展示页面能力和权限范围；工作台、任务看板及客户业务数据均不加载，正式使用仍需激活客户配置。"
+              message="本地功能预览"
+              description="当前尚未启用客户业务设置，只能查看页面和功能；工作台、任务看板和业务数据暂时不能使用。"
             />
           ) : null}
 
@@ -929,8 +969,8 @@ export default function ERPLayout() {
               <Alert
                 type="warning"
                 showIcon
-                message="当前账号暂无可见后台入口"
-                description="请确认当前账号已分配正确的角色和页面权限。若刷新后仍无可见入口，请联系管理员。"
+                message="当前账号暂无可用页面"
+                description="请确认当前账号已设置正确的岗位和可用页面。若刷新后仍无入口，请联系管理员。"
               />
             ) : shouldGuardProductCoreBusinessData ? (
               <ProductCoreCapabilityReview currentEntry={currentEntry} />

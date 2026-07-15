@@ -56,7 +56,7 @@ export function createPurchaseReceiptScenarios(deps) {
     assert.equal(
       await exportButton.isDisabled(),
       false,
-      `${scenarioName} 入库当前结果有数据时应允许真实导出`
+      `${scenarioName} 入库本页有数据时应允许真实导出`
     )
     assert.equal(
       await columnOrderButton.isDisabled(),
@@ -344,14 +344,18 @@ export function createPurchaseReceiptScenarios(deps) {
           ['明细', '', '入库单号'],
           `入库表格前置选择列不应显示“选择”二字: ${JSON.stringify(metrics)}`
         )
-        for (const header of metrics.headers.slice(0, 2)) {
-          assert(
-            header.width <= 56 &&
-              header.scrollWidth <= header.clientWidth &&
-              header.textAlign === 'center',
-            `入库表格控制列表头应保持窄列、居中且不裁字: ${JSON.stringify(metrics)}`
-          )
-        }
+        assert(
+          metrics.headers[0].width <= 104 &&
+            metrics.headers[0].scrollWidth <= metrics.headers[0].clientWidth &&
+            metrics.headers[0].textAlign === 'center',
+          `入库表格明细条数列应完整显示且居中: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.headers[1].width <= 56 &&
+            metrics.headers[1].scrollWidth <= metrics.headers[1].clientWidth &&
+            metrics.headers[1].textAlign === 'center',
+          `入库表格选择列应保持窄列、居中且不裁字: ${JSON.stringify(metrics)}`
+        )
         assert(
           metrics.selectionInputTypes.length > 0 &&
             metrics.selectionInputTypes.every((type) => type === 'radio'),
@@ -488,11 +492,11 @@ export function createPurchaseReceiptScenarios(deps) {
           })
           .last()
         await modal.waitFor({ state: 'visible', timeout: 10_000 })
-        await expectText(page, '草稿过账后才影响库存')
+        await expectText(page, '确认草稿后库存会同步更新')
         await expectText(page, 'PRT-STYLE-L1')
 
         const returnPostButton = modal.getByRole('button', {
-          name: /过\s*账/u,
+          name: /确\s*认/u,
         })
         assert.equal(
           await returnPostButton.count(),
@@ -504,16 +508,16 @@ export function createPurchaseReceiptScenarios(deps) {
           .locator('.ant-popover:visible')
           .getByRole('button', { name: /确\s*认/u })
           .click()
-        await expectText(page, '采购退货已过账')
+        await expectText(page, '采购退货已确认')
         await modal.getByRole('tab', { name: /入库调整/u }).click()
         await expectText(page, 'PRA-STYLE-L1')
-        await modal.getByRole('button', { name: '取消并冲正' }).click()
+        await modal.getByRole('button', { name: '取消并恢复库存' }).click()
         await page
           .locator('.ant-popover:visible')
           .last()
           .getByRole('button', { name: '确认取消', exact: true })
           .click()
-        await expectText(page, '入库调整已取消并冲正')
+        await expectText(page, '入库调整已取消，库存已恢复到调整前')
 
         const metrics = await modal.evaluate((node) => {
           const box = node.getBoundingClientRect()

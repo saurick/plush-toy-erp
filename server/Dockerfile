@@ -104,7 +104,11 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 RUN groupadd --system --gid 10001 app && \
-    useradd --system --uid 10001 --gid app --no-create-home --home-dir /nonexistent --shell /usr/sbin/nologin app
+    useradd --system --uid 10001 --gid app --create-home --home-dir /home/app --shell /usr/sbin/nologin app
+
+# Chromium 以非 root 用户启动时会在 HOME 下初始化 crashpad。HOME 指向
+# /nonexistent 会让进程在 warmup 阶段直接退出，进而使 /readyz 永久为 503。
+ENV HOME=/home/app
 
 ARG GIT_SHA
 ARG GIT_SHA_SHORT

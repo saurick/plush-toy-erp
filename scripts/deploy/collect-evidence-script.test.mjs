@@ -79,6 +79,30 @@ test("collect evidence draft includes backup restore artifact placeholders compa
     report.restore.migrationBeforeApply,
     "待填写，必须等于 release-evidence.md migrationBefore",
   );
+  assert.match(report.restore.populatedUpgradeAuditStatus, /20260714055504/u);
+  assert.match(report.summary.populatedUpgradeAuditStatus, /20260714055504/u);
+  assert.match(
+    report.restore.customerConfigCutoverAuditStatus,
+    /20260714055825/u,
+  );
+  assert.match(
+    report.summary.customerConfigCutoverAuditStatus,
+    /20260714055825/u,
+  );
+  const backupEvidence = fs.readFileSync(
+    path.join(output, "backup-evidence.md"),
+    "utf8",
+  );
+  assert.match(backupEvidence, /populatedUpgradeAuditStatus/u);
+  assert.match(backupEvidence, /customerConfigCutoverAuditStatus/u);
+  const commandSummary = fs.readFileSync(
+    path.join(output, "command-summary.txt"),
+    "utf8",
+  );
+  assert.match(commandSummary, /populatedUpgradeAuditStatus/u);
+  assert.match(commandSummary, /customerConfigCutoverAuditStatus/u);
+  assert.match(commandSummary, /populated upgrade read-only audit/u);
+  assert.match(commandSummary, /customer config cutover read-only audit/u);
   const preflightReport = fs.readFileSync(
     path.join(output, "production-preflight-report.txt"),
     "utf8",

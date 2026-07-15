@@ -3,11 +3,11 @@ export const PROCESSING_CONTRACT_DRAFT_VERSION = 2
 export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
   { key: 'contractNo', fieldKey: 'contractNo', label: '委外加工订单号' },
   { key: 'productOrderNo', fieldKey: 'productOrderNo', label: '来源订单编号' },
-  { key: 'productNo', fieldKey: 'productNo', label: '加工对象编号' },
+  { key: 'productNo', fieldKey: 'productNo', label: '产品 / 材料编号' },
   {
     key: 'productName',
     fieldKey: 'productName',
-    label: '加工对象名称',
+    label: '产品 / 材料名称',
     multiline: true,
   },
   {
@@ -132,18 +132,18 @@ export const processingContractTemplateMeta = {
   factBoundary: 'read_snapshot_only',
   moduleKeys: ['outsourcing_orders'],
   summary:
-    '基于已评审的合同字段与纸面版式类别，收口加工合同的独立打印工作台；产品运行时不保留客户原始文件名。',
+    '根据已确认的合同字段和纸面版式提供独立打印窗口；界面不会显示客户原始文件名。',
   scene: '委外加工下单、加工厂回签、财务对账留档',
   layout:
     'A4 单页固定合同版式，包含双栏合同头、加工明细表、条款区、签字区和页底两处纸样 / 图样附件位。',
   output: '在线预览 PDF / 下载 PDF / 打印',
   notes: [
-    '加工合同当前和采购合同一样，统一走独立打印工作台链路；其余汇总表和报表模板继续保留静态预览。',
-    '顶部按钮和弹窗工作流统一为：先打开可编辑打印窗口，再做独立 PDF 预览窗口 / 下载 PDF / 打印。',
-    '工作台上插 / 下插明细行时会新增真正空白行，不再预填合同号、产品号或其他相邻行字段。',
+    '加工合同和采购合同都使用独立打印窗口；其他汇总表和报表模板仍提供示例预览。',
+    '先打开可编辑打印窗口，再预览、下载或打印 PDF。',
+    '在明细上方或下方插入时会新增空白行，不会复制相邻行内容。',
     '纸样 / 图样附件通过工作台独立上传，并同步进入右侧页底附件位，随 PDF / 打印一起输出。',
   ],
-  tags: ['固定版式', '合同快照', 'PDF / 打印', '可编辑窗口'],
+  tags: ['固定版式', '合同内容', 'PDF / 打印', '可编辑窗口'],
   previewLines: [
     '合同头 / 加工商信息',
     '加工明细 / 合计',
@@ -154,10 +154,10 @@ export const processingContractTemplateMeta = {
     '来源样本：加工合同纸面 PDF',
   ],
   fieldTruth: [
-    '合同编号、下单日期、回货日期、加工方名称、委托单位都属于合同头快照，不回写主数据。',
-    '工序名称、工序类别、单价、委托加工数量、委托加工金额属于合同明细快照；金额默认按数量 × 单价带值，但允许按合同快照手工改写。',
+    '合同编号、下单日期、回货日期、加工方名称和委托单位保留在当前合同中，不会修改加工厂或公司资料。',
+    '工序名称、工序类别、单价、委托加工数量和金额保留在当前合同中；金额默认按数量 × 单价计算，也可手工修改。',
     '来货要求、合同约定、结算方式属于正式合同正文，不应只留在帮助文档里口头说明。',
-    '纸样 / 图样附件属于附件快照层，当前通过工作台上传后进入页底附件位，并随 PDF / 打印一起冻结。',
+    '纸样 / 图样附件上传后显示在页底，并随当前 PDF 或打印件一起输出。',
   ],
   fieldRequirements: [
     {
@@ -169,21 +169,21 @@ export const processingContractTemplateMeta = {
     },
     {
       key: 'processor_snapshot',
-      label: '加工方快照',
-      source: '供应商 / 加工厂主数据或合同草稿',
-      boundary: '只读快照；打印编辑不反写加工厂主数据',
+      label: '加工方资料',
+      source: '供应商 / 加工厂资料或合同草稿',
+      boundary: '打印时修改内容不会改变供应商或加工厂资料',
     },
     {
       key: 'processing_line_snapshots',
-      label: '加工明细快照',
+      label: '加工明细',
       source: '委外订单明细或合同明细草稿',
       boundary:
         '工序、数量、单价和金额保留在当前打印草稿中，不会自动生成发料、回货、库存或财务记录',
     },
     {
       key: 'attachment_snapshots',
-      label: '纸样 / 图样附件快照',
-      source: '当前打印窗口上传的附件快照',
+      label: '纸样 / 图样附件',
+      source: '当前打印窗口上传的附件',
       boundary: '图片随当前 PDF / 打印输出保留，不替代正式附件归档',
     },
     {
@@ -528,7 +528,7 @@ function normalizeProcessingFactTrace(record = {}) {
     )
   }
   if (subjectNo || (subjectType && subjectID)) {
-    traceParts.push(`加工对象: ${subjectNo || '加工对象已关联'}`)
+    traceParts.push(`产品 / 材料：${subjectNo || '已关联'}`)
   }
   if (sourceNo || (sourceType && sourceID)) {
     traceParts.push(`来源单据: ${sourceNo || '来源单据已关联'}`)

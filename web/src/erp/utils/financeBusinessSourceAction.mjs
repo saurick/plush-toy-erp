@@ -211,7 +211,7 @@ function strictRequest(params, sourceIDKey) {
   const sourceID = positiveID(params?.[sourceIDKey])
   const idempotencyKey = normalizedText(params?.idempotency_key)
   if (!sourceID || !idempotencyKey || [...idempotencyKey].length > 128) {
-    throw new Error('财务来源请求参数无效')
+    throw new Error('财务处理内容有误，请刷新页面后重新填写')
   }
   const customerKey = normalizedText(params?.customer_key)
   return {

@@ -53,7 +53,7 @@ function requiredID(value) {
   return parsed
 }
 
-function invalidContract(message = '委外业务请求信息不完整') {
+function invalidContract(message = '委外业务内容不完整，请重新核对') {
   const error = new Error(message)
   error.isInvalidResponse = true
   return error
@@ -254,14 +254,14 @@ export function normalizeOutsourcingSourceFactCreateRequest(
     typeof params !== 'object' ||
     Array.isArray(params)
   ) {
-    throw invalidContract('委外业务请求参数无效')
+    throw invalidContract('委外业务内容有误，请刷新页面后重新填写')
   }
   const allowed =
     normalizedAction === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT
       ? RETURN_RECEIPT_CREATE_REQUEST_KEYS
       : MATERIAL_ISSUE_CREATE_REQUEST_KEYS
   if (!Object.keys(params).every((key) => allowed.has(key))) {
-    throw invalidContract('委外业务请求包含不允许的字段')
+    throw invalidContract('委外业务内容有误，请刷新页面后重新填写')
   }
   let lotFields
   try {
@@ -269,7 +269,7 @@ export function normalizeOutsourcingSourceFactCreateRequest(
       allowNew: normalizedAction === OUTSOURCING_SOURCE_ACTIONS.RETURN_RECEIPT,
     })
   } catch {
-    throw invalidContract('委外业务批次参数无效')
+    throw invalidContract('委外业务批次有误，请重新选择或填写')
   }
   const customerKey = optionalText(params.customer_key, 64)
   const occurredAt = optionalOccurredAt(params.occurred_at)

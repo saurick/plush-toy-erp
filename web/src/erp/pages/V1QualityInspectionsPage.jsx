@@ -92,6 +92,7 @@ import {
   compactParams,
   buildSequentialDraftCode,
   hasActionPermission,
+  statusText,
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
@@ -127,6 +128,11 @@ import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessA
 
 const COLUMN_ORDER_STORAGE_PREFIX = 'erp.module.column-order.'
 const EMPTY_ADMIN_PROFILE = Object.freeze({})
+const PURCHASE_RECEIPT_STATUS_LABELS = Object.freeze({
+  DRAFT: '草稿',
+  POSTED: '已过账',
+  CANCELLED: '已取消',
+})
 const { Text } = Typography
 
 function readStoredColumnOrder(moduleKey) {
@@ -569,7 +575,7 @@ export default function V1QualityInspectionsPage() {
           : []
       )
     } catch (error) {
-      message.error(getActionErrorMessage(error, '加载质检引用数据'))
+      message.error(getActionErrorMessage(error, '加载质检相关资料'))
       setPurchaseReceipts([])
       setInventoryLots([])
       setMaterials([])
@@ -793,7 +799,7 @@ export default function V1QualityInspectionsPage() {
         )
         if (retained) {
           message.warning(
-            '采购退货生成结果暂时无法确认，已保留本次请求，请使用相同内容重试'
+            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
           )
         } else {
           message.error(getActionErrorMessage(error, '生成采购退货草稿'))
@@ -877,8 +883,8 @@ export default function V1QualityInspectionsPage() {
 
   const modalDescription = {
     create:
-      '选择采购入库及其入库行；材料、仓库和批次由服务端按来源行确定，不在表单中重复维护。',
-    pass: '合格或让步接收只更新质检判定和批次状态，不写库存流水。',
+      '选择采购入库单和入库明细；系统会自动带出材料、仓库和批次，无需重复填写。',
+    pass: '合格或让步接收只更新质检判定和批次状态，不会增减库存数量。',
     reject: '不合格只更新质检判定和批次状态，供应商退货仍走采购退货。',
     cancel: '取消只关闭当前质检流程，不会修改库存或采购入库记录。',
   }[inspectionModal?.mode || 'create']
@@ -977,7 +983,7 @@ export default function V1QualityInspectionsPage() {
   const exportQualityInspections = useCallback(() => {
     if (rows.length === 0) return
     downloadCSV({
-      filename: `quality-inspections-${new Date().toISOString().slice(0, 10)}.csv`,
+      filename: `质量检验-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: exportColumns,
       rows,
     })
@@ -1018,7 +1024,7 @@ export default function V1QualityInspectionsPage() {
       <PageHeaderCard
         compact
         title="质量检验"
-        description="质量检验统一承接采购来料、委外回货等来源的检验判定；提交会冻结对应批次，合格 / 让步接收恢复可用，不合格置为不可用。判定不写库存流水；采购来料不合格退供应商仍走采购退货，其他来源走对应业务。"
+        description="质量检验用于处理采购来料、委外回货等业务的检验判定；提交会冻结对应批次，合格 / 让步接收后恢复可用，不合格后置为不可用。质检判定不会增减库存数量；采购来料不合格退供应商仍需办理采购退货，其他情况请到对应业务页面处理。"
         tags={[
           <Tag color="gold" key="hold">
             已提交：批次冻结
@@ -1032,7 +1038,7 @@ export default function V1QualityInspectionsPage() {
         ]}
         stats={[
           { key: 'total', label: '总质检单', value: total },
-          { key: 'current', label: '当前结果', value: rows.length },
+          { key: 'current', label: '本页显示', value: rows.length },
           {
             key: 'submitted',
             label: '已提交',
@@ -1223,7 +1229,7 @@ export default function V1QualityInspectionsPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedRowLabel}
-          boundaryText="提交、判定和取消均由系统按质检规则处理；不会绕过规则直接修改批次状态或库存流水。"
+          boundaryText="提交、判定和取消均由系统按质检规则处理；不会绕过规则直接修改批次状态或库存数量。"
         >
           <Button
             type="link"
@@ -1251,7 +1257,7 @@ export default function V1QualityInspectionsPage() {
             </Button>
           </Dropdown>
           <Popconfirm
-            title="确认提交质检并将批次置为 HOLD？"
+            title="确认提交质检并冻结该批次？"
             onConfirm={() =>
               runInspectionAction(
                 selectedRow,
@@ -1411,7 +1417,11 @@ export default function V1QualityInspectionsPage() {
                     <Text>
                       {[
                         `供应商：${selectedPurchaseReceipt.supplier_name || '-'}`,
-                        `状态：${selectedPurchaseReceipt.status || '-'}`,
+                        `状态：${statusText(
+                          selectedPurchaseReceipt.status,
+                          PURCHASE_RECEIPT_STATUS_LABELS,
+                          '状态待确认'
+                        )}`,
                         selectedPurchaseReceiptItem
                           ? `来源行：${
                               selectedPurchaseReceiptItem.source_line_no ||
@@ -1477,7 +1487,7 @@ export default function V1QualityInspectionsPage() {
           ownerType="quality_inspection"
           ownerId={inspectionModal?.inspection?.id}
           title="质检附件"
-          description="上传不良照片、检验报告、让步说明或批次异常证据；附件不替代质检状态动作。"
+          description="上传不良照片、检验报告、让步说明或批次异常证据；附件不能代替质检处理。"
           canUpload={canCreate || canUpdate}
           canDelete={canUpdate}
           variant="inline"

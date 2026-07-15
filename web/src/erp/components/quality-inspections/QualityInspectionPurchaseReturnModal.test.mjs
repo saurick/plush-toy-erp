@@ -30,7 +30,9 @@ test('quality purchase return modal only asks for return business intent', () =>
   ]) {
     assert.doesNotMatch(source, new RegExp(`name="${derivedField}"`, 'u'))
   }
-  assert.match(source, /供应商、材料、仓库、批次和单位由不合格质检来源确定/u)
+  assert.match(source, /供应商、材料、仓库、批次和单位会根据这次不合格检验自动带入/u)
+  assert.match(source, /确认退货后，相应批次的库存会同步扣减/u)
+  assert.doesNotMatch(source, /写库存|库存流水|库存冲正/u)
 })
 
 test('quality purchase return modal prevents duplicate submission and stale fields', () => {

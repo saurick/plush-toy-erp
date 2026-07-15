@@ -156,7 +156,7 @@ export function normalizeProductionReworkRequest(params = {}) {
     Array.isArray(params) ||
     !Object.keys(params).every((key) => PRODUCTION_REWORK_REQUEST_KEYS.has(key))
   ) {
-    throw invalidResponse('返工请求包含不允许的字段')
+    throw invalidResponse('返工内容有误，请刷新页面后重新填写')
   }
   const sourceCompletionFactID = positiveID(params.source_completion_fact_id)
   const quantity = quantityText(params.quantity)
@@ -169,7 +169,7 @@ export function normalizeProductionReworkRequest(params = {}) {
     [...idempotencyKey].length > MAX_IDEMPOTENCY_KEY_LENGTH ||
     [...customerKey].length > 64
   ) {
-    throw invalidResponse('返工请求参数无效')
+    throw invalidResponse('返工内容有误，请刷新页面后重新填写')
   }
   const occurredAt = optionalOccurredAt(params.occurred_at)
   return {

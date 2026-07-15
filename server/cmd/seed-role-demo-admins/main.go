@@ -35,11 +35,14 @@ func main() {
 	resetPassword := flag.Bool("reset-password", false, "reset password for existing demo accounts")
 	includeDebug := flag.Bool("include-debug", false, "also seed demo_debug with debug_operator role")
 	includeManualAcceptanceScenarios := flag.Bool("include-manual-acceptance-scenarios", false, "also reset the three existing manual acceptance scenario account passwords without changing roles or status")
-	resetLocalSuperAdmin := flag.Bool("reset-local-super-admin", false, "also reset the existing local admin password without changing its status or permissions")
-	resetLocalSuperAdminConfirmation := flag.String("reset-local-super-admin-confirm", "", "exact confirmation required with --reset-local-super-admin")
+	resetLocalSuperAdmin := flag.Bool("reset-local-super-admin", false, "deprecated unsafe option; always rejected")
+	resetLocalSuperAdminConfirmation := flag.String("reset-local-super-admin-confirm", "", "deprecated unsafe option; always rejected")
 	allowProd := flag.Bool("allow-prod", false, "allow seeding when config path or environment looks like production")
 	timeout := flag.Duration("timeout", 15*time.Second, "database operation timeout")
 	flag.Parse()
+	if err := rejectStableAdminReset(*resetLocalSuperAdmin, *resetLocalSuperAdminConfirmation); err != nil {
+		fail("%v", err)
+	}
 
 	if err := guardProduction(*confPath, *allowProd); err != nil {
 		fail("%v", err)
@@ -104,15 +107,6 @@ func main() {
 			fail("reset manual acceptance scenario passwords failed: %v", err)
 		}
 	}
-	if *resetLocalSuperAdmin {
-		if strings.TrimSpace(*resetLocalSuperAdminConfirmation) != resetLocalSuperAdminConfirm {
-			fail("reset local super admin requires --reset-local-super-admin-confirm %s", resetLocalSuperAdminConfirm)
-		}
-		if err := data.ResetRoleDemoAdminPasswords(ctx, db, []string{"admin"}, effectivePassword); err != nil {
-			fail("reset local super admin password failed: %v", err)
-		}
-	}
-
 	fmt.Printf("role demo admin seed completed accounts=%d password_source=%s password_reset=%t include_debug=%t include_manual_acceptance_scenarios=%t reset_local_super_admin=%t\n",
 		len(result.Accounts),
 		source,
@@ -128,6 +122,13 @@ func main() {
 		}
 		fmt.Printf("- %s role=%s %s password_reset=%t\n", account.Username, account.RoleKey, action, account.PasswordReset)
 	}
+}
+
+func rejectStableAdminReset(requested bool, confirmation string) error {
+	if requested || strings.TrimSpace(confirmation) != "" {
+		return fmt.Errorf("stable local admin password reset is disabled; use demo accounts or an isolated database")
+	}
+	return nil
 }
 
 func resolvePostgresDSN(confPath string) (string, error) {

@@ -83,7 +83,7 @@ export default function ProductionMaterialIssueModal({
       <Alert
         type="info"
         showIcon
-        message="领料对象和单位来自发布时冻结的物料需求；记录先生成草稿，核对过账后才会写库存出库流水。"
+        message="领用材料和单位来自已发布的物料需求；记录先生成草稿，核对并过账后才会更新库存出库记录。"
       />
       {lotOptions.length === 0 ? (
         <Alert

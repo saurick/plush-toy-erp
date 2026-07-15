@@ -978,6 +978,124 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
+      name: 'bom-person-field-labels-desktop',
+      path: '/erp/purchase/material-bom',
+      auth: 'admin',
+      effectiveSession: {
+        configRevision: 'style-l1-bom-person-field-labels',
+        configHash: 'style-l1-bom-person-field-labels-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: ['workflow.task.create', 'workflow.task.read'],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['engineering'],
+        },
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, 'BOM 管理')
+        await page.getByRole('button', { name: '新建草稿' }).click()
+        const modal = page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
+        await expectText(page, '新建 BOM 草稿')
+        await modal.getByLabel('制表人', { exact: true }).waitFor()
+        await modal.getByLabel('审核人', { exact: true }).waitFor()
+
+        const labelMetrics = await modal.evaluate((node) => {
+          const normalizeText = (value) =>
+            String(value || '')
+              .replace(/\s+/gu, '')
+              .trim()
+          return ['制表人', '审核人'].map((label) => {
+            const formItem = Array.from(
+              node.querySelectorAll('.ant-form-item')
+            ).find(
+              (item) =>
+                normalizeText(
+                  item.querySelector('.ant-form-item-label')?.textContent
+                ) === label
+            )
+            const labelNode = formItem?.querySelector(
+              '.ant-form-item-label label'
+            )
+            const input = formItem?.querySelector('input')
+            const itemRect = formItem?.getBoundingClientRect()
+            const labelRect = labelNode?.getBoundingClientRect()
+            const inputRect = input?.getBoundingClientRect()
+            return {
+              label,
+              found: Boolean(formItem && labelNode && input),
+              labelWidth: labelRect?.width || 0,
+              inputWidth: inputRect?.width || 0,
+              contained:
+                Boolean(itemRect && inputRect) &&
+                inputRect.left >= itemRect.left - 1 &&
+                inputRect.right <= itemRect.right + 1,
+            }
+          })
+        })
+        assert(
+          labelMetrics.every(
+            (item) =>
+              item.found &&
+              item.labelWidth > 0 &&
+              item.inputWidth > 0 &&
+              item.contained
+          ),
+          `BOM 人员字段标签和值槽应完整可见且保持在字段容器内: ${JSON.stringify(
+            labelMetrics
+          )}`
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-person-field-labels-default.png'),
+        })
+
+        const makerInput = modal.getByLabel('制表人', { exact: true })
+        const auditorInput = modal.getByLabel('审核人', { exact: true })
+        await makerInput.fill('工程制表人员姓名边界样例')
+        await auditorInput.fill('工程审核人员姓名边界样例')
+        await auditorInput.focus()
+        assert.equal(
+          await makerInput.inputValue(),
+          '工程制表人员姓名边界样例',
+          'BOM 制表人字段应接受并保留人员姓名'
+        )
+        assert.equal(
+          await auditorInput.inputValue(),
+          '工程审核人员姓名边界样例',
+          'BOM 审核人字段应接受并保留人员姓名'
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'bom-person-field-labels-boundary.png'),
+        })
+        await closeBusinessFormModal(page, modal)
+      },
+    },
+    {
+      name: 'inventory-visible-copy-desktop',
+      path: '/erp/warehouse/inventory',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await expectText(page, '撤销调整')
+        await assertTextAbsent(page, '库存流水')
+        await assertTextAbsent(page, '流水')
+        await assertTextAbsent(page, '冲正')
+        await page.screenshot({
+          path: path.join(outputDir, 'inventory-visible-copy-desktop.png'),
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(page, 'inventory-visible-copy-desktop')
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
@@ -1002,7 +1120,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-v1-suppliers',
         })
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-v1-suppliers',
         })
@@ -1051,7 +1169,7 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-v1-customers',
         })
         await expectText(page, '暗色客户')
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-v1-customers',
         })
@@ -1102,8 +1220,8 @@ export function createBusinessFormalScenarios(deps) {
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-v1-sales-orders',
         })
-        await expectText(page, '订单行')
-        await expectText(page, '本页协同')
+        await expectText(page, '订单明细')
+        await expectText(page, '相关任务')
         await assertNoListDeleteTrashToolbar(page)
         await assertBusinessMainTableInitialSelectionEmpty(page, {
           scenarioName: 'business-v1-sales-orders',
@@ -1249,7 +1367,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-standard-products',
         })
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-standard-products',
         })
@@ -1258,7 +1376,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-products',
-          expectedLabels: ['总产品', '当前结果', '启用产品'],
+          expectedLabels: ['总产品', '本页显示', '启用产品'],
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-standard-products',
@@ -1377,7 +1495,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-standard-bom',
         })
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-standard-bom',
         })
@@ -1393,7 +1511,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-bom',
-          expectedLabels: ['总BOM', '当前结果', '已激活'],
+          expectedLabels: ['总BOM', '本页显示', '已激活'],
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建草稿',
@@ -1408,6 +1526,8 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, 'BOM 版本')
         await expectText(page, '产品')
         await expectText(page, '先选择产品，系统会建议下一个版本号')
+        await expectText(page, '制表人')
+        await expectText(page, '审核人')
         await expectText(page, 'BOM 附件')
         await expectText(page, 'BOM 明细')
         await expectText(page, '已录入')
@@ -2074,8 +2194,8 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-standard-inventory-lots',
         })
 
-        await page.getByRole('tab', { name: '库存流水' }).click()
-        await expectText(page, '冲正')
+        await page.getByRole('tab', { name: '库存变动记录' }).click()
+        await expectText(page, '撤销调整')
         await expectText(page, '其他来源')
         await expectText(page, '未提供业务单号')
         await expectText(page, '已关联来源行')
@@ -2500,13 +2620,13 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '加工合同只表达委外承诺和打印快照')
         await expectText(page, '查货只是工序候选')
         await assertTextAbsent(page, '判定结果回质检模块')
-        await expectText(page, '本页协同')
+        await expectText(page, '相关任务')
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-v1-processing-contracts',
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-v1-processing-contracts',
-          expectedLabels: ['总记录', '当前结果', '草稿', '已确认'],
+          expectedLabels: ['总记录', '本页显示', '草稿', '已确认'],
           allowWrappedStats: true,
         })
         await assertNoListDeleteTrashToolbar(page)
@@ -2646,7 +2766,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '生产订单')
         await expectText(page, 'MO-STYLE-L1-20260713')
-        await expectText(page, '维护生产计划源单')
+        await expectText(page, '维护生产计划单')
         await expectButton(page, '新建生产订单')
         await page.getByText('MO-STYLE-L1-20260713', { exact: true }).click()
         await expectButton(page, '编辑')
@@ -2669,7 +2789,7 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-workflow-production-scheduling',
           afterPageReady: async () => {
             await expectText(page, '暂无生产排程协同任务')
-            await expectText(page, '本页协同')
+            await expectText(page, '相关任务')
           },
         })
 
@@ -2685,7 +2805,7 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-workflow-production-exceptions',
           afterPageReady: async () => {
             await expectText(page, '暂无生产异常协同任务')
-            await expectText(page, '本页协同')
+            await expectText(page, '相关任务')
           },
         })
 
@@ -3116,7 +3236,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectHeading(page, '委外订单')
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-v1-outsourcing-mobile',
-          expectedLabels: ['总记录', '当前结果', '草稿', '已确认'],
+          expectedLabels: ['总记录', '本页显示', '草稿', '已确认'],
           allowWrappedStats: true,
         })
         await verifyBusinessActionFormModal(page, {

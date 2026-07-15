@@ -5,6 +5,7 @@ import {
   FORMAL_DEMO_ACCOUNTS,
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
   MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS,
+  MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE,
   applyManualAcceptanceAccountScenarios,
   buildManualAcceptanceAccountScenarioPlan,
   normalizeAccountScenarioBackendURL,
@@ -31,6 +32,7 @@ function admin({
   disabled = false,
   phone = "",
   isSuperAdmin = false,
+  accountStatus,
 }) {
   return {
     id,
@@ -38,6 +40,7 @@ function admin({
     phone,
     is_super_admin: isSuperAdmin,
     disabled,
+    ...(accountStatus ? { account_status: accountStatus } : {}),
     roles: roleKeys.map(role),
     permissions: [],
     menus: [],
@@ -52,6 +55,23 @@ function formalAccounts() {
       roleKeys: [username.replace(/^demo_/u, "")],
     }),
   );
+}
+
+function acceptanceRoles(overrides = {}) {
+  return MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.map((item, index) => ({
+    id: index + 1,
+    role_key: item.roleKey,
+    role_type: "business_default",
+    version: 1,
+    disabled: false,
+    permissions_editable: true,
+    permissions_editable_by_current_admin: true,
+    permissions: [
+      ...(Object.hasOwn(overrides, item.roleKey)
+        ? overrides[item.roleKey]
+        : item.capabilityKeys),
+    ].sort(),
+  }));
 }
 
 function ok(data, url, extras = {}) {
@@ -72,11 +92,34 @@ function createBackend({
   redirectLogin = false,
   malformedCreate = false,
   transformResetResponse = (account) => account,
+  initialAuditTotal = 4,
+  initialRolePermissions = {},
+  roleOptionsTransform = (roles) => roles,
+  permissionOptionsTransform = (permissions) => permissions,
 } = {}) {
   const state = initialAccounts.map((item) => structuredClone(item));
+  const roleState = acceptanceRoles(initialRolePermissions);
   const calls = [];
   const passwords = new Map();
   let nextID = Math.max(...state.map((item) => Number(item.id)), 0) + 1;
+  let auditTotal = initialAuditTotal;
+  const permissionOptions = () =>
+    [
+      ...new Set([
+        ...MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.flatMap(
+          (item) => item.capabilityKeys,
+        ),
+        ...roleState.flatMap((item) => item.permissions),
+      ]),
+    ]
+      .sort()
+      .map((permissionKey, index) => ({
+        id: index + 1,
+        permission_key: permissionKey,
+        class: "business",
+        assignable: true,
+        non_production_only: false,
+      }));
 
   const fetchImpl = async (url, options) => {
     const body = JSON.parse(options.body);
@@ -105,7 +148,22 @@ function createBackend({
       );
     }
     if (domain === "debug" && body.method === "capabilities") {
-      return ok({ environment }, url);
+      return ok(
+        {
+          environment,
+          ...(environment === "sql"
+            ? {
+                seedEnabled: false,
+                seedAllowed: false,
+                cleanupEnabled: false,
+                cleanupAllowed: false,
+                businessDataClearEnabled: false,
+                businessDataClearAllowed: false,
+              }
+            : {}),
+        },
+        url,
+      );
     }
     if (
       domain === "customer_config" &&
@@ -125,6 +183,29 @@ function createBackend({
     if (domain === "admin" && body.method === "list") {
       return ok({ admins: structuredClone(state) }, url);
     }
+    if (domain === "admin" && body.method === "rbac_options") {
+      return ok(
+        {
+          roles: roleOptionsTransform(structuredClone(roleState)),
+          permissions: permissionOptionsTransform(permissionOptions()),
+        },
+        url,
+      );
+    }
+    if (domain === "admin" && body.method === "set_role_permissions") {
+      const selected = roleState.find(
+        (item) => item.role_key === body.params.role_key,
+      );
+      assert(selected);
+      assert.equal(body.params.expected_version, selected.version);
+      selected.permissions = [...body.params.permission_keys].sort();
+      selected.version += 1;
+      auditTotal += 1;
+      return ok({ role: structuredClone(selected) }, url);
+    }
+    if (domain === "admin" && body.method === "audit_logs") {
+      return ok({ events: [], total: auditTotal, limit: 1, offset: 0 }, url);
+    }
     if (domain === "admin" && body.method === "create") {
       const created = admin({
         id: nextID++,
@@ -132,6 +213,7 @@ function createBackend({
         roleKeys: body.params.role_keys,
       });
       state.push(created);
+      auditTotal += 1;
       if (malformedCreate) {
         const malformed = structuredClone(created);
         delete malformed.id;
@@ -142,23 +224,26 @@ function createBackend({
     if (domain === "admin" && body.method === "set_roles") {
       const account = state.find((item) => item.id === body.params.id);
       account.roles = body.params.role_keys.map(role);
+      auditTotal += 1;
       return ok({ admin: structuredClone(account) }, url);
     }
     if (domain === "admin" && body.method === "set_disabled") {
       const account = state.find((item) => item.id === body.params.id);
       account.disabled = body.params.disabled;
+      auditTotal += 1;
       return ok({ admin: structuredClone(account) }, url);
     }
     if (domain === "admin" && body.method === "reset_password") {
       const account = state.find((item) => item.id === body.params.id);
       passwords.set(account.id, body.params.password);
+      auditTotal += 1;
       const responseAccount = transformResetResponse(structuredClone(account));
       return ok({ admin: responseAccount }, url);
     }
     throw new Error(`unexpected call ${domain}.${body.method}`);
   };
 
-  return { fetchImpl, calls, passwords, state };
+  return { fetchImpl, calls, passwords, state, roleState };
 }
 
 function mutationCalls(backend) {
@@ -174,6 +259,13 @@ function mutationCalls(backend) {
 function passwordResetCalls(backend) {
   return backend.calls.filter(
     (call) => call.domain === "admin" && call.method === "reset_password",
+  );
+}
+
+function rolePermissionCalls(backend) {
+  return backend.calls.filter(
+    (call) =>
+      call.domain === "admin" && call.method === "set_role_permissions",
   );
 }
 
@@ -205,9 +297,22 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(plan.simulatedOnly, true);
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.directSQL, false);
+  assert.equal(plan.target, "local-dev");
+  assert.equal(plan.dataVersion, "2026.07.15-v3");
+  assert.equal(plan.runId, "20260715-V3");
   assert.deepEqual(plan.protectedAccounts, FORMAL_DEMO_ACCOUNTS);
   assert.equal(plan.protectedAccounts.length, 10);
   assert.equal(plan.scenarios.length, 3);
+  assert.equal(plan.roleCapabilityBaseline.length, 9);
+  assert.deepEqual(
+    plan.roleCapabilityBaseline.map((item) => item.roleKey).sort(),
+    MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.map((item) => item.roleKey).sort(),
+  );
+  assert.equal(
+    plan.roleCapabilityBaseline.some((item) => item.roleKey === "admin"),
+    false,
+  );
+  assert.equal(plan.scenarios[0].disabledReason, "验收时暂时停用");
   assert.deepEqual(
     plan.scenarios.map((item) => item.username),
     ["demo_uat_disabled", "demo_uat_sales_purchase", "demo_uat_no_entry"],
@@ -370,10 +475,162 @@ test("non-local runtime and empty active revision perform zero account writes", 
         buildManualAcceptanceAccountScenarioPlan(),
         { password: "demo-pass", fetchImpl: emptyRevision.fetchImpl },
       ),
-      /active yoyoosun configuration revision is unavailable/u,
+      /active customer configuration is not the current runtime source/u,
     ),
   );
   assert.equal(mutationCalls(emptyRevision).length, 0);
+});
+
+test("local SQL runtime is accepted only through the shared debug-disabled policy", async () => {
+  const backend = createBackend({ environment: "sql" });
+  const report = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(
+      buildManualAcceptanceAccountScenarioPlan(),
+      { password: "demo-pass", fetchImpl: backend.fetchImpl },
+    ),
+  );
+  assert.equal(report.runtime.target, "local-dev");
+  assert.equal(report.runtime.environment, "sql");
+  assert.equal(report.runtime.dataVersion, "2026.07.15-v3");
+});
+
+test("local acceptance adds missing customer capabilities without replacing role selections", async () => {
+  const retained = {
+    warehouse: "erp.dashboard.read",
+    pmc: "erp.dashboard.read",
+    finance: "finance.report.read",
+  };
+  const backend = createBackend({
+    initialRolePermissions: Object.fromEntries(
+      Object.entries(retained).map(([roleKey, permissionKey]) => [
+        roleKey,
+        [permissionKey],
+      ]),
+    ),
+  });
+  const first = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(
+      buildManualAcceptanceAccountScenarioPlan(),
+      { password: "demo-pass", fetchImpl: backend.fetchImpl },
+    ),
+  );
+  assert.equal(first.roleCapabilityBaseline.source, "yoyoosun-role-flow-matrix");
+  assert.equal(first.roleCapabilityBaseline.updated, 3);
+  assert.equal(first.roleCapabilityBaseline.unchanged, 6);
+  assert.deepEqual(
+    rolePermissionCalls(backend)
+      .map((call) => call.params.role_key)
+      .sort(),
+    ["finance", "pmc", "warehouse"],
+  );
+  for (const call of rolePermissionCalls(backend)) {
+    assert.ok(call.params.permission_keys.includes(retained[call.params.role_key]));
+    const baseline = MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.find(
+      (item) => item.roleKey === call.params.role_key,
+    );
+    assert.ok(
+      baseline.capabilityKeys.every((key) =>
+        call.params.permission_keys.includes(key),
+      ),
+    );
+  }
+
+  const roleWrites = rolePermissionCalls(backend).length;
+  const second = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(
+      buildManualAcceptanceAccountScenarioPlan(),
+      { password: "demo-pass", fetchImpl: backend.fetchImpl },
+    ),
+  );
+  assert.equal(second.roleCapabilityBaseline.updated, 0);
+  assert.equal(second.roleCapabilityBaseline.unchanged, 9);
+  assert.equal(rolePermissionCalls(backend).length, roleWrites);
+});
+
+test("role and permission metadata are fully preflighted before the first acceptance write", async () => {
+  const cases = [
+    {
+      name: "missing role",
+      options: {
+        roleOptionsTransform: (roles) =>
+          roles.filter((item) => item.role_key !== "finance"),
+      },
+    },
+    {
+      name: "disabled role",
+      options: {
+        roleOptionsTransform: (roles) =>
+          roles.map((item) =>
+            item.role_key === "warehouse" ? { ...item, disabled: true } : item,
+          ),
+      },
+    },
+    {
+      name: "wrong role type",
+      options: {
+        roleOptionsTransform: (roles) =>
+          roles.map((item) =>
+            item.role_key === "pmc"
+              ? { ...item, role_type: "custom" }
+              : item,
+          ),
+      },
+    },
+    {
+      name: "not editable",
+      options: {
+        roleOptionsTransform: (roles) =>
+          roles.map((item) =>
+            item.role_key === "quality"
+              ? {
+                  ...item,
+                  permissions_editable: false,
+                  permissions_editable_by_current_admin: false,
+                }
+              : item,
+          ),
+      },
+    },
+    {
+      name: "nonassignable permission",
+      options: {
+        permissionOptionsTransform: (permissions) =>
+          permissions.map((item) =>
+            item.permission_key === "production.fact.read"
+              ? { ...item, assignable: false }
+              : item,
+          ),
+      },
+    },
+    {
+      name: "missing permission metadata",
+      options: {
+        permissionOptionsTransform: (permissions) =>
+          permissions.filter(
+            (item) => item.permission_key !== "purchase.return.read",
+          ),
+      },
+    },
+  ];
+
+  for (const item of cases) {
+    const backend = createBackend({
+      initialRolePermissions: { warehouse: ["erp.dashboard.read"] },
+      ...item.options,
+    });
+    await withConfirmation(() =>
+      assert.rejects(
+        applyManualAcceptanceAccountScenarios(
+          buildManualAcceptanceAccountScenarioPlan(),
+          { password: "demo-pass", fetchImpl: backend.fetchImpl },
+        ),
+        undefined,
+        item.name,
+      ),
+    );
+    assert.equal(rolePermissionCalls(backend).length, 0, item.name);
+    assert.equal(mutationCalls(backend).length, 0, item.name);
+  }
 });
 
 test("first apply creates three accounts and every repeated apply resets all passwords", async () => {
@@ -427,6 +684,62 @@ test("first apply creates three accounts and every repeated apply resets all pas
   );
   assert.deepEqual([...backend.passwords.values()], Array(3).fill("demo-pass"));
   assert.doesNotMatch(JSON.stringify(second), /demo-pass/u);
+});
+
+test("audit minimum is filled with the disabled scenario account and replay skips filler", async () => {
+  const backend = createBackend({ initialAuditTotal: 4 });
+  const plan = buildManualAcceptanceAccountScenarioPlan({ auditMinimum: 30 });
+
+  const first = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(plan, {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
+  );
+  assert.deepEqual(first.audit, {
+    minimum: 30,
+    before: 4,
+    after: 31,
+    added: 27,
+    fillMutations: 20,
+  });
+  const disabled = backend.state.find(
+    (item) => item.username === "demo_uat_disabled",
+  );
+  assert.equal(disabled.disabled, true);
+  assert.deepEqual(disabled.roles.map((item) => item.role_key), ["sales"]);
+  assert(
+    backend.calls
+      .filter(
+        (call) =>
+          call.domain === "admin" &&
+          call.method === "set_roles" &&
+          call.params.id === disabled.id,
+      )
+      .every(
+        (call) =>
+          call.params.role_keys.length === 0 ||
+          call.params.role_keys.join(",") === "sales",
+      ),
+  );
+
+  const second = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(plan, {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
+  );
+  assert.equal(second.audit.before, 31);
+  assert.equal(second.audit.after, 34);
+  assert.equal(second.audit.fillMutations, 0);
+});
+
+test("audit minimum parsing is bounded and report-only keeps zero by default", () => {
+  assert.equal(buildManualAcceptanceAccountScenarioPlan().auditMinimum, 0);
+  assert.throws(
+    () => buildManualAcceptanceAccountScenarioPlan({ auditMinimum: 201 }),
+    /between 0 and 200/u,
+  );
 });
 
 test("apply output reports password readiness without printing the password", async () => {
@@ -486,6 +799,10 @@ test("safely owned same-name accounts converge only the necessary fields", async
       "reset_password",
     ],
   );
+  const disableCall = mutationCalls(backend).find(
+    (call) => call.method === "set_disabled",
+  );
+  assert.equal(disableCall.params.reason, "验收时暂时停用");
 });
 
 test("unsafe same-name ownership fails before the first account write", async () => {
@@ -520,7 +837,7 @@ test("malformed list and mutation responses cannot be reported as success", asyn
         buildManualAcceptanceAccountScenarioPlan(),
         { password: "demo-pass", fetchImpl: listBackend.fetchImpl },
       ),
-      /missing disabled status/u,
+      /missing valid account status/u,
     ),
   );
   assert.equal(mutationCalls(listBackend).length, 0);
@@ -548,7 +865,7 @@ test("password reset response must contain the exact account identity and state"
     ["id", /missing admin id/u],
     ["username", /username is required/u],
     ["roles", /response missing roles/u],
-    ["disabled", /missing disabled status/u],
+    ["disabled", /missing valid account status/u],
   ];
   for (const [field, expectedError] of missingFields) {
     const backend = createBackend({
@@ -587,15 +904,52 @@ test("password reset response must contain the exact account identity and state"
   assert.equal(passwordResetCalls(wrongID).length, 1);
 });
 
-test("admin record validation requires id, username, roles and disabled", () => {
+test("admin record validation accepts login disabled or list account_status projections", () => {
   const valid = admin({ id: 1, username: "demo_uat_no_entry" });
   assert.equal(requireAdminAccountRecord(valid).username, "demo_uat_no_entry");
 
-  for (const field of ["id", "username", "roles", "disabled"]) {
+  for (const field of ["id", "username", "roles"]) {
     const malformed = structuredClone(valid);
     delete malformed[field];
     assert.throws(() => requireAdminAccountRecord(malformed));
   }
+
+  const listProjection = admin({
+    id: 2,
+    username: "demo_uat_disabled",
+    accountStatus: "suspended",
+  });
+  delete listProjection.disabled;
+  const normalizedList = requireAdminAccountRecord(listProjection);
+  assert.equal(normalizedList.accountStatus, "suspended");
+  assert.equal(normalizedList.disabled, true);
+
+  const missingStatus = structuredClone(valid);
+  delete missingStatus.disabled;
+  assert.throws(
+    () => requireAdminAccountRecord(missingStatus),
+    /valid account status/u,
+  );
+  assert.throws(
+    () =>
+      requireAdminAccountRecord(
+        admin({
+          id: 3,
+          username: "demo_uat_conflict",
+          disabled: false,
+          accountStatus: "suspended",
+        }),
+      ),
+    /conflicting account status/u,
+  );
+  assert.throws(
+    () =>
+      requireAdminAccountRecord({
+        ...listProjection,
+        account_status: "unknown",
+      }),
+    /valid account status/u,
+  );
 });
 
 test("scenario definitions remain the sole managed account set", () => {

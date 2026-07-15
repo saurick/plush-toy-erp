@@ -224,7 +224,7 @@ test('mobileTaskQueries: append 快照漂移时拒绝拼接并保留原分页槽
         { append: true }
       ),
     (error) =>
-      error.isInvalidResponse === true && /分页快照已失效/u.test(error.message)
+      error.isInvalidResponse === true && /任务列表已更新/u.test(error.message)
   )
   assert.deepEqual(currentSlot, before)
 })

@@ -124,11 +124,19 @@ test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
   )
   assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_UNAVAILABLE],
-    '短信服务暂不可用，请稍后再试或联系管理员'
+    '暂时无法发送验证码，请稍后再试或联系系统管理员'
   )
   assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED],
-    '短信服务额度已用完，请联系管理员处理'
+    '暂时无法发送验证码，请联系系统管理员'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_MOBILE_ROLE_DENIED],
+    '当前账号不能使用手机端待办，请联系系统管理员'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.IDEMPOTENCY_CONFLICT],
+    '本次操作内容与刚才提交的不一致，请刷新页面后重新办理'
   )
 })
 

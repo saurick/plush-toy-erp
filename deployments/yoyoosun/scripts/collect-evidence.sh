@@ -158,6 +158,8 @@ cat >"$output_dir/backup-evidence.md" <<EOF
 | restoreTestStatus | 待填写 |
 | restoreTarget | 待填写 |
 | restoreMigrationVersion | 待填写 |
+| populatedUpgradeAuditStatus | 待填写，跨越 20260714055504 时必须为 passed |
+| customerConfigCutoverAuditStatus | 待填写，跨越 20260714055825 时必须为 passed |
 | smokeQueryStatus | 待填写 |
 | webSmokeStatus | 待填写 |
 | verifiedAt | 待填写 |
@@ -180,7 +182,9 @@ backupId=待填写
 releaseVersion=待填写
 sourceAlias=待填写，必须脱敏，例如 env:SOURCE_POSTGRES_DSN
 restoreTarget=待填写，必须脱敏，例如 temp-postgres-container:postgres:18:removed-after-run
-steps=待填写，记录 pg_dump -> restore -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke 的脱敏命令摘要，不保存完整 DSN、secret、dump 内容或客户 raw rows
+populatedUpgradeAuditStatus=待填写，跨越 20260714055504 时必须为 passed
+customerConfigCutoverAuditStatus=待填写，跨越 20260714055825 时必须为 passed
+steps=待填写，记录 pg_dump -> restore -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke 的脱敏命令摘要，不保存完整 DSN、secret、dump 内容或客户 raw rows
 EOF
 
 cat >"$output_dir/backup-restore-report.json" <<EOF
@@ -208,7 +212,9 @@ cat >"$output_dir/backup-restore-report.json" <<EOF
     "restoreTestStatus": "待填写",
     "migrationBeforeApply": "待填写，必须等于 release-evidence.md migrationBefore",
     "restoreMigrationVersion": "待填写",
-    "pendingFiles": "待填写"
+    "pendingFiles": "待填写",
+    "populatedUpgradeAuditStatus": "待填写，跨越 20260714055504 时必须为 passed",
+    "customerConfigCutoverAuditStatus": "待填写，跨越 20260714055825 时必须为 passed"
   },
   "smoke": {
     "smokeQueryStatus": "待填写",
@@ -228,6 +234,8 @@ cat >"$output_dir/backup-restore-report.json" <<EOF
     "backupCreated": false,
     "restoreCompleted": false,
     "migrationStatus": "待填写",
+    "populatedUpgradeAuditStatus": "待填写，跨越 20260714055504 时必须为 passed",
+    "customerConfigCutoverAuditStatus": "待填写，跨越 20260714055825 时必须为 passed",
     "smokeQueryStatus": "待填写"
   }
 }

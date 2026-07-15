@@ -17,7 +17,7 @@ const (
 )
 
 var (
-	templatePDFCSSUnsafePattern  = regexp.MustCompile(`(?i)(@\s*import\b|\bexpression\s*\(|(?:https?|file|ftp|wss?|javascript)\s*:|behavior\s*:|-moz-binding)`)
+	templatePDFCSSUnsafePattern  = regexp.MustCompile(`(?i)(@\s*import\b|\bexpression\s*\(|\b(?:https?|file|ftp|wss?|javascript)\s*:|behavior\s*:|-moz-binding)`)
 	templatePDFCSSURLPattern     = regexp.MustCompile(`(?i)\burl\s*\(`)
 	templatePDFCSSCommentPattern = regexp.MustCompile(`(?s)/\*.*?\*/`)
 	templatePDFDataImagePattern  = regexp.MustCompile(`(?i)^data:image/(png|jpe?g|webp|gif);base64,([a-z0-9+/=]+)$`)

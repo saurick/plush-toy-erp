@@ -242,14 +242,14 @@ export function BOMHeaderFormFields({
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="制表"
+        label="制表人"
         name="maker"
       >
         <Input allowClear autoComplete="off" disabled={disabled} />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
-        label="审核"
+        label="审核人"
         name="auditor"
       >
         <Input allowClear autoComplete="off" disabled={disabled} />

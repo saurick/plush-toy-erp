@@ -674,7 +674,7 @@
 
 .erp-business-board-summary-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(140px, 1fr));
+  grid-template-columns: repeat(4, minmax(140px, 1fr));
   gap: 8px;
   margin-top: 10px;
 }
@@ -725,49 +725,86 @@
   font-variant-numeric: tabular-nums;
 }
 
+.erp-metric-readonly-card__hint.ant-typography {
+  font-size: 12px;
+  line-height: 1.2;
+}
+
+.erp-business-board-summary-note.ant-typography,
+.erp-business-board-table-note.ant-typography {
+  margin: 8px 0 0;
+}
+
+.erp-business-board-inline-alert {
+  margin-bottom: 8px;
+}
+
+.erp-business-board-source-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(210px, 1fr));
+  gap: 6px;
+}
+
+.erp-business-board-source-item {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border: 1px solid #e2ece4;
+  border-radius: 8px;
+  background: #fbfdfb;
+  padding: 5px 8px;
+}
+
+.erp-business-board-source-meta {
+  display: grid;
+  min-width: 0;
+  gap: 1px;
+}
+
+.erp-business-board-source-meta .ant-typography {
+  overflow-wrap: anywhere;
+}
+
+.erp-business-board-source-count {
+  color: #17231c;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.erp-business-board-source-entry.ant-btn {
+  flex: 0 0 auto;
+  height: auto;
+  padding: 2px 0;
+  white-space: normal;
+}
+
 .erp-business-board-lower-grid {
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
   gap: 10px;
 }
 
-.erp-business-board-status-list,
+.erp-business-board-boundary-list,
 .erp-business-board-alert-grid {
   display: grid;
   gap: 8px;
 }
 
-.erp-business-board-status-row {
-  position: relative;
+.erp-business-board-boundary-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
-  min-height: 38px;
-  align-items: center;
-  gap: 8px;
-  overflow: hidden;
+  gap: 3px;
+  min-height: 62px;
   border: 1px solid #e2ece4;
   border-radius: 8px;
   background: #fff;
   padding: 8px 10px;
 }
 
-.erp-business-board-status-row span,
-.erp-business-board-status-row strong {
-  position: relative;
-  z-index: 1;
-}
-
-.erp-business-board-status-row strong {
-  color: #17231c;
-  font-variant-numeric: tabular-nums;
-}
-
-.erp-business-board-status-row i {
-  position: absolute;
-  inset-block: 0;
-  inset-inline-start: 0;
-  min-width: 4px;
-  background: rgb(47 143 75 / 12%);
+.erp-business-board-boundary-row .ant-typography {
+  margin: 0;
+  overflow-wrap: anywhere;
 }
 
 .erp-business-board-alert-grid {
@@ -797,4 +834,16 @@
   color: #d4380d;
   font-size: 18px;
   font-variant-numeric: tabular-nums;
+}
+
+.erp-business-board-task-entry.ant-btn,
+.erp-business-board-task-text.ant-typography {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  white-space: normal;
+  overflow-wrap: anywhere;
 }

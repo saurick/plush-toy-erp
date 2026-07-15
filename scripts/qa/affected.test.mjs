@@ -115,9 +115,7 @@ test("affected: CI workflow changes run the repository CI contract", () => {
       item.args.includes("scripts/qa/ci-workflow.test.mjs"),
     ),
   );
-  assert(
-    plan.followUps.some((item) => item.id === "remote-ci-enforcement"),
-  );
+  assert(plan.followUps.some((item) => item.id === "remote-ci-enforcement"));
   assert.equal(plan.requiresFull, false);
 });
 
@@ -157,9 +155,12 @@ test("affected: a web helper with a sibling test uses the focused test", () => {
 });
 
 test("affected: a page without a sibling test expands to web tests and browser follow-up", () => {
-  const plan = buildAffectedPlan(["web/src/erp/pages/V1InventoryLedgerPage.jsx"], {
-    root: ROOT,
-  });
+  const plan = buildAffectedPlan(
+    ["web/src/erp/pages/V1InventoryLedgerPage.jsx"],
+    {
+      root: ROOT,
+    },
+  );
 
   assert(ids(plan).includes("web-lint"));
   assert(ids(plan).includes("web-test"));
@@ -181,10 +182,9 @@ test("affected: schema changes select migration guard and data tests without aut
 });
 
 test("affected: generated Ent changes select DB proof and regeneration follow-up", () => {
-  const plan = buildAffectedPlan(
-    ["server/internal/data/model/ent/client.go"],
-    { root: ROOT },
-  );
+  const plan = buildAffectedPlan(["server/internal/data/model/ent/client.go"], {
+    root: ROOT,
+  });
 
   assert(ids(plan).includes("db-guard"));
   assert(ids(plan).includes("server-data"));
@@ -230,7 +230,9 @@ test("affected: customer config changes select the T6 boundary suite", () => {
   );
   assert.equal(configCommand?.level, "T6");
   assert(
-    plan.commands.some((item) => item.args.includes("config/customers/index.test.mjs")),
+    plan.commands.some((item) =>
+      item.args.includes("config/customers/index.test.mjs"),
+    ),
   );
   assert(
     plan.commands.some((item) =>
@@ -252,7 +254,9 @@ test("affected: private deployment template changes include isolation boundaries
   );
   assert(
     plan.commands.some((item) =>
-      item.args.includes("scripts/qa/private-deployment-package-closure.test.mjs"),
+      item.args.includes(
+        "scripts/qa/private-deployment-package-closure.test.mjs",
+      ),
     ),
   );
 });
@@ -325,6 +329,38 @@ test("affected: QA shell scripts keep syntax proof and escalate without a siblin
     ),
   );
   assert.equal(ids(withSibling).includes("full"), false);
+});
+
+test("affected: migration preflight SQL files run only their static fail-closed contract", () => {
+  for (const file of [
+    "scripts/qa/populated-upgrade-20260714055504.sql",
+    "scripts/qa/customer-config-cutover-20260714055825.sql",
+  ]) {
+    const plan = buildAffectedPlan([file], { root: ROOT });
+    assert.equal(plan.requiresFull, false, file);
+    assert.deepEqual(ids(plan), [
+      "diff-check",
+      "node-tests:scripts/qa/populated-upgrade-preflight.test.mjs",
+    ]);
+  }
+});
+
+test("affected: populated upgrade fixture runs the static PostgreSQL gate contract", () => {
+  const plan = buildAffectedPlan(
+    ["scripts/qa/fixtures/populated-upgrade-20260710150001.sql"],
+    { root: ROOT },
+  );
+  assert.equal(plan.requiresFull, false);
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes("scripts/qa/critical-postgres-gate.test.mjs"),
+    ),
+  );
+  assert.equal(ids(plan).includes("full"), false);
+  assert.equal(
+    ids(plan).some((id) => id.startsWith("critical-pg-")),
+    false,
+  );
 });
 
 test("affected: CI YAML parser changes rerun the structural workflow contract", () => {

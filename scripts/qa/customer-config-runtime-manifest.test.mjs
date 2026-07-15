@@ -11,7 +11,9 @@ import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/custome
 import { yoyoosunMenuConfig } from "../../config/customers/yoyoosun/menuConfig.mjs";
 import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import {
+  LOCAL_TEST_APPLY_PURPOSE,
   RUNTIME_PAGE_KEYS,
+  buildLocalTestApplyRuntimeManifest,
   buildRuntimeManifest as compileRuntimeManifest,
   buildRuntimePreviewManifest,
   runCustomerConfigRuntimeManifest,
@@ -103,6 +105,50 @@ test("customer-config-runtime-manifest: preview stays explicitly non-publishable
   assert.equal(manifest.compiled_snapshot.package.publishEnabled, false);
   assertSelectionOnlyManifest(manifest);
   validateRuntimeManifest(manifest, { publishable: false });
+});
+
+test("customer-config-runtime-manifest: local test apply is content-addressed and isolated from formal release", () => {
+  const first = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+  const second = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+
+  assert.equal(first.manifest_status, "runtime_compile_ready");
+  assert.equal(first.runtime_enabled, true);
+  assert.equal(first.publishable, true);
+  assert.equal(first.product_version, "local-customer-package-test-apply");
+  assert.equal(first.compiled_snapshot.applyPurpose, LOCAL_TEST_APPLY_PURPOSE);
+  assert.equal(first.compiled_snapshot.package.status, "draft");
+  assert.equal(first.compiled_snapshot.package.runtimeEnabled, false);
+  assert.equal(first.compiled_snapshot.package.previewOnly, true);
+  assert.equal(first.compiled_snapshot.package.publishEnabled, false);
+  assert.match(
+    first.revision,
+    /^yoyoosun-customer-package-v7\.local-[a-f0-9]{16}\.runtime-v1$/u,
+  );
+  assert.equal(second.revision, first.revision);
+  assert(first.revision.length <= 64);
+  assert.deepEqual(second, first);
+  validateRuntimeManifest(first, {
+    publishable: true,
+    purpose: LOCAL_TEST_APPLY_PURPOSE,
+  });
+  assert.throws(
+    () => validateRuntimeManifest(first),
+    /revision must be namespaced|product_version must match|local test apply purpose/u,
+  );
+
+  const changedPackage = structuredClone(yoyoosunCustomerPackage);
+  changedPackage.label = `${changedPackage.label} 本地变更`;
+  const changed = buildLocalTestApplyRuntimeManifest(changedPackage);
+  assert.notEqual(changed.revision, first.revision);
+});
+
+test("customer-config-runtime-manifest: local test apply requires tracked opt-in", () => {
+  const disabled = structuredClone(yoyoosunCustomerPackage);
+  disabled.sourcePolicy.localTestApplyEnabled = false;
+  assert.throws(
+    () => buildLocalTestApplyRuntimeManifest(disabled),
+    /explicitly enabled tracked customer package/u,
+  );
 });
 
 test("customer-config-runtime-manifest: formal payload publishes versions and selection identifiers only", () => {
@@ -337,6 +383,16 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   const quality = entitlementsFor("quality");
   assert(quality.has("purchase.return.read"));
   assert(quality.has("purchase.return.create"));
+
+  assert(pages.pmc.includes("production-progress"));
+  assert(entitlementsFor("pmc").has("production.fact.read"));
+
+  assert(pages.warehouse.includes("inbound"));
+  const warehouse = entitlementsFor("warehouse");
+  assert(warehouse.has("purchase.return.read"));
+  assert(warehouse.has("purchase.receipt.adjustment.read"));
+  assert(!warehouse.has("purchase.return.create"));
+  assert(!warehouse.has("purchase.receipt.adjustment.create"));
 
   assert(pages.production.includes("production-orders"));
   assert(pages.production.includes("processing-contracts"));

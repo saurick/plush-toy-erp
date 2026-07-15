@@ -579,7 +579,7 @@ export function PurchaseOrderFormFields({
                 name={[field.name, 'amount']}
                 label="金额"
               >
-                <Input placeholder="留空时按数量和单价派生" />
+                <Input placeholder="留空时根据数量和单价自动计算" />
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--date"

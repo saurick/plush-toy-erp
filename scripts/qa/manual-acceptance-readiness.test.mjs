@@ -4,19 +4,32 @@ import test from "node:test";
 import {
   buildManualAcceptanceReadinessPlan,
   evaluateManualAcceptanceDataset,
+  MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS,
   parseManualAcceptanceReadinessArgs,
   renderManualAcceptanceReadinessMarkdown,
   runManualAcceptanceReadinessCli,
   verifyManualAcceptanceReadiness,
 } from "./manual-acceptance-readiness.mjs";
+import { TASK_COPY_REVISION } from "./manual-acceptance-task-data.mjs";
 
 function sourceReport(overrides = {}) {
   return {
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
-    runId: "LOCAL-UAT",
-    prefix: "SIM-YOYOOSUN-UAT-LOCAL-UAT",
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.15-v1",
+    runId: "20260715-V1",
+    target: "local-dev",
+    backendURL: "http://127.0.0.1:8300",
+    semanticDigest: "source-semantic-digest-v1",
+    prefix: "SIM-YOYOOSUN-UAT-20260715-V1",
+    runtime: {
+      environment: "local",
+      customerKey: "yoyoosun",
+      configRevision: "cfg-local-1",
+      source: "active_customer_config_revision",
+    },
     scale: {
       customers: 60,
       suppliers: 60,
@@ -28,33 +41,178 @@ function sourceReport(overrides = {}) {
       purchaseOrders: 45,
       outsourcingOrders: 45,
       bomVersions: 45,
-      ...overrides,
+      ...(overrides.scale || {}),
     },
+    ...Object.fromEntries(
+      Object.entries(overrides).filter(([key]) => key !== "scale"),
+    ),
   };
 }
 
-function factReport(overrides = {}) {
+function referenceRecords(count, options) {
+  const {
+    idBase,
+    numberKey,
+    numberPrefix,
+    statuses = [],
+    secondaryKey,
+    secondaryValues = [],
+    sourceType,
+  } = options;
+  return Array.from({ length: count }, (_, index) => ({
+    id: idBase + index,
+    ...(numberKey
+      ? { [numberKey]: `${numberPrefix}-${String(index + 1).padStart(3, "0")}` }
+      : {}),
+    ...(statuses.length > 0 ? { status: statuses[index % statuses.length] } : {}),
+    ...(secondaryKey
+      ? { [secondaryKey]: secondaryValues[index % secondaryValues.length] }
+      : {}),
+    ...(sourceType ? { sourceType, sourceID: idBase + 10_000 + index } : {}),
+  }));
+}
+
+function factReferenceRecords(countOverrides = {}) {
+  const count = (key, fallback) => countOverrides[key] ?? fallback;
+  const productionFacts = referenceRecords(count("productionFacts", 45), {
+    idBase: 10_000,
+    numberKey: "factNo",
+    numberPrefix: "SIM-SDF-PROD",
+    statuses: ["DRAFT", "POSTED", "CANCELLED"],
+    secondaryKey: "factType",
+    secondaryValues: [
+      "MATERIAL_ISSUE",
+      "FINISHED_GOODS_RECEIPT",
+      "REWORK",
+    ],
+    sourceType: "PRODUCTION_ORDER",
+  });
+  const financeFacts = [
+    ["PAYABLE", ["DRAFT", "POSTED", "SETTLED", "CANCELLED"]],
+    ["RECEIVABLE", ["DRAFT", "POSTED", "SETTLED", "CANCELLED"]],
+    ["RECONCILIATION", ["DRAFT", "POSTED", "SETTLED", "CANCELLED"]],
+    ["INVOICE", ["DRAFT", "POSTED", "CANCELLED"]],
+  ].flatMap(([factType, statuses], typeIndex) =>
+    referenceRecords(count(`finance:${factType}`, 45), {
+      idBase: 90_000 + typeIndex * 1_000,
+      numberKey: "factNo",
+      numberPrefix: `SIM-SDF-${factType}`,
+      statuses,
+      secondaryKey: "factType",
+      secondaryValues: [factType],
+      sourceType: factType === "PAYABLE" ? "OUTSOURCING_FACT" : "SHIPMENT",
+    }),
+  );
+  const records = {
+    productionOrders: referenceRecords(count("productionOrders", 45), {
+      idBase: 1_000,
+      numberKey: "orderNo",
+      numberPrefix: "SIM-SDF-PO",
+      statuses: ["DRAFT", "RELEASED", "CLOSED", "CANCELLED"],
+    }),
+    productionFacts,
+    purchaseReceipts: referenceRecords(count("purchaseReceipts", 54), {
+      idBase: 20_000,
+      numberKey: "receiptNo",
+      numberPrefix: "SIM-SDF-PR",
+      statuses: ["DRAFT", "POSTED", "CANCELLED"],
+    }),
+    purchaseReturns: referenceRecords(count("purchaseReturns", 6), {
+      idBase: 30_000,
+      numberKey: "returnNo",
+      numberPrefix: "SIM-SDF-RET",
+      statuses: ["DRAFT", "POSTED", "CANCELLED"],
+    }),
+    purchaseReceiptAdjustments: referenceRecords(
+      count("purchaseReceiptAdjustments", 6),
+      {
+        idBase: 40_000,
+        numberKey: "adjustmentNo",
+        numberPrefix: "SIM-SDF-ADJ",
+        statuses: ["DRAFT", "POSTED", "CANCELLED"],
+        secondaryKey: "adjustType",
+        secondaryValues: ["QUANTITY_INCREASE", "QUANTITY_DECREASE"],
+      },
+    ),
+    qualityInspections: referenceRecords(count("qualityInspections", 54), {
+      idBase: 50_000,
+      numberKey: "inspectionNo",
+      numberPrefix: "SIM-SDF-QI",
+      statuses: ["DRAFT", "SUBMITTED", "PASSED", "REJECTED", "CANCELLED"],
+      sourceType: "PURCHASE_RECEIPT",
+    }),
+    inventoryLots: referenceRecords(count("inventoryLots", 45), {
+      idBase: 60_000,
+      numberKey: "lotNo",
+      numberPrefix: "SIM-SDF-LOT",
+      statuses: ["HOLD", "ACTIVE", "REJECTED"],
+    }).map((item, index) => ({
+      ...item,
+      subjectType: index % 2 === 0 ? "MATERIAL" : "PRODUCT",
+      subjectID: 200 + index,
+      productSkuID: index % 2 === 0 ? undefined : 2_000 + index,
+    })),
+    inventoryBalances: referenceRecords(count("inventoryBalances", 45), {
+      idBase: 70_000,
+    }).map((item, index) => ({
+      ...item,
+      subjectType: index % 2 === 0 ? "MATERIAL" : "PRODUCT",
+      subjectID: 200 + index,
+      productSkuID: index % 2 === 0 ? undefined : 2_000 + index,
+      warehouseID: 300 + (index % 4),
+      lotID: 60_000 + index,
+      unitID: 400 + (index % 2),
+      quantity: "10",
+    })),
+    inventoryTxns: referenceRecords(count("inventoryTxns", 45), {
+      idBase: 80_000,
+      secondaryKey: "txnType",
+      secondaryValues: ["IN", "OUT", "REVERSAL"],
+      sourceType: "PRODUCTION_FACT",
+    }),
+    stockReservations: referenceRecords(count("stockReservations", 45), {
+      idBase: 110_000,
+      numberKey: "reservationNo",
+      numberPrefix: "SIM-SDF-RES",
+      statuses: ["ACTIVE", "RELEASED"],
+      sourceType: "SALES_ORDER",
+    }),
+    shipments: referenceRecords(count("shipments", 45), {
+      idBase: 120_000,
+      numberKey: "shipmentNo",
+      numberPrefix: "SIM-SDF-SHIP",
+      statuses: ["DRAFT", "SHIPPED", "CANCELLED"],
+      sourceType: "SALES_ORDER",
+    }),
+    financeFacts,
+  };
+  records.attachmentOwners = {
+    productionFactId: productionFacts.find((item) => item.status === "POSTED").id,
+    financeFactId: financeFacts.find((item) => item.status === "POSTED").id,
+  };
+  return records;
+}
+
+function factReport({ referenceCounts = {}, ...overrides } = {}) {
   return {
     reportContract: "source-driven-operational-facts-v1",
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
-    runId: "LOCAL-UAT-FACTS",
-    sourceRunId: "LOCAL-UAT",
-    sourcePrefix: "SIM-YOYOOSUN-UAT-LOCAL-UAT",
-    expectedMinimums: {
-      production: 45,
-      inventoryBalances: 45,
-      stockReservations: 45,
-      shipments: 45,
-      payables: 45,
-      receivables: 45,
-      invoices: 45,
-      reconciliation: 45,
-      purchaseReceipts: 54,
-      qualityInspections: 54,
-      ...overrides,
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.15-v1",
+    runId: "20260715-V1",
+    target: "local-dev",
+    backendURL: "http://127.0.0.1:8300",
+    semanticDigest: "fact-semantic-digest-v1",
+    runtime: {
+      environment: "local",
+      customerKey: "yoyoosun",
+      configRevision: "cfg-local-1",
+      source: "active_customer_config_revision",
     },
+    referenceRecords: factReferenceRecords(referenceCounts),
+    ...overrides,
   };
 }
 
@@ -67,15 +225,54 @@ test("readiness rejects legacy generic operational fact reports", () => {
   );
 });
 
+test("readiness fact contract requires bound identity, runtime, exact references, and in-batch attachment owners", () => {
+  for (const key of [
+    "datasetKey",
+    "dataVersion",
+    "target",
+    "backendURL",
+    "semanticDigest",
+    "runtime",
+    "referenceRecords",
+  ]) {
+    const report = factReport();
+    delete report[key];
+    assert.throws(
+      () => buildManualAcceptanceReadinessPlan({ factReport: report }),
+      /业务记录报告不是有效|缺少/u,
+      key,
+    );
+  }
+  const missingDataset = factReport();
+  delete missingDataset.referenceRecords.inventoryTxns;
+  assert.throws(
+    () => buildManualAcceptanceReadinessPlan({ factReport: missingDataset }),
+    /referenceRecords\.inventoryTxns/u,
+  );
+  const staleOwner = factReport();
+  staleOwner.referenceRecords.attachmentOwners.productionFactId = 999_999;
+  assert.throws(
+    () => buildManualAcceptanceReadinessPlan({ factReport: staleOwner }),
+    /attachmentOwners\.productionFactId/u,
+  );
+});
+
 function taskReport(overrides = {}) {
-  const runId = overrides.runId || "LOCAL-UAT";
+  const runId = overrides.runId || "20260715-V1";
   return {
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
     writesFacts: false,
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.15-v1",
     runId,
-    prefix: overrides.prefix || `SIM-YOYOOSUN-UAT-TASK-${runId}`,
+    target: "local-dev",
+    backendURL: "http://127.0.0.1:8300",
+    copyRevision: TASK_COPY_REVISION,
+    prefix:
+      overrides.prefix ||
+      `SIM-YOYOOSUN-UAT-TASK-${runId}-${TASK_COPY_REVISION}`,
     sourceType: "simulated-manual-acceptance-task-batch",
     sourceID: 123456,
     summary: {
@@ -143,6 +340,125 @@ function okResponse(data) {
 
 function createReadinessFetch(runtimeOptions = {}) {
   const calls = [];
+  const factRefs =
+    runtimeOptions.referenceRecords || factReferenceRecords();
+  const backendFactLists = {
+    list_production_orders: [
+      "production_orders",
+      factRefs.productionOrders.map((item) => ({
+        id: item.id,
+        order_no: item.orderNo,
+        status: item.status,
+      })),
+    ],
+    list_production_facts: [
+      "production_facts",
+      factRefs.productionFacts.map((item) => ({
+        id: item.id,
+        fact_no: item.factNo,
+        status: item.status,
+        fact_type: item.factType,
+        source_type: item.sourceType,
+        source_id: item.sourceID,
+      })),
+    ],
+    list_purchase_receipts: [
+      "purchase_receipts",
+      factRefs.purchaseReceipts.map((item) => ({
+        id: item.id,
+        receipt_no: item.receiptNo,
+        status: item.status,
+      })),
+    ],
+    list_purchase_returns: [
+      "purchase_returns",
+      factRefs.purchaseReturns.map((item) => ({
+        id: item.id,
+        return_no: item.returnNo,
+        status: item.status,
+      })),
+    ],
+    list_purchase_receipt_adjustments: [
+      "purchase_receipt_adjustments",
+      factRefs.purchaseReceiptAdjustments.map((item) => ({
+        id: item.id,
+        adjustment_no: item.adjustmentNo,
+        status: item.status,
+        items: [{ adjust_type: item.adjustType }],
+      })),
+    ],
+    list_quality_inspections: [
+      "quality_inspections",
+      factRefs.qualityInspections.map((item) => ({
+        id: item.id,
+        inspection_no: item.inspectionNo,
+        status: item.status,
+        source_type: item.sourceType,
+        source_id: item.sourceID,
+      })),
+    ],
+    list_inventory_lots: [
+      "inventory_lots",
+      factRefs.inventoryLots.map((item) => ({
+        id: item.id,
+        lot_no: item.lotNo,
+        status: item.status,
+        subject_type: item.subjectType,
+        subject_id: item.subjectID,
+        product_sku_id: item.productSkuID,
+      })),
+    ],
+    list_inventory_balances: [
+      "inventory_balances",
+      factRefs.inventoryBalances.map((item) => ({
+        id: item.id,
+        subject_type: item.subjectType,
+        subject_id: item.subjectID,
+        product_sku_id: item.productSkuID,
+        warehouse_id: item.warehouseID,
+        lot_id: item.lotID,
+        unit_id: item.unitID,
+        quantity: item.quantity,
+      })),
+    ],
+    list_inventory_txns: [
+      "inventory_txns",
+      factRefs.inventoryTxns.map((item) => ({
+        id: item.id,
+        txn_type: item.txnType,
+        source_type: item.sourceType,
+        source_id: item.sourceID,
+      })),
+    ],
+    list_stock_reservations: [
+      "stock_reservations",
+      factRefs.stockReservations.map((item) => ({
+        id: item.id,
+        reservation_no: item.reservationNo,
+        status: item.status,
+        sales_order_id: item.sourceID,
+      })),
+    ],
+    list_shipments: [
+      "shipments",
+      factRefs.shipments.map((item) => ({
+        id: item.id,
+        shipment_no: item.shipmentNo,
+        status: item.status,
+      })),
+    ],
+    list_finance_facts: [
+      "finance_facts",
+      factRefs.financeFacts.map((item) => ({
+        id: item.id,
+        fact_no: item.factNo,
+        status: item.status,
+        fact_type: item.factType,
+        source_type: item.sourceType,
+        source_id: item.sourceID,
+      })),
+    ],
+  };
   const listSpecs = {
     list_customers: ["customers", 60, "is_active", [true, false], "code"],
     list_suppliers: ["suppliers", 60, "is_active", [true, false], "code"],
@@ -176,49 +492,12 @@ function createReadinessFetch(runtimeOptions = {}) {
       ["DRAFT", "SUBMITTED", "APPROVED", "CLOSED", "CANCELED"],
       "purchase_order_no",
     ],
-    list_purchase_receipts: [
-      "purchase_receipts",
-      54,
-      "status",
-      ["DRAFT", "POSTED", "CANCELLED"],
-      "receipt_no",
-    ],
-    list_inventory_lots: [
-      "inventory_lots",
-      54,
-      "status",
-      ["HOLD", "ACTIVE", "REJECTED"],
-      "lot_no",
-    ],
     list_outsourcing_orders: [
       "outsourcing_orders",
       45,
       "lifecycle_status",
       ["DRAFT", "SUBMITTED", "CONFIRMED", "CLOSED", "CANCELED"],
       "outsourcing_order_no",
-    ],
-    list_production_facts: [
-      "production_facts",
-      45,
-      "status",
-      ["DRAFT", "POSTED", "CANCELLED"],
-      "fact_no",
-      "fact_type",
-      ["MATERIAL_ISSUE", "FINISHED_GOODS_RECEIPT", "REWORK"],
-    ],
-    list_stock_reservations: [
-      "stock_reservations",
-      45,
-      "status",
-      ["ACTIVE", "RELEASED"],
-      "reservation_no",
-    ],
-    list_shipments: [
-      "shipments",
-      45,
-      "status",
-      ["DRAFT", "SHIPPED", "CANCELLED"],
-      "shipment_no",
     ],
   };
   const fetchImpl = async (url, requestOptions) => {
@@ -239,6 +518,12 @@ function createReadinessFetch(runtimeOptions = {}) {
     if (body.method === "capabilities") {
       return okResponse({
         environment: runtimeOptions.runtimeEnvironment || "local",
+        seedEnabled: false,
+        seedAllowed: false,
+        cleanupEnabled: false,
+        cleanupAllowed: false,
+        businessDataClearEnabled: false,
+        businessDataClearAllowed: false,
       });
     }
     if (body.method === "get_effective_session") {
@@ -251,12 +536,38 @@ function createReadinessFetch(runtimeOptions = {}) {
             runtimeOptions.configRevision === undefined
               ? "cfg-local-1"
               : runtimeOptions.configRevision,
+          modules: Object.fromEntries(
+            [
+              "production_orders",
+              "production",
+              "inventory",
+              "shipments",
+              "finance",
+              "purchase_receipts",
+              "quality_inspections",
+            ].map((key) => [key, "enabled"]),
+          ),
         },
       });
     }
     if (body.method === "list") {
       return okResponse({
-        admins: records(13, "disabled", [false, true]),
+        admins: [
+          ...MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS.map(
+            (item, index) => ({
+              id: index + 1,
+              username: item.username,
+              account_status: item.accountStatus,
+              roles: item.roleKeys.map((roleKey) => ({ role_key: roleKey })),
+            }),
+          ),
+          {
+            id: 10_000,
+            username: "admin",
+            account_status: "active",
+            roles: [],
+          },
+        ],
       });
     }
     if (body.method === "rbac_options") {
@@ -277,7 +588,7 @@ function createReadinessFetch(runtimeOptions = {}) {
         tasks: records(count, "task_status_key", statuses).map(
           (item, index) => ({
             ...item,
-            task_code: `${runtimeOptions.taskPrefix || "SIM-YOYOOSUN-UAT-TASK-LOCAL-UAT"}-${String(index + 1).padStart(2, "0")}`,
+            task_code: `${runtimeOptions.taskPrefix || `SIM-YOYOOSUN-UAT-TASK-20260715-V1-${TASK_COPY_REVISION}`}-${String(index + 1).padStart(2, "0")}`,
             owner_role_key:
               runtimeOptions.taskOwnerRoleKey || body.params.owner_role_key,
             source_type:
@@ -288,21 +599,36 @@ function createReadinessFetch(runtimeOptions = {}) {
         total: runtimeOptions.taskResponseTotal ?? count,
       });
     }
-    if (body.method === "list_finance_facts") {
-      assert.match(
-        body.params.keyword,
-        /^SIM-YOYOOSUN-OPFACT-LOCAL-UAT-FACTS/u,
-      );
-      return okResponse({
-        finance_facts: records(
-          45,
-          "status",
-          ["DRAFT", "POSTED", "SETTLED", "CANCELLED"],
-          "fact_no",
-          body.params.keyword,
-        ),
-        total: 45,
+    if (backendFactLists[body.method]) {
+      const [listKey, allItems] = backendFactLists[body.method];
+      const keyword = String(body.params.keyword || "");
+      const filtered = allItems.filter((item) => {
+        if (
+          keyword &&
+          !Object.values(item).some((value) => String(value ?? "") === keyword)
+        ) {
+          return false;
+        }
+        for (const key of [
+          "subject_type",
+          "subject_id",
+          "product_sku_id",
+          "warehouse_id",
+          "lot_id",
+          "source_type",
+          "source_id",
+          "fact_type",
+        ]) {
+          if (
+            body.params[key] != null &&
+            String(item[key] ?? "") !== String(body.params[key])
+          ) {
+            return false;
+          }
+        }
+        return true;
       });
+      return okResponse({ [listKey]: filtered, total: filtered.length });
     }
     const spec = listSpecs[body.method];
     assert(spec, `unexpected read method ${body.method}`);
@@ -381,15 +707,26 @@ test("default plan covers all 48 targets and never connects to a backend", async
   );
   assert.deepEqual(productionOrders.roleKeys, ["production"]);
   assert.equal(productionOrders.expectedMinimum, 45);
-  assert.deepEqual(productionOrders.probeIds, []);
-  assert.equal(productionOrders.quantityNotProven, true);
+  assert.deepEqual(productionOrders.probeIds, ["production-orders"]);
+  assert.equal(productionOrders.quantityNotProven, undefined);
+  assert.equal(result.plan.expected.targets, 48);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
+  const probesByID = new Map(
+    result.plan.probes.map((probe) => [probe.id, probe]),
+  );
+  assert.equal(probesByID.get("purchase-returns").includeCustomerKey, false);
+  assert.equal(
+    probesByID.get("purchase-receipt-adjustments").includeCustomerKey,
+    false,
+  );
 });
 
 test("apply reports may raise expectations but cannot lower current catalog thresholds", () => {
   const plan = buildManualAcceptanceReadinessPlan({
-    sourceReport: sourceReport({ customers: 75, salesOrders: 20 }),
-    factReport: factReport({ shipments: 55, payables: 12 }),
+    sourceReport: sourceReport({ scale: { customers: 75, salesOrders: 20 } }),
+    factReport: factReport({
+      referenceCounts: { shipments: 55, "finance:PAYABLE": 12 },
+    }),
     taskReport: taskReport(),
   });
   const byId = new Map(plan.probes.map((probe) => [probe.id, probe]));
@@ -400,20 +737,17 @@ test("apply reports may raise expectations but cannot lower current catalog thre
   assert.equal(byId.get("finance-payables").expectedMinimum, 45);
   assert.equal(
     byId.get("customers").params.keyword,
-    "SIM-YOYOOSUN-UAT-LOCAL-UAT",
+    "SIM-YOYOOSUN-UAT-20260715-V1",
   );
-  assert.equal(
-    byId.get("shipments").params.keyword,
-    "SIM-YOYOOSUN-OPFACT-LOCAL-UAT-FACTS",
-  );
-  assert.equal(
-    byId.get("purchase-receipts").params.keyword,
-    "SIM-YOYOOSUN-PQ-LOCAL-UAT-FACTS",
-  );
-  assert.equal(byId.get("quality-inspections").batchEvidence, "not_proven");
-  assert.equal(byId.get("inventory-balances").batchEvidence, "not_proven");
-  assert.equal(byId.get("inventory-lots").batchEvidence, "not_proven");
-  assert.equal(byId.get("inventory-txns").batchEvidence, "not_proven");
+  assert.equal(byId.get("shipments").params.keyword, undefined);
+  assert.equal(byId.get("shipments").batchEvidence, "exact_references");
+  assert.equal(byId.get("shipments").referenceQueries.length, 55);
+  assert.equal(byId.get("purchase-receipts").batchEvidence, "exact_references");
+  assert.equal(byId.get("quality-inspections").batchEvidence, "exact_references");
+  assert.equal(byId.get("inventory-balances").batchEvidence, "exact_references");
+  assert.equal(byId.get("inventory-lots").batchEvidence, "exact_references");
+  assert.equal(byId.get("inventory-txns").batchEvidence, "exact_references");
+  assert.equal(byId.get("production-orders").batchEvidence, "exact_references");
   assert(
     plan.probes
       .filter((probe) => probe.batchEvidence === "prefix_filtered")
@@ -438,7 +772,7 @@ test("apply reports may raise expectations but cannot lower current catalog thre
     () =>
       buildManualAcceptanceReadinessPlan({
         sourceReport: sourceReport(),
-        factReport: { ...factReport(), sourceRunId: "STALE-SOURCE" },
+        factReport: { ...factReport(), runId: "STALE-SOURCE" },
         taskReport: taskReport(),
       }),
     /不是同一批次/u,
@@ -449,7 +783,7 @@ test("apply reports may raise expectations but cannot lower current catalog thre
         sourceReport: sourceReport(),
         taskReport: taskReport({ runId: "STALE-TASK" }),
       }),
-    /岗位任务报告不是同一批次/u,
+    /不是同一批次/u,
   );
   assert.throws(
     () =>
@@ -457,7 +791,7 @@ test("apply reports may raise expectations but cannot lower current catalog thre
         factReport: factReport(),
         taskReport: taskReport({ runId: "STALE-TASK" }),
       }),
-    /业务记录与岗位任务报告不是同一批次/u,
+    /不是同一批次/u,
   );
   assert.throws(
     () =>
@@ -567,6 +901,145 @@ test("dataset evaluation requires the named state set and only counts this batch
   assert.deepEqual(wrongSecondaryKinds.missingSecondaryKinds, ["REWORK"]);
 });
 
+test("account status projection maps suspended to the user-facing disabled evidence", () => {
+  const result = evaluateManualAcceptanceDataset(
+    {
+      id: "permission-accounts",
+      listKey: "admins",
+      statusField: "account_status",
+      expectedMinimum: 3,
+      requiredStatuses: ["ACTIVE", "DISABLED"],
+    },
+    {
+      admins: [
+        { id: 1, account_status: "active" },
+        { id: 2, account_status: "suspended" },
+        { id: 3, account_status: "revoked" },
+      ],
+    },
+  );
+  assert.equal(result.status, "pass");
+  assert.deepEqual(result.statusCounts, {
+    ACTIVE: 1,
+    DISABLED: 1,
+    REVOKED: 1,
+  });
+});
+
+test("permission account evidence requires the exact thirteen acceptance account states", () => {
+  const probe = buildManualAcceptanceReadinessPlan().probes.find(
+    (item) => item.id === "permission-accounts",
+  );
+  const admins = MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS.map(
+    (item, index) => ({
+      id: index + 1,
+      username: item.username,
+      account_status: item.accountStatus,
+      roles: item.roleKeys.map((roleKey) => ({ role_key: roleKey })),
+    }),
+  );
+  assert.equal(
+    evaluateManualAcceptanceDataset(probe, { admins }).status,
+    "pass",
+  );
+
+  const revokedExpected = structuredClone(admins);
+  revokedExpected.find(
+    (item) => item.username === "demo_uat_disabled",
+  ).account_status = "revoked";
+  const revokedResult = evaluateManualAcceptanceDataset(probe, {
+    admins: revokedExpected,
+  });
+  assert.equal(revokedResult.status, "fail");
+  assert.equal(revokedResult.accountStateMismatches.length, 1);
+
+  const unknownUnrelated = [
+    ...admins,
+    {
+      id: 99,
+      username: "historical_bad_state",
+      account_status: "unknown",
+      roles: [],
+    },
+  ];
+  const unknownResult = evaluateManualAcceptanceDataset(probe, {
+    admins: unknownUnrelated,
+  });
+  assert.equal(unknownResult.status, "fail");
+  assert.equal(unknownResult.statusCounts.INVALID, 1);
+
+  const unrelatedRevoked = [
+    ...admins,
+    {
+      id: 100,
+      username: "historical_revoked",
+      account_status: "revoked",
+      roles: [],
+    },
+  ];
+  const unrelatedResult = evaluateManualAcceptanceDataset(probe, {
+    admins: unrelatedRevoked,
+  });
+  assert.equal(unrelatedResult.status, "pass");
+  assert.equal(unrelatedResult.statusCounts.REVOKED, 1);
+});
+
+test("fact dataset evaluation proves only exact report references", () => {
+  const expectedReferences = [
+    {
+      key: "101:SIM-SDF-SHIP-001",
+      id: 101,
+      businessField: "shipment_no",
+      businessNo: "SIM-SDF-SHIP-001",
+      expectedFields: { status: "SHIPPED" },
+    },
+    {
+      key: "102:SIM-SDF-SHIP-002",
+      id: 102,
+      businessField: "shipment_no",
+      businessNo: "SIM-SDF-SHIP-002",
+      expectedFields: { status: "CANCELLED" },
+    },
+  ];
+  const probe = {
+    id: "shipments",
+    listKey: "shipments",
+    statusField: "status",
+    requiredStatuses: ["SHIPPED", "CANCELLED"],
+    expectedMinimum: 2,
+    batchEvidence: "exact_references",
+    expectedReferences,
+  };
+  const pass = evaluateManualAcceptanceDataset(probe, {
+    shipments: [
+      { id: 101, shipment_no: "SIM-SDF-SHIP-001", status: "SHIPPED" },
+      { id: 102, shipment_no: "SIM-SDF-SHIP-002", status: "CANCELLED" },
+      { id: 999, shipment_no: "OLD-SHIPMENT", status: "SHIPPED" },
+    ],
+    total: 300,
+  });
+  assert.equal(pass.status, "pass");
+  assert.equal(pass.actual, 2);
+  assert.deepEqual(pass.missingReferences, []);
+  assert.deepEqual(pass.referenceMismatches, []);
+
+  const stale = evaluateManualAcceptanceDataset(probe, {
+    shipments: [
+      { id: 101, shipment_no: "SIM-SDF-SHIP-001", status: "DRAFT" },
+      { id: 102, shipment_no: "OTHER-NUMBER", status: "CANCELLED" },
+    ],
+    total: 300,
+  });
+  assert.equal(stale.status, "fail");
+  assert.deepEqual(stale.missingReferences, ["102:SIM-SDF-SHIP-002"]);
+  assert.deepEqual(stale.referenceMismatches, [
+    {
+      key: "101:SIM-SDF-SHIP-001",
+      fields: { status: { expected: "SHIPPED", actual: "DRAFT" } },
+    },
+  ]);
+});
+
 test("task evidence requires exact source, role, prefix, count, and canonical status distribution", () => {
   const probe = {
     id: "mobile-tasks:sales",
@@ -660,9 +1133,17 @@ test("explicit verification reports page data, nine role totals, and honest manu
   });
 
   assert.equal(report.summary.totalTargets, 48);
-  assert.equal(report.summary.passedTargetData, 35);
+  assert.equal(
+    report.summary.passedTargetData,
+    38,
+    JSON.stringify(
+      report.targets
+        .filter((item) => item.dataStatus !== "pass")
+        .map((item) => ({ id: item.id, status: item.dataStatus, supporting: item.supporting })),
+    ),
+  );
   assert.equal(report.summary.failedTargetData, 0);
-  assert.equal(report.summary.notProvenTargetData, 13);
+  assert.equal(report.summary.notProvenTargetData, 10);
   assert.equal(report.summary.queryChecksPassed, true);
   assert.equal(report.summary.queryEvidenceComplete, false);
   assert.equal(report.summary.browserChecksCompleted, 0);
@@ -679,7 +1160,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(report.runtimePreflight.configRevision, "cfg-local-1");
   assert.equal(
     report.targets.find((item) => item.id === "entries:admin-login").actual,
-    13,
+    14,
   );
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:reconciliation")
@@ -723,19 +1204,19 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:inventory")
       .dataStatus,
-    "not_proven",
+    "pass",
   );
   assert.equal(
     report.targets.find(
       (item) => item.id === "desktopPages:quality-inspections",
     ).dataStatus,
-    "not_proven",
+    "pass",
   );
   assert.equal(
     report.targets.find(
       (item) => item.id === "desktopPages:production-orders",
     ).dataStatus,
-    "not_proven",
+    "pass",
   );
   assert(
     report.targets
@@ -760,9 +1241,42 @@ test("explicit verification reports page data, nine role totals, and honest manu
     ),
   );
   assert(calls.every((item) => item.redirect === "error"));
-  assert(!calls.some((item) => item.method === "list_quality_inspections"));
-  assert(!calls.some((item) => item.method === "list_inventory_balances"));
-  assert(!calls.some((item) => item.method === "list_inventory_txns"));
+  assert(calls.some((item) => item.method === "list_quality_inspections"));
+  assert(calls.some((item) => item.method === "list_inventory_balances"));
+  assert(calls.some((item) => item.method === "list_inventory_txns"));
+  assert(calls.some((item) => item.method === "list_production_orders"));
+  assert(
+    calls
+      .filter((item) => item.method === "list_production_orders")
+      .every((item) => !("customer_key" in item.params)),
+  );
+  assert(
+    calls
+      .filter((item) => item.method === "list_stock_reservations")
+      .every((item) => item.params.customer_key === "yoyoosun"),
+  );
+  assert(
+    calls
+      .filter((item) =>
+        [
+          "list_quality_inspections",
+          "list_inventory_balances",
+          "list_inventory_txns",
+          "list_production_orders",
+          "list_production_facts",
+          "list_stock_reservations",
+          "list_shipments",
+          "list_finance_facts",
+        ].includes(item.method),
+      )
+      .every(
+        (item) =>
+          !String(item.params.keyword || "").startsWith(
+            "SIM-YOYOOSUN-OPFACT-",
+          ) &&
+          !String(item.params.keyword || "").startsWith("SIM-YOYOOSUN-PQ-"),
+      ),
+  );
   assert(
     calls
       .filter((item) => item.method === "list_tasks")
@@ -885,7 +1399,7 @@ test("CLI and exported verification reject external backends before the first fe
         adminPassword: "local-admin-password",
         fetchImpl,
       }),
-    /loopback/u,
+    /registered SSH tunnel|完全一致/u,
   );
   await assert.rejects(
     () =>
@@ -900,9 +1414,102 @@ test("CLI and exported verification reject external backends before the first fe
           fetchImpl,
         },
       ),
-    /loopback/u,
+    /registered SSH tunnel|完全一致/u,
   );
   assert.equal(fetchCalls, 0);
+});
+
+test("registered customer-trial-133 verification requires explicit confirmation and attestation", async () => {
+  const backendURL = "http://127.0.0.1:18375";
+  const target = "customer-trial-133";
+  const remoteRuntime = {
+    environment: "prod",
+    customerKey: "yoyoosun",
+    configRevision: "cfg-trial-133-v1",
+    source: "active_customer_config_revision",
+    targetAttestation: {
+      source: "out-of-band",
+      release: "release-929ec0b3",
+      migration: "20260715120000",
+    },
+  };
+  const plan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport({ target, backendURL, runtime: remoteRuntime }),
+    factReport: factReport({ target, backendURL, runtime: remoteRuntime }),
+    taskReport: taskReport({ target, backendURL }),
+  });
+  const targetConfirmation =
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v1:20260715-V1";
+  const targetAttestation = {
+    target,
+    origin: backendURL,
+    customerKey: "yoyoosun",
+    environment: "prod",
+    release: "release-929ec0b3",
+    migration: "20260715120000",
+    debug: {
+      seedEnabled: false,
+      seedAllowed: false,
+      cleanupEnabled: false,
+      cleanupAllowed: false,
+      businessDataClearEnabled: false,
+      businessDataClearAllowed: false,
+    },
+  };
+  let fetchCalls = 0;
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceReadiness(plan, {
+        backendURL,
+        password: "trial-demo-password",
+        fetchImpl: async () => {
+          fetchCalls += 1;
+          throw new Error("missing target confirmation must fail before fetch");
+        },
+      }),
+    /MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
+  );
+  assert.equal(fetchCalls, 0);
+
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceReadiness(plan, {
+        backendURL,
+        password: "trial-demo-password",
+        targetConfirmation,
+        fetchImpl: async () => {
+          fetchCalls += 1;
+          throw new Error("missing attestation must fail before fetch");
+        },
+      }),
+    /attestation is required/u,
+  );
+  assert.equal(fetchCalls, 0);
+
+  const remote = createReadinessFetch({
+    runtimeEnvironment: "prod",
+    configRevision: "cfg-trial-133-v1",
+  });
+  const report = await verifyManualAcceptanceReadiness(plan, {
+    backendURL,
+    password: "trial-demo-password",
+    targetConfirmation,
+    targetAttestation,
+    fetchImpl: remote.fetchImpl,
+  });
+  assert.equal(report.runtimePreflight.target, target);
+  assert.equal(report.runtimePreflight.environment, "prod");
+  assert.equal(report.runtimePreflight.configRevision, "cfg-trial-133-v1");
+  assert.equal(
+    remote.calls.some((item) => item.method === "capabilities"),
+    false,
+  );
+  assert.equal(
+    remote.calls.some(
+      (item) => item.method === "admin_login" && item.params.username === "admin",
+    ),
+    false,
+  );
 });
 
 test("verification requires the local super-admin credential before any fetch", async () => {
@@ -960,15 +1567,21 @@ test("runtime preflight rejects unsafe environment or missing active revision be
   );
 
   const missingRevision = createReadinessFetch({ configRevision: "" });
+  const localhostBackendURL = "http://localhost:8300";
+  const localhostPlan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport({ backendURL: localhostBackendURL }),
+    factReport: factReport({ backendURL: localhostBackendURL }),
+    taskReport: taskReport({ backendURL: localhostBackendURL }),
+  });
   await assert.rejects(
     () =>
-      verifyManualAcceptanceReadiness(plan, {
-        backendURL: "http://localhost:8300",
+      verifyManualAcceptanceReadiness(localhostPlan, {
+        backendURL: localhostBackendURL,
         password: "local-demo-password",
         adminPassword: "local-admin-password",
         fetchImpl: missingRevision.fetchImpl,
       }),
-    /非空的已激活配置版本/u,
+    /active customer configuration|已激活配置版本/u,
   );
   assert.deepEqual(
     missingRevision.calls.map((item) => item.method),
@@ -977,16 +1590,17 @@ test("runtime preflight rejects unsafe environment or missing active revision be
 });
 
 test("verification rejects a redirected response even with a custom fetch", async () => {
+  const backendURL = "http://[::1]:8300";
   const plan = buildManualAcceptanceReadinessPlan({
-    sourceReport: sourceReport(),
-    factReport: factReport(),
-    taskReport: taskReport(),
+    sourceReport: sourceReport({ backendURL }),
+    factReport: factReport({ backendURL }),
+    taskReport: taskReport({ backendURL }),
   });
   let fetchCalls = 0;
   await assert.rejects(
     () =>
       verifyManualAcceptanceReadiness(plan, {
-        backendURL: "http://[::1]:8300",
+        backendURL,
         password: "local-demo-password",
         adminPassword: "local-admin-password",
         fetchImpl: async () => {

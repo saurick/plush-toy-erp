@@ -1308,9 +1308,33 @@ func (r *inventoryRepo) ListBOMHeaders(ctx context.Context, filter biz.BOMHeader
 	if err != nil {
 		return nil, 0, err
 	}
+	headerIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		headerIDs = append(headerIDs, row.ID)
+	}
+	itemCounts := make(map[int]int, len(headerIDs))
+	if len(headerIDs) > 0 {
+		var groupedCounts []struct {
+			BOMHeaderID int `json:"bom_header_id"`
+			Count       int `json:"count"`
+		}
+		if err := r.data.postgres.BOMItem.Query().
+			Where(bomitem.BomHeaderIDIn(headerIDs...)).
+			GroupBy(bomitem.FieldBomHeaderID).
+			Aggregate(ent.Count()).
+			Scan(ctx, &groupedCounts); err != nil {
+			return nil, 0, err
+		}
+		for _, grouped := range groupedCounts {
+			itemCounts[grouped.BOMHeaderID] = grouped.Count
+		}
+	}
 	out := make([]*biz.BOMHeader, 0, len(rows))
 	for _, row := range rows {
-		out = append(out, entBOMHeaderToBiz(row))
+		item := entBOMHeaderToBiz(row)
+		itemCount := itemCounts[row.ID]
+		item.ItemCount = &itemCount
+		out = append(out, item)
 	}
 	return out, total, nil
 }

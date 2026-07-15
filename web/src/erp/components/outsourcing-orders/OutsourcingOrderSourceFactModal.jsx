@@ -32,12 +32,12 @@ function actionCopy(actionType) {
   return actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
     ? {
         title: '委外发料',
-        alert: '发料记录创建为草稿，确认过账后才会写库存出库流水。',
+        alert: '发料记录创建为草稿，确认过账后才会更新库存出库记录。',
       }
     : {
         title: '登记回货',
         alert:
-          '选择已有产品批次或填写本次回货的新批次号；记录创建为草稿，确认过账后才会写库存入库流水。',
+          '选择已有产品批次或填写本次回货的新批次号；记录创建为草稿，确认过账后才会更新库存入库记录。',
       }
 }
 
@@ -166,7 +166,7 @@ export default function OutsourcingOrderSourceFactModal({
             children: order?.outsourcing_order_no || '-',
           },
           { key: 'supplier', label: '加工厂', children: supplierText },
-          { key: 'subject', label: '加工对象', children: sourceObject },
+          { key: 'subject', label: '产品 / 材料', children: sourceObject },
           {
             key: 'process',
             label: '工序',

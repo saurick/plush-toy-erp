@@ -18,7 +18,7 @@ test('production rework modal shows a read-only business source summary', () => 
   ]) {
     assert.match(source, new RegExp(copy, 'u'))
   }
-  assert.match(source, /返工对象、仓库、单位和批次由原完工记录锁定/u)
+  assert.match(source, /返工产品、仓库、单位和批次由原完工记录确定/u)
   assert.doesNotMatch(source, /label="(?:来源|内部编号|批次编号)"/u)
 })
 

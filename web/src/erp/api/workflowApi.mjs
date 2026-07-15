@@ -52,11 +52,11 @@ function requireWorkflowMutationParams(operation, params = {}) {
 
 function requireWorkflowRoleTaskQuery(params = {}) {
   if (!params || typeof params !== 'object' || Array.isArray(params)) {
-    throw new TypeError('岗位任务查询参数无效')
+    throw new TypeError('任务查询条件有误，请清除筛选后重试')
   }
   for (const key of Object.keys(params)) {
     if (!WORKFLOW_ROLE_TASK_QUERY_KEYS.has(key)) {
-      throw new TypeError('岗位任务查询参数无效')
+      throw new TypeError('任务查询条件有误，请清除筛选后重试')
     }
   }
 
@@ -73,7 +73,7 @@ function requireWorkflowRoleTaskQuery(params = {}) {
     (cursor !== undefined &&
       (typeof cursor !== 'string' || !cursor || cursor !== cursor.trim()))
   ) {
-    throw new TypeError('岗位任务查询参数无效')
+    throw new TypeError('任务查询条件有误，请清除筛选后重试')
   }
 
   return {
@@ -85,7 +85,7 @@ function requireWorkflowRoleTaskQuery(params = {}) {
 }
 
 function invalidWorkflowRoleTaskResponse() {
-  return Object.assign(new Error('岗位任务响应无效，请稍后重试'), {
+  return Object.assign(new Error('岗位任务暂时无法显示，请稍后重试'), {
     isInvalidResponse: true,
   })
 }
@@ -167,7 +167,7 @@ function requireWorkflowTaskMutationResult(operation, params, result) {
       (!WORKFLOW_TASK_URGE_STATUS_KEYS.has(task.task_status_key) ||
         workflowTaskUrgeResultInvalid(params, task)))
   ) {
-    throw Object.assign(new Error('任务响应无效，请刷新后重试'), {
+    throw Object.assign(new Error('任务处理结果暂时无法确认，请刷新后重试'), {
       isInvalidResponse: true,
     })
   }

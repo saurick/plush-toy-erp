@@ -40,7 +40,7 @@ const router = readFileSync(new URL('../router.jsx', import.meta.url), 'utf8')
 test('production order page is an independent Source Document route', () => {
   assert.match(router, /path="production\/orders"/u)
   assert.match(router, /V1ProductionOrdersPage/u)
-  assert.match(page, /生产计划源单/u)
+  assert.match(page, /生产计划单/u)
   assert.doesNotMatch(
     page,
     /createProductionFact|postProductionFact|WorkflowTask/u
@@ -105,7 +105,10 @@ test('production completion keeps unknown attempts and links to filtered records
     /refreshProductionSources\(completionContext\.order\.id\)/u
   )
   assert.match(page, /setCompletionContext\(EMPTY_COMPLETION_CONTEXT\)/u)
-  assert.match(page, /完工记录生成结果仍无法确认/u)
+  assert.match(
+    page,
+    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
+  )
   assert.match(page, /V1_ROUTE_PATHS\.productionProgress/u)
   assert.match(page, /source_id: order\.id/u)
   assert.match(completionModal, /disabled=\{loading\}/u)
@@ -181,5 +184,8 @@ test('production material issue is latest-wins, retry-safe and rereads unknown r
   assert.match(page, /findProductionMaterialIssueResult/u)
   assert.match(page, /refreshProductionSources\(order\.id\)/u)
   assert.match(page, /setMaterialIssueContext\(EMPTY_MATERIAL_ISSUE_CONTEXT\)/u)
-  assert.match(page, /领料记录生成结果仍无法确认/u)
+  assert.match(
+    page,
+    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
+  )
 })

@@ -6,19 +6,28 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { expectedAccounts } from "./trial-account-rbac.mjs";
+import { MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS } from "./manual-acceptance-account-scenarios.mjs";
 import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
 import {
+  TASK_COPY_REVISION,
   TASK_STATUS_KEYS,
   getManualAcceptanceTaskStatusCounts,
 } from "./manual-acceptance-task-data.mjs";
+import {
+  CUSTOMER_TRIAL_133_TARGET,
+  assertManualAcceptanceCapabilitiesPolicy,
+  assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimePolicy,
+  assertManualAcceptanceTargetAttestation,
+  parseManualAcceptanceTargetAttestation,
+  resolveManualAcceptanceTarget,
+} from "./manual-acceptance-target-policy.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/readiness";
 const MOBILE_TASK_TOTAL = 180;
 const MOBILE_TASKS_PER_ROLE = 20;
 const QUERY_LIMIT = 200;
-const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
-const SAFE_ENVIRONMENTS = new Set(["local", "dev"]);
 const RUNTIME_PREFLIGHT_USERNAME = "admin";
 const TASK_SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
 const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
@@ -31,6 +40,23 @@ const TASK_ROLE_KEYS = Object.freeze(
     .filter(([, , mobilePermission]) => Boolean(mobilePermission))
     .map(([, roleKey]) => roleKey),
 );
+
+export const MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS = Object.freeze([
+  ...expectedAccounts.map(([username, roleKey]) =>
+    Object.freeze({
+      username,
+      accountStatus: "active",
+      roleKeys: Object.freeze([roleKey]),
+    }),
+  ),
+  ...MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS.map((scenario) =>
+    Object.freeze({
+      username: scenario.username,
+      accountStatus: scenario.disabled ? "suspended" : "active",
+      roleKeys: Object.freeze([...scenario.roleKeys].sort()),
+    }),
+  ),
+]);
 
 function taskStatusCountsForRole(roleKey) {
   return Object.fromEntries(
@@ -68,6 +94,7 @@ const DESKTOP_DATASET_BY_PAGE = Object.freeze({
   "quality-inspections": "quality-inspections",
   inbound: "purchase-receipts",
   "processing-contracts": "outsourcing-orders",
+  "production-orders": "production-orders",
   "production-progress": "production-facts",
   outbound: "stock-reservations",
   shipments: "shipments",
@@ -98,17 +125,36 @@ const SOURCE_EXPECTATION_KEYS = Object.freeze({
   "bom-versions": "bomVersions",
 });
 
-const FACT_EXPECTATION_KEYS = Object.freeze({
-  "production-facts": "production",
-  "inventory-balances": "inventoryBalances",
-  "stock-reservations": "stockReservations",
-  shipments: "shipments",
-  "finance-reconciliation": "reconciliation",
-  "finance-payables": "payables",
-  "finance-receivables": "receivables",
-  "finance-invoices": "invoices",
-  "purchase-receipts": "purchaseReceipts",
-  "quality-inspections": "qualityInspections",
+const FACT_REFERENCE_DATASETS = Object.freeze({
+  "production-orders": Object.freeze({ referenceKey: "productionOrders" }),
+  "production-facts": Object.freeze({ referenceKey: "productionFacts" }),
+  "purchase-receipts": Object.freeze({ referenceKey: "purchaseReceipts" }),
+  "purchase-returns": Object.freeze({ referenceKey: "purchaseReturns" }),
+  "purchase-receipt-adjustments": Object.freeze({
+    referenceKey: "purchaseReceiptAdjustments",
+  }),
+  "quality-inspections": Object.freeze({ referenceKey: "qualityInspections" }),
+  "inventory-lots": Object.freeze({ referenceKey: "inventoryLots" }),
+  "inventory-balances": Object.freeze({ referenceKey: "inventoryBalances" }),
+  "inventory-txns": Object.freeze({ referenceKey: "inventoryTxns" }),
+  "stock-reservations": Object.freeze({ referenceKey: "stockReservations" }),
+  shipments: Object.freeze({ referenceKey: "shipments" }),
+  "finance-reconciliation": Object.freeze({
+    referenceKey: "financeFacts",
+    factType: "RECONCILIATION",
+  }),
+  "finance-payables": Object.freeze({
+    referenceKey: "financeFacts",
+    factType: "PAYABLE",
+  }),
+  "finance-receivables": Object.freeze({
+    referenceKey: "financeFacts",
+    factType: "RECEIVABLE",
+  }),
+  "finance-invoices": Object.freeze({
+    referenceKey: "financeFacts",
+    factType: "INVOICE",
+  }),
 });
 
 const DATASET_BLUEPRINTS = Object.freeze({
@@ -192,6 +238,17 @@ const DATASET_BLUEPRINTS = Object.freeze({
     batchReport: "source",
     batchMatchField: "purchase_order_no",
   },
+  "production-orders": {
+    roleKey: "production",
+    domain: "production_order",
+    method: "list_production_orders",
+    includeCustomerKey: false,
+    listKey: "production_orders",
+    statusField: "status",
+    requiredStatuses: ["DRAFT", "RELEASED", "CLOSED", "CANCELLED"],
+    batchReport: "fact",
+    factReferenceKey: "productionOrders",
+  },
   "quality-inspections": {
     roleKey: "quality",
     domain: "quality",
@@ -199,9 +256,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "quality_inspections",
     statusField: "status",
     requiredStatuses: ["DRAFT", "SUBMITTED", "PASSED", "REJECTED", "CANCELLED"],
-    batchReport: "fact-unfilterable",
-    batchNotProvenReason:
-      "当前质检查询只支持检验单号和关联记录筛选，不能按本次试用批次前缀可靠核对。",
+    batchReport: "fact",
+    factReferenceKey: "qualityInspections",
   },
   "purchase-receipts": {
     roleKey: "warehouse",
@@ -210,17 +266,40 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "purchase_receipts",
     statusField: "status",
     requiredStatuses: ["DRAFT", "POSTED", "CANCELLED"],
-    batchReport: "fact-purchase-quality",
-    batchMatchField: "receipt_no",
+    batchReport: "fact",
+    factReferenceKey: "purchaseReceipts",
+  },
+  "purchase-returns": {
+    roleKey: "warehouse",
+    domain: "purchase",
+    method: "list_purchase_returns",
+    listKey: "purchase_returns",
+    includeCustomerKey: false,
+    statusField: "status",
+    requiredStatuses: ["DRAFT", "POSTED", "CANCELLED"],
+    batchReport: "fact",
+    factReferenceKey: "purchaseReturns",
+  },
+  "purchase-receipt-adjustments": {
+    roleKey: "warehouse",
+    domain: "purchase",
+    method: "list_purchase_receipt_adjustments",
+    listKey: "purchase_receipt_adjustments",
+    includeCustomerKey: false,
+    statusField: "status",
+    requiredStatuses: ["DRAFT", "POSTED", "CANCELLED"],
+    secondaryField: "items.adjust_type",
+    requiredSecondaryKinds: ["QUANTITY_INCREASE", "QUANTITY_DECREASE"],
+    batchReport: "fact",
+    factReferenceKey: "purchaseReceiptAdjustments",
   },
   "inventory-balances": {
     roleKey: "warehouse",
     domain: "inventory",
     method: "list_inventory_balances",
     listKey: "inventory_balances",
-    batchReport: "fact-unfilterable",
-    batchNotProvenReason:
-      "库存余额查询只支持对象编号等条件，不能按本次试用批次前缀可靠核对。",
+    batchReport: "fact",
+    factReferenceKey: "inventoryBalances",
   },
   "inventory-lots": {
     roleKey: "warehouse",
@@ -229,9 +308,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "inventory_lots",
     statusField: "status",
     requiredStatuses: ["HOLD", "ACTIVE", "REJECTED"],
-    batchReport: "fact-unfilterable",
-    batchNotProvenReason:
-      "采购入库生成的内部批次号不保留试用批次前缀，当前批次查询也不能按报告中的批次编号集合过滤。",
+    batchReport: "fact",
+    factReferenceKey: "inventoryLots",
   },
   "inventory-txns": {
     roleKey: "warehouse",
@@ -240,9 +318,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "inventory_txns",
     statusField: "txn_type",
     requiredStatuses: ["IN", "OUT", "REVERSAL"],
-    batchReport: "fact-unfilterable",
-    batchNotProvenReason:
-      "库存流水的去重键只保留业务对象类型和编号，不能按本次试用批次前缀可靠核对。",
+    batchReport: "fact",
+    factReferenceKey: "inventoryTxns",
   },
   "outsourcing-orders": {
     roleKey: "production",
@@ -267,8 +344,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
       "FINISHED_GOODS_RECEIPT",
       "REWORK",
     ],
-    batchReport: "fact-operational",
-    batchMatchField: "fact_no",
+    batchReport: "fact",
+    factReferenceKey: "productionFacts",
   },
   "stock-reservations": {
     roleKey: "warehouse",
@@ -277,8 +354,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "stock_reservations",
     statusField: "status",
     requiredStatuses: ["ACTIVE", "RELEASED"],
-    batchReport: "fact-operational",
-    batchMatchField: "reservation_no",
+    batchReport: "fact",
+    factReferenceKey: "stockReservations",
   },
   shipments: {
     roleKey: "warehouse",
@@ -287,8 +364,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "shipments",
     statusField: "status",
     requiredStatuses: ["DRAFT", "SHIPPED", "CANCELLED"],
-    batchReport: "fact-operational",
-    batchMatchField: "shipment_no",
+    batchReport: "fact",
+    factReferenceKey: "shipments",
   },
   "finance-reconciliation": {
     roleKey: "finance",
@@ -297,8 +374,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "finance_facts",
     statusField: "status",
     requiredStatuses: ["DRAFT", "POSTED", "SETTLED", "CANCELLED"],
-    batchReport: "fact-operational",
-    batchMatchField: "fact_no",
+    batchReport: "fact",
+    factReferenceKey: "financeFacts",
     params: { fact_type: "RECONCILIATION" },
   },
   "finance-payables": {
@@ -308,8 +385,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "finance_facts",
     statusField: "status",
     requiredStatuses: ["DRAFT", "POSTED", "SETTLED", "CANCELLED"],
-    batchReport: "fact-operational",
-    batchMatchField: "fact_no",
+    batchReport: "fact",
+    factReferenceKey: "financeFacts",
     params: { fact_type: "PAYABLE" },
   },
   "finance-receivables": {
@@ -319,8 +396,8 @@ const DATASET_BLUEPRINTS = Object.freeze({
     listKey: "finance_facts",
     statusField: "status",
     requiredStatuses: ["DRAFT", "POSTED", "SETTLED", "CANCELLED"],
-    batchReport: "fact-operational",
-    batchMatchField: "fact_no",
+    batchReport: "fact",
+    factReferenceKey: "financeFacts",
     params: { fact_type: "RECEIVABLE" },
   },
   "finance-invoices": {
@@ -329,9 +406,9 @@ const DATASET_BLUEPRINTS = Object.freeze({
     method: "list_finance_facts",
     listKey: "finance_facts",
     statusField: "status",
-    requiredStatuses: ["DRAFT", "POSTED", "SETTLED", "CANCELLED"],
-    batchReport: "fact-operational",
-    batchMatchField: "fact_no",
+    requiredStatuses: ["DRAFT", "POSTED", "CANCELLED"],
+    batchReport: "fact",
+    factReferenceKey: "financeFacts",
     params: { fact_type: "INVOICE" },
   },
   "permission-accounts": {
@@ -339,8 +416,9 @@ const DATASET_BLUEPRINTS = Object.freeze({
     domain: "admin",
     method: "list",
     listKey: "admins",
-    statusField: "disabled",
+    statusField: "account_status",
     requiredStatuses: ["ACTIVE", "DISABLED"],
+    expectedAccountStates: MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS,
     params: {},
   },
   "permission-roles": {
@@ -379,25 +457,191 @@ function positiveInteger(value) {
   return Number.isInteger(number) && number >= 0 ? number : null;
 }
 
-function normalizeBackendURL(value) {
-  const url = new URL(requiredText(value, "--backend-url"));
-  if (url.username || url.password) {
-    throw new CliError("后端地址不能包含账号或密码", 2);
+function reportText(value, name) {
+  const normalized = String(value ?? "").trim();
+  if (!normalized) throw new CliError(`${name} 不能为空`, 2);
+  return normalized;
+}
+
+function reportValue(record, ...keys) {
+  for (const key of keys) {
+    if (record?.[key] != null && record[key] !== "") return record[key];
   }
-  if (!new Set(["http:", "https:"]).has(url.protocol)) {
-    throw new CliError("后端地址必须使用 http 或 https", 2);
+  return undefined;
+}
+
+function reportPositiveID(value, name) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed <= 0) {
+    throw new CliError(`${name} 必须是正整数`, 2);
   }
-  const hostname = url.hostname
-    .replace(/^\[/u, "")
-    .replace(/\]$/u, "")
-    .toLowerCase();
-  if (!LOCAL_HOSTS.has(hostname)) {
-    throw new CliError("只允许核对本机 loopback 后端", 2);
-  }
+  return parsed;
+}
+
+function normalizedBackendURL(value) {
+  const url = new URL(reportText(value, "backendURL"));
   url.pathname = url.pathname.replace(/\/+$/u, "");
   url.search = "";
   url.hash = "";
   return url.toString().replace(/\/+$/u, "");
+}
+
+function normalizeFactReference(record, key, index) {
+  const name = `referenceRecords.${key}[${index}]`;
+  const id = reportPositiveID(record?.id, `${name}.id`);
+  const normalized = { id };
+  const textField = (outputKey, ...aliases) => {
+    normalized[outputKey] = reportText(
+      reportValue(record, ...aliases),
+      `${name}.${aliases[0]}`,
+    );
+  };
+  const optionalID = (outputKey, ...aliases) => {
+    const value = reportValue(record, ...aliases);
+    if (value != null) {
+      normalized[outputKey] = reportPositiveID(value, `${name}.${aliases[0]}`);
+    }
+  };
+  switch (key) {
+    case "productionOrders":
+      textField("order_no", "orderNo", "order_no");
+      textField("status", "status");
+      break;
+    case "productionFacts":
+      textField("fact_no", "factNo", "fact_no");
+      textField("status", "status");
+      textField("fact_type", "factType", "fact_type");
+      textField("source_type", "sourceType", "source_type");
+      normalized.source_id = reportPositiveID(
+        reportValue(record, "sourceID", "sourceId", "source_id"),
+        `${name}.sourceID`,
+      );
+      break;
+    case "purchaseReceipts":
+      textField("receipt_no", "receiptNo", "receipt_no");
+      textField("status", "status");
+      break;
+    case "purchaseReturns":
+      textField("return_no", "returnNo", "return_no");
+      textField("status", "status");
+      break;
+    case "purchaseReceiptAdjustments":
+      textField("adjustment_no", "adjustmentNo", "adjustment_no");
+      textField("status", "status");
+      textField("adjust_type", "adjustType", "adjust_type");
+      break;
+    case "qualityInspections":
+      textField("inspection_no", "inspectionNo", "inspection_no");
+      textField("status", "status");
+      textField("source_type", "sourceType", "source_type");
+      normalized.source_id = reportPositiveID(
+        reportValue(record, "sourceID", "sourceId", "source_id"),
+        `${name}.sourceID`,
+      );
+      break;
+    case "inventoryLots":
+      textField("lot_no", "lotNo", "lot_no");
+      textField("status", "status");
+      textField("subject_type", "subjectType", "subject_type");
+      normalized.subject_id = reportPositiveID(
+        reportValue(record, "subjectID", "subjectId", "subject_id"),
+        `${name}.subjectID`,
+      );
+      optionalID("product_sku_id", "productSkuID", "productSkuId", "product_sku_id");
+      break;
+    case "inventoryBalances":
+      textField("subject_type", "subjectType", "subject_type");
+      normalized.subject_id = reportPositiveID(
+        reportValue(record, "subjectID", "subjectId", "subject_id"),
+        `${name}.subjectID`,
+      );
+      optionalID("product_sku_id", "productSkuID", "productSkuId", "product_sku_id");
+      normalized.warehouse_id = reportPositiveID(
+        reportValue(record, "warehouseID", "warehouseId", "warehouse_id"),
+        `${name}.warehouseID`,
+      );
+      optionalID("lot_id", "lotID", "lotId", "lot_id");
+      normalized.unit_id = reportPositiveID(
+        reportValue(record, "unitID", "unitId", "unit_id"),
+        `${name}.unitID`,
+      );
+      textField("quantity", "quantity");
+      break;
+    case "inventoryTxns":
+      textField("txn_type", "txnType", "txn_type");
+      textField("source_type", "sourceType", "source_type");
+      normalized.source_id = reportPositiveID(
+        reportValue(record, "sourceID", "sourceId", "source_id"),
+        `${name}.sourceID`,
+      );
+      break;
+    case "stockReservations":
+      textField("reservation_no", "reservationNo", "reservation_no");
+      textField("status", "status");
+      textField("source_type", "sourceType", "source_type");
+      normalized.source_id = reportPositiveID(
+        reportValue(record, "sourceID", "sourceId", "source_id"),
+        `${name}.sourceID`,
+      );
+      break;
+    case "shipments":
+      textField("shipment_no", "shipmentNo", "shipment_no");
+      textField("status", "status");
+      break;
+    case "financeFacts":
+      textField("fact_no", "factNo", "fact_no");
+      textField("status", "status");
+      textField("fact_type", "factType", "fact_type");
+      textField("source_type", "sourceType", "source_type");
+      normalized.source_id = reportPositiveID(
+        reportValue(record, "sourceID", "sourceId", "source_id"),
+        `${name}.sourceID`,
+      );
+      break;
+    default:
+      throw new CliError(`未知业务记录引用 ${key}`, 2);
+  }
+  return normalized;
+}
+
+function normalizeFactReferenceRecords(report) {
+  const records = report?.referenceRecords;
+  if (!records || typeof records !== "object" || Array.isArray(records)) {
+    throw new CliError("业务记录报告缺少 referenceRecords", 2);
+  }
+  const normalized = {};
+  const referenceKeys = [...new Set(Object.values(FACT_REFERENCE_DATASETS).map((item) => item.referenceKey))];
+  for (const key of referenceKeys) {
+    if (!Array.isArray(records[key]) || records[key].length === 0) {
+      throw new CliError(`业务记录报告缺少 referenceRecords.${key}`, 2);
+    }
+    normalized[key] = records[key].map((item, index) =>
+      normalizeFactReference(item, key, index),
+    );
+    if (new Set(normalized[key].map((item) => item.id)).size !== normalized[key].length) {
+      throw new CliError(`referenceRecords.${key} 包含重复 id`, 2);
+    }
+  }
+  const owners = records.attachmentOwners;
+  if (!owners || typeof owners !== "object" || Array.isArray(owners)) {
+    throw new CliError("业务记录报告缺少 referenceRecords.attachmentOwners", 2);
+  }
+  const productionFactId = reportPositiveID(
+    owners.productionFactId,
+    "referenceRecords.attachmentOwners.productionFactId",
+  );
+  const financeFactId = reportPositiveID(
+    owners.financeFactId,
+    "referenceRecords.attachmentOwners.financeFactId",
+  );
+  if (!normalized.productionFacts.some((item) => item.id === productionFactId && item.status === "POSTED")) {
+    throw new CliError("referenceRecords.attachmentOwners.productionFactId 必须指向本批已过账生产记录", 2);
+  }
+  if (!normalized.financeFacts.some((item) => item.id === financeFactId && item.status === "POSTED")) {
+    throw new CliError("referenceRecords.attachmentOwners.financeFactId 必须指向本批已过账财务记录", 2);
+  }
+  normalized.attachmentOwners = { productionFactId, financeFactId };
+  return normalized;
 }
 
 function validateSourceReport(report) {
@@ -407,7 +651,12 @@ function validateSourceReport(report) {
     report.simulatedOnly !== true ||
     report.realCustomerImport !== false ||
     !report.scale ||
+    !String(report.datasetKey || "").trim() ||
+    !String(report.dataVersion || "").trim() ||
     !String(report.runId || "").trim() ||
+    !String(report.target || "").trim() ||
+    !String(report.backendURL || "").trim() ||
+    !String(report.semanticDigest || "").trim() ||
     !String(report.prefix || "").trim()
   ) {
     throw new CliError("源数据报告不是有效的模拟试用写入报告", 2);
@@ -422,13 +671,43 @@ function validateFactReport(report) {
     report.mode !== "apply" ||
     report.simulatedOnly !== true ||
     report.realCustomerImport !== false ||
-    !report.expectedMinimums ||
+    !String(report.datasetKey || "").trim() ||
+    !String(report.dataVersion || "").trim() ||
     !String(report.runId || "").trim() ||
-    !String(report.sourceRunId || "").trim()
+    !String(report.target || "").trim() ||
+    !String(report.backendURL || "").trim() ||
+    !String(report.semanticDigest || "").trim() ||
+    !report.runtime ||
+    !String(report.runtime.environment || "").trim() ||
+    report.runtime.customerKey !== CUSTOMER_KEY ||
+    !String(report.runtime.configRevision || "").trim() ||
+    report.runtime.source !== "active_customer_config_revision"
   ) {
     throw new CliError("业务记录报告不是有效的模拟试用写入报告", 2);
   }
-  return report;
+  let policy;
+  try {
+    policy = resolveManualAcceptanceTarget(report);
+  } catch (error) {
+    throw new CliError(String(error?.message || error), 2);
+  }
+  if (normalizedBackendURL(report.backendURL) !== policy.backendURL) {
+    throw new CliError("业务记录报告 backendURL 与登记目标不一致", 2);
+  }
+  if (
+    policy.target === CUSTOMER_TRIAL_133_TARGET &&
+    (report.runtime.environment !== "prod" ||
+      report.runtime.targetAttestation?.source !== "out-of-band" ||
+      !String(report.runtime.targetAttestation?.release || "").trim() ||
+      !String(report.runtime.targetAttestation?.migration || "").trim())
+  ) {
+    throw new CliError("业务记录报告缺少 customer-trial-133 运行态证明", 2);
+  }
+  return {
+    ...report,
+    backendURL: policy.backendURL,
+    normalizedReferenceRecords: normalizeFactReferenceRecords(report),
+  };
 }
 
 function validateTaskReport(report) {
@@ -453,12 +732,17 @@ function validateTaskReport(report) {
     report.simulatedOnly !== true ||
     report.realCustomerImport !== false ||
     report.writesFacts !== false ||
+    !String(report.datasetKey || "").trim() ||
+    !String(report.dataVersion || "").trim() ||
+    !String(report.target || "").trim() ||
+    !String(report.backendURL || "").trim() ||
     report.summary?.total !== MOBILE_TASK_TOTAL ||
     report.summary?.persisted !== MOBILE_TASK_TOTAL ||
     !rolesAreExact ||
     !statusesAreExact ||
     !runId ||
-    prefix !== `SIM-YOYOOSUN-UAT-TASK-${runId}` ||
+    report.copyRevision !== TASK_COPY_REVISION ||
+    prefix !== `SIM-YOYOOSUN-UAT-TASK-${runId}-${TASK_COPY_REVISION}` ||
     report.sourceType !== TASK_SOURCE_TYPE ||
     !Number.isSafeInteger(Number(report.sourceID)) ||
     Number(report.sourceID) <= 0
@@ -469,18 +753,11 @@ function validateTaskReport(report) {
 }
 
 function validateReportBatch(sourceReport, factReport, taskReport) {
-  const sourceRunId = String(sourceReport?.runId || "").trim();
-  const factSourceRunId = String(factReport?.sourceRunId || "").trim();
-  const taskRunId = String(taskReport?.runId || "").trim();
-  const batchRunIds = [sourceRunId, factSourceRunId, taskRunId].filter(Boolean);
-  if (new Set(batchRunIds).size > 1) {
-    throw new CliError("源数据、业务记录与岗位任务报告不是同一批次", 2);
-  }
-  if (sourceReport && factReport) {
-    const sourcePrefix = String(sourceReport.prefix || "").trim();
-    const factSourcePrefix = String(factReport.sourcePrefix || "").trim();
-    if (factSourcePrefix && sourcePrefix !== factSourcePrefix) {
-      throw new CliError("源数据报告与业务记录报告不是同一批次", 2);
+  const reports = [sourceReport, factReport, taskReport].filter(Boolean);
+  for (const key of ["datasetKey", "dataVersion", "runId", "target", "backendURL"]) {
+    const values = reports.map((report) => String(report[key] || "").trim());
+    if (new Set(values).size > 1) {
+      throw new CliError("源数据、业务记录与岗位任务报告不是同一批次", 2);
     }
   }
 }
@@ -537,11 +814,13 @@ function declaredExpectations(sourceReport, factReport) {
     }
   }
   if (factReport) {
-    for (const [datasetId, reportKey] of Object.entries(
-      FACT_EXPECTATION_KEYS,
+    for (const [datasetId, definition] of Object.entries(
+      FACT_REFERENCE_DATASETS,
     )) {
-      const value = positiveInteger(factReport.expectedMinimums[reportKey]);
-      if (value !== null) values[datasetId] = value;
+      const records = factReport.normalizedReferenceRecords[definition.referenceKey];
+      values[datasetId] = definition.factType
+        ? records.filter((item) => item.fact_type === definition.factType).length
+        : records.length;
     }
   }
   return values;
@@ -579,19 +858,94 @@ function buildInputWarnings(canonical, declared) {
     }));
 }
 
-function resolveBatchEvidence(blueprint, sourceReport, factReport) {
+const FACT_BUSINESS_FIELDS = Object.freeze({
+  productionOrders: "order_no",
+  productionFacts: "fact_no",
+  purchaseReceipts: "receipt_no",
+  purchaseReturns: "return_no",
+  purchaseReceiptAdjustments: "adjustment_no",
+  qualityInspections: "inspection_no",
+  inventoryLots: "lot_no",
+  stockReservations: "reservation_no",
+  shipments: "shipment_no",
+  financeFacts: "fact_no",
+});
+
+function factReferenceEvidence(datasetId, blueprint, factReport) {
+  if (!factReport) {
+    return {
+      batchEvidence: "not_proven",
+      batchPrefix: null,
+      batchNotProvenReason:
+        "未提供本次业务记录写入报告，不能用历史总数代替本批数据。",
+      expectedReferences: [],
+      referenceQueries: [],
+    };
+  }
+  const definition = FACT_REFERENCE_DATASETS[datasetId];
+  const referenceKey = blueprint.factReferenceKey || definition?.referenceKey;
+  const businessField = FACT_BUSINESS_FIELDS[referenceKey];
+  const records = factReport.normalizedReferenceRecords[referenceKey].filter(
+    (item) => !definition?.factType || item.fact_type === definition.factType,
+  );
+  const expectedReferences = records.map((item) => {
+    const businessNo = businessField ? item[businessField] : undefined;
+    const expectedFields = Object.fromEntries(
+      Object.entries(item).filter(
+        ([key]) => key !== "id" && key !== businessField,
+      ),
+    );
+    return {
+      key: `${item.id}:${businessNo || referenceKey}`,
+      id: item.id,
+      ...(businessField ? { businessField, businessNo } : {}),
+      expectedFields,
+    };
+  });
+  const referenceQueries = records.map((item) => {
+    let params;
+    if (referenceKey === "inventoryBalances") {
+      params = {
+        subject_type: item.subject_type,
+        subject_id: item.subject_id,
+        ...(item.product_sku_id ? { product_sku_id: item.product_sku_id } : {}),
+        warehouse_id: item.warehouse_id,
+        ...(item.lot_id ? { lot_id: item.lot_id } : {}),
+        limit: QUERY_LIMIT,
+        offset: 0,
+      };
+    } else if (referenceKey === "inventoryTxns") {
+      params = {
+        source_type: item.source_type,
+        source_id: item.source_id,
+        limit: QUERY_LIMIT,
+        offset: 0,
+      };
+    } else {
+      params = {
+        ...(blueprint.params || {}),
+        keyword: item[businessField],
+        limit: QUERY_LIMIT,
+        offset: 0,
+      };
+    }
+    return { referenceKey: `${item.id}:${item[businessField] || referenceKey}`, params };
+  });
+  return {
+    batchEvidence: "exact_references",
+    batchPrefix: null,
+    batchNotProvenReason: null,
+    expectedReferences,
+    referenceQueries,
+  };
+}
+
+function resolveBatchEvidence(datasetId, blueprint, sourceReport, factReport) {
   if (!blueprint.batchReport) {
     return {
       batchEvidence: "not_applicable",
       batchPrefix: null,
       batchNotProvenReason: null,
-    };
-  }
-  if (blueprint.batchReport === "fact-unfilterable") {
-    return {
-      batchEvidence: "not_proven",
-      batchPrefix: null,
-      batchNotProvenReason: blueprint.batchNotProvenReason,
     };
   }
   if (blueprint.batchReport === "source") {
@@ -609,36 +963,21 @@ function resolveBatchEvidence(blueprint, sourceReport, factReport) {
             "未提供本次源数据写入报告，不能用历史总数代替本批数据。",
         };
   }
-  const factRunId = String(factReport?.runId || "").trim();
-  if (!factRunId) {
-    return {
-      batchEvidence: "not_proven",
-      batchPrefix: null,
-      batchNotProvenReason:
-        "未提供本次业务记录写入报告，不能用历史总数代替本批数据。",
-    };
-  }
-  const familyPrefix =
-    blueprint.batchReport === "fact-purchase-quality"
-      ? `SIM-YOYOOSUN-PQ-${factRunId}`
-      : `SIM-YOYOOSUN-OPFACT-${factRunId}`;
-  return {
-    batchEvidence: "prefix_filtered",
-    batchPrefix: familyPrefix,
-    batchNotProvenReason: null,
-  };
+  return factReferenceEvidence(datasetId, blueprint, factReport);
 }
 
 function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
   const canonical = buildCanonicalMinimums(catalog);
   const declared = declaredExpectations(sourceReport, factReport);
   const probes = Object.entries(DATASET_BLUEPRINTS).map(([id, blueprint]) => {
-    const batch = resolveBatchEvidence(blueprint, sourceReport, factReport);
+    const batch = resolveBatchEvidence(id, blueprint, sourceReport, factReport);
     const params = {
       ...(blueprint.params ??
         (blueprint.domain === "admin"
           ? {}
-          : { active_only: false, limit: QUERY_LIMIT, offset: 0 })),
+          : blueprint.batchReport === "fact"
+            ? { limit: QUERY_LIMIT, offset: 0 }
+            : { active_only: false, limit: QUERY_LIMIT, offset: 0 })),
       ...(batch.batchEvidence === "prefix_filtered"
         ? { keyword: batch.batchPrefix }
         : {}),
@@ -782,13 +1121,17 @@ function targetEvidence(item) {
         "本批岗位任务数量和状态可核对；排程或异常页面的筛选、详情和处理动作仍需页面确认。",
     };
   }
-  if (item.key === "production-orders") {
+  if (item.key === "inbound") {
     return {
-      probeIds: [],
+      probeIds: [
+        "purchase-receipts",
+        "purchase-returns",
+        "purchase-receipt-adjustments",
+      ],
+      actualProbeId: "purchase-receipts",
       browserRequired: true,
-      quantityNotProven: true,
       reason:
-        "当前写入报告没有生产订单批次合同，不能用生产记录或协同任务数量代替生产订单；列表、来源办理和写后读取仍需真实页面核对。",
+        "本批入库、退货和调整记录分别按精确引用核对；页面筛选、详情及业务操作仍需页面确认。",
     };
   }
   if (item.key === "inventory") {
@@ -864,7 +1207,7 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
     directSQL: false,
     callsBackend: false,
     expected: {
-      targets: 46,
+      targets: 48,
       mobileRolePages: 9,
       mobileTasksPerRole: MOBILE_TASKS_PER_ROLE,
       mobileTaskTotal: MOBILE_TASK_TOTAL,
@@ -876,9 +1219,13 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
       factReport: factReport
         ? {
             reportContract: factReport.reportContract,
+            datasetKey: factReport.datasetKey,
+            dataVersion: factReport.dataVersion,
             runId: factReport.runId,
-            sourceRunId: factReport.sourceRunId,
-            sourcePrefix: factReport.sourcePrefix || null,
+            target: factReport.target,
+            backendURL: factReport.backendURL,
+            semanticDigest: factReport.semanticDigest,
+            runtime: factReport.runtime,
           }
         : null,
       taskReport: taskReport
@@ -910,6 +1257,13 @@ function statusLabel(item, field) {
   const value = item?.[field];
   if (field === "is_active") return value === false ? "INACTIVE" : "ACTIVE";
   if (field === "disabled") return value === true ? "DISABLED" : "ACTIVE";
+  if (field === "account_status") {
+    const status = String(value ?? "").trim().toLowerCase();
+    if (status === "active") return "ACTIVE";
+    if (status === "suspended") return "DISABLED";
+    if (status === "revoked") return "REVOKED";
+    return "INVALID";
+  }
   return String(value ?? "")
     .trim()
     .toUpperCase();
@@ -918,9 +1272,16 @@ function statusLabel(item, field) {
 function statusCounts(items, field) {
   const counts = {};
   for (const item of items) {
-    const label = statusLabel(item, field);
-    if (!label) continue;
-    counts[label] = (counts[label] || 0) + 1;
+    const labels =
+      field === "items.adjust_type"
+        ? (Array.isArray(item?.items) ? item.items : []).map((entry) =>
+            String(entry?.adjust_type ?? "").trim().toUpperCase(),
+          )
+        : [statusLabel(item, field)];
+    for (const label of labels) {
+      if (!label) continue;
+      counts[label] = (counts[label] || 0) + 1;
+    }
   }
   return counts;
 }
@@ -966,6 +1327,8 @@ export function evaluateManualAcceptanceDataset(probe, data) {
       enoughSecondaryKinds: false,
       batchEvidence: probe.batchEvidence,
       batchPrefix: null,
+      missingReferences: [],
+      referenceMismatches: [],
       error: null,
       notProvenReason: probe.batchNotProvenReason,
     };
@@ -997,11 +1360,67 @@ export function evaluateManualAcceptanceDataset(probe, data) {
       missingSecondaryKinds: [...requiredSecondaryKinds],
       batchEvidence: probe.batchEvidence || "not_applicable",
       batchPrefix: probe.batchPrefix || null,
+      missingReferences: [],
+      referenceMismatches: [],
       error: `查询结果缺少 ${probe.listKey}`,
     };
   }
-  const batchItems =
-    probe.batchEvidence === "exact_source"
+  const missingReferences = [];
+  const referenceMismatches = [];
+  let batchItems;
+  if (probe.batchEvidence === "exact_references") {
+    batchItems = [];
+    for (const expected of probe.expectedReferences || []) {
+      const item = items.find(
+        (candidate) =>
+          Number(candidate?.id) === Number(expected.id) &&
+          (!expected.businessField ||
+            String(candidate?.[expected.businessField] || "") ===
+              expected.businessNo),
+      );
+      if (!item) {
+        missingReferences.push(expected.key);
+        continue;
+      }
+      const actualReferenceField = (field) => {
+        if (probe.id === "stock-reservations") {
+          if (field === "source_type") return "SALES_ORDER";
+          if (field === "source_id") return item?.sales_order_id;
+        }
+        if (
+          probe.id === "purchase-receipt-adjustments" &&
+          field === "adjust_type"
+        ) {
+          const types = [
+            ...new Set(
+              (Array.isArray(item?.items) ? item.items : [])
+                .map((entry) => String(entry?.adjust_type ?? "").trim())
+                .filter(Boolean),
+            ),
+          ].sort();
+          return types.length === 1 ? types[0] : types.join(",");
+        }
+        return item?.[field];
+      };
+      const fields = Object.fromEntries(
+        Object.entries(expected.expectedFields || {})
+          .filter(
+            ([field, value]) =>
+              String(actualReferenceField(field) ?? "") !== String(value ?? ""),
+          )
+          .map(([field, value]) => [
+            field,
+            { expected: value, actual: actualReferenceField(field) ?? null },
+          ]),
+      );
+      if (Object.keys(fields).length > 0) {
+        referenceMismatches.push({ key: expected.key, fields });
+      }
+      batchItems.push(item);
+    }
+  } else {
+    batchItems =
+      probe.batchEvidence === "exact_source"
       ? items.filter(
           (item) =>
             item?.source_type === probe.exactSourceType &&
@@ -1020,20 +1439,68 @@ export function evaluateManualAcceptanceDataset(probe, data) {
             ),
           )
         : items;
+  }
   const responseTotal = positiveInteger(data.total);
   const batchScoped =
-    probe.batchEvidence === "exact_source" || Boolean(probe.batchPrefix);
+    probe.batchEvidence === "exact_source" ||
+    probe.batchEvidence === "exact_references" ||
+    Boolean(probe.batchPrefix);
   const actual = batchScoped
     ? batchItems.length
     : (responseTotal ?? batchItems.length);
+  const accountStateMismatches = [];
+  if (Array.isArray(probe.expectedAccountStates)) {
+    const byUsername = new Map(
+      batchItems.map((item) => [String(item?.username ?? "").trim(), item]),
+    );
+    for (const expected of probe.expectedAccountStates) {
+      const item = byUsername.get(expected.username);
+      if (!item) {
+        accountStateMismatches.push({
+          username: expected.username,
+          reason: "missing",
+        });
+        continue;
+      }
+      const accountStatus = String(item.account_status ?? "")
+        .trim()
+        .toLowerCase();
+      const roleKeys = Array.isArray(item.roles)
+        ? [
+            ...new Set(
+              item.roles
+                .map((role) => String(role?.role_key ?? "").trim())
+                .filter(Boolean),
+            ),
+          ].sort()
+        : [];
+      if (
+        accountStatus !== expected.accountStatus ||
+        JSON.stringify(roleKeys) !== JSON.stringify(expected.roleKeys)
+      ) {
+        accountStateMismatches.push({
+          username: expected.username,
+          reason: "state_mismatch",
+          expected: {
+            accountStatus: expected.accountStatus,
+            roleKeys: expected.roleKeys,
+          },
+          actual: { accountStatus, roleKeys },
+        });
+      }
+    }
+  }
   const counts = statusCounts(batchItems, probe.statusField);
   const kinds = Object.keys(counts).length;
   const secondaryCounts = statusCounts(batchItems, probe.secondaryField);
   const secondaryKinds = Object.keys(secondaryCounts).length;
   const enoughRecords =
-    probe.expectedExact == null
+    missingReferences.length === 0 &&
+    referenceMismatches.length === 0 &&
+    accountStateMismatches.length === 0 &&
+    (probe.expectedExact == null
       ? actual >= probe.expectedMinimum
-      : actual === probe.expectedExact;
+      : actual === probe.expectedExact);
   const missingStatuses = requiredStatuses.filter((item) => !counts[item]);
   const mismatchedStatusCounts = Object.fromEntries(
     Object.entries(requiredStatusCounts)
@@ -1048,7 +1515,8 @@ export function evaluateManualAcceptanceDataset(probe, data) {
   );
   const enoughStatuses =
     missingStatuses.length === 0 &&
-    Object.keys(mismatchedStatusCounts).length === 0;
+    Object.keys(mismatchedStatusCounts).length === 0 &&
+    !(probe.statusField === "account_status" && counts.INVALID);
   const enoughSecondaryKinds = missingSecondaryKinds.length === 0;
   return {
     id: probe.id,
@@ -1077,6 +1545,9 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     enoughSecondaryKinds,
     batchEvidence: probe.batchEvidence || "not_applicable",
     batchPrefix: probe.batchPrefix || null,
+    missingReferences,
+    referenceMismatches,
+    accountStateMismatches,
     error: null,
     notProvenReason: null,
   };
@@ -1093,6 +1564,7 @@ async function rpcCall({
   domain,
   method,
   params = {},
+  includeCustomerKey = true,
   token,
   fetchImpl,
 }) {
@@ -1110,7 +1582,7 @@ async function rpcCall({
       id: `manual-acceptance-readiness-${requestSequence}`,
       method,
       params:
-        domain === "auth" || domain === "admin"
+        domain === "auth" || domain === "admin" || !includeCustomerKey
           ? params
           : { customer_key: CUSTOMER_KEY, ...params },
     }),
@@ -1129,6 +1601,60 @@ async function rpcCall({
   return json.result.data || {};
 }
 
+async function readProbeData({
+  backendURL,
+  probe,
+  token,
+  fetchImpl,
+}) {
+  if (probe.batchEvidence !== "exact_references") {
+    return rpcCall({
+      backendURL,
+      domain: probe.domain,
+      method: probe.method,
+      params: probe.params,
+      includeCustomerKey: probe.includeCustomerKey !== false,
+      token,
+      fetchImpl,
+    });
+  }
+  const queries = [
+    ...new Map(
+      (probe.referenceQueries || []).map((query) => [
+        JSON.stringify(query.params),
+        query,
+      ]),
+    ).values(),
+  ];
+  const byID = new Map();
+  for (const query of queries) {
+    const data = await rpcCall({
+      backendURL,
+      domain: probe.domain,
+      method: probe.method,
+      params: query.params,
+      includeCustomerKey: probe.includeCustomerKey !== false,
+      token,
+      fetchImpl,
+    });
+    const items = data?.[probe.listKey];
+    if (!Array.isArray(items)) {
+      throw new Error(
+        `${probe.domain}.${probe.method} 查询 ${query.referenceKey} 缺少 ${probe.listKey}`,
+      );
+    }
+    for (const item of items) {
+      if (Number.isSafeInteger(Number(item?.id)) && Number(item.id) > 0) {
+        byID.set(Number(item.id), item);
+      }
+    }
+  }
+  return {
+    [probe.listKey]: [...byID.values()],
+    total: byID.size,
+  };
+}
+
 async function loginAccount({ backendURL, username, password, fetchImpl }) {
   const data = await rpcCall({
     backendURL,
@@ -1142,53 +1668,95 @@ async function loginAccount({ backendURL, username, password, fetchImpl }) {
   return token;
 }
 
-async function assertSafeReadRuntime({ backendURL, adminPassword, fetchImpl }) {
-  const token = await loginAccount({
-    backendURL,
-    username: RUNTIME_PREFLIGHT_USERNAME,
-    password: adminPassword,
-    fetchImpl,
-  });
-  const capabilities = await rpcCall({
-    backendURL,
-    domain: "debug",
-    method: "capabilities",
-    token,
-    fetchImpl,
-  });
-  if (!SAFE_ENVIRONMENTS.has(capabilities.environment)) {
-    throw new CliError(
-      `拒绝核对 environment=${capabilities.environment || "unknown"} 的运行时`,
-      2,
-    );
+const READINESS_REQUIRED_MODULES = Object.freeze([
+  "production_orders",
+  "production",
+  "inventory",
+  "shipments",
+  "finance",
+  "purchase_receipts",
+  "quality_inspections",
+]);
+
+async function assertSafeReadRuntime({
+  policy,
+  adminPassword,
+  sessionToken,
+  attestation,
+  factRuntime,
+  fetchImpl,
+}) {
+  let token = sessionToken;
+  let capabilities;
+  if (attestation) {
+    capabilities = { environment: attestation.environment, ...attestation.debug };
+  } else {
+    token = await loginAccount({
+      backendURL: policy.backendURL,
+      username: RUNTIME_PREFLIGHT_USERNAME,
+      password: adminPassword,
+      fetchImpl,
+    });
+    capabilities = await rpcCall({
+      backendURL: policy.backendURL,
+      domain: "debug",
+      method: "capabilities",
+      token,
+      fetchImpl,
+    });
+  }
+  try {
+    assertManualAcceptanceCapabilitiesPolicy({ policy, capabilities });
+  } catch (error) {
+    throw new CliError(String(error?.message || error), 2);
   }
   const sessionData = await rpcCall({
-    backendURL,
+    backendURL: policy.backendURL,
     domain: "customer_config",
     method: "get_effective_session",
     token,
     fetchImpl,
   });
   const session = sessionData.session || {};
-  const configRevision = String(
-    session.configRevision || session.config_revision || "",
-  ).trim();
+  let runtime;
+  try {
+    runtime = assertManualAcceptanceRuntimePolicy({
+      policy,
+      capabilities,
+      session,
+      requiredModules: READINESS_REQUIRED_MODULES,
+      customerKey: CUSTOMER_KEY,
+    });
+  } catch (error) {
+    throw new CliError(String(error?.message || error), 2);
+  }
   if (
-    session?.customer?.key !== CUSTOMER_KEY ||
-    session.source !== "active_customer_config_revision" ||
-    !configRevision
+    factRuntime &&
+    (runtime.environment !== factRuntime.environment ||
+      runtime.customerKey !== factRuntime.customerKey ||
+      runtime.configRevision !== factRuntime.configRevision ||
+      runtime.source !== factRuntime.source)
   ) {
-    throw new CliError(
-      "拒绝核对：yoyoosun 当前运行时没有非空的已激活配置版本",
-      2,
-    );
+    throw new CliError("当前运行时与业务记录报告绑定的运行态不一致", 2);
+  }
+  if (
+    attestation &&
+    (attestation.release !== factRuntime?.targetAttestation?.release ||
+      attestation.migration !== factRuntime?.targetAttestation?.migration)
+  ) {
+    throw new CliError("customer-trial-133 attestation 与业务记录报告不一致", 2);
   }
   return {
-    username: RUNTIME_PREFLIGHT_USERNAME,
-    environment: capabilities.environment,
-    customerKey: session.customer.key,
-    configRevision,
-    source: session.source,
+    ...runtime,
+    ...(attestation
+      ? {
+          targetAttestation: {
+            source: "out-of-band",
+            release: attestation.release,
+            migration: attestation.migration,
+          },
+        }
+      : { username: RUNTIME_PREFLIGHT_USERNAME }),
   };
 }
 
@@ -1319,6 +1887,7 @@ function sanitizeProbe(probe, result) {
     method: probe.method,
     listKey: probe.listKey,
     params: probe.params,
+    includeCustomerKey: probe.includeCustomerKey !== false,
     batchEvidence: probe.batchEvidence,
     batchPrefix: probe.batchPrefix,
     exactSourceType: probe.exactSourceType,
@@ -1406,21 +1975,82 @@ function combineTargetResult(target, resultById) {
   };
 }
 
+function resolveReadinessTarget({
+  plan,
+  backendURL,
+  targetConfirmation,
+  targetAttestation,
+}) {
+  const factInput = plan.reportInputs?.factReport;
+  const identity = factInput || {
+    datasetKey: "yoyoosun-manual-acceptance",
+    target: "local-dev",
+  };
+  let policy;
+  try {
+    policy = resolveManualAcceptanceTarget({
+      backendURL,
+      target: identity.target,
+      datasetKey: identity.datasetKey,
+      dataVersion: identity.dataVersion,
+      runId: identity.runId,
+    });
+    if (factInput && policy.backendURL !== factInput.backendURL) {
+      throw new Error("--backend-url 必须与业务记录报告 backendURL 完全一致");
+    }
+    assertManualAcceptanceMutationTarget(policy, {
+      confirmation:
+        targetConfirmation || process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    });
+    const parsed = parseManualAcceptanceTargetAttestation(
+      targetAttestation ??
+        process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    );
+    if (policy.target === CUSTOMER_TRIAL_133_TARGET) {
+      return {
+        policy,
+        attestation: assertManualAcceptanceTargetAttestation({
+          policy,
+          attestation: parsed,
+        }),
+      };
+    }
+    if (parsed) {
+      throw new Error(
+        "target attestation is only valid for customer-trial-133",
+      );
+    }
+    return { policy, attestation: undefined };
+  } catch (error) {
+    throw new CliError(String(error?.message || error), 2);
+  }
+}
+
 export async function verifyManualAcceptanceReadiness(
   plan,
   {
     backendURL,
     password,
     adminPassword,
+    targetConfirmation,
+    targetAttestation,
     fetchImpl = fetch,
     now = () => new Date(),
   } = {},
 ) {
-  const normalizedBackendURL = normalizeBackendURL(backendURL);
-  const effectiveAdminPassword = requiredText(
-    adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
-    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-  );
+  const { policy, attestation } = resolveReadinessTarget({
+    plan,
+    backendURL,
+    targetConfirmation,
+    targetAttestation,
+  });
+  const normalizedBackendURL = policy.backendURL;
+  const effectiveAdminPassword = attestation
+    ? undefined
+    : requiredText(
+        adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+      );
   const effectivePassword = requiredText(
     password ||
       process.env.MANUAL_ACCEPTANCE_PASSWORD ||
@@ -1428,16 +2058,37 @@ export async function verifyManualAcceptanceReadiness(
       process.env.ERP_ROLE_DEMO_PASSWORD,
     "试用账号密码环境变量",
   );
-  const runtimePreflight = await assertSafeReadRuntime({
-    backendURL: normalizedBackendURL,
-    adminPassword: effectiveAdminPassword,
-    fetchImpl,
-  });
-  const accounts = await loginAccounts({
-    backendURL: normalizedBackendURL,
-    password: effectivePassword,
-    fetchImpl,
-  });
+  let accounts;
+  let runtimePreflight;
+  if (attestation) {
+    accounts = await loginAccounts({
+      backendURL: normalizedBackendURL,
+      password: effectivePassword,
+      fetchImpl,
+    });
+    if (!accounts.tokens.admin) {
+      throw new CliError("demo_admin 未能登录，不能核对客户试用运行时", 2);
+    }
+    runtimePreflight = await assertSafeReadRuntime({
+      policy,
+      sessionToken: accounts.tokens.admin,
+      attestation,
+      factRuntime: plan.reportInputs?.factReport?.runtime,
+      fetchImpl,
+    });
+  } else {
+    runtimePreflight = await assertSafeReadRuntime({
+      policy,
+      adminPassword: effectiveAdminPassword,
+      factRuntime: plan.reportInputs?.factReport?.runtime,
+      fetchImpl,
+    });
+    accounts = await loginAccounts({
+      backendURL: normalizedBackendURL,
+      password: effectivePassword,
+      fetchImpl,
+    });
+  }
   const rawResults = [];
   for (const probe of plan.probes) {
     if (probe.batchEvidence === "not_proven") {
@@ -1474,11 +2125,9 @@ export async function verifyManualAcceptanceReadiness(
       continue;
     }
     try {
-      const data = await rpcCall({
+      const data = await readProbeData({
         backendURL: normalizedBackendURL,
-        domain: probe.domain,
-        method: probe.method,
-        params: probe.params,
+        probe,
         token,
         fetchImpl,
       });
@@ -1562,10 +2211,14 @@ export async function verifyManualAcceptanceReadiness(
     authenticationMayAppendAudit: true,
     directSQL: false,
     runtimePreflight: {
+      target: runtimePreflight.target,
       environment: runtimePreflight.environment,
       customerKey: runtimePreflight.customerKey,
       configRevision: runtimePreflight.configRevision,
       source: runtimePreflight.source,
+      ...(runtimePreflight.targetAttestation
+        ? { targetAttestation: runtimePreflight.targetAttestation }
+        : {}),
     },
     reportInputs: plan.reportInputs,
     inputWarnings: plan.inputWarnings,
@@ -1762,6 +2415,8 @@ export async function runManualAcceptanceReadinessCli(argv = [], deps = {}) {
     backendURL: options.backendURL,
     password: deps.password,
     adminPassword: deps.adminPassword,
+    targetConfirmation: deps.targetConfirmation,
+    targetAttestation: deps.targetAttestation,
     fetchImpl: deps.fetchImpl,
     now: deps.now,
   });

@@ -147,7 +147,47 @@ func (r *salesOrderRepo) ListSalesOrders(ctx context.Context, filter biz.SalesOr
 	if err != nil {
 		return nil, 0, err
 	}
-	return entSalesOrdersToBiz(rows), total, nil
+	orders := entSalesOrdersToBiz(rows)
+	if err := r.populateSalesOrderItemCounts(ctx, orders); err != nil {
+		return nil, 0, err
+	}
+	return orders, total, nil
+}
+
+func (r *salesOrderRepo) populateSalesOrderItemCounts(ctx context.Context, orders []*biz.SalesOrder) error {
+	orderIDs := make([]int, 0, len(orders))
+	byID := make(map[int]*biz.SalesOrder, len(orders))
+	for _, order := range orders {
+		if order == nil {
+			continue
+		}
+		count := 0
+		order.ItemCount = &count
+		orderIDs = append(orderIDs, order.ID)
+		byID[order.ID] = order
+	}
+	if len(orderIDs) == 0 {
+		return nil
+	}
+
+	var counts []struct {
+		SalesOrderID int `json:"sales_order_id,omitempty"`
+		Count        int `json:"count,omitempty"`
+	}
+	if err := r.data.postgres.SalesOrderItem.Query().
+		Where(salesorderitem.SalesOrderIDIn(orderIDs...)).
+		GroupBy(salesorderitem.FieldSalesOrderID).
+		Aggregate(ent.Count()).
+		Scan(ctx, &counts); err != nil {
+		return err
+	}
+	for _, count := range counts {
+		if order := byID[count.SalesOrderID]; order != nil {
+			itemCount := count.Count
+			order.ItemCount = &itemCount
+		}
+	}
+	return nil
 }
 
 func applySalesOrderDateRange(query *ent.SalesOrderQuery, filter biz.SalesOrderFilter) *ent.SalesOrderQuery {

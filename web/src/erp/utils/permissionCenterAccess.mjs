@@ -39,7 +39,7 @@ export function getPermissionCenterRoleKey(role = {}) {
 export function getPermissionCenterRoleName(role = {}) {
   const name = normalizeString(role?.name)
   return (
-    name || getRoleDisplayName(getPermissionCenterRoleKey(role), '已配置角色')
+    name || getRoleDisplayName(getPermissionCenterRoleKey(role), '已配置岗位')
   )
 }
 
@@ -67,13 +67,13 @@ export function isAssignableBusinessRole(role = {}) {
 export function getRoleTypeLabel(role = {}) {
   switch (normalizeString(role?.role_type)) {
     case ROLE_TYPE.SYSTEM:
-      return '产品系统角色'
+      return '系统内置岗位'
     case ROLE_TYPE.BUSINESS_DEFAULT:
-      return '业务默认角色'
+      return '预设岗位'
     case ROLE_TYPE.CUSTOM:
-      return '自定义角色'
+      return '自定义岗位'
     default:
-      return '角色模板'
+      return '岗位'
   }
 }
 
@@ -83,13 +83,13 @@ export function getRolePermissionReadOnlyReason(
 ) {
   const roleKey = getPermissionCenterRoleKey(role)
   if (!roleKey) {
-    return '当前角色资料不完整，请刷新后重试'
+    return '当前岗位资料不完整，请刷新后重试'
   }
   if (isSystemRole(role)) {
-    return '产品系统角色由系统统一维护，只能查看；系统管理能力不会作为可分配业务功能展示'
+    return '系统内置岗位由系统统一维护，只能查看，不能在此修改'
   }
   if (role?.disabled === true) {
-    return '该角色已经停用，只能查看，不能调整权限'
+    return '该岗位已经停用，只能查看，不能调整可用功能'
   }
   const currentRoleKeys = (
     Array.isArray(currentAdmin?.roles) ? currentAdmin.roles : []
@@ -98,16 +98,16 @@ export function getRolePermissionReadOnlyReason(
     currentAdmin?.is_super_admin !== true &&
     currentRoleKeys.includes(roleKey)
   ) {
-    return '当前登录账号正在使用该角色，不能修改其权限；请由不使用该角色的超级管理员处理'
+    return '当前登录账号正在使用该岗位，不能修改其可用功能；请由不使用该岗位的超级管理员处理'
   }
   if (role?.permissions_editable_by_current_admin !== true) {
     return (
       normalizeString(role?.permissions_edit_blocked_reason) ||
-      '当前角色只能查看，不能调整权限'
+      '当前岗位只能查看，不能调整可用功能'
     )
   }
   if (!getPermissionCenterRoleVersion(role)) {
-    return '当前角色资料未完整加载，请刷新后再调整权限'
+    return '当前岗位资料未完整加载，请刷新后再调整可用功能'
   }
   return ''
 }
@@ -188,7 +188,7 @@ export function getAdminControlTargetBlockReason({
       ? assignedRole
       : roleByKey.get(roleKey)
     if (!roleKey || !role) {
-      return '账号角色资料尚未完整加载，请刷新后再操作'
+      return '账号岗位资料尚未完整加载，请刷新后再操作'
     }
     if (isSystemRole(role)) {
       return '该系统账号受保护，只有超级管理员可以维护'
@@ -203,19 +203,19 @@ export function getRoleAssignmentBlockReason({
   roles = [],
   isProduction = false,
 } = {}) {
-  if (!targetAdmin?.id) return '账号资料不完整，暂时不能分配岗位角色'
+  if (!targetAdmin?.id) return '账号资料不完整，暂时不能分配岗位'
   if (targetAdmin?.is_super_admin === true) {
-    return '超级管理员由系统保护，不能在这里分配岗位角色'
+    return '超级管理员由系统保护，不能在这里分配岗位'
   }
   const accountStatus = normalizeString(targetAdmin?.account_status)
   if (!['active', 'suspended', 'revoked'].includes(accountStatus)) {
-    return '账号状态尚未完整加载，请刷新后再分配岗位角色'
+    return '账号状态尚未完整加载，请刷新后再分配岗位'
   }
   if (accountStatus === 'revoked') {
-    return '已注销账号不能再分配岗位角色'
+    return '已注销账号不能再分配岗位'
   }
   if (isSameAdminAccount(currentAdmin, targetAdmin)) {
-    return '当前登录账号不能修改自己的岗位角色'
+    return '当前登录账号不能修改自己的岗位'
   }
 
   const roleByKey = new Map(
@@ -231,7 +231,7 @@ export function getRoleAssignmentBlockReason({
     return !role || !isAssignableBusinessRole(role, { isProduction })
   })
   return hasProtectedRole
-    ? '该账号包含受保护或不可分配的角色，不能在这里修改岗位角色'
+    ? '该账号包含受保护或不可分配的岗位，不能在这里修改岗位'
     : ''
 }
 
@@ -245,7 +245,7 @@ function controlTypeLabel(value = '') {
 
 function pageUsageEntry(page = {}) {
   return {
-    pageLabel: normalizeString(page?.name) || '未登记页面',
+    pageLabel: normalizeString(page?.name) || '其他页面',
     sectionLabel: normalizeString(page?.section_name),
     actionLabel:
       normalizeString(page?.control_name) ||

@@ -466,7 +466,7 @@ export function MasterDataFormFields({
           className="erp-business-action-form__field"
           label="需质检"
           name="quality_required"
-          extra="只标记该工序后续可能需要质检；合格、不合格、让步、返工等结果仍由质检 / 异常模块记录。"
+          extra="这里只标记该工序后续可能需要质检；合格、不合格、让步、返工等结果仍需到质检或异常处理页面登记。"
           valuePropName="checked"
         >
           <Switch />
@@ -708,7 +708,7 @@ export function ContactFormList({ form, entityLabel }) {
               <strong>联系人</strong>
               <span>
                 联系人随当前{entityLabel}
-                维护，不作为独立业务对象，也不会单独生成订单、出货、库存或财务记录。
+                维护，不作为独立业务资料，也不会单独生成订单、出货、库存或财务记录。
               </span>
             </div>
           </div>

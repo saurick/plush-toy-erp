@@ -13,6 +13,16 @@ APP_SERVICE="${APP_SERVICE:-app-server}"
 POSTGRES_HOST="${POSTGRES_HOST:-127.0.0.1}"
 MIGRATION_LOCK_FILE="${MIGRATION_LOCK_FILE:-/run/lock/plush-toy-erp/atlas-migrate.lock}"
 
+POPULATED_UPGRADE_PREFLIGHT=$(printenv POPULATED_UPGRADE_PREFLIGHT 2>/dev/null || true)
+[ -n "$POPULATED_UPGRADE_PREFLIGHT" ] ||
+	POPULATED_UPGRADE_PREFLIGHT="$SERVER_ROOT/../scripts/qa/populated-upgrade-preflight.sh"
+PSQL_BIN=$(printenv PSQL_BIN 2>/dev/null || true)
+[ -n "$PSQL_BIN" ] || PSQL_BIN=psql
+DB_URL_PROVIDED=0
+if [ -n "$(printenv DB_URL 2>/dev/null || true)" ]; then
+	DB_URL_PROVIDED=1
+fi
+
 APPLY_MODE=0
 STATUS_ONLY=0
 
@@ -22,8 +32,8 @@ usage() {
   sh migrate_online.sh [--apply] [--status-only] [--help]
 
 行为:
-  默认执行: status + dry-run
-  --apply:  执行 status + dry-run + 正式 apply
+  默认执行: status + 055504 存量升级审计 + 055825 客户配置切换审计 + dry-run
+  --apply:  执行上述两项只读审计 + dry-run + 正式 apply
   --status-only: 仅查看当前迁移状态
 
 可选环境变量:
@@ -37,6 +47,9 @@ usage() {
   MIGRATION_LOCK_FILE 迁移整段串行锁文件（默认 /run/lock/plush-toy-erp/atlas-migrate.lock）
                       必须使用绝对路径，其父目录专用于迁移锁且不得为符号链接
   DB_URL         手动覆盖数据库连接串（未设置时自动从 Postgres 容器和宿主机端口推导）
+  PSQL_BIN       DB_URL 覆盖模式使用的宿主机 psql（默认 psql）
+  POPULATED_UPGRADE_PREFLIGHT
+                 migration 只读审计脚本（默认仓库 scripts/qa 入口）
   MIGRATION_MAINTENANCE_CONFIRMED
                  正式 apply 必须显式设为 1，确认已进入停写维护窗口
 EOF
@@ -70,6 +83,11 @@ fi
 
 if [ ! -d "$MIG_DIR" ]; then
 	echo "ERROR: 迁移目录不存在: $MIG_DIR" >&2
+	exit 1
+fi
+
+if [ ! -x "$POPULATED_UPGRADE_PREFLIGHT" ]; then
+	echo "ERROR: populated upgrade 审计脚本不存在或不可执行: $POPULATED_UPGRADE_PREFLIGHT" >&2
 	exit 1
 fi
 
@@ -275,23 +293,47 @@ atlas_run() {
 	"$ATLAS_BIN" "$@"
 }
 
+run_migration_preflight() {
+	audit=$1
+	if [ "$DB_URL_PROVIDED" -eq 1 ]; then
+		POPULATED_UPGRADE_DATABASE_URL="$DB_URL" \
+			sh "$POPULATED_UPGRADE_PREFLIGHT" \
+			--audit "$audit" \
+			--database-url-env POPULATED_UPGRADE_DATABASE_URL \
+			--psql-bin "$PSQL_BIN"
+		return
+	fi
+
+	sh "$POPULATED_UPGRADE_PREFLIGHT" \
+		--audit "$audit" \
+		--docker-container "$POSTGRES_CID" \
+		--database "$DB_NAME" \
+		--username "$DB_USER"
+}
+
 echo "==> 迁移目录: $MIG_DIR"
 echo "==> compose 文件: $COMPOSE_FILE"
 echo "==> Postgres 容器: $POSTGRES_CID"
 echo "==> Atlas: $ATLAS_BIN"
 
-echo "==> [1/3] 查看当前迁移状态"
+echo "==> [1/5] 查看当前迁移状态"
 atlas_run migrate status --dir "file://$MIG_DIR" --url "$DB_URL"
 
 if [ "$STATUS_ONLY" -eq 1 ]; then
 	exit 0
 fi
 
-echo "==> [2/3] dry-run 预演"
+echo "==> [2/5] 只读审计 20260714055504 存量升级边界"
+run_migration_preflight populated-upgrade
+
+echo "==> [3/5] 只读审计 20260714055825 客户配置切换边界"
+run_migration_preflight customer-config-cutover
+
+echo "==> [4/5] dry-run 预演"
 atlas_run migrate apply --dry-run --dir "file://$MIG_DIR" --url "$DB_URL"
 
 if [ "$APPLY_MODE" -eq 1 ]; then
-	echo "==> [3/3] 正式执行迁移"
+	echo "==> [5/5] 正式执行迁移"
 	atlas_run migrate apply --dir "file://$MIG_DIR" --url "$DB_URL"
 else
 	echo "==> 未执行正式迁移。传入 --apply 可一键落库。"

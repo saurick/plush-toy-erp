@@ -4,8 +4,12 @@ import test from "node:test";
 import {
   DEFAULT_SOURCE_DATA_SCALE,
   applyManualAcceptanceSourceData,
+  assertPersistedSourceRecord,
+  buildOutsourcingOrderLineReferences,
+  buildPurchaseOrderLineReferences,
   buildSalesOrderLineReferences,
   buildManualAcceptanceSourceDataPlan,
+  buildSourceDrivenFactReferences,
   planBOMItemReconciliation,
   parseManualAcceptanceSourceDataArgs,
   requireLifecycleMutationStatus,
@@ -14,6 +18,13 @@ import {
   statusCounts,
   verifyManualAcceptanceSourceData,
 } from "./manual-acceptance-source-data.mjs";
+import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
+import {
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
+  MANUAL_ACCEPTANCE_DATASET_KEY,
+  manualAcceptanceTargetConfirmation,
+} from "./manual-acceptance-target-policy.mjs";
 
 const forbiddenVisibleCopy =
   /\b(?:workflow|fact|json-rpc|rbac|usecase|schema|api|debugrunid|raw id)\b|甲方/iu;
@@ -22,6 +33,26 @@ function ok(data = {}) {
   return {
     ok: true,
     json: async () => ({ result: { code: 0, message: "ok", data } }),
+  };
+}
+
+function customerTrial133Attestation(overrides = {}) {
+  return {
+    target: CUSTOMER_TRIAL_133_TARGET,
+    origin: CUSTOMER_TRIAL_133_ORIGIN,
+    customerKey: "yoyoosun",
+    environment: "prod",
+    release: "20c96d38",
+    migration: "20260711000101",
+    debug: {
+      seedEnabled: false,
+      seedAllowed: false,
+      cleanupEnabled: false,
+      cleanupAllowed: false,
+      businessDataClearEnabled: false,
+      businessDataClearAllowed: false,
+    },
+    ...overrides,
   };
 }
 
@@ -50,7 +81,9 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
   assert.equal(plan.simulatedOnly, true);
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.directSQL, false);
-  assert.equal(plan.allowExternalBaseURL, false);
+  assert.equal(plan.target, "local-dev");
+  assert.equal(plan.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
+  assert.equal(plan.dataVersion, "LOCAL-UAT");
   assert.equal(
     plan.records.customers.length,
     DEFAULT_SOURCE_DATA_SCALE.customers,
@@ -116,6 +149,45 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
     "sales orders need an active 25-line source for linked shipment testing",
   );
   assert.ok(plan.records.bomVersions.some((item) => item.items.length === 25));
+});
+
+test("versioned source plans use a stable date anchor and semantic digest across targets", () => {
+  const common = {
+    runId: "20260715-V1",
+    dataVersion: "2026.07.15-v1",
+  };
+  const localPlan = buildManualAcceptanceSourceDataPlan(common);
+  const remotePlan = buildManualAcceptanceSourceDataPlan({
+    ...common,
+    target: CUSTOMER_TRIAL_133_TARGET,
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+  });
+
+  assert.equal(localPlan.anchorDate, "2026-07-15");
+  assert.equal(remotePlan.anchorDate, localPlan.anchorDate);
+  assert.equal(remotePlan.semanticDigest, localPlan.semanticDigest);
+  assert.equal(localPlan.semanticDigest.length, 64);
+  assert.deepEqual(remotePlan.records, localPlan.records);
+  assert.equal(
+    localPlan.records.products.every(
+      (product) =>
+        product.customer_style_no === undefined &&
+        product.skus.every((sku) => sku.barcode === undefined),
+    ),
+    true,
+  );
+
+  const nextVersion = buildManualAcceptanceSourceDataPlan({
+    runId: "20260715-V3",
+    dataVersion: "2026.07.15-v3",
+  });
+  assert.notEqual(nextVersion.semanticDigest, localPlan.semanticDigest);
+
+  const changed = buildManualAcceptanceSourceDataPlan({
+    ...common,
+    anchorDate: "2026-07-16",
+  });
+  assert.notEqual(changed.semanticDigest, localPlan.semanticDigest);
 });
 
 test("manual acceptance source plan covers supported business lifecycle states", () => {
@@ -187,15 +259,145 @@ test("status counts preserve inactive false values", () => {
   );
 });
 
+test("persisted source content comparison normalizes dates and decimals but rejects drift", () => {
+  const expected = {
+    order_no: "SIM-ORDER-001",
+    order_date: "2026-07-15",
+    ordered_quantity: "12.000",
+    snapshot: { name: "试用客户", simulated_only: true },
+    optional_note: undefined,
+  };
+  const actual = {
+    order_no: "SIM-ORDER-001",
+    order_date: Date.parse("2026-07-15T00:00:00.000Z") / 1000,
+    ordered_quantity: "12",
+    snapshot: { simulated_only: true, name: "试用客户" },
+    optional_note: null,
+  };
+  assert.doesNotThrow(() =>
+    assertPersistedSourceRecord({
+      label: "sales_order SIM-ORDER-001",
+      expected,
+      actual,
+      fields: [
+        "order_no",
+        "order_date",
+        "ordered_quantity",
+        "snapshot",
+        "optional_note",
+      ],
+      dateFields: ["order_date"],
+      decimalFields: ["ordered_quantity"],
+    }),
+  );
+  assert.throws(
+    () =>
+      assertPersistedSourceRecord({
+        label: "sales_order SIM-ORDER-001",
+        expected,
+        actual: { ...actual, snapshot: { name: "被人工改动" } },
+        fields: ["snapshot"],
+      }),
+    /snapshot differs from dataVersion planned content/u,
+  );
+});
+
 test("business-visible fixture copy uses trial-user wording without developer jargon", () => {
   const plan = buildManualAcceptanceSourceDataPlan({ runId: "COPY-CHECK" });
   for (const text of visibleStrings(plan.records)) {
     assert.doesNotMatch(text, forbiddenVisibleCopy);
   }
-  assert.match(plan.records.customers[0].name, /^【试用】/u);
-  assert.match(plan.records.suppliers[0].name, /^【试用】/u);
-  assert.match(plan.records.materials[0].name, /^【试用】/u);
-  assert.match(plan.records.products[0].name, /^【试用】/u);
+  assert.equal(plan.records.customers[0].name, "东莞美悦礼品");
+  assert.equal(plan.records.suppliers[0].name, "嘉顺布行");
+  assert.equal(plan.records.materials[0].name, "米白短毛绒");
+  assert.equal(plan.records.products[0].name, "云朵小熊");
+  assert.equal(plan.records.products[0].style_no, "27001#");
+  assert.equal(plan.records.products[0].skus[0].sku_name, "米白·小号");
+  assert.equal(
+    plan.records.products[0].skus[0].customer_sku,
+    "27001#-米白-小号",
+  );
+  assert.equal(plan.records.products[0].skus[0].packaging_version, "单只装");
+  assert.equal(plan.records.processes[0].name, "裁片");
+  assert.equal(plan.records.salesOrders[0].note, "分两批交货");
+  assert.deepEqual(
+    Object.keys(plan.records.salesOrders[0].contact_snapshot),
+    ["name"],
+  );
+  assert.equal(
+    [...plan.records.customers, ...plan.records.suppliers].every(
+      (party) =>
+        party.tax_no === undefined &&
+        party.contacts.every(
+          (contact) =>
+            contact.mobile === undefined &&
+            contact.phone === undefined &&
+            contact.email === undefined,
+        ),
+    ),
+    true,
+  );
+  assert.equal(
+    plan.records.products.every(
+      (product) =>
+        product.customer_style_no === undefined &&
+        product.skus.every(
+          (sku) =>
+            sku.barcode === undefined &&
+            !/\bV\d+\b/iu.test(sku.packaging_version),
+        ),
+    ),
+    true,
+  );
+
+  const productByRef = new Map(
+    plan.records.products.map((product) => [product.code, product]),
+  );
+  const salesByRef = new Map(
+    plan.records.salesOrders.map((order) => [order.order_no, order]),
+  );
+  for (const order of plan.records.salesOrders) {
+    for (const item of order.items) {
+      const product = productByRef.get(item.productRef);
+      assert.equal(item.product_code_snapshot, product.style_no);
+      assert.equal(item.product_name_snapshot, product.name);
+      assert.doesNotMatch(item.product_code_snapshot, /^(?:SIM|TEST)-/u);
+    }
+  }
+  for (const order of plan.records.purchaseOrders) {
+    for (const item of order.items) {
+      const sourceOrder = plan.records.salesOrders.find(
+        (candidate) =>
+          candidate.customer_order_no === item.product_order_no_snapshot,
+      );
+      assert.ok(sourceOrder);
+      assert.equal(
+        sourceOrder.items.some(
+          (sourceItem) =>
+            sourceItem.product_code_snapshot === item.product_no_snapshot &&
+            sourceItem.product_name_snapshot === item.product_name_snapshot,
+        ),
+        true,
+      );
+      assert.doesNotMatch(item.product_no_snapshot, /^(?:SIM|TEST)-/u);
+    }
+  }
+  for (const order of plan.records.outsourcingOrders) {
+    const sourceOrder = salesByRef.get(order.sourceSalesOrderRef);
+    assert.equal(order.source_order_no, sourceOrder.customer_order_no);
+    for (const item of order.items.filter(
+      (candidate) => candidate.subject_type === "PRODUCT",
+    )) {
+      const product = productByRef.get(item.productRef);
+      assert.equal(item.product_no_snapshot, product.style_no);
+      assert.equal(item.product_name_snapshot, product.name);
+      assert.equal(item.product_order_no_snapshot, sourceOrder.customer_order_no);
+      assert.doesNotMatch(item.product_no_snapshot, /^(?:SIM|TEST)-/u);
+    }
+  }
+  assert.ok(
+    !visibleStrings(plan.records).some((text) => text.includes("【试用】")),
+  );
 });
 
 test("CLI remains report-only by default and refuses implicit external targets", async () => {
@@ -252,11 +454,80 @@ test("apply requires the exact simulation confirmation before any backend call",
   }
 });
 
+test("customer-trial-133 source apply accepts only the registered attested runtime before the first data mutation", async () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    target: CUSTOMER_TRIAL_133_TARGET,
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    dataVersion: "2026.07.15-v1",
+    runId: "20260715-V1",
+  });
+  const methods = [];
+  const fetchImpl = async (_url, init) => {
+    const body = JSON.parse(init.body);
+    methods.push(body.method);
+    if (body.method === "admin_login") {
+      return ok({
+        access_token: `token-${body.params.username}`,
+        is_super_admin: body.params.username === "admin",
+      });
+    }
+    if (body.method === "get_effective_session") {
+      return ok({
+        session: {
+          customer: { key: "yoyoosun" },
+          source: "active_customer_config_revision",
+          configRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+          modules: Object.fromEntries(
+            [
+              "customers",
+              "suppliers",
+              "products",
+              "materials",
+              "processes",
+              "sales_orders",
+              "purchase_orders",
+              "outsourcing_orders",
+              "material_bom",
+            ].map((key) => [key, "enabled"]),
+          ),
+        },
+      });
+    }
+    if (body.method === "list_customers") {
+      throw new Error("stop after remote preflight");
+    }
+    throw new Error(`unexpected method ${body.method}`);
+  };
+
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceSourceData(plan, {
+        password: "role-password",
+        adminPassword: "admin-password",
+        confirmPhrase: "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        targetAttestation: customerTrial133Attestation(),
+        fetchImpl,
+      }),
+    /stop after remote preflight/u,
+  );
+  assert.equal(methods.includes("capabilities"), false);
+  assert.equal(methods.includes("get_effective_session"), true);
+  assert.equal(
+    methods.some((method) =>
+      /^(?:save_|create_|submit_|approve_|confirm_|close_|cancel_|activate_|archive_|set_)/u.test(
+        method,
+      ),
+    ),
+    false,
+  );
+});
+
 test("direct source apply rejects an external plan before login", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     runId: "DIRECT-EXTERNAL",
-    backendURL: "https://example.invalid",
   });
+  plan.backendURL = "https://example.invalid";
   let fetchCalls = 0;
   await assert.rejects(
     () =>
@@ -267,7 +538,7 @@ test("direct source apply rejects an external plan before login", async () => {
           throw new Error("fetch must not run for an external plan");
         },
       }),
-    /refuse external backend/u,
+    /registered external origin|refuse external backend/u,
   );
   assert.equal(fetchCalls, 0);
 });
@@ -275,8 +546,8 @@ test("direct source apply rejects an external plan before login", async () => {
 test("direct source verification rejects an external plan before login", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     runId: "VERIFY-EXTERNAL",
-    backendURL: "https://example.invalid",
   });
+  plan.backendURL = "https://example.invalid";
   let fetchCalls = 0;
   await assert.rejects(
     () =>
@@ -287,7 +558,7 @@ test("direct source verification rejects an external plan before login", async (
           throw new Error("fetch must not run for external verification");
         },
       }),
-    /refuse external backend/u,
+    /registered external origin|refuse external backend/u,
   );
   assert.equal(fetchCalls, 0);
 });
@@ -569,6 +840,281 @@ test("persisted sales order lines retain exact IDs for linked reservations and s
       }),
     /does not match its persisted product, SKU, or unit reference/u,
   );
+});
+
+test("persisted outsourcing lines retain exact formal source references", () => {
+  const input = {
+    orderNo: "SIM-OS-001",
+    plannedItems: [
+      {
+        line_no: 1,
+        subject_type: "PRODUCT",
+        productRef: "P-1",
+        processRef: "PROC-1",
+      },
+    ],
+    actualItems: [
+      {
+        id: 902,
+        line_no: 1,
+        subject_type: "PRODUCT",
+        product_id: 101,
+        product_sku_id: 201,
+        material_id: null,
+        process_id: 401,
+        unit_id: 301,
+        outsourcing_quantity: "112",
+        line_status: "open",
+      },
+    ],
+    productIds: new Map([["P-1", 101]]),
+    materialIds: new Map(),
+    processIds: new Map([["PROC-1", 401]]),
+    unitId: 301,
+  };
+
+  assert.deepEqual(buildOutsourcingOrderLineReferences(input), [
+    {
+      outsourcingOrderItemId: 902,
+      lineNo: 1,
+      subjectType: "PRODUCT",
+      subjectId: 101,
+      productId: 101,
+      productSkuId: 201,
+      processId: 401,
+      unitId: 301,
+      quantity: "112",
+    },
+  ]);
+  assert.throws(
+    () =>
+      buildOutsourcingOrderLineReferences({
+        ...input,
+        actualItems: [{ ...input.actualItems[0], line_status: "closed" }],
+      }),
+    /open-line reference/u,
+  );
+});
+
+test("persisted purchase lines retain exact formal source references", () => {
+  const input = {
+    orderNo: "SIM-PO-001",
+    plannedItems: [
+      {
+        line_no: 1,
+        materialRef: "M-1",
+      },
+    ],
+    actualItems: [
+      {
+        id: 903,
+        line_no: 1,
+        material_id: 501,
+        unit_id: 301,
+        purchased_quantity: "500",
+        unit_price: "12.5",
+        amount: "6250",
+        line_status: "open",
+      },
+    ],
+    materialIds: new Map([["M-1", 501]]),
+    unitId: 301,
+  };
+
+  assert.deepEqual(buildPurchaseOrderLineReferences(input), [
+    {
+      purchaseOrderItemId: 903,
+      lineNo: 1,
+      materialId: 501,
+      unitId: 301,
+      quantity: "500",
+      unitPrice: "12.5",
+      amount: "6250",
+    },
+  ]);
+  assert.throws(
+    () =>
+      buildPurchaseOrderLineReferences({
+        ...input,
+        actualItems: [{ ...input.actualItems[0], line_status: "closed" }],
+      }),
+    /open-line reference/u,
+  );
+});
+
+test("source report exposes read-back candidates but blocks every Fact phase missing a formal lot or receipt", () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: "20260715-V1",
+    dataVersion: "2026.07.15-v1",
+  });
+  const activeBOMPlans = new Map(
+    plan.records.bomVersions
+      .filter((record) => record.targetStatus === "ACTIVE")
+      .map((record) => [record.productRef, record]),
+  );
+  const salesPlan = plan.records.salesOrders.find(
+    (record) =>
+      record.targetStatus === "ACTIVE" &&
+      record.items.some((item) => activeBOMPlans.has(item.productRef)),
+  );
+  const salesLinePlan = salesPlan.items.find((item) =>
+    activeBOMPlans.has(item.productRef),
+  );
+  const bomPlan = activeBOMPlans.get(salesLinePlan.productRef);
+  const outsourcingPlan = plan.records.outsourcingOrders.find(
+    (record) => record.targetStatus === "CONFIRMED",
+  );
+  const purchasePlan = plan.records.purchaseOrders.find(
+    (record) => record.targetStatus === "APPROVED",
+  );
+  const salesOrder = { id: 1001, lifecycle_status: "ACTIVE" };
+  const outsourcingOrder = { id: 2001, lifecycle_status: "CONFIRMED" };
+  const purchaseOrder = { id: 2501, lifecycle_status: "APPROVED" };
+  const sourceDocuments = {
+    sales: new Map([[salesPlan.order_no, salesOrder]]),
+    salesOrderItems: new Map([
+      [
+        salesOrder.id,
+        [
+          {
+            salesOrderItemId: 1002,
+            lineNo: salesLinePlan.line_no,
+            productId: 1003,
+            productSkuId: 1004,
+            unitId: 1005,
+            quantity: "129",
+          },
+        ],
+      ],
+    ]),
+    outsourcing: new Map([
+      [outsourcingPlan.outsourcing_order_no, outsourcingOrder],
+    ]),
+    outsourcingOrderItems: new Map([
+      [
+        outsourcingOrder.id,
+        [
+          {
+            outsourcingOrderItemId: 2002,
+            lineNo: 1,
+            subjectType: "PRODUCT",
+            subjectId: 1003,
+            productId: 1003,
+            processId: 2003,
+            unitId: 1005,
+            quantity: "112",
+          },
+        ],
+      ],
+    ]),
+    purchase: new Map([[purchasePlan.purchase_order_no, purchaseOrder]]),
+    purchaseOrderItems: new Map([
+      [
+        purchaseOrder.id,
+        [
+          {
+            purchaseOrderItemId: 2502,
+            lineNo: 1,
+            materialId: 3003,
+            unitId: 1005,
+            quantity: "500",
+            unitPrice: "12.5",
+            amount: "6250",
+          },
+        ],
+      ],
+    ]),
+  };
+  const bomVersions = new Map([
+    [
+      bomPlan.version,
+      {
+        id: 3001,
+        status: "ACTIVE",
+        items: [
+          {
+            id: 3002,
+            material_id: 3003,
+            unit_id: 1005,
+            quantity: "0.2",
+            loss_rate: "0",
+          },
+        ],
+      },
+    ],
+  ]);
+  const refs = {
+    customers: new Map([
+      [
+        salesPlan.customerRef,
+        { id: 5001, code: salesPlan.customerRef, name: "【试用】验收客户" },
+      ],
+    ]),
+    suppliers: new Map([
+      [
+        purchasePlan.supplierRef,
+        { id: 5002, code: purchasePlan.supplierRef, name: "嘉顺布行" },
+      ],
+    ]),
+    warehouses: [
+      { id: 4002, code: "WH-B", name: "试用仓库 B" },
+      { id: 4001, code: "WH-A", name: "试用仓库 A" },
+    ],
+  };
+
+  const sourceDrivenFacts = buildSourceDrivenFactReferences({
+    plan,
+    refs,
+    sourceDocuments,
+    bomVersions,
+  });
+  assert.deepEqual(
+    {
+      datasetKey: sourceDrivenFacts.datasetKey,
+      dataVersion: sourceDrivenFacts.dataVersion,
+      runId: sourceDrivenFacts.runId,
+    },
+    {
+      datasetKey: plan.datasetKey,
+      dataVersion: plan.dataVersion,
+      runId: plan.runId,
+    },
+  );
+  assert.equal(sourceDrivenFacts.sourceCandidates.production.item.id, 1002);
+  assert.equal(
+    sourceDrivenFacts.sourceCandidates.production.item.orderedQuantity,
+    "129",
+  );
+  assert.equal(sourceDrivenFacts.sourceCandidates.sales.order.customerId, 5001);
+  assert.equal(
+    sourceDrivenFacts.sourceCandidates.outsourcing.item.quantity,
+    "112",
+  );
+  assert.deepEqual(
+    sourceDrivenFacts.sourceCandidates.warehouses.map((item) => item.code),
+    ["WH-A", "WH-B"],
+  );
+  assert.equal(Object.hasOwn(sourceDrivenFacts, "production"), false);
+  assert.match(sourceDrivenFacts.phaseReadiness.production.reason, /lot/u);
+  assert.match(sourceDrivenFacts.phaseReadiness.purchase.reason, /receipt/u);
+
+  const factPlan = buildSourceDrivenFactPlan({
+    mode: "apply",
+    simulatedOnly: true,
+    realCustomerImport: false,
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.runId,
+    target: plan.target,
+    backendURL: plan.backendURL,
+    referenceRecords: { sourceDrivenFacts },
+  });
+  assert.equal(factPlan.readyForPreflight, false);
+  assert.deepEqual(
+    factPlan.blocked.map((item) => item.phase),
+    ["production", "outsourcing", "sales"],
+  );
+  assert.equal(factPlan.phases.purchase.status, "unsupported");
 });
 
 test("partial draft BOMs resume missing lines while settled BOMs fail closed", () => {

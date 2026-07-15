@@ -48,7 +48,7 @@ const navItemRegistry = {
     label: '任务看板',
     path: '/erp/task-board',
     shortLabel: '任务',
-    description: '按协同任务状态看待处理、处理中、阻塞、退回和超时任务。',
+    description: '按办理状态查看待处理、处理中、阻塞、退回和超时任务。',
   },
   'business-dashboard': {
     key: 'business-dashboard',
@@ -66,21 +66,21 @@ const navItemRegistry = {
   },
   'exception-flow': {
     key: 'exception-flow',
-    label: '异常 / 阻塞闭环',
+    label: '异常处理',
     path: '/erp/operations/exceptions',
     shortLabel: '异常',
-    description: '集中查看阻塞、催办、处理、验证和关闭的协同任务。',
+    description: '集中查看需要登记、催办、处理、确认和关闭的异常任务。',
   },
   'permission-center': {
     key: 'permission-center',
     label: '权限管理',
     path: '/erp/system/permissions',
     shortLabel: '权限',
-    description: '集中管理管理员账号、角色、权限码和启用状态。',
+    description: '集中管理员工账号、岗位、功能权限和账号状态。',
   },
   'system-audit-logs': {
     key: 'system-audit-logs',
-    label: '审计日志',
+    label: '系统操作记录',
     path: '/erp/system/audit-logs',
     shortLabel: '审计',
     description: '只读查看系统管理操作记录。',
@@ -91,9 +91,9 @@ export const navigationItemRegistry = navItemRegistry
 
 const productCoreDashboardItem = {
   ...navItemRegistry['global-dashboard'],
-  label: '产品核心总览',
-  shortLabel: '核心',
-  description: '审阅产品核心能力、运行边界、控制面和客户配置进入条件。',
+  label: '系统功能总览',
+  shortLabel: '功能',
+  description: '查看当前可用功能和系统设置；此模式不显示客户业务数据。',
 }
 
 function getDefaultNavigationSections() {
@@ -127,11 +127,11 @@ function getDefaultNavigationSections() {
 export function getProductCoreNavigationSections() {
   return [
     {
-      title: '产品核心',
+      title: '功能预览',
       items: [productCoreDashboardItem, navItemRegistry['print-center']],
     },
     {
-      title: '控制面',
+      title: '系统设置',
       items: [
         navItemRegistry['permission-center'],
         navItemRegistry['system-audit-logs'],

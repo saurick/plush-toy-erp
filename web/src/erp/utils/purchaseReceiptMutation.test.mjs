@@ -39,7 +39,7 @@ test('purchase receipt mutation UUID uses secure browser crypto only', () => {
     }),
     '01010101-0101-4101-8101-010101010101'
   )
-  assert.throws(() => purchaseReceiptMutationUUID({}), /安全请求标识/u)
+  assert.throws(() => purchaseReceiptMutationUUID({}), /暂时无法安全提交/u)
   const source = readFileSync(
     new URL('./purchaseReceiptMutation.mjs', import.meta.url),
     'utf8'

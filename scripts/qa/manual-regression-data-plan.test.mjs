@@ -27,6 +27,8 @@ test("manual-regression-data-plan: keeps read-only simulated boundary", () => {
   assert.equal(plan.productCore.prefix, "SIM-PLUSH-CORE");
   assert.equal(plan.productCore.realCustomerImport, false);
   assert.equal(plan.yoyoosun.customerKey, "yoyoosun");
+  assert.equal(plan.yoyoosun.dataVersion, "2026.07.15-v3");
+  assert.equal(plan.yoyoosun.runId, "20260715-V3");
   assert.equal(plan.yoyoosun.simulatedOnly, true);
   assert.equal(plan.yoyoosun.realCustomerImport, false);
   assert.equal(plan.yoyoosun.fixtureStatus, "preview_only");
@@ -85,47 +87,42 @@ test("manual-regression-data-plan: fixture coverage is broad enough for manual r
   );
 });
 
-test("manual-regression-data-plan: active apply commands keep confirmations and retired fact apply stays absent", () => {
+test("manual-regression-data-plan: current dataset uses one source-driven fact path for both targets", () => {
   const plan = buildManualRegressionDataPlan();
   const commands = plan.yoyoosun.commands;
 
-  assert.match(
-    commands.trialApplySimulated,
-    /TRIAL_SIM_CONFIRM=APPLY_SIMULATED_TRIAL_DATA/u,
+  assert.equal(plan.yoyoosun.currentContract.version, "2026.07.15-v3");
+  assert.equal(plan.yoyoosun.currentContract.runId, "20260715-V3");
+  assert.deepEqual(plan.yoyoosun.currentContract.targets, [
+    "local",
+    "customer-trial-133",
+  ]);
+  assert.equal(
+    plan.yoyoosun.currentContract.purchaseQualityHandledByFacts,
+    true,
   );
-  assert.match(
-    commands.operationalInputTemplate,
-    /operational-fact-simulated-closure\.mjs --print-input-template/u,
+  assert.equal(
+    plan.yoyoosun.targetRules["customer-trial-133"].remoteSeedAllowed,
+    false,
   );
-  assert.equal(commands.operationalApplySimulated, undefined);
-  assert.match(
-    plan.yoyoosun.retiredApplyPaths.operationalFacts,
-    /source-driven fixture/u,
+  assert.equal(
+    commands.factsEntrypoint,
+    "scripts/qa/manual-acceptance-fact-data.mjs",
   );
-  assert.match(
-    commands.mobileWorkflowApplySimulated,
-    /MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS/u,
-  );
-  assert.match(
-    commands.purchaseQualityApplySimulated,
-    /PURCHASE_QUALITY_SIM_CONFIRM=APPLY_SIMULATED_PURCHASE_QUALITY_MATRIX/u,
-  );
+  assert.match(commands.sourcePlan, /2026\.07\.15-v3.*20260715-V3/u);
   assert.doesNotMatch(
-    [
-      commands.trialApplySimulated,
-      commands.mobileWorkflowApplySimulated,
-      commands.purchaseQualityApplySimulated,
-    ].join("\n"),
-    /CUSTOMER_IMPORT_CONFIRM|EXECUTE_YOYOOSUN_IMPORT/u,
+    JSON.stringify(plan),
+    /purchase-quality-simulated-matrix|operational-fact-simulated-closure/u,
   );
 });
 
 test("manual-regression-data-plan: formatted output is reviewable", () => {
   const output = formatManualRegressionDataPlan(buildManualRegressionDataPlan());
 
-  assert.match(output, /manual regression data plan/u);
-  assert.match(output, /Product Core/u);
+  assert.match(output, /手工回归数据计划/u);
+  assert.match(output, /本地通用基础资料/u);
   assert.match(output, /SIM-PLUSH-CORE/u);
-  assert.match(output, /yoyoosun/u);
+  assert.match(output, /永绅模拟验收数据/u);
+  assert.match(output, /2026\.07\.15-v3 \/ 20260715-V3/u);
   assert.match(output, /review-pass-1-runtime-contract-and-fixture-unit-tests/u);
 });

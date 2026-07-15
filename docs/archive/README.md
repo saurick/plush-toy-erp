@@ -46,3 +46,4 @@
 | `docs/archive/progress-2026-07-11-before-manual-regression-deploy.md` | 全场景手工回归数据、提交推送和 133 部署收口前的 `progress.md` 过程记录归档 |
 | `docs/archive/progress-2026-07-12-before-agents-size-gate.md` | AGENTS 体积自动门禁前的 Skills 与项目规则治理过程归档 |
 | `docs/archive/progress-2026-07-12-before-doc-code-consistency-audit.md` | docs 与代码一致性审计前的 `progress.md` 过程记录归档 |
+| `docs/archive/progress-2026-07-15-before-local-admin-default-policy.md` | 本地管理员默认凭据稳定化前的 `progress.md` 完整过程记录归档 |

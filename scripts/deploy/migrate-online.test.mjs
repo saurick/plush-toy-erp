@@ -10,6 +10,10 @@ const migrateScript = path.join(
   repoRoot,
   "server/deploy/compose/prod/migrate_online.sh",
 );
+const populatedUpgradePreflight = path.join(
+  repoRoot,
+  "scripts/qa/populated-upgrade-preflight.sh",
+);
 const systemFlock = findCommand("flock");
 const perl = findCommand("perl");
 
@@ -33,6 +37,7 @@ function createFixture({ useSystemFlock = false } = {}) {
   const migrateDir = path.join(root, "migrations");
   const composeFile = path.join(root, "compose.yml");
   const atlasLog = path.join(root, "atlas.log");
+  const psqlLog = path.join(root, "psql.log");
   const eventLog = path.join(root, "events.log");
   const flockLog = path.join(root, "flock.log");
   const lockDir = path.join(root, "private-lock");
@@ -89,6 +94,26 @@ printf '%s end %s\n' "\${RUN_LABEL:-run}" "$phase" >> "$EVENT_LOG"
 `,
   );
 
+  const psqlBin = path.join(binDir, "psql");
+  writeExecutable(
+    psqlBin,
+    `#!/bin/sh
+printf '%s\n' "$*" >> "$PSQL_LOG"
+payload=$(cat)
+case "$payload" in
+  *plush_populated_upgrade*) audit='populated-upgrade' ;;
+  *plush_customer_config_cutover*) audit='customer-config-cutover' ;;
+  *) audit='unknown-audit' ;;
+esac
+printf '%s start %s\n' "\${RUN_LABEL:-run}" "$audit" >> "$EVENT_LOG"
+if [ -n "\${PREFLIGHT_FAIL_CODE:-}" ] && { [ -z "\${PREFLIGHT_FAIL_AUDIT:-}" ] || [ "$PREFLIGHT_FAIL_AUDIT" = "$audit" ]; }; then
+  printf '%s fail %s\n' "\${RUN_LABEL:-run}" "$audit" >> "$EVENT_LOG"
+  exit "$PREFLIGHT_FAIL_CODE"
+fi
+printf '%s end %s\n' "\${RUN_LABEL:-run}" "$audit" >> "$EVENT_LOG"
+`,
+  );
+
   if (!useSystemFlock) {
     writeExecutable(
       path.join(binDir, "flock"),
@@ -121,6 +146,7 @@ flock($lock_handle, LOCK_EX) or die "flock fd $fd failed: $!\\n";
     lockDir,
     lockFile,
     atlasLog,
+    psqlLog,
     eventLog,
     flockLog,
     env: {
@@ -129,9 +155,12 @@ flock($lock_handle, LOCK_EX) or die "flock fd $fd failed: $!\\n";
       COMPOSE_FILE: composeFile,
       MIG_DIR: migrateDir,
       ATLAS_BIN: atlasBin,
+      PSQL_BIN: psqlBin,
+      POPULATED_UPGRADE_PREFLIGHT: populatedUpgradePreflight,
       DB_URL: "postgres://test:test@127.0.0.1:5435/test?sslmode=disable",
       MIGRATION_LOCK_FILE: lockFile,
       ATLAS_LOG: atlasLog,
+      PSQL_LOG: psqlLog,
       EVENT_LOG: eventLog,
       FLOCK_LOG: flockLog,
     },
@@ -154,6 +183,13 @@ function atlasPhases(filePath) {
     if (line.startsWith("migrate apply ")) return "apply";
     return "unknown";
   });
+}
+
+function expectedEvents(phases, label = "run") {
+  return phases.flatMap((phase) => [
+    `${label} start ${phase}`,
+    `${label} end ${phase}`,
+  ]);
 }
 
 function runMigration(fixture, args = [], extraEnv = {}) {
@@ -195,7 +231,7 @@ function spawnMigration(fixture, args = [], extraEnv = {}) {
   });
 }
 
-async function waitForLine(filePath, expected, timeoutMs = 3000) {
+async function waitForLine(filePath, expected, timeoutMs = 10000) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
     if (readLines(filePath).includes(expected)) return;
@@ -204,14 +240,39 @@ async function waitForLine(filePath, expected, timeoutMs = 3000) {
   throw new Error(`timed out waiting for ${expected}`);
 }
 
-test("migrate_online 在一次锁内按模式执行 Atlas 命令", async (t) => {
+test("migrate_online 在一次锁内按 status、两项只读审计、dry-run、apply 顺序执行", async (t) => {
   const cases = [
-    { name: "status-only", args: ["--status-only"], phases: ["status"] },
-    { name: "dry-run", args: [], phases: ["status", "dry-run"] },
+    {
+      name: "status-only 不运行审计",
+      args: ["--status-only"],
+      atlas: ["status"],
+      sequence: ["status"],
+      preflightRuns: 0,
+    },
+    {
+      name: "dry-run",
+      args: [],
+      atlas: ["status", "dry-run"],
+      sequence: [
+        "status",
+        "populated-upgrade",
+        "customer-config-cutover",
+        "dry-run",
+      ],
+      preflightRuns: 2,
+    },
     {
       name: "apply",
       args: ["--apply"],
-      phases: ["status", "dry-run", "apply"],
+      atlas: ["status", "dry-run", "apply"],
+      sequence: [
+        "status",
+        "populated-upgrade",
+        "customer-config-cutover",
+        "dry-run",
+        "apply",
+      ],
+      preflightRuns: 2,
     },
   ];
 
@@ -221,12 +282,59 @@ test("migrate_online 在一次锁内按模式执行 Atlas 命令", async (t) => 
       try {
         const result = runMigration(fixture, item.args);
         assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
-        assert.deepEqual(atlasPhases(fixture.atlasLog), item.phases);
+        assert.deepEqual(atlasPhases(fixture.atlasLog), item.atlas);
+        assert.deepEqual(
+          readLines(fixture.eventLog),
+          expectedEvents(item.sequence),
+        );
+        assert.equal(readLines(fixture.psqlLog).length, item.preflightRuns);
         assert.deepEqual(readLines(fixture.flockLog), ["9"]);
       } finally {
         fs.rmSync(fixture.root, { recursive: true, force: true });
       }
     });
+  }
+});
+
+test("migrate_online populated upgrade 审计失败时不执行后续审计、dry-run 或 apply", () => {
+  const fixture = createFixture();
+  try {
+    const result = runMigration(fixture, ["--apply"], {
+      PREFLIGHT_FAIL_CODE: "43",
+      PREFLIGHT_FAIL_AUDIT: "populated-upgrade",
+    });
+    assert.equal(result.status, 43, `${result.stdout}\n${result.stderr}`);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), ["status"]);
+    assert.equal(readLines(fixture.psqlLog).length, 1);
+    assert.deepEqual(readLines(fixture.eventLog), [
+      ...expectedEvents(["status"]),
+      "run start populated-upgrade",
+      "run fail populated-upgrade",
+    ]);
+    assert.doesNotMatch(result.stdout, /\[3\/5\]|\[4\/5\]|\[5\/5\]/u);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online customer config cutover 审计失败时不执行 dry-run 或 apply", () => {
+  const fixture = createFixture();
+  try {
+    const result = runMigration(fixture, ["--apply"], {
+      PREFLIGHT_FAIL_CODE: "44",
+      PREFLIGHT_FAIL_AUDIT: "customer-config-cutover",
+    });
+    assert.equal(result.status, 44, `${result.stdout}\n${result.stderr}`);
+    assert.deepEqual(atlasPhases(fixture.atlasLog), ["status"]);
+    assert.equal(readLines(fixture.psqlLog).length, 2);
+    assert.deepEqual(readLines(fixture.eventLog), [
+      ...expectedEvents(["status", "populated-upgrade"]),
+      "run start customer-config-cutover",
+      "run fail customer-config-cutover",
+    ]);
+    assert.doesNotMatch(result.stdout, /\[4\/5\]|\[5\/5\]/u);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
   }
 });
 

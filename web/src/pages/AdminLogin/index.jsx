@@ -158,10 +158,10 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
   }
   const entryOptions = [
     canSelectDesktopEntry
-      ? { label: '后台管理', value: ENTRY_TARGET.DESKTOP }
+      ? { label: '电脑端业务管理', value: ENTRY_TARGET.DESKTOP }
       : null,
     canSelectMobileEntry
-      ? { label: '岗位任务端', value: ENTRY_TARGET.MOBILE_TASKS }
+      ? { label: '手机端待办', value: ENTRY_TARGET.MOBILE_TASKS }
       : null,
   ].filter(Boolean)
   const loginModeOptions = [
@@ -288,7 +288,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
 
   const onFinish = async (values) => {
     if (!entryTarget && entryOptions.length > 1) {
-      setError('请选择登录入口。')
+      setError('请选择工作方式。')
       return
     }
     if (activeLoginMode === LOGIN_MODE.SMS && !smsLoginEnabled) {
@@ -317,7 +317,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
       const nextPath = resolvePostLoginPath(result?.data)
       if (!nextPath) {
         logout(AUTH_SCOPE.ADMIN)
-        setError('该账号暂无当前入口权限，请联系管理员。')
+        setError('当前账号不能使用所选工作方式，请联系系统管理员。')
         return
       }
       navigate(nextPath, { replace: true })
@@ -358,7 +358,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
             <Alert
               type="warning"
               showIcon
-              message="登录入口暂不可用，请联系管理员"
+              message="暂时无法登录，请联系系统管理员"
             />
           ) : null}
 
@@ -371,7 +371,7 @@ export default function AdminLoginPage({ defaultRedirect = '/erp/dashboard' }) {
             {entryOptions.length > 1 ? (
               <Form.Item>
                 <Segmented
-                  aria-label="登录入口"
+                  aria-label="工作方式"
                   block
                   className={`erp-login-segmented ${
                     entryTarget === ENTRY_TARGET.MOBILE_TASKS

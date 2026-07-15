@@ -63,7 +63,8 @@ if [[ "\${1:-}" == "git" ]]; then
     if [[ "$1" == "--log-opts" ]]; then log_opts="$2"; shift 2; continue; fi
     shift
   done
-  if git log -p "$log_opts" | grep -q 'GATE_HISTORY_SECRET_MARKER'; then exit 1; fi
+  history_output="$(git log -p "$log_opts")" || exit 2
+  if grep -Fq 'GATE_HISTORY_SECRET_MARKER' <<<"$history_output"; then exit 1; fi
   exit 0
 fi
 exit 0
@@ -102,7 +103,11 @@ test("gitleaks allowlist is limited to the Atlas checksum path", async () => {
 test("range mode catches a secret added and deleted within the pushed history", async () => {
   await withRepository(async (root) => {
     const base = git(root, ["rev-parse", "HEAD"]);
-    await writeFile(path.join(root, "temporary-secret.txt"), "GATE_HISTORY_SECRET_MARKER\n", "utf8");
+    await writeFile(
+      path.join(root, "temporary-secret.txt"),
+      "GATE_HISTORY_SECRET_MARKER\n",
+      "utf8",
+    );
     commit(root, "add secret");
     await rm(path.join(root, "temporary-secret.txt"));
     commit(root, "remove secret");
@@ -121,7 +126,11 @@ test("range mode catches a secret added and deleted within the pushed history", 
 
 test("staged mode reads index content and reports only a redacted path and line", async () => {
   await withRepository(async (root) => {
-    await writeFile(path.join(root, ".npmrc"), "//registry.example/:_authToken=plain-text-token\n", "utf8");
+    await writeFile(
+      path.join(root, ".npmrc"),
+      "//registry.example/:_authToken=plain-text-token\n",
+      "utf8",
+    );
     git(root, ["add", ".npmrc"]);
 
     const result = scanSecrets({

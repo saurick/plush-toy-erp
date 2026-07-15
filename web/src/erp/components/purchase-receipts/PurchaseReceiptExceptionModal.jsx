@@ -88,8 +88,8 @@ export default function PurchaseReceiptExceptionModal({
         showIcon
         message={
           isReturn
-            ? '系统会从已过账入库行确定供应商、材料、仓库、批次和单位；退货过账后才写库存出库。'
-            : '调整会保留原入库记录并生成差额流水，不会改写原入库明细。'
+            ? '系统会根据已确认的采购入库自动带入供应商、材料、仓库、批次和单位；确认退货后，相应批次的库存会同步扣减。'
+            : '调整会保留原入库记录并生成差额调整记录，不会改写原入库明细。'
         }
       />
       <Form form={form} layout="vertical" preserve={false} disabled={loading}>

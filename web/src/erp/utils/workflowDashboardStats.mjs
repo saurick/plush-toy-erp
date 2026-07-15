@@ -550,7 +550,7 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
       notification_type: payload.notification_type || 'task_created',
       alert_type: 'qc_pending',
       alert_level: 'warning',
-      alert_label: 'IQC 待检',
+      alert_label: '来料检验（IQC）待处理',
     }
   }
 

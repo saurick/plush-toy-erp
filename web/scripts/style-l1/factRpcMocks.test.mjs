@@ -39,6 +39,7 @@ async function workflowMockHarness(
 ) {
   const handlers = new Map()
   const page = {
+    url: () => '',
     async route(pattern, handler) {
       handlers.set(pattern, handler)
     },
@@ -765,7 +766,11 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
       [key]: 'non-contract-value',
     })
     assert.equal(invalidCreate.result.code, 40010)
-    assert.match(invalidCreate.result.message, new RegExp(key, 'u'))
+    assert.equal(
+      invalidCreate.result.message,
+      '任务资料包含无法识别的内容，请刷新后重试'
+    )
+    assert.doesNotMatch(invalidCreate.result.message, new RegExp(key, 'u'))
   }
   for (const params of [
     {},
@@ -935,7 +940,7 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
   for (const action of terminalActions.result.data.actions) {
     assert.equal(action.allowed, false)
     assert.equal(action.reason_code, 'terminal_task')
-    assert.equal(action.reason, '该任务已结束，只能查看上下文。')
+    assert.equal(action.reason, '该任务已结束，只能查看任务详情。')
   }
 })
 

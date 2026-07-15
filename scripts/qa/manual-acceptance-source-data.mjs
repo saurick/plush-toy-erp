@@ -1,16 +1,25 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+
+import {
+  assertManualAcceptanceCapabilitiesPolicy,
+  assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimePolicy,
+  assertManualAcceptanceTargetAttestation,
+  parseManualAcceptanceTargetAttestation,
+  resolveManualAcceptanceTarget,
+} from "./manual-acceptance-target-policy.mjs";
 
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-data";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const CUSTOMER_KEY = "yoyoosun";
-const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "::1"]);
 const REQUIRED_SOURCE_MODULES = Object.freeze([
   "customers",
   "suppliers",
@@ -93,41 +102,6 @@ function timestampRunId(date = new Date()) {
     .replace(/\.\d{3}Z$/u, "Z");
 }
 
-function normalizeBackendURL(value) {
-  const url = new URL(String(value || DEFAULT_BACKEND_URL).trim());
-  if (url.username || url.password) {
-    throw new CliError("backend URL must not contain credentials");
-  }
-  if (!new Set(["http:", "https:"]).has(url.protocol)) {
-    throw new CliError("backend URL must use http or https");
-  }
-  url.pathname = url.pathname.replace(/\/+$/u, "");
-  url.search = "";
-  url.hash = "";
-  return url.toString().replace(/\/+$/u, "");
-}
-
-function assertLocalBackendURL(backendURL, allowExternalBaseURL) {
-  const url = new URL(backendURL);
-  if (LOCAL_HOSTS.has(url.hostname)) return backendURL;
-  if (!allowExternalBaseURL) {
-    throw new CliError(
-      `refuse external backend ${url.origin}; pass --allow-external-base-url only for an explicitly prepared non-production test environment`,
-      2,
-    );
-  }
-  if (
-    process.env.MANUAL_ACCEPTANCE_EXTERNAL_CONFIRM !==
-    "ALLOW_NON_PRODUCTION_TEST_ENV"
-  ) {
-    throw new CliError(
-      "external backend requires MANUAL_ACCEPTANCE_EXTERNAL_CONFIRM=ALLOW_NON_PRODUCTION_TEST_ENV",
-      2,
-    );
-  }
-  return backendURL;
-}
-
 function isoDate(offsetDays = 0, base = new Date()) {
   const value = new Date(base);
   value.setUTCHours(12, 0, 0, 0);
@@ -135,13 +109,45 @@ function isoDate(offsetDays = 0, base = new Date()) {
   return value.toISOString().slice(0, 10);
 }
 
+function sourceDataAnchorDate(dataVersion, explicitAnchorDate) {
+  const raw = optionalText(explicitAnchorDate);
+  const versionDate = String(dataVersion || "").match(
+    /^(\d{4})[.-](\d{2})[.-](\d{2})(?:$|[-._])/u,
+  );
+  const candidate = raw ||
+    (versionDate
+      ? `${versionDate[1]}-${versionDate[2]}-${versionDate[3]}`
+      : undefined);
+  if (!candidate) return isoDate(0);
+  if (!/^\d{4}-\d{2}-\d{2}$/u.test(candidate)) {
+    throw new CliError("anchorDate must be YYYY-MM-DD");
+  }
+  const parsed = new Date(`${candidate}T12:00:00.000Z`);
+  if (Number.isNaN(parsed.valueOf()) || isoDate(0, parsed) !== candidate) {
+    throw new CliError("anchorDate must be a real calendar date");
+  }
+  return candidate;
+}
+
+function sourceSemanticDigest({ datasetKey, dataVersion, runId, prefix, records }) {
+  return createHash("sha256")
+    .update(JSON.stringify({ datasetKey, dataVersion, runId, prefix, records }))
+    .digest("hex");
+}
+
 function pad(value, width = 2) {
   return String(value).padStart(width, "0");
 }
 
 function longBusinessNote(index) {
-  if (index % 15 !== 0) return "模拟试用数据，请勿用于正式业务。";
-  return "模拟试用数据，请勿用于正式业务。客户希望分批交付，外箱、洗水标和颜色须按订单分别核对；首批确认无误后再安排后续批次。";
+  const notes = [
+    "分两批交货",
+    "颜色按样板",
+    "外箱按订单分开",
+    "回货后先检验",
+    "洗水标单独装袋",
+  ];
+  return notes[(index - 1) % notes.length];
 }
 
 function lineCountFor(index) {
@@ -155,18 +161,31 @@ function lifecycleAt(index, values) {
 }
 
 function buildCustomers(prefix, count) {
-  const regions = ["华南", "华东", "华北", "西南", "海外"];
-  const types = ["礼品", "商超", "文创", "乐园", "品牌"];
+  const places = [
+    "东莞",
+    "深圳",
+    "广州",
+    "佛山",
+    "惠州",
+    "中山",
+    "珠海",
+    "厦门",
+    "杭州",
+    "苏州",
+    "宁波",
+    "成都",
+  ];
+  const names = ["美悦礼品", "森野文创", "星城乐园", "童梦商贸", "晴空品牌"];
+  const contacts = ["小陈", "小李", "小周", "小林", "小何", "小吴"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
-    const longName = index % 17 === 0 ? "暨周年庆限定联名毛绒礼赠项目" : "";
+    const name = `${places[offset % places.length]}${names[Math.floor(offset / places.length) % names.length]}`;
     return {
       code: `${prefix}-CUST-${pad(index, 3)}`,
-      name: `【试用】${regions[offset % regions.length]}${types[offset % types.length]}客户 ${pad(index)}${longName}`,
-      short_name: `试用客户${pad(index)}`,
+      name,
+      short_name: name.replace(/^(东莞|深圳|广州|佛山|惠州|中山|珠海|厦门|杭州|苏州|宁波|成都)/u, ""),
       default_payment_method: index % 3 === 0 ? "月结" : "银行转账",
       default_payment_term_days: [0, 30, 45, 60][offset % 4],
-      tax_no: `SIMULATED-CUSTOMER-${pad(index, 3)}`,
       note: longBusinessNote(index),
       isActive: index <= count - 5,
       contacts:
@@ -175,23 +194,20 @@ function buildCustomers(prefix, count) {
           : [
               {
                 owner_type: "CUSTOMER",
-                name: `客户业务联系人 ${pad(index)}`,
-                mobile: `1300000${pad(index, 4)}`,
-                email: `customer-${pad(index, 3)}@example.invalid`,
+                name: contacts[offset % contacts.length],
                 title: "业务联系人",
                 is_primary: true,
-                note: "模拟联系人，请勿用于正式业务。",
+                note: "主要联系人",
               },
               ...(index % 7 === 0
                 ? []
                 : [
                     {
                       owner_type: "CUSTOMER",
-                      name: `客户收货联系人 ${pad(index)}`,
-                      phone: `0769-0000${pad(index, 4)}`,
+                      name: contacts[(offset + 2) % contacts.length],
                       title: "收货联系人",
                       is_primary: false,
-                      note: "模拟联系人，请勿用于正式业务。",
+                      note: "收货联系",
                     },
                   ]),
             ],
@@ -201,22 +217,35 @@ function buildCustomers(prefix, count) {
 
 function buildSuppliers(prefix, count) {
   const categories = [
-    ["面料", "material"],
+    ["布行", "material"],
     ["辅料", "material"],
     ["包装", "material"],
-    ["车缝加工", "outsourcing"],
-    ["手工加工", "outsourcing"],
-    ["综合", "mixed"],
+    ["电绣", "outsourcing"],
+    ["激光", "outsourcing"],
+    ["车缝", "mixed"],
   ];
+  const shortNames = [
+    "嘉顺",
+    "佳美",
+    "安达",
+    "宏达",
+    "顺成",
+    "恒兴",
+    "新彩",
+    "联丰",
+    "广源",
+    "华盛",
+  ];
+  const contacts = ["阿明", "小兰", "陈姐", "李生", "周姐", "林生"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const [label, supplierType] = categories[offset % categories.length];
+    const name = `${shortNames[Math.floor(offset / categories.length) % shortNames.length]}${label}`;
     return {
       code: `${prefix}-SUP-${pad(index, 3)}`,
-      name: `【试用】${label}供应商 ${pad(index)}${index % 19 === 0 ? "（多品类与分批送货服务）" : ""}`,
-      short_name: `试用${label}${pad(index)}`,
+      name,
+      short_name: name,
       supplier_type: supplierType,
-      tax_no: `SIMULATED-SUPPLIER-${pad(index, 3)}`,
       note: longBusinessNote(index),
       isActive: index <= count - 5,
       contacts:
@@ -225,23 +254,20 @@ function buildSuppliers(prefix, count) {
           : [
               {
                 owner_type: "SUPPLIER",
-                name: `供应商业务联系人 ${pad(index)}`,
-                mobile: `1310000${pad(index, 4)}`,
-                email: `supplier-${pad(index, 3)}@example.invalid`,
+                name: contacts[offset % contacts.length],
                 title: "业务联系人",
                 is_primary: true,
-                note: "模拟联系人，请勿用于正式业务。",
+                note: "主要联系人",
               },
               ...(index % 8 === 0
                 ? []
                 : [
                     {
                       owner_type: "SUPPLIER",
-                      name: `供应商送货联系人 ${pad(index)}`,
-                      phone: `0769-1000${pad(index, 4)}`,
+                      name: contacts[(offset + 3) % contacts.length],
                       title: "送货联系人",
                       is_primary: false,
-                      note: "模拟联系人，请勿用于正式业务。",
+                      note: "送货联系",
                     },
                   ]),
             ],
@@ -250,38 +276,34 @@ function buildSuppliers(prefix, count) {
 }
 
 function buildMaterials(prefix, count) {
-  const categories = [
-    "面料",
-    "填充",
-    "胶件",
-    "绣花线",
-    "洗水标",
-    "包装",
-    "辅料",
-    "五金",
-  ];
-  const colors = [
-    "米白",
-    "浅粉",
-    "雾蓝",
-    "焦糖",
-    "奶咖",
-    "墨绿",
-    "黑色",
-    "彩色",
+  const templates = [
+    ["短毛绒", "面料", "58 英寸 / 280g", "米白"],
+    ["提花布", "面料", "57 英寸", "浅粉"],
+    ["网布", "面料", "60 英寸", "黑色"],
+    ["填充棉", "填充", "A级 PP棉", "白色"],
+    ["眼睛", "胶件", "12mm", "黑色"],
+    ["绣花线", "绣花线", "120D", "咖色"],
+    ["洗水标", "洗水标", "白底黑字", "白色"],
+    ["外箱", "包装", "12只装", "牛皮色"],
+    ["丝带", "辅料", "10mm", "浅蓝"],
+    ["钥匙圈", "五金", "25mm", "银色"],
   ];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
-    const category = categories[offset % categories.length];
+    const [label, category, spec, color] = templates[offset % templates.length];
+    const group = Math.floor(offset / templates.length) + 1;
+    const displayColor =
+      group === 1
+        ? color
+        : ["雾蓝", "奶咖", "浅黄", "豆绿", "藕粉", "浅灰", "焦糖"][
+            group - 2
+          ] || `色号${group}`;
     return {
       code: `${prefix}-MAT-${pad(index, 3)}`,
-      name: `【试用】${category} ${pad(index)}${index % 13 === 0 ? "（同色不同克重与不同供应批次）" : ""}`,
+      name: `${displayColor}${label}`,
       category,
-      spec:
-        index % 13 === 0
-          ? "150cm 幅宽 / 320g / 长毛与短毛拼接专用规格"
-          : `${120 + (index % 5) * 10}cm / ${180 + index * 2}g`,
-      color: colors[offset % colors.length],
+      spec,
+      color: displayColor,
       isActive: index <= count - 6,
     };
   });
@@ -289,14 +311,26 @@ function buildMaterials(prefix, count) {
 
 function buildProducts(prefix, count, skusPerProduct) {
   const animals = [
-    "抱抱熊",
-    "安抚兔",
-    "趴趴狗",
-    "长尾猫",
-    "小狐狸",
-    "节日鹿",
-    "企鹅",
-    "小象",
+    "云朵小熊",
+    "星星挂兔",
+    "奶油小狗",
+    "长尾小猫",
+    "围巾狐狸",
+    "铃铛小鹿",
+    "海盐企鹅",
+    "口袋小象",
+    "草莓小熊",
+    "月亮小兔",
+    "趴趴小狗",
+    "花园小猫",
+    "橘子狐狸",
+    "雪花小鹿",
+    "水手企鹅",
+    "背包小象",
+    "饼干小熊",
+    "彩虹小兔",
+    "咖啡小狗",
+    "蝴蝶小猫",
   ];
   const colors = ["米白", "浅粉", "雾蓝"];
   const sizes = ["小号", "中号", "大号"];
@@ -304,20 +338,18 @@ function buildProducts(prefix, count, skusPerProduct) {
     const index = offset + 1;
     const product = {
       code: `${prefix}-PROD-${pad(index, 3)}`,
-      name: `【试用】${animals[offset % animals.length]} ${pad(index)}${index % 11 === 0 ? "（礼盒装周年限定款）" : ""}`,
-      style_no: `${prefix}-STYLE-${pad(index, 3)}`,
-      customer_style_no: `${prefix}-CUSTOMER-STYLE-${pad(index, 3)}`,
+      name: animals[offset % animals.length],
+      style_no: `${27000 + index}${index % 4 === 0 ? "-1" : "#"}`,
       isActive: index <= count - 2,
     };
     product.skus = Array.from({ length: skusPerProduct }, (_, skuOffset) => ({
       sku_code: `${prefix}-SKU-${pad(index, 3)}-${pad(skuOffset + 1)}`,
-      sku_name: `${product.name} / ${colors[skuOffset % colors.length]} / ${sizes[skuOffset % sizes.length]}`,
-      barcode: `690${pad(index, 6)}${pad(skuOffset + 1, 3)}`,
-      customer_sku: `${prefix}-CSKU-${pad(index, 3)}-${pad(skuOffset + 1)}`,
+      sku_name: `${colors[skuOffset % colors.length]}·${sizes[skuOffset % sizes.length]}`,
+      customer_sku: `${product.style_no}-${colors[skuOffset % colors.length]}-${sizes[skuOffset % sizes.length]}`,
       color: colors[skuOffset % colors.length],
       color_no: `C-${pad(skuOffset + 1, 2)}`,
       size: sizes[skuOffset % sizes.length],
-      packaging_version: skuOffset === 2 ? "礼盒装 V2" : "常规单只装 V1",
+      packaging_version: skuOffset === 2 ? "礼盒装" : "单只装",
       isActive: !(index === count && skuOffset === skusPerProduct - 1),
     }));
     return product;
@@ -326,35 +358,55 @@ function buildProducts(prefix, count, skusPerProduct) {
 
 function buildProcesses(prefix, count) {
   const names = [
-    "开料",
     "裁片",
-    "绣花",
-    "车缝",
+    "脸部电绣",
+    "耳片激光",
+    "图案热转印",
+    "本体车缝",
     "充棉",
-    "手工",
+    "手工收口",
     "检针",
-    "查货",
+    "成品抽检",
     "包装",
-    "贴合",
+    "装箱",
+    "主料裁片",
+    "辅料裁片",
+    "眼鼻定位",
+    "商标车缝",
+    "配件安装",
+    "毛面梳理",
+    "线头修剪",
+    "重量检查",
+    "尺寸检查",
+    "外观检查",
+    "针距检查",
+    "拉力检查",
+    "金属检针",
+    "包装复核",
+    "外箱贴标",
+    "成品装袋",
+    "配件装袋",
+    "首件确认",
+    "尾数清点",
   ];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const name = names[offset % names.length];
     return {
       code: `${prefix}-PROC-${pad(index, 3)}`,
-      name: `【试用】${name}环节 ${pad(index)}`,
+      name,
       category: name,
-      outsourcing_enabled: !["检针", "查货"].includes(name),
+      outsourcing_enabled: !["检针", "成品抽检", "重量检查", "尺寸检查", "外观检查"].includes(name),
       inhouse_enabled: true,
-      quality_required: ["绣花", "检针", "查货"].includes(name),
+      quality_required: name.includes("检") || name.includes("确认"),
       sort_order: index * 10,
-      note: `${name}环节模拟资料，请按实际生产安排选择。`,
+      note: name.includes("检") ? "做完后记录检查结果" : "按生产安排办理",
       isActive: index <= count - 3,
     };
   });
 }
 
-function buildSalesOrders(prefix, count, customers, products) {
+function buildSalesOrders(prefix, count, customers, products, anchorDate) {
   const statuses = ["DRAFT", "SUBMITTED", "ACTIVE", "CLOSED", "CANCELED"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
@@ -379,35 +431,36 @@ function buildSalesOrders(prefix, count, customers, products) {
           line_no: lineOffset + 1,
           productRef: lineProduct.code,
           skuRef: sku.sku_code,
-          product_code_snapshot: lineProduct.code,
+          product_code_snapshot: lineProduct.style_no,
           product_name_snapshot: lineProduct.name,
           color_snapshot: sku.color,
           ordered_quantity: String(quantity),
           unit_price: unitPrice.toFixed(2),
           amount: (quantity * unitPrice).toFixed(2),
-          planned_delivery_date: isoDate(14 + (index % 20) + lineOffset),
+          planned_delivery_date: isoDate(14 + (index % 20) + lineOffset, anchorDate),
           note:
-            lineOffset === 0 ? longBusinessNote(index) : "按产品规格分批交付。",
+            lineOffset === 0 ? longBusinessNote(index) : "按颜色分开装箱",
         };
       },
     );
     return {
       order_no: `${prefix}-SO-${pad(index, 3)}`,
       customerRef: customer.code,
-      customer_order_no: `${prefix}-CPO-${pad(index, 3)}`,
+      customer_order_no: `${["MY", "SY", "XC", "TM", "QK"][offset % 5]}${anchorDate.slice(2, 7).replace("-", "")}${pad(index, 3)}`,
       customer_snapshot: { name: customer.name, simulated_only: true },
-      sales_owner: `试用业务员 ${pad((index % 6) + 1)}`,
+      sales_owner: ["小陈", "小李", "小周", "小林", "小何", "小吴"][
+        index % 6
+      ],
       contact_snapshot: customer.contacts[0]
         ? {
             name: customer.contacts[0].name,
-            mobile: customer.contacts[0].mobile,
           }
         : {},
       payment_method: index % 3 === 0 ? "月结" : "银行转账",
       payment_term_days: [0, 30, 45, 60][offset % 4],
       price_condition_note: index % 4 === 0 ? "含税含运费" : "含税，运费另计",
-      order_date: isoDate(-index),
-      planned_delivery_date: isoDate(14 + (index % 20)),
+      order_date: isoDate(-index, anchorDate),
+      planned_delivery_date: isoDate(14 + (index % 20), anchorDate),
       note: longBusinessNote(index),
       targetStatus: lifecycleAt(index, statuses),
       items: lines,
@@ -416,7 +469,14 @@ function buildSalesOrders(prefix, count, customers, products) {
   });
 }
 
-function buildPurchaseOrders(prefix, count, suppliers, materials, salesOrders) {
+function buildPurchaseOrders(
+  prefix,
+  count,
+  suppliers,
+  materials,
+  salesOrders,
+  anchorDate,
+) {
   const statuses = ["DRAFT", "SUBMITTED", "APPROVED", "CLOSED", "CANCELED"];
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
@@ -433,40 +493,45 @@ function buildPurchaseOrders(prefix, count, suppliers, materials, salesOrders) {
         const unitPrice = 1.8 + (lineOffset % 7) * 0.65;
         const salesOrder =
           salesOrders[(offset + lineOffset) % salesOrders.length];
+        const salesItem =
+          salesOrder.items[lineOffset % salesOrder.items.length];
         return {
           line_no: lineOffset + 1,
           materialRef: material.code,
           material_code_snapshot: material.code,
           material_name_snapshot: material.name,
           color_snapshot: material.color,
-          product_order_no_snapshot: salesOrder.order_no,
-          product_no_snapshot: salesOrder.productRef,
-          product_name_snapshot: `对应${salesOrder.productRef}`,
+          product_order_no_snapshot: salesOrder.customer_order_no,
+          product_no_snapshot: salesItem.product_code_snapshot,
+          product_name_snapshot: salesItem.product_name_snapshot,
           purchased_quantity: String(quantity),
           unit_price: unitPrice.toFixed(2),
           amount: (quantity * unitPrice).toFixed(2),
-          expected_arrival_date: isoDate(5 + (index % 15) + lineOffset),
+          expected_arrival_date: isoDate(
+            5 + (index % 15) + lineOffset,
+            anchorDate,
+          ),
           note:
             lineOffset === 0
               ? longBusinessNote(index)
-              : "按产品订单分别标识送货。",
+              : "按订单分开送货",
         };
       },
     );
     return {
       purchase_order_no: `${prefix}-PO-${pad(index, 3)}`,
       supplierRef: supplier.code,
-      supplier_purchase_order_no: `${prefix}-SUP-PO-${pad(index, 3)}`,
+      supplier_purchase_order_no: `CG${anchorDate.slice(2, 7).replace("-", "")}${pad(index, 3)}`,
       supplier_snapshot: { name: supplier.name, simulated_only: true },
       contract_party_snapshot: {
-        buyerCompany: "试用企业",
-        buyerContact: "试用采购负责人",
+        buyerCompany: "永绅演示工厂",
+        buyerContact: "采购部",
         buyerPhone: "0769-00000000",
-        buyerAddress: "试用地址",
-        buyerSigner: "试用采购负责人",
+        buyerAddress: "演示地址",
+        buyerSigner: "采购部",
       },
-      purchase_date: isoDate(-index + 2),
-      expected_arrival_date: isoDate(5 + (index % 15)),
+      purchase_date: isoDate(-index + 2, anchorDate),
+      expected_arrival_date: isoDate(5 + (index % 15), anchorDate),
       note: longBusinessNote(index),
       targetStatus: lifecycleAt(index, statuses),
       items: lines,
@@ -482,6 +547,7 @@ function buildOutsourcingOrders(
   materials,
   processes,
   salesOrders,
+  anchorDate,
 ) {
   const statuses = ["DRAFT", "SUBMITTED", "CONFIRMED", "CLOSED", "CANCELED"];
   const activeProcesses = processes.filter(
@@ -513,22 +579,26 @@ function buildOutsourcingOrders(
           productRef: materialSubject ? undefined : product.code,
           materialRef: materialSubject ? material.code : undefined,
           processRef: processItem.code,
-          product_no_snapshot: materialSubject ? undefined : product.code,
-          product_order_no_snapshot: sourceOrder.order_no,
+          product_no_snapshot: materialSubject ? undefined : product.style_no,
+          product_order_no_snapshot: materialSubject
+            ? undefined
+            : sourceOrder.customer_order_no,
           product_name_snapshot: materialSubject ? undefined : product.name,
           material_code_snapshot: materialSubject ? material.code : undefined,
           material_name_snapshot: materialSubject ? material.name : undefined,
           process_name_snapshot: processItem.name,
           process_category_snapshot: processItem.category,
-          unit_name_snapshot: "个",
           outsourcing_quantity: String(quantity),
           unit_price: unitPrice.toFixed(2),
           amount: (quantity * unitPrice).toFixed(2),
-          expected_return_date: isoDate(7 + (index % 18) + lineOffset),
+          expected_return_date: isoDate(
+            7 + (index % 18) + lineOffset,
+            anchorDate,
+          ),
           note:
             lineOffset === 0
               ? longBusinessNote(index)
-              : "按订单和工序分批回货。",
+              : "回货后先检验",
         };
       },
     );
@@ -537,16 +607,16 @@ function buildOutsourcingOrders(
       supplierRef: supplier.code,
       supplier_snapshot: { name: supplier.name, simulated_only: true },
       contract_party_snapshot: {
-        buyerCompany: "试用企业",
-        buyerContact: "试用委外负责人",
+        buyerCompany: "永绅演示工厂",
+        buyerContact: "生产部",
         buyerPhone: "0769-00000000",
-        buyerAddress: "试用地址",
-        buyerSigner: "试用委外负责人",
+        buyerAddress: "演示地址",
+        buyerSigner: "生产部",
       },
-      source_order_no: sourceOrder.order_no,
+      source_order_no: sourceOrder.customer_order_no,
       sourceSalesOrderRef: sourceOrder.order_no,
-      order_date: isoDate(-index + 4),
-      expected_return_date: isoDate(7 + (index % 18)),
+      order_date: isoDate(-index + 4, anchorDate),
+      expected_return_date: isoDate(7 + (index % 18), anchorDate),
       note: longBusinessNote(index),
       targetStatus: lifecycleAt(index, statuses),
       items: lines,
@@ -554,7 +624,7 @@ function buildOutsourcingOrders(
   });
 }
 
-function buildBOMVersions(prefix, count, products, materials) {
+function buildBOMVersions(prefix, count, products, materials, anchorDate) {
   const productGroupCount = Math.floor(count / 3);
   const statuses = ["ARCHIVED", "ACTIVE", "DRAFT"];
   const versions = [];
@@ -591,7 +661,7 @@ function buildBOMVersions(prefix, count, products, materials) {
             process_base: lineOffset % 2 === 0 ? "常规底料" : "按色卡确认底料",
             process_method: ["热裁", "车缝", "充棉", "包装"][lineOffset % 4],
             note:
-              lineOffset === 0 ? longBusinessNote(index) : "按色卡和样板确认。",
+              lineOffset === 0 ? longBusinessNote(index) : "颜色按样板",
           };
         },
       );
@@ -601,10 +671,10 @@ function buildBOMVersions(prefix, count, products, materials) {
         source_order_no: `${prefix}-SO-${pad(productOffset + 1, 3)}`,
         quantity_text: String(500 + productOffset * 50),
         spare_text: productOffset % 2 === 0 ? "含 3% 备品" : "按订单数量备料",
-        print_date: isoDate(-productOffset),
-        designer: `试用设计员 ${pad((productOffset % 4) + 1)}`,
-        maker: `试用制单员 ${pad((productOffset % 3) + 1)}`,
-        auditor: "试用工程审核",
+        print_date: isoDate(-productOffset, anchorDate),
+        designer: ["小陈", "小李", "小周", "小林"][productOffset % 4],
+        maker: ["小何", "小吴", "小梁"][productOffset % 3],
+        auditor: "工程部",
         hair_direction: productOffset % 2 === 0 ? "单方向" : "按样板方向",
         note: longBusinessNote(index),
         targetStatus,
@@ -641,9 +711,13 @@ function assertBusinessCopy(value, pathName = "dataset") {
 
 export function buildManualAcceptanceSourceDataPlan(options = {}) {
   const runId = sanitizeManualAcceptanceRunId(options.runId || "LOCAL-UAT");
-  const backendURL = normalizeBackendURL(
-    options.backendURL || DEFAULT_BACKEND_URL,
-  );
+  const targetPolicy = resolveManualAcceptanceTarget({
+    backendURL: options.backendURL || DEFAULT_BACKEND_URL,
+    target: options.target,
+    dataVersion: options.dataVersion,
+    runId,
+  });
+  const backendURL = targetPolicy.backendURL;
   const scale = {
     ...DEFAULT_SOURCE_DATA_SCALE,
     ...(options.scale || {}),
@@ -676,6 +750,10 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     );
   }
   const prefix = `${SIMULATION_PREFIX}-${runId}`;
+  const anchorDate = sourceDataAnchorDate(
+    targetPolicy.dataVersion,
+    options.anchorDate,
+  );
   const customers = buildCustomers(prefix, scale.customers);
   const suppliers = buildSuppliers(prefix, scale.suppliers);
   const materials = buildMaterials(prefix, scale.materials);
@@ -686,6 +764,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     scale.salesOrders,
     customers,
     products,
+    anchorDate,
   );
   const purchaseOrders = buildPurchaseOrders(
     prefix,
@@ -693,6 +772,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     suppliers,
     materials,
     salesOrders,
+    anchorDate,
   );
   const outsourcingOrders = buildOutsourcingOrders(
     prefix,
@@ -702,35 +782,48 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     materials,
     processes,
     salesOrders,
+    anchorDate,
   );
   const bomVersions = buildBOMVersions(
     prefix,
     scale.bomVersions,
     products,
     materials,
+    anchorDate,
   );
+  const records = {
+    customers,
+    suppliers,
+    materials,
+    products,
+    processes,
+    salesOrders,
+    purchaseOrders,
+    outsourcingOrders,
+    bomVersions,
+  };
   const plan = {
     scope: "manual-acceptance-source-data",
     customerKey: CUSTOMER_KEY,
     simulatedOnly: true,
     realCustomerImport: false,
     directSQL: false,
+    target: targetPolicy.target,
+    datasetKey: targetPolicy.datasetKey,
+    dataVersion: targetPolicy.dataVersion,
     runId,
     prefix,
+    anchorDate,
     backendURL,
-    allowExternalBaseURL: options.allowExternalBaseURL === true,
     scale,
-    records: {
-      customers,
-      suppliers,
-      materials,
-      products,
-      processes,
-      salesOrders,
-      purchaseOrders,
-      outsourcingOrders,
-      bomVersions,
-    },
+    records,
+    semanticDigest: sourceSemanticDigest({
+      datasetKey: targetPolicy.datasetKey,
+      dataVersion: targetPolicy.dataVersion,
+      runId,
+      prefix,
+      records,
+    }),
     cleanup: {
       mode: "lifecycle-and-disable",
       description:
@@ -749,9 +842,10 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
     verify: false,
     json: false,
     help: false,
-    allowExternalBaseURL: false,
     backendURL:
       process.env.MANUAL_ACCEPTANCE_BACKEND_URL || DEFAULT_BACKEND_URL,
+    target: process.env.MANUAL_ACCEPTANCE_TARGET,
+    dataVersion: process.env.MANUAL_ACCEPTANCE_DATA_VERSION,
     out: DEFAULT_OUT_DIR,
     runId: process.env.MANUAL_ACCEPTANCE_RUN_ID || timestampRunId(),
     scale: {},
@@ -770,10 +864,6 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
       options.json = true;
       continue;
     }
-    if (token === "--allow-external-base-url") {
-      options.allowExternalBaseURL = true;
-      continue;
-    }
     if (token === "--help" || token === "-h") {
       options.help = true;
       continue;
@@ -788,6 +878,12 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
     switch (key) {
       case "backend-url":
         options.backendURL = value;
+        break;
+      case "target":
+        options.target = value;
+        break;
+      case "data-version":
+        options.dataVersion = value;
         break;
       case "out":
         options.out = value;
@@ -829,8 +925,16 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
         throw new CliError(`unknown option ${token}`, 2);
     }
   }
-  options.backendURL = normalizeBackendURL(options.backendURL);
   options.runId = sanitizeManualAcceptanceRunId(options.runId);
+  const targetPolicy = resolveManualAcceptanceTarget({
+    backendURL: options.backendURL,
+    target: options.target,
+    dataVersion: options.dataVersion,
+    runId: options.runId,
+  });
+  options.backendURL = targetPolicy.backendURL;
+  options.target = targetPolicy.target;
+  options.dataVersion = targetPolicy.dataVersion;
   if (options.apply && options.verify)
     throw new CliError("--apply and --verify are separate modes", 2);
   return options;
@@ -921,19 +1025,28 @@ async function loginRoles({
   return Object.fromEntries(entries);
 }
 
-async function assertSafeRuntime({ plan, tokens, fetchImpl }) {
-  const capabilities = await rpcCall({
-    backendURL: plan.backendURL,
-    domain: "debug",
-    method: "capabilities",
-    token: tokens.seedAdmin || tokens.sales,
-    fetchImpl,
-  });
-  if (!new Set(["local", "dev"]).has(capabilities.environment)) {
-    throw new CliError(
-      `refuse manual acceptance writes in environment=${capabilities.environment || "unknown"}`,
-    );
-  }
+async function assertSafeRuntime({
+  plan,
+  tokens,
+  targetAttestation,
+  fetchImpl,
+}) {
+  const attested = targetAttestation
+    ? assertManualAcceptanceTargetAttestation({
+        policy: plan,
+        attestation: targetAttestation,
+      })
+    : undefined;
+  const capabilities = attested
+    ? { environment: attested.environment, ...attested.debug }
+    : await rpcCall({
+        backendURL: plan.backendURL,
+        domain: "debug",
+        method: "capabilities",
+        token: tokens.seedAdmin || tokens.sales,
+        fetchImpl,
+      });
+  assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const sessionData = await rpcCall({
     backendURL: plan.backendURL,
     domain: "customer_config",
@@ -942,38 +1055,117 @@ async function assertSafeRuntime({ plan, tokens, fetchImpl }) {
     fetchImpl,
   });
   const session = sessionData.session || {};
-  const configRevision = optionalText(
-    session.configRevision || session.config_revision,
-  );
-  if (
-    session?.customer?.key !== CUSTOMER_KEY ||
-    session.source !== "active_customer_config_revision" ||
-    !configRevision
-  ) {
-    throw new CliError(
-      "refuse writes: yoyoosun active customer configuration is not the current runtime source",
-    );
-  }
-  const modules = session.modules || {};
-  const unavailableModules = REQUIRED_SOURCE_MODULES.filter(
-    (key) => modules[key] !== "enabled",
-  );
-  if (unavailableModules.length > 0) {
-    throw new CliError(
-      `refuse writes: required modules are not enabled: ${unavailableModules.join(", ")}`,
-    );
-  }
-  return {
-    environment: capabilities.environment,
-    customerKey: session.customer.key,
-    configRevision,
-    source: session.source,
+  const runtime = assertManualAcceptanceRuntimePolicy({
+    policy: plan,
+    capabilities,
+    session,
     requiredModules: REQUIRED_SOURCE_MODULES,
-  };
+    customerKey: CUSTOMER_KEY,
+  });
+  return attested
+    ? {
+        ...runtime,
+        targetAttestation: {
+          source: "out-of-band",
+          release: attested.release,
+          migration: attested.migration,
+        },
+      }
+    : runtime;
 }
 
 function mapBy(items, key) {
   return new Map((items || []).map((item) => [item?.[key], item]));
+}
+
+function comparableDate(value) {
+  if (value == null || value === "") return null;
+  if (typeof value === "number") return value;
+  const parsed = Date.parse(`${value}T00:00:00.000Z`);
+  if (!Number.isFinite(parsed)) return value;
+  return Math.trunc(parsed / 1000);
+}
+
+function comparableDecimal(value) {
+  if (value == null || value === "") return null;
+  const number = Number(value);
+  return Number.isFinite(number) ? number : value;
+}
+
+function comparableValue(value) {
+  if (value == null || value === "") return null;
+  if (Array.isArray(value)) return value.map(comparableValue);
+  if (typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value)
+        .sort(([left], [right]) => left.localeCompare(right))
+        .map(([key, item]) => [key, comparableValue(item)]),
+    );
+  }
+  return value;
+}
+
+export function assertPersistedSourceRecord({
+  label,
+  expected,
+  actual,
+  fields,
+  dateFields = [],
+  decimalFields = [],
+}) {
+  if (!actual || typeof actual !== "object" || Array.isArray(actual)) {
+    throw new CliError(`${label} persisted record is missing`);
+  }
+  const dates = new Set(dateFields);
+  const decimals = new Set(decimalFields);
+  for (const field of fields) {
+    const normalize = dates.has(field)
+      ? comparableDate
+      : decimals.has(field)
+        ? comparableDecimal
+        : comparableValue;
+    const planned = normalize(expected?.[field]);
+    const persisted = normalize(actual?.[field]);
+    try {
+      if (typeof planned === "object" && planned !== null) {
+        if (JSON.stringify(planned) !== JSON.stringify(persisted)) {
+          throw new Error("mismatch");
+        }
+      } else if (persisted !== planned) {
+        throw new Error("mismatch");
+      }
+    } catch {
+      throw new CliError(
+        `${label}.${field} differs from dataVersion planned content`,
+      );
+    }
+  }
+}
+
+function assertPersistedContacts(label, expected, actual) {
+  if (!Array.isArray(actual) || actual.length !== expected.length) {
+    throw new CliError(
+      `${label} expected ${expected.length} contacts, got ${actual?.length ?? "invalid"}`,
+    );
+  }
+  const byName = mapBy(actual, "name");
+  for (const contact of expected) {
+    assertPersistedSourceRecord({
+      label: `${label} contact ${contact.name}`,
+      expected: contact,
+      actual: byName.get(contact.name),
+      fields: [
+        "owner_type",
+        "name",
+        "phone",
+        "mobile",
+        "email",
+        "title",
+        "is_primary",
+        "note",
+      ],
+    });
+  }
 }
 
 async function listAll({
@@ -1005,10 +1197,34 @@ async function createMissingAggregate({
   key,
   method,
   resultKey,
+  persistedFields,
+  contactOwnerType,
 }) {
   const steps = [];
   for (const record of records) {
     if (existing.has(record[key])) {
+      const current = existing.get(record[key]);
+      assertPersistedSourceRecord({
+        label: `${resultKey} ${record[key]}`,
+        expected: record,
+        actual: current,
+        fields: persistedFields,
+      });
+      if (contactOwnerType) {
+        const data = await rpcCall({
+          backendURL: plan.backendURL,
+          domain: "masterdata",
+          method: "list_contacts_by_owner",
+          params: { owner_type: contactOwnerType, owner_id: current.id },
+          token,
+          fetchImpl,
+        });
+        assertPersistedContacts(
+          `${resultKey} ${record[key]}`,
+          record.contacts,
+          data.contacts,
+        );
+      }
       steps.push({
         target: resultKey,
         key: record[key],
@@ -1030,6 +1246,19 @@ async function createMissingAggregate({
     const item = data[resultKey];
     if (!item?.id)
       throw new CliError(`${method} response missing ${resultKey}.id`);
+    assertPersistedSourceRecord({
+      label: `${resultKey} ${record[key]}`,
+      expected: record,
+      actual: item,
+      fields: persistedFields,
+    });
+    if (contactOwnerType) {
+      assertPersistedContacts(
+        `${resultKey} ${record[key]}`,
+        record.contacts,
+        data.contacts,
+      );
+    }
     existing.set(record[key], item);
     steps.push({
       target: resultKey,
@@ -1063,6 +1292,16 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
       key: "code",
       method: "save_customer_with_contacts",
       resultKey: "customer",
+      persistedFields: [
+        "code",
+        "name",
+        "short_name",
+        "default_payment_method",
+        "default_payment_term_days",
+        "tax_no",
+        "note",
+      ],
+      contactOwnerType: "CUSTOMER",
     })),
   );
 
@@ -1087,6 +1326,15 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
       key: "code",
       method: "save_supplier_with_contacts",
       resultKey: "supplier",
+      persistedFields: [
+        "code",
+        "name",
+        "short_name",
+        "supplier_type",
+        "tax_no",
+        "note",
+      ],
+      contactOwnerType: "SUPPLIER",
     })),
   );
 
@@ -1131,14 +1379,43 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     "code",
   );
   for (const record of plan.records.materials) {
-    if (materials.has(record.code)) continue;
+    const expected = { ...record, default_unit_id: unit.id };
+    if (materials.has(record.code)) {
+      assertPersistedSourceRecord({
+        label: `material ${record.code}`,
+        expected,
+        actual: materials.get(record.code),
+        fields: [
+          "code",
+          "name",
+          "category",
+          "spec",
+          "color",
+          "default_unit_id",
+        ],
+      });
+      continue;
+    }
     const data = await rpcCall({
       backendURL: plan.backendURL,
       domain: "masterdata",
       method: "create_material",
-      params: { ...record, default_unit_id: unit.id },
+      params: expected,
       token: tokens.purchase,
       fetchImpl,
+    });
+    assertPersistedSourceRecord({
+      label: `material ${record.code}`,
+      expected,
+      actual: data.material,
+      fields: [
+        "code",
+        "name",
+        "category",
+        "spec",
+        "color",
+        "default_unit_id",
+      ],
     });
     materials.set(record.code, data.material);
     report.steps.push({
@@ -1161,14 +1438,31 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     "code",
   );
   for (const record of plan.records.products) {
+    const expected = {
+      ...record,
+      skus: undefined,
+      default_unit_id: unit.id,
+    };
     if (!products.has(record.code)) {
       const data = await rpcCall({
         backendURL: plan.backendURL,
         domain: "masterdata",
         method: "create_product",
-        params: { ...record, skus: undefined, default_unit_id: unit.id },
+        params: expected,
         token: tokens.engineering,
         fetchImpl,
+      });
+      assertPersistedSourceRecord({
+        label: `product ${record.code}`,
+        expected,
+        actual: data.product,
+        fields: [
+          "code",
+          "name",
+          "style_no",
+          "customer_style_no",
+          "default_unit_id",
+        ],
       });
       products.set(record.code, data.product);
       report.steps.push({
@@ -1176,6 +1470,19 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
         key: record.code,
         action: "create",
         id: data.product?.id,
+      });
+    } else {
+      assertPersistedSourceRecord({
+        label: `product ${record.code}`,
+        expected,
+        actual: products.get(record.code),
+        fields: [
+          "code",
+          "name",
+          "style_no",
+          "customer_style_no",
+          "default_unit_id",
+        ],
       });
     }
   }
@@ -1194,14 +1501,55 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
   for (const record of plan.records.products) {
     const product = products.get(record.code);
     for (const sku of record.skus) {
-      if (skus.has(sku.sku_code)) continue;
+      const expected = {
+        ...sku,
+        product_id: product.id,
+        default_unit_id: unit.id,
+      };
+      if (skus.has(sku.sku_code)) {
+        assertPersistedSourceRecord({
+          label: `product_sku ${sku.sku_code}`,
+          expected,
+          actual: skus.get(sku.sku_code),
+          fields: [
+            "product_id",
+            "sku_code",
+            "sku_name",
+            "barcode",
+            "customer_sku",
+            "color",
+            "color_no",
+            "size",
+            "packaging_version",
+            "default_unit_id",
+          ],
+        });
+        continue;
+      }
       const data = await rpcCall({
         backendURL: plan.backendURL,
         domain: "masterdata",
         method: "create_product_sku",
-        params: { ...sku, product_id: product.id, default_unit_id: unit.id },
+        params: expected,
         token: tokens.engineering,
         fetchImpl,
+      });
+      assertPersistedSourceRecord({
+        label: `product_sku ${sku.sku_code}`,
+        expected,
+        actual: data.product_sku,
+        fields: [
+          "product_id",
+          "sku_code",
+          "sku_name",
+          "barcode",
+          "customer_sku",
+          "color",
+          "color_no",
+          "size",
+          "packaging_version",
+          "default_unit_id",
+        ],
       });
       skus.set(sku.sku_code, data.product_sku);
       report.steps.push({
@@ -1225,7 +1573,24 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     "code",
   );
   for (const record of plan.records.processes) {
-    if (processes.has(record.code)) continue;
+    if (processes.has(record.code)) {
+      assertPersistedSourceRecord({
+        label: `process ${record.code}`,
+        expected: record,
+        actual: processes.get(record.code),
+        fields: [
+          "code",
+          "name",
+          "category",
+          "outsourcing_enabled",
+          "inhouse_enabled",
+          "quality_required",
+          "sort_order",
+          "note",
+        ],
+      });
+      continue;
+    }
     const data = await rpcCall({
       backendURL: plan.backendURL,
       domain: "masterdata",
@@ -1233,6 +1598,21 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
       params: record,
       token: tokens.engineering,
       fetchImpl,
+    });
+    assertPersistedSourceRecord({
+      label: `process ${record.code}`,
+      expected: record,
+      actual: data.process,
+      fields: [
+        "code",
+        "name",
+        "category",
+        "outsourcing_enabled",
+        "inhouse_enabled",
+        "quality_required",
+        "sort_order",
+        "note",
+      ],
     });
     processes.set(record.code, data.process);
     report.steps.push({
@@ -1345,16 +1725,25 @@ async function applyDocumentGroup({
   listStatusKey,
   resolveParams,
   lifecycleActions,
+  headerFields,
+  headerDateFields,
+  itemMethod,
+  itemListKey,
+  itemForeignKey,
+  itemFields,
+  itemDateFields,
+  itemDecimalFields,
   report,
 }) {
   for (const record of records) {
+    const resolvedParams = resolveParams(record);
     let item = existing.get(record[key]);
     if (!item) {
       const data = await rpcCall({
         backendURL: plan.backendURL,
         domain,
         method: saveMethod,
-        params: resolveParams(record),
+        params: resolvedParams,
         token,
         fetchImpl,
       });
@@ -1376,8 +1765,43 @@ async function applyDocumentGroup({
         id: item.id,
       });
     }
+    assertPersistedSourceRecord({
+      label: `${resultKey} ${record[key]}`,
+      expected: resolvedParams,
+      actual: item,
+      fields: headerFields,
+      dateFields: headerDateFields,
+    });
+    const itemData = await rpcCall({
+      backendURL: plan.backendURL,
+      domain,
+      method: itemMethod,
+      params: { [itemForeignKey]: item.id, limit: 200, offset: 0 },
+      token,
+      fetchImpl,
+    });
+    const persistedItems = itemData[itemListKey];
+    if (
+      !Array.isArray(persistedItems) ||
+      persistedItems.length !== resolvedParams.items.length
+    ) {
+      throw new CliError(
+        `${resultKey} ${record[key]} expected ${resolvedParams.items.length} lines, got ${persistedItems?.length ?? "invalid"}`,
+      );
+    }
+    const persistedByLine = mapBy(persistedItems, "line_no");
+    for (const expectedItem of resolvedParams.items) {
+      assertPersistedSourceRecord({
+        label: `${resultKey} ${record[key]} line ${expectedItem.line_no}`,
+        expected: expectedItem,
+        actual: persistedByLine.get(expectedItem.line_no),
+        fields: itemFields,
+        dateFields: itemDateFields,
+        decimalFields: itemDecimalFields,
+      });
+    }
     const current = item[listStatusKey] || "DRAFT";
-    await advanceLifecycle({
+    const finalStatus = await advanceLifecycle({
       plan,
       token,
       fetchImpl,
@@ -1388,6 +1812,7 @@ async function applyDocumentGroup({
       actions: lifecycleActions,
       resultKey,
     });
+    item[listStatusKey] = finalStatus;
   }
 }
 
@@ -1438,6 +1863,111 @@ export function buildSalesOrderLineReferences({
   });
 }
 
+export function buildPurchaseOrderLineReferences({
+  orderNo,
+  plannedItems,
+  actualItems,
+  materialIds,
+  unitId,
+}) {
+  if (
+    !Array.isArray(actualItems) ||
+    actualItems.length !== plannedItems.length
+  ) {
+    throw new CliError(
+      `${orderNo} expected ${plannedItems.length} purchase order lines, got ${actualItems?.length ?? "invalid"}`,
+    );
+  }
+  const actualByLine = new Map(
+    actualItems.map((item) => [Number(item?.line_no), item]),
+  );
+  return plannedItems.map((planned) => {
+    const actual = actualByLine.get(Number(planned.line_no));
+    const expectedMaterialId = materialIds.get(planned.materialRef);
+    if (
+      !actual?.id ||
+      actual.material_id !== expectedMaterialId ||
+      actual.unit_id !== unitId ||
+      String(actual.line_status || "").toUpperCase() !== "OPEN"
+    ) {
+      throw new CliError(
+        `${orderNo} line ${planned.line_no} does not match its persisted material, unit, or open-line reference`,
+      );
+    }
+    return {
+      purchaseOrderItemId: actual.id,
+      lineNo: actual.line_no,
+      materialId: actual.material_id,
+      unitId: actual.unit_id,
+      quantity: actual.purchased_quantity,
+      unitPrice: actual.unit_price,
+      amount: actual.amount,
+    };
+  });
+}
+
+export function buildOutsourcingOrderLineReferences({
+  orderNo,
+  plannedItems,
+  actualItems,
+  productIds,
+  materialIds,
+  processIds,
+  unitId,
+}) {
+  if (
+    !Array.isArray(actualItems) ||
+    actualItems.length !== plannedItems.length
+  ) {
+    throw new CliError(
+      `${orderNo} expected ${plannedItems.length} outsourcing order lines, got ${actualItems?.length ?? "invalid"}`,
+    );
+  }
+  const actualByLine = new Map(
+    actualItems.map((item) => [Number(item?.line_no), item]),
+  );
+  return plannedItems.map((planned) => {
+    const actual = actualByLine.get(Number(planned.line_no));
+    const subjectType = String(planned.subject_type || "").toUpperCase();
+    const expectedProductId = planned.productRef
+      ? productIds.get(planned.productRef)
+      : undefined;
+    const expectedMaterialId = planned.materialRef
+      ? materialIds.get(planned.materialRef)
+      : undefined;
+    const expectedProcessId = processIds.get(planned.processRef);
+    if (
+      !actual?.id ||
+      String(actual.subject_type || "").toUpperCase() !== subjectType ||
+      (actual.product_id ?? undefined) !== expectedProductId ||
+      (actual.material_id ?? undefined) !== expectedMaterialId ||
+      actual.process_id !== expectedProcessId ||
+      actual.unit_id !== unitId ||
+      String(actual.line_status || "").toUpperCase() !== "OPEN"
+    ) {
+      throw new CliError(
+        `${orderNo} line ${planned.line_no} does not match its persisted subject, process, unit, or open-line reference`,
+      );
+    }
+    const subjectId =
+      subjectType === "MATERIAL" ? actual.material_id : actual.product_id;
+    return {
+      outsourcingOrderItemId: actual.id,
+      lineNo: actual.line_no,
+      subjectType,
+      subjectId,
+      ...(actual.product_id == null ? {} : { productId: actual.product_id }),
+      ...(actual.product_sku_id == null
+        ? {}
+        : { productSkuId: actual.product_sku_id }),
+      ...(actual.material_id == null ? {} : { materialId: actual.material_id }),
+      processId: actual.process_id,
+      unitId: actual.unit_id,
+      quantity: actual.outsourcing_quantity,
+    };
+  });
+}
+
 async function createSourceDocuments({
   plan,
   tokens,
@@ -1482,6 +2012,40 @@ async function createSourceDocuments({
     resultKey: "sales_order",
     listStatusKey: "lifecycle_status",
     lifecycleActions: salesActions,
+    headerFields: [
+      "order_no",
+      "customer_id",
+      "customer_order_no",
+      "customer_snapshot",
+      "sales_owner",
+      "contact_snapshot",
+      "payment_method",
+      "payment_term_days",
+      "price_condition_note",
+      "order_date",
+      "planned_delivery_date",
+      "note",
+    ],
+    headerDateFields: ["order_date", "planned_delivery_date"],
+    itemMethod: "list_sales_order_items",
+    itemListKey: "sales_order_items",
+    itemForeignKey: "sales_order_id",
+    itemFields: [
+      "line_no",
+      "product_id",
+      "product_sku_id",
+      "unit_id",
+      "product_code_snapshot",
+      "product_name_snapshot",
+      "color_snapshot",
+      "ordered_quantity",
+      "unit_price",
+      "amount",
+      "planned_delivery_date",
+      "note",
+    ],
+    itemDateFields: ["planned_delivery_date"],
+    itemDecimalFields: ["ordered_quantity", "unit_price", "amount"],
     report,
     resolveParams: (record) => ({
       ...record,
@@ -1578,6 +2142,38 @@ async function createSourceDocuments({
     resultKey: "purchase_order",
     listStatusKey: "lifecycle_status",
     lifecycleActions: purchaseActions,
+    headerFields: [
+      "purchase_order_no",
+      "supplier_id",
+      "supplier_purchase_order_no",
+      "supplier_snapshot",
+      "contract_party_snapshot",
+      "purchase_date",
+      "expected_arrival_date",
+      "note",
+    ],
+    headerDateFields: ["purchase_date", "expected_arrival_date"],
+    itemMethod: "list_purchase_order_items",
+    itemListKey: "purchase_order_items",
+    itemForeignKey: "purchase_order_id",
+    itemFields: [
+      "line_no",
+      "material_id",
+      "unit_id",
+      "material_code_snapshot",
+      "material_name_snapshot",
+      "color_snapshot",
+      "product_order_no_snapshot",
+      "product_no_snapshot",
+      "product_name_snapshot",
+      "purchased_quantity",
+      "unit_price",
+      "amount",
+      "expected_arrival_date",
+      "note",
+    ],
+    itemDateFields: ["expected_arrival_date"],
+    itemDecimalFields: ["purchased_quantity", "unit_price", "amount"],
     report,
     resolveParams: (record) => ({
       ...record,
@@ -1592,6 +2188,39 @@ async function createSourceDocuments({
       })),
     }),
   });
+
+  const materialIds = new Map(
+    [...refs.materials].map(([code, item]) => [code, item.id]),
+  );
+  const purchaseOrderItems = new Map();
+  for (const record of plan.records.purchaseOrders.filter(
+    (item) => item.targetStatus === "APPROVED",
+  )) {
+    const order = purchase.get(record.purchase_order_no);
+    if (!order?.id) {
+      throw new CliError(
+        `${record.purchase_order_no} approved purchase order is missing id`,
+      );
+    }
+    const data = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "purchase_order",
+      method: "list_purchase_order_items",
+      params: { purchase_order_id: order.id, limit: 50, offset: 0 },
+      token: tokens.purchase,
+      fetchImpl,
+    });
+    purchaseOrderItems.set(
+      order.id,
+      buildPurchaseOrderLineReferences({
+        orderNo: record.purchase_order_no,
+        plannedItems: record.items,
+        actualItems: data.purchase_order_items,
+        materialIds,
+        unitId: refs.unit.id,
+      }),
+    );
+  }
 
   const outsourcing = mapBy(
     await listAll({
@@ -1634,6 +2263,44 @@ async function createSourceDocuments({
     resultKey: "outsourcing_order",
     listStatusKey: "lifecycle_status",
     lifecycleActions: outsourcingActions,
+    headerFields: [
+      "outsourcing_order_no",
+      "supplier_id",
+      "supplier_snapshot",
+      "contract_party_snapshot",
+      "source_order_no",
+      "source_sales_order_id",
+      "order_date",
+      "expected_return_date",
+      "note",
+    ],
+    headerDateFields: ["order_date", "expected_return_date"],
+    itemMethod: "list_outsourcing_order_items",
+    itemListKey: "outsourcing_order_items",
+    itemForeignKey: "outsourcing_order_id",
+    itemFields: [
+      "line_no",
+      "subject_type",
+      "product_id",
+      "material_id",
+      "process_id",
+      "unit_id",
+      "product_no_snapshot",
+      "product_order_no_snapshot",
+      "product_name_snapshot",
+      "material_code_snapshot",
+      "material_name_snapshot",
+      "process_name_snapshot",
+      "process_category_snapshot",
+      "unit_name_snapshot",
+      "outsourcing_quantity",
+      "unit_price",
+      "amount",
+      "expected_return_date",
+      "note",
+    ],
+    itemDateFields: ["expected_return_date"],
+    itemDecimalFields: ["outsourcing_quantity", "unit_price", "amount"],
     report,
     resolveParams: (record) => ({
       ...record,
@@ -1652,13 +2319,54 @@ async function createSourceDocuments({
           : undefined,
         process_id: refs.processes.get(item.processRef).id,
         unit_id: refs.unit.id,
+        unit_name_snapshot: refs.unit.name,
         productRef: undefined,
         materialRef: undefined,
         processRef: undefined,
       })),
     }),
   });
-  return { sales, salesOrderItems, purchase, outsourcing };
+  const outsourcingOrderItems = new Map();
+  for (const confirmedRecord of plan.records.outsourcingOrders.filter(
+    (item) => item.targetStatus === "CONFIRMED",
+  )) {
+    const order = outsourcing.get(confirmedRecord.outsourcing_order_no);
+    if (!order?.id) {
+      throw new CliError(
+        `${confirmedRecord.outsourcing_order_no} confirmed outsourcing order is missing id`,
+      );
+    }
+    const data = await rpcCall({
+      backendURL: plan.backendURL,
+      domain: "outsourcing_order",
+      method: "list_outsourcing_order_items",
+      params: { outsourcing_order_id: order.id, limit: 50, offset: 0 },
+      token: tokens.production,
+      fetchImpl,
+    });
+    outsourcingOrderItems.set(
+      order.id,
+      buildOutsourcingOrderLineReferences({
+        orderNo: confirmedRecord.outsourcing_order_no,
+        plannedItems: confirmedRecord.items,
+        actualItems: data.outsourcing_order_items,
+        productIds,
+        materialIds,
+        processIds: new Map(
+          [...refs.processes].map(([code, item]) => [code, item.id]),
+        ),
+        unitId: refs.unit.id,
+      }),
+    );
+  }
+  return {
+    sales,
+    salesOrderItems,
+    purchase,
+    purchaseOrderItems,
+    outsourcing,
+    outsourcingOrderItems,
+  };
 }
 
 export function planBOMItemReconciliation({
@@ -1722,6 +2430,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
   const materialIds = new Map(
     [...refs.materials].map(([code, item]) => [code, item.id]),
   );
+  const details = new Map();
   for (const record of plan.records.bomVersions) {
     let bom = existing.get(record.version);
     let headerAction = "reuse";
@@ -1762,6 +2471,28 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
         `get_bom_version response is incomplete for ${record.version}`,
       );
     }
+    assertPersistedSourceRecord({
+      label: `bom_version ${record.version}`,
+      expected: {
+        ...record,
+        product_id: refs.products.get(record.productRef).id,
+      },
+      actual: detail,
+      fields: [
+        "product_id",
+        "version",
+        "source_order_no",
+        "quantity_text",
+        "spare_text",
+        "print_date",
+        "designer",
+        "maker",
+        "auditor",
+        "hair_direction",
+        "note",
+      ],
+      dateFields: ["print_date"],
+    });
     const reconciliation = planBOMItemReconciliation({
       version: record.version,
       status: detail.status,
@@ -1832,7 +2563,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
         { method: "archive_bom_version", resultStatus: "ARCHIVED" },
       ],
     };
-    await advanceLifecycle({
+    const finalStatus = await advanceLifecycle({
       plan,
       token: tokens.engineering,
       fetchImpl,
@@ -1843,7 +2574,197 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
       actions,
       resultKey: "bom_version",
     });
+    detail.status = finalStatus;
+    details.set(record.version, detail);
   }
+  return details;
+}
+
+function sortedReferenceWarehouses(warehouses) {
+  return [...warehouses]
+    .map((item) => ({ id: item.id, code: item.code, name: item.name }))
+    .sort(
+      (left, right) =>
+        String(left.code || "").localeCompare(String(right.code || "")) ||
+        left.id - right.id,
+    );
+}
+
+export function buildSourceDrivenFactReferences({
+  plan,
+  refs,
+  sourceDocuments,
+  bomVersions,
+}) {
+  const activeBOMPlans = new Map(
+    plan.records.bomVersions
+      .filter((record) => record.targetStatus === "ACTIVE")
+      .map((record) => [record.productRef, record]),
+  );
+  const productionCandidates = [];
+  const salesCandidates = [];
+  for (const orderPlan of plan.records.salesOrders.filter(
+    (record) => record.targetStatus === "ACTIVE",
+  )) {
+    const order = sourceDocuments.sales.get(orderPlan.order_no);
+    const items = sourceDocuments.salesOrderItems.get(order?.id) || [];
+    const customer = refs.customers.get(orderPlan.customerRef);
+    if (
+      !order?.id ||
+      String(order.lifecycle_status || "").toUpperCase() !== "ACTIVE" ||
+      !customer?.id ||
+      !customer?.name
+    ) {
+      continue;
+    }
+    const salesOrder = {
+      id: order.id,
+      orderNo: orderPlan.order_no,
+      status: "ACTIVE",
+      customerId: customer.id,
+      customerSnapshot: customer.name,
+    };
+    for (const plannedLine of orderPlan.items) {
+      const line = items.find(
+        (item) => item.lineNo === plannedLine.line_no,
+      );
+      if (!line?.salesOrderItemId) continue;
+      const item = {
+        id: line.salesOrderItemId,
+        productId: line.productId,
+        productSkuId: line.productSkuId,
+        unitId: line.unitId,
+        orderedQuantity: line.quantity,
+      };
+      salesCandidates.push({ order: salesOrder, item });
+      const bomPlan = activeBOMPlans.get(plannedLine.productRef);
+      const bom = bomPlan ? bomVersions.get(bomPlan.version) : undefined;
+      if (
+        !bom?.id ||
+        String(bom.status || "").toUpperCase() !== "ACTIVE" ||
+        !Array.isArray(bom.items) ||
+        bom.items.length === 0
+      ) {
+        continue;
+      }
+      productionCandidates.push({
+        salesOrder,
+        item,
+        bom: {
+          id: bom.id,
+          version: bomPlan.version,
+          status: "ACTIVE",
+          items: bom.items.map((bomItem) => ({
+            id: bomItem.id,
+            materialId: bomItem.material_id,
+            unitId: bomItem.unit_id,
+            quantity: bomItem.quantity,
+            lossRate: bomItem.loss_rate,
+          })),
+        },
+      });
+    }
+  }
+  const outsourcingCandidates = [];
+  for (const orderPlan of plan.records.outsourcingOrders.filter(
+    (record) => record.targetStatus === "CONFIRMED",
+  )) {
+    const order = sourceDocuments.outsourcing.get(
+      orderPlan.outsourcing_order_no,
+    );
+    if (
+      !order?.id ||
+      String(order.lifecycle_status || "").toUpperCase() !== "CONFIRMED"
+    ) {
+      continue;
+    }
+    for (const item of sourceDocuments.outsourcingOrderItems.get(order.id) || []) {
+      if (!item?.outsourcingOrderItemId) continue;
+      outsourcingCandidates.push({
+        order: {
+          id: order.id,
+          orderNo: orderPlan.outsourcing_order_no,
+          status: "CONFIRMED",
+        },
+        item,
+      });
+    }
+  }
+  const purchaseCandidates = [];
+  for (const orderPlan of plan.records.purchaseOrders.filter(
+    (record) => record.targetStatus === "APPROVED",
+  )) {
+    const order = sourceDocuments.purchase?.get(orderPlan.purchase_order_no);
+    const supplier = refs.suppliers?.get(orderPlan.supplierRef);
+    if (
+      !order?.id ||
+      String(order.lifecycle_status || "").toUpperCase() !== "APPROVED" ||
+      !supplier?.id
+    ) {
+      continue;
+    }
+    for (const item of sourceDocuments.purchaseOrderItems?.get(order.id) || []) {
+      if (!item?.purchaseOrderItemId) continue;
+      purchaseCandidates.push({
+        order: {
+          id: order.id,
+          orderNo: orderPlan.purchase_order_no,
+          status: "APPROVED",
+          supplierId: supplier.id,
+          supplierName: supplier.name,
+        },
+        item,
+      });
+    }
+  }
+  const productionCandidate = productionCandidates[0];
+  const outsourcingCandidate = outsourcingCandidates[0];
+  const salesCandidate = salesCandidates[0];
+  const purchaseCandidate = purchaseCandidates[0];
+
+  const warehouses = sortedReferenceWarehouses(refs.warehouses);
+  return {
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.runId,
+    sourceCandidates: {
+      ...(productionCandidate ? { production: productionCandidate } : {}),
+      ...(outsourcingCandidate ? { outsourcing: outsourcingCandidate } : {}),
+      ...(salesCandidate ? { sales: salesCandidate } : {}),
+      ...(purchaseCandidate ? { purchase: purchaseCandidate } : {}),
+      productionCandidates,
+      outsourcingCandidates,
+      salesCandidates,
+      purchaseCandidates,
+      warehouses,
+    },
+    phaseReadiness: {
+      production: {
+        status: "blocked",
+        reason: productionCandidate
+          ? "no posted inventory lot was created or read back for the BOM material budgets"
+          : "no read-back ACTIVE sales line with a matching read-back ACTIVE BOM was available",
+      },
+      outsourcing: {
+        status: "blocked",
+        reason: outsourcingCandidate
+          ? "no posted inventory lot was created or read back for the confirmed outsourcing line"
+          : "no read-back CONFIRMED outsourcing order with an OPEN line was available",
+      },
+      sales: {
+        status: "blocked",
+        reason: salesCandidate
+          ? "no posted inventory lot was created or read back for the active sales line"
+          : "no read-back ACTIVE sales line was available",
+      },
+      purchase: {
+        status: "unsupported",
+        reason: purchaseCandidate
+          ? "no POSTED purchase receipt was created or read back"
+          : "no read-back APPROVED purchase order line was available",
+      },
+    },
+  };
 }
 
 async function reconcileMasterActiveStates({
@@ -1942,10 +2863,27 @@ async function reconcileMasterActiveStates({
 
 export async function applyManualAcceptanceSourceData(
   plan,
-  { password, adminPassword, fetchImpl = fetch } = {},
+  {
+    password,
+    adminPassword,
+    confirmPhrase = process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM,
+    targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    fetchImpl = fetch,
+  } = {},
 ) {
-  assertLocalBackendURL(plan?.backendURL, plan?.allowExternalBaseURL === true);
-  if (process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM !== CONFIRM_PHRASE) {
+  assertManualAcceptanceMutationTarget(plan, {
+    confirmation: targetConfirmation,
+  });
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
+  if (parsedTargetAttestation) {
+    assertManualAcceptanceTargetAttestation({
+      policy: plan,
+      attestation: parsedTargetAttestation,
+    });
+  }
+  if (confirmPhrase !== CONFIRM_PHRASE) {
     throw new CliError(
       `apply requires MANUAL_ACCEPTANCE_SIM_CONFIRM=${CONFIRM_PHRASE}`,
       2,
@@ -1973,12 +2911,22 @@ export async function applyManualAcceptanceSourceData(
     mode: "apply",
     generatedAt: new Date().toISOString(),
     runId: plan.runId,
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    target: plan.target,
     prefix: plan.prefix,
+    anchorDate: plan.anchorDate,
+    semanticDigest: plan.semanticDigest,
     backendURL: plan.backendURL,
     scale: plan.scale,
     simulatedOnly: true,
     realCustomerImport: false,
-    runtime: await assertSafeRuntime({ plan, tokens, fetchImpl }),
+    runtime: await assertSafeRuntime({
+      plan,
+      tokens,
+      targetAttestation: parsedTargetAttestation,
+      fetchImpl,
+    }),
     steps: [],
   };
   const writeTokens = Object.fromEntries(
@@ -1997,7 +2945,7 @@ export async function applyManualAcceptanceSourceData(
     fetchImpl,
     report,
   });
-  await createBOMVersions({
+  const bomVersions = await createBOMVersions({
     plan,
     tokens: writeTokens,
     refs,
@@ -2023,6 +2971,12 @@ export async function applyManualAcceptanceSourceData(
     processIds: [...refs.processes.values()].map((item) => item.id),
   };
   report.referenceRecords = {
+    sourceDrivenFacts: buildSourceDrivenFactReferences({
+      plan,
+      refs,
+      sourceDocuments,
+      bomVersions,
+    }),
     unit: { id: refs.unit.id, code: refs.unit.code, name: refs.unit.name },
     warehouse: {
       id: refs.warehouse.id,
@@ -2094,6 +3048,57 @@ export async function applyManualAcceptanceSourceData(
             sourceDocuments.sales.get(record.order_no).id,
           ) || [],
       })),
+    purchaseOrders: plan.records.purchaseOrders
+      .filter((record) => record.targetStatus === "APPROVED")
+      .map((record) => {
+        const order = sourceDocuments.purchase.get(record.purchase_order_no);
+        const supplier = refs.suppliers.get(record.supplierRef);
+        return {
+          id: order.id,
+          orderNo: record.purchase_order_no,
+          status: "APPROVED",
+          supplierCode: record.supplierRef,
+          supplierId: supplier.id,
+          supplierName: supplier.name,
+          items: sourceDocuments.purchaseOrderItems.get(order.id) || [],
+        };
+      }),
+    outsourcingOrders: plan.records.outsourcingOrders
+      .filter((record) => record.targetStatus === "CONFIRMED")
+      .map((record) => {
+        const order = sourceDocuments.outsourcing.get(
+          record.outsourcing_order_no,
+        );
+        const supplier = refs.suppliers.get(record.supplierRef);
+        return {
+          id: order.id,
+          orderNo: record.outsourcing_order_no,
+          status: "CONFIRMED",
+          supplierCode: record.supplierRef,
+          supplierId: supplier.id,
+          supplierName: supplier.name,
+          items: sourceDocuments.outsourcingOrderItems.get(order.id) || [],
+        };
+      }),
+    bomVersions: plan.records.bomVersions
+      .filter((record) => record.targetStatus === "ACTIVE")
+      .map((record) => {
+        const bom = bomVersions.get(record.version);
+        return {
+          id: bom.id,
+          version: record.version,
+          status: "ACTIVE",
+          productCode: record.productRef,
+          productId: refs.products.get(record.productRef).id,
+          items: bom.items.map((item) => ({
+            id: item.id,
+            materialId: item.material_id,
+            unitId: item.unit_id,
+            quantity: item.quantity,
+            lossRate: item.loss_rate,
+          })),
+        };
+      }),
   };
   return report;
 }
@@ -2124,9 +3129,22 @@ export function statusCounts(items, key) {
 
 export async function verifyManualAcceptanceSourceData(
   plan,
-  { password, adminPassword, fetchImpl = fetch } = {},
+  {
+    password,
+    adminPassword,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    fetchImpl = fetch,
+  } = {},
 ) {
-  assertLocalBackendURL(plan?.backendURL, plan?.allowExternalBaseURL === true);
+  resolveManualAcceptanceTarget(plan);
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
+  if (parsedTargetAttestation) {
+    assertManualAcceptanceTargetAttestation({
+      policy: plan,
+      attestation: parsedTargetAttestation,
+    });
+  }
   const effectivePassword = requiredText(
     password ||
       process.env.MANUAL_ACCEPTANCE_PASSWORD ||
@@ -2134,18 +3152,25 @@ export async function verifyManualAcceptanceSourceData(
       process.env.ERP_ROLE_DEMO_PASSWORD,
     "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
   );
-  const effectiveAdminPassword = requiredText(
-    adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
-    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-  );
+  const effectiveAdminPassword = parsedTargetAttestation
+    ? undefined
+    : requiredText(
+        adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+      );
   const tokens = await loginRoles({
     backendURL: plan.backendURL,
     password: effectivePassword,
     seedAdminPassword: effectiveAdminPassword,
-    includeSeedAdmin: true,
+    includeSeedAdmin: !parsedTargetAttestation,
     fetchImpl,
   });
-  const runtime = await assertSafeRuntime({ plan, tokens, fetchImpl });
+  const runtime = await assertSafeRuntime({
+    plan,
+    tokens,
+    targetAttestation: parsedTargetAttestation,
+    fetchImpl,
+  });
   const specs = [
     [
       "customers",
@@ -2338,7 +3363,12 @@ export async function verifyManualAcceptanceSourceData(
     mode: "verify",
     generatedAt: new Date().toISOString(),
     runId: plan.runId,
+    datasetKey: plan.datasetKey,
+    dataVersion: plan.dataVersion,
+    target: plan.target,
     prefix: plan.prefix,
+    anchorDate: plan.anchorDate,
+    semanticDigest: plan.semanticDigest,
     simulatedOnly: true,
     realCustomerImport: false,
     runtime,
@@ -2402,6 +3432,13 @@ function usage() {
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-source-data.mjs --apply --run-id LOCAL-UAT
 
+写入已登记的 133 客户试用环境还必须显式提供：
+  --target customer-trial-133 --backend-url http://127.0.0.1:18375 \\
+  --data-version 2026.07.15-v3 --run-id 20260715-V3
+并设置绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
+以及包含精确 origin/customer/release/migration/debug 开关的
+MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
+
 写后核验：
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
@@ -2410,7 +3447,7 @@ function usage() {
 默认生成：60 客户、60 供应商、80 材料、20 产品/60 规格、30 加工环节、
 45 销售订单、45 采购订单、45 委外订单、45 BOM 版本。
 
-本入口默认只允许 localhost；业务名称使用试用人员可理解的中文，不写真实客户资料。`;
+本入口默认只允许 localhost；外部写入只允许已登记的精确目标。业务名称使用试用人员可理解的中文，不写真实客户资料。`;
 }
 
 export async function runManualAcceptanceSourceDataCli(argv, deps = {}) {
@@ -2418,7 +3455,6 @@ export async function runManualAcceptanceSourceDataCli(argv, deps = {}) {
   if (options.help) {
     return { text: `${usage()}\n`, exitCode: 0 };
   }
-  assertLocalBackendURL(options.backendURL, options.allowExternalBaseURL);
   const plan = buildManualAcceptanceSourceDataPlan(options);
   if (!options.apply && !options.verify) {
     return {

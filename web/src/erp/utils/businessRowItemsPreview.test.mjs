@@ -8,8 +8,54 @@ import {
   businessRowEmbeddedItemsSnapshot,
   businessRowItemsModalPage,
   isBusinessRowItemsResultComplete,
+  normalizeBusinessRowItemsTotal,
   normalizeBusinessRowItemsResult,
+  resolveBusinessRowItemsTotal,
 } from './businessRowItemsPreview.mjs'
+
+test('business row item totals strictly distinguish exact counts from unknown values', () => {
+  for (const [value, expected] of [
+    [0, 0],
+    [1, 1],
+    [987654321, 987654321],
+    [undefined, undefined],
+    [null, undefined],
+    ['0', undefined],
+    [-1, undefined],
+    [1.5, undefined],
+    [Number.MAX_SAFE_INTEGER + 1, undefined],
+  ]) {
+    assert.equal(normalizeBusinessRowItemsTotal(value), expected)
+  }
+})
+
+test('business row item totals prefer a loaded cache and fail closed to unknown', () => {
+  assert.equal(
+    resolveBusinessRowItemsTotal({
+      cachedTotal: 7,
+      getItemTotal: () => 1,
+      record: { item_count: 1 },
+    }),
+    7
+  )
+  assert.equal(
+    resolveBusinessRowItemsTotal({
+      cachedTotal: undefined,
+      getItemTotal: (record) => record.item_count,
+      record: { item_count: 0 },
+    }),
+    0
+  )
+  assert.equal(
+    resolveBusinessRowItemsTotal({
+      cachedTotal: undefined,
+      getItemTotal: () => {
+        throw new Error('malformed row')
+      },
+    }),
+    undefined
+  )
+})
 
 test('business row item preview uses a stable id and version cache boundary', () => {
   assert.equal(BUSINESS_ROW_ITEMS_PREVIEW_LIMIT, 5)
@@ -76,10 +122,16 @@ test('embedded item snapshots keep a five-row preview and complete modal data', 
     [1, 2, 3, 4, 5]
   )
   assert.equal(snapshot.preview.total, 7)
-  assert.deepEqual(businessRowEmbeddedItemsSnapshot(null), {
+  assert.deepEqual(businessRowEmbeddedItemsSnapshot([]), {
     all: { items: [], total: 0 },
     preview: { items: [], total: 0 },
   })
+  for (const malformed of [null, undefined, {}, '']) {
+    assert.throws(
+      () => businessRowEmbeddedItemsSnapshot(malformed),
+      /明细数据不完整/
+    )
+  }
 })
 
 test('business row item modal pagination clamps pages without losing items', () => {

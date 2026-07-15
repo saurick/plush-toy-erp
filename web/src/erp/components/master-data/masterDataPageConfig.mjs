@@ -65,7 +65,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'CUS',
     formBoundary: '只维护交易主体资料，不在此写订单、库存或财务记录。',
     summary:
-      '维护客户交易主体和联系人；订单、出货、库存和财务记录在对应业务模块处理。',
+      '维护客户交易主体和联系人；订单、出货、库存和财务记录请到对应业务页面处理。',
   },
   suppliers: {
     title: '供应商档案',
@@ -90,7 +90,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodePrefix: 'SUP',
     formBoundary: '只维护交易主体资料，不在此写采购、库存、质检或财务记录。',
     summary:
-      '维护供应商和加工厂交易主体；采购入库、质检、库存和财务记录在对应业务模块处理。',
+      '维护供应商和加工厂交易主体；采购入库、质检、库存和财务记录请到对应业务页面处理。',
   },
   materials: {
     title: '材料档案',
@@ -106,9 +106,10 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     },
     entityLabel: '材料',
     draftCodePrefix: 'MAT',
-    formBoundary: '只维护材料主数据，不在此写采购、库存、质检或 BOM 用量。',
+    formBoundary:
+      '这里只维护材料基础资料，不办理采购、库存、质检或物料清单用量。',
     summary:
-      '维护材料主数据；采购订单、库存余额、来料质检和 BOM 用量在对应业务模块处理。',
+      '维护材料基础资料；采购订单、库存余额、来料质检和物料清单用量请到对应业务页面处理。',
   },
   processes: {
     title: '加工环节',
@@ -125,7 +126,7 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     entityLabel: '加工环节',
     draftCodePrefix: 'PROC',
     formBoundary:
-      '只维护委外订单和后续质检可引用的标准加工环节；需质检只是工序属性标记，不在此生成委外订单、生产任务、库存流水或质检判定。',
+      '只维护委外订单和后续质检可引用的标准加工环节；需质检只是工序属性标记，不在此生成委外订单、生产任务、库存记录或质检判定。',
     summary:
       '维护少量可复用加工环节，用于委外订单选择和后续质检提示；不管理完整工艺路线、排程、报工、质检结果或库存记录。',
     initialValues: {
@@ -151,9 +152,9 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     createTitleLabel: '产品',
     draftCodePrefix: 'PRD',
     formBoundary:
-      '只维护产品基础信息，不在此写订单、库存、BOM、生产或出货业务。',
+      '这里只维护产品基础信息，不办理订单、库存、物料清单、生产或出货业务。',
     summary:
-      '维护产品基础信息；产品规格 / SKU、BOM、订单、库存和出货记录在对应业务模块处理。',
+      '维护产品基础信息；产品规格（SKU）、物料清单（BOM）、订单、库存和出货记录请到对应业务页面处理。',
   },
   product_skus: {
     title: '产品档案',
@@ -172,9 +173,9 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     draftCodeField: 'sku_code',
     draftCodePrefix: 'SKU',
     formBoundary:
-      '只维护产品规格主数据，不在此写订单、库存、BOM、生产或出货业务。',
+      '这里只维护产品规格，不办理订单、库存、物料清单、生产或出货业务。',
     summary:
-      '维护产品规格 / SKU；产品规格归属到对应产品；订单、库存、BOM 和出货记录在对应业务模块处理。',
+      '维护产品规格（SKU）及其所属产品；订单、库存、物料清单和出货记录请到对应业务页面处理。',
   },
 })
 
@@ -202,7 +203,7 @@ export function getRecordSearchPlaceholder(type = '') {
     return '搜索产品'
   }
   if (type === 'product_skus') {
-    return '搜索 SKU'
+    return '搜索产品规格'
   }
   if (type === 'customers') {
     return '搜索客户'
@@ -224,7 +225,7 @@ export function getRecordSearchHint(type = '') {
     return '可搜索：产品编号、名称、内部款号、客户款号'
   }
   if (type === 'product_skus') {
-    return '可搜索：SKU、条码、客户 SKU、颜色、色号、尺码、包装版本'
+    return '可搜索：规格编号、条码、客户规格编号、颜色、色号、尺码、包装版本'
   }
   if (type === 'customers') {
     return '可搜索：编号、名称、简称、付款方式'

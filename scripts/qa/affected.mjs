@@ -268,8 +268,7 @@ function isCustomerPrivateSourcePath(file) {
     return !isPublicAsset && PRIVATE_SOURCE_EXTENSIONS.has(extension);
   }
   return (
-    file.startsWith("deployments/") &&
-    PRIVATE_SOURCE_EXTENSIONS.has(extension)
+    file.startsWith("deployments/") && PRIVATE_SOURCE_EXTENSIONS.has(extension)
   );
 }
 
@@ -298,12 +297,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
 
   for (const file of changedFiles) {
     if (isCustomerPrivateSourcePath(file)) {
-      addNodeTests(
-        state,
-        [CUSTOMER_SOURCE_BOUNDARY_TEST],
-        file,
-        "T6",
-      );
+      addNodeTests(state, [CUSTOMER_SOURCE_BOUNDARY_TEST], file, "T6");
     }
     if (isDocumentation(file)) {
       addFixed(state, "docs", file);
@@ -520,6 +514,19 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       continue;
     }
 
+    if (
+      file === "scripts/qa/populated-upgrade-20260714055504.sql" ||
+      file === "scripts/qa/customer-config-cutover-20260714055825.sql"
+    ) {
+      directTests.add("scripts/qa/populated-upgrade-preflight.test.mjs");
+      continue;
+    }
+
+    if (file === "scripts/qa/fixtures/populated-upgrade-20260710150001.sql") {
+      directTests.add("scripts/qa/critical-postgres-gate.test.mjs");
+      continue;
+    }
+
     if (file.startsWith("scripts/qa/")) {
       if (file.endsWith(".test.mjs")) {
         if (fs.existsSync(path.join(root, file))) {
@@ -572,7 +579,10 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       ([, selected]) => selected.level === "T0",
     );
     const retainedReasons = new Map(
-      retainedCommands.map(([id]) => [id, new Set(state.reasons.get(id) || [])]),
+      retainedCommands.map(([id]) => [
+        id,
+        new Set(state.reasons.get(id) || []),
+      ]),
     );
     state.commands = new Map(retainedCommands);
     state.reasons = retainedReasons;

@@ -68,7 +68,7 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
     danger: true,
     confirmTitle: '确认取消采购订单',
     confirmContent:
-      '取消只会终止这张采购订单本身；已登记的入库、质检、库存或财务记录不会自动冲正。',
+      '取消只会终止这张采购订单本身；已登记的入库、质检、库存或财务记录不会自动撤销。',
     okText: '确认取消',
     run: cancelPurchaseOrder,
   },
@@ -154,7 +154,7 @@ export function getSingleSelectedPurchaseOrder({
 export function buildPurchaseOrderStats({ orders = [], total = 0 }) {
   return [
     { key: 'total', label: '总订单', value: total },
-    { key: 'current', label: '当前结果', value: orders.length },
+    { key: 'current', label: '本页显示', value: orders.length },
     {
       key: 'approved',
       label: '已审核',

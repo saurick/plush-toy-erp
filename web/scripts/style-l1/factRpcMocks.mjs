@@ -345,13 +345,11 @@ export async function installFactRpcMocks(page, context) {
         fact_no: `OUT-RR-PAGE-L1-${String(index + 1).padStart(3, '0')}`,
         status: 'DRAFT',
         source_line_id: 20_000 + index,
-        sku_code_snapshot: `SKU-OUTSOURCE-PAGE-L1-${String(
-          index + 1
-        ).padStart(3, '0')}`,
-        idempotency_key: `OUT-RR-PAGE-L1-${String(index + 1).padStart(
+        sku_code_snapshot: `SKU-OUTSOURCE-PAGE-L1-${String(index + 1).padStart(
           3,
           '0'
         )}`,
+        idempotency_key: `OUT-RR-PAGE-L1-${String(index + 1).padStart(3, '0')}`,
         note: '委外回货分页样例',
       })
     )
@@ -1782,6 +1780,8 @@ export async function installFactRpcMocks(page, context) {
       task,
     }
   }
+  let businessDashboardStatsFailureServed = false
+  let businessDashboardWorkflowFailureServed = false
   await page.route('**/rpc/business', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
@@ -1789,7 +1789,79 @@ export async function installFactRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'dashboard_stats':
-        data = { modules: [] }
+        if (
+          page
+            .url()
+            .includes('__style_l1_business_dashboard_stats_unavailable=1') &&
+          !businessDashboardStatsFailureServed
+        ) {
+          businessDashboardStatsFailureServed = true
+          data = unsupportedRpcMethod(
+            'business',
+            'dashboard_stats temporarily unavailable'
+          )
+          break
+        }
+        data = {
+          modules: [
+            {
+              module_key: 'customers',
+              available: true,
+              total: page
+                .url()
+                .includes('__style_l1_business_dashboard_large=1')
+                ? 1_234_567
+                : 60,
+            },
+            { module_key: 'suppliers', available: true, total: 60 },
+            { module_key: 'products', available: true, total: 24 },
+            { module_key: 'material-bom', available: true, total: 47 },
+            { module_key: 'sales-orders', available: true, total: 45 },
+            {
+              module_key: 'accessories-purchase',
+              available: true,
+              total: 45,
+            },
+            { module_key: 'inbound', available: true, total: 0 },
+            {
+              module_key: 'quality-inspections',
+              available: true,
+              total: 0,
+            },
+            { module_key: 'inventory', available: true, total: 0 },
+            { module_key: 'shipping-release', available: true, total: 0 },
+            { module_key: 'outbound', available: true, total: 0 },
+            {
+              module_key: 'production-orders',
+              available: true,
+              total: 0,
+            },
+            {
+              module_key: 'production-scheduling',
+              available: true,
+              total: 20,
+            },
+            {
+              module_key: 'production-progress',
+              available: true,
+              total: 0,
+            },
+            {
+              module_key: 'production-exceptions',
+              available: true,
+              total: 20,
+            },
+            {
+              module_key: 'processing-contracts',
+              available: true,
+              total: 45,
+            },
+            { module_key: 'reconciliation', available: true, total: 0 },
+            { module_key: 'payables', available: true, total: 0 },
+            { module_key: 'receivables', available: true, total: 0 },
+            { module_key: 'invoices', available: true, total: 0 },
+          ],
+        }
         break
       default:
         data = unsupportedRpcMethod('business', method)
@@ -1971,6 +2043,80 @@ export async function installFactRpcMocks(page, context) {
           )
         ) {
           fail('当前账号缺少查看协同任务权限')
+          break
+        }
+        if (
+          page
+            .url()
+            .includes('__style_l1_business_dashboard_workflow_unavailable=1') &&
+          !businessDashboardWorkflowFailureServed
+        ) {
+          businessDashboardWorkflowFailureServed = true
+          fail('协同概览暂不可用')
+          break
+        }
+        if (Number(params.limit) === 1 && Number(params.offset || 0) === 0) {
+          const counts = {
+            actionable: 55,
+            exception: 27,
+            due: 66,
+            finished: 32,
+          }
+          const representativeTasks = {
+            actionable: {
+              id: 91_001,
+              version: 1,
+              task_status_key: 'ready',
+              task_name: '跟进销售订单',
+              source_type: 'sales-orders',
+              source_id: 101,
+              source_no: 'STYLE-SO-001',
+              payload: {},
+            },
+            exception: {
+              id: 91_002,
+              version: 1,
+              task_status_key: 'blocked',
+              task_name: '处理订单阻塞',
+              source_type: 'sales-orders',
+              source_id: 102,
+              source_no: 'STYLE-SO-002',
+              payload: {},
+            },
+            due: {
+              id: 91_003,
+              version: 1,
+              task_status_key: 'ready',
+              task_name: '确认到期事项',
+              source_type: 'sales-orders',
+              source_id: 103,
+              source_no: 'STYLE-SO-003',
+              payload: {},
+            },
+            finished: {
+              id: 91_004,
+              version: 1,
+              task_status_key: 'done',
+              task_name: '查看已结束事项',
+              source_type: 'sales-orders',
+              source_id: 104,
+              source_no: 'STYLE-SO-004',
+              payload: {},
+            },
+          }
+          data = {
+            snapshot_at: Number(nowUnix()),
+            total: Object.values(counts).reduce((sum, count) => sum + count, 0),
+            counts,
+            lanes: Object.entries(counts).map(([key, total]) => ({
+              key,
+              total,
+              limit: 1,
+              offset: 0,
+              tasks: [representativeTasks[key]],
+            })),
+            source_types: ['sales-orders'],
+          }
           break
         }
         const visibleTasks = workflowTasks.filter((item) =>

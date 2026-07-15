@@ -296,7 +296,7 @@ test('useMobileRoleTaskActions: backend action projection is the local execution
   await view.submitDetailAction()
 
   assert.equal(actionCalls, 0)
-  assert.deepEqual(messages.warnings, ['当前角色不能done该任务'])
+  assert.deepEqual(messages.warnings, ['当前岗位不能处理该任务'])
 })
 
 test('useMobileRoleTaskActions: resume requires an explanation and uses the resume action', async () => {

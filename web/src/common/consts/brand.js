@@ -1,6 +1,6 @@
 export const ERP_BRAND_MARK = '绒'
-export const ERP_COMPANY_NAME = '毛绒玩具 ERP'
-export const ERP_ADMIN_SYSTEM_NAME = '毛绒 ERP 管理后台'
+export const ERP_COMPANY_NAME = '毛绒玩具管理系统'
+export const ERP_ADMIN_SYSTEM_NAME = '业务管理'
 
 function normalizeBrandConfig(brandConfig = {}) {
   if (!brandConfig || typeof brandConfig !== 'object') {

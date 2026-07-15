@@ -201,7 +201,7 @@ func bomHeaderToAny(item *biz.BOMHeader) map[string]any {
 	if item == nil {
 		return map[string]any{}
 	}
-	return map[string]any{
+	out := map[string]any{
 		"id":              item.ID,
 		"product_id":      item.ProductID,
 		"version":         item.Version,
@@ -220,6 +220,10 @@ func bomHeaderToAny(item *biz.BOMHeader) map[string]any {
 		"created_at":      item.CreatedAt.Unix(),
 		"updated_at":      item.UpdatedAt.Unix(),
 	}
+	if item.ItemCount != nil {
+		out["item_count"] = *item.ItemCount
+	}
+	return out
 }
 
 func bomItemToAny(item *biz.BOMItem) map[string]any {

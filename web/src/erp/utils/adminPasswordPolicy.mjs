@@ -8,7 +8,7 @@ export function getAdminPasswordPolicyError(password) {
     return `密码至少 ${ADMIN_PASSWORD_MIN_CHARACTERS} 位`
   }
   if (new TextEncoder().encode(value).byteLength > ADMIN_PASSWORD_MAX_BYTES) {
-    return `密码不能超过 ${ADMIN_PASSWORD_MAX_BYTES} 字节`
+    return '密码过长，请减少字符后重试'
   }
   return ''
 }

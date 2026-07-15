@@ -2,7 +2,7 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   {
     key: 'project_pending',
     label: '立项待确认',
-    summary: '客户、编号、交期和资料前置条件正在收口。',
+    summary: '客户、编号、交期和所需资料正在确认。',
   },
   {
     key: 'project_approved',
@@ -12,7 +12,7 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   {
     key: 'engineering_preparing',
     label: '资料准备中',
-    summary: 'BOM、色卡、作业指导书和包装要求正在补齐。',
+    summary: '物料清单（BOM）、色卡、作业指导书和包装要求正在补齐。',
   },
   {
     key: 'material_preparing',
@@ -36,14 +36,14 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   },
   {
     key: 'iqc_pending',
-    label: 'IQC 待检',
-    summary: '采购到货或入库通知已形成，等待品质做来料检验。',
+    label: '来料检验（IQC）待处理',
+    summary: '采购到货或入库通知已形成，等待品质人员检验。',
   },
   {
     key: 'qc_failed',
     label: '质检不合格',
     summary:
-      '来料、回货或成品检验未通过，等待责任角色处理退货、返工、补做或让步接收。',
+      '来料、回货或成品检验未通过，等待负责岗位处理退货、返工、补做或让步接收。',
   },
   {
     key: 'warehouse_processing',
@@ -53,11 +53,11 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   {
     key: 'warehouse_inbound_pending',
     label: '待确认入库',
-    summary: 'IQC 已放行，等待仓库确认入库数量、库位和经手人。',
+    summary: '来料检验已通过，等待仓库确认入库数量、库位和经手人。',
   },
   {
     key: 'inbound_done',
-    label: '入库协同已完成',
+    label: '入库跟进已完成',
     summary: '相关交接任务已经完成；实际库存以入库单过账结果为准。',
   },
   {
@@ -72,8 +72,8 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   },
   {
     key: 'shipped',
-    label: '出货协同已完成',
-    summary: '出货链路已完成；实际出货数量和库存扣减以出货单为准。',
+    label: '出货跟进已完成',
+    summary: '出货流程已完成；实际出货数量和库存扣减以出货单为准。',
   },
   {
     key: 'reconciling',
@@ -82,13 +82,13 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   },
   {
     key: 'settled',
-    label: '结算协同已完成',
+    label: '结算跟进已完成',
     summary: '对账交接已经完成；实际应收应付和收付款以业务财务记录为准。',
   },
   {
     key: 'blocked',
     label: '业务阻塞',
-    summary: '主链被缺料、延期、未放行、数量差异或异常问题卡住。',
+    summary: '业务流程因缺料、延期、未放行、数量差异或异常问题暂停。',
   },
   {
     key: 'cancelled',
@@ -98,7 +98,7 @@ export const BUSINESS_STATUS_OPTIONS = Object.freeze([
   {
     key: 'closed',
     label: '业务归档',
-    summary: '主链已完成并归档，保留历史快照与追溯记录。',
+    summary: '业务流程已完成并归档，保留历史记录供查询和追溯。',
   },
 ])
 

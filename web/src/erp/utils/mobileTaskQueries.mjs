@@ -180,7 +180,7 @@ export function mergeMobileRoleTaskPage(
 ) {
   if (append && currentSlot.server_time !== response.server_time) {
     throw Object.assign(
-      new Error('移动岗位任务分页快照已失效，请刷新后重试'),
+      new Error('任务列表已更新，请刷新后重试'),
       { isInvalidResponse: true }
     )
   }

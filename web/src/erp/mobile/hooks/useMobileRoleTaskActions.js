@@ -17,7 +17,6 @@ import {
   normalizeMobileTaskActionKey,
   requiresMobileActionFeedback,
   resolveMobileTaskActionReason,
-  resolveMobileActionLabel,
   resolveMobileUrgeAction,
 } from '../utils/mobileRoleTaskModel.mjs'
 import { verifyWorkflowTaskActionAccessBeforeSubmit } from '../../utils/workflowTaskActionSubmitGuard.mjs'
@@ -134,7 +133,7 @@ export default function useMobileRoleTaskActions({
                 ? resumeWorkflowTaskAction
                 : null
       if (!mutate) {
-        throw new Error('当前任务动作暂不支持')
+        throw new Error('当前处理方式暂不可用，请重新选择')
       }
       const scope = `${task.id}:${actionMode}`
       const params = {
@@ -148,9 +147,7 @@ export default function useMobileRoleTaskActions({
         params,
         verify: async () => {
           if (!canRunMobileTaskAction(task, taskStatusKey)) {
-            message.warning(
-              `当前角色不能${resolveMobileActionLabel(taskStatusKey)}该任务`
-            )
+            message.warning('当前岗位不能处理该任务')
             return false
           }
           return verifyWorkflowTaskActionAccessBeforeSubmit({
@@ -253,7 +250,7 @@ export default function useMobileRoleTaskActions({
         params,
         verify: async () => {
           if (!canRunMobileTaskAction(task, operation)) {
-            message.warning('当前角色没有催办该任务的权限')
+            message.warning('当前岗位不能催办该任务')
             return false
           }
           return verifyWorkflowTaskActionAccessBeforeSubmit({
@@ -318,7 +315,7 @@ export default function useMobileRoleTaskActions({
     setSelectedTaskID(task.id)
     if (['done', 'blocked', 'rejected', 'resume', 'urge'].includes(action)) {
       if (!canRunMobileTaskAction(task, action)) {
-        message.warning(`当前角色不能${resolveMobileActionLabel(action)}该任务`)
+        message.warning('当前岗位不能处理该任务')
         return
       }
       detailActionRef.current = action

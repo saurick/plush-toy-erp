@@ -126,7 +126,7 @@ export default function SalesOrderReservationModal({
       <Alert
         type="info"
         showIcon
-        message="预留只锁定可用库存，不写出库流水；确认发货时才会消耗匹配预留并出库。"
+        message="预留只会锁定可用库存；确认发货后才会使用对应预留并扣减库存。"
       />
       <Descriptions
         size="small"

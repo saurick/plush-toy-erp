@@ -16,7 +16,26 @@ test('DevCustomerConfigPage test apply uses canonical publish and transition CAS
     pageSource,
     /activateCustomerConfig\(\s*transition\.mutationPayload\s*\)/u
   )
+  assert.match(
+    pageSource,
+    /rollbackCustomerConfig\(\s*transition\.mutationPayload\s*\)/u
+  )
+  assert.match(pageSource, /resolveCustomerConfigApplyTransitionAction\(/)
   assert.match(pageSource, /assertEffectiveCustomerConfigIdentity\(/)
+  assert.match(pageSource, /assertLocalBackendCustomerContext\(/)
+  assert.match(pageSource, /用对应客户配置重新启动后端/)
+  assert.match(pageSource, /const effectiveSession = await getEffectiveSession\(\)/)
+  assert.doesNotMatch(
+    pageSource,
+    /getEffectiveSession\(\{\s*customer_key:\s*manifest\.customer_key/u
+  )
+  assert.match(pageSource, /RpcErrorCode\.AUTH_REQUIRED/)
+  assert.match(pageSource, /RpcErrorCode\.ADMIN_DISABLED/)
+  assert.match(pageSource, /RpcErrorCode\.PERMISSION_DENIED/)
+  assert.match(pageSource, /customer_config_active_revision_required/)
+  assert.doesNotMatch(pageSource, /error\?\.message/)
+  assert.doesNotMatch(pageSource, /manifestPayload\?\.message/)
+  assert.match(pageSource, /已登记的本地开发库/)
   assert.match(pageSource, /!overview\.importSummary\.canApplyTestConfig/)
   assert.match(pageSource, /当前配置包不可应用/)
   assert.match(pageSource, /当前配置只支持预览和试跑/)

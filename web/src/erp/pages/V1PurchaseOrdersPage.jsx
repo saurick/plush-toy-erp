@@ -264,6 +264,7 @@ export default function V1PurchaseOrdersPage() {
   )
   const purchaseOrderItemsPreview = useBusinessRowItemsPreview({
     records: orders,
+    getItemTotal: (order) => order?.item_count,
     rowExpandable: (order) =>
       canRead && Number(order?.id || 0) > 0 && Number(order?.version || 0) > 0,
     loadPreview: loadPurchaseOrderItemsPreview,
@@ -400,7 +401,7 @@ export default function V1PurchaseOrdersPage() {
       setWorkflowTasks(data?.tasks || [])
     } catch (error) {
       setWorkflowTasks([])
-      message.error(getActionErrorMessage(error, '加载采购协同任务失败'))
+      message.error(getActionErrorMessage(error, '加载采购相关任务'))
     }
   }, [canReadWorkflowTasks])
   const {
@@ -844,7 +845,7 @@ export default function V1PurchaseOrdersPage() {
   const exportOrders = useCallback(() => {
     if (orders.length === 0) return
     downloadCSV({
-      filename: `purchase-orders-${new Date().toISOString().slice(0, 10)}.csv`,
+      filename: `采购订单-${new Date().toISOString().slice(0, 10)}.csv`,
       columns: visibleDataColumns,
       rows: orders,
     })

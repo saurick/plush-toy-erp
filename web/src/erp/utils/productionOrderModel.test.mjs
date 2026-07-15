@@ -6,6 +6,7 @@ import {
   PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
   validateProductionOrderAggregate,
   validateProductionMaterialRequirementsResponse,
+  validateProductionOrderList,
   validateProductionOrderOptions,
 } from './productionOrderModel.mjs'
 
@@ -106,6 +107,36 @@ test('production order option response never accepts missing readable labels', (
       'product'
     )
   )
+})
+
+test('production order list requires an exact non-negative safe item count', () => {
+  const list = (itemCount) => ({
+    production_orders: [
+      {
+        id: 7,
+        version: 2,
+        order_no: 'MO-20260713-001',
+        status: 'RELEASED',
+        item_count: itemCount,
+      },
+    ],
+    total: 1,
+    limit: 20,
+    offset: 0,
+  })
+
+  assert.equal(validateProductionOrderList(list(0)).production_orders[0].item_count, 0)
+  assert.equal(validateProductionOrderList(list(22)).production_orders[0].item_count, 22)
+  for (const malformed of [
+    undefined,
+    null,
+    '1',
+    -1,
+    1.5,
+    Number.MAX_SAFE_INTEGER + 1,
+  ]) {
+    assert.throws(() => validateProductionOrderList(list(malformed)))
+  }
 })
 
 test('production order attempts replay exact intent and do not delete a newer intent', () => {

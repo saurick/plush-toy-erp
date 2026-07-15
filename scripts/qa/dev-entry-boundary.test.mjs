@@ -1032,17 +1032,14 @@ test("dev entry boundary: customer config console stays preview or gated apply o
       "passed",
       "preview_only",
       "preview_only",
-      "blocked",
+      "test_apply_ready",
       "release_gate_required",
     ],
   );
-  assert.deepEqual(summary.testApply.blockedReasons, [
-    "package_not_release_ready",
-    "preview_only",
-    "runtime_disabled",
-    "publish_disabled",
-    "activate_disabled",
-  ]);
+  assert.equal(summary.canApplyTestConfig, true);
+  assert.equal(summary.testApply.status, "test_apply_ready");
+  assert.deepEqual(summary.testApply.blockedReasons, []);
+  assert.match(summary.testApply.note, /loopback/);
   assert(
     summary.formalGates.some(
       (item) =>
@@ -1085,7 +1082,7 @@ test("dev entry boundary: customer config console stays preview or gated apply o
   );
   assert.match(
     pageSource,
-    /const requestApplyTestConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认应用测试配置[\s\S]*127\.0\.0\.1:8300[\s\S]*不会导入客户业务数据[\s\S]*不代表正式发布通过[\s\S]*onOk: handleApplyTestConfig/su,
+    /const requestApplyTestConfig = \(\) => \{[\s\S]*modal\.confirm\([\s\S]*确认应用测试配置[\s\S]*loopback 后端[\s\S]*已登记的本地开发库[\s\S]*不会导入客户业务数据[\s\S]*不代表正式发布通过[\s\S]*onOk: handleApplyTestConfig/su,
   );
   assertIncludes(
     pageSource,
@@ -1133,6 +1130,19 @@ test("dev entry boundary: make dev_restart 先预检再停服并且不自动执�
   const preflight = read("scripts/local-runtime-preflight.mjs");
   assert.doesNotMatch(preflight, /migrate\s+apply/u);
   assert.match(preflight, /\[\s*["']migrate["'],\s*["']status["']/u);
+  assert.match(
+    makefile,
+    /dev_restart:\s+export ERP_CUSTOMER_KEY \?= yoyoosun/u,
+  );
+  assert.match(makefile, /run:\s+export ERP_CUSTOMER_KEY \?= yoyoosun/u);
+  assert.match(
+    makefile,
+    /run:\s+export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1/u,
+  );
+  assert.match(
+    makefile,
+    /dev_restart:\s+export ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG := 1/u,
+  );
 });
 
 test("dev entry boundary: Product Core 与客户开发入口共用同一 web preflight", () => {

@@ -13,6 +13,7 @@ import {
 } from '@ant-design/icons'
 import { Alert, Button, Select, Space, Tag, Tooltip, Typography } from 'antd'
 import { useSearchParams } from 'react-router-dom'
+import { RpcErrorCode } from '@/common/consts/errorCodes.js'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import DevPageNav from '../components/dev/DevPageNav.jsx'
@@ -22,12 +23,14 @@ import {
   checkCustomerConfigTransition,
   getEffectiveSession,
   publishCustomerConfig,
+  rollbackCustomerConfig,
   validateCustomerConfig,
 } from '../api/customerConfigApi.mjs'
 import {
   assertEffectiveCustomerConfigIdentity,
   assertPublishedCustomerConfigIdentity,
   confirmCustomerConfigTransition,
+  resolveCustomerConfigApplyTransitionAction,
 } from '../api/customerConfigTransition.mjs'
 import {
   DEV_CUSTOMER_CONFIG_QUERY_KEY,
@@ -44,6 +47,8 @@ const VIEW_PREFLIGHT = 'preflight'
 const VIEW_DIFF = 'diff'
 const VIEW_ASSETS = 'assets'
 const VIEW_IMPORT = 'import'
+const ACTIVE_REVISION_REQUIRED_REASON =
+  'customer_config_active_revision_required'
 
 const VIEW_OPTIONS = [
   {
@@ -307,18 +312,39 @@ function copyText(value, successMessage = '已复制命令') {
 
 function getCustomerConfigActionError(error, fallback) {
   const code = error?.code
-  const rawMessage =
-    typeof error?.message === 'string' ? error.message.trim() : ''
-  if (code === 40302 || rawMessage.includes('未登录')) {
+  if (code === RpcErrorCode.AUTH_REQUIRED) {
     return '请先登录后台管理员账号，再执行客户配置应用。'
   }
-  if (code === 40303 || rawMessage.includes('无权限')) {
+  if (code === RpcErrorCode.ADMIN_DISABLED) {
+    return '当前后台管理员账号已停用，请更换账号后重试。'
+  }
+  if (code === RpcErrorCode.PERMISSION_DENIED) {
     return '当前管理员没有客户配置发布或激活权限。'
   }
   if (error?.isNetworkError) {
     return '无法连接本地后端，请确认 server-dev 正在运行。'
   }
   return getActionErrorMessage(error, fallback)
+}
+
+async function assertLocalBackendCustomerContext(customerKey) {
+  try {
+    const session = await getEffectiveSession()
+    const resolvedCustomerKey = String(session?.customer?.key || '').trim()
+    if (resolvedCustomerKey !== customerKey) {
+      throw new Error(
+        `当前代理后端未固定为 ${customerKey}；请用对应客户配置重新启动后端再重试。`
+      )
+    }
+  } catch (error) {
+    if (
+      error?.code === RpcErrorCode.PERMISSION_DENIED &&
+      error?.json?.result?.data?.reason === ACTIVE_REVISION_REQUIRED_REASON
+    ) {
+      return
+    }
+    throw error
+  }
 }
 
 function CommandBlock({ command }) {
@@ -1603,7 +1629,7 @@ function ImportPanel({
           }
           description={
             importSummary.canApplyTestConfig
-              ? '页面试跑不写数据库；应用操作通过当前 Vite /rpc 代理调用客户配置校验、发布和激活，当前固定目标为 http://127.0.0.1:8300。真实客户业务数据导入与正式发布仍是单独专项。'
+              ? '页面试跑不写数据库；应用操作只通过当前 Vite /rpc 代理调用客户配置校验、发布和激活。真实客户业务数据导入与正式发布仍是单独专项。'
               : '页面仅可生成预览和试跑证据；完成正式评审并开放运行时、发布与激活前，不会调用客户配置写接口。'
           }
         />
@@ -1665,7 +1691,7 @@ function ImportPanel({
             </div>
             <Paragraph type="secondary">
               {importSummary.canApplyTestConfig
-                ? '把已选客户配置应用到当前 Vite 代理后端的客户配置控制面；当前 /rpc 固定代理 http://127.0.0.1:8300。'
+                ? '把已选客户配置应用到当前 Vite 代理后端的客户配置控制面。'
                 : importSummary.testApply.note}
             </Paragraph>
             <div className="erp-dev-customer-test-apply-primary">
@@ -2136,9 +2162,22 @@ export default function DevCustomerConfigPage() {
         return
       }
       if (!response.ok) {
-        throw new Error('运行时清单编译失败')
+        throw new Error(
+          response.status === 403
+            ? '当前开发入口不允许生成永绅本地测试配置，请从 start:yoyoosun 启动后重试。'
+            : '本地测试配置编译失败，请检查客户配置包后重试。'
+        )
       }
       const { manifest } = manifestPayload
+
+      setApplyState({
+        status: 'running',
+        step: '正在确认后端客户上下文',
+      })
+      await assertLocalBackendCustomerContext(manifest.customer_key)
+      if (!ensureCurrent()) {
+        return
+      }
 
       setApplyState({
         status: 'running',
@@ -2151,10 +2190,12 @@ export default function DevCustomerConfigPage() {
 
       setApplyState({
         status: 'running',
-        step: '正在发布测试配置版本',
+        step: '正在写入本地测试配置版本',
       })
       const publish = await publishCustomerConfig(manifest)
       assertPublishedCustomerConfigIdentity(publish, manifest, validation)
+      const transitionAction =
+        resolveCustomerConfigApplyTransitionAction(publish)
       if (!ensureCurrent()) {
         return
       }
@@ -2164,7 +2205,7 @@ export default function DevCustomerConfigPage() {
         step: '正在检查配置切换条件',
       })
       const transition = await confirmCustomerConfigTransition({
-        action: 'activate',
+        action: transitionAction,
         manifest,
         validation,
         check: checkCustomerConfigTransition,
@@ -2175,9 +2216,15 @@ export default function DevCustomerConfigPage() {
 
       setApplyState({
         status: 'running',
-        step: '正在激活测试配置版本',
+        step:
+          transitionAction === 'rollback'
+            ? '正在回切本地测试配置版本'
+            : '正在激活本地测试配置版本',
       })
-      const activated = await activateCustomerConfig(transition.mutationPayload)
+      const applied =
+        transitionAction === 'rollback'
+          ? await rollbackCustomerConfig(transition.mutationPayload)
+          : await activateCustomerConfig(transition.mutationPayload)
       if (!ensureCurrent()) {
         return
       }
@@ -2186,9 +2233,7 @@ export default function DevCustomerConfigPage() {
         status: 'running',
         step: '正在读取有效配置投影',
       })
-      const effectiveSession = await getEffectiveSession({
-        customer_key: manifest.customer_key,
-      })
+      const effectiveSession = await getEffectiveSession()
       if (!ensureCurrent()) {
         return
       }
@@ -2206,7 +2251,7 @@ export default function DevCustomerConfigPage() {
           validation,
           publish,
           transition,
-          activated,
+          applied,
           effectiveSession,
           steps: [
             {
@@ -2238,9 +2283,16 @@ export default function DevCustomerConfigPage() {
             },
             {
               key: 'activate',
-              label: '激活测试版本',
+              label:
+                transitionAction === 'rollback'
+                  ? '回切测试版本'
+                  : '激活测试版本',
               status: 'test_apply_done',
-              note: activated?.status || '客户配置激活通过',
+              note:
+                applied?.status ||
+                (transitionAction === 'rollback'
+                  ? '客户配置回切通过'
+                  : '客户配置激活通过'),
             },
             {
               key: 'session',
@@ -2251,7 +2303,7 @@ export default function DevCustomerConfigPage() {
           ],
         },
       })
-      message.success('测试配置已应用')
+      message.success('永绅本地测试配置已应用')
     } catch (error) {
       if (error?.name === 'AbortError') {
         return
@@ -2275,7 +2327,7 @@ export default function DevCustomerConfigPage() {
       centered: true,
       title: '确认应用测试配置？',
       content:
-        '该操作会用当前管理员登录态，通过 Vite /rpc 代理写入 http://127.0.0.1:8300 的客户配置控制面并激活测试配置版本；不会导入客户业务数据，也不代表正式发布通过。',
+        '该操作会用当前管理员登录态，通过 Vite /rpc 的 loopback 后端向已登记的本地开发库写入客户配置控制面，并激活内容寻址的本地测试版本；不会导入客户业务数据，也不代表正式发布通过。',
       okText: '确认应用测试配置',
       cancelText: '取消',
       onOk: handleApplyTestConfig,

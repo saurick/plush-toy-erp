@@ -14,7 +14,7 @@ print_help() {
   secrets: 严格密钥扫描；pre-push 的逐 ref 扫描不会跳过 full 自身扫描
   web: fast 已跑 lint/css，这里强制 pnpm test + 非零执行/零 skip summary -> pnpm build
   browser: 动态独立端口自启当前 worktree Vite，再运行 Chromium 无写入 smoke
-  server: 当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货） -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
+  server: 存量数据真实升级 -> 当前完整 Schema 关键 PostgreSQL 矩阵（含采购退货） -> 真实 Chromium PDF 安全集成 -> go test JSON 非零执行/零 skip -> make build
   govulncheck: 最后执行 Go 漏洞扫描，避免外部网络扰动本地 PostgreSQL 并发门禁
 
 环境变量:
@@ -122,6 +122,7 @@ browser_port="$(
 echo "[qa:full] 运行 server 全量检查"
 (
   cd "$ROOT_DIR/server"
+  make populated_upgrade_pg_test
   make purchase_receipt_pg_createdb
   make purchase_receipt_migrate_apply
   make critical_transactions_pg_test

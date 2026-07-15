@@ -63,6 +63,9 @@ func TestProductionOrderJSONRPCCanonicalLifecycleReadAndReplay(t *testing.T) {
 	if order["created_by"] != float64(7) || order["status"] != biz.ProductionOrderStatusDraft || order["version"] != float64(1) {
 		t.Fatalf("created order=%#v", order)
 	}
+	if _, exists := order["item_count"]; exists {
+		t.Fatalf("create response must not report an unloaded list item count: %#v", order)
+	}
 	items := created.Data.AsMap()["production_order_items"].([]any)
 	if len(items) != 1 || items[0].(map[string]any)["planned_quantity"] != "10.5" {
 		t.Fatalf("created items=%#v", items)
@@ -116,6 +119,10 @@ func TestProductionOrderJSONRPCCanonicalLifecycleReadAndReplay(t *testing.T) {
 	}))
 	if list.Code != errcode.OK.Code || list.Data.AsMap()["total"] != float64(1) || len(list.Data.AsMap()["production_orders"].([]any)) != 1 {
 		t.Fatalf("list=%#v", list)
+	}
+	listedOrder := list.Data.AsMap()["production_orders"].([]any)[0].(map[string]any)
+	if listedOrder["item_count"] != float64(1) {
+		t.Fatalf("list item_count=%#v, want 1", listedOrder["item_count"])
 	}
 }
 

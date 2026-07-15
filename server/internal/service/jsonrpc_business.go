@@ -28,21 +28,29 @@ func (d *jsonrpcDispatcher) handleBusiness(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionERPDashboardRead); res != nil {
 			return id, res, nil
 		}
-		stats, err := d.businessDashboardProjectionStats(ctx)
+		admin, res := d.CurrentAdmin(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		permissions, res := d.CurrentAdminPermissions(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		stats, err := d.businessDashboardProjectionStats(
+			ctx,
+			admin,
+			biz.PermissionSetHasAny(biz.PermissionKeySet(permissions), biz.PermissionWorkflowTaskRead),
+		)
 		if err != nil {
 			l.Errorf("[business] dashboard stats projection failed err=%v", err)
 			return id, &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}, nil
 		}
 		modules := make([]any, 0, len(stats))
 		for _, item := range stats {
-			statusCounts := make(map[string]any, len(item.StatusCounts))
-			for statusKey, count := range item.StatusCounts {
-				statusCounts[statusKey] = count
-			}
 			modules = append(modules, map[string]any{
-				"module_key":    item.ModuleKey,
-				"total":         item.TotalRecords,
-				"status_counts": statusCounts,
+				"module_key": item.ModuleKey,
+				"available":  item.Available,
+				"total":      item.TotalRecords,
 			})
 		}
 		return id, &v1.JsonrpcResult{
@@ -84,16 +92,20 @@ var businessDashboardProjectionModuleKeys = []string{
 	"invoices",
 }
 
-func (d *jsonrpcDispatcher) businessDashboardProjectionStats(ctx context.Context) ([]biz.BusinessDashboardModuleStats, error) {
+func (d *jsonrpcDispatcher) businessDashboardProjectionStats(
+	ctx context.Context,
+	admin *biz.AdminUser,
+	canReadWorkflowTasks bool,
+) ([]biz.BusinessDashboardModuleStats, error) {
 	statsByModule := make(map[string]*biz.BusinessDashboardModuleStats, len(businessDashboardProjectionModuleKeys))
 	for _, moduleKey := range businessDashboardProjectionModuleKeys {
 		statsByModule[moduleKey] = &biz.BusinessDashboardModuleStats{
-			ModuleKey:    moduleKey,
-			StatusCounts: map[string]int{},
+			ModuleKey: moduleKey,
 		}
 	}
-	setTotal := func(moduleKey string, total int) {
-		if stats, ok := statsByModule[moduleKey]; ok && total > 0 {
+	setAvailableTotal := func(moduleKey string, total int) {
+		if stats, ok := statsByModule[moduleKey]; ok {
+			stats.Available = true
 			stats.TotalRecords = total
 		}
 	}
@@ -102,12 +114,17 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(ctx context.Context
 		if _, total, err := d.masterDataUC.ListCustomers(ctx, biz.MasterDataFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
-			setTotal("customers", total)
+			setAvailableTotal("customers", total)
 		}
 		if _, total, err := d.masterDataUC.ListSuppliers(ctx, biz.MasterDataFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
-			setTotal("suppliers", total)
+			setAvailableTotal("suppliers", total)
+		}
+		if _, total, err := d.masterDataUC.ListProducts(ctx, biz.MasterDataFilter{Limit: 1}); err != nil {
+			return nil, err
+		} else {
+			setAvailableTotal("products", total)
 		}
 	}
 
@@ -115,54 +132,74 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(ctx context.Context
 		if _, total, err := d.salesOrderUC.ListSalesOrders(ctx, biz.SalesOrderFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
-			setTotal("sales-orders", total)
+			setAvailableTotal("sales-orders", total)
+		}
+	}
+
+	if d.purchaseOrderUC != nil {
+		if _, total, err := d.purchaseOrderUC.ListPurchaseOrders(ctx, biz.PurchaseOrderFilter{Limit: 1}); err != nil {
+			return nil, err
+		} else {
+			setAvailableTotal("accessories-purchase", total)
+		}
+	}
+
+	if d.outsourcingOrderUC != nil {
+		if _, total, err := d.outsourcingOrderUC.ListOutsourcingOrders(ctx, biz.OutsourcingOrderFilter{Limit: 1}); err != nil {
+			return nil, err
+		} else {
+			setAvailableTotal("processing-contracts", total)
 		}
 	}
 
 	if d.inventoryUC != nil {
+		if _, total, err := d.inventoryUC.ListBOMHeaders(ctx, biz.BOMHeaderFilter{Limit: 1}); err != nil {
+			return nil, err
+		} else {
+			setAvailableTotal("material-bom", total)
+		}
 		if _, total, err := d.inventoryUC.ListPurchaseReceipts(ctx, biz.PurchaseReceiptFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
-			setTotal("inbound", total)
+			setAvailableTotal("inbound", total)
 		}
-		for _, status := range []string{
-			biz.PurchaseReceiptStatusDraft,
-			biz.PurchaseReceiptStatusPosted,
-			biz.PurchaseReceiptStatusCancelled,
-		} {
-			if _, total, err := d.inventoryUC.ListPurchaseReceipts(ctx, biz.PurchaseReceiptFilter{Status: status, Limit: 1}); err != nil {
-				return nil, err
-			} else if total > 0 {
-				statsByModule["inbound"].StatusCounts[status] = total
-			}
+		if _, total, err := d.inventoryUC.ListInventoryBalances(ctx, biz.InventoryBalanceFilter{Limit: 1}); err != nil {
+			return nil, err
+		} else {
+			setAvailableTotal("inventory", total)
+		}
+		if _, total, err := d.inventoryUC.ListQualityInspections(ctx, biz.QualityInspectionFilter{Limit: 1}); err != nil {
+			return nil, err
+		} else {
+			setAvailableTotal("quality-inspections", total)
 		}
 	}
 
 	if d.operationalFactUC != nil {
-		if _, total, err := d.operationalFactUC.ListOutsourcingFacts(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
-			return nil, err
-		} else {
-			setTotal("processing-contracts", total)
-		}
-		if _, total, err := d.operationalFactUC.ListStockReservations(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
-			return nil, err
-		} else {
-			setTotal("inventory", total)
-		}
 		if _, total, err := d.operationalFactUC.ListShipments(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
-			setTotal("outbound", total)
+			setAvailableTotal("outbound", total)
 		}
 		if _, total, err := d.operationalFactUC.ListProductionFacts(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
-			setTotal("production-progress", total)
+			setAvailableTotal("production-progress", total)
 		}
-		if _, total, err := d.operationalFactUC.ListFinanceFacts(ctx, biz.OperationalFactFilter{Limit: 1}); err != nil {
-			return nil, err
-		} else {
-			setTotal("reconciliation", total)
+		for _, financeModule := range []struct {
+			moduleKey string
+			factType  string
+		}{
+			{moduleKey: "reconciliation", factType: biz.FinanceFactReconciliation},
+			{moduleKey: "payables", factType: biz.FinanceFactPayable},
+			{moduleKey: "receivables", factType: biz.FinanceFactReceivable},
+			{moduleKey: "invoices", factType: biz.FinanceFactInvoice},
+		} {
+			if _, total, err := d.operationalFactUC.ListFinanceFacts(ctx, biz.OperationalFactFilter{FactType: financeModule.factType, Limit: 1}); err != nil {
+				return nil, err
+			} else {
+				setAvailableTotal(financeModule.moduleKey, total)
+			}
 		}
 	}
 
@@ -170,7 +207,32 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(ctx context.Context
 		if _, total, err := d.productionOrderUC.List(ctx, biz.ProductionOrderFilter{Limit: 1}); err != nil {
 			return nil, err
 		} else {
-			setTotal("production-orders", total)
+			setAvailableTotal("production-orders", total)
+		}
+	}
+
+	if d.workflowUC != nil && canReadWorkflowTasks {
+		visibilityScope, err := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
+		if err != nil {
+			return nil, err
+		}
+		for _, workflowModule := range []struct {
+			moduleKey string
+			taskGroup string
+		}{
+			{moduleKey: "shipping-release", taskGroup: "shipment_release"},
+			{moduleKey: "production-scheduling", taskGroup: "production_scheduling"},
+			{moduleKey: "production-exceptions", taskGroup: "production_exception"},
+		} {
+			if _, total, err := d.workflowUC.ListTasks(ctx, biz.WorkflowTaskFilter{
+				Limit:           1,
+				TaskGroup:       workflowModule.taskGroup,
+				VisibilityScope: visibilityScope,
+			}); err != nil {
+				return nil, err
+			} else {
+				setAvailableTotal(workflowModule.moduleKey, total)
+			}
 		}
 	}
 
@@ -179,8 +241,8 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(ctx context.Context
 		stats := statsByModule[moduleKey]
 		out = append(out, biz.BusinessDashboardModuleStats{
 			ModuleKey:    stats.ModuleKey,
+			Available:    stats.Available,
 			TotalRecords: stats.TotalRecords,
-			StatusCounts: stats.StatusCounts,
 		})
 	}
 	return out, nil

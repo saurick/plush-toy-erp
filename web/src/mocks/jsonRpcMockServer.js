@@ -1513,7 +1513,7 @@ export function setupJsonRpcMockServer() {
                       : '',
                 reason_code: reasonCode,
                 reason: terminal
-                  ? '该任务已结束，只能查看上下文。'
+                  ? '该任务已结束，只能查看任务详情。'
                   : assignedToCurrentAdmin
                     ? '当前账号是该任务的指定处理人。'
                     : ownerRoleMatched

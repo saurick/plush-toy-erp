@@ -2645,6 +2645,8 @@ export default function EngineeringPrintWorkspacePage() {
     return <Navigate to="/erp/print-center" replace />
   }
 
+  const pdfFileName = `${template.title}.pdf`
+
   const getToolbarButtonClassName = ({
     active = false,
     primary = false,
@@ -3569,7 +3571,7 @@ export default function EngineeringPrintWorkspacePage() {
             pageIndex === null
               ? `rows.${rowIndex}.imageLabels.${labelIndex}.text`
               : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.text`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 文案`,
+          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 文字`,
           value: label.text ?? '',
           multiline: true,
           rows: 2,
@@ -3585,7 +3587,7 @@ export default function EngineeringPrintWorkspacePage() {
             pageIndex === null
               ? `rows.${rowIndex}.imageLabels.${labelIndex}.x`
               : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.x`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} X`,
+          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 水平位置`,
           value: String(label.x ?? ''),
           onChange: (value) =>
             updateInstructionRowValue(
@@ -3599,7 +3601,7 @@ export default function EngineeringPrintWorkspacePage() {
             pageIndex === null
               ? `rows.${rowIndex}.imageLabels.${labelIndex}.y`
               : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.y`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} Y`,
+          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 垂直位置`,
           value: String(label.y ?? ''),
           onChange: (value) =>
             updateInstructionRowValue(
@@ -3613,7 +3615,7 @@ export default function EngineeringPrintWorkspacePage() {
             pageIndex === null
               ? `rows.${rowIndex}.imageLabels.${labelIndex}.width`
               : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.width`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 宽度`,
+          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 图片宽度`,
           value: String(label.width ?? ''),
           onChange: (value) =>
             updateInstructionRowValue(
@@ -3631,9 +3633,14 @@ export default function EngineeringPrintWorkspacePage() {
             pageIndex === null
               ? `rows.${rowIndex}.imageCallouts.${calloutIndex}.${calloutKey}`
               : `continuationPages.${pageIndex}.rows.${rowIndex}.imageCallouts.${calloutIndex}.${calloutKey}`,
-          label: `${labelPrefix} ${rowIndex + 1} 标注连线 ${
-            calloutIndex + 1
-          } ${calloutKey.toUpperCase()}`,
+          label: `${labelPrefix} ${rowIndex + 1} 标注连线 ${calloutIndex + 1} ${
+            {
+              x1: '起点水平位置',
+              y1: '起点垂直位置',
+              x2: '终点水平位置',
+              y2: '终点垂直位置',
+            }[calloutKey]
+          }`,
           value: String(callout[calloutKey] ?? ''),
           onChange: (value) =>
             updateInstructionRowValue(
@@ -3810,7 +3817,7 @@ export default function EngineeringPrintWorkspacePage() {
       () =>
         preloadPdfPreviewFromElement(paperRef.current, {
           title: template.title,
-          fileName: `${template.key}.pdf`,
+          fileName: pdfFileName,
           templateKey: template.key,
           customerKey,
         }),
@@ -3829,7 +3836,7 @@ export default function EngineeringPrintWorkspacePage() {
       })
       const opened = await openPdfPreviewFromElement(paperRef.current, {
         title: template.title,
-        fileName: `${template.key}.pdf`,
+        fileName: pdfFileName,
         templateKey: template.key,
         customerKey,
         preloaded: pdfPreviewPreloadRef.current,
@@ -3851,7 +3858,7 @@ export default function EngineeringPrintWorkspacePage() {
       setPdfActionStartedAt(Date.now())
       await downloadPdfFromElement(paperRef.current, {
         title: template.title,
-        fileName: `${template.key}.pdf`,
+        fileName: pdfFileName,
         templateKey: template.key,
         customerKey,
       })

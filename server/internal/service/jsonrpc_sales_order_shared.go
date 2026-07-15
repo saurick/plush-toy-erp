@@ -176,10 +176,14 @@ func salesOrderToMap(item *biz.SalesOrder) map[string]any {
 	}
 }
 
-func salesOrdersToAny(items []*biz.SalesOrder) []any {
+func salesOrdersToAny(items []*biz.SalesOrder, includeItemCount bool) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
-		out = append(out, salesOrderToMap(item))
+		mapped := salesOrderToMap(item)
+		if includeItemCount && item != nil && item.ItemCount != nil {
+			mapped["item_count"] = *item.ItemCount
+		}
+		out = append(out, mapped)
 	}
 	return out
 }

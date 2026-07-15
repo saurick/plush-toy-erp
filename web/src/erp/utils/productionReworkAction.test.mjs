@@ -72,12 +72,13 @@ test('production rework eligibility is limited to posted source-bound completion
 })
 
 test('production rework payload contains only operator fields plus the locked completion reference', () => {
+  const occurredAtInput = '2026-07-14T08:00'
   assert.deepEqual(
     buildProductionReworkPayload(
       {
         fact_no: ' RW-001 ',
         quantity: '2.5000',
-        occurred_at: '2026-07-14T08:00',
+        occurred_at: occurredAtInput,
         reason: ' 成品抽检不合格，返工处理 ',
       },
       source,
@@ -87,7 +88,7 @@ test('production rework payload contains only operator fields plus the locked co
       fact_no: 'RW-001',
       source_completion_fact_id: 81,
       quantity: '2.5',
-      occurred_at: '2026-07-14T00:00:00.000Z',
+      occurred_at: new Date(occurredAtInput).toISOString(),
       reason: '成品抽检不合格，返工处理',
     }
   )
@@ -142,7 +143,7 @@ test('production rework API request uses a strict allowlist', () => {
   ]) {
     assert.throws(
       () => normalizeProductionReworkRequest({ ...request, [forbidden]: 9 }),
-      /不允许的字段/u,
+      /返工内容有误/u,
       forbidden
     )
   }
@@ -152,7 +153,7 @@ test('production rework API request uses a strict allowlist', () => {
         ...request,
         idempotency_key: '',
       }),
-    /参数无效/u
+    /返工内容有误/u
   )
 })
 
@@ -188,16 +189,17 @@ test('production rework result and unknown reread stay bound to the source compl
     () => validateProductionReworkResult({ ...result, source_id: 82 }, request),
     /无法确认/u
   )
-  assert.deepEqual(
+  const occurredAtInstant = '2026-07-14T08:00:00.000Z'
+  const { occurred_at: occurredAtInput, ...formValues } =
     productionReworkFormValuesFromRequest({
       ...request,
-      occurred_at: '2026-07-14T08:00:00.000Z',
-    }),
-    {
-      fact_no: 'RW-001',
-      quantity: '2',
-      occurred_at: '2026-07-14T16:00',
-      reason: '返工处理',
-    }
-  )
+      occurred_at: occurredAtInstant,
+    })
+  assert.deepEqual(formValues, {
+    fact_no: 'RW-001',
+    quantity: '2',
+    reason: '返工处理',
+  })
+  assert.match(occurredAtInput, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u)
+  assert.equal(new Date(occurredAtInput).toISOString(), occurredAtInstant)
 })

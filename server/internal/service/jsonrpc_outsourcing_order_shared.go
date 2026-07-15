@@ -182,7 +182,11 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 func outsourcingOrdersToAny(items []*biz.OutsourcingOrder) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {
-		out = append(out, outsourcingOrderToMap(item))
+		mapped := outsourcingOrderToMap(item)
+		if item != nil && item.ItemCount != nil {
+			mapped["item_count"] = *item.ItemCount
+		}
+		out = append(out, mapped)
 	}
 	return out
 }

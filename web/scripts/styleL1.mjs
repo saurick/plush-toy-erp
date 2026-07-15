@@ -1541,8 +1541,8 @@ async function assertDashboardMetricInteractionSemantics(
   if (expectBusinessSummary) {
     assert.equal(
       metrics.businessSummary.length,
-      3,
-      `${scenarioName} 业务看板应有 3 个只读摘要卡: ${JSON.stringify(metrics)}`
+      4,
+      `${scenarioName} 业务看板应有 4 个只读摘要卡: ${JSON.stringify(metrics)}`
     )
     for (const item of metrics.businessSummary) {
       assert.equal(
@@ -1577,10 +1577,10 @@ async function assertDarkDashboardLinkButtonsUnboxed(page, { scenarioName }) {
   const metrics = await page.evaluate(() => {
     const buttons = Array.from(
       document.querySelectorAll(
-        '.erp-business-dashboard-page .erp-dashboard-table-card .erp-dashboard-link-button.ant-btn'
+        '.erp-business-dashboard-page .erp-dashboard-table-card .erp-business-board-source-entry.ant-btn'
       )
     )
-      .slice(0, 16)
+      .slice(0, 24)
       .map((button) => {
         const style = window.getComputedStyle(button)
         const rect = button.getBoundingClientRect()
@@ -1610,9 +1610,9 @@ async function assertDarkDashboardLinkButtonsUnboxed(page, { scenarioName }) {
     `${scenarioName} link 按钮无框断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.buttons.some((button) => button.text === '客户/供应商') &&
-      metrics.buttons.some((button) => button.text === '0'),
-    `${scenarioName} 缺少业务看板模块或数字 link 按钮样本: ${JSON.stringify(metrics)}`
+    metrics.buttons.some((button) => button.text === '查看客户') &&
+      metrics.buttons.some((button) => button.text === '查看发票记录'),
+    `${scenarioName} 缺少业务看板对象入口按钮样本: ${JSON.stringify(metrics)}`
   )
 
   for (const button of metrics.buttons) {
@@ -1705,7 +1705,7 @@ async function verifyBusinessModuleColumnOrderDialog(
   const dialog = page.locator('.erp-business-action-modal--columns:visible')
   await dialog.waitFor({ state: 'visible', timeout: 10_000 })
   await assertAntdModalCentered(page, dialog, 'business-column-order-modal')
-  await expectText(page, '在面板中调整后点击完成保存')
+  await expectText(page, '调整后的列顺序会保存到当前账号')
   await dialog.screenshot({
     path: path.resolve(outputDir, 'business-column-order-modal.png'),
   })
@@ -3411,11 +3411,7 @@ async function assertAdminLoginSmsCodeErrorHintSpacing(page, { scenarioName }) {
 
 async function assertAppAlertDialogLayout(
   page,
-  {
-    scenarioName,
-    expectedMessage = '请先登录',
-    exerciseEscape = false,
-  }
+  { scenarioName, expectedMessage = '请先登录', exerciseEscape = false }
 ) {
   const surface = page.locator('.app-alert-dialog').last()
   const semanticDialog = page.getByRole('alertdialog').last()
@@ -3660,10 +3656,7 @@ async function assertAppAlertDialogLayout(
         document.activeElement instanceof Element &&
         node.contains(document.activeElement)
     )
-    assert(
-      focusIsContained,
-      `${scenarioName} ${key} 后焦点逃出提示弹窗`
-    )
+    assert(focusIsContained, `${scenarioName} ${key} 后焦点逃出提示弹窗`)
   }
 
   if (exerciseEscape) {
@@ -3731,7 +3724,7 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
       formItemCount: formItems.length,
       hasRoleSelect: Boolean(
         [...node.querySelectorAll('.ant-select-selection-placeholder')].some(
-          (item) => item.textContent?.includes('选择一个或多个角色')
+          (item) => item.textContent?.includes('选择一个或多个岗位')
         )
       ),
       controls,
@@ -3744,7 +3737,7 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
   )
   assert(
     metrics.formItemCount >= 4 && metrics.hasRoleSelect,
-    `${scenarioName} 创建管理员弹窗缺少账号/手机号/密码/角色字段: ${JSON.stringify(metrics)}`
+    `${scenarioName} 创建员工账号弹窗缺少账号/手机号/密码/岗位字段: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.hasPermissionModalClass,
@@ -3752,13 +3745,13 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
   )
   assert(
     metrics.body.scrollWidth <= metrics.body.width + 8,
-    `${scenarioName} 创建管理员弹窗出现横向滚动: ${JSON.stringify(metrics)}`
+    `${scenarioName} 创建员工账号弹窗出现横向滚动: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.controls.every(
       (control) => control.width >= 120 && control.height >= 30
     ),
-    `${scenarioName} 创建管理员弹窗控件尺寸异常: ${JSON.stringify(metrics)}`
+    `${scenarioName} 创建员工账号弹窗控件尺寸异常: ${JSON.stringify(metrics)}`
   )
   const controlRadii = [
     ...new Set(metrics.controls.map((control) => control.borderRadius)),
@@ -3766,7 +3759,7 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
   assert(
     controlRadii.length === 1 &&
       Number.parseFloat(controlRadii[0] || '0') >= 10,
-    `${scenarioName} 创建管理员弹窗输入框圆角不一致: ${JSON.stringify(metrics)}`
+    `${scenarioName} 创建员工账号弹窗输入框圆角不一致: ${JSON.stringify(metrics)}`
   )
 }
 
@@ -4888,7 +4881,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     )}`
   )
   assert(
-    compactText(collapsedMetrics.titleLineText).includes('这里只处理协同任务'),
+    compactText(collapsedMetrics.titleLineText).includes('这里只处理待办任务'),
     `${scenarioName} 本页协同应保留业务处理边界短句: ${JSON.stringify(
       collapsedMetrics
     )}`
@@ -5119,7 +5112,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
   )
   assert.equal(
     expandedMetrics.tabListLabel,
-    '本页协同任务分类',
+    '相关任务分类',
     `${scenarioName} 协同任务分类 aria-label 不正确: ${JSON.stringify(expandedMetrics)}`
   )
   assert.equal(
@@ -7196,16 +7189,29 @@ async function assertBusinessHeaderHasNoSectionTitle(page, { scenarioName }) {
           )
       : []
     const forbiddenLabels = ['基础资料', '销售链路', '正式业务入口']
-    const headerText = String(header?.textContent || '')
-      .replace(/\s+/g, ' ')
-      .trim()
+    const forbiddenLabelsInHeader = header
+      ? Array.from(header.querySelectorAll('*'))
+          .filter(
+            (node) =>
+              isVisible(node) &&
+              node.children.length === 0 &&
+              forbiddenLabels.includes(
+                String(node.textContent || '')
+                  .replace(/\s+/g, ' ')
+                  .trim()
+              )
+          )
+          .map((node) =>
+            String(node.textContent || '')
+              .replace(/\s+/g, ' ')
+              .trim()
+          )
+      : []
 
     return {
       hasHeader: Boolean(header),
       directSectionLabels,
-      forbiddenLabelsInHeader: forbiddenLabels.filter((label) =>
-        headerText.includes(label)
-      ),
+      forbiddenLabelsInHeader,
     }
   })
 
@@ -7229,7 +7235,7 @@ async function assertBusinessHeaderStatsSingleLine(
   page,
   {
     scenarioName,
-    expectedLabels = ['总记录', '当前结果', '待处理'],
+    expectedLabels = ['总记录', '本页显示', '待处理'],
     allowWrappedStats = false,
   }
 ) {

@@ -58,7 +58,7 @@ test('workflowStatus: 业务状态展示文案不透出内部 key', () => {
 })
 
 test('workflowStatus: 协同状态文案不冒充库存出货和财务事实', () => {
-  assert.equal(getBusinessStatusLabel('inbound_done'), '入库协同已完成')
-  assert.equal(getBusinessStatusLabel('shipped'), '出货协同已完成')
-  assert.equal(getBusinessStatusLabel('settled'), '结算协同已完成')
+  assert.equal(getBusinessStatusLabel('inbound_done'), '入库跟进已完成')
+  assert.equal(getBusinessStatusLabel('shipped'), '出货跟进已完成')
+  assert.equal(getBusinessStatusLabel('settled'), '结算跟进已完成')
 })

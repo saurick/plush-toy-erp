@@ -16,6 +16,7 @@ import (
 var (
 	ErrRoleDemoPasswordRequired = errors.New("role demo admin password is required")
 	ErrRoleDemoPasswordTooShort = errors.New("role demo admin password must be at least 8 characters")
+	ErrStableAdminProtected     = errors.New("stable admin account is not managed by role demo or manual acceptance seeding")
 )
 
 type RoleDemoAdminAccountSpec struct {
@@ -42,41 +43,110 @@ type RoleDemoAdminSeedResult struct {
 }
 
 func ResetRoleDemoAdminPasswords(ctx context.Context, db *sql.DB, usernames []string, password string) error {
-	if db == nil {
-		return errors.New("ResetRoleDemoAdminPasswords: missing db")
+	for _, username := range usernames {
+		if strings.EqualFold(strings.TrimSpace(username), "admin") {
+			return ErrStableAdminProtected
+		}
 	}
-	password = strings.TrimSpace(password)
-	if password == "" {
+	return ResetManualAcceptancePasswords(ctx, db, nil, "", usernames, password)
+}
+
+func ResetManualAcceptancePasswords(
+	ctx context.Context,
+	db *sql.DB,
+	adminUsernames []string,
+	adminPassword string,
+	demoUsernames []string,
+	demoPassword string,
+) error {
+	if db == nil {
+		return errors.New("ResetManualAcceptancePasswords: missing db")
+	}
+	adminPassword = strings.TrimSpace(adminPassword)
+	demoPassword = strings.TrimSpace(demoPassword)
+	if len(adminUsernames) > 0 && adminPassword == "" {
+		return errors.New("manual acceptance admin password is required")
+	}
+	if len(demoUsernames) > 0 && demoPassword == "" {
 		return ErrRoleDemoPasswordRequired
 	}
-	if len(password) < 8 {
+	if len(adminUsernames) > 0 && len(adminPassword) < 8 {
+		return errors.New("manual acceptance admin password must be at least 8 characters")
+	}
+	if len(demoUsernames) > 0 && len(demoPassword) < 8 {
 		return ErrRoleDemoPasswordTooShort
 	}
-	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
+	if len(adminUsernames) > 0 && len(demoUsernames) > 0 && adminPassword == demoPassword {
+		return errors.New("manual acceptance admin and demo passwords must differ")
+	}
+
+	type passwordGroup struct {
+		usernames    []string
+		password     string
+		passwordHash string
+	}
+	groups := []passwordGroup{
+		{usernames: append([]string(nil), adminUsernames...), password: adminPassword},
+		{usernames: append([]string(nil), demoUsernames...), password: demoPassword},
+	}
+	seen := make(map[string]struct{}, len(adminUsernames)+len(demoUsernames))
+	for groupIndex := range groups {
+		group := &groups[groupIndex]
+		for usernameIndex, rawUsername := range group.usernames {
+			username := strings.TrimSpace(rawUsername)
+			if username == "" {
+				return biz.ErrBadParam
+			}
+			if _, exists := seen[username]; exists {
+				return fmt.Errorf("duplicate manual acceptance account: %s", username)
+			}
+			seen[username] = struct{}{}
+			group.usernames[usernameIndex] = username
+		}
+		if len(group.usernames) == 0 {
+			continue
+		}
+		hash, err := bcrypt.GenerateFromPassword([]byte(group.password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		group.passwordHash = string(hash)
+		group.password = ""
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	for _, rawUsername := range usernames {
-		username := strings.TrimSpace(rawUsername)
-		if username == "" {
-			return biz.ErrBadParam
+	defer func() { _ = tx.Rollback() }()
+	now := time.Now()
+	for _, group := range groups {
+		if len(group.usernames) == 0 {
+			continue
 		}
-		result, err := db.ExecContext(ctx, `
+		for _, username := range group.usernames {
+			var adminID int
+			if err := tx.QueryRowContext(ctx, `
 UPDATE admin_users
-SET password_hash = $2, updated_at = $3
-WHERE username = $1`, username, string(hash), time.Now())
-		if err != nil {
-			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows != 1 {
-			return fmt.Errorf("manual acceptance account not found: %s", username)
+SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id`, username, group.passwordHash, now).Scan(&adminID); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return fmt.Errorf("manual acceptance account not found: %s", username)
+				}
+				return err
+			}
+			if _, err := tx.ExecContext(ctx, `
+UPDATE admin_sessions
+SET revoked_at = $2, revoke_reason = $3, updated_at = $2
+WHERE admin_user_id = $1
+  AND revoked_at IS NULL
+  AND expires_at > $2`, adminID, now, adminSessionRevokeReasonPasswordReset); err != nil {
+				return err
+			}
 		}
 	}
-	return nil
+	return tx.Commit()
 }
 
 func DefaultRoleDemoAdminAccounts(includeDebug bool) []RoleDemoAdminAccountSpec {
@@ -133,6 +203,9 @@ func seedOneRoleDemoAdmin(ctx context.Context, db *sql.DB, account RoleDemoAdmin
 	roleKey := biz.NormalizeRoleKey(account.RoleKey)
 	if username == "" || roleKey == "" {
 		return RoleDemoAdminSeededAccount{}, biz.ErrBadParam
+	}
+	if strings.EqualFold(username, "admin") {
+		return RoleDemoAdminSeededAccount{}, ErrStableAdminProtected
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)

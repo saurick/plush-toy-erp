@@ -119,7 +119,9 @@ function printPlan(options) {
       }`,
       `[${label}] mode=vite dev server with HMR`,
       `[${label}] customer_config publish/activate is not executed`,
+      `[${label}] backend customer context=restart with "cd ../server && make dev_restart" when 8300 was not started for yoyoosun (local default=yoyoosun; local-test gate enabled; explicit demo override remains available)`,
       `[${label}] desktop fallback=same-key builtin RBAC is local preview only; customer business pages still require an active revision`,
+      `[${label}] local config sync=http://127.0.0.1:${options.port}/__dev/customer-config?customer=${options.customer}&view=import&action=test-apply (login, review, then apply explicitly)`,
       ...verificationLines,
       [
         `ERP_DEV_CUSTOMER_KEY=${options.customer}`,

@@ -45,9 +45,10 @@ node "$PRODUCT_ROOT/scripts/import/customerSourceExtract.mjs" \
 
 ## 当前永绅状态
 
-- 永绅专属 Private 仓库已以提交 `75423d0` 推送 17 个来源、v2 manifest 和验证入口；远端新 clone 后 hash / size、5 个结构化来源、12 个人工参考、5800 行提取和 no-real-import 校验通过。
-- Product Core 当前工作树已移除旧原件目录和真实 manifest；Git 历史仍含旧副本，历史清理不属于普通功能提交。
-- `product.lock.json` 仍等待 Product Core v2 来源工具形成可锁定提交，因此正式 pin 验证尚未完成。
+- Product Core 当前提交树与索引已移除旧原件目录和真实 manifest；普通导入测试只读取合成 fixture，不依赖客户私有仓。
+- 客户原件数量、manifest 版本、hash / size、结构化提取与远端回读证据以永绅专属 Private 仓库的 manifest、README 和正式验证记录为准；Product Core 不复写易漂移的客户仓提交号和计数。
+- 客户私有仓的 `product.lock.json` 是可变产品版本锁定真源。每次 Product Core `HEAD` 推进后，必须在两边已提交且工作树清洁时更新该锁，再以 `FORMAL_PRODUCT_PIN=1` 运行私有仓 `scripts/validate.sh`；没有这组证据时不能宣称最新 Product Core 版本已固定。
+- Product Core 既有 Git 历史仍含旧副本，历史清理不属于普通功能提交；真实导入批准和客户签收也仍是独立未完成项。
 
 ## 真实导入边界
 
@@ -64,4 +65,4 @@ node --test \
 node --test scripts/qa/test-data-isolation-boundary.test.mjs
 ```
 
-私有仓远端回读只证明资料存储和来源完整性；它不等于真实导入批准、Product Core 正式版本固定、Git 历史清理或客户交付签收。
+私有仓远端回读证明客户资料存储和来源完整性；`product.lock.json` 与正式 validate 共同证明锁定 Product Core 提交的来源工具合同可用。它们均不等于真实导入批准、全产品发布验收、Git 历史清理或客户交付签收。

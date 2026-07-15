@@ -93,7 +93,7 @@ test('workflowTaskActionSubmitGuard: missing task or action stops before backend
 
   assert.equal(allowed, false)
   assert.equal(explainCalls, 0)
-  assert.deepEqual(warnings, ['当前任务动作缺少必要参数，请刷新后重试'])
+  assert.deepEqual(warnings, ['当前操作暂时无法提交，请刷新后重试'])
 })
 
 test('workflowTaskActionSubmitGuard: unknown action key stops before backend explain', async () => {
@@ -114,7 +114,7 @@ test('workflowTaskActionSubmitGuard: unknown action key stops before backend exp
 
   assert.equal(allowed, false)
   assert.equal(explainCalls, 0)
-  assert.deepEqual(warnings, ['当前任务动作缺少必要参数，请刷新后重试'])
+  assert.deepEqual(warnings, ['当前操作暂时无法提交，请刷新后重试'])
 })
 
 test('workflowTaskActionSubmitGuard: allows only after backend explain allows the formal action', async () => {
@@ -162,7 +162,7 @@ test('workflowTaskActionSubmitGuard: hides raw backend deny reason from user vis
   })
 
   assert.equal(allowed, false)
-  assert.deepEqual(warnings, ['当前账号不能提交这个任务动作'])
+  assert.deepEqual(warnings, ['当前账号不能提交这项操作'])
 })
 
 test('workflowTaskActionSubmitGuard: required reason stops before backend explain', async () => {
@@ -225,7 +225,7 @@ test('workflowTaskActionSubmitGuard: missing requested backend action denies bef
   })
 
   assert.equal(allowed, false)
-  assert.deepEqual(warnings, ['当前账号不能提交这个任务动作'])
+  assert.deepEqual(warnings, ['当前账号不能提交这项操作'])
 })
 
 test('workflowTaskActionSubmitGuard: backend explain failure reports sanitized action error', async () => {
@@ -244,5 +244,5 @@ test('workflowTaskActionSubmitGuard: backend explain failure reports sanitized a
   })
 
   assert.equal(allowed, false)
-  assert.deepEqual(errors, ['核对任务动作权限失败'])
+  assert.deepEqual(errors, ['暂时无法确认这项操作是否可用，请稍后重试'])
 })

@@ -18,7 +18,7 @@ print_help() {
   1. 用本机 pg_dump 生成 custom dump 到 output/。
   2. 启动临时隔离 PostgreSQL 容器。
   3. 将 dump 恢复到临时库。
-  4. 对恢复库先读取 migrationBefore，再执行 Atlas migration apply 和 migration status。
+  4. 对恢复库先读取 migrationBefore，依次运行存量升级与客户配置切换只读审计，再执行 Atlas migration apply 和 migration status。
   5. 可选执行 backend healthz/readyz 和 web 主路径 HTTP smoke。
   6. 生成脱敏 backup-evidence.md、migration-status.txt、command-summary.txt 和 backup-restore-report.json。
   7. 如提供 --evidence-dir，只复制上述脱敏 artifact 到 release evidence 目录；dump 仍留在 output/。
@@ -31,6 +31,8 @@ print_help() {
 USAGE
 }
 
+repo_root="$(git rev-parse --show-toplevel)"
+populated_upgrade_preflight="$repo_root/scripts/qa/populated-upgrade-preflight.sh"
 customer="yoyoosun"
 environment="local-dev"
 release_version=""
@@ -242,6 +244,22 @@ echo "[backup-restore-rehearsal] reading pre-apply migration status against rest
 
 pre_migration_version="$(awk -F': ' '/Current Version:/ {print $2; exit}' "$pre_migration_status_file" | xargs || true)"
 
+echo "[backup-restore-rehearsal] auditing populated upgrade boundaries"
+sh "$populated_upgrade_preflight" \
+  --audit populated-upgrade \
+  --docker-container "$container_name" \
+  --database "$restore_db" \
+  --username postgres
+populated_upgrade_audit_status="passed"
+
+echo "[backup-restore-rehearsal] auditing customer config cutover boundaries"
+sh "$populated_upgrade_preflight" \
+  --audit customer-config-cutover \
+  --docker-container "$container_name" \
+  --database "$restore_db" \
+  --username postgres
+customer_config_cutover_audit_status="passed"
+
 echo "[backup-restore-rehearsal] applying migrations against restored DB"
 (
   cd server
@@ -303,7 +321,9 @@ fi
 
 cat >>"$command_summary_file" <<EOF
 restoreTarget=$restore_target
-steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> atlas migrate apply -> post-apply atlas status -> smoke query
+populatedUpgradeAuditStatus=$populated_upgrade_audit_status
+customerConfigCutoverAuditStatus=$customer_config_cutover_audit_status
+steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status -> populated upgrade read-only audit -> customer config cutover read-only audit -> atlas migrate apply -> post-apply atlas status -> smoke query
 EOF
 
 cat >"$backup_evidence" <<EOF
@@ -341,6 +361,8 @@ cat >"$backup_evidence" <<EOF
 | restoreMigrationVersion | ${current_version:-unknown} |
 | migrationBefore | ${pre_migration_version:-unknown} |
 | migrationAfter | ${current_version:-unknown} |
+| populatedUpgradeAuditStatus | $populated_upgrade_audit_status |
+| customerConfigCutoverAuditStatus | $customer_config_cutover_audit_status |
 | smokeQueryStatus | $smoke_query_status |
 | webSmokeStatus | $web_smoke_status |
 | verifiedAt | $verified_at |
@@ -378,7 +400,9 @@ cat >"$report_file" <<EOF
     "restoreTestStatus": "passed-temp-container",
     "migrationBeforeApply": "${pre_migration_version:-unknown}",
     "restoreMigrationVersion": "${current_version:-unknown}",
-    "pendingFiles": "${pending_files:-unknown}"
+    "pendingFiles": "${pending_files:-unknown}",
+    "populatedUpgradeAuditStatus": "$populated_upgrade_audit_status",
+    "customerConfigCutoverAuditStatus": "$customer_config_cutover_audit_status"
   },
   "smoke": {
     "smokeQueryStatus": "$smoke_query_status",
@@ -400,13 +424,15 @@ cat >"$report_file" <<EOF
     "backupCreated": true,
     "restoreCompleted": true,
     "migrationStatus": "$migration_status",
+    "populatedUpgradeAuditStatus": "$populated_upgrade_audit_status",
+    "customerConfigCutoverAuditStatus": "$customer_config_cutover_audit_status",
     "smokeQueryStatus": "$smoke_query_status"
   }
 }
 EOF
 
-if [[ "$migration_status" != "ok" || "$smoke_query_status" != "passed" ]]; then
-  echo "[backup-restore-rehearsal] failed: migrationStatus=$migration_status smokeQueryStatus=$smoke_query_status" >&2
+if [[ "$migration_status" != "ok" || "$populated_upgrade_audit_status" != "passed" || "$customer_config_cutover_audit_status" != "passed" || "$smoke_query_status" != "passed" ]]; then
+  echo "[backup-restore-rehearsal] failed: migrationStatus=$migration_status populatedUpgradeAuditStatus=$populated_upgrade_audit_status customerConfigCutoverAuditStatus=$customer_config_cutover_audit_status smokeQueryStatus=$smoke_query_status" >&2
   exit 1
 fi
 

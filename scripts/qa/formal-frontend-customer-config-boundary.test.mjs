@@ -131,7 +131,7 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(layoutSource.includes("data-effective-session-source"));
   assert(layoutSource.includes("filterNavigationSectionsByAdminProfile"));
   assert(layoutSource.includes("shouldRedirectFromCurrentNavigation"));
-  assert(layoutSource.includes("当前账号暂无可见后台入口"));
+  assert(layoutSource.includes("当前账号暂无可用页面"));
   assert(layoutSource.includes("isCustomerBusinessDataPageKey"));
   assert(layoutSource.includes("shouldGuardCustomerBusinessPageRuntime"));
   assert(layoutSource.includes("getProductCoreNavigationSections"));
@@ -141,10 +141,10 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(layoutSource.includes("data-product-core-business-data-guard"));
   assert(layoutSource.includes("data-product-core-capability-review"));
   assert(layoutSource.includes("ProductCoreCapabilityReview"));
-  assert(layoutSource.includes("能力审阅"));
+  assert(layoutSource.includes("功能预览"));
   assert(!layoutSource.includes("产品核心评审不读取客户业务数据"));
   assert(layoutSource.includes("data-effective-session-data-scope"));
-  assert(layoutSource.includes("无客户运行态"));
+  assert(layoutSource.includes("尚未连接客户环境"));
 
   const businessModuleSource = readRelative(
     "web/src/erp/config/businessModules.mjs",
@@ -157,16 +157,18 @@ test("formal frontend customer config boundary: page, action, and field projecti
   const seedDataSource = readRelative("web/src/erp/config/seedData.mjs");
   assert(seedDataSource.includes("getProductCoreNavigationSections"));
   assert(seedDataSource.includes("productCoreDashboardItem"));
-  assert(seedDataSource.includes("产品核心总览"));
-  assert(seedDataSource.includes("title: '产品核心'"));
-  assert(seedDataSource.includes("title: '控制面'"));
+  assert(seedDataSource.includes("系统功能总览"));
+  assert(seedDataSource.includes("title: '功能预览'"));
+  assert(seedDataSource.includes("title: '系统设置'"));
 
   const dashboardSource = readRelative("web/src/erp/pages/DashboardPage.jsx");
   assert(dashboardSource.includes("ProductCoreDashboard"));
   assert(dashboardSource.includes('data-product-core-dashboard="true"'));
   assert(dashboardSource.includes("shouldShowProductCoreDashboard"));
   assert(dashboardSource.includes("if (shouldShowProductCoreDashboard)"));
-  assert(dashboardSource.includes("不加载客户订单、库存、Workflow"));
+  assert(
+    dashboardSource.includes("当前不读取客户订单、库存、待办任务或财务记录"),
+  );
 
   const syncSource = readRelative("web/src/erp/utils/adminProfileSync.mjs");
   assert(syncSource.includes("effective_session_sync_failed"));
@@ -189,7 +191,7 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(mobileLayoutSource.includes("canMountCustomerRuntime"));
   assert(mobileLayoutSource.includes("shouldBlockMissingCustomerRuntime"));
   assert(mobileLayoutSource.includes('data-mobile-customer-runtime-guard="true"'));
-  assert(mobileLayoutSource.includes("暂时无法进入岗位任务端"));
+  assert(mobileLayoutSource.includes("暂时无法进入手机待办"));
 
   const mobileTasksSource = readRelative(
     "web/src/erp/mobile/pages/MobileRoleTasksPage.jsx",
@@ -321,8 +323,8 @@ test("formal customer frontend copy uses the current account and business perspe
   const mobileLayoutSource = readRelative(
     "web/src/erp/mobile/MobileAppLayout.jsx",
   );
-  assert(mobileLayoutSource.includes("正在准备岗位任务端"));
-  assert(mobileLayoutSource.includes("暂时无法进入岗位任务端"));
+  assert(mobileLayoutSource.includes("正在准备手机待办"));
+  assert(mobileLayoutSource.includes("暂时无法进入手机待办"));
 
   const permissionSource = readRelative(
     "web/src/erp/pages/PermissionCenterPage.jsx",

@@ -28,8 +28,8 @@ test('purchase exception records modal completes the draft post and posted cance
     source,
     /Number\(nextRecord\?\.id \|\| 0\) !== Number\(record\.id\)/u
   )
-  assert.match(source, /草稿过账后才影响库存/u)
-  assert.match(source, /取消时保留原记录，并生成反向库存流水/u)
+  assert.match(source, /确认草稿后库存会同步更新/u)
+  assert.match(source, /取消已确认记录时会保留原记录，并将库存恢复到操作前/u)
 })
 
 test('purchase exception records modal guards stale reads and reconciles unknown writes', () => {
@@ -59,7 +59,7 @@ test('purchase exception records modal presents business labels without technica
     '退货单号',
     '调整单号',
     '调整原因',
-    '取消并冲正',
+    '取消并恢复库存',
   ]) {
     assert.match(source, new RegExp(label, 'u'))
   }
@@ -73,4 +73,5 @@ test('purchase exception records modal presents business labels without technica
     assert.equal(source.includes(`>${forbiddenLabel}<`), false)
     assert.equal(source.includes(`title: '${forbiddenLabel}'`), false)
   }
+  assert.doesNotMatch(source, /写库存|库存流水|库存冲正|反向库存流水/u)
 })

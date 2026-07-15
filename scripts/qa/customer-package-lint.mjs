@@ -460,6 +460,12 @@ function validatePackage(
   );
   assert(config.sourcePolicy?.activateEnabled === false, "activate must stay disabled");
   assert(config.sourcePolicy?.rollbackEnabled === false, "rollback must stay disabled");
+  if (config.sourcePolicy?.localTestApplyEnabled !== undefined) {
+    assert(
+      typeof config.sourcePolicy.localTestApplyEnabled === "boolean",
+      "localTestApplyEnabled must be boolean when declared",
+    );
+  }
 
   for (const key of schema.requiredBoundaryFalseKeys) {
     assert(config.boundaries?.[key] === false, `boundaries.${key} must stay false`);

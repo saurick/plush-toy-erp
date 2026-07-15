@@ -1,53 +1,73 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Button, Card, Space, Spin, Table, Typography } from 'antd'
+import { Alert, Button, Card, Space, Spin, Table, Typography } from 'antd'
 import { useNavigate, useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { getBusinessDashboardStats } from '../api/businessDashboardApi.mjs'
-import { listWorkflowTasks } from '../api/workflowApi.mjs'
+import { getWorkflowTaskBoard } from '../api/workflowApi.mjs'
 import {
+  DASHBOARD_TRUTH_KINDS,
   dashboardHealthModules,
-  dashboardStatusGroups,
 } from '../config/dashboardModules.mjs'
+import {
+  formatWorkflowTaskSource,
+  resolveWorkflowTaskEntryPath,
+} from '../utils/dashboardTaskDisplay.mjs'
 import {
   buildDashboardModuleRows,
   buildDashboardSummary,
   normalizeDashboardModuleStats,
 } from '../utils/dashboardStats.mjs'
-import {
-  formatWorkflowAlertSource,
-  resolveWorkflowAlertEntryPath,
-} from '../utils/dashboardTaskDisplay.mjs'
-import { buildWorkflowDashboardStats } from '../utils/workflowDashboardStats.mjs'
-import { buildBusinessModuleQuery } from '../utils/businessModuleNavigation.mjs'
+import { TASK_BOARD_LANE_DEFINITIONS } from '../utils/workflowTaskBoard.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
-const ACTIVE_STATUS_GROUP_KEYS = Object.freeze([
-  'project',
-  'material',
-  'production',
-  'warehouse',
-  'finance',
+const NUMBER_FORMATTER = new Intl.NumberFormat('zh-CN')
+
+const DATA_BOUNDARIES = Object.freeze([
+  {
+    key: 'master-data',
+    title: '基础资料',
+    description: '客户、供应商、产品与物料清单等基础资料。',
+  },
+  {
+    key: 'source-document',
+    title: '业务单据',
+    description:
+      '销售、采购、生产与委外等订单或合同，用于记录业务发起或约定，后续仍需按流程办理。',
+  },
+  {
+    key: 'business-record',
+    title: '办理结果',
+    description: '入库、质检、库存、出货和财务等已经完成的业务记录。',
+  },
+  {
+    key: 'collaboration',
+    title: '待办事项',
+    description:
+      '排程、异常、放行等需要跟进的工作；完成任务不会自动产生库存、出货或财务记录。',
+  },
 ])
 
-function sumStatusGroups(record = {}, keys = []) {
-  return keys.reduce(
-    (total, key) => total + Number(record.statusGroupCounts?.[key] || 0),
-    0
-  )
+function formatCount(value) {
+  return Number.isSafeInteger(value) && value >= 0
+    ? NUMBER_FORMATTER.format(value)
+    : '—'
 }
 
-function statusKeysForGroups(keys = []) {
-  return dashboardStatusGroups
-    .filter((group) => keys.includes(group.key))
-    .flatMap((group) => group.statusKeys)
+function getLane(taskBoard, key) {
+  return Array.isArray(taskBoard?.lanes)
+    ? taskBoard.lanes.find((lane) => lane?.key === key) || null
+    : null
 }
 
 export default function BusinessDashboardPage() {
   const [loading, setLoading] = useState(false)
   const [moduleStats, setModuleStats] = useState([])
-  const [workflowTasks, setWorkflowTasks] = useState([])
+  const [dashboardLoadError, setDashboardLoadError] = useState(false)
+  const [taskBoard, setTaskBoard] = useState(null)
+  const [taskBoardReady, setTaskBoardReady] = useState(false)
+  const [workflowLoadError, setWorkflowLoadError] = useState(false)
   const mountedRef = useRef(false)
   const loadPromiseRef = useRef(null)
   const navigate = useNavigate()
@@ -60,29 +80,53 @@ export default function BusinessDashboardPage() {
 
     setLoading(true)
     const request = (async () => {
-      const [result, workflowResult] = await Promise.all([
+      const [dashboardResult, workflowResult] = await Promise.allSettled([
         getBusinessDashboardStats(),
-        listWorkflowTasks({ limit: 200 }),
+        getWorkflowTaskBoard({ limit: 1, offset: 0 }),
       ])
-      const modules = Array.isArray(result?.modules)
-        ? result.modules.map((item) => normalizeDashboardModuleStats(item))
-        : []
-      if (mountedRef.current) {
-        setModuleStats(modules)
-        setWorkflowTasks(workflowResult?.tasks || [])
+
+      if (!mountedRef.current) {
+        return false
       }
-      return true
+
+      if (dashboardResult.status === 'fulfilled') {
+        setModuleStats(
+          dashboardResult.value.modules.map((item) =>
+            normalizeDashboardModuleStats(item)
+          )
+        )
+        setDashboardLoadError(false)
+      } else {
+        setModuleStats([])
+        setDashboardLoadError(true)
+        message.error(
+          getActionErrorMessage(dashboardResult.reason, '加载业务统计')
+        )
+      }
+
+      if (workflowResult.status === 'fulfilled') {
+        setTaskBoard(workflowResult.value)
+        setTaskBoardReady(true)
+        setWorkflowLoadError(false)
+      } else {
+        setTaskBoard(null)
+        setTaskBoardReady(false)
+        setWorkflowLoadError(true)
+        message.error(
+          getActionErrorMessage(workflowResult.reason, '加载待办概览')
+        )
+      }
+
+      return (
+        dashboardResult.status === 'fulfilled' &&
+        workflowResult.status === 'fulfilled'
+      )
     })()
 
     loadPromiseRef.current = request
 
     try {
       return await request
-    } catch (error) {
-      if (mountedRef.current) {
-        message.error(getActionErrorMessage(error, '加载业务看板'))
-      }
-      return false
     } finally {
       loadPromiseRef.current = null
       if (mountedRef.current) {
@@ -108,78 +152,77 @@ export default function BusinessDashboardPage() {
     [moduleStats]
   )
   const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
-  const workflowStats = useMemo(
-    () => buildWorkflowDashboardStats(workflowTasks),
-    [workflowTasks]
-  )
+  const collaborationRisk = taskBoardReady
+    ? Number(taskBoard?.counts?.exception || 0) +
+      Number(taskBoard?.counts?.due || 0)
+    : null
 
   const businessMetricCards = useMemo(
     () => [
       {
-        key: 'totalRecords',
-        title: '对象总量',
-        value: summary.totalRecords,
-        note: '可进入标准页',
+        key: 'master-data',
+        title: '基础资料',
+        note: '档案与物料清单',
+        ...summary[DASHBOARD_TRUTH_KINDS.MASTER_DATA],
       },
       {
-        key: 'activeCount',
-        title: '推进中',
-        value: summary.activeCount,
-        note: '正在流转',
-        color: '#1677ff',
+        key: 'source-document',
+        title: '业务单据',
+        note: '订单与合同',
+        ...summary[DASHBOARD_TRUTH_KINDS.SOURCE_DOCUMENT],
       },
       {
-        key: 'blockedCount',
-        title: '需处理风险',
-        value: summary.blockedCount,
-        note: '优先核对',
+        key: 'business-fact',
+        title: '办理结果',
+        note: '已经发生',
+        ...summary[DASHBOARD_TRUTH_KINDS.BUSINESS_FACT],
+      },
+      {
+        key: 'collaboration-risk',
+        title: '需要关注',
+        note: '当前账号',
+        available: taskBoardReady,
+        total: collaborationRisk,
         color: '#d4380d',
       },
     ],
-    [summary]
+    [collaborationRisk, summary, taskBoardReady]
   )
 
-  const workflowAlertGroups = useMemo(
-    () => [
-      { key: 'shipmentRisk', title: '出货风险' },
-      { key: 'materialShortage', title: '欠料风险' },
-      { key: 'vendorDelay', title: '委外延期' },
-      { key: 'qcFailed', title: '质检不良' },
-      { key: 'financePending', title: '财务待处理' },
-      { key: 'approvalPending', title: '待老板审批' },
-      { key: 'pmcFocus', title: '计划物控关注事项' },
-      { key: 'overdueTasks', title: '超时任务' },
-      { key: 'blockedTasks', title: '阻塞任务' },
-    ],
-    []
-  )
-
-  const openModuleList = (record, businessStatusKeys = []) => {
-    if (!record?.path) {
-      return
-    }
-    const query = buildBusinessModuleQuery({ businessStatusKeys })
-    navigate(query ? `${record.path}?${query}` : record.path)
-  }
-
-  const openAlertEntry = (alert) => {
-    const entryPath = resolveWorkflowAlertEntryPath(alert)
+  const openTaskEntry = (task) => {
+    const entryPath = resolveWorkflowTaskEntryPath(task)
     if (entryPath) {
       navigate(entryPath)
     }
   }
 
-  const renderModuleEntryButton = (label, onClick, ariaLabel, disabled) => (
-    <Button
-      type="link"
-      size="small"
-      className="erp-dashboard-link-button"
-      onClick={onClick}
-      aria-label={ariaLabel}
-      disabled={disabled}
-    >
-      {label}
-    </Button>
+  const renderSourceDetails = (record) => (
+    <div className="erp-business-board-source-grid">
+      {record.sources.map((source) => (
+        <div className="erp-business-board-source-item" key={source.key}>
+          <div className="erp-business-board-source-meta">
+            <Text>{source.label}</Text>
+            <strong
+              className="erp-business-board-source-count"
+              aria-label={`${source.label}数量${
+                source.available ? formatCount(source.total) : '暂不可用'
+              }`}
+            >
+              {source.available ? formatCount(source.total) : '暂不可用'}
+            </strong>
+          </div>
+          <Button
+            type="link"
+            size="small"
+            className="erp-business-board-source-entry"
+            onClick={() => navigate(source.path)}
+            aria-label={`查看${source.label}`}
+          >
+            查看{source.label}
+          </Button>
+        </div>
+      ))}
+    </div>
   )
 
   return (
@@ -195,37 +238,64 @@ export default function BusinessDashboardPage() {
               业务看板
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
-              看核心业务对象族是否健康，并进入对应标准页处理。
+              查看各类业务数据，并进入对应页面继续处理。
             </Paragraph>
           </div>
         </div>
         <div className="erp-business-board-summary-grid">
-          {businessMetricCards.map((item) => (
-            <div
-              className="erp-business-board-summary-card erp-metric-readonly-card"
-              key={item.key}
-              aria-label={`${item.title} ${item.value}${item.suffix || ''}，只读摘要`}
-            >
-              <div className="erp-metric-readonly-card__head">
-                <Text type="secondary">{item.title}</Text>
-                <span className="erp-metric-readonly-card__badge">
-                  {item.note}
-                </span>
+          {businessMetricCards.map((item) => {
+            const displayValue = item.available ? formatCount(item.total) : '—'
+            return (
+              <div
+                className="erp-business-board-summary-card erp-metric-readonly-card"
+                key={item.key}
+                aria-label={`${item.title} ${
+                  item.available ? displayValue : '暂不可用'
+                }，只读摘要`}
+              >
+                <div className="erp-metric-readonly-card__head">
+                  <Text type="secondary">{item.title}</Text>
+                  <span className="erp-metric-readonly-card__badge">
+                    {item.note}
+                  </span>
+                </div>
+                <strong style={item.color ? { color: item.color } : undefined}>
+                  {displayValue}
+                </strong>
+                {!item.available ? (
+                  <Text
+                    type="secondary"
+                    className="erp-metric-readonly-card__hint"
+                  >
+                    暂不可用
+                  </Text>
+                ) : null}
               </div>
-              <strong style={item.color ? { color: item.color } : undefined}>
-                {item.value}
-                {item.suffix || ''}
-              </strong>
-            </div>
-          ))}
+            )
+          })}
         </div>
+        <Paragraph type="secondary" className="erp-business-board-summary-note">
+          四类数字分别统计，请不要直接相加；“需要关注”只统计当前账号可见的阻塞和到期任务。
+        </Paragraph>
       </Card>
 
       <Card
         className="erp-dashboard-card erp-dashboard-table-card"
         variant="borderless"
-        title="核心链路健康"
+        title="各类业务数据"
       >
+        {dashboardLoadError ? (
+          <Alert
+            type="warning"
+            showIcon
+            message="业务统计暂不可用"
+            description="仍可进入各业务页面；数字恢复后请刷新本页。"
+            className="erp-business-board-inline-alert"
+          />
+        ) : null}
+        <Paragraph type="secondary" className="erp-business-board-table-note">
+          每一项单独统计，请进入对应页面查看明细。
+        </Paragraph>
         <Table
           size="middle"
           loading={{
@@ -234,92 +304,19 @@ export default function BusinessDashboardPage() {
           }}
           pagination={false}
           rowKey="key"
-          scroll={{ x: 760 }}
+          scroll={{ x: 680 }}
           columns={[
             {
-              title: '对象族',
+              title: '业务分类',
               dataIndex: 'module',
               fixed: 'left',
-              width: 220,
-              sorter: (a, b) =>
-                String(a.module).localeCompare(String(b.module)),
-              render: (value, record) =>
-                renderModuleEntryButton(
-                  value,
-                  () => openModuleList(record),
-                  `查看${value}列表`,
-                  !record?.path
-                ),
+              width: 180,
+              render: (value) => <Text strong>{value}</Text>,
             },
             {
-              title: '记录数',
-              dataIndex: 'count',
-              width: 100,
-              sorter: (a, b) => Number(a.count || 0) - Number(b.count || 0),
-              render: (value, record) =>
-                renderModuleEntryButton(
-                  value,
-                  () => openModuleList(record),
-                  `查看${record?.module}全部记录`,
-                  !record?.path
-                ),
-            },
-            {
-              title: '推进中',
-              key: 'active',
-              width: 120,
-              align: 'center',
-              sorter: (a, b) =>
-                sumStatusGroups(a, ACTIVE_STATUS_GROUP_KEYS) -
-                sumStatusGroups(b, ACTIVE_STATUS_GROUP_KEYS),
-              render: (_, record) => {
-                const value = sumStatusGroups(record, ACTIVE_STATUS_GROUP_KEYS)
-                return renderModuleEntryButton(
-                  value,
-                  () =>
-                    openModuleList(
-                      record,
-                      statusKeysForGroups(ACTIVE_STATUS_GROUP_KEYS)
-                    ),
-                  `查看${record?.module}推进中记录`,
-                  !record?.path || value <= 0
-                )
-              },
-            },
-            {
-              title: '风险',
-              key: 'blocked',
-              width: 120,
-              align: 'center',
-              sorter: (a, b) =>
-                Number(a.statusGroupCounts?.blocked || 0) -
-                Number(b.statusGroupCounts?.blocked || 0),
-              render: (_, record) =>
-                renderModuleEntryButton(
-                  record.statusGroupCounts?.blocked || 0,
-                  () =>
-                    openModuleList(
-                      record,
-                      dashboardStatusGroups.find(
-                        (group) => group.key === 'blocked'
-                      )?.statusKeys || []
-                    ),
-                  `查看${record?.module}风险记录`,
-                  !record?.path ||
-                    Number(record.statusGroupCounts?.blocked) <= 0
-                ),
-            },
-            {
-              title: '入口',
-              key: 'entry',
-              width: 120,
-              render: (_, record) =>
-                renderModuleEntryButton(
-                  '进入',
-                  () => openModuleList(record),
-                  `进入${record?.module}`,
-                  !record?.path
-                ),
+              title: '数据明细',
+              key: 'sources',
+              render: (_, record) => renderSourceDetails(record),
             },
           ]}
           dataSource={moduleRows}
@@ -330,25 +327,15 @@ export default function BusinessDashboardPage() {
         <Card className="erp-dashboard-card" variant="borderless">
           <Space direction="vertical" className="erp-dashboard-block" size={8}>
             <Title level={5} className="erp-dashboard-section-title">
-              状态分布
+              数字说明
             </Title>
-            <div className="erp-business-board-status-list">
-              {dashboardStatusGroups.map((group) => {
-                const count = summary.statusGroupCount[group.key] || 0
-                const percent = summary.totalRecords
-                  ? Math.round((count / summary.totalRecords) * 100)
-                  : 0
-                return (
-                  <div
-                    className="erp-business-board-status-row"
-                    key={group.key}
-                  >
-                    <span>{group.title}</span>
-                    <strong>{count}</strong>
-                    <i style={{ width: `${Math.max(percent, 4)}%` }} />
-                  </div>
-                )
-              })}
+            <div className="erp-business-board-boundary-list">
+              {DATA_BOUNDARIES.map((item) => (
+                <div className="erp-business-board-boundary-row" key={item.key}>
+                  <Text strong>{item.title}</Text>
+                  <Text type="secondary">{item.description}</Text>
+                </div>
+              ))}
             </div>
           </Space>
         </Card>
@@ -356,41 +343,68 @@ export default function BusinessDashboardPage() {
         <Card className="erp-dashboard-card" variant="borderless">
           <Space direction="vertical" className="erp-dashboard-block" size={8}>
             <Title level={5} className="erp-dashboard-section-title">
-              当前风险
+              待办概览
             </Title>
+            {workflowLoadError ? (
+              <Alert
+                type="warning"
+                showIcon
+                message="待办概览暂不可用"
+                description="业务统计和各业务页面不受影响，可稍后刷新重试。"
+                className="erp-business-board-inline-alert"
+              />
+            ) : null}
             <div className="erp-business-board-alert-grid">
-              {workflowAlertGroups.slice(0, 4).map((group) => {
-                const alerts = workflowStats.buckets?.[group.key] || []
+              {TASK_BOARD_LANE_DEFINITIONS.map((definition) => {
+                const lane = getLane(taskBoard, definition.key)
+                const total = taskBoardReady
+                  ? taskBoard.counts[definition.key]
+                  : null
+                const task = taskBoardReady ? lane?.tasks?.[0] : null
+                const entryPath = task ? resolveWorkflowTaskEntryPath(task) : ''
                 return (
                   <div
                     className="erp-business-board-alert-item"
-                    key={group.key}
+                    key={definition.key}
                   >
                     <div>
-                      <Text strong>{group.title}</Text>
+                      <Text strong>{definition.title}</Text>
                       <strong className="erp-business-board-alert-count">
-                        {alerts.length}
+                        {taskBoardReady ? formatCount(total) : '—'}
                       </strong>
                     </div>
-                    {alerts.slice(0, 1).map((alert) => (
-                      <Button
-                        key={`${group.key}-${alert.task_id}`}
-                        type="link"
-                        size="small"
-                        className="erp-dashboard-link-button"
-                        disabled={!resolveWorkflowAlertEntryPath(alert)}
-                        onClick={() => openAlertEntry(alert)}
-                      >
-                        {alert.alert_label} / {formatWorkflowAlertSource(alert)}
-                      </Button>
-                    ))}
-                    {alerts.length === 0 ? (
+                    {!taskBoardReady ? (
+                      <Text type="secondary">暂不可用</Text>
+                    ) : task ? (
+                      entryPath ? (
+                        <Button
+                          type="link"
+                          size="small"
+                          className="erp-dashboard-link-button erp-business-board-task-entry"
+                          onClick={() => openTaskEntry(task)}
+                          aria-label={`查看${task.task_name || definition.title}`}
+                        >
+                          {task.task_name || definition.title} /{' '}
+                          {formatWorkflowTaskSource(task)}
+                        </Button>
+                      ) : (
+                        <Text className="erp-business-board-task-text">
+                          {task.task_name || definition.title} /{' '}
+                          {formatWorkflowTaskSource(task)}
+                        </Text>
+                      )
+                    ) : total > 0 ? (
+                      <Text type="secondary">暂无可展示事项</Text>
+                    ) : (
                       <Text type="secondary">暂无</Text>
-                    ) : null}
+                    )}
                   </div>
                 )
               })}
             </div>
+            <Text type="secondary">
+              四类任务互不重复；显示当前账号可见的总数，每类最多展示一项。
+            </Text>
           </Space>
         </Card>
       </div>

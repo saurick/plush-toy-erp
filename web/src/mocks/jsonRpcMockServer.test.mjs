@@ -132,7 +132,11 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
         [key]: 'non-contract-value',
       })
       assert.equal(invalidCreate.result.code, 40010)
-      assert.match(invalidCreate.result.message, new RegExp(key, 'u'))
+      assert.equal(
+        invalidCreate.result.message,
+        '任务资料包含无法识别的内容，请刷新后重试'
+      )
+      assert.doesNotMatch(invalidCreate.result.message, new RegExp(key, 'u'))
     }
     for (const params of [
       {},

@@ -17,7 +17,7 @@ function isNonNegativeSafeInteger(value) {
 }
 
 function invalidTaskBoardResponse() {
-  throw Object.assign(new Error('任务看板响应无效，请刷新后重试'), {
+  throw Object.assign(new Error('任务列表暂时无法显示，请刷新后重试'), {
     isInvalidResponse: true,
   })
 }
