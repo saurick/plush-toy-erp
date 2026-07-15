@@ -111,8 +111,24 @@ test('errorCodes: 默认文案覆盖核心鉴权错误', () => {
     '权限不足'
   )
   assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_USER_NOT_FOUND],
+    '账号不存在'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_INVALID_PASSWORD],
+    '密码错误'
+  )
+  assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_USER_DISABLED],
     '账号已停用'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_ACCOUNT_REVOKED],
+    '账号已注销'
+  )
+  assert.equal(
+    DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_CREDENTIALS_CHANGED],
+    '账号信息已变更，请重新登录'
   )
   assert.equal(
     DEFAULT_RPC_ERROR_MESSAGES[RpcErrorCode.AUTH_INVALID_SMS_CODE],

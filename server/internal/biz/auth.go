@@ -12,6 +12,7 @@ var (
 	ErrMobileRoleDenied = errors.New("mobile role denied")
 	ErrInvalidPassword  = errors.New("invalid password")
 	ErrUserDisabled     = errors.New("user disabled")
+	ErrUserRevoked      = errors.New("user revoked")
 	ErrSessionNotFound  = errors.New("admin session not found")
 	ErrSessionRevoked   = errors.New("admin session revoked")
 	ErrSessionExpired   = errors.New("admin session expired")

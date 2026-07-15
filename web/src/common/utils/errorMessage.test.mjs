@@ -156,6 +156,23 @@ test('errorMessage: 短信登录错误码显示精确中文提示', () => {
   }
 })
 
+test('errorMessage: 密码登录错误码显示精确账号状态', () => {
+  const cases = [
+    [RpcErrorCode.AUTH_USER_NOT_FOUND, '账号不存在'],
+    [RpcErrorCode.AUTH_INVALID_PASSWORD, '密码错误'],
+    [RpcErrorCode.AUTH_USER_DISABLED, '账号已停用'],
+    [RpcErrorCode.AUTH_ACCOUNT_REVOKED, '账号已注销'],
+    [RpcErrorCode.AUTH_CREDENTIALS_CHANGED, '账号信息已变更，请重新登录'],
+  ]
+
+  for (const [code, message] of cases) {
+    assert.equal(
+      getActionErrorMessage({ message: 'Business error', code }, '登录'),
+      message
+    )
+  }
+})
+
 test('errorMessage: 已是中文的后端文案保持原样', () => {
   assert.equal(
     getUserFacingErrorMessage('用户名已存在', '注册失败，请稍后重试'),

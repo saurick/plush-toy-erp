@@ -279,10 +279,10 @@ func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string
 		l.Infof("Login admin rejected admin_id=%d reason=password_invalid", admin.ID)
 		return "", time.Time{}, nil, err
 	}
-	if !admin.IsActive() {
-		err = ErrUserDisabled
+	if statusErr := adminLoginAccountStatusError(admin); statusErr != nil {
+		err = statusErr
 		span.SetStatus(codes.Error, err.Error())
-		l.Infof("Login admin rejected admin_id=%d reason=account_inactive", admin.ID)
+		l.Infof("Login admin rejected admin_id=%d reason=%s", admin.ID, adminLoginRejectionReason(err))
 		return "", time.Time{}, nil, err
 	}
 
@@ -308,10 +308,10 @@ func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string
 		l.Infof("Login admin rejected admin_id=%d reason=credentials_changed", admin.ID)
 		return "", time.Time{}, nil, err
 	}
-	if !admin.IsActive() {
-		err = ErrUserDisabled
+	if statusErr := adminLoginAccountStatusError(admin); statusErr != nil {
+		err = statusErr
 		span.SetStatus(codes.Error, err.Error())
-		l.Infof("Login admin rejected admin_id=%d reason=account_inactive", admin.ID)
+		l.Infof("Login admin rejected admin_id=%d reason=%s", admin.ID, adminLoginRejectionReason(err))
 		return "", time.Time{}, nil, err
 	}
 
@@ -335,6 +335,26 @@ func (uc *AdminAuthUsecase) Login(ctx context.Context, username, password string
 	l.Infof("Login admin success admin_id=%d", admin.ID)
 
 	return token, expireAt, admin, nil
+}
+
+func adminLoginAccountStatusError(admin *AdminUser) error {
+	if admin == nil {
+		return ErrUserNotFound
+	}
+	if admin.RevokedAt != nil {
+		return ErrUserRevoked
+	}
+	if admin.Disabled {
+		return ErrUserDisabled
+	}
+	return nil
+}
+
+func adminLoginRejectionReason(err error) string {
+	if errors.Is(err, ErrUserRevoked) {
+		return "account_revoked"
+	}
+	return "account_inactive"
 }
 
 func (uc *AdminAuthUsecase) RequestSMSLoginCode(ctx context.Context, phone, mobileRoleKey string) (challenge *SMSLoginChallenge, err error) {

@@ -7,6 +7,16 @@
 - 当前只收口上述真实缺口；不得回退其它已完成任务，也不把旧审查中的过期 / 超范围建议重新扩成产品功能。
 - 发布目标是内网测试机 `192.168.0.133`；低配目标只加载本地 fixed revision 构建产物、执行 migration、Compose 重启和部署后回归。
 
+## 2026-07-15 密码登录错误精确化
+
+完成：线上只读复现确认 `admin.yoyoosun.net` 服务健康，`admin` 使用本地开发默认密码登录失败的内部原因为 `password_invalid`；生产账号不继承本地开发默认密码，且启动不会覆盖已有账号密码。密码登录现按账号不存在、密码错误、账号停用、账号注销和核验期间账号信息变化返回独立错误码与岗位语言提示；短信登录继续保留防手机号枚举合同。未重置或读取线上真实密码，未改目标数据库、配置、账号或会话。
+
+验证：当前 13 文件影响面按 T0-T5 执行 `bash scripts/qa/affected.sh --run` 全部通过：docs inventory 3 / 3，server domain、server-all、server API / JSON-RPC 三组均通过，Web 全量 1255 / 1255、lint、场景语法和 `git diff --check` 通过；错误码生成 / 同步门禁通过。`admin-login-password-errors-desktop` 真实 Chromium 场景 1 / 1 通过，依次核对账号不存在、密码错误、账号停用、账号注销和账号信息变化五种提示，并确认最长提示无截断或布局溢出；`admin-login-mobile` 默认态也已生成本轮基线截图。
+
+下一步：如需上线，先收敛当前工作树并绑定 commit / image 执行正式发布，再在目标环境验证五类密码登录拒绝态；如需恢复 `admin` 登录，应通过受控密码重置设置新的生产强密码，不能使用 `adminadmin`。
+
+阻塞/风险：精确的账号不存在提示允许公开调用方枚举账号；当前只有服务级 BBR 限流，尚无按账号 fingerprint 与可信来源共享的密码登录限速。本轮未提交、推送、部署或执行线上密码重置，当前公网页面仍保持旧的合并提示。
+
 ## 归档索引
 
 - `docs/archive/progress-2026-06-28-before-runtime-manifest.md` 至 `docs/archive/progress-2026-07-08-before-runtime-lazy-import-retry.md`：历史过程记录索引见各归档、`docs/archive/README.md` 和 Git 历史。

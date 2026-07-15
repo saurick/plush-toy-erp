@@ -111,7 +111,7 @@ HTTP 路由：
 
 密码或短信验证码核验完成后，服务端在创建 session 的同一短事务内再次锁定并核对账号状态、`auth_version`、短信登录手机号和当前岗位入口权限；并发禁用、注销、重置密码或调整相关登录条件时，不会返回一个已经失效的“登录成功”结果。
 
-`auth.admin_login` 同样不对外区分用户名不存在、密码错误、账号停用 / 注销或登录期间凭据版本变化，统一返回 `AuthLoginRejected`。凭据查询故障返回 `Internal`，不能降级成“账号不存在”。每个用户名 / 密码尝试都会执行一次 bcrypt 比较；只有密码匹配后才加载完整 RBAC，并再次核对账号状态、密码哈希和 `auth_version`。
+`auth.admin_login` 按密码登录失败原因返回精确错误：账号不存在为 `AuthUserNotFound`，密码不匹配为 `AuthInvalidPassword`，账号停用为 `AuthUserDisabled`，账号注销为 `AuthAccountRevoked`，登录核验期间凭据发生变化为 `AuthCredentialsChanged`。凭据查询故障返回 `Internal`，不能降级成“账号不存在”。每个用户名 / 密码尝试都会执行一次 bcrypt 比较；只有密码匹配后才加载完整 RBAC，并再次核对账号状态、密码哈希和 `auth_version`。该公开合同允许调用方判断账号是否存在；当前仅有服务级 BBR 限流，部署到公网前仍需补按账号 fingerprint 与可信来源共享的密码登录限速。
 
 ### `auth.send_sms_code`
 

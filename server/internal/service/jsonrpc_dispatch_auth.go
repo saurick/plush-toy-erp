@@ -123,7 +123,7 @@ func (d *jsonrpcDispatcher) handleAuth(
 
 		token, expireAt, admin, err := d.adminAuthUC.Login(ctx, username, password)
 		if err != nil {
-			return id, d.mapAdminLoginError(ctx, err), nil
+			return id, d.mapAdminPasswordLoginError(ctx, err), nil
 		}
 
 		return id, &v1.JsonrpcResult{
@@ -184,6 +184,20 @@ func (d *jsonrpcDispatcher) handleAuth(
 			Code:    errcode.UnknownMethod.Code,
 			Message: fmt.Sprintf("auth: 未知方法=%s", method),
 		}, nil
+	}
+}
+
+func (d *jsonrpcDispatcher) mapAdminPasswordLoginError(ctx context.Context, err error) *v1.JsonrpcResult {
+	logger := d.log.WithContext(ctx)
+	switch {
+	case errors.Is(err, biz.ErrUserRevoked):
+		logger.Warn("[auth] admin password login rejected reason=account_revoked")
+		return &v1.JsonrpcResult{Code: errcode.AuthAccountRevoked.Code, Message: errcode.AuthAccountRevoked.Message}
+	case errors.Is(err, biz.ErrAuthVersionStale):
+		logger.Warn("[auth] admin password login rejected reason=credentials_changed")
+		return &v1.JsonrpcResult{Code: errcode.AuthCredentialsChanged.Code, Message: errcode.AuthCredentialsChanged.Message}
+	default:
+		return d.mapAuthError(ctx, err)
 	}
 }
 
@@ -251,6 +265,12 @@ func (d *jsonrpcDispatcher) mapAuthError(ctx context.Context, err error) *v1.Jso
 		return &v1.JsonrpcResult{
 			Code:    errcode.AuthUserDisabled.Code,
 			Message: errcode.AuthUserDisabled.Message,
+		}
+	case errors.Is(err, biz.ErrUserRevoked):
+		logger.Warn("[auth] user revoked")
+		return &v1.JsonrpcResult{
+			Code:    errcode.AuthAccountRevoked.Code,
+			Message: errcode.AuthAccountRevoked.Message,
 		}
 	case errors.Is(err, biz.ErrInvalidPhoneNumber):
 		logger.Warn("[auth] invalid phone number")

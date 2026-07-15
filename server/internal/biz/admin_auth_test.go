@@ -170,6 +170,7 @@ func TestAdminAuthUsecase_LoginUsesOnePasswordComparisonAndPreservesStorageError
 	t.Parallel()
 
 	storageErr := errors.New("storage unavailable")
+	revokedAt := time.Now()
 	tests := []struct {
 		name             string
 		admin            *AdminUser
@@ -197,6 +198,13 @@ func TestAdminAuthUsecase_LoginUsesOnePasswordComparisonAndPreservesStorageError
 			name:             "inactive account still compares password",
 			admin:            &AdminUser{ID: 7, Username: "operator", PasswordHash: "stored-hash", AuthVersion: 1, Disabled: true},
 			wantErr:          ErrUserDisabled,
+			wantCompareHash:  "stored-hash",
+			wantCompareCalls: 1,
+		},
+		{
+			name:             "revoked account remains distinct after password comparison",
+			admin:            &AdminUser{ID: 7, Username: "operator", PasswordHash: "stored-hash", AuthVersion: 1, Disabled: true, RevokedAt: &revokedAt},
+			wantErr:          ErrUserRevoked,
 			wantCompareHash:  "stored-hash",
 			wantCompareCalls: 1,
 		},

@@ -32,7 +32,7 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
   [RpcErrorCode.ADMIN_DISABLED]: '账号已停用',
   [RpcErrorCode.PERMISSION_DENIED]: '权限不足',
   [RpcErrorCode.ADMIN_NOT_FOUND]: '账号不存在',
-  [RpcErrorCode.AUTH_USER_NOT_FOUND]: '用户不存在',
+  [RpcErrorCode.AUTH_USER_NOT_FOUND]: '账号不存在',
   [RpcErrorCode.AUTH_INVALID_PASSWORD]: '密码错误',
   [RpcErrorCode.AUTH_USER_DISABLED]: '账号已停用',
   [RpcErrorCode.AUTH_USER_EXISTS]: '用户名已存在',
@@ -54,6 +54,8 @@ export const DEFAULT_RPC_ERROR_MESSAGES = Object.freeze({
   [RpcErrorCode.AUTH_SMS_SERVICE_QUOTA_EXCEEDED]:
     '暂时无法发送验证码，请联系系统管理员',
   [RpcErrorCode.AUTH_LOGIN_REJECTED]: '登录信息不正确或账号不可用',
+  [RpcErrorCode.AUTH_ACCOUNT_REVOKED]: '账号已注销',
+  [RpcErrorCode.AUTH_CREDENTIALS_CHANGED]: '账号信息已变更，请重新登录',
   [RpcErrorCode.ADMIN_EXISTS]: '账号已存在',
   [RpcErrorCode.ADMIN_PHONE_EXISTS]: '手机号已绑定其他账号',
   [RpcErrorCode.IDEMPOTENCY_CONFLICT]:

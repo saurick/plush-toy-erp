@@ -329,6 +329,32 @@ func TestJsonrpcDispatcher_AdminLoginIdentityFailuresUseSingleExternalContract(t
 	}
 }
 
+func TestJsonrpcDispatcher_AdminPasswordLoginFailuresUsePreciseExternalContract(t *testing.T) {
+	d := &jsonrpcDispatcher{log: log.NewHelper(log.NewStdLogger(io.Discard))}
+	tests := []struct {
+		err  error
+		want errcode.Definition
+	}{
+		{err: biz.ErrUserNotFound, want: errcode.AuthUserNotFound},
+		{err: biz.ErrInvalidPassword, want: errcode.AuthInvalidPassword},
+		{err: biz.ErrUserDisabled, want: errcode.AuthUserDisabled},
+		{err: biz.ErrUserRevoked, want: errcode.AuthAccountRevoked},
+		{err: biz.ErrAuthVersionStale, want: errcode.AuthCredentialsChanged},
+	}
+	for _, tt := range tests {
+		result := d.mapAdminPasswordLoginError(context.Background(), fmt.Errorf("wrapped: %w", tt.err))
+		if result.Code != tt.want.Code || result.Message != tt.want.Message || result.Data != nil {
+			t.Fatalf("mapAdminPasswordLoginError(%v) = %#v, want %#v", tt.err, result, tt.want)
+		}
+	}
+
+	storageErr := errors.New("authentication storage unavailable")
+	result := d.mapAdminPasswordLoginError(context.Background(), storageErr)
+	if result.Code != errcode.Internal.Code || result.Message != errcode.Internal.Message {
+		t.Fatalf("storage error must remain internal: %#v", result)
+	}
+}
+
 func assertExactSMSSendAcceptedResponse(t *testing.T, result *v1.JsonrpcResult, phone string) {
 	t.Helper()
 	if result == nil || result.Code != errcode.OK.Code || result.Message != "验证码已发送" || result.Data == nil {

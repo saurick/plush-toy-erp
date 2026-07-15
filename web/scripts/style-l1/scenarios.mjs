@@ -716,6 +716,83 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'admin-login-password-errors-desktop',
+      path: '/admin-login',
+      mockAdminRpc: true,
+      viewport: { width: 1280, height: 800 },
+      beforeNavigate: async (page) => {
+        await page.unroute('**/rpc/auth')
+        await page.route('**/rpc/auth', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          const { id = 'password-error-mock', method, params = {} } = body
+          if (method === 'capabilities') {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id,
+                result: {
+                  code: 0,
+                  message: 'OK',
+                  data: { sms_login: { enabled: false, mode: 'disabled' } },
+                },
+              }),
+            })
+            return
+          }
+
+          const failures = {
+            missing: [RpcErrorCode.AUTH_USER_NOT_FOUND, '账号不存在'],
+            wrong: [RpcErrorCode.AUTH_INVALID_PASSWORD, '密码错误'],
+            disabled: [RpcErrorCode.AUTH_USER_DISABLED, '账号已停用'],
+            revoked: [RpcErrorCode.AUTH_ACCOUNT_REVOKED, '账号已注销'],
+            changed: [
+              RpcErrorCode.AUTH_CREDENTIALS_CHANGED,
+              '账号信息已变更，请重新登录',
+            ],
+          }
+          const [code, message] = failures[String(params.username)] || [
+            RpcErrorCode.INTERNAL,
+            '服务器内部错误',
+          ]
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id,
+              result: { code, message, data: null },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectText(page, '业务管理')
+        const username = page.getByLabel('账号')
+        const password = page.getByLabel('密码')
+        const submit = page.locator('.erp-login-card button[type="submit"]')
+        const alert = page.locator('.erp-login-card .ant-alert-message')
+        for (const [account, message] of [
+          ['missing', '账号不存在'],
+          ['wrong', '密码错误'],
+          ['disabled', '账号已停用'],
+          ['revoked', '账号已注销'],
+          ['changed', '账号信息已变更，请重新登录'],
+        ]) {
+          await username.fill(account)
+          await password.fill('style-l1-password')
+          await submit.click()
+          await alert.filter({ hasText: message }).waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          assert.equal((await alert.textContent())?.trim(), message)
+        }
+        await assertAdminLoginLayout(page, { minCardWidth: 320 })
+      },
+    },
+    {
       name: 'admin-login-theme-modes-desktop',
       path: '/admin-login',
       mockAdminRpc: true,

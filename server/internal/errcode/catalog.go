@@ -30,9 +30,9 @@ var (
 	PayloadTooLarge    = Definition{Name: "PayloadTooLarge", Code: 41300, Message: "请求体过大"}
 	TemplateRenderBusy = Definition{Name: "TemplateRenderBusy", Code: 42953, Message: "当前 PDF 预览人数较多，请稍后重试"}
 
-	AuthUserNotFound                     = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "用户不存在"}
+	AuthUserNotFound                     = Definition{Name: "AuthUserNotFound", Code: 10001, Message: "账号不存在"}
 	AuthInvalidPassword                  = Definition{Name: "AuthInvalidPassword", Code: 10002, Message: "密码错误"}
-	AuthUserDisabled                     = Definition{Name: "AuthUserDisabled", Code: 10003, Message: "用户已被禁用"}
+	AuthUserDisabled                     = Definition{Name: "AuthUserDisabled", Code: 10003, Message: "账号已停用"}
 	AuthUserExists                       = Definition{Name: "AuthUserExists", Code: 10004, Message: "用户名已存在"}
 	AuthExpired                          = Definition{Name: "AuthExpired", Code: 10005, Message: "登录已过期，请重新登录"}
 	AuthInvalid                          = Definition{Name: "AuthInvalid", Code: 10006, Message: "登录无效，请重新登录"}
@@ -47,6 +47,8 @@ var (
 	AuthSMSServiceUnavailable            = Definition{Name: "AuthSMSServiceUnavailable", Code: 10015, Message: "短信服务暂不可用，请稍后再试或联系管理员"}
 	AuthSMSServiceQuotaExceeded          = Definition{Name: "AuthSMSServiceQuotaExceeded", Code: 10016, Message: "短信服务额度已用完，请联系管理员处理"}
 	AuthLoginRejected                    = Definition{Name: "AuthLoginRejected", Code: 10017, Message: "登录信息不正确或账号不可用"}
+	AuthAccountRevoked                   = Definition{Name: "AuthAccountRevoked", Code: 10018, Message: "账号已注销"}
+	AuthCredentialsChanged               = Definition{Name: "AuthCredentialsChanged", Code: 10019, Message: "账号信息已变更，请重新登录"}
 	AdminExists                          = Definition{Name: "AdminExists", Code: 40910, Message: "管理员账号已存在"}
 	AdminPhoneExists                     = Definition{Name: "AdminPhoneExists", Code: 40911, Message: "手机号已绑定其他管理员"}
 	AdminAccountRevoked                  = Definition{Name: "AdminAccountRevoked", Code: 40912, Message: "账号已正式注销，不能通过普通启用恢复"}
@@ -94,6 +96,8 @@ var definitions = []Definition{
 	AuthSMSServiceUnavailable,
 	AuthSMSServiceQuotaExceeded,
 	AuthLoginRejected,
+	AuthAccountRevoked,
+	AuthCredentialsChanged,
 	AdminExists,
 	AdminPhoneExists,
 	AdminAccountRevoked,
