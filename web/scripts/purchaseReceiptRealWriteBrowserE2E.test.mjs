@@ -87,7 +87,7 @@ test('purchase receipt real-write browser e2e CLI preflight writes sanitized no-
         ...process.env,
         REAL_LOGIN_ADMIN_USERNAME: '',
         REAL_LOGIN_ADMIN_PASSWORD: 'should-not-be-stored',
-        REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:4196',
+        REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:15213',
         REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL: 'http://127.0.0.1:1/healthz',
         PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA: '',
       },
@@ -150,7 +150,7 @@ test('purchase receipt real-write browser e2e checks backend after accepted loca
       encoding: 'utf8',
       env: {
         ...process.env,
-        REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:4196',
+        REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:15213',
         REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL: 'http://127.0.0.1:1/healthz',
         PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA: '',
       },

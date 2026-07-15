@@ -60,6 +60,8 @@ pnpm start
 
 默认地址：`http://localhost:5175`
 
+本地 `make dev` / `pnpm start` 的固定端口组以 [`config/dev-ports.env`](config/dev-ports.env) 为真源：主前端 `5175`、HTTP `8300`、gRPC `9300`，端口被占用时直接失败，不会静默顺延到其他项目。`start:yoyoosun`、`preview:yoyoosun` 等短生命周期入口从本项目独占辅助块 `15200-15299` 起探测，并始终输出实际 URL。确需本机整组覆盖时使用 ignored 的 `config/dev-ports.local.env`，必须同时填写完整端口组，避免前端、代理和后端漂移。
+
 同一个 Vite 服务同时提供桌面后台和岗位任务端，例如 `http://localhost:5175/m/warehouse/tasks`。统一登录页会按设备给默认入口，手机默认岗位任务端、电脑默认后台、平板优先使用上次选择；入口按钮由前端入口配置控制。用户不在登录前手选岗位角色，岗位任务端按管理员账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，最终访问仍由后端 RBAC 权限校验。
 
 ### 岗位任务端

@@ -10,6 +10,7 @@
 *.yarnrc.local.yml
 web/.npmrc.local
 web/.yarnrc.local.yml
+config/dev-ports.local.env
 
 web/node_modules/
 web/build/

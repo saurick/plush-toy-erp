@@ -6,6 +6,7 @@ import (
 	"flag"
 	"fmt"
 	"math"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -107,6 +108,93 @@ func resolveLocalConfPath(confPath string) string {
 		return localPath
 	}
 	return ""
+}
+
+func replaceListenPort(addr, rawPort, envKey string) (string, error) {
+	port, err := strconv.Atoi(strings.TrimSpace(rawPort))
+	if err != nil || port < 1024 || port > 65535 {
+		return "", fmt.Errorf("%s must be an integer between 1024 and 65535", envKey)
+	}
+	host, _, err := net.SplitHostPort(strings.TrimSpace(addr))
+	if err != nil {
+		return "", fmt.Errorf("replace %s in invalid listen address %q: %w", envKey, addr, err)
+	}
+	return net.JoinHostPort(host, strconv.Itoa(port)), nil
+}
+
+// overrideDevServerPorts applies the tracked local port bundle only to a dev
+// config. Production listen addresses continue to come exclusively from the
+// production config and release environment.
+func overrideDevServerPorts(confPath string, serverCfg *conf.Server, getenv func(string) string) error {
+	if !devdbguard.IsDevConfigPath(confPath) {
+		return nil
+	}
+	if serverCfg == nil {
+		return fmt.Errorf("development server config is nil")
+	}
+	if getenv == nil {
+		getenv = os.Getenv
+	}
+
+	type portOverride struct {
+		key  string
+		addr func() (string, bool)
+		set  func(string)
+	}
+	overrides := []portOverride{
+		{
+			key: "DEV_HTTP_PORT",
+			addr: func() (string, bool) {
+				if serverCfg.Http == nil {
+					return "", false
+				}
+				return serverCfg.Http.Addr, true
+			},
+			set: func(addr string) {
+				serverCfg.Http.Addr = addr
+			},
+		},
+		{
+			key: "DEV_GRPC_PORT",
+			addr: func() (string, bool) {
+				if serverCfg.Grpc == nil {
+					return "", false
+				}
+				return serverCfg.Grpc.Addr, true
+			},
+			set: func(addr string) {
+				serverCfg.Grpc.Addr = addr
+			},
+		},
+	}
+
+	seenPorts := make(map[string]string, len(overrides))
+	for _, override := range overrides {
+		rawPort := strings.TrimSpace(getenv(override.key))
+		if rawPort == "" {
+			continue
+		}
+		currentAddr, ok := override.addr()
+		if !ok {
+			return fmt.Errorf("%s cannot override a missing server transport config", override.key)
+		}
+		portNumber, err := strconv.Atoi(rawPort)
+		if err != nil || portNumber < 1024 || portNumber > 65535 {
+			return fmt.Errorf("%s must be an integer between 1024 and 65535", override.key)
+		}
+		normalizedPort := strconv.Itoa(portNumber)
+		if previous, exists := seenPorts[normalizedPort]; exists {
+			return fmt.Errorf("%s duplicates %s on development port %s", override.key, previous, normalizedPort)
+		}
+		seenPorts[normalizedPort] = override.key
+
+		addr, err := replaceListenPort(currentAddr, normalizedPort, override.key)
+		if err != nil {
+			return err
+		}
+		override.set(addr)
+	}
+	return nil
 }
 
 func overrideFromEnv(dataCfg *conf.Data, baseLogger log.Logger) {
@@ -530,6 +618,9 @@ func main() {
 	serverCfg := bc.Server
 	if serverCfg == nil {
 		panic(fmt.Errorf("bootstrap server config is nil, please check %s", confPath))
+	}
+	if err := overrideDevServerPorts(confPath, serverCfg, os.Getenv); err != nil {
+		panic(fmt.Errorf("apply development server ports: %w", err))
 	}
 
 	dataCfg := bc.Data

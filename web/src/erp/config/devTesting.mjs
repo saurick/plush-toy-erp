@@ -161,7 +161,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devCustomerConfig.test.mjs web/src/erp/config/printTemplates.test.mjs scripts/qa/dev-entry-boundary.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-customer-config-dark-desktop pnpm --dir web style:l1',
     ],
   },
   {
@@ -172,7 +172,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devPrototypes.test.mjs web/src/erp/config/devHub.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-prototypes-dark-desktop pnpm --dir web style:l1',
     ],
   },
   {
@@ -183,7 +183,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/erp/config/devDocs.test.mjs web/src/erp/config/devGovernance.test.mjs web/src/erp/config/devCapabilityLedger.test.mjs web/src/erp/config/devHub.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-docs-dark-desktop,dev-governance-dark-desktop STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=dev-hub-dark-desktop,dev-docs-dark-desktop,dev-governance-dark-desktop pnpm --dir web style:l1',
     ],
   },
   {
@@ -226,7 +226,7 @@ export const DEV_TESTING_COPY_PRESETS = Object.freeze([
     commands: [
       'cd /Users/simon/projects/plush-toy-erp',
       'PATH=/usr/local/bin:$PATH node --test web/src/erp/utils/adminProfileSync.test.mjs scripts/qa/formal-frontend-customer-config-boundary.test.mjs',
-      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages STYLE_L1_PORT=5235 pnpm --dir web style:l1',
+      'PATH=/usr/local/bin:$PATH STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages pnpm --dir web style:l1',
     ],
   },
   {

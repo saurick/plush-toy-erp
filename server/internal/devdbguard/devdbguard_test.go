@@ -9,8 +9,11 @@ func TestIsDevConfigPath(t *testing.T) {
 		path string
 		want bool
 	}{
+		{path: "./configs/dev", want: true},
+		{path: "./server/configs/dev", want: true},
 		{path: "./configs/dev/config.yaml", want: true},
 		{path: "server/configs/dev/config.yaml", want: true},
+		{path: "./configs/development", want: false},
 		{path: "./configs/prod/config.yaml", want: false},
 	}
 	for _, tc := range cases {

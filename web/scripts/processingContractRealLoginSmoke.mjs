@@ -4,6 +4,10 @@ import process from 'node:process'
 
 import { chromium } from 'playwright'
 import {
+  loadDevPorts,
+  resolveDevAuxPort,
+} from '../../scripts/dev-ports.mjs'
+import {
   attachErrorCollectors,
   createRealLoginSmokeRuntime,
   loginAsAdmin,
@@ -13,9 +17,16 @@ import {
   verifyPrintButtonInvokesWindowPrint,
 } from './realLoginSmokeShared.mjs'
 
+const devPorts = loadDevPorts(path.resolve(import.meta.dirname, '..', '..'))
+
 const runtime = createRealLoginSmokeRuntime({
   scriptDir: import.meta.dirname,
   outputSubdir: 'processing-contract-real-login-smoke',
+  defaultPort: resolveDevAuxPort(
+    devPorts,
+    12,
+    'processing contract real login smoke port'
+  ),
 })
 const defaultPreviewLatencyBudgetMs = 10_000
 const previewLatencyBudgetMs = resolvePositiveInteger(

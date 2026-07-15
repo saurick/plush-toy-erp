@@ -8,6 +8,10 @@ import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
 import {
+  loadDevPorts,
+  resolveDevAuxPort,
+} from '../../scripts/dev-ports.mjs'
+import {
   buildYoyoosunLocalEntryAudit,
   defaultYoyoosunEntryAuditPorts,
 } from './yoyoosunLocalEntryAudit.mjs'
@@ -16,6 +20,7 @@ import { getWorkflowTaskGroupLabel } from '../src/erp/utils/workflowTaskLabels.m
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
+const devPorts = loadDevPorts(repoRoot)
 const outputDir = path.resolve(
   webDir,
   'output',
@@ -31,7 +36,11 @@ const trialCustomerConfigScriptPath = path.resolve(
 )
 const DEFAULT_BACKEND_URL = 'http://127.0.0.1:8300'
 const DEFAULT_BACKEND_HEALTH_URL = `${DEFAULT_BACKEND_URL}/healthz`
-const DEFAULT_PORT = 4195
+const DEFAULT_PORT = resolveDevAuxPort(
+  devPorts,
+  40,
+  'mobile workflow browser smoke port'
+)
 const SIM_PREFIX = 'SIM-YOYOOSUN-MOBILE-BROWSER'
 const REAL_SMOKE_REQUIREMENTS = Object.freeze([
   'local backend health is reachable',

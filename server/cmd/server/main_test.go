@@ -87,6 +87,94 @@ func TestResolveTraceEnvOverridesRejectsInvalidRatio(t *testing.T) {
 	}
 }
 
+func TestOverrideDevServerPortsAppliesFixedBundle(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Server{
+		Http: &conf.Server_HTTP{Addr: "0.0.0.0:8300"},
+		Grpc: &conf.Server_GRPC{Addr: "[::]:9300"},
+	}
+	values := map[string]string{
+		"DEV_HTTP_PORT": "8310",
+		"DEV_GRPC_PORT": "9310",
+	}
+	if err := overrideDevServerPorts("./configs/dev/config.yaml", cfg, func(key string) string {
+		return values[key]
+	}); err != nil {
+		t.Fatalf("overrideDevServerPorts returned error: %v", err)
+	}
+	if cfg.Http.Addr != "0.0.0.0:8310" {
+		t.Fatalf("http addr = %q, want 0.0.0.0:8310", cfg.Http.Addr)
+	}
+	if cfg.Grpc.Addr != "[::]:9310" {
+		t.Fatalf("grpc addr = %q, want [::]:9310", cfg.Grpc.Addr)
+	}
+}
+
+func TestOverrideDevServerPortsRecognizesDevConfigDirectory(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Server{
+		Http: &conf.Server_HTTP{Addr: "0.0.0.0:8300"},
+		Grpc: &conf.Server_GRPC{Addr: "[::]:9300"},
+	}
+	values := map[string]string{
+		"DEV_HTTP_PORT": "8310",
+		"DEV_GRPC_PORT": "9310",
+	}
+	if err := overrideDevServerPorts("./server/configs/dev", cfg, func(key string) string {
+		return values[key]
+	}); err != nil {
+		t.Fatalf("overrideDevServerPorts returned error: %v", err)
+	}
+	if cfg.Http.Addr != "0.0.0.0:8310" || cfg.Grpc.Addr != "[::]:9310" {
+		t.Fatalf("development directory override was not applied: %#v", cfg)
+	}
+}
+
+func TestOverrideDevServerPortsDoesNotChangeProduction(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Server{
+		Http: &conf.Server_HTTP{Addr: "0.0.0.0:8300"},
+		Grpc: &conf.Server_GRPC{Addr: "0.0.0.0:9300"},
+	}
+	if err := overrideDevServerPorts("./configs/prod/config.yaml", cfg, func(string) string {
+		return "8500"
+	}); err != nil {
+		t.Fatalf("production config returned error: %v", err)
+	}
+	if cfg.Http.Addr != "0.0.0.0:8300" || cfg.Grpc.Addr != "0.0.0.0:9300" {
+		t.Fatalf("production addresses changed: %#v", cfg)
+	}
+}
+
+func TestOverrideDevServerPortsRejectsInvalidOrDuplicatePorts(t *testing.T) {
+	t.Parallel()
+
+	newConfig := func() *conf.Server {
+		return &conf.Server{
+			Http: &conf.Server_HTTP{Addr: "0.0.0.0:8300"},
+			Grpc: &conf.Server_GRPC{Addr: "0.0.0.0:9300"},
+		}
+	}
+
+	if err := overrideDevServerPorts("./configs/dev/config.yaml", newConfig(), func(key string) string {
+		if key == "DEV_HTTP_PORT" {
+			return "not-a-port"
+		}
+		return "9300"
+	}); err == nil || !strings.Contains(err.Error(), "DEV_HTTP_PORT") {
+		t.Fatalf("expected invalid HTTP port error, got %v", err)
+	}
+
+	if err := overrideDevServerPorts("./configs/dev/config.yaml", newConfig(), func(string) string {
+		return "8500"
+	}); err == nil || !strings.Contains(err.Error(), "duplicates") {
+		t.Fatalf("expected duplicate development port error, got %v", err)
+	}
+}
+
 func productionConfigTestEnv(overrides map[string]string) func(string) string {
 	values := map[string]string{
 		"ERP_DEBUG_ENV":                    "prod",

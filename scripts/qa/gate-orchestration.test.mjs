@@ -239,7 +239,16 @@ test("full browser evidence is current-worktree self-hosted on an isolated port"
   const style = read("web/scripts/styleL1.mjs");
 
   assert.match(full, /external_browser_target_forbidden/u);
-  assert.match(full, /net\.createServer\(\)/u);
+  assert.match(full, /dev-ports\.mjs/u);
+  assert.match(full, /--find-free-aux-port/u);
+  assert.doesNotMatch(full, /listen\(0/u);
+  assert.match(
+    full,
+    /source "\$ROOT_DIR\/scripts\/qa\/browser-gate-lock\.sh"/u,
+  );
+  assert.match(full, /trap browser_gate_lock_release EXIT/u);
+  assert.match(full, /browser_gate_lock_acquire/u);
+  assert.match(full, /browser_gate_lock_release/u);
   assert.match(full, /STYLE_L1_BASE_URL=""/u);
   assert.match(full, /STYLE_L1_PORT="\$browser_port"/u);
   assert.match(full, /"\$PNPM_BIN" style:l1/u);

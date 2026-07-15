@@ -5,10 +5,48 @@ import { fileURLToPath } from 'url'
 import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
 import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
+import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
 
 const ROOT_DIR = fileURLToPath(new URL('.', import.meta.url))
+const PROJECT_ROOT = resolve(ROOT_DIR, '..')
+const devPorts = loadDevPorts(PROJECT_ROOT)
 const DEV_HOST = '127.0.0.1'
+
+export function resolveERPDevServerPort(rawPort, ports = devPorts) {
+  const normalized = String(rawPort || '').trim()
+  const port = normalized ? Number(normalized) : ports.web
+  const auxEnd = ports.auxStart + 99
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error('ERP_VITE_PORT must be an integer between 1024 and 65535')
+  }
+  if (
+    port !== ports.web &&
+    port !== ports.style &&
+    (port < ports.auxStart || port > auxEnd)
+  ) {
+    throw new Error(
+      `ERP_VITE_PORT=${port} must use web=${ports.web}, style=${ports.style}, or auxiliary range ${ports.auxStart}-${auxEnd}`
+    )
+  }
+  return port
+}
+
+export function resolveERPHMRClientPort(rawPort, serverPort) {
+  const normalized = String(rawPort || '').trim()
+  const port = normalized ? Number(normalized) : serverPort
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new Error(
+      'ERP_VITE_HMR_CLIENT_PORT must be an integer between 1024 and 65535'
+    )
+  }
+  if (port !== serverPort) {
+    throw new Error(
+      `ERP_VITE_HMR_CLIENT_PORT=${port} must match ERP_VITE_PORT=${serverPort}`
+    )
+  }
+  return port
+}
 
 const createDevOrigin = (port) => `http://${DEV_HOST}:${port}`
 
@@ -53,10 +91,13 @@ const createDevLocalhostOriginNormalizer = (port) => ({
 
 export function createERPViteConfig(appId) {
   const app = getAppDefinition(appId)
-  const serverPort = Number(process.env.ERP_VITE_PORT || app.port)
-  const hmrClientPort = Number(process.env.ERP_VITE_HMR_CLIENT_PORT || app.port)
+  const serverPort = resolveERPDevServerPort(process.env.ERP_VITE_PORT)
+  const hmrClientPort = resolveERPHMRClientPort(
+    process.env.ERP_VITE_HMR_CLIENT_PORT,
+    serverPort
+  )
   const apiOrigin = normalizeAPIOrigin(
-    process.env.API_ORIGIN || 'http://127.0.0.1:8300'
+    process.env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`
   )
 
   return defineConfig(({ command, mode }) => {

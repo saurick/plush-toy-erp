@@ -7,6 +7,10 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 
 import { chromium } from 'playwright'
+import {
+  loadDevPorts,
+  resolveDevAuxPort,
+} from '../../scripts/dev-ports.mjs'
 import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
 import { mobileRoleDefinitions } from '../src/erp/config/appRegistry.mjs'
 import { getRoleWorkbench } from '../src/erp/config/seedData.mjs'
@@ -15,6 +19,7 @@ import { createMockAdminSessionToken } from './mockAdminSessionToken.mjs'
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
+const devPorts = loadDevPorts(repoRoot)
 const INPUT_TEMPLATE_SCOPE = 'mobile-auth-login-route-smoke-input-template'
 const PREFLIGHT_SCOPE = 'mobile-auth-login-route-smoke-preflight-report'
 const suggestedMockSmokeCommand =
@@ -33,7 +38,10 @@ const outputDir = path.resolve(
   'playwright',
   'mobile-auth-login-route-smoke'
 )
-const devServerPort = Number(process.env.MOBILE_AUTH_SMOKE_PORT || 4193)
+const devServerPort = Number(
+  process.env.MOBILE_AUTH_SMOKE_PORT ||
+    resolveDevAuxPort(devPorts, 20, 'mobile auth smoke port')
+)
 const externalBaseURL = normalizeOptionalURL(
   process.env.MOBILE_AUTH_SMOKE_BASE_URL || '',
   'MOBILE_AUTH_SMOKE_BASE_URL'

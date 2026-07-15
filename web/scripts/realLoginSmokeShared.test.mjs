@@ -46,7 +46,7 @@ test('real login smoke runtime rejects credentialed base URL', () => {
   assert.throws(
     () =>
       withEnv(
-        { REAL_LOGIN_SMOKE_BASE_URL: 'http://admin:secret@127.0.0.1:4174' },
+        { REAL_LOGIN_SMOKE_BASE_URL: 'http://admin:secret@127.0.0.1:15210' },
         () =>
           createRealLoginSmokeRuntime({
             scriptDir: import.meta.dirname,
@@ -78,7 +78,7 @@ test('real login smoke runtime rejects credentialed backend health URL', () => {
 test('real login smoke runtime accepts plain local URLs', () => {
   const runtime = withEnv(
     {
-      REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:4174',
+      REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:15210',
       REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL: 'http://127.0.0.1:8300/healthz',
     },
     () =>
@@ -88,7 +88,7 @@ test('real login smoke runtime accepts plain local URLs', () => {
       })
   )
 
-  assert.equal(runtime.baseURL, 'http://127.0.0.1:4174')
+  assert.equal(runtime.baseURL, 'http://127.0.0.1:15210')
 })
 
 test('real login smoke waits current dashboard heading after login', async () => {
@@ -189,7 +189,7 @@ test('real login smoke preflight probes health without reading secrets or auth',
       REAL_LOGIN_ADMIN_USERNAME: 'local-admin',
       REAL_LOGIN_ADMIN_PASSWORD: 'local-password',
       REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL: 'http://127.0.0.1:8300/healthz',
-      REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:4174',
+      REAL_LOGIN_SMOKE_BASE_URL: 'http://127.0.0.1:15210',
     },
     () =>
       withFetch(
@@ -265,6 +265,7 @@ test('real login smoke CLI preflight writes sanitized blocker report', () => {
   assert.equal(report.writesDatabase, false)
   assert.equal(report.startsBrowser, false)
   assert.equal(report.startsDevServer, false)
+  assert.equal(report.baseURL, 'http://127.0.0.1:15210')
   assert.equal(report.callsAuthEndpoint, false)
   assert.equal(report.callsJSONRPCAuth, false)
   assert.equal(report.readsLocalConfig, false)

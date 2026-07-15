@@ -105,8 +105,16 @@ echo "[qa:full] 运行 web 测试与构建"
 )
 
 echo "[qa:full] 实际启动 Chromium 运行无写入浏览器 smoke"
+# 同一 worktree 的浏览器证据必须串行；stale lock 保守失败，避免并发回收竞态。
+# shellcheck source=scripts/qa/browser-gate-lock.sh
+source "$ROOT_DIR/scripts/qa/browser-gate-lock.sh"
+BROWSER_GATE_LOCK_PATH="${TMPDIR:-/tmp}/plush-toy-erp-qa-browser.lock"
+trap browser_gate_lock_release EXIT
+browser_gate_lock_acquire
 browser_port="$(
-  node -e 'const net=require("node:net");const server=net.createServer();server.unref();server.listen(0,"127.0.0.1",()=>{const address=server.address();console.log(address.port);server.close();});'
+  node "$ROOT_DIR/scripts/dev-ports.mjs" \
+    --find-free-aux-port \
+    --project-root "$ROOT_DIR"
 )"
 (
   cd "$ROOT_DIR/web"
@@ -118,6 +126,8 @@ browser_port="$(
     STYLE_L1_SCENARIOS="${QA_BROWSER_SCENARIOS:-root-redirect-desktop}" \
     "$PNPM_BIN" style:l1
 )
+browser_gate_lock_release
+trap - EXIT
 
 echo "[qa:full] 运行 server 全量检查"
 (

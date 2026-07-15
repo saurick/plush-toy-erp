@@ -7,18 +7,22 @@ import { promisify } from 'node:util'
 import { pathToFileURL } from 'node:url'
 
 import { normalizeDevCustomerKey } from '../devCustomerConfigPlugin.mjs'
+import { loadDevPorts } from '../../scripts/dev-ports.mjs'
 
 const execFileAsync = promisify(execFile)
 const webRoot = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webRoot, '..')
-export const defaultYoyoosunEntryAuditPorts = Object.freeze([
-  '5175',
-  '5176',
-  '5177',
-  '5178',
-  '5179',
-])
-const defaultBackendHealthURL = 'http://127.0.0.1:8300/healthz'
+const devPorts = loadDevPorts(repoRoot)
+export const defaultYoyoosunEntryAuditPorts = Object.freeze(
+  [...new Set([
+    ...Array.from({ length: 5 }, (_, offset) => String(devPorts.web + offset)),
+    ...Array.from(
+      { length: 5 },
+      (_, offset) => String(devPorts.auxStart + offset)
+    ),
+  ])]
+)
+const defaultBackendHealthURL = `http://127.0.0.1:${devPorts.http}/healthz`
 
 function parseArgs(argv) {
   const options = {
@@ -466,7 +470,7 @@ if (isCli) {
       process.stdout.write(
         [
           'Usage:',
-          '  node web/scripts/yoyoosunLocalEntryAudit.mjs [--ports 5175,5176,5177,5178,5179] [--backend-health-url http://127.0.0.1:8300/healthz] [--json] [--report output/yoyoosun-local-entry-audit.json]',
+          `  node web/scripts/yoyoosunLocalEntryAudit.mjs [--ports ${defaultYoyoosunEntryAuditPorts.join(',')}] [--backend-health-url ${defaultBackendHealthURL}] [--json] [--report output/yoyoosun-local-entry-audit.json]`,
           '',
         ].join('\n')
       )

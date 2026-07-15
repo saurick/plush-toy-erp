@@ -314,12 +314,12 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
 export function getManualAcceptanceBrowserHelp() {
   return `用法：
   MANUAL_ACCEPTANCE_PASSWORD='<本地试用密码>' node scripts/qa/manual-acceptance-browser.mjs \\
-    --base-url http://127.0.0.1:5177 \\
+    --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8300 \
     --source-report output/qa/manual-acceptance/source-data/apply-report.json \
     --fact-report output/qa/manual-acceptance/fact-data/apply-report.json
   node scripts/qa/manual-acceptance-browser.mjs --plan \\
-    --base-url http://127.0.0.1:5177 \\
+    --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8300
 
 说明：

@@ -4,7 +4,11 @@ import path from 'node:path'
 import process from 'node:process'
 import { pathToFileURL } from 'node:url'
 
+import { loadDevPorts } from '../../scripts/dev-ports.mjs'
 import { runWebRuntimePreflight } from '../../scripts/local-runtime-preflight.mjs'
+
+const repoRoot = path.resolve(import.meta.dirname, '..', '..')
+const devPorts = loadDevPorts(repoRoot)
 
 export function parseStartWebDevArgs(argv, env = process.env) {
   const viteArgs = []
@@ -17,7 +21,7 @@ export function parseStartWebDevArgs(argv, env = process.env) {
     }
   }
   return {
-    apiOrigin: env.API_ORIGIN || 'http://127.0.0.1:8300',
+    apiOrigin: env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`,
     frontendOnly,
     viteArgs,
   }

@@ -15,7 +15,7 @@
 | `bash scripts/qa/fast.sh`                                                                               | 高频快速检查，覆盖文档清单、命名边界、客户配置、菜单和核心脚本守卫                                                                                     | 日常开发后                                      |
 | `node scripts/qa/skill-health.mjs`                                                                       | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；`affected` 对 Skill 变更会直接执行，不再只提示 follow-up                         | 修改 `.agents/skills/**` 后                     |
 | `bash scripts/qa/strict.sh`                                                                             | full 的真实超集：复用全部 full 门禁及真实 browser-smoke，再追加扩展视口、零 warning、shell / YAML 格式和严格 govulncheck                               | 发版前 / 大改后                                 |
-| `bash scripts/qa/full.sh`                                                                               | 推送前全量检查；动态空闲端口自启当前 worktree Vite 并运行 Chromium，另含 fast、secrets、历史存量升级与当前 schema PostgreSQL、前后端测试 / 构建和 govulncheck | 提交推送前                                      |
+| `bash scripts/qa/full.sh`                                                                               | 推送前全量检查；在本项目 AUX 段选择空闲端口、串行自启当前 worktree Vite 并运行 Chromium，另含 fast、secrets、历史存量升级与当前 schema PostgreSQL、前后端测试 / 构建和 govulncheck | 提交推送前                                      |
 | `sh scripts/qa/populated-upgrade-preflight.sh --audit <populated-upgrade\|customer-config-cutover> ...` | 对指定数据库运行固定 allowlist 的 migration 只读审计；不执行 migration 或自动数据治理                                                                | 跨越 20260714055504 / 20260714055825 前          |
 | `.github/workflows/ci.yml`                                                                              | 单一 job 复用 `strict.sh` 的完整本地门禁，另在前后补 Ent / Atlas 零漂移与 committed source archive；不复制第二套业务规则                              | pull request、main push、手工触发               |
 | `node scripts/qa/docs-inventory.test.mjs`                                                               | 检查当前维护 Markdown 是否登记到 `docs/文档清单.md`                                                                                                    | 新增、删除、重命名 README 或长期文档后          |
@@ -51,7 +51,7 @@
 
 ## 门禁完整性与 CI 边界
 
-`full.sh` 默认拒绝继承的 `STYLE_L1_BASE_URL`，为本轮分配动态端口并只清理自身启动的 Vite 进程；外部 base URL 只能用于显式单项 browser smoke，不能替代 full 的当前 worktree 证据。server 全量测试先在唯一临时数据库中从历史 checkpoint 装载合成存量行，验证 055504 / 055825 两项只读 blocker、显式测试专用切换和 latest pending=0，再运行当前 schema 关键事务矩阵；它还启用真实 Chromium PDF 安全集成，本机自动发现 Chrome/Chromium，CI 则传入本轮 Playwright 下载的精确可执行路径。安全集成未执行会以 Go skip 阻断 full。`strict.sh` 直接复用 full，保持 strict 是 full 的真实超集。fast / full 的固定 Node 与 Go 测试除子进程退出码外，还要求可解析结果、实际执行数大于 0、失败数与跳过数均为 0；缺 summary、零执行或 skip 一律阻断。
+`full.sh` 默认拒绝继承的 `STYLE_L1_BASE_URL`，仅在本项目 `15200-15299` AUX 段为本轮选择空闲端口，并只清理自身启动的 Vite 进程。同一 worktree 的浏览器证据使用原子 PID 锁串行运行；活动锁直接阻断，stale lock 也保守失败且保留现场，只能在确认 owner 已不存在且没有门禁运行后手工清理。外部 base URL 只能用于显式单项 browser smoke，不能替代 full 的当前 worktree 证据。server 全量测试先在唯一临时数据库中从历史 checkpoint 装载合成存量行，验证 055504 / 055825 两项只读 blocker、显式测试专用切换和 latest pending=0，再运行当前 schema 关键事务矩阵；它还启用真实 Chromium PDF 安全集成，本机自动发现 Chrome/Chromium，CI 则传入本轮 Playwright 下载的精确可执行路径。安全集成未执行会以 Go skip 阻断 full。`strict.sh` 直接复用 full，保持 strict 是 full 的真实超集。fast / full 的固定 Node 与 Go 测试除子进程退出码外，还要求可解析结果、实际执行数大于 0、失败数与跳过数均为 0；缺 summary、零执行或 skip 一律阻断。
 
 `populated-upgrade-preflight.sh` 只接受 `populated-upgrade` 和 `customer-config-cutover` 两个 audit key，并把 DSN 仅从调用方指定的环境变量传给 `psql`。前者检查 20260714055504 的状态、生命周期、取消审计束、流程锚点、版本和待删除时间字段；后者检查 20260714055825 前必须显式治理的流程运行态与任务配置锚点。两者都使用 read-only 事务，不能修复或清理生产数据；出现 blocker 后必须停止 apply，由单独评审的治理动作处理，完成后重跑审计。
 
@@ -175,12 +175,12 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
 
 ```bash
 node scripts/qa/manual-acceptance-browser.mjs --plan \
-  --base-url http://127.0.0.1:5177 \
+  --base-url http://127.0.0.1:15200 \
   --backend-url http://127.0.0.1:8300
 
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
   node scripts/qa/manual-acceptance-browser.mjs \
-    --base-url http://127.0.0.1:5177 \
+    --base-url http://127.0.0.1:15200 \
     --backend-url http://127.0.0.1:8300 \
     --source-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/source/apply-report.json \
     --fact-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/facts/apply-report.json \

@@ -5,17 +5,23 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 
 import { normalizeDevCustomerKey } from '../devCustomerConfigPlugin.mjs'
+import {
+  loadDevPorts,
+  validateDevAuxPort,
+} from '../../scripts/dev-ports.mjs'
 import { resolveAvailablePort } from './localPort.mjs'
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url))
 const webRoot = path.resolve(scriptDir, '..')
 const repoRoot = path.resolve(webRoot, '..')
+const devPorts = loadDevPorts(repoRoot)
 
 function parseArgs(argv) {
   const options = {
     customer: process.env.ERP_CUSTOMER_KEY || 'yoyoosun',
-    port: process.env.PORT || '5176',
-    apiOrigin: process.env.API_ORIGIN || 'http://127.0.0.1:8300',
+    port: process.env.PORT || String(devPorts.auxStart),
+    apiOrigin:
+      process.env.API_ORIGIN || `http://127.0.0.1:${devPorts.http}`,
     skipBuild: false,
     skipHealthCheck: false,
     printPlan: false,
@@ -184,8 +190,16 @@ function runStep(command, args, { cwd, env } = {}) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2))
-  options.requestedPort = options.port
-  options.port = await resolveAvailablePort(options.port)
+  const requestedPort = validateDevAuxPort(
+    devPorts,
+    options.port,
+    'preview:yoyoosun port'
+  )
+  options.requestedPort = String(requestedPort)
+  options.port = await resolveAvailablePort(
+    requestedPort,
+    devPorts.auxStart + 100 - requestedPort
+  )
 
   printPlan(options)
 

@@ -5,7 +5,6 @@ const ERP_APP_DEFINITIONS = {
     title: '业务管理',
     shortTitle: '电脑端',
     roleKey: null,
-    port: 5175,
     command: 'pnpm start',
     description:
       '电脑端用于查看业务看板、办理日常业务、打印单据和管理账号权限；手机待办可用于随时查看和处理岗位任务。',

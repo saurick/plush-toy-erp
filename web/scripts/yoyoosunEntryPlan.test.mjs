@@ -23,7 +23,7 @@ function runScript(scriptName, env = {}) {
       path.join(webRoot, 'scripts', scriptName),
       '--print-plan',
       '--port',
-      '5188',
+      '15288',
       '--api-origin',
       'http://127.0.0.1:8300',
     ],
@@ -77,8 +77,8 @@ function assertCommonYoyoosunPlan(output, label) {
 }
 
 async function findConsecutiveFreePortPair(
-  startPort = 39200,
-  maxProbeCount = 200
+  startPort = 15280,
+  maxProbeCount = 19
 ) {
   for (let offset = 0; offset < maxProbeCount; offset += 1) {
     const port = startPort + offset
@@ -118,6 +118,25 @@ test('start:yoyoosun print-plan describes dev injection without publishing custo
   assert.match(result.stdout, /login, review, then apply explicitly/u)
   assert.match(result.stdout, /ERP_VITE_PORT=\d+/u)
   assert.match(result.stdout, /pnpm start:yoyoosun/u)
+})
+
+test('managed yoyoosun entrypoints reject ports outside the plush auxiliary block', () => {
+  for (const scriptName of [
+    'startYoyoosunDev.mjs',
+    'previewYoyoosun.mjs',
+  ]) {
+    const result = spawnSync(
+      process.execPath,
+      [path.join(webRoot, 'scripts', scriptName), '--print-plan', '--port', '5177'],
+      {
+        cwd: webRoot,
+        encoding: 'utf8',
+        env: { ...process.env, PORT: '', API_ORIGIN: '' },
+      }
+    )
+    assert.notEqual(result.status, 0)
+    assert.match(result.stderr, /must be inside 15200-15299/u)
+  }
 })
 
 test('start:yoyoosun statically verifies the dev customer config and public asset sources', () => {
@@ -374,6 +393,11 @@ test('audit:yoyoosun-entry default port scan includes second fallback port', asy
     '5177',
     '5178',
     '5179',
+    '15200',
+    '15201',
+    '15202',
+    '15203',
+    '15204',
   ])
 })
 
@@ -406,7 +430,10 @@ test('audit:yoyoosun-entry help documents current default port range', () => {
   )
 
   assert.equal(result.status, 0)
-  assert.match(result.stdout, /--ports 5175,5176,5177,5178,5179/u)
+  assert.match(
+    result.stdout,
+    /--ports 5175,5176,5177,5178,5179,15200,15201,15202,15203,15204/u
+  )
   assert.match(
     result.stdout,
     /--report output\/yoyoosun-local-entry-audit\.json/u

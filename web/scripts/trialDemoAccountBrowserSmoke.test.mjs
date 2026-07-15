@@ -167,6 +167,11 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     '5177',
     '5178',
     '5179',
+    '15200',
+    '15201',
+    '15202',
+    '15203',
+    '15204',
   ])
   assert.equal(
     template.yoyoosunEntryAuditPlan.expectedCustomerConfigStatus,
@@ -379,6 +384,11 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
     '5177',
     '5178',
     '5179',
+    '15200',
+    '15201',
+    '15202',
+    '15203',
+    '15204',
   ])
   assert(Array.isArray(report.yoyoosunEntryAudit.yoyoosunPorts))
   assert(Array.isArray(report.yoyoosunEntryAudit.auditedYoyoosunURLs))
@@ -459,6 +469,11 @@ test('trial demo account browser smoke preflight supports deterministic yoyoosun
     '5177',
     '5178',
     '5179',
+    '15200',
+    '15201',
+    '15202',
+    '15203',
+    '15204',
   ])
   assert.deepEqual(report.yoyoosunEntryAudit.yoyoosunPorts, ['5177'])
   assert.deepEqual(report.yoyoosunEntryAudit.auditedYoyoosunURLs, [

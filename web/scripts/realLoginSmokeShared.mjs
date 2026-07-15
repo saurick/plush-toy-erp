@@ -6,13 +6,26 @@ import process from 'node:process'
 import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 
+import {
+  loadDevPorts,
+  resolveDevAuxPort,
+} from '../../scripts/dev-ports.mjs'
+
 const INPUT_TEMPLATE_SCOPE = 'real-login-smoke-shared-input-template'
 const PREFLIGHT_SCOPE = 'real-login-smoke-shared-preflight-report'
 const scriptDir = import.meta.dirname
 const webDir = path.resolve(scriptDir, '..')
 const repoDir = path.resolve(webDir, '..')
+const devPorts = loadDevPorts(repoDir)
+const defaultRealLoginSmokePort = resolveDevAuxPort(
+  devPorts,
+  10,
+  'real login smoke port'
+)
 
-export function buildRealLoginSmokeInputTemplate({ defaultPort = 4174 } = {}) {
+export function buildRealLoginSmokeInputTemplate({
+  defaultPort = defaultRealLoginSmokePort,
+} = {}) {
   return {
     scope: INPUT_TEMPLATE_SCOPE,
     writesDatabase: false,
@@ -59,7 +72,7 @@ export function buildRealLoginSmokeInputTemplate({ defaultPort = 4174 } = {}) {
 export function createRealLoginSmokeRuntime({
   scriptDir,
   outputSubdir,
-  defaultPort = 4174,
+  defaultPort = defaultRealLoginSmokePort,
 } = {}) {
   const webDir = path.resolve(scriptDir, '..')
   const repoDir = path.resolve(webDir, '..')
@@ -130,7 +143,7 @@ export function createRealLoginSmokeRuntime({
 }
 
 export async function buildRealLoginSmokePreflightReport({
-  defaultPort = 4174,
+  defaultPort = defaultRealLoginSmokePort,
 } = {}) {
   const serverDir = path.resolve(repoDir, 'server')
   const backendHealthURL = normalizeSmokeURL({

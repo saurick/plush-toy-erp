@@ -50,6 +50,8 @@ pnpm start
 
 默认地址：`http://127.0.0.1:5175`。开发服务器会把 `http://localhost:5175` 自动规范到同一 IPv4 地址。
 
+本地开发端口由仓库根目录 `config/dev-ports.env` 统一提供，Vite 主入口固定 `5175` 并启用 `strictPort`；被占用时应处理占用者或调整完整本机端口组，不能让主入口静默顺延。`API_ORIGIN` 仍可显式覆盖，否则代理从同一清单的 HTTP `8300` 推导。
+
 `pnpm start` 默认先执行共享本地 runtime preflight：本机 `API_ORIGIN` 会先检查工作区 schema / versioned migration、开发库 Atlas status，再要求后端 `/healthz` 与 `/readyz` 同时通过；预检和 Vite 的 `/rpc`、`/templates` 代理共用同一 `API_ORIGIN`。预检只读，不会 apply migration。仅做不登录、不调 RPC 的前端布局调试时，可显式使用 `pnpm start:frontend-only`；该模式会标记为降级、非绿色证据，不能用来验证登录或业务页。如果 `API_ORIGIN` 指向外部环境，本地不会读取其数据库，但仍要求该环境 health / ready 通过，migration 由目标环境发布证据负责。
 
 桌面构建提供单端口岗位任务端主路径：
@@ -191,7 +193,7 @@ pnpm build:all
 APP_ID=desktop PORT=5175 API_ORIGIN=http://127.0.0.1:8300 pnpm serve:prod
 ```
 
-本地预览永绅 yoyoosun 前端包可使用一键脚本。它会先检查 `http://127.0.0.1:8300/healthz`，再构建桌面和岗位任务端产物、注入 `config/customers/yoyoosun/customer-config.example.js` 和客户静态资产，并从 `5176` 起自动选择可用端口启动静态服务；该脚本只处理前端静态包，不会调用后端 `customer_config.validate / publish / activate / rollback`，也不会导入业务数据：
+本地预览永绅 yoyoosun 前端包可使用一键脚本。它会先检查 `http://127.0.0.1:8300/healthz`，再构建桌面和岗位任务端产物、注入 `config/customers/yoyoosun/customer-config.example.js` 和客户静态资产，并从本项目独占辅助块 `15200-15299` 起自动选择可用端口启动静态服务；该脚本只处理前端静态包，不会调用后端 `customer_config.validate / publish / activate / rollback`，也不会导入业务数据：
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp/web
@@ -199,15 +201,15 @@ pnpm preview:yoyoosun --print-plan
 pnpm preview:yoyoosun
 ```
 
-默认从 `5176` 起探测可用端口，实际地址以终端输出的 `url=http://localhost:<port>/erp` 为准。如需指定起始端口或后端地址：
+默认从 `15200` 起探测可用端口，实际地址以终端输出的 `url=http://localhost:<port>/erp` 为准。如需指定起始端口或后端地址：
 
 ```bash
-PORT=5177 API_ORIGIN=http://127.0.0.1:8300 pnpm preview:yoyoosun
+PORT=15202 API_ORIGIN=http://127.0.0.1:8300 pnpm preview:yoyoosun
 ```
 
 `preview:yoyoosun --print-plan` 会按实际可用端口输出 `verify customer config` 和 `verify customer asset` 两条 `curl` 命令。打开页面前先用这两条命令确认当前端口的 `/customer-config.js` 已是 yoyoosun 配置、`/customer-assets/yoyoosun/favicon-yoyoosun.svg` 返回 SVG content-type；如果返回默认占位配置、资产 404，或 asset 命令只命中 Vite HTML fallback，说明当前打开的是 Product Core / 旧静态服务 / 错误端口，而不是本次 yoyoosun 预览。
 
-如果本机已经开了多个前端端口，先跑只读端口审计。它默认检查 `5175,5176,5177,5178,5179` 的监听进程、`/customer-config.js`、yoyoosun favicon 和 `8300/healthz`，用于区分 Product Core dev、yoyoosun dev / preview 或其他项目占用；不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写数据库。需要保存当前端口归属证据时，可追加 `--report output/yoyoosun-local-entry-audit/current.json` 写本地 no-write 报告；该报告不得写进 `deployments/**/evidence/**`：
+如果本机已经开了多个前端端口，先跑只读端口审计。它默认同时检查主开发保留区 `5175-5179` 和本项目辅助块起点附近 `15200-15204` 的监听进程、`/customer-config.js`、yoyoosun favicon 和 `8300/healthz`，用于区分 Product Core dev、yoyoosun dev / preview、遗留占用或其他项目；不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写数据库。需要保存当前端口归属证据时，可追加 `--report output/yoyoosun-local-entry-audit/current.json` 写本地 no-write 报告；该报告不得写进 `deployments/**/evidence/**`：
 
 ```bash
 pnpm --silent audit:yoyoosun-entry -- --json
@@ -233,11 +235,11 @@ pnpm start:yoyoosun
 
 本地后端的 `make run`、`make dev` 和 `make dev_restart` 默认使用 `ERP_CUSTOMER_KEY=yoyoosun`，避免未显式携带 customer key 的业务 RPC 回落到 demo；这些本地入口同时显式开放后端 local-test gate，gate 按 pgx 最终连接配置只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，production 配置会拒绝该开关。确需 demo 时使用 `ERP_CUSTOMER_KEY=demo make dev_restart` 显式覆盖。
 
-`start:yoyoosun` 同样从 `5176` 起自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
+`start:yoyoosun` 同样从 `15200` 起在 `15200-15299` 辅助块内自动顺延端口，保留 HMR，并复用 `pnpm start` 的 schema / migration / health / ready 预检，再检查 yoyoosun 静态配置和公开资源存在。启动命令只注入前端静态客户配置，不自动写库或切换后端 revision。登录后可在 `/__dev/customer-config?customer=yoyoosun` 由管理员显式确认应用；dev-only middleware 只接受匹配的 `start:yoyoosun` 客户上下文和 loopback `API_ORIGIN`，生成内容寻址、长度不超过 64 的 `local_test_apply` revision，再由已开放本地 gate 的后端执行 validate / publish / transition / active readback。该操作写入共享开发 PostgreSQL 客户配置控制面，active 切换对其他共享库使用者也可见；默认后端与正式 validator / executor 均拒绝 local-test marker，因此不等于正式 publish / activate、目标环境部署或客户签收。
 
 未显式应用时，后端若只返回同 key 的 `builtin_rbac_fallback`，DEV 桌面端会进入带警示的本地预览壳，避免把成功登录误报成工作台故障；该 fallback 不视为 active revision，工作台 / 任务看板只做零 Workflow RPC 的能力审阅，客户业务数据页和岗位任务端仍 fail closed。页面 / 动作 / 字段是否按永绅 active revision 收窄，仍取决于本地后端 `8300` 当前数据库里的 `customer_config.get_effective_session`；静态包检查通过不等于 active revision 已就绪。
 
-`start:yoyoosun --print-plan` 也会输出同一组按实际端口生成的 `curl` 验证命令；端口被占用时不要按 `5176` 手工猜测，以终端输出的 `url=` 和验证命令为准。
+`start:yoyoosun --print-plan` 也会输出同一组按实际端口生成的 `curl` 验证命令；端口被占用时不要按 `15200` 手工猜测，以终端输出的 `url=` 和验证命令为准。
 
 生产入口：
 

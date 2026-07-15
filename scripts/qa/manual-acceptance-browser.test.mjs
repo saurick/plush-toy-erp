@@ -34,7 +34,7 @@ const scriptPath = path.resolve(
 
 test("manual acceptance browser plan covers all 48 catalog targets and ten formal accounts", () => {
   const plan = buildManualAcceptanceBrowserPlan({
-    baseURL: "http://127.0.0.1:5177",
+    baseURL: "http://127.0.0.1:15200",
     backendURL: "http://localhost:8300",
   });
 
@@ -98,17 +98,17 @@ test("manual acceptance browser boundary is explicitly read-only", () => {
 test("browser and backend URLs fail closed outside localhost", () => {
   for (const value of [
     "https://example.com",
-    "http://192.168.0.106:5177",
-    "http://user:secret@127.0.0.1:5177",
+    "http://192.168.0.106:15200",
+    "http://user:secret@127.0.0.1:15200",
     "file:///tmp/index.html",
-    "http://127.0.0.1:5177/erp",
-    "http://127.0.0.1:5177/?next=prod",
+    "http://127.0.0.1:15200/erp",
+    "http://127.0.0.1:15200/?next=prod",
   ]) {
     assert.throws(() => normalizeLocalBrowserURL(value, "target"));
   }
   assert.equal(
-    normalizeLocalBrowserURL("http://127.0.0.1:5177", "target"),
-    "http://127.0.0.1:5177",
+    normalizeLocalBrowserURL("http://127.0.0.1:15200", "target"),
+    "http://127.0.0.1:15200",
   );
   assert.equal(
     normalizeLocalBrowserURL("http://localhost:8300", "target"),
@@ -137,7 +137,7 @@ test("CLI requires explicit local frontend and backend origins", () => {
   );
   const parsed = parseManualAcceptanceBrowserArgs([
     "--plan",
-    "--base-url=http://127.0.0.1:5177",
+    "--base-url=http://127.0.0.1:15200",
     "--backend-url",
     "http://127.0.0.1:8300",
     "--source-report",
@@ -146,7 +146,7 @@ test("CLI requires explicit local frontend and backend origins", () => {
     "output/qa/manual-acceptance/datasets/v3/facts/apply-report.json",
   ]);
   assert.equal(parsed.plan, true);
-  assert.equal(parsed.baseURL, "http://127.0.0.1:5177");
+  assert.equal(parsed.baseURL, "http://127.0.0.1:15200");
   assert.equal(parsed.backendURL, "http://127.0.0.1:8300");
   assert.match(parsed.sourceReportPath, /datasets\/v3\/source\/apply-report\.json$/u);
   assert.match(parsed.factReportPath, /datasets\/v3\/facts\/apply-report\.json$/u);
@@ -227,7 +227,7 @@ test("fresh print workspaces never hide render-pdf failures by route or status",
   const events = [
     {
       type: "response",
-      message: "400 http://127.0.0.1:5177/templates/render-pdf",
+      message: "400 http://127.0.0.1:15200/templates/render-pdf",
     },
     {
       type: "console",
@@ -470,7 +470,7 @@ test("missing password starts zero browsers and performs zero probes", async () 
   await assert.rejects(
     runManualAcceptanceBrowser(
       {
-        baseURL: "http://127.0.0.1:5177",
+        baseURL: "http://127.0.0.1:15200",
         backendURL: "http://127.0.0.1:8300",
         password: "",
       },
@@ -498,7 +498,7 @@ test("plan mode needs no password and starts no browser", () => {
       scriptPath,
       "--plan",
       "--base-url",
-      "http://127.0.0.1:5177",
+      "http://127.0.0.1:15200",
       "--backend-url",
       "http://127.0.0.1:8300",
     ],

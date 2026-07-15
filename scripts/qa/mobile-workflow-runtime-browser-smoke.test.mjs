@@ -206,7 +206,7 @@ test("mobile workflow runtime browser smoke keeps safe run id boundary", () => {
 
 test("mobile workflow runtime browser smoke rejects credentialed URLs", async () => {
   assert.throws(
-    () => parseCliArgs(["--base-url", "http://demo:secret@127.0.0.1:4195"]),
+    () => parseCliArgs(["--base-url", "http://demo:secret@127.0.0.1:15240"]),
     /URL must not contain username or password/u,
   );
   assert.throws(
@@ -453,6 +453,11 @@ test("mobile workflow runtime browser smoke preflight report is no-write and red
       "5177",
       "5178",
       "5179",
+      "15200",
+      "15201",
+      "15202",
+      "15203",
+      "15204",
     ]);
     assert.deepEqual(report.yoyoosunEntryAudit.yoyoosunPorts, ["5177"]);
     assert.deepEqual(report.yoyoosunEntryAudit.auditedYoyoosunURLs, [

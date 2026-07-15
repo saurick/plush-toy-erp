@@ -7,6 +7,18 @@
 - 当前只收口上述真实缺口；不得回退其它已完成任务，也不把旧审查中的过期 / 超范围建议重新扩成产品功能。
 - 发布目标是内网测试机 `192.168.0.133`；低配目标只加载本地 fixed revision 构建产物、执行 migration、Compose 重启和部署后回归。
 
+## 2026-07-15 本地开发端口与并行启动治理
+
+完成：本仓新增受版本控制的 `config/dev-ports.env`，固定主前端 `5175`、HTTP `8300`、gRPC `9300`、Style L1 `6175`，并独占 `15200-15299` 作为短生命周期 AUX 段。Make、Vite、开发态 Go override、yoyoosun 入口、预览与浏览器脚本统一消费该真源；具体 dev 配置文件和 Kratos 支持的 dev 目录参数均能识别，主服务端口冲突直接失败，不再静默顺延。`dev_stop` 只停止 cwd 属于当前仓库的 listener，拒绝误杀其他项目。`full.sh` 只在 AUX 段探测空闲端口，并用原子 PID 锁串行化同一 worktree 的浏览器证据；活动锁和 stale lock 均 fail closed，只有实际 owner 的 EXIT 清理能移除本轮锁。
+
+完成：同级 7 个带 `make dev` 的仓库均已登记互不重叠的固定 bundle；`webapp-template` 提供创建时顺序分配与兄弟仓只读审计，新模板派生项目在初始化时取得下一组固定端口、同步 dev YAML fallback，并由 parity 门禁阻止正式文档复制端口数字，日常运行不自动漂移。短期 preview、测试和 dashboard 只能使用各自 AUX 段，OAuth callback、主前端和后端继续保持稳定 origin / callback。
+
+验证：兄弟仓审计检查 7 个 manifest 通过；本仓端口、CLI、门禁编排与锁行为定向测试 17 / 17，ShellCheck 与 Bash 语法检查通过。真实 Chromium 在 `15200` 自启当前 worktree，完成 `root-redirect-desktop` 1 / 1，并验证进程归属与 EXIT 后锁清理。最终 `bash scripts/qa/full.sh` 完整通过，包含脚本自动发现 1010 / 1010、Web 合同 195 / 195、Web 全量 1258 / 1258、server-all 2085 / 2085、关键 PostgreSQL、存量升级、production build、真实浏览器、Go build 与 govulncheck，全部 0 fail / 0 skip。首轮 full 曾因并行净重字段尚未生成 Ent 代码阻断；生成现场补齐后复跑全绿，未把首轮中间状态冒充最终结果。
+
+下一步：各项目现有开发进程在下次重启后消费固定端口；部署与客户验收仍是独立交付步骤。
+
+阻塞/风险：Git 收口范围仅限端口治理相关路径，共享工作树中的净重字段、migration、业务代码和页面改动保持未暂存；未部署或修改生产配置。固定端口解决跨项目抢占与误杀，不等于当前所有服务都已启动；AUX 端口只保证项目级隔离，单仓内并行消费者仍须通过分配器或门锁协调。
+
 ## 2026-07-15 密码登录精确提示部署收口
 
 完成：commit `56ecf873` 已推送并以本地构建的 amd64 server/web 镜像加载到 `192.168.0.133`。目标应用数据库已显式核对为 `plush_erp_uat_20260715`，Atlas 为 75 / 75、pending 0；UAT 备份、镜像 digest、旧 release `929ec0b3` 回滚点均已保留。客户试用配置通过标准 validate / publish / activate / effective-session readback 升级到 v3，未直接写配置内容。`admin` 已设置新的生产强密码、撤销既有活动会话，密码只存 macOS Keychain；应用 JWT 签名密钥已轮换并同步当前与回滚 release。

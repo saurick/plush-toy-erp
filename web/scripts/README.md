@@ -38,7 +38,9 @@ pnpm preview:yoyoosun --print-plan
 pnpm preview:yoyoosun
 ```
 
-`STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归。默认端口冲突时优先换一个 `STYLE_L1_PORT=<port>` 复跑，不要先把端口占用误判成页面回归。
+`STYLE_L1_SCENARIOS` 支持逗号分隔的场景名，适合局部页面回归。默认读取 `config/dev-ports.env` 的专属 style 端口 `6175`；如需显式设置 `STYLE_L1_PORT=<port>`，只能使用该 style 端口或本项目 `15200-15299` 辅助区间，脚本会把实际端口同步给 Vite 和 HMR。
+
+受管前端脚本的默认辅助端口按用途分开：共享真实登录 `15210`、采购合同 `15211`、委外合同 `15212`、采购入库 E2E `15213`、移动认证 `15220`、试用浏览器 `15230`、移动 Workflow `15240`。`start:yoyoosun` / `preview:yoyoosun` 从 `15200` 起探测，但不会越过 `15299`；所有 Vite 入口的统一配置会拒绝主前端 `5175`、样式 `6175` 和本项目辅助块之外的受管监听端口。
 
 ## 写入和输出边界
 
@@ -55,10 +57,10 @@ pnpm preview:yoyoosun
 - 真实登录 smoke 的 `REAL_LOGIN_SMOKE_BASE_URL` 和 `REAL_LOGIN_SMOKE_BACKEND_HEALTH_URL` 不得包含 URL 账号密码；账号密码只能走显式环境变量或本地开发配置读取。
 - `smoke:purchase-receipt-real-write` 会用采购入库 RPC 准备带 `PR-BROWSER-*` 前缀的模拟草稿，再到入库管理页完成过账和取消；收尾口径是取消冲正并保留可追踪记录，不物理删除已过账单据。入库管理页本身不提供页面级“新建入库单”，真实业务草稿从采购订单“生成入库”入口产生。
 - `pnpm start` 先运行仓库共享的 `scripts/local-runtime-preflight.mjs`；本机 API 必须通过 db-guard、Atlas pending=0、`healthz` 和 `readyz`，才启动 Vite。预检与 Vite proxy 共用 `API_ORIGIN`，且不会自动 apply migration。`pnpm start:frontend-only` 只适用于不登录、不调 RPC 的页面调试，会显式输出非绿色证据边界。
-- `start:yoyoosun` 默认从 `5176` 起探测可用端口，复用同一 runtime preflight，再检查 `config/customers/yoyoosun/customer-config.example.js` 和 `public-assets/`，通过 dev-only middleware 提供 `/customer-config.js`、`/customer-assets/yoyoosun/*`；客户工程图和来源资料不会公开提供。它保留 HMR，不构建生产包，不调用 `customer_config.validate / publish / activate / rollback`，不写数据库。同 key `builtin_rbac_fallback` 只允许进入带警示的 DEV 桌面预览壳，不升级为 active customer runtime；工作台 / 任务看板不发出 Workflow RPC，客户业务数据页和岗位任务端仍 fail closed。静态包通过不代表后端 active revision 已就绪。
-- `preview:yoyoosun` 默认执行单入口 `build:all`、注入 `config/customers/yoyoosun/customer-config.example.js` 与客户静态资产，并以 `APP_ID=desktop API_ORIGIN=http://127.0.0.1:8300` 启动 `serve:prod`；端口默认从 `5176` 起探测，遇占用自动顺延并在终端输出实际 URL。它只预览永绅前端静态包，不生成 `build/mobile-*`，不调用 `customer_config.validate / publish / activate / rollback`，不导入业务数据、不写数据库。
+- `start:yoyoosun` 默认从清单中的独占辅助块 `15200-15299` 起探测可用端口，且耗尽时失败、不会跨块顺延；它复用同一 runtime preflight，再检查 `config/customers/yoyoosun/customer-config.example.js` 和 `public-assets/`，通过 dev-only middleware 提供 `/customer-config.js`、`/customer-assets/yoyoosun/*`；客户工程图和来源资料不会公开提供。它保留 HMR，不构建生产包，不调用 `customer_config.validate / publish / activate / rollback`，不写数据库。同 key `builtin_rbac_fallback` 只允许进入带警示的 DEV 桌面预览壳，不升级为 active customer runtime；工作台 / 任务看板不发出 Workflow RPC，客户业务数据页和岗位任务端仍 fail closed。静态包通过不代表后端 active revision 已就绪。
+- `preview:yoyoosun` 默认执行单入口 `build:all`、注入 `config/customers/yoyoosun/customer-config.example.js` 与客户静态资产，并以 `APP_ID=desktop API_ORIGIN=http://127.0.0.1:8300` 启动 `serve:prod`；端口默认从清单辅助块 `15200-15299` 起探测，遇占用只在块内顺延并在终端输出实际 URL，耗尽时失败。它只预览永绅前端静态包，不生成 `build/mobile-*`，不调用 `customer_config.validate / publish / activate / rollback`，不导入业务数据、不写数据库。
 - 两个 yoyoosun 入口的 `--print-plan` 都会按实际可用端口输出 `verify customer config` 和 `verify customer asset` 两条 `curl` 命令；验证通过只证明当前前端端口注入了 yoyoosun 静态配置和资产，不证明后端 active revision、真实 RBAC、真实登录或 release evidence 已完成。
-- `audit:yoyoosun-entry` 默认只读检查 `5175,5176,5177,5178,5179`，汇总每个端口的监听进程 cwd / 命令、`/customer-config.js` 分类、yoyoosun favicon content-type 和 `8300/healthz`。它不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写报告、不写数据库；使用 `pnpm --silent audit:yoyoosun-entry -- --json` 可输出机器可读的本地诊断结果，仍不证明后端 active revision、真实 RBAC、真实登录或 release evidence。
+- `audit:yoyoosun-entry` 默认只读检查主开发保留区 `5175-5179` 与本项目辅助块起点附近 `15200-15204`，汇总每个端口的监听进程 cwd / 命令、`/customer-config.js` 分类、yoyoosun favicon content-type 和 `8300/healthz`。它不启动服务、不登录、不调用 JSON-RPC、不读取密码或 token、不写报告、不写数据库；使用 `pnpm --silent audit:yoyoosun-entry -- --json` 可输出机器可读的本地诊断结果，仍不证明后端 active revision、真实 RBAC、真实登录或 release evidence。
 - 本目录脚本不能绕过后端 RBAC、schema、migration、Workflow / Fact usecase 或客户配置边界。
 
 ## 维护规则

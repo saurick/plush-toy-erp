@@ -165,7 +165,9 @@ make init
 make run
 ```
 
-`make run` 和 `make dev_restart` 都会先执行共享的本地启动预检：先运行 `db-guard` 核对 Ent schema 与 versioned migration，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision 且 pending 为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 `migrate apply`；失败时应先审查并完成 migration，不应绕过。
+`make run`、`make dev` 和 `make dev_restart` 会先校验仓库根目录 `config/dev-ports.env`，并把其中固定的 HTTP `8300`、gRPC `9300` 注入 dev 配置；生产配置不消费这组覆盖。随后共享本地启动预检运行 `db-guard` 核对 Ent schema 与 versioned migration，再读取当前 dev 配置命中的数据库，要求 Atlas status 已到最新 revision 且 pending 为 0。`make dev_restart` 只在预检通过后才停止旧进程，避免先停服再发现缺 migration。该预检始终只读，不会自动执行 `migrate apply`；失败时应先审查并完成 migration，不应绕过。
+
+主端口不自动顺延。`make dev_stop` / `make dev_restart` 虽按登记端口查找 listener，但停止前会逐个校验进程 cwd 位于本仓库；端口被其他项目占用时会报告 PID、cwd 和命令并拒绝 kill。整组本机覆盖必须写入 ignored 的 `config/dev-ports.local.env`，且包含完整端口组。
 
 登记的本地开发库未显式设置管理员账号或密码时，分别使用 `admin` / `adminadmin`。配置或 `APP_ADMIN_*` 显式值优先；启动只创建缺失账号，不会覆盖已有账号密码。若本地验收工具曾改动稳定管理员，使用以下专用命令恢复当前开发库；它会递增认证版本并撤销旧会话，且没有生产或 133 逃逸开关：
 

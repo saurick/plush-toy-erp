@@ -19,7 +19,11 @@ const (
 
 func IsDevConfigPath(confPath string) bool {
 	normalized := filepath.ToSlash(filepath.Clean(strings.TrimSpace(confPath)))
-	return strings.Contains(normalized, "/configs/dev/") || strings.HasPrefix(normalized, "configs/dev/")
+	const devConfigDir = "configs/dev"
+	return normalized == devConfigDir ||
+		strings.HasPrefix(normalized, devConfigDir+"/") ||
+		strings.Contains(normalized, "/"+devConfigDir+"/") ||
+		strings.HasSuffix(normalized, "/"+devConfigDir)
 }
 
 func RequireLocalDevDSN(confPath string, dsn string, getenv func(string) string) error {

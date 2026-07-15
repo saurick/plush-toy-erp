@@ -206,7 +206,7 @@ export function buildManualRegressionDataPlan() {
       {
         id: "review-pass-2-data-isolation-and-browser-regression",
         command:
-          "PATH=/usr/local/bin:$PATH node scripts/qa/test-data-isolation-boundary.mjs --json && STYLE_L1_PORT=5239 STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages pnpm --dir web style:l1",
+          "PATH=/usr/local/bin:$PATH node scripts/qa/test-data-isolation-boundary.mjs --json && STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-action-projection-business-pages pnpm --dir web style:l1",
       },
     ],
     boundaries: [

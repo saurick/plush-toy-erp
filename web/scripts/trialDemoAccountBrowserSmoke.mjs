@@ -7,6 +7,10 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
+import {
+  loadDevPorts,
+  resolveDevAuxPort,
+} from '../../scripts/dev-ports.mjs'
 import { yoyoosunMenuConfig } from '../../config/customers/yoyoosun/menuConfig.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { businessModuleDefinitions } from '../src/erp/config/businessModules.mjs'
@@ -19,6 +23,7 @@ import {
 
 const webDir = path.resolve(import.meta.dirname, '..')
 const repoRoot = path.resolve(webDir, '..')
+const devPorts = loadDevPorts(repoRoot)
 const outputDir = path.resolve(
   webDir,
   'output',
@@ -35,7 +40,10 @@ const trialCustomerConfigScriptPath = path.resolve(
 )
 const defaultRealSmokeReportPath =
   'output/trial-demo-account-browser-smoke/report.json'
-const devServerPort = Number(process.env.TRIAL_BROWSER_SMOKE_PORT || 4194)
+const devServerPort = Number(
+  process.env.TRIAL_BROWSER_SMOKE_PORT ||
+    resolveDevAuxPort(devPorts, 30, 'trial browser smoke port')
+)
 const externalBaseURL = normalizeOptionalURL(
   process.env.TRIAL_BROWSER_SMOKE_BASE_URL
 )
