@@ -12,6 +12,7 @@ import {
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
+  manualAcceptanceRuntimeCapabilitiesFromAttestation,
   manualAcceptanceTargetConfirmation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
@@ -26,7 +27,7 @@ const remotePolicyInput = Object.freeze({
 
 const safeRemoteCapabilities = Object.freeze({
   databaseName: CUSTOMER_TRIAL_133_DATABASE,
-  environment: "prod",
+  environment: "remote",
   seedEnabled: false,
   seedAllowed: false,
   cleanupEnabled: false,
@@ -221,6 +222,13 @@ test("customer-trial-133 out-of-band attestation pins origin, customer, release,
     "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
   );
   assert.equal(checked.migration, "20260714165115");
+  assert.deepEqual(
+    manualAcceptanceRuntimeCapabilitiesFromAttestation({
+      policy: remotePolicyInput,
+      attestation: checked,
+    }),
+    safeRemoteCapabilities,
+  );
 
   for (const patch of [
     { origin: "http://192.168.0.133:5175" },
@@ -318,7 +326,7 @@ test("runtime identity precondition requires the dedicated proof marker before a
   );
 });
 
-test("customer-trial-133 runtime accepts only prod with all debug mutations disabled", () => {
+test("customer-trial-133 runtime accepts only normalized remote with all debug mutations disabled", () => {
   const runtime = assertManualAcceptanceRuntimePolicy({
     policy: remotePolicyInput,
     capabilities: safeRemoteCapabilities,
@@ -326,11 +334,18 @@ test("customer-trial-133 runtime accepts only prod with all debug mutations disa
     requiredModules: ["customers", "workflow_tasks"],
   });
   assert.equal(runtime.target, CUSTOMER_TRIAL_133_TARGET);
-  assert.equal(runtime.environment, "prod");
+  assert.equal(runtime.environment, "remote");
   assert.equal(runtime.debugMutationsDisabled, true);
   assert.deepEqual(runtime.requiredModules, ["customers", "workflow_tasks"]);
 
-  for (const environment of ["local", "dev", "production", "test", ""]) {
+  for (const environment of [
+    "local",
+    "dev",
+    "prod",
+    "production",
+    "test",
+    "",
+  ]) {
     assert.throws(
       () =>
         assertManualAcceptanceRuntimePolicy({
@@ -338,7 +353,7 @@ test("customer-trial-133 runtime accepts only prod with all debug mutations disa
           capabilities: { ...safeRemoteCapabilities, environment },
           session: safeSession,
         }),
-      /requires runtime environment=prod/u,
+      /requires runtime environment=remote/u,
     );
   }
 });

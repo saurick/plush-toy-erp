@@ -24,7 +24,8 @@ export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
   [CUSTOMER_TRIAL_133_TARGET]: Object.freeze({
     target: CUSTOMER_TRIAL_133_TARGET,
     origin: CUSTOMER_TRIAL_133_ORIGIN,
-    environment: "prod",
+    attestationEnvironment: "prod",
+    runtimeEnvironment: "remote",
     databaseName: CUSTOMER_TRIAL_133_DATABASE,
     customerKey: "yoyoosun",
     requireActiveCustomerConfigRevision: true,
@@ -323,11 +324,12 @@ export function assertManualAcceptanceTargetAttestation({
     REMOTE_ATTESTATION_FIELDS,
     "customer-trial-133 attestation",
   );
+  const profile = MANUAL_ACCEPTANCE_TARGET_PROFILES[resolved.target];
   if (
     value.target !== resolved.target ||
     value.origin !== resolved.origin ||
     value.customerKey !== "yoyoosun" ||
-    value.environment !== "prod"
+    value.environment !== profile.attestationEnvironment
   ) {
     throw new ManualAcceptanceTargetPolicyError(
       "customer-trial-133 attestation target/origin/customer/environment mismatch",
@@ -376,6 +378,22 @@ export function assertManualAcceptanceTargetAttestation({
         REMOTE_DEBUG_FALSE_FIELDS.map((key) => [key, false]),
       ),
     ),
+  });
+}
+
+export function manualAcceptanceRuntimeCapabilitiesFromAttestation({
+  policy,
+  attestation,
+} = {}) {
+  const checked = assertManualAcceptanceTargetAttestation({
+    policy,
+    attestation,
+  });
+  const profile = MANUAL_ACCEPTANCE_TARGET_PROFILES[checked.target];
+  return Object.freeze({
+    databaseName: profile.databaseName,
+    environment: profile.runtimeEnvironment,
+    ...checked.debug,
   });
 }
 
@@ -488,9 +506,9 @@ export function assertManualAcceptanceCapabilitiesPolicy({
   }
 
   const profile = MANUAL_ACCEPTANCE_TARGET_PROFILES[resolved.target];
-  if (environment !== profile.environment) {
+  if (environment !== profile.runtimeEnvironment) {
     throw new ManualAcceptanceTargetPolicyError(
-      `${resolved.target} requires runtime environment=${profile.environment}, got ${environment || "unknown"}`,
+      `${resolved.target} requires runtime environment=${profile.runtimeEnvironment}, got ${environment || "unknown"}`,
     );
   }
   const unsafeDebugFields = REMOTE_DEBUG_FALSE_FIELDS.filter(

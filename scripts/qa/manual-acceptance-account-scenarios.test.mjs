@@ -195,7 +195,7 @@ function createBackend({
       return ok(
         {
           environment,
-          ...(environment === "sql" || environment === "prod"
+          ...(["sql", "prod", "remote"].includes(environment)
             ? {
                 seedEnabled: false,
                 seedAllowed: false,
@@ -539,7 +539,10 @@ test("local SQL runtime is accepted only through the shared debug-disabled polic
 });
 
 test("registered 133 target reconciles the same three scenario accounts without changing role permissions", async () => {
-  const backend = createBackend({ environment: "prod", revision: "remote-v3" });
+  const backend = createBackend({
+    environment: "remote",
+    revision: "remote-v3",
+  });
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,

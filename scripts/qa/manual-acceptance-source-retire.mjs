@@ -16,6 +16,7 @@ import {
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
+  manualAcceptanceRuntimeCapabilitiesFromAttestation,
   normalizeManualAcceptanceBackendURL,
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
@@ -312,7 +313,10 @@ async function assertSafeRuntime({
         token: tokens.seedAdmin || tokens.sales,
         fetchImpl,
       })
-    : { environment: targetAttestation.environment, ...targetAttestation.debug };
+    : manualAcceptanceRuntimeCapabilitiesFromAttestation({
+        policy: plan,
+        attestation: targetAttestation,
+      });
   assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const data = await rpcCall({
     backendURL: plan.backendURL,

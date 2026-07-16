@@ -9,6 +9,7 @@ import {
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
+  manualAcceptanceRuntimeCapabilitiesFromAttestation,
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
@@ -246,8 +247,12 @@ export function validateAttachmentReportBatch({
         policy,
         attestation: parsed,
       });
+      const capabilities = manualAcceptanceRuntimeCapabilitiesFromAttestation({
+        policy,
+        attestation,
+      });
       if (
-        factReport.runtime.environment !== "prod" ||
+        factReport.runtime.environment !== capabilities.environment ||
         factReport.runtime.targetAttestation?.source !== "out-of-band" ||
         factReport.runtime.targetAttestation?.release !== attestation.release ||
         factReport.runtime.targetAttestation?.migration !== attestation.migration

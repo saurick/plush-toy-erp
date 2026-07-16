@@ -1081,7 +1081,7 @@ test("core RPC verifier uses one admin read-only preflight and returns only stab
           ? { access_token: "secret-token" }
           : request.method === "capabilities"
             ? {
-                environment: "prod",
+                environment: "remote",
                 databaseName: "plush_erp_uat_20260715",
                 seedEnabled: false,
                 seedAllowed: false,
@@ -1281,7 +1281,7 @@ test("core preflight uses live debug capabilities and stops before business-code
       request.method === "admin_login"
         ? { access_token: "admin-token" }
         : {
-            environment: "prod",
+            environment: "remote",
             databaseName: "plush_erp_uat_20260715",
             seedEnabled: false,
             seedAllowed: false,

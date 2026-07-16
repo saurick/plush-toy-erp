@@ -190,7 +190,7 @@ test("attachment report batch binds exact dataset identity and registered target
   const target = "customer-trial-133";
   const backendURL = "http://127.0.0.1:18375";
   const remoteRuntime = {
-    environment: "prod",
+    environment: "remote",
     customerKey: "yoyoosun",
     configRevision: "cfg-trial-133-v1",
     source: "active_customer_config_revision",

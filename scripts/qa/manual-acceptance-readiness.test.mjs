@@ -1529,7 +1529,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
   const backendURL = "http://127.0.0.1:18375";
   const target = "customer-trial-133";
   const remoteRuntime = {
-    environment: "prod",
+    environment: "remote",
     customerKey: "yoyoosun",
     configRevision: "cfg-trial-133-v1",
     source: "active_customer_config_revision",
@@ -1593,7 +1593,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
   assert.equal(fetchCalls, 0);
 
   const remote = createReadinessFetch({
-    runtimeEnvironment: "prod",
+    runtimeEnvironment: "remote",
     configRevision: "cfg-trial-133-v1",
   });
   const report = await verifyManualAcceptanceReadiness(plan, {
@@ -1604,7 +1604,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     fetchImpl: remote.fetchImpl,
   });
   assert.equal(report.runtimePreflight.target, target);
-  assert.equal(report.runtimePreflight.environment, "prod");
+  assert.equal(report.runtimePreflight.environment, "remote");
   assert.equal(report.runtimePreflight.configRevision, "cfg-trial-133-v1");
   assert.equal(
     remote.calls.some((item) => item.method === "capabilities"),

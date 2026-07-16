@@ -407,7 +407,7 @@ test("retirement rejects a disabled required module before dataset reads", async
   }
 });
 
-test("customer-trial-133 retirement uses attested prod runtime and business lifecycle RPC only", async () => {
+test("customer-trial-133 retirement uses prod attestation, normalized remote runtime, and business lifecycle RPC only", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
@@ -484,7 +484,7 @@ test("customer-trial-133 retirement uses attested prod runtime and business life
     }
     if (body.method === "capabilities") {
       return ok({
-        environment: "prod",
+        environment: "remote",
         databaseName: "plush_erp_uat_20260715",
         seedEnabled: false,
         seedAllowed: false,

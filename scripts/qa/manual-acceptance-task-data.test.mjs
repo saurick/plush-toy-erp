@@ -174,7 +174,7 @@ function createMockRuntime(options = {}) {
       assert.equal(actorRole, "runtime_admin");
       return jsonResponse({
         environment: options.environment || "local",
-        ...(["prod", "sql"].includes(options.environment)
+        ...(["prod", "remote", "sql"].includes(options.environment)
           ? {
               seedEnabled: false,
               seedAllowed: false,
@@ -1063,7 +1063,7 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
     runId: "20260715-V1",
     nowSec: NOW_SEC,
   });
-  const mock = createMockRuntime({ environment: "prod" });
+  const mock = createMockRuntime({ environment: "remote" });
   const report = await applyManualAcceptanceTaskData(plan, {
     confirmPhrase: CONFIRM_PHRASE,
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
@@ -1100,7 +1100,7 @@ test("customer-trial-133 accepts a later immutable release when the CAS migratio
     nowSec: NOW_SEC,
   });
   const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
-  const mock = createMockRuntime({ environment: "prod" });
+  const mock = createMockRuntime({ environment: "remote" });
   const report = await applyManualAcceptanceTaskData(plan, {
     confirmPhrase: CONFIRM_PHRASE,
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),

@@ -544,7 +544,7 @@ test("customer-trial-133 source apply accepts only the registered attested runti
     }
     if (body.method === "capabilities") {
       return ok({
-        environment: "prod",
+        environment: "remote",
         databaseName: "plush_erp_uat_20260715",
         seedEnabled: false,
         seedAllowed: false,

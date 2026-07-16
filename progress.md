@@ -215,3 +215,13 @@
 下一步：按用户授权提交并推送 `main`，从最终提交构建固定 `linux/amd64` 镜像；随后只在 133 试用环境执行备份校验、正式 migration、health / ready、同版 v3 数据幂等重放、数量读回、岗位页面与五类打印浏览器复核。133 现有旧数据和旧镜像证据不得冒充本次提交的发布证据。
 
 阻塞/风险：当前代码与本地全量门禁已完成，但本节记录时尚未推送、构建或部署。模拟数据只用于甲方试用，不是客户真实业务事实或签收；人工业务判断仍需甲方实际操作确认。发布失败必须停在原镜像 / 备份回滚点，不得放宽目标身份、运行态提交、migration 或试用配置门禁；本地共享开发库 `admin / adminadmin` 不得由验收流程改写。
+
+## 2026-07-16 133 验收运行环境合同修正
+
+完成：修正 `customer-trial-133` 首次数据执行在业务写入前暴露的环境口径混用。部署 attestation 继续精确要求 `environment=prod`，服务端 `debug.capabilities` 归一化运行态改为精确要求 `environment=remote`；共享 helper 统一完成 attestation 到运行能力的安全映射，并同步数据源、任务、附件、退役、readiness 与数据集执行测试。没有改变 133 服务环境、数据库、调试开关、目标身份、客户配置或管理员账号。
+
+验证：项目锁定 Node 24.14.0 下 `node --test scripts/qa/manual-acceptance-*.test.mjs` 为 231 / 231，0 fail / 0 skip；`affected.sh --plan` 判定 12 个 QA 脚本路径为 T1，`git diff --check` 通过。
+
+下一步：先提交并推送本修正，使实际数据执行工具具备不可变代码身份；随后只通过登记的 SSH 隧道向 133 隔离试用库执行 `2026.07.15-v3 / 20260715-V3`，保存首次写入、幂等重放、数量读回、页面与打印证据。
+
+阻塞/风险：本节记录时尚未执行本轮 133 业务数据写入或页面复核。attestation 的 `prod` 与运行能力的 `remote` 是两层不同事实，不得全局替换，也不得借修正降低 debug mutation、release、migration、数据库或 active customer-config 门禁。

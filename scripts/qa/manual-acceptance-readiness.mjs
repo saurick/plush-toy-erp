@@ -22,10 +22,12 @@ import {
 } from "./manual-acceptance-task-data.mjs";
 import {
   CUSTOMER_TRIAL_133_TARGET,
+  MANUAL_ACCEPTANCE_TARGET_PROFILES,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
+  manualAcceptanceRuntimeCapabilitiesFromAttestation,
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
@@ -672,7 +674,8 @@ function validateFactReport(report) {
   }
   if (
     policy.target === CUSTOMER_TRIAL_133_TARGET &&
-    (report.runtime.environment !== "prod" ||
+    (report.runtime.environment !==
+      MANUAL_ACCEPTANCE_TARGET_PROFILES[policy.target].runtimeEnvironment ||
       report.runtime.targetAttestation?.source !== "out-of-band" ||
       !String(report.runtime.targetAttestation?.release || "").trim() ||
       !String(report.runtime.targetAttestation?.migration || "").trim())
@@ -1543,7 +1546,10 @@ async function assertSafeReadRuntime({
   let token = sessionToken;
   let capabilities;
   if (attestation) {
-    capabilities = { environment: attestation.environment, ...attestation.debug };
+    capabilities = manualAcceptanceRuntimeCapabilitiesFromAttestation({
+      policy,
+      attestation,
+    });
   } else {
     token = await loginAccount({
       backendURL: policy.backendURL,
