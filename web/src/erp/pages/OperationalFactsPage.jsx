@@ -3,6 +3,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DownOutlined,
+  EyeOutlined,
   LinkOutlined,
   PrinterOutlined,
   RollbackOutlined,
@@ -42,6 +43,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import ProductionReworkModal from '../components/production-facts/ProductionReworkModal.jsx'
 import {
@@ -134,6 +136,7 @@ export function OperationalFactWorkspace({
   const [totalByKey, setTotalByKey] = useState({})
   const [paginationByKey, setPaginationByKey] = useState({})
   const [selectedByKey, setSelectedByKey] = useState({})
+  const [detailRecord, setDetailRecord] = useState(null)
   const listRequestVersionRef = useRef(0)
   const mountedRef = useRef(false)
   const financeSourceAttemptsRef = useRef(
@@ -213,6 +216,17 @@ export function OperationalFactWorkspace({
   )
   const activeTotal = totalByKey[currentActiveKey] || 0
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
+  const openOperationalFactDetails = useCallback(
+    (record) => {
+      if (!record?.id) return
+      setSelectedByKey((prev) => ({
+        ...prev,
+        [currentActiveKey]: record,
+      }))
+      setDetailRecord(record)
+    },
+    [currentActiveKey]
+  )
   const financeSourceScope = financeSourceContext?.source?.id
     ? `${financeSourceContext.action}:${financeSourceContext.source.id}`
     : ''
@@ -979,6 +993,14 @@ export function OperationalFactWorkspace({
               相关单据 <DownOutlined />
             </Button>
           </Dropdown>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            disabled={!activeSelectedRow}
+            onClick={() => openOperationalFactDetails(activeSelectedRow)}
+          >
+            查看详情
+          </Button>
           {['production', 'outsourcing'].includes(currentActiveKey) ? (
             <Popconfirm
               title="确认过账？"
@@ -1277,6 +1299,7 @@ export function OperationalFactWorkspace({
               [currentActiveKey]: record,
             })),
         })}
+        onOpenRecord={openOperationalFactDetails}
         emptyDescription="暂无业务记录"
         pagination={createBusinessTablePagination({
           pagination: activePagination,
@@ -1291,6 +1314,14 @@ export function OperationalFactWorkspace({
       />
 
       {columnOrderModal}
+      <BusinessRecordDetailsModal
+        columns={visibleColumns}
+        description="当前弹窗只用于查看记录；如需确认、结清、取消、返工或继续办理，请使用列表上方的当前操作区。"
+        open={Boolean(detailRecord)}
+        record={detailRecord}
+        title={`${activeConfig.title}详情`}
+        onClose={() => setDetailRecord(null)}
+      />
       <FinanceBusinessSourceModal
         action={financeSourceContext?.action}
         open={Boolean(financeSourceContext)}

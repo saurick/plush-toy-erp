@@ -106,9 +106,9 @@ func DefaultUnitID(v int) predicate.ProductSKU {
 	return predicate.ProductSKU(sql.FieldEQ(FieldDefaultUnitID, v))
 }
 
-// UnitNetWeightKg applies equality check predicate on the "unit_net_weight_kg" field. It's identical to UnitNetWeightKgEQ.
-func UnitNetWeightKg(v decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldEQ(FieldUnitNetWeightKg, v))
+// UnitNetWeightG applies equality check predicate on the "unit_net_weight_g" field. It's identical to UnitNetWeightGEQ.
+func UnitNetWeightG(v decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldEQ(FieldUnitNetWeightG, v))
 }
 
 // IsActive applies equality check predicate on the "is_active" field. It's identical to IsActiveEQ.
@@ -766,54 +766,54 @@ func DefaultUnitIDNotNil() predicate.ProductSKU {
 	return predicate.ProductSKU(sql.FieldNotNull(FieldDefaultUnitID))
 }
 
-// UnitNetWeightKgEQ applies the EQ predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgEQ(v decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldEQ(FieldUnitNetWeightKg, v))
+// UnitNetWeightGEQ applies the EQ predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGEQ(v decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldEQ(FieldUnitNetWeightG, v))
 }
 
-// UnitNetWeightKgNEQ applies the NEQ predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgNEQ(v decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldNEQ(FieldUnitNetWeightKg, v))
+// UnitNetWeightGNEQ applies the NEQ predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGNEQ(v decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldNEQ(FieldUnitNetWeightG, v))
 }
 
-// UnitNetWeightKgIn applies the In predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgIn(vs ...decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldIn(FieldUnitNetWeightKg, vs...))
+// UnitNetWeightGIn applies the In predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGIn(vs ...decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldIn(FieldUnitNetWeightG, vs...))
 }
 
-// UnitNetWeightKgNotIn applies the NotIn predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgNotIn(vs ...decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldNotIn(FieldUnitNetWeightKg, vs...))
+// UnitNetWeightGNotIn applies the NotIn predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGNotIn(vs ...decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldNotIn(FieldUnitNetWeightG, vs...))
 }
 
-// UnitNetWeightKgGT applies the GT predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgGT(v decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldGT(FieldUnitNetWeightKg, v))
+// UnitNetWeightGGT applies the GT predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGGT(v decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldGT(FieldUnitNetWeightG, v))
 }
 
-// UnitNetWeightKgGTE applies the GTE predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgGTE(v decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldGTE(FieldUnitNetWeightKg, v))
+// UnitNetWeightGGTE applies the GTE predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGGTE(v decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldGTE(FieldUnitNetWeightG, v))
 }
 
-// UnitNetWeightKgLT applies the LT predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgLT(v decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldLT(FieldUnitNetWeightKg, v))
+// UnitNetWeightGLT applies the LT predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGLT(v decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldLT(FieldUnitNetWeightG, v))
 }
 
-// UnitNetWeightKgLTE applies the LTE predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgLTE(v decimal.Decimal) predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldLTE(FieldUnitNetWeightKg, v))
+// UnitNetWeightGLTE applies the LTE predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGLTE(v decimal.Decimal) predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldLTE(FieldUnitNetWeightG, v))
 }
 
-// UnitNetWeightKgIsNil applies the IsNil predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgIsNil() predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldIsNull(FieldUnitNetWeightKg))
+// UnitNetWeightGIsNil applies the IsNil predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGIsNil() predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldIsNull(FieldUnitNetWeightG))
 }
 
-// UnitNetWeightKgNotNil applies the NotNil predicate on the "unit_net_weight_kg" field.
-func UnitNetWeightKgNotNil() predicate.ProductSKU {
-	return predicate.ProductSKU(sql.FieldNotNull(FieldUnitNetWeightKg))
+// UnitNetWeightGNotNil applies the NotNil predicate on the "unit_net_weight_g" field.
+func UnitNetWeightGNotNil() predicate.ProductSKU {
+	return predicate.ProductSKU(sql.FieldNotNull(FieldUnitNetWeightG))
 }
 
 // IsActiveEQ applies the EQ predicate on the "is_active" field.

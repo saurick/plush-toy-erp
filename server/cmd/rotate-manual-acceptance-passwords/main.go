@@ -14,6 +14,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/biz"
 	"server/internal/data"
 
 	"github.com/jackc/pgx/v5/pgconn"
@@ -323,6 +324,12 @@ func validateRotationPasswords(adminUsernames []string, adminPassword, demoPassw
 	}
 	if demoPassword == "" {
 		return fmt.Errorf("%s is required", demoPasswordEnv)
+	}
+	if len(adminUsernames) > 0 && biz.ValidateAdminPassword(adminPassword) != nil {
+		return fmt.Errorf("%s must contain 8-20 characters", adminPasswordEnv)
+	}
+	if biz.ValidateAdminPassword(demoPassword) != nil {
+		return fmt.Errorf("%s must contain 8-20 characters", demoPasswordEnv)
 	}
 	if len(adminUsernames) > 0 && adminPassword == demoPassword {
 		return errors.New("manual acceptance admin and demo passwords must differ")

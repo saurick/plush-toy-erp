@@ -110,7 +110,7 @@ type Product struct {
 	StyleNo         *string
 	CustomerStyleNo *string
 	DefaultUnitID   int
-	UnitNetWeightKg *decimal.Decimal
+	UnitNetWeightG  *decimal.Decimal
 	IsActive        bool
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -128,7 +128,7 @@ type ProductSKU struct {
 	Size             *string
 	PackagingVersion *string
 	DefaultUnitID    *int
-	UnitNetWeightKg  *decimal.Decimal
+	UnitNetWeightG   *decimal.Decimal
 	IsActive         bool
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -195,7 +195,7 @@ type ProductMutation struct {
 	StyleNo         *string
 	CustomerStyleNo *string
 	DefaultUnitID   int
-	UnitNetWeightKg *decimal.Decimal
+	UnitNetWeightG  *decimal.Decimal
 }
 
 type ProductSKUMutation struct {
@@ -209,7 +209,7 @@ type ProductSKUMutation struct {
 	Size             *string
 	PackagingVersion *string
 	DefaultUnitID    *int
-	UnitNetWeightKg  *decimal.Decimal
+	UnitNetWeightG   *decimal.Decimal
 }
 
 type ContactMutation struct {
@@ -830,7 +830,7 @@ func normalizeProductMutation(in ProductMutation) (ProductMutation, error) {
 	in.StyleNo = normalizeOptionalString(in.StyleNo)
 	in.CustomerStyleNo = normalizeOptionalString(in.CustomerStyleNo)
 	if in.Code == "" || in.Name == "" || in.DefaultUnitID <= 0 ||
-		!validNetWeightKg(in.UnitNetWeightKg) {
+		!validNetWeightG(in.UnitNetWeightG) {
 		return ProductMutation{}, ErrBadParam
 	}
 	return in, nil
@@ -849,8 +849,8 @@ func normalizeProductSKUMutation(in ProductSKUMutation) (ProductSKUMutation, err
 		in.DefaultUnitID = nil
 	}
 	if in.ProductID <= 0 || in.SKUCode == "" ||
-		!validNetWeightKg(in.UnitNetWeightKg) ||
-		(in.UnitNetWeightKg != nil && in.DefaultUnitID == nil) {
+		!validNetWeightG(in.UnitNetWeightG) ||
+		(in.UnitNetWeightG != nil && in.DefaultUnitID == nil) {
 		return ProductSKUMutation{}, ErrBadParam
 	}
 	return in, nil

@@ -88,11 +88,11 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 }
 
 func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T) {
-	manualTotalNetWeightKg := decimal.RequireFromString("12.345600")
+	manualTotalNetWeightG := decimal.RequireFromString("12.345600")
 	aggregate, ok := shipmentCreateWithItemsFromParams(map[string]any{
-		"shipment_no":         "SHP-SKU-TRACE",
-		"idempotency_key":     "SHP-SKU-TRACE",
-		"total_net_weight_kg": manualTotalNetWeightKg.StringFixed(6),
+		"shipment_no":        "SHP-SKU-TRACE",
+		"idempotency_key":    "SHP-SKU-TRACE",
+		"total_net_weight_g": manualTotalNetWeightG.StringFixed(6),
 		"items": []any{map[string]any{
 			"sales_order_item_id": float64(31),
 			"product_id":          float64(7),
@@ -109,8 +109,8 @@ func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T)
 	if in.ProductSkuID == nil || *in.ProductSkuID != 11 {
 		t.Fatalf("expected product sku id 11, got %#v", in.ProductSkuID)
 	}
-	if aggregate.Shipment.TotalNetWeightKg == nil || !aggregate.Shipment.TotalNetWeightKg.Equal(manualTotalNetWeightKg) {
-		t.Fatalf("expected manual shipment total net weight, got %#v", aggregate.Shipment.TotalNetWeightKg)
+	if aggregate.Shipment.TotalNetWeightG == nil || !aggregate.Shipment.TotalNetWeightG.Equal(manualTotalNetWeightG) {
+		t.Fatalf("expected manual shipment total net weight, got %#v", aggregate.Shipment.TotalNetWeightG)
 	}
 	forgedSnapshotParams := map[string]any{
 		"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": "1", "amount_snapshot": "999999",
@@ -124,37 +124,37 @@ func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T)
 	amountSnapshot := decimal.RequireFromString("125.500000")
 	currencySnapshot := biz.FinanceCurrencyCNY
 	out := shipmentItemToAny(&biz.ShipmentItem{
-		ID:                      1,
-		ShipmentID:              9,
-		SalesOrderItemID:        in.SalesOrderItemID,
-		ProductID:               in.ProductID,
-		ProductSkuID:            in.ProductSkuID,
-		WarehouseID:             in.WarehouseID,
-		UnitID:                  in.UnitID,
-		Quantity:                in.Quantity,
-		UnitNetWeightKgSnapshot: &snapshot,
-		UnitPriceSnapshot:       &unitPriceSnapshot,
-		AmountSnapshot:          &amountSnapshot,
-		CurrencySnapshot:        &currencySnapshot,
+		ID:                     1,
+		ShipmentID:             9,
+		SalesOrderItemID:       in.SalesOrderItemID,
+		ProductID:              in.ProductID,
+		ProductSkuID:           in.ProductSkuID,
+		WarehouseID:            in.WarehouseID,
+		UnitID:                 in.UnitID,
+		Quantity:               in.Quantity,
+		UnitNetWeightGSnapshot: &snapshot,
+		UnitPriceSnapshot:      &unitPriceSnapshot,
+		AmountSnapshot:         &amountSnapshot,
+		CurrencySnapshot:       &currencySnapshot,
 	})
 	if !reflect.DeepEqual(out["product_sku_id"], 11) {
 		t.Fatalf("expected product_sku_id in response, got %#v", out)
 	}
-	if out["unit_net_weight_kg_snapshot"] != "0.425" {
+	if out["unit_net_weight_g_snapshot"] != "0.425" {
 		t.Fatalf("expected shipment item net weight snapshot decimal string, got %#v", out)
 	}
 	if out["unit_price_snapshot"] != "25.1" || out["amount_snapshot"] != "125.5" || out["currency_snapshot"] != biz.FinanceCurrencyCNY {
 		t.Fatalf("expected shipment item finance snapshots, got %#v", out)
 	}
 
-	shipmentOut := shipmentToAny(&biz.Shipment{TotalNetWeightKg: &manualTotalNetWeightKg})
-	if shipmentOut["total_net_weight_kg"] != "12.3456" {
+	shipmentOut := shipmentToAny(&biz.Shipment{TotalNetWeightG: &manualTotalNetWeightG})
+	if shipmentOut["total_net_weight_g"] != "12.3456" {
 		t.Fatalf("expected shipment total net weight decimal string, got %#v", shipmentOut)
 	}
-	if _, exposed := shipmentOut["requested_total_net_weight_kg"]; exposed {
+	if _, exposed := shipmentOut["requested_total_net_weight_g"]; exposed {
 		t.Fatalf("internal create-intent weight must not be exposed: %#v", shipmentOut)
 	}
-	if shipmentToAny(&biz.Shipment{})["total_net_weight_kg"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["unit_net_weight_kg_snapshot"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["amount_snapshot"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["currency_snapshot"] != nil {
+	if shipmentToAny(&biz.Shipment{})["total_net_weight_g"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["unit_net_weight_g_snapshot"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["amount_snapshot"] != nil || shipmentItemToAny(&biz.ShipmentItem{})["currency_snapshot"] != nil {
 		t.Fatal("expected unknown shipment weights to serialize as null")
 	}
 
@@ -188,9 +188,9 @@ func TestJsonrpcDispatcher_ShipmentManualTotalNetWeightContract(t *testing.T) {
 
 	params := func(no string, weight any) *structpb.Struct {
 		return mustJSONRPCStruct(t, map[string]any{
-			"shipment_no":         no,
-			"idempotency_key":     no,
-			"total_net_weight_kg": weight,
+			"shipment_no":        no,
+			"idempotency_key":    no,
+			"total_net_weight_g": weight,
 			"items": []any{map[string]any{
 				"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": "1",
 			}},
@@ -201,12 +201,12 @@ func TestJsonrpcDispatcher_ShipmentManualTotalNetWeightContract(t *testing.T) {
 	if err != nil || res == nil || res.Code != errcode.OK.Code {
 		t.Fatalf("create shipment with manual total: result=%#v err=%v", res, err)
 	}
-	if repo.lastShipmentCreate == nil || repo.lastShipmentCreate.Shipment.TotalNetWeightKg == nil || !repo.lastShipmentCreate.Shipment.TotalNetWeightKg.Equal(decimal.RequireFromString("12.3456")) {
+	if repo.lastShipmentCreate == nil || repo.lastShipmentCreate.Shipment.TotalNetWeightG == nil || !repo.lastShipmentCreate.Shipment.TotalNetWeightG.Equal(decimal.RequireFromString("12.3456")) {
 		t.Fatalf("manual total not forwarded to usecase repo: %#v", repo.lastShipmentCreate)
 	}
 	shipmentData := res.Data.AsMap()["shipment"].(map[string]any)
-	if shipmentData["total_net_weight_kg"] != "12.3456" {
-		t.Fatalf("manual total response = %#v, want decimal string", shipmentData["total_net_weight_kg"])
+	if shipmentData["total_net_weight_g"] != "12.3456" {
+		t.Fatalf("manual total response = %#v, want decimal string", shipmentData["total_net_weight_g"])
 	}
 
 	for _, tc := range []struct {
@@ -233,7 +233,7 @@ func TestJsonrpcDispatcher_ShipmentManualTotalNetWeightContract(t *testing.T) {
 	}
 
 	parsed, ok := shipmentCreateWithItemsFromParams(params("SHP-WEIGHT-NULL", nil).AsMap())
-	if !ok || parsed.Shipment.TotalNetWeightKg != nil {
+	if !ok || parsed.Shipment.TotalNetWeightG != nil {
 		t.Fatalf("explicit null total parse = %#v ok=%t, want nil true", parsed, ok)
 	}
 }
@@ -1539,13 +1539,13 @@ func (r *shipmentModuleGateOperationalFactRepo) CreateShipmentDraftWithItems(_ c
 	r.lastShipmentCreate = in
 	now := time.Now()
 	out := &biz.Shipment{
-		ID:               101,
-		ShipmentNo:       in.Shipment.ShipmentNo,
-		Status:           biz.ShipmentStatusDraft,
-		IdempotencyKey:   in.Shipment.IdempotencyKey,
-		TotalNetWeightKg: in.Shipment.TotalNetWeightKg,
-		CreatedAt:        now,
-		UpdatedAt:        now,
+		ID:              101,
+		ShipmentNo:      in.Shipment.ShipmentNo,
+		Status:          biz.ShipmentStatusDraft,
+		IdempotencyKey:  in.Shipment.IdempotencyKey,
+		TotalNetWeightG: in.Shipment.TotalNetWeightG,
+		CreatedAt:       now,
+		UpdatedAt:       now,
 	}
 	for idx, item := range in.Items {
 		out.Items = append(out.Items, &biz.ShipmentItem{

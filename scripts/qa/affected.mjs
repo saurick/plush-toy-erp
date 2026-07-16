@@ -522,7 +522,10 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
       continue;
     }
 
-    if (file === "scripts/qa/fixtures/populated-upgrade-20260710150001.sql") {
+    if (
+      file === "scripts/qa/fixtures/populated-upgrade-20260710150001.sql" ||
+      file === "scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql"
+    ) {
       directTests.add("scripts/qa/critical-postgres-gate.test.mjs");
       continue;
     }

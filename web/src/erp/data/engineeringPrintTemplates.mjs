@@ -1,3 +1,5 @@
+import { normalizeWorkInstructionImageAnnotations } from '../utils/workInstructionImageAnnotations.mjs'
+
 export const MATERIAL_DETAIL_TEMPLATE_KEY = 'engineering-material-detail'
 export const COLOR_CARD_TEMPLATE_KEY = 'engineering-color-card'
 export const WORK_INSTRUCTION_TEMPLATE_KEY = 'engineering-work-instruction'
@@ -93,6 +95,7 @@ export function createEmptyEngineeringImageSlot() {
     mimeType: '',
     crop: null,
     layout: null,
+    annotations: [],
   }
 }
 
@@ -150,6 +153,9 @@ function normalizeImageMap(raw = {}, slots = []) {
           mimeType: toText(source.mimeType),
           crop: normalizeImageCrop(source.crop),
           layout: normalizeImageLayout(source.layout),
+          annotations: normalizeWorkInstructionImageAnnotations(
+            source.annotations
+          ),
         },
       ]
     })
@@ -169,6 +175,7 @@ function normalizeRuntimeSampleImage(image = {}) {
     mimeType: toText(image.mimeType),
     crop: normalizeImageCrop(image.crop),
     layout: normalizeImageLayout(image.layout),
+    annotations: normalizeWorkInstructionImageAnnotations(image.annotations),
   }
 }
 
@@ -404,9 +411,8 @@ function normalizeWorkInstructionPage(page = {}) {
   const sourceHeaderRowHeights = Array.isArray(page.headerRowHeightsMm)
     ? page.headerRowHeightsMm
     : DEFAULT_WORK_INSTRUCTION_SAMPLE.headerRowHeightsMm
-  const sourceRows = hasOwn(page, 'rows') && Array.isArray(page.rows)
-    ? page.rows
-    : []
+  const sourceRows =
+    hasOwn(page, 'rows') && Array.isArray(page.rows) ? page.rows : []
   return {
     companyName: textWithDefault(
       page,
@@ -529,6 +535,7 @@ function normalizeInstructionRow(row = {}, index = 0) {
       mimeType: toText(image?.mimeType),
       crop: normalizeImageCrop(image?.crop),
       layout: normalizeImageLayout(image?.layout),
+      annotations: normalizeWorkInstructionImageAnnotations(image?.annotations),
     })),
   }
 }
@@ -1244,10 +1251,7 @@ export function buildWorkInstructionDraftFromOutsourcingOrder(
   const supplierName =
     toText(supplierSnapshot.short_name) || toText(supplierSnapshot.name)
   const productNos = activeItems.map((item) =>
-    compactTextParts(
-      [item.product_no_snapshot, item.sku_code_snapshot],
-      ' / '
-    )
+    compactTextParts([item.product_no_snapshot, item.sku_code_snapshot], ' / ')
   )
   const productNames = activeItems.map((item) => item.product_name_snapshot)
   const processNames = activeItems.map((item) => item.process_name_snapshot)

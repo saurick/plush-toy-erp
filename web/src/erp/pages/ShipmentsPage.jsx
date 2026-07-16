@@ -94,7 +94,7 @@ import {
   searchParamText,
 } from '../utils/routeQuery.mjs'
 import {
-  calculateShipmentLineNetWeightKg,
+  calculateShipmentLineNetWeightG,
   hasFinalShipmentWeight,
   listAllShipmentWeightReferenceRecords,
   normalizeShipmentQuantity,
@@ -134,9 +134,9 @@ function buildShipmentParams(
     customer_snapshot: trimOptional(values.customer_snapshot),
     idempotency_key: trimOptional(values.idempotency_key),
     planned_ship_at: trimOptional(values.planned_ship_at),
-    total_net_weight_kg: resolveShipmentSubmittedTotalNetWeight({
+    total_net_weight_g: resolveShipmentSubmittedTotalNetWeight({
       preview: weightPreview,
-      manualValue: values.total_net_weight_kg,
+      manualValue: values.total_net_weight_g,
       manualItemsSignature: values.total_net_weight_items_signature,
       items,
     }),
@@ -166,7 +166,7 @@ function shipmentFormValues(shipment = {}) {
       plannedShipAt > 0
         ? new Date(plannedShipAt * 1000).toISOString().slice(0, 10)
         : '',
-    total_net_weight_kg: shipment.total_net_weight_kg,
+    total_net_weight_g: shipment.total_net_weight_g,
     note: shipment.note || '',
   }
 }
@@ -338,22 +338,18 @@ export default function ShipmentsPage() {
         ? [
             {
               key: 'confirmed_unit_net_weight',
-              label: '确认出货单重（kg）',
-              value: item?.unit_net_weight_kg_snapshot
-                ? `${item.unit_net_weight_kg_snapshot} kg / ${referenceLabel(
-                    unitOptions,
-                    item?.unit_id,
-                    '单位'
-                  )}`
+              label: '确认出货单重（克）',
+              value: item?.unit_net_weight_g_snapshot
+                ? `${item.unit_net_weight_g_snapshot} 克`
                 : '-',
             },
             {
               key: 'line_net_weight',
-              label: '行净重（kg）',
+              label: '行净重（克）',
               value:
-                calculateShipmentLineNetWeightKg(
+                calculateShipmentLineNetWeightG(
                   item?.quantity,
-                  item?.unit_net_weight_kg_snapshot
+                  item?.unit_net_weight_g_snapshot
                 ) || '-',
             },
           ]
@@ -1221,6 +1217,7 @@ export default function ShipmentsPage() {
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
         })}
+        onOpenRecord={openShipmentDetails}
       />
       {shipmentItemsPreview.modal}
       {columnOrderModal}

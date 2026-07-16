@@ -757,6 +757,13 @@
   padding: 5px 8px;
 }
 
+.erp-business-board-source-item--openable {
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
 .erp-business-board-source-meta {
   display: grid;
   min-width: 0;
@@ -821,6 +828,29 @@
   border-radius: 8px;
   background: #fff;
   padding: 8px 10px;
+}
+
+.erp-business-board-alert-item--openable {
+  transition:
+    border-color 0.18s ease,
+    background 0.18s ease,
+    box-shadow 0.18s ease;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .erp-business-board-source-item--openable,
+  .erp-business-board-alert-item--openable {
+    cursor: pointer;
+  }
+}
+
+.erp-business-board-source-item--openable:hover,
+.erp-business-board-source-item--openable:focus-within,
+.erp-business-board-alert-item--openable:hover,
+.erp-business-board-alert-item--openable:focus-within {
+  border-color: #9bb8d5;
+  background: #f8fbff;
+  box-shadow: 0 8px 18px rgb(31 64 104 / 0.08);
 }
 
 .erp-business-board-alert-item > div {

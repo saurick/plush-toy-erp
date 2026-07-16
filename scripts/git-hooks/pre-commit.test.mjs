@@ -91,6 +91,39 @@ function installHookFixture(root) {
   chmodSync(shellcheck, 0o755);
 }
 
+function installDbModelFixture(root) {
+  const schema = path.join(root, "server/internal/data/model/schema/item.go");
+  const migration = path.join(
+    root,
+    "server/internal/data/model/migrate/20260101000000_migrate.sql",
+  );
+  const atlasSum = path.join(
+    root,
+    "server/internal/data/model/migrate/atlas.sum",
+  );
+  mkdirSync(path.dirname(schema), { recursive: true });
+  mkdirSync(path.dirname(migration), { recursive: true });
+  writeFileSync(
+    schema,
+    "package schema\n\nfunc (Item) Fields() []ent.Field { return nil }\n",
+    "utf8",
+  );
+  writeFileSync(migration, "CREATE TABLE items (id bigint);\n", "utf8");
+  writeFileSync(atlasSum, "h1:base\n", "utf8");
+}
+
+function installDbGuardFixture(root) {
+  for (const file of [
+    "scripts/qa/db-guard.sh",
+    "scripts/qa/db-guard.mjs",
+    "scripts/qa/lib/git-range.mjs",
+  ]) {
+    copyFileSync(path.join(ROOT, file), path.join(root, file));
+  }
+  chmodSync(path.join(root, "scripts/qa/db-guard.sh"), 0o755);
+  installDbModelFixture(root);
+}
+
 test("pre-commit is check-only and preserves partial staging", () => {
   const root = mkdtempSync(path.join(os.tmpdir(), "plush-pre-commit-"));
   try {
@@ -134,6 +167,73 @@ test("pre-commit keeps a relative commit index bound after entering its snapshot
     });
     assert.equal(result.status, 0, result.stderr || result.stdout);
     assert.equal(git(root, ["show", ":payload.txt"]), "staged");
+  } finally {
+    rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test("pre-commit requires staged schema, migration, and atlas.sum as one change", () => {
+  const root = mkdtempSync(
+    path.join(os.tmpdir(), "plush-pre-commit-db-guard-"),
+  );
+  try {
+    git(root, ["init", "-q"]);
+    installHookFixture(root);
+    installDbGuardFixture(root);
+    commit(root, "base");
+
+    const schema = path.join(root, "server/internal/data/model/schema/item.go");
+    writeFileSync(
+      schema,
+      'package schema\n\nfunc (Item) Fields() []ent.Field { return []ent.Field{field.String("name")} }\n',
+      "utf8",
+    );
+    git(root, ["add", "server/internal/data/model/schema/item.go"]);
+
+    const result = spawnSync("bash", ["scripts/git-hooks/pre-commit.sh"], {
+      cwd: root,
+      encoding: "utf8",
+    });
+    assert.equal(result.status, 1, result.stderr || result.stdout);
+    assert.match(result.stderr, /schema\/ent 结构变更但没有新增 migration/u);
+    assert.match(
+      git(root, ["diff", "--cached", "--name-only"]),
+      /schema\/item\.go/u,
+    );
+
+    writeFileSync(
+      path.join(
+        root,
+        "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      ),
+      "ALTER TABLE items ADD COLUMN name text;\n",
+      "utf8",
+    );
+    writeFileSync(
+      path.join(root, "server/internal/data/model/migrate/atlas.sum"),
+      "h1:next\n",
+      "utf8",
+    );
+    git(root, ["add", "server/internal/data/model"]);
+
+    const completeResult = spawnSync(
+      "bash",
+      ["scripts/git-hooks/pre-commit.sh"],
+      {
+        cwd: root,
+        encoding: "utf8",
+      },
+    );
+    assert.equal(
+      completeResult.status,
+      0,
+      completeResult.stderr || completeResult.stdout,
+    );
+    assert.match(completeResult.stdout, /\[qa:db-guard\] 通过/u);
+    assert.match(
+      git(root, ["diff", "--cached", "--name-only"]),
+      /20260102000000_migrate\.sql/u,
+    );
   } finally {
     rmSync(root, { recursive: true, force: true });
   }
@@ -241,4 +341,7 @@ test("pre-commit source contains no mutating formatter or git add", () => {
   assert.match(source, /git checkout-index --all/u);
   assert.match(source, /GIT_WORK_TREE="\$INDEX_ROOT"/u);
   assert.match(source, /SHFMT_CHECK=1/u);
+  assert.match(source, /SKIP_DB_GUARD=0 QA_BASE_RANGE=HEAD\.\.\.HEAD/u);
+  assert.match(source, /scripts\/qa\/db-guard\.sh/u);
+  assert.doesNotMatch(source, /\bmake data\b|\bmigrate_apply\b/u);
 });

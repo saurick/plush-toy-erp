@@ -107,9 +107,9 @@ export function buildShipmentColumns({ salesOrdersByID }) {
       exportValue: (record) => record.items?.length || 0,
     },
     {
-      title: '实际 / 最终总净重（kg）',
-      exportTitle: '总净重（kg）',
-      dataIndex: 'total_net_weight_kg',
+      title: '实际 / 最终总净重（克）',
+      exportTitle: '总净重（克）',
+      dataIndex: 'total_net_weight_g',
       width: 190,
       sortable: false,
       render: (value, record) => {
@@ -119,11 +119,11 @@ export function buildShipmentColumns({ salesOrdersByID }) {
           if (hasFinalShipmentWeight(record?.status)) return '未记录'
           return '-'
         }
-        if (hasFinalShipmentWeight(record?.status)) return `最终 ${weight} kg`
-        if (record?.status === 'DRAFT') return `实际 ${weight} kg`
-        return `${weight} kg`
+        if (hasFinalShipmentWeight(record?.status)) return `最终 ${weight} 克`
+        if (record?.status === 'DRAFT') return `实际 ${weight} 克`
+        return `${weight} 克`
       },
-      exportValue: (record) => String(record?.total_net_weight_kg ?? '').trim(),
+      exportValue: (record) => String(record?.total_net_weight_g ?? '').trim(),
     },
     {
       title: '计划出货日期 / 实际出货日期',

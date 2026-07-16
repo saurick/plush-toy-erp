@@ -824,8 +824,8 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
-	unitNetWeightKg := decimal.RequireFromString("0.425000")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(unitNetWeightKg).Save(ctx); err != nil {
+	unitNetWeightG := decimal.RequireFromString("0.425000")
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(unitNetWeightG).Save(ctx); err != nil {
 		t.Fatalf("set product unit net weight failed: %v", err)
 	}
 
@@ -872,14 +872,14 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if shipped.Status != biz.ShipmentStatusShipped {
 		t.Fatalf("expected SHIPPED, got %s", shipped.Status)
 	}
-	if shipped.TotalNetWeightKg == nil || !shipped.TotalNetWeightKg.Equal(decimal.RequireFromString("0.850000")) {
-		t.Fatalf("shipped total net weight = %v, want 0.850000", shipped.TotalNetWeightKg)
+	if shipped.TotalNetWeightG == nil || !shipped.TotalNetWeightG.Equal(decimal.RequireFromString("0.850000")) {
+		t.Fatalf("shipped total net weight = %v, want 0.850000", shipped.TotalNetWeightG)
 	}
-	if len(shipped.Items) != 1 || shipped.Items[0].UnitNetWeightKgSnapshot == nil || !shipped.Items[0].UnitNetWeightKgSnapshot.Equal(unitNetWeightKg) {
-		t.Fatalf("shipment item unit net weight snapshot = %#v, want %s", shipped.Items, unitNetWeightKg)
+	if len(shipped.Items) != 1 || shipped.Items[0].UnitNetWeightGSnapshot == nil || !shipped.Items[0].UnitNetWeightGSnapshot.Equal(unitNetWeightG) {
+		t.Fatalf("shipment item unit net weight snapshot = %#v, want %s", shipped.Items, unitNetWeightG)
 	}
 	changedMasterWeight := decimal.RequireFromString("0.900000")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(changedMasterWeight).Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(changedMasterWeight).Save(ctx); err != nil {
 		t.Fatalf("change product unit net weight after shipment failed: %v", err)
 	}
 	repeatedShipped, err := repo.ShipShipment(ctx, shipment.ID)
@@ -889,7 +889,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if repeatedShipped.Status != biz.ShipmentStatusShipped {
 		t.Fatalf("expected repeated ship to stay SHIPPED, got %s", repeatedShipped.Status)
 	}
-	if repeatedShipped.TotalNetWeightKg == nil || !repeatedShipped.TotalNetWeightKg.Equal(decimal.RequireFromString("0.850000")) || repeatedShipped.Items[0].UnitNetWeightKgSnapshot == nil || !repeatedShipped.Items[0].UnitNetWeightKgSnapshot.Equal(unitNetWeightKg) {
+	if repeatedShipped.TotalNetWeightG == nil || !repeatedShipped.TotalNetWeightG.Equal(decimal.RequireFromString("0.850000")) || repeatedShipped.Items[0].UnitNetWeightGSnapshot == nil || !repeatedShipped.Items[0].UnitNetWeightGSnapshot.Equal(unitNetWeightG) {
 		t.Fatalf("repeat ship recalculated frozen net weight: %#v", repeatedShipped)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ShipmentSourceType)).CountX(ctx); count != 1 {
@@ -902,7 +902,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if cancelled.Status != biz.ShipmentStatusCancelled {
 		t.Fatalf("expected CANCELLED, got %s", cancelled.Status)
 	}
-	if cancelled.TotalNetWeightKg == nil || !cancelled.TotalNetWeightKg.Equal(decimal.RequireFromString("0.850000")) || cancelled.Items[0].UnitNetWeightKgSnapshot == nil || !cancelled.Items[0].UnitNetWeightKgSnapshot.Equal(unitNetWeightKg) {
+	if cancelled.TotalNetWeightG == nil || !cancelled.TotalNetWeightG.Equal(decimal.RequireFromString("0.850000")) || cancelled.Items[0].UnitNetWeightGSnapshot == nil || !cancelled.Items[0].UnitNetWeightGSnapshot.Equal(unitNetWeightG) {
 		t.Fatalf("cancel changed frozen net weight: %#v", cancelled)
 	}
 	repeatedCancelled, err := repo.CancelShippedShipment(ctx, shipment.ID)
@@ -928,12 +928,12 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
 	productWeight := decimal.RequireFromString("0.400000")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(productWeight).Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(productWeight).Save(ctx); err != nil {
 		t.Fatalf("set base product unit net weight: %v", err)
 	}
 	productB := createTestProduct(t, ctx, client, fixtures.unitID, "PRD-SHIP-WEIGHT-B")
 	productBWeight := decimal.RequireFromString("0.100000")
-	if _, err := client.Product.UpdateOneID(productB.ID).SetUnitNetWeightKg(productBWeight).Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(productB.ID).SetUnitNetWeightG(productBWeight).Save(ctx); err != nil {
 		t.Fatalf("set second product unit net weight: %v", err)
 	}
 	skuWeight := decimal.RequireFromString("0.425000")
@@ -941,7 +941,7 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 		SetProductID(fixtures.productID).
 		SetSkuCode("SKU-SHIP-WEIGHT").
 		SetDefaultUnitID(fixtures.unitID).
-		SetUnitNetWeightKg(skuWeight).
+		SetUnitNetWeightG(skuWeight).
 		Save(ctx)
 	if err != nil {
 		t.Fatalf("create weighted SKU: %v", err)
@@ -985,21 +985,21 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 	if err != nil {
 		t.Fatalf("ship complete-weight shipment: %v", err)
 	}
-	if complete.TotalNetWeightKg == nil || !complete.TotalNetWeightKg.Equal(decimal.RequireFromString("1.150000")) {
-		t.Fatalf("complete shipment total = %v, want 1.150000", complete.TotalNetWeightKg)
+	if complete.TotalNetWeightG == nil || !complete.TotalNetWeightG.Equal(decimal.RequireFromString("1.150000")) {
+		t.Fatalf("complete shipment total = %v, want 1.150000", complete.TotalNetWeightG)
 	}
 	if len(complete.Items) != 2 ||
-		complete.Items[0].UnitNetWeightKgSnapshot == nil || !complete.Items[0].UnitNetWeightKgSnapshot.Equal(skuWeight) ||
-		complete.Items[1].UnitNetWeightKgSnapshot == nil || !complete.Items[1].UnitNetWeightKgSnapshot.Equal(productBWeight) {
+		complete.Items[0].UnitNetWeightGSnapshot == nil || !complete.Items[0].UnitNetWeightGSnapshot.Equal(skuWeight) ||
+		complete.Items[1].UnitNetWeightGSnapshot == nil || !complete.Items[1].UnitNetWeightGSnapshot.Equal(productBWeight) {
 		t.Fatalf("complete shipment snapshots = %#v", complete.Items)
 	}
 
-	if _, err := client.Product.UpdateOneID(productB.ID).ClearUnitNetWeightKg().Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(productB.ID).ClearUnitNetWeightG().Save(ctx); err != nil {
 		t.Fatalf("clear second product unit net weight: %v", err)
 	}
 	manualTotal := decimal.RequireFromString("9.900000")
 	incomplete, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
-		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-INCOMPLETE", IdempotencyKey: "SHP-WEIGHT-INCOMPLETE", TotalNetWeightKg: &manualTotal},
+		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-INCOMPLETE", IdempotencyKey: "SHP-WEIGHT-INCOMPLETE", TotalNetWeightG: &manualTotal},
 		Items: []*biz.ShipmentItemCreate{
 			{ProductID: fixtures.productID, ProductSkuID: &sku.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)},
 			{ProductID: productB.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)},
@@ -1012,10 +1012,10 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 	if err != nil {
 		t.Fatalf("ship incomplete-weight shipment: %v", err)
 	}
-	if incomplete.TotalNetWeightKg == nil || !incomplete.TotalNetWeightKg.Equal(manualTotal) {
-		t.Fatalf("incomplete shipment total = %v, want retained manual %s", incomplete.TotalNetWeightKg, manualTotal)
+	if incomplete.TotalNetWeightG == nil || !incomplete.TotalNetWeightG.Equal(manualTotal) {
+		t.Fatalf("incomplete shipment total = %v, want retained manual %s", incomplete.TotalNetWeightG, manualTotal)
 	}
-	if len(incomplete.Items) != 2 || incomplete.Items[0].UnitNetWeightKgSnapshot == nil || !incomplete.Items[0].UnitNetWeightKgSnapshot.Equal(skuWeight) || incomplete.Items[1].UnitNetWeightKgSnapshot != nil {
+	if len(incomplete.Items) != 2 || incomplete.Items[0].UnitNetWeightGSnapshot == nil || !incomplete.Items[0].UnitNetWeightGSnapshot.Equal(skuWeight) || incomplete.Items[1].UnitNetWeightGSnapshot != nil {
 		t.Fatalf("incomplete shipment snapshots = %#v, want resolved first and nil second", incomplete.Items)
 	}
 }
@@ -1025,13 +1025,13 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	data, client := openInventoryRepoTestData(t, "operational_fact_shipment_net_weight_rollback")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
-	unitNetWeightKg := decimal.RequireFromString("0.500000")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(unitNetWeightKg).Save(ctx); err != nil {
+	unitNetWeightG := decimal.RequireFromString("0.500000")
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(unitNetWeightG).Save(ctx); err != nil {
 		t.Fatalf("set product unit net weight: %v", err)
 	}
 	manualTotal := decimal.RequireFromString("7.700000")
 	rejected, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
-		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-ROLLBACK", IdempotencyKey: "SHP-WEIGHT-ROLLBACK", TotalNetWeightKg: &manualTotal},
+		Shipment: &biz.ShipmentCreate{ShipmentNo: "SHP-WEIGHT-ROLLBACK", IdempotencyKey: "SHP-WEIGHT-ROLLBACK", TotalNetWeightG: &manualTotal},
 		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
 	})
 	if err != nil {
@@ -1044,12 +1044,12 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	if err != nil {
 		t.Fatalf("reload rejected shipment: %v", err)
 	}
-	if rejected.Status != biz.ShipmentStatusDraft || rejected.TotalNetWeightKg == nil || !rejected.TotalNetWeightKg.Equal(manualTotal) || rejected.Items[0].UnitNetWeightKgSnapshot != nil {
+	if rejected.Status != biz.ShipmentStatusDraft || rejected.TotalNetWeightG == nil || !rejected.TotalNetWeightG.Equal(manualTotal) || rejected.Items[0].UnitNetWeightGSnapshot != nil {
 		t.Fatalf("rejected shipment leaked weight writes: %#v", rejected)
 	}
 
 	overflowWeight := decimal.RequireFromString("99999999999999.999999")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(overflowWeight).Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(overflowWeight).Save(ctx); err != nil {
 		t.Fatalf("set overflow-bound product unit net weight: %v", err)
 	}
 	overflow, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
@@ -1066,7 +1066,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	if err != nil {
 		t.Fatalf("reload overflow shipment: %v", err)
 	}
-	if overflow.Status != biz.ShipmentStatusDraft || overflow.TotalNetWeightKg != nil || overflow.Items[0].UnitNetWeightKgSnapshot != nil {
+	if overflow.Status != biz.ShipmentStatusDraft || overflow.TotalNetWeightG != nil || overflow.Items[0].UnitNetWeightGSnapshot != nil {
 		t.Fatalf("overflow shipment leaked weight writes: %#v", overflow)
 	}
 
@@ -1092,7 +1092,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	if err != nil {
 		t.Fatalf("reload mismatched shipment: %v", err)
 	}
-	if mismatched.Status != biz.ShipmentStatusDraft || mismatched.TotalNetWeightKg != nil || mismatched.Items[0].UnitNetWeightKgSnapshot != nil {
+	if mismatched.Status != biz.ShipmentStatusDraft || mismatched.TotalNetWeightG != nil || mismatched.Items[0].UnitNetWeightGSnapshot != nil {
 		t.Fatalf("mismatched shipment leaked transition writes: %#v", mismatched)
 	}
 }
@@ -1492,8 +1492,8 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
-	unitNetWeightKg := decimal.RequireFromString("0.500000")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(unitNetWeightKg).Save(ctx); err != nil {
+	unitNetWeightG := decimal.RequireFromString("0.500000")
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(unitNetWeightG).Save(ctx); err != nil {
 		t.Fatalf("set product unit net weight: %v", err)
 	}
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
@@ -1512,9 +1512,9 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	requestedTotal := decimal.RequireFromString("9.900000")
 	input := &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{
-			ShipmentNo:       "SHP-IDEMPOTENT-001",
-			IdempotencyKey:   "shp-1",
-			TotalNetWeightKg: &requestedTotal,
+			ShipmentNo:      "SHP-IDEMPOTENT-001",
+			IdempotencyKey:  "shp-1",
+			TotalNetWeightG: &requestedTotal,
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			ProductID:   fixtures.productID,
@@ -1538,8 +1538,8 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	if err != nil {
 		t.Fatalf("ship idempotent shipment: %v", err)
 	}
-	if shipped.TotalNetWeightKg == nil || !shipped.TotalNetWeightKg.Equal(decimal.NewFromInt(1)) {
-		t.Fatalf("shipped auto total = %v, want 1", shipped.TotalNetWeightKg)
+	if shipped.TotalNetWeightG == nil || !shipped.TotalNetWeightG.Equal(decimal.NewFromInt(1)) {
+		t.Fatalf("shipped auto total = %v, want 1", shipped.TotalNetWeightG)
 	}
 	replayed, err = repo.CreateShipmentDraftWithItems(ctx, input)
 	if err != nil || replayed.ID != first.ID || replayed.Status != biz.ShipmentStatusShipped {
@@ -1547,7 +1547,7 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	}
 	differentTotal := decimal.RequireFromString("8.800000")
 	conflictingShipment := *input.Shipment
-	conflictingShipment.TotalNetWeightKg = &differentTotal
+	conflictingShipment.TotalNetWeightG = &differentTotal
 	if _, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{Shipment: &conflictingShipment, Items: input.Items}); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("different manual total after ship replay error = %v, want ErrIdempotencyConflict", err)
 	}
@@ -1559,8 +1559,8 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	if err != nil || replayed.ID != first.ID || replayed.Status != biz.ShipmentStatusCancelled {
 		t.Fatalf("same create intent after cancellation replay = %#v err=%v", replayed, err)
 	}
-	if cancelled.TotalNetWeightKg == nil || !cancelled.TotalNetWeightKg.Equal(decimal.NewFromInt(1)) {
-		t.Fatalf("cancelled shipment total = %v, want frozen 1", cancelled.TotalNetWeightKg)
+	if cancelled.TotalNetWeightG == nil || !cancelled.TotalNetWeightG.Equal(decimal.NewFromInt(1)) {
+		t.Fatalf("cancelled shipment total = %v, want frozen 1", cancelled.TotalNetWeightG)
 	}
 	if _, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{Shipment: &conflictingShipment, Items: input.Items}); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("different manual total after cancellation replay error = %v, want ErrIdempotencyConflict", err)

@@ -24,8 +24,8 @@ const (
 	FieldCustomerStyleNo = "customer_style_no"
 	// FieldDefaultUnitID holds the string denoting the default_unit_id field in the database.
 	FieldDefaultUnitID = "default_unit_id"
-	// FieldUnitNetWeightKg holds the string denoting the unit_net_weight_kg field in the database.
-	FieldUnitNetWeightKg = "unit_net_weight_kg"
+	// FieldUnitNetWeightG holds the string denoting the unit_net_weight_g field in the database.
+	FieldUnitNetWeightG = "unit_net_weight_g"
 	// FieldIsActive holds the string denoting the is_active field in the database.
 	FieldIsActive = "is_active"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -98,7 +98,7 @@ var Columns = []string{
 	FieldStyleNo,
 	FieldCustomerStyleNo,
 	FieldDefaultUnitID,
-	FieldUnitNetWeightKg,
+	FieldUnitNetWeightG,
 	FieldIsActive,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -168,9 +168,9 @@ func ByDefaultUnitID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDefaultUnitID, opts...).ToFunc()
 }
 
-// ByUnitNetWeightKg orders the results by the unit_net_weight_kg field.
-func ByUnitNetWeightKg(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUnitNetWeightKg, opts...).ToFunc()
+// ByUnitNetWeightG orders the results by the unit_net_weight_g field.
+func ByUnitNetWeightG(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUnitNetWeightG, opts...).ToFunc()
 }
 
 // ByIsActive orders the results by the is_active field.

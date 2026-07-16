@@ -39,6 +39,10 @@ echo "[pre-commit] 检查 required 文件的暂存状态与 executable bit"
 node "$INDEX_ROOT/scripts/qa/gate-profiles.mjs" \
   --profile fast --source index-transition --baseline HEAD
 
+echo "[pre-commit] 检查暂存 Ent schema 与 Atlas migration 同步"
+SKIP_DB_GUARD=0 QA_BASE_RANGE=HEAD...HEAD \
+  bash "$INDEX_ROOT/scripts/qa/db-guard.sh"
+
 echo "[pre-commit] 检查错误码生成同步"
 bash "$INDEX_ROOT/scripts/qa/error-code-sync.sh"
 

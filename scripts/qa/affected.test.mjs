@@ -346,21 +346,25 @@ test("affected: migration preflight SQL files run only their static fail-closed 
 });
 
 test("affected: populated upgrade fixture runs the static PostgreSQL gate contract", () => {
-  const plan = buildAffectedPlan(
-    ["scripts/qa/fixtures/populated-upgrade-20260710150001.sql"],
-    { root: ROOT },
-  );
-  assert.equal(plan.requiresFull, false);
-  assert(
-    plan.commands.some((item) =>
-      item.args.includes("scripts/qa/critical-postgres-gate.test.mjs"),
-    ),
-  );
-  assert.equal(ids(plan).includes("full"), false);
-  assert.equal(
-    ids(plan).some((id) => id.startsWith("critical-pg-")),
-    false,
-  );
+  for (const fixture of [
+    "scripts/qa/fixtures/populated-upgrade-20260710150001.sql",
+    "scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql",
+  ]) {
+    const plan = buildAffectedPlan([fixture], { root: ROOT });
+    assert.equal(plan.requiresFull, false, fixture);
+    assert(
+      plan.commands.some((item) =>
+        item.args.includes("scripts/qa/critical-postgres-gate.test.mjs"),
+      ),
+      fixture,
+    );
+    assert.equal(ids(plan).includes("full"), false, fixture);
+    assert.equal(
+      ids(plan).some((id) => id.startsWith("critical-pg-")),
+      false,
+      fixture,
+    );
+  }
 });
 
 test("affected: CI YAML parser changes rerun the structural workflow contract", () => {

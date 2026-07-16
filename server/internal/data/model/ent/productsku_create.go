@@ -155,16 +155,16 @@ func (_c *ProductSKUCreate) SetNillableDefaultUnitID(v *int) *ProductSKUCreate {
 	return _c
 }
 
-// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
-func (_c *ProductSKUCreate) SetUnitNetWeightKg(v decimal.Decimal) *ProductSKUCreate {
-	_c.mutation.SetUnitNetWeightKg(v)
+// SetUnitNetWeightG sets the "unit_net_weight_g" field.
+func (_c *ProductSKUCreate) SetUnitNetWeightG(v decimal.Decimal) *ProductSKUCreate {
+	_c.mutation.SetUnitNetWeightG(v)
 	return _c
 }
 
-// SetNillableUnitNetWeightKg sets the "unit_net_weight_kg" field if the given value is not nil.
-func (_c *ProductSKUCreate) SetNillableUnitNetWeightKg(v *decimal.Decimal) *ProductSKUCreate {
+// SetNillableUnitNetWeightG sets the "unit_net_weight_g" field if the given value is not nil.
+func (_c *ProductSKUCreate) SetNillableUnitNetWeightG(v *decimal.Decimal) *ProductSKUCreate {
 	if v != nil {
-		_c.SetUnitNetWeightKg(*v)
+		_c.SetUnitNetWeightG(*v)
 	}
 	return _c
 }
@@ -518,9 +518,9 @@ func (_c *ProductSKUCreate) createSpec() (*ProductSKU, *sqlgraph.CreateSpec) {
 		_spec.SetField(productsku.FieldPackagingVersion, field.TypeString, value)
 		_node.PackagingVersion = &value
 	}
-	if value, ok := _c.mutation.UnitNetWeightKg(); ok {
-		_spec.SetField(productsku.FieldUnitNetWeightKg, field.TypeOther, value)
-		_node.UnitNetWeightKg = &value
+	if value, ok := _c.mutation.UnitNetWeightG(); ok {
+		_spec.SetField(productsku.FieldUnitNetWeightG, field.TypeOther, value)
+		_node.UnitNetWeightG = &value
 	}
 	if value, ok := _c.mutation.IsActive(); ok {
 		_spec.SetField(productsku.FieldIsActive, field.TypeBool, value)

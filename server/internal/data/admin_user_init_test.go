@@ -136,7 +136,7 @@ func TestInitAdminUsersIfNeededRejectsWeakBootstrapPassword(t *testing.T) {
 		log.NewHelper(log.NewStdLogger(io.Discard)),
 		adminBootstrapOptions{},
 	)
-	if err == nil || !strings.Contains(err.Error(), "at least 8 characters") {
+	if err == nil || !strings.Contains(err.Error(), "8-20 characters") {
 		t.Fatalf("expected bootstrap password policy error, got %v", err)
 	}
 	mustCloseDB(t, db)

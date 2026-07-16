@@ -263,19 +263,19 @@ func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 	}
 	styleNo := "BEAR-BASE"
 	customerStyleNo := "CUS-BEAR"
-	unitNetWeightKg := decimal.RequireFromString("0.425")
+	unitNetWeightG := decimal.RequireFromString("0.425")
 	product, err := uc.CreateProduct(ctx, &biz.ProductMutation{
 		Code:            "P-001",
 		Name:            "毛绒熊",
 		StyleNo:         &styleNo,
 		CustomerStyleNo: &customerStyleNo,
 		DefaultUnitID:   unitRow.ID,
-		UnitNetWeightKg: &unitNetWeightKg,
+		UnitNetWeightG:  &unitNetWeightG,
 	})
 	if err != nil {
 		t.Fatalf("create product failed: %v", err)
 	}
-	if product.DefaultUnitID != unitRow.ID || product.StyleNo == nil || *product.StyleNo != styleNo || product.UnitNetWeightKg == nil || !product.UnitNetWeightKg.Equal(unitNetWeightKg) {
+	if product.DefaultUnitID != unitRow.ID || product.StyleNo == nil || *product.StyleNo != styleNo || product.UnitNetWeightG == nil || !product.UnitNetWeightG.Equal(unitNetWeightG) {
 		t.Fatalf("expected product fields retained, got %#v", product)
 	}
 	if _, err := uc.CreateProduct(ctx, &biz.ProductMutation{Code: "P-001", Name: "重复产品", DefaultUnitID: unitRow.ID}); !ent.IsConstraintError(err) {
@@ -285,17 +285,17 @@ func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 		t.Fatalf("expected missing unit rejected, got %v", err)
 	}
 
-	updatedUnitNetWeightKg := decimal.RequireFromString("0.5")
+	updatedUnitNetWeightG := decimal.RequireFromString("0.5")
 	updated, err := uc.UpdateProduct(ctx, product.ID, &biz.ProductMutation{
-		Code:            "P-001-A",
-		Name:            "毛绒熊 A",
-		DefaultUnitID:   unitRow.ID,
-		UnitNetWeightKg: &updatedUnitNetWeightKg,
+		Code:           "P-001-A",
+		Name:           "毛绒熊 A",
+		DefaultUnitID:  unitRow.ID,
+		UnitNetWeightG: &updatedUnitNetWeightG,
 	})
 	if err != nil {
 		t.Fatalf("update product failed: %v", err)
 	}
-	if updated.StyleNo != nil || updated.CustomerStyleNo != nil || updated.UnitNetWeightKg == nil || !updated.UnitNetWeightKg.Equal(updatedUnitNetWeightKg) {
+	if updated.StyleNo != nil || updated.CustomerStyleNo != nil || updated.UnitNetWeightG == nil || !updated.UnitNetWeightG.Equal(updatedUnitNetWeightG) {
 		t.Fatalf("expected optional product fields cleared, got %#v", updated)
 	}
 	cleared, err := uc.UpdateProduct(ctx, product.ID, &biz.ProductMutation{
@@ -306,8 +306,8 @@ func TestMasterDataRepoProductCRUDAndUnitGuard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("clear product unit net weight failed: %v", err)
 	}
-	if cleared.UnitNetWeightKg != nil {
-		t.Fatalf("expected product unit net weight cleared, got %#v", cleared.UnitNetWeightKg)
+	if cleared.UnitNetWeightG != nil {
+		t.Fatalf("expected product unit net weight cleared, got %#v", cleared.UnitNetWeightG)
 	}
 	if _, err := uc.SetProductActive(ctx, product.ID, false); err != nil {
 		t.Fatalf("disable product failed: %v", err)
@@ -348,19 +348,19 @@ func TestMasterDataRepoProductSKUCRUDAndGuards(t *testing.T) {
 	skuName := "红色小号"
 	color := "红色"
 	defaultUnitID := unitRow.ID
-	unitNetWeightKg := decimal.RequireFromString("0.425000")
+	unitNetWeightG := decimal.RequireFromString("0.425000")
 	sku, err := uc.CreateProductSKU(ctx, &biz.ProductSKUMutation{
-		ProductID:       productRow.ID,
-		SKUCode:         "SKU-RED-S",
-		SKUName:         &skuName,
-		Color:           &color,
-		DefaultUnitID:   &defaultUnitID,
-		UnitNetWeightKg: &unitNetWeightKg,
+		ProductID:      productRow.ID,
+		SKUCode:        "SKU-RED-S",
+		SKUName:        &skuName,
+		Color:          &color,
+		DefaultUnitID:  &defaultUnitID,
+		UnitNetWeightG: &unitNetWeightG,
 	})
 	if err != nil {
 		t.Fatalf("create product sku failed: %v", err)
 	}
-	if sku.ProductID != productRow.ID || sku.SKUName == nil || *sku.SKUName != skuName || sku.UnitNetWeightKg == nil || !sku.UnitNetWeightKg.Equal(unitNetWeightKg) {
+	if sku.ProductID != productRow.ID || sku.SKUName == nil || *sku.SKUName != skuName || sku.UnitNetWeightG == nil || !sku.UnitNetWeightG.Equal(unitNetWeightG) {
 		t.Fatalf("expected sku fields retained, got %#v", sku)
 	}
 	if _, err := uc.CreateProductSKU(ctx, &biz.ProductSKUMutation{ProductID: productRow.ID, SKUCode: "SKU-RED-S"}); !ent.IsConstraintError(err) {
@@ -377,7 +377,7 @@ func TestMasterDataRepoProductSKUCRUDAndGuards(t *testing.T) {
 	if err != nil {
 		t.Fatalf("update product sku failed: %v", err)
 	}
-	if updated.SKUName != nil || updated.Color != nil || updated.DefaultUnitID != nil || updated.UnitNetWeightKg != nil {
+	if updated.SKUName != nil || updated.Color != nil || updated.DefaultUnitID != nil || updated.UnitNetWeightG != nil {
 		t.Fatalf("expected optional sku fields cleared, got %#v", updated)
 	}
 	if _, err := uc.SetProductSKUActive(ctx, sku.ID, false); err != nil {

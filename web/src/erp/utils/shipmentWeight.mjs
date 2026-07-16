@@ -264,7 +264,7 @@ function resolveLineWeight(item, products, productSKUs, index) {
     }
   }
 
-  const skuWeightText = String(sku?.unit_net_weight_kg ?? '').trim()
+  const skuWeightText = String(sku?.unit_net_weight_g ?? '').trim()
   if (sku && skuWeightText) {
     const skuWeight = normalizedDecimal(skuWeightText)
     const basisUnitID = normalizedID(sku.default_unit_id)
@@ -289,11 +289,11 @@ function resolveLineWeight(item, products, productSKUs, index) {
     return {
       basisUnitID,
       source: 'sku',
-      unitWeightKg: skuWeight,
+      unitWeightG: skuWeight,
     }
   }
 
-  const productWeight = normalizedDecimal(product.unit_net_weight_kg)
+  const productWeight = normalizedDecimal(product.unit_net_weight_g)
   const productUnitID = normalizedID(product.default_unit_id)
   if (!productWeight || !productUnitID) {
     return {
@@ -307,11 +307,11 @@ function resolveLineWeight(item, products, productSKUs, index) {
   return {
     basisUnitID: productUnitID,
     source: 'product',
-    unitWeightKg: productWeight,
+    unitWeightG: productWeight,
   }
 }
 
-export function normalizeNetWeightKg(value) {
+export function normalizeNetWeightG(value) {
   const decimal = normalizedDecimal(value)
   if (
     !decimal ||
@@ -323,7 +323,7 @@ export function normalizeNetWeightKg(value) {
 }
 
 export function normalizeShipmentQuantity(value) {
-  return normalizeNetWeightKg(value)
+  return normalizeNetWeightG(value)
 }
 
 export function hasFinalShipmentWeight(status) {
@@ -334,9 +334,9 @@ export function hasFinalShipmentWeight(status) {
   )
 }
 
-export function calculateShipmentLineNetWeightKg(quantity, unitWeightKg) {
+export function calculateShipmentLineNetWeightG(quantity, unitWeightG) {
   const normalizedQuantity = normalizedDecimal(quantity)
-  const normalizedUnitWeight = normalizedDecimal(unitWeightKg)
+  const normalizedUnitWeight = normalizedDecimal(unitWeightG)
   if (!normalizedQuantity || !normalizedUnitWeight) return null
   const rounded = roundProductToWeightScale(
     multiplyUnsignedDecimalStrings(
@@ -376,7 +376,7 @@ export function resolveShipmentWeightPreview({
       complete: false,
       issues: [lineIssue(0, 'items_missing', '请先添加出货明细')],
       linePreviews: [],
-      totalNetWeightKg: null,
+      totalNetWeightG: null,
     }
   }
 
@@ -413,15 +413,15 @@ export function resolveShipmentWeightPreview({
     }
     const exactLineWeight = multiplyUnsignedDecimalStrings(
       quantity.scaled,
-      resolved.unitWeightKg.scaled
+      resolved.unitWeightG.scaled
     )
     exactTotal = addUnsignedDecimalStrings(exactTotal, exactLineWeight)
     linePreviews.push({
       basisUnitID: resolved.basisUnitID,
       lineNumber: index + 1,
       source: resolved.source,
-      unitNetWeightKg: formatScaledDecimal(resolved.unitWeightKg.scaled),
-      lineNetWeightKg: formatScaledDecimal(
+      unitNetWeightG: formatScaledDecimal(resolved.unitWeightG.scaled),
+      lineNetWeightG: formatScaledDecimal(
         roundProductToWeightScale(exactLineWeight)
       ),
     })
@@ -432,7 +432,7 @@ export function resolveShipmentWeightPreview({
       complete: false,
       issues,
       linePreviews,
-      totalNetWeightKg: null,
+      totalNetWeightG: null,
     }
   }
 
@@ -450,14 +450,14 @@ export function resolveShipmentWeightPreview({
       complete: false,
       issues: [issue],
       linePreviews,
-      totalNetWeightKg: null,
+      totalNetWeightG: null,
     }
   }
   return {
     complete: true,
     issues: [],
     linePreviews,
-    totalNetWeightKg: formatScaledDecimal(roundedTotal),
+    totalNetWeightG: formatScaledDecimal(roundedTotal),
   }
 }
 
@@ -468,7 +468,7 @@ export function resolveShipmentSubmittedTotalNetWeight({
   items = [],
 } = {}) {
   if (preview?.complete === true) return null
-  const normalizedManual = normalizeNetWeightKg(manualValue)
+  const normalizedManual = normalizeNetWeightG(manualValue)
   if (!normalizedManual) return null
   return manualItemsSignature === shipmentWeightItemsSignature(items)
     ? normalizedManual

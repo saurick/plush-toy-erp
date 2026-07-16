@@ -71,9 +71,9 @@ func initAdminUsersIfNeeded(ctx context.Context, d *Data, cfg *conf.Data, l *log
 			}
 		}
 		return fmt.Errorf(
-			"admin bootstrap password must contain at least %d characters and no more than %d bytes",
+			"admin bootstrap password must contain %d-%d characters",
 			biz.AdminPasswordMinLength,
-			biz.AdminPasswordMaxBytes,
+			biz.AdminPasswordMaxLength,
 		)
 	}
 

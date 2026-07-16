@@ -96,9 +96,9 @@ func Quantity(v decimal.Decimal) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldEQ(FieldQuantity, v))
 }
 
-// UnitNetWeightKgSnapshot applies equality check predicate on the "unit_net_weight_kg_snapshot" field. It's identical to UnitNetWeightKgSnapshotEQ.
-func UnitNetWeightKgSnapshot(v decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldEQ(FieldUnitNetWeightKgSnapshot, v))
+// UnitNetWeightGSnapshot applies equality check predicate on the "unit_net_weight_g_snapshot" field. It's identical to UnitNetWeightGSnapshotEQ.
+func UnitNetWeightGSnapshot(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldUnitNetWeightGSnapshot, v))
 }
 
 // UnitPriceSnapshot applies equality check predicate on the "unit_price_snapshot" field. It's identical to UnitPriceSnapshotEQ.
@@ -341,54 +341,54 @@ func QuantityLTE(v decimal.Decimal) predicate.ShipmentItem {
 	return predicate.ShipmentItem(sql.FieldLTE(FieldQuantity, v))
 }
 
-// UnitNetWeightKgSnapshotEQ applies the EQ predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotEQ(v decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldEQ(FieldUnitNetWeightKgSnapshot, v))
+// UnitNetWeightGSnapshotEQ applies the EQ predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotEQ(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldEQ(FieldUnitNetWeightGSnapshot, v))
 }
 
-// UnitNetWeightKgSnapshotNEQ applies the NEQ predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotNEQ(v decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldNEQ(FieldUnitNetWeightKgSnapshot, v))
+// UnitNetWeightGSnapshotNEQ applies the NEQ predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotNEQ(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNEQ(FieldUnitNetWeightGSnapshot, v))
 }
 
-// UnitNetWeightKgSnapshotIn applies the In predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldIn(FieldUnitNetWeightKgSnapshot, vs...))
+// UnitNetWeightGSnapshotIn applies the In predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIn(FieldUnitNetWeightGSnapshot, vs...))
 }
 
-// UnitNetWeightKgSnapshotNotIn applies the NotIn predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotNotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldNotIn(FieldUnitNetWeightKgSnapshot, vs...))
+// UnitNetWeightGSnapshotNotIn applies the NotIn predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotNotIn(vs ...decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotIn(FieldUnitNetWeightGSnapshot, vs...))
 }
 
-// UnitNetWeightKgSnapshotGT applies the GT predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotGT(v decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldGT(FieldUnitNetWeightKgSnapshot, v))
+// UnitNetWeightGSnapshotGT applies the GT predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotGT(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGT(FieldUnitNetWeightGSnapshot, v))
 }
 
-// UnitNetWeightKgSnapshotGTE applies the GTE predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotGTE(v decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldGTE(FieldUnitNetWeightKgSnapshot, v))
+// UnitNetWeightGSnapshotGTE applies the GTE predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotGTE(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldGTE(FieldUnitNetWeightGSnapshot, v))
 }
 
-// UnitNetWeightKgSnapshotLT applies the LT predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotLT(v decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldLT(FieldUnitNetWeightKgSnapshot, v))
+// UnitNetWeightGSnapshotLT applies the LT predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotLT(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLT(FieldUnitNetWeightGSnapshot, v))
 }
 
-// UnitNetWeightKgSnapshotLTE applies the LTE predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotLTE(v decimal.Decimal) predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldLTE(FieldUnitNetWeightKgSnapshot, v))
+// UnitNetWeightGSnapshotLTE applies the LTE predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotLTE(v decimal.Decimal) predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldLTE(FieldUnitNetWeightGSnapshot, v))
 }
 
-// UnitNetWeightKgSnapshotIsNil applies the IsNil predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotIsNil() predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldIsNull(FieldUnitNetWeightKgSnapshot))
+// UnitNetWeightGSnapshotIsNil applies the IsNil predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotIsNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldIsNull(FieldUnitNetWeightGSnapshot))
 }
 
-// UnitNetWeightKgSnapshotNotNil applies the NotNil predicate on the "unit_net_weight_kg_snapshot" field.
-func UnitNetWeightKgSnapshotNotNil() predicate.ShipmentItem {
-	return predicate.ShipmentItem(sql.FieldNotNull(FieldUnitNetWeightKgSnapshot))
+// UnitNetWeightGSnapshotNotNil applies the NotNil predicate on the "unit_net_weight_g_snapshot" field.
+func UnitNetWeightGSnapshotNotNil() predicate.ShipmentItem {
+	return predicate.ShipmentItem(sql.FieldNotNull(FieldUnitNetWeightGSnapshot))
 }
 
 // UnitPriceSnapshotEQ applies the EQ predicate on the "unit_price_snapshot" field.

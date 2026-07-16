@@ -4,6 +4,7 @@ import {
   CloseCircleOutlined,
   DownOutlined,
   DownloadOutlined,
+  EyeOutlined,
   FileDoneOutlined,
   LinkOutlined,
   PlusOutlined,
@@ -68,6 +69,7 @@ import {
   getColumnLabel,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import QualityInspectionPurchaseReturnModal from '../components/quality-inspections/QualityInspectionPurchaseReturnModal.jsx'
 import {
@@ -235,6 +237,7 @@ export default function V1QualityInspectionsPage() {
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [inspectionModal, setInspectionModal] = useState(null)
+  const [detailInspection, setDetailInspection] = useState(null)
   const [purchaseReturnModal, setPurchaseReturnModal] = useState(null)
   const [purchaseReturnLoading, setPurchaseReturnLoading] = useState(false)
   const [returnedInspectionIDs, setReturnedInspectionIDs] = useState(
@@ -254,6 +257,13 @@ export default function V1QualityInspectionsPage() {
   const purchaseReturnInFlightRef = useRef(false)
   const purchaseReturnAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
+  )
+  const detailRequestRef = useRef(0)
+  useEffect(
+    () => () => {
+      detailRequestRef.current += 1
+    },
+    []
   )
   const routePurchaseOrderID = searchParamPositiveIntText(
     searchParams,
@@ -640,6 +650,29 @@ export default function V1QualityInspectionsPage() {
   const openDecision = useCallback((mode, inspection) => {
     inspectionAttachmentRef.current?.clearPendingAttachments()
     setInspectionModal({ mode, inspection })
+  }, [])
+
+  const openQualityInspectionDetails = useCallback(async (inspection) => {
+    if (!inspection?.id) return
+    const requestID = detailRequestRef.current + 1
+    detailRequestRef.current = requestID
+    setSelectedRow(inspection)
+    setDetailInspection(inspection)
+    try {
+      const detail = await getQualityInspection({ id: inspection.id })
+      if (detailRequestRef.current === requestID && detail?.id) {
+        setDetailInspection(detail)
+      }
+    } catch (error) {
+      if (detailRequestRef.current === requestID) {
+        message.warning(getActionErrorMessage(error, '刷新质量检验详情'))
+      }
+    }
+  }, [])
+
+  const closeQualityInspectionDetails = useCallback(() => {
+    detailRequestRef.current += 1
+    setDetailInspection(null)
   }, [])
 
   const closeModal = useCallback(() => {
@@ -1256,6 +1289,14 @@ export default function V1QualityInspectionsPage() {
               相关单据 <DownOutlined />
             </Button>
           </Dropdown>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            disabled={!selectedRow}
+            onClick={() => openQualityInspectionDetails(selectedRow)}
+          >
+            查看详情
+          </Button>
           <Popconfirm
             title="确认提交质检并冻结该批次？"
             onConfirm={() =>
@@ -1365,6 +1406,7 @@ export default function V1QualityInspectionsPage() {
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
         })}
+        onOpenRecord={openQualityInspectionDetails}
         emptyDescription="暂无质量检验单"
       />
 
@@ -1386,6 +1428,25 @@ export default function V1QualityInspectionsPage() {
         onCancel={closePurchaseReturn}
         onSubmit={submitPurchaseReturn}
       />
+
+      <BusinessRecordDetailsModal
+        columns={visibleDataColumns}
+        description="查看当前质检单的来源、批次、检验状态和判定结果；如需提交、判定或取消，请使用列表上方的当前操作区。"
+        open={Boolean(detailInspection)}
+        record={detailInspection}
+        title="质量检验详情"
+        onClose={closeQualityInspectionDetails}
+      >
+        <BusinessAttachmentPanel
+          ownerType="quality_inspection"
+          ownerId={detailInspection?.id}
+          title="质检附件"
+          description="查看不良照片、检验报告、让步说明或批次异常证据。"
+          canUpload={false}
+          canDelete={false}
+          variant="inline"
+        />
+      </BusinessRecordDetailsModal>
 
       <BusinessFormModal
         title={modalTitle}

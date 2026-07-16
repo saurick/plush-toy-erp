@@ -254,8 +254,8 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 	}
 
 	plannedShipAt := time.Date(2026, 7, 10, 12, 34, 56, 123456789, time.FixedZone("UTC+8", 8*60*60))
-	manualTotalNetWeightKg := decimal.RequireFromString("12.345600")
-	shipment := &ShipmentCreate{ShipmentNo: "SHIP-1", IdempotencyKey: "  SHIPMENT:1:create  ", PlannedShipAt: &plannedShipAt, TotalNetWeightKg: &manualTotalNetWeightKg}
+	manualTotalNetWeightG := decimal.RequireFromString("12.345600")
+	shipment := &ShipmentCreate{ShipmentNo: "SHIP-1", IdempotencyKey: "  SHIPMENT:1:create  ", PlannedShipAt: &plannedShipAt, TotalNetWeightG: &manualTotalNetWeightG}
 	normalizedShipment, err := normalizeShipmentCreate(shipment)
 	if err != nil {
 		t.Fatalf("normalizeShipmentCreate() error = %v", err)
@@ -263,8 +263,8 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 	if normalizedShipment.IdempotencyKey != "SHIPMENT:1:create" {
 		t.Fatalf("expected shipment idempotency key trimmed, got %q", normalizedShipment.IdempotencyKey)
 	}
-	if normalizedShipment.TotalNetWeightKg == nil || !normalizedShipment.TotalNetWeightKg.Equal(manualTotalNetWeightKg) {
-		t.Fatalf("expected shipment manual total net weight retained, got %#v", normalizedShipment.TotalNetWeightKg)
+	if normalizedShipment.TotalNetWeightG == nil || !normalizedShipment.TotalNetWeightG.Equal(manualTotalNetWeightG) {
+		t.Fatalf("expected shipment manual total net weight retained, got %#v", normalizedShipment.TotalNetWeightG)
 	}
 	expectedPlannedShipAt := plannedShipAt.UTC().Truncate(time.Microsecond)
 	if normalizedShipment.PlannedShipAt == nil || normalizedShipment.PlannedShipAt.Location() != time.UTC || !normalizedShipment.PlannedShipAt.Equal(expectedPlannedShipAt) || normalizedShipment.PlannedShipAt.Nanosecond()%1000 != 0 {
@@ -280,7 +280,7 @@ func TestNormalizeOperationalFactInputsUseCoreValueGuards(t *testing.T) {
 		decimal.RequireFromString("0.0000001"),
 		decimal.RequireFromString("100000000000000"),
 	} {
-		shipment.TotalNetWeightKg = &invalidWeight
+		shipment.TotalNetWeightG = &invalidWeight
 		if _, err := normalizeShipmentCreate(shipment); !errors.Is(err, ErrBadParam) {
 			t.Fatalf("expected invalid shipment total net weight %s rejected, got %v", invalidWeight, err)
 		}

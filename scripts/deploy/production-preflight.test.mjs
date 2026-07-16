@@ -216,6 +216,56 @@ test("production preflight rejects the known local admin password", () => {
   assert.match(result.stderr, /不得使用已知的本地开发默认密码/u);
 });
 
+test("production preflight rejects admin passwords outside 8 to 20 characters", () => {
+  for (const password of ["1234567", "123456789012345678901"]) {
+    const fixture = writeFixture();
+    const env = fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace(
+        "APP_ADMIN_USERNAME=admin",
+        `APP_ADMIN_USERNAME=admin\nAPP_ADMIN_PASSWORD=${password}`,
+      )
+      .replace("BOOTSTRAP_ADMIN_ONCE=false", "BOOTSTRAP_ADMIN_ONCE=true");
+    fs.writeFileSync(fixture.envFile, env, "utf8");
+    const result = runPreflight(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /APP_ADMIN_PASSWORD 必须为 8 到 20 字符/u);
+  }
+});
+
+test("production preflight enforces the bcrypt 72-byte boundary", () => {
+  const fixture = writeFixture();
+  const password = "😀".repeat(20);
+  const env = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace(
+      "APP_ADMIN_USERNAME=admin",
+      `APP_ADMIN_USERNAME=admin\nAPP_ADMIN_PASSWORD=${password}`,
+    )
+    .replace("BOOTSTRAP_ADMIN_ONCE=false", "BOOTSTRAP_ADMIN_ONCE=true");
+  fs.writeFileSync(fixture.envFile, env, "utf8");
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /不得超过 72 字节/u);
+});
+
+test("production preflight counts UTF-8 characters independently of the process locale", () => {
+  const fixture = writeFixture();
+  const password = "测试密码安全有效";
+  const env = fs
+    .readFileSync(fixture.envFile, "utf8")
+    .replace(
+      "APP_ADMIN_USERNAME=admin",
+      `APP_ADMIN_USERNAME=admin\nAPP_ADMIN_PASSWORD=${password}`,
+    )
+    .replace("BOOTSTRAP_ADMIN_ONCE=false", "BOOTSTRAP_ADMIN_ONCE=true");
+  fs.writeFileSync(fixture.envFile, env, "utf8");
+
+  const result = runPreflight(fixture, [], { env: { LC_ALL: "C" } });
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+});
+
 test("production preflight writes sanitized report to out file", () => {
   const fixture = writeFixture();
   const reportPath = path.join(

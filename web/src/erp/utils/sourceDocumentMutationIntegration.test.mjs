@@ -13,12 +13,18 @@ const pageSources = [
     end: 'const runLifecycleAction',
     saveCall: 'saveSalesOrderWithItems',
     allItemsCall: 'listAllSalesOrderItems',
+    detailsItemsLoader: 'loadAllSalesOrderItemsForPreview',
     bindCall: /setEditingOrder\(savedOrder\)/u,
     openStart: 'const openEditOrder = async (order) => {',
     openEnd: 'const saveOrder = async () => {',
     editBindCall: /setEditingOrder\(order\)/u,
     editModalCall: /setOrderModalOpen\(true\)/u,
-    doubleClickCall: /onDoubleClick:\s*\(\)\s*=>\s*openEditOrder\(record\)/u,
+    recordOpenCall: /onOpenRecord=\{openSalesOrderRecord\}/u,
+    detailsOpenStart: 'const openSalesOrderDetails = (order) => {',
+    detailsOpenEnd: 'const openSalesOrderRecord = (order) => {',
+    detailsOpenCall: /openSalesOrderDetails\(order\)/u,
+    recordOpenStart: 'const openSalesOrderRecord = (order) => {',
+    recordOpenEditCall: /openEditOrder\(order\)/u,
   },
   {
     name: 'purchase order',
@@ -30,12 +36,18 @@ const pageSources = [
     end: 'const runLifecycleAction',
     saveCall: 'savePurchaseOrderWithItems',
     allItemsCall: 'listAllPurchaseOrderItems',
+    detailsItemsLoader: 'loadAllPurchaseOrderItemsForPreview',
     bindCall: /setEditingOrder\(savedOrder\)/u,
     openStart: 'const openEditModal = async (record) => {',
     openEnd: 'const resolveSupplierSnapshot',
     editBindCall: /setEditingOrder\(record\)/u,
     editModalCall: /setModalOpen\(true\)/u,
-    doubleClickCall: /onDoubleClick:\s*\(\)\s*=>\s*openEditModal\(record\)/u,
+    recordOpenCall: /onOpenRecord=\{openPurchaseOrderRecord\}/u,
+    detailsOpenStart: 'const openPurchaseOrderDetails = (record) => {',
+    detailsOpenEnd: 'const openPurchaseOrderRecord = (record) => {',
+    detailsOpenCall: /openPurchaseOrderDetails\(record\)/u,
+    recordOpenStart: 'const openPurchaseOrderRecord = (record) => {',
+    recordOpenEditCall: /openEditModal\(record\)/u,
   },
   {
     name: 'outsourcing order',
@@ -47,12 +59,18 @@ const pageSources = [
     end: 'const runLifecycleAction',
     saveCall: 'saveOutsourcingOrderWithItems',
     allItemsCall: 'listAllOutsourcingOrderItems',
+    detailsItemsLoader: 'loadAllOutsourcingOrderItemsForPreview',
     bindCall: /setEditingRow\(savedOrder\)/u,
     openStart: 'const openEdit = async (record) => {',
     openEnd: 'const closeModal',
     editBindCall: /setEditingRow\(record\)/u,
     editModalCall: /setModalOpen\(true\)/u,
-    doubleClickCall: /onDoubleClick:\s*\(\)\s*=>\s*openEdit\(record\)/u,
+    recordOpenCall: /onOpenRecord=\{openOutsourcingOrderRecord\}/u,
+    detailsOpenStart: 'const openOutsourcingOrderDetails = (record) => {',
+    detailsOpenEnd: 'const openOutsourcingOrderRecord = (record) => {',
+    detailsOpenCall: /openOutsourcingOrderDetails\(record\)/u,
+    recordOpenStart: 'const openOutsourcingOrderRecord = (record) => {',
+    recordOpenEditCall: /openEdit\(record\)/u,
   },
 ]
 
@@ -105,7 +123,23 @@ for (const page of pageSources) {
     assert.doesNotMatch(beforeEnterEditing, page.editModalCall)
 
     assert.match(page.source, /createSourceDocumentOpenEditController\(/u)
-    assert.match(page.source, page.doubleClickCall)
+    assert.match(page.source, page.recordOpenCall)
+    const recordOpen = functionSlice(
+      page.source,
+      page.recordOpenStart,
+      page.openEnd
+    )
+    assert.match(recordOpen, page.recordOpenEditCall)
+    assert.match(recordOpen, page.detailsOpenCall)
+    const detailsOpen = functionSlice(
+      page.source,
+      page.detailsOpenStart,
+      page.detailsOpenEnd
+    )
+    assert.match(
+      detailsOpen,
+      /sourceDocumentOpenEditController\.invalidate\(\)/u
+    )
     const invalidationCount = (
       page.source.match(/sourceDocumentOpenEditController\.invalidate\(\)/gu) ||
       []
@@ -181,6 +215,32 @@ test('sales and purchase edit actions expose item-read loading and disable repea
     /key === 'order-items'[\s\S]*?openEditModal\(singleSelectedOrder\)/u
   )
   assert.match(outsourcingPage.source, /openEdit\(selectedRow\)/u)
+})
+
+test('source-document read-only modals load complete line items', () => {
+  for (const page of pageSources) {
+    const detailsModal = functionSlice(
+      page.source,
+      '<BusinessRecordDetailsModal',
+      '<CollaborationTaskPanel'
+    )
+    assert.match(detailsModal, /lineItems=\{/u)
+    assert.match(detailsModal, new RegExp(`load: ${page.detailsItemsLoader}`))
+    assert.doesNotMatch(detailsModal, /列表首列展开/u)
+  }
+
+  const receiptSource = readFileSync(
+    new URL('../pages/V1PurchaseReceiptsPage.jsx', import.meta.url),
+    'utf8'
+  )
+  const receiptDetailsModal = functionSlice(
+    receiptSource,
+    '<BusinessRecordDetailsModal',
+    '<PurchaseReceiptExceptionModal'
+  )
+  assert.match(receiptDetailsModal, /lineItems=\{/u)
+  assert.match(receiptDetailsModal, /items: detailReceipt\?\.items/u)
+  assert.doesNotMatch(receiptDetailsModal, /列表首列展开/u)
 })
 
 test('outsourcing order excludes canceled rows from editing and save parameters', () => {

@@ -49,6 +49,21 @@ sha256_file() {
   fail "缺少 sha256sum / shasum，无法校验 Chromium seccomp profile"
 }
 
+utf8_codepoint_count() {
+  local value="$1"
+  local utf32_bytes
+  command -v iconv >/dev/null 2>&1 || fail "缺少 iconv，无法按 UTF-8 字符校验管理员密码"
+  if ! utf32_bytes="$(printf "%s" "$value" | iconv -f UTF-8 -t UTF-32LE 2>/dev/null | wc -c | tr -d '[:space:]')"; then
+    fail "APP_ADMIN_PASSWORD 必须是有效 UTF-8"
+  fi
+  [[ "$utf32_bytes" =~ ^[0-9]+$ && $((utf32_bytes % 4)) -eq 0 ]] || fail "APP_ADMIN_PASSWORD UTF-8 字符计数失败"
+  printf "%s" "$((utf32_bytes / 4))"
+}
+
+byte_count() {
+  LC_ALL=C printf "%s" "$1" | wc -c | tr -d '[:space:]'
+}
+
 trim() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"
@@ -283,7 +298,10 @@ else
     if grep -Eiq "$placeholder_pattern" <<<"$app_admin_password"; then
       fail "APP_ADMIN_PASSWORD 仍包含 placeholder"
     fi
-    [[ "${#app_admin_password}" -ge 8 ]] || fail "APP_ADMIN_PASSWORD 至少需要 8 字符"
+    app_admin_password_chars="$(utf8_codepoint_count "$app_admin_password")"
+    app_admin_password_bytes="$(byte_count "$app_admin_password")"
+    [[ "$app_admin_password_chars" -ge 8 && "$app_admin_password_chars" -le 20 ]] || fail "APP_ADMIN_PASSWORD 必须为 8 到 20 字符"
+    [[ "$app_admin_password_bytes" -le 72 ]] || fail "APP_ADMIN_PASSWORD UTF-8 编码后不得超过 72 字节"
     [[ "$bootstrap_admin_once" == "true" ]] || fail "APP_ADMIN_PASSWORD 只能在 BOOTSTRAP_ADMIN_ONCE=true 的首次初始化窗口临时注入"
   fi
   if [[ "$bootstrap_admin_once" == "true" && -z "$app_admin_password" ]]; then

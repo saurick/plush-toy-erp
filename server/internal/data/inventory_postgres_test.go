@@ -68,8 +68,8 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 
-	unitNetWeightKg := decimal.RequireFromString("0.425000")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(unitNetWeightKg).Save(ctx); err != nil {
+	unitNetWeightG := decimal.RequireFromString("0.425000")
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(unitNetWeightG).Save(ctx); err != nil {
 		t.Fatalf("set postgres product unit net weight: %v", err)
 	}
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
@@ -89,7 +89,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	shipmentNo := "PG-SHP-WEIGHT-" + fixtures.suffix
 	requestedTotal := decimal.RequireFromString("9.900000")
 	shipmentInput := &biz.ShipmentCreateWithItems{
-		Shipment: &biz.ShipmentCreate{ShipmentNo: shipmentNo, IdempotencyKey: shipmentNo, TotalNetWeightKg: &requestedTotal},
+		Shipment: &biz.ShipmentCreate{ShipmentNo: shipmentNo, IdempotencyKey: shipmentNo, TotalNetWeightG: &requestedTotal},
 		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2)}},
 	}
 	created, err := repo.CreateShipmentDraftWithItems(ctx, shipmentInput)
@@ -100,7 +100,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ship postgres weighted shipment: %v", err)
 	}
-	if shipped.TotalNetWeightKg == nil || !shipped.TotalNetWeightKg.Equal(decimal.RequireFromString("0.850000")) || len(shipped.Items) != 1 || shipped.Items[0].UnitNetWeightKgSnapshot == nil || !shipped.Items[0].UnitNetWeightKgSnapshot.Equal(unitNetWeightKg) {
+	if shipped.TotalNetWeightG == nil || !shipped.TotalNetWeightG.Equal(decimal.RequireFromString("0.850000")) || len(shipped.Items) != 1 || shipped.Items[0].UnitNetWeightGSnapshot == nil || !shipped.Items[0].UnitNetWeightGSnapshot.Equal(unitNetWeightG) {
 		t.Fatalf("postgres frozen shipment weights = %#v", shipped)
 	}
 	replayed, err := repo.CreateShipmentDraftWithItems(ctx, shipmentInput)
@@ -109,28 +109,28 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	}
 	changedRequestedTotal := decimal.RequireFromString("8.800000")
 	changedShipment := *shipmentInput.Shipment
-	changedShipment.TotalNetWeightKg = &changedRequestedTotal
+	changedShipment.TotalNetWeightG = &changedRequestedTotal
 	changedInput := &biz.ShipmentCreateWithItems{Shipment: &changedShipment, Items: shipmentInput.Items}
 	if _, err := repo.CreateShipmentDraftWithItems(ctx, changedInput); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("postgres changed create intent after ship error = %v, want ErrIdempotencyConflict", err)
 	}
 
 	changedWeight := decimal.RequireFromString("0.900000")
-	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightKg(changedWeight).Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(fixtures.productID).SetUnitNetWeightG(changedWeight).Save(ctx); err != nil {
 		t.Fatalf("change postgres product unit net weight: %v", err)
 	}
 	repeated, err := repo.ShipShipment(ctx, created.ID)
 	if err != nil {
 		t.Fatalf("repeat postgres shipment: %v", err)
 	}
-	if repeated.TotalNetWeightKg == nil || !repeated.TotalNetWeightKg.Equal(decimal.RequireFromString("0.850000")) || repeated.Items[0].UnitNetWeightKgSnapshot == nil || !repeated.Items[0].UnitNetWeightKgSnapshot.Equal(unitNetWeightKg) {
+	if repeated.TotalNetWeightG == nil || !repeated.TotalNetWeightG.Equal(decimal.RequireFromString("0.850000")) || repeated.Items[0].UnitNetWeightGSnapshot == nil || !repeated.Items[0].UnitNetWeightGSnapshot.Equal(unitNetWeightG) {
 		t.Fatalf("postgres repeat shipment recalculated weight: %#v", repeated)
 	}
 	cancelled, err := repo.CancelShippedShipment(ctx, created.ID)
 	if err != nil {
 		t.Fatalf("cancel postgres shipment: %v", err)
 	}
-	if cancelled.TotalNetWeightKg == nil || !cancelled.TotalNetWeightKg.Equal(decimal.RequireFromString("0.850000")) || cancelled.Items[0].UnitNetWeightKgSnapshot == nil || !cancelled.Items[0].UnitNetWeightKgSnapshot.Equal(unitNetWeightKg) {
+	if cancelled.TotalNetWeightG == nil || !cancelled.TotalNetWeightG.Equal(decimal.RequireFromString("0.850000")) || cancelled.Items[0].UnitNetWeightGSnapshot == nil || !cancelled.Items[0].UnitNetWeightGSnapshot.Equal(unitNetWeightG) {
 		t.Fatalf("postgres cancellation changed frozen weight: %#v", cancelled)
 	}
 	replayed, err = repo.CreateShipmentDraftWithItems(ctx, shipmentInput)
@@ -141,13 +141,13 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 		t.Fatalf("postgres changed create intent after cancellation error = %v, want ErrIdempotencyConflict", err)
 	}
 
-	if _, err := client.Product.UpdateOneID(fixtures.productID).ClearUnitNetWeightKg().Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(fixtures.productID).ClearUnitNetWeightG().Save(ctx); err != nil {
 		t.Fatalf("clear postgres product unit net weight: %v", err)
 	}
 	manualTotal := decimal.RequireFromString("7.700000")
 	incompleteNo := "PG-SHP-WEIGHT-MANUAL-" + fixtures.suffix
 	incomplete, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
-		Shipment: &biz.ShipmentCreate{ShipmentNo: incompleteNo, IdempotencyKey: incompleteNo, TotalNetWeightKg: &manualTotal},
+		Shipment: &biz.ShipmentCreate{ShipmentNo: incompleteNo, IdempotencyKey: incompleteNo, TotalNetWeightG: &manualTotal},
 		Items:    []*biz.ShipmentItemCreate{{ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
 	})
 	if err != nil {
@@ -157,19 +157,19 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ship postgres manual-weight shipment: %v", err)
 	}
-	if incomplete.TotalNetWeightKg == nil || !incomplete.TotalNetWeightKg.Equal(manualTotal) || len(incomplete.Items) != 1 || incomplete.Items[0].UnitNetWeightKgSnapshot != nil {
+	if incomplete.TotalNetWeightG == nil || !incomplete.TotalNetWeightG.Equal(manualTotal) || len(incomplete.Items) != 1 || incomplete.Items[0].UnitNetWeightGSnapshot != nil {
 		t.Fatalf("postgres incomplete shipment did not preserve manual total: %#v", incomplete)
 	}
 
 	rejectedProduct := createTestProduct(t, ctx, client, fixtures.unitID, "PG-PRD-WEIGHT-ROLLBACK-"+fixtures.suffix)
 	rejectedWeight := decimal.RequireFromString("0.500000")
-	if _, err := client.Product.UpdateOneID(rejectedProduct.ID).SetUnitNetWeightKg(rejectedWeight).Save(ctx); err != nil {
+	if _, err := client.Product.UpdateOneID(rejectedProduct.ID).SetUnitNetWeightG(rejectedWeight).Save(ctx); err != nil {
 		t.Fatalf("set postgres rollback product unit net weight: %v", err)
 	}
 	rejectedManualTotal := decimal.RequireFromString("6.600000")
 	rejectedNo := "PG-SHP-WEIGHT-ROLLBACK-" + fixtures.suffix
 	rejected, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
-		Shipment: &biz.ShipmentCreate{ShipmentNo: rejectedNo, IdempotencyKey: rejectedNo, TotalNetWeightKg: &rejectedManualTotal},
+		Shipment: &biz.ShipmentCreate{ShipmentNo: rejectedNo, IdempotencyKey: rejectedNo, TotalNetWeightG: &rejectedManualTotal},
 		Items:    []*biz.ShipmentItemCreate{{ProductID: rejectedProduct.ID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(1)}},
 	})
 	if err != nil {
@@ -182,7 +182,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatalf("reload postgres rollback shipment: %v", err)
 	}
-	if rejected.Status != biz.ShipmentStatusDraft || rejected.TotalNetWeightKg == nil || !rejected.TotalNetWeightKg.Equal(rejectedManualTotal) || len(rejected.Items) != 1 || rejected.Items[0].UnitNetWeightKgSnapshot != nil {
+	if rejected.Status != biz.ShipmentStatusDraft || rejected.TotalNetWeightG == nil || !rejected.TotalNetWeightG.Equal(rejectedManualTotal) || len(rejected.Items) != 1 || rejected.Items[0].UnitNetWeightGSnapshot != nil {
 		t.Fatalf("postgres failed shipment leaked weight writes: %#v", rejected)
 	}
 }

@@ -202,6 +202,7 @@ test-populated-upgrade)
   root_dir="$(cd "$script_dir/.." && pwd)"
   migration_dir="$root_dir/server/internal/data/model/migrate"
   fixture_file="$root_dir/scripts/qa/fixtures/populated-upgrade-20260710150001.sql"
+  net_weight_fixture_file="$root_dir/scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql"
   preflight_script="$root_dir/scripts/qa/populated-upgrade-preflight.sh"
   cutover_preflight_sql="$root_dir/scripts/qa/customer-config-cutover-20260714055825.sql"
   populated_report_file=""
@@ -217,7 +218,7 @@ test-populated-upgrade)
       exit 1
     fi
   done
-  for required_file in "$fixture_file" "$preflight_script" "$cutover_preflight_sql"; do
+  for required_file in "$fixture_file" "$net_weight_fixture_file" "$preflight_script" "$cutover_preflight_sql"; do
     if [[ ! -f "$required_file" ]]; then
       echo "ERROR: test-populated-upgrade required file is missing: $required_file" >&2
       exit 1
@@ -446,6 +447,200 @@ SQL
       --to-version "$version"
   }
 
+  assert_net_weight_kg_fixture() {
+    local readback
+    readback="$(
+      populated_psql -Atq <<'SQL'
+SELECT weighted_product.unit_net_weight_kg::text
+       || '|' || weighted_sku.unit_net_weight_kg::text
+       || '|' || weighted_shipment.total_net_weight_kg::text
+       || '|' || weighted_shipment.requested_total_net_weight_kg::text
+       || '|' || weighted_item.unit_net_weight_kg_snapshot::text
+       || '|' || (
+         (null_product.unit_net_weight_kg IS NULL)::int
+         + (null_sku.unit_net_weight_kg IS NULL)::int
+         + (null_shipment.total_net_weight_kg IS NULL)::int
+         + (null_shipment.requested_total_net_weight_kg IS NULL)::int
+         + (null_item.unit_net_weight_kg_snapshot IS NULL)::int
+       )::text
+  FROM products AS weighted_product,
+       products AS null_product,
+       product_skus AS weighted_sku,
+       product_skus AS null_sku,
+       shipments AS weighted_shipment,
+       shipments AS null_shipment,
+       shipment_items AS weighted_item,
+       shipment_items AS null_item
+ WHERE weighted_product.id = 910001
+   AND null_product.id = 910002
+   AND weighted_sku.id = 910001
+   AND null_sku.id = 910002
+   AND weighted_shipment.id = 910001
+   AND null_shipment.id = 910002
+   AND weighted_item.id = 910001
+   AND null_item.id = 910002;
+SQL
+    )"
+    if [[ "$readback" != '0.425000|0.123456|12.345600|11.111111|0.425000|5' ]]; then
+      echo "ERROR: populated-upgrade kg fixture mismatch: ${readback:-empty}" >&2
+      return 1
+    fi
+  }
+
+  assert_net_weight_gram_upgrade() {
+    local readback column_readback constraint_readback
+    readback="$(
+      populated_psql -Atq <<'SQL'
+SELECT weighted_product.unit_net_weight_g::text
+       || '|' || weighted_sku.unit_net_weight_g::text
+       || '|' || weighted_shipment.total_net_weight_g::text
+       || '|' || weighted_shipment.requested_total_net_weight_g::text
+       || '|' || weighted_item.unit_net_weight_g_snapshot::text
+       || '|' || (
+         (null_product.unit_net_weight_g IS NULL)::int
+         + (null_sku.unit_net_weight_g IS NULL)::int
+         + (null_shipment.total_net_weight_g IS NULL)::int
+         + (null_shipment.requested_total_net_weight_g IS NULL)::int
+         + (null_item.unit_net_weight_g_snapshot IS NULL)::int
+       )::text
+  FROM products AS weighted_product,
+       products AS null_product,
+       product_skus AS weighted_sku,
+       product_skus AS null_sku,
+       shipments AS weighted_shipment,
+       shipments AS null_shipment,
+       shipment_items AS weighted_item,
+       shipment_items AS null_item
+ WHERE weighted_product.id = 910001
+   AND null_product.id = 910002
+   AND weighted_sku.id = 910001
+   AND null_sku.id = 910002
+   AND weighted_shipment.id = 910001
+   AND null_shipment.id = 910002
+   AND weighted_item.id = 910001
+   AND null_item.id = 910002;
+SQL
+    )"
+    if [[ "$readback" != '425.000000|123.456000|12345.600000|11111.111000|425.000000|5' ]]; then
+      echo "ERROR: populated-upgrade g conversion mismatch: ${readback:-empty}" >&2
+      return 1
+    fi
+
+    column_readback="$(
+      populated_psql -Atq <<'SQL'
+WITH expected(table_name, column_name) AS (
+  VALUES
+    ('products', 'unit_net_weight_g'),
+    ('product_skus', 'unit_net_weight_g'),
+    ('shipments', 'total_net_weight_g'),
+    ('shipments', 'requested_total_net_weight_g'),
+    ('shipment_items', 'unit_net_weight_g_snapshot')
+), old_columns(table_name, column_name) AS (
+  VALUES
+    ('products', 'unit_net_weight_kg'),
+    ('product_skus', 'unit_net_weight_kg'),
+    ('shipments', 'total_net_weight_kg'),
+    ('shipments', 'requested_total_net_weight_kg'),
+    ('shipment_items', 'unit_net_weight_kg_snapshot')
+)
+SELECT count(actual.column_name)::text
+       || '|' || count(*) FILTER (
+         WHERE actual.data_type = 'numeric'
+           AND actual.numeric_precision = 20
+           AND actual.numeric_scale = 6
+           AND actual.is_nullable = 'YES'
+       )::text
+       || '|' || (
+         SELECT count(*)
+           FROM information_schema.columns AS actual_old
+           JOIN old_columns
+             ON old_columns.table_name = actual_old.table_name
+            AND old_columns.column_name = actual_old.column_name
+          WHERE actual_old.table_schema = 'public'
+       )::text
+  FROM expected
+  LEFT JOIN information_schema.columns AS actual
+    ON actual.table_schema = 'public'
+   AND actual.table_name = expected.table_name
+   AND actual.column_name = expected.column_name;
+SQL
+    )"
+    if [[ "$column_readback" != '5|5|0' ]]; then
+      echo "ERROR: populated-upgrade g column shape mismatch: ${column_readback:-empty}" >&2
+      return 1
+    fi
+
+    constraint_readback="$(
+      populated_psql -Atq <<'SQL'
+WITH expected(name) AS (
+  VALUES
+    ('products_unit_net_weight_g_positive'),
+    ('product_skus_unit_net_weight_g_positive'),
+    ('product_skus_unit_net_weight_g_requires_default_unit'),
+    ('shipments_total_net_weight_g_positive'),
+    ('shipments_requested_total_net_weight_g_positive'),
+    ('shipment_items_unit_net_weight_g_snapshot_positive')
+), old(name) AS (
+  VALUES
+    ('products_unit_net_weight_kg_positive'),
+    ('product_skus_unit_net_weight_kg_positive'),
+    ('product_skus_unit_net_weight_kg_requires_default_unit'),
+    ('shipments_total_net_weight_kg_positive'),
+    ('shipments_requested_total_net_weight_kg_positive'),
+    ('shipment_items_unit_net_weight_kg_snapshot_positive')
+)
+SELECT (SELECT count(*) FROM pg_constraint JOIN expected ON expected.name = pg_constraint.conname)::text
+       || '|' || (SELECT count(*) FROM pg_constraint JOIN old ON old.name = pg_constraint.conname)::text;
+SQL
+    )"
+    if [[ "$constraint_readback" != '6|0' ]]; then
+      echo "ERROR: populated-upgrade g constraint set mismatch: ${constraint_readback:-empty}" >&2
+      return 1
+    fi
+
+    populated_psql -q <<'SQL'
+DO $$
+DECLARE
+  rejection_count integer := 0;
+BEGIN
+  BEGIN
+    UPDATE products SET unit_net_weight_g = 0 WHERE id = 910001;
+  EXCEPTION WHEN check_violation THEN
+    rejection_count := rejection_count + 1;
+  END;
+  BEGIN
+    UPDATE product_skus SET unit_net_weight_g = 0 WHERE id = 910001;
+  EXCEPTION WHEN check_violation THEN
+    rejection_count := rejection_count + 1;
+  END;
+  BEGIN
+    UPDATE product_skus SET unit_net_weight_g = 1 WHERE id = 910002;
+  EXCEPTION WHEN check_violation THEN
+    rejection_count := rejection_count + 1;
+  END;
+  BEGIN
+    UPDATE shipments SET total_net_weight_g = 0 WHERE id = 910001;
+  EXCEPTION WHEN check_violation THEN
+    rejection_count := rejection_count + 1;
+  END;
+  BEGIN
+    UPDATE shipments SET requested_total_net_weight_g = 0 WHERE id = 910001;
+  EXCEPTION WHEN check_violation THEN
+    rejection_count := rejection_count + 1;
+  END;
+  BEGIN
+    UPDATE shipment_items SET unit_net_weight_g_snapshot = 0 WHERE id = 910001;
+  EXCEPTION WHEN check_violation THEN
+    rejection_count := rejection_count + 1;
+  END;
+  IF rejection_count <> 6 THEN
+    RAISE EXCEPTION 'expected 6 net-weight constraint rejections, got %', rejection_count;
+  END IF;
+END
+$$;
+SQL
+  }
+
   echo "[qa:populated-upgrade] create isolated db=${POPULATED_UPGRADE_DB_NAME}"
   psql "$PURCHASE_RECEIPT_PG_ADMIN_DB_URL" -X --no-psqlrc -v ON_ERROR_STOP=1 \
     -c "CREATE DATABASE \"${POPULATED_UPGRADE_DB_NAME}\""
@@ -597,9 +792,16 @@ SQL
     exit 1
   fi
 
+  apply_populated_upgrade_to 20260714165115
+  populated_psql -q -f "$net_weight_fixture_file"
+  assert_net_weight_kg_fixture
+  assert_populated_preflight_green checkpoint-20260714165115-with-kg
+  assert_customer_config_cutover_preflight_green checkpoint-20260714165115-with-kg
+
   atlas migrate apply \
     --dir "file://${migration_dir}" \
     --url "$POPULATED_UPGRADE_DB_URL"
+  assert_net_weight_gram_upgrade
   assert_populated_preflight_green latest
   assert_customer_config_cutover_preflight_green latest
   populated_readback="$(

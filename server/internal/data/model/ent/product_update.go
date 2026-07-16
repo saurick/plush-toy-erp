@@ -117,23 +117,23 @@ func (_u *ProductUpdate) SetNillableDefaultUnitID(v *int) *ProductUpdate {
 	return _u
 }
 
-// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
-func (_u *ProductUpdate) SetUnitNetWeightKg(v decimal.Decimal) *ProductUpdate {
-	_u.mutation.SetUnitNetWeightKg(v)
+// SetUnitNetWeightG sets the "unit_net_weight_g" field.
+func (_u *ProductUpdate) SetUnitNetWeightG(v decimal.Decimal) *ProductUpdate {
+	_u.mutation.SetUnitNetWeightG(v)
 	return _u
 }
 
-// SetNillableUnitNetWeightKg sets the "unit_net_weight_kg" field if the given value is not nil.
-func (_u *ProductUpdate) SetNillableUnitNetWeightKg(v *decimal.Decimal) *ProductUpdate {
+// SetNillableUnitNetWeightG sets the "unit_net_weight_g" field if the given value is not nil.
+func (_u *ProductUpdate) SetNillableUnitNetWeightG(v *decimal.Decimal) *ProductUpdate {
 	if v != nil {
-		_u.SetUnitNetWeightKg(*v)
+		_u.SetUnitNetWeightG(*v)
 	}
 	return _u
 }
 
-// ClearUnitNetWeightKg clears the value of the "unit_net_weight_kg" field.
-func (_u *ProductUpdate) ClearUnitNetWeightKg() *ProductUpdate {
-	_u.mutation.ClearUnitNetWeightKg()
+// ClearUnitNetWeightG clears the value of the "unit_net_weight_g" field.
+func (_u *ProductUpdate) ClearUnitNetWeightG() *ProductUpdate {
+	_u.mutation.ClearUnitNetWeightG()
 	return _u
 }
 
@@ -452,11 +452,11 @@ func (_u *ProductUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.CustomerStyleNoCleared() {
 		_spec.ClearField(product.FieldCustomerStyleNo, field.TypeString)
 	}
-	if value, ok := _u.mutation.UnitNetWeightKg(); ok {
-		_spec.SetField(product.FieldUnitNetWeightKg, field.TypeOther, value)
+	if value, ok := _u.mutation.UnitNetWeightG(); ok {
+		_spec.SetField(product.FieldUnitNetWeightG, field.TypeOther, value)
 	}
-	if _u.mutation.UnitNetWeightKgCleared() {
-		_spec.ClearField(product.FieldUnitNetWeightKg, field.TypeOther)
+	if _u.mutation.UnitNetWeightGCleared() {
+		_spec.ClearField(product.FieldUnitNetWeightG, field.TypeOther)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(product.FieldIsActive, field.TypeBool, value)
@@ -820,23 +820,23 @@ func (_u *ProductUpdateOne) SetNillableDefaultUnitID(v *int) *ProductUpdateOne {
 	return _u
 }
 
-// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
-func (_u *ProductUpdateOne) SetUnitNetWeightKg(v decimal.Decimal) *ProductUpdateOne {
-	_u.mutation.SetUnitNetWeightKg(v)
+// SetUnitNetWeightG sets the "unit_net_weight_g" field.
+func (_u *ProductUpdateOne) SetUnitNetWeightG(v decimal.Decimal) *ProductUpdateOne {
+	_u.mutation.SetUnitNetWeightG(v)
 	return _u
 }
 
-// SetNillableUnitNetWeightKg sets the "unit_net_weight_kg" field if the given value is not nil.
-func (_u *ProductUpdateOne) SetNillableUnitNetWeightKg(v *decimal.Decimal) *ProductUpdateOne {
+// SetNillableUnitNetWeightG sets the "unit_net_weight_g" field if the given value is not nil.
+func (_u *ProductUpdateOne) SetNillableUnitNetWeightG(v *decimal.Decimal) *ProductUpdateOne {
 	if v != nil {
-		_u.SetUnitNetWeightKg(*v)
+		_u.SetUnitNetWeightG(*v)
 	}
 	return _u
 }
 
-// ClearUnitNetWeightKg clears the value of the "unit_net_weight_kg" field.
-func (_u *ProductUpdateOne) ClearUnitNetWeightKg() *ProductUpdateOne {
-	_u.mutation.ClearUnitNetWeightKg()
+// ClearUnitNetWeightG clears the value of the "unit_net_weight_g" field.
+func (_u *ProductUpdateOne) ClearUnitNetWeightG() *ProductUpdateOne {
+	_u.mutation.ClearUnitNetWeightG()
 	return _u
 }
 
@@ -1185,11 +1185,11 @@ func (_u *ProductUpdateOne) sqlSave(ctx context.Context) (_node *Product, err er
 	if _u.mutation.CustomerStyleNoCleared() {
 		_spec.ClearField(product.FieldCustomerStyleNo, field.TypeString)
 	}
-	if value, ok := _u.mutation.UnitNetWeightKg(); ok {
-		_spec.SetField(product.FieldUnitNetWeightKg, field.TypeOther, value)
+	if value, ok := _u.mutation.UnitNetWeightG(); ok {
+		_spec.SetField(product.FieldUnitNetWeightG, field.TypeOther, value)
 	}
-	if _u.mutation.UnitNetWeightKgCleared() {
-		_spec.ClearField(product.FieldUnitNetWeightKg, field.TypeOther)
+	if _u.mutation.UnitNetWeightGCleared() {
+		_spec.ClearField(product.FieldUnitNetWeightG, field.TypeOther)
 	}
 	if value, ok := _u.mutation.IsActive(); ok {
 		_spec.SetField(product.FieldIsActive, field.TypeBool, value)

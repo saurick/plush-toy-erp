@@ -584,7 +584,7 @@ func prepareShipmentFinanceSource(
 	shipment, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{
 			ShipmentNo: "SHP-" + suffix, SalesOrderID: &order.ID, CustomerID: &customer.ID,
-			IdempotencyKey: "shipment-" + suffix, TotalNetWeightKg: &manualWeight,
+			IdempotencyKey: "shipment-" + suffix, TotalNetWeightG: &manualWeight,
 		},
 		Items: []*biz.ShipmentItemCreate{{
 			SalesOrderItemID: &item.ID, ProductID: product.ID, WarehouseID: warehouse.ID,

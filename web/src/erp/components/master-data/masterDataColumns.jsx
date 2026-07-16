@@ -97,14 +97,13 @@ function productColumns({ unitDisplay }) {
     unitColumn(unitDisplay),
     {
       title: '产品单重（净重）',
-      exportTitle: '产品单重（kg / 默认单位）',
-      dataIndex: 'unit_net_weight_kg',
+      exportTitle: '产品单重（克）',
+      dataIndex: 'unit_net_weight_g',
       width: 190,
       sorter: (a, b) =>
-        Number(a?.unit_net_weight_kg || 0) - Number(b?.unit_net_weight_kg || 0),
-      render: (value, record) =>
-        formatProductUnitNetWeight(value, unitDisplay(record?.default_unit_id)),
-      exportValue: (record) => String(record?.unit_net_weight_kg ?? '').trim(),
+        Number(a?.unit_net_weight_g || 0) - Number(b?.unit_net_weight_g || 0),
+      render: (value) => formatProductUnitNetWeight(value),
+      exportValue: (record) => String(record?.unit_net_weight_g ?? '').trim(),
     },
     statusColumn(),
   ]
@@ -188,13 +187,12 @@ function productSKUColumns({ productOptions, unitDisplay }) {
     unitColumn(unitDisplay),
     {
       title: 'SKU 单重（净重）',
-      exportTitle: 'SKU 单重（kg / SKU 默认单位）',
-      dataIndex: 'unit_net_weight_kg',
+      exportTitle: 'SKU 单重（克）',
+      dataIndex: 'unit_net_weight_g',
       width: 200,
       sortable: false,
-      render: (value, record) =>
-        formatProductUnitNetWeight(value, unitDisplay(record?.default_unit_id)),
-      exportValue: (record) => String(record?.unit_net_weight_kg ?? '').trim(),
+      render: (value) => formatProductUnitNetWeight(value),
+      exportValue: (record) => String(record?.unit_net_weight_g ?? '').trim(),
     },
     statusColumn(),
   ]

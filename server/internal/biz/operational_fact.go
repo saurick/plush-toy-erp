@@ -155,7 +155,7 @@ type Shipment struct {
 	IdempotencyKey   string
 	PlannedShipAt    *time.Time
 	ShippedAt        *time.Time
-	TotalNetWeightKg *decimal.Decimal
+	TotalNetWeightG  *decimal.Decimal
 	Note             *string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -163,22 +163,22 @@ type Shipment struct {
 }
 
 type ShipmentItem struct {
-	ID                      int
-	ShipmentID              int
-	SalesOrderItemID        *int
-	ProductID               int
-	ProductSkuID            *int
-	WarehouseID             int
-	UnitID                  int
-	LotID                   *int
-	Quantity                decimal.Decimal
-	UnitNetWeightKgSnapshot *decimal.Decimal
-	UnitPriceSnapshot       *decimal.Decimal
-	AmountSnapshot          *decimal.Decimal
-	CurrencySnapshot        *string
-	Note                    *string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
+	ID                     int
+	ShipmentID             int
+	SalesOrderItemID       *int
+	ProductID              int
+	ProductSkuID           *int
+	WarehouseID            int
+	UnitID                 int
+	LotID                  *int
+	Quantity               decimal.Decimal
+	UnitNetWeightGSnapshot *decimal.Decimal
+	UnitPriceSnapshot      *decimal.Decimal
+	AmountSnapshot         *decimal.Decimal
+	CurrencySnapshot       *string
+	Note                   *string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
 }
 
 type StockReservation struct {
@@ -329,7 +329,7 @@ type ShipmentCreate struct {
 	CustomerSnapshot *string
 	IdempotencyKey   string
 	PlannedShipAt    *time.Time
-	TotalNetWeightKg *decimal.Decimal
+	TotalNetWeightG  *decimal.Decimal
 	Note             *string
 }
 
@@ -1204,7 +1204,7 @@ func normalizeShipmentCreate(in *ShipmentCreate) (*ShipmentCreate, error) {
 	out.ShipmentNo = strings.TrimSpace(out.ShipmentNo)
 	out.CustomerSnapshot = normalizeOptionalString(out.CustomerSnapshot)
 	out.Note = normalizeOptionalString(out.Note)
-	if !validNetWeightKg(out.TotalNetWeightKg) {
+	if !validNetWeightG(out.TotalNetWeightG) {
 		return nil, ErrBadParam
 	}
 	idempotencyKey, err := value.NewIdempotencyKey(out.IdempotencyKey)

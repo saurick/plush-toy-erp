@@ -50,6 +50,7 @@ import {
   formatUnixDateTime,
   hasActionPermission,
   inferDefaultUnitID,
+  inferProductDefaultUnitID,
   normalizeOutsourcingLineFormValue,
   paymentConditionCompleteness,
   resolvePaymentTermDays,
@@ -284,7 +285,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       name: '毛绒熊',
       style_no: 'BEAR-BASE',
       default_unit_id: 2,
-      unit_net_weight_kg: null,
+      unit_net_weight_g: null,
     }
   )
 
@@ -873,7 +874,7 @@ test('FL_product_master_style_no__retains_style_no_snapshot masterDataOrderView:
       style_no: ' BEAR-2026 ',
       customer_style_no: ' YOYOO-BEAR-01 ',
       default_unit_id: '2',
-      unit_net_weight_kg: ' 0.425000 ',
+      unit_net_weight_g: ' 425.000000 ',
     }),
     {
       code: 'P-STYLE-001',
@@ -881,7 +882,7 @@ test('FL_product_master_style_no__retains_style_no_snapshot masterDataOrderView:
       style_no: 'BEAR-2026',
       customer_style_no: 'YOYOO-BEAR-01',
       default_unit_id: 2,
-      unit_net_weight_kg: '0.425000',
+      unit_net_weight_g: '425.000000',
     }
   )
 })
@@ -892,13 +893,13 @@ test('masterDataOrderView: blank product unit net weight is an explicit null', (
       code: 'P-WEIGHT-UNKNOWN',
       name: '未维护单重产品',
       default_unit_id: 2,
-      unit_net_weight_kg: ' ',
+      unit_net_weight_g: ' ',
     }),
     {
       code: 'P-WEIGHT-UNKNOWN',
       name: '未维护单重产品',
       default_unit_id: 2,
-      unit_net_weight_kg: null,
+      unit_net_weight_g: null,
     }
   )
 })
@@ -909,35 +910,32 @@ test('masterDataOrderView: SKU unit net weight remains a decimal string and blan
       product_id: '7',
       sku_code: ' SKU-WEIGHT-001 ',
       default_unit_id: '2',
-      unit_net_weight_kg: ' 0.375000 ',
+      unit_net_weight_g: ' 375.000000 ',
     }),
     {
       product_id: 7,
       sku_code: 'SKU-WEIGHT-001',
       default_unit_id: 2,
-      unit_net_weight_kg: '0.375000',
+      unit_net_weight_g: '375.000000',
     }
   )
   assert.deepEqual(
     buildProductSKUParams({
       product_id: '7',
       sku_code: 'SKU-WEIGHT-001',
-      unit_net_weight_kg: ' ',
+      unit_net_weight_g: ' ',
     }),
     {
       product_id: 7,
       sku_code: 'SKU-WEIGHT-001',
-      unit_net_weight_kg: null,
+      unit_net_weight_g: null,
     }
   )
 })
 
 test('masterDataOrderView: product unit net weight uses the selected default unit label', () => {
-  assert.equal(
-    formatProductUnitNetWeight('0.425', '件（PCS）'),
-    '0.425 kg / 件（PCS）'
-  )
-  assert.equal(formatProductUnitNetWeight(null, '件（PCS）'), '-')
+  assert.equal(formatProductUnitNetWeight('425'), '425 克')
+  assert.equal(formatProductUnitNetWeight(null), '-')
 })
 
 test('FL_product_master_style_no__prefills_from_blank_source masterDataOrderView: blank product style no can rebuild before save', () => {
@@ -951,7 +949,7 @@ test('FL_product_master_style_no__prefills_from_blank_source masterDataOrderView
     {
       code: 'P-STYLE-002',
       name: '空白款式',
-      unit_net_weight_kg: null,
+      unit_net_weight_g: null,
     }
   )
 
@@ -967,7 +965,7 @@ test('FL_product_master_style_no__prefills_from_blank_source masterDataOrderView
       name: '空白款式',
       style_no: 'RABBIT-2026',
       customer_style_no: 'YOYOO-RABBIT-01',
-      unit_net_weight_kg: null,
+      unit_net_weight_g: null,
     }
   )
 })
@@ -1296,6 +1294,21 @@ test('masterDataOrderView: material create helpers reduce repetitive manual entr
   ])
   assert.equal(inferDefaultUnitID(records, unitOptions), 12)
   assert.equal(inferDefaultUnitID([], unitOptions), 12)
+  assert.equal(
+    inferProductDefaultUnitID(records, [
+      { value: 12, label: '千克（KG）' },
+      { value: 13, label: '件（PCS）' },
+    ]),
+    13
+  )
+  assert.equal(inferProductDefaultUnitID(records, unitOptions), 13)
+  assert.equal(
+    inferProductDefaultUnitID(records, [
+      { value: 12, label: '米（M）' },
+      { value: 15, label: '千克（KG）' },
+    ]),
+    12
+  )
 })
 
 test('masterDataOrderView: draft numbers use one shared date sequence rule', () => {

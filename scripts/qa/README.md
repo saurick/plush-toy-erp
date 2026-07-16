@@ -51,7 +51,7 @@
 
 ## 门禁完整性与 CI 边界
 
-`full.sh` 默认拒绝继承的 `STYLE_L1_BASE_URL`，仅在本项目 `15200-15299` AUX 段为本轮选择空闲端口，并只清理自身启动的 Vite 进程。同一 worktree 的浏览器证据使用原子 PID 锁串行运行；活动锁直接阻断，stale lock 也保守失败且保留现场，只能在确认 owner 已不存在且没有门禁运行后手工清理。外部 base URL 只能用于显式单项 browser smoke，不能替代 full 的当前 worktree 证据。server 全量测试先在唯一临时数据库中从历史 checkpoint 装载合成存量行，验证 055504 / 055825 两项只读 blocker、显式测试专用切换和 latest pending=0，再运行当前 schema 关键事务矩阵；它还启用真实 Chromium PDF 安全集成，本机自动发现 Chrome/Chromium，CI 则传入本轮 Playwright 下载的精确可执行路径。安全集成未执行会以 Go skip 阻断 full。`strict.sh` 直接复用 full，保持 strict 是 full 的真实超集。fast / full 的固定 Node 与 Go 测试除子进程退出码外，还要求可解析结果、实际执行数大于 0、失败数与跳过数均为 0；缺 summary、零执行或 skip 一律阻断。
+`full.sh` 默认拒绝继承的 `STYLE_L1_BASE_URL`，仅在本项目 `15200-15299` AUX 段为本轮选择空闲端口，并只清理自身启动的 Vite 进程。同一 worktree 的浏览器证据使用原子 PID 锁串行运行；活动锁直接阻断，stale lock 也保守失败且保留现场，只能在确认 owner 已不存在且没有门禁运行后手工清理。外部 base URL 只能用于显式单项 browser smoke，不能替代 full 的当前 worktree 证据。server 全量测试先在唯一临时数据库中从历史 checkpoint 装载合成存量行，验证 055504 / 055825 两项只读 blocker、克重 kg→g 非空/NULL 存量转换和 latest pending=0；随后再为本批 current-schema 关键事务矩阵创建另一座唯一临时库，同批完成 migration、测试和 fail-closed 清理，不复用固定开发测试库。它还启用真实 Chromium PDF 安全集成，本机自动发现 Chrome/Chromium，CI 则传入本轮 Playwright 下载的精确可执行路径。安全集成未执行会以 Go skip 阻断 full。`strict.sh` 直接复用 full，保持 strict 是 full 的真实超集。fast / full 的固定 Node 与 Go 测试除子进程退出码外，还要求可解析结果、实际执行数大于 0、失败数与跳过数均为 0；缺 summary、零执行或 skip 一律阻断。
 
 `populated-upgrade-preflight.sh` 只接受 `populated-upgrade` 和 `customer-config-cutover` 两个 audit key，并把 DSN 仅从调用方指定的环境变量传给 `psql`。前者检查 20260714055504 的状态、生命周期、取消审计束、流程锚点、版本和待删除时间字段；后者检查 20260714055825 前必须显式治理的流程运行态与任务配置锚点。两者都使用 read-only 事务，不能修复或清理生产数据；出现 blocker 后必须停止 apply，由单独评审的治理动作处理，完成后重跑审计。
 

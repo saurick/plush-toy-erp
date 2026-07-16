@@ -32,9 +32,9 @@ import {
 } from '../../utils/businessLineItems.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 import {
-  calculateShipmentLineNetWeightKg,
+  calculateShipmentLineNetWeightG,
   hasFinalShipmentWeight,
-  normalizeNetWeightKg,
+  normalizeNetWeightG,
   normalizeShipmentQuantity,
   resolveShipmentWeightPreview,
   shipmentWeightItemsSignature,
@@ -225,12 +225,12 @@ function ShipmentSelectedSourceAlert({
 
 function shipmentWeightText(value, emptyText = '待补齐') {
   const text = String(value ?? '').trim()
-  return text ? `${text} kg` : emptyText
+  return text ? `${text} 克` : emptyText
 }
 
 function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
   const items = Form.useWatch('items', form) || EMPTY_SHIPMENT_ITEMS
-  const manualWeight = Form.useWatch('total_net_weight_kg', form)
+  const manualWeight = Form.useWatch('total_net_weight_g', form)
   const manualItemsSignature = Form.useWatch(
     'total_net_weight_items_signature',
     form
@@ -243,7 +243,7 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
     if (!hasManualWeight) return
     if (preview.complete) {
       form.setFieldsValue({
-        total_net_weight_kg: undefined,
+        total_net_weight_g: undefined,
         total_net_weight_items_signature: undefined,
       })
       message.info('当前明细已可自动计算，旧人工总净重已清空')
@@ -255,7 +255,7 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
     }
     if (manualItemsSignature !== itemsSignature) {
       form.setFieldsValue({
-        total_net_weight_kg: undefined,
+        total_net_weight_g: undefined,
         total_net_weight_items_signature: undefined,
       })
       message.warning('出货明细已变更，旧人工总净重已清空，请重新填写')
@@ -277,7 +277,7 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
         <Alert
           showIcon
           type="info"
-          message={`预计总净重：${preview.totalNetWeightKg} kg`}
+          message={`预计总净重：${preview.totalNetWeightG} 克`}
           description="按当前明细和产品 / SKU 单重计算；保存草稿时不提交人工总重，确认出货后的最终总净重以系统确认结果为准。"
         />
       ) : (
@@ -293,15 +293,15 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
           <Form.Item
             className="erp-business-action-form__field"
             extra="选填。该数值与当前整组出货明细绑定；产品、SKU、单位、数量、增删行或重新导入后需要重新填写。"
-            label="实际总净重（kg）"
-            name="total_net_weight_kg"
+            label="实际总净重（克）"
+            name="total_net_weight_g"
             rules={[
               {
                 validator: async (_, value) => {
                   if (value === undefined || value === null || value === '') {
                     return
                   }
-                  if (!normalizeNetWeightKg(value)) {
+                  if (!normalizeNetWeightG(value)) {
                     throw new Error('实际总净重必须大于 0，且最多保留 6 位小数')
                   }
                 },
@@ -331,12 +331,12 @@ function ShipmentWeightCreateSummary({ form, products, productSKUs }) {
 function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
   const status = String(shipment?.status || '').toUpperCase()
   if (hasFinalShipmentWeight(status)) {
-    const finalWeight = String(shipment?.total_net_weight_kg ?? '').trim()
+    const finalWeight = String(shipment?.total_net_weight_g ?? '').trim()
     return (
       <Alert
         showIcon
         type={finalWeight ? 'success' : 'warning'}
-        message={`最终总净重：${finalWeight ? `${finalWeight} kg` : '未记录'}`}
+        message={`最终总净重：${finalWeight ? `${finalWeight} 克` : '未记录'}`}
         description={
           finalWeight
             ? '这是确认出货时形成的整单净重；下方明细同时显示确认出货单重和行净重。'
@@ -356,7 +356,7 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
         <Alert
           showIcon
           type="info"
-          message={`预计总净重：${preview.totalNetWeightKg} kg`}
+          message={`预计总净重：${preview.totalNetWeightG} 克`}
           description="当前仍是草稿，数值按现有明细和基础资料计算，尚不是最终出货结果。"
         />
       )
@@ -364,10 +364,10 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
     return (
       <Alert
         showIcon
-        type={shipment?.total_net_weight_kg ? 'warning' : 'info'}
+        type={shipment?.total_net_weight_g ? 'warning' : 'info'}
         message={
-          shipment?.total_net_weight_kg
-            ? `实际总净重：${shipmentWeightText(shipment.total_net_weight_kg)}`
+          shipment?.total_net_weight_g
+            ? `实际总净重：${shipmentWeightText(shipment.total_net_weight_g)}`
             : '预计总净重：待补齐'
         }
         description="当前仍是草稿；单重信息不完整时仅显示人工填写的整单实际净重，不显示部分合计。"
@@ -379,7 +379,7 @@ function ShipmentWeightDetailSummary({ shipment, products, productSKUs }) {
       showIcon
       type="info"
       message={`出货记录总净重：${shipmentWeightText(
-        shipment?.total_net_weight_kg
+        shipment?.total_net_weight_g
       )}`}
     />
   )
@@ -614,28 +614,24 @@ function ShipmentItemsTable({
         ...(hasFinalShipmentWeight(status)
           ? [
               {
-                title: '确认出货单重（kg）',
-                dataIndex: 'unit_net_weight_kg_snapshot',
+                title: '确认出货单重（克）',
+                dataIndex: 'unit_net_weight_g_snapshot',
                 width: 180,
-                render: (value, record) => {
+                render: (value) => {
                   const weight = String(value ?? '').trim()
                   if (!weight) return '-'
-                  return `${weight} kg / ${referenceLabel(
-                    unitOptions,
-                    record.unit_id,
-                    '单位'
-                  )}`
+                  return `${weight} 克`
                 },
               },
               {
-                title: '行净重（kg）',
+                title: '行净重（克）',
                 width: 140,
                 render: (_, record) => {
-                  const lineWeight = calculateShipmentLineNetWeightKg(
+                  const lineWeight = calculateShipmentLineNetWeightG(
                     record.quantity,
-                    record.unit_net_weight_kg_snapshot
+                    record.unit_net_weight_g_snapshot
                   )
-                  return lineWeight ? `${lineWeight} kg` : '-'
+                  return lineWeight ? `${lineWeight} 克` : '-'
                 },
               },
             ]
@@ -682,10 +678,10 @@ export default function ShipmentBusinessModal({
   const { registerLineItemRow, requestLineItemScroll } =
     useLineItemAppendScroll()
   const clearStaleManualWeight = () => {
-    const currentWeight = form?.getFieldValue('total_net_weight_kg')
+    const currentWeight = form?.getFieldValue('total_net_weight_g')
     if (String(currentWeight ?? '').trim() === '') return
     form.setFieldsValue({
-      total_net_weight_kg: undefined,
+      total_net_weight_g: undefined,
       total_net_weight_items_signature: undefined,
     })
     message.warning('出货来源或明细已变更，旧人工总净重已清空，请重新填写')

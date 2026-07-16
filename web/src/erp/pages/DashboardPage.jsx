@@ -83,6 +83,7 @@ import {
   resolveWorkflowTaskBoardResponseState,
   writeWorkflowTaskBoardFiltersToSearch,
 } from '../utils/workflowTaskBoard.mjs'
+import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -366,7 +367,12 @@ function TaskLane({
                   isSelected ? ' erp-task-board-card--selected' : ''
                 }`}
                 key={`${lane.key}-${taskId || task.id}`}
+                data-open-on-double-click="true"
+                title="单击选中，双击查看任务详情"
                 onClick={() => onSelectTask(task)}
+                onDoubleClick={(event) =>
+                  openDashboardItemOnDoubleClick(event, () => onOpenTask(task))
+                }
                 onFocusCapture={() => onSelectTask(task)}
               >
                 <Space
@@ -1327,7 +1333,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   <div>
                     <Title level={5}>优先处理</Title>
                     <Text type="secondary">
-                      按截止时间排列；选中任务后可在右侧查看详情。
+                      单击任务可在右侧查看；电脑端双击可直接打开详情。
                     </Text>
                   </div>
                   <Tag
@@ -1358,20 +1364,31 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   }
                   scroll={{ x: 760 }}
                   rowClassName={(record) =>
-                    String(record.id || record.task_code) ===
-                    String(
-                      selectedWorkbenchTask?.id ||
-                        selectedWorkbenchTask?.task_code ||
-                        ''
-                    )
-                      ? 'erp-workbench-task-row--active'
-                      : ''
+                    [
+                      'erp-workbench-task-row--openable',
+                      String(record.id || record.task_code) ===
+                      String(
+                        selectedWorkbenchTask?.id ||
+                          selectedWorkbenchTask?.task_code ||
+                          ''
+                      )
+                        ? 'erp-workbench-task-row--active'
+                        : '',
+                    ]
+                      .filter(Boolean)
+                      .join(' ')
                   }
                   onRow={(record) => ({
                     tabIndex: 0,
+                    title: '单击选中，双击查看任务详情',
+                    'data-open-on-double-click': 'true',
                     onClick: () =>
                       setSelectedWorkbenchTaskId(
                         String(record.id || record.task_code || '')
+                      ),
+                    onDoubleClick: (event) =>
+                      openDashboardItemOnDoubleClick(event, () =>
+                        openTaskDrawer(record)
                       ),
                     onFocus: () =>
                       setSelectedWorkbenchTaskId(
@@ -1555,7 +1572,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     任务看板
                   </Title>
                   <Paragraph className="erp-dashboard-summary">
-                    看清谁该处理、哪里卡住、哪些已经超时。
+                    看清谁该处理、哪里卡住、哪些已经超时；电脑端可双击任务卡快速查看详情。
                   </Paragraph>
                 </div>
                 <div

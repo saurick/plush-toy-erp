@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
+  EyeOutlined,
   ExclamationCircleOutlined,
   RedoOutlined,
   SendOutlined,
@@ -34,6 +35,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
@@ -174,6 +176,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [dueFrom, setDueFrom] = useState('')
   const [dueTo, setDueTo] = useState('')
   const [selectedTaskKeys, setSelectedTaskKeys] = useState([])
+  const [detailTask, setDetailTask] = useState(null)
   const [taskActionLoadingID, setTaskActionLoadingID] = useState(0)
   const [urgingTaskID, setUrgingTaskID] = useState(0)
   const canReadWorkflowTasks = hasActionPermission(
@@ -740,7 +743,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       ]),
     []
   )
-  const { tableColumns, openColumnOrder, columnOrderModal } =
+  const { tableColumns, visibleColumns, openColumnOrder, columnOrderModal } =
     useBusinessColumnOrder({
       adminProfile,
       moduleKey,
@@ -867,6 +870,14 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           >
             清空已选
           </Button>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            disabled={!selectedTask}
+            onClick={() => setDetailTask(selectedTask)}
+          >
+            查看任务
+          </Button>
           {canCompleteSelected ? (
             <Button
               size="small"
@@ -960,6 +971,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         onRow={(record) => ({
           onClick: () => setSelectedTaskKeys([record.id]),
         })}
+        onOpenRecord={(record) => {
+          setSelectedTaskKeys([record.id])
+          setDetailTask(record)
+        }}
         pagination={{
           pageSize: 10,
           showSizeChanger: false,
@@ -967,6 +982,15 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         }}
       />
       {columnOrderModal}
+
+      <BusinessRecordDetailsModal
+        columns={visibleColumns}
+        description="查看任务来源、责任、到期和当前原因；完成、阻塞、退回和催办仍从当前操作区办理。"
+        open={Boolean(detailTask)}
+        record={detailTask}
+        title={`${moduleItem.title}任务详情`}
+        onClose={() => setDetailTask(null)}
+      />
 
       <CollaborationTaskPanel
         tasks={tasks}

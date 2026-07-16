@@ -221,6 +221,7 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   const makefile = read('server/Makefile')
   const pgScript = read('scripts/purchase-receipt-pg.sh')
   const fixture = read('scripts/qa/fixtures/populated-upgrade-20260710150001.sql')
+  const netWeightFixture = read('scripts/qa/fixtures/net-weight-kg-to-g-20260714165115.sql')
   const cutoverPreflight = read('scripts/qa/customer-config-cutover-20260714055825.sql')
   const profiles = read('scripts/qa/gate-profiles.mjs')
 
@@ -253,10 +254,12 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
     '20260713095327',
     '20260714055504',
     '20260714055825',
+    '20260714165115',
   ]) {
     assert(pgScript.includes(checkpoint), `populated upgrade gate must apply checkpoint ${checkpoint}`)
   }
   assert.match(pgScript, /fixtures\/populated-upgrade-20260710150001\.sql/u)
+  assert.match(pgScript, /fixtures\/net-weight-kg-to-g-20260714165115\.sql/u)
   assert.match(pgScript, /customer-config-cutover-20260714055825\.sql/u)
   assert.match(pgScript, /--audit populated-upgrade/u)
   assert.match(pgScript, /--audit customer-config-cutover/u)
@@ -269,6 +272,13 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.doesNotMatch(pgScript, /\{\{ add /u)
   assert.match(pgScript, /migration_status_counts" != '0\|0'/u)
   assert.match(pgScript, /shipment_pending\|shipment_pending\|1/u)
+  assert.match(pgScript, /assert_net_weight_kg_fixture/u)
+  assert.match(pgScript, /assert_net_weight_gram_upgrade/u)
+  assert.match(pgScript, /0\.425000\|0\.123456\|12\.345600\|11\.111111\|0\.425000\|5/u)
+  assert.match(pgScript, /425\.000000\|123\.456000\|12345\.600000\|11111\.111000\|425\.000000\|5/u)
+  assert.match(pgScript, /column_readback" != '5\|5\|0'/u)
+  assert.match(pgScript, /constraint_readback" != '6\|0'/u)
+  assert.match(pgScript, /rejection_count <> 6/u)
 
   for (const blocker of [
     'bom',
@@ -323,6 +333,14 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.match(fixture, /'active'/u)
   assert.match(fixture, /'waiting'/u)
   assert.match(fixture, /'ready'/u)
+  for (const table of ['products', 'warehouses', 'product_skus', 'shipments', 'shipment_items']) {
+    assert.match(netWeightFixture, new RegExp(`(?:INSERT INTO|UPDATE) ${table}\\b`, 'u'))
+  }
+  assert.match(netWeightFixture, /unit_net_weight_kg/u)
+  assert.match(netWeightFixture, /unit_net_weight_kg_snapshot/u)
+  assert.match(netWeightFixture, /total_net_weight_kg/u)
+  assert.match(netWeightFixture, /requested_total_net_weight_kg/u)
+  assert.match(netWeightFixture, /NULL/u)
   assert.match(pgScript, /POPULATED_EXPECTED_ROW_COUNT=13/u)
   assert.match(pgScript, /POPULATED_EXPECTED_ROW_COUNT=9/u)
   assert.match(pgScript, /UPDATE workflow_tasks\s+SET process_instance_id = NULL,/u)
@@ -375,6 +393,7 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   assert.doesNotMatch(fastGates, /populated-upgrade-postgres/u)
   assert.match(fullOnlyGates, /populated-upgrade-postgres/u)
   assert.match(fullRequiredFiles, /fixtures\/populated-upgrade-20260710150001\.sql/u)
+  assert.match(fullRequiredFiles, /fixtures\/net-weight-kg-to-g-20260714165115\.sql/u)
   assert.match(profiles, /customer-config-cutover-20260714055825\.sql/u)
 })
 

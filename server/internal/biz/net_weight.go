@@ -4,32 +4,32 @@ import "github.com/shopspring/decimal"
 
 const netWeightScale int32 = 6
 
-var maxNetWeightKg = decimal.RequireFromString("99999999999999.999999")
+var maxNetWeightG = decimal.RequireFromString("99999999999999.999999")
 
-func validNetWeightKg(value *decimal.Decimal) bool {
+func validNetWeightG(value *decimal.Decimal) bool {
 	if value == nil {
 		return true
 	}
 	return value.IsPositive() &&
 		value.Equal(value.Truncate(netWeightScale)) &&
-		value.LessThanOrEqual(maxNetWeightKg)
+		value.LessThanOrEqual(maxNetWeightG)
 }
 
 func validShipmentNetWeightQuantity(value decimal.Decimal) bool {
 	return value.IsPositive() &&
 		value.Equal(value.Truncate(netWeightScale)) &&
-		value.LessThanOrEqual(maxNetWeightKg)
+		value.LessThanOrEqual(maxNetWeightG)
 }
 
 type ShipmentNetWeightLine struct {
-	Quantity        decimal.Decimal
-	UnitNetWeightKg *decimal.Decimal
+	Quantity       decimal.Decimal
+	UnitNetWeightG *decimal.Decimal
 }
 
-// ResolveShipmentItemUnitNetWeightKg returns the effective unit net weight only
+// ResolveShipmentItemUnitNetWeightG returns the effective unit net weight only
 // when its basis unit matches the immutable shipment-line unit. Unit conversion
 // is intentionally outside this contract.
-func ResolveShipmentItemUnitNetWeightKg(lineUnitID int, product *Product, sku *ProductSKU) (*decimal.Decimal, error) {
+func ResolveShipmentItemUnitNetWeightG(lineUnitID int, product *Product, sku *ProductSKU) (*decimal.Decimal, error) {
 	if lineUnitID <= 0 || product == nil || product.DefaultUnitID <= 0 {
 		return nil, ErrBadParam
 	}
@@ -37,30 +37,30 @@ func ResolveShipmentItemUnitNetWeightKg(lineUnitID int, product *Product, sku *P
 		if sku.ProductID != product.ID {
 			return nil, ErrBadParam
 		}
-		if sku.UnitNetWeightKg != nil {
-			if sku.DefaultUnitID == nil || !validNetWeightKg(sku.UnitNetWeightKg) {
+		if sku.UnitNetWeightG != nil {
+			if sku.DefaultUnitID == nil || !validNetWeightG(sku.UnitNetWeightG) {
 				return nil, ErrBadParam
 			}
 			if lineUnitID != *sku.DefaultUnitID {
 				return nil, nil
 			}
-			resolved := *sku.UnitNetWeightKg
+			resolved := *sku.UnitNetWeightG
 			return &resolved, nil
 		}
 	}
-	if product.UnitNetWeightKg != nil && !validNetWeightKg(product.UnitNetWeightKg) {
+	if product.UnitNetWeightG != nil && !validNetWeightG(product.UnitNetWeightG) {
 		return nil, ErrBadParam
 	}
-	if lineUnitID != product.DefaultUnitID || product.UnitNetWeightKg == nil {
+	if lineUnitID != product.DefaultUnitID || product.UnitNetWeightG == nil {
 		return nil, nil
 	}
-	resolved := *product.UnitNetWeightKg
+	resolved := *product.UnitNetWeightG
 	return &resolved, nil
 }
 
-// CalculateShipmentTotalNetWeightKg returns complete=false when any line has no
+// CalculateShipmentTotalNetWeightG returns complete=false when any line has no
 // resolvable unit net weight. It never returns a partial total.
-func CalculateShipmentTotalNetWeightKg(lines []ShipmentNetWeightLine) (*decimal.Decimal, bool, error) {
+func CalculateShipmentTotalNetWeightG(lines []ShipmentNetWeightLine) (*decimal.Decimal, bool, error) {
 	if len(lines) == 0 {
 		return nil, false, ErrBadParam
 	}
@@ -70,20 +70,20 @@ func CalculateShipmentTotalNetWeightKg(lines []ShipmentNetWeightLine) (*decimal.
 		if !validShipmentNetWeightQuantity(line.Quantity) {
 			return nil, false, ErrBadParam
 		}
-		if line.UnitNetWeightKg == nil {
+		if line.UnitNetWeightG == nil {
 			complete = false
 			continue
 		}
-		if !validNetWeightKg(line.UnitNetWeightKg) {
+		if !validNetWeightG(line.UnitNetWeightG) {
 			return nil, false, ErrBadParam
 		}
-		total = total.Add(line.Quantity.Mul(*line.UnitNetWeightKg))
+		total = total.Add(line.Quantity.Mul(*line.UnitNetWeightG))
 	}
 	if !complete {
 		return nil, false, nil
 	}
 	total = total.Round(netWeightScale)
-	if !validNetWeightKg(&total) {
+	if !validNetWeightG(&total) {
 		return nil, false, ErrBadParam
 	}
 	return &total, true, nil

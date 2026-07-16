@@ -48,21 +48,46 @@ test('BusinessAttachmentModalButton is the only page-level wrapper around Busine
   assert(source.includes('allowPendingAttachmentsWithoutOwner={false}'))
 })
 
-test('remaining direct attachment panels stay inside business form modals', () => {
+test('remaining direct attachment panels stay inside form-backed business modals', () => {
+  const modalWrappers = [
+    ['<BusinessFormModal', '</BusinessFormModal>'],
+    ['<BusinessRecordDetailsModal', '</BusinessRecordDetailsModal>'],
+  ]
   for (const relativePath of formModalAttachmentEntrypoints) {
     const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
-    const panelIndex = source.indexOf('<BusinessAttachmentPanel')
-    const modalStartIndex = source.lastIndexOf('<BusinessFormModal', panelIndex)
-    const modalEndIndex = source.indexOf('</BusinessFormModal>', panelIndex)
+    const panelIndexes = [
+      ...source.matchAll(/<BusinessAttachmentPanel/g),
+    ].map((match) => match.index)
 
-    assert.notEqual(
-      panelIndex,
-      -1,
+    assert(
+      panelIndexes.length > 0,
       `${relativePath} should keep its direct attachment panel explicit`
     )
-    assert(
-      modalStartIndex >= 0 && modalEndIndex > panelIndex,
-      `${relativePath} direct BusinessAttachmentPanel must remain inside BusinessFormModal`
-    )
+    for (const panelIndex of panelIndexes) {
+      const isInsideFormBackedModal = modalWrappers.some(
+        ([startTag, endTag]) =>
+          source.lastIndexOf(startTag, panelIndex) >= 0 &&
+          source.indexOf(endTag, panelIndex) > panelIndex
+      )
+      assert(
+        isInsideFormBackedModal,
+        `${relativePath} direct BusinessAttachmentPanel must remain inside a form-backed business modal`
+      )
+    }
   }
+})
+
+test('BusinessRecordDetailsModal remains a read-only BusinessFormModal wrapper', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessRecordDetailsModal.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  assert(source.includes("import BusinessFormModal from './BusinessFormModal.jsx'"))
+  assert(source.includes('<BusinessFormModal'))
+  assert(source.includes('<Button key="close" onClick={onClose}>'))
+  assert(!source.includes('onOk='))
 })

@@ -120,30 +120,30 @@ func (_c *ShipmentCreate) SetNillableShippedAt(v *time.Time) *ShipmentCreate {
 	return _c
 }
 
-// SetTotalNetWeightKg sets the "total_net_weight_kg" field.
-func (_c *ShipmentCreate) SetTotalNetWeightKg(v decimal.Decimal) *ShipmentCreate {
-	_c.mutation.SetTotalNetWeightKg(v)
+// SetTotalNetWeightG sets the "total_net_weight_g" field.
+func (_c *ShipmentCreate) SetTotalNetWeightG(v decimal.Decimal) *ShipmentCreate {
+	_c.mutation.SetTotalNetWeightG(v)
 	return _c
 }
 
-// SetNillableTotalNetWeightKg sets the "total_net_weight_kg" field if the given value is not nil.
-func (_c *ShipmentCreate) SetNillableTotalNetWeightKg(v *decimal.Decimal) *ShipmentCreate {
+// SetNillableTotalNetWeightG sets the "total_net_weight_g" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableTotalNetWeightG(v *decimal.Decimal) *ShipmentCreate {
 	if v != nil {
-		_c.SetTotalNetWeightKg(*v)
+		_c.SetTotalNetWeightG(*v)
 	}
 	return _c
 }
 
-// SetRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field.
-func (_c *ShipmentCreate) SetRequestedTotalNetWeightKg(v decimal.Decimal) *ShipmentCreate {
-	_c.mutation.SetRequestedTotalNetWeightKg(v)
+// SetRequestedTotalNetWeightG sets the "requested_total_net_weight_g" field.
+func (_c *ShipmentCreate) SetRequestedTotalNetWeightG(v decimal.Decimal) *ShipmentCreate {
+	_c.mutation.SetRequestedTotalNetWeightG(v)
 	return _c
 }
 
-// SetNillableRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field if the given value is not nil.
-func (_c *ShipmentCreate) SetNillableRequestedTotalNetWeightKg(v *decimal.Decimal) *ShipmentCreate {
+// SetNillableRequestedTotalNetWeightG sets the "requested_total_net_weight_g" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableRequestedTotalNetWeightG(v *decimal.Decimal) *ShipmentCreate {
 	if v != nil {
-		_c.SetRequestedTotalNetWeightKg(*v)
+		_c.SetRequestedTotalNetWeightG(*v)
 	}
 	return _c
 }
@@ -375,13 +375,13 @@ func (_c *ShipmentCreate) createSpec() (*Shipment, *sqlgraph.CreateSpec) {
 		_spec.SetField(shipment.FieldShippedAt, field.TypeTime, value)
 		_node.ShippedAt = &value
 	}
-	if value, ok := _c.mutation.TotalNetWeightKg(); ok {
-		_spec.SetField(shipment.FieldTotalNetWeightKg, field.TypeOther, value)
-		_node.TotalNetWeightKg = &value
+	if value, ok := _c.mutation.TotalNetWeightG(); ok {
+		_spec.SetField(shipment.FieldTotalNetWeightG, field.TypeOther, value)
+		_node.TotalNetWeightG = &value
 	}
-	if value, ok := _c.mutation.RequestedTotalNetWeightKg(); ok {
-		_spec.SetField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther, value)
-		_node.RequestedTotalNetWeightKg = &value
+	if value, ok := _c.mutation.RequestedTotalNetWeightG(); ok {
+		_spec.SetField(shipment.FieldRequestedTotalNetWeightG, field.TypeOther, value)
+		_node.RequestedTotalNetWeightG = &value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(shipment.FieldNote, field.TypeString, value)

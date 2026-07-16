@@ -73,7 +73,7 @@
 | `scripts/qa/docs-inventory.test.mjs`                   | 自动扫描当前维护 Markdown，确认已登记到 `docs/文档清单.md`                                                     | 新增、删除、重命名或调整长期维护 Markdown 后                |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、SKU、预留、出货、冲正和并发边界        |
 | `scripts/bom-lot-pg.sh`                                | BOM 与批次库存本地 PostgreSQL migration / 集成测试防呆入口                                                       | 验证 BOM schema 和批次库存行为                            |
-| `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 全链关键事务并发测试防呆入口                                                  | 验证采购、库存/出货、ProcessRuntime、源单及 Workflow CAS / receipt 并发 |
+| `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 全链关键事务并发测试防呆入口；full 通过该入口创建同批唯一临时库，并在历史升级库验证 kg→g 存量转换 | 验证采购、库存/出货、ProcessRuntime、源单、Workflow CAS / receipt 并发及迁移数据保持 |
 | `scripts/purchase-return-pg.sh`                        | 采购退货当前完整 PostgreSQL migration / 集成测试防呆入口；使用与关键事务矩阵一致的 schema，不保留旧 migration 上限兼容分支 | 验证采购退货 schema、OUT 扣减、REVERSAL 回补和批次并发扣减 |
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
 | `scripts/qa/fast.sh`                                   | 高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界；server quick 过滤由 full 单独执行的 PostgreSQL 与 Chromium PDF 集成用例，其余 Go 用例仍要求非零执行且零 skip | 日常开发                                                   |
@@ -84,8 +84,8 @@
 | `scripts/qa/customer-package-preview-boundary.test.mjs` | 锁住 yoyoosun 客户包 `businessFlows / stateMachines / processPolicies` 仍为 preview-only，不执行 runtime command、不写 Fact、不覆盖 usecase 生命周期 | 调整客户包流程、状态机或策略预览后 |
 | `scripts/qa/customer-config-runtime-manifest.mjs`      | 将已跟踪客户包编译为后端 `customer_config` 可验证的 runtime manifest，检查 moduleStates、role key 映射、页面 / 字段投影、受控流程定义、打印 snapshot 和 forbidden payload；正式编译与 `local_test_apply` 分开校验，revision 长度不超过 64，只允许白名单 ProcessRuntime 读取，不写 Fact | 调整客户包 catalog、模块状态、角色池、页面投影、字段策略、打印配置草案、流程定义证据或 runtime 发布输入后 |
 | `scripts/qa/erp-field-linkage.mjs`                     | 字段联动专项测试并刷新 latest 覆盖报告                                                                            | 改字段真源、保存转换、合同金额、打印快照后                 |
-| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`、secrets、前端 test / build、本地 PostgreSQL 关键事务门禁、Chromium PDF 安全集成和剩余服务端 test / build；服务端全包复跑过滤已由专用矩阵真实执行的 PostgreSQL 用例，所有实际选中的测试仍要求零 skip；最后运行外部网络型 govulncheck | 提交前 / 推送前                                            |
-| `scripts/qa/strict.sh`                                 | 严格检查，在 fast 边界上补零 warning、完整前后端构建和本地 PostgreSQL 关键事务门禁 | 发版前                                                     |
+| `scripts/qa/full.sh`                                   | 推送前全量检查，先执行 `fast.sh`、secrets、前端 test / build、历史 populated upgrade、同批唯一 PostgreSQL 关键事务门禁、Chromium PDF 安全集成和剩余服务端 test / build；服务端全包复跑过滤已由专用矩阵真实执行的 PostgreSQL 用例，所有实际选中的测试仍要求零 skip；最后运行外部网络型 govulncheck | 提交前 / 推送前                                            |
+| `scripts/qa/strict.sh`                                 | 严格检查，完整复用 full 并补 shell / YAML / 前端零 warning 与漏洞检查 | 发版前                                                     |
 | `scripts/qa/db-guard.sh`                               | 约束 schema 变更必须带 migration                                                                                  | 改数据模型后                                               |
 | `scripts/qa/agents-size.sh`                            | 扫描全部 AGENTS.md；16 KiB 预警、超过 24 KiB 阻断，不自动改写                                                     | 修改长期协作规则后                                         |
 | `scripts/qa/skill-health.mjs`                          | 检查项目 Skill frontmatter、目录名、metadata、README 索引和相对引用；不依赖 PyYAML                              | 修改 `.agents/skills/**` 后                                |
@@ -433,6 +433,8 @@ bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 默认不生成 `debug_operator` 账号；如确需调试权限账号，必须显式加 `--include-debug`，此时会额外生成 `demo_debug`。
 
 `demo_admin` 是普通演示角色账号，不是稳定超级管理员 `admin`。角色演示账号的 seed / reset 只处理 `demo_*`，不得顺带重置稳定管理员。
+
+管理员和演示账号的创建、重置密码统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界；生产环境仍应使用独立随机密码，不能复用本地默认值或测试账号密码。
 
 ```bash
 ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
@@ -1009,6 +1011,8 @@ node /Users/simon/projects/plush-toy-erp/scripts/deploy/rollback-rehearsal-repor
 - `pre-commit` -> `scripts/git-hooks/pre-commit.sh`
 - `pre-push` -> `scripts/git-hooks/pre-push.sh`
 - `commit-msg` -> `scripts/git-hooks/commit-msg.sh`
+
+`pre-commit` 只读取当前 staged index 快照，并通过 `db-guard` 拒绝缺少 versioned migration 或 `atlas.sum` 的 Ent schema 结构变更；它保持 check-only，不执行 `make data`、`migrate_apply` 或重新暂存文件。
 
 ## 版本锁定
 

@@ -358,9 +358,9 @@ func invalidAdminPasswordResult() *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{
 		Code: errcode.InvalidParam.Code,
 		Message: fmt.Sprintf(
-			"密码至少 %d 位，且不能超过 %d 字节",
+			"密码应为 %d 到 %d 位",
 			biz.AdminPasswordMinLength,
-			biz.AdminPasswordMaxBytes,
+			biz.AdminPasswordMaxLength,
 		),
 	}
 }

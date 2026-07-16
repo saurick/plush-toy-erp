@@ -100,16 +100,16 @@ func (_c *ShipmentItemCreate) SetQuantity(v decimal.Decimal) *ShipmentItemCreate
 	return _c
 }
 
-// SetUnitNetWeightKgSnapshot sets the "unit_net_weight_kg_snapshot" field.
-func (_c *ShipmentItemCreate) SetUnitNetWeightKgSnapshot(v decimal.Decimal) *ShipmentItemCreate {
-	_c.mutation.SetUnitNetWeightKgSnapshot(v)
+// SetUnitNetWeightGSnapshot sets the "unit_net_weight_g_snapshot" field.
+func (_c *ShipmentItemCreate) SetUnitNetWeightGSnapshot(v decimal.Decimal) *ShipmentItemCreate {
+	_c.mutation.SetUnitNetWeightGSnapshot(v)
 	return _c
 }
 
-// SetNillableUnitNetWeightKgSnapshot sets the "unit_net_weight_kg_snapshot" field if the given value is not nil.
-func (_c *ShipmentItemCreate) SetNillableUnitNetWeightKgSnapshot(v *decimal.Decimal) *ShipmentItemCreate {
+// SetNillableUnitNetWeightGSnapshot sets the "unit_net_weight_g_snapshot" field if the given value is not nil.
+func (_c *ShipmentItemCreate) SetNillableUnitNetWeightGSnapshot(v *decimal.Decimal) *ShipmentItemCreate {
 	if v != nil {
-		_c.SetUnitNetWeightKgSnapshot(*v)
+		_c.SetUnitNetWeightGSnapshot(*v)
 	}
 	return _c
 }
@@ -418,9 +418,9 @@ func (_c *ShipmentItemCreate) createSpec() (*ShipmentItem, *sqlgraph.CreateSpec)
 		_spec.SetField(shipmentitem.FieldQuantity, field.TypeOther, value)
 		_node.Quantity = value
 	}
-	if value, ok := _c.mutation.UnitNetWeightKgSnapshot(); ok {
-		_spec.SetField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther, value)
-		_node.UnitNetWeightKgSnapshot = &value
+	if value, ok := _c.mutation.UnitNetWeightGSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldUnitNetWeightGSnapshot, field.TypeOther, value)
+		_node.UnitNetWeightGSnapshot = &value
 	}
 	if value, ok := _c.mutation.UnitPriceSnapshot(); ok {
 		_spec.SetField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther, value)
