@@ -205,3 +205,13 @@
 下一步：full-worktree closeout owner 在冻结树门禁前先决定现有 L1 文案断言与当前页面真源哪一侧需要修正，再重跑工作台和任务看板双击步骤；本切片不代替全量 Web、full / strict、目标环境或客户验收。
 
 阻塞/风险：本轮按共享收口协调冻结后不再扩范围；未运行 PostgreSQL、full、strict 或全量浏览器门禁，未 stage、commit、push、deploy 或写入 133，当前没有在途测试或写入进程。
+
+## 2026-07-16 全工作区收口与 133 模拟验收数据准备
+
+完成：以稳定 `main` 为基线精确合并共享工作区全部冻结成果与 `customer-trial-133` 模拟验收数据链路，保留本地客户配置、远程试用配置和正式发布三条互斥的 fail-closed 边界。验收数据继续使用 `2026.07.15-v3 / 20260715-V3 / SIM-YOYOOSUN-UAT-20260715-V3`，演示账号只覆盖 `demo_*`，共享开发库稳定超级管理员 `admin` 不进入轮换。新增运行态提交 / migration / debug 身份证明、串行数据阶段、幂等重放、精确数量读回、页面就绪清单、同批次浏览器证据和清理入口；产品、订单、Workflow、采购、质检、生产、库存、出货、财务与附件均读取各自正式真源，不用 Workflow payload 伪造 Fact。同步完成看板双击查看、工艺图片标注、用户文案、净重克单位迁移及其前后端和文档合同。
+
+验证：`bash scripts/qa/full.sh` 与 `bash scripts/qa/strict.sh` 均完整通过且 0 fail / 0 skip。证据包含 scripts 自动发现、Web 合同与 1276 项全量测试、Web 构建、lint / CSS、真实浏览器 smoke、server quick / all（1993 / 1993、2101 / 2101）、fresh / populated-upgrade / current-schema 独立 PostgreSQL、Go build、shellcheck、shfmt、yamllint、零 warning 和 govulncheck。净重旧 kg 数据升级演练覆盖非空值精确乘 1000、NULL 保留、旧列退出、新约束生效与非法更新拒绝；门禁数据库每次使用唯一临时库并完成清理。
+
+下一步：按用户授权提交并推送 `main`，从最终提交构建固定 `linux/amd64` 镜像；随后只在 133 试用环境执行备份校验、正式 migration、health / ready、同版 v3 数据幂等重放、数量读回、岗位页面与五类打印浏览器复核。133 现有旧数据和旧镜像证据不得冒充本次提交的发布证据。
+
+阻塞/风险：当前代码与本地全量门禁已完成，但本节记录时尚未推送、构建或部署。模拟数据只用于甲方试用，不是客户真实业务事实或签收；人工业务判断仍需甲方实际操作确认。发布失败必须停在原镜像 / 备份回滚点，不得放宽目标身份、运行态提交、migration 或试用配置门禁；本地共享开发库 `admin / adminadmin` 不得由验收流程改写。
