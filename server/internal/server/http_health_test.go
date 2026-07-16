@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"net/http"
@@ -9,6 +10,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/DATA-DOG/go-sqlmock"
 	klog "github.com/go-kratos/kratos/v2/log"
 	httpx "github.com/go-kratos/kratos/v2/transport/http"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
@@ -102,6 +104,117 @@ func TestRegisterHealthRoutesReadyzOK(t *testing.T) {
 	}
 	if body := strings.TrimSpace(recorder.Body.String()); body != "ready" {
 		t.Fatalf("readyz body = %q, want %q", body, "ready")
+	}
+}
+
+func TestRegisterHealthRoutesReadyzVerifiesRuntimeIdentityWithoutAuthentication(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	const release = "20c96d38a7b9e6d4f3c2b1a09876543210fedcba"
+	const migration = "20260714165115"
+	t.Setenv("GIT_SHA", release)
+	mock.ExpectQuery(`SELECT current_database\(\)`).WillReturnRows(
+		sqlmock.NewRows([]string{"current_database"}).AddRow("plush_erp_uat_20260715"),
+	)
+	mock.ExpectQuery(`SELECT version[\s\S]+atlas_schema_revisions`).WillReturnRows(
+		sqlmock.NewRows([]string{"version"}).AddRow(migration),
+	)
+
+	logger := &captureLogger{}
+	srv := httpx.NewServer()
+	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), db, nil)
+	req := httptest.NewRequest(http.MethodGet, runtimeIdentityPath, nil)
+	req.Header.Set(runtimeIdentityScopeHeader, runtimeIdentityReleaseScope)
+	req.Header.Set(
+		runtimeIdentityDigestHeader,
+		hex.EncodeToString(runtimeIdentityDigest(
+			runtimeIdentityReleaseScope,
+			"plush_erp_uat_20260715",
+			release,
+			migration,
+		)),
+	)
+	recorder := httptest.NewRecorder()
+	srv.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("runtime identity status = %d, body=%q", recorder.Code, recorder.Body.String())
+	}
+	if body := strings.TrimSpace(recorder.Body.String()); body != "runtime identity matched" {
+		t.Fatalf("runtime identity body = %q", body)
+	}
+	if recorder.Header().Get(runtimeIdentityProofHeader) != runtimeIdentityProofValue {
+		t.Fatalf("runtime identity proof header missing")
+	}
+	if recorder.Header().Get("Cache-Control") != "no-store" {
+		t.Fatalf("runtime identity response must be no-store")
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("runtime identity queries: %v", err)
+	}
+}
+
+func TestRegisterHealthRoutesReadyzRejectsRuntimeIdentityMismatchWithoutDisclosingActualValue(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	mock.ExpectQuery(`SELECT current_database\(\)`).WillReturnRows(
+		sqlmock.NewRows([]string{"current_database"}).AddRow("other_database"),
+	)
+
+	logger := &captureLogger{}
+	srv := httpx.NewServer()
+	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), db, nil)
+	req := httptest.NewRequest(http.MethodGet, runtimeIdentityPath, nil)
+	req.Header.Set(runtimeIdentityScopeHeader, runtimeIdentityDatabaseScope)
+	req.Header.Set(
+		runtimeIdentityDigestHeader,
+		hex.EncodeToString(runtimeIdentityDigest(
+			runtimeIdentityDatabaseScope,
+			"plush_erp_uat_20260715",
+			"",
+			"",
+		)),
+	)
+	recorder := httptest.NewRecorder()
+	srv.ServeHTTP(recorder, req)
+
+	if recorder.Code != http.StatusPreconditionFailed {
+		t.Fatalf("readyz status = %d, want %d", recorder.Code, http.StatusPreconditionFailed)
+	}
+	body := strings.TrimSpace(recorder.Body.String())
+	if body != "runtime identity mismatch" || strings.Contains(body, "other_database") {
+		t.Fatalf("readyz body disclosed runtime identity: %q", body)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("runtime identity queries: %v", err)
+	}
+}
+
+func TestRegisterHealthRoutesRuntimeIdentityRejectsMalformedProbeWithoutQuery(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New: %v", err)
+	}
+	defer func() { _ = db.Close() }()
+	logger := &captureLogger{}
+	srv := httpx.NewServer()
+	registerHealthRoutes(srv, logger, sdktrace.NewTracerProvider(), db, nil)
+	req := httptest.NewRequest(http.MethodGet, runtimeIdentityPath, nil)
+	req.Header.Set(runtimeIdentityScopeHeader, runtimeIdentityReleaseScope)
+	req.Header.Set(runtimeIdentityDigestHeader, "not-a-digest")
+	recorder := httptest.NewRecorder()
+	srv.ServeHTTP(recorder, req)
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("runtime identity status = %d, want %d", recorder.Code, http.StatusBadRequest)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("malformed probe queried database: %v", err)
 	}
 }
 

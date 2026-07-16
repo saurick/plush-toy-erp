@@ -6,6 +6,7 @@ import path from "node:path";
 import {
   CUSTOMER_TRIAL_133_TARGET,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
   parseManualAcceptanceTargetAttestation,
@@ -338,6 +339,13 @@ export async function applyAttachmentData({
     password,
   });
   backendURL = policy.backendURL;
+  if (policy.external) {
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy,
+      attestation,
+      fetchImpl: fetch,
+    });
+  }
   buildAttachmentTargets({
     sourceReport,
     factReport,
@@ -363,14 +371,12 @@ export async function applyAttachmentData({
   if (!runtimeAdminToken) {
     throw new Error("admin login response is missing access token");
   }
-  const capabilities = attestation
-    ? { environment: attestation.environment, ...attestation.debug }
-    : await rpc({
-        backendURL,
-        domain: "debug",
-        method: "capabilities",
-        token: runtimeAdminToken,
-      });
+  const capabilities = await rpc({
+    backendURL,
+    domain: "debug",
+    method: "capabilities",
+    token: runtimeAdminToken,
+  });
   const pmcLogin = await rpc({
     backendURL,
     domain: "auth",

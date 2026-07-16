@@ -196,7 +196,7 @@ test("attachment report batch binds exact dataset identity and registered target
     source: "active_customer_config_revision",
     targetAttestation: {
       source: "out-of-band",
-      release: "release-929ec0b3",
+      release: "929ec0b3a563bec0796274d033a97277519bcb51",
       migration: "20260715120000",
     },
   };
@@ -216,7 +216,7 @@ test("attachment report batch binds exact dataset identity and registered target
     origin: backendURL,
     customerKey: "yoyoosun",
     environment: "prod",
-    release: "release-929ec0b3",
+    release: "929ec0b3a563bec0796274d033a97277519bcb51",
     migration: "20260715120000",
     debug: {
       seedEnabled: false,
@@ -233,7 +233,10 @@ test("attachment report batch binds exact dataset identity and registered target
     targetAttestation,
   });
   assert.equal(resolvedRemote.policy.target, target);
-  assert.equal(resolvedRemote.attestation.release, "release-929ec0b3");
+  assert.equal(
+    resolvedRemote.attestation.release,
+    "929ec0b3a563bec0796274d033a97277519bcb51",
+  );
 
   const wrongBatch = reports();
   wrongBatch.taskReport.runId = "OTHER-RUN";

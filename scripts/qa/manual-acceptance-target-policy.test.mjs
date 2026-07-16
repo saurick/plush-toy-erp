@@ -3,10 +3,13 @@ import test from "node:test";
 
 import {
   CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
   MANUAL_ACCEPTANCE_DATASET_KEY,
+  assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
   manualAcceptanceTargetConfirmation,
@@ -22,6 +25,7 @@ const remotePolicyInput = Object.freeze({
 });
 
 const safeRemoteCapabilities = Object.freeze({
+  databaseName: CUSTOMER_TRIAL_133_DATABASE,
   environment: "prod",
   seedEnabled: false,
   seedAllowed: false,
@@ -152,29 +156,81 @@ test("customer-trial-133 mutation confirmation binds target, version, and run", 
   );
 });
 
+test("local dedicated apply confirmation and runtime database identity are exact", () => {
+  const localPolicy = {
+    target: LOCAL_DEV_TARGET,
+    backendURL: "http://127.0.0.1:18376",
+    datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+    dataVersion: "2026.07.15-v3",
+    runId: "20260715-V3",
+    databaseName: "plush_erp_acceptance_20260715_v3_dev",
+  };
+  const confirmation =
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.15-v3:20260715-V3:plush_erp_acceptance_20260715_v3_dev";
+  assert.equal(manualAcceptanceTargetConfirmation(localPolicy), confirmation);
+  assert.throws(
+    () => assertManualAcceptanceMutationTarget(localPolicy),
+    /local-dev apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
+  );
+  assert.equal(
+    assertManualAcceptanceMutationTarget(localPolicy, { confirmation })
+      .databaseName,
+    "plush_erp_acceptance_20260715_v3_dev",
+  );
+  assert.equal(
+    assertManualAcceptanceDatabaseIdentity({
+      policy: localPolicy,
+      capabilities: {
+        databaseName: "plush_erp_acceptance_20260715_v3_dev",
+      },
+    }).databaseName,
+    "plush_erp_acceptance_20260715_v3_dev",
+  );
+  assert.throws(
+    () =>
+      assertManualAcceptanceDatabaseIdentity({
+        policy: localPolicy,
+        capabilities: { databaseName: "plush_erp_simon_dev" },
+      }),
+    /runtime databaseName=plush_erp_simon_dev/u,
+  );
+  assert.throws(
+    () => resolveManualAcceptanceTarget({ ...localPolicy, databaseName: "plush_erp_simon_dev" }),
+    /plush_erp_acceptance_/u,
+  );
+});
+
 test("customer-trial-133 out-of-band attestation pins origin, customer, release, migration, and debug flags", () => {
   const attestation = {
     target: CUSTOMER_TRIAL_133_TARGET,
     origin: CUSTOMER_TRIAL_133_ORIGIN,
     customerKey: "yoyoosun",
     environment: "prod",
-    release: "20c96d38",
-    migration: "20260711000101",
+    release: "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
+    migration: "20260714165115",
     debug: { ...safeRemoteCapabilities, environment: undefined },
   };
   delete attestation.debug.environment;
+  delete attestation.debug.databaseName;
   const checked = assertManualAcceptanceTargetAttestation({
     policy: remotePolicyInput,
     attestation: JSON.stringify(attestation),
   });
-  assert.equal(checked.release, "20c96d38");
-  assert.equal(checked.migration, "20260711000101");
+  assert.equal(
+    checked.release,
+    "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
+  );
+  assert.equal(checked.migration, "20260714165115");
 
   for (const patch of [
     { origin: "http://192.168.0.133:5175" },
     { customerKey: "other" },
     { release: "" },
+    { release: "20c96d38" },
+    { release: "G0c96d38a7b9e6d4f3c2b1a09876543210fedcba" },
     { migration: "" },
+    { migration: "atlas-head" },
+    { migration: "20260711063237" },
     { debug: { ...attestation.debug, cleanupAllowed: true } },
     { unexpected: true },
     { debug: { ...attestation.debug, unexpected: false } },
@@ -188,6 +244,78 @@ test("customer-trial-133 out-of-band attestation pins origin, customer, release,
       /attestation|unsafe fields/u,
     );
   }
+});
+
+test("runtime identity precondition requires the dedicated proof marker before authentication", async () => {
+  const attestation = {
+    target: CUSTOMER_TRIAL_133_TARGET,
+    origin: CUSTOMER_TRIAL_133_ORIGIN,
+    customerKey: "yoyoosun",
+    environment: "prod",
+    release: "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
+    migration: "20260714165115",
+    debug: Object.fromEntries(
+      [
+        "seedEnabled",
+        "seedAllowed",
+        "cleanupEnabled",
+        "cleanupAllowed",
+        "businessDataClearEnabled",
+        "businessDataClearAllowed",
+      ].map((key) => [key, false]),
+    ),
+  };
+  let request;
+  const proof = await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: remotePolicyInput,
+    attestation,
+    fetchImpl: async (url, init) => {
+      request = { url, init };
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        headers: {
+          get: (name) =>
+            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+        },
+        async text() {
+          return "runtime identity matched";
+        },
+      };
+    },
+  });
+  assert.equal(proof.databaseName, CUSTOMER_TRIAL_133_DATABASE);
+  assert.equal(proof.release, attestation.release);
+  assert.equal(request.url, `${CUSTOMER_TRIAL_133_ORIGIN}/readyz/runtime-identity`);
+  assert.equal(request.init.method, "GET");
+  assert.equal(request.init.body, undefined);
+  assert.equal(
+    request.init.headers["X-ERP-Runtime-Identity-Scope"],
+    "release-v1",
+  );
+  assert.match(
+    request.init.headers["X-ERP-Expected-Runtime-Identity-SHA256"],
+    /^[0-9a-f]{64}$/u,
+  );
+
+  await assert.rejects(
+    () =>
+      assertManualAcceptanceRuntimeIdentityPrecondition({
+        policy: remotePolicyInput,
+        attestation,
+        fetchImpl: async () => ({
+          ok: true,
+          status: 200,
+          redirected: false,
+          headers: { get: () => null },
+          async text() {
+            return "ready";
+          },
+        }),
+      }),
+    /identity precondition failed before authentication/u,
+  );
 });
 
 test("customer-trial-133 runtime accepts only prod with all debug mutations disabled", () => {

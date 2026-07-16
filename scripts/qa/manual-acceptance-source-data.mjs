@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import {
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
   parseManualAcceptanceTargetAttestation,
@@ -20,6 +21,13 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-data";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const CUSTOMER_KEY = "yoyoosun";
+export const MANUAL_ACCEPTANCE_CORE_UNIT_CODE = "SIM-PLUSH-CORE-PCS";
+export const MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES = Object.freeze({
+  material: "SIM-PLUSH-CORE-RM-WH",
+  product: "SIM-PLUSH-CORE-FG-WH",
+  qualityHold: "SIM-PLUSH-CORE-QC-HOLD",
+  workInProcess: "SIM-PLUSH-CORE-WIP-WH",
+});
 const REQUIRED_SOURCE_MODULES = Object.freeze([
   "customers",
   "suppliers",
@@ -81,6 +89,38 @@ function asPositiveInt(value, name, { min = 1, max = 200 } = {}) {
     throw new CliError(`${name} must be an integer between ${min} and ${max}`);
   }
   return parsed;
+}
+
+function requireUniqueCoreRecord(records, code, label) {
+  const matches = (records || []).filter(
+    (item) => String(item?.code || "").trim() === code,
+  );
+  if (matches.length !== 1 || !Number.isSafeInteger(Number(matches[0]?.id))) {
+    throw new CliError(
+      `${label} must contain exactly one active ${code}; reconcile the shared core dataset first`,
+      2,
+    );
+  }
+  return matches[0];
+}
+
+export function resolveManualAcceptanceCoreReferences({ units, warehouses }) {
+  if (!Array.isArray(units) || !Array.isArray(warehouses)) {
+    throw new CliError("core unit and warehouse queries must return arrays", 2);
+  }
+  const unit = requireUniqueCoreRecord(
+    units,
+    MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
+    "core units",
+  );
+  const selectedWarehouses = Object.values(
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+  ).map((code) => requireUniqueCoreRecord(warehouses, code, "core warehouses"));
+  return Object.freeze({
+    unit,
+    warehouse: selectedWarehouses[0],
+    warehouses: Object.freeze(selectedWarehouses),
+  });
 }
 
 export function sanitizeManualAcceptanceRunId(value) {
@@ -1037,15 +1077,13 @@ async function assertSafeRuntime({
         attestation: targetAttestation,
       })
     : undefined;
-  const capabilities = attested
-    ? { environment: attested.environment, ...attested.debug }
-    : await rpcCall({
-        backendURL: plan.backendURL,
-        domain: "debug",
-        method: "capabilities",
-        token: tokens.seedAdmin || tokens.sales,
-        fetchImpl,
-      });
+  const capabilities = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "debug",
+    method: "capabilities",
+    token: tokens.seedAdmin || tokens.sales,
+    fetchImpl,
+  });
   assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const sessionData = await rpcCall({
     backendURL: plan.backendURL,
@@ -1347,11 +1385,6 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     fetchImpl,
     params: { keyword: "", active_only: true },
   });
-  const unit = units[0];
-  if (!unit?.id)
-    throw new CliError(
-      "no active unit available; run scripts/seed-core-demo-data.sh first",
-    );
   const warehouses = await listAll({
     plan,
     token: tokens.purchase,
@@ -1361,11 +1394,11 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     fetchImpl,
     params: { keyword: "", active_only: true },
   });
-  const warehouse = warehouses[0];
-  if (!warehouse?.id || warehouses.length < 4)
-    throw new CliError(
-      "at least four active warehouses are required for multi-warehouse acceptance; run scripts/seed-core-demo-data.sh first",
-    );
+  const coreReferences = resolveManualAcceptanceCoreReferences({
+    units,
+    warehouses,
+  });
+  const { unit, warehouse } = coreReferences;
 
   const materials = mapBy(
     await listAll({
@@ -1632,7 +1665,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
     processes,
     unit,
     warehouse,
-    warehouses,
+    warehouses: [...coreReferences.warehouses],
   };
 }
 
@@ -2872,7 +2905,7 @@ export async function applyManualAcceptanceSourceData(
     fetchImpl = fetch,
   } = {},
 ) {
-  assertManualAcceptanceMutationTarget(plan, {
+  const mutationTarget = assertManualAcceptanceMutationTarget(plan, {
     confirmation: targetConfirmation,
   });
   const parsedTargetAttestation =
@@ -2900,6 +2933,13 @@ export async function applyManualAcceptanceSourceData(
     adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
+  if (mutationTarget.external) {
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: plan,
+      attestation: parsedTargetAttestation,
+      fetchImpl,
+    });
+  }
   const tokens = await loginRoles({
     backendURL: plan.backendURL,
     password: effectivePassword,

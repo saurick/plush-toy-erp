@@ -34,7 +34,7 @@ function customerTrial133Attestation(overrides = {}) {
     customerKey: "yoyoosun",
     environment: "prod",
     release: "929ec0b3a563bec0796274d033a97277519bcb51",
-    migration: "20260711063237",
+    migration: "20260714165115",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -428,6 +428,26 @@ test("customer-trial-133 retirement uses attested prod runtime and business life
     suppliers: [],
   };
   const fetchImpl = async (url, init) => {
+    if (!init.body) {
+      calls.push({
+        url,
+        domain: "runtime-identity",
+        method: "probe",
+        authorization: "",
+      });
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        headers: {
+          get: (name) =>
+            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+        },
+        async text() {
+          return "runtime identity matched";
+        },
+      };
+    }
     const domain = new URL(url).pathname.split("/").filter(Boolean).at(-1);
     const body = JSON.parse(init.body);
     const authorization = init.headers.Authorization || "";
@@ -460,6 +480,18 @@ test("customer-trial-133 retirement uses attested prod runtime and business life
             ].map((key) => [key, "enabled"]),
           ),
         },
+      });
+    }
+    if (body.method === "capabilities") {
+      return ok({
+        environment: "prod",
+        databaseName: "plush_erp_uat_20260715",
+        seedEnabled: false,
+        seedAllowed: false,
+        cleanupEnabled: false,
+        cleanupAllowed: false,
+        businessDataClearEnabled: false,
+        businessDataClearAllowed: false,
       });
     }
     if (body.method === "list_customers") {
@@ -512,9 +544,10 @@ test("customer-trial-133 retirement uses attested prod runtime and business life
   assert.deepEqual(report.runtime.targetAttestation, {
     source: "out-of-band",
     release: "929ec0b3a563bec0796274d033a97277519bcb51",
-    migration: "20260711063237",
+    migration: "20260714165115",
   });
-  assert.equal(calls.some((call) => call.method === "capabilities"), false);
+  assert.equal(calls[0].method, "probe");
+  assert.equal(calls.some((call) => call.method === "capabilities"), true);
   assert.equal(
     calls.some((call) => /delete|truncate|clear/iu.test(call.method)),
     false,

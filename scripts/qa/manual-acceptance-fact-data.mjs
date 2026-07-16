@@ -15,11 +15,13 @@ import {
   CUSTOMER_TRIAL_133_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
@@ -293,13 +295,17 @@ function allocateOutsourcingPairs(candidates, count) {
   });
 }
 
-function chooseWarehouse(warehouses, pattern, fallbackOffset = 0) {
-  const item =
-    warehouses.find((candidate) =>
-      pattern.test(`${candidate.code || ""} ${candidate.name || ""}`),
-    ) || warehouses[fallbackOffset % warehouses.length];
-  if (!item?.id) throw new CliError("source report has no usable warehouse", 2);
-  return item;
+function requireCoreWarehouse(warehouses, code, purpose) {
+  const matches = warehouses.filter(
+    (candidate) => String(candidate?.code || "").trim() === code,
+  );
+  if (matches.length !== 1 || !matches[0]?.id) {
+    throw new CliError(
+      `source report must contain exactly one ${purpose} warehouse ${code}`,
+      2,
+    );
+  }
+  return matches[0];
 }
 
 function receiptStatus(index) {
@@ -359,8 +365,16 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
       unitId: positiveID(candidate.issue.item.unitId, "outsourcing.unitId"),
     });
   }
-  const materialWarehouse = chooseWarehouse(warehouses, /RM|材料|原料/iu, 0);
-  const productWarehouse = chooseWarehouse(warehouses, /FG|成品/iu, 1);
+  const materialWarehouse = requireCoreWarehouse(
+    warehouses,
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material,
+    "material",
+  );
+  const productWarehouse = requireCoreWarehouse(
+    warehouses,
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product,
+    "finished-goods",
+  );
   const linkedOrders = (refs.purchaseOrders || []).filter(
     (item) => String(item.status || "").toUpperCase() === "APPROVED",
   );
@@ -601,19 +615,14 @@ async function createExecutionContext(plan, options = {}) {
   });
   assertManualAcceptanceAdminProfile(adminMe);
   tokens.admin = adminToken;
-  let capabilities;
-  if (attested) {
-    capabilities = { environment: attested.environment, ...attested.debug };
-  } else {
-    capabilities = await rpcCall({
-      backendURL: plan.backendURL,
-      domain: "debug",
-      method: "capabilities",
-      params: { customer_key: CUSTOMER_KEY },
-      token: adminToken,
-      fetchImpl,
-    });
-  }
+  const capabilities = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "debug",
+    method: "capabilities",
+    params: { customer_key: CUSTOMER_KEY },
+    token: adminToken,
+    fetchImpl,
+  });
   assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const sessionData = await rpcCall({
     backendURL: plan.backendURL,
@@ -3114,6 +3123,13 @@ export async function applyManualAcceptanceFactPlan(
       `apply requires MANUAL_ACCEPTANCE_SIM_CONFIRM=${APPLY_CONFIRMATION}`,
       2,
     );
+  }
+  if (mutationTarget.external) {
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: plan,
+      attestation: targetAttestation,
+      fetchImpl: options.fetchImpl || fetch,
+    });
   }
   const baseContext =
     options.executionContext || (await createExecutionContext(plan, options));

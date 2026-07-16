@@ -9,6 +9,13 @@ import { expectedAccounts } from "./trial-account-rbac.mjs";
 import { MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS } from "./manual-acceptance-account-scenarios.mjs";
 import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
 import {
+  MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS,
+  MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE,
+  MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
+  assertManualAcceptancePageDataContract,
+  buildManualAcceptancePageDataContract,
+} from "./manual-acceptance-page-data-contract.mjs";
+import {
   TASK_COPY_REVISION,
   TASK_STATUS_KEYS,
   getManualAcceptanceTaskStatusCounts,
@@ -81,37 +88,6 @@ function totalTaskStatusCounts() {
   }
   return totals;
 }
-
-const DESKTOP_DATASET_BY_PAGE = Object.freeze({
-  customers: "customers",
-  suppliers: "suppliers",
-  products: "product-skus",
-  materials: "materials",
-  "sales-orders": "sales-orders",
-  "material-bom": "bom-versions",
-  processes: "processes",
-  "accessories-purchase": "purchase-orders",
-  "quality-inspections": "quality-inspections",
-  inbound: "purchase-receipts",
-  "processing-contracts": "outsourcing-orders",
-  "production-orders": "production-orders",
-  "production-progress": "production-facts",
-  outbound: "stock-reservations",
-  shipments: "shipments",
-  reconciliation: "finance-reconciliation",
-  payables: "finance-payables",
-  receivables: "finance-receivables",
-  invoices: "finance-invoices",
-  "system-audit-logs": "audit-events",
-});
-
-const PRINT_SUPPORT_DATASET = Object.freeze({
-  "material-purchase-contract": "purchase-orders",
-  "processing-contract": "outsourcing-orders",
-  "engineering-material-detail": "bom-versions",
-  "engineering-color-card": "bom-versions",
-  "engineering-work-instruction": "bom-versions",
-});
 
 const SOURCE_EXPECTATION_KEYS = Object.freeze({
   customers: "customers",
@@ -762,35 +738,6 @@ function validateReportBatch(sourceReport, factReport, taskReport) {
   }
 }
 
-function flattenCatalog(catalog) {
-  return [
-    ...catalog.technicalManifest.entries.map((item) => ({
-      ...item,
-      catalogGroup: "entries",
-    })),
-    ...catalog.technicalManifest.desktopPages.map((item) => ({
-      ...item,
-      catalogGroup: "desktopPages",
-    })),
-    ...catalog.technicalManifest.mobileRolePages.map((item) => ({
-      ...item,
-      catalogGroup: "mobileRolePages",
-    })),
-    ...catalog.technicalManifest.printPreviewPages.map((item) => ({
-      ...item,
-      catalogGroup: "printPreviewPages",
-    })),
-    ...catalog.technicalManifest.printWorkspacePages.map((item) => ({
-      ...item,
-      catalogGroup: "printWorkspacePages",
-    })),
-  ];
-}
-
-function targetId(item) {
-  return `${item.catalogGroup}:${item.key}`;
-}
-
 function catalogMinimum(catalog, pageKey) {
   const item = catalog.technicalManifest.desktopPages.find(
     (candidate) => candidate.key === pageKey,
@@ -828,7 +775,9 @@ function declaredExpectations(sourceReport, factReport) {
 
 function buildCanonicalMinimums(catalog) {
   const minimums = {};
-  for (const [pageKey, datasetId] of Object.entries(DESKTOP_DATASET_BY_PAGE)) {
+  for (const [pageKey, datasetId] of Object.entries(
+    MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE,
+  )) {
     minimums[datasetId] = catalogMinimum(catalog, pageKey);
   }
   const inventoryMinimum = catalogMinimum(catalog, "inventory");
@@ -1069,133 +1018,32 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
   };
 }
 
-function targetEvidence(item) {
-  if (item.catalogGroup === "entries") {
-    return {
-      probeIds: ["permission-accounts", "valid-account-logins"],
-      actualProbeId: "permission-accounts",
-      browserRequired: true,
-      reason:
-        "账号数量和正常登录可由系统查询核对；错误密码、停用账号提示及入口切换仍需页面操作确认。",
-    };
-  }
-  if (item.catalogGroup === "mobileRolePages") {
-    return {
-      probeIds: [`mobile-tasks:${item.key}`],
-      browserRequired: true,
-      reason: "任务数量和状态可核对，页面操作与恢复状态仍需页面确认。",
-    };
-  }
-  if (
-    item.catalogGroup === "printPreviewPages" ||
-    item.catalogGroup === "printWorkspacePages"
-  ) {
-    return {
-      probeIds: [PRINT_SUPPORT_DATASET[item.key]].filter(Boolean),
-      browserRequired: true,
-      quantityNotProven: true,
-      reason:
-        "业务来源记录可以核对，但纸面明细行数、分页和编辑恢复不能由清单查询证明。",
-    };
-  }
-  if (item.key === "global-dashboard" || item.key === "task-board") {
-    return {
-      probeIds: ["mobile-task-total", "boss-dashboard-tasks"],
-      actualProbeId: "mobile-task-total",
-      browserRequired: true,
-      reason:
-        "九个岗位合计数量与老板账号实际可见任务分别核对；不把跨岗位总数冒充老板可见数量，卡片跳转和页面显示仍需页面确认。",
-    };
-  }
-  const workflowRoleByPage = {
-    "production-scheduling": "pmc",
-    "production-exceptions": "production",
-  };
-  const workflowRoleKey = workflowRoleByPage[item.key];
-  if (workflowRoleKey) {
-    return {
-      probeIds: [`mobile-tasks:${workflowRoleKey}`],
-      actualProbeId: `mobile-tasks:${workflowRoleKey}`,
-      browserRequired: true,
-      reason:
-        "本批岗位任务数量和状态可核对；排程或异常页面的筛选、详情和处理动作仍需页面确认。",
-    };
-  }
-  if (item.key === "inbound") {
-    return {
-      probeIds: [
-        "purchase-receipts",
-        "purchase-returns",
-        "purchase-receipt-adjustments",
-      ],
-      actualProbeId: "purchase-receipts",
-      browserRequired: true,
-      reason:
-        "本批入库、退货和调整记录分别按精确引用核对；页面筛选、详情及业务操作仍需页面确认。",
-    };
-  }
-  if (item.key === "inventory") {
-    return {
-      probeIds: ["inventory-balances", "inventory-lots", "inventory-txns"],
-      combine: "minimum",
-      browserRequired: true,
-      reason: "余额、批次和流水分别核对，页面切换与相互对照仍需页面确认。",
-    };
-  }
-  if (item.key === "print-center") {
-    return {
-      probeIds: ["catalog-print-templates"],
-      browserRequired: true,
-      reason: "模板数量来自当前正式目录，模板打开和纸面内容仍需页面确认。",
-    };
-  }
-  if (item.key === "permission-center") {
-    return {
-      probeIds: ["permission-accounts", "permission-roles"],
-      actualProbeId: "permission-accounts",
-      browserRequired: true,
-      reason: "账号和岗位模板数量可核对，筛选及权限调整仍需页面确认。",
-    };
-  }
-  const datasetId = DESKTOP_DATASET_BY_PAGE[item.key];
-  if (!datasetId) {
-    throw new CliError(`页面 ${item.key} 没有只读数据核验口径`);
-  }
-  return {
-    probeIds: [datasetId],
-    browserRequired: true,
-    reason: "数量和状态分布可核对，筛选、详情及业务操作仍需页面确认。",
-  };
-}
-
 export function buildManualAcceptanceReadinessPlan(options = {}) {
   const catalog = options.catalog || buildManualAcceptanceCatalog();
+  const pageDataContract = buildManualAcceptancePageDataContract({ catalog });
   const sourceReport = validateSourceReport(options.sourceReport || null);
   const factReport = validateFactReport(options.factReport || null);
   const taskReport = validateTaskReport(options.taskReport || null);
   validateReportBatch(sourceReport, factReport, taskReport);
-  const allTargets = flattenCatalog(catalog).map((item) => ({
-    id: targetId(item),
-    key: item.key,
-    title: item.title,
-    route: item.route,
-    catalogGroup: item.catalogGroup,
+  const allTargets = pageDataContract.targets.map((item) => ({
+    ...item,
     roleKeys: [...item.roleKeys],
-    expectedMinimum: item.minimumRecords,
-    expectedUnit: item.minimumRecordUnit,
-    ...targetEvidence(item),
+    probeIds: [...item.probeIds],
+    generatorStageKeys: [...item.generatorStageKeys],
   }));
-  if (allTargets.length !== 48) {
-    throw new CliError(
-      `当前验收目标应为 48 个，实际为 ${allTargets.length} 个`,
-    );
-  }
   const { probes, inputWarnings } = buildDatasetProbes(
     catalog,
     sourceReport,
     factReport,
     taskReport,
   );
+  assertManualAcceptancePageDataContract(pageDataContract, {
+    catalog,
+    knownProbeIds: [
+      ...probes.map((probe) => probe.id),
+      ...Object.values(MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS),
+    ],
+  });
   return {
     mode: "plan",
     scope: "manual-acceptance-readiness",
@@ -1207,10 +1055,16 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
     directSQL: false,
     callsBackend: false,
     expected: {
-      targets: 48,
+      targets: MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
       mobileRolePages: 9,
       mobileTasksPerRole: MOBILE_TASKS_PER_ROLE,
       mobileTaskTotal: MOBILE_TASK_TOTAL,
+    },
+    pageDataContract: {
+      contract: pageDataContract.contract,
+      targetCount: pageDataContract.targetCount,
+      generatorStages: pageDataContract.generatorStages,
+      boundary: pageDataContract.boundary,
     },
     reportInputs: {
       sourceReport: sourceReport
@@ -1788,7 +1642,7 @@ async function loginAccounts({ backendURL, password, fetchImpl }) {
 function loginProbeResult(accountResults) {
   const actual = accountResults.filter((item) => item.status === "pass").length;
   return {
-    id: "valid-account-logins",
+    id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.validAccountLogins,
     status: actual === expectedAccounts.length ? "pass" : "fail",
     expectedMinimum: expectedAccounts.length,
     actual,
@@ -1827,7 +1681,7 @@ function mobileTotalResult(mobileResults) {
   const missingStatuses = requiredStatuses.filter((item) => !counts[item]);
   const allRolesPass = mobileResults.every((item) => item.status === "pass");
   return {
-    id: "mobile-task-total",
+    id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.mobileTaskTotal,
     status: unproven
       ? "not_proven"
       : allRolesPass && actual >= MOBILE_TASK_TOTAL
@@ -1861,7 +1715,7 @@ function catalogPrintTemplateResult(plan) {
     (item) => item.catalogGroup === "printPreviewPages",
   ).length;
   return {
-    id: "catalog-print-templates",
+    id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.catalogPrintTemplates,
     status: actual >= 5 ? "pass" : "fail",
     expectedMinimum: 5,
     actual,

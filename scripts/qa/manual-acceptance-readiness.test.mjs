@@ -10,6 +10,11 @@ import {
   runManualAcceptanceReadinessCli,
   verifyManualAcceptanceReadiness,
 } from "./manual-acceptance-readiness.mjs";
+import {
+  MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS,
+  assertManualAcceptancePageDataContract,
+  buildManualAcceptancePageDataContract,
+} from "./manual-acceptance-page-data-contract.mjs";
 import { TASK_COPY_REVISION } from "./manual-acceptance-task-data.mjs";
 
 function sourceReport(overrides = {}) {
@@ -663,6 +668,107 @@ function createReadinessFetch(runtimeOptions = {}) {
   };
   return { fetchImpl, calls };
 }
+
+test("all 48 formal targets are owned by shared generator stages", () => {
+  const contract = buildManualAcceptancePageDataContract();
+  const plan = buildManualAcceptanceReadinessPlan();
+  const ownershipByID = new Map(
+    contract.targets.map((target) => [
+      target.id,
+      {
+        probeIds: target.probeIds,
+        generatorStageKeys: target.generatorStageKeys,
+      },
+    ]),
+  );
+
+  assert.equal(contract.targets.length, 48);
+  assert.deepEqual(
+    Object.keys(contract.generatorStages).sort(),
+    [...MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS].sort(),
+  );
+  assert(
+    contract.targets.every(
+      (target) =>
+        target.probeIds.length > 0 && target.generatorStageKeys.length === 1,
+    ),
+  );
+  assert(
+    contract.targets.every((target) =>
+      Object.keys(target).every(
+        (key) => !/(?:builder|command|entrypoint|scriptPath)/iu.test(key),
+      ),
+    ),
+  );
+  assert.deepEqual(
+    plan.targets.map((target) => [
+      target.id,
+      {
+        probeIds: target.probeIds,
+        generatorStageKeys: target.generatorStageKeys,
+      },
+    ]),
+    [...ownershipByID.entries()],
+  );
+  assert.deepEqual(
+    plan.targets.find((target) => target.id === "entries:admin-login")
+      .generatorStageKeys,
+    ["role"],
+  );
+  assert.deepEqual(
+    plan.targets.find((target) => target.id === "desktopPages:customers")
+      .generatorStageKeys,
+    ["source"],
+  );
+  assert.deepEqual(
+    plan.targets.find((target) => target.id === "desktopPages:global-dashboard")
+      .generatorStageKeys,
+    ["task"],
+  );
+  assert.deepEqual(
+    plan.targets.find((target) => target.id === "desktopPages:inventory")
+      .generatorStageKeys,
+    ["facts"],
+  );
+  assert.deepEqual(
+    plan.targets.find((target) => target.id === "desktopPages:print-center")
+      .generatorStageKeys,
+    ["catalog"],
+  );
+});
+
+test("page data ownership fails closed for missing pages, unknown probes, and page builders", () => {
+  const contract = buildManualAcceptancePageDataContract();
+  const missingPage = structuredClone(contract);
+  missingPage.targets.pop();
+  assert.throws(
+    () => assertManualAcceptancePageDataContract(missingPage),
+    /必须恰好覆盖 48 个正式目标/u,
+  );
+
+  const unknownProbe = structuredClone(contract);
+  unknownProbe.targets[0].probeIds = ["page-local-mock-data"];
+  assert.throws(
+    () => assertManualAcceptancePageDataContract(unknownProbe),
+    /没有共享生成阶段/u,
+  );
+
+  const pageBuilder = structuredClone(contract);
+  pageBuilder.targets[0].entrypoint = "web/src/pages/admin-login/mock.mjs";
+  assert.throws(
+    () => assertManualAcceptancePageDataContract(pageBuilder),
+    /不得声明自有数据生成入口/u,
+  );
+
+  const stageFork = structuredClone(contract);
+  stageFork.generatorStages.source.entrypoints = [
+    "web/src/pages/customers/mock.mjs",
+  ];
+  assert.throws(
+    () => assertManualAcceptancePageDataContract(stageFork),
+    /偏离了唯一登记入口/u,
+  );
+});
 
 test("default plan covers all 48 targets and never connects to a backend", async () => {
   let fetchCalls = 0;
@@ -1429,7 +1535,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     source: "active_customer_config_revision",
     targetAttestation: {
       source: "out-of-band",
-      release: "release-929ec0b3",
+      release: "929ec0b3a563bec0796274d033a97277519bcb51",
       migration: "20260715120000",
     },
   };
@@ -1445,7 +1551,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     origin: backendURL,
     customerKey: "yoyoosun",
     environment: "prod",
-    release: "release-929ec0b3",
+    release: "929ec0b3a563bec0796274d033a97277519bcb51",
     migration: "20260715120000",
     debug: {
       seedEnabled: false,

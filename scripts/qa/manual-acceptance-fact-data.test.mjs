@@ -25,6 +25,7 @@ import {
   verifyReceiptQualities,
   verifyManualAcceptanceFactPlan,
 } from "./manual-acceptance-fact-data.mjs";
+import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
 import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
 
 const DATA_VERSION = "2026.07.15-v3";
@@ -202,8 +203,8 @@ function sourceReport({ remote = false } = {}) {
         ? {
             targetAttestation: {
               source: "out-of-band",
-              release: "release-v2",
-              migration: "migration-v2",
+              release: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              migration: "20260714165115",
             },
           }
         : {}),
@@ -212,8 +213,16 @@ function sourceReport({ remote = false } = {}) {
       materials: [material],
       suppliers: [{ id: 201, code: "SUP-201", name: "嘉顺布行" }],
       warehouses: [
-        { id: 301, code: "RM", name: "材料仓" },
-        { id: 302, code: "FG", name: "成品仓" },
+        {
+          id: 301,
+          code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material,
+          name: "材料仓",
+        },
+        {
+          id: 302,
+          code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product,
+          name: "成品仓",
+        },
       ],
       purchaseOrders: Array.from({ length: 9 }, (_, offset) => ({
         id: 400 + offset,
@@ -245,8 +254,16 @@ function sourceReport({ remote = false } = {}) {
           ],
           purchaseCandidates: [],
           warehouses: [
-            { id: 301, code: "RM", name: "材料仓" },
-            { id: 302, code: "FG", name: "成品仓" },
+            {
+              id: 301,
+              code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material,
+              name: "材料仓",
+            },
+            {
+              id: 302,
+              code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product,
+              name: "成品仓",
+            },
           ],
         },
         phaseReadiness: {
@@ -1289,8 +1306,8 @@ function attestation() {
     origin: "http://127.0.0.1:18375",
     customerKey: "yoyoosun",
     environment: "prod",
-    release: "release-v2",
-    migration: "migration-v2",
+    release: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    migration: "20260714165115",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -1298,6 +1315,18 @@ function attestation() {
       cleanupAllowed: false,
       businessDataClearEnabled: false,
       businessDataClearAllowed: false,
+    },
+  };
+}
+
+function runtimeIdentityResponse() {
+  return {
+    ok: true,
+    status: 200,
+    redirected: false,
+    headers: { get: (name) => (name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null) },
+    async text() {
+      return "runtime identity matched";
     },
   };
 }
@@ -1315,8 +1344,8 @@ test("remote apply rejects missing target confirmation and attestation before ex
         target: "customer-trial-133",
         targetAttestation: {
           source: "out-of-band",
-          release: "release-v2",
-          migration: "migration-v2",
+          release: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          migration: "20260714165115",
         },
       },
     },
@@ -1325,6 +1354,7 @@ test("remote apply rejects missing target confirmation and attestation before ex
       return purchaseStage();
     },
     factStage: async () => factStage(),
+    fetchImpl: async () => runtimeIdentityResponse(),
   };
   await assert.rejects(
     () => applyManualAcceptanceFactPlan(plan, report, options),
@@ -1369,8 +1399,8 @@ test("remote runtime release drift fails before any fact stage", async () => {
             target: "customer-trial-133",
             targetAttestation: {
               source: "out-of-band",
-              release: "release-other",
-              migration: "migration-v2",
+              release: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+              migration: "20260714165115",
             },
           },
         },
@@ -1378,6 +1408,7 @@ test("remote runtime release drift fails before any fact stage", async () => {
           stageCalls += 1;
           return purchaseStage();
         },
+        fetchImpl: async () => runtimeIdentityResponse(),
       }),
     /attestation release does not match/u,
   );

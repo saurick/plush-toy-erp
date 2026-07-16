@@ -205,6 +205,7 @@ func TestJsonrpcDispatcher_DebugClearBusinessDataRequiresExactConfirmation(t *te
 func TestJsonrpcDispatcher_DebugCapabilitiesDescribeBusinessClearSafety(t *testing.T) {
 	j := newDebugJSONRPCTestData(biz.DebugSafetyConfig{
 		Environment:              "dev",
+		DatabaseName:             "plush_erp_acceptance_20260715_v3_dev",
 		BusinessDataClearEnabled: true,
 	})
 
@@ -216,6 +217,14 @@ func TestJsonrpcDispatcher_DebugCapabilitiesDescribeBusinessClearSafety(t *testi
 		t.Fatalf("expected capabilities OK, got %#v", res)
 	}
 	data := res.Data.AsMap()
+	if data["databaseName"] != "plush_erp_acceptance_20260715_v3_dev" {
+		t.Fatalf("missing sanitized database identity %#v", data)
+	}
+	for _, forbiddenKey := range []string{"dsn", "postgresDsn", "databaseDsn", "databaseUser", "databasePassword"} {
+		if _, ok := data[forbiddenKey]; ok {
+			t.Fatalf("debug capabilities exposed forbidden connection field %q: %#v", forbiddenKey, data)
+		}
+	}
 	if data["businessDataClearAllowed"] != true || data["businessDataClearDryRunDefault"] != true {
 		t.Fatalf("unexpected business clear capabilities %#v", data)
 	}

@@ -34,6 +34,7 @@ var debugRunIDPattern = regexp.MustCompile(`^[A-Za-z0-9_-]{6,64}$`)
 
 type DebugSafetyConfig struct {
 	Environment              string
+	DatabaseName             string
 	SeedEnabled              bool
 	CleanupEnabled           bool
 	BusinessDataClearEnabled bool
@@ -42,6 +43,7 @@ type DebugSafetyConfig struct {
 
 type DebugCapabilities struct {
 	Environment                     string
+	DatabaseName                    string
 	SeedEnabled                     bool
 	SeedAllowed                     bool
 	SeedDisabledReason              string
@@ -277,6 +279,7 @@ func NewDebugUsecase(repo DebugRepo, config DebugSafetyConfig) *DebugUsecase {
 
 func NormalizeDebugSafetyConfig(config DebugSafetyConfig) DebugSafetyConfig {
 	config.Environment = normalizeDebugEnvironment(config.Environment)
+	config.DatabaseName = strings.TrimSpace(config.DatabaseName)
 	config.CleanupScope = strings.TrimSpace(config.CleanupScope)
 	if config.CleanupScope == "" {
 		config.CleanupScope = DebugDefaultCleanupScope
@@ -292,6 +295,7 @@ func (uc *DebugUsecase) Capabilities() DebugCapabilities {
 	config = NormalizeDebugSafetyConfig(config)
 	return DebugCapabilities{
 		Environment:                     config.Environment,
+		DatabaseName:                    config.DatabaseName,
 		SeedEnabled:                     config.SeedEnabled,
 		SeedAllowed:                     debugSeedAllowed(config),
 		SeedDisabledReason:              debugSeedDisabledReason(config),

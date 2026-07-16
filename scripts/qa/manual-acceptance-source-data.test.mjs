@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   DEFAULT_SOURCE_DATA_SCALE,
+  MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
+  MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   applyManualAcceptanceSourceData,
   assertPersistedSourceRecord,
   buildOutsourcingOrderLineReferences,
@@ -14,6 +16,7 @@ import {
   parseManualAcceptanceSourceDataArgs,
   requireLifecycleMutationStatus,
   runManualAcceptanceSourceDataCli,
+  resolveManualAcceptanceCoreReferences,
   sanitizeManualAcceptanceRunId,
   statusCounts,
   verifyManualAcceptanceSourceData,
@@ -42,8 +45,8 @@ function customerTrial133Attestation(overrides = {}) {
     origin: CUSTOMER_TRIAL_133_ORIGIN,
     customerKey: "yoyoosun",
     environment: "prod",
-    release: "20c96d38",
-    migration: "20260711000101",
+    release: "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
+    migration: "20260714165115",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -70,6 +73,37 @@ function visibleStrings(value, key = "") {
   }
   return [];
 }
+
+test("core references use exact stable business codes instead of environment order", () => {
+  const references = resolveManualAcceptanceCoreReferences({
+    units: [
+      { id: 99, code: "OTHER-UNIT" },
+      { id: 11, code: MANUAL_ACCEPTANCE_CORE_UNIT_CODE },
+    ],
+    warehouses: [
+      { id: 99, code: "OTHER-WH" },
+      { id: 14, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.workInProcess },
+      { id: 12, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product },
+      { id: 13, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.qualityHold },
+      { id: 11, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material },
+    ],
+  });
+
+  assert.equal(references.unit.id, 11);
+  assert.equal(references.warehouse.id, 11);
+  assert.deepEqual(
+    references.warehouses.map((item) => item.id),
+    [11, 12, 13, 14],
+  );
+  assert.throws(
+    () =>
+      resolveManualAcceptanceCoreReferences({
+        units: [{ id: 1, code: "OTHER-UNIT" }],
+        warehouses: [],
+      }),
+    new RegExp(MANUAL_ACCEPTANCE_CORE_UNIT_CODE, "u"),
+  );
+});
 
 test("manual acceptance source plan reaches every agreed pagination threshold", () => {
   const plan = buildManualAcceptanceSourceDataPlan({
@@ -463,6 +497,21 @@ test("customer-trial-133 source apply accepts only the registered attested runti
   });
   const methods = [];
   const fetchImpl = async (_url, init) => {
+    if (!init.body) {
+      methods.push("runtime_identity");
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        headers: {
+          get: (name) =>
+            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+        },
+        async text() {
+          return "runtime identity matched";
+        },
+      };
+    }
     const body = JSON.parse(init.body);
     methods.push(body.method);
     if (body.method === "admin_login") {
@@ -493,6 +542,18 @@ test("customer-trial-133 source apply accepts only the registered attested runti
         },
       });
     }
+    if (body.method === "capabilities") {
+      return ok({
+        environment: "prod",
+        databaseName: "plush_erp_uat_20260715",
+        seedEnabled: false,
+        seedAllowed: false,
+        cleanupEnabled: false,
+        cleanupAllowed: false,
+        businessDataClearEnabled: false,
+        businessDataClearAllowed: false,
+      });
+    }
     if (body.method === "list_customers") {
       throw new Error("stop after remote preflight");
     }
@@ -511,7 +572,8 @@ test("customer-trial-133 source apply accepts only the registered attested runti
       }),
     /stop after remote preflight/u,
   );
-  assert.equal(methods.includes("capabilities"), false);
+  assert.equal(methods[0], "runtime_identity");
+  assert.equal(methods.includes("capabilities"), true);
   assert.equal(methods.includes("get_effective_session"), true);
   assert.equal(
     methods.some((method) =>

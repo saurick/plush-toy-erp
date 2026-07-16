@@ -13,6 +13,7 @@ import {
   CUSTOMER_TRIAL_133_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
   normalizeManualAcceptanceBackendURL,
@@ -303,15 +304,15 @@ async function assertSafeRuntime({
   targetAttestation,
   fetchImpl,
 }) {
-  const capabilities = targetAttestation
-    ? { environment: targetAttestation.environment, ...targetAttestation.debug }
-    : await rpcCall({
+  const capabilities = !targetAttestation || tokens.seedAdmin
+    ? await rpcCall({
         backendURL: plan.backendURL,
         domain: "debug",
         method: "capabilities",
         token: tokens.seedAdmin || tokens.sales,
         fetchImpl,
-      });
+      })
+    : { environment: targetAttestation.environment, ...targetAttestation.debug };
   assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const data = await rpcCall({
     backendURL: plan.backendURL,
@@ -482,6 +483,13 @@ export async function retireManualAcceptanceSourceData(
         "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
       )
     : undefined;
+  if (apply && targetPolicy.external) {
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: targetPolicy,
+      attestation: parsedTargetAttestation,
+      fetchImpl,
+    });
+  }
   const tokens = await loginRoles({
     backendURL: safePlan.backendURL,
     password: effectivePassword,

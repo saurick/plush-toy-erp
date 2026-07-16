@@ -27,12 +27,12 @@
 | `node scripts/qa/experimental/canonical-runtime-audit.mjs`                                             | 非阻断实验审计；宽泛 keyword 命中只作只读复核线索，不进入 fast / affected，不代表产品缺陷或发布证据；恢复阻断前必须改成逐域 status key / API field / function / runtime branch 精确合同 | 需要人工盘点历史词命中时                        |
 | `node scripts/qa/test-data-isolation-boundary.mjs --json`                                               | 只读检查 Product Core demo seed、yoyoosun 模拟数据和真实导入准备边界，并锁住 dry-run 不具备执行能力                                                    | 改 seed、fixture、模拟数据或导入准备工具后      |
 | `node scripts/qa/manual-acceptance-catalog.mjs`                                                         | 从当前客户菜单、岗位矩阵和打印模板生成 48 项全页面手工验收目录；默认只输出，不连接后端                                                                 | 准备全页面试用验收范围时                        |
-| `node scripts/qa/manual-acceptance-dataset.mjs`                                                         | 生成当前 `2026.07.15-v3 / 20260715-V3` 的 local 与 133 同语义计划；默认不连接后端                                                                      | 准备双环境全页面模拟数据前                      |
+| `node scripts/qa/manual-acceptance-dataset.mjs`                                                         | 默认生成 local 与 133 同语义计划；显式 `--apply --target` 后由唯一串行 runner 调用同一组正式 API 入口并校验严格阶段回执                                  | 准备或重放双环境全页面模拟数据时                |
 | `node scripts/qa/manual-acceptance-source-data.mjs --target local-dev --data-version 2026.07.15-v3 --run-id 20260715-V3 --json` | 生成带稳定批次前缀的客户、供应商、产品规格、材料、加工环节及销售 / 采购 / 委外 / BOM 源数据计划；默认只读                                              | 写入模拟源数据前确认数量、状态和边界时          |
-| `node scripts/qa/manual-acceptance-account-scenarios.mjs --json`                                        | 生成停用、多岗位和无业务入口三种补充账号计划；不修改十个正式岗位账号                                                                                   | 核对登录与入口异常场景前                        |
+| `node scripts/qa/manual-acceptance-account-scenarios.mjs --json`                                        | 生成停用、多岗位和无业务入口三种补充账号计划；local / 133 共用同一入口，十个正式岗位账号只核对、不由该入口创建                                          | 核对登录与入口异常场景前                        |
 | `node scripts/qa/manual-acceptance-task-data.mjs --data-version 2026.07.15-v3 --run-id 20260715-V3`     | 生成九个岗位各 20 条、共 180 条任务的可重复计划；默认只输出，不连接后端                                                                                | 准备岗位任务端数据前                            |
 | `node scripts/qa/manual-acceptance-fact-data.mjs --source-report <report> --data-version 2026.07.15-v3 --run-id 20260715-V3 --json` | 复用已核验源数据，按正式来源驱动 API 统一准备采购、质检、库存、生产、出货和财务事实；默认只读                                                          | 写入模拟业务事实前                              |
-| `node scripts/qa/manual-acceptance-readiness.mjs`                                                       | 生成 48 项只读就绪核验计划；只有显式 `--verify --backend-url` 才登录试用账号并查询数量和状态分布                                                       | 写入后核对页面数据是否达到手工验收门槛时        |
+| `node scripts/qa/manual-acceptance-readiness.mjs`                                                       | 生成 48 项只读就绪核验计划，并校验每页只能归属共享 role / source / task / facts / catalog 生成阶段；显式 `--verify --backend-url` 才查询运行数据         | 写入后核对页面数据是否达到手工验收门槛时        |
 | `node scripts/qa/manual-acceptance-browser.mjs --plan --base-url <local-url> --backend-url <local-url>` | 生成 48 项本机浏览器验收计划；真实模式只登录、逐页读取和切换只读任务页签，不点击业务写动作                                                             | 核对真实账号、页面、岗位端和打印入口时          |
 | `node scripts/qa/manual-acceptance-source-retire.mjs --data-version 2026.07.15-v3 --run-id 20260715-V3` | 默认 dry-run，预览按批次取消 / 归档源单并停用主数据的退出动作；local 与已登记 133 均受精确 target policy 保护，不物理删除历史记录                       | 试用批次退出前                                  |
 | `node scripts/qa/customer-config-effective-session-probe.mjs --json`                                    | 无 Authorization 探测本地 `customer_config.get_effective_session`，确认后端可达和 `40302 未登录` 边界                                                  | yoyoosun 静态入口已命中、但还没有真实登录证据时 |
@@ -46,7 +46,7 @@
 | 文档、命名与真源守卫 | `docs-inventory.test.mjs`、`phase-label-boundaries.mjs`、`experimental/canonical-runtime-audit.mjs`                                                                                                                                                                                                                                                                                                                                                                                           | 前两者阻断路径、命名和登记漂移；canonical broad scan 仅为显式非阻断实验审计，不进入 fast / affected，不能替代逐域合同、migration 或 runtime 验证                                                                                  |
 | 客户配置与私有化边界 | `config/customers/index.test.mjs`、`scripts/build/apply-customer-web-config.test.mjs`、`customer-config-boundaries.mjs`、`customer-config-effective-session-probe.mjs`、`customer-package-lint.mjs`、`customer-package-preview-boundary.test.mjs`、`customer-config-runtime-manifest.mjs`、`private-deployment-boundaries.mjs`、`private-deployment-package-closure.test.mjs` | 只做构建期索引、overlay、lint / preview / manifest 编译、无凭据读回探针和模板边界检查；`boundariesSatisfied` 不等于交付、evidence 或签收完成，不写 Fact |
 | Workflow / Fact 边界 | `workflow-fact-boundary.test.mjs`、`workflow-ui-action-boundary.test.mjs`                                                                                                                                                                                                                                                                                                                                                                                                                    | 防止协同任务路径越界写入事实层                                                                                                                                                                                                 |
-| 测试数据隔离         | `test-data-isolation-boundary.mjs`、`manual-acceptance-dataset.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-source-driven-facts.mjs`、`manual-acceptance-attachment-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs` | Product Core、本地 / 133 同版模拟数据、真实导入准备和执行门禁分桶检查；当前事实只走正式来源驱动 API，旧通用写入器不得回流，浏览器入口只执行登录和只读页面查询 |
+| 测试数据隔离         | `test-data-isolation-boundary.mjs`、`manual-acceptance-dataset.mjs`、`manual-acceptance-dataset-runner.mjs`、`manual-acceptance-page-data-contract.mjs`、`manual-acceptance-catalog.mjs`、`manual-acceptance-account-scenarios.mjs`、`manual-acceptance-source-data.mjs`、`manual-acceptance-task-data.mjs`、`manual-acceptance-fact-data.mjs`、`manual-acceptance-source-driven-facts.mjs`、`manual-acceptance-attachment-data.mjs`、`manual-acceptance-readiness.mjs`、`manual-acceptance-browser.mjs`、`manual-acceptance-source-retire.mjs` | Product Core、本地 / 133 同版模拟数据、页面归属、真实导入准备和执行门禁分桶检查；当前事实只走正式来源驱动 API，旧通用写入器不得回流，浏览器入口只执行登录和只读页面查询 |
 | 代码质量和安全       | `secrets.sh`、`error-codes.sh`、`go-vet.sh`、`govulncheck.sh`、`shellcheck.sh`、`shfmt.sh`、`yamllint.sh`                                                                                                                                                                                                                                                                                                                                                                                    | 按对应语言 / 配置类型补充检查，不替代业务回归                                                                                                                                                                                  |
 
 ## 门禁完整性与 CI 边界
@@ -71,11 +71,13 @@ CI action 固定到审核过的 commit，工具链读取 `.n-node-version`、`we
 
 当前唯一整批合同是 `2026.07.15-v3 / 20260715-V3`。本地开发库和 133 试用库使用同一套业务含义、数量与状态矩阵，但数据库 ID 各自独立，不能复制表行或用“编号相同”代替读回证明。正式部署默认不执行这套数据。
 
+48 个正式验收目标统一登记在 `manual-acceptance-page-data-contract.mjs`。每页只能引用共享的 `role / source / task / facts / catalog` 阶段，不允许页面自带 builder、脚本或另一套 fixture；`manual-acceptance-dataset-runner.mjs` 直接消费相同的阶段入口。新增页面、probe 或入口发生漏登、重复或分叉时，readiness 合同测试会 fail closed。
+
 模拟数据沿用永绅原文件的简短习惯，例如款号与品名分开、规格写成“米白·小号”、材料写成“米白短毛绒”、环节写成“裁片 / 车缝 / 电绣”，备注用“分两批交货”“颜色按样板”这类日常说法。页面名称不再每条重复开发提示；模拟身份由 `SIM-YOYOOSUN-*` 编号、`datasetKey / dataVersion / runId` 和报告统一证明。原文件只用于理解字段和用词，不直接导入真实行。
 
 | 阶段 | 本地 | 133 试用库 |
 | --- | --- | --- |
-| 通用基础资料、岗位账号 | 可准备、核对或复用 | 只能核对或复用，禁止远程 seed |
+| 通用基础资料、岗位账号 | runner 只通过正式 API 核对基础资料和十个岗位账号，并调和三类场景账号；不隐式执行 seed | 同一入口、同一规则；禁止远程 seed，十个岗位账号缺失即阻断 |
 | 客户、供应商、产品、材料、工序、销售 / 采购 / 委外 / BOM | 按稳定编号写入并读回 | 通过已登记目标、精确确认和带外证明写入并读回 |
 | 采购收货、质检、库存、生产、预留、出货、财务 | 统一由 `manual-acceptance-fact-data.mjs` 调用正式来源驱动 API | 同一入口；不得复制本地报告或数据库 ID |
 | 附件与就绪核对 | 绑定同批源单、事实和任务报告 | 额外绑定 release、migration 和全部 debug=false 证明 |
@@ -97,7 +99,27 @@ node scripts/qa/manual-acceptance-source-data.mjs \
 node scripts/qa/manual-acceptance-data-depth.mjs
 ```
 
-本地写入必须显式使用当前版本和批次。密码只从环境变量提供，不写进报告或仓库：
+正常整批写入只使用顶层 runner。它按 `core → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，再检查稳定基础资料码。全部通过后才允许账号或业务数据写入。任何阶段缺正式回执、摘要不符或语义摘要漂移都会停止后续阶段。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节，凭据只从环境变量注入，不写报告。
+
+本地命令必须指向明确绑定专用验收数据库的后端；当前共享开发端口不能因为地址是本机就当作验收库：
+
+```bash
+MANUAL_ACCEPTANCE_PASSWORD='<8-to-20-character-demo-password>' \
+MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<8-to-20-character-admin-password>' \
+  node scripts/qa/manual-acceptance-dataset.mjs \
+    --apply \
+    --target local \
+    --data-version 2026.07.15-v3 \
+    --backend-url '<dedicated-local-acceptance-backend-url-not-port-8300>' \
+    --database-name plush_erp_acceptance_20260715_v3_dev \
+    --confirm APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.15-v3:20260715-V3:plush_erp_acceptance_20260715_v3_dev
+```
+
+本地 `--apply` 同时要求显式后端、`plush_erp_acceptance_*` 数据库名和数据库绑定确认串；端口 `8300` 在参数解析阶段直接拒绝。运行态数据库摘要不匹配时，runner 在认证前停止，不会创建登录会话，也不会进入 `role` 或任何业务写阶段。
+
+133 仍使用同一命令和 runner，但必须额外传入 dry-run 计划给出的精确确认串，以及绑定当前 40 位小写 commit、至少 `20260714165115` 的 14 位 migration 和全部 debug=false 的 attestation。探针会把声明与当前容器 `GIT_SHA`、实际连接库和 Atlas 最新 revision 做只读核对；未冻结并部署同一代码版本时不得写入。
+
+下面的分阶段入口只用于定位单个阶段问题，不是另一套页面数据生成流程。直接运行时仍必须显式使用当前版本和批次，密码只从环境变量提供，不写进报告或仓库：
 
 ```bash
 MANUAL_ACCEPTANCE_SIM_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA \
@@ -108,7 +130,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --target local-dev \
     --data-version 2026.07.15-v3 \
     --run-id 20260715-V3 \
-    --backend-url http://127.0.0.1:8300 \
+    --backend-url '<dedicated-local-acceptance-backend-url>' \
     --out output/qa/manual-acceptance/datasets/2026.07.15-v3/local/source
 ```
 
@@ -123,7 +145,13 @@ node scripts/qa/manual-acceptance-task-data.mjs \
 MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=APPLY_SIMULATED_ACCOUNT_SCENARIOS \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
-  node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --json
+  node scripts/qa/manual-acceptance-account-scenarios.mjs \
+    --apply \
+    --target local-dev \
+    --data-version 2026.07.15-v3 \
+    --run-id 20260715-V3 \
+    --backend-url '<dedicated-local-acceptance-backend-url>' \
+    --json
 
 MANUAL_ACCEPTANCE_TASK_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS \
 MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
@@ -133,7 +161,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --target local-dev \
     --data-version 2026.07.15-v3 \
     --run-id 20260715-V3 \
-    --backend-url http://127.0.0.1:8300 \
+    --backend-url '<dedicated-local-acceptance-backend-url>' \
     --out output/qa/manual-acceptance/datasets/2026.07.15-v3/local/task
 ```
 
@@ -148,7 +176,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --target local-dev \
     --data-version 2026.07.15-v3 \
     --run-id 20260715-V3 \
-    --backend-url http://127.0.0.1:8300 \
+    --backend-url '<dedicated-local-acceptance-backend-url>' \
     --source-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/source/apply-report.json \
     --out output/qa/manual-acceptance/datasets/2026.07.15-v3/local/facts
 ```
@@ -162,7 +190,7 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
 MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
   node scripts/qa/manual-acceptance-readiness.mjs \
     --verify \
-    --backend-url http://127.0.0.1:8300 \
+    --backend-url '<dedicated-local-acceptance-backend-url>' \
     --source-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/source/apply-report.json \
     --fact-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/facts/apply-report.json \
     --task-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/task/apply-report.json \

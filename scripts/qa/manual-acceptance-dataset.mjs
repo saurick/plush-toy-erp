@@ -14,6 +14,10 @@ import {
   SIMULATION_PREFIX as SOURCE_PREFIX,
 } from "./manual-acceptance-source-data.mjs";
 import {
+  MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  createManualAcceptanceDatasetStageRunner,
+} from "./manual-acceptance-dataset-runner.mjs";
+import {
   buildManualAcceptanceTaskDataPlan,
   TOTAL_TASKS,
 } from "./manual-acceptance-task-data.mjs";
@@ -36,8 +40,8 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS = Object.freeze([
   "role",
   "source",
   "task",
-  "purchase-quality",
   "facts",
+  "purchase-quality",
   "attachments",
   "readiness",
 ]);
@@ -52,14 +56,14 @@ function stageCapability(mode, supportedTargets, reason) {
 
 export const MANUAL_ACCEPTANCE_DATASET_STAGE_CAPABILITIES = Object.freeze({
   core: stageCapability(
-    "target-specific",
+    "registered-targets-read-only",
     [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
-    "local may seed or verify stable core codes; customer-trial-133 may only verify or reuse existing records",
+    "both targets use the same formal RPC verifier for exact stable unit and warehouse codes; local database seed is never implicit",
   ),
   role: stageCapability(
-    "target-specific",
+    "registered-targets",
     [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
-    "local may seed or verify demo roles; customer-trial-133 may only verify or reuse accounts prepared by the password rotation command",
+    "the registered account-scenario component reconciles the same simulated accounts on both targets; remote role capabilities remain verify-only",
   ),
   source: stageCapability(
     "registered-targets",
@@ -71,15 +75,15 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_CAPABILITIES = Object.freeze({
     [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
     "task-data has explicit local and registered customer-trial target guards",
   ),
-  "purchase-quality": stageCapability(
-    "facts-integrated",
-    [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
-    "purchase receipt and quality scenarios are created and verified by the unified source-driven facts stage",
-  ),
   facts: stageCapability(
     "registered-targets",
     [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
     "the unified fact runner uses formal source-driven APIs under the shared target, runtime, and attestation policy",
+  ),
+  "purchase-quality": stageCapability(
+    "facts-integrated",
+    [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
+    "purchase receipt and quality scenarios are created and verified by the unified source-driven facts stage",
   ),
   attachments: stageCapability(
     "registered-targets",
@@ -231,7 +235,7 @@ function command(entrypoint, args, extra = {}) {
     kind: "registered-entrypoint",
     entrypoint,
     args,
-    execution: "injected-stage-runner-only",
+    execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
     ...extra,
   };
 }
@@ -250,19 +254,6 @@ function capabilityForStage(stageKey) {
   };
 }
 
-function localSeedRemoteReuseExecution() {
-  return {
-    [LOCAL_DATASET_TARGET]: {
-      seedAllowed: true,
-      allowedOperations: ["applied", "completed", "verified", "reused"],
-    },
-    [CUSTOMER_TRIAL_133_TARGET]: {
-      seedAllowed: false,
-      allowedOperations: ["verified", "reused"],
-    },
-  };
-}
-
 function verificationOnlyExecution() {
   return {
     [LOCAL_DATASET_TARGET]: {
@@ -272,6 +263,25 @@ function verificationOnlyExecution() {
     [CUSTOMER_TRIAL_133_TARGET]: {
       seedAllowed: false,
       allowedOperations: ["verified", "reused"],
+    },
+  };
+}
+
+function roleStageExecution() {
+  return {
+    [LOCAL_DATASET_TARGET]: {
+      seedAllowed: false,
+      allowedOperations: ["applied", "completed", "verified", "reused"],
+    },
+    [CUSTOMER_TRIAL_133_TARGET]: {
+      seedAllowed: false,
+      allowedOperations: [
+        "applied",
+        "completed",
+        "resumed",
+        "reused",
+        "verified",
+      ],
     },
   };
 }
@@ -287,30 +297,40 @@ function buildStages(identity) {
   const attachmentFixtures = ATTACHMENT_FIXTURE_METADATA.map((item) => ({
     ...item,
   }));
-  return [
+  const stages = [
     {
       key: "core",
       applyCapability: capabilityForStage("core"),
       purpose:
-        "本地可准备稳定编码的基础资料；133 只核对或复用当前已有资料，不远程执行 seed。",
-      writesBusinessData: true,
-      targetExecution: localSeedRemoteReuseExecution(),
+        "两端都通过正式 RPC 精确核对同一组稳定基础资料编码；本地 seed 仅是绑定专用验收库后的显式准备动作，不由默认 runner 执行。",
+      writesBusinessData: false,
+      targetExecution: verificationOnlyExecution(),
       commands: [
         command(
           "scripts/seed-core-demo-data.sh",
           ["--prefix", identity.prefixes.core],
           {
+            execution: "out-of-band-explicit-only",
             supportedTargets: [LOCAL_DATASET_TARGET],
+            defaultRunner: false,
+            dedicatedAcceptanceDatabaseBindingRequired: true,
             remoteSeedAllowed: false,
           },
         ),
         {
-          kind: "existing-record-verification",
-          execution: "injected-stage-runner-only",
-          supportedTargets: [CUSTOMER_TRIAL_133_TARGET],
+          kind: "registered-read-only-verification",
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          supportedTargets: [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
           operation: "verify-or-reuse",
           seedAllowed: false,
           stablePrefix: identity.prefixes.core,
+          unitCode: "SIM-PLUSH-CORE-PCS",
+          warehouseCodes: [
+            "SIM-PLUSH-CORE-RM-WH",
+            "SIM-PLUSH-CORE-FG-WH",
+            "SIM-PLUSH-CORE-QC-HOLD",
+            "SIM-PLUSH-CORE-WIP-WH",
+          ],
         },
       ],
       expected: {
@@ -328,15 +348,18 @@ function buildStages(identity) {
       key: "role",
       applyCapability: capabilityForStage("role"),
       purpose:
-        "本地可准备岗位账号；133 只核对或复用已由受控密码轮换入口准备的账号。",
+        "两端共用正式账号场景 API：十个正式岗位账号缺失即阻断，三类模拟场景账号同源调和；本地岗位 seed 不由默认 runner 执行。",
       writesBusinessData: true,
-      targetExecution: localSeedRemoteReuseExecution(),
+      targetExecution: roleStageExecution(),
       commands: [
         command(
           "scripts/seed-role-demo-admins.sh",
           ["--reset-password"],
           {
+            execution: "out-of-band-explicit-only",
             supportedTargets: [LOCAL_DATASET_TARGET],
+            defaultRunner: false,
+            dedicatedAcceptanceDatabaseBindingRequired: true,
             remoteSeedAllowed: false,
           },
         ),
@@ -344,28 +367,31 @@ function buildStages(identity) {
           "scripts/qa/manual-acceptance-account-scenarios.mjs",
           [
             "--apply",
+            "--target",
+            "${TARGET_POLICY_TARGET}",
+            "--data-version",
+            identity.dataVersion,
+            "--run-id",
+            identity.runId,
             "--backend-url",
             "${TARGET_BACKEND_URL}",
             "--audit-minimum",
             "30",
           ],
           {
-            supportedTargets: [LOCAL_DATASET_TARGET],
+            supportedTargets: [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
             remoteSeedAllowed: false,
+            remoteRoleCapabilityMutationAllowed: false,
+            scenarioAccountReconcileAllowed: true,
             environment: {
               MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM:
                 "APPLY_SIMULATED_ACCOUNT_SCENARIOS",
+              MANUAL_ACCEPTANCE_TARGET_CONFIRM: "${TARGET_CONFIRMATION}",
+              MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON:
+                "${TARGET_ATTESTATION_JSON}",
             },
           },
         ),
-        {
-          kind: "existing-account-verification",
-          execution: "injected-stage-runner-only",
-          supportedTargets: [CUSTOMER_TRIAL_133_TARGET],
-          operation: "verify-or-reuse",
-          seedAllowed: false,
-          credentialSource: "rotate-manual-acceptance-passwords",
-        },
       ],
       expected: {
         formalAccounts: [...FORMAL_DEMO_ACCOUNTS],
@@ -462,7 +488,7 @@ function buildStages(identity) {
         {
           kind: "delegated-fact-stage-contract",
           contract: "source-driven-operational-facts-v1",
-          execution: "injected-stage-runner-only",
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
           delegatedTo: "facts",
           entrypoint: "scripts/qa/manual-acceptance-fact-data.mjs",
           genericWriterAllowed: false,
@@ -518,7 +544,7 @@ function buildStages(identity) {
         {
           kind: "source-driven-fact-contract",
           contract: "source-driven-operational-facts-v1",
-          execution: "injected-stage-runner-only",
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
           applyEntrypoint: "scripts/qa/manual-acceptance-fact-data.mjs",
           helperEntrypoint:
             "scripts/qa/manual-acceptance-source-driven-facts.mjs",
@@ -629,6 +655,15 @@ function buildStages(identity) {
       cleanupPolicy: "not-applicable",
     },
   ];
+  return MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.map((stageKey) => {
+    const stage = stages.find((item) => item.key === stageKey);
+    if (!stage) {
+      throw new ManualAcceptanceDatasetError(
+        `stage ${stageKey} is missing from the semantic plan`,
+      );
+    }
+    return stage;
+  });
 }
 
 export function buildManualAcceptanceSemanticPlan(options = {}) {
@@ -651,6 +686,8 @@ export function buildManualAcceptanceSemanticPlan(options = {}) {
     runnerContract: {
       serial: true,
       failClosed: true,
+      revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+      handlerRegistry: "scripts/qa/manual-acceptance-dataset-runner.mjs",
       placeholders: {
         "${TARGET_POLICY_TARGET}": "target.policyTarget",
         "${TARGET_BACKEND_URL}": "target.backendURL",
@@ -752,6 +789,7 @@ export function evaluateManualAcceptanceTargetCapabilities(
 function buildTarget({
   targetAlias,
   backendURL,
+  databaseName,
   dataVersion,
   runId,
   targetAttestation,
@@ -769,6 +807,7 @@ function buildTarget({
     datasetKey: DATASET_KEY,
     dataVersion,
     runId,
+    databaseName,
   });
   const parsedAttestation = parseManualAcceptanceTargetAttestation(
     targetAttestation,
@@ -809,6 +848,7 @@ function buildTarget({
       alias === LOCAL_DATASET_TARGET ? "local-development" : "customer-trial",
     productionTarget: false,
     backendURL: policy.backendURL,
+    databaseName: policy.databaseName || null,
     external: policy.external,
     expectedCustomerKey: CUSTOMER_KEY,
     datasetKey: DATASET_KEY,
@@ -817,8 +857,11 @@ function buildTarget({
     expectedConfirmation: manualAcceptanceTargetConfirmation(policy) || null,
     targetAttestation: attestation,
     targetAttestationTemplate: attestationTemplate,
-    databaseIdentity: "independent-per-target",
-    bindingReady: alias === LOCAL_DATASET_TARGET || Boolean(attestation),
+    databaseIdentity: "independent-per-target/runtime-readback-exact",
+    bindingReady:
+      alias === LOCAL_DATASET_TARGET
+        ? Boolean(backendURL && policy.databaseName)
+        : Boolean(attestation),
   };
 }
 
@@ -828,6 +871,7 @@ export function buildManualAcceptanceDatasetTargetPlan(options = {}) {
   const targetBinding = buildTarget({
     targetAlias: options.targetAlias || LOCAL_DATASET_TARGET,
     backendURL: options.backendURL,
+    databaseName: options.databaseName,
     dataVersion: semanticPlan.dataVersion,
     runId: semanticPlan.runId,
     targetAttestation: options.targetAttestation,
@@ -905,9 +949,22 @@ function validateApplyPlan(plan, confirmation, targetAttestation) {
     );
   }
   const target = plan.target || {};
-  normalizeTargetAlias(target.alias);
+  const targetAlias = normalizeTargetAlias(target.alias);
   if (target.productionTarget !== false) {
     throw new ManualAcceptanceDatasetError("production targets are forbidden");
+  }
+  if (targetAlias === LOCAL_DATASET_TARGET) {
+    if (target.bindingReady !== true || !target.databaseName) {
+      throw new ManualAcceptanceDatasetError(
+        "local apply requires an explicitly bound dedicated acceptance backend and databaseName",
+      );
+    }
+    const localBackend = new URL(target.backendURL);
+    if (localBackend.port === "8300") {
+      throw new ManualAcceptanceDatasetError(
+        "local apply refuses port 8300 because it is the shared development backend",
+      );
+    }
   }
   const digest = digestManualAcceptanceSemanticPlan(plan.semanticPlan);
   if (digest !== plan.semanticDigest) {
@@ -919,6 +976,7 @@ function validateApplyPlan(plan, confirmation, targetAttestation) {
     target: target.policyTarget,
     datasetKey: plan.semanticPlan.datasetKey,
     backendURL: target.backendURL,
+    databaseName: target.databaseName || undefined,
     dataVersion: plan.dataVersion,
     runId: plan.semanticPlan.runId,
   };
@@ -950,7 +1008,9 @@ function validateApplyPlan(plan, confirmation, targetAttestation) {
     );
   }
   return {
-    confirmation: resolved.external ? confirmation : null,
+    confirmation: manualAcceptanceTargetConfirmation(resolved)
+      ? confirmation
+      : null,
     targetAttestation: attestation,
     stageCapabilities,
   };
@@ -1025,18 +1085,51 @@ export function normalizeManualAcceptanceStageResult(result, stage, plan) {
       `${stage.key} runner operation=${operation} is forbidden for target ${plan.target?.alias}`,
     );
   }
+  const summary = normalizeRunnerRecord(value.summary, stage.key, "summary");
+  const references = normalizeRunnerRecord(
+    value.references,
+    stage.key,
+    "references",
+  );
+  const runner = references.runner;
+  if (!isPlainRecord(runner)) {
+    throw new ManualAcceptanceDatasetError(
+      `${stage.key} runner references.runner must be an explicit object`,
+    );
+  }
+  if (runner.revision !== MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION) {
+    throw new ManualAcceptanceDatasetError(
+      `${stage.key} runner receipt has an unexpected runner revision`,
+    );
+  }
+  if (
+    runner.handlerId !==
+    `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stage.key}`
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      `${stage.key} runner receipt has an unexpected handler identity`,
+    );
+  }
+  for (const field of ["componentEntrypoint", "reportPath"]) {
+    if (!String(runner[field] || "").trim()) {
+      throw new ManualAcceptanceDatasetError(
+        `${stage.key} runner receipt is missing ${field}`,
+      );
+    }
+  }
+  if (!/^[0-9a-f]{64}$/u.test(String(runner.componentDigest || ""))) {
+    throw new ManualAcceptanceDatasetError(
+      `${stage.key} runner receipt has an invalid componentDigest`,
+    );
+  }
   return {
     status: value.status,
     stageKey: value.stageKey,
     dataVersion: value.dataVersion,
     semanticDigest: value.semanticDigest,
     operation,
-    summary: normalizeRunnerRecord(value.summary, stage.key, "summary"),
-    references: normalizeRunnerRecord(
-      value.references,
-      stage.key,
-      "references",
-    ),
+    summary,
+    references,
   };
 }
 
@@ -1066,6 +1159,7 @@ function baseApplyReport(plan, generatedAt) {
       cleanupPolicy: stage.cleanupPolicy,
       summary: null,
       references: null,
+      blockedReason: null,
       error: null,
     })),
   };
@@ -1081,11 +1175,7 @@ export async function applyManualAcceptanceDataset(
     confirmation,
     targetAttestation,
   );
-  if (typeof deps.runStage !== "function") {
-    throw new ManualAcceptanceDatasetError(
-      "apply requires an injected runStage function; no implicit writer is available",
-    );
-  }
+  const runStage = createManualAcceptanceDatasetStageRunner(deps);
   const generatedAt = normalizeGeneratedAt(
     typeof deps.now === "function" ? deps.now() : deps.now,
   );
@@ -1100,7 +1190,7 @@ export async function applyManualAcceptanceDataset(
     const stageReport = report.stages[index];
     stageReport.status = "running";
     try {
-      const result = await deps.runStage({
+      const result = await runStage({
         mode: "apply",
         target: structuredClone(plan.target),
         dataVersion: plan.dataVersion,
@@ -1141,6 +1231,15 @@ export async function applyManualAcceptanceDataset(
     } catch (error) {
       stageReport.status = "failed";
       stageReport.error = String(error?.message || error);
+      if (typeof error?.toBlockedReason === "function") {
+        stageReport.blockedReason = error.toBlockedReason(stage.key);
+      } else if (String(error?.code || "").trim()) {
+        stageReport.blockedReason = {
+          code: String(error.code),
+          stageKey: stage.key,
+          runnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+        };
+      }
       report.failedStage = stage.key;
       return report;
     }
@@ -1156,6 +1255,7 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
     dataVersion: DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION,
     target: "",
     backendURL: "",
+    databaseName: "",
     confirmation: "",
     targetAttestation: "",
   };
@@ -1188,6 +1288,9 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
       case "backend-url":
         options.backendURL = value;
         break;
+      case "database-name":
+        options.databaseName = value;
+        break;
       case "confirm":
         options.confirmation = value;
         break;
@@ -1208,9 +1311,37 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
       );
     }
     options.target = normalizeTargetAlias(options.target);
+    if (options.target === LOCAL_DATASET_TARGET) {
+      if (!options.backendURL || !options.databaseName) {
+        throw new ManualAcceptanceDatasetError(
+          "local --apply requires explicit --backend-url and --database-name for a dedicated acceptance backend",
+        );
+      }
+      let localBackend;
+      try {
+        localBackend = new URL(options.backendURL);
+      } catch {
+        throw new ManualAcceptanceDatasetError("backend URL is invalid");
+      }
+      if (localBackend.port === "8300") {
+        throw new ManualAcceptanceDatasetError(
+          "local --apply refuses port 8300 because it is the shared development backend",
+        );
+      }
+      if (!options.confirmation) {
+        throw new ManualAcceptanceDatasetError(
+          "local --apply requires the exact database-bound --confirm value",
+        );
+      }
+    } else if (options.databaseName) {
+      throw new ManualAcceptanceDatasetError(
+        "customer-trial-133 uses its registered database identity; omit --database-name",
+      );
+    }
   } else if (
     options.target ||
     options.backendURL ||
+    options.databaseName ||
     options.confirmation ||
     options.targetAttestation
   ) {
@@ -1231,10 +1362,13 @@ function helpText() {
     "不连接服务、不写文件、不写数据库：",
     "  node scripts/qa/manual-acceptance-dataset.mjs",
     "",
-    "注入 runner 后才允许调用 apply API。CLI 仍要求显式目标。",
-    "完整 apply 会 fail-closed：在调用任何 stage runner 前核对全部阶段的真实目标能力。",
-    "本地 core / role 可准备或核对；133 的 core / role 只能核对或复用，禁止远程 seed。",
+    `CLI --apply 固定使用 ${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}，并要求显式目标。`,
+    "完整 apply 会 fail-closed：每个阶段只允许走唯一注册 handler 与严格组件回执。",
+    "core 两端都只走正式 RPC 稳定码核对；默认 runner 不执行任何数据库 seed 脚本。",
+    "role 两端都只走注册账号场景组件；正式岗位账号缺失会返回机器可读阻断原因。",
     "采购收货与质检归入统一 source-driven facts，不再调用旧通用写入器。",
+    "local apply 必须显式提供非 8300 的专用后端、plush_erp_acceptance_* 数据库名，",
+    "以及绑定 target/dataVersion/runId/databaseName 的精确确认串；runner 会先读回数据库身份和 core 稳定码，再执行任何写入。",
     "133 apply 还必须提供同一 dataVersion/runId 绑定的确认串，",
     "以及 target/origin/customer/release/migration/debug 的带外证明：",
     "  --target customer-trial-133",
@@ -1267,6 +1401,7 @@ export async function runManualAcceptanceDatasetCli(argv = [], deps = {}) {
     dataVersion: options.dataVersion,
     targetAlias: options.target,
     backendURL: options.backendURL || undefined,
+    databaseName: options.databaseName || undefined,
     targetAttestation: options.targetAttestation || undefined,
     generatedAt:
       typeof deps.now === "function" ? deps.now() : deps.now || new Date(),

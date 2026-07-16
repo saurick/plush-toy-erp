@@ -2,10 +2,15 @@ package server
 
 import (
 	"context"
+	"crypto/sha256"
+	"crypto/subtle"
+	"database/sql"
+	"encoding/hex"
 	"fmt"
 	stdhttp "net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -21,6 +26,20 @@ import (
 type readinessPinger interface {
 	PingContext(ctx context.Context) error
 }
+
+type readinessIdentityReader interface {
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
+const (
+	runtimeIdentityPath          = "/readyz/runtime-identity"
+	runtimeIdentityDigestHeader  = "X-ERP-Expected-Runtime-Identity-SHA256"
+	runtimeIdentityScopeHeader   = "X-ERP-Runtime-Identity-Scope"
+	runtimeIdentityProofHeader   = "X-ERP-Runtime-Identity-Proof"
+	runtimeIdentityProofValue    = "matched-v1"
+	runtimeIdentityDatabaseScope = "database-v1"
+	runtimeIdentityReleaseScope  = "release-v1"
+)
 
 type templatePDFWarmupReadiness interface {
 	TemplatePDFWarmupReady() (bool, string, error)
@@ -80,6 +99,55 @@ func writePlainText(w stdhttp.ResponseWriter, status int, body string) {
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
 	w.WriteHeader(status)
 	_, _ = w.Write([]byte(body))
+}
+
+func runtimeIdentityDigest(scope, databaseName, release, migration string) []byte {
+	fields := []string{scope, strings.TrimSpace(databaseName)}
+	if scope == runtimeIdentityReleaseScope {
+		fields = append(fields, strings.TrimSpace(release), strings.TrimSpace(migration))
+	}
+	digest := sha256.Sum256([]byte(strings.Join(fields, "\n")))
+	return digest[:]
+}
+
+func verifyExpectedRuntimeIdentity(ctx context.Context, postgres readinessPinger, r *stdhttp.Request) (int, error) {
+	if r.Method != stdhttp.MethodGet {
+		return stdhttp.StatusMethodNotAllowed, fmt.Errorf("runtime identity probe requires GET")
+	}
+	scope := strings.TrimSpace(r.Header.Get(runtimeIdentityScopeHeader))
+	if scope != runtimeIdentityDatabaseScope && scope != runtimeIdentityReleaseScope {
+		return stdhttp.StatusBadRequest, fmt.Errorf("runtime identity scope is invalid")
+	}
+	expectedDigest, err := hex.DecodeString(strings.TrimSpace(r.Header.Get(runtimeIdentityDigestHeader)))
+	if err != nil || len(expectedDigest) != sha256.Size {
+		return stdhttp.StatusBadRequest, fmt.Errorf("runtime identity digest is invalid")
+	}
+	reader, ok := postgres.(readinessIdentityReader)
+	if !ok {
+		return stdhttp.StatusServiceUnavailable, fmt.Errorf("runtime identity reader unavailable")
+	}
+	var actualDatabase string
+	if err := reader.QueryRowContext(ctx, `SELECT current_database()`).Scan(&actualDatabase); err != nil {
+		return stdhttp.StatusServiceUnavailable, fmt.Errorf("read runtime database identity: %w", err)
+	}
+	actualRelease := ""
+	var actualMigration string
+	if scope == runtimeIdentityReleaseScope {
+		actualRelease = strings.TrimSpace(os.Getenv("GIT_SHA"))
+		if err := reader.QueryRowContext(ctx, `
+SELECT version
+FROM atlas_schema_revisions.atlas_schema_revisions
+WHERE type = 2
+ORDER BY executed_at DESC
+LIMIT 1`).Scan(&actualMigration); err != nil {
+			return stdhttp.StatusServiceUnavailable, fmt.Errorf("read runtime migration identity: %w", err)
+		}
+	}
+	actualDigest := runtimeIdentityDigest(scope, actualDatabase, actualRelease, actualMigration)
+	if subtle.ConstantTimeCompare(actualDigest, expectedDigest) != 1 {
+		return stdhttp.StatusPreconditionFailed, fmt.Errorf("runtime identity mismatch")
+	}
+	return 0, nil
 }
 
 // 统一给自定义 HTTP handler 补 trace、recover 和结构化收尾日志，避免健康检查与静态路由成为观测盲区。
@@ -187,6 +255,38 @@ func registerHealthRoutes(
 
 	srv.Handle("/healthz", newObservedHTTPHandler(logger, tp, "server.http.healthz", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
 		writePlainText(w, stdhttp.StatusOK, "ok")
+	}))
+
+	srv.Handle(runtimeIdentityPath, newObservedHTTPHandler(logger, tp, "server.http.runtime_identity", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {
+		w.Header().Set("Cache-Control", "no-store")
+		status, err := verifyExpectedRuntimeIdentity(ctx, postgres, r)
+		if err != nil {
+			if status == stdhttp.StatusMethodNotAllowed {
+				w.Header().Set("Allow", stdhttp.MethodGet)
+			}
+			healthLogger.WithContext(ctx).Warnw(
+				"msg", "runtime identity precondition failed",
+				"operation", "server.http.runtime_identity",
+				"component", "runtime_identity",
+				"status", status,
+				"request_id", requestIDFromRequest(r),
+				"trace_id", traceIDFromContext(ctx),
+				"error", err.Error(),
+			)
+			body := "runtime identity unavailable"
+			switch status {
+			case stdhttp.StatusBadRequest:
+				body = "runtime identity request invalid"
+			case stdhttp.StatusMethodNotAllowed:
+				body = "method not allowed"
+			case stdhttp.StatusPreconditionFailed:
+				body = "runtime identity mismatch"
+			}
+			writePlainText(w, status, body)
+			return
+		}
+		w.Header().Set(runtimeIdentityProofHeader, runtimeIdentityProofValue)
+		writePlainText(w, stdhttp.StatusOK, "runtime identity matched")
 	}))
 
 	srv.Handle("/readyz", newObservedHTTPHandler(logger, tp, "server.http.readyz", func(ctx context.Context, w stdhttp.ResponseWriter, r *stdhttp.Request) {

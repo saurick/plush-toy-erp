@@ -9,6 +9,7 @@ import {
   CUSTOMER_TRIAL_133_TARGET,
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
   normalizeManualAcceptanceBackendURL,
@@ -30,6 +31,9 @@ export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS";
 export const RETIRE_CONFIRM_PREFIX =
   "RETIRE_LEGACY_SIMULATED_MANUAL_ACCEPTANCE_TASKS";
 export const WORKFLOW_TASK_CAS_MIGRATION = "20260711063237";
+// Historical review anchor only. Remote writes are gated by the forward
+// migration floor plus live runtime/readback checks, so later immutable
+// releases are not incorrectly rejected.
 export const WORKFLOW_TASK_CAS_RELEASE =
   "929ec0b3a563bec0796274d033a97277519bcb51";
 export const TASKS_PER_ROLE = 20;
@@ -81,12 +85,6 @@ export function assertManualAcceptanceTaskTargetCompatibility(
   ) {
     throw new CliError(
       `${CUSTOMER_TRIAL_133_TARGET} requires Workflow task CAS migration >= ${WORKFLOW_TASK_CAS_MIGRATION} before the first task write`,
-      2,
-    );
-  }
-  if (attested.release !== WORKFLOW_TASK_CAS_RELEASE) {
-    throw new CliError(
-      `${CUSTOMER_TRIAL_133_TARGET} requires the reviewed Workflow task CAS release ${WORKFLOW_TASK_CAS_RELEASE} before the first task write`,
       2,
     );
   }
@@ -1140,15 +1138,13 @@ async function assertSafeRuntime({
         attestation: targetAttestation,
       })
     : undefined;
-  const capabilities = attested
-    ? { environment: attested.environment, ...attested.debug }
-    : await rpcCall({
-        backendURL: plan.backendURL,
-        domain: "debug",
-        method: "capabilities",
-        token: runtimeAdmin.token,
-        fetchImpl,
-      });
+  const capabilities = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "debug",
+    method: "capabilities",
+    token: runtimeAdmin.token,
+    fetchImpl,
+  });
   assertManualAcceptanceCapabilitiesPolicy({ policy: plan, capabilities });
   const sessionData = await rpcCall({
     backendURL: plan.backendURL,
@@ -1471,7 +1467,7 @@ export async function applyManualAcceptanceTaskData(
   } = {},
 ) {
   validateManualAcceptanceTaskPlan(plan);
-  assertManualAcceptanceMutationTarget(plan, {
+  const mutationTarget = assertManualAcceptanceMutationTarget(plan, {
     confirmation: targetConfirmation,
   });
   const parsedTargetAttestation = parseManualAcceptanceTargetAttestation(
@@ -1494,19 +1490,22 @@ export async function applyManualAcceptanceTaskData(
       process.env.ERP_ROLE_DEMO_PASSWORD,
     "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
   );
-  const effectiveAdminPassword = parsedTargetAttestation
-    ? undefined
-    : requiredText(
-        adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
-        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-      );
-  const runtimeAdmin = parsedTargetAttestation
-    ? undefined
-    : await loginRuntimeAdmin({
-        backendURL: plan.backendURL,
-        password: effectiveAdminPassword,
-        fetchImpl,
-      });
+  const effectiveAdminPassword = requiredText(
+    adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+  );
+  if (mutationTarget.external) {
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: plan,
+      attestation: parsedTargetAttestation,
+      fetchImpl,
+    });
+  }
+  const runtimeAdmin = await loginRuntimeAdmin({
+    backendURL: plan.backendURL,
+    password: effectiveAdminPassword,
+    fetchImpl,
+  });
   const accounts = await loginAccounts({
     backendURL: plan.backendURL,
     password: effectivePassword,
@@ -1749,7 +1748,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
   ) {
     throw new CliError("legacy task batch must differ from the keep batch", 2);
   }
-  assertManualAcceptanceMutationTarget(keepPlan, {
+  const mutationTarget = assertManualAcceptanceMutationTarget(keepPlan, {
     confirmation: targetConfirmation,
   });
   const parsedTargetAttestation = parseManualAcceptanceTargetAttestation(
@@ -1776,19 +1775,22 @@ export async function retireLegacyManualAcceptanceTaskBatch(
       process.env.ERP_ROLE_DEMO_PASSWORD,
     "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
   );
-  const effectiveAdminPassword = parsedTargetAttestation
-    ? undefined
-    : requiredText(
-        adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
-        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-      );
-  const runtimeAdmin = parsedTargetAttestation
-    ? undefined
-    : await loginRuntimeAdmin({
-        backendURL: keepPlan.backendURL,
-        password: effectiveAdminPassword,
-        fetchImpl,
-      });
+  const effectiveAdminPassword = requiredText(
+    adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
+    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+  );
+  if (mutationTarget.external) {
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: keepPlan,
+      attestation: parsedTargetAttestation,
+      fetchImpl,
+    });
+  }
+  const runtimeAdmin = await loginRuntimeAdmin({
+    backendURL: keepPlan.backendURL,
+    password: effectiveAdminPassword,
+    fetchImpl,
+  });
   const accounts = await loginAccounts({
     backendURL: keepPlan.backendURL,
     password: effectivePassword,

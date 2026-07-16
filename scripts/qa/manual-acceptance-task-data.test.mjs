@@ -47,7 +47,7 @@ function customerTrial133Attestation(overrides = {}) {
     customerKey: "yoyoosun",
     environment: "prod",
     release: WORKFLOW_TASK_CAS_RELEASE,
-    migration: WORKFLOW_TASK_CAS_MIGRATION,
+    migration: "20260714165115",
     debug: {
       seedEnabled: false,
       seedAllowed: false,
@@ -102,6 +102,26 @@ function createMockRuntime(options = {}) {
   tokenToRole.set("token-runtime-admin", "runtime_admin");
 
   const fetchImpl = async (url, request) => {
+    if (!request.body) {
+      calls.push({
+        domain: "runtime-identity",
+        method: "probe",
+        params: {},
+        actorRole: undefined,
+      });
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        headers: {
+          get: (name) =>
+            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+        },
+        async text() {
+          return "runtime identity matched";
+        },
+      };
+    }
     const domain = new URL(url).pathname.split("/").filter(Boolean).at(-1);
     const body = JSON.parse(request.body);
     const params = body.params || {};
@@ -154,6 +174,16 @@ function createMockRuntime(options = {}) {
       assert.equal(actorRole, "runtime_admin");
       return jsonResponse({
         environment: options.environment || "local",
+        ...(["prod", "sql"].includes(options.environment)
+          ? {
+              seedEnabled: false,
+              seedAllowed: false,
+              cleanupEnabled: false,
+              cleanupAllowed: false,
+              businessDataClearEnabled: false,
+              businessDataClearAllowed: false,
+            }
+          : {}),
         ...(options.capabilities || {}),
       });
     }
@@ -1025,7 +1055,7 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
   assert.deepEqual(mock.counts(), countsAfterFirst);
 });
 
-test("customer-trial-133 task apply uses exact attestation without debug admin and keeps the same dataset identity", async () => {
+test("customer-trial-133 task apply binds exact attestation and live debug capabilities", async () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
@@ -1039,6 +1069,7 @@ test("customer-trial-133 task apply uses exact attestation without debug admin a
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
     targetAttestation: customerTrial133Attestation(),
     password: "local-password",
+    adminPassword: "admin-password",
     fetchImpl: mock.fetchImpl,
   });
 
@@ -1050,17 +1081,17 @@ test("customer-trial-133 task apply uses exact attestation without debug admin a
   assert.deepEqual(report.runtime.targetAttestation, {
     source: "out-of-band",
     release: WORKFLOW_TASK_CAS_RELEASE,
-    migration: WORKFLOW_TASK_CAS_MIGRATION,
+    migration: "20260714165115",
   });
   assert.equal(
     mock.calls.some(
       (call) => call.domain === "debug" || call.actorRole === "runtime_admin",
     ),
-    false,
+    true,
   );
 });
 
-test("customer-trial-133 rejects an old Workflow release before login or write", async () => {
+test("customer-trial-133 accepts a later immutable release when the CAS migration floor is satisfied", async () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
@@ -1068,28 +1099,18 @@ test("customer-trial-133 rejects an old Workflow release before login or write",
     runId: "20260715-V1",
     nowSec: NOW_SEC,
   });
-  let fetchCount = 0;
-
-  await assert.rejects(
-    () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
-        targetAttestation: customerTrial133Attestation({
-          release: "20c96d3819429361a35d2551b63b211f055de37e",
-        }),
-        password: "must-not-be-used",
-        fetchImpl: async () => {
-          fetchCount += 1;
-          throw new Error("must not fetch");
-        },
-      }),
-    new RegExp(
-      `requires the reviewed Workflow task CAS release ${WORKFLOW_TASK_CAS_RELEASE}`,
-      "u",
-    ),
-  );
-  assert.equal(fetchCount, 0);
+  const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
+  const mock = createMockRuntime({ environment: "prod" });
+  const report = await applyManualAcceptanceTaskData(plan, {
+    confirmPhrase: CONFIRM_PHRASE,
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    targetAttestation: customerTrial133Attestation({ release: laterRelease }),
+    password: "local-password",
+    adminPassword: "admin-password",
+    fetchImpl: mock.fetchImpl,
+  });
+  assert.equal(report.summary.persisted, TOTAL_TASKS);
+  assert.equal(report.runtime.targetAttestation.release, laterRelease);
 });
 
 test("customer-trial-133 rejects an old Workflow migration before login or write", async () => {
@@ -1116,10 +1137,7 @@ test("customer-trial-133 rejects an old Workflow migration before login or write
           throw new Error("must not fetch");
         },
       }),
-    new RegExp(
-      `requires Workflow task CAS migration >= ${WORKFLOW_TASK_CAS_MIGRATION}`,
-      "u",
-    ),
+    /attestation\.migration must be at least 20260714165115/u,
   );
   assert.equal(fetchCount, 0);
 });
