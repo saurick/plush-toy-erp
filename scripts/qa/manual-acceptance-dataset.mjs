@@ -645,7 +645,11 @@ function buildStages(identity) {
       expected: {
         componentDataVersion: identity.dataVersion,
         componentSemanticDigest: "${SEMANTIC_DIGEST}",
-        queryEvidenceComplete: true,
+        queryChecksPassed: true,
+        queryEvidenceComplete: false,
+        datasetSubstrateVerified: true,
+        browserEvidencePending: true,
+        browserOnlyNotProvenTargets: 10,
       },
       replay: "read-only-repeatable-verification",
       cleanupPolicy: "not-applicable",

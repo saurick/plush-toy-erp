@@ -9,6 +9,16 @@ import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
 import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
+import {
+  MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  assertManualAcceptanceDatasetReadinessBoundary,
+} from "./manual-acceptance-dataset-runner.mjs";
+import {
+  CUSTOMER_TRIAL_133_TARGET,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
+  parseManualAcceptanceTargetAttestation,
+  resolveManualAcceptanceTarget,
+} from "./manual-acceptance-target-policy.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -21,6 +31,10 @@ const DEFAULT_REPORT_PATH = path.resolve(
 const REPORT_ROOT = path.resolve(
   REPO_ROOT,
   "output/qa/manual-acceptance/browser",
+);
+const DATASET_REPORT_ROOT = path.resolve(
+  REPO_ROOT,
+  "output/qa/manual-acceptance/datasets",
 );
 const INPUT_REPORT_ROOT = path.resolve(
   REPO_ROOT,
@@ -139,10 +153,13 @@ export function normalizeLocalBrowserURL(value, label = "URL") {
 
 export function resolveManualAcceptanceBrowserReportPath(value = "") {
   const target = value ? path.resolve(REPO_ROOT, value) : DEFAULT_REPORT_PATH;
-  const relative = path.relative(REPORT_ROOT, target);
-  if (relative.startsWith("..") || path.isAbsolute(relative)) {
+  const allowed = [REPORT_ROOT, DATASET_REPORT_ROOT].some((root) => {
+    const relative = path.relative(root, target);
+    return !relative.startsWith("..") && !path.isAbsolute(relative);
+  });
+  if (!allowed) {
     throw new BrowserAcceptanceError(
-      "--report must stay under output/qa/manual-acceptance/browser",
+      "--report must stay under output/qa/manual-acceptance/browser or output/qa/manual-acceptance/datasets",
       2,
     );
   }
@@ -246,6 +263,8 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
     reportPath: DEFAULT_REPORT_PATH,
     sourceReportPath: DEFAULT_SOURCE_REPORT_PATH,
     factReportPath: DEFAULT_FACT_REPORT_PATH,
+    readinessReportPath: "",
+    targetAttestation: "",
     headed: false,
     plan: false,
     help: false,
@@ -299,6 +318,18 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
       );
       continue;
     }
+    if (key === "readiness-report") {
+      options.readinessReportPath =
+        resolveManualAcceptanceBrowserInputReportPath(
+          value,
+          "--readiness-report",
+        );
+      continue;
+    }
+    if (key === "target-attestation-json") {
+      options.targetAttestation = parseManualAcceptanceTargetAttestation(value);
+      continue;
+    }
     throw new BrowserAcceptanceError(`不支持的参数：--${key}`, 2);
   }
   if (!options.help) {
@@ -317,7 +348,8 @@ export function getManualAcceptanceBrowserHelp() {
     --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8300 \
     --source-report output/qa/manual-acceptance/source-data/apply-report.json \
-    --fact-report output/qa/manual-acceptance/fact-data/apply-report.json
+    --fact-report output/qa/manual-acceptance/fact-data/apply-report.json \
+    --readiness-report output/qa/manual-acceptance/readiness/verify-report.json
   node scripts/qa/manual-acceptance-browser.mjs --plan \\
     --base-url http://127.0.0.1:15200 \\
     --backend-url http://127.0.0.1:8300
@@ -325,6 +357,7 @@ export function getManualAcceptanceBrowserHelp() {
 说明：
   只允许 localhost / 127.0.0.1 / ::1，不接受带凭据、路径、查询参数或跳转的 URL。
   真实验收只登录、读页面和切换只读页签，不点击新增、编辑、提交、完成、取消或过账动作。
+  customer-trial-133 必须提供同批 readiness 报告和带外 attestation，并先通过只读 runtime identity 探针。
   报告默认写入 output/qa/manual-acceptance/browser/report.json，不保存密码或登录令牌。
 `;
 }
@@ -786,6 +819,7 @@ async function readListEvidence(page, target) {
 
 export function assertBoundSimulatedPrintReports(source, fact) {
   const sourceRunId = requiredText(source?.runId, "source report runId");
+  const target = requiredText(source?.target, "source report target");
   const identityFields = [
     "datasetKey",
     "dataVersion",
@@ -805,6 +839,21 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       "source report configRevision",
     ) ===
     requiredText(fact?.runtime?.configRevision, "fact report configRevision");
+  const sourceAttestation = source?.runtime?.targetAttestation;
+  const factAttestation = fact?.runtime?.targetAttestation;
+  const runtimeAttestationMatches =
+    target === CUSTOMER_TRIAL_133_TARGET
+      ? sourceAttestation?.source === "out-of-band" &&
+        factAttestation?.source === "out-of-band" &&
+        ["release", "migration"].every(
+          (field) =>
+            requiredText(
+              sourceAttestation?.[field],
+              `source report ${field}`,
+            ) ===
+            requiredText(factAttestation?.[field], `fact report ${field}`),
+        )
+      : !sourceAttestation && !factAttestation;
   if (
     source?.mode !== "apply" ||
     fact?.mode !== "apply" ||
@@ -814,22 +863,45 @@ export function assertBoundSimulatedPrintReports(source, fact) {
     fact?.realCustomerImport !== false ||
     fact?.reportContract !== SOURCE_DRIVEN_FACT_REPORT_CONTRACT ||
     !identityMatches ||
-    !runtimeMatches
+    !runtimeMatches ||
+    !runtimeAttestationMatches
   ) {
     throw new BrowserAcceptanceError(
       "打印验收只接受同一批次、同一运行配置的本机模拟业务记录",
     );
   }
   return {
+    datasetKey: requiredText(source?.datasetKey, "source report datasetKey"),
+    dataVersion: requiredText(source?.dataVersion, "source report dataVersion"),
+    runId: sourceRunId,
     sourceRunId,
     factRunId: requiredText(fact?.runId, "fact report runId"),
+    target,
+    backendURL: requiredText(source?.backendURL, "source report backendURL"),
+    semanticDigest: requiredText(
+      source?.semanticDigest,
+      "source report semanticDigest",
+    ),
     sourcePrefix: requiredText(source?.prefix, "source report prefix"),
+    configRevision: requiredText(
+      source?.runtime?.configRevision,
+      "source report configRevision",
+    ),
+    runtimeAttestation:
+      target === CUSTOMER_TRIAL_133_TARGET
+        ? {
+            source: "out-of-band",
+            release: sourceAttestation.release,
+            migration: sourceAttestation.migration,
+          }
+        : null,
   };
 }
 
 async function loadBoundSimulatedPrintInput({
   sourceReportPath,
   factReportPath,
+  backendURL,
 }) {
   const [sourceRaw, factRaw] = await Promise.all([
     fs.readFile(sourceReportPath, "utf8"),
@@ -838,12 +910,204 @@ async function loadBoundSimulatedPrintInput({
   const source = JSON.parse(sourceRaw);
   const fact = JSON.parse(factRaw);
   const identity = assertBoundSimulatedPrintReports(source, fact);
+  if (identity.backendURL !== backendURL) {
+    throw new BrowserAcceptanceError(
+      "浏览器后端与同批模拟数据报告的 backendURL 不一致",
+    );
+  }
   return {
     ...identity,
     sourceReportPath: path.relative(REPO_ROOT, sourceReportPath),
     factReportPath: path.relative(REPO_ROOT, factReportPath),
     sourceReportSHA256: createHash("sha256").update(sourceRaw).digest("hex"),
     factReportSHA256: createHash("sha256").update(factRaw).digest("hex"),
+  };
+}
+
+export function assertManualAcceptanceBrowserReadinessBinding(
+  readiness,
+  printInput,
+) {
+  const summary = readiness?.summary || {};
+  const substrate = assertManualAcceptanceDatasetReadinessBoundary(
+    readiness,
+    summary.queryEvidenceComplete === true ? 0 : 1,
+  );
+  const factInput = readiness?.reportInputs?.factReport;
+  const sourceInput = readiness?.reportInputs?.sourceReport;
+  const taskInput = readiness?.reportInputs?.taskReport;
+  const identityFields = [
+    "datasetKey",
+    "dataVersion",
+    "runId",
+    "target",
+    "backendURL",
+    "semanticDigest",
+  ];
+  const factMatches = identityFields.every(
+    (field) => String(factInput?.[field] || "") === String(printInput[field]),
+  );
+  const sourceMatches =
+    String(sourceInput?.runId || "") === printInput.sourceRunId &&
+    String(sourceInput?.prefix || "") === printInput.sourcePrefix;
+  const taskMatches =
+    String(taskInput?.runId || "") === printInput.sourceRunId &&
+    Boolean(String(taskInput?.prefix || "").trim()) &&
+    Boolean(String(taskInput?.sourceType || "").trim()) &&
+    Number.isSafeInteger(Number(taskInput?.sourceID)) &&
+    Number(taskInput.sourceID) > 0;
+  const runtimeMatches =
+    readiness?.backendURL === printInput.backendURL &&
+    readiness?.customerKey === CUSTOMER_KEY &&
+    readiness?.runtimePreflight?.target === printInput.target &&
+    readiness?.runtimePreflight?.customerKey === CUSTOMER_KEY &&
+    readiness?.runtimePreflight?.configRevision === printInput.configRevision &&
+    factInput?.runtime?.configRevision === printInput.configRevision;
+  const reportedAttestation = factInput?.runtime?.targetAttestation;
+  const remoteAttestationMatches =
+    printInput.target === CUSTOMER_TRIAL_133_TARGET
+      ? reportedAttestation?.source === "out-of-band" &&
+        ["release", "migration"].every(
+          (field) =>
+            String(reportedAttestation?.[field] || "") ===
+            String(printInput.runtimeAttestation?.[field] || ""),
+        )
+      : !reportedAttestation && !printInput.runtimeAttestation;
+  if (
+    !factMatches ||
+    !sourceMatches ||
+    !taskMatches ||
+    !runtimeMatches ||
+    !remoteAttestationMatches
+  ) {
+    throw new BrowserAcceptanceError(
+      "readiness 报告与当前模拟数据批次或运行态身份不一致",
+    );
+  }
+  return {
+    ...substrate,
+    datasetRunnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    taskRunId: taskInput.runId,
+    taskPrefix: taskInput.prefix,
+    taskSourceType: taskInput.sourceType,
+    taskSourceID: Number(taskInput.sourceID),
+  };
+}
+
+async function loadBoundReadinessInput({ readinessReportPath, printInput }) {
+  const raw = await fs.readFile(readinessReportPath, "utf8");
+  const report = JSON.parse(raw);
+  const binding = assertManualAcceptanceBrowserReadinessBinding(
+    report,
+    printInput,
+  );
+  return {
+    ...binding,
+    readinessReportPath: path.relative(REPO_ROOT, readinessReportPath),
+    readinessReportSHA256: createHash("sha256").update(raw).digest("hex"),
+  };
+}
+
+export function assertManualAcceptanceBrowserReportPathBinding(
+  reportPath,
+  printInput,
+) {
+  if (printInput.target !== CUSTOMER_TRIAL_133_TARGET) return reportPath;
+  const expected = path.resolve(
+    DATASET_REPORT_ROOT,
+    printInput.dataVersion,
+    printInput.target,
+    "browser/report.json",
+  );
+  if (reportPath !== expected) {
+    throw new BrowserAcceptanceError(
+      `customer-trial-133 browser report must use ${path.relative(REPO_ROOT, expected)}`,
+      2,
+    );
+  }
+  return reportPath;
+}
+
+async function verifyManualAcceptanceBrowserDatasetBinding({
+  backendURL,
+  printInput,
+  readinessReportPath,
+  targetAttestation,
+  fetchImpl,
+}) {
+  if (printInput.backendURL !== backendURL) {
+    throw new BrowserAcceptanceError(
+      "浏览器后端与当前模拟数据批次不一致",
+    );
+  }
+  let readiness = null;
+  if (readinessReportPath) {
+    readiness = await loadBoundReadinessInput({
+      readinessReportPath,
+      printInput,
+    });
+  } else if (printInput.target === CUSTOMER_TRIAL_133_TARGET) {
+    throw new BrowserAcceptanceError(
+      "customer-trial-133 浏览器验收必须提供同批 --readiness-report",
+      2,
+    );
+  }
+  if (printInput.target !== CUSTOMER_TRIAL_133_TARGET) {
+    if (targetAttestation) {
+      throw new BrowserAcceptanceError(
+        "本地浏览器验收不得提供 customer-trial-133 attestation",
+        2,
+      );
+    }
+    return {
+      datasetKey: printInput.datasetKey,
+      dataVersion: printInput.dataVersion,
+      runId: printInput.sourceRunId,
+      target: printInput.target,
+      semanticDigest: printInput.semanticDigest,
+      configRevision: printInput.configRevision,
+      readiness,
+      runtimeIdentity: null,
+    };
+  }
+  const policy = resolveManualAcceptanceTarget({
+    target: printInput.target,
+    backendURL,
+    datasetKey: printInput.datasetKey,
+    dataVersion: printInput.dataVersion,
+    runId: printInput.sourceRunId,
+  });
+  const parsedAttestation = parseManualAcceptanceTargetAttestation(
+    targetAttestation,
+  );
+  const runtimeIdentity =
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy,
+      attestation: parsedAttestation,
+      fetchImpl,
+    });
+  if (
+    runtimeIdentity.release !== printInput.runtimeAttestation?.release ||
+    runtimeIdentity.migration !== printInput.runtimeAttestation?.migration
+  ) {
+    throw new BrowserAcceptanceError(
+      "当前运行时 release/migration 与同批模拟数据报告不一致",
+    );
+  }
+  return {
+    datasetKey: printInput.datasetKey,
+    dataVersion: printInput.dataVersion,
+    runId: printInput.sourceRunId,
+    target: printInput.target,
+    semanticDigest: printInput.semanticDigest,
+    configRevision: printInput.configRevision,
+    readiness,
+    runtimeIdentity: {
+      databaseName: runtimeIdentity.databaseName,
+      release: runtimeIdentity.release,
+      migration: runtimeIdentity.migration,
+      proof: runtimeIdentity.proof,
+    },
   };
 }
 
@@ -1525,6 +1789,8 @@ export async function runManualAcceptanceBrowser(
     reportPath = DEFAULT_REPORT_PATH,
     sourceReportPath = DEFAULT_SOURCE_REPORT_PATH,
     factReportPath = DEFAULT_FACT_REPORT_PATH,
+    readinessReportPath = "",
+    targetAttestation = "",
     headed = false,
   } = {},
   runtime = {},
@@ -1547,6 +1813,12 @@ export async function runManualAcceptanceBrowser(
       path.relative(REPO_ROOT, factReportPath),
       "--fact-report",
     );
+  const normalizedReadinessReportPath = readinessReportPath
+    ? resolveManualAcceptanceBrowserInputReportPath(
+        path.relative(REPO_ROOT, readinessReportPath),
+        "--readiness-report",
+      )
+    : "";
   const secret = String(password || "").trim();
   if (!secret) {
     throw new BrowserAcceptanceError(
@@ -1560,14 +1832,26 @@ export async function runManualAcceptanceBrowser(
     backendURL: normalizedBackendURL,
   });
   const fetchImpl = runtime.fetchImpl || globalThis.fetch;
+  const printInput = await loadBoundSimulatedPrintInput({
+    sourceReportPath: normalizedSourceReportPath,
+    factReportPath: normalizedFactReportPath,
+    backendURL: normalizedBackendURL,
+  });
+  assertManualAcceptanceBrowserReportPathBinding(
+    normalizedReportPath,
+    printInput,
+  );
+  const datasetBinding = await verifyManualAcceptanceBrowserDatasetBinding({
+    backendURL: normalizedBackendURL,
+    printInput,
+    readinessReportPath: normalizedReadinessReportPath,
+    targetAttestation,
+    fetchImpl,
+  });
   const preflight = await verifyRuntimePreflight({
     baseURL: normalizedBaseURL,
     backendURL: normalizedBackendURL,
     fetchImpl,
-  });
-  const printInput = await loadBoundSimulatedPrintInput({
-    sourceReportPath: normalizedSourceReportPath,
-    factReportPath: normalizedFactReportPath,
   });
   const chromium =
     runtime.chromium || (await (runtime.loadChromium || loadChromium)());
@@ -1685,6 +1969,7 @@ export async function runManualAcceptanceBrowser(
     ...MANUAL_ACCEPTANCE_BROWSER_BOUNDARY,
     callsAuthLogin: true,
     callsReadOnlyPageQueries: true,
+    datasetBinding,
     preflight,
     catalogSummary: plan.summary,
     formalAccounts,
@@ -1754,6 +2039,9 @@ async function main() {
   const report = await runManualAcceptanceBrowser({
     ...options,
     password: process.env.MANUAL_ACCEPTANCE_PASSWORD,
+    targetAttestation:
+      options.targetAttestation ||
+      process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
   });
   process.stdout.write(
     `[manual-acceptance-browser] 通过：正式账号 ${report.summary.formalAccountPassedCount}/${report.summary.formalAccountCount}，异常账号 ${report.summary.exceptionAccountPassedCount}/${report.summary.exceptionAccountCount}，页面 ${report.summary.targetPassedCount}/${report.summary.targetCount}；数据量已由页面证明 ${report.summary.dataMinimumProvenCount}/${report.summary.listTargetCount}。报告 ${path.relative(REPO_ROOT, options.reportPath)}\n`,

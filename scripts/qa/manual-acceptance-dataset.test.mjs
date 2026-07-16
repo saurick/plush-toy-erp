@@ -568,7 +568,15 @@ test("semantic plan locks the eight narrow stage contracts", () => {
 
   const readiness = plan.stages.find((stage) => stage.key === "readiness");
   assert.equal(readiness.writesBusinessData, false);
-  assert.equal(readiness.expected.componentDataVersion, "2026.07.15-v3");
+  assert.deepEqual(readiness.expected, {
+    componentDataVersion: "2026.07.15-v3",
+    componentSemanticDigest: "${SEMANTIC_DIGEST}",
+    queryChecksPassed: true,
+    queryEvidenceComplete: false,
+    datasetSubstrateVerified: true,
+    browserEvidencePending: true,
+    browserOnlyNotProvenTargets: 10,
+  });
 });
 
 test("dataset runner accepts only the exact ten browser-only print gaps", () => {

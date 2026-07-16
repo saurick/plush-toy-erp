@@ -214,8 +214,11 @@ MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \
     --backend-url http://127.0.0.1:8300 \
     --source-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/source/apply-report.json \
     --fact-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/facts/apply-report.json \
+    --readiness-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/readiness/verify-report.json \
     --report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/browser/report.json
 ```
+
+`customer-trial-133` 的浏览器报告必须写到当前版本与目标的规范路径 `output/qa/manual-acceptance/datasets/<dataVersion>/customer-trial-133/browser/report.json`，并同时提供同批 `readiness/verify-report.json` 与 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`。浏览器启动前会重新调用 `/readyz/runtime-identity`，把当前数据库、完整 release commit、Atlas migration、source / fact / task / readiness 批次身份原子绑定；readiness 只参与身份闭合，列表数量仍必须由当前页面 DOM 重新证明，打印仍必须由当前 5 份 PDF 证明。
 
 打印工作台必须从同批采购订单、委外订单和 BOM 选择真实模拟记录。PDF 出现 4xx / 5xx、空文件、非 PDF 或缺少 `request_id` 都要失败，不能用页面打开代替带值打印证据。
 

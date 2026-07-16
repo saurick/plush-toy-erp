@@ -10,6 +10,8 @@ import {
   FORMAL_BROWSER_ACCOUNTS,
   MANUAL_ACCEPTANCE_BROWSER_BOUNDARY,
   assertPDFRenderResponse,
+  assertManualAcceptanceBrowserReadinessBinding,
+  assertManualAcceptanceBrowserReportPathBinding,
   assertBoundSimulatedPrintReports,
   buildManualAcceptanceBrowserPlan,
   normalizeLocalBrowserURL,
@@ -152,12 +154,18 @@ test("CLI requires explicit local frontend and backend origins", () => {
   assert.match(parsed.factReportPath, /datasets\/v3\/facts\/apply-report\.json$/u);
 });
 
-test("report output cannot leave the manual acceptance browser directory", () => {
+test("report output stays in the manual acceptance browser or dataset evidence roots", () => {
   assert.match(
     resolveManualAcceptanceBrowserReportPath(
       "output/qa/manual-acceptance/browser/custom.json",
     ),
     /output\/qa\/manual-acceptance\/browser\/custom\.json$/u,
+  );
+  assert.match(
+    resolveManualAcceptanceBrowserReportPath(
+      "output/qa/manual-acceptance/datasets/2026.07.15-v3/customer-trial-133/browser/report.json",
+    ),
+    /datasets\/2026\.07\.15-v3\/customer-trial-133\/browser\/report\.json$/u,
   );
   assert.throws(
     () => resolveManualAcceptanceBrowserReportPath("output/qa/other.json"),
@@ -208,9 +216,17 @@ test("bound print inputs stay in the acceptance report root and match the curren
     reportContract: "source-driven-operational-facts-v1",
   };
   assert.deepEqual(assertBoundSimulatedPrintReports(source, fact), {
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.15-v3",
+    runId: "20260715-V3",
     sourceRunId: "20260715-V3",
     factRunId: "20260715-V3",
+    target: "local-dev",
+    backendURL: "http://127.0.0.1:8310",
+    semanticDigest: "digest-v3",
     sourcePrefix: "SIM-YOYOOSUN-UAT-20260715-V3",
+    configRevision: "customer-config-v3",
+    runtimeAttestation: null,
   });
   assert.throws(
     () =>
@@ -220,6 +236,123 @@ test("bound print inputs stay in the acceptance report root and match the curren
         sourceRunId: source.runId,
       }),
     /同一批次/u,
+  );
+});
+
+test("remote browser evidence binds the exact readiness batch and canonical report path", () => {
+  const runtimeAttestation = {
+    source: "out-of-band",
+    release: "a".repeat(40),
+    migration: "20260714165115",
+  };
+  const printInput = {
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.15-v3",
+    runId: "20260715-V3",
+    sourceRunId: "20260715-V3",
+    target: "customer-trial-133",
+    backendURL: "http://127.0.0.1:18375",
+    semanticDigest: "digest-v3",
+    sourcePrefix: "SIM-YOYOOSUN-UAT-20260715-V3",
+    configRevision: "customer-trial-v3",
+    runtimeAttestation,
+  };
+  const targets = [
+    ...Array.from({ length: 38 }, (_, index) => ({
+      id: `desktopPages:query-${index}`,
+      catalogGroup: "desktopPages",
+      dataStatus: "pass",
+      browserRequired: true,
+    })),
+    ...Array.from({ length: 5 }, (_, index) => ({
+      id: `printPreviewPages:preview-${index}`,
+      catalogGroup: "printPreviewPages",
+      dataStatus: "not_proven",
+      browserRequired: true,
+      quantityNotProven: true,
+    })),
+    ...Array.from({ length: 5 }, (_, index) => ({
+      id: `printWorkspacePages:workspace-${index}`,
+      catalogGroup: "printWorkspacePages",
+      dataStatus: "not_proven",
+      browserRequired: true,
+      quantityNotProven: true,
+    })),
+  ];
+  const readiness = {
+    customerKey: "yoyoosun",
+    backendURL: printInput.backendURL,
+    runtimePreflight: {
+      target: printInput.target,
+      customerKey: "yoyoosun",
+      configRevision: printInput.configRevision,
+    },
+    reportInputs: {
+      sourceReport: {
+        runId: printInput.runId,
+        prefix: printInput.sourcePrefix,
+      },
+      factReport: {
+        datasetKey: printInput.datasetKey,
+        dataVersion: printInput.dataVersion,
+        runId: printInput.runId,
+        target: printInput.target,
+        backendURL: printInput.backendURL,
+        semanticDigest: printInput.semanticDigest,
+        runtime: {
+          configRevision: printInput.configRevision,
+          targetAttestation: runtimeAttestation,
+        },
+      },
+      taskReport: {
+        runId: printInput.runId,
+        prefix: "SIM-YOYOOSUN-UAT-TASK-20260715-V3-plain-v1",
+        sourceType: "manual_acceptance_batch",
+        sourceID: 99,
+      },
+    },
+    summary: {
+      totalTargets: 48,
+      passedTargetData: 38,
+      failedTargetData: 0,
+      notProvenTargetData: 10,
+      queryChecksPassed: true,
+      queryEvidenceComplete: false,
+      manualAcceptanceCompleted: false,
+    },
+    targets,
+  };
+  const binding = assertManualAcceptanceBrowserReadinessBinding(
+    readiness,
+    printInput,
+  );
+  assert.equal(binding.datasetSubstrateVerified, true);
+  assert.equal(binding.browserOnlyNotProvenTargets, 10);
+  assert.equal(binding.taskSourceID, 99);
+
+  const canonical = resolveManualAcceptanceBrowserReportPath(
+    "output/qa/manual-acceptance/datasets/2026.07.15-v3/customer-trial-133/browser/report.json",
+  );
+  assert.equal(
+    assertManualAcceptanceBrowserReportPathBinding(canonical, printInput),
+    canonical,
+  );
+  assert.throws(
+    () =>
+      assertManualAcceptanceBrowserReportPathBinding(
+        resolveManualAcceptanceBrowserReportPath(
+          "output/qa/manual-acceptance/browser/report.json",
+        ),
+        printInput,
+      ),
+    /customer-trial-133 browser report must use/u,
+  );
+  const wrongRuntime = structuredClone(readiness);
+  wrongRuntime.runtimePreflight.configRevision = "other-revision";
+  assert.throws(
+    () =>
+      assertManualAcceptanceBrowserReadinessBinding(wrongRuntime, printInput),
+    /运行态身份不一致/u,
   );
 });
 
@@ -454,14 +587,15 @@ test("historical readiness evidence cannot override a current DOM minimum failur
   assert.equal(summary.failedDataMinimums.length, 1);
 });
 
-test("list proof reads current task cards and the permission account tab without readiness fallback", async () => {
+test("readiness binding cannot replace current DOM list minimum proof", async () => {
   const source = await fs.readFile(
     path.resolve(repoRoot, "scripts/qa/manual-acceptance-browser.mjs"),
     "utf8",
   );
   assert.match(source, /\.erp-task-board-card/u);
   assert.match(source, /getByRole\("tab", \{ name: \/管理员账号/u);
-  assert.doesNotMatch(source, /loadReadinessEvidence|readinessReportSHA256/u);
+  assert.match(source, /readinessReportSHA256/u);
+  assert.match(source, /failedDataMinimums = listTargets\.filter/u);
 });
 
 test("missing password starts zero browsers and performs zero probes", async () => {
