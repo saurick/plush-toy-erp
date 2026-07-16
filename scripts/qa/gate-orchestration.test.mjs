@@ -361,7 +361,7 @@ test("fixed full and strict gates cannot disappear behind file or package probes
     /ERP_PDF_CHROMIUM_INTEGRATION=1\s+\\\s+node "\$ROOT_DIR\/scripts\/qa\/run-test-gate\.mjs"/u,
   );
   assert.match(full, /go test -count=1 -json -skip '\^Test\.\*Postgres\.\*\$' \.\/\.\.\./u);
-  assert.match(full, /make critical_transactions_pg_test/u);
+  assert.match(full, /purchase-receipt-pg\.sh" test-critical-disposable/u);
   assert.doesNotMatch(
     full,
     /make purchase_return_(?:pg_createdb|migrate_apply|pg_test)/u,
@@ -430,6 +430,6 @@ test("fixed Node and Go gates require fail-closed execution summaries", () => {
   assert.match(full, /"\$PNPM_BIN" test --test-reporter=tap/u);
   assert.match(full, /--kind go --label server-all/u);
   assert.match(full, /go test -count=1 -json -skip '\^Test\.\*Postgres\.\*\$' \.\/\.\.\./u);
-  assert.match(full, /make critical_transactions_pg_test/u);
+  assert.match(full, /purchase-receipt-pg\.sh" test-critical-disposable/u);
   assert.match(full, /ERP_PDF_CHROMIUM_INTEGRATION=1/u);
 });

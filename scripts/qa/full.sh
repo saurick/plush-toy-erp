@@ -19,7 +19,7 @@ print_help() {
 
 环境变量:
   QA_BASE_RANGE=...    指定 diff 范围供 db-guard/secrets 使用
-  PURCHASE_RECEIPT_PG_DB_URL=...  本地隔离 PostgreSQL 关键事务测试库；只允许防呆脚本接受的本地/test DSN
+  PURCHASE_RECEIPT_PG_DB_URL=...  本地 PostgreSQL 连接基线；门禁派生唯一 disposable test 库，不写入基线库
   QA_BROWSER_SCENARIOS=...        浏览器诊断时覆盖默认场景；门禁始终至少运行一个场景
 
 结果边界:
@@ -107,7 +107,9 @@ echo "[qa:full] 运行 web 测试与构建"
 echo "[qa:full] 实际启动 Chromium 运行无写入浏览器 smoke"
 # 同一 worktree 的浏览器证据必须串行；stale lock 保守失败，避免并发回收竞态。
 # shellcheck source=scripts/qa/browser-gate-lock.sh
+# shellcheck disable=SC1091
 source "$ROOT_DIR/scripts/qa/browser-gate-lock.sh"
+# shellcheck disable=SC2034
 BROWSER_GATE_LOCK_PATH="${TMPDIR:-/tmp}/plush-toy-erp-qa-browser.lock"
 trap browser_gate_lock_release EXIT
 browser_gate_lock_acquire
@@ -133,9 +135,7 @@ echo "[qa:full] 运行 server 全量检查"
 (
   cd "$ROOT_DIR/server"
   make populated_upgrade_pg_test
-  make purchase_receipt_pg_createdb
-  make purchase_receipt_migrate_apply
-  make critical_transactions_pg_test
+  bash "$ROOT_DIR/scripts/purchase-receipt-pg.sh" test-critical-disposable
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind go --label server-all -- \

@@ -33,9 +33,16 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     'server/internal/data/production_order_postgres_concurrency_test.go',
   )
 
-  assert.match(full, /make purchase_receipt_pg_createdb/u, 'full must prepare the isolated test database')
-  assert.match(full, /make purchase_receipt_migrate_apply/u, 'full must apply current migrations before concurrency tests')
-  assert.match(full, /make critical_transactions_pg_test/u, 'full must run the non-skippable transaction gate')
+  assert.match(
+    full,
+    /purchase-receipt-pg\.sh" test-critical-disposable/u,
+    'full must create, migrate, test, and clean a per-run PostgreSQL database',
+  )
+  assert.doesNotMatch(
+    full,
+    /make purchase_receipt_(?:pg_createdb|migrate_apply)|make critical_transactions_pg_test/u,
+    'full must not reuse the fixed manual PostgreSQL database',
+  )
   assert.doesNotMatch(
     full,
     /make purchase_return_(?:pg_createdb|migrate_apply|pg_test)/u,
@@ -43,7 +50,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   )
   const fullVulnerabilityScanIndex = full.lastIndexOf('scripts/qa/govulncheck.sh')
   for (const gate of [
-    'make critical_transactions_pg_test',
+    'test-critical-disposable',
     '--kind go --label server-all',
     'make build',
   ]) {
@@ -96,6 +103,16 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
 
   assert.match(makefile, /^critical_transactions_pg_test:/mu)
   assert.match(pgScript, /test-critical\)/u)
+  assert.match(pgScript, /test-critical-disposable\)/u)
+  assert.match(pgScript, /_critical_\{process_id\}_\{secrets\.token_hex\(4\)\}/u)
+  assert.match(pgScript, /CREATE DATABASE \\"\$\{CRITICAL_DATABASE_NAME\}\\"/u)
+  assert.match(pgScript, /DROP DATABASE IF EXISTS \\"\$\{CRITICAL_DATABASE_NAME\}\\" WITH \(FORCE\)/u)
+  assert.match(pgScript, /trap cleanup_disposable_critical_gate EXIT/u)
+  assert.match(pgScript, /trap 'exit 129' HUP/u)
+  assert.match(pgScript, /trap 'exit 130' INT/u)
+  assert.match(pgScript, /trap 'exit 143' TERM/u)
+  assert.match(pgScript, /PURCHASE_RECEIPT_PG_DB_URL="\$CRITICAL_DATABASE_URL" "\$0" apply/u)
+  assert.match(pgScript, /PURCHASE_RECEIPT_PG_DB_URL="\$CRITICAL_DATABASE_URL" "\$0" test-critical/u)
   assert.match(pgScript, /PURCHASE_RECEIPT_PG_TEST=1/u)
   assert.match(pgScript, /INVENTORY_PG_TEST=1/u)
   assert.match(pgScript, /BOM_LOT_PG_TEST=1/u)
@@ -208,12 +225,10 @@ test('full and strict require the fail-closed populated upgrade PostgreSQL gate'
   const profiles = read('scripts/qa/gate-profiles.mjs')
 
   const populatedIndex = full.indexOf('make populated_upgrade_pg_test')
-  const createIndex = full.indexOf('make purchase_receipt_pg_createdb')
-  const migrateIndex = full.indexOf('make purchase_receipt_migrate_apply')
-  const criticalIndex = full.indexOf('make critical_transactions_pg_test')
+  const criticalIndex = full.indexOf('test-critical-disposable')
   assert(populatedIndex >= 0, 'full must run the populated upgrade PostgreSQL gate')
   assert(
-    populatedIndex < createIndex && createIndex < migrateIndex && migrateIndex < criticalIndex,
+    populatedIndex < criticalIndex,
     'full must finish the historical populated upgrade before current-schema PostgreSQL gates',
   )
   assert.match(
@@ -433,6 +448,104 @@ exit 42
       'a create collision/failure must never drop a database the entrypoint did not create',
     )
     assert.doesNotMatch(failedCreate.log, /^atlas:/mu)
+  } finally {
+    rmSync(fixtureRoot, { recursive: true, force: true })
+  }
+})
+
+test('critical PostgreSQL batch owns a unique database and cleans it fail-closed', () => {
+  const fixtureRoot = mkdtempSync(path.join(tmpdir(), 'plush-critical-postgres-disposable-'))
+  const fakeBin = path.join(fixtureRoot, 'bin')
+  const logFile = path.join(fixtureRoot, 'commands.log')
+  mkdirSync(fakeBin)
+
+  const executables = {
+    psql: `#!/usr/bin/env bash
+set -euo pipefail
+printf 'psql:%s\n' "$*" >> "\${FAKE_PG_LOG:?}"
+if [[ "$*" == *'CREATE DATABASE '* && "\${FAKE_CREATE_FAIL:-0}" == '1' ]]; then exit 19; fi
+if [[ "$*" == *'DROP DATABASE '* && "\${FAKE_DROP_FAIL:-0}" == '1' ]]; then exit 44; fi
+`,
+    atlas: `#!/usr/bin/env bash
+set -euo pipefail
+printf 'atlas:%s\n' "$*" >> "\${FAKE_PG_LOG:?}"
+if [[ "$*" == 'migrate apply '* && "\${FAKE_ATLAS_FAIL:-0}" == '1' ]]; then exit 42; fi
+`,
+    go: `#!/usr/bin/env bash
+set -euo pipefail
+printf 'go:%s\n' "$*" >> "\${FAKE_PG_LOG:?}"
+if [[ "\${FAKE_GO_FAIL:-0}" == '1' ]]; then exit 43; fi
+printf '{"Action":"pass","Test":"TestPurchaseReceiptPostgresSynthetic"}\n'
+`,
+    node: `#!/usr/bin/env bash
+set -euo pipefail
+printf 'node:%s\n' "$*" >> "\${FAKE_PG_LOG:?}"
+`,
+  }
+  for (const [name, source] of Object.entries(executables)) {
+    const file = path.join(fakeBin, name)
+    writeFileSync(file, source)
+    chmodSync(file, 0o755)
+  }
+
+  const run = (extraEnv = {}) => {
+    writeFileSync(logFile, '')
+    const result = spawnSync(
+      'bash',
+      [path.join(repoRoot, 'scripts/purchase-receipt-pg.sh'), 'test-critical-disposable'],
+      {
+        cwd: path.join(repoRoot, 'server'),
+        encoding: 'utf8',
+        env: {
+          ...process.env,
+          FAKE_PG_LOG: logFile,
+          PATH: `${fakeBin}${path.delimiter}${process.env.PATH}`,
+          PURCHASE_RECEIPT_PG_DB_URL:
+            'postgres://postgres:critical-secret@127.0.0.1:55432/plush_erp_purchase_receipt_test?sslmode=disable',
+          ...extraEnv,
+        },
+      },
+    )
+    return { result, log: readFileSync(logFile, 'utf8') }
+  }
+
+  const identities = (log) => ({
+    created: log.match(/CREATE DATABASE "([A-Za-z0-9_]+)"/u)?.[1],
+    dropped: log.match(/DROP DATABASE IF EXISTS "([A-Za-z0-9_]+)" WITH \(FORCE\)/u)?.[1],
+  })
+
+  try {
+    const first = run()
+    const firstIdentity = identities(first.log)
+    assert.equal(first.result.status, 0, `${first.result.stdout}\n${first.result.stderr}`)
+    assert.match(firstIdentity.created, /_critical_[0-9]+_[0-9a-f]{8}$/u)
+    assert.notEqual(firstIdentity.created, 'plush_erp_purchase_receipt_test')
+    assert.equal(firstIdentity.dropped, firstIdentity.created)
+    assert.match(first.log, new RegExp(`/${firstIdentity.created}\\?sslmode=disable`, 'u'))
+    assert.doesNotMatch(`${first.result.stdout}\n${first.result.stderr}`, /critical-secret/u)
+
+    const second = run()
+    const secondIdentity = identities(second.log)
+    assert.equal(second.result.status, 0, `${second.result.stdout}\n${second.result.stderr}`)
+    assert.notEqual(secondIdentity.created, firstIdentity.created)
+    assert.equal(secondIdentity.dropped, secondIdentity.created)
+
+    const failedCreate = run({ FAKE_CREATE_FAIL: '1' })
+    assert.equal(failedCreate.result.status, 19)
+    assert.doesNotMatch(failedCreate.log, /DROP DATABASE|^atlas:|^go:/mu)
+
+    const failedAtlas = run({ FAKE_ATLAS_FAIL: '1' })
+    assert.equal(failedAtlas.result.status, 42)
+    assert.equal(identities(failedAtlas.log).dropped, identities(failedAtlas.log).created)
+    assert.doesNotMatch(failedAtlas.log, /^go:/mu)
+
+    const failedGo = run({ FAKE_GO_FAIL: '1' })
+    assert.equal(failedGo.result.status, 43)
+    assert.equal(identities(failedGo.log).dropped, identities(failedGo.log).created)
+
+    const failedDrop = run({ FAKE_DROP_FAIL: '1' })
+    assert.equal(failedDrop.result.status, 44)
+    assert.equal(identities(failedDrop.log).dropped, identities(failedDrop.log).created)
   } finally {
     rmSync(fixtureRoot, { recursive: true, force: true })
   }

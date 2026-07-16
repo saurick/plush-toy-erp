@@ -3,7 +3,7 @@ set -euo pipefail
 
 cmd="${1:-}"
 if [ -z "$cmd" ]; then
-  echo "usage: $0 {createdb|status|apply|test|test-workflow|test-critical|test-populated-upgrade|dropdb}" >&2
+  echo "usage: $0 {createdb|status|apply|test|test-workflow|test-critical|test-critical-disposable|test-populated-upgrade|dropdb}" >&2
   exit 2
 fi
 
@@ -75,6 +75,65 @@ run_verified_go_test() {
   )
 }
 
+run_disposable_critical_gate() {
+  local critical_target
+  critical_target="$(
+    python3 - "$PURCHASE_RECEIPT_PG_DB_URL" "$$" <<'PY'
+import re
+import secrets
+import shlex
+import sys
+import urllib.parse
+
+raw, process_id = sys.argv[1:]
+url = urllib.parse.urlparse(raw)
+base_name = (url.path or "").lstrip("/")
+suffix = f"_critical_{process_id}_{secrets.token_hex(4)}"
+database_name = base_name[: 63 - len(suffix)] + suffix
+if not re.fullmatch(r"[A-Za-z0-9_]+", database_name):
+    raise SystemExit(f"ERROR: unsafe disposable critical database name: {database_name}")
+database_url = urllib.parse.urlunparse(url._replace(path="/" + database_name))
+print(f"CRITICAL_DATABASE_NAME={shlex.quote(database_name)}")
+print(f"CRITICAL_DATABASE_URL={shlex.quote(database_url)}")
+PY
+  )" || exit 1
+  eval "$critical_target"
+
+  CRITICAL_DATABASE_CREATED=0
+  cleanup_disposable_critical_gate() {
+    CRITICAL_STATUS=$?
+    trap - EXIT HUP INT TERM
+    if [ "$CRITICAL_DATABASE_CREATED" -eq 1 ]; then
+      set +e
+      psql "$PURCHASE_RECEIPT_PG_ADMIN_DB_URL" -X --no-psqlrc -v ON_ERROR_STOP=1 \
+        -c "DROP DATABASE IF EXISTS \"${CRITICAL_DATABASE_NAME}\" WITH (FORCE)"
+      CRITICAL_DROP_STATUS=$?
+      set -e
+      if [ "$CRITICAL_DROP_STATUS" -ne 0 ]; then
+        echo "ERROR: failed to drop disposable critical database ${CRITICAL_DATABASE_NAME}" >&2
+        if [ "$CRITICAL_STATUS" -eq 0 ]; then
+          CRITICAL_STATUS=$CRITICAL_DROP_STATUS
+        fi
+      fi
+    fi
+    exit "$CRITICAL_STATUS"
+  }
+  trap cleanup_disposable_critical_gate EXIT
+  trap 'exit 129' HUP
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+
+  echo "[qa:critical-postgres] create disposable db=${CRITICAL_DATABASE_NAME}"
+  psql "$PURCHASE_RECEIPT_PG_ADMIN_DB_URL" -X --no-psqlrc -v ON_ERROR_STOP=1 \
+    -c "CREATE DATABASE \"${CRITICAL_DATABASE_NAME}\""
+  CRITICAL_DATABASE_CREATED=1
+
+  PURCHASE_RECEIPT_PG_DB_URL="$CRITICAL_DATABASE_URL" "$0" apply
+  PURCHASE_RECEIPT_PG_DB_URL="$CRITICAL_DATABASE_URL" "$0" status
+  PURCHASE_RECEIPT_PG_DB_URL="$CRITICAL_DATABASE_URL" "$0" test-critical
+  echo "[qa:critical-postgres] status=complete disposable=1"
+}
+
 case "$cmd" in
 createdb)
   psql "$PURCHASE_RECEIPT_PG_ADMIN_DB_URL" -v ON_ERROR_STOP=1 -tc "SELECT 1 FROM pg_database WHERE datname = '${PURCHASE_RECEIPT_PG_DB_NAME}'" | grep -q 1 ||
@@ -134,6 +193,9 @@ test-critical)
     --require-prefix TestFinanceFactCancelAuditPostgres \
     --require-prefix TestFinanceProcessCommandPostgres \
     --require-prefix TestSalesProcessCommandPostgres
+  ;;
+test-critical-disposable)
+  run_disposable_critical_gate
   ;;
 test-populated-upgrade)
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
