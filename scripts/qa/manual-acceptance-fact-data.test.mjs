@@ -21,16 +21,26 @@ import {
   reuseOrApplyManualAcceptanceFactPhase,
   sourceDrivenPhaseIdentitySpecs,
   validatePurchaseCorrectionRecord,
+  validateProductionPhasePartialRecords,
   validateSalesPhaseRecords,
+  validateSalesPhasePartialRecords,
   verifyReceiptQualities,
   verifyManualAcceptanceFactPlan,
 } from "./manual-acceptance-fact-data.mjs";
 import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
 import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
+import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_DATABASE,
+  manualAcceptanceTargetConfirmation,
+} from "./manual-acceptance-target-policy.mjs";
 
-const DATA_VERSION = "2026.07.15-v3";
-const RUN_ID = "20260715-V3";
+const DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
+const RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 const DATASET_KEY = "yoyoosun-manual-acceptance";
+const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
+const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
 
 test("runtime admin guard consumes the formal top-level auth.me profile", () => {
   assert.deepEqual(
@@ -190,9 +200,10 @@ function sourceReport({ remote = false } = {}) {
     dataVersion: DATA_VERSION,
     runId: RUN_ID,
     target: remote ? "customer-trial-133" : "local-dev",
-    backendURL: remote ? "http://127.0.0.1:18375" : "http://127.0.0.1:8300",
+    backendURL: remote ? "http://127.0.0.1:18375" : LOCAL_BACKEND_URL,
+    databaseName: remote ? CUSTOMER_TRIAL_133_DATABASE : LOCAL_DATABASE_NAME,
     semanticDigest: "digest-v2",
-    prefix: `SIM-YOYOOSUN-UAT-${RUN_ID}`,
+    prefix: "YS5",
     anchorDate: "2026-07-15",
     runtime: {
       target: remote ? "customer-trial-133" : "local-dev",
@@ -249,9 +260,13 @@ function sourceReport({ remote = false } = {}) {
             outsourcingMaterialCandidate,
             outsourcingProductCandidate,
           ],
-          salesCandidates: [
-            { order: productionCandidate.salesOrder, item: productionCandidate.item },
-          ],
+          salesCandidates: Array.from({ length: 25 }, (_, offset) => ({
+            order: productionCandidate.salesOrder,
+            item: {
+              ...productionCandidate.item,
+              id: productionCandidate.item.id + offset,
+            },
+          })),
           purchaseCandidates: [],
           warehouses: [
             {
@@ -267,10 +282,19 @@ function sourceReport({ remote = false } = {}) {
           ],
         },
         phaseReadiness: {
-          production: { status: "blocked", reason: "awaiting posted material lot" },
-          outsourcing: { status: "blocked", reason: "awaiting posted material lot" },
+          production: {
+            status: "blocked",
+            reason: "awaiting posted material lot",
+          },
+          outsourcing: {
+            status: "blocked",
+            reason: "awaiting posted material lot",
+          },
           sales: { status: "blocked", reason: "awaiting completion lot" },
-          purchase: { status: "unsupported", reason: "awaiting posted receipt" },
+          purchase: {
+            status: "unsupported",
+            reason: "awaiting posted receipt",
+          },
         },
       },
     },
@@ -286,7 +310,13 @@ function fakeRecords(count, start, fields = {}) {
 
 function purchaseStage() {
   const receiptStatuses = ["DRAFT", "POSTED", "CANCELLED"];
-  const qualityStatuses = ["DRAFT", "SUBMITTED", "PASSED", "REJECTED", "CANCELLED"];
+  const qualityStatuses = [
+    "DRAFT",
+    "SUBMITTED",
+    "PASSED",
+    "REJECTED",
+    "CANCELLED",
+  ];
   const correctionStatuses = ["DRAFT", "POSTED", "CANCELLED"];
   return {
     purchaseReceipts: fakeRecords(54, 1000).map((item, offset) => ({
@@ -305,7 +335,8 @@ function purchaseStage() {
       status: correctionStatuses[offset % correctionStatuses.length],
       items: [
         {
-          adjust_type: offset % 2 === 0 ? "QUANTITY_INCREASE" : "QUANTITY_DECREASE",
+          adjust_type:
+            offset % 2 === 0 ? "QUANTITY_INCREASE" : "QUANTITY_DECREASE",
         },
       ],
     })),
@@ -337,7 +368,10 @@ function purchaseStage() {
       source_id: 1000,
     })),
     materialStock: new Map([
-      ["101:1001", { materialId: 101, unitId: 1001, warehouseId: 301, lotId: 5000 }],
+      [
+        "101:1001",
+        { materialId: 101, unitId: 1001, warehouseId: 301, lotId: 5000 },
+      ],
     ]),
   };
 }
@@ -345,7 +379,11 @@ function purchaseStage() {
 function factStage() {
   const productionOrderStatuses = ["DRAFT", "RELEASED", "CLOSED", "CANCELLED"];
   const productionStatuses = ["DRAFT", "POSTED", "CANCELLED"];
-  const productionTypes = ["MATERIAL_ISSUE", "FINISHED_GOODS_RECEIPT", "REWORK"];
+  const productionTypes = [
+    "MATERIAL_ISSUE",
+    "FINISHED_GOODS_RECEIPT",
+    "REWORK",
+  ];
   const shipmentStatuses = ["DRAFT", "SHIPPED", "CANCELLED"];
   const reservationStatuses = ["ACTIVE", "RELEASED"];
   const finance = [];
@@ -430,6 +468,13 @@ function factStage() {
       ...item,
       shipment_no: `SHP-${offset}`,
       status: shipmentStatuses[offset % shipmentStatuses.length],
+      items:
+        offset === 0
+          ? Array.from({ length: 25 }, (_, lineOffset) => ({
+              id: 19000 + lineOffset,
+              sales_order_item_id: 701 + lineOffset,
+            }))
+          : [{ id: 19000 + offset, sales_order_item_id: 701 }],
     })),
     financeFacts: finance,
   };
@@ -442,6 +487,13 @@ const runtime = Object.freeze({
   configRevision: "runtime-v2",
   source: "active_customer_config_revision",
 });
+
+function localMutationGuards(report) {
+  return {
+    targetConfirmation: manualAcceptanceTargetConfirmation(report),
+    fetchImpl: async () => runtimeIdentityResponse(),
+  };
+}
 
 test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact runs", () => {
   const plan = buildManualAcceptanceFactPlan(sourceReport());
@@ -457,11 +509,16 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
   assert.ok(
     plan.corrections.every((correction) => {
       const receipt = plan.receipts[correction.receiptIndex];
-      return receipt?.status === "POSTED" && receipt.linkedPurchaseOrder === undefined;
+      return (
+        receipt?.status === "POSTED" &&
+        receipt.linkedPurchaseOrder === undefined
+      );
     }),
   );
   assert.equal(plan.productionCandidates.length, 45);
   assert.equal(plan.outsourcingCandidates.length, 45);
+  assert.equal(plan.expectedMinimums.shipments, 47);
+  assert.equal(plan.shipmentLineSample.items.length, 25);
   assert.ok(
     plan.outsourcingCandidates.every(
       (candidate) =>
@@ -470,14 +527,21 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
         candidate.return.item.subjectType === "PRODUCT",
     ),
   );
-  assert.ok(MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("purchase_orders"));
-  assert.ok(MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("outsourcing_orders"));
+  assert.ok(
+    MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("purchase_orders"),
+  );
+  assert.ok(
+    MANUAL_ACCEPTANCE_FACT_REQUIRED_MODULES.includes("outsourcing_orders"),
+  );
   assert.deepEqual(
     [...new Set(plan.receipts.map((item) => item.status))].sort(),
     ["CANCELLED", "DRAFT", "POSTED"],
   );
   assert.equal(plan.receipts[9].items[0].materialName, "米白短毛绒");
-  assert.doesNotMatch(JSON.stringify(plan), /【试用】|workflow|generic operational/iu);
+  assert.doesNotMatch(
+    JSON.stringify(plan),
+    /【试用】|workflow|generic operational/iu,
+  );
 });
 
 test("CLI supports mutually exclusive apply/verify and staged execution", () => {
@@ -503,7 +567,11 @@ test("CLI supports mutually exclusive apply/verify and staged execution", () => 
 
 test("strict RPC params follow endpoint allowlists without broad customer injection", () => {
   assert.deepEqual(
-    manualAcceptanceFactRPCParams("production_order", "create_production_order", { order_no: "MO-1" }),
+    manualAcceptanceFactRPCParams(
+      "production_order",
+      "create_production_order",
+      { order_no: "MO-1" },
+    ),
     { order_no: "MO-1" },
   );
   assert.deepEqual(
@@ -514,7 +582,9 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     { id: 1, reason: "本笔取消" },
   );
   assert.deepEqual(
-    manualAcceptanceFactRPCParams("operational_fact", "post_finance_fact", { id: 1 }),
+    manualAcceptanceFactRPCParams("operational_fact", "post_finance_fact", {
+      id: 1,
+    }),
     { customer_key: "yoyoosun", id: 1 },
   );
   for (const method of [
@@ -538,7 +608,10 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
   ]) {
     assert.equal(manualAcceptanceFactRole("purchase", method), "admin");
   }
-  assert.equal(manualAcceptanceFactRole("purchase", "list_purchase_receipts"), "purchase");
+  assert.equal(
+    manualAcceptanceFactRole("purchase", "list_purchase_receipts"),
+    "purchase",
+  );
   assert.equal(
     manualAcceptanceFactRole("production_order", "create_production_order"),
     "admin",
@@ -548,7 +621,10 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     "admin",
   );
   assert.equal(
-    manualAcceptanceFactRole("operational_fact", "create_receivable_from_shipment"),
+    manualAcceptanceFactRole(
+      "operational_fact",
+      "create_receivable_from_shipment",
+    ),
     "admin",
   );
 });
@@ -597,8 +673,14 @@ test("DRAFT quality sample cancels the generated inspection and reuses one repla
   let mutations = 0;
   const rpc = async ({ domain, method, params }) => {
     assert.equal(domain, "quality");
-    if (method === "list_quality_inspections" && params.purchase_receipt_id === 41) {
-      return { quality_inspections: structuredClone(inspections), total: inspections.length };
+    if (
+      method === "list_quality_inspections" &&
+      params.purchase_receipt_id === 41
+    ) {
+      return {
+        quality_inspections: structuredClone(inspections),
+        total: inspections.length,
+      };
     }
     if (method === "list_quality_inspections") {
       return {
@@ -636,12 +718,18 @@ test("DRAFT quality sample cancels the generated inspection and reuses one repla
   const first = await ensureReceiptQualities(rpc, receipt, receiptPlan, {
     anchorDate: "2026-07-15",
   });
-  assert.deepEqual(first.map((item) => item.status).sort(), ["CANCELLED", "DRAFT"]);
+  assert.deepEqual(first.map((item) => item.status).sort(), [
+    "CANCELLED",
+    "DRAFT",
+  ]);
   assert.equal(mutations, 2);
   const second = await ensureReceiptQualities(rpc, receipt, receiptPlan, {
     anchorDate: "2026-07-15",
   });
-  assert.deepEqual(second.map((item) => item.status).sort(), ["CANCELLED", "DRAFT"]);
+  assert.deepEqual(second.map((item) => item.status).sort(), [
+    "CANCELLED",
+    "DRAFT",
+  ]);
   assert.equal(mutations, 2);
 });
 
@@ -673,7 +761,10 @@ test("receipt quality verification reads exact persisted states without mutation
       calls += 1;
       assert.equal(method, "list_quality_inspections");
       assert.equal(params.purchase_receipt_id, 41);
-      return { quality_inspections: structuredClone(inspections), total: inspections.length };
+      return {
+        quality_inspections: structuredClone(inspections),
+        total: inspections.length,
+      };
     },
     receipt,
     {
@@ -720,18 +811,30 @@ test("final inventory readback runs after all facts and rejects truncated pages"
     { id: 1, lot_no: "LOT-1" },
     { id: 2, lot_no: "LOT-2" },
   ]);
-  assert.deepEqual(result.inventoryLots.map((item) => item.id), [2, 1]);
-  assert.deepEqual(result.inventoryBalances.map((item) => item.id), [20, 10]);
-  assert.deepEqual(result.inventoryTxns.map((item) => item.id), [200, 100]);
+  assert.deepEqual(
+    result.inventoryLots.map((item) => item.id),
+    [2, 1],
+  );
+  assert.deepEqual(
+    result.inventoryBalances.map((item) => item.id),
+    [20, 10],
+  );
+  assert.deepEqual(
+    result.inventoryTxns.map((item) => item.id),
+    [200, 100],
+  );
   assert.equal(calls.length, 4);
 
   await assert.rejects(
-    readManualAcceptanceFinalInventoryReferences(async ({ method }) => {
-      if (method === "list_inventory_balances") {
-        return { inventory_balances: [{ id: 10 }], total: 2 };
-      }
-      return { inventory_txns: [], total: 0 };
-    }, [{ id: 1 }]),
+    readManualAcceptanceFinalInventoryReferences(
+      async ({ method }) => {
+        if (method === "list_inventory_balances") {
+          return { inventory_balances: [{ id: 10 }], total: 2 };
+        }
+        return { inventory_txns: [], total: 0 };
+      },
+      [{ id: 1 }],
+    ),
     /balance readback was truncated/u,
   );
 });
@@ -745,7 +848,9 @@ test("partial source-driven phase fails before replay mutation", async () => {
       reuseOrApplyManualAcceptanceFactPhase({
         phase: "production PROD-001",
         apply: true,
-        rpc: async ({ params }) => ({ records: rows.has(params.keyword) ? [rows.get(params.keyword)] : [] }),
+        rpc: async ({ params }) => ({
+          records: rows.has(params.keyword) ? [rows.get(params.keyword)] : [],
+        }),
         specs: ["ONE", "TWO"].map((businessNo) => ({
           domain: "test",
           method: "list",
@@ -790,7 +895,10 @@ test("verified contiguous partial phase resumes and reaches an exact complete re
     allowVerifiedPartialResume: true,
     validatePartialRecords: async (records) => {
       partialValidations += 1;
-      assert.deepEqual(records.map((record) => record.fact_no), ["ONE"]);
+      assert.deepEqual(
+        records.map((record) => record.fact_no),
+        ["ONE"],
+      );
     },
     mutate: async () => {
       mutations += 1;
@@ -805,6 +913,394 @@ test("verified contiguous partial phase resumes and reaches an exact complete re
   assert.equal(partialValidations, 1);
   assert.equal(mutations, 1);
   assert.equal(reads, 1);
+});
+
+function productionResumeFixture() {
+  const report = sourceReport();
+  const candidate =
+    buildManualAcceptanceFactPlan(report).productionCandidates[0];
+  const sourcePlan = buildSourceDrivenFactPlan(report, {
+    instanceKey: "PROD-RESUME",
+    enabledPhases: ["production"],
+    production: {
+      salesOrder: candidate.salesOrder,
+      item: candidate.item,
+      bom: { id: candidate.bom.id, status: candidate.bom.status },
+      plannedQuantity: "3",
+      materialIssues: candidate.bom.items.map((item) => ({
+        materialId: item.materialId,
+        unitId: item.unitId,
+        warehouseId: 301,
+        lotId: 5000,
+        quantity: "3",
+      })),
+      completion: {
+        warehouseId: 302,
+        newLotNo: "YS-V5-CP-RESUME",
+        quantity: "3",
+      },
+    },
+  });
+  const specs = sourceDrivenPhaseIdentitySpecs(sourcePlan, "production");
+  const identity = sourcePlan.identities.production;
+  const source = sourcePlan.phases.production.source;
+  const order = {
+    id: 10_001,
+    order_no: specs[0].businessNo,
+    status: "RELEASED",
+  };
+  const orderItem = {
+    id: 11_001,
+    production_order_id: order.id,
+    line_no: 1,
+    product_id: source.item.productId,
+    product_sku_id: source.item.productSkuId ?? null,
+    unit_id: source.item.unitId,
+    planned_quantity: source.plannedQuantity,
+    sales_order_item_id: source.item.id,
+    bom_header_id: source.bom.id,
+  };
+  const requirements = source.materialIssues.map((item, index) => ({
+    id: 12_001 + index,
+    material_id: item.materialId,
+    unit_id: item.unitId,
+  }));
+  const records = [
+    order,
+    ...source.materialIssues.map((item, index) => ({
+      id: 13_001 + index,
+      fact_no: identity.materialIssues[index].businessNo,
+      status: "POSTED",
+      fact_type: "MATERIAL_ISSUE",
+      subject_type: "MATERIAL",
+      subject_id: item.materialId,
+      warehouse_id: item.warehouseId,
+      unit_id: item.unitId,
+      lot_id: item.lotId,
+      quantity: item.quantity,
+      source_type: "PRODUCTION_ORDER",
+      source_id: order.id,
+      source_line_id: requirements[index].id,
+      idempotency_key: identity.materialIssues[index].idempotencyKey,
+    })),
+    {
+      id: 14_001,
+      fact_no: identity.completion.businessNo,
+      status: "POSTED",
+      fact_type: "FINISHED_GOODS_RECEIPT",
+      subject_type: "PRODUCT",
+      subject_id: source.item.productId,
+      product_sku_id: source.item.productSkuId ?? null,
+      warehouse_id: source.completion.warehouseId,
+      unit_id: source.item.unitId,
+      quantity: source.completion.quantity,
+      source_type: "PRODUCTION_ORDER",
+      source_id: order.id,
+      source_line_id: orderItem.id,
+      idempotency_key: identity.completion.idempotencyKey,
+    },
+  ];
+  return {
+    sourcePlan,
+    specs,
+    records,
+    detail: {
+      production_order_items: [orderItem],
+      production_material_requirements: requirements,
+    },
+  };
+}
+
+function salesResumeFixture() {
+  const report = sourceReport();
+  const candidate =
+    buildManualAcceptanceFactPlan(report).productionCandidates[0];
+  const sourcePlan = buildSourceDrivenFactPlan(report, {
+    instanceKey: "SALE-RESUME",
+    enabledPhases: ["sales"],
+    sales: {
+      order: candidate.salesOrder,
+      item: candidate.item,
+      inventory: { warehouseId: 302, lotId: 13_000, quantity: "1" },
+    },
+  });
+  const specs = sourceDrivenPhaseIdentitySpecs(sourcePlan, "sales");
+  const identity = sourcePlan.identities.sales;
+  const source = sourcePlan.phases.sales.source;
+  const reservation = {
+    id: 20_001,
+    reservation_no: identity.reservation.businessNo,
+    status: "ACTIVE",
+    sales_order_id: source.order.id,
+    sales_order_item_id: source.item.id,
+    product_id: source.item.productId,
+    product_sku_id: source.item.productSkuId ?? null,
+    warehouse_id: source.inventory.warehouseId,
+    unit_id: source.item.unitId,
+    lot_id: source.inventory.lotId,
+    quantity: source.inventory.quantity,
+    idempotency_key: identity.reservation.idempotencyKey,
+  };
+  const shipment = {
+    id: 20_002,
+    shipment_no: identity.shipment.businessNo,
+    status: "SHIPPED",
+    sales_order_id: source.order.id,
+    customer_id: source.order.customerId,
+    customer_snapshot: source.order.customerSnapshot,
+    idempotency_key: identity.shipment.idempotencyKey,
+    items: [
+      {
+        sales_order_item_id: source.item.id,
+        product_id: source.item.productId,
+        product_sku_id: source.item.productSkuId ?? null,
+        warehouse_id: source.inventory.warehouseId,
+        unit_id: source.item.unitId,
+        lot_id: source.inventory.lotId,
+        quantity: source.inventory.quantity,
+      },
+    ],
+  };
+  const receivable = {
+    id: 20_003,
+    fact_no: identity.receivable.businessNo,
+    status: "POSTED",
+    fact_type: "RECEIVABLE",
+    source_type: "SHIPMENT",
+    source_id: shipment.id,
+    idempotency_key: identity.receivable.idempotencyKey,
+  };
+  const receivableReconciliation = {
+    id: 20_004,
+    fact_no: identity.receivableReconciliation.businessNo,
+    status: "POSTED",
+    fact_type: "RECONCILIATION",
+    source_type: "FINANCE_FACT",
+    source_id: receivable.id,
+    idempotency_key: identity.receivableReconciliation.idempotencyKey,
+  };
+  const invoice = {
+    id: 20_005,
+    fact_no: identity.invoice.businessNo,
+    status: "POSTED",
+    fact_type: "INVOICE",
+    source_type: "SHIPMENT",
+    source_id: shipment.id,
+    idempotency_key: identity.invoice.idempotencyKey,
+  };
+  const invoiceReconciliation = {
+    id: 20_006,
+    fact_no: identity.invoiceReconciliation.businessNo,
+    status: "POSTED",
+    fact_type: "RECONCILIATION",
+    source_type: "FINANCE_FACT",
+    source_id: invoice.id,
+    idempotency_key: identity.invoiceReconciliation.idempotencyKey,
+  };
+  return {
+    sourcePlan,
+    specs,
+    records: [
+      reservation,
+      shipment,
+      receivable,
+      receivableReconciliation,
+      invoice,
+      invoiceReconciliation,
+    ],
+  };
+}
+
+function phaseLookupRPC(specs, rows, productionDetail) {
+  return async ({ method, params }) => {
+    if (method === "get_production_order") return productionDetail;
+    const spec = specs.find((item) => item.businessNo === params.keyword);
+    if (!spec) throw new Error(`unexpected phase lookup ${method}`);
+    const record = rows.get(spec.businessNo);
+    return { [spec.listKey]: record ? [structuredClone(record)] : [] };
+  };
+}
+
+test("verified production and sales prefixes resume and reach exact complete readback", async () => {
+  const production = productionResumeFixture();
+  const productionRows = new Map(
+    production.records
+      .slice(0, 2)
+      .map((record, index) => [production.specs[index].businessNo, record]),
+  );
+  let productionMutations = 0;
+  const productionResult = await reuseOrApplyManualAcceptanceFactPhase({
+    phase: "production PROD-RESUME",
+    apply: true,
+    specs: production.specs,
+    rpc: phaseLookupRPC(production.specs, productionRows, production.detail),
+    allowVerifiedPartialResume: true,
+    validatePartialRecords: (records) =>
+      validateProductionPhasePartialRecords(
+        phaseLookupRPC(production.specs, productionRows, production.detail),
+        production.sourcePlan,
+        records,
+      ),
+    validateRecords: (records) =>
+      validateProductionPhasePartialRecords(
+        phaseLookupRPC(production.specs, productionRows, production.detail),
+        production.sourcePlan,
+        records,
+      ),
+    mutate: async () => {
+      productionMutations += 1;
+      production.records.slice(2).forEach((record, index) => {
+        productionRows.set(production.specs[index + 2].businessNo, record);
+      });
+    },
+    readComplete: async () => ({ phase: "production", complete: true }),
+  });
+  assert.deepEqual(productionResult, {
+    phase: "production",
+    complete: true,
+  });
+  assert.equal(productionMutations, 1);
+
+  const sales = salesResumeFixture();
+  const salesRows = new Map(
+    sales.records
+      .slice(0, 3)
+      .map((record, index) => [sales.specs[index].businessNo, record]),
+  );
+  let salesMutations = 0;
+  const salesResult = await reuseOrApplyManualAcceptanceFactPhase({
+    phase: "sales SALE-RESUME",
+    apply: true,
+    specs: sales.specs,
+    rpc: phaseLookupRPC(sales.specs, salesRows),
+    allowVerifiedPartialResume: true,
+    validatePartialRecords: (records) =>
+      validateSalesPhasePartialRecords(sales.sourcePlan, records),
+    validateRecords: (records) =>
+      validateSalesPhaseRecords(sales.sourcePlan, records),
+    mutate: async () => {
+      salesMutations += 1;
+      sales.records.slice(3).forEach((record, index) => {
+        salesRows.set(sales.specs[index + 3].businessNo, record);
+      });
+    },
+    readComplete: async () => ({ phase: "sales", complete: true }),
+  });
+  assert.deepEqual(salesResult, { phase: "sales", complete: true });
+  assert.equal(salesMutations, 1);
+});
+
+test("partial replay rejects gaps, status or source drift, and records beyond the plan", async () => {
+  const sales = salesResumeFixture();
+  let mutations = 0;
+  const gapRows = new Map([
+    [sales.specs[0].businessNo, sales.records[0]],
+    [sales.specs[2].businessNo, sales.records[2]],
+  ]);
+  await assert.rejects(
+    () =>
+      reuseOrApplyManualAcceptanceFactPhase({
+        phase: "sales SALE-GAP",
+        apply: true,
+        specs: sales.specs,
+        rpc: phaseLookupRPC(sales.specs, gapRows),
+        allowVerifiedPartialResume: true,
+        validatePartialRecords: (records) =>
+          validateSalesPhasePartialRecords(sales.sourcePlan, records),
+        mutate: async () => {
+          mutations += 1;
+        },
+        readComplete: async () => ({ complete: true }),
+      }),
+    /non-contiguous/u,
+  );
+
+  const statusRows = new Map([
+    [sales.specs[0].businessNo, { ...sales.records[0], status: "CANCELLED" }],
+  ]);
+  await assert.rejects(
+    () =>
+      reuseOrApplyManualAcceptanceFactPhase({
+        phase: "sales SALE-STATUS",
+        apply: true,
+        specs: sales.specs,
+        rpc: phaseLookupRPC(sales.specs, statusRows),
+        allowVerifiedPartialResume: true,
+        validatePartialRecords: (records) =>
+          validateSalesPhasePartialRecords(sales.sourcePlan, records),
+        mutate: async () => {
+          mutations += 1;
+        },
+        readComplete: async () => ({ complete: true }),
+      }),
+    /conflicting status CANCELLED/u,
+  );
+
+  const sourceRows = new Map([
+    [
+      sales.specs[0].businessNo,
+      {
+        ...sales.records[0],
+        sales_order_id: sales.records[0].sales_order_id + 1,
+      },
+    ],
+  ]);
+  await assert.rejects(
+    () =>
+      reuseOrApplyManualAcceptanceFactPhase({
+        phase: "sales SALE-SOURCE",
+        apply: true,
+        specs: sales.specs,
+        rpc: phaseLookupRPC(sales.specs, sourceRows),
+        allowVerifiedPartialResume: true,
+        validatePartialRecords: (records) =>
+          validateSalesPhasePartialRecords(sales.sourcePlan, records),
+        mutate: async () => {
+          mutations += 1;
+        },
+        readComplete: async () => ({ complete: true }),
+      }),
+    /conflicting sales_order_id/u,
+  );
+  assert.throws(
+    () =>
+      validateSalesPhasePartialRecords(sales.sourcePlan, [
+        ...sales.records,
+        { id: 99_999 },
+      ]),
+    /1-6 record prefix/u,
+  );
+
+  const production = productionResumeFixture();
+  const productionRows = new Map([
+    [production.specs[0].businessNo, production.records[0]],
+    [
+      production.specs[1].businessNo,
+      {
+        ...production.records[1],
+        source_id: production.records[1].source_id + 1,
+      },
+    ],
+  ]);
+  await assert.rejects(
+    () =>
+      validateProductionPhasePartialRecords(
+        phaseLookupRPC(production.specs, productionRows, production.detail),
+        production.sourcePlan,
+        [...productionRows.values()],
+      ),
+    /conflicting source_id/u,
+  );
+  await assert.rejects(
+    () =>
+      validateProductionPhasePartialRecords(
+        phaseLookupRPC(production.specs, productionRows, production.detail),
+        production.sourcePlan,
+        [...production.records, { id: 99_998 }],
+      ),
+    /record prefix/u,
+  );
+  assert.equal(mutations, 0);
 });
 
 test("verified partial resume still rejects semantic drift before mutation", async () => {
@@ -861,7 +1357,9 @@ test("same-number semantic collision fails before replay mutation", async () => 
           },
         ],
         rpc: async () => ({
-          stock_reservations: [{ id: 1, reservation_no: "RSV-SAME", status: "ACTIVE" }],
+          stock_reservations: [
+            { id: 1, reservation_no: "RSV-SAME", status: "ACTIVE" },
+          ],
         }),
         mutate: async () => {
           mutations += 1;
@@ -881,7 +1379,8 @@ test("same-number semantic collision fails before replay mutation", async () => 
 
 test("sales phase semantic validator rejects an exact number bound to the wrong source", () => {
   const report = sourceReport();
-  const candidate = buildManualAcceptanceFactPlan(report).productionCandidates[0];
+  const candidate =
+    buildManualAcceptanceFactPlan(report).productionCandidates[0];
   const sourcePlan = buildSourceDrivenFactPlan(report, {
     instanceKey: "SALE-SEMANTIC",
     enabledPhases: ["sales"],
@@ -1174,7 +1673,11 @@ test("finance lifecycle uses stable business numbers and second apply is a no-op
   assert.equal(mutations, firstMutationCount);
   assert.equal(creations, firstCreationCount);
   assert.deepEqual(
-    [...records.values()].map(({ id, fact_no, status }) => ({ id, fact_no, status })),
+    [...records.values()].map(({ id, fact_no, status }) => ({
+      id,
+      fact_no,
+      status,
+    })),
     firstStates,
   );
   assert.deepEqual(
@@ -1199,6 +1702,7 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
   const report = sourceReport();
   const plan = buildManualAcceptanceFactPlan(report);
   const result = await applyManualAcceptanceFactPlan(plan, report, {
+    ...localMutationGuards(report),
     confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
     executionContext: { rpc: async () => ({}), runtime },
     purchaseStage: async () => purchaseStage(),
@@ -1239,6 +1743,7 @@ test("runtime revision drift fails before purchase or fact mutation", async () =
   await assert.rejects(
     () =>
       applyManualAcceptanceFactPlan(plan, report, {
+        ...localMutationGuards(report),
         confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
         executionContext: {
           rpc: async () => ({}),
@@ -1283,6 +1788,7 @@ test("facts-only apply verifies the purchase prerequisite without rewriting it",
   let purchaseWrites = 0;
   let purchaseVerifies = 0;
   await applyManualAcceptanceFactPlan(plan, report, {
+    ...localMutationGuards(report),
     phase: "facts",
     confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
     executionContext: { rpc: async () => ({}), runtime },
@@ -1324,7 +1830,10 @@ function runtimeIdentityResponse() {
     ok: true,
     status: 200,
     redirected: false,
-    headers: { get: (name) => (name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null) },
+    headers: {
+      get: (name) =>
+        name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+    },
     async text() {
       return "runtime identity matched";
     },
@@ -1361,8 +1870,7 @@ test("remote apply rejects missing target confirmation and attestation before ex
     /external apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
   );
   assert.equal(executionCalls, 0);
-  const targetConfirmation =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v3:20260715-V3";
+  const targetConfirmation = `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:${DATA_VERSION}:${RUN_ID}`;
   await assert.rejects(
     () =>
       applyManualAcceptanceFactPlan(plan, report, {
@@ -1389,8 +1897,7 @@ test("remote runtime release drift fails before any fact stage", async () => {
     () =>
       applyManualAcceptanceFactPlan(plan, report, {
         confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
-        targetConfirmation:
-          "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v3:20260715-V3",
+        targetConfirmation: `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:${DATA_VERSION}:${RUN_ID}`,
         targetAttestation: attestation(),
         executionContext: {
           rpc: async () => ({}),
@@ -1439,6 +1946,7 @@ test("local apply forbids remote attestation before any stage runs", async () =>
   await assert.rejects(
     () =>
       applyManualAcceptanceFactPlan(plan, report, {
+        ...localMutationGuards(report),
         confirmPhrase: MANUAL_ACCEPTANCE_FACT_CONFIRM_PHRASE,
         targetAttestation: attestation(),
         executionContext: { rpc: async () => ({}), runtime },
@@ -1457,8 +1965,14 @@ test("source contains no direct SQL or retired generic writer import", async () 
     new URL("./manual-acceptance-fact-data.mjs", import.meta.url),
     "utf8",
   );
-  assert.doesNotMatch(source, /operational-fact-simulated-closure|purchase-quality-simulated-matrix/u);
-  assert.doesNotMatch(source, /\b(?:SELECT|INSERT|UPDATE|DELETE)\s+(?:FROM|INTO|SET)\b/iu);
+  assert.doesNotMatch(
+    source,
+    /operational-fact-simulated-closure|purchase-quality-simulated-matrix/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /\b(?:SELECT|INSERT|UPDATE|DELETE)\s+(?:FROM|INTO|SET)\b/iu,
+  );
   assert.match(source, /applySourceDrivenFactPlan/u);
   assert.match(source, /assertManualAcceptanceTargetAttestation/u);
 });

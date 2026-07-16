@@ -14,8 +14,8 @@ import {
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
 
-export const SOURCE_DRIVEN_FACT_DATA_VERSION = "2026.07.15-v3";
-export const SOURCE_DRIVEN_FACT_RUN_ID = "20260715-V3";
+export const SOURCE_DRIVEN_FACT_DATA_VERSION = "2026.07.16-v5";
+export const SOURCE_DRIVEN_FACT_RUN_ID = "20260716-V5";
 
 const CUSTOMER_KEY = "yoyoosun";
 const SIMULATED_NOTE = "按订单办理。";
@@ -789,6 +789,7 @@ function validateSourceReport(report) {
     datasetKey: report.datasetKey,
     dataVersion: report.dataVersion,
     runId: report.runId,
+    databaseName: report.databaseName,
   });
   return { report, policy };
 }
@@ -949,6 +950,7 @@ export function buildSourceDrivenFactPlan(sourceReport, options = {}) {
         : requiredText(options.lifecycleProfile, "lifecycleProfile", 32),
     target: policy.target,
     backendURL: policy.backendURL,
+    databaseName: policy.databaseName,
     phases,
     identities: buildIdentities(identity, phases),
     blocked,
@@ -1701,6 +1703,7 @@ export async function applySourceDrivenFactPlan(
     datasetKey: plan.datasetKey,
     dataVersion: plan.dataVersion,
     runId: plan.runId,
+    databaseName: plan.databaseName,
   };
   const mutationTarget = assertManualAcceptanceMutationTarget(policy, {
     confirmation: targetConfirmation,

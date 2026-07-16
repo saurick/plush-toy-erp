@@ -15,7 +15,7 @@ func TestNewDebugSafetyConfigFromEnv_UsesEffectiveConfigDatabaseNameWithoutCrede
 	)
 	config := newDebugSafetyConfigFromEnv(&conf.Data{
 		Postgres: &conf.Data_Postgres{
-			Dsn: "postgresql://effective_user:" + effectivePassword + "@192.168.0.133:5435/plush_erp_uat_20260715?sslmode=disable",
+			Dsn: "postgresql://effective_user:" + effectivePassword + "@192.168.0.133:5435/plush_erp_uat_20260716_v5?sslmode=disable",
 		},
 	}, func(key string) string {
 		if key == "POSTGRES_DSN" {
@@ -24,7 +24,7 @@ func TestNewDebugSafetyConfigFromEnv_UsesEffectiveConfigDatabaseNameWithoutCrede
 		return ""
 	})
 
-	if config.DatabaseName != "plush_erp_uat_20260715" {
+	if config.DatabaseName != "plush_erp_uat_20260716_v5" {
 		t.Fatalf("database name = %q, want effective config database", config.DatabaseName)
 	}
 	exposed := fmt.Sprintf("%#v", config)

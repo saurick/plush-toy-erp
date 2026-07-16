@@ -8,11 +8,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
     faviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun.svg",
   }),
   desktopMenu: Object.freeze({
-    hiddenItemKeys: Object.freeze([
-      "business-dashboard",
-      "shipping-release",
-      "exception-flow",
-    ]),
+    hiddenItemKeys: Object.freeze([]),
     sections: Object.freeze([
       Object.freeze({
         title: "看板中心",

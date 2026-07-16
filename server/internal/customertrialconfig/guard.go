@@ -18,9 +18,10 @@ const (
 
 	ProductVersion = biz.CustomerConfigTrialProductVersion
 	ApplyPurpose   = biz.CustomerConfigTrialApplyPurpose
-	DatasetVersion = "2026.07.15-v3"
+	DatasetVersion = biz.CustomerConfigTrialDatasetVersion
+	Revision       = "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1"
 
-	expectedDatabase = "plush_erp_uat_20260715"
+	expectedDatabase = "plush_erp_uat_20260716_v5"
 	expectedHost     = "postgres"
 	expectedPort     = "5432"
 )
@@ -55,17 +56,22 @@ func ResolveGate(dsn string, getenv func(string) string) (bool, error) {
 
 // ClassifyManifest reserves the trial marker fields as one atomic identity.
 // A payload carrying any reserved marker must carry every exact marker value.
-func ClassifyManifest(productVersion string, compiledSnapshot map[string]any) (bool, error) {
+func ClassifyManifest(customerKey, revision, productVersion string, compiledSnapshot map[string]any) (bool, error) {
+	customerKey = strings.TrimSpace(customerKey)
+	revision = strings.TrimSpace(revision)
 	productVersion = strings.TrimSpace(productVersion)
 	applyPurpose, _ := compiledSnapshot["applyPurpose"].(string)
 	target, _ := compiledSnapshot["target"].(string)
-	candidate := strings.HasPrefix(productVersion, "customer-trial-") ||
+	candidate := strings.HasPrefix(revision, "yoyoosun-customer-trial-") ||
+		strings.HasPrefix(productVersion, "customer-trial-") ||
 		strings.HasPrefix(strings.TrimSpace(applyPurpose), "customer_trial_") ||
 		strings.HasPrefix(strings.TrimSpace(target), "customer-trial-")
 	if !candidate {
 		return false, nil
 	}
-	if productVersion != ProductVersion ||
+	if customerKey != ExpectedCustomerKey ||
+		revision != Revision ||
+		productVersion != ProductVersion ||
 		!exactSnapshotString(compiledSnapshot, "applyPurpose", ApplyPurpose) ||
 		!exactSnapshotString(compiledSnapshot, "datasetVersion", DatasetVersion) ||
 		!exactSnapshotString(compiledSnapshot, "target", ExpectedTarget) {
@@ -76,13 +82,16 @@ func ClassifyManifest(productVersion string, compiledSnapshot map[string]any) (b
 
 // ClassifyProductVersion applies the transition-operation subset of the
 // marker contract. Transition CAS still verifies the stored product version.
-func ClassifyProductVersion(productVersion string) (bool, error) {
+func ClassifyRevisionProductVersion(customerKey, revision, productVersion string) (bool, error) {
+	customerKey = strings.TrimSpace(customerKey)
+	revision = strings.TrimSpace(revision)
 	productVersion = strings.TrimSpace(productVersion)
-	if !strings.HasPrefix(productVersion, "customer-trial-") {
+	if !strings.HasPrefix(revision, "yoyoosun-customer-trial-") &&
+		!strings.HasPrefix(productVersion, "customer-trial-") {
 		return false, nil
 	}
-	if productVersion != ProductVersion {
-		return false, fmt.Errorf("customer trial config product version is invalid")
+	if customerKey != ExpectedCustomerKey || revision != Revision || productVersion != ProductVersion {
+		return false, fmt.Errorf("customer trial config revision or product version is invalid")
 	}
 	return true, nil
 }

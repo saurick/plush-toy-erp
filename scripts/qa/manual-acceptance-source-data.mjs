@@ -21,12 +21,12 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/source-data";
 const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const CUSTOMER_KEY = "yoyoosun";
-export const MANUAL_ACCEPTANCE_CORE_UNIT_CODE = "SIM-PLUSH-CORE-PCS";
+export const MANUAL_ACCEPTANCE_CORE_UNIT_CODE = "YS5-DW-01";
 export const MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES = Object.freeze({
-  material: "SIM-PLUSH-CORE-RM-WH",
-  product: "SIM-PLUSH-CORE-FG-WH",
-  qualityHold: "SIM-PLUSH-CORE-QC-HOLD",
-  workInProcess: "SIM-PLUSH-CORE-WIP-WH",
+  material: "YS5-CK-01",
+  product: "YS5-CK-02",
+  qualityHold: "YS5-CK-03",
+  workInProcess: "YS5-CK-04",
 });
 const REQUIRED_SOURCE_MODULES = Object.freeze([
   "customers",
@@ -175,6 +175,12 @@ function sourceSemanticDigest({ datasetKey, dataVersion, runId, prefix, records 
     .digest("hex");
 }
 
+export function manualAcceptanceVisibleSourcePrefix(dataVersion) {
+  const version = String(dataVersion || "").trim();
+  const match = version.match(/(?:^|[-._])v(\d+)$/iu);
+  return match ? `YS${Number(match[1])}` : "YS-CS";
+}
+
 function pad(value, width = 2) {
   return String(value).padStart(width, "0");
 }
@@ -221,7 +227,7 @@ function buildCustomers(prefix, count) {
     const index = offset + 1;
     const name = `${places[offset % places.length]}${names[Math.floor(offset / places.length) % names.length]}`;
     return {
-      code: `${prefix}-CUST-${pad(index, 3)}`,
+      code: `${prefix}-KH-${pad(index, 3)}`,
       name,
       short_name: name.replace(/^(东莞|深圳|广州|佛山|惠州|中山|珠海|厦门|杭州|苏州|宁波|成都)/u, ""),
       default_payment_method: index % 3 === 0 ? "月结" : "银行转账",
@@ -282,7 +288,7 @@ function buildSuppliers(prefix, count) {
     const [label, supplierType] = categories[offset % categories.length];
     const name = `${shortNames[Math.floor(offset / categories.length) % shortNames.length]}${label}`;
     return {
-      code: `${prefix}-SUP-${pad(index, 3)}`,
+      code: `${prefix}-GYS-${pad(index, 3)}`,
       name,
       short_name: name,
       supplier_type: supplierType,
@@ -339,7 +345,7 @@ function buildMaterials(prefix, count) {
             group - 2
           ] || `色号${group}`;
     return {
-      code: `${prefix}-MAT-${pad(index, 3)}`,
+      code: `${prefix}-WL-${pad(index, 3)}`,
       name: `${displayColor}${label}`,
       category,
       spec,
@@ -377,13 +383,13 @@ function buildProducts(prefix, count, skusPerProduct) {
   return Array.from({ length: count }, (_, offset) => {
     const index = offset + 1;
     const product = {
-      code: `${prefix}-PROD-${pad(index, 3)}`,
+      code: `${prefix}-CP-${pad(index, 3)}`,
       name: animals[offset % animals.length],
       style_no: `${27000 + index}${index % 4 === 0 ? "-1" : "#"}`,
       isActive: index <= count - 2,
     };
     product.skus = Array.from({ length: skusPerProduct }, (_, skuOffset) => ({
-      sku_code: `${prefix}-SKU-${pad(index, 3)}-${pad(skuOffset + 1)}`,
+      sku_code: `${prefix}-GG-${pad(index, 3)}-${pad(skuOffset + 1)}`,
       sku_name: `${colors[skuOffset % colors.length]}·${sizes[skuOffset % sizes.length]}`,
       customer_sku: `${product.style_no}-${colors[skuOffset % colors.length]}-${sizes[skuOffset % sizes.length]}`,
       color: colors[skuOffset % colors.length],
@@ -433,7 +439,7 @@ function buildProcesses(prefix, count) {
     const index = offset + 1;
     const name = names[offset % names.length];
     return {
-      code: `${prefix}-PROC-${pad(index, 3)}`,
+      code: `${prefix}-GX-${pad(index, 3)}`,
       name,
       category: name,
       outsourcing_enabled: !["检针", "成品抽检", "重量检查", "尺寸检查", "外观检查"].includes(name),
@@ -484,7 +490,7 @@ function buildSalesOrders(prefix, count, customers, products, anchorDate) {
       },
     );
     return {
-      order_no: `${prefix}-SO-${pad(index, 3)}`,
+      order_no: `${prefix}-XD-${pad(index, 3)}`,
       customerRef: customer.code,
       customer_order_no: `${["MY", "SY", "XC", "TM", "QK"][offset % 5]}${anchorDate.slice(2, 7).replace("-", "")}${pad(index, 3)}`,
       customer_snapshot: { name: customer.name, simulated_only: true },
@@ -559,7 +565,7 @@ function buildPurchaseOrders(
       },
     );
     return {
-      purchase_order_no: `${prefix}-PO-${pad(index, 3)}`,
+      purchase_order_no: `${prefix}-CG-${pad(index, 3)}`,
       supplierRef: supplier.code,
       supplier_purchase_order_no: `CG${anchorDate.slice(2, 7).replace("-", "")}${pad(index, 3)}`,
       supplier_snapshot: { name: supplier.name, simulated_only: true },
@@ -643,7 +649,7 @@ function buildOutsourcingOrders(
       },
     );
     return {
-      outsourcing_order_no: `${prefix}-OS-${pad(index, 3)}`,
+      outsourcing_order_no: `${prefix}-WW-${pad(index, 3)}`,
       supplierRef: supplier.code,
       supplier_snapshot: { name: supplier.name, simulated_only: true },
       contract_party_snapshot: {
@@ -708,7 +714,7 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
       versions.push({
         productRef: product.code,
         version: `${prefix}-BOM-${pad(productOffset + 1, 3)}-${statusOffset + 1}`,
-        source_order_no: `${prefix}-SO-${pad(productOffset + 1, 3)}`,
+        source_order_no: `${prefix}-XD-${pad(productOffset + 1, 3)}`,
         quantity_text: String(500 + productOffset * 50),
         spare_text: productOffset % 2 === 0 ? "含 3% 备品" : "按订单数量备料",
         print_date: isoDate(-productOffset, anchorDate),
@@ -756,6 +762,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     target: options.target,
     dataVersion: options.dataVersion,
     runId,
+    databaseName: options.databaseName,
   });
   const backendURL = targetPolicy.backendURL;
   const scale = {
@@ -789,7 +796,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
       "scale.products must cover every three-version BOM product group",
     );
   }
-  const prefix = `${SIMULATION_PREFIX}-${runId}`;
+  const prefix = manualAcceptanceVisibleSourcePrefix(targetPolicy.dataVersion);
   const anchorDate = sourceDataAnchorDate(
     targetPolicy.dataVersion,
     options.anchorDate,
@@ -855,6 +862,7 @@ export function buildManualAcceptanceSourceDataPlan(options = {}) {
     prefix,
     anchorDate,
     backendURL,
+    databaseName: targetPolicy.databaseName,
     scale,
     records,
     semanticDigest: sourceSemanticDigest({
@@ -885,6 +893,7 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
     backendURL:
       process.env.MANUAL_ACCEPTANCE_BACKEND_URL || DEFAULT_BACKEND_URL,
     target: process.env.MANUAL_ACCEPTANCE_TARGET,
+    databaseName: process.env.MANUAL_ACCEPTANCE_DATABASE_NAME,
     dataVersion: process.env.MANUAL_ACCEPTANCE_DATA_VERSION,
     out: DEFAULT_OUT_DIR,
     runId: process.env.MANUAL_ACCEPTANCE_RUN_ID || timestampRunId(),
@@ -924,6 +933,9 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
         break;
       case "data-version":
         options.dataVersion = value;
+        break;
+      case "database-name":
+        options.databaseName = value;
         break;
       case "out":
         options.out = value;
@@ -971,10 +983,12 @@ export function parseManualAcceptanceSourceDataArgs(argv) {
     target: options.target,
     dataVersion: options.dataVersion,
     runId: options.runId,
+    databaseName: options.databaseName,
   });
   options.backendURL = targetPolicy.backendURL;
   options.target = targetPolicy.target;
   options.dataVersion = targetPolicy.dataVersion;
+  options.databaseName = targetPolicy.databaseName;
   if (options.apply && options.verify)
     throw new CliError("--apply and --verify are separate modes", 2);
   return options;
@@ -2905,7 +2919,7 @@ export async function applyManualAcceptanceSourceData(
     fetchImpl = fetch,
   } = {},
 ) {
-  const mutationTarget = assertManualAcceptanceMutationTarget(plan, {
+  assertManualAcceptanceMutationTarget(plan, {
     confirmation: targetConfirmation,
   });
   const parsedTargetAttestation =
@@ -2933,13 +2947,11 @@ export async function applyManualAcceptanceSourceData(
     adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
-  if (mutationTarget.external) {
-    await assertManualAcceptanceRuntimeIdentityPrecondition({
-      policy: plan,
-      attestation: parsedTargetAttestation,
-      fetchImpl,
-    });
-  }
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: plan,
+    attestation: parsedTargetAttestation,
+    fetchImpl,
+  });
   const tokens = await loginRoles({
     backendURL: plan.backendURL,
     password: effectivePassword,
@@ -2958,6 +2970,7 @@ export async function applyManualAcceptanceSourceData(
     anchorDate: plan.anchorDate,
     semanticDigest: plan.semanticDigest,
     backendURL: plan.backendURL,
+    databaseName: plan.databaseName,
     scale: plan.scale,
     simulatedOnly: true,
     realCustomerImport: false,
@@ -3409,6 +3422,8 @@ export async function verifyManualAcceptanceSourceData(
     prefix: plan.prefix,
     anchorDate: plan.anchorDate,
     semanticDigest: plan.semanticDigest,
+    backendURL: plan.backendURL,
+    databaseName: plan.databaseName,
     simulatedOnly: true,
     realCustomerImport: false,
     runtime,
@@ -3468,13 +3483,20 @@ function usage() {
 
 写入本地开发环境：
   MANUAL_ACCEPTANCE_SIM_CONFIRM=${CONFIRM_PHRASE} \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
-    node scripts/qa/manual-acceptance-source-data.mjs --apply --run-id LOCAL-UAT
+    node scripts/qa/manual-acceptance-source-data.mjs --apply \\
+      --target local-dev \\
+      --backend-url http://127.0.0.1:8310 \\
+      --database-name plush_erp_acceptance_20260716_v5_dev \\
+      --data-version 2026.07.16-v5 \\
+      --run-id 20260716-V5 \\
+      --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source
 
 写入已登记的 133 客户试用环境还必须显式提供：
   --target customer-trial-133 --backend-url http://127.0.0.1:18375 \\
-  --data-version 2026.07.15-v3 --run-id 20260715-V3
+  --data-version 2026.07.16-v5 --run-id 20260716-V5
 并设置绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 以及包含精确 origin/customer/release/migration/debug 开关的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
@@ -3482,7 +3504,12 @@ MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
 写后核验：
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
-    node scripts/qa/manual-acceptance-source-data.mjs --verify --run-id LOCAL-UAT
+    node scripts/qa/manual-acceptance-source-data.mjs --verify \\
+      --target local-dev \\
+      --backend-url http://127.0.0.1:8310 \\
+      --database-name plush_erp_acceptance_20260716_v5_dev \\
+      --data-version 2026.07.16-v5 \\
+      --run-id 20260716-V5
 
 默认生成：60 客户、60 供应商、80 材料、20 产品/60 规格、30 加工环节、
 45 销售订单、45 采购订单、45 委外订单、45 BOM 版本。

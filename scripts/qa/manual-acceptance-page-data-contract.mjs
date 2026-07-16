@@ -1,8 +1,8 @@
 import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
 
 export const MANUAL_ACCEPTANCE_PAGE_DATA_CONTRACT =
-  "manual-acceptance-page-data-ownership-v1";
-export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 48;
+  "manual-acceptance-page-data-ownership-v2";
+export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 51;
 
 export const MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS = Object.freeze([
   "role",
@@ -77,6 +77,7 @@ const PRINT_SUPPORT_DATASET = Object.freeze({
 
 export const MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS = Object.freeze({
   validAccountLogins: "valid-account-logins",
+  bossDashboardActiveTasks: "boss-dashboard-active-tasks",
   mobileTaskTotal: "mobile-task-total",
   catalogPrintTemplates: "catalog-print-templates",
 });
@@ -111,8 +112,15 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "audit-events": "role",
   "valid-account-logins": "role",
   "boss-dashboard-tasks": "task",
+  "boss-dashboard-active-tasks": "task",
   "mobile-task-total": "task",
   "catalog-print-templates": "catalog",
+});
+
+const WORKFLOW_TASK_GROUP_PROBES = Object.freeze({
+  "production-scheduling": "workflow-tasks:production_scheduling",
+  "production-exceptions": "workflow-tasks:production_exception",
+  "shipping-release": "workflow-tasks:shipment_release",
 });
 
 const FORBIDDEN_TARGET_ENTRYPOINT_KEY =
@@ -172,6 +180,13 @@ function generatorStageForProbe(probeId, mobileRoleKeys) {
     );
     return "task";
   }
+  const workflowPrefix = "workflow-tasks:";
+  if (
+    probeId.startsWith(workflowPrefix) &&
+    Object.values(WORKFLOW_TASK_GROUP_PROBES).includes(probeId)
+  ) {
+    return "task";
+  }
   throw new ManualAcceptancePageDataContractError(
     `数据核验 probe ${probeId} 没有共享生成阶段`,
   );
@@ -211,30 +226,75 @@ function targetEvidence(item) {
         "业务来源记录可以核对，但纸面明细行数、分页和编辑恢复不能由清单查询证明。",
     };
   }
-  if (item.key === "global-dashboard" || item.key === "task-board") {
+  if (item.key === "global-dashboard") {
+    return {
+      probeIds: [MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.bossDashboardActiveTasks],
+      actualProbeId:
+        MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.bossDashboardActiveTasks,
+      browserRequired: true,
+      reason:
+        "工作台只显示老板账号当前可见且未结束的本批事项；不把九岗位合计或已办任务冒充首页可见数量，卡片跳转和页面显示仍需页面确认。",
+    };
+  }
+  if (item.key === "task-board") {
     return {
       probeIds: [
         MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.mobileTaskTotal,
         "boss-dashboard-tasks",
       ],
-      actualProbeId: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.mobileTaskTotal,
+      actualProbeId: "boss-dashboard-tasks",
       browserRequired: true,
       reason:
-        "九个岗位合计数量与老板账号实际可见任务分别核对；不把跨岗位总数冒充老板可见数量，卡片跳转和页面显示仍需页面确认。",
+        "九个岗位合计数量与老板账号实际可见任务分别核对；页面数量只采用当前老板账号的本批任务，不把跨岗位总数冒充页面可见数量。",
     };
   }
-  const workflowRoleByPage = {
-    "production-scheduling": "pmc",
-    "production-exceptions": "production",
-  };
-  const workflowRoleKey = workflowRoleByPage[item.key];
-  if (workflowRoleKey) {
+  if (item.key === "business-dashboard") {
     return {
-      probeIds: [`mobile-tasks:${workflowRoleKey}`],
-      actualProbeId: `mobile-tasks:${workflowRoleKey}`,
+      probeIds: [
+        "customers",
+        "suppliers",
+        "product-skus",
+        "bom-versions",
+        "sales-orders",
+        "purchase-orders",
+        "purchase-receipts",
+        "quality-inspections",
+        "inventory-balances",
+        "workflow-tasks:shipment_release",
+        "shipments",
+        "production-orders",
+        "workflow-tasks:production_scheduling",
+        "production-facts",
+        "workflow-tasks:production_exception",
+        "outsourcing-orders",
+        "finance-reconciliation",
+        "finance-payables",
+        "finance-receivables",
+        "finance-invoices",
+      ],
+      combine: "minimum",
       browserRequired: true,
       reason:
-        "本批岗位任务数量和状态可核对；排程或异常页面的筛选、详情和处理动作仍需页面确认。",
+        "基础资料、业务单据、办理结果和当前待办分别按共享批次核对；页面四类数字与跳转仍需页面确认。",
+    };
+  }
+  if (item.key === "exception-flow") {
+    return {
+      probeIds: ["workflow-tasks:production_exception"],
+      actualProbeId: "workflow-tasks:production_exception",
+      browserRequired: true,
+      reason:
+        "当前账号可见任务的阻塞、今日或超时和可处理分布由同批岗位任务支撑；异常步骤和页面可见数量仍需页面确认。",
+    };
+  }
+  const workflowProbeId = WORKFLOW_TASK_GROUP_PROBES[item.key];
+  if (workflowProbeId) {
+    return {
+      probeIds: [workflowProbeId],
+      actualProbeId: workflowProbeId,
+      browserRequired: true,
+      reason:
+        "本批任务按精确 task_group、岗位、来源和状态矩阵核对；页面筛选、详情和处理动作仍需页面确认。",
     };
   }
   if (item.key === "inbound") {
@@ -360,6 +420,19 @@ export function assertManualAcceptancePageDataContract(contract, options = {}) {
       new Set(target.probeIds).size === target.probeIds.length,
       `页面 ${target.id} 存在重复数据核验 probe`,
     );
+    if (
+      target.catalogGroup === "mobileRolePages" ||
+      (target.probeIds.length === 1 &&
+        target.probeIds[0].startsWith("workflow-tasks:"))
+    ) {
+      assertContract(
+        Array.isArray(target.requiredTaskScenarios) &&
+          target.requiredTaskScenarios.length > 0 &&
+          new Set(target.requiredTaskScenarios).size ===
+            target.requiredTaskScenarios.length,
+        `任务页面 ${target.id} 缺少唯一的任务场景目录`,
+      );
+    }
     const expectedStageKeys = sortedUnique(
       target.probeIds.map((probeId) => {
         usedProbeIds.add(probeId);
@@ -431,6 +504,9 @@ export function buildManualAcceptancePageDataContract(options = {}) {
       roleKeys: [...item.roleKeys],
       expectedMinimum: item.minimumRecords,
       expectedUnit: item.minimumRecordUnit,
+      ...(Array.isArray(item.requiredTaskScenarios)
+        ? { requiredTaskScenarios: [...item.requiredTaskScenarios] }
+        : {}),
       ...evidence,
       generatorStageKeys,
     };

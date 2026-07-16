@@ -3,20 +3,40 @@ import test from "node:test";
 
 import {
   FORMAL_DEMO_ACCOUNTS,
+  FORMAL_DEMO_ACCOUNT_PROFILES,
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
   MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS,
   MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE,
   applyManualAcceptanceAccountScenarios,
   buildManualAcceptanceAccountScenarioPlan,
+  manualAcceptanceFormalAccountBootstrapConfirmation,
   normalizeAccountScenarioBackendURL,
   requireAdminAccountRecord,
   runManualAcceptanceAccountScenarioCli,
 } from "./manual-acceptance-account-scenarios.mjs";
 import {
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   manualAcceptanceTargetConfirmation,
 } from "./manual-acceptance-target-policy.mjs";
+
+const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
+const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
+
+function localPlan(overrides = {}) {
+  return buildManualAcceptanceAccountScenarioPlan({
+    backendURL: LOCAL_BACKEND_URL,
+    databaseName: LOCAL_DATABASE_NAME,
+    ...overrides,
+  });
+}
 
 function customerTrial133Attestation() {
   return {
@@ -111,7 +131,11 @@ function ok(data, url, extras = {}) {
 
 function createBackend({
   environment = "local",
-  revision = "rev-local-1",
+  revision,
+  configProductVersion,
+  configApplyPurpose,
+  configDatasetVersion,
+  configTarget,
   initialAccounts = formalAccounts(),
   redirectLogin = false,
   malformedCreate = false,
@@ -121,6 +145,33 @@ function createBackend({
   roleOptionsTransform = (roles) => roles,
   permissionOptionsTransform = (permissions) => permissions,
 } = {}) {
+  const remote = environment === "remote";
+  const activeRevision =
+    revision === undefined
+      ? remote
+        ? CUSTOMER_TRIAL_133_CONFIG_REVISION
+        : LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION
+      : revision;
+  const activeProductVersion =
+    configProductVersion === undefined
+      ? remote
+        ? CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION
+        : LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION
+      : configProductVersion;
+  const activeApplyPurpose =
+    configApplyPurpose === undefined
+      ? remote
+        ? CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE
+        : LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE
+      : configApplyPurpose;
+  const activeDatasetVersion =
+    configDatasetVersion === undefined && remote
+      ? CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION
+      : configDatasetVersion;
+  const activeTarget =
+    configTarget === undefined && remote
+      ? CUSTOMER_TRIAL_133_TARGET
+      : configTarget;
   const state = initialAccounts.map((item) => structuredClone(item));
   const roleState = acceptanceRoles(initialRolePermissions);
   const calls = [];
@@ -218,7 +269,11 @@ function createBackend({
           session: {
             customer: { key: "yoyoosun" },
             source: "active_customer_config_revision",
-            configRevision: revision,
+            configRevision: activeRevision,
+            configProductVersion: activeProductVersion,
+            configApplyPurpose: activeApplyPurpose,
+            configDatasetVersion: activeDatasetVersion,
+            configTarget: activeTarget,
           },
         },
         url,
@@ -316,9 +371,17 @@ function rolePermissionCalls(backend) {
 async function withConfirmation(fn) {
   const previous = process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM;
   const previousAdminPassword = process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD;
+  const previousTargetConfirm = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM;
+  const previousFormalConfirm =
+    process.env.MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM;
+  const plan = localPlan();
   process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM =
     MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE;
   process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD = "guard-pass";
+  process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM =
+    manualAcceptanceTargetConfirmation(plan);
+  process.env.MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM =
+    manualAcceptanceFormalAccountBootstrapConfirmation(plan);
   try {
     return await fn();
   } finally {
@@ -332,6 +395,17 @@ async function withConfirmation(fn) {
     } else {
       process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD = previousAdminPassword;
     }
+    if (previousTargetConfirm === undefined) {
+      delete process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM;
+    } else {
+      process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM = previousTargetConfirm;
+    }
+    if (previousFormalConfirm === undefined) {
+      delete process.env.MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM;
+    } else {
+      process.env.MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM =
+        previousFormalConfirm;
+    }
   }
 }
 
@@ -342,8 +416,8 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.directSQL, false);
   assert.equal(plan.target, "local-dev");
-  assert.equal(plan.dataVersion, "2026.07.15-v3");
-  assert.equal(plan.runId, "20260715-V3");
+  assert.equal(plan.dataVersion, "2026.07.16-v5");
+  assert.equal(plan.runId, "20260716-V5");
   assert.deepEqual(plan.protectedAccounts, FORMAL_DEMO_ACCOUNTS);
   assert.equal(plan.protectedAccounts.length, 10);
   assert.equal(plan.scenarios.length, 3);
@@ -426,12 +500,14 @@ test("apply requires the exact confirmation before login", async () => {
   const previous = process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM;
   process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM = "APPLY";
   let fetchCount = 0;
+  const plan = localPlan();
   try {
     await assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        plan,
         {
           password: "demo-pass",
+          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
           fetchImpl: async () => {
             fetchCount += 1;
             throw new Error("must not fetch");
@@ -457,12 +533,14 @@ test("apply requires a separate local super-admin credential before login", asyn
     MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE;
   delete process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD;
   let fetchCount = 0;
+  const plan = localPlan();
   try {
     await assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        plan,
         {
           password: "demo-pass",
+          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
           fetchImpl: async () => {
             fetchCount += 1;
             throw new Error("must not fetch without the guard credential");
@@ -487,16 +565,17 @@ test("redirected login is rejected and every request opts out of redirects", asy
   await withConfirmation(() =>
     assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        localPlan(),
         { password: "demo-pass", fetchImpl: backend.fetchImpl },
       ),
       /refused redirected response/u,
     ),
   );
   assert.equal(mutationCalls(backend).length, 0);
-  assert.equal(backend.calls.length, 1);
-  assert.equal(backend.calls[0].params.username, "admin");
-  assert.equal(backend.calls[0].options.redirect, "error");
+  assert.equal(backend.calls.length, 2);
+  assert.equal(backend.calls[0].method, "probe");
+  assert.equal(backend.calls[1].params.username, "admin");
+  assert.equal(backend.calls[1].options.redirect, "error");
 });
 
 test("non-local runtime and empty active revision perform zero account writes", async () => {
@@ -504,7 +583,7 @@ test("non-local runtime and empty active revision perform zero account writes", 
   await withConfirmation(() =>
     assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        localPlan(),
         { password: "demo-pass", fetchImpl: nonLocal.fetchImpl },
       ),
       /environment=prod/u,
@@ -516,7 +595,7 @@ test("non-local runtime and empty active revision perform zero account writes", 
   await withConfirmation(() =>
     assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        localPlan(),
         { password: "demo-pass", fetchImpl: emptyRevision.fetchImpl },
       ),
       /active customer configuration is not the current runtime source/u,
@@ -529,25 +608,25 @@ test("local SQL runtime is accepted only through the shared debug-disabled polic
   const backend = createBackend({ environment: "sql" });
   const report = await withConfirmation(() =>
     applyManualAcceptanceAccountScenarios(
-      buildManualAcceptanceAccountScenarioPlan(),
+      localPlan(),
       { password: "demo-pass", fetchImpl: backend.fetchImpl },
     ),
   );
   assert.equal(report.runtime.target, "local-dev");
   assert.equal(report.runtime.environment, "sql");
-  assert.equal(report.runtime.dataVersion, "2026.07.15-v3");
+  assert.equal(report.runtime.dataVersion, "2026.07.16-v5");
 });
 
 test("registered 133 target reconciles the same three scenario accounts without changing role permissions", async () => {
   const backend = createBackend({
     environment: "remote",
-    revision: "remote-v3",
+    revision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
   });
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
-    dataVersion: "2026.07.15-v3",
-    runId: "20260715-V3",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
     auditMinimum: 30,
   });
   const report = await applyManualAcceptanceAccountScenarios(plan, {
@@ -556,32 +635,208 @@ test("registered 133 target reconciles the same three scenario accounts without 
     confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
     targetConfirmation: manualAcceptanceTargetConfirmation(plan),
     targetAttestation: customerTrial133Attestation(),
+    formalAccountConfirmation:
+      manualAcceptanceFormalAccountBootstrapConfirmation(plan),
     fetchImpl: backend.fetchImpl,
   });
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
-  assert.equal(report.dataVersion, "2026.07.15-v3");
-  assert.equal(report.runId, "20260715-V3");
+  assert.equal(report.dataVersion, "2026.07.16-v5");
+  assert.equal(report.runId, "20260716-V5");
   assert.equal(report.roleCapabilityBaseline.mode, "verify-only");
   assert.equal(rolePermissionCalls(backend).length, 0);
   assert.equal(report.summary.created, 3);
   assert.equal(report.scenarios.length, 3);
+  assert.equal(report.formalAccountBootstrap.created, 0);
+  assert.equal(report.formalAccountBootstrap.verified, 10);
   assert.equal(
     report.targetAttestation.release,
     customerTrial133Attestation().release,
   );
 });
 
+test("fresh registered 133 target creates the exact ten formal accounts before scenario accounts", async () => {
+  const backend = createBackend({
+    environment: "remote",
+    revision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    initialAccounts: [],
+  });
+  const plan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    target: CUSTOMER_TRIAL_133_TARGET,
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  });
+  const options = {
+    password: "demo-pass",
+    adminPassword: "guard-pass",
+    confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    targetAttestation: customerTrial133Attestation(),
+    formalAccountConfirmation:
+      manualAcceptanceFormalAccountBootstrapConfirmation(plan),
+    fetchImpl: backend.fetchImpl,
+  };
+
+  const first = await applyManualAcceptanceAccountScenarios(plan, options);
+  assert.equal(first.formalAccountBootstrap.created, 10);
+  assert.equal(first.formalAccountBootstrap.verified, 0);
+  assert.deepEqual(
+    first.formalAccountBootstrap.accounts.map((item) => ({
+      username: item.username,
+      roleKey: item.roleKeys[0],
+    })),
+    FORMAL_DEMO_ACCOUNT_PROFILES.map((item) => ({
+      username: item.username,
+      roleKey: item.roleKey,
+    })),
+  );
+  assert.equal(first.protectedAccounts.length, 10);
+  assert.equal(first.summary.created, 3);
+  assert.doesNotMatch(JSON.stringify(first), /demo-pass/u);
+
+  const second = await applyManualAcceptanceAccountScenarios(plan, options);
+  assert.equal(second.formalAccountBootstrap.created, 0);
+  assert.equal(second.formalAccountBootstrap.verified, 10);
+  assert.equal(
+    backend.calls.filter(
+      (call) =>
+        call.domain === "admin" &&
+        call.method === "create" &&
+        FORMAL_DEMO_ACCOUNTS.includes(call.params.username),
+    ).length,
+    10,
+  );
+});
+
+test("fresh dedicated local database creates the exact formal accounts before scenarios and reuses them", async () => {
+  const backend = createBackend({ initialAccounts: [] });
+  const plan = localPlan();
+  const options = {
+    password: "demo-pass",
+    adminPassword: "guard-pass",
+    confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    formalAccountConfirmation:
+      manualAcceptanceFormalAccountBootstrapConfirmation(plan),
+    fetchImpl: backend.fetchImpl,
+  };
+
+  const first = await applyManualAcceptanceAccountScenarios(plan, options);
+  assert.equal(first.formalAccountBootstrap.created, 10);
+  assert.equal(first.formalAccountBootstrap.verified, 0);
+  assert.deepEqual(
+    first.formalAccountBootstrap.accounts.map((item) => ({
+      username: item.username,
+      roleKey: item.roleKeys[0],
+    })),
+    FORMAL_DEMO_ACCOUNT_PROFILES.map((item) => ({
+      username: item.username,
+      roleKey: item.roleKey,
+    })),
+  );
+  assert.equal(first.summary.created, 3);
+
+  const second = await applyManualAcceptanceAccountScenarios(plan, options);
+  assert.equal(second.formalAccountBootstrap.created, 0);
+  assert.equal(second.formalAccountBootstrap.verified, 10);
+  assert.equal(
+    backend.calls.filter(
+      (call) =>
+        call.domain === "admin" &&
+        call.method === "create" &&
+        FORMAL_DEMO_ACCOUNTS.includes(call.params.username),
+    ).length,
+    10,
+  );
+});
+
+test("fresh dedicated local database rejects the wrong formal confirmation with zero account writes", async () => {
+  const backend = createBackend({ initialAccounts: [] });
+  const plan = localPlan();
+  await assert.rejects(
+    applyManualAcceptanceAccountScenarios(plan, {
+      password: "demo-pass",
+      adminPassword: "guard-pass",
+      confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+      targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+      formalAccountConfirmation: "BOOTSTRAP_FORMAL_ACCOUNTS",
+      fetchImpl: backend.fetchImpl,
+    }),
+    /MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=/u,
+  );
+  assert.equal(mutationCalls(backend).length, 0);
+  assert.equal(rolePermissionCalls(backend).length, 0);
+});
+
+test("fresh registered 133 target requires the exact formal-account confirmation before writes", async () => {
+  const backend = createBackend({
+    environment: "remote",
+    revision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    initialAccounts: [],
+  });
+  const plan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    target: CUSTOMER_TRIAL_133_TARGET,
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  });
+
+  await assert.rejects(
+    applyManualAcceptanceAccountScenarios(plan, {
+      password: "demo-pass",
+      adminPassword: "guard-pass",
+      confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+      targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+      targetAttestation: customerTrial133Attestation(),
+      formalAccountConfirmation: "BOOTSTRAP_FORMAL_ACCOUNTS",
+      fetchImpl: backend.fetchImpl,
+    }),
+    /MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=/u,
+  );
+  assert.equal(mutationCalls(backend).length, 0);
+});
+
+test("registered 133 target rejects the old active configuration before account writes", async () => {
+  const backend = createBackend({
+    environment: "remote",
+    revision: "yoyoosun-customer-trial-133-package-v3.runtime-manifest-v1",
+    configProductVersion: "customer-trial-133-test-2026.07.15-v3",
+    configDatasetVersion: "2026.07.15-v3",
+  });
+  const plan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    target: CUSTOMER_TRIAL_133_TARGET,
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  });
+
+  await assert.rejects(
+    applyManualAcceptanceAccountScenarios(plan, {
+      password: "demo-pass",
+      adminPassword: "guard-pass",
+      confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+      targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+      targetAttestation: customerTrial133Attestation(),
+      fetchImpl: backend.fetchImpl,
+    }),
+    /active customer-trial configuration identity/u,
+  );
+  assert.equal(mutationCalls(backend).length, 0);
+});
+
 test("scenario password policy rejects values outside 8 to 20 characters before login", async () => {
   for (const password of ["1234567", "123456789012345678901"]) {
     let fetchCount = 0;
+    const plan = localPlan();
     await assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        plan,
         {
           password,
           adminPassword: "guard-pass",
           confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
           fetchImpl: async () => {
             fetchCount += 1;
             throw new Error("must not fetch");
@@ -610,7 +865,7 @@ test("local acceptance adds missing customer capabilities without replacing role
   });
   const first = await withConfirmation(() =>
     applyManualAcceptanceAccountScenarios(
-      buildManualAcceptanceAccountScenarioPlan(),
+      localPlan(),
       { password: "demo-pass", fetchImpl: backend.fetchImpl },
     ),
   );
@@ -638,7 +893,7 @@ test("local acceptance adds missing customer capabilities without replacing role
   const roleWrites = rolePermissionCalls(backend).length;
   const second = await withConfirmation(() =>
     applyManualAcceptanceAccountScenarios(
-      buildManualAcceptanceAccountScenarioPlan(),
+      localPlan(),
       { password: "demo-pass", fetchImpl: backend.fetchImpl },
     ),
   );
@@ -721,7 +976,7 @@ test("role and permission metadata are fully preflighted before the first accept
     await withConfirmation(() =>
       assert.rejects(
         applyManualAcceptanceAccountScenarios(
-          buildManualAcceptanceAccountScenarioPlan(),
+          localPlan(),
           { password: "demo-pass", fetchImpl: backend.fetchImpl },
         ),
         undefined,
@@ -735,7 +990,7 @@ test("role and permission metadata are fully preflighted before the first accept
 
 test("first apply creates three accounts and every repeated apply resets all passwords", async () => {
   const backend = createBackend();
-  const plan = buildManualAcceptanceAccountScenarioPlan();
+  const plan = localPlan();
 
   const first = await withConfirmation(() =>
     applyManualAcceptanceAccountScenarios(plan, {
@@ -788,7 +1043,7 @@ test("first apply creates three accounts and every repeated apply resets all pas
 
 test("audit minimum is filled with the disabled scenario account and replay skips filler", async () => {
   const backend = createBackend({ initialAuditTotal: 4 });
-  const plan = buildManualAcceptanceAccountScenarioPlan({ auditMinimum: 30 });
+  const plan = localPlan({ auditMinimum: 30 });
 
   const first = await withConfirmation(() =>
     applyManualAcceptanceAccountScenarios(plan, {
@@ -842,10 +1097,27 @@ test("audit minimum parsing is bounded and report-only keeps zero by default", (
   );
 });
 
+test("CLI help points only to the dedicated current local acceptance database", async () => {
+  const help = await runManualAcceptanceAccountScenarioCli(["--help"]);
+  assert.equal(help.exitCode, 0);
+  assert.match(help.text, /http:\/\/127\.0\.0\.1:8310/u);
+  assert.match(help.text, /--database-name plush_erp_acceptance_20260716_v5_dev/u);
+  assert.match(help.text, /--data-version 2026\.07\.16-v5/u);
+  assert.match(help.text, /--run-id 20260716-V5/u);
+  assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
+});
+
 test("apply output reports password readiness without printing the password", async () => {
   const backend = createBackend();
   const result = await withConfirmation(() =>
-    runManualAcceptanceAccountScenarioCli(["--apply", "--json"], {
+    runManualAcceptanceAccountScenarioCli([
+      "--apply",
+      "--json",
+      "--backend-url",
+      LOCAL_BACKEND_URL,
+      "--database-name",
+      LOCAL_DATABASE_NAME,
+    ], {
       password: "demo-pass",
       fetchImpl: backend.fetchImpl,
     }),
@@ -877,7 +1149,7 @@ test("safely owned same-name accounts converge only the necessary fields", async
   const backend = createBackend({ initialAccounts: existing });
   const report = await withConfirmation(() =>
     applyManualAcceptanceAccountScenarios(
-      buildManualAcceptanceAccountScenarioPlan(),
+      localPlan(),
       { password: "demo-pass", fetchImpl: backend.fetchImpl },
     ),
   );
@@ -918,7 +1190,7 @@ test("unsafe same-name ownership fails before the first account write", async ()
   await withConfirmation(() =>
     assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        localPlan(),
         { password: "demo-pass", fetchImpl: backend.fetchImpl },
       ),
       /unrelated position/u,
@@ -934,7 +1206,7 @@ test("malformed list and mutation responses cannot be reported as success", asyn
   await withConfirmation(() =>
     assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        localPlan(),
         { password: "demo-pass", fetchImpl: listBackend.fetchImpl },
       ),
       /missing valid account status/u,
@@ -948,7 +1220,7 @@ test("malformed list and mutation responses cannot be reported as success", asyn
   await withConfirmation(() =>
     assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        localPlan(),
         {
           password: "demo-pass",
           fetchImpl: createBackendWithMalformedResponse.fetchImpl,
@@ -977,7 +1249,7 @@ test("password reset response must contain the exact account identity and state"
     await withConfirmation(() =>
       assert.rejects(
         applyManualAcceptanceAccountScenarios(
-          buildManualAcceptanceAccountScenarioPlan(),
+          localPlan(),
           { password: "demo-pass", fetchImpl: backend.fetchImpl },
         ),
         expectedError,
@@ -995,7 +1267,7 @@ test("password reset response must contain the exact account identity and state"
   await withConfirmation(() =>
     assert.rejects(
       applyManualAcceptanceAccountScenarios(
-        buildManualAcceptanceAccountScenarioPlan(),
+        localPlan(),
         { password: "demo-pass", fetchImpl: wrongID.fetchImpl },
       ),
       /password reset returned another account/u,

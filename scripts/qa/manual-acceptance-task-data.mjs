@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 
+import { createHash } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
+
+import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
 
 import {
   CUSTOMER_TRIAL_133_TARGET,
@@ -21,11 +24,36 @@ const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
 const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/task-data";
 const CUSTOMER_KEY = "yoyoosun";
 const RUNTIME_ADMIN_USERNAME = "admin";
-const SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
-const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT-TASK";
-export const TASK_COPY_REVISION = "PLAIN3";
+export const TASK_SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
+export const TASK_SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT-TASK";
+const SOURCE_TYPE = TASK_SOURCE_TYPE;
+const SIMULATION_PREFIX = TASK_SIMULATION_PREFIX;
+export const TASK_COPY_REVISION = "PLAIN5";
+export const TASK_VISIBLE_CODE_PREFIX_BY_ROLE = Object.freeze({
+  boss: "YS-V5-LD",
+  sales: "YS-V5-XS",
+  purchase: "YS-V5-CG",
+  production: "YS-V5-SC",
+  warehouse: "YS-V5-CK",
+  finance: "YS-V5-CW",
+  pmc: "YS-V5-JH",
+  quality: "YS-V5-ZJ",
+  engineering: "YS-V5-GC",
+});
 const STABLE_ANCHOR_BASE_UNIX = Date.UTC(2024, 0, 1, 12, 0, 0) / 1000;
 const STABLE_ANCHOR_WINDOW_DAYS = 10 * 366;
+const HOUR_SECONDS = 60 * 60;
+const DAY_SECONDS = 24 * HOUR_SECONDS;
+
+export const TASK_SCHEDULE_POLICY = Object.freeze({
+  contract: "manual-acceptance-task-schedule-policy-v1",
+  anchorSource: "fresh-dataset-apply-reused-on-resume",
+  overdueOffsetSeconds: -2 * DAY_SECONDS,
+  dueSoonOffsetSeconds: 23 * HOUR_SECONDS,
+  thisWeekOffsetSeconds: 2 * DAY_SECONDS,
+  laterOffsetSeconds: 7 * DAY_SECONDS,
+  dueSoonWindowSeconds: DAY_SECONDS,
+});
 
 export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS";
 export const RETIRE_CONFIRM_PREFIX =
@@ -59,6 +87,98 @@ export const ROLE_USERS = Object.freeze({
   pmc: "demo_pmc",
   quality: "demo_quality",
   engineering: "demo_engineering",
+});
+const SINGLE_TASK_GROUP_BY_ROLE = Object.freeze({
+  boss: "trial_boss_work",
+  sales: "trial_sales_work",
+  purchase: "trial_purchase_work",
+  finance: "trial_finance_work",
+  pmc: "production_scheduling",
+  quality: "trial_quality_work",
+  engineering: "trial_engineering_work",
+});
+const TASK_GROUP_OVERRIDES_BY_ROLE_SCENARIO = Object.freeze({
+  production: Object.freeze({
+    today_production: "production_scheduling",
+    outsourcing_return: "outsource_return_tracking",
+    rework: "finished_goods_rework",
+    production_exception: "production_exception",
+  }),
+  warehouse: Object.freeze({
+    receiving: "outsource_warehouse_inbound",
+    inbound: "warehouse_inbound",
+    material_picking: "trial_warehouse_work",
+    shipping: "shipment_release",
+    exception: "trial_warehouse_work",
+  }),
+});
+// Primary desktop group only. Role-wide coverage must use the scenario mapping
+// helpers below because production and warehouse intentionally span groups.
+export const TASK_GROUP_BY_ROLE = Object.freeze({
+  ...SINGLE_TASK_GROUP_BY_ROLE,
+  production: "production_exception",
+  warehouse: "shipment_release",
+});
+const BUSINESS_STATUS_OVERRIDES_BY_ROLE_SCENARIO = Object.freeze({
+  production: Object.freeze({
+    today_production: "production_processing",
+    outsourcing_return: "production_processing",
+    rework: "qc_failed",
+    production_exception: "production_processing",
+  }),
+  warehouse: Object.freeze({
+    receiving: "warehouse_inbound_pending",
+    inbound: "warehouse_inbound_pending",
+    material_picking: "warehouse_processing",
+    shipping: "shipment_pending",
+    exception: "blocked",
+  }),
+});
+const TASK_SCENARIO_SCHEDULE_BY_ROLE = Object.freeze({
+  production: Object.freeze([
+    "production_exception",
+    "today_production",
+    "outsourcing_return",
+    "rework",
+    "today_production",
+    "production_exception",
+    "outsourcing_return",
+    "rework",
+    "today_production",
+    "outsourcing_return",
+    "production_exception",
+    "rework",
+    "today_production",
+    "outsourcing_return",
+    "production_exception",
+    "rework",
+    "today_production",
+    "production_exception",
+    "outsourcing_return",
+    "rework",
+  ]),
+  warehouse: Object.freeze([
+    "receiving",
+    "shipping",
+    "inbound",
+    "material_picking",
+    "exception",
+    "receiving",
+    "inbound",
+    "material_picking",
+    "exception",
+    "receiving",
+    "inbound",
+    "exception",
+    "shipping",
+    "receiving",
+    "material_picking",
+    "shipping",
+    "inbound",
+    "material_picking",
+    "shipping",
+    "exception",
+  ]),
 });
 
 export function assertManualAcceptanceTaskTargetCompatibility(
@@ -230,15 +350,35 @@ const ROLE_SCENARIOS = Object.freeze({
     businessStatus: "production_processing",
     requiredCapability: "workflow.task.complete",
     topics: Object.freeze([
-      "安排今日车缝",
-      "调整充棉安排",
-      "看首件是否合格",
-      "安排返工",
-      "确认交接内容",
+      "处理订单延期",
+      "处理返工问题",
+      "处理成品质量问题",
+      "处理设备停机",
+      "处理主料缺料",
     ]),
-    summary: "请看材料是否到齐，再安排今天做多少。",
-    blockedReason: "主料还没到，今天还不能开始做。",
-    rejectedReason: "数量超过今天产能，请调整。",
+    scenarioTopics: Object.freeze({
+      today_production: Object.freeze([
+        "安排今日生产",
+        "查看今日进度",
+        "确认今天先做哪一单",
+        "确认今天能完成多少",
+      ]),
+      outsourcing_return: Object.freeze([
+        "确认委外回货",
+        "核对回货进度",
+        "跟进委外回货",
+      ]),
+      rework: Object.freeze(["安排返工", "查看返工进度", "处理返工问题"]),
+      production_exception: Object.freeze([
+        "处理订单延期",
+        "处理成品质量问题",
+        "处理设备停机",
+        "处理主料缺料",
+      ]),
+    }),
+    summary: "请确认异常影响什么、由谁处理和下一步怎么做。",
+    blockedReason: "还在等材料、设备或品质确认。",
+    rejectedReason: "异常说明不完整，请补充。",
     context: Object.freeze({
       customer_name: "广州美悦礼品",
       style_no: "27003#",
@@ -249,18 +389,46 @@ const ROLE_SCENARIOS = Object.freeze({
   }),
   warehouse: Object.freeze({
     label: "仓库",
-    businessStatus: "warehouse_processing",
+    businessStatus: "shipment_pending",
     requiredCapability: "workflow.task.complete",
     topics: Object.freeze([
-      "检查成品数量",
-      "确认备货数量",
-      "安排来料放哪里",
-      "检查标签",
-      "确认出库数量",
+      "核对备货数量",
+      "核对质检结果",
+      "确认箱唛",
+      "确认送货地址",
+      "确认出货时间",
     ]),
-    summary: "请对照实物、标签和单据确认。",
-    blockedReason: "系统数量和实物对不上，请盘点。",
-    rejectedReason: "标签和实物不一致，请更正。",
+    scenarioTopics: Object.freeze({
+      receiving: Object.freeze([
+        "确认委外回货",
+        "核对委外回货数量",
+        "确认委外回货批次",
+      ]),
+      inbound: Object.freeze([
+        "确认采购来料入库",
+        "核对来料入库数量",
+        "确认来料入库仓位",
+      ]),
+      material_picking: Object.freeze([
+        "确认生产备料",
+        "核对生产备料数量",
+        "确认领料位置",
+      ]),
+      shipping: Object.freeze([
+        "核对质检结果",
+        "确认箱唛",
+        "确认送货地址",
+        "确认出货时间",
+      ]),
+      exception: Object.freeze([
+        "处理数量异常",
+        "处理批次异常",
+        "处理包装异常",
+      ]),
+    }),
+    summary: "请确认数量、批次、库位、备料或送货资料都齐全。",
+    blockedReason: "数量、库位或送货资料还没确认。",
+    rejectedReason: "数量、批次或送货资料不对，请更正。",
     context: Object.freeze({
       customer_name: "东莞美悦礼品",
       style_no: "27001#",
@@ -365,16 +533,23 @@ const USAGE = `Manual acceptance task data
 Usage:
   node scripts/qa/manual-acceptance-task-data.mjs [--run-id <text>] \\
     [--backend-url <url>] [--target <profile>] [--data-version <text>] \\
-    [--out <directory>] [--apply] [--retire-legacy-run-id <text>] [--retire-legacy-copy-revision <text>]
+    [--database-name <name>] [--schedule-anchor-utc <iso>] \\
+    [--out <directory>] [--apply] \\
+    [--retire-legacy-run-id <text>] [--retire-legacy-copy-revision <text>]
 
-Apply to the default loopback local/dev runtime:
+Apply to the dedicated local acceptance runtime:
   MANUAL_ACCEPTANCE_TASK_CONFIRM=${CONFIRM_PHRASE} \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \\
     node scripts/qa/manual-acceptance-task-data.mjs --apply \\
-      --backend-url http://127.0.0.1:8300 \\
-      --run-id LOCAL-UAT-20260711 \\
-      --out output/qa/manual-acceptance/task-data
+      --target local-dev \\
+      --backend-url http://127.0.0.1:8310 \\
+      --database-name plush_erp_acceptance_20260716_v5_dev \\
+      --data-version 2026.07.16-v5 \\
+      --run-id 20260716-V5 \\
+      --schedule-anchor-utc 2026-07-17T09:00:00.000Z \\
+      --out output/qa/manual-acceptance/datasets/2026.07.16-v5/local/task
 
 The registered customer trial target additionally requires
 --target customer-trial-133, the exact registered backend origin, an explicit
@@ -384,8 +559,8 @@ origin/customer/release/migration/debug fields.
 
 Default mode only prints the deterministic 180-task plan. Apply uses the formal
 workflow JSON-RPC create/action contracts, never writes facts, and never connects
-to SQL directly. A date-bearing run id uses that UTC date as its schedule anchor;
-other run ids use a stable hash anchor and remain reproducible. Apply writes
+to SQL directly. Apply requires the schedule anchor captured by the fresh dataset
+run; a same-batch resume must reuse that exact anchor. Apply writes
 <out>/apply-report.json with runId, prefix, sourceType, and sourceID batch fields.
 The independent runtime super admin is used only for debug.capabilities; task reads,
 creates, and actions continue to use the corresponding demo role accounts.`;
@@ -502,6 +677,19 @@ function stablePositiveSourceID(runId) {
   return (hash % 2_000_000_000) + 1;
 }
 
+export function manualAcceptanceTaskBatchIdentity(runId) {
+  const normalizedRunID = sanitizeRunId(runId);
+  return Object.freeze({
+    runId: normalizedRunID,
+    copyRevision: TASK_COPY_REVISION,
+    sourceType: TASK_SOURCE_TYPE,
+    sourceID: stablePositiveSourceID(
+      `${normalizedRunID}:${TASK_COPY_REVISION}`,
+    ),
+    prefix: `${TASK_SIMULATION_PREFIX}-${normalizedRunID}-${TASK_COPY_REVISION}`,
+  });
+}
+
 export function buildLegacyManualAcceptanceTaskBatchReference({
   runId,
   copyRevision,
@@ -514,6 +702,18 @@ export function buildLegacyManualAcceptanceTaskBatchReference({
   const identity = normalizedCopyRevision
     ? `${normalizedRunID}:${normalizedCopyRevision}`
     : normalizedRunID;
+  const codeScheme =
+    normalizedCopyRevision === TASK_COPY_REVISION
+      ? "short-v5"
+      : !normalizedCopyRevision || /^PLAIN[1-4]$/u.test(normalizedCopyRevision)
+        ? "long-batch"
+        : null;
+  if (!codeScheme) {
+    throw new CliError(
+      `unsupported legacy task copy revision ${normalizedCopyRevision}`,
+      2,
+    );
+  }
   return Object.freeze({
     runId: normalizedRunID,
     copyRevision: normalizedCopyRevision,
@@ -521,18 +721,26 @@ export function buildLegacyManualAcceptanceTaskBatchReference({
     sourceType: SOURCE_TYPE,
     sourceID: stablePositiveSourceID(identity),
     prefix: `${SIMULATION_PREFIX}-${normalizedRunID}${normalizedCopyRevision ? `-${normalizedCopyRevision}` : ""}`,
+    codeScheme,
   });
 }
 
-export function manualAcceptanceTaskRetireConfirmation(
-  keepPlan,
-  legacyBatch,
-) {
-  const parts = [
-    RETIRE_CONFIRM_PREFIX,
-    keepPlan.target,
-    legacyBatch.runId,
-  ];
+export function manualAcceptanceLegacyTaskCode(legacyBatch, roleKey, index) {
+  if (!TASK_ROLES.includes(roleKey)) {
+    throw new CliError(`unknown legacy task role ${roleKey}`, 2);
+  }
+  const sequence = pad(index);
+  if (legacyBatch?.codeScheme === "short-v5") {
+    return `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${sequence}`;
+  }
+  if (legacyBatch?.codeScheme === "long-batch") {
+    return `${legacyBatch.prefix}-${roleKey.toUpperCase()}-${sequence}`;
+  }
+  throw new CliError("legacy task code scheme is invalid", 2);
+}
+
+export function manualAcceptanceTaskRetireConfirmation(keepPlan, legacyBatch) {
+  const parts = [RETIRE_CONFIRM_PREFIX, keepPlan.target, legacyBatch.runId];
   if (legacyBatch.copyRevision) parts.push(legacyBatch.copyRevision);
   parts.push(keepPlan.runId, keepPlan.copyRevision);
   return parts.join(":");
@@ -549,18 +757,101 @@ function targetStatusAt(roleKey, index) {
   throw new CliError(`task index ${index} exceeds role scale`);
 }
 
-function dueAtFor(index, nowSec) {
-  const hour = 60 * 60;
-  const day = 24 * hour;
+export function getManualAcceptanceTaskGroupScenarioCounts(roleKey, taskGroup) {
+  const expectedScenarios =
+    getManualAcceptanceTaskGroupScenarios(roleKey)[taskGroup];
+  if (!expectedScenarios) {
+    throw new CliError(`${roleKey} has unknown task group ${taskGroup}`);
+  }
+  const counts = Object.fromEntries(
+    expectedScenarios.map((scenarioKey) => [scenarioKey, 0]),
+  );
+  for (let index = 1; index <= TASKS_PER_ROLE; index += 1) {
+    const scenarioKey = taskScenarioAt(roleKey, index);
+    if (getManualAcceptanceTaskGroup(roleKey, scenarioKey) === taskGroup) {
+      counts[scenarioKey] += 1;
+    }
+  }
+  return counts;
+}
+
+export function getManualAcceptanceTaskGroupCount(roleKey, taskGroup) {
+  return Object.values(
+    getManualAcceptanceTaskGroupScenarioCounts(roleKey, taskGroup),
+  ).reduce((total, count) => total + count, 0);
+}
+
+export function getManualAcceptanceTaskGroupStatusCounts(roleKey, taskGroup) {
+  getManualAcceptanceTaskGroupScenarioCounts(roleKey, taskGroup);
+  const counts = Object.fromEntries(
+    TASK_STATUS_KEYS.map((status) => [status, 0]),
+  );
+  for (let index = 1; index <= TASKS_PER_ROLE; index += 1) {
+    const scenarioKey = taskScenarioAt(roleKey, index);
+    if (getManualAcceptanceTaskGroup(roleKey, scenarioKey) === taskGroup) {
+      counts[targetStatusAt(roleKey, index)] += 1;
+    }
+  }
+  return Object.fromEntries(
+    Object.entries(counts).filter(([, count]) => count > 0),
+  );
+}
+
+export function buildManualAcceptanceTaskSchedule(anchorUnix) {
+  const normalizedAnchor = positiveSafeInteger(anchorUnix, "schedule anchor");
+  const dueSoonValidUntilUnix =
+    normalizedAnchor + TASK_SCHEDULE_POLICY.dueSoonOffsetSeconds;
+  return Object.freeze({
+    contract: "manual-acceptance-task-schedule-v1",
+    anchorSource: TASK_SCHEDULE_POLICY.anchorSource,
+    anchorUnix: normalizedAnchor,
+    anchorUtc: new Date(normalizedAnchor * 1000).toISOString(),
+    dueSoonValidUntilUnix,
+    dueSoonValidUntilUtc: new Date(dueSoonValidUntilUnix * 1000).toISOString(),
+    offsets: Object.freeze({
+      overdue: TASK_SCHEDULE_POLICY.overdueOffsetSeconds,
+      dueSoon: TASK_SCHEDULE_POLICY.dueSoonOffsetSeconds,
+      thisWeek: TASK_SCHEDULE_POLICY.thisWeekOffsetSeconds,
+      later: TASK_SCHEDULE_POLICY.laterOffsetSeconds,
+    }),
+  });
+}
+
+export function manualAcceptanceTaskScheduleAnchorUnix(value) {
+  const text = requiredText(value, "schedule anchor UTC");
+  const milliseconds = Date.parse(text);
+  if (!Number.isFinite(milliseconds)) {
+    throw new CliError("schedule anchor UTC must be a valid ISO timestamp", 2);
+  }
+  return positiveSafeInteger(
+    Math.floor(milliseconds / 1000),
+    "schedule anchor UTC",
+  );
+}
+
+export function manualAcceptanceTaskDueAt(index, anchorUnix) {
+  const anchor = positiveSafeInteger(anchorUnix, "schedule anchor");
   switch ((index - 1) % 4) {
     case 0:
-      return { scenario: "overdue", value: nowSec - 2 * day };
+      return {
+        scenario: "overdue",
+        value: anchor + TASK_SCHEDULE_POLICY.overdueOffsetSeconds,
+      };
     case 1:
-      return { scenario: "due_soon", value: nowSec + 4 * hour };
+      return {
+        scenario: "due_soon",
+        value: anchor + TASK_SCHEDULE_POLICY.dueSoonOffsetSeconds,
+      };
     case 2:
-      return { scenario: "this_week", value: nowSec + 2 * day };
+      return {
+        scenario: "this_week",
+        value: anchor + TASK_SCHEDULE_POLICY.thisWeekOffsetSeconds,
+      };
     default:
-      return { scenario: "later", value: nowSec + 7 * day };
+      return {
+        scenario: "later",
+        value: anchor + TASK_SCHEDULE_POLICY.laterOffsetSeconds,
+      };
   }
 }
 
@@ -588,30 +879,178 @@ function actionFor(roleKey, targetStatus, runId, index, profile) {
   };
 }
 
-function buildRoleTask({ roleKey, index, runId, prefix, sourceID, nowSec }) {
+function requiredTaskScenarios(roleKey) {
+  const scenarios = MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS[roleKey];
+  if (!Array.isArray(scenarios) || scenarios.length === 0) {
+    throw new CliError(`${roleKey} is missing catalog task scenarios`);
+  }
+  if (
+    scenarios.some(
+      (scenario) =>
+        typeof scenario !== "string" ||
+        !scenario.trim() ||
+        !/^[a-z][a-z0-9_]*$/u.test(scenario),
+    ) ||
+    new Set(scenarios).size !== scenarios.length
+  ) {
+    throw new CliError(`${roleKey} catalog task scenarios are invalid`);
+  }
+  return scenarios;
+}
+
+export function getManualAcceptanceTaskGroup(roleKey, scenarioKey) {
+  const scenarios = requiredTaskScenarios(roleKey);
+  if (!scenarios.includes(scenarioKey)) {
+    throw new CliError(`${roleKey} has unknown task scenario ${scenarioKey}`);
+  }
+  const taskGroup =
+    TASK_GROUP_OVERRIDES_BY_ROLE_SCENARIO[roleKey]?.[scenarioKey] ||
+    SINGLE_TASK_GROUP_BY_ROLE[roleKey];
+  if (!taskGroup) {
+    throw new CliError(`${roleKey}/${scenarioKey} has no task group mapping`);
+  }
+  return taskGroup;
+}
+
+export function getManualAcceptanceTaskBusinessStatus(roleKey, scenarioKey) {
+  const profile = ROLE_SCENARIOS[roleKey];
+  if (!profile) throw new CliError(`unknown task role ${roleKey}`);
+  getManualAcceptanceTaskGroup(roleKey, scenarioKey);
+  return (
+    BUSINESS_STATUS_OVERRIDES_BY_ROLE_SCENARIO[roleKey]?.[scenarioKey] ||
+    profile.businessStatus
+  );
+}
+
+export function getManualAcceptanceTaskGroupScenarios(roleKey) {
+  const grouped = {};
+  for (const scenarioKey of requiredTaskScenarios(roleKey)) {
+    const taskGroup = getManualAcceptanceTaskGroup(roleKey, scenarioKey);
+    grouped[taskGroup] ||= [];
+    grouped[taskGroup].push(scenarioKey);
+  }
+  return Object.fromEntries(
+    Object.entries(grouped)
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([taskGroup, scenarios]) => [taskGroup, [...scenarios]]),
+  );
+}
+
+export function getManualAcceptanceRoleTaskGroups(roleKey) {
+  return Object.keys(getManualAcceptanceTaskGroupScenarios(roleKey));
+}
+
+function taskScenarioAt(roleKey, index) {
+  const schedule = TASK_SCENARIO_SCHEDULE_BY_ROLE[roleKey];
+  if (schedule) {
+    if (schedule.length !== TASKS_PER_ROLE) {
+      throw new CliError(
+        `${roleKey} task scenario schedule must contain ${TASKS_PER_ROLE} items`,
+      );
+    }
+    const scenarioKey = schedule[index - 1];
+    if (!requiredTaskScenarios(roleKey).includes(scenarioKey)) {
+      throw new CliError(
+        `${roleKey} task scenario schedule contains unknown ${scenarioKey}`,
+      );
+    }
+    return scenarioKey;
+  }
+  const scenarios = requiredTaskScenarios(roleKey);
+  return scenarios[(index - 1) % scenarios.length];
+}
+
+function taskTopicAt(profile, scenarioKey, index) {
+  const scenarioTopics = profile.scenarioTopics?.[scenarioKey];
+  if (scenarioTopics) {
+    return scenarioTopics[
+      Math.floor((index - 1) / Object.keys(profile.scenarioTopics).length) %
+        scenarioTopics.length
+    ];
+  }
+  const scenarioIndex = requiredTaskScenarios(profile.roleKey).indexOf(
+    scenarioKey,
+  );
+  return profile.topics[scenarioIndex];
+}
+
+function catalogScenarioContract() {
+  return Object.fromEntries(
+    TASK_ROLES.map((roleKey) => [
+      roleKey,
+      {
+        scenarios: [...requiredTaskScenarios(roleKey)],
+        groups: getManualAcceptanceTaskGroupScenarios(roleKey),
+        schedule: Array.from({ length: TASKS_PER_ROLE }, (_, offset) =>
+          taskScenarioAt(roleKey, offset + 1),
+        ),
+      },
+    ]),
+  );
+}
+
+export const TASK_CATALOG_SCENARIO_DIGEST = createHash("sha256")
+  .update(JSON.stringify(catalogScenarioContract()))
+  .digest("hex");
+
+function summarizeTaskCoverage(tasks) {
+  const taskGroupsByRole = {};
+  const scenariosByRoleTaskGroup = {};
+  for (const roleKey of TASK_ROLES) {
+    const roleTasks = tasks.filter((task) => task.roleKey === roleKey);
+    const groups = getManualAcceptanceRoleTaskGroups(roleKey);
+    taskGroupsByRole[roleKey] = groups;
+    scenariosByRoleTaskGroup[roleKey] = {};
+    for (const taskGroup of groups) {
+      const counts = Object.fromEntries(
+        getManualAcceptanceTaskGroupScenarios(roleKey)[taskGroup].map(
+          (scenarioKey) => [scenarioKey, 0],
+        ),
+      );
+      for (const task of roleTasks.filter(
+        (candidate) => candidate.createParams.task_group === taskGroup,
+      )) {
+        const scenarioKey = task.createParams.payload?.acceptance_scenario_key;
+        if (Object.hasOwn(counts, scenarioKey)) {
+          counts[scenarioKey] += 1;
+        } else {
+          counts[`__unexpected__:${scenarioKey}`] =
+            (counts[`__unexpected__:${scenarioKey}`] || 0) + 1;
+        }
+      }
+      scenariosByRoleTaskGroup[roleKey][taskGroup] = counts;
+    }
+  }
+  return {
+    taskGroupsByRole,
+    scenariosByRoleTaskGroup,
+    catalogScenarioDigest: TASK_CATALOG_SCENARIO_DIGEST,
+  };
+}
+
+function buildRoleTask({ roleKey, index, runId, sourceID, nowSec }) {
   const profile = ROLE_SCENARIOS[roleKey];
   const targetStatus = targetStatusAt(roleKey, index);
   const action = actionFor(roleKey, targetStatus, runId, index, profile);
-  const due = dueAtFor(index, nowSec);
+  const due = manualAcceptanceTaskDueAt(index, nowSec);
   const assignmentMode = index % 2 === 0 ? "role_account" : "owner_pool";
-  const topic = profile.topics[(index - 1) % profile.topics.length];
-  const taskCode = `${prefix}-${roleKey.toUpperCase()}-${pad(index)}`;
+  const scenarioKey = taskScenarioAt(roleKey, index);
+  const topic = taskTopicAt({ ...profile, roleKey }, scenarioKey, index);
+  const taskCode = `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${pad(index)}`;
   const sourceNo = `样例-${profile.label}-${pad(index)}`;
-  const taskGroup =
-    roleKey === "pmc"
-      ? "production_scheduling"
-      : roleKey === "production"
-        ? "production_exception"
-        : `trial_${roleKey}_work`;
+  const taskGroup = getManualAcceptanceTaskGroup(roleKey, scenarioKey);
+  const businessStatus = getManualAcceptanceTaskBusinessStatus(
+    roleKey,
+    scenarioKey,
+  );
   const payload = {
     simulated_only: true,
     real_customer_data: false,
     trial_task: true,
+    acceptance_scenario_key: scenarioKey,
     business_summary: profile.summary,
     attention_note:
-      index % 5 === 0
-        ? "内容较多，请逐项确认。"
-        : "按提示处理即可。",
+      index % 5 === 0 ? "内容较多，请逐项确认。" : "按提示处理即可。",
     expected_result:
       targetStatus === "blocked"
         ? "写明还缺什么，等条件齐了再处理。"
@@ -637,7 +1076,7 @@ function buildRoleTask({ roleKey, index, runId, prefix, sourceID, nowSec }) {
       source_type: SOURCE_TYPE,
       source_id: sourceID,
       source_no: sourceNo,
-      business_status_key: profile.businessStatus,
+      business_status_key: businessStatus,
       // create_task 只接受 ready；blocked/done/rejected 必须由正式动作产生。
       task_status_key: "ready",
       owner_role_key: roleKey,
@@ -652,13 +1091,18 @@ function buildRoleTask({ roleKey, index, runId, prefix, sourceID, nowSec }) {
 
 function summarizePlanTasks(tasks) {
   const byRole = Object.fromEntries(TASK_ROLES.map((roleKey) => [roleKey, 0]));
-  const byStatus = Object.fromEntries(TASK_STATUS_KEYS.map((status) => [status, 0]));
+  const byStatus = Object.fromEntries(
+    TASK_STATUS_KEYS.map((status) => [status, 0]),
+  );
+  const byTaskGroup = {};
   const dueScenarios = {};
   let assigned = 0;
   let actionCount = 0;
   for (const task of tasks) {
     byRole[task.roleKey] += 1;
     byStatus[task.targetStatus] += 1;
+    const taskGroup = task.createParams.task_group;
+    byTaskGroup[taskGroup] = (byTaskGroup[taskGroup] || 0) + 1;
     dueScenarios[task.dueScenario] = (dueScenarios[task.dueScenario] || 0) + 1;
     if (task.assignmentMode === "role_account") assigned += 1;
     if (task.action) actionCount += 1;
@@ -667,6 +1111,7 @@ function summarizePlanTasks(tasks) {
     total: tasks.length,
     byRole,
     byStatus,
+    byTaskGroup,
     assigned,
     ownerPoolOnly: tasks.length - assigned,
     dueScenarios,
@@ -728,6 +1173,14 @@ export function validateManualAcceptanceTaskPlan(plan) {
   if (!Array.isArray(plan.tasks) || plan.tasks.length !== TOTAL_TASKS) {
     throw new CliError(`task plan must contain exactly ${TOTAL_TASKS} tasks`);
   }
+  const expectedSchedule = buildManualAcceptanceTaskSchedule(
+    plan.generatedAtUnix,
+  );
+  if (JSON.stringify(plan.schedule) !== JSON.stringify(expectedSchedule)) {
+    throw new CliError(
+      "task plan schedule does not match its controlled anchor",
+    );
+  }
   const seenCodes = new Set();
   for (const roleKey of TASK_ROLES) {
     const roleTasks = plan.tasks.filter((task) => task.roleKey === roleKey);
@@ -737,18 +1190,80 @@ export function validateManualAcceptanceTaskPlan(plan) {
     const statusCounts = Object.fromEntries(
       TASK_STATUS_KEYS.map((status) => [status, 0]),
     );
+    const scenarioCounts = Object.fromEntries(
+      requiredTaskScenarios(roleKey).map((scenarioKey) => [scenarioKey, 0]),
+    );
     for (const task of roleTasks) {
       const params = task.createParams || {};
       if (seenCodes.has(params.task_code)) {
         throw new CliError(`duplicate task_code ${params.task_code}`);
       }
       seenCodes.add(params.task_code);
+      if (
+        params.task_code !==
+        `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${pad(task.index)}`
+      ) {
+        throw new CliError(`${task.key} visible task code is not canonical`);
+      }
+      const expectedDue = manualAcceptanceTaskDueAt(
+        task.index,
+        plan.schedule.anchorUnix,
+      );
+      if (
+        task.dueScenario !== expectedDue.scenario ||
+        params.due_at !== expectedDue.value
+      ) {
+        throw new CliError(
+          `${task.key} due schedule does not match the anchor`,
+        );
+      }
       statusCounts[task.targetStatus] += 1;
       if (
         params.owner_role_key !== roleKey ||
         params.owner_pool_key !== roleKey
       ) {
         throw new CliError(`${task.key} owner scope does not match its role`);
+      }
+      const scenarioKey = params.payload?.acceptance_scenario_key;
+      if (!Object.hasOwn(scenarioCounts, scenarioKey)) {
+        throw new CliError(
+          `${task.key} acceptance scenario is outside the catalog`,
+        );
+      }
+      const expectedTaskGroup = getManualAcceptanceTaskGroup(
+        roleKey,
+        scenarioKey,
+      );
+      if (params.task_group !== expectedTaskGroup) {
+        throw new CliError(
+          `${task.key} task group does not match scenario ${scenarioKey}`,
+        );
+      }
+      const expectedBusinessStatus = getManualAcceptanceTaskBusinessStatus(
+        roleKey,
+        scenarioKey,
+      );
+      if (params.business_status_key !== expectedBusinessStatus) {
+        throw new CliError(
+          `${task.key} business status does not match scenario ${scenarioKey}`,
+        );
+      }
+      scenarioCounts[scenarioKey] += 1;
+      if (
+        params.task_group === "shipment_release" &&
+        (roleKey !== "warehouse" || scenarioKey !== "shipping")
+      ) {
+        throw new CliError(
+          `${task.key} shipment_release is reserved for the shipping scenario`,
+        );
+      }
+      if (
+        params.task_group === "production_exception" &&
+        (roleKey !== "production" || scenarioKey !== "production_exception")
+      ) {
+        throw new CliError(
+          `${task.key} production_exception is reserved for the exception scenario`,
+        );
       }
       if (
         params.source_type !== SOURCE_TYPE ||
@@ -845,6 +1360,20 @@ export function validateManualAcceptanceTaskPlan(plan) {
         );
       }
     }
+    const missingScenarios = Object.entries(scenarioCounts)
+      .filter(([, count]) => count === 0)
+      .map(([scenarioKey]) => scenarioKey);
+    if (missingScenarios.length > 0) {
+      throw new CliError(
+        `${roleKey} is missing catalog task scenarios: ${missingScenarios.join(", ")}`,
+      );
+    }
+  }
+  const expectedCoverage = summarizeTaskCoverage(plan.tasks);
+  if (JSON.stringify(plan.coverage) !== JSON.stringify(expectedCoverage)) {
+    throw new CliError(
+      "task plan coverage does not match its catalog scenarios",
+    );
   }
   return plan;
 }
@@ -856,18 +1385,19 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
     target: options.target,
     dataVersion: options.dataVersion,
     runId,
+    databaseName: options.databaseName,
   });
   const backendURL = targetPolicy.backendURL;
   const nowSec = runAnchorSeconds(runId, options.nowSec);
-  const prefix = `${SIMULATION_PREFIX}-${runId}-${TASK_COPY_REVISION}`;
-  const sourceID = stablePositiveSourceID(`${runId}:${TASK_COPY_REVISION}`);
+  const schedule = buildManualAcceptanceTaskSchedule(nowSec);
+  const batchIdentity = manualAcceptanceTaskBatchIdentity(runId);
+  const { prefix, sourceID } = batchIdentity;
   const tasks = TASK_ROLES.flatMap((roleKey) =>
     Array.from({ length: TASKS_PER_ROLE }, (_, offset) =>
       buildRoleTask({
         roleKey,
         index: offset + 1,
         runId,
-        prefix,
         sourceID,
         nowSec,
       }),
@@ -884,16 +1414,19 @@ export function buildManualAcceptanceTaskDataPlan(options = {}) {
     datasetKey: targetPolicy.datasetKey,
     dataVersion: targetPolicy.dataVersion,
     backendURL,
+    databaseName: targetPolicy.databaseName,
     runId,
     copyRevision: TASK_COPY_REVISION,
     prefix,
     sourceType: SOURCE_TYPE,
     sourceID,
     generatedAtUnix: nowSec,
+    schedule,
     roleUsers: Object.fromEntries(
       TASK_ROLES.map((roleKey) => [roleKey, ROLE_USERS[roleKey]]),
     ),
     summary: summarizePlanTasks(tasks),
+    coverage: summarizeTaskCoverage(tasks),
     tasks,
   };
   return validateManualAcceptanceTaskPlan(plan);
@@ -907,6 +1440,9 @@ export function parseArgs(argv) {
     backendURL:
       process.env.MANUAL_ACCEPTANCE_TASK_BACKEND_URL || DEFAULT_BACKEND_URL,
     target: process.env.MANUAL_ACCEPTANCE_TASK_TARGET,
+    databaseName: process.env.MANUAL_ACCEPTANCE_DATABASE_NAME,
+    scheduleAnchorUtc:
+      process.env.MANUAL_ACCEPTANCE_TASK_SCHEDULE_ANCHOR_UTC || "",
     dataVersion: process.env.MANUAL_ACCEPTANCE_TASK_DATA_VERSION,
     retireLegacyRunId: "",
     retireLegacyCopyRevision: "",
@@ -945,8 +1481,17 @@ export function parseArgs(argv) {
       case "data-version":
         options.dataVersion = value;
         break;
+      case "database-name":
+        options.databaseName = value;
+        break;
       case "run-id":
         options.runId = value;
+        break;
+      case "schedule-anchor-utc":
+        options.scheduleAnchorUtc = requiredText(
+          value,
+          "--schedule-anchor-utc",
+        );
         break;
       case "retire-legacy-run-id":
         options.retireLegacyRunId = sanitizeRunId(value);
@@ -962,6 +1507,12 @@ export function parseArgs(argv) {
     }
   }
   options.runId = sanitizeRunId(options.runId);
+  if (options.scheduleAnchorUtc) {
+    options.nowSec = manualAcceptanceTaskScheduleAnchorUnix(
+      options.scheduleAnchorUtc,
+    );
+    options.scheduleAnchorUtc = new Date(options.nowSec * 1000).toISOString();
+  }
   if (options.retireLegacyRunId && !options.apply) {
     throw new CliError("--retire-legacy-run-id requires --apply", 2);
   }
@@ -971,15 +1522,27 @@ export function parseArgs(argv) {
       2,
     );
   }
+  if (
+    options.apply &&
+    !options.retireLegacyRunId &&
+    !options.scheduleAnchorUtc
+  ) {
+    throw new CliError(
+      "task --apply requires --schedule-anchor-utc captured by the fresh dataset run; same-batch replay must reuse it",
+      2,
+    );
+  }
   const targetPolicy = resolveManualAcceptanceTarget({
     backendURL: options.backendURL,
     target: options.target,
     dataVersion: options.dataVersion,
     runId: options.runId,
+    databaseName: options.databaseName,
   });
   options.backendURL = targetPolicy.backendURL;
   options.target = targetPolicy.target;
   options.dataVersion = targetPolicy.dataVersion;
+  options.databaseName = targetPolicy.databaseName;
   return options;
 }
 
@@ -1461,22 +2024,17 @@ export async function applyManualAcceptanceTaskData(
     adminPassword,
     confirmPhrase = process.env.MANUAL_ACCEPTANCE_TASK_CONFIRM,
     targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
-    targetAttestation = process.env
-      .MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
     fetchImpl = fetch,
   } = {},
 ) {
   validateManualAcceptanceTaskPlan(plan);
-  const mutationTarget = assertManualAcceptanceMutationTarget(plan, {
+  assertManualAcceptanceMutationTarget(plan, {
     confirmation: targetConfirmation,
   });
-  const parsedTargetAttestation = parseManualAcceptanceTargetAttestation(
-    targetAttestation,
-  );
-  assertManualAcceptanceTaskTargetCompatibility(
-    plan,
-    parsedTargetAttestation,
-  );
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
+  assertManualAcceptanceTaskTargetCompatibility(plan, parsedTargetAttestation);
   if (confirmPhrase !== CONFIRM_PHRASE) {
     throw new CliError(
       `apply requires MANUAL_ACCEPTANCE_TASK_CONFIRM=${CONFIRM_PHRASE}`,
@@ -1494,13 +2052,11 @@ export async function applyManualAcceptanceTaskData(
     adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
-  if (mutationTarget.external) {
-    await assertManualAcceptanceRuntimeIdentityPrecondition({
-      policy: plan,
-      attestation: parsedTargetAttestation,
-      fetchImpl,
-    });
-  }
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: plan,
+    attestation: parsedTargetAttestation,
+    fetchImpl,
+  });
   const runtimeAdmin = await loginRuntimeAdmin({
     backendURL: plan.backendURL,
     password: effectiveAdminPassword,
@@ -1586,6 +2142,9 @@ export async function applyManualAcceptanceTaskData(
     sourceType: plan.sourceType,
     sourceID: plan.sourceID,
     backendURL: plan.backendURL,
+    databaseName: plan.databaseName,
+    coverage: plan.coverage,
+    schedule: plan.schedule,
     runtime,
     summary: {
       ...plan.summary,
@@ -1602,9 +2161,17 @@ export async function applyManualAcceptanceTaskData(
 function assertLegacyTaskBatchRecord(task, legacyBatch, roleKey, accounts) {
   positiveSafeInteger(task?.id, `${roleKey} legacy task.id`);
   positiveSafeInteger(task?.version, `${roleKey} legacy task.version`);
-  const code = requiredText(task?.task_code, `${roleKey} legacy task.task_code`);
+  const code = requiredText(
+    task?.task_code,
+    `${roleKey} legacy task.task_code`,
+  );
   if (
-    !code.startsWith(`${legacyBatch.prefix}-${roleKey.toUpperCase()}-`) ||
+    code !==
+      manualAcceptanceLegacyTaskCode(
+        legacyBatch,
+        roleKey,
+        Number(code.slice(-2)),
+      ) ||
     task.source_type !== legacyBatch.sourceType ||
     Number(task.source_id) !== legacyBatch.sourceID ||
     task.owner_role_key !== roleKey ||
@@ -1621,7 +2188,10 @@ function assertLegacyTaskBatchRecord(task, legacyBatch, roleKey, accounts) {
   }
   const assigneeID = task.assignee_id ?? null;
   if (assigneeID !== null && assigneeID !== accounts[roleKey].id) {
-    throw new CliError(`${code} is assigned outside the legacy role account`, 2);
+    throw new CliError(
+      `${code} is assigned outside the legacy role account`,
+      2,
+    );
   }
   if (!TASK_STATUS_KEYS.includes(task.task_status_key)) {
     throw new CliError(`${code} has unknown task status`, 2);
@@ -1629,11 +2199,7 @@ function assertLegacyTaskBatchRecord(task, legacyBatch, roleKey, accounts) {
   return task;
 }
 
-async function listLegacyTaskBatch({
-  legacyBatch,
-  accounts,
-  fetchImpl,
-}) {
+async function listLegacyTaskBatch({ legacyBatch, accounts, fetchImpl }) {
   const tasks = [];
   for (const roleKey of TASK_ROLES) {
     const roleTasks = await listRoleBatch({
@@ -1649,10 +2215,8 @@ async function listLegacyTaskBatch({
       );
     }
     const expectedCodes = new Set(
-      Array.from(
-        { length: TASKS_PER_ROLE },
-        (_, offset) =>
-          `${legacyBatch.prefix}-${roleKey.toUpperCase()}-${pad(offset + 1)}`,
+      Array.from({ length: TASKS_PER_ROLE }, (_, offset) =>
+        manualAcceptanceLegacyTaskCode(legacyBatch, roleKey, offset + 1),
       ),
     );
     for (const task of roleTasks) {
@@ -1731,8 +2295,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     adminPassword,
     confirmPhrase = process.env.MANUAL_ACCEPTANCE_TASK_RETIRE_CONFIRM,
     targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
-    targetAttestation = process.env
-      .MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
     fetchImpl = fetch,
   } = {},
 ) {
@@ -1748,12 +2311,11 @@ export async function retireLegacyManualAcceptanceTaskBatch(
   ) {
     throw new CliError("legacy task batch must differ from the keep batch", 2);
   }
-  const mutationTarget = assertManualAcceptanceMutationTarget(keepPlan, {
+  assertManualAcceptanceMutationTarget(keepPlan, {
     confirmation: targetConfirmation,
   });
-  const parsedTargetAttestation = parseManualAcceptanceTargetAttestation(
-    targetAttestation,
-  );
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
   assertManualAcceptanceTaskTargetCompatibility(
     keepPlan,
     parsedTargetAttestation,
@@ -1779,13 +2341,11 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     adminPassword ?? process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
-  if (mutationTarget.external) {
-    await assertManualAcceptanceRuntimeIdentityPrecondition({
-      policy: keepPlan,
-      attestation: parsedTargetAttestation,
-      fetchImpl,
-    });
-  }
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: keepPlan,
+    attestation: parsedTargetAttestation,
+    fetchImpl,
+  });
   const runtimeAdmin = await loginRuntimeAdmin({
     backendURL: keepPlan.backendURL,
     password: effectiveAdminPassword,
@@ -1862,7 +2422,10 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     });
     terminalized += 1;
     actionsApplied += 1;
-    steps.push({ taskCode: task.task_code, operation: reject ? "reject" : "complete" });
+    steps.push({
+      taskCode: task.task_code,
+      operation: reject ? "reject" : "complete",
+    });
   }
   const after = await listLegacyTaskBatch({
     legacyBatch,
@@ -1889,6 +2452,7 @@ export async function retireLegacyManualAcceptanceTaskBatch(
     dataVersion: keepPlan.dataVersion,
     runId: keepPlan.runId,
     backendURL: keepPlan.backendURL,
+    databaseName: keepPlan.databaseName,
     runtime,
     keepBatch: {
       runId: keepPlan.runId,
@@ -1915,9 +2479,8 @@ export async function retireLegacyManualAcceptanceTaskBatch(
       terminalized,
       actionsApplied,
       finalDone: after.filter((task) => task.task_status_key === "done").length,
-      finalRejected: after.filter(
-        (task) => task.task_status_key === "rejected",
-      ).length,
+      finalRejected: after.filter((task) => task.task_status_key === "rejected")
+        .length,
     },
     steps,
   };

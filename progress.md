@@ -247,3 +247,35 @@
 下一步：按用户授权提交并推送本轮 QA 与进度收口；甲方可使用现有岗位账号在 133 进行人工业务判断。后续正式发布仍须以目标 commit / image 独立绑定 migration、容器编排、health / ready 和回滚点，不能把本次模拟试用数据当成客户真实业务或签收记录。
 
 阻塞/风险：自动化已证明当前数据底座、页面、权限入口与五类 PDF 技术链路，不替代甲方逐字段业务确认、每模板多样本排版检查、25 行长单据、下载 / 浏览器打印和最终签收。当前验收 Web 为不改 root-only compose 环境而独立启动的同镜像容器，旧 Web 容器保留为回滚点；如要转为长期 133 编排，需另行取得受控环境配置并按发布流程重建，不能临时放宽文件权限。模拟数据的 forward-only retire 只适合停止继续使用，完整回滚应使用写入前数据库备份。
+
+## 2026-07-17 全页面 V5 模拟验收数据治理
+
+完成：重新以正式可访问路由审查验收全集，发现业务看板、出货放行和异常处理虽被永绅菜单隐藏但仍可直接访问，旧版 48 项目录因此存在漏页。V5 将验收合同扩为 51 项，并把页面数据证据与“是否列表页”解耦：业务看板必须逐项有来源，异常处理必须有阻塞与到期事项，出货放行必须精确读回 20 条 `shipment_release` Workflow 任务及可见行，不能再用 47 条 Shipment Fact 冒充放行任务。仓库岗位原有 20 / 180 条任务原位改为放行任务，不增加重复任务；生产异常标题改为延期、返工、质量、设备和缺料等真实异常语义；其他标题、说明和原因继续使用数量、质检、箱唛、地址、时间等普通使用者能直接理解的永绅业务语言。完成放行仍只表示 `shipping_released`，不伪造已出货、扣库存或收款。本地与 133 浏览器现在都强制绑定同批 readiness，目录测试同时反查真实 router；验收密码工具永久只处理 `demo_*`，不再提供任何稳定 `admin` 轮换开关。数据身份升级为 `2026.07.16-v5 / 20260716-V5`，两端必须绑定同一业务编号集和 semantic digest。
+
+验证：V4 预审树的定向测试、`full.sh` 与 `strict.sh` 曾完整通过且 0 fail / 0 skip，并在本地专用库完成首次写入与幂等重放；随后独立 diff 审查发现上述 readiness、异常语义、管理员轮换和 router 自证缺口，旧绿色已降级为发现前证据，不作为 V5 最终结论。V5 定向、整树门禁与双环境运行态仍须重新执行。
+
+下一步：在全新本地 V5 专用库重跑八阶段、幂等复跑和 51 项浏览器，再完成同一最终树 full / strict、提交推送并构建固定 `linux/amd64` 镜像；备份并发布到 133 后，发布 / 激活 V5 试用配置、重放同一 V5 数据集、执行第二次幂等复跑、51 项页面与 5 类 PDF 浏览器验收，最后读回两端数量与业务编号 digest。
+
+阻塞/风险：本节记录时本地 V5 尚未重放，133 仍是旧 commit / image 与 V3 数据，不能把 V4 本地绿色、编号相同或旧 133 证据表述为双环境完成。发布与造数必须继续保护本地和 133 稳定 `admin`，不得放宽 target、release、migration、active revision 或 debug mutation 门禁；失败时停在原镜像、原 active revision 与写入前数据库备份回滚点。
+
+## 2026-07-17 V5 全页面造数逻辑复核与发布前收口
+
+完成：重新按页面真实查询条件核对 V5 数据归属，修正“仓库 20 条任务全部作为出货放行”的语义假绿。九岗位仍各 20 条、合计 180 条，但仓库任务现按委外回货、入库、备料、出货和异常分别进入对应 task group；只有 4 条真实出货场景进入 `shipment_release`，精确编号 `YS-V5-CK-02/13/16/19`，覆盖待处理、阻塞、完成、退回，并同时包含临期和逾期。生产岗位 20 条任务同样按生产排程、委外回货、返工和生产异常拆分，只有 5 条进入 `production_exception`；PMC 生产排程页面仍精确读取自己的 20 条任务。出货管理继续独立读取 47 张 Shipment Fact，其中一张为 25 行长单，Workflow 放行与出货 Fact 不互相凑数。
+
+数据执行器新增每目标、版本和别名唯一的 `dataset/.apply.lock` 原子排他锁，fresh / resume 共用；竞争进程会在 runner / RPC 前停止，锁只由 owner 释放，异常遗留锁必须确认进程退出后改名归档，不能自动删除。readiness、页面最低数量、业务看板、手工清单和执行手册已同步真实数量；本地数据库精确锁定 `plush_erp_acceptance_20260716_v5_dev`，133 数据库精确锁定 `plush_erp_uat_20260716_v5`，旧端口 `5435` 不再被 V5 密码工具接受。
+
+验证：项目锁定 Node 24.14.0 下人工验收脚本与隔离边界 284 / 284，0 fail / 0 skip。最终 `bash scripts/qa/full.sh` 和 `bash scripts/qa/strict.sh` 均完整通过且 0 fail / 0 skip；包含 93 个自动发现 scripts Node 测试文件、195 项 Web 合同、Web 全量、lint / CSS / build、2144 项 server-all、fresh / populated-upgrade / current-schema PostgreSQL、真实 Chromium、Go build、shellcheck、shfmt、yamllint、零 warning 与 govulncheck。最终只读差异复核未发现 P0 / P1 阻断。
+
+下一步：按用户授权提交并推送当前整树，基于新的 40 位 commit 构建固定 `linux/amd64` server / web 镜像；随后分别创建全新本地 V5 专用库与 133 V5 独立栈，执行 migration、试用配置激活、core 基础资料、同版完整 dataset、幂等重放、readiness、51 / 51 浏览器页面和 5 / 5 真实 PDF 验收，再回写与 commit / image 绑定的运行证据。
+
+阻塞/风险：本节记录时发布前代码与门禁已经完成，但新 commit / image、本地 V5 和 133 V5 的实际 apply / readback / browser 尚未执行，不能提前宣称双环境已造数。共享开发库的稳定 `admin/adminadmin` 不得被验收流程修改；133 使用独立强密码和独立栈，旧 V3 栈保留回滚，不执行 `down -v`。
+
+## 2026-07-17 V5 发布树最终门禁复核
+
+完成：把全页面 V5 合同进一步锁定为 51 个真实目标，出货放行只接受 `YS-V5-CK-02/13/16/19` 四条 Workflow 任务并覆盖待处理、阻塞、完成、退回、临期和逾期；出货管理独立要求 47 张 Shipment Fact，且恰有一张 25 行长单。数据计划采用一次捕获的受控排期锚点，fresh 持久化、resume 校验并复用，时间或报告被篡改会在任何写入阶段前失败。浏览器、readiness、数据集报告和静态隔离门禁均使用同一精确合同，避免页面有路由但无数据、用 Fact 冒充 Workflow 或只靠数量下限形成假绿。验收角色计划不再调用任何本地超级管理员重置路径，密码轮换器永久只选择 `demo_*`。
+
+验证：首次 full 揭示旧静态边界对新 Fact 数据结构的长正则误判，已拆成采购收货、质检、出货、库存流水和附件归属的独立语义检查，并新增原子防回归测试。修正后在同一精确工作树重新执行 `bash scripts/qa/full.sh` 与 `bash scripts/qa/strict.sh`，两者均以 `status=complete` 结束；覆盖 scripts 自动发现、Web 合同 195 / 195、Web 全量 1276 / 1276、server-all 2161 / 2161、关键 PostgreSQL 154 / 154、fresh / populated-upgrade、Web 构建、真实 Chromium、Go build、shellcheck、shfmt、yamllint、零 warning 和 govulncheck，0 fail / 0 skip。
+
+下一步：提交并推送当前精确工作树，以 40 位 commit 构建固定 `linux/amd64` server / web 镜像；随后只对本地与 133 的 V5 隔离库执行 migration、客户试用配置、core 基础资料、完整数据集、幂等重放、readiness、51 / 51 页面和 5 / 5 PDF 验收。
+
+阻塞/风险：当前仅发布树与门禁已完成，双环境运行态尚未据此新 commit / image 重建，因此仍不能宣称本地和 133 已完成 V5 造数。共享开发库及其稳定 `admin/adminadmin` 必须保持不变；133 旧栈与旧数据只作回滚点，不停服、不删卷、不冒充本次证据。

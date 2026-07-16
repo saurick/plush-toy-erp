@@ -4,9 +4,15 @@ import path from "node:path";
 import process from "node:process";
 
 import { applyAttachmentData } from "./manual-acceptance-attachment-data.mjs";
-import { runManualAcceptanceAccountScenarioCli } from "./manual-acceptance-account-scenarios.mjs";
+import {
+  manualAcceptanceFormalAccountBootstrapConfirmation,
+  runManualAcceptanceAccountScenarioCli,
+} from "./manual-acceptance-account-scenarios.mjs";
 import { runManualAcceptanceFactCli } from "./manual-acceptance-fact-data.mjs";
-import { MANUAL_ACCEPTANCE_GENERATOR_STAGES } from "./manual-acceptance-page-data-contract.mjs";
+import {
+  MANUAL_ACCEPTANCE_GENERATOR_STAGES,
+  MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
+} from "./manual-acceptance-page-data-contract.mjs";
 import { runManualAcceptanceReadinessCli } from "./manual-acceptance-readiness.mjs";
 import {
   MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
@@ -18,27 +24,185 @@ import {
   CONFIRM_PHRASE as TASK_CONFIRM_PHRASE,
   applyManualAcceptanceTaskData,
   buildManualAcceptanceTaskDataPlan,
+  buildManualAcceptanceTaskSchedule,
 } from "./manual-acceptance-task-data.mjs";
 import {
   assertManualAcceptanceCapabilitiesPolicy,
   assertManualAcceptanceDatabaseIdentity,
+  assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
-  "manual-acceptance-dataset-runner-v2";
+  "manual-acceptance-dataset-runner-v5";
 
 const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const ACCOUNT_CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
 const ATTACHMENT_CONFIRM_PHRASE =
   "APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS";
-const DEFAULT_OUTPUT_ROOT = "output/qa/manual-acceptance/datasets";
+export const MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT =
+  "output/qa/manual-acceptance/datasets";
 const BROWSER_ONLY_READINESS_GROUPS = Object.freeze({
   printPreviewPages: 5,
   printWorkspacePages: 5,
 });
+const BROWSER_ONLY_READINESS_TARGET_COUNT = Object.values(
+  BROWSER_ONLY_READINESS_GROUPS,
+).reduce((total, count) => total + count, 0);
+
+export const MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES = Object.freeze(
+  [
+    {
+      key: "customers",
+      domain: "masterdata",
+      method: "list_customers",
+      listKey: "customers",
+    },
+    {
+      key: "suppliers",
+      domain: "masterdata",
+      method: "list_suppliers",
+      listKey: "suppliers",
+    },
+    {
+      key: "materials",
+      domain: "masterdata",
+      method: "list_materials",
+      listKey: "materials",
+    },
+    {
+      key: "products",
+      domain: "masterdata",
+      method: "list_products",
+      listKey: "products",
+    },
+    {
+      key: "productSkus",
+      domain: "masterdata",
+      method: "list_product_skus",
+      listKey: "product_skus",
+    },
+    {
+      key: "processes",
+      domain: "masterdata",
+      method: "list_processes",
+      listKey: "processes",
+    },
+    {
+      key: "bomVersions",
+      domain: "bom",
+      method: "list_bom_versions",
+      listKey: "bom_versions",
+    },
+    {
+      key: "salesOrders",
+      domain: "sales_order",
+      method: "list_sales_orders",
+      listKey: "sales_orders",
+    },
+    {
+      key: "purchaseOrders",
+      domain: "purchase_order",
+      method: "list_purchase_orders",
+      listKey: "purchase_orders",
+    },
+    {
+      key: "outsourcingOrders",
+      domain: "outsourcing_order",
+      method: "list_outsourcing_orders",
+      listKey: "outsourcing_orders",
+    },
+    {
+      key: "productionOrders",
+      domain: "production_order",
+      method: "list_production_orders",
+      listKey: "production_orders",
+      includeCustomerKey: false,
+    },
+    {
+      key: "purchaseReceipts",
+      domain: "purchase",
+      method: "list_purchase_receipts",
+      listKey: "purchase_receipts",
+    },
+    {
+      key: "purchaseReturns",
+      domain: "purchase",
+      method: "list_purchase_returns",
+      listKey: "purchase_returns",
+      includeCustomerKey: false,
+    },
+    {
+      key: "purchaseReceiptAdjustments",
+      domain: "purchase",
+      method: "list_purchase_receipt_adjustments",
+      listKey: "purchase_receipt_adjustments",
+      includeCustomerKey: false,
+    },
+    {
+      key: "qualityInspections",
+      domain: "quality",
+      method: "list_quality_inspections",
+      listKey: "quality_inspections",
+    },
+    {
+      key: "inventoryBalances",
+      domain: "inventory",
+      method: "list_inventory_balances",
+      listKey: "inventory_balances",
+    },
+    {
+      key: "inventoryLots",
+      domain: "inventory",
+      method: "list_inventory_lots",
+      listKey: "inventory_lots",
+    },
+    {
+      key: "inventoryTxns",
+      domain: "inventory",
+      method: "list_inventory_txns",
+      listKey: "inventory_txns",
+    },
+    {
+      key: "productionFacts",
+      domain: "operational_fact",
+      method: "list_production_facts",
+      listKey: "production_facts",
+    },
+    {
+      key: "outsourcingFacts",
+      domain: "operational_fact",
+      method: "list_outsourcing_facts",
+      listKey: "outsourcing_facts",
+    },
+    {
+      key: "stockReservations",
+      domain: "operational_fact",
+      method: "list_stock_reservations",
+      listKey: "stock_reservations",
+    },
+    {
+      key: "shipments",
+      domain: "operational_fact",
+      method: "list_shipments",
+      listKey: "shipments",
+    },
+    {
+      key: "financeFacts",
+      domain: "operational_fact",
+      method: "list_finance_facts",
+      listKey: "finance_facts",
+    },
+    {
+      key: "workflowTasks",
+      domain: "workflow",
+      method: "list_tasks",
+      listKey: "tasks",
+    },
+  ].map((probe) => Object.freeze(probe)),
+);
 
 function pageGeneratorEntrypoint(stageKey) {
   const entrypoints = MANUAL_ACCEPTANCE_GENERATOR_STAGES[stageKey]?.entrypoints;
@@ -52,6 +216,8 @@ function pageGeneratorEntrypoint(stageKey) {
 
 const COMPONENT_ENTRYPOINTS = Object.freeze({
   core: "scripts/qa/manual-acceptance-dataset-runner.mjs#core-rpc-verifier",
+  baseline:
+    "scripts/qa/manual-acceptance-dataset-runner.mjs#empty-baseline-rpc-verifier",
   role: pageGeneratorEntrypoint("role"),
   source: pageGeneratorEntrypoint("source"),
   task: pageGeneratorEntrypoint("task"),
@@ -61,8 +227,9 @@ const COMPONENT_ENTRYPOINTS = Object.freeze({
   readiness: "scripts/qa/manual-acceptance-readiness.mjs",
 });
 
-const STAGE_REPORT_FILES = Object.freeze({
+export const MANUAL_ACCEPTANCE_DATASET_STAGE_REPORT_FILES = Object.freeze({
   core: "apply-report.json",
+  baseline: "verify-report.json",
   role: "apply-report.json",
   source: "apply-report.json",
   task: "apply-report.json",
@@ -140,7 +307,7 @@ function jsonRecord(value, name) {
   return JSON.parse(canonicalJSON(value));
 }
 
-function componentDigest(report) {
+export function digestManualAcceptanceDatasetComponentReport(report) {
   return createHash("sha256").update(canonicalJSON(report)).digest("hex");
 }
 
@@ -160,11 +327,36 @@ function reportDirectory(targetAdapter, stageKey) {
   return path.join(targetAdapter.reportRoot, stageKey);
 }
 
-function reportPathFor(targetAdapter, stageKey) {
+export function manualAcceptanceDatasetStageReportPath({
+  outputRoot = MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
+  dataVersion,
+  targetAlias,
+  stageKey,
+}) {
+  const fileName = MANUAL_ACCEPTANCE_DATASET_STAGE_REPORT_FILES[stageKey];
+  if (!fileName) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "stage_report_path_invalid",
+      `stage ${stageKey} has no canonical report file`,
+      { stageKey },
+    );
+  }
   return path.join(
-    reportDirectory(targetAdapter, stageKey),
-    STAGE_REPORT_FILES[stageKey],
+    outputRoot,
+    requiredText(dataVersion, "dataVersion"),
+    requiredText(targetAlias, "targetAlias"),
+    stageKey,
+    fileName,
   );
+}
+
+function reportPathFor(targetAdapter, stageKey, dataVersion) {
+  return manualAcceptanceDatasetStageReportPath({
+    outputRoot: path.dirname(path.dirname(targetAdapter.reportRoot)),
+    dataVersion,
+    targetAlias: targetAdapter.alias,
+    stageKey,
+  });
 }
 
 async function persistReport(reportPath, report) {
@@ -202,6 +394,10 @@ export function buildManualAcceptanceRunnerBusinessInput(context) {
     dataVersion: requiredText(context?.dataVersion, "dataVersion"),
     runId: requiredText(context?.semanticPlan?.runId, "semanticPlan.runId"),
     dateAnchorUtc: requiredText(context?.dateAnchorUtc, "dateAnchorUtc"),
+    taskScheduleAnchorUtc: requiredText(
+      context?.taskScheduleAnchorUtc,
+      "taskScheduleAnchorUtc",
+    ),
     semanticDigest: requiredText(context?.semanticDigest, "semanticDigest"),
     prefixes: structuredClone(context.semanticPlan.prefixes),
     stage: {
@@ -222,7 +418,7 @@ export function buildManualAcceptanceRunnerBusinessInput(context) {
 export function buildManualAcceptanceTargetAdapter(context, deps = {}) {
   const target = context?.target || {};
   const alias = requiredText(target.alias, "target.alias");
-  const outputRoot = deps.outputRoot || DEFAULT_OUTPUT_ROOT;
+  const outputRoot = deps.outputRoot || MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT;
   const adapter = {
     contract: "manual-acceptance-dataset-target-adapter-v1",
     alias,
@@ -287,14 +483,23 @@ function normalizeComponentResult(raw, execution, defaultOperation) {
     backendURL: adapter.backendURL,
     databaseName: adapter.databaseName,
   })) {
-    if (
-      report[field] !== undefined &&
-      String(report[field]) !== String(expected)
-    ) {
+    if (String(report[field] ?? "") !== String(expected)) {
       throw new ManualAcceptanceDatasetRunnerError(
         "component_identity_mismatch",
         `${execution.stageKey} component report ${field} does not match the runner binding`,
         { stageKey: execution.stageKey, field },
+      );
+    }
+  }
+  if (execution.stageKey === "task") {
+    const expectedSchedule = buildManualAcceptanceTaskSchedule(
+      Math.floor(Date.parse(input.taskScheduleAnchorUtc) / 1000),
+    );
+    if (canonicalJSON(report.schedule) !== canonicalJSON(expectedSchedule)) {
+      throw new ManualAcceptanceDatasetRunnerError(
+        "task_schedule_anchor_mismatch",
+        "task component report does not reuse the dataset task schedule anchor",
+        { stageKey: execution.stageKey },
       );
     }
   }
@@ -308,10 +513,18 @@ function normalizeComponentResult(raw, execution, defaultOperation) {
   const operation = String(
     wrapped.operation || report.operation || defaultOperation,
   );
+  const reportPath = String(wrapped.reportPath || execution.reportPath);
+  if (path.resolve(reportPath) !== path.resolve(execution.reportPath)) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "component_report_path_mismatch",
+      `${execution.stageKey} component report path is not canonical`,
+      { stageKey: execution.stageKey },
+    );
+  }
   return {
     operation,
     report,
-    reportPath: String(wrapped.reportPath || execution.reportPath),
+    reportPath,
     summary: jsonRecord(wrapped.summary || report.summary, "component summary"),
     references: isPlainRecord(wrapped.references)
       ? jsonRecord(wrapped.references, "component references")
@@ -346,7 +559,7 @@ async function executeRegisteredComponent(
 }
 
 function receipt(execution, component) {
-  const digest = componentDigest(component.report);
+  const digest = digestManualAcceptanceDatasetComponentReport(component.report);
   return {
     ok: true,
     status: "completed",
@@ -371,6 +584,8 @@ function receipt(execution, component) {
           component.report.dataVersion || execution.businessInput.dataVersion,
         runId: component.report.runId || execution.businessInput.runId,
         target: component.report.target || execution.targetAdapter.policyTarget,
+        backendURL: component.report.backendURL,
+        databaseName: component.report.databaseName,
         semanticDigest: component.report.semanticDigest || null,
       },
     },
@@ -394,8 +609,10 @@ async function coreRPC({
   domain,
   method,
   params = {},
+  includeCustomerKey = true,
   token,
   fetchImpl = fetch,
+  stageKey = "core",
 }) {
   const response = await fetchImpl(
     new URL(`/rpc/${domain}`, `${backendURL}/`).toString(),
@@ -409,18 +626,20 @@ async function coreRPC({
       },
       body: JSON.stringify({
         jsonrpc: "2.0",
-        id: `manual-acceptance-core-${domain}-${method}`,
+        id: `manual-acceptance-${stageKey}-${domain}-${method}`,
         method,
         params:
-          domain === "auth" ? params : { customer_key: "yoyoosun", ...params },
+          domain === "auth" || !includeCustomerKey
+            ? params
+            : { customer_key: "yoyoosun", ...params },
       }),
     },
   );
   if (response.redirected === true) {
     throw new ManualAcceptanceDatasetRunnerError(
-      "core_verifier_redirected",
+      `${stageKey}_verifier_redirected`,
       `${domain}.${method} refused a redirected response`,
-      { stageKey: "core", domain, method },
+      { stageKey, domain, method },
     );
   }
   let body;
@@ -431,10 +650,10 @@ async function coreRPC({
   }
   if (!response.ok || body?.result?.code !== 0) {
     throw new ManualAcceptanceDatasetRunnerError(
-      "core_verifier_rpc_failed",
+      `${stageKey}_verifier_rpc_failed`,
       `${domain}.${method} failed`,
       {
-        stageKey: "core",
+        stageKey,
         domain,
         method,
         httpStatus: response.status,
@@ -509,8 +728,20 @@ export async function verifyManualAcceptanceCoreReferences({
     capabilities,
   });
   assertManualAcceptanceCapabilitiesPolicy({ policy, capabilities });
-  const queryParams = {
-    keyword: "SIM-PLUSH-CORE",
+  const sessionData = await coreRPC({
+    backendURL: policy.backendURL,
+    domain: "customer_config",
+    method: "get_effective_session",
+    params: {},
+    token: adminToken,
+    fetchImpl,
+  });
+  const runtime = assertManualAcceptanceRuntimePolicy({
+    policy,
+    capabilities,
+    session: sessionData.session,
+  });
+  const queryBase = {
     active_only: true,
     limit: 200,
   };
@@ -519,7 +750,7 @@ export async function verifyManualAcceptanceCoreReferences({
       backendURL: policy.backendURL,
       domain: "masterdata",
       method: "list_units",
-      params: queryParams,
+      params: { ...queryBase, keyword: MANUAL_ACCEPTANCE_CORE_UNIT_CODE },
       token: adminToken,
       fetchImpl,
     }),
@@ -527,7 +758,7 @@ export async function verifyManualAcceptanceCoreReferences({
       backendURL: policy.backendURL,
       domain: "masterdata",
       method: "list_warehouses",
-      params: queryParams,
+      params: { ...queryBase, keyword: "YS5-CK-" },
       token: adminToken,
       fetchImpl,
     }),
@@ -546,9 +777,257 @@ export async function verifyManualAcceptanceCoreReferences({
   }
   return {
     databaseName: databaseIdentity.databaseName,
+    configRevision: runtime.configRevision,
+    configProductVersion: runtime.configProductVersion,
+    configApplyPurpose: runtime.configApplyPurpose,
+    configDatasetVersion: runtime.configDatasetVersion ?? null,
+    configTarget: runtime.configTarget ?? null,
     unitCode: MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
     warehouseCodes: Object.values(MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES),
     summary: { units: 1, warehouses: 4 },
+  };
+}
+
+const BASELINE_CONFIG_FIELDS = Object.freeze([
+  "configRevision",
+  "configProductVersion",
+  "configApplyPurpose",
+  "configDatasetVersion",
+  "configTarget",
+]);
+
+function exactBaselineList(data, probe, expectedTotal) {
+  const items = data?.[probe.listKey];
+  if (!Array.isArray(items)) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "empty_baseline_list_missing",
+      `${probe.domain}.${probe.method} response is missing ${probe.listKey}`,
+      {
+        stageKey: "baseline",
+        objectKey: probe.key,
+        listKey: probe.listKey,
+      },
+    );
+  }
+  if (!Number.isSafeInteger(data?.total) || data.total < 0) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "empty_baseline_total_missing",
+      `${probe.domain}.${probe.method} response is missing an exact total`,
+      { stageKey: "baseline", objectKey: probe.key },
+    );
+  }
+  if (data.total !== expectedTotal || items.length !== expectedTotal) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      expectedTotal === 0
+        ? "empty_baseline_not_empty"
+        : "empty_baseline_core_mismatch",
+      `${probe.key} must contain exactly ${expectedTotal} records before dataset apply`,
+      {
+        stageKey: "baseline",
+        objectKey: probe.key,
+        expectedTotal,
+        actualTotal: data.total,
+        returned: items.length,
+      },
+    );
+  }
+  return items;
+}
+
+function assertBaselineCoreCodes(units, warehouses) {
+  const unitCodes = units.map((item) => String(item?.code || "")).sort();
+  const warehouseCodes = warehouses
+    .map((item) => String(item?.code || ""))
+    .sort();
+  const expectedUnitCodes = [MANUAL_ACCEPTANCE_CORE_UNIT_CODE];
+  const expectedWarehouseCodes = Object.values(
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+  ).sort();
+  if (
+    JSON.stringify(unitCodes) !== JSON.stringify(expectedUnitCodes) ||
+    JSON.stringify(warehouseCodes) !== JSON.stringify(expectedWarehouseCodes)
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "empty_baseline_core_code_mismatch",
+      "fresh baseline must contain only the exact V5 unit and warehouse codes",
+      {
+        stageKey: "baseline",
+        expectedUnitCodes,
+        actualUnitCodes: unitCodes,
+        expectedWarehouseCodes,
+        actualWarehouseCodes: warehouseCodes,
+      },
+    );
+  }
+}
+
+export async function verifyManualAcceptanceEmptyBaseline({
+  backendURL,
+  policyTarget,
+  databaseName,
+  datasetKey,
+  dataVersion,
+  runId,
+  targetAttestation,
+  adminPassword,
+  coreReport,
+  fetchImpl,
+}) {
+  const policy = resolveManualAcceptanceTarget({
+    backendURL,
+    target: policyTarget,
+    datasetKey,
+    dataVersion,
+    runId,
+    databaseName,
+  });
+  let attestedTarget;
+  if (policy.external) {
+    attestedTarget = assertManualAcceptanceTargetAttestation({
+      policy,
+      attestation: targetAttestation,
+    });
+  } else if (targetAttestation) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "empty_baseline_attestation_forbidden",
+      "local empty-baseline verification must not receive a remote target attestation",
+      { stageKey: "baseline" },
+    );
+  }
+  const runtimeIdentity =
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy,
+      attestation: attestedTarget,
+      fetchImpl,
+    });
+  const adminLogin = await coreRPC({
+    backendURL: policy.backendURL,
+    domain: "auth",
+    method: "admin_login",
+    params: {
+      username: "admin",
+      password: requiredCredential(adminPassword, "adminPassword", "baseline"),
+    },
+    fetchImpl,
+    stageKey: "baseline",
+  });
+  const adminToken = requiredText(
+    adminLogin.access_token || adminLogin.token,
+    "admin access token",
+  );
+  const capabilities = await coreRPC({
+    backendURL: policy.backendURL,
+    domain: "debug",
+    method: "capabilities",
+    params: {},
+    token: adminToken,
+    fetchImpl,
+    stageKey: "baseline",
+  });
+  const databaseIdentity = assertManualAcceptanceDatabaseIdentity({
+    policy,
+    capabilities,
+  });
+  assertManualAcceptanceCapabilitiesPolicy({ policy, capabilities });
+  const sessionData = await coreRPC({
+    backendURL: policy.backendURL,
+    domain: "customer_config",
+    method: "get_effective_session",
+    params: {},
+    token: adminToken,
+    fetchImpl,
+    stageKey: "baseline",
+  });
+  const runtime = assertManualAcceptanceRuntimePolicy({
+    policy,
+    capabilities,
+    session: sessionData.session,
+  });
+  if (!isPlainRecord(coreReport)) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "empty_baseline_core_receipt_missing",
+      "empty-baseline verification requires the completed core report",
+      { stageKey: "baseline" },
+    );
+  }
+  if (String(coreReport.databaseName || "") !== databaseIdentity.databaseName) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "empty_baseline_core_identity_mismatch",
+      "empty-baseline database identity does not match the completed core report",
+      { stageKey: "baseline", field: "databaseName" },
+    );
+  }
+  for (const field of BASELINE_CONFIG_FIELDS) {
+    if (String(coreReport[field] ?? "") !== String(runtime[field] ?? "")) {
+      throw new ManualAcceptanceDatasetRunnerError(
+        "empty_baseline_customer_config_mismatch",
+        `empty-baseline customer configuration ${field} does not match the completed core report`,
+        { stageKey: "baseline", field },
+      );
+    }
+  }
+
+  const query = async (probe, params) =>
+    coreRPC({
+      backendURL: policy.backendURL,
+      domain: probe.domain,
+      method: probe.method,
+      params,
+      includeCustomerKey: probe.includeCustomerKey !== false,
+      token: adminToken,
+      fetchImpl,
+      stageKey: "baseline",
+    });
+  const unitProbe = {
+    key: "units",
+    domain: "masterdata",
+    method: "list_units",
+    listKey: "units",
+  };
+  const warehouseProbe = {
+    key: "warehouses",
+    domain: "masterdata",
+    method: "list_warehouses",
+    listKey: "warehouses",
+  };
+  const units = exactBaselineList(
+    await query(unitProbe, { limit: 200, offset: 0 }),
+    unitProbe,
+    1,
+  );
+  const warehouses = exactBaselineList(
+    await query(warehouseProbe, { limit: 200, offset: 0 }),
+    warehouseProbe,
+    4,
+  );
+  assertBaselineCoreCodes(units, warehouses);
+
+  const zeroCounts = {};
+  for (const probe of MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES) {
+    exactBaselineList(await query(probe, { limit: 1, offset: 0 }), probe, 0);
+    zeroCounts[probe.key] = 0;
+  }
+  return {
+    databaseName: databaseIdentity.databaseName,
+    runtimeIdentity: {
+      scope: policy.external ? "release-v1" : "database-v1",
+      proof: runtimeIdentity.proof,
+      databaseName: runtimeIdentity.databaseName,
+      release: runtimeIdentity.release ?? null,
+      migration: runtimeIdentity.migration ?? null,
+    },
+    customerConfig: Object.fromEntries(
+      BASELINE_CONFIG_FIELDS.map((field) => [field, runtime[field] ?? null]),
+    ),
+    core: {
+      units: 1,
+      warehouses: 4,
+      unitCodes: [MANUAL_ACCEPTANCE_CORE_UNIT_CODE],
+      warehouseCodes: Object.values(
+        MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+      ).sort(),
+    },
+    zeroCounts,
   };
 }
 
@@ -584,6 +1063,11 @@ async function defaultCoreComponent(invocation, deps) {
       target: targetAdapter.policyTarget,
       backendURL: targetAdapter.backendURL,
       databaseName: verified.databaseName,
+      configRevision: verified.configRevision,
+      configProductVersion: verified.configProductVersion,
+      configApplyPurpose: verified.configApplyPurpose,
+      configDatasetVersion: verified.configDatasetVersion,
+      configTarget: verified.configTarget,
       prefix,
       businessCodes: {
         unit: verified.unitCode,
@@ -592,6 +1076,68 @@ async function defaultCoreComponent(invocation, deps) {
       summary: {
         ...verified.summary,
         seedExecuted: false,
+      },
+    },
+  };
+}
+
+async function defaultBaselineComponent(invocation, deps) {
+  const { businessInput, targetAdapter } = invocation;
+  const core = deps.state.componentReports.get("core");
+  if (!core?.report) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "empty_baseline_core_receipt_missing",
+      "empty-baseline verification can only run after the completed core stage",
+      { stageKey: "baseline" },
+    );
+  }
+  const verified = await verifyManualAcceptanceEmptyBaseline({
+    backendURL: targetAdapter.backendURL,
+    databaseName: targetAdapter.databaseName,
+    policyTarget: targetAdapter.policyTarget,
+    datasetKey: businessInput.datasetKey,
+    dataVersion: businessInput.dataVersion,
+    runId: businessInput.runId,
+    targetAttestation: targetAdapter.attestation || undefined,
+    adminPassword: targetAdapter.credentials.adminPassword,
+    coreReport: core.report,
+    fetchImpl: deps.fetchImpl,
+  });
+  return {
+    operation: "verified",
+    references: {
+      coreReport: {
+        reportPath: core.reportPath,
+        componentDigest: digestManualAcceptanceDatasetComponentReport(
+          core.report,
+        ),
+      },
+      runtimeIdentity: verified.runtimeIdentity,
+    },
+    report: {
+      contract: "manual-acceptance-empty-baseline-report-v1",
+      mode: "verify",
+      scope: "manual-acceptance-empty-business-baseline",
+      simulatedOnly: true,
+      datasetKey: businessInput.datasetKey,
+      dataVersion: businessInput.dataVersion,
+      runId: businessInput.runId,
+      target: targetAdapter.policyTarget,
+      backendURL: targetAdapter.backendURL,
+      databaseName: verified.databaseName,
+      runtimeIdentity: verified.runtimeIdentity,
+      customerConfig: verified.customerConfig,
+      core: verified.core,
+      zeroCounts: verified.zeroCounts,
+      summary: {
+        exactEmptyBusinessBaseline: true,
+        checkedBusinessObjectKinds:
+          MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length,
+        zeroBusinessRecords: Object.values(verified.zeroCounts).every(
+          (count) => count === 0,
+        ),
+        units: verified.core.units,
+        warehouses: verified.core.warehouses,
       },
     },
   };
@@ -610,6 +1156,8 @@ async function defaultSourceComponent(invocation, deps) {
       businessInput.runId,
       "--backend-url",
       targetAdapter.backendURL,
+      "--database-name",
+      targetAdapter.databaseName,
       "--out",
       reportDirectory,
     ],
@@ -657,6 +1205,8 @@ async function defaultRoleComponent(invocation, deps) {
       businessInput.runId,
       "--backend-url",
       targetAdapter.backendURL,
+      "--database-name",
+      targetAdapter.databaseName,
       "--audit-minimum",
       "30",
       "--json",
@@ -675,6 +1225,12 @@ async function defaultRoleComponent(invocation, deps) {
       confirmPhrase: ACCOUNT_CONFIRM_PHRASE,
       targetConfirmation: targetAdapter.confirmation || undefined,
       targetAttestation: targetAdapter.attestation || undefined,
+      formalAccountConfirmation:
+        manualAcceptanceFormalAccountBootstrapConfirmation({
+          target: targetAdapter.policyTarget,
+          dataVersion: businessInput.dataVersion,
+          runId: businessInput.runId,
+        }),
       fetchImpl: deps.fetchImpl,
     },
   );
@@ -705,7 +1261,8 @@ async function defaultTaskComponent(invocation, deps) {
     dataVersion: businessInput.dataVersion,
     runId: businessInput.runId,
     backendURL: targetAdapter.backendURL,
-    nowSec: Math.floor(Date.parse(businessInput.dateAnchorUtc) / 1000),
+    databaseName: targetAdapter.databaseName,
+    nowSec: Math.floor(Date.parse(businessInput.taskScheduleAnchorUtc) / 1000),
   });
   const report = await applyManualAcceptanceTaskData(plan, {
     password: requiredCredential(
@@ -748,6 +1305,8 @@ async function defaultFactsComponent(invocation, deps) {
       businessInput.runId,
       "--backend-url",
       targetAdapter.backendURL,
+      "--database-name",
+      targetAdapter.databaseName,
       "--source-report",
       sourceState.reportPath,
       "--out",
@@ -798,6 +1357,7 @@ async function defaultAttachmentsComponent(invocation, deps) {
   }
   const report = await applyAttachmentData({
     backendURL: targetAdapter.backendURL,
+    databaseName: targetAdapter.databaseName,
     adminPassword: requiredCredential(
       targetAdapter.credentials.adminPassword,
       "adminPassword",
@@ -836,6 +1396,8 @@ async function defaultReadinessComponent(invocation, deps) {
       "--verify",
       "--backend-url",
       targetAdapter.backendURL,
+      "--database-name",
+      targetAdapter.databaseName,
       "--source-report",
       source.reportPath,
       "--fact-report",
@@ -908,8 +1470,7 @@ export function assertManualAcceptanceDatasetReadinessBoundary(
     (target) => target?.dataStatus === "not_proven",
   );
   const failed = targets.filter(
-    (target) =>
-      target?.dataStatus === "fail" || target?.dataStatus === "error",
+    (target) => target?.dataStatus === "fail" || target?.dataStatus === "error",
   );
   const groupCounts = Object.fromEntries(
     Object.keys(BROWSER_ONLY_READINESS_GROUPS).map((group) => [
@@ -922,12 +1483,14 @@ export function assertManualAcceptanceDatasetReadinessBoundary(
     summary.queryChecksPassed === true &&
     summary.queryEvidenceComplete === false &&
     summary.failedTargetData === 0 &&
-    summary.notProvenTargetData === 10 &&
-    summary.passedTargetData === 38 &&
-    summary.totalTargets === 48 &&
-    targets.length === 48 &&
+    summary.notProvenTargetData === BROWSER_ONLY_READINESS_TARGET_COUNT &&
+    summary.passedTargetData ===
+      MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT -
+        BROWSER_ONLY_READINESS_TARGET_COUNT &&
+    summary.totalTargets === MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT &&
+    targets.length === MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT &&
     failed.length === 0 &&
-    notProven.length === 10 &&
+    notProven.length === BROWSER_ONLY_READINESS_TARGET_COUNT &&
     Object.entries(BROWSER_ONLY_READINESS_GROUPS).every(
       ([group, expected]) => groupCounts[group] === expected,
     ) &&
@@ -959,6 +1522,126 @@ export function assertManualAcceptanceDatasetReadinessBoundary(
   };
 }
 
+function assertReusableBaseline(execution, report) {
+  const currentCore = execution.state.componentReports.get("core")?.report;
+  const expectedWarehouses = Object.values(
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
+  ).sort();
+  const validZeroCounts =
+    isPlainRecord(report.zeroCounts) &&
+    Object.keys(report.zeroCounts).length ===
+      MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
+    MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.every(
+      ({ key }) => report.zeroCounts[key] === 0,
+    );
+  const validCore =
+    report.core?.units === 1 &&
+    report.core?.warehouses === 4 &&
+    JSON.stringify(report.core?.unitCodes) ===
+      JSON.stringify([MANUAL_ACCEPTANCE_CORE_UNIT_CODE]) &&
+    JSON.stringify([...(report.core?.warehouseCodes || [])].sort()) ===
+      JSON.stringify(expectedWarehouses);
+  const validSummary =
+    report.contract === "manual-acceptance-empty-baseline-report-v1" &&
+    report.summary?.exactEmptyBusinessBaseline === true &&
+    report.summary?.zeroBusinessRecords === true &&
+    report.summary?.checkedBusinessObjectKinds ===
+      MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length;
+  if (!currentCore || !validZeroCounts || !validCore || !validSummary) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "resume_baseline_invalid",
+      "resume receipt does not contain a complete fresh empty-baseline proof",
+      { stageKey: "baseline" },
+    );
+  }
+  if (
+    report.databaseName !== currentCore.databaseName ||
+    report.runtimeIdentity?.databaseName !== currentCore.databaseName
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "resume_baseline_runtime_mismatch",
+      "resume baseline database identity does not match the current core probe",
+      { stageKey: "baseline", field: "databaseName" },
+    );
+  }
+  for (const field of BASELINE_CONFIG_FIELDS) {
+    if (
+      String(report.customerConfig?.[field] ?? "") !==
+      String(currentCore[field] ?? "")
+    ) {
+      throw new ManualAcceptanceDatasetRunnerError(
+        "resume_baseline_config_mismatch",
+        `resume baseline ${field} does not match the current core probe`,
+        { stageKey: "baseline", field },
+      );
+    }
+  }
+  const attestation = execution.targetAdapter.attestation;
+  const remoteIdentityMatches = attestation
+    ? report.runtimeIdentity?.release === attestation.release &&
+      report.runtimeIdentity?.migration === attestation.migration
+    : report.runtimeIdentity?.release == null &&
+      report.runtimeIdentity?.migration == null;
+  if (!remoteIdentityMatches) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "resume_baseline_runtime_mismatch",
+      "resume baseline release/migration does not match the current target binding",
+      { stageKey: "baseline", field: "release/migration" },
+    );
+  }
+}
+
+function reuseStageComponent(execution, resumeComponent) {
+  if (!isPlainRecord(resumeComponent?.report)) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "resume_component_invalid",
+      `${execution.stageKey} resume component is missing its report`,
+      { stageKey: execution.stageKey },
+    );
+  }
+  if (
+    path.resolve(String(resumeComponent.reportPath || "")) !==
+    path.resolve(execution.reportPath)
+  ) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "resume_component_path_mismatch",
+      `${execution.stageKey} resume component is outside its canonical report path`,
+      { stageKey: execution.stageKey },
+    );
+  }
+  const digest = digestManualAcceptanceDatasetComponentReport(
+    resumeComponent.report,
+  );
+  if (digest !== resumeComponent.componentDigest) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "resume_component_digest_mismatch",
+      `${execution.stageKey} resume component digest does not match its receipt`,
+      { stageKey: execution.stageKey },
+    );
+  }
+  const component = normalizeComponentResult(
+    {
+      operation: "reused",
+      report: resumeComponent.report,
+      reportPath: execution.reportPath,
+      references: {
+        resumeReceipt: {
+          applyReportPath: resumeComponent.applyReportPath,
+          priorOperation: resumeComponent.priorOperation,
+          componentDigest: digest,
+        },
+      },
+    },
+    execution,
+    "reused",
+  );
+  if (execution.stageKey === "baseline") {
+    assertReusableBaseline(execution, component.report);
+  }
+  execution.state.componentReports.set(execution.stageKey, component);
+  return receipt(execution, component);
+}
+
 async function registeredStage(execution, defaultComponent, operation) {
   const component = await executeRegisteredComponent(
     execution,
@@ -973,6 +1656,10 @@ async function registeredStage(execution, defaultComponent, operation) {
 
 async function coreStageHandler(execution) {
   return registeredStage(execution, defaultCoreComponent, "verified");
+}
+
+async function baselineStageHandler(execution) {
+  return registeredStage(execution, defaultBaselineComponent, "verified");
 }
 
 async function roleStageHandler(execution) {
@@ -1028,10 +1715,13 @@ async function purchaseQualityStageHandler(execution) {
     runId: execution.businessInput.runId,
     target: execution.targetAdapter.policyTarget,
     backendURL: execution.targetAdapter.backendURL,
+    databaseName: execution.targetAdapter.databaseName,
     summary: { purchaseReceipts, qualityInspections },
     delegatedFactReport: {
       reportPath: facts.reportPath,
-      componentDigest: componentDigest(facts.report),
+      componentDigest: digestManualAcceptanceDatasetComponentReport(
+        facts.report,
+      ),
     },
   };
   const component = normalizeComponentResult(
@@ -1058,6 +1748,7 @@ async function readinessStageHandler(execution) {
 
 export const MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY = Object.freeze({
   core: coreStageHandler,
+  baseline: baselineStageHandler,
   role: roleStageHandler,
   source: sourceStageHandler,
   task: taskStageHandler,
@@ -1069,7 +1760,8 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY = Object.freeze({
 
 export function createManualAcceptanceDatasetStageRunner(deps = {}) {
   const registry = deps.registry || MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY;
-  const state = { componentReports: new Map() };
+  const registeredStageKeys = Object.keys(registry);
+  const state = { componentReports: new Map(), completedStageKeys: [] };
   return async function runManualAcceptanceDatasetStage(context) {
     const businessInput = buildManualAcceptanceRunnerBusinessInput(context);
     const targetAdapter = buildManualAcceptanceTargetAdapter(context, deps);
@@ -1082,15 +1774,38 @@ export function createManualAcceptanceDatasetStageRunner(deps = {}) {
         { stageKey },
       );
     }
+    const expectedStageKey =
+      registeredStageKeys[state.completedStageKeys.length] || null;
+    if (stageKey !== expectedStageKey) {
+      throw new ManualAcceptanceDatasetRunnerError(
+        "stage_sequence_violation",
+        `stage ${stageKey} cannot run before ${expectedStageKey || "the registered sequence is complete"}`,
+        {
+          stageKey,
+          expectedStageKey,
+          completedStageKeys: [...state.completedStageKeys],
+        },
+      );
+    }
     const handlerId = `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${stageKey}`;
-    return handler({
+    const execution = {
       stageKey,
       handlerId,
       businessInput,
       targetAdapter,
-      reportPath: reportPathFor(targetAdapter, stageKey),
+      reportPath: reportPathFor(
+        targetAdapter,
+        stageKey,
+        businessInput.dataVersion,
+      ),
       deps: { ...deps, state },
       state,
-    });
+    };
+    const resumeComponent = deps.resumeComponents?.get?.(stageKey);
+    const result = resumeComponent
+      ? reuseStageComponent(execution, resumeComponent)
+      : await handler(execution);
+    state.completedStageKeys.push(stageKey);
+    return result;
   };
 }

@@ -41,6 +41,7 @@ export const customerPackageCatalog = Object.freeze({
   pages: Object.freeze([
     { key: "global-dashboard", label: "全局看板", requiredCapabilityKeys: ["erp.dashboard.read", "workflow.task.read"] },
     { key: "task-board", label: "任务看板", requiredCapabilityKeys: ["workflow.task.read"] },
+    { key: "business-dashboard", label: "业务看板", requiredCapabilityKeys: ["erp.dashboard.read", "workflow.task.read"] },
     { key: "customers", label: "客户档案", requiredCapabilityKeys: ["customer.read"] },
     { key: "suppliers", label: "供应商档案", requiredCapabilityKeys: ["supplier.read", "contact.read"] },
     { key: "products", label: "产品档案", requiredCapabilityKeys: ["product.read", "product_sku.read", "material.read"] },
@@ -57,6 +58,7 @@ export const customerPackageCatalog = Object.freeze({
     { key: "production-scheduling", label: "生产排程", requiredCapabilityKeys: ["pmc.plan.read"] },
     { key: "production-progress", label: "生产进度", requiredCapabilityKeys: ["pmc.plan.read"] },
     { key: "production-exceptions", label: "生产异常", requiredCapabilityKeys: ["pmc.risk.read"] },
+    { key: "shipping-release", label: "出货放行", requiredCapabilityKeys: ["workflow.task.read", "warehouse.outbound.read"] },
     { key: "outbound", label: "出库管理", requiredCapabilityKeys: ["warehouse.outbound.read", "warehouse.inventory.read"] },
     { key: "shipments", label: "出货单", requiredCapabilityKeys: ["shipment.read", "customer.read", "warehouse.inventory.read", "product.read", "product_sku.read", "sales_order.read", "sales_order_item.read", "material.read"] },
     { key: "reconciliation", label: "业务对账", requiredCapabilityKeys: ["finance.reconciliation.read"] },
@@ -64,6 +66,7 @@ export const customerPackageCatalog = Object.freeze({
     { key: "receivables", label: "应收台账", requiredCapabilityKeys: ["finance.receivable.read"] },
     { key: "invoices", label: "发票台账", requiredCapabilityKeys: ["finance.invoice.read"] },
     { key: "print-center", label: "打印中心", requiredCapabilityKeys: ["erp.print_template.read"] },
+    { key: "exception-flow", label: "异常处理", requiredCapabilityKeys: ["workflow.task.read"] },
     { key: "permission-center", label: "权限中心", requiredCapabilityKeys: ["system.user.read", "system.role.read"] },
     { key: "system-audit-logs", label: "系统操作记录", requiredCapabilityKeys: ["system.audit.read"] },
   ]),

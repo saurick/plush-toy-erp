@@ -17,13 +17,25 @@ import (
 
 const customerConfigErrorReasonActiveRevisionRequired = "customer_config_active_revision_required"
 
-func localTestCustomerConfigBoundaryResult(productVersion string, compiledSnapshot map[string]any) *v1.JsonrpcResult {
+func localTestCustomerConfigBoundaryResult(productVersion string, compiledSnapshot map[string]any, gateEnabled bool) *v1.JsonrpcResult {
 	applyPurpose := ""
 	if value, ok := compiledSnapshot["applyPurpose"].(string); ok {
 		applyPurpose = strings.TrimSpace(value)
 	}
-	isLocalTest := strings.TrimSpace(productVersion) == biz.CustomerConfigLocalTestProductVersion || applyPurpose == biz.CustomerConfigLocalTestApplyPurpose
-	if !isLocalTest || strings.TrimSpace(os.Getenv(biz.CustomerConfigLocalTestAllowEnv)) == "1" {
+	productVersion = strings.TrimSpace(productVersion)
+	isLocalTest := strings.HasPrefix(productVersion, "local-customer-package-test-") ||
+		strings.HasPrefix(applyPurpose, "local_test_")
+	if !isLocalTest {
+		return nil
+	}
+	if productVersion != biz.CustomerConfigLocalTestProductVersion ||
+		(applyPurpose != "" && applyPurpose != biz.CustomerConfigLocalTestApplyPurpose) {
+		return &v1.JsonrpcResult{
+			Code:    errcode.InvalidParam.Code,
+			Message: "本地测试客户配置标识无效",
+		}
+	}
+	if gateEnabled {
 		return nil
 	}
 	return &v1.JsonrpcResult{
@@ -54,7 +66,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := localTestCustomerConfigBoundaryResult(in.ProductVersion, in.CompiledSnapshot); res != nil {
+		if res := localTestCustomerConfigBoundaryResult(in.ProductVersion, in.CompiledSnapshot, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerTrialConfigManifest(in); res != nil {
@@ -87,7 +99,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := localTestCustomerConfigBoundaryResult(in.ProductVersion, in.CompiledSnapshot); res != nil {
+		if res := localTestCustomerConfigBoundaryResult(in.ProductVersion, in.CompiledSnapshot, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerTrialConfigManifest(in); res != nil {
@@ -120,10 +132,10 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
 		}
-		if res := localTestCustomerConfigBoundaryResult(in.ExpectedProductVersion, nil); res != nil {
+		if res := localTestCustomerConfigBoundaryResult(in.ExpectedProductVersion, nil, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerTrialConfigProductVersion(in.ExpectedProductVersion); res != nil {
+		if res := d.requireCustomerTrialConfigRevisionProductVersion(in.CustomerKey, in.TargetRevision, in.ExpectedProductVersion); res != nil {
 			return id, res, nil
 		}
 		resolvedCustomerKey, err := runtimeCustomerKey(in.CustomerKey)
@@ -149,10 +161,10 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil); res != nil {
+		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerTrialConfigProductVersion(identity.ExpectedProductVersion); res != nil {
+		if res := d.requireCustomerTrialConfigRevisionProductVersion(identity.CustomerKey, identity.TargetRevision, identity.ExpectedProductVersion); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
@@ -189,10 +201,10 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if !ok {
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
 		}
-		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil); res != nil {
+		if res := localTestCustomerConfigBoundaryResult(identity.ExpectedProductVersion, nil, d.localTestConfigEnabled); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerTrialConfigProductVersion(identity.ExpectedProductVersion); res != nil {
+		if res := d.requireCustomerTrialConfigRevisionProductVersion(identity.CustomerKey, identity.TargetRevision, identity.ExpectedProductVersion); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
@@ -827,7 +839,7 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 }
 
 func (d *jsonrpcDispatcher) requireCustomerTrialConfigManifest(in biz.CustomerConfigPublishInput) *v1.JsonrpcResult {
-	trial, err := customertrialconfig.ClassifyManifest(in.ProductVersion, in.CompiledSnapshot)
+	trial, err := customertrialconfig.ClassifyManifest(in.CustomerKey, in.Revision, in.ProductVersion, in.CompiledSnapshot)
 	if err != nil {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
@@ -837,8 +849,8 @@ func (d *jsonrpcDispatcher) requireCustomerTrialConfigManifest(in biz.CustomerCo
 	return nil
 }
 
-func (d *jsonrpcDispatcher) requireCustomerTrialConfigProductVersion(productVersion string) *v1.JsonrpcResult {
-	trial, err := customertrialconfig.ClassifyProductVersion(productVersion)
+func (d *jsonrpcDispatcher) requireCustomerTrialConfigRevisionProductVersion(customerKey, revision, productVersion string) *v1.JsonrpcResult {
+	trial, err := customertrialconfig.ClassifyRevisionProductVersion(customerKey, revision, productVersion)
 	if err != nil {
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	}
@@ -1634,9 +1646,13 @@ func effectiveSessionToMap(session *biz.EffectiveSession) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"configRevision":    session.ConfigRevision,
-		"configHash":        session.ConfigHash,
-		"configHashVersion": session.ConfigHashVersion,
+		"configRevision":       session.ConfigRevision,
+		"configHash":           session.ConfigHash,
+		"configHashVersion":    session.ConfigHashVersion,
+		"configProductVersion": session.ConfigProductVersion,
+		"configApplyPurpose":   session.ConfigApplyPurpose,
+		"configDatasetVersion": session.ConfigDatasetVersion,
+		"configTarget":         session.ConfigTarget,
 		"customer": map[string]any{
 			"key":  session.Customer.Key,
 			"name": session.Customer.Name,

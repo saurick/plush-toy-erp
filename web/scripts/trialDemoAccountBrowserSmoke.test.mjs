@@ -153,7 +153,10 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     true
   )
   assert.equal(template.menuProjectionCoverage.coversMobileDeniedAdmin, true)
-  assert.equal(template.menuProjectionCoverage.coversCustomerHiddenMenus, true)
+  assert.equal(
+    template.menuProjectionCoverage.coversFormalCustomerPageProjection,
+    true
+  )
   assert.equal(template.menuProjectionCoverage.coversLegacyMenuCleanup, true)
   assert.equal(
     template.effectiveSessionDiagnosticPlan.windowKey,
@@ -221,19 +224,22 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   )
   assert.deepEqual(adminPlan.visibleExpectedMenus, ['权限管理'])
   assert.match(adminPlan.forbiddenMenus.join('\n'), /工作台/u)
-  for (const account of template.desktopAccounts) {
-    if (account.username === 'demo_admin') {
-      continue
-    }
-    assert(
-      !account.expectedMenus.includes('业务看板'),
-      `${account.username} must not expect yoyoosun hidden business dashboard`
-    )
-    assert(
-      !account.expectedMenus.includes('异常处理'),
-      `${account.username} must not expect yoyoosun hidden exception flow`
-    )
-  }
+  assert(
+    template.desktopAccounts
+      .find((account) => account.username === 'demo_boss')
+      ?.expectedMenus.includes('业务看板')
+  )
+  assert(
+    template.desktopAccounts
+      .find((account) => account.username === 'demo_warehouse')
+      ?.expectedMenus.includes('出货放行')
+  )
+  assert(
+    template.desktopAccounts
+      .find((account) => account.username === 'demo_production')
+      ?.expectedMenus.includes('异常处理')
+  )
+  assert.match(adminPlan.forbiddenMenus.join('\n'), /业务看板.*出货放行.*异常处理/su)
   const engineeringPlan = template.menuProjectionPlan.desktopAccounts.find(
     (account) => account.username === 'demo_engineering'
   )
@@ -337,19 +343,25 @@ test('trial demo account browser smoke CLI preflight writes sanitized report', (
   assert.equal(report.menuProjectionCoverage.coversMobileDeniedAdmin, true)
   assert.equal(report.menuProjectionCoverage.allMobileAccountsHaveEntries, true)
   assert.deepEqual(report.menuProjectionCoverage.blockers, [])
-  for (const account of report.menuProjectionPlan.desktopAccounts) {
-    if (account.username === 'demo_admin') {
-      continue
-    }
-    assert(
-      !account.configuredExpectedMenus.includes('业务看板'),
-      `${account.username} must not configure yoyoosun hidden business dashboard as expected`
-    )
-    assert(
-      !account.configuredExpectedMenus.includes('异常处理'),
-      `${account.username} must not configure yoyoosun hidden exception flow as expected`
-    )
-  }
+  assert.equal(
+    report.menuProjectionCoverage.coversFormalCustomerPageProjection,
+    true
+  )
+  assert(
+    report.menuProjectionPlan.desktopAccounts
+      .find((account) => account.username === 'demo_boss')
+      ?.configuredExpectedMenus.includes('业务看板')
+  )
+  assert(
+    report.menuProjectionPlan.desktopAccounts
+      .find((account) => account.username === 'demo_warehouse')
+      ?.configuredExpectedMenus.includes('出货放行')
+  )
+  assert(
+    report.menuProjectionPlan.desktopAccounts
+      .find((account) => account.username === 'demo_production')
+      ?.configuredExpectedMenus.includes('异常处理')
+  )
   assert(
     report.menuProjectionPlan.mobileAccounts.some(
       (account) =>

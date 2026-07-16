@@ -27,7 +27,9 @@ const (
 	CustomerConfigLocalTestAllowEnv       = "ERP_ALLOW_LOCAL_TEST_CUSTOMER_CONFIG"
 
 	CustomerConfigTrialApplyPurpose   = "customer_trial_test_apply"
-	CustomerConfigTrialProductVersion = "customer-trial-133-test-2026.07.15-v3"
+	CustomerConfigTrialDatasetVersion = "2026.07.16-v5"
+	CustomerConfigTrialProductVersion = "customer-trial-133-test-2026.07.16-v5"
+	CustomerConfigTrialTarget         = "customer-trial-133"
 )
 
 var (
@@ -140,6 +142,10 @@ type EffectiveSession struct {
 	ConfigRevision        string
 	ConfigHash            string
 	ConfigHashVersion     int
+	ConfigProductVersion  string
+	ConfigApplyPurpose    string
+	ConfigDatasetVersion  string
+	ConfigTarget          string
 	Customer              EffectiveSessionCustomer
 	Modules               map[string]string
 	Roles                 []string
@@ -983,7 +989,7 @@ var productModuleCatalog = map[string]productModuleCatalogItem{
 	"inventory":           {Name: "库存台账", Layer: "FactReadModel", Maturity: "runtime_v1", PageKeys: []string{"inventory", "inbound", "outbound"}},
 	"shipments":           {Name: "出货单", Layer: "Fact", Maturity: "runtime_v1", Dependencies: []string{"sales_orders", "inventory"}, PageKeys: []string{"shipments", "outbound"}},
 	"finance":             {Name: "财务业务", Layer: "FactCandidate", Maturity: "workflow_assisted", PageKeys: []string{"finance-dashboard", "payable-reconciliation", "shipment-finance"}},
-	"workflow_tasks":      {Name: "协同任务", Layer: "Workflow", Maturity: "runtime_v1", PageKeys: []string{"task-board"}},
+	"workflow_tasks":      {Name: "协同任务", Layer: "Workflow", Maturity: "runtime_v1", PageKeys: []string{"task-board", "shipping-release", "exception-flow"}},
 	"production":          {Name: "生产协同", Layer: "Workflow", Maturity: "workflow_assisted", PageKeys: []string{"production-progress"}},
 }
 
@@ -1287,18 +1293,35 @@ func normalizeCustomerConfigPublishInput(in CustomerConfigPublishInput) (Custome
 			return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot apply purpose is invalid", ErrBadParam)
 		}
 	}
+	snapshotString := func(key string) string {
+		value, _ := in.CompiledSnapshot[key].(string)
+		return strings.TrimSpace(value)
+	}
 	localPurpose := applyPurpose == CustomerConfigLocalTestApplyPurpose
 	localProduct := in.ProductVersion == CustomerConfigLocalTestProductVersion
-	trialPurpose := applyPurpose == CustomerConfigTrialApplyPurpose
-	trialProduct := in.ProductVersion == CustomerConfigTrialProductVersion
-	trialProductNamespace := strings.HasPrefix(in.ProductVersion, "customer-trial-")
+	localCandidate := strings.HasPrefix(in.ProductVersion, "local-customer-package-test-") ||
+		strings.HasPrefix(applyPurpose, "local_test_")
+	trialDatasetVersion := snapshotString("datasetVersion")
+	trialTarget := snapshotString("target")
+	trialRevision := strings.Contains(in.Revision, "-customer-trial-")
+	trialProduct := strings.HasPrefix(in.ProductVersion, "customer-trial-")
+	trialPurpose := strings.HasPrefix(applyPurpose, "customer_trial_")
+	trialTargetMarker := strings.HasPrefix(trialTarget, "customer-trial-")
+	trialCandidate := trialRevision ||
+		trialProduct || trialPurpose || trialTargetMarker
 	_, hasDatasetVersion := in.CompiledSnapshot["datasetVersion"]
 	_, hasTarget := in.CompiledSnapshot["target"]
 	localIdentityHasRemoteMarker := localPurpose && localProduct && (hasDatasetVersion || hasTarget)
-	validTestIdentity := (localPurpose && localProduct) || (trialPurpose && trialProduct)
-	if (applyPurpose != "" && !validTestIdentity) ||
-		(applyPurpose == "" && (localProduct || trialProductNamespace)) || localIdentityHasRemoteMarker {
+	if (localCandidate && (!localPurpose || !localProduct)) || localIdentityHasRemoteMarker ||
+		(!localPurpose && applyPurpose != "" && !trialCandidate) {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: test apply purpose and product version must match", ErrBadParam)
+	}
+	if trialCandidate && (!trialRevision ||
+		in.ProductVersion != CustomerConfigTrialProductVersion ||
+		applyPurpose != CustomerConfigTrialApplyPurpose ||
+		trialDatasetVersion != CustomerConfigTrialDatasetVersion ||
+		trialTarget != CustomerConfigTrialTarget) {
+		return CustomerConfigPublishInput{}, fmt.Errorf("%w: customer trial identity must match the registered dataset", ErrBadParam)
 	}
 	if containsForbiddenCustomerConfigPayload(in.CompiledSnapshot) {
 		return CustomerConfigPublishInput{}, fmt.Errorf("%w: compiled snapshot contains forbidden payload", ErrBadParam)
@@ -1679,6 +1702,13 @@ func buildEffectiveSessionFromRevision(
 	workPools []WorkPoolInput,
 	memberships []WorkPoolMembershipInput,
 ) *EffectiveSession {
+	compiledSnapshotString := func(key string) string {
+		if revision == nil || revision.CompiledSnapshot == nil {
+			return ""
+		}
+		value, _ := revision.CompiledSnapshot[key].(string)
+		return strings.TrimSpace(value)
+	}
 	moduleMap := map[string]string{}
 	for _, item := range modules {
 		if item.ModuleKey != "" {
@@ -1730,9 +1760,13 @@ func buildEffectiveSessionFromRevision(
 		pages = effectivePageKeysForRoles(pages, revision.CompiledSnapshot, roleKeys)
 	}
 	return &EffectiveSession{
-		ConfigRevision:    revision.Revision,
-		ConfigHash:        revision.ConfigHash,
-		ConfigHashVersion: revision.ConfigHashVersion,
+		ConfigRevision:       revision.Revision,
+		ConfigHash:           revision.ConfigHash,
+		ConfigHashVersion:    revision.ConfigHashVersion,
+		ConfigProductVersion: strings.TrimSpace(revision.ProductVersion),
+		ConfigApplyPurpose:   compiledSnapshotString("applyPurpose"),
+		ConfigDatasetVersion: compiledSnapshotString("datasetVersion"),
+		ConfigTarget:         compiledSnapshotString("target"),
 		Customer: EffectiveSessionCustomer{
 			Key:  customerKey,
 			Name: customerName,

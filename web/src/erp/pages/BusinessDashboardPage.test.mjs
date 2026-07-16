@@ -44,10 +44,15 @@ test('business dashboard renders unavailable counts distinctly from true zero', 
   assert.match(source, /待办概览暂不可用/u)
 })
 
-test('business dashboard avoids cross-boundary family totals and gives every source its own entry', () => {
+test('business dashboard avoids cross-boundary family totals and keeps every source visible', () => {
   assert.match(source, /每一项单独统计/u)
   assert.match(source, /record\.sources\.map/u)
-  assert.match(source, /onClick=\{\(\) => navigate\(source\.path\)\}/u)
+  assert.match(source, /effectiveSessionAllowsPage/u)
+  assert.match(source, /allowedMenuPaths\.has\(source\.path\)/u)
+  assert.match(source, /rbacAllowsPath\s*&&\s*effectiveSessionAllowsPage/u)
+  assert.match(source, /isLocalDev:\s*false/u)
+  assert.match(source, /canOpen\s*\?\s*\(/u)
+  assert.match(source, />\s*只读\s*</u)
   assert.match(source, /aria-label=\{`查看\$\{source\.label\}`\}/u)
   assert.doesNotMatch(source, /title: '记录合计'/u)
   assert.doesNotMatch(source, /erp-business-board-family-total/u)
@@ -72,15 +77,16 @@ test('business dashboard keeps explicit entries and adds guarded double-click sh
   assert.match(source, /erp-business-board-source-item--openable/u)
   assert.match(source, /erp-business-board-alert-item--openable/u)
   assert.match(source, /data-open-on-double-click/u)
-  assert.match(source, /title=\{`双击进入\$\{source\.label\}`\}/u)
+  assert.match(source, /data-target-path=\{canOpen \? source\.path : undefined\}/u)
+  assert.match(source, /title=\{canOpen \? `双击进入\$\{source\.label\}` : undefined\}/u)
   assert.match(
     source,
-    /openDashboardItemOnDoubleClick\(event,\s*\(\) => navigate\(source\.path\)\)/u
+    /openDashboardItemOnDoubleClick\(event,\s*\(\) =>[\s\S]*?navigate\(source\.path\)[\s\S]*?\)/u
   )
   assert.match(
     source,
     /openDashboardItemOnDoubleClick\(event,\s*\(\) =>\s*openTaskEntry\(task\)/u
   )
-  assert.match(source, /点击“查看”进入，电脑端也可双击整项/u)
+  assert.match(source, /有“查看”的项目可进入，其他项目仅显示数量/u)
   assert.match(source, /aria-label=\{`查看\$\{source\.label\}`\}/u)
 })

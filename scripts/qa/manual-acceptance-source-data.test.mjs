@@ -23,19 +23,80 @@ import {
 } from "./manual-acceptance-source-data.mjs";
 import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
 import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   MANUAL_ACCEPTANCE_DATASET_KEY,
   manualAcceptanceTargetConfirmation,
 } from "./manual-acceptance-target-policy.mjs";
 
+const LOCAL_ACCEPTANCE_BACKEND_URL = "http://127.0.0.1:8310";
+const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
 const forbiddenVisibleCopy =
   /\b(?:workflow|fact|json-rpc|rbac|usecase|schema|api|debugrunid|raw id)\b|甲方/iu;
+
+function buildLocalSourceMutationPlan(overrides = {}) {
+  return buildManualAcceptanceSourceDataPlan({
+    backendURL: LOCAL_ACCEPTANCE_BACKEND_URL,
+    databaseName: LOCAL_ACCEPTANCE_DATABASE,
+    ...overrides,
+  });
+}
+
+function localSourceMutationOptions(plan, overrides = {}) {
+  return {
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    ...overrides,
+  };
+}
+
+function localCapabilities(overrides = {}) {
+  return {
+    environment: "local",
+    databaseName: LOCAL_ACCEPTANCE_DATABASE,
+    ...overrides,
+  };
+}
+
+function localSession(overrides = {}) {
+  return {
+    customer: { key: "yoyoosun" },
+    source: "active_customer_config_revision",
+    configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+    configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+    ...overrides,
+  };
+}
 
 function ok(data = {}) {
   return {
     ok: true,
     json: async () => ({ result: { code: 0, message: "ok", data } }),
+  };
+}
+
+function runtimeIdentityResponse() {
+  return {
+    ok: true,
+    status: 200,
+    redirected: false,
+    headers: {
+      get: (name) =>
+        name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+    },
+    async text() {
+      return "runtime identity matched";
+    },
   };
 }
 
@@ -111,7 +172,7 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
     backendURL: "http://127.0.0.1:8300",
   });
 
-  assert.equal(plan.prefix, "SIM-YOYOOSUN-UAT-LOCAL-UAT");
+  assert.equal(plan.prefix, "YS-CS");
   assert.equal(plan.simulatedOnly, true);
   assert.equal(plan.realCustomerImport, false);
   assert.equal(plan.directSQL, false);
@@ -185,10 +246,31 @@ test("manual acceptance source plan reaches every agreed pagination threshold", 
   assert.ok(plan.records.bomVersions.some((item) => item.items.length === 25));
 });
 
+test("current V5 plans use short yoyoosun-style visible business numbers", () => {
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  });
+  assert.equal(plan.prefix, "YS5");
+  assert.equal(plan.records.customers[0].code, "YS5-KH-001");
+  assert.equal(plan.records.suppliers[0].code, "YS5-GYS-001");
+  assert.equal(plan.records.materials[0].code, "YS5-WL-001");
+  assert.equal(plan.records.products[0].code, "YS5-CP-001");
+  assert.equal(plan.records.products[0].skus[0].sku_code, "YS5-GG-001-01");
+  assert.equal(plan.records.processes[0].code, "YS5-GX-001");
+  assert.equal(plan.records.salesOrders[0].order_no, "YS5-XD-001");
+  assert.equal(plan.records.purchaseOrders[0].purchase_order_no, "YS5-CG-001");
+  assert.equal(
+    plan.records.outsourcingOrders[0].outsourcing_order_no,
+    "YS5-WW-001",
+  );
+  assert.match(plan.records.bomVersions[0].version, /^YS5-BOM-/u);
+});
+
 test("versioned source plans use a stable date anchor and semantic digest across targets", () => {
   const common = {
-    runId: "20260715-V1",
-    dataVersion: "2026.07.15-v1",
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   };
   const localPlan = buildManualAcceptanceSourceDataPlan(common);
   const remotePlan = buildManualAcceptanceSourceDataPlan({
@@ -197,7 +279,7 @@ test("versioned source plans use a stable date anchor and semantic digest across
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
   });
 
-  assert.equal(localPlan.anchorDate, "2026-07-15");
+  assert.equal(localPlan.anchorDate, "2026-07-16");
   assert.equal(remotePlan.anchorDate, localPlan.anchorDate);
   assert.equal(remotePlan.semanticDigest, localPlan.semanticDigest);
   assert.equal(localPlan.semanticDigest.length, 64);
@@ -212,14 +294,14 @@ test("versioned source plans use a stable date anchor and semantic digest across
   );
 
   const nextVersion = buildManualAcceptanceSourceDataPlan({
-    runId: "20260715-V3",
-    dataVersion: "2026.07.15-v3",
+    runId: "20260717-V6",
+    dataVersion: "2026.07.17-v6",
   });
   assert.notEqual(nextVersion.semanticDigest, localPlan.semanticDigest);
 
   const changed = buildManualAcceptanceSourceDataPlan({
     ...common,
-    anchorDate: "2026-07-16",
+    anchorDate: "2026-07-18",
   });
   assert.notEqual(changed.semanticDigest, localPlan.semanticDigest);
 });
@@ -354,10 +436,9 @@ test("business-visible fixture copy uses trial-user wording without developer ja
   assert.equal(plan.records.products[0].skus[0].packaging_version, "单只装");
   assert.equal(plan.records.processes[0].name, "裁片");
   assert.equal(plan.records.salesOrders[0].note, "分两批交货");
-  assert.deepEqual(
-    Object.keys(plan.records.salesOrders[0].contact_snapshot),
-    ["name"],
-  );
+  assert.deepEqual(Object.keys(plan.records.salesOrders[0].contact_snapshot), [
+    "name",
+  ]);
   assert.equal(
     [...plan.records.customers, ...plan.records.suppliers].every(
       (party) =>
@@ -425,7 +506,10 @@ test("business-visible fixture copy uses trial-user wording without developer ja
       const product = productByRef.get(item.productRef);
       assert.equal(item.product_no_snapshot, product.style_no);
       assert.equal(item.product_name_snapshot, product.name);
-      assert.equal(item.product_order_no_snapshot, sourceOrder.customer_order_no);
+      assert.equal(
+        item.product_order_no_snapshot,
+        sourceOrder.customer_order_no,
+      );
       assert.doesNotMatch(item.product_no_snapshot, /^(?:SIM|TEST)-/u);
     }
   }
@@ -463,21 +547,37 @@ test("CLI remains report-only by default and refuses implicit external targets",
   );
 });
 
+test("CLI help points only to the dedicated current local acceptance database", async () => {
+  const help = await runManualAcceptanceSourceDataCli(["--help"]);
+  assert.equal(help.exitCode, 0);
+  assert.match(help.text, /http:\/\/127\.0\.0\.1:8310/u);
+  assert.match(
+    help.text,
+    /--database-name plush_erp_acceptance_20260716_v5_dev/u,
+  );
+  assert.match(help.text, /--data-version 2026\.07\.16-v5/u);
+  assert.match(help.text, /--run-id 20260716-V5/u);
+  assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
+});
+
 test("apply requires the exact simulation confirmation before any backend call", async () => {
-  const plan = buildManualAcceptanceSourceDataPlan({ runId: "CONFIRM-CHECK" });
+  const plan = buildLocalSourceMutationPlan({ runId: "CONFIRM-CHECK" });
   const previous = process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM;
   delete process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM;
   let fetchCalls = 0;
   try {
     await assert.rejects(
       () =>
-        applyManualAcceptanceSourceData(plan, {
-          password: "local-demo-password",
-          fetchImpl: async () => {
-            fetchCalls += 1;
-            throw new Error("fetch should not run");
-          },
-        }),
+        applyManualAcceptanceSourceData(
+          plan,
+          localSourceMutationOptions(plan, {
+            password: "local-demo-password",
+            fetchImpl: async () => {
+              fetchCalls += 1;
+              throw new Error("fetch should not run");
+            },
+          }),
+        ),
       /apply requires MANUAL_ACCEPTANCE_SIM_CONFIRM/u,
     );
     assert.equal(fetchCalls, 0);
@@ -488,12 +588,44 @@ test("apply requires the exact simulation confirmation before any backend call",
   }
 });
 
+test("local source mutation fails closed without the dedicated database identity", async () => {
+  const missingDatabasePlan = buildManualAcceptanceSourceDataPlan({
+    runId: "MISSING-DATABASE",
+    backendURL: LOCAL_ACCEPTANCE_BACKEND_URL,
+  });
+  let fetchCalls = 0;
+  await assert.rejects(
+    () =>
+      applyManualAcceptanceSourceData(missingDatabasePlan, {
+        confirmPhrase: "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
+        password: "must-not-be-used",
+        adminPassword: "must-not-be-used",
+        fetchImpl: async () => {
+          fetchCalls += 1;
+          throw new Error("fetch must not run");
+        },
+      }),
+    /explicit dedicated databaseName/u,
+  );
+  assert.equal(fetchCalls, 0);
+
+  assert.throws(
+    () =>
+      buildManualAcceptanceSourceDataPlan({
+        runId: "WRONG-DATABASE",
+        backendURL: LOCAL_ACCEPTANCE_BACKEND_URL,
+        databaseName: "plush_erp",
+      }),
+    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+  );
+});
+
 test("customer-trial-133 source apply accepts only the registered attested runtime before the first data mutation", async () => {
   const plan = buildManualAcceptanceSourceDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   });
   const methods = [];
   const fetchImpl = async (_url, init) => {
@@ -525,7 +657,11 @@ test("customer-trial-133 source apply accepts only the registered attested runti
         session: {
           customer: { key: "yoyoosun" },
           source: "active_customer_config_revision",
-          configRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+          configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+          configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+          configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+          configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+          configTarget: CUSTOMER_TRIAL_133_TARGET,
           modules: Object.fromEntries(
             [
               "customers",
@@ -545,7 +681,7 @@ test("customer-trial-133 source apply accepts only the registered attested runti
     if (body.method === "capabilities") {
       return ok({
         environment: "remote",
-        databaseName: "plush_erp_uat_20260715",
+        databaseName: CUSTOMER_TRIAL_133_DATABASE,
         seedEnabled: false,
         seedAllowed: false,
         cleanupEnabled: false,
@@ -643,7 +779,7 @@ test("source verification requires a separate local super-admin credential befor
 });
 
 test("source apply rejects redirected login responses before runtime reads", async () => {
-  const plan = buildManualAcceptanceSourceDataPlan({ runId: "REDIRECT" });
+  const plan = buildLocalSourceMutationPlan({ runId: "REDIRECT" });
   const previous = process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM;
   process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM =
     "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
@@ -651,22 +787,26 @@ test("source apply rejects redirected login responses before runtime reads", asy
   try {
     await assert.rejects(
       () =>
-        applyManualAcceptanceSourceData(plan, {
-          password: "local-demo-password",
-          adminPassword: "local-admin-password",
-          fetchImpl: async () => {
-            fetchCalls += 1;
-            return {
-              ok: true,
-              status: 200,
-              redirected: true,
-              json: async () => ({ result: { code: 0, data: {} } }),
-            };
-          },
-        }),
+        applyManualAcceptanceSourceData(
+          plan,
+          localSourceMutationOptions(plan, {
+            password: "local-demo-password",
+            adminPassword: "local-admin-password",
+            fetchImpl: async (_url, init) => {
+              fetchCalls += 1;
+              if (!init.body) return runtimeIdentityResponse();
+              return {
+                ok: true,
+                status: 200,
+                redirected: true,
+                json: async () => ({ result: { code: 0, data: {} } }),
+              };
+            },
+          }),
+        ),
       /redirected response/u,
     );
-    assert(fetchCalls > 0);
+    assert.equal(fetchCalls, 2);
   } finally {
     if (previous === undefined) {
       delete process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM;
@@ -677,7 +817,7 @@ test("source apply rejects redirected login responses before runtime reads", asy
 });
 
 test("source apply requires a non-empty active yoyoosun revision before data writes", async () => {
-  const plan = buildManualAcceptanceSourceDataPlan({ runId: "EMPTY-REVISION" });
+  const plan = buildLocalSourceMutationPlan({ runId: "EMPTY-REVISION" });
   const previous = process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM;
   process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM =
     "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
@@ -686,34 +826,39 @@ test("source apply requires a non-empty active yoyoosun revision before data wri
   try {
     await assert.rejects(
       () =>
-        applyManualAcceptanceSourceData(plan, {
-          password: "local-demo-password",
-          adminPassword: "local-admin-password",
-          fetchImpl: async (_url, init) => {
-            const body = JSON.parse(init.body);
-            methods.push(body.method);
-            if (body.method === "admin_login") {
-              loginPasswords.set(body.params.username, body.params.password);
-              return ok({
-                access_token: `token-${body.params.username}`,
-                is_super_admin: body.params.username === "admin",
-              });
-            }
-            if (body.method === "capabilities") {
-              return ok({ environment: "local" });
-            }
-            if (body.method === "get_effective_session") {
-              return ok({
-                session: {
-                  customer: { key: "yoyoosun" },
-                  source: "active_customer_config_revision",
-                  configRevision: "",
-                },
-              });
-            }
-            throw new Error(`unexpected method ${body.method}`);
-          },
-        }),
+        applyManualAcceptanceSourceData(
+          plan,
+          localSourceMutationOptions(plan, {
+            password: "local-demo-password",
+            adminPassword: "local-admin-password",
+            fetchImpl: async (_url, init) => {
+              if (!init.body) {
+                methods.push("runtime_identity");
+                return runtimeIdentityResponse();
+              }
+              const body = JSON.parse(init.body);
+              methods.push(body.method);
+              if (body.method === "admin_login") {
+                loginPasswords.set(body.params.username, body.params.password);
+                return ok({
+                  access_token: `token-${body.params.username}`,
+                  is_super_admin: body.params.username === "admin",
+                });
+              }
+              if (body.method === "capabilities") {
+                return ok(localCapabilities());
+              }
+              if (body.method === "get_effective_session") {
+                return ok({
+                  session: localSession({
+                    configRevision: "",
+                  }),
+                });
+              }
+              throw new Error(`unexpected method ${body.method}`);
+            },
+          }),
+        ),
       /active customer configuration is not the current runtime source/u,
     );
     assert(!methods.includes("list_customers"));
@@ -730,7 +875,7 @@ test("source apply requires a non-empty active yoyoosun revision before data wri
 });
 
 test("source apply rejects a disabled required module before data reads or writes", async () => {
-  const plan = buildManualAcceptanceSourceDataPlan({ runId: "MODULE-OFF" });
+  const plan = buildLocalSourceMutationPlan({ runId: "MODULE-OFF" });
   const previous = process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM;
   process.env.MANUAL_ACCEPTANCE_SIM_CONFIRM =
     "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
@@ -738,44 +883,48 @@ test("source apply rejects a disabled required module before data reads or write
   try {
     await assert.rejects(
       () =>
-        applyManualAcceptanceSourceData(plan, {
-          password: "local-demo-password",
-          adminPassword: "local-admin-password",
-          fetchImpl: async (_url, init) => {
-            const body = JSON.parse(init.body);
-            methods.push(body.method);
-            if (body.method === "admin_login") {
-              return ok({
-                access_token: `token-${body.params.username}`,
-                is_super_admin: body.params.username === "admin",
-              });
-            }
-            if (body.method === "capabilities") {
-              return ok({ environment: "local" });
-            }
-            if (body.method === "get_effective_session") {
-              return ok({
-                session: {
-                  customer: { key: "yoyoosun" },
-                  source: "active_customer_config_revision",
-                  configRevision: "revision-1",
-                  modules: {
-                    customers: "enabled",
-                    suppliers: "enabled",
-                    products: "enabled",
-                    materials: "enabled",
-                    processes: "enabled",
-                    sales_orders: "enabled",
-                    purchase_orders: "enabled",
-                    outsourcing_orders: "enabled",
-                    material_bom: "disabled",
-                  },
-                },
-              });
-            }
-            throw new Error(`unexpected method ${body.method}`);
-          },
-        }),
+        applyManualAcceptanceSourceData(
+          plan,
+          localSourceMutationOptions(plan, {
+            password: "local-demo-password",
+            adminPassword: "local-admin-password",
+            fetchImpl: async (_url, init) => {
+              if (!init.body) {
+                methods.push("runtime_identity");
+                return runtimeIdentityResponse();
+              }
+              const body = JSON.parse(init.body);
+              methods.push(body.method);
+              if (body.method === "admin_login") {
+                return ok({
+                  access_token: `token-${body.params.username}`,
+                  is_super_admin: body.params.username === "admin",
+                });
+              }
+              if (body.method === "capabilities") {
+                return ok(localCapabilities());
+              }
+              if (body.method === "get_effective_session") {
+                return ok({
+                  session: localSession({
+                    modules: {
+                      customers: "enabled",
+                      suppliers: "enabled",
+                      products: "enabled",
+                      materials: "enabled",
+                      processes: "enabled",
+                      sales_orders: "enabled",
+                      purchase_orders: "enabled",
+                      outsourcing_orders: "enabled",
+                      material_bom: "disabled",
+                    },
+                  }),
+                });
+              }
+              throw new Error(`unexpected method ${body.method}`);
+            },
+          }),
+        ),
       /required modules are not enabled: material_bom/u,
     );
     assert(!methods.includes("list_customers"));

@@ -3,11 +3,176 @@ package data
 import (
 	"context"
 	"errors"
+	"reflect"
 	"regexp"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
+
+func TestDefaultCoreDemoReferenceSeedDatasetIsExact(t *testing.T) {
+	want := CoreDemoReferenceSeedDataset{
+		Prefix: CoreDemoReferenceSeedPrefix,
+		Units: []CoreDemoUnitSeed{
+			{Code: "YS5-DW-01", Name: "件", Precision: 0},
+		},
+		Warehouses: []CoreDemoWarehouseSeed{
+			{Code: "YS5-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
+			{Code: "YS5-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
+			{Code: "YS5-CK-03", Name: "待检仓", Type: "QC_HOLD"},
+			{Code: "YS5-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
+		},
+	}
+	got := DefaultCoreDemoReferenceSeedDataset()
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected references-only dataset\n got: %#v\nwant: %#v", got, want)
+	}
+	if err := validateCoreDemoReferenceSeedDataset(got); err != nil {
+		t.Fatalf("validateCoreDemoReferenceSeedDataset() error = %v", err)
+	}
+}
+
+func TestCoreDemoReferenceSeedRejectsAnythingOutsideExactAllowlist(t *testing.T) {
+	tests := []struct {
+		name   string
+		mutate func(*CoreDemoReferenceSeedDataset)
+	}{
+		{
+			name: "alternate prefix",
+			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
+				dataset.Prefix = "SIM-OTHER"
+			},
+		},
+		{
+			name: "extra unit",
+			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
+				dataset.Units = append(dataset.Units, CoreDemoUnitSeed{Code: "YS5-DW-02", Name: "箱"})
+			},
+		},
+		{
+			name: "changed unit",
+			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
+				dataset.Units[0].Name = "只"
+			},
+		},
+		{
+			name: "missing warehouse",
+			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
+				dataset.Warehouses = dataset.Warehouses[:3]
+			},
+		},
+		{
+			name: "extra warehouse",
+			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
+				dataset.Warehouses = append(dataset.Warehouses, CoreDemoWarehouseSeed{Code: "YS5-CK-05", Name: "其他仓", Type: "OTHER"})
+			},
+		},
+		{
+			name: "changed warehouse",
+			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
+				dataset.Warehouses[0].Type = "FINISHED_GOODS"
+			},
+		},
+		{
+			name: "duplicate warehouse",
+			mutate: func(dataset *CoreDemoReferenceSeedDataset) {
+				dataset.Warehouses[1] = dataset.Warehouses[0]
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dataset := DefaultCoreDemoReferenceSeedDataset()
+			tt.mutate(&dataset)
+			if err := validateCoreDemoReferenceSeedDataset(dataset); !errors.Is(err, ErrCoreDemoSeedInvalidRecord) {
+				t.Fatalf("expected ErrCoreDemoSeedInvalidRecord, got %v", err)
+			}
+		})
+	}
+}
+
+func TestSeedCoreDemoReferencesUpsertsOnlyExactReferencesIdempotently(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	dataset := DefaultCoreDemoReferenceSeedDataset()
+
+	expectRun := func() {
+		mock.ExpectBegin()
+		mock.ExpectQuery("INSERT INTO units").
+			WithArgs("YS5-DW-01", "件", 0).
+			WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
+		warehouseIDs := []int{21, 22, 23, 24}
+		for index, warehouse := range dataset.Warehouses {
+			mock.ExpectQuery("INSERT INTO warehouses").
+				WithArgs(warehouse.Code, warehouse.Name, warehouse.Type).
+				WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(warehouseIDs[index]))
+		}
+		mock.ExpectCommit()
+	}
+	expectRun()
+	expectRun()
+	mock.ExpectClose()
+
+	for run := 0; run < 2; run++ {
+		result, err := SeedCoreDemoReferences(context.Background(), db, dataset)
+		if err != nil {
+			t.Fatalf("SeedCoreDemoReferences() run %d error = %v", run+1, err)
+		}
+		if result.PrimaryUnitID != 11 || result.PrimaryWarehouseID != 22 {
+			t.Fatalf("unexpected primary ids on run %d: %#v", run+1, result)
+		}
+		if len(result.UnitIDs) != 1 || len(result.WarehouseIDs) != 4 {
+			t.Fatalf("unexpected reference counts on run %d: %#v", run+1, result)
+		}
+		if len(result.MaterialIDs) != 0 || len(result.ProductIDs) != 0 || len(result.ProcessIDs) != 0 || len(result.BOMHeaderIDs) != 0 {
+			t.Fatalf("references-only seed wrote an unrelated record kind on run %d: %#v", run+1, result)
+		}
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
+
+func TestSeedCoreDemoReferencesRejectsMissingDB(t *testing.T) {
+	if _, err := SeedCoreDemoReferences(context.Background(), nil, DefaultCoreDemoReferenceSeedDataset()); !errors.Is(err, ErrCoreDemoSeedMissingDB) {
+		t.Fatalf("expected ErrCoreDemoSeedMissingDB, got %v", err)
+	}
+}
+
+func TestSeedCoreDemoReferencesRollsBackAtomically(t *testing.T) {
+	db, mock, err := sqlmock.New()
+	if err != nil {
+		t.Fatalf("sqlmock.New() error = %v", err)
+	}
+	dataset := DefaultCoreDemoReferenceSeedDataset()
+	wantErr := errors.New("warehouse write failed")
+
+	mock.ExpectBegin()
+	mock.ExpectQuery("INSERT INTO units").
+		WithArgs("YS5-DW-01", "件", 0).
+		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(11))
+	mock.ExpectQuery("INSERT INTO warehouses").
+		WithArgs(dataset.Warehouses[0].Code, dataset.Warehouses[0].Name, dataset.Warehouses[0].Type).
+		WillReturnError(wantErr)
+	mock.ExpectRollback()
+	mock.ExpectClose()
+
+	if _, err := SeedCoreDemoReferences(context.Background(), db, dataset); !errors.Is(err, wantErr) {
+		t.Fatalf("expected warehouse error, got %v", err)
+	}
+	if err := db.Close(); err != nil {
+		t.Fatalf("db.Close() error = %v", err)
+	}
+	if err := mock.ExpectationsWereMet(); err != nil {
+		t.Fatalf("ExpectationsWereMet() error = %v", err)
+	}
+}
 
 func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 	dataset := DefaultCoreDemoSeedDataset("")

@@ -35,7 +35,10 @@ RUN pnpm build:all && \
 
 FROM ${RUNTIME_BASE_IMAGE} AS runtime
 
+ARG GIT_SHA
+
 ENV NODE_ENV=production
+ENV GIT_SHA=${GIT_SHA}
 ENV HOST=0.0.0.0
 ENV APP_ID=desktop
 ENV PORT=5175

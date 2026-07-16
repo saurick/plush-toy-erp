@@ -78,7 +78,10 @@ RUN --mount=type=cache,id=plush-gomod,target=/go/pkg/mod \
     mkdir -p bin && \
     GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
       -ldflags "-X main.Version=${GIT_SHA}" \
-      -o ./bin/server ./cmd/server
+      -o ./bin/server ./cmd/server && \
+    GOOS=${GO_TARGETOS} GOARCH=${GO_TARGETARCH} go build \
+      -ldflags "-X main.Version=${GIT_SHA}" \
+      -o ./bin/bootstrap-manual-acceptance-core ./cmd/bootstrap-manual-acceptance-core
 
 # ======================
 # 3) Runtime 阶段
@@ -123,6 +126,7 @@ ENV IMAGE_TAG=${IMAGE_TAG}
 WORKDIR /app
 
 COPY --from=builder /src/bin/server /app/server
+COPY --from=builder /src/bin/bootstrap-manual-acceptance-core /app/bootstrap-manual-acceptance-core
 COPY --from=builder /src/configs/prod /app/configs
 COPY --from=web-builder /web/build /app/public
 

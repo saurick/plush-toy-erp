@@ -9,6 +9,7 @@ import (
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
+	"server/internal/conf"
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -274,8 +275,7 @@ func TestCustomerConfigPublishInputFromParamsMergesFormalManifestMetadata(t *tes
 }
 
 func TestLocalTestCustomerConfigBoundaryDefaultsClosedAndRequiresExplicitLocalFlag(t *testing.T) {
-	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "")
-	if res := localTestCustomerConfigBoundaryResult("product-v1", map[string]any{}); res != nil {
+	if res := localTestCustomerConfigBoundaryResult("product-v1", map[string]any{}, false); res != nil {
 		t.Fatalf("formal customer config must remain available: %#v", res)
 	}
 	for _, testCase := range []struct {
@@ -292,24 +292,82 @@ func TestLocalTestCustomerConfigBoundaryDefaultsClosedAndRequiresExplicitLocalFl
 			name:           "transition product identity",
 			productVersion: biz.CustomerConfigLocalTestProductVersion,
 		},
+		{
+			name:           "reserved local product namespace drift",
+			productVersion: "local-customer-package-test-unknown",
+		},
+		{
+			name:             "reserved local purpose namespace drift",
+			productVersion:   "product-v1",
+			compiledSnapshot: map[string]any{"applyPurpose": "local_test_unknown"},
+		},
 	} {
 		t.Run(testCase.name, func(t *testing.T) {
-			res := localTestCustomerConfigBoundaryResult(testCase.productVersion, testCase.compiledSnapshot)
+			res := localTestCustomerConfigBoundaryResult(testCase.productVersion, testCase.compiledSnapshot, false)
 			if res == nil || res.Code != errcode.InvalidParam.Code {
 				t.Fatalf("local test boundary result = %#v, want invalid param", res)
 			}
 		})
 	}
 
-	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "1")
 	if res := localTestCustomerConfigBoundaryResult(
 		biz.CustomerConfigLocalTestProductVersion,
 		map[string]any{"applyPurpose": biz.CustomerConfigLocalTestApplyPurpose},
+		true,
 	); res != nil {
 		t.Fatalf("explicit local flag must allow local test manifest: %#v", res)
 	}
-	if res := localTestCustomerConfigBoundaryResult(biz.CustomerConfigLocalTestProductVersion, nil); res != nil {
+	if res := localTestCustomerConfigBoundaryResult(biz.CustomerConfigLocalTestProductVersion, nil, true); res != nil {
 		t.Fatalf("explicit local flag must allow local test transition: %#v", res)
+	}
+	for _, testCase := range []struct {
+		productVersion   string
+		compiledSnapshot map[string]any
+	}{
+		{productVersion: "local-customer-package-test-unknown"},
+		{
+			productVersion:   biz.CustomerConfigLocalTestProductVersion,
+			compiledSnapshot: map[string]any{"applyPurpose": "local_test_unknown"},
+		},
+	} {
+		res := localTestCustomerConfigBoundaryResult(testCase.productVersion, testCase.compiledSnapshot, true)
+		if res == nil || res.Code != errcode.InvalidParam.Code {
+			t.Fatalf("reserved local identity drift must stay invalid while flag is enabled: %#v", res)
+		}
+	}
+}
+
+func TestResolveCustomerConfigLocalTestGateBindsFlagToRegisteredDevelopmentFamily(t *testing.T) {
+	t.Parallel()
+
+	exact := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+	}}
+	enabled, err := resolveCustomerConfigLocalTestGate(exact, func(key string) string {
+		if key == biz.CustomerConfigLocalTestAllowEnv {
+			return "1"
+		}
+		return ""
+	})
+	if err != nil || !enabled {
+		t.Fatalf("resolveCustomerConfigLocalTestGate() = %v, %v", enabled, err)
+	}
+
+	shared := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+	}}
+	if enabled, err := resolveCustomerConfigLocalTestGate(shared, func(string) string { return "1" }); err != nil || !enabled {
+		t.Fatalf("shared dev gate = %v, %v; want enabled", enabled, err)
+	}
+	if enabled, err := resolveCustomerConfigLocalTestGate(shared, func(string) string { return "" }); err != nil || enabled {
+		t.Fatalf("disabled shared dev gate = %v, %v", enabled, err)
+	}
+
+	remote := &conf.Data{Postgres: &conf.Data_Postgres{
+		Dsn: "postgres://test_user:secret@192.168.0.133:5435/plush_erp?sslmode=disable",
+	}}
+	if enabled, err := resolveCustomerConfigLocalTestGate(remote, func(string) string { return "1" }); err == nil || enabled {
+		t.Fatalf("remote test-server gate = %v, %v; want fail closed", enabled, err)
 	}
 }
 
@@ -1687,7 +1745,7 @@ func TestCustomerConfigJSONRPCLocalTestManifestRequiresExplicitBackendFlag(t *te
 	)
 	ctx := customerConfigAdminCtx(1, "admin")
 
-	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "")
+	dispatcher.localTestConfigEnabled = false
 	for _, method := range []string{"validate_customer_config", "publish_customer_config"} {
 		_, res, err := dispatcher.handleCustomerConfig(ctx, method, method+"-blocked", params)
 		if err != nil {
@@ -1698,7 +1756,7 @@ func TestCustomerConfigJSONRPCLocalTestManifestRequiresExplicitBackendFlag(t *te
 		}
 	}
 
-	t.Setenv(biz.CustomerConfigLocalTestAllowEnv, "1")
+	dispatcher.localTestConfigEnabled = true
 	for _, method := range []string{"validate_customer_config", "publish_customer_config"} {
 		_, res, err := dispatcher.handleCustomerConfig(ctx, method, method+"-allowed", params)
 		if err != nil {
@@ -1864,6 +1922,12 @@ func TestCustomerConfigJSONRPCPublishActivateAndEffectiveSession(t *testing.T) {
 	}
 	if session["configHash"] != publishedHash {
 		t.Fatalf("configHash = %#v, want published hash %q", session["configHash"], publishedHash)
+	}
+	if session["configProductVersion"] != "test" {
+		t.Fatalf("configProductVersion = %#v", session["configProductVersion"])
+	}
+	if session["configApplyPurpose"] != "" || session["configDatasetVersion"] != "" || session["configTarget"] != "" {
+		t.Fatalf("unexpected config markers = %#v", session)
 	}
 	if session["source"] != "active_customer_config_revision" {
 		t.Fatalf("source = %#v", session["source"])

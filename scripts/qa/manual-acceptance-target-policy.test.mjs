@@ -2,10 +2,18 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
+  LOCAL_MANUAL_ACCEPTANCE_DATABASE,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   MANUAL_ACCEPTANCE_DATASET_KEY,
   assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
@@ -21,8 +29,8 @@ const remotePolicyInput = Object.freeze({
   target: CUSTOMER_TRIAL_133_TARGET,
   backendURL: CUSTOMER_TRIAL_133_ORIGIN,
   datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
-  dataVersion: "2026.07.15-v1",
-  runId: "20260715-V1",
+  dataVersion: "2026.07.16-v5",
+  runId: "20260716-V5",
 });
 
 const safeRemoteCapabilities = Object.freeze({
@@ -39,14 +47,30 @@ const safeRemoteCapabilities = Object.freeze({
 const safeSession = Object.freeze({
   customer: { key: "yoyoosun" },
   source: "active_customer_config_revision",
-  configRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+  configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  configTarget: CUSTOMER_TRIAL_133_TARGET,
   modules: {
     customers: "enabled",
     workflow_tasks: "enabled",
   },
 });
 
-test("target policy keeps implicit loopback on the local-dev guard", () => {
+const safeLocalSession = Object.freeze({
+  customer: { key: "yoyoosun" },
+  source: "active_customer_config_revision",
+  configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  modules: {
+    customers: "enabled",
+    workflow_tasks: "enabled",
+  },
+});
+
+test("implicit shared loopback stays read-only and cannot pass the local apply guard", () => {
   const policy = resolveManualAcceptanceTarget({
     backendURL: "http://localhost:8300/",
     runId: "LOCAL-UAT",
@@ -60,9 +84,9 @@ test("target policy keeps implicit loopback on the local-dev guard", () => {
     runId: "LOCAL-UAT",
     external: false,
   });
-  assert.equal(
-    assertManualAcceptanceMutationTarget(policy).target,
-    LOCAL_DEV_TARGET,
+  assert.throws(
+    () => assertManualAcceptanceMutationTarget(policy),
+    /explicit dedicated databaseName/u,
   );
 });
 
@@ -133,13 +157,13 @@ test("customer-trial-133 requires explicit safe dataVersion and runId", () => {
 
 test("customer-trial-133 mutation confirmation binds target, version, and run", () => {
   const expected =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v1:20260715-V1";
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.16-v5:20260716-V5";
   assert.equal(manualAcceptanceTargetConfirmation(remotePolicyInput), expected);
   for (const confirmation of [
     undefined,
     "yes",
-    expected.replace("2026.07.15-v1", "2026.07.15-v2"),
-    expected.replace("20260715-V1", "20260715-V2"),
+    expected.replace("2026.07.16-v5", "2026.07.16-v6"),
+    expected.replace("20260716-V5", "20260716-V6"),
   ]) {
     assert.throws(
       () =>
@@ -162,12 +186,12 @@ test("local dedicated apply confirmation and runtime database identity are exact
     target: LOCAL_DEV_TARGET,
     backendURL: "http://127.0.0.1:18376",
     datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
-    dataVersion: "2026.07.15-v3",
-    runId: "20260715-V3",
-    databaseName: "plush_erp_acceptance_20260715_v3_dev",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+    databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE,
   };
   const confirmation =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.15-v3:20260715-V3:plush_erp_acceptance_20260715_v3_dev";
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev";
   assert.equal(manualAcceptanceTargetConfirmation(localPolicy), confirmation);
   assert.throws(
     () => assertManualAcceptanceMutationTarget(localPolicy),
@@ -176,16 +200,16 @@ test("local dedicated apply confirmation and runtime database identity are exact
   assert.equal(
     assertManualAcceptanceMutationTarget(localPolicy, { confirmation })
       .databaseName,
-    "plush_erp_acceptance_20260715_v3_dev",
+    LOCAL_MANUAL_ACCEPTANCE_DATABASE,
   );
   assert.equal(
     assertManualAcceptanceDatabaseIdentity({
       policy: localPolicy,
       capabilities: {
-        databaseName: "plush_erp_acceptance_20260715_v3_dev",
+        databaseName: LOCAL_MANUAL_ACCEPTANCE_DATABASE,
       },
     }).databaseName,
-    "plush_erp_acceptance_20260715_v3_dev",
+    LOCAL_MANUAL_ACCEPTANCE_DATABASE,
   );
   assert.throws(
     () =>
@@ -196,8 +220,31 @@ test("local dedicated apply confirmation and runtime database identity are exact
     /runtime databaseName=plush_erp_simon_dev/u,
   );
   assert.throws(
-    () => resolveManualAcceptanceTarget({ ...localPolicy, databaseName: "plush_erp_simon_dev" }),
-    /plush_erp_acceptance_/u,
+    () =>
+      resolveManualAcceptanceTarget({
+        ...localPolicy,
+        databaseName: "plush_erp_simon_dev",
+      }),
+    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+  );
+  assert.throws(
+    () =>
+      resolveManualAcceptanceTarget({
+        ...localPolicy,
+        databaseName: "plush_erp_acceptance_20260716_other_dev",
+      }),
+    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+  );
+  assert.throws(
+    () =>
+      assertManualAcceptanceMutationTarget(
+        {
+          ...localPolicy,
+          backendURL: "http://127.0.0.1:8300",
+        },
+        { confirmation },
+      ),
+    /isolated non-8300 backend/u,
   );
 });
 
@@ -217,10 +264,7 @@ test("customer-trial-133 out-of-band attestation pins origin, customer, release,
     policy: remotePolicyInput,
     attestation: JSON.stringify(attestation),
   });
-  assert.equal(
-    checked.release,
-    "20c96d38a7b9e6d4f3c2b1a09876543210fedcba",
-  );
+  assert.equal(checked.release, "20c96d38a7b9e6d4f3c2b1a09876543210fedcba");
   assert.equal(checked.migration, "20260714165115");
   assert.deepEqual(
     manualAcceptanceRuntimeCapabilitiesFromAttestation({
@@ -295,7 +339,10 @@ test("runtime identity precondition requires the dedicated proof marker before a
   });
   assert.equal(proof.databaseName, CUSTOMER_TRIAL_133_DATABASE);
   assert.equal(proof.release, attestation.release);
-  assert.equal(request.url, `${CUSTOMER_TRIAL_133_ORIGIN}/readyz/runtime-identity`);
+  assert.equal(
+    request.url,
+    `${CUSTOMER_TRIAL_133_ORIGIN}/readyz/runtime-identity`,
+  );
   assert.equal(request.init.method, "GET");
   assert.equal(request.init.body, undefined);
   assert.equal(
@@ -337,6 +384,27 @@ test("customer-trial-133 runtime accepts only normalized remote with all debug m
   assert.equal(runtime.environment, "remote");
   assert.equal(runtime.debugMutationsDisabled, true);
   assert.deepEqual(runtime.requiredModules, ["customers", "workflow_tasks"]);
+
+  for (const drift of [
+    {
+      configRevision:
+        "yoyoosun-customer-trial-133-package-v3.runtime-manifest-v1",
+    },
+    { configProductVersion: "customer-trial-133-test-2026.07.15-v3" },
+    { configApplyPurpose: "customer_trial_test_apply_old" },
+    { configDatasetVersion: "2026.07.15-v3" },
+    { configTarget: "customer-trial-other" },
+  ]) {
+    assert.throws(
+      () =>
+        assertManualAcceptanceRuntimePolicy({
+          policy: remotePolicyInput,
+          capabilities: safeRemoteCapabilities,
+          session: { ...safeSession, ...drift },
+        }),
+      /active customer-trial configuration identity/u,
+    );
+  }
 
   for (const environment of [
     "local",
@@ -382,20 +450,70 @@ test("customer-trial-133 fails closed when any debug mutation flag is true or ab
   }
 });
 
+test("local runtime accepts only the tracked local-test package without trial markers", () => {
+  const policy = {
+    backendURL: "http://127.0.0.1:8310",
+    databaseName: "plush_erp_acceptance_20260716_v5_dev",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  };
+  const runtime = assertManualAcceptanceRuntimePolicy({
+    policy,
+    capabilities: { environment: "local" },
+    session: safeLocalSession,
+    requiredModules: ["customers", "workflow_tasks"],
+  });
+  assert.equal(runtime.configRevision, LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION);
+  assert.equal(
+    runtime.configProductVersion,
+    LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  );
+  assert.equal(
+    runtime.configApplyPurpose,
+    LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  );
+  assert.equal(runtime.configDatasetVersion, undefined);
+  assert.equal(runtime.configTarget, undefined);
+
+  for (const drift of [
+    { configRevision: "yoyoosun-customer-package-v7.local-old.runtime-v1" },
+    { configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION },
+    { configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION },
+    { configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE },
+    { configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION },
+    { configTarget: CUSTOMER_TRIAL_133_TARGET },
+  ]) {
+    assert.throws(
+      () =>
+        assertManualAcceptanceRuntimePolicy({
+          policy,
+          capabilities: { environment: "local" },
+          session: { ...safeLocalSession, ...drift },
+        }),
+      /active local-test configuration identity/u,
+    );
+  }
+});
+
 test("both local and customer-trial-133 require yoyoosun active revision and modules", () => {
   const policies = [
     {
       policy: { backendURL: "http://127.0.0.1:8300", runId: "LOCAL-UAT" },
       capabilities: { environment: "local" },
+      session: safeLocalSession,
     },
-    { policy: remotePolicyInput, capabilities: safeRemoteCapabilities },
+    {
+      policy: remotePolicyInput,
+      capabilities: safeRemoteCapabilities,
+      session: safeSession,
+    },
   ];
   for (const entry of policies) {
     assert.throws(
       () =>
         assertManualAcceptanceRuntimePolicy({
           ...entry,
-          session: { ...safeSession, configRevision: "" },
+          session: { ...entry.session, configRevision: "" },
           requiredModules: ["customers"],
         }),
       /active customer configuration/u,
@@ -405,8 +523,8 @@ test("both local and customer-trial-133 require yoyoosun active revision and mod
         assertManualAcceptanceRuntimePolicy({
           ...entry,
           session: {
-            ...safeSession,
-            modules: { ...safeSession.modules, customers: "disabled" },
+            ...entry.session,
+            modules: { ...entry.session.modules, customers: "disabled" },
           },
           requiredModules: ["customers"],
         }),
@@ -424,11 +542,12 @@ test("loopback accepts the SQL default only while every debug mutation stays dis
   const runtime = assertManualAcceptanceRuntimePolicy({
     policy,
     capabilities: { ...safeRemoteCapabilities, environment: "sql" },
-    session: safeSession,
+    session: safeLocalSession,
     requiredModules: ["customers"],
   });
   assert.equal(runtime.target, LOCAL_DEV_TARGET);
   assert.equal(runtime.environment, "sql");
+  assert.equal(Object.hasOwn(runtime, "debugMutationsDisabled"), false);
 
   for (const key of [
     "seedEnabled",
@@ -447,7 +566,7 @@ test("loopback accepts the SQL default only while every debug mutation stays dis
             environment: "sql",
             [key]: true,
           },
-          session: safeSession,
+          session: safeLocalSession,
         }),
       /environment=sql requires every debug mutation disabled/u,
     );

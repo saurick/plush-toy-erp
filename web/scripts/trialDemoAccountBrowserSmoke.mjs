@@ -158,6 +158,7 @@ const desktopAccounts = [
       '销售订单',
       '采购订单',
       '模板打印中心',
+      '出货放行',
       '异常处理',
     ],
   },
@@ -350,6 +351,15 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
   const adminDesktop = plan.desktopAccounts.find(
     (account) => account.username === 'demo_admin'
   )
+  const bossDesktop = plan.desktopAccounts.find(
+    (account) => account.username === 'demo_boss'
+  )
+  const warehouseDesktop = plan.desktopAccounts.find(
+    (account) => account.username === 'demo_warehouse'
+  )
+  const productionDesktop = plan.desktopAccounts.find(
+    (account) => account.username === 'demo_production'
+  )
   const blockers = []
   const checks = {
     desktopAccountCount: plan.desktopAccounts.length,
@@ -378,12 +388,13 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
         account.expectedMessage ===
           '当前账号不能使用所选工作方式，请联系系统管理员。'
     ),
-    coversCustomerHiddenMenus:
-      plan.customerHiddenMenuLabels.length > 0 &&
-      plan.desktopAccounts.every((account) =>
-        plan.customerHiddenMenuLabels.every((label) =>
-          account.forbiddenMenus.includes(label)
-        )
+    coversFormalCustomerPageProjection:
+      plan.customerHiddenMenuLabels.length === 0 &&
+      bossDesktop?.visibleExpectedMenus.includes('业务看板') &&
+      warehouseDesktop?.visibleExpectedMenus.includes('出货放行') &&
+      productionDesktop?.visibleExpectedMenus.includes('异常处理') &&
+      ['业务看板', '出货放行', '异常处理'].every((label) =>
+        adminDesktop?.forbiddenMenus.includes(label)
       ),
     coversLegacyMenuCleanup:
       plan.forbiddenLegacyMenuLabels.length > 0 &&

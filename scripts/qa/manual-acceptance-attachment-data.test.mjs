@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
 import test from "node:test";
 import {
   ATTACHMENT_NOTE,
   SOURCE_DRIVEN_FACT_REPORT_CONTRACT,
+  assertAttachmentFixtureIntegrity,
   buildAttachmentFixtures,
   buildAttachmentTargets,
   normalizeLocalBackendURL,
@@ -10,6 +12,19 @@ import {
   selectAttachmentWorkflowTask,
   validateAttachmentReportBatch,
 } from "./manual-acceptance-attachment-data.mjs";
+import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
+  CUSTOMER_TRIAL_133_TARGET,
+  manualAcceptanceTargetConfirmation,
+} from "./manual-acceptance-target-policy.mjs";
+
+const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
+const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
 
 test("attachment copy stays short, ordinary, and clearly sample-only", () => {
   const fixtures = buildAttachmentFixtures();
@@ -66,8 +81,13 @@ test("attachment actors use an independent role password", () => {
 });
 
 function reports(overrides = {}) {
-  const backendURL = overrides.backendURL || "http://127.0.0.1:8300";
+  const backendURL = overrides.backendURL || LOCAL_BACKEND_URL;
   const target = overrides.target || "local-dev";
+  const databaseName =
+    overrides.databaseName ||
+    (target === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_DATABASE
+      : LOCAL_DATABASE_NAME);
   const runtime =
     overrides.runtime || {
       environment: "local",
@@ -77,10 +97,11 @@ function reports(overrides = {}) {
     };
   const identity = {
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
     target,
     backendURL,
+    databaseName,
   };
   const sourceReport = {
     mode: "apply",
@@ -145,6 +166,79 @@ test("attachment fixtures include multiple formats and one near-limit sample", (
   assert(fixtures.some((item) => item.sizeClass === "near-limit" && item.content.length > 4_000_000));
 });
 
+test("same-name attachment reuse requires exact metadata and downloaded content", () => {
+  const item = buildAttachmentFixtures({ includeNearLimit: false })[0];
+  const sha256 = createHash("sha256").update(item.content).digest("hex");
+  const metadata = {
+    file_name: item.file_name,
+    mime_type: item.mime_type,
+    file_size: item.content.length,
+    sha256,
+    note: ATTACHMENT_NOTE,
+  };
+  const downloadedAttachment = {
+    ...metadata,
+    content_base64: item.content.toString("base64"),
+  };
+
+  assert.deepEqual(
+    assertAttachmentFixtureIntegrity({
+      fixture: item,
+      attachment: metadata,
+      downloadedAttachment,
+    }),
+    { sha256, fileSize: item.content.length },
+  );
+
+  const conflicts = {
+    file_name: `${item.file_name}.old`,
+    mime_type: "application/octet-stream",
+    file_size: item.content.length + 1,
+    sha256: "0".repeat(64),
+    note: "旧样例",
+  };
+  for (const location of ["attachment", "downloadedAttachment"]) {
+    for (const [field, value] of Object.entries(conflicts)) {
+      const options = {
+        fixture: item,
+        attachment: { ...metadata },
+        downloadedAttachment: { ...downloadedAttachment },
+      };
+      options[location][field] = value;
+      assert.throws(
+        () => assertAttachmentFixtureIntegrity(options),
+        /conflicts with the current fixture/u,
+        `${location}.${field}`,
+      );
+    }
+  }
+
+  assert.throws(
+    () =>
+      assertAttachmentFixtureIntegrity({
+        fixture: item,
+        attachment: metadata,
+        downloadedAttachment: {
+          ...downloadedAttachment,
+          content_base64: "",
+        },
+      }),
+    /downloaded content is empty/u,
+  );
+  assert.throws(
+    () =>
+      assertAttachmentFixtureIntegrity({
+        fixture: item,
+        attachment: metadata,
+        downloadedAttachment: {
+          ...downloadedAttachment,
+          content_base64: Buffer.from("wrong content").toString("base64"),
+        },
+      }),
+    /downloaded content conflicts with the current fixture/u,
+  );
+});
+
 test("attachment targets require seven business owners and workflow version", () => {
   const { sourceReport, factReport } = reports();
   const targets = buildAttachmentTargets({ sourceReport, factReport, workflowTask: { id: 17, version: 3 } });
@@ -182,17 +276,23 @@ test("attachment report batch binds exact dataset identity and registered target
   const local = reports();
   const resolvedLocal = validateAttachmentReportBatch({
     ...local,
-    targetConfirmation: undefined,
+    targetConfirmation: manualAcceptanceTargetConfirmation(
+      local.factReport,
+    ),
     targetAttestation: undefined,
   });
   assert.equal(resolvedLocal.policy.target, "local-dev");
 
-  const target = "customer-trial-133";
+  const target = CUSTOMER_TRIAL_133_TARGET;
   const backendURL = "http://127.0.0.1:18375";
   const remoteRuntime = {
     environment: "remote",
     customerKey: "yoyoosun",
-    configRevision: "cfg-trial-133-v1",
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
     source: "active_customer_config_revision",
     targetAttestation: {
       source: "out-of-band",
@@ -206,7 +306,7 @@ test("attachment report batch binds exact dataset identity and registered target
     /MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
   );
   const targetConfirmation =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v1:20260715-V1";
+    `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:${CUSTOMER_TRIAL_133_TARGET}:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`;
   assert.throws(
     () => validateAttachmentReportBatch({ ...remote, targetConfirmation }),
     /attestation is required/u,
@@ -243,6 +343,33 @@ test("attachment report batch binds exact dataset identity and registered target
   assert.throws(
     () => validateAttachmentReportBatch(wrongBatch),
     /same dataset batch/u,
+  );
+});
+
+test("attachment batch rejects local and 133 database drift before report acceptance", () => {
+  const local = reports();
+  const localDrift = structuredClone(local);
+  localDrift.sourceReport.databaseName =
+    "plush_erp_acceptance_20260716_other_dev";
+  assert.throws(
+    () =>
+      validateAttachmentReportBatch({
+        ...localDrift,
+        targetConfirmation: manualAcceptanceTargetConfirmation(
+          local.factReport,
+        ),
+      }),
+    /same dataset batch/u,
+  );
+
+  const remote = reports({
+    target: CUSTOMER_TRIAL_133_TARGET,
+    backendURL: "http://127.0.0.1:18375",
+  });
+  remote.factReport.databaseName = "plush_erp_uat_wrong";
+  assert.throws(
+    () => validateAttachmentReportBatch(remote),
+    /same dataset batch|databaseName/u,
   );
 });
 

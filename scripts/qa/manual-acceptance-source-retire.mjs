@@ -363,6 +363,60 @@ function itemIdentity(item) {
   );
 }
 
+function retirementIdentityAllowlists(plan) {
+  const records = plan?.records || {};
+  const values = {
+    salesOrders: (records.salesOrders || []).map((item) => item.order_no),
+    purchaseOrders: (records.purchaseOrders || []).map(
+      (item) => item.purchase_order_no,
+    ),
+    outsourcingOrders: (records.outsourcingOrders || []).map(
+      (item) => item.outsourcing_order_no,
+    ),
+    bomVersions: (records.bomVersions || []).map((item) => item.version),
+    productSkus: (records.products || []).flatMap((product) =>
+      (product.skus || []).map((item) => item.sku_code),
+    ),
+    processes: (records.processes || []).map((item) => item.code),
+    materials: (records.materials || []).map((item) => item.code),
+    products: (records.products || []).map((item) => item.code),
+    suppliers: (records.suppliers || []).map((item) => item.code),
+    customers: (records.customers || []).map((item) => item.code),
+  };
+  return Object.fromEntries(
+    Object.entries(values).map(([datasetKey, identities]) => {
+      const normalized = identities.map((value) => requiredText(value, datasetKey));
+      if (
+        normalized.length === 0 ||
+        new Set(normalized).size !== normalized.length
+      ) {
+        throw new CliError(
+          `source retirement ${datasetKey} identity allowlist is empty or duplicated`,
+          2,
+        );
+      }
+      return [datasetKey, new Set(normalized)];
+    }),
+  );
+}
+
+function assertExactRetirementSnapshot(datasetKey, items, allowlist) {
+  const identities = items.map((item) => itemIdentity(item));
+  const actual = new Set(identities);
+  const duplicate = identities.find(
+    (identity, index) => identities.indexOf(identity) !== index,
+  );
+  const unknown = identities.filter((identity) => !allowlist.has(identity));
+  const missing = [...allowlist].filter((identity) => !actual.has(identity));
+  if (duplicate || unknown.length > 0 || missing.length > 0) {
+    throw new CliError(
+      `source retirement ${datasetKey} exact batch mismatch: duplicate=${duplicate || "none"} unknown=${unknown.slice(0, 3).join(",") || "none"} missing=${missing.slice(0, 3).join(",") || "none"}`,
+      2,
+    );
+  }
+  return items;
+}
+
 export function buildManualAcceptanceRetirementActions(snapshot) {
   const actions = [];
   for (const [datasetKey, config] of Object.entries(DOCUMENT_RETIREMENT)) {
@@ -410,6 +464,7 @@ export function assertManualAcceptanceRetirementComplete(snapshot) {
 }
 
 async function loadSnapshot({ plan, tokens, fetchImpl }) {
+  const allowlists = retirementIdentityAllowlists(plan);
   const entries = await Promise.all(
     DATASET_SPECS.map(async (spec) => {
       const data = await rpcCall({
@@ -420,7 +475,14 @@ async function loadSnapshot({ plan, tokens, fetchImpl }) {
         token: tokens[spec.role],
         fetchImpl,
       });
-      return [spec.key, data[spec.listKey] || []];
+      return [
+        spec.key,
+        assertExactRetirementSnapshot(
+          spec.key,
+          data[spec.listKey] || [],
+          allowlists[spec.key],
+        ),
+      ];
     }),
   );
   return Object.fromEntries(entries);
@@ -487,7 +549,7 @@ export async function retireManualAcceptanceSourceData(
         "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
       )
     : undefined;
-  if (apply && targetPolicy.external) {
+  if (apply) {
     await assertManualAcceptanceRuntimeIdentityPrecondition({
       policy: targetPolicy,
       attestation: parsedTargetAttestation,
@@ -544,6 +606,7 @@ export async function retireManualAcceptanceSourceData(
     dataVersion: safePlan.dataVersion,
     prefix: safePlan.prefix,
     backendURL: safePlan.backendURL,
+    databaseName: safePlan.databaseName,
     simulatedOnly: true,
     physicalDelete: false,
     runtime,
@@ -567,6 +630,7 @@ export function parseManualAcceptanceRetireArgs(argv) {
     dataVersion: process.env.MANUAL_ACCEPTANCE_DATA_VERSION,
     out: DEFAULT_OUT_DIR,
     runId: process.env.MANUAL_ACCEPTANCE_RUN_ID || "LOCAL-UAT",
+    databaseName: process.env.MANUAL_ACCEPTANCE_DATABASE_NAME,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -606,6 +670,9 @@ export function parseManualAcceptanceRetireArgs(argv) {
       case "--run-id":
         options.runId = value;
         break;
+      case "--database-name":
+        options.databaseName = value;
+        break;
       default:
         throw new CliError(`unknown option ${token}`, 2);
     }
@@ -615,10 +682,12 @@ export function parseManualAcceptanceRetireArgs(argv) {
     target: options.target,
     dataVersion: options.dataVersion,
     runId: options.runId,
+    databaseName: options.databaseName,
   });
   options.backendURL = targetPolicy.backendURL;
   options.target = targetPolicy.target;
   options.dataVersion = targetPolicy.dataVersion;
+  options.databaseName = targetPolicy.databaseName;
   return options;
 }
 
@@ -674,7 +743,7 @@ function usage() {
 
 133 客户试用环境必须通过已登记的 SSH 隧道，并额外提供：
   --target customer-trial-133 --backend-url http://127.0.0.1:18375 \\
-  --data-version 2026.07.15-v3 --run-id 20260715-V3
+  --data-version 2026.07.16-v5 --run-id 20260716-V5
 以及绑定 target / dataVersion / runId 的 MANUAL_ACCEPTANCE_TARGET_CONFIRM，
 和包含精确 origin/customer/release/migration/debug=false 的
 MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
@@ -690,6 +759,7 @@ export async function runManualAcceptanceRetireCli(argv, deps = {}) {
     backendURL: options.backendURL,
     target: options.target,
     dataVersion: options.dataVersion,
+    databaseName: options.databaseName,
   });
   const report = await retireManualAcceptanceSourceData(plan, {
     ...deps,

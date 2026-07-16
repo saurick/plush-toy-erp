@@ -158,6 +158,69 @@ func TestJsonrpcDispatcher_BusinessDashboardSuperAdminCanReadScopedWorkflowModul
 	}
 }
 
+func TestJsonrpcDispatcher_BusinessDashboardBossReadsGlobalWorkflowAggregateOnly(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.BossRoleKey},
+		biz.PermissionERPDashboardRead,
+		biz.PermissionWorkflowTaskRead,
+	)
+	workflowRepo := &businessDashboardWorkflowRepo{}
+	j := newCompleteBusinessDashboardDispatcher(
+		admin,
+		&businessDashboardMasterDataRepo{},
+		workflowRepo,
+		&businessDashboardOperationalFactRepo{},
+		businessDashboardCustomerConfigUC("yoyoosun"),
+	)
+
+	ordinaryScope, err := j.workflowTaskQueryVisibilityScope(
+		workflowJSONRPCAdminContext(),
+		admin,
+		biz.PermissionWorkflowTaskRead,
+	)
+	if err != nil {
+		t.Fatalf("ordinary task scope error=%v", err)
+	}
+	ordinaryScope = biz.NormalizeWorkflowTaskVisibilityScope(ordinaryScope)
+	if ordinaryScope == nil || ordinaryScope.StandaloneAllowAllOwnerRoles ||
+		ordinaryScope.VisibleAssigneeID == nil {
+		t.Fatalf("ordinary boss task access must remain role/assignee scoped: %#v", ordinaryScope)
+	}
+
+	_, res, err := j.handleBusiness(
+		workflowJSONRPCAdminContext(),
+		"dashboard_stats",
+		"boss-global-workflow-aggregate",
+		nil,
+	)
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("result=%#v err=%v", res, err)
+	}
+	modules := businessDashboardModulesByKey(t, res)
+	for moduleKey, wantTotal := range map[string]float64{
+		"shipping-release":      10,
+		"production-scheduling": 13,
+		"production-exceptions": 15,
+	} {
+		module := modules[moduleKey]
+		if available, _ := module["available"].(bool); !available ||
+			testNumberValue(module["total"]) != wantTotal {
+			t.Fatalf("boss aggregate %s=%#v", moduleKey, module)
+		}
+	}
+	if len(workflowRepo.filters) != 3 {
+		t.Fatalf("boss aggregate filters=%#v", workflowRepo.filters)
+	}
+	for _, filter := range workflowRepo.filters {
+		scope := biz.NormalizeWorkflowTaskVisibilityScope(filter.VisibilityScope)
+		if scope == nil || !scope.StandaloneAllowAllOwnerRoles ||
+			scope.VisibleAssigneeID != nil {
+			t.Fatalf("boss aggregate workflow scope=%#v", scope)
+		}
+	}
+}
+
 func TestJsonrpcDispatcher_BusinessDashboardSuccessfulZeroIsAvailableAndMissingUsecaseIsUnavailable(t *testing.T) {
 	j := &jsonrpcDispatcher{
 		log:          businessDashboardTestLogger(),
@@ -288,7 +351,11 @@ func newCompleteBusinessDashboardDispatcher(
 	}
 }
 
-func businessDashboardCustomerConfigUC() *biz.CustomerConfigUsecase {
+func businessDashboardCustomerConfigUC(customerKeys ...string) *biz.CustomerConfigUsecase {
+	customerKey := biz.DefaultCustomerKey
+	if len(customerKeys) > 0 && customerKeys[0] != "" {
+		customerKey = customerKeys[0]
+	}
 	repo := newServiceCustomerConfigRepo()
 	for _, item := range []struct {
 		revision    string
@@ -306,9 +373,9 @@ func businessDashboardCustomerConfigUC() *biz.CustomerConfigUsecase {
 			permissions: []string{biz.PermissionERPDashboardRead},
 		},
 	} {
-		key := serviceCustomerConfigKey(biz.DefaultCustomerKey, item.revision)
+		key := serviceCustomerConfigKey(customerKey, item.revision)
 		repo.revisions[key] = &biz.CustomerConfigRevision{
-			CustomerKey: biz.DefaultCustomerKey,
+			CustomerKey: customerKey,
 			Revision:    item.revision,
 			Status:      item.status,
 		}
@@ -319,9 +386,39 @@ func businessDashboardCustomerConfigUC() *biz.CustomerConfigUsecase {
 				RoleKey:       biz.WarehouseRoleKey,
 				CapabilityKey: permissionKey,
 				ScopeType:     "customer",
-				ScopeValue:    biz.DefaultCustomerKey,
+				ScopeValue:    customerKey,
 				Enabled:       true,
 			})
+		}
+	}
+	if customerKey == "yoyoosun" {
+		for _, revision := range []string{"rev-a", "rev-b"} {
+			key := serviceCustomerConfigKey(customerKey, revision)
+			repo.profiles[key] = append(repo.profiles[key], biz.RoleProfileInput{
+				RoleKey:     biz.BossRoleKey,
+				DisplayName: "老板 / 管理层",
+			})
+			repo.memberships[key] = append(repo.memberships[key], biz.WorkPoolMembershipInput{
+				PoolKey: "boss",
+				RoleKey: biz.BossRoleKey,
+				Enabled: true,
+			})
+		}
+		activeKey := serviceCustomerConfigKey(customerKey, "rev-b")
+		for _, permissionKey := range []string{
+			biz.PermissionERPDashboardRead,
+			biz.PermissionWorkflowTaskRead,
+		} {
+			repo.entitlements[activeKey] = append(
+				repo.entitlements[activeKey],
+				biz.AccessEntitlementInput{
+					RoleKey:       biz.BossRoleKey,
+					CapabilityKey: permissionKey,
+					ScopeType:     "customer",
+					ScopeValue:    customerKey,
+					Enabled:       true,
+				},
+			)
 		}
 	}
 	return biz.NewCustomerConfigUsecase(repo)

@@ -216,6 +216,7 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(
 		if err != nil {
 			return nil, err
 		}
+		visibilityScope = businessDashboardWorkflowAggregationScope(admin, visibilityScope)
 		for _, workflowModule := range []struct {
 			moduleKey string
 			taskGroup string
@@ -246,4 +247,28 @@ func (d *jsonrpcDispatcher) businessDashboardProjectionStats(
 		})
 	}
 	return out, nil
+}
+
+// businessDashboardWorkflowAggregationScope broadens only the count queries
+// used by the management overview. A boss can see company-wide workflow
+// totals without receiving list, detail, assignment or mutation access to
+// another role's tasks; those endpoints continue to use the ordinary
+// revision-aware visibility scope.
+func businessDashboardWorkflowAggregationScope(
+	admin *biz.AdminUser,
+	scope *biz.WorkflowTaskVisibilityScope,
+) *biz.WorkflowTaskVisibilityScope {
+	normalized := biz.NormalizeWorkflowTaskVisibilityScope(scope)
+	if normalized == nil || admin == nil || admin.Disabled ||
+		(!admin.IsSuperAdmin && !biz.AdminHasRole(admin, biz.BossRoleKey)) {
+		return normalized
+	}
+	normalized.StandaloneAllowAllOwnerRoles = true
+	normalized.StandaloneVisibleOwnerRoleKeys = nil
+	normalized.VisibleAssigneeID = nil
+	for index := range normalized.RevisionRoleScopes {
+		normalized.RevisionRoleScopes[index].AllowAllOwnerRoles = true
+		normalized.RevisionRoleScopes[index].VisibleOwnerRoleKeys = nil
+	}
+	return biz.NormalizeWorkflowTaskVisibilityScope(normalized)
 }

@@ -65,6 +65,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       ownerPools: Object.freeze(["boss"]),
       menuSurfaces: Object.freeze([
         "global-dashboard",
+        "business-dashboard",
         "task-board",
         "accessories-purchase",
         "print-center",
@@ -220,6 +221,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
       menuSurfaces: Object.freeze([
         "inventory",
         "inbound",
+        "shipping-release",
         "outbound",
         "shipments",
         "task-board",
@@ -367,6 +369,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "production-orders",
         "processing-contracts",
         "production-exceptions",
+        "exception-flow",
         "production-progress",
         "task-board",
         "print-center",

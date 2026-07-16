@@ -314,6 +314,42 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
       `visible yoyoosun menu page must be published: ${key}`,
     );
   }
+  assert.deepEqual(yoyoosunMenuConfig.desktopMenu.hiddenItemKeys, []);
+  for (const key of [
+    "business-dashboard",
+    "shipping-release",
+    "exception-flow",
+  ]) {
+    assert(manifest.compiled_snapshot.pages.includes(key));
+  }
+  assert(
+    manifest.compiled_snapshot.rolePageProjections.boss.includes(
+      "business-dashboard",
+    ),
+  );
+  assert(
+    manifest.compiled_snapshot.rolePageProjections.warehouse.includes(
+      "shipping-release",
+    ),
+  );
+  assert(
+    manifest.compiled_snapshot.rolePageProjections.production.includes(
+      "exception-flow",
+    ),
+  );
+  for (const [pageKey, expectedOwner] of [
+    ["business-dashboard", "boss"],
+    ["shipping-release", "warehouse"],
+    ["exception-flow", "production"],
+  ]) {
+    const owners = Object.entries(
+      manifest.compiled_snapshot.rolePageProjections,
+    )
+      .filter(([, pageKeys]) => pageKeys.includes(pageKey))
+      .map(([roleKey]) => roleKey)
+      .sort();
+    assert.deepEqual(owners, [expectedOwner]);
+  }
   assert.equal(manifest.module_states.length, customerPackageCatalog.modules.length);
   assert.equal(
     new Set(manifest.module_states.map((item) => item.module_key)).size,

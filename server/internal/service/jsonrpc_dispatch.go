@@ -6,11 +6,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/conf"
 	"server/internal/customertrialconfig"
+	"server/internal/devdbguard"
 	"server/internal/errcode"
 
 	"github.com/go-kratos/kratos/v2/log"
@@ -21,22 +23,23 @@ import (
 type jsonrpcDispatcher struct {
 	log *log.Helper
 
-	adminAuthUC        *biz.AdminAuthUsecase
-	adminManageUC      *biz.AdminManageUsecase
-	workflowUC         *biz.WorkflowUsecase
-	processRuntimeUC   *biz.ProcessRuntimeUsecase
-	debugUC            *biz.DebugUsecase
-	masterDataUC       *biz.MasterDataUsecase
-	salesOrderUC       *biz.SalesOrderUsecase
-	purchaseOrderUC    *biz.PurchaseOrderUsecase
-	productionOrderUC  *biz.ProductionOrderUsecase
-	outsourcingOrderUC *biz.OutsourcingOrderUsecase
-	inventoryUC        *biz.InventoryUsecase
-	operationalFactUC  *biz.OperationalFactUsecase
-	attachmentUC       *biz.BusinessAttachmentUsecase
-	customerConfigUC   *biz.CustomerConfigUsecase
-	authSMS            authSMSRuntimeConfig
-	trialConfigEnabled bool
+	adminAuthUC            *biz.AdminAuthUsecase
+	adminManageUC          *biz.AdminManageUsecase
+	workflowUC             *biz.WorkflowUsecase
+	processRuntimeUC       *biz.ProcessRuntimeUsecase
+	debugUC                *biz.DebugUsecase
+	masterDataUC           *biz.MasterDataUsecase
+	salesOrderUC           *biz.SalesOrderUsecase
+	purchaseOrderUC        *biz.PurchaseOrderUsecase
+	productionOrderUC      *biz.ProductionOrderUsecase
+	outsourcingOrderUC     *biz.OutsourcingOrderUsecase
+	inventoryUC            *biz.InventoryUsecase
+	operationalFactUC      *biz.OperationalFactUsecase
+	attachmentUC           *biz.BusinessAttachmentUsecase
+	customerConfigUC       *biz.CustomerConfigUsecase
+	authSMS                authSMSRuntimeConfig
+	trialConfigEnabled     bool
+	localTestConfigEnabled bool
 
 	adminReader biz.AdminAccountReader
 }
@@ -133,30 +136,51 @@ func newJSONRPCDispatcher(
 	if err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: customer trial config gate: %v", err))
 	}
+	localTestConfigEnabled, err := resolveCustomerConfigLocalTestGate(c, os.Getenv)
+	if err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: customer config local-test gate: %v", err))
+	}
 	authSMS := newAuthSMSRuntimeConfig(c)
 
 	helper.Info("jsonrpcDispatcher created")
 
 	return &jsonrpcDispatcher{
-		log:                helper,
-		adminAuthUC:        adminAuthUC,
-		adminManageUC:      adminManageUC,
-		workflowUC:         workflowUC,
-		processRuntimeUC:   processRuntimeUC,
-		debugUC:            debugUC,
-		masterDataUC:       masterDataUC,
-		salesOrderUC:       salesOrderUC,
-		purchaseOrderUC:    purchaseOrderUC,
-		productionOrderUC:  productionOrderUC,
-		outsourcingOrderUC: outsourcingOrderUC,
-		inventoryUC:        inventoryUC,
-		operationalFactUC:  operationalFactUC,
-		attachmentUC:       attachmentUC,
-		customerConfigUC:   customerConfigUC,
-		authSMS:            authSMS,
-		trialConfigEnabled: trialConfigEnabled,
-		adminReader:        adminReader,
+		log:                    helper,
+		adminAuthUC:            adminAuthUC,
+		adminManageUC:          adminManageUC,
+		workflowUC:             workflowUC,
+		processRuntimeUC:       processRuntimeUC,
+		debugUC:                debugUC,
+		masterDataUC:           masterDataUC,
+		salesOrderUC:           salesOrderUC,
+		purchaseOrderUC:        purchaseOrderUC,
+		productionOrderUC:      productionOrderUC,
+		outsourcingOrderUC:     outsourcingOrderUC,
+		inventoryUC:            inventoryUC,
+		operationalFactUC:      operationalFactUC,
+		attachmentUC:           attachmentUC,
+		customerConfigUC:       customerConfigUC,
+		authSMS:                authSMS,
+		trialConfigEnabled:     trialConfigEnabled,
+		localTestConfigEnabled: localTestConfigEnabled,
+		adminReader:            adminReader,
 	}
+}
+
+func resolveCustomerConfigLocalTestGate(c *conf.Data, getenv func(string) string) (bool, error) {
+	if getenv == nil {
+		getenv = func(string) string { return "" }
+	}
+	if strings.TrimSpace(getenv(biz.CustomerConfigLocalTestAllowEnv)) != "1" {
+		return false, nil
+	}
+	if c == nil || c.Postgres == nil || strings.TrimSpace(c.Postgres.Dsn) == "" {
+		return false, fmt.Errorf("POSTGRES_DSN is required")
+	}
+	if err := devdbguard.RequireCustomerConfigLocalTestDSN(c.Postgres.Dsn); err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func (d *jsonrpcDispatcher) Handle(

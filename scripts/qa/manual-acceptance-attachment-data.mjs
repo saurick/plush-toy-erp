@@ -2,9 +2,11 @@
 
 import fs from "node:fs";
 import path from "node:path";
+import { createHash } from "node:crypto";
 
 import {
   CUSTOMER_TRIAL_133_TARGET,
+  assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
@@ -55,6 +57,44 @@ export function normalizeLocalBackendURL(value) {
 
 function fixture(name, mimeType, content, sizeClass = "small") {
   return { file_name: name, mime_type: mimeType, content, sizeClass };
+}
+
+function fixtureDigest(item) {
+  return createHash("sha256").update(item.content).digest("hex");
+}
+
+export function assertAttachmentFixtureIntegrity({
+  fixture: item,
+  attachment,
+  downloadedAttachment,
+}) {
+  const expectedHash = fixtureDigest(item);
+  const expectedSize = item.content.length;
+  const metadata = [attachment, downloadedAttachment];
+  for (const [index, value] of metadata.entries()) {
+    const label = index === 0 ? "attachment metadata" : "download metadata";
+    if (
+      String(value?.file_name || "") !== item.file_name ||
+      String(value?.mime_type || "") !== item.mime_type ||
+      Number(value?.file_size) !== expectedSize ||
+      String(value?.sha256 || "").toLowerCase() !== expectedHash ||
+      String(value?.note || "") !== ATTACHMENT_NOTE
+    ) {
+      throw new Error(`${item.file_name} ${label} conflicts with the current fixture`);
+    }
+  }
+  const encoded = String(downloadedAttachment?.content_base64 || "");
+  if (!encoded) {
+    throw new Error(`${item.file_name} downloaded content is empty`);
+  }
+  const downloaded = Buffer.from(encoded, "base64");
+  if (
+    downloaded.length !== expectedSize ||
+    createHash("sha256").update(downloaded).digest("hex") !== expectedHash
+  ) {
+    throw new Error(`${item.file_name} downloaded content conflicts with the current fixture`);
+  }
+  return Object.freeze({ sha256: expectedHash, fileSize: expectedSize });
 }
 
 export function buildAttachmentFixtures({ includeNearLimit = true } = {}) {
@@ -160,6 +200,7 @@ function validateAttachmentFactReport(report) {
     "runId",
     "target",
     "backendURL",
+    "databaseName",
     "semanticDigest",
   ]) {
     requiredReportText(report[key], `fact report ${key}`);
@@ -197,7 +238,14 @@ function validateAttachmentInputReport(report, name) {
   ) {
     throw new Error(`${name} is not a simulated apply report`);
   }
-  for (const key of ["datasetKey", "dataVersion", "runId", "target", "backendURL"]) {
+  for (const key of [
+    "datasetKey",
+    "dataVersion",
+    "runId",
+    "target",
+    "backendURL",
+    "databaseName",
+  ]) {
     requiredReportText(report[key], `${name}.${key}`);
   }
   return report;
@@ -205,6 +253,7 @@ function validateAttachmentInputReport(report, name) {
 
 export function validateAttachmentReportBatch({
   backendURL,
+  databaseName,
   sourceReport,
   factReport,
   taskReport,
@@ -214,7 +263,14 @@ export function validateAttachmentReportBatch({
   validateAttachmentInputReport(sourceReport, "source report");
   validateAttachmentFactReport(factReport);
   validateAttachmentInputReport(taskReport, "task report");
-  for (const key of ["datasetKey", "dataVersion", "runId", "target", "backendURL"]) {
+  for (const key of [
+    "datasetKey",
+    "dataVersion",
+    "runId",
+    "target",
+    "backendURL",
+    "databaseName",
+  ]) {
     const values = [sourceReport, factReport, taskReport].map((report) =>
       String(report[key] || "").trim(),
     );
@@ -230,9 +286,15 @@ export function validateAttachmentReportBatch({
       datasetKey: factReport.datasetKey,
       dataVersion: factReport.dataVersion,
       runId: factReport.runId,
+      databaseName: databaseName || factReport.databaseName,
     });
-    if (policy.backendURL !== factReport.backendURL) {
-      throw new Error("backendURL must exactly match the bound fact report");
+    if (
+      policy.backendURL !== factReport.backendURL ||
+      policy.databaseName !== factReport.databaseName
+    ) {
+      throw new Error(
+        "backendURL and databaseName must exactly match the bound fact report",
+      );
     }
     assertManualAcceptanceMutationTarget(policy, {
       confirmation:
@@ -315,6 +377,7 @@ async function rpc({ backendURL, domain, method, params = {}, token = "" }) {
 
 export async function applyAttachmentData({
   backendURL,
+  databaseName,
   password,
   adminPassword,
   rolePassword,
@@ -331,6 +394,7 @@ export async function applyAttachmentData({
   const taskReport = readJSON(taskReportPath);
   const { policy, attestation } = validateAttachmentReportBatch({
     backendURL,
+    databaseName,
     sourceReport,
     factReport,
     taskReport,
@@ -344,13 +408,11 @@ export async function applyAttachmentData({
     password,
   });
   backendURL = policy.backendURL;
-  if (policy.external) {
-    await assertManualAcceptanceRuntimeIdentityPrecondition({
-      policy,
-      attestation,
-      fetchImpl: fetch,
-    });
-  }
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy,
+    attestation,
+    fetchImpl: fetch,
+  });
   buildAttachmentTargets({
     sourceReport,
     factReport,
@@ -382,6 +444,7 @@ export async function applyAttachmentData({
     method: "capabilities",
     token: runtimeAdminToken,
   });
+  assertManualAcceptanceDatabaseIdentity({ policy, capabilities });
   const pmcLogin = await rpc({
     backendURL,
     domain: "auth",
@@ -445,7 +508,15 @@ export async function applyAttachmentData({
   for (const target of targets) {
     const actorToken = actorTokens[target.owner_type];
     const listed = await rpc({ backendURL, domain: "attachment", method: "list_attachments", params: { owner_type: target.owner_type, owner_id: target.owner_id }, token: actorToken });
-    const existing = new Map((listed.attachments || []).map((item) => [item.file_name, item]));
+    const existing = new Map();
+    for (const listedItem of listed.attachments || []) {
+      if (existing.has(listedItem.file_name)) {
+        throw new Error(
+          `${target.owner_type}:${target.owner_id} has duplicate attachment name ${listedItem.file_name}`,
+        );
+      }
+      existing.set(listedItem.file_name, listedItem);
+    }
     for (const item of fixtures.slice(0, target.files)) {
       let attachment = existing.get(item.file_name);
       let operation = "reuse";
@@ -470,13 +541,20 @@ export async function applyAttachmentData({
         operation = "upload";
       }
       const downloaded = await rpc({ backendURL, domain: "attachment", method: "download_attachment", params: { id: attachment.id }, token: actorToken });
-      if (!downloaded.attachment?.content_base64) throw new Error(`attachment ${attachment.id} download is empty`);
+      const integrity = assertAttachmentFixtureIntegrity({
+        fixture: item,
+        attachment,
+        downloadedAttachment: downloaded.attachment,
+      });
       steps.push({
         ownerType: target.owner_type,
         ownerId: target.owner_id,
         attachmentId: attachment.id,
         fileName: item.file_name,
         sizeClass: item.sizeClass,
+        mimeType: item.mime_type,
+        fileSize: integrity.fileSize,
+        sha256: integrity.sha256,
         operation,
         actor:
           target.owner_type === "workflow_task" ? "demo_pmc" : "admin",
@@ -487,13 +565,16 @@ export async function applyAttachmentData({
       throw new Error(`${target.owner_type}:${target.owner_id} attachment readback is incomplete`);
     }
   }
-  return { scope: "manual-acceptance-attachment-data", customerKey: CUSTOMER_KEY, simulatedOnly: true, datasetKey: factReport.datasetKey, dataVersion: factReport.dataVersion, runId: factReport.runId, target: factReport.target, semanticDigest: factReport.semanticDigest, runtime, actorPolicy: { crossDomainSeed: "admin", workflowTask: "demo_pmc", rolePageAccessVerifiedElsewhere: true }, summary: { targets: targets.length, attachments: steps.length, uploaded: steps.filter((item) => item.operation === "upload").length, reused: steps.filter((item) => item.operation === "reuse").length }, steps };
+  return { scope: "manual-acceptance-attachment-data", customerKey: CUSTOMER_KEY, simulatedOnly: true, datasetKey: factReport.datasetKey, dataVersion: factReport.dataVersion, runId: factReport.runId, target: factReport.target, backendURL: policy.backendURL, databaseName: policy.databaseName, semanticDigest: factReport.semanticDigest, runtime, actorPolicy: { crossDomainSeed: "admin", workflowTask: "demo_pmc", rolePageAccessVerifiedElsewhere: true }, summary: { targets: targets.length, attachments: steps.length, uploaded: steps.filter((item) => item.operation === "upload").length, reused: steps.filter((item) => item.operation === "reuse").length }, steps };
 }
 
 async function main() {
   const args = new Map(process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]));
   const report = await applyAttachmentData({
     backendURL: args.get("--backend-url") || "http://127.0.0.1:8300",
+    databaseName:
+      args.get("--database-name") ||
+      process.env.MANUAL_ACCEPTANCE_DATABASE_NAME,
     adminPassword: process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     rolePassword: process.env.MANUAL_ACCEPTANCE_PASSWORD,
     confirm: process.env.MANUAL_ACCEPTANCE_ATTACHMENT_CONFIRM,

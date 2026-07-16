@@ -11,6 +11,14 @@ import {
   preflightSourceDrivenFactPlan,
   sourceDrivenFactConfirmation,
 } from "./manual-acceptance-source-driven-facts.mjs";
+import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_DATABASE,
+  manualAcceptanceTargetConfirmation,
+} from "./manual-acceptance-target-policy.mjs";
+
+const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
 
 function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
   const report = {
@@ -21,7 +29,8 @@ function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
     dataVersion: "2026.07.15-v1",
     runId: "20260715-V1",
     target: "local-dev",
-    backendURL: "http://127.0.0.1:8300",
+    backendURL: "http://127.0.0.1:8310",
+    databaseName: LOCAL_ACCEPTANCE_DATABASE,
     referenceRecords: {},
   };
   if (!includeFacts) return report;
@@ -357,6 +366,7 @@ test("phase-scoped apply executes the formal production chain and returns exact 
   const report = await applySourceDrivenFactPlan(plan, {
     rpc,
     confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
   });
 
   assert.equal(report.ok, true);
@@ -389,6 +399,7 @@ test("idempotent create responses already POSTED are reused without a second pos
   const report = await applySourceDrivenFactPlan(plan, {
     rpc,
     confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
   });
 
   assert.equal(report.results.production.materialIssues[0].status, "POSTED");
@@ -507,10 +518,11 @@ test("explicit phase sources replace the source report's pre-inventory blocked r
 
 test("registered 133 apply rejects missing target confirmation before RPC", async () => {
   const report = sourceReport();
-  report.dataVersion = "2026.07.15-v3";
-  report.runId = "20260715-V3";
+  report.dataVersion = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
+  report.runId = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
   report.target = "customer-trial-133";
   report.backendURL = "http://127.0.0.1:18375";
+  report.databaseName = CUSTOMER_TRIAL_133_DATABASE;
   report.referenceRecords.sourceDrivenFacts.dataVersion = report.dataVersion;
   report.referenceRecords.sourceDrivenFacts.runId = report.runId;
   const plan = buildSourceDrivenFactPlan(report, {

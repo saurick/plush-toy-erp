@@ -7,7 +7,13 @@ import { fileURLToPath } from "node:url";
 
 import { expectedAccounts } from "./trial-account-rbac.mjs";
 import { MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS } from "./manual-acceptance-account-scenarios.mjs";
-import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
+import {
+  MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
+  MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
+  MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
+  MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS,
+  buildManualAcceptanceCatalog,
+} from "./manual-acceptance-catalog.mjs";
 import {
   MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS,
   MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE,
@@ -17,14 +23,25 @@ import {
 } from "./manual-acceptance-page-data-contract.mjs";
 import {
   TASK_COPY_REVISION,
+  TASK_CATALOG_SCENARIO_DIGEST,
+  TASK_SOURCE_TYPE,
   TASK_STATUS_KEYS,
+  TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
+  getManualAcceptanceRoleTaskGroups,
+  getManualAcceptanceTaskGroupCount,
+  getManualAcceptanceTaskGroupScenarioCounts,
+  getManualAcceptanceTaskGroupScenarios,
+  getManualAcceptanceTaskGroupStatusCounts,
   getManualAcceptanceTaskStatusCounts,
+  manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
 import {
   CUSTOMER_TRIAL_133_TARGET,
   MANUAL_ACCEPTANCE_TARGET_PROFILES,
   assertManualAcceptanceCapabilitiesPolicy,
+  assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
   manualAcceptanceRuntimeCapabilitiesFromAttestation,
@@ -38,9 +55,7 @@ const MOBILE_TASK_TOTAL = 180;
 const MOBILE_TASKS_PER_ROLE = 20;
 const QUERY_LIMIT = 200;
 const RUNTIME_PREFLIGHT_USERNAME = "admin";
-const TASK_SOURCE_TYPE = "simulated-manual-acceptance-task-batch";
-const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
-  "source-driven-operational-facts-v1";
+const SOURCE_DRIVEN_FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const TASK_REQUIRED_STATUSES = Object.freeze(
   TASK_STATUS_KEYS.map((status) => status.toUpperCase()),
 );
@@ -75,12 +90,34 @@ function taskStatusCountsForRole(roleKey) {
   );
 }
 
+function taskGroupStatusCountsForRole(roleKey, taskGroup) {
+  return Object.fromEntries(
+    Object.entries(
+      getManualAcceptanceTaskGroupStatusCounts(roleKey, taskGroup),
+    ).map(([status, count]) => [status.toUpperCase(), count]),
+  );
+}
+
+function expectedTaskGroupTotals() {
+  const totals = {};
+  for (const roleKey of TASK_ROLE_KEYS) {
+    for (const taskGroup of getManualAcceptanceRoleTaskGroups(roleKey)) {
+      totals[taskGroup] =
+        (totals[taskGroup] || 0) +
+        getManualAcceptanceTaskGroupCount(roleKey, taskGroup);
+    }
+  }
+  return totals;
+}
+
 function taskRequiredStatusesForRole(roleKey) {
   return Object.keys(taskStatusCountsForRole(roleKey));
 }
 
 function totalTaskStatusCounts() {
-  const totals = Object.fromEntries(TASK_STATUS_KEYS.map((status) => [status, 0]));
+  const totals = Object.fromEntries(
+    TASK_STATUS_KEYS.map((status) => [status, 0]),
+  );
   for (const roleKey of TASK_ROLE_KEYS) {
     for (const [status, count] of Object.entries(
       getManualAcceptanceTaskStatusCounts(roleKey),
@@ -525,7 +562,12 @@ function normalizeFactReference(record, key, index) {
         reportValue(record, "subjectID", "subjectId", "subject_id"),
         `${name}.subjectID`,
       );
-      optionalID("product_sku_id", "productSkuID", "productSkuId", "product_sku_id");
+      optionalID(
+        "product_sku_id",
+        "productSkuID",
+        "productSkuId",
+        "product_sku_id",
+      );
       break;
     case "inventoryBalances":
       textField("subject_type", "subjectType", "subject_type");
@@ -533,7 +575,12 @@ function normalizeFactReference(record, key, index) {
         reportValue(record, "subjectID", "subjectId", "subject_id"),
         `${name}.subjectID`,
       );
-      optionalID("product_sku_id", "productSkuID", "productSkuId", "product_sku_id");
+      optionalID(
+        "product_sku_id",
+        "productSkuID",
+        "productSkuId",
+        "product_sku_id",
+      );
       normalized.warehouse_id = reportPositiveID(
         reportValue(record, "warehouseID", "warehouseId", "warehouse_id"),
         `${name}.warehouseID`,
@@ -588,7 +635,11 @@ function normalizeFactReferenceRecords(report) {
     throw new CliError("业务记录报告缺少 referenceRecords", 2);
   }
   const normalized = {};
-  const referenceKeys = [...new Set(Object.values(FACT_REFERENCE_DATASETS).map((item) => item.referenceKey))];
+  const referenceKeys = [
+    ...new Set(
+      Object.values(FACT_REFERENCE_DATASETS).map((item) => item.referenceKey),
+    ),
+  ];
   for (const key of referenceKeys) {
     if (!Array.isArray(records[key]) || records[key].length === 0) {
       throw new CliError(`业务记录报告缺少 referenceRecords.${key}`, 2);
@@ -596,7 +647,10 @@ function normalizeFactReferenceRecords(report) {
     normalized[key] = records[key].map((item, index) =>
       normalizeFactReference(item, key, index),
     );
-    if (new Set(normalized[key].map((item) => item.id)).size !== normalized[key].length) {
+    if (
+      new Set(normalized[key].map((item) => item.id)).size !==
+      normalized[key].length
+    ) {
       throw new CliError(`referenceRecords.${key} 包含重复 id`, 2);
     }
   }
@@ -612,11 +666,25 @@ function normalizeFactReferenceRecords(report) {
     owners.financeFactId,
     "referenceRecords.attachmentOwners.financeFactId",
   );
-  if (!normalized.productionFacts.some((item) => item.id === productionFactId && item.status === "POSTED")) {
-    throw new CliError("referenceRecords.attachmentOwners.productionFactId 必须指向本批已过账生产记录", 2);
+  if (
+    !normalized.productionFacts.some(
+      (item) => item.id === productionFactId && item.status === "POSTED",
+    )
+  ) {
+    throw new CliError(
+      "referenceRecords.attachmentOwners.productionFactId 必须指向本批已过账生产记录",
+      2,
+    );
   }
-  if (!normalized.financeFacts.some((item) => item.id === financeFactId && item.status === "POSTED")) {
-    throw new CliError("referenceRecords.attachmentOwners.financeFactId 必须指向本批已过账财务记录", 2);
+  if (
+    !normalized.financeFacts.some(
+      (item) => item.id === financeFactId && item.status === "POSTED",
+    )
+  ) {
+    throw new CliError(
+      "referenceRecords.attachmentOwners.financeFactId 必须指向本批已过账财务记录",
+      2,
+    );
   }
   normalized.attachmentOwners = { productionFactId, financeFactId };
   return normalized;
@@ -634,6 +702,7 @@ function validateSourceReport(report) {
     !String(report.runId || "").trim() ||
     !String(report.target || "").trim() ||
     !String(report.backendURL || "").trim() ||
+    !String(report.databaseName || "").trim() ||
     !String(report.semanticDigest || "").trim() ||
     !String(report.prefix || "").trim()
   ) {
@@ -654,6 +723,7 @@ function validateFactReport(report) {
     !String(report.runId || "").trim() ||
     !String(report.target || "").trim() ||
     !String(report.backendURL || "").trim() ||
+    !String(report.databaseName || "").trim() ||
     !String(report.semanticDigest || "").trim() ||
     !report.runtime ||
     !String(report.runtime.environment || "").trim() ||
@@ -682,10 +752,30 @@ function validateFactReport(report) {
   ) {
     throw new CliError("业务记录报告缺少 customer-trial-133 运行态证明", 2);
   }
+  const normalizedReferenceRecords = normalizeFactReferenceRecords(report);
+  const shipments = report.referenceRecords.shipments;
+  if (shipments.length !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT) {
+    throw new CliError(
+      `业务记录报告必须精确包含 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张出货单`,
+      2,
+    );
+  }
+  const longShipmentCount = shipments.filter(
+    (shipment) =>
+      Array.isArray(shipment?.items) &&
+      shipment.items.length ===
+        MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
+  ).length;
+  if (longShipmentCount !== MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT) {
+    throw new CliError(
+      `业务记录报告必须恰好包含 ${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT} 张 ${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT} 行出货单`,
+      2,
+    );
+  }
   return {
     ...report,
     backendURL: policy.backendURL,
-    normalizedReferenceRecords: normalizeFactReferenceRecords(report),
+    normalizedReferenceRecords,
   };
 }
 
@@ -693,8 +783,12 @@ function validateTaskReport(report) {
   if (!report) return null;
   const runId = String(report.runId || "").trim();
   const prefix = String(report.prefix || "").trim();
+  const expectedIdentity = runId
+    ? manualAcceptanceTaskBatchIdentity(runId)
+    : null;
   const byRole = report.summary?.byRole || {};
   const byStatus = report.summary?.byStatus || {};
+  const byTaskGroup = report.summary?.byTaskGroup || {};
   const expectedStatusTotals = totalTaskStatusCounts();
   const rolesAreExact =
     Object.keys(byRole).length === TASK_ROLE_KEYS.length &&
@@ -706,6 +800,49 @@ function validateTaskReport(report) {
     TASK_STATUS_KEYS.every(
       (status) => Number(byStatus[status]) === expectedStatusTotals[status],
     );
+  const expectedGroupTotals = expectedTaskGroupTotals();
+  const groupsAreExact =
+    Object.keys(byTaskGroup).length ===
+      Object.keys(expectedGroupTotals).length &&
+    Object.entries(expectedGroupTotals).every(
+      ([taskGroup, count]) => Number(byTaskGroup[taskGroup]) === count,
+    );
+  const coverage = report.coverage;
+  const coverageRoles = Object.keys(coverage?.taskGroupsByRole || {});
+  const scenarioCoverageRoles = Object.keys(
+    coverage?.scenariosByRoleTaskGroup || {},
+  );
+  const coverageIsExact =
+    coverage?.catalogScenarioDigest === TASK_CATALOG_SCENARIO_DIGEST &&
+    coverageRoles.length === TASK_ROLE_KEYS.length &&
+    scenarioCoverageRoles.length === TASK_ROLE_KEYS.length &&
+    TASK_ROLE_KEYS.every((roleKey) => {
+      const expectedGroups = getManualAcceptanceRoleTaskGroups(roleKey);
+      const groups = coverage.taskGroupsByRole[roleKey];
+      const groupsCoverage = coverage.scenariosByRoleTaskGroup[roleKey];
+      return (
+        Array.isArray(groups) &&
+        JSON.stringify(groups) === JSON.stringify(expectedGroups) &&
+        groupsCoverage &&
+        JSON.stringify(Object.keys(groupsCoverage)) ===
+          JSON.stringify(expectedGroups) &&
+        expectedGroups.every((taskGroup) => {
+          const scenarioCounts = groupsCoverage[taskGroup];
+          const expectedScenarioCounts =
+            getManualAcceptanceTaskGroupScenarioCounts(roleKey, taskGroup);
+          return (
+            scenarioCounts &&
+            JSON.stringify(scenarioCounts) ===
+              JSON.stringify(expectedScenarioCounts)
+          );
+        }) &&
+        expectedGroups.reduce(
+          (total, taskGroup) =>
+            total + getManualAcceptanceTaskGroupCount(roleKey, taskGroup),
+          0,
+        ) === MOBILE_TASKS_PER_ROLE
+      );
+    });
   if (
     report.mode !== "apply" ||
     report.simulatedOnly !== true ||
@@ -715,16 +852,18 @@ function validateTaskReport(report) {
     !String(report.dataVersion || "").trim() ||
     !String(report.target || "").trim() ||
     !String(report.backendURL || "").trim() ||
+    !String(report.databaseName || "").trim() ||
     report.summary?.total !== MOBILE_TASK_TOTAL ||
     report.summary?.persisted !== MOBILE_TASK_TOTAL ||
     !rolesAreExact ||
     !statusesAreExact ||
+    !groupsAreExact ||
+    !coverageIsExact ||
     !runId ||
     report.copyRevision !== TASK_COPY_REVISION ||
-    prefix !== `SIM-YOYOOSUN-UAT-TASK-${runId}-${TASK_COPY_REVISION}` ||
+    prefix !== expectedIdentity?.prefix ||
     report.sourceType !== TASK_SOURCE_TYPE ||
-    !Number.isSafeInteger(Number(report.sourceID)) ||
-    Number(report.sourceID) <= 0
+    Number(report.sourceID) !== expectedIdentity?.sourceID
   ) {
     throw new CliError("岗位任务报告不是有效的模拟试用写入报告", 2);
   }
@@ -733,7 +872,14 @@ function validateTaskReport(report) {
 
 function validateReportBatch(sourceReport, factReport, taskReport) {
   const reports = [sourceReport, factReport, taskReport].filter(Boolean);
-  for (const key of ["datasetKey", "dataVersion", "runId", "target", "backendURL"]) {
+  for (const key of [
+    "datasetKey",
+    "dataVersion",
+    "runId",
+    "target",
+    "backendURL",
+    "databaseName",
+  ]) {
     const values = reports.map((report) => String(report[key] || "").trim());
     if (new Set(values).size > 1) {
       throw new CliError("源数据、业务记录与岗位任务报告不是同一批次", 2);
@@ -747,6 +893,14 @@ function catalogMinimum(catalog, pageKey) {
   );
   if (!item) throw new CliError(`验收目录缺少页面 ${pageKey}`);
   return item.minimumRecords;
+}
+
+function catalogTaskScenarios(catalog, pageKey) {
+  const item = catalog.technicalManifest.desktopPages.find(
+    (candidate) => candidate.key === pageKey,
+  );
+  if (!item) throw new CliError(`验收目录缺少页面 ${pageKey}`);
+  return [...(item.requiredTaskScenarios || [])];
 }
 
 function declaredExpectations(sourceReport, factReport) {
@@ -767,9 +921,11 @@ function declaredExpectations(sourceReport, factReport) {
     for (const [datasetId, definition] of Object.entries(
       FACT_REFERENCE_DATASETS,
     )) {
-      const records = factReport.normalizedReferenceRecords[definition.referenceKey];
+      const records =
+        factReport.normalizedReferenceRecords[definition.referenceKey];
       values[datasetId] = definition.factType
-        ? records.filter((item) => item.fact_type === definition.factType).length
+        ? records.filter((item) => item.fact_type === definition.factType)
+            .length
         : records.length;
     }
   }
@@ -881,7 +1037,10 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
         offset: 0,
       };
     }
-    return { referenceKey: `${item.id}:${item[businessField] || referenceKey}`, params };
+    return {
+      referenceKey: `${item.id}:${item[businessField] || referenceKey}`,
+      params,
+    };
   });
   return {
     batchEvidence: "exact_references",
@@ -940,6 +1099,9 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       ...batch,
       params,
       expectedMinimum: Math.max(canonical[id] ?? 0, declared[id] ?? 0),
+      ...(id === "shipments"
+        ? { expectedExact: MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT }
+        : {}),
       declaredMinimum: declared[id] ?? null,
       readOnly: true,
     };
@@ -971,8 +1133,16 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
     batchEvidence: taskReport ? "exact_source" : "not_proven",
     exactSourceType: taskReport?.sourceType || null,
     exactSourceID: taskReport?.sourceID || null,
-    exactTaskPrefix: taskReport?.prefix || null,
+    exactTaskCodePrefix: taskReport
+      ? TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss
+      : null,
     exactOwnerRoleKey: taskReport ? "boss" : null,
+    exactTaskGroup: taskReport
+      ? getManualAcceptanceRoleTaskGroups("boss")[0]
+      : null,
+    requiredTaskGroups: getManualAcceptanceRoleTaskGroups("boss"),
+    requiredScenariosByTaskGroup: getManualAcceptanceTaskGroupScenarios("boss"),
+    requiredScenarios: [...MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.boss],
     batchNotProvenReason: taskReport
       ? null
       : "未提供本次岗位任务写入报告，不能用历史任务数量代替本批任务。",
@@ -1007,8 +1177,78 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       batchEvidence: taskReport ? "exact_source" : "not_proven",
       exactSourceType: taskReport?.sourceType || null,
       exactSourceID: taskReport?.sourceID || null,
-      exactTaskPrefix: taskReport?.prefix || null,
+      exactTaskCodePrefix: taskReport
+        ? TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]
+        : null,
       exactOwnerRoleKey: taskReport ? roleKey : null,
+      exactTaskGroup: null,
+      requiredTaskGroups: getManualAcceptanceRoleTaskGroups(roleKey),
+      requiredScenariosByTaskGroup:
+        getManualAcceptanceTaskGroupScenarios(roleKey),
+      requiredScenarios: [...MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS[roleKey]],
+      batchNotProvenReason: taskReport
+        ? null
+        : "未提供本次岗位任务写入报告，不能用历史任务数量代替本批任务。",
+      readOnly: true,
+    });
+  }
+  for (const [pageKey, roleKey, taskGroup] of [
+    ["production-scheduling", "pmc", "production_scheduling"],
+    ["production-exceptions", "production", "production_exception"],
+    ["shipping-release", "warehouse", "shipment_release"],
+  ]) {
+    const expectedCount = getManualAcceptanceTaskGroupCount(roleKey, taskGroup);
+    const requiredScenarios =
+      getManualAcceptanceTaskGroupScenarios(roleKey)[taskGroup];
+    const declaredScenarios = catalogTaskScenarios(catalog, pageKey);
+    if (
+      catalogMinimum(catalog, pageKey) !== expectedCount ||
+      JSON.stringify(declaredScenarios) !== JSON.stringify(requiredScenarios)
+    ) {
+      throw new CliError(
+        `验收目录页面 ${pageKey} 与 ${roleKey}/${taskGroup} 任务映射不一致`,
+      );
+    }
+    probes.push({
+      id: `workflow-tasks:${taskGroup}`,
+      roleKey,
+      username: `demo_${roleKey}`,
+      domain: "workflow",
+      method: "list_tasks",
+      listKey: "tasks",
+      statusField: "task_status_key",
+      requiredStatuses: Object.keys(
+        taskGroupStatusCountsForRole(roleKey, taskGroup),
+      ),
+      requiredStatusCounts: taskGroupStatusCountsForRole(roleKey, taskGroup),
+      expectedMinimum: expectedCount,
+      expectedExact: expectedCount,
+      declaredMinimum: null,
+      params: {
+        owner_role_key: roleKey,
+        task_group: taskGroup,
+        ...(taskReport
+          ? {
+              source_type: taskReport.sourceType,
+              source_id: taskReport.sourceID,
+            }
+          : {}),
+        limit: QUERY_LIMIT,
+        offset: 0,
+      },
+      batchEvidence: taskReport ? "exact_source" : "not_proven",
+      exactSourceType: taskReport?.sourceType || null,
+      exactSourceID: taskReport?.sourceID || null,
+      exactTaskCodePrefix: taskReport
+        ? TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]
+        : null,
+      exactOwnerRoleKey: taskReport ? roleKey : null,
+      exactTaskGroup: taskReport ? taskGroup : null,
+      requiredTaskGroups: [taskGroup],
+      requiredScenarios: [...requiredScenarios],
+      requiredScenariosByTaskGroup: {
+        [taskGroup]: [...requiredScenarios],
+      },
       batchNotProvenReason: taskReport
         ? null
         : "未提供本次岗位任务写入报告，不能用历史任务数量代替本批任务。",
@@ -1071,7 +1311,15 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
     },
     reportInputs: {
       sourceReport: sourceReport
-        ? { runId: sourceReport.runId, prefix: sourceReport.prefix }
+        ? {
+            datasetKey: sourceReport.datasetKey,
+            dataVersion: sourceReport.dataVersion,
+            runId: sourceReport.runId,
+            target: sourceReport.target,
+            backendURL: sourceReport.backendURL,
+            databaseName: sourceReport.databaseName,
+            prefix: sourceReport.prefix,
+          }
         : null,
       factReport: factReport
         ? {
@@ -1081,16 +1329,23 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
             runId: factReport.runId,
             target: factReport.target,
             backendURL: factReport.backendURL,
+            databaseName: factReport.databaseName,
             semanticDigest: factReport.semanticDigest,
             runtime: factReport.runtime,
           }
         : null,
       taskReport: taskReport
         ? {
+            datasetKey: taskReport.datasetKey,
+            dataVersion: taskReport.dataVersion,
             runId: taskReport.runId,
+            target: taskReport.target,
+            backendURL: taskReport.backendURL,
+            databaseName: taskReport.databaseName,
             prefix: taskReport.prefix,
             sourceType: taskReport.sourceType,
             sourceID: taskReport.sourceID,
+            taskGroupCoverageDigest: taskReport.coverage.catalogScenarioDigest,
           }
         : null,
     },
@@ -1115,7 +1370,9 @@ function statusLabel(item, field) {
   if (field === "is_active") return value === false ? "INACTIVE" : "ACTIVE";
   if (field === "disabled") return value === true ? "DISABLED" : "ACTIVE";
   if (field === "account_status") {
-    const status = String(value ?? "").trim().toLowerCase();
+    const status = String(value ?? "")
+      .trim()
+      .toLowerCase();
     if (status === "active") return "ACTIVE";
     if (status === "suspended") return "DISABLED";
     if (status === "revoked") return "REVOKED";
@@ -1132,13 +1389,24 @@ function statusCounts(items, field) {
     const labels =
       field === "items.adjust_type"
         ? (Array.isArray(item?.items) ? item.items : []).map((entry) =>
-            String(entry?.adjust_type ?? "").trim().toUpperCase(),
+            String(entry?.adjust_type ?? "")
+              .trim()
+              .toUpperCase(),
           )
         : [statusLabel(item, field)];
     for (const label of labels) {
       if (!label) continue;
       counts[label] = (counts[label] || 0) + 1;
     }
+  }
+  return counts;
+}
+
+function textValueCounts(items, valueAt) {
+  const counts = {};
+  for (const item of items) {
+    const value = String(valueAt(item) ?? "").trim() || "__missing__";
+    counts[value] = (counts[value] || 0) + 1;
   }
   return counts;
 }
@@ -1154,6 +1422,17 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     Object.entries(probe.requiredStatusCounts || {}).map(([key, value]) => [
       String(key).toUpperCase(),
       Number(value),
+    ]),
+  );
+  const requiredTaskGroups = [...(probe.requiredTaskGroups || [])];
+  const requiredScenarios = [...(probe.requiredScenarios || [])];
+  const requiredScenariosByTaskGroup = Object.fromEntries(
+    requiredTaskGroups.map((taskGroup) => [
+      taskGroup,
+      [
+        ...(probe.requiredScenariosByTaskGroup?.[taskGroup] ||
+          (requiredTaskGroups.length === 1 ? requiredScenarios : [])),
+      ],
     ]),
   );
   if (probe.batchEvidence === "not_proven") {
@@ -1182,6 +1461,18 @@ export function evaluateManualAcceptanceDataset(probe, data) {
       enoughRecords: false,
       enoughStatuses: false,
       enoughSecondaryKinds: false,
+      taskGroupCounts: {},
+      requiredTaskGroups,
+      missingTaskGroups: [...requiredTaskGroups],
+      unknownTaskGroups: [],
+      enoughTaskGroups: requiredTaskGroups.length === 0,
+      scenarioCounts: {},
+      scenarioCountsByTaskGroup: {},
+      requiredScenarios,
+      requiredScenariosByTaskGroup,
+      missingScenarios: [...requiredScenarios],
+      unknownScenarios: [],
+      enoughScenarios: requiredScenarios.length === 0,
       batchEvidence: probe.batchEvidence,
       batchPrefix: null,
       missingReferences: [],
@@ -1215,6 +1506,18 @@ export function evaluateManualAcceptanceDataset(probe, data) {
       secondaryKinds: 0,
       requiredSecondaryKinds,
       missingSecondaryKinds: [...requiredSecondaryKinds],
+      taskGroupCounts: {},
+      requiredTaskGroups,
+      missingTaskGroups: [...requiredTaskGroups],
+      unknownTaskGroups: [],
+      enoughTaskGroups: requiredTaskGroups.length === 0,
+      scenarioCounts: {},
+      scenarioCountsByTaskGroup: {},
+      requiredScenarios,
+      requiredScenariosByTaskGroup,
+      missingScenarios: [...requiredScenarios],
+      unknownScenarios: [],
+      enoughScenarios: requiredScenarios.length === 0,
       batchEvidence: probe.batchEvidence || "not_applicable",
       batchPrefix: probe.batchPrefix || null,
       missingReferences: [],
@@ -1225,6 +1528,7 @@ export function evaluateManualAcceptanceDataset(probe, data) {
   const missingReferences = [];
   const referenceMismatches = [];
   let batchItems;
+  let taskCoverageItems = null;
   if (probe.batchEvidence === "exact_references") {
     batchItems = [];
     for (const expected of probe.expectedReferences || []) {
@@ -1276,27 +1580,35 @@ export function evaluateManualAcceptanceDataset(probe, data) {
       batchItems.push(item);
     }
   } else {
-    batchItems =
-      probe.batchEvidence === "exact_source"
-      ? items.filter(
-          (item) =>
-            item?.source_type === probe.exactSourceType &&
-            Number(item?.source_id) === Number(probe.exactSourceID) &&
-            (!probe.exactTaskPrefix ||
-              String(item?.task_code || "").startsWith(
-                `${probe.exactTaskPrefix}-`,
-              )) &&
-            (!probe.exactOwnerRoleKey ||
-              item?.owner_role_key === probe.exactOwnerRoleKey),
-        )
-      : probe.batchPrefix
+    if (probe.batchEvidence === "exact_source") {
+      taskCoverageItems = items.filter(
+        (item) =>
+          item?.source_type === probe.exactSourceType &&
+          Number(item?.source_id) === Number(probe.exactSourceID) &&
+          (!probe.exactTaskCodePrefix ||
+            String(item?.task_code || "").startsWith(
+              `${probe.exactTaskCodePrefix}-`,
+            )) &&
+          (!probe.exactOwnerRoleKey ||
+            item?.owner_role_key === probe.exactOwnerRoleKey),
+      );
+      batchItems = taskCoverageItems.filter(
+        (item) =>
+          !probe.exactTaskGroup || item?.task_group === probe.exactTaskGroup,
+      );
+    } else {
+      batchItems = probe.batchPrefix
         ? items.filter((item) =>
             String(item?.[probe.batchMatchField] || "").startsWith(
               probe.batchPrefix,
             ),
           )
         : items;
+    }
   }
+  taskCoverageItems = probe.exactTaskGroup
+    ? batchItems
+    : (taskCoverageItems ?? batchItems);
   const responseTotal = positiveInteger(data.total);
   const batchScoped =
     probe.batchEvidence === "exact_source" ||
@@ -1375,10 +1687,62 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     Object.keys(mismatchedStatusCounts).length === 0 &&
     !(probe.statusField === "account_status" && counts.INVALID);
   const enoughSecondaryKinds = missingSecondaryKinds.length === 0;
+  const taskGroupCounts =
+    requiredTaskGroups.length > 0
+      ? textValueCounts(taskCoverageItems, (item) => item?.task_group)
+      : {};
+  const missingTaskGroups = requiredTaskGroups.filter(
+    (taskGroup) => !taskGroupCounts[taskGroup],
+  );
+  const unknownTaskGroups = Object.keys(taskGroupCounts).filter(
+    (taskGroup) => !requiredTaskGroups.includes(taskGroup),
+  );
+  const enoughTaskGroups =
+    missingTaskGroups.length === 0 && unknownTaskGroups.length === 0;
+  const scenarioCounts =
+    requiredScenarios.length > 0
+      ? textValueCounts(
+          taskCoverageItems,
+          (item) => item?.payload?.acceptance_scenario_key,
+        )
+      : {};
+  const missingScenarios = requiredScenarios.filter(
+    (scenarioKey) => !scenarioCounts[scenarioKey],
+  );
+  const unknownScenarios = Object.keys(scenarioCounts).filter(
+    (scenarioKey) => !requiredScenarios.includes(scenarioKey),
+  );
+  const scenarioCountsByTaskGroup = Object.fromEntries(
+    requiredTaskGroups.map((taskGroup) => [
+      taskGroup,
+      textValueCounts(
+        taskCoverageItems.filter((item) => item?.task_group === taskGroup),
+        (item) => item?.payload?.acceptance_scenario_key,
+      ),
+    ]),
+  );
+  const groupScenarioMismatches = requiredTaskGroups.filter((taskGroup) => {
+    const expected = requiredScenariosByTaskGroup[taskGroup] || [];
+    const actual = scenarioCountsByTaskGroup[taskGroup] || {};
+    return (
+      expected.some((scenarioKey) => !actual[scenarioKey]) ||
+      Object.keys(actual).some((scenarioKey) => !expected.includes(scenarioKey))
+    );
+  });
+  const enoughScenarios =
+    missingScenarios.length === 0 &&
+    unknownScenarios.length === 0 &&
+    groupScenarioMismatches.length === 0;
   return {
     id: probe.id,
     status:
-      enoughRecords && enoughStatuses && enoughSecondaryKinds ? "pass" : "fail",
+      enoughRecords &&
+      enoughStatuses &&
+      enoughSecondaryKinds &&
+      enoughTaskGroups &&
+      enoughScenarios
+        ? "pass"
+        : "fail",
     expectedMinimum: probe.expectedMinimum,
     expectedExact: probe.expectedExact ?? null,
     actual,
@@ -1400,6 +1764,19 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     enoughRecords,
     enoughStatuses,
     enoughSecondaryKinds,
+    taskGroupCounts,
+    requiredTaskGroups,
+    missingTaskGroups,
+    unknownTaskGroups,
+    enoughTaskGroups,
+    scenarioCounts,
+    scenarioCountsByTaskGroup,
+    requiredScenarios,
+    requiredScenariosByTaskGroup,
+    groupScenarioMismatches,
+    missingScenarios,
+    unknownScenarios,
+    enoughScenarios,
     batchEvidence: probe.batchEvidence || "not_applicable",
     batchPrefix: probe.batchPrefix || null,
     missingReferences,
@@ -1458,12 +1835,7 @@ async function rpcCall({
   return json.result.data || {};
 }
 
-async function readProbeData({
-  backendURL,
-  probe,
-  token,
-  fetchImpl,
-}) {
+async function readProbeData({ backendURL, probe, token, fetchImpl }) {
   if (probe.batchEvidence !== "exact_references") {
     return rpcCall({
       backendURL,
@@ -1567,6 +1939,7 @@ async function assertSafeReadRuntime({
   }
   try {
     assertManualAcceptanceCapabilitiesPolicy({ policy, capabilities });
+    assertManualAcceptanceDatabaseIdentity({ policy, capabilities });
   } catch (error) {
     throw new CliError(String(error?.message || error), 2);
   }
@@ -1604,7 +1977,10 @@ async function assertSafeReadRuntime({
     (attestation.release !== factRuntime?.targetAttestation?.release ||
       attestation.migration !== factRuntime?.targetAttestation?.migration)
   ) {
-    throw new CliError("customer-trial-133 attestation 与业务记录报告不一致", 2);
+    throw new CliError(
+      "customer-trial-133 attestation 与业务记录报告不一致",
+      2,
+    );
   }
   return {
     ...runtime,
@@ -1716,6 +2092,119 @@ function mobileTotalResult(mobileResults) {
   };
 }
 
+function taskGroupCoverageSummary(mobileResults, catalogScenarioDigest) {
+  const byRole = {};
+  for (const result of mobileResults) {
+    const roleKey = String(result?.id || "").replace("mobile-tasks:", "");
+    if (!TASK_ROLE_KEYS.includes(roleKey)) continue;
+    const taskGroups = [...(result.requiredTaskGroups || [])];
+    const groups = {};
+    for (const taskGroup of taskGroups) {
+      const requiredScenarios = [
+        ...(result.requiredScenariosByTaskGroup?.[taskGroup] || []),
+      ];
+      const scenarioCounts = {
+        ...(result.scenarioCountsByTaskGroup?.[taskGroup] || {}),
+      };
+      const scenarioTotal = Object.values(scenarioCounts).reduce(
+        (total, count) => total + Number(count || 0),
+        0,
+      );
+      const missingScenarios = requiredScenarios.filter(
+        (scenarioKey) => !scenarioCounts[scenarioKey],
+      );
+      const unknownScenarios = Object.keys(scenarioCounts).filter(
+        (scenarioKey) => !requiredScenarios.includes(scenarioKey),
+      );
+      const enoughScenarios =
+        result.enoughScenarios === true &&
+        result.enoughTaskGroups === true &&
+        Number(result.taskGroupCounts?.[taskGroup] || 0) === scenarioTotal &&
+        missingScenarios.length === 0 &&
+        unknownScenarios.length === 0;
+      groups[taskGroup] = {
+        requiredScenarios,
+        scenarioCounts,
+        missingScenarios,
+        unknownScenarios,
+        enoughScenarios,
+      };
+    }
+    byRole[roleKey] = { taskGroups, groups };
+  }
+  const complete =
+    catalogScenarioDigest === TASK_CATALOG_SCENARIO_DIGEST &&
+    Object.keys(byRole).length === TASK_ROLE_KEYS.length &&
+    TASK_ROLE_KEYS.every((roleKey) => {
+      const expectedGroups = getManualAcceptanceRoleTaskGroups(roleKey);
+      const roleCoverage = byRole[roleKey];
+      return (
+        JSON.stringify(roleCoverage?.taskGroups) ===
+          JSON.stringify(expectedGroups) &&
+        JSON.stringify(Object.keys(roleCoverage?.groups || {})) ===
+          JSON.stringify(expectedGroups) &&
+        expectedGroups.every((taskGroup) => {
+          const groupCoverage = roleCoverage.groups[taskGroup];
+          return (
+            groupCoverage?.enoughScenarios === true &&
+            groupCoverage.missingScenarios.length === 0 &&
+            groupCoverage.unknownScenarios.length === 0
+          );
+        })
+      );
+    });
+  return {
+    catalogScenarioDigest,
+    complete,
+    byRole,
+  };
+}
+
+function bossDashboardActiveResult(bossResult) {
+  const terminalStatuses = new Set(["DONE", "REJECTED"]);
+  const expectedCounts = taskStatusCountsForRole("boss");
+  const expectedMinimum = Object.entries(expectedCounts).reduce(
+    (sum, [status, count]) =>
+      terminalStatuses.has(status) ? sum : sum + Number(count || 0),
+    0,
+  );
+  const statusCounts = Object.fromEntries(
+    Object.entries(bossResult?.statusCounts || {}).filter(
+      ([status]) => !terminalStatuses.has(status),
+    ),
+  );
+  const actual = Object.values(statusCounts).reduce(
+    (sum, count) => sum + Number(count || 0),
+    0,
+  );
+  const sourceProven = bossResult?.batchEvidence === "exact_source";
+  const passed =
+    bossResult?.status === "pass" && sourceProven && actual === expectedMinimum;
+  return {
+    id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.bossDashboardActiveTasks,
+    status: passed ? "pass" : sourceProven ? "fail" : "not_proven",
+    expectedMinimum,
+    expectedExact: expectedMinimum,
+    actual: sourceProven ? actual : null,
+    returned: bossResult?.returned ?? 0,
+    statusField: "task_status_key",
+    statusCounts,
+    statusKinds: Object.keys(statusCounts).length,
+    requiredStatuses: Object.keys(expectedCounts).filter(
+      (status) => !terminalStatuses.has(status),
+    ),
+    missingStatuses: [],
+    enoughRecords: passed,
+    enoughStatuses: passed,
+    enoughSecondaryKinds: true,
+    batchEvidence: sourceProven ? "exact_source" : "not_proven",
+    notProvenReason: sourceProven
+      ? null
+      : "未提供老板岗位本批任务，不能证明工作台当前事项。",
+    error: null,
+  };
+}
+
 function catalogPrintTemplateResult(plan) {
   const actual = plan.targets.filter(
     (item) => item.catalogGroup === "printPreviewPages",
@@ -1752,8 +2241,9 @@ function sanitizeProbe(probe, result) {
     batchPrefix: probe.batchPrefix ?? null,
     exactSourceType: probe.exactSourceType ?? null,
     exactSourceID: probe.exactSourceID ?? null,
-    exactTaskPrefix: probe.exactTaskPrefix ?? null,
+    exactTaskCodePrefix: probe.exactTaskCodePrefix ?? null,
     exactOwnerRoleKey: probe.exactOwnerRoleKey ?? null,
+    exactTaskGroup: probe.exactTaskGroup ?? null,
     declaredMinimum: probe.declaredMinimum ?? null,
     ...result,
   };
@@ -1838,6 +2328,7 @@ function combineTargetResult(target, resultById) {
 function resolveReadinessTarget({
   plan,
   backendURL,
+  databaseName,
   targetConfirmation,
   targetAttestation,
 }) {
@@ -1854,9 +2345,16 @@ function resolveReadinessTarget({
       datasetKey: identity.datasetKey,
       dataVersion: identity.dataVersion,
       runId: identity.runId,
+      databaseName: databaseName || identity.databaseName,
     });
-    if (factInput && policy.backendURL !== factInput.backendURL) {
-      throw new Error("--backend-url 必须与业务记录报告 backendURL 完全一致");
+    if (
+      factInput &&
+      (policy.backendURL !== factInput.backendURL ||
+        policy.databaseName !== factInput.databaseName)
+    ) {
+      throw new Error(
+        "--backend-url 和 --database-name 必须与业务记录报告完全一致",
+      );
     }
     assertManualAcceptanceMutationTarget(policy, {
       confirmation:
@@ -1890,6 +2388,7 @@ export async function verifyManualAcceptanceReadiness(
   plan,
   {
     backendURL,
+    databaseName,
     password,
     adminPassword,
     targetConfirmation,
@@ -1901,10 +2400,16 @@ export async function verifyManualAcceptanceReadiness(
   const { policy, attestation } = resolveReadinessTarget({
     plan,
     backendURL,
+    databaseName,
     targetConfirmation,
     targetAttestation,
   });
   const normalizedBackendURL = policy.backendURL;
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy,
+    attestation,
+    fetchImpl,
+  });
   const effectiveAdminPassword = attestation
     ? undefined
     : requiredText(
@@ -1977,6 +2482,16 @@ export async function verifyManualAcceptanceReadiness(
           secondaryKinds: 0,
           requiredSecondaryKinds: [...(probe.requiredSecondaryKinds || [])],
           missingSecondaryKinds: [...(probe.requiredSecondaryKinds || [])],
+          taskGroupCounts: {},
+          requiredTaskGroups: [...(probe.requiredTaskGroups || [])],
+          missingTaskGroups: [...(probe.requiredTaskGroups || [])],
+          unknownTaskGroups: [],
+          enoughTaskGroups: !(probe.requiredTaskGroups || []).length,
+          scenarioCounts: {},
+          requiredScenarios: [...(probe.requiredScenarios || [])],
+          missingScenarios: [...(probe.requiredScenarios || [])],
+          unknownScenarios: [],
+          enoughScenarios: !(probe.requiredScenarios || []).length,
           batchEvidence: probe.batchEvidence || "not_applicable",
           batchPrefix: probe.batchPrefix || null,
           error: `岗位 ${probe.roleKey} 未能登录，未执行查询`,
@@ -2028,8 +2543,16 @@ export async function verifyManualAcceptanceReadiness(
   const mobileResults = plan.probes
     .filter((probe) => probe.id.startsWith("mobile-tasks:"))
     .map((probe) => resultById.get(probe.id));
+  const taskGroupCoverage = taskGroupCoverageSummary(
+    mobileResults,
+    plan.reportInputs.taskReport?.taskGroupCoverageDigest || null,
+  );
   const totalResult = mobileTotalResult(mobileResults);
   resultById.set(totalResult.id, totalResult);
+  const activeBossResult = bossDashboardActiveResult(
+    resultById.get("boss-dashboard-tasks"),
+  );
+  resultById.set(activeBossResult.id, activeBossResult);
   const printCatalogResult = catalogPrintTemplateResult(plan);
   resultById.set(printCatalogResult.id, printCatalogResult);
 
@@ -2057,6 +2580,7 @@ export async function verifyManualAcceptanceReadiness(
   const probes = [
     ...rawResults.map(({ probe, result }) => sanitizeProbe(probe, result)),
     loginResult,
+    activeBossResult,
     totalResult,
     printCatalogResult,
   ];
@@ -2065,7 +2589,12 @@ export async function verifyManualAcceptanceReadiness(
     scope: plan.scope,
     generatedAt: now().toISOString(),
     customerKey: plan.customerKey,
+    datasetKey: policy.datasetKey,
+    dataVersion: policy.dataVersion,
+    runId: policy.runId,
+    target: policy.target,
     backendURL: normalizedBackendURL,
+    databaseName: policy.databaseName,
     readOnly: true,
     writesBusinessData: false,
     authenticationMayAppendAudit: true,
@@ -2098,6 +2627,7 @@ export async function verifyManualAcceptanceReadiness(
       mobileActualByRole,
       mobileTaskTotalExpected: MOBILE_TASK_TOTAL,
       mobileTaskTotalActual: totalResult.actual,
+      taskGroupCoverage,
     },
     accountChecks: accounts.results,
     probes,
@@ -2152,6 +2682,7 @@ export function parseManualAcceptanceReadinessArgs(argv = []) {
   const options = {
     verify: false,
     backendURL: "",
+    databaseName: "",
     sourceReport: "",
     factReport: "",
     taskReport: "",
@@ -2181,6 +2712,9 @@ export function parseManualAcceptanceReadinessArgs(argv = []) {
       case "--backend-url":
         options.backendURL = value;
         break;
+      case "--database-name":
+        options.databaseName = value;
+        break;
       case "--source-report":
         options.sourceReport = value;
         break;
@@ -2203,8 +2737,11 @@ export function parseManualAcceptanceReadinessArgs(argv = []) {
         throw new CliError(`无法识别参数 ${token}`, 2);
     }
   }
-  if (options.verify && !options.backendURL) {
-    throw new CliError("--verify 必须同时提供 --backend-url", 2);
+  if (options.verify && (!options.backendURL || !options.databaseName)) {
+    throw new CliError(
+      "--verify 必须同时提供 --backend-url 和 --database-name",
+      2,
+    );
   }
   return options;
 }
@@ -2237,13 +2774,14 @@ function helpText() {
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-super-admin-password>' \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
     node scripts/qa/manual-acceptance-readiness.mjs --verify \\
-      --backend-url http://127.0.0.1:8300 \\
+      --backend-url http://127.0.0.1:8310 \\
+      --database-name plush_erp_acceptance_20260716_v5_dev \\
       --source-report output/qa/manual-acceptance/source-data/apply-report.json \\
       --fact-report output/qa/manual-acceptance/fact-data/apply-report.json \\
       --task-report output/qa/manual-acceptance/task-data/apply-report.json \\
       --out ${DEFAULT_OUT_DIR}
 
-说明：默认模式不会连接系统；只有同时提供 --verify 和 --backend-url 才执行只读核对。本地超级管理员 admin 只用于运行时安全前置，demo_admin 仍按试用账号权限核对。`;
+  说明：默认模式不会连接系统；只有同时提供 --verify、--backend-url 和 --database-name 才执行只读核对。本地超级管理员 admin 只用于运行时安全前置，demo_admin 仍按试用账号权限核对。`;
 }
 
 export async function runManualAcceptanceReadinessCli(argv = [], deps = {}) {
@@ -2273,6 +2811,7 @@ export async function runManualAcceptanceReadinessCli(argv = [], deps = {}) {
   }
   const report = await verifyManualAcceptanceReadiness(plan, {
     backendURL: options.backendURL,
+    databaseName: options.databaseName,
     password: deps.password,
     adminPassword: deps.adminPassword,
     targetConfirmation: deps.targetConfirmation,

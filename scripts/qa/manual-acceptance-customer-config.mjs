@@ -7,23 +7,38 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  LOCAL_DEV_TARGET,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   MANUAL_ACCEPTANCE_DATASET_KEY,
   assertManualAcceptanceMutationTarget,
+  assertManualAcceptanceRuntimeIdentityPrecondition,
   assertManualAcceptanceTargetAttestation,
   manualAcceptanceTargetConfirmation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import { yoyoosunCustomerPackage } from "../../config/customers/yoyoosun/customerPackage.mjs";
+import { buildRuntimePreviewManifest } from "./customer-config-runtime-manifest.mjs";
+import { buildLocalTestApplyRuntimeManifest } from "./customer-config-runtime-manifest.mjs";
 
-export const CUSTOMER_CONFIG_DATA_VERSION = "2026.07.15-v3";
-export const CUSTOMER_CONFIG_RUN_ID = "20260715-V3";
+export const CUSTOMER_CONFIG_DATA_VERSION =
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION;
+export const CUSTOMER_CONFIG_RUN_ID = CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
 export const CUSTOMER_CONFIG_CUSTOMER_KEY = "yoyoosun";
 export const CUSTOMER_CONFIG_PRODUCT_VERSION =
-  "customer-trial-133-test-2026.07.15-v3";
-export const CUSTOMER_CONFIG_REVISION =
-  "yoyoosun-customer-trial-133-package-v3.runtime-manifest-v1";
-export const CUSTOMER_CONFIG_APPLY_PURPOSE = "customer_trial_test_apply";
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION;
+export const CUSTOMER_CONFIG_REVISION = CUSTOMER_TRIAL_133_CONFIG_REVISION;
+export const CUSTOMER_CONFIG_APPLY_PURPOSE =
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE;
 export const DEFAULT_PREVIEW_MANIFEST =
   "output/qa/manual-acceptance-dataset/yoyoosun-runtime-manifest-preview.json";
 export const DEFAULT_OUT_DIR =
@@ -39,7 +54,7 @@ const FORMAL_RELEASE_CREDENTIAL_KEYS = Object.freeze([
   "CUSTOMER_CONFIG_VERIFY_TOKEN",
 ]);
 
-export const CUSTOMER_CONFIG_USAGE = `133 customer-trial customer-config helper
+export const CUSTOMER_CONFIG_USAGE = `manual-acceptance customer-config helper
 
 Report only (default; no network call):
   node scripts/qa/manual-acceptance-customer-config.mjs
@@ -56,13 +71,14 @@ Options:
   --apply                    Execute validate, publish, transition check, activate and readback.
   --preview-manifest <path>  Preview-only yoyoosun runtime manifest source.
   --out <dir>                Report directory outside deployments evidence.
-  --backend-url <url>        Must be the registered customer-trial-133 SSH tunnel origin.
-  --target <target>          Must be customer-trial-133.
+  --backend-url <url>        Dedicated local backend or registered customer-trial-133 SSH tunnel.
+  --target <target>          local-dev or customer-trial-133.
+  --database-name <name>     Exact fresh acceptance database identity.
   --data-version <version>   Must be ${CUSTOMER_CONFIG_DATA_VERSION}.
   --run-id <id>              Must be ${CUSTOMER_CONFIG_RUN_ID}.
   --help                     Print this help.
 
-This is a simulated customer-trial configuration path. It does not use formal
+This is a simulated local/trial configuration path. It does not use formal
 release evidence, the formal release executor, direct database writes, or
 Workflow / Fact writes, and it never proves release readiness.`;
 
@@ -102,6 +118,23 @@ function sha256(value) {
 
 function jsonText(value) {
   return `${JSON.stringify(value, null, 2)}\n`;
+}
+
+function canonicalJSON(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => canonicalJSON(item)).join(",")}]`;
+  }
+  if (Boolean(value) && typeof value === "object") {
+    return `{${Object.keys(value)
+      .sort()
+      .map((key) => `${JSON.stringify(key)}:${canonicalJSON(value[key])}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function currentYoyoosunPreviewManifest() {
+  return buildRuntimePreviewManifest(yoyoosunCustomerPackage);
 }
 
 function relativeRepoPath(repoRoot, absolutePath, name) {
@@ -144,6 +177,7 @@ export function parseManualAcceptanceCustomerConfigArgs(argv) {
     out: DEFAULT_OUT_DIR,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
+    databaseName: CUSTOMER_TRIAL_133_DATABASE,
     dataVersion: CUSTOMER_CONFIG_DATA_VERSION,
     runId: CUSTOMER_CONFIG_RUN_ID,
   };
@@ -187,6 +221,9 @@ export function parseManualAcceptanceCustomerConfigArgs(argv) {
         break;
       case "target":
         options.target = value;
+        break;
+      case "database-name":
+        options.databaseName = value;
         break;
       case "data-version":
         options.dataVersion = value;
@@ -265,6 +302,13 @@ function assertPreviewManifest(preview) {
       );
     }
   }
+  const expected = currentYoyoosunPreviewManifest();
+  if (sha256(canonicalJSON(preview)) !== sha256(canonicalJSON(expected))) {
+    throw new ManualAcceptanceCustomerConfigError(
+      "preview manifest must exactly match the current tracked yoyoosun runtime projection",
+      2,
+    );
+  }
 }
 
 export function buildCustomerTrial133Manifest(
@@ -294,6 +338,25 @@ export function buildCustomerTrial133Manifest(
   return manifest;
 }
 
+export function buildLocalManualAcceptanceManifest(preview) {
+  assertPreviewManifest(preview);
+  const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+  if (
+    manifest.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
+    manifest.product_version !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
+    manifest.compiled_snapshot?.applyPurpose !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE ||
+    manifest.compiled_snapshot?.datasetVersion !== undefined ||
+    manifest.compiled_snapshot?.target !== undefined
+  ) {
+    throw new ManualAcceptanceCustomerConfigError(
+      "local-test manifest does not match the current registered acceptance identity",
+      2,
+    );
+  }
+  return manifest;
+}
+
 function assertCurrentCustomerTrialManifestIdentity(manifest) {
   if (
     manifest?.customer_key !== CUSTOMER_CONFIG_CUSTOMER_KEY ||
@@ -306,7 +369,31 @@ function assertCurrentCustomerTrialManifestIdentity(manifest) {
     manifest?.compiled_snapshot?.target !== CUSTOMER_TRIAL_133_TARGET
   ) {
     throw new ManualAcceptanceCustomerConfigError(
-      "customer-trial-133 manifest must match the current registered v3 identity",
+      "customer-trial-133 manifest must match the current registered v5 identity",
+      2,
+    );
+  }
+}
+
+function assertCurrentManualAcceptanceManifestIdentity(manifest, policy) {
+  if (policy.target === CUSTOMER_TRIAL_133_TARGET) {
+    assertCurrentCustomerTrialManifestIdentity(manifest);
+    return;
+  }
+  const expected = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
+  if (
+    policy.target !== LOCAL_DEV_TARGET ||
+    manifest?.customer_key !== CUSTOMER_CONFIG_CUSTOMER_KEY ||
+    manifest?.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
+    manifest?.product_version !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
+    manifest?.compiled_snapshot?.applyPurpose !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE ||
+    manifest?.compiled_snapshot?.datasetVersion !== undefined ||
+    manifest?.compiled_snapshot?.target !== undefined ||
+    sha256(canonicalJSON(manifest)) !== sha256(canonicalJSON(expected))
+  ) {
+    throw new ManualAcceptanceCustomerConfigError(
+      "local-test manifest must exactly match the current tracked customer package",
       2,
     );
   }
@@ -486,8 +573,12 @@ function requireTransition(data, manifest, identity, expectedActiveRevision) {
 
 function requireEffectiveSession(data, manifest, identity) {
   const session = data?.session;
-  const pages = Array.isArray(session?.pages) ? session.pages : [];
-  const manifestPages = manifest.compiled_snapshot.pages;
+  const pages = Array.isArray(session?.pages)
+    ? [...session.pages].map((item) => String(item)).sort()
+    : [];
+  const manifestPages = [...manifest.compiled_snapshot.pages]
+    .map((item) => String(item))
+    .sort();
   const sessionFields = Object.keys(session?.fieldPolicies || {}).sort();
   const manifestFields = Object.keys(
     manifest.compiled_snapshot.fieldPolicies || {},
@@ -496,14 +587,17 @@ function requireEffectiveSession(data, manifest, identity) {
     !session ||
     session.customer?.key !== manifest.customer_key ||
     session.configRevision !== manifest.revision ||
+    session.configProductVersion !== manifest.product_version ||
+    session.configApplyPurpose !== manifest.compiled_snapshot.applyPurpose ||
+    session.configDatasetVersion !== manifest.compiled_snapshot.datasetVersion ||
+    session.configTarget !== manifest.compiled_snapshot.target ||
     normalizeHash(
       session.configHash,
       "get_effective_session configHash",
     ) !== identity.configHash ||
     Number(session.configHashVersion) !== identity.configHashVersion ||
     session.source !== "active_customer_config_revision" ||
-    pages.length === 0 ||
-    pages.some((key) => !manifestPages.includes(key)) ||
+    JSON.stringify(pages) !== JSON.stringify(manifestPages) ||
     JSON.stringify(sessionFields) !== JSON.stringify(manifestFields)
   ) {
     throw new ManualAcceptanceCustomerConfigError(
@@ -516,6 +610,10 @@ function requireEffectiveSession(data, manifest, identity) {
     configRevision: session.configRevision,
     configHash: identity.configHash,
     configHashVersion: identity.configHashVersion,
+    configProductVersion: session.configProductVersion,
+    configApplyPurpose: session.configApplyPurpose,
+    configDatasetVersion: session.configDatasetVersion,
+    configTarget: session.configTarget,
     source: session.source,
     pageCount: pages.length,
     actionCount: Array.isArray(session.actions) ? session.actions.length : 0,
@@ -526,18 +624,13 @@ function requireEffectiveSession(data, manifest, identity) {
   };
 }
 
-export async function applyCustomerTrial133Config({
+export async function applyManualAcceptanceCustomerConfig({
   manifest,
   policy,
   env,
   fetchImpl = fetch,
 }) {
   const resolvedPolicy = resolveManualAcceptanceTarget(policy);
-  requireExact(
-    resolvedPolicy.target,
-    CUSTOMER_TRIAL_133_TARGET,
-    "policy.target",
-  );
   requireExact(
     resolvedPolicy.dataVersion,
     CUSTOMER_CONFIG_DATA_VERSION,
@@ -548,7 +641,7 @@ export async function applyCustomerTrial133Config({
     CUSTOMER_CONFIG_RUN_ID,
     "policy.runId",
   );
-  assertCurrentCustomerTrialManifestIdentity(manifest);
+  assertCurrentManualAcceptanceManifestIdentity(manifest, resolvedPolicy);
   const operations = [];
   let sequence = 0;
   const call = (input) =>
@@ -562,11 +655,24 @@ export async function applyCustomerTrial133Config({
     assertManualAcceptanceMutationTarget(resolvedPolicy, {
       confirmation: env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
     });
-    const attestation = assertManualAcceptanceTargetAttestation({
-      policy: resolvedPolicy,
-      attestation: env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
-    });
+    let attestation;
+    if (resolvedPolicy.target === CUSTOMER_TRIAL_133_TARGET) {
+      attestation = assertManualAcceptanceTargetAttestation({
+        policy: resolvedPolicy,
+        attestation: env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+      });
+    } else if (optionalText(env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON)) {
+      throw new ManualAcceptanceCustomerConfigError(
+        "local-dev customer config apply must not use a remote target attestation",
+        2,
+      );
+    }
     const credential = requireIndependentAdminCredential(env);
+    await assertManualAcceptanceRuntimeIdentityPrecondition({
+      policy: resolvedPolicy,
+      attestation,
+      fetchImpl,
+    });
     const login = await call({
       domain: "auth",
       method: "admin_login",
@@ -720,14 +826,16 @@ export async function applyCustomerTrial133Config({
       identity,
       operations,
       effectiveSession,
-      attestation: {
-        target: attestation.target,
-        origin: attestation.origin,
-        environment: attestation.environment,
-        release: attestation.release,
-        migration: attestation.migration,
-        debugMutationsDisabled: true,
-      },
+      attestation: attestation
+        ? {
+            target: attestation.target,
+            origin: attestation.origin,
+            environment: attestation.environment,
+            release: attestation.release,
+            migration: attestation.migration,
+            debugMutationsDisabled: true,
+          }
+        : null,
       adminCredential: {
         mode: "manual-acceptance-username-password",
         superAdminVerified: true,
@@ -739,6 +847,10 @@ export async function applyCustomerTrial133Config({
     error.completedOperations = [...operations];
     throw error;
   }
+}
+
+export async function applyCustomerTrial133Config(input) {
+  return applyManualAcceptanceCustomerConfig(input);
 }
 
 function reportBoundary() {
@@ -775,7 +887,12 @@ export async function runManualAcceptanceCustomerConfig({
 } = {}) {
   const options = parseManualAcceptanceCustomerConfigArgs(argv);
   if (options.help) return { help: true, usage: CUSTOMER_CONFIG_USAGE };
-  requireExact(options.target, CUSTOMER_TRIAL_133_TARGET, "target");
+  if (![LOCAL_DEV_TARGET, CUSTOMER_TRIAL_133_TARGET].includes(options.target)) {
+    throw new ManualAcceptanceCustomerConfigError(
+      `target must be ${LOCAL_DEV_TARGET} or ${CUSTOMER_TRIAL_133_TARGET}`,
+      2,
+    );
+  }
   requireExact(
     options.dataVersion,
     CUSTOMER_CONFIG_DATA_VERSION,
@@ -788,6 +905,7 @@ export async function runManualAcceptanceCustomerConfig({
     datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
     dataVersion: options.dataVersion,
     runId: options.runId,
+    databaseName: options.databaseName,
   });
   const previewPath = resolveRepoPath(
     repoRoot,
@@ -809,21 +927,39 @@ export async function runManualAcceptanceCustomerConfig({
       2,
     );
   }
-  const manifest = buildCustomerTrial133Manifest(preview, policy);
+  const manifest =
+    policy.target === CUSTOMER_TRIAL_133_TARGET
+      ? buildCustomerTrial133Manifest(preview, policy)
+      : buildLocalManualAcceptanceManifest(preview);
   const manifestRaw = jsonText(manifest);
   const manifestSha256 = sha256(manifestRaw);
-  const manifestPath = path.join(outDir, TRIAL_MANIFEST_FILE);
-  const reportPath = path.join(outDir, REPORT_FILE);
+  const manifestPath = path.join(
+    outDir,
+    policy.target === CUSTOMER_TRIAL_133_TARGET
+      ? TRIAL_MANIFEST_FILE
+      : "local-test-manifest.json",
+  );
+  const reportPath = path.join(
+    outDir,
+    policy.target === CUSTOMER_TRIAL_133_TARGET
+      ? REPORT_FILE
+      : "local-test-report.json",
+  );
   await mkdir(outDir, { recursive: true });
   await writeFile(manifestPath, manifestRaw, "utf8");
 
   const baseReport = {
     schemaVersion: "manual-acceptance-customer-config-report/v1",
     status: options.apply ? "applying" : "planned",
-    mode: options.apply ? "customer-trial-test-apply" : "report-only",
+    mode: options.apply
+      ? policy.target === CUSTOMER_TRIAL_133_TARGET
+        ? "customer-trial-test-apply"
+        : "local-test-apply"
+      : "report-only",
     generatedAt: now().toISOString(),
     target: policy.target,
     origin: policy.origin,
+    databaseName: policy.databaseName,
     transport: policy.transport,
     customerKey: CUSTOMER_CONFIG_CUSTOMER_KEY,
     datasetKey: policy.datasetKey,
@@ -854,7 +990,10 @@ export async function runManualAcceptanceCustomerConfig({
     operations: [],
     identity: null,
     effectiveSession: null,
-    attestation: { requiredForApply: true, verified: false },
+    attestation: {
+      requiredForApply: policy.target === CUSTOMER_TRIAL_133_TARGET,
+      verified: false,
+    },
     adminCredential: {
       requiredForApply: true,
       mode: "manual-acceptance-username-password",
@@ -870,7 +1009,7 @@ export async function runManualAcceptanceCustomerConfig({
   }
 
   try {
-    const applied = await applyCustomerTrial133Config({
+    const applied = await applyManualAcceptanceCustomerConfig({
       manifest,
       policy,
       env,
@@ -884,9 +1023,9 @@ export async function runManualAcceptanceCustomerConfig({
       identity: applied.identity,
       effectiveSession: applied.effectiveSession,
       attestation: {
-        requiredForApply: true,
-        verified: true,
-        ...applied.attestation,
+        requiredForApply: policy.target === CUSTOMER_TRIAL_133_TARGET,
+        verified: applied.attestation !== null,
+        ...(applied.attestation || {}),
       },
       adminCredential: {
         requiredForApply: true,

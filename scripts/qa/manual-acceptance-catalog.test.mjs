@@ -8,12 +8,15 @@ import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlow
 import { getNavigationSections } from "../../web/src/erp/config/seedData.mjs";
 import { printTemplateCatalog } from "../../web/src/erp/config/printTemplates.mjs";
 import {
+  MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS,
   buildManualAcceptanceCatalog,
   parseManualAcceptanceCatalogArgs,
   renderManualAcceptanceJson,
   renderManualAcceptanceMarkdown,
   runManualAcceptanceCatalogCli,
 } from "./manual-acceptance-catalog.mjs";
+
+const repoRoot = path.resolve(import.meta.dirname, "../..");
 
 function flattenTechnicalManifest(catalog) {
   return [
@@ -41,18 +44,37 @@ function minimumRecordsByKey(items) {
   );
 }
 
+function routerLiteralPaths() {
+  const source = fs.readFileSync(
+    path.resolve(repoRoot, "web/src/erp/router.jsx"),
+    "utf8",
+  );
+  return {
+    source,
+    paths: new Set(
+      [...source.matchAll(/<Route\b[\s\S]*?\bpath="([^"]+)"/gu)].map(
+        (match) => match[1],
+      ),
+    ),
+  };
+}
+
 test("manual acceptance catalog derives the complete current yoyoosun page inventory", () => {
   const catalog = buildManualAcceptanceCatalog();
-  const expectedDesktopItems = getNavigationSections(
-    yoyoosunMenuConfig,
-  ).flatMap((section) => section.items);
+  const expectedDesktopItems = getNavigationSections({
+    ...yoyoosunMenuConfig,
+    desktopMenu: {
+      ...yoyoosunMenuConfig.desktopMenu,
+      hiddenItemKeys: [],
+    },
+  }).flatMap((section) => section.items);
 
   assert.equal(catalog.summary.entryPages, 2);
-  assert.equal(catalog.summary.desktopPages, 27);
+  assert.equal(catalog.summary.desktopPages, 30);
   assert.equal(catalog.summary.mobileRolePages, 9);
   assert.equal(catalog.summary.printPreviewPages, 5);
   assert.equal(catalog.summary.printWorkspacePages, 5);
-  assert.equal(catalog.summary.totalScenarios, 48);
+  assert.equal(catalog.summary.totalScenarios, 51);
   assert.deepEqual(
     catalog.technicalManifest.desktopPages.map((item) => item.key),
     expectedDesktopItems.map((item) => item.key),
@@ -71,21 +93,63 @@ test("manual acceptance catalog derives the complete current yoyoosun page inven
   );
 });
 
-test("manual acceptance catalog excludes hidden and development-only pages", () => {
+test("manual acceptance catalog keeps every formal route visible and excludes development-only pages", () => {
   const catalog = buildManualAcceptanceCatalog();
   const allTechnical = flattenTechnicalManifest(catalog);
   const serialized = JSON.stringify(allTechnical);
 
-  for (const hiddenKey of yoyoosunMenuConfig.desktopMenu.hiddenItemKeys) {
-    assert(
-      !catalog.technicalManifest.desktopPages.some(
-        (item) => item.key === hiddenKey,
-      ),
-      `${hiddenKey} must stay excluded from the desktop acceptance inventory`,
+  assert.deepEqual(yoyoosunMenuConfig.desktopMenu.hiddenItemKeys, []);
+  for (const pageKey of [
+    "business-dashboard",
+    "shipping-release",
+    "exception-flow",
+  ]) {
+    const item = catalog.technicalManifest.desktopPages.find(
+      (candidate) => candidate.key === pageKey,
     );
+    assert(item, `${pageKey} must stay in the formal route inventory`);
+    assert.equal(item.menuHidden, false);
   }
+  assert.deepEqual(catalog.technicalManifest.excludedDesktopKeys, []);
   assert(!serialized.includes("__dev"));
   assert(!serialized.includes("/erp/__dev"));
+});
+
+test("manual acceptance catalog is independently backed by the current router", () => {
+  const catalog = buildManualAcceptanceCatalog();
+  const router = routerLiteralPaths();
+
+  for (const entry of catalog.technicalManifest.entries) {
+    assert(
+      router.paths.has(entry.route),
+      `${entry.key} route ${entry.route} is missing from router.jsx`,
+    );
+  }
+  for (const page of catalog.technicalManifest.desktopPages) {
+    const nestedPath = page.route.replace(/^\/erp\//u, "");
+    assert.notEqual(nestedPath, page.route, `${page.key} must stay under /erp`);
+    assert(
+      router.paths.has(nestedPath),
+      `${page.key} route ${page.route} is missing from router.jsx`,
+    );
+  }
+  assert(router.paths.has("/m/:roleKey"));
+  assert(router.paths.has("tasks"));
+  assert(router.paths.has("print-center/:templateKey"));
+  assert(router.paths.has("/erp/print-workspace/:templateKey"));
+  assert.match(router.source, /<Route path="\/erp"/u);
+  assert.match(
+    router.source,
+    /path="business-dashboard"[\s\S]*?element=\{<BusinessDashboardPage\s*\/>\}/u,
+  );
+  assert.match(
+    router.source,
+    /path="operations\/exceptions"[\s\S]*?<DashboardPage initialView="exception-flow"\s*\/>/u,
+  );
+  assert.match(
+    router.source,
+    /path="warehouse\/shipping-release"[\s\S]*?<WorkflowBusinessModulePage moduleKey="shipping-release"\s*\/>/u,
+  );
 });
 
 test("manual acceptance catalog keeps technical routing separate from customer-facing steps", () => {
@@ -139,8 +203,9 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
   assert.deepEqual(
     minimumRecordsByKey(catalog.technicalManifest.desktopPages),
     {
-      "global-dashboard": 180,
+      "global-dashboard": 18,
       "task-board": 20,
+      "business-dashboard": 20,
       customers: 60,
       suppliers: 60,
       products: 20,
@@ -156,9 +221,10 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       "production-orders": 45,
       "production-scheduling": 20,
       "production-progress": 45,
-      "production-exceptions": 20,
+      "production-exceptions": 5,
+      "shipping-release": 4,
       outbound: 45,
-      shipments: 45,
+      shipments: 47,
       reconciliation: 45,
       payables: 45,
       receivables: 45,
@@ -166,6 +232,7 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       "print-center": 5,
       "permission-center": 10,
       "system-audit-logs": 30,
+      "exception-flow": 3,
     },
   );
   assert.deepEqual(
@@ -219,6 +286,27 @@ test("manual acceptance catalog treats production and outbound pages as source-g
   );
 });
 
+test("production collaboration pages match the roles' executable task states", () => {
+  const catalog = buildManualAcceptanceCatalog();
+  const byTitle = new Map(
+    catalog.acceptanceGuide.desktopPages.map((item) => [item.title, item]),
+  );
+  const scheduling = byTitle.get("生产排程");
+  const exceptions = byTitle.get("生产异常");
+
+  assert(scheduling);
+  assert(exceptions);
+  assert.doesNotMatch(
+    [...scheduling.keyStates, ...scheduling.whatToDo].join("\n"),
+    /退回/u,
+  );
+  assert.doesNotMatch(
+    [...exceptions.keyStates, ...exceptions.whatToDo].join("\n"),
+    /退回/u,
+  );
+  assert.match(exceptions.whatToDo.join("\n"), /资料不足、等待补充/u);
+});
+
 test("manual acceptance catalog assigns production orders to production with source-driven actions", () => {
   const catalog = buildManualAcceptanceCatalog();
   const technical = catalog.technicalManifest.desktopPages.find(
@@ -230,7 +318,10 @@ test("manual acceptance catalog assigns production orders to production with sou
 
   assert.deepEqual(technical?.roleKeys, ["production"]);
   assert.equal(technical?.minimumRecords, 45);
-  assert.match(acceptance?.whatToDo.join("\n") || "", /已发布.*领料草稿.*完工草稿/u);
+  assert.match(
+    acceptance?.whatToDo.join("\n") || "",
+    /已发布.*领料草稿.*完工草稿/u,
+  );
   assert.match(
     acceptance?.whatToSee.join("\n") || "",
     /生产记录中过账后才会影响库存/u,
@@ -246,8 +337,69 @@ test("boss trial tasks do not pretend generic records are formal order approvals
   assert(boss);
   assert.match(boss.whatToDo.join("\n"), /销售订单正常提交后生成的审批事项/u);
   assert.match(boss.whatToDo.join("\n"), /退回.*阻塞原因/su);
+  assert.doesNotMatch(boss.keyStates.join("\n"), /已同意/u);
   assert.doesNotMatch(boss.whatToDo.join("\n"), /选择同意或退回/u);
   assert.match(boss.whatToSee.join("\n"), /不会冒充正式订单审批/u);
+});
+
+test("mobile acceptance copy only asks each role to use supported task actions", () => {
+  const catalog = buildManualAcceptanceCatalog();
+  const byTitle = new Map(
+    catalog.acceptanceGuide.mobileRolePages.map((item) => [item.title, item]),
+  );
+  const sales = byTitle.get("销售岗位任务端");
+  const engineering = byTitle.get("工程岗位任务端");
+
+  assert(sales);
+  assert(engineering);
+  assert.doesNotMatch(
+    [...sales.keyStates, ...sales.whatToDo].join("\n"),
+    /退回/u,
+  );
+  assert.match(sales.whatToDo.join("\n"), /已阻塞.*已完成/su);
+  assert.doesNotMatch(
+    [...engineering.keyStates, ...engineering.whatToDo].join("\n"),
+    /退回/u,
+  );
+  assert.match(engineering.whatToDo.join("\n"), /设为阻塞.*原因/su);
+  const technicalByRole = new Map(
+    catalog.technicalManifest.mobileRolePages.map((item) => [item.key, item]),
+  );
+  assert.deepEqual(technicalByRole.get("production")?.requiredTaskScenarios, [
+    "today_production",
+    "outsourcing_return",
+    "rework",
+    "production_exception",
+  ]);
+  assert.deepEqual(technicalByRole.get("warehouse")?.requiredTaskScenarios, [
+    "receiving",
+    "inbound",
+    "material_picking",
+    "shipping",
+    "exception",
+  ]);
+  assert(
+    Object.entries(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS).every(
+      ([roleKey, scenarios]) =>
+        JSON.stringify(technicalByRole.get(roleKey)?.requiredTaskScenarios) ===
+        JSON.stringify(scenarios),
+    ),
+  );
+  const desktopByKey = new Map(
+    catalog.technicalManifest.desktopPages.map((item) => [item.key, item]),
+  );
+  assert.deepEqual(
+    desktopByKey.get("production-scheduling")?.requiredTaskScenarios,
+    MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.pmc,
+  );
+  assert.deepEqual(
+    desktopByKey.get("production-exceptions")?.requiredTaskScenarios,
+    ["production_exception"],
+  );
+  assert.deepEqual(
+    desktopByKey.get("shipping-release")?.requiredTaskScenarios,
+    ["shipping"],
+  );
 });
 
 test("manual acceptance catalog separates fixed previews from business-filled workspaces", () => {
@@ -275,7 +427,7 @@ test("manual acceptance catalog separates fixed previews from business-filled wo
   assert.doesNotMatch(colorCard.whatToDo.join("\n"), /上传|更换.*图片/u);
 });
 
-test("formal customer checklist keeps all 48 targets and client-facing truth", () => {
+test("formal customer checklist keeps all 51 targets and client-facing truth", () => {
   const checklist = fs.readFileSync(
     new URL(
       "../../docs/customers/yoyoosun/试用人员全页面手工验收清单.md",
@@ -289,7 +441,7 @@ test("formal customer checklist keeps all 48 targets and client-facing truth", (
     /^### (?:进入|桌面|岗位|预览|打印)-\d{2} /gmu,
   );
 
-  assert.equal(targetHeadings?.length, 48);
+  assert.equal(targetHeadings?.length, 51);
   assert.doesNotMatch(checklist, forbiddenCustomerCopy);
   assert.match(checklist, /10 个正式岗位试用账号/u);
   assert.doesNotMatch(checklist, /13 个(?:不同岗位组合的)?试用账号/u);
@@ -304,8 +456,42 @@ test("formal customer checklist keeps all 48 targets and client-facing truth", (
   assert.match(checklist, /线下贴样/u);
   assert.match(checklist, /不要求上传图片/u);
   assert.match(checklist, /销售订单正常提交后生成的审批事项验收/u);
+  assert.match(checklist, /老板账号当前至少 18 条本轮可见事项/u);
+  assert.match(checklist, /有退回权限的岗位另覆盖退回/u);
+  assert.match(checklist, /已处理清单查看已退回的记录/u);
+  assert.match(checklist, /\| 桌面页面\s+\|\s+30\s+\|/u);
+  assert.match(checklist, /\| 合计\s+\|\s+51\s+\|/u);
+  assert.match(checklist, /完成 51 项并不自动代表正式交付/u);
+  assert.match(checklist, /本轮固定编号识别/u);
+  assert.match(checklist, /名称保持简单易懂/u);
+  assert.match(checklist, /可执行、临近到期、阻塞/u);
   assert.doesNotMatch(checklist, /订单摘要后同意一条/u);
+  assert.doesNotMatch(checklist, /已经同意的历史/u);
+  assert.doesNotMatch(checklist, /完成 48 项/u);
+  assert.doesNotMatch(checklist, /待处理、处理中/u);
+  assert.doesNotMatch(checklist, /待补资料、待提交、退回/u);
+  assert.doesNotMatch(checklist, /工程[\s\S]{0,240}退回一条/u);
   assert.doesNotMatch(checklist, /名称、单号或备注统一带/u);
+});
+
+test("active trial runbook keeps the exact 51-target and fresh-database evidence boundary", () => {
+  const runbook = fs.readFileSync(
+    new URL(
+      "../../docs/customers/yoyoosun/试用环境执行手册.md",
+      import.meta.url,
+    ),
+    "utf8",
+  );
+
+  assert.match(
+    runbook,
+    /51 项：2 个登录与入口、30 个电脑业务页、9 个岗位任务页、5 个打印预览和 5 个打印工作台/u,
+  );
+  assert.match(runbook, /fresh 空库基线已记录/u);
+  assert.match(runbook, /plush_erp_acceptance_20260716_v5_dev/u);
+  assert.match(runbook, /plush_erp_uat_20260716_v5/u);
+  assert.match(runbook, /出货放行[\s\S]*4 条/u);
+  assert.match(runbook, /出货管理[\s\S]*47 张/u);
 });
 
 test("manual acceptance catalog derives five preview and five fresh-workspace routes", () => {
@@ -358,7 +544,7 @@ test("manual acceptance catalog default run stays stdout-only and never calls a 
     );
     assert.equal(fetchCalled, false);
     assert.deepEqual(result.writtenPaths, []);
-    assert.equal(JSON.parse(stdout).summary.totalScenarios, 48);
+    assert.equal(JSON.parse(stdout).summary.totalScenarios, 51);
   } finally {
     globalThis.fetch = originalFetch;
   }
@@ -370,7 +556,7 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   const json = renderManualAcceptanceJson(catalog);
 
   assert.match(markdown, /# 东莞市永绅玩具有限公司全页面手动验收目录/);
-  assert.match(markdown, /\| 桌面后台 \| 27 \|/);
+  assert.match(markdown, /\| 桌面后台 \| 30 \|/);
   assert.match(markdown, /你要做什么/);
   assert.match(markdown, /应看到什么/);
   assert.match(markdown, /采购合同预览/);
@@ -378,8 +564,8 @@ test("manual acceptance catalog renders Chinese Markdown and JSON", () => {
   assert.doesNotMatch(markdown, /Workflow|Fact|JSON-RPC|RBAC|raw\s*id|甲方/i);
 
   const parsed = JSON.parse(json);
-  assert.equal(parsed.summary.totalScenarios, 48);
-  assert.equal(parsed.technicalManifest.desktopPages.length, 27);
+  assert.equal(parsed.summary.totalScenarios, 51);
+  assert.equal(parsed.technicalManifest.desktopPages.length, 30);
 });
 
 test("manual acceptance catalog CLI parses formats and writes local report artifacts", () => {

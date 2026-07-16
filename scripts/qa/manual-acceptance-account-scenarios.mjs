@@ -21,9 +21,11 @@ const CUSTOMER_KEY = "yoyoosun";
 const BUSINESS_ADMIN_USERNAME = "demo_admin";
 const GUARD_ADMIN_USERNAME = "admin";
 const CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
+const FORMAL_ACCOUNT_BOOTSTRAP_CONFIRM_PREFIX =
+  "BOOTSTRAP_FORMAL_MANUAL_ACCEPTANCE_ACCOUNTS";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]"]);
-const ACCOUNT_DATA_VERSION = "2026.07.15-v3";
-const ACCOUNT_RUN_ID = "20260715-V3";
+const ACCOUNT_DATA_VERSION = "2026.07.16-v5";
+const ACCOUNT_RUN_ID = "20260716-V5";
 const MANAGED_ROLE_KEYS = new Set(["sales", "purchase"]);
 const MAX_AUDIT_MINIMUM = 200;
 
@@ -49,6 +51,19 @@ export const FORMAL_DEMO_ACCOUNTS = Object.freeze([
   "demo_pmc",
   "demo_engineering",
   "demo_admin",
+]);
+
+export const FORMAL_DEMO_ACCOUNT_PROFILES = Object.freeze([
+  Object.freeze({ username: "demo_boss", roleKey: "boss" }),
+  Object.freeze({ username: "demo_sales", roleKey: "sales" }),
+  Object.freeze({ username: "demo_purchase", roleKey: "purchase" }),
+  Object.freeze({ username: "demo_production", roleKey: "production" }),
+  Object.freeze({ username: "demo_warehouse", roleKey: "warehouse" }),
+  Object.freeze({ username: "demo_quality", roleKey: "quality" }),
+  Object.freeze({ username: "demo_finance", roleKey: "finance" }),
+  Object.freeze({ username: "demo_pmc", roleKey: "pmc" }),
+  Object.freeze({ username: "demo_engineering", roleKey: "engineering" }),
+  Object.freeze({ username: "demo_admin", roleKey: "admin" }),
 ]);
 
 export const MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS = Object.freeze([
@@ -360,18 +375,127 @@ function assertFormalAccountsUnchanged(before, afterAccounts) {
   }
 }
 
+export function manualAcceptanceFormalAccountBootstrapConfirmation({
+  target,
+  dataVersion,
+  runId,
+} = {}) {
+  return [
+    FORMAL_ACCOUNT_BOOTSTRAP_CONFIRM_PREFIX,
+    requiredText(target, "target"),
+    requiredText(dataVersion, "dataVersion"),
+    requiredText(runId, "runId"),
+  ].join(":");
+}
+
+function assertFormalAccountState(account, profile) {
+  if (
+    account.username !== profile.username ||
+    account.phone ||
+    account.isSuperAdmin ||
+    account.disabled ||
+    account.accountStatus !== "active" ||
+    !sameStringList(account.roleKeys, [profile.roleKey])
+  ) {
+    throw new CliError(
+      `formal demo account is not the exact safe single-role account: ${profile.username}`,
+      2,
+    );
+  }
+}
+
+async function bootstrapMissingFormalAccounts({
+  plan,
+  token,
+  password,
+  confirmation,
+  fetchImpl,
+}) {
+  const expectedConfirmation =
+    manualAcceptanceFormalAccountBootstrapConfirmation(plan);
+  if (confirmation !== expectedConfirmation) {
+    throw new CliError(
+      `fresh dedicated manual acceptance database requires MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM=${expectedConfirmation}`,
+      2,
+    );
+  }
+  const beforeAccounts = await listAdmins({
+    backendURL: plan.backendURL,
+    token,
+    fetchImpl,
+  });
+  const beforeByUsername = new Map(
+    beforeAccounts.map((account) => [account.username, account]),
+  );
+  for (const profile of FORMAL_DEMO_ACCOUNT_PROFILES) {
+    const existing = beforeByUsername.get(profile.username);
+    if (existing) assertFormalAccountState(existing, profile);
+  }
+
+  const actions = [];
+  for (const profile of FORMAL_DEMO_ACCOUNT_PROFILES) {
+    if (beforeByUsername.has(profile.username)) {
+      actions.push({ username: profile.username, action: "verified" });
+      continue;
+    }
+    const account = await mutateAdmin({
+      backendURL: plan.backendURL,
+      token,
+      fetchImpl,
+      method: "create",
+      params: {
+        username: profile.username,
+        password,
+        phone: "",
+        role_keys: [profile.roleKey],
+      },
+      context: `admin.create ${profile.username}`,
+    });
+    assertFormalAccountState(account, profile);
+    actions.push({ username: profile.username, action: "created" });
+  }
+
+  const afterAccounts = await listAdmins({
+    backendURL: plan.backendURL,
+    token,
+    fetchImpl,
+  });
+  const afterByUsername = new Map(
+    afterAccounts.map((account) => [account.username, account]),
+  );
+  const accounts = FORMAL_DEMO_ACCOUNT_PROFILES.map((profile) => {
+    const account = afterByUsername.get(profile.username);
+    if (!account) {
+      throw new CliError(
+        `formal demo account is missing after bootstrap: ${profile.username}`,
+      );
+    }
+    assertFormalAccountState(account, profile);
+    return accountSnapshot(account);
+  });
+  return {
+    mode: `${plan.target}-exact-create-or-verify`,
+    created: actions.filter((item) => item.action === "created").length,
+    verified: actions.filter((item) => item.action === "verified").length,
+    accounts,
+    actions,
+  };
+}
+
 export function buildManualAcceptanceAccountScenarioPlan({
   backendURL = DEFAULT_BACKEND_URL,
   auditMinimum = 0,
   target,
   dataVersion = ACCOUNT_DATA_VERSION,
   runId = ACCOUNT_RUN_ID,
+  databaseName,
 } = {}) {
   const targetPolicy = resolveManualAcceptanceTarget({
     backendURL: normalizeAccountScenarioBackendURL(backendURL),
     target,
     dataVersion,
     runId,
+    databaseName,
   });
   return {
     mode: "report-only",
@@ -380,6 +504,7 @@ export function buildManualAcceptanceAccountScenarioPlan({
     datasetKey: targetPolicy.datasetKey,
     dataVersion: targetPolicy.dataVersion,
     runId: targetPolicy.runId,
+    databaseName: targetPolicy.databaseName,
     external: targetPolicy.external,
     loginAccount: BUSINESS_ADMIN_USERNAME,
     simulatedOnly: true,
@@ -809,6 +934,8 @@ export async function applyManualAcceptanceAccountScenarios(
     confirmPhrase = process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM,
     targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
     targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    formalAccountConfirmation =
+      process.env.MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM,
     fetchImpl = fetch,
   } = {},
 ) {
@@ -818,6 +945,7 @@ export async function applyManualAcceptanceAccountScenarios(
     target: plan?.target,
     dataVersion: plan?.dataVersion,
     runId: plan?.runId,
+    databaseName: plan?.databaseName,
   });
   const resolvedTarget = assertManualAcceptanceMutationTarget(safePlan, {
     confirmation: targetConfirmation,
@@ -856,19 +984,37 @@ export async function applyManualAcceptanceAccountScenarios(
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
 
-  if (resolvedTarget.external) {
-    await assertManualAcceptanceRuntimeIdentityPrecondition({
-      policy: safePlan,
-      attestation: parsedTargetAttestation,
-      fetchImpl,
-    });
-  }
+  await assertManualAcceptanceRuntimeIdentityPrecondition({
+    policy: safePlan,
+    attestation: parsedTargetAttestation,
+    fetchImpl,
+  });
 
   const { token: guardToken } = await loginAdmin({
     backendURL: safePlan.backendURL,
     username: GUARD_ADMIN_USERNAME,
     password: effectiveAdminPassword,
     requireSuperAdmin: true,
+    fetchImpl,
+  });
+  const guardRuntime = await assertSafeRuntime({
+    policy: safePlan,
+    guardToken,
+    sessionToken: guardToken,
+    fetchImpl,
+  });
+  const roleCapabilityBaseline = await alignAcceptanceRoleCapabilities({
+    backendURL: safePlan.backendURL,
+    token: guardToken,
+    fetchImpl,
+    baseline: safePlan.roleCapabilityBaseline,
+    allowMutation: !resolvedTarget.external,
+  });
+  const formalAccountBootstrap = await bootstrapMissingFormalAccounts({
+    plan: safePlan,
+    token: guardToken,
+    password: effectivePassword,
+    confirmation: formalAccountConfirmation,
     fetchImpl,
   });
   const { token, profile } = await loginAdmin({
@@ -883,13 +1029,15 @@ export async function applyManualAcceptanceAccountScenarios(
     sessionToken: token,
     fetchImpl,
   });
-  const roleCapabilityBaseline = await alignAcceptanceRoleCapabilities({
-    backendURL: safePlan.backendURL,
-    token,
-    fetchImpl,
-    baseline: safePlan.roleCapabilityBaseline,
-    allowMutation: !resolvedTarget.external,
-  });
+  if (
+    guardRuntime.configRevision !== runtime.configRevision ||
+    guardRuntime.configProductVersion !== runtime.configProductVersion
+  ) {
+    throw new CliError(
+      "customer configuration changed while preparing formal accounts",
+      2,
+    );
+  }
   const beforeAccounts = await listAdmins({
     backendURL: safePlan.backendURL,
     token,
@@ -1093,6 +1241,7 @@ export async function applyManualAcceptanceAccountScenarios(
     datasetKey: safePlan.datasetKey,
     dataVersion: safePlan.dataVersion,
     runId: safePlan.runId,
+    databaseName: safePlan.databaseName,
     simulatedOnly: true,
     realCustomerImport: false,
     directSQL: false,
@@ -1106,6 +1255,7 @@ export async function applyManualAcceptanceAccountScenarios(
         }
       : null,
     roleCapabilityBaseline,
+    formalAccountBootstrap,
     protectedAccounts: formalBefore,
     scenarios,
     actions,
@@ -1132,6 +1282,7 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
     target: "",
     dataVersion: ACCOUNT_DATA_VERSION,
     runId: ACCOUNT_RUN_ID,
+    databaseName: process.env.MANUAL_ACCEPTANCE_DATABASE_NAME || "",
     json: false,
     help: false,
   };
@@ -1152,6 +1303,8 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
       options.dataVersion = requiredText(argv[++index], "--data-version");
     } else if (token === "--run-id") {
       options.runId = requiredText(argv[++index], "--run-id");
+    } else if (token === "--database-name") {
+      options.databaseName = requiredText(argv[++index], "--database-name");
     } else {
       throw new CliError(`unknown option ${token}`, 2);
     }
@@ -1177,17 +1330,29 @@ function usage() {
 
 写入本机开发环境：
   MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE} \\
+  MANUAL_ACCEPTANCE_TARGET_CONFIRM=APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.16-v5:20260716-V5:plush_erp_acceptance_20260716_v5_dev \\
   MANUAL_ACCEPTANCE_PASSWORD='<local-demo-password>' \\
   MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-super-admin-password>' \\
-    node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --audit-minimum 30 --json
+    node scripts/qa/manual-acceptance-account-scenarios.mjs --apply \\
+      --target local-dev \\
+      --backend-url http://127.0.0.1:8310 \\
+      --database-name plush_erp_acceptance_20260716_v5_dev \\
+      --data-version 2026.07.16-v5 \\
+      --run-id 20260716-V5 \\
+      --audit-minimum 30 \\
+      --json
 
 本入口保留现有十个正式试用账号，只准备“已停用”“业务与采购兼任”
 和“未分配岗位”三个补充验收账号。密码必须为 8 到 20 位。
 
-133 试用环境必须通过 127.0.0.1:18375 SSH 隧道，并显式提供：
-  --target customer-trial-133 --data-version 2026.07.15-v3 --run-id 20260715-V3
+  fresh 本地专用库和 133 都必须设置精确的
+  MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM，只创建或读回固定十个单岗位账号。
+
+  133 试用环境必须通过 127.0.0.1:18375 SSH 隧道，并显式提供：
+  --target customer-trial-133 --data-version 2026.07.16-v5 --run-id 20260716-V5 --database-name plush_erp_uat_20260716_v5
 同时设置绑定目标的 MANUAL_ACCEPTANCE_TARGET_CONFIRM 与
-MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。远端只核对岗位权限，不修改岗位权限。`;
+  MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。
+远端只核对岗位权限，不修改岗位权限。`;
 }
 
 export async function runManualAcceptanceAccountScenarioCli(argv, deps = {}) {

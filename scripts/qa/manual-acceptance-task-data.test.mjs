@@ -3,6 +3,8 @@ import { spawnSync } from "node:child_process";
 import test from "node:test";
 import { fileURLToPath } from "node:url";
 
+import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
+
 import {
   applyManualAcceptanceTaskData,
   buildLegacyManualAcceptanceTaskBatchReference,
@@ -11,11 +13,17 @@ import {
   normalizeLocalBackendURL,
   parseArgs,
   manualAcceptanceTaskRetireConfirmation,
+  manualAcceptanceLegacyTaskCode,
   ROLE_USERS,
   TASK_ROLES,
   TASK_COPY_REVISION,
+  TASK_CATALOG_SCENARIO_DIGEST,
+  TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
   TASKS_PER_ROLE,
   TOTAL_TASKS,
+  getManualAcceptanceTaskBusinessStatus,
+  getManualAcceptanceTaskGroup,
+  getManualAcceptanceTaskGroupScenarios,
   retireLegacyManualAcceptanceTaskBatch,
   validateManualAcceptanceTaskPlan,
   WORKFLOW_TASK_CAS_MIGRATION,
@@ -23,13 +31,23 @@ import {
 } from "./manual-acceptance-task-data.mjs";
 import { buildManualAcceptanceSourceDataPlan } from "./manual-acceptance-source-data.mjs";
 import {
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
   MANUAL_ACCEPTANCE_DATASET_KEY,
   manualAcceptanceTargetConfirmation,
 } from "./manual-acceptance-target-policy.mjs";
 
 const NOW_SEC = 1_800_000_000;
+const LOCAL_ACCEPTANCE_BACKEND_URL = "http://127.0.0.1:8310";
+const LOCAL_ACCEPTANCE_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
 const SCRIPT_PATH = fileURLToPath(
   new URL("./manual-acceptance-task-data.mjs", import.meta.url),
 );
@@ -39,6 +57,21 @@ const ROLE_IDS = Object.freeze(
     Object.keys(ROLE_USERS).map((roleKey, offset) => [roleKey, 101 + offset]),
   ),
 );
+
+function buildLocalTaskMutationPlan(overrides = {}) {
+  return buildManualAcceptanceTaskDataPlan({
+    backendURL: LOCAL_ACCEPTANCE_BACKEND_URL,
+    databaseName: LOCAL_ACCEPTANCE_DATABASE,
+    ...overrides,
+  });
+}
+
+function localTaskMutationOptions(plan, overrides = {}) {
+  return {
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    ...overrides,
+  };
+}
 
 function customerTrial133Attestation(overrides = {}) {
   return {
@@ -66,6 +99,21 @@ function jsonResponse(data, code = 0, message = "OK") {
     status: 200,
     async json() {
       return { result: { code, message, data } };
+    },
+  };
+}
+
+function runtimeIdentityResponse() {
+  return {
+    ok: true,
+    status: 200,
+    redirected: false,
+    headers: {
+      get: (name) =>
+        name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+    },
+    async text() {
+      return "runtime identity matched";
     },
   };
 }
@@ -109,18 +157,7 @@ function createMockRuntime(options = {}) {
         params: {},
         actorRole: undefined,
       });
-      return {
-        ok: true,
-        status: 200,
-        redirected: false,
-        headers: {
-          get: (name) =>
-            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
-        },
-        async text() {
-          return "runtime identity matched";
-        },
-      };
+      return runtimeIdentityResponse();
     }
     const domain = new URL(url).pathname.split("/").filter(Boolean).at(-1);
     const body = JSON.parse(request.body);
@@ -174,6 +211,11 @@ function createMockRuntime(options = {}) {
       assert.equal(actorRole, "runtime_admin");
       return jsonResponse({
         environment: options.environment || "local",
+        databaseName:
+          options.databaseName ||
+          (options.environment === "remote"
+            ? CUSTOMER_TRIAL_133_DATABASE
+            : LOCAL_ACCEPTANCE_DATABASE),
         ...(["prod", "remote", "sql"].includes(options.environment)
           ? {
               seedEnabled: false,
@@ -202,8 +244,24 @@ function createMockRuntime(options = {}) {
               : options.sessionSource,
           config_revision:
             options.configRevision === undefined
-              ? "yoyoosun-test-revision"
+              ? options.environment === "remote"
+                ? CUSTOMER_TRIAL_133_CONFIG_REVISION
+                : LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION
               : options.configRevision,
+          ...(options.environment === "remote"
+            ? {
+                config_product_version:
+                  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+                config_apply_purpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+                config_dataset_version: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+                config_target: CUSTOMER_TRIAL_133_TARGET,
+              }
+            : {
+                config_product_version:
+                  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+                config_apply_purpose:
+                  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+              }),
           modules: {
             workflow_tasks:
               options.workflowTasksModule === undefined
@@ -400,13 +458,31 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     plan.tasks.filter(
       (task) => task.createParams.task_group === "production_scheduling",
     ).length,
-    20,
+    25,
   );
   assert.equal(
     plan.tasks.filter(
       (task) => task.createParams.task_group === "production_exception",
     ).length,
-    20,
+    5,
+  );
+  const productionExceptionTopics = plan.tasks
+    .filter((task) => task.roleKey === "production")
+    .map((task) => task.createParams.task_name)
+    .join("\n");
+  for (const topic of ["延期", "返工", "质量", "设备", "缺料"]) {
+    assert.match(productionExceptionTopics, new RegExp(topic, "u"));
+  }
+  for (const topic of ["今日生产", "委外回货", "返工"]) {
+    assert.match(productionExceptionTopics, new RegExp(topic, "u"));
+  }
+  assert.deepEqual(
+    new Set(
+      plan.tasks
+        .filter((task) => task.roleKey === "production")
+        .map((task) => task.createParams.payload.acceptance_scenario_key),
+    ),
+    new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.production),
   );
 
   for (const roleKey of TASK_ROLES) {
@@ -430,9 +506,7 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     );
     assert.equal(
       tasks.filter((task) => task.targetStatus === "rejected").length,
-      ["boss", "warehouse", "finance", "quality"].includes(roleKey)
-        ? 2
-        : 0,
+      ["boss", "warehouse", "finance", "quality"].includes(roleKey) ? 2 : 0,
     );
     assert.equal(
       tasks.filter((task) => task.assignmentMode === "role_account").length,
@@ -452,9 +526,7 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     );
     assert.equal(
       tasks.every((task) =>
-        ["ready", "blocked", "done", "rejected"].includes(
-          task.targetStatus,
-        ),
+        ["ready", "blocked", "done", "rejected"].includes(task.targetStatus),
       ),
       true,
     );
@@ -497,7 +569,7 @@ test("uses short yoyoosun-style copy while keeping every task visibly synthetic"
     plan.tasks.every(
       (task) =>
         task.createParams.task_code.startsWith(
-          `SIM-YOYOOSUN-UAT-TASK-COPY-SIMPLIFIED-${TASK_COPY_REVISION}-`,
+          `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[task.roleKey]}-`,
         ) &&
         task.createParams.source_type ===
           "simulated-manual-acceptance-task-batch" &&
@@ -528,8 +600,8 @@ test("uses short yoyoosun-style copy while keeping every task visibly synthetic"
     true,
   );
   assert.equal(
-    plan.tasks.some(
-      (task) => task.createParams.task_name.startsWith("确认材料齐不齐"),
+    plan.tasks.some((task) =>
+      task.createParams.task_name.startsWith("确认材料齐不齐"),
     ),
     true,
   );
@@ -538,11 +610,13 @@ test("uses short yoyoosun-style copy while keeping every task visibly synthetic"
       const style = task.createParams.payload.style_no;
       const product = task.createParams.payload.product_name;
       if (!style || !product) return true;
-      return new Map([
-        ["27001#", "云朵小熊"],
-        ["27002#", "星星挂兔"],
-        ["27003#", "奶油小狗"],
-      ]).get(style) === product;
+      return (
+        new Map([
+          ["27001#", "云朵小熊"],
+          ["27002#", "星星挂兔"],
+          ["27003#", "奶油小狗"],
+        ]).get(style) === product
+      );
     }),
     true,
   );
@@ -582,6 +656,143 @@ test("uses short yoyoosun-style copy while keeping every task visibly synthetic"
       assert.equal(sourceSuppliers.has(payload.supplier_name), true);
     }
   }
+});
+
+test("warehouse scenarios use their own groups and only shipping fills the shipping release page", () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    runId: "20260716-V5",
+    dataVersion: "2026.07.16-v5",
+    nowSec: NOW_SEC,
+  });
+  const warehouseTasks = plan.tasks.filter(
+    (task) => task.roleKey === "warehouse",
+  );
+
+  assert.equal(TASK_COPY_REVISION, "PLAIN5");
+  assert.equal(warehouseTasks.length, 20);
+  const shippingTasks = warehouseTasks.filter(
+    (task) => task.createParams.task_group === "shipment_release",
+  );
+  assert.equal(plan.summary.byTaskGroup.shipment_release, 4);
+  assert.deepEqual(
+    shippingTasks.map((task) => task.createParams.task_code),
+    ["YS-V5-CK-02", "YS-V5-CK-13", "YS-V5-CK-16", "YS-V5-CK-19"],
+  );
+  assert.deepEqual(
+    new Set(shippingTasks.map((task) => task.targetStatus)),
+    new Set(["ready", "blocked", "done", "rejected"]),
+  );
+  assert.equal(
+    shippingTasks.some((task) => task.dueScenario === "due_soon"),
+    true,
+  );
+  assert.equal(
+    shippingTasks.some((task) => task.dueScenario === "overdue"),
+    true,
+  );
+  assert(
+    warehouseTasks.every((task) => {
+      const scenarioKey = task.createParams.payload.acceptance_scenario_key;
+      return (
+        task.createParams.task_group ===
+          getManualAcceptanceTaskGroup("warehouse", scenarioKey) &&
+        task.createParams.business_status_key ===
+          getManualAcceptanceTaskBusinessStatus("warehouse", scenarioKey) &&
+        task.createParams.owner_role_key === "warehouse" &&
+        task.createParams.source_type ===
+          "simulated-manual-acceptance-task-batch" &&
+        task.createParams.payload.shipment_release === undefined &&
+        task.createParams.payload.finished_goods === undefined
+      );
+    }),
+  );
+  assert.deepEqual(
+    new Set(
+      warehouseTasks.map(
+        (task) => task.createParams.payload.acceptance_scenario_key,
+      ),
+    ),
+    new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.warehouse),
+  );
+  assert.deepEqual(
+    plan.coverage.taskGroupsByRole.warehouse,
+    Object.keys(getManualAcceptanceTaskGroupScenarios("warehouse")),
+  );
+  assert.deepEqual(
+    plan.coverage.scenariosByRoleTaskGroup.warehouse.shipment_release,
+    { shipping: 4 },
+  );
+  assert.deepEqual(
+    plan.coverage.scenariosByRoleTaskGroup.warehouse.trial_warehouse_work,
+    { material_picking: 4, exception: 4 },
+  );
+  assert.equal(
+    plan.coverage.catalogScenarioDigest,
+    TASK_CATALOG_SCENARIO_DIGEST,
+  );
+  const visibleTopics = warehouseTasks
+    .map((task) => task.createParams.task_name)
+    .join("\n");
+  for (const phrase of ["回货", "入库", "备料", "出货", "异常"]) {
+    assert.match(visibleTopics, new RegExp(phrase, "u"));
+  }
+});
+
+test("task plan fails closed when a catalog role scenario is missing", () => {
+  const plan = buildManualAcceptanceTaskDataPlan({
+    runId: "SCENARIO-GUARD",
+    nowSec: NOW_SEC,
+  });
+  for (const task of plan.tasks.filter(
+    (item) =>
+      item.roleKey === "production" &&
+      item.createParams.payload.acceptance_scenario_key ===
+        "outsourcing_return",
+  )) {
+    task.createParams.payload.acceptance_scenario_key = "today_production";
+    task.createParams.task_group = getManualAcceptanceTaskGroup(
+      "production",
+      "today_production",
+    );
+    task.createParams.business_status_key =
+      getManualAcceptanceTaskBusinessStatus("production", "today_production");
+  }
+  assert.throws(
+    () => validateManualAcceptanceTaskPlan(plan),
+    /missing catalog task scenarios: outsourcing_return/u,
+  );
+});
+
+test("formal desktop groups reject unrelated role scenarios", () => {
+  const shippingMismatch = buildManualAcceptanceTaskDataPlan({
+    runId: "SHIPPING-GROUP-GUARD",
+    nowSec: NOW_SEC,
+  });
+  const inbound = shippingMismatch.tasks.find(
+    (task) =>
+      task.roleKey === "warehouse" &&
+      task.createParams.payload.acceptance_scenario_key === "inbound",
+  );
+  inbound.createParams.task_group = "shipment_release";
+  assert.throws(
+    () => validateManualAcceptanceTaskPlan(shippingMismatch),
+    /task group does not match scenario inbound/u,
+  );
+
+  const productionMismatch = buildManualAcceptanceTaskDataPlan({
+    runId: "PROD-GROUP-GUARD",
+    nowSec: NOW_SEC,
+  });
+  const normalProduction = productionMismatch.tasks.find(
+    (task) =>
+      task.roleKey === "production" &&
+      task.createParams.payload.acceptance_scenario_key === "today_production",
+  );
+  normalProduction.createParams.task_group = "production_exception";
+  assert.throws(
+    () => validateManualAcceptanceTaskPlan(productionMismatch),
+    /task group does not match scenario today_production/u,
+  );
 });
 
 test("rejects developer-facing copy in a business-visible task field", () => {
@@ -629,30 +840,34 @@ test("CLI and exported URL normalization fail closed for external backends", asy
 });
 
 test("rejects redirected login responses before task reads or writes", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "REDIRECT-GUARD",
     nowSec: NOW_SEC,
   });
   let fetchCalls = 0;
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: async () => {
-          fetchCalls += 1;
-          return {
-            ok: true,
-            status: 200,
-            redirected: true,
-            json: async () => ({ result: { code: 0, data: {} } }),
-          };
-        },
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: async (_url, request) => {
+            fetchCalls += 1;
+            if (!request.body) return runtimeIdentityResponse();
+            return {
+              ok: true,
+              status: 200,
+              redirected: true,
+              json: async () => ({ result: { code: 0, data: {} } }),
+            };
+          },
+        }),
+      ),
     /redirected response/u,
   );
-  assert.equal(fetchCalls, 1);
+  assert.equal(fetchCalls, 2);
 });
 
 test("date-bearing run ids keep the same schedule anchor across rebuilds", () => {
@@ -697,9 +912,13 @@ test("CLI documents and parses the output report boundary", () => {
   const options = parseArgs([
     "--apply",
     "--backend-url",
-    "http://localhost:8300/",
+    `${LOCAL_ACCEPTANCE_BACKEND_URL}/`,
+    "--database-name",
+    LOCAL_ACCEPTANCE_DATABASE,
     "--run-id",
     "local-uat-20260711",
+    "--schedule-anchor-utc",
+    "2026-07-17T09:00:00.000Z",
     "--out",
     "output/custom-task-data",
   ]);
@@ -707,10 +926,13 @@ test("CLI documents and parses the output report boundary", () => {
     apply: true,
     help: false,
     out: "output/custom-task-data",
-    backendURL: "http://localhost:8300",
+    backendURL: LOCAL_ACCEPTANCE_BACKEND_URL,
     target: "local-dev",
+    databaseName: LOCAL_ACCEPTANCE_DATABASE,
     dataVersion: "LOCAL-UAT-20260711",
     runId: "LOCAL-UAT-20260711",
+    scheduleAnchorUtc: "2026-07-17T09:00:00.000Z",
+    nowSec: Date.parse("2026-07-17T09:00:00.000Z") / 1000,
     retireLegacyRunId: "",
     retireLegacyCopyRevision: "",
   });
@@ -724,67 +946,76 @@ test("CLI documents and parses the output report boundary", () => {
   assert.match(help.stdout, /--retire-legacy-copy-revision/u);
   assert.match(help.stdout, /<out>\/apply-report\.json/u);
   assert.match(help.stdout, /sourceType, and sourceID/u);
-  assert.match(help.stdout, /--run-id LOCAL-UAT-20260711/u);
+  assert.match(help.stdout, /--database-name <name>/u);
+  assert.match(help.stdout, /--schedule-anchor-utc <iso>/u);
+  assert.match(help.stdout, /http:\/\/127\.0\.0\.1:8310/u);
+  assert.match(
+    help.stdout,
+    /--database-name plush_erp_acceptance_20260716_v5_dev/u,
+  );
+  assert.match(help.stdout, /--run-id 20260716-V5/u);
+  assert.doesNotMatch(help.stdout, /127\.0\.0\.1:8300/u);
   assert.match(help.stdout, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u);
   assert.match(help.stdout, /used only for debug\.capabilities/u);
 
   assert.throws(
-    () =>
-      parseArgs([
-        "--apply",
-        "--retire-legacy-copy-revision",
-        "PLAIN2",
-      ]),
+    () => parseArgs(["--apply", "--retire-legacy-copy-revision", "PLAIN2"]),
     /requires --retire-legacy-run-id/u,
   );
 });
 
 test("exported apply requires the exact confirmation before login", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "CONFIRM-GUARD",
     nowSec: NOW_SEC,
   });
   let fetched = false;
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: "yes",
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: async () => {
-          fetched = true;
-          throw new Error("must not fetch");
-        },
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: "yes",
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: async () => {
+            fetched = true;
+            throw new Error("must not fetch");
+          },
+        }),
+      ),
     /MANUAL_ACCEPTANCE_TASK_CONFIRM/u,
   );
   assert.equal(fetched, false);
 });
 
 test("requires the independent admin credential before any fetch", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "ADMIN-CRED-GUARD",
     nowSec: NOW_SEC,
   });
   let fetched = false;
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "   ",
-        fetchImpl: async () => {
-          fetched = true;
-          throw new Error("must not fetch");
-        },
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "   ",
+          fetchImpl: async () => {
+            fetched = true;
+            throw new Error("must not fetch");
+          },
+        }),
+      ),
     /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u,
   );
   assert.equal(fetched, false);
 });
 
 test("accepts the independent admin credential from the environment", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "ADMIN-ENV-GUARD",
     nowSec: NOW_SEC,
   });
@@ -794,11 +1025,14 @@ test("accepts the independent admin credential from the environment", async () =
   try {
     await assert.rejects(
       () =>
-        applyManualAcceptanceTaskData(plan, {
-          confirmPhrase: CONFIRM_PHRASE,
-          password: "local-password",
-          fetchImpl: mock.fetchImpl,
-        }),
+        applyManualAcceptanceTaskData(
+          plan,
+          localTaskMutationOptions(plan, {
+            confirmPhrase: CONFIRM_PHRASE,
+            password: "local-password",
+            fetchImpl: mock.fetchImpl,
+          }),
+        ),
       /environment=production/u,
     );
   } finally {
@@ -812,42 +1046,51 @@ test("accepts the independent admin credential from the environment", async () =
 });
 
 test("requires username admin to be a local super admin before capabilities", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "ADMIN-SUPER-GUARD",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ adminIsSuperAdmin: false });
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: mock.fetchImpl,
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
     /requires a local super admin/u,
   );
   assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
   assert.deepEqual(
     mock.calls.map(({ domain, method }) => ({ domain, method })),
-    [{ domain: "auth", method: "admin_login" }],
+    [
+      { domain: "runtime-identity", method: "probe" },
+      { domain: "auth", method: "admin_login" },
+    ],
   );
 });
 
 test("refuses non-local runtime environments before any task write", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "ENV-GUARD",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ environment: "production" });
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: mock.fetchImpl,
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
     /environment=production/u,
   );
   assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
@@ -858,19 +1101,22 @@ test("refuses non-local runtime environments before any task write", async () =>
 });
 
 test("requires a non-empty active yoyoosun revision before any task write", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "REVISION-GUARD",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ configRevision: "" });
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: mock.fetchImpl,
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
     /active customer configuration/u,
   );
   assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
@@ -883,19 +1129,22 @@ test("requires a non-empty active yoyoosun revision before any task write", asyn
 });
 
 test("requires the workflow task module before any task read or write", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "MODULE-GUARD",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ workflowTasksModule: "disabled" });
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: mock.fetchImpl,
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
     /required modules are not enabled: workflow_tasks/u,
   );
   assert.deepEqual(mock.counts(), { createCount: 0, actionCount: 0 });
@@ -906,7 +1155,7 @@ test("requires the workflow task module before any task read or write", async ()
 });
 
 test("applies and safely resumes the 180-task batch through current CAS action contracts", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "APPLY-CONTRACT",
     nowSec: NOW_SEC,
   });
@@ -918,12 +1167,15 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   mock.seedPlannedTask(plan, actionSeed);
   mock.seedPlannedTask(plan, directSeed, { final: true });
 
-  const report = await applyManualAcceptanceTaskData(plan, {
-    confirmPhrase: CONFIRM_PHRASE,
-    password: "local-password",
-    adminPassword: "admin-password",
-    fetchImpl: mock.fetchImpl,
-  });
+  const report = await applyManualAcceptanceTaskData(
+    plan,
+    localTaskMutationOptions(plan, {
+      confirmPhrase: CONFIRM_PHRASE,
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
 
   assert.equal(report.summary.persisted, 180);
   assert.equal(report.runId, plan.runId);
@@ -964,18 +1216,27 @@ test("applies and safely resumes the 180-task batch through current CAS action c
   assert.equal(
     mock.calls.some(
       (call) =>
-        !["auth", "debug", "customer_config", "workflow"].includes(call.domain),
+        ![
+          "runtime-identity",
+          "auth",
+          "debug",
+          "customer_config",
+          "workflow",
+        ].includes(call.domain),
     ),
     false,
   );
 
   const countsBeforeReplay = mock.counts();
-  const replayReport = await applyManualAcceptanceTaskData(plan, {
-    confirmPhrase: CONFIRM_PHRASE,
-    password: "local-password",
-    adminPassword: "admin-password",
-    fetchImpl: mock.fetchImpl,
-  });
+  const replayReport = await applyManualAcceptanceTaskData(
+    plan,
+    localTaskMutationOptions(plan, {
+      confirmPhrase: CONFIRM_PHRASE,
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
   assert.equal(replayReport.summary.created, 0);
   assert.equal(replayReport.summary.resumed, 0);
   assert.equal(replayReport.summary.reusedFinal, 180);
@@ -984,7 +1245,7 @@ test("applies and safely resumes the 180-task batch through current CAS action c
 });
 
 test("retires an exact legacy batch only after the plain-copy keep batch is complete", async () => {
-  const keepPlan = buildManualAcceptanceTaskDataPlan({
+  const keepPlan = buildLocalTaskMutationPlan({
     runId: "RETIRE-KEEP",
     nowSec: NOW_SEC,
   });
@@ -1004,17 +1265,20 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
     mock.seedPlannedTask(keepPlan, legacyTask, { final: true });
   }
 
-  const report = await retireLegacyManualAcceptanceTaskBatch(keepPlan, {
-    retireRunId: legacyBatch.runId,
-    retireCopyRevision: legacyBatch.copyRevision,
-    confirmPhrase: manualAcceptanceTaskRetireConfirmation(
-      keepPlan,
-      legacyBatch,
-    ),
-    password: "local-password",
-    adminPassword: "admin-password",
-    fetchImpl: mock.fetchImpl,
-  });
+  const report = await retireLegacyManualAcceptanceTaskBatch(
+    keepPlan,
+    localTaskMutationOptions(keepPlan, {
+      retireRunId: legacyBatch.runId,
+      retireCopyRevision: legacyBatch.copyRevision,
+      confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+        keepPlan,
+        legacyBatch,
+      ),
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
 
   assert.deepEqual(report.summary, {
     total: 180,
@@ -1038,29 +1302,52 @@ test("retires an exact legacy batch only after the plain-copy keep batch is comp
   const countsAfterFirst = mock.counts();
   assert.deepEqual(countsAfterFirst, { createCount: 0, actionCount: 175 });
 
-  const replay = await retireLegacyManualAcceptanceTaskBatch(keepPlan, {
-    retireRunId: legacyBatch.runId,
-    retireCopyRevision: legacyBatch.copyRevision,
-    confirmPhrase: manualAcceptanceTaskRetireConfirmation(
-      keepPlan,
-      legacyBatch,
-    ),
-    password: "local-password",
-    adminPassword: "admin-password",
-    fetchImpl: mock.fetchImpl,
-  });
+  const replay = await retireLegacyManualAcceptanceTaskBatch(
+    keepPlan,
+    localTaskMutationOptions(keepPlan, {
+      retireRunId: legacyBatch.runId,
+      retireCopyRevision: legacyBatch.copyRevision,
+      confirmPhrase: manualAcceptanceTaskRetireConfirmation(
+        keepPlan,
+        legacyBatch,
+      ),
+      password: "local-password",
+      adminPassword: "admin-password",
+      fetchImpl: mock.fetchImpl,
+    }),
+  );
   assert.equal(replay.summary.activeBefore, 0);
   assert.equal(replay.summary.alreadyTerminal, 180);
   assert.equal(replay.summary.actionsApplied, 0);
   assert.deepEqual(mock.counts(), countsAfterFirst);
 });
 
+test("PLAIN5 legacy references retain the short visible code scheme for future retirement", () => {
+  const legacyBatch = buildLegacyManualAcceptanceTaskBatchReference({
+    runId: "20260716-V5",
+    copyRevision: "PLAIN5",
+  });
+  assert.equal(legacyBatch.codeScheme, "short-v5");
+  assert.equal(
+    manualAcceptanceLegacyTaskCode(legacyBatch, "warehouse", 1),
+    "YS-V5-CK-01",
+  );
+  assert.throws(
+    () =>
+      buildLegacyManualAcceptanceTaskBatchReference({
+        runId: "FUTURE",
+        copyRevision: "UNKNOWN",
+      }),
+    /unsupported legacy task copy revision/u,
+  );
+});
+
 test("customer-trial-133 task apply binds exact attestation and live debug capabilities", async () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ environment: "remote" });
@@ -1075,8 +1362,8 @@ test("customer-trial-133 task apply binds exact attestation and live debug capab
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(report.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
-  assert.equal(report.dataVersion, "2026.07.15-v1");
-  assert.equal(report.runId, "20260715-V1");
+  assert.equal(report.dataVersion, "2026.07.16-v5");
+  assert.equal(report.runId, "20260716-V5");
   assert.equal(report.summary.persisted, 180);
   assert.deepEqual(report.runtime.targetAttestation, {
     source: "out-of-band",
@@ -1095,8 +1382,8 @@ test("customer-trial-133 accepts a later immutable release when the CAS migratio
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
     nowSec: NOW_SEC,
   });
   const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
@@ -1117,8 +1404,8 @@ test("customer-trial-133 rejects an old Workflow migration before login or write
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
     nowSec: NOW_SEC,
   });
   let fetchCount = 0;
@@ -1143,7 +1430,7 @@ test("customer-trial-133 rejects an old Workflow migration before login or write
 });
 
 test("local task apply rejects out-of-band target attestation before login or write", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "LOCAL-ATTESTATION",
     nowSec: NOW_SEC,
   });
@@ -1151,54 +1438,63 @@ test("local task apply rejects out-of-band target attestation before login or wr
 
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        targetAttestation: customerTrial133Attestation(),
-        password: "must-not-be-used",
-        adminPassword: "must-not-be-used",
-        fetchImpl: async () => {
-          fetchCount += 1;
-          throw new Error("must not fetch");
-        },
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          targetAttestation: customerTrial133Attestation(),
+          password: "must-not-be-used",
+          adminPassword: "must-not-be-used",
+          fetchImpl: async () => {
+            fetchCount += 1;
+            throw new Error("must not fetch");
+          },
+        }),
+      ),
     /target attestation is only valid for customer-trial-133/u,
   );
   assert.equal(fetchCount, 0);
 });
 
 test("fails when create_task success omits the current version required by CAS", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "MALFORMED-CREATE",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ malformedCreateAt: 1 });
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: mock.fetchImpl,
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
     /create_task task\.version/u,
   );
   assert.deepEqual(mock.counts(), { createCount: 1, actionCount: 0 });
 });
 
 test("fails when an action response omits the updated task", async () => {
-  const plan = buildManualAcceptanceTaskDataPlan({
+  const plan = buildLocalTaskMutationPlan({
     runId: "MALFORMED-ACTION",
     nowSec: NOW_SEC,
   });
   const mock = createMockRuntime({ malformedActionAt: 1 });
   await assert.rejects(
     () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        password: "local-password",
-        adminPassword: "admin-password",
-        fetchImpl: mock.fetchImpl,
-      }),
+      applyManualAcceptanceTaskData(
+        plan,
+        localTaskMutationOptions(plan, {
+          confirmPhrase: CONFIRM_PHRASE,
+          password: "local-password",
+          adminPassword: "admin-password",
+          fetchImpl: mock.fetchImpl,
+        }),
+      ),
     /response missing task/u,
   );
   assert.equal(mock.counts().actionCount, 1);

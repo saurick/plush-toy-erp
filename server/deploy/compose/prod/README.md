@@ -3,6 +3,7 @@
 本目录是当前仓库唯一部署主路径，默认提供：
 
 - `compose.yml`：PostgreSQL + Jaeger + 业务服务 + 前端单入口静态服务
+- `compose.customer-trial-133.yml`：仅为 133 V5 独立验收栈覆盖 Compose project name，不允许修改服务
 - `.env.example`：推荐环境变量
 - `migrate_online.sh`：通过宿主机 `/usr/local/bin/atlas` 执行 migration，并用同一个 `flock` 锁住完整 `status -> 055504 存量升级审计 -> 055825 客户配置切换审计 -> dry-run -> apply` 序列
 
@@ -36,6 +37,62 @@ docker compose --env-file .env -f compose.yml up -d
 如果不需要自带 tracing 存储，可以再按需移除 Jaeger 服务和对应环境变量。
 
 生产启动会阻断 `POSTGRES_DSN`、`APP_JWT_SECRET` 或 bootstrap 管理员密码中的 `change-this` / placeholder，拒绝已知本地开发默认密码，并拒绝 SMS mock、未显式关闭的 debug seed / cleanup。生产 Compose 默认不注入 `APP_ADMIN_PASSWORD`，避免环境变量长期覆盖配置文件里的管理员初始化口径。只有新库首次初始化需要创建 bootstrap 管理员时，才允许同时临时设置 `BOOTSTRAP_ADMIN_ONCE=true` 和 `APP_ADMIN_PASSWORD`；初始化成功后会写入 runtime marker 和 runtime audit event，后续重复 bootstrap 会被拒绝。已有 `admin` 或同名管理员不会被启动逻辑自动提权，应通过管理员改密或受控 SQL 更新密码哈希。当前产品不提供公开自助注册 API 或前端路由。
+
+### 全新库一次性管理员 bootstrap
+
+全新库先完成 migration，并保持常驻 `app-server` 停止。steady `.env` 必须固定 `BOOTSTRAP_ADMIN_ONCE=false`，且不声明 `APP_ADMIN_PASSWORD`。从仓库根目录运行受控脚本；它会先执行 production preflight，核对 Compose PostgreSQL、目标数据库、Atlas current version 和镜像内 `GIT_SHA`，再启动一次性无端口 `app-server` 容器。密码不得使用本地开发默认值 `adminadmin`。
+
+```bash
+APP_ADMIN_PASSWORD='<8-to-20-character-ephemeral-secret>' \
+  bash scripts/deploy/bootstrap-production-admin.sh \
+    --env-file server/deploy/compose/prod/.env \
+    --expected-database '<exact-database>' \
+    --expected-migration '<14-digit-atlas-version>' \
+    --expected-release '<40-character-lowercase-git-sha>' \
+    --confirm 'BOOTSTRAP_PRODUCTION_ADMIN:<project>:<database>:<username>:<migration>:<release>'
+```
+
+脚本成功后会删除一次性容器并确认 steady env 未变化。`status=complete` 只证明管理员、marker、audit 和内置 RBAC 已读回；之后仍须以无密码 steady env 启动服务，再单独完成客户配置、health / ready、smoke 和业务验收。
+
+### 133 V5 基础资料 bootstrap
+
+只有已经部署当前固定 release、Atlas migration 和 `customer-trial-133` V5 active 配置的 133 独立验收库，才允许运行镜像内的一次性基础资料入口。该入口只创建或复用 `YS5-DW-01` 与 `YS5-CK-01..04`，写前要求材料、产品、工序和 BOM 为空；不会创建客户、订单、Workflow 或 Fact。
+
+133 V5 必须始终同时传入 base Compose 和受控 override，并在每条 Compose 命令显式使用 `-p plush-toy-erp-v5`。该 override 只有 `name: plush-toy-erp-v5` 一项；preflight 会拒绝缺失、符号链接、额外服务修改、错误 project name，以及与旧栈冲突的容器标识、数据目录、migration 锁或宿主端口。数据目录只能是 `/home/simon/plush-toy-erp-v5/data/postgres`，migration 锁只能是 `/home/simon/plush-toy-erp-v5/run/atlas-migrate.lock`；相对路径、`.` / `..` 路径段和符号链接均会被拒绝。固定端口是 PostgreSQL `55435`、HTTP `8315`、gRPC `9315`、Web `5185`；Jaeger 独立组是 `45775 / 46831 / 46832 / 45778 / 46687 / 54268 / 54250 / 49411 / 44317 / 44318`。旧 `plush-toy-erp-prod` 栈及其数据不被停止或覆盖。
+
+以下约定 133 当前固定 release 通过 `/home/simon/plush-toy-erp-v5/current` 访问，运行 env 位于 `/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133`。该 env 必须是当前执行用户拥有的普通文件，权限精确为 `0600`，文件本身和任一父路径均不得是符号链接。preflight 会先生成 `0600` 私有快照，所有解析和 Compose config 只读快照，结束前再校验原文件的 owner、mode 和 SHA-256；期间任何替换或改写都会阻断。在同一个干净 shell 执行 preflight 和后续 Compose；必须先 `unset` 所有与 env-file 同名的宿主变量，以及 `COMPOSE_PROJECT_NAME / COMPOSE_FILE / COMPOSE_PROFILES / COMPOSE_ENV_FILES / COMPOSE_PATH_SEPARATOR / DOCKER_HOST / DOCKER_CONTEXT / DOCKER_TLS_VERIFY / DOCKER_CERT_PATH`。preflight 只报告冲突键名，不输出值。
+
+```bash
+cd /home/simon/plush-toy-erp-v5/current
+bash scripts/deploy/production-preflight.sh \
+  --env-file /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133 \
+  --compose-dir /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod \
+  --compose-override /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml
+
+cd /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod
+docker compose \
+  -p plush-toy-erp-v5 \
+  --env-file /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133 \
+  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.yml \
+  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml \
+  up -d
+```
+
+```bash
+docker compose \
+  -p plush-toy-erp-v5 \
+  --env-file /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133 \
+  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.yml \
+  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml \
+  run --rm -T --no-deps --pull never \
+  app-server /app/bootstrap-manual-acceptance-core \
+    --expected-database plush_erp_uat_20260716_v5 \
+    --expected-migration '<14-digit-atlas-version>' \
+    --expected-release '<40-character-lowercase-git-sha>' \
+    --confirm 'BOOTSTRAP_MANUAL_ACCEPTANCE_CORE:customer-trial-133:yoyoosun:plush_erp_uat_20260716_v5:yoyoosun-manual-acceptance:2026.07.16-v5:20260716-V5:<migration>:<release>'
+```
+
+命令中的 `<migration>`、`<release>` 必须与对应参数逐字一致。成功回执只证明 1 个单位和 4 个仓库及运行身份；完整 V5 仍由手工验收 runner 在空库门禁通过后，通过正式 API 写入并逐页读回。
 
 前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 只启动 `web-desktop` 一个前端实例，并通过 `APP_ID=desktop`、`PORT=5175` 固定入口；岗位任务端统一走 `/m/<role>/tasks`，不再启动 8 个 `APP_ID=mobile-*` 生产容器。
 
@@ -104,7 +161,7 @@ export JAEGER_BIND_ADDR=127.0.0.1
 - PostgreSQL 宿主机端口默认通过 `POSTGRES_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；Atlas migration 使用宿主机本地端口访问，不需要把 PostgreSQL 暴露给外部网络。
 - 后端 HTTP / gRPC 宿主机端口默认通过 `APP_HTTP_BIND_ADDR=127.0.0.1` 和 `APP_GRPC_BIND_ADDR=127.0.0.1` 只绑定本机 loopback；浏览器业务流量通过前端容器 `/rpc` 反代到 Docker 网络内的 `app-server:8300`。
 - `POSTGRES_DSN` 是 URL，若 `POSTGRES_PASSWORD` 包含 `@`、`:`、`/`、`%`、`#` 等特殊字符，DSN 里的密码必须先 URL 编码；`POSTGRES_PASSWORD` 本身保持原值。
-- `ERP_ALLOW_CUSTOMER_TRIAL_CONFIG` 默认必须为 `0`，同时 `ERP_CUSTOMER_TRIAL_TARGET` 必须为空。只有 133 的隔离验收库可临时使用 `1` + `customer-trial-133`；启动门禁还会核对 `ERP_DEBUG_ENV=prod`，并按最终解析后的 DSN 精确要求单一 `postgres:5432/plush_erp_uat_20260715?sslmode=disable`。该开关只允许带独立 `customer_trial_test_apply` 标记的试用配置走标准 validate / publish / transition / activate / effective-session 链，不是正式发布能力；关闭开关后，若库中仍有该试用 revision 为 active，服务会拒绝启动，回滚时必须连同数据库目标一起恢复。
+- `ERP_ALLOW_CUSTOMER_TRIAL_CONFIG` 默认必须为 `0`，同时 `ERP_CUSTOMER_TRIAL_TARGET` 必须为空。只有 133 的隔离验收库可临时使用 `1` + `customer-trial-133`；启动门禁还会核对 `ERP_DEBUG_ENV=prod`，并按最终解析后的 DSN 精确要求单一 `postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable`。该模式还必须使用 `PROJECT_SLUG=plush-toy-erp-v5`、独立数据与 migration 锁目录、完整 V5 端口组，以及 `compose.customer-trial-133.yml`；任何一项缺失都不能启动。该开关只允许带独立 `customer_trial_test_apply` 标记的试用配置走标准 validate / publish / transition / activate / effective-session 链，不是正式发布能力；关闭开关后，若库中仍有该试用 revision 为 active，服务会拒绝启动，回滚时必须连同数据库目标一起恢复。
 - 前端容器默认将 `/rpc` 和 `/templates` 反代到 `WEB_API_ORIGIN`，外部网关只需把前端流量映射到 `5175`
 - 前端默认以根路径构建；如果网关使用路径前缀且不剥离前缀，需要先评审构建期 `VITE_BASE_URL`
 - 如果后续要重新开放公网域名或网关入口，必须先补新的正式部署方案，再更新本 README、Compose 环境说明和对应 smoke；不要沿用已经撤销的阿里云 / Cloudflare 旧口径。
@@ -126,12 +183,16 @@ docker build -f web/Dockerfile -t plush-toy-erp-web:dev .
 默认构建产物是中性产品包。yoyoosun 客户试用 / 交付镜像必须在本地或 CI 构建时显式传入客户 key，Dockerfile 会把客户 `customer-config.js` 和 `customer-assets/yoyoosun/` 写入前端静态产物；低配目标机仍不执行构建。
 
 ```bash
+GIT_SHA="$(git rev-parse HEAD)"
+
 docker build \
+  --build-arg GIT_SHA="$GIT_SHA" \
   --build-arg ERP_CUSTOMER_KEY=yoyoosun \
   -f server/Dockerfile \
   -t plush-toy-erp-server:yoyoosun-dev .
 
 docker build \
+  --build-arg GIT_SHA="$GIT_SHA" \
   --build-arg ERP_CUSTOMER_KEY=yoyoosun \
   -f web/Dockerfile \
   -t plush-toy-erp-web:yoyoosun-dev .
@@ -170,7 +231,22 @@ make production_preflight
 
 ```bash
 cd /Users/simon/projects/plush-toy-erp
-bash scripts/deploy/production-preflight.sh --env-file server/deploy/compose/prod/.env --runtime
+bash scripts/deploy/production-preflight.sh \
+  --env-file server/deploy/compose/prod/.env \
+  --runtime \
+  --expected-release "$(git rev-parse HEAD)"
+```
+
+133 V5 运行态必须继续带同一 override 并显式绑定 40 位 release；`--runtime` 会使用显式 `-p plush-toy-erp-v5`，要求四个服务各只有一个容器，并读回 env 指定的镜像引用、当前 image content ID、容器 content ID、app / web `GIT_SHA`、容器名、project label、宿主端口、PostgreSQL 挂载源、app 试用变量和脱敏 DSN 身份：
+
+```bash
+cd /home/simon/plush-toy-erp-v5/current
+bash scripts/deploy/production-preflight.sh \
+  --env-file /home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133 \
+  --compose-dir /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod \
+  --compose-override /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml \
+  --runtime \
+  --expected-release '<40-character-lowercase-git-sha>'
 ```
 
 ### 本地启动
@@ -221,6 +297,29 @@ sh migrate_online.sh
 MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 ```
 
+133 V5 不使用上面的 canonical 默认值。它只接受当前 release 内的受控 override、release 外的精确 `0600` runtime env、仓库 migration 目录、`/usr/local/bin/atlas`、`psql` 和仓库 populated-upgrade preflight；宿主环境或 env 文件中出现 `MIG_DIR / ATLAS_BIN / PSQL_BIN / POPULATED_UPGRADE_PREFLIGHT` 会在任何 Compose、psql 或 Atlas 调用前阻断。精确序列如下：
+
+```bash
+cd /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod
+export COMPOSE_OVERRIDE_FILE=/home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.customer-trial-133.yml
+export COMPOSE_ENV_FILE=/home/simon/plush-toy-erp-v5/runtime/.env.customer-trial-133
+
+sh ./migrate_online.sh --status-only
+sh ./migrate_online.sh
+
+docker compose \
+  -p plush-toy-erp-v5 \
+  --env-file "$COMPOSE_ENV_FILE" \
+  -f /home/simon/plush-toy-erp-v5/current/server/deploy/compose/prod/compose.yml \
+  -f "$COMPOSE_OVERRIDE_FILE" \
+  stop app-server
+
+MIGRATION_MAINTENANCE_CONFIRMED=1 sh ./migrate_online.sh --apply
+sh ./migrate_online.sh --status-only
+```
+
+apply 窗口只停止 V5 `app-server`，并保持 V5 PostgreSQL 运行供宿主 Atlas 连接；不停止、重建或改写旧 `plush-toy-erp-prod` 栈。apply 完成后先读回 final status，再用无 bootstrap 密码的 steady env 启动 V5 app / web 并执行带 `--expected-release` 的 runtime preflight。
+
 三种调用的证据边界不同：
 
 - `--status-only` 只输出 Atlas status，不运行存量审计、dry-run 或 apply。
@@ -231,7 +330,7 @@ MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 
 备份恢复演练遵循同一边界：dump 恢复到隔离 PostgreSQL 后，先记录 pre-apply status，再运行两项适用的只读审计；只有审计通过才允许 apply。恢复链跨越对应 revision 时，脚本会在 `backup-evidence.md`、`backup-restore-report.json` 和 `command-summary.txt` 中分别记录审计通过状态，release gate 会交叉核对字段、步骤和 migrationBefore / migrationAfter；任一缺失都不能作为完整证据。正式证据还必须绑定本次备份、release 和 migration version，不能由 fresh 结果替代。
 
-常用覆盖项：
+常用覆盖项（仅 canonical 部署路径；133 V5 会拒绝这些目标覆盖）：
 
 ```bash
 export COMPOSE_FILE=/path/to/compose.yml

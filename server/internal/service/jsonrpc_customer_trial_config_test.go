@@ -12,6 +12,8 @@ import (
 
 func customerTrialConfigInputForTest() biz.CustomerConfigPublishInput {
 	return biz.CustomerConfigPublishInput{
+		CustomerKey:    customertrialconfig.ExpectedCustomerKey,
+		Revision:       customertrialconfig.Revision,
 		ProductVersion: customertrialconfig.ProductVersion,
 		CompiledSnapshot: map[string]any{
 			"applyPurpose":   customertrialconfig.ApplyPurpose,
@@ -38,6 +40,8 @@ func TestCustomerTrialConfigManifestGateAllowsExactMarkerWhenEnabled(t *testing.
 
 func TestCustomerTrialConfigJSONRPCValidateAndPublishExactMarkerWhenEnabled(t *testing.T) {
 	payload := customerConfigPublishParams(t).AsMap()
+	payload["customer_key"] = customertrialconfig.ExpectedCustomerKey
+	payload["revision"] = customertrialconfig.Revision
 	payload["product_version"] = customertrialconfig.ProductVersion
 	snapshot, ok := payload["compiled_snapshot"].(map[string]any)
 	if !ok {
@@ -101,22 +105,26 @@ func TestCustomerTrialConfigManifestGateLeavesLocalTestInputToItsOwnBoundary(t *
 	}
 }
 
-func TestCustomerTrialConfigTransitionGateUsesExactProductVersion(t *testing.T) {
+func TestCustomerTrialConfigTransitionGateUsesExactRevisionAndProductVersion(t *testing.T) {
 	disabled := &jsonrpcDispatcher{}
-	result := disabled.requireCustomerTrialConfigProductVersion(customertrialconfig.ProductVersion)
+	result := disabled.requireCustomerTrialConfigRevisionProductVersion(customertrialconfig.ExpectedCustomerKey, customertrialconfig.Revision, customertrialconfig.ProductVersion)
 	if result == nil || result.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("disabled transition gate result = %#v, want permission denied", result)
 	}
 
 	enabled := &jsonrpcDispatcher{trialConfigEnabled: true}
-	if result := enabled.requireCustomerTrialConfigProductVersion(customertrialconfig.ProductVersion); result != nil {
+	if result := enabled.requireCustomerTrialConfigRevisionProductVersion(customertrialconfig.ExpectedCustomerKey, customertrialconfig.Revision, customertrialconfig.ProductVersion); result != nil {
 		t.Fatalf("enabled transition gate result = %#v, want nil", result)
 	}
-	if result := disabled.requireCustomerTrialConfigProductVersion("formal-product-version"); result != nil {
+	if result := disabled.requireCustomerTrialConfigRevisionProductVersion(customertrialconfig.ExpectedCustomerKey, "formal-revision", "formal-product-version"); result != nil {
 		t.Fatalf("formal transition gate result = %#v, want nil", result)
 	}
-	result = enabled.requireCustomerTrialConfigProductVersion("customer-trial-133-test-2026.07.15-v1")
+	result = enabled.requireCustomerTrialConfigRevisionProductVersion(customertrialconfig.ExpectedCustomerKey, "old-trial-revision", "customer-trial-133-test-2026.07.15-v1")
 	if result == nil || result.Code != errcode.InvalidParam.Code {
 		t.Fatalf("invalid trial transition gate result = %#v, want invalid param", result)
+	}
+	result = enabled.requireCustomerTrialConfigRevisionProductVersion(customertrialconfig.ExpectedCustomerKey, "other-revision", customertrialconfig.ProductVersion)
+	if result == nil || result.Code != errcode.InvalidParam.Code {
+		t.Fatalf("mismatched trial revision gate result = %#v, want invalid param", result)
 	}
 }

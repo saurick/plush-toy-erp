@@ -10,6 +10,13 @@ import {
 } from "./manual-acceptance-source-retire.mjs";
 import { buildManualAcceptanceSourceDataPlan } from "./manual-acceptance-source-data.mjs";
 import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
   MANUAL_ACCEPTANCE_DATASET_KEY,
@@ -24,6 +31,63 @@ function ok(data = {}) {
   return {
     ok: true,
     json: async () => ({ result: { code: 0, message: "ok", data } }),
+  };
+}
+
+function exactRetirementSnapshot(plan, { firstCustomerActive = false } = {}) {
+  return {
+    sales_orders: plan.records.salesOrders.map((item) => ({
+      id: 1000 + Number(item.order_no.slice(-3)),
+      order_no: item.order_no,
+      lifecycle_status: "CANCELLED",
+    })),
+    purchase_orders: plan.records.purchaseOrders.map((item) => ({
+      id: 2000 + Number(item.purchase_order_no.slice(-3)),
+      purchase_order_no: item.purchase_order_no,
+      lifecycle_status: "CANCELLED",
+    })),
+    outsourcing_orders: plan.records.outsourcingOrders.map((item) => ({
+      id: 3000 + Number(item.outsourcing_order_no.slice(-3)),
+      outsourcing_order_no: item.outsourcing_order_no,
+      lifecycle_status: "CANCELLED",
+    })),
+    bom_versions: plan.records.bomVersions.map((item, index) => ({
+      id: 4000 + index,
+      version: item.version,
+      status: "ARCHIVED",
+    })),
+    product_skus: plan.records.products.flatMap((product) =>
+      product.skus.map((item, index) => ({
+        id: 5000 + Number(product.code.slice(-3)) * 10 + index,
+        sku_code: item.sku_code,
+        is_active: false,
+      })),
+    ),
+    processes: plan.records.processes.map((item, index) => ({
+      id: 6000 + index,
+      code: item.code,
+      is_active: false,
+    })),
+    materials: plan.records.materials.map((item, index) => ({
+      id: 7000 + index,
+      code: item.code,
+      is_active: false,
+    })),
+    products: plan.records.products.map((item, index) => ({
+      id: 8000 + index,
+      code: item.code,
+      is_active: false,
+    })),
+    suppliers: plan.records.suppliers.map((item, index) => ({
+      id: 9000 + index,
+      code: item.code,
+      is_active: false,
+    })),
+    customers: plan.records.customers.map((item, index) => ({
+      id: 10000 + index,
+      code: item.code,
+      is_active: firstCustomerActive && index === 0,
+    })),
   };
 }
 
@@ -135,13 +199,13 @@ test("retirement CLI keeps local dry-run default and permits only the registered
     "--backend-url",
     CUSTOMER_TRIAL_133_ORIGIN,
     "--data-version",
-    "2026.07.15-v1",
+    CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     "--run-id",
-    "20260715-V1",
+    CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   ]);
   assert.equal(remote.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(remote.backendURL, CUSTOMER_TRIAL_133_ORIGIN);
-  assert.equal(remote.dataVersion, "2026.07.15-v1");
+  assert.equal(remote.dataVersion, CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION);
 
   assert.throws(
     () =>
@@ -156,7 +220,11 @@ test("retirement CLI keeps local dry-run default and permits only the registered
 });
 
 test("retirement apply requires exact confirmation before login or reads", async () => {
-  const plan = buildManualAcceptanceSourceDataPlan({ runId: "RETIRE-CONFIRM" });
+  const plan = buildManualAcceptanceSourceDataPlan({
+    runId: "RETIRE-CONFIRM",
+    backendURL: "http://127.0.0.1:8310",
+    databaseName: "plush_erp_acceptance_20260716_v5_dev",
+  });
   const previous = process.env.MANUAL_ACCEPTANCE_RETIRE_CONFIRM;
   delete process.env.MANUAL_ACCEPTANCE_RETIRE_CONFIRM;
   let fetchCalls = 0;
@@ -166,6 +234,7 @@ test("retirement apply requires exact confirmation before login or reads", async
         retireManualAcceptanceSourceData(plan, {
           apply: true,
           password: "local-demo-password",
+          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
           fetchImpl: async () => {
             fetchCalls += 1;
             throw new Error("fetch should not run");
@@ -187,8 +256,8 @@ test("customer-trial-133 retirement apply requires the target-bound confirmation
   const plan = buildManualAcceptanceSourceDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   });
   let fetchCalls = 0;
 
@@ -214,8 +283,8 @@ test("customer-trial-133 retirement rejects unsafe out-of-band debug attestation
   const plan = buildManualAcceptanceSourceDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   });
   let fetchCalls = 0;
 
@@ -411,22 +480,11 @@ test("customer-trial-133 retirement uses prod attestation, normalized remote run
   const plan = buildManualAcceptanceSourceDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
   });
   const calls = [];
   let customerReads = 0;
-  const emptyLists = {
-    sales_orders: [],
-    purchase_orders: [],
-    outsourcing_orders: [],
-    bom_versions: [],
-    product_skus: [],
-    processes: [],
-    materials: [],
-    products: [],
-    suppliers: [],
-  };
   const fetchImpl = async (url, init) => {
     if (!init.body) {
       calls.push({
@@ -465,7 +523,11 @@ test("customer-trial-133 retirement uses prod attestation, normalized remote run
         session: {
           customer: { key: "yoyoosun" },
           source: "active_customer_config_revision",
-          configRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+          configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+          configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+          configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+          configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+          configTarget: CUSTOMER_TRIAL_133_TARGET,
           modules: Object.fromEntries(
             [
               "customers",
@@ -485,7 +547,7 @@ test("customer-trial-133 retirement uses prod attestation, normalized remote run
     if (body.method === "capabilities") {
       return ok({
         environment: "remote",
-        databaseName: "plush_erp_uat_20260715",
+        databaseName: CUSTOMER_TRIAL_133_DATABASE,
         seedEnabled: false,
         seedAllowed: false,
         cleanupEnabled: false,
@@ -496,21 +558,17 @@ test("customer-trial-133 retirement uses prod attestation, normalized remote run
     }
     if (body.method === "list_customers") {
       customerReads += 1;
-      return ok({
-        ...emptyLists,
-        customers: [
-          record(101, {
-            code: `${plan.prefix}-CUS-001`,
-            is_active: customerReads === 1,
-          }),
-        ],
-      });
+      return ok(
+        exactRetirementSnapshot(plan, {
+          firstCustomerActive: customerReads === 1,
+        }),
+      );
     }
     if (body.method.startsWith("list_")) {
-      return ok({ ...emptyLists, customers: [] });
+      return ok(exactRetirementSnapshot(plan));
     }
     if (body.method === "set_customer_active") {
-      assert.equal(body.params.id, 101);
+      assert.equal(body.params.id, 10000);
       assert.equal(body.params.active, false);
       assert.equal(authorization, "Bearer token-admin");
       return ok({ customer: record(101, { is_active: false }) });
@@ -530,13 +588,13 @@ test("customer-trial-133 retirement uses prod attestation, normalized remote run
 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(report.datasetKey, MANUAL_ACCEPTANCE_DATASET_KEY);
-  assert.equal(report.dataVersion, "2026.07.15-v1");
-  assert.equal(report.runId, "20260715-V1");
+  assert.equal(report.dataVersion, CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION);
+  assert.equal(report.runId, CURRENT_MANUAL_ACCEPTANCE_RUN_ID);
   assert.equal(report.summary.totalActions, 1);
   assert.deepEqual(report.executed, [
     {
       datasetKey: "customers",
-      key: `${plan.prefix}-CUS-001`,
+      key: plan.records.customers[0].code,
       method: "set_customer_active",
     },
   ]);

@@ -1,6 +1,15 @@
 #!/usr/bin/env node
 
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import {
+  mkdir,
+  open,
+  readFile,
+  rename,
+  unlink,
+  writeFile,
+} from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 import { fileURLToPath } from "node:url";
 
@@ -10,20 +19,29 @@ import {
 } from "./manual-acceptance-account-scenarios.mjs";
 import { buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 import {
-  DEFAULT_SOURCE_DATA_SCALE,
-  SIMULATION_PREFIX as SOURCE_PREFIX,
-} from "./manual-acceptance-source-data.mjs";
+  MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
+  MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
+  MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
+} from "./manual-acceptance-catalog.mjs";
+import { DEFAULT_SOURCE_DATA_SCALE } from "./manual-acceptance-source-data.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
+  MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   createManualAcceptanceDatasetStageRunner,
+  digestManualAcceptanceDatasetComponentReport,
+  manualAcceptanceDatasetStageReportPath,
 } from "./manual-acceptance-dataset-runner.mjs";
 import {
+  TASK_SCHEDULE_POLICY,
+  buildManualAcceptanceTaskSchedule,
   buildManualAcceptanceTaskDataPlan,
   TOTAL_TASKS,
 } from "./manual-acceptance-task-data.mjs";
 import {
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   LOCAL_DEV_TARGET,
   MANUAL_ACCEPTANCE_DATASET_KEY,
   assertManualAcceptanceMutationTarget,
@@ -33,10 +51,12 @@ import {
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
 
-export const DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION = "2026.07.15-v3";
+export const DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION =
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
 export const LOCAL_DATASET_TARGET = "local";
 export const MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS = Object.freeze([
   "core",
+  "baseline",
   "role",
   "source",
   "task",
@@ -45,6 +65,10 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS = Object.freeze([
   "attachments",
   "readiness",
 ]);
+export const MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT =
+  "manual-acceptance-dataset-apply-report-v2";
+export const MANUAL_ACCEPTANCE_DATASET_APPLY_LOCK_CONTRACT =
+  "manual-acceptance-dataset-apply-lock-v1";
 
 function stageCapability(mode, supportedTargets, reason) {
   return Object.freeze({
@@ -59,6 +83,11 @@ export const MANUAL_ACCEPTANCE_DATASET_STAGE_CAPABILITIES = Object.freeze({
     "registered-targets-read-only",
     [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
     "both targets use the same formal RPC verifier for exact stable unit and warehouse codes; local database seed is never implicit",
+  ),
+  baseline: stageCapability(
+    "registered-targets-read-only",
+    [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
+    "after core and before any dataset mutation, both targets must prove an exact empty business baseline under the same runtime and customer configuration",
   ),
   role: stageCapability(
     "registered-targets",
@@ -136,7 +165,8 @@ function requiredText(value, name) {
 }
 
 function normalizeGeneratedAt(value = new Date()) {
-  const date = value instanceof Date ? new Date(value) : new Date(String(value));
+  const date =
+    value instanceof Date ? new Date(value) : new Date(String(value));
   if (!Number.isFinite(date.getTime())) {
     throw new ManualAcceptanceDatasetError("generatedAt must be a valid date");
   }
@@ -148,7 +178,7 @@ export function normalizeManualAcceptanceDataVersion(value) {
   const match = raw.match(DATA_VERSION_PATTERN);
   if (!match) {
     throw new ManualAcceptanceDatasetError(
-      "dataVersion must use the current YYYY.MM.DD-vN contract, for example 2026.07.15-v3",
+      "dataVersion must use the current YYYY.MM.DD-vN contract, for example 2026.07.16-v5",
     );
   }
   const [, yearText, monthText, dayText, versionText] = match;
@@ -190,8 +220,8 @@ export function deriveManualAcceptanceDatasetIdentity(
     dateAnchorUtc,
     dateAnchorUnix: Math.floor(Date.parse(dateAnchorUtc) / 1000),
     prefixes: {
-      core: "SIM-PLUSH-CORE",
-      source: `${SOURCE_PREFIX}-${runId}`,
+      core: `YS${version}`,
+      source: `YS${version}`,
       task: `SIM-YOYOOSUN-UAT-TASK-${runId}`,
       purchaseQuality: `SIM-YOYOOSUN-PQ-${runId}`,
       facts: `SIM-YOYOOSUN-UAT-FACT-${runId}`,
@@ -200,8 +230,23 @@ export function deriveManualAcceptanceDatasetIdentity(
   };
 }
 
+export function normalizeManualAcceptanceRunId(dataVersion, value) {
+  const identity = deriveManualAcceptanceDatasetIdentity(dataVersion);
+  const runId = requiredText(value, "runId");
+  if (runId !== identity.runId) {
+    throw new ManualAcceptanceDatasetError(
+      `runId must be ${identity.runId} for dataVersion ${identity.dataVersion}`,
+    );
+  }
+  return runId;
+}
+
 function canonicalJSON(value) {
-  if (value === null || typeof value === "string" || typeof value === "boolean") {
+  if (
+    value === null ||
+    typeof value === "string" ||
+    typeof value === "boolean"
+  ) {
     return JSON.stringify(value);
   }
   if (typeof value === "number") {
@@ -228,6 +273,187 @@ function canonicalJSON(value) {
 
 export function digestManualAcceptanceSemanticPlan(semanticPlan) {
   return createHash("sha256").update(canonicalJSON(semanticPlan)).digest("hex");
+}
+
+export function manualAcceptanceDatasetApplyReportPath({
+  outputRoot = MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
+  dataVersion,
+  targetAlias,
+}) {
+  return path.join(
+    outputRoot,
+    requiredText(dataVersion, "dataVersion"),
+    requiredText(targetAlias, "targetAlias"),
+    "dataset/apply-report.json",
+  );
+}
+
+export function manualAcceptanceDatasetApplyLockPath({
+  outputRoot = MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
+  dataVersion,
+  targetAlias,
+}) {
+  return path.join(
+    outputRoot,
+    requiredText(dataVersion, "dataVersion"),
+    requiredText(targetAlias, "targetAlias"),
+    "dataset/.apply.lock",
+  );
+}
+
+function sanitizedApplyLockOwner(value) {
+  if (!isPlainRecord(value)) return null;
+  const lockId = String(value.lockId || "").trim();
+  const pid = Number(value.pid);
+  const acquiredAt = String(value.acquiredAt || "").trim();
+  if (
+    value.contract !== MANUAL_ACCEPTANCE_DATASET_APPLY_LOCK_CONTRACT ||
+    !/^[0-9a-f-]{36}$/u.test(lockId) ||
+    !Number.isSafeInteger(pid) ||
+    pid <= 0 ||
+    !acquiredAt
+  ) {
+    return null;
+  }
+  return {
+    contract: value.contract,
+    lockId,
+    pid,
+    acquiredAt,
+    datasetKey: String(value.datasetKey || ""),
+    dataVersion: String(value.dataVersion || ""),
+    runId: String(value.runId || ""),
+    targetAlias: String(value.targetAlias || ""),
+    policyTarget: String(value.policyTarget || ""),
+    operation: value.operation === "resume" ? "resume" : "fresh",
+  };
+}
+
+function lockRecoveryArchivePath(lockPath, owner) {
+  const suffix = owner?.lockId || "unknown-owner";
+  return `${lockPath}.stale-${suffix}`;
+}
+
+async function acquireManualAcceptanceDatasetApplyLock({
+  lockPath,
+  plan,
+  resumeRequested,
+}) {
+  await mkdir(path.dirname(lockPath), { recursive: true });
+  const owner = {
+    contract: MANUAL_ACCEPTANCE_DATASET_APPLY_LOCK_CONTRACT,
+    lockId: randomUUID(),
+    pid: process.pid,
+    acquiredAt: new Date().toISOString(),
+    datasetKey: plan.semanticPlan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.semanticPlan.runId,
+    targetAlias: plan.target.alias,
+    policyTarget: plan.target.policyTarget,
+    operation: resumeRequested ? "resume" : "fresh",
+  };
+  let handle;
+  try {
+    handle = await open(lockPath, "wx", 0o600);
+  } catch (error) {
+    if (error?.code !== "EEXIST") {
+      throw new ManualAcceptanceDatasetError(
+        `cannot acquire canonical dataset apply lock: ${error?.message || error}`,
+      );
+    }
+    let existingOwner = null;
+    try {
+      existingOwner = sanitizedApplyLockOwner(
+        JSON.parse(await readFile(lockPath, "utf8")),
+      );
+    } catch {
+      // A just-created or damaged lock is still authoritative. Never infer staleness.
+    }
+    const recoveryArchivePath = lockRecoveryArchivePath(
+      lockPath,
+      existingOwner,
+    );
+    const ownerSummary = existingOwner
+      ? `owner=${existingOwner.lockId} pid=${existingOwner.pid} acquiredAt=${existingOwner.acquiredAt}`
+      : "owner metadata is incomplete or unreadable";
+    const lockError = new ManualAcceptanceDatasetError(
+      `canonical dataset apply lock is already held (${ownerSummary}); ` +
+        "no runner or RPC was started. Do not delete the lock. Verify that the recorded process is no longer running, then recover conservatively by renaming " +
+        `${lockPath} to ${recoveryArchivePath} and rerun the exact command.`,
+    );
+    lockError.code = "dataset_apply_lock_held";
+    lockError.details = {
+      lockPath,
+      recoveryArchivePath,
+      owner: existingOwner,
+    };
+    throw lockError;
+  }
+  try {
+    await handle.writeFile(`${JSON.stringify(owner, null, 2)}\n`, "utf8");
+    await handle.sync();
+  } catch (error) {
+    try {
+      await handle.close();
+    } catch {
+      // The original write error remains the actionable failure.
+    }
+    throw new ManualAcceptanceDatasetError(
+      `cannot persist canonical dataset apply lock: ${error?.message || error}; ` +
+        "the lock remains fail-closed and must be verified and renamed for recovery, never blindly deleted",
+    );
+  }
+  await handle.close();
+  return { lockPath, lockId: owner.lockId };
+}
+
+async function releaseManualAcceptanceDatasetApplyLock(lock) {
+  let currentOwner;
+  try {
+    currentOwner = sanitizedApplyLockOwner(
+      JSON.parse(await readFile(lock.lockPath, "utf8")),
+    );
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    return false;
+  }
+  if (!currentOwner || currentOwner.lockId !== lock.lockId) {
+    return false;
+  }
+  try {
+    await unlink(lock.lockPath);
+    return true;
+  } catch (error) {
+    if (error?.code === "ENOENT") return false;
+    throw new ManualAcceptanceDatasetError(
+      `cannot release canonical dataset apply lock: ${error?.message || error}`,
+    );
+  }
+}
+
+async function persistManualAcceptanceDatasetApplyReport(reportPath, report) {
+  await mkdir(path.dirname(reportPath), { recursive: true });
+  const temporaryPath = `${reportPath}.${process.pid}.${Date.now()}.tmp`;
+  await writeFile(
+    temporaryPath,
+    `${JSON.stringify(report, null, 2)}\n`,
+    "utf8",
+  );
+  await rename(temporaryPath, reportPath);
+}
+
+async function assertFreshApplyReportSlot(applyReportPath) {
+  try {
+    await readFile(applyReportPath, "utf8");
+  } catch (error) {
+    if (error?.code === "ENOENT") return;
+    throw new ManualAcceptanceDatasetError(
+      `cannot inspect canonical apply report: ${error?.message || error}`,
+    );
+  }
+  throw new ManualAcceptanceDatasetError(
+    "canonical dataset apply report already exists; use explicit --resume-report so the prior receipt cannot be overwritten",
+  );
 }
 
 function command(entrypoint, args, extra = {}) {
@@ -308,7 +534,13 @@ function buildStages(identity) {
       commands: [
         command(
           "scripts/seed-core-demo-data.sh",
-          ["--prefix", identity.prefixes.core],
+          [
+            "--references-only",
+            "--expected-database",
+            "plush_erp_acceptance_20260716_v5_dev",
+            "--confirm",
+            "SEED_MANUAL_ACCEPTANCE_CORE_REFERENCES:local-dev:plush_erp_acceptance_20260716_v5_dev:2026.07.16-v5:20260716-V5",
+          ],
           {
             execution: "out-of-band-explicit-only",
             supportedTargets: [LOCAL_DATASET_TARGET],
@@ -324,13 +556,8 @@ function buildStages(identity) {
           operation: "verify-or-reuse",
           seedAllowed: false,
           stablePrefix: identity.prefixes.core,
-          unitCode: "SIM-PLUSH-CORE-PCS",
-          warehouseCodes: [
-            "SIM-PLUSH-CORE-RM-WH",
-            "SIM-PLUSH-CORE-FG-WH",
-            "SIM-PLUSH-CORE-QC-HOLD",
-            "SIM-PLUSH-CORE-WIP-WH",
-          ],
+          unitCode: "YS5-DW-01",
+          warehouseCodes: ["YS5-CK-01", "YS5-CK-02", "YS5-CK-03", "YS5-CK-04"],
         },
       ],
       expected: {
@@ -341,24 +568,45 @@ function buildStages(identity) {
       cleanupPolicy: "forward-only",
     },
     {
+      key: "baseline",
+      applyCapability: capabilityForStage("baseline"),
+      purpose:
+        "在任何岗位、源单、任务或事实写入前，只读证明目标库仅有一条单位、四个仓库且全部 V5 业务对象精确为零。",
+      writesBusinessData: false,
+      targetExecution: verificationOnlyExecution(),
+      commands: [
+        {
+          kind: "registered-read-only-verification",
+          execution: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          supportedTargets: [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
+          operation: "verify-fresh-empty-business-baseline",
+          databaseIdentityRequired: true,
+          runtimeIdentityRequired: true,
+          activeCustomerConfigurationRequired: true,
+          remoteAttestationRequired: "when-external",
+          adminQueriesReadOnly: true,
+        },
+      ],
+      expected: {
+        exactEmptyBusinessBaseline: true,
+        units: 1,
+        warehouses: 4,
+        businessObjectKinds: MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.map(
+          ({ key }) => key,
+        ),
+        exactCountPerBusinessObject: 0,
+      },
+      replay: "fresh-database-only-readback",
+      cleanupPolicy: "not-applicable",
+    },
+    {
       key: "role",
       applyCapability: capabilityForStage("role"),
       purpose:
-        "两端共用正式账号场景 API：十个正式岗位账号缺失即阻断，三类模拟场景账号同源调和；本地岗位 seed 不由默认 runner 执行。",
+        "两端只通过正式账号场景 API 调和十个岗位账号和三类模拟场景账号，不保留可绕过 exact V5 数据库绑定的本地 seed 写入口。",
       writesBusinessData: true,
       targetExecution: roleStageExecution(),
       commands: [
-        command(
-          "scripts/seed-role-demo-admins.sh",
-          ["--reset-password"],
-          {
-            execution: "out-of-band-explicit-only",
-            supportedTargets: [LOCAL_DATASET_TARGET],
-            defaultRunner: false,
-            dedicatedAcceptanceDatabaseBindingRequired: true,
-            remoteSeedAllowed: false,
-          },
-        ),
         command(
           "scripts/qa/manual-acceptance-account-scenarios.mjs",
           [
@@ -406,30 +654,35 @@ function buildStages(identity) {
     {
       key: "source",
       applyCapability: capabilityForStage("source"),
-      purpose: "准备客户、供应商、材料、产品、工序、销售、采购、委外和 BOM 模拟源单。",
+      purpose:
+        "准备客户、供应商、材料、产品、工序、销售、采购、委外和 BOM 模拟源单。",
       writesBusinessData: true,
       commands: [
-        command("scripts/qa/manual-acceptance-source-data.mjs", [
-          "--apply",
-          "--target",
-          "${TARGET_POLICY_TARGET}",
-          "--data-version",
-          identity.dataVersion,
-          "--run-id",
-          identity.runId,
-          "--backend-url",
-          "${TARGET_BACKEND_URL}",
-          "--out",
-          `${REPORT_ROOT}/source`,
-        ], {
-          environment: {
-            MANUAL_ACCEPTANCE_SIM_CONFIRM:
-              "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
-            MANUAL_ACCEPTANCE_TARGET_CONFIRM: "${TARGET_CONFIRMATION}",
-            MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON:
-              "${TARGET_ATTESTATION_JSON}",
+        command(
+          "scripts/qa/manual-acceptance-source-data.mjs",
+          [
+            "--apply",
+            "--target",
+            "${TARGET_POLICY_TARGET}",
+            "--data-version",
+            identity.dataVersion,
+            "--run-id",
+            identity.runId,
+            "--backend-url",
+            "${TARGET_BACKEND_URL}",
+            "--out",
+            `${REPORT_ROOT}/source`,
+          ],
+          {
+            environment: {
+              MANUAL_ACCEPTANCE_SIM_CONFIRM:
+                "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA",
+              MANUAL_ACCEPTANCE_TARGET_CONFIRM: "${TARGET_CONFIRMATION}",
+              MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON:
+                "${TARGET_ATTESTATION_JSON}",
+            },
           },
-        }),
+        ),
       ],
       expected: { scale: { ...DEFAULT_SOURCE_DATA_SCALE } },
       replay: "resume-or-reuse-by-stable-business-code",
@@ -441,34 +694,38 @@ function buildStages(identity) {
       purpose: "准备九个岗位的 Workflow 手工验收任务状态矩阵。",
       writesBusinessData: true,
       commands: [
-        command("scripts/qa/manual-acceptance-task-data.mjs", [
-          "--apply",
-          "--target",
-          "${TARGET_POLICY_TARGET}",
-          "--data-version",
-          identity.dataVersion,
-          "--run-id",
-          identity.runId,
-          "--backend-url",
-          "${TARGET_BACKEND_URL}",
-          "--out",
-          `${REPORT_ROOT}/task`,
-        ], {
-          environment: {
-            MANUAL_ACCEPTANCE_TASK_CONFIRM:
-              "APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS",
-            MANUAL_ACCEPTANCE_TARGET_CONFIRM: "${TARGET_CONFIRMATION}",
-            MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON:
-              "${TARGET_ATTESTATION_JSON}",
+        command(
+          "scripts/qa/manual-acceptance-task-data.mjs",
+          [
+            "--apply",
+            "--target",
+            "${TARGET_POLICY_TARGET}",
+            "--data-version",
+            identity.dataVersion,
+            "--run-id",
+            identity.runId,
+            "--backend-url",
+            "${TARGET_BACKEND_URL}",
+            "--out",
+            `${REPORT_ROOT}/task`,
+          ],
+          {
+            environment: {
+              MANUAL_ACCEPTANCE_TASK_CONFIRM:
+                "APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS",
+              MANUAL_ACCEPTANCE_TARGET_CONFIRM: "${TARGET_CONFIRMATION}",
+              MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON:
+                "${TARGET_ATTESTATION_JSON}",
+            },
           },
-        }),
+        ),
       ],
       expected: {
         tasks: TOTAL_TASKS,
         sourceType: taskPlan.sourceType,
         sourceIdempotencyID: taskPlan.sourceID,
         statusSummary: taskPlan.summary,
-        scheduleAnchorUnix: taskPlan.generatedAtUnix,
+        schedulePolicy: { ...TASK_SCHEDULE_POLICY },
       },
       replay: "resume-or-reuse-by-task-code-and-idempotency-key",
       cleanupPolicy: "forward-only",
@@ -563,7 +820,10 @@ function buildStages(identity) {
         productionOrdersMinimum: 45,
         productionFactsMinimum: 45,
         stockReservationsMinimum: 45,
-        shipmentsMinimum: 45,
+        shipmentsExact: MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
+        shipmentLongRecordsExact: MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
+        shipmentLongRecordLinesExact:
+          MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
         financeFactsPerTypeMinimum: 45,
       },
       replay: "idempotent-source-reference-and-payload-digest",
@@ -670,6 +930,9 @@ export function buildManualAcceptanceSemanticPlan(options = {}) {
   const identity = deriveManualAcceptanceDatasetIdentity(
     options.dataVersion || DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION,
   );
+  if (options.runId !== undefined && options.runId !== null) {
+    normalizeManualAcceptanceRunId(identity.dataVersion, options.runId);
+  }
   return {
     contract: "manual-acceptance-dataset-semantic-plan-v2",
     datasetKey: identity.datasetKey,
@@ -681,6 +944,7 @@ export function buildManualAcceptanceSemanticPlan(options = {}) {
     runId: identity.runId,
     dateAnchorUtc: identity.dateAnchorUtc,
     dateAnchorUnix: identity.dateAnchorUnix,
+    taskSchedulePolicy: { ...TASK_SCHEDULE_POLICY },
     prefixes: identity.prefixes,
     stageOrder: [...MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS],
     runnerContract: {
@@ -721,7 +985,11 @@ function normalizeTargetAlias(value) {
 
 function normalizedStageCapability(stage) {
   const capability = stage?.applyCapability;
-  if (!capability || typeof capability !== "object" || Array.isArray(capability)) {
+  if (
+    !capability ||
+    typeof capability !== "object" ||
+    Array.isArray(capability)
+  ) {
     throw new ManualAcceptanceDatasetError(
       `stage ${stage?.key || "unknown"} is missing an apply capability object`,
     );
@@ -796,7 +1064,9 @@ function buildTarget({
 }) {
   const alias = normalizeTargetAlias(targetAlias);
   const policyTarget =
-    alias === LOCAL_DATASET_TARGET ? LOCAL_DEV_TARGET : CUSTOMER_TRIAL_133_TARGET;
+    alias === LOCAL_DATASET_TARGET
+      ? LOCAL_DEV_TARGET
+      : CUSTOMER_TRIAL_133_TARGET;
   const policy = resolveManualAcceptanceTarget({
     target: policyTarget,
     backendURL:
@@ -809,9 +1079,8 @@ function buildTarget({
     runId,
     databaseName,
   });
-  const parsedAttestation = parseManualAcceptanceTargetAttestation(
-    targetAttestation,
-  );
+  const parsedAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
   if (parsedAttestation && !policy.external) {
     throw new ManualAcceptanceDatasetError(
       "target attestation is only valid for customer-trial-133",
@@ -893,6 +1162,7 @@ export function buildManualAcceptanceDatasetTargetPlan(options = {}) {
     },
     targetSelectionExplicit: Boolean(options.targetAlias),
     dataVersion: semanticPlan.dataVersion,
+    runId: semanticPlan.runId,
     datasetKey: semanticPlan.datasetKey,
     semanticDigest,
     semanticPlan,
@@ -906,12 +1176,14 @@ export function buildManualAcceptanceDatasetBundle(options = {}) {
   const local = buildManualAcceptanceDatasetTargetPlan({
     ...overrides[LOCAL_DATASET_TARGET],
     dataVersion: options.dataVersion,
+    runId: options.runId,
     generatedAt,
     targetAlias: LOCAL_DATASET_TARGET,
   });
   const trial = buildManualAcceptanceDatasetTargetPlan({
     ...overrides[CUSTOMER_TRIAL_133_TARGET],
     dataVersion: options.dataVersion,
+    runId: options.runId,
     generatedAt,
     targetAlias: CUSTOMER_TRIAL_133_TARGET,
   });
@@ -927,6 +1199,7 @@ export function buildManualAcceptanceDatasetBundle(options = {}) {
     scope: "manual-acceptance-dataset-bundle",
     generatedAt,
     dataVersion: local.dataVersion,
+    runId: local.runId,
     datasetKey: local.datasetKey,
     semanticDigest: local.semanticDigest,
     targets: [local, trial],
@@ -941,7 +1214,9 @@ export function buildManualAcceptanceDatasetBundle(options = {}) {
 
 function validateApplyPlan(plan, confirmation, targetAttestation) {
   if (!plan || plan.mode !== "plan" || plan.dryRun !== true) {
-    throw new ManualAcceptanceDatasetError("apply requires a validated target plan");
+    throw new ManualAcceptanceDatasetError(
+      "apply requires a validated target plan",
+    );
   }
   if (plan.targetSelectionExplicit !== true) {
     throw new ManualAcceptanceDatasetError(
@@ -1013,6 +1288,211 @@ function validateApplyPlan(plan, confirmation, targetAttestation) {
       : null,
     targetAttestation: attestation,
     stageCapabilities,
+  };
+}
+
+function assertResumeIdentity(prior, plan, executionBinding) {
+  if (
+    prior?.contract !== MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT ||
+    prior?.mode !== "apply" ||
+    prior?.scope !== "manual-acceptance-dataset"
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report is not a canonical dataset apply report",
+    );
+  }
+  const expected = {
+    datasetKey: plan.semanticPlan.datasetKey,
+    dataVersion: plan.dataVersion,
+    runId: plan.semanticPlan.runId,
+    dateAnchorUtc: plan.semanticPlan.dateAnchorUtc,
+    semanticDigest: plan.semanticDigest,
+  };
+  for (const [field, value] of Object.entries(expected)) {
+    if (String(prior[field] ?? "") !== String(value)) {
+      throw new ManualAcceptanceDatasetError(
+        `resume report ${field} does not match the current dataset plan`,
+      );
+    }
+  }
+  for (const [field, value] of Object.entries({
+    alias: plan.target.alias,
+    policyTarget: plan.target.policyTarget,
+    backendURL: plan.target.backendURL,
+    databaseName: plan.target.databaseName,
+  })) {
+    if (String(prior.target?.[field] ?? "") !== String(value ?? "")) {
+      throw new ManualAcceptanceDatasetError(
+        `resume report target.${field} does not match the current target binding`,
+      );
+    }
+  }
+  if (
+    canonicalJSON(prior.targetAttestation ?? null) !==
+    canonicalJSON(executionBinding.targetAttestation ?? null)
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report target attestation does not match the current target binding",
+    );
+  }
+  let expectedTaskSchedule;
+  try {
+    expectedTaskSchedule = buildManualAcceptanceTaskSchedule(
+      prior?.taskSchedule?.anchorUnix,
+    );
+  } catch (error) {
+    throw new ManualAcceptanceDatasetError(
+      `resume report task schedule is invalid: ${error?.message || error}`,
+    );
+  }
+  if (
+    canonicalJSON(prior.taskSchedule) !== canonicalJSON(expectedTaskSchedule)
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report task schedule does not match its controlled anchor",
+    );
+  }
+}
+
+async function prepareManualAcceptanceResume({
+  plan,
+  executionBinding,
+  resumeReportPath,
+  outputRoot,
+  applyReportPath,
+}) {
+  if (!resumeReportPath) {
+    return {
+      components: new Map(),
+      taskSchedule: null,
+      metadata: {
+        requested: false,
+        mode: "fresh_empty_baseline",
+        sourceReportPath: null,
+        sourceReportSHA256: null,
+        reusedStages: [],
+      },
+    };
+  }
+  const resolvedResumePath = path.resolve(resumeReportPath);
+  if (resolvedResumePath !== path.resolve(applyReportPath)) {
+    throw new ManualAcceptanceDatasetError(
+      "--resume-report must point to this target's canonical dataset/apply-report.json",
+    );
+  }
+  let raw;
+  let prior;
+  try {
+    raw = await readFile(resolvedResumePath, "utf8");
+    prior = JSON.parse(raw);
+  } catch (error) {
+    throw new ManualAcceptanceDatasetError(
+      `cannot read resume report: ${error?.message || error}`,
+    );
+  }
+  assertResumeIdentity(prior, plan, executionBinding);
+  if (
+    !Array.isArray(prior.stages) ||
+    prior.stages.length !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
+    prior.stages.some(
+      (stage, index) =>
+        stage?.key !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS[index],
+    )
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report stage order does not match the canonical dataset",
+    );
+  }
+
+  const components = new Map();
+  const completedStageKeys = [];
+  let terminalStatus = null;
+  let failedStage = null;
+  for (const stage of prior.stages) {
+    if (!terminalStatus && stage.status === "completed") {
+      if (
+        stage.stageKey !== stage.key ||
+        stage.dataVersion !== plan.dataVersion ||
+        stage.semanticDigest !== plan.semanticDigest ||
+        !isPlainRecord(stage.references?.runner)
+      ) {
+        throw new ManualAcceptanceDatasetError(
+          `resume report ${stage.key} receipt identity is incomplete`,
+        );
+      }
+      const expectedPath = manualAcceptanceDatasetStageReportPath({
+        outputRoot,
+        dataVersion: plan.dataVersion,
+        targetAlias: plan.target.alias,
+        stageKey: stage.key,
+      });
+      const reportedPath = String(stage.references.runner.reportPath || "");
+      if (path.resolve(reportedPath) !== path.resolve(expectedPath)) {
+        throw new ManualAcceptanceDatasetError(
+          `resume report ${stage.key} component path is not canonical`,
+        );
+      }
+      let componentReport;
+      try {
+        componentReport = JSON.parse(await readFile(expectedPath, "utf8"));
+      } catch (error) {
+        throw new ManualAcceptanceDatasetError(
+          `cannot read ${stage.key} resume component: ${error?.message || error}`,
+        );
+      }
+      const digest =
+        digestManualAcceptanceDatasetComponentReport(componentReport);
+      if (digest !== stage.references.runner.componentDigest) {
+        throw new ManualAcceptanceDatasetError(
+          `resume report ${stage.key} component digest mismatch`,
+        );
+      }
+      completedStageKeys.push(stage.key);
+      if (!["core", "readiness"].includes(stage.key)) {
+        components.set(stage.key, {
+          report: componentReport,
+          reportPath: expectedPath,
+          componentDigest: digest,
+          priorOperation: stage.operation,
+          applyReportPath,
+        });
+      }
+      continue;
+    }
+    if (!terminalStatus && stage.status === "failed") {
+      terminalStatus = "failed";
+      failedStage = stage.key;
+      continue;
+    }
+    if (stage.status === "not_started" && terminalStatus === "failed") {
+      continue;
+    }
+    throw new ManualAcceptanceDatasetError(
+      `resume report has a non-contiguous stage state at ${stage.key}`,
+    );
+  }
+  if (
+    (prior.ok === true &&
+      (terminalStatus || completedStageKeys.length !== prior.stages.length)) ||
+    (prior.ok === false &&
+      (terminalStatus !== "failed" || prior.failedStage !== failedStage))
+  ) {
+    throw new ManualAcceptanceDatasetError(
+      "resume report completion state is inconsistent",
+    );
+  }
+  return {
+    components,
+    taskSchedule: structuredClone(prior.taskSchedule),
+    metadata: {
+      requested: true,
+      mode: "same_batch_safe_resume",
+      sourceReportPath: applyReportPath,
+      sourceReportSHA256: createHash("sha256").update(raw).digest("hex"),
+      priorSucceeded: prior.ok === true,
+      priorFailedStage: prior.failedStage || null,
+      reusedStages: [...components.keys()],
+    },
   };
 }
 
@@ -1133,8 +1613,15 @@ export function normalizeManualAcceptanceStageResult(result, stage, plan) {
   };
 }
 
-function baseApplyReport(plan, generatedAt) {
+function baseApplyReport(
+  plan,
+  generatedAt,
+  applyReportPath,
+  resume,
+  taskSchedule,
+) {
   return {
+    contract: MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
     mode: "apply",
     ok: false,
     scope: "manual-acceptance-dataset",
@@ -1144,9 +1631,13 @@ function baseApplyReport(plan, generatedAt) {
     dataVersion: plan.dataVersion,
     runId: plan.semanticPlan.runId,
     dateAnchorUtc: plan.semanticPlan.dateAnchorUtc,
+    taskSchedule: structuredClone(taskSchedule),
     semanticDigest: plan.semanticDigest,
+    applyReportPath,
     cleanup: "retire/forward-only",
     replay: { ...plan.semanticPlan.replay },
+    resume,
+    freshEmptyBaseline: null,
     failedStage: null,
     stages: plan.semanticPlan.stages.map((stage) => ({
       key: stage.key,
@@ -1167,7 +1658,7 @@ function baseApplyReport(plan, generatedAt) {
 
 export async function applyManualAcceptanceDataset(
   plan,
-  { confirmation, targetAttestation } = {},
+  { confirmation, targetAttestation, resumeReportPath = "" } = {},
   deps = {},
 ) {
   const executionBinding = validateApplyPlan(
@@ -1175,77 +1666,140 @@ export async function applyManualAcceptanceDataset(
     confirmation,
     targetAttestation,
   );
-  const runStage = createManualAcceptanceDatasetStageRunner(deps);
-  const generatedAt = normalizeGeneratedAt(
-    typeof deps.now === "function" ? deps.now() : deps.now,
-  );
-  const report = baseApplyReport(plan, generatedAt);
-  report.targetConfirmation = executionBinding.confirmation;
-  report.targetAttestation = executionBinding.targetAttestation;
-  report.target.stageCapabilities = executionBinding.stageCapabilities;
-  report.target.applyReady = true;
-  report.target.targetAttestation = executionBinding.targetAttestation;
-  for (let index = 0; index < plan.semanticPlan.stages.length; index += 1) {
-    const stage = plan.semanticPlan.stages[index];
-    const stageReport = report.stages[index];
-    stageReport.status = "running";
-    try {
-      const result = await runStage({
-        mode: "apply",
-        target: structuredClone(plan.target),
-        dataVersion: plan.dataVersion,
-        dateAnchorUtc: plan.semanticPlan.dateAnchorUtc,
-        semanticDigest: plan.semanticDigest,
-        semanticPlan: structuredClone(plan.semanticPlan),
-        stage: structuredClone(stage),
-        targetConfirmation: executionBinding.confirmation,
-        targetAttestation: executionBinding.targetAttestation
-          ? structuredClone(executionBinding.targetAttestation)
-          : null,
-        completedStages: report.stages
-          .slice(0, index)
-          .map(
-            ({
-              key,
-              stageKey,
-              status,
-              dataVersion,
-              semanticDigest,
-              operation,
-            }) => ({
-              key,
-              stageKey,
-              status,
-              dataVersion,
-              semanticDigest,
-              operation,
-            }),
-          ),
-      });
-      const normalized = normalizeManualAcceptanceStageResult(
-        result,
-        stage,
-        plan,
-      );
-      Object.assign(stageReport, normalized);
-    } catch (error) {
-      stageReport.status = "failed";
-      stageReport.error = String(error?.message || error);
-      if (typeof error?.toBlockedReason === "function") {
-        stageReport.blockedReason = error.toBlockedReason(stage.key);
-      } else if (String(error?.code || "").trim()) {
-        stageReport.blockedReason = {
-          code: String(error.code),
-          stageKey: stage.key,
-          runnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
-        };
-      }
-      report.failedStage = stage.key;
-      return report;
+  const outputRoot = deps.outputRoot || MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT;
+  const applyReportPath = manualAcceptanceDatasetApplyReportPath({
+    outputRoot,
+    dataVersion: plan.dataVersion,
+    targetAlias: plan.target.alias,
+  });
+  const applyLockPath = manualAcceptanceDatasetApplyLockPath({
+    outputRoot,
+    dataVersion: plan.dataVersion,
+    targetAlias: plan.target.alias,
+  });
+  const applyLock = await acquireManualAcceptanceDatasetApplyLock({
+    lockPath: applyLockPath,
+    plan,
+    resumeRequested: Boolean(resumeReportPath),
+  });
+  try {
+    if (!resumeReportPath) {
+      await assertFreshApplyReportSlot(applyReportPath);
     }
+    const generatedAt = normalizeGeneratedAt(
+      typeof deps.now === "function" ? deps.now() : deps.now,
+    );
+    const resume = await prepareManualAcceptanceResume({
+      plan,
+      executionBinding,
+      resumeReportPath,
+      outputRoot,
+      applyReportPath,
+    });
+    const runStage = createManualAcceptanceDatasetStageRunner({
+      ...deps,
+      resumeComponents: resume.components,
+    });
+    const taskSchedule =
+      resume.taskSchedule ||
+      buildManualAcceptanceTaskSchedule(
+        Math.floor(Date.parse(generatedAt) / 1000),
+      );
+    const report = baseApplyReport(
+      plan,
+      generatedAt,
+      applyReportPath,
+      resume.metadata,
+      taskSchedule,
+    );
+    report.targetConfirmation = executionBinding.confirmation;
+    report.targetAttestation = executionBinding.targetAttestation;
+    report.target.stageCapabilities = executionBinding.stageCapabilities;
+    report.target.applyReady = true;
+    report.target.targetAttestation = executionBinding.targetAttestation;
+    for (let index = 0; index < plan.semanticPlan.stages.length; index += 1) {
+      const stage = plan.semanticPlan.stages[index];
+      const stageReport = report.stages[index];
+      stageReport.status = "running";
+      try {
+        const result = await runStage({
+          mode: "apply",
+          target: structuredClone(plan.target),
+          dataVersion: plan.dataVersion,
+          dateAnchorUtc: plan.semanticPlan.dateAnchorUtc,
+          taskScheduleAnchorUtc: taskSchedule.anchorUtc,
+          semanticDigest: plan.semanticDigest,
+          semanticPlan: structuredClone(plan.semanticPlan),
+          stage: structuredClone(stage),
+          targetConfirmation: executionBinding.confirmation,
+          targetAttestation: executionBinding.targetAttestation
+            ? structuredClone(executionBinding.targetAttestation)
+            : null,
+          completedStages: report.stages
+            .slice(0, index)
+            .map(
+              ({
+                key,
+                stageKey,
+                status,
+                dataVersion,
+                semanticDigest,
+                operation,
+              }) => ({
+                key,
+                stageKey,
+                status,
+                dataVersion,
+                semanticDigest,
+                operation,
+              }),
+            ),
+        });
+        const normalized = normalizeManualAcceptanceStageResult(
+          result,
+          stage,
+          plan,
+        );
+        Object.assign(stageReport, normalized);
+        if (stage.key === "baseline") {
+          report.freshEmptyBaseline = {
+            origin:
+              normalized.operation === "reused"
+                ? "validated_resume_receipt"
+                : "fresh_empty_baseline",
+            status: normalized.status,
+            operation: normalized.operation,
+            summary: structuredClone(normalized.summary),
+            reportPath: normalized.references.runner.reportPath,
+            componentDigest: normalized.references.runner.componentDigest,
+          };
+        }
+      } catch (error) {
+        stageReport.status = "failed";
+        stageReport.error = String(error?.message || error);
+        if (typeof error?.toBlockedReason === "function") {
+          stageReport.blockedReason = error.toBlockedReason(stage.key);
+        } else if (String(error?.code || "").trim()) {
+          stageReport.blockedReason = {
+            code: String(error.code),
+            stageKey: stage.key,
+            runnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+          };
+        }
+        report.failedStage = stage.key;
+        await persistManualAcceptanceDatasetApplyReport(
+          applyReportPath,
+          report,
+        );
+        return report;
+      }
+    }
+    report.ok = true;
+    await persistManualAcceptanceDatasetApplyReport(applyReportPath, report);
+    return report;
+  } finally {
+    await releaseManualAcceptanceDatasetApplyLock(applyLock);
   }
-  report.ok = true;
-  return report;
 }
 
 export function parseManualAcceptanceDatasetArgs(argv = []) {
@@ -1253,11 +1807,13 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
     apply: false,
     help: false,
     dataVersion: DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: "",
     target: "",
     backendURL: "",
     databaseName: "",
     confirmation: "",
     targetAttestation: "",
+    resumeReportPath: "",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const token = argv[index];
@@ -1282,6 +1838,9 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
       case "data-version":
         options.dataVersion = value;
         break;
+      case "run-id":
+        options.runId = value;
+        break;
       case "target":
         options.target = value;
         break;
@@ -1297,6 +1856,9 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
       case "target-attestation-json":
         options.targetAttestation = value;
         break;
+      case "resume-report":
+        options.resumeReportPath = value;
+        break;
       default:
         throw new ManualAcceptanceDatasetError(`unknown option ${token}`);
     }
@@ -1304,6 +1866,9 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
   options.dataVersion = normalizeManualAcceptanceDataVersion(
     options.dataVersion,
   );
+  options.runId = options.runId
+    ? normalizeManualAcceptanceRunId(options.dataVersion, options.runId)
+    : deriveManualAcceptanceDatasetIdentity(options.dataVersion).runId;
   if (options.apply) {
     if (!options.target) {
       throw new ManualAcceptanceDatasetError(
@@ -1343,7 +1908,8 @@ export function parseManualAcceptanceDatasetArgs(argv = []) {
     options.backendURL ||
     options.databaseName ||
     options.confirmation ||
-    options.targetAttestation
+    options.targetAttestation ||
+    options.resumeReportPath
   ) {
     throw new ManualAcceptanceDatasetError(
       "target and apply-binding options are only valid with --apply; " +
@@ -1357,16 +1923,22 @@ function helpText() {
   return [
     "手工验收数据集编排器 / Manual Acceptance Dataset",
     "",
-    `当前唯一数据合同为 ${DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION} / 20260715-V3。`,
+    `当前唯一数据合同为 ${DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION} / 20260716-V5。`,
     "默认只生成 local 与 customer-trial-133 两份同语义计划，",
     "不连接服务、不写文件、不写数据库：",
-    "  node scripts/qa/manual-acceptance-dataset.mjs",
+    "  node scripts/qa/manual-acceptance-dataset.mjs --data-version 2026.07.16-v5 --run-id 20260716-V5",
     "",
     `CLI --apply 固定使用 ${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}，并要求显式目标。`,
+    "--run-id 可用于 plan 与 apply，但必须精确等于当前 dataVersion 唯一派生的 20260716-V5。",
     "完整 apply 会 fail-closed：每个阶段只允许走唯一注册 handler 与严格组件回执。",
     "core 两端都只走正式 RPC 稳定码核对；默认 runner 不执行任何数据库 seed 脚本。",
+    "baseline 紧跟 core，只读确认 1 个单位、4 个仓库和全部业务对象精确为 0；未通过时不启动任何数据写入。",
     "role 两端都只走注册账号场景组件；正式岗位账号缺失会返回机器可读阻断原因。",
     "采购收货与质检归入统一 source-driven facts，不再调用旧通用写入器。",
+    "fresh 与 resume 会先用 dataset/.apply.lock 原子排他；同目标同版本第二实例会在任何 runner/RPC 前阻断。",
+    "进程崩溃遗留锁不会自动删除：先核实锁内 PID 已退出，再按错误提示把该锁重命名归档，随后重跑原命令。",
+    "首次 apply 要求规范 dataset/apply-report.json 不存在；阶段失败或完整同批重放时，",
+    "必须在原命令上增加 --resume-report <同一规范 apply-report.json>，不得删除回执后伪装 fresh apply。",
     "local apply 必须显式提供非 8300 的专用后端、plush_erp_acceptance_* 数据库名，",
     "以及绑定 target/dataVersion/runId/databaseName 的精确确认串；runner 会先读回数据库身份和 core 稳定码，再执行任何写入。",
     "133 apply 还必须提供同一 dataVersion/runId 绑定的确认串，",
@@ -1387,6 +1959,7 @@ export async function runManualAcceptanceDatasetCli(argv = [], deps = {}) {
   if (!options.apply) {
     const plan = buildManualAcceptanceDatasetBundle({
       dataVersion: options.dataVersion,
+      runId: options.runId,
       generatedAt:
         typeof deps.now === "function" ? deps.now() : deps.now || new Date(),
     });
@@ -1399,6 +1972,7 @@ export async function runManualAcceptanceDatasetCli(argv = [], deps = {}) {
   }
   const plan = buildManualAcceptanceDatasetTargetPlan({
     dataVersion: options.dataVersion,
+    runId: options.runId,
     targetAlias: options.target,
     backendURL: options.backendURL || undefined,
     databaseName: options.databaseName || undefined,
@@ -1411,6 +1985,7 @@ export async function runManualAcceptanceDatasetCli(argv = [], deps = {}) {
     {
       confirmation: options.confirmation || undefined,
       targetAttestation: options.targetAttestation || undefined,
+      resumeReportPath: options.resumeReportPath || undefined,
     },
     deps,
   );
@@ -1430,6 +2005,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     })
     .catch((error) => {
       process.stderr.write(`${error?.message || error}\n`);
-      process.exitCode = error instanceof ManualAcceptanceDatasetError ? error.exitCode : 1;
+      process.exitCode =
+        error instanceof ManualAcceptanceDatasetError ? error.exitCode : 1;
     });
 }

@@ -706,6 +706,7 @@ export default function ERPLayout() {
   const outletContext = useMemo(
     () => ({
       adminProfile,
+      allowedMenuPaths,
       profileSyncCompleted,
       registerPageLeaveGuard,
       registerPageRefresh,
@@ -713,6 +714,7 @@ export default function ERPLayout() {
     }),
     [
       adminProfile,
+      allowedMenuPaths,
       profileSyncCompleted,
       registerPageLeaveGuard,
       registerPageRefresh,

@@ -469,7 +469,14 @@ func TestCustomerConfigLocalTestIdentityMustStayPaired(t *testing.T) {
 			in.ProductVersion = CustomerConfigLocalTestProductVersion
 		},
 		func(in *CustomerConfigPublishInput) {
+			in.ProductVersion = "local-customer-package-test-unknown"
+		},
+		func(in *CustomerConfigPublishInput) {
 			in.CompiledSnapshot["applyPurpose"] = CustomerConfigLocalTestApplyPurpose
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.ProductVersion = CustomerConfigLocalTestProductVersion
+			in.CompiledSnapshot["applyPurpose"] = "local_test_unknown"
 		},
 		func(in *CustomerConfigPublishInput) {
 			in.CompiledSnapshot["applyPurpose"] = "unknown_apply_purpose"
@@ -507,17 +514,54 @@ func TestCustomerConfigLocalTestIdentityMustStayPaired(t *testing.T) {
 }
 
 func TestCustomerConfigTrialIdentityMustStayPaired(t *testing.T) {
+	const trialRevision = "demo-customer-trial-v5"
 	uc := NewCustomerConfigUsecase(newMemCustomerConfigRepo())
 	for _, mutation := range []func(*CustomerConfigPublishInput){
+		func(in *CustomerConfigPublishInput) {
+			in.Revision = "trial-v5"
+			in.ProductVersion = CustomerConfigTrialProductVersion
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+			in.CompiledSnapshot["datasetVersion"] = CustomerConfigTrialDatasetVersion
+			in.CompiledSnapshot["target"] = "customer-trial-133"
+		},
 		func(in *CustomerConfigPublishInput) {
 			in.ProductVersion = CustomerConfigTrialProductVersion
 		},
 		func(in *CustomerConfigPublishInput) {
-			in.ProductVersion = "customer-trial-133-test-2026.07.15-v1"
+			in.ProductVersion = "customer-trial-133-test-2026.07.15-v3"
 			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
 		},
 		func(in *CustomerConfigPublishInput) {
 			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.Revision = trialRevision
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.Revision = trialRevision
+			in.ProductVersion = CustomerConfigTrialProductVersion
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+			in.CompiledSnapshot["target"] = "customer-trial-133"
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.Revision = trialRevision
+			in.ProductVersion = CustomerConfigTrialProductVersion
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+			in.CompiledSnapshot["datasetVersion"] = "2026.07.15-v3"
+			in.CompiledSnapshot["target"] = "customer-trial-133"
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.Revision = trialRevision
+			in.ProductVersion = CustomerConfigTrialProductVersion
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+			in.CompiledSnapshot["datasetVersion"] = CustomerConfigTrialDatasetVersion
+		},
+		func(in *CustomerConfigPublishInput) {
+			in.Revision = trialRevision
+			in.ProductVersion = CustomerConfigTrialProductVersion
+			in.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+			in.CompiledSnapshot["datasetVersion"] = CustomerConfigTrialDatasetVersion
+			in.CompiledSnapshot["target"] = "customer-trial-other"
 		},
 	} {
 		in := validCustomerConfigInput()
@@ -528,8 +572,11 @@ func TestCustomerConfigTrialIdentityMustStayPaired(t *testing.T) {
 	}
 
 	valid := validCustomerConfigInput()
+	valid.Revision = trialRevision
 	valid.ProductVersion = CustomerConfigTrialProductVersion
 	valid.CompiledSnapshot["applyPurpose"] = CustomerConfigTrialApplyPurpose
+	valid.CompiledSnapshot["datasetVersion"] = CustomerConfigTrialDatasetVersion
+	valid.CompiledSnapshot["target"] = "customer-trial-133"
 	if _, err := uc.ValidateCustomerConfig(context.Background(), valid); err != nil {
 		t.Fatalf("paired customer trial identity must remain structurally valid: %v", err)
 	}
@@ -583,6 +630,12 @@ func TestCustomerConfigUsecasePublishActivateAndEffectiveSession(t *testing.T) {
 	}
 	if session.ConfigRevision != "2026.06.28.1" {
 		t.Fatalf("ConfigRevision = %s", session.ConfigRevision)
+	}
+	if session.ConfigProductVersion != "local-test" {
+		t.Fatalf("ConfigProductVersion = %s", session.ConfigProductVersion)
+	}
+	if session.ConfigApplyPurpose != "" || session.ConfigDatasetVersion != "" || session.ConfigTarget != "" {
+		t.Fatalf("unexpected config markers = purpose:%q dataset:%q target:%q", session.ConfigApplyPurpose, session.ConfigDatasetVersion, session.ConfigTarget)
 	}
 	if session.Customer.Name != "永绅" {
 		t.Fatalf("customer name = %s", session.Customer.Name)
@@ -990,6 +1043,26 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(
 	}
 	if _, ok := session.FieldPolicies["sales_orders.default"]; !ok {
 		t.Fatalf("read-only module must retain field labels and visibility policy: %#v", session.FieldPolicies)
+	}
+}
+
+func TestWorkflowTaskPagesFollowModuleReadBoundaryTogether(t *testing.T) {
+	pages := []string{"task-board", "shipping-release", "exception-flow"}
+	disabled := map[string]struct{}{}
+	readable := map[string]struct{}{"workflow_tasks": {}}
+	for _, pageKey := range pages {
+		if customerConfigPageAllowedByModules(pageKey, disabled) {
+			t.Fatalf("disabled workflow_tasks must hide %s", pageKey)
+		}
+		if !customerConfigPageAllowedByModules(pageKey, readable) {
+			t.Fatalf("readable workflow_tasks must retain %s", pageKey)
+		}
+	}
+	if !customerConfigActionAllowedByModuleState(PermissionWorkflowTaskRead, disabled, readable) {
+		t.Fatal("read_only workflow_tasks must retain workflow.task.read")
+	}
+	if customerConfigActionAllowedByModuleState(PermissionWorkflowTaskComplete, disabled, readable) {
+		t.Fatal("read_only workflow_tasks must remove workflow task mutations")
 	}
 }
 

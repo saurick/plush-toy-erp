@@ -30,7 +30,10 @@ const TRIAL_FIXTURE_BEHAVIOR_RULES = Object.freeze([
       "yoyoosun trial fixture must use one synthetic source identity for every top-level record",
     verify: (fixture) => {
       const fixtureKey = String(fixture?.fixtureKey || "").trim();
-      if (!fixtureKey.startsWith("__synthetic_") || !fixtureKey.endsWith("__")) {
+      if (
+        !fixtureKey.startsWith("__synthetic_") ||
+        !fixtureKey.endsWith("__")
+      ) {
         return false;
       }
       return Object.values(fixture || {})
@@ -61,8 +64,9 @@ const TRIAL_FIXTURE_BEHAVIOR_RULES = Object.freeze([
   {
     message: "yoyoosun trial fixture must cover a cancelled shipment",
     verify: (fixture) =>
-      fixture?.shipments?.some((shipment) => shipment.status === "cancelled") ===
-      true,
+      fixture?.shipments?.some(
+        (shipment) => shipment.status === "cancelled",
+      ) === true,
   },
   {
     message: "yoyoosun trial fixture must cover a boss-owned workflow task",
@@ -369,40 +373,65 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     ]),
   },
   {
-    id: "manual-acceptance-dataset-keeps-one-current-v3-contract",
+    id: "manual-acceptance-dataset-keeps-one-current-v5-contract",
     bucket: "customer-trial-simulated-data",
     description:
-      "the dataset coordinator accepts only the current v3 identity, keeps local and registered 133 semantics equal, and forbids remote core or role seed.",
+      "the dataset coordinator accepts only the current v5 identity, keeps local and registered 133 semantics equal, and forbids remote core or role seed.",
     required: Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern:
-          /DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION = "2026\.07\.15-v3"/u,
-        message: "manual acceptance dataset must keep v3 as the only current version",
+          /DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION =\s*CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION/u,
+        message:
+          "manual acceptance dataset must keep v5 as the only current version",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-customer-config.mjs",
+        pattern:
+          /CUSTOMER_CONFIG_DATA_VERSION =\s*CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION[\s\S]{0,320}CUSTOMER_CONFIG_PRODUCT_VERSION =\s*CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION/u,
+        message:
+          "customer-trial config helper must use the current v5 version and product identity",
+      },
+      {
+        path: "server/internal/biz/customer_config.go",
+        pattern:
+          /CustomerConfigTrialDatasetVersion = "2026\.07\.16-v5"[\s\S]{0,100}CustomerConfigTrialProductVersion = "customer-trial-133-test-2026\.07\.16-v5"/u,
+        message:
+          "backend trial identity must use the same current v5 dataset and product version",
+      },
+      {
+        path: "server/internal/customertrialconfig/guard.go",
+        pattern: /DatasetVersion = biz\.CustomerConfigTrialDatasetVersion/u,
+        message:
+          "runtime trial gate must consume the backend dataset identity instead of duplicating a stale version",
       },
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern:
           /normalized !== DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION[\s\S]{0,300}unsupported dataVersion/u,
-        message: "manual acceptance dataset must reject every non-current version",
+        message:
+          "manual acceptance dataset must reject every non-current version",
       },
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern:
           /\[CUSTOMER_TRIAL_133_TARGET\]: \{[\s\S]{0,160}seedAllowed: false,[\s\S]{0,160}allowedOperations: \["verified", "reused"\]/u,
-        message: "customer-trial-133 core and role stages must forbid remote seed",
+        message:
+          "customer-trial-133 core and role stages must forbid remote seed",
       },
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern:
           /key: "purchase-quality"[\s\S]{0,1000}delegatedTo: "facts"[\s\S]{0,220}genericWriterAllowed: false/u,
-        message: "purchase and quality preparation must be delegated to unified facts",
+        message:
+          "purchase and quality preparation must be delegated to unified facts",
       },
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern:
           /key: "facts"[\s\S]{0,650}manual-acceptance-fact-data\.mjs[\s\S]{0,800}formalBusinessAPIsOnly: true/u,
-        message: "facts stage must use the registered formal source-driven runner",
+        message:
+          "facts stage must use the registered formal source-driven runner",
       },
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
@@ -415,7 +444,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern: /2026\.07\.15-v1|20260715-V1/u,
-        message: "the current dataset implementation must not retain a v1 alias",
+        message:
+          "the current dataset implementation must not retain a v1 alias",
       },
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
@@ -426,7 +456,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-dataset.mjs",
         pattern: NO_DIRECT_DB_PATTERN,
-        message: "dataset orchestration must not connect to DB or write SQL directly",
+        message:
+          "dataset orchestration must not connect to DB or write SQL directly",
       },
     ]),
   },
@@ -516,7 +547,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-source-data.mjs",
         pattern: /2026\.07\.15-v1|20260715-V1/u,
-        message: "manual acceptance source data must not retain a v1 current alias",
+        message:
+          "manual acceptance source data must not retain a v1 current alias",
       },
     ]),
   },
@@ -528,7 +560,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     required: Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",
-        pattern: /const SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT-TASK"/u,
+        pattern:
+          /export const TASK_SIMULATION_PREFIX = "SIM-YOYOOSUN-UAT-TASK"[\s\S]{0,100}const SIMULATION_PREFIX = TASK_SIMULATION_PREFIX/u,
         message:
           "manual acceptance task data must keep its stable simulation prefix",
       },
@@ -574,7 +607,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",
         pattern:
-          /const parsedTargetAttestation = parseManualAcceptanceTargetAttestation[\s\S]{0,500}assertManualAcceptanceTaskTargetCompatibility[\s\S]{0,1800}assertManualAcceptanceRuntimeIdentityPrecondition[\s\S]{0,500}const runtimeAdmin = await loginRuntimeAdmin/u,
+          /const parsedTargetAttestation\s*=\s*parseManualAcceptanceTargetAttestation[\s\S]{0,500}assertManualAcceptanceTaskTargetCompatibility[\s\S]{0,1800}await assertManualAcceptanceRuntimeIdentityPrecondition[\s\S]{0,500}const runtimeAdmin\s*=\s*await loginRuntimeAdmin/u,
         message:
           "manual acceptance task data must validate attestation and live runtime identity before debug admin login",
       },
@@ -610,8 +643,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
     required: Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
-        pattern:
-          /FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1"/u,
+        pattern: /FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1"/u,
         message:
           "manual acceptance fact reports must retain the source-driven contract",
       },
@@ -660,9 +692,26 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
         pattern:
-          /requireStatuses\("purchaseReceipts", \["DRAFT", "POSTED", "CANCELLED"\]\)[\s\S]{0,1200}requireStatuses\("qualityInspections", \["DRAFT", "SUBMITTED", "PASSED", "REJECTED", "CANCELLED"\]\)[\s\S]{0,1000}requireStatuses\("shipments", \["DRAFT", "SHIPPED", "CANCELLED"\]\)[\s\S]{0,1000}\["IN", "OUT", "REVERSAL"\]/u,
-        message:
-          "fact report must keep the purchase, quality, shipment, and inventory lifecycle matrices",
+          /requireStatuses\("purchaseReceipts", \["DRAFT", "POSTED", "CANCELLED"\]\)/u,
+        message: "fact report must keep the purchase receipt lifecycle matrix",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern:
+          /requireStatuses\("qualityInspections", \[\s*"DRAFT",\s*"SUBMITTED",\s*"PASSED",\s*"REJECTED",\s*"CANCELLED",?\s*\]\)/u,
+        message: "fact report must keep the quality lifecycle matrix",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern:
+          /requireStatuses\("shipments", \["DRAFT", "SHIPPED", "CANCELLED"\]\)/u,
+        message: "fact report must keep the shipment lifecycle matrix",
+      },
+      {
+        path: "scripts/qa/manual-acceptance-fact-data.mjs",
+        pattern:
+          /records\.inventoryTxns\.map\([\s\S]{0,220}for \(const type of \["IN", "OUT", "REVERSAL"\]\)/u,
+        message: "fact report must keep the inventory transaction matrix",
       },
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
@@ -673,7 +722,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-fact-data.mjs",
         pattern:
-          /function assertReferenceRecords[\s\S]{0,5200}attachment owners require POSTED production and finance facts/u,
+          /const productionOwner = records\.productionFacts\.find\([\s\S]{0,220}"POSTED"[\s\S]{0,260}const financeOwner = records\.financeFacts\.find\([\s\S]{0,220}"POSTED"[\s\S]{0,220}if \(!productionOwner \|\| !financeOwner\)[\s\S]{0,180}attachment owners require POSTED production and finance facts[\s\S]{0,220}productionFactId: productionOwner\.id,[\s\S]{0,100}financeFactId: financeOwner\.id/u,
         message:
           "fact report attachment owners must use posted production and finance facts",
       },
@@ -723,9 +772,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
         pattern:
-          /SOURCE_DRIVEN_FACT_DATA_VERSION = "2026\.07\.15-v3"[\s\S]{0,100}SOURCE_DRIVEN_FACT_RUN_ID = "20260715-V3"/u,
-        message:
-          "source-driven Fact helper must keep the current v3 identity",
+          /SOURCE_DRIVEN_FACT_DATA_VERSION = "2026\.07\.16-v5"[\s\S]{0,100}SOURCE_DRIVEN_FACT_RUN_ID = "20260716-V5"/u,
+        message: "source-driven Fact helper must keep the current v5 identity",
       },
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
@@ -757,7 +805,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
-        pattern: /applySupported:\s*true[\s\S]{0,180}simulatedOnly:\s*true[\s\S]{0,120}realCustomerImport:\s*false[\s\S]{0,120}directSQL:\s*false/u,
+        pattern:
+          /applySupported:\s*true[\s\S]{0,180}simulatedOnly:\s*true[\s\S]{0,120}realCustomerImport:\s*false[\s\S]{0,120}directSQL:\s*false/u,
         message:
           "source-driven Fact plan must remain simulated-only and direct-SQL free",
       },
@@ -766,8 +815,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
         pattern: /2026\.07\.15-v1|20260715-V1/u,
-        message:
-          "source-driven Fact helper must not retain a v1 current alias",
+        message: "source-driven Fact helper must not retain a v1 current alias",
       },
       {
         path: "scripts/qa/manual-acceptance-source-driven-facts.mjs",
@@ -825,7 +873,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-attachment-data.mjs",
         pattern: NO_DIRECT_DB_PATTERN,
-        message: "attachment fixture must not connect to DB or write SQL directly",
+        message:
+          "attachment fixture must not connect to DB or write SQL directly",
       },
     ]),
   },
@@ -838,17 +887,20 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
         pattern: /RUN_ISOLATED_MANUAL_ACCEPTANCE_PRESSURE/u,
-        message: "pressure execution must require its exact confirmation phrase",
+        message:
+          "pressure execution must require its exact confirmation phrase",
       },
       {
         path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
         pattern: /\^plush_erp_capacity_\[a-z0-9_\]\+\$/u,
-        message: "pressure execution must require a disposable capacity database name",
+        message:
+          "pressure execution must require a disposable capacity database name",
       },
       {
         path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
         pattern: /parsedDatabaseURL\.pathname !== `\/\$\{databaseName\}`/u,
-        message: "pressure database URL must match the declared disposable database",
+        message:
+          "pressure database URL must match the declared disposable database",
       },
       {
         path: "scripts/qa/manual-acceptance-capacity-pressure.mjs",
@@ -878,10 +930,9 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",
-        pattern:
-          /--data-version 2026\.07\.15-v3 --run-id 20260715-V3/u,
+        pattern: /--data-version 2026\.07\.16-v5 --run-id 20260716-V5/u,
         message:
-          "manual acceptance retirement usage must show the current v3 batch",
+          "manual acceptance retirement usage must show the current v5 batch",
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",
@@ -905,8 +956,7 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       },
       {
         path: "scripts/qa/manual-acceptance-source-retire.mjs",
-        pattern:
-          /requiredModules: REQUIRED_RETIREMENT_MODULES/u,
+        pattern: /requiredModules: REQUIRED_RETIREMENT_MODULES/u,
         message:
           "manual acceptance retirement must require every owned source module before reads",
       },
@@ -971,7 +1021,8 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
         path: "scripts/qa/manual-acceptance-readiness.mjs",
         pattern:
           /CUSTOMER_TRIAL_133_TARGET[\s\S]{0,900}assertManualAcceptanceTargetAttestation/u,
-        message: "readiness verification must require remote target attestation",
+        message:
+          "readiness verification must require remote target attestation",
       },
     ]),
     forbidden: Object.freeze([

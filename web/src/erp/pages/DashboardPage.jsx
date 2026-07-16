@@ -1946,7 +1946,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                               size="small"
                               onClick={() => openTaskDrawer(task)}
                             >
-                              处理闭环
+                              查看处理
                             </Button>
                           </Space>
                         </div>

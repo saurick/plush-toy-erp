@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
 import {
   buildManualAcceptanceReadinessPlan,
   evaluateManualAcceptanceDataset,
@@ -15,24 +16,88 @@ import {
   assertManualAcceptancePageDataContract,
   buildManualAcceptancePageDataContract,
 } from "./manual-acceptance-page-data-contract.mjs";
-import { TASK_COPY_REVISION } from "./manual-acceptance-task-data.mjs";
+import {
+  TASK_COPY_REVISION,
+  TASK_CATALOG_SCENARIO_DIGEST,
+  TASK_GROUP_BY_ROLE,
+  TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
+  buildManualAcceptanceTaskDataPlan,
+  manualAcceptanceTaskBatchIdentity,
+} from "./manual-acceptance-task-data.mjs";
+import {
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+  CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+  CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+  CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  CUSTOMER_TRIAL_133_DATABASE,
+  CUSTOMER_TRIAL_133_TARGET,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+  LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  manualAcceptanceTargetConfirmation,
+} from "./manual-acceptance-target-policy.mjs";
+
+const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
+const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
+
+function localTargetConfirmation() {
+  return manualAcceptanceTargetConfirmation({
+    target: "local-dev",
+    backendURL: LOCAL_BACKEND_URL,
+    databaseName: LOCAL_DATABASE_NAME,
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+  });
+}
+
+function localVerificationOptions(overrides = {}) {
+  return {
+    backendURL: LOCAL_BACKEND_URL,
+    databaseName: LOCAL_DATABASE_NAME,
+    targetConfirmation: localTargetConfirmation(),
+    ...overrides,
+  };
+}
+
+function localVerifyArgs(...extra) {
+  return [
+    "--verify",
+    "--backend-url",
+    LOCAL_BACKEND_URL,
+    "--database-name",
+    LOCAL_DATABASE_NAME,
+    ...extra,
+  ];
+}
 
 function sourceReport(overrides = {}) {
+  const target = overrides.target || "local-dev";
+  const backendURL = overrides.backendURL || LOCAL_BACKEND_URL;
+  const databaseName =
+    overrides.databaseName ||
+    (target === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_DATABASE
+      : LOCAL_DATABASE_NAME);
   return {
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
-    target: "local-dev",
-    backendURL: "http://127.0.0.1:8300",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    target,
+    backendURL,
+    databaseName,
     semanticDigest: "source-semantic-digest-v1",
-    prefix: "SIM-YOYOOSUN-UAT-20260715-V1",
+    prefix: "YS5",
     runtime: {
       environment: "local",
       customerKey: "yoyoosun",
-      configRevision: "cfg-local-1",
+      configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+      configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+      configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
       source: "active_customer_config_revision",
     },
     scale: {
@@ -69,7 +134,9 @@ function referenceRecords(count, options) {
     ...(numberKey
       ? { [numberKey]: `${numberPrefix}-${String(index + 1).padStart(3, "0")}` }
       : {}),
-    ...(statuses.length > 0 ? { status: statuses[index % statuses.length] } : {}),
+    ...(statuses.length > 0
+      ? { status: statuses[index % statuses.length] }
+      : {}),
     ...(secondaryKey
       ? { [secondaryKey]: secondaryValues[index % secondaryValues.length] }
       : {}),
@@ -85,11 +152,7 @@ function factReferenceRecords(countOverrides = {}) {
     numberPrefix: "SIM-SDF-PROD",
     statuses: ["DRAFT", "POSTED", "CANCELLED"],
     secondaryKey: "factType",
-    secondaryValues: [
-      "MATERIAL_ISSUE",
-      "FINISHED_GOODS_RECEIPT",
-      "REWORK",
-    ],
+    secondaryValues: ["MATERIAL_ISSUE", "FINISHED_GOODS_RECEIPT", "REWORK"],
     sourceType: "PRODUCTION_ORDER",
   });
   const financeFacts = [
@@ -182,38 +245,57 @@ function factReferenceRecords(countOverrides = {}) {
       statuses: ["ACTIVE", "RELEASED"],
       sourceType: "SALES_ORDER",
     }),
-    shipments: referenceRecords(count("shipments", 45), {
+    shipments: referenceRecords(count("shipments", 47), {
       idBase: 120_000,
       numberKey: "shipmentNo",
       numberPrefix: "SIM-SDF-SHIP",
       statuses: ["DRAFT", "SHIPPED", "CANCELLED"],
       sourceType: "SALES_ORDER",
-    }),
+    }).map((shipment, index) => ({
+      ...shipment,
+      items:
+        index === 0
+          ? Array.from({ length: 25 }, (_, itemIndex) => ({
+              id: itemIndex + 1,
+            }))
+          : [],
+    })),
     financeFacts,
   };
   records.attachmentOwners = {
-    productionFactId: productionFacts.find((item) => item.status === "POSTED").id,
+    productionFactId: productionFacts.find((item) => item.status === "POSTED")
+      .id,
     financeFactId: financeFacts.find((item) => item.status === "POSTED").id,
   };
   return records;
 }
 
 function factReport({ referenceCounts = {}, ...overrides } = {}) {
+  const target = overrides.target || "local-dev";
+  const backendURL = overrides.backendURL || LOCAL_BACKEND_URL;
+  const databaseName =
+    overrides.databaseName ||
+    (target === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_DATABASE
+      : LOCAL_DATABASE_NAME);
   return {
     reportContract: "source-driven-operational-facts-v1",
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.07.15-v1",
-    runId: "20260715-V1",
-    target: "local-dev",
-    backendURL: "http://127.0.0.1:8300",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    target,
+    backendURL,
+    databaseName,
     semanticDigest: "fact-semantic-digest-v1",
     runtime: {
       environment: "local",
       customerKey: "yoyoosun",
-      configRevision: "cfg-local-1",
+      configRevision: LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+      configProductVersion: LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION,
+      configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
       source: "active_customer_config_revision",
     },
     referenceRecords: factReferenceRecords(referenceCounts),
@@ -260,26 +342,63 @@ test("readiness fact contract requires bound identity, runtime, exact references
     () => buildManualAcceptanceReadinessPlan({ factReport: staleOwner }),
     /attachmentOwners\.productionFactId/u,
   );
+  for (const shipmentCount of [45, 46, 48]) {
+    assert.throws(
+      () =>
+        buildManualAcceptanceReadinessPlan({
+          factReport: factReport({
+            referenceCounts: { shipments: shipmentCount },
+          }),
+        }),
+      /必须精确包含 47 张出货单/u,
+    );
+  }
+  const duplicateLongShipment = factReport();
+  duplicateLongShipment.referenceRecords.shipments[1].items = Array.from(
+    { length: 25 },
+    (_, index) => ({ id: 100 + index }),
+  );
+  assert.throws(
+    () =>
+      buildManualAcceptanceReadinessPlan({ factReport: duplicateLongShipment }),
+    /必须恰好包含 1 张 25 行出货单/u,
+  );
 });
 
 function taskReport(overrides = {}) {
-  const runId = overrides.runId || "20260715-V1";
+  const runId = overrides.runId || CURRENT_MANUAL_ACCEPTANCE_RUN_ID;
+  const target = overrides.target || "local-dev";
+  const backendURL = overrides.backendURL || LOCAL_BACKEND_URL;
+  const databaseName =
+    overrides.databaseName ||
+    (target === CUSTOMER_TRIAL_133_TARGET
+      ? CUSTOMER_TRIAL_133_DATABASE
+      : LOCAL_DATABASE_NAME);
+  const batchIdentity = manualAcceptanceTaskBatchIdentity(runId);
+  const taskPlan = buildManualAcceptanceTaskDataPlan({
+    target,
+    backendURL,
+    databaseName,
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    runId,
+  });
+  const coverage = taskPlan.coverage;
   return {
     mode: "apply",
     simulatedOnly: true,
     realCustomerImport: false,
     writesFacts: false,
     datasetKey: "yoyoosun-manual-acceptance",
-    dataVersion: "2026.07.15-v1",
+    dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
     runId,
-    target: "local-dev",
-    backendURL: "http://127.0.0.1:8300",
+    target,
+    backendURL,
+    databaseName,
     copyRevision: TASK_COPY_REVISION,
-    prefix:
-      overrides.prefix ||
-      `SIM-YOYOOSUN-UAT-TASK-${runId}-${TASK_COPY_REVISION}`,
-    sourceType: "simulated-manual-acceptance-task-batch",
-    sourceID: 123456,
+    prefix: batchIdentity.prefix,
+    sourceType: batchIdentity.sourceType,
+    sourceID: batchIdentity.sourceID,
+    coverage,
     summary: {
       total: 180,
       persisted: 180,
@@ -300,6 +419,7 @@ function taskReport(overrides = {}) {
         done: 24,
         rejected: 8,
       },
+      byTaskGroup: { ...taskPlan.summary.byTaskGroup },
     },
     ...overrides,
   };
@@ -345,8 +465,7 @@ function okResponse(data) {
 
 function createReadinessFetch(runtimeOptions = {}) {
   const calls = [];
-  const factRefs =
-    runtimeOptions.referenceRecords || factReferenceRecords();
+  const factRefs = runtimeOptions.referenceRecords || factReferenceRecords();
   const backendFactLists = {
     list_production_orders: [
       "production_orders",
@@ -506,6 +625,27 @@ function createReadinessFetch(runtimeOptions = {}) {
     ],
   };
   const fetchImpl = async (url, requestOptions) => {
+    if (!requestOptions.body) {
+      calls.push({
+        url: String(url),
+        method: "runtime_identity",
+        params: {},
+        redirect: requestOptions.redirect,
+        authorization: requestOptions.headers.Authorization,
+      });
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        headers: {
+          get: (name) =>
+            name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+        },
+        async text() {
+          return "runtime identity matched";
+        },
+      };
+    }
     const body = JSON.parse(requestOptions.body);
     calls.push({
       url: String(url),
@@ -523,6 +663,11 @@ function createReadinessFetch(runtimeOptions = {}) {
     if (body.method === "capabilities") {
       return okResponse({
         environment: runtimeOptions.runtimeEnvironment || "local",
+        databaseName:
+          runtimeOptions.databaseName ||
+          (runtimeOptions.runtimeEnvironment === "remote"
+            ? CUSTOMER_TRIAL_133_DATABASE
+            : LOCAL_DATABASE_NAME),
         seedEnabled: false,
         seedAllowed: false,
         cleanupEnabled: false,
@@ -539,8 +684,32 @@ function createReadinessFetch(runtimeOptions = {}) {
             runtimeOptions.sessionSource || "active_customer_config_revision",
           config_revision:
             runtimeOptions.configRevision === undefined
-              ? "cfg-local-1"
+              ? runtimeOptions.runtimeEnvironment === "remote"
+                ? CUSTOMER_TRIAL_133_CONFIG_REVISION
+                : LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION
               : runtimeOptions.configRevision,
+          config_product_version:
+            runtimeOptions.configProductVersion === undefined
+              ? runtimeOptions.runtimeEnvironment === "remote"
+                ? CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION
+                : LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION
+              : runtimeOptions.configProductVersion,
+          config_apply_purpose:
+            runtimeOptions.configApplyPurpose === undefined
+              ? runtimeOptions.runtimeEnvironment === "remote"
+                ? CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE
+                : LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE
+              : runtimeOptions.configApplyPurpose,
+          config_dataset_version:
+            runtimeOptions.configDatasetVersion === undefined &&
+            runtimeOptions.runtimeEnvironment === "remote"
+              ? CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION
+              : runtimeOptions.configDatasetVersion,
+          config_target:
+            runtimeOptions.configTarget === undefined &&
+            runtimeOptions.runtimeEnvironment === "remote"
+              ? CUSTOMER_TRIAL_133_TARGET
+              : runtimeOptions.configTarget,
           modules: Object.fromEntries(
             [
               "production_orders",
@@ -585,22 +754,39 @@ function createReadinessFetch(runtimeOptions = {}) {
       });
     }
     if (body.method === "list_tasks") {
-      const statuses =
-        runtimeOptions.taskStatuses ||
-        taskStatusesForRole(body.params.owner_role_key);
-      const count = runtimeOptions.taskCount ?? statuses.length;
+      const roleKey =
+        runtimeOptions.taskOwnerRoleKey || body.params.owner_role_key;
+      const taskPlan = buildManualAcceptanceTaskDataPlan({
+        runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+        nowSec: 1_800_000_000,
+      });
+      let plannedTasks = taskPlan.tasks.filter(
+        (task) => task.roleKey === body.params.owner_role_key,
+      );
+      if (body.params.task_group) {
+        plannedTasks = plannedTasks.filter(
+          (task) => task.createParams.task_group === body.params.task_group,
+        );
+      }
+      const count = runtimeOptions.taskCount ?? plannedTasks.length;
       return okResponse({
-        tasks: records(count, "task_status_key", statuses).map(
-          (item, index) => ({
-            ...item,
-            task_code: `${runtimeOptions.taskPrefix || `SIM-YOYOOSUN-UAT-TASK-20260715-V1-${TASK_COPY_REVISION}`}-${String(index + 1).padStart(2, "0")}`,
-            owner_role_key:
-              runtimeOptions.taskOwnerRoleKey || body.params.owner_role_key,
-            source_type:
-              runtimeOptions.taskSourceType || body.params.source_type,
-            source_id: runtimeOptions.taskSourceID || body.params.source_id,
-          }),
-        ),
+        tasks: plannedTasks.slice(0, count).map((task, index) => ({
+          id: index + 1,
+          task_status_key:
+            runtimeOptions.taskStatuses?.[index] || task.targetStatus,
+          task_code: runtimeOptions.taskCodePrefix
+            ? `${runtimeOptions.taskCodePrefix}-${String(task.index).padStart(2, "0")}`
+            : task.createParams.task_code,
+          owner_role_key: roleKey,
+          source_type: runtimeOptions.taskSourceType || body.params.source_type,
+          source_id: runtimeOptions.taskSourceID || body.params.source_id,
+          task_group: runtimeOptions.taskGroup || task.createParams.task_group,
+          payload: {
+            acceptance_scenario_key:
+              runtimeOptions.taskScenarioKey ||
+              task.createParams.payload.acceptance_scenario_key,
+          },
+        })),
         total: runtimeOptions.taskResponseTotal ?? count,
       });
     }
@@ -669,7 +855,7 @@ function createReadinessFetch(runtimeOptions = {}) {
   return { fetchImpl, calls };
 }
 
-test("all 48 formal targets are owned by shared generator stages", () => {
+test("all 51 formal targets are owned by shared generator stages", () => {
   const contract = buildManualAcceptancePageDataContract();
   const plan = buildManualAcceptanceReadinessPlan();
   const ownershipByID = new Map(
@@ -682,7 +868,7 @@ test("all 48 formal targets are owned by shared generator stages", () => {
     ]),
   );
 
-  assert.equal(contract.targets.length, 48);
+  assert.equal(contract.targets.length, 51);
   assert.deepEqual(
     Object.keys(contract.generatorStages).sort(),
     [...MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS].sort(),
@@ -690,7 +876,7 @@ test("all 48 formal targets are owned by shared generator stages", () => {
   assert(
     contract.targets.every(
       (target) =>
-        target.probeIds.length > 0 && target.generatorStageKeys.length === 1,
+        target.probeIds.length > 0 && target.generatorStageKeys.length >= 1,
     ),
   );
   assert(
@@ -726,6 +912,12 @@ test("all 48 formal targets are owned by shared generator stages", () => {
     ["task"],
   );
   assert.deepEqual(
+    plan.targets.find(
+      (target) => target.id === "desktopPages:business-dashboard",
+    ).generatorStageKeys,
+    ["facts", "source", "task"],
+  );
+  assert.deepEqual(
     plan.targets.find((target) => target.id === "desktopPages:inventory")
       .generatorStageKeys,
     ["facts"],
@@ -743,7 +935,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   missingPage.targets.pop();
   assert.throws(
     () => assertManualAcceptancePageDataContract(missingPage),
-    /必须恰好覆盖 48 个正式目标/u,
+    /必须恰好覆盖 51 个正式目标/u,
   );
 
   const unknownProbe = structuredClone(contract);
@@ -770,7 +962,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   );
 });
 
-test("default plan covers all 48 targets and never connects to a backend", async () => {
+test("default plan covers all 51 targets and never connects to a backend", async () => {
   let fetchCalls = 0;
   const result = await runManualAcceptanceReadinessCli([], {
     fetchImpl: async () => {
@@ -784,7 +976,7 @@ test("default plan covers all 48 targets and never connects to a backend", async
   assert.equal(result.plan.callsBackend, false);
   assert.equal(result.plan.writesBackend, false);
   assert.equal(result.plan.directSQL, false);
-  assert.equal(result.plan.targets.length, 48);
+  assert.equal(result.plan.targets.length, 51);
   assert.equal(
     result.plan.targets.filter(
       (item) => item.catalogGroup === "mobileRolePages",
@@ -800,13 +992,19 @@ test("default plan covers all 48 targets and never connects to a backend", async
     result.plan.targets.find(
       (item) => item.id === "desktopPages:production-scheduling",
     ).probeIds,
-    ["mobile-tasks:pmc"],
+    ["workflow-tasks:production_scheduling"],
   );
   assert.deepEqual(
     result.plan.targets.find(
       (item) => item.id === "desktopPages:production-exceptions",
     ).probeIds,
-    ["mobile-tasks:production"],
+    ["workflow-tasks:production_exception"],
+  );
+  assert.deepEqual(
+    result.plan.targets.find(
+      (item) => item.id === "desktopPages:shipping-release",
+    ).probeIds,
+    ["workflow-tasks:shipment_release"],
   );
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
@@ -815,7 +1013,7 @@ test("default plan covers all 48 targets and never connects to a backend", async
   assert.equal(productionOrders.expectedMinimum, 45);
   assert.deepEqual(productionOrders.probeIds, ["production-orders"]);
   assert.equal(productionOrders.quantityNotProven, undefined);
-  assert.equal(result.plan.expected.targets, 48);
+  assert.equal(result.plan.expected.targets, 51);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
   const probesByID = new Map(
     result.plan.probes.map((probe) => [probe.id, probe]),
@@ -827,11 +1025,11 @@ test("default plan covers all 48 targets and never connects to a backend", async
   );
 });
 
-test("apply reports may raise expectations but cannot lower current catalog thresholds", () => {
+test("apply reports may raise minimums while the shipment dataset stays exact", () => {
   const plan = buildManualAcceptanceReadinessPlan({
     sourceReport: sourceReport({ scale: { customers: 75, salesOrders: 20 } }),
     factReport: factReport({
-      referenceCounts: { shipments: 55, "finance:PAYABLE": 12 },
+      referenceCounts: { shipments: 47, "finance:PAYABLE": 55 },
     }),
     taskReport: taskReport(),
   });
@@ -839,18 +1037,22 @@ test("apply reports may raise expectations but cannot lower current catalog thre
 
   assert.equal(byId.get("customers").expectedMinimum, 75);
   assert.equal(byId.get("sales-orders").expectedMinimum, 45);
-  assert.equal(byId.get("shipments").expectedMinimum, 55);
-  assert.equal(byId.get("finance-payables").expectedMinimum, 45);
-  assert.equal(
-    byId.get("customers").params.keyword,
-    "SIM-YOYOOSUN-UAT-20260715-V1",
-  );
+  assert.equal(byId.get("shipments").expectedMinimum, 47);
+  assert.equal(byId.get("shipments").expectedExact, 47);
+  assert.equal(byId.get("finance-payables").expectedMinimum, 55);
+  assert.equal(byId.get("customers").params.keyword, "YS5");
   assert.equal(byId.get("shipments").params.keyword, undefined);
   assert.equal(byId.get("shipments").batchEvidence, "exact_references");
-  assert.equal(byId.get("shipments").referenceQueries.length, 55);
+  assert.equal(byId.get("shipments").referenceQueries.length, 47);
   assert.equal(byId.get("purchase-receipts").batchEvidence, "exact_references");
-  assert.equal(byId.get("quality-inspections").batchEvidence, "exact_references");
-  assert.equal(byId.get("inventory-balances").batchEvidence, "exact_references");
+  assert.equal(
+    byId.get("quality-inspections").batchEvidence,
+    "exact_references",
+  );
+  assert.equal(
+    byId.get("inventory-balances").batchEvidence,
+    "exact_references",
+  );
   assert.equal(byId.get("inventory-lots").batchEvidence, "exact_references");
   assert.equal(byId.get("inventory-txns").batchEvidence, "exact_references");
   assert.equal(byId.get("production-orders").batchEvidence, "exact_references");
@@ -865,7 +1067,7 @@ test("apply reports may raise expectations but cannot lower current catalog thre
   );
   assert.deepEqual(
     new Set(plan.inputWarnings.map((item) => item.datasetId)),
-    new Set(["sales-orders", "finance-payables"]),
+    new Set(["sales-orders"]),
   );
   assert.throws(
     () =>
@@ -909,6 +1111,18 @@ test("apply reports may raise expectations but cannot lower current catalog thre
           },
         }),
       }),
+    /岗位任务报告不是有效/u,
+  );
+  const staleCoverage = structuredClone(taskReport());
+  staleCoverage.coverage.catalogScenarioDigest = "stale";
+  assert.throws(
+    () => buildManualAcceptanceReadinessPlan({ taskReport: staleCoverage }),
+    /岗位任务报告不是有效/u,
+  );
+  const missingScenario = structuredClone(taskReport());
+  missingScenario.coverage.scenariosByRoleTaskGroup.production.outsource_return_tracking.outsourcing_return = 0;
+  assert.throws(
+    () => buildManualAcceptanceReadinessPlan({ taskReport: missingScenario }),
     /岗位任务报告不是有效/u,
   );
   assert.throws(
@@ -1162,16 +1376,26 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
     batchEvidence: "exact_source",
     exactSourceType: "simulated-manual-acceptance-task-batch",
     exactSourceID: 123456,
-    exactTaskPrefix: "SIM-YOYOOSUN-UAT-TASK-LOCAL-UAT",
+    exactTaskCodePrefix: "YS-V5-XS",
     exactOwnerRoleKey: "sales",
+    exactTaskGroup: null,
+    requiredTaskGroups: ["trial_sales_work"],
+    requiredScenarios: [...MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.sales],
   };
   const batchTasks = TASK_STATUSES.map((status, index) => ({
     id: index + 1,
-    task_code: `SIM-YOYOOSUN-UAT-TASK-LOCAL-UAT-SALES-${String(index + 1).padStart(2, "0")}`,
+    task_code: `YS-V5-XS-${String(index + 1).padStart(2, "0")}`,
     source_type: "simulated-manual-acceptance-task-batch",
     source_id: 123456,
     owner_role_key: "sales",
+    task_group: "trial_sales_work",
     task_status_key: status,
+    payload: {
+      acceptance_scenario_key:
+        MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.sales[
+          index % MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.sales.length
+        ],
+    },
   }));
   const ignoredOldTasks = [
     {
@@ -1198,6 +1422,53 @@ test("task evidence requires exact source, role, prefix, count, and canonical st
   assert.equal(pass.actual, 20);
   assert.equal(pass.responseTotal, 203);
   assert.deepEqual(pass.mismatchedStatusCounts, {});
+  assert.equal(pass.enoughTaskGroups, true);
+  assert.equal(pass.enoughScenarios, true);
+  assert.deepEqual(pass.missingScenarios, []);
+  assert.deepEqual(pass.unknownScenarios, []);
+
+  const missingScenario = batchTasks.map((item) => ({
+    ...item,
+    payload: {
+      ...item.payload,
+      acceptance_scenario_key:
+        item.payload.acceptance_scenario_key === "delivery_date_reply"
+          ? "customer_details"
+          : item.payload.acceptance_scenario_key,
+    },
+  }));
+  const missingScenarioFailure = evaluateManualAcceptanceDataset(probe, {
+    tasks: missingScenario,
+    total: 20,
+  });
+  assert.equal(missingScenarioFailure.status, "fail");
+  assert.deepEqual(missingScenarioFailure.missingScenarios, [
+    "delivery_date_reply",
+  ]);
+  assert.deepEqual(missingScenarioFailure.unknownScenarios, []);
+  assert.equal(missingScenarioFailure.enoughScenarios, false);
+
+  const unknownScenario = structuredClone(batchTasks);
+  unknownScenario[0].payload.acceptance_scenario_key = "unknown_scenario";
+  const unknownScenarioFailure = evaluateManualAcceptanceDataset(probe, {
+    tasks: unknownScenario,
+    total: 20,
+  });
+  assert.equal(unknownScenarioFailure.status, "fail");
+  assert.deepEqual(unknownScenarioFailure.unknownScenarios, [
+    "unknown_scenario",
+  ]);
+
+  const unknownTaskGroup = structuredClone(batchTasks);
+  unknownTaskGroup[0].task_group = "unknown_group";
+  const unknownTaskGroupFailure = evaluateManualAcceptanceDataset(probe, {
+    tasks: unknownTaskGroup,
+    total: 20,
+  });
+  assert.equal(unknownTaskGroupFailure.status, "fail");
+  assert.deepEqual(unknownTaskGroupFailure.unknownTaskGroups, [
+    "unknown_group",
+  ]);
 
   const wrongDistribution = batchTasks.map((item, index) => ({
     ...item,
@@ -1230,22 +1501,28 @@ test("explicit verification reports page data, nine role totals, and honest manu
     taskReport: taskReport(),
   });
   const { fetchImpl, calls } = createReadinessFetch();
-  const report = await verifyManualAcceptanceReadiness(plan, {
-    backendURL: "http://127.0.0.1:8300",
-    password: "local-demo-password",
-    adminPassword: "local-admin-password",
-    fetchImpl,
-    now: () => new Date("2026-07-11T10:00:00.000Z"),
-  });
+  const report = await verifyManualAcceptanceReadiness(
+    plan,
+    localVerificationOptions({
+      password: "local-demo-password",
+      adminPassword: "local-admin-password",
+      fetchImpl,
+      now: () => new Date("2026-07-11T10:00:00.000Z"),
+    }),
+  );
 
-  assert.equal(report.summary.totalTargets, 48);
+  assert.equal(report.summary.totalTargets, 51);
   assert.equal(
     report.summary.passedTargetData,
-    38,
+    41,
     JSON.stringify(
       report.targets
         .filter((item) => item.dataStatus !== "pass")
-        .map((item) => ({ id: item.id, status: item.dataStatus, supporting: item.supporting })),
+        .map((item) => ({
+          id: item.id,
+          status: item.dataStatus,
+          supporting: item.supporting,
+        })),
     ),
   );
   assert.equal(report.summary.failedTargetData, 0);
@@ -1256,14 +1533,44 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(report.summary.manualAcceptanceCompleted, false);
   assert.equal(report.summary.mobileRolePages, 9);
   assert.equal(report.summary.mobileTaskTotalActual, 180);
+  assert.equal(
+    report.reportInputs.taskReport.taskGroupCoverageDigest,
+    TASK_CATALOG_SCENARIO_DIGEST,
+  );
+  assert.equal(report.summary.taskGroupCoverage.complete, true);
+  assert.equal(
+    report.summary.taskGroupCoverage.catalogScenarioDigest,
+    TASK_CATALOG_SCENARIO_DIGEST,
+  );
+  assert.deepEqual(
+    report.summary.taskGroupCoverage.byRole.production.groups
+      .production_exception.requiredScenarios,
+    ["production_exception"],
+  );
+  assert.deepEqual(
+    new Set(
+      Object.values(
+        report.summary.taskGroupCoverage.byRole.production.groups,
+      ).flatMap((group) => group.requiredScenarios),
+    ),
+    new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.production),
+  );
+  assert.deepEqual(
+    report.summary.taskGroupCoverage.byRole.warehouse.groups.shipment_release
+      .missingScenarios,
+    [],
+  );
   assert.deepEqual(
     new Set(Object.values(report.summary.mobileActualByRole)),
     new Set([20]),
   );
-  assert.equal(report.targets.length, 48);
+  assert.equal(report.targets.length, 51);
   assert.equal(report.runtimePreflight.environment, "local");
   assert.equal(report.runtimePreflight.customerKey, "yoyoosun");
-  assert.equal(report.runtimePreflight.configRevision, "cfg-local-1");
+  assert.equal(
+    report.runtimePreflight.configRevision,
+    LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION,
+  );
   assert.equal(
     report.targets.find((item) => item.id === "entries:admin-login").actual,
     14,
@@ -1281,6 +1588,25 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.deepEqual(productionProbe.missingSecondaryKinds, []);
   const mobileProbes = report.probes.filter((item) =>
     item.id.startsWith("mobile-tasks:"),
+  );
+  const workflowPageProbes = report.probes.filter((item) =>
+    item.id.startsWith("workflow-tasks:"),
+  );
+  assert.equal(workflowPageProbes.length, 3);
+  const expectedWorkflowPageCounts = new Map([
+    ["workflow-tasks:production_scheduling", 20],
+    ["workflow-tasks:production_exception", 5],
+    ["workflow-tasks:shipment_release", 4],
+  ]);
+  assert(
+    workflowPageProbes.every(
+      (item) =>
+        item.status === "pass" &&
+        item.actual === expectedWorkflowPageCounts.get(item.id) &&
+        item.exactTaskGroup &&
+        item.params.task_group === item.exactTaskGroup,
+    ),
+    JSON.stringify(workflowPageProbes, null, 2),
   );
   assert.equal(mobileProbes.length, 9);
   assert(
@@ -1305,7 +1631,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:global-dashboard")
       .actual,
-    180,
+    18,
   );
   assert.equal(
     report.targets.find((item) => item.id === "desktopPages:inventory")
@@ -1319,9 +1645,8 @@ test("explicit verification reports page data, nine role totals, and honest manu
     "pass",
   );
   assert.equal(
-    report.targets.find(
-      (item) => item.id === "desktopPages:production-orders",
-    ).dataStatus,
+    report.targets.find((item) => item.id === "desktopPages:production-orders")
+      .dataStatus,
     "pass",
   );
   assert(
@@ -1334,11 +1659,17 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert(!JSON.stringify(report).includes("local-demo-password"));
   assert(!JSON.stringify(report).includes("local-admin-password"));
   assert.deepEqual(
-    calls.slice(0, 4).map((item) => item.method),
-    ["admin_login", "capabilities", "get_effective_session", "admin_login"],
+    calls.slice(0, 5).map((item) => item.method),
+    [
+      "runtime_identity",
+      "admin_login",
+      "capabilities",
+      "get_effective_session",
+      "admin_login",
+    ],
   );
-  assert.equal(calls[0].params.username, "admin");
-  assert.equal(calls[0].params.password, "local-admin-password");
+  assert.equal(calls[1].params.username, "admin");
+  assert.equal(calls[1].params.password, "local-admin-password");
   assert(
     calls.some(
       (item) =>
@@ -1391,13 +1722,15 @@ test("explicit verification reports page data, nine role totals, and honest manu
         (item) =>
           item.params.source_type ===
             "simulated-manual-acceptance-task-batch" &&
-          item.params.source_id === 123456 &&
+          item.params.source_id ===
+            manualAcceptanceTaskBatchIdentity(CURRENT_MANUAL_ACCEPTANCE_RUN_ID)
+              .sourceID &&
           Boolean(item.params.owner_role_key),
       ),
   );
   assert(
     calls.every(({ method }) =>
-      /^(?:admin_login|capabilities|get_effective_session|list|list_|rbac_options|audit_logs)/u.test(
+      /^(?:runtime_identity|admin_login|capabilities|get_effective_session|list|list_|rbac_options|audit_logs)/u.test(
         method,
       ),
     ),
@@ -1408,6 +1741,7 @@ test("CLI requires an explicit backend for verification and stays read-only", as
   assert.deepEqual(parseManualAcceptanceReadinessArgs([]), {
     verify: false,
     backendURL: "",
+    databaseName: "",
     sourceReport: "",
     factReport: "",
     taskReport: "",
@@ -1420,9 +1754,7 @@ test("CLI requires an explicit backend for verification and stays read-only", as
     /必须同时提供 --backend-url/u,
   );
   const parsed = parseManualAcceptanceReadinessArgs([
-    "--verify",
-    "--backend-url",
-    "http://127.0.0.1:8300",
+    ...localVerifyArgs(),
     "--task-report",
     "output/task-report.json",
     "--format",
@@ -1439,48 +1771,42 @@ test("CLI requires an explicit backend for verification and stays read-only", as
 
 test("CLI verification uses strict non-green exit codes for not-proven and wrong-batch evidence", async () => {
   const normalRuntime = createReadinessFetch();
-  const normal = await runManualAcceptanceReadinessCli(
-    ["--verify", "--backend-url", "http://127.0.0.1:8300"],
-    {
-      sourceReport: sourceReport(),
-      factReport: factReport(),
-      taskReport: taskReport(),
-      password: "local-demo-password",
-      adminPassword: "local-admin-password",
-      fetchImpl: normalRuntime.fetchImpl,
-    },
-  );
+  const normal = await runManualAcceptanceReadinessCli(localVerifyArgs(), {
+    sourceReport: sourceReport(),
+    factReport: factReport(),
+    taskReport: taskReport(),
+    password: "local-demo-password",
+    adminPassword: "local-admin-password",
+    targetConfirmation: localTargetConfirmation(),
+    fetchImpl: normalRuntime.fetchImpl,
+  });
   assert.equal(normal.report.summary.failedTargetData, 0);
   assert(normal.report.summary.notProvenTargetData > 0);
   assert.equal(normal.report.summary.queryEvidenceComplete, false);
   assert.equal(normal.exitCode, 1);
 
   const wrongBatchRuntime = createReadinessFetch({ taskSourceID: 999999 });
-  const wrongBatch = await runManualAcceptanceReadinessCli(
-    ["--verify", "--backend-url", "http://127.0.0.1:8300"],
-    {
-      sourceReport: sourceReport(),
-      factReport: factReport(),
-      taskReport: taskReport(),
-      password: "local-demo-password",
-      adminPassword: "local-admin-password",
-      fetchImpl: wrongBatchRuntime.fetchImpl,
-    },
-  );
+  const wrongBatch = await runManualAcceptanceReadinessCli(localVerifyArgs(), {
+    sourceReport: sourceReport(),
+    factReport: factReport(),
+    taskReport: taskReport(),
+    password: "local-demo-password",
+    adminPassword: "local-admin-password",
+    targetConfirmation: localTargetConfirmation(),
+    fetchImpl: wrongBatchRuntime.fetchImpl,
+  });
   assert(wrongBatch.report.summary.failedTargetData > 0);
   assert.equal(wrongBatch.exitCode, 1);
 
   const noTaskRuntime = createReadinessFetch();
-  const noTask = await runManualAcceptanceReadinessCli(
-    ["--verify", "--backend-url", "http://127.0.0.1:8300"],
-    {
-      sourceReport: sourceReport(),
-      factReport: factReport(),
-      password: "local-demo-password",
-      adminPassword: "local-admin-password",
-      fetchImpl: noTaskRuntime.fetchImpl,
-    },
-  );
+  const noTask = await runManualAcceptanceReadinessCli(localVerifyArgs(), {
+    sourceReport: sourceReport(),
+    factReport: factReport(),
+    password: "local-demo-password",
+    adminPassword: "local-admin-password",
+    targetConfirmation: localTargetConfirmation(),
+    fetchImpl: noTaskRuntime.fetchImpl,
+  });
   assert.equal(noTask.exitCode, 1);
   assert.equal(noTask.report.summary.mobileTaskTotalActual, null);
   assert(!noTaskRuntime.calls.some((item) => item.method === "list_tasks"));
@@ -1502,6 +1828,8 @@ test("CLI and exported verification reject external backends before the first fe
     () =>
       verifyManualAcceptanceReadiness(plan, {
         backendURL: "https://example.com",
+        databaseName: LOCAL_DATABASE_NAME,
+        targetConfirmation: localTargetConfirmation(),
         password: "local-demo-password",
         adminPassword: "local-admin-password",
         fetchImpl,
@@ -1511,13 +1839,20 @@ test("CLI and exported verification reject external backends before the first fe
   await assert.rejects(
     () =>
       runManualAcceptanceReadinessCli(
-        ["--verify", "--backend-url", "http://127.0.0.1.example.com:8300"],
+        [
+          "--verify",
+          "--backend-url",
+          "http://127.0.0.1.example.com:8310",
+          "--database-name",
+          LOCAL_DATABASE_NAME,
+        ],
         {
           sourceReport: sourceReport(),
           factReport: factReport(),
           taskReport: taskReport(),
           password: "local-demo-password",
           adminPassword: "local-admin-password",
+          targetConfirmation: localTargetConfirmation(),
           fetchImpl,
         },
       ),
@@ -1532,7 +1867,11 @@ test("registered customer-trial-133 verification requires explicit confirmation 
   const remoteRuntime = {
     environment: "remote",
     customerKey: "yoyoosun",
-    configRevision: "cfg-trial-133-v1",
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
     source: "active_customer_config_revision",
     targetAttestation: {
       source: "out-of-band",
@@ -1541,12 +1880,29 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     },
   };
   const plan = buildManualAcceptanceReadinessPlan({
-    sourceReport: sourceReport({ target, backendURL, runtime: remoteRuntime }),
-    factReport: factReport({ target, backendURL, runtime: remoteRuntime }),
-    taskReport: taskReport({ target, backendURL }),
+    sourceReport: sourceReport({
+      target,
+      backendURL,
+      runtime: remoteRuntime,
+      dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+      runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+      prefix: "YS5",
+    }),
+    factReport: factReport({
+      target,
+      backendURL,
+      runtime: remoteRuntime,
+      dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+      runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    }),
+    taskReport: taskReport({
+      target,
+      backendURL,
+      dataVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+      runId: CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+    }),
   });
-  const targetConfirmation =
-    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:customer-trial-133:2026.07.15-v1:20260715-V1";
+  const targetConfirmation = `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:${CUSTOMER_TRIAL_133_TARGET}:${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION}:${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`;
   const targetAttestation = {
     target,
     origin: backendURL,
@@ -1568,6 +1924,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     () =>
       verifyManualAcceptanceReadiness(plan, {
         backendURL,
+        databaseName: CUSTOMER_TRIAL_133_DATABASE,
         password: "trial-demo-password",
         fetchImpl: async () => {
           fetchCalls += 1;
@@ -1582,6 +1939,7 @@ test("registered customer-trial-133 verification requires explicit confirmation 
     () =>
       verifyManualAcceptanceReadiness(plan, {
         backendURL,
+        databaseName: CUSTOMER_TRIAL_133_DATABASE,
         password: "trial-demo-password",
         targetConfirmation,
         fetchImpl: async () => {
@@ -1595,10 +1953,15 @@ test("registered customer-trial-133 verification requires explicit confirmation 
 
   const remote = createReadinessFetch({
     runtimeEnvironment: "remote",
-    configRevision: "cfg-trial-133-v1",
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
   });
   const report = await verifyManualAcceptanceReadiness(plan, {
     backendURL,
+    databaseName: CUSTOMER_TRIAL_133_DATABASE,
     password: "trial-demo-password",
     targetConfirmation,
     targetAttestation,
@@ -1606,20 +1969,93 @@ test("registered customer-trial-133 verification requires explicit confirmation 
   });
   assert.equal(report.runtimePreflight.target, target);
   assert.equal(report.runtimePreflight.environment, "remote");
-  assert.equal(report.runtimePreflight.configRevision, "cfg-trial-133-v1");
+  assert.equal(
+    report.runtimePreflight.configRevision,
+    CUSTOMER_TRIAL_133_CONFIG_REVISION,
+  );
   assert.equal(
     remote.calls.some((item) => item.method === "capabilities"),
     false,
   );
   assert.equal(
     remote.calls.some(
-      (item) => item.method === "admin_login" && item.params.username === "admin",
+      (item) =>
+        item.method === "admin_login" && item.params.username === "admin",
     ),
     false,
   );
 });
 
-test("verification requires the local super-admin credential before any fetch", async () => {
+test("local and 133 database mismatches stop before the first network request", async () => {
+  const localPlan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport(),
+    factReport: factReport(),
+    taskReport: taskReport(),
+  });
+  let fetchCalls = 0;
+  const failIfFetched = async () => {
+    fetchCalls += 1;
+    throw new Error("database mismatch must stop before fetch");
+  };
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceReadiness(localPlan, {
+        backendURL: LOCAL_BACKEND_URL,
+        databaseName: "plush_erp_acceptance_20260716_other_dev",
+        targetConfirmation: localTargetConfirmation(),
+        password: "local-demo-password",
+        adminPassword: "local-admin-password",
+        fetchImpl: failIfFetched,
+      }),
+    /requires databaseName=plush_erp_acceptance_20260716_v5_dev/u,
+  );
+
+  const backendURL = "http://127.0.0.1:18375";
+  const remoteRuntime = {
+    environment: "remote",
+    customerKey: "yoyoosun",
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
+    source: "active_customer_config_revision",
+    targetAttestation: {
+      source: "out-of-band",
+      release: "929ec0b3a563bec0796274d033a97277519bcb51",
+      migration: "20260715120000",
+    },
+  };
+  const remotePlan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport({
+      target: CUSTOMER_TRIAL_133_TARGET,
+      backendURL,
+      runtime: remoteRuntime,
+    }),
+    factReport: factReport({
+      target: CUSTOMER_TRIAL_133_TARGET,
+      backendURL,
+      runtime: remoteRuntime,
+    }),
+    taskReport: taskReport({
+      target: CUSTOMER_TRIAL_133_TARGET,
+      backendURL,
+    }),
+  });
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceReadiness(remotePlan, {
+        backendURL,
+        databaseName: "plush_erp_uat_wrong",
+        password: "trial-demo-password",
+        fetchImpl: failIfFetched,
+      }),
+    /requires databaseName=/u,
+  );
+  assert.equal(fetchCalls, 0);
+});
+
+test("verification requires the local super-admin credential before authentication or business requests", async () => {
   const plan = buildManualAcceptanceReadinessPlan({
     sourceReport: sourceReport(),
     factReport: factReport(),
@@ -1631,14 +2067,34 @@ test("verification requires the local super-admin credential before any fetch", 
   try {
     await assert.rejects(
       () =>
-        verifyManualAcceptanceReadiness(plan, {
-          backendURL: "http://127.0.0.1:8300",
-          password: "local-demo-password",
-          fetchImpl: async () => {
-            fetchCalls += 1;
-            throw new Error("missing admin credential must fail before fetch");
-          },
-        }),
+        verifyManualAcceptanceReadiness(
+          plan,
+          localVerificationOptions({
+            password: "local-demo-password",
+            fetchImpl: async (_url, options) => {
+              fetchCalls += 1;
+              if (options.body) {
+                throw new Error(
+                  "missing admin credential must fail before authentication",
+                );
+              }
+              return {
+                ok: true,
+                status: 200,
+                redirected: false,
+                headers: {
+                  get: (name) =>
+                    name === "X-ERP-Runtime-Identity-Proof"
+                      ? "matched-v1"
+                      : null,
+                },
+                async text() {
+                  return "runtime identity matched";
+                },
+              };
+            },
+          }),
+        ),
       /MANUAL_ACCEPTANCE_ADMIN_PASSWORD/u,
     );
   } finally {
@@ -1648,7 +2104,7 @@ test("verification requires the local super-admin credential before any fetch", 
       process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD = previous;
     }
   }
-  assert.equal(fetchCalls, 0);
+  assert.equal(fetchCalls, 1);
 });
 
 test("runtime preflight rejects unsafe environment or missing active revision before other account logins", async () => {
@@ -1660,21 +2116,23 @@ test("runtime preflight rejects unsafe environment or missing active revision be
   const production = createReadinessFetch({ runtimeEnvironment: "production" });
   await assert.rejects(
     () =>
-      verifyManualAcceptanceReadiness(plan, {
-        backendURL: "http://127.0.0.1:8300",
-        password: "local-demo-password",
-        adminPassword: "local-admin-password",
-        fetchImpl: production.fetchImpl,
-      }),
+      verifyManualAcceptanceReadiness(
+        plan,
+        localVerificationOptions({
+          password: "local-demo-password",
+          adminPassword: "local-admin-password",
+          fetchImpl: production.fetchImpl,
+        }),
+      ),
     /environment=production/u,
   );
   assert.deepEqual(
     production.calls.map((item) => item.method),
-    ["admin_login", "capabilities"],
+    ["runtime_identity", "admin_login", "capabilities"],
   );
 
   const missingRevision = createReadinessFetch({ configRevision: "" });
-  const localhostBackendURL = "http://localhost:8300";
+  const localhostBackendURL = "http://localhost:8310";
   const localhostPlan = buildManualAcceptanceReadinessPlan({
     sourceReport: sourceReport({ backendURL: localhostBackendURL }),
     factReport: factReport({ backendURL: localhostBackendURL }),
@@ -1684,6 +2142,8 @@ test("runtime preflight rejects unsafe environment or missing active revision be
     () =>
       verifyManualAcceptanceReadiness(localhostPlan, {
         backendURL: localhostBackendURL,
+        databaseName: LOCAL_DATABASE_NAME,
+        targetConfirmation: localTargetConfirmation(),
         password: "local-demo-password",
         adminPassword: "local-admin-password",
         fetchImpl: missingRevision.fetchImpl,
@@ -1692,12 +2152,17 @@ test("runtime preflight rejects unsafe environment or missing active revision be
   );
   assert.deepEqual(
     missingRevision.calls.map((item) => item.method),
-    ["admin_login", "capabilities", "get_effective_session"],
+    [
+      "runtime_identity",
+      "admin_login",
+      "capabilities",
+      "get_effective_session",
+    ],
   );
 });
 
 test("verification rejects a redirected response even with a custom fetch", async () => {
-  const backendURL = "http://[::1]:8300";
+  const backendURL = "http://[::1]:8310";
   const plan = buildManualAcceptanceReadinessPlan({
     sourceReport: sourceReport({ backendURL }),
     factReport: factReport({ backendURL }),
@@ -1708,10 +2173,26 @@ test("verification rejects a redirected response even with a custom fetch", asyn
     () =>
       verifyManualAcceptanceReadiness(plan, {
         backendURL,
+        databaseName: LOCAL_DATABASE_NAME,
+        targetConfirmation: localTargetConfirmation(),
         password: "local-demo-password",
         adminPassword: "local-admin-password",
-        fetchImpl: async () => {
+        fetchImpl: async (_url, options) => {
           fetchCalls += 1;
+          if (!options.body) {
+            return {
+              ok: true,
+              status: 200,
+              redirected: false,
+              headers: {
+                get: (name) =>
+                  name === "X-ERP-Runtime-Identity-Proof" ? "matched-v1" : null,
+              },
+              async text() {
+                return "runtime identity matched";
+              },
+            };
+          }
           return {
             ...okResponse({ access_token: "token-admin" }),
             redirected: true,
@@ -1720,7 +2201,7 @@ test("verification rejects a redirected response even with a custom fetch", asyn
       }),
     /拒绝重定向响应/u,
   );
-  assert.equal(fetchCalls, 1);
+  assert.equal(fetchCalls, 2);
 });
 
 test("customer-facing report uses ordinary business wording", async () => {
@@ -1730,19 +2211,21 @@ test("customer-facing report uses ordinary business wording", async () => {
     taskReport: taskReport(),
   });
   const { fetchImpl } = createReadinessFetch();
-  const report = await verifyManualAcceptanceReadiness(plan, {
-    backendURL: "http://127.0.0.1:8300",
-    password: "local-demo-password",
-    adminPassword: "local-admin-password",
-    fetchImpl,
-  });
+  const report = await verifyManualAcceptanceReadiness(
+    plan,
+    localVerificationOptions({
+      password: "local-demo-password",
+      adminPassword: "local-admin-password",
+      fetchImpl,
+    }),
+  );
   const markdown = renderManualAcceptanceReadinessMarkdown(report);
 
   assert.match(markdown, /# 全页面手动验收就绪核验/u);
   assert.match(markdown, /九个岗位任务合计：180 \/ 180/u);
   assert.match(markdown, /尚未证明/u);
   assert.match(markdown, /人工验收：未完成/u);
-  assert.match(markdown, /页面操作已完成：0 \/ 48/u);
+  assert.match(markdown, /页面操作已完成：0 \/ 51/u);
   assert.doesNotMatch(
     markdown,
     /Workflow|Fact|JSON-RPC|RBAC|schema|raw\s*id|甲方/iu,

@@ -12,9 +12,12 @@ import {
   trialFixtureCoverageViolations,
 } from "./test-data-isolation-boundary.mjs";
 import { yoyoosunTrialDataFixture } from "../../config/customers/yoyoosun/trialDataFixture.mjs";
+import { CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION } from "./manual-acceptance-target-policy.mjs";
 
 async function withTempRepo(callback) {
-  const root = await mkdtemp(path.join(os.tmpdir(), "plush-test-data-isolation-"));
+  const root = await mkdtemp(
+    path.join(os.tmpdir(), "plush-test-data-isolation-"),
+  );
   try {
     await callback(root);
   } finally {
@@ -25,11 +28,7 @@ async function withTempRepo(callback) {
 test("test-data-isolation-boundary: current repo keeps test data buckets isolated", async () => {
   const report = await buildTestDataIsolationReport();
 
-  assert.equal(
-    report.ok,
-    true,
-    formatTestDataIsolationReport(report),
-  );
+  assert.equal(report.ok, true, formatTestDataIsolationReport(report));
   assert.equal(report.scope.readOnly, true);
   assert.equal(report.scope.writesDatabase, false);
   assert.equal(report.scope.executesImport, false);
@@ -44,22 +43,23 @@ test("test-data-isolation-boundary: current repo keeps test data buckets isolate
   }
 });
 
-test("test-data-isolation-boundary: v3 target checks stay atomic and fail closed", () => {
+test("test-data-isolation-boundary: v5 target checks stay atomic and fail closed", () => {
   const ids = DEFAULT_TEST_DATA_ISOLATION_CHECKS.map((check) => check.id);
   assert.equal(new Set(ids).size, ids.length);
 
   const dataset = DEFAULT_TEST_DATA_ISOLATION_CHECKS.find(
     (check) =>
-      check.id === "manual-acceptance-dataset-keeps-one-current-v3-contract",
+      check.id === "manual-acceptance-dataset-keeps-one-current-v5-contract",
   );
   assert(dataset);
   assert(
     dataset.required.some((rule) =>
       rule.pattern.test(
-        'export const DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION = "2026.07.15-v3";',
+        "export const DEFAULT_MANUAL_ACCEPTANCE_DATA_VERSION = CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;",
       ),
     ),
   );
+  assert.equal(CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION, "2026.07.16-v5");
   assert(
     dataset.forbidden.some((rule) =>
       rule.pattern.test('const legacy = "2026.07.15-v1";'),
@@ -77,6 +77,29 @@ test("test-data-isolation-boundary: v3 target checks stay atomic and fail closed
   assert(
     retirement.forbidden.some((rule) =>
       rule.message.includes("physical deletion"),
+    ),
+  );
+
+  const facts = DEFAULT_TEST_DATA_ISOLATION_CHECKS.find(
+    (check) =>
+      check.id ===
+      "manual-acceptance-fact-data-stays-source-driven-and-target-bound",
+  );
+  assert(facts);
+  for (const lifecycle of [
+    "purchase receipt lifecycle",
+    "quality lifecycle",
+    "shipment lifecycle",
+    "inventory transaction matrix",
+  ]) {
+    assert(
+      facts.required.some((rule) => rule.message.includes(lifecycle)),
+      `missing independent ${lifecycle} guard`,
+    );
+  }
+  assert(
+    facts.required.some((rule) =>
+      rule.message.includes("attachment owners must use posted"),
     ),
   );
 });

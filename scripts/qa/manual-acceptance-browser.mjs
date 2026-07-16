@@ -8,10 +8,23 @@ import process from "node:process";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 
-import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
+import {
+  MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
+  MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
+  MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
+  buildManualAcceptanceCatalog,
+} from "./manual-acceptance-catalog.mjs";
+import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
+import {
+  MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
+  MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+} from "./manual-acceptance-dataset.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   assertManualAcceptanceDatasetReadinessBoundary,
+  digestManualAcceptanceDatasetComponentReport,
+  manualAcceptanceDatasetStageReportPath,
 } from "./manual-acceptance-dataset-runner.mjs";
 import {
   CUSTOMER_TRIAL_133_TARGET,
@@ -19,6 +32,12 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import {
+  TASK_SOURCE_TYPE,
+  TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
+  buildManualAcceptanceTaskSchedule,
+  manualAcceptanceTaskBatchIdentity,
+} from "./manual-acceptance-task-data.mjs";
 
 const REPO_ROOT = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -48,8 +67,7 @@ const DEFAULT_FACT_REPORT_PATH = path.resolve(
   REPO_ROOT,
   "output/qa/manual-acceptance/fact-data/apply-report.json",
 );
-const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
-  "source-driven-operational-facts-v1";
+const SOURCE_DRIVEN_FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const LOCAL_HOSTS = new Set(["127.0.0.1", "localhost", "[::1]", "::1"]);
 const COMPANY_NAME = "东莞市永绅玩具有限公司";
 const SYSTEM_NAME = "业务管理";
@@ -196,7 +214,7 @@ function flattenCatalogTargets(catalog) {
 
 function accountForTarget(target) {
   if (target.key === "admin-login") return null;
-  const roleKey = target.roleKeys[0];
+  const roleKey = target.key === "task-board" ? "boss" : target.roleKeys[0];
   const account = FORMAL_BROWSER_ACCOUNTS.find(
     (item) => item.roleKey === roleKey,
   );
@@ -208,8 +226,36 @@ function accountForTarget(target) {
   return account;
 }
 
+const BUSINESS_DASHBOARD_PAGE_KEY_BY_SOURCE = Object.freeze({
+  outbound: "shipments",
+});
+
+function businessDashboardRequirements(catalog) {
+  const desktopByKey = new Map(
+    catalog.technicalManifest.desktopPages.map((item) => [item.key, item]),
+  );
+  return dashboardHealthModules.flatMap((module) =>
+    module.sources.map((source) => {
+      const pageKey =
+        BUSINESS_DASHBOARD_PAGE_KEY_BY_SOURCE[source.key] || source.key;
+      const page = desktopByKey.get(pageKey);
+      if (!page) {
+        throw new BrowserAcceptanceError(
+          `业务看板来源 ${source.key} 没有正式页面数据合同`,
+        );
+      }
+      return {
+        key: source.key,
+        label: source.label,
+        minimumRecords: page.minimumRecords,
+      };
+    }),
+  );
+}
+
 export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
   const catalog = buildManualAcceptanceCatalog();
+  const dashboardRequirements = businessDashboardRequirements(catalog);
   const targets = flattenCatalogTargets(catalog).map((target) => {
     const account = accountForTarget(target);
     return {
@@ -222,12 +268,21 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
       minimumRecordUnit: target.minimumRecordUnit,
       roleKey: account?.roleKey || "anonymous",
       username: account?.username || "",
+      requiresDataEvidence:
+        target.isList ||
+        ["print-preview", "print-workspace"].includes(target.group) ||
+        ["global-dashboard", "business-dashboard", "exception-flow"].includes(
+          target.key,
+        ),
+      ...(target.key === "business-dashboard"
+        ? { dataEvidenceRequirements: dashboardRequirements }
+        : {}),
     };
   });
   assert.equal(
     targets.length,
-    48,
-    "手工验收浏览器计划必须覆盖当前 48 个正式目标",
+    51,
+    "手工验收浏览器计划必须覆盖当前 51 个正式目标",
   );
   return {
     scope: "manual-acceptance-browser-plan",
@@ -264,6 +319,7 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
     sourceReportPath: DEFAULT_SOURCE_REPORT_PATH,
     factReportPath: DEFAULT_FACT_REPORT_PATH,
     readinessReportPath: "",
+    datasetReportPath: "",
     targetAttestation: "",
     headed: false,
     plan: false,
@@ -326,6 +382,13 @@ export function parseManualAcceptanceBrowserArgs(argv = []) {
         );
       continue;
     }
+    if (key === "dataset-report") {
+      options.datasetReportPath = resolveManualAcceptanceBrowserInputReportPath(
+        value,
+        "--dataset-report",
+      );
+      continue;
+    }
     if (key === "target-attestation-json") {
       options.targetAttestation = parseManualAcceptanceTargetAttestation(value);
       continue;
@@ -346,18 +409,21 @@ export function getManualAcceptanceBrowserHelp() {
   return `用法：
   MANUAL_ACCEPTANCE_PASSWORD='<本地试用密码>' node scripts/qa/manual-acceptance-browser.mjs \\
     --base-url http://127.0.0.1:15200 \\
-    --backend-url http://127.0.0.1:8300 \
-    --source-report output/qa/manual-acceptance/source-data/apply-report.json \
-    --fact-report output/qa/manual-acceptance/fact-data/apply-report.json \
-    --readiness-report output/qa/manual-acceptance/readiness/verify-report.json
+    --backend-url http://127.0.0.1:8310 \\
+    --source-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/source/apply-report.json \\
+    --fact-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/facts/apply-report.json \\
+    --readiness-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/readiness/verify-report.json \\
+    --dataset-report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/dataset/apply-report.json \\
+    --report output/qa/manual-acceptance/datasets/2026.07.16-v5/local/browser/report.json
   node scripts/qa/manual-acceptance-browser.mjs --plan \\
     --base-url http://127.0.0.1:15200 \\
-    --backend-url http://127.0.0.1:8300
+    --backend-url http://127.0.0.1:8310
 
 说明：
   只允许 localhost / 127.0.0.1 / ::1，不接受带凭据、路径、查询参数或跳转的 URL。
   真实验收只登录、读页面和切换只读页签，不点击新增、编辑、提交、完成、取消或过账动作。
-  customer-trial-133 必须提供同批 readiness 报告和带外 attestation，并先通过只读 runtime identity 探针。
+  非 plan 模式必须提供同一 runner 生成的 dataset、source、facts 和 readiness 规范报告；缺少附件或岗位场景也会失败。
+  customer-trial-133 使用 127.0.0.1:18375 SSH 隧道、对应 customer-trial-133 报告和 --target-attestation-json，并先通过只读 runtime identity 探针。
   报告默认写入 output/qa/manual-acceptance/browser/report.json，不保存密码或登录令牌。
 `;
 }
@@ -498,8 +564,7 @@ async function waitForReadablePage(page) {
 }
 
 async function selectLoginEntry(page, entryTarget) {
-  const label =
-    entryTarget === "mobile" ? "手机端待办" : "电脑端业务管理";
+  const label = entryTarget === "mobile" ? "手机端待办" : "电脑端业务管理";
   const entry = page
     .locator(".ant-segmented-item")
     .filter({ hasText: label })
@@ -638,16 +703,123 @@ function largestTotalFromTexts(texts) {
   return values.length ? Math.max(...values) : 0;
 }
 
+export function evaluatePrintPreviewEvidence(
+  { entryVisible, rendererVisible, rendererTextLength },
+  minimumRecords,
+) {
+  const observedTotal =
+    entryVisible && rendererVisible && Number(rendererTextLength) >= 40 ? 1 : 0;
+  const minimumSatisfied = observedTotal >= Number(minimumRecords);
+  return {
+    status: minimumSatisfied ? "minimum_proven" : "not_proven",
+    evidenceSource: "visible fixed print preview renderer DOM",
+    observedTotal,
+    minimumRecords,
+    minimumSatisfied,
+    entryVisible: Boolean(entryVisible),
+    rendererVisible: Boolean(rendererVisible),
+    rendererTextLength: Number(rendererTextLength) || 0,
+  };
+}
+
+export function evaluatePrintSourceMinimumEvidence({
+  sourcePrefix,
+  visibleRows,
+  matchingCurrentBatchRows,
+  paginationTexts = [],
+  minimumRecords,
+}) {
+  const renderedRows = Number(visibleRows) || 0;
+  const matchingRows = Number(matchingCurrentBatchRows) || 0;
+  const currentBatchRowsOnly =
+    renderedRows > 0 && matchingRows === renderedRows;
+  const paginationTotal = largestTotalFromTexts(paginationTexts);
+  const observedTotal = currentBatchRowsOnly
+    ? Math.max(renderedRows, paginationTotal)
+    : 0;
+  const minimumSatisfied =
+    currentBatchRowsOnly && observedTotal >= Number(minimumRecords);
+  return {
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : renderedRows > 0
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource:
+      "current batch source-prefix search and visible table/pagination DOM",
+    sourcePrefix,
+    visibleRows: renderedRows,
+    matchingCurrentBatchRows: matchingRows,
+    currentBatchRowsOnly,
+    paginationTotal,
+    observedTotal,
+    minimumRecords,
+    minimumSatisfied,
+  };
+}
+
+export function buildPrintWorkspaceDataEvidence(proof, minimumRecords) {
+  const sourceEvidence = proof?.sourceDataEvidence || {};
+  const observedTotal = Number(sourceEvidence.observedTotal) || 0;
+  const minimumSatisfied =
+    sourceEvidence.minimumSatisfied === true &&
+    Number(sourceEvidence.minimumRecords) === Number(minimumRecords) &&
+    observedTotal >= Number(minimumRecords);
+  return {
+    ...sourceEvidence,
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : observedTotal > 0
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource:
+      sourceEvidence.evidenceSource ||
+      "bound current-batch business source record proof",
+    observedTotal,
+    minimumRecords,
+    minimumSatisfied,
+  };
+}
+
+async function readPrintPreviewEvidence(page, target) {
+  const entry = page.getByText("模板预览入口", { exact: true });
+  const action = page.getByRole("button", {
+    name: "打开可编辑打印窗口",
+    exact: true,
+  });
+  const renderer = page
+    .locator(
+      ".erp-material-contract-paper--preview, .erp-print-paper, .erp-engineering-print-paper",
+    )
+    .first();
+  await entry.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+  await action.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+  await renderer.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+  const rendererText = String(await renderer.innerText()).trim();
+  const evidence = evaluatePrintPreviewEvidence(
+    {
+      entryVisible: await entry.isVisible(),
+      rendererVisible: await renderer.isVisible(),
+      rendererTextLength: rendererText.length,
+    },
+    target.minimumRecords,
+  );
+  if (!evidence.minimumSatisfied) {
+    throw new BrowserAcceptanceError(
+      `${target.title} 未证明至少 ${target.minimumRecords} 份固定样例`,
+    );
+  }
+  return evidence;
+}
+
 export function readBusinessSummaryTotal(targetKey, bodyText = "") {
   const patterns = {
     "task-board": [/全部任务\s*(\d+)/u],
     products: [/总产品\s*(\d+)/u],
     "production-orders": [/符合条件\s*(\d+)/u],
     "accessories-purchase": [/总订单\s*(\d+)/u],
-    "permission-center": [
-      /员工账号\s*(\d+)/u,
-      /共\s*(\d+)\s*个员工账号/u,
-    ],
+    shipments: [/总出货单\s*(\d+)/u],
+    "permission-center": [/员工账号\s*(\d+)/u, /共\s*(\d+)\s*个员工账号/u],
   };
   const values = (patterns[targetKey] || []).flatMap((pattern) => {
     const match = String(bodyText).match(pattern);
@@ -675,6 +847,227 @@ export function readMobileLoadedTaskCount(tabKey, bodyText = "") {
     new RegExp(`已加载\\s*(\\d+)\\s*条${label}`, "u"),
   );
   return match ? Number(match[1]) : 0;
+}
+
+export function evaluateGlobalDashboardEvidence(
+  queueLabels,
+  visibleRows,
+  minimumRecords,
+) {
+  const queueCounts = Object.fromEntries(
+    (queueLabels || []).flatMap((label) => {
+      const match = String(label || "").match(/^(.+?)，\s*(\d+)\s*项(?:，|$)/u);
+      return match ? [[match[1].trim(), Number(match[2])]] : [];
+    }),
+  );
+  const observedTotal = Object.values(queueCounts).reduce(
+    (total, value) => total + value,
+    0,
+  );
+  const minimumSatisfied =
+    observedTotal >= minimumRecords && Number(visibleRows) > 0;
+  return {
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : observedTotal > 0 || Number(visibleRows) > 0
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource: "workbench queue filters and visible task rows",
+    queueCounts,
+    visibleRows: Number(visibleRows) || 0,
+    observedTotal,
+    minimumRecords,
+    minimumSatisfied,
+  };
+}
+
+export function evaluateExceptionFlowEvidence(
+  bodyText,
+  visibleItems,
+  minimumRecords,
+) {
+  const blockedMatch = String(bodyText || "").match(/阻塞任务\s*(\d+)/u);
+  const dueMatch = String(bodyText || "").match(/今日\/超时任务\s*(\d+)/u);
+  const blockedCount = blockedMatch ? Number(blockedMatch[1]) : 0;
+  const dueCount = dueMatch ? Number(dueMatch[1]) : 0;
+  const observedTotal = blockedCount;
+  const minimumSatisfied =
+    blockedCount >= minimumRecords &&
+    dueCount > 0 &&
+    Number(visibleItems) > 0 &&
+    !String(bodyText || "").includes("暂无阻塞任务");
+  return {
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : blockedCount > 0 || dueCount > 0 || Number(visibleItems) > 0
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource: "exception summary and visible exception items",
+    blockedCount,
+    dueCount,
+    visibleItems: Number(visibleItems) || 0,
+    observedTotal,
+    minimumRecords,
+    minimumSatisfied,
+  };
+}
+
+export function evaluateBusinessDashboardEvidence(ariaLabels, requirements) {
+  const parsedByLabel = new Map(
+    (ariaLabels || []).flatMap((ariaLabel) => {
+      const match = String(ariaLabel || "").match(/^(.+?)数量(\d+|暂不可用)$/u);
+      return match ? [[match[1].trim(), match[2]]] : [];
+    }),
+  );
+  const sources = (requirements || []).map((requirement) => {
+    const raw = parsedByLabel.get(requirement.label);
+    const actual = /^\d+$/u.test(String(raw || "")) ? Number(raw) : null;
+    return {
+      ...requirement,
+      actual,
+      available: actual !== null,
+      minimumSatisfied:
+        actual !== null && actual >= Number(requirement.minimumRecords),
+    };
+  });
+  const minimumSatisfied =
+    sources.length > 0 && sources.every((source) => source.minimumSatisfied);
+  const observedTotal = sources.length
+    ? Math.min(...sources.map((source) => source.actual ?? 0))
+    : 0;
+  return {
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : sources.some((source) => Number(source.actual) > 0)
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource: "business dashboard source aria labels",
+    sources,
+    observedTotal,
+    minimumRecords: sources.length
+      ? Math.min(...sources.map((source) => Number(source.minimumRecords)))
+      : 0,
+    minimumSatisfied,
+  };
+}
+
+async function readDashboardEvidence(page, target) {
+  if (target.key === "global-dashboard") {
+    await page.waitForFunction(
+      () => {
+        const labels = [
+          ...document.querySelectorAll(
+            ".erp-workbench-queue-filter[aria-label]",
+          ),
+        ].map((node) => node.getAttribute("aria-label") || "");
+        const total = labels.reduce((sum, label) => {
+          const match = label.match(/，\s*(\d+)\s*项(?:，|$)/u);
+          return sum + Number(match?.[1] || 0);
+        }, 0);
+        return (
+          total > 0 &&
+          document.querySelector(".erp-workbench-task-row--openable")
+        );
+      },
+      null,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
+    const metrics = await page.evaluate(() => ({
+      queueLabels: [
+        ...document.querySelectorAll(".erp-workbench-queue-filter[aria-label]"),
+      ].map((node) => node.getAttribute("aria-label") || ""),
+      visibleRows: [
+        ...document.querySelectorAll(".erp-workbench-task-row--openable"),
+      ].filter((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }).length,
+    }));
+    return evaluateGlobalDashboardEvidence(
+      metrics.queueLabels,
+      metrics.visibleRows,
+      target.minimumRecords,
+    );
+  }
+  if (target.key === "business-dashboard") {
+    await page.locator(".erp-business-dashboard-page").waitFor({
+      state: "visible",
+      timeout: PAGE_TIMEOUT_MS,
+    });
+    await page.waitForFunction(
+      (expected) => {
+        const labels = [
+          ...document.querySelectorAll(
+            ".erp-business-board-source-count[aria-label]",
+          ),
+        ].map((node) => node.getAttribute("aria-label") || "");
+        return (
+          labels.length === expected &&
+          labels.every((label) => !label.includes("暂不可用"))
+        );
+      },
+      target.dataEvidenceRequirements.length,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
+    const labels = await page
+      .locator(".erp-business-board-source-count[aria-label]")
+      .evaluateAll((nodes) =>
+        nodes.map((node) => node.getAttribute("aria-label") || ""),
+      );
+    const evidence = evaluateBusinessDashboardEvidence(
+      labels,
+      target.dataEvidenceRequirements,
+    );
+    const openable = page
+      .locator(".erp-business-board-source-item[data-target-path]")
+      .first();
+    const expectedPath = requiredText(
+      await openable.getAttribute("data-target-path"),
+      "业务看板可进入来源路径",
+    );
+    await Promise.all([
+      page.waitForURL((url) => url.pathname === expectedPath, {
+        timeout: PAGE_TIMEOUT_MS,
+      }),
+      openable.getByRole("button").click(),
+    ]);
+    await waitForReadablePage(page);
+    return {
+      ...evidence,
+      navigationProof: {
+        expectedPath,
+        actualPath: new URL(page.url()).pathname,
+        passed: new URL(page.url()).pathname === expectedPath,
+      },
+    };
+  }
+  if (target.key === "exception-flow") {
+    await page.waitForFunction(
+      () => {
+        const text = document.body?.innerText || "";
+        return (
+          /阻塞任务\s*\d+/u.test(text) && /今日\/超时任务\s*\d+/u.test(text)
+        );
+      },
+      null,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
+    const metrics = await page.evaluate(() => ({
+      bodyText: document.body?.innerText || "",
+      visibleItems: [
+        ...document.querySelectorAll(".erp-command-center-focus-item"),
+      ].filter((node) => {
+        const rect = node.getBoundingClientRect();
+        return rect.width > 0 && rect.height > 0;
+      }).length,
+    }));
+    return evaluateExceptionFlowEvidence(
+      metrics.bodyText,
+      metrics.visibleItems,
+      target.minimumRecords,
+    );
+  }
+  throw new BrowserAcceptanceError(`${target.title} 缺少页面数据证据读取器`);
 }
 
 async function readMobileTaskEvidence(page, minimumRecords) {
@@ -748,7 +1141,8 @@ async function readMobileTaskEvidence(page, minimumRecords) {
   };
 }
 
-async function readListEvidence(page, target) {
+async function readListEvidence(page, target, datasetBinding) {
+  let specializedEvidence = null;
   if (target.group === "mobile") {
     return readMobileTaskEvidence(page, target.minimumRecords);
   }
@@ -759,6 +1153,70 @@ async function readListEvidence(page, target) {
       await page
         .locator(".erp-permission-section--admins .ant-table-tbody")
         .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    }
+  }
+  if (target.key === "shipping-release") {
+    const visibleCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE.warehouse;
+    const search = page.getByRole("textbox", { name: "搜索待办任务" });
+    await search.fill(visibleCodePrefix);
+    await page.locator(".erp-workflow-business-page").waitFor({
+      state: "visible",
+      timeout: PAGE_TIMEOUT_MS,
+    });
+    await page.waitForFunction(
+      () =>
+        !document.querySelector(
+          ".erp-workflow-business-page .ant-spin-spinning",
+        ) &&
+        Boolean(
+          document.querySelector(
+            ".erp-workflow-business-page .ant-table-tbody > tr:not(.ant-table-placeholder)",
+          ),
+        ),
+      null,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
+    const taskRows = await page
+      .locator(
+        ".erp-workflow-business-page .ant-table-tbody > tr:not(.ant-table-placeholder)",
+      )
+      .evaluateAll((rows) =>
+        rows.map((row) => ({
+          code:
+            row.querySelector("td:first-child strong")?.textContent?.trim() ||
+            "",
+          text: row.textContent?.replace(/\s+/gu, " ").trim() || "",
+        })),
+      );
+    const visibleCodes = taskRows.map((row) => row.code);
+    if (
+      visibleCodes.length === 0 ||
+      visibleCodes.some(
+        (value) =>
+          !new RegExp(`^${visibleCodePrefix}-\\d{2}$`, "u").test(
+            String(value || "").trim(),
+          ),
+      )
+    ) {
+      throw new BrowserAcceptanceError(
+        "出货放行页面未显示当前 V5 仓库任务批次",
+      );
+    }
+    if (
+      datasetBinding?.readiness?.taskSourceType !== TASK_SOURCE_TYPE ||
+      !Number.isSafeInteger(datasetBinding?.readiness?.taskSourceID)
+    ) {
+      throw new BrowserAcceptanceError("出货放行页面缺少同批任务来源绑定");
+    }
+    specializedEvidence = evaluateShipmentReleaseEvidence(
+      taskRows,
+      datasetBinding?.dataset?.taskSchedule,
+      Date.now(),
+    );
+    if (!specializedEvidence.passed) {
+      throw new BrowserAcceptanceError(
+        `出货放行页面未证明即将到期与已超时状态：${specializedEvidence.reason}`,
+      );
     }
   }
   const metrics = await page.evaluate(() => {
@@ -807,7 +1265,43 @@ async function readListEvidence(page, target) {
     largestTotalFromTexts([...metrics.paginationTexts, metrics.bodyText]),
     readBusinessSummaryTotal(target.key, metrics.bodyText),
   );
-  const minimumSatisfied = observedTotal >= target.minimumRecords;
+  if (target.key === "shipments") {
+    const expected = datasetBinding?.dataset?.shipments;
+    if (
+      expected?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT ||
+      observedTotal !== expected.exactCount
+    ) {
+      throw new BrowserAcceptanceError(
+        `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${observedTotal}`,
+      );
+    }
+    const search = page.getByPlaceholder("搜索出货");
+    await search.fill(expected.longShipmentNo);
+    await page.keyboard.press("Enter");
+    const row = page
+      .locator(".ant-table-tbody > tr:not(.ant-table-placeholder)")
+      .filter({ hasText: expected.longShipmentNo })
+      .first();
+    await row.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    await row.click();
+    await page.getByRole("button", { name: "查看明细", exact: true }).click();
+    const modal = page.getByRole("dialog", { name: "查看出货明细" });
+    await modal.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    const lineTag = modal.getByText(
+      `${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT} 行`,
+      { exact: true },
+    );
+    await lineTag.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    specializedEvidence = {
+      passed: true,
+      exactCount: observedTotal,
+      longShipmentNo: expected.longShipmentNo,
+      longLineCount: MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
+    };
+    await modal.locator(".ant-modal-close").click();
+  }
+  const minimumSatisfied =
+    observedTotal >= target.minimumRecords && renderedItems > 0;
   return {
     status: minimumSatisfied
       ? "minimum_proven"
@@ -819,6 +1313,53 @@ async function readListEvidence(page, target) {
     observedTotal,
     minimumRecords: target.minimumRecords,
     minimumSatisfied,
+    specializedEvidence,
+  };
+}
+
+export function evaluateShipmentReleaseEvidence(rows, schedule, nowMs) {
+  let expectedSchedule;
+  try {
+    expectedSchedule = buildManualAcceptanceTaskSchedule(schedule?.anchorUnix);
+  } catch (error) {
+    return {
+      passed: false,
+      reason: `任务时间锚点无效：${error?.message || error}`,
+    };
+  }
+  if (JSON.stringify(schedule) !== JSON.stringify(expectedSchedule)) {
+    return { passed: false, reason: "任务时间锚点结构不一致" };
+  }
+  const observedAt = Number(nowMs);
+  if (
+    !Number.isFinite(observedAt) ||
+    observedAt < schedule.anchorUnix * 1000 ||
+    observedAt > schedule.dueSoonValidUntilUnix * 1000
+  ) {
+    return { passed: false, reason: "即将到期样例已超出本批有效时间窗口" };
+  }
+  const requirements = [
+    ["YS-V5-CK-02", "可执行", "即将到期"],
+    ["YS-V5-CK-13", "阻塞", "已超时"],
+    ["YS-V5-CK-16", "已完成", null],
+    ["YS-V5-CK-19", "退回", null],
+  ];
+  const missing = requirements.filter(([code, status, dueLabel]) => {
+    const row = (rows || []).find((item) => item.code === code);
+    return (
+      !row ||
+      !String(row.text || "").includes(status) ||
+      (dueLabel && !String(row.text || "").includes(dueLabel))
+    );
+  });
+  return {
+    passed: missing.length === 0,
+    reason: missing.length
+      ? `缺少 ${missing.map(([code]) => code).join(", ")}`
+      : null,
+    observedAtUtc: new Date(observedAt).toISOString(),
+    validUntilUtc: schedule.dueSoonValidUntilUtc,
+    requiredCodes: requirements.map(([code]) => code),
   };
 }
 
@@ -831,6 +1372,7 @@ export function assertBoundSimulatedPrintReports(source, fact) {
     "runId",
     "target",
     "backendURL",
+    "databaseName",
     "semanticDigest",
   ];
   const identityMatches = identityFields.every(
@@ -875,6 +1417,49 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       "打印验收只接受同一批次、同一运行配置的本机模拟业务记录",
     );
   }
+  const exactLongRecord = (records, identityField, label) => {
+    const matches = (Array.isArray(records) ? records : []).filter(
+      (item) =>
+        Array.isArray(item?.items) &&
+        item.items.length === 25 &&
+        String(item?.[identityField] || "").trim(),
+    );
+    if (matches.length === 0) {
+      throw new BrowserAcceptanceError(`同批源数据缺少 25 行${label}打印样本`);
+    }
+    const selected = matches
+      .slice()
+      .sort((left, right) =>
+        String(left[identityField]).localeCompare(
+          String(right[identityField]),
+          "zh-CN",
+        ),
+      )[0];
+    return {
+      recordQuery: requiredText(
+        selected[identityField],
+        `${label}打印样本编号`,
+      ),
+      lineCount: selected.items.length,
+    };
+  };
+  const printRecords = {
+    purchaseOrder: exactLongRecord(
+      source?.referenceRecords?.purchaseOrders,
+      "orderNo",
+      "采购订单",
+    ),
+    outsourcingOrder: exactLongRecord(
+      source?.referenceRecords?.outsourcingOrders,
+      "orderNo",
+      "委外订单",
+    ),
+    bomVersion: exactLongRecord(
+      source?.referenceRecords?.bomVersions,
+      "version",
+      "产品结构版本",
+    ),
+  };
   return {
     datasetKey: requiredText(source?.datasetKey, "source report datasetKey"),
     dataVersion: requiredText(source?.dataVersion, "source report dataVersion"),
@@ -883,6 +1468,10 @@ export function assertBoundSimulatedPrintReports(source, fact) {
     factRunId: requiredText(fact?.runId, "fact report runId"),
     target,
     backendURL: requiredText(source?.backendURL, "source report backendURL"),
+    databaseName: requiredText(
+      source?.databaseName,
+      "source report databaseName",
+    ),
     semanticDigest: requiredText(
       source?.semanticDigest,
       "source report semanticDigest",
@@ -892,6 +1481,7 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       source?.runtime?.configRevision,
       "source report configRevision",
     ),
+    printRecords,
     runtimeAttestation:
       target === CUSTOMER_TRIAL_133_TARGET
         ? {
@@ -929,6 +1519,138 @@ async function loadBoundSimulatedPrintInput({
   };
 }
 
+export function assertManualAcceptanceTaskGroupCoverage(
+  readiness,
+  taskReportCoverage = null,
+) {
+  const taskInput = readiness?.reportInputs?.taskReport;
+  const coverage = readiness?.summary?.taskGroupCoverage;
+  const digest = String(taskInput?.taskGroupCoverageDigest || "");
+  const expectedRoles = FORMAL_BROWSER_ACCOUNTS.map((item) => item.roleKey)
+    .filter((roleKey) => roleKey !== "system_admin")
+    .sort();
+  const actualRoles = Object.keys(coverage?.byRole || {}).sort();
+  const relevantProbes = (
+    Array.isArray(readiness?.probes) ? readiness.probes : []
+  ).filter((probe) => /^(mobile-tasks|workflow-tasks):/u.test(probe?.id || ""));
+  const validProbeCoverage =
+    relevantProbes.length >= expectedRoles.length &&
+    relevantProbes.every(
+      (probe) =>
+        Array.isArray(probe.requiredScenarios) &&
+        probe.requiredScenarios.length > 0 &&
+        Array.isArray(probe.requiredTaskGroups) &&
+        probe.requiredTaskGroups.length > 0 &&
+        probe.taskGroupCounts &&
+        typeof probe.taskGroupCounts === "object" &&
+        !Array.isArray(probe.taskGroupCounts) &&
+        probe.requiredTaskGroups.every(
+          (taskGroup) => Number(probe.taskGroupCounts[taskGroup] || 0) > 0,
+        ) &&
+        Array.isArray(probe.missingTaskGroups) &&
+        probe.missingTaskGroups.length === 0 &&
+        Array.isArray(probe.unknownTaskGroups) &&
+        probe.unknownTaskGroups.length === 0 &&
+        probe.enoughTaskGroups === true &&
+        probe.scenarioCounts &&
+        typeof probe.scenarioCounts === "object" &&
+        !Array.isArray(probe.scenarioCounts) &&
+        probe.requiredScenarios.every(
+          (scenarioKey) => Number(probe.scenarioCounts[scenarioKey] || 0) > 0,
+        ) &&
+        Array.isArray(probe.missingScenarios) &&
+        probe.missingScenarios.length === 0 &&
+        Array.isArray(probe.unknownScenarios) &&
+        probe.unknownScenarios.length === 0 &&
+        probe.enoughScenarios === true,
+    );
+  const validSummaryCoverage = expectedRoles.every((roleKey) => {
+    const role = coverage?.byRole?.[roleKey];
+    if (
+      !Array.isArray(role?.taskGroups) ||
+      role.taskGroups.length === 0 ||
+      !role.groups ||
+      typeof role.groups !== "object" ||
+      Array.isArray(role.groups)
+    ) {
+      return false;
+    }
+    const groupKeys = Object.keys(role.groups).sort();
+    if (
+      JSON.stringify([...role.taskGroups].sort()) !== JSON.stringify(groupKeys)
+    ) {
+      return false;
+    }
+    return groupKeys.every((taskGroup) => {
+      const group = role.groups[taskGroup];
+      return (
+        Array.isArray(group?.requiredScenarios) &&
+        group.requiredScenarios.length > 0 &&
+        group.scenarioCounts &&
+        typeof group.scenarioCounts === "object" &&
+        !Array.isArray(group.scenarioCounts) &&
+        group.requiredScenarios.every(
+          (scenarioKey) => Number(group.scenarioCounts[scenarioKey] || 0) > 0,
+        ) &&
+        Array.isArray(group.missingScenarios) &&
+        group.missingScenarios.length === 0 &&
+        Array.isArray(group.unknownScenarios) &&
+        group.unknownScenarios.length === 0 &&
+        group.enoughScenarios === true
+      );
+    });
+  });
+  const taskReportCoverageMatches = taskReportCoverage
+    ? taskReportCoverage.catalogScenarioDigest === digest &&
+      expectedRoles.every((roleKey) => {
+        const taskGroups = [
+          ...(taskReportCoverage.taskGroupsByRole?.[roleKey] || []),
+        ].sort();
+        const summaryRole = coverage?.byRole?.[roleKey];
+        if (
+          JSON.stringify(taskGroups) !==
+          JSON.stringify([...(summaryRole?.taskGroups || [])].sort())
+        ) {
+          return false;
+        }
+        return taskGroups.every(
+          (taskGroup) =>
+            JSON.stringify(
+              Object.entries(
+                taskReportCoverage.scenariosByRoleTaskGroup?.[roleKey]?.[
+                  taskGroup
+                ] || {},
+              ).sort(([left], [right]) => left.localeCompare(right)),
+            ) ===
+            JSON.stringify(
+              Object.entries(
+                summaryRole?.groups?.[taskGroup]?.scenarioCounts || {},
+              ).sort(([left], [right]) => left.localeCompare(right)),
+            ),
+        );
+      })
+    : true;
+  if (
+    !/^[0-9a-f]{64}$/u.test(digest) ||
+    coverage?.catalogScenarioDigest !== digest ||
+    coverage?.complete !== true ||
+    JSON.stringify(actualRoles) !== JSON.stringify(expectedRoles) ||
+    !validSummaryCoverage ||
+    !validProbeCoverage ||
+    !taskReportCoverageMatches
+  ) {
+    throw new BrowserAcceptanceError(
+      "readiness 未完整证明九个岗位的 taskGroup 与场景覆盖",
+    );
+  }
+  return {
+    catalogScenarioDigest: digest,
+    roleCount: actualRoles.length,
+    relevantProbeCount: relevantProbes.length,
+    complete: true,
+  };
+}
+
 export function assertManualAcceptanceBrowserReadinessBinding(
   readiness,
   printInput,
@@ -947,22 +1669,39 @@ export function assertManualAcceptanceBrowserReadinessBinding(
     "runId",
     "target",
     "backendURL",
+    "databaseName",
     "semanticDigest",
   ];
   const factMatches = identityFields.every(
     (field) => String(factInput?.[field] || "") === String(printInput[field]),
   );
   const sourceMatches =
+    ["datasetKey", "dataVersion", "target", "backendURL", "databaseName"].every(
+      (field) =>
+        String(sourceInput?.[field] || "") === String(printInput[field] || ""),
+    ) &&
     String(sourceInput?.runId || "") === printInput.sourceRunId &&
     String(sourceInput?.prefix || "") === printInput.sourcePrefix;
+  const expectedTaskIdentity = manualAcceptanceTaskBatchIdentity(
+    printInput.sourceRunId,
+  );
   const taskMatches =
+    ["datasetKey", "dataVersion", "target", "backendURL", "databaseName"].every(
+      (field) =>
+        String(taskInput?.[field] || "") === String(printInput[field] || ""),
+    ) &&
     String(taskInput?.runId || "") === printInput.sourceRunId &&
-    Boolean(String(taskInput?.prefix || "").trim()) &&
-    Boolean(String(taskInput?.sourceType || "").trim()) &&
-    Number.isSafeInteger(Number(taskInput?.sourceID)) &&
-    Number(taskInput.sourceID) > 0;
+    String(taskInput?.prefix || "") === expectedTaskIdentity.prefix &&
+    String(taskInput?.sourceType || "") === TASK_SOURCE_TYPE &&
+    Number(taskInput?.sourceID) === expectedTaskIdentity.sourceID;
+  const taskGroupCoverage = assertManualAcceptanceTaskGroupCoverage(readiness);
   const runtimeMatches =
+    readiness?.datasetKey === printInput.datasetKey &&
+    readiness?.dataVersion === printInput.dataVersion &&
+    readiness?.runId === printInput.sourceRunId &&
+    readiness?.target === printInput.target &&
     readiness?.backendURL === printInput.backendURL &&
+    readiness?.databaseName === printInput.databaseName &&
     readiness?.customerKey === CUSTOMER_KEY &&
     readiness?.runtimePreflight?.target === printInput.target &&
     readiness?.runtimePreflight?.customerKey === CUSTOMER_KEY &&
@@ -996,6 +1735,8 @@ export function assertManualAcceptanceBrowserReadinessBinding(
     taskPrefix: taskInput.prefix,
     taskSourceType: taskInput.sourceType,
     taskSourceID: Number(taskInput.sourceID),
+    taskVisibleCodePrefixes: { ...TASK_VISIBLE_CODE_PREFIX_BY_ROLE },
+    taskGroupCoverage,
   };
 }
 
@@ -1010,6 +1751,305 @@ async function loadBoundReadinessInput({ readinessReportPath, printInput }) {
     ...binding,
     readinessReportPath: path.relative(REPO_ROOT, readinessReportPath),
     readinessReportSHA256: createHash("sha256").update(raw).digest("hex"),
+  };
+}
+
+async function readJSONEvidence(reportPath, label) {
+  let raw;
+  let report;
+  try {
+    raw = await fs.readFile(reportPath, "utf8");
+    report = JSON.parse(raw);
+  } catch (error) {
+    throw new BrowserAcceptanceError(
+      `${label} 无法读取：${error?.message || error}`,
+      2,
+    );
+  }
+  return { raw, report };
+}
+
+function expectedDatasetTargetAlias(policyTarget) {
+  return policyTarget === CUSTOMER_TRIAL_133_TARGET ? policyTarget : "local";
+}
+
+export async function verifyManualAcceptanceDatasetApplyReportBinding({
+  datasetReportPath,
+  sourceReportPath,
+  factReportPath,
+  readinessReportPath,
+  printInput,
+  datasetReportRoot = DATASET_REPORT_ROOT,
+}) {
+  if (!datasetReportPath) {
+    throw new BrowserAcceptanceError(
+      "浏览器验收必须提供同批 --dataset-report",
+      2,
+    );
+  }
+  const targetAlias = expectedDatasetTargetAlias(printInput.target);
+  const expectedDatasetPath = path.resolve(
+    datasetReportRoot,
+    printInput.dataVersion,
+    targetAlias,
+    "dataset/apply-report.json",
+  );
+  if (path.resolve(datasetReportPath) !== expectedDatasetPath) {
+    throw new BrowserAcceptanceError(
+      "dataset apply 报告不在当前批次与目标的 canonical path",
+      2,
+    );
+  }
+  const datasetEvidence = await readJSONEvidence(
+    expectedDatasetPath,
+    "dataset apply 报告",
+  );
+  const dataset = datasetEvidence.report;
+  const datasetSemanticDigest =
+    typeof dataset?.semanticDigest === "string" &&
+    /^[0-9a-f]{64}$/u.test(dataset.semanticDigest)
+      ? dataset.semanticDigest
+      : "";
+  const identityMatches =
+    dataset?.contract === MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT &&
+    dataset?.mode === "apply" &&
+    dataset?.scope === "manual-acceptance-dataset" &&
+    dataset?.ok === true &&
+    dataset?.failedStage == null &&
+    dataset?.datasetKey === printInput.datasetKey &&
+    dataset?.dataVersion === printInput.dataVersion &&
+    dataset?.runId === printInput.sourceRunId &&
+    Boolean(datasetSemanticDigest) &&
+    dataset?.target?.alias === targetAlias &&
+    dataset?.target?.policyTarget === printInput.target &&
+    dataset?.target?.backendURL === printInput.backendURL &&
+    dataset?.target?.databaseName === printInput.databaseName;
+  if (!identityMatches) {
+    throw new BrowserAcceptanceError(
+      "dataset apply 报告与当前模拟数据批次或目标身份不一致",
+    );
+  }
+  if (
+    !Array.isArray(dataset.stages) ||
+    dataset.stages.length !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length ||
+    dataset.stages.some(
+      (stage, index) =>
+        stage?.key !== MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS[index] ||
+        stage?.stageKey !== stage.key ||
+        stage?.status !== "completed" ||
+        stage?.dataVersion !== printInput.dataVersion ||
+        stage?.semanticDigest !== datasetSemanticDigest ||
+        stage?.references?.runner?.revision !==
+          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    )
+  ) {
+    throw new BrowserAcceptanceError(
+      "dataset apply 报告没有完整完成全部 canonical stages",
+    );
+  }
+
+  const components = {};
+  const componentDigests = {};
+  for (const stage of dataset.stages) {
+    const expectedPath = path.resolve(
+      REPO_ROOT,
+      manualAcceptanceDatasetStageReportPath({
+        outputRoot: datasetReportRoot,
+        dataVersion: printInput.dataVersion,
+        targetAlias,
+        stageKey: stage.key,
+      }),
+    );
+    if (path.resolve(stage.references.runner.reportPath) !== expectedPath) {
+      throw new BrowserAcceptanceError(
+        `dataset ${stage.key} stage 报告路径不是 canonical path`,
+      );
+    }
+    const evidence = await readJSONEvidence(
+      expectedPath,
+      `dataset ${stage.key} stage 报告`,
+    );
+    const digest = digestManualAcceptanceDatasetComponentReport(
+      evidence.report,
+    );
+    if (digest !== stage.references.runner.componentDigest) {
+      throw new BrowserAcceptanceError(
+        `dataset ${stage.key} stage component digest 不一致`,
+      );
+    }
+    for (const [field, expected] of Object.entries({
+      datasetKey: printInput.datasetKey,
+      dataVersion: printInput.dataVersion,
+      runId: printInput.sourceRunId,
+      target: printInput.target,
+      backendURL: printInput.backendURL,
+      databaseName: printInput.databaseName,
+    })) {
+      if (String(evidence.report?.[field] ?? "") !== String(expected)) {
+        throw new BrowserAcceptanceError(
+          `dataset ${stage.key} stage ${field} 与当前批次不一致`,
+        );
+      }
+    }
+    components[stage.key] = {
+      path: expectedPath,
+      raw: evidence.raw,
+      report: evidence.report,
+    };
+    componentDigests[stage.key] = digest;
+  }
+
+  for (const [stageKey, providedPath] of Object.entries({
+    source: sourceReportPath,
+    facts: factReportPath,
+    readiness: readinessReportPath,
+  })) {
+    if (path.resolve(providedPath || "") !== components[stageKey].path) {
+      throw new BrowserAcceptanceError(
+        `--${stageKey === "facts" ? "fact" : stageKey}-report 必须使用 dataset runner 同批 stage 报告`,
+        2,
+      );
+    }
+  }
+
+  const core = components.core.report;
+  const baseline = components.baseline.report;
+  const freshBaseline = dataset.freshEmptyBaseline;
+  const baselineConfigMatches = [
+    "configRevision",
+    "configProductVersion",
+    "configApplyPurpose",
+    "configDatasetVersion",
+    "configTarget",
+  ].every(
+    (field) =>
+      String(baseline.customerConfig?.[field] ?? "") ===
+      String(core?.[field] ?? ""),
+  );
+  const emptyBaselineProven =
+    freshBaseline?.status === "completed" &&
+    ["fresh_empty_baseline", "validated_resume_receipt"].includes(
+      freshBaseline?.origin,
+    ) &&
+    ["verified", "reused"].includes(freshBaseline?.operation) &&
+    path.resolve(freshBaseline?.reportPath || "") ===
+      components.baseline.path &&
+    freshBaseline?.componentDigest === componentDigests.baseline &&
+    baseline?.contract === "manual-acceptance-empty-baseline-report-v1" &&
+    baseline?.summary?.exactEmptyBusinessBaseline === true &&
+    baseline?.summary?.zeroBusinessRecords === true &&
+    baseline?.summary?.checkedBusinessObjectKinds ===
+      MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
+    Object.keys(baseline?.zeroCounts || {}).length ===
+      MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.length &&
+    MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES.every(
+      ({ key }) => baseline.zeroCounts?.[key] === 0,
+    ) &&
+    baseline?.databaseName === printInput.databaseName &&
+    baseline?.runtimeIdentity?.databaseName === printInput.databaseName &&
+    core?.configRevision === printInput.configRevision &&
+    baselineConfigMatches;
+  const runtimeBaselineMatches =
+    printInput.target === CUSTOMER_TRIAL_133_TARGET
+      ? baseline?.runtimeIdentity?.release ===
+          printInput.runtimeAttestation?.release &&
+        baseline?.runtimeIdentity?.migration ===
+          printInput.runtimeAttestation?.migration
+      : baseline?.runtimeIdentity?.release == null &&
+        baseline?.runtimeIdentity?.migration == null;
+  if (!emptyBaselineProven || !runtimeBaselineMatches) {
+    throw new BrowserAcceptanceError(
+      "dataset apply 报告没有绑定当前运行态的 fresh empty baseline",
+    );
+  }
+
+  const taskCoverageDigest = requiredText(
+    components.task.report?.coverage?.catalogScenarioDigest,
+    "task report coverage.catalogScenarioDigest",
+  );
+  if (
+    components.readiness.report?.reportInputs?.taskReport
+      ?.taskGroupCoverageDigest !== taskCoverageDigest
+  ) {
+    throw new BrowserAcceptanceError(
+      "task 与 readiness 的 taskGroup coverage digest 不一致",
+    );
+  }
+  const taskGroupCoverage = assertManualAcceptanceTaskGroupCoverage(
+    components.readiness.report,
+    components.task.report.coverage,
+  );
+  let expectedTaskSchedule;
+  try {
+    expectedTaskSchedule = buildManualAcceptanceTaskSchedule(
+      dataset?.taskSchedule?.anchorUnix,
+    );
+  } catch (error) {
+    throw new BrowserAcceptanceError(
+      `dataset 任务时间锚点无效：${error?.message || error}`,
+    );
+  }
+  if (
+    JSON.stringify(dataset.taskSchedule) !==
+      JSON.stringify(expectedTaskSchedule) ||
+    JSON.stringify(components.task.report?.schedule) !==
+      JSON.stringify(expectedTaskSchedule)
+  ) {
+    throw new BrowserAcceptanceError(
+      "dataset 与 task component 没有绑定同一个任务时间锚点",
+    );
+  }
+  const shipments = components.facts.report?.referenceRecords?.shipments;
+  if (
+    !Array.isArray(shipments) ||
+    shipments.length !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT
+  ) {
+    throw new BrowserAcceptanceError(
+      `dataset facts 必须精确包含 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张出货单`,
+    );
+  }
+  const longShipments = shipments.filter(
+    (shipment) =>
+      Array.isArray(shipment?.items) &&
+      shipment.items.length ===
+        MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
+  );
+  if (longShipments.length !== MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT) {
+    throw new BrowserAcceptanceError(
+      `dataset facts 必须恰好包含 ${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT} 张 ${MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT} 行出货单`,
+    );
+  }
+  const longShipmentNo = requiredText(
+    longShipments[0]?.shipmentNo || longShipments[0]?.shipment_no,
+    "25 行出货单号",
+  );
+  return {
+    applyReportPath: path.relative(REPO_ROOT, expectedDatasetPath),
+    applyReportSHA256: createHash("sha256")
+      .update(datasetEvidence.raw)
+      .digest("hex"),
+    datasetSemanticDigest,
+    targetAlias,
+    baseline: {
+      origin: freshBaseline.origin,
+      operation: freshBaseline.operation,
+      reportPath: path.relative(REPO_ROOT, components.baseline.path),
+      componentDigest: componentDigests.baseline,
+      exactEmptyBusinessBaseline: true,
+    },
+    componentDigests,
+    taskSchedule: expectedTaskSchedule,
+    shipments: {
+      exactCount: shipments.length,
+      longShipmentNo,
+      longLineCount: MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
+    },
+    attachments: {
+      reportPath: path.relative(REPO_ROOT, components.attachments.path),
+      componentDigest: componentDigests.attachments,
+      summary: components.attachments.report.summary,
+    },
+    taskGroupCoverage,
   };
 }
 
@@ -1033,47 +2073,47 @@ export function assertManualAcceptanceBrowserReportPathBinding(
   return reportPath;
 }
 
-async function verifyManualAcceptanceBrowserDatasetBinding({
+export async function verifyManualAcceptanceBrowserDatasetBinding({
   backendURL,
   printInput,
+  datasetReportPath,
+  sourceReportPath,
+  factReportPath,
   readinessReportPath,
   targetAttestation,
   fetchImpl,
 }) {
   if (printInput.backendURL !== backendURL) {
-    throw new BrowserAcceptanceError(
-      "浏览器后端与当前模拟数据批次不一致",
-    );
+    throw new BrowserAcceptanceError("浏览器后端与当前模拟数据批次不一致");
   }
-  let readiness = null;
-  if (readinessReportPath) {
-    readiness = await loadBoundReadinessInput({
-      readinessReportPath,
-      printInput,
-    });
-  } else if (printInput.target === CUSTOMER_TRIAL_133_TARGET) {
+  if (!datasetReportPath) {
     throw new BrowserAcceptanceError(
-      "customer-trial-133 浏览器验收必须提供同批 --readiness-report",
+      "浏览器验收必须提供同批 --dataset-report",
       2,
     );
   }
-  if (printInput.target !== CUSTOMER_TRIAL_133_TARGET) {
-    if (targetAttestation) {
-      throw new BrowserAcceptanceError(
-        "本地浏览器验收不得提供 customer-trial-133 attestation",
-        2,
-      );
-    }
-    return {
-      datasetKey: printInput.datasetKey,
-      dataVersion: printInput.dataVersion,
-      runId: printInput.sourceRunId,
-      target: printInput.target,
-      semanticDigest: printInput.semanticDigest,
-      configRevision: printInput.configRevision,
-      readiness,
-      runtimeIdentity: null,
-    };
+  if (!readinessReportPath) {
+    throw new BrowserAcceptanceError(
+      "浏览器验收必须提供同批 --readiness-report",
+      2,
+    );
+  }
+  const dataset = await verifyManualAcceptanceDatasetApplyReportBinding({
+    datasetReportPath,
+    sourceReportPath,
+    factReportPath,
+    readinessReportPath,
+    printInput,
+  });
+  const readiness = await loadBoundReadinessInput({
+    readinessReportPath,
+    printInput,
+  });
+  if (printInput.target !== CUSTOMER_TRIAL_133_TARGET && targetAttestation) {
+    throw new BrowserAcceptanceError(
+      "本地浏览器验收不得提供 customer-trial-133 attestation",
+      2,
+    );
   }
   const policy = resolveManualAcceptanceTarget({
     target: printInput.target,
@@ -1081,19 +2121,25 @@ async function verifyManualAcceptanceBrowserDatasetBinding({
     datasetKey: printInput.datasetKey,
     dataVersion: printInput.dataVersion,
     runId: printInput.sourceRunId,
+    databaseName: printInput.databaseName,
   });
-  const parsedAttestation = parseManualAcceptanceTargetAttestation(
-    targetAttestation,
-  );
+  const parsedAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
   const runtimeIdentity =
     await assertManualAcceptanceRuntimeIdentityPrecondition({
       policy,
       attestation: parsedAttestation,
       fetchImpl,
     });
+  if (runtimeIdentity.databaseName !== printInput.databaseName) {
+    throw new BrowserAcceptanceError(
+      "当前运行时数据库与同批模拟数据报告不一致",
+    );
+  }
   if (
-    runtimeIdentity.release !== printInput.runtimeAttestation?.release ||
-    runtimeIdentity.migration !== printInput.runtimeAttestation?.migration
+    printInput.target === CUSTOMER_TRIAL_133_TARGET &&
+    (runtimeIdentity.release !== printInput.runtimeAttestation?.release ||
+      runtimeIdentity.migration !== printInput.runtimeAttestation?.migration)
   ) {
     throw new BrowserAcceptanceError(
       "当前运行时 release/migration 与同批模拟数据报告不一致",
@@ -1106,11 +2152,12 @@ async function verifyManualAcceptanceBrowserDatasetBinding({
     target: printInput.target,
     semanticDigest: printInput.semanticDigest,
     configRevision: printInput.configRevision,
+    dataset,
     readiness,
     runtimeIdentity: {
       databaseName: runtimeIdentity.databaseName,
-      release: runtimeIdentity.release,
-      migration: runtimeIdentity.migration,
+      release: runtimeIdentity.release ?? null,
+      migration: runtimeIdentity.migration ?? null,
       proof: runtimeIdentity.proof,
     },
   };
@@ -1173,6 +2220,73 @@ export async function assertPDFRenderResponse(response, templateKey) {
   return { status, contentType, requestID };
 }
 
+async function readPrintSourceMinimumEvidence(
+  page,
+  {
+    search,
+    searchPlaceholder,
+    sourcePrefix,
+    minimumSourceRecords,
+    templateKey,
+  },
+) {
+  await search.fill(sourcePrefix);
+  await page.waitForFunction(
+    ({ placeholder, prefix }) => {
+      const input = [...document.querySelectorAll("input")].find(
+        (candidate) => candidate.getAttribute("placeholder") === placeholder,
+      );
+      const visibleRows = [
+        ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
+      ].filter((row) => {
+        const style = window.getComputedStyle(row);
+        const rect = row.getBoundingClientRect();
+        return (
+          rect.width > 0 && rect.height > 0 && style.visibility !== "hidden"
+        );
+      });
+      return (
+        input?.value === prefix &&
+        visibleRows.length > 0 &&
+        visibleRows.every((row) => row.innerText.includes(prefix))
+      );
+    },
+    { placeholder: searchPlaceholder, prefix: sourcePrefix },
+    { timeout: PAGE_TIMEOUT_MS },
+  );
+  const metrics = await page.evaluate((prefix) => {
+    const visibleRows = [
+      ...document.querySelectorAll(".ant-table-tbody > tr.ant-table-row"),
+    ].filter((row) => {
+      const style = window.getComputedStyle(row);
+      const rect = row.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
+    });
+    return {
+      visibleRows: visibleRows.length,
+      matchingCurrentBatchRows: visibleRows.filter((row) =>
+        row.innerText.includes(prefix),
+      ).length,
+      paginationTexts: [
+        ...document.querySelectorAll(
+          ".ant-pagination-total-text,.ant-pagination",
+        ),
+      ].map((node) => node.textContent || ""),
+    };
+  }, sourcePrefix);
+  const evidence = evaluatePrintSourceMinimumEvidence({
+    sourcePrefix,
+    ...metrics,
+    minimumRecords: minimumSourceRecords,
+  });
+  if (!evidence.minimumSatisfied) {
+    throw new BrowserAcceptanceError(
+      `${templateKey} 当前批次来源记录不足：expected>=${minimumSourceRecords} actual=${evidence.observedTotal}`,
+    );
+  }
+  return evidence;
+}
+
 async function verifyBusinessPrintTemplate(browser, options) {
   const {
     baseURL,
@@ -1183,6 +2297,8 @@ async function verifyBusinessPrintTemplate(browser, options) {
     templateKey,
     searchPlaceholder,
     recordQuery,
+    expectedLineCount,
+    minimumSourceRecords,
   } = options;
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
@@ -1213,6 +2329,13 @@ async function verifyBusinessPrintTemplate(browser, options) {
       .first()
       .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     const search = page.getByPlaceholder(searchPlaceholder, { exact: true });
+    const sourceDataEvidence = await readPrintSourceMinimumEvidence(page, {
+      search,
+      searchPlaceholder,
+      sourcePrefix,
+      minimumSourceRecords,
+      templateKey,
+    });
     const row = page.getByRole("row").filter({ hasText: recordQuery }).first();
     const recordCell = row.getByText(recordQuery, { exact: true }).first();
     const selectionControl = row
@@ -1333,6 +2456,23 @@ async function verifyBusinessPrintTemplate(browser, options) {
     await workspace
       .getByText(workspaceSourceLabel, { exact: true })
       .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+    assert.equal(expectedLineCount, 25, `${templateKey} 必须绑定 25 行源记录`);
+    const counterPattern = {
+      "material-purchase-contract": /采购明细行:\s*25\//u,
+      "processing-contract": /加工明细行:\s*25\//u,
+      "engineering-material-detail": /物料行:\s*25\//u,
+      "engineering-color-card": /色卡块:\s*25\//u,
+      "engineering-work-instruction": /正文行:\s*25\b/u,
+    }[templateKey];
+    if (counterPattern) {
+      await page.waitForTimeout(100);
+      const workspaceText = await workspace.locator("body").innerText();
+      assert.match(
+        workspaceText,
+        counterPattern,
+        `${templateKey} 工作台未读回 25 行明细`,
+      );
+    }
     assert.equal(
       new URL(workspace.url()).searchParams.get("source"),
       "business",
@@ -1364,6 +2504,8 @@ async function verifyBusinessPrintTemplate(browser, options) {
       actionLabel,
       sourcePrefix,
       recordQuery,
+      expectedLineCount,
+      sourceDataEvidence,
       workspaceSource: "business",
       workspacePath: new URL(workspace.url()).pathname,
       status: responseEvidence.status,
@@ -1374,65 +2516,68 @@ async function verifyBusinessPrintTemplate(browser, options) {
     };
   } catch (error) {
     const diagnostics = await page
-      .evaluate(({ label, query, searchPlaceholder: placeholder }) => {
-        const normalize = (value) =>
-          String(value || "")
-            .replace(/\s+/gu, " ")
-            .trim();
-        const matchingButtons = [...document.querySelectorAll("button")]
-          .filter((button) => normalize(button.innerText) === label)
-          .map((button) => {
-            const style = window.getComputedStyle(button);
-            const rect = button.getBoundingClientRect();
-            return {
-              disabled: button.disabled,
-              display: style.display,
-              visibility: style.visibility,
-              opacity: style.opacity,
-              width: Math.round(rect.width),
-              height: Math.round(rect.height),
-              inSelectionBar: Boolean(
-                button.closest(".erp-business-selection-action-bar"),
+      .evaluate(
+        ({ label, query, searchPlaceholder: placeholder }) => {
+          const normalize = (value) =>
+            String(value || "")
+              .replace(/\s+/gu, " ")
+              .trim();
+          const matchingButtons = [...document.querySelectorAll("button")]
+            .filter((button) => normalize(button.innerText) === label)
+            .map((button) => {
+              const style = window.getComputedStyle(button);
+              const rect = button.getBoundingClientRect();
+              return {
+                disabled: button.disabled,
+                display: style.display,
+                visibility: style.visibility,
+                opacity: style.opacity,
+                width: Math.round(rect.width),
+                height: Math.round(rect.height),
+                inSelectionBar: Boolean(
+                  button.closest(".erp-business-selection-action-bar"),
+                ),
+              };
+            });
+          return {
+            matchingButtons,
+            searchValue:
+              document.querySelector(
+                `input[placeholder="${CSS.escape(placeholder)}"]`,
+              )?.value || "",
+            visibleRows: [
+              ...document.querySelectorAll(
+                ".ant-table-tbody > tr.ant-table-row",
               ),
-            };
-          });
-        return {
-          matchingButtons,
-          searchValue:
-            document.querySelector(
-              `input[placeholder="${CSS.escape(placeholder)}"]`,
-            )?.value || "",
-          visibleRows: [
-            ...document.querySelectorAll(
-              ".ant-table-tbody > tr.ant-table-row",
+            ].filter((row) => {
+              const style = window.getComputedStyle(row);
+              const rect = row.getBoundingClientRect();
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.visibility !== "hidden"
+              );
+            }).length,
+            matchingRows: [
+              ...document.querySelectorAll(
+                ".ant-table-tbody > tr.ant-table-row",
+              ),
+            ].filter((row) => row.innerText.includes(query)).length,
+            selectedRows: document.querySelectorAll(".ant-table-row-selected")
+              .length,
+            selectionBarActive: Boolean(
+              document.querySelector(
+                ".erp-business-selection-action-bar--active",
+              ),
             ),
-          ].filter((row) => {
-            const style = window.getComputedStyle(row);
-            const rect = row.getBoundingClientRect();
-            return (
-              rect.width > 0 &&
-              rect.height > 0 &&
-              style.visibility !== "hidden"
-            );
-          }).length,
-          matchingRows: [
-            ...document.querySelectorAll(
-              ".ant-table-tbody > tr.ant-table-row",
-            ),
-          ].filter((row) => row.innerText.includes(query)).length,
-          selectedRows: document.querySelectorAll(".ant-table-row-selected")
-            .length,
-          selectionBarActive: Boolean(
-            document.querySelector(
-              ".erp-business-selection-action-bar--active",
-            ),
-          ),
-        };
-      }, {
-        label: actionLabel,
-        query: recordQuery,
-        searchPlaceholder,
-      })
+          };
+        },
+        {
+          label: actionLabel,
+          query: recordQuery,
+          searchPlaceholder,
+        },
+      )
       .catch(() => null);
     const screenshotPath = path.resolve(
       REPORT_ROOT,
@@ -1459,6 +2604,11 @@ async function verifyBusinessPrintEvidence(
   browser,
   { baseURL, password, printInput },
 ) {
+  const workspaceMinimumByTemplate = new Map(
+    buildManualAcceptanceCatalog().technicalManifest.printWorkspacePages.map(
+      (target) => [target.key, target.minimumRecords],
+    ),
+  );
   const cases = [
     [
       "demo_purchase",
@@ -1466,7 +2616,8 @@ async function verifyBusinessPrintEvidence(
       "打印合同",
       "material-purchase-contract",
       "搜索采购单",
-      `${printInput.sourcePrefix}-PO-001`,
+      printInput.printRecords.purchaseOrder.recordQuery,
+      printInput.printRecords.purchaseOrder.lineCount,
     ],
     [
       "demo_production",
@@ -1474,7 +2625,8 @@ async function verifyBusinessPrintEvidence(
       "加工合同打印",
       "processing-contract",
       "搜索合同",
-      `${printInput.sourcePrefix}-OS-001`,
+      printInput.printRecords.outsourcingOrder.recordQuery,
+      printInput.printRecords.outsourcingOrder.lineCount,
     ],
     [
       "demo_engineering",
@@ -1482,7 +2634,8 @@ async function verifyBusinessPrintEvidence(
       "打印物料明细",
       "engineering-material-detail",
       "搜索 BOM 版本",
-      `${printInput.sourcePrefix}-BOM-001-1`,
+      printInput.printRecords.bomVersion.recordQuery,
+      printInput.printRecords.bomVersion.lineCount,
     ],
     [
       "demo_engineering",
@@ -1490,7 +2643,8 @@ async function verifyBusinessPrintEvidence(
       "打印色卡",
       "engineering-color-card",
       "搜索 BOM 版本",
-      `${printInput.sourcePrefix}-BOM-001-1`,
+      printInput.printRecords.bomVersion.recordQuery,
+      printInput.printRecords.bomVersion.lineCount,
     ],
     [
       "demo_engineering",
@@ -1498,7 +2652,8 @@ async function verifyBusinessPrintEvidence(
       "打印作业指导书",
       "engineering-work-instruction",
       "搜索 BOM 版本",
-      `${printInput.sourcePrefix}-BOM-001-1`,
+      printInput.printRecords.bomVersion.recordQuery,
+      printInput.printRecords.bomVersion.lineCount,
     ],
   ];
   const templates = [];
@@ -1509,8 +2664,14 @@ async function verifyBusinessPrintEvidence(
     templateKey,
     searchPlaceholder,
     recordQuery,
+    expectedLineCount,
   ] of cases) {
+    const minimumSourceRecords = workspaceMinimumByTemplate.get(templateKey);
     try {
+      assert.ok(
+        Number.isSafeInteger(minimumSourceRecords) && minimumSourceRecords > 0,
+        `${templateKey} 缺少打印工作台最少来源记录合同`,
+      );
       const account = FORMAL_BROWSER_ACCOUNTS.find(
         (candidate) => candidate.username === username,
       );
@@ -1531,6 +2692,8 @@ async function verifyBusinessPrintEvidence(
           templateKey,
           searchPlaceholder,
           recordQuery,
+          expectedLineCount,
+          minimumSourceRecords,
         }),
       );
     } catch (error) {
@@ -1540,6 +2703,8 @@ async function verifyBusinessPrintEvidence(
         actionLabel,
         sourcePrefix: printInput.sourcePrefix,
         recordQuery,
+        expectedLineCount,
+        minimumSourceRecords,
         passed: false,
         error: sanitizeDiagnostic(error?.message || error),
       });
@@ -1567,7 +2732,10 @@ export function summarizeManualAcceptance({
   const failedAccounts = formalAccounts.filter((item) => !item.passed);
   const failedExceptions = exceptionAccounts.filter((item) => !item.passed);
   const listTargets = targets.filter((item) => item.isList);
-  const failedDataMinimums = listTargets.filter(
+  const dataEvidenceTargets = targets.filter(
+    (item) => item.requiresDataEvidence ?? item.isList,
+  );
+  const failedDataMinimums = dataEvidenceTargets.filter(
     (item) => item.dataEvidence?.minimumSatisfied !== true,
   );
   const pageRuntimePassed =
@@ -1584,6 +2752,7 @@ export function summarizeManualAcceptance({
     failedAccounts,
     failedExceptions,
     listTargets,
+    dataEvidenceTargets,
     failedDataMinimums,
     printEvidencePassed,
   };
@@ -1598,6 +2767,7 @@ async function verifyTarget(
     mobileStorageStates,
     preflight,
     reportPath,
+    datasetBinding,
   },
 ) {
   const storageState = target.username
@@ -1641,11 +2811,15 @@ async function verifyTarget(
         );
       }
     }
-    const dataEvidence = target.isList
-      ? await readListEvidence(page, target)
+    const dataEvidence = target.requiresDataEvidence
+      ? target.isList
+        ? await readListEvidence(page, target, datasetBinding)
+        : target.group === "print-preview"
+          ? await readPrintPreviewEvidence(page, target)
+          : await readDashboardEvidence(page, target)
       : {
           status: "not_applicable",
-          evidenceSource: "page content only",
+          evidenceSource: "covered by account or print-specific evidence",
           minimumRecords: target.minimumRecords,
           minimumSatisfied: null,
         };
@@ -1917,6 +3091,7 @@ export async function runManualAcceptanceBrowser(
     sourceReportPath = DEFAULT_SOURCE_REPORT_PATH,
     factReportPath = DEFAULT_FACT_REPORT_PATH,
     readinessReportPath = "",
+    datasetReportPath = "",
     targetAttestation = "",
     headed = false,
   } = {},
@@ -1946,6 +3121,12 @@ export async function runManualAcceptanceBrowser(
         "--readiness-report",
       )
     : "";
+  const normalizedDatasetReportPath = datasetReportPath
+    ? resolveManualAcceptanceBrowserInputReportPath(
+        path.relative(REPO_ROOT, datasetReportPath),
+        "--dataset-report",
+      )
+    : "";
   const secret = String(password || "").trim();
   if (!secret) {
     throw new BrowserAcceptanceError(
@@ -1971,6 +3152,9 @@ export async function runManualAcceptanceBrowser(
   const datasetBinding = await verifyManualAcceptanceBrowserDatasetBinding({
     backendURL: normalizedBackendURL,
     printInput,
+    datasetReportPath: normalizedDatasetReportPath,
+    sourceReportPath: normalizedSourceReportPath,
+    factReportPath: normalizedFactReportPath,
     readinessReportPath: normalizedReadinessReportPath,
     targetAttestation,
     fetchImpl,
@@ -2030,6 +3214,7 @@ export async function runManualAcceptanceBrowser(
           mobileStorageStates,
           preflight,
           reportPath: normalizedReportPath,
+          datasetBinding,
         }),
       );
       await wait(TARGET_PACE_MS);
@@ -2040,9 +3225,13 @@ export async function runManualAcceptanceBrowser(
       const proof = printEvidence.templates.find(
         (item) => item.templateKey === target.key,
       );
+      const dataEvidence = buildPrintWorkspaceDataEvidence(
+        proof,
+        target.minimumRecords,
+      );
       targets.push({
         ...target,
-        passed: proof?.passed === true,
+        passed: proof?.passed === true && dataEvidence.minimumSatisfied,
         actualPath: proof?.workspacePath || "",
         customerBrandVerified: preflight.verified,
         customerBrandVisibleOnPage: true,
@@ -2052,12 +3241,7 @@ export async function runManualAcceptanceBrowser(
             ? "业务记录带值；PDF 已生成"
             : "打印证据未通过",
         },
-        dataEvidence: {
-          status: "not_applicable",
-          evidenceSource: "bound business record PDF proof",
-          minimumRecords: 0,
-          minimumSatisfied: null,
-        },
+        dataEvidence,
         runtimeErrors: proof?.passed
           ? []
           : [{ type: "print-evidence", message: proof?.error || "PDF 未通过" }],
@@ -2085,6 +3269,7 @@ export async function runManualAcceptanceBrowser(
     failedAccounts,
     failedExceptions,
     listTargets,
+    dataEvidenceTargets,
     failedDataMinimums,
   } = acceptance;
   const report = {
@@ -2122,14 +3307,15 @@ export async function runManualAcceptanceBrowser(
       targetFailedCount: failedTargets.length,
       targetCount: targets.length,
       listTargetCount: listTargets.length,
-      dataMinimumProvenCount: listTargets.filter(
+      dataEvidenceTargetCount: dataEvidenceTargets.length,
+      dataMinimumProvenCount: dataEvidenceTargets.filter(
         (item) => item.dataEvidence?.status === "minimum_proven",
       ).length,
-      dataPresentMinimumNotProvenCount: listTargets.filter(
+      dataPresentMinimumNotProvenCount: dataEvidenceTargets.filter(
         (item) =>
           item.dataEvidence?.status === "page_has_data_minimum_not_proven",
       ).length,
-      dataNotProvenCount: listTargets.filter(
+      dataNotProvenCount: dataEvidenceTargets.filter(
         (item) => item.dataEvidence?.status === "not_proven",
       ).length,
       dataMinimumFailedCount: failedDataMinimums.length,

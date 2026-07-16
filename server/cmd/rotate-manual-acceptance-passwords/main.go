@@ -25,24 +25,22 @@ const (
 	targetLocalDev         = "local-dev"
 	targetCustomerTrial133 = "customer-trial-133"
 	demoPasswordEnv        = "MANUAL_ACCEPTANCE_PASSWORD"
-	adminPasswordEnv       = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
 	dsnEnv                 = "POSTGRES_DSN"
-	localAcceptanceDB      = "plush_erp_acceptance_20260715_v3_dev"
-	customerTrial133DB     = "plush_erp_uat_20260715"
-	currentDatasetVersion  = "2026.07.15-v3"
+	localAcceptanceDB      = "plush_erp_acceptance_20260716_v5_dev"
+	customerTrial133DB     = "plush_erp_uat_20260716_v5"
+	customerTrial133Port   = "55435"
+	currentDatasetVersion  = "2026.07.16-v5"
 
 	localCustomerConfigProductVersion = "local-customer-package-test-apply"
 	localCustomerConfigApplyPurpose   = "local_test_apply"
-	customerTrial133Revision          = "yoyoosun-customer-trial-133-package-v3.runtime-manifest-v1"
-	customerTrial133ProductVersion    = "customer-trial-133-test-2026.07.15-v3"
+	customerTrial133Revision          = "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1"
+	customerTrial133ProductVersion    = "customer-trial-133-test-2026.07.16-v5"
 	customerTrial133ApplyPurpose      = "customer_trial_test_apply"
 )
 
 var localCustomerConfigRevisionPattern = regexp.MustCompile(
 	`^yoyoosun-customer-package-v[1-9][0-9]*\.local-[a-f0-9]{16}\.runtime-v1$`,
 )
-
-var customerTrialAdminAcceptanceUsernames = []string{"admin"}
 
 var demoAcceptanceUsernames = []string{
 	"demo_admin",
@@ -62,8 +60,6 @@ type options struct {
 	datasetVersion           string
 	expectedMigrationVersion string
 	confirm                  string
-	rotateAdmin              bool
-	rotateAdminConfirm       string
 	timeout                  time.Duration
 }
 
@@ -75,10 +71,6 @@ type activeCustomerConfigIdentity struct {
 
 func expectedConfirmation(target, datasetVersion string) string {
 	return "ROTATE_SIMULATED_ACCEPTANCE_ACCOUNTS:" + target + ":" + datasetVersion
-}
-
-func expectedAdminRotationConfirmation(target, datasetVersion string) string {
-	return "ROTATE_STABLE_ADMIN_PASSWORD:" + target + ":" + datasetVersion
 }
 
 func validateOptions(opts options) error {
@@ -93,16 +85,6 @@ func validateOptions(opts options) error {
 	}
 	if opts.confirm != expectedConfirmation(opts.target, opts.datasetVersion) {
 		return errors.New("confirmation does not match target and dataset version")
-	}
-	if opts.rotateAdmin {
-		if opts.target != targetCustomerTrial133 {
-			return errors.New("stable admin rotation is only available for customer-trial-133; local development must use its dedicated admin reset command")
-		}
-		if opts.rotateAdminConfirm != expectedAdminRotationConfirmation(opts.target, opts.datasetVersion) {
-			return errors.New("admin rotation confirmation does not match target and dataset version")
-		}
-	} else if strings.TrimSpace(opts.rotateAdminConfirm) != "" {
-		return errors.New("admin rotation confirmation requires --rotate-admin")
 	}
 	if opts.timeout <= 0 || opts.timeout > time.Minute {
 		return errors.New("timeout must be between 1ns and 1m")
@@ -158,8 +140,8 @@ func validateTargetDSN(target, datasetVersion, rawDSN string) error {
 		if databaseName != customerTrial133DB {
 			return fmt.Errorf("customer-trial-133 target requires isolated database %s", customerTrial133DB)
 		}
-		if port != "5435" || (host != "127.0.0.1" && host != "localhost") {
-			return errors.New("customer-trial-133 target requires the loopback PostgreSQL endpoint on the 133 host")
+		if port != customerTrial133Port || (host != "127.0.0.1" && host != "localhost") {
+			return fmt.Errorf("customer-trial-133 target requires the loopback PostgreSQL endpoint on port %s of the 133 host", customerTrial133Port)
 		}
 	default:
 		return errors.New("unsupported target")
@@ -259,12 +241,7 @@ func validateActiveCustomerConfigIdentity(target string, identity activeCustomer
 func acceptanceAccountUsernames(opts options) (adminUsernames, demoUsernames []string, err error) {
 	demoUsernames = append([]string(nil), demoAcceptanceUsernames...)
 	switch opts.target {
-	case targetLocalDev:
-		return nil, demoUsernames, nil
-	case targetCustomerTrial133:
-		if opts.rotateAdmin {
-			return append([]string(nil), customerTrialAdminAcceptanceUsernames...), demoUsernames, nil
-		}
+	case targetLocalDev, targetCustomerTrial133:
 		return nil, demoUsernames, nil
 	default:
 		return nil, nil, errors.New("unsupported target")
@@ -316,28 +293,18 @@ func assertAcceptanceAccounts(ctx context.Context, db *sql.DB, adminUsernames, d
 	return nil
 }
 
-func validateRotationPasswords(adminUsernames []string, adminPassword, demoPassword string) error {
-	adminPassword = strings.TrimSpace(adminPassword)
+func validateRotationPassword(demoPassword string) error {
 	demoPassword = strings.TrimSpace(demoPassword)
-	if len(adminUsernames) > 0 && adminPassword == "" {
-		return fmt.Errorf("%s is required", adminPasswordEnv)
-	}
 	if demoPassword == "" {
 		return fmt.Errorf("%s is required", demoPasswordEnv)
-	}
-	if len(adminUsernames) > 0 && biz.ValidateAdminPassword(adminPassword) != nil {
-		return fmt.Errorf("%s must contain 8-20 characters", adminPasswordEnv)
 	}
 	if biz.ValidateAdminPassword(demoPassword) != nil {
 		return fmt.Errorf("%s must contain 8-20 characters", demoPasswordEnv)
 	}
-	if len(adminUsernames) > 0 && adminPassword == demoPassword {
-		return errors.New("manual acceptance admin and demo passwords must differ")
-	}
 	return nil
 }
 
-func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword string) error {
+func run(ctx context.Context, opts options, dsn, demoPassword string) error {
 	if err := validateOptions(opts); err != nil {
 		return err
 	}
@@ -348,7 +315,7 @@ func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword str
 	if err != nil {
 		return err
 	}
-	if err := validateRotationPasswords(adminUsernames, adminPassword, demoPassword); err != nil {
+	if err := validateRotationPassword(demoPassword); err != nil {
 		return err
 	}
 	db, err := sql.Open("pgx", dsn)
@@ -380,7 +347,7 @@ func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword str
 		ctx,
 		db,
 		adminUsernames,
-		adminPassword,
+		"",
 		demoUsernames,
 		demoPassword,
 	); err != nil {
@@ -396,8 +363,6 @@ func main() {
 	flag.StringVar(&opts.datasetVersion, "dataset-version", "", "semantic acceptance dataset version")
 	flag.StringVar(&opts.expectedMigrationVersion, "expected-migration-version", "", "exact Atlas migration version")
 	flag.StringVar(&opts.confirm, "confirm", "", "exact target and dataset-bound confirmation")
-	flag.BoolVar(&opts.rotateAdmin, "rotate-admin", false, "also rotate the stable admin password; only customer-trial-133 may opt in")
-	flag.StringVar(&opts.rotateAdminConfirm, "rotate-admin-confirm", "", "separate exact confirmation required with --rotate-admin")
 	flag.DurationVar(&opts.timeout, "timeout", 30*time.Second, "database operation timeout")
 	flag.Parse()
 
@@ -407,7 +372,6 @@ func main() {
 		ctx,
 		opts,
 		os.Getenv(dsnEnv),
-		os.Getenv(adminPasswordEnv),
 		os.Getenv(demoPasswordEnv),
 	); err != nil {
 		fmt.Fprintf(os.Stderr, "rotate manual acceptance passwords: %v\n", err)

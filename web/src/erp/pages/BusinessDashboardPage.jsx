@@ -19,11 +19,15 @@ import {
   normalizeDashboardModuleStats,
 } from '../utils/dashboardStats.mjs'
 import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
+import { effectiveSessionAllowsPage } from '../utils/adminProfileSync.mjs'
 import { TASK_BOARD_LANE_DEFINITIONS } from '../utils/workflowTaskBoard.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
 const NUMBER_FORMATTER = new Intl.NumberFormat('zh-CN')
+const PAGE_KEY_BY_DASHBOARD_SOURCE = Object.freeze({
+  outbound: 'shipments',
+})
 
 const DATA_BOUNDARIES = Object.freeze([
   {
@@ -153,6 +157,16 @@ export default function BusinessDashboardPage() {
     [moduleStats]
   )
   const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
+  const isSuperAdmin = outletContext?.adminProfile?.is_super_admin === true
+  const allowedMenuPaths = useMemo(
+    () =>
+      new Set(
+        Array.isArray(outletContext?.allowedMenuPaths)
+          ? outletContext.allowedMenuPaths
+          : []
+      ),
+    [outletContext?.allowedMenuPaths]
+  )
   const collaborationRisk = taskBoardReady
     ? Number(taskBoard?.counts?.exception || 0) +
       Number(taskBoard?.counts?.due || 0)
@@ -199,38 +213,62 @@ export default function BusinessDashboardPage() {
 
   const renderSourceDetails = (record) => (
     <div className="erp-business-board-source-grid">
-      {record.sources.map((source) => (
-        <div
-          className="erp-business-board-source-item erp-business-board-source-item--openable"
-          key={source.key}
-          data-open-on-double-click="true"
-          title={`双击进入${source.label}`}
-          onDoubleClick={(event) =>
-            openDashboardItemOnDoubleClick(event, () => navigate(source.path))
-          }
-        >
-          <div className="erp-business-board-source-meta">
-            <Text>{source.label}</Text>
-            <strong
-              className="erp-business-board-source-count"
-              aria-label={`${source.label}数量${
-                source.available ? formatCount(source.total) : '暂不可用'
-              }`}
-            >
-              {source.available ? formatCount(source.total) : '暂不可用'}
-            </strong>
-          </div>
-          <Button
-            type="link"
-            size="small"
-            className="erp-business-board-source-entry"
-            onClick={() => navigate(source.path)}
-            aria-label={`查看${source.label}`}
+      {record.sources.map((source) => {
+        const pageKey = PAGE_KEY_BY_DASHBOARD_SOURCE[source.key] || source.key
+        const rbacAllowsPath = isSuperAdmin || allowedMenuPaths.has(source.path)
+        const canOpen =
+          rbacAllowsPath &&
+          effectiveSessionAllowsPage(outletContext?.adminProfile, pageKey, {
+            isLocalDev: false,
+            isSuperAdmin,
+          })
+        return (
+          <div
+            className={`erp-business-board-source-item${
+              canOpen ? ' erp-business-board-source-item--openable' : ''
+            }`}
+            key={source.key}
+            data-open-on-double-click={canOpen ? 'true' : undefined}
+            data-target-path={canOpen ? source.path : undefined}
+            title={canOpen ? `双击进入${source.label}` : undefined}
+            onDoubleClick={
+              canOpen
+                ? (event) =>
+                    openDashboardItemOnDoubleClick(event, () =>
+                      navigate(source.path)
+                    )
+                : undefined
+            }
           >
-            查看{source.label}
-          </Button>
-        </div>
-      ))}
+            <div className="erp-business-board-source-meta">
+              <Text>{source.label}</Text>
+              <strong
+                className="erp-business-board-source-count"
+                aria-label={`${source.label}数量${
+                  source.available ? formatCount(source.total) : '暂不可用'
+                }`}
+              >
+                {source.available ? formatCount(source.total) : '暂不可用'}
+              </strong>
+            </div>
+            {canOpen ? (
+              <Button
+                type="link"
+                size="small"
+                className="erp-business-board-source-entry"
+                onClick={() => navigate(source.path)}
+                aria-label={`查看${source.label}`}
+              >
+                查看{source.label}
+              </Button>
+            ) : (
+              <Text type="secondary" className="erp-business-board-source-readonly">
+                只读
+              </Text>
+            )}
+          </div>
+        )
+      })}
     </div>
   )
 
@@ -303,7 +341,7 @@ export default function BusinessDashboardPage() {
           />
         ) : null}
         <Paragraph type="secondary" className="erp-business-board-table-note">
-          每一项单独统计；点击“查看”进入，电脑端也可双击整项。
+          每一项单独统计；有“查看”的项目可进入，其他项目仅显示数量。
         </Paragraph>
         <Table
           size="middle"

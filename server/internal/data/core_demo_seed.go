@@ -11,6 +11,7 @@ import (
 )
 
 const CoreDemoSeedPrefix = "SIM-PLUSH-CORE"
+const CoreDemoReferenceSeedPrefix = "YS5"
 
 var (
 	ErrCoreDemoSeedMissingDB     = errors.New("SeedCoreDemoData: missing db")
@@ -85,6 +86,16 @@ type CoreDemoSeedDataset struct {
 	BOMs       []CoreDemoBOMSeed
 }
 
+// CoreDemoReferenceSeedDataset is the exact, minimal foundation required by
+// manual-acceptance source data. It intentionally excludes materials,
+// products, processes and BOMs so a fresh acceptance database does not gain
+// unrelated demo records before its versioned dataset is applied.
+type CoreDemoReferenceSeedDataset struct {
+	Prefix     string
+	Units      []CoreDemoUnitSeed
+	Warehouses []CoreDemoWarehouseSeed
+}
+
 type CoreDemoSeedResult struct {
 	Prefix             string
 	UnitIDs            map[string]int
@@ -96,6 +107,21 @@ type CoreDemoSeedResult struct {
 	PrimaryUnitID      int
 	PrimaryProductID   int
 	PrimaryWarehouseID int
+}
+
+func DefaultCoreDemoReferenceSeedDataset() CoreDemoReferenceSeedDataset {
+	return CoreDemoReferenceSeedDataset{
+		Prefix: CoreDemoReferenceSeedPrefix,
+		Units: []CoreDemoUnitSeed{
+			{Code: CoreDemoReferenceSeedPrefix + "-DW-01", Name: "件", Precision: 0},
+		},
+		Warehouses: []CoreDemoWarehouseSeed{
+			{Code: CoreDemoReferenceSeedPrefix + "-CK-01", Name: "原料仓", Type: "RAW_MATERIAL"},
+			{Code: CoreDemoReferenceSeedPrefix + "-CK-02", Name: "成品仓", Type: "FINISHED_GOODS"},
+			{Code: CoreDemoReferenceSeedPrefix + "-CK-03", Name: "待检仓", Type: "QC_HOLD"},
+			{Code: CoreDemoReferenceSeedPrefix + "-CK-04", Name: "在制仓", Type: "WORK_IN_PROCESS"},
+		},
+	}
 }
 
 func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
@@ -306,6 +332,59 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 	}
 }
 
+func SeedCoreDemoReferences(ctx context.Context, db *sql.DB, dataset CoreDemoReferenceSeedDataset) (*CoreDemoSeedResult, error) {
+	if db == nil {
+		return nil, ErrCoreDemoSeedMissingDB
+	}
+	if err := validateCoreDemoReferenceSeedDataset(dataset); err != nil {
+		return nil, err
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackSQLTx(ctx, tx, nil)
+
+	result := &CoreDemoSeedResult{
+		Prefix:       dataset.Prefix,
+		UnitIDs:      map[string]int{},
+		MaterialIDs:  map[string]int{},
+		ProductIDs:   map[string]int{},
+		WarehouseIDs: map[string]int{},
+		ProcessIDs:   map[string]int{},
+		BOMHeaderIDs: map[string]int{},
+	}
+	for _, unit := range dataset.Units {
+		id, err := upsertCoreDemoUnit(ctx, tx, unit)
+		if err != nil {
+			return nil, err
+		}
+		result.UnitIDs[unit.Code] = id
+	}
+	for _, warehouse := range dataset.Warehouses {
+		id, err := upsertCoreDemoWarehouse(ctx, tx, warehouse)
+		if err != nil {
+			return nil, err
+		}
+		result.WarehouseIDs[warehouse.Code] = id
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+
+	result.PrimaryUnitID = result.UnitIDs[dataset.Units[0].Code]
+	for _, warehouse := range dataset.Warehouses {
+		if warehouse.Type == "FINISHED_GOODS" {
+			result.PrimaryWarehouseID = result.WarehouseIDs[warehouse.Code]
+			break
+		}
+	}
+	return result, nil
+}
+
 func SeedCoreDemoData(ctx context.Context, db *sql.DB, dataset CoreDemoSeedDataset) (*CoreDemoSeedResult, error) {
 	if db == nil {
 		return nil, ErrCoreDemoSeedMissingDB
@@ -494,6 +573,49 @@ func validateCoreDemoSeedDataset(dataset CoreDemoSeedDataset) error {
 				return fmt.Errorf("%w: bom item naming: %v", ErrCoreDemoSeedInvalidRecord, err)
 			}
 		}
+	}
+	return nil
+}
+
+func validateCoreDemoReferenceSeedDataset(dataset CoreDemoReferenceSeedDataset) error {
+	expected := DefaultCoreDemoReferenceSeedDataset()
+	if strings.TrimSpace(dataset.Prefix) != expected.Prefix {
+		return fmt.Errorf("%w: references-only prefix must be %q", ErrCoreDemoSeedInvalidRecord, expected.Prefix)
+	}
+	if len(dataset.Units) != len(expected.Units) || len(dataset.Warehouses) != len(expected.Warehouses) {
+		return fmt.Errorf("%w: references-only requires exactly one unit and four warehouses", ErrCoreDemoSeedInvalidRecord)
+	}
+
+	expectedUnits := make(map[string]CoreDemoUnitSeed, len(expected.Units))
+	for _, unit := range expected.Units {
+		expectedUnits[unit.Code] = unit
+	}
+	seenUnits := make(map[string]struct{}, len(dataset.Units))
+	for _, unit := range dataset.Units {
+		want, ok := expectedUnits[unit.Code]
+		if !ok || unit != want {
+			return fmt.Errorf("%w: references-only unit %q is outside the exact allowlist", ErrCoreDemoSeedInvalidRecord, unit.Code)
+		}
+		if _, duplicate := seenUnits[unit.Code]; duplicate {
+			return fmt.Errorf("%w: duplicate references-only unit %q", ErrCoreDemoSeedInvalidRecord, unit.Code)
+		}
+		seenUnits[unit.Code] = struct{}{}
+	}
+
+	expectedWarehouses := make(map[string]CoreDemoWarehouseSeed, len(expected.Warehouses))
+	for _, warehouse := range expected.Warehouses {
+		expectedWarehouses[warehouse.Code] = warehouse
+	}
+	seenWarehouses := make(map[string]struct{}, len(dataset.Warehouses))
+	for _, warehouse := range dataset.Warehouses {
+		want, ok := expectedWarehouses[warehouse.Code]
+		if !ok || warehouse != want {
+			return fmt.Errorf("%w: references-only warehouse %q is outside the exact allowlist", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
+		}
+		if _, duplicate := seenWarehouses[warehouse.Code]; duplicate {
+			return fmt.Errorf("%w: duplicate references-only warehouse %q", ErrCoreDemoSeedInvalidRecord, warehouse.Code)
+		}
+		seenWarehouses[warehouse.Code] = struct{}{}
 	}
 	return nil
 }

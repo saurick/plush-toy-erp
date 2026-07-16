@@ -7,17 +7,34 @@ const SAFE_DATA_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/u;
 const SAFE_RUN_ID = /^[A-Z0-9][A-Z0-9_-]{0,31}$/u;
 const IMMUTABLE_RELEASE_SHA = /^[0-9a-f]{40}$/u;
 const ATLAS_MIGRATION_VERSION = /^[0-9]{14}$/u;
-const SAFE_LOCAL_ACCEPTANCE_DATABASE =
-  /^plush_erp_acceptance_[a-z0-9][a-z0-9_]{0,62}$/u;
+const EXACT_LOCAL_ACCEPTANCE_DATABASE =
+  /^plush_erp_acceptance_20260716_v5_dev$/u;
 
 export const LOCAL_DEV_TARGET = "local-dev";
+export const LOCAL_MANUAL_ACCEPTANCE_DATABASE =
+  "plush_erp_acceptance_20260716_v5_dev";
 export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
 // Customer-trial writes carry administrator credentials and bearer tokens. Keep
 // the registered endpoint on loopback so callers must reach 133 through an SSH
 // tunnel instead of sending those secrets over plaintext LAN HTTP.
 export const CUSTOMER_TRIAL_133_ORIGIN = "http://127.0.0.1:18375";
-export const CUSTOMER_TRIAL_133_DATABASE = "plush_erp_uat_20260715";
+export const CUSTOMER_TRIAL_133_DATABASE = "plush_erp_uat_20260716_v5";
 export const CUSTOMER_TRIAL_133_MIN_MIGRATION = "20260714165115";
+export const CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION = "2026.07.16-v5";
+export const CURRENT_MANUAL_ACCEPTANCE_RUN_ID = "20260716-V5";
+export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION =
+  "yoyoosun-customer-package-v7.local-1fe1691c03359367.runtime-v1";
+export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION =
+  "local-customer-package-test-apply";
+export const LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE = "local_test_apply";
+export const CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION =
+  CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION;
+export const CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION =
+  "customer-trial-133-test-2026.07.16-v5";
+export const CUSTOMER_TRIAL_133_CONFIG_REVISION =
+  "yoyoosun-customer-trial-133-package-v5.runtime-manifest-v1";
+export const CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE =
+  "customer_trial_test_apply";
 export const MANUAL_ACCEPTANCE_DATASET_KEY = "yoyoosun-manual-acceptance";
 
 export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
@@ -28,6 +45,11 @@ export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
     runtimeEnvironment: "remote",
     databaseName: CUSTOMER_TRIAL_133_DATABASE,
     customerKey: "yoyoosun",
+    configRevision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
+    configProductVersion: CUSTOMER_TRIAL_133_CONFIG_PRODUCT_VERSION,
+    configApplyPurpose: CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
+    configDatasetVersion: CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
+    configTarget: CUSTOMER_TRIAL_133_TARGET,
     requireActiveCustomerConfigRevision: true,
     requireDebugMutationsDisabled: true,
   }),
@@ -39,6 +61,30 @@ export class ManualAcceptanceTargetPolicyError extends Error {
     this.name = "ManualAcceptanceTargetPolicyError";
     this.exitCode = exitCode;
   }
+}
+
+function registeredCustomerTrialDatasetIdentity(dataVersion, runId) {
+  const normalizedDataVersion = requiredIdentity(
+    dataVersion,
+    "dataVersion",
+    SAFE_DATA_VERSION,
+    "the current registered manual acceptance data version",
+  );
+  const normalizedRunId = requiredIdentity(
+    runId,
+    "runId",
+    SAFE_RUN_ID,
+    "the current registered manual acceptance run identifier",
+  );
+  if (
+    normalizedDataVersion !== CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION ||
+    normalizedRunId !== CURRENT_MANUAL_ACCEPTANCE_RUN_ID
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `${CUSTOMER_TRIAL_133_TARGET} requires dataVersion=${CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION} and runId=${CURRENT_MANUAL_ACCEPTANCE_RUN_ID}`,
+    );
+  }
+  return { dataVersion: normalizedDataVersion, runId: normalizedRunId };
 }
 
 function optionalText(value) {
@@ -113,6 +159,7 @@ export function resolveManualAcceptanceTarget({
     requestedTarget === CUSTOMER_TRIAL_133_TARGET &&
     normalizedBackendURL === CUSTOMER_TRIAL_133_ORIGIN
   ) {
+    const identity = registeredCustomerTrialDatasetIdentity(dataVersion, runId);
     if (
       requestedDatabaseName &&
       requestedDatabaseName !== CUSTOMER_TRIAL_133_DATABASE
@@ -126,18 +173,8 @@ export function resolveManualAcceptanceTarget({
       datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
       backendURL: normalizedBackendURL,
       origin: url.origin,
-      dataVersion: requiredIdentity(
-        dataVersion,
-        "dataVersion",
-        SAFE_DATA_VERSION,
-        "an explicit 1-48 character version identifier",
-      ),
-      runId: requiredIdentity(
-        runId,
-        "runId",
-        SAFE_RUN_ID,
-        "an explicit 1-32 character uppercase run identifier",
-      ),
+      dataVersion: identity.dataVersion,
+      runId: identity.runId,
       external: true,
       transport: "ssh-tunnel",
       databaseName: CUSTOMER_TRIAL_133_DATABASE,
@@ -152,10 +189,10 @@ export function resolveManualAcceptanceTarget({
     }
     if (
       requestedDatabaseName &&
-      !SAFE_LOCAL_ACCEPTANCE_DATABASE.test(requestedDatabaseName)
+      requestedDatabaseName !== LOCAL_MANUAL_ACCEPTANCE_DATABASE
     ) {
       throw new ManualAcceptanceTargetPolicyError(
-        "local manual acceptance databaseName must use plush_erp_acceptance_*",
+        `${LOCAL_DEV_TARGET} requires databaseName=${LOCAL_MANUAL_ACCEPTANCE_DATABASE}`,
       );
     }
     return Object.freeze({
@@ -166,9 +203,7 @@ export function resolveManualAcceptanceTarget({
       dataVersion: optionalText(dataVersion) || optionalText(runId),
       runId: optionalText(runId),
       external: false,
-      ...(requestedDatabaseName
-        ? { databaseName: requestedDatabaseName }
-        : {}),
+      ...(requestedDatabaseName ? { databaseName: requestedDatabaseName } : {}),
     });
   }
 
@@ -183,23 +218,14 @@ export function resolveManualAcceptanceTarget({
     );
   }
 
+  const identity = registeredCustomerTrialDatasetIdentity(dataVersion, runId);
   return Object.freeze({
     target: CUSTOMER_TRIAL_133_TARGET,
     datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
     backendURL: normalizedBackendURL,
     origin: url.origin,
-    dataVersion: requiredIdentity(
-      dataVersion,
-      "dataVersion",
-      SAFE_DATA_VERSION,
-      "an explicit 1-48 character version identifier",
-    ),
-    runId: requiredIdentity(
-      runId,
-      "runId",
-      SAFE_RUN_ID,
-      "an explicit 1-32 character uppercase run identifier",
-    ),
+    dataVersion: identity.dataVersion,
+    runId: identity.runId,
     external: true,
     databaseName: CUSTOMER_TRIAL_133_DATABASE,
   });
@@ -219,8 +245,17 @@ export function assertManualAcceptanceMutationTarget(
   { confirmation } = {},
 ) {
   const resolved = resolveManualAcceptanceTarget(policy);
+  if (!resolved.external && !resolved.databaseName) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "local manual acceptance apply requires an explicit dedicated databaseName",
+    );
+  }
+  if (!resolved.external && new URL(resolved.backendURL).port === "8300") {
+    throw new ManualAcceptanceTargetPolicyError(
+      "local manual acceptance apply must use an isolated non-8300 backend",
+    );
+  }
   const expected = manualAcceptanceTargetConfirmation(resolved);
-  if (!expected) return resolved;
   if (confirmation !== expected) {
     const scope = resolved.external ? "external" : resolved.target;
     throw new ManualAcceptanceTargetPolicyError(
@@ -374,9 +409,7 @@ export function assertManualAcceptanceTargetAttestation({
     release,
     migration,
     debug: Object.freeze(
-      Object.fromEntries(
-        REMOTE_DEBUG_FALSE_FIELDS.map((key) => [key, false]),
-      ),
+      Object.fromEntries(REMOTE_DEBUG_FALSE_FIELDS.map((key) => [key, false])),
     ),
   });
 }
@@ -422,7 +455,7 @@ export async function assertManualAcceptanceRuntimeIdentityPrecondition({
       "runtime databaseName",
       resolved.external
         ? /^plush_erp_uat_[a-z0-9_]+$/u
-        : SAFE_LOCAL_ACCEPTANCE_DATABASE,
+        : EXACT_LOCAL_ACCEPTANCE_DATABASE,
       "the registered acceptance database identity",
     ),
   ];
@@ -556,6 +589,43 @@ export function assertManualAcceptanceRuntimePolicy({
     );
   }
 
+  const configProductVersion = optionalText(
+    session?.configProductVersion || session?.config_product_version,
+  );
+  const configApplyPurpose = optionalText(
+    session?.configApplyPurpose || session?.config_apply_purpose,
+  );
+  const configDatasetVersion = optionalText(
+    session?.configDatasetVersion || session?.config_dataset_version,
+  );
+  const configTarget = optionalText(
+    session?.configTarget || session?.config_target,
+  );
+  if (resolved.target === CUSTOMER_TRIAL_133_TARGET) {
+    const profile = MANUAL_ACCEPTANCE_TARGET_PROFILES[resolved.target];
+    if (
+      configRevision !== profile.configRevision ||
+      configProductVersion !== profile.configProductVersion ||
+      configApplyPurpose !== profile.configApplyPurpose ||
+      configDatasetVersion !== profile.configDatasetVersion ||
+      configTarget !== profile.configTarget
+    ) {
+      throw new ManualAcceptanceTargetPolicyError(
+        "refuse writes: active customer-trial configuration identity does not match the registered dataset",
+      );
+    }
+  } else if (
+    configRevision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
+    configProductVersion !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
+    configApplyPurpose !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE ||
+    configDatasetVersion !== undefined ||
+    configTarget !== undefined
+  ) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "refuse writes: active local-test configuration identity does not match the current tracked customer package",
+    );
+  }
+
   return Object.freeze({
     target: resolved.target,
     origin: resolved.origin,
@@ -565,9 +635,14 @@ export function assertManualAcceptanceRuntimePolicy({
     environment,
     customerKey: session.customer.key,
     configRevision,
+    configProductVersion,
+    configApplyPurpose,
+    configDatasetVersion,
+    configTarget,
     source: session.source,
     requiredModules: [...requiredModules],
-    debugMutationsDisabled:
-      resolved.target === CUSTOMER_TRIAL_133_TARGET ? true : undefined,
+    ...(resolved.target === CUSTOMER_TRIAL_133_TARGET
+      ? { debugMutationsDisabled: true }
+      : {}),
   });
 }

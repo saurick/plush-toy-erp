@@ -71,27 +71,52 @@ func TestRequireLocalDevDSNAllowsLocalDevServer(t *testing.T) {
 	}
 }
 
-func TestRequireCustomerConfigLocalTestDSNOnlyAllowsSharedDevelopmentDatabase(t *testing.T) {
+func TestRequireCustomerConfigLocalTestDSNOnlyAllowsRegisteredDevelopmentFamily(t *testing.T) {
 	t.Parallel()
 
 	for _, dsn := range []string{
 		"postgres://test_user:secret@192.168.0.106:5432/plush_erp?sslmode=disable",
 		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
 	} {
 		if err := RequireCustomerConfigLocalTestDSN(dsn); err != nil {
-			t.Fatalf("expected shared development database to pass, got %v", err)
+			t.Fatalf("expected registered development database to pass, got %v", err)
 		}
 	}
 	for _, dsn := range []string{
 		"postgres://postgres:secret@192.168.0.133:5435/plush_erp?sslmode=disable",
 		"postgres://postgres:secret@127.0.0.1:5432/plush_erp?sslmode=disable",
 		"postgres://postgres:secret@192.168.0.106:5432/other_db?sslmode=disable",
+		"postgres://postgres:secret@192.168.0.106:5432/plush_erp_dev?sslmode=disable",
 		"postgres://postgres:secret@192.168.0.106:5432/plush_erp?host=192.168.0.133&port=5435&sslmode=disable",
 		"postgres://postgres:secret@192.168.0.106:5432/plush_erp?dbname=target_db&sslmode=disable",
 		"host=192.168.0.106,192.168.0.133 port=5432,5435 dbname=plush_erp user=postgres password=secret sslmode=disable",
 	} {
 		if err := RequireCustomerConfigLocalTestDSN(dsn); err == nil {
 			t.Fatalf("expected customer config local-test DSN %q to be rejected", dsn)
+		}
+	}
+}
+
+func TestRequireLocalAdminResetDSNAllowsOnlyRegisteredDevelopmentFamily(t *testing.T) {
+	t.Parallel()
+
+	for _, dsn := range []string{
+		"postgres://test_user:secret@192.168.0.106:5432/plush_erp?sslmode=disable",
+		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_simon_dev?sslmode=disable",
+		"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+	} {
+		if err := RequireLocalAdminResetDSN(dsn); err != nil {
+			t.Fatalf("expected registered local database to pass, got %v", err)
+		}
+	}
+	for _, dsn := range []string{
+		"postgres://postgres:secret@192.168.0.133:5435/plush_erp?sslmode=disable",
+		"postgres://postgres:secret@127.0.0.1:5432/plush_erp?sslmode=disable",
+		"host=192.168.0.106,192.168.0.133 port=5432,5435 dbname=plush_erp user=postgres password=secret sslmode=disable",
+	} {
+		if err := RequireLocalAdminResetDSN(dsn); err == nil {
+			t.Fatalf("expected local admin reset DSN %q to be rejected", dsn)
 		}
 	}
 }

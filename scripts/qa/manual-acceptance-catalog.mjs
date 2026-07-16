@@ -18,10 +18,79 @@ import {
   isSupportedPrintWorkspaceTemplate,
 } from "../../web/src/erp/utils/printWorkspace.js";
 
-const EXPECTED_DESKTOP_PAGE_COUNT = 27;
+const EXPECTED_DESKTOP_PAGE_COUNT = 30;
 const EXPECTED_MOBILE_PAGE_COUNT = 9;
 const EXPECTED_PRINT_TEMPLATE_COUNT = 5;
 const FORMAL_TRIAL_ACCOUNT_COUNT = 10;
+
+export const MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT = 47;
+export const MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT = 1;
+export const MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT = 25;
+
+export const MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS = Object.freeze({
+  boss: Object.freeze([
+    "delivery_review",
+    "quotation_review",
+    "delay_risk",
+    "customer_requirement",
+    "priority_order",
+  ]),
+  sales: Object.freeze([
+    "customer_details",
+    "color_confirmation",
+    "packaging_confirmation",
+    "delivery_address",
+    "delivery_date_reply",
+  ]),
+  purchase: Object.freeze([
+    "main_material_arrival",
+    "accessory_delivery",
+    "supplier_reply",
+    "purchase_quantity",
+    "expedite_material",
+  ]),
+  production: Object.freeze([
+    "today_production",
+    "outsourcing_return",
+    "rework",
+    "production_exception",
+  ]),
+  warehouse: Object.freeze([
+    "receiving",
+    "inbound",
+    "material_picking",
+    "shipping",
+    "exception",
+  ]),
+  finance: Object.freeze([
+    "customer_receipt",
+    "supplier_statement",
+    "invoice_details",
+    "overdue_receivable",
+    "weekly_payment",
+  ]),
+  pmc: Object.freeze([
+    "material_readiness",
+    "order_priority",
+    "delay_risk",
+    "production_readiness",
+    "open_item_followup",
+  ]),
+  quality: Object.freeze([
+    "incoming_inspection",
+    "first_article",
+    "rework_inspection",
+    "pre_shipment_inspection",
+    "appearance_issue",
+  ]),
+  engineering: Object.freeze([
+    "material_list",
+    "drawing_dimensions",
+    "sewing_instructions",
+    "packaging_information",
+    "first_article_requirements",
+  ]),
+});
 const SYSTEM_ADMIN_ROLE_KEY = "system_admin";
 const CUSTOMER_ROLE_LABELS = Object.freeze({
   pmc: "生产计划",
@@ -76,9 +145,9 @@ const ENTRY_PLANS = Object.freeze({
 const DESKTOP_PLANS = Object.freeze({
   "global-dashboard": {
     isList: false,
-    minimumRecords: 180,
-    minimumRecordUnit: "跨业务模拟记录",
-    keyStates: ["今日待处理", "临近到期", "已经阻塞", "近期完成", "暂无提醒"],
+    minimumRecords: 18,
+    minimumRecordUnit: "当前账号可见事项",
+    keyStates: ["今日待处理", "临近到期", "已经阻塞", "需要关注", "暂无提醒"],
     whatToDo: [
       "你要查看今日重点、临近到期和阻塞事项，再从卡片进入对应页面。",
       "你要对照任务看板和业务页面抽查数量，确认刷新后数字仍一致。",
@@ -88,11 +157,25 @@ const DESKTOP_PLANS = Object.freeze({
       "应看到卡片数字与进入后的清单一致；没有提醒时显示清楚的空白说明。",
     ],
   },
+  "business-dashboard": {
+    isList: false,
+    minimumRecords: 20,
+    minimumRecordUnit: "可查看的业务记录与待办事项",
+    keyStates: ["基础资料", "业务单据", "办理结果", "需要关注", "暂不可用"],
+    whatToDo: [
+      "你要查看基础资料、业务单据、办理结果和需要关注四类数字，再打开几项业务明细。",
+      "你要对照进入后的页面数量，确认刷新后数字和可用状态仍一致。",
+    ],
+    whatToSee: [
+      "应看到每类数字各自统计，客户、订单、生产、出货和待办等项目都有可以核对的数量。",
+      "应看到数字暂不可用时有清楚说明，不会把不同类别直接相加或显示内部字段。",
+    ],
+  },
   "task-board": {
     isList: true,
     minimumRecords: 20,
     minimumRecordUnit: "当前账号可见岗位任务（九个岗位合计 180 条）",
-    keyStates: ["待处理", "处理中", "已阻塞", "已退回", "已完成", "已逾期"],
+    keyStates: ["可执行", "临近到期", "已阻塞", "已退回", "已完成", "已逾期"],
     whatToDo: [
       "你要按岗位、状态和到期时间筛选任务，并打开几条长标题和多次处理记录。",
       "你要完成一条任务、阻塞一条任务并填写原因，再恢复到原来的筛选条件。",
@@ -323,7 +406,8 @@ const DESKTOP_PLANS = Object.freeze({
     isList: true,
     minimumRecords: 20,
     minimumRecordUnit: "生产排程协同任务",
-    keyStates: ["待处理", "可执行", "阻塞", "退回", "已完成", "已逾期"],
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.pmc,
+    keyStates: ["待处理", "可执行", "阻塞", "已完成", "临近到期", "已逾期"],
     whatToDo: [
       "你要按任务编号、状态、责任岗位和到期日期查找，打开正常排程、缺料、插单和延期任务。",
       "你要完成一条资料齐全的排程任务，阻塞一条缺料任务并填写具体原因，再催办一条临近到期任务。",
@@ -335,16 +419,32 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "production-exceptions": {
     isList: true,
-    minimumRecords: 20,
+    minimumRecords: 5,
     minimumRecordUnit: "生产异常协同任务",
-    keyStates: ["待处理", "可执行", "阻塞", "退回", "已完成", "已逾期"],
+    taskScenarios: Object.freeze(["production_exception"]),
+    keyStates: ["待处理", "可执行", "阻塞", "已完成", "已逾期"],
     whatToDo: [
       "你要按任务编号、状态、责任岗位和到期日期查找，分别打开延期、返工、质量、设备和缺料异常。",
-      "你要完成一条已有处理结论的异常任务，退回一条证据不足的任务，并阻塞一条等待其他岗位处理的任务。",
+      "你要查看一条资料不足、等待补充的异常任务，并阻塞一条等待其他岗位处理的任务。",
     ],
     whatToSee: [
       "应看到异常来源、影响产品或订单、影响数量、发生时间、责任岗位、原因和下一步清楚可读。",
       "应看到完成异常协同不会直接修改生产、库存、出货或财务记录；返工和报废仍需在对应业务页面登记。",
+    ],
+  },
+  "shipping-release": {
+    isList: true,
+    minimumRecords: 4,
+    minimumRecordUnit: "出货放行任务",
+    taskScenarios: Object.freeze(["shipping"]),
+    keyStates: ["可执行", "阻塞", "退回", "已完成", "临近到期", "已经逾期"],
+    whatToDo: [
+      "你要按任务编号、状态、负责岗位和到期日期查找，打开数量、质检、箱唛、地址和出货时间等任务。",
+      "你要核对一条资料齐全的放行任务，并查看阻塞、退回和已完成任务写明的原因或结果。",
+    ],
+    whatToSee: [
+      "应看到客户、产品、数量、质检、包装和送货资料清楚，缺少什么可以直接看懂。",
+      "应看到完成放行只表示可以继续办理出库，不能被误显示成已经出货、已经扣库存或已经收款。",
     ],
   },
   outbound: {
@@ -370,7 +470,7 @@ const DESKTOP_PLANS = Object.freeze({
   },
   shipments: {
     isList: true,
-    minimumRecords: 45,
+    minimumRecords: MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
     minimumRecordUnit: "出货单",
     keyStates: [
       "草稿",
@@ -507,14 +607,30 @@ const DESKTOP_PLANS = Object.freeze({
       "应看到大量记录可以稳定翻页和筛选，刷新后不会重复或丢失当前条件。",
     ],
   },
+  "exception-flow": {
+    isList: false,
+    minimumRecords: 3,
+    minimumRecordUnit: "当前账号可见的阻塞或到期事项",
+    taskScenarios: Object.freeze(["production_exception"]),
+    keyStates: ["阻塞", "今天到期", "已经超时", "可以处理"],
+    whatToDo: [
+      "你要查看阻塞、今天到期和已经超时的事项，再打开一条可以处理的事项。",
+      "你要打开几条事项，确认名称、负责岗位、原因、到期时间和下一步都能直接看懂。",
+    ],
+    whatToSee: [
+      "应看到真正需要处理的阻塞或到期事项，不会只显示固定说明或空白数字。",
+      "应看到每条事项写明发生了什么、由谁处理和下一步做什么，处理入口与当前状态一致。",
+    ],
+  },
 });
 
 const MOBILE_PLANS = Object.freeze({
   boss: {
-    keyStates: ["待审批", "已退回", "已同意", "已阻塞", "已逾期"],
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.boss,
+    keyStates: ["待查看", "已退回", "已阻塞", "临近到期", "已逾期"],
     whatToDo: [
       "你要查看待审批和临近到期事项，打开摘要后将一条资料不足的事项退回，并给一条暂不能决定的事项填写阻塞原因。",
-      "你要从已处理清单查看已经同意的历史；正式同意操作请用销售订单正常提交后生成的审批事项验收。",
+      "你要从已处理清单查看已退回的记录；正式同意操作请用销售订单正常提交后生成的审批事项验收。",
     ],
     whatToSee: [
       "应看到客户、单号、金额、交期、风险和提交人足够支持判断，不需要先看复杂表格。",
@@ -522,10 +638,11 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   sales: {
-    keyStates: ["待补资料", "待提交", "已退回", "临近交期", "已完成"],
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.sales,
+    keyStates: ["待补资料", "待提交", "已阻塞", "临近交期", "已完成"],
     whatToDo: [
       "你要查看客户订单和缺资料事项，补齐可填写内容并提交一条试用任务。",
-      "你要打开被退回和临近交期的事项，查看原因并继续跟进。",
+      "你要打开已阻塞、已完成和临近交期的事项，查看原因或处理结果并继续跟进。",
     ],
     whatToSee: [
       "应看到客户、订单、产品、交期和缺少内容清楚，下一步动作一眼可见。",
@@ -533,6 +650,7 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   purchase: {
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.purchase,
     keyStates: ["待下单", "待回签", "待到料", "已经阻塞", "已经完成"],
     whatToDo: [
       "你要查看待下单、待回签和待到料事项，打开材料与供应商摘要。",
@@ -544,6 +662,7 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   production: {
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.production,
     keyStates: ["待安排", "进行中", "待回货", "返工", "已经阻塞", "已经完成"],
     whatToDo: [
       "你要查看今日生产、委外回货和返工事项，按到期时间处理。",
@@ -555,6 +674,7 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   warehouse: {
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.warehouse,
     keyStates: ["待收货", "待入库", "待备料", "待出货", "异常件", "已经完成"],
     whatToDo: [
       "你要查看待收货、待入库、待备料、待出货和异常件事项。",
@@ -566,6 +686,7 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   finance: {
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.finance,
     keyStates: ["待对账", "待付款", "待收款", "有差异", "已逾期", "已经完成"],
     whatToDo: [
       "你要查看待对账、待付款、待收款和差异事项，按到期时间排序。",
@@ -577,6 +698,7 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   pmc: {
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.pmc,
     customerTitle: "生产计划岗位任务端",
     keyStates: ["待评审", "待排期", "缺料风险", "延期", "已催办", "已经完成"],
     whatToDo: [
@@ -589,6 +711,7 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   quality: {
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.quality,
     keyStates: ["待检", "合格", "不合格", "待复检", "已退回", "已经完成"],
     whatToDo: [
       "你要查看待检、待复检和不合格事项，打开材料、批次和抽检摘要。",
@@ -600,17 +723,18 @@ const MOBILE_PLANS = Object.freeze({
     ],
   },
   engineering: {
+    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.engineering,
     keyStates: [
       "待建产品",
       "待补规格",
       "待补工序",
       "待补材料清单",
-      "已退回",
+      "已阻塞",
       "已经完成",
     ],
     whatToDo: [
       "你要查看产品资料、规格、工序和材料清单补齐事项。",
-      "你要完成一条资料齐全的任务，并退回一条缺少样板或关键尺寸的任务。",
+      "你要完成一条资料齐全的任务，并将一条缺少样板或关键尺寸的任务设为阻塞后填写原因。",
     ],
     whatToSee: [
       "应看到产品、订单、缺少内容、要求日期和来源说明清楚。",
@@ -689,7 +813,7 @@ const PRINT_ROLE_KEYS = Object.freeze({
 });
 
 const SHARED_PREPARATION = Object.freeze([
-  "所有样本都使用虚构内容，并在名称、单号或备注等适用位置标注“试用”；不同数据的标注位置可能不同。",
+  "所有样本都使用虚构内容，并用本轮固定编号识别；名称保持简单易懂，不要在每个名称里重复堆叠“试用”。",
   "每个清单页按本目录列出的数量准备数据，日期覆盖过去、今天和未来，状态不能全部相同。",
   "每类数据都要包含长名称、长备注、选填项为空、多明细、大数量和小数金额等边界样本。",
   "同一客户、供应商、产品、材料和来源单据要能跨页面对照，避免各页面各造一套互不关联的数据。",
@@ -742,6 +866,7 @@ function createTechnicalItem({
   roleKeys,
   plan,
   source,
+  menuHidden = false,
 }) {
   return {
     key,
@@ -752,7 +877,11 @@ function createTechnicalItem({
     isList: Boolean(plan.isList),
     minimumRecords: plan.minimumRecords,
     minimumRecordUnit: plan.minimumRecordUnit,
+    ...(Array.isArray(plan.taskScenarios)
+      ? { requiredTaskScenarios: [...plan.taskScenarios] }
+      : {}),
     source,
+    menuHidden,
   };
 }
 
@@ -816,20 +945,20 @@ function buildPrintPlans(template) {
 
 export function buildManualAcceptanceCatalog() {
   const { roles, byKey: roleByKey } = createRoleMaps();
-  const visibleSections = getNavigationSections(yoyoosunMenuConfig);
-  const visibleDesktopItems = visibleSections.flatMap((section) =>
+  const hiddenItemKeys = [
+    ...(yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []),
+  ];
+  const formalSections = getNavigationSections(yoyoosunMenuConfig);
+  const formalDesktopItems = formalSections.flatMap((section) =>
     section.items.map((item) => ({ ...item, sectionTitle: section.title })),
   );
   const businessModuleKeys = new Set(
     businessModuleDefinitions.map((item) => item.key),
   );
-  const hiddenItemKeys = [
-    ...(yoyoosunMenuConfig.desktopMenu?.hiddenItemKeys || []),
-  ];
 
   assertSource(
-    visibleDesktopItems.length === EXPECTED_DESKTOP_PAGE_COUNT,
-    `当前桌面页应为 ${EXPECTED_DESKTOP_PAGE_COUNT} 个，实际为 ${visibleDesktopItems.length} 个`,
+    formalDesktopItems.length === EXPECTED_DESKTOP_PAGE_COUNT,
+    `当前正式桌面路由应为 ${EXPECTED_DESKTOP_PAGE_COUNT} 个，实际为 ${formalDesktopItems.length} 个`,
   );
   assertSource(
     roleWorkbenches.length === EXPECTED_MOBILE_PAGE_COUNT,
@@ -875,7 +1004,7 @@ export function buildManualAcceptanceCatalog() {
     createAcceptanceItem(item, ENTRY_PLANS[item.key], roleByKey),
   );
 
-  const desktopTechnical = visibleDesktopItems.map((item) => {
+  const desktopTechnical = formalDesktopItems.map((item) => {
     const plan = DESKTOP_PLANS[item.key];
     assertSource(plan, `桌面页 ${item.key} 缺少验收方案`);
     assertSource(
@@ -892,6 +1021,7 @@ export function buildManualAcceptanceCatalog() {
       source: businessModuleKeys.has(item.key)
         ? "businessModules+seedData+yoyoosunMenu"
         : "seedData+yoyoosunMenu",
+      menuHidden: hiddenItemKeys.includes(item.key),
     });
   });
   const desktopAcceptance = desktopTechnical.map((item) =>
@@ -993,11 +1123,11 @@ export function buildManualAcceptanceCatalog() {
     ...previewTechnical,
     ...workspaceTechnical,
   ];
-  const visibleDesktopKeys = new Set(desktopTechnical.map((item) => item.key));
+  const formalDesktopKeys = new Set(desktopTechnical.map((item) => item.key));
   hiddenItemKeys.forEach((hiddenKey) =>
     assertSource(
-      !visibleDesktopKeys.has(hiddenKey),
-      `隐藏页 ${hiddenKey} 不应进入手动验收目录`,
+      formalDesktopKeys.has(hiddenKey),
+      `菜单隐藏页 ${hiddenKey} 仍应进入正式路由验收目录`,
     ),
   );
   assertSource(
@@ -1013,7 +1143,7 @@ export function buildManualAcceptanceCatalog() {
 
   return {
     meta: {
-      version: 1,
+      version: 2,
       title: `${yoyoosunMenuConfig.brand.companyName}全页面手动验收目录`,
       systemName: yoyoosunMenuConfig.brand.systemName,
       customerKey: yoyoosunMenuConfig.customerKey,
@@ -1029,11 +1159,12 @@ export function buildManualAcceptanceCatalog() {
       printPreviewPages: previewTechnical.length,
       printWorkspacePages: workspaceTechnical.length,
       totalScenarios: allTechnical.length,
-      hiddenDesktopPagesExcluded: hiddenItemKeys.length,
+      hiddenDesktopPagesCovered: hiddenItemKeys.length,
     },
     technicalManifest: {
       sourceFiles: [...SOURCE_FILES],
-      excludedDesktopKeys: hiddenItemKeys,
+      hiddenDesktopKeys: hiddenItemKeys,
+      excludedDesktopKeys: [],
       entries: entryTechnical,
       desktopPages: desktopTechnical,
       mobileRolePages: mobileTechnical,
