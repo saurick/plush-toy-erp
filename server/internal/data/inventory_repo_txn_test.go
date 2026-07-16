@@ -209,7 +209,7 @@ func TestInventoryRepo_ReversalOffsetsOriginalAndRejectsDuplicate(t *testing.T) 
 		Quantity:       mustDecimal(t, "10"),
 		UnitID:         fixtures.unitID,
 		SourceType:     "test",
-		IdempotencyKey: "mat-reversal-in-001",
+		IdempotencyKey: "test-1",
 	})
 	if err != nil {
 		t.Fatalf("inbound before reversal failed: %v", err)
@@ -225,7 +225,7 @@ func TestInventoryRepo_ReversalOffsetsOriginalAndRejectsDuplicate(t *testing.T) 
 		Quantity:        mustDecimal(t, "10"),
 		UnitID:          fixtures.unitID,
 		SourceType:      "test",
-		IdempotencyKey:  "mat-reversal-in-001-r",
+		IdempotencyKey:  "test-2",
 		ReversalOfTxnID: &reversalOf,
 	})
 	if err != nil {
@@ -242,7 +242,7 @@ func TestInventoryRepo_ReversalOffsetsOriginalAndRejectsDuplicate(t *testing.T) 
 		Quantity:        mustDecimal(t, "10"),
 		UnitID:          fixtures.unitID,
 		SourceType:      "test",
-		IdempotencyKey:  "mat-reversal-in-001-r",
+		IdempotencyKey:  "test-2",
 		ReversalOfTxnID: &reversalOf,
 	})
 	if err != nil {
@@ -262,7 +262,7 @@ func TestInventoryRepo_ReversalOffsetsOriginalAndRejectsDuplicate(t *testing.T) 
 		Quantity:        mustDecimal(t, "10"),
 		UnitID:          fixtures.unitID,
 		SourceType:      "test",
-		IdempotencyKey:  "mat-reversal-in-001-r-duplicate",
+		IdempotencyKey:  "test-3",
 		ReversalOfTxnID: &reversalOf,
 	})
 	if !errors.Is(err, biz.ErrInventoryTxnAlreadyReversed) {

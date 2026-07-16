@@ -50,7 +50,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		SourceType:     "MANUAL_SEED",
 		SourceID:       &sourceID,
 		SourceLineID:   &sourceLineID,
-		IdempotencyKey: "INV-LEDGER-TXN-001",
+		IdempotencyKey: "test-1",
 		OccurredAt:     time.Date(2026, 6, 17, 9, 30, 0, 0, time.UTC),
 		CreatedBy:      &createdBy,
 		Note:           inventoryStringPtr("ledger seed"),
@@ -129,7 +129,7 @@ func TestJsonrpcDispatcher_InventoryLedgerReadOnlyLists(t *testing.T) {
 		t.Fatalf("expected one inventory txn, got %#v", txns)
 	}
 	txn := txns[0].(map[string]any)
-	if got := txn["idempotency_key"]; got != "INV-LEDGER-TXN-001" {
+	if got := txn["idempotency_key"]; got != "test-1" {
 		t.Fatalf("expected idempotency key in list, got %#v", got)
 	}
 	if got := txn["source_type"]; got != "MANUAL_SEED" {
