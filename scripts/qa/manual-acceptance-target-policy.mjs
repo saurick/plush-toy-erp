@@ -4,6 +4,8 @@ const EXPLICIT_LOCAL_ENVIRONMENTS = new Set(["local", "dev"]);
 const SAFE_DATA_VERSION = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/u;
 const SAFE_RUN_ID = /^[A-Z0-9][A-Z0-9_-]{0,31}$/u;
 const SAFE_ATTESTED_REVISION = /^[A-Za-z0-9][A-Za-z0-9._:@/+\-]{0,127}$/u;
+const SAFE_LOCAL_ACCEPTANCE_DATABASE =
+  /^plush_erp_acceptance_[a-z0-9][a-z0-9_]{0,62}$/u;
 
 export const LOCAL_DEV_TARGET = "local-dev";
 export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
@@ -11,6 +13,7 @@ export const CUSTOMER_TRIAL_133_TARGET = "customer-trial-133";
 // the registered endpoint on loopback so callers must reach 133 through an SSH
 // tunnel instead of sending those secrets over plaintext LAN HTTP.
 export const CUSTOMER_TRIAL_133_ORIGIN = "http://127.0.0.1:18375";
+export const CUSTOMER_TRIAL_133_DATABASE = "plush_erp_uat_20260715";
 export const MANUAL_ACCEPTANCE_DATASET_KEY = "yoyoosun-manual-acceptance";
 
 export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
@@ -18,6 +21,7 @@ export const MANUAL_ACCEPTANCE_TARGET_PROFILES = Object.freeze({
     target: CUSTOMER_TRIAL_133_TARGET,
     origin: CUSTOMER_TRIAL_133_ORIGIN,
     environment: "prod",
+    databaseName: CUSTOMER_TRIAL_133_DATABASE,
     customerKey: "yoyoosun",
     requireActiveCustomerConfigRevision: true,
     requireDebugMutationsDisabled: true,
@@ -78,11 +82,13 @@ export function resolveManualAcceptanceTarget({
   datasetKey = MANUAL_ACCEPTANCE_DATASET_KEY,
   dataVersion,
   runId,
+  databaseName,
 } = {}) {
   const normalizedBackendURL = normalizeManualAcceptanceBackendURL(backendURL);
   const url = new URL(normalizedBackendURL);
   const hostname = url.hostname.replace(/^\[|\]$/gu, "");
   const requestedTarget = optionalText(target);
+  const requestedDatabaseName = optionalText(databaseName);
   if (datasetKey !== MANUAL_ACCEPTANCE_DATASET_KEY) {
     throw new ManualAcceptanceTargetPolicyError(
       `datasetKey must be ${MANUAL_ACCEPTANCE_DATASET_KEY}`,
@@ -102,6 +108,14 @@ export function resolveManualAcceptanceTarget({
     requestedTarget === CUSTOMER_TRIAL_133_TARGET &&
     normalizedBackendURL === CUSTOMER_TRIAL_133_ORIGIN
   ) {
+    if (
+      requestedDatabaseName &&
+      requestedDatabaseName !== CUSTOMER_TRIAL_133_DATABASE
+    ) {
+      throw new ManualAcceptanceTargetPolicyError(
+        `${CUSTOMER_TRIAL_133_TARGET} requires databaseName=${CUSTOMER_TRIAL_133_DATABASE}`,
+      );
+    }
     return Object.freeze({
       target: CUSTOMER_TRIAL_133_TARGET,
       datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
@@ -121,6 +135,7 @@ export function resolveManualAcceptanceTarget({
       ),
       external: true,
       transport: "ssh-tunnel",
+      databaseName: CUSTOMER_TRIAL_133_DATABASE,
     });
   }
 
@@ -128,6 +143,14 @@ export function resolveManualAcceptanceTarget({
     if (requestedTarget && requestedTarget !== LOCAL_DEV_TARGET) {
       throw new ManualAcceptanceTargetPolicyError(
         `${requestedTarget} must use its registered SSH tunnel origin`,
+      );
+    }
+    if (
+      requestedDatabaseName &&
+      !SAFE_LOCAL_ACCEPTANCE_DATABASE.test(requestedDatabaseName)
+    ) {
+      throw new ManualAcceptanceTargetPolicyError(
+        "local manual acceptance databaseName must use plush_erp_acceptance_*",
       );
     }
     return Object.freeze({
@@ -138,6 +161,9 @@ export function resolveManualAcceptanceTarget({
       dataVersion: optionalText(dataVersion) || optionalText(runId),
       runId: optionalText(runId),
       external: false,
+      ...(requestedDatabaseName
+        ? { databaseName: requestedDatabaseName }
+        : {}),
     });
   }
 
@@ -170,12 +196,16 @@ export function resolveManualAcceptanceTarget({
       "an explicit 1-32 character uppercase run identifier",
     ),
     external: true,
+    databaseName: CUSTOMER_TRIAL_133_DATABASE,
   });
 }
 
 export function manualAcceptanceTargetConfirmation(policy) {
   const resolved = resolveManualAcceptanceTarget(policy);
-  if (!resolved.external) return undefined;
+  if (!resolved.external) {
+    if (!resolved.databaseName) return undefined;
+    return `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:${resolved.target}:${resolved.dataVersion}:${resolved.runId}:${resolved.databaseName}`;
+  }
   return `APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:${resolved.target}:${resolved.dataVersion}:${resolved.runId}`;
 }
 
@@ -184,14 +214,40 @@ export function assertManualAcceptanceMutationTarget(
   { confirmation } = {},
 ) {
   const resolved = resolveManualAcceptanceTarget(policy);
-  if (!resolved.external) return resolved;
   const expected = manualAcceptanceTargetConfirmation(resolved);
+  if (!expected) return resolved;
   if (confirmation !== expected) {
+    const scope = resolved.external ? "external" : resolved.target;
     throw new ManualAcceptanceTargetPolicyError(
-      `external apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM=${expected}`,
+      `${scope} apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM=${expected}`,
     );
   }
   return resolved;
+}
+
+export function assertManualAcceptanceDatabaseIdentity({
+  policy,
+  capabilities,
+} = {}) {
+  const resolved = resolveManualAcceptanceTarget(policy);
+  const expectedDatabaseName =
+    resolved.databaseName ||
+    MANUAL_ACCEPTANCE_TARGET_PROFILES[resolved.target]?.databaseName;
+  if (!expectedDatabaseName) {
+    throw new ManualAcceptanceTargetPolicyError(
+      "local manual acceptance apply requires an explicit dedicated databaseName",
+    );
+  }
+  const actualDatabaseName = optionalText(capabilities?.databaseName);
+  if (actualDatabaseName !== expectedDatabaseName) {
+    throw new ManualAcceptanceTargetPolicyError(
+      `refuse writes: runtime databaseName=${actualDatabaseName || "unknown"}, expected ${expectedDatabaseName}`,
+    );
+  }
+  return Object.freeze({
+    resolved,
+    databaseName: actualDatabaseName,
+  });
 }
 
 const REMOTE_DEBUG_FALSE_FIELDS = Object.freeze([

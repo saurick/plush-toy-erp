@@ -12,6 +12,30 @@ import {
   requireAdminAccountRecord,
   runManualAcceptanceAccountScenarioCli,
 } from "./manual-acceptance-account-scenarios.mjs";
+import {
+  CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_TARGET,
+  manualAcceptanceTargetConfirmation,
+} from "./manual-acceptance-target-policy.mjs";
+
+function customerTrial133Attestation() {
+  return {
+    target: CUSTOMER_TRIAL_133_TARGET,
+    origin: CUSTOMER_TRIAL_133_ORIGIN,
+    customerKey: "yoyoosun",
+    environment: "prod",
+    release: "56ecf873796ffafc53f12a3cd5f8b7adb0214581",
+    migration: "20260714165115",
+    debug: {
+      seedEnabled: false,
+      seedAllowed: false,
+      cleanupEnabled: false,
+      cleanupAllowed: false,
+      businessDataClearEnabled: false,
+      businessDataClearAllowed: false,
+    },
+  };
+}
 
 function role(roleKey) {
   return {
@@ -151,7 +175,7 @@ function createBackend({
       return ok(
         {
           environment,
-          ...(environment === "sql"
+          ...(environment === "sql" || environment === "prod"
             ? {
                 seedEnabled: false,
                 seedAllowed: false,
@@ -492,6 +516,59 @@ test("local SQL runtime is accepted only through the shared debug-disabled polic
   assert.equal(report.runtime.target, "local-dev");
   assert.equal(report.runtime.environment, "sql");
   assert.equal(report.runtime.dataVersion, "2026.07.15-v3");
+});
+
+test("registered 133 target reconciles the same three scenario accounts without changing role permissions", async () => {
+  const backend = createBackend({ environment: "prod", revision: "remote-v3" });
+  const plan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    target: CUSTOMER_TRIAL_133_TARGET,
+    dataVersion: "2026.07.15-v3",
+    runId: "20260715-V3",
+    auditMinimum: 30,
+  });
+  const report = await applyManualAcceptanceAccountScenarios(plan, {
+    password: "demo-pass",
+    adminPassword: "guard-pass",
+    confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    targetAttestation: customerTrial133Attestation(),
+    fetchImpl: backend.fetchImpl,
+  });
+
+  assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
+  assert.equal(report.dataVersion, "2026.07.15-v3");
+  assert.equal(report.runId, "20260715-V3");
+  assert.equal(report.roleCapabilityBaseline.mode, "verify-only");
+  assert.equal(rolePermissionCalls(backend).length, 0);
+  assert.equal(report.summary.created, 3);
+  assert.equal(report.scenarios.length, 3);
+  assert.equal(
+    report.targetAttestation.release,
+    customerTrial133Attestation().release,
+  );
+});
+
+test("scenario password policy rejects values outside 8 to 20 characters before login", async () => {
+  for (const password of ["1234567", "123456789012345678901"]) {
+    let fetchCount = 0;
+    await assert.rejects(
+      applyManualAcceptanceAccountScenarios(
+        buildManualAcceptanceAccountScenarioPlan(),
+        {
+          password,
+          adminPassword: "guard-pass",
+          confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+          fetchImpl: async () => {
+            fetchCount += 1;
+            throw new Error("must not fetch");
+          },
+        },
+      ),
+      /8-20 characters/u,
+    );
+    assert.equal(fetchCount, 0);
+  }
 });
 
 test("local acceptance adds missing customer capabilities without replacing role selections", async () => {

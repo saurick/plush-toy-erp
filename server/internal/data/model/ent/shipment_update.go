@@ -174,43 +174,43 @@ func (_u *ShipmentUpdate) ClearShippedAt() *ShipmentUpdate {
 	return _u
 }
 
-// SetTotalNetWeightKg sets the "total_net_weight_kg" field.
-func (_u *ShipmentUpdate) SetTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdate {
-	_u.mutation.SetTotalNetWeightKg(v)
+// SetTotalNetWeightG sets the "total_net_weight_g" field.
+func (_u *ShipmentUpdate) SetTotalNetWeightG(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetTotalNetWeightG(v)
 	return _u
 }
 
-// SetNillableTotalNetWeightKg sets the "total_net_weight_kg" field if the given value is not nil.
-func (_u *ShipmentUpdate) SetNillableTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdate {
+// SetNillableTotalNetWeightG sets the "total_net_weight_g" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableTotalNetWeightG(v *decimal.Decimal) *ShipmentUpdate {
 	if v != nil {
-		_u.SetTotalNetWeightKg(*v)
+		_u.SetTotalNetWeightG(*v)
 	}
 	return _u
 }
 
-// ClearTotalNetWeightKg clears the value of the "total_net_weight_kg" field.
-func (_u *ShipmentUpdate) ClearTotalNetWeightKg() *ShipmentUpdate {
-	_u.mutation.ClearTotalNetWeightKg()
+// ClearTotalNetWeightG clears the value of the "total_net_weight_g" field.
+func (_u *ShipmentUpdate) ClearTotalNetWeightG() *ShipmentUpdate {
+	_u.mutation.ClearTotalNetWeightG()
 	return _u
 }
 
-// SetRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field.
-func (_u *ShipmentUpdate) SetRequestedTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdate {
-	_u.mutation.SetRequestedTotalNetWeightKg(v)
+// SetRequestedTotalNetWeightG sets the "requested_total_net_weight_g" field.
+func (_u *ShipmentUpdate) SetRequestedTotalNetWeightG(v decimal.Decimal) *ShipmentUpdate {
+	_u.mutation.SetRequestedTotalNetWeightG(v)
 	return _u
 }
 
-// SetNillableRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field if the given value is not nil.
-func (_u *ShipmentUpdate) SetNillableRequestedTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdate {
+// SetNillableRequestedTotalNetWeightG sets the "requested_total_net_weight_g" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableRequestedTotalNetWeightG(v *decimal.Decimal) *ShipmentUpdate {
 	if v != nil {
-		_u.SetRequestedTotalNetWeightKg(*v)
+		_u.SetRequestedTotalNetWeightG(*v)
 	}
 	return _u
 }
 
-// ClearRequestedTotalNetWeightKg clears the value of the "requested_total_net_weight_kg" field.
-func (_u *ShipmentUpdate) ClearRequestedTotalNetWeightKg() *ShipmentUpdate {
-	_u.mutation.ClearRequestedTotalNetWeightKg()
+// ClearRequestedTotalNetWeightG clears the value of the "requested_total_net_weight_g" field.
+func (_u *ShipmentUpdate) ClearRequestedTotalNetWeightG() *ShipmentUpdate {
+	_u.mutation.ClearRequestedTotalNetWeightG()
 	return _u
 }
 
@@ -424,17 +424,17 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	if _u.mutation.ShippedAtCleared() {
 		_spec.ClearField(shipment.FieldShippedAt, field.TypeTime)
 	}
-	if value, ok := _u.mutation.TotalNetWeightKg(); ok {
-		_spec.SetField(shipment.FieldTotalNetWeightKg, field.TypeOther, value)
+	if value, ok := _u.mutation.TotalNetWeightG(); ok {
+		_spec.SetField(shipment.FieldTotalNetWeightG, field.TypeOther, value)
 	}
-	if _u.mutation.TotalNetWeightKgCleared() {
-		_spec.ClearField(shipment.FieldTotalNetWeightKg, field.TypeOther)
+	if _u.mutation.TotalNetWeightGCleared() {
+		_spec.ClearField(shipment.FieldTotalNetWeightG, field.TypeOther)
 	}
-	if value, ok := _u.mutation.RequestedTotalNetWeightKg(); ok {
-		_spec.SetField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther, value)
+	if value, ok := _u.mutation.RequestedTotalNetWeightG(); ok {
+		_spec.SetField(shipment.FieldRequestedTotalNetWeightG, field.TypeOther, value)
 	}
-	if _u.mutation.RequestedTotalNetWeightKgCleared() {
-		_spec.ClearField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther)
+	if _u.mutation.RequestedTotalNetWeightGCleared() {
+		_spec.ClearField(shipment.FieldRequestedTotalNetWeightG, field.TypeOther)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipment.FieldNote, field.TypeString, value)
@@ -710,43 +710,43 @@ func (_u *ShipmentUpdateOne) ClearShippedAt() *ShipmentUpdateOne {
 	return _u
 }
 
-// SetTotalNetWeightKg sets the "total_net_weight_kg" field.
-func (_u *ShipmentUpdateOne) SetTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdateOne {
-	_u.mutation.SetTotalNetWeightKg(v)
+// SetTotalNetWeightG sets the "total_net_weight_g" field.
+func (_u *ShipmentUpdateOne) SetTotalNetWeightG(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetTotalNetWeightG(v)
 	return _u
 }
 
-// SetNillableTotalNetWeightKg sets the "total_net_weight_kg" field if the given value is not nil.
-func (_u *ShipmentUpdateOne) SetNillableTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdateOne {
+// SetNillableTotalNetWeightG sets the "total_net_weight_g" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableTotalNetWeightG(v *decimal.Decimal) *ShipmentUpdateOne {
 	if v != nil {
-		_u.SetTotalNetWeightKg(*v)
+		_u.SetTotalNetWeightG(*v)
 	}
 	return _u
 }
 
-// ClearTotalNetWeightKg clears the value of the "total_net_weight_kg" field.
-func (_u *ShipmentUpdateOne) ClearTotalNetWeightKg() *ShipmentUpdateOne {
-	_u.mutation.ClearTotalNetWeightKg()
+// ClearTotalNetWeightG clears the value of the "total_net_weight_g" field.
+func (_u *ShipmentUpdateOne) ClearTotalNetWeightG() *ShipmentUpdateOne {
+	_u.mutation.ClearTotalNetWeightG()
 	return _u
 }
 
-// SetRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field.
-func (_u *ShipmentUpdateOne) SetRequestedTotalNetWeightKg(v decimal.Decimal) *ShipmentUpdateOne {
-	_u.mutation.SetRequestedTotalNetWeightKg(v)
+// SetRequestedTotalNetWeightG sets the "requested_total_net_weight_g" field.
+func (_u *ShipmentUpdateOne) SetRequestedTotalNetWeightG(v decimal.Decimal) *ShipmentUpdateOne {
+	_u.mutation.SetRequestedTotalNetWeightG(v)
 	return _u
 }
 
-// SetNillableRequestedTotalNetWeightKg sets the "requested_total_net_weight_kg" field if the given value is not nil.
-func (_u *ShipmentUpdateOne) SetNillableRequestedTotalNetWeightKg(v *decimal.Decimal) *ShipmentUpdateOne {
+// SetNillableRequestedTotalNetWeightG sets the "requested_total_net_weight_g" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableRequestedTotalNetWeightG(v *decimal.Decimal) *ShipmentUpdateOne {
 	if v != nil {
-		_u.SetRequestedTotalNetWeightKg(*v)
+		_u.SetRequestedTotalNetWeightG(*v)
 	}
 	return _u
 }
 
-// ClearRequestedTotalNetWeightKg clears the value of the "requested_total_net_weight_kg" field.
-func (_u *ShipmentUpdateOne) ClearRequestedTotalNetWeightKg() *ShipmentUpdateOne {
-	_u.mutation.ClearRequestedTotalNetWeightKg()
+// ClearRequestedTotalNetWeightG clears the value of the "requested_total_net_weight_g" field.
+func (_u *ShipmentUpdateOne) ClearRequestedTotalNetWeightG() *ShipmentUpdateOne {
+	_u.mutation.ClearRequestedTotalNetWeightG()
 	return _u
 }
 
@@ -990,17 +990,17 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	if _u.mutation.ShippedAtCleared() {
 		_spec.ClearField(shipment.FieldShippedAt, field.TypeTime)
 	}
-	if value, ok := _u.mutation.TotalNetWeightKg(); ok {
-		_spec.SetField(shipment.FieldTotalNetWeightKg, field.TypeOther, value)
+	if value, ok := _u.mutation.TotalNetWeightG(); ok {
+		_spec.SetField(shipment.FieldTotalNetWeightG, field.TypeOther, value)
 	}
-	if _u.mutation.TotalNetWeightKgCleared() {
-		_spec.ClearField(shipment.FieldTotalNetWeightKg, field.TypeOther)
+	if _u.mutation.TotalNetWeightGCleared() {
+		_spec.ClearField(shipment.FieldTotalNetWeightG, field.TypeOther)
 	}
-	if value, ok := _u.mutation.RequestedTotalNetWeightKg(); ok {
-		_spec.SetField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther, value)
+	if value, ok := _u.mutation.RequestedTotalNetWeightG(); ok {
+		_spec.SetField(shipment.FieldRequestedTotalNetWeightG, field.TypeOther, value)
 	}
-	if _u.mutation.RequestedTotalNetWeightKgCleared() {
-		_spec.ClearField(shipment.FieldRequestedTotalNetWeightKg, field.TypeOther)
+	if _u.mutation.RequestedTotalNetWeightGCleared() {
+		_spec.ClearField(shipment.FieldRequestedTotalNetWeightG, field.TypeOther)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(shipment.FieldNote, field.TypeString, value)

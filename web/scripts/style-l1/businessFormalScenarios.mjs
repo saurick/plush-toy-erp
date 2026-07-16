@@ -37,7 +37,7 @@ export function createBusinessFormalScenarios(deps) {
     path,
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,
-    verifyBusinessRowDoubleClickEditModal,
+    verifyBusinessRowDoubleClickModal,
     verifySourceImportPicker,
     customerRuntimeEffectiveSession,
   } = deps
@@ -941,7 +941,7 @@ export function createBusinessFormalScenarios(deps) {
               .trim(),
           }))
         assert(
-          weightColumnMetrics.headers.includes('总净重（kg）') &&
+          weightColumnMetrics.headers.includes('总净重（克）') &&
             weightColumnMetrics.text.includes('待确认'),
           `出货列表应显示总净重列和草稿待确认状态: ${JSON.stringify(
             weightColumnMetrics
@@ -956,13 +956,13 @@ export function createBusinessFormalScenarios(deps) {
             '出货明细',
             '从销售订单导入',
             '预计总净重暂不可计算',
-            '实际总净重（kg）',
+            '实际总净重（克）',
           ],
           afterOpen: async (modal) => {
             await modal.getByLabel('产品').click()
             await page.getByText('PROD-STYLE-L1').last().click()
             await modal.getByLabel('数量').fill('10')
-            await expectText(page, '预计总净重：4.25 kg')
+            await expectText(page, '预计总净重：4250 克')
             await modal.screenshot({
               path: path.join(outputDir, 'shipment-net-weight-predicted.png'),
             })
@@ -975,6 +975,117 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
         await assertNoHorizontalOverflow(page, 'shipment-net-weight-desktop')
+      },
+    },
+    {
+      name: 'product-net-weight-unit-suffix-desktop',
+      path: '/erp/master/products',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_units') {
+            await route.fallback()
+            return
+          }
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: body.id || 'product-weight-unit-options',
+              result: {
+                code: 0,
+                message: 'OK',
+                data: {
+                  units: [
+                    {
+                      id: 1,
+                      code: 'KG',
+                      name: '千克',
+                      precision: 3,
+                      is_active: true,
+                    },
+                    {
+                      id: 2,
+                      code: 'PCS',
+                      name: '件',
+                      precision: 0,
+                      is_active: true,
+                    },
+                  ],
+                  total: 2,
+                  limit: 100,
+                  offset: 0,
+                },
+              },
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectHeading(page, '产品档案')
+        await page.getByRole('button', { name: '新建产品' }).click()
+        const modal = page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .last()
+        await expectText(page, '产品单重（净重）')
+        const suffix = modal.locator('.erp-item-field-unit-suffix').first()
+        await suffix.waitFor()
+        await expectText(modal, '件（PCS）')
+        await modal.screenshot({
+          path: path.join(
+            outputDir,
+            'product-net-weight-unit-suffix-default.png'
+          ),
+        })
+        const weightInput = modal.getByLabel('产品单重（净重）')
+        await weightInput.fill('425')
+        await modal
+          .locator('#default_unit_id')
+          .locator('xpath=ancestor::div[contains(@class,"ant-select-selector")]')
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option-content')
+          .filter({ hasText: '千克（KG）' })
+          .click()
+        await page.keyboard.press('Tab')
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .waitFor({ state: 'hidden' })
+        await expectText(modal, '千克（KG）')
+        assert.equal(
+          await weightInput.inputValue(),
+          '',
+          '默认单位变更后应清除旧产品单重'
+        )
+        const suffixMetrics = await suffix.evaluate((node) => ({
+          text: String(node.value || '').trim(),
+          clientWidth: node.clientWidth,
+          scrollWidth: node.scrollWidth,
+          clientHeight: node.clientHeight,
+          scrollHeight: node.scrollHeight,
+        }))
+        assert.equal(
+          suffixMetrics.text,
+          '克',
+          `产品单重应使用清晰的中文克单位: ${JSON.stringify(suffixMetrics)}`
+        )
+        assert(
+          suffixMetrics.scrollWidth <= suffixMetrics.clientWidth + 1 &&
+            suffixMetrics.scrollHeight <= suffixMetrics.clientHeight + 1,
+          `产品单重单位后缀不得被裁切: ${JSON.stringify(suffixMetrics)}`
+        )
+        await modal.screenshot({
+          path: path.join(outputDir, 'product-net-weight-unit-suffix.png'),
+        })
+        await closeBusinessFormModal(page, modal)
+        await assertNoHorizontalOverflow(
+          page,
+          'product-net-weight-unit-suffix-desktop'
+        )
       },
     },
     {
@@ -1096,6 +1207,60 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
+      name: 'business-row-double-click-modals-desktop',
+      path: '/erp/warehouse/inventory',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        await expectText(page, '12.5')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: '12.5',
+          titleText: '库存余额详情',
+          scenarioName: 'business-row-double-click-inventory',
+          screenshotName: 'business-v1-inventory-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '当前弹窗只用于库存查询和追溯')
+            await expectText(page, 'SKU-STYLE-L1')
+          },
+        })
+
+        await gotoScenarioPath(page, '/erp/production/quality-inspections', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '质量检验')
+        await expectText(page, 'QI-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'QI-STYLE-L1',
+          titleText: '质量检验详情',
+          scenarioName: 'business-row-double-click-quality-inspection',
+          screenshotName:
+            'business-v1-quality-inspection-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, 'PR-STYLE-L1')
+            await expectText(page, 'INV-LOT-001')
+            await expectText(page, '质检附件')
+          },
+        })
+
+        await gotoScenarioPath(page, '/erp/warehouse/shipments', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '出货单')
+        await expectText(page, 'SHIP-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'SHIP-STYLE-L1',
+          titleText: '查看出货明细',
+          scenarioName: 'business-row-double-click-shipment',
+          screenshotName: 'business-v1-shipment-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '已保存出货明细')
+          },
+        })
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
@@ -1149,7 +1314,7 @@ export function createBusinessFormalScenarios(deps) {
             })
           },
         })
-        await verifyBusinessRowDoubleClickEditModal(page, {
+        await verifyBusinessRowDoubleClickModal(page, {
           rowText: '样式供应商',
           titleText: '编辑供应商',
           scenarioName: 'business-v1-suppliers',
@@ -1201,7 +1366,7 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
         await assertNoHorizontalOverflow(page, 'business-standard-customers')
-        await verifyBusinessRowDoubleClickEditModal(page, {
+        await verifyBusinessRowDoubleClickModal(page, {
           rowText: '暗色客户',
           titleText: '编辑客户',
           scenarioName: 'business-v1-customers',
@@ -1322,7 +1487,7 @@ export function createBusinessFormalScenarios(deps) {
           },
         })
         await assertNoHorizontalOverflow(page, 'business-standard-sales-orders')
-        await verifyBusinessRowDoubleClickEditModal(page, {
+        await verifyBusinessRowDoubleClickModal(page, {
           rowText: 'SO-STYLE-L1',
           titleText: '编辑销售订单',
           scenarioName: 'business-v1-sales-orders',
@@ -1362,7 +1527,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertNoListDeleteTrashToolbar(page)
         await expectText(page, 'PROD-STYLE-L1')
         await expectText(page, 'BEAR-STYLE')
-        await expectText(page, '0.425 kg / 件（PCS）')
+        await expectText(page, '425 克')
         await expectText(page, '当前操作')
         await assertCurrentOperationBarCompact(page, {
           scenarioName: 'business-standard-products',
@@ -1421,7 +1586,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectButton(page, '新建产品规格')
         await expectText(page, 'SKU-STYLE-L1')
-        await expectText(page, '0.375 kg / 件（PCS）')
+        await expectText(page, '375 克')
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-standard-product-skus',
         })
@@ -2185,6 +2350,16 @@ export function createBusinessFormalScenarios(deps) {
         forceEmptyInventoryBalances = false
         await page.getByRole('button', { name: '刷新当前页' }).click()
         await expectText(page, '12.5')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: '12.5',
+          titleText: '库存余额详情',
+          scenarioName: 'business-standard-inventory-balances',
+          screenshotName: 'business-v1-inventory-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '当前弹窗只用于库存查询和追溯')
+            await expectText(page, 'SKU-STYLE-L1')
+          },
+        })
 
         await page.getByRole('tab', { name: '库存批次' }).click()
         await expectText(page, 'INV-LOT-001')
@@ -2321,6 +2496,18 @@ export function createBusinessFormalScenarios(deps) {
         await page.getByPlaceholder('搜索质检单').first().fill('')
         await page.keyboard.press('Enter')
         await expectText(page, 'QI-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'QI-STYLE-L1',
+          titleText: '质量检验详情',
+          scenarioName: 'business-v1-quality-inspections',
+          screenshotName:
+            'business-v1-quality-inspection-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, 'PR-STYLE-L1')
+            await expectText(page, 'INV-LOT-001')
+            await expectText(page, '质检附件')
+          },
+        })
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'quality-inspections',
           heading: '质量检验',
@@ -2372,7 +2559,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '新建草稿')
         await expectText(page, '计划出货日期')
         await expectText(page, '实际出货日期')
-        await expectText(page, '总净重（kg）')
+        await expectText(page, '总净重（克）')
         await expectText(page, '待确认')
         await expectText(page, 'SHIP-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
@@ -2424,6 +2611,15 @@ export function createBusinessFormalScenarios(deps) {
           .click()
         await page.getByTitle('全部状态', { exact: true }).click()
         await expectText(page, 'SHIP-STYLE-L1')
+        await verifyBusinessRowDoubleClickModal(page, {
+          rowText: 'SHIP-STYLE-L1',
+          titleText: '查看出货明细',
+          scenarioName: 'business-v1-shipments',
+          screenshotName: 'business-v1-shipment-double-click-details',
+          afterModalOpen: async () => {
+            await expectText(page, '已保存出货明细')
+          },
+        })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建草稿',
           titleText: '新建出货单',
@@ -2466,7 +2662,7 @@ export function createBusinessFormalScenarios(deps) {
             '产品',
             '仓库',
             '预计总净重暂不可计算',
-            '实际总净重（kg）',
+            '实际总净重（克）',
           ],
           afterOpen: async (modal) => {
             await verifySourceImportPicker(page, {
@@ -2487,7 +2683,7 @@ export function createBusinessFormalScenarios(deps) {
               scenarioName: 'shipment-source-import-picker',
             })
             await assertTextAbsent(page, 'sales_order_item_id 追溯')
-            await expectText(page, '预计总净重：4.25 kg')
+            await expectText(page, '预计总净重：4250 克')
             await modal.screenshot({
               path: path.join(
                 outputDir,
@@ -2711,7 +2907,7 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '销售订单ID')
         await assertTextAbsent(page, '单位ID')
         await assertTextAbsent(page, '产品编号快照')
-        await verifyBusinessRowDoubleClickEditModal(page, {
+        await verifyBusinessRowDoubleClickModal(page, {
           rowText: 'SIM-OUTSOURCE-CONTRACT-L1',
           titleText: '编辑加工合同',
           scenarioName: 'business-v1-processing-contracts',

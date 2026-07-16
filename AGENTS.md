@@ -138,7 +138,8 @@
 - 当前 Compose 真源是 `server/deploy/compose/prod`；低配目标机不构建，只 load 制品、migration、启动和检查。
 - 发布前确认 commit/image、migration、config、rollback；线上 Atlas 使用项目文档指定的宿主机工具和串行锁。
 - 镜像清理先保留当前及项目要求的回滚版本，再按 `$plush-operations-governance` 和发布文档执行。
-- schema 变更使用 Ent/Atlas 正式流程；开发库归属不清、共享/生产库或高风险 migration 必须先确认。
+- 修改 `server/internal/data/model/schema/**` 后，本轮收口前必须在 `server/` 执行 `make data`，审查并纳入由此产生的 Ent 生成物、新 Atlas migration 与 `atlas.sum`，再运行 `bash scripts/qa/db-guard.sh`；结构变更缺 migration 或生成零漂移证据时只能报告 `incomplete`。Git hook 只做 check-only，不自动生成或改写 migration。
+- `make migrate_apply` 只对已确认归属的本地/隔离开发库执行，并按 `migrate_status -> migrate_apply -> migrate_status / 结构读回` 验证；共享、测试、生产或归属不明数据库必须先确认，未 apply 必须明确报告。
 - 代码/正式文档改动完成后更新 progress；提交推送只精确 stage 本轮范围，push 前 fetch 并确认 upstream。
 
 ## 前端、原型与错误

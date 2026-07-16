@@ -66,3 +66,21 @@ test('business dashboard explains the four business-facing data boundaries', () 
   assert.doesNotMatch(source, />\s*状态分布\s*</u)
   assert.doesNotMatch(source, />\s*当前风险\s*</u)
 })
+
+test('business dashboard keeps explicit entries and adds guarded double-click shortcuts', () => {
+  assert.match(source, /openDashboardItemOnDoubleClick/u)
+  assert.match(source, /erp-business-board-source-item--openable/u)
+  assert.match(source, /erp-business-board-alert-item--openable/u)
+  assert.match(source, /data-open-on-double-click/u)
+  assert.match(source, /title=\{`双击进入\$\{source\.label\}`\}/u)
+  assert.match(
+    source,
+    /openDashboardItemOnDoubleClick\(event,\s*\(\) => navigate\(source\.path\)\)/u
+  )
+  assert.match(
+    source,
+    /openDashboardItemOnDoubleClick\(event,\s*\(\) =>\s*openTaskEntry\(task\)/u
+  )
+  assert.match(source, /点击“查看”进入，电脑端也可双击整项/u)
+  assert.match(source, /aria-label=\{`查看\$\{source\.label\}`\}/u)
+})

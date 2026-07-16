@@ -11,8 +11,10 @@ func TestValidateAdminPassword(t *testing.T) {
 		wantErr  bool
 	}{
 		{name: "minimum ASCII length", password: "12345678"},
+		{name: "maximum ASCII length", password: "12345678901234567890"},
 		{name: "unicode within bcrypt byte limit", password: "毛绒玩具权限管理安全密码"},
 		{name: "too short", password: "1234567", wantErr: true},
+		{name: "too many characters", password: "123456789012345678901", wantErr: true},
 		{name: "bcrypt byte limit exceeded", password: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", wantErr: true},
 		{name: "invalid UTF-8", password: string([]byte{0xff, 0xfe, 0xfd, 0xfc, 0xfb, 0xfa, 0xf9, 0xf8}), wantErr: true},
 	}

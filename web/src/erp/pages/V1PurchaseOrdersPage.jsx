@@ -20,6 +20,7 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import {
   createBlankPurchaseLine,
   normalizePurchaseLineFormValue,
@@ -166,6 +167,7 @@ export default function V1PurchaseOrdersPage() {
   const [sortValue, setSortValue] = useState('updated_at:desc')
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [editingOrder, setEditingOrder] = useState(null)
+  const [detailOrder, setDetailOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const orderAttachmentRef = useRef(null)
   const routePurchaseOrderID = searchParamPositiveIntText(
@@ -224,7 +226,7 @@ export default function V1PurchaseOrdersPage() {
           '明细状态待核对'
         ),
       },
-      ...(view === 'modal'
+      ...(view !== 'preview'
         ? [{ label: '备注', value: item?.note, wide: true }]
         : []),
     ],
@@ -548,6 +550,26 @@ export default function V1PurchaseOrdersPage() {
         )}，未进入编辑`
       )
     }
+  }
+
+  const openPurchaseOrderDetails = (record) => {
+    if (!record?.id) return
+    sourceDocumentOpenEditController.invalidate()
+    applySelectedRowKeys([record.id])
+    setSelectedOrder(record)
+    setDetailOrder(record)
+  }
+
+  const openPurchaseOrderRecord = (record) => {
+    if (!record?.id) return
+    applySelectedRowKeys([record.id])
+    setSelectedOrder(record)
+    if (canEditPurchaseOrderSelection({ canUpdate, order: record })) {
+      setDetailOrder(null)
+      openEditModal(record)
+      return
+    }
+    openPurchaseOrderDetails(record)
   }
 
   const resolveSupplierSnapshot = useCallback(
@@ -1094,8 +1116,8 @@ export default function V1PurchaseOrdersPage() {
             applySelectedRowKeys([record.id])
             setSelectedOrder(record)
           },
-          onDoubleClick: () => openEditModal(record),
         })}
+        onOpenRecord={openPurchaseOrderRecord}
         pagination={{
           current: pagination.current,
           pageSize: pagination.pageSize,
@@ -1107,6 +1129,31 @@ export default function V1PurchaseOrdersPage() {
       />
 
       {purchaseOrderItemsPreview.modal}
+
+      <BusinessRecordDetailsModal
+        columns={dataColumns}
+        description="查看采购订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
+        lineItems={
+          canRead
+            ? {
+                emptyDescription: '当前采购订单暂无明细',
+                getItemFields: getPurchaseOrderItemFields,
+                getItemLabel: (item, { index }) =>
+                  `明细 ${item?.line_no || index + 1}`,
+                getItemSummary: (item) =>
+                  [item?.material_code_snapshot, item?.material_name_snapshot]
+                    .filter(Boolean)
+                    .join(' / '),
+                load: loadAllPurchaseOrderItemsForPreview,
+                title: '采购订单明细',
+              }
+            : null
+        }
+        open={Boolean(detailOrder)}
+        record={detailOrder}
+        title="采购订单详情"
+        onClose={() => setDetailOrder(null)}
+      />
 
       <CollaborationTaskPanel
         tasks={workflowTasks}

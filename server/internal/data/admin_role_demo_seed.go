@@ -15,7 +15,7 @@ import (
 
 var (
 	ErrRoleDemoPasswordRequired = errors.New("role demo admin password is required")
-	ErrRoleDemoPasswordTooShort = errors.New("role demo admin password must be at least 8 characters")
+	ErrRoleDemoPasswordInvalid  = errors.New("role demo admin password must contain 8-20 characters")
 	ErrStableAdminProtected     = errors.New("stable admin account is not managed by role demo or manual acceptance seeding")
 )
 
@@ -70,11 +70,11 @@ func ResetManualAcceptancePasswords(
 	if len(demoUsernames) > 0 && demoPassword == "" {
 		return ErrRoleDemoPasswordRequired
 	}
-	if len(adminUsernames) > 0 && len(adminPassword) < 8 {
-		return errors.New("manual acceptance admin password must be at least 8 characters")
+	if len(adminUsernames) > 0 && biz.ValidateAdminPassword(adminPassword) != nil {
+		return errors.New("manual acceptance admin password must contain 8-20 characters")
 	}
-	if len(demoUsernames) > 0 && len(demoPassword) < 8 {
-		return ErrRoleDemoPasswordTooShort
+	if len(demoUsernames) > 0 && biz.ValidateAdminPassword(demoPassword) != nil {
+		return ErrRoleDemoPasswordInvalid
 	}
 	if len(adminUsernames) > 0 && len(demoUsernames) > 0 && adminPassword == demoPassword {
 		return errors.New("manual acceptance admin and demo passwords must differ")
@@ -179,8 +179,8 @@ func SeedRoleDemoAdminAccounts(ctx context.Context, db *sql.DB, opts RoleDemoAdm
 	if password == "" {
 		return nil, ErrRoleDemoPasswordRequired
 	}
-	if len(password) < 8 {
-		return nil, ErrRoleDemoPasswordTooShort
+	if biz.ValidateAdminPassword(password) != nil {
+		return nil, ErrRoleDemoPasswordInvalid
 	}
 	accounts := opts.Accounts
 	if len(accounts) == 0 {

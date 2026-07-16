@@ -121,7 +121,7 @@ func (s *masterDataRepoStub) ProductIsActive(_ context.Context, id int) (bool, e
 func (s *masterDataRepoStub) CreateProduct(_ context.Context, in *ProductMutation) (*Product, error) {
 	cp := *in
 	s.createdProduct = &cp
-	return &Product{ID: 1, Code: in.Code, Name: in.Name, StyleNo: in.StyleNo, CustomerStyleNo: in.CustomerStyleNo, DefaultUnitID: in.DefaultUnitID, UnitNetWeightKg: in.UnitNetWeightKg, IsActive: true}, nil
+	return &Product{ID: 1, Code: in.Code, Name: in.Name, StyleNo: in.StyleNo, CustomerStyleNo: in.CustomerStyleNo, DefaultUnitID: in.DefaultUnitID, UnitNetWeightG: in.UnitNetWeightG, IsActive: true}, nil
 }
 func (s *masterDataRepoStub) UpdateProduct(context.Context, int, *ProductMutation) (*Product, error) {
 	return nil, nil
@@ -138,7 +138,7 @@ func (s *masterDataRepoStub) SetProductActive(context.Context, int, bool) (*Prod
 func (s *masterDataRepoStub) CreateProductSKU(_ context.Context, in *ProductSKUMutation) (*ProductSKU, error) {
 	cp := *in
 	s.createdSKU = &cp
-	return &ProductSKU{ID: 1, ProductID: in.ProductID, SKUCode: in.SKUCode, DefaultUnitID: in.DefaultUnitID, UnitNetWeightKg: in.UnitNetWeightKg, IsActive: true}, nil
+	return &ProductSKU{ID: 1, ProductID: in.ProductID, SKUCode: in.SKUCode, DefaultUnitID: in.DefaultUnitID, UnitNetWeightG: in.UnitNetWeightG, IsActive: true}, nil
 }
 func (s *masterDataRepoStub) UpdateProductSKU(context.Context, int, *ProductSKUMutation) (*ProductSKU, error) {
 	return nil, nil
@@ -277,12 +277,12 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	}
 	styleNo := "  BEAR-BASE  "
 	customerStyleNo := " "
-	unitNetWeightKg := decimal.RequireFromString("0.425")
-	productInput, err := normalizeProductMutation(ProductMutation{Code: " P-001 ", Name: " 毛绒熊 ", StyleNo: &styleNo, CustomerStyleNo: &customerStyleNo, DefaultUnitID: 10, UnitNetWeightKg: &unitNetWeightKg})
+	unitNetWeightG := decimal.RequireFromString("0.425")
+	productInput, err := normalizeProductMutation(ProductMutation{Code: " P-001 ", Name: " 毛绒熊 ", StyleNo: &styleNo, CustomerStyleNo: &customerStyleNo, DefaultUnitID: 10, UnitNetWeightG: &unitNetWeightG})
 	if err != nil {
 		t.Fatalf("expected product mutation valid, got %v", err)
 	}
-	if productInput.Code != "P-001" || productInput.Name != "毛绒熊" || productInput.StyleNo == nil || *productInput.StyleNo != "BEAR-BASE" || productInput.UnitNetWeightKg == nil || !productInput.UnitNetWeightKg.Equal(unitNetWeightKg) {
+	if productInput.Code != "P-001" || productInput.Name != "毛绒熊" || productInput.StyleNo == nil || *productInput.StyleNo != "BEAR-BASE" || productInput.UnitNetWeightG == nil || !productInput.UnitNetWeightG.Equal(unitNetWeightG) {
 		t.Fatalf("expected normalized product, got %#v", productInput)
 	}
 	if productInput.CustomerStyleNo != nil {
@@ -292,19 +292,19 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 		t.Fatalf("expected missing product unit rejected, got %v", err)
 	}
 	zeroWeight := decimal.Zero
-	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightKg: &zeroWeight}); !errors.Is(err, ErrBadParam) {
+	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightG: &zeroWeight}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected zero product unit net weight rejected, got %v", err)
 	}
 	negativeWeight := decimal.RequireFromString("-0.001")
-	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightKg: &negativeWeight}); !errors.Is(err, ErrBadParam) {
+	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightG: &negativeWeight}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected negative product unit net weight rejected, got %v", err)
 	}
 	overPreciseWeight := decimal.RequireFromString("0.0000001")
-	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightKg: &overPreciseWeight}); !errors.Is(err, ErrBadParam) {
+	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightG: &overPreciseWeight}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected product unit net weight beyond six decimals rejected, got %v", err)
 	}
 	overflowWeight := decimal.RequireFromString("100000000000000")
-	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightKg: &overflowWeight}); !errors.Is(err, ErrBadParam) {
+	if _, err := normalizeProductMutation(ProductMutation{Code: "P-001", Name: "毛绒熊", DefaultUnitID: 10, UnitNetWeightG: &overflowWeight}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected product unit net weight beyond numeric(20,6) rejected, got %v", err)
 	}
 	phone := " 0574-12345678 "
@@ -331,21 +331,21 @@ func TestMasterDataUsecaseProductGuardsUnit(t *testing.T) {
 	ctx := context.Background()
 	unitID := 3
 	styleNo := "  BEAR-BASE  "
-	unitNetWeightKg := decimal.RequireFromString("0.425")
+	unitNetWeightG := decimal.RequireFromString("0.425")
 	repo := &masterDataRepoStub{units: map[int]bool{unitID: true, 4: false}}
 	uc := NewMasterDataUsecase(repo)
 
 	product, err := uc.CreateProduct(ctx, &ProductMutation{
-		Code:            " P-001 ",
-		Name:            " 毛绒熊 ",
-		StyleNo:         &styleNo,
-		DefaultUnitID:   unitID,
-		UnitNetWeightKg: &unitNetWeightKg,
+		Code:           " P-001 ",
+		Name:           " 毛绒熊 ",
+		StyleNo:        &styleNo,
+		DefaultUnitID:  unitID,
+		UnitNetWeightG: &unitNetWeightG,
 	})
 	if err != nil {
 		t.Fatalf("expected product valid, got %v", err)
 	}
-	if product.Code != "P-001" || repo.createdProduct.StyleNo == nil || *repo.createdProduct.StyleNo != "BEAR-BASE" || repo.createdProduct.UnitNetWeightKg == nil || !repo.createdProduct.UnitNetWeightKg.Equal(unitNetWeightKg) {
+	if product.Code != "P-001" || repo.createdProduct.StyleNo == nil || *repo.createdProduct.StyleNo != "BEAR-BASE" || repo.createdProduct.UnitNetWeightG == nil || !repo.createdProduct.UnitNetWeightG.Equal(unitNetWeightG) {
 		t.Fatalf("expected normalized product mutation, got product=%#v mutation=%#v", product, repo.createdProduct)
 	}
 
@@ -365,7 +365,7 @@ func TestMasterDataUsecaseProductSKUGuardsProductAndUnit(t *testing.T) {
 	unitID := 3
 	skuName := "  红色小号  "
 	emptyBarcode := " "
-	unitNetWeightKg := decimal.RequireFromString("0.425000")
+	unitNetWeightG := decimal.RequireFromString("0.425000")
 	repo := &masterDataRepoStub{
 		products: map[int]bool{7: true, 8: false},
 		units:    map[int]bool{unitID: true, 4: false},
@@ -373,17 +373,17 @@ func TestMasterDataUsecaseProductSKUGuardsProductAndUnit(t *testing.T) {
 	uc := NewMasterDataUsecase(repo)
 
 	sku, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{
-		ProductID:       7,
-		SKUCode:         " SKU-RED-S ",
-		SKUName:         &skuName,
-		Barcode:         &emptyBarcode,
-		DefaultUnitID:   &unitID,
-		UnitNetWeightKg: &unitNetWeightKg,
+		ProductID:      7,
+		SKUCode:        " SKU-RED-S ",
+		SKUName:        &skuName,
+		Barcode:        &emptyBarcode,
+		DefaultUnitID:  &unitID,
+		UnitNetWeightG: &unitNetWeightG,
 	})
 	if err != nil {
 		t.Fatalf("expected product sku valid, got %v", err)
 	}
-	if sku.SKUCode != "SKU-RED-S" || repo.createdSKU.SKUName == nil || *repo.createdSKU.SKUName != "红色小号" || repo.createdSKU.UnitNetWeightKg == nil || !repo.createdSKU.UnitNetWeightKg.Equal(unitNetWeightKg) {
+	if sku.SKUCode != "SKU-RED-S" || repo.createdSKU.SKUName == nil || *repo.createdSKU.SKUName != "红色小号" || repo.createdSKU.UnitNetWeightG == nil || !repo.createdSKU.UnitNetWeightG.Equal(unitNetWeightG) {
 		t.Fatalf("expected normalized sku mutation, got sku=%#v mutation=%#v", sku, repo.createdSKU)
 	}
 	if repo.createdSKU.Barcode != nil {
@@ -403,7 +403,7 @@ func TestMasterDataUsecaseProductSKUGuardsProductAndUnit(t *testing.T) {
 	if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected empty sku code rejected, got %v", err)
 	}
-	if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7, SKUCode: "SKU-NO-UNIT", UnitNetWeightKg: &unitNetWeightKg}); !errors.Is(err, ErrBadParam) {
+	if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7, SKUCode: "SKU-NO-UNIT", UnitNetWeightG: &unitNetWeightG}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected weighted SKU without default unit rejected, got %v", err)
 	}
 	for _, weight := range []decimal.Decimal{
@@ -411,7 +411,7 @@ func TestMasterDataUsecaseProductSKUGuardsProductAndUnit(t *testing.T) {
 		decimal.RequireFromString("0.0000001"),
 		decimal.RequireFromString("100000000000000"),
 	} {
-		if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7, SKUCode: "SKU-BAD-WEIGHT", DefaultUnitID: &unitID, UnitNetWeightKg: &weight}); !errors.Is(err, ErrBadParam) {
+		if _, err := uc.CreateProductSKU(ctx, &ProductSKUMutation{ProductID: 7, SKUCode: "SKU-BAD-WEIGHT", DefaultUnitID: &unitID, UnitNetWeightG: &weight}); !errors.Is(err, ErrBadParam) {
 			t.Fatalf("expected invalid SKU unit net weight %s rejected, got %v", weight, err)
 		}
 	}

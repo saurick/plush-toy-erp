@@ -19,7 +19,7 @@ func (Product) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"products_unit_net_weight_kg_positive": "unit_net_weight_kg IS NULL OR unit_net_weight_kg > 0",
+				"products_unit_net_weight_g_positive": "unit_net_weight_g IS NULL OR unit_net_weight_g > 0",
 			},
 		},
 	}
@@ -43,7 +43,7 @@ func (Product) Fields() []ent.Field {
 			MaxLen(128),
 		field.Int("default_unit_id").
 			Positive(),
-		optionalDecimalField("unit_net_weight_kg"),
+		optionalDecimalField("unit_net_weight_g"),
 		field.Bool("is_active").
 			Default(true),
 		field.Time("created_at").

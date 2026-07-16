@@ -1472,14 +1472,14 @@ export default function BOMVersionsPage() {
             }
             selectSingleVersion(record)
           },
-          onDoubleClick: () => {
-            if (record.status === 'DRAFT' && canUpdate) {
-              openEdit(record)
-              return
-            }
-            openView(record)
-          },
         })}
+        onOpenRecord={(record) => {
+          if (record.status === 'DRAFT' && canUpdate) {
+            openEdit(record)
+            return
+          }
+          openView(record)
+        }}
       />
       {bomItemsPreview.modal}
 

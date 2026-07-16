@@ -180,7 +180,7 @@ function getScenarios() {
     selectPurchaseReceiptRow,
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,
-    verifyBusinessRowDoubleClickEditModal,
+    verifyBusinessRowDoubleClickModal,
     verifySourceImportPicker,
     waitForPath,
     webDir,
@@ -3044,9 +3044,9 @@ async function assertBusinessToolbarDisabledButtons(
   )
 }
 
-async function verifyBusinessRowDoubleClickEditModal(
+async function verifyBusinessRowDoubleClickModal(
   page,
-  { rowText, titleText, scenarioName, afterModalOpen }
+  { rowText, titleText, scenarioName, screenshotName, afterModalOpen }
 ) {
   const row = page
     .locator('.erp-business-data-table-card .ant-table-tbody tr')
@@ -3060,9 +3060,20 @@ async function verifyBusinessRowDoubleClickEditModal(
     .filter({ hasText: titleText })
     .last()
   await modal.waitFor({ state: 'visible', timeout: 10_000 })
+  await assertAntdModalCentered(
+    page,
+    modal,
+    `${scenarioName}-double-click-modal`
+  )
   await expectText(page, titleText)
   if (afterModalOpen) {
     await afterModalOpen()
+  }
+  if (screenshotName) {
+    await page.screenshot({
+      path: path.join(outputDir, `${screenshotName}.png`),
+      fullPage: true,
+    })
   }
 
   const modalMetrics = await page.evaluate(
@@ -3094,7 +3105,7 @@ async function verifyBusinessRowDoubleClickEditModal(
   assert.equal(
     modalMetrics.visibleEditModals,
     1,
-    `${scenarioName} 双击行应打开编辑弹窗: ${JSON.stringify(modalMetrics)}`
+    `${scenarioName} 双击行应打开业务弹窗: ${JSON.stringify(modalMetrics)}`
   )
   assert.equal(
     modalMetrics.visibleDetailDrawers,

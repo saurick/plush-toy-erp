@@ -31,8 +31,8 @@ const (
 	FieldLotID = "lot_id"
 	// FieldQuantity holds the string denoting the quantity field in the database.
 	FieldQuantity = "quantity"
-	// FieldUnitNetWeightKgSnapshot holds the string denoting the unit_net_weight_kg_snapshot field in the database.
-	FieldUnitNetWeightKgSnapshot = "unit_net_weight_kg_snapshot"
+	// FieldUnitNetWeightGSnapshot holds the string denoting the unit_net_weight_g_snapshot field in the database.
+	FieldUnitNetWeightGSnapshot = "unit_net_weight_g_snapshot"
 	// FieldUnitPriceSnapshot holds the string denoting the unit_price_snapshot field in the database.
 	FieldUnitPriceSnapshot = "unit_price_snapshot"
 	// FieldAmountSnapshot holds the string denoting the amount_snapshot field in the database.
@@ -123,7 +123,7 @@ var Columns = []string{
 	FieldUnitID,
 	FieldLotID,
 	FieldQuantity,
-	FieldUnitNetWeightKgSnapshot,
+	FieldUnitNetWeightGSnapshot,
 	FieldUnitPriceSnapshot,
 	FieldAmountSnapshot,
 	FieldCurrencySnapshot,
@@ -225,9 +225,9 @@ func ByQuantity(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldQuantity, opts...).ToFunc()
 }
 
-// ByUnitNetWeightKgSnapshot orders the results by the unit_net_weight_kg_snapshot field.
-func ByUnitNetWeightKgSnapshot(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldUnitNetWeightKgSnapshot, opts...).ToFunc()
+// ByUnitNetWeightGSnapshot orders the results by the unit_net_weight_g_snapshot field.
+func ByUnitNetWeightGSnapshot(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldUnitNetWeightGSnapshot, opts...).ToFunc()
 }
 
 // ByUnitPriceSnapshot orders the results by the unit_price_snapshot field.

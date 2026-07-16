@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { DownOutlined, LinkOutlined } from '@ant-design/icons'
+import { DownOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons'
 import { Button, Card, Dropdown, Empty, Table, Tabs, Tag } from 'antd'
 import {
   useNavigate,
@@ -34,6 +34,7 @@ import {
   downloadBusinessListCSV,
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import {
   compactParams,
   formatUnixDate,
@@ -330,6 +331,7 @@ export default function V1InventoryLedgerPage() {
   const [pagination, setPagination] = useState({ current: 1, pageSize: 20 })
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
+  const [detailRecord, setDetailRecord] = useState(null)
   const routeView = searchParamText(searchParams, 'view')
   const routeLotID = searchParamPositiveIntText(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveIntText(searchParams, 'source_id')
@@ -459,6 +461,7 @@ export default function V1InventoryLedgerPage() {
     if (routeView && VIEW_LABELS[routeView] && routeView !== activeView) {
       setActiveView(routeView)
       setSelectedRow(null)
+      setDetailRecord(null)
     }
   }, [activeView, routeView])
 
@@ -474,6 +477,7 @@ export default function V1InventoryLedgerPage() {
     (nextView) => {
       setActiveView(nextView)
       setSelectedRow(null)
+      setDetailRecord(null)
       setDateFilterStart('')
       setDateFilterEnd('')
       resetCurrentPage()
@@ -482,6 +486,11 @@ export default function V1InventoryLedgerPage() {
   )
 
   const activeLabel = VIEW_LABELS[activeView]
+  const openInventoryDetails = useCallback((record) => {
+    if (!record?.id) return
+    setSelectedRow(record)
+    setDetailRecord(record)
+  }, [])
   const selectedRowKey = selectedRow
     ? `${activeView}-${selectedRow.id}`
     : undefined
@@ -1229,6 +1238,14 @@ export default function V1InventoryLedgerPage() {
               相关单据 <DownOutlined />
             </Button>
           </Dropdown>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            disabled={!selectedRow}
+            onClick={() => openInventoryDetails(selectedRow)}
+          >
+            查看详情
+          </Button>
         </SelectionActionBar>
       </BusinessOperationPanel>
 
@@ -1262,6 +1279,18 @@ export default function V1InventoryLedgerPage() {
           }
           onRow={(record) => ({
             onClick: () => setSelectedRow(record),
+            onDoubleClick: (event) => {
+              if (
+                event.target?.closest?.(
+                  'a, button, input, textarea, select, label, [role="button"], [role="link"], .ant-table-selection-column, .ant-radio-wrapper, .ant-checkbox-wrapper, .erp-business-row-expand-button'
+                )
+              ) {
+                return
+              }
+              openInventoryDetails(record)
+            },
+            style: { cursor: 'pointer' },
+            title: '单击选中，双击打开',
           })}
           locale={{
             emptyText: <Empty description={`暂无${activeLabel}`} />,
@@ -1269,6 +1298,14 @@ export default function V1InventoryLedgerPage() {
         />
       </Card>
       {columnOrderModal}
+      <BusinessRecordDetailsModal
+        columns={visibleColumns}
+        description="当前弹窗只用于库存查询和追溯，不会修改库存、批次状态、预留或变动记录。"
+        open={Boolean(detailRecord)}
+        record={detailRecord}
+        title={`${activeLabel}详情`}
+        onClose={() => setDetailRecord(null)}
+      />
     </BusinessPageLayout>
   )
 }

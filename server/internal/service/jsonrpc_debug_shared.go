@@ -92,6 +92,7 @@ func debugParamString(pm map[string]any, keys ...string) string {
 func debugCapabilitiesToMap(capabilities biz.DebugCapabilities) map[string]any {
 	return map[string]any{
 		"environment":                          capabilities.Environment,
+		"databaseName":                         capabilities.DatabaseName,
 		"seedEnabled":                          capabilities.SeedEnabled,
 		"seedAllowed":                          capabilities.SeedAllowed,
 		"seedDisabledReason":                   capabilities.SeedDisabledReason,

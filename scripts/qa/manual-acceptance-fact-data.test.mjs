@@ -25,6 +25,7 @@ import {
   verifyReceiptQualities,
   verifyManualAcceptanceFactPlan,
 } from "./manual-acceptance-fact-data.mjs";
+import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
 import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
 
 const DATA_VERSION = "2026.07.15-v3";
@@ -212,8 +213,16 @@ function sourceReport({ remote = false } = {}) {
       materials: [material],
       suppliers: [{ id: 201, code: "SUP-201", name: "嘉顺布行" }],
       warehouses: [
-        { id: 301, code: "RM", name: "材料仓" },
-        { id: 302, code: "FG", name: "成品仓" },
+        {
+          id: 301,
+          code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material,
+          name: "材料仓",
+        },
+        {
+          id: 302,
+          code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product,
+          name: "成品仓",
+        },
       ],
       purchaseOrders: Array.from({ length: 9 }, (_, offset) => ({
         id: 400 + offset,
@@ -245,8 +254,16 @@ function sourceReport({ remote = false } = {}) {
           ],
           purchaseCandidates: [],
           warehouses: [
-            { id: 301, code: "RM", name: "材料仓" },
-            { id: 302, code: "FG", name: "成品仓" },
+            {
+              id: 301,
+              code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material,
+              name: "材料仓",
+            },
+            {
+              id: 302,
+              code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product,
+              name: "成品仓",
+            },
           ],
         },
         phaseReadiness: {

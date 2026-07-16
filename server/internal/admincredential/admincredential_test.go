@@ -32,7 +32,7 @@ func TestParseOptionsSupportsExplicitEnvironmentAndFlagOverrides(t *testing.T) {
 		case AdminUsernameEnv:
 			return "env-admin"
 		case AdminPasswordEnv:
-			return "environment-admin-password"
+			return "env-admin-pass"
 		default:
 			return ""
 		}
@@ -44,19 +44,19 @@ func TestParseOptionsSupportsExplicitEnvironmentAndFlagOverrides(t *testing.T) {
 	if err != nil {
 		t.Fatalf("environment parseOptions() error = %v", err)
 	}
-	if envOpts.username != "env-admin" || envOpts.password != "environment-admin-password" {
+	if envOpts.username != "env-admin" || envOpts.password != "env-admin-pass" {
 		t.Fatal("environment overrides were not applied")
 	}
 
 	flagOpts, err := parseOptions([]string{
 		"--username", "flag-admin",
-		"--password", "flag-admin-password",
+		"--password", "flag-admin-pass",
 		"--confirm", ExpectedConfirmation("flag-admin"),
 	}, getenv)
 	if err != nil {
 		t.Fatalf("flag parseOptions() error = %v", err)
 	}
-	if flagOpts.username != "flag-admin" || flagOpts.password != "flag-admin-password" {
+	if flagOpts.username != "flag-admin" || flagOpts.password != "flag-admin-pass" {
 		t.Fatal("flag overrides did not take precedence over environment values")
 	}
 }

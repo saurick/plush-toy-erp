@@ -93,7 +93,7 @@ export function createStyleL1Scenarios(deps) {
     selectPurchaseReceiptRow,
     verifyBusinessActionFormModal,
     verifyBusinessModuleColumnOrderDialog,
-    verifyBusinessRowDoubleClickEditModal,
+    verifyBusinessRowDoubleClickModal,
     verifySourceImportPicker,
     waitForPath,
     webDir,
@@ -1370,6 +1370,26 @@ export function createStyleL1Scenarios(deps) {
         await detailPanel
           .getByText('长队列待办 01', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
+        await queueRows.first().dblclick({ position: { x: 24, y: 20 } })
+        const workbenchTaskDrawer = page.locator('.erp-task-action-drawer')
+        await workbenchTaskDrawer.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await workbenchTaskDrawer
+          .getByText('长队列待办 01', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-yoyo-global-dashboard-row-double-click.png'
+          ),
+        })
+        await workbenchTaskDrawer.locator('.ant-drawer-close').click()
+        await workbenchTaskDrawer.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
 
         const metrics = await page.evaluate(async () => {
           const dashboard = document.querySelector('.erp-workbench-command')
@@ -2680,6 +2700,22 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '看板跳转测试任务' })
           .first()
         await navigationLaneTask
+          .locator('.erp-task-board-card-meta')
+          .first()
+          .dblclick()
+        await taskDrawer.waitFor({ state: 'visible', timeout: 10_000 })
+        await taskDrawer
+          .getByText('看板跳转测试任务', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-card-double-click.png'
+          ),
+        })
+        await taskDrawer.locator('.ant-drawer-close').click()
+        await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
+        await navigationLaneTask
           .getByRole('button', { name: '看板跳转测试任务', exact: true })
           .click()
         await waitForPath(page, '/erp/warehouse/shipping-release')
@@ -2759,6 +2795,77 @@ export function createStyleL1Scenarios(deps) {
           page,
           'erp-business-dashboard-desktop'
         )
+        const customerSourceItem = page
+          .getByRole('button', { name: '查看客户', exact: true })
+          .locator('xpath=..')
+        const customerSourceBeforeHover = await customerSourceItem.evaluate(
+          (element) => {
+            const rect = element.getBoundingClientRect()
+            const style = getComputedStyle(element)
+            return {
+              width: rect.width,
+              height: rect.height,
+              backgroundColor: style.backgroundColor,
+              borderColor: style.borderColor,
+            }
+          }
+        )
+        await customerSourceItem.hover()
+        await page.waitForFunction(
+          ({ backgroundColor, borderColor }) => {
+            const sourceItem = document
+              .querySelector('[aria-label="查看客户"]')
+              ?.closest('.erp-business-board-source-item')
+            if (!sourceItem) return false
+            const style = getComputedStyle(sourceItem)
+            return (
+              style.backgroundColor !== backgroundColor ||
+              style.borderColor !== borderColor
+            )
+          },
+          customerSourceBeforeHover,
+          { timeout: 2_000 }
+        )
+        const customerSourceAfterHover = await customerSourceItem.evaluate(
+          (element) => {
+            const rect = element.getBoundingClientRect()
+            const style = getComputedStyle(element)
+            return {
+              width: rect.width,
+              height: rect.height,
+              backgroundColor: style.backgroundColor,
+              borderColor: style.borderColor,
+              fitsContent: element.scrollWidth <= element.clientWidth + 1,
+            }
+          }
+        )
+        assert(
+          customerSourceAfterHover.width === customerSourceBeforeHover.width &&
+            customerSourceAfterHover.height ===
+              customerSourceBeforeHover.height &&
+            customerSourceAfterHover.fitsContent &&
+            (customerSourceAfterHover.backgroundColor !==
+              customerSourceBeforeHover.backgroundColor ||
+              customerSourceAfterHover.borderColor !==
+                customerSourceBeforeHover.borderColor),
+          `业务来源项 hover 应有反馈且不改变尺寸或产生溢出: ${JSON.stringify({
+            before: customerSourceBeforeHover,
+            after: customerSourceAfterHover,
+          })}`
+        )
+        await customerSourceItem.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-business-dashboard-source-double-click-hover.png'
+          ),
+        })
+        await customerSourceItem
+          .locator('.erp-business-board-source-meta')
+          .dblclick()
+        await waitForPath(page, '/erp/master/partners/customers')
+        await page.goBack()
+        await waitForPath(page, '/erp/business-dashboard')
+        await expectHeading(page, '业务看板')
         await page
           .getByRole('button', { name: '查看客户', exact: true })
           .click()
@@ -3009,6 +3116,11 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'erp-task-board-mobile',
           expectTaskMetrics: true,
         })
+        await page
+          .locator('.erp-task-board-card')
+          .first()
+          .getByRole('button', { name: '查看', exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
       },
     },
     {
@@ -7586,6 +7698,9 @@ export function createStyleL1Scenarios(deps) {
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-business-dashboard-mobile',
         })
+        await page
+          .getByRole('button', { name: '查看客户', exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
       },
     },
     {
@@ -13625,7 +13740,7 @@ export function createStyleL1Scenarios(deps) {
       path,
       verifyBusinessActionFormModal,
       verifyBusinessModuleColumnOrderDialog,
-      verifyBusinessRowDoubleClickEditModal,
+      verifyBusinessRowDoubleClickModal,
       verifySourceImportPicker,
       customerRuntimeEffectiveSession,
     }),

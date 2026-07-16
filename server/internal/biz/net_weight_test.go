@@ -7,14 +7,14 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestResolveShipmentItemUnitNetWeightKg(t *testing.T) {
+func TestResolveShipmentItemUnitNetWeightG(t *testing.T) {
 	productWeight := decimal.RequireFromString("0.400000")
 	skuWeight := decimal.RequireFromString("0.425000")
-	product := &Product{ID: 7, DefaultUnitID: 1, UnitNetWeightKg: &productWeight}
+	product := &Product{ID: 7, DefaultUnitID: 1, UnitNetWeightG: &productWeight}
 	skuUnitID := 2
-	sku := &ProductSKU{ID: 11, ProductID: product.ID, DefaultUnitID: &skuUnitID, UnitNetWeightKg: &skuWeight}
+	sku := &ProductSKU{ID: 11, ProductID: product.ID, DefaultUnitID: &skuUnitID, UnitNetWeightG: &skuWeight}
 
-	resolved, err := ResolveShipmentItemUnitNetWeightKg(skuUnitID, product, sku)
+	resolved, err := ResolveShipmentItemUnitNetWeightG(skuUnitID, product, sku)
 	if err != nil {
 		t.Fatalf("resolve SKU weight: %v", err)
 	}
@@ -22,7 +22,7 @@ func TestResolveShipmentItemUnitNetWeightKg(t *testing.T) {
 		t.Fatalf("resolved SKU weight = %v, want %s", resolved, skuWeight)
 	}
 
-	resolved, err = ResolveShipmentItemUnitNetWeightKg(product.DefaultUnitID, product, &ProductSKU{ID: 12, ProductID: product.ID})
+	resolved, err = ResolveShipmentItemUnitNetWeightG(product.DefaultUnitID, product, &ProductSKU{ID: 12, ProductID: product.ID})
 	if err != nil {
 		t.Fatalf("resolve product fallback: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestResolveShipmentItemUnitNetWeightKg(t *testing.T) {
 		{name: "missing product weight", lineUnitID: 1, product: &Product{ID: 8, DefaultUnitID: 1}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, resolveErr := ResolveShipmentItemUnitNetWeightKg(tc.lineUnitID, tc.product, tc.sku)
+			got, resolveErr := ResolveShipmentItemUnitNetWeightG(tc.lineUnitID, tc.product, tc.sku)
 			if resolveErr != nil {
 				t.Fatalf("resolve weight: %v", resolveErr)
 			}
@@ -55,23 +55,23 @@ func TestResolveShipmentItemUnitNetWeightKg(t *testing.T) {
 		name string
 		sku  *ProductSKU
 	}{
-		{name: "SKU belongs to another product", sku: &ProductSKU{ID: 13, ProductID: 999, DefaultUnitID: &skuUnitID, UnitNetWeightKg: &skuWeight}},
-		{name: "weighted SKU has no basis unit", sku: &ProductSKU{ID: 14, ProductID: product.ID, UnitNetWeightKg: &skuWeight}},
+		{name: "SKU belongs to another product", sku: &ProductSKU{ID: 13, ProductID: 999, DefaultUnitID: &skuUnitID, UnitNetWeightG: &skuWeight}},
+		{name: "weighted SKU has no basis unit", sku: &ProductSKU{ID: 14, ProductID: product.ID, UnitNetWeightG: &skuWeight}},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if _, resolveErr := ResolveShipmentItemUnitNetWeightKg(product.DefaultUnitID, product, tc.sku); !errors.Is(resolveErr, ErrBadParam) {
+			if _, resolveErr := ResolveShipmentItemUnitNetWeightG(product.DefaultUnitID, product, tc.sku); !errors.Is(resolveErr, ErrBadParam) {
 				t.Fatalf("resolve error = %v, want ErrBadParam", resolveErr)
 			}
 		})
 	}
 }
 
-func TestCalculateShipmentTotalNetWeightKg(t *testing.T) {
+func TestCalculateShipmentTotalNetWeightG(t *testing.T) {
 	weightA := decimal.RequireFromString("0.333333")
 	weightB := decimal.RequireFromString("0.125000")
-	total, complete, err := CalculateShipmentTotalNetWeightKg([]ShipmentNetWeightLine{
-		{Quantity: decimal.RequireFromString("1.5"), UnitNetWeightKg: &weightA},
-		{Quantity: decimal.NewFromInt(2), UnitNetWeightKg: &weightB},
+	total, complete, err := CalculateShipmentTotalNetWeightG([]ShipmentNetWeightLine{
+		{Quantity: decimal.RequireFromString("1.5"), UnitNetWeightG: &weightA},
+		{Quantity: decimal.NewFromInt(2), UnitNetWeightG: &weightB},
 	})
 	if err != nil {
 		t.Fatalf("calculate complete total: %v", err)
@@ -81,16 +81,16 @@ func TestCalculateShipmentTotalNetWeightKg(t *testing.T) {
 	}
 
 	smallWeight := decimal.RequireFromString("0.000001")
-	total, complete, err = CalculateShipmentTotalNetWeightKg([]ShipmentNetWeightLine{
-		{Quantity: decimal.RequireFromString("0.4"), UnitNetWeightKg: &smallWeight},
-		{Quantity: decimal.RequireFromString("0.4"), UnitNetWeightKg: &smallWeight},
+	total, complete, err = CalculateShipmentTotalNetWeightG([]ShipmentNetWeightLine{
+		{Quantity: decimal.RequireFromString("0.4"), UnitNetWeightG: &smallWeight},
+		{Quantity: decimal.RequireFromString("0.4"), UnitNetWeightG: &smallWeight},
 	})
 	if err != nil || !complete || total == nil || !total.Equal(decimal.RequireFromString("0.000001")) {
 		t.Fatalf("single final rounding total = %v complete=%t err=%v, want 0.000001", total, complete, err)
 	}
 
-	total, complete, err = CalculateShipmentTotalNetWeightKg([]ShipmentNetWeightLine{
-		{Quantity: decimal.NewFromInt(1), UnitNetWeightKg: &weightA},
+	total, complete, err = CalculateShipmentTotalNetWeightG([]ShipmentNetWeightLine{
+		{Quantity: decimal.NewFromInt(1), UnitNetWeightG: &weightA},
 		{Quantity: decimal.NewFromInt(2)},
 	})
 	if err != nil {
@@ -101,9 +101,9 @@ func TestCalculateShipmentTotalNetWeightKg(t *testing.T) {
 	}
 
 	overflowWeight := decimal.RequireFromString("99999999999999.999999")
-	if _, _, err = CalculateShipmentTotalNetWeightKg([]ShipmentNetWeightLine{{
-		Quantity:        decimal.NewFromInt(2),
-		UnitNetWeightKg: &overflowWeight,
+	if _, _, err = CalculateShipmentTotalNetWeightG([]ShipmentNetWeightLine{{
+		Quantity:       decimal.NewFromInt(2),
+		UnitNetWeightG: &overflowWeight,
 	}}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("overflow error = %v, want ErrBadParam", err)
 	}
@@ -111,9 +111,9 @@ func TestCalculateShipmentTotalNetWeightKg(t *testing.T) {
 		decimal.RequireFromString("0.0000001"),
 		decimal.RequireFromString("100000000000000"),
 	} {
-		if _, _, err = CalculateShipmentTotalNetWeightKg([]ShipmentNetWeightLine{{
-			Quantity:        quantity,
-			UnitNetWeightKg: &weightA,
+		if _, _, err = CalculateShipmentTotalNetWeightG([]ShipmentNetWeightLine{{
+			Quantity:       quantity,
+			UnitNetWeightG: &weightA,
 		}}); !errors.Is(err, ErrBadParam) {
 			t.Fatalf("invalid quantity %s error = %v, want ErrBadParam", quantity, err)
 		}

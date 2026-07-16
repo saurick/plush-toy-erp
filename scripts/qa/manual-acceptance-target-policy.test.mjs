@@ -3,9 +3,11 @@ import test from "node:test";
 
 import {
   CUSTOMER_TRIAL_133_ORIGIN,
+  CUSTOMER_TRIAL_133_DATABASE,
   CUSTOMER_TRIAL_133_TARGET,
   LOCAL_DEV_TARGET,
   MANUAL_ACCEPTANCE_DATASET_KEY,
+  assertManualAcceptanceDatabaseIdentity,
   assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimePolicy,
   assertManualAcceptanceTargetAttestation,
@@ -22,6 +24,7 @@ const remotePolicyInput = Object.freeze({
 });
 
 const safeRemoteCapabilities = Object.freeze({
+  databaseName: CUSTOMER_TRIAL_133_DATABASE,
   environment: "prod",
   seedEnabled: false,
   seedAllowed: false,
@@ -152,6 +155,50 @@ test("customer-trial-133 mutation confirmation binds target, version, and run", 
   );
 });
 
+test("local dedicated apply confirmation and runtime database identity are exact", () => {
+  const localPolicy = {
+    target: LOCAL_DEV_TARGET,
+    backendURL: "http://127.0.0.1:18376",
+    datasetKey: MANUAL_ACCEPTANCE_DATASET_KEY,
+    dataVersion: "2026.07.15-v3",
+    runId: "20260715-V3",
+    databaseName: "plush_erp_acceptance_20260715_v3_dev",
+  };
+  const confirmation =
+    "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA:local-dev:2026.07.15-v3:20260715-V3:plush_erp_acceptance_20260715_v3_dev";
+  assert.equal(manualAcceptanceTargetConfirmation(localPolicy), confirmation);
+  assert.throws(
+    () => assertManualAcceptanceMutationTarget(localPolicy),
+    /local-dev apply requires MANUAL_ACCEPTANCE_TARGET_CONFIRM/u,
+  );
+  assert.equal(
+    assertManualAcceptanceMutationTarget(localPolicy, { confirmation })
+      .databaseName,
+    "plush_erp_acceptance_20260715_v3_dev",
+  );
+  assert.equal(
+    assertManualAcceptanceDatabaseIdentity({
+      policy: localPolicy,
+      capabilities: {
+        databaseName: "plush_erp_acceptance_20260715_v3_dev",
+      },
+    }).databaseName,
+    "plush_erp_acceptance_20260715_v3_dev",
+  );
+  assert.throws(
+    () =>
+      assertManualAcceptanceDatabaseIdentity({
+        policy: localPolicy,
+        capabilities: { databaseName: "plush_erp_simon_dev" },
+      }),
+    /runtime databaseName=plush_erp_simon_dev/u,
+  );
+  assert.throws(
+    () => resolveManualAcceptanceTarget({ ...localPolicy, databaseName: "plush_erp_simon_dev" }),
+    /plush_erp_acceptance_/u,
+  );
+});
+
 test("customer-trial-133 out-of-band attestation pins origin, customer, release, migration, and debug flags", () => {
   const attestation = {
     target: CUSTOMER_TRIAL_133_TARGET,
@@ -163,6 +210,7 @@ test("customer-trial-133 out-of-band attestation pins origin, customer, release,
     debug: { ...safeRemoteCapabilities, environment: undefined },
   };
   delete attestation.debug.environment;
+  delete attestation.debug.databaseName;
   const checked = assertManualAcceptanceTargetAttestation({
     policy: remotePolicyInput,
     attestation: JSON.stringify(attestation),

@@ -1338,7 +1338,7 @@ var (
 		{Name: "name", Type: field.TypeString, Size: 255},
 		{Name: "style_no", Type: field.TypeString, Nullable: true, Size: 128},
 		{Name: "customer_style_no", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "unit_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -1391,7 +1391,7 @@ var (
 		{Name: "color_no", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "size", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "packaging_version", Type: field.TypeString, Nullable: true, Size: 64},
-		{Name: "unit_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "is_active", Type: field.TypeBool, Default: true},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -2930,8 +2930,8 @@ var (
 		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
 		{Name: "planned_ship_at", Type: field.TypeTime, Nullable: true},
 		{Name: "shipped_at", Type: field.TypeTime, Nullable: true},
-		{Name: "total_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "requested_total_net_weight_kg", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "total_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "requested_total_net_weight_g", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
@@ -2989,7 +2989,7 @@ var (
 	ShipmentItemsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
 		{Name: "quantity", Type: field.TypeOther, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
-		{Name: "unit_net_weight_kg_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
+		{Name: "unit_net_weight_g_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "unit_price_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "amount_snapshot", Type: field.TypeOther, Nullable: true, SchemaType: map[string]string{"postgres": "numeric(20,6)", "sqlite3": "numeric"}},
 		{Name: "currency_snapshot", Type: field.TypeString, Size: 16, Default: "CNY"},
@@ -3742,7 +3742,7 @@ func init() {
 	ProductsTable.ForeignKeys[0].RefTable = UnitsTable
 	ProductsTable.Annotation = &entsql.Annotation{}
 	ProductsTable.Annotation.Checks = map[string]string{
-		"products_unit_net_weight_kg_positive": "unit_net_weight_kg IS NULL OR unit_net_weight_kg > 0",
+		"products_unit_net_weight_g_positive": "unit_net_weight_g IS NULL OR unit_net_weight_g > 0",
 	}
 	ProductSkusTable.ForeignKeys[0].RefTable = ProductsTable
 	ProductSkusTable.ForeignKeys[1].RefTable = UnitsTable
@@ -3750,8 +3750,8 @@ func init() {
 		Table: "product_skus",
 	}
 	ProductSkusTable.Annotation.Checks = map[string]string{
-		"product_skus_unit_net_weight_kg_positive":              "unit_net_weight_kg IS NULL OR unit_net_weight_kg > 0",
-		"product_skus_unit_net_weight_kg_requires_default_unit": "unit_net_weight_kg IS NULL OR default_unit_id IS NOT NULL",
+		"product_skus_unit_net_weight_g_positive":              "unit_net_weight_g IS NULL OR unit_net_weight_g > 0",
+		"product_skus_unit_net_weight_g_requires_default_unit": "unit_net_weight_g IS NULL OR default_unit_id IS NOT NULL",
 	}
 	ProductionFactsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ProductionFactsTable.ForeignKeys[1].RefTable = ProductSkusTable
@@ -3924,9 +3924,9 @@ func init() {
 	ShipmentsTable.ForeignKeys[1].RefTable = SalesOrdersTable
 	ShipmentsTable.Annotation = &entsql.Annotation{}
 	ShipmentsTable.Annotation.Checks = map[string]string{
-		"shipments_requested_total_net_weight_kg_positive": "requested_total_net_weight_kg IS NULL OR requested_total_net_weight_kg > 0",
-		"shipments_status_allowed":                         "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
-		"shipments_total_net_weight_kg_positive":           "total_net_weight_kg IS NULL OR total_net_weight_kg > 0",
+		"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
+		"shipments_status_allowed":                        "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+		"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",
 	}
 	ShipmentItemsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	ShipmentItemsTable.ForeignKeys[1].RefTable = ProductsTable
@@ -3937,11 +3937,11 @@ func init() {
 	ShipmentItemsTable.ForeignKeys[6].RefTable = WarehousesTable
 	ShipmentItemsTable.Annotation = &entsql.Annotation{}
 	ShipmentItemsTable.Annotation.Checks = map[string]string{
-		"shipment_items_amount_snapshot_nonnegative":          "amount_snapshot IS NULL OR amount_snapshot >= 0",
-		"shipment_items_currency_snapshot_allowed":            "currency_snapshot IN ('USD', 'CNY', 'HKD')",
-		"shipment_items_quantity_positive":                    "quantity > 0",
-		"shipment_items_unit_net_weight_kg_snapshot_positive": "unit_net_weight_kg_snapshot IS NULL OR unit_net_weight_kg_snapshot > 0",
-		"shipment_items_unit_price_snapshot_nonnegative":      "unit_price_snapshot IS NULL OR unit_price_snapshot >= 0",
+		"shipment_items_amount_snapshot_nonnegative":         "amount_snapshot IS NULL OR amount_snapshot >= 0",
+		"shipment_items_currency_snapshot_allowed":           "currency_snapshot IN ('USD', 'CNY', 'HKD')",
+		"shipment_items_quantity_positive":                   "quantity > 0",
+		"shipment_items_unit_net_weight_g_snapshot_positive": "unit_net_weight_g_snapshot IS NULL OR unit_net_weight_g_snapshot > 0",
+		"shipment_items_unit_price_snapshot_nonnegative":     "unit_price_snapshot IS NULL OR unit_price_snapshot >= 0",
 	}
 	StockReservationsTable.ForeignKeys[0].RefTable = InventoryLotsTable
 	StockReservationsTable.ForeignKeys[1].RefTable = ProductsTable

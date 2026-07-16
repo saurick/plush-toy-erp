@@ -96,14 +96,14 @@ func ShippedAt(v time.Time) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldShippedAt, v))
 }
 
-// TotalNetWeightKg applies equality check predicate on the "total_net_weight_kg" field. It's identical to TotalNetWeightKgEQ.
-func TotalNetWeightKg(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldTotalNetWeightKg, v))
+// TotalNetWeightG applies equality check predicate on the "total_net_weight_g" field. It's identical to TotalNetWeightGEQ.
+func TotalNetWeightG(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTotalNetWeightG, v))
 }
 
-// RequestedTotalNetWeightKg applies equality check predicate on the "requested_total_net_weight_kg" field. It's identical to RequestedTotalNetWeightKgEQ.
-func RequestedTotalNetWeightKg(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldRequestedTotalNetWeightKg, v))
+// RequestedTotalNetWeightG applies equality check predicate on the "requested_total_net_weight_g" field. It's identical to RequestedTotalNetWeightGEQ.
+func RequestedTotalNetWeightG(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldRequestedTotalNetWeightG, v))
 }
 
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
@@ -551,104 +551,104 @@ func ShippedAtNotNil() predicate.Shipment {
 	return predicate.Shipment(sql.FieldNotNull(FieldShippedAt))
 }
 
-// TotalNetWeightKgEQ applies the EQ predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgEQ(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldTotalNetWeightKg, v))
+// TotalNetWeightGEQ applies the EQ predicate on the "total_net_weight_g" field.
+func TotalNetWeightGEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldTotalNetWeightG, v))
 }
 
-// TotalNetWeightKgNEQ applies the NEQ predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgNEQ(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNEQ(FieldTotalNetWeightKg, v))
+// TotalNetWeightGNEQ applies the NEQ predicate on the "total_net_weight_g" field.
+func TotalNetWeightGNEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldTotalNetWeightG, v))
 }
 
-// TotalNetWeightKgIn applies the In predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgIn(vs ...decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldIn(FieldTotalNetWeightKg, vs...))
+// TotalNetWeightGIn applies the In predicate on the "total_net_weight_g" field.
+func TotalNetWeightGIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldTotalNetWeightG, vs...))
 }
 
-// TotalNetWeightKgNotIn applies the NotIn predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgNotIn(vs ...decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNotIn(FieldTotalNetWeightKg, vs...))
+// TotalNetWeightGNotIn applies the NotIn predicate on the "total_net_weight_g" field.
+func TotalNetWeightGNotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldTotalNetWeightG, vs...))
 }
 
-// TotalNetWeightKgGT applies the GT predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgGT(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldGT(FieldTotalNetWeightKg, v))
+// TotalNetWeightGGT applies the GT predicate on the "total_net_weight_g" field.
+func TotalNetWeightGGT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldTotalNetWeightG, v))
 }
 
-// TotalNetWeightKgGTE applies the GTE predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgGTE(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldGTE(FieldTotalNetWeightKg, v))
+// TotalNetWeightGGTE applies the GTE predicate on the "total_net_weight_g" field.
+func TotalNetWeightGGTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldTotalNetWeightG, v))
 }
 
-// TotalNetWeightKgLT applies the LT predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgLT(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldLT(FieldTotalNetWeightKg, v))
+// TotalNetWeightGLT applies the LT predicate on the "total_net_weight_g" field.
+func TotalNetWeightGLT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldTotalNetWeightG, v))
 }
 
-// TotalNetWeightKgLTE applies the LTE predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgLTE(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldLTE(FieldTotalNetWeightKg, v))
+// TotalNetWeightGLTE applies the LTE predicate on the "total_net_weight_g" field.
+func TotalNetWeightGLTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldTotalNetWeightG, v))
 }
 
-// TotalNetWeightKgIsNil applies the IsNil predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgIsNil() predicate.Shipment {
-	return predicate.Shipment(sql.FieldIsNull(FieldTotalNetWeightKg))
+// TotalNetWeightGIsNil applies the IsNil predicate on the "total_net_weight_g" field.
+func TotalNetWeightGIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldTotalNetWeightG))
 }
 
-// TotalNetWeightKgNotNil applies the NotNil predicate on the "total_net_weight_kg" field.
-func TotalNetWeightKgNotNil() predicate.Shipment {
-	return predicate.Shipment(sql.FieldNotNull(FieldTotalNetWeightKg))
+// TotalNetWeightGNotNil applies the NotNil predicate on the "total_net_weight_g" field.
+func TotalNetWeightGNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldTotalNetWeightG))
 }
 
-// RequestedTotalNetWeightKgEQ applies the EQ predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgEQ(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldEQ(FieldRequestedTotalNetWeightKg, v))
+// RequestedTotalNetWeightGEQ applies the EQ predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldRequestedTotalNetWeightG, v))
 }
 
-// RequestedTotalNetWeightKgNEQ applies the NEQ predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgNEQ(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNEQ(FieldRequestedTotalNetWeightKg, v))
+// RequestedTotalNetWeightGNEQ applies the NEQ predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGNEQ(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldRequestedTotalNetWeightG, v))
 }
 
-// RequestedTotalNetWeightKgIn applies the In predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgIn(vs ...decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldIn(FieldRequestedTotalNetWeightKg, vs...))
+// RequestedTotalNetWeightGIn applies the In predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldRequestedTotalNetWeightG, vs...))
 }
 
-// RequestedTotalNetWeightKgNotIn applies the NotIn predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgNotIn(vs ...decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldNotIn(FieldRequestedTotalNetWeightKg, vs...))
+// RequestedTotalNetWeightGNotIn applies the NotIn predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGNotIn(vs ...decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldRequestedTotalNetWeightG, vs...))
 }
 
-// RequestedTotalNetWeightKgGT applies the GT predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgGT(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldGT(FieldRequestedTotalNetWeightKg, v))
+// RequestedTotalNetWeightGGT applies the GT predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGGT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldRequestedTotalNetWeightG, v))
 }
 
-// RequestedTotalNetWeightKgGTE applies the GTE predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgGTE(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldGTE(FieldRequestedTotalNetWeightKg, v))
+// RequestedTotalNetWeightGGTE applies the GTE predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGGTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldRequestedTotalNetWeightG, v))
 }
 
-// RequestedTotalNetWeightKgLT applies the LT predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgLT(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldLT(FieldRequestedTotalNetWeightKg, v))
+// RequestedTotalNetWeightGLT applies the LT predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGLT(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldRequestedTotalNetWeightG, v))
 }
 
-// RequestedTotalNetWeightKgLTE applies the LTE predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgLTE(v decimal.Decimal) predicate.Shipment {
-	return predicate.Shipment(sql.FieldLTE(FieldRequestedTotalNetWeightKg, v))
+// RequestedTotalNetWeightGLTE applies the LTE predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGLTE(v decimal.Decimal) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldRequestedTotalNetWeightG, v))
 }
 
-// RequestedTotalNetWeightKgIsNil applies the IsNil predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgIsNil() predicate.Shipment {
-	return predicate.Shipment(sql.FieldIsNull(FieldRequestedTotalNetWeightKg))
+// RequestedTotalNetWeightGIsNil applies the IsNil predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldRequestedTotalNetWeightG))
 }
 
-// RequestedTotalNetWeightKgNotNil applies the NotNil predicate on the "requested_total_net_weight_kg" field.
-func RequestedTotalNetWeightKgNotNil() predicate.Shipment {
-	return predicate.Shipment(sql.FieldNotNull(FieldRequestedTotalNetWeightKg))
+// RequestedTotalNetWeightGNotNil applies the NotNil predicate on the "requested_total_net_weight_g" field.
+func RequestedTotalNetWeightGNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldRequestedTotalNetWeightG))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

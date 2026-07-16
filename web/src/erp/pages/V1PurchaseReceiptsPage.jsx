@@ -3,6 +3,7 @@ import {
   CheckCircleOutlined,
   CloseCircleOutlined,
   DownOutlined,
+  EyeOutlined,
   LinkOutlined,
 } from '@ant-design/icons'
 import { Button, Dropdown, Form, Input, Popconfirm, Select, Tag } from 'antd'
@@ -47,6 +48,7 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import BusinessLineItemsFooter from '../components/business-list/BusinessLineItemsFooter.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import PurchaseReceiptExceptionModal from '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
@@ -376,6 +378,7 @@ export default function V1PurchaseReceiptsPage() {
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
+  const [detailReceipt, setDetailReceipt] = useState(null)
   const [itemEditorReceipt, setItemEditorReceipt] = useState(null)
   const [receiptExceptionMode, setReceiptExceptionMode] = useState(null)
   const [receiptExceptionRecordsOpen, setReceiptExceptionRecordsOpen] =
@@ -486,19 +489,13 @@ export default function V1PurchaseReceiptsPage() {
     () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
     [warehouses]
   )
-  const receiptItemsPreview = useBusinessRowItemsPreview({
-    records: rows,
-    getEmbeddedItems: (record) => record?.items,
-    getItemTotal: (record) =>
-      Array.isArray(record?.items) ? record.items.length : undefined,
-    rowExpandable: (record) =>
-      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
-    getRecordLabel: (record) => record?.receipt_no || '当前采购入库单',
-    getItemKey: (item) => item?.id,
-    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
-    getItemSummary: (item) =>
+  const getPurchaseReceiptItemSummary = useCallback(
+    (item) =>
       `数量 ${formatQuantity(decimalNumber(item?.quantity))} / 金额 ${optionalText(item?.amount)}`,
-    getItemFields: (item) => [
+    []
+  )
+  const getPurchaseReceiptItemFields = useCallback(
+    (item) => [
       {
         key: 'material',
         label: '材料',
@@ -554,6 +551,20 @@ export default function V1PurchaseReceiptsPage() {
         wide: true,
       },
     ],
+    [inventoryLotOptions, materialOptions, unitOptions, warehouseOptions]
+  )
+  const receiptItemsPreview = useBusinessRowItemsPreview({
+    records: rows,
+    getEmbeddedItems: (record) => record?.items,
+    getItemTotal: (record) =>
+      Array.isArray(record?.items) ? record.items.length : undefined,
+    rowExpandable: (record) =>
+      canRead && Number.isSafeInteger(record?.id) && record.id > 0,
+    getRecordLabel: (record) => record?.receipt_no || '当前采购入库单',
+    getItemKey: (item) => item?.id,
+    getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
+    getItemSummary: getPurchaseReceiptItemSummary,
+    getItemFields: getPurchaseReceiptItemFields,
     modalTitle: '采购入库单完整明细',
   })
 
@@ -981,6 +992,12 @@ export default function V1PurchaseReceiptsPage() {
       }`
     : '请先选择一张采购入库单'
 
+  const openPurchaseReceiptDetails = useCallback((receipt) => {
+    if (!receipt?.id) return
+    setSelectedRow(receipt)
+    setDetailReceipt(receipt)
+  }, [])
+
   const columns = useMemo(
     () =>
       applyBusinessColumnSorters([
@@ -1058,6 +1075,7 @@ export default function V1PurchaseReceiptsPage() {
   const {
     tableColumns,
     exportColumns,
+    visibleColumns,
     openColumnOrder,
     columnOrderModal,
   } = useBusinessColumnOrder({
@@ -1287,6 +1305,14 @@ export default function V1PurchaseReceiptsPage() {
               相关单据 <DownOutlined />
             </Button>
           </Dropdown>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            disabled={!selectedRow}
+            onClick={() => openPurchaseReceiptDetails(selectedRow)}
+          >
+            查看详情
+          </Button>
           <BusinessAttachmentModalButton
             ownerType="purchase_receipt"
             ownerId={selectedRow?.id}
@@ -1473,10 +1499,29 @@ export default function V1PurchaseReceiptsPage() {
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
         })}
+        onOpenRecord={openPurchaseReceiptDetails}
         expandable={receiptItemsPreview.expandable}
         emptyDescription="暂无采购入库单"
       />
       {receiptItemsPreview.modal}
+
+      <BusinessRecordDetailsModal
+        columns={visibleColumns}
+        description="查看采购入库单头、状态、数量汇总和完整材料明细。"
+        lineItems={{
+          emptyDescription: '当前采购入库单暂无明细',
+          getItemFields: getPurchaseReceiptItemFields,
+          getItemKey: (item) => item?.id,
+          getItemLabel: (_item, { index }) => `明细 ${index + 1}`,
+          getItemSummary: getPurchaseReceiptItemSummary,
+          items: detailReceipt?.items,
+          title: '采购入库明细',
+        }}
+        open={Boolean(detailReceipt)}
+        record={detailReceipt}
+        title="采购入库详情"
+        onClose={() => setDetailReceipt(null)}
+      />
 
       <PurchaseReceiptExceptionModal
         open={Boolean(receiptExceptionMode)}

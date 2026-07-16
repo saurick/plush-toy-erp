@@ -136,7 +136,7 @@ UPDATE admin_users
 SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
 WHERE username = $1
 RETURNING id`)).
-		WithArgs("demo_uat_disabled", bcryptHashMatcher("manual-acceptance-password"), sqlmock.AnyArg()).
+		WithArgs("demo_uat_disabled", bcryptHashMatcher("manual-test-pass"), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(101))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_sessions
@@ -153,7 +153,7 @@ WHERE admin_user_id = $1
 		context.Background(),
 		db,
 		[]string{"demo_uat_disabled"},
-		"manual-acceptance-password",
+		"manual-test-pass",
 	)
 	if err != nil {
 		t.Fatalf("ResetRoleDemoAdminPasswords() error = %v", err)
@@ -177,7 +177,7 @@ func TestResetRoleDemoAdminPasswordsProtectsStableAdminBeforeTransaction(t *test
 		context.Background(),
 		db,
 		[]string{" admin "},
-		"manual-acceptance-password",
+		"manual-test-pass",
 	)
 	if !errors.Is(err, ErrStableAdminProtected) {
 		t.Fatalf("ResetRoleDemoAdminPasswords() error = %v, want ErrStableAdminProtected", err)
@@ -198,7 +198,7 @@ func TestSeedRoleDemoAdminAccountsProtectsStableAdminBeforeTransaction(t *testin
 	mock.ExpectClose()
 
 	_, err = SeedRoleDemoAdminAccounts(context.Background(), db, RoleDemoAdminSeedOptions{
-		Password: "manual-acceptance-password",
+		Password: "manual-test-pass",
 		Accounts: []RoleDemoAdminAccountSpec{
 			{Username: "ADMIN", RoleKey: biz.AdminRoleKey},
 		},
@@ -226,8 +226,8 @@ func TestResetManualAcceptancePasswordsRotatesAdminAndDemoInOneTransaction(t *te
 		adminID  int
 		sessions int64
 	}{
-		{username: "admin", password: "independent-admin-password", adminID: 1, sessions: 2},
-		{username: "demo_sales", password: "independent-demo-password", adminID: 2, sessions: 1},
+		{username: "admin", password: "admin-test-pass", adminID: 1, sessions: 2},
+		{username: "demo_sales", password: "demo-test-pass", adminID: 2, sessions: 1},
 	}
 	for _, account := range accounts {
 		mock.ExpectQuery(regexp.QuoteMeta(`
@@ -253,9 +253,9 @@ WHERE admin_user_id = $1
 		context.Background(),
 		db,
 		[]string{"admin"},
-		"independent-admin-password",
+		"admin-test-pass",
 		[]string{"demo_sales"},
-		"independent-demo-password",
+		"demo-test-pass",
 	)
 	if err != nil {
 		t.Fatalf("ResetManualAcceptancePasswords() error = %v", err)
@@ -305,7 +305,7 @@ UPDATE admin_users
 SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
 WHERE username = $1
 RETURNING id`)).
-		WithArgs("demo_sales", bcryptHashMatcher("manual-acceptance-password"), sqlmock.AnyArg()).
+		WithArgs("demo_sales", bcryptHashMatcher("manual-test-pass"), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(201))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_sessions
@@ -320,7 +320,7 @@ UPDATE admin_users
 SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
 WHERE username = $1
 RETURNING id`)).
-		WithArgs("demo_purchase", bcryptHashMatcher("manual-acceptance-password"), sqlmock.AnyArg()).
+		WithArgs("demo_purchase", bcryptHashMatcher("manual-test-pass"), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectRollback()
 	mock.ExpectClose()
@@ -329,7 +329,7 @@ RETURNING id`)).
 		context.Background(),
 		db,
 		[]string{"demo_sales", "demo_purchase"},
-		"manual-acceptance-password",
+		"manual-test-pass",
 	)
 	if err == nil || !strings.Contains(err.Error(), "demo_purchase") {
 		t.Fatalf("ResetRoleDemoAdminPasswords() error = %v, want missing second account", err)
@@ -353,7 +353,7 @@ UPDATE admin_users
 SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
 WHERE username = $1
 RETURNING id`)).
-		WithArgs("admin", bcryptHashMatcher("independent-admin-password"), sqlmock.AnyArg()).
+		WithArgs("admin", bcryptHashMatcher("admin-test-pass"), sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(301))
 	mock.ExpectExec(regexp.QuoteMeta(`
 UPDATE admin_sessions
@@ -370,7 +370,7 @@ WHERE admin_user_id = $1
 		context.Background(),
 		db,
 		[]string{"admin"},
-		"independent-admin-password",
+		"admin-test-pass",
 		nil,
 		"",
 	)

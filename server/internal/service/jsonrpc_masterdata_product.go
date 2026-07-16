@@ -130,7 +130,7 @@ func (d *jsonrpcDispatcher) handleMasterDataProduct(
 }
 
 func productMutationFromParams(pm map[string]any) (*biz.ProductMutation, bool) {
-	unitNetWeightKg, ok := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_kg")
+	unitNetWeightG, ok := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_g")
 	if !ok {
 		return nil, false
 	}
@@ -140,12 +140,12 @@ func productMutationFromParams(pm map[string]any) (*biz.ProductMutation, bool) {
 		StyleNo:         getWorkflowStringPtr(pm, "style_no"),
 		CustomerStyleNo: getWorkflowStringPtr(pm, "customer_style_no"),
 		DefaultUnitID:   getInt(pm, "default_unit_id", 0),
-		UnitNetWeightKg: unitNetWeightKg,
+		UnitNetWeightG:  unitNetWeightG,
 	}, true
 }
 
 func productSKUMutationFromParams(pm map[string]any) (*biz.ProductSKUMutation, bool) {
-	unitNetWeightKg, ok := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_kg")
+	unitNetWeightG, ok := getOptionalJSONRPCDecimalString(pm, "unit_net_weight_g")
 	if !ok {
 		return nil, false
 	}
@@ -160,7 +160,7 @@ func productSKUMutationFromParams(pm map[string]any) (*biz.ProductSKUMutation, b
 		Size:             getWorkflowStringPtr(pm, "size"),
 		PackagingVersion: getWorkflowStringPtr(pm, "packaging_version"),
 		DefaultUnitID:    getOptionalPositiveIntPtr(pm, "default_unit_id"),
-		UnitNetWeightKg:  unitNetWeightKg,
+		UnitNetWeightG:   unitNetWeightG,
 	}, true
 }
 
@@ -193,16 +193,16 @@ func productToMap(item *biz.Product) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                 item.ID,
-		"code":               item.Code,
-		"name":               item.Name,
-		"style_no":           optionalStringValue(item.StyleNo),
-		"customer_style_no":  optionalStringValue(item.CustomerStyleNo),
-		"default_unit_id":    item.DefaultUnitID,
-		"unit_net_weight_kg": optionalDecimalString(item.UnitNetWeightKg),
-		"is_active":          item.IsActive,
-		"created_at":         item.CreatedAt.Unix(),
-		"updated_at":         item.UpdatedAt.Unix(),
+		"id":                item.ID,
+		"code":              item.Code,
+		"name":              item.Name,
+		"style_no":          optionalStringValue(item.StyleNo),
+		"customer_style_no": optionalStringValue(item.CustomerStyleNo),
+		"default_unit_id":   item.DefaultUnitID,
+		"unit_net_weight_g": optionalDecimalString(item.UnitNetWeightG),
+		"is_active":         item.IsActive,
+		"created_at":        item.CreatedAt.Unix(),
+		"updated_at":        item.UpdatedAt.Unix(),
 	}
 }
 
@@ -219,21 +219,21 @@ func productSKUToMap(item *biz.ProductSKU) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                 item.ID,
-		"product_id":         item.ProductID,
-		"sku_code":           item.SKUCode,
-		"sku_name":           optionalStringValue(item.SKUName),
-		"barcode":            optionalStringValue(item.Barcode),
-		"customer_sku":       optionalStringValue(item.CustomerSKU),
-		"color":              optionalStringValue(item.Color),
-		"color_no":           optionalStringValue(item.ColorNo),
-		"size":               optionalStringValue(item.Size),
-		"packaging_version":  optionalStringValue(item.PackagingVersion),
-		"default_unit_id":    optionalIntValue(item.DefaultUnitID),
-		"unit_net_weight_kg": optionalDecimalString(item.UnitNetWeightKg),
-		"is_active":          item.IsActive,
-		"created_at":         item.CreatedAt.Unix(),
-		"updated_at":         item.UpdatedAt.Unix(),
+		"id":                item.ID,
+		"product_id":        item.ProductID,
+		"sku_code":          item.SKUCode,
+		"sku_name":          optionalStringValue(item.SKUName),
+		"barcode":           optionalStringValue(item.Barcode),
+		"customer_sku":      optionalStringValue(item.CustomerSKU),
+		"color":             optionalStringValue(item.Color),
+		"color_no":          optionalStringValue(item.ColorNo),
+		"size":              optionalStringValue(item.Size),
+		"packaging_version": optionalStringValue(item.PackagingVersion),
+		"default_unit_id":   optionalIntValue(item.DefaultUnitID),
+		"unit_net_weight_g": optionalDecimalString(item.UnitNetWeightG),
+		"is_active":         item.IsActive,
+		"created_at":        item.CreatedAt.Unix(),
+		"updated_at":        item.UpdatedAt.Unix(),
 	}
 }
 

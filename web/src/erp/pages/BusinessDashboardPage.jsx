@@ -18,6 +18,7 @@ import {
   buildDashboardSummary,
   normalizeDashboardModuleStats,
 } from '../utils/dashboardStats.mjs'
+import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
 import { TASK_BOARD_LANE_DEFINITIONS } from '../utils/workflowTaskBoard.mjs'
 
 const { Paragraph, Text, Title } = Typography
@@ -199,7 +200,15 @@ export default function BusinessDashboardPage() {
   const renderSourceDetails = (record) => (
     <div className="erp-business-board-source-grid">
       {record.sources.map((source) => (
-        <div className="erp-business-board-source-item" key={source.key}>
+        <div
+          className="erp-business-board-source-item erp-business-board-source-item--openable"
+          key={source.key}
+          data-open-on-double-click="true"
+          title={`双击进入${source.label}`}
+          onDoubleClick={(event) =>
+            openDashboardItemOnDoubleClick(event, () => navigate(source.path))
+          }
+        >
           <div className="erp-business-board-source-meta">
             <Text>{source.label}</Text>
             <strong
@@ -294,7 +303,7 @@ export default function BusinessDashboardPage() {
           />
         ) : null}
         <Paragraph type="secondary" className="erp-business-board-table-note">
-          每一项单独统计，请进入对应页面查看明细。
+          每一项单独统计；点击“查看”进入，电脑端也可双击整项。
         </Paragraph>
         <Table
           size="middle"
@@ -364,8 +373,22 @@ export default function BusinessDashboardPage() {
                 const entryPath = task ? resolveWorkflowTaskEntryPath(task) : ''
                 return (
                   <div
-                    className="erp-business-board-alert-item"
+                    className={`erp-business-board-alert-item${
+                      entryPath
+                        ? ' erp-business-board-alert-item--openable'
+                        : ''
+                    }`}
                     key={definition.key}
+                    data-open-on-double-click={entryPath ? 'true' : undefined}
+                    title={entryPath ? '双击查看相关业务' : undefined}
+                    onDoubleClick={
+                      entryPath
+                        ? (event) =>
+                            openDashboardItemOnDoubleClick(event, () =>
+                              openTaskEntry(task)
+                            )
+                        : undefined
+                    }
                   >
                     <div>
                       <Text strong>{definition.title}</Text>

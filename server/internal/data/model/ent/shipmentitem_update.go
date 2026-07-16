@@ -166,23 +166,23 @@ func (_u *ShipmentItemUpdate) SetNillableQuantity(v *decimal.Decimal) *ShipmentI
 	return _u
 }
 
-// SetUnitNetWeightKgSnapshot sets the "unit_net_weight_kg_snapshot" field.
-func (_u *ShipmentItemUpdate) SetUnitNetWeightKgSnapshot(v decimal.Decimal) *ShipmentItemUpdate {
-	_u.mutation.SetUnitNetWeightKgSnapshot(v)
+// SetUnitNetWeightGSnapshot sets the "unit_net_weight_g_snapshot" field.
+func (_u *ShipmentItemUpdate) SetUnitNetWeightGSnapshot(v decimal.Decimal) *ShipmentItemUpdate {
+	_u.mutation.SetUnitNetWeightGSnapshot(v)
 	return _u
 }
 
-// SetNillableUnitNetWeightKgSnapshot sets the "unit_net_weight_kg_snapshot" field if the given value is not nil.
-func (_u *ShipmentItemUpdate) SetNillableUnitNetWeightKgSnapshot(v *decimal.Decimal) *ShipmentItemUpdate {
+// SetNillableUnitNetWeightGSnapshot sets the "unit_net_weight_g_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdate) SetNillableUnitNetWeightGSnapshot(v *decimal.Decimal) *ShipmentItemUpdate {
 	if v != nil {
-		_u.SetUnitNetWeightKgSnapshot(*v)
+		_u.SetUnitNetWeightGSnapshot(*v)
 	}
 	return _u
 }
 
-// ClearUnitNetWeightKgSnapshot clears the value of the "unit_net_weight_kg_snapshot" field.
-func (_u *ShipmentItemUpdate) ClearUnitNetWeightKgSnapshot() *ShipmentItemUpdate {
-	_u.mutation.ClearUnitNetWeightKgSnapshot()
+// ClearUnitNetWeightGSnapshot clears the value of the "unit_net_weight_g_snapshot" field.
+func (_u *ShipmentItemUpdate) ClearUnitNetWeightGSnapshot() *ShipmentItemUpdate {
+	_u.mutation.ClearUnitNetWeightGSnapshot()
 	return _u
 }
 
@@ -481,11 +481,11 @@ func (_u *ShipmentItemUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if value, ok := _u.mutation.Quantity(); ok {
 		_spec.SetField(shipmentitem.FieldQuantity, field.TypeOther, value)
 	}
-	if value, ok := _u.mutation.UnitNetWeightKgSnapshot(); ok {
-		_spec.SetField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther, value)
+	if value, ok := _u.mutation.UnitNetWeightGSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldUnitNetWeightGSnapshot, field.TypeOther, value)
 	}
-	if _u.mutation.UnitNetWeightKgSnapshotCleared() {
-		_spec.ClearField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther)
+	if _u.mutation.UnitNetWeightGSnapshotCleared() {
+		_spec.ClearField(shipmentitem.FieldUnitNetWeightGSnapshot, field.TypeOther)
 	}
 	if value, ok := _u.mutation.UnitPriceSnapshot(); ok {
 		_spec.SetField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther, value)
@@ -864,23 +864,23 @@ func (_u *ShipmentItemUpdateOne) SetNillableQuantity(v *decimal.Decimal) *Shipme
 	return _u
 }
 
-// SetUnitNetWeightKgSnapshot sets the "unit_net_weight_kg_snapshot" field.
-func (_u *ShipmentItemUpdateOne) SetUnitNetWeightKgSnapshot(v decimal.Decimal) *ShipmentItemUpdateOne {
-	_u.mutation.SetUnitNetWeightKgSnapshot(v)
+// SetUnitNetWeightGSnapshot sets the "unit_net_weight_g_snapshot" field.
+func (_u *ShipmentItemUpdateOne) SetUnitNetWeightGSnapshot(v decimal.Decimal) *ShipmentItemUpdateOne {
+	_u.mutation.SetUnitNetWeightGSnapshot(v)
 	return _u
 }
 
-// SetNillableUnitNetWeightKgSnapshot sets the "unit_net_weight_kg_snapshot" field if the given value is not nil.
-func (_u *ShipmentItemUpdateOne) SetNillableUnitNetWeightKgSnapshot(v *decimal.Decimal) *ShipmentItemUpdateOne {
+// SetNillableUnitNetWeightGSnapshot sets the "unit_net_weight_g_snapshot" field if the given value is not nil.
+func (_u *ShipmentItemUpdateOne) SetNillableUnitNetWeightGSnapshot(v *decimal.Decimal) *ShipmentItemUpdateOne {
 	if v != nil {
-		_u.SetUnitNetWeightKgSnapshot(*v)
+		_u.SetUnitNetWeightGSnapshot(*v)
 	}
 	return _u
 }
 
-// ClearUnitNetWeightKgSnapshot clears the value of the "unit_net_weight_kg_snapshot" field.
-func (_u *ShipmentItemUpdateOne) ClearUnitNetWeightKgSnapshot() *ShipmentItemUpdateOne {
-	_u.mutation.ClearUnitNetWeightKgSnapshot()
+// ClearUnitNetWeightGSnapshot clears the value of the "unit_net_weight_g_snapshot" field.
+func (_u *ShipmentItemUpdateOne) ClearUnitNetWeightGSnapshot() *ShipmentItemUpdateOne {
+	_u.mutation.ClearUnitNetWeightGSnapshot()
 	return _u
 }
 
@@ -1209,11 +1209,11 @@ func (_u *ShipmentItemUpdateOne) sqlSave(ctx context.Context) (_node *ShipmentIt
 	if value, ok := _u.mutation.Quantity(); ok {
 		_spec.SetField(shipmentitem.FieldQuantity, field.TypeOther, value)
 	}
-	if value, ok := _u.mutation.UnitNetWeightKgSnapshot(); ok {
-		_spec.SetField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther, value)
+	if value, ok := _u.mutation.UnitNetWeightGSnapshot(); ok {
+		_spec.SetField(shipmentitem.FieldUnitNetWeightGSnapshot, field.TypeOther, value)
 	}
-	if _u.mutation.UnitNetWeightKgSnapshotCleared() {
-		_spec.ClearField(shipmentitem.FieldUnitNetWeightKgSnapshot, field.TypeOther)
+	if _u.mutation.UnitNetWeightGSnapshotCleared() {
+		_spec.ClearField(shipmentitem.FieldUnitNetWeightGSnapshot, field.TypeOther)
 	}
 	if value, ok := _u.mutation.UnitPriceSnapshot(); ok {
 		_spec.SetField(shipmentitem.FieldUnitPriceSnapshot, field.TypeOther, value)

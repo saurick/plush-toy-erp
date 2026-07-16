@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"server/internal/biz"
 	"server/internal/data"
 	"server/internal/devdbguard"
 
@@ -69,8 +70,8 @@ func main() {
 	if effectivePassword == "" {
 		fail("missing role demo password: set ERP_ROLE_DEMO_PASSWORD or pass --password")
 	}
-	if len(effectivePassword) < 8 {
-		fail("role demo password must be at least 8 characters")
+	if biz.ValidateAdminPassword(effectivePassword) != nil {
+		fail("role demo password must contain 8-20 characters")
 	}
 
 	db, err := sql.Open("pgx", dsn)

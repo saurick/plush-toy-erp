@@ -10,6 +10,7 @@ import {
   CheckCircleOutlined,
   DownloadOutlined,
   EditOutlined,
+  EyeOutlined,
   PlusOutlined,
   SettingOutlined,
   StopOutlined,
@@ -40,6 +41,7 @@ import {
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import {
   ContactFormList,
@@ -69,6 +71,7 @@ import {
   formatUnitShortDisplayName,
   hasActionPermission,
   inferDefaultUnitID,
+  inferProductDefaultUnitID,
   resolvePaymentTermDays,
 } from '../utils/masterDataOrderView.mjs'
 import {
@@ -129,6 +132,7 @@ export default function V1MasterDataPage({ type }) {
   const [recordModalOpen, setRecordModalOpen] = useState(false)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const [detailRecord, setDetailRecord] = useState(null)
   const [saving, setSaving] = useState(false)
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -249,7 +253,7 @@ export default function V1MasterDataPage({ type }) {
       ) {
         return
       }
-      const currentWeight = recordForm.getFieldValue('unit_net_weight_kg')
+      const currentWeight = recordForm.getFieldValue('unit_net_weight_g')
       if (
         currentWeight === undefined ||
         currentWeight === null ||
@@ -257,7 +261,7 @@ export default function V1MasterDataPage({ type }) {
       ) {
         return
       }
-      recordForm.setFieldValue('unit_net_weight_kg', undefined)
+      recordForm.setFieldValue('unit_net_weight_g', undefined)
       message.info(
         effectiveType === 'product_skus'
           ? '所属产品或 SKU 默认单位已变更，SKU 单重已清空，请重新确认'
@@ -527,7 +531,10 @@ export default function V1MasterDataPage({ type }) {
             })
     }
     if (needsUnitDictionary(effectiveType)) {
-      const defaultUnitID = inferDefaultUnitID(records, unitOptions)
+      const inferUnitID = ['products', 'product_skus'].includes(effectiveType)
+        ? inferProductDefaultUnitID
+        : inferDefaultUnitID
+      const defaultUnitID = inferUnitID(records, unitOptions)
       if (defaultUnitID) {
         createDefaults.default_unit_id = defaultUnitID
       }
@@ -552,7 +559,10 @@ export default function V1MasterDataPage({ type }) {
     if (recordForm.getFieldValue('default_unit_id')) {
       return
     }
-    const defaultUnitID = inferDefaultUnitID(records, unitOptions)
+    const inferUnitID = ['products', 'product_skus'].includes(effectiveType)
+      ? inferProductDefaultUnitID
+      : inferDefaultUnitID
+    const defaultUnitID = inferUnitID(records, unitOptions)
     if (defaultUnitID) {
       recordForm.setFieldsValue({ default_unit_id: defaultUnitID })
     }
@@ -579,6 +589,16 @@ export default function V1MasterDataPage({ type }) {
         : {}),
     })
     setRecordModalOpen(true)
+  }
+
+  const openMasterDataRecord = (record) => {
+    if (!record?.id) return
+    setSelectedRecord(record)
+    if (canUpdate) {
+      openEditRecord(record)
+      return
+    }
+    setDetailRecord(record)
   }
 
   const saveRecord = async () => {
@@ -862,7 +882,16 @@ export default function V1MasterDataPage({ type }) {
             >
               编辑{entityLabel}
             </Button>
-          ) : null}
+          ) : (
+            <Button
+              size="small"
+              icon={<EyeOutlined />}
+              disabled={!selectedRecord}
+              onClick={() => setDetailRecord(selectedRecord)}
+            >
+              查看{entityLabel}
+            </Button>
+          )}
           {canDisable ? (
             <Popconfirm
               title={
@@ -925,12 +954,8 @@ export default function V1MasterDataPage({ type }) {
         }
         onRow={(record) => ({
           onClick: () => setSelectedRecord(record),
-          onDoubleClick: () => {
-            if (canUpdate) {
-              openEditRecord(record)
-            }
-          },
         })}
+        onOpenRecord={openMasterDataRecord}
       />
 
       <CollaborationTaskPanel
@@ -995,6 +1020,15 @@ export default function V1MasterDataPage({ type }) {
           ) : null}
         </Form>
       </BusinessFormModal>
+
+      <BusinessRecordDetailsModal
+        columns={recordColumns}
+        description="当前账号为只读查看；如需维护，请由具备相应权限的岗位办理。"
+        open={Boolean(detailRecord)}
+        record={detailRecord}
+        title={`${entityLabel}详情`}
+        onClose={() => setDetailRecord(null)}
+      />
 
       <ColumnOrderModal
         open={columnOrderOpen}

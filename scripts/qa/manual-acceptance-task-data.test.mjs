@@ -1060,7 +1060,7 @@ test("customer-trial-133 task apply uses exact attestation without debug admin a
   );
 });
 
-test("customer-trial-133 rejects an old Workflow release before login or write", async () => {
+test("customer-trial-133 accepts a later immutable release when the CAS migration floor is satisfied", async () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     target: CUSTOMER_TRIAL_133_TARGET,
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
@@ -1068,28 +1068,17 @@ test("customer-trial-133 rejects an old Workflow release before login or write",
     runId: "20260715-V1",
     nowSec: NOW_SEC,
   });
-  let fetchCount = 0;
-
-  await assert.rejects(
-    () =>
-      applyManualAcceptanceTaskData(plan, {
-        confirmPhrase: CONFIRM_PHRASE,
-        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
-        targetAttestation: customerTrial133Attestation({
-          release: "20c96d3819429361a35d2551b63b211f055de37e",
-        }),
-        password: "must-not-be-used",
-        fetchImpl: async () => {
-          fetchCount += 1;
-          throw new Error("must not fetch");
-        },
-      }),
-    new RegExp(
-      `requires the reviewed Workflow task CAS release ${WORKFLOW_TASK_CAS_RELEASE}`,
-      "u",
-    ),
-  );
-  assert.equal(fetchCount, 0);
+  const laterRelease = "56ecf873796ffafc53f12a3cd5f8b7adb0214581";
+  const mock = createMockRuntime({ environment: "prod" });
+  const report = await applyManualAcceptanceTaskData(plan, {
+    confirmPhrase: CONFIRM_PHRASE,
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+    targetAttestation: customerTrial133Attestation({ release: laterRelease }),
+    password: "local-password",
+    fetchImpl: mock.fetchImpl,
+  });
+  assert.equal(report.summary.persisted, TOTAL_TASKS);
+  assert.equal(report.runtime.targetAttestation.release, laterRelease);
 });
 
 test("customer-trial-133 rejects an old Workflow migration before login or write", async () => {

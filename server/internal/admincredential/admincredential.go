@@ -155,9 +155,9 @@ func validateOptions(opts options) error {
 	}
 	if err := biz.ValidateAdminPassword(opts.password); err != nil {
 		return fmt.Errorf(
-			"admin password must contain at least %d characters and no more than %d bytes",
+			"admin password must contain %d-%d characters",
 			biz.AdminPasswordMinLength,
-			biz.AdminPasswordMaxBytes,
+			biz.AdminPasswordMaxLength,
 		)
 	}
 	if opts.confirm != ExpectedConfirmation(opts.username) {

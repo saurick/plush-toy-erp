@@ -3,6 +3,7 @@ import {
   DownOutlined,
   DownloadOutlined,
   EditOutlined,
+  EyeOutlined,
   LinkOutlined,
   PlusOutlined,
   SettingOutlined,
@@ -34,6 +35,7 @@ import {
   ColumnOrderModal,
 } from '../components/business-list/ColumnOrderModal.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
 import {
   getSalesOrder,
@@ -228,6 +230,7 @@ export default function V1SalesOrdersPage() {
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [orderModalOpen, setOrderModalOpen] = useState(false)
   const [editingOrder, setEditingOrder] = useState(null)
+  const [detailOrder, setDetailOrder] = useState(null)
   const [orderColumnOrder, setOrderColumnOrder] = useState(null)
   const [columnOrderTarget, setColumnOrderTarget] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -321,7 +324,7 @@ export default function V1SalesOrdersPage() {
           '明细状态待核对'
         ),
       },
-      ...(view === 'modal'
+      ...(view !== 'preview'
         ? [{ label: '备注', value: item?.note, wide: true }]
         : []),
     ],
@@ -868,6 +871,24 @@ export default function V1SalesOrdersPage() {
     }
   }
 
+  const openSalesOrderDetails = (order) => {
+    if (!order?.id) return
+    sourceDocumentOpenEditController.invalidate()
+    setSelectedOrder(order)
+    setDetailOrder(order)
+  }
+
+  const openSalesOrderRecord = (order) => {
+    if (!order?.id) return
+    setSelectedOrder(order)
+    if (canUpdateOrder && isDraftSourceDocument(order)) {
+      setDetailOrder(null)
+      openEditOrder(order)
+      return
+    }
+    openSalesOrderDetails(order)
+  }
+
   const saveOrder = async () => {
     const values = await orderForm.validateFields()
     const customer = customers.find((item) => item.id === values.customer_id)
@@ -1318,6 +1339,14 @@ export default function V1SalesOrdersPage() {
               相关单据 <DownOutlined />
             </Button>
           </Dropdown>
+          <Button
+            size="small"
+            icon={<EyeOutlined />}
+            disabled={!selectedOrder}
+            onClick={() => openSalesOrderDetails(selectedOrder)}
+          >
+            查看详情
+          </Button>
           {canUpdateOrder ? (
             <Button
               size="small"
@@ -1412,11 +1441,36 @@ export default function V1SalesOrdersPage() {
         }
         onRow={(record) => ({
           onClick: () => setSelectedOrder(record),
-          onDoubleClick: () => openEditOrder(record),
         })}
+        onOpenRecord={openSalesOrderRecord}
       />
 
       {salesOrderItemsPreview.modal}
+
+      <BusinessRecordDetailsModal
+        columns={orderDataColumns}
+        description="查看订单摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
+        lineItems={
+          canReadOrderItems
+            ? {
+                emptyDescription: '当前销售订单暂无明细',
+                getItemFields: getSalesOrderItemFields,
+                getItemLabel: (item, { index }) =>
+                  `明细 ${item?.line_no || index + 1}`,
+                getItemSummary: (item) =>
+                  [item?.product_code_snapshot, item?.product_name_snapshot]
+                    .filter(Boolean)
+                    .join(' / '),
+                load: loadAllSalesOrderItemsForPreview,
+                title: '销售订单明细',
+              }
+            : null
+        }
+        open={Boolean(detailOrder)}
+        record={detailOrder}
+        title="销售订单详情"
+        onClose={() => setDetailOrder(null)}
+      />
 
       <CollaborationTaskPanel
         tasks={[]}

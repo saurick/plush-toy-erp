@@ -41,8 +41,8 @@ type ShipmentItem struct {
 	LotID *int `json:"lot_id,omitempty"`
 	// Quantity holds the value of the "quantity" field.
 	Quantity decimal.Decimal `json:"quantity,omitempty"`
-	// UnitNetWeightKgSnapshot holds the value of the "unit_net_weight_kg_snapshot" field.
-	UnitNetWeightKgSnapshot *decimal.Decimal `json:"unit_net_weight_kg_snapshot,omitempty"`
+	// UnitNetWeightGSnapshot holds the value of the "unit_net_weight_g_snapshot" field.
+	UnitNetWeightGSnapshot *decimal.Decimal `json:"unit_net_weight_g_snapshot,omitempty"`
 	// UnitPriceSnapshot holds the value of the "unit_price_snapshot" field.
 	UnitPriceSnapshot *decimal.Decimal `json:"unit_price_snapshot,omitempty"`
 	// AmountSnapshot holds the value of the "amount_snapshot" field.
@@ -164,7 +164,7 @@ func (*ShipmentItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case shipmentitem.FieldUnitNetWeightKgSnapshot, shipmentitem.FieldUnitPriceSnapshot, shipmentitem.FieldAmountSnapshot:
+		case shipmentitem.FieldUnitNetWeightGSnapshot, shipmentitem.FieldUnitPriceSnapshot, shipmentitem.FieldAmountSnapshot:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case shipmentitem.FieldQuantity:
 			values[i] = new(decimal.Decimal)
@@ -246,12 +246,12 @@ func (_m *ShipmentItem) assignValues(columns []string, values []any) error {
 			} else if value != nil {
 				_m.Quantity = *value
 			}
-		case shipmentitem.FieldUnitNetWeightKgSnapshot:
+		case shipmentitem.FieldUnitNetWeightGSnapshot:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field unit_net_weight_kg_snapshot", values[i])
+				return fmt.Errorf("unexpected type %T for field unit_net_weight_g_snapshot", values[i])
 			} else if value.Valid {
-				_m.UnitNetWeightKgSnapshot = new(decimal.Decimal)
-				*_m.UnitNetWeightKgSnapshot = *value.S.(*decimal.Decimal)
+				_m.UnitNetWeightGSnapshot = new(decimal.Decimal)
+				*_m.UnitNetWeightGSnapshot = *value.S.(*decimal.Decimal)
 			}
 		case shipmentitem.FieldUnitPriceSnapshot:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
@@ -393,8 +393,8 @@ func (_m *ShipmentItem) String() string {
 	builder.WriteString("quantity=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Quantity))
 	builder.WriteString(", ")
-	if v := _m.UnitNetWeightKgSnapshot; v != nil {
-		builder.WriteString("unit_net_weight_kg_snapshot=")
+	if v := _m.UnitNetWeightGSnapshot; v != nil {
+		builder.WriteString("unit_net_weight_g_snapshot=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

@@ -10,6 +10,9 @@ import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import PrintWorkspaceShell from '../components/print/PrintWorkspaceShell.jsx'
+import WorkInstructionImageAnnotationEditor, {
+  WorkInstructionImageAnnotationLayer,
+} from '../components/print/WorkInstructionImageAnnotationEditor.jsx'
 import { getPrintTemplateByKey } from '../config/printTemplates.mjs'
 import {
   COLOR_CARD_TEMPLATE_KEY,
@@ -891,6 +894,7 @@ function ImageSlot({
   compact = false,
   showActions = true,
   layoutStyle,
+  annotations = [],
 }) {
   const inputRef = useRef(null)
   const hasImage = Boolean(snapshot?.dataURL)
@@ -916,6 +920,11 @@ function ImageSlot({
         height: `${(100 / cropHeight) * 100}%`,
       }
     : undefined
+  const hasAnnotations =
+    hasImage && Array.isArray(annotations) && annotations.length > 0
+  const hasCallout =
+    hasAnnotations &&
+    annotations.some((annotation) => annotation?.type === 'callout')
   return (
     <div
       className={`erp-engineering-print-image-slot${
@@ -924,6 +933,8 @@ function ImageSlot({
         showActions ? '' : ' erp-engineering-print-image-slot--readonly'
       }${hasCrop ? ' erp-engineering-print-image-slot--cropped' : ''}${
         layoutStyle ? ' erp-engineering-print-image-slot--positioned' : ''
+      }${hasAnnotations ? ' erp-engineering-print-image-slot--annotated' : ''}${
+        hasCallout ? ' erp-engineering-print-image-slot--with-callout' : ''
       }`}
       data-image-crop={hasCrop ? 'excel-src-rect' : undefined}
       style={
@@ -942,11 +953,16 @@ function ImageSlot({
           : undefined
       }
     >
-      {hasImage ? (
-        <img src={snapshot.dataURL} alt={label} style={cropStyle} />
-      ) : (
-        <span>{label}</span>
-      )}
+      <div className="erp-engineering-print-image-slot__viewport">
+        {hasImage ? (
+          <img src={snapshot.dataURL} alt={label} style={cropStyle} />
+        ) : (
+          <span>{label}</span>
+        )}
+      </div>
+      {hasAnnotations ? (
+        <WorkInstructionImageAnnotationLayer annotations={annotations} />
+      ) : null}
       {showActions ? (
         <>
           <div className="erp-engineering-print-image-slot__actions">
@@ -1754,6 +1770,7 @@ function WorkInstructionPaper({
                           key={`step-${pageIndex ?? 'main'}-${rowIndex}-image-${imageIndex}`}
                           label={`工序 ${row.no || rowIndex + 1} 图片 ${visibleIndex + 1}`}
                           snapshot={image}
+                          annotations={image.annotations}
                           compact
                           showActions={false}
                           layoutStyle={
@@ -1832,6 +1849,7 @@ function WorkInstructionPaper({
                     key={`step-${pageIndex ?? 'main'}-${rowIndex}-image-${imageIndex}`}
                     label={`工序 ${row.no || rowIndex + 1} 图片 ${visibleIndex + 1}`}
                     snapshot={image}
+                    annotations={image.annotations}
                     compact
                     showActions={false}
                     layoutStyle={
@@ -2233,6 +2251,7 @@ function WorkInstructionContinuationPage({
                             visibleIndex + 1
                           }`}
                           snapshot={image}
+                          annotations={image.annotations}
                           compact
                           showActions={false}
                           layoutStyle={
@@ -2311,6 +2330,7 @@ function WorkInstructionContinuationPage({
                       visibleIndex + 1
                     }`}
                     snapshot={image}
+                    annotations={image.annotations}
                     compact
                     showActions={false}
                     layoutStyle={
@@ -2561,6 +2581,10 @@ export default function EngineeringPrintWorkspacePage() {
     useState(null)
   const [instructionRowSelectionMode, setInstructionRowSelectionMode] =
     useState(false)
+  const [
+    instructionAnnotationEditorTarget,
+    setInstructionAnnotationEditorTarget,
+  ] = useState(null)
 
   useEffect(() => {
     document.title = template?.title ? `${template.title}打印窗口` : '打印窗口'
@@ -2591,6 +2615,7 @@ export default function EngineeringPrintWorkspacePage() {
     setColorLineSelectionMode(false)
     setSelectedInstructionRowTarget(null)
     setInstructionRowSelectionMode(false)
+    setInstructionAnnotationEditorTarget(null)
   }, [
     businessInput,
     draftStorageKey,
@@ -2739,6 +2764,7 @@ export default function EngineeringPrintWorkspacePage() {
     setColorLineSelectionMode(false)
     setSelectedInstructionRowTarget(null)
     setInstructionRowSelectionMode(false)
+    setInstructionAnnotationEditorTarget(null)
   }
 
   const handleResetDraft = () => {
@@ -3271,6 +3297,57 @@ export default function EngineeringPrintWorkspacePage() {
         normalizedTarget
       )}图片。`
     )
+    if (
+      isSameInstructionRowTarget(
+        instructionAnnotationEditorTarget,
+        normalizedTarget
+      )
+    ) {
+      setInstructionAnnotationEditorTarget(null)
+    }
+  }
+
+  const openInstructionAnnotationEditor = (target) => {
+    const normalizedTarget = normalizeInstructionRowTarget(target)
+    if (!normalizedTarget) return
+    const row = getInstructionRowsForTarget(draft, normalizedTarget)[
+      normalizedTarget.rowIndex
+    ]
+    const firstImageIndex = Array.isArray(row?.images)
+      ? row.images.findIndex((image) => image?.dataURL)
+      : -1
+    if (!isWorkInstructionStepRow(row) || firstImageIndex < 0) {
+      message.warning('请先给当前编号行上传图片。')
+      return
+    }
+    setInstructionAnnotationEditorTarget({
+      ...normalizedTarget,
+      imageIndex: firstImageIndex,
+    })
+  }
+
+  const saveInstructionImageAnnotations = (nextImages = []) => {
+    const target = normalizeInstructionRowTarget(
+      instructionAnnotationEditorTarget
+    )
+    if (!target) return
+    setDraft((current) =>
+      updateInstructionRowByTarget(current, target, (row) => ({
+        ...row,
+        images: (Array.isArray(row?.images) ? row.images : []).map(
+          (image, imageIndex) => ({
+            ...image,
+            annotations: Array.isArray(nextImages[imageIndex]?.annotations)
+              ? nextImages[imageIndex].annotations
+              : [],
+          })
+        ),
+      }))
+    )
+    setInstructionAnnotationEditorTarget(null)
+    setToolbarStatus(
+      `已保存作业指导书${formatInstructionRowTargetLabel(target)}图片标注。`
+    )
   }
 
   const updateMaterialLine = (rowIndex, key, value) => {
@@ -3544,113 +3621,7 @@ export default function EngineeringPrintWorkspacePage() {
           onChange: (value) => updateInstructionRowValue(target, 'text', value),
         },
       ]
-      if (rowType !== WORK_INSTRUCTION_ROW_TYPES.step) {
-        return baseRows
-      }
-      const noteRows = ['left', 'right']
-        .filter((noteKey) => richTextHasVisibleText(row.imageNotes?.[noteKey]))
-        .map((noteKey) => ({
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.imageNotes.${noteKey}`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.imageNotes.${noteKey}`,
-          label: `${labelPrefix} ${rowIndex + 1} ${
-            noteKey === 'left' ? '左侧图片批注' : '右侧图片批注'
-          }`,
-          value: plainTextFromRichHTML(row.imageNotes?.[noteKey]),
-          multiline: true,
-          rows: 3,
-          onChange: (value) =>
-            updateInstructionRowValue(target, `imageNotes.${noteKey}`, value),
-        }))
-      const labelRows = (
-        Array.isArray(row.imageLabels) ? row.imageLabels : []
-      ).flatMap((label, labelIndex) => [
-        {
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.imageLabels.${labelIndex}.text`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.text`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 文字`,
-          value: label.text ?? '',
-          multiline: true,
-          rows: 2,
-          onChange: (value) =>
-            updateInstructionRowValue(
-              target,
-              `imageLabels.${labelIndex}.text`,
-              value
-            ),
-        },
-        {
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.imageLabels.${labelIndex}.x`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.x`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 水平位置`,
-          value: String(label.x ?? ''),
-          onChange: (value) =>
-            updateInstructionRowValue(
-              target,
-              `imageLabels.${labelIndex}.x`,
-              value
-            ),
-        },
-        {
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.imageLabels.${labelIndex}.y`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.y`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 垂直位置`,
-          value: String(label.y ?? ''),
-          onChange: (value) =>
-            updateInstructionRowValue(
-              target,
-              `imageLabels.${labelIndex}.y`,
-              value
-            ),
-        },
-        {
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.imageLabels.${labelIndex}.width`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.imageLabels.${labelIndex}.width`,
-          label: `${labelPrefix} ${rowIndex + 1} 图片说明 ${labelIndex + 1} 图片宽度`,
-          value: String(label.width ?? ''),
-          onChange: (value) =>
-            updateInstructionRowValue(
-              target,
-              `imageLabels.${labelIndex}.width`,
-              value
-            ),
-        },
-      ])
-      const calloutRows = (
-        Array.isArray(row.imageCallouts) ? row.imageCallouts : []
-      ).flatMap((callout, calloutIndex) =>
-        ['x1', 'y1', 'x2', 'y2'].map((calloutKey) => ({
-          key:
-            pageIndex === null
-              ? `rows.${rowIndex}.imageCallouts.${calloutIndex}.${calloutKey}`
-              : `continuationPages.${pageIndex}.rows.${rowIndex}.imageCallouts.${calloutIndex}.${calloutKey}`,
-          label: `${labelPrefix} ${rowIndex + 1} 标注连线 ${calloutIndex + 1} ${
-            {
-              x1: '起点水平位置',
-              y1: '起点垂直位置',
-              x2: '终点水平位置',
-              y2: '终点垂直位置',
-            }[calloutKey]
-          }`,
-          value: String(callout[calloutKey] ?? ''),
-          onChange: (value) =>
-            updateInstructionRowValue(
-              target,
-              `imageCallouts.${calloutIndex}.${calloutKey}`,
-              value
-            ),
-        }))
-      )
-      return [...baseRows, ...noteRows, ...labelRows, ...calloutRows]
+      return baseRows
     })
 
   const workInstructionFieldRows = () => [
@@ -3919,6 +3890,20 @@ export default function EngineeringPrintWorkspacePage() {
     : []
   const selectedInstructionRowIsStep =
     selectedInstructionRow && isWorkInstructionStepRow(selectedInstructionRow)
+  const normalizedInstructionAnnotationEditorTarget =
+    normalizeInstructionRowTarget(instructionAnnotationEditorTarget)
+  const instructionAnnotationEditorRow =
+    normalizedInstructionAnnotationEditorTarget === null
+      ? null
+      : getInstructionRowsForTarget(
+          draft,
+          normalizedInstructionAnnotationEditorTarget
+        )[normalizedInstructionAnnotationEditorTarget.rowIndex]
+  const instructionAnnotationEditorImages = Array.isArray(
+    instructionAnnotationEditorRow?.images
+  )
+    ? instructionAnnotationEditorRow.images
+    : []
 
   const templateEditorActions = (() => {
     if (templateKey === MATERIAL_DETAIL_TEMPLATE_KEY) {
@@ -4158,6 +4143,21 @@ export default function EngineeringPrintWorkspacePage() {
         </button>
         <button
           type="button"
+          className={getToolbarButtonClassName()}
+          data-open-work-instruction-annotation-editor
+          disabled={
+            selectedWorkInstructionRowTarget === null ||
+            !selectedInstructionRowIsStep ||
+            selectedInstructionRowImages.length === 0
+          }
+          onClick={() =>
+            openInstructionAnnotationEditor(selectedWorkInstructionRowTarget)
+          }
+        >
+          标注当前行图片
+        </button>
+        <button
+          type="button"
           className={getToolbarButtonClassName({
             active: instructionRowSelectionMode,
           })}
@@ -4306,25 +4306,36 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   return (
-    <PrintWorkspaceShell
-      title={template.title}
-      sourceTag={businessInput ? '业务记录带值' : '使用默认模板'}
-      statusText={toolbarStatus}
-      workspaceClassName="erp-engineering-print-workspace-shell"
-      panelTip="左侧维护关键字段；右侧纸面可直接编辑，打印和 PDF 只输出右侧纸面。"
-      panelActions={panelActions}
-      toolbarActions={toolbarActions}
-      fieldRows={fieldRows.map((row) => ({
-        ...row,
-        readOnly: false,
-        value: row.value ?? '',
-        onChange: row.onChange,
-      }))}
-      prepareSignature={`${templateKey}:${workspaceStateID}:${businessInput}`}
-    >
-      <div className="erp-print-shell__stage-wrap" ref={stageWrapRef}>
-        {paper}
-      </div>
-    </PrintWorkspaceShell>
+    <>
+      <PrintWorkspaceShell
+        title={template.title}
+        sourceTag={businessInput ? '业务记录带值' : '使用默认模板'}
+        statusText={toolbarStatus}
+        workspaceClassName="erp-engineering-print-workspace-shell"
+        panelTip="左侧维护关键字段；右侧纸面可直接编辑，打印和 PDF 只输出右侧纸面。"
+        panelActions={panelActions}
+        toolbarActions={toolbarActions}
+        fieldRows={fieldRows.map((row) => ({
+          ...row,
+          readOnly: false,
+          value: row.value ?? '',
+          onChange: row.onChange,
+        }))}
+        prepareSignature={`${templateKey}:${workspaceStateID}:${businessInput}`}
+      >
+        <div className="erp-print-shell__stage-wrap" ref={stageWrapRef}>
+          {paper}
+        </div>
+      </PrintWorkspaceShell>
+      <WorkInstructionImageAnnotationEditor
+        open={normalizedInstructionAnnotationEditorTarget !== null}
+        images={instructionAnnotationEditorImages}
+        initialImageIndex={
+          Number(instructionAnnotationEditorTarget?.imageIndex) || 0
+        }
+        onCancel={() => setInstructionAnnotationEditorTarget(null)}
+        onSave={saveInstructionImageAnnotations}
+      />
+    </>
   )
 }

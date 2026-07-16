@@ -189,13 +189,12 @@ export function normalizeOptionalDecimalString(value) {
   return text || null
 }
 
-export function formatProductUnitNetWeight(value, unitLabel = '默认单位') {
+export function formatProductUnitNetWeight(value) {
   const weight = String(value ?? '').trim()
   if (!weight) {
     return '-'
   }
-  const label = String(unitLabel || '').trim() || '默认单位'
-  return `${weight} kg / ${label}`
+  return `${weight} 克`
 }
 
 export function normalizeOptionalNonNegativeInteger(value) {
@@ -684,6 +683,30 @@ export function inferDefaultUnitID(records = [], unitOptions = []) {
   return mostUsedUnitID || [...allowedUnitIDs][0]
 }
 
+export function inferProductDefaultUnitID(records = [], unitOptions = []) {
+  const options = Array.isArray(unitOptions) ? unitOptions : []
+  const preferredCodes = ['PCS', 'PC', 'EA']
+  for (const code of preferredCodes) {
+    const codePattern = new RegExp(`(?:^|[（(\\s])${code}(?:[）)\\s]|$)`, 'u')
+    const matched = options.find((option) =>
+      codePattern.test(
+        `${String(option?.label || '')} ${String(option?.title || '')}`.toUpperCase()
+      )
+    )
+    const unitID = Number(matched?.value || 0)
+    if (Number.isFinite(unitID) && unitID > 0) {
+      return unitID
+    }
+  }
+  const matchedByName = options.find((option) =>
+    /^(?:件|个|只)(?:[（(]|$)/u.test(String(option?.label || '').trim())
+  )
+  const unitID = Number(matchedByName?.value || 0)
+  return Number.isFinite(unitID) && unitID > 0
+    ? unitID
+    : inferDefaultUnitID(records, options)
+}
+
 function draftCodeDateKey(now = new Date()) {
   const date =
     now instanceof Date && !Number.isNaN(now.valueOf()) ? now : new Date()
@@ -896,8 +919,8 @@ export function buildProductParams(values = {}, extra = {}) {
       values.default_unit_id === undefined
         ? undefined
         : Number(values.default_unit_id || 0),
-    unit_net_weight_kg: normalizeOptionalDecimalString(
-      values.unit_net_weight_kg
+    unit_net_weight_g: normalizeOptionalDecimalString(
+      values.unit_net_weight_g
     ),
   })
 }
@@ -935,8 +958,8 @@ export function buildProductSKUParams(values = {}, extra = {}) {
       values.default_unit_id === undefined || values.default_unit_id === null
         ? undefined
         : Number(values.default_unit_id || 0),
-    unit_net_weight_kg: normalizeOptionalDecimalString(
-      values.unit_net_weight_kg
+    unit_net_weight_g: normalizeOptionalDecimalString(
+      values.unit_net_weight_g
     ),
   })
 }

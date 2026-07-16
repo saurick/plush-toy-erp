@@ -544,7 +544,7 @@ func (r *masterDataRepo) CreateProduct(ctx context.Context, in *biz.ProductMutat
 		SetName(in.Name).
 		SetNillableStyleNo(in.StyleNo).
 		SetNillableCustomerStyleNo(in.CustomerStyleNo).
-		SetNillableUnitNetWeightKg(in.UnitNetWeightKg).
+		SetNillableUnitNetWeightG(in.UnitNetWeightG).
 		SetDefaultUnitID(in.DefaultUnitID).
 		Save(ctx)
 	if err != nil {
@@ -568,10 +568,10 @@ func (r *masterDataRepo) UpdateProduct(ctx context.Context, id int, in *biz.Prod
 	} else {
 		update.SetCustomerStyleNo(*in.CustomerStyleNo)
 	}
-	if in.UnitNetWeightKg == nil {
-		update.ClearUnitNetWeightKg()
+	if in.UnitNetWeightG == nil {
+		update.ClearUnitNetWeightG()
 	} else {
-		update.SetUnitNetWeightKg(*in.UnitNetWeightKg)
+		update.SetUnitNetWeightG(*in.UnitNetWeightG)
 	}
 	row, err := update.Save(ctx)
 	if err != nil {
@@ -652,7 +652,7 @@ func (r *masterDataRepo) CreateProductSKU(ctx context.Context, in *biz.ProductSK
 		SetNillableSize(in.Size).
 		SetNillablePackagingVersion(in.PackagingVersion).
 		SetNillableDefaultUnitID(in.DefaultUnitID).
-		SetNillableUnitNetWeightKg(in.UnitNetWeightKg)
+		SetNillableUnitNetWeightG(in.UnitNetWeightG)
 	row, err := create.Save(ctx)
 	if err != nil {
 		return nil, err
@@ -703,10 +703,10 @@ func (r *masterDataRepo) UpdateProductSKU(ctx context.Context, id int, in *biz.P
 	} else {
 		update.SetDefaultUnitID(*in.DefaultUnitID)
 	}
-	if in.UnitNetWeightKg == nil {
-		update.ClearUnitNetWeightKg()
+	if in.UnitNetWeightG == nil {
+		update.ClearUnitNetWeightG()
 	} else {
-		update.SetUnitNetWeightKg(*in.UnitNetWeightKg)
+		update.SetUnitNetWeightG(*in.UnitNetWeightG)
 	}
 	row, err := update.Save(ctx)
 	if err != nil {
@@ -1359,7 +1359,7 @@ func entProductToBiz(row *ent.Product) *biz.Product {
 		StyleNo:         row.StyleNo,
 		CustomerStyleNo: row.CustomerStyleNo,
 		DefaultUnitID:   row.DefaultUnitID,
-		UnitNetWeightKg: row.UnitNetWeightKg,
+		UnitNetWeightG:  row.UnitNetWeightG,
 		IsActive:        row.IsActive,
 		CreatedAt:       row.CreatedAt,
 		UpdatedAt:       row.UpdatedAt,
@@ -1390,7 +1390,7 @@ func entProductSKUToBiz(row *ent.ProductSKU) *biz.ProductSKU {
 		Size:             row.Size,
 		PackagingVersion: row.PackagingVersion,
 		DefaultUnitID:    row.DefaultUnitID,
-		UnitNetWeightKg:  row.UnitNetWeightKg,
+		UnitNetWeightG:   row.UnitNetWeightG,
 		IsActive:         row.IsActive,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,

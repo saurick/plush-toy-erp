@@ -73,16 +73,16 @@ func (_c *ProductCreate) SetDefaultUnitID(v int) *ProductCreate {
 	return _c
 }
 
-// SetUnitNetWeightKg sets the "unit_net_weight_kg" field.
-func (_c *ProductCreate) SetUnitNetWeightKg(v decimal.Decimal) *ProductCreate {
-	_c.mutation.SetUnitNetWeightKg(v)
+// SetUnitNetWeightG sets the "unit_net_weight_g" field.
+func (_c *ProductCreate) SetUnitNetWeightG(v decimal.Decimal) *ProductCreate {
+	_c.mutation.SetUnitNetWeightG(v)
 	return _c
 }
 
-// SetNillableUnitNetWeightKg sets the "unit_net_weight_kg" field if the given value is not nil.
-func (_c *ProductCreate) SetNillableUnitNetWeightKg(v *decimal.Decimal) *ProductCreate {
+// SetNillableUnitNetWeightG sets the "unit_net_weight_g" field if the given value is not nil.
+func (_c *ProductCreate) SetNillableUnitNetWeightG(v *decimal.Decimal) *ProductCreate {
 	if v != nil {
-		_c.SetUnitNetWeightKg(*v)
+		_c.SetUnitNetWeightG(*v)
 	}
 	return _c
 }
@@ -348,9 +348,9 @@ func (_c *ProductCreate) createSpec() (*Product, *sqlgraph.CreateSpec) {
 		_spec.SetField(product.FieldCustomerStyleNo, field.TypeString, value)
 		_node.CustomerStyleNo = &value
 	}
-	if value, ok := _c.mutation.UnitNetWeightKg(); ok {
-		_spec.SetField(product.FieldUnitNetWeightKg, field.TypeOther, value)
-		_node.UnitNetWeightKg = &value
+	if value, ok := _c.mutation.UnitNetWeightG(); ok {
+		_spec.SetField(product.FieldUnitNetWeightG, field.TypeOther, value)
+		_node.UnitNetWeightG = &value
 	}
 	if value, ok := _c.mutation.IsActive(); ok {
 		_spec.SetField(product.FieldIsActive, field.TypeBool, value)

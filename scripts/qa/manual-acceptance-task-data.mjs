@@ -30,6 +30,9 @@ export const CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_TASKS";
 export const RETIRE_CONFIRM_PREFIX =
   "RETIRE_LEGACY_SIMULATED_MANUAL_ACCEPTANCE_TASKS";
 export const WORKFLOW_TASK_CAS_MIGRATION = "20260711063237";
+// Historical review anchor only. Remote writes are gated by the forward
+// migration floor plus live runtime/readback checks, so later immutable
+// releases are not incorrectly rejected.
 export const WORKFLOW_TASK_CAS_RELEASE =
   "929ec0b3a563bec0796274d033a97277519bcb51";
 export const TASKS_PER_ROLE = 20;
@@ -81,12 +84,6 @@ export function assertManualAcceptanceTaskTargetCompatibility(
   ) {
     throw new CliError(
       `${CUSTOMER_TRIAL_133_TARGET} requires Workflow task CAS migration >= ${WORKFLOW_TASK_CAS_MIGRATION} before the first task write`,
-      2,
-    );
-  }
-  if (attested.release !== WORKFLOW_TASK_CAS_RELEASE) {
-    throw new CliError(
-      `${CUSTOMER_TRIAL_133_TARGET} requires the reviewed Workflow task CAS release ${WORKFLOW_TASK_CAS_RELEASE} before the first task write`,
       2,
     );
   }

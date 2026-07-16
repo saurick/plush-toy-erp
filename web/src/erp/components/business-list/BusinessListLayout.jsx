@@ -927,6 +927,28 @@ export function SelectedItemsSummaryTag({
   )
 }
 
+const BUSINESS_DATA_TABLE_INTERACTIVE_TARGET = [
+  'a',
+  'button',
+  'input',
+  'textarea',
+  'select',
+  'label',
+  '[role="button"]',
+  '[role="link"]',
+  '.ant-table-selection-column',
+  '.ant-radio-wrapper',
+  '.ant-checkbox-wrapper',
+  '.erp-business-row-expand-button',
+].join(', ')
+
+function isBusinessDataTableInteractiveTarget(target) {
+  return Boolean(
+    target instanceof Element &&
+      target.closest(BUSINESS_DATA_TABLE_INTERACTIVE_TARGET)
+  )
+}
+
 export function BusinessDataTable({
   tableHeader,
   loading,
@@ -939,6 +961,7 @@ export function BusinessDataTable({
   rowSelection,
   rowClassName,
   onRow,
+  onOpenRecord,
   onChange,
   pagination,
   emptyDescription = '暂无匹配记录',
@@ -965,6 +988,24 @@ export function BusinessDataTable({
       }),
     }
   }, [resolvedColumns, resolvedRowSelection, scroll])
+  const resolvedOnRow = React.useCallback(
+    (record, index) => {
+      const rowProps = onRow?.(record, index) || {}
+      if (typeof onOpenRecord !== 'function') return rowProps
+      const userDoubleClick = rowProps.onDoubleClick
+      return {
+        ...rowProps,
+        style: { cursor: 'pointer', ...(rowProps.style || {}) },
+        title: rowProps.title || '单击选中，双击打开',
+        onDoubleClick: (event) => {
+          if (isBusinessDataTableInteractiveTarget(event?.target)) return
+          userDoubleClick?.(event)
+          if (!event?.defaultPrevented) onOpenRecord(record, event)
+        },
+      }
+    },
+    [onOpenRecord, onRow]
+  )
 
   return (
     <Card className="erp-business-data-table-card erp-business-module-table-card">
@@ -979,7 +1020,7 @@ export function BusinessDataTable({
         scroll={resolvedScroll}
         rowSelection={resolvedRowSelection}
         rowClassName={rowClassName}
-        onRow={onRow}
+        onRow={resolvedOnRow}
         onChange={onChange}
         pagination={pagination}
         locale={{

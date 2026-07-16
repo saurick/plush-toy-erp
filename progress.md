@@ -7,6 +7,30 @@
 - 当前只收口上述真实缺口；不得回退其它已完成任务，也不把旧审查中的过期 / 超范围建议重新扩成产品功能。
 - 发布目标是内网测试机 `192.168.0.133`；低配目标只加载本地 fixed revision 构建产物、执行 migration、Compose 重启和部署后回归。
 
+## 2026-07-16 Ent migration 会话收口与暂存门禁
+
+完成：项目 `AGENTS.md` 将 Ent schema 变更收口固定为 `make data` 生成与审查 Ent 产物、versioned migration 和 `atlas.sum`，再执行 `db-guard`；缺 migration 或生成零漂移证据只能报告 `incomplete`。`migrate_apply` 与生成门禁分离：只对已确认归属的本地/隔离开发库按 `status -> apply -> status / 结构读回` 执行，共享、测试、生产或归属不明库仍需先确认。
+
+完成：`pre-commit` 在已有 staged index 快照内强制执行 `QA_BASE_RANGE=HEAD...HEAD` 的 `db-guard`，只检查本次暂存 transition；守卫不可通过环境中的 `SKIP_DB_GUARD=1` 被静默跳过，且保持 check-only，不运行 `make data`、`migrate_apply`或 `git add`。集成回归用真实 `db-guard` 先证明只暂存结构 schema 时 hook 失败，再证明补齐对应 migration 与 `atlas.sum` 后同一 staged 变更通过。
+
+验证：`node --test scripts/qa/db-guard.test.mjs scripts/git-hooks/pre-commit.test.mjs` 29 / 29 通过，0 fail / 0 skip；`bash -n`、定向 shfmt / shellcheck、Node 语法、`git diff --check` 和 AGENTS 体积门禁通过，当前项目 `AGENTS.md` 为 12,554 bytes。`affected` 将仓库级 hook 变更保守归为 T8；定向绿色不替代推送前最终冻结树的 `full.sh`。
+
+下一步：后续任务只要修改 Ent schema，就必须在本轮内完成生成、migration 审查、静态守卫和 apply 状态报告；提交推送前仍按最终整树执行 `full.sh`。
+
+阻塞/风险：本轮没有修改 Ent schema 或 migration，没有 apply 任何本地、共享、133 或生产数据库；共享工作树中已有的净重 schema / migration 与手工验收改动均原样保留，不属于本轮成果。本轮未 stage、commit、push、deploy 或客户验收。
+
+## 2026-07-16 全页面验收数据同源生成与密码范围收口
+
+完成：新增唯一 `manual-acceptance-dataset-runner-v1`，local 与 `customer-trial-133` 共用同一串行阶段 registry、target-free 业务输入和严格组件回执；目标 adapter 只提供 endpoint、数据库身份、凭据、确认串、attestation 与报告目录。顺序固定为 `core → role → source → task → facts → purchase-quality → attachments → readiness`：先通过 admin 只读 RPC 回读 `debug.capabilities.databaseName`，并精确核对 `SIM-PLUSH-CORE-PCS` 和四个稳定仓库码，再允许任何账号或业务写入。local apply 必须显式提供非 8300 的专用后端、`plush_erp_acceptance_*` 数据库名及数据库绑定确认串；运行态数据库名不一致时 fail closed。默认 runner 不再执行不绑定后端的 core / role seed shell；十个正式岗位账号缺失即阻断，三类异常账号统一由 account-scenarios 正式 API 调和。采购收货与质检只从同批 facts 报告派生，不再保留独立造数分支；任务远端门禁改为 migration floor + 当前运行态 / 读回，不再把历史 review commit 当作唯一允许 release。
+
+完成：新增 48 个正式页面的数据归属合同，每页只能消费共享 `role / source / task / facts / catalog` 阶段及其 readback probe；漏页、重复页、孤立 probe、页面自有 builder / 脚本或阶段入口分叉全部 fail closed。双环境 dry-run 得到同一 semantic digest `2836b37bf723a43fae94a49cf1cdc04610cec0f46441c458c9a1fffcf5ecb9b4`，数据库 ID 仍各自独立。管理员与演示账号的创建、初始化、重置和生产 preflight 密码范围统一为 8～20 个 Unicode 字符且 UTF-8 编码后不超过 72 字节；登录既有账号不因该创建策略被前端提前拦截。
+
+验证：Node 24 手工验收与 production preflight 定向测试 252 / 252、相关 Go 7 个包通过。`bash scripts/qa/affected.sh --run` 判定 41 文件 / T8 并完整通过 full；最终 `bash scripts/qa/strict.sh` 也从头通过：scripts Node 1021 / 1021、Web 合同 195 / 195、Web 全量 1258 / 1258、关键 PostgreSQL 154 / 154、server-all 2097 / 2097、真实 Chromium、Web / Go build、shellcheck、shfmt、yamllint 与两次 govulncheck 均通过，0 fail / 0 skip。较早一次漏洞库刷新曾遇到瞬时 `EOF`，随后单独复检和两轮完整门禁均确认 0 个可调用漏洞，未跳过检查。
+
+下一步：取得提交推送与发布授权后，先冻结 commit / image / migration；再让专用本地验收后端绑定独立验收库执行 v3 并读回，随后部署同一不可变版本到 133、重放同一 semantic digest，补 readiness / browser / PDF 证据。确认 v3 完整后，133 旧 v1 批次只按生命周期退出，不物理删除。
+
+阻塞/风险：当前 `8300` 指向共享开发库，不能作为专用验收写入目标；133 当前仍是 v3 配置配合 v1 数据，缺同批 v3 facts / attachments / readiness 证据。本轮未写本地或 133 业务数据，未提交、推送或部署，不能把代码和本地门禁绿色写成目标数据已同步或客户验收完成。
+
 ## 2026-07-15 本地开发端口与并行启动治理
 
 完成：本仓新增受版本控制的 `config/dev-ports.env`，固定主前端 `5175`、HTTP `8300`、gRPC `9300`、Style L1 `6175`，并独占 `15200-15299` 作为短生命周期 AUX 段。Make、Vite、开发态 Go override、yoyoosun 入口、预览与浏览器脚本统一消费该真源；具体 dev 配置文件和 Kratos 支持的 dev 目录参数均能识别，主服务端口冲突直接失败，不再静默顺延。`dev_stop` 只停止 cwd 属于当前仓库的 listener，拒绝误杀其他项目。`full.sh` 只在 AUX 段探测空闲端口，并用原子 PID 锁串行化同一 worktree 的浏览器证据；活动锁和 stale lock 均 fail closed，只有实际 owner 的 EXIT 清理能移除本轮锁。
@@ -151,3 +175,33 @@
 下一步：按用户授权一次性暂存全部工作树、运行提交钩子、提交并推送 `main`；push 前由仓库钩子再次执行 `full.sh`。若后续要更新 133，必须基于新 commit / image 在隔离验收库重跑 migration、试用配置 publish / activate、v3 数据回放、health / ready、岗位浏览器读回与回滚验证，不能复用旧基线证据。
 
 阻塞/风险：本轮不部署、不写 133、不轮换共享开发库稳定管理员，也不把模拟数据描述为客户真实事实或签收结果。目标环境发布与客户验收仍是提交推送后的独立事项。
+
+## 2026-07-16 产品与出货净重统一为克
+
+完成：产品与 SKU 单重、出货行确认快照、整单人工 / 自动 / 最终总净重的 schema、Ent、biz、repo、JSON-RPC、前端表单 / 列表 / 明细 / CSV、浏览器 mock、测试和正式文档统一从 kg 改为 g。新增 Atlas migration 原位重命名四组重量字段，并把已有非空产品、SKU、出货快照、总净重和幂等请求快照乘 1000；迁移在转换前检查 numeric 上限，禁止 Atlas 的删列重建路径。默认单位变化后的单重清空、SKU 优先 / 产品回退、缺任一行不计算部分总重、已出货快照冻结与取消保留边界不变。
+
+验证：`make data` 生成并同步 Ent / Atlas；Go `internal/biz + internal/data + internal/service` 通过，定向重量纯逻辑、repo、JSON-RPC 和迁移结构测试通过。一次性 PostgreSQL populated migration 演练从旧 revision 写入 `0.425 kg / 4.25 kg / 9.9 kg`，升级后读回 `425 g / 4250 g / 9900 g`，旧 kg 列不存在，临时数据库已删除；fresh PostgreSQL 的产品 / SKU / 出货约束和真实出货冻结 3 / 3 通过，0 skip。项目锁定 Node 24.14.0 下 Web 全量 1258 / 1258、lint、CSS 通过。组合 Style L1 被既有 SKU 单重列排序入口断言提前阻断，不计为本轮通过；已改用独立 `shipment-net-weight-desktop` 场景复核出货净重页面。
+
+下一步：目标环境发布前必须绑定 commit / image，先备份并执行 migration dry-run / apply，再核对产品单重与历史出货快照抽样、health / ready、业务 smoke 和回滚点；迁移未 apply 的环境不能运行新 API / 前端合同。
+
+阻塞/风险：本轮未修改材料采购等独立的千克计量单位，也未自动 apply 到共享开发库、133 或生产；未提交、推送、部署或客户签收。共享工作树中既有端口与浏览器门禁改动保持原样，不属于本轮成果。
+
+## 2026-07-16 净重单位中文显示修正
+
+完成：产品、SKU 与出货净重的用户可见单位由小写 `g` 统一显示为中文“克”，避免小写字形在当前字体和缩放下产生被裁切的误读；列表、表单、详情、预计 / 实际 / 最终总重及 CSV 标题同步更新。进一步移除净重值后重复拼接的默认计量单位：默认单位仍单独显示“件、千克”等业务数量单位，产品 / SKU / 确认出货单重只显示重量单位“克”，不再出现“克 / 千克”的维度矛盾。新建产品和 SKU 默认优先选择标准计件单位 `PCS / PC / EA` 或“件 / 个 / 只”，不再因为历史记录常用千克而自动选中千克；没有计件单位时才回退原有常用单位推断，材料不受影响，用户仍可手工选择千克。内部数据库、API 与计算字段仍使用标准 `*_g` 命名和按默认单位计算的现有合同，没有新增 schema、migration 或单位限制。
+
+验证：项目锁定 Node 24.14.0 下 Web 全量 1258 / 1258、定向合同 131 / 131、ESLint、CSS、场景脚本语法和 `git diff --check` 均通过；产品单重与出货净重两个 Style L1 场景合计 2 / 2。产品浏览器场景用“历史产品默认单位为千克、单位字典同时有件和千克”的边界，确认新建产品先选中件；随后填入 425 克再手工切为千克，确认旧单重被清空、后缀仍只显示“克”且横纵向无裁切，截图为 `product-net-weight-unit-suffix.png`。`affected.sh --plan` 因共享工作树 108 个变更路径判定最高 T8，该结果只用于说明整树推送前仍需 full，不把其他会话改动算作本轮成果。
+
+下一步：如需发布，先收敛共享工作树归属并绑定 commit / image，再执行目标环境检查。
+
+阻塞/风险：应用内浏览器只能到登录页且没有可复用登录态，本轮没有输入或重置凭据；页面证据来自项目自托管 mock 浏览器场景。未 stage、commit、push、deploy 或客户验收。
+
+## 2026-07-16 看板中心双击查看
+
+完成：看板中心的工作台任务行、任务看板任务卡、业务看板单一目标来源项与可下钻待办项新增电脑端双击查看捷径；原“查看”按钮继续保留为键盘、触屏和明确操作入口。共享过滤器排除按钮、链接、输入、选择、分页等内部控件，避免双击冒泡重复打开；只读指标和包含多个目标的业务分类整行不增加虚假点击语义。业务来源项补齐浅色 / 暗色 hover 与 focus 反馈、尺寸稳定检查和“电脑端双击”提示，未修改 API、RBAC、路由、Workflow / Fact、schema、migration 或客户配置。
+
+验证：项目锁定 Node 24.14.0 下定向合同 11 / 11、两页 JSX 定向 ESLint、两份 CSS 定向 stylelint、场景脚本语法和定向 `git diff --check` 通过。`erp-business-dashboard-desktop + erp-business-dashboard-mobile` 两个 L1 场景 2 / 2 通过，实测来源项 hover 的背景 / 边框发生变化且尺寸、溢出稳定，双击来源项与“查看客户”按钮进入同一路由，移动端仍显示按钮。工作台和任务看板 L1 分别在到达本轮双击步骤前被既有“等待交接”和“阻塞 / 退回”文案断言阻断，不能计为浏览器通过；源码合同已证明两处接线与内部控件过滤。
+
+下一步：full-worktree closeout owner 在冻结树门禁前先决定现有 L1 文案断言与当前页面真源哪一侧需要修正，再重跑工作台和任务看板双击步骤；本切片不代替全量 Web、full / strict、目标环境或客户验收。
+
+阻塞/风险：本轮按共享收口协调冻结后不再扩范围；未运行 PostgreSQL、full、strict 或全量浏览器门禁，未 stage、commit、push、deploy 或写入 133，当前没有在途测试或写入进程。

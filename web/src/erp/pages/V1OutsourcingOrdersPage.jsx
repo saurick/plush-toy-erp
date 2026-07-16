@@ -43,6 +43,7 @@ import {
   writeStoredColumnOrder,
 } from '../components/business-list/businessListPreferences.mjs'
 import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx'
+import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import OutsourcingOrderForm, {
   materialLabel,
@@ -231,6 +232,7 @@ export default function V1OutsourcingOrdersPage() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [editingRow, setEditingRow] = useState(null)
+  const [detailOrder, setDetailOrder] = useState(null)
   const orderAttachmentRef = useRef(null)
   const [suppliers, setSuppliers] = useState([])
   const [products, setProducts] = useState([])
@@ -1004,10 +1006,10 @@ export default function V1OutsourcingOrdersPage() {
             '明细状态待核对'
           ),
         },
-        ...(view === 'modal'
+        ...(view !== 'preview'
           ? [{ label: '备注', value: item?.note, wide: true }]
           : []),
-        ...(sourceAction
+        ...(sourceAction && view === 'modal'
           ? [{ label: '业务操作', value: sourceAction, wide: true }]
           : []),
       ]
@@ -1295,6 +1297,24 @@ export default function V1OutsourcingOrdersPage() {
         )}，未进入编辑`
       )
     }
+  }
+
+  const openOutsourcingOrderDetails = (record) => {
+    if (!record?.id) return
+    sourceDocumentOpenEditController.invalidate()
+    setSelectedRow(record)
+    setDetailOrder(record)
+  }
+
+  const openOutsourcingOrderRecord = (record) => {
+    if (!record?.id) return
+    setSelectedRow(record)
+    if (canUpdate && canEditOutsourcingOrder(record)) {
+      setDetailOrder(null)
+      openEdit(record)
+      return
+    }
+    openOutsourcingOrderDetails(record)
   }
 
   const closeModal = () => {
@@ -2090,8 +2110,8 @@ export default function V1OutsourcingOrdersPage() {
         }
         onRow={(record) => ({
           onClick: () => setSelectedRow(record),
-          onDoubleClick: () => openEdit(record),
         })}
+        onOpenRecord={openOutsourcingOrderRecord}
         emptyDescription="暂无加工合同"
         pagination={{
           current: pagination.current,
@@ -2106,6 +2126,45 @@ export default function V1OutsourcingOrdersPage() {
       />
 
       {outsourcingOrderItemsPreview.modal}
+
+      <BusinessRecordDetailsModal
+        columns={dataColumns}
+        description="查看加工合同摘要和完整明细；草稿且具备编辑权限时，双击会直接进入编辑。"
+        lineItems={
+          canRead
+            ? {
+                emptyDescription: '当前加工合同暂无明细',
+                getItemFields: getOutsourcingOrderItemFields,
+                getItemLabel: (item, { index }) =>
+                  `明细 ${item?.line_no || index + 1}`,
+                getItemSummary: (item) => {
+                  const isMaterial =
+                    item?.subject_type ===
+                    OUTSOURCING_ORDER_SUBJECT_TYPES.MATERIAL
+                  const subject = isMaterial
+                    ? [
+                        item?.material_code_snapshot,
+                        item?.material_name_snapshot,
+                      ]
+                    : [
+                        item?.product_no_snapshot,
+                        item?.sku_code_snapshot,
+                        item?.product_name_snapshot,
+                      ]
+                  return [...subject, item?.process_name_snapshot]
+                    .filter(Boolean)
+                    .join(' / ')
+                },
+                load: loadAllOutsourcingOrderItemsForPreview,
+                title: '加工合同明细',
+              }
+            : null
+        }
+        open={Boolean(detailOrder)}
+        record={detailOrder}
+        title="加工合同详情"
+        onClose={() => setDetailOrder(null)}
+      />
 
       <OutsourcingOrderSourceFactModal
         open={sourceFactOpen}

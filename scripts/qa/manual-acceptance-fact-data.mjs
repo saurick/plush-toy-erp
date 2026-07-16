@@ -20,6 +20,7 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
@@ -293,13 +294,17 @@ function allocateOutsourcingPairs(candidates, count) {
   });
 }
 
-function chooseWarehouse(warehouses, pattern, fallbackOffset = 0) {
-  const item =
-    warehouses.find((candidate) =>
-      pattern.test(`${candidate.code || ""} ${candidate.name || ""}`),
-    ) || warehouses[fallbackOffset % warehouses.length];
-  if (!item?.id) throw new CliError("source report has no usable warehouse", 2);
-  return item;
+function requireCoreWarehouse(warehouses, code, purpose) {
+  const matches = warehouses.filter(
+    (candidate) => String(candidate?.code || "").trim() === code,
+  );
+  if (matches.length !== 1 || !matches[0]?.id) {
+    throw new CliError(
+      `source report must contain exactly one ${purpose} warehouse ${code}`,
+      2,
+    );
+  }
+  return matches[0];
 }
 
 function receiptStatus(index) {
@@ -359,8 +364,16 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
       unitId: positiveID(candidate.issue.item.unitId, "outsourcing.unitId"),
     });
   }
-  const materialWarehouse = chooseWarehouse(warehouses, /RM|材料|原料/iu, 0);
-  const productWarehouse = chooseWarehouse(warehouses, /FG|成品/iu, 1);
+  const materialWarehouse = requireCoreWarehouse(
+    warehouses,
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material,
+    "material",
+  );
+  const productWarehouse = requireCoreWarehouse(
+    warehouses,
+    MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product,
+    "finished-goods",
+  );
   const linkedOrders = (refs.purchaseOrders || []).filter(
     (item) => String(item.status || "").toUpperCase() === "APPROVED",
   );

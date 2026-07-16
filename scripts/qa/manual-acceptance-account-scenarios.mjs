@@ -5,7 +5,12 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import {
+  CUSTOMER_TRIAL_133_TARGET,
+  LOCAL_DEV_TARGET,
+  assertManualAcceptanceMutationTarget,
   assertManualAcceptanceRuntimePolicy,
+  assertManualAcceptanceTargetAttestation,
+  parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
 import { yoyoosunRoleFlowMatrix } from "../../config/customers/yoyoosun/roleFlowMatrix.mjs";
@@ -357,20 +362,24 @@ function assertFormalAccountsUnchanged(before, afterAccounts) {
 export function buildManualAcceptanceAccountScenarioPlan({
   backendURL = DEFAULT_BACKEND_URL,
   auditMinimum = 0,
+  target,
+  dataVersion = ACCOUNT_DATA_VERSION,
+  runId = ACCOUNT_RUN_ID,
 } = {}) {
-  const target = resolveManualAcceptanceTarget({
+  const targetPolicy = resolveManualAcceptanceTarget({
     backendURL: normalizeAccountScenarioBackendURL(backendURL),
-    target: "local-dev",
-    dataVersion: ACCOUNT_DATA_VERSION,
-    runId: ACCOUNT_RUN_ID,
+    target,
+    dataVersion,
+    runId,
   });
   return {
     mode: "report-only",
-    backendURL: target.backendURL,
-    target: target.target,
-    datasetKey: target.datasetKey,
-    dataVersion: target.dataVersion,
-    runId: target.runId,
+    backendURL: targetPolicy.backendURL,
+    target: targetPolicy.target,
+    datasetKey: targetPolicy.datasetKey,
+    dataVersion: targetPolicy.dataVersion,
+    runId: targetPolicy.runId,
+    external: targetPolicy.external,
     loginAccount: BUSINESS_ADMIN_USERNAME,
     simulatedOnly: true,
     realCustomerImport: false,
@@ -616,6 +625,7 @@ async function alignAcceptanceRoleCapabilities({
   token,
   fetchImpl,
   baseline,
+  allowMutation = true,
 }) {
   const controlPlane = await readRoleControlPlane({
     backendURL,
@@ -630,6 +640,12 @@ async function alignAcceptanceRoleCapabilities({
     if (missing.length === 0) {
       actions.push({ roleKey: role.roleKey, action: "unchanged", added: [] });
       continue;
+    }
+    if (!allowMutation) {
+      throw new CliError(
+        `岗位 ${role.roleKey} 缺少验收所需权限 ${missing.join(", ")}；远端账号准备不修改岗位权限`,
+        2,
+      );
     }
     const updatedData = await rpcCall({
       backendURL,
@@ -675,6 +691,7 @@ async function alignAcceptanceRoleCapabilities({
   }
   return {
     source: "yoyoosun-role-flow-matrix",
+    mode: allowMutation ? "reconcile" : "verify-only",
     updated: actions.filter((item) => item.action === "updated").length,
     unchanged: actions.filter((item) => item.action === "unchanged").length,
     actions,
@@ -785,13 +802,39 @@ async function fillAuditEvidence({
 
 export async function applyManualAcceptanceAccountScenarios(
   plan,
-  { password, adminPassword, fetchImpl = fetch } = {},
+  {
+    password,
+    adminPassword,
+    confirmPhrase = process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM,
+    targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
+    targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
+    fetchImpl = fetch,
+  } = {},
 ) {
   const safePlan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: plan?.backendURL,
     auditMinimum: plan?.auditMinimum,
+    target: plan?.target,
+    dataVersion: plan?.dataVersion,
+    runId: plan?.runId,
   });
-  if (process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM !== CONFIRM_PHRASE) {
+  const resolvedTarget = assertManualAcceptanceMutationTarget(safePlan, {
+    confirmation: targetConfirmation,
+  });
+  const parsedTargetAttestation =
+    parseManualAcceptanceTargetAttestation(targetAttestation);
+  if (resolvedTarget.external) {
+    assertManualAcceptanceTargetAttestation({
+      policy: safePlan,
+      attestation: parsedTargetAttestation,
+    });
+  } else if (parsedTargetAttestation) {
+    throw new CliError(
+      "target attestation is only valid for customer-trial-133",
+      2,
+    );
+  }
+  if (confirmPhrase !== CONFIRM_PHRASE) {
     throw new CliError(
       `apply requires MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=${CONFIRM_PHRASE}`,
       2,
@@ -804,11 +847,8 @@ export async function applyManualAcceptanceAccountScenarios(
       process.env.ERP_ROLE_DEMO_PASSWORD,
     "MANUAL_ACCEPTANCE_PASSWORD/TRIAL_ACCOUNT_PASSWORD/ERP_ROLE_DEMO_PASSWORD",
   );
-  if (effectivePassword.length < 6) {
-    throw new CliError(
-      "account password must contain at least 6 characters",
-      2,
-    );
+  if ([...effectivePassword].length < 8 || [...effectivePassword].length > 20) {
+    throw new CliError("account password must contain 8-20 characters", 2);
   }
   const effectiveAdminPassword = requiredText(
     adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
@@ -839,6 +879,7 @@ export async function applyManualAcceptanceAccountScenarios(
     token,
     fetchImpl,
     baseline: safePlan.roleCapabilityBaseline,
+    allowMutation: !resolvedTarget.external,
   });
   const beforeAccounts = await listAdmins({
     backendURL: safePlan.backendURL,
@@ -1048,6 +1089,13 @@ export async function applyManualAcceptanceAccountScenarios(
     directSQL: false,
     loginAccount: accountSnapshot(profile),
     runtime,
+    targetAttestation: parsedTargetAttestation
+      ? {
+          source: "out-of-band",
+          release: parsedTargetAttestation.release,
+          migration: parsedTargetAttestation.migration,
+        }
+      : null,
     roleCapabilityBaseline,
     protectedAccounts: formalBefore,
     scenarios,
@@ -1072,6 +1120,9 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
     backendURL: DEFAULT_BACKEND_URL,
     apply: false,
     auditMinimum: 0,
+    target: "",
+    dataVersion: ACCOUNT_DATA_VERSION,
+    runId: ACCOUNT_RUN_ID,
     json: false,
     help: false,
   };
@@ -1086,11 +1137,26 @@ export function parseManualAcceptanceAccountScenarioArgs(argv) {
       options.auditMinimum = normalizeAuditMinimum(
         requiredText(argv[++index], "--audit-minimum"),
       );
+    } else if (token === "--target") {
+      options.target = requiredText(argv[++index], "--target");
+    } else if (token === "--data-version") {
+      options.dataVersion = requiredText(argv[++index], "--data-version");
+    } else if (token === "--run-id") {
+      options.runId = requiredText(argv[++index], "--run-id");
     } else {
       throw new CliError(`unknown option ${token}`, 2);
     }
   }
   options.backendURL = normalizeAccountScenarioBackendURL(options.backendURL);
+  if (
+    options.target &&
+    !new Set([LOCAL_DEV_TARGET, CUSTOMER_TRIAL_133_TARGET]).has(options.target)
+  ) {
+    throw new CliError(
+      `--target must be ${LOCAL_DEV_TARGET} or ${CUSTOMER_TRIAL_133_TARGET}`,
+      2,
+    );
+  }
   return options;
 }
 
@@ -1107,7 +1173,12 @@ function usage() {
     node scripts/qa/manual-acceptance-account-scenarios.mjs --apply --audit-minimum 30 --json
 
 本入口保留现有十个正式试用账号，只准备“已停用”“业务与采购兼任”
-和“未分配岗位”三个补充验收账号。`;
+和“未分配岗位”三个补充验收账号。密码必须为 8 到 20 位。
+
+133 试用环境必须通过 127.0.0.1:18375 SSH 隧道，并显式提供：
+  --target customer-trial-133 --data-version 2026.07.15-v3 --run-id 20260715-V3
+同时设置绑定目标的 MANUAL_ACCEPTANCE_TARGET_CONFIRM 与
+MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON。远端只核对岗位权限，不修改岗位权限。`;
 }
 
 export async function runManualAcceptanceAccountScenarioCli(argv, deps = {}) {

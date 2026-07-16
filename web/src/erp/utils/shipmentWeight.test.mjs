@@ -4,10 +4,10 @@ import test from 'node:test'
 import { fileURLToPath } from 'node:url'
 
 import {
-  calculateShipmentLineNetWeightKg,
+  calculateShipmentLineNetWeightG,
   hasFinalShipmentWeight,
   listAllShipmentWeightReferenceRecords,
-  normalizeNetWeightKg,
+  normalizeNetWeightG,
   normalizeShipmentQuantity,
   resolveShipmentSubmittedTotalNetWeight,
   resolveShipmentWeightPreview,
@@ -19,7 +19,7 @@ const products = [
   {
     id: 1,
     default_unit_id: 10,
-    unit_net_weight_kg: '0.5',
+    unit_net_weight_g: '0.5',
   },
 ]
 
@@ -46,13 +46,13 @@ test('shipmentWeight: SKU weight wins and uses its explicit default unit', () =>
         id: 11,
         product_id: 1,
         default_unit_id: 20,
-        unit_net_weight_kg: '0.625',
+        unit_net_weight_g: '0.625',
       },
     ],
   })
 
   assert.equal(preview.complete, true)
-  assert.equal(preview.totalNetWeightKg, '1.875')
+  assert.equal(preview.totalNetWeightG, '1.875')
   assert.equal(preview.linePreviews[0].source, 'sku')
 })
 
@@ -62,7 +62,7 @@ test('shipmentWeight: product fallback is only used when SKU has no weight and l
       id: 11,
       product_id: 1,
       default_unit_id: 20,
-      unit_net_weight_kg: null,
+      unit_net_weight_g: null,
     },
   ]
   const preview = resolveShipmentWeightPreview({
@@ -79,7 +79,7 @@ test('shipmentWeight: product fallback is only used when SKU has no weight and l
   })
 
   assert.equal(preview.complete, true)
-  assert.equal(preview.totalNetWeightKg, '1.5')
+  assert.equal(preview.totalNetWeightG, '1.5')
   assert.equal(preview.linePreviews[0].source, 'product')
 
   const mismatched = resolveShipmentWeightPreview({
@@ -88,7 +88,7 @@ test('shipmentWeight: product fallback is only used when SKU has no weight and l
     productSKUs,
   })
   assert.equal(mismatched.complete, false)
-  assert.equal(mismatched.totalNetWeightKg, null)
+  assert.equal(mismatched.totalNetWeightG, null)
   assert.equal(mismatched.issues[0].code, 'unit_mismatch')
 })
 
@@ -101,13 +101,13 @@ test('shipmentWeight: SKU weight without an explicit unit never falls back to pr
         id: 11,
         product_id: 1,
         default_unit_id: null,
-        unit_net_weight_kg: '0.625',
+        unit_net_weight_g: '0.625',
       },
     ],
   })
 
   assert.equal(preview.complete, false)
-  assert.equal(preview.totalNetWeightKg, null)
+  assert.equal(preview.totalNetWeightG, null)
   assert.equal(preview.issues[0].code, 'sku_weight_unit_missing')
 })
 
@@ -121,8 +121,8 @@ test('shipmentWeight: one unresolved line suppresses the whole total instead of 
   })
 
   assert.equal(preview.complete, false)
-  assert.equal(preview.totalNetWeightKg, null)
-  assert.equal(preview.linePreviews[0].lineNetWeightKg, '1')
+  assert.equal(preview.totalNetWeightG, null)
+  assert.equal(preview.linePreviews[0].lineNetWeightG, '1')
   assert.equal(preview.issues[0].lineNumber, 2)
 })
 
@@ -131,7 +131,7 @@ test('shipmentWeight: product and SKU weight references load every page includin
     id: index + 1,
     default_unit_id: 10,
     is_active: index !== 250,
-    unit_net_weight_kg: index === 250 ? '0.625' : '0.5',
+    unit_net_weight_g: index === 250 ? '0.625' : '0.5',
   }))
   const requests = []
   const records = await listAllShipmentWeightReferenceRecords(
@@ -159,7 +159,7 @@ test('shipmentWeight: product and SKU weight references load every page includin
     resolveShipmentWeightPreview({
       items: [{ product_id: 251, unit_id: 10, quantity: '2' }],
       products: records,
-    }).totalNetWeightKg,
+    }).totalNetWeightG,
     '1.25'
   )
   assert.deepEqual(
@@ -199,13 +199,13 @@ test('shipmentWeight: decimal string calculation preserves values beyond JavaScr
         quantity: '90071992547409.123456',
       },
     ],
-    products: [{ id: 1, default_unit_id: 10, unit_net_weight_kg: '0.000001' }],
+    products: [{ id: 1, default_unit_id: 10, unit_net_weight_g: '0.000001' }],
   })
 
   assert.equal(preview.complete, true)
-  assert.equal(preview.totalNetWeightKg, '90071992.547409')
+  assert.equal(preview.totalNetWeightG, '90071992.547409')
   assert.equal(
-    calculateShipmentLineNetWeightKg('90071992547409.123456', '0.000001'),
+    calculateShipmentLineNetWeightG('90071992547409.123456', '0.000001'),
     '90071992.547409'
   )
 })
@@ -220,12 +220,12 @@ test('shipmentWeight: decimal parser accepts backend-equivalent plain and expone
     ['10e-7', '0.000001'],
     ['1000000000000000000000000e-24', '1'],
   ]) {
-    assert.equal(normalizeNetWeightKg(value), expected)
+    assert.equal(normalizeNetWeightG(value), expected)
     assert.equal(normalizeShipmentQuantity(value), expected)
   }
 
   for (const value of ['1e-7', '0.00000010', '0.5000001', '1e14']) {
-    assert.equal(normalizeNetWeightKg(value), null)
+    assert.equal(normalizeNetWeightG(value), null)
     assert.equal(normalizeShipmentQuantity(value), null)
   }
 
@@ -235,17 +235,17 @@ test('shipmentWeight: decimal parser accepts backend-equivalent plain and expone
       {
         id: 1,
         default_unit_id: 10,
-        unit_net_weight_kg: '.5',
+        unit_net_weight_g: '.5',
       },
     ],
   })
   assert.equal(preview.complete, true)
-  assert.equal(preview.totalNetWeightKg, '50')
+  assert.equal(preview.totalNetWeightG, '50')
   assert.deepEqual(
     ['.5', '01', '1e2'].map((quantity) => normalizeShipmentQuantity(quantity)),
     ['0.5', '1', '100']
   )
-  assert.equal(calculateShipmentLineNetWeightKg('.5', '0.000001'), '0.000001')
+  assert.equal(calculateShipmentLineNetWeightG('.5', '0.000001'), '0.000001')
   assert.equal(
     resolveShipmentWeightPreview({
       items: [
@@ -256,10 +256,10 @@ test('shipmentWeight: decimal parser accepts backend-equivalent plain and expone
         {
           id: 1,
           default_unit_id: 10,
-          unit_net_weight_kg: '0.000001',
+          unit_net_weight_g: '0.000001',
         },
       ],
-    }).totalNetWeightKg,
+    }).totalNetWeightG,
     '0.000001'
   )
 })
@@ -271,7 +271,7 @@ test('shipmentWeight: stored decimal inputs outside numeric(20,6) fail closed', 
   })
 
   assert.equal(preview.complete, false)
-  assert.equal(preview.totalNetWeightKg, null)
+  assert.equal(preview.totalNetWeightG, null)
   assert.equal(preview.issues[0].code, 'quantity_invalid')
 })
 
@@ -329,12 +329,12 @@ test('shipmentWeight: manual total is bound to the full line signature and clear
 })
 
 test('shipmentWeight: frozen line snapshot can produce the displayed line net weight', () => {
-  assert.equal(calculateShipmentLineNetWeightKg('3', '0.425'), '1.275')
+  assert.equal(calculateShipmentLineNetWeightG('3', '0.425'), '1.275')
   assert.equal(
-    normalizeNetWeightKg('99999999999999.999999'),
+    normalizeNetWeightG('99999999999999.999999'),
     '99999999999999.999999'
   )
-  assert.equal(normalizeNetWeightKg('100000000000000'), null)
+  assert.equal(normalizeNetWeightG('100000000000000'), null)
   assert.equal(hasFinalShipmentWeight('SHIPPED'), true)
   assert.equal(hasFinalShipmentWeight('CANCELLED'), true)
   assert.equal(hasFinalShipmentWeight('DRAFT'), false)
@@ -362,7 +362,7 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
   assert.match(masterFormSource, /label="SKU 单重（净重）"/u)
   assert.match(
     masterFormSource,
-    /requiredWhenWeightField="unit_net_weight_kg"/u
+    /requiredWhenWeightField="unit_net_weight_g"/u
   )
   assert.match(
     masterPageSource,
@@ -371,16 +371,16 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
   assert.match(masterColumnsSource, /title: 'SKU 单重（净重）'/u)
   assert.match(
     masterColumnsSource,
-    /exportTitle: 'SKU 单重（kg \/ SKU 默认单位）'/u
+    /exportTitle: 'SKU 单重（克）'/u
   )
 
   assert.match(shipmentModalSource, /message=\{`预计总净重：/u)
-  assert.match(shipmentModalSource, /label="实际总净重（kg）"/u)
+  assert.match(shipmentModalSource, /label="实际总净重（克）"/u)
   assert.match(shipmentModalSource, /normalizeShipmentQuantity\(value\)/u)
   assert.match(shipmentModalSource, /数量必须大于 0，且最多保留 6 位小数/u)
   assert.match(shipmentModalSource, /系统不会显示或提交部分合计/u)
-  assert.match(shipmentModalSource, /确认出货单重（kg）/u)
-  assert.match(shipmentModalSource, /行净重（kg）/u)
+  assert.match(shipmentModalSource, /确认出货单重（克）/u)
+  assert.match(shipmentModalSource, /行净重（克）/u)
   assert.match(shipmentModalSource, /hasFinalShipmentWeight\(status\)/u)
   assert.match(
     shipmentModalSource,
@@ -391,8 +391,8 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
     /onImport=\{\(sourceItems\) => \{[\s\S]*clearStaleManualWeight\(\)/u
   )
 
-  assert.match(shipmentColumnsSource, /dataIndex: 'total_net_weight_kg'/u)
-  assert.match(shipmentColumnsSource, /exportTitle: '总净重（kg）'/u)
+  assert.match(shipmentColumnsSource, /dataIndex: 'total_net_weight_g'/u)
+  assert.match(shipmentColumnsSource, /exportTitle: '总净重（克）'/u)
   assert.match(shipmentColumnsSource, /return '待确认'/u)
   assert.match(shipmentColumnsSource, /return '未记录'/u)
   assert.match(

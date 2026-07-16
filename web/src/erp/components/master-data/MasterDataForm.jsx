@@ -12,7 +12,7 @@ import {
 } from 'antd'
 
 import { paymentConditionCompleteness } from '../../utils/masterDataOrderView.mjs'
-import { normalizeNetWeightKg } from '../../utils/shipmentWeight.mjs'
+import { normalizeNetWeightG } from '../../utils/shipmentWeight.mjs'
 import {
   optionalContactEmailRule,
   optionalContactPhoneRule,
@@ -67,26 +67,20 @@ function DefaultUnitSelect({
   )
 }
 
-function ProductUnitNetWeightField({ form, unitOptions }) {
-  const defaultUnitID = Form.useWatch('default_unit_id', form)
-  const defaultUnitLabel =
-    unitOptions.find(
-      (option) => Number(option?.value || 0) === Number(defaultUnitID || 0)
-    )?.label || '默认单位'
-
+function ProductUnitNetWeightField() {
   return (
     <Form.Item
       className="erp-business-action-form__field"
       extra="按当前默认单位记录；默认单位变更后需要重新确认。未知时可留空。"
       label="产品单重（净重）"
-      name="unit_net_weight_kg"
+      name="unit_net_weight_g"
       rules={[
         {
           validator: async (_, value) => {
             if (value === undefined || value === null || value === '') {
               return
             }
-            if (!normalizeNetWeightKg(value)) {
+            if (!normalizeNetWeightG(value)) {
               throw new Error('产品单重必须大于 0，且最多保留 6 位小数')
             }
           },
@@ -103,7 +97,7 @@ function ProductUnitNetWeightField({ form, unitOptions }) {
             style={{ width: '100%' }}
           />
         }
-        unitText={`kg / ${defaultUnitLabel}`}
+        unitText="克"
       />
     </Form.Item>
   )
@@ -111,14 +105,9 @@ function ProductUnitNetWeightField({ form, unitOptions }) {
 
 function SKUUnitNetWeightField({ form, products, unitOptions }) {
   const productID = Form.useWatch('product_id', form)
-  const defaultUnitID = Form.useWatch('default_unit_id', form)
   const selectedProduct = products.find(
     (product) => String(product?.id || '') === String(productID || '')
   )
-  const defaultUnitLabel =
-    unitOptions.find(
-      (option) => String(option?.value || '') === String(defaultUnitID || '')
-    )?.label || 'SKU 默认单位'
   const productDefaultUnitLabel =
     unitOptions.find(
       (option) =>
@@ -131,7 +120,7 @@ function SKUUnitNetWeightField({ form, products, unitOptions }) {
       className="erp-business-action-form__field"
       extra={`未知时可留空；出货仅在 SKU 未填单重且单位为${productDefaultUnitLabel}时回退产品单重。`}
       label="SKU 单重（净重）"
-      name="unit_net_weight_kg"
+      name="unit_net_weight_g"
       dependencies={['default_unit_id']}
       rules={[
         {
@@ -142,7 +131,7 @@ function SKUUnitNetWeightField({ form, products, unitOptions }) {
             if (!form?.getFieldValue('default_unit_id')) {
               throw new Error('请先选择 SKU 默认单位')
             }
-            if (!normalizeNetWeightKg(value)) {
+            if (!normalizeNetWeightG(value)) {
               throw new Error('SKU 单重必须大于 0，且最多保留 6 位小数')
             }
           },
@@ -159,7 +148,7 @@ function SKUUnitNetWeightField({ form, products, unitOptions }) {
             style={{ width: '100%' }}
           />
         }
-        unitText={`kg / ${defaultUnitLabel}`}
+        unitText="克"
       />
     </Form.Item>
   )
@@ -303,7 +292,7 @@ export function MasterDataFormFields({
           unitOptions={unitOptions}
           unitLoading={unitLoading}
         />
-        <ProductUnitNetWeightField form={form} unitOptions={unitOptions} />
+        <ProductUnitNetWeightField />
       </>
     )
   }
@@ -388,7 +377,7 @@ export function MasterDataFormFields({
         </Form.Item>
         <DefaultUnitSelect
           form={form}
-          requiredWhenWeightField="unit_net_weight_kg"
+          requiredWhenWeightField="unit_net_weight_g"
           unitOptions={unitOptions}
           unitLoading={unitLoading}
         />

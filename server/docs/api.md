@@ -151,7 +151,7 @@ HTTP 路由：
 请求字段：
 
 - `id`：普通管理员 ID
-- `password`：新密码，至少 8 位且不超过 72 字节；密码按原值校验，不做 trim 或大小写归一化
+- `password`：新密码，8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界；密码按原值校验，不做 trim 或大小写归一化
 
 成功后在同一事务覆盖该普通管理员的 `password_hash`、递增 `auth_version`、注销该账号全部 active admin session，并追加不含密码、密码哈希或 session key 的控制面审计。旧密码和旧 token 立即失效；接口不返回明文密码，也不允许非超级管理员维护受保护的系统账号。
 

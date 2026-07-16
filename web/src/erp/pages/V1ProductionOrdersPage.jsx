@@ -1365,14 +1365,15 @@ export default function V1ProductionOrdersPage() {
         }}
         onRow={(record) => ({
           onClick: () => selectRecord(record),
-          onDoubleClick: () =>
-            loadDetail(
-              record,
-              canUpdate && record.status === PRODUCTION_ORDER_STATUS.DRAFT
-                ? 'edit'
-                : 'view'
-            ),
         })}
+        onOpenRecord={(record) =>
+          loadDetail(
+            record,
+            canUpdate && record.status === PRODUCTION_ORDER_STATUS.DRAFT
+              ? 'edit'
+              : 'view'
+          )
+        }
         pagination={{
           current: query.page,
           pageSize: query.page_size,

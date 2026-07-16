@@ -107,7 +107,7 @@ export function createFinanceBusinessSourceScenarios(deps) {
             customer_snapshot: '暗色客户',
             planned_ship_at: now - 86_400,
             shipped_at: now,
-            total_net_weight_kg: '2.5',
+            total_net_weight_g: '2.5',
             note: '已确认出货，等待财务记录',
             items: [
               {

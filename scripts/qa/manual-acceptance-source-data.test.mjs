@@ -3,6 +3,8 @@ import test from "node:test";
 
 import {
   DEFAULT_SOURCE_DATA_SCALE,
+  MANUAL_ACCEPTANCE_CORE_UNIT_CODE,
+  MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES,
   applyManualAcceptanceSourceData,
   assertPersistedSourceRecord,
   buildOutsourcingOrderLineReferences,
@@ -14,6 +16,7 @@ import {
   parseManualAcceptanceSourceDataArgs,
   requireLifecycleMutationStatus,
   runManualAcceptanceSourceDataCli,
+  resolveManualAcceptanceCoreReferences,
   sanitizeManualAcceptanceRunId,
   statusCounts,
   verifyManualAcceptanceSourceData,
@@ -70,6 +73,37 @@ function visibleStrings(value, key = "") {
   }
   return [];
 }
+
+test("core references use exact stable business codes instead of environment order", () => {
+  const references = resolveManualAcceptanceCoreReferences({
+    units: [
+      { id: 99, code: "OTHER-UNIT" },
+      { id: 11, code: MANUAL_ACCEPTANCE_CORE_UNIT_CODE },
+    ],
+    warehouses: [
+      { id: 99, code: "OTHER-WH" },
+      { id: 14, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.workInProcess },
+      { id: 12, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.product },
+      { id: 13, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.qualityHold },
+      { id: 11, code: MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES.material },
+    ],
+  });
+
+  assert.equal(references.unit.id, 11);
+  assert.equal(references.warehouse.id, 11);
+  assert.deepEqual(
+    references.warehouses.map((item) => item.id),
+    [11, 12, 13, 14],
+  );
+  assert.throws(
+    () =>
+      resolveManualAcceptanceCoreReferences({
+        units: [{ id: 1, code: "OTHER-UNIT" }],
+        warehouses: [],
+      }),
+    new RegExp(MANUAL_ACCEPTANCE_CORE_UNIT_CODE, "u"),
+  );
+});
 
 test("manual acceptance source plan reaches every agreed pagination threshold", () => {
   const plan = buildManualAcceptanceSourceDataPlan({

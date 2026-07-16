@@ -36,10 +36,10 @@ type Shipment struct {
 	PlannedShipAt *time.Time `json:"planned_ship_at,omitempty"`
 	// ShippedAt holds the value of the "shipped_at" field.
 	ShippedAt *time.Time `json:"shipped_at,omitempty"`
-	// TotalNetWeightKg holds the value of the "total_net_weight_kg" field.
-	TotalNetWeightKg *decimal.Decimal `json:"total_net_weight_kg,omitempty"`
-	// RequestedTotalNetWeightKg holds the value of the "requested_total_net_weight_kg" field.
-	RequestedTotalNetWeightKg *decimal.Decimal `json:"requested_total_net_weight_kg,omitempty"`
+	// TotalNetWeightG holds the value of the "total_net_weight_g" field.
+	TotalNetWeightG *decimal.Decimal `json:"total_net_weight_g,omitempty"`
+	// RequestedTotalNetWeightG holds the value of the "requested_total_net_weight_g" field.
+	RequestedTotalNetWeightG *decimal.Decimal `json:"requested_total_net_weight_g,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -101,7 +101,7 @@ func (*Shipment) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case shipment.FieldTotalNetWeightKg, shipment.FieldRequestedTotalNetWeightKg:
+		case shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
 		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID:
 			values[i] = new(sql.NullInt64)
@@ -183,19 +183,19 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 				_m.ShippedAt = new(time.Time)
 				*_m.ShippedAt = value.Time
 			}
-		case shipment.FieldTotalNetWeightKg:
+		case shipment.FieldTotalNetWeightG:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field total_net_weight_kg", values[i])
+				return fmt.Errorf("unexpected type %T for field total_net_weight_g", values[i])
 			} else if value.Valid {
-				_m.TotalNetWeightKg = new(decimal.Decimal)
-				*_m.TotalNetWeightKg = *value.S.(*decimal.Decimal)
+				_m.TotalNetWeightG = new(decimal.Decimal)
+				*_m.TotalNetWeightG = *value.S.(*decimal.Decimal)
 			}
-		case shipment.FieldRequestedTotalNetWeightKg:
+		case shipment.FieldRequestedTotalNetWeightG:
 			if value, ok := values[i].(*sql.NullScanner); !ok {
-				return fmt.Errorf("unexpected type %T for field requested_total_net_weight_kg", values[i])
+				return fmt.Errorf("unexpected type %T for field requested_total_net_weight_g", values[i])
 			} else if value.Valid {
-				_m.RequestedTotalNetWeightKg = new(decimal.Decimal)
-				*_m.RequestedTotalNetWeightKg = *value.S.(*decimal.Decimal)
+				_m.RequestedTotalNetWeightG = new(decimal.Decimal)
+				*_m.RequestedTotalNetWeightG = *value.S.(*decimal.Decimal)
 			}
 		case shipment.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -301,13 +301,13 @@ func (_m *Shipment) String() string {
 		builder.WriteString(v.Format(time.ANSIC))
 	}
 	builder.WriteString(", ")
-	if v := _m.TotalNetWeightKg; v != nil {
-		builder.WriteString("total_net_weight_kg=")
+	if v := _m.TotalNetWeightG; v != nil {
+		builder.WriteString("total_net_weight_g=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
-	if v := _m.RequestedTotalNetWeightKg; v != nil {
-		builder.WriteString("requested_total_net_weight_kg=")
+	if v := _m.RequestedTotalNetWeightG; v != nil {
+		builder.WriteString("requested_total_net_weight_g=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import os from "node:os";
+import path from "node:path";
 import test from "node:test";
 
 import {
@@ -20,11 +22,48 @@ import {
   runManualAcceptanceDatasetCli,
 } from "./manual-acceptance-dataset.mjs";
 import {
+  MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+  MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY,
+  MANUAL_ACCEPTANCE_TARGET_ADAPTER_KEYS,
+  verifyManualAcceptanceCoreReferences,
+} from "./manual-acceptance-dataset-runner.mjs";
+import {
   CUSTOMER_TRIAL_133_ORIGIN,
   CUSTOMER_TRIAL_133_TARGET,
 } from "./manual-acceptance-target-policy.mjs";
 
 const GENERATED_AT = "2026-07-15T01:02:03.000Z";
+const LOCAL_APPLY_BACKEND = "http://127.0.0.1:18376";
+const LOCAL_APPLY_DATABASE = "plush_erp_acceptance_20260715_v3_dev";
+
+function localApplyPlan(overrides = {}) {
+  return buildManualAcceptanceDatasetTargetPlan({
+    targetAlias: "local",
+    backendURL: LOCAL_APPLY_BACKEND,
+    databaseName: LOCAL_APPLY_DATABASE,
+    generatedAt: GENERATED_AT,
+    ...overrides,
+  });
+}
+
+function localApplyBinding(plan) {
+  return { confirmation: plan.target.expectedConfirmation };
+}
+
+function localApplyArgs() {
+  const plan = localApplyPlan();
+  return [
+    "--apply",
+    "--target",
+    "local",
+    "--backend-url",
+    LOCAL_APPLY_BACKEND,
+    "--database-name",
+    LOCAL_APPLY_DATABASE,
+    "--confirm",
+    plan.target.expectedConfirmation,
+  ];
+}
 
 function trialAttestation(release = "release-929ec0b3", migration = "atlas-head") {
   return {
@@ -57,23 +96,81 @@ function completedStageResult(
     semanticDigest: context.semanticDigest,
     operation,
     summary,
-    references,
+    references: {
+      ...references,
+      runner: {
+        revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+        handlerId: `${MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION}:${context.stage.key}`,
+        componentEntrypoint: `fake/${context.stage.key}`,
+        componentDigest: "a".repeat(64),
+        reportPath: `/tmp/${context.stage.key}-report.json`,
+      },
+    },
   };
 }
 
-function makeSyntheticExecutablePlan(plan) {
-  const semanticPlan = structuredClone(plan.semanticPlan);
-  for (const stage of semanticPlan.stages) {
-    stage.applyCapability = {
-      mode: "synthetic-test-runner",
-      supportedTargets: [plan.target.alias],
-      reason: "unit test exercises the runner receipt contract",
-    };
-  }
+function fakeComponentReport({ stageKey, businessInput, targetAdapter }) {
   return {
-    ...plan,
-    semanticPlan,
-    semanticDigest: digestManualAcceptanceSemanticPlan(semanticPlan),
+    mode: stageKey === "readiness" ? "verify" : "apply",
+    scope: `fake-${stageKey}`,
+    simulatedOnly: true,
+    datasetKey: businessInput.datasetKey,
+    dataVersion: businessInput.dataVersion,
+    runId: businessInput.runId,
+    target: targetAdapter.policyTarget,
+    backendURL: targetAdapter.backendURL,
+    semanticDigest: `${stageKey}-component-digest`,
+    summary:
+      stageKey === "facts"
+        ? {
+            purchaseReceipts: 54,
+            qualityInspections: 54,
+            records: 108,
+          }
+        : stageKey === "readiness"
+          ? { queryEvidenceComplete: true, records: 48 }
+          : { records: 1 },
+  };
+}
+
+function fakeComponents({ onCall, override } = {}) {
+  return Object.fromEntries(
+    MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
+      (stageKey) => stageKey !== "purchase-quality",
+    ).map((stageKey) => [
+      stageKey,
+      async (invocation) => {
+        onCall?.(stageKey, invocation);
+        if (override?.[stageKey]) {
+          return override[stageKey](invocation);
+        }
+        const report = fakeComponentReport({ stageKey, ...invocation });
+        return {
+          report,
+          reportPath: path.join(
+            os.tmpdir(),
+            "plush-manual-acceptance-dataset-tests",
+            invocation.targetAdapter.alias,
+            `${stageKey}.json`,
+          ),
+          operation: ["core", "readiness"].includes(stageKey)
+            ? "verified"
+            : "applied",
+        };
+      },
+    ]),
+  );
+}
+
+function runnerDeps(options = {}) {
+  return {
+    now: options.now || (() => new Date(GENERATED_AT)),
+    outputRoot: path.join(os.tmpdir(), "plush-manual-acceptance-dataset-tests"),
+    credentials: {
+      rolePassword: "role-password",
+      adminPassword: "admin-password",
+    },
+    components: fakeComponents(options),
   };
 }
 
@@ -131,7 +228,8 @@ test("bundle emits local and 133 plans with identical target-free semantics", ()
     generatedAt: GENERATED_AT,
     targetOverrides: {
       local: {
-        backendURL: "http://localhost:8300",
+        backendURL: LOCAL_APPLY_BACKEND,
+        databaseName: LOCAL_APPLY_DATABASE,
       },
       [CUSTOMER_TRIAL_133_TARGET]: {
         targetAttestation: trialAttestation(),
@@ -150,7 +248,8 @@ test("bundle emits local and 133 plans with identical target-free semantics", ()
     bundle.targets.map((item) => item.target.alias),
     [LOCAL_DATASET_TARGET, CUSTOMER_TRIAL_133_TARGET],
   );
-  assert.equal(bundle.targets[0].target.backendURL, "http://localhost:8300");
+  assert.equal(bundle.targets[0].target.backendURL, LOCAL_APPLY_BACKEND);
+  assert.equal(bundle.targets[0].target.databaseName, LOCAL_APPLY_DATABASE);
   assert.equal(bundle.targets[1].target.backendURL, CUSTOMER_TRIAL_133_ORIGIN);
   assert.equal(bundle.targets[0].semanticDigest, bundle.semanticDigest);
   assert.equal(bundle.targets[1].semanticDigest, bundle.semanticDigest);
@@ -248,11 +347,11 @@ test("semantic plan locks the eight narrow stage contracts", () => {
     ),
     {
       core: {
-        mode: "target-specific",
+        mode: "registered-targets-read-only",
         supportedTargets: ["local", CUSTOMER_TRIAL_133_TARGET],
       },
       role: {
-        mode: "target-specific",
+        mode: "registered-targets",
         supportedTargets: ["local", CUSTOMER_TRIAL_133_TARGET],
       },
       source: {
@@ -288,6 +387,8 @@ test("semantic plan locks the eight narrow stage contracts", () => {
   assert.deepEqual(plan.runnerContract, {
     serial: true,
     failClosed: true,
+    revision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    handlerRegistry: "scripts/qa/manual-acceptance-dataset-runner.mjs",
     placeholders: {
       "${TARGET_POLICY_TARGET}": "target.policyTarget",
       "${TARGET_BACKEND_URL}": "target.backendURL",
@@ -295,21 +396,25 @@ test("semantic plan locks the eight narrow stage contracts", () => {
       "${TARGET_ATTESTATION_JSON}": "targetAttestation",
     },
   });
-  assert.equal(plan.stages[0].commands[0].entrypoint, "scripts/seed-core-demo-data.sh");
-  assert.deepEqual(plan.stages[0].commands[0].args, [
-    "--prefix",
-    "SIM-PLUSH-CORE",
-  ]);
+  const core = plan.stages.find((stage) => stage.key === "core");
+  assert.equal(core.commands[0].entrypoint, "scripts/seed-core-demo-data.sh");
+  assert.equal(core.commands[0].execution, "out-of-band-explicit-only");
+  assert.equal(core.commands[0].defaultRunner, false);
+  assert.deepEqual(core.commands[0].args, ["--prefix", "SIM-PLUSH-CORE"]);
   assert.equal(
-    plan.stages[0].targetExecution[CUSTOMER_TRIAL_133_TARGET].seedAllowed,
+    core.targetExecution[CUSTOMER_TRIAL_133_TARGET].seedAllowed,
     false,
   );
   assert.deepEqual(
-    plan.stages[0].targetExecution[CUSTOMER_TRIAL_133_TARGET]
-      .allowedOperations,
+    core.targetExecution[CUSTOMER_TRIAL_133_TARGET].allowedOperations,
     ["verified", "reused"],
   );
-  assert.equal(plan.stages[0].commands[0].remoteSeedAllowed, false);
+  assert.equal(core.commands[0].remoteSeedAllowed, false);
+  assert.equal(core.commands[1].kind, "registered-read-only-verification");
+  assert.deepEqual(core.commands[1].supportedTargets, [
+    "local",
+    CUSTOMER_TRIAL_133_TARGET,
+  ]);
 
   const role = plan.stages.find((stage) => stage.key === "role");
   assert.equal(role.expected.formalAccounts.length, 10);
@@ -318,7 +423,14 @@ test("semantic plan locks the eight narrow stage contracts", () => {
     role.targetExecution[CUSTOMER_TRIAL_133_TARGET].seedAllowed,
     false,
   );
-  assert.equal(role.commands.at(-1).operation, "verify-or-reuse");
+  assert.equal(
+    role.commands.at(-1).entrypoint,
+    "scripts/qa/manual-acceptance-account-scenarios.mjs",
+  );
+  assert.deepEqual(role.commands.at(-1).supportedTargets, [
+    "local",
+    CUSTOMER_TRIAL_133_TARGET,
+  ]);
   assert.equal(
     role.commands[1].environment.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM,
     "APPLY_SIMULATED_ACCOUNT_SCENARIOS",
@@ -327,6 +439,12 @@ test("semantic plan locks the eight narrow stage contracts", () => {
   assert(!role.commands[0].args.includes("--reset-local-super-admin"));
   assert.deepEqual(role.commands[1].args, [
     "--apply",
+    "--target",
+    "${TARGET_POLICY_TARGET}",
+    "--data-version",
+    "2026.07.15-v3",
+    "--run-id",
+    "20260715-V3",
     "--backend-url",
     "${TARGET_BACKEND_URL}",
     "--audit-minimum",
@@ -357,7 +475,7 @@ test("semantic plan locks the eight narrow stage contracts", () => {
   );
   assert.equal(
     taskStage.commands[0].execution,
-    "injected-stage-runner-only",
+    MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
   );
   assert.equal(
     taskStage.commands[0].args[
@@ -471,6 +589,7 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
     dataVersion: "2026.07.15-v3",
     target: "",
     backendURL: "",
+    databaseName: "",
     confirmation: "",
     targetAttestation: "",
   });
@@ -491,6 +610,25 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
     () => parseManualAcceptanceDatasetArgs(["--target", "local"]),
     /only valid with --apply/u,
   );
+  assert.throws(
+    () => parseManualAcceptanceDatasetArgs(["--apply", "--target", "local"]),
+    /requires explicit --backend-url and --database-name/u,
+  );
+  assert.throws(
+    () =>
+      parseManualAcceptanceDatasetArgs([
+        "--apply",
+        "--target",
+        "local",
+        "--backend-url",
+        "http://127.0.0.1:8300",
+        "--database-name",
+        LOCAL_APPLY_DATABASE,
+        "--confirm",
+        "not-used",
+      ]),
+    /refuses port 8300/u,
+  );
 
   let runnerCalls = 0;
   const result = await runManualAcceptanceDatasetCli([], {
@@ -507,40 +645,35 @@ test("CLI defaults to a two-target dry-run and rejects implicit or production ap
 });
 
 test("an executable plan records strict stage receipts serially", async () => {
-  const plan = makeSyntheticExecutablePlan(
-    buildManualAcceptanceDatasetTargetPlan({
-      targetAlias: "local",
-      generatedAt: GENERATED_AT,
+  const plan = localApplyPlan();
+  const calls = [];
+  const report = await applyManualAcceptanceDataset(
+    plan,
+    localApplyBinding(plan),
+    runnerDeps({
+      now: () => new Date("2026-07-15T03:04:05.000Z"),
+      onCall(stageKey, invocation) {
+        assert.equal(invocation.targetAdapter.alias, "local");
+        assert.equal(invocation.businessInput.dataVersion, "2026.07.15-v3");
+        assert.equal(
+          invocation.businessInput.dateAnchorUtc,
+          "2026-07-15T12:00:00.000Z",
+        );
+        calls.push(stageKey);
+      },
     }),
   );
-  const calls = [];
-  const report = await applyManualAcceptanceDataset(plan, {}, {
-    now: () => new Date("2026-07-15T03:04:05.000Z"),
-    async runStage(context) {
-      assert.equal(context.target.alias, "local");
-      assert.equal(context.dataVersion, "2026.07.15-v3");
-      assert.equal(context.dateAnchorUtc, "2026-07-15T12:00:00.000Z");
-      assert.equal(context.targetConfirmation, null);
-      assert.equal(context.targetAttestation, null);
-      assert.equal(context.completedStages.length, calls.length);
-      calls.push(context.stage.key);
-      return completedStageResult(context, {
-        operation: ["purchase-quality", "readiness"].includes(
-          context.stage.key,
-        )
-          ? "verified"
-          : "applied",
-        summary: { records: calls.length },
-        references: { environmentDatabaseId: calls.length * 100 },
-      });
-    },
-  });
 
   assert.equal(report.ok, true);
   assert.equal(report.failedStage, null);
   assert.equal(report.generatedAt, "2026-07-15T03:04:05.000Z");
   assert.equal(report.cleanup, "retire/forward-only");
-  assert.deepEqual(calls, [...MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS]);
+  assert.deepEqual(
+    calls,
+    MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.filter(
+      (stageKey) => stageKey !== "purchase-quality",
+    ),
+  );
   assert.ok(report.stages.every((stage) => stage.status === "completed"));
   assert.ok(
     report.stages.every(
@@ -551,7 +684,24 @@ test("an executable plan records strict stage receipts serially", async () => {
     ),
   );
   assert.equal(report.stages.at(-1).operation, "verified");
-  assert.equal(report.stages[0].references.environmentDatabaseId, 100);
+  assert.ok(
+    report.stages.every(
+      (stage) =>
+        stage.references.runner.revision ===
+          MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION &&
+        /^[0-9a-f]{64}$/u.test(stage.references.runner.componentDigest) &&
+        Boolean(stage.references.runner.reportPath),
+    ),
+  );
+  assert.equal(
+    report.stages.findIndex((stage) => stage.key === "purchase-quality"),
+    report.stages.findIndex((stage) => stage.key === "facts") + 1,
+  );
+  assert.equal(
+    report.stages.find((stage) => stage.key === "purchase-quality").summary
+      .purchaseReceipts,
+    54,
+  );
   assert.equal(
     report.semanticDigest,
     digestManualAcceptanceSemanticPlan(plan.semanticPlan),
@@ -559,34 +709,35 @@ test("an executable plan records strict stage receipts serially", async () => {
 });
 
 test("apply stops at the first failed stage and leaves later stages not started", async () => {
-  const plan = makeSyntheticExecutablePlan(
-    buildManualAcceptanceDatasetTargetPlan({
-      targetAlias: "local",
-      generatedAt: GENERATED_AT,
+  const plan = localApplyPlan();
+  const calls = [];
+  const report = await applyManualAcceptanceDataset(
+    plan,
+    localApplyBinding(plan),
+    runnerDeps({
+      onCall(stageKey) {
+        calls.push(stageKey);
+      },
+      override: {
+        facts(invocation) {
+          const report = fakeComponentReport({
+            stageKey: "facts",
+            ...invocation,
+          });
+          report.summary.purchaseReceipts = 53;
+          return {
+            operation: "applied",
+            report,
+            reportPath: path.join(os.tmpdir(), "facts-incomplete.json"),
+          };
+        },
+      },
     }),
   );
-  const calls = [];
-  const report = await applyManualAcceptanceDataset(plan, {}, {
-    now: () => new Date(GENERATED_AT),
-    async runStage(context) {
-      const { stage } = context;
-      calls.push(stage.key);
-      if (stage.key === "purchase-quality") {
-        throw new Error("partial batch collision");
-      }
-      return completedStageResult(context);
-    },
-  });
 
   assert.equal(report.ok, false);
   assert.equal(report.failedStage, "purchase-quality");
-  assert.deepEqual(calls, [
-    "core",
-    "role",
-    "source",
-    "task",
-    "purchase-quality",
-  ]);
+  assert.deepEqual(calls, ["core", "role", "source", "task", "facts"]);
   assert.deepEqual(
     report.stages.map((stage) => stage.status),
     [
@@ -594,77 +745,83 @@ test("apply stops at the first failed stage and leaves later stages not started"
       "completed",
       "completed",
       "completed",
+      "completed",
       "failed",
-      "not_started",
       "not_started",
       "not_started",
     ],
   );
-  assert.match(report.stages[4].error, /partial batch collision/u);
+  assert.match(report.stages[5].error, /does not meet.*minimums/u);
+  assert.equal(
+    report.stages[5].blockedReason.code,
+    "delegated_fact_evidence_incomplete",
+  );
 });
 
-test("runner result mismatches fail closed before the next stage", async () => {
-  const plan = makeSyntheticExecutablePlan(
-    buildManualAcceptanceDatasetTargetPlan({
-      targetAlias: "local",
-      generatedAt: GENERATED_AT,
-    }),
-  );
+test("component identity mismatches fail closed before the next stage", async () => {
+  const plan = localApplyPlan();
   let calls = 0;
-  const report = await applyManualAcceptanceDataset(plan, {}, {
-    now: () => new Date(GENERATED_AT),
-    async runStage(context) {
-      calls += 1;
-      return {
-        ...completedStageResult(context),
-        dataVersion: "2026.07.15-v99",
-      };
-    },
-  });
-
-  assert.equal(calls, 1);
-  assert.equal(report.failedStage, "core");
-  assert.match(report.stages[0].error, /different dataVersion/u);
-  assert.ok(report.stages.slice(1).every((stage) => stage.status === "not_started"));
-});
-
-test("runner cannot turn skipped or unverifiable work into a completed stage", async () => {
-  const plan = makeSyntheticExecutablePlan(
-    buildManualAcceptanceDatasetTargetPlan({
-      targetAlias: "local",
-      generatedAt: GENERATED_AT,
+  const report = await applyManualAcceptanceDataset(
+    plan,
+    localApplyBinding(plan),
+    runnerDeps({
+      onCall() {
+        calls += 1;
+      },
+      override: {
+        role(invocation) {
+          const component = fakeComponentReport({
+            stageKey: "role",
+            ...invocation,
+          });
+          component.dataVersion = "2026.07.15-v99";
+          return component;
+        },
+      },
     }),
   );
-  const skipped = await applyManualAcceptanceDataset(plan, {}, {
-    now: () => new Date(GENERATED_AT),
-    async runStage(context) {
-      return {
-        ...completedStageResult(context),
-        status: "skipped",
-      };
-    },
-  });
-  assert.equal(skipped.failedStage, "core");
-  assert.match(skipped.stages[0].error, /non-complete status=skipped/u);
 
-  const unverifiable = await applyManualAcceptanceDataset(plan, {}, {
-    now: () => new Date(GENERATED_AT),
-    async runStage() {
-      return { operation: "completed" };
-    },
-  });
-  assert.equal(unverifiable.failedStage, "core");
-  assert.match(unverifiable.stages[0].error, /must return ok=true/u);
+  assert.equal(calls, 2);
+  assert.equal(report.failedStage, "role");
+  assert.match(report.stages[1].error, /dataVersion does not match/u);
+  assert.equal(
+    report.stages[1].blockedReason.code,
+    "component_identity_mismatch",
+  );
+  assert.ok(
+    report.stages.slice(2).every((stage) => stage.status === "not_started"),
+  );
+});
+
+test("runner cannot turn a component without explicit evidence into completion", async () => {
+  const plan = localApplyPlan();
+  const unverifiable = await applyManualAcceptanceDataset(
+    plan,
+    localApplyBinding(plan),
+    runnerDeps({
+      override: {
+        role(invocation) {
+          const report = fakeComponentReport({
+            stageKey: "role",
+            ...invocation,
+          });
+          delete report.summary;
+          return report;
+        },
+      },
+    }),
+  );
+  assert.equal(unverifiable.failedStage, "role");
+  assert.match(unverifiable.stages[1].error, /explicit summary/u);
+  assert.equal(
+    unverifiable.stages[1].blockedReason.code,
+    "component_summary_missing",
+  );
 });
 
 test("stage receipt requires exact identity and explicit report objects", () => {
-  const plan = makeSyntheticExecutablePlan(
-    buildManualAcceptanceDatasetTargetPlan({
-      targetAlias: "local",
-      generatedAt: GENERATED_AT,
-    }),
-  );
-  const stage = plan.semanticPlan.stages[0];
+  const plan = localApplyPlan();
+  const stage = plan.semanticPlan.stages.find((item) => item.key === "core");
   const context = {
     stage,
     dataVersion: plan.dataVersion,
@@ -682,7 +839,7 @@ test("stage receipt requires exact identity and explicit report objects", () => 
     semanticDigest: plan.semanticDigest,
     operation: "reused",
     summary: { records: 4 },
-    references: { unitId: 10 },
+    references: valid.references,
   });
 
   for (const field of [
@@ -729,18 +886,50 @@ test("stage receipt requires exact identity and explicit report objects", () => 
       ),
     /references must be an explicit object/u,
   );
+  assert.throws(
+    () =>
+      normalizeManualAcceptanceStageResult(
+        {
+          ...valid,
+          references: {
+            ...valid.references,
+            runner: {
+              ...valid.references.runner,
+              componentDigest: "not-a-digest",
+            },
+          },
+        },
+        stage,
+        plan,
+      ),
+    /invalid componentDigest/u,
+  );
 });
 
 test("apply requires exact target binding and forbids remote core or role seed", async () => {
-  const localPlan = buildManualAcceptanceDatasetTargetPlan({
+  const implicitSharedLocal = buildManualAcceptanceDatasetTargetPlan({
     targetAlias: "local",
     generatedAt: GENERATED_AT,
   });
-  assert.equal(localPlan.target.applyReady, true);
+  assert.equal(implicitSharedLocal.target.applyReady, false);
   await assert.rejects(
-    () => applyManualAcceptanceDataset(localPlan),
-    /requires an injected runStage/u,
+    () =>
+      applyManualAcceptanceDataset(
+        implicitSharedLocal,
+        {},
+        runnerDeps(),
+      ),
+    /dedicated acceptance backend and databaseName/u,
   );
+
+  const localPlan = localApplyPlan();
+  assert.equal(localPlan.target.applyReady, true);
+  const local = await applyManualAcceptanceDataset(
+    localPlan,
+    localApplyBinding(localPlan),
+    runnerDeps(),
+  );
+  assert.equal(local.ok, true);
 
   const unboundTrial = buildManualAcceptanceDatasetTargetPlan({
     targetAlias: CUSTOMER_TRIAL_133_TARGET,
@@ -751,7 +940,7 @@ test("apply requires exact target binding and forbids remote core or role seed",
       applyManualAcceptanceDataset(
         unboundTrial,
         { confirmation: unboundTrial.target.expectedConfirmation },
-        { runStage: async () => undefined },
+        runnerDeps(),
       ),
     /target attestation is required/u,
   );
@@ -772,50 +961,154 @@ test("apply requires exact target binding and forbids remote core or role seed",
       applyManualAcceptanceDataset(
         trialPlan,
         { confirmation: "wrong" },
-        { runStage: async () => undefined },
+        runnerDeps(),
       ),
-    /external apply requires/u,
-  );
-
-  const forbiddenSeed = await applyManualAcceptanceDataset(
-    trialPlan,
-    { confirmation: trialPlan.target.expectedConfirmation },
-    {
-      now: () => new Date(GENERATED_AT),
-      async runStage(context) {
-        return completedStageResult(context, { operation: "applied" });
-      },
-    },
-  );
-  assert.equal(forbiddenSeed.ok, false);
-  assert.equal(forbiddenSeed.failedStage, "core");
-  assert.match(
-    forbiddenSeed.stages[0].error,
-    /operation=applied is forbidden for target customer-trial-133/u,
+    /apply requires/u,
   );
 });
 
-test("CLI apply executes both current targets through explicit injected stage receipts", async () => {
-  let localCalls = 0;
-  const local = await runManualAcceptanceDatasetCli(
-    ["--apply", "--target", "local"],
-    {
-      now: () => new Date(GENERATED_AT),
-      async runStage(context) {
-        localCalls += 1;
-        return completedStageResult(context, {
-          operation: ["purchase-quality", "readiness"].includes(
-            context.stage.key,
-          )
-            ? "verified"
-            : "applied",
-        });
+test("core RPC verifier uses one admin read-only preflight and returns only stable business codes", async () => {
+  const requests = [];
+  const makeFetch =
+    (omitWarehouse = "") =>
+    async (_url, init) => {
+      const request = JSON.parse(init.body);
+      requests.push({
+        method: request.method,
+        params: request.params,
+        hasAuthorization: Boolean(init.headers.Authorization),
+      });
+      const data =
+        request.method === "admin_login"
+          ? { access_token: "secret-token" }
+          : request.method === "capabilities"
+            ? { databaseName: "plush_erp_uat_20260715" }
+          : request.method === "list_units"
+            ? { units: [{ id: 11, code: "SIM-PLUSH-CORE-PCS" }] }
+            : {
+                warehouses: [
+                  "SIM-PLUSH-CORE-RM-WH",
+                  "SIM-PLUSH-CORE-FG-WH",
+                  "SIM-PLUSH-CORE-QC-HOLD",
+                  "SIM-PLUSH-CORE-WIP-WH",
+                ]
+                  .filter((code) => code !== omitWarehouse)
+                  .map((code, index) => ({ id: index + 20, code })),
+              };
+      return {
+        ok: true,
+        status: 200,
+        redirected: false,
+        async json() {
+          return { result: { code: 0, data } };
+        },
+      };
+    };
+  const binding = {
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    policyTarget: CUSTOMER_TRIAL_133_TARGET,
+    datasetKey: "yoyoosun-manual-acceptance",
+    dataVersion: "2026.07.15-v3",
+    runId: "20260715-V3",
+    targetAttestation: trialAttestation(),
+    adminPassword: "admin-password",
+  };
+  const verified = await verifyManualAcceptanceCoreReferences({
+    ...binding,
+    fetchImpl: makeFetch(),
+  });
+  assert.deepEqual(verified, {
+    databaseName: "plush_erp_uat_20260715",
+    unitCode: "SIM-PLUSH-CORE-PCS",
+    warehouseCodes: [
+      "SIM-PLUSH-CORE-RM-WH",
+      "SIM-PLUSH-CORE-FG-WH",
+      "SIM-PLUSH-CORE-QC-HOLD",
+      "SIM-PLUSH-CORE-WIP-WH",
+    ],
+    summary: { units: 1, warehouses: 4 },
+  });
+  assert.deepEqual(
+    requests.map((item) => item.method),
+    [
+      "admin_login",
+      "capabilities",
+      "list_units",
+      "list_warehouses",
+    ],
+  );
+  assert.deepEqual(requests[0].params, {
+    username: "admin",
+    password: "admin-password",
+  });
+  assert.equal(requests[0].hasAuthorization, false);
+  assert.equal(requests[1].hasAuthorization, true);
+  assert.equal(requests[2].hasAuthorization, true);
+  assert.equal(JSON.stringify(verified).includes("secret-token"), false);
+  assert.equal(JSON.stringify(verified).includes('"id"'), false);
+
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceCoreReferences({
+        ...binding,
+        fetchImpl: makeFetch("SIM-PLUSH-CORE-WIP-WH"),
+      }),
+    /SIM-PLUSH-CORE-WIP-WH/u,
+  );
+});
+
+test("core preflight rejects a shared local database before role or business reads", async () => {
+  const methods = [];
+  const fetchImpl = async (_url, init) => {
+    const request = JSON.parse(init.body);
+    methods.push(request.method);
+    const data =
+      request.method === "admin_login"
+        ? { access_token: "admin-token" }
+        : { databaseName: "plush_erp_simon_dev" };
+    return {
+      ok: true,
+      status: 200,
+      redirected: false,
+      async json() {
+        return { result: { code: 0, data } };
       },
-    },
+    };
+  };
+  await assert.rejects(
+    () =>
+      verifyManualAcceptanceCoreReferences({
+        backendURL: LOCAL_APPLY_BACKEND,
+        policyTarget: "local-dev",
+        databaseName: LOCAL_APPLY_DATABASE,
+        datasetKey: "yoyoosun-manual-acceptance",
+        dataVersion: "2026.07.15-v3",
+        runId: "20260715-V3",
+        adminPassword: "admin-password",
+        fetchImpl,
+      }),
+    /runtime databaseName=plush_erp_simon_dev/u,
+  );
+  assert.deepEqual(methods, ["admin_login", "capabilities"]);
+});
+
+test("CLI apply uses one registry and target-free business inputs for both targets", async () => {
+  let localCalls = 0;
+  const localInputs = [];
+  const localAdapters = [];
+  const local = await runManualAcceptanceDatasetCli(
+    localApplyArgs(),
+    runnerDeps({
+      onCall(_stageKey, invocation) {
+        localCalls += 1;
+        localInputs.push(invocation.businessInput);
+        localAdapters.push(invocation.targetAdapter);
+      },
+    }),
   );
   assert.equal(local.exitCode, 0);
   assert.equal(local.report.ok, true);
-  assert.equal(localCalls, MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length);
+  assert.equal(localCalls, MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length - 1);
 
   const trialPlan = buildManualAcceptanceDatasetTargetPlan({
     targetAlias: CUSTOMER_TRIAL_133_TARGET,
@@ -823,6 +1116,8 @@ test("CLI apply executes both current targets through explicit injected stage re
     generatedAt: GENERATED_AT,
   });
   let trialCalls = 0;
+  const trialInputs = [];
+  const trialAdapters = [];
   const trial = await runManualAcceptanceDatasetCli(
     [
       "--apply",
@@ -837,26 +1132,52 @@ test("CLI apply executes both current targets through explicit injected stage re
       "--target-attestation-json",
       JSON.stringify(trialAttestation()),
     ],
-    {
-      now: () => new Date(GENERATED_AT),
-      async runStage(context) {
+    runnerDeps({
+      onCall(_stageKey, invocation) {
         trialCalls += 1;
-        return completedStageResult(context, {
-          operation: ["core", "role"].includes(context.stage.key)
-            ? "reused"
-            : ["purchase-quality", "readiness"].includes(context.stage.key)
-              ? "verified"
-              : "applied",
-        });
+        trialInputs.push(invocation.businessInput);
+        trialAdapters.push(invocation.targetAdapter);
       },
-    },
+    }),
   );
   assert.equal(trial.exitCode, 0);
   assert.equal(trial.report.ok, true);
-  assert.equal(trialCalls, MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length);
+  assert.equal(trialCalls, MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS.length - 1);
+  assert.deepEqual(trialInputs, localInputs);
+  assert.ok(
+    localAdapters.every(
+      (adapter) =>
+        JSON.stringify(Object.keys(adapter)) ===
+        JSON.stringify(MANUAL_ACCEPTANCE_TARGET_ADAPTER_KEYS),
+    ),
+  );
+  assert.ok(
+    trialAdapters.every(
+      (adapter) =>
+        JSON.stringify(Object.keys(adapter)) ===
+        JSON.stringify(MANUAL_ACCEPTANCE_TARGET_ADAPTER_KEYS),
+    ),
+  );
+  assert.ok(localAdapters.every((adapter) => adapter.alias === "local"));
+  assert.ok(
+    trialAdapters.every(
+      (adapter) => adapter.alias === CUSTOMER_TRIAL_133_TARGET,
+    ),
+  );
+  assert.deepEqual(Object.keys(MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY), [
+    ...MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS,
+  ]);
+  for (const stageKey of MANUAL_ACCEPTANCE_DATASET_STAGE_KEYS) {
+    assert.equal(
+      local.report.stages.find((stage) => stage.key === stageKey).references
+        .runner.handlerId,
+      trial.report.stages.find((stage) => stage.key === stageKey).references
+        .runner.handlerId,
+    );
+  }
   assert.deepEqual(
     trial.report.stages.slice(0, 2).map((stage) => stage.operation),
-    ["reused", "reused"],
+    ["verified", "applied"],
   );
 });
 
