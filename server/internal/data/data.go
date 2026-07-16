@@ -168,7 +168,7 @@ func NewData(c *conf.Data, logger log.Logger) (*Data, func(), error) {
 		_ = db.Close()
 		return nil, nil, err
 	}
-	if err := validateActiveCustomerTrialConfig(context.Background(), db, trialConfigEnabled); err != nil {
+	if err := validateActiveCustomerTrialConfig(context.Background(), db, trialConfigEnabled, c.Postgres.Dsn); err != nil {
 		_ = db.Close()
 		return nil, nil, err
 	}

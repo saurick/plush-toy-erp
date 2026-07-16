@@ -9,7 +9,6 @@ import (
 
 	"server/internal/biz"
 	"server/internal/customertrialconfig"
-	"server/internal/devdbguard"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
@@ -19,8 +18,6 @@ func expectActiveCustomerConfigVersion(
 	revision string,
 	productVersion string,
 	markers map[string]string,
-	databaseHost string,
-	databasePort int,
 	databaseName string,
 	queryErr error,
 ) (*sql.DB, sqlmock.Sqlmock) {
@@ -35,8 +32,6 @@ SELECT revision,
 	       COALESCE(jsonb_extract_path_text(compiled_snapshot, 'applyPurpose'), ''),
 	       COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), ''),
 	       COALESCE(jsonb_extract_path_text(compiled_snapshot, 'target'), ''),
-	       COALESCE(host(inet_server_addr()), ''),
-	       COALESCE(inet_server_port(), 0),
 	       current_database()
 FROM customer_config_revisions
 WHERE customer_key = $1
@@ -47,8 +42,8 @@ LIMIT 1`)).WithArgs(customertrialconfig.ExpectedCustomerKey)
 		expectation.WillReturnError(queryErr)
 	} else {
 		expectation.WillReturnRows(
-			sqlmock.NewRows([]string{"revision", "product_version", "apply_purpose", "dataset_version", "target", "database_host", "database_port", "database_name"}).
-				AddRow(revision, productVersion, markers["applyPurpose"], markers["datasetVersion"], markers["target"], databaseHost, databasePort, databaseName),
+			sqlmock.NewRows([]string{"revision", "product_version", "apply_purpose", "dataset_version", "target", "database_name"}).
+				AddRow(revision, productVersion, markers["applyPurpose"], markers["datasetVersion"], markers["target"], databaseName),
 		)
 	}
 	return db, mock
@@ -64,9 +59,9 @@ func TestValidateActiveCustomerTrialConfigAllowsFormalOrMissingRevision(t *testi
 		{name: "no active revision", queryError: sql.ErrNoRows},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			db, mock := expectActiveCustomerConfigVersion(t, "formal-revision", tc.version, nil, "postgres", 5432, "formal_database", tc.queryError)
+			db, mock := expectActiveCustomerConfigVersion(t, "formal-revision", tc.version, nil, "formal_database", tc.queryError)
 			defer func() { _ = db.Close() }()
-			if err := validateActiveCustomerTrialConfig(context.Background(), db, false); err != nil {
+			if err := validateActiveCustomerTrialConfig(context.Background(), db, false, ""); err != nil {
 				t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
 			}
 			if err := mock.ExpectationsWereMet(); err != nil {
@@ -81,9 +76,9 @@ func TestValidateActiveCustomerTrialConfigRequiresExactRuntimeOptIn(t *testing.T
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "postgres", 5432, "plush_erp_uat_20260716_v5", nil)
+	}, "plush_erp_uat_20260716_v5", nil)
 	defer func() { _ = db.Close() }()
-	if err := validateActiveCustomerTrialConfig(context.Background(), db, false); err == nil {
+	if err := validateActiveCustomerTrialConfig(context.Background(), db, false, ""); err == nil {
 		t.Fatal("expected active trial revision to be rejected while gate is disabled")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -96,9 +91,9 @@ func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "postgres", 5432, "plush_erp_uat_20260716_v5", nil)
+	}, "plush_erp_uat_20260716_v5", nil)
 	defer func() { _ = db.Close() }()
-	if err := validateActiveCustomerTrialConfig(context.Background(), db, true); err != nil {
+	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err != nil {
 		t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -111,9 +106,9 @@ func TestValidateActiveCustomerTrialConfigRejectsReservedVersionDrift(t *testing
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": "2026.07.15-v1",
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "postgres", 5432, "plush_erp_uat_20260716_v5", nil)
+	}, "plush_erp_uat_20260716_v5", nil)
 	defer func() { _ = db.Close() }()
-	if err := validateActiveCustomerTrialConfig(context.Background(), db, true); err == nil {
+	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err == nil {
 		t.Fatal("expected reserved customer-trial version drift to be rejected")
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
@@ -123,59 +118,54 @@ func TestValidateActiveCustomerTrialConfigRejectsReservedVersionDrift(t *testing
 
 func TestValidateActiveCustomerTrialConfigRequiresRegisteredLocalTestRuntime(t *testing.T) {
 	const acceptanceDatabase = "plush_erp_acceptance_20260716_v5_dev"
+	const localAcceptanceDSN = "postgres://test_user:secret@192.168.0.106:5432/" + acceptanceDatabase + "?sslmode=disable"
 	localMarkers := map[string]string{"applyPurpose": biz.CustomerConfigLocalTestApplyPurpose}
 	for _, tc := range []struct {
-		name         string
-		allow        string
-		databaseHost string
-		databasePort int
-		databaseName string
-		wantError    string
+		name          string
+		allow         string
+		configuredDSN string
+		databaseName  string
+		wantError     string
 	}{
 		{
-			name:         "exact local acceptance runtime",
-			allow:        "1",
-			databaseHost: devdbguard.CustomerConfigLocalTestHost,
-			databasePort: int(devdbguard.CustomerConfigLocalTestPort),
-			databaseName: acceptanceDatabase,
+			name:          "exact local acceptance runtime behind NAT",
+			allow:         "1",
+			configuredDSN: localAcceptanceDSN,
+			databaseName:  acceptanceDatabase,
 		},
 		{
-			name:         "local flag is absent",
-			databaseHost: devdbguard.CustomerConfigLocalTestHost,
-			databasePort: int(devdbguard.CustomerConfigLocalTestPort),
-			databaseName: acceptanceDatabase,
-			wantError:    "exact registered runtime opt-in",
+			name:          "local flag is absent",
+			configuredDSN: localAcceptanceDSN,
+			databaseName:  acceptanceDatabase,
+			wantError:     "exact registered runtime opt-in",
 		},
 		{
-			name:         "local flag is not exact",
-			allow:        "true",
-			databaseHost: devdbguard.CustomerConfigLocalTestHost,
-			databasePort: int(devdbguard.CustomerConfigLocalTestPort),
-			databaseName: acceptanceDatabase,
-			wantError:    "exact registered runtime opt-in",
+			name:          "local flag is not exact",
+			allow:         "true",
+			configuredDSN: localAcceptanceDSN,
+			databaseName:  acceptanceDatabase,
+			wantError:     "exact registered runtime opt-in",
 		},
 		{
-			name:         "non-local server",
-			allow:        "1",
-			databaseHost: "192.168.0.133",
-			databasePort: int(devdbguard.CustomerConfigLocalTestPort),
-			databaseName: acceptanceDatabase,
-			wantError:    "registered local development database family",
+			name:          "non-local configured server",
+			allow:         "1",
+			configuredDSN: "postgres://test_user:secret@192.168.0.133:5432/" + acceptanceDatabase + "?sslmode=disable",
+			databaseName:  acceptanceDatabase,
+			wantError:     "registered local development database family",
 		},
 		{
-			name:         "wrong port",
-			allow:        "1",
-			databaseHost: devdbguard.CustomerConfigLocalTestHost,
-			databasePort: 5435,
-			databaseName: acceptanceDatabase,
-			wantError:    "registered local development database family",
+			name:          "wrong configured port",
+			allow:         "1",
+			configuredDSN: "postgres://test_user:secret@192.168.0.106:5435/" + acceptanceDatabase + "?sslmode=disable",
+			databaseName:  acceptanceDatabase,
+			wantError:     "registered local development database family",
 		},
 		{
-			name:         "shared development database",
-			allow:        "1",
-			databaseHost: devdbguard.CustomerConfigLocalTestHost,
-			databasePort: int(devdbguard.CustomerConfigLocalTestPort),
-			databaseName: "plush_erp",
+			name:          "configured and connected database differ",
+			allow:         "1",
+			configuredDSN: localAcceptanceDSN,
+			databaseName:  "plush_erp",
+			wantError:     "registered local development database family",
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
@@ -185,13 +175,11 @@ func TestValidateActiveCustomerTrialConfigRequiresRegisteredLocalTestRuntime(t *
 				"yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
 				biz.CustomerConfigLocalTestProductVersion,
 				localMarkers,
-				tc.databaseHost,
-				tc.databasePort,
 				tc.databaseName,
 				nil,
 			)
 			defer func() { _ = db.Close() }()
-			err := validateActiveCustomerTrialConfig(context.Background(), db, false)
+			err := validateActiveCustomerTrialConfig(context.Background(), db, false, tc.configuredDSN)
 			if tc.wantError == "" && err != nil {
 				t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
 			}
@@ -244,13 +232,16 @@ func TestValidateActiveCustomerTrialConfigRejectsIncompleteLocalTestMarker(t *te
 				"local-revision",
 				tc.productVersion,
 				tc.markers,
-				devdbguard.CustomerConfigLocalTestHost,
-				int(devdbguard.CustomerConfigLocalTestPort),
 				"plush_erp_acceptance_20260716_v5_dev",
 				nil,
 			)
 			defer func() { _ = db.Close() }()
-			err := validateActiveCustomerTrialConfig(context.Background(), db, false)
+			err := validateActiveCustomerTrialConfig(
+				context.Background(),
+				db,
+				false,
+				"postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+			)
 			if err == nil || !strings.Contains(err.Error(), "local-test customer config marker is incomplete or invalid") {
 				t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
 			}

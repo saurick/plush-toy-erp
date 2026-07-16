@@ -24,21 +24,19 @@ func validateActiveCustomerTrialConfig(
 	ctx context.Context,
 	db customerTrialConfigQueryRower,
 	trialConfigEnabled bool,
+	postgresDSN string,
 ) error {
 	if db == nil {
 		return fmt.Errorf("customer trial config startup check requires PostgreSQL")
 	}
 	var revision, productVersion, applyPurpose, datasetVersion, target string
-	var databaseHost, databaseName string
-	var databasePort int
+	var databaseName string
 	err := db.QueryRowContext(ctx, `
 SELECT revision,
        product_version,
 	   COALESCE(jsonb_extract_path_text(compiled_snapshot, 'applyPurpose'), ''),
 	   COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), ''),
 	   COALESCE(jsonb_extract_path_text(compiled_snapshot, 'target'), ''),
-	   COALESCE(host(inet_server_addr()), ''),
-	   COALESCE(inet_server_port(), 0),
 	   current_database()
 FROM customer_config_revisions
 WHERE customer_key = $1
@@ -50,8 +48,6 @@ LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
 		&applyPurpose,
 		&datasetVersion,
 		&target,
-		&databaseHost,
-		&databasePort,
 		&databaseName,
 	)
 	if err == sql.ErrNoRows {
@@ -68,7 +64,7 @@ LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
 		if strings.TrimSpace(os.Getenv(biz.CustomerConfigLocalTestAllowEnv)) != "1" {
 			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the exact registered runtime opt-in")
 		}
-		if databasePort < 0 || databasePort > 65535 || devdbguard.RequireCustomerConfigLocalTestTarget(databaseHost, uint16(databasePort), databaseName) != nil {
+		if devdbguard.RequireCustomerConfigLocalTestRuntime(postgresDSN, databaseName) != nil {
 			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the registered local development database family")
 		}
 	}

@@ -98,6 +98,26 @@ func TestRequireCustomerConfigLocalTestDSNOnlyAllowsRegisteredDevelopmentFamily(
 	}
 }
 
+func TestRequireCustomerConfigLocalTestRuntimeBindsConfiguredAndConnectedDatabase(t *testing.T) {
+	t.Parallel()
+
+	const dsn = "postgres://test_user:secret@192.168.0.106:5432/plush_erp_acceptance_20260716_v5_dev?sslmode=disable"
+	if err := RequireCustomerConfigLocalTestRuntime(dsn, "plush_erp_acceptance_20260716_v5_dev"); err != nil {
+		t.Fatalf("expected matching registered runtime to pass, got %v", err)
+	}
+	for _, currentDatabase := range []string{"", "plush_erp", "plush_erp_acceptance_other_dev"} {
+		if err := RequireCustomerConfigLocalTestRuntime(dsn, currentDatabase); err == nil {
+			t.Fatalf("expected connected database %q to be rejected", currentDatabase)
+		}
+	}
+	if err := RequireCustomerConfigLocalTestRuntime(
+		"postgres://postgres:secret@192.168.0.133:5435/plush_erp_acceptance_20260716_v5_dev?sslmode=disable",
+		"plush_erp_acceptance_20260716_v5_dev",
+	); err == nil {
+		t.Fatal("expected unregistered configured target to be rejected")
+	}
+}
+
 func TestRequireLocalAdminResetDSNAllowsOnlyRegisteredDevelopmentFamily(t *testing.T) {
 	t.Parallel()
 

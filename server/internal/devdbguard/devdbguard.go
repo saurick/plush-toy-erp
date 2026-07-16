@@ -55,14 +55,43 @@ func RequireLocalDevDSN(confPath string, dsn string, getenv func(string) string)
 // ERP_ALLOW_TEST_DB_AS_DEV so that an explicit test-server operation cannot
 // enable this revision class on 133 or another target.
 func RequireCustomerConfigLocalTestDSN(dsn string) error {
+	_, err := requireCustomerConfigLocalTestConfig(dsn)
+	return err
+}
+
+// RequireCustomerConfigLocalTestRuntime keeps the configured connection target
+// and the connected database identity bound together. PostgreSQL may report an
+// internal/NAT server address from inet_server_addr(), so the network allowlist
+// must be checked against the configured DSN while current_database() proves
+// that the live connection did not switch databases.
+func RequireCustomerConfigLocalTestRuntime(dsn string, currentDatabase string) error {
+	config, err := requireCustomerConfigLocalTestConfig(dsn)
+	if err != nil {
+		return err
+	}
+	currentDatabase = strings.TrimSpace(currentDatabase)
+	if currentDatabase == "" || currentDatabase != strings.TrimSpace(config.Database) {
+		return fmt.Errorf(
+			"customer config local-test runtime database mismatch: configured %s, connected %s",
+			strings.TrimSpace(config.Database),
+			currentDatabase,
+		)
+	}
+	return nil
+}
+
+func requireCustomerConfigLocalTestConfig(dsn string) (*pgconn.Config, error) {
 	config, err := pgconn.ParseConfig(strings.TrimSpace(dsn))
 	if err != nil {
-		return fmt.Errorf("parse postgres dsn for customer config local-test guard failed: %w", err)
+		return nil, fmt.Errorf("parse postgres dsn for customer config local-test guard failed: %w", err)
 	}
 	if len(config.Fallbacks) != 0 {
-		return customerConfigLocalTestDSNError(strings.TrimSpace(config.Host), config.Port, strings.TrimSpace(config.Database))
+		return nil, customerConfigLocalTestDSNError(strings.TrimSpace(config.Host), config.Port, strings.TrimSpace(config.Database))
 	}
-	return RequireCustomerConfigLocalTestTarget(config.Host, config.Port, config.Database)
+	if err := RequireCustomerConfigLocalTestTarget(config.Host, config.Port, config.Database); err != nil {
+		return nil, err
+	}
+	return config, nil
 }
 
 func RequireCustomerConfigLocalTestTarget(host string, port uint16, database string) error {
