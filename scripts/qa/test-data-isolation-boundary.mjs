@@ -574,9 +574,9 @@ export const DEFAULT_TEST_DATA_ISOLATION_CHECKS = Object.freeze([
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",
         pattern:
-          /const parsedTargetAttestation = parseManualAcceptanceTargetAttestation[\s\S]{0,500}assertManualAcceptanceTaskTargetCompatibility[\s\S]{0,900}const effectiveAdminPassword = parsedTargetAttestation/u,
+          /const parsedTargetAttestation = parseManualAcceptanceTargetAttestation[\s\S]{0,500}assertManualAcceptanceTaskTargetCompatibility[\s\S]{0,1800}assertManualAcceptanceRuntimeIdentityPrecondition[\s\S]{0,500}const runtimeAdmin = await loginRuntimeAdmin/u,
         message:
-          "manual acceptance task data must validate attestation before skipping debug admin",
+          "manual acceptance task data must validate attestation and live runtime identity before debug admin login",
       },
       {
         path: "scripts/qa/manual-acceptance-task-data.mjs",
