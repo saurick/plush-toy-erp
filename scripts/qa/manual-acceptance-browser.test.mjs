@@ -404,8 +404,18 @@ test("business summary totals use the visible client-facing counters", () => {
     203,
   );
   assert.equal(
-    readBusinessSummaryTotal("permission-center", "角色模板 11 管理员账号 22"),
+    readBusinessSummaryTotal(
+      "permission-center",
+      "岗位设置 11 共 22 个员工账号",
+    ),
     22,
+  );
+  assert.equal(
+    readBusinessSummaryTotal(
+      "permission-center",
+      "岗位设置 22 共 5 个员工账号",
+    ),
+    5,
   );
   assert.equal(
     readBusinessSummaryTotal("production-orders", "符合条件 47 当前页 20"),
@@ -469,21 +479,72 @@ test("PDF response failures surface before blob preview polling", async () => {
   );
 });
 
-test("disabled login keeps the non-enumerating user-visible message", async () => {
+test("disabled password login follows the precise inactive-account contract", async () => {
   const source = await fs.readFile(scriptPath, "utf8");
-  assert.match(source, /expectedText:\s*"登录信息不正确或账号不可用"/u);
-  assert.doesNotMatch(source, /expectedText:\s*"账号已停用"/u);
+  assert.match(source, /expectedText:\s*"账号已停用"/u);
+  assert.doesNotMatch(
+    source,
+    /expectedText:\s*"登录信息不正确或账号不可用"/u,
+  );
+});
+
+test("exception account probes use the current ordinary entry copy", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  assert.match(source, /\["\/entry", "电脑端"\]/u);
+  assert.match(source, /\["\/entry", "手机待办"\]/u);
+  assert.match(source, /text:\s*"当前账号暂无可用入口"/u);
+  assert.match(source, /absentTexts:\s*\["电脑端", "手机待办"\]/u);
+  assert.doesNotMatch(source, /\["\/entry", "后台管理"\]/u);
+  assert.doesNotMatch(source, /text:\s*"当前账号暂无可用入口权限"/u);
 });
 
 test("business print proof searches canonical current-batch records before exact actions", async () => {
   const source = await fs.readFile(scriptPath, "utf8");
   assert.match(source, /recordQuery/u);
   assert.match(source, /search\.fill\(recordQuery\)/u);
-  assert.match(source, /search\.press\("Enter"\)/u);
+  assert.doesNotMatch(source, /search\.press\("Enter"\)/u);
+  assert.match(
+    source,
+    /rows\.every\(\(candidate\) => candidate\.innerText\.includes\(query\)\)/u,
+  );
   assert.match(source, /-PO-001/u);
   assert.match(source, /-OS-001/u);
   assert.match(source, /-BOM-001-1/u);
   assert.match(source, /row\.getByText\(recordQuery, \{ exact: true \}\)/u);
+  assert.match(source, /const selectionControl = row/u);
+  assert.match(source, /\.ant-table-selection-column \.ant-radio-wrapper/u);
+  assert.match(source, /await selectionControl\.click\(\)/u);
+  assert.match(source, /selectionInput\.isChecked\(\)/u);
+  assert.doesNotMatch(source, /force: true/u);
+  assert.match(source, /attempt <= 3/u);
+  assert.match(source, /search\.inputValue\(\)/u);
+  assert.match(source, /const filteredRowsReady = await page/u);
+  assert.match(source, /if \(!filteredRowsReady\)/u);
+  assert.match(source, /timeout: 5_000/u);
+  assert.match(source, /selectionStable/u);
+  assert.match(source, /selected && enabledAction/u);
+  assert.match(
+    source,
+    /templateKey === "processing-contract" \? "来自业务页面" : "业务记录带值"/u,
+  );
+  assert.match(
+    source,
+    /new URL\(page\.url\(\)\)\.pathname,[\s\S]{0,120}sourceRoute/u,
+  );
+  assert.match(source, /getByText\(COMPANY_NAME, \{ exact: true \}\)/u);
+  assert.doesNotMatch(
+    source,
+    /__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__/u,
+  );
+  assert.match(
+    source,
+    /const login = await loginFormalAccount\(browser,[\s\S]{0,160}password,[\s\S]{0,240}storageState: login\.storageState/u,
+  );
+  assert.doesNotMatch(
+    source,
+    /verifyBusinessPrintEvidence\(browser,[\s\S]{0,120}desktopStorageStates/u,
+  );
+  assert.doesNotMatch(source, /await recordCell\.click\(\)/u);
   assert.match(source, /\.ant-table-row-selected/u);
   assert.doesNotMatch(source, /selector\.evaluate\(\(node\) => node\.click\(\)\)/u);
   assert.match(
@@ -491,6 +552,13 @@ test("business print proof searches canonical current-batch records before exact
     /locator\("button"\)[\s\S]{0,180}getByText\(actionLabel,\s*\{\s*exact:\s*true\s*\}\)/u,
   );
   assert.match(source, /button\.innerText[\s\S]*=== label[\s\S]*!button\.disabled/u);
+});
+
+test("permission center evidence follows the current employee-account tab", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  assert.match(source, /getByRole\("tab", \{ name: \/员工账号\/u \}\)/u);
+  assert.match(source, /共\\s\*\(\\d\+\)\\s\*个员工账号/u);
+  assert.doesNotMatch(source, /getByRole\("tab", \{ name: \/管理员账号\/u \}\)/u);
 });
 
 test("mobile role totals cannot overwrite a task board DOM minimum failure", () => {
@@ -560,6 +628,18 @@ test("five real business PDF proofs are required for final acceptance", () => {
   assert.equal(summary.acceptancePassed, false);
 });
 
+test("fresh business print sessions run before the long page traversal", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  const printIndex = source.lastIndexOf(
+    "printEvidence = await verifyBusinessPrintEvidence",
+  );
+  const formalAccountIndex = source.lastIndexOf(
+    "for (const account of FORMAL_BROWSER_ACCOUNTS)",
+  );
+  assert.ok(printIndex > 0);
+  assert.ok(formalAccountIndex > printIndex);
+});
+
 test("historical readiness evidence cannot override a current DOM minimum failure", () => {
   const summary = summarizeManualAcceptance({
     formalAccounts: [{ passed: true }],
@@ -593,7 +673,7 @@ test("readiness binding cannot replace current DOM list minimum proof", async ()
     "utf8",
   );
   assert.match(source, /\.erp-task-board-card/u);
-  assert.match(source, /getByRole\("tab", \{ name: \/管理员账号/u);
+  assert.match(source, /getByRole\("tab", \{ name: \/员工账号/u);
   assert.match(source, /readinessReportSHA256/u);
   assert.match(source, /failedDataMinimums = listTargets\.filter/u);
 });

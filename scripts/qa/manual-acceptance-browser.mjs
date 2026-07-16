@@ -644,7 +644,10 @@ export function readBusinessSummaryTotal(targetKey, bodyText = "") {
     products: [/总产品\s*(\d+)/u],
     "production-orders": [/符合条件\s*(\d+)/u],
     "accessories-purchase": [/总订单\s*(\d+)/u],
-    "permission-center": [/管理员账号\s*(\d+)/u, /角色模板\s*(\d+)/u],
+    "permission-center": [
+      /员工账号\s*(\d+)/u,
+      /共\s*(\d+)\s*个员工账号/u,
+    ],
   };
   const values = (patterns[targetKey] || []).flatMap((pattern) => {
     const match = String(bodyText).match(pattern);
@@ -750,10 +753,12 @@ async function readListEvidence(page, target) {
     return readMobileTaskEvidence(page, target.minimumRecords);
   }
   if (target.key === "permission-center") {
-    const accountTab = page.getByRole("tab", { name: /管理员账号/u });
+    const accountTab = page.getByRole("tab", { name: /员工账号/u });
     if (await accountTab.count()) {
       await accountTab.click();
-      await page.waitForTimeout(150);
+      await page
+        .locator(".erp-permission-section--admins .ant-table-tbody")
+        .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     }
   }
   const metrics = await page.evaluate(() => {
@@ -1198,45 +1203,120 @@ async function verifyBusinessPrintTemplate(browser, options) {
       timeout: PAGE_TIMEOUT_MS,
     });
     await waitForReadablePage(page);
-    await page.waitForFunction(
-      (customerKey) =>
-        window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__?.customerKey ===
-          customerKey &&
-        window.__PLUSH_ERP_EFFECTIVE_SESSION_DIAGNOSTIC__?.blockers?.length ===
-          0,
-      CUSTOMER_KEY,
-      { timeout: PAGE_TIMEOUT_MS },
+    assert.equal(
+      new URL(page.url()).pathname,
+      sourceRoute,
+      `${templateKey} 应停留在绑定的业务来源页`,
     );
+    await page
+      .getByText(COMPANY_NAME, { exact: true })
+      .first()
+      .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     const search = page.getByPlaceholder(searchPlaceholder, { exact: true });
-    await search.fill(recordQuery);
-    await search.press("Enter");
     const row = page.getByRole("row").filter({ hasText: recordQuery }).first();
-    await row.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     const recordCell = row.getByText(recordQuery, { exact: true }).first();
-    await recordCell.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
-    await recordCell.click();
-    await page.waitForFunction(
-      (query) =>
-        [...document.querySelectorAll(".ant-table-row-selected")].some(
-          (selectedRow) => selectedRow.innerText.includes(query),
-        ),
-      recordQuery,
-      { timeout: PAGE_TIMEOUT_MS },
-    );
+    const selectionControl = row
+      .locator(
+        ".ant-table-selection-column .ant-radio-wrapper, .ant-table-selection-column .ant-checkbox-wrapper",
+      )
+      .first();
+    const selectionInput = row
+      .locator(
+        ".ant-table-selection-column input[type=radio], .ant-table-selection-column input[type=checkbox]",
+      )
+      .first();
     const action = page
       .locator("button")
       .filter({ has: page.getByText(actionLabel, { exact: true }) })
       .first();
     await action.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
-    await page.waitForFunction(
-      (label) =>
-        [...document.querySelectorAll("button")].some(
-          (button) =>
-            button.innerText.replace(/\s+/gu, " ").trim() === label &&
-            !button.disabled,
+    let selectionStable = false;
+    for (let attempt = 1; attempt <= 3; attempt += 1) {
+      await search.fill(recordQuery);
+      const filteredRowsReady = await page
+        .waitForFunction(
+          (query) => {
+            const rows = [
+              ...document.querySelectorAll(
+                ".ant-table-tbody > tr.ant-table-row",
+              ),
+            ].filter((candidate) => {
+              const style = window.getComputedStyle(candidate);
+              const rect = candidate.getBoundingClientRect();
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                style.visibility !== "hidden"
+              );
+            });
+            return (
+              rows.length > 0 &&
+              rows.every((candidate) => candidate.innerText.includes(query))
+            );
+          },
+          recordQuery,
+          { timeout: 5_000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (!filteredRowsReady) {
+        await page.waitForTimeout(500);
+        continue;
+      }
+      await row.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+      await recordCell.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
+      await selectionControl.waitFor({
+        state: "visible",
+        timeout: PAGE_TIMEOUT_MS,
+      });
+      await selectionInput.waitFor({
+        state: "attached",
+        timeout: PAGE_TIMEOUT_MS,
+      });
+      if (!(await selectionInput.isChecked())) {
+        await selectionControl.click();
+      }
+      const actionReady = await page
+        .waitForFunction(
+          ({ label, query }) => {
+            const selected = [
+              ...document.querySelectorAll(".ant-table-row-selected"),
+            ].some((selectedRow) => selectedRow.innerText.includes(query));
+            const enabledAction = [...document.querySelectorAll("button")].some(
+              (button) =>
+                button.innerText.replace(/\s+/gu, " ").trim() === label &&
+                !button.disabled,
+            );
+            return selected && enabledAction;
+          },
+          { label: actionLabel, query: recordQuery },
+          { timeout: 3_000 },
+        )
+        .then(() => true)
+        .catch(() => false);
+      if (!actionReady) {
+        continue;
+      }
+      await page.waitForTimeout(750);
+      selectionStable = await Promise.all([
+        search.inputValue().then((value) => value === recordQuery),
+        selectionInput.isChecked(),
+        row.evaluate((selectedRow) =>
+          selectedRow.classList.contains("ant-table-row-selected"),
         ),
-      actionLabel,
-      { timeout: PAGE_TIMEOUT_MS },
+        action.isDisabled().then((disabled) => !disabled),
+      ])
+        .then((checks) => checks.every(Boolean))
+        .catch(() => false);
+      if (selectionStable) {
+        break;
+      }
+      await page.waitForTimeout(250);
+    }
+    assert.equal(
+      selectionStable,
+      true,
+      `${recordQuery} 的搜索、选中与打印动作应保持稳定`,
     );
     assert.equal(
       await action.isDisabled(),
@@ -1248,8 +1328,10 @@ async function verifyBusinessPrintTemplate(browser, options) {
       action.click(),
     ]);
     await workspace.waitForLoadState("domcontentloaded");
+    const workspaceSourceLabel =
+      templateKey === "processing-contract" ? "来自业务页面" : "业务记录带值";
     await workspace
-      .getByText("业务记录带值", { exact: true })
+      .getByText(workspaceSourceLabel, { exact: true })
       .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     assert.equal(
       new URL(workspace.url()).searchParams.get("source"),
@@ -1292,7 +1374,7 @@ async function verifyBusinessPrintTemplate(browser, options) {
     };
   } catch (error) {
     const diagnostics = await page
-      .evaluate((label) => {
+      .evaluate(({ label, query, searchPlaceholder: placeholder }) => {
         const normalize = (value) =>
           String(value || "")
             .replace(/\s+/gu, " ")
@@ -1316,6 +1398,28 @@ async function verifyBusinessPrintTemplate(browser, options) {
           });
         return {
           matchingButtons,
+          searchValue:
+            document.querySelector(
+              `input[placeholder="${CSS.escape(placeholder)}"]`,
+            )?.value || "",
+          visibleRows: [
+            ...document.querySelectorAll(
+              ".ant-table-tbody > tr.ant-table-row",
+            ),
+          ].filter((row) => {
+            const style = window.getComputedStyle(row);
+            const rect = row.getBoundingClientRect();
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.visibility !== "hidden"
+            );
+          }).length,
+          matchingRows: [
+            ...document.querySelectorAll(
+              ".ant-table-tbody > tr.ant-table-row",
+            ),
+          ].filter((row) => row.innerText.includes(query)).length,
           selectedRows: document.querySelectorAll(".ant-table-row-selected")
             .length,
           selectionBarActive: Boolean(
@@ -1324,7 +1428,11 @@ async function verifyBusinessPrintTemplate(browser, options) {
             ),
           ),
         };
-      }, actionLabel)
+      }, {
+        label: actionLabel,
+        query: recordQuery,
+        searchPlaceholder,
+      })
       .catch(() => null);
     const screenshotPath = path.resolve(
       REPORT_ROOT,
@@ -1349,7 +1457,7 @@ async function verifyBusinessPrintTemplate(browser, options) {
 
 async function verifyBusinessPrintEvidence(
   browser,
-  { baseURL, desktopStorageStates, printInput },
+  { baseURL, password, printInput },
 ) {
   const cases = [
     [
@@ -1403,10 +1511,20 @@ async function verifyBusinessPrintEvidence(
     recordQuery,
   ] of cases) {
     try {
+      const account = FORMAL_BROWSER_ACCOUNTS.find(
+        (candidate) => candidate.username === username,
+      );
+      assert.ok(account, `${username} 必须是正式岗位试用账号`);
+      const login = await loginFormalAccount(browser, {
+        baseURL,
+        account,
+        password,
+      });
+      await wait(AUTH_PACE_MS);
       templates.push(
         await verifyBusinessPrintTemplate(browser, {
           baseURL,
-          storageState: desktopStorageStates.get(username),
+          storageState: login.storageState,
           sourcePrefix: printInput.sourcePrefix,
           sourceRoute,
           actionLabel,
@@ -1647,7 +1765,7 @@ async function loginForScenario(
 
 async function verifyScenarioRoute(
   browser,
-  { baseURL, storageState, route, text },
+  { baseURL, storageState, route, text, absentTexts = [] },
 ) {
   const context = await browser.newContext({
     viewport: { width: 390, height: 844 },
@@ -1668,8 +1786,15 @@ async function verifyScenarioRoute(
       state: "visible",
       timeout: PAGE_TIMEOUT_MS,
     });
+    for (const absentText of absentTexts) {
+      assert.equal(
+        await page.getByText(absentText, { exact: true }).count(),
+        0,
+        `${route} 不应显示 ${absentText}`,
+      );
+    }
     assert.deepEqual(events, []);
-    return { route, visibleText: text, passed: true };
+    return { route, visibleText: text, absentTexts, passed: true };
   } finally {
     await context.close();
   }
@@ -1681,7 +1806,7 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
     baseURL,
     username: "demo_uat_disabled",
     password,
-    expectedText: "登录信息不正确或账号不可用",
+    expectedText: "账号已停用",
   });
 
   await wait(AUTH_PACE_MS);
@@ -1696,7 +1821,8 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
     });
     const verifiedEntries = [];
     for (const [route, text] of [
-      ["/entry", "后台管理"],
+      ["/entry", "电脑端"],
+      ["/entry", "手机待办"],
       ["/m/sales/tasks", "业务"],
       ["/m/purchase/tasks", "采购"],
     ]) {
@@ -1743,7 +1869,8 @@ async function verifyExceptionAccounts(browser, { baseURL, password }) {
       baseURL,
       storageState: login.storageState,
       route: "/entry",
-      text: "当前账号暂无可用入口权限",
+      text: "当前账号暂无可用入口",
+      absentTexts: ["电脑端", "手机待办"],
     });
     noEntry = {
       key: "no-business-entry-account",
@@ -1864,6 +1991,11 @@ export async function runManualAcceptanceBrowser(
   let exceptionAccounts = [];
   let printEvidence = { ...printInput, templates: [], passed: false };
   try {
+    printEvidence = await verifyBusinessPrintEvidence(browser, {
+      baseURL: normalizedBaseURL,
+      password: secret,
+      printInput,
+    });
     for (const account of FORMAL_BROWSER_ACCOUNTS) {
       const login = await loginFormalAccount(browser, {
         baseURL: normalizedBaseURL,
@@ -1902,11 +2034,6 @@ export async function runManualAcceptanceBrowser(
       );
       await wait(TARGET_PACE_MS);
     }
-    printEvidence = await verifyBusinessPrintEvidence(browser, {
-      baseURL: normalizedBaseURL,
-      desktopStorageStates,
-      printInput,
-    });
     for (const target of plan.targets.filter(
       (item) => item.group === "print-workspace",
     )) {
