@@ -352,8 +352,8 @@ test("local-test apply is bound to the fresh database and exact active-session i
         data.session.configProductVersion = manifest.product_version;
         data.session.configApplyPurpose =
           manifest.compiled_snapshot.applyPurpose;
-        delete data.session.configDatasetVersion;
-        delete data.session.configTarget;
+        data.session.configDatasetVersion = "";
+        data.session.configTarget = "";
       }
       return data;
     },

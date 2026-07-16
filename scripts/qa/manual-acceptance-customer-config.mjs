@@ -139,11 +139,7 @@ function currentYoyoosunPreviewManifest() {
 
 function relativeRepoPath(repoRoot, absolutePath, name) {
   const relative = path.relative(repoRoot, absolutePath);
-  if (
-    !relative ||
-    relative.startsWith("..") ||
-    path.isAbsolute(relative)
-  ) {
+  if (!relative || relative.startsWith("..") || path.isAbsolute(relative)) {
     throw new ManualAcceptanceCustomerConfigError(
       `${name} must stay inside the repository`,
       2,
@@ -343,7 +339,8 @@ export function buildLocalManualAcceptanceManifest(preview) {
   const manifest = buildLocalTestApplyRuntimeManifest(yoyoosunCustomerPackage);
   if (
     manifest.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
-    manifest.product_version !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
+    manifest.product_version !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
     manifest.compiled_snapshot?.applyPurpose !==
       LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE ||
     manifest.compiled_snapshot?.datasetVersion !== undefined ||
@@ -385,7 +382,8 @@ function assertCurrentManualAcceptanceManifestIdentity(manifest, policy) {
     policy.target !== LOCAL_DEV_TARGET ||
     manifest?.customer_key !== CUSTOMER_CONFIG_CUSTOMER_KEY ||
     manifest?.revision !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_REVISION ||
-    manifest?.product_version !== LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
+    manifest?.product_version !==
+      LOCAL_MANUAL_ACCEPTANCE_CONFIG_PRODUCT_VERSION ||
     manifest?.compiled_snapshot?.applyPurpose !==
       LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE ||
     manifest?.compiled_snapshot?.datasetVersion !== undefined ||
@@ -485,7 +483,9 @@ function requireIndependentAdminCredential(env) {
 }
 
 function normalizeHash(value, name) {
-  const hash = String(value ?? "").trim().toLowerCase();
+  const hash = String(value ?? "")
+    .trim()
+    .toLowerCase();
   if (!/^[a-f0-9]{64}$/u.test(hash)) {
     throw new ManualAcceptanceCustomerConfigError(
       `${name} must be a SHA-256 hex digest`,
@@ -519,16 +519,20 @@ function requireValidationIdentity(data, manifest) {
   };
 }
 
-function requireRevisionIdentity(data, manifest, identity, operation, statuses) {
+function requireRevisionIdentity(
+  data,
+  manifest,
+  identity,
+  operation,
+  statuses,
+) {
   const revision = data?.revision;
   if (
     revision?.customer_key !== manifest.customer_key ||
     revision?.revision !== manifest.revision ||
     revision?.product_version !== identity.productVersion ||
-    normalizeHash(
-      revision?.config_hash,
-      `${operation} config_hash`,
-    ) !== identity.configHash ||
+    normalizeHash(revision?.config_hash, `${operation} config_hash`) !==
+      identity.configHash ||
     Number(revision?.config_hash_version) !== identity.configHashVersion ||
     !statuses.includes(revision?.status)
   ) {
@@ -573,6 +577,9 @@ function requireTransition(data, manifest, identity, expectedActiveRevision) {
 
 function requireEffectiveSession(data, manifest, identity) {
   const session = data?.session;
+  const expectedDatasetVersion =
+    optionalText(manifest.compiled_snapshot.datasetVersion) || "";
+  const expectedTarget = optionalText(manifest.compiled_snapshot.target) || "";
   const pages = Array.isArray(session?.pages)
     ? [...session.pages].map((item) => String(item)).sort()
     : [];
@@ -589,12 +596,12 @@ function requireEffectiveSession(data, manifest, identity) {
     session.configRevision !== manifest.revision ||
     session.configProductVersion !== manifest.product_version ||
     session.configApplyPurpose !== manifest.compiled_snapshot.applyPurpose ||
-    session.configDatasetVersion !== manifest.compiled_snapshot.datasetVersion ||
-    session.configTarget !== manifest.compiled_snapshot.target ||
-    normalizeHash(
-      session.configHash,
-      "get_effective_session configHash",
-    ) !== identity.configHash ||
+    typeof session.configDatasetVersion !== "string" ||
+    session.configDatasetVersion.trim() !== expectedDatasetVersion ||
+    typeof session.configTarget !== "string" ||
+    session.configTarget.trim() !== expectedTarget ||
+    normalizeHash(session.configHash, "get_effective_session configHash") !==
+      identity.configHash ||
     Number(session.configHashVersion) !== identity.configHashVersion ||
     session.source !== "active_customer_config_revision" ||
     JSON.stringify(pages) !== JSON.stringify(manifestPages) ||
@@ -636,11 +643,7 @@ export async function applyManualAcceptanceCustomerConfig({
     CUSTOMER_CONFIG_DATA_VERSION,
     "policy.dataVersion",
   );
-  requireExact(
-    resolvedPolicy.runId,
-    CUSTOMER_CONFIG_RUN_ID,
-    "policy.runId",
-  );
+  requireExact(resolvedPolicy.runId, CUSTOMER_CONFIG_RUN_ID, "policy.runId");
   assertCurrentManualAcceptanceManifestIdentity(manifest, resolvedPolicy);
   const operations = [];
   let sequence = 0;
@@ -863,8 +866,7 @@ function reportBoundary() {
     workflowWrites: false,
     factWrites: false,
     sourceManifestRequiredPreviewOnly: true,
-    note:
-      "runtime_compile_ready is only the standard customer_config protocol shape for this explicitly marked trial manifest; it is not release readiness or customer signoff.",
+    note: "runtime_compile_ready is only the standard customer_config protocol shape for this explicitly marked trial manifest; it is not release readiness or customer signoff.",
   };
 }
 
@@ -1005,7 +1007,14 @@ export async function runManualAcceptanceCustomerConfig({
 
   if (!options.apply) {
     await writeFile(reportPath, jsonText(baseReport), "utf8");
-    return { options, policy, manifest, report: baseReport, manifestPath, reportPath };
+    return {
+      options,
+      policy,
+      manifest,
+      report: baseReport,
+      manifestPath,
+      reportPath,
+    };
   }
 
   try {
@@ -1060,22 +1069,26 @@ async function main() {
     return;
   }
   process.stdout.write(
-    `${JSON.stringify({
-      status: result.report.status,
-      target: result.report.target,
-      dataVersion: result.report.dataVersion,
-      runId: result.report.runId,
-      revision: result.manifest.revision,
-      productVersion: result.manifest.product_version,
-      manifestSha256: result.report.manifest.manifestSha256,
-      configHash: result.report.identity?.configHash || null,
-      manifest: result.report.manifest.path,
-      report: path.relative(
-        path.resolve(fileURLToPath(new URL("../..", import.meta.url))),
-        result.reportPath,
-      ),
-      releaseReady: false,
-    }, null, 2)}\n`,
+    `${JSON.stringify(
+      {
+        status: result.report.status,
+        target: result.report.target,
+        dataVersion: result.report.dataVersion,
+        runId: result.report.runId,
+        revision: result.manifest.revision,
+        productVersion: result.manifest.product_version,
+        manifestSha256: result.report.manifest.manifestSha256,
+        configHash: result.report.identity?.configHash || null,
+        manifest: result.report.manifest.path,
+        report: path.relative(
+          path.resolve(fileURLToPath(new URL("../..", import.meta.url))),
+          result.reportPath,
+        ),
+        releaseReady: false,
+      },
+      null,
+      2,
+    )}\n`,
   );
 }
 
