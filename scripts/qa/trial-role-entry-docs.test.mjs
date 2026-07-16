@@ -140,7 +140,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     scriptReadme,
-    "严格检查，在 fast 边界上补零 warning、完整前后端构建和本地 PostgreSQL 关键事务门禁",
+    "严格检查，完整复用 full 并补 shell / YAML / 前端零 warning 与漏洞检查",
     "scripts README strict QA summary",
   );
   assertIncludes(
