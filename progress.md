@@ -225,3 +225,13 @@
 下一步：先提交并推送本修正，使实际数据执行工具具备不可变代码身份；随后只通过登记的 SSH 隧道向 133 隔离试用库执行 `2026.07.15-v3 / 20260715-V3`，保存首次写入、幂等重放、数量读回、页面与打印证据。
 
 阻塞/风险：本节记录时尚未执行本轮 133 业务数据写入或页面复核。attestation 的 `prod` 与运行能力的 `remote` 是两层不同事实，不得全局替换，也不得借修正降低 debug mutation、release、migration、数据库或 active customer-config 门禁。
+
+## 2026-07-16 133 readiness JSON 证据收口
+
+完成：133 首次 v3 执行已完成核心、岗位、源数据、任务、Fact、采购质检与附件阶段，readiness 的 38 项只读查询也通过；最终 receipt 因报告内存对象包含可选 `undefined` 而按严格 JSON 合同阻断。现将 probe 与 supporting 的可选字段统一显式归一为 `null`、空对象或空数组，避免磁盘报告与内存 receipt 语义不一致，并新增整份报告 JSON 往返等价断言。
+
+验证：项目锁定 Node 24.14.0 下 readiness + dataset 定向 39 / 39、人工验收脚本全量 231 / 231，均 0 fail / 0 skip；首轮组件证据已冻结到独立 `customer-trial-133-run1` 输出目录。
+
+下一步：提交推送本修正后执行同批幂等重放，核对 source 全 reuse、task 零创建 / 零动作、附件零上传、Fact 精确 ID 集不变，再启动 133 Web 并完成 48 页与 5 份真实 PDF 自动浏览器验收。
+
+阻塞/风险：本节记录时业务底座已真实写入 133，但顶层 readiness receipt 尚未转绿，不能宣称全页面完成；模拟数据可由数据库 pre-dataset 备份整体回滚，现有 forward-only retire 不能替代已过账 Fact 的数据库回滚。

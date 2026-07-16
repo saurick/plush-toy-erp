@@ -1330,6 +1330,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
       .every((item) => item.dataStatus === "not_proven"),
   );
   assert.equal(report.readyForManualAcceptance, false);
+  assert.deepEqual(report, JSON.parse(JSON.stringify(report)));
   assert(!JSON.stringify(report).includes("local-demo-password"));
   assert(!JSON.stringify(report).includes("local-admin-password"));
   assert.deepEqual(
