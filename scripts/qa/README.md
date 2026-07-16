@@ -99,7 +99,7 @@ node scripts/qa/manual-acceptance-source-data.mjs \
 node scripts/qa/manual-acceptance-data-depth.mjs
 ```
 
-正常整批写入只使用顶层 runner。它按 `core → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，再检查稳定基础资料码。全部通过后才允许账号或业务数据写入。任何阶段缺正式回执、摘要不符或语义摘要漂移都会停止后续阶段。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节，凭据只从环境变量注入，不写报告。
+正常整批写入只使用顶层 runner。它按 `core → role → source → task → facts → purchase-quality → attachments → readiness` 串行执行；两端 handler 身份和 target-free 业务输入相同，目标适配层只提供 endpoint、数据库身份、凭据、确认、带外证明和报告目录。`core` 在登录前先调用只读 `/readyz/runtime-identity`，用摘要同时绑定实际数据库、完整 40 位 release commit 和 14 位 Atlas revision；探针只返回匹配 marker，不返回数据库名或连接信息。随后登录 admin 读取真实 `debug.capabilities`，再次核对数据库、运行环境和六个 debug=false，只读证明后续阶段依赖的 1 个稳定单位和 4 个仓库；材料、产品、工序、BOM 与业务源单数量由 `source` 阶段独立写入并读回，不把未查询的 Product Core seed 数量写进 `core` 回执。全部通过后才允许账号或业务数据写入。任何阶段缺正式回执、摘要不符或语义摘要漂移都会停止后续阶段。密码创建与重置统一要求 8～20 位且 UTF-8 编码后不超过 72 字节，凭据只从环境变量注入，不写报告。
 
 本地命令必须指向明确绑定专用验收数据库的后端；当前共享开发端口不能因为地址是本机就当作验收库：
 
@@ -196,6 +196,8 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --task-report output/qa/manual-acceptance/datasets/2026.07.15-v3/local/task/apply-report.json \
     --out output/qa/manual-acceptance/datasets/2026.07.15-v3/local/readiness
 ```
+
+`readiness` 独立命令保持严格非绿：38 项可查询数据全部通过、5 项模板预览与 5 项打印工作台仍待浏览器时，报告为 `queryChecksPassed=true / queryEvidenceComplete=false` 并退出 1。顶层 dataset runner 只在“0 项查询失败、恰好这 10 项打印目标 `not_proven`、其余 38 项全过”时把数据底座记为已证明，同时明确写入 `browserEvidencePending=true`；任意其他缺口仍立即阻断。最终只有同批浏览器报告的 `acceptancePassed=true` 才能宣称 48 项自动化验收完成。
 
 附件入口绑定同批源单、事实和任务报告，按岗位权限上传并做列表与下载读回。133 还必须提供 `MANUAL_ACCEPTANCE_TARGET_CONFIRM` 和 `MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON`，证明精确 target、origin、customer、release、migration 及全部 debug=false；未绑定最终 commit / image 时不得写 133。
 

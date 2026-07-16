@@ -334,12 +334,8 @@ function buildStages(identity) {
         },
       ],
       expected: {
-        units: 4,
-        materials: 7,
-        products: 4,
+        units: 1,
         warehouses: 4,
-        processes: 9,
-        bomHeaders: 2,
       },
       replay: "upsert-by-stable-code",
       cleanupPolicy: "forward-only",

@@ -28,13 +28,17 @@ import {
 } from "./manual-acceptance-target-policy.mjs";
 
 export const MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION =
-  "manual-acceptance-dataset-runner-v1";
+  "manual-acceptance-dataset-runner-v2";
 
 const DATASET_CONFIRM_PHRASE = "APPLY_SIMULATED_MANUAL_ACCEPTANCE_DATA";
 const ACCOUNT_CONFIRM_PHRASE = "APPLY_SIMULATED_ACCOUNT_SCENARIOS";
 const ATTACHMENT_CONFIRM_PHRASE =
   "APPLY_SIMULATED_MANUAL_ACCEPTANCE_ATTACHMENTS";
 const DEFAULT_OUTPUT_ROOT = "output/qa/manual-acceptance/datasets";
+const BROWSER_ONLY_READINESS_GROUPS = Object.freeze({
+  printPreviewPages: 5,
+  printWorkspacePages: 5,
+});
 
 function pageGeneratorEntrypoint(stageKey) {
   const entrypoints = MANUAL_ACCEPTANCE_GENERATOR_STAGES[stageKey]?.entrypoints;
@@ -858,17 +862,100 @@ async function defaultReadinessComponent(invocation, deps) {
       now: deps.now,
     },
   );
-  if (result.exitCode !== 0 || !result.report || !result.output?.jsonPath) {
+  if (!result.report || !result.output?.jsonPath) {
     throw new ManualAcceptanceDatasetRunnerError(
       "readiness_component_failed",
-      "readiness did not prove complete query evidence",
+      "readiness did not produce a query evidence report",
       { stageKey: "readiness", exitCode: result.exitCode },
     );
   }
+  const datasetReadiness = assertManualAcceptanceDatasetReadinessBoundary(
+    result.report,
+    result.exitCode,
+  );
   return {
     operation: "verified",
     report: result.report,
     reportPath: result.output.jsonPath,
+    summary: {
+      ...result.report.summary,
+      ...datasetReadiness,
+    },
+  };
+}
+
+export function assertManualAcceptanceDatasetReadinessBoundary(
+  report,
+  exitCode,
+) {
+  const summary = jsonRecord(report?.summary, "readiness summary");
+  const targets = Array.isArray(report?.targets) ? report.targets : [];
+  const completeQueryEvidence =
+    exitCode === 0 &&
+    summary.queryChecksPassed === true &&
+    summary.queryEvidenceComplete === true &&
+    summary.failedTargetData === 0 &&
+    summary.notProvenTargetData === 0;
+  if (completeQueryEvidence) {
+    return {
+      datasetSubstrateVerified: true,
+      browserEvidencePending: summary.manualAcceptanceCompleted !== true,
+      browserOnlyNotProvenTargets: 0,
+    };
+  }
+
+  const notProven = targets.filter(
+    (target) => target?.dataStatus === "not_proven",
+  );
+  const failed = targets.filter(
+    (target) =>
+      target?.dataStatus === "fail" || target?.dataStatus === "error",
+  );
+  const groupCounts = Object.fromEntries(
+    Object.keys(BROWSER_ONLY_READINESS_GROUPS).map((group) => [
+      group,
+      notProven.filter((target) => target?.catalogGroup === group).length,
+    ]),
+  );
+  const exactBrowserOnlyGap =
+    exitCode === 1 &&
+    summary.queryChecksPassed === true &&
+    summary.queryEvidenceComplete === false &&
+    summary.failedTargetData === 0 &&
+    summary.notProvenTargetData === 10 &&
+    summary.passedTargetData === 38 &&
+    summary.totalTargets === 48 &&
+    targets.length === 48 &&
+    failed.length === 0 &&
+    notProven.length === 10 &&
+    Object.entries(BROWSER_ONLY_READINESS_GROUPS).every(
+      ([group, expected]) => groupCounts[group] === expected,
+    ) &&
+    notProven.every(
+      (target) =>
+        target?.browserRequired === true && target?.quantityNotProven === true,
+    ) &&
+    targets.every((target) =>
+      notProven.includes(target) ? true : target?.dataStatus === "pass",
+    );
+  if (!exactBrowserOnlyGap) {
+    throw new ManualAcceptanceDatasetRunnerError(
+      "readiness_component_failed",
+      "readiness did not prove the exact dataset query substrate",
+      {
+        stageKey: "readiness",
+        exitCode,
+        failedTargetData: summary.failedTargetData,
+        notProvenTargetData: summary.notProvenTargetData,
+        printPreviewNotProven: groupCounts.printPreviewPages,
+        printWorkspaceNotProven: groupCounts.printWorkspacePages,
+      },
+    );
+  }
+  return {
+    datasetSubstrateVerified: true,
+    browserEvidencePending: true,
+    browserOnlyNotProvenTargets: 10,
   };
 }
 

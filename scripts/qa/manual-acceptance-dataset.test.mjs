@@ -26,6 +26,7 @@ import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
   MANUAL_ACCEPTANCE_DATASET_STAGE_REGISTRY,
   MANUAL_ACCEPTANCE_TARGET_ADAPTER_KEYS,
+  assertManualAcceptanceDatasetReadinessBoundary,
   verifyManualAcceptanceCoreReferences,
 } from "./manual-acceptance-dataset-runner.mjs";
 import {
@@ -407,6 +408,7 @@ test("semantic plan locks the eight narrow stage contracts", () => {
     },
   });
   const core = plan.stages.find((stage) => stage.key === "core");
+  assert.deepEqual(core.expected, { units: 1, warehouses: 4 });
   assert.equal(core.commands[0].entrypoint, "scripts/seed-core-demo-data.sh");
   assert.equal(core.commands[0].execution, "out-of-band-explicit-only");
   assert.equal(core.commands[0].defaultRunner, false);
@@ -567,6 +569,61 @@ test("semantic plan locks the eight narrow stage contracts", () => {
   const readiness = plan.stages.find((stage) => stage.key === "readiness");
   assert.equal(readiness.writesBusinessData, false);
   assert.equal(readiness.expected.componentDataVersion, "2026.07.15-v3");
+});
+
+test("dataset runner accepts only the exact ten browser-only print gaps", () => {
+  const targets = [
+    ...Array.from({ length: 38 }, (_, index) => ({
+      id: `desktopPages:query-${index + 1}`,
+      catalogGroup: "desktopPages",
+      dataStatus: "pass",
+      browserRequired: true,
+    })),
+    ...Array.from({ length: 5 }, (_, index) => ({
+      id: `printPreviewPages:print-${index + 1}`,
+      catalogGroup: "printPreviewPages",
+      dataStatus: "not_proven",
+      browserRequired: true,
+      quantityNotProven: true,
+    })),
+    ...Array.from({ length: 5 }, (_, index) => ({
+      id: `printWorkspacePages:print-${index + 1}`,
+      catalogGroup: "printWorkspacePages",
+      dataStatus: "not_proven",
+      browserRequired: true,
+      quantityNotProven: true,
+    })),
+  ];
+  const report = {
+    summary: {
+      totalTargets: 48,
+      passedTargetData: 38,
+      failedTargetData: 0,
+      notProvenTargetData: 10,
+      queryChecksPassed: true,
+      queryEvidenceComplete: false,
+      manualAcceptanceCompleted: false,
+    },
+    targets,
+  };
+  assert.deepEqual(assertManualAcceptanceDatasetReadinessBoundary(report, 1), {
+    datasetSubstrateVerified: true,
+    browserEvidencePending: true,
+    browserOnlyNotProvenTargets: 10,
+  });
+
+  const wrongGap = structuredClone(report);
+  wrongGap.targets[38].catalogGroup = "desktopPages";
+  assert.throws(
+    () => assertManualAcceptanceDatasetReadinessBoundary(wrongGap, 1),
+    (error) => error?.code === "readiness_component_failed",
+  );
+  const failedQuery = structuredClone(report);
+  failedQuery.summary.failedTargetData = 1;
+  assert.throws(
+    () => assertManualAcceptanceDatasetReadinessBoundary(failedQuery, 1),
+    (error) => error?.code === "readiness_component_failed",
+  );
 });
 
 test("target capability evaluation accepts both exact targets without broadening target policy", () => {
