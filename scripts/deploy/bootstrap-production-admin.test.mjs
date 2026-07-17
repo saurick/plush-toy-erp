@@ -213,6 +213,19 @@ if [[ "\${1:-}" == "inspect" ]]; then
     if [[ -f "$FAKE_STATE_DIR/removed" ]]; then
       exit 1
     fi
+    if [[ "\${FAKE_INSPECT_FAILURE_AFTER_COMMIT:-0}" == "1" && -f "$FAKE_STATE_DIR/committed-readback-complete" ]]; then
+      exit 48
+    fi
+    if [[ "\${FAKE_AUTO_REMOVE_AFTER_VERIFIED:-0}" == "1" && -f "$FAKE_STATE_DIR/committed-readback-complete" ]]; then
+      if [[ -f "$FAKE_STATE_DIR/auto-remove-armed" ]]; then
+        touch "$FAKE_STATE_DIR/removed"
+        exit 1
+      fi
+      if [[ "$*" != *'--format'* ]]; then
+        touch "$FAKE_STATE_DIR/auto-remove-armed"
+        exit 0
+      fi
+    fi
     if [[ "$*" == *'.State.Running'* ]]; then
       if [[ "\${FAKE_ONE_SHOT_EARLY_EXIT:-0}" == "1" ]]; then
         printf 'false\n'
@@ -439,6 +452,9 @@ elif [[ "$args" == *'FROM permissions WHERE builtin IS TRUE'* ]]; then
 elif [[ "$args" == *'FROM roles WHERE builtin IS TRUE'* ]]; then
   printf '%s\n' "\${FAKE_BUILTIN_ROLE_COUNT:-10}"
 elif [[ "$args" == *'FROM role_permissions;'* ]]; then
+  if [[ "\${FAKE_AUTO_REMOVE_AFTER_VERIFIED:-0}" == "1" || "\${FAKE_INSPECT_FAILURE_AFTER_COMMIT:-0}" == "1" ]]; then
+    touch "$FAKE_STATE_DIR/committed-readback-complete"
+  fi
   printf '%s\n' "\${FAKE_ROLE_PERMISSION_COUNT:-30}"
 else
   exit 1
@@ -1364,7 +1380,7 @@ test("bootstrap production admin retains locks when random-operation discovery f
   }
 });
 
-test("bootstrap production admin releases locks after a compose run failure with no discovered container", (t) => {
+test("bootstrap production admin retains locks when a failed compose run has no verified container", (t) => {
   const fixture = writeFixture(t);
   const result = runHelper(fixture, {
     env: {
@@ -1376,11 +1392,11 @@ test("bootstrap production admin releases locks after a compose run failure with
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /一次性 app-server bootstrap 容器启动失败/u);
-  assert.doesNotMatch(result.stderr, /容器发现、身份复核或清理不确定/u);
+  assert.match(result.stderr, /容器发现、身份复核或清理不确定/u);
   assert.doesNotMatch(result.stderr, /advisory lock 无法证明已释放/u);
-  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), false);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), true);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "started")), false);
-  assert.equal(fs.existsSync(bootstrapLockPath(fixture)), false);
+  assert.equal(fs.existsSync(bootstrapLockPath(fixture)), true);
   assertSecretSafe(result, fixture);
 });
 
@@ -1395,6 +1411,37 @@ test("bootstrap production admin reports committed but not ready when container 
     JSON.stringify(result),
   );
   assert.match(result.stderr, /容器无法清理/u);
+  assertSecretSafe(result, fixture);
+});
+
+test("bootstrap production admin accepts an already verified --rm container disappearing during cleanup", (t) => {
+  const fixture = writeFixture(t);
+  const result = runHelper(fixture, {
+    env: { FAKE_AUTO_REMOVE_AFTER_VERIFIED: "1" },
+  });
+
+  assert.equal(result.status, 0, JSON.stringify(result));
+  assert.match(result.stdout, /status=complete/u);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "removed")), true);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "stopped")), false);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), false);
+  assert.equal(fs.existsSync(bootstrapLockPath(fixture)), false);
+  assertSecretSafe(result, fixture);
+});
+
+test("bootstrap production admin does not confuse Docker inspect failure with verified absence", (t) => {
+  const fixture = writeFixture(t);
+  const result = runHelper(fixture, {
+    env: { FAKE_INSPECT_FAILURE_AFTER_COMMIT: "1" },
+  });
+
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /bootstrap_committed_runtime_not_ready/u);
+  assert.match(result.stderr, /容器无法清理/u);
+  assert.match(result.stderr, /容器发现、身份复核或清理不确定/u);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "removed")), false);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), true);
+  assert.equal(fs.existsSync(bootstrapLockPath(fixture)), true);
   assertSecretSafe(result, fixture);
 });
 

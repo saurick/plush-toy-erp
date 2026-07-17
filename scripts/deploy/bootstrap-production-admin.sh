@@ -372,24 +372,49 @@ discover_one_shot_by_operation() {
     count=$((count + 1))
   done <<<"$output"
   [[ "$count" -le 1 ]] || return 1
-  if [[ "$count" -eq 0 ]]; then
-    return 0
-  fi
+  [[ "$count" -eq 1 ]] || return 1
   one_shot_cid="$candidate"
   verify_one_shot_identity "$one_shot_cid" || return 1
   one_shot_identity_verified=1
 }
 
+clear_one_shot_tracking() {
+  one_shot_cid=""
+  one_shot_name=""
+  one_shot_identity_verified=0
+  operation_id=""
+}
+
+confirm_verified_one_shot_absent() {
+  local output line count=0
+
+  [[ "${one_shot_identity_verified:-0}" -eq 1 ]] || return 1
+  [[ "$operation_id" =~ ^[0-9a-f]{32}$ ]] || return 1
+  if ! output="$(docker ps -aq --no-trunc --filter "label=$one_shot_operation_label=$operation_id" 2>/dev/null)"; then
+    return 1
+  fi
+  while IFS= read -r line; do
+    line="$(trim "$line")"
+    [[ -z "$line" ]] && continue
+    [[ "$line" =~ ^[0-9a-f]{64}$ ]] || return 1
+    count=$((count + 1))
+  done <<<"$output"
+  [[ "$count" -eq 0 ]] || return 1
+  clear_one_shot_tracking
+}
+
 ensure_one_shot_cleanup_identity() {
   if [[ "${one_shot_identity_verified:-0}" -eq 1 ]]; then
     if ! docker inspect "$one_shot_cid" >/dev/null 2>&1; then
-      one_shot_cid=""
-      one_shot_name=""
-      one_shot_identity_verified=0
-      operation_id=""
+      confirm_verified_one_shot_absent
+      return
+    fi
+    if verify_one_shot_identity "$one_shot_cid"; then
       return 0
     fi
-    verify_one_shot_identity "$one_shot_cid"
+    # --rm may delete the already verified one-shot between Docker inspect calls.
+    # An existing identity mismatch remains fail-closed; only proven absence is clean.
+    confirm_verified_one_shot_absent
     return
   fi
   if [[ -n "${one_shot_cid:-}" ]] && docker inspect "$one_shot_cid" >/dev/null 2>&1; then
@@ -407,26 +432,22 @@ best_effort_remove_one_shot() {
   container_ref="${one_shot_cid:-}"
   [[ -n "$container_ref" ]] || return 0
   if ! docker inspect "$container_ref" >/dev/null 2>&1; then
-    one_shot_cid=""
-    one_shot_name=""
-    one_shot_identity_verified=0
-    operation_id=""
-    return 0
+    confirm_verified_one_shot_absent
+    return
   fi
-  verify_one_shot_identity "$container_ref" || return 1
+  if ! verify_one_shot_identity "$container_ref"; then
+    confirm_verified_one_shot_absent
+    return
+  fi
   docker stop --time 10 "$container_ref" >/dev/null 2>&1 || true
   if docker inspect "$container_ref" >/dev/null 2>&1; then
-    verify_one_shot_identity "$container_ref" || return 1
+    if ! verify_one_shot_identity "$container_ref"; then
+      confirm_verified_one_shot_absent
+      return
+    fi
     docker rm --force "$container_ref" >/dev/null 2>&1 || true
   fi
-  if docker inspect "$container_ref" >/dev/null 2>&1; then
-    return 1
-  fi
-  one_shot_cid=""
-  one_shot_name=""
-  one_shot_identity_verified=0
-  operation_id=""
-  return 0
+  confirm_verified_one_shot_absent
 }
 
 cleanup() {
