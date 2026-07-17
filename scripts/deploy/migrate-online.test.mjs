@@ -270,6 +270,7 @@ function configureCustomerTrialFixture(fixture, replacements = {}) {
     ["POSTGRES_BIND_ADDR", "127.0.0.1"],
     ["APP_HTTP_BIND_ADDR", "127.0.0.1"],
     ["APP_GRPC_BIND_ADDR", "127.0.0.1"],
+    ["WEB_DESKTOP_BIND_ADDR", "127.0.0.1"],
     ["POSTGRES_PORT", "55435"],
     ["APP_HTTP_PORT", "8315"],
     ["APP_GRPC_PORT", "9315"],
@@ -609,6 +610,21 @@ test("migrate_online V5 强制精确 runtime env 文件与端口合同", async (
       const result = runMigration(fixture, ["--status-only"]);
       assert.notEqual(result.status, 0);
       assert.match(result.stderr, /JAEGER_UI_PORT=46687/u);
+      assert.deepEqual(atlasPhases(fixture.atlasLog), []);
+    } finally {
+      fs.rmSync(fixture.root, { recursive: true, force: true });
+    }
+  });
+
+  await t.test("V5 前端宿主绑定漂移", () => {
+    const fixture = createFixture();
+    try {
+      configureCustomerTrialFixture(fixture, {
+        WEB_DESKTOP_BIND_ADDR: "0.0.0.0",
+      });
+      const result = runMigration(fixture, ["--status-only"]);
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /WEB_DESKTOP_BIND_ADDR=127\.0\.0\.1/u);
       assert.deepEqual(atlasPhases(fixture.atlasLog), []);
     } finally {
       fs.rmSync(fixture.root, { recursive: true, force: true });

@@ -146,6 +146,7 @@ exec /usr/bin/mktemp "$template"
       "WEB_API_ORIGIN=http://app-server:8300",
       "APP_HTTP_BIND_ADDR=127.0.0.1",
       "APP_GRPC_BIND_ADDR=127.0.0.1",
+      "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
       `APP_JWT_SECRET=${"j".repeat(40)}`,
       "APP_AUTH_SMS_MODE=disabled",
       "APP_ADMIN_USERNAME=admin",
@@ -514,6 +515,7 @@ function configureTrialFixture(fixture) {
     POSTGRES_PORT: "55435",
     APP_HTTP_PORT: "8315",
     APP_GRPC_PORT: "9315",
+    WEB_DESKTOP_BIND_ADDR: "127.0.0.1",
     WEB_DESKTOP_PORT: "5185",
     JAEGER_5775_PORT: "45775",
     JAEGER_6831_PORT: "46831",
@@ -845,6 +847,7 @@ test("bootstrap production admin rejects every drift from the exact customer-tri
   const cases = [
     ["POSTGRES_DATA_DIR", "/home/simon/plush-toy-erp-v5/data/other"],
     ["MIGRATION_LOCK_FILE", path.join("__alternate__", "atlas-migrate.lock")],
+    ["WEB_DESKTOP_BIND_ADDR", "0.0.0.0"],
     ["JAEGER_5775_PORT", "25775"],
     ["JAEGER_6831_PORT", "26831"],
     ["JAEGER_6832_PORT", "26832"],

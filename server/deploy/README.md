@@ -38,6 +38,7 @@ Atlas migration 在生产 / 低配服务器上统一使用宿主机 `/usr/local/
 - `BOOTSTRAP_ADMIN_ONCE=false`；只有新库首次初始化 bootstrap 管理员时才临时改为 `true`
 - `POSTGRES_BIND_ADDR=127.0.0.1`，PostgreSQL 宿主机映射只允许 loopback
 - `APP_HTTP_BIND_ADDR=127.0.0.1` 和 `APP_GRPC_BIND_ADDR=127.0.0.1`，后端宿主机端口只允许 loopback；外部业务流量先进入前端 / 网关
+- `WEB_DESKTOP_BIND_ADDR=0.0.0.0`，普通内网部署前端默认对宿主机网络开放；也允许改为 `127.0.0.1` 交给同机网关。`customer-trial-133` 必须精确使用 `127.0.0.1` 并通过 SSH tunnel 验收
 - `ERP_DEBUG_ENV=prod`
 - `ERP_DEBUG_SEED_ENABLED=false`
 - `ERP_DEBUG_CLEANUP_ENABLED=false`

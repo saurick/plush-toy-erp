@@ -32,6 +32,7 @@
 | `PROJECT_SLUG`、`COMPOSE_PROJECT_NAME` | 隔离容器名称与 Compose project |
 | `APP_IMAGE`、`WEB_IMAGE` | 固定发布制品，目标机不构建 |
 | `POSTGRES_DB`、`POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DATA_DIR` | 独立数据库、账号和数据目录 |
+| `WEB_DESKTOP_BIND_ADDR`、`WEB_DESKTOP_PORT` | 前端宿主机监听地址与端口；内网直连用 `0.0.0.0`，同机网关或隧道用 `127.0.0.1` |
 | `CONTAINER_LOG_MAX_SIZE`、`CONTAINER_LOG_MAX_FILE` | 由可选 override 消费的容器日志轮转上限 |
 | `MIGRATION_LOCK_FILE` | 独立 migration 串行锁 |
 

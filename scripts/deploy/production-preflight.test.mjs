@@ -50,6 +50,7 @@ function writeFixture({
       "APP_HTTP_PORT=8300",
       "APP_GRPC_BIND_ADDR=127.0.0.1",
       "APP_GRPC_PORT=9300",
+      "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
       "WEB_DESKTOP_PORT=5175",
       `APP_JWT_SECRET=${jwtSecret}`,
       "APP_AUTH_SMS_MODE=disabled",
@@ -103,6 +104,8 @@ function writeFixture({
       '      - "${APP_GRPC_BIND_ADDR:-127.0.0.1}:9300:9300"',
       "  web-desktop:",
       "    image: ${WEB_IMAGE}",
+      "    ports:",
+      '      - "${WEB_DESKTOP_BIND_ADDR:-0.0.0.0}:${WEB_DESKTOP_PORT:-5175}:5175"',
       "",
     ].join("\n"),
     "utf8",
@@ -221,6 +224,7 @@ function configureExactCustomerTrialFixture(
     ["POSTGRES_PORT", "55435"],
     ["APP_HTTP_PORT", "8315"],
     ["APP_GRPC_PORT", "9315"],
+    ["WEB_DESKTOP_BIND_ADDR", "127.0.0.1"],
     ["WEB_DESKTOP_PORT", "5185"],
     ["JAEGER_5775_PORT", "45775"],
     ["JAEGER_6831_PORT", "46831"],
@@ -362,7 +366,11 @@ if [[ "\${1:-}" == "port" ]]; then
   if [[ "\${FAKE_RUNTIME_PORT_DRIFT_TARGET:-}" == "$cid:$container_port" ]]; then
     host_port="\${FAKE_RUNTIME_PORT_DRIFT_VALUE:-65534}"
   fi
-  printf '127.0.0.1:%s\n' "$host_port"
+  host_ip=127.0.0.1
+  if [[ "$cid" == "web-desktop-cid" ]]; then
+    host_ip="\${FAKE_RUNTIME_WEB_HOST_IP:-127.0.0.1}"
+  fi
+  printf '%s:%s\n' "$host_ip" "$host_port"
   exit 0
 fi
 if [[ "\${1:-}" == "inspect" ]]; then
@@ -472,6 +480,80 @@ test("production preflight accepts a prepared runtime env without docker config"
 
   assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
   assert.match(result.stdout, /all checks passed/);
+});
+
+test("production preflight accepts the supported normal web bind addresses", async (t) => {
+  for (const bindAddress of ["0.0.0.0", "127.0.0.1"]) {
+    await t.test(bindAddress, () => {
+      const fixture = writeFixture();
+      fs.writeFileSync(
+        fixture.envFile,
+        fs
+          .readFileSync(fixture.envFile, "utf8")
+          .replace(
+            "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
+            `WEB_DESKTOP_BIND_ADDR=${bindAddress}`,
+          ),
+      );
+
+      const result = runPreflight(fixture);
+      assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+    });
+  }
+});
+
+test("production preflight rejects a missing or unsupported web bind address", async (t) => {
+  await t.test("missing", () => {
+    const fixture = writeFixture();
+    fs.writeFileSync(
+      fixture.envFile,
+      fs
+        .readFileSync(fixture.envFile, "utf8")
+        .replace("WEB_DESKTOP_BIND_ADDR=0.0.0.0\n", ""),
+    );
+
+    const result = runPreflight(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /缺少必需变量: WEB_DESKTOP_BIND_ADDR/u);
+  });
+
+  await t.test("unsupported", () => {
+    const fixture = writeFixture();
+    fs.writeFileSync(
+      fixture.envFile,
+      fs
+        .readFileSync(fixture.envFile, "utf8")
+        .replace(
+          "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
+          "WEB_DESKTOP_BIND_ADDR=192.168.0.133",
+        ),
+    );
+
+    const result = runPreflight(fixture);
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /WEB_DESKTOP_BIND_ADDR 只允许 0\.0\.0\.0 或 127\.0\.0\.1/u,
+    );
+  });
+});
+
+test("production preflight rejects Compose that bypasses the web bind variable", () => {
+  const fixture = writeFixture();
+  const composePath = path.join(fixture.composeDir, "compose.yml");
+  fs.writeFileSync(
+    composePath,
+    fs
+      .readFileSync(composePath, "utf8")
+      .replace("WEB_DESKTOP_BIND_ADDR:-0.0.0.0", "WEB_DESKTOP_PORT:+0.0.0.0"),
+  );
+
+  const result = runPreflight(fixture);
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /Compose web desktop 端口必须显式消费 WEB_DESKTOP_BIND_ADDR/u,
+  );
 });
 
 test("production preflight snapshots a private env and passes only the snapshot to Compose", () => {
@@ -944,6 +1026,22 @@ test("production preflight rejects V5 runtime host port drift", () => {
   assert.match(result.stderr, /端口 8300\/tcp 未精确绑定 V5 独立宿主端口/u);
 });
 
+test("production preflight rejects a publicly bound V5 runtime web port", () => {
+  const fixture = writeFixture();
+  configureExactCustomerTrialFixture(fixture);
+  const result = runTrialPreflight(
+    fixture,
+    [...trialOverrideArgs(fixture), "--runtime"],
+    { env: { FAKE_RUNTIME_WEB_HOST_IP: "0.0.0.0" } },
+  );
+
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /web-desktop 端口 5175\/tcp 未精确绑定 V5 独立宿主端口/u,
+  );
+});
+
 test("production preflight rejects V5 runtime PostgreSQL mount drift", () => {
   const fixture = writeFixture();
   configureExactCustomerTrialFixture(fixture);
@@ -1215,6 +1313,27 @@ test("production preflight allows the exact isolated customer-trial-133 database
 
   const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
   assert.equal(result.status, 0, result.stderr);
+});
+
+test("production preflight requires a loopback web bind for customer-trial-133", () => {
+  const fixture = writeFixture();
+  configureExactCustomerTrialFixture(fixture);
+  fs.writeFileSync(
+    fixture.envFile,
+    fs
+      .readFileSync(fixture.envFile, "utf8")
+      .replace(
+        "WEB_DESKTOP_BIND_ADDR=127.0.0.1",
+        "WEB_DESKTOP_BIND_ADDR=0.0.0.0",
+      ),
+  );
+
+  const result = runTrialPreflight(fixture, trialOverrideArgs(fixture));
+  assert.notEqual(result.status, 0);
+  assert.match(
+    result.stderr,
+    /customer-trial-133 前端宿主机端口必须绑定 WEB_DESKTOP_BIND_ADDR=127\.0\.0\.1/u,
+  );
 });
 
 test("production preflight invokes V5 Compose with an explicit project and both files", () => {

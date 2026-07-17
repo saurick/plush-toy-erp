@@ -127,7 +127,7 @@ services:
     <<: *web-app-common
     container_name: "${PROJECT_SLUG:-plush-toy-erp}-web-desktop"
     ports:
-      - "${WEB_DESKTOP_PORT:-5175}:5175"
+      - "${WEB_DESKTOP_BIND_ADDR:-0.0.0.0}:${WEB_DESKTOP_PORT:-5175}:5175"
     environment:
       <<: *web-app-environment
       APP_ID: desktop

@@ -234,6 +234,7 @@ validate_trial_compose_inputs() {
   require_trial_env_value POSTGRES_BIND_ADDR 127.0.0.1
   require_trial_env_value APP_HTTP_BIND_ADDR 127.0.0.1
   require_trial_env_value APP_GRPC_BIND_ADDR 127.0.0.1
+  require_trial_env_value WEB_DESKTOP_BIND_ADDR 127.0.0.1
   for port_contract in \
     POSTGRES_PORT=55435 \
     APP_HTTP_PORT=8315 \
