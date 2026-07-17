@@ -2486,13 +2486,18 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
       const data = await rpcCall({
         backendURL: plan.backendURL,
         domain: "bom",
-        method: "create_bom_draft",
+        method: "save_bom_with_items",
         params: {
           ...record,
           product_id: refs.products.get(record.productRef).id,
           productRef: undefined,
           targetStatus: undefined,
-          items: undefined,
+          items: record.items.map((item) => ({
+            ...item,
+            material_id: materialIds.get(item.materialRef),
+            unit_id: refs.unit.id,
+            materialRef: undefined,
+          })),
         },
         token: tokens.engineering,
         fetchImpl,
@@ -2500,7 +2505,7 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
       bom = data.bom_version;
       if (!bom?.id)
         throw new CliError(
-          `create_bom_draft response missing id for ${record.version}`,
+          `save_bom_with_items response missing id for ${record.version}`,
         );
       existing.set(record.version, bom);
       headerAction = "create";
@@ -2549,24 +2554,42 @@ async function createBOMVersions({ plan, tokens, refs, fetchImpl, report }) {
       materialIds,
       unitId: refs.unit.id,
     });
-    for (const item of reconciliation.missing) {
+    if (
+      String(detail.status || "").toUpperCase() === "DRAFT" &&
+      (reconciliation.missing.length > 0 ||
+        reconciliation.actualCount !== record.items.length)
+    ) {
+      const existingByMaterial = new Map(
+        detail.items.map((item) => [Number(item.material_id || 0), item]),
+      );
       const data = await rpcCall({
         backendURL: plan.backendURL,
         domain: "bom",
-        method: "add_bom_item",
+        method: "save_bom_with_items",
         params: {
-          ...item,
-          bom_header_id: bom.id,
-          material_id: materialIds.get(item.materialRef),
-          unit_id: refs.unit.id,
-          materialRef: undefined,
+          ...record,
+          id: bom.id,
+          expected_version: detail.edit_version,
+          product_id: refs.products.get(record.productRef).id,
+          productRef: undefined,
+          targetStatus: undefined,
+          items: record.items.map((item) => {
+            const materialId = materialIds.get(item.materialRef);
+            return {
+              ...item,
+              id: existingByMaterial.get(materialId)?.id,
+              material_id: materialId,
+              unit_id: refs.unit.id,
+              materialRef: undefined,
+            };
+          }),
         },
         token: tokens.engineering,
         fetchImpl,
       });
-      if (!data.bom_item?.id) {
+      if (!data.bom_version?.id) {
         throw new CliError(
-          `add_bom_item response missing id for ${record.version}`,
+          `save_bom_with_items response missing id for ${record.version}`,
         );
       }
     }

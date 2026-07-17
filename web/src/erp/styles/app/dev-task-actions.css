@@ -26,19 +26,24 @@
 
 .erp-task-action-drawer__footer {
   display: flex;
-  justify-content: flex-end;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
   width: 100%;
 }
 
-.erp-task-action-drawer__footer-actions {
-  justify-content: flex-end;
-  width: 100%;
+.erp-task-action-drawer__footer-nav,
+.erp-task-action-drawer__footer-primary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 @media (max-width: 1280px) {
   .erp-command-center-hero,
   .erp-business-board-hero,
   .erp-business-board-lower-grid,
+  .erp-business-board-workspace,
   .erp-task-center-overview,
   .erp-product-core-dashboard__grid,
   .erp-workbench-main-grid {
@@ -57,6 +62,31 @@
 
   .erp-task-board-lanes {
     grid-template-columns: repeat(2, minmax(220px, 1fr));
+    grid-row: 3;
+  }
+
+  .erp-dashboard-task-board-card .erp-dashboard-block {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-task-center-summary,
+  .erp-task-board-filters,
+  .erp-task-board-lanes,
+  .erp-task-center-current {
+    grid-column: 1;
+  }
+
+  .erp-task-center-summary {
+    grid-row: 1;
+  }
+
+  .erp-task-board-filters {
+    grid-row: 2;
+  }
+
+  .erp-task-center-current {
+    grid-row: 4;
+    position: static;
   }
 }
 
@@ -65,12 +95,20 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-exception-flow-steps {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .erp-exception-workspace__main {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-exception-workspace__detail {
+    position: static;
   }
 
   .erp-business-board-alert-grid {
     grid-template-columns: 1fr;
+  }
+
+  .erp-business-board-attention-card.ant-card {
+    position: static;
   }
 
   .erp-product-core-entry-grid {
@@ -150,8 +188,15 @@
     border-left: 0;
   }
 
-  .erp-task-action-drawer__footer-actions .ant-space-item,
-  .erp-task-action-drawer__footer-actions .ant-btn {
+  .erp-task-action-drawer__footer {
+    align-items: stretch;
+    flex-direction: column-reverse;
+  }
+
+  .erp-task-action-drawer__footer-nav,
+  .erp-task-action-drawer__footer-primary,
+  .erp-task-action-drawer__footer-nav .ant-btn,
+  .erp-task-action-drawer__footer-primary .ant-btn {
     width: 100%;
   }
 
@@ -165,8 +210,28 @@
     align-items: stretch;
   }
 
-  .erp-exception-flow-steps {
+  .erp-exception-workspace__summary,
+  .erp-exception-workspace__section-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-exception-workspace__metrics {
+    width: 100%;
+  }
+
+  .erp-exception-workspace__metrics > span {
+    min-width: 0;
+  }
+
+  .erp-exception-workspace__item {
     grid-template-columns: 1fr;
+  }
+
+  .erp-exception-workspace__item-status {
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    justify-items: start;
   }
 
   .erp-task-board-lanes {

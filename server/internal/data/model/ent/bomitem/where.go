@@ -106,6 +106,11 @@ func ProcessMethod(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldEQ(FieldProcessMethod, v))
 }
 
+// ProductionOperationCode applies equality check predicate on the "production_operation_code" field. It's identical to ProductionOperationCodeEQ.
+func ProductionOperationCode(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldProductionOperationCode, v))
+}
+
 // Note applies equality check predicate on the "note" field. It's identical to NoteEQ.
 func Note(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldEQ(FieldNote, v))
@@ -634,6 +639,81 @@ func ProcessMethodEqualFold(v string) predicate.BOMItem {
 // ProcessMethodContainsFold applies the ContainsFold predicate on the "process_method" field.
 func ProcessMethodContainsFold(v string) predicate.BOMItem {
 	return predicate.BOMItem(sql.FieldContainsFold(FieldProcessMethod, v))
+}
+
+// ProductionOperationCodeEQ applies the EQ predicate on the "production_operation_code" field.
+func ProductionOperationCodeEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEQ(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeNEQ applies the NEQ predicate on the "production_operation_code" field.
+func ProductionOperationCodeNEQ(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNEQ(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeIn applies the In predicate on the "production_operation_code" field.
+func ProductionOperationCodeIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIn(FieldProductionOperationCode, vs...))
+}
+
+// ProductionOperationCodeNotIn applies the NotIn predicate on the "production_operation_code" field.
+func ProductionOperationCodeNotIn(vs ...string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotIn(FieldProductionOperationCode, vs...))
+}
+
+// ProductionOperationCodeGT applies the GT predicate on the "production_operation_code" field.
+func ProductionOperationCodeGT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGT(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeGTE applies the GTE predicate on the "production_operation_code" field.
+func ProductionOperationCodeGTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldGTE(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeLT applies the LT predicate on the "production_operation_code" field.
+func ProductionOperationCodeLT(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLT(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeLTE applies the LTE predicate on the "production_operation_code" field.
+func ProductionOperationCodeLTE(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldLTE(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeContains applies the Contains predicate on the "production_operation_code" field.
+func ProductionOperationCodeContains(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContains(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeHasPrefix applies the HasPrefix predicate on the "production_operation_code" field.
+func ProductionOperationCodeHasPrefix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasPrefix(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeHasSuffix applies the HasSuffix predicate on the "production_operation_code" field.
+func ProductionOperationCodeHasSuffix(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldHasSuffix(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeIsNil applies the IsNil predicate on the "production_operation_code" field.
+func ProductionOperationCodeIsNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldIsNull(FieldProductionOperationCode))
+}
+
+// ProductionOperationCodeNotNil applies the NotNil predicate on the "production_operation_code" field.
+func ProductionOperationCodeNotNil() predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldNotNull(FieldProductionOperationCode))
+}
+
+// ProductionOperationCodeEqualFold applies the EqualFold predicate on the "production_operation_code" field.
+func ProductionOperationCodeEqualFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldEqualFold(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeContainsFold applies the ContainsFold predicate on the "production_operation_code" field.
+func ProductionOperationCodeContainsFold(v string) predicate.BOMItem {
+	return predicate.BOMItem(sql.FieldContainsFold(FieldProductionOperationCode, v))
 }
 
 // NoteEQ applies the EQ predicate on the "note" field.

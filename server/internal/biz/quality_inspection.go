@@ -6,6 +6,8 @@ import (
 	"time"
 
 	corestatus "server/internal/core/status"
+
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -15,18 +17,23 @@ const (
 	QualityInspectionStatusRejected  = corestatus.QualityInspectionRejected
 	QualityInspectionStatusCancelled = corestatus.QualityInspectionCancelled
 
-	QualityInspectionResultPass       = "PASS"
-	QualityInspectionResultReject     = "REJECT"
-	QualityInspectionResultConcession = "CONCESSION"
+	QualityInspectionResultPass               = "PASS"
+	QualityInspectionResultReject             = "REJECT"
+	QualityInspectionResultConcession         = "CONCESSION"
+	QualityInspectionDefectRateOperatorApprox = "APPROX"
+	QualityInspectionDefectRateOperatorGT     = "GT"
 
 	QualityInspectionSourcePurchaseReceipt = "PURCHASE_RECEIPT"
 	QualityInspectionSourceShipment        = ShipmentSourceType
 	QualityInspectionSourceOutsourcingFact = OutsourcingFactSourceType
+	QualityInspectionSourceProductionWIP   = ProductionWIPQualitySourceType
 	QualityInspectionTypeIncoming          = "INCOMING"
 	QualityInspectionTypeFinishedGoods     = "FINISHED_GOODS"
 	QualityInspectionTypeOutsourcingReturn = "OUTSOURCING_RETURN"
+	QualityInspectionTypeProductionStage   = ProductionWIPQualityInspectionType
 	QualityInspectionSubjectMaterial       = "MATERIAL"
 	QualityInspectionSubjectProduct        = InventorySubjectProduct
+	QualityInspectionSubjectWIP            = ProductionWIPQualitySubjectType
 )
 
 var (
@@ -34,6 +41,10 @@ var (
 		QualityInspectionResultPass:       {},
 		QualityInspectionResultReject:     {},
 		QualityInspectionResultConcession: {},
+	}
+	qualityInspectionDefectRateOperators = map[string]struct{}{
+		QualityInspectionDefectRateOperatorApprox: {},
+		QualityInspectionDefectRateOperatorGT:     {},
 	}
 )
 
@@ -43,6 +54,8 @@ type QualityInspection struct {
 	PurchaseReceiptID     int
 	PurchaseReceiptItemID *int
 	InventoryLotID        int
+	ProductionWIPBatchID  *int
+	GateCode              *string
 	MaterialID            int
 	WarehouseID           int
 	SourceType            *string
@@ -56,7 +69,20 @@ type QualityInspection struct {
 	OriginalLotStatus     string
 	InspectedAt           *time.Time
 	InspectorID           *int
+	DefectRateOperator    *string
+	DefectRatePercent     *decimal.Decimal
 	DecisionNote          *string
+	// Production-stage list projections are resolved from the immutable route
+	// snapshot and WIP batch. They are read-only display fields, not quality
+	// decision inputs.
+	ProductionOrderNo     *string
+	ProductionOrderItemID *int
+	ProductCode           *string
+	ProductName           *string
+	OperationCode         *string
+	OperationName         *string
+	WIPBatchNo            *string
+	BatchQuantity         *decimal.Decimal
 	CreatedAt             time.Time
 	UpdatedAt             time.Time
 }
@@ -66,6 +92,8 @@ type QualityInspectionCreate struct {
 	PurchaseReceiptID     int
 	PurchaseReceiptItemID *int
 	InventoryLotID        int
+	ProductionWIPBatchID  int
+	GateCode              string
 	MaterialID            int
 	WarehouseID           int
 	SourceType            string
@@ -103,6 +131,8 @@ type QualityInspectionDecision struct {
 	// InspectedAtDefaulted means the input omitted inspected_at and this value was generated locally.
 	InspectedAtDefaulted bool
 	InspectorID          *int
+	DefectRateOperator   *string
+	DefectRatePercent    *decimal.Decimal
 	DecisionNote         *string
 }
 
@@ -116,6 +146,8 @@ type QualityInspectionFilter struct {
 	PurchaseReceiptItemID int
 	PurchaseOrderID       int
 	InventoryLotID        int
+	ProductionWIPBatchID  int
+	GateCode              string
 	MaterialID            int
 	WarehouseID           int
 	SourceType            string
@@ -283,6 +315,17 @@ func (uc *InventoryUsecase) ListOutsourcingReturnQualityInspections(ctx context.
 	return uc.repo.ListQualityInspections(ctx, normalized)
 }
 
+func (uc *InventoryUsecase) ListProductionStageQualityInspections(ctx context.Context, filter QualityInspectionFilter) ([]*QualityInspection, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeProductionStageQualityInspectionFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	return uc.repo.ListQualityInspections(ctx, normalized)
+}
+
 func (uc *InventoryUsecase) EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error) {
 	if uc == nil || uc.repo == nil || receiptID <= 0 {
 		return nil, ErrBadParam
@@ -297,6 +340,38 @@ func IsValidQualityInspectionStatus(value string) bool {
 func IsValidQualityInspectionResult(value string) bool {
 	_, ok := qualityInspectionResults[strings.ToUpper(strings.TrimSpace(value))]
 	return ok
+}
+
+func IsValidQualityInspectionDefectRateOperator(value string) bool {
+	_, ok := qualityInspectionDefectRateOperators[strings.ToUpper(strings.TrimSpace(value))]
+	return ok
+}
+
+// NormalizeQualityInspectionDefectRate keeps the approximate defect-rate pair
+// canonical across direct decisions, process-command fingerprints and storage.
+// required is applied only when a new SUBMITTED inspection is being decided;
+// terminal historical rows may legitimately have no pair.
+func NormalizeQualityInspectionDefectRate(operator *string, percent *decimal.Decimal, required bool) (*string, *decimal.Decimal, error) {
+	if operator == nil && percent == nil {
+		if required {
+			return nil, nil, ErrBadParam
+		}
+		return nil, nil, nil
+	}
+	if operator == nil || percent == nil {
+		return nil, nil, ErrBadParam
+	}
+	normalizedOperator := strings.ToUpper(strings.TrimSpace(*operator))
+	if !IsValidQualityInspectionDefectRateOperator(normalizedOperator) {
+		return nil, nil, ErrBadParam
+	}
+	normalizedPercent, err := decimal.NewFromString(percent.String())
+	if err != nil || normalizedPercent.IsNegative() || normalizedPercent.GreaterThan(decimal.NewFromInt(100)) ||
+		!normalizedPercent.Equal(normalizedPercent.Truncate(6)) ||
+		(normalizedOperator == QualityInspectionDefectRateOperatorGT && !normalizedPercent.LessThan(decimal.NewFromInt(100))) {
+		return nil, nil, ErrBadParam
+	}
+	return &normalizedOperator, &normalizedPercent, nil
 }
 
 func normalizeQualityInspectionCreateBase(in QualityInspectionCreate) QualityInspectionCreate {
@@ -386,6 +461,12 @@ func normalizeQualityInspectionDecision(in QualityInspectionDecision, defaultRes
 	if in.InspectorID != nil && *in.InspectorID <= 0 {
 		in.InspectorID = nil
 	}
+	defectRateOperator, defectRatePercent, err := NormalizeQualityInspectionDefectRate(in.DefectRateOperator, in.DefectRatePercent, false)
+	if err != nil {
+		return QualityInspectionDecision{}, err
+	}
+	in.DefectRateOperator = defectRateOperator
+	in.DefectRatePercent = defectRatePercent
 	if in.InspectionID <= 0 || !IsValidQualityInspectionResult(in.Result) {
 		return QualityInspectionDecision{}, ErrBadParam
 	}
@@ -403,6 +484,7 @@ func normalizeQualityInspectionFilter(in QualityInspectionFilter) (QualityInspec
 	in.SourceType = strings.ToUpper(strings.TrimSpace(in.SourceType))
 	in.InspectionType = strings.ToUpper(strings.TrimSpace(in.InspectionType))
 	in.SubjectType = strings.ToUpper(strings.TrimSpace(in.SubjectType))
+	in.GateCode = strings.ToUpper(strings.TrimSpace(in.GateCode))
 	in.Keyword = strings.TrimSpace(in.Keyword)
 	if in.Status != "" && !IsValidQualityInspectionStatus(in.Status) {
 		return QualityInspectionFilter{}, ErrBadParam
@@ -410,13 +492,25 @@ func normalizeQualityInspectionFilter(in QualityInspectionFilter) (QualityInspec
 	if in.Result != "" && !IsValidQualityInspectionResult(in.Result) {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
-	if in.SourceType != "" && in.SourceType != QualityInspectionSourcePurchaseReceipt {
+	if in.SourceType == "" {
+		in.SourceType = QualityInspectionSourcePurchaseReceipt
+	}
+	if in.InspectionType == "" {
+		in.InspectionType = QualityInspectionTypeIncoming
+	}
+	if in.SubjectType == "" {
+		in.SubjectType = QualityInspectionSubjectMaterial
+	}
+	if in.SourceType != QualityInspectionSourcePurchaseReceipt {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
-	if in.InspectionType != "" && in.InspectionType != QualityInspectionTypeIncoming {
+	if in.InspectionType != QualityInspectionTypeIncoming {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
-	if in.SubjectType != "" && in.SubjectType != QualityInspectionSubjectMaterial {
+	if in.SubjectType != QualityInspectionSubjectMaterial {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.ProductionWIPBatchID > 0 || in.GateCode != "" {
 		return QualityInspectionFilter{}, ErrBadParam
 	}
 	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
@@ -492,6 +586,42 @@ func normalizeOutsourcingReturnQualityInspectionFilter(in QualityInspectionFilte
 	in.SourceType = QualityInspectionSourceOutsourcingFact
 	in.InspectionType = QualityInspectionTypeOutsourcingReturn
 	in.SubjectType = QualityInspectionSubjectProduct
+	if in.Limit <= 0 || in.Limit > 200 {
+		in.Limit = 50
+	}
+	if in.Offset < 0 {
+		in.Offset = 0
+	}
+	return in, nil
+}
+
+func normalizeProductionStageQualityInspectionFilter(in QualityInspectionFilter) (QualityInspectionFilter, error) {
+	in.Status = strings.ToUpper(strings.TrimSpace(in.Status))
+	in.Result = strings.ToUpper(strings.TrimSpace(in.Result))
+	in.GateCode = strings.ToUpper(strings.TrimSpace(in.GateCode))
+	in.Keyword = strings.TrimSpace(in.Keyword)
+	if in.Status != "" && !IsValidQualityInspectionStatus(in.Status) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.Result != "" && !IsValidQualityInspectionResult(in.Result) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.GateCode != "" && !isProductionWIPQualityGate(in.GateCode) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.PurchaseReceiptID > 0 || in.PurchaseReceiptItemID > 0 || in.PurchaseOrderID > 0 ||
+		in.InventoryLotID > 0 || in.MaterialID > 0 || in.WarehouseID > 0 || in.SubjectID > 0 {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	if in.DateFrom != nil && in.DateTo != nil && in.DateFrom.After(*in.DateTo) {
+		return QualityInspectionFilter{}, ErrBadParam
+	}
+	in.SourceType = QualityInspectionSourceProductionWIP
+	in.InspectionType = QualityInspectionTypeProductionStage
+	in.SubjectType = QualityInspectionSubjectWIP
+	if in.ProductionWIPBatchID > 0 {
+		in.SourceID = in.ProductionWIPBatchID
+	}
 	if in.Limit <= 0 || in.Limit > 200 {
 		in.Limit = 50
 	}

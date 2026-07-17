@@ -40,7 +40,7 @@ test('contractPrintDraftCompleteness: processing draft fills missing display fie
       {
         productNo: 'P-001',
         productName: '抱枕',
-        processName: '车缝',
+        processingItem: '本体',
         quantity: '12',
         unitPrice: '3.2',
         amount: '38.4',
@@ -53,6 +53,7 @@ test('contractPrintDraftCompleteness: processing draft fills missing display fie
   assert.equal(draft.buyerContact, '未配置委托人')
   assert.equal(draft.lines[0].supplierAlias, '加工厂 A')
   assert.equal(draft.lines[0].productOrderNo, '未关联产品订单')
+  assert.equal(draft.lines[0].processingItem, '本体')
   assert.equal(draft.lines[0].processCategory, '未维护工序类别')
 })
 

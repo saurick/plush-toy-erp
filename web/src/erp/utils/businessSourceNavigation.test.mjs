@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url'
 import test from 'node:test'
 
 import {
+  businessRecordInventoryRouteFor,
   businessSourceRouteFor,
   sourceRouteFor,
 } from './businessSourceNavigation.mjs'
@@ -57,6 +58,23 @@ test('business source navigation fails closed for indirect or ambiguous source i
   }
   assert.equal(businessSourceRouteFor('SALES_ORDER', 0), '')
   assert.equal(businessSourceRouteFor('SALES_ORDER', 'not-an-id'), '')
+})
+
+test('business record inventory navigation uses the posted fact itself as the ledger source', () => {
+  assert.equal(
+    businessRecordInventoryRouteFor('production', 21),
+    '/erp/warehouse/inventory?source_type=PRODUCTION_FACT&source_id=21&view=txns'
+  )
+  assert.equal(
+    businessRecordInventoryRouteFor('outsourcing', 22),
+    '/erp/warehouse/inventory?source_type=OUTSOURCING_FACT&source_id=22&view=txns'
+  )
+  assert.equal(
+    businessRecordInventoryRouteFor('shipments', 23),
+    '/erp/warehouse/inventory?source_type=SHIPMENT&source_id=23&view=txns'
+  )
+  assert.equal(businessRecordInventoryRouteFor('reservations', 24), '')
+  assert.equal(businessRecordInventoryRouteFor('production', 0), '')
 })
 
 test('direct source route keys are consumed by their target pages', () => {

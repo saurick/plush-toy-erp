@@ -16,6 +16,14 @@ import {
 
 export const PRINT_TEMPLATE_FACT_BOUNDARY = 'read_snapshot_only'
 
+const APPENDIX_IMAGE_FIELD_REQUIREMENT = {
+  key: 'appendix_image_snapshots',
+  label: '末尾附图',
+  source: '当前打印窗口添加的图片',
+  boundary:
+    '图片数量不设业务上限；普通图片自动两张一行，长图自动整行，可逐张切换排版；只随当前草稿、PDF / 打印输出，不替代正式附件归档',
+}
+
 export const printTemplateCatalog = [
   {
     key: 'material-purchase-contract',
@@ -77,6 +85,7 @@ export const printTemplateCatalog = [
         source: '正式模板正文',
         boundary: '纸面文本可编辑；审批、签收和财务处理仍需在对应业务流程完成',
       },
+      APPENDIX_IMAGE_FIELD_REQUIREMENT,
     ],
     helpNotes: [
       '这张模板适合采购发起材料采购下单、供应商确认和财务留档；辅料、包材等都来自材料资料。',
@@ -101,6 +110,7 @@ export const printTemplateCatalog = [
       supplierSigner: '供应商签字人',
       signDateText: '2026/2/28',
       supplierSignDateText: '2026/2/28',
+      appendixImages: [],
       lines: [
         {
           contractNo: 'A26022832',
@@ -167,20 +177,20 @@ export const printTemplateCatalog = [
     summary: '供板房工程部整理物料明细并交给仓库核对发料。',
     scene: '板房工程部整理物料明细，打印给仓库按物料、部位和工艺方式发料。',
     layout:
-      'A4 竖版明细表，包含产品头信息、右上产品图、材料明细、审核制表和页底产品图槽。',
+      'A4 竖版明细表，包含产品头信息、右上 0–2 张产品图、材料明细、审核制表和按顺序追加的末尾附图。',
     output: '在线预览 PDF / 下载 PDF / 打印',
     notes: [
       '物料明细用于工程资料打印和仓库发料核对，不会自动生成采购、库存、生产或财务记录。',
-      '右上角和页底图片槽只进入当前打印草稿和输出，不替代业务附件归档。',
-      '从 BOM 管理选中版本打开时，只带入当前产品、版本和 BOM 明细；缺失内容保持空白。',
+      '从 BOM 打开时，右上角优先带入产品基础信息中的 0–2 张产品图；打印窗口仍可只为当前草稿替换或清空。末尾附图继续由打印窗口维护。',
+      '从物料清单（BOM）页面选中版本打开时，只带入当前产品、版本和 BOM 明细；缺失内容保持空白。',
     ],
     tags: ['工程资料', '物料明细', '图片槽', 'PDF / 打印'],
-    previewLines: ['产品头信息', '材料明细 / 用量', '右上与页底图片槽'],
+    previewLines: ['产品头信息', '材料明细 / 用量', '右上产品图 / 末尾附图'],
     sourceFiles: ['来源样本：材料分析明细工作表'],
     fieldTruth: [
       '产品编号、产品名称、BOM 版本和材料明细优先来自所选 BOM 版本及其明细。',
       '单位用量、损耗率、部位、备注来自 BOM 明细或当前打印草稿，不反写 BOM。',
-      '图片来自当前打印窗口上传的内容，不会自动保存为业务附件。',
+      '右上图片可来自产品基础信息中的产品图或当前打印窗口；末尾附图来自当前打印窗口。草稿修改不会反向修改产品主档或业务附件。',
     ],
     fieldRequirements: [
       {
@@ -197,10 +207,12 @@ export const printTemplateCatalog = [
       },
       {
         key: 'print_image_slots',
-        label: '右上和页底图片槽',
-        source: '当前打印窗口上传的图片',
-        boundary: '随当前 PDF / 打印输出保留，不会自动保存为正式附件',
+        label: '右上产品图 1 / 2',
+        source: '产品基础信息的产品图快照，或当前打印窗口上传的图片',
+        boundary:
+          '打开时冻结到当前草稿；打印窗口修改不会反向修改产品主档或业务附件',
       },
+      APPENDIX_IMAGE_FIELD_REQUIREMENT,
     ],
     helpNotes: [
       '色卡和物料明细均服务板房工程部，打印后给仓库发料核对。',
@@ -223,7 +235,7 @@ export const printTemplateCatalog = [
     output: '在线预览 PDF / 下载 PDF / 打印',
     notes: [
       '色卡用于打印核对，贴样在线下完成，不会自动修改材料档案或库存记录。',
-      '从 BOM 管理带值时按 BOM 明细生成物料分块，无法确认的颜色 / 加工方式保持空白。',
+      '从物料清单（BOM）页面带值时按 BOM 明细生成物料分块，无法确认的颜色 / 加工方式保持空白。',
     ],
     tags: ['工程资料', '色卡', '对色发料', 'PDF / 打印'],
     previewLines: ['产品信息', '物料分块', '制卡 / 审核 / 复核'],
@@ -246,6 +258,7 @@ export const printTemplateCatalog = [
         source: 'BOM 明细、材料资料或打印草稿',
         boundary: '只用于线下贴样和仓库对照，不会自动生成库存或采购记录',
       },
+      APPENDIX_IMAGE_FIELD_REQUIREMENT,
     ],
     helpNotes: [
       '色卡用于板房线下贴样；打印不会自动保存为附件，也不会修改系统中的业务资料。',
@@ -265,11 +278,11 @@ export const printTemplateCatalog = [
     scene:
       '工程部准备产品作业资料，供生产和品质参考；从委外订单进入时可带入加工项目、数量和回货信息。',
     layout:
-      'A4 竖版作业指导书，包含产品头信息、右上产品图、可变标题 / 编号 / 文本正文行；正文行默认等高，编号行可维护行内图片。',
+      'A4 竖版作业指导书，包含产品头信息、右上 0–2 张产品图、可变标题 / 编号 / 文本正文行；正文行默认等高，编号行可维护行内图片。',
     output: '在线预览 PDF / 下载 PDF / 打印',
     notes: [
-      '作业指导书可从 BOM 管理带入产品和工程资料，也可从委外订单带入加工厂、加工项目、数量和回货信息；两者都只生成当前打印草稿。',
-      '右上产品图和编号行图片只进入当前打印草稿；正文行可添加并切换为标题行、编号行或文本行，图片只允许放在编号行。',
+      '作业指导书可从物料清单（BOM）页面带入产品和工程资料，也可从委外订单带入加工厂、加工项目、数量和回货信息；两者都只生成当前打印草稿。',
+      '从单一产品的 BOM 或委外订单打开时，右上角优先带入产品基础信息中的 0–2 张产品图；多产品委外不猜测首行产品。右上产品图和编号行图片都只进入当前打印草稿。',
     ],
     tags: ['工程资料', '作业指导', '加工厂', '图片槽'],
     previewLines: ['产品头信息', '可变正文行', '编号行 / 图片槽'],
@@ -277,7 +290,7 @@ export const printTemplateCatalog = [
     fieldTruth: [
       '产品编号、产品名称和 BOM 版本来自 BOM 版本、委外订单明细、产品资料或打印草稿；加工厂、加工项目、委外数量和回货日期只在从委外订单打开时带入。',
       '标题行、编号行和文本行都属于打印正文，不固定为裁床、刺绣 / 印花或车缝，也不会自动生成生产、质检或库存记录。',
-      '右上图片和编号行图片来自当前打印窗口上传的图片。',
+      '右上图片可来自产品基础信息中的产品图快照或当前打印窗口；编号行图片来自当前打印窗口。',
     ],
     fieldRequirements: [
       {
@@ -294,13 +307,15 @@ export const printTemplateCatalog = [
       },
       {
         key: 'work_instruction_image_slots',
-        label: '右上和编号行图片槽',
-        source: '当前打印窗口上传的图片',
-        boundary: '随当前 PDF / 打印输出保留，不会自动保存为正式附件',
+        label: '右上产品图 1 / 2 和编号行图片槽',
+        source: '产品基础信息的产品图快照，以及当前打印窗口上传的图片',
+        boundary:
+          '随当前 PDF / 打印输出保留；打印窗口修改不会反向修改产品主档或业务附件',
       },
+      APPENDIX_IMAGE_FIELD_REQUIREMENT,
     ],
     helpNotes: [
-      '从 BOM 管理进入时会带入产品资料；从委外订单进入时会带入加工厂和加工内容。打印不会自动更新生产、委外、质检或库存记录。',
+      '从物料清单（BOM）页面进入时会带入产品资料；从委外订单进入时会带入加工厂和加工内容。打印不会自动更新生产、委外、质检或库存记录。',
     ],
     sample: createWorkInstructionDraft(DEFAULT_WORK_INSTRUCTION_SAMPLE),
   },

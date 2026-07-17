@@ -21,7 +21,6 @@ import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js
 import {
   BusinessDataTable,
   BusinessOperationPanel,
-  CollaborationTaskPanel,
   BusinessPageLayout,
   DateRangeFilter,
   PageHeaderCard,

@@ -54,6 +54,13 @@ const DATA_BOUNDARIES = Object.freeze([
   },
 ])
 
+const DATA_BOUNDARY_LABELS = Object.freeze({
+  [DASHBOARD_TRUTH_KINDS.MASTER_DATA]: '基础资料',
+  [DASHBOARD_TRUTH_KINDS.SOURCE_DOCUMENT]: '业务单据',
+  [DASHBOARD_TRUTH_KINDS.BUSINESS_FACT]: '办理结果',
+  [DASHBOARD_TRUTH_KINDS.COLLABORATION]: '待办事项',
+})
+
 function formatCount(value) {
   return Number.isSafeInteger(value) && value >= 0
     ? NUMBER_FORMATTER.format(value)
@@ -155,6 +162,16 @@ export default function BusinessDashboardPage() {
   const moduleRows = useMemo(
     () => buildDashboardModuleRows(dashboardHealthModules, moduleStats),
     [moduleStats]
+  )
+  const businessSourceRows = useMemo(
+    () =>
+      moduleRows.flatMap((moduleRow) =>
+        moduleRow.sources.map((source) => ({
+          ...source,
+          module: moduleRow.module,
+        }))
+      ),
+    [moduleRows]
   )
   const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
   const isSuperAdmin = outletContext?.adminProfile?.is_super_admin === true
@@ -285,7 +302,7 @@ export default function BusinessDashboardPage() {
               业务看板
             </Title>
             <Paragraph type="secondary" className="erp-dashboard-summary">
-              查看各类业务数据，并进入对应页面继续处理。
+              从业务数量和待办风险定位需要关注的环节。
             </Paragraph>
           </div>
         </div>
@@ -326,18 +343,98 @@ export default function BusinessDashboardPage() {
         </Paragraph>
       </Card>
 
-      <Card
-        className="erp-dashboard-card erp-dashboard-table-card"
-        variant="borderless"
-        title="各类业务数据"
-      >
-        {dashboardLoadError ? (
-          <Alert
-            type="warning"
-            showIcon
-            message="业务统计暂不可用"
-            description="仍可进入各业务页面；数字恢复后请刷新本页。"
-            className="erp-business-board-inline-alert"
+      <div className="erp-business-board-workspace">
+        <Card
+          className="erp-dashboard-card erp-dashboard-table-card"
+          variant="borderless"
+          title="业务数据"
+        >
+          {dashboardLoadError ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="业务统计暂不可用"
+              description="仍可进入各业务页面；数字恢复后请刷新本页。"
+              className="erp-business-board-inline-alert"
+            />
+          ) : null}
+          <Paragraph type="secondary" className="erp-business-board-table-note">
+            每项分别统计；0 表示当前确实为零，—
+            表示统计暂不可用。点击“查看业务记录”进入，电脑端也可双击整行。
+          </Paragraph>
+          <Table
+            size="middle"
+            loading={{
+              spinning: loading,
+              indicator: <Spin size="small" />,
+            }}
+            pagination={false}
+            rowKey="key"
+            scroll={{ x: 760 }}
+            rowClassName="erp-business-board-source-item--openable"
+            onRow={(source) => ({
+              'data-open-on-double-click': 'true',
+              title: `双击进入${source.label}`,
+              onDoubleClick: (event) =>
+                openDashboardItemOnDoubleClick(event, () =>
+                  navigate(source.path)
+                ),
+            })}
+            columns={[
+              {
+                title: '业务环节',
+                dataIndex: 'module',
+                fixed: 'left',
+                width: 150,
+                render: (value) => <Text strong>{value}</Text>,
+              },
+              {
+                title: '业务记录',
+                dataIndex: 'label',
+                width: 180,
+                render: (value) => <Text>{value}</Text>,
+              },
+              {
+                title: '当前数量',
+                dataIndex: 'total',
+                width: 110,
+                align: 'right',
+                render: (_, source) => (
+                  <strong
+                    className="erp-business-board-source-count"
+                    aria-label={`${source.label}数量${
+                      source.available ? formatCount(source.total) : '暂不可用'
+                    }`}
+                  >
+                    {source.available ? formatCount(source.total) : '—'}
+                  </strong>
+                ),
+              },
+              {
+                title: '统计口径',
+                dataIndex: 'truthKind',
+                width: 120,
+                render: (value) => DATA_BOUNDARY_LABELS[value] || '业务数据',
+              },
+              {
+                title: '进入业务',
+                key: 'entry',
+                width: 150,
+                fixed: 'right',
+                render: (_, source) => (
+                  <Button
+                    type="link"
+                    size="small"
+                    className="erp-business-board-source-entry"
+                    onClick={() => navigate(source.path)}
+                    aria-label={`查看${source.label}`}
+                  >
+                    查看业务记录
+                  </Button>
+                ),
+              },
+            ]}
+            dataSource={businessSourceRows}
           />
         ) : null}
         <Paragraph type="secondary" className="erp-business-board-table-note">
@@ -387,10 +484,13 @@ export default function BusinessDashboardPage() {
           </Space>
         </Card>
 
-        <Card className="erp-dashboard-card" variant="borderless">
+        <Card
+          className="erp-dashboard-card erp-business-board-attention-card"
+          variant="borderless"
+        >
           <Space direction="vertical" className="erp-dashboard-block" size={8}>
             <Title level={5} className="erp-dashboard-section-title">
-              待办概览
+              需要关注
             </Title>
             {workflowLoadError ? (
               <Alert
@@ -402,7 +502,7 @@ export default function BusinessDashboardPage() {
               />
             ) : null}
             <div className="erp-business-board-alert-grid">
-              {TASK_BOARD_LANE_DEFINITIONS.map((definition) => {
+              {BUSINESS_ATTENTION_LANES.map((definition) => {
                 const lane = getLane(taskBoard, definition.key)
                 const total = taskBoardReady
                   ? taskBoard.counts[definition.key]
@@ -464,11 +564,17 @@ export default function BusinessDashboardPage() {
               })}
             </div>
             <Text type="secondary">
-              四类任务互不重复；显示当前账号可见的总数，每类最多展示一项。
+              阻塞和到期任务互不重复；显示当前账号可见的总数，每类最多展示一项。
             </Text>
           </Space>
         </Card>
       </div>
+
+      <Text type="secondary" className="erp-business-board-boundary-summary">
+        {DATA_BOUNDARIES.map(
+          (item) => `${item.title}：${item.description}`
+        ).join('；')}
+      </Text>
     </Space>
   )
 }

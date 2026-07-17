@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/qualityinspection"
@@ -15,6 +16,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"github.com/shopspring/decimal"
 )
 
 // QualityInspection is the model entity for the QualityInspection schema.
@@ -29,11 +31,15 @@ type QualityInspection struct {
 	// PurchaseReceiptItemID holds the value of the "purchase_receipt_item_id" field.
 	PurchaseReceiptItemID *int `json:"purchase_receipt_item_id,omitempty"`
 	// InventoryLotID holds the value of the "inventory_lot_id" field.
-	InventoryLotID int `json:"inventory_lot_id,omitempty"`
+	InventoryLotID *int `json:"inventory_lot_id,omitempty"`
+	// ProductionWipBatchID holds the value of the "production_wip_batch_id" field.
+	ProductionWipBatchID *int `json:"production_wip_batch_id,omitempty"`
+	// GateCode holds the value of the "gate_code" field.
+	GateCode *string `json:"gate_code,omitempty"`
 	// MaterialID holds the value of the "material_id" field.
 	MaterialID *int `json:"material_id,omitempty"`
 	// WarehouseID holds the value of the "warehouse_id" field.
-	WarehouseID int `json:"warehouse_id,omitempty"`
+	WarehouseID *int `json:"warehouse_id,omitempty"`
 	// SourceType holds the value of the "source_type" field.
 	SourceType *string `json:"source_type,omitempty"`
 	// SourceID holds the value of the "source_id" field.
@@ -54,6 +60,10 @@ type QualityInspection struct {
 	InspectedAt *time.Time `json:"inspected_at,omitempty"`
 	// InspectorID holds the value of the "inspector_id" field.
 	InspectorID *int `json:"inspector_id,omitempty"`
+	// DefectRateOperator holds the value of the "defect_rate_operator" field.
+	DefectRateOperator *string `json:"defect_rate_operator,omitempty"`
+	// DefectRatePercent holds the value of the "defect_rate_percent" field.
+	DefectRatePercent *decimal.Decimal `json:"defect_rate_percent,omitempty"`
 	// DecisionNote holds the value of the "decision_note" field.
 	DecisionNote *string `json:"decision_note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -74,6 +84,8 @@ type QualityInspectionEdges struct {
 	PurchaseReceiptItem *PurchaseReceiptItem `json:"purchase_receipt_item,omitempty"`
 	// InventoryLot holds the value of the inventory_lot edge.
 	InventoryLot *InventoryLot `json:"inventory_lot,omitempty"`
+	// ProductionWipBatch holds the value of the production_wip_batch edge.
+	ProductionWipBatch *ProductionWIPBatch `json:"production_wip_batch,omitempty"`
 	// Material holds the value of the material edge.
 	Material *Material `json:"material,omitempty"`
 	// Warehouse holds the value of the warehouse edge.
@@ -82,7 +94,7 @@ type QualityInspectionEdges struct {
 	PurchaseReturns []*PurchaseReturn `json:"purchase_returns,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [7]bool
 }
 
 // PurchaseReceiptOrErr returns the PurchaseReceipt value or an error if the edge
@@ -118,12 +130,23 @@ func (e QualityInspectionEdges) InventoryLotOrErr() (*InventoryLot, error) {
 	return nil, &NotLoadedError{edge: "inventory_lot"}
 }
 
+// ProductionWipBatchOrErr returns the ProductionWipBatch value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e QualityInspectionEdges) ProductionWipBatchOrErr() (*ProductionWIPBatch, error) {
+	if e.ProductionWipBatch != nil {
+		return e.ProductionWipBatch, nil
+	} else if e.loadedTypes[3] {
+		return nil, &NotFoundError{label: productionwipbatch.Label}
+	}
+	return nil, &NotLoadedError{edge: "production_wip_batch"}
+}
+
 // MaterialOrErr returns the Material value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e QualityInspectionEdges) MaterialOrErr() (*Material, error) {
 	if e.Material != nil {
 		return e.Material, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[4] {
 		return nil, &NotFoundError{label: material.Label}
 	}
 	return nil, &NotLoadedError{edge: "material"}
@@ -134,7 +157,7 @@ func (e QualityInspectionEdges) MaterialOrErr() (*Material, error) {
 func (e QualityInspectionEdges) WarehouseOrErr() (*Warehouse, error) {
 	if e.Warehouse != nil {
 		return e.Warehouse, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: warehouse.Label}
 	}
 	return nil, &NotLoadedError{edge: "warehouse"}
@@ -143,7 +166,7 @@ func (e QualityInspectionEdges) WarehouseOrErr() (*Warehouse, error) {
 // PurchaseReturnsOrErr returns the PurchaseReturns value or an error if the edge
 // was not loaded in eager-loading.
 func (e QualityInspectionEdges) PurchaseReturnsOrErr() ([]*PurchaseReturn, error) {
-	if e.loadedTypes[5] {
+	if e.loadedTypes[6] {
 		return e.PurchaseReturns, nil
 	}
 	return nil, &NotLoadedError{edge: "purchase_returns"}
@@ -154,9 +177,11 @@ func (*QualityInspection) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
-		case qualityinspection.FieldID, qualityinspection.FieldPurchaseReceiptID, qualityinspection.FieldPurchaseReceiptItemID, qualityinspection.FieldInventoryLotID, qualityinspection.FieldMaterialID, qualityinspection.FieldWarehouseID, qualityinspection.FieldSourceID, qualityinspection.FieldSubjectID, qualityinspection.FieldInspectorID:
+		case qualityinspection.FieldDefectRatePercent:
+			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
+		case qualityinspection.FieldID, qualityinspection.FieldPurchaseReceiptID, qualityinspection.FieldPurchaseReceiptItemID, qualityinspection.FieldInventoryLotID, qualityinspection.FieldProductionWipBatchID, qualityinspection.FieldMaterialID, qualityinspection.FieldWarehouseID, qualityinspection.FieldSourceID, qualityinspection.FieldSubjectID, qualityinspection.FieldInspectorID:
 			values[i] = new(sql.NullInt64)
-		case qualityinspection.FieldInspectionNo, qualityinspection.FieldSourceType, qualityinspection.FieldInspectionType, qualityinspection.FieldSubjectType, qualityinspection.FieldStatus, qualityinspection.FieldResult, qualityinspection.FieldOriginalLotStatus, qualityinspection.FieldDecisionNote:
+		case qualityinspection.FieldInspectionNo, qualityinspection.FieldGateCode, qualityinspection.FieldSourceType, qualityinspection.FieldInspectionType, qualityinspection.FieldSubjectType, qualityinspection.FieldStatus, qualityinspection.FieldResult, qualityinspection.FieldOriginalLotStatus, qualityinspection.FieldDefectRateOperator, qualityinspection.FieldDecisionNote:
 			values[i] = new(sql.NullString)
 		case qualityinspection.FieldInspectedAt, qualityinspection.FieldCreatedAt, qualityinspection.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -205,7 +230,22 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field inventory_lot_id", values[i])
 			} else if value.Valid {
-				_m.InventoryLotID = int(value.Int64)
+				_m.InventoryLotID = new(int)
+				*_m.InventoryLotID = int(value.Int64)
+			}
+		case qualityinspection.FieldProductionWipBatchID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field production_wip_batch_id", values[i])
+			} else if value.Valid {
+				_m.ProductionWipBatchID = new(int)
+				*_m.ProductionWipBatchID = int(value.Int64)
+			}
+		case qualityinspection.FieldGateCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field gate_code", values[i])
+			} else if value.Valid {
+				_m.GateCode = new(string)
+				*_m.GateCode = value.String
 			}
 		case qualityinspection.FieldMaterialID:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
@@ -218,7 +258,8 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field warehouse_id", values[i])
 			} else if value.Valid {
-				_m.WarehouseID = int(value.Int64)
+				_m.WarehouseID = new(int)
+				*_m.WarehouseID = int(value.Int64)
 			}
 		case qualityinspection.FieldSourceType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -288,6 +329,20 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 				_m.InspectorID = new(int)
 				*_m.InspectorID = int(value.Int64)
 			}
+		case qualityinspection.FieldDefectRateOperator:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field defect_rate_operator", values[i])
+			} else if value.Valid {
+				_m.DefectRateOperator = new(string)
+				*_m.DefectRateOperator = value.String
+			}
+		case qualityinspection.FieldDefectRatePercent:
+			if value, ok := values[i].(*sql.NullScanner); !ok {
+				return fmt.Errorf("unexpected type %T for field defect_rate_percent", values[i])
+			} else if value.Valid {
+				_m.DefectRatePercent = new(decimal.Decimal)
+				*_m.DefectRatePercent = *value.S.(*decimal.Decimal)
+			}
 		case qualityinspection.FieldDecisionNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field decision_note", values[i])
@@ -333,6 +388,11 @@ func (_m *QualityInspection) QueryPurchaseReceiptItem() *PurchaseReceiptItemQuer
 // QueryInventoryLot queries the "inventory_lot" edge of the QualityInspection entity.
 func (_m *QualityInspection) QueryInventoryLot() *InventoryLotQuery {
 	return NewQualityInspectionClient(_m.config).QueryInventoryLot(_m)
+}
+
+// QueryProductionWipBatch queries the "production_wip_batch" edge of the QualityInspection entity.
+func (_m *QualityInspection) QueryProductionWipBatch() *ProductionWIPBatchQuery {
+	return NewQualityInspectionClient(_m.config).QueryProductionWipBatch(_m)
 }
 
 // QueryMaterial queries the "material" edge of the QualityInspection entity.
@@ -386,16 +446,30 @@ func (_m *QualityInspection) String() string {
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
-	builder.WriteString("inventory_lot_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.InventoryLotID))
+	if v := _m.InventoryLotID; v != nil {
+		builder.WriteString("inventory_lot_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductionWipBatchID; v != nil {
+		builder.WriteString("production_wip_batch_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.GateCode; v != nil {
+		builder.WriteString("gate_code=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	if v := _m.MaterialID; v != nil {
 		builder.WriteString("material_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
-	builder.WriteString("warehouse_id=")
-	builder.WriteString(fmt.Sprintf("%v", _m.WarehouseID))
+	if v := _m.WarehouseID; v != nil {
+		builder.WriteString("warehouse_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	if v := _m.SourceType; v != nil {
 		builder.WriteString("source_type=")
@@ -440,6 +514,16 @@ func (_m *QualityInspection) String() string {
 	builder.WriteString(", ")
 	if v := _m.InspectorID; v != nil {
 		builder.WriteString("inspector_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.DefectRateOperator; v != nil {
+		builder.WriteString("defect_rate_operator=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DefectRatePercent; v != nil {
+		builder.WriteString("defect_rate_percent=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

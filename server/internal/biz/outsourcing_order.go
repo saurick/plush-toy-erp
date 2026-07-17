@@ -70,6 +70,7 @@ type OutsourcingOrderItem struct {
 	ProductNameSnapshot     *string
 	MaterialCodeSnapshot    *string
 	MaterialNameSnapshot    *string
+	ProcessingItem          *string
 	ProcessNameSnapshot     *string
 	ProcessCategorySnapshot *string
 	UnitNameSnapshot        *string
@@ -111,6 +112,7 @@ type OutsourcingOrderItemMutation struct {
 	ProductNameSnapshot     *string
 	MaterialCodeSnapshot    *string
 	MaterialNameSnapshot    *string
+	ProcessingItem          *string
 	ProcessNameSnapshot     *string
 	ProcessCategorySnapshot *string
 	UnitNameSnapshot        *string
@@ -411,6 +413,7 @@ func normalizeOutsourcingOrderItemFields(in OutsourcingOrderItemMutation) (Outso
 	in.ProductNameSnapshot = normalizeOptionalString(in.ProductNameSnapshot)
 	in.MaterialCodeSnapshot = normalizeOptionalString(in.MaterialCodeSnapshot)
 	in.MaterialNameSnapshot = normalizeOptionalString(in.MaterialNameSnapshot)
+	in.ProcessingItem = normalizeOptionalString(in.ProcessingItem)
 	in.ProcessNameSnapshot = normalizeOptionalString(in.ProcessNameSnapshot)
 	in.ProcessCategorySnapshot = normalizeOptionalString(in.ProcessCategorySnapshot)
 	in.UnitNameSnapshot = normalizeOptionalString(in.UnitNameSnapshot)
@@ -435,7 +438,6 @@ func normalizeOutsourcingOrderItemFields(in OutsourcingOrderItemMutation) (Outso
 		in.ProductNoSnapshot = nil
 		in.ProductSKUID = nil
 		in.SKUCodeSnapshot = nil
-		in.ProductOrderNoSnapshot = nil
 		in.ProductNameSnapshot = nil
 	default:
 		return OutsourcingOrderItemMutation{}, ErrBadParam

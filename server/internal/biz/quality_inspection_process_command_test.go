@@ -113,6 +113,47 @@ func TestFinishedGoodsQualityProcessDomainCommandReplaysPostgresMicrosecondTime(
 	}
 }
 
+func TestFinishedGoodsQualityProcessDomainCommandCanonicalizesDefectRateFingerprint(t *testing.T) {
+	handler := &finishedGoodsQualityDecideProcessCommandHandler{}
+	first, err := handler.NormalizeProcessDomainCommandPayload(map[string]any{
+		"shipment_id": 9001, "quality_inspection_id": 8001, "result": QualityInspectionResultPass,
+		"defect_rate_operator": " approx ", "defect_rate_percent": "5.0",
+	})
+	if err != nil {
+		t.Fatalf("normalize first payload: %v", err)
+	}
+	second, err := handler.NormalizeProcessDomainCommandPayload(map[string]any{
+		"shipment_id": 9001, "quality_inspection_id": 8001, "result": QualityInspectionResultPass,
+		"defect_rate_operator": "APPROX", "defect_rate_percent": "5",
+	})
+	if err != nil {
+		t.Fatalf("normalize second payload: %v", err)
+	}
+	firstFingerprint, err := processDomainCommandFingerprint(ProcessDomainCommandFinishedGoodsQualityDecide, "quality-rate", first)
+	if err != nil {
+		t.Fatalf("fingerprint first payload: %v", err)
+	}
+	secondFingerprint, err := processDomainCommandFingerprint(ProcessDomainCommandFinishedGoodsQualityDecide, "quality-rate", second)
+	if err != nil {
+		t.Fatalf("fingerprint second payload: %v", err)
+	}
+	if firstFingerprint != secondFingerprint {
+		t.Fatalf("semantically equal rates must share fingerprint: %s != %s", firstFingerprint, secondFingerprint)
+	}
+	changed := make(map[string]any, len(second))
+	for key, value := range second {
+		changed[key] = value
+	}
+	changed[qualityInspectionProcessCommandPayloadDefectRatePercent] = "10"
+	changedFingerprint, err := processDomainCommandFingerprint(ProcessDomainCommandFinishedGoodsQualityDecide, "quality-rate", changed)
+	if err != nil {
+		t.Fatalf("fingerprint changed payload: %v", err)
+	}
+	if changedFingerprint == firstFingerprint {
+		t.Fatal("changed defect rate must change immutable intent fingerprint")
+	}
+}
+
 func TestFinishedGoodsQualityProcessDomainCommandLegacyResultWithoutInspectedAtRequiresRecovery(t *testing.T) {
 	tests := []struct {
 		name   string
@@ -458,6 +499,8 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideBindsShipmentLinkedInspec
 			"quality_inspection_id": float64(8001),
 			"finished_goods_lot_id": float64(7001),
 			"result":                QualityInspectionResultPass,
+			"defect_rate_operator":  QualityInspectionDefectRateOperatorApprox,
+			"defect_rate_percent":   "5.0",
 			"decision_note":         "成品质检通过，进入财务放行",
 		},
 	}, 7)
@@ -475,6 +518,10 @@ func TestFinishedGoodsQualityProcessDomainCommandDecideBindsShipmentLinkedInspec
 	}
 	if inventoryRepo.passInput.InspectorID == nil || *inventoryRepo.passInput.InspectorID != 7 {
 		t.Fatalf("expected authenticated actor 7 as inspector truth, got %#v", inventoryRepo.passInput.InspectorID)
+	}
+	if inventoryRepo.passInput.DefectRateOperator == nil || *inventoryRepo.passInput.DefectRateOperator != QualityInspectionDefectRateOperatorApprox ||
+		inventoryRepo.passInput.DefectRatePercent == nil || inventoryRepo.passInput.DefectRatePercent.String() != "5" {
+		t.Fatalf("expected canonical approximate defect rate, got operator=%#v percent=%#v", inventoryRepo.passInput.DefectRateOperator, inventoryRepo.passInput.DefectRatePercent)
 	}
 	if inventoryRepo.rejectInput != nil {
 		t.Fatalf("pass decision must not call reject usecase, got %#v", inventoryRepo.rejectInput)

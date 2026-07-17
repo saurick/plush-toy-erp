@@ -17,16 +17,22 @@ test('bomApi: exposes BOM version lifecycle methods only', () => {
   for (const methodName of [
     'list_bom_versions',
     'get_bom_version',
-    'create_bom_draft',
-    'update_bom_draft',
-    'add_bom_item',
-    'update_bom_item',
-    'delete_bom_item',
+    'save_bom_with_items',
     'copy_bom_version',
     'activate_bom_version',
     'archive_bom_version',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
+  }
+
+  for (const retiredMethodName of [
+    'create_bom_draft',
+    'update_bom_draft',
+    'add_bom_item',
+    'update_bom_item',
+    'delete_bom_item',
+  ]) {
+    assert.doesNotMatch(source, new RegExp(`call\\(\\s*'${retiredMethodName}'`))
   }
 
   for (const forbiddenActionName of [

@@ -203,6 +203,26 @@ func (_u *BOMItemUpdate) ClearProcessMethod() *BOMItemUpdate {
 	return _u
 }
 
+// SetProductionOperationCode sets the "production_operation_code" field.
+func (_u *BOMItemUpdate) SetProductionOperationCode(v string) *BOMItemUpdate {
+	_u.mutation.SetProductionOperationCode(v)
+	return _u
+}
+
+// SetNillableProductionOperationCode sets the "production_operation_code" field if the given value is not nil.
+func (_u *BOMItemUpdate) SetNillableProductionOperationCode(v *string) *BOMItemUpdate {
+	if v != nil {
+		_u.SetProductionOperationCode(*v)
+	}
+	return _u
+}
+
+// ClearProductionOperationCode clears the value of the "production_operation_code" field.
+func (_u *BOMItemUpdate) ClearProductionOperationCode() *BOMItemUpdate {
+	_u.mutation.ClearProductionOperationCode()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *BOMItemUpdate) SetNote(v string) *BOMItemUpdate {
 	_u.mutation.SetNote(v)
@@ -381,6 +401,11 @@ func (_u *BOMItemUpdate) check() error {
 			return &ValidationError{Name: "process_method", err: fmt.Errorf(`ent: validator failed for field "BOMItem.process_method": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductionOperationCode(); ok {
+		if err := bomitem.ProductionOperationCodeValidator(v); err != nil {
+			return &ValidationError{Name: "production_operation_code", err: fmt.Errorf(`ent: validator failed for field "BOMItem.production_operation_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := bomitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BOMItem.note": %w`, err)}
@@ -445,6 +470,12 @@ func (_u *BOMItemUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.ProcessMethodCleared() {
 		_spec.ClearField(bomitem.FieldProcessMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductionOperationCode(); ok {
+		_spec.SetField(bomitem.FieldProductionOperationCode, field.TypeString, value)
+	}
+	if _u.mutation.ProductionOperationCodeCleared() {
+		_spec.ClearField(bomitem.FieldProductionOperationCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(bomitem.FieldNote, field.TypeString, value)
@@ -777,6 +808,26 @@ func (_u *BOMItemUpdateOne) ClearProcessMethod() *BOMItemUpdateOne {
 	return _u
 }
 
+// SetProductionOperationCode sets the "production_operation_code" field.
+func (_u *BOMItemUpdateOne) SetProductionOperationCode(v string) *BOMItemUpdateOne {
+	_u.mutation.SetProductionOperationCode(v)
+	return _u
+}
+
+// SetNillableProductionOperationCode sets the "production_operation_code" field if the given value is not nil.
+func (_u *BOMItemUpdateOne) SetNillableProductionOperationCode(v *string) *BOMItemUpdateOne {
+	if v != nil {
+		_u.SetProductionOperationCode(*v)
+	}
+	return _u
+}
+
+// ClearProductionOperationCode clears the value of the "production_operation_code" field.
+func (_u *BOMItemUpdateOne) ClearProductionOperationCode() *BOMItemUpdateOne {
+	_u.mutation.ClearProductionOperationCode()
+	return _u
+}
+
 // SetNote sets the "note" field.
 func (_u *BOMItemUpdateOne) SetNote(v string) *BOMItemUpdateOne {
 	_u.mutation.SetNote(v)
@@ -968,6 +1019,11 @@ func (_u *BOMItemUpdateOne) check() error {
 			return &ValidationError{Name: "process_method", err: fmt.Errorf(`ent: validator failed for field "BOMItem.process_method": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductionOperationCode(); ok {
+		if err := bomitem.ProductionOperationCodeValidator(v); err != nil {
+			return &ValidationError{Name: "production_operation_code", err: fmt.Errorf(`ent: validator failed for field "BOMItem.production_operation_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Note(); ok {
 		if err := bomitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BOMItem.note": %w`, err)}
@@ -1049,6 +1105,12 @@ func (_u *BOMItemUpdateOne) sqlSave(ctx context.Context) (_node *BOMItem, err er
 	}
 	if _u.mutation.ProcessMethodCleared() {
 		_spec.ClearField(bomitem.FieldProcessMethod, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductionOperationCode(); ok {
+		_spec.SetField(bomitem.FieldProductionOperationCode, field.TypeString, value)
+	}
+	if _u.mutation.ProductionOperationCodeCleared() {
+		_spec.ClearField(bomitem.FieldProductionOperationCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.Note(); ok {
 		_spec.SetField(bomitem.FieldNote, field.TypeString, value)

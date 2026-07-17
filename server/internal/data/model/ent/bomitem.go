@@ -41,6 +41,8 @@ type BOMItem struct {
 	ProcessBase *string `json:"process_base,omitempty"`
 	// ProcessMethod holds the value of the "process_method" field.
 	ProcessMethod *string `json:"process_method,omitempty"`
+	// ProductionOperationCode holds the value of the "production_operation_code" field.
+	ProductionOperationCode *string `json:"production_operation_code,omitempty"`
 	// Note holds the value of the "note" field.
 	Note *string `json:"note,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -119,7 +121,7 @@ func (*BOMItem) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case bomitem.FieldID, bomitem.FieldBomHeaderID, bomitem.FieldMaterialID, bomitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case bomitem.FieldPosition, bomitem.FieldPieceCount, bomitem.FieldTotalUsageSnapshot, bomitem.FieldProcessBase, bomitem.FieldProcessMethod, bomitem.FieldNote:
+		case bomitem.FieldPosition, bomitem.FieldPieceCount, bomitem.FieldTotalUsageSnapshot, bomitem.FieldProcessBase, bomitem.FieldProcessMethod, bomitem.FieldProductionOperationCode, bomitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case bomitem.FieldCreatedAt, bomitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -208,6 +210,13 @@ func (_m *BOMItem) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.ProcessMethod = new(string)
 				*_m.ProcessMethod = value.String
+			}
+		case bomitem.FieldProductionOperationCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field production_operation_code", values[i])
+			} else if value.Valid {
+				_m.ProductionOperationCode = new(string)
+				*_m.ProductionOperationCode = value.String
 			}
 		case bomitem.FieldNote:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -321,6 +330,11 @@ func (_m *BOMItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.ProcessMethod; v != nil {
 		builder.WriteString("process_method=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductionOperationCode; v != nil {
+		builder.WriteString("production_operation_code=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

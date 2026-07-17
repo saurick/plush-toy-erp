@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
@@ -32,6 +33,7 @@ type QualityInspectionQuery struct {
 	withPurchaseReceipt     *PurchaseReceiptQuery
 	withPurchaseReceiptItem *PurchaseReceiptItemQuery
 	withInventoryLot        *InventoryLotQuery
+	withProductionWipBatch  *ProductionWIPBatchQuery
 	withMaterial            *MaterialQuery
 	withWarehouse           *WarehouseQuery
 	withPurchaseReturns     *PurchaseReturnQuery
@@ -130,6 +132,28 @@ func (_q *QualityInspectionQuery) QueryInventoryLot() *InventoryLotQuery {
 			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, selector),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.InventoryLotTable, qualityinspection.InventoryLotColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductionWipBatch chains the current query on the "production_wip_batch" edge.
+func (_q *QualityInspectionQuery) QueryProductionWipBatch() *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, selector),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.ProductionWipBatchTable, qualityinspection.ProductionWipBatchColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -398,6 +422,7 @@ func (_q *QualityInspectionQuery) Clone() *QualityInspectionQuery {
 		withPurchaseReceipt:     _q.withPurchaseReceipt.Clone(),
 		withPurchaseReceiptItem: _q.withPurchaseReceiptItem.Clone(),
 		withInventoryLot:        _q.withInventoryLot.Clone(),
+		withProductionWipBatch:  _q.withProductionWipBatch.Clone(),
 		withMaterial:            _q.withMaterial.Clone(),
 		withWarehouse:           _q.withWarehouse.Clone(),
 		withPurchaseReturns:     _q.withPurchaseReturns.Clone(),
@@ -437,6 +462,17 @@ func (_q *QualityInspectionQuery) WithInventoryLot(opts ...func(*InventoryLotQue
 		opt(query)
 	}
 	_q.withInventoryLot = query
+	return _q
+}
+
+// WithProductionWipBatch tells the query-builder to eager-load the nodes that are connected to
+// the "production_wip_batch" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *QualityInspectionQuery) WithProductionWipBatch(opts ...func(*ProductionWIPBatchQuery)) *QualityInspectionQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductionWipBatch = query
 	return _q
 }
 
@@ -551,10 +587,11 @@ func (_q *QualityInspectionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	var (
 		nodes       = []*QualityInspection{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withPurchaseReceipt != nil,
 			_q.withPurchaseReceiptItem != nil,
 			_q.withInventoryLot != nil,
+			_q.withProductionWipBatch != nil,
 			_q.withMaterial != nil,
 			_q.withWarehouse != nil,
 			_q.withPurchaseReturns != nil,
@@ -593,6 +630,12 @@ func (_q *QualityInspectionQuery) sqlAll(ctx context.Context, hooks ...queryHook
 	if query := _q.withInventoryLot; query != nil {
 		if err := _q.loadInventoryLot(ctx, query, nodes, nil,
 			func(n *QualityInspection, e *InventoryLot) { n.Edges.InventoryLot = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductionWipBatch; query != nil {
+		if err := _q.loadProductionWipBatch(ctx, query, nodes, nil,
+			func(n *QualityInspection, e *ProductionWIPBatch) { n.Edges.ProductionWipBatch = e }); err != nil {
 			return nil, err
 		}
 	}
@@ -688,7 +731,10 @@ func (_q *QualityInspectionQuery) loadInventoryLot(ctx context.Context, query *I
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*QualityInspection)
 	for i := range nodes {
-		fk := nodes[i].InventoryLotID
+		if nodes[i].InventoryLotID == nil {
+			continue
+		}
+		fk := *nodes[i].InventoryLotID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -706,6 +752,38 @@ func (_q *QualityInspectionQuery) loadInventoryLot(ctx context.Context, query *I
 		nodes, ok := nodeids[n.ID]
 		if !ok {
 			return fmt.Errorf(`unexpected foreign-key "inventory_lot_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
+}
+func (_q *QualityInspectionQuery) loadProductionWipBatch(ctx context.Context, query *ProductionWIPBatchQuery, nodes []*QualityInspection, init func(*QualityInspection), assign func(*QualityInspection, *ProductionWIPBatch)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*QualityInspection)
+	for i := range nodes {
+		if nodes[i].ProductionWipBatchID == nil {
+			continue
+		}
+		fk := *nodes[i].ProductionWipBatchID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(productionwipbatch.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "production_wip_batch_id" returned %v`, n.ID)
 		}
 		for i := range nodes {
 			assign(nodes[i], n)
@@ -749,7 +827,10 @@ func (_q *QualityInspectionQuery) loadWarehouse(ctx context.Context, query *Ware
 	ids := make([]int, 0, len(nodes))
 	nodeids := make(map[int][]*QualityInspection)
 	for i := range nodes {
-		fk := nodes[i].WarehouseID
+		if nodes[i].WarehouseID == nil {
+			continue
+		}
+		fk := *nodes[i].WarehouseID
 		if _, ok := nodeids[fk]; !ok {
 			ids = append(ids, fk)
 		}
@@ -841,6 +922,9 @@ func (_q *QualityInspectionQuery) querySpec() *sqlgraph.QuerySpec {
 		}
 		if _q.withInventoryLot != nil {
 			_spec.Node.AddColumnOnce(qualityinspection.FieldInventoryLotID)
+		}
+		if _q.withProductionWipBatch != nil {
+			_spec.Node.AddColumnOnce(qualityinspection.FieldProductionWipBatchID)
 		}
 		if _q.withMaterial != nil {
 			_spec.Node.AddColumnOnce(qualityinspection.FieldMaterialID)

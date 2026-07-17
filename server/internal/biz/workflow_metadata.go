@@ -38,6 +38,7 @@ const (
 	workflowOrderApprovalStatusKey             = "project_pending"
 	workflowOrderApprovedStatusKey             = "project_approved"
 	workflowEngineeringPreparingStatusKey      = "engineering_preparing"
+	workflowProductionReadyStatusKey           = "production_ready"
 	workflowProductionProcessingStatusKey      = "production_processing"
 	workflowQCPendingStatusKey                 = "qc_pending"
 	workflowIQCPendingStatusKey                = "iqc_pending"

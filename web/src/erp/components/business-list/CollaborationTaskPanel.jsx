@@ -21,6 +21,7 @@ import {
   getBusinessCollaborationTaskUrgeMeta,
   isBusinessCollaborationTaskBlocking,
   isBusinessCollaborationTaskTerminal,
+  resolveBusinessCollaborationActionTask,
 } from '../../utils/businessCollaborationTasks.mjs'
 import {
   getWorkflowTaskOwnerRoleLabel,
@@ -129,8 +130,8 @@ export function CollaborationPanelResizeHandle({
           ? 'erp-business-collaboration-task-panel__resize-handle--dragging'
           : ''
       )}
-      aria-label="拖动调整相关任务区域高度"
-      title="拖动调整相关任务区域高度"
+      aria-label="拖动调整当前记录任务区域高度"
+      title="拖动调整当前记录任务区域高度"
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={finishDrag}
@@ -144,10 +145,10 @@ export function CollaborationPanelResizeHandle({
 
 export function CollaborationTaskPanel({
   tasks = [],
-  selectedTasks = [],
   selectedRecordLabel = '',
   adminProfile,
   taskStatusLabels,
+  onOpenTaskBoard,
   onUrgeTask,
   onCompleteTask,
   onBlockTask,
@@ -157,7 +158,7 @@ export function CollaborationTaskPanel({
   taskActionLoadingID,
 }) {
   const [expanded, setExpanded] = React.useState(false)
-  const [activeTaskTab, setActiveTaskTab] = React.useState('todo')
+  const [activeTaskTab, setActiveTaskTab] = React.useState('current')
   const [panelHeight, setPanelHeight] = React.useState(
     COLLABORATION_PANEL_DEFAULT_HEIGHT
   )
@@ -195,40 +196,27 @@ export function CollaborationTaskPanel({
     ? '正在确认您是否可以处理当前任务。'
     : actionDrawerAccess.readonlyReason
   const taskPanelModel = React.useMemo(
-    () =>
-      buildBusinessCollaborationTaskPanelModel({
-        tasks,
-        selectedTasks,
-      }),
-    [selectedTasks, tasks]
+    () => buildBusinessCollaborationTaskPanelModel({ tasks }),
+    [tasks]
   )
   const tabItems = React.useMemo(
     () => [
-      {
-        key: 'todo',
-        label: '本页待办',
-        count: taskPanelModel.pageTaskCount,
-        items: taskPanelModel.pageTasks,
-        emptyText: '本页暂无待处理任务。',
-      },
       {
         key: 'current',
         label: '当前记录',
         count: taskPanelModel.currentRecordTaskCount,
         items: taskPanelModel.currentRecordTasks,
-        emptyText: selectedRecordLabel
-          ? '当前记录暂无相关任务。'
-          : '先选择一条业务记录，再查看相关任务。',
+        emptyText: '当前记录暂无待处理任务。',
       },
       {
         key: 'blocked',
         label: '阻塞异常',
         count: taskPanelModel.blockedTaskCount,
         items: taskPanelModel.blockedTasks,
-        emptyText: '暂无阻塞或退回的任务。',
+        emptyText: '暂无阻塞任务。',
       },
     ],
-    [selectedRecordLabel, taskPanelModel]
+    [taskPanelModel]
   )
   const activeTab =
     tabItems.find((item) => item.key === activeTaskTab) || tabItems[0]
@@ -258,6 +246,9 @@ export function CollaborationTaskPanel({
     window.addEventListener('resize', syncPanelMaxHeight)
     return () => window.removeEventListener('resize', syncPanelMaxHeight)
   }, [])
+  React.useEffect(() => {
+    setActiveTaskTab('current')
+  }, [selectedRecordLabel])
   const hasFocusedRecord = Boolean(
     selectedRecordLabel &&
       !/^(?:请先|已选择)/u.test(String(selectedRecordLabel).trim())
@@ -328,23 +319,18 @@ export function CollaborationTaskPanel({
   React.useEffect(() => {
     if (!actionDrawerTask) return
 
-    const drawerTaskID = String(actionDrawerTask.id || '').trim()
-    if (!drawerTaskID) {
+    const latestActionTask = resolveBusinessCollaborationActionTask({
+      actionTask: actionDrawerTask,
+      tasks,
+    })
+    if (!latestActionTask) {
       closeActionDrawer()
       return
     }
-
-    const visibleTasks = [
-      ...(Array.isArray(tasks) ? tasks : []),
-      ...(Array.isArray(selectedTasks) ? selectedTasks : []),
-    ]
-    const taskStillVisible = visibleTasks.some(
-      (task) => String(task?.id || '').trim() === drawerTaskID
-    )
-    if (!taskStillVisible) {
-      closeActionDrawer()
+    if (latestActionTask !== actionDrawerTask) {
+      setActionDrawerTask(latestActionTask)
     }
-  }, [actionDrawerTask, closeActionDrawer, selectedTasks, tasks])
+  }, [actionDrawerTask, closeActionDrawer, tasks])
   const submitActionDrawer = React.useCallback(async () => {
     if (!actionDrawerTask || !actionDrawerMode) return
     const actionMeta = TASK_ACTION_META[actionDrawerMode]
@@ -494,6 +480,8 @@ export function CollaborationTaskPanel({
     )
   }
 
+  if (!hasFocusedRecord || taskPanelModel.activeTaskCount === 0) return null
+
   return (
     <>
       <Card
@@ -520,9 +508,9 @@ export function CollaborationTaskPanel({
           ) : null}
           <div className="erp-business-collaboration-task-panel__head erp-business-module-task-card__head">
             <div className="erp-business-collaboration-task-panel__title-line">
-              <strong>相关任务</strong>
+              <strong>当前记录任务</strong>
               <Text type="secondary">
-                这里只处理待办任务；库存、出货、财务、开票和收付款仍需在对应业务页面完成。
+                这里只处理当前记录待办；库存、出货和财务等业务仍在对应页面办理。
               </Text>
               {!expanded ? (
                 <span
@@ -550,6 +538,16 @@ export function CollaborationTaskPanel({
               size={[6, 6]}
               className="erp-business-collaboration-task-panel__actions"
             >
+              {onOpenTaskBoard ? (
+                <Button
+                  size="small"
+                  type="link"
+                  title="查看全部任务"
+                  onClick={onOpenTaskBoard}
+                >
+                  任务中心
+                </Button>
+              ) : null}
               <Button
                 size="small"
                 icon={expanded ? <DownOutlined /> : <UpOutlined />}
@@ -566,7 +564,7 @@ export function CollaborationTaskPanel({
               <div
                 className="erp-business-collaboration-task-panel__tabs"
                 role="tablist"
-                aria-label="相关任务分类"
+                aria-label="当前记录任务分类"
               >
                 {tabItems.map((item) => (
                   <button

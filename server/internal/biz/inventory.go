@@ -20,6 +20,7 @@ var (
 	ErrBOMItemNotFound                       = errors.New("bom item not found")
 	ErrBOMActiveImmutable                    = errors.New("active bom must be copied before edit")
 	ErrBOMActiveConflict                     = errors.New("another bom version is active")
+	ErrBOMVersionConflict                    = errors.New("bom version conflict")
 	ErrPurchaseReceiptNotFound               = errors.New("purchase receipt not found")
 	ErrPurchaseReceiptItemNotFound           = errors.New("purchase receipt item not found")
 	ErrPurchaseReturnNotFound                = errors.New("purchase return not found")
@@ -268,23 +269,27 @@ type BOMHeader struct {
 	Note          *string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+	// EditVersion is an internal optimistic-lock token derived from UpdatedAt.
+	// Version remains the business-facing BOM version string.
+	EditVersion int64
 }
 
 type BOMItem struct {
-	ID                 int
-	BOMHeaderID        int
-	MaterialID         int
-	Quantity           decimal.Decimal
-	UnitID             int
-	LossRate           decimal.Decimal
-	Position           *string
-	PieceCount         *string
-	TotalUsageSnapshot *string
-	ProcessBase        *string
-	ProcessMethod      *string
-	Note               *string
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                      int
+	BOMHeaderID             int
+	MaterialID              int
+	Quantity                decimal.Decimal
+	UnitID                  int
+	LossRate                decimal.Decimal
+	Position                *string
+	PieceCount              *string
+	TotalUsageSnapshot      *string
+	ProcessBase             *string
+	ProcessMethod           *string
+	ProductionOperationCode *string
+	Note                    *string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
 }
 
 type BOMHeaderCreate struct {
@@ -320,30 +325,43 @@ type BOMHeaderUpdate struct {
 }
 
 type BOMItemCreate struct {
-	BOMHeaderID        int
-	MaterialID         int
-	Quantity           decimal.Decimal
-	UnitID             int
-	LossRate           decimal.Decimal
-	Position           *string
-	PieceCount         *string
-	TotalUsageSnapshot *string
-	ProcessBase        *string
-	ProcessMethod      *string
-	Note               *string
+	BOMHeaderID             int
+	MaterialID              int
+	Quantity                decimal.Decimal
+	UnitID                  int
+	LossRate                decimal.Decimal
+	Position                *string
+	PieceCount              *string
+	TotalUsageSnapshot      *string
+	ProcessBase             *string
+	ProcessMethod           *string
+	ProductionOperationCode *string
+	Note                    *string
 }
 
 type BOMItemUpdate struct {
-	MaterialID         int
-	Quantity           decimal.Decimal
-	UnitID             int
-	LossRate           decimal.Decimal
-	Position           *string
-	PieceCount         *string
-	TotalUsageSnapshot *string
-	ProcessBase        *string
-	ProcessMethod      *string
-	Note               *string
+	MaterialID              int
+	Quantity                decimal.Decimal
+	UnitID                  int
+	LossRate                decimal.Decimal
+	Position                *string
+	PieceCount              *string
+	TotalUsageSnapshot      *string
+	ProcessBase             *string
+	ProcessMethod           *string
+	ProductionOperationCode *string
+	Note                    *string
+}
+
+type BOMVersionMutation struct {
+	ExpectedVersion int64
+	ProductID       int
+	BOMHeaderUpdate
+}
+
+type BOMItemSaveMutation struct {
+	ID int
+	BOMItemUpdate
 }
 
 type BOMHeaderFilter struct {
@@ -357,6 +375,10 @@ type BOMHeaderFilter struct {
 type BOMVersionDetail struct {
 	Header *BOMHeader
 	Items  []*BOMItem
+}
+
+type BOMAggregateSaveRepo interface {
+	SaveBOMWithItems(ctx context.Context, id int, in *BOMVersionMutation, items []*BOMItemSaveMutation) (*BOMVersionDetail, error)
 }
 
 type InventoryTxnApplyResult struct {
@@ -613,6 +635,83 @@ func (uc *InventoryUsecase) DeleteBOMDraftItem(ctx context.Context, id int) erro
 		return ErrBadParam
 	}
 	return uc.repo.DeleteBOMDraftItem(ctx, id)
+}
+
+func (uc *InventoryUsecase) SaveBOMWithItems(ctx context.Context, id int, in *BOMVersionMutation, items []*BOMItemSaveMutation) (*BOMVersionDetail, error) {
+	if uc == nil || uc.repo == nil || in == nil || id < 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(BOMAggregateSaveRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+
+	normalizedHeader, err := normalizeBOMHeaderUpdate(in.BOMHeaderUpdate)
+	if err != nil {
+		return nil, err
+	}
+	normalized := &BOMVersionMutation{
+		ExpectedVersion: in.ExpectedVersion,
+		ProductID:       in.ProductID,
+		BOMHeaderUpdate: normalizedHeader,
+	}
+	if normalized.ProductID <= 0 {
+		return nil, ErrBadParam
+	}
+	if id == 0 {
+		if normalized.ExpectedVersion != 0 {
+			return nil, ErrBadParam
+		}
+		if err := requireActiveReference(ctx, normalized.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+			return nil, err
+		}
+	} else {
+		if normalized.ExpectedVersion <= 0 {
+			return nil, ErrBadParam
+		}
+		current, err := uc.repo.GetBOMHeader(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if current.Status != BOMStatusDraft {
+			return nil, ErrBOMActiveImmutable
+		}
+		if current.ProductID != normalized.ProductID {
+			return nil, ErrBadParam
+		}
+		if err := requireActiveReference(ctx, normalized.ProductID, uc.repo.ProductIsActive, ErrProductInactive); err != nil {
+			return nil, err
+		}
+	}
+
+	normalizedItems := make([]*BOMItemSaveMutation, 0, len(items))
+	seenIDs := make(map[int]struct{}, len(items))
+	for _, item := range items {
+		if item == nil || item.ID < 0 {
+			return nil, ErrBadParam
+		}
+		if item.ID > 0 {
+			if id == 0 {
+				return nil, ErrBadParam
+			}
+			if _, duplicate := seenIDs[item.ID]; duplicate {
+				return nil, ErrBadParam
+			}
+			seenIDs[item.ID] = struct{}{}
+		}
+		normalizedItem, err := normalizeBOMItemUpdate(item.BOMItemUpdate)
+		if err != nil {
+			return nil, err
+		}
+		if err := uc.validateBOMItemActiveReferences(ctx, normalizedItem.MaterialID, normalizedItem.UnitID); err != nil {
+			return nil, err
+		}
+		normalizedItems = append(normalizedItems, &BOMItemSaveMutation{
+			ID:            item.ID,
+			BOMItemUpdate: normalizedItem,
+		})
+	}
+	return repo.SaveBOMWithItems(ctx, id, normalized, normalizedItems)
 }
 
 func (uc *InventoryUsecase) ListBOMHeaders(ctx context.Context, filter BOMHeaderFilter) ([]*BOMHeader, int, error) {
@@ -993,6 +1092,14 @@ func normalizeBOMItemCreate(in BOMItemCreate) (BOMItemCreate, error) {
 	in.TotalUsageSnapshot = normalizeOptionalString(in.TotalUsageSnapshot)
 	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
 	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
+	in.ProductionOperationCode = normalizeOptionalString(in.ProductionOperationCode)
+	if in.ProductionOperationCode != nil {
+		value := strings.ToUpper(*in.ProductionOperationCode)
+		if value != ProductionWIPOperationFabricProcessing {
+			return BOMItemCreate{}, ErrBadParam
+		}
+		in.ProductionOperationCode = &value
+	}
 	in.Note = normalizeOptionalString(in.Note)
 	if in.BOMHeaderID <= 0 ||
 		in.MaterialID <= 0 ||
@@ -1012,6 +1119,14 @@ func normalizeBOMItemUpdate(in BOMItemUpdate) (BOMItemUpdate, error) {
 	in.TotalUsageSnapshot = normalizeOptionalString(in.TotalUsageSnapshot)
 	in.ProcessBase = normalizeOptionalString(in.ProcessBase)
 	in.ProcessMethod = normalizeOptionalString(in.ProcessMethod)
+	in.ProductionOperationCode = normalizeOptionalString(in.ProductionOperationCode)
+	if in.ProductionOperationCode != nil {
+		value := strings.ToUpper(*in.ProductionOperationCode)
+		if value != ProductionWIPOperationFabricProcessing {
+			return BOMItemUpdate{}, ErrBadParam
+		}
+		in.ProductionOperationCode = &value
+	}
 	in.Note = normalizeOptionalString(in.Note)
 	if in.MaterialID <= 0 ||
 		in.UnitID <= 0 ||

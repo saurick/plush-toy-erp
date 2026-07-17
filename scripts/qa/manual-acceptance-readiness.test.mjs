@@ -1088,7 +1088,7 @@ test("default plan covers all 51 targets and never connects to a backend", async
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
   );
-  assert.deepEqual(productionOrders.roleKeys, ["production"]);
+  assert.deepEqual(productionOrders.roleKeys, ["sales", "pmc", "production"]);
   assert.equal(productionOrders.expectedMinimum, 45);
   assert.deepEqual(productionOrders.probeIds, ["production-orders"]);
   assert.equal(productionOrders.quantityNotProven, undefined);

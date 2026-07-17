@@ -25,6 +25,8 @@ func (ProductionOrderItem) Annotations() []schema.Annotation {
 				"production_order_items_sku_id_positive":     "product_sku_id IS NULL OR product_sku_id > 0",
 				"production_order_items_sales_line_positive": "sales_order_item_id IS NULL OR sales_order_item_id > 0",
 				"production_order_items_bom_header_positive": "bom_header_id IS NULL OR bom_header_id > 0",
+				"production_order_items_route_allowed":       "route_code IS NULL OR route_code = 'PLUSH_SEW_HAND_V1'",
+				"production_order_items_customer_gate_route": "NOT customer_inspection_required OR route_code IS NOT NULL",
 			},
 		},
 	}
@@ -53,6 +55,12 @@ func (ProductionOrderItem) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Positive(),
+		field.String("route_code").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.Bool("customer_inspection_required").
+			Default(false),
 		field.String("product_code_snapshot").
 			Optional().
 			Nillable().
@@ -96,6 +104,13 @@ func (ProductionOrderItem) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("material_requirements", ProductionOrderMaterialRequirement.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("operations", ProductionOrderOperation.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("wip_batches", ProductionWIPBatch.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("packaging_confirmation", ProductionPackagingConfirmation.Type).
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("product", Product.Type).
 			Field("product_id").
 			Required().
@@ -127,5 +142,6 @@ func (ProductionOrderItem) Indexes() []ent.Index {
 		index.Fields("product_id", "product_sku_id"),
 		index.Fields("sales_order_item_id"),
 		index.Fields("bom_header_id"),
+		index.Fields("route_code"),
 	}
 }

@@ -24,6 +24,18 @@ const WORKFLOW_TASK_CREATE_REQUIRED_STRING_KEYS = Object.freeze([
   'owner_role_key',
 ])
 
+const WORKFLOW_SOURCE_TASK_GROUPS = new Set([
+  'production_scheduling',
+  'production_exception',
+  'shipment_release',
+])
+
+const WORKFLOW_SOURCE_TASK_CODE_PREFIXES = Object.freeze([
+  'source-production-scheduling-',
+  'source-production-exception-',
+  'source-shipment-release-',
+])
+
 const WORKFLOW_BUSINESS_STATE_KEYS = new Set([
   'project_pending',
   'project_approved',
@@ -55,6 +67,20 @@ function normalizedOptionalString(params, key) {
   return params[key].trim() || null
 }
 
+export function isReservedWorkflowSourceTaskNamespace(params = {}) {
+  if (!params || typeof params !== 'object' || Array.isArray(params)) {
+    return false
+  }
+  const taskGroup = String(params.task_group ?? params.taskGroup ?? '').trim()
+  const taskCode = String(params.task_code ?? params.taskCode ?? '').trim()
+  return (
+    WORKFLOW_SOURCE_TASK_GROUPS.has(taskGroup) ||
+    WORKFLOW_SOURCE_TASK_CODE_PREFIXES.some((prefix) =>
+      taskCode.startsWith(prefix)
+    )
+  )
+}
+
 export function requireWorkflowTaskCreateParams(params = {}) {
   if (!params || typeof params !== 'object' || Array.isArray(params)) {
     throw new TypeError('任务资料格式不正确，请刷新后重试')
@@ -71,6 +97,9 @@ export function requireWorkflowTaskCreateParams(params = {}) {
       throw new TypeError('任务必填资料不完整，请补充后重试')
     }
     normalized[key] = params[key].trim()
+  }
+  if (isReservedWorkflowSourceTaskNamespace(normalized)) {
+    throw new TypeError('该类任务由业务单据自动生成，不能手工创建')
   }
   if (!Number.isSafeInteger(params.source_id) || params.source_id <= 0) {
     throw new TypeError('关联业务单据无效，请重新选择')

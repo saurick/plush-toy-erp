@@ -35,6 +35,9 @@ import {
   cancelQualityInspection,
   createQualityInspectionDraft,
   getQualityInspection,
+  listFinishedGoodsQualityInspections,
+  listOutsourcingReturnQualityInspections,
+  listProductionStageQualityInspections,
   listQualityInspections,
   passQualityInspection,
   rejectQualityInspection,
@@ -42,6 +45,7 @@ import {
 } from '../api/qualityApi.mjs'
 import {
   createPurchaseReturnFromQualityInspection,
+  getPurchaseReceipt,
   listPurchaseReceipts,
   listPurchaseReturns,
 } from '../api/purchaseApi.mjs'
@@ -83,7 +87,10 @@ import {
 import {
   buildQualityInspectionDataColumns,
   buildQualityInspectionExportColumns,
+  isProductionStageQualityInspection,
+  productionQualityGateLabel,
   QUALITY_DATE_FILTER_OPTIONS,
+  QUALITY_INSPECTION_TYPE_LABELS,
   QUALITY_INSPECTION_TYPE_FILTER_OPTIONS,
   QUALITY_INSPECTIONS_MODULE_KEY,
   QUALITY_RESULT_FILTER_OPTIONS,
@@ -124,6 +131,7 @@ import {
 } from '../utils/routeQuery.mjs'
 import {
   buildPurchaseReturnFromQualityInspectionPayload,
+  canCreatePurchaseReturnFromRejectedInspection,
   isRejectedIncomingInspection,
 } from '../utils/qualityInspectionSourceAction.mjs'
 import { createSourceBusinessActionAttemptStore } from '../utils/sourceBusinessAction.mjs'
@@ -214,6 +222,97 @@ function findByPositiveID(id, records = []) {
   )
 }
 
+function buildDecisionSourceSummary({
+  inspection,
+  allPurchaseReceiptItemOptions,
+  inventoryLotOptions,
+  materialOptions,
+  productOptions,
+  purchaseReceiptOptions,
+}) {
+  const sourceType = String(inspection?.source_type || '').toUpperCase()
+  const subjectType = String(inspection?.subject_type || '').toUpperCase()
+  const inspectionType =
+    QUALITY_INSPECTION_TYPE_LABELS[
+      String(inspection?.inspection_type || '').toUpperCase()
+    ] || '质量检验'
+  const visibleWipText = (value) => String(value ?? '').trim() || '—'
+
+  if (isProductionStageQualityInspection(inspection)) {
+    return {
+      sourceNo: visibleWipText(inspection?.production_order_no),
+      primary: [
+        `检验类型：${inspectionType}`,
+        `质量关口：${productionQualityGateLabel(inspection?.gate_code)}`,
+      ].join('；'),
+      secondary: [
+        `产品：${visibleWipText(
+          inspection?.product_code
+        )} / ${visibleWipText(inspection?.product_name)}`,
+        `生产工序：${visibleWipText(inspection?.operation_name)}`,
+        `在制批次：${visibleWipText(inspection?.wip_batch_no)}`,
+        `批次数量：${visibleWipText(inspection?.batch_quantity)}`,
+      ].join('；'),
+    }
+  }
+
+  const recordedSourceNo = trimOptional(inspection?.source_no)
+  let sourceNo = recordedSourceNo
+  if (!sourceNo && sourceType === 'PURCHASE_RECEIPT') {
+    sourceNo = referenceLabel(
+      purchaseReceiptOptions,
+      inspection?.purchase_receipt_id,
+      '采购入库已关联'
+    )
+  }
+  if (!sourceNo && sourceType === 'OUTSOURCING_FACT') {
+    sourceNo = '委外回货单已关联'
+  }
+  if (!sourceNo && sourceType === 'SHIPMENT') {
+    sourceNo = '出货单已关联'
+  }
+
+  const sourceLine =
+    sourceType === 'PURCHASE_RECEIPT' && inspection?.purchase_receipt_item_id
+      ? referenceLabel(
+          allPurchaseReceiptItemOptions,
+          inspection.purchase_receipt_item_id,
+          '入库行已关联'
+        )
+      : ''
+  const subject =
+    subjectType === 'PRODUCT'
+      ? referenceLabel(productOptions, inspection?.subject_id, '产品已关联')
+      : referenceLabel(
+          materialOptions,
+          inspection?.material_id || inspection?.subject_id,
+          '材料已关联'
+        )
+  const lot = inspection?.inventory_lot_id
+    ? referenceLabel(
+        inventoryLotOptions,
+        inspection.inventory_lot_id,
+        '批次已关联'
+      )
+    : ''
+
+  return {
+    sourceNo: sourceNo || '来源单据已关联',
+    primary: [
+      `检验类型：${inspectionType}`,
+      sourceLine ? `来源行：${sourceLine}` : '',
+    ]
+      .filter(Boolean)
+      .join('；'),
+    secondary: [
+      subject ? `产品或材料：${subject}` : '',
+      lot ? `批次：${lot}` : '',
+    ]
+      .filter(Boolean)
+      .join('；'),
+  }
+}
+
 export default function V1QualityInspectionsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
@@ -240,6 +339,12 @@ export default function V1QualityInspectionsPage() {
   const [detailInspection, setDetailInspection] = useState(null)
   const [purchaseReturnModal, setPurchaseReturnModal] = useState(null)
   const [purchaseReturnLoading, setPurchaseReturnLoading] = useState(false)
+  const [selectedRowPurchaseReceipt, setSelectedRowPurchaseReceipt] =
+    useState(null)
+  const [
+    selectedRowPurchaseReceiptLoading,
+    setSelectedRowPurchaseReceiptLoading,
+  ] = useState(false)
   const [returnedInspectionIDs, setReturnedInspectionIDs] = useState(
     () => new Set()
   )
@@ -304,6 +409,15 @@ export default function V1QualityInspectionsPage() {
     adminProfile,
     'purchase.return.read'
   )
+  const canReadPurchaseReceipt = hasActionPermission(
+    adminProfile,
+    'purchase.receipt.read'
+  )
+  const canReadInventory = hasActionPermission(
+    adminProfile,
+    'warehouse.inventory.read'
+  )
+  const canReadShipment = hasActionPermission(adminProfile, 'shipment.read')
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const selectedSourceType = String(
     selectedRow?.source_type || ''
@@ -311,10 +425,21 @@ export default function V1QualityInspectionsPage() {
   const relatedMenuItems =
     selectedSourceType === 'PURCHASE_RECEIPT'
       ? [
-          { key: 'purchase-receipts', label: '采购入库' },
-          { key: 'inventory', label: '库存台账' },
-        ]
-      : [{ key: 'inventory', label: '库存台账' }]
+          canReadPurchaseReceipt
+            ? { key: 'purchase-receipts', label: '采购入库' }
+            : null,
+          canReadInventory ? { key: 'inventory', label: '库存台账' } : null,
+        ].filter(Boolean)
+      : selectedSourceType === 'SHIPMENT'
+        ? [
+            canReadShipment ? { key: 'shipments', label: '出货单' } : null,
+            canReadInventory ? { key: 'inventory', label: '库存台账' } : null,
+          ].filter(Boolean)
+        : selectedSourceType === 'PRODUCTION_WIP'
+          ? []
+          : canReadInventory
+            ? [{ key: 'inventory', label: '库存台账' }]
+            : []
   const purchaseReceiptOptions = useMemo(
     () => uniqueReferenceOptions(purchaseReceipts, purchaseReceiptOption),
     [purchaseReceipts]
@@ -369,6 +494,11 @@ export default function V1QualityInspectionsPage() {
     () => findByPositiveID(selectedPurchaseReceiptID, purchaseReceipts) || null,
     [purchaseReceipts, selectedPurchaseReceiptID]
   )
+  const selectedRowCanCreatePurchaseReturn =
+    canCreatePurchaseReturnFromRejectedInspection(
+      selectedRow,
+      selectedRowPurchaseReceipt
+    )
   const selectedPurchaseReceiptItem = useMemo(
     () =>
       findByPositiveID(selectedPurchaseReceiptItemID, purchaseReceiptItems) ||
@@ -377,14 +507,21 @@ export default function V1QualityInspectionsPage() {
   )
   const purchaseReturnSourceSummary = useMemo(() => {
     const inspection = purchaseReturnModal?.inspection
-    const receipt = findByPositiveID(
-      inspection?.purchase_receipt_id,
-      purchaseReceipts
-    )
-    const item = findByPositiveID(
-      inspection?.purchase_receipt_item_id,
-      purchaseReceiptItems
-    )
+    const receipt =
+      findByPositiveID(inspection?.purchase_receipt_id, purchaseReceipts) ||
+      (positiveInt(selectedRowPurchaseReceipt?.id) ===
+      positiveInt(inspection?.purchase_receipt_id)
+        ? selectedRowPurchaseReceipt
+        : null)
+    const item =
+      findByPositiveID(
+        inspection?.purchase_receipt_item_id,
+        purchaseReceiptItems
+      ) ||
+      findByPositiveID(
+        inspection?.purchase_receipt_item_id,
+        Array.isArray(receipt?.items) ? receipt.items : []
+      )
     return {
       receipt: receipt?.receipt_no || '采购入库已关联',
       supplier: receipt?.supplier_name || '供应商已关联',
@@ -410,6 +547,7 @@ export default function V1QualityInspectionsPage() {
     purchaseReceiptItems,
     purchaseReceipts,
     purchaseReturnModal?.inspection,
+    selectedRowPurchaseReceipt,
     warehouseOptions,
   ])
 
@@ -448,6 +586,9 @@ export default function V1QualityInspectionsPage() {
       'purchase-receipts': routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
         receipt_id: selectedRow.purchase_receipt_id,
       }),
+      shipments: routeWithQuery(V1_ROUTE_PATHS.shipments, {
+        shipment_id: selectedRow.source_id,
+      }),
       inventory: routeWithQuery(V1_ROUTE_PATHS.inventory, {
         source_type: selectedRow.source_type,
         source_id: selectedRow.source_id,
@@ -466,27 +607,56 @@ export default function V1QualityInspectionsPage() {
     setLoading(true)
     try {
       const routeSelectedID = Number(routeQualityInspectionID || 0)
-      const [data, routeInspection] = await Promise.all([
-        listQualityInspections(
+      const baseParams = compactParams({
+        status: statusFilter,
+        result: resultFilter,
+        keyword: trimOptional(keyword),
+        date_from: dateFilterStart || undefined,
+        date_to: dateFilterEnd || undefined,
+        ...getBusinessPaginationParams(pagination),
+      })
+      const inventorySourceParams = compactParams({
+        ...baseParams,
+        warehouse_id: warehouseFilter || undefined,
+        inventory_lot_id: lotFilter || undefined,
+      })
+      let listRequest
+      if (inspectionTypeFilter === 'OUTSOURCING_RETURN') {
+        listRequest = listOutsourcingReturnQualityInspections(
+          {
+            ...inventorySourceParams,
+            customer_key: activeCustomerKey || undefined,
+          },
+          { signal: request.signal }
+        )
+      } else if (inspectionTypeFilter === 'FINISHED_GOODS') {
+        listRequest = listFinishedGoodsQualityInspections(
+          inventorySourceParams,
+          {
+            signal: request.signal,
+          }
+        )
+      } else if (inspectionTypeFilter === 'PRODUCTION_STAGE') {
+        listRequest = listProductionStageQualityInspections(baseParams, {
+          signal: request.signal,
+        })
+      } else {
+        listRequest = listQualityInspections(
           compactParams({
-            status: statusFilter,
-            result: resultFilter,
+            ...inventorySourceParams,
             inspection_type: inspectionTypeFilter || undefined,
-            keyword: trimOptional(keyword),
             date_field: dateFilterField,
-            date_from: dateFilterStart || undefined,
-            date_to: dateFilterEnd || undefined,
             purchase_receipt_id:
               purchaseReceiptFilter || routePurchaseReceiptID || undefined,
             purchase_order_id: routePurchaseOrderID || undefined,
             material_id: materialFilter || undefined,
-            warehouse_id: warehouseFilter || undefined,
-            inventory_lot_id: lotFilter || undefined,
-            ...getBusinessPaginationParams(pagination),
           }),
           { signal: request.signal }
-        ),
-        routeSelectedID > 0
+        )
+      }
+      const [data, routeInspection] = await Promise.all([
+        listRequest,
+        routeSelectedID > 0 && inspectionTypeFilter !== 'PRODUCTION_STAGE'
           ? getQualityInspection({ id: routeSelectedID })
           : Promise.resolve(null),
       ])
@@ -496,23 +666,33 @@ export default function V1QualityInspectionsPage() {
       const listedRows = Array.isArray(data?.quality_inspections)
         ? data.quality_inspections
         : []
-      const nextRows = routeInspection
+      const listedRouteInspection =
+        routeSelectedID > 0
+          ? listedRows.find((item) => Number(item?.id) === routeSelectedID) ||
+            null
+          : null
+      const selectedRouteInspection = routeInspection || listedRouteInspection
+      const nextRows = selectedRouteInspection
         ? [
-            routeInspection,
-            ...listedRows.filter((item) => item.id !== routeInspection.id),
+            selectedRouteInspection,
+            ...listedRows.filter(
+              (item) => Number(item?.id) !== Number(selectedRouteInspection.id)
+            ),
           ]
         : listedRows
       setRows(nextRows)
       setSelectedRow((current) => {
-        if (routeSelectedID > 0) return routeInspection
+        if (routeSelectedID > 0) return selectedRouteInspection
         return current?.id
           ? nextRows.find((item) => item.id === current.id) || null
           : null
       })
       setTotal(
         Number(data?.total || 0) +
-          (routeInspection &&
-          !listedRows.some((item) => item.id === routeInspection.id)
+          (selectedRouteInspection &&
+          !listedRows.some(
+            (item) => Number(item?.id) === Number(selectedRouteInspection.id)
+          )
             ? 1
             : 0)
       )
@@ -528,6 +708,7 @@ export default function V1QualityInspectionsPage() {
       }
     }
   }, [
+    activeCustomerKey,
     beginLatestRequest,
     dateFilterEnd,
     dateFilterField,
@@ -559,7 +740,7 @@ export default function V1QualityInspectionsPage() {
         productResult,
         warehouseResult,
       ] = await Promise.all([
-        listPurchaseReceipts({ limit: 500 }),
+        listPurchaseReceipts({ limit: 200 }),
         listInventoryLots({ limit: 500 }),
         listMaterials({ limit: 500, active_only: true }),
         listProducts({ limit: 500, active_only: true }),
@@ -593,6 +774,43 @@ export default function V1QualityInspectionsPage() {
       setWarehouses([])
     }
   }, [])
+
+  useEffect(() => {
+    const receiptID = positiveInt(selectedRow?.purchase_receipt_id)
+    const requestID = selectedRowPurchaseReceiptRequestRef.current + 1
+    selectedRowPurchaseReceiptRequestRef.current = requestID
+    setSelectedRowPurchaseReceipt(null)
+
+    if (!receiptID || !isRejectedIncomingInspection(selectedRow)) {
+      setSelectedRowPurchaseReceiptLoading(false)
+      return undefined
+    }
+
+    setSelectedRowPurchaseReceiptLoading(true)
+    getPurchaseReceipt({ id: receiptID })
+      .then((receipt) => {
+        if (selectedRowPurchaseReceiptRequestRef.current !== requestID) return
+        setSelectedRowPurchaseReceipt(
+          positiveInt(receipt?.id) === receiptID ? receipt : null
+        )
+      })
+      .catch((error) => {
+        if (selectedRowPurchaseReceiptRequestRef.current !== requestID) return
+        message.error(getActionErrorMessage(error, '核对来源收货状态'))
+        setSelectedRowPurchaseReceipt(null)
+      })
+      .finally(() => {
+        if (selectedRowPurchaseReceiptRequestRef.current === requestID) {
+          setSelectedRowPurchaseReceiptLoading(false)
+        }
+      })
+
+    return () => {
+      if (selectedRowPurchaseReceiptRequestRef.current === requestID) {
+        selectedRowPurchaseReceiptRequestRef.current += 1
+      }
+    }
+  }, [selectedRow])
 
   const clearRouteContext = useCallback(
     (keys) => {
@@ -633,10 +851,13 @@ export default function V1QualityInspectionsPage() {
       })
     }
     if (['pass', 'reject', 'cancel'].includes(inspectionModal?.mode)) {
+      decisionForm.resetFields()
       decisionForm.setFieldsValue({
         result: inspectionModal?.mode === 'pass' ? 'PASS' : undefined,
         inspected_at:
           inspectionModal?.mode === 'cancel' ? undefined : todayInputValue(),
+        defect_rate_selection: undefined,
+        defect_rate_custom_percent: undefined,
         decision_note: '',
       })
     }
@@ -734,6 +955,18 @@ export default function V1QualityInspectionsPage() {
         message.warning('只有已判定不合格的来料质检单可以退供应商')
         return
       }
+      const sourceReceipt = selectedRowPurchaseReceipt
+      if (
+        !canCreatePurchaseReturnFromRejectedInspection(
+          inspection,
+          sourceReceipt
+        )
+      ) {
+        message.warning(
+          '首次到货检验不合格只会阻止入库；只有已入库后追加检验不合格才可退供应商'
+        )
+        return
+      }
       if (returnedInspectionIDs.has(inspection.id)) {
         message.info('该质检单已生成采购退货')
         return
@@ -772,6 +1005,7 @@ export default function V1QualityInspectionsPage() {
       canReadPurchaseReturn,
       markInspectionReturned,
       returnedInspectionIDs,
+      selectedRowPurchaseReceipt,
     ]
   )
 
@@ -900,11 +1134,15 @@ export default function V1QualityInspectionsPage() {
   }, [closeModal, decisionForm, inspectionModal, loadRows])
 
   const selectedRowLabel = selectedRow
-    ? `${selectedRow.inspection_no || '质量检验单已关联'} / ${referenceLabel(
-        inventoryLotOptions,
-        selectedRow.inventory_lot_id,
-        '批次'
-      )}`
+    ? `${selectedRow.inspection_no || '质量检验单已关联'} / ${
+        isProductionStageQualityInspection(selectedRow)
+          ? String(selectedRow.wip_batch_no || '').trim() || '—'
+          : referenceLabel(
+              inventoryLotOptions,
+              selectedRow.inventory_lot_id,
+              '批次'
+            )
+      }`
     : '请先选择一张质量检验单'
 
   const modalTitle = {
@@ -914,13 +1152,29 @@ export default function V1QualityInspectionsPage() {
     cancel: '取消质检',
   }[inspectionModal?.mode || 'create']
 
+  const decisionIsProductionStage = isProductionStageQualityInspection(
+    inspectionModal?.inspection
+  )
+
   const modalDescription = {
     create:
-      '选择采购入库单和入库明细；系统会自动带出材料、仓库和批次，无需重复填写。',
-    pass: '合格或让步接收只更新质检判定和批次状态，不会增减库存数量。',
-    reject: '不合格只更新质检判定和批次状态，供应商退货仍走采购退货。',
-    cancel: '取消只关闭当前质检流程，不会修改库存或采购入库记录。',
+      '入库准备通常已逐行生成待检记录；这里只为已取消等需要重建的采购入库行补建质检，材料、仓库和批次由来源行带出。',
+    pass: decisionIsProductionStage
+      ? '生产阶段质量关口当前只允许合格放行；让步接收需另有按关口审批策略和审计，在该能力落地前保持阻断。'
+      : '选择合格或让步接收，并按来源记录估算不良比例；这里只登记质量结论，后续由对应来源规则处理。',
+    reject:
+      '记录不合格及来源的估算不良比例；后续返工、退货或阻断仍由对应来源业务办理。',
+    cancel: '取消只关闭当前质检流程，不会直接改写库存数量或生产事实。',
   }[inspectionModal?.mode || 'create']
+
+  const decisionSourceSummary = buildDecisionSourceSummary({
+    inspection: inspectionModal?.inspection,
+    allPurchaseReceiptItemOptions,
+    inventoryLotOptions,
+    materialOptions,
+    productOptions,
+    purchaseReceiptOptions,
+  })
 
   const modalOkText = {
     create: '生成草稿',
@@ -1057,16 +1311,16 @@ export default function V1QualityInspectionsPage() {
       <PageHeaderCard
         compact
         title="质量检验"
-        description="质量检验用于处理采购来料、委外回货等业务的检验判定；提交会冻结对应批次，合格 / 让步接收后恢复可用，不合格后置为不可用。质检判定不会增减库存数量；采购来料不合格退供应商仍需办理采购退货，其他情况请到对应业务页面处理。"
+        description="质量检验集中办理采购到货、委外回货、出货关联成品和生产 WIP 分段关口的质量判定。生产分段质检按裁片、皮套、成品、针检、抽检及订单要求的客户验货分别记录；每张质检单只代表当前在制批次和当前关口，不代表其他关口已经完成。首次到货检验不合格会阻止本单入库，现有退供应商草稿只适用于已入库后追加检验不合格。"
         tags={[
           <Tag color="gold" key="hold">
-            已提交：批次冻结
+            已提交：等待判定
           </Tag>,
           <Tag color="green" key="pass">
-            通过：批次可用
+            通过：按来源规则继续
           </Tag>,
           <Tag color="red" key="reject">
-            不合格：批次不可用
+            不合格：阻止对应后续
           </Tag>,
         ]}
         stats={[
@@ -1124,7 +1378,21 @@ export default function V1QualityInspectionsPage() {
               value={inspectionTypeFilter}
               options={QUALITY_INSPECTION_TYPE_FILTER_OPTIONS}
               onChange={(nextType) => {
-                setInspectionTypeFilter(nextType || '')
+                const normalizedType = nextType || ''
+                setInspectionTypeFilter(normalizedType)
+                if (normalizedType && normalizedType !== 'INCOMING') {
+                  setPurchaseReceiptFilter('')
+                  setMaterialFilter('')
+                  clearRouteContext([
+                    'purchase_order_id',
+                    'purchase_receipt_id',
+                  ])
+                }
+                if (normalizedType === 'PRODUCTION_STAGE') {
+                  setWarehouseFilter('')
+                  setLotFilter('')
+                }
+                setSelectedRow(null)
                 resetBusinessPaginationCurrent(setPagination)
               }}
             />
@@ -1136,6 +1404,9 @@ export default function V1QualityInspectionsPage() {
                 ...purchaseReceiptOptions,
               ]}
               placeholder="全部入库单"
+              disabled={Boolean(
+                inspectionTypeFilter && inspectionTypeFilter !== 'INCOMING'
+              )}
               showSearch
               optionFilterProp="label"
               onChange={(nextReceipt) => {
@@ -1148,6 +1419,9 @@ export default function V1QualityInspectionsPage() {
               value={materialFilter}
               options={[{ label: '全部材料', value: '' }, ...materialOptions]}
               placeholder="全部材料"
+              disabled={Boolean(
+                inspectionTypeFilter && inspectionTypeFilter !== 'INCOMING'
+              )}
               showSearch
               optionFilterProp="label"
               onChange={(nextMaterial) => {
@@ -1160,6 +1434,7 @@ export default function V1QualityInspectionsPage() {
               value={warehouseFilter}
               options={[{ label: '全部仓库', value: '' }, ...warehouseOptions]}
               placeholder="全部仓库"
+              disabled={inspectionTypeFilter === 'PRODUCTION_STAGE'}
               showSearch
               optionFilterProp="label"
               onChange={(nextWarehouse) => {
@@ -1175,6 +1450,7 @@ export default function V1QualityInspectionsPage() {
                 ...inventoryLotOptions,
               ]}
               placeholder="全部批次"
+              disabled={inspectionTypeFilter === 'PRODUCTION_STAGE'}
               showSearch
               optionFilterProp="label"
               onChange={(nextLot) => {
@@ -1254,7 +1530,7 @@ export default function V1QualityInspectionsPage() {
             disabled={!canCreate}
             onClick={openCreate}
           >
-            生成质检草稿
+            补建来料质检
           </ToolbarButton>
         }
       >
@@ -1262,7 +1538,7 @@ export default function V1QualityInspectionsPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedRowLabel}
-          boundaryText="提交、判定和取消均由系统按质检规则处理；不会绕过规则直接修改批次状态或库存数量。"
+          boundaryText="提交、判定和取消均由系统按质检规则处理；不会绕过来源规则直接改写库存数量或生产事实。"
         >
           <Button
             type="link"
@@ -1284,7 +1560,7 @@ export default function V1QualityInspectionsPage() {
             <Button
               size="small"
               icon={<LinkOutlined />}
-              disabled={!selectedRow}
+              disabled={!selectedRow || relatedMenuItems.length === 0}
             >
               相关单据 <DownOutlined />
             </Button>
@@ -1298,12 +1574,12 @@ export default function V1QualityInspectionsPage() {
             查看详情
           </Button>
           <Popconfirm
-            title="确认提交质检并冻结该批次？"
+            title="确认提交质检并进入待判定状态？"
             onConfirm={() =>
               runInspectionAction(
                 selectedRow,
                 submitQualityInspection,
-                '来料质检已提交'
+                '质检已提交'
               )
             }
             okText="确认"
@@ -1356,9 +1632,21 @@ export default function V1QualityInspectionsPage() {
               icon={<RollbackOutlined />}
               disabled={
                 !selectedRow ||
-                !isRejectedIncomingInspection(selectedRow) ||
+                !selectedRowCanCreatePurchaseReturn ||
                 returnedInspectionIDs.has(selectedRow.id) ||
+                selectedRowPurchaseReceiptLoading ||
                 purchaseReturnLoading
+              }
+              title={
+                selectedRow && isRejectedIncomingInspection(selectedRow)
+                  ? selectedRowPurchaseReceiptLoading
+                    ? '正在核对来源收货状态'
+                    : !selectedRowPurchaseReceipt
+                      ? '未能确认来源收货已入库，暂不能生成采购退货'
+                      : !selectedRowCanCreatePurchaseReturn
+                        ? '首次到货检验不合格只阻止入库，不在此生成采购退货'
+                        : undefined
+                  : undefined
               }
               onClick={() => openPurchaseReturn(selectedRow)}
             >
@@ -1393,7 +1681,7 @@ export default function V1QualityInspectionsPage() {
           total,
           onChange: (current, pageSize) => setPagination({ current, pageSize }),
         })}
-        scroll={{ x: 1460 }}
+        scroll={{ x: 1600 }}
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selectedRow ? [selectedRow.id] : [],
@@ -1538,10 +1826,29 @@ export default function V1QualityInspectionsPage() {
             />
           </>
         ) : (
-          <QualityInspectionDecisionForm
-            form={decisionForm}
-            mode={inspectionModal?.mode}
-          />
+          <>
+            <Alert
+              className="erp-business-source-summary"
+              showIcon
+              type="info"
+              message={`来源单据：${decisionSourceSummary.sourceNo}`}
+              description={
+                <Space direction="vertical" size={2}>
+                  <Text>{decisionSourceSummary.primary}</Text>
+                  {decisionSourceSummary.secondary ? (
+                    <Text type="secondary">
+                      {decisionSourceSummary.secondary}
+                    </Text>
+                  ) : null}
+                </Space>
+              }
+            />
+            <QualityInspectionDecisionForm
+              form={decisionForm}
+              mode={inspectionModal?.mode}
+              allowConcession={!decisionIsProductionStage}
+            />
+          </>
         )}
         <BusinessAttachmentPanel
           ref={inspectionAttachmentRef}

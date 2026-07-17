@@ -598,6 +598,9 @@ async function runScenarioOnce(browser, scenario) {
       baseURL,
       adminProfileOverride: scenario.adminProfile,
       effectiveSessionOverride: scenario.effectiveSession,
+      workflowTaskFixtures: scenario.workflowTaskFixtures,
+      workflowSourceTaskProducerFixtures:
+        scenario.workflowSourceTaskProducerFixtures,
     })
   }
 
@@ -614,6 +617,9 @@ async function runScenarioOnce(browser, scenario) {
         baseURL,
         adminProfileOverride: scenario.adminProfile,
         effectiveSessionOverride: scenario.effectiveSession,
+        workflowTaskFixtures: scenario.workflowTaskFixtures,
+        workflowSourceTaskProducerFixtures:
+          scenario.workflowSourceTaskProducerFixtures,
       })
       await installAdminDisabledRpcMocks(page)
     } else {
@@ -621,6 +627,9 @@ async function runScenarioOnce(browser, scenario) {
         baseURL,
         adminProfileOverride: scenario.adminProfile,
         effectiveSessionOverride: scenario.effectiveSession,
+        workflowTaskFixtures: scenario.workflowTaskFixtures,
+        workflowSourceTaskProducerFixtures:
+          scenario.workflowSourceTaskProducerFixtures,
       })
     }
     await page.addInitScript(
@@ -1590,6 +1599,7 @@ async function assertDarkDashboardLinkButtonsUnboxed(page, { scenarioName }) {
         const rect = button.getBoundingClientRect()
         return {
           text: String(button.textContent || '').trim(),
+          ariaLabel: String(button.getAttribute('aria-label') || ''),
           disabled: button.disabled,
           backgroundColor: style.backgroundColor,
           borderColor: style.borderColor,
@@ -1614,8 +1624,8 @@ async function assertDarkDashboardLinkButtonsUnboxed(page, { scenarioName }) {
     `${scenarioName} link 按钮无框断言必须在暗色模式执行: ${JSON.stringify(metrics)}`
   )
   assert(
-    metrics.buttons.some((button) => button.text === '查看客户') &&
-      metrics.buttons.some((button) => button.text === '查看发票记录'),
+    metrics.buttons.some((button) => button.ariaLabel === '查看客户') &&
+      metrics.buttons.some((button) => button.ariaLabel === '查看发票记录'),
     `${scenarioName} 缺少业务看板对象入口按钮样本: ${JSON.stringify(metrics)}`
   )
 
@@ -4687,8 +4697,19 @@ async function assertPaginationSizeChangerFocusStyle(page, { scenarioName }) {
 
 async function seedBusinessCollaborationOverflowTasks(
   page,
-  { sourceType, currentSourceID }
+  {
+    sourceType,
+    currentSourceID,
+    currentSourceNo = 'PO-STYLE-L1',
+    currentTaskLabel = '当前采购订单',
+  }
 ) {
+  const taskCodeScope =
+    String(sourceType || '')
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/gu, '-')
+      .replace(/^-+|-+$/gu, '') || 'source'
   const createTask = async (params) =>
     page.evaluate(async (taskParams) => {
       const response = await fetch('/rpc/workflow', {
@@ -4705,23 +4726,50 @@ async function seedBusinessCollaborationOverflowTasks(
       if (payload?.result?.code !== 0) {
         throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
       }
+      return payload?.result?.data?.task || null
     }, params)
+  const blockTask = async (task, reason) =>
+    page.evaluate(
+      async ({ task, reason }) => {
+        const response = await fetch('/rpc/workflow', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: `seed-business-collab-block-${task.task_code}`,
+            method: 'block_task_action',
+            params: {
+              task_id: task.id,
+              expected_version: task.version,
+              idempotency_key: `seed-block-${task.task_code}`,
+              action_key: 'block',
+              reason,
+            },
+          }),
+        })
+        const payload = await response.json()
+        if (payload?.result?.code !== 0) {
+          throw new Error(
+            `block_task_action failed: ${JSON.stringify(payload)}`
+          )
+        }
+      },
+      { task, reason }
+    )
 
   for (let index = 0; index < 12; index += 1) {
     await createTask({
-      task_code: `style-l1-business-collab-page-${index + 1}`,
+      task_code: `style-l1-business-collab-${taskCodeScope}-other-${index + 1}`,
       task_group: sourceType,
       task_name:
         index === 11
-          ? '超长本页协同任务名称用于验证很多任务时不会横向溢出ABCDEFGHIJKLMN1234567890'
-          : `本页协同批量任务 ${index + 1}`,
+          ? '超长其他记录任务名称用于验证当前记录统计不会混入跨记录任务ABCDEFGHIJKLMN1234567890'
+          : `其他记录协同任务 ${index + 1}`,
       source_type: sourceType,
       source_id: 9000 + index,
       source_no: `PO-BULK-${String(index + 1).padStart(3, '0')}`,
-      task_status_key: index < 3 ? 'blocked' : 'ready',
+      task_status_key: 'ready',
       owner_role_key: index % 2 === 0 ? 'purchase' : 'finance',
-      blocked_reason:
-        index < 3 ? '批量阻塞原因很长用于验证提示换行和面板滚动边界' : '',
       payload:
         index === 1
           ? {
@@ -4733,19 +4781,24 @@ async function seedBusinessCollaborationOverflowTasks(
     })
   }
 
-  for (let index = 0; index < 2; index += 1) {
-    await createTask({
-      task_code: `style-l1-business-collab-current-${index + 1}`,
+  for (let index = 0; index < 8; index += 1) {
+    const task = await createTask({
+      task_code: `style-l1-business-collab-${taskCodeScope}-current-${index + 1}`,
       task_group: sourceType,
-      task_name: `当前采购订单协同任务 ${index + 1}`,
+      task_name:
+        index === 7
+          ? '超长当前记录协同任务名称用于验证很多任务时不会横向溢出ABCDEFGHIJKLMN1234567890'
+          : `${currentTaskLabel}协同任务 ${index + 1}`,
       source_type: sourceType,
       source_id: currentSourceID,
-      source_no: 'PO-STYLE-L1',
-      task_status_key: index === 0 ? 'blocked' : 'ready',
-      owner_role_key: 'purchase',
-      blocked_reason: index === 0 ? '当前记录阻塞原因' : '',
+      source_no: currentSourceNo,
+      task_status_key: 'ready',
+      owner_role_key: index % 2 === 0 ? 'purchase' : 'finance',
       payload: {},
     })
+    if (index < 3) {
+      await blockTask(task, `当前记录阻塞原因 ${index + 1}`)
+    }
   }
 }
 
@@ -4753,7 +4806,6 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
   page,
   {
     scenarioName,
-    expectCurrentRecord = false,
     checkDesktopResize = true,
     checkResizeHandleHover = true,
     expectedOverflowNote = '',
@@ -4835,6 +4887,11 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
           '.erp-business-collaboration-task-panel__actions .ant-tag'
         ),
       ].map((item) => String(item.textContent || '').trim()),
+      actionButtonTexts: [
+        ...node.querySelectorAll(
+          '.erp-business-collaboration-task-panel__actions button'
+        ),
+      ].map((item) => String(item.textContent || '').trim()),
       bodyHeight: panelBody?.getBoundingClientRect().height || 0,
       panelBackground: panelStyle.backgroundColor,
       tableCardBackground: tableCardStyle?.backgroundColor || '',
@@ -4871,23 +4928,12 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       collapsedMetrics
     )}`
   )
-  if (expectCurrentRecord) {
-    assert(
-      collapsedSummaryText.some((text) => text.startsWith('当前')),
-      `${scenarioName} 选中记录后收起态应显示当前记录摘要: ${JSON.stringify(
-        collapsedMetrics
-      )}`
-    )
-  } else {
-    assert(
-      !collapsedSummaryText.some(
-        (text) => text.startsWith('当前') || text.includes('未选择')
-      ),
-      `${scenarioName} 未选中记录时不应展示空的当前记录占位: ${JSON.stringify(
-        collapsedMetrics
-      )}`
-    )
-  }
+  assert(
+    collapsedSummaryText.some((text) => text.startsWith('当前')),
+    `${scenarioName} 收起态应显示当前记录摘要: ${JSON.stringify(
+      collapsedMetrics
+    )}`
+  )
   assert.equal(
     collapsedMetrics.actionTagTexts.length,
     0,
@@ -4896,8 +4942,17 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
     )}`
   )
   assert(
-    compactText(collapsedMetrics.titleLineText).includes('这里只处理待办任务'),
-    `${scenarioName} 本页协同应保留业务处理边界短句: ${JSON.stringify(
+    compactText(collapsedMetrics.titleLineText).includes('当前记录任务') &&
+      compactText(collapsedMetrics.titleLineText).includes(
+        '这里只处理当前记录待办'
+      ),
+    `${scenarioName} 当前记录任务面板应保留标题和业务处理边界短句: ${JSON.stringify(
+      collapsedMetrics
+    )}`
+  )
+  assert(
+    collapsedMetrics.actionButtonTexts.includes('任务中心'),
+    `${scenarioName} 当前记录任务面板应提供前往全局任务中心的入口: ${JSON.stringify(
       collapsedMetrics
     )}`
   )
@@ -5086,7 +5141,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
       expandedMetrics.tabTexts.map((text) =>
         compactText(text).replace(/\d+$/u, '')
       ),
-      ['本页待办', '当前记录', '阻塞异常'],
+      ['当前记录', '阻塞异常'],
       `${scenarioName} 展开后任务 tab 不完整: ${JSON.stringify(expandedMetrics)}`
     )
   }
@@ -5127,7 +5182,7 @@ async function assertBusinessCollaborationPanelCollapsedByDefault(
   )
   assert.equal(
     expandedMetrics.tabListLabel,
-    '相关任务分类',
+    '当前记录任务分类',
     `${scenarioName} 协同任务分类 aria-label 不正确: ${JSON.stringify(expandedMetrics)}`
   )
   assert.equal(
@@ -5691,26 +5746,8 @@ async function assertDashboardWorkbenchEntryNavigation(page, { scenarioName }) {
     due_at: nowSec + 3_600,
     payload: { notification_type: 'task_created' },
   })
-  await createTask({
-    task_code: 'style-l1-dashboard-entry-shell',
-    task_group: 'shipment_release',
-    task_name: '工作台出货放行入口任务',
-    source_type: 'shipping-release',
-    source_id: 9011,
-    source_no: 'OUT-DASH-SHIPMENT',
-    business_status_key: 'shipment_pending',
-    task_status_key: 'ready',
-    owner_role_key: 'warehouse',
-    due_at: nowSec + 7_200,
-    payload: {
-      notification_type: 'task_created',
-      alert_type: 'shipment_pending',
-    },
-  })
-
   await page.getByRole('button', { name: '刷新当前页' }).click()
   await expectText(page, '工作台正式页关联任务')
-  await expectText(page, '工作台出货放行入口任务')
 
   const formalRow = page
     .locator('.erp-workbench-queue-panel .ant-table-row')
@@ -5730,31 +5767,6 @@ async function assertDashboardWorkbenchEntryNavigation(page, { scenarioName }) {
   )
   await expectHeading(page, '销售订单')
   await expectText(page, 'SO-STYLE-L1')
-
-  await gotoScenarioPath(page, '/erp/dashboard', {
-    waitUntil: 'domcontentloaded',
-  })
-  await expectHeading(page, '工作台')
-  await expectText(page, '工作台出货放行入口任务')
-  const shipmentRow = page
-    .locator('.erp-workbench-queue-panel .ant-table-row')
-    .filter({ hasText: '工作台出货放行入口任务' })
-    .first()
-  await shipmentRow.click()
-  await detailPanel
-    .getByText('工作台出货放行入口任务', { exact: true })
-    .waitFor({ state: 'visible', timeout: 10_000 })
-  await detailPanel
-    .getByRole('button', { name: '关联记录', exact: true })
-    .click()
-  await waitForPath(page, '/erp/warehouse/shipping-release')
-  assert.match(
-    page.url(),
-    /[?&]link_keyword=OUT-DASH-SHIPMENT(?:&|$)/,
-    `${scenarioName} 出货放行入口应带来源单号: ${page.url()}`
-  )
-  await expectHeading(page, '出货放行')
-  await expectText(page, '工作台出货放行入口任务')
 }
 
 async function assertDashboardTaskBoardLayout(page, { scenarioName }) {
@@ -5880,7 +5892,7 @@ async function assertTaskActionDrawerLayout(
   {
     scenarioName,
     expectedTaskText,
-    expectedActionText,
+    expectedActionText = '',
     expectReasonInput = false,
   }
 ) {
@@ -5888,7 +5900,9 @@ async function assertTaskActionDrawerLayout(
     hasText: expectedTaskText,
   })
   await drawer.waitFor({ state: 'visible', timeout: 10_000 })
-  await expectText(page, expectedActionText)
+  if (expectedActionText) {
+    await expectText(page, expectedActionText)
+  }
   await expectText(page, '处理范围：')
 
   const metrics = await page.evaluate(
@@ -5935,17 +5949,31 @@ async function assertTaskActionDrawerLayout(
         drawerElement instanceof HTMLElement
           ? rectOf(drawerElement.querySelector(selector))
           : null
+      const activeStepPanel =
+        drawerElement instanceof HTMLElement
+          ? Array.from(
+              drawerElement.querySelectorAll(
+                '.erp-task-action-drawer__step-panel'
+              )
+            ).find(isVisible)
+          : null
+      const rectInActiveStepPanel = (selector) =>
+        activeStepPanel instanceof HTMLElement
+          ? rectOf(activeStepPanel.querySelector(selector))
+          : null
       const summary = rectInDrawer('.erp-task-action-drawer__summary')
       const metaGrid = rectInDrawer('.erp-task-action-drawer__meta-grid')
       const guide = rectInDrawer('.erp-task-action-drawer__guide')
       const guideSteps = rectInDrawer('.erp-task-action-drawer__guide-steps')
       const guideNote = rectInDrawer('.erp-task-action-drawer__guide-note')
       const actionPanel =
-        rectInDrawer('.erp-task-action-drawer__action-panel') ||
-        rectInDrawer('.erp-task-action-drawer__action-prompt')
+        rectInActiveStepPanel('.erp-task-action-drawer__action-panel') ||
+        rectInActiveStepPanel('.erp-task-action-drawer__action-prompt') ||
+        rectInActiveStepPanel('.erp-task-action-drawer__confirm-panel') ||
+        rectOf(activeStepPanel)
       const footer = rectInDrawer('.ant-drawer-footer')
       const body = rectInDrawer('.ant-drawer-body')
-      const textArea = rectInDrawer('textarea')
+      const textArea = rectInActiveStepPanel('textarea')
       const metaItems =
         drawerElement?.querySelectorAll(
           '.erp-task-action-drawer__meta-grid > div'
@@ -5955,8 +5983,15 @@ async function assertTaskActionDrawerLayout(
           .length || 0
       const footerButtons =
         drawerElement?.querySelectorAll(
-          '.erp-task-action-drawer__footer-actions button'
+          '.erp-task-action-drawer__footer button'
         ).length || 0
+      const selectedTabs =
+        drawerElement?.querySelectorAll(
+          '.erp-task-action-drawer__step[role="tab"][aria-selected="true"]'
+        ).length || 0
+      const tabList = rectInDrawer(
+        '.erp-task-action-drawer__guide-steps[role="tablist"]'
+      )
       return {
         viewport: {
           width: window.innerWidth,
@@ -5976,6 +6011,8 @@ async function assertTaskActionDrawerLayout(
         textArea,
         metaItems,
         stepItems,
+        selectedTabs,
+        tabList,
         footerButtons,
       }
     },
@@ -6009,6 +6046,15 @@ async function assertTaskActionDrawerLayout(
     metrics.stepItems,
     3,
     `${scenarioName} 任务处理抽屉应展示 3 个处理步骤: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(
+    metrics.selectedTabs,
+    1,
+    `${scenarioName} 任务处理步骤应只有一个当前步骤: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.tabList?.height > 0,
+    `${scenarioName} 任务处理步骤缺少可访问的 tablist: ${JSON.stringify(metrics)}`
   )
   assert(
     metrics.footerButtons >= 2,

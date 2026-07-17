@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
@@ -17,6 +18,7 @@ import (
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/shopspring/decimal"
 )
 
 // QualityInspectionCreate is the builder for creating a QualityInspection entity.
@@ -66,6 +68,42 @@ func (_c *QualityInspectionCreate) SetInventoryLotID(v int) *QualityInspectionCr
 	return _c
 }
 
+// SetNillableInventoryLotID sets the "inventory_lot_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableInventoryLotID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetInventoryLotID(*v)
+	}
+	return _c
+}
+
+// SetProductionWipBatchID sets the "production_wip_batch_id" field.
+func (_c *QualityInspectionCreate) SetProductionWipBatchID(v int) *QualityInspectionCreate {
+	_c.mutation.SetProductionWipBatchID(v)
+	return _c
+}
+
+// SetNillableProductionWipBatchID sets the "production_wip_batch_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableProductionWipBatchID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetProductionWipBatchID(*v)
+	}
+	return _c
+}
+
+// SetGateCode sets the "gate_code" field.
+func (_c *QualityInspectionCreate) SetGateCode(v string) *QualityInspectionCreate {
+	_c.mutation.SetGateCode(v)
+	return _c
+}
+
+// SetNillableGateCode sets the "gate_code" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableGateCode(v *string) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetGateCode(*v)
+	}
+	return _c
+}
+
 // SetMaterialID sets the "material_id" field.
 func (_c *QualityInspectionCreate) SetMaterialID(v int) *QualityInspectionCreate {
 	_c.mutation.SetMaterialID(v)
@@ -83,6 +121,14 @@ func (_c *QualityInspectionCreate) SetNillableMaterialID(v *int) *QualityInspect
 // SetWarehouseID sets the "warehouse_id" field.
 func (_c *QualityInspectionCreate) SetWarehouseID(v int) *QualityInspectionCreate {
 	_c.mutation.SetWarehouseID(v)
+	return _c
+}
+
+// SetNillableWarehouseID sets the "warehouse_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableWarehouseID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetWarehouseID(*v)
+	}
 	return _c
 }
 
@@ -226,6 +272,34 @@ func (_c *QualityInspectionCreate) SetNillableInspectorID(v *int) *QualityInspec
 	return _c
 }
 
+// SetDefectRateOperator sets the "defect_rate_operator" field.
+func (_c *QualityInspectionCreate) SetDefectRateOperator(v string) *QualityInspectionCreate {
+	_c.mutation.SetDefectRateOperator(v)
+	return _c
+}
+
+// SetNillableDefectRateOperator sets the "defect_rate_operator" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableDefectRateOperator(v *string) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetDefectRateOperator(*v)
+	}
+	return _c
+}
+
+// SetDefectRatePercent sets the "defect_rate_percent" field.
+func (_c *QualityInspectionCreate) SetDefectRatePercent(v decimal.Decimal) *QualityInspectionCreate {
+	_c.mutation.SetDefectRatePercent(v)
+	return _c
+}
+
+// SetNillableDefectRatePercent sets the "defect_rate_percent" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableDefectRatePercent(v *decimal.Decimal) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetDefectRatePercent(*v)
+	}
+	return _c
+}
+
 // SetDecisionNote sets the "decision_note" field.
 func (_c *QualityInspectionCreate) SetDecisionNote(v string) *QualityInspectionCreate {
 	_c.mutation.SetDecisionNote(v)
@@ -281,6 +355,11 @@ func (_c *QualityInspectionCreate) SetPurchaseReceiptItem(v *PurchaseReceiptItem
 // SetInventoryLot sets the "inventory_lot" edge to the InventoryLot entity.
 func (_c *QualityInspectionCreate) SetInventoryLot(v *InventoryLot) *QualityInspectionCreate {
 	return _c.SetInventoryLotID(v.ID)
+}
+
+// SetProductionWipBatch sets the "production_wip_batch" edge to the ProductionWIPBatch entity.
+func (_c *QualityInspectionCreate) SetProductionWipBatch(v *ProductionWIPBatch) *QualityInspectionCreate {
+	return _c.SetProductionWipBatchID(v.ID)
 }
 
 // SetMaterial sets the "material" edge to the Material entity.
@@ -390,21 +469,25 @@ func (_c *QualityInspectionCreate) check() error {
 			return &ValidationError{Name: "purchase_receipt_item_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.purchase_receipt_item_id": %w`, err)}
 		}
 	}
-	if _, ok := _c.mutation.InventoryLotID(); !ok {
-		return &ValidationError{Name: "inventory_lot_id", err: errors.New(`ent: missing required field "QualityInspection.inventory_lot_id"`)}
-	}
 	if v, ok := _c.mutation.InventoryLotID(); ok {
 		if err := qualityinspection.InventoryLotIDValidator(v); err != nil {
 			return &ValidationError{Name: "inventory_lot_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inventory_lot_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ProductionWipBatchID(); ok {
+		if err := qualityinspection.ProductionWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "production_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.production_wip_batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.GateCode(); ok {
+		if err := qualityinspection.GateCodeValidator(v); err != nil {
+			return &ValidationError{Name: "gate_code", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.gate_code": %w`, err)}
 		}
 	}
 	if v, ok := _c.mutation.MaterialID(); ok {
 		if err := qualityinspection.MaterialIDValidator(v); err != nil {
 			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.material_id": %w`, err)}
 		}
-	}
-	if _, ok := _c.mutation.WarehouseID(); !ok {
-		return &ValidationError{Name: "warehouse_id", err: errors.New(`ent: missing required field "QualityInspection.warehouse_id"`)}
 	}
 	if v, ok := _c.mutation.WarehouseID(); ok {
 		if err := qualityinspection.WarehouseIDValidator(v); err != nil {
@@ -462,6 +545,11 @@ func (_c *QualityInspectionCreate) check() error {
 			return &ValidationError{Name: "inspector_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspector_id": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DefectRateOperator(); ok {
+		if err := qualityinspection.DefectRateOperatorValidator(v); err != nil {
+			return &ValidationError{Name: "defect_rate_operator", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.defect_rate_operator": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.DecisionNote(); ok {
 		if err := qualityinspection.DecisionNoteValidator(v); err != nil {
 			return &ValidationError{Name: "decision_note", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.decision_note": %w`, err)}
@@ -472,12 +560,6 @@ func (_c *QualityInspectionCreate) check() error {
 	}
 	if _, ok := _c.mutation.UpdatedAt(); !ok {
 		return &ValidationError{Name: "updated_at", err: errors.New(`ent: missing required field "QualityInspection.updated_at"`)}
-	}
-	if len(_c.mutation.InventoryLotIDs()) == 0 {
-		return &ValidationError{Name: "inventory_lot", err: errors.New(`ent: missing required edge "QualityInspection.inventory_lot"`)}
-	}
-	if len(_c.mutation.WarehouseIDs()) == 0 {
-		return &ValidationError{Name: "warehouse", err: errors.New(`ent: missing required edge "QualityInspection.warehouse"`)}
 	}
 	return nil
 }
@@ -508,6 +590,10 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 	if value, ok := _c.mutation.InspectionNo(); ok {
 		_spec.SetField(qualityinspection.FieldInspectionNo, field.TypeString, value)
 		_node.InspectionNo = value
+	}
+	if value, ok := _c.mutation.GateCode(); ok {
+		_spec.SetField(qualityinspection.FieldGateCode, field.TypeString, value)
+		_node.GateCode = &value
 	}
 	if value, ok := _c.mutation.SourceType(); ok {
 		_spec.SetField(qualityinspection.FieldSourceType, field.TypeString, value)
@@ -548,6 +634,14 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 	if value, ok := _c.mutation.InspectorID(); ok {
 		_spec.SetField(qualityinspection.FieldInspectorID, field.TypeInt, value)
 		_node.InspectorID = &value
+	}
+	if value, ok := _c.mutation.DefectRateOperator(); ok {
+		_spec.SetField(qualityinspection.FieldDefectRateOperator, field.TypeString, value)
+		_node.DefectRateOperator = &value
+	}
+	if value, ok := _c.mutation.DefectRatePercent(); ok {
+		_spec.SetField(qualityinspection.FieldDefectRatePercent, field.TypeOther, value)
+		_node.DefectRatePercent = &value
 	}
 	if value, ok := _c.mutation.DecisionNote(); ok {
 		_spec.SetField(qualityinspection.FieldDecisionNote, field.TypeString, value)
@@ -609,7 +703,24 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.InventoryLotID = nodes[0]
+		_node.InventoryLotID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionWipBatchIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   qualityinspection.ProductionWipBatchTable,
+			Columns: []string{qualityinspection.ProductionWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ProductionWipBatchID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.MaterialIDs(); len(nodes) > 0 {
@@ -643,7 +754,7 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 		for _, k := range nodes {
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
-		_node.WarehouseID = nodes[0]
+		_node.WarehouseID = &nodes[0]
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	if nodes := _c.mutation.PurchaseReturnsIDs(); len(nodes) > 0 {

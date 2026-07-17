@@ -49,9 +49,11 @@ type Process struct {
 type ProcessEdges struct {
 	// OutsourcingOrderItems holds the value of the outsourcing_order_items edge.
 	OutsourcingOrderItems []*OutsourcingOrderItem `json:"outsourcing_order_items,omitempty"`
+	// CapableSuppliers holds the value of the capable_suppliers edge.
+	CapableSuppliers []*Supplier `json:"capable_suppliers,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [1]bool
+	loadedTypes [2]bool
 }
 
 // OutsourcingOrderItemsOrErr returns the OutsourcingOrderItems value or an error if the edge
@@ -61,6 +63,15 @@ func (e ProcessEdges) OutsourcingOrderItemsOrErr() ([]*OutsourcingOrderItem, err
 		return e.OutsourcingOrderItems, nil
 	}
 	return nil, &NotLoadedError{edge: "outsourcing_order_items"}
+}
+
+// CapableSuppliersOrErr returns the CapableSuppliers value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProcessEdges) CapableSuppliersOrErr() ([]*Supplier, error) {
+	if e.loadedTypes[1] {
+		return e.CapableSuppliers, nil
+	}
+	return nil, &NotLoadedError{edge: "capable_suppliers"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -181,6 +192,11 @@ func (_m *Process) Value(name string) (ent.Value, error) {
 // QueryOutsourcingOrderItems queries the "outsourcing_order_items" edge of the Process entity.
 func (_m *Process) QueryOutsourcingOrderItems() *OutsourcingOrderItemQuery {
 	return NewProcessClient(_m.config).QueryOutsourcingOrderItems(_m)
+}
+
+// QueryCapableSuppliers queries the "capable_suppliers" edge of the Process entity.
+func (_m *Process) QueryCapableSuppliers() *SupplierQuery {
+	return NewProcessClient(_m.config).QueryCapableSuppliers(_m)
 }
 
 // Update returns a builder for updating this Process.

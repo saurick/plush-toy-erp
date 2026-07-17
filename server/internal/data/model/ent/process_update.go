@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/process"
+	"server/internal/data/model/ent/supplier"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -195,6 +196,21 @@ func (_u *ProcessUpdate) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *P
 	return _u.AddOutsourcingOrderItemIDs(ids...)
 }
 
+// AddCapableSupplierIDs adds the "capable_suppliers" edge to the Supplier entity by IDs.
+func (_u *ProcessUpdate) AddCapableSupplierIDs(ids ...int) *ProcessUpdate {
+	_u.mutation.AddCapableSupplierIDs(ids...)
+	return _u
+}
+
+// AddCapableSuppliers adds the "capable_suppliers" edges to the Supplier entity.
+func (_u *ProcessUpdate) AddCapableSuppliers(v ...*Supplier) *ProcessUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCapableSupplierIDs(ids...)
+}
+
 // Mutation returns the ProcessMutation object of the builder.
 func (_u *ProcessUpdate) Mutation() *ProcessMutation {
 	return _u.mutation
@@ -219,6 +235,27 @@ func (_u *ProcessUpdate) RemoveOutsourcingOrderItems(v ...*OutsourcingOrderItem)
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveOutsourcingOrderItemIDs(ids...)
+}
+
+// ClearCapableSuppliers clears all "capable_suppliers" edges to the Supplier entity.
+func (_u *ProcessUpdate) ClearCapableSuppliers() *ProcessUpdate {
+	_u.mutation.ClearCapableSuppliers()
+	return _u
+}
+
+// RemoveCapableSupplierIDs removes the "capable_suppliers" edge to Supplier entities by IDs.
+func (_u *ProcessUpdate) RemoveCapableSupplierIDs(ids ...int) *ProcessUpdate {
+	_u.mutation.RemoveCapableSupplierIDs(ids...)
+	return _u
+}
+
+// RemoveCapableSuppliers removes "capable_suppliers" edges to Supplier entities.
+func (_u *ProcessUpdate) RemoveCapableSuppliers(v ...*Supplier) *ProcessUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCapableSupplierIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -376,6 +413,51 @@ func (_u *ProcessUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CapableSuppliersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   process.CapableSuppliersTable,
+			Columns: process.CapableSuppliersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCapableSuppliersIDs(); len(nodes) > 0 && !_u.mutation.CapableSuppliersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   process.CapableSuppliersTable,
+			Columns: process.CapableSuppliersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CapableSuppliersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   process.CapableSuppliersTable,
+			Columns: process.CapableSuppliersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -569,6 +651,21 @@ func (_u *ProcessUpdateOne) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem)
 	return _u.AddOutsourcingOrderItemIDs(ids...)
 }
 
+// AddCapableSupplierIDs adds the "capable_suppliers" edge to the Supplier entity by IDs.
+func (_u *ProcessUpdateOne) AddCapableSupplierIDs(ids ...int) *ProcessUpdateOne {
+	_u.mutation.AddCapableSupplierIDs(ids...)
+	return _u
+}
+
+// AddCapableSuppliers adds the "capable_suppliers" edges to the Supplier entity.
+func (_u *ProcessUpdateOne) AddCapableSuppliers(v ...*Supplier) *ProcessUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddCapableSupplierIDs(ids...)
+}
+
 // Mutation returns the ProcessMutation object of the builder.
 func (_u *ProcessUpdateOne) Mutation() *ProcessMutation {
 	return _u.mutation
@@ -593,6 +690,27 @@ func (_u *ProcessUpdateOne) RemoveOutsourcingOrderItems(v ...*OutsourcingOrderIt
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveOutsourcingOrderItemIDs(ids...)
+}
+
+// ClearCapableSuppliers clears all "capable_suppliers" edges to the Supplier entity.
+func (_u *ProcessUpdateOne) ClearCapableSuppliers() *ProcessUpdateOne {
+	_u.mutation.ClearCapableSuppliers()
+	return _u
+}
+
+// RemoveCapableSupplierIDs removes the "capable_suppliers" edge to Supplier entities by IDs.
+func (_u *ProcessUpdateOne) RemoveCapableSupplierIDs(ids ...int) *ProcessUpdateOne {
+	_u.mutation.RemoveCapableSupplierIDs(ids...)
+	return _u
+}
+
+// RemoveCapableSuppliers removes "capable_suppliers" edges to Supplier entities.
+func (_u *ProcessUpdateOne) RemoveCapableSuppliers(v ...*Supplier) *ProcessUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveCapableSupplierIDs(ids...)
 }
 
 // Where appends a list predicates to the ProcessUpdate builder.
@@ -780,6 +898,51 @@ func (_u *ProcessUpdateOne) sqlSave(ctx context.Context) (_node *Process, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.CapableSuppliersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   process.CapableSuppliersTable,
+			Columns: process.CapableSuppliersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedCapableSuppliersIDs(); len(nodes) > 0 && !_u.mutation.CapableSuppliersCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   process.CapableSuppliersTable,
+			Columns: process.CapableSuppliersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.CapableSuppliersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   process.CapableSuppliersTable,
+			Columns: process.CapableSuppliersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

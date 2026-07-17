@@ -3,54 +3,64 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>业务管理中心样板</title>
+    <title>业务管理中心样板 / Business Management Center Pattern</title>
+    <link rel="icon" href="data:," />
     <style>
       :root {
         color-scheme: light;
-        --bg: #f4f6f9;
-        --panel: #fff;
-        --soft: #f8fafc;
-        --tint: #eef6ff;
-        --line: #dbe4ef;
+        --bg: #f3f6fa;
+        --surface: #ffffff;
+        --surface-soft: #f7f9fc;
+        --line: #dce4ef;
         --line-strong: #bdcad9;
         --text: #172033;
         --muted: #66758a;
-        --blue: #1d67d8;
-        --green: #197250;
-        --amber: #a85f00;
-        --red: #bd3440;
-        --blue-soft: #eaf3ff;
-        --green-soft: #eaf7f1;
-        --amber-soft: #fff4df;
-        --red-soft: #fff0f2;
-        --shadow: 0 16px 36px rgb(15 23 42 / 8%);
+        --primary: #1f67c9;
+        --primary-soft: #e9f3ff;
+        --danger: #b42331;
+        --danger-soft: #fff0f2;
+        --warning: #985900;
+        --warning-soft: #fff4df;
+        --success: #17704d;
+        --success-soft: #eaf7f1;
+        --info: #42617e;
+        --info-soft: #edf3f8;
+        --focus: #73aaf5;
+        --shadow: 0 12px 30px rgb(28 47 72 / 8%);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
           color-scheme: dark;
-          --bg: #101722;
-          --panel: #182233;
-          --soft: #202b3d;
-          --tint: #1c304d;
-          --line: #334157;
-          --line-strong: #4a5a72;
-          --text: #eef4fb;
-          --muted: #a9b6c8;
-          --blue: #76a8ff;
-          --green: #7ad7aa;
-          --amber: #f2bd65;
-          --red: #ff9aa3;
-          --blue-soft: #1f3556;
-          --green-soft: #183b2d;
-          --amber-soft: #463214;
-          --red-soft: #4a2229;
-          --shadow: 0 18px 42px rgb(0 0 0 / 28%);
+          --bg: #0f1722;
+          --surface: #182334;
+          --surface-soft: #202c3e;
+          --line: #334258;
+          --line-strong: #4a5b72;
+          --text: #edf3fb;
+          --muted: #a8b6c8;
+          --primary: #82b4ff;
+          --primary-soft: #1e3657;
+          --danger: #ff9ca6;
+          --danger-soft: #4b222b;
+          --warning: #f0bd68;
+          --warning-soft: #463315;
+          --success: #7bd7aa;
+          --success-soft: #193c2e;
+          --info: #aac3dd;
+          --info-soft: #243448;
+          --focus: #8cbbff;
+          --shadow: 0 16px 38px rgb(0 0 0 / 28%);
         }
       }
 
       * {
         box-sizing: border-box;
+      }
+
+      html {
+        min-width: 320px;
+        background: var(--bg);
       }
 
       body {
@@ -61,129 +71,105 @@
           "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
-      button {
+      select {
         font: inherit;
-        cursor: pointer;
+      }
+
+      select:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--focus) 42%, transparent);
+        outline-offset: 2px;
       }
 
       .app {
-        display: grid;
-        grid-template-rows: 58px minmax(0, 1fr);
-        height: 100vh;
-        overflow: hidden;
+        min-height: 100vh;
       }
 
-      .topbar {
+      .app-bar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
         display: flex;
+        min-height: 60px;
         align-items: center;
         justify-content: space-between;
-        gap: 14px;
+        gap: 16px;
         border-bottom: 1px solid var(--line);
-        background: rgb(255 255 255 / 94%);
-        padding: 0 22px;
+        background: color-mix(in srgb, var(--surface) 94%, transparent);
+        padding: 10px 24px;
+        backdrop-filter: blur(14px);
       }
 
       .brand {
         display: flex;
-        align-items: center;
-        gap: 10px;
         min-width: 0;
+        align-items: center;
+        gap: 11px;
       }
 
-      .mark {
+      .brand-mark {
         display: grid;
-        flex: 0 0 auto;
-        place-items: center;
         width: 34px;
         height: 34px;
-        border-radius: 8px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 9px;
         background: #245f98;
         color: #fff;
         font-weight: 760;
       }
 
-      .brand strong,
-      .brand span {
+      .brand-copy {
+        min-width: 0;
+      }
+
+      .brand-copy strong,
+      .brand-copy span {
         display: block;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      .brand span,
-      .muted,
-      .object span,
-      .detail-note,
-      .stat span,
-      .handoff p {
+      .brand-copy span {
         color: var(--muted);
         font-size: 12px;
       }
 
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
-      }
-
-      .btn {
-        min-height: 34px;
+      .stage {
+        display: inline-flex;
+        min-height: 26px;
+        flex: 0 0 auto;
+        align-items: center;
         border: 1px solid var(--line-strong);
-        border-radius: 7px;
-        background: var(--panel);
-        color: var(--text);
-        padding: 0 12px;
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 700;
       }
 
-      .btn.primary {
-        border-color: var(--blue);
-        background: var(--blue);
-        color: #fff;
-      }
-
-      .btn.text {
-        border-color: transparent;
-        background: transparent;
-        color: var(--blue);
-        padding-inline: 4px;
-      }
-
-      .content {
-        min-height: 0;
-        overflow: auto;
-        padding: 20px 22px 24px;
-      }
-
-      .workspace {
+      main {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
+        width: min(1480px, 100%);
         gap: 16px;
-        max-width: 1320px;
         margin: 0 auto;
+        padding: 24px;
       }
 
-      .hero,
-      .panel,
-      .detail,
-      .risk,
-      .handoff {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-        box-shadow: var(--shadow);
-      }
-
-      .hero {
-        grid-column: 1 / -1;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-        gap: 18px;
-        padding: 20px;
+      .page-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
       }
 
       .eyebrow {
-        color: var(--muted);
+        margin: 0 0 4px;
+        color: var(--primary);
         font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
       }
 
       h1,
@@ -194,594 +180,905 @@
       }
 
       h1 {
-        margin-bottom: 10px;
-        max-width: 780px;
-        font-size: 28px;
+        margin-bottom: 7px;
+        font-size: clamp(24px, 2.4vw, 32px);
         line-height: 1.18;
       }
 
-      h2,
-      h3 {
+      h2 {
         margin-bottom: 0;
+        font-size: 17px;
+        line-height: 1.35;
       }
 
-      .summary {
-        max-width: 800px;
+      h3 {
+        margin-bottom: 0;
+        font-size: 14px;
+      }
+
+      .lede {
+        max-width: 760px;
         margin-bottom: 0;
         color: var(--muted);
       }
 
-      .stats {
-        display: grid;
-        gap: 10px;
-      }
-
-      .stat {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--soft);
-        padding: 10px;
-      }
-
-      .stat > strong:first-child {
-        display: grid;
-        place-items: center;
-        width: 42px;
-        height: 42px;
-        border-radius: 8px;
-        background: var(--panel);
-        color: var(--blue);
-        font-size: 20px;
-      }
-
-      .panel,
-      .detail {
-        overflow: hidden;
-      }
-
-      .panel-head,
-      .detail-head {
+      .prototype-control {
         display: flex;
-        justify-content: space-between;
-        gap: 12px;
+        flex: 0 0 auto;
         align-items: center;
-        border-bottom: 1px solid var(--line);
-        padding: 14px 16px;
+        gap: 8px;
+        border: 1px dashed var(--line-strong);
+        border-radius: 9px;
+        background: var(--surface);
+        padding: 8px 10px;
       }
 
-      .tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
+      .prototype-control label {
+        color: var(--muted);
+        font-size: 12px;
       }
 
-      .tab {
-        min-height: 30px;
-        border: 1px solid var(--line);
+      .prototype-control select {
+        min-height: 34px;
+        max-width: 190px;
+        border: 1px solid var(--line-strong);
         border-radius: 7px;
-        background: var(--panel);
+        background: var(--surface);
         color: var(--text);
-        padding: 0 10px;
+        padding: 0 30px 0 9px;
       }
 
-      .tab[aria-selected="true"] {
-        border-color: var(--blue);
-        background: var(--blue-soft);
-        color: var(--blue);
-        font-weight: 700;
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
       }
 
-      .object-list {
+      .summary-card {
+        display: grid;
+        min-width: 0;
+        min-height: 124px;
+        align-content: space-between;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+        padding: 15px 16px;
+      }
+
+      .summary-card[data-state="unavailable"] {
+        border-color: color-mix(in srgb, var(--warning) 38%, var(--line));
+        background: color-mix(in srgb, var(--warning-soft) 48%, var(--surface));
+      }
+
+      .summary-head {
+        display: flex;
+        min-width: 0;
+        align-items: start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .summary-label {
+        min-width: 0;
+        font-weight: 650;
+        overflow-wrap: anywhere;
+      }
+
+      .summary-kind {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--info-soft);
+        color: var(--info);
+        padding: 2px 8px;
+        font-size: 11px;
+      }
+
+      .summary-value {
+        display: block;
+        font-size: 30px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+
+      .summary-card[data-key="risk"] .summary-value {
+        color: var(--danger);
+      }
+
+      .summary-note {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .summary-guidance {
+        margin: -4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .content-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+        gap: 16px;
+        align-items: start;
+      }
+
+      .panel {
+        min-width: 0;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .panel-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        padding: 16px 18px 14px;
+      }
+
+      .panel-head p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .panel-meta {
+        color: var(--muted);
+        font-size: 12px;
+        white-space: nowrap;
+      }
+
+      .table-wrap {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 11px 14px;
+        text-align: left;
+        vertical-align: middle;
+      }
+
+      thead th {
+        position: sticky;
+        top: 0;
+        z-index: 1;
+        background: var(--surface-soft);
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      tbody tr:last-child td,
+      tbody tr:last-child th {
+        border-bottom: 0;
+      }
+
+      .family-row th {
+        border-top: 1px solid var(--line-strong);
+        background: color-mix(in srgb, var(--primary-soft) 46%, var(--surface));
+        color: var(--text);
+        padding-top: 9px;
+        padding-bottom: 9px;
+        font-size: 13px;
+      }
+
+      tbody:first-of-type .family-row th {
+        border-top: 0;
+      }
+
+      .module-name {
+        min-width: 150px;
+        font-weight: 650;
+      }
+
+      .module-kind,
+      .entry-copy {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .module-total {
+        font-weight: 750;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .state-badge {
+        display: inline-flex;
+        min-height: 24px;
+        align-items: center;
+        border-radius: 999px;
+        background: var(--success-soft);
+        color: var(--success);
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 650;
+        white-space: nowrap;
+      }
+
+      .state-badge[data-state="unavailable"] {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
+      .side-stack {
+        display: grid;
+        min-width: 0;
+        gap: 16px;
+      }
+
+      .side-body {
         display: grid;
         gap: 10px;
         padding: 14px;
       }
 
-      .object {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: center;
+      .risk-item,
+      .failure-item,
+      .empty-state {
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-        padding: 12px;
-        text-align: left;
-      }
-
-      .object[aria-selected="true"] {
-        border-color: var(--blue);
-        box-shadow: 0 0 0 3px rgb(31 111 229 / 11%);
-      }
-
-      .object strong,
-      .object span {
-        display: block;
-        min-width: 0;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        white-space: nowrap;
-      }
-
-      .tag {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 24px;
-        border-radius: 999px;
-        padding: 0 9px;
-        font-size: 12px;
-        font-weight: 700;
-        white-space: nowrap;
-      }
-
-      .tag.blue {
-        background: var(--blue-soft);
-        color: var(--blue);
-      }
-
-      .tag.green {
-        background: var(--green-soft);
-        color: var(--green);
-      }
-
-      .tag.amber {
-        background: var(--amber-soft);
-        color: var(--amber);
-      }
-
-      .tag.red {
-        background: var(--red-soft);
-        color: var(--red);
-      }
-
-      .detail-body {
-        display: grid;
-        gap: 14px;
-        padding: 16px;
-      }
-
-      .why,
-      .detail-grid {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--soft);
+        border-radius: 9px;
+        background: var(--surface-soft);
         padding: 12px;
       }
 
-      .why {
-        background: var(--tint);
-      }
-
-      .why span {
-        display: block;
-        margin-top: 4px;
-      }
-
-      .detail-grid {
-        display: grid;
-        gap: 8px;
-      }
-
-      .detail-row {
+      .risk-head,
+      .failure-head {
         display: flex;
+        align-items: start;
         justify-content: space-between;
-        gap: 12px;
+        gap: 10px;
       }
 
-      .detail-row span {
+      .risk-count {
+        color: var(--danger);
+        font-size: 20px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+
+      .risk-item p,
+      .failure-item p,
+      .empty-state p {
+        margin: 5px 0 0;
         color: var(--muted);
         font-size: 12px;
       }
 
-      .detail-row strong {
-        text-align: right;
+      .risk-tone,
+      .failure-tone {
+        flex: 0 0 auto;
+        border-radius: 999px;
+        background: var(--warning-soft);
+        color: var(--warning);
+        padding: 2px 8px;
+        font-size: 11px;
       }
 
-      .lower {
-        grid-column: 1 / -1;
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
-        gap: 16px;
+      .failure-item {
+        border-color: color-mix(in srgb, var(--danger) 28%, var(--line));
+        background: color-mix(in srgb, var(--danger-soft) 52%, var(--surface));
       }
 
-      .risk,
-      .handoff {
-        padding: 16px;
+      .failure-tone {
+        background: var(--danger-soft);
+        color: var(--danger);
       }
 
-      .risk-grid,
-      .handoff-grid {
-        display: grid;
-        gap: 10px;
-        margin-top: 12px;
+      .empty-state[data-tone="success"] {
+        border-color: color-mix(in srgb, var(--success) 26%, var(--line));
+        background: color-mix(in srgb, var(--success-soft) 54%, var(--surface));
       }
 
-      .risk-grid {
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+      .empty-state strong {
+        color: var(--success);
       }
 
-      .risk-card,
-      .handoff-row {
+      .boundary-note {
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--soft);
-        padding: 10px;
-      }
-
-      .risk-card strong,
-      .risk-card span {
-        display: block;
-        overflow-wrap: anywhere;
-      }
-
-      .risk-card span {
-        margin-top: 4px;
+        border-radius: 10px;
+        background: var(--surface);
         color: var(--muted);
+        padding: 13px 16px;
         font-size: 12px;
       }
 
-      .handoff-row {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 10px;
+      .boundary-note strong {
+        color: var(--text);
       }
 
-      .dot {
-        width: 10px;
-        height: 10px;
-        margin-top: 5px;
-        border-radius: 50%;
-        background: var(--blue);
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
       }
 
-      .dot.red {
-        background: var(--red);
-      }
-
-      .dot.amber {
-        background: var(--amber);
-      }
-
-      .dot.green {
-        background: var(--green);
-      }
-
-      @media (prefers-color-scheme: dark) {
-        .topbar {
-          background: rgb(24 34 51 / 94%);
+      @media (max-width: 1120px) {
+        .summary-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
         }
-      }
 
-      @media (max-width: 1040px) {
-        .workspace,
-        .hero,
-        .lower {
+        .content-grid {
           grid-template-columns: 1fr;
         }
 
-        .risk-grid {
+        .side-stack {
           grid-template-columns: repeat(2, minmax(0, 1fr));
         }
       }
 
       @media (max-width: 700px) {
-        .app {
-          grid-template-rows: auto minmax(0, 1fr);
-          height: auto;
-          min-height: 100vh;
-          overflow: visible;
+        .app-bar {
+          position: static;
+          padding: 12px 14px;
         }
 
-        .topbar {
-          align-items: flex-start;
-          flex-direction: column;
-          padding: 14px 16px;
+        main {
+          padding: 16px 12px 24px;
         }
 
-        .content {
-          overflow: visible;
-          padding: 14px;
+        .page-heading {
+          display: grid;
+          align-items: start;
         }
 
-        h1 {
-          font-size: 22px;
+        .prototype-control {
+          width: 100%;
+          justify-content: space-between;
         }
 
-        .object {
+        .prototype-control select {
+          min-width: 0;
+          flex: 1 1 auto;
+        }
+
+        .summary-grid,
+        .side-stack {
           grid-template-columns: 1fr;
         }
 
-        .risk-grid {
-          grid-template-columns: 1fr;
+        .summary-card {
+          min-height: 108px;
+        }
+
+        .panel-head {
+          display: grid;
+        }
+
+        .panel-meta {
+          white-space: normal;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
   </head>
   <body>
     <div class="app">
-      <header class="topbar">
+      <header class="app-bar">
         <div class="brand">
-          <div class="mark">业</div>
-          <div>
-            <strong>业务管理中心样板</strong>
-            <span>To Implement / 业务对象总控，不是模块堆叠</span>
+          <div class="brand-mark" aria-hidden="true">业</div>
+          <div class="brand-copy">
+            <strong>业务看板</strong>
+            <span>只读摘要、对象扫描与风险状态</span>
           </div>
         </div>
-        <div class="actions">
-          <button class="btn">刷新摘要</button>
-          <button class="btn primary">进入当前对象</button>
-        </div>
+        <span class="stage">To Implement · 原型样板</span>
       </header>
 
-      <main class="content">
-        <div class="workspace">
-          <section class="hero" aria-label="业务管理入口意义">
-            <div>
-              <div class="eyebrow">Business / 对象总控</div>
-              <h1>业务管理菜单只做一件事：帮用户选对业务对象和处理路径。</h1>
-              <p class="summary">
-                这里不把所有模块铺成大菜单，也不恢复旧 business_records。业务管理只按链路聚合对象、风险和入口，真实字段、动作和过账仍回到标准业务页。
-              </p>
-            </div>
-            <div class="stats">
-              <div class="stat"><strong>1</strong><div><strong>先选链路</strong><span>客户订单、采购入库、库存出货或财务。</span></div></div>
-              <div class="stat"><strong>2</strong><div><strong>再选对象</strong><span>进入销售订单、入库、库存、出货等标准页。</span></div></div>
-              <div class="stat"><strong>3</strong><div><strong>最后做动作</strong><span>保存、过账、冲正和导出都回到目标页。</span></div></div>
-            </div>
-          </section>
-
-          <section class="panel" aria-label="业务链路对象">
-            <div class="panel-head">
-              <div>
-                <div class="eyebrow">业务链路</div>
-                <h2>按链路管理，不按菜单堆叠</h2>
-              </div>
-              <div class="tabs" role="tablist" aria-label="业务链路">
-                <button class="tab" id="tab-sales" type="button" role="tab" data-filter="sales" aria-controls="objectList" aria-selected="true">客户与订单</button>
-                <button class="tab" id="tab-inbound" type="button" role="tab" data-filter="inbound" aria-controls="objectList" aria-selected="false">采购入库质检</button>
-                <button class="tab" id="tab-stock" type="button" role="tab" data-filter="stock" aria-controls="objectList" aria-selected="false">库存出货</button>
-                <button class="tab" id="tab-finance" type="button" role="tab" data-filter="finance" aria-controls="objectList" aria-selected="false">财务对账</button>
-              </div>
-            </div>
-            <div class="object-list" id="objectList" role="tabpanel" aria-labelledby="tab-sales"></div>
-          </section>
-
-          <aside class="detail" aria-label="当前业务对象">
-            <div class="detail-head">
-              <div>
-                <div class="eyebrow">当前对象</div>
-                <h2 id="detailTitle">销售订单</h2>
-              </div>
-              <span class="tag green" id="detailTag">V1</span>
-            </div>
-            <div class="detail-body">
-              <div class="why">
-                <strong id="detailWhy">承接客户订单、交期和明细承诺。</strong>
-                <span id="detailNext">下一步：进入销售订单标准页，查看列表、详情和明细。</span>
-              </div>
-              <div class="detail-grid">
-                <div class="detail-row"><span>页面类型</span><strong id="detailPattern">标准列表 + 详情</strong></div>
-                <div class="detail-row"><span>事实边界</span><strong id="detailFact">不写库存 / 出货 / 财务</strong></div>
-                <div class="detail-row"><span>能力状态</span><strong id="detailStatus">已接 V1</strong></div>
-                <div class="detail-row"><span>建议入口</span><strong id="detailEntry">销售订单</strong></div>
-              </div>
-              <p class="detail-note" id="detailBoundary">销售订单表达客户承诺，不自动生成出货、库存预留、应收或发票事实。</p>
-              <div class="actions">
-                <button class="btn primary">进入标准页</button>
-                <button class="btn">查看详情样板</button>
-                <button class="btn text">查看关联任务</button>
-              </div>
-            </div>
-          </aside>
-
-          <div class="lower">
-            <section class="risk" aria-label="链路风险摘要">
-              <div>
-                <div class="eyebrow">只读摘要</div>
-                <h3>业务管理只提示风险，不在这里写事实</h3>
-                <div class="muted">风险卡只作为跳转和筛选线索，不能替代业务页状态机。</div>
-              </div>
-              <div class="risk-grid">
-                <div class="risk-card"><strong>交期风险</strong><span>订单未确认交期时，提示进入销售订单或任务中心。</span></div>
-                <div class="risk-card"><strong>入库风险</strong><span>质检或入库阻塞时，提示进入入库 / 质检对象。</span></div>
-                <div class="risk-card"><strong>事实风险</strong><span>库存、出货、财务动作必须由对应 usecase 完成。</span></div>
-              </div>
-            </section>
-
-            <section class="handoff" aria-label="业务管理边界">
-              <div>
-                <div class="eyebrow">边界</div>
-                <h3>业务管理不是第二套业务系统</h3>
-              </div>
-              <div class="handoff-grid">
-                <div class="handoff-row"><span class="dot red"></span><div><strong>不恢复 business_records</strong><p>不查询、不写入旧通用业务记录，也不把它作为对象总控真源。</p></div></div>
-                <div class="handoff-row"><span class="dot amber"></span><div><strong>不提前承诺未接能力</strong><p>入口壳可以展示方向，但必须标明待接 API / usecase。</p></div></div>
-                <div class="handoff-row"><span class="dot green"></span><div><strong>不替代正式菜单</strong><p>是否新增或合并左侧菜单，仍要单独评审 seed、客户菜单和 RBAC。</p></div></div>
-              </div>
-            </section>
+      <main>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">BUSINESS OVERVIEW / 分口径阅读</p>
+            <h1>先看全局，再定位业务对象</h1>
+            <p class="lede">
+              摘要只读取已有业务投影；对象表用于逐项扫描模块状态，协同风险与读取失败独立展示。
+            </p>
+          </div>
+          <div class="prototype-control">
+            <label for="demoState">原型数据状态</label>
+            <select id="demoState">
+              <option value="ready">全部可用</option>
+              <option value="partial" selected>部分来源失败</option>
+              <option value="zero">成功返回零值</option>
+              <option value="error">全部暂不可用</option>
+            </select>
           </div>
         </div>
+
+        <section class="summary-grid" id="summaryGrid" aria-label="业务只读摘要"></section>
+        <p class="summary-guidance">
+          四类数字语义不同，不形成“总对象数”或健康分；原型数字仅用于状态与版式演示。
+        </p>
+
+        <div class="content-grid">
+          <section class="panel" aria-labelledby="objectsTitle">
+            <header class="panel-head">
+              <div>
+                <h2 id="objectsTitle">各类业务数据</h2>
+                <p>按对象族和模块逐项核对；数量不可用时明确显示“—”，不降级为 0。</p>
+              </div>
+              <span class="panel-meta">8 个对象族 · 20 个模块</span>
+            </header>
+            <div class="table-wrap">
+              <table>
+                <caption class="sr-only">业务对象族与模块扫描表</caption>
+                <thead>
+                  <tr>
+                    <th scope="col">模块</th>
+                    <th scope="col">数据口径</th>
+                    <th scope="col">当前数量</th>
+                    <th scope="col">数据状态</th>
+                    <th scope="col">入口归属</th>
+                  </tr>
+                </thead>
+                <tbody id="moduleRows"></tbody>
+              </table>
+            </div>
+          </section>
+
+          <aside class="side-stack" aria-label="风险与读取状态">
+            <section class="panel" aria-labelledby="riskTitle">
+              <header class="panel-head">
+                <div>
+                  <h2 id="riskTitle">需关注</h2>
+                  <p>只统计当前账号可见的阻塞和到期任务。</p>
+                </div>
+                <span class="panel-meta" id="riskMeta"></span>
+              </header>
+              <div class="side-body" id="riskList"></div>
+            </section>
+
+            <section class="panel" aria-labelledby="failureTitle">
+              <header class="panel-head">
+                <div>
+                  <h2 id="failureTitle">数据状态</h2>
+                  <p>读取失败单独说明，不清空其他已成功区域。</p>
+                </div>
+                <span class="panel-meta" id="failureMeta"></span>
+              </header>
+              <div class="side-body" id="failureList"></div>
+            </section>
+          </aside>
+        </div>
+
+        <div class="boundary-note">
+          <strong>页面边界：</strong>
+          看板只负责摘要、定位和异常提示；字段修改、业务办理与状态变更仍在对应业务页面完成。
+        </div>
+        <p class="sr-only" id="stateAnnouncement" aria-live="polite"></p>
       </main>
     </div>
 
     <script>
-      const objects = [
+      const truthLabels = {
+        master: "基础资料",
+        source: "业务单据",
+        fact: "办理结果",
+        collaboration: "协同任务",
+      };
+
+      const families = [
         {
-          id: "sales-order",
-          filter: "sales",
+          title: "客户 / 供应商",
+          modules: [
+            ["customers", "客户", "master", "客户档案"],
+            ["suppliers", "供应商", "master", "供应商档案"],
+          ],
+        },
+        {
+          title: "产品 / BOM",
+          modules: [
+            ["products", "产品", "master", "产品档案"],
+            ["material-bom", "BOM", "master", "BOM 管理"],
+          ],
+        },
+        {
           title: "销售订单",
-          meta: "客户承诺 / 交期 / 明细",
-          tag: "green",
-          status: "已接 V1",
-          pattern: "标准列表 + 详情",
-          fact: "不写库存 / 出货 / 财务",
-          entry: "销售订单",
-          why: "承接客户订单、交期和明细承诺。",
-          next: "下一步：进入销售订单标准页，查看列表、详情和明细。",
-          boundary: "销售订单表达客户承诺，不自动生成出货、库存预留、应收或发票事实。",
+          modules: [
+            ["sales-orders", "销售订单", "source", "销售订单"],
+          ],
         },
         {
-          id: "customer-supplier",
-          filter: "sales",
-          title: "客户 / 供应商档案",
-          meta: "主数据 / 联系人 / 启停",
-          tag: "green",
-          status: "已接 V1",
-          pattern: "标准列表 + 表单",
-          fact: "不写订单 / 采购事实",
-          entry: "客户档案 / 供应商档案",
-          why: "承接业务对象基础资料和联系人。",
-          next: "下一步：进入对应主数据页面维护基础资料。",
-          boundary: "主数据不直接生成销售、采购、库存、生产或财务事实。",
+          title: "采购 / 入库",
+          modules: [
+            ["accessories-purchase", "采购订单", "source", "采购订单"],
+            ["inbound", "采购入库", "fact", "采购入库"],
+          ],
         },
         {
-          id: "inbound-quality",
-          filter: "inbound",
-          title: "入库通知/检验/入库",
-          meta: "到仓 / 质检 / 入库协同",
-          tag: "amber",
-          status: "入口壳 + 部分事实",
-          pattern: "标准列表 + 动作浮层",
-          fact: "采购入库事实另走 usecase",
-          entry: "入库管理 / 来料质检",
-          why: "把到仓、质检和入库继续放在同一条处理链路里。",
-          next: "下一步：进入入库或质检页面，按状态处理。",
-          boundary: "Workflow 入库任务完成不等于 purchase_receipt posted，也不等于库存已入账。",
+          title: "质检 / 库存",
+          modules: [
+            ["quality-inspections", "质量检验", "fact", "来料质检"],
+            ["inventory", "库存台账", "fact", "库存台账"],
+          ],
         },
         {
-          id: "purchase-order",
-          filter: "inbound",
-          title: "采购订单",
-          meta: "采购承诺 / 供应商 / 到货",
-          tag: "amber",
-          status: "待接 API",
-          pattern: "标准列表 + 表单",
-          fact: "不等于采购收货",
-          entry: "采购订单",
-          why: "表达采购承诺，给收货和质检提供来源。",
-          next: "下一步：保持入口壳，后续单独评审采购订单 schema / API。",
-          boundary: "采购订单不是入库事实，不能用菜单提前承诺完整采购闭环。",
-        },
-        {
-          id: "inventory",
-          filter: "stock",
-          title: "库存台账",
-          meta: "余额 / 批次 / 流水",
-          tag: "green",
-          status: "事实真源已存在",
-          pattern: "台账列表 + 详情",
-          fact: "inventory_txns / balances / lots",
-          entry: "库存台账",
-          why: "库存管理应从台账进入，按余额、批次和流水追溯。",
-          next: "下一步：进入库存台账查看事实投影。",
-          boundary: "库存事实不能直接改余额，错误需走调整或 REVERSAL。",
-        },
-        {
-          id: "shipment",
-          filter: "stock",
           title: "出货 / 出库",
-          meta: "放行 / 装箱 / 发货",
-          tag: "amber",
-          status: "入口壳",
-          pattern: "标准列表 + 动作浮层",
-          fact: "Shipment / Inventory 待接",
-          entry: "出货放行 / 出库管理",
-          why: "交付链路需要区分放行、装箱、真实出货和库存扣减。",
-          next: "下一步：进入出货或出库页面查看当前状态。",
-          boundary: "shipping_released 不等于 shipped；真实出货和扣库存必须走事实层。",
+          modules: [
+            ["shipping-release", "出货放行", "collaboration", "出货管理"],
+            ["outbound", "出货单", "fact", "出货单"],
+          ],
         },
         {
-          id: "receivable",
-          filter: "finance",
-          title: "应收 / 发票",
-          meta: "应收事实 / 开票登记",
-          tag: "amber",
-          status: "入口壳",
-          pattern: "标准列表 + 详情",
-          fact: "至少基于真实 shipped",
-          entry: "应收管理 / 发票管理",
-          why: "财务管理应从真实业务事实派生，而不是从任务完成派生。",
-          next: "下一步：进入财务页面查看待接能力和边界提示。",
-          boundary: "应收至少应在真实出货或对账后评审，不能由出货放行或任务完成直接生成。",
+          title: "生产 / 委外",
+          modules: [
+            ["production-orders", "生产订单", "source", "生产订单"],
+            ["production-scheduling", "生产排程", "collaboration", "生产排程"],
+            ["production-progress", "生产记录", "fact", "生产进度"],
+            ["production-exceptions", "生产异常", "collaboration", "生产异常"],
+            ["processing-contracts", "委外订单", "source", "加工合同"],
+          ],
         },
         {
-          id: "payable",
-          filter: "finance",
-          title: "应付 / 对账",
-          meta: "采购 / 委外 / 付款提醒",
-          tag: "amber",
-          status: "入口壳",
-          pattern: "标准列表 + 对账视图",
-          fact: "待接 Finance usecase",
-          entry: "应付管理 / 对账管理",
-          why: "应付来源需要采购入库、委外结算或对账确认。",
-          next: "下一步：进入财务对账页面查看来源和状态。",
-          boundary: "待付款提醒不是付款事实，也不是完整付款审批流。",
+          title: "财务记录",
+          modules: [
+            ["reconciliation", "对账记录", "fact", "对账管理"],
+            ["payables", "应付记录", "fact", "应付管理"],
+            ["receivables", "应收记录", "fact", "应收管理"],
+            ["invoices", "发票记录", "fact", "发票管理"],
+          ],
         },
       ];
 
-      let activeFilter = "sales";
-      let selectedId = objects[0].id;
-      const list = document.querySelector("#objectList");
-      const tabs = [...document.querySelectorAll(".tab")];
+      const baseTotals = {
+        customers: 48,
+        suppliers: 31,
+        products: 126,
+        "material-bom": 74,
+        "sales-orders": 36,
+        "accessories-purchase": 29,
+        inbound: 18,
+        "quality-inspections": 12,
+        inventory: 164,
+        "shipping-release": 7,
+        outbound: 14,
+        "production-orders": 22,
+        "production-scheduling": 9,
+        "production-progress": 56,
+        "production-exceptions": 3,
+        "processing-contracts": 11,
+        reconciliation: 17,
+        payables: 24,
+        receivables: 20,
+        invoices: 15,
+      };
 
-      function visibleObjects() {
-        return objects.filter((object) => object.filter === activeFilter);
+      const stateDefinitions = {
+        ready: {
+          unavailable: [],
+          zero: false,
+          riskReady: true,
+          risks: [
+            ["阻塞任务", 2, "等待原因或责任岗位处理", "需处理"],
+            ["即将到期", 3, "今天需要完成或重新确认", "今日"],
+          ],
+          failures: [],
+          label: "全部可用",
+        },
+        partial: {
+          unavailable: ["accessories-purchase", "invoices"],
+          zero: false,
+          riskReady: true,
+          risks: [
+            ["阻塞任务", 2, "等待原因或责任岗位处理", "需处理"],
+            ["即将到期", 3, "今天需要完成或重新确认", "今日"],
+          ],
+          failures: [
+            ["采购订单", "该模块数量暂不可用；其他业务单据继续保留。"],
+            ["发票记录", "该模块数量暂不可用；其他办理结果继续保留。"],
+          ],
+          label: "部分来源失败",
+        },
+        zero: {
+          unavailable: [],
+          zero: true,
+          riskReady: true,
+          risks: [],
+          failures: [],
+          label: "成功返回零值",
+        },
+        error: {
+          unavailable: Object.keys(baseTotals),
+          zero: false,
+          riskReady: false,
+          risks: [],
+          failures: [
+            ["业务统计", "各模块数量暂不可用；保留模块清单与入口归属。"],
+            ["待办概览", "协同风险暂不可用；不影响业务模块扫描区的独立状态。"],
+          ],
+          label: "全部暂不可用",
+        },
+      };
+
+      const summaryDefinitions = [
+        ["master", "基础资料", "档案与物料清单", "master"],
+        ["source", "业务单据", "订单与合同", "source"],
+        ["fact", "办理结果", "已经发生", "fact"],
+        ["risk", "需要关注", "当前账号", "risk"],
+      ];
+
+      const summaryGrid = document.querySelector("#summaryGrid");
+      const moduleRows = document.querySelector("#moduleRows");
+      const riskList = document.querySelector("#riskList");
+      const failureList = document.querySelector("#failureList");
+      const stateSelect = document.querySelector("#demoState");
+      const announcement = document.querySelector("#stateAnnouncement");
+
+      function formatNumber(value) {
+        return new Intl.NumberFormat("zh-CN").format(value);
       }
 
-      function setText(selector, value) {
-        document.querySelector(selector).textContent = value;
+      function isAvailable(moduleKey, state) {
+        return !state.unavailable.includes(moduleKey);
       }
 
-      function updateDetail(object) {
-        setText("#detailTitle", object.title);
-        setText("#detailTag", object.status);
-        setText("#detailWhy", object.why);
-        setText("#detailNext", object.next);
-        setText("#detailPattern", object.pattern);
-        setText("#detailFact", object.fact);
-        setText("#detailStatus", object.status);
-        setText("#detailEntry", object.entry);
-        setText("#detailBoundary", object.boundary);
-        document.querySelector("#detailTag").className = `tag ${object.tag}`;
+      function moduleTotal(moduleKey, state) {
+        if (!isAvailable(moduleKey, state)) return null;
+        return state.zero ? 0 : baseTotals[moduleKey];
       }
 
-      function selectObject(object) {
-        selectedId = object.id;
-        updateDetail(object);
-        renderObjects();
-      }
-
-      function renderObjects() {
-        list.innerHTML = "";
-        visibleObjects().forEach((object) => {
-          const item = document.createElement("button");
-          item.type = "button";
-          item.className = "object";
-          item.setAttribute("aria-selected", String(object.id === selectedId));
-          item.innerHTML = `<span><strong>${object.title}</strong><span>${object.meta}</span></span><span class="tag ${object.tag}">${object.status}</span>`;
-          item.addEventListener("click", () => selectObject(object));
-          list.appendChild(item);
+      function modulesByTruth(truthKind) {
+        return families.flatMap(function (family) {
+          return family.modules.filter(function (module) {
+            return module[2] === truthKind;
+          });
         });
       }
 
-      tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-          tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
-          tab.setAttribute("aria-selected", "true");
-          activeFilter = tab.dataset.filter;
-          list.setAttribute("aria-labelledby", tab.id);
-          selectObject(visibleObjects()[0] || objects[0]);
+      function summaryForTruth(truthKind, state) {
+        const modules = modulesByTruth(truthKind);
+        const available = modules.every(function (module) {
+          return isAvailable(module[0], state);
         });
+        if (!available) return { available: false, total: null };
+        return {
+          available: true,
+          total: modules.reduce(function (sum, module) {
+            return sum + moduleTotal(module[0], state);
+          }, 0),
+        };
+      }
+
+      function riskSummary(state) {
+        if (!state.riskReady) return { available: false, total: null };
+        return {
+          available: true,
+          total: state.risks.reduce(function (sum, risk) {
+            return sum + risk[1];
+          }, 0),
+        };
+      }
+
+      function renderSummary(state) {
+        summaryGrid.replaceChildren();
+        summaryDefinitions.forEach(function (definition) {
+          const key = definition[0];
+          const result =
+            key === "risk"
+              ? riskSummary(state)
+              : summaryForTruth(definition[3], state);
+          const card = document.createElement("div");
+          card.className = "summary-card";
+          card.dataset.key = key;
+          card.dataset.state = result.available ? "ready" : "unavailable";
+          card.setAttribute(
+            "aria-label",
+            definition[1] +
+              " " +
+              (result.available ? formatNumber(result.total) : "暂不可用") +
+              "，只读摘要"
+          );
+
+          const head = document.createElement("div");
+          head.className = "summary-head";
+          const label = document.createElement("span");
+          label.className = "summary-label";
+          label.textContent = definition[1];
+          const kind = document.createElement("span");
+          kind.className = "summary-kind";
+          kind.textContent = definition[2];
+          head.append(label, kind);
+
+          const value = document.createElement("strong");
+          value.className = "summary-value";
+          value.textContent = result.available ? formatNumber(result.total) : "—";
+
+          const note = document.createElement("span");
+          note.className = "summary-note";
+          if (!result.available) {
+            note.textContent = "来源暂不可用";
+          } else if (result.total === 0) {
+            note.textContent = "来源成功，当前为 0";
+          } else {
+            note.textContent =
+              key === "risk" ? "阻塞与到期任务" : "当前可用模块合计";
+          }
+
+          card.append(head, value, note);
+          summaryGrid.appendChild(card);
+        });
+      }
+
+      function renderModules(state) {
+        moduleRows.replaceChildren();
+        families.forEach(function (family) {
+          const familyRow = document.createElement("tr");
+          familyRow.className = "family-row";
+          const familyTitle = document.createElement("th");
+          familyTitle.colSpan = 5;
+          familyTitle.scope = "rowgroup";
+          familyTitle.textContent = family.title;
+          familyRow.appendChild(familyTitle);
+          moduleRows.appendChild(familyRow);
+
+          family.modules.forEach(function (module) {
+            const available = isAvailable(module[0], state);
+            const total = moduleTotal(module[0], state);
+            const row = document.createElement("tr");
+
+            const name = document.createElement("th");
+            name.scope = "row";
+            name.className = "module-name";
+            name.textContent = module[1];
+
+            const kind = document.createElement("td");
+            kind.className = "module-kind";
+            kind.textContent = truthLabels[module[2]];
+
+            const count = document.createElement("td");
+            count.className = "module-total";
+            count.textContent = available ? formatNumber(total) : "—";
+
+            const stateCell = document.createElement("td");
+            const badge = document.createElement("span");
+            badge.className = "state-badge";
+            badge.dataset.state = available ? "ready" : "unavailable";
+            badge.textContent = available ? "可用" : "暂不可用";
+            stateCell.appendChild(badge);
+
+            const entry = document.createElement("td");
+            entry.className = "entry-copy";
+            entry.textContent = module[3];
+
+            row.append(name, kind, count, stateCell, entry);
+            moduleRows.appendChild(row);
+          });
+        });
+      }
+
+      function renderRisks(state) {
+        riskList.replaceChildren();
+        if (!state.riskReady) {
+          const unavailable = document.createElement("div");
+          unavailable.className = "empty-state";
+          const title = document.createElement("strong");
+          title.textContent = "待办概览暂不可用";
+          const copy = document.createElement("p");
+          copy.textContent = "业务统计和模块清单保持各自状态，不以 0 代替失败。";
+          unavailable.append(title, copy);
+          riskList.appendChild(unavailable);
+          document.querySelector("#riskMeta").textContent = "暂不可用";
+          return;
+        }
+
+        const riskTotal = state.risks.reduce(function (sum, risk) {
+          return sum + risk[1];
+        }, 0);
+        document.querySelector("#riskMeta").textContent =
+          formatNumber(riskTotal) + " 项";
+
+        if (!state.risks.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.dataset.tone = "success";
+          const title = document.createElement("strong");
+          title.textContent = "当前没有需关注任务";
+          const copy = document.createElement("p");
+          copy.textContent = "来源成功返回，阻塞与到期任务均为 0。";
+          empty.append(title, copy);
+          riskList.appendChild(empty);
+          return;
+        }
+
+        state.risks.forEach(function (risk) {
+          const item = document.createElement("div");
+          item.className = "risk-item";
+          const head = document.createElement("div");
+          head.className = "risk-head";
+          const title = document.createElement("strong");
+          title.textContent = risk[0];
+          const count = document.createElement("strong");
+          count.className = "risk-count";
+          count.textContent = formatNumber(risk[1]);
+          head.append(title, count);
+          const copy = document.createElement("p");
+          copy.textContent = risk[2];
+          const tone = document.createElement("span");
+          tone.className = "risk-tone";
+          tone.textContent = risk[3];
+          item.append(head, copy, tone);
+          riskList.appendChild(item);
+        });
+      }
+
+      function renderFailures(state) {
+        failureList.replaceChildren();
+        document.querySelector("#failureMeta").textContent =
+          state.failures.length + " 个异常来源";
+
+        if (!state.failures.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty-state";
+          empty.dataset.tone = "success";
+          const title = document.createElement("strong");
+          title.textContent = "本次读取没有失败";
+          const copy = document.createElement("p");
+          copy.textContent = "只有来源成功且真实数量为零时，页面才显示 0。";
+          empty.append(title, copy);
+          failureList.appendChild(empty);
+          return;
+        }
+
+        state.failures.forEach(function (failure) {
+          const item = document.createElement("div");
+          item.className = "failure-item";
+          const head = document.createElement("div");
+          head.className = "failure-head";
+          const title = document.createElement("strong");
+          title.textContent = failure[0];
+          const tone = document.createElement("span");
+          tone.className = "failure-tone";
+          tone.textContent = "暂不可用";
+          head.append(title, tone);
+          const copy = document.createElement("p");
+          copy.textContent = failure[1];
+          item.append(head, copy);
+          failureList.appendChild(item);
+        });
+      }
+
+      function render(stateKey, shouldAnnounce) {
+        const state = stateDefinitions[stateKey];
+        renderSummary(state);
+        renderModules(state);
+        renderRisks(state);
+        renderFailures(state);
+        if (shouldAnnounce) {
+          announcement.textContent = "原型已切换为：" + state.label;
+        }
+      }
+
+      stateSelect.addEventListener("change", function () {
+        render(stateSelect.value, true);
       });
 
-      updateDetail(objects[0]);
-      renderObjects();
+      render(stateSelect.value, false);
     </script>
   </body>
 </html>

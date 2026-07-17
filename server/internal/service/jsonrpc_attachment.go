@@ -94,6 +94,19 @@ func (d *jsonrpcDispatcher) handleBusinessAttachment(
 		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
 			"attachment": businessAttachmentToAny(item, false),
 		})}, nil
+	case "clear_product_image":
+		if res := d.requireBusinessAttachmentOwnerPermission(ctx, biz.BusinessAttachmentOwnerProduct, true); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireBusinessAttachmentOwnerModuleEnabled(ctx, getString(pm, "customer_key"), biz.BusinessAttachmentOwnerProduct); res != nil {
+			return id, res, nil
+		}
+		if err := d.attachmentUC.ClearProductImage(ctx, getInt(pm, "owner_id", 0), getString(pm, "slot_key")); err != nil {
+			return id, d.mapBusinessAttachmentError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{Code: errcode.OK.Code, Message: errcode.OK.Message, Data: newDataStruct(map[string]any{
+			"cleared": true,
+		})}, nil
 	case "download_attachment":
 		item, err := d.attachmentUC.GetBusinessAttachmentMetadata(ctx, getInt(pm, "id", 0))
 		if err != nil {
@@ -209,6 +222,8 @@ func businessAttachmentOwnerModuleKeys(ownerType string) []string {
 		return []string{"finance"}
 	case biz.BusinessAttachmentOwnerProductionFact:
 		return []string{"production"}
+	case biz.BusinessAttachmentOwnerProduct:
+		return []string{"products"}
 	case biz.BusinessAttachmentOwnerProductSKU:
 		return []string{"products"}
 	case biz.BusinessAttachmentOwnerBOMHeader:
@@ -240,6 +255,8 @@ func businessAttachmentReadPermissions(ownerType string) []string {
 		return []string{biz.PermissionProductionFactRead}
 	case biz.BusinessAttachmentOwnerOutsourcingFact:
 		return []string{biz.PermissionOutsourcingOrderRead}
+	case biz.BusinessAttachmentOwnerProduct:
+		return []string{biz.PermissionProductRead}
 	case biz.BusinessAttachmentOwnerProductSKU:
 		return []string{biz.PermissionProductSKURead, biz.PermissionProductRead}
 	case biz.BusinessAttachmentOwnerBOMHeader:
@@ -271,6 +288,8 @@ func businessAttachmentWritePermissions(ownerType string) []string {
 		return []string{biz.PermissionProductionCompletionCreate, biz.PermissionProductionFactPost, biz.PermissionProductionFactCancel}
 	case biz.BusinessAttachmentOwnerOutsourcingFact:
 		return []string{biz.PermissionOutsourcingOrderCreate, biz.PermissionOutsourcingOrderUpdate}
+	case biz.BusinessAttachmentOwnerProduct:
+		return []string{biz.PermissionProductUpdate}
 	case biz.BusinessAttachmentOwnerProductSKU:
 		return []string{biz.PermissionProductSKUCreate, biz.PermissionProductSKUUpdate}
 	case biz.BusinessAttachmentOwnerBOMHeader:
@@ -321,6 +340,25 @@ func (d *jsonrpcDispatcher) mapBusinessAttachmentError(ctx context.Context, err 
 	switch {
 	case errors.Is(err, biz.ErrBusinessAttachmentTooLarge):
 		return &v1.JsonrpcResult{Code: errcode.PayloadTooLarge.Code, Message: "附件超过 5MB，请压缩后再上传"}
+	case errors.Is(err, biz.ErrBusinessAttachmentProductImageMimeNotAllowed):
+		return &v1.JsonrpcResult{
+			Code:    errcode.InvalidParam.Code,
+			Message: "产品图片仅支持 PNG、JPG/JPEG 或 WebP 格式，请重新选择图片",
+		}
+	case errors.Is(err, biz.ErrBusinessAttachmentProductImageDimensionsInvalid):
+		return &v1.JsonrpcResult{
+			Code: errcode.InvalidParam.Code,
+			Message: fmt.Sprintf(
+				"产品图片尺寸过大，请将宽高压缩至 %d 像素以内且总像素不超过 %d 万",
+				biz.BusinessAttachmentProductImageMaxWidth,
+				biz.BusinessAttachmentProductImageMaxPixels/10_000,
+			),
+		}
+	case errors.Is(err, biz.ErrBusinessAttachmentProductImageContentInvalid):
+		return &v1.JsonrpcResult{
+			Code:    errcode.InvalidParam.Code,
+			Message: "无法识别产品图片内容，请确认文件未损坏，且实际格式与文件扩展名一致",
+		}
 	case errors.Is(err, biz.ErrBadParam),
 		errors.Is(err, biz.ErrBusinessAttachmentOwnerInvalid),
 		errors.Is(err, biz.ErrBusinessAttachmentContentInvalid),

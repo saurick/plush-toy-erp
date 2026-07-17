@@ -82,6 +82,15 @@ var (
 	ErrShipmentQuantityExceeded             = errors.New("shipment quantity exceeds sales order")
 	ErrShipmentReservationSplit             = errors.New("shipment requires partial reservation consumption")
 	ErrShipmentFinanceDependency            = errors.New("shipment has active finance facts")
+	ErrShipmentQualityPending               = errors.New("shipment has pending finished goods quality inspection")
+	ErrShipmentQualityRejected              = errors.New("shipment has rejected finished goods quality inspection")
+	ErrShipmentReleaseRequired              = errors.New("shipment release task is required")
+	ErrShipmentReleasePending               = errors.New("shipment release task is not completed")
+	ErrShipmentReleaseRejected              = errors.New("shipment release task was rejected")
+	ErrShipmentReleaseAlreadySubmitted      = errors.New("shipment release was already submitted")
+	ErrShipmentCancellationTaskActive       = errors.New("shipment release task is still active")
+	ErrProductionExceptionTaskRequired      = errors.New("production exception task is required")
+	ErrProductionExceptionTaskActive        = errors.New("production exception task is still active")
 	ErrStockReservationNotFound             = errors.New("stock reservation not found")
 	ErrStockReservationSourceMismatch       = errors.New("stock reservation source mismatch")
 	ErrStockReservationQuantityExceeded     = errors.New("stock reservation quantity exceeds sales order")
@@ -473,9 +482,38 @@ type OperationalFactRepo interface {
 }
 
 // OperationalFactCancellationActorRepo is the authenticated path for shipment
-// cancellation compensation evidence.
+// cancellation and, when already shipped, inventory compensation evidence.
 type OperationalFactCancellationActorRepo interface {
 	CancelShippedShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error)
+}
+
+// OperationalFactShipmentActorRepo is the authenticated direct-shipping path.
+// It keeps the base repository contract stable for isolated adapters while the
+// service fails closed if an implementation cannot preserve the actor.
+type OperationalFactShipmentActorRepo interface {
+	ShipShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error)
+}
+
+// ProductionFactPostingActorRepo preserves the authenticated actor on source-
+// generated Workflow task events without widening the base repository contract
+// used by isolated test doubles.
+type ProductionFactPostingActorRepo interface {
+	PostProductionFactWithActor(ctx context.Context, id int, actorID int) (*ProductionFact, error)
+	CancelPostedProductionFactWithActor(ctx context.Context, id int, actorID int) (*ProductionFact, error)
+}
+
+// ProductionFactSourceTaskDependencyRepo lets the service apply the Workflow
+// module gate only to the production fact types that atomically create a
+// source task. The repository remains the truth for source classification.
+type ProductionFactSourceTaskDependencyRepo interface {
+	ProductionFactRequiresSourceTask(ctx context.Context, id int) (bool, error)
+}
+
+// ShipmentReleaseSourceRepo owns the DRAFT shipment lock and creates the
+// source-generated release task, event and coordination state atomically.
+type ShipmentReleaseSourceRepo interface {
+	SubmitShipmentRelease(ctx context.Context, id int, actorID int) (*WorkflowTask, bool, error)
+	ValidateShipmentReleaseForShipping(ctx context.Context, id int) error
 }
 
 // ProductionCompletionSourceRepo resolves the immutable production-order line
@@ -650,9 +688,29 @@ func (uc *OperationalFactUsecase) PostProductionFact(ctx context.Context, id int
 	return uc.repo.PostProductionFact(ctx, id)
 }
 
+func (uc *OperationalFactUsecase) PostProductionFactWithActor(ctx context.Context, id int, actorID int) (*ProductionFact, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	if repo, ok := uc.repo.(ProductionFactPostingActorRepo); ok {
+		return repo.PostProductionFactWithActor(ctx, id, actorID)
+	}
+	return uc.repo.PostProductionFact(ctx, id)
+}
+
 func (uc *OperationalFactUsecase) CancelPostedProductionFact(ctx context.Context, id int) (*ProductionFact, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
+	}
+	return uc.repo.CancelPostedProductionFact(ctx, id)
+}
+
+func (uc *OperationalFactUsecase) CancelPostedProductionFactWithActor(ctx context.Context, id int, actorID int) (*ProductionFact, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	if repo, ok := uc.repo.(ProductionFactPostingActorRepo); ok {
+		return repo.CancelPostedProductionFactWithActor(ctx, id, actorID)
 	}
 	return uc.repo.CancelPostedProductionFact(ctx, id)
 }
@@ -784,11 +842,57 @@ func (uc *OperationalFactUsecase) CreateShipmentDraftWithItems(ctx context.Conte
 	return uc.repo.CreateShipmentDraftWithItems(ctx, normalized)
 }
 
+func (uc *OperationalFactUsecase) SubmitShipmentRelease(ctx context.Context, id int, actorID int) (*WorkflowTask, bool, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
+		return nil, false, ErrBadParam
+	}
+	repo, ok := uc.repo.(ShipmentReleaseSourceRepo)
+	if !ok {
+		return nil, false, ErrBadParam
+	}
+	return repo.SubmitShipmentRelease(ctx, id, actorID)
+}
+
+func (uc *OperationalFactUsecase) ProductionFactRequiresSourceTask(ctx context.Context, id int) (bool, error) {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return false, ErrBadParam
+	}
+	repo, ok := uc.repo.(ProductionFactSourceTaskDependencyRepo)
+	if !ok {
+		return false, nil
+	}
+	return repo.ProductionFactRequiresSourceTask(ctx, id)
+}
+
+func (uc *OperationalFactUsecase) ValidateShipmentReleaseForShipping(ctx context.Context, id int) error {
+	if uc == nil || uc.repo == nil || id <= 0 {
+		return ErrBadParam
+	}
+	repo, ok := uc.repo.(ShipmentReleaseSourceRepo)
+	if !ok {
+		// Test doubles and adapters predating the source-task contract do not own
+		// the production data transaction. The concrete repository always does.
+		return nil
+	}
+	return repo.ValidateShipmentReleaseForShipping(ctx, id)
+}
+
 func (uc *OperationalFactUsecase) ShipShipment(ctx context.Context, id int) (*Shipment, error) {
 	if uc == nil || uc.repo == nil || id <= 0 {
 		return nil, ErrBadParam
 	}
 	return uc.repo.ShipShipment(ctx, id)
+}
+
+func (uc *OperationalFactUsecase) ShipShipmentWithActor(ctx context.Context, id int, actorID int) (*Shipment, error) {
+	if uc == nil || uc.repo == nil || id <= 0 || actorID <= 0 {
+		return nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(OperationalFactShipmentActorRepo)
+	if !ok {
+		return nil, ErrActorAwareShipmentUnavailable
+	}
+	return repo.ShipShipmentWithActor(ctx, id, actorID)
 }
 
 func (uc *OperationalFactUsecase) GetShipment(ctx context.Context, id int) (*Shipment, error) {

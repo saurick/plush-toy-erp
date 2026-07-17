@@ -1,8 +1,11 @@
 package biz
 
 import (
+	"encoding/hex"
 	"strings"
 )
+
+const workflowSourceTaskIntentPayloadKey = "source_task_intent_hash"
 
 func isShipmentFinanceSourceType(sourceType string) bool {
 	switch strings.TrimSpace(sourceType) {
@@ -266,21 +269,64 @@ func isFinishedGoodsReworkTask(task *WorkflowTask) bool {
 	}
 }
 
-func isShipmentReleaseTask(task *WorkflowTask) bool {
-	if task == nil || task.SourceID <= 0 {
+func isProductionSchedulingSourceTask(task *WorkflowTask) bool {
+	if !IsTrustedProductionSchedulingSourceTask(task) ||
+		strings.TrimSpace(task.OwnerRoleKey) != PMCRoleKey ||
+		!workflowSourceTaskIntentMarkerValid(task.Payload) {
 		return false
 	}
-	switch strings.TrimSpace(task.SourceType) {
-	case workflowShippingReleaseModuleKey, workflowProductionProgressModuleKey, workflowInboundModuleKey:
+	productionOrderID, found, err := processCommandPositiveIntFromPayload(task.Payload, "production_order_id")
+	if err != nil || !found || productionOrderID != task.SourceID {
+		return false
+	}
+	if task.BusinessStatusKey == nil {
+		return false
+	}
+	switch strings.TrimSpace(*task.BusinessStatusKey) {
+	case workflowProductionReadyStatusKey, workflowBlockedStatusKey:
+		return true
 	default:
 		return false
 	}
-	if strings.TrimSpace(task.TaskGroup) != workflowShipmentReleaseTaskGroup ||
-		strings.TrimSpace(task.OwnerRoleKey) != "warehouse" {
+}
+
+func isProductionExceptionSourceTask(task *WorkflowTask) bool {
+	if !IsTrustedProductionExceptionSourceTask(task) ||
+		strings.TrimSpace(task.OwnerRoleKey) != ProductionRoleKey ||
+		!workflowSourceTaskIntentMarkerValid(task.Payload) {
 		return false
 	}
-	if workflowPayloadString(task.Payload, "shipment_release") != "true" &&
-		workflowPayloadString(task.Payload, "finished_goods") != "true" {
+	productionFactID, found, err := processCommandPositiveIntFromPayload(task.Payload, "production_fact_id")
+	if err != nil || !found || productionFactID != task.SourceID {
+		return false
+	}
+	productionOrderID, found, err := processCommandPositiveIntFromPayload(task.Payload, "production_order_id")
+	if err != nil || !found || productionOrderID <= 0 {
+		return false
+	}
+	return task.BusinessStatusKey != nil && strings.TrimSpace(*task.BusinessStatusKey) == workflowBlockedStatusKey
+}
+
+func workflowSourceTaskIntentMarkerValid(payload map[string]any) bool {
+	intentHash := workflowPayloadString(payload, workflowSourceTaskIntentPayloadKey)
+	if len(intentHash) != 64 || intentHash != strings.ToLower(intentHash) {
+		return false
+	}
+	decoded, err := hex.DecodeString(intentHash)
+	return err == nil && len(decoded) == 32
+}
+
+func isShipmentReleaseTask(task *WorkflowTask) bool {
+	if !IsTrustedShipmentReleaseSourceTask(task) ||
+		strings.TrimSpace(task.OwnerRoleKey) != WarehouseRoleKey ||
+		!workflowSourceTaskIntentMarkerValid(task.Payload) {
+		return false
+	}
+	shipmentID, found, err := processCommandPositiveIntFromPayload(task.Payload, "shipment_id")
+	if err != nil || !found || shipmentID != task.SourceID {
+		return false
+	}
+	if workflowPayloadString(task.Payload, "shipment_release") != "true" {
 		return false
 	}
 	if task.BusinessStatusKey == nil {

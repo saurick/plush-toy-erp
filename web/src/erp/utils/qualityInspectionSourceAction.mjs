@@ -41,17 +41,17 @@ export const OUTSOURCING_RETURN_QUALITY_GATE_STATES = Object.freeze({
 })
 
 export function resolveOutsourcingReturnQualityGate(inspections = []) {
-  const activeInspections = (Array.isArray(inspections) ? inspections : [])
-    .filter(
-      (inspection) =>
-        String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
-    )
+  const activeInspections = (
+    Array.isArray(inspections) ? inspections : []
+  ).filter(
+    (inspection) =>
+      String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
+  )
 
   if (activeInspections.length !== 1) {
     return {
       state: OUTSOURCING_RETURN_QUALITY_GATE_STATES.PENDING,
-      label:
-        activeInspections.length > 1 ? '质检状态待核对' : '待发起质检',
+      label: activeInspections.length > 1 ? '质检状态待核对' : '待发起质检',
       inspection: null,
     }
   }
@@ -66,10 +66,7 @@ export function resolveOutsourcingReturnQualityGate(inspections = []) {
       inspection,
     }
   }
-  if (
-    status === 'PASSED' &&
-    (result === 'PASS' || result === 'CONCESSION')
-  ) {
+  if (status === 'PASSED' && (result === 'PASS' || result === 'CONCESSION')) {
     return {
       state: OUTSOURCING_RETURN_QUALITY_GATE_STATES.ACCEPTED,
       label: result === 'CONCESSION' ? '让步接收' : '质检合格',
@@ -106,6 +103,18 @@ export function isRejectedIncomingInspection(inspection) {
       String(inspection?.inspection_type || '').toUpperCase() === 'INCOMING' &&
       positiveID(inspection?.purchase_receipt_id) &&
       positiveID(inspection?.purchase_receipt_item_id)
+  )
+}
+
+export function canCreatePurchaseReturnFromRejectedInspection(
+  inspection,
+  purchaseReceipt
+) {
+  return Boolean(
+    isRejectedIncomingInspection(inspection) &&
+      positiveID(purchaseReceipt?.id) ===
+        positiveID(inspection?.purchase_receipt_id) &&
+      String(purchaseReceipt?.status || '').toUpperCase() === 'POSTED'
   )
 }
 

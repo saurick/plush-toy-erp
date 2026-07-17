@@ -1,4 +1,5 @@
 import { normalizeWorkInstructionImageAnnotations } from '../utils/workInstructionImageAnnotations.mjs'
+import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 
 export const MATERIAL_DETAIL_TEMPLATE_KEY = 'engineering-material-detail'
 export const COLOR_CARD_TEMPLATE_KEY = 'engineering-color-card'
@@ -82,11 +83,14 @@ export const engineeringImageSlots = {
   materialDetail: [
     { key: 'header_left', label: '右上产品图 1' },
     { key: 'header_right', label: '右上产品图 2' },
-    { key: 'footer_left', label: '底部补充图 1' },
-    { key: 'footer_right', label: '底部补充图 2' },
   ],
-  workInstruction: [{ key: 'header', label: '右上产品图' }],
+  workInstruction: [
+    { key: 'header', label: '右上产品图 1' },
+    { key: 'header_right', label: '右上产品图 2' },
+  ],
 }
+
+const LEGACY_MATERIAL_DETAIL_FOOTER_IMAGE_KEYS = ['footer_left', 'footer_right']
 
 export function createEmptyEngineeringImageSlot() {
   return {
@@ -159,6 +163,17 @@ function normalizeImageMap(raw = {}, slots = []) {
         },
       ]
     })
+  )
+}
+
+function resolveMaterialDetailAppendixImages(input = {}) {
+  if (hasOwn(input, 'appendixImages')) {
+    return normalizePrintAppendixImages(input.appendixImages)
+  }
+  const legacyImages =
+    input?.images && typeof input.images === 'object' ? input.images : {}
+  return normalizePrintAppendixImages(
+    LEGACY_MATERIAL_DETAIL_FOOTER_IMAGE_KEYS.map((key) => legacyImages[key])
   )
 }
 
@@ -802,6 +817,7 @@ export function createMaterialDetailDraft(input = {}) {
       input.images,
       engineeringImageSlots.materialDetail
     ),
+    appendixImages: resolveMaterialDetailAppendixImages(input),
   }
 }
 
@@ -847,6 +863,7 @@ export function createColorCardDraft(input = {}) {
       DEFAULT_COLOR_CARD_SAMPLE.reviewer
     ),
     blocks: sourceBlocks.map(normalizeColorCardBlock),
+    appendixImages: normalizePrintAppendixImages(input.appendixImages),
   }
 }
 
@@ -933,6 +950,7 @@ export function createWorkInstructionDraft(input = {}) {
       input.images,
       engineeringImageSlots.workInstruction
     ),
+    appendixImages: normalizePrintAppendixImages(input.appendixImages),
   }
 }
 
@@ -967,6 +985,30 @@ function recordByID(records, id) {
   )
 }
 
+function orderedProductPrintImages(productImages = {}) {
+  const primary = productImages?.primary?.dataURL ? productImages.primary : null
+  const secondary = productImages?.secondary?.dataURL
+    ? productImages.secondary
+    : null
+  return primary ? [primary, secondary] : [secondary, null]
+}
+
+function materialDetailImagesFromProductImages(productImages = {}) {
+  const [firstImage, secondImage] = orderedProductPrintImages(productImages)
+  return {
+    header_left: firstImage,
+    header_right: secondImage,
+  }
+}
+
+function workInstructionImagesFromProductImages(productImages = {}) {
+  const [firstImage, secondImage] = orderedProductPrintImages(productImages)
+  return {
+    header: firstImage,
+    header_right: secondImage,
+  }
+}
+
 function sourceProductSnapshot(
   record = {},
   { productOptions = [], products = [] } = {}
@@ -997,6 +1039,7 @@ export function buildMaterialDetailDraftFromBOMVersion(
     materials = [],
     units = [],
     companyName = '',
+    productImages = {},
   } = {}
 ) {
   const product = sourceProductSnapshot(version, { productOptions, products })
@@ -1051,6 +1094,7 @@ export function buildMaterialDetailDraftFromBOMVersion(
     auditor: version.auditor || '',
     hairDirection: version.hair_direction || '',
     topRemark: version.note || '',
+    images: materialDetailImagesFromProductImages(productImages),
     lines,
   })
 }
@@ -1122,6 +1166,7 @@ export function buildWorkInstructionDraftFromBOMVersion(
     materials = [],
     units = [],
     companyName = '',
+    productImages = {},
   } = {}
 ) {
   const product = sourceProductSnapshot(version, { productOptions, products })
@@ -1188,6 +1233,7 @@ export function buildWorkInstructionDraftFromBOMVersion(
     designer: version.designer || '',
     auditor: version.auditor || '',
     remark: version.note || '',
+    images: workInstructionImagesFromProductImages(productImages),
     rows: rows.length ? rows : [],
   })
 }
@@ -1220,8 +1266,8 @@ function summarizeOutsourcingInstructionItem(item = {}, index = 0) {
     ''
   )
   const parts = [
-    toText(item.process_name_snapshot)
-      ? `加工项目：${toText(item.process_name_snapshot)}`
+    toText(item.processing_item)
+      ? `加工项目：${toText(item.processing_item)}`
       : '',
     productText ? `产品：${productText}` : '',
     quantityText ? `数量：${quantityText}` : '',
@@ -1239,7 +1285,7 @@ function summarizeOutsourcingInstructionItem(item = {}, index = 0) {
 export function buildWorkInstructionDraftFromOutsourcingOrder(
   order = {},
   items = [],
-  { companyName = '' } = {}
+  { companyName = '', productImages = {} } = {}
 ) {
   const activeItems = (Array.isArray(items) ? items : []).filter(
     (item) => !isCanceledLineStatus(item?.line_status)
@@ -1289,6 +1335,7 @@ export function buildWorkInstructionDraftFromOutsourcingOrder(
       ],
       '；'
     ),
+    images: workInstructionImagesFromProductImages(productImages),
     rows: contextRows,
   })
 }

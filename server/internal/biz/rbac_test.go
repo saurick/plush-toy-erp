@@ -125,9 +125,10 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskReject,
 				PermissionMobileProductionAccess,
 			},
-			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskApprove, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: EngineeringRoleKey,
@@ -178,10 +179,11 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskCreate,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskReject,
 				PermissionShipmentRead,
 				PermissionMobilePMCAccess,
 			},
-			omits: []string{PermissionWorkflowTaskReject, PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskApprove, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: SalesRoleKey,
@@ -235,6 +237,10 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 		t,
 		production,
 		PermissionProductionFactRead,
+		PermissionProductionWIPRead,
+		PermissionProductionWIPAssign,
+		PermissionProductionWIPExecute,
+		PermissionProductionWIPRework,
 		PermissionProductionCompletionCreate,
 		PermissionProductionMaterialIssueCreate,
 		PermissionProductionFactPost,
@@ -242,19 +248,20 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 	)
 
 	pmc := builtinRolePermissionSet(t, PMCRoleKey)
-	assertPermissionSetContains(t, pmc, PermissionProductionFactRead)
-	assertPermissionSetOmits(t, pmc, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
+	assertPermissionSetContains(t, pmc, PermissionProductionFactRead, PermissionProductionWIPRead)
+	assertPermissionSetOmits(t, pmc, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionProductionWIPRework, PermissionPackagingMaterialConfirm, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
 
 	sales := builtinRolePermissionSet(t, SalesRoleKey)
-	assertPermissionSetContains(t, sales, PermissionStockReservationCreate, PermissionStockReservationRelease)
+	assertPermissionSetContains(t, sales, PermissionStockReservationCreate, PermissionStockReservationRelease, PermissionProductionWIPRead, PermissionPackagingMaterialConfirm)
+	assertPermissionSetOmits(t, sales, PermissionProductionWIPAssign, PermissionProductionWIPExecute, PermissionProductionWIPRework)
 
 	warehouse := builtinRolePermissionSet(t, WarehouseRoleKey)
 	assertPermissionSetContains(t, warehouse, PermissionStockReservationCreate, PermissionStockReservationRelease)
 	assertPermissionSetOmits(t, warehouse, PermissionProductionCompletionCreate, PermissionProductionMaterialIssueCreate, PermissionProductionFactPost, PermissionProductionFactCancel)
 
 	quality := builtinRolePermissionSet(t, QualityRoleKey)
-	assertPermissionSetContains(t, quality, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate)
-	assertPermissionSetOmits(t, quality, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionFinancePayableConfirm)
+	assertPermissionSetContains(t, quality, PermissionCustomerRead, PermissionSalesOrderRead, PermissionSalesOrderItemRead, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionShipmentRead, PermissionProductionWIPRead, PermissionQualityInspectionRead, PermissionQualityInspectionCreate)
+	assertPermissionSetOmits(t, quality, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionShipmentCreate, PermissionShipmentShip, PermissionShipmentCancel, PermissionFinancePayableConfirm)
 
 	finance := builtinRolePermissionSet(t, FinanceRoleKey)
 	assertPermissionSetContains(t, finance, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionQualityInspectionRead, PermissionFinancePayableConfirm)
@@ -400,6 +407,18 @@ func TestAdminMenuRequirementsDistinguishAnyAndAll(t *testing.T) {
 		reconciliationMenus := AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionFinanceReconciliationRead}})
 		if !adminMenusContainKey(reconciliationMenus, "reconciliation") || adminMenusContainKey(reconciliationMenus, "invoices") {
 			t.Fatal("reconciliation read must expose only the reconciliation page among exact finance families")
+		}
+	})
+
+	t.Run("production orders accept plan read or WIP read", func(t *testing.T) {
+		for _, permission := range []string{PermissionPMCPlanRead, PermissionProductionWIPRead} {
+			menus := AdminVisibleMenus(&AdminUser{Permissions: []string{permission}})
+			if !adminMenusContainKey(menus, "production-orders") {
+				t.Fatalf("permission %q must expose production orders", permission)
+			}
+		}
+		if adminMenusContainKey(AdminVisibleMenus(&AdminUser{Permissions: []string{PermissionProductionFactRead}}), "production-orders") {
+			t.Fatal("production fact read alone must not expose production orders")
 		}
 	})
 }

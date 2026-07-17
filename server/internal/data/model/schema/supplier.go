@@ -41,6 +41,10 @@ func (Supplier) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(32),
+		field.String("address").
+			Optional().
+			Nillable().
+			MaxLen(512),
 		field.String("tax_no").
 			Optional().
 			Nillable().
@@ -65,6 +69,8 @@ func (Supplier) Edges() []ent.Edge {
 		edge.To("purchase_orders", PurchaseOrder.Type),
 		edge.To("purchase_receipts", PurchaseReceipt.Type),
 		edge.To("outsourcing_orders", OutsourcingOrder.Type),
+		edge.To("process_capabilities", Process.Type).
+			StorageKey(edge.Table("supplier_process_capabilities"), edge.Columns("supplier_id", "process_id")),
 	}
 }
 

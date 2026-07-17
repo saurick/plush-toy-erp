@@ -206,7 +206,8 @@ function buildInputTemplate(options = {}) {
       "order_approval",
       "finished_goods_qc",
       "warehouse_inbound",
-      "shipment_release",
+      "trial_warehouse_exception",
+      "trial_warehouse_urge",
     ],
     simulatedActions: [
       "boss done",
@@ -377,7 +378,7 @@ function buildPlan(options) {
       }),
       warehouseUrge: buildTask(prefix, {
         code: "WH-URGE",
-        group: "shipment_release",
+        group: "trial_warehouse_urge",
         name: "Mobile workflow 模拟仓库任务催办",
         sourceType: "shipping-release",
         sourceId: 910006,
@@ -395,9 +396,9 @@ function buildPlan(options) {
       }),
       shipmentRelease: buildTask(prefix, {
         code: "SHIP-REL",
-        group: "shipment_release",
-        name: "Mobile workflow 模拟出货放行异常",
-        sourceType: "shipping-release",
+        group: "trial_warehouse_exception",
+        name: "Mobile workflow 模拟仓库异常",
+        sourceType: "trial-workflow",
         sourceId: 910004,
         sourceNo: "SHIP-REL",
         businessStatus: "shipment_pending",
@@ -407,7 +408,7 @@ function buildPlan(options) {
         completeCondition:
           "仓库在岗位任务端确认出货放行；异常时必须上报原因和留痕。",
         payload: {
-          shipment_release: true,
+          formal_shipment_release: false,
           shipment_risk: true,
         },
       }),
@@ -739,7 +740,7 @@ async function applyPlan(plan, tokens) {
     plan.actions.warehouseInboundDone,
   );
   await run(
-    "shipment release exception",
+    "warehouse exception",
     plan.tasks.shipmentRelease,
     plan.actions.shipmentReleaseBlocked,
   );

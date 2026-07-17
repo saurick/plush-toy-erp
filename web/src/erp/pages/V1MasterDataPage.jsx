@@ -23,7 +23,6 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
-  CollaborationTaskPanel,
   BusinessPageLayout,
   PageHeaderCard,
   SearchInput,
@@ -51,8 +50,10 @@ import {
   mergeTextSuggestionOptions,
   normalizeContactRows,
 } from '../components/master-data/MasterDataForm.jsx'
+import ProductImageSlots from '../components/master-data/ProductImageSlots.jsx'
 import {
   listContactsByOwner,
+  listProcesses,
   listProducts,
   listUnits,
 } from '../api/masterDataOrderApi.mjs'
@@ -80,6 +81,7 @@ import {
 } from '../utils/moduleTableColumns.mjs'
 import { filterColumnsByEffectiveFieldPolicy } from '../utils/adminProfileSync.mjs'
 import {
+  processOption,
   productOption,
   uniqueReferenceOptions,
 } from '../utils/referenceSelectOptions.mjs'
@@ -127,6 +129,7 @@ export default function V1MasterDataPage({ type }) {
   const [selectedRecord, setSelectedRecord] = useState(null)
   const [, setContacts] = useState([])
   const [productReferences, setProductReferences] = useState([])
+  const [processReferences, setProcessReferences] = useState([])
   const [units, setUnits] = useState([])
   const [unitLoading, setUnitLoading] = useState(false)
   const [recordModalOpen, setRecordModalOpen] = useState(false)
@@ -137,6 +140,7 @@ export default function V1MasterDataPage({ type }) {
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [recordForm] = Form.useForm()
+  const productImageSlotsRef = useRef(null)
   const skuAttachmentRef = useRef(null)
   const requestControllersRef = useRef({})
   const requestSequenceRef = useRef({})
@@ -169,6 +173,10 @@ export default function V1MasterDataPage({ type }) {
   const productOptions = useMemo(
     () => uniqueReferenceOptions(productReferences, productOption),
     [productReferences]
+  )
+  const supplierProcessOptions = useMemo(
+    () => uniqueReferenceOptions(processReferences, processOption),
+    [processReferences]
   )
   const unitByID = useMemo(
     () =>
@@ -414,6 +422,41 @@ export default function V1MasterDataPage({ type }) {
     }
   }, [beginLatestRequest, effectiveType])
 
+  const loadProcessReferences = useCallback(async () => {
+    const request = beginLatestRequest('processReferences')
+    if (effectiveType !== 'suppliers') {
+      if (request.isCurrent()) {
+        setProcessReferences([])
+      }
+      request.finish()
+      return true
+    }
+    try {
+      const result = await listProcesses(
+        { limit: 500 },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) {
+        return false
+      }
+      setProcessReferences(
+        Array.isArray(result?.processes) ? result.processes : []
+      )
+      return true
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
+      message.error(getActionErrorMessage(error, '加载可加工工序'))
+      setProcessReferences([])
+      return false
+    } finally {
+      if (request.isCurrent()) {
+        request.finish()
+      }
+    }
+  }, [beginLatestRequest, effectiveType])
+
   const loadRecords = useCallback(async () => {
     const request = beginLatestRequest('records')
     setLoading(true)
@@ -454,15 +497,20 @@ export default function V1MasterDataPage({ type }) {
   }, [activeOnly, beginLatestRequest, config, keyword, pagination])
 
   const refreshCurrentData = useCallback(async () => {
-    const [recordsOK, unitsOK, productReferencesOK] = await Promise.all([
-      loadRecords(),
-      loadUnits(),
-      loadProductReferences(),
-    ])
+    const [recordsOK, unitsOK, productReferencesOK, processReferencesOK] =
+      await Promise.all([
+        loadRecords(),
+        loadUnits(),
+        loadProductReferences(),
+        loadProcessReferences(),
+      ])
     return (
-      recordsOK !== false && unitsOK !== false && productReferencesOK !== false
+      recordsOK !== false &&
+      unitsOK !== false &&
+      productReferencesOK !== false &&
+      processReferencesOK !== false
     )
-  }, [loadProductReferences, loadRecords, loadUnits])
+  }, [loadProcessReferences, loadProductReferences, loadRecords, loadUnits])
 
   useEffect(() => {
     loadRecords()
@@ -475,6 +523,10 @@ export default function V1MasterDataPage({ type }) {
   useEffect(() => {
     loadProductReferences()
   }, [loadProductReferences])
+
+  useEffect(() => {
+    loadProcessReferences()
+  }, [loadProcessReferences])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(refreshCurrentData)
@@ -634,13 +686,42 @@ export default function V1MasterDataPage({ type }) {
               saved?.id
             )) !== false
           : true
-      message.success(
-        attachmentSaved
-          ? editingRecord?.id
-            ? `${entityLabel}已更新`
-            : `${entityLabel}已创建`
-          : `${entityLabel}已保存，未上传的附件请重新选择`
-      )
+      const productImageResult =
+        effectiveType === 'products'
+          ? await productImageSlotsRef.current?.flushChanges(saved?.id)
+          : { mutationsApplied: true, reloaded: true }
+      const productImagesApplied = productImageResult?.mutationsApplied === true
+      const productImagesReloaded = productImageResult?.reloaded === true
+      if (!productImagesApplied) {
+        setSelectedRecord(saved || selectedRecord)
+        setEditingRecord(saved || editingRecord)
+        if (Array.isArray(savedData?.contacts)) {
+          setContacts(savedData.contacts)
+        }
+        await loadRecords()
+        const currentImagesReloaded = productImagesReloaded
+          ? true
+          : (await productImageSlotsRef.current?.beginSession(saved?.id)) ===
+            true
+        message.warning(
+          currentImagesReloaded
+            ? '产品已保存，产品图未全部更新；已刷新当前图片，请重新选择未完成的产品图后再保存'
+            : '产品已保存，产品图未全部更新且暂时无法刷新；请稍后重新打开产品并核对图片'
+        )
+        return
+      }
+      if (!productImagesReloaded) {
+        message.warning(
+          '产品和产品图已保存，但当前图片状态暂未刷新；请稍后重新打开产品核对'
+        )
+      } else if (!attachmentSaved) {
+        message.warning(`${entityLabel}已保存，未上传的附件请重新选择`)
+      } else {
+        message.success(
+          editingRecord?.id ? `${entityLabel}已更新` : `${entityLabel}已创建`
+        )
+      }
+      productImageSlotsRef.current?.cancelSession()
       skuAttachmentRef.current?.clearPendingAttachments()
       setRecordModalOpen(false)
       setSelectedRecord(saved || selectedRecord)
@@ -702,9 +783,10 @@ export default function V1MasterDataPage({ type }) {
       buildMasterDataRecordColumns({
         type: effectiveType,
         productOptions,
+        processOptions: supplierProcessOptions,
         unitDisplay,
       }),
-    [effectiveType, productOptions, unitDisplay]
+    [effectiveType, productOptions, supplierProcessOptions, unitDisplay]
   )
   const recordColumns = useMemo(
     () =>
@@ -975,10 +1057,15 @@ export default function V1MasterDataPage({ type }) {
         open={recordModalOpen}
         onOk={saveRecord}
         onCancel={() => {
+          if (saving || contactLoading) return
+          productImageSlotsRef.current?.cancelSession()
           skuAttachmentRef.current?.clearPendingAttachments()
           setRecordModalOpen(false)
         }}
         confirmLoading={saving || contactLoading}
+        cancelButtonProps={{ disabled: saving || contactLoading }}
+        closable={!(saving || contactLoading)}
+        keyboard={!(saving || contactLoading)}
         forceRender
         destroyOnHidden={false}
       >
@@ -991,6 +1078,7 @@ export default function V1MasterDataPage({ type }) {
           <MasterDataFormFields
             form={recordForm}
             type={effectiveType}
+            isEditing={Boolean(editingRecord?.id)}
             products={productReferences}
             productOptions={productOptions}
             unitOptions={unitOptions}
@@ -999,10 +1087,19 @@ export default function V1MasterDataPage({ type }) {
             materialColorOptions={materialColorOptions}
             processNameOptions={processNameOptions}
             processCategoryOptions={processCategoryOptions}
+            supplierProcessOptions={supplierProcessOptions}
             supplierTypeOptions={SUPPLIER_TYPE_OPTIONS}
             customerPaymentConditionOptions={customerPaymentConditionOptions}
             onCustomerPaymentMethodChange={applyCustomerPaymentMethod}
           />
+          {effectiveType === 'products' ? (
+            <ProductImageSlots
+              ref={productImageSlotsRef}
+              productId={editingRecord?.id}
+              open={recordModalOpen}
+              canEdit={canUpdate}
+            />
+          ) : null}
           {effectiveType === 'product_skus' ? (
             <BusinessAttachmentPanel
               ref={skuAttachmentRef}

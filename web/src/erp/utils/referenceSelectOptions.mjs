@@ -141,6 +141,21 @@ export function supplierOption(supplier = {}) {
   }
 }
 
+export function processOption(process = {}) {
+  const value = positiveID(process.id)
+  if (!value) return null
+  return {
+    value,
+    label: compactParts([
+      process.code || '工序已关联',
+      process.name,
+      process.category,
+    ]),
+    disabled:
+      process.is_active === false || process.outsourcing_enabled !== true,
+  }
+}
+
 export function salesOrderOption(order = {}) {
   const value = positiveID(order.id)
   if (!value) return null

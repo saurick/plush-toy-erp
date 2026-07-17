@@ -15,6 +15,7 @@ import {
 import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
 import { purchaseReceiptMutationSignature } from '../../src/erp/utils/purchaseReceiptMutation.mjs'
 import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+import { isMatchingShipmentReleaseFixture } from './workflowSourceTaskFixtures.mjs'
 
 const SALES_ORDER_RESERVATION_CREATE_KEYS = new Set([
   'customer_key',
@@ -815,6 +816,50 @@ export async function installFactRpcMocks(page, context) {
           },
         }
         break
+      case 'submit_shipment_release': {
+        const shipmentID = params.id
+        if (
+          Object.keys(params).length !== 1 ||
+          !Number.isSafeInteger(shipmentID) ||
+          shipmentID <= 0
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'submit_shipment_release invalid params'
+          )
+          break
+        }
+        let workflowTask = workflowTasks.find(
+          (task) =>
+            task.task_group === 'shipment_release' &&
+            task.source_id === shipmentID
+        )
+        let created = false
+        if (!workflowTask) {
+          const fixtureIndex = workflowSourceTaskProducerFixtures.findIndex(
+            (task) => isMatchingShipmentReleaseFixture(task, shipmentID)
+          )
+          if (fixtureIndex >= 0) {
+            workflowTask = cloneWorkflowTask(
+              workflowSourceTaskProducerFixtures.splice(fixtureIndex, 1)[0]
+            )
+            workflowTasks.unshift(workflowTask)
+            created = true
+          }
+        }
+        if (!isMatchingShipmentReleaseFixture(workflowTask, shipmentID)) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'submit_shipment_release source fixture unavailable'
+          )
+          break
+        }
+        data = {
+          workflow_task: cloneWorkflowTask(workflowTask),
+          created,
+        }
+        break
+      }
       case 'ship_shipment':
         data = { shipment: { ...shipment, status: 'SHIPPED' } }
         break
@@ -1725,10 +1770,24 @@ export async function installFactRpcMocks(page, context) {
     })
   })
 
-  const workflowTasks = []
+  const cloneWorkflowTask = (task) => JSON.parse(JSON.stringify(task))
+  const workflowTasks = Array.isArray(context.workflowTaskFixtures)
+    ? context.workflowTaskFixtures.map(cloneWorkflowTask)
+    : []
+  const workflowSourceTaskProducerFixtures = Array.isArray(
+    context.workflowSourceTaskProducerFixtures
+  )
+    ? context.workflowSourceTaskProducerFixtures.map(cloneWorkflowTask)
+    : []
   const workflowBusinessStates = []
   const workflowMutationReceipts = new Map()
-  let workflowTaskID = 1
+  let workflowTaskID = Math.max(
+    1,
+    ...workflowTasks.map((task) => Number(task.id || 0) + 1),
+    ...workflowSourceTaskProducerFixtures.map(
+      (task) => Number(task.id || 0) + 1
+    )
+  )
   const workflowMutationOperationByMethod = {
     complete_task_action: 'complete',
     block_task_action: 'block',
@@ -1736,7 +1795,6 @@ export async function installFactRpcMocks(page, context) {
     resume_task_action: 'resume',
     urge_task: 'urge',
   }
-  const cloneWorkflowTask = (task) => JSON.parse(JSON.stringify(task))
   const resolveWorkflowMutationRequest = (method, params = {}) => {
     const operation = workflowMutationOperationByMethod[method] || ''
     let mutationParams

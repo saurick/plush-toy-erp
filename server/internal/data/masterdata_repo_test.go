@@ -82,10 +82,21 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	}
 
 	supplierType := "material"
+	address := "测试工业园 1 号"
+	processRow, err := client.Process.Create().
+		SetCode("PROC-SUP-001").
+		SetName("电绣").
+		SetOutsourcingEnabled(true).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create supplier capability process failed: %v", err)
+	}
 	supplier, err := uc.CreateSupplier(ctx, &biz.SupplierMutation{
 		Code:         "S-001",
 		Name:         "测试供应商",
 		SupplierType: &supplierType,
+		Address:      &address,
+		ProcessIDs:   []int{processRow.ID, processRow.ID},
 	})
 	if err != nil {
 		t.Fatalf("create supplier failed: %v", err)
@@ -99,6 +110,20 @@ func TestMasterDataRepoCustomerSupplierCRUD(t *testing.T) {
 	}
 	if loadedSupplier.SupplierType == nil || *loadedSupplier.SupplierType != supplierType {
 		t.Fatalf("expected supplier type %s, got %#v", supplierType, loadedSupplier.SupplierType)
+	}
+	if loadedSupplier.Address == nil || *loadedSupplier.Address != address || len(loadedSupplier.ProcessIDs) != 1 || loadedSupplier.ProcessIDs[0] != processRow.ID {
+		t.Fatalf("expected supplier address and deduplicated process capability retained, got %#v", loadedSupplier)
+	}
+	clearedSupplier, err := uc.UpdateSupplier(ctx, supplier.ID, &biz.SupplierMutation{
+		Code:       "S-001",
+		Name:       "测试供应商",
+		ProcessIDs: []int{},
+	})
+	if err != nil {
+		t.Fatalf("clear supplier address and process capabilities failed: %v", err)
+	}
+	if clearedSupplier.Address != nil || len(clearedSupplier.ProcessIDs) != 0 {
+		t.Fatalf("expected supplier address and process capabilities cleared, got %#v", clearedSupplier)
 	}
 	if _, err := uc.SetSupplierActive(ctx, supplier.ID, false); err != nil {
 		t.Fatalf("disable supplier failed: %v", err)

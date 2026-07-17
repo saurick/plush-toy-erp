@@ -968,6 +968,9 @@ func runtimeCustomerConfigRequiresActiveRevision() bool {
 func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrWorkflowTaskSourceGeneratedOnly):
+		l.Warnf("[customer_config] source-generated task namespace rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该任务由业务来源生成，请回到对应业务页面办理"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[customer_config] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
@@ -1162,6 +1165,24 @@ func finishedGoodsDeliveryProcessInputFromParams(pm map[string]any) (biz.Process
 }
 
 func finishedGoodsDeliveryQualityDecisionExecutionFromParams(pm map[string]any) (*biz.ProcessDomainCommandExecution, bool) {
+	if !jsonRPCParamsAllowed(pm,
+		"customer_key",
+		"process_instance_id",
+		"process_node_instance_id",
+		"expected_version",
+		"shipment_id",
+		"business_ref_id",
+		"quality_inspection_id",
+		"finished_goods_lot_id",
+		"result",
+		"inspected_at",
+		"defect_rate_operator",
+		"defect_rate_percent",
+		"decision_note",
+		"idempotency_key",
+	) {
+		return nil, false
+	}
 	processInstanceID := getInt(pm, "process_instance_id", 0)
 	processNodeInstanceID := getInt(pm, "process_node_instance_id", 0)
 	expectedVersion := getInt(pm, "expected_version", 0)
@@ -1175,6 +1196,10 @@ func finishedGoodsDeliveryQualityDecisionExecutionFromParams(pm map[string]any) 
 	if processInstanceID <= 0 || processNodeInstanceID <= 0 || expectedVersion <= 0 || shipmentID <= 0 || qualityInspectionID <= 0 || result == "" || idempotencyKey == "" {
 		return nil, false
 	}
+	defectRateOperator, defectRatePercent, ok := qualityInspectionDefectRateFromParams(pm)
+	if !ok {
+		return nil, false
+	}
 	payload := map[string]any{
 		"shipment_id":           shipmentID,
 		"quality_inspection_id": qualityInspectionID,
@@ -1182,6 +1207,10 @@ func finishedGoodsDeliveryQualityDecisionExecutionFromParams(pm map[string]any) 
 	}
 	putPositiveIntPayload(payload, "finished_goods_lot_id", getInt(pm, "finished_goods_lot_id", 0))
 	putStringPayload(payload, "inspected_at", getString(pm, "inspected_at"))
+	if defectRateOperator != nil && defectRatePercent != nil {
+		payload["defect_rate_operator"] = *defectRateOperator
+		payload["defect_rate_percent"] = defectRatePercent.String()
+	}
 	putStringPayload(payload, "decision_note", getString(pm, "decision_note"))
 	return &biz.ProcessDomainCommandExecution{
 		ProcessInstanceID:     processInstanceID,

@@ -11,6 +11,9 @@ import (
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionorderoperation"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
@@ -96,6 +99,34 @@ func (_c *ProductionOrderItemCreate) SetBomHeaderID(v int) *ProductionOrderItemC
 func (_c *ProductionOrderItemCreate) SetNillableBomHeaderID(v *int) *ProductionOrderItemCreate {
 	if v != nil {
 		_c.SetBomHeaderID(*v)
+	}
+	return _c
+}
+
+// SetRouteCode sets the "route_code" field.
+func (_c *ProductionOrderItemCreate) SetRouteCode(v string) *ProductionOrderItemCreate {
+	_c.mutation.SetRouteCode(v)
+	return _c
+}
+
+// SetNillableRouteCode sets the "route_code" field if the given value is not nil.
+func (_c *ProductionOrderItemCreate) SetNillableRouteCode(v *string) *ProductionOrderItemCreate {
+	if v != nil {
+		_c.SetRouteCode(*v)
+	}
+	return _c
+}
+
+// SetCustomerInspectionRequired sets the "customer_inspection_required" field.
+func (_c *ProductionOrderItemCreate) SetCustomerInspectionRequired(v bool) *ProductionOrderItemCreate {
+	_c.mutation.SetCustomerInspectionRequired(v)
+	return _c
+}
+
+// SetNillableCustomerInspectionRequired sets the "customer_inspection_required" field if the given value is not nil.
+func (_c *ProductionOrderItemCreate) SetNillableCustomerInspectionRequired(v *bool) *ProductionOrderItemCreate {
+	if v != nil {
+		_c.SetCustomerInspectionRequired(*v)
 	}
 	return _c
 }
@@ -232,6 +263,55 @@ func (_c *ProductionOrderItemCreate) AddMaterialRequirements(v ...*ProductionOrd
 	return _c.AddMaterialRequirementIDs(ids...)
 }
 
+// AddOperationIDs adds the "operations" edge to the ProductionOrderOperation entity by IDs.
+func (_c *ProductionOrderItemCreate) AddOperationIDs(ids ...int) *ProductionOrderItemCreate {
+	_c.mutation.AddOperationIDs(ids...)
+	return _c
+}
+
+// AddOperations adds the "operations" edges to the ProductionOrderOperation entity.
+func (_c *ProductionOrderItemCreate) AddOperations(v ...*ProductionOrderOperation) *ProductionOrderItemCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOperationIDs(ids...)
+}
+
+// AddWipBatchIDs adds the "wip_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_c *ProductionOrderItemCreate) AddWipBatchIDs(ids ...int) *ProductionOrderItemCreate {
+	_c.mutation.AddWipBatchIDs(ids...)
+	return _c
+}
+
+// AddWipBatches adds the "wip_batches" edges to the ProductionWIPBatch entity.
+func (_c *ProductionOrderItemCreate) AddWipBatches(v ...*ProductionWIPBatch) *ProductionOrderItemCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddWipBatchIDs(ids...)
+}
+
+// SetPackagingConfirmationID sets the "packaging_confirmation" edge to the ProductionPackagingConfirmation entity by ID.
+func (_c *ProductionOrderItemCreate) SetPackagingConfirmationID(id int) *ProductionOrderItemCreate {
+	_c.mutation.SetPackagingConfirmationID(id)
+	return _c
+}
+
+// SetNillablePackagingConfirmationID sets the "packaging_confirmation" edge to the ProductionPackagingConfirmation entity by ID if the given value is not nil.
+func (_c *ProductionOrderItemCreate) SetNillablePackagingConfirmationID(id *int) *ProductionOrderItemCreate {
+	if id != nil {
+		_c = _c.SetPackagingConfirmationID(*id)
+	}
+	return _c
+}
+
+// SetPackagingConfirmation sets the "packaging_confirmation" edge to the ProductionPackagingConfirmation entity.
+func (_c *ProductionOrderItemCreate) SetPackagingConfirmation(v *ProductionPackagingConfirmation) *ProductionOrderItemCreate {
+	return _c.SetPackagingConfirmationID(v.ID)
+}
+
 // SetProduct sets the "product" edge to the Product entity.
 func (_c *ProductionOrderItemCreate) SetProduct(v *Product) *ProductionOrderItemCreate {
 	return _c.SetProductID(v.ID)
@@ -292,6 +372,10 @@ func (_c *ProductionOrderItemCreate) ExecX(ctx context.Context) {
 
 // defaults sets the default values of the builder before save.
 func (_c *ProductionOrderItemCreate) defaults() {
+	if _, ok := _c.mutation.CustomerInspectionRequired(); !ok {
+		v := productionorderitem.DefaultCustomerInspectionRequired
+		_c.mutation.SetCustomerInspectionRequired(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := productionorderitem.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -353,6 +437,14 @@ func (_c *ProductionOrderItemCreate) check() error {
 		if err := productionorderitem.BomHeaderIDValidator(v); err != nil {
 			return &ValidationError{Name: "bom_header_id", err: fmt.Errorf(`ent: validator failed for field "ProductionOrderItem.bom_header_id": %w`, err)}
 		}
+	}
+	if v, ok := _c.mutation.RouteCode(); ok {
+		if err := productionorderitem.RouteCodeValidator(v); err != nil {
+			return &ValidationError{Name: "route_code", err: fmt.Errorf(`ent: validator failed for field "ProductionOrderItem.route_code": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.CustomerInspectionRequired(); !ok {
+		return &ValidationError{Name: "customer_inspection_required", err: errors.New(`ent: missing required field "ProductionOrderItem.customer_inspection_required"`)}
 	}
 	if v, ok := _c.mutation.ProductCodeSnapshot(); ok {
 		if err := productionorderitem.ProductCodeSnapshotValidator(v); err != nil {
@@ -433,6 +525,14 @@ func (_c *ProductionOrderItemCreate) createSpec() (*ProductionOrderItem, *sqlgra
 		_spec.SetField(productionorderitem.FieldPlannedQuantity, field.TypeOther, value)
 		_node.PlannedQuantity = value
 	}
+	if value, ok := _c.mutation.RouteCode(); ok {
+		_spec.SetField(productionorderitem.FieldRouteCode, field.TypeString, value)
+		_node.RouteCode = &value
+	}
+	if value, ok := _c.mutation.CustomerInspectionRequired(); ok {
+		_spec.SetField(productionorderitem.FieldCustomerInspectionRequired, field.TypeBool, value)
+		_node.CustomerInspectionRequired = value
+	}
 	if value, ok := _c.mutation.ProductCodeSnapshot(); ok {
 		_spec.SetField(productionorderitem.FieldProductCodeSnapshot, field.TypeString, value)
 		_node.ProductCodeSnapshot = &value
@@ -491,6 +591,54 @@ func (_c *ProductionOrderItemCreate) createSpec() (*ProductionOrderItem, *sqlgra
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OperationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorderitem.OperationsTable,
+			Columns: []string{productionorderitem.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.WipBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorderitem.WipBatchesTable,
+			Columns: []string{productionorderitem.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PackagingConfirmationIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2O,
+			Inverse: false,
+			Table:   productionorderitem.PackagingConfirmationTable,
+			Columns: []string{productionorderitem.PackagingConfirmationColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

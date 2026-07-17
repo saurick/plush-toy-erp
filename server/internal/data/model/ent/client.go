@@ -40,6 +40,11 @@ import (
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionorderoperation"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
+	"server/internal/data/model/ent/productionwipbatch"
+	"server/internal/data/model/ent/productionwipevent"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
@@ -140,6 +145,16 @@ type Client struct {
 	ProductionOrderItem *ProductionOrderItemClient
 	// ProductionOrderMaterialRequirement is the client for interacting with the ProductionOrderMaterialRequirement builders.
 	ProductionOrderMaterialRequirement *ProductionOrderMaterialRequirementClient
+	// ProductionOrderOperation is the client for interacting with the ProductionOrderOperation builders.
+	ProductionOrderOperation *ProductionOrderOperationClient
+	// ProductionPackagingConfirmation is the client for interacting with the ProductionPackagingConfirmation builders.
+	ProductionPackagingConfirmation *ProductionPackagingConfirmationClient
+	// ProductionWIPBatch is the client for interacting with the ProductionWIPBatch builders.
+	ProductionWIPBatch *ProductionWIPBatchClient
+	// ProductionWIPEvent is the client for interacting with the ProductionWIPEvent builders.
+	ProductionWIPEvent *ProductionWIPEventClient
+	// ProductionWIPOutsourcingAllocation is the client for interacting with the ProductionWIPOutsourcingAllocation builders.
+	ProductionWIPOutsourcingAllocation *ProductionWIPOutsourcingAllocationClient
 	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
 	PurchaseOrder *PurchaseOrderClient
 	// PurchaseOrderItem is the client for interacting with the PurchaseOrderItem builders.
@@ -235,6 +250,11 @@ func (c *Client) init() {
 	c.ProductionOrderEvent = NewProductionOrderEventClient(c.config)
 	c.ProductionOrderItem = NewProductionOrderItemClient(c.config)
 	c.ProductionOrderMaterialRequirement = NewProductionOrderMaterialRequirementClient(c.config)
+	c.ProductionOrderOperation = NewProductionOrderOperationClient(c.config)
+	c.ProductionPackagingConfirmation = NewProductionPackagingConfirmationClient(c.config)
+	c.ProductionWIPBatch = NewProductionWIPBatchClient(c.config)
+	c.ProductionWIPEvent = NewProductionWIPEventClient(c.config)
+	c.ProductionWIPOutsourcingAllocation = NewProductionWIPOutsourcingAllocationClient(c.config)
 	c.PurchaseOrder = NewPurchaseOrderClient(c.config)
 	c.PurchaseOrderItem = NewPurchaseOrderItemClient(c.config)
 	c.PurchaseReceipt = NewPurchaseReceiptClient(c.config)
@@ -384,6 +404,11 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		ProductionOrderEvent:               NewProductionOrderEventClient(cfg),
 		ProductionOrderItem:                NewProductionOrderItemClient(cfg),
 		ProductionOrderMaterialRequirement: NewProductionOrderMaterialRequirementClient(cfg),
+		ProductionOrderOperation:           NewProductionOrderOperationClient(cfg),
+		ProductionPackagingConfirmation:    NewProductionPackagingConfirmationClient(cfg),
+		ProductionWIPBatch:                 NewProductionWIPBatchClient(cfg),
+		ProductionWIPEvent:                 NewProductionWIPEventClient(cfg),
+		ProductionWIPOutsourcingAllocation: NewProductionWIPOutsourcingAllocationClient(cfg),
 		PurchaseOrder:                      NewPurchaseOrderClient(cfg),
 		PurchaseOrderItem:                  NewPurchaseOrderItemClient(cfg),
 		PurchaseReceipt:                    NewPurchaseReceiptClient(cfg),
@@ -460,6 +485,11 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		ProductionOrderEvent:               NewProductionOrderEventClient(cfg),
 		ProductionOrderItem:                NewProductionOrderItemClient(cfg),
 		ProductionOrderMaterialRequirement: NewProductionOrderMaterialRequirementClient(cfg),
+		ProductionOrderOperation:           NewProductionOrderOperationClient(cfg),
+		ProductionPackagingConfirmation:    NewProductionPackagingConfirmationClient(cfg),
+		ProductionWIPBatch:                 NewProductionWIPBatchClient(cfg),
+		ProductionWIPEvent:                 NewProductionWIPEventClient(cfg),
+		ProductionWIPOutsourcingAllocation: NewProductionWIPOutsourcingAllocationClient(cfg),
 		PurchaseOrder:                      NewPurchaseOrderClient(cfg),
 		PurchaseOrderItem:                  NewPurchaseOrderItemClient(cfg),
 		PurchaseReceipt:                    NewPurchaseReceiptClient(cfg),
@@ -523,8 +553,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
 		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
 		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement, c.PurchaseOrder,
-		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
+		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
+		c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
+		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
 		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
 		c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder,
@@ -547,8 +580,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
 		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
 		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
-		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement, c.PurchaseOrder,
-		c.PurchaseOrderItem, c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
+		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
+		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
+		c.ProductionWIPBatch, c.ProductionWIPEvent,
+		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
+		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
 		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
 		c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder,
@@ -623,6 +659,16 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.ProductionOrderItem.mutate(ctx, m)
 	case *ProductionOrderMaterialRequirementMutation:
 		return c.ProductionOrderMaterialRequirement.mutate(ctx, m)
+	case *ProductionOrderOperationMutation:
+		return c.ProductionOrderOperation.mutate(ctx, m)
+	case *ProductionPackagingConfirmationMutation:
+		return c.ProductionPackagingConfirmation.mutate(ctx, m)
+	case *ProductionWIPBatchMutation:
+		return c.ProductionWIPBatch.mutate(ctx, m)
+	case *ProductionWIPEventMutation:
+		return c.ProductionWIPEvent.mutate(ctx, m)
+	case *ProductionWIPOutsourcingAllocationMutation:
+		return c.ProductionWIPOutsourcingAllocation.mutate(ctx, m)
 	case *PurchaseOrderMutation:
 		return c.PurchaseOrder.mutate(ctx, m)
 	case *PurchaseOrderItemMutation:
@@ -3988,6 +4034,22 @@ func (c *OutsourcingOrderItemClient) QueryUnit(_m *OutsourcingOrderItem) *UnitQu
 	return query
 }
 
+// QueryProductionWipOutsourcingAllocations queries the production_wip_outsourcing_allocations edge of a OutsourcingOrderItem.
+func (c *OutsourcingOrderItemClient) QueryProductionWipOutsourcingAllocations(_m *OutsourcingOrderItem) *ProductionWIPOutsourcingAllocationQuery {
+	query := (&ProductionWIPOutsourcingAllocationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, id),
+			sqlgraph.To(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, outsourcingorderitem.ProductionWipOutsourcingAllocationsTable, outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *OutsourcingOrderItemClient) Hooks() []Hook {
 	return c.hooks.OutsourcingOrderItem
@@ -4263,6 +4325,22 @@ func (c *ProcessClient) QueryOutsourcingOrderItems(_m *Process) *OutsourcingOrde
 			sqlgraph.From(process.Table, process.FieldID, id),
 			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, process.OutsourcingOrderItemsTable, process.OutsourcingOrderItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCapableSuppliers queries the capable_suppliers edge of a Process.
+func (c *ProcessClient) QueryCapableSuppliers(_m *Process) *SupplierQuery {
+	query := (&SupplierClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(process.Table, process.FieldID, id),
+			sqlgraph.To(supplier.Table, supplier.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, true, process.CapableSuppliersTable, process.CapableSuppliersPrimaryKey...),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -5485,6 +5563,54 @@ func (c *ProductionOrderClient) QueryMaterialRequirements(_m *ProductionOrder) *
 	return query
 }
 
+// QueryOperations queries the operations edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryOperations(_m *ProductionOrder) *ProductionOrderOperationQuery {
+	query := (&ProductionOrderOperationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(productionorderoperation.Table, productionorderoperation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.OperationsTable, productionorder.OperationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryWipBatches queries the wip_batches edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryWipBatches(_m *ProductionOrder) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.WipBatchesTable, productionorder.WipBatchesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPackagingConfirmations queries the packaging_confirmations edge of a ProductionOrder.
+func (c *ProductionOrderClient) QueryPackagingConfirmations(_m *ProductionOrder) *ProductionPackagingConfirmationQuery {
+	query := (&ProductionPackagingConfirmationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, id),
+			sqlgraph.To(productionpackagingconfirmation.Table, productionpackagingconfirmation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.PackagingConfirmationsTable, productionorder.PackagingConfirmationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryEvents queries the events edge of a ProductionOrder.
 func (c *ProductionOrderClient) QueryEvents(_m *ProductionOrder) *ProductionOrderEventQuery {
 	query := (&ProductionOrderEventClient{config: c.config}).Query()
@@ -5897,6 +6023,54 @@ func (c *ProductionOrderItemClient) QueryMaterialRequirements(_m *ProductionOrde
 	return query
 }
 
+// QueryOperations queries the operations edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryOperations(_m *ProductionOrderItem) *ProductionOrderOperationQuery {
+	query := (&ProductionOrderOperationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(productionorderoperation.Table, productionorderoperation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorderitem.OperationsTable, productionorderitem.OperationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryWipBatches queries the wip_batches edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryWipBatches(_m *ProductionOrderItem) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorderitem.WipBatchesTable, productionorderitem.WipBatchesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryPackagingConfirmation queries the packaging_confirmation edge of a ProductionOrderItem.
+func (c *ProductionOrderItemClient) QueryPackagingConfirmation(_m *ProductionOrderItem) *ProductionPackagingConfirmationQuery {
+	query := (&ProductionPackagingConfirmationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderitem.Table, productionorderitem.FieldID, id),
+			sqlgraph.To(productionpackagingconfirmation.Table, productionpackagingconfirmation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, productionorderitem.PackagingConfirmationTable, productionorderitem.PackagingConfirmationColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryProduct queries the product edge of a ProductionOrderItem.
 func (c *ProductionOrderItemClient) QueryProduct(_m *ProductionOrderItem) *ProductQuery {
 	query := (&ProductClient{config: c.config}).Query()
@@ -6206,6 +6380,22 @@ func (c *ProductionOrderMaterialRequirementClient) QueryUnit(_m *ProductionOrder
 	return query
 }
 
+// QueryProductionWipOutsourcingAllocations queries the production_wip_outsourcing_allocations edge of a ProductionOrderMaterialRequirement.
+func (c *ProductionOrderMaterialRequirementClient) QueryProductionWipOutsourcingAllocations(_m *ProductionOrderMaterialRequirement) *ProductionWIPOutsourcingAllocationQuery {
+	query := (&ProductionWIPOutsourcingAllocationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, id),
+			sqlgraph.To(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable, productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *ProductionOrderMaterialRequirementClient) Hooks() []Hook {
 	hooks := c.hooks.ProductionOrderMaterialRequirement
@@ -6229,6 +6419,1044 @@ func (c *ProductionOrderMaterialRequirementClient) mutate(ctx context.Context, m
 		return (&ProductionOrderMaterialRequirementDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ProductionOrderMaterialRequirement mutation op: %q", m.Op())
+	}
+}
+
+// ProductionOrderOperationClient is a client for the ProductionOrderOperation schema.
+type ProductionOrderOperationClient struct {
+	config
+}
+
+// NewProductionOrderOperationClient returns a client for the ProductionOrderOperation from the given config.
+func NewProductionOrderOperationClient(c config) *ProductionOrderOperationClient {
+	return &ProductionOrderOperationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionorderoperation.Hooks(f(g(h())))`.
+func (c *ProductionOrderOperationClient) Use(hooks ...Hook) {
+	c.hooks.ProductionOrderOperation = append(c.hooks.ProductionOrderOperation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionorderoperation.Intercept(f(g(h())))`.
+func (c *ProductionOrderOperationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionOrderOperation = append(c.inters.ProductionOrderOperation, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionOrderOperation entity.
+func (c *ProductionOrderOperationClient) Create() *ProductionOrderOperationCreate {
+	mutation := newProductionOrderOperationMutation(c.config, OpCreate)
+	return &ProductionOrderOperationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionOrderOperation entities.
+func (c *ProductionOrderOperationClient) CreateBulk(builders ...*ProductionOrderOperationCreate) *ProductionOrderOperationCreateBulk {
+	return &ProductionOrderOperationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionOrderOperationClient) MapCreateBulk(slice any, setFunc func(*ProductionOrderOperationCreate, int)) *ProductionOrderOperationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionOrderOperationCreateBulk{err: fmt.Errorf("calling to ProductionOrderOperationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionOrderOperationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionOrderOperationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionOrderOperation.
+func (c *ProductionOrderOperationClient) Update() *ProductionOrderOperationUpdate {
+	mutation := newProductionOrderOperationMutation(c.config, OpUpdate)
+	return &ProductionOrderOperationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionOrderOperationClient) UpdateOne(_m *ProductionOrderOperation) *ProductionOrderOperationUpdateOne {
+	mutation := newProductionOrderOperationMutation(c.config, OpUpdateOne, withProductionOrderOperation(_m))
+	return &ProductionOrderOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionOrderOperationClient) UpdateOneID(id int) *ProductionOrderOperationUpdateOne {
+	mutation := newProductionOrderOperationMutation(c.config, OpUpdateOne, withProductionOrderOperationID(id))
+	return &ProductionOrderOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionOrderOperation.
+func (c *ProductionOrderOperationClient) Delete() *ProductionOrderOperationDelete {
+	mutation := newProductionOrderOperationMutation(c.config, OpDelete)
+	return &ProductionOrderOperationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionOrderOperationClient) DeleteOne(_m *ProductionOrderOperation) *ProductionOrderOperationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionOrderOperationClient) DeleteOneID(id int) *ProductionOrderOperationDeleteOne {
+	builder := c.Delete().Where(productionorderoperation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionOrderOperationDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionOrderOperation.
+func (c *ProductionOrderOperationClient) Query() *ProductionOrderOperationQuery {
+	return &ProductionOrderOperationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionOrderOperation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionOrderOperation entity by its id.
+func (c *ProductionOrderOperationClient) Get(ctx context.Context, id int) (*ProductionOrderOperation, error) {
+	return c.Query().Where(productionorderoperation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionOrderOperationClient) GetX(ctx context.Context, id int) *ProductionOrderOperation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionOrder queries the production_order edge of a ProductionOrderOperation.
+func (c *ProductionOrderOperationClient) QueryProductionOrder(_m *ProductionOrderOperation) *ProductionOrderQuery {
+	query := (&ProductionOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderoperation.Table, productionorderoperation.FieldID, id),
+			sqlgraph.To(productionorder.Table, productionorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionorderoperation.ProductionOrderTable, productionorderoperation.ProductionOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderItem queries the production_order_item edge of a ProductionOrderOperation.
+func (c *ProductionOrderOperationClient) QueryProductionOrderItem(_m *ProductionOrderOperation) *ProductionOrderItemQuery {
+	query := (&ProductionOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderoperation.Table, productionorderoperation.FieldID, id),
+			sqlgraph.To(productionorderitem.Table, productionorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionorderoperation.ProductionOrderItemTable, productionorderoperation.ProductionOrderItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProcess queries the process edge of a ProductionOrderOperation.
+func (c *ProductionOrderOperationClient) QueryProcess(_m *ProductionOrderOperation) *ProcessQuery {
+	query := (&ProcessClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderoperation.Table, productionorderoperation.FieldID, id),
+			sqlgraph.To(process.Table, process.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionorderoperation.ProcessTable, productionorderoperation.ProcessColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryWipBatches queries the wip_batches edge of a ProductionOrderOperation.
+func (c *ProductionOrderOperationClient) QueryWipBatches(_m *ProductionOrderOperation) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorderoperation.Table, productionorderoperation.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorderoperation.WipBatchesTable, productionorderoperation.WipBatchesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionOrderOperationClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionOrderOperation
+	return append(hooks[:len(hooks):len(hooks)], productionorderoperation.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionOrderOperationClient) Interceptors() []Interceptor {
+	return c.inters.ProductionOrderOperation
+}
+
+func (c *ProductionOrderOperationClient) mutate(ctx context.Context, m *ProductionOrderOperationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionOrderOperationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionOrderOperationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionOrderOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionOrderOperationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionOrderOperation mutation op: %q", m.Op())
+	}
+}
+
+// ProductionPackagingConfirmationClient is a client for the ProductionPackagingConfirmation schema.
+type ProductionPackagingConfirmationClient struct {
+	config
+}
+
+// NewProductionPackagingConfirmationClient returns a client for the ProductionPackagingConfirmation from the given config.
+func NewProductionPackagingConfirmationClient(c config) *ProductionPackagingConfirmationClient {
+	return &ProductionPackagingConfirmationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionpackagingconfirmation.Hooks(f(g(h())))`.
+func (c *ProductionPackagingConfirmationClient) Use(hooks ...Hook) {
+	c.hooks.ProductionPackagingConfirmation = append(c.hooks.ProductionPackagingConfirmation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionpackagingconfirmation.Intercept(f(g(h())))`.
+func (c *ProductionPackagingConfirmationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionPackagingConfirmation = append(c.inters.ProductionPackagingConfirmation, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionPackagingConfirmation entity.
+func (c *ProductionPackagingConfirmationClient) Create() *ProductionPackagingConfirmationCreate {
+	mutation := newProductionPackagingConfirmationMutation(c.config, OpCreate)
+	return &ProductionPackagingConfirmationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionPackagingConfirmation entities.
+func (c *ProductionPackagingConfirmationClient) CreateBulk(builders ...*ProductionPackagingConfirmationCreate) *ProductionPackagingConfirmationCreateBulk {
+	return &ProductionPackagingConfirmationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionPackagingConfirmationClient) MapCreateBulk(slice any, setFunc func(*ProductionPackagingConfirmationCreate, int)) *ProductionPackagingConfirmationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionPackagingConfirmationCreateBulk{err: fmt.Errorf("calling to ProductionPackagingConfirmationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionPackagingConfirmationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionPackagingConfirmationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionPackagingConfirmation.
+func (c *ProductionPackagingConfirmationClient) Update() *ProductionPackagingConfirmationUpdate {
+	mutation := newProductionPackagingConfirmationMutation(c.config, OpUpdate)
+	return &ProductionPackagingConfirmationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionPackagingConfirmationClient) UpdateOne(_m *ProductionPackagingConfirmation) *ProductionPackagingConfirmationUpdateOne {
+	mutation := newProductionPackagingConfirmationMutation(c.config, OpUpdateOne, withProductionPackagingConfirmation(_m))
+	return &ProductionPackagingConfirmationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionPackagingConfirmationClient) UpdateOneID(id int) *ProductionPackagingConfirmationUpdateOne {
+	mutation := newProductionPackagingConfirmationMutation(c.config, OpUpdateOne, withProductionPackagingConfirmationID(id))
+	return &ProductionPackagingConfirmationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionPackagingConfirmation.
+func (c *ProductionPackagingConfirmationClient) Delete() *ProductionPackagingConfirmationDelete {
+	mutation := newProductionPackagingConfirmationMutation(c.config, OpDelete)
+	return &ProductionPackagingConfirmationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionPackagingConfirmationClient) DeleteOne(_m *ProductionPackagingConfirmation) *ProductionPackagingConfirmationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionPackagingConfirmationClient) DeleteOneID(id int) *ProductionPackagingConfirmationDeleteOne {
+	builder := c.Delete().Where(productionpackagingconfirmation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionPackagingConfirmationDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionPackagingConfirmation.
+func (c *ProductionPackagingConfirmationClient) Query() *ProductionPackagingConfirmationQuery {
+	return &ProductionPackagingConfirmationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionPackagingConfirmation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionPackagingConfirmation entity by its id.
+func (c *ProductionPackagingConfirmationClient) Get(ctx context.Context, id int) (*ProductionPackagingConfirmation, error) {
+	return c.Query().Where(productionpackagingconfirmation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionPackagingConfirmationClient) GetX(ctx context.Context, id int) *ProductionPackagingConfirmation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionOrder queries the production_order edge of a ProductionPackagingConfirmation.
+func (c *ProductionPackagingConfirmationClient) QueryProductionOrder(_m *ProductionPackagingConfirmation) *ProductionOrderQuery {
+	query := (&ProductionOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionpackagingconfirmation.Table, productionpackagingconfirmation.FieldID, id),
+			sqlgraph.To(productionorder.Table, productionorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionpackagingconfirmation.ProductionOrderTable, productionpackagingconfirmation.ProductionOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderItem queries the production_order_item edge of a ProductionPackagingConfirmation.
+func (c *ProductionPackagingConfirmationClient) QueryProductionOrderItem(_m *ProductionPackagingConfirmation) *ProductionOrderItemQuery {
+	query := (&ProductionOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionpackagingconfirmation.Table, productionpackagingconfirmation.FieldID, id),
+			sqlgraph.To(productionorderitem.Table, productionorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, true, productionpackagingconfirmation.ProductionOrderItemTable, productionpackagingconfirmation.ProductionOrderItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryConfirmer queries the confirmer edge of a ProductionPackagingConfirmation.
+func (c *ProductionPackagingConfirmationClient) QueryConfirmer(_m *ProductionPackagingConfirmation) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionpackagingconfirmation.Table, productionpackagingconfirmation.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionpackagingconfirmation.ConfirmerTable, productionpackagingconfirmation.ConfirmerColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionPackagingConfirmationClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionPackagingConfirmation
+	return append(hooks[:len(hooks):len(hooks)], productionpackagingconfirmation.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionPackagingConfirmationClient) Interceptors() []Interceptor {
+	return c.inters.ProductionPackagingConfirmation
+}
+
+func (c *ProductionPackagingConfirmationClient) mutate(ctx context.Context, m *ProductionPackagingConfirmationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionPackagingConfirmationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionPackagingConfirmationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionPackagingConfirmationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionPackagingConfirmationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionPackagingConfirmation mutation op: %q", m.Op())
+	}
+}
+
+// ProductionWIPBatchClient is a client for the ProductionWIPBatch schema.
+type ProductionWIPBatchClient struct {
+	config
+}
+
+// NewProductionWIPBatchClient returns a client for the ProductionWIPBatch from the given config.
+func NewProductionWIPBatchClient(c config) *ProductionWIPBatchClient {
+	return &ProductionWIPBatchClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionwipbatch.Hooks(f(g(h())))`.
+func (c *ProductionWIPBatchClient) Use(hooks ...Hook) {
+	c.hooks.ProductionWIPBatch = append(c.hooks.ProductionWIPBatch, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionwipbatch.Intercept(f(g(h())))`.
+func (c *ProductionWIPBatchClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionWIPBatch = append(c.inters.ProductionWIPBatch, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionWIPBatch entity.
+func (c *ProductionWIPBatchClient) Create() *ProductionWIPBatchCreate {
+	mutation := newProductionWIPBatchMutation(c.config, OpCreate)
+	return &ProductionWIPBatchCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionWIPBatch entities.
+func (c *ProductionWIPBatchClient) CreateBulk(builders ...*ProductionWIPBatchCreate) *ProductionWIPBatchCreateBulk {
+	return &ProductionWIPBatchCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionWIPBatchClient) MapCreateBulk(slice any, setFunc func(*ProductionWIPBatchCreate, int)) *ProductionWIPBatchCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionWIPBatchCreateBulk{err: fmt.Errorf("calling to ProductionWIPBatchClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionWIPBatchCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionWIPBatchCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) Update() *ProductionWIPBatchUpdate {
+	mutation := newProductionWIPBatchMutation(c.config, OpUpdate)
+	return &ProductionWIPBatchUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionWIPBatchClient) UpdateOne(_m *ProductionWIPBatch) *ProductionWIPBatchUpdateOne {
+	mutation := newProductionWIPBatchMutation(c.config, OpUpdateOne, withProductionWIPBatch(_m))
+	return &ProductionWIPBatchUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionWIPBatchClient) UpdateOneID(id int) *ProductionWIPBatchUpdateOne {
+	mutation := newProductionWIPBatchMutation(c.config, OpUpdateOne, withProductionWIPBatchID(id))
+	return &ProductionWIPBatchUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) Delete() *ProductionWIPBatchDelete {
+	mutation := newProductionWIPBatchMutation(c.config, OpDelete)
+	return &ProductionWIPBatchDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionWIPBatchClient) DeleteOne(_m *ProductionWIPBatch) *ProductionWIPBatchDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionWIPBatchClient) DeleteOneID(id int) *ProductionWIPBatchDeleteOne {
+	builder := c.Delete().Where(productionwipbatch.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionWIPBatchDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) Query() *ProductionWIPBatchQuery {
+	return &ProductionWIPBatchQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionWIPBatch},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionWIPBatch entity by its id.
+func (c *ProductionWIPBatchClient) Get(ctx context.Context, id int) (*ProductionWIPBatch, error) {
+	return c.Query().Where(productionwipbatch.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionWIPBatchClient) GetX(ctx context.Context, id int) *ProductionWIPBatch {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionOrder queries the production_order edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryProductionOrder(_m *ProductionWIPBatch) *ProductionOrderQuery {
+	query := (&ProductionOrderClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionorder.Table, productionorder.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.ProductionOrderTable, productionwipbatch.ProductionOrderColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderItem queries the production_order_item edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryProductionOrderItem(_m *ProductionWIPBatch) *ProductionOrderItemQuery {
+	query := (&ProductionOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionorderitem.Table, productionorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.ProductionOrderItemTable, productionwipbatch.ProductionOrderItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderOperation queries the production_order_operation edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryProductionOrderOperation(_m *ProductionWIPBatch) *ProductionOrderOperationQuery {
+	query := (&ProductionOrderOperationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionorderoperation.Table, productionorderoperation.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.ProductionOrderOperationTable, productionwipbatch.ProductionOrderOperationColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryChildBatches queries the child_batches edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryChildBatches(_m *ProductionWIPBatch) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionwipbatch.ChildBatchesTable, productionwipbatch.ChildBatchesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QuerySourceBatch queries the source_batch edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QuerySourceBatch(_m *ProductionWIPBatch) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipbatch.SourceBatchTable, productionwipbatch.SourceBatchColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryEvents queries the events edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryEvents(_m *ProductionWIPBatch) *ProductionWIPEventQuery {
+	query := (&ProductionWIPEventClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionwipevent.Table, productionwipevent.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionwipbatch.EventsTable, productionwipbatch.EventsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryQualityInspections queries the quality_inspections edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryQualityInspections(_m *ProductionWIPBatch) *QualityInspectionQuery {
+	query := (&QualityInspectionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionwipbatch.QualityInspectionsTable, productionwipbatch.QualityInspectionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOutsourcingAllocations queries the outsourcing_allocations edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryOutsourcingAllocations(_m *ProductionWIPBatch) *ProductionWIPOutsourcingAllocationQuery {
+	query := (&ProductionWIPOutsourcingAllocationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionwipbatch.OutsourcingAllocationsTable, productionwipbatch.OutsourcingAllocationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCreator queries the creator edge of a ProductionWIPBatch.
+func (c *ProductionWIPBatchClient) QueryCreator(_m *ProductionWIPBatch) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipbatch.Table, productionwipbatch.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionwipbatch.CreatorTable, productionwipbatch.CreatorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionWIPBatchClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionWIPBatch
+	return append(hooks[:len(hooks):len(hooks)], productionwipbatch.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionWIPBatchClient) Interceptors() []Interceptor {
+	return c.inters.ProductionWIPBatch
+}
+
+func (c *ProductionWIPBatchClient) mutate(ctx context.Context, m *ProductionWIPBatchMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionWIPBatchCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionWIPBatchUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionWIPBatchUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionWIPBatchDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionWIPBatch mutation op: %q", m.Op())
+	}
+}
+
+// ProductionWIPEventClient is a client for the ProductionWIPEvent schema.
+type ProductionWIPEventClient struct {
+	config
+}
+
+// NewProductionWIPEventClient returns a client for the ProductionWIPEvent from the given config.
+func NewProductionWIPEventClient(c config) *ProductionWIPEventClient {
+	return &ProductionWIPEventClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionwipevent.Hooks(f(g(h())))`.
+func (c *ProductionWIPEventClient) Use(hooks ...Hook) {
+	c.hooks.ProductionWIPEvent = append(c.hooks.ProductionWIPEvent, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionwipevent.Intercept(f(g(h())))`.
+func (c *ProductionWIPEventClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionWIPEvent = append(c.inters.ProductionWIPEvent, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionWIPEvent entity.
+func (c *ProductionWIPEventClient) Create() *ProductionWIPEventCreate {
+	mutation := newProductionWIPEventMutation(c.config, OpCreate)
+	return &ProductionWIPEventCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionWIPEvent entities.
+func (c *ProductionWIPEventClient) CreateBulk(builders ...*ProductionWIPEventCreate) *ProductionWIPEventCreateBulk {
+	return &ProductionWIPEventCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionWIPEventClient) MapCreateBulk(slice any, setFunc func(*ProductionWIPEventCreate, int)) *ProductionWIPEventCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionWIPEventCreateBulk{err: fmt.Errorf("calling to ProductionWIPEventClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionWIPEventCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionWIPEventCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionWIPEvent.
+func (c *ProductionWIPEventClient) Update() *ProductionWIPEventUpdate {
+	mutation := newProductionWIPEventMutation(c.config, OpUpdate)
+	return &ProductionWIPEventUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionWIPEventClient) UpdateOne(_m *ProductionWIPEvent) *ProductionWIPEventUpdateOne {
+	mutation := newProductionWIPEventMutation(c.config, OpUpdateOne, withProductionWIPEvent(_m))
+	return &ProductionWIPEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionWIPEventClient) UpdateOneID(id int) *ProductionWIPEventUpdateOne {
+	mutation := newProductionWIPEventMutation(c.config, OpUpdateOne, withProductionWIPEventID(id))
+	return &ProductionWIPEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionWIPEvent.
+func (c *ProductionWIPEventClient) Delete() *ProductionWIPEventDelete {
+	mutation := newProductionWIPEventMutation(c.config, OpDelete)
+	return &ProductionWIPEventDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionWIPEventClient) DeleteOne(_m *ProductionWIPEvent) *ProductionWIPEventDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionWIPEventClient) DeleteOneID(id int) *ProductionWIPEventDeleteOne {
+	builder := c.Delete().Where(productionwipevent.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionWIPEventDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionWIPEvent.
+func (c *ProductionWIPEventClient) Query() *ProductionWIPEventQuery {
+	return &ProductionWIPEventQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionWIPEvent},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionWIPEvent entity by its id.
+func (c *ProductionWIPEventClient) Get(ctx context.Context, id int) (*ProductionWIPEvent, error) {
+	return c.Query().Where(productionwipevent.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionWIPEventClient) GetX(ctx context.Context, id int) *ProductionWIPEvent {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionWipBatch queries the production_wip_batch edge of a ProductionWIPEvent.
+func (c *ProductionWIPEventClient) QueryProductionWipBatch(_m *ProductionWIPEvent) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipevent.Table, productionwipevent.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipevent.ProductionWipBatchTable, productionwipevent.ProductionWipBatchColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryActor queries the actor edge of a ProductionWIPEvent.
+func (c *ProductionWIPEventClient) QueryActor(_m *ProductionWIPEvent) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipevent.Table, productionwipevent.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionwipevent.ActorTable, productionwipevent.ActorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionWIPEventClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionWIPEvent
+	return append(hooks[:len(hooks):len(hooks)], productionwipevent.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionWIPEventClient) Interceptors() []Interceptor {
+	return c.inters.ProductionWIPEvent
+}
+
+func (c *ProductionWIPEventClient) mutate(ctx context.Context, m *ProductionWIPEventMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionWIPEventCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionWIPEventUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionWIPEventUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionWIPEventDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionWIPEvent mutation op: %q", m.Op())
+	}
+}
+
+// ProductionWIPOutsourcingAllocationClient is a client for the ProductionWIPOutsourcingAllocation schema.
+type ProductionWIPOutsourcingAllocationClient struct {
+	config
+}
+
+// NewProductionWIPOutsourcingAllocationClient returns a client for the ProductionWIPOutsourcingAllocation from the given config.
+func NewProductionWIPOutsourcingAllocationClient(c config) *ProductionWIPOutsourcingAllocationClient {
+	return &ProductionWIPOutsourcingAllocationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionwipoutsourcingallocation.Hooks(f(g(h())))`.
+func (c *ProductionWIPOutsourcingAllocationClient) Use(hooks ...Hook) {
+	c.hooks.ProductionWIPOutsourcingAllocation = append(c.hooks.ProductionWIPOutsourcingAllocation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionwipoutsourcingallocation.Intercept(f(g(h())))`.
+func (c *ProductionWIPOutsourcingAllocationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionWIPOutsourcingAllocation = append(c.inters.ProductionWIPOutsourcingAllocation, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionWIPOutsourcingAllocation entity.
+func (c *ProductionWIPOutsourcingAllocationClient) Create() *ProductionWIPOutsourcingAllocationCreate {
+	mutation := newProductionWIPOutsourcingAllocationMutation(c.config, OpCreate)
+	return &ProductionWIPOutsourcingAllocationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionWIPOutsourcingAllocation entities.
+func (c *ProductionWIPOutsourcingAllocationClient) CreateBulk(builders ...*ProductionWIPOutsourcingAllocationCreate) *ProductionWIPOutsourcingAllocationCreateBulk {
+	return &ProductionWIPOutsourcingAllocationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionWIPOutsourcingAllocationClient) MapCreateBulk(slice any, setFunc func(*ProductionWIPOutsourcingAllocationCreate, int)) *ProductionWIPOutsourcingAllocationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionWIPOutsourcingAllocationCreateBulk{err: fmt.Errorf("calling to ProductionWIPOutsourcingAllocationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionWIPOutsourcingAllocationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionWIPOutsourcingAllocationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) Update() *ProductionWIPOutsourcingAllocationUpdate {
+	mutation := newProductionWIPOutsourcingAllocationMutation(c.config, OpUpdate)
+	return &ProductionWIPOutsourcingAllocationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionWIPOutsourcingAllocationClient) UpdateOne(_m *ProductionWIPOutsourcingAllocation) *ProductionWIPOutsourcingAllocationUpdateOne {
+	mutation := newProductionWIPOutsourcingAllocationMutation(c.config, OpUpdateOne, withProductionWIPOutsourcingAllocation(_m))
+	return &ProductionWIPOutsourcingAllocationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionWIPOutsourcingAllocationClient) UpdateOneID(id int) *ProductionWIPOutsourcingAllocationUpdateOne {
+	mutation := newProductionWIPOutsourcingAllocationMutation(c.config, OpUpdateOne, withProductionWIPOutsourcingAllocationID(id))
+	return &ProductionWIPOutsourcingAllocationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) Delete() *ProductionWIPOutsourcingAllocationDelete {
+	mutation := newProductionWIPOutsourcingAllocationMutation(c.config, OpDelete)
+	return &ProductionWIPOutsourcingAllocationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionWIPOutsourcingAllocationClient) DeleteOne(_m *ProductionWIPOutsourcingAllocation) *ProductionWIPOutsourcingAllocationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionWIPOutsourcingAllocationClient) DeleteOneID(id int) *ProductionWIPOutsourcingAllocationDeleteOne {
+	builder := c.Delete().Where(productionwipoutsourcingallocation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionWIPOutsourcingAllocationDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) Query() *ProductionWIPOutsourcingAllocationQuery {
+	return &ProductionWIPOutsourcingAllocationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionWIPOutsourcingAllocation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionWIPOutsourcingAllocation entity by its id.
+func (c *ProductionWIPOutsourcingAllocationClient) Get(ctx context.Context, id int) (*ProductionWIPOutsourcingAllocation, error) {
+	return c.Query().Where(productionwipoutsourcingallocation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionWIPOutsourcingAllocationClient) GetX(ctx context.Context, id int) *ProductionWIPOutsourcingAllocation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryProductionWipBatch queries the production_wip_batch edge of a ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) QueryProductionWipBatch(_m *ProductionWIPOutsourcingAllocation) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipoutsourcingallocation.ProductionWipBatchTable, productionwipoutsourcingallocation.ProductionWipBatchColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryOutsourcingOrderItem queries the outsourcing_order_item edge of a ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) QueryOutsourcingOrderItem(_m *ProductionWIPOutsourcingAllocation) *OutsourcingOrderItemQuery {
+	query := (&OutsourcingOrderItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID, id),
+			sqlgraph.To(outsourcingorderitem.Table, outsourcingorderitem.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipoutsourcingallocation.OutsourcingOrderItemTable, productionwipoutsourcingallocation.OutsourcingOrderItemColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionOrderMaterialRequirement queries the production_order_material_requirement edge of a ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) QueryProductionOrderMaterialRequirement(_m *ProductionWIPOutsourcingAllocation) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionOrderMaterialRequirementClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID, id),
+			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, productionwipoutsourcingallocation.ProductionOrderMaterialRequirementTable, productionwipoutsourcingallocation.ProductionOrderMaterialRequirementColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryUnit queries the unit edge of a ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) QueryUnit(_m *ProductionWIPOutsourcingAllocation) *UnitQuery {
+	query := (&UnitClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID, id),
+			sqlgraph.To(unit.Table, unit.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionwipoutsourcingallocation.UnitTable, productionwipoutsourcingallocation.UnitColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryCreator queries the creator edge of a ProductionWIPOutsourcingAllocation.
+func (c *ProductionWIPOutsourcingAllocationClient) QueryCreator(_m *ProductionWIPOutsourcingAllocation) *AdminUserQuery {
+	query := (&AdminUserClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID, id),
+			sqlgraph.To(adminuser.Table, adminuser.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, false, productionwipoutsourcingallocation.CreatorTable, productionwipoutsourcingallocation.CreatorColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionWIPOutsourcingAllocationClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionWIPOutsourcingAllocation
+	return append(hooks[:len(hooks):len(hooks)], productionwipoutsourcingallocation.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionWIPOutsourcingAllocationClient) Interceptors() []Interceptor {
+	return c.inters.ProductionWIPOutsourcingAllocation
+}
+
+func (c *ProductionWIPOutsourcingAllocationClient) mutate(ctx context.Context, m *ProductionWIPOutsourcingAllocationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionWIPOutsourcingAllocationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionWIPOutsourcingAllocationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionWIPOutsourcingAllocationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionWIPOutsourcingAllocationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionWIPOutsourcingAllocation mutation op: %q", m.Op())
 	}
 }
 
@@ -8043,6 +9271,22 @@ func (c *QualityInspectionClient) QueryInventoryLot(_m *QualityInspection) *Inve
 			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
 			sqlgraph.To(inventorylot.Table, inventorylot.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.InventoryLotTable, qualityinspection.InventoryLotColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// QueryProductionWipBatch queries the production_wip_batch edge of a QualityInspection.
+func (c *QualityInspectionClient) QueryProductionWipBatch(_m *QualityInspection) *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(qualityinspection.Table, qualityinspection.FieldID, id),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, qualityinspection.ProductionWipBatchTable, qualityinspection.ProductionWipBatchColumn),
 		)
 		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
 		return fromV, nil
@@ -10047,6 +11291,22 @@ func (c *SupplierClient) QueryOutsourcingOrders(_m *Supplier) *OutsourcingOrderQ
 	return query
 }
 
+// QueryProcessCapabilities queries the process_capabilities edge of a Supplier.
+func (c *SupplierClient) QueryProcessCapabilities(_m *Supplier) *ProcessQuery {
+	query := (&ProcessClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(supplier.Table, supplier.FieldID, id),
+			sqlgraph.To(process.Table, process.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, supplier.ProcessCapabilitiesTable, supplier.ProcessCapabilitiesPrimaryKey...),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *SupplierClient) Hooks() []Hook {
 	return c.hooks.Supplier
@@ -11493,7 +12753,9 @@ type (
 		OutsourcingOrderItem, Permission, Process, ProcessInstance,
 		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
 		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
-		PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
+		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
+		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
 		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
 		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
@@ -11509,7 +12771,9 @@ type (
 		OutsourcingOrderItem, Permission, Process, ProcessInstance,
 		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
 		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
-		PurchaseOrder, PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
+		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
+		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
+		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
 		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
 		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,

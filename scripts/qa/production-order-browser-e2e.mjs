@@ -151,6 +151,73 @@ async function externalSave(page, authorization, aggregate, note) {
   );
 }
 
+async function completeProductionSchedulingTask(
+  page,
+  authorization,
+  productionOrderID,
+) {
+  return page.evaluate(
+    async ({ authorization, productionOrderID }) => {
+      const call = async (method, params) => {
+        const response = await fetch("/rpc/workflow", {
+          method: "POST",
+          headers: {
+            Accept: "application/json",
+            Authorization: authorization,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            jsonrpc: "2.0",
+            id: `production-order-browser-${method}`,
+            method,
+            params,
+          }),
+        });
+        return { status: response.status, body: await response.json() };
+      };
+      const listed = await call("list_tasks", {
+        task_group: "production_scheduling",
+        source_type: "production-orders",
+        source_id: productionOrderID,
+        limit: 20,
+        offset: 0,
+      });
+      const tasks = listed.body?.result?.data?.tasks || [];
+      const task = tasks.find(
+        (item) =>
+          item?.task_code ===
+            `source-production-scheduling-${productionOrderID}` &&
+          item?.owner_role_key === "pmc" &&
+          item?.source_id === productionOrderID &&
+          item?.payload?.production_order_id === productionOrderID &&
+          item?.payload?.source_task_contract === "workflow.source-task/v1" &&
+          item?.payload?.source_task_producer === "production_order.release" &&
+          /^[0-9a-f]{64}$/u.test(
+            String(item?.payload?.source_task_intent_hash || ""),
+          ),
+      );
+      if (
+        listed.status !== 200 ||
+        listed.body?.result?.code !== 0 ||
+        tasks.length !== 1 ||
+        !task ||
+        task.task_status_key !== "ready"
+      ) {
+        return { listed, task, completed: null };
+      }
+      const completed = await call("complete_task_action", {
+        task_id: task.id,
+        expected_version: task.version,
+        idempotency_key: globalThis.crypto.randomUUID(),
+        action_key: "complete",
+        payload: { feedback: "浏览器验收确认生产排程" },
+      });
+      return { listed, task, completed };
+    },
+    { authorization, productionOrderID },
+  );
+}
+
 async function selectOrder(page, orderNo) {
   let row = page.locator("tr").filter({ hasText: orderNo }).first();
   if (!(await row.isVisible().catch(() => false))) {
@@ -262,8 +329,7 @@ export async function runProductionOrderBrowserE2E({
     const recoveredNote = recoveredModal.getByLabel("备注", { exact: true });
     await recoveredNote.waitFor({ state: "visible" });
     if (
-      (await recoveredNote.inputValue()) !==
-      "另一位处理人已保存的恢复态备注"
+      (await recoveredNote.inputValue()) !== "另一位处理人已保存的恢复态备注"
     ) {
       throw new Error("刷新后未恢复服务端最新生产订单内容");
     }
@@ -276,7 +342,9 @@ export async function runProductionOrderBrowserE2E({
       name: /^发\s*布$/u,
     });
     if (!(await releaseButton.count())) {
-      const visibleButtons = await page.locator("button:visible").allTextContents();
+      const visibleButtons = await page
+        .locator("button:visible")
+        .allTextContents();
       throw new Error(
         `生产订单发布动作不可见 url=${page.url()} buttons=${visibleButtons.join("|")}`,
       );
@@ -284,8 +352,24 @@ export async function runProductionOrderBrowserE2E({
     await releaseButton.click();
     await page.getByRole("button", { name: "确认发布" }).click();
     await page
-      .getByText("生产订单发布成功", { exact: true })
+      .getByText("生产订单已发布，排程任务已进入 PMC 待办", {
+        exact: true,
+      })
       .waitFor({ state: "visible" });
+    const scheduling = await completeProductionSchedulingTask(
+      page,
+      created.authorization,
+      created.aggregate.production_order.id,
+    );
+    if (
+      scheduling.completed?.status !== 200 ||
+      scheduling.completed?.body?.result?.code !== 0 ||
+      scheduling.completed?.body?.result?.data?.task?.task_status_key !== "done"
+    ) {
+      throw new Error(
+        `生产排程任务未完成 list_code=${scheduling.listed?.body?.result?.code} complete_code=${scheduling.completed?.body?.result?.code}`,
+      );
+    }
     await selectOrder(page, lifecycleOrderNo);
     await page.getByRole("button", { name: /^关\s*闭$/u }).click();
     const closeModal = page

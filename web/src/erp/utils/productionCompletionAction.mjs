@@ -17,13 +17,43 @@ const CREATE_REQUEST_KEYS = new Set([
   'note',
 ])
 
-function decimalNumber(value) {
-  const parsed = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(parsed) ? parsed : 0
+const QUANTITY_PATTERN = /^(?:0*\d+(?:\.\d+)?|0*\.\d+)$/u
+const QUANTITY_MAX_LENGTH = 21
+const QUANTITY_SCALE = 6
+
+function zeroQuantityUnits() {
+  return BigInt(0)
+}
+
+function canonicalQuantity(value, allowZero = false) {
+  const text = String(value ?? '').trim()
+  if (text.length > QUANTITY_MAX_LENGTH || !QUANTITY_PATTERN.test(text)) {
+    return ''
+  }
+  const [whole = '0', fraction = ''] = text.split('.')
+  const normalizedWhole = whole.replace(/^0+(?=\d)/u, '') || '0'
+  if (normalizedWhole.length > 14 || fraction.length > QUANTITY_SCALE) {
+    return ''
+  }
+  const normalizedFraction = fraction.replace(/0+$/u, '')
+  const normalized = normalizedFraction
+    ? `${normalizedWhole}.${normalizedFraction}`
+    : normalizedWhole
+  return allowZero || normalized !== '0' ? normalized : ''
+}
+
+function quantityUnits(value, allowZero = false) {
+  const normalized = canonicalQuantity(value, allowZero)
+  if (!normalized) throw invalidContract('完工数量不完整，请刷新后重试')
+  const [whole, fraction = ''] = normalized.split('.')
+  return BigInt(`${whole}${fraction.padEnd(QUANTITY_SCALE, '0')}`)
+}
+
+function quantityTextFromUnits(value) {
+  const digits = value.toString().padStart(QUANTITY_SCALE + 1, '0')
+  const whole = digits.slice(0, -QUANTITY_SCALE) || '0'
+  const fraction = digits.slice(-QUANTITY_SCALE).replace(/0+$/u, '')
+  return fraction ? `${whole}.${fraction}` : whole
 }
 
 function invalidContract(message = '完工入库内容不完整，请重新核对') {
@@ -77,9 +107,13 @@ function optionalOccurredAt(value) {
 }
 
 function normalizedQuantity(value) {
-  const parsed = decimalNumber(value)
-  if (parsed <= 0) return ''
-  return String(Number(parsed.toFixed(4)))
+  return canonicalQuantity(value)
+}
+
+export function compareProductionCompletionQuantity(left, right) {
+  const leftUnits = quantityUnits(left)
+  const rightUnits = quantityUnits(right, true)
+  return leftUnits === rightUnits ? 0 : leftUnits > rightUnits ? 1 : -1
 }
 
 export function buildProductionCompletionChoices(items = [], facts = []) {
@@ -96,15 +130,22 @@ export function buildProductionCompletionChoices(items = [], facts = []) {
     const target = fact.status === 'POSTED' ? postedByLine : draftByLine
     if (!['POSTED', 'DRAFT'].includes(fact.status)) continue
     const lineID = Number(fact.source_line_id)
-    target.set(lineID, (target.get(lineID) || 0) + decimalNumber(fact.quantity))
+    const quantity = quantityUnits(fact.quantity)
+    target.set(lineID, (target.get(lineID) || zeroQuantityUnits()) + quantity)
   }
 
   return (Array.isArray(items) ? items : []).map((item, index) => {
     const lineID = Number(item?.id || 0)
-    const planned = decimalNumber(item?.planned_quantity)
-    const posted = postedByLine.get(lineID) || 0
-    const draft = draftByLine.get(lineID) || 0
-    const remaining = Math.max(0, planned - posted)
+    const planned = quantityUnits(item?.planned_quantity)
+    const acceptedPackaging = item?.accepted_packaging_quantity
+      ? quantityUnits(item.accepted_packaging_quantity)
+      : planned
+    const posted = postedByLine.get(lineID) || zeroQuantityUnits()
+    const draft = draftByLine.get(lineID) || zeroQuantityUnits()
+    const remaining =
+      acceptedPackaging > posted
+        ? acceptedPackaging - posted
+        : zeroQuantityUnits()
     const productText =
       [item?.product_code_snapshot, item?.product_name_snapshot]
         .map((value) => String(value || '').trim())
@@ -114,13 +155,14 @@ export function buildProductionCompletionChoices(items = [], facts = []) {
     const unitText = String(item?.unit_name_snapshot || '').trim()
     return {
       value: lineID,
-      label: `${productText}${skuText ? ` / ${skuText}` : ''} · 剩余 ${normalizedQuantity(remaining)}${unitText ? ` ${unitText}` : ''}`,
+      label: `${productText}${skuText ? ` / ${skuText}` : ''} · 剩余 ${quantityTextFromUnits(remaining)}${unitText ? ` ${unitText}` : ''}`,
       item,
-      planned: normalizedQuantity(planned),
-      posted: normalizedQuantity(posted),
-      draft: normalizedQuantity(draft),
-      remaining: normalizedQuantity(remaining),
-      disabled: lineID <= 0 || remaining <= 0,
+      planned: quantityTextFromUnits(planned),
+      acceptedPackaging: quantityTextFromUnits(acceptedPackaging),
+      posted: quantityTextFromUnits(posted),
+      draft: quantityTextFromUnits(draft),
+      remaining: quantityTextFromUnits(remaining),
+      disabled: lineID <= 0 || remaining <= zeroQuantityUnits(),
     }
   })
 }

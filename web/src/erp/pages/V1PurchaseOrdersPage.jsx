@@ -74,7 +74,10 @@ import {
   SUPPLIER_CONTACT_OWNER_TYPE,
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
-import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
+import {
+  filterBusinessCollaborationTasksBySource,
+  loadBusinessCollaborationTasksForSource,
+} from '../utils/businessCollaborationTasks.mjs'
 import {
   commitSourceDocumentSaveResult,
   createSourceDocumentOpenEditController,
@@ -146,6 +149,8 @@ export default function V1PurchaseOrdersPage() {
   const [itemsLoading, setItemsLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const [workflowTasks, setWorkflowTasks] = useState([])
+  const [workflowTaskLoadState, setWorkflowTaskLoadState] = useState('idle')
+  const workflowTaskSourceIDRef = useRef(0)
   const [orders, setOrders] = useState([])
   const [total, setTotal] = useState(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
@@ -390,22 +395,30 @@ export default function V1PurchaseOrdersPage() {
     supplierFilter,
   ])
 
-  const loadWorkflowTasks = useCallback(async () => {
-    if (!canReadWorkflowTasks) {
-      setWorkflowTasks([])
-      return
-    }
-    try {
-      const data = await listWorkflowTasks({
-        source_type: PURCHASE_ORDERS_MODULE_KEY,
-        limit: 200,
+  const loadWorkflowTasks = useCallback(
+    (sourceID) => {
+      const requestedSourceID = Number(
+        sourceID ?? workflowTaskSourceIDRef.current ?? 0
+      )
+      return loadBusinessCollaborationTasksForSource({
+        beginLatestRequest,
+        canRead: canReadWorkflowTasks,
+        isAbortError: isRpcAbortError,
+        isCurrentSource: (candidateSourceID) =>
+          candidateSourceID === workflowTaskSourceIDRef.current,
+        listTasks: listWorkflowTasks,
+        onError: (error) =>
+          message.error(
+            getActionErrorMessage(error, '加载当前采购订单任务失败')
+          ),
+        setLoadState: setWorkflowTaskLoadState,
+        setTasks: setWorkflowTasks,
+        sourceID: requestedSourceID,
+        sourceType: PURCHASE_ORDERS_MODULE_KEY,
       })
-      setWorkflowTasks(data?.tasks || [])
-    } catch (error) {
-      setWorkflowTasks([])
-      message.error(getActionErrorMessage(error, '加载采购相关任务'))
-    }
-  }, [canReadWorkflowTasks])
+    },
+    [beginLatestRequest, canReadWorkflowTasks]
+  )
   const {
     blockWorkflowTask,
     completeWorkflowTask,
@@ -457,10 +470,6 @@ export default function V1PurchaseOrdersPage() {
   useEffect(() => {
     loadOrders()
   }, [loadOrders])
-
-  useEffect(() => {
-    loadWorkflowTasks()
-  }, [loadWorkflowTasks])
 
   const refreshPageData = useCallback(async () => {
     await Promise.all([loadOrders(), loadWorkflowTasks()])
@@ -899,6 +908,17 @@ export default function V1PurchaseOrdersPage() {
     selectedOrders,
     selectedRowKeys,
   })
+  useEffect(() => {
+    const sourceID = Number(singleSelectedOrder?.id || 0)
+    workflowTaskSourceIDRef.current = sourceID
+    loadWorkflowTasks(sourceID)
+  }, [loadWorkflowTasks, singleSelectedOrder?.id])
+  useEffect(
+    () => () => {
+      workflowTaskSourceIDRef.current = 0
+    },
+    []
+  )
   const purchasePrintTemplateDefaults = useMemo(
     () =>
       getEffectivePrintTemplateDefaults(
@@ -1156,10 +1176,14 @@ export default function V1PurchaseOrdersPage() {
       />
 
       <CollaborationTaskPanel
-        tasks={workflowTasks}
-        selectedTasks={selectedOrderWorkflowTasks}
+        tasks={
+          canReadWorkflowTasks && workflowTaskLoadState === 'ready'
+            ? selectedOrderWorkflowTasks
+            : []
+        }
         selectedRecordLabel={singleSelectedOrder?.purchase_order_no || ''}
         adminProfile={adminProfile}
+        onOpenTaskBoard={() => navigate('/erp/task-board')}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined
         }

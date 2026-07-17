@@ -64,6 +64,12 @@ type ProductionOrderEdges struct {
 	Items []*ProductionOrderItem `json:"items,omitempty"`
 	// MaterialRequirements holds the value of the material_requirements edge.
 	MaterialRequirements []*ProductionOrderMaterialRequirement `json:"material_requirements,omitempty"`
+	// Operations holds the value of the operations edge.
+	Operations []*ProductionOrderOperation `json:"operations,omitempty"`
+	// WipBatches holds the value of the wip_batches edge.
+	WipBatches []*ProductionWIPBatch `json:"wip_batches,omitempty"`
+	// PackagingConfirmations holds the value of the packaging_confirmations edge.
+	PackagingConfirmations []*ProductionPackagingConfirmation `json:"packaging_confirmations,omitempty"`
 	// Events holds the value of the events edge.
 	Events []*ProductionOrderEvent `json:"events,omitempty"`
 	// Creator holds the value of the creator edge.
@@ -76,7 +82,7 @@ type ProductionOrderEdges struct {
 	Canceller *AdminUser `json:"canceller,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [10]bool
 }
 
 // ItemsOrErr returns the Items value or an error if the edge
@@ -97,10 +103,37 @@ func (e ProductionOrderEdges) MaterialRequirementsOrErr() ([]*ProductionOrderMat
 	return nil, &NotLoadedError{edge: "material_requirements"}
 }
 
+// OperationsOrErr returns the Operations value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionOrderEdges) OperationsOrErr() ([]*ProductionOrderOperation, error) {
+	if e.loadedTypes[2] {
+		return e.Operations, nil
+	}
+	return nil, &NotLoadedError{edge: "operations"}
+}
+
+// WipBatchesOrErr returns the WipBatches value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionOrderEdges) WipBatchesOrErr() ([]*ProductionWIPBatch, error) {
+	if e.loadedTypes[3] {
+		return e.WipBatches, nil
+	}
+	return nil, &NotLoadedError{edge: "wip_batches"}
+}
+
+// PackagingConfirmationsOrErr returns the PackagingConfirmations value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionOrderEdges) PackagingConfirmationsOrErr() ([]*ProductionPackagingConfirmation, error) {
+	if e.loadedTypes[4] {
+		return e.PackagingConfirmations, nil
+	}
+	return nil, &NotLoadedError{edge: "packaging_confirmations"}
+}
+
 // EventsOrErr returns the Events value or an error if the edge
 // was not loaded in eager-loading.
 func (e ProductionOrderEdges) EventsOrErr() ([]*ProductionOrderEvent, error) {
-	if e.loadedTypes[2] {
+	if e.loadedTypes[5] {
 		return e.Events, nil
 	}
 	return nil, &NotLoadedError{edge: "events"}
@@ -111,7 +144,7 @@ func (e ProductionOrderEdges) EventsOrErr() ([]*ProductionOrderEvent, error) {
 func (e ProductionOrderEdges) CreatorOrErr() (*AdminUser, error) {
 	if e.Creator != nil {
 		return e.Creator, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "creator"}
@@ -122,7 +155,7 @@ func (e ProductionOrderEdges) CreatorOrErr() (*AdminUser, error) {
 func (e ProductionOrderEdges) ReleaserOrErr() (*AdminUser, error) {
 	if e.Releaser != nil {
 		return e.Releaser, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[7] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "releaser"}
@@ -133,7 +166,7 @@ func (e ProductionOrderEdges) ReleaserOrErr() (*AdminUser, error) {
 func (e ProductionOrderEdges) CloserOrErr() (*AdminUser, error) {
 	if e.Closer != nil {
 		return e.Closer, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[8] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "closer"}
@@ -144,7 +177,7 @@ func (e ProductionOrderEdges) CloserOrErr() (*AdminUser, error) {
 func (e ProductionOrderEdges) CancellerOrErr() (*AdminUser, error) {
 	if e.Canceller != nil {
 		return e.Canceller, nil
-	} else if e.loadedTypes[6] {
+	} else if e.loadedTypes[9] {
 		return nil, &NotFoundError{label: adminuser.Label}
 	}
 	return nil, &NotLoadedError{edge: "canceller"}
@@ -316,6 +349,21 @@ func (_m *ProductionOrder) QueryItems() *ProductionOrderItemQuery {
 // QueryMaterialRequirements queries the "material_requirements" edge of the ProductionOrder entity.
 func (_m *ProductionOrder) QueryMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
 	return NewProductionOrderClient(_m.config).QueryMaterialRequirements(_m)
+}
+
+// QueryOperations queries the "operations" edge of the ProductionOrder entity.
+func (_m *ProductionOrder) QueryOperations() *ProductionOrderOperationQuery {
+	return NewProductionOrderClient(_m.config).QueryOperations(_m)
+}
+
+// QueryWipBatches queries the "wip_batches" edge of the ProductionOrder entity.
+func (_m *ProductionOrder) QueryWipBatches() *ProductionWIPBatchQuery {
+	return NewProductionOrderClient(_m.config).QueryWipBatches(_m)
+}
+
+// QueryPackagingConfirmations queries the "packaging_confirmations" edge of the ProductionOrder entity.
+func (_m *ProductionOrder) QueryPackagingConfirmations() *ProductionPackagingConfirmationQuery {
+	return NewProductionOrderClient(_m.config).QueryPackagingConfirmations(_m)
 }
 
 // QueryEvents queries the "events" edge of the ProductionOrder entity.

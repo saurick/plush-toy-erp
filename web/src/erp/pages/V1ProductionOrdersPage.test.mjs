@@ -75,6 +75,10 @@ test('production order lifecycle keeps backend authority and separates refresh e
   assert.match(page, /getActionErrorMessage/u)
 })
 
+test('production order release explains the atomic scheduling handoff', () => {
+  assert.match(page, /生产订单已发布，排程任务已进入 PMC 待办/u)
+})
+
 test('production order forms initialize only after their modal is mounted', () => {
   assert.equal(page.match(/form\.setFieldsValue/gu)?.length, 1)
   assert.equal(page.match(/reasonForm\.resetFields/gu)?.length, 1)
@@ -94,6 +98,61 @@ test('released production orders create a source-bound completion draft', () => 
   assert.match(page, /validateProductionCompletionResult/u)
   assert.match(page, /完工记录草稿已生成，请到生产记录核对并过账/u)
   assert.doesNotMatch(page, /postProductionFact/u)
+})
+
+test('released production orders expose route execution through separate permissions', () => {
+  assert.match(page, /ProductionRouteExecutionModal/u)
+  for (const permission of [
+    'production.wip.read',
+    'production.wip.assign',
+    'production.wip.execute',
+    'production.wip.rework',
+    'production.packaging_material.confirm',
+    'outsourcing.order.read',
+  ]) {
+    assert.match(page, new RegExp(`['"]${permission}['"]`, 'u'))
+  }
+  assert.match(
+    page,
+    /canAssign=\{canAssignProductionWip\}[\s\S]*canExecute=\{canExecuteProductionWip\}[\s\S]*canRework=\{canReworkProductionWip\}[\s\S]*canConfirmPackaging=\{canConfirmPackagingMaterial\}[\s\S]*canReadOutsourcingContracts=\{canReadOutsourcingContracts\}/u
+  )
+  assert.match(
+    page,
+    /selected\?\.status === PRODUCTION_ORDER_STATUS\.RELEASED/u
+  )
+  assert.match(page, />\s*工序办理\s*</u)
+})
+
+test('WIP readers can open production orders without receiving PMC write permissions', () => {
+  assert.match(
+    page,
+    /const canRead =\s*hasActionPermission\(adminProfile, 'pmc\.plan\.read'\) \|\| canReadProductionWip/u
+  )
+  assert.match(
+    page,
+    /const canCreate = hasActionPermission\(adminProfile, 'pmc\.plan\.create'\)/u
+  )
+  assert.match(
+    page,
+    /const canUpdate = hasActionPermission\(adminProfile, 'pmc\.plan\.update'\)/u
+  )
+})
+
+test('routed completion fails closed until packaging is accepted and packaging material is confirmed', () => {
+  assert.match(page, /partitionProductionCompletionItems/u)
+  assert.match(page, /productionWipCompletionEligibility/u)
+  assert.match(page, /hasRoutedItem \? getProductionWip\(orderID\)/u)
+  assert.match(page, /eligibleItems\.length === 0/u)
+  assert.match(page, /暂不能登记完工入库/u)
+  assert.match(page, /工序状态已变化/u)
+  assert.match(page, /当前账号没有查看生产工序的权限/u)
+  assert.match(completionModal, /部分路线明细暂不可登记/u)
+})
+
+test('production page explains fixed sewing-before-handwork and layered facts', () => {
+  assert.match(page, /布料加工、车缝、手工、包装依次办理/u)
+  assert.match(page, /先车缝、后手工/u)
+  assert.match(page, /工序完工、品质判定与最终完工入库分层办理/u)
 })
 
 test('production completion keeps unknown attempts and links to filtered records', () => {

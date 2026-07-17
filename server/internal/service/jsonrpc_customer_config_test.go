@@ -192,6 +192,15 @@ func TestMapCustomerConfigError_IdempotencyConflict(t *testing.T) {
 	}
 }
 
+func TestMapCustomerConfigError_SourceGeneratedTaskNamespace(t *testing.T) {
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
+	result := dispatcher.mapCustomerConfigError(context.Background(), biz.ErrWorkflowTaskSourceGeneratedOnly)
+	if result.Code != errcode.InvalidParam.Code || result.Message != "该任务由业务来源生成，请回到对应业务页面办理" {
+		t.Fatalf("unexpected source-generated task namespace result: %#v", result)
+	}
+}
+
 func TestMapCustomerConfigError_RevisionImmutable(t *testing.T) {
 	logger := log.NewStdLogger(io.Discard)
 	dispatcher := &jsonrpcDispatcher{log: log.NewHelper(logger)}
@@ -2290,6 +2299,8 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideGuardedBy
 		"finished_goods_lot_id":    float64(7001),
 		"quality_inspection_id":    float64(8001),
 		"result":                   "PASS",
+		"defect_rate_operator":     "approx",
+		"defect_rate_percent":      "5.0",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/quality/PASS",
 		"decision_note":            "guard only",
 	})
@@ -2383,6 +2394,8 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegis
 		"finished_goods_lot_id":    float64(7001),
 		"quality_inspection_id":    float64(8001),
 		"result":                   "PASS",
+		"defect_rate_operator":     "approx",
+		"defect_rate_percent":      "5.0",
 		"idempotency_key":          "finished-goods-delivery/SHIP-9001/quality/PASS",
 		"decision_note":            "成品质检通过",
 	})
@@ -2394,7 +2407,9 @@ func TestCustomerConfigJSONRPCExecuteFinishedGoodsDeliveryQualityDecideRunsRegis
 		t.Fatalf("execute code = %d msg=%s", executeRes.Code, executeRes.Message)
 	}
 	if inventoryRepo.passInput == nil || inventoryRepo.passInput.InspectionID != 8001 ||
-		!inventoryRepo.passInput.InspectedAtDefaulted {
+		!inventoryRepo.passInput.InspectedAtDefaulted ||
+		inventoryRepo.passInput.DefectRateOperator == nil || *inventoryRepo.passInput.DefectRateOperator != biz.QualityInspectionDefectRateOperatorApprox ||
+		inventoryRepo.passInput.DefectRatePercent == nil || inventoryRepo.passInput.DefectRatePercent.String() != "5" {
 		t.Fatalf("expected quality pass input for inspection 8001, got %#v", inventoryRepo.passInput)
 	}
 	data := executeRes.Data.AsMap()

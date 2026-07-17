@@ -101,6 +101,11 @@ func PlannedQuantity(v decimal.Decimal) predicate.ProductionOrderMaterialRequire
 	return predicate.ProductionOrderMaterialRequirement(sql.FieldEQ(FieldPlannedQuantity, v))
 }
 
+// ProductionOperationCode applies equality check predicate on the "production_operation_code" field. It's identical to ProductionOperationCodeEQ.
+func ProductionOperationCode(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldEQ(FieldProductionOperationCode, v))
+}
+
 // MaterialCodeSnapshot applies equality check predicate on the "material_code_snapshot" field. It's identical to MaterialCodeSnapshotEQ.
 func MaterialCodeSnapshot(v string) predicate.ProductionOrderMaterialRequirement {
 	return predicate.ProductionOrderMaterialRequirement(sql.FieldEQ(FieldMaterialCodeSnapshot, v))
@@ -369,6 +374,81 @@ func PlannedQuantityLT(v decimal.Decimal) predicate.ProductionOrderMaterialRequi
 // PlannedQuantityLTE applies the LTE predicate on the "planned_quantity" field.
 func PlannedQuantityLTE(v decimal.Decimal) predicate.ProductionOrderMaterialRequirement {
 	return predicate.ProductionOrderMaterialRequirement(sql.FieldLTE(FieldPlannedQuantity, v))
+}
+
+// ProductionOperationCodeEQ applies the EQ predicate on the "production_operation_code" field.
+func ProductionOperationCodeEQ(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldEQ(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeNEQ applies the NEQ predicate on the "production_operation_code" field.
+func ProductionOperationCodeNEQ(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldNEQ(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeIn applies the In predicate on the "production_operation_code" field.
+func ProductionOperationCodeIn(vs ...string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldIn(FieldProductionOperationCode, vs...))
+}
+
+// ProductionOperationCodeNotIn applies the NotIn predicate on the "production_operation_code" field.
+func ProductionOperationCodeNotIn(vs ...string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldNotIn(FieldProductionOperationCode, vs...))
+}
+
+// ProductionOperationCodeGT applies the GT predicate on the "production_operation_code" field.
+func ProductionOperationCodeGT(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldGT(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeGTE applies the GTE predicate on the "production_operation_code" field.
+func ProductionOperationCodeGTE(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldGTE(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeLT applies the LT predicate on the "production_operation_code" field.
+func ProductionOperationCodeLT(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldLT(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeLTE applies the LTE predicate on the "production_operation_code" field.
+func ProductionOperationCodeLTE(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldLTE(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeContains applies the Contains predicate on the "production_operation_code" field.
+func ProductionOperationCodeContains(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldContains(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeHasPrefix applies the HasPrefix predicate on the "production_operation_code" field.
+func ProductionOperationCodeHasPrefix(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldHasPrefix(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeHasSuffix applies the HasSuffix predicate on the "production_operation_code" field.
+func ProductionOperationCodeHasSuffix(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldHasSuffix(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeIsNil applies the IsNil predicate on the "production_operation_code" field.
+func ProductionOperationCodeIsNil() predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldIsNull(FieldProductionOperationCode))
+}
+
+// ProductionOperationCodeNotNil applies the NotNil predicate on the "production_operation_code" field.
+func ProductionOperationCodeNotNil() predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldNotNull(FieldProductionOperationCode))
+}
+
+// ProductionOperationCodeEqualFold applies the EqualFold predicate on the "production_operation_code" field.
+func ProductionOperationCodeEqualFold(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldEqualFold(FieldProductionOperationCode, v))
+}
+
+// ProductionOperationCodeContainsFold applies the ContainsFold predicate on the "production_operation_code" field.
+func ProductionOperationCodeContainsFold(v string) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(sql.FieldContainsFold(FieldProductionOperationCode, v))
 }
 
 // MaterialCodeSnapshotEQ applies the EQ predicate on the "material_code_snapshot" field.
@@ -841,6 +921,29 @@ func HasUnit() predicate.ProductionOrderMaterialRequirement {
 func HasUnitWith(preds ...predicate.Unit) predicate.ProductionOrderMaterialRequirement {
 	return predicate.ProductionOrderMaterialRequirement(func(s *sql.Selector) {
 		step := newUnitStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductionWipOutsourcingAllocations applies the HasEdge predicate on the "production_wip_outsourcing_allocations" edge.
+func HasProductionWipOutsourcingAllocations() predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ProductionWipOutsourcingAllocationsTable, ProductionWipOutsourcingAllocationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductionWipOutsourcingAllocationsWith applies the HasEdge predicate on the "production_wip_outsourcing_allocations" edge with a given conditions (other predicates).
+func HasProductionWipOutsourcingAllocationsWith(preds ...predicate.ProductionWIPOutsourcingAllocation) predicate.ProductionOrderMaterialRequirement {
+	return predicate.ProductionOrderMaterialRequirement(func(s *sql.Selector) {
+		step := newProductionWipOutsourcingAllocationsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

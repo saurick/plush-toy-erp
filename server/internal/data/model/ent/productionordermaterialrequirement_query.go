@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/bomheader"
@@ -13,6 +14,7 @@ import (
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/unit"
 
 	"entgo.io/ent"
@@ -24,16 +26,17 @@ import (
 // ProductionOrderMaterialRequirementQuery is the builder for querying ProductionOrderMaterialRequirement entities.
 type ProductionOrderMaterialRequirementQuery struct {
 	config
-	ctx                     *QueryContext
-	order                   []productionordermaterialrequirement.OrderOption
-	inters                  []Interceptor
-	predicates              []predicate.ProductionOrderMaterialRequirement
-	withProductionOrder     *ProductionOrderQuery
-	withProductionOrderItem *ProductionOrderItemQuery
-	withBomHeader           *BOMHeaderQuery
-	withBomItem             *BOMItemQuery
-	withMaterial            *MaterialQuery
-	withUnit                *UnitQuery
+	ctx                                     *QueryContext
+	order                                   []productionordermaterialrequirement.OrderOption
+	inters                                  []Interceptor
+	predicates                              []predicate.ProductionOrderMaterialRequirement
+	withProductionOrder                     *ProductionOrderQuery
+	withProductionOrderItem                 *ProductionOrderItemQuery
+	withBomHeader                           *BOMHeaderQuery
+	withBomItem                             *BOMItemQuery
+	withMaterial                            *MaterialQuery
+	withUnit                                *UnitQuery
+	withProductionWipOutsourcingAllocations *ProductionWIPOutsourcingAllocationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -195,6 +198,28 @@ func (_q *ProductionOrderMaterialRequirementQuery) QueryUnit() *UnitQuery {
 			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, selector),
 			sqlgraph.To(unit.Table, unit.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, productionordermaterialrequirement.UnitTable, productionordermaterialrequirement.UnitColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductionWipOutsourcingAllocations chains the current query on the "production_wip_outsourcing_allocations" edge.
+func (_q *ProductionOrderMaterialRequirementQuery) QueryProductionWipOutsourcingAllocations() *ProductionWIPOutsourcingAllocationQuery {
+	query := (&ProductionWIPOutsourcingAllocationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID, selector),
+			sqlgraph.To(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable, productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -389,17 +414,18 @@ func (_q *ProductionOrderMaterialRequirementQuery) Clone() *ProductionOrderMater
 		return nil
 	}
 	return &ProductionOrderMaterialRequirementQuery{
-		config:                  _q.config,
-		ctx:                     _q.ctx.Clone(),
-		order:                   append([]productionordermaterialrequirement.OrderOption{}, _q.order...),
-		inters:                  append([]Interceptor{}, _q.inters...),
-		predicates:              append([]predicate.ProductionOrderMaterialRequirement{}, _q.predicates...),
-		withProductionOrder:     _q.withProductionOrder.Clone(),
-		withProductionOrderItem: _q.withProductionOrderItem.Clone(),
-		withBomHeader:           _q.withBomHeader.Clone(),
-		withBomItem:             _q.withBomItem.Clone(),
-		withMaterial:            _q.withMaterial.Clone(),
-		withUnit:                _q.withUnit.Clone(),
+		config:                                  _q.config,
+		ctx:                                     _q.ctx.Clone(),
+		order:                                   append([]productionordermaterialrequirement.OrderOption{}, _q.order...),
+		inters:                                  append([]Interceptor{}, _q.inters...),
+		predicates:                              append([]predicate.ProductionOrderMaterialRequirement{}, _q.predicates...),
+		withProductionOrder:                     _q.withProductionOrder.Clone(),
+		withProductionOrderItem:                 _q.withProductionOrderItem.Clone(),
+		withBomHeader:                           _q.withBomHeader.Clone(),
+		withBomItem:                             _q.withBomItem.Clone(),
+		withMaterial:                            _q.withMaterial.Clone(),
+		withUnit:                                _q.withUnit.Clone(),
+		withProductionWipOutsourcingAllocations: _q.withProductionWipOutsourcingAllocations.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -469,6 +495,17 @@ func (_q *ProductionOrderMaterialRequirementQuery) WithUnit(opts ...func(*UnitQu
 		opt(query)
 	}
 	_q.withUnit = query
+	return _q
+}
+
+// WithProductionWipOutsourcingAllocations tells the query-builder to eager-load the nodes that are connected to
+// the "production_wip_outsourcing_allocations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionOrderMaterialRequirementQuery) WithProductionWipOutsourcingAllocations(opts ...func(*ProductionWIPOutsourcingAllocationQuery)) *ProductionOrderMaterialRequirementQuery {
+	query := (&ProductionWIPOutsourcingAllocationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductionWipOutsourcingAllocations = query
 	return _q
 }
 
@@ -550,13 +587,14 @@ func (_q *ProductionOrderMaterialRequirementQuery) sqlAll(ctx context.Context, h
 	var (
 		nodes       = []*ProductionOrderMaterialRequirement{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withProductionOrder != nil,
 			_q.withProductionOrderItem != nil,
 			_q.withBomHeader != nil,
 			_q.withBomItem != nil,
 			_q.withMaterial != nil,
 			_q.withUnit != nil,
+			_q.withProductionWipOutsourcingAllocations != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -610,6 +648,17 @@ func (_q *ProductionOrderMaterialRequirementQuery) sqlAll(ctx context.Context, h
 	if query := _q.withUnit; query != nil {
 		if err := _q.loadUnit(ctx, query, nodes, nil,
 			func(n *ProductionOrderMaterialRequirement, e *Unit) { n.Edges.Unit = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductionWipOutsourcingAllocations; query != nil {
+		if err := _q.loadProductionWipOutsourcingAllocations(ctx, query, nodes,
+			func(n *ProductionOrderMaterialRequirement) {
+				n.Edges.ProductionWipOutsourcingAllocations = []*ProductionWIPOutsourcingAllocation{}
+			},
+			func(n *ProductionOrderMaterialRequirement, e *ProductionWIPOutsourcingAllocation) {
+				n.Edges.ProductionWipOutsourcingAllocations = append(n.Edges.ProductionWipOutsourcingAllocations, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -787,6 +836,39 @@ func (_q *ProductionOrderMaterialRequirementQuery) loadUnit(ctx context.Context,
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (_q *ProductionOrderMaterialRequirementQuery) loadProductionWipOutsourcingAllocations(ctx context.Context, query *ProductionWIPOutsourcingAllocationQuery, nodes []*ProductionOrderMaterialRequirement, init func(*ProductionOrderMaterialRequirement), assign func(*ProductionOrderMaterialRequirement, *ProductionWIPOutsourcingAllocation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionOrderMaterialRequirement)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionwipoutsourcingallocation.FieldProductionOrderMaterialRequirementID)
+	}
+	query.Where(predicate.ProductionWIPOutsourcingAllocation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductionOrderMaterialRequirementID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "production_order_material_requirement_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "production_order_material_requirement_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

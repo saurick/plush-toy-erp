@@ -63,6 +63,8 @@ const mockProductionOrderItems = [
     planned_quantity: '20.0000',
     sales_order_item_id: 601,
     bom_header_id: 701,
+    route_code: 'PLUSH_SEW_HAND_V1',
+    customer_inspection_required: false,
     product_code_snapshot: 'PROD-MOCK',
     product_name_snapshot: '演示产品',
     sku_code_snapshot: 'SKU-MOCK',

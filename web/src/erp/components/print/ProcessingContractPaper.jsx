@@ -1,7 +1,6 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react'
 import {
   calculateProcessingContractTotals,
-  processingContractAttachmentSlots,
   PROCESSING_CONTRACT_TABLE_COLUMNS,
   resolveProcessingLineAmount,
 } from '../../data/processingContractTemplate.mjs'
@@ -11,6 +10,7 @@ import {
   isMergeTopLeftCell,
 } from '../../utils/detailCellMerge.mjs'
 import { runSilentPrintWorkspaceDraftUpdate } from '../../utils/usePersistentPrintWorkspaceDraft.js'
+import { PrintAppendixImages } from './PrintAppendixImages.jsx'
 import { renderPrintValue } from './printValue.mjs'
 
 function normalizeEditableText(value, multiline = false) {
@@ -152,7 +152,6 @@ function ContractTableCell({
 export default function ProcessingContractPaper({
   paperRef = null,
   contract,
-  attachments = {},
   selectedLineIndex = null,
   lineSelectionMode = false,
   cellSelectionMode = false,
@@ -169,12 +168,6 @@ export default function ProcessingContractPaper({
     merges: contract?.merges,
   })
   const templateModesActive = lineSelectionMode || cellSelectionMode
-  const uploadedAttachments = processingContractAttachmentSlots
-    .map((slot) => ({
-      slot,
-      snapshot: attachments?.[slot.key],
-    }))
-    .filter(({ snapshot }) => Boolean(snapshot?.dataURL))
 
   return (
     <div className="erp-processing-contract-paper" ref={paperRef}>
@@ -261,32 +254,23 @@ export default function ProcessingContractPaper({
       <table className="erp-processing-contract-table">
         <colgroup>
           <col style={{ width: '11.5%' }} />
-          <col style={{ width: '11%' }} />
-          <col style={{ width: '8%' }} />
-          <col style={{ width: '8.5%' }} />
-          <col style={{ width: '9%' }} />
+          <col style={{ width: '10.5%' }} />
+          <col style={{ width: '10.5%' }} />
+          <col style={{ width: '10.5%' }} />
+          <col style={{ width: '7%' }} />
           <col style={{ width: '6.5%' }} />
-          <col style={{ width: '7.5%' }} />
+          <col style={{ width: '7%' }} />
+          <col style={{ width: '4%' }} />
           <col style={{ width: '4.5%' }} />
-          <col style={{ width: '6%' }} />
           <col style={{ width: '9.5%' }} />
           <col style={{ width: '10%' }} />
-          <col style={{ width: '8%' }} />
+          <col style={{ width: '8.5%' }} />
         </colgroup>
         <thead>
           <tr>
-            <th>委外加工订单号</th>
-            <th>产品订单编号</th>
-            <th>产品编号</th>
-            <th>产品名称</th>
-            <th>工序名称</th>
-            <th>加工厂商</th>
-            <th>工序类别</th>
-            <th>单位</th>
-            <th>单价</th>
-            <th>委托加工数量</th>
-            <th>委托加工金额</th>
-            <th>备注</th>
+            {PROCESSING_CONTRACT_TABLE_COLUMNS.map((column) => (
+              <th key={column.key}>{column.label}</th>
+            ))}
           </tr>
         </thead>
         <tbody>
@@ -524,22 +508,7 @@ export default function ProcessingContractPaper({
         </div>
       </section>
 
-      {uploadedAttachments.length > 0 ? (
-        <section className="erp-processing-contract-attachments">
-          {uploadedAttachments.map(({ slot, snapshot }) => (
-            <figure
-              key={slot.key}
-              className={`erp-processing-contract-attachments__item erp-processing-contract-attachments__item--${slot.key}`}
-            >
-              <img
-                className="erp-processing-contract-attachments__image"
-                src={snapshot.dataURL}
-                alt={snapshot.name || slot.title}
-              />
-            </figure>
-          ))}
-        </section>
-      ) : null}
+      <PrintAppendixImages images={contract.appendixImages} />
     </div>
   )
 }

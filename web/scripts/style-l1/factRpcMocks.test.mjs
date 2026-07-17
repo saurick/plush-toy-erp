@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import { installFactRpcMocks } from './factRpcMocks.mjs'
+import { createWorkflowSourceTaskFixture } from './workflowSourceTaskFixtures.mjs'
 
 function workflowScopes(roleKey, actions) {
   return Object.fromEntries(actions.map((action) => [action, [roleKey]]))
@@ -35,7 +36,8 @@ async function workflowMockHarness(
         'workflow.task.reject',
       ]),
     },
-  }
+  },
+  { workflowTaskFixtures = [], workflowSourceTaskProducerFixtures = [] } = {}
 ) {
   const handlers = new Map()
   const page = {
@@ -49,6 +51,8 @@ async function workflowMockHarness(
     effectiveSession: adminProfile?.effective_session || null,
     nowUnix: () => 1_750_000_000,
     resolveDelayFromReferer: () => 0,
+    workflowTaskFixtures,
+    workflowSourceTaskProducerFixtures,
   })
   const handler = handlers.get('**/rpc/workflow')
   assert.equal(typeof handler, 'function')
@@ -944,6 +948,107 @@ test('style-l1 workflow mock keeps explain_action_access params canonical', asyn
   }
 })
 
+test('style-l1 workflow mock rejects source-produced task groups and code namespaces', async () => {
+  const call = await workflowMockHarness()
+  for (const [taskGroup, taskCode] of [
+    ['production_scheduling', 'STYLE-L1-MANUAL-SCHEDULING'],
+    ['production_exception', 'STYLE-L1-MANUAL-EXCEPTION'],
+    ['shipment_release', 'STYLE-L1-MANUAL-SHIPMENT'],
+    ['trial_pmc_work', 'source-production-scheduling-71'],
+    ['trial_production_work', 'source-production-exception-81'],
+    ['trial_warehouse_work', 'source-shipment-release-92'],
+  ]) {
+    const rejected = await call('create_task', {
+      task_code: taskCode,
+      task_group: taskGroup,
+      task_name: '不允许手工伪造来源任务',
+      source_type: 'trial-workflow',
+      source_id: 1,
+      owner_role_key: 'warehouse',
+    })
+    assert.equal(rejected.result.code, 40010, `${taskGroup}/${taskCode}`)
+    assert.equal(
+      rejected.result.message,
+      '该类任务由业务单据自动生成，不能手工创建'
+    )
+  }
+  const listed = await call('list_tasks', { limit: 50, offset: 0 })
+  assert.equal(listed.result.code, 0)
+  assert.equal(listed.result.data.total, 0)
+})
+
+test('style-l1 workflow source task fixtures inject all formal producer contracts directly', async () => {
+  const fixtures = [
+    createWorkflowSourceTaskFixture({
+      taskGroup: 'production_scheduling',
+      sourceID: 71,
+      taskID: 971,
+      sourceNo: 'MO-STYLE-L1-71',
+      intentHash: '6'.repeat(64),
+    }),
+    createWorkflowSourceTaskFixture({
+      taskGroup: 'production_exception',
+      sourceID: 81,
+      taskID: 981,
+      sourceNo: 'RW-STYLE-L1-81',
+      intentHash: '7'.repeat(64),
+    }),
+    createWorkflowSourceTaskFixture({
+      taskGroup: 'shipment_release',
+      sourceID: 92,
+      taskID: 992,
+      sourceNo: 'SHIP-STYLE-L1-92',
+      intentHash: '8'.repeat(64),
+    }),
+  ]
+  const call = await workflowMockHarness(undefined, {
+    workflowTaskFixtures: fixtures,
+  })
+  const listed = await call('list_tasks', { limit: 50, offset: 0 })
+  assert.equal(listed.result.code, 0)
+  assert.equal(listed.result.data.total, 3)
+  assert.deepEqual(
+    listed.result.data.tasks.map((task) => ({
+      code: task.task_code,
+      group: task.task_group,
+      sourceType: task.source_type,
+      owner: task.owner_role_key,
+      contract: task.payload.source_task_contract,
+      producer: task.payload.source_task_producer,
+      intent: task.payload.source_task_intent_hash,
+    })),
+    [
+      {
+        code: 'source-production-scheduling-71',
+        group: 'production_scheduling',
+        sourceType: 'production-orders',
+        owner: 'pmc',
+        contract: 'workflow.source-task/v1',
+        producer: 'production_order.release',
+        intent: '6'.repeat(64),
+      },
+      {
+        code: 'source-production-exception-81',
+        group: 'production_exception',
+        sourceType: 'production-progress',
+        owner: 'production',
+        contract: 'workflow.source-task/v1',
+        producer: 'production_rework.post',
+        intent: '7'.repeat(64),
+      },
+      {
+        code: 'source-shipment-release-92',
+        group: 'shipment_release',
+        sourceType: 'shipments',
+        owner: 'warehouse',
+        contract: 'workflow.source-task/v1',
+        producer: 'shipment.submit_release',
+        intent: '8'.repeat(64),
+      },
+    ]
+  )
+})
+
 test('style-l1 workflow role task view mock applies role, view and cursor boundaries', async () => {
   const call = await workflowMockHarness()
   const createTask = (params) =>
@@ -1045,7 +1150,7 @@ test('style-l1 workflow mock serves the dedicated task board projection', async 
   for (let index = 1; index <= 10; index += 1) {
     const created = await call('create_task', {
       task_code: `STYLE-L1-BOARD-${index}`,
-      task_group: 'shipment_release',
+      task_group: 'trial_warehouse_work',
       task_name: `任务看板分页 ${index}`,
       source_type: 'shipping-release',
       source_id: index,

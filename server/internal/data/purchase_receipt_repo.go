@@ -452,6 +452,9 @@ func (r *inventoryRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.Purc
 	if !corestatus.CanAddPurchaseReceiptItem(receipt.Status) {
 		return nil, biz.ErrBadParam
 	}
+	if err := validatePurchaseReceiptAppendSource(ctx, tx.client, receipt, in.PurchaseOrderItemID); err != nil {
+		return nil, err
+	}
 	sequence, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).Count(ctx)
 	if err != nil {
 		return nil, err
@@ -1277,9 +1280,9 @@ func validatePurchaseReceiptReplayItemFactSet(
 	if inspection.InspectionNo != expectedInspectionNo ||
 		inspection.PurchaseReceiptID == nil || *inspection.PurchaseReceiptID != receiptID ||
 		inspection.PurchaseReceiptItemID == nil || *inspection.PurchaseReceiptItemID != item.ID ||
-		inspection.InventoryLotID != *item.LotID ||
+		inspection.InventoryLotID == nil || *inspection.InventoryLotID != *item.LotID ||
 		inspection.MaterialID == nil || *inspection.MaterialID != item.MaterialID ||
-		inspection.WarehouseID != item.WarehouseID ||
+		inspection.WarehouseID == nil || *inspection.WarehouseID != item.WarehouseID ||
 		inspection.SourceType == nil || *inspection.SourceType != biz.QualityInspectionSourcePurchaseReceipt ||
 		inspection.SourceID == nil || *inspection.SourceID != receiptID ||
 		inspection.InspectionType == nil || *inspection.InspectionType != biz.QualityInspectionTypeIncoming ||
@@ -1388,6 +1391,62 @@ func validatePurchaseReceiptItemReferences(ctx context.Context, client *ent.Clie
 	}
 	if lot.SubjectType != biz.InventorySubjectMaterial || lot.SubjectID != in.MaterialID {
 		return biz.ErrBadParam
+	}
+	return nil
+}
+
+func validatePurchaseReceiptAppendSource(
+	ctx context.Context,
+	client *ent.Client,
+	receipt *ent.PurchaseReceipt,
+	purchaseOrderItemID *int,
+) error {
+	// Source-less append is limited to non-public internal construction paths.
+	// Public JSON-RPC requires a purchase order line before it reaches this method.
+	if purchaseOrderItemID == nil {
+		return nil
+	}
+	if client == nil || receipt == nil || *purchaseOrderItemID <= 0 {
+		return biz.ErrBadParam
+	}
+
+	sourceItem, err := client.PurchaseOrderItem.Query().
+		Where(purchaseorderitem.ID(*purchaseOrderItemID)).
+		WithPurchaseOrder().
+		Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrPurchaseOrderItemNotFound
+		}
+		return err
+	}
+	sourceOrder, err := sourceItem.Edges.PurchaseOrderOrErr()
+	if err != nil {
+		return err
+	}
+	if receipt.SupplierID == nil ||
+		*receipt.SupplierID != sourceOrder.SupplierID {
+		return biz.ErrBadParam
+	}
+
+	existingSourceItems, err := client.PurchaseReceiptItem.Query().
+		Where(
+			purchasereceiptitem.ReceiptID(receipt.ID),
+			purchasereceiptitem.PurchaseOrderItemIDNotNil(),
+		).
+		WithPurchaseOrderItem().
+		All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, existingItem := range existingSourceItems {
+		existingSource, edgeErr := existingItem.Edges.PurchaseOrderItemOrErr()
+		if edgeErr != nil {
+			return edgeErr
+		}
+		if existingSource.PurchaseOrderID != sourceItem.PurchaseOrderID {
+			return biz.ErrBadParam
+		}
 	}
 	return nil
 }

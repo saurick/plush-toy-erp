@@ -26,6 +26,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
           'pmc.plan.update',
           'production.fact.read',
           'production.completion.create',
+          'production.wip.read',
         ],
       },
       effectiveSession: {
@@ -36,6 +37,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
           'pmc.plan.update',
           'production.fact.read',
           'production.completion.create',
+          'production.wip.read',
         ],
       },
       beforeNavigate: async (page) => {
@@ -65,7 +67,7 @@ export function createProductionSourceInboundLotScenarios(deps) {
         assert.equal(await releaseButton.isEnabled(), true)
         await releaseButton.click()
         await page.getByRole('button', { name: '确认发布' }).click()
-        await expectText(page, '生产订单发布成功')
+        await expectText(page, '生产订单已发布，排程任务已进入 PMC 待办')
 
         const completionButton = page.getByRole('button', {
           name: '登记完工入库',

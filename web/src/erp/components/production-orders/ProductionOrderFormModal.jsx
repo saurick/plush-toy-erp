@@ -6,7 +6,9 @@ import {
   Form,
   Input,
   Row,
+  Select,
   Space,
+  Switch,
   Table,
   Tag,
   Typography,
@@ -24,6 +26,7 @@ import {
   PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
   PRODUCTION_ORDER_STATUS,
 } from '../../utils/productionOrderModel.mjs'
+import { PRODUCTION_WIP_ROUTE_KEY } from '../../utils/productionWipModel.mjs'
 
 const { Text } = Typography
 
@@ -157,6 +160,7 @@ function RowReference({ field, form, optionsByType, readOnly }) {
   const productID = Form.useWatch(['items', index, 'product_id'], form)
   const skuID = Form.useWatch(['items', index, 'product_sku_id'], form)
   const unitID = Form.useWatch(['items', index, 'unit_id'], form)
+  const routeCode = Form.useWatch(['items', index, 'route_code'], form)
 
   const setRow = (patch) => {
     const items = [...(form.getFieldValue('items') || [])]
@@ -236,6 +240,38 @@ function RowReference({ field, form, optionsByType, readOnly }) {
                 bom_header_id: null,
               })
             }}
+          />
+        </Form.Item>
+      </Col>
+      <Col xs={24} md={16}>
+        <Form.Item
+          name={[field.name, 'route_code']}
+          label="生产路线"
+          rules={[{ required: true, message: '请选择生产路线' }]}
+          extra="发布后冻结为“布料加工 → 车缝 → 手工 → 包装”，车缝和手工分别决定本厂或外发。"
+        >
+          <Select
+            disabled={readOnly}
+            options={[
+              {
+                value: PRODUCTION_WIP_ROUTE_KEY,
+                label: '毛绒标准路线（先车缝、后手工）',
+              },
+            ]}
+          />
+        </Form.Item>
+      </Col>
+      <Col xs={24} md={8}>
+        <Form.Item
+          name={[field.name, 'customer_inspection_required']}
+          label="客户验货"
+          valuePropName="checked"
+          extra="仅订单明确要求时开启；不等同于系统验收。"
+        >
+          <Switch
+            disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_KEY}
+            checkedChildren="需要"
+            unCheckedChildren="不需要"
           />
         </Form.Item>
       </Col>
@@ -344,7 +380,7 @@ export default function ProductionOrderFormModal({
     <BusinessFormModal
       open={open}
       title={title}
-      description="生产订单字段只维护计划；发布后可从冻结的物料需求办理领料，领料草稿仍需在生产记录中核对过账。"
+      description="生产订单维护计划与工艺路线；发布后冻结路线和物料需求。工序办理、质量结论与正式入库分别记账。"
       icon={<ScheduleOutlined />}
       size="masterDataItems"
       confirmLoading={loading}
@@ -423,7 +459,12 @@ export default function ProductionOrderFormModal({
                   block
                   icon={<PlusOutlined />}
                   onClick={() =>
-                    add({ line_no: fields.length + 1, planned_quantity: '1' })
+                    add({
+                      line_no: fields.length + 1,
+                      planned_quantity: '1',
+                      route_code: PRODUCTION_WIP_ROUTE_KEY,
+                      customer_inspection_required: false,
+                    })
                   }
                 >
                   添加明细

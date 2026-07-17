@@ -14,9 +14,11 @@
 @import './app/processing-contract-print.css';
 @import './app/material-contract-print.css';
 @import './app/engineering-print.css';
+@import './app/print-appendix-images.css';
 @import './app/print-responsive.css';
 @import './app/business-modals.css';
 @import './app/business-attachments.css';
+@import './app/product-image-slots.css';
 @import './app/business-tables.css';
 @import './app/business-responsive.css';
 @import './app/theme-overrides.css';

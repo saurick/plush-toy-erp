@@ -27,20 +27,39 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		}
 		item, err := d.operationalFactUC.CreateShipmentDraftWithItems(ctx, in)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
+	case "submit_shipment_release":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
+			return id, res, nil
+		}
+		if !shipmentItemAllowsOnly(pm, "customer_key", "id") {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "workflow_tasks"); res != nil {
+			return id, res, nil
+		}
+		task, created, err := d.operationalFactUC.SubmitShipmentRelease(ctx, getInt(pm, "id", 0), actorID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		return id, okData(map[string]any{"workflow_task": workflowTaskToMap(task), "created": created}), nil
 	case "ship_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory", "workflow_tasks"); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.ShipShipment(ctx, getInt(pm, "id", 0))
+		shipmentID := getInt(pm, "id", 0)
+		if err := d.operationalFactUC.ValidateShipmentReleaseForShipping(ctx, shipmentID); err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		item, err := d.operationalFactUC.ShipShipmentWithActor(ctx, shipmentID, actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "cancel_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCancel); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory"); res != nil {
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "inventory", workflowModuleKeyTasks); res != nil {
 			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CancelShippedShipmentWithActor(ctx, getInt(pm, "id", 0), actorID)

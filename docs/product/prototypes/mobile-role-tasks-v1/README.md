@@ -19,8 +19,9 @@
 
 - 这批 PNG 已作为岗位任务端改版参考，真实实现入口已经落到 `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx`，且与早期 PNG 略有差异。
 - `implemented-reference.html` 用于记录真实页面吸收早期方向后的 as-built 形态。
+- 该 HTML 保持可直接在浏览器打开；脚本状态必须先于首屏内容初始化，不能让演示页因初始化顺序错误停在空白或半渲染状态。
 - 真实页面继续以运行时代码、自动化测试和浏览器回归结果为准，HTML 只作为可打开的设计参考。
-- 若后续要重新设计岗位任务端 v2，应基于当前真实页面和新目标重新做可交互 HTML 原型，而不是机械复刻历史 PNG。
+- 岗位任务中心的重新设计已单独进入 [`../mobile-role-tasks-v2/`](../mobile-role-tasks-v2/)；v2 保持 To Implement，不覆盖本目录的 Current 参考或历史 PNG。
 
 ## 边界
 

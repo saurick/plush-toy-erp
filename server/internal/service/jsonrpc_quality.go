@@ -4,12 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"strings"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/errcode"
 
+	"github.com/shopspring/decimal"
 	"google.golang.org/protobuf/types/known/structpb"
 )
 
@@ -60,8 +62,11 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
 			return id, res, nil
 		}
-		in := finishedGoodsQualityInspectionCreateFromParams(pm)
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
+		in, ok := finishedGoodsQualityInspectionCreateFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "quality_inspections"); res != nil {
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, in)
@@ -173,6 +178,27 @@ func (d *jsonrpcDispatcher) handleQuality(
 			"limit":               normalizedLimit(pm),
 			"offset":              normalizedOffset(pm),
 		}), nil
+	case "list_production_stage_quality_inspections":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
+			return id, res, nil
+		}
+		filter, ok := productionStageQualityInspectionFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders", "quality_inspections"); res != nil {
+			return id, res, nil
+		}
+		items, total, err := d.inventoryUC.ListProductionStageQualityInspections(ctx, filter)
+		if err != nil {
+			return id, d.mapQualityError(ctx, err), nil
+		}
+		return id, okData(map[string]any{
+			"quality_inspections": qualityInspectionsToAny(items),
+			"total":               total,
+			"limit":               normalizedLimit(pm),
+			"offset":              normalizedOffset(pm),
+		}), nil
 	default:
 		return id, &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知 quality 接口 method=%s", method)}, nil
 	}
@@ -201,45 +227,93 @@ func qualityInspectionFromOutsourcingReturnCreateFromParams(pm map[string]any) (
 	}, true
 }
 
-func finishedGoodsQualityInspectionCreateFromParams(pm map[string]any) *biz.QualityInspectionCreate {
-	sourceID := getInt(pm, "shipment_id", 0)
-	if sourceID <= 0 {
-		sourceID = getInt(pm, "source_id", 0)
-	}
-	lotID := getInt(pm, "finished_goods_lot_id", 0)
-	if lotID <= 0 {
-		lotID = getInt(pm, "inventory_lot_id", 0)
-	}
-	subjectID := getInt(pm, "product_id", 0)
-	if subjectID <= 0 {
-		subjectID = getInt(pm, "subject_id", 0)
+func finishedGoodsQualityInspectionCreateFromParams(pm map[string]any) (*biz.QualityInspectionCreate, bool) {
+	if !jsonRPCParamsAllowed(
+		pm,
+		"customer_key",
+		"inspection_no",
+		"shipment_id",
+		"finished_goods_lot_id",
+		"product_id",
+		"warehouse_id",
+		"decision_note",
+	) {
+		return nil, false
 	}
 	return &biz.QualityInspectionCreate{
 		InspectionNo:   getString(pm, "inspection_no"),
-		InventoryLotID: lotID,
+		InventoryLotID: getInt(pm, "finished_goods_lot_id", 0),
 		WarehouseID:    getInt(pm, "warehouse_id", 0),
 		SourceType:     biz.QualityInspectionSourceShipment,
-		SourceID:       sourceID,
+		SourceID:       getInt(pm, "shipment_id", 0),
 		InspectionType: biz.QualityInspectionTypeFinishedGoods,
 		SubjectType:    biz.QualityInspectionSubjectProduct,
-		SubjectID:      subjectID,
-		InspectorID:    getOptionalInt(pm, "inspector_id"),
+		SubjectID:      getInt(pm, "product_id", 0),
 		DecisionNote:   getWorkflowStringPtr(pm, "decision_note"),
-	}
+	}, true
 }
 
 func qualityInspectionDecisionFromParams(pm map[string]any) (*biz.QualityInspectionDecision, bool) {
+	if !jsonRPCParamsAllowed(pm,
+		"customer_key",
+		"id",
+		"result",
+		"inspected_at",
+		"inspector_id",
+		"defect_rate_operator",
+		"defect_rate_percent",
+		"decision_note",
+	) {
+		return nil, false
+	}
 	inspectedAt, ok := getOptionalJSONRPCTime(pm, "inspected_at")
 	if !ok {
 		return nil, false
 	}
+	defectRateOperator, defectRatePercent, ok := qualityInspectionDefectRateFromParams(pm)
+	if !ok {
+		return nil, false
+	}
 	return &biz.QualityInspectionDecision{
-		InspectionID: getInt(pm, "id", 0),
-		Result:       getString(pm, "result"),
-		InspectedAt:  optionalTimeValue(inspectedAt),
-		InspectorID:  getOptionalInt(pm, "inspector_id"),
-		DecisionNote: getWorkflowStringPtr(pm, "decision_note"),
+		InspectionID:       getInt(pm, "id", 0),
+		Result:             getString(pm, "result"),
+		InspectedAt:        optionalTimeValue(inspectedAt),
+		InspectorID:        getOptionalInt(pm, "inspector_id"),
+		DefectRateOperator: defectRateOperator,
+		DefectRatePercent:  defectRatePercent,
+		DecisionNote:       getWorkflowStringPtr(pm, "decision_note"),
 	}, true
+}
+
+func qualityInspectionDefectRateFromParams(pm map[string]any) (*string, *decimal.Decimal, bool) {
+	operatorRaw, operatorPresent := pm["defect_rate_operator"]
+	if operatorPresent && operatorRaw == nil {
+		operatorPresent = false
+	}
+	percentRaw, percentPresent := pm["defect_rate_percent"]
+	if percentPresent && percentRaw == nil {
+		percentPresent = false
+	}
+	if !operatorPresent && !percentPresent {
+		return nil, nil, true
+	}
+	if !operatorPresent || !percentPresent {
+		return nil, nil, false
+	}
+	operatorText, ok := operatorRaw.(string)
+	if !ok {
+		return nil, nil, false
+	}
+	operatorText = strings.ToUpper(strings.TrimSpace(operatorText))
+	if operatorText == "" {
+		return nil, nil, false
+	}
+	percent, ok := getOptionalJSONRPCDecimalString(pm, "defect_rate_percent")
+	if !ok || percent == nil {
+		return nil, nil, false
+	}
+	operator, normalizedPercent, err := biz.NormalizeQualityInspectionDefectRate(&operatorText, percent, true)
+	return operator, normalizedPercent, err == nil
 }
 
 func qualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
@@ -317,6 +391,43 @@ func outsourcingReturnQualityInspectionFilterFromParams(pm map[string]any) (biz.
 	}, true
 }
 
+func productionStageQualityInspectionFilterFromParams(pm map[string]any) (biz.QualityInspectionFilter, bool) {
+	if !jsonRPCParamsAllowed(
+		pm,
+		"customer_key",
+		"status",
+		"result",
+		"keyword",
+		"production_wip_batch_id",
+		"gate_code",
+		"date_from",
+		"date_to",
+		"limit",
+		"offset",
+	) {
+		return biz.QualityInspectionFilter{}, false
+	}
+	dateFrom, ok := getOptionalJSONRPCTime(pm, "date_from")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
+	dateTo, ok := getOptionalJSONRPCTime(pm, "date_to")
+	if !ok {
+		return biz.QualityInspectionFilter{}, false
+	}
+	return biz.QualityInspectionFilter{
+		Status:               getString(pm, "status"),
+		Result:               getString(pm, "result"),
+		Keyword:              getString(pm, "keyword"),
+		ProductionWIPBatchID: getInt(pm, "production_wip_batch_id", 0),
+		GateCode:             getString(pm, "gate_code"),
+		DateFrom:             dateFrom,
+		DateTo:               dateTo,
+		Limit:                getInt(pm, "limit", 50),
+		Offset:               getInt(pm, "offset", 0),
+	}, true
+}
+
 func qualityInspectionResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.QualityInspection, err error) *v1.JsonrpcResult {
 	if err != nil {
 		return d.mapQualityError(ctx, err)
@@ -330,11 +441,19 @@ func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.
 	case errors.Is(err, biz.ErrIdempotencyConflict):
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
 	case errors.Is(err, biz.ErrQualityInspectionSourceConflict):
-		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该委外回货已存在未取消的质检单"}
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该业务来源已存在未取消的质检单"}
 	case errors.Is(err, biz.ErrQualityInspectionSourceInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "质检来源与业务记录不一致，请刷新来源后重试"}
 	case errors.Is(err, biz.ErrQualityInspectionSourceState):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源业务记录当前状态不允许发起质检"}
+	case errors.Is(err, biz.ErrProductionWIPInvalidRoute):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产路线或质量关口不完整，请刷新生产订单后核对"}
+	case errors.Is(err, biz.ErrProductionWIPInvalidTransition):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "当前在制批次状态已变化，不能重复办理该质量关口，请刷新后重试"}
+	case errors.Is(err, biz.ErrProductionWIPQualityGateIncomplete):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "前置质量关口尚未通过，不能越级办理当前检验"}
+	case errors.Is(err, biz.ErrShipmentReleaseAlreadySubmitted):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已提交放行，不能再新增出货前检验"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[quality] invalid param err=%v", err)
 		return invalidParamResult()
@@ -346,6 +465,8 @@ func (d *jsonrpcDispatcher) mapQualityError(ctx context.Context, err error) *v1.
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库行不存在"}
 	case errors.Is(err, biz.ErrOutsourcingFactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货记录不存在"}
+	case errors.Is(err, biz.ErrShipmentNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货单不存在"}
 	case errors.Is(err, biz.ErrInventoryLotNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存批次不存在"}
 	case errors.Is(err, biz.ErrInventoryLotStatusBlocked):
@@ -375,9 +496,11 @@ func qualityInspectionToAny(item *biz.QualityInspection) map[string]any {
 		"inspection_no":            item.InspectionNo,
 		"purchase_receipt_id":      positiveIntToAny(item.PurchaseReceiptID),
 		"purchase_receipt_item_id": optionalIntToAny(item.PurchaseReceiptItemID),
-		"inventory_lot_id":         item.InventoryLotID,
+		"inventory_lot_id":         positiveIntToAny(item.InventoryLotID),
+		"production_wip_batch_id":  optionalIntToAny(item.ProductionWIPBatchID),
+		"gate_code":                optionalStringToAny(item.GateCode),
 		"material_id":              positiveIntToAny(item.MaterialID),
-		"warehouse_id":             item.WarehouseID,
+		"warehouse_id":             positiveIntToAny(item.WarehouseID),
 		"source_type":              optionalStringToAny(item.SourceType),
 		"source_id":                optionalIntToAny(item.SourceID),
 		"source_no":                optionalStringToAny(item.SourceNo),
@@ -389,7 +512,17 @@ func qualityInspectionToAny(item *biz.QualityInspection) map[string]any {
 		"original_lot_status":      item.OriginalLotStatus,
 		"inspected_at":             optionalUnix(item.InspectedAt),
 		"inspector_id":             optionalIntToAny(item.InspectorID),
+		"defect_rate_operator":     optionalStringToAny(item.DefectRateOperator),
+		"defect_rate_percent":      optionalDecimalString(item.DefectRatePercent),
 		"decision_note":            optionalStringToAny(item.DecisionNote),
+		"production_order_no":      optionalStringToAny(item.ProductionOrderNo),
+		"production_order_item_id": optionalIntToAny(item.ProductionOrderItemID),
+		"product_code":             optionalStringToAny(item.ProductCode),
+		"product_name":             optionalStringToAny(item.ProductName),
+		"operation_code":           optionalStringToAny(item.OperationCode),
+		"operation_name":           optionalStringToAny(item.OperationName),
+		"wip_batch_no":             optionalStringToAny(item.WIPBatchNo),
+		"batch_quantity":           optionalDecimalString(item.BatchQuantity),
 		"created_at":               item.CreatedAt.Unix(),
 		"updated_at":               item.UpdatedAt.Unix(),
 	}

@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"time"
@@ -179,6 +180,20 @@ func (_c *OutsourcingOrderItemCreate) SetMaterialNameSnapshot(v string) *Outsour
 func (_c *OutsourcingOrderItemCreate) SetNillableMaterialNameSnapshot(v *string) *OutsourcingOrderItemCreate {
 	if v != nil {
 		_c.SetMaterialNameSnapshot(*v)
+	}
+	return _c
+}
+
+// SetProcessingItem sets the "processing_item" field.
+func (_c *OutsourcingOrderItemCreate) SetProcessingItem(v string) *OutsourcingOrderItemCreate {
+	_c.mutation.SetProcessingItem(v)
+	return _c
+}
+
+// SetNillableProcessingItem sets the "processing_item" field if the given value is not nil.
+func (_c *OutsourcingOrderItemCreate) SetNillableProcessingItem(v *string) *OutsourcingOrderItemCreate {
+	if v != nil {
+		_c.SetProcessingItem(*v)
 	}
 	return _c
 }
@@ -359,6 +374,21 @@ func (_c *OutsourcingOrderItemCreate) SetUnit(v *Unit) *OutsourcingOrderItemCrea
 	return _c.SetUnitID(v.ID)
 }
 
+// AddProductionWipOutsourcingAllocationIDs adds the "production_wip_outsourcing_allocations" edge to the ProductionWIPOutsourcingAllocation entity by IDs.
+func (_c *OutsourcingOrderItemCreate) AddProductionWipOutsourcingAllocationIDs(ids ...int) *OutsourcingOrderItemCreate {
+	_c.mutation.AddProductionWipOutsourcingAllocationIDs(ids...)
+	return _c
+}
+
+// AddProductionWipOutsourcingAllocations adds the "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_c *OutsourcingOrderItemCreate) AddProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *OutsourcingOrderItemCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductionWipOutsourcingAllocationIDs(ids...)
+}
+
 // Mutation returns the OutsourcingOrderItemMutation object of the builder.
 func (_c *OutsourcingOrderItemCreate) Mutation() *OutsourcingOrderItemMutation {
 	return _c.mutation
@@ -495,6 +525,11 @@ func (_c *OutsourcingOrderItemCreate) check() error {
 			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ProcessingItem(); ok {
+		if err := outsourcingorderitem.ProcessingItemValidator(v); err != nil {
+			return &ValidationError{Name: "processing_item", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.processing_item": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.ProcessNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProcessNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "process_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.process_name_snapshot": %w`, err)}
@@ -598,6 +633,10 @@ func (_c *OutsourcingOrderItemCreate) createSpec() (*OutsourcingOrderItem, *sqlg
 	if value, ok := _c.mutation.MaterialNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString, value)
 		_node.MaterialNameSnapshot = &value
+	}
+	if value, ok := _c.mutation.ProcessingItem(); ok {
+		_spec.SetField(outsourcingorderitem.FieldProcessingItem, field.TypeString, value)
+		_node.ProcessingItem = &value
 	}
 	if value, ok := _c.mutation.ProcessNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProcessNameSnapshot, field.TypeString, value)
@@ -743,6 +782,22 @@ func (_c *OutsourcingOrderItemCreate) createSpec() (*OutsourcingOrderItem, *sqlg
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.UnitID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

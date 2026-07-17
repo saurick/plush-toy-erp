@@ -22,6 +22,8 @@ const (
 	FieldShortName = "short_name"
 	// FieldSupplierType holds the string denoting the supplier_type field in the database.
 	FieldSupplierType = "supplier_type"
+	// FieldAddress holds the string denoting the address field in the database.
+	FieldAddress = "address"
 	// FieldTaxNo holds the string denoting the tax_no field in the database.
 	FieldTaxNo = "tax_no"
 	// FieldIsActive holds the string denoting the is_active field in the database.
@@ -38,6 +40,8 @@ const (
 	EdgePurchaseReceipts = "purchase_receipts"
 	// EdgeOutsourcingOrders holds the string denoting the outsourcing_orders edge name in mutations.
 	EdgeOutsourcingOrders = "outsourcing_orders"
+	// EdgeProcessCapabilities holds the string denoting the process_capabilities edge name in mutations.
+	EdgeProcessCapabilities = "process_capabilities"
 	// Table holds the table name of the supplier in the database.
 	Table = "suppliers"
 	// PurchaseOrdersTable is the table that holds the purchase_orders relation/edge.
@@ -61,6 +65,11 @@ const (
 	OutsourcingOrdersInverseTable = "outsourcing_orders"
 	// OutsourcingOrdersColumn is the table column denoting the outsourcing_orders relation/edge.
 	OutsourcingOrdersColumn = "supplier_id"
+	// ProcessCapabilitiesTable is the table that holds the process_capabilities relation/edge. The primary key declared below.
+	ProcessCapabilitiesTable = "supplier_process_capabilities"
+	// ProcessCapabilitiesInverseTable is the table name for the Process entity.
+	// It exists in this package in order to avoid circular dependency with the "process" package.
+	ProcessCapabilitiesInverseTable = "processes"
 )
 
 // Columns holds all SQL columns for supplier fields.
@@ -70,12 +79,19 @@ var Columns = []string{
 	FieldName,
 	FieldShortName,
 	FieldSupplierType,
+	FieldAddress,
 	FieldTaxNo,
 	FieldIsActive,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
+
+var (
+	// ProcessCapabilitiesPrimaryKey and ProcessCapabilitiesColumn2 are the table columns denoting the
+	// primary key for the process_capabilities relation (M2M).
+	ProcessCapabilitiesPrimaryKey = []string{"supplier_id", "process_id"}
+)
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
@@ -96,6 +112,8 @@ var (
 	ShortNameValidator func(string) error
 	// SupplierTypeValidator is a validator for the "supplier_type" field. It is called by the builders before save.
 	SupplierTypeValidator func(string) error
+	// AddressValidator is a validator for the "address" field. It is called by the builders before save.
+	AddressValidator func(string) error
 	// TaxNoValidator is a validator for the "tax_no" field. It is called by the builders before save.
 	TaxNoValidator func(string) error
 	// DefaultIsActive holds the default value on creation for the "is_active" field.
@@ -136,6 +154,11 @@ func ByShortName(opts ...sql.OrderTermOption) OrderOption {
 // BySupplierType orders the results by the supplier_type field.
 func BySupplierType(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSupplierType, opts...).ToFunc()
+}
+
+// ByAddress orders the results by the address field.
+func ByAddress(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldAddress, opts...).ToFunc()
 }
 
 // ByTaxNo orders the results by the tax_no field.
@@ -204,6 +227,20 @@ func ByOutsourcingOrders(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption
 		sqlgraph.OrderByNeighborTerms(s, newOutsourcingOrdersStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByProcessCapabilitiesCount orders the results by process_capabilities count.
+func ByProcessCapabilitiesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProcessCapabilitiesStep(), opts...)
+	}
+}
+
+// ByProcessCapabilities orders the results by process_capabilities terms.
+func ByProcessCapabilities(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProcessCapabilitiesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newPurchaseOrdersStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -223,5 +260,12 @@ func newOutsourcingOrdersStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(OutsourcingOrdersInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingOrdersTable, OutsourcingOrdersColumn),
+	)
+}
+func newProcessCapabilitiesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProcessCapabilitiesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, false, ProcessCapabilitiesTable, ProcessCapabilitiesPrimaryKey...),
 	)
 }

@@ -28,6 +28,10 @@ import {
   validateProductionReworkResult,
 } from '../utils/productionReworkAction.mjs'
 import {
+  normalizeShipmentReleaseTaskRequest,
+  validateShipmentReleaseTaskResult,
+} from '../utils/workflowSourceTask.mjs'
+import {
   OUTSOURCING_SOURCE_ACTIONS,
   normalizeOutsourcingSourceFactCreateRequest,
   validateOutsourcingSourceFactResult,
@@ -130,8 +134,7 @@ export async function listAllOutsourcingFacts(params = {}, options = {}) {
     'outsourcing_facts',
     options,
     {
-      invalidResponseMessage:
-        '服务器返回的委外业务记录不完整，请刷新后重试',
+      invalidResponseMessage: '服务器返回的委外业务记录不完整，请刷新后重试',
     }
   )
 }
@@ -202,6 +205,15 @@ export async function createShipmentWithItems(params = {}) {
     params
   )
   return dataOf(result)?.shipment || null
+}
+
+export async function submitShipmentRelease(params = {}) {
+  const request = normalizeShipmentReleaseTaskRequest(params)
+  const result = await operationalFactRpc.call(
+    'submit_shipment_release',
+    request
+  )
+  return validateShipmentReleaseTaskResult(dataOf(result), request)
 }
 
 export async function shipShipment(params = {}) {

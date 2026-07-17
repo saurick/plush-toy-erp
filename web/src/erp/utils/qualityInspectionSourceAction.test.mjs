@@ -4,6 +4,7 @@ import test from 'node:test'
 import {
   buildOutsourcingReturnQualityInspectionPayload,
   buildPurchaseReturnFromQualityInspectionPayload,
+  canCreatePurchaseReturnFromRejectedInspection,
   groupOutsourcingReturnQualityInspections,
   isMatchingOutsourcingReturnQualityInspection,
   isPostedOutsourcingReturn,
@@ -80,10 +81,7 @@ test('outsourcing return quality result and related-record grouping stay source-
 
 test('outsourcing return payable quality gate matches the backend active inspection rule', () => {
   const pending = resolveOutsourcingReturnQualityGate([])
-  assert.equal(
-    pending.state,
-    OUTSOURCING_RETURN_QUALITY_GATE_STATES.PENDING
-  )
+  assert.equal(pending.state, OUTSOURCING_RETURN_QUALITY_GATE_STATES.PENDING)
   assert.equal(pending.label, '待发起质检')
 
   for (const [status, result, label] of [
@@ -109,10 +107,7 @@ test('outsourcing return payable quality gate matches the backend active inspect
   const rejected = resolveOutsourcingReturnQualityGate([
     { status: 'REJECTED', result: 'REJECT' },
   ])
-  assert.equal(
-    rejected.state,
-    OUTSOURCING_RETURN_QUALITY_GATE_STATES.REJECTED
-  )
+  assert.equal(rejected.state, OUTSOURCING_RETURN_QUALITY_GATE_STATES.REJECTED)
   assert.equal(rejected.label, '质检不合格')
 
   const cancelledOnly = resolveOutsourcingReturnQualityGate([
@@ -126,10 +121,7 @@ test('outsourcing return payable quality gate matches the backend active inspect
     { status: 'PASSED', result: 'PASS' },
     { status: 'SUBMITTED', result: '' },
   ])
-  assert.equal(
-    ambiguous.state,
-    OUTSOURCING_RETURN_QUALITY_GATE_STATES.PENDING
-  )
+  assert.equal(ambiguous.state, OUTSOURCING_RETURN_QUALITY_GATE_STATES.PENDING)
   assert.equal(ambiguous.label, '质检状态待核对')
 })
 
@@ -187,6 +179,27 @@ test('quality rejection return eligibility and business fields are strict', () =
   assert.equal(isRejectedIncomingInspection({ ...base, result: 'PASS' }), false)
   assert.equal(
     isRejectedIncomingInspection({ ...base, source_type: 'OUTSOURCING_FACT' }),
+    false
+  )
+  assert.equal(
+    canCreatePurchaseReturnFromRejectedInspection(base, {
+      id: 61,
+      status: 'POSTED',
+    }),
+    true
+  )
+  assert.equal(
+    canCreatePurchaseReturnFromRejectedInspection(base, {
+      id: 61,
+      status: 'DRAFT',
+    }),
+    false
+  )
+  assert.equal(
+    canCreatePurchaseReturnFromRejectedInspection(base, {
+      id: 999,
+      status: 'POSTED',
+    }),
     false
   )
   assert.throws(() =>

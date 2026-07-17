@@ -253,6 +253,21 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
 
   assert.deepEqual(
     buildMasterDataParams({
+      code: ' SUP-001 ',
+      name: ' 加工厂 ',
+      address: ' 测试工业园 1 号 ',
+      process_ids: ['3', 5],
+    }),
+    {
+      code: 'SUP-001',
+      name: '加工厂',
+      address: '测试工业园 1 号',
+      process_ids: [3, 5],
+    }
+  )
+
+  assert.deepEqual(
+    buildMasterDataParams({
       code: ' MAT001 ',
       name: ' 面料 ',
       category: ' fabric ',
@@ -592,7 +607,7 @@ test('masterDataOrderView: payment condition options keep zero-day defaults and 
   )
 })
 
-test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDataOrderView: 加工对象切换不保留上一个主体残值', () => {
+test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDataOrderView: 加工对象切换清理主体残值但保留独立来源订单号', () => {
   assert.deepEqual(createBlankOutsourcingLine(3), {
     line_no: 3,
     subject_type: OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT,
@@ -607,6 +622,7 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
     product_name_snapshot: '',
     material_code_snapshot: '',
     material_name_snapshot: '',
+    processing_item: '',
     process_name_snapshot: '',
     process_category_snapshot: '',
     unit_name_snapshot: '',
@@ -624,7 +640,6 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
     material_id: undefined,
     product_no_snapshot: '',
     sku_code_snapshot: '',
-    product_order_no_snapshot: '',
     product_name_snapshot: '',
     material_code_snapshot: '',
     material_name_snapshot: '',
@@ -649,7 +664,6 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
       material_id: undefined,
       product_no_snapshot: 'PROD-012',
       sku_code_snapshot: '',
-      product_order_no_snapshot: '',
       product_name_snapshot: '玩具熊半成品',
       material_code_snapshot: '',
       material_name_snapshot: '',
@@ -705,7 +719,6 @@ test('FL_outsourcing_subject_switch__clears_other_subject_and_snapshots masterDa
       material_id: 18,
       product_no_snapshot: '',
       sku_code_snapshot: '',
-      product_order_no_snapshot: '',
       product_name_snapshot: '',
       material_code_snapshot: 'MAT-018',
       material_name_snapshot: '短毛绒布',
@@ -728,6 +741,7 @@ test('FL_outsourcing_subject_echo__uses_migrated_subject_type masterDataOrderVie
       product_name_snapshot: '玩具熊半成品',
       material_code_snapshot: 'STALE-MAT',
       material_name_snapshot: '残留材料',
+      processing_item: '脸*1',
       process_id: 5,
       unit_id: 2,
       outsourcing_quantity: '10',
@@ -751,6 +765,7 @@ test('FL_outsourcing_subject_echo__uses_migrated_subject_type masterDataOrderVie
       product_name_snapshot: '玩具熊半成品',
       material_code_snapshot: '',
       material_name_snapshot: '',
+      processing_item: '脸*1',
       process_name_snapshot: '',
       process_category_snapshot: '',
       unit_name_snapshot: '',
@@ -769,17 +784,21 @@ test('FL_outsourcing_subject_echo__uses_migrated_subject_type masterDataOrderVie
     material_id: 18,
     product_no_snapshot: 'STALE-PRODUCT',
     product_name_snapshot: '残留产品',
+    product_order_no_snapshot: 'SO-MATERIAL-001',
     material_code_snapshot: 'MAT-018',
     material_name_snapshot: '短毛绒布',
+    processing_item: '复合面料',
   })
   assert.equal(materialLine.product_id, undefined)
   assert.equal(materialLine.product_sku_id, undefined)
   assert.equal(materialLine.product_no_snapshot, '')
   assert.equal(materialLine.sku_code_snapshot, '')
   assert.equal(materialLine.product_name_snapshot, '')
+  assert.equal(materialLine.product_order_no_snapshot, 'SO-MATERIAL-001')
   assert.equal(materialLine.material_id, 18)
   assert.equal(materialLine.material_code_snapshot, 'MAT-018')
   assert.equal(materialLine.material_name_snapshot, '短毛绒布')
+  assert.equal(materialLine.processing_item, '复合面料')
 })
 
 test('FL_outsourcing_subject_payload__serializes_exactly_one_subject masterDataOrderView: 加工保存只提交当前主体且金额由后端核算', () => {
@@ -790,10 +809,11 @@ test('FL_outsourcing_subject_payload__serializes_exactly_one_subject masterDataO
       product_id: 12,
       material_id: 18,
       product_no_snapshot: 'STALE-PRODUCT',
-      product_order_no_snapshot: 'STALE-ORDER',
+      product_order_no_snapshot: ' SO-MATERIAL-001 ',
       product_name_snapshot: '残留产品',
       material_code_snapshot: ' MAT-018 ',
       material_name_snapshot: ' 短毛绒布 ',
+      processing_item: ' 复合面料 ',
       process_id: 6,
       unit_id: 4,
       outsourcing_quantity: '20',
@@ -806,8 +826,10 @@ test('FL_outsourcing_subject_payload__serializes_exactly_one_subject masterDataO
       material_id: 18,
       process_id: 6,
       unit_id: 4,
+      product_order_no_snapshot: 'SO-MATERIAL-001',
       material_code_snapshot: 'MAT-018',
       material_name_snapshot: '短毛绒布',
+      processing_item: '复合面料',
       outsourcing_quantity: '20',
       unit_price: '2.5',
     }
@@ -821,6 +843,7 @@ test('FL_outsourcing_subject_payload__serializes_exactly_one_subject masterDataO
       material_id: 18,
       product_no_snapshot: ' PROD-012 ',
       product_name_snapshot: ' 玩具熊半成品 ',
+      processing_item: ' 脸*1 ',
       material_code_snapshot: 'STALE-MAT',
       material_name_snapshot: '残留材料',
       process_id: 5,
@@ -835,6 +858,7 @@ test('FL_outsourcing_subject_payload__serializes_exactly_one_subject masterDataO
       unit_id: 2,
       product_no_snapshot: 'PROD-012',
       product_name_snapshot: '玩具熊半成品',
+      processing_item: '脸*1',
       outsourcing_quantity: '10',
     }
   )
@@ -2134,7 +2158,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
   }
 
   for (const visibleText of [
-    '加工内容类型',
+    '加工品类',
     '产品 / 半成品（车缝、手工等）',
     '材料（布料加工等）',
     '金额预览',
@@ -2150,6 +2174,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
     'product_name_snapshot',
     'material_code_snapshot',
     'material_name_snapshot',
+    'processing_item',
   ]) {
     assert.match(formSource, new RegExp(`'${fieldName}'`, 'u'))
   }
@@ -2157,6 +2182,30 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
   assert.match(formSource, /key="material-source"/u)
   assert.match(formSource, /<Input\s+readOnly/u)
   assert.doesNotMatch(formSource, /name=\{\[field\.name, 'amount'\]\}/u)
+  assert.match(
+    pageSource,
+    /label: '来源产品订单编号',\s*value: item\?\.product_order_no_snapshot,\s*\},\s*\.\.\.\(isMaterial/u
+  )
+})
+
+test('FL_supplier_processing_profile__wires_address_and_process_capabilities masterDataOrderView: 供应商资料显式维护地址与可加工工序', () => {
+  const pageSource = readERPSource('../pages/V1MasterDataPage.jsx')
+  const formSource = readERPSource(
+    '../components/master-data/MasterDataForm.jsx'
+  )
+  const columnsSource = readERPSource(
+    '../components/master-data/masterDataColumns.jsx'
+  )
+
+  assert.match(pageSource, /加载可加工工序/u)
+  assert.match(pageSource, /supplierProcessOptions/u)
+  assert.match(formSource, /label="经营 \/ 加工地址"/u)
+  assert.match(formSource, /name="address"/u)
+  assert.match(formSource, /label="可加工工序"/u)
+  assert.match(formSource, /name="process_ids"/u)
+  assert.match(formSource, /具体订单仍需逐行选择工序/u)
+  assert.match(columnsSource, /dataIndex: 'address'/u)
+  assert.match(columnsSource, /dataIndex: 'process_ids'/u)
 })
 
 test('FL_sales_order_source_no__retains_customer_order_no_snapshot masterDataOrderView: sales order params retain customer source no', () => {

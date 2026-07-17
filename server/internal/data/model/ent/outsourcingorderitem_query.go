@@ -4,6 +4,7 @@ package ent
 
 import (
 	"context"
+	"database/sql/driver"
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/material"
@@ -12,6 +13,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 
@@ -24,16 +26,17 @@ import (
 // OutsourcingOrderItemQuery is the builder for querying OutsourcingOrderItem entities.
 type OutsourcingOrderItemQuery struct {
 	config
-	ctx                  *QueryContext
-	order                []outsourcingorderitem.OrderOption
-	inters               []Interceptor
-	predicates           []predicate.OutsourcingOrderItem
-	withOutsourcingOrder *OutsourcingOrderQuery
-	withProduct          *ProductQuery
-	withProductSku       *ProductSKUQuery
-	withMaterial         *MaterialQuery
-	withProcess          *ProcessQuery
-	withUnit             *UnitQuery
+	ctx                                     *QueryContext
+	order                                   []outsourcingorderitem.OrderOption
+	inters                                  []Interceptor
+	predicates                              []predicate.OutsourcingOrderItem
+	withOutsourcingOrder                    *OutsourcingOrderQuery
+	withProduct                             *ProductQuery
+	withProductSku                          *ProductSKUQuery
+	withMaterial                            *MaterialQuery
+	withProcess                             *ProcessQuery
+	withUnit                                *UnitQuery
+	withProductionWipOutsourcingAllocations *ProductionWIPOutsourcingAllocationQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -195,6 +198,28 @@ func (_q *OutsourcingOrderItemQuery) QueryUnit() *UnitQuery {
 			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, selector),
 			sqlgraph.To(unit.Table, unit.FieldID),
 			sqlgraph.Edge(sqlgraph.M2O, true, outsourcingorderitem.UnitTable, outsourcingorderitem.UnitColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProductionWipOutsourcingAllocations chains the current query on the "production_wip_outsourcing_allocations" edge.
+func (_q *OutsourcingOrderItemQuery) QueryProductionWipOutsourcingAllocations() *ProductionWIPOutsourcingAllocationQuery {
+	query := (&ProductionWIPOutsourcingAllocationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(outsourcingorderitem.Table, outsourcingorderitem.FieldID, selector),
+			sqlgraph.To(productionwipoutsourcingallocation.Table, productionwipoutsourcingallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, outsourcingorderitem.ProductionWipOutsourcingAllocationsTable, outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -389,17 +414,18 @@ func (_q *OutsourcingOrderItemQuery) Clone() *OutsourcingOrderItemQuery {
 		return nil
 	}
 	return &OutsourcingOrderItemQuery{
-		config:               _q.config,
-		ctx:                  _q.ctx.Clone(),
-		order:                append([]outsourcingorderitem.OrderOption{}, _q.order...),
-		inters:               append([]Interceptor{}, _q.inters...),
-		predicates:           append([]predicate.OutsourcingOrderItem{}, _q.predicates...),
-		withOutsourcingOrder: _q.withOutsourcingOrder.Clone(),
-		withProduct:          _q.withProduct.Clone(),
-		withProductSku:       _q.withProductSku.Clone(),
-		withMaterial:         _q.withMaterial.Clone(),
-		withProcess:          _q.withProcess.Clone(),
-		withUnit:             _q.withUnit.Clone(),
+		config:                                  _q.config,
+		ctx:                                     _q.ctx.Clone(),
+		order:                                   append([]outsourcingorderitem.OrderOption{}, _q.order...),
+		inters:                                  append([]Interceptor{}, _q.inters...),
+		predicates:                              append([]predicate.OutsourcingOrderItem{}, _q.predicates...),
+		withOutsourcingOrder:                    _q.withOutsourcingOrder.Clone(),
+		withProduct:                             _q.withProduct.Clone(),
+		withProductSku:                          _q.withProductSku.Clone(),
+		withMaterial:                            _q.withMaterial.Clone(),
+		withProcess:                             _q.withProcess.Clone(),
+		withUnit:                                _q.withUnit.Clone(),
+		withProductionWipOutsourcingAllocations: _q.withProductionWipOutsourcingAllocations.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -469,6 +495,17 @@ func (_q *OutsourcingOrderItemQuery) WithUnit(opts ...func(*UnitQuery)) *Outsour
 		opt(query)
 	}
 	_q.withUnit = query
+	return _q
+}
+
+// WithProductionWipOutsourcingAllocations tells the query-builder to eager-load the nodes that are connected to
+// the "production_wip_outsourcing_allocations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *OutsourcingOrderItemQuery) WithProductionWipOutsourcingAllocations(opts ...func(*ProductionWIPOutsourcingAllocationQuery)) *OutsourcingOrderItemQuery {
+	query := (&ProductionWIPOutsourcingAllocationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProductionWipOutsourcingAllocations = query
 	return _q
 }
 
@@ -550,13 +587,14 @@ func (_q *OutsourcingOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryH
 	var (
 		nodes       = []*OutsourcingOrderItem{}
 		_spec       = _q.querySpec()
-		loadedTypes = [6]bool{
+		loadedTypes = [7]bool{
 			_q.withOutsourcingOrder != nil,
 			_q.withProduct != nil,
 			_q.withProductSku != nil,
 			_q.withMaterial != nil,
 			_q.withProcess != nil,
 			_q.withUnit != nil,
+			_q.withProductionWipOutsourcingAllocations != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -610,6 +648,17 @@ func (_q *OutsourcingOrderItemQuery) sqlAll(ctx context.Context, hooks ...queryH
 	if query := _q.withUnit; query != nil {
 		if err := _q.loadUnit(ctx, query, nodes, nil,
 			func(n *OutsourcingOrderItem, e *Unit) { n.Edges.Unit = e }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProductionWipOutsourcingAllocations; query != nil {
+		if err := _q.loadProductionWipOutsourcingAllocations(ctx, query, nodes,
+			func(n *OutsourcingOrderItem) {
+				n.Edges.ProductionWipOutsourcingAllocations = []*ProductionWIPOutsourcingAllocation{}
+			},
+			func(n *OutsourcingOrderItem, e *ProductionWIPOutsourcingAllocation) {
+				n.Edges.ProductionWipOutsourcingAllocations = append(n.Edges.ProductionWipOutsourcingAllocations, e)
+			}); err != nil {
 			return nil, err
 		}
 	}
@@ -796,6 +845,36 @@ func (_q *OutsourcingOrderItemQuery) loadUnit(ctx context.Context, query *UnitQu
 		for i := range nodes {
 			assign(nodes[i], n)
 		}
+	}
+	return nil
+}
+func (_q *OutsourcingOrderItemQuery) loadProductionWipOutsourcingAllocations(ctx context.Context, query *ProductionWIPOutsourcingAllocationQuery, nodes []*OutsourcingOrderItem, init func(*OutsourcingOrderItem), assign func(*OutsourcingOrderItem, *ProductionWIPOutsourcingAllocation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*OutsourcingOrderItem)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionwipoutsourcingallocation.FieldOutsourcingOrderItemID)
+	}
+	query.Where(predicate.ProductionWIPOutsourcingAllocation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.OutsourcingOrderItemID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "outsourcing_order_item_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
 	}
 	return nil
 }

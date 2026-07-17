@@ -1,353 +1,1081 @@
 <!doctype html>
 <html lang="zh-CN">
   <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>指标卡交互语义样板 / Metric Card Interaction Standard</title>
+    <link rel="icon" href="data:," />
     <style>
       :root {
         color-scheme: light;
-        --bg: #f4f7f5;
-        --panel: #ffffff;
-        --panel-soft: #f8fbf8;
-        --border: #dce7df;
-        --border-strong: #b9cbe5;
-        --text: #17231c;
-        --muted: #667085;
-        --primary: #2d64a7;
-        --danger: #b42318;
-        --shadow: 0 12px 28px rgb(30 64 54 / 0.08);
+        --bg: #f3f6fa;
+        --surface: #ffffff;
+        --surface-soft: #f7f9fc;
+        --line: #dce4ef;
+        --line-strong: #bdcad9;
+        --text: #172033;
+        --muted: #66758a;
+        --primary: #1f67c9;
+        --primary-strong: #1857ac;
+        --primary-soft: #e9f3ff;
+        --danger: #b42331;
+        --danger-soft: #fff0f2;
+        --warning: #985900;
+        --warning-soft: #fff4df;
+        --success: #17704d;
+        --success-soft: #eaf7f1;
+        --focus: #73aaf5;
+        --shadow: 0 12px 30px rgb(28 47 72 / 8%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root {
+          color-scheme: dark;
+          --bg: #0f1722;
+          --surface: #182334;
+          --surface-soft: #202c3e;
+          --line: #334258;
+          --line-strong: #4a5b72;
+          --text: #edf3fb;
+          --muted: #a8b6c8;
+          --primary: #82b4ff;
+          --primary-strong: #a7caff;
+          --primary-soft: #1e3657;
+          --danger: #ff9ca6;
+          --danger-soft: #4b222b;
+          --warning: #f0bd68;
+          --warning-soft: #463315;
+          --success: #7bd7aa;
+          --success-soft: #193c2e;
+          --focus: #8cbbff;
+          --shadow: 0 16px 38px rgb(0 0 0 / 28%);
+        }
       }
 
       * {
         box-sizing: border-box;
       }
 
-      body {
-        margin: 0;
-        color: var(--text);
-        font-family:
-          Inter, "PingFang SC", "Microsoft YaHei", Arial, sans-serif;
+      html {
+        min-width: 320px;
+        scroll-behavior: smooth;
         background: var(--bg);
       }
 
-      main {
-        display: grid;
-        gap: 18px;
-        width: min(1180px, calc(100vw - 32px));
-        margin: 0 auto;
-        padding: 24px 0 36px;
-      }
-
-      header,
-      section {
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: var(--panel);
-        box-shadow: var(--shadow);
-      }
-
-      header {
-        display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 16px;
-        align-items: start;
-        padding: 20px;
-      }
-
-      h1,
-      h2,
-      p {
+      body {
         margin: 0;
-      }
-
-      h1 {
-        font-size: 24px;
-        line-height: 1.25;
-      }
-
-      h2 {
-        font-size: 16px;
-        line-height: 1.35;
-      }
-
-      p,
-      small {
-        color: var(--muted);
-        line-height: 1.6;
-      }
-
-      .badge {
-        display: inline-flex;
-        align-items: center;
-        min-height: 24px;
-        color: #385269;
-        font-size: 12px;
-        border: 1px solid #d8e1ed;
-        border-radius: 999px;
-        background: #f8fbff;
-        padding: 0 9px;
-      }
-
-      section {
-        display: grid;
-        gap: 14px;
-        padding: 18px;
-      }
-
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(150px, 1fr));
-        gap: 10px;
-      }
-
-      .metric-readonly,
-      .metric-action,
-      .metric-filter {
-        min-width: 0;
-        min-height: 88px;
-        border-radius: 8px;
-        padding: 12px 14px;
-      }
-
-      .metric-readonly {
-        display: grid;
-        gap: 5px;
-        align-content: center;
-        border: 1px solid var(--border);
-        background: var(--panel-soft);
-        cursor: default;
-      }
-
-      .metric-readonly__head,
-      .metric-action__head {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 8px;
-        min-width: 0;
-      }
-
-      .metric-readonly__head span:first-child,
-      .metric-action__head span:first-child {
-        min-width: 0;
-        color: var(--muted);
-        font-size: 13px;
-        overflow-wrap: anywhere;
-      }
-
-      .metric-readonly__head span:last-child {
-        flex: 0 0 auto;
-        color: var(--muted);
-        font-size: 11px;
-        border: 1px solid #d8e1ed;
-        border-radius: 999px;
-        background: #fff;
-        padding: 0 7px;
-      }
-
-      strong {
-        font-size: 28px;
-        line-height: 1;
-        font-variant-numeric: tabular-nums;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
       button {
         font: inherit;
       }
 
-      .metric-action,
-      .metric-filter {
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--focus) 42%, transparent);
+        outline-offset: 3px;
+      }
+
+      .app-bar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
+        display: flex;
+        min-height: 60px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--surface) 94%, transparent);
+        padding: 10px 24px;
+        backdrop-filter: blur(14px);
+      }
+
+      .brand {
+        display: flex;
+        min-width: 0;
+        align-items: center;
+        gap: 11px;
+      }
+
+      .brand-mark {
         display: grid;
-        gap: 6px;
-        color: var(--text);
-        text-align: left;
-        border: 1px solid var(--border-strong);
-        background: linear-gradient(180deg, #fff 0%, #f7fbff 100%);
-        cursor: pointer;
-        transition:
-          border-color 0.18s ease,
-          box-shadow 0.18s ease,
-          transform 0.18s ease,
-          background 0.18s ease;
+        width: 34px;
+        height: 34px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 9px;
+        background: #245f98;
+        color: #fff;
+        font-weight: 760;
       }
 
-      .metric-action:hover,
-      .metric-action:focus-visible,
-      .metric-filter:hover,
-      .metric-filter:focus-visible {
-        border-color: var(--primary);
-        background: #f4f8ff;
-        outline: none;
-        box-shadow: 0 0 0 3px rgb(45 100 167 / 0.14);
-        transform: translateY(-1px);
+      .brand-copy {
+        min-width: 0;
       }
 
-      .metric-filter[aria-pressed="true"] {
-        border-color: var(--primary);
-        background: #edf5ff;
-        box-shadow: inset 3px 0 0 var(--primary);
+      .brand-copy strong,
+      .brand-copy span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
       }
 
-      .metric-action__icon {
+      .brand-copy span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stage {
+        display: inline-flex;
+        min-height: 26px;
+        flex: 0 0 auto;
+        align-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      main {
+        display: grid;
+        width: min(1320px, 100%);
+        gap: 16px;
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .page-heading,
+      .section {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface);
+        box-shadow: var(--shadow);
+      }
+
+      .page-heading {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 20px;
+        align-items: start;
+        padding: 22px;
+      }
+
+      .eyebrow {
+        margin: 0 0 4px;
         color: var(--primary);
-        font-size: 13px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
       }
 
-      .metric-action small,
-      .metric-filter small {
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 7px;
+        font-size: clamp(24px, 2.4vw, 32px);
+        line-height: 1.18;
+      }
+
+      h2 {
+        margin-bottom: 0;
+        font-size: 18px;
+        line-height: 1.35;
+      }
+
+      h3 {
+        margin-bottom: 0;
+        font-size: 14px;
+      }
+
+      .lede {
+        max-width: 780px;
+        margin-bottom: 0;
         color: var(--muted);
       }
 
-      .metric-danger,
-      .metric-danger strong {
-        color: var(--danger);
+      .semantic-key {
+        display: grid;
+        grid-template-columns: repeat(3, auto);
+        gap: 8px;
       }
 
-      .comparison {
+      .key-item,
+      .element-type {
+        display: inline-flex;
+        min-height: 25px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        padding: 0 9px;
+        font-size: 11px;
+        font-weight: 700;
+      }
+
+      .section {
+        display: grid;
+        gap: 16px;
+        padding: 18px;
+      }
+
+      .section-head {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 16px;
+      }
+
+      .section-head p {
+        max-width: 780px;
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .semantic-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 12px;
       }
 
-      .rule {
+      .example {
         display: grid;
-        gap: 6px;
         min-width: 0;
-        border: 1px solid var(--border);
-        border-radius: 8px;
-        background: #fbfcfe;
+        align-content: start;
+        gap: 9px;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: var(--surface-soft);
         padding: 12px;
       }
 
-      .rule strong {
-        font-size: 15px;
-        line-height: 1.35;
+      .example-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
       }
 
-      @media (max-width: 780px) {
+      .example-copy {
+        min-height: 38px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric-card {
+        display: grid;
+        width: 100%;
+        min-width: 0;
+        min-height: 118px;
+        align-content: space-between;
+        gap: 9px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 14px;
+        text-align: left;
+        text-decoration: none;
+      }
+
+      .metric-head {
+        display: flex;
+        min-width: 0;
+        align-items: start;
+        justify-content: space-between;
+        gap: 10px;
+      }
+
+      .metric-label {
+        min-width: 0;
+        color: var(--muted);
+        font-size: 13px;
+        font-weight: 650;
+        overflow-wrap: anywhere;
+      }
+
+      .metric-signal {
+        flex: 0 0 auto;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .metric-value {
+        display: block;
+        font-size: 30px;
+        font-variant-numeric: tabular-nums;
+        line-height: 1;
+      }
+
+      .metric-note {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .metric-readonly {
+        cursor: default;
+      }
+
+      .metric-filter,
+      .metric-command {
+        cursor: pointer;
+        transition:
+          border-color 0.16s ease,
+          background 0.16s ease,
+          box-shadow 0.16s ease,
+          transform 0.16s ease;
+      }
+
+      .metric-filter:hover,
+      .metric-command:hover {
+        border-color: var(--primary);
+        background: color-mix(in srgb, var(--primary-soft) 40%, var(--surface));
+        transform: translateY(-1px);
+      }
+
+      .metric-filter[aria-pressed="true"] {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+        box-shadow: inset 3px 0 0 var(--primary);
+      }
+
+      .metric-filter[aria-pressed="true"] .metric-signal {
+        color: var(--primary-strong);
+      }
+
+      .metric-link {
+        border-color: color-mix(in srgb, var(--primary) 45%, var(--line));
+        cursor: pointer;
+        transition:
+          border-color 0.16s ease,
+          background 0.16s ease,
+          box-shadow 0.16s ease,
+          transform 0.16s ease;
+      }
+
+      .metric-link:hover {
+        border-color: var(--primary);
+        background: color-mix(in srgb, var(--primary-soft) 40%, var(--surface));
+        box-shadow: 0 8px 18px
+          color-mix(in srgb, var(--primary) 12%, transparent);
+        transform: translateY(-1px);
+      }
+
+      .metric-link .metric-signal {
+        color: var(--primary-strong);
+      }
+
+      .filter-demo {
+        display: grid;
+        gap: 10px;
+      }
+
+      .filter-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .filter-result {
+        display: flex;
+        min-height: 40px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--surface-soft);
+        padding: 8px 10px;
+      }
+
+      .filter-result p {
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .text-button {
+        min-height: 30px;
+        border: 1px solid var(--line-strong);
+        border-radius: 7px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 0 10px;
+        cursor: pointer;
+      }
+
+      .text-button:hover {
+        border-color: var(--primary);
+        color: var(--primary-strong);
+      }
+
+      .text-button:disabled {
+        border-color: var(--line);
+        background: var(--surface-soft);
+        color: var(--muted);
+        cursor: not-allowed;
+        opacity: 0.62;
+      }
+
+      .state-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .state-example {
+        display: grid;
+        min-width: 0;
+        gap: 8px;
+      }
+
+      .state-label {
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .metric-card:disabled {
+        border-color: var(--line);
+        background: var(--surface-soft);
+        color: var(--muted);
+        cursor: not-allowed;
+        opacity: 0.62;
+        transform: none;
+      }
+
+      .metric-card[aria-busy="true"] {
+        cursor: progress;
+      }
+
+      .metric-card[aria-busy="true"] .metric-value {
+        color: transparent;
+        background: linear-gradient(
+          90deg,
+          var(--surface-soft),
+          var(--line),
+          var(--surface-soft)
+        );
+        background-size: 180% 100%;
+        border-radius: 7px;
+        animation: shimmer 1.1s linear infinite;
+        user-select: none;
+      }
+
+      .metric-zero .metric-value {
+        color: var(--muted);
+      }
+
+      .recovery-card {
+        border-color: color-mix(in srgb, var(--danger) 38%, var(--line));
+        background: color-mix(in srgb, var(--danger-soft) 45%, var(--surface));
+      }
+
+      .recovery-card[data-state="loading"] {
+        border-color: var(--line-strong);
+        background: var(--surface);
+      }
+
+      .recovery-card[data-state="recovered"] {
+        border-color: color-mix(in srgb, var(--success) 38%, var(--line));
+        background: color-mix(in srgb, var(--success-soft) 45%, var(--surface));
+      }
+
+      .recovery-card[data-state="error"] .metric-value {
+        color: var(--danger);
+      }
+
+      .recovery-card[data-state="recovered"] .metric-value {
+        color: var(--success);
+      }
+
+      .recovery-actions {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+
+      .recovery-state {
+        color: var(--danger);
+        font-size: 12px;
+        font-weight: 650;
+      }
+
+      .recovery-card[data-state="loading"] .recovery-state {
+        color: var(--muted);
+      }
+
+      .recovery-card[data-state="recovered"] .recovery-state {
+        color: var(--success);
+      }
+
+      .matrix-wrap {
+        max-width: 100%;
+        overflow-x: auto;
+      }
+
+      table {
+        width: 100%;
+        min-width: 760px;
+        border-collapse: collapse;
+      }
+
+      th,
+      td {
+        border-bottom: 1px solid var(--line);
+        padding: 11px 12px;
+        text-align: left;
+        vertical-align: top;
+      }
+
+      thead th {
+        background: var(--surface-soft);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      tbody tr:last-child th,
+      tbody tr:last-child td {
+        border-bottom: 0;
+      }
+
+      tbody th {
+        min-width: 110px;
+      }
+
+      code {
+        border-radius: 5px;
+        background: var(--surface-soft);
+        color: var(--primary-strong);
+        padding: 2px 5px;
+        font-family: "SFMono-Regular", Consolas, monospace;
+        font-size: 12px;
+      }
+
+      .target {
+        scroll-margin-top: 76px;
+        border: 1px solid color-mix(in srgb, var(--primary) 36%, var(--line));
+        border-radius: 9px;
+        background: color-mix(in srgb, var(--primary-soft) 40%, var(--surface));
+        padding: 12px 14px;
+      }
+
+      .target p {
+        margin: 4px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+      }
+
+      @keyframes shimmer {
+        to {
+          background-position: -180% 0;
+        }
+      }
+
+      @media (max-width: 980px) {
+        .semantic-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .state-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 680px) {
+        .app-bar {
+          position: static;
+          padding: 12px 14px;
+        }
+
         main {
-          width: min(100vw - 20px, 520px);
-          padding-top: 12px;
+          padding: 16px 12px 24px;
         }
 
-        header,
-        .comparison {
+        .page-heading {
+          grid-template-columns: 1fr;
+          padding: 18px 14px;
+        }
+
+        .semantic-key {
+          grid-template-columns: repeat(3, minmax(0, 1fr));
+        }
+
+        .section {
+          padding: 14px;
+        }
+
+        .section-head {
+          display: block;
+        }
+
+        .filter-grid,
+        .state-grid {
           grid-template-columns: 1fr;
         }
 
-        .grid {
-          grid-template-columns: 1fr;
+        .filter-result,
+        .recovery-actions {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .metric-card {
+          min-height: 108px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html {
+          scroll-behavior: auto;
+        }
+
+        *,
+        *::before,
+        *::after {
+          animation-duration: 0.01ms !important;
+          animation-iteration-count: 1 !important;
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
   </head>
   <body>
+    <header class="app-bar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">标</div>
+        <div class="brand-copy">
+          <strong>指标卡交互语义</strong>
+          <span>只读、筛选、跳转与状态标准</span>
+        </div>
+      </div>
+      <span class="stage">To Implement · Core Pattern</span>
+    </header>
+
     <main>
-      <header>
+      <section class="page-heading" aria-labelledby="pageTitle">
         <div>
-          <p>Backoffice Component Standard</p>
-          <h1>指标卡交互语义样板</h1>
-          <p>
-            同一类数据展示先区分语义：只读摘要保持安静，可点击入口默认露出动作信号，筛选型指标必须有选中态和恢复态。
+          <p class="eyebrow">COMPONENT SEMANTICS / 先定行为，再定外观</p>
+          <h1 id="pageTitle">相似的指标，必须有不同的交互信号</h1>
+          <p class="lede">
+            只读摘要保持安静；筛选使用真实按钮并显示选中态；页面跳转使用真实链接。加载、零值、错误与恢复也必须让用户一眼分清。
           </p>
         </div>
-        <span class="badge">To Implement / Core</span>
-      </header>
-
-      <section aria-labelledby="readonly-heading">
-        <div>
-          <h2 id="readonly-heading">只读统计卡</h2>
-          <p>用于业务看板摘要。没有 pointer 光标、没有 hover 抬升、没有按钮角色，默认显示“摘要”。</p>
+        <div class="semantic-key" aria-label="语义元素">
+          <span class="key-item">DIV · 只读</span>
+          <span class="key-item">BUTTON · 操作</span>
+          <span class="key-item">LINK · 跳转</span>
         </div>
-        <div class="grid" aria-label="只读统计卡示例">
-          <div class="metric-readonly" aria-label="业务对象总数 128，只读摘要">
-            <div class="metric-readonly__head"><span>业务对象总数</span><span>摘要</span></div>
-            <strong>128</strong>
+      </section>
+
+      <section class="section" aria-labelledby="semanticsTitle">
+        <div class="section-head">
+          <div>
+            <h2 id="semanticsTitle">三种基础语义</h2>
+            <p>元素类型与实际结果一致，不用可点击外观包装只读内容，也不用 div 冒充按钮。</p>
           </div>
-          <div class="metric-readonly" aria-label="推进中记录数 42，只读摘要">
-            <div class="metric-readonly__head"><span>推进中记录数</span><span>摘要</span></div>
-            <strong>42</strong>
+        </div>
+
+        <div class="semantic-grid">
+          <article class="example">
+            <div class="example-head">
+              <h3>只读摘要</h3>
+              <span class="element-type">DIV</span>
+            </div>
+            <p class="example-copy">没有 hover 抬升、pointer 光标、键盘焦点或按钮角色。</p>
+            <div
+              class="metric-card metric-readonly"
+              aria-label="办理结果 184，只读摘要"
+            >
+              <div class="metric-head">
+                <span class="metric-label">办理结果</span>
+                <span class="metric-signal">摘要</span>
+              </div>
+              <strong class="metric-value">184</strong>
+              <span class="metric-note">来源成功 · 已经发生</span>
+            </div>
+          </article>
+
+          <article class="example">
+            <div class="example-head">
+              <h3>筛选当前列表</h3>
+              <span class="element-type">BUTTON</span>
+            </div>
+            <p class="example-copy">真实按钮，具有 hover、focus 和 aria-pressed 选中状态。</p>
+            <button
+              class="metric-card metric-filter"
+              id="semanticFilterExample"
+              type="button"
+              data-filter="blocked"
+              aria-pressed="true"
+            >
+              <span class="metric-head">
+                <span class="metric-label">阻塞交接</span>
+                <span class="metric-signal">已筛选</span>
+              </span>
+              <strong class="metric-value">4</strong>
+              <span class="metric-note">再次选择不改变业务数据</span>
+            </button>
+          </article>
+
+          <article class="example">
+            <div class="example-head">
+              <h3>进入目标页面</h3>
+              <span class="element-type">LINK</span>
+            </div>
+            <p class="example-copy">真实链接，默认露出“进入”信号；本例跳到页面内目标说明。</p>
+            <a class="metric-card metric-link" href="#navigation-target">
+              <span class="metric-head">
+                <span class="metric-label">销售订单</span>
+                <span class="metric-signal">进入 →</span>
+              </span>
+              <strong class="metric-value">38</strong>
+              <span class="metric-note">查看销售订单列表</span>
+            </a>
+          </article>
+        </div>
+      </section>
+
+      <section class="section" aria-labelledby="filterTitle">
+        <div class="section-head">
+          <div>
+            <h2 id="filterTitle">筛选、选中与恢复</h2>
+            <p>选中态改变当前列表视图；“清除筛选”是真实恢复动作，并在没有筛选时禁用。</p>
           </div>
-          <div class="metric-readonly" aria-label="阻塞记录数 6，只读摘要">
-            <div class="metric-readonly__head"><span>阻塞记录数</span><span>摘要</span></div>
-            <strong class="metric-danger">6</strong>
+        </div>
+        <div class="filter-demo">
+          <div class="filter-grid" aria-label="任务筛选指标">
+            <button
+              class="metric-card metric-filter"
+              type="button"
+              data-filter="mine"
+              aria-pressed="false"
+            >
+              <span class="metric-head">
+                <span class="metric-label">待我处理</span>
+                <span class="metric-signal">筛选</span>
+              </span>
+              <strong class="metric-value">12</strong>
+              <span class="metric-note">只看当前账号待处理</span>
+            </button>
+            <button
+              class="metric-card metric-filter"
+              type="button"
+              data-filter="blocked"
+              aria-pressed="true"
+            >
+              <span class="metric-head">
+                <span class="metric-label">阻塞交接</span>
+                <span class="metric-signal">已筛选</span>
+              </span>
+              <strong class="metric-value">4</strong>
+              <span class="metric-note">只看阻塞事项</span>
+            </button>
+            <button
+              class="metric-card metric-filter"
+              type="button"
+              data-filter="due"
+              aria-pressed="false"
+            >
+              <span class="metric-head">
+                <span class="metric-label">即将到期</span>
+                <span class="metric-signal">筛选</span>
+              </span>
+              <strong class="metric-value">2</strong>
+              <span class="metric-note">只看今日到期</span>
+            </button>
           </div>
-          <div class="metric-readonly" aria-label="业务完成比例 63%，只读摘要">
-            <div class="metric-readonly__head"><span>业务完成比例</span><span>摘要</span></div>
-            <strong>63%</strong>
+          <div class="filter-result">
+            <p id="filterResult" aria-live="polite">当前筛选：阻塞交接 · 4 项</p>
+            <button class="text-button" id="clearFilter" type="button">
+              清除筛选
+            </button>
           </div>
         </div>
       </section>
 
-      <section aria-labelledby="filter-heading">
-        <div>
-          <h2 id="filter-heading">筛选统计卡</h2>
-          <p>用于任务看板。它是真实 button，默认有动作提示、进入箭头和 `aria-pressed` 选中态。</p>
+      <section class="section" aria-labelledby="statesTitle">
+        <div class="section-head">
+          <div>
+            <h2 id="statesTitle">状态覆盖</h2>
+            <p>默认、禁用、加载、零值、错误与恢复都使用明确文案；0 只代表来源成功后的真实零值。</p>
+          </div>
         </div>
-        <div class="grid" aria-label="筛选统计卡示例">
-          <button class="metric-filter" type="button" aria-pressed="false">
-            <span class="metric-action__head"><span>待我处理</span><span class="metric-action__icon">查看</span></span>
-            <strong>12</strong>
-            <small>点击筛选待处理</small>
-          </button>
-          <button class="metric-filter" type="button" aria-pressed="false">
-            <span class="metric-action__head"><span>发起来源</span><span class="metric-action__icon">查看</span></span>
-            <strong>26</strong>
-            <small>查看全部来源</small>
-          </button>
-          <button class="metric-filter metric-danger" type="button" aria-pressed="true">
-            <span class="metric-action__head"><span>阻塞交接</span><span class="metric-action__icon">筛选</span></span>
-            <strong>4</strong>
-            <small>点击筛选阻塞</small>
-          </button>
-          <button class="metric-filter" type="button" aria-pressed="false">
-            <span class="metric-action__head"><span>当前结果</span><span class="metric-action__icon">恢复</span></span>
-            <strong>18</strong>
-            <small>清空筛选</small>
-          </button>
+
+        <div class="state-grid">
+          <div class="state-example">
+            <span class="state-label">默认 / Hover / Focus</span>
+            <button class="metric-card metric-command" id="loadingAction" type="button">
+              <span class="metric-head">
+                <span class="metric-label">同步当前视图</span>
+                <span class="metric-signal">执行</span>
+              </span>
+              <strong class="metric-value">20</strong>
+              <span class="metric-note">点击演示 loading → recovery</span>
+            </button>
+          </div>
+
+          <div class="state-example">
+            <span class="state-label">Disabled</span>
+            <button class="metric-card metric-command" type="button" disabled>
+              <span class="metric-head">
+                <span class="metric-label">敏感操作</span>
+                <span class="metric-signal">不可用</span>
+              </span>
+              <strong class="metric-value">—</strong>
+              <span class="metric-note">当前条件不满足</span>
+            </button>
+          </div>
+
+          <div class="state-example">
+            <span class="state-label">Zero</span>
+            <div
+              class="metric-card metric-readonly metric-zero"
+              aria-label="即将到期 0，来源成功，当前无记录"
+            >
+              <div class="metric-head">
+                <span class="metric-label">即将到期</span>
+                <span class="metric-signal">摘要</span>
+              </div>
+              <strong class="metric-value">0</strong>
+              <span class="metric-note">来源成功 · 当前无记录</span>
+            </div>
+          </div>
+
+          <div class="state-example">
+            <span class="state-label">Error → Loading → Recovery</span>
+            <div
+              class="metric-card metric-readonly recovery-card"
+              id="recoveryCard"
+              data-state="error"
+              aria-live="polite"
+            >
+              <div class="metric-head">
+                <span class="metric-label">协同风险</span>
+                <span class="metric-signal">只读摘要</span>
+              </div>
+              <strong class="metric-value" id="recoveryValue">—</strong>
+              <div class="recovery-actions">
+                <span class="recovery-state" id="recoveryState">来源暂不可用</span>
+                <button class="text-button" id="retryButton" type="button">
+                  重新加载
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
+        <p class="sr-only" id="actionAnnouncement" aria-live="polite"></p>
       </section>
 
-      <section aria-labelledby="action-heading">
-        <div>
-          <h2 id="action-heading">进入动作卡 / 行级入口</h2>
-          <p>用于关联记录入口、详情入口或明确的业务动作入口。默认露出动作信号，不把整块静默卡片偷偷变成可点。</p>
-        </div>
-        <div class="grid" aria-label="动作入口示例">
-          <button class="metric-action" type="button">
-            <span class="metric-action__head"><span>销售订单</span><span class="metric-action__icon">进入</span></span>
-            <strong>38</strong>
-            <small>查看订单列表</small>
-          </button>
-          <button class="metric-action" type="button">
-            <span class="metric-action__head"><span>来料质检</span><span class="metric-action__icon">进入</span></span>
-            <strong>9</strong>
-            <small>处理待检任务</small>
-          </button>
-        </div>
-      </section>
-
-      <section aria-labelledby="rules-heading">
-        <div>
-          <h2 id="rules-heading">实现规则</h2>
-          <p>真实页面吸收时按语义选组件，不按视觉相似度偷懒复用。</p>
-        </div>
-        <div class="comparison">
-          <div class="rule">
-            <strong>只读</strong>
-            <small>div、default 光标、摘要角标、无 hover 抬升。</small>
+      <section class="section" aria-labelledby="matrixTitle">
+        <div class="section-head">
+          <div>
+            <h2 id="matrixTitle">实现矩阵</h2>
+            <p>先按结果选择语义元素，再补视觉与状态；不可用来源不能显示为 0。</p>
           </div>
-          <div class="rule">
-            <strong>动作</strong>
-            <small>button / link、pointer 光标、动作提示、focus ring、进入信号。</small>
-          </div>
-          <div class="rule">
-            <strong>筛选</strong>
-            <small>button、`aria-pressed`、选中态、恢复态、URL / 状态同步。</small>
-          </div>
+        </div>
+        <div class="matrix-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">用途</th>
+                <th scope="col">真实元素</th>
+                <th scope="col">交互反馈</th>
+                <th scope="col">状态要求</th>
+                <th scope="col">禁止做法</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">只读摘要</th>
+                <td><code>div</code></td>
+                <td>无 hover 抬升、无 pointer、无焦点</td>
+                <td>正常 / loading / 0 / error</td>
+                <td>添加 button role 或 onClick</td>
+              </tr>
+              <tr>
+                <th scope="row">筛选列表</th>
+                <td><code>button</code></td>
+                <td>hover / focus / aria-pressed</td>
+                <td>默认 / 选中 / 禁用 / 恢复</td>
+                <td>只改颜色、不暴露选中语义</td>
+              </tr>
+              <tr>
+                <th scope="row">页面跳转</th>
+                <td><code>a href</code></td>
+                <td>hover / focus / 进入信号</td>
+                <td>默认 / 已访问 / 无权限时不渲染</td>
+                <td>用空按钮模拟路由</td>
+              </tr>
+              <tr>
+                <th scope="row">执行命令</th>
+                <td><code>button</code></td>
+                <td>hover / focus / loading / result</td>
+                <td>默认 / disabled / loading / recovery</td>
+                <td>点击后无反馈或重复提交</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="target" id="navigation-target" tabindex="-1">
+          <h3>链接目标示例</h3>
+          <p>上方“销售订单”使用真实锚点链接到这里；真实实现应替换为受正式菜单和权限约束的页面路由。</p>
         </div>
       </section>
     </main>
+
+    <script>
+      const filterLabels = {
+        mine: ["待我处理", 12],
+        blocked: ["阻塞交接", 4],
+        due: ["即将到期", 2],
+      };
+
+      const filterButtons = Array.from(
+        document.querySelectorAll(".filter-grid .metric-filter")
+      );
+      const clearFilter = document.querySelector("#clearFilter");
+      const filterResult = document.querySelector("#filterResult");
+      const loadingAction = document.querySelector("#loadingAction");
+      const retryButton = document.querySelector("#retryButton");
+      const semanticFilterExample = document.querySelector(
+        "#semanticFilterExample"
+      );
+      const recoveryCard = document.querySelector("#recoveryCard");
+      const recoveryValue = document.querySelector("#recoveryValue");
+      const recoveryState = document.querySelector("#recoveryState");
+      const announcement = document.querySelector("#actionAnnouncement");
+
+      let activeFilter = "blocked";
+      let loadingTimer = null;
+      let recoveryTimer = null;
+
+      function renderFilter() {
+        filterButtons.forEach(function (button) {
+          const active = button.dataset.filter === activeFilter;
+          button.setAttribute("aria-pressed", String(active));
+          const signal = button.querySelector(".metric-signal");
+          signal.textContent = active ? "已筛选" : "筛选";
+        });
+
+        if (activeFilter) {
+          const current = filterLabels[activeFilter];
+          filterResult.textContent =
+            "当前筛选：" + current[0] + " · " + current[1] + " 项";
+          clearFilter.disabled = false;
+        } else {
+          filterResult.textContent = "当前筛选：全部任务 · 18 项";
+          clearFilter.disabled = true;
+        }
+      }
+
+      filterButtons.forEach(function (button) {
+        button.addEventListener("click", function () {
+          activeFilter = button.dataset.filter;
+          renderFilter();
+        });
+      });
+
+      clearFilter.addEventListener("click", function () {
+        activeFilter = "";
+        renderFilter();
+        filterButtons[0].focus();
+      });
+
+      semanticFilterExample.addEventListener("click", function () {
+        const nextSelected =
+          semanticFilterExample.getAttribute("aria-pressed") !== "true";
+        semanticFilterExample.setAttribute(
+          "aria-pressed",
+          String(nextSelected)
+        );
+        semanticFilterExample.querySelector(".metric-signal").textContent =
+          nextSelected ? "已筛选" : "筛选";
+        semanticFilterExample.querySelector(".metric-note").textContent =
+          nextSelected ? "当前示例只看阻塞事项" : "当前示例已恢复全部事项";
+        announcement.textContent = nextSelected
+          ? "基础筛选示例：已选择阻塞交接"
+          : "基础筛选示例：已恢复全部事项";
+      });
+
+      loadingAction.addEventListener("click", function () {
+        if (loadingAction.getAttribute("aria-busy") === "true") return;
+        window.clearTimeout(loadingTimer);
+        loadingAction.setAttribute("aria-busy", "true");
+        loadingAction.disabled = true;
+        loadingAction.querySelector(".metric-signal").textContent = "加载中";
+        loadingAction.querySelector(".metric-note").textContent =
+          "正在同步当前视图";
+        announcement.textContent = "同步当前视图：加载中";
+
+        loadingTimer = window.setTimeout(function () {
+          loadingAction.removeAttribute("aria-busy");
+          loadingAction.disabled = false;
+          loadingAction.querySelector(".metric-signal").textContent = "已完成";
+          loadingAction.querySelector(".metric-note").textContent =
+            "同步完成，可再次演示";
+          announcement.textContent = "同步当前视图：已完成";
+        }, 900);
+      });
+
+      retryButton.addEventListener("click", function () {
+        window.clearTimeout(recoveryTimer);
+        recoveryCard.dataset.state = "loading";
+        recoveryCard.setAttribute("aria-busy", "true");
+        recoveryValue.textContent = "•••";
+        recoveryState.textContent = "正在重新加载";
+        retryButton.disabled = true;
+
+        recoveryTimer = window.setTimeout(function () {
+          recoveryCard.dataset.state = "recovered";
+          recoveryCard.removeAttribute("aria-busy");
+          recoveryValue.textContent = "6";
+          recoveryState.textContent = "已恢复";
+          retryButton.disabled = false;
+          retryButton.textContent = "再次演示";
+        }, 900);
+      });
+
+      document
+        .querySelector('.metric-link[href="#navigation-target"]')
+        .addEventListener("click", function () {
+          window.setTimeout(function () {
+            document.querySelector("#navigation-target").focus({
+              preventScroll: true,
+            });
+          }, 0);
+        });
+
+      renderFilter();
+    </script>
   </body>
 </html>

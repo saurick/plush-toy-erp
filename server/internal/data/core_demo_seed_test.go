@@ -5,6 +5,7 @@ import (
 	"errors"
 	"reflect"
 	"regexp"
+	"strings"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
@@ -195,6 +196,7 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 		"车缝": {outsourcing: true, inhouse: true},
 		"包装": {outsourcing: true, inhouse: true},
 	}
+	defaultProcessSortOrder := map[string]int{}
 	for _, process := range dataset.Processes {
 		expected, ok := requiredProcesses[process.Name]
 		if !ok {
@@ -206,10 +208,17 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 			process.QualityRequired != expected.quality {
 			t.Fatalf("unexpected default plush process %q: %#v", process.Name, process)
 		}
+		if !strings.Contains(process.Note, "排序仅供列表展示，不代表工艺路线") {
+			t.Fatalf("default plush process %q must explain the display-only sort boundary: %#v", process.Name, process)
+		}
+		defaultProcessSortOrder[process.Name] = process.SortOrder
 		delete(requiredProcesses, process.Name)
 	}
 	if len(requiredProcesses) > 0 {
 		t.Fatalf("missing default plush processes: %#v", requiredProcesses)
+	}
+	if defaultProcessSortOrder["车缝"] >= defaultProcessSortOrder["手工"] {
+		t.Fatalf("default process display order must show sewing before handwork: %#v", defaultProcessSortOrder)
 	}
 	requiredMaterialCategories := map[string]bool{
 		"fabric":    false,
@@ -326,7 +335,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 		WithArgs(51, 21).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}))
 	mock.ExpectExec("INSERT INTO bom_items").
-		WithArgs(51, 21, "1.000000", 11, "0.000000", sqlmock.AnyArg(), sqlmock.AnyArg()).
+		WithArgs(51, 21, "1.000000", 11, "0.000000", sqlmock.AnyArg(), sqlmock.AnyArg(), sqlmock.AnyArg()).
 		WillReturnResult(sqlmock.NewResult(61, 1))
 	mock.ExpectCommit()
 	mock.ExpectClose()

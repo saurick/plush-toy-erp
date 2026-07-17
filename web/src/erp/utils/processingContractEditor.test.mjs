@@ -14,13 +14,13 @@ import {
 const sampleLines = [
   {
     contractNo: 'SIM-OS-001',
-    processName: '面*1',
+    processingItem: '面*1',
     quantity: '100',
     unitPrice: '0.2',
   },
   {
     contractNo: 'SIM-OS-001',
-    processName: '耳*2',
+    processingItem: '耳*2',
     quantity: '100',
     unitPrice: '0.1',
   },
@@ -42,7 +42,7 @@ test('FL_processing_contract_editor__clears_blank_inserted_lines processingContr
   assert.equal(inserted.lines[1].productOrderNo, '')
   assert.equal(inserted.lines[1].productNo, '')
   assert.equal(inserted.lines[1].productName, '')
-  assert.equal(inserted.lines[1].processName, '')
+  assert.equal(inserted.lines[1].processingItem, '')
 })
 
 test('processingContractEditor: 手签留白只清空签字人并保留日期', () => {
@@ -80,7 +80,7 @@ test('processingContractEditor: 达到 300 行后不允许继续插入', () => {
     { length: PROCESSING_CONTRACT_MAX_ROWS },
     () => ({
       contractNo: 'SIM-OS-001',
-      processName: '电绣',
+      processingItem: '电绣',
       quantity: '1',
       unitPrice: '1',
     })
@@ -113,7 +113,7 @@ test('FL_processing_contract_editor__clears_deleted_last_line processingContract
     productOrderNo: '',
     productNo: '',
     productName: '',
-    processName: '',
+    processingItem: '',
     supplierAlias: '',
     processCategory: '',
     unit: '',

@@ -36,6 +36,11 @@ import (
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionorderoperation"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
+	"server/internal/data/model/ent/productionwipbatch"
+	"server/internal/data/model/ent/productionwipevent"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
@@ -159,6 +164,11 @@ func checkColumn(t, c string) error {
 			productionorderevent.Table:               productionorderevent.ValidColumn,
 			productionorderitem.Table:                productionorderitem.ValidColumn,
 			productionordermaterialrequirement.Table: productionordermaterialrequirement.ValidColumn,
+			productionorderoperation.Table:           productionorderoperation.ValidColumn,
+			productionpackagingconfirmation.Table:    productionpackagingconfirmation.ValidColumn,
+			productionwipbatch.Table:                 productionwipbatch.ValidColumn,
+			productionwipevent.Table:                 productionwipevent.ValidColumn,
+			productionwipoutsourcingallocation.Table: productionwipoutsourcingallocation.ValidColumn,
 			purchaseorder.Table:                      purchaseorder.ValidColumn,
 			purchaseorderitem.Table:                  purchaseorderitem.ValidColumn,
 			purchasereceipt.Table:                    purchasereceipt.ValidColumn,

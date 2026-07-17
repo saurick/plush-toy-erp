@@ -7,7 +7,10 @@ import {
   listSourceDocumentItemsAtVersion,
   listSourceDocumentItemsPreview,
 } from '../utils/sourceDocumentPagination.mjs'
-import { listAllReferenceRecords } from '../utils/referencePagination.mjs'
+import {
+  listAllPaginatedRecords,
+  listAllReferenceRecords,
+} from '../utils/referencePagination.mjs'
 
 const masterDataRpc = new JsonRpc({
   url: 'masterdata',
@@ -496,6 +499,18 @@ export async function listOutsourcingOrders(params = {}, options = {}) {
     options
   )
   return dataOf(result)
+}
+
+export async function listAllOutsourcingOrders(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listOutsourcingOrders,
+    params,
+    'outsourcing_orders',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的加工合同列表不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function getOutsourcingOrder(params = {}, options = {}) {

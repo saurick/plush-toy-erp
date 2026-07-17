@@ -31,6 +31,14 @@ const prototypesPageSource = readFileSync(
   path.join(repoRoot, 'web/src/erp/pages/DevPrototypesPage.jsx'),
   'utf8'
 )
+const prototypeRegistryReadmeSource = readFileSync(
+  path.join(repoRoot, 'docs/product/prototypes/README.md'),
+  'utf8'
+)
+const prototypeStaticIndexSource = readFileSync(
+  path.join(repoRoot, 'docs/product/prototypes/index.html'),
+  'utf8'
+)
 
 test('devPrototypes: 只通过开发态独立路径暴露', () => {
   assert.equal(DEV_PROTOTYPES_ROUTE, '/__dev/prototypes')
@@ -55,14 +63,14 @@ test('devPrototypes: sandbox preview uses in-memory storage without same-origin 
 })
 
 test('devPrototypes: 登记当前原型与样板资产并区分类型和状态', () => {
-  assert.equal(DEV_PROTOTYPE_ASSETS.length, 20)
+  assert.equal(DEV_PROTOTYPE_ASSETS.length, 26)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'HTML').length,
-    14
+    16
   )
   assert.equal(
     DEV_PROTOTYPE_ASSETS.filter((item) => item.type === 'PNG').length,
-    6
+    10
   )
   assert(
     DEV_PROTOTYPE_ASSETS.every(
@@ -82,7 +90,13 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     DEV_PROTOTYPE_ASSETS.filter((item) =>
       item.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)
     ).length,
-    13
+    15
+  )
+  assert.deepEqual(
+    DEV_PROTOTYPE_ASSETS.filter((item) =>
+      item.statuses.includes(DEV_PROTOTYPE_STATUSES.CURRENT)
+    ).map((item) => item.key),
+    ['mobile-role-tasks-implemented']
   )
   assert.deepEqual(
     DEV_PROTOTYPE_FILTER_OPTIONS.map((option) => option.value),
@@ -98,6 +112,38 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
       ?.statuses[0],
     DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
   )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'workflow-task-action-flow'
+    )?.statuses[0],
+    DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
+  )
+  assert.match(
+    DEV_PROTOTYPE_ASSETS.find(
+      (item) => item.key === 'workflow-task-action-flow'
+    )?.description || '',
+    /可直接导航的三步流程/
+  )
+  assert.equal(
+    DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'mobile-role-tasks-v2')
+      ?.statuses[0],
+    DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
+  )
+  assert.match(
+    DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'mobile-role-tasks-v2')
+      ?.appliesTo || '',
+    /v2 不代表 API、RBAC、菜单或客户环境已改造/
+  )
+  for (const key of [
+    'admin-command-center-redesign-reference',
+    'task-command-center-redesign-reference',
+    'business-management-center-redesign-reference',
+    'workflow-task-action-flow-redesign-reference',
+  ]) {
+    const reference = DEV_PROTOTYPE_ASSETS.find((item) => item.key === key)
+    assert.equal(reference?.type, 'PNG')
+    assert.deepEqual(reference?.statuses, [DEV_PROTOTYPE_STATUSES.DRAFT])
+  }
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'core-menu-coverage')
       ?.statuses[0],
@@ -146,6 +192,26 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     )?.statuses[0],
     DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT
   )
+  const businessStandardPage = DEV_PROTOTYPE_ASSETS.find(
+    (item) => item.key === 'business-module-standard-page'
+  )
+  const businessCollaborationEntry = DEV_PROTOTYPE_ASSETS.find(
+    (item) => item.key === 'business-task-collab-entry'
+  )
+  assert.match(
+    businessStandardPage?.description || '',
+    /不作为所有标准页的默认固定栏/
+  )
+  assert.match(businessStandardPage?.appliesTo || '', /不默认挂载协同入口/)
+  assert.match(
+    businessCollaborationEntry?.description || '',
+    /当前选中业务记录/
+  )
+  assert.match(
+    businessCollaborationEntry?.description || '',
+    /无待办时不显示固定栏/
+  )
+  assert.match(businessCollaborationEntry?.appliesTo || '', /任务中心承接/)
   assert.equal(
     DEV_PROTOTYPE_ASSETS.find((item) => item.key === 'print-template-center')
       ?.statuses[0],
@@ -197,6 +263,67 @@ test('devPrototypes: 登记当前原型与样板资产并区分类型和状态',
     )?.statuses[0],
     DEV_PROTOTYPE_STATUSES.DRAFT
   )
+})
+
+test('devPrototypes: 中央 README 与静态查看器同步登记本轮重设计资产', () => {
+  const redesignedAssetPaths = [
+    'admin-command-center-v1/images/workbench-redesign-reference.png',
+    'task-command-center-v1/images/task-board-redesign-reference.png',
+    'business-management-center-v1/images/business-board-redesign-reference.png',
+    'workflow-task-action-flow-v1/index.html',
+    'workflow-task-action-flow-v1/images/task-action-flow-redesign-reference.png',
+    'mobile-role-tasks-v2/index.html',
+  ]
+
+  assert.match(
+    prototypeStaticIndexSource,
+    /<span>HTML 样板<\/span><strong>16<\/strong>/u
+  )
+  assert.match(
+    prototypeStaticIndexSource,
+    /<span>PNG \/ 截图<\/span><strong>10<\/strong>/u
+  )
+  for (const assetPath of redesignedAssetPaths) {
+    assert(
+      prototypeStaticIndexSource.includes(assetPath),
+      `${assetPath} should be listed in the static prototype index`
+    )
+    assert(
+      prototypeRegistryReadmeSource.includes(assetPath),
+      `${assetPath} should be listed in the prototype registry README`
+    )
+    assert.doesNotThrow(() =>
+      readFileSync(path.join(repoRoot, 'docs/product/prototypes', assetPath))
+    )
+  }
+  assert.match(prototypeRegistryReadmeSource, /截至 2026-07-16/u)
+  assert.match(prototypeRegistryReadmeSource, /十五个产品内核相关 HTML/u)
+  assert.match(
+    prototypeRegistryReadmeSource,
+    /mobile-role-tasks-v2\/index\.html` 尚未进入运行时/u
+  )
+})
+
+test('devPrototypes: 业务页协同入口只呈现当前记录待办并在空待办时隐藏', () => {
+  const html = readFileSync(
+    path.join(
+      repoRoot,
+      'docs/product/prototypes/business-module-page-standard-v1/task-collab-entry-v2.html'
+    ),
+    'utf8'
+  )
+
+  assert.match(html, /协同入口只处理当前选中记录的待办/u)
+  assert.match(html, /跨记录任务回到任务中心/u)
+  assert.match(html, /const tasksByRecord = \{/u)
+  assert.match(
+    html,
+    /activeRecordTasks = tasksByRecord\[recordKey\] \|\| \[\]/u
+  )
+  assert.match(html, /dock\.hidden = activeRecordTasks\.length === 0/u)
+  assert.match(html, /data-record-key="SO-202606-017"[\s\S]*?<td>无待办<\/td>/u)
+  assert.match(html, /实际出货、开票和收付款仍须在对应业务页面办理/u)
+  assert.doesNotMatch(html, /处理本页相关任务|本页待办|只显示当前页面相关任务/u)
 })
 
 test('devPrototypes: 岗位任务端 Current 参考不透出移动端旧动作和技术 key', () => {
@@ -479,6 +606,8 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
     htmlModules: {
       '../../../../docs/product/prototypes/admin-command-center-v1/index.html':
         '<!doctype html><title>后台工作台样板</title>',
+      '../../../../docs/product/prototypes/workflow-task-action-flow-v1/index.html':
+        '<!doctype html><title>Workflow 任务处理流程样板</title>',
       '../../../../docs/product/prototypes/core-menu-coverage-v1/index.html':
         '<!doctype html><title>产品核心菜单覆盖样板</title>',
       '../../../../docs/product/prototypes/formal-menu-candidate-v1/index.html':
@@ -499,8 +628,18 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
         '<!doctype html><title>弹窗抽屉动作标准样板</title>',
       '../../../../docs/product/prototypes/mobile-role-tasks-v1/implemented-reference.html':
         '<!doctype html><title>岗位任务端</title>',
+      '../../../../docs/product/prototypes/mobile-role-tasks-v2/index.html':
+        '<!doctype html><title>岗位任务中心 v2</title>',
     },
     imageModules: {
+      '../../../../docs/product/prototypes/admin-command-center-v1/images/workbench-redesign-reference.png':
+        '/assets/workbench-redesign-reference.png',
+      '../../../../docs/product/prototypes/task-command-center-v1/images/task-board-redesign-reference.png':
+        '/assets/task-board-redesign-reference.png',
+      '../../../../docs/product/prototypes/business-management-center-v1/images/business-board-redesign-reference.png':
+        '/assets/business-board-redesign-reference.png',
+      '../../../../docs/product/prototypes/workflow-task-action-flow-v1/images/task-action-flow-redesign-reference.png':
+        '/assets/task-action-flow-redesign-reference.png',
       '../../../../docs/product/prototypes/mobile-role-tasks-v1/images/mobile-role-tasks-list-reference.png':
         '/assets/mobile-role-tasks-list-reference.png',
     },
@@ -535,6 +674,15 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   const actionPrototype = items.find(
     (item) => item.key === 'action-modal-drawer-standard'
   )
+  const workflowActionPrototype = items.find(
+    (item) => item.key === 'workflow-task-action-flow'
+  )
+  const workflowActionReference = items.find(
+    (item) => item.key === 'workflow-task-action-flow-redesign-reference'
+  )
+  const mobileV2Prototype = items.find(
+    (item) => item.key === 'mobile-role-tasks-v2'
+  )
 
   assert.equal(commandCenterPrototype?.available, true)
   assert.match(commandCenterPrototype?.source || '', /后台工作台样板/)
@@ -556,6 +704,15 @@ test('devPrototypes: 构建 HTML source 和 PNG URL 资产', () => {
   assert.match(formPrototype?.source || '', /新建编辑表单标准样板/)
   assert.equal(actionPrototype?.available, true)
   assert.match(actionPrototype?.source || '', /弹窗抽屉动作标准样板/)
+  assert.equal(workflowActionPrototype?.available, true)
+  assert.match(workflowActionPrototype?.source || '', /任务处理流程样板/)
+  assert.equal(workflowActionReference?.available, true)
+  assert.equal(
+    workflowActionReference?.url,
+    '/assets/task-action-flow-redesign-reference.png'
+  )
+  assert.equal(mobileV2Prototype?.available, true)
+  assert.match(mobileV2Prototype?.source || '', /岗位任务中心 v2/)
   assert.equal(mobileList?.available, true)
   assert.equal(mobileList?.url, '/assets/mobile-role-tasks-list-reference.png')
 })
@@ -650,6 +807,7 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
       'admin-command-center',
       'core-menu-coverage',
       'task-command-center',
+      'workflow-task-action-flow',
       'business-management-center',
       'metric-card-interaction-standard',
       'formal-menu-candidate',
@@ -660,6 +818,7 @@ test('devPrototypes: 支持按状态和关键词筛选', () => {
       'business-detail-standard-page',
       'business-form-standard-page',
       'action-modal-drawer-standard',
+      'mobile-role-tasks-v2',
     ]
   )
   assert.equal(
@@ -747,9 +906,14 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
     groups.map((group) => group.directory),
     [
       'admin-command-center-v1/',
+      'admin-command-center-v1/images/',
       'core-menu-coverage-v1/',
       'task-command-center-v1/',
+      'task-command-center-v1/images/',
+      'workflow-task-action-flow-v1/',
+      'workflow-task-action-flow-v1/images/',
       'business-management-center-v1/',
+      'business-management-center-v1/images/',
       'metric-card-interaction-standard-v1/',
       'formal-menu-candidate-v1/',
       'audit-log-page-v1/',
@@ -759,13 +923,14 @@ test('devPrototypes: 按所属目录分组并清理无效展开目录', () => {
       'business-form-page-standard-v1/',
       'action-modal-drawer-standard-v1/',
       'business-module-page-standard-v1/images/',
+      'mobile-role-tasks-v2/',
       'mobile-role-tasks-v1/',
       'mobile-role-tasks-v1/images/',
     ]
   )
   assert.deepEqual(
     groups.map((group) => group.items.length),
-    [1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 3, 1, 3]
+    [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 3, 1, 1, 3]
   )
 
   assert.deepEqual(

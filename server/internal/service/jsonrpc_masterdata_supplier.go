@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"math"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -33,7 +34,11 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		if !ok {
 			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
 		}
-		item, err := d.masterDataUC.SaveSupplierWithContacts(ctx, ownerID, supplierMutationFromParams(pm), contacts)
+		mutation, ok := supplierMutationFromParams(pm)
+		if !ok {
+			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
+		}
+		item, err := d.masterDataUC.SaveSupplierWithContacts(ctx, ownerID, mutation, contacts)
 		return id, supplierWithContactsMutationResult(ctx, d, item, err), nil
 	case "create_supplier":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierCreate); res != nil {
@@ -42,7 +47,11 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeySuppliers); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.CreateSupplier(ctx, supplierMutationFromParams(pm))
+		mutation, ok := supplierMutationFromParams(pm)
+		if !ok {
+			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
+		}
+		item, err := d.masterDataUC.CreateSupplier(ctx, mutation)
 		return id, supplierMutationResult(ctx, d, item, err), nil
 	case "update_supplier":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierUpdate); res != nil {
@@ -51,7 +60,11 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), masterDataModuleKeySuppliers); res != nil {
 			return id, res, nil
 		}
-		item, err := d.masterDataUC.UpdateSupplier(ctx, getInt(pm, "id", 0), supplierMutationFromParams(pm))
+		mutation, ok := supplierMutationFromParams(pm)
+		if !ok {
+			return id, d.mapMasterDataError(ctx, biz.ErrBadParam), nil
+		}
+		item, err := d.masterDataUC.UpdateSupplier(ctx, getInt(pm, "id", 0), mutation)
 		return id, supplierMutationResult(ctx, d, item, err), nil
 	case "get_supplier":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSupplierRead); res != nil {
@@ -87,15 +100,52 @@ func (d *jsonrpcDispatcher) handleMasterDataSupplier(
 	}
 }
 
-func supplierMutationFromParams(pm map[string]any) *biz.SupplierMutation {
+func supplierMutationFromParams(pm map[string]any) (*biz.SupplierMutation, bool) {
+	processIDs, ok := supplierProcessIDsFromParams(pm)
+	if !ok {
+		return nil, false
+	}
 	return &biz.SupplierMutation{
 		Code:         getString(pm, "code"),
 		Name:         getString(pm, "name"),
 		ShortName:    getWorkflowStringPtr(pm, "short_name"),
 		SupplierType: getWorkflowStringPtr(pm, "supplier_type"),
+		Address:      getWorkflowStringPtr(pm, "address"),
 		TaxNo:        getWorkflowStringPtr(pm, "tax_no"),
+		ProcessIDs:   processIDs,
 		Note:         getWorkflowStringPtr(pm, "note"),
+	}, true
+}
+
+func supplierProcessIDsFromParams(pm map[string]any) ([]int, bool) {
+	raw, exists := pm["process_ids"]
+	if !exists || raw == nil {
+		return nil, true
 	}
+	items, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	processIDs := make([]int, 0, len(items))
+	for _, item := range items {
+		var processID int
+		switch value := item.(type) {
+		case float64:
+			if math.Trunc(value) != value || value <= 0 || value > float64(math.MaxInt) {
+				return nil, false
+			}
+			processID = int(value)
+		case int:
+			processID = value
+		default:
+			return nil, false
+		}
+		if processID <= 0 {
+			return nil, false
+		}
+		processIDs = append(processIDs, processID)
+	}
+	return processIDs, true
 }
 
 func supplierMutationResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.Supplier, err error) *v1.JsonrpcResult {
@@ -125,12 +175,22 @@ func supplierToMap(item *biz.Supplier) map[string]any {
 		"name":          item.Name,
 		"short_name":    optionalStringValue(item.ShortName),
 		"supplier_type": optionalStringValue(item.SupplierType),
+		"address":       optionalStringValue(item.Address),
 		"tax_no":        optionalStringValue(item.TaxNo),
+		"process_ids":   supplierProcessIDsToAny(item.ProcessIDs),
 		"is_active":     item.IsActive,
 		"note":          optionalStringValue(item.Note),
 		"created_at":    item.CreatedAt.Unix(),
 		"updated_at":    item.UpdatedAt.Unix(),
 	}
+}
+
+func supplierProcessIDsToAny(processIDs []int) []any {
+	out := make([]any, 0, len(processIDs))
+	for _, processID := range processIDs {
+		out = append(out, processID)
+	}
+	return out
 }
 
 func suppliersToAny(items []*biz.Supplier) []any {

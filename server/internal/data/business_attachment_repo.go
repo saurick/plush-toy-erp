@@ -13,6 +13,7 @@ import (
 	"server/internal/data/model/ent/financefact"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/purchaseorder"
@@ -41,9 +42,19 @@ func NewBusinessAttachmentRepo(d *Data, logger log.Logger) *businessAttachmentRe
 var _ biz.BusinessAttachmentRepo = (*businessAttachmentRepo)(nil)
 
 func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, in *biz.BusinessAttachmentCreate) (*biz.BusinessAttachment, error) {
-	ownerTable, ok := businessAttachmentOwnerTable(in.OwnerType)
-	if !ok || r == nil || r.data == nil || r.data.sqldb == nil {
+	if r == nil || r.data == nil || r.data.sqldb == nil || in == nil {
 		return nil, biz.ErrBusinessAttachmentOwnerInvalid
+	}
+	ownerTable, ok := businessAttachmentOwnerTable(in.OwnerType)
+	if !ok {
+		return nil, biz.ErrBusinessAttachmentOwnerInvalid
+	}
+	productImageWrite := in.OwnerType == biz.BusinessAttachmentOwnerProduct || in.AttachmentType == biz.BusinessAttachmentTypeProductImage
+	if productImageWrite && (in.OwnerType != biz.BusinessAttachmentOwnerProduct ||
+		in.AttachmentType != biz.BusinessAttachmentTypeProductImage ||
+		in.SlotKey == nil ||
+		!biz.IsBusinessAttachmentProductImageSlotAllowed(*in.SlotKey)) {
+		return nil, biz.ErrBadParam
 	}
 	tx, err := r.data.sqldb.BeginTx(ctx, nil)
 	if err != nil {
@@ -53,7 +64,9 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 
 	ownerQuery := fmt.Sprintf("SELECT id FROM %s WHERE id = $1 FOR KEY SHARE", ownerTable)
 	workflowGuard := in.WorkflowGuard
-	if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask {
+	if productImageWrite {
+		ownerQuery = "SELECT id FROM products WHERE id = $1 FOR UPDATE"
+	} else if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask {
 		if workflowGuard == nil || workflowGuard.ExpectedVersion <= 0 || workflowGuard.ActorID <= 0 {
 			return nil, biz.ErrBadParam
 		}
@@ -61,7 +74,9 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 	}
 	if r.data.sqlDialect == "sqlite3" {
 		ownerQuery = fmt.Sprintf("SELECT id FROM %s WHERE id = ?", ownerTable)
-		if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask {
+		if productImageWrite {
+			ownerQuery = "UPDATE products SET id = id WHERE id = ? RETURNING id"
+		} else if in.OwnerType == biz.BusinessAttachmentOwnerWorkflowTask {
 			ownerQuery = "SELECT id, version, task_status_key, owner_role_key, assignee_id FROM workflow_tasks WHERE id = ?"
 		}
 	}
@@ -100,6 +115,11 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 			return nil, biz.ErrBusinessAttachmentOwnerNotFound
 		}
 		return nil, err
+	}
+	if productImageWrite {
+		if _, err := tx.ExecContext(ctx, businessAttachmentProductImageDeleteSQL(r.data.sqlDialect), in.OwnerID, *in.SlotKey); err != nil {
+			return nil, err
+		}
 	}
 
 	insertQuery := `
@@ -153,6 +173,44 @@ func (r *businessAttachmentRepo) CreateBusinessAttachment(ctx context.Context, i
 	}, nil
 }
 
+func (r *businessAttachmentRepo) ClearProductImage(ctx context.Context, productID int, slotKey string) error {
+	if r == nil || r.data == nil || r.data.sqldb == nil || productID <= 0 {
+		return biz.ErrBadParam
+	}
+	slotKey = biz.NormalizeBusinessAttachmentProductImageSlot(slotKey)
+	if !biz.IsBusinessAttachmentProductImageSlotAllowed(slotKey) {
+		return biz.ErrBadParam
+	}
+	tx, err := r.data.sqldb.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	ownerQuery := "SELECT id FROM products WHERE id = $1 FOR UPDATE"
+	if r.data.sqlDialect == "sqlite3" {
+		ownerQuery = "UPDATE products SET id = id WHERE id = ? RETURNING id"
+	}
+	var lockedProductID int
+	if err := tx.QueryRowContext(ctx, ownerQuery, productID).Scan(&lockedProductID); err != nil {
+		if err == stdsql.ErrNoRows {
+			return biz.ErrBusinessAttachmentOwnerNotFound
+		}
+		return err
+	}
+	if _, err := tx.ExecContext(ctx, businessAttachmentProductImageDeleteSQL(r.data.sqlDialect), productID, slotKey); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+func businessAttachmentProductImageDeleteSQL(sqlDialect string) string {
+	if sqlDialect == "sqlite3" {
+		return "DELETE FROM business_attachments WHERE owner_type = 'product' AND owner_id = ? AND attachment_type = 'product_image' AND slot_key = ?"
+	}
+	return "DELETE FROM business_attachments WHERE owner_type = 'product' AND owner_id = $1 AND attachment_type = 'product_image' AND slot_key = $2"
+}
+
 func businessAttachmentOwnerTable(ownerType string) (string, bool) {
 	tables := map[string]string{
 		biz.BusinessAttachmentOwnerSalesOrder:        "sales_orders",
@@ -164,6 +222,7 @@ func businessAttachmentOwnerTable(ownerType string) (string, bool) {
 		biz.BusinessAttachmentOwnerFinanceFact:       "finance_facts",
 		biz.BusinessAttachmentOwnerProductionFact:    "production_facts",
 		biz.BusinessAttachmentOwnerOutsourcingFact:   "outsourcing_facts",
+		biz.BusinessAttachmentOwnerProduct:           "products",
 		biz.BusinessAttachmentOwnerProductSKU:        "product_skus",
 		biz.BusinessAttachmentOwnerBOMHeader:         "bom_headers",
 		biz.BusinessAttachmentOwnerWorkflowTask:      "workflow_tasks",
@@ -283,6 +342,8 @@ func (r *businessAttachmentRepo) BusinessAttachmentOwnerExists(ctx context.Conte
 		return r.data.postgres.ProductionFact.Query().Where(productionfact.ID(ownerID)).Exist(ctx)
 	case biz.BusinessAttachmentOwnerOutsourcingFact:
 		return r.data.postgres.OutsourcingFact.Query().Where(outsourcingfact.ID(ownerID)).Exist(ctx)
+	case biz.BusinessAttachmentOwnerProduct:
+		return r.data.postgres.Product.Query().Where(product.ID(ownerID)).Exist(ctx)
 	case biz.BusinessAttachmentOwnerProductSKU:
 		return r.data.postgres.ProductSKU.Query().Where(productsku.ID(ownerID)).Exist(ctx)
 	case biz.BusinessAttachmentOwnerBOMHeader:

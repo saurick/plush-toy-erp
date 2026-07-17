@@ -29,6 +29,7 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'cancel_outsourcing_fact',
     'list_shipments',
     'create_shipment_with_items',
+    'submit_shipment_release',
     'ship_shipment',
     'cancel_shipment',
     'list_stock_reservations',
@@ -107,6 +108,13 @@ test('operationalFactApi: production rework uses the strict completion source co
   assert.doesNotMatch(
     source,
     /export async function createProductionReworkFromCompletion[\s\S]*create_production_fact/u
+  )
+})
+
+test('operationalFactApi: shipment release uses the strict source task contract', () => {
+  assert.match(
+    source,
+    /export async function submitShipmentRelease[\s\S]*normalizeShipmentReleaseTaskRequest\(params\)[\s\S]*'submit_shipment_release'[\s\S]*validateShipmentReleaseTaskResult/u
   )
 })
 

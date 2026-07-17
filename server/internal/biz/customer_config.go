@@ -2329,7 +2329,7 @@ func processDomainCommandReferencedModuleKeys(commandKey string) []string {
 	case ProcessDomainCommandShipmentFinanceRelease:
 		return []string{"shipments", "finance"}
 	case ProcessDomainCommandShipmentShip:
-		return []string{"shipments", "inventory"}
+		return []string{"shipments", "inventory", "workflow_tasks"}
 	case ProcessDomainCommandFinanceReceivableLead:
 		return []string{"shipments", "finance"}
 	default:
@@ -2498,7 +2498,12 @@ func validateCustomerConfigProcessNode(processKey, businessRefType, nodeKey, nod
 		if writesFact, err := boolFromProcessDefinition(policySnapshot, "writes_fact"); err != nil || writesFact {
 			return ErrBadParam
 		}
-	case ProcessNodeTypeApproval, ProcessNodeTypeHumanTask, ProcessNodeTypeEnd:
+	case ProcessNodeTypeApproval, ProcessNodeTypeHumanTask:
+		if err := ValidateWorkflowSourceTaskReservedNamespace(nodeKey, ""); err != nil {
+			return fmt.Errorf("%w: process node %s uses a source-generated workflow task namespace", ErrBadParam, nodeKey)
+		}
+		return nil
+	case ProcessNodeTypeEnd:
 		return nil
 	default:
 		return ErrBadParam

@@ -34,6 +34,8 @@ const (
 	FieldProcessBase = "process_base"
 	// FieldProcessMethod holds the string denoting the process_method field in the database.
 	FieldProcessMethod = "process_method"
+	// FieldProductionOperationCode holds the string denoting the production_operation_code field in the database.
+	FieldProductionOperationCode = "production_operation_code"
 	// FieldNote holds the string denoting the note field in the database.
 	FieldNote = "note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -93,6 +95,7 @@ var Columns = []string{
 	FieldTotalUsageSnapshot,
 	FieldProcessBase,
 	FieldProcessMethod,
+	FieldProductionOperationCode,
 	FieldNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -125,6 +128,8 @@ var (
 	ProcessBaseValidator func(string) error
 	// ProcessMethodValidator is a validator for the "process_method" field. It is called by the builders before save.
 	ProcessMethodValidator func(string) error
+	// ProductionOperationCodeValidator is a validator for the "production_operation_code" field. It is called by the builders before save.
+	ProductionOperationCodeValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	NoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -191,6 +196,11 @@ func ByProcessBase(opts ...sql.OrderTermOption) OrderOption {
 // ByProcessMethod orders the results by the process_method field.
 func ByProcessMethod(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProcessMethod, opts...).ToFunc()
+}
+
+// ByProductionOperationCode orders the results by the production_operation_code field.
+func ByProductionOperationCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductionOperationCode, opts...).ToFunc()
 }
 
 // ByNote orders the results by the note field.

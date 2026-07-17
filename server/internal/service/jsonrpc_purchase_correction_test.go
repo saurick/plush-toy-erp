@@ -6,6 +6,8 @@ import (
 
 	"server/internal/biz"
 	"server/internal/errcode"
+
+	"github.com/shopspring/decimal"
 )
 
 func TestPurchaseCorrectionCreateParsersOwnIdempotencyPayload(t *testing.T) {
@@ -91,7 +93,14 @@ func TestJsonrpcDispatcher_RejectedQualityInspectionCreatesTraceablePurchaseRetu
 	if _, err := j.inventoryUC.SubmitQualityInspection(ctx, draft.ID); err != nil {
 		t.Fatalf("submit quality return source: %v", err)
 	}
-	rejected, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: draft.ID, DecisionNote: stringPtr("尺寸不合格")})
+	operator := biz.QualityInspectionDefectRateOperatorApprox
+	percent := decimal.NewFromInt(20)
+	rejected, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
+		InspectionID:       draft.ID,
+		DefectRateOperator: &operator,
+		DefectRatePercent:  &percent,
+		DecisionNote:       stringPtr("尺寸不合格"),
+	})
 	if err != nil {
 		t.Fatalf("reject quality return source: %v", err)
 	}

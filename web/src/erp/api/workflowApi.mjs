@@ -174,8 +174,8 @@ function requireWorkflowTaskMutationResult(operation, params, result) {
   return task
 }
 
-export async function listWorkflowTasks(params = {}) {
-  const result = await workflowRpc.call('list_tasks', params)
+export async function listWorkflowTasks(params = {}, options = {}) {
+  const result = await workflowRpc.call('list_tasks', params, options)
   return dataOf(result)
 }
 

@@ -12,6 +12,9 @@ import (
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionorderoperation"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
+	"server/internal/data/model/ent/productionwipbatch"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -337,6 +340,51 @@ func (_u *ProductionOrderUpdate) AddMaterialRequirements(v ...*ProductionOrderMa
 	return _u.AddMaterialRequirementIDs(ids...)
 }
 
+// AddOperationIDs adds the "operations" edge to the ProductionOrderOperation entity by IDs.
+func (_u *ProductionOrderUpdate) AddOperationIDs(ids ...int) *ProductionOrderUpdate {
+	_u.mutation.AddOperationIDs(ids...)
+	return _u
+}
+
+// AddOperations adds the "operations" edges to the ProductionOrderOperation entity.
+func (_u *ProductionOrderUpdate) AddOperations(v ...*ProductionOrderOperation) *ProductionOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOperationIDs(ids...)
+}
+
+// AddWipBatchIDs adds the "wip_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionOrderUpdate) AddWipBatchIDs(ids ...int) *ProductionOrderUpdate {
+	_u.mutation.AddWipBatchIDs(ids...)
+	return _u
+}
+
+// AddWipBatches adds the "wip_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionOrderUpdate) AddWipBatches(v ...*ProductionWIPBatch) *ProductionOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWipBatchIDs(ids...)
+}
+
+// AddPackagingConfirmationIDs adds the "packaging_confirmations" edge to the ProductionPackagingConfirmation entity by IDs.
+func (_u *ProductionOrderUpdate) AddPackagingConfirmationIDs(ids ...int) *ProductionOrderUpdate {
+	_u.mutation.AddPackagingConfirmationIDs(ids...)
+	return _u
+}
+
+// AddPackagingConfirmations adds the "packaging_confirmations" edges to the ProductionPackagingConfirmation entity.
+func (_u *ProductionOrderUpdate) AddPackagingConfirmations(v ...*ProductionPackagingConfirmation) *ProductionOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPackagingConfirmationIDs(ids...)
+}
+
 // AddEventIDs adds the "events" edge to the ProductionOrderEvent entity by IDs.
 func (_u *ProductionOrderUpdate) AddEventIDs(ids ...int) *ProductionOrderUpdate {
 	_u.mutation.AddEventIDs(ids...)
@@ -454,6 +502,69 @@ func (_u *ProductionOrderUpdate) RemoveMaterialRequirements(v ...*ProductionOrde
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveMaterialRequirementIDs(ids...)
+}
+
+// ClearOperations clears all "operations" edges to the ProductionOrderOperation entity.
+func (_u *ProductionOrderUpdate) ClearOperations() *ProductionOrderUpdate {
+	_u.mutation.ClearOperations()
+	return _u
+}
+
+// RemoveOperationIDs removes the "operations" edge to ProductionOrderOperation entities by IDs.
+func (_u *ProductionOrderUpdate) RemoveOperationIDs(ids ...int) *ProductionOrderUpdate {
+	_u.mutation.RemoveOperationIDs(ids...)
+	return _u
+}
+
+// RemoveOperations removes "operations" edges to ProductionOrderOperation entities.
+func (_u *ProductionOrderUpdate) RemoveOperations(v ...*ProductionOrderOperation) *ProductionOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOperationIDs(ids...)
+}
+
+// ClearWipBatches clears all "wip_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionOrderUpdate) ClearWipBatches() *ProductionOrderUpdate {
+	_u.mutation.ClearWipBatches()
+	return _u
+}
+
+// RemoveWipBatchIDs removes the "wip_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionOrderUpdate) RemoveWipBatchIDs(ids ...int) *ProductionOrderUpdate {
+	_u.mutation.RemoveWipBatchIDs(ids...)
+	return _u
+}
+
+// RemoveWipBatches removes "wip_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionOrderUpdate) RemoveWipBatches(v ...*ProductionWIPBatch) *ProductionOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWipBatchIDs(ids...)
+}
+
+// ClearPackagingConfirmations clears all "packaging_confirmations" edges to the ProductionPackagingConfirmation entity.
+func (_u *ProductionOrderUpdate) ClearPackagingConfirmations() *ProductionOrderUpdate {
+	_u.mutation.ClearPackagingConfirmations()
+	return _u
+}
+
+// RemovePackagingConfirmationIDs removes the "packaging_confirmations" edge to ProductionPackagingConfirmation entities by IDs.
+func (_u *ProductionOrderUpdate) RemovePackagingConfirmationIDs(ids ...int) *ProductionOrderUpdate {
+	_u.mutation.RemovePackagingConfirmationIDs(ids...)
+	return _u
+}
+
+// RemovePackagingConfirmations removes "packaging_confirmations" edges to ProductionPackagingConfirmation entities.
+func (_u *ProductionOrderUpdate) RemovePackagingConfirmations(v ...*ProductionPackagingConfirmation) *ProductionOrderUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePackagingConfirmationIDs(ids...)
 }
 
 // ClearEvents clears all "events" edges to the ProductionOrderEvent entity.
@@ -748,6 +859,141 @@ func (_u *ProductionOrderUpdate) sqlSave(ctx context.Context) (_node int, err er
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OperationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.OperationsTable,
+			Columns: []string{productionorder.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOperationsIDs(); len(nodes) > 0 && !_u.mutation.OperationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.OperationsTable,
+			Columns: []string{productionorder.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OperationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.OperationsTable,
+			Columns: []string{productionorder.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.WipBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.WipBatchesTable,
+			Columns: []string{productionorder.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWipBatchesIDs(); len(nodes) > 0 && !_u.mutation.WipBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.WipBatchesTable,
+			Columns: []string{productionorder.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WipBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.WipBatchesTable,
+			Columns: []string{productionorder.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PackagingConfirmationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.PackagingConfirmationsTable,
+			Columns: []string{productionorder.PackagingConfirmationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPackagingConfirmationsIDs(); len(nodes) > 0 && !_u.mutation.PackagingConfirmationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.PackagingConfirmationsTable,
+			Columns: []string{productionorder.PackagingConfirmationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PackagingConfirmationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.PackagingConfirmationsTable,
+			Columns: []string{productionorder.PackagingConfirmationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1212,6 +1458,51 @@ func (_u *ProductionOrderUpdateOne) AddMaterialRequirements(v ...*ProductionOrde
 	return _u.AddMaterialRequirementIDs(ids...)
 }
 
+// AddOperationIDs adds the "operations" edge to the ProductionOrderOperation entity by IDs.
+func (_u *ProductionOrderUpdateOne) AddOperationIDs(ids ...int) *ProductionOrderUpdateOne {
+	_u.mutation.AddOperationIDs(ids...)
+	return _u
+}
+
+// AddOperations adds the "operations" edges to the ProductionOrderOperation entity.
+func (_u *ProductionOrderUpdateOne) AddOperations(v ...*ProductionOrderOperation) *ProductionOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddOperationIDs(ids...)
+}
+
+// AddWipBatchIDs adds the "wip_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_u *ProductionOrderUpdateOne) AddWipBatchIDs(ids ...int) *ProductionOrderUpdateOne {
+	_u.mutation.AddWipBatchIDs(ids...)
+	return _u
+}
+
+// AddWipBatches adds the "wip_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionOrderUpdateOne) AddWipBatches(v ...*ProductionWIPBatch) *ProductionOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddWipBatchIDs(ids...)
+}
+
+// AddPackagingConfirmationIDs adds the "packaging_confirmations" edge to the ProductionPackagingConfirmation entity by IDs.
+func (_u *ProductionOrderUpdateOne) AddPackagingConfirmationIDs(ids ...int) *ProductionOrderUpdateOne {
+	_u.mutation.AddPackagingConfirmationIDs(ids...)
+	return _u
+}
+
+// AddPackagingConfirmations adds the "packaging_confirmations" edges to the ProductionPackagingConfirmation entity.
+func (_u *ProductionOrderUpdateOne) AddPackagingConfirmations(v ...*ProductionPackagingConfirmation) *ProductionOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddPackagingConfirmationIDs(ids...)
+}
+
 // AddEventIDs adds the "events" edge to the ProductionOrderEvent entity by IDs.
 func (_u *ProductionOrderUpdateOne) AddEventIDs(ids ...int) *ProductionOrderUpdateOne {
 	_u.mutation.AddEventIDs(ids...)
@@ -1329,6 +1620,69 @@ func (_u *ProductionOrderUpdateOne) RemoveMaterialRequirements(v ...*ProductionO
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveMaterialRequirementIDs(ids...)
+}
+
+// ClearOperations clears all "operations" edges to the ProductionOrderOperation entity.
+func (_u *ProductionOrderUpdateOne) ClearOperations() *ProductionOrderUpdateOne {
+	_u.mutation.ClearOperations()
+	return _u
+}
+
+// RemoveOperationIDs removes the "operations" edge to ProductionOrderOperation entities by IDs.
+func (_u *ProductionOrderUpdateOne) RemoveOperationIDs(ids ...int) *ProductionOrderUpdateOne {
+	_u.mutation.RemoveOperationIDs(ids...)
+	return _u
+}
+
+// RemoveOperations removes "operations" edges to ProductionOrderOperation entities.
+func (_u *ProductionOrderUpdateOne) RemoveOperations(v ...*ProductionOrderOperation) *ProductionOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveOperationIDs(ids...)
+}
+
+// ClearWipBatches clears all "wip_batches" edges to the ProductionWIPBatch entity.
+func (_u *ProductionOrderUpdateOne) ClearWipBatches() *ProductionOrderUpdateOne {
+	_u.mutation.ClearWipBatches()
+	return _u
+}
+
+// RemoveWipBatchIDs removes the "wip_batches" edge to ProductionWIPBatch entities by IDs.
+func (_u *ProductionOrderUpdateOne) RemoveWipBatchIDs(ids ...int) *ProductionOrderUpdateOne {
+	_u.mutation.RemoveWipBatchIDs(ids...)
+	return _u
+}
+
+// RemoveWipBatches removes "wip_batches" edges to ProductionWIPBatch entities.
+func (_u *ProductionOrderUpdateOne) RemoveWipBatches(v ...*ProductionWIPBatch) *ProductionOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveWipBatchIDs(ids...)
+}
+
+// ClearPackagingConfirmations clears all "packaging_confirmations" edges to the ProductionPackagingConfirmation entity.
+func (_u *ProductionOrderUpdateOne) ClearPackagingConfirmations() *ProductionOrderUpdateOne {
+	_u.mutation.ClearPackagingConfirmations()
+	return _u
+}
+
+// RemovePackagingConfirmationIDs removes the "packaging_confirmations" edge to ProductionPackagingConfirmation entities by IDs.
+func (_u *ProductionOrderUpdateOne) RemovePackagingConfirmationIDs(ids ...int) *ProductionOrderUpdateOne {
+	_u.mutation.RemovePackagingConfirmationIDs(ids...)
+	return _u
+}
+
+// RemovePackagingConfirmations removes "packaging_confirmations" edges to ProductionPackagingConfirmation entities.
+func (_u *ProductionOrderUpdateOne) RemovePackagingConfirmations(v ...*ProductionPackagingConfirmation) *ProductionOrderUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemovePackagingConfirmationIDs(ids...)
 }
 
 // ClearEvents clears all "events" edges to the ProductionOrderEvent entity.
@@ -1653,6 +2007,141 @@ func (_u *ProductionOrderUpdateOne) sqlSave(ctx context.Context) (_node *Product
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.OperationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.OperationsTable,
+			Columns: []string{productionorder.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedOperationsIDs(); len(nodes) > 0 && !_u.mutation.OperationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.OperationsTable,
+			Columns: []string{productionorder.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.OperationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.OperationsTable,
+			Columns: []string{productionorder.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.WipBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.WipBatchesTable,
+			Columns: []string{productionorder.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedWipBatchesIDs(); len(nodes) > 0 && !_u.mutation.WipBatchesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.WipBatchesTable,
+			Columns: []string{productionorder.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.WipBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.WipBatchesTable,
+			Columns: []string{productionorder.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.PackagingConfirmationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.PackagingConfirmationsTable,
+			Columns: []string{productionorder.PackagingConfirmationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedPackagingConfirmationsIDs(); len(nodes) > 0 && !_u.mutation.PackagingConfirmationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.PackagingConfirmationsTable,
+			Columns: []string{productionorder.PackagingConfirmationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.PackagingConfirmationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.PackagingConfirmationsTable,
+			Columns: []string{productionorder.PackagingConfirmationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -260,7 +260,13 @@ function processColumns() {
   ]
 }
 
-function baseColumns({ type, unitDisplay }) {
+function supplierProcessLabels(processIDs, processOptions) {
+  return (Array.isArray(processIDs) ? processIDs : [])
+    .map((processID) => referenceLabel(processOptions, processID, '工序'))
+    .filter(Boolean)
+}
+
+function baseColumns({ type, unitDisplay, processOptions }) {
   return [
     {
       title: '编号',
@@ -365,6 +371,33 @@ function baseColumns({ type, unitDisplay }) {
               SUPPLIER_TYPE_LABELS[record?.supplier_type] ||
               (record?.supplier_type ? '供应商类型' : ''),
           },
+          {
+            title: '经营 / 加工地址',
+            exportTitle: '经营 / 加工地址',
+            dataIndex: 'address',
+            width: 240,
+            sorter: (a, b) => compareText(a?.address, b?.address),
+            render: (value) => value || '-',
+          },
+          {
+            title: '可加工工序',
+            exportTitle: '可加工工序',
+            dataIndex: 'process_ids',
+            width: 260,
+            sorter: (a, b) =>
+              compareText(
+                supplierProcessLabels(a?.process_ids, processOptions).join(
+                  '、'
+                ),
+                supplierProcessLabels(b?.process_ids, processOptions).join('、')
+              ),
+            render: (value) =>
+              supplierProcessLabels(value, processOptions).join('、') || '-',
+            exportValue: (record) =>
+              supplierProcessLabels(record?.process_ids, processOptions).join(
+                '、'
+              ),
+          },
         ]
       : []),
     ...(type === 'materials'
@@ -386,6 +419,7 @@ function baseColumns({ type, unitDisplay }) {
 export function buildMasterDataRecordColumns({
   type,
   productOptions,
+  processOptions = [],
   unitDisplay,
 }) {
   if (type === 'products') {
@@ -399,5 +433,7 @@ export function buildMasterDataRecordColumns({
   if (type === 'processes') {
     return applyBusinessColumnSorters(processColumns())
   }
-  return applyBusinessColumnSorters(baseColumns({ type, unitDisplay }))
+  return applyBusinessColumnSorters(
+    baseColumns({ type, unitDisplay, processOptions })
+  )
 }

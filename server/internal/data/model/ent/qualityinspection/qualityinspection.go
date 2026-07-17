@@ -23,6 +23,10 @@ const (
 	FieldPurchaseReceiptItemID = "purchase_receipt_item_id"
 	// FieldInventoryLotID holds the string denoting the inventory_lot_id field in the database.
 	FieldInventoryLotID = "inventory_lot_id"
+	// FieldProductionWipBatchID holds the string denoting the production_wip_batch_id field in the database.
+	FieldProductionWipBatchID = "production_wip_batch_id"
+	// FieldGateCode holds the string denoting the gate_code field in the database.
+	FieldGateCode = "gate_code"
 	// FieldMaterialID holds the string denoting the material_id field in the database.
 	FieldMaterialID = "material_id"
 	// FieldWarehouseID holds the string denoting the warehouse_id field in the database.
@@ -47,6 +51,10 @@ const (
 	FieldInspectedAt = "inspected_at"
 	// FieldInspectorID holds the string denoting the inspector_id field in the database.
 	FieldInspectorID = "inspector_id"
+	// FieldDefectRateOperator holds the string denoting the defect_rate_operator field in the database.
+	FieldDefectRateOperator = "defect_rate_operator"
+	// FieldDefectRatePercent holds the string denoting the defect_rate_percent field in the database.
+	FieldDefectRatePercent = "defect_rate_percent"
 	// FieldDecisionNote holds the string denoting the decision_note field in the database.
 	FieldDecisionNote = "decision_note"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -59,6 +67,8 @@ const (
 	EdgePurchaseReceiptItem = "purchase_receipt_item"
 	// EdgeInventoryLot holds the string denoting the inventory_lot edge name in mutations.
 	EdgeInventoryLot = "inventory_lot"
+	// EdgeProductionWipBatch holds the string denoting the production_wip_batch edge name in mutations.
+	EdgeProductionWipBatch = "production_wip_batch"
 	// EdgeMaterial holds the string denoting the material edge name in mutations.
 	EdgeMaterial = "material"
 	// EdgeWarehouse holds the string denoting the warehouse edge name in mutations.
@@ -88,6 +98,13 @@ const (
 	InventoryLotInverseTable = "inventory_lots"
 	// InventoryLotColumn is the table column denoting the inventory_lot relation/edge.
 	InventoryLotColumn = "inventory_lot_id"
+	// ProductionWipBatchTable is the table that holds the production_wip_batch relation/edge.
+	ProductionWipBatchTable = "quality_inspections"
+	// ProductionWipBatchInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	ProductionWipBatchInverseTable = "production_wip_batches"
+	// ProductionWipBatchColumn is the table column denoting the production_wip_batch relation/edge.
+	ProductionWipBatchColumn = "production_wip_batch_id"
 	// MaterialTable is the table that holds the material relation/edge.
 	MaterialTable = "quality_inspections"
 	// MaterialInverseTable is the table name for the Material entity.
@@ -118,6 +135,8 @@ var Columns = []string{
 	FieldPurchaseReceiptID,
 	FieldPurchaseReceiptItemID,
 	FieldInventoryLotID,
+	FieldProductionWipBatchID,
+	FieldGateCode,
 	FieldMaterialID,
 	FieldWarehouseID,
 	FieldSourceType,
@@ -130,6 +149,8 @@ var Columns = []string{
 	FieldOriginalLotStatus,
 	FieldInspectedAt,
 	FieldInspectorID,
+	FieldDefectRateOperator,
+	FieldDefectRatePercent,
 	FieldDecisionNote,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -160,6 +181,10 @@ var (
 	PurchaseReceiptItemIDValidator func(int) error
 	// InventoryLotIDValidator is a validator for the "inventory_lot_id" field. It is called by the builders before save.
 	InventoryLotIDValidator func(int) error
+	// ProductionWipBatchIDValidator is a validator for the "production_wip_batch_id" field. It is called by the builders before save.
+	ProductionWipBatchIDValidator func(int) error
+	// GateCodeValidator is a validator for the "gate_code" field. It is called by the builders before save.
+	GateCodeValidator func(string) error
 	// MaterialIDValidator is a validator for the "material_id" field. It is called by the builders before save.
 	MaterialIDValidator func(int) error
 	// WarehouseIDValidator is a validator for the "warehouse_id" field. It is called by the builders before save.
@@ -186,6 +211,8 @@ var (
 	OriginalLotStatusValidator func(string) error
 	// InspectorIDValidator is a validator for the "inspector_id" field. It is called by the builders before save.
 	InspectorIDValidator func(int) error
+	// DefectRateOperatorValidator is a validator for the "defect_rate_operator" field. It is called by the builders before save.
+	DefectRateOperatorValidator func(string) error
 	// DecisionNoteValidator is a validator for the "decision_note" field. It is called by the builders before save.
 	DecisionNoteValidator func(string) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -222,6 +249,16 @@ func ByPurchaseReceiptItemID(opts ...sql.OrderTermOption) OrderOption {
 // ByInventoryLotID orders the results by the inventory_lot_id field.
 func ByInventoryLotID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldInventoryLotID, opts...).ToFunc()
+}
+
+// ByProductionWipBatchID orders the results by the production_wip_batch_id field.
+func ByProductionWipBatchID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductionWipBatchID, opts...).ToFunc()
+}
+
+// ByGateCode orders the results by the gate_code field.
+func ByGateCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldGateCode, opts...).ToFunc()
 }
 
 // ByMaterialID orders the results by the material_id field.
@@ -284,6 +321,16 @@ func ByInspectorID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldInspectorID, opts...).ToFunc()
 }
 
+// ByDefectRateOperator orders the results by the defect_rate_operator field.
+func ByDefectRateOperator(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefectRateOperator, opts...).ToFunc()
+}
+
+// ByDefectRatePercent orders the results by the defect_rate_percent field.
+func ByDefectRatePercent(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDefectRatePercent, opts...).ToFunc()
+}
+
 // ByDecisionNote orders the results by the decision_note field.
 func ByDecisionNote(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDecisionNote, opts...).ToFunc()
@@ -317,6 +364,13 @@ func ByPurchaseReceiptItemField(field string, opts ...sql.OrderTermOption) Order
 func ByInventoryLotField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
 		sqlgraph.OrderByNeighborTerms(s, newInventoryLotStep(), sql.OrderByField(field, opts...))
+	}
+}
+
+// ByProductionWipBatchField orders the results by production_wip_batch field.
+func ByProductionWipBatchField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductionWipBatchStep(), sql.OrderByField(field, opts...))
 	}
 }
 
@@ -366,6 +420,13 @@ func newInventoryLotStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(InventoryLotInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, InventoryLotTable, InventoryLotColumn),
+	)
+}
+func newProductionWipBatchStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductionWipBatchInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ProductionWipBatchTable, ProductionWipBatchColumn),
 	)
 }
 func newMaterialStep() *sqlgraph.Step {

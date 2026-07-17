@@ -1,3 +1,5 @@
+import { Buffer } from 'node:buffer'
+
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
@@ -5,6 +7,7 @@ import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPrevie
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
+import { createWorkflowSourceTaskScenarios } from './workflowSourceTaskScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
   const {
@@ -132,13 +135,13 @@ export function createStyleL1Scenarios(deps) {
       .waitFor({ state: 'visible', timeout: 10_000 })
     const metrics = await page.evaluate(() => {
       const sourceItems = Array.from(
-        document.querySelectorAll('.erp-business-board-source-item')
+        document.querySelectorAll('.erp-business-board-source-item--openable')
       )
       const sourceCount = (label) => {
         const entry = document.querySelector(`[aria-label="查看${label}"]`)
         return String(
           entry
-            ?.closest('.erp-business-board-source-item')
+            ?.closest('.erp-business-board-source-item--openable')
             ?.querySelector('.erp-business-board-source-count')?.textContent ||
             ''
         ).trim()
@@ -204,10 +207,8 @@ export function createStyleL1Scenarios(deps) {
     assert(!metrics.factSummary.ariaLabel.includes('暂不可用'))
     assert(metrics.riskSummary.text.includes('93'))
     assert.deepEqual(metrics.laneCounts, {
-      常规待办: '55',
       阻塞: '27',
       到期提醒: '66',
-      已结束: '32',
     })
   }
   const assertResponsiveSelectionActionBar = async (
@@ -639,6 +640,328 @@ export function createStyleL1Scenarios(deps) {
         fullPage: false,
       })
     }
+  }
+
+  const createAppendixSVGFile = (
+    templateKey,
+    { index, width = 640, height = 360, label = `Appendix ${index}` }
+  ) => {
+    const colors = ['#dbeafe', '#dcfce7', '#fef3c7', '#fce7f3', '#ede9fe']
+    const color = colors[(Math.max(1, Number(index)) - 1) % colors.length]
+    const bandHeight = Math.max(180, Math.min(600, Math.round(height / 4)))
+    const bands = Array.from(
+      { length: Math.max(1, Math.ceil(height / bandHeight)) },
+      (_, bandIndex) => {
+        const y = bandIndex * bandHeight
+        return [
+          `<rect x="0" y="${y}" width="${width}" height="${Math.min(
+            bandHeight,
+            height - y
+          )}" fill="${bandIndex % 2 === 0 ? color : '#ffffff'}"/>`,
+          `<text x="${width / 2}" y="${Math.min(
+            height - 24,
+            y + bandHeight / 2
+          )}" text-anchor="middle" font-family="sans-serif" font-size="${Math.max(
+            28,
+            Math.min(52, Math.round(width / 12))
+          )}" fill="#0f172a">${label} · ${bandIndex + 1}</text>`,
+        ].join('')
+      }
+    ).join('')
+    const name = `${templateKey}-appendix-${index}.svg`
+    const svg = [
+      `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">`,
+      bands,
+      `<rect x="8" y="8" width="${Math.max(1, width - 16)}" height="${Math.max(
+        1,
+        height - 16
+      )}" rx="18" fill="none" stroke="#334155" stroke-width="4"/>`,
+      '</svg>',
+    ].join('')
+    return {
+      name,
+      mimeType: 'image/svg+xml',
+      buffer: Buffer.from(svg),
+    }
+  }
+
+  const createAppendixSVGFiles = (templateKey, startIndex, count) => {
+    const halfWidthHeights = [360, 520, 420, 640, 480]
+    return Array.from({ length: count }, (_, offset) => {
+      const index = startIndex + offset
+      return createAppendixSVGFile(templateKey, {
+        index,
+        height: halfWidthHeights[(index - 1) % halfWidthHeights.length],
+      })
+    })
+  }
+
+  const waitForPrintAppendixImageCount = async (
+    page,
+    { paperSelector, expectedCount }
+  ) => {
+    await page.waitForFunction(
+      ({ paperSelector, expectedCount }) => {
+        const paper = document.querySelector(paperSelector)
+        const appendix = paper?.querySelector('[data-print-appendix-images]')
+        const manager = document.querySelector('[data-print-appendix-manager]')
+        const logicalImages = Array.from(
+          appendix?.querySelectorAll('[data-print-appendix-image-id]') || []
+        )
+        const renderedSegments = Array.from(
+          appendix?.querySelectorAll('[data-print-appendix-segment] img') || []
+        )
+        return (
+          appendix?.getAttribute('data-print-appendix-image-count') ===
+            String(expectedCount) &&
+          manager?.querySelectorAll('[data-print-appendix-manager-item]')
+            .length === expectedCount &&
+          logicalImages.length === expectedCount &&
+          renderedSegments.length >= expectedCount &&
+          renderedSegments.every(
+            (image) => image.complete && image.naturalWidth > 0
+          )
+        )
+      },
+      { paperSelector, expectedCount },
+      { timeout: 20_000 }
+    )
+  }
+
+  const assertPrintAppendixImageLayout = async (
+    page,
+    {
+      templateTitle,
+      paperSelector,
+      expectedNames,
+      expectedLayouts = expectedNames.map(() => 'half'),
+      expectedRequestedLayouts = expectedNames.map(() => 'auto'),
+      expectedSegmentCounts = expectedNames.map(() => 1),
+    }
+  ) => {
+    await page.waitForFunction(
+      ({ paperSelector, expectedNames }) => {
+        const paper = document.querySelector(paperSelector)
+        const appendix = paper?.querySelector('[data-print-appendix-images]')
+        const names = Array.from(
+          appendix?.querySelectorAll('[data-print-appendix-image-id]') || []
+        ).map((image) => image.getAttribute('data-print-appendix-image-name'))
+        return JSON.stringify(names) === JSON.stringify(expectedNames)
+      },
+      { paperSelector, expectedNames },
+      { timeout: 10_000 }
+    )
+    const metrics = await page.evaluate((paperSelector) => {
+      const paper = document.querySelector(paperSelector)
+      const appendix = paper?.querySelector('[data-print-appendix-images]')
+      const manager = document.querySelector('[data-print-appendix-manager]')
+      const rows = Array.from(
+        appendix?.querySelectorAll('[data-print-appendix-row]') || []
+      )
+      const images = Array.from(
+        appendix?.querySelectorAll('[data-print-appendix-image-id]') || []
+      )
+      const rowMetrics = rows.map((row) => {
+        const rowRect = row.getBoundingClientRect()
+        const rowImages = Array.from(
+          row.querySelectorAll('[data-print-appendix-image-id]')
+        )
+        const itemRects = rowImages.map((item) => item.getBoundingClientRect())
+        return {
+          layout: row.getAttribute('data-print-appendix-row-layout'),
+          itemCount: rowImages.length,
+          gridColumnCount: window
+            .getComputedStyle(row)
+            .gridTemplateColumns.split(/\s+/u)
+            .filter(Boolean).length,
+          top: rowRect.top,
+          bottom: rowRect.bottom,
+          itemTops: itemRects.map((rect) => rect.top),
+          itemBottoms: itemRects.map((rect) => rect.bottom),
+        }
+      })
+      const imageMetrics = images.map((item) => {
+        const segmentImages = Array.from(item.querySelectorAll('img'))
+        return {
+          name: item.getAttribute('data-print-appendix-image-name'),
+          requestedLayout: item.getAttribute(
+            'data-print-appendix-requested-layout'
+          ),
+          resolvedLayout: item.getAttribute(
+            'data-print-appendix-resolved-layout'
+          ),
+          column: item.getAttribute('data-print-appendix-column'),
+          segmentCount: Number(
+            item.getAttribute('data-print-appendix-segment-count') || 0
+          ),
+          objectFits: segmentImages.map(
+            (image) => window.getComputedStyle(image).objectFit
+          ),
+          segmentRatios: segmentImages.map((image) => {
+            const rect = image.getBoundingClientRect()
+            return {
+              rendered: rect.width > 0 ? rect.height / rect.width : 0,
+              natural:
+                image.naturalWidth > 0
+                  ? image.naturalHeight / image.naturalWidth
+                  : 0,
+            }
+          }),
+        }
+      })
+      return {
+        managerCount: document.querySelectorAll('[data-print-appendix-manager]')
+          .length,
+        managerInRecordPanel: Boolean(
+          manager?.closest('.erp-print-shell__record-panel')
+        ),
+        managerInStage: Boolean(manager?.closest('.erp-print-shell__stage')),
+        appendixCount: paper?.querySelectorAll('[data-print-appendix-images]')
+          .length,
+        declaredImageCount: appendix?.getAttribute(
+          'data-print-appendix-image-count'
+        ),
+        rows: rowMetrics,
+        images: imageMetrics,
+        managerInsidePaper: Boolean(
+          paper?.querySelector('[data-print-appendix-manager]')
+        ),
+        managerActionButtonsInsidePaper:
+          paper?.querySelectorAll(
+            '.erp-print-appendix-manager__item-actions button'
+          ).length || 0,
+      }
+    }, paperSelector)
+    const expectedRows = []
+    let pendingHalf = []
+    const flushHalf = () => {
+      if (!pendingHalf.length) return
+      expectedRows.push({ layout: 'half', indexes: pendingHalf })
+      pendingHalf = []
+    }
+    expectedLayouts.forEach((layout, imageIndex) => {
+      if (layout === 'full') {
+        flushHalf()
+        expectedRows.push({ layout: 'full', indexes: [imageIndex] })
+        return
+      }
+      pendingHalf.push(imageIndex)
+      if (pendingHalf.length === 2) flushHalf()
+    })
+    flushHalf()
+    const expectedColumns = expectedRows.flatMap((row) =>
+      row.indexes.map((_, columnIndex) =>
+        row.layout === 'full' ? 'full' : columnIndex === 0 ? 'left' : 'right'
+      )
+    )
+
+    assert.equal(
+      metrics.managerCount,
+      1,
+      `${templateTitle} 应只有一个末尾附图管理区: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.managerInRecordPanel,
+      true,
+      `${templateTitle} 末尾附图管理区应位于左侧控制面: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.managerInStage,
+      false,
+      `${templateTitle} 末尾附图管理区不应进入右侧纸面: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.appendixCount,
+      1,
+      `${templateTitle} 纸面应渲染一个末尾附图区: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.declaredImageCount,
+      String(expectedNames.length),
+      `${templateTitle} 纸面末尾附图数量不符: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.rows.map((row) => ({
+        layout: row.layout,
+        itemCount: row.itemCount,
+      })),
+      expectedRows.map((row) => ({
+        layout: row.layout,
+        itemCount: row.indexes.length,
+      })),
+      `${templateTitle} 末尾附图混排行结构不符: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.rows.every(
+        (row) =>
+          row.gridColumnCount === (row.layout === 'full' ? 1 : 2) &&
+          row.itemTops.every((top) => Math.abs(top - row.top) <= 1) &&
+          Math.abs(Math.max(...row.itemBottoms) - row.bottom) <= 1
+      ),
+      `${templateTitle} 半宽行应顶部对齐并由较高图片决定行高，整行图片应独占一列: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.rows.some(
+        (row) =>
+          row.layout === 'half' &&
+          row.itemBottoms.length === 2 &&
+          Math.abs(row.itemBottoms[0] - row.itemBottoms[1]) >= 10
+      ),
+      `${templateTitle} 场景必须包含一组不同高度的半宽图片，才能真实证明下一行按较高图片换行: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.images.map((image) => image.name),
+      expectedNames,
+      `${templateTitle} 末尾附图纸面顺序应和控制面顺序一致: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.images.map((image) => image.column),
+      expectedColumns,
+      `${templateTitle} 末尾附图列位置不符: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.images.map((image) => image.requestedLayout),
+      expectedRequestedLayouts,
+      `${templateTitle} 末尾附图手动排版偏好不符: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.images.map((image) => image.resolvedLayout),
+      expectedLayouts,
+      `${templateTitle} 末尾附图实际排版不符: ${JSON.stringify(metrics)}`
+    )
+    assert.deepEqual(
+      metrics.images.map((image) => image.segmentCount),
+      expectedSegmentCounts,
+      `${templateTitle} 末尾附图切片数量不符: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.images.every(
+        (image) =>
+          image.objectFits.every((objectFit) => objectFit === 'contain') &&
+          image.segmentRatios.every(
+            (ratio) => Math.abs(ratio.rendered - ratio.natural) <= 0.02
+          )
+      ),
+      `${templateTitle} 末尾附图应保持原始比例且不裁切: ${JSON.stringify(metrics)}`
+    )
+    assert(
+      metrics.rows.every(
+        (row, rowIndex) =>
+          rowIndex === metrics.rows.length - 1 ||
+          metrics.rows[rowIndex + 1].top >= row.bottom
+      ),
+      `${templateTitle} 下一行必须从上一行最高图片下方开始: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.managerInsidePaper,
+      false,
+      `${templateTitle} 纸面 DOM 不应包含末尾附图管理区: ${JSON.stringify(metrics)}`
+    )
+    assert.equal(
+      metrics.managerActionButtonsInsidePaper,
+      0,
+      `${templateTitle} 纸面 DOM 不应包含前移、后移或移除按钮: ${JSON.stringify(metrics)}`
+    )
   }
 
   const customerRuntimeEffectiveSession = Object.freeze({
@@ -1256,9 +1579,9 @@ export function createStyleL1Scenarios(deps) {
         await expectHeading(page, '工作台')
         await expectText(page, '待我处理')
         await expectText(page, '阻塞/逾期')
-        await expectText(page, '等待交接')
         await expectText(page, '优先处理')
         await expectText(page, '任务详情')
+        await assertTextAbsent(page, '等待交接')
         for (const engineeringText of [
           'Product Core',
           'customer key',
@@ -1295,8 +1618,10 @@ export function createStyleL1Scenarios(deps) {
                   business_status_key: 'project_pending',
                   task_status_key: 'ready',
                   owner_role_key: 'boss',
-                  priority: overdue ? 90 : 50,
-                  due_at: overdue ? now - (10 - index) * 60 : now + index * 60,
+                  priority: overdue ? 90 : 1,
+                  due_at: overdue
+                    ? now - (10 - index) * 60
+                    : now + 86_400 + index * 60,
                   payload: { notification_type: 'task_created' },
                 },
               }),
@@ -1319,56 +1644,73 @@ export function createStyleL1Scenarios(deps) {
         })
         assert.equal(seededTaskCount, 27, '工作台长队列样本应完整创建')
         await page.getByRole('button', { name: '刷新当前页' }).click()
-        await expectText(page, '第 1-8 项 / 共 18 项')
-        await expectText(page, '长队列待办 01')
 
         const queuePanel = page.locator('.erp-workbench-queue-panel')
         const detailPanel = page.locator('.erp-workbench-task-detail')
+        const actionableFilter = page.getByRole('button', {
+          name: /待我处理，\d+ 项/,
+        })
+        const riskFilter = page.getByRole('button', {
+          name: /阻塞\/逾期，\d+ 项/,
+        })
+        const actionableLabel =
+          await actionableFilter.getAttribute('aria-label')
+        const actionableTotal = Number(
+          String(actionableLabel || '').match(/待我处理，(\d+) 项/u)?.[1] || 0
+        )
+        assert(
+          actionableTotal >= 18,
+          `工作台待处理队列应包含新建的 18 条样本: ${actionableLabel}`
+        )
         assert.equal(
           await queuePanel.locator('.ant-table-tbody .ant-table-row').count(),
           8,
           '工作台长队列首屏应只展示 8 项'
         )
         await queuePanel.locator('.ant-pagination-item-2').click()
-        await expectText(page, '第 9-16 项 / 共 18 项')
-        await detailPanel
-          .getByText('长队列待办 09', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-
-        await page.getByRole('button', { name: /阻塞\/逾期，9 项/ }).click()
-        await expectText(page, '第 1-8 项 / 共 9 项')
-        await detailPanel
-          .getByText('长队列逾期 01', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await page.getByRole('button', { name: /待我处理，18 项/ }).click()
-        await expectText(page, '第 1-8 项 / 共 18 项')
-        await detailPanel
-          .getByText('长队列待办 01', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-
-        await page.getByRole('button', { name: /等待交接，0 项/ }).click()
-        await expectText(page, '等待交接暂无任务，可切到待我处理继续处理。')
-        assert.equal(
-          await queuePanel.locator('.ant-pagination').count(),
-          0,
-          '工作台空队列不应保留无意义分页'
-        )
         await queuePanel
-          .getByRole('button', { name: '查看待我处理', exact: true })
-          .click()
-        await expectText(page, '第 1-8 项 / 共 18 项')
-        await detailPanel
-          .getByText('长队列待办 01', { exact: true })
+          .locator('.ant-pagination-item-2.ant-pagination-item-active')
           .waitFor({ state: 'visible', timeout: 10_000 })
+
+        const riskLabel = await riskFilter.getAttribute('aria-label')
+        const riskTotal = Number(
+          String(riskLabel || '').match(/阻塞\/逾期，(\d+) 项/u)?.[1] || 0
+        )
+        assert(
+          riskTotal >= 9,
+          `工作台风险队列应包含新建的 9 条样本: ${riskLabel}`
+        )
+        await riskFilter.click()
+        await queuePanel
+          .locator('.ant-table-tbody .ant-table-row')
+          .first()
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await actionableFilter.click()
 
         const queueRows = queuePanel.locator('.ant-table-tbody .ant-table-row')
+        const queueRowCount = await queueRows.count()
+        assert.equal(queueRowCount, 8, '工作台待处理队列首屏应保持 8 条')
+        const firstTaskName = String(
+          await queueRows
+            .first()
+            .locator('.erp-workbench-task-cell .ant-typography')
+            .first()
+            .textContent()
+        ).trim()
+        const secondTaskName = String(
+          await queueRows
+            .nth(1)
+            .locator('.erp-workbench-task-cell .ant-typography')
+            .first()
+            .textContent()
+        ).trim()
         await queueRows.nth(1).focus()
         await detailPanel
-          .getByText('长队列待办 02', { exact: true })
+          .getByText(secondTaskName, { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await queueRows.first().focus()
         await detailPanel
-          .getByText('长队列待办 01', { exact: true })
+          .getByText(firstTaskName, { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await queueRows.first().dblclick({ position: { x: 24, y: 20 } })
         const workbenchTaskDrawer = page.locator('.erp-task-action-drawer')
@@ -1404,6 +1746,9 @@ export function createStyleL1Scenarios(deps) {
           )
           const pagination = queue?.querySelector('.ant-pagination')
           const sideStack = document.querySelector('.erp-workbench-side-stack')
+          const processingHint = detail?.querySelector(
+            '.erp-task-processing-hint'
+          )
           const dashboardRect = dashboard?.getBoundingClientRect()
           const queueRect = queue?.getBoundingClientRect()
           const detailRect = detail?.getBoundingClientRect()
@@ -1460,6 +1805,8 @@ export function createStyleL1Scenarios(deps) {
             stickyThreshold,
             stickyTopAfterScroll,
             sideStackHeight,
+            processingHintClientWidth: processingHint?.clientWidth || 0,
+            processingHintScrollWidth: processingHint?.scrollWidth || 0,
             stickyPinnedAfterScroll: Boolean(
               contentRect &&
                 contentScrollTop >= stickyThreshold &&
@@ -1485,7 +1832,10 @@ export function createStyleL1Scenarios(deps) {
             metrics.paginationVisible &&
             metrics.selectedRowCount === 1 &&
             metrics.focusableRowCount === 8 &&
-            metrics.selectedRowText.includes('长队列待办 01') &&
+            metrics.selectedRowText.includes(firstTaskName) &&
+            metrics.processingHintClientWidth > 0 &&
+            metrics.processingHintScrollWidth <=
+              metrics.processingHintClientWidth + 1 &&
             metrics.sideStackPosition === 'sticky' &&
             metrics.stickyPinnedAfterScroll &&
             metrics.documentOverflowX <= 1,
@@ -1511,6 +1861,9 @@ export function createStyleL1Scenarios(deps) {
           const detail = document.querySelector('.erp-workbench-task-detail')
           const pagination = queue?.querySelector('.ant-pagination')
           const sideStack = document.querySelector('.erp-workbench-side-stack')
+          const processingHint = detail?.querySelector(
+            '.erp-task-processing-hint'
+          )
           const queueRect = queue?.getBoundingClientRect()
           const detailRect = detail?.getBoundingClientRect()
           const paginationRect = pagination?.getBoundingClientRect()
@@ -1522,6 +1875,8 @@ export function createStyleL1Scenarios(deps) {
             sideStackPosition: sideStack
               ? window.getComputedStyle(sideStack).position
               : '',
+            processingHintClientWidth: processingHint?.clientWidth || 0,
+            processingHintScrollWidth: processingHint?.scrollWidth || 0,
             documentOverflowX:
               document.documentElement.scrollWidth -
               document.documentElement.clientWidth,
@@ -1532,6 +1887,9 @@ export function createStyleL1Scenarios(deps) {
             mobileMetrics.paginationWidth > 0 &&
             mobileMetrics.paginationWidth <= mobileMetrics.queueWidth + 1 &&
             mobileMetrics.detailTop >= mobileMetrics.queueBottom - 1 &&
+            mobileMetrics.processingHintClientWidth > 0 &&
+            mobileMetrics.processingHintScrollWidth <=
+              mobileMetrics.processingHintClientWidth + 1 &&
             mobileMetrics.sideStackPosition !== 'sticky' &&
             mobileMetrics.documentOverflowX <= 1,
           `永绅全局工作台窄屏分页、队列和上下文应按文档流排列: ${JSON.stringify(
@@ -1830,9 +2188,7 @@ export function createStyleL1Scenarios(deps) {
       adminProfile: {
         is_super_admin: false,
         permissions: ['erp.dashboard.read', 'workflow.task.read'],
-        menus: [
-          { key: 'global-dashboard', path: '/erp/dashboard' },
-        ],
+        menus: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
       },
       customerKey: 'yoyoosun',
       viewport: { width: 1440, height: 900 },
@@ -2160,7 +2516,7 @@ export function createStyleL1Scenarios(deps) {
         await expectHeading(page, '质量检验')
         await expectText(page, 'QI-STYLE-L1')
         await expectProjectedActionDisabled(
-          '生成质检草稿',
+          '补建来料质检',
           '质检页页面可见但 actions 为空时不应允许生成草稿'
         )
         await page.getByText('QI-STYLE-L1', { exact: false }).first().click()
@@ -2275,7 +2631,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '看板中心')
         await expectHeading(page, '任务看板')
         await expectText(page, '常规待办')
-        await expectText(page, '阻塞 / 退回')
+        await expectText(page, '阻塞')
         await expectText(page, '到期提醒')
         await expectText(page, '已结束')
         await assertTextAbsent(page, '内部来源')
@@ -2309,7 +2665,7 @@ export function createStyleL1Scenarios(deps) {
               method: 'create_task',
               params: {
                 task_code: 'style-l1-dashboard-task-navigation',
-                task_group: 'shipment_release',
+                task_group: 'trial_warehouse_work',
                 task_name: '看板跳转测试任务',
                 source_type: 'shipping-release',
                 source_id: 9010,
@@ -2352,7 +2708,7 @@ export function createStyleL1Scenarios(deps) {
                   method: 'create_task',
                   params: {
                     task_code: `style-l1-dashboard-pagination-${suffix}`,
-                    task_group: 'shipment_release',
+                    task_group: 'trial_warehouse_work',
                     task_name: `看板分页测试任务 ${suffix}`,
                     source_type: 'shipping-release',
                     source_id: 9020 + index,
@@ -2537,7 +2893,7 @@ export function createStyleL1Scenarios(deps) {
           ),
         })
         await page
-          .getByRole('button', { name: '返回全部泳道', exact: true })
+          .getByRole('button', { name: '查看全部分类', exact: true })
           .click()
         await page.waitForFunction(() => {
           const params = new URLSearchParams(window.location.search)
@@ -2554,7 +2910,7 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(() =>
           new URLSearchParams(window.location.search).has('q')
         )
-        await page.getByText('全部角色').click()
+        await page.getByText('全部岗位').click()
         await page.getByTitle('仓库', { exact: true }).click()
         await page.reload({ waitUntil: 'domcontentloaded' })
         await waitForPath(page, '/erp/task-board')
@@ -2581,13 +2937,68 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '看板跳转测试任务' })
           .first()
         await navigationCurrentTask
-          .getByRole('button', { name: '处理完成', exact: true })
+          .getByText('处理提示', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await navigationCurrentTask
+          .getByText('系统按任务状态、可用操作和关联入口生成', {
+            exact: true,
+          })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        const processingHintMetrics = await navigationCurrentTask
+          .locator('.erp-task-processing-hint')
+          .evaluate((node) => ({
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            clientHeight: node.clientHeight,
+            scrollHeight: node.scrollHeight,
+          }))
+        assert(
+          processingHintMetrics.clientWidth > 0 &&
+            processingHintMetrics.clientHeight > 0 &&
+            processingHintMetrics.scrollWidth <=
+              processingHintMetrics.clientWidth + 1 &&
+            processingHintMetrics.scrollHeight <=
+              processingHintMetrics.clientHeight + 1,
+          `任务看板处理提示不应裁切或横向溢出: ${JSON.stringify(
+            processingHintMetrics
+          )}`
+        )
+        await navigationCurrentTask.screenshot({
+          path: path.resolve(outputDir, 'erp-task-board-processing-hint.png'),
+        })
+        await navigationCurrentTask
+          .getByRole('button', { name: '处理任务', exact: true })
           .click()
         const taskDrawer = page.locator('.erp-task-action-drawer')
         await assertTaskActionDrawerLayout(page, {
-          scenarioName: 'erp-task-board-desktop-complete-drawer',
+          scenarioName: 'erp-task-board-desktop-context-drawer',
           expectedTaskText: '看板跳转测试任务',
-          expectedActionText: '处理完成',
+          expectedActionText: '核对任务信息',
+          expectReasonInput: false,
+        })
+        const actionStep = taskDrawer.getByRole('tab', {
+          name: /选择处理/,
+        })
+        const confirmStep = taskDrawer.getByRole('tab', {
+          name: /确认与提交/,
+        })
+        assert.equal(
+          await confirmStep.getAttribute('aria-disabled'),
+          'true',
+          '未选择处理方式前确认步骤必须禁用'
+        )
+        await actionStep.click()
+        await taskDrawer.getByRole('radio', { name: /处理完成/ }).click()
+        assert.equal(
+          await confirmStep.getAttribute('aria-disabled'),
+          'false',
+          '选择处理方式后确认步骤应可直接点击'
+        )
+        await confirmStep.click()
+        await assertTaskActionDrawerLayout(page, {
+          scenarioName: 'erp-task-board-desktop-complete-confirmation',
+          expectedTaskText: '看板跳转测试任务',
+          expectedActionText: '即将提交',
           expectReasonInput: false,
         })
         const conflictMutation = await page.evaluate(
@@ -2629,16 +3040,16 @@ export function createStyleL1Scenarios(deps) {
           .waitFor({ state: 'visible', timeout: 10_000 })
         await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
         await navigationCurrentTask
-          .getByRole('button', { name: '处理完成', exact: true })
+          .getByRole('button', { name: '处理任务', exact: true })
           .click()
         await assertTaskActionDrawerLayout(page, {
-          scenarioName: 'erp-task-board-desktop-refreshed-complete-drawer',
+          scenarioName: 'erp-task-board-desktop-refreshed-context-drawer',
           expectedTaskText: '看板跳转测试任务',
-          expectedActionText: '处理完成',
+          expectedActionText: '核对任务信息',
           expectReasonInput: false,
         })
-        await taskDrawer.getByRole('button', { name: '返回动作选择' }).click()
-        await taskDrawer.getByRole('button', { name: '标记阻塞' }).click()
+        await taskDrawer.getByRole('tab', { name: /选择处理/ }).click()
+        await taskDrawer.getByRole('radio', { name: /标记阻塞/ }).click()
         await assertTaskActionDrawerLayout(page, {
           scenarioName: 'erp-task-board-desktop-block-drawer',
           expectedTaskText: '看板跳转测试任务',
@@ -2739,16 +3150,32 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '超级管理员')
         await expectText(page, '运营工具')
         await expectHeading(page, '异常处理')
-        await expectText(page, '阻塞记录')
-        await expectText(page, '责任分派')
-        await expectText(page, '处理跟进')
-        await expectText(page, '验证恢复')
-        await expectText(page, '关闭归档')
-        await expectText(page, '异常任务列表')
+        await expectText(page, '阻塞')
+        await expectText(page, '到期风险')
+        await expectText(page, '风险任务')
+        await expectText(page, '当前任务')
+        await expectText(page, '任务状态和业务办理结果分开确认')
+        await assertTextAbsent(page, '责任分派')
+        await assertTextAbsent(page, '关闭归档')
         await expectNoButton(page, '回任务看板')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-exception-flow-desktop',
         })
+        await assertNoHorizontalOverflow(page, 'erp-exception-flow-desktop')
+      },
+    },
+    {
+      name: 'erp-exception-flow-mobile',
+      path: '/erp/operations/exceptions',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '异常处理')
+        await expectText(page, '风险任务')
+        await expectText(page, '当前任务')
+        await assertTextAbsent(page, '责任分派')
+        await assertNoHorizontalOverflow(page, 'erp-exception-flow-mobile')
       },
     },
     {
@@ -2769,13 +3196,12 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '业务单据')
         await expectText(page, '办理结果')
         await expectText(page, '需要关注')
-        await expectText(page, '数字说明')
-        await expectText(page, '待办概览')
-        await expectText(page, '各类业务数据')
+        await expectText(page, '业务数据')
         await assertTextAbsent(page, '内部来源')
-        await expectText(page, '业务分类')
+        await expectText(page, '业务环节')
         await expectText(page, '采购/入库')
-        await expectText(page, '数据明细')
+        await expectText(page, '当前数量')
+        await assertTextAbsent(page, '数字说明')
         await expectNoButton(page, '任务看板')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-business-dashboard-desktop',
@@ -2889,9 +3315,9 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '业务管理')
         await expectHeading(page, '业务看板')
         await expectText(page, '基础资料')
-        await expectText(page, '各类业务数据')
-        await expectText(page, '数字说明')
-        await expectText(page, '待办概览')
+        await expectText(page, '业务数据')
+        await expectText(page, '需要关注')
+        await assertTextAbsent(page, '数字说明')
         await assertERPThemeMode(page, {
           scenarioName: 'erp-business-dashboard-dark-desktop',
           expectedMode: 'dark',
@@ -2916,7 +3342,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertThemeReadable(page, {
           scenarioName: 'erp-business-dashboard-dark-desktop',
-          selector: '.erp-business-board-boundary-row',
+          selector: '.erp-dashboard-table-card',
         })
         await assertThemeReadable(page, {
           scenarioName: 'erp-business-dashboard-dark-desktop',
@@ -2961,7 +3387,7 @@ export function createStyleL1Scenarios(deps) {
             String(
               document
                 .querySelector('[aria-label="查看客户"]')
-                ?.closest('.erp-business-board-source-item')
+                ?.closest('.erp-business-board-source-item--openable')
                 ?.querySelector('.erp-business-board-source-count')
                 ?.textContent || ''
             ).trim() === '60',
@@ -3100,9 +3526,56 @@ export function createStyleL1Scenarios(deps) {
       name: 'erp-task-board-mobile',
       path: '/erp/task-board',
       auth: 'admin',
-      effectiveSession: customerRuntimeEffectiveSession,
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: [
+          'workflow.task.create',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['warehouse'],
+          'workflow.task.update': ['warehouse'],
+          'workflow.task.complete': ['warehouse'],
+        },
+      },
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
+        await page.evaluate(async () => {
+          const response = await fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'dashboard-mobile-task',
+              method: 'create_task',
+              params: {
+                task_code: 'style-l1-dashboard-mobile-task',
+                task_group: 'trial_warehouse_work',
+                task_name: '移动端任务处理回归',
+                source_type: 'shipping-release',
+                source_id: 9050,
+                source_no: 'OUT-DASH-MOBILE',
+                business_status_key: 'shipment_pending',
+                task_status_key: 'ready',
+                owner_role_key: 'warehouse',
+                payload: { notification_type: 'task_created' },
+              },
+            }),
+          })
+          const body = await response.json()
+          if (!response.ok || body?.result?.code !== 0) {
+            throw new Error(
+              `create mobile task failed: ${JSON.stringify(body)}`
+            )
+          }
+        })
+        await page.getByRole('button', { name: '刷新当前页' }).click()
+        await expectText(page, '移动端任务处理回归')
         await expectText(page, '超级管理员')
         await expectText(page, '业务管理')
         await expectText(page, '任务看板')
@@ -3201,7 +3674,7 @@ export function createStyleL1Scenarios(deps) {
               method: 'create_task',
               params: {
                 task_code: 'style-l1-dashboard-wide-layout',
-                task_group: 'shipment_release',
+                task_group: 'trial_warehouse_work',
                 task_name: '宽屏重叠回归任务',
                 source_type: 'shipping-release',
                 source_id: 9020,
@@ -3260,12 +3733,26 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '宽屏重叠回归任务' })
           .first()
         await wideCurrentTask
-          .getByRole('button', { name: '处理完成', exact: true })
+          .getByRole('button', { name: '处理任务', exact: true })
           .click()
         await assertTaskActionDrawerLayout(page, {
-          scenarioName: 'erp-task-board-dark-wide-complete-drawer',
+          scenarioName: 'erp-task-board-dark-wide-context-drawer',
           expectedTaskText: '宽屏重叠回归任务',
-          expectedActionText: '处理完成',
+          expectedActionText: '核对任务信息',
+          expectReasonInput: false,
+        })
+        await page
+          .locator('.erp-task-action-drawer')
+          .getByRole('tab', { name: /选择处理/ })
+          .click()
+        await page
+          .locator('.erp-task-action-drawer')
+          .getByRole('radio', { name: /处理完成/ })
+          .click()
+        await assertTaskActionDrawerLayout(page, {
+          scenarioName: 'erp-task-board-dark-wide-complete-action',
+          expectedTaskText: '宽屏重叠回归任务',
+          expectedActionText: '提交后任务会进入已完成',
           expectReasonInput: false,
         })
         await page.locator('.erp-task-action-drawer .ant-drawer-close').click()
@@ -3300,11 +3787,11 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '暗色客户' })
           .first()
           .click()
-        await assertBusinessCollaborationPanelCollapsedByDefault(page, {
-          scenarioName: 'business-module-dark-customers-desktop',
-          expectCurrentRecord: true,
-          checkDesktopResize: false,
-        })
+        assert.equal(
+          await page.locator('.erp-business-collaboration-task-panel').count(),
+          0,
+          'business-module-dark-customers-desktop 客户档案不应展示空的任务面板'
+        )
         await assertDarkThemeContrast(page, {
           scenarioName: 'business-module-dark-customers-desktop',
           selector: '.erp-business-page-layout',
@@ -7685,9 +8172,9 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '超级管理员')
         await expectText(page, '业务管理')
         await expectText(page, '业务看板')
-        await expectText(page, '各类业务数据')
-        await expectText(page, '数字说明')
-        await expectText(page, '待办概览')
+        await expectText(page, '业务数据')
+        await expectText(page, '需要关注')
+        await assertTextAbsent(page, '数字说明')
         await assertNoDuplicatedAdminPageTitle(page, {
           scenarioName: 'erp-business-dashboard-mobile',
         })
@@ -7896,9 +8383,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await expectText(page, '只看已选')
         await page
-          .locator(
-            '.erp-permission-checklist__actions button:not([disabled])'
-          )
+          .locator('.erp-permission-checklist__actions button:not([disabled])')
           .filter({ hasText: '全选本组' })
           .first()
           .click()
@@ -7949,8 +8434,7 @@ export function createStyleL1Scenarios(deps) {
             adminTabMetrics.documentClientWidth + 1,
           `权限管理员工账号 tab 出现横向溢出: ${JSON.stringify(adminTabMetrics)}`
         )
-        const adminSearch =
-          page.getByPlaceholder('搜索员工账号、手机号或岗位')
+        const adminSearch = page.getByPlaceholder('搜索员工账号、手机号或岗位')
         await adminSearch.fill('assistant')
         await expectText(page, '命中 1/2 个员工账号')
         const filteredTableText = await page
@@ -8553,7 +9037,7 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '采购合同')
-        await expectText(page, '当前记录字段（可编辑）')
+        await expectText(page, '打印内容')
         await expectText(page, '使用默认模板')
         await expectText(page, '在线预览 PDF')
         await expectText(page, '选择明细行')
@@ -8716,15 +9200,14 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '加工合同')
-        await expectText(page, '当前记录字段（可编辑）')
+        await expectText(page, '打印内容')
         await expectText(page, '使用默认模板')
         await expectText(page, '在线预览 PDF')
         await expectText(page, '下载 PDF')
         await expectText(page, '选择明细行')
         await expectText(page, '加工明细行: 3/300')
         await expectText(page, '打印')
-        await expectButton(page, '上传纸样 / 图样附件位 1')
-        await expectButton(page, '上传纸样 / 图样附件位 2')
+        await expectButton(page, '添加末尾图片')
         await assertProcessingContractPaperRowCount(page)
         await assertProcessingContractSignatureLayout(page)
         await assertPrintWorkspacePaginationStyle(page, {
@@ -8747,10 +9230,10 @@ export function createStyleL1Scenarios(deps) {
           tableSelector: '.erp-processing-contract-table',
           expectedHeaders: [
             '委外加工订单号',
-            '产品订单编号',
-            '产品编号',
-            '产品名称',
-            '工序名称',
+            '来源订单编号',
+            '产品 / 材料编号',
+            '产品 / 材料名称',
+            '加工项目',
             '加工厂商',
             '工序类别',
             '单位',
@@ -8782,94 +9265,38 @@ export function createStyleL1Scenarios(deps) {
           storageKey: '__plush_erp_processing_contract_print_draft__',
           paperSelector: '.erp-processing-contract-paper',
         })
-        const emptyAttachmentState = await page.evaluate(() => ({
-          uploadBarInPanel: Boolean(
-            document
-              .querySelector('.erp-processing-contract-upload-bar')
-              ?.closest('.erp-print-shell__record-panel')
-          ),
-          uploadBarInStage: Boolean(
-            document
-              .querySelector('.erp-processing-contract-upload-bar')
-              ?.closest('.erp-print-shell__stage')
-          ),
-          templateAttachmentCount: document.querySelectorAll(
-            '.erp-processing-contract-attachments'
-          ).length,
-          templateAttachmentImageCount: document.querySelectorAll(
-            '.erp-processing-contract-attachments__image'
-          ).length,
-        }))
-        assert.equal(
-          emptyAttachmentState.uploadBarInPanel,
-          true,
-          '加工合同附件上传区应位于左侧字段面板'
-        )
-        assert.equal(
-          emptyAttachmentState.uploadBarInStage,
-          false,
-          '加工合同附件上传区不应占用右侧纸面编辑区'
-        )
-        assert.equal(
-          emptyAttachmentState.templateAttachmentCount,
-          0,
-          '未上传时纸面不应渲染附件区'
-        )
-        assert.equal(
-          emptyAttachmentState.templateAttachmentImageCount,
-          0,
-          '未上传时纸面不应渲染附件图片'
-        )
-        await page
-          .locator('.erp-processing-contract-upload-bar__input')
-          .first()
-          .setInputFiles(path.resolve(webDir, 'public', 'favicon.svg'))
-        await expectText(page, '已同步：favicon.svg')
-        const attachmentTemplateState = await page.evaluate(() => ({
-          uploadPanelCount: document.querySelectorAll(
-            '.erp-processing-contract-upload-bar'
-          ).length,
-          templateAttachmentCount: document.querySelectorAll(
-            '.erp-processing-contract-attachments'
-          ).length,
-          templateAttachmentImageCount: document.querySelectorAll(
-            '.erp-processing-contract-attachments__image'
-          ).length,
-        }))
-        assert.equal(
-          attachmentTemplateState.uploadPanelCount,
-          1,
-          '加工合同工作台应显示独立附件上传区'
-        )
-        assert.equal(
-          attachmentTemplateState.templateAttachmentCount,
-          1,
-          '加工合同纸面模板应渲染页底附件区'
-        )
-        assert.equal(
-          attachmentTemplateState.templateAttachmentImageCount,
-          1,
-          '上传后的附件应同步显示到纸面附件位'
-        )
-        await page.getByRole('button', { name: '清空' }).click()
-        await expectText(page, '未上传')
-        const clearedAttachmentState = await page.evaluate(() => ({
-          templateAttachmentCount: document.querySelectorAll(
-            '.erp-processing-contract-attachments'
-          ).length,
-          templateAttachmentImageCount: document.querySelectorAll(
-            '.erp-processing-contract-attachments__image'
-          ).length,
-        }))
-        assert.equal(
-          clearedAttachmentState.templateAttachmentCount,
-          0,
-          '清空附件位后不应保留附件区'
-        )
-        assert.equal(
-          clearedAttachmentState.templateAttachmentImageCount,
-          0,
-          '清空附件位后不应残留旧图'
+        const emptyAppendixState = await page.evaluate(() => {
+          const manager = document.querySelector(
+            '[data-print-appendix-manager]'
+          )
+          return {
+            managerCount: document.querySelectorAll(
+              '[data-print-appendix-manager]'
+            ).length,
+            managerInPanel: Boolean(
+              manager?.closest('.erp-print-shell__record-panel')
+            ),
+            managerInStage: Boolean(
+              manager?.closest('.erp-print-shell__stage')
+            ),
+            paperAppendixCount: document.querySelectorAll(
+              '.erp-processing-contract-paper [data-print-appendix-images]'
+            ).length,
+            legacyAttachmentCount: document.querySelectorAll(
+              '.erp-processing-contract-attachments'
+            ).length,
+          }
+        })
+        assert.deepEqual(
+          emptyAppendixState,
+          {
+            managerCount: 1,
+            managerInPanel: true,
+            managerInStage: false,
+            paperAppendixCount: 0,
+            legacyAttachmentCount: 0,
+          },
+          `加工合同应使用左侧共享末尾附图管理区，未添加时不占纸面: ${JSON.stringify(emptyAppendixState)}`
         )
       },
     },
@@ -10247,155 +10674,58 @@ export function createStyleL1Scenarios(deps) {
           '.erp-material-detail-paper',
           '物料分析明细表'
         )
-        let materialImageState = await page.evaluate(() => ({
-          uploadBarInPanel: Boolean(
-            document
-              .querySelector('.erp-processing-contract-upload-bar')
-              ?.closest('.erp-print-shell__record-panel')
-          ),
-          uploadBarInStage: Boolean(
-            document
-              .querySelector('.erp-processing-contract-upload-bar')
-              ?.closest('.erp-print-shell__stage')
-          ),
-          topSlotCount: document.querySelectorAll(
-            '.erp-material-detail-paper__images .erp-engineering-print-image-slot'
-          ).length,
-          bottomSectionCount: document.querySelectorAll(
-            '.erp-material-detail-paper__bottom-images'
-          ).length,
-          bottomSlotCount: document.querySelectorAll(
-            '.erp-material-detail-paper__bottom-images .erp-engineering-print-image-slot'
-          ).length,
-          paperImageActionCount: document.querySelectorAll(
-            '.erp-material-detail-paper .erp-engineering-print-image-slot__actions'
-          ).length,
-        }))
+        const materialImageState = await page.evaluate(() => {
+          const headerUploadBar = document.querySelector(
+            '.erp-processing-contract-upload-bar'
+          )
+          const appendixManager = document.querySelector(
+            '[data-print-appendix-manager]'
+          )
+          return {
+            headerUploadBarInPanel: Boolean(
+              headerUploadBar?.closest('.erp-print-shell__record-panel')
+            ),
+            headerUploadBarInStage: Boolean(
+              headerUploadBar?.closest('.erp-print-shell__stage')
+            ),
+            headerUploadItemCount:
+              headerUploadBar?.querySelectorAll(
+                '.erp-processing-contract-upload-bar__item'
+              ).length || 0,
+            topSlotCount: document.querySelectorAll(
+              '.erp-material-detail-paper__images .erp-engineering-print-image-slot'
+            ).length,
+            appendixManagerInPanel: Boolean(
+              appendixManager?.closest('.erp-print-shell__record-panel')
+            ),
+            appendixManagerInStage: Boolean(
+              appendixManager?.closest('.erp-print-shell__stage')
+            ),
+            appendixSectionCount: document.querySelectorAll(
+              '.erp-material-detail-paper [data-print-appendix-images]'
+            ).length,
+            legacyBottomSectionCount: document.querySelectorAll(
+              '.erp-material-detail-paper__bottom-images'
+            ).length,
+            paperImageActionCount: document.querySelectorAll(
+              '.erp-material-detail-paper .erp-engineering-print-image-slot__actions'
+            ).length,
+          }
+        })
         assert.deepEqual(
           materialImageState,
           {
-            uploadBarInPanel: true,
-            uploadBarInStage: false,
+            headerUploadBarInPanel: true,
+            headerUploadBarInStage: false,
+            headerUploadItemCount: 2,
             topSlotCount: 2,
-            bottomSectionCount: 0,
-            bottomSlotCount: 0,
+            appendixManagerInPanel: true,
+            appendixManagerInStage: false,
+            appendixSectionCount: 0,
+            legacyBottomSectionCount: 0,
             paperImageActionCount: 0,
           },
-          `物料明细固定图片位应由左侧上传栏控制，底部补充图未上传时不占纸面: ${JSON.stringify(materialImageState)}`
-        )
-        await page
-          .locator('.erp-processing-contract-upload-bar__input')
-          .nth(2)
-          .setInputFiles(path.resolve(webDir, 'public', 'favicon.svg'))
-        await expectText(page, '已同步：favicon.svg')
-        materialImageState = await page.evaluate(() => ({
-          bottomGridColumnCount:
-            window
-              .getComputedStyle(
-                document.querySelector(
-                  '.erp-material-detail-paper__bottom-images'
-                )
-              )
-              .gridTemplateColumns.split(' ')
-              .filter(Boolean).length || 0,
-          bottomGridGap: parseFloat(
-            window.getComputedStyle(
-              document.querySelector(
-                '.erp-material-detail-paper__bottom-images'
-              )
-            ).columnGap || '0'
-          ),
-          bottomSectionCount: document.querySelectorAll(
-            '.erp-material-detail-paper__bottom-images'
-          ).length,
-          bottomSlotCount: document.querySelectorAll(
-            '.erp-material-detail-paper__bottom-images .erp-engineering-print-image-slot'
-          ).length,
-          bottomImageCount: document.querySelectorAll(
-            '.erp-material-detail-paper__bottom-images img'
-          ).length,
-          paperImageActionCount: document.querySelectorAll(
-            '.erp-material-detail-paper .erp-engineering-print-image-slot__actions'
-          ).length,
-          bottomSlotHeight:
-            document
-              .querySelector(
-                '.erp-material-detail-paper__bottom-images .erp-engineering-print-image-slot'
-              )
-              ?.getBoundingClientRect().height || 0,
-          bottomGridWidth:
-            document
-              .querySelector('.erp-material-detail-paper__bottom-images')
-              ?.getBoundingClientRect().width || 0,
-          bottomSlotWidth:
-            document
-              .querySelector(
-                '.erp-material-detail-paper__bottom-images .erp-engineering-print-image-slot'
-              )
-              ?.getBoundingClientRect().width || 0,
-          bottomTopGapFromFooter: (() => {
-            const footer = document.querySelector(
-              '.erp-material-detail-paper__footer'
-            )
-            const bottomImages = document.querySelector(
-              '.erp-material-detail-paper__bottom-images'
-            )
-            const footerRect = footer?.getBoundingClientRect()
-            const bottomImagesRect = bottomImages?.getBoundingClientRect()
-            return footerRect && bottomImagesRect
-              ? bottomImagesRect.top - footerRect.bottom
-              : null
-          })(),
-          bottomSlotBorderWidth: parseFloat(
-            window.getComputedStyle(
-              document.querySelector(
-                '.erp-material-detail-paper__bottom-images .erp-engineering-print-image-slot'
-              )
-            ).borderTopWidth || '0'
-          ),
-        }))
-        assert.deepEqual(
-          {
-            bottomSectionCount: materialImageState.bottomSectionCount,
-            bottomSlotCount: materialImageState.bottomSlotCount,
-            bottomImageCount: materialImageState.bottomImageCount,
-            paperImageActionCount: materialImageState.paperImageActionCount,
-          },
-          {
-            bottomSectionCount: 1,
-            bottomSlotCount: 1,
-            bottomImageCount: 1,
-            paperImageActionCount: 0,
-          },
-          `物料明细底部补充图上传后才应出现在右侧纸面: ${JSON.stringify(materialImageState)}`
-        )
-        assert(
-          materialImageState.bottomGridColumnCount === 2 &&
-            materialImageState.bottomGridGap >= 24 &&
-            materialImageState.bottomGridGap <= 30 &&
-            materialImageState.bottomGridWidth >= 700 &&
-            materialImageState.bottomSlotWidth >= 320 &&
-            materialImageState.bottomSlotHeight >= 220 &&
-            materialImageState.bottomSlotHeight <= 235 &&
-            materialImageState.bottomTopGapFromFooter >= 14 &&
-            materialImageState.bottomTopGapFromFooter <= 18 &&
-            materialImageState.bottomSlotBorderWidth === 0,
-          `物料明细底部补充图应按加工合同同类页尾附件位输出，宽幅两列、60mm 高、7mm 间距、无占位边框: ${JSON.stringify(materialImageState)}`
-        )
-        await writeEngineeringPaperReviewScreenshot(
-          '.erp-material-detail-paper',
-          'material-detail-bottom-image-uploaded.png'
-        )
-        await page
-          .locator('.erp-processing-contract-upload-bar__item')
-          .nth(2)
-          .getByRole('button', { name: '清空' })
-          .click()
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-material-detail-paper__bottom-images'
-            ).length === 0
+          `物料明细应保留两个表头图片区，并用独立共享管理区接管末尾附图: ${JSON.stringify(materialImageState)}`
         )
         let toolbarGroups = await collectToolbarGroups()
         assertButtonTexts(
@@ -11265,7 +11595,7 @@ export function createStyleL1Scenarios(deps) {
             '设为编号行',
             '设为文本行',
             '给当前行加图',
-            '清空当前行图片',
+            '管理当前行图片',
             '选择行',
           ],
           '作业指导书纸面行'
@@ -11324,7 +11654,7 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(
           toolbarGroups[0].buttons[7].disabled,
           true,
-          '作业指导书未选择纸面行前，清空当前行图片应禁用'
+          '作业指导书未选择纸面行前，管理当前行图片应禁用'
         )
         let workInstructionHeaderImageState = await page.evaluate(() => ({
           uploadBarInPanel: Boolean(
@@ -11730,6 +12060,118 @@ export function createStyleL1Scenarios(deps) {
           `作业指导书右上产品图上传后应只在纸面 header 输出图片: ${JSON.stringify(workInstructionHeaderImageState)}`
         )
         await page
+          .locator('.erp-processing-contract-upload-bar__input')
+          .nth(1)
+          .setInputFiles(path.resolve(webDir, 'public', 'favicon.svg'))
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-paper__header .erp-engineering-print-image-slot img'
+            ).length === 2
+        )
+        const workInstructionDualHeaderImageState = await page.evaluate(() => {
+          const cell = document.querySelector(
+            '.erp-work-instruction-paper__header-image-cell'
+          )
+          const wrapper = cell?.querySelector(
+            '.erp-work-instruction-paper__header-images--count-2'
+          )
+          const slots = [
+            ...(wrapper?.querySelectorAll(
+              '.erp-engineering-print-image-slot'
+            ) || []),
+          ]
+          const cellRect = cell?.getBoundingClientRect()
+          const wrapperRect = wrapper?.getBoundingClientRect()
+          const slotRects = slots.map((slot) => {
+            const rect = slot.getBoundingClientRect()
+            return {
+              top: rect.top,
+              right: rect.right,
+              bottom: rect.bottom,
+              left: rect.left,
+              width: rect.width,
+              height: rect.height,
+            }
+          })
+          const wrapperStyle = wrapper && window.getComputedStyle(wrapper)
+          return {
+            imageCount: wrapper?.querySelectorAll('img').length || 0,
+            snapshotCount:
+              wrapper?.getAttribute(
+                'data-work-instruction-header-image-count'
+              ) || '',
+            gridColumns: wrapperStyle?.gridTemplateColumns || '',
+            wrapperClientWidth: wrapper?.clientWidth || 0,
+            wrapperScrollWidth: wrapper?.scrollWidth || 0,
+            wrapperClientHeight: wrapper?.clientHeight || 0,
+            wrapperScrollHeight: wrapper?.scrollHeight || 0,
+            cellRect: cellRect
+              ? {
+                  top: cellRect.top,
+                  right: cellRect.right,
+                  bottom: cellRect.bottom,
+                  left: cellRect.left,
+                }
+              : null,
+            wrapperRect: wrapperRect
+              ? {
+                  top: wrapperRect.top,
+                  right: wrapperRect.right,
+                  bottom: wrapperRect.bottom,
+                  left: wrapperRect.left,
+                }
+              : null,
+            slotRects,
+          }
+        })
+        const dualImageCell = workInstructionDualHeaderImageState.cellRect
+        const dualImageWrapper = workInstructionDualHeaderImageState.wrapperRect
+        const dualImageSlots = workInstructionDualHeaderImageState.slotRects
+        assert(
+          workInstructionDualHeaderImageState.imageCount === 2 &&
+            workInstructionDualHeaderImageState.snapshotCount === '2' &&
+            workInstructionDualHeaderImageState.gridColumns.trim().split(/\s+/u)
+              .length === 2 &&
+            workInstructionDualHeaderImageState.wrapperScrollWidth <=
+              workInstructionDualHeaderImageState.wrapperClientWidth + 1 &&
+            workInstructionDualHeaderImageState.wrapperScrollHeight <=
+              workInstructionDualHeaderImageState.wrapperClientHeight + 1 &&
+            dualImageCell &&
+            dualImageWrapper &&
+            dualImageSlots.length === 2 &&
+            dualImageWrapper.left >= dualImageCell.left - 1 &&
+            dualImageWrapper.right <= dualImageCell.right + 1 &&
+            dualImageWrapper.top >= dualImageCell.top - 1 &&
+            dualImageWrapper.bottom <= dualImageCell.bottom + 1 &&
+            dualImageSlots.every(
+              (rect) =>
+                rect.width > 0 &&
+                rect.height > 0 &&
+                rect.left >= dualImageWrapper.left - 1 &&
+                rect.right <= dualImageWrapper.right + 1 &&
+                rect.top >= dualImageWrapper.top - 1 &&
+                rect.bottom <= dualImageWrapper.bottom + 1
+            ) &&
+            dualImageSlots[0].right <= dualImageSlots[1].left + 1,
+          `作业指导书右上两张产品图应在同一单元格内横向并列且不溢出: ${JSON.stringify(workInstructionDualHeaderImageState)}`
+        )
+        await writeEngineeringPaperReviewScreenshot(
+          '.erp-work-instruction-paper',
+          'work-instruction-header-two-product-images.png'
+        )
+        await page
+          .locator('.erp-processing-contract-upload-bar__item')
+          .nth(1)
+          .getByRole('button', { name: '清空' })
+          .click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-paper__header .erp-engineering-print-image-slot img'
+            ).length === 1
+        )
+        await page
           .locator('.erp-processing-contract-upload-bar__item')
           .first()
           .getByRole('button', { name: '清空' })
@@ -11766,7 +12208,7 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(
           toolbarGroups[0].buttons[7].disabled,
           true,
-          '作业指导书选中无图片行时，清空当前行图片仍应禁用'
+          '作业指导书选中无图片行时，管理当前行图片仍应禁用'
         )
         workInstructionRowImageControlState = await page.evaluate(() => ({
           visibleUploadButtons: [
@@ -11977,9 +12419,9 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-work-instruction-paper__row-image-input')
           .setInputFiles([
             path.resolve(webDir, 'public', 'favicon.svg'),
-            path.resolve(webDir, 'public', 'favicon.svg'),
-            path.resolve(webDir, 'public', 'favicon.svg'),
-            path.resolve(webDir, 'public', 'favicon.svg'),
+            path.resolve(webDir, 'public', 'favicon-docs.svg'),
+            path.resolve(webDir, 'public', 'favicon-dev.svg'),
+            path.resolve(webDir, 'public', 'favicon-testing.svg'),
           ])
         await page.waitForFunction(
           () =>
@@ -12016,6 +12458,11 @@ export function createStyleL1Scenarios(deps) {
           ].filter(
             (node) => window.getComputedStyle(node).visibility !== 'hidden'
           ).length,
+          imageSources: [
+            ...document.querySelectorAll(
+              '.erp-work-instruction-paper__step-row--image .erp-engineering-print-image-slot img'
+            ),
+          ].map((image) => image.src),
         }))
         assert.deepEqual(
           {
@@ -12048,9 +12495,197 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(
           toolbarGroups[0].buttons[7].disabled,
           false,
-          '作业指导书图片上传后，清空当前行图片应可用'
+          '作业指导书图片上传后，管理当前行图片应可用'
         )
-        await page.getByRole('button', { name: '清空当前行图片' }).click()
+        const originalImageSources =
+          workInstructionRowImageControlState.imageSources
+        const instructionImageManager = page.locator(
+          '.erp-work-instruction-annotation-modal'
+        )
+        await page
+          .getByRole('button', { name: '管理当前行图片', exact: true })
+          .click()
+        await instructionImageManager.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await instructionImageManager
+          .getByRole('tab', { name: '图片 2', exact: true })
+          .click()
+        await page.waitForFunction(() => {
+          const modal = document.querySelector(
+            '.erp-work-instruction-annotation-modal'
+          )
+          return (modal?.getBoundingClientRect().width || 0) >= 1000
+        })
+        await page.waitForTimeout(350)
+        const instructionImageManagerLayout =
+          await instructionImageManager.evaluate((modal) => {
+            const toolbar = modal.querySelector(
+              '.erp-work-instruction-annotation-modal__image-toolbar'
+            )
+            const removeButton = modal.querySelector(
+              '[data-remove-current-work-instruction-image]'
+            )
+            const modalRect = modal.getBoundingClientRect()
+            const toolbarRect = toolbar?.getBoundingClientRect()
+            const removeButtonRect = removeButton?.getBoundingClientRect()
+            return {
+              modalWidth: modalRect.width,
+              toolbarFits:
+                Boolean(toolbar) &&
+                toolbar.scrollWidth <= toolbar.clientWidth + 1,
+              removeButtonInsideToolbar:
+                Boolean(toolbarRect && removeButtonRect) &&
+                removeButtonRect.left >= toolbarRect.left &&
+                removeButtonRect.right <= toolbarRect.right,
+              removeButtonDisabled: Boolean(removeButton?.disabled),
+            }
+          })
+        assert(
+          instructionImageManagerLayout.modalWidth >= 1000 &&
+            instructionImageManagerLayout.toolbarFits &&
+            instructionImageManagerLayout.removeButtonInsideToolbar &&
+            !instructionImageManagerLayout.removeButtonDisabled,
+          `作业指导书多图管理工具栏应完整显示且允许逐图移除: ${JSON.stringify(instructionImageManagerLayout)}`
+        )
+        await instructionImageManager.screenshot({
+          path: path.resolve(
+            outputDir,
+            'work-instruction-image-manager-multiple.png'
+          ),
+        })
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .focus()
+        await page.keyboard.press('Enter')
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-annotation-modal [role="tab"]'
+            ).length === 3
+        )
+        await instructionImageManager
+          .getByRole('button', { name: '取消', exact: true })
+          .click()
+        await instructionImageManager.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        assert.equal(
+          await page
+            .getByRole('button', { name: '管理当前行图片', exact: true })
+            .evaluate((button) => document.activeElement === button),
+          true,
+          '取消图片管理后焦点应返回管理当前行图片按钮'
+        )
+        assert.equal(
+          await page
+            .locator(
+              '.erp-work-instruction-paper__step-row--image .erp-engineering-print-image-slot img'
+            )
+            .count(),
+          4,
+          '取消图片管理后不应修改当前行图片'
+        )
+
+        await page
+          .getByRole('button', { name: '管理当前行图片', exact: true })
+          .click()
+        await instructionImageManager.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await instructionImageManager
+          .getByRole('tab', { name: '图片 2', exact: true })
+          .click()
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-annotation-modal [role="tab"]'
+            ).length === 3
+        )
+        await instructionImageManager
+          .getByRole('button', { name: '保存图片调整', exact: true })
+          .click()
+        await instructionImageManager.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-paper__step-row--image .erp-engineering-print-image-slot img'
+            ).length === 3
+        )
+        const imageSourcesAfterMiddleRemoval = await page
+          .locator(
+            '.erp-work-instruction-paper__step-row--image .erp-engineering-print-image-slot img'
+          )
+          .evaluateAll((images) => images.map((image) => image.src))
+        assert.deepEqual(
+          imageSourcesAfterMiddleRemoval,
+          [
+            originalImageSources[0],
+            originalImageSources[2],
+            originalImageSources[3],
+          ],
+          '移除第 2 张图片后应保留原第 1、3、4 张及其顺序'
+        )
+
+        await page
+          .getByRole('button', { name: '管理当前行图片', exact: true })
+          .click()
+        await instructionImageManager.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-annotation-modal [role="tab"]'
+            ).length === 2
+        )
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await instructionImageManager
+          .getByText('图片 1 / 1', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await instructionImageManager
+          .locator('.erp-work-instruction-annotation-modal__image-summary', {
+            hasText: '当前行没有图片',
+          })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await instructionImageManager
+            .getByRole('button', { name: '移除当前图片', exact: true })
+            .isDisabled(),
+          true,
+          '移除最后一张图片后不应继续允许移除'
+        )
+        await instructionImageManager.screenshot({
+          path: path.resolve(
+            outputDir,
+            'work-instruction-image-manager-empty.png'
+          ),
+        })
+        await instructionImageManager
+          .getByRole('button', { name: '保存图片调整', exact: true })
+          .click()
+        await instructionImageManager.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
         await page.waitForFunction(
           () =>
             document.querySelectorAll(
@@ -12074,7 +12709,7 @@ export function createStyleL1Scenarios(deps) {
             directTextEditorCount: row?.querySelectorAll(
               '.erp-work-instruction-paper__step-content-cell > .erp-engineering-print-editable'
             ).length,
-            textAfterClear: String(editor?.textContent || '')
+            textAfterRemoval: String(editor?.textContent || '')
               .replace(/\u00a0/gu, '')
               .trim(),
           }
@@ -12083,8 +12718,8 @@ export function createStyleL1Scenarios(deps) {
           workInstructionRowImageControlState.isTextRow &&
             workInstructionRowImageControlState.imageCount === 0 &&
             workInstructionRowImageControlState.directTextEditorCount === 1 &&
-            workInstructionRowImageControlState.textAfterClear.length > 0,
-          `作业指导书图片行清空后应保留当前行文字并移除图片: ${JSON.stringify(workInstructionRowImageControlState)}`
+            workInstructionRowImageControlState.textAfterRemoval.length > 0,
+          `作业指导书逐张移除全部图片后应保留当前行文字: ${JSON.stringify(workInstructionRowImageControlState)}`
         )
         const mainInstructionSheet = page.locator(
           '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation)'
@@ -12209,8 +12844,51 @@ export function createStyleL1Scenarios(deps) {
         await page
           .locator('.erp-print-shell__toolbar-group')
           .first()
-          .getByRole('button', { name: '清空当前行图片' })
+          .getByRole('button', { name: '管理当前行图片', exact: true })
           .click()
+        await instructionImageManager.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-annotation-modal [role="tab"]'
+            ).length === 3
+        )
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-work-instruction-annotation-modal [role="tab"]'
+            ).length === 2
+        )
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await instructionImageManager
+          .getByText('图片 1 / 1', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await instructionImageManager
+          .getByRole('button', { name: '移除当前图片', exact: true })
+          .click()
+        await instructionImageManager
+          .locator('.erp-work-instruction-annotation-modal__image-summary', {
+            hasText: '当前行没有图片',
+          })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await instructionImageManager
+          .getByRole('button', { name: '保存图片调整', exact: true })
+          .click()
+        await instructionImageManager.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
         await page.waitForFunction((rowIndex) => {
           const sheet = document.querySelector(
             '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation)'
@@ -12577,6 +13255,308 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'print-workspace-all-template-appendix-images',
+      path: '/erp/print-workspace/material-purchase-contract',
+      auth: 'admin',
+      viewport: { width: 1600, height: 1600 },
+      verify: async (page) => {
+        const templates = [
+          {
+            key: 'material-purchase-contract',
+            title: '采购合同',
+            paperSelector: '.erp-material-contract-paper',
+          },
+          {
+            key: 'processing-contract',
+            title: '加工合同',
+            paperSelector: '.erp-processing-contract-paper',
+          },
+          {
+            key: 'engineering-material-detail',
+            title: '物料分析明细表',
+            paperSelector: '.erp-material-detail-paper',
+          },
+          {
+            key: 'engineering-color-card',
+            title: '色卡',
+            paperSelector: '.erp-color-card-paper',
+          },
+          {
+            key: 'engineering-work-instruction',
+            title: '作业指导书',
+            paperSelector: '.erp-work-instruction-paper',
+          },
+        ]
+
+        for (const [templateIndex, template] of templates.entries()) {
+          if (templateIndex > 0) {
+            await gotoScenarioPath(page, `/erp/print-workspace/${template.key}`)
+          }
+          await page.locator(template.paperSelector).first().waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          await expectText(page, template.title)
+          await page
+            .locator('[data-print-appendix-manager]')
+            .waitFor({ state: 'visible', timeout: 10_000 })
+
+          const firstBatch = createAppendixSVGFiles(template.key, 1, 5)
+          const firstBatchNames = firstBatch.map((file) => file.name)
+          await page
+            .locator('[data-print-appendix-input]')
+            .setInputFiles(firstBatch)
+          await waitForPrintAppendixImageCount(page, {
+            paperSelector: template.paperSelector,
+            expectedCount: 5,
+          })
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: template.title,
+            paperSelector: template.paperSelector,
+            expectedNames: firstBatchNames,
+          })
+          const appendix = page
+            .locator(`${template.paperSelector} [data-print-appendix-images]`)
+            .first()
+          await appendix.scrollIntoViewIfNeeded()
+          await appendix.screenshot({
+            path: path.join(
+              outputDir,
+              `print-workspace-${template.key}-appendix-five.png`
+            ),
+          })
+
+          const longImage = createAppendixSVGFile(template.key, {
+            index: 50,
+            width: 640,
+            height: 3200,
+            label: 'Long appendix',
+          })
+          const namesWithLongImage = [...firstBatchNames, longImage.name]
+          await page
+            .locator('[data-print-appendix-input]')
+            .setInputFiles([longImage])
+          await waitForPrintAppendixImageCount(page, {
+            paperSelector: template.paperSelector,
+            expectedCount: 6,
+          })
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}长图自动整行`,
+            paperSelector: template.paperSelector,
+            expectedNames: namesWithLongImage,
+            expectedLayouts: ['half', 'half', 'half', 'half', 'half', 'full'],
+            expectedSegmentCounts: [1, 1, 1, 1, 1, 4],
+          })
+          if (templateIndex !== 0) {
+            await page.getByRole('button', { name: '移除末尾图片 6' }).click()
+            await waitForPrintAppendixImageCount(page, {
+              paperSelector: template.paperSelector,
+              expectedCount: 5,
+            })
+            continue
+          }
+
+          await page
+            .locator('[data-print-appendix-manager-item]')
+            .nth(5)
+            .screenshot({
+              path: path.join(
+                outputDir,
+                'print-workspace-appendix-layout-controls.png'
+              ),
+            })
+          const longImageItem = page
+            .locator(
+              `${template.paperSelector} [data-print-appendix-image-name="${longImage.name}"]`
+            )
+            .first()
+          await longImageItem
+            .locator('[data-print-appendix-segment="1"]')
+            .screenshot({
+              path: path.join(
+                outputDir,
+                'print-workspace-appendix-long-first-segment.png'
+              ),
+            })
+
+          await page
+            .getByRole('button', { name: '将末尾图片 6 设为半宽' })
+            .click()
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}长图手动半宽`,
+            paperSelector: template.paperSelector,
+            expectedNames: namesWithLongImage,
+            expectedLayouts: ['half', 'half', 'half', 'half', 'half', 'half'],
+            expectedRequestedLayouts: [
+              'auto',
+              'auto',
+              'auto',
+              'auto',
+              'auto',
+              'half',
+            ],
+            expectedSegmentCounts: [1, 1, 1, 1, 1, 4],
+          })
+          await page
+            .getByRole('button', { name: '将末尾图片 6 设为整行' })
+            .click()
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}长图手动整行`,
+            paperSelector: template.paperSelector,
+            expectedNames: namesWithLongImage,
+            expectedLayouts: ['half', 'half', 'half', 'half', 'half', 'full'],
+            expectedRequestedLayouts: [
+              'auto',
+              'auto',
+              'auto',
+              'auto',
+              'auto',
+              'full',
+            ],
+            expectedSegmentCounts: [1, 1, 1, 1, 1, 4],
+          })
+
+          await page.reload({ waitUntil: 'domcontentloaded' })
+          await page.locator(template.paperSelector).first().waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          await waitForPrintAppendixImageCount(page, {
+            paperSelector: template.paperSelector,
+            expectedCount: 6,
+          })
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}手动整行刷新恢复`,
+            paperSelector: template.paperSelector,
+            expectedNames: namesWithLongImage,
+            expectedLayouts: ['half', 'half', 'half', 'half', 'half', 'full'],
+            expectedRequestedLayouts: [
+              'auto',
+              'auto',
+              'auto',
+              'auto',
+              'auto',
+              'full',
+            ],
+            expectedSegmentCounts: [1, 1, 1, 1, 1, 4],
+          })
+          await page
+            .getByRole('button', { name: '将末尾图片 6 设为自动' })
+            .click()
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}恢复自动排版`,
+            paperSelector: template.paperSelector,
+            expectedNames: namesWithLongImage,
+            expectedLayouts: ['half', 'half', 'half', 'half', 'half', 'full'],
+            expectedSegmentCounts: [1, 1, 1, 1, 1, 4],
+          })
+          await page.emulateMedia({ media: 'print' })
+          const printSegmentMetrics = await page
+            .locator(
+              `${template.paperSelector} [data-print-appendix-image-name="${longImage.name}"]`
+            )
+            .evaluate((item) => ({
+              segmentBreaks: Array.from(
+                item.querySelectorAll('[data-print-appendix-segment]')
+              ).map((segment) => window.getComputedStyle(segment).breakBefore),
+              managerDisplay: window.getComputedStyle(
+                document.querySelector('[data-print-appendix-manager]')
+              ).display,
+            }))
+          assert(
+            printSegmentMetrics.managerDisplay === 'none' &&
+              printSegmentMetrics.segmentBreaks
+                .slice(1)
+                .every((value) => value === 'page'),
+            `超长图后续片段应逐页输出且管理区不进入打印件: ${JSON.stringify(
+              printSegmentMetrics
+            )}`
+          )
+          await page.emulateMedia({ media: 'screen' })
+          await page.getByRole('button', { name: '移除末尾图片 6' }).click()
+          await waitForPrintAppendixImageCount(page, {
+            paperSelector: template.paperSelector,
+            expectedCount: 5,
+          })
+
+          await page.getByRole('button', { name: '将末尾图片 2 前移' }).click()
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}前移`,
+            paperSelector: template.paperSelector,
+            expectedNames: [
+              firstBatchNames[1],
+              firstBatchNames[0],
+              ...firstBatchNames.slice(2),
+            ],
+          })
+          await page.getByRole('button', { name: '将末尾图片 1 后移' }).click()
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}后移`,
+            paperSelector: template.paperSelector,
+            expectedNames: firstBatchNames,
+          })
+
+          await page.getByRole('button', { name: '移除末尾图片 3' }).click()
+          await waitForPrintAppendixImageCount(page, {
+            paperSelector: template.paperSelector,
+            expectedCount: 4,
+          })
+          const namesAfterRemove = [
+            ...firstBatchNames.slice(0, 2),
+            ...firstBatchNames.slice(3),
+          ]
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}移除`,
+            paperSelector: template.paperSelector,
+            expectedNames: namesAfterRemove,
+          })
+
+          const additionalBatch = createAppendixSVGFiles(template.key, 6, 5)
+          const nineImageNames = [
+            ...namesAfterRemove,
+            ...additionalBatch.map((file) => file.name),
+          ]
+          await page
+            .locator('[data-print-appendix-input]')
+            .setInputFiles(additionalBatch)
+          await waitForPrintAppendixImageCount(page, {
+            paperSelector: template.paperSelector,
+            expectedCount: 9,
+          })
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}九张`,
+            paperSelector: template.paperSelector,
+            expectedNames: nineImageNames,
+          })
+
+          await page.reload({ waitUntil: 'domcontentloaded' })
+          await page.locator(template.paperSelector).first().waitFor({
+            state: 'visible',
+            timeout: 10_000,
+          })
+          await waitForPrintAppendixImageCount(page, {
+            paperSelector: template.paperSelector,
+            expectedCount: 9,
+          })
+          await assertPrintAppendixImageLayout(page, {
+            templateTitle: `${template.title}刷新恢复`,
+            paperSelector: template.paperSelector,
+            expectedNames: nineImageNames,
+          })
+          const refreshedAppendix = page
+            .locator(`${template.paperSelector} [data-print-appendix-images]`)
+            .first()
+          await refreshedAppendix.scrollIntoViewIfNeeded()
+          await refreshedAppendix.screenshot({
+            path: path.join(
+              outputDir,
+              `print-workspace-${template.key}-appendix-nine-refreshed.png`
+            ),
+          })
+        }
+      },
+    },
+    {
       name: 'print-workspace-all-template-long-business-values',
       path: '/erp/print-workspace/material-purchase-contract?draft=fresh',
       auth: 'admin',
@@ -12832,7 +13812,7 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, 'BOM 管理')
+        await expectHeading(page, '物料清单（BOM）')
         await expectText(page, '当前操作')
         for (const label of ['打印物料明细', '打印色卡', '打印作业指导书']) {
           await expectButton(page, label)
@@ -13281,6 +14261,8 @@ export function createStyleL1Scenarios(deps) {
             '加工厂',
             '加工明细',
             '同一份加工合同内维护产品、工序、数量、单价和预计回货。',
+            '来源产品订单编号',
+            '加工项目',
             '工序',
             '单位',
           ],
@@ -13318,7 +14300,7 @@ export function createStyleL1Scenarios(deps) {
             await productSKUInput.press('Escape')
             const subjectTypeField = modal
               .locator('.ant-form-item')
-              .filter({ hasText: '加工对象类型' })
+              .filter({ hasText: '加工品类' })
               .first()
             const subjectTypeInput = subjectTypeField.locator(
               '.ant-select-selection-search-input'
@@ -13410,16 +14392,21 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '供应商档案')
-        await expectText(page, '相关任务')
+        assert.equal(
+          await page.locator('.erp-business-collaboration-task-panel').count(),
+          0,
+          'business-collaboration-supplier-desktop 未选中记录时不应展示空的任务面板'
+        )
         await page
           .locator('.ant-table-row')
           .filter({ hasText: '样式供应商' })
           .first()
           .click()
-        await assertBusinessCollaborationPanelCollapsedByDefault(page, {
-          scenarioName: 'business-collaboration-supplier-desktop',
-          expectCurrentRecord: true,
-        })
+        assert.equal(
+          await page.locator('.erp-business-collaboration-task-panel').count(),
+          0,
+          'business-collaboration-supplier-desktop 选中供应商后也不应展示无真实任务来源的面板'
+        )
         await assertNoHorizontalOverflow(
           page,
           'business-collaboration-supplier-desktop'
@@ -13432,9 +14419,14 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       effectiveSession: {
         ...customerRuntimeEffectiveSession,
-        actions: ['workflow.task.create', 'workflow.task.read'],
+        actions: [
+          'workflow.task.create',
+          'workflow.task.read',
+          'workflow.task.update',
+        ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['purchase', 'finance'],
+          'workflow.task.update': ['purchase', 'finance'],
         },
       },
       viewport: { width: 1440, height: 900 },
@@ -13445,7 +14437,11 @@ export function createStyleL1Scenarios(deps) {
         })
         await page.reload({ waitUntil: 'domcontentloaded' })
         await expectHeading(page, '采购订单')
-        await expectText(page, '相关任务')
+        assert.equal(
+          await page.locator('.erp-business-collaboration-task-panel').count(),
+          0,
+          'business-collaboration-purchase-selected-desktop 未选中采购订单时不应展示任务面板'
+        )
         const purchaseOrderRow = page
           .locator('.erp-business-data-table-card .ant-table-tbody tr')
           .filter({ hasText: 'PO-STYLE-L1' })
@@ -13459,15 +14455,47 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessCollaborationPanelCollapsedByDefault(page, {
           scenarioName: 'business-collaboration-purchase-selected-desktop',
-          expectCurrentRecord: true,
           checkDesktopResize: false,
           checkResizeHandleHover: false,
-          expectedOverflowNote: '仅显示前 6 条，还有 6 条',
-          expectedTabTexts: ['本页待办12', '当前记录2', '阻塞异常4'],
+          expectedOverflowNote: '仅显示前 6 条，还有 2 条',
+          expectedTabTexts: ['当前记录8', '阻塞异常3'],
         })
         await assertNoHorizontalOverflow(
           page,
           'business-collaboration-purchase-selected-desktop'
+        )
+
+        await seedBusinessCollaborationOverflowTasks(page, {
+          sourceType: 'processing-contracts',
+          currentSourceID: 1,
+          currentSourceNo: 'SIM-OUTSOURCE-CONTRACT-L1',
+          currentTaskLabel: '当前加工合同',
+        })
+        await gotoScenarioPath(page, '/erp/purchase/processing-contracts', {
+          waitUntil: 'domcontentloaded',
+        })
+        await expectHeading(page, '委外订单')
+        assert.equal(
+          await page.locator('.erp-business-collaboration-task-panel').count(),
+          0,
+          'business-collaboration-purchase-selected-desktop 未选中加工合同时不应展示任务面板'
+        )
+        await page
+          .locator('.erp-business-data-table-card .ant-table-tbody tr')
+          .filter({ hasText: 'SIM-OUTSOURCE-CONTRACT-L1' })
+          .first()
+          .click()
+        await assertBusinessCollaborationPanelCollapsedByDefault(page, {
+          scenarioName:
+            'business-collaboration-processing-contract-selected-desktop',
+          checkDesktopResize: false,
+          checkResizeHandleHover: false,
+          expectedOverflowNote: '仅显示前 6 条，还有 2 条',
+          expectedTabTexts: ['当前记录8', '阻塞异常3'],
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'business-collaboration-processing-contract-selected-desktop'
         )
       },
     },
@@ -13563,21 +14591,51 @@ export function createStyleL1Scenarios(deps) {
     },
     {
       name: 'business-collaboration-mobile',
-      path: '/erp/master/partners/suppliers',
+      path: '/erp/purchase/accessories',
       auth: 'admin',
-      effectiveSession: customerRuntimeEffectiveSession,
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        actions: [
+          'workflow.task.create',
+          'workflow.task.read',
+          'workflow.task.update',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['purchase', 'finance'],
+          'workflow.task.update': ['purchase', 'finance'],
+        },
+      },
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '供应商档案')
-        await expectText(page, '相关任务')
-        await page
-          .locator('.ant-table-row')
-          .filter({ hasText: '样式供应商' })
+        await seedBusinessCollaborationOverflowTasks(page, {
+          sourceType: 'accessories-purchase',
+          currentSourceID: 1,
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '采购订单')
+        assert.equal(
+          await page.locator('.erp-business-collaboration-task-panel').count(),
+          0,
+          'business-collaboration-mobile 未选中采购订单时不应展示任务面板'
+        )
+        const purchaseOrderRow = page
+          .locator('.erp-business-data-table-card .ant-table-tbody tr')
+          .filter({ hasText: 'PO-STYLE-L1' })
           .first()
-          .click()
+        await purchaseOrderRow.getByRole('radio').check()
+        await purchaseOrderRow.waitFor({ state: 'visible', timeout: 10_000 })
+        assert(
+          String((await purchaseOrderRow.getAttribute('class')) || '').includes(
+            'ant-table-row-selected'
+          ),
+          'business-collaboration-mobile 选择采购订单后主表应进入选中态'
+        )
         await assertBusinessCollaborationPanelCollapsedByDefault(page, {
           scenarioName: 'business-collaboration-mobile',
-          expectCurrentRecord: true,
+          checkDesktopResize: false,
+          checkResizeHandleHover: false,
+          expectedOverflowNote: '仅显示前 6 条，还有 2 条',
+          expectedTabTexts: ['当前记录8', '阻塞异常3'],
         })
         await assertResponsiveSelectionActionBar(page, {
           scenarioName: 'business-collaboration-mobile',
@@ -13711,6 +14769,15 @@ export function createStyleL1Scenarios(deps) {
         await assertNoHorizontalOverflow(page, 'textarea-show-count-layout')
       },
     },
+    ...createWorkflowSourceTaskScenarios({
+      assert,
+      expectHeading,
+      expectText,
+      gotoScenarioPath,
+      outputDir,
+      path,
+      waitForPath,
+    }),
     ...createBusinessFormalScenarios({
       assert,
       assertAntdModalCentered,

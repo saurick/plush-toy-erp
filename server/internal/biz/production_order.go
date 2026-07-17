@@ -53,6 +53,9 @@ var (
 	ErrProductionOrderMaterialIssueQuantityExceeded  = errors.New("production order material issue quantity exceeded")
 	ErrProductionOrderHasPostedFacts                 = errors.New("production order has posted facts")
 	ErrProductionOrderCloseReasonRequired            = errors.New("production order close reason required")
+	ErrProductionOrderSchedulingTaskRequired         = errors.New("production order scheduling task required")
+	ErrProductionOrderSchedulingTaskActive           = errors.New("production order scheduling task active")
+	ErrProductionOrderWIPActive                      = errors.New("production order has active WIP")
 )
 
 type ProductionOrder struct {
@@ -78,47 +81,50 @@ type ProductionOrder struct {
 }
 
 type ProductionOrderItem struct {
-	ID                  int             `json:"id"`
-	ProductionOrderID   int             `json:"production_order_id"`
-	LineNo              int             `json:"line_no"`
-	ProductID           int             `json:"product_id"`
-	ProductSKUID        *int            `json:"product_sku_id,omitempty"`
-	UnitID              int             `json:"unit_id"`
-	PlannedQuantity     decimal.Decimal `json:"planned_quantity"`
-	SalesOrderItemID    *int            `json:"sales_order_item_id,omitempty"`
-	BOMHeaderID         *int            `json:"bom_header_id,omitempty"`
-	ProductCodeSnapshot *string         `json:"product_code_snapshot,omitempty"`
-	ProductNameSnapshot *string         `json:"product_name_snapshot,omitempty"`
-	SKUCodeSnapshot     *string         `json:"sku_code_snapshot,omitempty"`
-	UnitNameSnapshot    *string         `json:"unit_name_snapshot,omitempty"`
-	BOMVersionSnapshot  *string         `json:"bom_version_snapshot,omitempty"`
-	Note                *string         `json:"note,omitempty"`
-	CreatedAt           time.Time       `json:"created_at"`
-	UpdatedAt           time.Time       `json:"updated_at"`
+	ID                         int             `json:"id"`
+	ProductionOrderID          int             `json:"production_order_id"`
+	LineNo                     int             `json:"line_no"`
+	ProductID                  int             `json:"product_id"`
+	ProductSKUID               *int            `json:"product_sku_id,omitempty"`
+	UnitID                     int             `json:"unit_id"`
+	PlannedQuantity            decimal.Decimal `json:"planned_quantity"`
+	SalesOrderItemID           *int            `json:"sales_order_item_id,omitempty"`
+	BOMHeaderID                *int            `json:"bom_header_id,omitempty"`
+	RouteCode                  *string         `json:"route_code,omitempty"`
+	CustomerInspectionRequired bool            `json:"customer_inspection_required"`
+	ProductCodeSnapshot        *string         `json:"product_code_snapshot,omitempty"`
+	ProductNameSnapshot        *string         `json:"product_name_snapshot,omitempty"`
+	SKUCodeSnapshot            *string         `json:"sku_code_snapshot,omitempty"`
+	UnitNameSnapshot           *string         `json:"unit_name_snapshot,omitempty"`
+	BOMVersionSnapshot         *string         `json:"bom_version_snapshot,omitempty"`
+	Note                       *string         `json:"note,omitempty"`
+	CreatedAt                  time.Time       `json:"created_at"`
+	UpdatedAt                  time.Time       `json:"updated_at"`
 }
 
 // ProductionOrderMaterialRequirement is an immutable release-time BOM
 // snapshot. IssuedQuantity and RemainingQuantity are query projections derived
 // from posted production material issues.
 type ProductionOrderMaterialRequirement struct {
-	ID                    int             `json:"id"`
-	ProductionOrderID     int             `json:"production_order_id"`
-	ProductionOrderItemID int             `json:"production_order_item_id"`
-	BOMHeaderID           int             `json:"bom_header_id"`
-	BOMItemID             int             `json:"bom_item_id"`
-	MaterialID            int             `json:"material_id"`
-	UnitID                int             `json:"unit_id"`
-	UnitQuantitySnapshot  decimal.Decimal `json:"unit_quantity_snapshot"`
-	LossRateSnapshot      decimal.Decimal `json:"loss_rate_snapshot"`
-	PlannedQuantity       decimal.Decimal `json:"planned_quantity"`
-	IssuedQuantity        decimal.Decimal `json:"issued_quantity"`
-	RemainingQuantity     decimal.Decimal `json:"remaining_quantity"`
-	MaterialCodeSnapshot  string          `json:"material_code_snapshot"`
-	MaterialNameSnapshot  string          `json:"material_name_snapshot"`
-	UnitCodeSnapshot      string          `json:"unit_code_snapshot"`
-	UnitNameSnapshot      string          `json:"unit_name_snapshot"`
-	CreatedAt             time.Time       `json:"created_at"`
-	UpdatedAt             time.Time       `json:"updated_at"`
+	ID                      int             `json:"id"`
+	ProductionOrderID       int             `json:"production_order_id"`
+	ProductionOrderItemID   int             `json:"production_order_item_id"`
+	BOMHeaderID             int             `json:"bom_header_id"`
+	BOMItemID               int             `json:"bom_item_id"`
+	MaterialID              int             `json:"material_id"`
+	UnitID                  int             `json:"unit_id"`
+	ProductionOperationCode *string         `json:"production_operation_code,omitempty"`
+	UnitQuantitySnapshot    decimal.Decimal `json:"unit_quantity_snapshot"`
+	LossRateSnapshot        decimal.Decimal `json:"loss_rate_snapshot"`
+	PlannedQuantity         decimal.Decimal `json:"planned_quantity"`
+	IssuedQuantity          decimal.Decimal `json:"issued_quantity"`
+	RemainingQuantity       decimal.Decimal `json:"remaining_quantity"`
+	MaterialCodeSnapshot    string          `json:"material_code_snapshot"`
+	MaterialNameSnapshot    string          `json:"material_name_snapshot"`
+	UnitCodeSnapshot        string          `json:"unit_code_snapshot"`
+	UnitNameSnapshot        string          `json:"unit_name_snapshot"`
+	CreatedAt               time.Time       `json:"created_at"`
+	UpdatedAt               time.Time       `json:"updated_at"`
 }
 
 type ProductionOrderAggregate struct {
@@ -129,14 +135,16 @@ type ProductionOrderAggregate struct {
 }
 
 type ProductionOrderDraftItem struct {
-	LineNo           int
-	ProductID        int
-	ProductSKUID     *int
-	UnitID           int
-	PlannedQuantity  decimal.Decimal
-	SalesOrderItemID *int
-	BOMHeaderID      *int
-	Note             *string
+	LineNo                     int
+	ProductID                  int
+	ProductSKUID               *int
+	UnitID                     int
+	PlannedQuantity            decimal.Decimal
+	SalesOrderItemID           *int
+	BOMHeaderID                *int
+	RouteCode                  *string
+	CustomerInspectionRequired bool
+	Note                       *string
 }
 
 type ProductionOrderDraft struct {
@@ -474,6 +482,7 @@ func normalizeProductionOrderCommand(draft ProductionOrderDraft, actorID int, ra
 	for i := range items {
 		item := &items[i]
 		item.Note = normalizeOptionalProductionOrderText(item.Note)
+		item.RouteCode = normalizeOptionalProductionOrderText(item.RouteCode)
 		if item.LineNo <= 0 || item.ProductID <= 0 || item.UnitID <= 0 || !item.PlannedQuantity.GreaterThan(decimal.Zero) || (item.Note != nil && len(*item.Note) > 255) {
 			return ProductionOrderDraft{}, "", ErrBadParam
 		}
@@ -482,6 +491,9 @@ func normalizeProductionOrderCommand(draft ProductionOrderDraft, actorID int, ra
 		}
 		seen[item.LineNo] = struct{}{}
 		if (item.ProductSKUID != nil && *item.ProductSKUID <= 0) || (item.SalesOrderItemID != nil && *item.SalesOrderItemID <= 0) || (item.BOMHeaderID != nil && *item.BOMHeaderID <= 0) {
+			return ProductionOrderDraft{}, "", ErrBadParam
+		}
+		if (item.RouteCode != nil && *item.RouteCode != ProductionWIPRoutePlushSewHandV1) || (item.CustomerInspectionRequired && item.RouteCode == nil) {
 			return ProductionOrderDraft{}, "", ErrBadParam
 		}
 	}
@@ -510,14 +522,16 @@ func normalizeOptionalProductionOrderText(value *string) *string {
 }
 
 type productionOrderIntentItem struct {
-	LineNo           int     `json:"line_no"`
-	ProductID        int     `json:"product_id"`
-	ProductSKUID     *int    `json:"product_sku_id,omitempty"`
-	UnitID           int     `json:"unit_id"`
-	PlannedQuantity  string  `json:"planned_quantity"`
-	SalesOrderItemID *int    `json:"sales_order_item_id,omitempty"`
-	BOMHeaderID      *int    `json:"bom_header_id,omitempty"`
-	Note             *string `json:"note,omitempty"`
+	LineNo                     int     `json:"line_no"`
+	ProductID                  int     `json:"product_id"`
+	ProductSKUID               *int    `json:"product_sku_id,omitempty"`
+	UnitID                     int     `json:"unit_id"`
+	PlannedQuantity            string  `json:"planned_quantity"`
+	SalesOrderItemID           *int    `json:"sales_order_item_id,omitempty"`
+	BOMHeaderID                *int    `json:"bom_header_id,omitempty"`
+	RouteCode                  *string `json:"route_code,omitempty"`
+	CustomerInspectionRequired bool    `json:"customer_inspection_required"`
+	Note                       *string `json:"note,omitempty"`
 }
 
 func productionOrderIntentHash(command string, draft ProductionOrderDraft, reason *string) (string, error) {
@@ -536,7 +550,8 @@ func productionOrderIntentHash(command string, draft ProductionOrderDraft, reaso
 			intent.Items = append(intent.Items, productionOrderIntentItem{
 				LineNo: item.LineNo, ProductID: item.ProductID, ProductSKUID: item.ProductSKUID,
 				UnitID: item.UnitID, PlannedQuantity: item.PlannedQuantity.String(),
-				SalesOrderItemID: item.SalesOrderItemID, BOMHeaderID: item.BOMHeaderID, Note: item.Note,
+				SalesOrderItemID: item.SalesOrderItemID, BOMHeaderID: item.BOMHeaderID,
+				RouteCode: item.RouteCode, CustomerInspectionRequired: item.CustomerInspectionRequired, Note: item.Note,
 			})
 		}
 	}

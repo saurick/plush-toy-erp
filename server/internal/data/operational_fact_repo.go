@@ -25,6 +25,9 @@ import (
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionorderoperation"
+	"server/internal/data/model/ent/productionwipbatch"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/shipment"
@@ -82,6 +85,9 @@ func (r *operationalFactRepo) ResolveProductionCompletionSource(ctx context.Cont
 	}
 	if item.ProductionOrderID != productionOrderID {
 		return nil, biz.ErrProductionOrderFactSourceInvalid
+	}
+	if err := validateProductionWIPFinishedGoodsAvailability(ctx, r.data.postgres, item, decimal.Zero); err != nil {
+		return nil, err
 	}
 	return entProductionOrderItemToBiz(item), nil
 }
@@ -829,6 +835,11 @@ func validateProductionOrderFactSource(ctx context.Context, client *ent.Client, 
 	if item.ProductionOrderID != orderID || item.ProductID != in.SubjectID || item.UnitID != in.UnitID || !sameOptionalInt(item.ProductSkuID, in.ProductSkuID) {
 		return nil, biz.ErrProductionOrderFactSourceInvalid
 	}
+	if requireReleased {
+		if err := validateProductionWIPFinishedGoodsAvailability(ctx, client, item, in.Quantity); err != nil {
+			return nil, err
+		}
+	}
 	return item, nil
 }
 
@@ -853,6 +864,73 @@ func validateProductionOrderFinishedQuantity(ctx context.Context, client *ent.Cl
 	}
 	if effective.Add(additional).GreaterThan(item.PlannedQuantity) {
 		return biz.ErrProductionOrderQuantityExceeded
+	}
+	if err := validateProductionWIPFinishedGoodsAvailability(ctx, client, item, additional); err != nil {
+		return err
+	}
+	return nil
+}
+
+// validateProductionWIPFinishedGoodsAvailability preserves the legacy
+// completion path for route_code=NULL. Explicit route lines may create or post
+// finished-goods facts only within the quantity already ACCEPTED by the frozen
+// final packaging operation.
+func validateProductionWIPFinishedGoodsAvailability(
+	ctx context.Context,
+	client *ent.Client,
+	item *ent.ProductionOrderItem,
+	additional decimal.Decimal,
+) error {
+	if client == nil || item == nil {
+		return biz.ErrProductionOrderFactSourceInvalid
+	}
+	if item.RouteCode == nil {
+		return nil
+	}
+	if strings.TrimSpace(*item.RouteCode) != biz.ProductionWIPRoutePlushSewHandV1 {
+		return biz.ErrProductionWIPInvalidRoute
+	}
+	finalOperation, err := client.ProductionOrderOperation.Query().Where(
+		productionorderoperation.ProductionOrderID(item.ProductionOrderID),
+		productionorderoperation.ProductionOrderItemID(item.ID),
+		productionorderoperation.RouteCode(biz.ProductionWIPRoutePlushSewHandV1),
+		productionorderoperation.RouteVersion(biz.ProductionWIPRoutePlushSewHandV1Version),
+		productionorderoperation.OperationCode(biz.ProductionWIPOperationPackaging),
+	).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return biz.ErrProductionWIPInvalidRoute
+		}
+		return err
+	}
+	acceptedRows, err := client.ProductionWIPBatch.Query().Where(
+		productionwipbatch.ProductionOrderID(item.ProductionOrderID),
+		productionwipbatch.ProductionOrderItemID(item.ID),
+		productionwipbatch.ProductionOrderOperationID(finalOperation.ID),
+		productionwipbatch.Status(biz.ProductionWIPStatusAccepted),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	accepted := decimal.Zero
+	for _, row := range acceptedRows {
+		accepted = accepted.Add(row.Quantity)
+	}
+	effective, err := productionOrderEffectiveCompletedQuantity(ctx, client, item)
+	if err != nil {
+		return err
+	}
+	if additional.IsNegative() {
+		return biz.ErrProductionOrderFactSourceInvalid
+	}
+	if additional.IsZero() {
+		if !accepted.GreaterThan(effective) {
+			return biz.ErrProductionWIPInvalidTransition
+		}
+		return nil
+	}
+	if effective.Add(additional).GreaterThan(accepted) {
+		return biz.ErrProductionWIPQuantityExceeded
 	}
 	return nil
 }
@@ -1083,11 +1161,39 @@ func (r *operationalFactRepo) createProductionOrderLinkedFactDraft(ctx context.C
 }
 
 func (r *operationalFactRepo) PostProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
-	return r.postProductionFact(ctx, id, false)
+	return r.postProductionFact(ctx, id, false, 0)
 }
 
 func (r *operationalFactRepo) CancelPostedProductionFact(ctx context.Context, id int) (*biz.ProductionFact, error) {
-	return r.postProductionFact(ctx, id, true)
+	return r.postProductionFact(ctx, id, true, 0)
+}
+
+func (r *operationalFactRepo) PostProductionFactWithActor(ctx context.Context, id int, actorID int) (*biz.ProductionFact, error) {
+	if actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	return r.postProductionFact(ctx, id, false, actorID)
+}
+
+func (r *operationalFactRepo) ProductionFactRequiresSourceTask(ctx context.Context, id int) (bool, error) {
+	if id <= 0 {
+		return false, biz.ErrBadParam
+	}
+	row, err := r.data.postgres.ProductionFact.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return false, biz.ErrProductionFactNotFound
+		}
+		return false, err
+	}
+	return isProductionReworkLinkedFactRow(row), nil
+}
+
+func (r *operationalFactRepo) CancelPostedProductionFactWithActor(ctx context.Context, id int, actorID int) (*biz.ProductionFact, error) {
+	if actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	return r.postProductionFact(ctx, id, true, actorID)
 }
 
 func (r *operationalFactRepo) ListProductionFacts(ctx context.Context, filter biz.OperationalFactFilter) ([]*biz.ProductionFact, int, error) {
@@ -1719,6 +1825,90 @@ func (r *operationalFactRepo) CreateShipmentDraftWithItems(ctx context.Context, 
 	return commitShipment(ctx, tx, row)
 }
 
+func (r *operationalFactRepo) SubmitShipmentRelease(ctx context.Context, id int, actorID int) (*biz.WorkflowTask, bool, error) {
+	if id <= 0 || actorID <= 0 {
+		return nil, false, biz.ErrBadParam
+	}
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "shipments", id, biz.ErrShipmentNotFound); err != nil {
+		return nil, false, err
+	}
+	row, err := tx.client.Shipment.Get(ctx, id)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, biz.ErrShipmentNotFound
+		}
+		return nil, false, err
+	}
+	if row.Status != biz.ShipmentStatusDraft {
+		return nil, false, biz.ErrBadParam
+	}
+	shipmentSource, err := shipmentWithItems(ctx, tx.client, row)
+	if err != nil {
+		return nil, false, err
+	}
+	if len(shipmentSource.Items) == 0 {
+		return nil, false, biz.ErrBadParam
+	}
+	if err := validateShipmentFinishedGoodsQualityGate(ctx, tx, id); err != nil {
+		return nil, false, err
+	}
+	taskCreate, state, err := biz.BuildShipmentReleaseSourceTask(shipmentSource)
+	if err != nil {
+		return nil, false, err
+	}
+	task, created, err := ensureSourceWorkflowTaskWithClient(ctx, tx.client, taskCreate, state, actorID)
+	if err != nil {
+		return nil, false, err
+	}
+	if err := tx.sqlTx.Commit(); err != nil {
+		return nil, false, err
+	}
+	tx.sqlTx = nil
+	return task, created, nil
+}
+
+func (r *operationalFactRepo) ValidateShipmentReleaseForShipping(ctx context.Context, id int) error {
+	if id <= 0 {
+		return biz.ErrBadParam
+	}
+	shipmentSource, err := r.GetShipment(ctx, id)
+	if err != nil {
+		return err
+	}
+	if shipmentSource.Status == biz.ShipmentStatusShipped {
+		// Shipping is already an immutable fact for this call. Preserve the
+		// existing idempotent replay without trying to rebuild a DRAFT contract.
+		return nil
+	}
+	expected, _, err := biz.BuildShipmentReleaseSourceTask(shipmentSource)
+	if err != nil {
+		return err
+	}
+	current, err := getSourceWorkflowTaskWithClient(ctx, r.data.postgres, expected.TaskGroup, expected.SourceID)
+	if err != nil {
+		if errors.Is(err, biz.ErrWorkflowTaskNotFound) {
+			return biz.ErrShipmentReleaseRequired
+		}
+		return err
+	}
+	if !workflowSourceTaskMatchesExpectedIntent(current, expected) {
+		return biz.ErrIdempotencyConflict
+	}
+	switch current.TaskStatusKey {
+	case "done":
+		return nil
+	case "rejected":
+		return biz.ErrShipmentReleaseRejected
+	default:
+		return biz.ErrShipmentReleasePending
+	}
+}
+
 func createShipmentItem(ctx context.Context, client *ent.Client, shipmentID int, salesOrderID *int, in *biz.ShipmentItemCreate) (*ent.ShipmentItem, error) {
 	if err := validateOperationalFactSKUAndLot(ctx, client, biz.InventorySubjectProduct, in.ProductID, in.ProductSkuID, in.LotID); err != nil {
 		return nil, err
@@ -1948,6 +2138,13 @@ func shipmentItemsMatchCreate(rows []*biz.ShipmentItem, inputs []*biz.ShipmentIt
 
 func (r *operationalFactRepo) ShipShipment(ctx context.Context, id int) (*biz.Shipment, error) {
 	return r.shipShipment(ctx, id, false, nil, nil, 0)
+}
+
+func (r *operationalFactRepo) ShipShipmentWithActor(ctx context.Context, id int, actorID int) (*biz.Shipment, error) {
+	if actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	return r.shipShipment(ctx, id, false, nil, nil, actorID)
 }
 
 func (r *operationalFactRepo) CancelShippedShipment(ctx context.Context, id int) (*biz.Shipment, error) {
@@ -3033,7 +3230,7 @@ func (r *operationalFactRepo) listFinanceFacts(
 	return out, total, nil
 }
 
-func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, cancel bool) (*biz.ProductionFact, error) {
+func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, cancel bool, actorID int) (*biz.ProductionFact, error) {
 	preview, err := r.data.postgres.ProductionFact.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -3042,7 +3239,7 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, ca
 		return nil, err
 	}
 	if isProductionReworkLinkedFactRow(preview) {
-		return r.postProductionReworkFact(ctx, id, cancel)
+		return r.postProductionReworkFact(ctx, id, cancel, actorID)
 	}
 	if isProductionOrderLinkedFactRow(preview) {
 		return r.postProductionOrderLinkedFact(ctx, id, cancel)
@@ -3100,7 +3297,7 @@ func (r *operationalFactRepo) postProductionFact(ctx context.Context, id int, ca
 	return commitProductionFact(ctx, tx, row)
 }
 
-func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id int, cancel bool) (*biz.ProductionFact, error) {
+func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id int, cancel bool, actorID int) (*biz.ProductionFact, error) {
 	preview, err := r.data.postgres.ProductionFact.Get(ctx, id)
 	if err != nil {
 		if ent.IsNotFound(err) {
@@ -3156,6 +3353,14 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 	if !operationalFactMutationMatchesProduction(row, resolved) {
 		return nil, biz.ErrProductionReworkSourceInvalid
 	}
+	item, err := tx.client.ProductionOrderItem.Get(ctx, itemID)
+	if err != nil {
+		return nil, err
+	}
+	task, state, err := buildProductionExceptionSourceTaskFromFact(ctx, tx.client, row)
+	if err != nil {
+		return nil, err
+	}
 	if cancel {
 		if row.Status == biz.OperationalFactStatusCancelled {
 			return commitProductionFact(ctx, tx, row)
@@ -3173,9 +3378,25 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
 		}
-		item, err := tx.client.ProductionOrderItem.Get(ctx, itemID)
+		currentTask, taskErr := getSourceWorkflowTaskWithClient(ctx, tx.client, task.TaskGroup, task.SourceID)
+		if taskErr != nil {
+			if errors.Is(taskErr, biz.ErrWorkflowTaskNotFound) {
+				return nil, biz.ErrProductionExceptionTaskRequired
+			}
+			return nil, taskErr
+		}
+		if !workflowSourceTaskMatchesExpectedIntent(currentTask, task) {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		if err := lockOperationalFactRow(ctx, tx, "workflow_tasks", currentTask.ID, biz.ErrProductionExceptionTaskRequired); err != nil {
+			return nil, err
+		}
+		currentTask, err = getSourceWorkflowTaskWithClient(ctx, tx.client, task.TaskGroup, task.SourceID)
 		if err != nil {
 			return nil, err
+		}
+		if currentTask.TaskStatusKey != "done" && currentTask.TaskStatusKey != "rejected" {
+			return nil, biz.ErrProductionExceptionTaskActive
 		}
 		effective, err := productionOrderEffectiveCompletedQuantity(ctx, tx.client, item)
 		if err != nil {
@@ -3188,6 +3409,15 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 			return nil, err
 		}
 		if err := updateOperationalFactStatus(ctx, tx, "production_facts", id, biz.OperationalFactStatusCancelled, "posted_at", nil); err != nil {
+			return nil, err
+		}
+		if err := transitionSourceWorkflowProjection(
+			ctx, tx.client, task, "cancelled", biz.ProductionRoleKey, actorID,
+			"production_rework.cancel", map[string]any{
+				"source_document_status": biz.OperationalFactStatusCancelled,
+				"cancelled_at":           time.Now().UTC().Unix(),
+			},
+		); err != nil {
 			return nil, err
 		}
 	} else {
@@ -3211,6 +3441,11 @@ func (r *operationalFactRepo) postProductionReworkFact(ctx context.Context, id i
 	row, err = tx.client.ProductionFact.Get(ctx, id)
 	if err != nil {
 		return nil, err
+	}
+	if !cancel {
+		if _, _, err := ensureSourceWorkflowTaskWithClient(ctx, tx.client, task, state, actorID); err != nil {
+			return nil, err
+		}
 	}
 	return commitProductionFact(ctx, tx, row)
 }
@@ -3345,11 +3580,29 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 	if err != nil {
 		return nil, err
 	}
+	var dependencyBatchID int
+	if cancel && preview.FactType == biz.OutsourcingFactMaterialIssue {
+		allocation, allocationErr := r.data.postgres.ProductionWIPOutsourcingAllocation.Query().Where(
+			productionwipoutsourcingallocation.OutsourcingOrderItemID(itemID),
+			productionwipoutsourcingallocation.SubjectType(biz.OutsourcingOrderSubjectMaterial),
+		).Only(ctx)
+		if allocationErr != nil && !ent.IsNotFound(allocationErr) {
+			return nil, allocationErr
+		}
+		if allocationErr == nil {
+			dependencyBatchID = allocation.ProductionWipBatchID
+		}
+	}
 	tx, err := r.inv.beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if dependencyBatchID > 0 {
+		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", dependencyBatchID, biz.ErrProductionWIPOutsourcingSourceDependency); err != nil {
+			return nil, err
+		}
+	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", orderID, biz.ErrOutsourcingOrderNotFound); err != nil {
 		return nil, err
 	}
@@ -3383,6 +3636,43 @@ func (r *operationalFactRepo) postOutsourcingFact(ctx context.Context, id int, c
 		}
 		if row.Status != biz.OperationalFactStatusPosted {
 			return nil, biz.ErrBadParam
+		}
+		if row.FactType == biz.OutsourcingFactMaterialIssue && dependencyBatchID > 0 {
+			allocation, err := tx.client.ProductionWIPOutsourcingAllocation.Query().Where(
+				productionwipoutsourcingallocation.OutsourcingOrderItemID(itemID),
+				productionwipoutsourcingallocation.ProductionWipBatchID(dependencyBatchID),
+				productionwipoutsourcingallocation.SubjectType(biz.OutsourcingOrderSubjectMaterial),
+			).Only(ctx)
+			if err != nil {
+				if ent.IsNotFound(err) {
+					return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+				}
+				return nil, err
+			}
+			batch, err := tx.client.ProductionWIPBatch.Get(ctx, dependencyBatchID)
+			if err != nil {
+				return nil, err
+			}
+			if batch.Status != biz.ProductionWIPStatusPlanned {
+				remainingFacts, err := tx.client.OutsourcingFact.Query().Where(
+					outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+					outsourcingfact.SourceID(orderID),
+					outsourcingfact.SourceLineID(itemID),
+					outsourcingfact.FactType(biz.OutsourcingFactMaterialIssue),
+					outsourcingfact.Status(biz.OperationalFactStatusPosted),
+					outsourcingfact.IDNEQ(row.ID),
+				).All(ctx)
+				if err != nil {
+					return nil, err
+				}
+				remaining := decimal.Zero
+				for _, fact := range remainingFacts {
+					remaining = remaining.Add(fact.Quantity)
+				}
+				if remaining.LessThan(allocation.AllocatedQuantity) {
+					return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+				}
+			}
 		}
 		if row.FactType == biz.OutsourcingFactReturnReceipt {
 			activeInspection, err := tx.client.QualityInspection.Query().Where(
@@ -3547,25 +3837,29 @@ func (r *operationalFactRepo) shipShipment(
 	if len(items) == 0 {
 		return nil, biz.ErrBadParam
 	}
+	cancelledShippedFact := false
 	if cancel {
-		transition, ok := corestatus.CancelShippedShipment(parent.Status)
+		transition, ok := corestatus.CancelShipment(parent.Status)
 		if !ok {
 			return nil, biz.ErrBadParam
 		}
 		if !transition.Changed {
-			if err := markProcessDomainCommandEffectCompensatedWithClient(
-				ctx,
-				tx.client,
-				biz.ProcessDomainCommandShipmentShip,
-				"shipment",
-				parent.ID,
-				"出货单已取消并完成库存冲正，原出货流程结果需要核对",
-				actorID,
-			); err != nil {
-				return nil, err
+			if parent.ShippedAt != nil {
+				if err := markProcessDomainCommandEffectCompensatedWithClient(
+					ctx,
+					tx.client,
+					biz.ProcessDomainCommandShipmentShip,
+					"shipment",
+					parent.ID,
+					"出货单已取消并完成库存冲正，原出货流程结果需要核对",
+					actorID,
+				); err != nil {
+					return nil, err
+				}
 			}
 			return commitShipment(ctx, tx, parent)
 		}
+		cancelledShippedFact = parent.Status == biz.ShipmentStatusShipped
 		hasFinanceDependency, err := tx.client.FinanceFact.Query().Where(
 			financefact.SourceType(biz.ShipmentSourceType),
 			financefact.SourceID(parent.ID),
@@ -3578,13 +3872,46 @@ func (r *operationalFactRepo) shipShipment(
 		if hasFinanceDependency {
 			return nil, biz.ErrShipmentFinanceDependency
 		}
-		for _, item := range items {
-			if err := r.applyShipmentItemInventory(ctx, tx, parent, item, true); err != nil {
+		releaseSource := entShipmentToBiz(parent, items)
+		if cancelledShippedFact {
+			releaseSource.Status = biz.ShipmentStatusDraft
+		}
+		releaseTask, _, err := biz.BuildShipmentReleaseSourceTask(releaseSource)
+		if err != nil {
+			return nil, err
+		}
+		hasReleaseTask := true
+		if cancelledShippedFact {
+			if err := requireShipmentReleaseTaskDone(ctx, tx, releaseTask); err != nil {
 				return nil, err
+			}
+		} else {
+			_, hasReleaseTask, err = shipmentReleaseTaskForCancellation(ctx, tx, releaseTask)
+			if err != nil {
+				return nil, err
+			}
+		}
+		if cancelledShippedFact {
+			for _, item := range items {
+				if err := r.applyShipmentItemInventory(ctx, tx, parent, item, true); err != nil {
+					return nil, err
+				}
 			}
 		}
 		if err := updateOperationalFactStatus(ctx, tx, "shipments", id, transition.Target, "shipped_at", nil); err != nil {
 			return nil, err
+		}
+		if hasReleaseTask {
+			if err := transitionSourceWorkflowProjection(
+				ctx, tx.client, releaseTask, "cancelled", biz.WarehouseRoleKey, actorID,
+				"shipment.cancel", map[string]any{
+					"source_document_status": biz.ShipmentStatusCancelled,
+					"cancelled_at":           time.Now().UTC().Unix(),
+					"inventory_out_reversed": cancelledShippedFact,
+				},
+			); err != nil {
+				return nil, err
+			}
 		}
 	} else {
 		transition, ok := corestatus.ShipShipment(parent.Status)
@@ -3601,6 +3928,17 @@ func (r *operationalFactRepo) shipShipment(
 				}
 			}
 			return commitShipment(ctx, tx, parent)
+		}
+		releaseSource := entShipmentToBiz(parent, items)
+		releaseTask, _, err := biz.BuildShipmentReleaseSourceTask(releaseSource)
+		if err != nil {
+			return nil, err
+		}
+		if err := requireShipmentReleaseTaskDone(ctx, tx, releaseTask); err != nil {
+			return nil, err
+		}
+		if err := validateShipmentFinishedGoodsQualityGate(ctx, tx, parent.ID); err != nil {
+			return nil, err
 		}
 		sourceQuantity, err := validateShipmentSourceAndQuantity(ctx, tx, parent, items)
 		if err != nil {
@@ -3624,12 +3962,22 @@ func (r *operationalFactRepo) shipShipment(
 		if err := updateOperationalFactStatus(ctx, tx, "shipments", id, transition.Target, "shipped_at", &now); err != nil {
 			return nil, err
 		}
+		if err := transitionSourceWorkflowProjection(
+			ctx, tx.client, releaseTask, "shipped", biz.WarehouseRoleKey, actorID,
+			"shipment.ship", map[string]any{
+				"source_document_status": biz.ShipmentStatusShipped,
+				"shipped_at":             now.UTC().Unix(),
+				"inventory_out_posted":   true,
+			},
+		); err != nil {
+			return nil, err
+		}
 	}
 	parent, err = tx.client.Shipment.Get(ctx, id)
 	if err != nil {
 		return nil, err
 	}
-	if cancel {
+	if cancel && cancelledShippedFact {
 		if err := markProcessDomainCommandEffectCompensatedWithClient(
 			ctx,
 			tx.client,
@@ -3647,6 +3995,52 @@ func (r *operationalFactRepo) shipShipment(
 		}
 	}
 	return commitShipment(ctx, tx, parent)
+}
+
+// validateShipmentFinishedGoodsQualityGate keeps the optional inspection side
+// flow internally consistent. A shipment with no inspection remains shippable;
+// once an active inspection exists, shipping waits for a PASS or CONCESSION.
+// The caller already owns the shipment row lock, which also serializes source
+// creation against shipping.
+func validateShipmentFinishedGoodsQualityGate(ctx context.Context, tx *inventoryDBTx, shipmentID int) error {
+	if tx == nil || tx.client == nil || shipmentID <= 0 {
+		return biz.ErrBadParam
+	}
+	inspections, err := tx.client.QualityInspection.Query().Where(
+		qualityinspection.SourceType(biz.QualityInspectionSourceShipment),
+		qualityinspection.SourceID(shipmentID),
+		qualityinspection.InspectionType(biz.QualityInspectionTypeFinishedGoods),
+		qualityinspection.StatusNEQ(biz.QualityInspectionStatusCancelled),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	pending := false
+	rejected := false
+	for _, inspection := range inspections {
+		switch inspection.Status {
+		case biz.QualityInspectionStatusDraft, biz.QualityInspectionStatusSubmitted:
+			pending = true
+		case biz.QualityInspectionStatusRejected:
+			if inspection.Result == nil || *inspection.Result != biz.QualityInspectionResultReject {
+				return biz.ErrBadParam
+			}
+			rejected = true
+		case biz.QualityInspectionStatusPassed:
+			if inspection.Result == nil || (*inspection.Result != biz.QualityInspectionResultPass && *inspection.Result != biz.QualityInspectionResultConcession) {
+				return biz.ErrBadParam
+			}
+		default:
+			return biz.ErrBadParam
+		}
+	}
+	if rejected {
+		return biz.ErrShipmentQualityRejected
+	}
+	if pending {
+		return biz.ErrShipmentQualityPending
+	}
+	return nil
 }
 
 func freezeShipmentNetWeights(ctx context.Context, tx *inventoryDBTx, items []*ent.ShipmentItem) error {

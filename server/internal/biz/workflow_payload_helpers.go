@@ -161,23 +161,23 @@ func workflowFinishedGoodsCommonPayload(current *WorkflowTask) map[string]any {
 }
 
 func workflowShipmentReleaseCommonPayload(current *WorkflowTask) map[string]any {
-	return map[string]any{
-		"record_title":          workflowShipmentReleaseRecordTitle(current),
-		"customer_name":         workflowPayloadString(current.Payload, "customer_name"),
-		"style_no":              workflowPayloadString(current.Payload, "style_no"),
-		"material_name":         workflowPayloadString(current.Payload, "material_name"),
-		"product_no":            workflowPayloadString(current.Payload, "product_no"),
-		"product_name":          workflowPayloadString(current.Payload, "product_name"),
-		"quantity":              workflowPayloadValue(current.Payload, "quantity"),
-		"unit":                  workflowPayloadString(current.Payload, "unit"),
-		"due_date":              workflowPayloadString(current.Payload, "due_date"),
-		"shipment_date":         workflowPayloadString(current.Payload, "shipment_date"),
-		"warehouse_location":    workflowPayloadString(current.Payload, "warehouse_location"),
-		"packaging_requirement": workflowPayloadString(current.Payload, "packaging_requirement"),
-		"shipping_requirement":  workflowPayloadString(current.Payload, "shipping_requirement"),
-		"finished_goods":        workflowPayloadString(current.Payload, "finished_goods") == "true",
-		"shipment_release":      true,
-	}
+	payload := mergeWorkflowPayload(current.Payload, nil)
+	payload["record_title"] = workflowShipmentReleaseRecordTitle(current)
+	payload["customer_name"] = workflowPayloadString(current.Payload, "customer_name")
+	payload["style_no"] = workflowPayloadString(current.Payload, "style_no")
+	payload["material_name"] = workflowPayloadString(current.Payload, "material_name")
+	payload["product_no"] = workflowPayloadString(current.Payload, "product_no")
+	payload["product_name"] = workflowPayloadString(current.Payload, "product_name")
+	payload["quantity"] = workflowPayloadValue(current.Payload, "quantity")
+	payload["unit"] = workflowPayloadString(current.Payload, "unit")
+	payload["due_date"] = workflowPayloadString(current.Payload, "due_date")
+	payload["shipment_date"] = workflowPayloadString(current.Payload, "shipment_date")
+	payload["warehouse_location"] = workflowPayloadString(current.Payload, "warehouse_location")
+	payload["packaging_requirement"] = workflowPayloadString(current.Payload, "packaging_requirement")
+	payload["shipping_requirement"] = workflowPayloadString(current.Payload, "shipping_requirement")
+	payload["finished_goods"] = workflowPayloadString(current.Payload, "finished_goods") == "true"
+	payload["shipment_release"] = true
+	return payload
 }
 
 func workflowShipmentFinanceCommonPayload(current *WorkflowTask) map[string]any {

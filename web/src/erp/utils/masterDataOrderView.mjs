@@ -418,6 +418,7 @@ export function createBlankOutsourcingLine(lineNo = 1) {
     product_name_snapshot: '',
     material_code_snapshot: '',
     material_name_snapshot: '',
+    processing_item: '',
     process_name_snapshot: '',
     process_category_snapshot: '',
     unit_name_snapshot: '',
@@ -444,12 +445,11 @@ export function normalizeOutsourcingLineFormValue(item = {}) {
     unit_id: item.unit_id,
     product_no_snapshot: isProduct ? item.product_no_snapshot || '' : '',
     sku_code_snapshot: isProduct ? item.sku_code_snapshot || '' : '',
-    product_order_no_snapshot: isProduct
-      ? item.product_order_no_snapshot || ''
-      : '',
+    product_order_no_snapshot: item.product_order_no_snapshot || '',
     product_name_snapshot: isProduct ? item.product_name_snapshot || '' : '',
     material_code_snapshot: isMaterial ? item.material_code_snapshot || '' : '',
     material_name_snapshot: isMaterial ? item.material_name_snapshot || '' : '',
+    processing_item: item.processing_item || '',
     process_name_snapshot: item.process_name_snapshot || '',
     process_category_snapshot: item.process_category_snapshot || '',
     unit_name_snapshot: item.unit_name_snapshot || '',
@@ -896,7 +896,11 @@ export function buildMasterDataParams(values = {}, extra = {}) {
       values.default_payment_term_days
     ),
     supplier_type: trimOptional(values.supplier_type),
+    address: trimOptional(values.address),
     tax_no: trimOptional(values.tax_no),
+    process_ids: Array.isArray(values.process_ids)
+      ? values.process_ids.map((value) => Number(value || 0))
+      : undefined,
     category: trimOptional(values.category),
     spec: trimOptional(values.spec),
     color: trimOptional(values.color),
@@ -1078,7 +1082,6 @@ export function buildOutsourcingOrderSubjectSwitchValues(subjectType) {
     material_id: undefined,
     product_no_snapshot: '',
     sku_code_snapshot: '',
-    product_order_no_snapshot: '',
     product_name_snapshot: '',
     material_code_snapshot: '',
     material_name_snapshot: '',
@@ -1246,9 +1249,7 @@ export function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
     sku_code_snapshot: productSubject
       ? trimOptional(values.sku_code_snapshot)
       : undefined,
-    product_order_no_snapshot: productSubject
-      ? trimOptional(values.product_order_no_snapshot)
-      : undefined,
+    product_order_no_snapshot: trimOptional(values.product_order_no_snapshot),
     product_name_snapshot: productSubject
       ? trimOptional(values.product_name_snapshot)
       : undefined,
@@ -1258,6 +1259,7 @@ export function buildOutsourcingOrderItemParams(values = {}, extra = {}) {
     material_name_snapshot: materialSubject
       ? trimOptional(values.material_name_snapshot)
       : undefined,
+    processing_item: trimOptional(values.processing_item),
     process_name_snapshot: trimOptional(values.process_name_snapshot),
     process_category_snapshot: trimOptional(values.process_category_snapshot),
     unit_name_snapshot: trimOptional(values.unit_name_snapshot),

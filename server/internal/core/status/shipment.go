@@ -22,9 +22,9 @@ func ShipShipment(current string) (ShipmentTransition, bool) {
 	}
 }
 
-func CancelShippedShipment(current string) (ShipmentTransition, bool) {
+func CancelShipment(current string) (ShipmentTransition, bool) {
 	switch current {
-	case ShipmentShipped:
+	case ShipmentDraft, ShipmentShipped:
 		return ShipmentTransition{Target: ShipmentCancelled, Changed: true}, true
 	case ShipmentCancelled:
 		return ShipmentTransition{Target: ShipmentCancelled}, true

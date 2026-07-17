@@ -1021,6 +1021,75 @@ func HasMaterialRequirementsWith(preds ...predicate.ProductionOrderMaterialRequi
 	})
 }
 
+// HasOperations applies the HasEdge predicate on the "operations" edge.
+func HasOperations() predicate.ProductionOrder {
+	return predicate.ProductionOrder(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OperationsTable, OperationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOperationsWith applies the HasEdge predicate on the "operations" edge with a given conditions (other predicates).
+func HasOperationsWith(preds ...predicate.ProductionOrderOperation) predicate.ProductionOrder {
+	return predicate.ProductionOrder(func(s *sql.Selector) {
+		step := newOperationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasWipBatches applies the HasEdge predicate on the "wip_batches" edge.
+func HasWipBatches() predicate.ProductionOrder {
+	return predicate.ProductionOrder(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, WipBatchesTable, WipBatchesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasWipBatchesWith applies the HasEdge predicate on the "wip_batches" edge with a given conditions (other predicates).
+func HasWipBatchesWith(preds ...predicate.ProductionWIPBatch) predicate.ProductionOrder {
+	return predicate.ProductionOrder(func(s *sql.Selector) {
+		step := newWipBatchesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPackagingConfirmations applies the HasEdge predicate on the "packaging_confirmations" edge.
+func HasPackagingConfirmations() predicate.ProductionOrder {
+	return predicate.ProductionOrder(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, PackagingConfirmationsTable, PackagingConfirmationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPackagingConfirmationsWith applies the HasEdge predicate on the "packaging_confirmations" edge with a given conditions (other predicates).
+func HasPackagingConfirmationsWith(preds ...predicate.ProductionPackagingConfirmation) predicate.ProductionOrder {
+	return predicate.ProductionOrder(func(s *sql.Selector) {
+		step := newPackagingConfirmationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
 // HasEvents applies the HasEdge predicate on the "events" edge.
 func HasEvents() predicate.ProductionOrder {
 	return predicate.ProductionOrder(func(s *sql.Selector) {

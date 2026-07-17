@@ -65,12 +65,21 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	}
 	assertLotStatus(t, ctx, client, lotID, biz.InventoryLotHold)
 	assertInventoryTxnCountUnchanged(t, ctx, client, txnCount)
+	_, missingRateRes, err := j.handleQuality(adminCtx, "pass_quality_inspection", "missing-rate", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(inspectionID),
+	}))
+	if err != nil || missingRateRes == nil || missingRateRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("new submitted decision without defect rate must fail, res=%#v err=%v", missingRateRes, err)
+	}
+	assertLotStatus(t, ctx, client, lotID, biz.InventoryLotHold)
 
 	_, passRes, err := j.handleQuality(adminCtx, "pass_quality_inspection", "3", mustJSONRPCStruct(t, map[string]any{
-		"id":            float64(inspectionID),
-		"result":        biz.QualityInspectionResultConcession,
-		"inspected_at":  "2026-06-17",
-		"decision_note": "让步接收",
+		"id":                   float64(inspectionID),
+		"result":               biz.QualityInspectionResultConcession,
+		"inspected_at":         "2026-06-17",
+		"defect_rate_operator": "approx",
+		"defect_rate_percent":  "5.0",
+		"decision_note":        "让步接收",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -81,6 +90,9 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	}
 	if result := passed["result"]; result != biz.QualityInspectionResultConcession {
 		t.Fatalf("expected concession result, got %#v", result)
+	}
+	if passed["defect_rate_operator"] != biz.QualityInspectionDefectRateOperatorApprox || passed["defect_rate_percent"] != "5" {
+		t.Fatalf("expected canonical defect rate response, got %#v", passed)
 	}
 	assertLotStatus(t, ctx, client, lotID, biz.InventoryLotActive)
 	assertInventoryTxnCountUnchanged(t, ctx, client, txnCount)
@@ -128,8 +140,10 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 		t.Fatalf("expected submit reject draft OK, res=%#v err=%v", submitRejectRes, err)
 	}
 	_, rejectRes, err := j.handleQuality(adminCtx, "reject_quality_inspection", "6", mustJSONRPCStruct(t, map[string]any{
-		"id":            float64(rejectDraft),
-		"decision_note": "尺寸不符",
+		"id":                   float64(rejectDraft),
+		"defect_rate_operator": biz.QualityInspectionDefectRateOperatorGT,
+		"defect_rate_percent":  "50",
+		"decision_note":        "尺寸不符",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -266,8 +280,10 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 		t.Fatalf("submit outsourcing quality result=%#v err=%v", submitRes, err)
 	}
 	_, rejectRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "reject_quality_inspection", "out-reject", mustJSONRPCStruct(t, map[string]any{
-		"id":            float64(inspectionID),
-		"decision_note": "尺寸不符",
+		"id":                   float64(inspectionID),
+		"defect_rate_operator": biz.QualityInspectionDefectRateOperatorApprox,
+		"defect_rate_percent":  "20",
+		"decision_note":        "尺寸不符",
 	}))
 	if err != nil || rejectRes == nil || rejectRes.Code != errcode.OK.Code {
 		t.Fatalf("reject outsourcing quality result=%#v err=%v", rejectRes, err)
@@ -317,6 +333,26 @@ func TestQualityInspectionSourceCreateParamsRejectDerivedFields(t *testing.T) {
 			t.Fatalf("outsourcing quality derived field %s must be rejected", field)
 		}
 	}
+
+	finishedGoods := map[string]any{
+		"customer_key":          "yoyoosun",
+		"inspection_no":         "QI-FINISHED-GOODS-SOURCE-PARAMS",
+		"shipment_id":           float64(30),
+		"finished_goods_lot_id": float64(31),
+		"product_id":            float64(32),
+		"warehouse_id":          float64(33),
+		"decision_note":         "出货前抽检",
+	}
+	if in, ok := finishedGoodsQualityInspectionCreateFromParams(finishedGoods); !ok || in.SourceID != 30 || in.InventoryLotID != 31 || in.SubjectID != 32 || in.WarehouseID != 33 {
+		t.Fatalf("allowed finished goods quality source params in=%#v ok=%v", in, ok)
+	}
+	for _, field := range []string{"source_id", "inventory_lot_id", "subject_id", "source_type", "inspection_type", "subject_type", "inspector_id", "shipment_item_id", "quantity", "unit_id"} {
+		forged := cloneQualityParams(finishedGoods)
+		forged[field] = "forged"
+		if _, ok := finishedGoodsQualityInspectionCreateFromParams(forged); ok {
+			t.Fatalf("finished goods quality non-canonical field %s must be rejected", field)
+		}
+	}
 }
 
 func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t *testing.T) {
@@ -360,14 +396,15 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t 
 	}
 	txnCount := client.InventoryTxn.Query().CountX(ctx)
 
-	_, createRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-create", mustJSONRPCStruct(t, map[string]any{
+	createParams := map[string]any{
 		"inspection_no":         "QI-JSONRPC-FG",
 		"shipment_id":           float64(shipment.ID),
 		"finished_goods_lot_id": float64(lot.ID),
 		"product_id":            float64(fixtures.productID),
 		"warehouse_id":          float64(fixtures.warehouseID),
 		"decision_note":         "成品质检待判定",
-	}))
+	}
+	_, createRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-create", mustJSONRPCStruct(t, createParams))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -387,6 +424,23 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t 
 		t.Fatalf("expected shipment finished goods source anchor, got %#v", created)
 	}
 	assertInventoryTxnCountUnchanged(t, ctx, client, txnCount)
+	_, replayRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-replay", mustJSONRPCStruct(t, createParams))
+	if err != nil || replayRes == nil || replayRes.Code != errcode.OK.Code || jsonRPCInt(t, jsonRPCNestedMap(t, replayRes, "quality_inspection"), "id") != inspectionID {
+		t.Fatalf("same finished goods quality intent must replay id=%d, res=%#v err=%v", inspectionID, replayRes, err)
+	}
+	conflictParams := cloneQualityParams(createParams)
+	conflictParams["inspection_no"] = "QI-JSONRPC-FG-CONFLICT"
+	_, conflictRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-conflict", mustJSONRPCStruct(t, conflictParams))
+	if err != nil || conflictRes == nil || conflictRes.Code != errcode.IdempotencyConflict.Code || conflictRes.Message != "该业务来源已存在未取消的质检单" {
+		t.Fatalf("same active finished goods quality grain must conflict, res=%#v err=%v", conflictRes, err)
+	}
+	missingShipmentParams := cloneQualityParams(createParams)
+	missingShipmentParams["inspection_no"] = "QI-JSONRPC-FG-MISSING-SHIPMENT"
+	missingShipmentParams["shipment_id"] = float64(shipment.ID + 100000)
+	_, missingShipmentRes, err := j.handleQuality(adminCtx, "create_finished_goods_quality_inspection_draft", "fg-missing-shipment", mustJSONRPCStruct(t, missingShipmentParams))
+	if err != nil || missingShipmentRes == nil || missingShipmentRes.Code != errcode.InvalidParam.Code || missingShipmentRes.Message != "出货单不存在" {
+		t.Fatalf("missing shipment must map to readable invalid param, res=%#v err=%v", missingShipmentRes, err)
+	}
 
 	_, submitRes, err := j.handleQuality(adminCtx, "submit_quality_inspection", "fg-submit", mustJSONRPCStruct(t, map[string]any{"id": float64(inspectionID)}))
 	if err != nil {
@@ -524,6 +578,63 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresEnabledModules(t *testing
 	}
 }
 
+func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionRequiresShipmentModuleEnabled(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_finished_goods_quality_shipment_module_gate")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.QualityRoleKey},
+		biz.PermissionQualityInspectionCreate,
+	))
+	lot, err := j.inventoryUC.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
+		SubjectType: biz.InventorySubjectProduct,
+		SubjectID:   fixtures.productID,
+		LotNo:       "QI-MODULE-FG-LOT",
+	})
+	if err != nil {
+		t.Fatalf("create finished goods lot fixture: %v", err)
+	}
+	operationalUC := biz.NewOperationalFactUsecase(datarepo.NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "QI-MODULE-FG-SHIPMENT",
+			IdempotencyKey: "QI-MODULE-FG-SHIPMENT",
+		},
+		Items: []*biz.ShipmentItemCreate{{
+			ProductID:   fixtures.productID,
+			WarehouseID: fixtures.warehouseID,
+			UnitID:      fixtures.unitID,
+			LotID:       &lot.ID,
+			Quantity:    mustDecimal(t, "1"),
+		}},
+	})
+	if err != nil {
+		t.Fatalf("create finished goods shipment fixture: %v", err)
+	}
+	readOnlyShipmentConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.17.quality-shipment-read-only",
+		"shipments",
+		"read_only",
+	)
+	activateQualityTestCustomerConfig(t, j, readOnlyShipmentConfig)
+
+	_, createRes, err := j.handleQuality(workflowJSONRPCAdminContext(), "create_finished_goods_quality_inspection_draft", "fg-shipment-read-only", mustJSONRPCStruct(t, map[string]any{
+		"inspection_no":         "QI-MODULE-FG-READONLY",
+		"shipment_id":           float64(shipment.ID),
+		"finished_goods_lot_id": float64(lot.ID),
+		"product_id":            float64(fixtures.productID),
+		"warehouse_id":          float64(fixtures.warehouseID),
+	}))
+	if err != nil || createRes == nil || createRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("read_only shipments must reject finished goods quality creation, res=%#v err=%v", createRes, err)
+	}
+	if count := client.QualityInspection.Query().Where(qualityinspection.InspectionNo("QI-MODULE-FG-READONLY")).CountX(ctx); count != 0 {
+		t.Fatalf("read_only shipments must not create finished goods quality inspection, got %d", count)
+	}
+}
+
 func TestQualityInspectionFilterFromParamsForwardsContextFilters(t *testing.T) {
 	filter, ok := qualityInspectionFilterFromParams(map[string]any{
 		"purchase_order_id":        float64(21),
@@ -617,9 +728,13 @@ func passPurchaseReceiptQualityForServiceTest(t *testing.T, ctx context.Context,
 		t.Fatalf("load generated incoming inspections for receipt %d failed: count=%d err=%v", receiptID, len(inspections), err)
 	}
 	for _, inspection := range inspections {
+		operator := biz.QualityInspectionDefectRateOperatorApprox
+		percent := decimal.NewFromInt(5)
 		if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-			InspectionID: inspection.ID,
-			Result:       biz.QualityInspectionResultPass,
+			InspectionID:       inspection.ID,
+			Result:             biz.QualityInspectionResultPass,
+			DefectRateOperator: &operator,
+			DefectRatePercent:  &percent,
 		}); err != nil {
 			t.Fatalf("pass generated incoming inspection %d failed: %v", inspection.ID, err)
 		}

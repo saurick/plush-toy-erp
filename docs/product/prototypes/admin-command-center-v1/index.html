@@ -3,49 +3,54 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>后台工作台样板</title>
+    <title>后台工作台样板 / Admin Workbench Pattern</title>
+    <link rel="icon" href="data:," />
     <style>
       :root {
         color-scheme: light;
-        --bg: #f4f6f9;
-        --panel: #ffffff;
-        --panel-soft: #f8fafc;
-        --panel-tint: #f2f7ff;
-        --line: #dbe3ee;
+        --bg: #f3f6fa;
+        --surface: #ffffff;
+        --surface-soft: #f7f9fc;
+        --surface-blue: #edf5ff;
+        --line: #dce4ef;
         --line-strong: #bdcad9;
         --text: #172033;
         --muted: #66758a;
-        --blue: #1d67d8;
-        --blue-soft: #eaf3ff;
-        --green: #197250;
-        --green-soft: #eaf7f1;
-        --amber: #a85f00;
-        --amber-soft: #fff4df;
-        --red: #bd3440;
-        --red-soft: #fff0f2;
-        --shadow: 0 16px 36px rgb(15 23 42 / 8%);
+        --primary: #1f67c9;
+        --primary-strong: #1857ac;
+        --primary-soft: #e8f2ff;
+        --danger: #b42331;
+        --danger-soft: #fff0f2;
+        --warning: #9a5a00;
+        --warning-soft: #fff4df;
+        --success: #17704d;
+        --success-soft: #eaf7f1;
+        --focus: #73aaf5;
+        --shadow: 0 12px 30px rgb(28 47 72 / 8%);
       }
 
       @media (prefers-color-scheme: dark) {
         :root {
           color-scheme: dark;
-          --bg: #101722;
-          --panel: #182233;
-          --panel-soft: #202b3d;
-          --panel-tint: #1c304d;
-          --line: #334157;
-          --line-strong: #4a5a72;
-          --text: #eef4fb;
-          --muted: #a9b6c8;
-          --blue: #76a8ff;
-          --blue-soft: #1f3556;
-          --green: #7ad7aa;
-          --green-soft: #183b2d;
-          --amber: #f2bd65;
-          --amber-soft: #463214;
-          --red: #ff9aa3;
-          --red-soft: #4a2229;
-          --shadow: 0 18px 42px rgb(0 0 0 / 28%);
+          --bg: #0f1722;
+          --surface: #182334;
+          --surface-soft: #202c3e;
+          --surface-blue: #1d314c;
+          --line: #334258;
+          --line-strong: #4a5b72;
+          --text: #edf3fb;
+          --muted: #a8b6c8;
+          --primary: #82b4ff;
+          --primary-strong: #a7caff;
+          --primary-soft: #1e3657;
+          --danger: #ff9ca6;
+          --danger-soft: #4b222b;
+          --warning: #f0bd68;
+          --warning-soft: #463315;
+          --success: #7bd7aa;
+          --success-soft: #193c2e;
+          --focus: #8cbbff;
+          --shadow: 0 16px 38px rgb(0 0 0 / 28%);
         }
       }
 
@@ -53,7 +58,13 @@
         box-sizing: border-box;
       }
 
+      html {
+        min-width: 320px;
+        background: var(--bg);
+      }
+
       body {
+        min-width: 0;
         margin: 0;
         background: var(--bg);
         color: var(--text);
@@ -61,856 +72,1181 @@
           "PingFang SC", "Microsoft YaHei", sans-serif;
       }
 
-      button,
-      select {
+      button {
         font: inherit;
       }
 
-      button {
-        cursor: pointer;
+      button:focus-visible,
+      a:focus-visible {
+        outline: 3px solid color-mix(in srgb, var(--focus) 42%, transparent);
+        outline-offset: 2px;
       }
 
       .app {
-        display: grid;
-        grid-template-rows: 58px minmax(0, 1fr);
-        height: 100vh;
-        min-width: 0;
-        overflow: hidden;
+        min-height: 100vh;
       }
 
-      .topbar {
+      .app-bar {
+        position: sticky;
+        top: 0;
+        z-index: 10;
         display: flex;
+        min-height: 60px;
         align-items: center;
         justify-content: space-between;
         gap: 16px;
         border-bottom: 1px solid var(--line);
-        background: rgb(255 255 255 / 94%);
-        padding: 0 22px;
+        background: color-mix(in srgb, var(--surface) 94%, transparent);
+        padding: 10px 24px;
+        backdrop-filter: blur(14px);
       }
 
       .brand {
         display: flex;
-        align-items: center;
-        gap: 10px;
         min-width: 0;
+        align-items: center;
+        gap: 11px;
       }
 
-      .mark {
+      .brand-mark {
         display: grid;
-        flex: 0 0 auto;
-        place-items: center;
         width: 34px;
         height: 34px;
-        border-radius: 8px;
+        flex: 0 0 auto;
+        place-items: center;
+        border-radius: 9px;
         background: #245f98;
         color: #fff;
-        font-size: 18px;
         font-weight: 760;
       }
 
-      .brand-text {
+      .brand-copy {
         min-width: 0;
       }
 
-      .brand strong,
-      .brand span {
+      .brand-copy strong,
+      .brand-copy span {
         display: block;
         overflow: hidden;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      .brand span {
+      .brand-copy span {
         color: var(--muted);
         font-size: 12px;
       }
 
-      .top-actions,
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 8px;
+      .stage {
+        display: inline-flex;
+        min-height: 26px;
+        flex: 0 0 auto;
         align-items: center;
-      }
-
-      .btn {
-        min-height: 34px;
         border: 1px solid var(--line-strong);
-        border-radius: 7px;
-        background: var(--panel);
+        border-radius: 999px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      main {
+        width: min(1440px, 100%);
+        margin: 0 auto;
+        padding: 24px;
+      }
+
+      .page-heading {
+        display: flex;
+        align-items: end;
+        justify-content: space-between;
+        gap: 24px;
+        margin-bottom: 16px;
+      }
+
+      .eyebrow {
+        margin: 0 0 4px;
+        color: var(--primary);
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.04em;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1 {
+        margin-bottom: 7px;
+        font-size: clamp(24px, 2.4vw, 32px);
+        line-height: 1.18;
+      }
+
+      h2 {
+        margin-bottom: 0;
+        font-size: 17px;
+        line-height: 1.35;
+      }
+
+      h3 {
+        margin-bottom: 0;
+        font-size: 14px;
+      }
+
+      .lede {
+        max-width: 760px;
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .keyboard-hint {
+        max-width: 330px;
+        margin: 0;
+        color: var(--muted);
+        font-size: 12px;
+        text-align: right;
+      }
+
+      kbd {
+        border: 1px solid var(--line-strong);
+        border-bottom-width: 2px;
+        border-radius: 5px;
+        background: var(--surface);
         color: var(--text);
-        padding: 0 12px;
-      }
-
-      .btn.primary {
-        border-color: var(--blue);
-        background: var(--blue);
-        color: #fff;
-      }
-
-      .btn.text {
-        border-color: transparent;
-        background: transparent;
-        color: var(--blue);
-        padding-inline: 4px;
-      }
-
-      .content {
-        min-width: 0;
-        min-height: 0;
-        overflow: auto;
-        padding: 20px 22px 24px;
+        padding: 1px 5px;
+        font: inherit;
+        font-size: 11px;
       }
 
       .workspace {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
-        gap: 16px;
-        max-width: 1320px;
-        margin: 0 auto;
-      }
-
-      .focus,
-      .panel,
-      .detail {
+        grid-template-columns: minmax(360px, 0.82fr) minmax(500px, 1.38fr);
+        min-height: 670px;
+        overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
+        border-radius: 12px;
+        background: var(--surface);
         box-shadow: var(--shadow);
       }
 
-      .focus {
-        grid-column: 1 / -1;
+      .master {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(280px, 380px);
-        gap: 18px;
-        padding: 20px;
-      }
-
-      .eyebrow {
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .focus h1,
-      .panel h2,
-      .detail h2,
-      .lane h3,
-      .handoff h3 {
-        margin: 0;
-      }
-
-      .focus h1 {
-        margin-top: 4px;
-        max-width: 760px;
-        font-size: 28px;
-        line-height: 1.18;
-      }
-
-      .summary {
-        margin: 10px 0 0;
-        max-width: 800px;
-        color: var(--muted);
-      }
-
-      .focus-list {
-        display: grid;
-        gap: 10px;
-        align-content: start;
-      }
-
-      .focus-item {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 10px;
-        align-items: center;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-soft);
-        padding: 10px;
-      }
-
-      .focus-count {
-        display: grid;
-        place-items: center;
-        width: 42px;
-        height: 42px;
-        border-radius: 8px;
-        background: var(--panel);
-        color: var(--blue);
-        font-size: 20px;
-        font-weight: 780;
-      }
-
-      .focus-item strong,
-      .focus-item span {
-        display: block;
-        overflow-wrap: anywhere;
-      }
-
-      .focus-item span {
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .panel,
-      .detail {
         min-width: 0;
-        overflow: hidden;
+        grid-template-rows: auto minmax(0, 1fr);
+        border-right: 1px solid var(--line);
+        background: var(--surface-soft);
       }
 
-      .panel-head,
-      .detail-head {
+      .master-head {
+        border-bottom: 1px solid var(--line);
+        background: var(--surface);
+        padding: 18px;
+      }
+
+      .master-title {
         display: flex;
+        align-items: center;
         justify-content: space-between;
         gap: 12px;
-        align-items: center;
-        border-bottom: 1px solid var(--line);
-        padding: 14px 16px;
+        margin-bottom: 14px;
       }
 
-      .tabs {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 6px;
+      .queue-total {
+        color: var(--muted);
+        font-size: 12px;
       }
 
-      .tab {
-        min-height: 30px;
-        border: 1px solid var(--line);
-        border-radius: 7px;
-        background: var(--panel);
-        color: var(--text);
-        padding: 0 10px;
-      }
-
-      .tab[aria-selected="true"] {
-        border-color: var(--blue);
-        background: var(--blue-soft);
-        color: var(--blue);
-        font-weight: 700;
-      }
-
-      .queue {
+      .queue-tabs {
         display: grid;
-        gap: 10px;
-        padding: 14px;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
       }
 
-      .task {
+      .queue-tab {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) auto;
-        gap: 12px;
-        align-items: center;
+        min-width: 0;
+        min-height: 68px;
+        align-content: center;
+        gap: 3px;
         border: 1px solid var(--line);
         border-radius: 8px;
-        background: var(--panel);
-        padding: 12px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 9px 10px;
         text-align: left;
+        cursor: pointer;
       }
 
-      .task[aria-selected="true"] {
-        border-color: var(--blue);
-        box-shadow: 0 0 0 3px rgb(31 111 229 / 11%);
+      .queue-tab:hover {
+        border-color: var(--line-strong);
+        background: var(--surface-blue);
       }
 
-      .task-title {
-        display: grid;
-        gap: 4px;
-        min-width: 0;
+      .queue-tab[aria-selected="true"] {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+        color: var(--primary-strong);
+        box-shadow: inset 3px 0 0 var(--primary);
       }
 
-      .task-title strong,
-      .task-title span {
+      .queue-tab strong {
+        font-size: 20px;
+        line-height: 1;
+        font-variant-numeric: tabular-nums;
+      }
+
+      .queue-tab span {
         overflow: hidden;
+        font-size: 12px;
         text-overflow: ellipsis;
         white-space: nowrap;
       }
 
-      .task-title span,
-      .detail-note,
-      .detail-row span,
-      .shortcut span,
-      .handoff p,
-      .lane-meta {
+      .task-panel {
+        min-height: 0;
+        overflow: auto;
+        padding: 10px;
+      }
+
+      .task-list {
+        display: grid;
+        gap: 8px;
+      }
+
+      .task-row {
+        position: relative;
+        display: grid;
+        width: 100%;
+        min-width: 0;
+        grid-template-columns: minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        overflow: hidden;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--surface);
+        color: var(--text);
+        padding: 13px 13px 13px 16px;
+        text-align: left;
+        cursor: pointer;
+      }
+
+      .task-row::before {
+        position: absolute;
+        inset: 0 auto 0 0;
+        width: 3px;
+        background: var(--line-strong);
+        content: "";
+      }
+
+      .task-row[data-tone="danger"]::before {
+        background: var(--danger);
+      }
+
+      .task-row[data-tone="warning"]::before {
+        background: var(--warning);
+      }
+
+      .task-row[data-tone="primary"]::before {
+        background: var(--primary);
+      }
+
+      .task-row:hover {
+        border-color: var(--line-strong);
+        background: var(--surface-blue);
+      }
+
+      .task-row[aria-pressed="true"] {
+        border-color: var(--primary);
+        background: var(--primary-soft);
+        box-shadow: 0 0 0 2px
+          color-mix(in srgb, var(--primary) 12%, transparent);
+      }
+
+      .task-copy {
+        display: grid;
+        min-width: 0;
+        gap: 5px;
+      }
+
+      .task-copy strong {
+        overflow: hidden;
+        font-size: 14px;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .task-meta {
+        display: flex;
+        min-width: 0;
+        flex-wrap: wrap;
+        gap: 4px 10px;
         color: var(--muted);
         font-size: 12px;
       }
 
-      .tag {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        min-height: 24px;
+      .task-meta span {
+        overflow-wrap: anywhere;
+      }
+
+      .task-due {
+        align-self: start;
         border-radius: 999px;
-        padding: 0 9px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        padding: 3px 8px;
         font-size: 12px;
-        font-weight: 700;
         white-space: nowrap;
       }
 
-      .tag.blue {
-        background: var(--blue-soft);
-        color: var(--blue);
+      .task-due[data-tone="danger"] {
+        background: var(--danger-soft);
+        color: var(--danger);
       }
 
-      .tag.green {
-        background: var(--green-soft);
-        color: var(--green);
+      .task-due[data-tone="warning"] {
+        background: var(--warning-soft);
+        color: var(--warning);
       }
 
-      .tag.amber {
-        background: var(--amber-soft);
-        color: var(--amber);
-      }
-
-      .tag.red {
-        background: var(--red-soft);
-        color: var(--red);
+      .empty {
+        display: grid;
+        min-height: 220px;
+        place-items: center;
+        border: 1px dashed var(--line-strong);
+        border-radius: 9px;
+        background: var(--surface);
+        color: var(--muted);
+        padding: 24px;
+        text-align: center;
       }
 
       .detail {
-        display: grid;
-        grid-template-rows: auto minmax(0, 1fr);
+        min-width: 0;
+        background: var(--surface);
+      }
+
+      .detail-head {
+        display: flex;
+        align-items: start;
+        justify-content: space-between;
+        gap: 18px;
+        border-bottom: 1px solid var(--line);
+        padding: 22px 24px 18px;
+      }
+
+      .detail-head h2 {
+        margin-top: 3px;
+        font-size: 22px;
+      }
+
+      .detail-subtitle {
+        margin: 6px 0 0;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .status {
+        display: inline-flex;
+        min-height: 26px;
+        flex: 0 0 auto;
+        align-items: center;
+        border-radius: 999px;
+        background: var(--primary-soft);
+        color: var(--primary-strong);
+        padding: 0 10px;
+        font-size: 12px;
+        font-weight: 700;
+      }
+
+      .status[data-tone="danger"] {
+        background: var(--danger-soft);
+        color: var(--danger);
+      }
+
+      .status[data-tone="warning"] {
+        background: var(--warning-soft);
+        color: var(--warning);
+      }
+
+      .status[data-tone="success"] {
+        background: var(--success-soft);
+        color: var(--success);
       }
 
       .detail-body {
         display: grid;
-        gap: 14px;
-        align-content: start;
-        padding: 16px;
+        gap: 20px;
+        padding: 22px 24px 28px;
       }
 
-      .why {
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-tint);
-        padding: 12px;
-      }
-
-      .why strong,
-      .why span {
-        display: block;
-      }
-
-      .why span {
-        margin-top: 4px;
-        color: var(--muted);
-        font-size: 12px;
-      }
-
-      .detail-grid {
+      .priority-note {
         display: grid;
-        gap: 8px;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 12px;
+        align-items: start;
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-soft);
-        padding: 12px;
+        border-radius: 9px;
+        background: var(--surface-blue);
+        padding: 14px;
       }
 
-      .detail-row {
+      .note-icon {
+        display: grid;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border-radius: 8px;
+        background: var(--primary-soft);
+        color: var(--primary-strong);
+        font-weight: 800;
+      }
+
+      .priority-note p {
+        margin: 4px 0 0;
+        color: var(--muted);
+      }
+
+      .section-block {
+        display: grid;
+        gap: 10px;
+      }
+
+      .section-heading {
         display: flex;
+        align-items: baseline;
         justify-content: space-between;
         gap: 12px;
       }
 
-      .detail-row strong {
-        text-align: right;
+      .section-heading span {
+        color: var(--muted);
+        font-size: 12px;
       }
 
-      .detail-note {
-        margin: 0;
-      }
-
-      .lower {
-        grid-column: 1 / -1;
+      .context-grid {
         display: grid;
-        grid-template-columns: minmax(0, 1fr) minmax(340px, 410px);
-        gap: 16px;
-      }
-
-      .lane {
-        display: grid;
-        gap: 10px;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-        box-shadow: var(--shadow);
-        padding: 16px;
+        border-radius: 9px;
+        background: var(--surface-soft);
       }
 
-      .shortcut-grid {
-        display: grid;
-        grid-template-columns: repeat(4, minmax(0, 1fr));
-        gap: 10px;
+      .context-grid div {
+        min-width: 0;
+        border-right: 1px solid var(--line);
+        border-bottom: 1px solid var(--line);
+        padding: 12px 14px;
       }
 
-      .shortcut {
-        min-height: 96px;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-soft);
-        padding: 12px;
-        text-align: left;
+      .context-grid div:nth-child(2n) {
+        border-right: 0;
       }
 
-      .shortcut[data-related="true"] {
-        border-color: var(--blue);
-        background: var(--blue-soft);
+      .context-grid div:nth-last-child(-n + 2) {
+        border-bottom: 0;
       }
 
-      .shortcut strong,
-      .shortcut span {
-        display: block;
+      dt {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      dd {
+        margin: 4px 0 0;
         overflow-wrap: anywhere;
+        font-weight: 650;
       }
 
-      .shortcut span {
-        margin-top: 4px;
-      }
-
-      .handoff {
+      .record-list {
         display: grid;
-        gap: 10px;
+        overflow: hidden;
         border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel);
-        box-shadow: var(--shadow);
-        padding: 16px;
+        border-radius: 9px;
       }
 
-      .handoff-grid {
+      .record-row {
         display: grid;
-        gap: 8px;
+        grid-template-columns: 110px minmax(0, 1fr) auto;
+        gap: 12px;
+        align-items: center;
+        border-bottom: 1px solid var(--line);
+        padding: 11px 13px;
       }
 
-      .handoff-row {
-        display: grid;
-        grid-template-columns: auto minmax(0, 1fr);
-        gap: 10px;
-        align-items: start;
-        border: 1px solid var(--line);
-        border-radius: 8px;
-        background: var(--panel-soft);
-        padding: 10px;
+      .record-row:last-child {
+        border-bottom: 0;
       }
 
-      .dot {
-        width: 10px;
-        height: 10px;
-        margin-top: 5px;
-        border-radius: 50%;
-        background: var(--blue);
+      .record-kind,
+      .record-note {
+        color: var(--muted);
+        font-size: 12px;
       }
 
-      .dot.red {
-        background: var(--red);
+      .record-value {
+        min-width: 0;
+        overflow-wrap: anywhere;
+        font-weight: 650;
       }
 
-      .dot.amber {
-        background: var(--amber);
+      .processing-hint {
+        border-left: 3px solid var(--primary);
+        background: var(--surface-soft);
+        padding: 12px 14px;
       }
 
-      .dot.green {
-        background: var(--green);
+      .processing-hint p {
+        margin: 4px 0 0;
+        color: var(--muted);
       }
 
-      @media (prefers-color-scheme: dark) {
-        .topbar {
-          background: rgb(24 34 51 / 94%);
-        }
+      .boundary {
+        margin: 0;
+        border-top: 1px solid var(--line);
+        color: var(--muted);
+        padding-top: 14px;
+        font-size: 12px;
       }
 
-      @media (max-width: 1040px) {
-        .workspace,
-        .focus,
-        .lower {
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+      }
+
+      @media (max-width: 980px) {
+        .workspace {
           grid-template-columns: 1fr;
         }
 
-        .shortcut-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
+        .master {
+          max-height: 560px;
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
         }
       }
 
-      @media (max-width: 700px) {
-        .app {
-          grid-template-rows: auto minmax(0, 1fr);
-          height: auto;
-          min-height: 100vh;
-          overflow: visible;
-        }
-
-        .topbar {
+      @media (max-width: 660px) {
+        .app-bar {
+          position: static;
           align-items: flex-start;
-          flex-direction: column;
-          height: auto;
-          padding: 14px 16px;
+          padding: 12px 14px;
         }
 
-        .content {
-          overflow: visible;
-          padding: 14px;
+        main {
+          padding: 16px 12px 24px;
         }
 
-        .focus h1 {
-          font-size: 22px;
+        .page-heading {
+          display: block;
         }
 
-        .task {
+        .keyboard-hint {
+          margin-top: 10px;
+          text-align: left;
+        }
+
+        .workspace {
+          min-height: 0;
+        }
+
+        .master-head,
+        .detail-head,
+        .detail-body {
+          padding-right: 14px;
+          padding-left: 14px;
+        }
+
+        .queue-tabs {
           grid-template-columns: 1fr;
         }
 
-        .shortcut-grid {
+        .queue-tab {
+          min-height: 52px;
+          grid-template-columns: auto minmax(0, 1fr);
+          align-items: center;
+          gap: 10px;
+        }
+
+        .task-row {
           grid-template-columns: 1fr;
+        }
+
+        .task-due {
+          justify-self: start;
+        }
+
+        .detail-head {
+          display: grid;
+        }
+
+        .status {
+          justify-self: start;
+        }
+
+        .context-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .context-grid div,
+        .context-grid div:nth-child(2n),
+        .context-grid div:nth-last-child(-n + 2) {
+          border-right: 0;
+          border-bottom: 1px solid var(--line);
+        }
+
+        .context-grid div:last-child {
+          border-bottom: 0;
+        }
+
+        .record-row {
+          grid-template-columns: 1fr;
+          gap: 3px;
+        }
+
+        .record-note {
+          justify-self: start;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
         }
       }
     </style>
   </head>
   <body>
     <div class="app">
-      <header class="topbar">
+      <header class="app-bar">
         <div class="brand">
-          <div class="mark">样</div>
-          <div class="brand-text">
-            <strong>后台工作台样板</strong>
-            <span>To Implement / 今日处理台，不是正式菜单</span>
+          <div class="brand-mark" aria-hidden="true">工</div>
+          <div class="brand-copy">
+            <strong>工作台</strong>
+            <span>今日待办与当前任务</span>
           </div>
         </div>
-        <div class="top-actions">
-          <button class="btn">刷新队列</button>
-          <button class="btn primary">处理当前任务</button>
-        </div>
+        <span class="stage">To Implement · 原型样板</span>
       </header>
 
-      <main class="content">
-        <div class="workspace">
-          <section class="focus" aria-label="今日焦点">
-            <div>
-              <div class="eyebrow">ERP / 今日先后顺序</div>
-              <h1>工作台只做一件事：把今天最该处理的协同任务推到眼前。</h1>
-              <p class="summary">
-                这里不复制完整菜单，也不直接写库存、出货、财务或打印事实。
-                它只帮助用户判断优先级、理解卡点影响，并进入对应业务页面继续处理。
-              </p>
-            </div>
-            <div class="focus-list" aria-label="首屏判断">
-              <div class="focus-item">
-                <div class="focus-count">2</div>
-                <div>
-                  <strong>先清阻塞</strong>
-                  <span>影响入库、交期或后续开票的事项排在最前。</span>
-                </div>
-              </div>
-              <div class="focus-item">
-                <div class="focus-count">3</div>
-                <div>
-                  <strong>再处理待我动作</strong>
-                  <span>只展示需要当前角色继续推进的任务。</span>
-                </div>
-              </div>
-              <div class="focus-item">
-                <div class="focus-count">4</div>
-                <div>
-                  <strong>最后进入关联记录</strong>
-                  <span>入口跟随当前任务出现，不作为新菜单结构。</span>
-                </div>
-              </div>
-            </div>
-          </section>
+      <main>
+        <div class="page-heading">
+          <div>
+            <p class="eyebrow">TODAY / 先判断，再处理</p>
+            <h1>今天先处理什么</h1>
+            <p class="lede">
+              按紧急程度聚合当前账号需要关注的协同任务；选择左侧任务后，在右侧核对影响、责任和关联记录。
+            </p>
+          </div>
+          <p class="keyboard-hint">
+            键盘：<kbd>←</kbd><kbd>→</kbd> 切换队列，
+            <kbd>↑</kbd><kbd>↓</kbd> 切换当前任务
+          </p>
+        </div>
 
-          <section class="panel" aria-label="优先处理队列">
-            <div class="panel-head">
-              <div>
-                <div class="eyebrow">优先队列</div>
-                <h2>今天先处理</h2>
+        <section class="workspace" aria-label="优先队列与当前任务">
+          <aside class="master" aria-labelledby="queue-heading">
+            <div class="master-head">
+              <div class="master-title">
+                <h2 id="queue-heading">优先队列</h2>
+                <span class="queue-total" id="queueTotal"></span>
               </div>
-              <div class="tabs" role="tablist" aria-label="任务筛选">
+              <div class="queue-tabs" role="tablist" aria-label="任务队列">
                 <button
-                  class="tab"
-                  id="tab-actionable"
-                  role="tab"
+                  class="queue-tab"
+                  id="queue-mine"
                   type="button"
-                  data-filter="actionable"
-                  aria-controls="taskList"
+                  role="tab"
+                  data-filter="mine"
+                  aria-controls="taskPanel"
                   aria-selected="true"
                 >
-                  待我处理
+                  <strong id="count-mine">0</strong>
+                  <span>待我处理</span>
                 </button>
                 <button
-                  class="tab"
-                  id="tab-risk"
-                  role="tab"
+                  class="queue-tab"
+                  id="queue-risk"
                   type="button"
+                  role="tab"
                   data-filter="risk"
-                  aria-controls="taskList"
+                  aria-controls="taskPanel"
                   aria-selected="false"
+                  tabindex="-1"
                 >
-                  阻塞/逾期
+                  <strong id="count-risk">0</strong>
+                  <span>阻塞 / 逾期</span>
                 </button>
                 <button
-                  class="tab"
-                  id="tab-waiting"
-                  role="tab"
+                  class="queue-tab"
+                  id="queue-waiting"
                   type="button"
+                  role="tab"
                   data-filter="waiting"
-                  aria-controls="taskList"
+                  aria-controls="taskPanel"
                   aria-selected="false"
+                  tabindex="-1"
                 >
-                  等待交接
+                  <strong id="count-waiting">0</strong>
+                  <span>等待交接</span>
                 </button>
               </div>
             </div>
-            <div class="queue" id="taskList" role="tabpanel" aria-labelledby="tab-actionable"></div>
-          </section>
-
-          <aside class="detail" aria-label="当前任务上下文">
-            <div class="detail-head">
-              <div>
-                <div class="eyebrow">当前任务上下文</div>
-                <h2 id="detailTitle">采购合同待回签</h2>
-              </div>
-              <span class="tag blue" id="detailTag">待我处理</span>
-            </div>
-            <div class="detail-body">
-              <div class="why">
-                <strong id="detailWhy">合同未回签会影响后续到货跟进和供应商确认。</strong>
-                <span id="detailNext">下一步：进入单据模板，打开采购合同打印窗口继续处理。</span>
-              </div>
-              <div class="detail-grid">
-                <div class="detail-row"><span>业务对象</span><strong id="detailSource">单据模板</strong></div>
-                <div class="detail-row"><span>责任角色</span><strong id="detailRole">采购</strong></div>
-                <div class="detail-row"><span>到期</span><strong id="detailDue">今天 18:00</strong></div>
-                <div class="detail-row"><span>建议入口</span><strong id="detailEntry">单据模板</strong></div>
-              </div>
-              <p class="detail-note" id="detailBoundary">
-                打印和纸面快照不反向写采购、库存或财务事实。
-              </p>
-              <div class="actions">
-                <button class="btn primary">进入建议入口</button>
-                <button class="btn">记录阻塞</button>
-                <button class="btn text">查看任务看板</button>
-              </div>
+            <div
+              class="task-panel"
+              id="taskPanel"
+              role="tabpanel"
+              aria-labelledby="queue-mine"
+            >
+              <div class="task-list" id="taskList" aria-label="当前队列任务"></div>
             </div>
           </aside>
 
-          <div class="lower">
-            <section class="lane" aria-label="当前任务关联记录">
+          <article class="detail" aria-labelledby="detailTitle">
+            <header class="detail-head">
               <div>
-                <div class="eyebrow">随当前任务变化</div>
-                <h3>当前任务关联记录</h3>
-                <div class="lane-meta">
-                  只放能继续处理当前事项的记录。高亮表示与当前任务上下文直接相关，不替代左侧正式菜单。
-                </div>
+                <p class="eyebrow">CURRENT TASK / 当前任务</p>
+                <h2 id="detailTitle"></h2>
+                <p class="detail-subtitle" id="detailSubtitle"></p>
               </div>
-              <div class="shortcut-grid">
-                <button class="shortcut" data-shortcut="sales">
-                  <strong>销售订单</strong>
-                  <span>交期、客户承诺、订单明细</span>
-                </button>
-                <button class="shortcut" data-shortcut="inbound">
-                  <strong>入库通知/检验/入库</strong>
-                  <span>到仓、质检、入库协同</span>
-                </button>
-                <button class="shortcut" data-shortcut="inventory">
-                  <strong>库存</strong>
-                  <span>余额、批次、流水查看</span>
-                </button>
-                <button class="shortcut" data-shortcut="print">
-                  <strong>单据模板</strong>
-                  <span>采购合同、加工合同打印</span>
-                </button>
-              </div>
-            </section>
+              <span class="status" id="detailStatus"></span>
+            </header>
 
-            <section class="handoff" aria-label="交接摘要">
-              <div>
-                <div class="eyebrow">工作台边界</div>
-                <h3>看得到，但不在这里做事实过账</h3>
-              </div>
-              <div class="handoff-grid">
-                <div class="handoff-row">
-                  <span class="dot red"></span>
-                  <div>
-                    <strong>Workflow 任务</strong>
-                    <p>可提醒、跳转、记录阻塞；任务完成不等于库存或出货事实完成。</p>
-                  </div>
+            <div class="detail-body">
+              <section class="priority-note" aria-labelledby="impactTitle">
+                <span class="note-icon" aria-hidden="true">!</span>
+                <div>
+                  <h3 id="impactTitle">为什么现在处理</h3>
+                  <p id="detailImpact"></p>
                 </div>
-                <div class="handoff-row">
-                  <span class="dot amber"></span>
-                  <div>
-                    <strong>关联记录</strong>
-                    <p>只做当前任务上下文跳转；字段、保存、导出仍回到对应页面。</p>
-                  </div>
+              </section>
+
+              <section class="section-block" aria-labelledby="contextTitle">
+                <div class="section-heading">
+                  <h3 id="contextTitle">处理上下文</h3>
+                  <span>只读核对</span>
                 </div>
-                <div class="handoff-row">
-                  <span class="dot green"></span>
+                <dl class="context-grid">
                   <div>
-                    <strong>正式菜单</strong>
-                    <p>仍由 seedData、客户菜单配置和 RBAC 决定；本页不反推菜单结构。</p>
+                    <dt>责任岗位</dt>
+                    <dd id="detailRole"></dd>
                   </div>
+                  <div>
+                    <dt>到期时间</dt>
+                    <dd id="detailDue"></dd>
+                  </div>
+                  <div>
+                    <dt>任务来源</dt>
+                    <dd id="detailSource"></dd>
+                  </div>
+                  <div>
+                    <dt>处理入口</dt>
+                    <dd id="detailEntry"></dd>
+                  </div>
+                </dl>
+              </section>
+
+              <section class="section-block" aria-labelledby="recordsTitle">
+                <div class="section-heading">
+                  <h3 id="recordsTitle">关联记录</h3>
+                  <span>随当前任务变化</span>
                 </div>
-              </div>
-            </section>
-          </div>
-        </div>
+                <div class="record-list" id="recordList"></div>
+              </section>
+
+              <section class="processing-hint" aria-labelledby="processingHintTitle">
+                <h3 id="processingHintTitle">处理提示</h3>
+                <p id="detailProcessingHint"></p>
+              </section>
+
+              <p class="boundary" id="detailBoundary"></p>
+            </div>
+          </article>
+        </section>
+        <p class="sr-only" id="selectionAnnouncement" aria-live="polite"></p>
       </main>
     </div>
 
     <script>
       const tasks = [
         {
-          id: "warehouse-blocked",
-          title: "入库质检被阻塞",
-          source: "入库通知/检验/入库",
-          role: "品质 / 仓库",
-          status: "阻塞",
-          due: "已超时 2 小时",
-          filter: "risk",
-          tag: "red",
-          related: ["inbound", "inventory"],
-          why: "影响本批产品入库，销售订单交期无法确认。",
-          next: "下一步：进入入库通知/检验/入库，补充阻塞原因并重新推进。",
-          boundary:
-            "工作台只做协同提醒；质检完成不等于库存已经入账，库存事实仍由正式 usecase 处理。",
+          id: "quality-review",
+          filter: "mine",
+          title: "确认来料质检结论",
+          subtitle: "来料质检 · QI-240716-018",
+          status: "待我处理",
+          tone: "primary",
+          due: "今天 14:30",
+          role: "品质",
+          source: "采购入库",
+          entry: "来料质检",
+          impact: "本批物料尚未形成可用于后续入库判断的检验结论，采购与仓库都在等待处理结果。",
+          processingHint: "进入来料质检页面核对抽检结果，并按真实检验结果提交结论。",
+          boundary: "完成协同任务只表示责任已处理；库存是否入账仍以采购入库记录为准。",
+          records: [
+            ["采购入库单", "PR-240716-006", "待检"],
+            ["供应商", "华东辅料供应商", "已启用"],
+            ["物料", "填充棉 · 300kg", "本批"],
+          ],
         },
         {
-          id: "shipment-risk",
-          title: "出货放行前缺装箱确认",
-          source: "出货管理",
-          role: "仓库 / 业务",
-          status: "影响交付",
+          id: "delivery-confirm",
+          filter: "mine",
+          title: "确认销售订单交期",
+          subtitle: "销售订单 · SO-240715-012",
+          status: "待我处理",
+          tone: "primary",
           due: "今天 16:00",
-          filter: "risk",
-          tag: "amber",
-          related: ["sales", "inventory"],
-          why: "客户交付节点临近，缺装箱确认会影响后续发货。",
-          next: "下一步：进入出货或销售订单页面核对关联对象。",
-          boundary:
-            "shipment_release done 不是 shipped；真实出货必须由事实层主路径确认。",
+          role: "业务",
+          source: "销售订单",
+          entry: "销售订单",
+          impact: "客户承诺日期尚未确认，采购与生产排程无法使用稳定的交期依据。",
+          processingHint: "进入销售订单页面核对客户要求、数量和承诺日期。",
+          boundary: "确认订单交期不会自动生成生产、库存预留、出货或财务记录。",
+          records: [
+            ["销售订单", "SO-240715-012", "待确认"],
+            ["客户", "国内渠道客户", "正常"],
+            ["产品", "毛绒公仔 · 2,400 件", "订单明细"],
+          ],
         },
         {
           id: "purchase-sign",
-          title: "采购合同待回签",
-          source: "单据模板",
-          role: "采购",
+          filter: "mine",
+          title: "核对采购合同回签",
+          subtitle: "采购订单 · PO-240715-009",
           status: "待我处理",
-          due: "今天 18:00",
-          filter: "actionable",
-          tag: "blue",
-          related: ["print"],
-          why: "合同未回签会影响后续到货跟进和供应商确认。",
-          next: "下一步：进入单据模板，打开采购合同打印窗口继续处理。",
-          boundary:
-            "打印和纸面快照不反向写采购、库存或财务事实。",
-        },
-        {
-          id: "sales-confirm",
-          title: "销售订单交期确认",
-          source: "销售订单",
-          role: "业务",
-          status: "待我处理",
+          tone: "primary",
           due: "明天 10:00",
-          filter: "actionable",
-          tag: "green",
-          related: ["sales"],
-          why: "交期未确认会让采购、生产和出货优先级失真。",
-          next: "下一步：进入销售订单，核对客户承诺和关联任务。",
-          boundary:
-            "工作台只提示协同动作；订单字段保存仍走销售订单页面和对应 API。",
+          role: "采购",
+          source: "采购订单",
+          entry: "采购订单",
+          impact: "供应商尚未确认最终交期与数量，后续到货跟进缺少双方确认依据。",
+          processingHint: "进入采购订单页面核对采购承诺与合同附件状态。",
+          boundary: "合同回签是采购协同依据，不等于采购收货、库存增加或应付形成。",
+          records: [
+            ["采购订单", "PO-240715-009", "待回签"],
+            ["供应商", "面料供应商", "正常"],
+            ["预计到货", "7 月 19 日", "未到期"],
+          ],
         },
         {
-          id: "quality-waiting",
-          title: "等待品质补充返工原因",
-          source: "质检管理",
-          role: "品质",
-          status: "等待交接",
-          due: "今天",
+          id: "inbound-blocked",
+          filter: "risk",
+          title: "采购入库被质检阻塞",
+          subtitle: "采购入库 · PR-240716-004",
+          status: "已阻塞",
+          tone: "danger",
+          due: "逾期 2 小时",
+          role: "品质 / 仓库",
+          source: "采购入库",
+          entry: "来料质检",
+          impact: "检验原因不完整，仓库无法判断本批物料能否继续办理入库。",
+          processingHint: "进入来料质检页面补充检验原因并重新确认结论。",
+          boundary: "解除任务阻塞不会自动修改库存；真实库存变化只能来自正式入库办理。",
+          records: [
+            ["采购入库单", "PR-240716-004", "待检"],
+            ["质检单", "QI-240716-015", "已阻塞"],
+            ["物料", "短毛绒布 · 18 卷", "本批"],
+          ],
+        },
+        {
+          id: "shipment-due",
+          filter: "risk",
+          title: "出货前缺少装箱确认",
+          subtitle: "出货单 · SH-240716-002",
+          status: "即将逾期",
+          tone: "warning",
+          due: "剩余 45 分钟",
+          role: "仓库",
+          source: "出货单",
+          entry: "出货管理",
+          impact: "承诺发货时间临近，装箱数量尚未核对，不能安全确认实际出货。",
+          processingHint: "进入出货单核对装箱明细和实际发货条件。",
+          boundary: "出货放行不等于已发货；只有正式出货记录才能代表真实出货事实。",
+          records: [
+            ["出货单", "SH-240716-002", "待装箱"],
+            ["销售订单", "SO-240712-021", "待交付"],
+            ["承诺发货", "今天 15:00", "临近"],
+          ],
+        },
+        {
+          id: "reason-handoff",
           filter: "waiting",
-          tag: "amber",
-          related: ["inbound"],
-          why: "原因缺失时不能让后续角色误判为已闭环。",
-          next: "下一步：查看任务看板或催办责任角色。",
-          boundary:
-            "等待态只说明协同还未完成，不代表事实表被修改或回滚。",
+          title: "等待品质补充返工原因",
+          subtitle: "生产记录 · PRD-240715-027",
+          status: "等待交接",
+          tone: "warning",
+          due: "今天",
+          role: "生产",
+          source: "生产异常",
+          entry: "生产异常",
+          impact: "返工原因尚未补齐，生产负责人无法判断后续安排和责任交接。",
+          processingHint: "等待品质岗位补充原因；信息完整后再进入生产异常页面继续处理。",
+          boundary: "等待交接只表示协同未完成，不代表生产、库存或质量记录被回滚。",
+          records: [
+            ["生产记录", "PRD-240715-027", "异常"],
+            ["质量检验", "QI-240715-011", "待补原因"],
+            ["产品", "坐姿公仔 · 160 件", "本批"],
+          ],
+        },
+        {
+          id: "finance-handoff",
+          filter: "waiting",
+          title: "等待采购确认对账差异",
+          subtitle: "对账记录 · RC-240715-008",
+          status: "等待交接",
+          tone: "warning",
+          due: "明天",
+          role: "财务",
+          source: "对账记录",
+          entry: "对账管理",
+          impact: "数量差异尚未由采购核实，财务不能继续确认本次对账结果。",
+          processingHint: "等待采购岗位确认来源记录；确认后回到对账页面继续核对。",
+          boundary: "对账协同完成不等于付款完成，也不会自动生成付款记录。",
+          records: [
+            ["对账记录", "RC-240715-008", "有差异"],
+            ["采购入库", "PR-240710-019", "已办理"],
+            ["供应商", "包装材料供应商", "正常"],
+          ],
         },
       ];
 
-      let selectedId = "purchase-sign";
-      let activeFilter = "actionable";
+      const filterLabels = {
+        mine: "待我处理",
+        risk: "阻塞 / 逾期",
+        waiting: "等待交接",
+      };
 
+      let activeFilter = "mine";
+      const selectedByFilter = {
+        mine: "quality-review",
+        risk: "inbound-blocked",
+        waiting: "reason-handoff",
+      };
+
+      const tabs = Array.from(document.querySelectorAll(".queue-tab"));
       const taskList = document.querySelector("#taskList");
-      const tabs = [...document.querySelectorAll(".tab")];
-      const shortcuts = [...document.querySelectorAll(".shortcut")];
-
-      function visibleTasks() {
-        return tasks.filter((task) => task.filter === activeFilter);
-      }
-
-      function selectedTask() {
-        return tasks.find((task) => task.id === selectedId) || tasks[0];
-      }
+      const taskPanel = document.querySelector("#taskPanel");
+      const announcement = document.querySelector("#selectionAnnouncement");
 
       function setText(selector, value) {
-        document.querySelector(selector).textContent = value;
+        const element = document.querySelector(selector);
+        if (element) element.textContent = value;
       }
 
-      function updateDetail(task) {
-        setText("#detailTitle", task.title);
-        setText("#detailTag", task.status);
-        setText("#detailWhy", task.why);
-        setText("#detailNext", task.next);
-        setText("#detailSource", task.source);
-        setText("#detailRole", task.role);
-        setText("#detailDue", task.due);
-        setText("#detailEntry", task.source);
-        setText("#detailBoundary", task.boundary);
-        const tag = document.querySelector("#detailTag");
-        tag.className = `tag ${task.tag}`;
-        shortcuts.forEach((shortcut) => {
-          shortcut.dataset.related = String(
-            task.related.includes(shortcut.dataset.shortcut),
-          );
+      function tasksForActiveFilter() {
+        return tasks.filter(function (task) {
+          return task.filter === activeFilter;
         });
       }
 
-      function selectTask(task) {
-        selectedId = task.id;
-        updateDetail(task);
+      function selectedTask() {
+        const fallback = tasksForActiveFilter()[0] || tasks[0];
+        return (
+          tasks.find(function (task) {
+            return task.id === selectedByFilter[activeFilter];
+          }) || fallback
+        );
+      }
+
+      function updateCounts() {
+        Object.keys(filterLabels).forEach(function (filter) {
+          const count = tasks.filter(function (task) {
+            return task.filter === filter;
+          }).length;
+          setText("#count-" + filter, String(count));
+        });
+      }
+
+      function renderRecords(task) {
+        const list = document.querySelector("#recordList");
+        list.replaceChildren();
+        task.records.forEach(function (record) {
+          const row = document.createElement("div");
+          row.className = "record-row";
+
+          const kind = document.createElement("span");
+          kind.className = "record-kind";
+          kind.textContent = record[0];
+
+          const value = document.createElement("span");
+          value.className = "record-value";
+          value.textContent = record[1];
+
+          const note = document.createElement("span");
+          note.className = "record-note";
+          note.textContent = record[2];
+
+          row.append(kind, value, note);
+          list.appendChild(row);
+        });
+      }
+
+      function updateDetail(task, shouldAnnounce) {
+        setText("#detailTitle", task.title);
+        setText("#detailSubtitle", task.subtitle);
+        setText("#detailStatus", task.status);
+        setText("#detailImpact", task.impact);
+        setText("#detailRole", task.role);
+        setText("#detailDue", task.due);
+        setText("#detailSource", task.source);
+        setText("#detailEntry", task.entry);
+        setText("#detailProcessingHint", task.processingHint);
+        setText("#detailBoundary", task.boundary);
+
+        const status = document.querySelector("#detailStatus");
+        status.dataset.tone = task.tone;
+        renderRecords(task);
+
+        if (shouldAnnounce) {
+          announcement.textContent = "已选择任务：" + task.title;
+        }
+      }
+
+      function selectTask(task, shouldFocus, shouldAnnounce) {
+        selectedByFilter[activeFilter] = task.id;
         renderTasks();
+        updateDetail(task, shouldAnnounce);
+        if (shouldFocus) {
+          const selectedButton = taskList.querySelector(
+            '[data-task-id="' + task.id + '"]'
+          );
+          if (selectedButton) selectedButton.focus();
+        }
+      }
+
+      function handleTaskKeydown(event, task) {
+        if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) {
+          return;
+        }
+        event.preventDefault();
+        const visible = tasksForActiveFilter();
+        const index = visible.findIndex(function (item) {
+          return item.id === task.id;
+        });
+        let nextIndex = index;
+        if (event.key === "ArrowDown") nextIndex = (index + 1) % visible.length;
+        if (event.key === "ArrowUp") {
+          nextIndex = (index - 1 + visible.length) % visible.length;
+        }
+        if (event.key === "Home") nextIndex = 0;
+        if (event.key === "End") nextIndex = visible.length - 1;
+        selectTask(visible[nextIndex], true, true);
       }
 
       function renderTasks() {
-        taskList.innerHTML = "";
-        visibleTasks().forEach((task) => {
+        const visible = tasksForActiveFilter();
+        taskList.replaceChildren();
+        setText(
+          "#queueTotal",
+          filterLabels[activeFilter] + " · " + visible.length + " 项"
+        );
+
+        if (!visible.length) {
+          const empty = document.createElement("div");
+          empty.className = "empty";
+          empty.textContent = "当前队列没有需要显示的任务";
+          taskList.appendChild(empty);
+          return;
+        }
+
+        visible.forEach(function (task) {
           const button = document.createElement("button");
-          button.className = "task";
+          button.className = "task-row";
           button.type = "button";
-          button.setAttribute("aria-selected", String(task.id === selectedId));
-          button.innerHTML = `
-            <span class="task-title">
-              <strong>${task.title}</strong>
-              <span>${task.source} / ${task.role} / ${task.due}</span>
-            </span>
-            <span class="tag ${task.tag}">${task.status}</span>
-          `;
-          button.addEventListener("click", () => selectTask(task));
+          button.dataset.taskId = task.id;
+          button.dataset.tone = task.tone;
+          button.setAttribute(
+            "aria-pressed",
+            String(selectedByFilter[activeFilter] === task.id)
+          );
+
+          const copy = document.createElement("span");
+          copy.className = "task-copy";
+          const title = document.createElement("strong");
+          title.textContent = task.title;
+          const meta = document.createElement("span");
+          meta.className = "task-meta";
+          const source = document.createElement("span");
+          source.textContent = task.subtitle;
+          const role = document.createElement("span");
+          role.textContent = "责任：" + task.role;
+          meta.append(source, role);
+          copy.append(title, meta);
+
+          const due = document.createElement("span");
+          due.className = "task-due";
+          due.dataset.tone = task.tone;
+          due.textContent = task.due;
+
+          button.append(copy, due);
+          button.addEventListener("click", function () {
+            selectTask(task, true, true);
+          });
+          button.addEventListener("keydown", function (event) {
+            handleTaskKeydown(event, task);
+          });
           taskList.appendChild(button);
         });
       }
 
-      tabs.forEach((tab) => {
-        tab.addEventListener("click", () => {
-          tabs.forEach((item) => item.setAttribute("aria-selected", "false"));
-          tab.setAttribute("aria-selected", "true");
-          taskList.setAttribute("aria-labelledby", tab.id);
-          activeFilter = tab.dataset.filter;
-          selectTask(visibleTasks()[0] || selectedTask());
+      function activateFilter(tab, shouldFocus) {
+        activeFilter = tab.dataset.filter;
+        tabs.forEach(function (item) {
+          const active = item === tab;
+          item.setAttribute("aria-selected", String(active));
+          item.tabIndex = active ? 0 : -1;
+        });
+        taskPanel.setAttribute("aria-labelledby", tab.id);
+        const task = selectedTask();
+        renderTasks();
+        updateDetail(task, true);
+        if (shouldFocus) tab.focus();
+      }
+
+      function handleTabKeydown(event, tab) {
+        if (!["ArrowRight", "ArrowLeft", "Home", "End"].includes(event.key)) {
+          return;
+        }
+        event.preventDefault();
+        const currentIndex = tabs.indexOf(tab);
+        let nextIndex = currentIndex;
+        if (event.key === "ArrowRight") {
+          nextIndex = (currentIndex + 1) % tabs.length;
+        }
+        if (event.key === "ArrowLeft") {
+          nextIndex = (currentIndex - 1 + tabs.length) % tabs.length;
+        }
+        if (event.key === "Home") nextIndex = 0;
+        if (event.key === "End") nextIndex = tabs.length - 1;
+        activateFilter(tabs[nextIndex], true);
+      }
+
+      tabs.forEach(function (tab) {
+        tab.addEventListener("click", function () {
+          activateFilter(tab, false);
+        });
+        tab.addEventListener("keydown", function (event) {
+          handleTabKeydown(event, tab);
         });
       });
 
-      updateDetail(selectedTask());
+      updateCounts();
       renderTasks();
+      updateDetail(selectedTask(), false);
     </script>
   </body>
 </html>

@@ -184,7 +184,7 @@ test("mobile workflow runtime browser smoke creates simulated workflow task only
 
   assert.equal(Object.hasOwn(warehouseTask, "customer_key"), false);
   assert.match(warehouseTask.task_code, /^SIM-YOYOOSUN-MOBILE-BROWSER-/u);
-  assert.equal(warehouseTask.task_group, "shipment_release");
+  assert.equal(warehouseTask.task_group, "trial_warehouse_followup");
   assert.equal(warehouseTask.owner_role_key, "warehouse");
   assert.equal(warehouseTask.assignee_id, 88);
   assert.equal(warehouseTask.task_status_key, "ready");
@@ -791,7 +791,7 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
     updatedWarehouseTask: {
       task_code: createdWarehouseTask.task_code,
       owner_role_key: "warehouse",
-      task_group: "shipment_release",
+      task_group: "trial_warehouse_followup",
       task_status_key: "ready",
       payload: {
         last_urge_reason: browserResult.urgeReason,
@@ -872,14 +872,8 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
       ["boss-complete", "老板", "销售订单受理", "已完成", "完成任务"],
       ["boss-reject", "老板", "销售订单受理", "已退回", "退回任务"],
       ["quality-complete", "品质", "成品质检", "已完成", "完成任务"],
-      [
-        "warehouse-inbound-complete",
-        "仓库",
-        "采购入库",
-        "已完成",
-        "完成任务",
-      ],
-      ["warehouse-urge", "仓库", "出货放行", "待处理", "催办协同"],
+      ["warehouse-inbound-complete", "仓库", "采购入库", "已完成", "完成任务"],
+      ["warehouse-urge", "仓库", "业务协同", "待处理", "催办协同"],
     ],
   );
   assert.doesNotMatch(serialized, /Bearer/u);

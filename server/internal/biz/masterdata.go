@@ -48,7 +48,9 @@ type Supplier struct {
 	Name         string
 	ShortName    *string
 	SupplierType *string
+	Address      *string
 	TaxNo        *string
+	ProcessIDs   []int
 	IsActive     bool
 	Note         *string
 	CreatedAt    time.Time
@@ -165,8 +167,12 @@ type SupplierMutation struct {
 	Name         string
 	ShortName    *string
 	SupplierType *string
+	Address      *string
 	TaxNo        *string
-	Note         *string
+	// Nil preserves existing capabilities on partial update; a non-nil empty
+	// slice explicitly clears the declared supplier-process relationships.
+	ProcessIDs []int
+	Note       *string
 }
 
 type MaterialMutation struct {
@@ -388,6 +394,9 @@ func (uc *MasterDataUsecase) CreateSupplier(ctx context.Context, in *SupplierMut
 	if err != nil {
 		return nil, err
 	}
+	if err := uc.validateSupplierProcessIDs(ctx, 0, normalized.ProcessIDs); err != nil {
+		return nil, err
+	}
 	return uc.repo.CreateSupplier(ctx, &normalized)
 }
 
@@ -399,6 +408,9 @@ func (uc *MasterDataUsecase) UpdateSupplier(ctx context.Context, id int, in *Sup
 	if err != nil {
 		return nil, err
 	}
+	if err := uc.validateSupplierProcessIDs(ctx, id, normalized.ProcessIDs); err != nil {
+		return nil, err
+	}
 	return uc.repo.UpdateSupplier(ctx, id, &normalized)
 }
 
@@ -408,6 +420,9 @@ func (uc *MasterDataUsecase) SaveSupplierWithContacts(ctx context.Context, id in
 	}
 	normalized, err := normalizeSupplierMutation(*in)
 	if err != nil {
+		return nil, err
+	}
+	if err := uc.validateSupplierProcessIDs(ctx, id, normalized.ProcessIDs); err != nil {
 		return nil, err
 	}
 	normalizedContacts, err := normalizeContactSaveMutations(contacts)
@@ -790,12 +805,58 @@ func normalizeSupplierMutation(in SupplierMutation) (SupplierMutation, error) {
 	in.Name = strings.TrimSpace(in.Name)
 	in.ShortName = normalizeOptionalString(in.ShortName)
 	in.SupplierType = normalizeOptionalString(in.SupplierType)
+	in.Address = normalizeOptionalString(in.Address)
 	in.TaxNo = normalizeOptionalString(in.TaxNo)
 	in.Note = normalizeOptionalString(in.Note)
+	if in.ProcessIDs != nil {
+		normalizedIDs := make([]int, 0, len(in.ProcessIDs))
+		seen := make(map[int]struct{}, len(in.ProcessIDs))
+		for _, processID := range in.ProcessIDs {
+			if processID <= 0 {
+				return SupplierMutation{}, ErrBadParam
+			}
+			if _, exists := seen[processID]; exists {
+				continue
+			}
+			seen[processID] = struct{}{}
+			normalizedIDs = append(normalizedIDs, processID)
+		}
+		in.ProcessIDs = normalizedIDs
+	}
 	if in.Code == "" || in.Name == "" {
 		return SupplierMutation{}, ErrBadParam
 	}
 	return in, nil
+}
+
+func (uc *MasterDataUsecase) validateSupplierProcessIDs(ctx context.Context, supplierID int, processIDs []int) error {
+	if processIDs == nil {
+		return nil
+	}
+	existingIDs := map[int]struct{}{}
+	if supplierID > 0 {
+		existing, err := uc.repo.GetSupplier(ctx, supplierID)
+		if err != nil {
+			return err
+		}
+		for _, processID := range existing.ProcessIDs {
+			existingIDs[processID] = struct{}{}
+		}
+	}
+	for _, processID := range processIDs {
+		processItem, err := uc.repo.GetProcess(ctx, processID)
+		if err != nil {
+			return err
+		}
+		if processItem.IsActive && processItem.OutsourcingEnabled {
+			continue
+		}
+		if _, alreadyDeclared := existingIDs[processID]; alreadyDeclared {
+			continue
+		}
+		return ErrBadParam
+	}
+	return nil
 }
 
 func normalizeMaterialMutation(in MaterialMutation) (MaterialMutation, error) {

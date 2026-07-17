@@ -33,40 +33,37 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		}
 		item, err := d.inventoryUC.GetBOMVersion(ctx, getInt(pm, "id", 0))
 		return id, bomVersionDetailResult(ctx, d, item, err), nil
-	case "create_bom_draft":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
+	case "save_bom_with_items":
+		headerID := getInt(pm, "id", 0)
+		permission := biz.PermissionBOMCreate
+		if headerID > 0 {
+			permission = biz.PermissionBOMUpdate
+		}
+		if res := d.RequireAdminPermission(ctx, permission); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
 			return id, res, nil
 		}
-		in, ok := bomHeaderCreateFromParams(pm)
+		expectedVersion := 0
+		if headerID > 0 {
+			var ok bool
+			expectedVersion, ok = getRequiredJSONRPCPositiveInt(pm, "expected_version")
+			if !ok {
+				return id, invalidParamResult(), nil
+			}
+		}
+		in, ok := bomVersionMutationFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		in.Status = biz.BOMStatusDraft
-		item, err := d.inventoryUC.CreateBOMHeader(ctx, in)
-		if err != nil {
-			return id, d.mapBOMError(ctx, err), nil
-		}
-		return id, okData(map[string]any{"bom_version": bomVersionDetailToAny(&biz.BOMVersionDetail{Header: item})}), nil
-	case "update_bom_draft":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMUpdate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
-			return id, res, nil
-		}
-		in, ok := bomHeaderUpdateFromParams(pm)
+		in.ExpectedVersion = int64(expectedVersion)
+		items, ok := bomItemSaveMutationsFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		item, err := d.inventoryUC.UpdateBOMDraftHeader(ctx, getInt(pm, "id", 0), in)
-		if err != nil {
-			return id, d.mapBOMError(ctx, err), nil
-		}
-		detail, err := d.inventoryUC.GetBOMVersion(ctx, item.ID)
-		return id, bomVersionDetailResult(ctx, d, detail, err), nil
+		item, err := d.inventoryUC.SaveBOMWithItems(ctx, headerID, in, items)
+		return id, bomVersionDetailResult(ctx, d, item, err), nil
 	case "copy_bom_version":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
 			return id, res, nil

@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/unit"
 	"time"
 
@@ -78,6 +79,20 @@ func (_c *ProductionOrderMaterialRequirementCreate) SetLossRateSnapshot(v decima
 // SetPlannedQuantity sets the "planned_quantity" field.
 func (_c *ProductionOrderMaterialRequirementCreate) SetPlannedQuantity(v decimal.Decimal) *ProductionOrderMaterialRequirementCreate {
 	_c.mutation.SetPlannedQuantity(v)
+	return _c
+}
+
+// SetProductionOperationCode sets the "production_operation_code" field.
+func (_c *ProductionOrderMaterialRequirementCreate) SetProductionOperationCode(v string) *ProductionOrderMaterialRequirementCreate {
+	_c.mutation.SetProductionOperationCode(v)
+	return _c
+}
+
+// SetNillableProductionOperationCode sets the "production_operation_code" field if the given value is not nil.
+func (_c *ProductionOrderMaterialRequirementCreate) SetNillableProductionOperationCode(v *string) *ProductionOrderMaterialRequirementCreate {
+	if v != nil {
+		_c.SetProductionOperationCode(*v)
+	}
 	return _c
 }
 
@@ -161,6 +176,21 @@ func (_c *ProductionOrderMaterialRequirementCreate) SetMaterial(v *Material) *Pr
 // SetUnit sets the "unit" edge to the Unit entity.
 func (_c *ProductionOrderMaterialRequirementCreate) SetUnit(v *Unit) *ProductionOrderMaterialRequirementCreate {
 	return _c.SetUnitID(v.ID)
+}
+
+// AddProductionWipOutsourcingAllocationIDs adds the "production_wip_outsourcing_allocations" edge to the ProductionWIPOutsourcingAllocation entity by IDs.
+func (_c *ProductionOrderMaterialRequirementCreate) AddProductionWipOutsourcingAllocationIDs(ids ...int) *ProductionOrderMaterialRequirementCreate {
+	_c.mutation.AddProductionWipOutsourcingAllocationIDs(ids...)
+	return _c
+}
+
+// AddProductionWipOutsourcingAllocations adds the "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_c *ProductionOrderMaterialRequirementCreate) AddProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *ProductionOrderMaterialRequirementCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProductionWipOutsourcingAllocationIDs(ids...)
 }
 
 // Mutation returns the ProductionOrderMaterialRequirementMutation object of the builder.
@@ -276,6 +306,11 @@ func (_c *ProductionOrderMaterialRequirementCreate) check() error {
 	if _, ok := _c.mutation.PlannedQuantity(); !ok {
 		return &ValidationError{Name: "planned_quantity", err: errors.New(`ent: missing required field "ProductionOrderMaterialRequirement.planned_quantity"`)}
 	}
+	if v, ok := _c.mutation.ProductionOperationCode(); ok {
+		if err := productionordermaterialrequirement.ProductionOperationCodeValidator(v); err != nil {
+			return &ValidationError{Name: "production_operation_code", err: fmt.Errorf(`ent: validator failed for field "ProductionOrderMaterialRequirement.production_operation_code": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.MaterialCodeSnapshot(); !ok {
 		return &ValidationError{Name: "material_code_snapshot", err: errors.New(`ent: missing required field "ProductionOrderMaterialRequirement.material_code_snapshot"`)}
 	}
@@ -369,6 +404,10 @@ func (_c *ProductionOrderMaterialRequirementCreate) createSpec() (*ProductionOrd
 	if value, ok := _c.mutation.PlannedQuantity(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldPlannedQuantity, field.TypeOther, value)
 		_node.PlannedQuantity = value
+	}
+	if value, ok := _c.mutation.ProductionOperationCode(); ok {
+		_spec.SetField(productionordermaterialrequirement.FieldProductionOperationCode, field.TypeString, value)
+		_node.ProductionOperationCode = &value
 	}
 	if value, ok := _c.mutation.MaterialCodeSnapshot(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldMaterialCodeSnapshot, field.TypeString, value)
@@ -494,6 +533,22 @@ func (_c *ProductionOrderMaterialRequirementCreate) createSpec() (*ProductionOrd
 			edge.Target.Nodes = append(edge.Target.Nodes, k)
 		}
 		_node.UnitID = nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
 		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec

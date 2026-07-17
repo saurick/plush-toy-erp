@@ -22,29 +22,9 @@ export async function getBOMVersion(params = {}) {
   return dataOf(result)?.bom_version || null
 }
 
-export async function createBOMDraft(params = {}) {
-  const result = await bomRpc.call('create_bom_draft', params)
+export async function saveBOMWithItems(params = {}) {
+  const result = await bomRpc.call('save_bom_with_items', params)
   return dataOf(result)?.bom_version || null
-}
-
-export async function updateBOMDraft(params = {}) {
-  const result = await bomRpc.call('update_bom_draft', params)
-  return dataOf(result)?.bom_version || null
-}
-
-export async function addBOMItem(params = {}) {
-  const result = await bomRpc.call('add_bom_item', params)
-  return dataOf(result)?.bom_item || null
-}
-
-export async function updateBOMItem(params = {}) {
-  const result = await bomRpc.call('update_bom_item', params)
-  return dataOf(result)?.bom_item || null
-}
-
-export async function deleteBOMItem(params = {}) {
-  const result = await bomRpc.call('delete_bom_item', params)
-  return dataOf(result)
 }
 
 export async function copyBOMVersion(params = {}) {

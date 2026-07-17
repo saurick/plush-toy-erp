@@ -195,6 +195,25 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       })
       assert.equal(invalidCreate.result.code, 40010)
     }
+    for (const [taskGroup, taskCode] of [
+      ['production_scheduling', 'MOCK-MANUAL-SCHEDULING'],
+      ['production_exception', 'MOCK-MANUAL-EXCEPTION'],
+      ['shipment_release', 'MOCK-MANUAL-SHIPMENT'],
+      ['trial_pmc_work', 'source-production-scheduling-71'],
+      ['trial_production_work', 'source-production-exception-81'],
+      ['trial_warehouse_work', 'source-shipment-release-92'],
+    ]) {
+      const invalidCreate = await workflowCall('create_task', {
+        ...validCreateParams,
+        task_group: taskGroup,
+        task_code: taskCode,
+      })
+      assert.equal(invalidCreate.result.code, 40010)
+      assert.equal(
+        invalidCreate.result.message,
+        '该类任务由业务单据自动生成，不能手工创建'
+      )
+    }
     for (const invalidDueAt of [
       { not: 'unix' },
       '1800000000',
@@ -222,10 +241,7 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
       validCreateParams
     )
     assert.equal(defaultStatusCreated.result.code, 0)
-    assert.equal(
-      defaultStatusCreated.result.data.task.task_status_key,
-      'ready'
-    )
+    assert.equal(defaultStatusCreated.result.data.task.task_status_key, 'ready')
 
     const completedTask = await createTask('MOCK-CAS-DONE')
     const completed = await workflowCall('complete_task_action', {
@@ -364,13 +380,10 @@ test('workflow mock keeps the terminal and version CAS contract aligned with the
     })
     assert.equal(changedResumeIntent.result.code, 40920)
 
-    const newResumeIntentAfterReady = await workflowCall(
-      'resume_task_action',
-      {
-        ...resumeParams,
-        idempotency_key: 'mock-resume-new-intent',
-      }
-    )
+    const newResumeIntentAfterReady = await workflowCall('resume_task_action', {
+      ...resumeParams,
+      idempotency_key: 'mock-resume-new-intent',
+    })
     assert.equal(newResumeIntentAfterReady.result.code, 40010)
 
     const rejectedTask = await createTask('MOCK-CAS-REJECTED')

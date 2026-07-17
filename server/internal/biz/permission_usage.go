@@ -252,8 +252,8 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addCRUD(PermissionProductSKURead, PermissionProductSKUCreate, PermissionProductSKUUpdate, PermissionProductSKUDisable, "products", "product-skus", "产品规格", "产品规格", "masterdata", []string{"get_product_sku", "list_product_skus"}, []string{"create_product_sku"}, []string{"update_product_sku"}, []string{"set_product_sku_active"})
 
 	addMenu(PermissionBOMRead, "material-bom", "bom-versions", "BOM 版本", "bom-version-list", "BOM 版本和明细", permissionControlPage, "允许进入并查看", permissionMethods("bom", "list_bom_versions", "get_bom_version"), businessUsageConditions)
-	addMenu(PermissionBOMCreate, "material-bom", "bom-versions", "BOM 版本", "create-bom", "新建或复制 BOM 版本", permissionControlButton, "显示并允许创建", permissionMethods("bom", "create_bom_draft", "copy_bom_version"), businessUsageConditions)
-	addMenu(PermissionBOMUpdate, "material-bom", "bom-versions", "BOM 版本", "edit-bom", "维护 BOM 草稿和明细", permissionControlForm, "显示并允许编辑", permissionMethods("bom", "update_bom_draft", "archive_bom_version", "add_bom_item", "update_bom_item", "delete_bom_item"), businessUsageConditions)
+	addMenu(PermissionBOMCreate, "material-bom", "bom-versions", "BOM 版本", "create-bom", "新建或复制 BOM 版本", permissionControlButton, "显示并允许创建", permissionMethods("bom", "save_bom_with_items", "copy_bom_version"), businessUsageConditions)
+	addMenu(PermissionBOMUpdate, "material-bom", "bom-versions", "BOM 版本", "edit-bom", "维护 BOM 草稿和明细", permissionControlForm, "显示并允许编辑", permissionMethods("bom", "save_bom_with_items", "archive_bom_version"), businessUsageConditions)
 	addMenu(PermissionBOMActivate, "material-bom", "bom-versions", "BOM 版本", "activate-bom", "激活 BOM 版本", permissionControlButton, "显示并允许激活", permissionMethods("bom", "activate_bom_version"), businessUsageConditions)
 
 	contactSurface := func(menuKey string, controlKey string, controlLabel string, controlType string, effect string, methods []PermissionBackendMethod) PermissionUsageSurface {
@@ -332,7 +332,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionPurchaseReceiptAdjustmentPost, "inbound", "purchase-receipt-adjustments", "采购入库调整", "post-purchase-receipt-adjustment", "确认入库调整", permissionControlButton, "显示并允许确认", permissionMethods("purchase", "post_purchase_receipt_adjustment"), businessUsageConditions)
 	addMenu(PermissionPurchaseReceiptAdjustmentCancel, "inbound", "purchase-receipt-adjustments", "采购入库调整", "cancel-purchase-receipt-adjustment", "取消入库调整", permissionControlButton, "显示并允许取消", permissionMethods("purchase", "cancel_purchase_receipt_adjustment"), businessUsageConditions)
 	addBackend(PermissionPurchaseReturnRead, permissionMethods("purchase", "get_purchase_return", "list_purchase_returns"), businessUsageConditions)
-	addMenu(PermissionPurchaseReturnCreate, "inbound", "purchase-returns", "采购退货", "create-purchase-return", "登记采购退货", permissionControlButton, "显示并允许登记", permissionMethods("purchase", "create_purchase_return_from_receipt"), businessUsageConditions)
+	add(PermissionPurchaseReturnCreate,
+		menuPermissionSurface("inbound", "purchase-returns", "采购退货", "create-purchase-return", "从采购入库生成退货", permissionControlButton, "显示并允许生成", permissionMethods("purchase", "create_purchase_return_from_receipt"), businessUsageConditions),
+		menuPermissionSurface("quality-inspections", "quality-actions", "质检动作", "create-purchase-return-from-quality-inspection", "退供应商", permissionControlButton, "显示并允许生成采购退货", permissionMethods("purchase", "create_purchase_return_from_quality_inspection"), businessUsageConditions),
+	)
 	addMenu(PermissionPurchaseReturnPost, "inbound", "purchase-returns", "采购退货", "post-purchase-return", "确认采购退货", permissionControlButton, "显示并允许确认", permissionMethods("purchase", "post_purchase_return"), businessUsageConditions)
 	addMenu(PermissionPurchaseReturnCancel, "inbound", "purchase-returns", "采购退货", "cancel-purchase-return", "取消采购退货", permissionControlButton, "显示并允许取消", permissionMethods("purchase", "cancel_purchase_return"), businessUsageConditions)
 
@@ -357,7 +360,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 
 	addMenu(PermissionShipmentRead, "shipments", "shipments", "出货单", "shipment-list", "出货单列表", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "list_shipments"), businessUsageConditions)
-	addMenu(PermissionShipmentCreate, "shipments", "shipments", "出货单", "create-shipment", "创建出货单", permissionControlButton, "显示并允许创建", permissionMethods("operational_fact", "create_shipment_with_items"), businessUsageConditions)
+	addMenu(PermissionShipmentCreate, "shipments", "shipments", "出货单", "create-shipment", "创建出货单或提交出货放行", permissionControlButton, "显示并允许办理", permissionMethods("operational_fact", "create_shipment_with_items", "submit_shipment_release"), businessUsageConditions)
 	addMenu(PermissionShipmentShip, "shipments", "shipment-actions", "出货动作", "ship-shipment", "确认出货", permissionControlButton, "显示并允许确认出货", permissionMethods("operational_fact", "ship_shipment"), businessUsageConditions)
 	addMenu(PermissionShipmentCancel, "shipments", "shipment-actions", "出货动作", "cancel-shipment", "取消出货单", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_shipment"), businessUsageConditions)
 
@@ -369,7 +372,8 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("processing-contracts", "outsourcing-related-records", "委外订单", "outsourcing-return-quality-list", "查看委外回货质检", permissionControlSection, "允许查看", permissionMethods("quality", "list_outsourcing_return_quality_inspections"), businessUsageConditions),
 	)
 	add(PermissionQualityInspectionCreate,
-		menuPermissionSurface("quality-inspections", "quality-inspections", "质量检验", "create-quality-inspection", "创建质检单", permissionControlButton, "显示并允许创建", permissionMethods("quality", "create_quality_inspection_draft", "create_finished_goods_quality_inspection_draft"), businessUsageConditions),
+		menuPermissionSurface("quality-inspections", "quality-inspections", "质量检验", "create-quality-inspection", "创建质检单", permissionControlButton, "显示并允许创建", permissionMethods("quality", "create_quality_inspection_draft"), businessUsageConditions),
+		menuPermissionSurface("shipments", "shipment-actions", "出货单", "create-shipment-finished-goods-quality-inspection", "发起出货前成品检验", permissionControlButton, "显示并允许创建", permissionMethods("quality", "create_finished_goods_quality_inspection_draft"), businessUsageConditions),
 		menuPermissionSurface("processing-contracts", "outsourcing-related-records", "委外订单", "create-outsourcing-return-quality-inspection", "发起委外回货质检", permissionControlButton, "显示并允许创建", permissionMethods("quality", "create_quality_inspection_from_outsourcing_return"), businessUsageConditions),
 	)
 	addMenu(PermissionQualityInspectionUpdate, "quality-inspections", "quality-actions", "质检动作", "decide-quality-inspection", "提交、判定或取消质检", permissionControlButton, "显示并允许处理", permissionMethods("quality", "submit_quality_inspection", "pass_quality_inspection", "reject_quality_inspection", "cancel_quality_inspection"), businessUsageConditions)
@@ -405,6 +409,15 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("production-orders", "production-related-records", "关联生产记录", "production-fact-reference", "查看订单关联生产记录", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_production_facts"), businessUsageConditions),
 		menuPermissionSurface("production-progress", "production-progress", "生产进度", "production-fact-list", "生产记录列表", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "list_production_facts"), businessUsageConditions),
 	)
+	productionWIPReadMethods := append(
+		permissionMethods("production_order", "get_production_order", "list_production_orders"),
+		permissionMethods("production_wip", "get_production_wip")...,
+	)
+	addMenu(PermissionProductionWIPRead, "production-orders", "production-wip", "工序办理", "view-production-wip", "查看生产订单、路线、在制批次和质量关口", permissionControlSection, "允许查看", productionWIPReadMethods, businessUsageConditions)
+	addMenu(PermissionProductionWIPAssign, "production-orders", "production-wip", "工序办理", "assign-production-wip", "拆分批次并安排本厂或外发", permissionControlButton, "显示并允许安排", permissionMethods("production_wip", "initialize_production_wip", "execute_production_wip_action"), businessUsageConditions)
+	addMenu(PermissionProductionWIPExecute, "production-orders", "production-wip", "工序办理", "execute-production-wip", "开始、完工、外发回仓和车间移交", permissionControlButton, "显示并允许办理", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
+	addMenu(PermissionProductionWIPRework, "production-orders", "production-wip", "工序办理", "rework-production-wip", "选择目标工序并安排返工", permissionControlButton, "显示并允许返工", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
+	addMenu(PermissionPackagingMaterialConfirm, "production-orders", "production-wip", "工序办理", "confirm-packaging-material", "确认包材版面与包装版本", permissionControlButton, "显示并允许业务确认", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
 	addMenu(PermissionProductionCompletionCreate, "production-orders", "production-order-actions", "生产动作", "create-production-completion", "登记完工入库", permissionControlButton, "显示并允许登记", permissionMethods("operational_fact", "create_production_completion_from_order"), businessUsageConditions)
 	addMenu(PermissionProductionMaterialIssueCreate, "production-orders", "production-order-actions", "生产动作", "create-production-material-issue", "登记生产领料", permissionControlButton, "显示并允许登记", permissionMethods("operational_fact", "create_production_material_issue_from_order"), businessUsageConditions)
 	addMenu(PermissionProductionReworkCreate, "production-progress", "production-fact-actions", "生产记录动作", "create-production-rework", "发起返工", permissionControlButton, "显示并允许发起", permissionMethods("operational_fact", "create_production_rework_from_completion"), businessUsageConditions)

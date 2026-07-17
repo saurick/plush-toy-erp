@@ -1083,6 +1083,15 @@
         },
       ];
 
+      // 这些状态会在 tabData 初始化时被 renderTodo / renderTaskRows 读取，
+      // 必须先于 tabData 赋值，避免浏览器触发 let 的暂时性死区。
+      let activeTaskTrigger = null;
+      let activeFilter = "all";
+      let visibleTaskLimit = 4;
+      let activeActionButton = null;
+      let activeTask = null;
+      let actionSubmitting = false;
+
       const tabData = {
         todo: {
           title: "待办",
@@ -1127,12 +1136,6 @@
       const detailException = document.querySelector("#detailException");
       const detailLinkedSource = document.querySelector("#detailLinkedSource");
       const backButton = document.querySelector("#backButton");
-      let activeTaskTrigger = null;
-      let activeFilter = "all";
-      let visibleTaskLimit = 4;
-      let activeActionButton = null;
-      let activeTask = null;
-      let actionSubmitting = false;
 
       function renderTaskDetail(task) {
         activeTask = task;

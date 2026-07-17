@@ -615,6 +615,10 @@ func (s *stubBusinessDashboardOperationalFactRepo) ShipShipment(context.Context,
 	return nil, biz.ErrBadParam
 }
 
+func (s *stubBusinessDashboardOperationalFactRepo) ShipShipmentWithActor(ctx context.Context, id int, _ int) (*biz.Shipment, error) {
+	return s.ShipShipment(ctx, id)
+}
+
 func (s *stubBusinessDashboardOperationalFactRepo) CancelShippedShipment(context.Context, int) (*biz.Shipment, error) {
 	return nil, biz.ErrBadParam
 }

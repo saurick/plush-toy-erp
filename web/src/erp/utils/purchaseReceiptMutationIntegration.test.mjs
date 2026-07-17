@@ -56,34 +56,17 @@ test('purchase order inbound draft keeps unknown results in the current modal', 
   assert.doesNotMatch(inboundDraftHook, /idempotency_key/u)
 })
 
-test('purchase receipt add-item keeps unknown results in the current editor', () => {
-  const mutation = functionSlice(
-    purchaseReceiptPage,
-    'const handleAddItem',
-    'const runReceiptAction'
-  )
-  assert.match(
-    purchaseReceiptPage,
-    /createPurchaseReceiptMutationAttemptStore/u
-  )
-  assert.match(mutation, /mutationAttemptsRef\.current\.prepare/u)
-  assert.match(mutation, /addPurchaseReceiptItem\(attempt\.params\)/u)
-  assert.match(mutation, /settle\(scope, attempt, error\)/u)
-  assert.match(
-    mutation,
-    /暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录/u
-  )
-  const catchBody = mutation.match(
-    /catch \(error\) \{([\s\S]*?)\n {6}\} finally/u
-  )?.[1]
-  assert(catchBody)
-  assert.doesNotMatch(catchBody, /closeItemEditor|loadRows/u)
-  assert(
-    mutation.indexOf('settle(scope, attempt)') <
-      mutation.indexOf('closeItemEditor()')
-  )
-  assert(
-    mutation.indexOf('closeItemEditor()') < mutation.indexOf('await loadRows()')
-  )
-  assert.doesNotMatch(mutation, /idempotency_key/u)
+test('purchase receipt page does not append source-less manual lines', () => {
+  for (const retiredEntry of [
+    'addPurchaseReceiptItem',
+    'PurchaseReceiptInlineItemEditor',
+    'buildPurchaseReceiptItemParams',
+    '添加入库明细',
+  ]) {
+    assert.equal(
+      purchaseReceiptPage.includes(retiredEntry),
+      false,
+      `source-generated receipt page must not expose ${retiredEntry}`
+    )
+  }
 })

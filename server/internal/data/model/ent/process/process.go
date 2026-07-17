@@ -38,6 +38,8 @@ const (
 	FieldUpdatedAt = "updated_at"
 	// EdgeOutsourcingOrderItems holds the string denoting the outsourcing_order_items edge name in mutations.
 	EdgeOutsourcingOrderItems = "outsourcing_order_items"
+	// EdgeCapableSuppliers holds the string denoting the capable_suppliers edge name in mutations.
+	EdgeCapableSuppliers = "capable_suppliers"
 	// Table holds the table name of the process in the database.
 	Table = "processes"
 	// OutsourcingOrderItemsTable is the table that holds the outsourcing_order_items relation/edge.
@@ -47,6 +49,11 @@ const (
 	OutsourcingOrderItemsInverseTable = "outsourcing_order_items"
 	// OutsourcingOrderItemsColumn is the table column denoting the outsourcing_order_items relation/edge.
 	OutsourcingOrderItemsColumn = "process_id"
+	// CapableSuppliersTable is the table that holds the capable_suppliers relation/edge. The primary key declared below.
+	CapableSuppliersTable = "supplier_process_capabilities"
+	// CapableSuppliersInverseTable is the table name for the Supplier entity.
+	// It exists in this package in order to avoid circular dependency with the "supplier" package.
+	CapableSuppliersInverseTable = "suppliers"
 )
 
 // Columns holds all SQL columns for process fields.
@@ -64,6 +71,12 @@ var Columns = []string{
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
+
+var (
+	// CapableSuppliersPrimaryKey and CapableSuppliersColumn2 are the table columns denoting the
+	// primary key for the capable_suppliers relation (M2M).
+	CapableSuppliersPrimaryKey = []string{"supplier_id", "process_id"}
+)
 
 // ValidColumn reports if the column name is valid (part of the table columns).
 func ValidColumn(column string) bool {
@@ -180,10 +193,31 @@ func ByOutsourcingOrderItems(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOp
 		sqlgraph.OrderByNeighborTerms(s, newOutsourcingOrderItemsStep(), append([]sql.OrderTerm{term}, terms...)...)
 	}
 }
+
+// ByCapableSuppliersCount orders the results by capable_suppliers count.
+func ByCapableSuppliersCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newCapableSuppliersStep(), opts...)
+	}
+}
+
+// ByCapableSuppliers orders the results by capable_suppliers terms.
+func ByCapableSuppliers(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newCapableSuppliersStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newOutsourcingOrderItemsStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(OutsourcingOrderItemsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, OutsourcingOrderItemsTable, OutsourcingOrderItemsColumn),
+	)
+}
+func newCapableSuppliersStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(CapableSuppliersInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2M, true, CapableSuppliersTable, CapableSuppliersPrimaryKey...),
 	)
 }

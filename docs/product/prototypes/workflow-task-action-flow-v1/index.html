@@ -1,0 +1,1436 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Workflow 任务处理流程样板</title>
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%23185e9e'/%3E%3C/svg%3E" />
+    <style>
+      :root {
+        color-scheme: light;
+        --bg: #f3f5f8;
+        --panel: #ffffff;
+        --raised: #ffffff;
+        --soft: #f7f9fc;
+        --blue-soft: #edf5ff;
+        --line: #dfe5ee;
+        --line-strong: #bbc7d7;
+        --text: #172033;
+        --muted: #66758a;
+        --blue: #1768d4;
+        --blue-strong: #0d55b5;
+        --green: #16724f;
+        --amber: #a85d00;
+        --red: #b93645;
+        --green-soft: #e8f7f0;
+        --amber-soft: #fff3dc;
+        --red-soft: #ffedf0;
+        --shadow: 0 18px 44px rgb(22 32 51 / 10%);
+        --focus: 0 0 0 3px rgb(23 104 212 / 22%);
+      }
+
+      :root[data-theme="dark"] {
+        color-scheme: dark;
+        --bg: #101620;
+        --panel: #172131;
+        --raised: #1c2738;
+        --soft: #202c3d;
+        --blue-soft: #1d3553;
+        --line: #344258;
+        --line-strong: #526178;
+        --text: #edf3fb;
+        --muted: #abb7c8;
+        --blue: #7aaeff;
+        --blue-strong: #9bc2ff;
+        --green: #79d6aa;
+        --amber: #f1bd68;
+        --red: #ff9aa6;
+        --green-soft: #193b2e;
+        --amber-soft: #493317;
+        --red-soft: #4c232b;
+        --shadow: 0 20px 52px rgb(0 0 0 / 30%);
+        --focus: 0 0 0 3px rgb(122 174 255 / 28%);
+      }
+
+      @media (prefers-color-scheme: dark) {
+        :root:not([data-theme="light"]) {
+          color-scheme: dark;
+          --bg: #101620;
+          --panel: #172131;
+          --raised: #1c2738;
+          --soft: #202c3d;
+          --blue-soft: #1d3553;
+          --line: #344258;
+          --line-strong: #526178;
+          --text: #edf3fb;
+          --muted: #abb7c8;
+          --blue: #7aaeff;
+          --blue-strong: #9bc2ff;
+          --green: #79d6aa;
+          --amber: #f1bd68;
+          --red: #ff9aa6;
+          --green-soft: #193b2e;
+          --amber-soft: #493317;
+          --red-soft: #4c232b;
+          --shadow: 0 20px 52px rgb(0 0 0 / 30%);
+          --focus: 0 0 0 3px rgb(122 174 255 / 28%);
+        }
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        min-height: 100%;
+      }
+
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI",
+          "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+
+      button,
+      input,
+      textarea {
+        font: inherit;
+      }
+
+      button,
+      input[type="radio"] {
+        cursor: pointer;
+      }
+
+      button:focus-visible,
+      a:focus-visible,
+      input:focus-visible,
+      textarea:focus-visible {
+        outline: 0;
+        box-shadow: var(--focus);
+      }
+
+      .topbar {
+        display: flex;
+        min-height: 58px;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        background: color-mix(in srgb, var(--panel) 94%, transparent);
+        padding: 8px 22px;
+      }
+
+      .brand,
+      .top-actions,
+      .heading-badges,
+      .scenario-copy,
+      .step-main,
+      .stage-foot,
+      .foot-actions,
+      .action-card__head,
+      .review-row,
+      .receipt-head {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .brand {
+        min-width: 0;
+      }
+
+      .brand-mark {
+        display: grid;
+        flex: 0 0 auto;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border-radius: 9px;
+        background: #185e9e;
+        color: #ffffff;
+        font-weight: 800;
+      }
+
+      .brand strong,
+      .brand span {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .brand span,
+      .muted,
+      .eyebrow,
+      .step-copy small,
+      .field-hint,
+      .status-line,
+      .scenario-copy span,
+      .task-code {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .btn,
+      .link-btn {
+        display: inline-flex;
+        min-height: 36px;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 0 13px;
+        text-decoration: none;
+      }
+
+      .btn:hover:not(:disabled),
+      .link-btn:hover {
+        border-color: var(--blue);
+        color: var(--blue);
+      }
+
+      .btn.primary {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #ffffff;
+      }
+
+      .btn.primary:hover:not(:disabled) {
+        border-color: var(--blue-strong);
+        background: var(--blue-strong);
+        color: #ffffff;
+      }
+
+      .btn:disabled {
+        cursor: not-allowed;
+        opacity: 0.52;
+      }
+
+      .chip {
+        display: inline-flex;
+        min-height: 24px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: var(--blue-soft);
+        color: var(--blue);
+        padding: 0 9px;
+        font-size: 12px;
+        font-weight: 700;
+        white-space: nowrap;
+      }
+
+      .chip.green {
+        background: var(--green-soft);
+        color: var(--green);
+      }
+
+      .chip.amber {
+        background: var(--amber-soft);
+        color: var(--amber);
+      }
+
+      .chip.red {
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .shell {
+        width: min(1120px, calc(100% - 36px));
+        margin: 0 auto;
+        padding: 24px 0 32px;
+      }
+
+      .page-heading {
+        display: flex;
+        align-items: flex-end;
+        justify-content: space-between;
+        gap: 18px;
+        margin-bottom: 15px;
+      }
+
+      .page-heading h1,
+      .page-heading p,
+      .stage-head h2,
+      .stage-head p,
+      .card h3,
+      .card p,
+      .receipt h3,
+      .receipt p {
+        margin-top: 0;
+      }
+
+      .page-heading h1 {
+        margin-bottom: 4px;
+        font-size: clamp(24px, 3vw, 32px);
+        line-height: 1.2;
+      }
+
+      .page-heading p {
+        max-width: 760px;
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .scenario-bar {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+
+      .scenario-button {
+        min-height: 72px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--panel);
+        color: var(--text);
+        padding: 10px 11px;
+        text-align: left;
+      }
+
+      .scenario-button:hover,
+      .scenario-button[aria-selected="true"] {
+        border-color: var(--blue);
+      }
+
+      .scenario-button[aria-selected="true"] {
+        background: var(--blue-soft);
+        box-shadow: var(--focus);
+      }
+
+      .scenario-button strong,
+      .scenario-button span {
+        display: block;
+      }
+
+      .scenario-button span {
+        margin-top: 2px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .stage {
+        display: grid;
+        grid-template-rows: auto auto minmax(300px, auto) auto;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--panel);
+        overflow: hidden;
+        box-shadow: var(--shadow);
+      }
+
+      .stage-head {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 16px;
+        border-bottom: 1px solid var(--line);
+        padding: 15px 18px;
+      }
+
+      .stage-head h2 {
+        margin-bottom: 3px;
+        font-size: 20px;
+      }
+
+      .stage-head p {
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .stepper {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        border-bottom: 1px solid var(--line);
+        background: var(--soft);
+        padding: 11px 14px;
+      }
+
+      .step-button {
+        min-width: 0;
+        border: 0;
+        border-radius: 9px;
+        background: transparent;
+        color: var(--text);
+        padding: 9px;
+        text-align: left;
+      }
+
+      .step-button:hover {
+        background: var(--panel);
+      }
+
+      .step-button[aria-current="step"] {
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .step-button[aria-disabled="true"] {
+        cursor: not-allowed;
+        opacity: 0.55;
+      }
+
+      .step-main {
+        min-width: 0;
+      }
+
+      .step-number {
+        display: grid;
+        flex: 0 0 auto;
+        width: 30px;
+        height: 30px;
+        place-items: center;
+        border: 1px solid var(--line-strong);
+        border-radius: 50%;
+        background: var(--panel);
+        font-weight: 800;
+      }
+
+      .step-button[aria-current="step"] .step-number {
+        border-color: var(--blue);
+        background: var(--blue);
+        color: #ffffff;
+      }
+
+      .step-copy {
+        min-width: 0;
+      }
+
+      .step-copy strong,
+      .step-copy small {
+        display: block;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+
+      .stage-body {
+        min-height: 0;
+        background: var(--soft);
+        padding: 16px;
+      }
+
+      .step-panel {
+        display: grid;
+        gap: 12px;
+      }
+
+      .step-panel[hidden] {
+        display: none;
+      }
+
+      .card,
+      .boundary,
+      .feedback,
+      .receipt {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--panel);
+        padding: 13px;
+      }
+
+      .card h3 {
+        margin-bottom: 4px;
+      }
+
+      .card p {
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .task-summary {
+        display: grid;
+        grid-template-columns: minmax(0, 1.2fr) minmax(280px, 0.8fr);
+        gap: 12px;
+      }
+
+      .task-primary {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--raised);
+        padding: 14px;
+      }
+
+      .task-primary h3 {
+        margin: 3px 0 5px;
+        font-size: 21px;
+      }
+
+      .task-primary p {
+        margin: 10px 0 0;
+        color: var(--muted);
+      }
+
+      .task-meta,
+      .review-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 8px;
+      }
+
+      .task-meta > div,
+      .review-grid > div {
+        min-width: 0;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--raised);
+        padding: 10px;
+      }
+
+      .task-meta span,
+      .task-meta strong,
+      .review-grid span,
+      .review-grid strong {
+        display: block;
+        overflow-wrap: anywhere;
+      }
+
+      .task-meta span,
+      .review-grid span {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .boundary {
+        border-color: color-mix(in srgb, var(--blue) 36%, var(--line));
+        background: var(--blue-soft);
+      }
+
+      .boundary strong,
+      .boundary span {
+        display: block;
+      }
+
+      .boundary span {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .action-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 9px;
+        margin-top: 12px;
+      }
+
+      .action-card {
+        position: relative;
+        display: grid;
+        min-height: 102px;
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--raised);
+        padding: 11px;
+      }
+
+      .action-card:hover,
+      .action-card:has(input:checked) {
+        border-color: var(--blue);
+      }
+
+      .action-card:has(input:checked) {
+        background: var(--blue-soft);
+        box-shadow: var(--focus);
+      }
+
+      .action-card input {
+        position: absolute;
+        top: 12px;
+        right: 12px;
+      }
+
+      .action-card__head {
+        justify-content: space-between;
+        padding-right: 22px;
+      }
+
+      .action-card__copy {
+        display: block;
+        margin-top: 6px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .field {
+        display: grid;
+        gap: 5px;
+        margin-top: 12px;
+      }
+
+      .field[hidden],
+      .action-grid[hidden],
+      .readonly[hidden] {
+        display: none;
+      }
+
+      .field label {
+        font-weight: 700;
+      }
+
+      .field textarea {
+        min-height: 104px;
+        width: 100%;
+        resize: vertical;
+        border: 1px solid var(--line-strong);
+        border-radius: 8px;
+        background: var(--raised);
+        color: var(--text);
+        padding: 10px;
+      }
+
+      .field-error {
+        min-height: 20px;
+        margin: 0;
+        color: var(--red);
+        font-size: 12px;
+      }
+
+      .readonly {
+        border: 1px solid color-mix(in srgb, var(--amber) 42%, var(--line));
+        border-radius: 9px;
+        background: var(--amber-soft);
+        padding: 12px;
+      }
+
+      .readonly strong,
+      .readonly span {
+        display: block;
+      }
+
+      .readonly span {
+        margin-top: 3px;
+        color: var(--muted);
+      }
+
+      .review-row {
+        justify-content: space-between;
+        align-items: flex-start;
+        border-bottom: 1px solid var(--line);
+        padding: 9px 0;
+      }
+
+      .review-row:last-child {
+        border-bottom: 0;
+      }
+
+      .review-row span {
+        color: var(--muted);
+      }
+
+      .review-row strong {
+        max-width: 66%;
+        overflow-wrap: anywhere;
+        text-align: right;
+      }
+
+      .feedback {
+        color: var(--muted);
+      }
+
+      .feedback.loading {
+        border-color: color-mix(in srgb, var(--blue) 42%, var(--line));
+        background: var(--blue-soft);
+        color: var(--blue);
+      }
+
+      .feedback.error {
+        border-color: color-mix(in srgb, var(--red) 48%, var(--line));
+        background: var(--red-soft);
+        color: var(--red);
+      }
+
+      .receipt {
+        border-color: color-mix(in srgb, var(--green) 48%, var(--line));
+        background: var(--green-soft);
+      }
+
+      .receipt[hidden] {
+        display: none;
+      }
+
+      .receipt-head {
+        justify-content: space-between;
+        align-items: flex-start;
+      }
+
+      .receipt h3 {
+        margin-bottom: 4px;
+      }
+
+      .receipt p {
+        margin-bottom: 0;
+        color: var(--muted);
+      }
+
+      .spinner {
+        display: inline-block;
+        width: 14px;
+        height: 14px;
+        border: 2px solid currentColor;
+        border-right-color: transparent;
+        border-radius: 50%;
+        animation: spin 0.75s linear infinite;
+        vertical-align: -2px;
+      }
+
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      .stage-foot {
+        justify-content: space-between;
+        gap: 14px;
+        border-top: 1px solid var(--line);
+        background: var(--panel);
+        padding: 12px 16px;
+      }
+
+      .foot-actions {
+        flex-wrap: wrap;
+        justify-content: flex-end;
+      }
+
+      .gate-message {
+        min-height: 22px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .gate-message.error {
+        color: var(--red);
+      }
+
+      .review-notes {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 8px;
+        margin-top: 12px;
+      }
+
+      .review-note {
+        border: 1px solid var(--line);
+        border-radius: 9px;
+        background: var(--panel);
+        padding: 11px;
+      }
+
+      .review-note strong,
+      .review-note span {
+        display: block;
+      }
+
+      .review-note span {
+        margin-top: 3px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .toast {
+        position: fixed;
+        right: 18px;
+        bottom: 18px;
+        z-index: 50;
+        max-width: min(420px, calc(100vw - 36px));
+        border: 1px solid var(--line-strong);
+        border-radius: 9px;
+        background: var(--panel);
+        padding: 11px 13px;
+        box-shadow: var(--shadow);
+      }
+
+      .toast[hidden] {
+        display: none;
+      }
+
+      @media (max-width: 780px) {
+        .shell {
+          width: min(100% - 24px, 680px);
+          padding-top: 16px;
+        }
+
+        .page-heading,
+        .stage-head,
+        .stage-foot {
+          align-items: flex-start;
+          flex-direction: column;
+        }
+
+        .scenario-bar {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+
+        .task-summary,
+        .review-notes {
+          grid-template-columns: 1fr;
+        }
+
+        .stage {
+          grid-template-rows: auto auto minmax(300px, auto) auto;
+        }
+
+        .foot-actions {
+          width: 100%;
+        }
+      }
+
+      @media (max-width: 560px) {
+        .topbar {
+          align-items: flex-start;
+          flex-direction: column;
+          padding: 12px;
+        }
+
+        .top-actions {
+          width: 100%;
+          justify-content: space-between;
+        }
+
+        .scenario-bar,
+        .stepper,
+        .task-meta,
+        .review-grid,
+        .action-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .scenario-button {
+          min-height: 62px;
+        }
+
+        .stepper {
+          gap: 2px;
+        }
+
+        .step-copy small {
+          white-space: normal;
+        }
+
+        .stage-body {
+          padding: 11px;
+        }
+
+        .foot-actions,
+        .foot-actions .btn,
+        .foot-actions .link-btn {
+          width: 100%;
+        }
+
+        .foot-actions .btn,
+        .foot-actions .link-btn {
+          min-height: 42px;
+        }
+
+        .review-row {
+          flex-direction: column;
+          gap: 3px;
+        }
+
+        .review-row strong {
+          max-width: none;
+          text-align: left;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .spinner {
+          animation: none;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <header class="topbar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">流</div>
+        <div>
+          <strong>Workflow 任务处理流程</strong>
+          <span>共享交互样板，不是业务事实办理页</span>
+        </div>
+      </div>
+      <div class="top-actions">
+        <a class="link-btn" href="../task-command-center-v1/index.html">返回任务看板样板</a>
+        <button class="btn" id="themeToggle" type="button" aria-pressed="false">深色主题</button>
+      </div>
+    </header>
+
+    <main class="shell">
+      <section class="page-heading" aria-labelledby="pageTitle">
+        <div>
+          <div class="eyebrow">Shared action flow</div>
+          <h1 id="pageTitle">任务处理三步流</h1>
+          <p>步骤 1、2 始终可直接点击；步骤 3 只有在选择有效操作并补齐必填原因后才可进入。催办只是一种处理方式。</p>
+        </div>
+        <div class="heading-badges">
+          <span class="chip">To Implement</span>
+          <span class="chip green">Keyboard ready</span>
+        </div>
+      </section>
+
+      <nav class="scenario-bar" id="scenarioBar" role="tablist" aria-label="交互示例"></nav>
+
+      <section class="stage" id="stageRegion" aria-labelledby="stageTitle">
+        <header class="stage-head">
+          <div>
+            <div class="eyebrow">当前示例</div>
+            <h2 id="stageTitle">常规可处理任务</h2>
+            <p id="stageDescription">验证动作选择、原因校验、提交中和成功回执。</p>
+          </div>
+          <div class="scenario-copy">
+            <span id="scenarioHint">步骤 3 当前未解锁</span>
+            <span class="chip" id="scenarioStatus">可执行</span>
+          </div>
+        </header>
+
+        <nav class="stepper" aria-label="任务处理步骤">
+          <button class="step-button" id="stepButton1" type="button" data-step="1" aria-current="step" aria-controls="stepPanel1">
+            <span class="step-main"><span class="step-number">1</span><span class="step-copy"><strong>核对任务</strong><small>任务、相关单据与岗位</small></span></span>
+          </button>
+          <button class="step-button" id="stepButton2" type="button" data-step="2" aria-controls="stepPanel2">
+            <span class="step-main"><span class="step-number">2</span><span class="step-copy"><strong>选择处理</strong><small>完成、异常处理或催办</small></span></span>
+          </button>
+          <button class="step-button" id="stepButton3" type="button" data-step="3" aria-controls="stepPanel3" aria-disabled="true" aria-describedby="gateMessage">
+            <span class="step-main"><span class="step-number">3</span><span class="step-copy"><strong>确认与结果</strong><small>前置满足后提交并留回执</small></span></span>
+          </button>
+        </nav>
+
+        <div class="stage-body">
+          <section class="step-panel" id="stepPanel1" role="tabpanel" aria-labelledby="stepButton1">
+            <div class="task-summary">
+              <article class="task-primary">
+                <div class="eyebrow">当前任务</div>
+                <h3 id="taskTitle">安排来料放置库位</h3>
+                <span class="task-code" id="taskCode">任务 T-20260716-014 · 到货通知 ASN-202607-009</span>
+                <p id="taskReason">来料将在今天到仓，需要确认暂存区域和交接人员。</p>
+              </article>
+              <div class="task-meta" id="taskMeta"></div>
+            </div>
+            <div class="boundary">
+              <strong>处理范围</strong>
+              <span id="taskBoundary">完成、阻塞、退回或催办只更新当前协同任务；入库与库存事实仍需到对应业务页面办理。</span>
+            </div>
+          </section>
+
+          <section class="step-panel" id="stepPanel2" role="tabpanel" aria-labelledby="stepButton2" hidden>
+            <div class="card">
+              <div class="eyebrow">处理方式</div>
+              <h3>选择这次要记录的任务动作</h3>
+              <p>操作按当前任务状态和账号权限展示；催办不会改变任务状态。</p>
+              <div class="action-grid" id="actionGrid" role="radiogroup" aria-label="可用处理方式"></div>
+              <div class="field" id="reasonField" hidden>
+                <label for="actionReason">处理原因 <span aria-hidden="true">*</span></label>
+                <textarea id="actionReason" maxlength="180" placeholder="填写原因、影响范围和需要谁处理" aria-describedby="reasonHint reasonError"></textarea>
+                <div class="field-hint" id="reasonHint">必填，最多 180 字；返回步骤 1 后输入仍保留。</div>
+                <p class="field-error" id="reasonError" aria-live="polite"></p>
+              </div>
+              <div class="readonly" id="readonlyState" hidden>
+                <strong>当前任务只读</strong>
+                <span id="readonlyReason"></span>
+              </div>
+            </div>
+          </section>
+
+          <section class="step-panel" id="stepPanel3" role="tabpanel" aria-labelledby="stepButton3" hidden>
+            <div class="card" id="reviewCard">
+              <div class="eyebrow">提交前确认</div>
+              <h3>确认只处理当前任务</h3>
+              <div id="reviewRows"></div>
+            </div>
+            <div class="feedback" id="submitFeedback" role="status" aria-live="polite">尚未提交。确认信息后可提交当前任务动作。</div>
+            <div class="receipt" id="receipt" hidden aria-live="polite"></div>
+          </section>
+        </div>
+
+        <footer class="stage-foot">
+          <div class="gate-message" id="gateMessage" aria-live="polite">请先核对任务；步骤 1、2 可直接切换。</div>
+          <div class="foot-actions" id="footActions"></div>
+        </footer>
+      </section>
+
+      <section class="review-notes" aria-label="原型 review 要点">
+        <div class="review-note"><strong>直接导航</strong><span>步骤 1、2 是按钮，不依赖底部“催办”或其他动作进入。</span></div>
+        <div class="review-note"><strong>受控确认</strong><span>步骤 3 在动作与原因未满足时保持锁定，并把焦点带回缺失项。</span></div>
+        <div class="review-note"><strong>诚实结果</strong><span>失败不假定状态已改变；成功回执明确只更新当前 Workflow 任务。</span></div>
+      </section>
+    </main>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+    <script>
+      var actionDefinitions = {
+        complete: { label: "处理完成", tone: "green", reasonRequired: false, copy: "关闭当前协同任务，不自动办理相关业务。" },
+        block: { label: "标记阻塞", tone: "red", reasonRequired: true, copy: "记录卡点、影响范围和下一位接手人。" },
+        reject: { label: "退回任务", tone: "red", reasonRequired: true, copy: "记录退回依据、需补齐事项和负责岗位。" },
+        resume: { label: "解除阻塞", tone: "green", reasonRequired: true, copy: "说明阻塞如何解除，并恢复为可办理。" },
+        urge: { label: "催办", tone: "amber", reasonRequired: true, copy: "记录催办对象和需要补齐的事项；不改变状态。" }
+      };
+
+      var scenarios = {
+        normal: {
+          label: "常规可处理",
+          short: "完整动作与成功回执",
+          description: "验证动作选择、原因校验、提交中和成功回执。",
+          title: "安排来料放置库位",
+          code: "任务 T-20260716-014",
+          reference: "到货通知 ASN-202607-009",
+          source: "采购订单",
+          role: "仓库",
+          due: "今天 20:00",
+          status: "可执行",
+          tone: "blue",
+          reason: "来料将在今天到仓，需要确认暂存区域和交接人员。",
+          boundary: "完成、阻塞、退回或催办只更新当前协同任务；入库与库存事实仍需到对应业务页面办理。",
+          actions: ["complete", "block", "reject", "urge"],
+          failFirstAttempt: false
+        },
+        failure: {
+          label: "提交失败",
+          short: "保留输入后重试",
+          description: "首次提交模拟网络失败；不假定任务已改变，重试后显示成功回执。",
+          title: "确认出货交接资料",
+          code: "任务 T-20260716-019",
+          reference: "出货单 SH-202607-018",
+          source: "出货单",
+          role: "仓库",
+          due: "今天 18:00",
+          status: "可执行",
+          tone: "blue",
+          reason: "出货前需要核对交接资料是否齐全。",
+          boundary: "任务完成不等于出货单已发货；真实出货仍以 Shipment 主路径为准。",
+          actions: ["complete", "block", "reject", "urge"],
+          failFirstAttempt: true
+        },
+        readonly: {
+          label: "只读终态",
+          short: "查看但不能重复提交",
+          description: "验证已退回 / 已完成任务只保留核对和相关单据入口。",
+          title: "采购订单退回补充交期",
+          code: "任务 T-20260715-024",
+          reference: "采购订单 PO-202607-033",
+          source: "采购订单",
+          role: "采购",
+          due: "昨天 18:00",
+          status: "已退回",
+          tone: "red",
+          reason: "供应商承诺日期缺失，任务已退回采购补充。",
+          boundary: "退回只记录 Workflow 结果，不撤销已经保存的采购订单，也不写库存或应付事实。",
+          actions: [],
+          readonlyReason: "任务已经退回并结束，当前账号只能查看任务原因与相关单据。",
+          failFirstAttempt: false
+        },
+        urgeOnly: {
+          label: "仅可催办",
+          short: "权限受限动作示例",
+          description: "验证催办只是可用动作之一；当前账号不能完成、阻塞、退回或解除阻塞。",
+          title: "采购合同回签跟进",
+          code: "任务 T-20260716-022",
+          reference: "采购订单 PO-202607-041",
+          source: "采购订单",
+          role: "采购",
+          due: "明天 12:00",
+          status: "仅可催办",
+          tone: "amber",
+          reason: "当前账号可关注回签进度，但不是负责处理该任务的岗位。",
+          boundary: "催办只写任务事件，不改变采购订单、入库、应付、发票或付款事实。",
+          actions: ["urge"],
+          failFirstAttempt: false
+        }
+      };
+
+      var state = {
+        scenario: "normal",
+        step: 1,
+        actionMode: "",
+        reason: "",
+        reasonTouched: false,
+        submitting: false,
+        result: "idle",
+        receiptTime: "",
+        attempt: 0
+      };
+
+      var elements = {
+        scenarioBar: document.getElementById("scenarioBar"),
+        stageTitle: document.getElementById("stageTitle"),
+        stageDescription: document.getElementById("stageDescription"),
+        scenarioHint: document.getElementById("scenarioHint"),
+        scenarioStatus: document.getElementById("scenarioStatus"),
+        taskTitle: document.getElementById("taskTitle"),
+        taskCode: document.getElementById("taskCode"),
+        taskReason: document.getElementById("taskReason"),
+        taskMeta: document.getElementById("taskMeta"),
+        taskBoundary: document.getElementById("taskBoundary"),
+        actionGrid: document.getElementById("actionGrid"),
+        reasonField: document.getElementById("reasonField"),
+        actionReason: document.getElementById("actionReason"),
+        reasonError: document.getElementById("reasonError"),
+        readonlyState: document.getElementById("readonlyState"),
+        readonlyReason: document.getElementById("readonlyReason"),
+        reviewRows: document.getElementById("reviewRows"),
+        submitFeedback: document.getElementById("submitFeedback"),
+        receipt: document.getElementById("receipt"),
+        gateMessage: document.getElementById("gateMessage"),
+        footActions: document.getElementById("footActions"),
+        theme: document.getElementById("themeToggle"),
+        toast: document.getElementById("toast")
+      };
+
+      function currentScenario() {
+        return scenarios[state.scenario];
+      }
+
+      function escapeHtml(value) {
+        return String(value || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function selectedAction() {
+        return actionDefinitions[state.actionMode] || null;
+      }
+
+      function canReview() {
+        var scenario = currentScenario();
+        var action = selectedAction();
+        if (!action || !scenario.actions.includes(state.actionMode)) return false;
+        return !action.reasonRequired || Boolean(state.reason.trim());
+      }
+
+      function renderScenarios() {
+        elements.scenarioBar.innerHTML = Object.keys(scenarios).map(function (key) {
+          var scenario = scenarios[key];
+          return '<button class="scenario-button" type="button" role="tab" data-scenario="' + key + '" aria-selected="' + String(state.scenario === key) + '" tabindex="' + (state.scenario === key ? "0" : "-1") + '" aria-controls="stageRegion"><strong>' + escapeHtml(scenario.label) + '</strong><span>' + escapeHtml(scenario.short) + '</span></button>';
+        }).join("");
+      }
+
+      function renderTask() {
+        var scenario = currentScenario();
+        elements.stageTitle.textContent = scenario.label + "任务";
+        elements.stageDescription.textContent = scenario.description;
+        elements.scenarioStatus.className = "chip " + scenario.tone;
+        elements.scenarioStatus.textContent = scenario.status;
+        elements.taskTitle.textContent = scenario.title;
+        elements.taskCode.textContent = scenario.code + " · " + scenario.reference;
+        elements.taskReason.textContent = scenario.reason;
+        elements.taskBoundary.textContent = scenario.boundary;
+        elements.taskMeta.innerHTML =
+          '<div><span>业务来源</span><strong>' + escapeHtml(scenario.source) + '</strong></div>' +
+          '<div><span>负责岗位</span><strong>' + escapeHtml(scenario.role) + '</strong></div>' +
+          '<div><span>到期时间</span><strong>' + escapeHtml(scenario.due) + '</strong></div>' +
+          '<div><span>当前状态</span><strong>' + escapeHtml(scenario.status) + '</strong></div>';
+      }
+
+      function renderActions() {
+        var scenario = currentScenario();
+        elements.actionGrid.innerHTML = scenario.actions.map(function (key) {
+          var action = actionDefinitions[key];
+          return '<label class="action-card">' +
+            '<input type="radio" name="taskAction" value="' + key + '"' + (state.actionMode === key ? " checked" : "") + ' />' +
+            '<span class="action-card__head"><strong>' + escapeHtml(action.label) + '</strong><span class="chip ' + action.tone + '">' + (action.reasonRequired ? "需原因" : "直接确认") + '</span></span>' +
+            '<span class="action-card__copy">' + escapeHtml(action.copy) + '</span>' +
+          '</label>';
+        }).join("");
+        elements.actionGrid.hidden = scenario.actions.length === 0;
+        elements.readonlyState.hidden = scenario.actions.length > 0;
+        elements.readonlyReason.textContent = scenario.readonlyReason || "当前任务没有可提交的处理动作。";
+
+        var action = selectedAction();
+        var reasonRequired = Boolean(action && action.reasonRequired);
+        elements.reasonField.hidden = !reasonRequired;
+        elements.actionReason.value = state.reason;
+        elements.reasonError.textContent = reasonRequired && state.reasonTouched && !state.reason.trim() ? "请先填写处理原因。" : "";
+      }
+
+      function renderReview() {
+        var scenario = currentScenario();
+        var action = selectedAction();
+        if (!action) {
+          elements.reviewRows.innerHTML = "";
+          return;
+        }
+        elements.reviewRows.innerHTML =
+          '<div class="review-row"><span>当前任务</span><strong>' + escapeHtml(scenario.title) + '</strong></div>' +
+          '<div class="review-row"><span>处理方式</span><strong>' + escapeHtml(action.label) + '</strong></div>' +
+          '<div class="review-row"><span>处理原因</span><strong>' + escapeHtml(action.reasonRequired ? state.reason : "无需填写；确认当前任务完成") + '</strong></div>' +
+          '<div class="review-row"><span>影响范围</span><strong>仅当前 Workflow 任务</strong></div>';
+      }
+
+      function renderResult() {
+        elements.receipt.hidden = state.result !== "success";
+        if (state.result === "success") {
+          elements.receipt.innerHTML =
+            '<div class="receipt-head"><div><h3>✓ 任务动作已收到</h3><p>' + escapeHtml(state.receiptTime) + ' · ' + escapeHtml(selectedAction().label) + '</p></div><span class="chip green">成功回执</span></div>' +
+            '<p>本回执只确认当前任务动作已记录；没有自动处理库存、出货、财务、开票或付款业务。</p>';
+        } else {
+          elements.receipt.innerHTML = "";
+        }
+
+        if (state.submitting) {
+          elements.submitFeedback.className = "feedback loading";
+          elements.submitFeedback.innerHTML = '<span class="spinner" aria-hidden="true"></span> 正在提交当前任务动作，请勿重复操作…';
+        } else if (state.result === "error") {
+          elements.submitFeedback.className = "feedback error";
+          elements.submitFeedback.textContent = "提交未成功，未确认任务状态发生变化。当前输入已保留，请重试。";
+        } else if (state.result === "success") {
+          elements.submitFeedback.className = "feedback";
+          elements.submitFeedback.textContent = "已保留成功回执，等待用户主动返回任务列表。";
+        } else {
+          elements.submitFeedback.className = "feedback";
+          elements.submitFeedback.textContent = "尚未提交。确认信息后可提交当前任务动作。";
+        }
+      }
+
+      function renderStepper() {
+        document.querySelectorAll("[data-step]").forEach(function (button) {
+          var step = Number(button.dataset.step);
+          if (step === state.step) button.setAttribute("aria-current", "step");
+          else button.removeAttribute("aria-current");
+          if (step === 3) button.setAttribute("aria-disabled", String(!canReview()));
+        });
+        document.querySelectorAll(".step-panel").forEach(function (panel, index) {
+          panel.hidden = index + 1 !== state.step;
+        });
+        elements.scenarioHint.textContent = canReview() ? "步骤 3 已解锁" : "步骤 3 当前未解锁";
+      }
+
+      function renderFooter() {
+        var scenario = currentScenario();
+        var buttons = [];
+        if (state.step === 1) {
+          elements.gateMessage.className = "gate-message";
+          elements.gateMessage.textContent = "请先核对任务；步骤 1、2 可直接切换。";
+          buttons.push('<a class="link-btn" href="../task-command-center-v1/index.html">返回任务看板</a>');
+          buttons.push('<button class="btn primary" type="button" data-command="step2">' + (scenario.actions.length ? "选择处理方式" : "查看只读说明") + '</button>');
+        } else if (state.step === 2) {
+          elements.gateMessage.className = "gate-message" + (state.reasonTouched && !canReview() ? " error" : "");
+          elements.gateMessage.textContent = scenario.actions.length ? (canReview() ? "前置条件已满足，可以进入确认。" : "先选择处理方式；需要原因的操作必须填写原因。") : "当前任务只读，不能进入提交确认。";
+          buttons.push('<button class="btn" type="button" data-command="step1">返回核对</button>');
+          if (scenario.actions.length) buttons.push('<button class="btn primary" type="button" data-command="review">确认并预览</button>');
+        } else if (state.result === "success") {
+          elements.gateMessage.className = "gate-message";
+          elements.gateMessage.textContent = "成功后停留在结果页，不自动关闭。";
+          buttons.push('<button class="btn" type="button" data-command="restart">重新演示</button>');
+          buttons.push('<a class="link-btn" href="../task-command-center-v1/index.html">返回任务看板</a>');
+        } else {
+          elements.gateMessage.className = "gate-message" + (state.result === "error" ? " error" : "");
+          elements.gateMessage.textContent = state.result === "error" ? "失败时保留输入；重试前不假定任务状态已改变。" : "Ctrl/⌘ + Enter 可提交当前任务动作。";
+          buttons.push('<button class="btn" type="button" data-command="step2"' + (state.submitting ? " disabled" : "") + '>返回修改</button>');
+          buttons.push('<button class="btn primary" type="button" data-command="submit"' + (state.submitting ? " disabled" : "") + '>' + (state.submitting ? '<span class="spinner" aria-hidden="true"></span> 提交中' : (state.result === "error" ? "重试提交" : "提交当前动作")) + '</button>');
+        }
+        elements.footActions.innerHTML = buttons.join("");
+      }
+
+      function render() {
+        renderScenarios();
+        renderTask();
+        renderActions();
+        renderReview();
+        renderResult();
+        renderStepper();
+        renderFooter();
+      }
+
+      function setScenario(key) {
+        state.scenario = key;
+        state.step = 1;
+        state.actionMode = "";
+        state.reason = "";
+        state.reasonTouched = false;
+        state.submitting = false;
+        state.result = "idle";
+        state.receiptTime = "";
+        state.attempt = 0;
+        render();
+      }
+
+      function selectAction(mode) {
+        state.actionMode = mode;
+        state.reason = "";
+        state.reasonTouched = false;
+        state.result = "idle";
+        elements.actionGrid.querySelectorAll('input[name="taskAction"]').forEach(function (input) {
+          input.checked = input.value === mode;
+        });
+        var action = selectedAction();
+        elements.reasonField.hidden = !action.reasonRequired;
+        elements.actionReason.value = "";
+        elements.reasonError.textContent = "";
+        renderReview();
+        renderResult();
+        renderStepper();
+        renderFooter();
+        if (action.reasonRequired) window.setTimeout(function () { elements.actionReason.focus(); }, 0);
+      }
+
+      function showToast(message) {
+        elements.toast.textContent = message;
+        elements.toast.hidden = false;
+        window.clearTimeout(showToast.timer);
+        showToast.timer = window.setTimeout(function () { elements.toast.hidden = true; }, 2600);
+      }
+
+      function tryReview() {
+        var scenario = currentScenario();
+        var action = selectedAction();
+        if (!scenario.actions.length) {
+          state.step = 2;
+          render();
+          showToast("当前任务只读，不能进入提交确认。 ");
+          elements.readonlyState.setAttribute("tabindex", "-1");
+          elements.readonlyState.focus();
+          return;
+        }
+        if (!action) {
+          state.step = 2;
+          render();
+          showToast("请先选择处理方式；催办只是其中一个选项。 ");
+          var first = elements.actionGrid.querySelector("input");
+          if (first) first.focus();
+          return;
+        }
+        if (action.reasonRequired && !state.reason.trim()) {
+          state.reasonTouched = true;
+          state.step = 2;
+          render();
+          showToast("请先填写处理原因。 ");
+          elements.actionReason.focus();
+          return;
+        }
+        state.step = 3;
+        state.result = "idle";
+        render();
+        document.getElementById("reviewCard").setAttribute("tabindex", "-1");
+        document.getElementById("reviewCard").focus();
+      }
+
+      function submit() {
+        if (!canReview() || state.submitting) {
+          tryReview();
+          return;
+        }
+        state.step = 3;
+        state.submitting = true;
+        state.result = "idle";
+        state.attempt += 1;
+        render();
+        window.setTimeout(function () {
+          state.submitting = false;
+          if (currentScenario().failFirstAttempt && state.attempt === 1) {
+            state.result = "error";
+          } else {
+            state.result = "success";
+            state.receiptTime = new Intl.DateTimeFormat("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" }).format(new Date());
+          }
+          render();
+          var nextFocus = elements.footActions.querySelector("button, a");
+          if (nextFocus) nextFocus.focus();
+        }, 820);
+      }
+
+      function updateThemeButton() {
+        var isDark = document.documentElement.dataset.theme === "dark" || (!document.documentElement.dataset.theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        elements.theme.textContent = isDark ? "浅色主题" : "深色主题";
+        elements.theme.setAttribute("aria-pressed", String(isDark));
+      }
+
+      function toggleTheme() {
+        var isDark = document.documentElement.dataset.theme === "dark" || (!document.documentElement.dataset.theme && window.matchMedia("(prefers-color-scheme: dark)").matches);
+        document.documentElement.dataset.theme = isDark ? "light" : "dark";
+        updateThemeButton();
+      }
+
+      elements.theme.addEventListener("click", toggleTheme);
+
+      elements.scenarioBar.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-scenario]");
+        if (button) {
+          var key = button.dataset.scenario;
+          setScenario(key);
+          var selectedButton = elements.scenarioBar.querySelector('[data-scenario="' + key + '"]');
+          if (selectedButton) selectedButton.focus();
+        }
+      });
+
+      elements.scenarioBar.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "Home" && event.key !== "End") return;
+        var buttons = Array.from(elements.scenarioBar.querySelectorAll("[data-scenario]"));
+        var current = buttons.indexOf(document.activeElement);
+        var next = current;
+        if (event.key === "ArrowRight") next = Math.min(buttons.length - 1, Math.max(0, current + 1));
+        if (event.key === "ArrowLeft") next = Math.max(0, current <= 0 ? 0 : current - 1);
+        if (event.key === "Home") next = 0;
+        if (event.key === "End") next = buttons.length - 1;
+        event.preventDefault();
+        var key = buttons[next].dataset.scenario;
+        setScenario(key);
+        var selectedButton = elements.scenarioBar.querySelector('[data-scenario="' + key + '"]');
+        if (selectedButton) selectedButton.focus();
+      });
+
+      document.querySelector(".stepper").addEventListener("click", function (event) {
+        var button = event.target.closest("[data-step]");
+        if (!button || state.submitting || state.result === "success") return;
+        var step = Number(button.dataset.step);
+        if (step === 3) tryReview();
+        else {
+          state.step = step;
+          render();
+        }
+      });
+
+      elements.actionGrid.addEventListener("change", function (event) {
+        if (event.target.matches('input[name="taskAction"]')) selectAction(event.target.value);
+      });
+
+      elements.actionReason.addEventListener("input", function () {
+        state.reason = elements.actionReason.value;
+        state.result = "idle";
+        elements.reasonError.textContent = "";
+        document.getElementById("stepButton3").setAttribute("aria-disabled", String(!canReview()));
+        elements.scenarioHint.textContent = canReview() ? "步骤 3 已解锁" : "步骤 3 当前未解锁";
+        elements.gateMessage.textContent = canReview() ? "前置条件已满足，可以进入确认。" : "需要原因的操作必须填写原因。";
+      });
+
+      elements.actionReason.addEventListener("blur", function () {
+        state.reasonTouched = true;
+        render();
+      });
+
+      elements.footActions.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-command]");
+        if (!button) return;
+        var command = button.dataset.command;
+        if (command === "step1") { state.step = 1; render(); }
+        if (command === "step2") { state.step = 2; render(); }
+        if (command === "review") tryReview();
+        if (command === "submit") submit();
+        if (command === "restart") setScenario(state.scenario);
+      });
+
+      document.addEventListener("keydown", function (event) {
+        if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+          event.preventDefault();
+          if (state.step === 1) { state.step = 2; render(); }
+          else if (state.step === 2) tryReview();
+          else if (state.result !== "success") submit();
+        }
+      });
+
+      updateThemeButton();
+      render();
+    </script>
+  </body>
+</html>

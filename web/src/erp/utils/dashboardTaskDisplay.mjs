@@ -1,5 +1,7 @@
 import { businessModuleDefinitions } from '../config/businessModules.mjs'
 import { dashboardModules } from '../config/dashboardModules.mjs'
+import { V1_ROUTE_PATHS } from './masterDataOrderView.mjs'
+import { routeWithQuery } from './routeQuery.mjs'
 import {
   isInternalWorkflowDocumentRef,
   resolveReadableWorkflowSourceNo,
@@ -15,8 +17,9 @@ const TASK_SOURCE_TITLE_MAP = new Map([
   ['inventory', '库存任务'],
   ['shipping-release', '出货放行'],
   ['outbound', '出库任务'],
+  ['production-orders', '生产订单'],
   ['production-scheduling', '生产排程'],
-  ['production-progress', '生产进度'],
+  ['production-progress', '生产记录'],
   ['production-exceptions', '生产异常'],
   ['quality-inspections', '质量检验'],
   ['reconciliation', '财务对账'],
@@ -40,6 +43,98 @@ const ACTIVE_TASK_ENTRY_PATHS = new Set([
   '/erp/business-dashboard',
   ...FORMAL_V1_TASK_ENTRY_MODULES.map((moduleItem) => moduleItem.path),
   ...dashboardModules.map((moduleItem) => moduleItem.path),
+])
+const DIRECT_TASK_SOURCE_TARGETS = new Map([
+  ['project-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
+  ['sales-orders', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
+  ['sales_order', [V1_ROUTE_PATHS.salesOrders, 'sales_order_id']],
+  [
+    'accessories-purchase',
+    [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id'],
+  ],
+  ['purchase-order', [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id']],
+  ['purchase_order', [V1_ROUTE_PATHS.purchaseOrders, 'purchase_order_id']],
+  ['inbound', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
+  ['purchase-receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
+  ['purchase_receipt', [V1_ROUTE_PATHS.purchaseReceipts, 'receipt_id']],
+  [
+    'processing-contracts',
+    [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
+  ],
+  [
+    'outsourcing-order',
+    [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
+  ],
+  [
+    'outsourcing_order',
+    [V1_ROUTE_PATHS.processingContracts, 'outsourcing_order_id'],
+  ],
+  [
+    'production-orders',
+    [V1_ROUTE_PATHS.productionOrders, 'production_order_id'],
+  ],
+  [
+    'production-order',
+    [V1_ROUTE_PATHS.productionOrders, 'production_order_id'],
+  ],
+  [
+    'production_order',
+    [V1_ROUTE_PATHS.productionOrders, 'production_order_id'],
+  ],
+  ['production-progress', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
+  ['production-fact', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
+  ['production_fact', [V1_ROUTE_PATHS.productionProgress, 'fact_id']],
+  [
+    'quality-inspections',
+    [V1_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
+  ],
+  [
+    'quality-inspection',
+    [V1_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
+  ],
+  [
+    'quality_inspection',
+    [V1_ROUTE_PATHS.qualityInspections, 'quality_inspection_id'],
+  ],
+  ['shipments', [V1_ROUTE_PATHS.shipments, 'shipment_id']],
+  ['shipment', [V1_ROUTE_PATHS.shipments, 'shipment_id']],
+])
+const SOURCE_TASK_CONTRACT = 'workflow.source-task/v1'
+const SOURCE_TASK_INTENT_HASH_PATTERN = /^[0-9a-f]{64}$/
+const STANDALONE_SOURCE_TASK_CONTRACTS = new Map([
+  [
+    'production_scheduling',
+    Object.freeze({
+      taskGroup: 'production_scheduling',
+      sourceType: 'production-orders',
+      producer: 'production_order.release',
+      taskCodePrefix: 'source-production-scheduling-',
+      ownerRoleKey: 'pmc',
+      payloadSourceIDKey: 'production_order_id',
+    }),
+  ],
+  [
+    'production_exception',
+    Object.freeze({
+      taskGroup: 'production_exception',
+      sourceType: 'production-progress',
+      producer: 'production_rework.post',
+      taskCodePrefix: 'source-production-exception-',
+      ownerRoleKey: 'production',
+      payloadSourceIDKey: 'production_fact_id',
+    }),
+  ],
+  [
+    'shipment_release',
+    Object.freeze({
+      taskGroup: 'shipment_release',
+      sourceType: 'shipments',
+      producer: 'shipment.submit_release',
+      taskCodePrefix: 'source-shipment-release-',
+      ownerRoleKey: 'warehouse',
+      payloadSourceIDKey: 'shipment_id',
+    }),
+  ],
 ])
 
 export function getWorkflowTaskSourceTypeLabel(
@@ -117,7 +212,72 @@ function payloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
 
+function standaloneSourceTaskContract(task = {}) {
+  const taskGroup = String(task.task_group || '')
+    .trim()
+    .toLowerCase()
+  return STANDALONE_SOURCE_TASK_CONTRACTS.get(taskGroup) || null
+}
+
+function isTrustedStandaloneSourceTask(task = {}) {
+  const contract = standaloneSourceTaskContract(task)
+  if (!contract) return false
+  const payload = payloadOf(task)
+  const sourceID = task.source_id
+  return Boolean(
+    Number.isSafeInteger(sourceID) &&
+      sourceID > 0 &&
+      task.task_group === contract.taskGroup &&
+      task.task_code === `${contract.taskCodePrefix}${sourceID}` &&
+      task.owner_role_key === contract.ownerRoleKey &&
+      task.source_type === contract.sourceType &&
+      payload &&
+      typeof payload === 'object' &&
+      !Array.isArray(payload) &&
+      payload.source_task_contract === SOURCE_TASK_CONTRACT &&
+      payload.source_task_producer === contract.producer &&
+      payload[contract.payloadSourceIDKey] === sourceID &&
+      typeof payload.source_task_intent_hash === 'string' &&
+      SOURCE_TASK_INTENT_HASH_PATTERN.test(payload.source_task_intent_hash)
+  )
+}
+
+export function resolveWorkflowTaskSourceEntryPath(task = {}) {
+  const sourceTaskContract = standaloneSourceTaskContract(task)
+  const standaloneSourceTrusted = isTrustedStandaloneSourceTask(task)
+  if (sourceTaskContract && !standaloneSourceTrusted) {
+    return ''
+  }
+  const processInstanceID = Number(task.process_instance_id || 0)
+  const processSourceTrusted =
+    Number.isSafeInteger(processInstanceID) && processInstanceID > 0
+  if (!processSourceTrusted && !standaloneSourceTrusted) {
+    return ''
+  }
+  const sourceType = String(task.source_type || '')
+    .trim()
+    .toLowerCase()
+  const sourceID = Number(task.source_id || 0)
+  const target = DIRECT_TASK_SOURCE_TARGETS.get(sourceType)
+  if (!target || !Number.isSafeInteger(sourceID) || sourceID <= 0) {
+    return ''
+  }
+  const [path, queryKey] = target
+  return routeWithQuery(path, {
+    [queryKey]: sourceID,
+    link_source: 'task-dashboard',
+  })
+}
+
 export function resolveWorkflowTaskEntryPath(task = {}) {
+  const sourceTaskContract = standaloneSourceTaskContract(task)
+  if (sourceTaskContract && !isTrustedStandaloneSourceTask(task)) {
+    return ''
+  }
+  const sourceEntryPath = resolveWorkflowTaskSourceEntryPath(task)
+  if (sourceEntryPath) {
+    return sourceEntryPath
+  }
   const payload = payloadOf(task)
   const entryPath = String(payload.entry_path || '').trim()
   const sourceType = String(task.source_type || '').trim()

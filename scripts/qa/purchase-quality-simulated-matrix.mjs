@@ -661,6 +661,8 @@ async function createReceiptMatrix(plan, tokens, steps, fetchImpl, orders) {
           id: inspection.id,
           result: index % 2 === 0 ? "PASS" : "CONCESSION",
           inspected_at: scenarioDate(index),
+          defect_rate_operator: "APPROX",
+          defect_rate_percent: index % 2 === 0 ? "5" : "10",
           decision_note:
             "【试用】检验通过或让步接收；模拟试用记录，请勿作为正式质检结论。",
         },
@@ -682,6 +684,8 @@ async function createReceiptMatrix(plan, tokens, steps, fetchImpl, orders) {
           id: inspection.id,
           result: "REJECT",
           inspected_at: scenarioDate(index),
+          defect_rate_operator: "GT",
+          defect_rate_percent: "50",
           decision_note:
             "【试用】尺寸偏差，执行拒收；模拟试用记录，请勿作为正式质检结论。",
         },

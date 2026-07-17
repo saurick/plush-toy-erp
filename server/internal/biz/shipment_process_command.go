@@ -109,6 +109,11 @@ func (h *shipmentShipProcessCommandHandler) ValidateProcessDomainCommand(ctx con
 	if shipment == nil || shipment.ID != shipmentID || (shipment.Status != ShipmentStatusDraft && shipment.Status != ShipmentStatusShipped) {
 		return ErrBadParam
 	}
+	if shipment.Status == ShipmentStatusDraft {
+		if err := h.uc.ValidateShipmentReleaseForShipping(ctx, shipmentID); err != nil {
+			return err
+		}
+	}
 	return nil
 }
 

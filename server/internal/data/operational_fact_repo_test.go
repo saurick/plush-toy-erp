@@ -13,6 +13,8 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/stockreservation"
+	"server/internal/data/model/ent/workflowbusinessstate"
+	"server/internal/data/model/ent/workflowtask"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -862,9 +864,7 @@ func TestOperationalFactRepo_ShipShipmentAndCancelWritesOutboundReversal(t *test
 	if len(shipment.Items) != 1 {
 		t.Fatalf("expected one shipment item, got %d", len(shipment.Items))
 	}
-	if _, err := repo.CancelShippedShipment(ctx, shipment.ID); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("cancel draft shipment error = %v, want ErrBadParam", err)
-	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 	shipped, err := repo.ShipShipment(ctx, shipment.ID)
 	if err != nil {
 		t.Fatalf("ship shipment failed: %v", err)
@@ -981,6 +981,7 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 	if err != nil {
 		t.Fatalf("create complete-weight shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, complete.ID)
 	complete, err = repo.ShipShipment(ctx, complete.ID)
 	if err != nil {
 		t.Fatalf("ship complete-weight shipment: %v", err)
@@ -1008,6 +1009,7 @@ func TestOperationalFactRepo_ShipmentNetWeightCompleteAndManualFallback(t *testi
 	if err != nil {
 		t.Fatalf("create incomplete-weight shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, incomplete.ID)
 	incomplete, err = repo.ShipShipment(ctx, incomplete.ID)
 	if err != nil {
 		t.Fatalf("ship incomplete-weight shipment: %v", err)
@@ -1037,6 +1039,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	if err != nil {
 		t.Fatalf("create rollback shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, rejected.ID)
 	if _, err := repo.ShipShipment(ctx, rejected.ID); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
 		t.Fatalf("ship without inventory error = %v, want ErrInventoryInsufficientStock", err)
 	}
@@ -1059,6 +1062,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	if err != nil {
 		t.Fatalf("create overflow shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, overflow.ID)
 	if _, err := repo.ShipShipment(ctx, overflow.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("ship overflow error = %v, want ErrBadParam", err)
 	}
@@ -1085,6 +1089,7 @@ func TestOperationalFactRepo_ShipmentNetWeightWritesRollbackWithShipFailure(t *t
 	if _, err := data.sqldb.ExecContext(ctx, `UPDATE shipment_items SET product_sku_id = ? WHERE id = ?`, otherSKU.ID, mismatched.Items[0].ID); err != nil {
 		t.Fatalf("simulate mismatched shipment SKU: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, mismatched.ID)
 	if _, err := repo.ShipShipment(ctx, mismatched.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("ship mismatched product/SKU error = %v, want ErrBadParam", err)
 	}
@@ -1169,6 +1174,7 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 	}
 
 	mismatched := createShipment("SHP-SOURCE-MISMATCH", otherCustomer.ID, decimal.NewFromInt(1))
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, mismatched.ID)
 	if _, err := repo.ShipShipment(ctx, mismatched.ID); !errors.Is(err, biz.ErrShipmentSourceMismatch) {
 		t.Fatalf("ship mismatched customer error = %v, want ErrShipmentSourceMismatch", err)
 	}
@@ -1177,10 +1183,12 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 	}
 
 	first := createShipment("SHP-SOURCE-FIRST", customer.ID, decimal.NewFromInt(2))
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, first.ID)
 	if _, err := repo.ShipShipment(ctx, first.ID); err != nil {
 		t.Fatalf("ship first partial shipment failed: %v", err)
 	}
 	second := createShipment("SHP-SOURCE-OVER", customer.ID, decimal.NewFromInt(2))
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, second.ID)
 	if _, err := repo.ShipShipment(ctx, second.ID); !errors.Is(err, biz.ErrShipmentQuantityExceeded) {
 		t.Fatalf("ship cumulative over-quantity error = %v, want ErrShipmentQuantityExceeded", err)
 	}
@@ -1273,6 +1281,7 @@ func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnothe
 	}
 
 	shipmentB := createShipment("SHP-ORDER-B", customerB, orderB, itemB)
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipmentB.ID)
 	if _, err := operationalUC.ShipShipment(ctx, shipmentB.ID); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
 		t.Fatalf("ship order B against order A reservation error = %v, want insufficient stock", err)
 	}
@@ -1284,6 +1293,7 @@ func TestOperationalFactRepo_ShipmentConsumesOwnReservationWithoutStealingAnothe
 	}
 
 	shipmentA := createShipment("SHP-ORDER-A", customerA, orderA, itemA)
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipmentA.ID)
 	if _, err := operationalUC.ShipShipment(ctx, shipmentA.ID); err != nil {
 		t.Fatalf("ship order A with own reservation failed: %v", err)
 	}
@@ -1342,6 +1352,7 @@ func TestOperationalFactRepo_ShipmentRejectsPartialAtomicReservationConsumption(
 	if err != nil {
 		t.Fatalf("create shipment failed: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 	if _, err := operationalUC.ShipShipment(ctx, shipment.ID); !errors.Is(err, biz.ErrShipmentReservationSplit) {
 		t.Fatalf("partial reservation shipment error = %v, want ErrShipmentReservationSplit", err)
 	}
@@ -1406,6 +1417,7 @@ func TestOperationalFactRepo_ShipmentRejectsRemainingReservationAcrossInventoryG
 	if err != nil {
 		t.Fatalf("create shipment failed: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 	if _, err := operationalUC.ShipShipment(ctx, shipment.ID); !errors.Is(err, biz.ErrShipmentQuantityExceeded) {
 		t.Fatalf("cross-grain shipment error = %v, want ErrShipmentQuantityExceeded", err)
 	}
@@ -1534,6 +1546,7 @@ func TestOperationalFactRepo_CreateShipmentWithItemsIdempotencyRequiresSamePaylo
 	if replayed.ID != first.ID || len(replayed.Items) != 1 {
 		t.Fatalf("unexpected shipment replay: %#v", replayed)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, first.ID)
 	shipped, err := repo.ShipShipment(ctx, first.ID)
 	if err != nil {
 		t.Fatalf("ship idempotent shipment: %v", err)
@@ -1706,6 +1719,7 @@ func TestOperationalFactUsecase_ReceivableAndInvoiceRequireShippedShipment(t *te
 		t.Fatalf("receivable from draft shipment error = %v, want ErrBadParam", err)
 	}
 
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 	shipped, err := uc.ShipShipment(ctx, shipment.ID)
 	if err != nil {
 		t.Fatalf("ship shipment failed: %v", err)

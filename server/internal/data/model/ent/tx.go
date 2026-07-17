@@ -72,6 +72,16 @@ type Tx struct {
 	ProductionOrderItem *ProductionOrderItemClient
 	// ProductionOrderMaterialRequirement is the client for interacting with the ProductionOrderMaterialRequirement builders.
 	ProductionOrderMaterialRequirement *ProductionOrderMaterialRequirementClient
+	// ProductionOrderOperation is the client for interacting with the ProductionOrderOperation builders.
+	ProductionOrderOperation *ProductionOrderOperationClient
+	// ProductionPackagingConfirmation is the client for interacting with the ProductionPackagingConfirmation builders.
+	ProductionPackagingConfirmation *ProductionPackagingConfirmationClient
+	// ProductionWIPBatch is the client for interacting with the ProductionWIPBatch builders.
+	ProductionWIPBatch *ProductionWIPBatchClient
+	// ProductionWIPEvent is the client for interacting with the ProductionWIPEvent builders.
+	ProductionWIPEvent *ProductionWIPEventClient
+	// ProductionWIPOutsourcingAllocation is the client for interacting with the ProductionWIPOutsourcingAllocation builders.
+	ProductionWIPOutsourcingAllocation *ProductionWIPOutsourcingAllocationClient
 	// PurchaseOrder is the client for interacting with the PurchaseOrder builders.
 	PurchaseOrder *PurchaseOrderClient
 	// PurchaseOrderItem is the client for interacting with the PurchaseOrderItem builders.
@@ -287,6 +297,11 @@ func (tx *Tx) init() {
 	tx.ProductionOrderEvent = NewProductionOrderEventClient(tx.config)
 	tx.ProductionOrderItem = NewProductionOrderItemClient(tx.config)
 	tx.ProductionOrderMaterialRequirement = NewProductionOrderMaterialRequirementClient(tx.config)
+	tx.ProductionOrderOperation = NewProductionOrderOperationClient(tx.config)
+	tx.ProductionPackagingConfirmation = NewProductionPackagingConfirmationClient(tx.config)
+	tx.ProductionWIPBatch = NewProductionWIPBatchClient(tx.config)
+	tx.ProductionWIPEvent = NewProductionWIPEventClient(tx.config)
+	tx.ProductionWIPOutsourcingAllocation = NewProductionWIPOutsourcingAllocationClient(tx.config)
 	tx.PurchaseOrder = NewPurchaseOrderClient(tx.config)
 	tx.PurchaseOrderItem = NewPurchaseOrderItemClient(tx.config)
 	tx.PurchaseReceipt = NewPurchaseReceiptClient(tx.config)

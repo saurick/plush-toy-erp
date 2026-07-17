@@ -77,6 +77,10 @@ import {
   saveOutsourcingOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
+  downloadBusinessAttachment,
+  listBusinessAttachments,
+} from '../api/attachmentApi.mjs'
+import {
   createOutsourcingMaterialIssueFromOrder,
   createOutsourcingReturnReceiptFromOrder,
   createPayableFromOutsourcingReturn,
@@ -114,7 +118,10 @@ import {
   unixToDateInputValue,
 } from '../utils/masterDataOrderView.mjs'
 import { referenceLabel } from '../utils/referenceSelectOptions.mjs'
-import { filterBusinessCollaborationTasksBySource } from '../utils/businessCollaborationTasks.mjs'
+import {
+  filterBusinessCollaborationTasksBySource,
+  loadBusinessCollaborationTasksForSource,
+} from '../utils/businessCollaborationTasks.mjs'
 import {
   buildSourceDocumentItemSaveParams,
   commitSourceDocumentSaveResult,
@@ -135,6 +142,10 @@ import {
   openPrintWorkspaceWindow,
   resolveRuntimeCustomerPrintCompanyName,
 } from '../utils/printWorkspace.js'
+import {
+  loadProductPrintImageSnapshots,
+  resolveSharedProductIDForPrintImages,
+} from '../utils/productPrintImages.mjs'
 import { getEffectivePrintTemplateDefaults } from '../utils/adminProfileSync.mjs'
 import { buildProcessingContractDraftFromOutsourcingOrder } from '../data/processingContractTemplate.mjs'
 import {
@@ -217,6 +228,8 @@ export default function V1OutsourcingOrdersPage() {
   const [itemsLoading, setItemsLoading] = useState(false)
   const [printingAction, setPrintingAction] = useState('')
   const [workflowTasks, setWorkflowTasks] = useState([])
+  const [workflowTaskLoadState, setWorkflowTaskLoadState] = useState('idle')
+  const workflowTaskSourceIDRef = useRef(0)
   const [columnOrder, setColumnOrder] = useState(null)
   const [columnOrderOpen, setColumnOrderOpen] = useState(false)
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
@@ -556,10 +569,7 @@ export default function V1OutsourcingOrdersPage() {
           })
         )
       ).flat()
-      return groupOutsourcingReturnQualityInspections(
-        inspections,
-        facts
-      )
+      return groupOutsourcingReturnQualityInspections(inspections, facts)
     },
     [activeCustomerKey, canReadQualityInspection]
   )
@@ -717,7 +727,7 @@ export default function V1OutsourcingOrdersPage() {
         message.success(
           confirmedByReread
             ? '已重新读取并确认质检草稿'
-            : '质检草稿已生成，请到质量检验继续办理'
+            : '质检草稿已生成，请在相关回货记录中继续办理'
         )
 
         if (returnRecordsOrder?.id) {
@@ -751,12 +761,21 @@ export default function V1OutsourcingOrdersPage() {
     ]
   )
 
+  const viewOutsourcingReturnQualityInspection = useCallback(
+    (inspection) => {
+      if (!inspection?.id) return
+      navigate(
+        routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
+          quality_inspection_id: inspection.id,
+        })
+      )
+    },
+    [navigate]
+  )
+
   const openOutsourcingReturnPayable = useCallback(
     (fact) => {
-      if (
-        !canCreatePayable ||
-        !isPostedOutsourcingReturn(fact)
-      ) {
+      if (!canCreatePayable || !isPostedOutsourcingReturn(fact)) {
         message.warning('请先选择已过账的委外回货记录')
         return
       }
@@ -764,12 +783,10 @@ export default function V1OutsourcingOrdersPage() {
         qualityInspectionByFactID?.[fact.id] || []
       )
       if (
-        qualityGate.state !==
-        OUTSOURCING_RETURN_QUALITY_GATE_STATES.ACCEPTED
+        qualityGate.state !== OUTSOURCING_RETURN_QUALITY_GATE_STATES.ACCEPTED
       ) {
         message.warning(
-          qualityGate.state ===
-            OUTSOURCING_RETURN_QUALITY_GATE_STATES.REJECTED
+          qualityGate.state === OUTSOURCING_RETURN_QUALITY_GATE_STATES.REJECTED
             ? '该委外回货质检不合格，请先完成返工、退回等质量处置'
             : '该委外回货尚未完成合格或让步接收判定，不能生成应付'
         )
@@ -966,8 +983,12 @@ export default function V1OutsourcingOrdersPage() {
       const sourceAction = renderOutsourcingSourceFactAction(record, item)
       return [
         {
-          label: '加工内容类型',
+          label: '加工品类',
           value: isMaterial ? '材料' : '产品 / 半成品',
+        },
+        {
+          label: '来源产品订单编号',
+          value: item?.product_order_no_snapshot,
         },
         ...(isMaterial
           ? [
@@ -975,14 +996,11 @@ export default function V1OutsourcingOrdersPage() {
               { label: '材料名称', value: item?.material_name_snapshot },
             ]
           : [
-              {
-                label: '产品订单编号',
-                value: item?.product_order_no_snapshot,
-              },
               { label: '产品编号', value: item?.product_no_snapshot },
               { label: '产品规格', value: item?.sku_code_snapshot },
               { label: '产品名称', value: item?.product_name_snapshot },
             ]),
+        { label: '加工项目', value: item?.processing_item },
         { label: '工序', value: item?.process_name_snapshot },
         { label: '工序分类', value: item?.process_category_snapshot },
         { label: '加工数量', value: item?.outsourcing_quantity },
@@ -1325,26 +1343,42 @@ export default function V1OutsourcingOrdersPage() {
     form.resetFields()
   }
 
-  const loadWorkflowTasks = useCallback(async () => {
-    if (!canReadWorkflowTasks) {
-      setWorkflowTasks([])
-      return
-    }
-    try {
-      const data = await listWorkflowTasks({
-        source_type: OUTSOURCING_ORDERS_MODULE_KEY,
-        limit: 200,
+  const loadWorkflowTasks = useCallback(
+    (sourceID) => {
+      const requestedSourceID = Number(
+        sourceID ?? workflowTaskSourceIDRef.current ?? 0
+      )
+      return loadBusinessCollaborationTasksForSource({
+        beginLatestRequest,
+        canRead: canReadWorkflowTasks,
+        isAbortError: isRpcAbortError,
+        isCurrentSource: (candidateSourceID) =>
+          candidateSourceID === workflowTaskSourceIDRef.current,
+        listTasks: listWorkflowTasks,
+        onError: (error) =>
+          message.error(
+            getActionErrorMessage(error, '加载当前加工合同任务失败')
+          ),
+        setLoadState: setWorkflowTaskLoadState,
+        setTasks: setWorkflowTasks,
+        sourceID: requestedSourceID,
+        sourceType: OUTSOURCING_ORDERS_MODULE_KEY,
       })
-      setWorkflowTasks(data?.tasks || [])
-    } catch (error) {
-      setWorkflowTasks([])
-      message.error(getActionErrorMessage(error, '加载委外相关任务'))
-    }
-  }, [canReadWorkflowTasks])
+    },
+    [beginLatestRequest, canReadWorkflowTasks]
+  )
 
   useEffect(() => {
-    loadWorkflowTasks()
-  }, [loadWorkflowTasks])
+    const sourceID = Number(selectedRow?.id || 0)
+    workflowTaskSourceIDRef.current = sourceID
+    loadWorkflowTasks(sourceID)
+  }, [loadWorkflowTasks, selectedRow?.id])
+  useEffect(
+    () => () => {
+      workflowTaskSourceIDRef.current = 0
+    },
+    []
+  )
 
   const refreshPageData = useCallback(async () => {
     await Promise.all([loadOrders(), loadWorkflowTasks()])
@@ -1424,7 +1458,8 @@ export default function V1OutsourcingOrdersPage() {
     const productSKU = productSKUs.find((item) => item.id === productSKUID)
     setLineValues(fieldName, {
       unit_name_snapshot: unit?.name || '',
-      ...(productSKU && Number(productSKU.default_unit_id || 0) !== Number(unitID)
+      ...(productSKU &&
+      Number(productSKU.default_unit_id || 0) !== Number(unitID)
         ? { product_sku_id: undefined, sku_code_snapshot: '' }
         : {}),
     })
@@ -1657,11 +1692,21 @@ export default function V1OutsourcingOrdersPage() {
         message.warning('当前加工合同没有可带入作业指导书的产品 / 半成品明细')
         return
       }
+      const productImageSource =
+        resolveSharedProductIDForPrintImages(activeItems)
+      const productImages =
+        productImageSource.reason === 'single'
+          ? await loadProductPrintImageSnapshots(productImageSource.productID, {
+              listAttachments: listBusinessAttachments,
+              downloadAttachment: downloadBusinessAttachment,
+            })
+          : {}
       const initialDraft = buildWorkInstructionDraftFromOutsourcingOrder(
         selectedRow,
         activeItems,
         {
           companyName: resolveRuntimeCustomerPrintCompanyName(),
+          productImages,
         }
       )
       openPrintWorkspaceWindow(WORK_INSTRUCTION_TEMPLATE_KEY, {
@@ -1669,7 +1714,17 @@ export default function V1OutsourcingOrdersPage() {
         initialDraft,
         customerKey: activeCustomerKey,
       })
-      message.success('已打开作业指导书打印模板')
+      if (productImageSource.reason === 'multiple') {
+        message.warning(
+          '已打开作业指导书；当前加工合同包含多个产品，未自动带入产品图，请在打印窗口核对后补充。'
+        )
+      } else if (productImageSource.reason === 'missing') {
+        message.warning(
+          '已打开作业指导书；部分产品明细未关联明确产品，未自动带入产品图，请在打印窗口核对后补充。'
+        )
+      } else {
+        message.success('已打开作业指导书打印模板')
+      }
     } catch (error) {
       message.error(getActionErrorMessage(error, '打开作业指导书打印失败'))
     } finally {
@@ -2185,11 +2240,13 @@ export default function V1OutsourcingOrdersPage() {
         facts={relatedReturnFacts}
         loading={returnRecordsLoading}
         canCreateQualityInspection={canCreateQualityInspection}
+        canViewQualityInspection={canReadQualityInspection}
         qualityInspectionByFactID={qualityInspectionByFactID}
         canCreatePayable={canCreatePayable}
         canViewPayable={canViewPayable}
         onCancel={closeRelatedReturnRecords}
         onCreateQualityInspection={openOutsourcingReturnQualityInspection}
+        onViewQualityInspection={viewOutsourcingReturnQualityInspection}
         onGeneratePayable={openOutsourcingReturnPayable}
         onViewPayable={viewOutsourcingReturnPayable}
       />
@@ -2214,12 +2271,16 @@ export default function V1OutsourcingOrdersPage() {
       />
 
       <CollaborationTaskPanel
-        tasks={workflowTasks}
-        selectedTasks={selectedWorkflowTasks}
+        tasks={
+          canReadWorkflowTasks && workflowTaskLoadState === 'ready'
+            ? selectedWorkflowTasks
+            : []
+        }
         selectedRecordLabel={
           selectedRow ? getOutsourcingOrderDisplayNo(selectedRow) : ''
         }
         adminProfile={adminProfile}
+        onOpenTaskBoard={() => navigate('/erp/task-board')}
         onCompleteTask={
           canCompleteWorkflowTasks ? completeWorkflowTask : undefined
         }

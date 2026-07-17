@@ -13,6 +13,9 @@ import (
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionorderoperation"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
+	"server/internal/data/model/ent/productionwipbatch"
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
@@ -23,17 +26,20 @@ import (
 // ProductionOrderQuery is the builder for querying ProductionOrder entities.
 type ProductionOrderQuery struct {
 	config
-	ctx                      *QueryContext
-	order                    []productionorder.OrderOption
-	inters                   []Interceptor
-	predicates               []predicate.ProductionOrder
-	withItems                *ProductionOrderItemQuery
-	withMaterialRequirements *ProductionOrderMaterialRequirementQuery
-	withEvents               *ProductionOrderEventQuery
-	withCreator              *AdminUserQuery
-	withReleaser             *AdminUserQuery
-	withCloser               *AdminUserQuery
-	withCanceller            *AdminUserQuery
+	ctx                        *QueryContext
+	order                      []productionorder.OrderOption
+	inters                     []Interceptor
+	predicates                 []predicate.ProductionOrder
+	withItems                  *ProductionOrderItemQuery
+	withMaterialRequirements   *ProductionOrderMaterialRequirementQuery
+	withOperations             *ProductionOrderOperationQuery
+	withWipBatches             *ProductionWIPBatchQuery
+	withPackagingConfirmations *ProductionPackagingConfirmationQuery
+	withEvents                 *ProductionOrderEventQuery
+	withCreator                *AdminUserQuery
+	withReleaser               *AdminUserQuery
+	withCloser                 *AdminUserQuery
+	withCanceller              *AdminUserQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -107,6 +113,72 @@ func (_q *ProductionOrderQuery) QueryMaterialRequirements() *ProductionOrderMate
 			sqlgraph.From(productionorder.Table, productionorder.FieldID, selector),
 			sqlgraph.To(productionordermaterialrequirement.Table, productionordermaterialrequirement.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.MaterialRequirementsTable, productionorder.MaterialRequirementsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryOperations chains the current query on the "operations" edge.
+func (_q *ProductionOrderQuery) QueryOperations() *ProductionOrderOperationQuery {
+	query := (&ProductionOrderOperationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, selector),
+			sqlgraph.To(productionorderoperation.Table, productionorderoperation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.OperationsTable, productionorder.OperationsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryWipBatches chains the current query on the "wip_batches" edge.
+func (_q *ProductionOrderQuery) QueryWipBatches() *ProductionWIPBatchQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, selector),
+			sqlgraph.To(productionwipbatch.Table, productionwipbatch.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.WipBatchesTable, productionorder.WipBatchesColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryPackagingConfirmations chains the current query on the "packaging_confirmations" edge.
+func (_q *ProductionOrderQuery) QueryPackagingConfirmations() *ProductionPackagingConfirmationQuery {
+	query := (&ProductionPackagingConfirmationClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(productionorder.Table, productionorder.FieldID, selector),
+			sqlgraph.To(productionpackagingconfirmation.Table, productionpackagingconfirmation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, productionorder.PackagingConfirmationsTable, productionorder.PackagingConfirmationsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -411,18 +483,21 @@ func (_q *ProductionOrderQuery) Clone() *ProductionOrderQuery {
 		return nil
 	}
 	return &ProductionOrderQuery{
-		config:                   _q.config,
-		ctx:                      _q.ctx.Clone(),
-		order:                    append([]productionorder.OrderOption{}, _q.order...),
-		inters:                   append([]Interceptor{}, _q.inters...),
-		predicates:               append([]predicate.ProductionOrder{}, _q.predicates...),
-		withItems:                _q.withItems.Clone(),
-		withMaterialRequirements: _q.withMaterialRequirements.Clone(),
-		withEvents:               _q.withEvents.Clone(),
-		withCreator:              _q.withCreator.Clone(),
-		withReleaser:             _q.withReleaser.Clone(),
-		withCloser:               _q.withCloser.Clone(),
-		withCanceller:            _q.withCanceller.Clone(),
+		config:                     _q.config,
+		ctx:                        _q.ctx.Clone(),
+		order:                      append([]productionorder.OrderOption{}, _q.order...),
+		inters:                     append([]Interceptor{}, _q.inters...),
+		predicates:                 append([]predicate.ProductionOrder{}, _q.predicates...),
+		withItems:                  _q.withItems.Clone(),
+		withMaterialRequirements:   _q.withMaterialRequirements.Clone(),
+		withOperations:             _q.withOperations.Clone(),
+		withWipBatches:             _q.withWipBatches.Clone(),
+		withPackagingConfirmations: _q.withPackagingConfirmations.Clone(),
+		withEvents:                 _q.withEvents.Clone(),
+		withCreator:                _q.withCreator.Clone(),
+		withReleaser:               _q.withReleaser.Clone(),
+		withCloser:                 _q.withCloser.Clone(),
+		withCanceller:              _q.withCanceller.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -448,6 +523,39 @@ func (_q *ProductionOrderQuery) WithMaterialRequirements(opts ...func(*Productio
 		opt(query)
 	}
 	_q.withMaterialRequirements = query
+	return _q
+}
+
+// WithOperations tells the query-builder to eager-load the nodes that are connected to
+// the "operations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionOrderQuery) WithOperations(opts ...func(*ProductionOrderOperationQuery)) *ProductionOrderQuery {
+	query := (&ProductionOrderOperationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withOperations = query
+	return _q
+}
+
+// WithWipBatches tells the query-builder to eager-load the nodes that are connected to
+// the "wip_batches" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionOrderQuery) WithWipBatches(opts ...func(*ProductionWIPBatchQuery)) *ProductionOrderQuery {
+	query := (&ProductionWIPBatchClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withWipBatches = query
+	return _q
+}
+
+// WithPackagingConfirmations tells the query-builder to eager-load the nodes that are connected to
+// the "packaging_confirmations" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *ProductionOrderQuery) WithPackagingConfirmations(opts ...func(*ProductionPackagingConfirmationQuery)) *ProductionOrderQuery {
+	query := (&ProductionPackagingConfirmationClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withPackagingConfirmations = query
 	return _q
 }
 
@@ -584,9 +692,12 @@ func (_q *ProductionOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	var (
 		nodes       = []*ProductionOrder{}
 		_spec       = _q.querySpec()
-		loadedTypes = [7]bool{
+		loadedTypes = [10]bool{
 			_q.withItems != nil,
 			_q.withMaterialRequirements != nil,
+			_q.withOperations != nil,
+			_q.withWipBatches != nil,
+			_q.withPackagingConfirmations != nil,
 			_q.withEvents != nil,
 			_q.withCreator != nil,
 			_q.withReleaser != nil,
@@ -624,6 +735,31 @@ func (_q *ProductionOrderQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 			func(n *ProductionOrder) { n.Edges.MaterialRequirements = []*ProductionOrderMaterialRequirement{} },
 			func(n *ProductionOrder, e *ProductionOrderMaterialRequirement) {
 				n.Edges.MaterialRequirements = append(n.Edges.MaterialRequirements, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withOperations; query != nil {
+		if err := _q.loadOperations(ctx, query, nodes,
+			func(n *ProductionOrder) { n.Edges.Operations = []*ProductionOrderOperation{} },
+			func(n *ProductionOrder, e *ProductionOrderOperation) {
+				n.Edges.Operations = append(n.Edges.Operations, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withWipBatches; query != nil {
+		if err := _q.loadWipBatches(ctx, query, nodes,
+			func(n *ProductionOrder) { n.Edges.WipBatches = []*ProductionWIPBatch{} },
+			func(n *ProductionOrder, e *ProductionWIPBatch) { n.Edges.WipBatches = append(n.Edges.WipBatches, e) }); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withPackagingConfirmations; query != nil {
+		if err := _q.loadPackagingConfirmations(ctx, query, nodes,
+			func(n *ProductionOrder) { n.Edges.PackagingConfirmations = []*ProductionPackagingConfirmation{} },
+			func(n *ProductionOrder, e *ProductionPackagingConfirmation) {
+				n.Edges.PackagingConfirmations = append(n.Edges.PackagingConfirmations, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -707,6 +843,96 @@ func (_q *ProductionOrderQuery) loadMaterialRequirements(ctx context.Context, qu
 	}
 	query.Where(predicate.ProductionOrderMaterialRequirement(func(s *sql.Selector) {
 		s.Where(sql.InValues(s.C(productionorder.MaterialRequirementsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductionOrderID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "production_order_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductionOrderQuery) loadOperations(ctx context.Context, query *ProductionOrderOperationQuery, nodes []*ProductionOrder, init func(*ProductionOrder), assign func(*ProductionOrder, *ProductionOrderOperation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionOrder)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionorderoperation.FieldProductionOrderID)
+	}
+	query.Where(predicate.ProductionOrderOperation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionorder.OperationsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductionOrderID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "production_order_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductionOrderQuery) loadWipBatches(ctx context.Context, query *ProductionWIPBatchQuery, nodes []*ProductionOrder, init func(*ProductionOrder), assign func(*ProductionOrder, *ProductionWIPBatch)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionOrder)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionwipbatch.FieldProductionOrderID)
+	}
+	query.Where(predicate.ProductionWIPBatch(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionorder.WipBatchesColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ProductionOrderID
+		node, ok := nodeids[fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "production_order_id" returned %v for node %v`, fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *ProductionOrderQuery) loadPackagingConfirmations(ctx context.Context, query *ProductionPackagingConfirmationQuery, nodes []*ProductionOrder, init func(*ProductionOrder), assign func(*ProductionOrder, *ProductionPackagingConfirmation)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*ProductionOrder)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(productionpackagingconfirmation.FieldProductionOrderID)
+	}
+	query.Where(predicate.ProductionPackagingConfirmation(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(productionorder.PackagingConfirmationsColumn), fks...))
 	}))
 	neighbors, err := query.All(ctx)
 	if err != nil {

@@ -126,6 +126,11 @@ func MaterialNameSnapshot(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldMaterialNameSnapshot, v))
 }
 
+// ProcessingItem applies equality check predicate on the "processing_item" field. It's identical to ProcessingItemEQ.
+func ProcessingItem(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProcessingItem, v))
+}
+
 // ProcessNameSnapshot applies equality check predicate on the "process_name_snapshot" field. It's identical to ProcessNameSnapshotEQ.
 func ProcessNameSnapshot(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProcessNameSnapshot, v))
@@ -884,6 +889,81 @@ func MaterialNameSnapshotEqualFold(v string) predicate.OutsourcingOrderItem {
 // MaterialNameSnapshotContainsFold applies the ContainsFold predicate on the "material_name_snapshot" field.
 func MaterialNameSnapshotContainsFold(v string) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldMaterialNameSnapshot, v))
+}
+
+// ProcessingItemEQ applies the EQ predicate on the "processing_item" field.
+func ProcessingItemEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEQ(FieldProcessingItem, v))
+}
+
+// ProcessingItemNEQ applies the NEQ predicate on the "processing_item" field.
+func ProcessingItemNEQ(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNEQ(FieldProcessingItem, v))
+}
+
+// ProcessingItemIn applies the In predicate on the "processing_item" field.
+func ProcessingItemIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIn(FieldProcessingItem, vs...))
+}
+
+// ProcessingItemNotIn applies the NotIn predicate on the "processing_item" field.
+func ProcessingItemNotIn(vs ...string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotIn(FieldProcessingItem, vs...))
+}
+
+// ProcessingItemGT applies the GT predicate on the "processing_item" field.
+func ProcessingItemGT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGT(FieldProcessingItem, v))
+}
+
+// ProcessingItemGTE applies the GTE predicate on the "processing_item" field.
+func ProcessingItemGTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldGTE(FieldProcessingItem, v))
+}
+
+// ProcessingItemLT applies the LT predicate on the "processing_item" field.
+func ProcessingItemLT(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLT(FieldProcessingItem, v))
+}
+
+// ProcessingItemLTE applies the LTE predicate on the "processing_item" field.
+func ProcessingItemLTE(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldLTE(FieldProcessingItem, v))
+}
+
+// ProcessingItemContains applies the Contains predicate on the "processing_item" field.
+func ProcessingItemContains(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContains(FieldProcessingItem, v))
+}
+
+// ProcessingItemHasPrefix applies the HasPrefix predicate on the "processing_item" field.
+func ProcessingItemHasPrefix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasPrefix(FieldProcessingItem, v))
+}
+
+// ProcessingItemHasSuffix applies the HasSuffix predicate on the "processing_item" field.
+func ProcessingItemHasSuffix(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldHasSuffix(FieldProcessingItem, v))
+}
+
+// ProcessingItemIsNil applies the IsNil predicate on the "processing_item" field.
+func ProcessingItemIsNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldIsNull(FieldProcessingItem))
+}
+
+// ProcessingItemNotNil applies the NotNil predicate on the "processing_item" field.
+func ProcessingItemNotNil() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldNotNull(FieldProcessingItem))
+}
+
+// ProcessingItemEqualFold applies the EqualFold predicate on the "processing_item" field.
+func ProcessingItemEqualFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldEqualFold(FieldProcessingItem, v))
+}
+
+// ProcessingItemContainsFold applies the ContainsFold predicate on the "processing_item" field.
+func ProcessingItemContainsFold(v string) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(sql.FieldContainsFold(FieldProcessingItem, v))
 }
 
 // ProcessNameSnapshotEQ applies the EQ predicate on the "process_name_snapshot" field.
@@ -1651,6 +1731,29 @@ func HasUnit() predicate.OutsourcingOrderItem {
 func HasUnitWith(preds ...predicate.Unit) predicate.OutsourcingOrderItem {
 	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
 		step := newUnitStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductionWipOutsourcingAllocations applies the HasEdge predicate on the "production_wip_outsourcing_allocations" edge.
+func HasProductionWipOutsourcingAllocations() predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, ProductionWipOutsourcingAllocationsTable, ProductionWipOutsourcingAllocationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductionWipOutsourcingAllocationsWith applies the HasEdge predicate on the "production_wip_outsourcing_allocations" edge with a given conditions (other predicates).
+func HasProductionWipOutsourcingAllocationsWith(preds ...predicate.ProductionWIPOutsourcingAllocation) predicate.OutsourcingOrderItem {
+	return predicate.OutsourcingOrderItem(func(s *sql.Selector) {
+		step := newProductionWipOutsourcingAllocationsStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

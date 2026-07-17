@@ -96,6 +96,16 @@ func BomHeaderID(v int) predicate.ProductionOrderItem {
 	return predicate.ProductionOrderItem(sql.FieldEQ(FieldBomHeaderID, v))
 }
 
+// RouteCode applies equality check predicate on the "route_code" field. It's identical to RouteCodeEQ.
+func RouteCode(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldEQ(FieldRouteCode, v))
+}
+
+// CustomerInspectionRequired applies equality check predicate on the "customer_inspection_required" field. It's identical to CustomerInspectionRequiredEQ.
+func CustomerInspectionRequired(v bool) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldEQ(FieldCustomerInspectionRequired, v))
+}
+
 // ProductCodeSnapshot applies equality check predicate on the "product_code_snapshot" field. It's identical to ProductCodeSnapshotEQ.
 func ProductCodeSnapshot(v string) predicate.ProductionOrderItem {
 	return predicate.ProductionOrderItem(sql.FieldEQ(FieldProductCodeSnapshot, v))
@@ -364,6 +374,91 @@ func BomHeaderIDIsNil() predicate.ProductionOrderItem {
 // BomHeaderIDNotNil applies the NotNil predicate on the "bom_header_id" field.
 func BomHeaderIDNotNil() predicate.ProductionOrderItem {
 	return predicate.ProductionOrderItem(sql.FieldNotNull(FieldBomHeaderID))
+}
+
+// RouteCodeEQ applies the EQ predicate on the "route_code" field.
+func RouteCodeEQ(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldEQ(FieldRouteCode, v))
+}
+
+// RouteCodeNEQ applies the NEQ predicate on the "route_code" field.
+func RouteCodeNEQ(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldNEQ(FieldRouteCode, v))
+}
+
+// RouteCodeIn applies the In predicate on the "route_code" field.
+func RouteCodeIn(vs ...string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldIn(FieldRouteCode, vs...))
+}
+
+// RouteCodeNotIn applies the NotIn predicate on the "route_code" field.
+func RouteCodeNotIn(vs ...string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldNotIn(FieldRouteCode, vs...))
+}
+
+// RouteCodeGT applies the GT predicate on the "route_code" field.
+func RouteCodeGT(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldGT(FieldRouteCode, v))
+}
+
+// RouteCodeGTE applies the GTE predicate on the "route_code" field.
+func RouteCodeGTE(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldGTE(FieldRouteCode, v))
+}
+
+// RouteCodeLT applies the LT predicate on the "route_code" field.
+func RouteCodeLT(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldLT(FieldRouteCode, v))
+}
+
+// RouteCodeLTE applies the LTE predicate on the "route_code" field.
+func RouteCodeLTE(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldLTE(FieldRouteCode, v))
+}
+
+// RouteCodeContains applies the Contains predicate on the "route_code" field.
+func RouteCodeContains(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldContains(FieldRouteCode, v))
+}
+
+// RouteCodeHasPrefix applies the HasPrefix predicate on the "route_code" field.
+func RouteCodeHasPrefix(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldHasPrefix(FieldRouteCode, v))
+}
+
+// RouteCodeHasSuffix applies the HasSuffix predicate on the "route_code" field.
+func RouteCodeHasSuffix(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldHasSuffix(FieldRouteCode, v))
+}
+
+// RouteCodeIsNil applies the IsNil predicate on the "route_code" field.
+func RouteCodeIsNil() predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldIsNull(FieldRouteCode))
+}
+
+// RouteCodeNotNil applies the NotNil predicate on the "route_code" field.
+func RouteCodeNotNil() predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldNotNull(FieldRouteCode))
+}
+
+// RouteCodeEqualFold applies the EqualFold predicate on the "route_code" field.
+func RouteCodeEqualFold(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldEqualFold(FieldRouteCode, v))
+}
+
+// RouteCodeContainsFold applies the ContainsFold predicate on the "route_code" field.
+func RouteCodeContainsFold(v string) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldContainsFold(FieldRouteCode, v))
+}
+
+// CustomerInspectionRequiredEQ applies the EQ predicate on the "customer_inspection_required" field.
+func CustomerInspectionRequiredEQ(v bool) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldEQ(FieldCustomerInspectionRequired, v))
+}
+
+// CustomerInspectionRequiredNEQ applies the NEQ predicate on the "customer_inspection_required" field.
+func CustomerInspectionRequiredNEQ(v bool) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(sql.FieldNEQ(FieldCustomerInspectionRequired, v))
 }
 
 // ProductCodeSnapshotEQ applies the EQ predicate on the "product_code_snapshot" field.
@@ -934,6 +1029,75 @@ func HasMaterialRequirements() predicate.ProductionOrderItem {
 func HasMaterialRequirementsWith(preds ...predicate.ProductionOrderMaterialRequirement) predicate.ProductionOrderItem {
 	return predicate.ProductionOrderItem(func(s *sql.Selector) {
 		step := newMaterialRequirementsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasOperations applies the HasEdge predicate on the "operations" edge.
+func HasOperations() predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, OperationsTable, OperationsColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasOperationsWith applies the HasEdge predicate on the "operations" edge with a given conditions (other predicates).
+func HasOperationsWith(preds ...predicate.ProductionOrderOperation) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := newOperationsStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasWipBatches applies the HasEdge predicate on the "wip_batches" edge.
+func HasWipBatches() predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, WipBatchesTable, WipBatchesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasWipBatchesWith applies the HasEdge predicate on the "wip_batches" edge with a given conditions (other predicates).
+func HasWipBatchesWith(preds ...predicate.ProductionWIPBatch) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := newWipBatchesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasPackagingConfirmation applies the HasEdge predicate on the "packaging_confirmation" edge.
+func HasPackagingConfirmation() predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2O, false, PackagingConfirmationTable, PackagingConfirmationColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasPackagingConfirmationWith applies the HasEdge predicate on the "packaging_confirmation" edge with a given conditions (other predicates).
+func HasPackagingConfirmationWith(preds ...predicate.ProductionPackagingConfirmation) predicate.ProductionOrderItem {
+	return predicate.ProductionOrderItem(func(s *sql.Selector) {
+		step := newPackagingConfirmationStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

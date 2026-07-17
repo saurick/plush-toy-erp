@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/outsourcingorder"
+	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/supplier"
@@ -59,6 +60,20 @@ func (_c *SupplierCreate) SetSupplierType(v string) *SupplierCreate {
 func (_c *SupplierCreate) SetNillableSupplierType(v *string) *SupplierCreate {
 	if v != nil {
 		_c.SetSupplierType(*v)
+	}
+	return _c
+}
+
+// SetAddress sets the "address" field.
+func (_c *SupplierCreate) SetAddress(v string) *SupplierCreate {
+	_c.mutation.SetAddress(v)
+	return _c
+}
+
+// SetNillableAddress sets the "address" field if the given value is not nil.
+func (_c *SupplierCreate) SetNillableAddress(v *string) *SupplierCreate {
+	if v != nil {
+		_c.SetAddress(*v)
 	}
 	return _c
 }
@@ -178,6 +193,21 @@ func (_c *SupplierCreate) AddOutsourcingOrders(v ...*OutsourcingOrder) *Supplier
 	return _c.AddOutsourcingOrderIDs(ids...)
 }
 
+// AddProcessCapabilityIDs adds the "process_capabilities" edge to the Process entity by IDs.
+func (_c *SupplierCreate) AddProcessCapabilityIDs(ids ...int) *SupplierCreate {
+	_c.mutation.AddProcessCapabilityIDs(ids...)
+	return _c
+}
+
+// AddProcessCapabilities adds the "process_capabilities" edges to the Process entity.
+func (_c *SupplierCreate) AddProcessCapabilities(v ...*Process) *SupplierCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddProcessCapabilityIDs(ids...)
+}
+
 // Mutation returns the SupplierMutation object of the builder.
 func (_c *SupplierCreate) Mutation() *SupplierMutation {
 	return _c.mutation
@@ -255,6 +285,11 @@ func (_c *SupplierCreate) check() error {
 			return &ValidationError{Name: "supplier_type", err: fmt.Errorf(`ent: validator failed for field "Supplier.supplier_type": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.Address(); ok {
+		if err := supplier.AddressValidator(v); err != nil {
+			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "Supplier.address": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.TaxNo(); ok {
 		if err := supplier.TaxNoValidator(v); err != nil {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Supplier.tax_no": %w`, err)}
@@ -315,6 +350,10 @@ func (_c *SupplierCreate) createSpec() (*Supplier, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.SupplierType(); ok {
 		_spec.SetField(supplier.FieldSupplierType, field.TypeString, value)
 		_node.SupplierType = &value
+	}
+	if value, ok := _c.mutation.Address(); ok {
+		_spec.SetField(supplier.FieldAddress, field.TypeString, value)
+		_node.Address = &value
 	}
 	if value, ok := _c.mutation.TaxNo(); ok {
 		_spec.SetField(supplier.FieldTaxNo, field.TypeString, value)
@@ -377,6 +416,22 @@ func (_c *SupplierCreate) createSpec() (*Supplier, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ProcessCapabilitiesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   supplier.ProcessCapabilitiesTable,
+			Columns: supplier.ProcessCapabilitiesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(process.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

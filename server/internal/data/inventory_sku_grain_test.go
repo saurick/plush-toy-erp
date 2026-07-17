@@ -239,6 +239,7 @@ func TestShipmentAndReservationUseExactSKUAvailability(t *testing.T) {
 		if err != nil {
 			return nil, err
 		}
+		submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 		return operationalUC.ShipShipment(ctx, shipment.ID)
 	}
 	if _, err := ship("SHIP-SKU-B", &skuB.ID, 5); err != nil {

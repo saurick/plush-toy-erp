@@ -39,6 +39,13 @@ test('product SKU reference loading uses complete 200-row pagination', () => {
   )
 })
 
+test('confirmed outsourcing candidate loading uses complete strict pagination', () => {
+  assert.match(
+    source,
+    /export async function listAllOutsourcingOrders\([\s\S]*?listAllPaginatedRecords\(\s*listOutsourcingOrders,\s*params,\s*'outsourcing_orders'/u
+  )
+})
+
 function sourceDocumentItems(start, count) {
   return Array.from({ length: count }, (_unused, index) => ({
     id: start + index,

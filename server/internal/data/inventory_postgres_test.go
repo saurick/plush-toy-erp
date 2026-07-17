@@ -96,6 +96,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create postgres weighted shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, created.ID)
 	shipped, err := repo.ShipShipment(ctx, created.ID)
 	if err != nil {
 		t.Fatalf("ship postgres weighted shipment: %v", err)
@@ -153,6 +154,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create postgres manual-weight shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, incomplete.ID)
 	incomplete, err = repo.ShipShipment(ctx, incomplete.ID)
 	if err != nil {
 		t.Fatalf("ship postgres manual-weight shipment: %v", err)
@@ -175,6 +177,7 @@ func TestOperationalFactPostgresShipmentNetWeightFreeze(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create postgres rollback shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, rejected.ID)
 	if _, err := repo.ShipShipment(ctx, rejected.ID); !errors.Is(err, biz.ErrInventoryInsufficientStock) {
 		t.Fatalf("ship postgres rollback shipment error = %v, want ErrInventoryInsufficientStock", err)
 	}
@@ -821,6 +824,7 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 		if err != nil {
 			t.Fatalf("create postgres shipment %d failed: %v", index, err)
 		}
+		submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, created.ID)
 		shipmentIDs = append(shipmentIDs, created.ID)
 	}
 
@@ -1002,6 +1006,7 @@ func TestOperationalFactPostgresConcurrentReservationReleaseAndShipmentPreserveR
 	if err != nil {
 		t.Fatalf("create postgres shipment failed: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipmentRow.ID)
 
 	releaseTx, err := data.sqldb.BeginTx(ctx, nil)
 	if err != nil {
@@ -1095,6 +1100,7 @@ func TestOperationalFactPostgresShipmentRejectsRemainingReservationAcrossInvento
 	if err != nil {
 		t.Fatalf("create postgres cross-grain shipment failed: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipmentRow.ID)
 	if _, err := operationalUC.ShipShipment(ctx, shipmentRow.ID); !errors.Is(err, biz.ErrShipmentQuantityExceeded) {
 		t.Fatalf("postgres cross-grain shipment error = %v, want ErrShipmentQuantityExceeded", err)
 	}

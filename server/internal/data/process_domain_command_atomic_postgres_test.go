@@ -324,6 +324,7 @@ func TestInventoryPostgresShipmentProcessCommandRollsBackSKUInventoryOnResultCon
 	if err != nil {
 		t.Fatalf("create exact SKU shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipmentRow.ID)
 	payload := map[string]any{"shipment_id": shipmentRow.ID}
 	command := claimedPostgresProcessCommandForBusinessRef(
 		t, ctx, processRepo, biz.ProcessDomainCommandShipmentShip,
@@ -421,9 +422,12 @@ func TestInventoryPostgresQualityProcessCommandRollsBackDecisionOnResultConflict
 	if inspection.Status != biz.QualityInspectionStatusSubmitted {
 		t.Fatalf("quality fixture status=%s, want SUBMITTED", inspection.Status)
 	}
+	defectRateOperator := biz.QualityInspectionDefectRateOperatorApprox
+	defectRatePercent := decimal.NewFromInt(5)
 	payload := map[string]any{
 		"shipment_id": shipmentRow.ID, "quality_inspection_id": inspection.ID,
 		"finished_goods_lot_id": lot.ID, "result": biz.QualityInspectionResultPass,
+		"defect_rate_operator": defectRateOperator, "defect_rate_percent": defectRatePercent.String(),
 	}
 	command := claimedPostgresProcessCommandForBusinessRef(
 		t, ctx, processRepo, biz.ProcessDomainCommandFinishedGoodsQualityDecide,
@@ -434,6 +438,7 @@ func TestInventoryPostgresQualityProcessCommandRollsBackDecisionOnResultConflict
 	decision := &biz.QualityInspectionDecision{
 		InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
 		InspectedAt: time.Now().UTC().Truncate(time.Microsecond), InspectorID: &inspectorID,
+		DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 		DecisionNote: stringPtr("atomic result conflict"),
 	}
 	result := &biz.ProcessDomainCommandResult{
@@ -447,7 +452,7 @@ func TestInventoryPostgresQualityProcessCommandRollsBackDecisionOnResultConflict
 
 	inspectionAfter, err := inventoryUC.GetQualityInspection(ctx, inspection.ID)
 	if err != nil || inspectionAfter.Status != biz.QualityInspectionStatusSubmitted || inspectionAfter.Result != nil ||
-		inspectionAfter.InspectedAt != nil || inspectionAfter.InspectorID != nil || inspectionAfter.DecisionNote != nil {
+		inspectionAfter.InspectedAt != nil || inspectionAfter.InspectorID != nil || inspectionAfter.DefectRateOperator != nil || inspectionAfter.DefectRatePercent != nil || inspectionAfter.DecisionNote != nil {
 		t.Fatalf("quality decision must roll back, inspection=%#v err=%v", inspectionAfter, err)
 	}
 	lotAfter, err := inventoryUC.GetInventoryLot(ctx, lot.ID)
@@ -500,9 +505,12 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 	if err != nil {
 		t.Fatalf("submit concurrent quality inspection: %v", err)
 	}
+	defectRateOperator := biz.QualityInspectionDefectRateOperatorApprox
+	defectRatePercent := decimal.NewFromInt(5)
 	payload := map[string]any{
 		"shipment_id": shipmentRow.ID, "quality_inspection_id": inspection.ID,
 		"finished_goods_lot_id": lot.ID, "result": biz.QualityInspectionResultPass,
+		"defect_rate_operator": defectRateOperator, "defect_rate_percent": defectRatePercent.String(),
 	}
 	command := claimedPostgresProcessCommandForBusinessRef(
 		t, ctx, processRepo, biz.ProcessDomainCommandFinishedGoodsQualityDecide,
@@ -519,10 +527,12 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 		{
 			InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
 			InspectedAt: firstTime, InspectedAtDefaulted: true, InspectorID: &inspectorID,
+			DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 		},
 		{
 			InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
 			InspectedAt: firstTime.Add(time.Second), InspectedAtDefaulted: true, InspectorID: &inspectorID,
+			DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 		},
 	}
 	start := make(chan struct{})
@@ -568,6 +578,7 @@ func TestInventoryPostgresConcurrentQualityProcessCommandDefaultedTimesConverge(
 	explicitMismatch := &biz.QualityInspectionDecision{
 		InspectionID: inspection.ID, Result: biz.QualityInspectionResultPass,
 		InspectedAt: firstTime.Add(2 * time.Second), InspectorID: &inspectorID,
+		DefectRateOperator: &defectRateOperator, DefectRatePercent: &defectRatePercent,
 	}
 	if _, err := inventoryRepo.PassQualityInspectionForProcessCommand(ctx, explicitMismatch, command, result, inspectorID); !errors.Is(err, biz.ErrIdempotencyConflict) {
 		t.Fatalf("explicit inspected_at mismatch must remain strict, got %v", err)

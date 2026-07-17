@@ -42,6 +42,8 @@ const (
 	FieldMaterialCodeSnapshot = "material_code_snapshot"
 	// FieldMaterialNameSnapshot holds the string denoting the material_name_snapshot field in the database.
 	FieldMaterialNameSnapshot = "material_name_snapshot"
+	// FieldProcessingItem holds the string denoting the processing_item field in the database.
+	FieldProcessingItem = "processing_item"
 	// FieldProcessNameSnapshot holds the string denoting the process_name_snapshot field in the database.
 	FieldProcessNameSnapshot = "process_name_snapshot"
 	// FieldProcessCategorySnapshot holds the string denoting the process_category_snapshot field in the database.
@@ -76,6 +78,8 @@ const (
 	EdgeProcess = "process"
 	// EdgeUnit holds the string denoting the unit edge name in mutations.
 	EdgeUnit = "unit"
+	// EdgeProductionWipOutsourcingAllocations holds the string denoting the production_wip_outsourcing_allocations edge name in mutations.
+	EdgeProductionWipOutsourcingAllocations = "production_wip_outsourcing_allocations"
 	// Table holds the table name of the outsourcingorderitem in the database.
 	Table = "outsourcing_order_items"
 	// OutsourcingOrderTable is the table that holds the outsourcing_order relation/edge.
@@ -120,6 +124,13 @@ const (
 	UnitInverseTable = "units"
 	// UnitColumn is the table column denoting the unit relation/edge.
 	UnitColumn = "unit_id"
+	// ProductionWipOutsourcingAllocationsTable is the table that holds the production_wip_outsourcing_allocations relation/edge.
+	ProductionWipOutsourcingAllocationsTable = "production_wip_outsourcing_allocations"
+	// ProductionWipOutsourcingAllocationsInverseTable is the table name for the ProductionWIPOutsourcingAllocation entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipoutsourcingallocation" package.
+	ProductionWipOutsourcingAllocationsInverseTable = "production_wip_outsourcing_allocations"
+	// ProductionWipOutsourcingAllocationsColumn is the table column denoting the production_wip_outsourcing_allocations relation/edge.
+	ProductionWipOutsourcingAllocationsColumn = "outsourcing_order_item_id"
 )
 
 // Columns holds all SQL columns for outsourcingorderitem fields.
@@ -139,6 +150,7 @@ var Columns = []string{
 	FieldProductNameSnapshot,
 	FieldMaterialCodeSnapshot,
 	FieldMaterialNameSnapshot,
+	FieldProcessingItem,
 	FieldProcessNameSnapshot,
 	FieldProcessCategorySnapshot,
 	FieldUnitNameSnapshot,
@@ -191,6 +203,8 @@ var (
 	MaterialCodeSnapshotValidator func(string) error
 	// MaterialNameSnapshotValidator is a validator for the "material_name_snapshot" field. It is called by the builders before save.
 	MaterialNameSnapshotValidator func(string) error
+	// ProcessingItemValidator is a validator for the "processing_item" field. It is called by the builders before save.
+	ProcessingItemValidator func(string) error
 	// ProcessNameSnapshotValidator is a validator for the "process_name_snapshot" field. It is called by the builders before save.
 	ProcessNameSnapshotValidator func(string) error
 	// ProcessCategorySnapshotValidator is a validator for the "process_category_snapshot" field. It is called by the builders before save.
@@ -289,6 +303,11 @@ func ByMaterialNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldMaterialNameSnapshot, opts...).ToFunc()
 }
 
+// ByProcessingItem orders the results by the processing_item field.
+func ByProcessingItem(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProcessingItem, opts...).ToFunc()
+}
+
 // ByProcessNameSnapshot orders the results by the process_name_snapshot field.
 func ByProcessNameSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProcessNameSnapshot, opts...).ToFunc()
@@ -385,6 +404,20 @@ func ByUnitField(field string, opts ...sql.OrderTermOption) OrderOption {
 		sqlgraph.OrderByNeighborTerms(s, newUnitStep(), sql.OrderByField(field, opts...))
 	}
 }
+
+// ByProductionWipOutsourcingAllocationsCount orders the results by production_wip_outsourcing_allocations count.
+func ByProductionWipOutsourcingAllocationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newProductionWipOutsourcingAllocationsStep(), opts...)
+	}
+}
+
+// ByProductionWipOutsourcingAllocations orders the results by production_wip_outsourcing_allocations terms.
+func ByProductionWipOutsourcingAllocations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newProductionWipOutsourcingAllocationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
 func newOutsourcingOrderStep() *sqlgraph.Step {
 	return sqlgraph.NewStep(
 		sqlgraph.From(Table, FieldID),
@@ -425,5 +458,12 @@ func newUnitStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(UnitInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.M2O, true, UnitTable, UnitColumn),
+	)
+}
+func newProductionWipOutsourcingAllocationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ProductionWipOutsourcingAllocationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ProductionWipOutsourcingAllocationsTable, ProductionWipOutsourcingAllocationsColumn),
 	)
 }

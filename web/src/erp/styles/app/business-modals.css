@@ -120,10 +120,7 @@
   .erp-processing-contract-clauses__group,
   .erp-processing-contract-clauses__item,
   .erp-processing-contract-signature,
-  .erp-processing-contract-signature__block,
-  .erp-processing-contract-attachments,
-  .erp-processing-contract-attachments__item,
-  .erp-processing-contract-attachments__image {
+  .erp-processing-contract-signature__block {
     break-inside: avoid-page;
     page-break-inside: avoid;
   }

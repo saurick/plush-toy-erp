@@ -1,11 +1,14 @@
 # plush-toy-erp progress
 
 本文件只保留当前活跃事项、最近完成记录和归档索引；历史流水已归档到 `docs/archive/`。`progress.md` 是过程交接线索，不是正式需求、数据模型或部署真源。
+
 ## 当前活跃事项
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试。
-- 当前只收口上述真实缺口；不得回退其它已完成任务，也不把旧审查中的过期 / 超范围建议重新扩成产品功能。
-- 发布目标是内网测试机 `192.168.0.133`；低配目标只加载本地 fixed revision 构建产物、执行 migration、Compose 重启和部署后回归。
+- 三类 Workflow 来源任务与固定生产路线 / WIP 已完成同一 worktree 本地闭环，`full / strict`、隔离迁移和浏览器合同场景通过；仍待真实后端岗位浏览器读回、明确目标开发库后的 migration / backfill 预演与发布验收。
+- 公开 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 仍可创建无采购订单来源的入库草稿，继续作为独立来源边界治理项。
+- 当前共享 worktree 含大量其他会话改动；本轮保留并验证固定生产路线、WIP、质量、包装、完工入库及来源任务相关切片，不回退、不 stage，也不把共享整树全部改动归为本轮成果。
+- 发布目标是内网测试机 `192.168.0.133`；提交、推送、部署、migration / backfill apply、目标 smoke 与客户岗位验收均需独立授权和证据。
 
 ## 2026-07-16 Ent migration 会话收口与暂存门禁
 
@@ -33,35 +36,37 @@
 
 ## 2026-07-15 本地开发端口与并行启动治理
 
-完成：本仓新增受版本控制的 `config/dev-ports.env`，固定主前端 `5175`、HTTP `8300`、gRPC `9300`、Style L1 `6175`，并独占 `15200-15299` 作为短生命周期 AUX 段。Make、Vite、开发态 Go override、yoyoosun 入口、预览与浏览器脚本统一消费该真源；具体 dev 配置文件和 Kratos 支持的 dev 目录参数均能识别，主服务端口冲突直接失败，不再静默顺延。`dev_stop` 只停止 cwd 属于当前仓库的 listener，拒绝误杀其他项目。`full.sh` 只在 AUX 段探测空闲端口，并用原子 PID 锁串行化同一 worktree 的浏览器证据；活动锁和 stale lock 均 fail closed，只有实际 owner 的 EXIT 清理能移除本轮锁。
+完成：按甲方确认口径固化 `PLUSH_SEW_HAND_V1`：布料加工（仅委外）→ 裁片 WIP 质检 → 车缝（本厂 / 委外）→ 皮套 WIP 质检 → 手工（本厂 / 委外）→ 成品、针检、抽检及条件式客户验货 → 包材版面 / 版本确认 → 包装 WIP → 成品入库。车缝与手工分别由生产经理决策去向，允许同批拆分内部 / 委外子批；内部流转称“车间移交 / WIP 转移”，只有委外返回称“外发回仓”。
 
-完成：同级 7 个带 `make dev` 的仓库均已登记互不重叠的固定 bundle；`webapp-template` 提供创建时顺序分配与兄弟仓只读审计，新模板派生项目在初始化时取得下一组固定端口、同步 dev YAML fallback，并由 parity 门禁阻止正式文档复制端口数字，日常运行不自动漂移。短期 preview、测试和 dashboard 只能使用各自 AUX 段，OAuth callback、主前端和后端继续保持稳定 origin / callback。
+完成：BOM 与生产需求新增显式布料加工工序归属，禁止按名称或顺序猜测；WIP 与委外合同通过独立分配表关联。普通布料加工必须在同一已确认加工合同内完整覆盖显式布料需求，车缝 / 手工委外必须匹配产品、规格、工序、单位和子批数量；返工显式记录目标与数量。委外合同在仍有 WIP 分配或活跃批次时不能取消 / 关闭，生产订单存在活跃 WIP 时不能关闭。
 
-验证：兄弟仓审计检查 7 个 manifest 通过；本仓端口、CLI、门禁编排与锁行为定向测试 17 / 17，ShellCheck 与 Bash 语法检查通过。真实 Chromium 在 `15200` 自启当前 worktree，完成 `root-redirect-desktop` 1 / 1，并验证进程归属与 EXIT 后锁清理。最终 `bash scripts/qa/full.sh` 完整通过，包含脚本自动发现 1010 / 1010、Web 合同 195 / 195、Web 全量 1258 / 1258、server-all 2085 / 2085、关键 PostgreSQL、存量升级、production build、真实浏览器、Go build 与 govulncheck，全部 0 fail / 0 skip。首轮 full 曾因并行净重字段尚未生成 Ent 代码阻断；生成现场补齐后复跑全绿，未把首轮中间状态冒充最终结果。
+完成：生产工序质检仅接受 `PASSED + PASS`，让步结论不能放行；针检、抽检和条件式客户验货保持独立关口。包材外观 / 版面确认归业务动作，不冒充品质 IQC。完工上限以已验收包装 WIP 减已过账成品入库事实计算，使用 `numeric(20,6)` 等价精确数量算法；生产构建使用兼容 ES2018 的 BigInt 构造写法。
 
-下一步：各项目现有开发进程在下次重启后消费固定端口；部署与客户验收仍是独立交付步骤。
+完成：生产订单页接入路线初始化、拆批、内转 / 委外、质检阻断、返工、包装确认和完工上限；补齐生产、销售、品质、PMC 的 WIP 只读 / 执行权限与菜单投影。同步当前真源、能力台账、客户差异、API 和架构边界文档，并生成三页移动版正式报告 `output/pdf/plush_factory_formal_report_v4_mobile.pdf`，已逐页渲染检查。
 
-阻塞/风险：Git 收口范围仅限端口治理相关路径，共享工作树中的净重字段、migration、业务代码和页面改动保持未暂存；未部署或修改生产配置。固定端口解决跨项目抢占与误杀，不等于当前所有服务都已启动；AUX 端口只保证项目级隔离，单仓内并行消费者仍须通过分配器或门锁协调。
+验证：`make data` 完成且未产生额外 schema 漂移，Atlas migration `20260717035245`、`20260717043625` 已生成，`db-guard` 通过。最终 `bash scripts/qa/strict.sh` 全绿：前端全量 1450 / 1450、服务端全量 2279 / 2279，生产构建、隔离全量迁移及 populated-upgrade、PostgreSQL 并发 / 事务、扩展浏览器场景、lint / stylelint / shellcheck / shfmt / yamllint、密钥检查和 `govulncheck` 均通过。
 
-## 2026-07-15 密码登录精确提示部署收口
+未做 / 风险：上述 migration 未向共享开发库、测试库或生产库 apply；未执行目标环境部署、health / smoke、真实账号岗位读回或客户 UAT。甲方确认的是高层业务流程，不等于系统已发布或客户已验收。当前未 stage、commit、push 或 deploy。
 
-完成：commit `56ecf873` 已推送并以本地构建的 amd64 server/web 镜像加载到 `192.168.0.133`。目标应用数据库已显式核对为 `plush_erp_uat_20260715`，Atlas 为 75 / 75、pending 0；UAT 备份、镜像 digest、旧 release `929ec0b3` 回滚点均已保留。客户试用配置通过标准 validate / publish / activate / effective-session readback 升级到 v3，未直接写配置内容。`admin` 已设置新的生产强密码、撤销既有活动会话，密码只存 macOS Keychain；应用 JWT 签名密钥已轮换并同步当前与回滚 release。
+## 2026-07-17 三类 Workflow 任务接入真实业务生产者
 
-验证：新镜像冷启动、生产预检、health / ready、客户配置读取均通过，最终复核 server/web restart count 为 0、web healthy，公网 health 返回 `ok`。公网 API 已分别确认不存在账号返回 10001 / `账号不存在`、旧开发默认密码返回 10002 / `密码错误`、新密码返回业务码 0 且签发 token；真实 Chromium 页面确认前两类提示与 API 一致。完整操作证据见 `deployments/yoyoosun/evidence/releases/2026-07-15/deployment-operation-evidence.md`。
+完成：生产订单由 `DRAFT -> RELEASED` 同一事务生成 `production_scheduling` 任务、created event 与 `production_ready` 协同状态，责任岗位为 PMC；订单关闭必须排程任务已完成，已发布订单取消必须任务已完成或已退回，来源取消不伪造任务终态。只有真实发布动作能生成任务，试用任务改用 `trial_*` 组。
 
-下一步：由甲方使用实际岗位账号完成业务人工验收；账号所有者在阿里云控制台轮换短信 AccessKey 后，再更新目标环境密钥并复核短信登录。
+完成：只有 REWORK 生产事实从 `DRAFT -> POSTED` 时，才在同一库存 / 事实事务生成 `production_exception` 任务，异常原因取返工事实备注快照，责任岗位为生产；任务完成不代替返工、报废、库存调整或 Fact posted。已过账返工冲销要求异常任务先进入完成或退回终态，草稿返工取消不造任务。
 
-阻塞/风险：代码、制品、migration、客户试用配置、管理员密码登录和公网提示已闭环；正式客户签收尚未发生。阿里云 AccessKey 属于外部账号资源，本轮无法代替账号所有者完成控制台轮换，不得将其写成已处置。
+完成：草稿出货单新增“提交出货放行”，在锁定出货单、校验明细和可选成品质检结果后生成 `shipment_release` 任务，责任岗位为仓库。任务完成只写 `shipping_released` 协同状态，不确认出货、不扣库存、不生成应收 / 发票；实际出货路径要求放行任务已完成。提交放行后不再允许补造出货前质检，避免放行快照之后改变检验集合。
 
-## 2026-07-15 密码登录错误精确化
+完成：来源对象终态与任务结论保持分离。排程 / 异常任务完成只推进协同投影，不代替生产事实；生产订单关闭 / 取消、返工事实取消会在同一事务核对精确来源任务并推进来源投影。出货草稿无任务可直接取消且不写库存，存在进行中放行任务时拒绝，任务已完成 / 退回时保留任务结论再取消；只有已出货取消才写库存冲正。ProcessRuntime 的 `shipment.ship` 同样要求 `workflow_tasks` 模块，不能绕过普通 API 放行门禁。
 
-完成：线上只读复现确认 `admin.yoyoosun.net` 服务健康，`admin` 使用本地开发默认密码登录失败的内部原因为 `password_invalid`；生产账号不继承本地开发默认密码，且启动不会覆盖已有账号密码。密码登录现按账号不存在、密码错误、账号停用、账号注销和核验期间账号信息变化返回独立错误码与岗位语言提示；短信登录继续保留防手机号枚举合同。未重置或读取线上真实密码，未改目标数据库、配置、账号或会话。
+完成：三类任务统一使用 `workflow.source-task/v1`、确定性 task code、producer 和 intent hash；同意图重放返回原任务，不同意图冲突并回滚。公开 `workflow.create_task`、ProcessRuntime 显式 / 默认任务、客户流程配置、seed、mock 和试用数据均拒绝三个保留任务组与编号前缀。PMC / 生产岗位补齐来源任务退回权限，后端仍校验 owner / assignee、责任池和客户 scope。前端补齐生产订单发布、返工过账和出货提交的岗位文案、严格响应校验、精确来源跳转、任务标签、页面血缘，以及 yoyoosun PMC 的生产订单菜单投影；没有恢复通用“新建任务 / 新建事实”。
 
-验证：当前 13 文件影响面按 T0-T5 执行 `bash scripts/qa/affected.sh --run` 全部通过：docs inventory 3 / 3，server domain、server-all、server API / JSON-RPC 三组均通过，Web 全量 1255 / 1255、lint、场景语法和 `git diff --check` 通过；错误码生成 / 同步门禁通过。`admin-login-password-errors-desktop` 真实 Chromium 场景 1 / 1 通过，依次核对账号不存在、密码错误、账号停用、账号注销和账号信息变化五种提示，并确认最长提示无截断或布局溢出；`admin-login-mobile` 默认态也已生成本轮基线截图。
+完成：新增 `backfill-workflow-source-tasks` 受控修复命令，默认事务 dry-run，apply 必须确认精确数据库名；只补当前 `RELEASED` 生产订单和当前 `POSTED REWORK` 返工事实，不回补 `DRAFT` 出货单，不猜测历史任务终态，遇到意图冲突或任务包不完整时整批失败。
 
-下一步：如需上线，先收敛当前工作树并绑定 commit / image 执行正式发布，再在目标环境验证五类密码登录拒绝态；如需恢复 `admin` 登录，应通过受控密码重置设置新的生产强密码，不能使用 `adminadmin`。
+验证：后端 `go test ./internal/biz -count=1`、`./internal/data -count=1`、`./internal/service -count=1`、`./internal/core/status -count=1` 与 `./cmd/backfill-workflow-source-tasks -count=1` 通过。来源任务 / 页面血缘前端 Node 69 / 69 通过；行业模板、文档清单、试用数据隔离和 yoyoosun 角色闭环 Node 76 / 76 通过。`shipment-release-source-handoff-desktop` 本地 Style L1 真实渲染 1 / 1 通过，并人工核对来源出货页和伪造合同 fail-closed 截图；当前运行 Node v26.5.0 与项目要求 Node 24.14.x 不同，命令有 engine warning，不能替代目标运行时证据。
 
-阻塞/风险：精确的账号不存在提示允许公开调用方枚举账号；当前只有服务级 BBR 限流，尚无按账号 fingerprint 与可信来源共享的密码登录限速。本轮未提交、推送、部署或执行线上密码重置，当前公网页面仍保持旧的合并提示。
+下一步：用真实本地后端执行生产订单下达、返工过账、出货提交 / 放行 / 出货 / 取消的浏览器与数据库读回；在确认目标开发库后先跑 backfill dry-run，不自动 apply。当前同一 worktree 的 `db-guard`、`full / strict` 已通过；精确提交推送、目标环境 health / smoke 和客户岗位验收仍是后续独立关口。
+
+阻塞/风险：当前没有本切片代码级阻塞；来源任务本身未新增 schema / migration，固定生产路线 / WIP 的 Ent 与 Atlas migration 已生成并通过隔离迁移和整树严格门禁，但未向共享开发库或任何目标环境 apply。真实后端浏览器、开发库 backfill / migration apply、目标环境 health / smoke 和客户验收均未执行。未 stage、commit、push 或 deploy。
 
 ## 归档索引
 

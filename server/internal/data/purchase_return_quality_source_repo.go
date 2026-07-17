@@ -48,6 +48,7 @@ func (r *inventoryRepo) CreatePurchaseReturnFromQualityInspection(
 		return nil, biz.ErrPurchaseReturnQualitySourceState
 	}
 	if inspection.PurchaseReceiptID == nil || inspection.PurchaseReceiptItemID == nil || inspection.MaterialID == nil ||
+		inspection.InventoryLotID == nil || inspection.WarehouseID == nil ||
 		*inspection.PurchaseReceiptID != receiptID ||
 		inspection.SourceType == nil || *inspection.SourceType != biz.QualityInspectionSourcePurchaseReceipt ||
 		inspection.SourceID == nil || *inspection.SourceID != *inspection.PurchaseReceiptID ||
@@ -77,11 +78,11 @@ func (r *inventoryRepo) CreatePurchaseReturnFromQualityInspection(
 		}
 		return nil, err
 	}
-	if item.ReceiptID != receipt.ID || item.MaterialID != *inspection.MaterialID || item.WarehouseID != inspection.WarehouseID ||
-		item.LotID == nil || *item.LotID != inspection.InventoryLotID {
+	if item.ReceiptID != receipt.ID || item.MaterialID != *inspection.MaterialID || item.WarehouseID != *inspection.WarehouseID ||
+		item.LotID == nil || *item.LotID != *inspection.InventoryLotID {
 		return nil, biz.ErrPurchaseReturnQualitySourceInvalid
 	}
-	lot, err := tx.client.InventoryLot.Get(ctx, inspection.InventoryLotID)
+	lot, err := tx.client.InventoryLot.Get(ctx, *inspection.InventoryLotID)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrInventoryLotNotFound

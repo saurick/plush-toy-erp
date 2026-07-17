@@ -52,6 +52,8 @@ type OutsourcingOrderItem struct {
 	MaterialCodeSnapshot *string `json:"material_code_snapshot,omitempty"`
 	// MaterialNameSnapshot holds the value of the "material_name_snapshot" field.
 	MaterialNameSnapshot *string `json:"material_name_snapshot,omitempty"`
+	// ProcessingItem holds the value of the "processing_item" field.
+	ProcessingItem *string `json:"processing_item,omitempty"`
 	// ProcessNameSnapshot holds the value of the "process_name_snapshot" field.
 	ProcessNameSnapshot *string `json:"process_name_snapshot,omitempty"`
 	// ProcessCategorySnapshot holds the value of the "process_category_snapshot" field.
@@ -94,9 +96,11 @@ type OutsourcingOrderItemEdges struct {
 	Process *Process `json:"process,omitempty"`
 	// Unit holds the value of the unit edge.
 	Unit *Unit `json:"unit,omitempty"`
+	// ProductionWipOutsourcingAllocations holds the value of the production_wip_outsourcing_allocations edge.
+	ProductionWipOutsourcingAllocations []*ProductionWIPOutsourcingAllocation `json:"production_wip_outsourcing_allocations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [7]bool
 }
 
 // OutsourcingOrderOrErr returns the OutsourcingOrder value or an error if the edge
@@ -165,6 +169,15 @@ func (e OutsourcingOrderItemEdges) UnitOrErr() (*Unit, error) {
 	return nil, &NotLoadedError{edge: "unit"}
 }
 
+// ProductionWipOutsourcingAllocationsOrErr returns the ProductionWipOutsourcingAllocations value or an error if the edge
+// was not loaded in eager-loading.
+func (e OutsourcingOrderItemEdges) ProductionWipOutsourcingAllocationsOrErr() ([]*ProductionWIPOutsourcingAllocation, error) {
+	if e.loadedTypes[6] {
+		return e.ProductionWipOutsourcingAllocations, nil
+	}
+	return nil, &NotLoadedError{edge: "production_wip_outsourcing_allocations"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*OutsourcingOrderItem) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -176,7 +189,7 @@ func (*OutsourcingOrderItem) scanValues(columns []string) ([]any, error) {
 			values[i] = new(decimal.Decimal)
 		case outsourcingorderitem.FieldID, outsourcingorderitem.FieldOutsourcingOrderID, outsourcingorderitem.FieldLineNo, outsourcingorderitem.FieldProductID, outsourcingorderitem.FieldProductSkuID, outsourcingorderitem.FieldMaterialID, outsourcingorderitem.FieldProcessID, outsourcingorderitem.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case outsourcingorderitem.FieldSubjectType, outsourcingorderitem.FieldProductNoSnapshot, outsourcingorderitem.FieldSkuCodeSnapshot, outsourcingorderitem.FieldProductOrderNoSnapshot, outsourcingorderitem.FieldProductNameSnapshot, outsourcingorderitem.FieldMaterialCodeSnapshot, outsourcingorderitem.FieldMaterialNameSnapshot, outsourcingorderitem.FieldProcessNameSnapshot, outsourcingorderitem.FieldProcessCategorySnapshot, outsourcingorderitem.FieldUnitNameSnapshot, outsourcingorderitem.FieldLineStatus, outsourcingorderitem.FieldNote:
+		case outsourcingorderitem.FieldSubjectType, outsourcingorderitem.FieldProductNoSnapshot, outsourcingorderitem.FieldSkuCodeSnapshot, outsourcingorderitem.FieldProductOrderNoSnapshot, outsourcingorderitem.FieldProductNameSnapshot, outsourcingorderitem.FieldMaterialCodeSnapshot, outsourcingorderitem.FieldMaterialNameSnapshot, outsourcingorderitem.FieldProcessingItem, outsourcingorderitem.FieldProcessNameSnapshot, outsourcingorderitem.FieldProcessCategorySnapshot, outsourcingorderitem.FieldUnitNameSnapshot, outsourcingorderitem.FieldLineStatus, outsourcingorderitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case outsourcingorderitem.FieldExpectedReturnDate, outsourcingorderitem.FieldCreatedAt, outsourcingorderitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -294,6 +307,13 @@ func (_m *OutsourcingOrderItem) assignValues(columns []string, values []any) err
 				_m.MaterialNameSnapshot = new(string)
 				*_m.MaterialNameSnapshot = value.String
 			}
+		case outsourcingorderitem.FieldProcessingItem:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field processing_item", values[i])
+			} else if value.Valid {
+				_m.ProcessingItem = new(string)
+				*_m.ProcessingItem = value.String
+			}
 		case outsourcingorderitem.FieldProcessNameSnapshot:
 			if value, ok := values[i].(*sql.NullString); !ok {
 				return fmt.Errorf("unexpected type %T for field process_name_snapshot", values[i])
@@ -410,6 +430,11 @@ func (_m *OutsourcingOrderItem) QueryUnit() *UnitQuery {
 	return NewOutsourcingOrderItemClient(_m.config).QueryUnit(_m)
 }
 
+// QueryProductionWipOutsourcingAllocations queries the "production_wip_outsourcing_allocations" edge of the OutsourcingOrderItem entity.
+func (_m *OutsourcingOrderItem) QueryProductionWipOutsourcingAllocations() *ProductionWIPOutsourcingAllocationQuery {
+	return NewOutsourcingOrderItemClient(_m.config).QueryProductionWipOutsourcingAllocations(_m)
+}
+
 // Update returns a builder for updating this OutsourcingOrderItem.
 // Note that you need to call OutsourcingOrderItem.Unwrap() before calling this method if this OutsourcingOrderItem
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -490,6 +515,11 @@ func (_m *OutsourcingOrderItem) String() string {
 	builder.WriteString(", ")
 	if v := _m.MaterialNameSnapshot; v != nil {
 		builder.WriteString("material_name_snapshot=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProcessingItem; v != nil {
+		builder.WriteString("processing_item=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

@@ -121,6 +121,7 @@ export async function installOrderRpcMocks(page, context) {
       purchase_order_id: 1,
       line_no: 1,
       material_id: 1,
+      production_operation_code: 'FABRIC_PROCESSING',
       material_code_snapshot: 'MAT-STYLE-L1',
       material_name_snapshot: '样式材料',
       color_snapshot: '米白',
@@ -241,23 +242,158 @@ export async function installOrderRpcMocks(page, context) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const confirmedOutsourcingOrder = {
+      ...outsourcingOrder,
+      id: 2,
+      outsourcing_order_no: 'SIM-OUTSOURCE-SEWING-CONFIRMED',
+      supplier_snapshot: {
+        id: 2,
+        code: 'SUP-SEW-L1',
+        short_name: '永绅车缝加工厂',
+        name: '永绅车缝加工厂',
+      },
+      lifecycle_status: 'confirmed',
+      version: 3,
+      item_count: 5,
+      note: '已确认的车缝加工合同',
+    }
+    const confirmedOutsourcingOrderItems = [
+      {
+        ...outsourcingOrderItem,
+        id: 22,
+        outsourcing_order_id: 2,
+        product_id: 301,
+        product_sku_id: 401,
+        process_id: 902,
+        unit_id: 501,
+        product_no_snapshot: 'PROD-STYLE-L1',
+        sku_code_snapshot: 'SKU-STYLE-L1-LONG',
+        product_name_snapshot: '超长产品名称用于验证生产订单明细可读换行',
+        process_name_snapshot: '车缝',
+        process_category_snapshot: '车缝',
+        unit_name_snapshot: '只',
+        outsourcing_quantity: '20.0000',
+        line_status: 'open',
+      },
+      {
+        ...outsourcingOrderItem,
+        id: 23,
+        outsourcing_order_id: 2,
+        line_no: 2,
+        product_id: 301,
+        product_sku_id: 401,
+        process_id: 903,
+        unit_id: 501,
+        product_no_snapshot: 'PROD-STYLE-L1',
+        sku_code_snapshot: 'SKU-STYLE-L1-LONG',
+        product_name_snapshot: '超长产品名称用于验证生产订单明细可读换行',
+        process_name_snapshot: '手工',
+        process_category_snapshot: '手工',
+        unit_name_snapshot: '只',
+        outsourcing_quantity: '20',
+        line_status: 'open',
+      },
+      {
+        ...outsourcingOrderItem,
+        id: 24,
+        outsourcing_order_id: 2,
+        line_no: 3,
+        product_id: 301,
+        product_sku_id: 401,
+        process_id: 902,
+        unit_id: 501,
+        product_no_snapshot: 'PROD-STYLE-L1',
+        sku_code_snapshot: 'SKU-STYLE-L1-LONG',
+        product_name_snapshot: '超长产品名称用于验证生产订单明细可读换行',
+        process_name_snapshot: '车缝',
+        process_category_snapshot: '车缝',
+        unit_name_snapshot: '只',
+        outsourcing_quantity: '20',
+        line_status: 'closed',
+      },
+      {
+        ...outsourcingOrderItem,
+        id: 25,
+        outsourcing_order_id: 2,
+        line_no: 4,
+        subject_type: 'MATERIAL',
+        product_id: null,
+        product_sku_id: null,
+        material_id: 1,
+        process_id: 901,
+        unit_id: 1,
+        product_no_snapshot: '',
+        sku_code_snapshot: '',
+        product_name_snapshot: '',
+        material_code_snapshot: 'MAT-STYLE-L1',
+        material_name_snapshot: '样式短毛绒布',
+        process_name_snapshot: '布料加工',
+        process_category_snapshot: '布料加工',
+        unit_name_snapshot: '米',
+        outsourcing_quantity: '10.2',
+        line_status: 'open',
+      },
+      {
+        ...outsourcingOrderItem,
+        id: 26,
+        outsourcing_order_id: 2,
+        line_no: 5,
+        subject_type: 'MATERIAL',
+        product_id: null,
+        product_sku_id: null,
+        material_id: 2,
+        process_id: 901,
+        unit_id: 1,
+        product_no_snapshot: '',
+        sku_code_snapshot: '',
+        product_name_snapshot: '',
+        material_code_snapshot: 'MAT-LINING-L1',
+        material_name_snapshot: '样式里布',
+        process_name_snapshot: '布料加工',
+        process_category_snapshot: '布料加工',
+        unit_name_snapshot: '米',
+        outsourcing_quantity: '5',
+        line_status: 'open',
+      },
+    ]
 
     let data = {}
     switch (method) {
       case 'list_outsourcing_orders':
-        data = {
-          outsourcing_orders: [outsourcingOrder],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const rows =
+            params.lifecycle_status === 'confirmed'
+              ? [confirmedOutsourcingOrder]
+              : [outsourcingOrder]
+          const limit = Number(params.limit || 100)
+          const offset = Number(params.offset || 0)
+          data = {
+            outsourcing_orders: rows.slice(offset, offset + limit),
+            total: rows.length,
+            limit,
+            offset,
+          }
         }
         break
       case 'list_outsourcing_order_items':
-        data = {
-          outsourcing_order_items: [outsourcingOrderItem],
-          total: 1,
-          limit: Number(params.limit || 50),
-          offset: Number(params.offset || 0),
+        {
+          const sourceItems =
+            Number(params.outsourcing_order_id) === confirmedOutsourcingOrder.id
+              ? confirmedOutsourcingOrderItems
+              : [outsourcingOrderItem]
+          const rows = params.line_status
+            ? sourceItems.filter(
+                (item) => item.line_status === params.line_status
+              )
+            : sourceItems
+          const limit = Number(params.limit || 50)
+          const offset = Number(params.offset || 0)
+          data = {
+            outsourcing_order_items: rows.slice(offset, offset + limit),
+            total: rows.length,
+            limit,
+            offset,
+          }
         }
         break
       case 'save_outsourcing_order_with_items':
@@ -271,7 +407,12 @@ export async function installOrderRpcMocks(page, context) {
         }
         break
       case 'get_outsourcing_order':
-        data = { outsourcing_order: { ...outsourcingOrder, ...params } }
+        data = {
+          outsourcing_order:
+            Number(params.id) === confirmedOutsourcingOrder.id
+              ? confirmedOutsourcingOrder
+              : { ...outsourcingOrder, ...params },
+        }
         break
       case 'submit_outsourcing_order':
         data = {
@@ -339,6 +480,7 @@ export async function installOrderRpcMocks(page, context) {
       note: '样式回归 BOM',
       created_at: nowUnix(),
       updated_at: nowUnix(),
+      edit_version: Date.now() * 1000,
     }
     const bomDraft = {
       ...bomVersion,
@@ -365,6 +507,7 @@ export async function installOrderRpcMocks(page, context) {
         ...bomItem,
         id: 2,
         material_id: 2,
+        production_operation_code: null,
         quantity: '0.8500',
         loss_rate: '0.0500',
         position: '填充',
@@ -374,6 +517,7 @@ export async function installOrderRpcMocks(page, context) {
         ...bomItem,
         id: 3,
         material_id: 3,
+        production_operation_code: null,
         quantity: '1.0000',
         loss_rate: '0',
         position: '包装',
@@ -400,20 +544,17 @@ export async function installOrderRpcMocks(page, context) {
           bom_items: bomItems,
         }
         break
-      case 'create_bom_draft':
-      case 'update_bom_draft':
+      case 'save_bom_with_items':
       case 'copy_bom_version':
         data = {
-          bom_version: { ...bomDraft, ...params, items: bomItems },
+          bom_version: {
+            ...bomDraft,
+            ...params,
+            edit_version: bomDraft.edit_version + 1,
+            items: Array.isArray(params.items) ? params.items : bomItems,
+          },
           bom_items: bomItems,
         }
-        break
-      case 'add_bom_item':
-      case 'update_bom_item':
-        data = { bom_item: { ...bomItem, ...params } }
-        break
-      case 'delete_bom_item':
-        data = {}
         break
       case 'activate_bom_version':
         data = {
@@ -471,6 +612,8 @@ export async function installOrderRpcMocks(page, context) {
     planned_quantity: index === 0 ? '999999999999.9999' : '20.0000',
     sales_order_item_id: 601,
     bom_header_id: 701,
+    route_code: 'PLUSH_SEW_HAND_V1',
+    customer_inspection_required: false,
     product_code_snapshot: 'PROD-STYLE-L1',
     product_name_snapshot: '超长产品名称用于验证生产订单明细可读换行',
     sku_code_snapshot: 'SKU-STYLE-L1-LONG',
@@ -482,6 +625,27 @@ export async function installOrderRpcMocks(page, context) {
   }))
   const productionMaterialRequirements = [
     {
+      id: 7200,
+      production_order_id: 71,
+      production_order_item_id: 7100,
+      bom_header_id: 701,
+      bom_item_id: 7300,
+      material_id: 1,
+      unit_id: 1,
+      production_operation_code: 'FABRIC_PROCESSING',
+      unit_quantity_snapshot: '0.500000',
+      loss_rate_snapshot: '0',
+      planned_quantity: '10.2',
+      issued_quantity: '10.2',
+      remaining_quantity: '0',
+      material_code_snapshot: 'MAT-STYLE-L1',
+      material_name_snapshot: '样式短毛绒布',
+      unit_code_snapshot: 'M',
+      unit_name_snapshot: '米',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    },
+    {
       id: 7201,
       production_order_id: 71,
       production_order_item_id: 7101,
@@ -489,6 +653,7 @@ export async function installOrderRpcMocks(page, context) {
       bom_item_id: 7301,
       material_id: 1,
       unit_id: 1,
+      production_operation_code: 'FABRIC_PROCESSING',
       unit_quantity_snapshot: '0.500000',
       loss_rate_snapshot: '0.020000',
       planned_quantity: '10.200000',
@@ -496,6 +661,48 @@ export async function installOrderRpcMocks(page, context) {
       remaining_quantity: '8.000000',
       material_code_snapshot: 'MAT-STYLE-L1',
       material_name_snapshot: '样式短毛绒布',
+      unit_code_snapshot: 'M',
+      unit_name_snapshot: '米',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    },
+    {
+      id: 7202,
+      production_order_id: 71,
+      production_order_item_id: 7102,
+      bom_header_id: 701,
+      bom_item_id: 7302,
+      material_id: 1,
+      unit_id: 1,
+      production_operation_code: 'FABRIC_PROCESSING',
+      unit_quantity_snapshot: '0.500000',
+      loss_rate_snapshot: '0.020000',
+      planned_quantity: '10.2',
+      issued_quantity: '10.2',
+      remaining_quantity: '0',
+      material_code_snapshot: 'MAT-STYLE-L1',
+      material_name_snapshot: '样式短毛绒布',
+      unit_code_snapshot: 'M',
+      unit_name_snapshot: '米',
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    },
+    {
+      id: 7203,
+      production_order_id: 71,
+      production_order_item_id: 7102,
+      bom_header_id: 701,
+      bom_item_id: 7303,
+      material_id: 2,
+      unit_id: 1,
+      production_operation_code: 'FABRIC_PROCESSING',
+      unit_quantity_snapshot: '0.250000',
+      loss_rate_snapshot: '0',
+      planned_quantity: '5',
+      issued_quantity: '5',
+      remaining_quantity: '0',
+      material_code_snapshot: 'MAT-LINING-L1',
+      material_name_snapshot: '样式里布',
       unit_code_snapshot: 'M',
       unit_name_snapshot: '米',
       created_at: nowUnix(),
@@ -733,6 +940,378 @@ export async function installOrderRpcMocks(page, context) {
         production_order_items: productionOrderItems,
         ...productionMaterialRequirementProjection(),
       }
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: styleRpcResult(data),
+      }),
+    })
+  })
+
+  const productionWipSteps = [
+    {
+      step_no: 10,
+      operation_code: 'FABRIC_PROCESSING',
+      process_name_snapshot: '布料加工',
+      output_code: 'CUT_PIECE',
+      inhouse_allowed: false,
+      outsourcing_allowed: true,
+      required_quality_gates: ['CUT_PIECE'],
+      business_confirmation_code: null,
+    },
+    {
+      step_no: 20,
+      operation_code: 'SEWING',
+      process_name_snapshot: '车缝',
+      output_code: 'SHELL',
+      inhouse_allowed: true,
+      outsourcing_allowed: true,
+      required_quality_gates: ['SHELL'],
+      business_confirmation_code: null,
+    },
+    {
+      step_no: 30,
+      operation_code: 'HANDWORK',
+      process_name_snapshot: '手工',
+      output_code: 'FINISHED_GOODS',
+      inhouse_allowed: true,
+      outsourcing_allowed: true,
+      required_quality_gates: ['FINISHED_GOODS', 'NEEDLE', 'SAMPLING'],
+      business_confirmation_code: null,
+    },
+    {
+      step_no: 40,
+      operation_code: 'PACKAGING',
+      process_name_snapshot: '包装',
+      output_code: 'PACKED_GOODS',
+      inhouse_allowed: true,
+      outsourcing_allowed: false,
+      required_quality_gates: [],
+      business_confirmation_code: 'PACKAGING_MATERIAL',
+    },
+  ]
+  const productionWipOperations = productionOrderItems.flatMap(
+    (item, itemIndex) =>
+      productionWipSteps.map((step, stepIndex) => ({
+        id: 80_000 + itemIndex * 10 + stepIndex + 1,
+        production_order_id: productionOrder.id,
+        production_order_item_id: item.id,
+        route_code: 'PLUSH_SEW_HAND_V1',
+        route_version: 1,
+        step_no: step.step_no,
+        operation_code: step.operation_code,
+        process_id: 900 + stepIndex + 1,
+        process_code_snapshot: `STYLE-${step.operation_code}`,
+        process_name_snapshot: step.process_name_snapshot,
+        output_code: step.output_code,
+        inhouse_allowed: step.inhouse_allowed,
+        outsourcing_allowed: step.outsourcing_allowed,
+        planned_quantity: item.planned_quantity,
+        required_quality_gates: [...step.required_quality_gates],
+        business_confirmation_code: step.business_confirmation_code,
+        created_at: nowUnix(),
+      }))
+  )
+  const operationFor = (itemIndex, stepIndex) =>
+    productionWipOperations.find(
+      (operation) =>
+        operation.production_order_item_id ===
+          productionOrderItems[itemIndex].id &&
+        operation.step_no === productionWipSteps[stepIndex].step_no
+    )
+  const makeProductionWipBatch = ({
+    id,
+    itemIndex,
+    stepIndex,
+    sourceBatchID = null,
+    executionMode,
+    status,
+    quantity,
+  }) => ({
+    id,
+    production_order_id: productionOrder.id,
+    production_order_item_id: productionOrderItems[itemIndex].id,
+    production_order_operation_id: operationFor(itemIndex, stepIndex).id,
+    source_batch_id: sourceBatchID,
+    batch_no: `WIP-STYLE-${id}`,
+    flow_type: 'NORMAL',
+    execution_mode: executionMode,
+    status,
+    version: 1,
+    quantity: quantity || productionOrderItems[itemIndex].planned_quantity,
+    rework_reason: null,
+    created_at: nowUnix(),
+    updated_at: nowUnix(),
+  })
+  const productionWipBatches = [
+    makeProductionWipBatch({
+      id: 91_001,
+      itemIndex: 0,
+      stepIndex: 0,
+      executionMode: 'OUTSOURCED',
+      status: 'ACCEPTED',
+    }),
+    makeProductionWipBatch({
+      id: 91_002,
+      itemIndex: 0,
+      stepIndex: 1,
+      sourceBatchID: 91_001,
+      executionMode: 'IN_HOUSE',
+      status: 'ACCEPTED',
+    }),
+    makeProductionWipBatch({
+      id: 91_003,
+      itemIndex: 0,
+      stepIndex: 2,
+      sourceBatchID: 91_002,
+      executionMode: 'IN_HOUSE',
+      status: 'ACCEPTED',
+    }),
+    makeProductionWipBatch({
+      id: 91_004,
+      itemIndex: 0,
+      stepIndex: 3,
+      sourceBatchID: 91_003,
+      executionMode: 'IN_HOUSE',
+      status: 'ACCEPTED',
+    }),
+    makeProductionWipBatch({
+      id: 91_011,
+      itemIndex: 1,
+      stepIndex: 0,
+      executionMode: 'OUTSOURCED',
+      status: 'ACCEPTED',
+    }),
+    makeProductionWipBatch({
+      id: 91_021,
+      itemIndex: 2,
+      stepIndex: 0,
+      executionMode: null,
+      status: 'PLANNED',
+    }),
+    makeProductionWipBatch({
+      id: 91_012,
+      itemIndex: 1,
+      stepIndex: 1,
+      sourceBatchID: 91_011,
+      executionMode: null,
+      status: 'PLANNED',
+    }),
+  ]
+  const productionWipQualityInspections = [
+    [91_001, 'CUT_PIECE'],
+    [91_002, 'SHELL'],
+    [91_003, 'FINISHED_GOODS'],
+    [91_003, 'NEEDLE'],
+    [91_003, 'SAMPLING'],
+    [91_011, 'CUT_PIECE'],
+  ].map(([batchID, gateCode], index) => ({
+    id: 92_000 + index,
+    inspection_no: `QI-STYLE-${index + 1}`,
+    production_wip_batch_id: batchID,
+    gate_code: gateCode,
+    status: 'PASSED',
+    result: 'PASS',
+  }))
+  const productionPackagingConfirmations = productionOrderItems.map(
+    (item, index) => ({
+      id: 93_000 + index,
+      production_order_id: productionOrder.id,
+      production_order_item_id: item.id,
+      status: index === 0 ? 'CONFIRMED' : 'PENDING',
+      version: 1,
+      packaging_version_snapshot: index === 0 ? '彩盒 V3' : null,
+      confirmed_by: index === 0 ? 1 : null,
+      confirmed_at: index === 0 ? nowUnix() : null,
+      note: index === 0 ? '版面与装箱方式已核对' : null,
+      created_at: nowUnix(),
+      updated_at: nowUnix(),
+    })
+  )
+  const productionWipOutsourcingAllocations = [
+    {
+      id: 95_001,
+      production_wip_batch_id: 91_001,
+      outsourcing_order_item_id: 25,
+      production_order_material_requirement_id: 7200,
+      subject_type: 'MATERIAL',
+      allocated_quantity: '10.2',
+      unit_id: 1,
+      created_by: 1,
+      created_at: nowUnix(),
+    },
+    {
+      id: 95_002,
+      production_wip_batch_id: 91_011,
+      outsourcing_order_item_id: 25,
+      production_order_material_requirement_id: 7201,
+      subject_type: 'MATERIAL',
+      allocated_quantity: '10.2',
+      unit_id: 1,
+      created_by: 1,
+      created_at: nowUnix(),
+    },
+  ]
+  const productionWipAggregate = () => ({
+    production_order: productionOrder,
+    production_order_items: productionOrderItems,
+    material_requirements: productionRequirementsFrozen
+      ? productionMaterialRequirements
+      : [],
+    production_order_operations: productionWipOperations,
+    production_wip_batches: productionWipBatches,
+    outsourcing_allocations: productionWipOutsourcingAllocations,
+    packaging_confirmations: productionPackagingConfirmations,
+    quality_inspections: productionWipQualityInspections,
+  })
+
+  await page.route('**/rpc/production_wip', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method, params = {} } = body
+    let data
+    if (
+      !Number.isSafeInteger(params.production_order_id) ||
+      params.production_order_id !== productionOrder.id
+    ) {
+      data = unsupportedRpcMethod('production_wip', method)
+    } else if (
+      method === 'get_production_wip' ||
+      method === 'initialize_production_wip'
+    ) {
+      data = productionWipAggregate()
+    } else if (method === 'execute_production_wip_action') {
+      const batch = productionWipBatches.find(
+        (candidate) => candidate.id === params.production_wip_batch_id
+      )
+      const confirmation = productionPackagingConfirmations.find(
+        (candidate) =>
+          candidate.production_order_item_id === params.production_order_item_id
+      )
+      if (params.action === 'SPLIT_BATCH' && batch) {
+        const splitQuantities = Array.isArray(params.splits)
+          ? params.splits.map((split) => String(split?.quantity || ''))
+          : []
+        batch.status = 'SPLIT'
+        batch.version += 1
+        productionWipBatches.push(
+          ...splitQuantities.map((quantity, index) =>
+            makeProductionWipBatch({
+              id: 94_000 + productionWipBatches.length * 2 + index,
+              itemIndex: productionOrderItems.findIndex(
+                (item) => item.id === batch.production_order_item_id
+              ),
+              stepIndex: productionWipSteps.findIndex(
+                (step) =>
+                  step.step_no ===
+                  productionWipOperations.find(
+                    (operation) =>
+                      operation.id === batch.production_order_operation_id
+                  )?.step_no
+              ),
+              sourceBatchID: batch.id,
+              executionMode: null,
+              status: 'PLANNED',
+              quantity,
+            })
+          )
+        )
+      } else if (params.action === 'ASSIGN_EXECUTION' && batch) {
+        batch.execution_mode = params.execution_mode
+        for (
+          let index = productionWipOutsourcingAllocations.length - 1;
+          index >= 0;
+          index -= 1
+        ) {
+          if (
+            productionWipOutsourcingAllocations[index]
+              .production_wip_batch_id === batch.id
+          ) {
+            productionWipOutsourcingAllocations.splice(index, 1)
+          }
+        }
+        if (params.execution_mode === 'OUTSOURCED') {
+          for (const allocation of params.outsourcing_allocations || []) {
+            const requirement = productionMaterialRequirements.find(
+              (item) =>
+                item.id === allocation.production_order_material_requirement_id
+            )
+            productionWipOutsourcingAllocations.push({
+              id: 96_000 + productionWipOutsourcingAllocations.length,
+              production_wip_batch_id: batch.id,
+              outsourcing_order_item_id: allocation.outsourcing_order_item_id,
+              production_order_material_requirement_id:
+                allocation.production_order_material_requirement_id || null,
+              subject_type: requirement ? 'MATERIAL' : 'PRODUCT',
+              allocated_quantity: requirement
+                ? requirement.planned_quantity
+                : batch.quantity,
+              unit_id: requirement
+                ? requirement.unit_id
+                : productionOrderItems.find(
+                    (item) => item.id === batch.production_order_item_id
+                  )?.unit_id,
+              created_by: 1,
+              created_at: nowUnix(),
+            })
+          }
+        }
+        batch.version += 1
+      } else if (params.action === 'START_OPERATION' && batch) {
+        batch.status =
+          batch.execution_mode === 'OUTSOURCED' ? 'OUTSOURCED' : 'IN_PROGRESS'
+        batch.version += 1
+      } else if (
+        ['COMPLETE_OPERATION', 'RECEIVE_OUTSOURCING_RETURN'].includes(
+          params.action
+        ) &&
+        batch
+      ) {
+        batch.status = 'WAITING_QUALITY'
+        batch.version += 1
+      } else if (
+        params.action === 'CONFIRM_PACKAGING_MATERIAL' &&
+        confirmation
+      ) {
+        confirmation.status = 'CONFIRMED'
+        confirmation.packaging_version_snapshot =
+          params.packaging_version_snapshot
+        confirmation.confirmed_by = 1
+        confirmation.confirmed_at = nowUnix()
+        confirmation.note = params.note || null
+        confirmation.version += 1
+        confirmation.updated_at = nowUnix()
+      } else if (
+        ['TRANSFER_TO_NEXT_OPERATION', 'REWORK'].includes(params.action) &&
+        batch
+      ) {
+        const target = productionWipOperations.find(
+          (operation) => operation.id === params.target_operation_id
+        )
+        productionWipBatches.push({
+          ...makeProductionWipBatch({
+            id: 95_000 + productionWipBatches.length,
+            itemIndex: productionOrderItems.findIndex(
+              (item) => item.id === batch.production_order_item_id
+            ),
+            stepIndex: productionWipSteps.findIndex(
+              (step) => step.step_no === target?.step_no
+            ),
+            sourceBatchID: batch.id,
+            executionMode: null,
+            status: 'PLANNED',
+            quantity: params.quantity,
+          }),
+          flow_type: params.action === 'REWORK' ? 'REWORK' : 'NORMAL',
+          rework_reason: params.action === 'REWORK' ? params.reason : null,
+        })
+      }
+      data = productionWipAggregate()
+    } else {
+      data = unsupportedRpcMethod('production_wip', method)
     }
     await route.fulfill({
       status: 200,

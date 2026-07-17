@@ -968,7 +968,7 @@ export function createPrintAssertions({
                   : sourceLine.productOrderNo,
                 remark: `${String(
                   sourceLine.remark ||
-                    sourceLine.processName ||
+                    sourceLine.processingItem ||
                     sourceLine.materialName ||
                     '续页页边距回归'
                 )} ${index + 1}`,
@@ -1313,7 +1313,7 @@ export function createPrintAssertions({
       }, storageKey)
 
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectText(page, '当前记录字段（可编辑）')
+      await expectText(page, '打印内容')
       await expectText(page, 'SIM-YOYOOSUN-BULK-PO-03')
 
       const metrics = await page.evaluate(() => {
@@ -1450,7 +1450,7 @@ export function createPrintAssertions({
         }
       )
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectText(page, '当前记录字段（可编辑）')
+      await expectText(page, '打印内容')
     }
   }
 
@@ -1941,7 +1941,7 @@ export function createPrintAssertions({
       )
 
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectText(page, '当前记录字段（可编辑）')
+      await expectText(page, '打印内容')
       await page.waitForFunction(
         (selector) => document.querySelectorAll(selector).length >= 2,
         totalValueSelector,
@@ -2000,7 +2000,7 @@ export function createPrintAssertions({
       )
       await restoreLocalStorageValues(page, originalEntries)
       await page.reload({ waitUntil: 'domcontentloaded' })
-      await expectText(page, '当前记录字段（可编辑）')
+      await expectText(page, '打印内容')
     }
   }
 

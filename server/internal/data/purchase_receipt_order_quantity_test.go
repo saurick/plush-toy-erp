@@ -25,12 +25,12 @@ func TestPurchaseReceiptOrderQuantityGuard(t *testing.T) {
 	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "SQLITE", mustDecimal(t, "10"))
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 
-	first := createLinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, orderItem.ID, "PR-PO-PARTIAL-1", mustDecimal(t, "4"))
+	first := createLinkedPurchaseReceiptDraftForTest(t, ctx, client, uc, fixtures, orderItem.ID, "PR-PO-PARTIAL-1", mustDecimal(t, "4"))
 	if _, err := uc.PostPurchaseReceipt(ctx, first.ID); err != nil {
 		t.Fatalf("post first partial receipt failed: %v", err)
 	}
 
-	second := createLinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, orderItem.ID, "PR-PO-PARTIAL-2", mustDecimal(t, "6"))
+	second := createLinkedPurchaseReceiptDraftForTest(t, ctx, client, uc, fixtures, orderItem.ID, "PR-PO-PARTIAL-2", mustDecimal(t, "6"))
 	if _, err := uc.PostPurchaseReceipt(ctx, second.ID); err != nil {
 		t.Fatalf("post exact remaining receipt failed: %v", err)
 	}
@@ -38,7 +38,7 @@ func TestPurchaseReceiptOrderQuantityGuard(t *testing.T) {
 		t.Fatalf("repeat post should remain idempotent: %v", err)
 	}
 
-	over := createLinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, orderItem.ID, "PR-PO-OVER", mustDecimal(t, "0.000001"))
+	over := createLinkedPurchaseReceiptDraftForTest(t, ctx, client, uc, fixtures, orderItem.ID, "PR-PO-OVER", mustDecimal(t, "0.000001"))
 	if _, err := uc.PostPurchaseReceipt(ctx, over.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected over-receipt to be rejected, got %v", err)
 	}
@@ -49,14 +49,145 @@ func TestPurchaseReceiptOrderQuantityGuard(t *testing.T) {
 	if _, err := uc.CancelPostedPurchaseReceipt(ctx, second.ID); err != nil {
 		t.Fatalf("cancel exact receipt failed: %v", err)
 	}
-	replacement := createLinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, orderItem.ID, "PR-PO-REPLACEMENT", mustDecimal(t, "6"))
+	replacement := createLinkedPurchaseReceiptDraftForTest(t, ctx, client, uc, fixtures, orderItem.ID, "PR-PO-REPLACEMENT", mustDecimal(t, "6"))
 	if _, err := uc.PostPurchaseReceipt(ctx, replacement.ID); err != nil {
 		t.Fatalf("cancelled receipt quantity should be receivable again: %v", err)
 	}
 
 	unlinked := createUnlinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, "PR-NO-PO", mustDecimal(t, "1000"))
 	if _, err := uc.PostPurchaseReceipt(ctx, unlinked.ID); err != nil {
-		t.Fatalf("receipt without purchase-order source should keep the supported quick-receipt boundary: %v", err)
+		t.Fatalf("non-public source-less fixture construction must remain available: %v", err)
+	}
+}
+
+func TestPurchaseReceiptAppendSourceKeepsOnePurchaseOrderAndSupplier(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "purchase_receipt_append_source_guard")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+
+	supplierA := createPurchaseOrderTestSupplier(t, ctx, client, "SUP-RECEIPT-APPEND-A", true)
+	supplierB := createPurchaseOrderTestSupplier(t, ctx, client, "SUP-RECEIPT-APPEND-B", true)
+	orderA, orderAItems := createApprovedPurchaseOrderForReceiptAppendTest(t, ctx, client, fixtures, supplierA, "A", 1, 2)
+	_, orderBItems := createApprovedPurchaseOrderForReceiptAppendTest(t, ctx, client, fixtures, supplierA, "B", 3)
+	_, orderCItems := createApprovedPurchaseOrderForReceiptAppendTest(t, ctx, client, fixtures, supplierB, "C", 4)
+
+	supplierAID := supplierA.ID
+	receiptA, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-APPEND-SOURCE-A",
+		SupplierID:   &supplierAID,
+		SupplierName: supplierA.Name,
+	})
+	if err != nil {
+		t.Fatalf("create supplier-linked receipt failed: %v", err)
+	}
+	first, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:           receiptA.ID,
+		MaterialID:          fixtures.materialID,
+		WarehouseID:         fixtures.warehouseID,
+		UnitID:              fixtures.unitID,
+		PurchaseOrderItemID: &orderAItems[0].ID,
+		Quantity:            mustDecimal(t, "2"),
+		IdempotencyKey:      "test:receipt-append-source:a:1",
+	})
+	if err != nil {
+		t.Fatalf("append first source line failed: %v", err)
+	}
+	if first.PurchaseOrderItemID == nil || *first.PurchaseOrderItemID != orderAItems[0].ID || first.SourceLineNo == nil || *first.SourceLineNo != "1" {
+		t.Fatalf("first append lost source identity: %#v", first)
+	}
+	second, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:           receiptA.ID,
+		MaterialID:          fixtures.materialID,
+		WarehouseID:         fixtures.warehouseID,
+		UnitID:              fixtures.unitID,
+		PurchaseOrderItemID: &orderAItems[1].ID,
+		Quantity:            mustDecimal(t, "3"),
+		IdempotencyKey:      "test:receipt-append-source:a:2",
+	})
+	if err != nil {
+		t.Fatalf("append second line from purchase order %d failed: %v", orderA.ID, err)
+	}
+	if second.PurchaseOrderItemID == nil || *second.PurchaseOrderItemID != orderAItems[1].ID || second.SourceLineNo == nil || *second.SourceLineNo != "2" {
+		t.Fatalf("second append lost source identity: %#v", second)
+	}
+
+	type preparedFactCounts struct {
+		items       int
+		lots        int
+		inspections int
+	}
+	counts := func() preparedFactCounts {
+		return preparedFactCounts{
+			items:       client.PurchaseReceiptItem.Query().CountX(ctx),
+			lots:        client.InventoryLot.Query().CountX(ctx),
+			inspections: client.QualityInspection.Query().CountX(ctx),
+		}
+	}
+	assertRejectedWithoutWrites := func(label, key string, receiptID int, sourceItem *ent.PurchaseOrderItem) {
+		t.Helper()
+		before := counts()
+		_, appendErr := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+			ReceiptID:           receiptID,
+			MaterialID:          fixtures.materialID,
+			WarehouseID:         fixtures.warehouseID,
+			UnitID:              fixtures.unitID,
+			PurchaseOrderItemID: &sourceItem.ID,
+			Quantity:            mustDecimal(t, "1"),
+			IdempotencyKey:      key,
+		})
+		if !errors.Is(appendErr, biz.ErrBadParam) {
+			t.Fatalf("%s must be rejected, got %v", label, appendErr)
+		}
+		if after := counts(); after != before {
+			t.Fatalf("%s wrote prepared facts: before=%#v after=%#v", label, before, after)
+		}
+		if count := client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.IdempotencyKey(key)).CountX(ctx); count != 0 {
+			t.Fatalf("%s persisted an idempotency row, got %d", label, count)
+		}
+	}
+
+	assertRejectedWithoutWrites("same supplier but different purchase order", "test:receipt-append-source:cross-order", receiptA.ID, orderBItems[0])
+
+	receiptB, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-APPEND-SOURCE-B",
+		SupplierID:   &supplierAID,
+		SupplierName: supplierA.Name,
+	})
+	if err != nil {
+		t.Fatalf("create supplier guard receipt failed: %v", err)
+	}
+	assertRejectedWithoutWrites("different supplier source", "test:receipt-append-source:cross-supplier", receiptB.ID, orderCItems[0])
+
+	manualReceipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-APPEND-SOURCE-NO-SUPPLIER",
+		SupplierName: supplierA.Name,
+	})
+	if err != nil {
+		t.Fatalf("create receipt without supplier identity failed: %v", err)
+	}
+	assertRejectedWithoutWrites("source append without stable receipt supplier", "test:receipt-append-source:no-supplier", manualReceipt.ID, orderAItems[0])
+
+	unlinkedReceipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-APPEND-INTERNAL-UNLINKED",
+		SupplierName: "内部无来源夹具供应商",
+	})
+	if err != nil {
+		t.Fatalf("create internal source-less receipt failed: %v", err)
+	}
+	internalItem, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID:      unlinkedReceipt.ID,
+		MaterialID:     fixtures.materialID,
+		WarehouseID:    fixtures.warehouseID,
+		UnitID:         fixtures.unitID,
+		Quantity:       mustDecimal(t, "1"),
+		IdempotencyKey: "test:receipt-append-source:internal-unlinked",
+	})
+	if err != nil {
+		t.Fatalf("non-public source-less fixture append must remain available: %v", err)
+	}
+	if internalItem.PurchaseOrderItemID != nil {
+		t.Fatalf("internal source-less append unexpectedly gained a source: %#v", internalItem)
 	}
 }
 
@@ -183,7 +314,7 @@ func TestCreatePurchaseReceiptFromPurchaseOrderReservesDraftWithoutCountingItAsP
 		t.Fatalf("automatic generation should reserve an existing draft and reject a duplicate, got %v", err)
 	}
 
-	manualDraft := createLinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, orderItem.ID, "PR-PO-MANUAL-DRAFT", mustDecimal(t, "10"))
+	manualDraft := createLinkedPurchaseReceiptDraftForTest(t, ctx, client, uc, fixtures, orderItem.ID, "PR-PO-MANUAL-DRAFT", mustDecimal(t, "10"))
 	if _, err := uc.PostPurchaseReceipt(ctx, manualDraft.ID); err != nil {
 		t.Fatalf("an existing draft must not be counted as posted quantity at the posting boundary: %v", err)
 	}
@@ -252,20 +383,14 @@ func TestMaterialSupplyReceiptCreatesLineQualityGateBeforeInventoryPost(t *testi
 	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
 		t.Fatalf("pending quality must keep inventory empty, got %d txns", count)
 	}
-	if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: receipt.QualityInspections[0].ID,
-		Result:       biz.QualityInspectionResultConcession,
-	}); err != nil {
+	if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(receipt.QualityInspections[0].ID, biz.QualityInspectionResultConcession)); err != nil {
 		t.Fatalf("concession decision failed: %v", err)
 	}
 	gate, err = uc.EvaluatePurchaseReceiptQualityGate(ctx, receipt.ID)
 	if err != nil || gate.Outcome != biz.PurchaseReceiptQualityGatePending || gate.PassedLines != 1 {
 		t.Fatalf("one decided line must keep aggregate pending, gate=%#v err=%v", gate, err)
 	}
-	if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: receipt.QualityInspections[1].ID,
-		Result:       biz.QualityInspectionResultPass,
-	}); err != nil {
+	if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(receipt.QualityInspections[1].ID, biz.QualityInspectionResultPass)); err != nil {
 		t.Fatalf("pass decision failed: %v", err)
 	}
 	gate, err = uc.EvaluatePurchaseReceiptQualityGate(ctx, receipt.ID)
@@ -295,11 +420,9 @@ func TestMaterialSupplyRejectedLineBlocksReceiptPost(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create rejected quality fixture failed: %v", err)
 	}
-	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: receipt.QualityInspections[0].ID,
-		Result:       biz.QualityInspectionResultReject,
-		DecisionNote: stringPtr("来料拒收"),
-	}); err != nil {
+	rejectDecision := approximateQualityInspectionDecision(receipt.QualityInspections[0].ID, biz.QualityInspectionResultReject)
+	rejectDecision.DecisionNote = stringPtr("来料拒收")
+	if _, err := uc.RejectQualityInspection(ctx, rejectDecision); err != nil {
 		t.Fatalf("reject incoming inspection failed: %v", err)
 	}
 	gate, err := uc.EvaluatePurchaseReceiptQualityGate(ctx, receipt.ID)
@@ -321,7 +444,7 @@ func TestPurchaseReceiptOrderQuantityGuardIncludesPostedQuantityAdjustments(t *t
 	orderItem := createApprovedPurchaseOrderItemForReceiptTest(t, ctx, client, fixtures, "ADJUSTMENT", mustDecimal(t, "10"))
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
 
-	receipt := createLinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, orderItem.ID, "PR-PO-ADJUST-BASE", mustDecimal(t, "8"))
+	receipt := createLinkedPurchaseReceiptDraftForTest(t, ctx, client, uc, fixtures, orderItem.ID, "PR-PO-ADJUST-BASE", mustDecimal(t, "8"))
 	postedReceipt, err := uc.PostPurchaseReceipt(ctx, receipt.ID)
 	if err != nil {
 		t.Fatalf("post base receipt failed: %v", err)
@@ -377,7 +500,7 @@ func TestPurchaseReceiptOrderQuantityGuardIncludesPostedQuantityAdjustments(t *t
 	if _, err := uc.PostPurchaseReceiptAdjustment(ctx, decrease.ID); err != nil {
 		t.Fatalf("post quantity decrease failed: %v", err)
 	}
-	replacement := createLinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, orderItem.ID, "PR-PO-ADJUST-REPLACEMENT", mustDecimal(t, "2"))
+	replacement := createLinkedPurchaseReceiptDraftForTest(t, ctx, client, uc, fixtures, orderItem.ID, "PR-PO-ADJUST-REPLACEMENT", mustDecimal(t, "2"))
 	if _, err := uc.PostPurchaseReceipt(ctx, replacement.ID); err != nil {
 		t.Fatalf("quantity decrease should release receivable quantity: %v", err)
 	}
@@ -422,6 +545,7 @@ func TestPurchaseReceiptPostgresOrderQuantityGuardConcurrent(t *testing.T) {
 	first := createLinkedPurchaseReceiptDraftForTest(
 		t,
 		ctx,
+		client,
 		uc,
 		fixtures,
 		orderItem.ID,
@@ -431,6 +555,7 @@ func TestPurchaseReceiptPostgresOrderQuantityGuardConcurrent(t *testing.T) {
 	second := createLinkedPurchaseReceiptDraftForTest(
 		t,
 		ctx,
+		client,
 		uc,
 		fixtures,
 		orderItem.ID,
@@ -467,6 +592,7 @@ func TestPurchaseReceiptPostgresOrderQuantityGuardConcurrent(t *testing.T) {
 	duplicate := createLinkedPurchaseReceiptDraftForTest(
 		t,
 		ctx,
+		client,
 		uc,
 		fixtures,
 		duplicateOrderItem.ID,
@@ -580,9 +706,48 @@ func createApprovedPurchaseOrderItemForReceiptTest(
 	return item
 }
 
+func createApprovedPurchaseOrderForReceiptAppendTest(
+	t *testing.T,
+	ctx context.Context,
+	client *ent.Client,
+	fixtures inventoryTestFixtures,
+	supplier *ent.Supplier,
+	suffix string,
+	lineNumbers ...int,
+) (*ent.PurchaseOrder, []*ent.PurchaseOrderItem) {
+	t.Helper()
+	order, err := client.PurchaseOrder.Create().
+		SetPurchaseOrderNo("PO-RECEIPT-APPEND-" + suffix).
+		SetSupplierID(supplier.ID).
+		SetSupplierSnapshot(map[string]any{"name": supplier.Name}).
+		SetPurchaseDate(time.Date(2026, 7, 10, 0, 0, 0, 0, time.UTC)).
+		SetLifecycleStatus(biz.PurchaseOrderStatusApproved).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create append-source purchase order failed: %v", err)
+	}
+	items := make([]*ent.PurchaseOrderItem, 0, len(lineNumbers))
+	for _, lineNo := range lineNumbers {
+		item, createErr := client.PurchaseOrderItem.Create().
+			SetPurchaseOrderID(order.ID).
+			SetLineNo(lineNo).
+			SetMaterialID(fixtures.materialID).
+			SetUnitID(fixtures.unitID).
+			SetPurchasedQuantity(mustDecimal(t, "10")).
+			SetLineStatus(biz.PurchaseOrderItemStatusOpen).
+			Save(ctx)
+		if createErr != nil {
+			t.Fatalf("create append-source purchase order line %d failed: %v", lineNo, createErr)
+		}
+		items = append(items, item)
+	}
+	return order, items
+}
+
 func createLinkedPurchaseReceiptDraftForTest(
 	t *testing.T,
 	ctx context.Context,
+	client *ent.Client,
 	uc *biz.InventoryUsecase,
 	fixtures inventoryTestFixtures,
 	orderItemID int,
@@ -590,9 +755,23 @@ func createLinkedPurchaseReceiptDraftForTest(
 	quantity decimal.Decimal,
 ) *biz.PurchaseReceipt {
 	t.Helper()
+	orderItem, err := client.PurchaseOrderItem.Get(ctx, orderItemID)
+	if err != nil {
+		t.Fatalf("load source purchase order item failed: %v", err)
+	}
+	order, err := client.PurchaseOrder.Get(ctx, orderItem.PurchaseOrderID)
+	if err != nil {
+		t.Fatalf("load source purchase order failed: %v", err)
+	}
+	supplier, err := client.Supplier.Get(ctx, order.SupplierID)
+	if err != nil {
+		t.Fatalf("load source purchase order supplier failed: %v", err)
+	}
+	supplierID := supplier.ID
 	receipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
 		ReceiptNo:    receiptNo,
-		SupplierName: "采购供应商",
+		SupplierID:   &supplierID,
+		SupplierName: supplier.Name,
 		ReceivedAt:   time.Date(2026, 7, 10, 12, 0, 0, 0, time.UTC),
 	})
 	if err != nil {
@@ -624,7 +803,7 @@ func createUnlinkedPurchaseReceiptDraftForTest(
 	t.Helper()
 	receipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
 		ReceiptNo:    receiptNo,
-		SupplierName: "历史快速入库供应商",
+		SupplierName: "内部无来源夹具供应商",
 		ReceivedAt:   time.Date(2026, 7, 10, 13, 0, 0, 0, time.UTC),
 	})
 	if err != nil {

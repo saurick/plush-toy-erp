@@ -2,6 +2,7 @@ package data
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"testing"
 
@@ -27,7 +28,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 		log.NewStdLogger(io.Discard),
 	)
 	uc := biz.NewWorkflowUsecase(repo)
-	shipmentTask := createShipmentReleaseTask(t, ctx, repo, 5801, map[string]any{})
+	shipmentTask := createCanonicalShipmentReleaseSourceTask(t, ctx, repo, 5801, map[string]any{})
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 		ID:              shipmentTask.ID,
@@ -41,7 +42,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 	}
 
 	state, err := client.WorkflowBusinessState.Query().
-		Where(workflowbusinessstate.SourceType("shipping-release"), workflowbusinessstate.SourceID(5801)).
+		Where(workflowbusinessstate.SourceType(biz.WorkflowSourceTaskShipmentSourceType), workflowbusinessstate.SourceID(5801)).
 		Only(ctx)
 	if err != nil {
 		t.Fatalf("query shipment release business state failed: %v", err)
@@ -64,12 +65,26 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 		state.Payload["transition_status"] != "done" {
 		t.Fatalf("expected shipment release done payload, got %#v", state.Payload)
 	}
+	assertCanonicalShipmentReleasePayload(t, state.Payload, 5801)
 	if state.Payload["shipment_result"] == "shipped" {
 		t.Fatalf("shipment release state must not be shipped, got %#v", state.Payload)
 	}
+	updatedTask, err := client.WorkflowTask.Get(ctx, shipmentTask.ID)
+	if err != nil {
+		t.Fatalf("query completed shipment release task failed: %v", err)
+	}
+	if updatedTask.TaskStatusKey != "done" ||
+		updatedTask.BusinessStatusKey == nil ||
+		*updatedTask.BusinessStatusKey != "shipping_released" ||
+		updatedTask.Payload["decision"] != "done" ||
+		updatedTask.Payload["transition_status"] != "done" ||
+		updatedTask.Payload["shipment_release_result"] != "done" {
+		t.Fatalf("unexpected completed shipment release task projection %#v", updatedTask)
+	}
+	assertCanonicalShipmentReleasePayload(t, updatedTask.Payload, 5801)
 
 	taskCount, err := client.WorkflowTask.Query().
-		Where(workflowtask.SourceType("shipping-release"), workflowtask.SourceID(5801)).
+		Where(workflowtask.SourceType(biz.WorkflowSourceTaskShipmentSourceType), workflowtask.SourceID(5801)).
 		Count(ctx)
 	if err != nil {
 		t.Fatalf("count workflow tasks failed: %v", err)
@@ -79,7 +94,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 	}
 	receivableCount, err := client.WorkflowTask.Query().
 		Where(
-			workflowtask.SourceType("shipping-release"),
+			workflowtask.SourceType(biz.WorkflowSourceTaskShipmentSourceType),
 			workflowtask.SourceID(5801),
 			workflowtask.TaskGroup("receivable_registration"),
 		).
@@ -89,7 +104,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 	}
 	invoiceCount, err := client.WorkflowTask.Query().
 		Where(
-			workflowtask.SourceType("shipping-release"),
+			workflowtask.SourceType(biz.WorkflowSourceTaskShipmentSourceType),
 			workflowtask.SourceID(5801),
 			workflowtask.TaskGroup("invoice_registration"),
 		).
@@ -134,6 +149,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 		events[1].Payload["invoice_deferred"] != true {
 		t.Fatalf("expected shipment release status event ready -> done, got %#v", events)
 	}
+	assertCanonicalShipmentReleasePayload(t, events[1].Payload, 5801)
 
 	if _, err := uc.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
 		ID:              shipmentTask.ID,
@@ -146,7 +162,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 		t.Fatalf("repeat done update failed: %v", err)
 	}
 	stateCount, err := client.WorkflowBusinessState.Query().
-		Where(workflowbusinessstate.SourceType("shipping-release"), workflowbusinessstate.SourceID(5801)).
+		Where(workflowbusinessstate.SourceType(biz.WorkflowSourceTaskShipmentSourceType), workflowbusinessstate.SourceID(5801)).
 		Count(ctx)
 	if err != nil {
 		t.Fatalf("count business states failed: %v", err)
@@ -155,7 +171,7 @@ func TestWorkflowRepo_ShipmentReleaseDoneUpsertsBusinessStateOnly(t *testing.T) 
 		t.Fatalf("expected business state upsert to keep one row, got %d", stateCount)
 	}
 	taskCount, err = client.WorkflowTask.Query().
-		Where(workflowtask.SourceType("shipping-release"), workflowtask.SourceID(5801)).
+		Where(workflowtask.SourceType(biz.WorkflowSourceTaskShipmentSourceType), workflowtask.SourceID(5801)).
 		Count(ctx)
 	if err != nil {
 		t.Fatalf("count repeated workflow tasks failed: %v", err)
@@ -188,7 +204,7 @@ func TestWorkflowRepo_ShipmentReleaseBlockedAndRejectedPreserveReasonPayload(t *
 				log.NewStdLogger(io.Discard),
 			)
 			uc := biz.NewWorkflowUsecase(repo)
-			shipmentTask := createShipmentReleaseTask(t, ctx, repo, tc.sourceID, map[string]any{
+			shipmentTask := createCanonicalShipmentReleaseSourceTask(t, ctx, repo, tc.sourceID, map[string]any{
 				tc.staleKey: "旧原因",
 			})
 			if shipmentTask.BusinessStatusKey == nil || *shipmentTask.BusinessStatusKey != tc.initialState {
@@ -225,12 +241,13 @@ func TestWorkflowRepo_ShipmentReleaseBlockedAndRejectedPreserveReasonPayload(t *
 				updatedTask.Payload["shipment_release_task_id"] != float64(shipmentTask.ID) && updatedTask.Payload["shipment_release_task_id"] != shipmentTask.ID {
 				t.Fatalf("expected decision payload on shipment release task, got %#v", updatedTask.Payload)
 			}
+			assertCanonicalShipmentReleasePayload(t, updatedTask.Payload, tc.sourceID)
 			if _, ok := updatedTask.Payload[tc.staleKey]; ok {
 				t.Fatalf("expected stale %s to be cleared, got %#v", tc.staleKey, updatedTask.Payload)
 			}
 
 			state, err := client.WorkflowBusinessState.Query().
-				Where(workflowbusinessstate.SourceType("shipping-release"), workflowbusinessstate.SourceID(tc.sourceID)).
+				Where(workflowbusinessstate.SourceType(biz.WorkflowSourceTaskShipmentSourceType), workflowbusinessstate.SourceID(tc.sourceID)).
 				Only(ctx)
 			if err != nil {
 				t.Fatalf("query shipment release business state failed: %v", err)
@@ -247,12 +264,13 @@ func TestWorkflowRepo_ShipmentReleaseBlockedAndRejectedPreserveReasonPayload(t *
 				state.Payload[tc.reasonKey] != reason {
 				t.Fatalf("expected reason payload on business state, got %#v", state.Payload)
 			}
+			assertCanonicalShipmentReleasePayload(t, state.Payload, tc.sourceID)
 			if _, ok := state.Payload[tc.staleKey]; ok {
 				t.Fatalf("expected business state stale %s to be cleared, got %#v", tc.staleKey, state.Payload)
 			}
 
 			taskCount, err := client.WorkflowTask.Query().
-				Where(workflowtask.SourceType("shipping-release"), workflowtask.SourceID(tc.sourceID)).
+				Where(workflowtask.SourceType(biz.WorkflowSourceTaskShipmentSourceType), workflowtask.SourceID(tc.sourceID)).
 				Count(ctx)
 			if err != nil {
 				t.Fatalf("count workflow tasks failed: %v", err)
@@ -275,6 +293,55 @@ func TestWorkflowRepo_ShipmentReleaseBlockedAndRejectedPreserveReasonPayload(t *
 				events[1].Payload[tc.reasonKey] != reason {
 				t.Fatalf("expected status event with reason payload, got %#v", events)
 			}
+			assertCanonicalShipmentReleasePayload(t, events[1].Payload, tc.sourceID)
 		})
+	}
+}
+
+func createCanonicalShipmentReleaseSourceTask(
+	t *testing.T,
+	ctx context.Context,
+	repo *workflowRepo,
+	sourceID int,
+	payloadOverrides map[string]any,
+) *biz.WorkflowTask {
+	t.Helper()
+	customerName := "成慧怡"
+	taskCreate, initialState, err := biz.BuildShipmentReleaseSourceTask(&biz.Shipment{
+		ID:               sourceID,
+		ShipmentNo:       fmt.Sprintf("SHIP-%d", sourceID),
+		CustomerSnapshot: &customerName,
+		Status:           biz.ShipmentStatusDraft,
+		Items:            []*biz.ShipmentItem{{ShipmentID: sourceID}},
+	})
+	if err != nil {
+		t.Fatalf("build canonical shipment release source task failed: %v", err)
+	}
+	for key, value := range payloadOverrides {
+		taskCreate.Payload[key] = value
+		initialState.Payload[key] = value
+	}
+	task, created, err := ensureSourceWorkflowTaskWithClient(ctx, repo.data.postgres, taskCreate, initialState, 7)
+	if err != nil {
+		t.Fatalf("create canonical shipment release source task failed: %v", err)
+	}
+	if !created {
+		t.Fatalf("expected canonical shipment release source task to be created")
+	}
+	if !biz.IsTrustedShipmentReleaseSourceTask(task) || task.OwnerRoleKey != biz.WarehouseRoleKey {
+		t.Fatalf("unexpected canonical shipment release source task %#v", task)
+	}
+	assertCanonicalShipmentReleasePayload(t, task.Payload, sourceID)
+	return task
+}
+
+func assertCanonicalShipmentReleasePayload(t *testing.T, payload map[string]any, sourceID int) {
+	t.Helper()
+	if payload["source_task_contract"] != biz.WorkflowSourceTaskContractV1 ||
+		payload["source_task_producer"] != biz.WorkflowSourceTaskShipmentSubmitReleaseProducer ||
+		payload["shipment_release"] != true ||
+		payload["shipment_id"] != float64(sourceID) && payload["shipment_id"] != sourceID ||
+		payload[workflowSourceTaskIntentHashPayloadKey] == "" {
+		t.Fatalf("expected canonical shipment release source payload, got %#v", payload)
 	}
 }

@@ -32,4 +32,8 @@ test('payable and quality actions fail closed on posted and accepted quality sta
   assert.match(source, /判定合格或让步接收后才能生成应付/u)
   assert.match(source, /生成应付/u)
   assert.match(source, /已发起质检/u)
+  assert.match(source, /canViewQualityInspection/u)
+  assert.match(source, /selectedQualityInspection/u)
+  assert.match(source, /onViewQualityInspection/u)
+  assert.match(source, /继续质检/u)
 })

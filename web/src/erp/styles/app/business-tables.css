@@ -1567,6 +1567,11 @@
   box-shadow: 0 14px 34px rgb(27 51 36 / 10%);
 }
 
+.erp-business-collaboration-task-panel--expanded.ant-card {
+  position: relative;
+  bottom: auto;
+}
+
 .erp-business-collaboration-task-panel__resize-handle {
   display: flex;
   width: 100%;

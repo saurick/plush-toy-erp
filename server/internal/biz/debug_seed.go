@@ -695,17 +695,17 @@ var debugBusinessChainScenarios = map[string]debugBusinessChainScenario{
 		},
 		records: []debugRecordTemplate{
 			{ref: "progress", moduleKey: "production-progress", title: "成品完工待抽检", statusKey: "qc_pending", ownerRoleKey: "production", customerName: "调试客户 B", productName: "调试款毛绒狗", quantity: 600, unit: "只", amount: 33000, dueOffsetDays: 2},
-			{ref: "shipping", moduleKey: "shipping-release", title: "成品入库后待出货放行", statusKey: "shipping_released", ownerRoleKey: "warehouse", customerName: "调试客户 B", productName: "调试款毛绒狗", warehouseLocation: "FG-DEBUG-01", quantity: 590, unit: "只", amount: 32450, dueOffsetDays: 5},
+			{ref: "shipping", moduleKey: "shipping-release", title: "成品入库后待出货放行", statusKey: "shipment_pending", ownerRoleKey: "warehouse", customerName: "调试客户 B", productName: "调试款毛绒狗", warehouseLocation: "FG-DEBUG-01", quantity: 590, unit: "只", amount: 32450, dueOffsetDays: 5},
 			{ref: "outbound", moduleKey: "outbound", title: "出库待确认", statusKey: "shipped", ownerRoleKey: "warehouse", customerName: "调试客户 B", productName: "调试款毛绒狗", quantity: 590, unit: "只", amount: 32450, dueOffsetDays: 6},
 		},
 		tasks: []debugTaskTemplate{
 			{recordRef: "progress", suffix: "FQC", group: "finished_goods_qc", name: "成品抽检", statusKey: "ready", businessStatusKey: "qc_pending", ownerRoleKey: "quality", priority: 2, dueOffsetDays: 1},
-			{recordRef: "shipping", suffix: "SHIP", group: "shipment_release", name: "出货放行确认", statusKey: "ready", businessStatusKey: "shipping_released", ownerRoleKey: "sales", priority: 2, dueOffsetDays: 3},
+			{recordRef: "shipping", suffix: "SHIP", group: "trial_warehouse_work", name: "模拟出货放行确认", statusKey: "ready", businessStatusKey: "shipment_pending", ownerRoleKey: "warehouse", priority: 2, dueOffsetDays: 3},
 			{recordRef: "outbound", suffix: "OUT", group: "warehouse_outbound", name: "仓库出库确认", statusKey: "ready", businessStatusKey: "shipped", ownerRoleKey: "warehouse", priority: 1, dueOffsetDays: 4},
 		},
 		states: []debugStateTemplate{
 			{recordRef: "progress", statusKey: "qc_pending", ownerRoleKey: "quality"},
-			{recordRef: "shipping", statusKey: "shipping_released", ownerRoleKey: "sales"},
+			{recordRef: "shipping", statusKey: "shipment_pending", ownerRoleKey: "warehouse"},
 			{recordRef: "outbound", statusKey: "shipped", ownerRoleKey: "warehouse"},
 		},
 	},

@@ -45,6 +45,15 @@ test('post-success refresh failure is not reported as a failed cancellation', ()
   assert.match(source, /return true/)
 })
 
+test('only posted rework feedback explains the atomic exception handoff', () => {
+  assert.match(
+    source,
+    /currentActiveKey === 'production'[\s\S]{0,180}actionKey === 'post'[\s\S]{0,180}row\.fact_type[\s\S]{0,180}'REWORK'/u
+  )
+  assert.match(source, /返工记录已过账，生产异常任务已生成/u)
+  assert.doesNotMatch(source, /发起生产异常/u)
+})
+
 test('production and outsourcing source links constrain the destination list', () => {
   assert.match(
     source,

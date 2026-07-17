@@ -176,11 +176,7 @@ export const yoyoosunImportConfig = Object.freeze({
       classification: "draft_customer_config",
       decision: "review_required",
       source: "docs/customers/yoyoosun/试用账号角色菜单核对清单.md",
-      appliesTo: Object.freeze([
-        "roles",
-        "permissions",
-        "mobile_task_entry",
-      ]),
+      appliesTo: Object.freeze(["roles", "permissions", "mobile_task_entry"]),
       productCoreImpact: "none",
       guardrail:
         "只作为客户账号和培训核对清单；不改变后端 RBAC 真源，不把移动端任务完成写成事实过账。",
@@ -231,7 +227,12 @@ export const yoyoosunImportConfig = Object.freeze({
     {
       key: "purchase_material_summary",
       label: "辅材 / 包材 / 原辅料采购汇总线索",
-      domains: Object.freeze(["purchase_orders", "materials", "suppliers", "units"]),
+      domains: Object.freeze([
+        "purchase_orders",
+        "materials",
+        "suppliers",
+        "units",
+      ]),
       mappedFields: Object.freeze([
         "产品订单编号",
         "产品编号",
@@ -247,12 +248,19 @@ export const yoyoosunImportConfig = Object.freeze({
         "回货日期",
       ]),
       decision: "deferred",
-      guardrail: "采购数量和金额不能自动生成采购订单、采购入库、库存或应付事实。",
+      guardrail:
+        "采购数量和金额不能自动生成采购订单、采购入库、库存或应付事实。",
     },
     {
       key: "supplier_contact_directory",
       label: "材料厂商 / 加工厂商资料线索",
-      domains: Object.freeze(["suppliers", "contacts"]),
+      domains: Object.freeze([
+        "suppliers",
+        "contacts",
+        "processes",
+        "supplier_process_capabilities",
+        "customer_material",
+      ]),
       mappedFields: Object.freeze([
         "厂商简称",
         "厂商编号",
@@ -261,17 +269,29 @@ export const yoyoosunImportConfig = Object.freeze({
         "加工工序",
         "联系人",
         "联系电话",
-        "地址",
+        "开票类型",
+        "开票点数",
+        "加工商地址",
         "类别",
         "银行卡号",
+        "公司对接人",
+        "对接人电话",
+        "备注",
       ]),
       decision: "review_required",
-      guardrail: "联系电话、地址、银行卡号属于敏感字段线索；联系人 owner_id 不能按名称猜测。",
+      guardrail:
+        "加工工序是供应商能力关系，不是 supplier_type；公司侧对接人不能混入供应商联系人。银行卡只保留存在性与脱敏证据，联系人 owner_id 和能力关系两端 ID 都不能按名称猜测。",
     },
     {
       key: "outsourcing_summary",
       label: "委外加工汇总线索",
-      domains: Object.freeze(["outsourcing", "processes", "suppliers", "products", "units"]),
+      domains: Object.freeze([
+        "outsourcing",
+        "processes",
+        "suppliers",
+        "products",
+        "units",
+      ]),
       mappedFields: Object.freeze([
         "委外加工订单号",
         "产品订单编号",
@@ -282,18 +302,29 @@ export const yoyoosunImportConfig = Object.freeze({
         "工序类别",
         "单位",
         "单价",
-        "加工数量",
+        "数量",
         "加工金额",
+        "备注",
+        "下单人",
+        "联系电话",
         "回货日期",
+        "用料数量",
+        "材料单位",
+        "加工入库数量",
+        "数量差异(采购-入库)",
       ]),
       decision: "deferred",
       guardrail:
-        "加工项目、工序名称和工序类别可作为 processes 工序档案候选；委外汇总仍不创建委外源单，不写 outsourcing_facts、inventory_txns 或 finance_facts。",
+        "加工项目是订单行部位/内容，不能并入工序档案；工序类别只作 process 匹配候选。末尾用料、入库、差异列是空表头，需按多材料需求与已过账回货事实另行确认，不能导入为订单可编辑字段；委外汇总仍不创建委外源单，不写 outsourcing_facts、inventory_txns 或 finance_facts。",
     },
     {
       key: "contract_print_samples",
       label: "C 类辅料合同 / B 类加工合同打印样本",
-      domains: Object.freeze(["purchase_orders", "outsourcing", "print_template_input"]),
+      domains: Object.freeze([
+        "purchase_orders",
+        "outsourcing",
+        "print_template_input",
+      ]),
       mappedFields: Object.freeze([
         "采购订单号",
         "委外加工订单号",
@@ -322,27 +353,43 @@ export const yoyoosunImportConfig = Object.freeze({
     },
     {
       step: 2,
-      domains: Object.freeze(["products", "materials", "processes", "suppliers"]),
+      domains: Object.freeze([
+        "products",
+        "materials",
+        "processes",
+        "suppliers",
+      ]),
       decision: "review_required",
-      reason: "产品、材料、工序和供应商可进入主数据候选，但重复名称、工序类别、厂商简称和加工厂角色必须人工确认。",
+      reason:
+        "产品、材料、工序和供应商可进入主数据候选，但重复名称、工序类别、厂商简称和加工厂角色必须人工确认。",
     },
     {
       step: 3,
-      domains: Object.freeze(["contacts"]),
+      domains: Object.freeze(["supplier_process_capabilities"]),
       decision: "review_required",
-      reason: "联系人必须先确认 owner_type + owner_id；不能按供应商名称猜 owner_id。",
+      reason:
+        "供应商和工序两端都必须先唯一匹配，能力关系不能按名称直接写入。",
     },
     {
       step: 4,
-      domains: Object.freeze(["bom"]),
+      domains: Object.freeze(["contacts", "customer_material"]),
       decision: "review_required",
-      reason: "BOM 只在产品、材料、单位均唯一匹配后才能作为后续导入候选；不写库存事实。",
+      reason:
+        "供应商联系人必须确认 owner_type + owner_id；公司对接人继续作为客户侧审核材料，不能混入供应商联系人。",
     },
     {
       step: 5,
+      domains: Object.freeze(["bom"]),
+      decision: "review_required",
+      reason:
+        "BOM 只在产品、材料、单位均唯一匹配后才能作为后续导入候选；不写库存事实。",
+    },
+    {
+      step: 6,
       domains: Object.freeze(["purchase_orders", "outsourcing"]),
       decision: "deferred",
-      reason: "采购订单和委外源单据当前仍是 deferred domain；工序只进入 processes 主数据候选，本提取只保留来源快照和字段映射。",
+      reason:
+        "采购订单和委外源单据当前仍是 deferred domain；工序只进入 processes 主数据候选，本提取只保留来源快照和字段映射。",
     },
   ]),
   reviewQueues: Object.freeze([
@@ -394,7 +441,12 @@ export const yoyoosunImportConfig = Object.freeze({
     {
       key: "existing_v1_snapshot",
       severity: "block",
-      domains: Object.freeze(["customers", "suppliers", "contacts", "sales_orders"]),
+      domains: Object.freeze([
+        "customers",
+        "suppliers",
+        "contacts",
+        "sales_orders",
+      ]),
       evidenceRequired: true,
       decision: "review_required",
       owner: "data_governance",

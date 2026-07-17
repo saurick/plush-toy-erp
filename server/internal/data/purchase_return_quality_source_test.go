@@ -95,7 +95,7 @@ func TestPurchaseReturnFromQualityInspectionRejectsWrongStateAndExcessQuantity(t
 	if _, err := uc.SubmitQualityInspection(ctx, passedDraft.ID); err != nil {
 		t.Fatalf("submit passed-state quality draft: %v", err)
 	}
-	if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: passedDraft.ID}); err != nil {
+	if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(passedDraft.ID, biz.QualityInspectionResultPass)); err != nil {
 		t.Fatalf("pass quality inspection: %v", err)
 	}
 	if _, err := uc.CreatePurchaseReturnFromQualityInspection(ctx, &biz.PurchaseReturnFromQualityInspectionCreate{
@@ -145,10 +145,9 @@ func createRejectedPurchaseReceiptInspection(
 	if _, err := uc.SubmitQualityInspection(ctx, draft.ID); err != nil {
 		t.Fatalf("submit rejected quality draft: %v", err)
 	}
-	rejected, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: draft.ID,
-		DecisionNote: stringPtr("来料不合格"),
-	})
+	decision := approximateQualityInspectionDecision(draft.ID, biz.QualityInspectionResultReject)
+	decision.DecisionNote = stringPtr("来料不合格")
+	rejected, err := uc.RejectQualityInspection(ctx, decision)
 	if err != nil {
 		t.Fatalf("reject quality inspection: %v", err)
 	}

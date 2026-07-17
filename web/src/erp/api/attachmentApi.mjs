@@ -28,3 +28,31 @@ export async function downloadBusinessAttachment(params = {}) {
   const result = await attachmentRpc.call('download_attachment', params)
   return dataOf(result)?.attachment || null
 }
+
+export async function listProductImages(params = {}) {
+  const { product_id: productID, ...rest } = params
+  return listBusinessAttachments({
+    ...rest,
+    owner_type: 'product',
+    owner_id: productID,
+  })
+}
+
+export async function uploadProductImage(params = {}) {
+  const { product_id: productID, ...rest } = params
+  return uploadBusinessAttachment({
+    ...rest,
+    owner_type: 'product',
+    owner_id: productID,
+    attachment_type: 'product_image',
+  })
+}
+
+export async function clearProductImage(params = {}) {
+  const { product_id: productID, ...rest } = params
+  const result = await attachmentRpc.call('clear_product_image', {
+    ...rest,
+    owner_id: productID,
+  })
+  return dataOf(result)?.cleared === true
+}

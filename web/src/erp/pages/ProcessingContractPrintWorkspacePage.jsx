@@ -7,17 +7,15 @@ import {
 } from 'react-router-dom'
 import { message, modal } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import PrintAppendixImageManager from '../components/print/PrintAppendixImages.jsx'
 import ProcessingContractPaper from '../components/print/ProcessingContractPaper.jsx'
 import PrintWorkspaceShell from '../components/print/PrintWorkspaceShell.jsx'
 import {
   PROCESSING_CONTRACT_TEMPLATE_KEY,
-  createEmptyProcessingAttachment,
   createBlankProcessingContractDraft,
   createProcessingContractBusinessDraft,
   createProcessingContractDraft,
-  normalizeProcessingContractAttachments,
-  normalizeProcessingLine,
-  processingContractAttachmentSlots,
+  normalizeProcessingContractDraft,
 } from '../data/processingContractTemplate.mjs'
 import {
   PDF_ACTION_UI_STALE_TIMEOUT_MS,
@@ -55,6 +53,7 @@ import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
+import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSnapshot.js'
 import {
   useFlushPrintWorkspaceDraftOnPageExit,
@@ -62,73 +61,6 @@ import {
 } from '../utils/usePersistentPrintWorkspaceDraft.js'
 
 const DRAFT_STORAGE_KEY = '__plush_erp_processing_contract_print_draft__'
-const ATTACHMENT_ACCEPT = 'image/*,.svg'
-
-function readFileAsDataURL(file) {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(new Error('读取附件失败，请重新上传'))
-    reader.onload = () => resolve(String(reader.result || ''))
-    reader.readAsDataURL(file)
-  })
-}
-
-function loadImageFromDataURL(dataURL) {
-  return new Promise((resolve, reject) => {
-    const image = new Image()
-    image.onerror = () =>
-      reject(new Error('附件图片无法识别，请换一张图片重试'))
-    image.onload = () => resolve(image)
-    image.src = dataURL
-  })
-}
-
-async function createAttachmentSnapshot(file) {
-  const fileName = String(file?.name || '').trim()
-  const fileType = String(file?.type || '').toLowerCase()
-  const isSVG =
-    fileType === 'image/svg+xml' || fileName.toLowerCase().endsWith('.svg')
-
-  if (!isSVG && !fileType.startsWith('image/')) {
-    throw new Error('纸样 / 图样附件当前只支持图片格式')
-  }
-
-  const originalDataURL = await readFileAsDataURL(file)
-  if (isSVG) {
-    return {
-      name: fileName,
-      dataURL: originalDataURL,
-      mimeType: fileType || 'image/svg+xml',
-    }
-  }
-
-  const image = await loadImageFromDataURL(originalDataURL)
-  const maxDimension = 1400
-  const scale = Math.min(
-    1,
-    maxDimension / Math.max(image.naturalWidth || 1, image.naturalHeight || 1)
-  )
-  const width = Math.max(1, Math.round((image.naturalWidth || 1) * scale))
-  const height = Math.max(1, Math.round((image.naturalHeight || 1) * scale))
-  const canvas = document.createElement('canvas')
-  canvas.width = width
-  canvas.height = height
-  const context = canvas.getContext('2d')
-  if (!context) {
-    throw new Error('浏览器暂不支持当前附件处理能力')
-  }
-
-  // 纸样快照会持久化到草稿并进入服务端 PDF 渲染，这里先压缩到可控尺寸。
-  context.fillStyle = '#ffffff'
-  context.fillRect(0, 0, width, height)
-  context.drawImage(image, 0, 0, width, height)
-
-  return {
-    name: fileName,
-    dataURL: canvas.toDataURL('image/jpeg', 0.86),
-    mimeType: 'image/jpeg',
-  }
-}
 
 function loadDraft({
   forceFresh = false,
@@ -153,18 +85,9 @@ function loadDraft({
     workspaceStateID
   )
   if (initialDraft) {
-    if (businessInput) {
-      return createProcessingContractBusinessDraft(initialDraft)
-    }
-    const { attachments, lines, ...rest } = initialDraft || {}
-    return {
-      ...createProcessingContractDraft(),
-      ...rest,
-      lines: Array.isArray(lines)
-        ? lines.map((line) => normalizeProcessingLine(line))
-        : createProcessingContractDraft().lines,
-      attachments: normalizeProcessingContractAttachments(attachments),
-    }
+    return businessInput
+      ? createProcessingContractBusinessDraft(initialDraft)
+      : normalizeProcessingContractDraft(initialDraft)
   }
 
   try {
@@ -174,18 +97,9 @@ function loadDraft({
     }
 
     const parsed = JSON.parse(raw)
-    if (businessInput) {
-      return createProcessingContractBusinessDraft(parsed)
-    }
-    const { attachments, lines, ...rest } = parsed || {}
-    return {
-      ...createProcessingContractDraft(),
-      ...rest,
-      lines: Array.isArray(lines)
-        ? lines.map((line) => normalizeProcessingLine(line))
-        : createProcessingContractDraft().lines,
-      attachments: normalizeProcessingContractAttachments(attachments),
-    }
+    return businessInput
+      ? createProcessingContractBusinessDraft(parsed)
+      : normalizeProcessingContractDraft(parsed)
   } catch {
     return fallbackDraft
   }
@@ -223,7 +137,6 @@ export default function ProcessingContractPrintWorkspacePage() {
   )
   const paperRef = useRef(null)
   const stageWrapRef = useRef(null)
-  const attachmentInputRefs = useRef({})
   const workspaceStateID = resolvePrintWorkspaceStateID(searchParams)
   const entrySource = resolvePrintWorkspaceEntrySource(searchParams)
   const sourceTag =
@@ -414,6 +327,21 @@ export default function ProcessingContractPrintWorkspacePage() {
         ),
       },
     }))
+  }
+
+  const handleAppendixImagesChange = (images) => {
+    let persisted = true
+    setContract((current) => {
+      const nextContract = {
+        ...current,
+        appendixImages: normalizePrintAppendixImages(images),
+      }
+      persisted =
+        !draftStorageKey ||
+        persistPrintWorkspaceDraftSnapshot(draftStorageKey, nextContract)
+      return nextContract
+    })
+    return persisted
   }
 
   const handleToggleRowSelectionMode = () => {
@@ -665,45 +593,6 @@ export default function ProcessingContractPrintWorkspacePage() {
     setToolbarStatus(result.message)
   }
 
-  const handleAttachmentUploadClick = (slotKey) => {
-    attachmentInputRefs.current[slotKey]?.click()
-  }
-
-  const handleAttachmentFileChange = async (slot, event) => {
-    const file = event.target.files?.[0]
-    event.target.value = ''
-    if (!file) {
-      return
-    }
-
-    setToolbarStatus(`正在处理${slot.title}...`)
-    try {
-      const snapshot = await createAttachmentSnapshot(file)
-      setContract((current) => ({
-        ...current,
-        attachments: {
-          ...current.attachments,
-          [slot.key]: snapshot,
-        },
-      }))
-      setToolbarStatus(`已将${slot.title}添加到右侧附件区：${file.name}`)
-    } catch (error) {
-      setToolbarStatus(`上传${slot.title}失败。`)
-      message.error(getActionErrorMessage(error, `处理${slot.title}`))
-    }
-  }
-
-  const handleAttachmentClear = (slot) => {
-    setContract((current) => ({
-      ...current,
-      attachments: {
-        ...current.attachments,
-        [slot.key]: createEmptyProcessingAttachment(),
-      },
-    }))
-    setToolbarStatus(`已清空${slot.title}。`)
-  }
-
   const resetDraft = () => {
     setContract(createProcessingContractDraft())
     setSelectedLineIndex(null)
@@ -718,7 +607,7 @@ export default function ProcessingContractPrintWorkspacePage() {
     modal.confirm({
       title: '生成空白加工合同',
       content:
-        '将清空当前窗口中的合同内容、明细和附件，保留模板结构与合同条款。此操作不会修改业务记录。',
+        '将清空当前窗口中的合同内容、明细和末尾图片，保留模板结构与合同条款。此操作不会修改业务记录。',
       okText: '生成空白模板',
       cancelText: '取消',
       onOk: () => {
@@ -866,68 +755,6 @@ export default function ProcessingContractPrintWorkspacePage() {
     ),
   ]
 
-  const attachmentUploadBar = (
-    <section className="erp-processing-contract-upload-bar">
-      <div className="erp-processing-contract-upload-bar__copy">
-        纸样 / 图样附件通过左侧按钮上传，会显示在右侧页底附件区，并随 PDF /
-        打印一起输出。
-      </div>
-      <div className="erp-processing-contract-upload-bar__actions">
-        {processingContractAttachmentSlots.map((slot) => {
-          const attachmentSnapshot = contract.attachments?.[slot.key]
-          const hasAttachment = Boolean(attachmentSnapshot?.dataURL)
-          return (
-            <div
-              key={slot.key}
-              className="erp-processing-contract-upload-bar__item"
-            >
-              <input
-                ref={(node) => {
-                  attachmentInputRefs.current[slot.key] = node
-                }}
-                className="erp-processing-contract-upload-bar__input"
-                type="file"
-                accept={ATTACHMENT_ACCEPT}
-                onChange={(event) => handleAttachmentFileChange(slot, event)}
-              />
-              <button
-                type="button"
-                className={getToolbarButtonClassName({
-                  active: hasAttachment,
-                })}
-                onClick={() => handleAttachmentUploadClick(slot.key)}
-                title={
-                  hasAttachment
-                    ? `${slot.title}：${attachmentSnapshot.name}`
-                    : `上传${slot.title}`
-                }
-              >
-                上传{slot.title}
-              </button>
-              {hasAttachment ? (
-                <button
-                  type="button"
-                  className={getToolbarButtonClassName()}
-                  onClick={() => handleAttachmentClear(slot)}
-                >
-                  清空
-                </button>
-              ) : null}
-              <span
-                className="erp-processing-contract-upload-bar__status"
-                title={attachmentSnapshot?.name || slot.title}
-              >
-                {hasAttachment
-                  ? `已添加：${attachmentSnapshot.name}`
-                  : '未上传'}
-              </span>
-            </div>
-          )
-        })}
-      </div>
-    </section>
-  )
-
   const detailEditor = (
     <section className="erp-print-shell__detail-panel">
       <h4>加工明细分行编辑</h4>
@@ -935,7 +762,7 @@ export default function ProcessingContractPrintWorkspacePage() {
         <thead>
           <tr>
             <th>序号</th>
-            <th>工序名称</th>
+            <th>加工项目</th>
             <th>数量</th>
             <th>单价</th>
             <th>金额</th>
@@ -952,9 +779,9 @@ export default function ProcessingContractPrintWorkspacePage() {
                 <textarea
                   className="erp-print-shell__detail-editor erp-print-shell__detail-editor--multiline"
                   rows={2}
-                  value={line.processName}
+                  value={line.processingItem}
                   onChange={(event) =>
-                    setLineField(index, 'processName', event.target.value)
+                    setLineField(index, 'processingItem', event.target.value)
                   }
                 />
               </td>
@@ -1024,9 +851,15 @@ export default function ProcessingContractPrintWorkspacePage() {
             ? '正在下载 PDF...'
             : toolbarStatus
       }
-      panelTip="左侧修改会立即显示在右侧合同中；右侧表格和条款可直接编辑，打印时只输出右侧合同。"
+      panelTip="左侧修改会立即显示在右侧合同中；普通末尾图片自动两张一行，长图自动整行，每张可切换排版，打印时只输出右侧合同。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
-      panelActions={attachmentUploadBar}
+      panelActions={
+        <PrintAppendixImageManager
+          images={contract.appendixImages}
+          onImagesChange={handleAppendixImagesChange}
+          onStatusChange={setToolbarStatus}
+        />
+      }
       detailEditor={detailEditor}
       fieldRows={fieldRows}
       formulaPanel={
@@ -1176,7 +1009,6 @@ export default function ProcessingContractPrintWorkspacePage() {
         <ProcessingContractPaper
           paperRef={paperRef}
           contract={contract}
-          attachments={contract.attachments}
           selectedLineIndex={selectedLineIndex}
           lineSelectionMode={rowSelectionMode}
           cellSelectionMode={cellSelectionMode}

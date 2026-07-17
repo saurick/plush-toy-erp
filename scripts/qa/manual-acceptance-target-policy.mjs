@@ -256,6 +256,7 @@ export function assertManualAcceptanceMutationTarget(
     );
   }
   const expected = manualAcceptanceTargetConfirmation(resolved);
+  if (!expected) return resolved;
   if (confirmation !== expected) {
     const scope = resolved.external ? "external" : resolved.target;
     throw new ManualAcceptanceTargetPolicyError(

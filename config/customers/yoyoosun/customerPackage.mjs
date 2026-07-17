@@ -241,19 +241,30 @@ export const yoyoosunCustomerPackage = Object.freeze({
     },
     {
       key: "purchase_to_inventory",
-      label: "采购到库存",
+      label: "采购、IQC 到库存",
       status: "preview_only",
-      modules: Object.freeze(["purchase_orders", "purchase_receipts", "inventory"]),
+      modules: Object.freeze([
+        "purchase_orders",
+        "purchase_receipts",
+        "quality_inspections",
+        "inventory",
+      ]),
       guardrail:
-        "采购承诺、到货协同和库存入账分开；只有采购入库事实 usecase 可写库存。",
+        "采购订单批准只形成采购承诺；到货后先形成采购入库草稿和逐行待检，再由正式 IQC 判定；只有全部行合格或让步接收才允许 POSTED 入库。当前流程预览不替代采购、质检或库存 usecase。",
     },
     {
       key: "production_to_inventory",
-      label: "生产到库存",
+      label: "车缝、手工到成品库存",
       status: "preview_only",
-      modules: Object.freeze(["workflow_tasks", "inventory", "quality_inspections"]),
+      modules: Object.freeze([
+        "production_orders",
+        "outsourcing_orders",
+        "workflow_tasks",
+        "quality_inspections",
+        "inventory",
+      ]),
       guardrail:
-        "生产完工协同不等于成品入库；质检和入库事实必须走对应 usecase。",
+        "甲方已确认车缝完成并检验后再进入手工，车缝和手工分别由生产经理决定本厂或外发；正式 WIP 执行按生产订单冻结路线快照，以显式子批承接本厂车间移交或外发回仓，并为裁片、皮套、成品、针检、抽检和条件性客户验货保留独立质量关口。这里仍是客户流程预览，不替代生产、委外、质检或库存 usecase；包装完成和生产协同完成都不等于成品已经入库。",
     },
     {
       key: "delivery_to_settlement",

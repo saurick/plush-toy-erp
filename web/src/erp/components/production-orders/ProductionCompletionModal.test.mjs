@@ -48,3 +48,13 @@ test('production completion requires one bounded lot input and handles validatio
   assert.match(source, /if \(!error\?\.errorFields\) throw error/u)
   assert.match(source, /disabled=\{loading\}/u)
 })
+
+test('production completion defaults and validates against the current completion cap', () => {
+  assert.match(source, /quantity:\s*firstAvailable\?\.remaining/u)
+  assert.match(source, /当前可完工上限/u)
+  assert.match(source, /compareProductionCompletionQuantity/u)
+  assert.match(source, /不能超过当前可完工上限/u)
+  assert.doesNotMatch(source, /包装已合格/u)
+  assert.match(source, /maxLength=\{21\}/u)
+  assert.doesNotMatch(source, /const quantity = Number\(value\)/u)
+})

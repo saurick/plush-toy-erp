@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
+	"server/internal/data/model/ent/supplier"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -172,6 +173,21 @@ func (_c *ProcessCreate) AddOutsourcingOrderItems(v ...*OutsourcingOrderItem) *P
 		ids[i] = v[i].ID
 	}
 	return _c.AddOutsourcingOrderItemIDs(ids...)
+}
+
+// AddCapableSupplierIDs adds the "capable_suppliers" edge to the Supplier entity by IDs.
+func (_c *ProcessCreate) AddCapableSupplierIDs(ids ...int) *ProcessCreate {
+	_c.mutation.AddCapableSupplierIDs(ids...)
+	return _c
+}
+
+// AddCapableSuppliers adds the "capable_suppliers" edges to the Supplier entity.
+func (_c *ProcessCreate) AddCapableSuppliers(v ...*Supplier) *ProcessCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddCapableSupplierIDs(ids...)
 }
 
 // Mutation returns the ProcessMutation object of the builder.
@@ -372,6 +388,22 @@ func (_c *ProcessCreate) createSpec() (*Process, *sqlgraph.CreateSpec) {
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(outsourcingorderitem.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.CapableSuppliersIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: true,
+			Table:   process.CapableSuppliersTable,
+			Columns: process.CapableSuppliersPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(supplier.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

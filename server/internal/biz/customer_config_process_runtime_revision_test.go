@@ -117,3 +117,71 @@ func processRuntimeSalesSubmitModules(workflowState string) []DeploymentModuleSt
 		{ModuleKey: "workflow_tasks", State: workflowState},
 	}
 }
+
+func TestProcessDomainCommandShipmentShipRequiresWorkflowTasksAtCapturedRevision(t *testing.T) {
+	ctx := context.Background()
+	const (
+		customerKey = "yoyoosun"
+		r1          = "yoyoosun-shipment-r1"
+		r2          = "yoyoosun-shipment-r2"
+	)
+	activatedAt := time.Date(2026, 7, 17, 9, 0, 0, 0, time.UTC)
+	repo := newMemCustomerConfigRepo()
+	repo.revisions[customerRevisionKey(customerKey, r1)] = &CustomerConfigRevision{
+		CustomerKey: customerKey,
+		Revision:    r1,
+		Status:      CustomerConfigStatusSuperseded,
+		ActivatedAt: &activatedAt,
+	}
+	repo.revisions[customerRevisionKey(customerKey, r2)] = &CustomerConfigRevision{
+		CustomerKey: customerKey,
+		Revision:    r2,
+		Status:      CustomerConfigStatusActive,
+		ActivatedAt: &activatedAt,
+	}
+	repo.modules[customerRevisionKey(customerKey, r1)] = processRuntimeShipmentShipModules("enabled")
+	repo.modules[customerRevisionKey(customerKey, r2)] = processRuntimeShipmentShipModules("read_only")
+	for _, revision := range []string{r1, r2} {
+		key := customerRevisionKey(customerKey, revision)
+		repo.roles[key] = []RoleProfileInput{{RoleKey: WarehouseRoleKey, DisplayName: "仓库"}}
+		repo.entitlements[key] = []AccessEntitlementInput{{
+			RoleKey:       WarehouseRoleKey,
+			CapabilityKey: PermissionShipmentShip,
+			ScopeType:     "customer",
+			ScopeValue:    customerKey,
+			Enabled:       true,
+		}}
+	}
+	uc := NewCustomerConfigUsecase(repo)
+	admin := &AdminUser{
+		ID:          7,
+		Username:    "warehouse-r1",
+		Roles:       []AdminRole{{Key: WarehouseRoleKey}},
+		Permissions: []string{PermissionShipmentShip},
+		CreatedAt:   activatedAt,
+		UpdatedAt:   activatedAt,
+	}
+
+	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r1, admin, ProcessDomainCommandShipmentShip); err != nil {
+		t.Fatalf("enabled workflow_tasks at captured R1 rejected shipment ship: %v", err)
+	}
+	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r2, admin, ProcessDomainCommandShipmentShip); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("read_only workflow_tasks at captured R2 allowed shipment ship: %v", err)
+	}
+
+	repo.modules[customerRevisionKey(customerKey, r2)] = processRuntimeShipmentShipModules("disabled")
+	if err := uc.EnsureProcessDomainCommandAllowedAtRevision(ctx, customerKey, r2, admin, ProcessDomainCommandShipmentShip); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("disabled workflow_tasks at captured R2 allowed shipment ship: %v", err)
+	}
+}
+
+func processRuntimeShipmentShipModules(workflowState string) []DeploymentModuleStateInput {
+	return []DeploymentModuleStateInput{
+		{ModuleKey: "customers", State: "enabled"},
+		{ModuleKey: "products", State: "enabled"},
+		{ModuleKey: "sales_orders", State: "enabled"},
+		{ModuleKey: "inventory", State: "enabled"},
+		{ModuleKey: "shipments", State: "enabled"},
+		{ModuleKey: "workflow_tasks", State: workflowState},
+	}
+}

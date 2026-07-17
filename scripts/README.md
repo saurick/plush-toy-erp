@@ -34,8 +34,8 @@
 | `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 本机 local / dev 覆盖草稿、提交、审批、关闭、取消、检验通过 / 拒收、入库过账 / 取消等人工回归状态 |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 旧业务事实模拟矩阵的只读输入 / 计划入口；`--apply` 已 fail-closed 退役，待生产订单、委外订单、销售订单、出货、采购入库和财务事实来源驱动 fixture 重建后才能恢复写入 | 审查旧模拟范围和来源驱动重建前置                  |
-| `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、出货放行阻塞异常、跨角色催办和现场留痕 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
-| `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成、品质完成、仓库入库完成和仓库放行任务，分别登录 boss / quality / warehouse 岗位端验证完成、阻塞、退回、催办反馈和内部提醒线索 | 本地 / 试用岗位任务端真实页面验收                         |
+| `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式 `trial_*` 模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、仓库出货异常、跨角色催办和现场留痕，不占用 `production_scheduling / production_exception / shipment_release` 保留组 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
+| `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成、品质完成、仓库入库完成和 `trial_warehouse_followup` 仓库出货跟进任务，分别登录 boss / quality / warehouse 岗位端验证完成、阻塞、退回、催办反馈和内部提醒线索；不创建正式 `shipment_release` | 本地 / 试用岗位任务端真实页面验收                         |
 | `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
 | `scripts/qa/purchase-receipt-real-write-e2e.mjs` | 采购入库真实写入链路验收入口，支持 `--print-input-template` 只读输出前置和 `--preflight-report <path>` 本地脱敏前置报告；真实命令默认跑 JSON-RPC 创建 / 加行 / 过账 / 回显 / 库存事实 / 权限测试，可选追加本地 PostgreSQL 防呆测试 | MVP 第一条真实写入链路回归 / 采购入库事实验收 |
 | `scripts/qa/industry-template-boundaries.mjs`          | 行业模板候选边界检查，确保模板不变成 tenant、runtime loader、真实导入或事实写入入口                              | 行业模板调整后                                             |
@@ -132,6 +132,8 @@ node scripts/import/customerSourceManifestCheck.mjs \
 ```
 
 customer source extractor 只按显式 source manifest 中 `structuredExtract.enabled=true` 的 Excel 来源提取本地 evidence；PDF / 图片仍只是人工来源引用，不做 OCR，也不直接 glob 任意 raw 目录作为正式主路径。
+
+加工类来源保持字段分层：`加工项目` 只生成委外行 `processing_item` 候选，`工序类别` 生成委外工序匹配候选，厂商资料中的 `加工工序` 生成供应商—工序能力关系候选；`序号` 不生成供应商编码。合法回货日期与非日期来源说明分开保存，后者必须人工 review；银行卡号只输出“来源存在 / 已脱敏”标志，公司对接人也不会写成供应商联系人。
 
 ```bash
 node scripts/import/customerSourceExtract.mjs \
@@ -305,7 +307,7 @@ node scripts/qa/mobile-workflow-simulated-closure.mjs \
 
 `--print-input-template` 只输出 report-only / apply simulated mobile workflow tasks 所需的 runId、演示账号密码来源、岗位角色账号、模拟任务组和后续真实命令，不登录、不调用后端、不写报告、不写数据库、不创建 workflow 任务，也不写任何业务事实。
 
-若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、出货放行异常上报、跨角色催办和现场留痕 evidence；所有状态 / 催办动作都使用读回的正整数 `expected_version` 和由 task/action 稳定生成的顶层 `idempotency_key`，缺版本时 fail closed。它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 的 `trial_*` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、仓库出货异常上报、跨角色催办和现场留痕 evidence；它不创建或冒充 `production_scheduling / production_exception / shipment_release` 来源任务。所有状态 / 催办动作都使用读回的正整数 `expected_version` 和由 task/action 稳定生成的顶层 `idempotency_key`，缺版本时 fail closed。它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
 
 ```bash
 MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \

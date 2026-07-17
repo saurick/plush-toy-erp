@@ -27,6 +27,7 @@ import { useBusinessRowItemsPreview } from '../components/business-list/Business
 import ProductionCompletionModal from '../components/production-orders/ProductionCompletionModal.jsx'
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionOrderFormModal from '../components/production-orders/ProductionOrderFormModal.jsx'
+import ProductionRouteExecutionModal from '../components/production-orders/ProductionRouteExecutionModal.jsx'
 import { listInventoryLots } from '../api/inventoryApi.mjs'
 import { listWarehouses } from '../api/masterDataOrderApi.mjs'
 import {
@@ -45,6 +46,7 @@ import {
   releaseProductionOrder,
   saveProductionOrder,
 } from '../api/productionOrderApi.mjs'
+import { getProductionWip } from '../api/productionWipApi.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   hasActionPermission,
@@ -72,6 +74,12 @@ import {
   unixToDateInput,
 } from '../utils/productionOrderModel.mjs'
 import {
+  PRODUCTION_WIP_ROUTE_KEY,
+  partitionProductionCompletionItems,
+  productionWipCompletionEligibility,
+  productionWipOrderItemLabel,
+} from '../utils/productionWipModel.mjs'
+import {
   uniqueReferenceOptions,
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
@@ -89,6 +97,7 @@ const { Text } = Typography
 const EMPTY_COMPLETION_CONTEXT = Object.freeze({
   order: null,
   items: [],
+  blockedItems: [],
   facts: [],
   warehouseOptions: [],
   lots: [],
@@ -167,6 +176,19 @@ function productionSnapshotLabel(values, fallback) {
   )
 }
 
+function productionCompletionBlockerText(blockedItems = []) {
+  const details = blockedItems
+    .slice(0, 3)
+    .map(
+      ({ item, reason }) =>
+        `${productionWipOrderItemLabel(item)}：${String(reason || '').trim()}`
+    )
+  if (blockedItems.length > 3) {
+    details.push(`另有 ${blockedItems.length - 3} 项路线明细暂不可办理`)
+  }
+  return details.join('；')
+}
+
 function aggregateToForm(aggregate) {
   return {
     order_no: aggregate.order.order_no,
@@ -181,6 +203,8 @@ function aggregateToForm(aggregate) {
       planned_quantity: item.planned_quantity,
       sales_order_item_id: item.sales_order_item_id ?? null,
       bom_header_id: item.bom_header_id ?? null,
+      route_code: item.route_code || null,
+      customer_inspection_required: Boolean(item.customer_inspection_required),
       note: item.note || '',
     })),
   }
@@ -200,6 +224,8 @@ function draftParams(values) {
       planned_quantity: String(item.planned_quantity || '').trim(),
       sales_order_item_id: item.sales_order_item_id || null,
       bom_header_id: item.bom_header_id || null,
+      route_code: item.route_code || null,
+      customer_inspection_required: Boolean(item.customer_inspection_required),
       note: String(item.note || '').trim() || null,
     })),
   }
@@ -233,6 +259,7 @@ export default function V1ProductionOrdersPage() {
   const [completionContext, setCompletionContext] = useState(
     EMPTY_COMPLETION_CONTEXT
   )
+  const [productionRouteOpen, setProductionRouteOpen] = useState(false)
   const [materialIssueOpen, setMaterialIssueOpen] = useState(false)
   const [materialIssueLoading, setMaterialIssueLoading] = useState(false)
   const [materialIssueLotsLoading, setMaterialIssueLotsLoading] =
@@ -255,7 +282,12 @@ export default function V1ProductionOrdersPage() {
 
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
 
-  const canRead = hasActionPermission(adminProfile, 'pmc.plan.read')
+  const canReadProductionWip = hasActionPermission(
+    adminProfile,
+    'production.wip.read'
+  )
+  const canRead =
+    hasActionPermission(adminProfile, 'pmc.plan.read') || canReadProductionWip
   const canCreate = hasActionPermission(adminProfile, 'pmc.plan.create')
   const canUpdate = hasActionPermission(adminProfile, 'pmc.plan.update')
   const canCreateCompletion = hasActionPermission(
@@ -269,6 +301,26 @@ export default function V1ProductionOrdersPage() {
   const canCreateMaterialIssue = hasActionPermission(
     adminProfile,
     'production.material_issue.create'
+  )
+  const canAssignProductionWip = hasActionPermission(
+    adminProfile,
+    'production.wip.assign'
+  )
+  const canExecuteProductionWip = hasActionPermission(
+    adminProfile,
+    'production.wip.execute'
+  )
+  const canReworkProductionWip = hasActionPermission(
+    adminProfile,
+    'production.wip.rework'
+  )
+  const canConfirmPackagingMaterial = hasActionPermission(
+    adminProfile,
+    'production.packaging_material.confirm'
+  )
+  const canReadOutsourcingContracts = hasActionPermission(
+    adminProfile,
+    'outsourcing.order.read'
   )
 
   useEffect(() => {
@@ -905,24 +957,52 @@ export default function V1ProductionOrdersPage() {
         await refreshAfterSuccess()
         return
       }
-      const [factData, warehouseData, lotData] = await Promise.all([
-        listProductionFacts({
-          source_type: 'PRODUCTION_ORDER',
-          source_id: orderID,
-          limit: 500,
-        }),
-        listWarehouses({ active_only: true, limit: 500 }),
-        listInventoryLots({ status: 'ACTIVE', limit: 500 }),
-      ])
+      const orderItems = Array.isArray(nextAggregate.items)
+        ? nextAggregate.items
+        : []
+      const hasRoutedItem = orderItems.some(
+        (item) => item.route_code === PRODUCTION_WIP_ROUTE_KEY
+      )
+      if (hasRoutedItem && !canReadProductionWip) {
+        modal.warning({
+          title: '暂不能核对工序入库条件',
+          content:
+            '当前账号没有查看生产工序的权限，无法核对路线明细是否完成包装并确认包材，请联系管理员调整岗位权限。',
+        })
+        return
+      }
+      const [factData, warehouseData, lotData, wipAggregate] =
+        await Promise.all([
+          listProductionFacts({
+            source_type: 'PRODUCTION_ORDER',
+            source_id: orderID,
+            limit: 500,
+          }),
+          listWarehouses({ active_only: true, limit: 500 }),
+          listInventoryLots({ status: 'ACTIVE', limit: 500 }),
+          hasRoutedItem ? getProductionWip(orderID) : Promise.resolve(null),
+        ])
       if (
         completionContextRequestRef.current !== requestID ||
         selectedIDRef.current !== orderID
       ) {
         return
       }
+      const { eligibleItems, blockedItems } =
+        partitionProductionCompletionItems(orderItems, wipAggregate)
+      if (eligibleItems.length === 0) {
+        modal.warning({
+          title: '暂不能登记完工入库',
+          content:
+            productionCompletionBlockerText(blockedItems) ||
+            '当前没有可登记完工入库的生产明细。',
+        })
+        return
+      }
       setCompletionContext({
         order: nextAggregate.order,
-        items: Array.isArray(nextAggregate.items) ? nextAggregate.items : [],
+        items: eligibleItems,
+        blockedItems,
         facts: Array.isArray(factData?.production_facts)
           ? factData.production_facts
           : [],
@@ -973,19 +1053,44 @@ export default function V1ProductionOrdersPage() {
       message.error('生产明细已变化，请关闭后重新办理')
       return
     }
-    const scope = `production-completion:${completionContext.order.id}:${payload.production_order_item_id}`
-    const attempt = completionAttemptsRef.current.prepare(scope, payload)
-    const params = {
-      ...attempt.params,
-      fact_no: sourceBusinessActionNo(
-        'PROD-FG',
-        completionContext.order.order_no,
-        attempt.params.idempotency_key
-      ),
-    }
     completionInFlightRef.current = true
     setCompletionLoading(true)
     try {
+      if (orderItem.route_code === PRODUCTION_WIP_ROUTE_KEY) {
+        if (!canReadProductionWip) {
+          message.warning(
+            '当前账号无法复核生产工序状态，请联系管理员调整岗位权限后重试'
+          )
+          return
+        }
+        let latestWipAggregate
+        try {
+          latestWipAggregate = await getProductionWip(
+            completionContext.order.id
+          )
+        } catch (error) {
+          message.error(getActionErrorMessage(error, '复核完工入库条件'))
+          return
+        }
+        const eligibility = productionWipCompletionEligibility(
+          latestWipAggregate,
+          orderItem
+        )
+        if (!eligibility.eligible) {
+          message.warning(`工序状态已变化：${eligibility.reason}`)
+          return
+        }
+      }
+      const scope = `production-completion:${completionContext.order.id}:${payload.production_order_item_id}`
+      const attempt = completionAttemptsRef.current.prepare(scope, payload)
+      const params = {
+        ...attempt.params,
+        fact_no: sourceBusinessActionNo(
+          'PROD-FG',
+          completionContext.order.order_no,
+          attempt.params.idempotency_key
+        ),
+      }
       let result
       let confirmedByReread = false
       try {
@@ -1048,7 +1153,14 @@ export default function V1ProductionOrdersPage() {
       planned_start_at: '',
       planned_end_at: '',
       note: '',
-      items: [{ line_no: 1, planned_quantity: '1' }],
+      items: [
+        {
+          line_no: 1,
+          planned_quantity: '1',
+          route_code: PRODUCTION_WIP_ROUTE_KEY,
+          customer_inspection_required: false,
+        },
+      ],
     })
     setFormMode('create')
   }
@@ -1125,7 +1237,10 @@ export default function V1ProductionOrdersPage() {
       ...(action === 'close' || action === 'cancel' ? { reason } : {}),
     }
     const operations = {
-      release: [releaseProductionOrder, '生产订单发布成功'],
+      release: [
+        releaseProductionOrder,
+        '生产订单已发布，排程任务已进入 PMC 待办',
+      ],
       close: [closeProductionOrder, '生产订单关闭成功'],
       cancel: [cancelProductionOrder, '生产订单取消成功'],
     }
@@ -1193,7 +1308,7 @@ export default function V1ProductionOrdersPage() {
     <BusinessPageLayout>
       <PageHeaderCard
         title="生产订单"
-        description="维护生产计划单；已发布订单可按已确认需求登记领料或完工草稿，核对、过账及库存结果仍在生产记录中办理。"
+        description="维护生产计划单；标准路线按布料加工、车缝、手工、包装依次办理，特别是先车缝、后手工。工序完工、品质判定与最终完工入库分层办理，库存仍以生产记录过账结果为准。"
         stats={[{ key: 'total', label: '符合条件', value: total }]}
       />
       <BusinessOperationPanel
@@ -1291,6 +1406,15 @@ export default function V1ProductionOrdersPage() {
               onClick={openProductionCompletion}
             >
               登记完工入库
+            </Button>
+          ) : null}
+          {canReadProductionWip &&
+          selected?.status === PRODUCTION_ORDER_STATUS.RELEASED ? (
+            <Button
+              disabled={detailLoading || mutationLoading}
+              onClick={() => setProductionRouteOpen(true)}
+            >
+              工序办理
             </Button>
           ) : null}
           {canReadProductionFacts ? (
@@ -1414,12 +1538,27 @@ export default function V1ProductionOrdersPage() {
         open={completionOpen}
         order={completionContext.order}
         items={completionContext.items}
+        blockedItems={completionContext.blockedItems}
         facts={completionContext.facts}
         warehouseOptions={completionContext.warehouseOptions}
         lots={completionContext.lots}
         loading={completionLoading}
         onCancel={closeProductionCompletion}
         onSubmit={submitProductionCompletion}
+      />
+
+      <ProductionRouteExecutionModal
+        open={productionRouteOpen}
+        productionOrder={selected}
+        canAssign={canAssignProductionWip}
+        canExecute={canExecuteProductionWip}
+        canRework={canReworkProductionWip}
+        canConfirmPackaging={canConfirmPackagingMaterial}
+        canReadOutsourcingContracts={canReadOutsourcingContracts}
+        onCancel={() => setProductionRouteOpen(false)}
+        onChanged={() => {
+          if (selected) selectRecord(selected)
+        }}
       />
 
       <ProductionMaterialIssueModal

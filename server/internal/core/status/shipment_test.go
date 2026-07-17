@@ -44,7 +44,7 @@ func TestShipShipmentTransition(t *testing.T) {
 	}
 }
 
-func TestCancelShippedShipmentTransition(t *testing.T) {
+func TestCancelShipmentTransition(t *testing.T) {
 	tests := []struct {
 		name        string
 		current     string
@@ -54,13 +54,13 @@ func TestCancelShippedShipmentTransition(t *testing.T) {
 	}{
 		{name: "shipped cancels", current: ShipmentShipped, wantTarget: ShipmentCancelled, wantChanged: true, wantOK: true},
 		{name: "already cancelled is idempotent", current: ShipmentCancelled, wantTarget: ShipmentCancelled, wantOK: true},
-		{name: "draft cannot cancel", current: ShipmentDraft},
+		{name: "draft cancels without shipping", current: ShipmentDraft, wantTarget: ShipmentCancelled, wantChanged: true, wantOK: true},
 		{name: "unknown status is rejected", current: "CLOSED"},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got, ok := CancelShippedShipment(tt.current)
+			got, ok := CancelShipment(tt.current)
 			if ok != tt.wantOK {
 				t.Fatalf("ok = %v, want %v", ok, tt.wantOK)
 			}

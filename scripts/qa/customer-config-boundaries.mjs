@@ -869,8 +869,8 @@ function validateYoyoosunImportConfig(config) {
     "recommendedImportSequence must be an array",
   );
   assert(
-    config.recommendedImportSequence.length === 5,
-    "recommendedImportSequence must keep the five reviewed steps",
+    config.recommendedImportSequence.length === 6,
+    "recommendedImportSequence must keep the six reviewed steps",
   );
   config.recommendedImportSequence.forEach((step, index) => {
     const stepPath = `recommendedImportSequence[${index}]`;

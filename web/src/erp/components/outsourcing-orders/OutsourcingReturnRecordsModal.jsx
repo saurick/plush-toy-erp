@@ -65,9 +65,11 @@ export default function OutsourcingReturnRecordsModal({
   canCreatePayable = false,
   canViewPayable = false,
   canCreateQualityInspection = false,
+  canViewQualityInspection = false,
   qualityInspectionByFactID = {},
   onCancel,
   onCreateQualityInspection,
+  onViewQualityInspection,
   onGeneratePayable,
   onViewPayable,
 }) {
@@ -102,6 +104,11 @@ export default function OutsourcingReturnRecordsModal({
     (inspection) =>
       String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
   )
+  const selectedQualityInspection =
+    selectedQualityInspections.find(
+      (inspection) =>
+        String(inspection?.status || '').toUpperCase() !== 'CANCELLED'
+    ) || selectedQualityInspections[0]
   const selectedQualityGate = resolveOutsourcingReturnQualityGate(
     selectedQualityInspections
   )
@@ -171,6 +178,19 @@ export default function OutsourcingReturnRecordsModal({
               onClick={() => onCreateQualityInspection?.(selected)}
             >
               {hasActiveQualityInspection ? '已发起质检' : '发起质检'}
+            </Button>
+          ) : null}
+          {canViewQualityInspection && selectedQualityInspection ? (
+            <Button
+              onClick={() =>
+                onViewQualityInspection?.(selectedQualityInspection)
+              }
+            >
+              {['DRAFT', 'SUBMITTED'].includes(
+                String(selectedQualityInspection.status || '').toUpperCase()
+              )
+                ? '继续质检'
+                : '查看质检'}
             </Button>
           ) : null}
           {canViewPayable ? (

@@ -320,6 +320,33 @@ function validateCatalog(catalog) {
     assert(catalog[section].length > 0, `catalog.${section} must not be empty`);
   }
   const moduleKeys = toKeySet(catalog.modules);
+  const pageKeys = new Set();
+  for (const [index, page] of catalog.pages.entries()) {
+    const pagePath = `catalog.pages[${index}]`;
+    assertNonEmptyString(page.key, `${pagePath}.key`);
+    assert(!pageKeys.has(page.key), `${pagePath}.key must be unique`);
+    pageKeys.add(page.key);
+    assertNonEmptyString(page.label, `${pagePath}.label`);
+    const requiredAll = page.requiredCapabilityKeys || [];
+    const requiredAny = page.requiredAnyCapabilityKeys || [];
+    assert(Array.isArray(requiredAll), `${pagePath}.requiredCapabilityKeys must be an array`);
+    assert(Array.isArray(requiredAny), `${pagePath}.requiredAnyCapabilityKeys must be an array`);
+    assert(
+      requiredAll.length > 0 || requiredAny.length > 0,
+      `${pagePath} must declare requiredCapabilityKeys or requiredAnyCapabilityKeys`,
+    );
+    for (const [key, values] of [
+      ["requiredCapabilityKeys", requiredAll],
+      ["requiredAnyCapabilityKeys", requiredAny],
+    ]) {
+      const seen = new Set();
+      values.forEach((value, valueIndex) => {
+        assertNonEmptyString(value, `${pagePath}.${key}[${valueIndex}]`);
+        assert(!seen.has(value), `${pagePath}.${key} must not contain duplicates`);
+        seen.add(value);
+      });
+    }
+  }
   const fieldsByModule = new Map();
   for (const field of catalog.fields) {
     const fields = fieldsByModule.get(field.module) || new Set();

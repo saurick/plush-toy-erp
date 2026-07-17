@@ -24,6 +24,8 @@ func TestQualityInspectionPostgresShapeAndFlow(t *testing.T) {
 		"purchase_receipt_id",
 		"purchase_receipt_item_id",
 		"inventory_lot_id",
+		"production_wip_batch_id",
+		"gate_code",
 		"material_id",
 		"warehouse_id",
 		"source_type",
@@ -36,6 +38,8 @@ func TestQualityInspectionPostgresShapeAndFlow(t *testing.T) {
 		"original_lot_status",
 		"inspected_at",
 		"inspector_id",
+		"defect_rate_operator",
+		"defect_rate_percent",
 		"decision_note",
 		"created_at",
 		"updated_at",
@@ -44,11 +48,19 @@ func TestQualityInspectionPostgresShapeAndFlow(t *testing.T) {
 	}
 	assertPostgresUniqueIndex(t, data.sqldb, "quality_inspections", "qualityinspection_inspection_no")
 	assertPostgresPartialUniqueIndex(t, data.sqldb, "quality_inspections", "qualityinspection_inventory_lot_id_submitted", "status = 'SUBMITTED'")
+	assertPostgresPartialUniqueIndex(t, data.sqldb, "quality_inspections", "qualityinspection_wip_batch_gate_active", "production_wip_batch_id IS NOT NULL")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "quality_inspections", "quality_inspections_purchase_receipts_quality_inspections", "NO ACTION")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "quality_inspections", "quality_inspections_purchase_receipt_items_quality_inspections", "NO ACTION")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "quality_inspections", "quality_inspections_inventory_lots_quality_inspections", "NO ACTION")
+	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "quality_inspections", "quality_inspections_production_wip_batches_quality_inspections", "NO ACTION")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "quality_inspections", "quality_inspections_materials_quality_inspections", "NO ACTION")
 	assertPostgresForeignKeyDeleteRule(t, data.sqldb, "quality_inspections", "quality_inspections_warehouses_quality_inspections", "NO ACTION")
+	assertPostgresCheckConstraint(t, data.sqldb, "quality_inspections", "quality_inspections_defect_rate_bundle_complete", "defect_rate_operator IS NULL")
+	assertPostgresCheckConstraint(t, data.sqldb, "quality_inspections", "quality_inspections_defect_rate_operator_valid", "defect_rate_operator IS NULL")
+	assertPostgresCheckConstraint(t, data.sqldb, "quality_inspections", "quality_inspections_defect_rate_percent_range", "defect_rate_percent IS NULL")
+	assertPostgresCheckConstraint(t, data.sqldb, "quality_inspections", "quality_inspections_defect_rate_gt_below_100", "defect_rate_operator IS NULL")
+	assertPostgresCheckConstraint(t, data.sqldb, "quality_inspections", "quality_inspections_source_shape", "production_wip_batch_id IS NULL")
+	assertPostgresCheckConstraint(t, data.sqldb, "quality_inspections", "quality_inspections_production_gate_allowed", "gate_code IS NULL")
 
 	fixtures := createPurchaseOperationalPostgresFixtures(t, ctx, client)
 	uc := biz.NewInventoryUsecase(NewInventoryRepo(
@@ -100,17 +112,32 @@ func TestQualityInspectionPostgresShapeAndFlow(t *testing.T) {
 		Save(ctx); !ent.IsConstraintError(err) {
 		t.Fatalf("expected postgres SUBMITTED partial unique constraint, got %v", err)
 	}
-	passed, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: draft.ID,
-		Result:       biz.QualityInspectionResultConcession,
-		InspectedAt:  time.Date(2026, 4, 26, 12, 30, 0, 0, time.UTC),
-		DecisionNote: stringPtr("让步接收"),
-	})
+	decision := approximateQualityInspectionDecision(draft.ID, biz.QualityInspectionResultConcession)
+	decision.InspectedAt = time.Date(2026, 4, 26, 12, 30, 0, 0, time.UTC)
+	decision.DecisionNote = stringPtr("让步接收")
+	passed, err := uc.PassQualityInspection(ctx, decision)
 	if err != nil {
 		t.Fatalf("pass postgres quality inspection failed: %v", err)
 	}
-	if passed.Status != biz.QualityInspectionStatusPassed || passed.Result == nil || *passed.Result != biz.QualityInspectionResultConcession {
+	if passed.Status != biz.QualityInspectionStatusPassed || passed.Result == nil || *passed.Result != biz.QualityInspectionResultConcession ||
+		passed.DefectRateOperator == nil || *passed.DefectRateOperator != biz.QualityInspectionDefectRateOperatorApprox ||
+		passed.DefectRatePercent == nil || passed.DefectRatePercent.String() != "5" {
 		t.Fatalf("unexpected postgres passed quality state: %+v", passed)
+	}
+	for name, statement := range map[string]string{
+		"missing percent":  `UPDATE quality_inspections SET defect_rate_operator = 'APPROX', defect_rate_percent = NULL WHERE id = $1`,
+		"unknown operator": `UPDATE quality_inspections SET defect_rate_operator = 'UNKNOWN', defect_rate_percent = 5 WHERE id = $1`,
+		"over range":       `UPDATE quality_inspections SET defect_rate_operator = 'APPROX', defect_rate_percent = 101 WHERE id = $1`,
+		"invalid gt 100":   `UPDATE quality_inspections SET defect_rate_operator = 'GT', defect_rate_percent = 100 WHERE id = $1`,
+	} {
+		if _, err := data.sqldb.ExecContext(ctx, statement, passed.ID); err == nil {
+			t.Fatalf("expected postgres defect-rate constraint to reject %s", name)
+		}
+	}
+	persistedPassed, err := uc.GetQualityInspection(ctx, passed.ID)
+	if err != nil || persistedPassed.DefectRateOperator == nil || *persistedPassed.DefectRateOperator != biz.QualityInspectionDefectRateOperatorApprox ||
+		persistedPassed.DefectRatePercent == nil || persistedPassed.DefectRatePercent.String() != "5" {
+		t.Fatalf("failed defect-rate writes must preserve the valid decision, row=%+v err=%v", persistedPassed, err)
 	}
 	assertLotStatus(t, ctx, uc, *receiptItem.LotID, biz.InventoryLotActive)
 	assertInventoryTxnCount(t, ctx, client, qualityTxnCount)
@@ -157,7 +184,7 @@ func TestQualityInspectionPostgresShapeAndFlow(t *testing.T) {
 	if _, err := uc.SubmitQualityInspection(ctx, rejectDraft.ID); err != nil {
 		t.Fatalf("submit postgres reject quality fixture failed: %v", err)
 	}
-	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID}); err != nil {
+	if _, err := uc.RejectQualityInspection(ctx, approximateQualityInspectionDecision(rejectDraft.ID, biz.QualityInspectionResultReject)); err != nil {
 		t.Fatalf("reject postgres quality inspection failed: %v", err)
 	}
 	assertLotStatus(t, ctx, uc, *rejectReceipt.Items[0].LotID, biz.InventoryLotRejected)

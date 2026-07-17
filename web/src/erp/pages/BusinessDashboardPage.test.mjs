@@ -32,7 +32,11 @@ test('business dashboard separates three data totals from collaboration risk', (
   }
   assert.match(source, /四类数字分别统计，请不要直接相加/u)
   assert.match(source, /只统计当前账号可见的阻塞和到期任务/u)
-  assert.match(source, /TASK_BOARD_LANE_DEFINITIONS\.map/u)
+  assert.match(source, /BUSINESS_ATTENTION_LANES\.map/u)
+  assert.match(source, /definition\.key === 'exception'/u)
+  assert.match(source, /definition\.key === 'due'/u)
+  assert.match(source, /阻塞和到期任务互不重复/u)
+  assert.doesNotMatch(source, /四类任务互不重复/u)
   assert.match(source, /每类最多展示一项/u)
 })
 
@@ -61,13 +65,11 @@ test('business dashboard avoids cross-boundary family totals and keeps every sou
 })
 
 test('business dashboard explains the four business-facing data boundaries', () => {
-  assert.match(source, />\s*数字说明\s*</u)
+  assert.match(source, /erp-business-board-boundary-summary/u)
   assert.match(source, /用于记录业务发起或约定，后续仍需按流程办理/u)
   assert.match(source, /完成任务不会自动产生库存、出货或财务记录/u)
-  assert.doesNotMatch(
-    source,
-    /业务源单|事实记录|对象族|数据口径|协同概览/u
-  )
+  assert.doesNotMatch(source, />\s*数字说明\s*</u)
+  assert.doesNotMatch(source, /业务源单|事实记录|对象族|数据口径|协同概览/u)
   assert.doesNotMatch(source, />\s*状态分布\s*</u)
   assert.doesNotMatch(source, />\s*当前风险\s*</u)
 })

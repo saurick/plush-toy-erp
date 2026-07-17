@@ -983,9 +983,12 @@ func (_q *WarehouseQuery) loadQualityInspections(ctx context.Context, query *Qua
 	}
 	for _, n := range neighbors {
 		fk := n.WarehouseID
-		node, ok := nodeids[fk]
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "warehouse_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
 		if !ok {
-			return fmt.Errorf(`unexpected referenced foreign-key "warehouse_id" returned %v for node %v`, fk, n.ID)
+			return fmt.Errorf(`unexpected referenced foreign-key "warehouse_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

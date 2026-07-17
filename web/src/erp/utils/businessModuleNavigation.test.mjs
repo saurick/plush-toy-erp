@@ -60,6 +60,20 @@ test('business modules: 正式入口不再登记预览壳页', () => {
   assert.equal(getBusinessModule('shipping-release')?.pageKind, 'formal-v1')
 })
 
+test('production-orders module declares WIP route truth without claiming inventory facts', () => {
+  const moduleItem = getBusinessModule('production-orders')
+  assert.match(moduleItem.description, /布料加工、车缝、手工、包装/u)
+  assert.match(moduleItem.description, /WIP/u)
+  assert.match(moduleItem.description, /分段质检与包材确认/u)
+  assert.match(moduleItem.factSource, /production_wip_batches/u)
+  assert.match(moduleItem.factSource, /quality_inspections/u)
+  assert.match(moduleItem.boundary, /不等于库存事实/u)
+  assert.match(moduleItem.boundary, /只有已过账生产事实/u)
+  assert(
+    moduleItem.currentScope.some((value) => value.includes('车缝 / 手工逐工序'))
+  )
+})
+
 test('workflow business modules: 三页不冒充事实写入', () => {
   const source = readFileSync(
     new URL('../pages/WorkflowBusinessModulePage.jsx', import.meta.url),
@@ -109,6 +123,8 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     "surface_key: 'workflow_business_module'",
     "entry_path: moduleItem?.path || ''",
     'BusinessListToolbarActions',
+    'resolveWorkflowTaskSourceEntryPath',
+    '查看来源',
     '当前页面只用于处理任务，暂不提供业务数据导出。',
     '当前操作只更新任务状态；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。',
   ]) {

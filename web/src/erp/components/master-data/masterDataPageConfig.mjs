@@ -27,12 +27,12 @@ import {
   updateSupplier,
 } from '../../api/masterDataOrderApi.mjs'
 
-export const DEFAULT_PLUSH_PROCESS_NAMES = ['查货', '手工', '车缝', '包装']
+export const DEFAULT_PLUSH_PROCESS_NAMES = ['查货', '车缝', '手工', '包装']
 
 export const DEFAULT_PLUSH_PROCESS_CATEGORIES = [
   '查货',
-  '手工',
   '车缝',
+  '手工',
   '包装',
   '裁片',
   '裁片质检',
@@ -126,9 +126,9 @@ export const MASTER_DATA_PAGE_CONFIG = Object.freeze({
     entityLabel: '加工环节',
     draftCodePrefix: 'PROC',
     formBoundary:
-      '只维护委外订单和后续质检可引用的标准加工环节；需质检只是工序属性标记，不在此生成委外订单、生产任务、库存记录或质检判定。',
+      '只维护委外订单和后续质检可引用的标准加工环节；排序只影响列表展示，不定义前后工序。需质检只是工序属性标记，不在此生成委外订单、生产任务、库存记录或质检判定。',
     summary:
-      '维护少量可复用加工环节，用于委外订单选择和后续质检提示；不管理完整工艺路线、排程、报工、质检结果或库存记录。',
+      '维护少量可复用加工环节，用于委外订单选择和后续质检提示；默认展示车缝在手工前，但不管理完整工艺路线、排程、报工、质检结果或库存记录。',
     initialValues: {
       outsourcing_enabled: true,
       inhouse_enabled: false,

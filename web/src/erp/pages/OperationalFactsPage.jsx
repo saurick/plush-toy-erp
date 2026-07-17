@@ -86,7 +86,10 @@ import {
   hasAnyPermission,
   selectedLabelForKey,
 } from '../components/operational-facts/OperationalFactForms.jsx'
-import { businessSourceRouteFor } from '../utils/businessSourceNavigation.mjs'
+import {
+  businessRecordInventoryRouteFor,
+  businessSourceRouteFor,
+} from '../utils/businessSourceNavigation.mjs'
 import {
   DEFAULT_OPERATIONAL_FACT_PAGINATION,
   DEFAULT_OPERATIONAL_FACT_SUMMARY,
@@ -428,7 +431,15 @@ export function OperationalFactWorkspace({
           : {}),
         ...extraParams,
       })
-      message.success(`${actionLabel}已完成`)
+      message.success(
+        currentActiveKey === 'production' &&
+          actionKey === 'post' &&
+          String(row.fact_type || '')
+            .trim()
+            .toUpperCase() === 'REWORK'
+          ? '返工记录已过账，生产异常任务已生成'
+          : `${actionLabel}已完成`
+      )
     } catch (error) {
       message.error(getActionErrorMessage(error, actionLabel))
       setSaving(false)
@@ -763,18 +774,10 @@ export function OperationalFactWorkspace({
       'sales-order': routeWithQuery(V1_ROUTE_PATHS.salesOrders, {
         sales_order_id: activeSelectedRow.sales_order_id,
       }),
-      inventory: routeWithQuery(V1_ROUTE_PATHS.inventory, {
-        source_type:
-          currentActiveKey === 'shipments'
-            ? 'SHIPMENT'
-            : activeSelectedRow.source_type || undefined,
-        source_id:
-          currentActiveKey === 'shipments'
-            ? activeSelectedRow.id
-            : activeSelectedRow.source_id || undefined,
-        sales_order_id: activeSelectedRow.sales_order_id,
-        view: 'txns',
-      }),
+      inventory: businessRecordInventoryRouteFor(
+        currentActiveKey,
+        activeSelectedRow.id
+      ),
       receivables: routeWithQuery(V1_ROUTE_PATHS.receivables, {
         source_type: 'SHIPMENT',
         source_id: activeSelectedRow.id,

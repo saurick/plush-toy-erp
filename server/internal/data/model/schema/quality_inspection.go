@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
+	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
@@ -21,6 +22,8 @@ var qualityInspectionLockedFields = map[string]struct{}{
 	"purchase_receipt_id":      {},
 	"purchase_receipt_item_id": {},
 	"inventory_lot_id":         {},
+	"production_wip_batch_id":  {},
+	"gate_code":                {},
 	"material_id":              {},
 	"warehouse_id":             {},
 	"source_type":              {},
@@ -33,6 +36,8 @@ var qualityInspectionLockedFields = map[string]struct{}{
 	"original_lot_status":      {},
 	"inspected_at":             {},
 	"inspector_id":             {},
+	"defect_rate_operator":     {},
+	"defect_rate_percent":      {},
 }
 
 func (QualityInspection) Hooks() []ent.Hook {
@@ -52,6 +57,60 @@ func (QualityInspection) Hooks() []ent.Hook {
 	}
 }
 
+func (QualityInspection) Annotations() []schema.Annotation {
+	return []schema.Annotation{
+		entsql.Annotation{
+			Checks: map[string]string{
+				"quality_inspections_source_shape": `
+(
+  (
+    production_wip_batch_id IS NULL
+    AND gate_code IS NULL
+    AND inventory_lot_id IS NOT NULL
+    AND warehouse_id IS NOT NULL
+  )
+  OR
+  (
+    production_wip_batch_id IS NOT NULL
+    AND gate_code IS NOT NULL
+    AND source_type IS NOT NULL
+    AND source_type = 'PRODUCTION_WIP'
+    AND source_id IS NOT NULL
+    AND source_id = production_wip_batch_id
+    AND inspection_type IS NOT NULL
+    AND inspection_type = 'PRODUCTION_STAGE'
+    AND subject_type IS NOT NULL
+    AND subject_type = 'WIP'
+    AND subject_id IS NOT NULL
+    AND subject_id = production_wip_batch_id
+    AND inventory_lot_id IS NULL
+    AND warehouse_id IS NULL
+    AND purchase_receipt_id IS NULL
+    AND purchase_receipt_item_id IS NULL
+    AND material_id IS NULL
+  )
+)`,
+				"quality_inspections_production_gate_allowed": "gate_code IS NULL OR gate_code IN ('CUT_PIECE', 'SHELL', 'FINISHED_GOODS', 'NEEDLE', 'SAMPLING', 'CUSTOMER_ACCEPTANCE')",
+				"quality_inspections_defect_rate_bundle_complete": `
+(
+  (
+    defect_rate_operator IS NULL
+    AND defect_rate_percent IS NULL
+  )
+  OR
+  (
+    defect_rate_operator IS NOT NULL
+    AND defect_rate_percent IS NOT NULL
+  )
+)`,
+				"quality_inspections_defect_rate_operator_valid": "defect_rate_operator IS NULL OR defect_rate_operator IN ('APPROX', 'GT')",
+				"quality_inspections_defect_rate_percent_range":  "defect_rate_percent IS NULL OR (defect_rate_percent >= 0 AND defect_rate_percent <= 100)",
+				"quality_inspections_defect_rate_gt_below_100":   "defect_rate_operator IS NULL OR defect_rate_operator <> 'GT' OR defect_rate_percent < 100",
+			},
+		},
+	}
+}
+
 func (QualityInspection) Fields() []ent.Field {
 	return []ent.Field{
 		field.String("inspection_no").
@@ -66,12 +125,24 @@ func (QualityInspection) Fields() []ent.Field {
 			Nillable().
 			Positive(),
 		field.Int("inventory_lot_id").
+			Optional().
+			Nillable().
 			Positive(),
+		field.Int("production_wip_batch_id").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("gate_code").
+			Optional().
+			Nillable().
+			MaxLen(64),
 		field.Int("material_id").
 			Optional().
 			Nillable().
 			Positive(),
 		field.Int("warehouse_id").
+			Optional().
+			Nillable().
 			Positive(),
 		field.String("source_type").
 			Optional().
@@ -112,6 +183,11 @@ func (QualityInspection) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Positive(),
+		field.String("defect_rate_operator").
+			Optional().
+			Nillable().
+			MaxLen(16),
+		optionalDecimalField("defect_rate_percent"),
 		field.String("decision_note").
 			Optional().
 			Nillable().
@@ -140,7 +216,11 @@ func (QualityInspection) Edges() []ent.Edge {
 		edge.From("inventory_lot", InventoryLot.Type).
 			Ref("quality_inspections").
 			Field("inventory_lot_id").
-			Required().
+			Unique().
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.From("production_wip_batch", ProductionWIPBatch.Type).
+			Ref("quality_inspections").
+			Field("production_wip_batch_id").
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.From("material", Material.Type).
@@ -151,7 +231,6 @@ func (QualityInspection) Edges() []ent.Edge {
 		edge.From("warehouse", Warehouse.Type).
 			Ref("quality_inspections").
 			Field("warehouse_id").
-			Required().
 			Unique().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("purchase_returns", PurchaseReturn.Type).
@@ -165,6 +244,7 @@ func (QualityInspection) Indexes() []ent.Index {
 		index.Fields("purchase_receipt_id"),
 		index.Fields("purchase_receipt_item_id"),
 		index.Fields("inventory_lot_id"),
+		index.Fields("production_wip_batch_id", "gate_code"),
 		index.Fields("material_id"),
 		index.Fields("warehouse_id"),
 		index.Fields("source_type", "source_id"),
@@ -178,6 +258,12 @@ func (QualityInspection) Indexes() []ent.Index {
 			StorageKey("qualityinspection_inventory_lot_id_submitted").
 			Annotations(
 				entsql.IndexWhere("status = 'SUBMITTED'"),
+			),
+		index.Fields("production_wip_batch_id", "gate_code").
+			Unique().
+			StorageKey("qualityinspection_wip_batch_gate_active").
+			Annotations(
+				entsql.IndexWhere("production_wip_batch_id IS NOT NULL AND gate_code IS NOT NULL AND status <> 'CANCELLED'"),
 			),
 	}
 }

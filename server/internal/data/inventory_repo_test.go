@@ -522,11 +522,9 @@ func passAllPurchaseReceiptQualityInspections(t *testing.T, ctx context.Context,
 		if inspection.Status != biz.QualityInspectionStatusSubmitted {
 			t.Fatalf("purchase receipt %d inspection %d not decidable: %s", receiptID, inspection.ID, inspection.Status)
 		}
-		if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-			InspectionID: inspection.ID,
-			Result:       biz.QualityInspectionResultPass,
-			DecisionNote: stringPtr("测试来料质检通过"),
-		}); err != nil {
+		decision := approximateQualityInspectionDecision(inspection.ID, biz.QualityInspectionResultPass)
+		decision.DecisionNote = stringPtr("测试来料质检通过")
+		if _, err := uc.PassQualityInspection(ctx, decision); err != nil {
 			t.Fatalf("pass purchase receipt %d inspection %d failed: %v", receiptID, inspection.ID, err)
 		}
 	}

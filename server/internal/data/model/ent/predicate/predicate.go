@@ -96,6 +96,21 @@ type ProductionOrderItem func(*sql.Selector)
 // ProductionOrderMaterialRequirement is the predicate function for productionordermaterialrequirement builders.
 type ProductionOrderMaterialRequirement func(*sql.Selector)
 
+// ProductionOrderOperation is the predicate function for productionorderoperation builders.
+type ProductionOrderOperation func(*sql.Selector)
+
+// ProductionPackagingConfirmation is the predicate function for productionpackagingconfirmation builders.
+type ProductionPackagingConfirmation func(*sql.Selector)
+
+// ProductionWIPBatch is the predicate function for productionwipbatch builders.
+type ProductionWIPBatch func(*sql.Selector)
+
+// ProductionWIPEvent is the predicate function for productionwipevent builders.
+type ProductionWIPEvent func(*sql.Selector)
+
+// ProductionWIPOutsourcingAllocation is the predicate function for productionwipoutsourcingallocation builders.
+type ProductionWIPOutsourcingAllocation func(*sql.Selector)
+
 // PurchaseOrder is the predicate function for purchaseorder builders.
 type PurchaseOrder func(*sql.Selector)
 

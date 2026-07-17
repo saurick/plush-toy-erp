@@ -11,6 +11,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 	ctx context.Context,
 	method, id string,
 	pm map[string]any,
+	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
 	case "create_production_completion_from_order":
@@ -56,19 +57,37 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactPost); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+		factID := getInt(pm, "id", 0)
+		requiresSourceTask, err := d.operationalFactUC.ProductionFactRequiresSourceTask(ctx, factID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		modules := []string{"production"}
+		if requiresSourceTask {
+			modules = append(modules, "workflow_tasks")
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.PostProductionFact(ctx, getInt(pm, "id", 0))
+		item, err := d.operationalFactUC.PostProductionFactWithActor(ctx, factID, actorID)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "cancel_production_fact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactCancel); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+		factID := getInt(pm, "id", 0)
+		requiresSourceTask, err := d.operationalFactUC.ProductionFactRequiresSourceTask(ctx, factID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		modules := []string{"production"}
+		if requiresSourceTask {
+			modules = append(modules, workflowModuleKeyTasks)
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), modules...); res != nil {
 			return id, res, nil
 		}
-		item, err := d.operationalFactUC.CancelPostedProductionFact(ctx, getInt(pm, "id", 0))
+		item, err := d.operationalFactUC.CancelPostedProductionFactWithActor(ctx, factID, actorID)
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "list_production_facts":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
@@ -252,7 +271,8 @@ func productionOrderMaterialRequirementToAny(item *biz.ProductionOrderMaterialRe
 	return map[string]any{
 		"id": item.ID, "production_order_id": item.ProductionOrderID, "production_order_item_id": item.ProductionOrderItemID,
 		"bom_header_id": item.BOMHeaderID, "bom_item_id": item.BOMItemID, "material_id": item.MaterialID, "unit_id": item.UnitID,
-		"unit_quantity_snapshot": item.UnitQuantitySnapshot.String(), "loss_rate_snapshot": item.LossRateSnapshot.String(),
+		"production_operation_code": optionalStringToAny(item.ProductionOperationCode),
+		"unit_quantity_snapshot":    item.UnitQuantitySnapshot.String(), "loss_rate_snapshot": item.LossRateSnapshot.String(),
 		"planned_quantity": item.PlannedQuantity.String(), "issued_quantity": item.IssuedQuantity.String(), "remaining_quantity": item.RemainingQuantity.String(),
 		"material_code_snapshot": item.MaterialCodeSnapshot, "material_name_snapshot": item.MaterialNameSnapshot,
 		"unit_code_snapshot": item.UnitCodeSnapshot, "unit_name_snapshot": item.UnitNameSnapshot,

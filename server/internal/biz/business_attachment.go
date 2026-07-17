@@ -1,19 +1,30 @@
 package biz
 
 import (
+	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/base64"
 	"encoding/hex"
 	"errors"
+	"fmt"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"path/filepath"
 	"strings"
 	"time"
+
+	"golang.org/x/image/webp"
 )
 
 const (
 	BusinessAttachmentMaxBytes            = 5 * 1024 * 1024
 	BusinessAttachmentMaxJSONRPCBodyBytes = 7 * 1024 * 1024
+
+	BusinessAttachmentProductImageMaxWidth  = 8192
+	BusinessAttachmentProductImageMaxHeight = 8192
+	BusinessAttachmentProductImageMaxPixels = int64(20_000_000)
 )
 
 const (
@@ -26,9 +37,16 @@ const (
 	BusinessAttachmentOwnerFinanceFact       = "finance_fact"
 	BusinessAttachmentOwnerProductionFact    = "production_fact"
 	BusinessAttachmentOwnerOutsourcingFact   = "outsourcing_fact"
+	BusinessAttachmentOwnerProduct           = "product"
 	BusinessAttachmentOwnerProductSKU        = "product_sku"
 	BusinessAttachmentOwnerBOMHeader         = "bom_header"
 	BusinessAttachmentOwnerWorkflowTask      = "workflow_task"
+)
+
+const (
+	BusinessAttachmentTypeProductImage          = "product_image"
+	BusinessAttachmentProductImageSlotPrimary   = "primary"
+	BusinessAttachmentProductImageSlotSecondary = "secondary"
 )
 
 var (
@@ -38,6 +56,13 @@ var (
 	ErrBusinessAttachmentContentInvalid = errors.New("business attachment content invalid")
 	ErrBusinessAttachmentTooLarge       = errors.New("business attachment too large")
 	ErrBusinessAttachmentMimeNotAllowed = errors.New("business attachment mime type not allowed")
+
+	ErrBusinessAttachmentProductImageContentInvalid    = fmt.Errorf("product image content invalid: %w", ErrBusinessAttachmentContentInvalid)
+	ErrBusinessAttachmentProductImageMimeNotAllowed    = fmt.Errorf("product image mime type not allowed: %w", ErrBusinessAttachmentMimeNotAllowed)
+	ErrBusinessAttachmentProductImageDimensionsInvalid = fmt.Errorf(
+		"product image dimensions invalid: %w",
+		ErrBusinessAttachmentContentInvalid,
+	)
 )
 
 var allowedBusinessAttachmentOwnerTypes = map[string]struct{}{
@@ -50,9 +75,15 @@ var allowedBusinessAttachmentOwnerTypes = map[string]struct{}{
 	BusinessAttachmentOwnerFinanceFact:       {},
 	BusinessAttachmentOwnerProductionFact:    {},
 	BusinessAttachmentOwnerOutsourcingFact:   {},
+	BusinessAttachmentOwnerProduct:           {},
 	BusinessAttachmentOwnerProductSKU:        {},
 	BusinessAttachmentOwnerBOMHeader:         {},
 	BusinessAttachmentOwnerWorkflowTask:      {},
+}
+
+var allowedBusinessAttachmentProductImageSlots = map[string]struct{}{
+	BusinessAttachmentProductImageSlotPrimary:   {},
+	BusinessAttachmentProductImageSlotSecondary: {},
 }
 
 var allowedBusinessAttachmentFileTypes = map[string]map[string]struct{}{
@@ -79,6 +110,13 @@ var allowedBusinessAttachmentFileTypes = map[string]map[string]struct{}{
 		"application/zip":              {},
 		"application/x-zip-compressed": {},
 	},
+}
+
+var allowedBusinessAttachmentProductImageFileTypes = map[string]map[string]struct{}{
+	".jpeg": {"image/jpeg": {}},
+	".jpg":  {"image/jpeg": {}},
+	".png":  {"image/png": {}},
+	".webp": {"image/webp": {}},
 }
 
 type BusinessAttachment struct {
@@ -133,6 +171,7 @@ type BusinessAttachmentCreate struct {
 
 type BusinessAttachmentRepo interface {
 	CreateBusinessAttachment(ctx context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error)
+	ClearProductImage(ctx context.Context, productID int, slotKey string) error
 	ListBusinessAttachments(ctx context.Context, ownerType string, ownerID int) ([]*BusinessAttachment, error)
 	GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error)
 	GetBusinessAttachmentContent(ctx context.Context, id int, ownerType string, ownerID int) ([]byte, error)
@@ -156,6 +195,15 @@ func IsBusinessAttachmentOwnerTypeAllowed(ownerType string) bool {
 	return ok
 }
 
+func NormalizeBusinessAttachmentProductImageSlot(raw string) string {
+	return strings.ToLower(strings.TrimSpace(raw))
+}
+
+func IsBusinessAttachmentProductImageSlotAllowed(slotKey string) bool {
+	_, ok := allowedBusinessAttachmentProductImageSlots[NormalizeBusinessAttachmentProductImageSlot(slotKey)]
+	return ok
+}
+
 func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Context, in *BusinessAttachmentUploadInput) (*BusinessAttachment, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -173,7 +221,15 @@ func (uc *BusinessAttachmentUsecase) UploadBusinessAttachment(ctx context.Contex
 	}
 	content, err := decodeBusinessAttachmentContent(in.ContentBase64)
 	if err != nil {
+		if normalized.AttachmentType == BusinessAttachmentTypeProductImage && errors.Is(err, ErrBusinessAttachmentContentInvalid) {
+			return nil, ErrBusinessAttachmentProductImageContentInvalid
+		}
 		return nil, err
+	}
+	if normalized.AttachmentType == BusinessAttachmentTypeProductImage {
+		if err := validateBusinessAttachmentProductImageContent(content, normalized.MimeType); err != nil {
+			return nil, err
+		}
 	}
 	sum := sha256.Sum256(content)
 	return uc.repo.CreateBusinessAttachment(ctx, &BusinessAttachmentCreate{
@@ -208,6 +264,17 @@ func (uc *BusinessAttachmentUsecase) ListBusinessAttachments(ctx context.Context
 		return nil, ErrBusinessAttachmentOwnerNotFound
 	}
 	return uc.repo.ListBusinessAttachments(ctx, normalizedOwnerType, ownerID)
+}
+
+func (uc *BusinessAttachmentUsecase) ClearProductImage(ctx context.Context, productID int, slotKey string) error {
+	if uc == nil || uc.repo == nil || productID <= 0 {
+		return ErrBadParam
+	}
+	normalizedSlotKey := NormalizeBusinessAttachmentProductImageSlot(slotKey)
+	if !IsBusinessAttachmentProductImageSlotAllowed(normalizedSlotKey) {
+		return ErrBadParam
+	}
+	return uc.repo.ClearProductImage(ctx, productID, normalizedSlotKey)
 }
 
 func (uc *BusinessAttachmentUsecase) GetBusinessAttachmentMetadata(ctx context.Context, id int) (*BusinessAttachment, error) {
@@ -270,8 +337,21 @@ func normalizeBusinessAttachmentUploadInput(in BusinessAttachmentUploadInput) (B
 		return in, ErrBadParam
 	}
 
+	isProductOwner := in.OwnerType == BusinessAttachmentOwnerProduct
+	isProductImage := in.AttachmentType == BusinessAttachmentTypeProductImage
+	if isProductOwner != isProductImage {
+		return in, ErrBadParam
+	}
+
 	in.MimeType = strings.ToLower(strings.TrimSpace(in.MimeType))
-	if !isBusinessAttachmentFileTypeAllowed(in.FileName, in.MimeType) {
+	if isProductImage {
+		if in.SlotKey == nil || !IsBusinessAttachmentProductImageSlotAllowed(*in.SlotKey) {
+			return in, ErrBadParam
+		}
+		if !isBusinessAttachmentProductImageFileTypeAllowed(in.FileName, in.MimeType) {
+			return in, ErrBusinessAttachmentProductImageMimeNotAllowed
+		}
+	} else if !isBusinessAttachmentFileTypeAllowed(in.FileName, in.MimeType) {
 		return in, ErrBusinessAttachmentMimeNotAllowed
 	}
 
@@ -300,6 +380,62 @@ func isBusinessAttachmentFileTypeAllowed(fileName string, mimeType string) bool 
 	}
 	_, ok = allowedMIMETypes[mimeType]
 	return ok
+}
+
+func isBusinessAttachmentProductImageFileTypeAllowed(fileName string, mimeType string) bool {
+	allowedMIMETypes, ok := allowedBusinessAttachmentProductImageFileTypes[strings.ToLower(filepath.Ext(fileName))]
+	if !ok {
+		return false
+	}
+	_, ok = allowedMIMETypes[mimeType]
+	return ok
+}
+
+func validateBusinessAttachmentProductImageContent(content []byte, mimeType string) error {
+	var (
+		config image.Config
+		err    error
+	)
+	switch mimeType {
+	case "image/png":
+		config, err = png.DecodeConfig(bytes.NewReader(content))
+	case "image/jpeg":
+		config, err = jpeg.DecodeConfig(bytes.NewReader(content))
+	case "image/webp":
+		config, err = webp.DecodeConfig(bytes.NewReader(content))
+	default:
+		return ErrBusinessAttachmentProductImageMimeNotAllowed
+	}
+	if err != nil {
+		return ErrBusinessAttachmentProductImageContentInvalid
+	}
+	if !isBusinessAttachmentProductImageDimensionsAllowed(config.Width, config.Height) {
+		return ErrBusinessAttachmentProductImageDimensionsInvalid
+	}
+	switch mimeType {
+	case "image/png":
+		_, err = png.Decode(bytes.NewReader(content))
+	case "image/jpeg":
+		_, err = jpeg.Decode(bytes.NewReader(content))
+	case "image/webp":
+		_, err = webp.Decode(bytes.NewReader(content))
+	}
+	if err != nil {
+		return ErrBusinessAttachmentProductImageContentInvalid
+	}
+	return nil
+}
+
+func isBusinessAttachmentProductImageDimensionsAllowed(width, height int) bool {
+	if width <= 0 || height <= 0 ||
+		width > BusinessAttachmentProductImageMaxWidth ||
+		height > BusinessAttachmentProductImageMaxHeight {
+		return false
+	}
+	width64 := int64(width)
+	height64 := int64(height)
+	return height64 <= BusinessAttachmentProductImageMaxPixels &&
+		width64 <= BusinessAttachmentProductImageMaxPixels/height64
 }
 
 func decodeBusinessAttachmentContent(raw string) ([]byte, error) {

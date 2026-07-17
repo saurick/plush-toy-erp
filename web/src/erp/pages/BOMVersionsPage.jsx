@@ -16,16 +16,16 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   activateBOMVersion,
-  addBOMItem,
   archiveBOMVersion,
   copyBOMVersion,
-  createBOMDraft,
-  deleteBOMItem,
   getBOMVersion,
   listBOMVersions,
-  updateBOMDraft,
-  updateBOMItem,
+  saveBOMWithItems,
 } from '../api/bomApi.mjs'
+import {
+  downloadBusinessAttachment,
+  listBusinessAttachments,
+} from '../api/attachmentApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
   listMaterials,
@@ -36,7 +36,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  CollaborationTaskPanel,
   PageHeaderCard,
   SearchInput,
   SelectFilter,
@@ -96,10 +95,15 @@ import {
 } from '../utils/referenceSelectOptions.mjs'
 import { createDuplicatedDraftLineItem } from '../utils/businessLineItems.mjs'
 import {
+  BOM_PRODUCTION_OPERATION_OPTIONS,
+  bomProductionOperationLabel,
+} from '../utils/bomProductionOperation.mjs'
+import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   openPrintWorkspaceWindow,
   resolveRuntimeCustomerPrintCompanyName,
 } from '../utils/printWorkspace.js'
+import { loadProductPrintImageSnapshots } from '../utils/productPrintImages.mjs'
 import {
   COLOR_CARD_TEMPLATE_KEY,
   MATERIAL_DETAIL_TEMPLATE_KEY,
@@ -207,6 +211,7 @@ function createBlankBOMLine(headerID) {
   return {
     bom_header_id: headerID,
     material_id: undefined,
+    production_operation_code: undefined,
     quantity: '',
     unit_id: undefined,
     loss_rate: '0',
@@ -224,6 +229,7 @@ function normalizeBOMLineForForm(headerID, item = {}) {
     id: item.id,
     bom_header_id: item.bom_header_id || headerID,
     material_id: item.material_id || undefined,
+    production_operation_code: item.production_operation_code || undefined,
     quantity: item.quantity ?? '',
     unit_id: item.unit_id || undefined,
     loss_rate: item.loss_rate ?? '0',
@@ -249,7 +255,6 @@ const BOMLineItemsForm = React.memo(
     form,
     materialByID,
     materialOptions,
-    onRemoveSavedItem,
     registerLineItemRow,
     requestLineItemScroll,
     selectedVersionID,
@@ -289,8 +294,6 @@ const BOMLineItemsForm = React.memo(
           canEdit ? '暂无 BOM 明细，可在同一表单内新增' : '暂无 BOM 明细'
         }
         renderRow={({ add, field, fields, index, remove }) => {
-          const lineID = form.getFieldValue(['items', field.name, 'id'])
-
           return (
             <div
               className="erp-sales-order-lines-form__row"
@@ -327,12 +330,7 @@ const BOMLineItemsForm = React.memo(
                       type="text"
                       icon={<DeleteOutlined />}
                       disabled={fields.length <= 1}
-                      onClick={() => {
-                        if (lineID) {
-                          onRemoveSavedItem(lineID)
-                        }
-                        remove(field.name)
-                      }}
+                      onClick={() => remove(field.name)}
                     >
                       移除行
                     </Button>
@@ -373,6 +371,19 @@ const BOMLineItemsForm = React.memo(
                     options={materialOptions}
                     placeholder="请选择材料"
                     showSearch
+                  />
+                </Form.Item>
+                <Form.Item
+                  className="erp-line-item-field erp-line-item-field--date"
+                  label="生产工序归属"
+                  name={[field.name, 'production_operation_code']}
+                  extra="显式标记进入首道布料加工的材料；不按材料名称自动判断"
+                >
+                  <Select
+                    allowClear
+                    disabled={!canEdit}
+                    options={BOM_PRODUCTION_OPERATION_OPTIONS}
+                    placeholder="不指定"
                   />
                 </Form.Item>
                 <Form.Item
@@ -522,7 +533,6 @@ export default function BOMVersionsPage() {
   const [columnOrderSaving, setColumnOrderSaving] = useState(false)
   const [headerModalOpen, setHeaderModalOpen] = useState(false)
   const [headerMode, setHeaderMode] = useState('create')
-  const [removedItemIDs, setRemovedItemIDs] = useState([])
   const [products, setProducts] = useState([])
   const [materials, setMaterials] = useState([])
   const [units, setUnits] = useState([])
@@ -542,6 +552,10 @@ export default function BOMVersionsPage() {
   const canCreate = hasActionPermission(adminProfile, 'bom.create')
   const canUpdate = hasActionPermission(adminProfile, 'bom.update')
   const canActivate = hasActionPermission(adminProfile, 'bom.activate')
+  const canPrint = hasActionPermission(adminProfile, 'erp.print_template.read')
+  const printPermissionHint = canPrint
+    ? undefined
+    : '当前账号没有打印模板的权限。'
   const productOptions = useMemo(
     () => uniqueReferenceOptions(products, productOption),
     [products]
@@ -584,6 +598,11 @@ export default function BOMVersionsPage() {
         label: '材料',
         value: referenceLabel(materialOptions, item?.material_id, '材料'),
         wide: true,
+      },
+      {
+        key: 'production_operation',
+        label: '生产工序归属',
+        value: bomProductionOperationLabel(item?.production_operation_code),
       },
       {
         key: 'quantity',
@@ -847,6 +866,10 @@ export default function BOMVersionsPage() {
     )}`,
   }))
   const openEngineeringPrint = async (templateKey) => {
+    if (!canPrint) {
+      message.warning(printPermissionHint)
+      return
+    }
     if (!activeActionVersion?.id || selectedRowKeys.length !== 1) return
     setPrintingTemplateKey(templateKey)
     try {
@@ -862,12 +885,22 @@ export default function BOMVersionsPage() {
           : templateKey === WORK_INSTRUCTION_TEMPLATE_KEY
             ? buildWorkInstructionDraftFromBOMVersion
             : buildMaterialDetailDraftFromBOMVersion
+      const productImages = [
+        MATERIAL_DETAIL_TEMPLATE_KEY,
+        WORK_INSTRUCTION_TEMPLATE_KEY,
+      ].includes(templateKey)
+        ? await loadProductPrintImageSnapshots(detail.product_id, {
+            listAttachments: listBusinessAttachments,
+            downloadAttachment: downloadBusinessAttachment,
+          })
+        : {}
       const initialDraft = builder(detail, {
         productOptions,
         products,
         materials,
         units,
         companyName: resolveRuntimeCustomerPrintCompanyName(),
+        productImages,
       })
       openPrintWorkspaceWindow(templateKey, {
         entrySource: PRINT_WORKSPACE_ENTRY_SOURCE.BUSINESS,
@@ -899,7 +932,6 @@ export default function BOMVersionsPage() {
 
   const openCreate = () => {
     headerAttachmentRef.current?.clearPendingAttachments()
-    setRemovedItemIDs([])
     setHeaderMode('create')
     headerForm.resetFields()
     headerForm.setFieldsValue({
@@ -942,7 +974,6 @@ export default function BOMVersionsPage() {
   const openView = async (record = selectedVersion) => {
     if (!record?.id) return
     headerAttachmentRef.current?.clearPendingAttachments()
-    setRemovedItemIDs([])
     applySelectedRowKeys([record.id])
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('view')
@@ -954,7 +985,6 @@ export default function BOMVersionsPage() {
   const openEdit = async (record = selectedVersion) => {
     if (!record?.id || !canEditBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
-    setRemovedItemIDs([])
     applySelectedRowKeys([record.id])
     const detail = (await loadDetail(record.id)) || record
     setHeaderMode('edit')
@@ -966,7 +996,6 @@ export default function BOMVersionsPage() {
   const openCopy = (record = selectedVersion) => {
     if (!record?.id || !canCopyBOM(record)) return
     headerAttachmentRef.current?.clearPendingAttachments()
-    setRemovedItemIDs([])
     applySelectedRowKeys([record.id])
     const nextVersionSuggestion = suggestNextBOMVersion(
       versions,
@@ -994,33 +1023,6 @@ export default function BOMVersionsPage() {
     setHeaderModalOpen(true)
   }
 
-  const syncBOMItems = async ({ bomHeaderID, items = [], removedIDs = [] }) => {
-    const normalizedBOMHeaderID = Number(bomHeaderID || 0)
-    if (!Number.isFinite(normalizedBOMHeaderID) || normalizedBOMHeaderID <= 0) {
-      throw new Error('缺少物料清单草稿编号，无法保存材料明细')
-    }
-    const uniqueRemovedIDs = Array.from(
-      new Set(
-        (Array.isArray(removedIDs) ? removedIDs : [])
-          .map((id) => Number(id || 0))
-          .filter((id) => Number.isFinite(id) && id > 0)
-      )
-    )
-    for (const id of uniqueRemovedIDs) {
-      await deleteBOMItem({ id })
-    }
-    for (const item of Array.isArray(items) ? items : []) {
-      const params = buildItemParams(item, {
-        bom_header_id: normalizedBOMHeaderID,
-      })
-      if (item?.id) {
-        await updateBOMItem({ ...params, id: item.id })
-      } else {
-        await addBOMItem(params)
-      }
-    }
-  }
-
   const saveHeader = async () => {
     const values = await headerForm.validateFields()
     setSaving(true)
@@ -1031,20 +1033,25 @@ export default function BOMVersionsPage() {
           buildHeaderParams(values, { source_id: modalActionVersion?.id })
         )
       } else if (headerMode === 'edit') {
-        savedVersion = await updateBOMDraft(
-          buildHeaderParams(values, { id: modalActionVersion?.id })
-        )
-        await syncBOMItems({
-          bomHeaderID: savedVersion?.id || modalActionVersion?.id,
-          items: values.items,
-          removedIDs: removedItemIDs,
+        savedVersion = await saveBOMWithItems({
+          ...buildHeaderParams(values, {
+            id: modalActionVersion?.id,
+            product_id: modalActionVersion?.product_id,
+          }),
+          expected_version: modalActionVersion?.edit_version,
+          items: (Array.isArray(values.items) ? values.items : []).map(
+            (item) => ({
+              ...buildItemParams(item),
+              id: item?.id || undefined,
+            })
+          ),
         })
       } else {
-        savedVersion = await createBOMDraft(buildHeaderParams(values))
-        await syncBOMItems({
-          bomHeaderID: savedVersion?.id,
-          items: values.items,
-          removedIDs: [],
+        savedVersion = await saveBOMWithItems({
+          ...buildHeaderParams(values),
+          items: (Array.isArray(values.items) ? values.items : []).map((item) =>
+            buildItemParams(item)
+          ),
         })
       }
       const attachmentSaved =
@@ -1061,7 +1068,6 @@ export default function BOMVersionsPage() {
           : 'BOM 草稿已保存，未上传的附件请重新选择'
       )
       headerAttachmentRef.current?.clearPendingAttachments()
-      setRemovedItemIDs([])
       setHeaderModalOpen(false)
       await loadVersions()
     } catch (error) {
@@ -1349,7 +1355,9 @@ export default function BOMVersionsPage() {
           <Button
             size="small"
             icon={<PrinterOutlined />}
+            title={printPermissionHint}
             disabled={
+              !canPrint ||
               selectedRowKeys.length !== 1 ||
               detailLoading ||
               printingTemplateKey !== ''
@@ -1362,7 +1370,9 @@ export default function BOMVersionsPage() {
           <Button
             size="small"
             icon={<PrinterOutlined />}
+            title={printPermissionHint}
             disabled={
+              !canPrint ||
               selectedRowKeys.length !== 1 ||
               detailLoading ||
               printingTemplateKey !== ''
@@ -1375,7 +1385,9 @@ export default function BOMVersionsPage() {
           <Button
             size="small"
             icon={<PrinterOutlined />}
+            title={printPermissionHint}
             disabled={
+              !canPrint ||
               selectedRowKeys.length !== 1 ||
               detailLoading ||
               printingTemplateKey !== ''
@@ -1483,12 +1495,6 @@ export default function BOMVersionsPage() {
       />
       {bomItemsPreview.modal}
 
-      <CollaborationTaskPanel
-        tasks={[]}
-        selectedTasks={[]}
-        selectedRecordLabel={selectedVersion?.version || ''}
-      />
-
       <BusinessFormModal
         open={headerModalOpen}
         title={
@@ -1507,14 +1513,12 @@ export default function BOMVersionsPage() {
         onOk={saveHeader}
         onCancel={() => {
           headerAttachmentRef.current?.clearPendingAttachments()
-          setRemovedItemIDs([])
           setHeaderModalOpen(false)
         }}
         footer={
           headerMode === 'view' ? (
             <Button
               onClick={() => {
-                setRemovedItemIDs([])
                 setHeaderModalOpen(false)
               }}
             >
@@ -1573,11 +1577,6 @@ export default function BOMVersionsPage() {
               form={headerForm}
               materialByID={materialByID}
               materialOptions={materialOptions}
-              onRemoveSavedItem={(id) =>
-                setRemovedItemIDs((current) =>
-                  current.includes(id) ? current : [...current, id]
-                )
-              }
               registerLineItemRow={registerLineItemRow}
               requestLineItemScroll={requestLineItemScroll}
               selectedVersionID={

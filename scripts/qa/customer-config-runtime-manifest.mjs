@@ -757,6 +757,16 @@ function configuredRoleProfiles(config) {
   return new Map(config.roleProfiles.map((profile) => [profile.roleKey, profile]));
 }
 
+function roleCapabilitiesSatisfyPage(page, capabilityKeys) {
+  const requiredAll = uniqueSorted(page.requiredCapabilityKeys || []);
+  const requiredAny = uniqueSorted(page.requiredAnyCapabilityKeys || []);
+  return (
+    requiredAll.every((capabilityKey) => capabilityKeys.has(capabilityKey)) &&
+    (requiredAny.length === 0 ||
+      requiredAny.some((capabilityKey) => capabilityKeys.has(capabilityKey)))
+  );
+}
+
 function rolePageProjectionsFromPackage(config, catalog) {
   const pagesByKey = new Map(catalog.pages.map((page) => [page.key, page]));
   const configuredProfiles = configuredRoleProfiles(config);
@@ -772,23 +782,17 @@ function rolePageProjectionsFromPackage(config, catalog) {
       ? uniqueSorted(profile.menuSurfaces || [])
       : uniqueSorted(
         catalog.pages
-          .filter((page) =>
-            uniqueSorted(page.requiredCapabilityKeys || []).every((capabilityKey) =>
-              capabilityKeys.has(capabilityKey),
-            ),
-          )
+          .filter((page) => roleCapabilitiesSatisfyPage(page, capabilityKeys))
           .map((page) => page.key),
       );
     assert(pageKeys.length > 0, `${roleKey} role profile must resolve at least one runtime page`);
     for (const pageKey of pageKeys) {
       const page = pagesByKey.get(pageKey);
       assert(page, `${roleKey}.menuSurfaces contains unknown runtime page: ${pageKey}`);
-      for (const capabilityKey of uniqueSorted(page.requiredCapabilityKeys || [])) {
-        assert(
-          capabilityKeys.has(capabilityKey),
-          `${roleKey} page ${pageKey} requires capability ${capabilityKey}`,
-        );
-      }
+      assert(
+        roleCapabilitiesSatisfyPage(page, capabilityKeys),
+        `${roleKey} page ${pageKey} does not satisfy its required capability contract`,
+      );
     }
     projections[roleKey] = pageKeys;
   }

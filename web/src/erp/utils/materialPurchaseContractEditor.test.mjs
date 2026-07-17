@@ -243,6 +243,12 @@ test('materialPurchaseContractEditor: 空白模板清空示例字段和明细但
     supplierName: '示例供应商',
     buyerCompany: '本公司',
     buyerSigner: '签字人',
+    appendixImages: [
+      {
+        name: '采购末尾图.svg',
+        dataURL: 'data:image/svg+xml;base64,aW1hZ2U=',
+      },
+    ],
     clauses: {
       delivery: ['保留来货要求'],
       contract: ['保留合同约定'],
@@ -281,6 +287,7 @@ test('materialPurchaseContractEditor: 空白模板清空示例字段和明细但
   assert.deepEqual(blankDraft.clauses.contract, ['保留合同约定'])
   assert.deepEqual(blankDraft.clauses.settlement, ['保留结算方式'])
   assert.deepEqual(blankDraft.merges, [])
+  assert.deepEqual(blankDraft.appendixImages, [])
 })
 
 test('materialPurchaseContractEditor: 手签留白只清空签字人并保留日期', () => {

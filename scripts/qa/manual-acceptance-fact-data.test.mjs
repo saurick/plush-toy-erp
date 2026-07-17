@@ -745,6 +745,70 @@ test("DRAFT quality sample cancels the generated inspection and reuses one repla
   assert.equal(mutations, 2);
 });
 
+test("quality decision fixtures send approximate percentages as required string pairs", async () => {
+  const cases = [
+    {
+      target: "PASSED",
+      method: "pass_quality_inspection",
+      result: "PASS",
+      operator: "APPROX",
+      percent: "5",
+    },
+    {
+      target: "REJECTED",
+      method: "reject_quality_inspection",
+      result: "REJECT",
+      operator: "GT",
+      percent: "50",
+    },
+  ];
+
+  for (const scenario of cases) {
+    const receipt = { id: 41, items: [{ id: 51 }] };
+    const inspection = {
+      id: 61,
+      inspection_no: "IQC-PR-41-ITEM-51",
+      purchase_receipt_id: 41,
+      purchase_receipt_item_id: 51,
+      source_type: "PURCHASE_RECEIPT",
+      inspection_type: "INCOMING",
+      status: "SUBMITTED",
+    };
+    let decision;
+    const result = await ensureReceiptQualities(
+      async ({ domain, method, params }) => {
+        assert.equal(domain, "quality");
+        if (method === "list_quality_inspections") {
+          return { quality_inspections: [structuredClone(inspection)], total: 1 };
+        }
+        assert.equal(method, scenario.method);
+        decision = structuredClone(params);
+        return {
+          quality_inspection: {
+            ...inspection,
+            status: scenario.target,
+            result: scenario.result,
+            defect_rate_operator: params.defect_rate_operator,
+            defect_rate_percent: params.defect_rate_percent,
+          },
+        };
+      },
+      receipt,
+      {
+        receiptNo: "PR-001",
+        status: "DRAFT",
+        qualityTarget: scenario.target,
+      },
+      { anchorDate: "2026-07-15" },
+    );
+
+    assert.equal(result[0].status, scenario.target);
+    assert.equal(decision.defect_rate_operator, scenario.operator);
+    assert.equal(decision.defect_rate_percent, scenario.percent);
+    assert.equal(typeof decision.defect_rate_percent, "string");
+  }
+});
+
 test("receipt quality verification reads exact persisted states without mutation", async () => {
   const receipt = { id: 41, items: [{ id: 51 }] };
   const inspections = [

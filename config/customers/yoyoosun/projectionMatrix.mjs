@@ -95,6 +95,8 @@ export const yoyoosunProjectionMatrix = Object.freeze({
         "inspection_no",
         "source_no",
         "result",
+        "defect_rate_operator",
+        "defect_rate_percent",
         "decision_note",
       ]),
     }),

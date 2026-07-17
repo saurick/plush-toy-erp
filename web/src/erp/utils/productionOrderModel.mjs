@@ -1,3 +1,5 @@
+import { PRODUCTION_WIP_ROUTE_KEY } from './productionWipModel.mjs'
+
 export const PRODUCTION_ORDER_STATUS = Object.freeze({
   DRAFT: 'DRAFT',
   RELEASED: 'RELEASED',
@@ -77,7 +79,12 @@ export function validateProductionOrderAggregate(data, expected = {}) {
       !positiveSafeInteger(item.product_id) ||
       !positiveSafeInteger(item.unit_id) ||
       typeof item.planned_quantity !== 'string' ||
-      !item.planned_quantity.trim()
+      !item.planned_quantity.trim() ||
+      (item.route_code != null &&
+        item.route_code !== PRODUCTION_WIP_ROUTE_KEY) ||
+      typeof item.customer_inspection_required !== 'boolean' ||
+      (item.customer_inspection_required &&
+        item.route_code !== PRODUCTION_WIP_ROUTE_KEY)
     ) {
       throw invalidResponse()
     }

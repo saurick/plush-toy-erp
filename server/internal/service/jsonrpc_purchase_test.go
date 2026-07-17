@@ -9,6 +9,7 @@ import (
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 	datarepo "server/internal/data"
+	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/errcode"
@@ -128,31 +129,68 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if receiptRes == nil || receiptRes.Code != errcode.OK.Code {
 		t.Fatalf("expected create OK, got %#v", receiptRes)
 	}
-	receiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id")
+	manualReceiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id")
+	if manualReceiptID <= 0 {
+		t.Fatalf("expected manual receipt identity, got %d", manualReceiptID)
+	}
 
 	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
 		t.Fatalf("draft purchase receipt must not write inventory txns, got %d", count)
 	}
+	linkedReceipt, sourceItem := createPurchaseReceiptAppendSourceForServiceTest(
+		t,
+		ctx,
+		client,
+		j.inventoryUC,
+		fixtures,
+		"JSONRPC-API",
+	)
+	receiptID := linkedReceipt.ID
+	itemCountBeforeMissingSource := client.PurchaseReceiptItem.Query().CountX(ctx)
+	lotCountBeforeMissingSource := client.InventoryLot.Query().CountX(ctx)
+	inspectionCountBeforeMissingSource := client.QualityInspection.Query().CountX(ctx)
+	_, missingSourceRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2-missing-source", mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":      float64(receiptID),
+		"material_id":     float64(fixtures.materialID),
+		"warehouse_id":    float64(fixtures.warehouseID),
+		"unit_id":         float64(fixtures.unitID),
+		"quantity":        "8.5",
+		"idempotency_key": "jsonrpc-receipt-item-missing-source",
+	}))
+	if err != nil || missingSourceRes == nil || missingSourceRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected missing purchase order item source rejected, result=%#v err=%v", missingSourceRes, err)
+	}
+	if got := client.PurchaseReceiptItem.Query().CountX(ctx); got != itemCountBeforeMissingSource {
+		t.Fatalf("missing source changed receipt item count: %d -> %d", itemCountBeforeMissingSource, got)
+	}
+	if got := client.InventoryLot.Query().CountX(ctx); got != lotCountBeforeMissingSource {
+		t.Fatalf("missing source changed inventory lot count: %d -> %d", lotCountBeforeMissingSource, got)
+	}
+	if got := client.QualityInspection.Query().CountX(ctx); got != inspectionCountBeforeMissingSource {
+		t.Fatalf("missing source changed quality inspection count: %d -> %d", inspectionCountBeforeMissingSource, got)
+	}
 	_, missingItemKeyRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2-missing-key", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":   float64(receiptID),
-		"material_id":  float64(fixtures.materialID),
-		"warehouse_id": float64(fixtures.warehouseID),
-		"unit_id":      float64(fixtures.unitID),
-		"quantity":     "8.5",
+		"receipt_id":             float64(receiptID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(sourceItem.ID),
+		"quantity":               "8.5",
 	}))
 	if err != nil || missingItemKeyRes == nil || missingItemKeyRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected missing receipt item idempotency key rejected, result=%#v err=%v", missingItemKeyRes, err)
 	}
 
 	_, itemRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":      float64(receiptID),
-		"material_id":     float64(fixtures.materialID),
-		"warehouse_id":    float64(fixtures.warehouseID),
-		"unit_id":         float64(fixtures.unitID),
-		"lot_no":          "JSONRPC-LOT-001",
-		"quantity":        "8.5",
-		"source_line_no":  "1",
-		"idempotency_key": "jsonrpc-receipt-item-attempt-1",
+		"receipt_id":             float64(receiptID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(sourceItem.ID),
+		"lot_no":                 "JSONRPC-LOT-001",
+		"quantity":               "8.5",
+		"source_line_no":         "1",
+		"idempotency_key":        "jsonrpc-receipt-item-attempt-1",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -179,14 +217,15 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	lotCount := client.InventoryLot.Query().CountX(ctx)
 	inspectionCount := client.QualityInspection.Query().CountX(ctx)
 	_, replayRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2-replay", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":      float64(receiptID),
-		"material_id":     float64(fixtures.materialID),
-		"warehouse_id":    float64(fixtures.warehouseID),
-		"unit_id":         float64(fixtures.unitID),
-		"lot_no":          "JSONRPC-LOT-001",
-		"quantity":        "8.5000",
-		"source_line_no":  "1",
-		"idempotency_key": "jsonrpc-receipt-item-attempt-1",
+		"receipt_id":             float64(receiptID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(sourceItem.ID),
+		"lot_no":                 "JSONRPC-LOT-001",
+		"quantity":               "8.5000",
+		"source_line_no":         "1",
+		"idempotency_key":        "jsonrpc-receipt-item-attempt-1",
 	}))
 	if err != nil || replayRes == nil || replayRes.Code != errcode.OK.Code {
 		t.Fatalf("expected exact receipt item replay OK, result=%#v err=%v", replayRes, err)
@@ -204,26 +243,28 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		t.Fatalf("receipt item replay changed inspection count: %d -> %d", inspectionCount, got)
 	}
 	_, conflictRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "2-conflict", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":      float64(receiptID),
-		"material_id":     float64(fixtures.materialID),
-		"warehouse_id":    float64(fixtures.warehouseID),
-		"unit_id":         float64(fixtures.unitID),
-		"lot_no":          "JSONRPC-LOT-001",
-		"quantity":        "9",
-		"source_line_no":  "1",
-		"idempotency_key": "jsonrpc-receipt-item-attempt-1",
+		"receipt_id":             float64(receiptID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(sourceItem.ID),
+		"lot_no":                 "JSONRPC-LOT-001",
+		"quantity":               "9",
+		"source_line_no":         "1",
+		"idempotency_key":        "jsonrpc-receipt-item-attempt-1",
 	}))
 	if err != nil || conflictRes == nil || conflictRes.Code != errcode.IdempotencyConflict.Code {
 		t.Fatalf("expected receipt item idempotency conflict, result=%#v err=%v", conflictRes, err)
 	}
 
 	_, invalidLineRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "invalid-line", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":      float64(receiptID),
-		"material_id":     float64(fixtures.materialID),
-		"warehouse_id":    float64(fixtures.warehouseID),
-		"unit_id":         float64(fixtures.unitID),
-		"quantity":        "0",
-		"idempotency_key": "jsonrpc-receipt-item-invalid-quantity",
+		"receipt_id":             float64(receiptID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(sourceItem.ID),
+		"quantity":               "0",
+		"idempotency_key":        "jsonrpc-receipt-item-invalid-quantity",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err adding invalid line, got %v", err)
@@ -306,7 +347,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 
 	_, listRes, err := j.handlePurchase(adminCtx, "list_purchase_receipts", "5", mustJSONRPCStruct(t, map[string]any{
 		"status":        biz.PurchaseReceiptStatusPosted,
-		"supplier_name": "布料供应商",
+		"supplier_name": linkedReceipt.SupplierName,
 		"date_from":     "2026-06-11",
 		"date_to":       "2026-06-11",
 		"material_id":   float64(fixtures.materialID),
@@ -347,7 +388,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if dashboardRes == nil || dashboardRes.Code != errcode.OK.Code {
 		t.Fatalf("expected dashboard OK, got %#v", dashboardRes)
 	}
-	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, 2)
+	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, 3)
 
 	_, cancelledRes, err := j.handlePurchase(adminCtx, "cancel_purchase_receipt", "7", mustJSONRPCStruct(t, map[string]any{"id": float64(receiptID)}))
 	if err != nil {
@@ -513,6 +554,9 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if manualReceipt["supplier_id"] != nil {
 		t.Fatalf("manual receipt without stable supplier identity must return supplier_id=nil, got %#v", manualReceipt["supplier_id"])
 	}
+	manualItemCount := client.PurchaseReceiptItem.Query().CountX(ctx)
+	manualLotCount := client.InventoryLot.Query().CountX(ctx)
+	manualInspectionCount := client.QualityInspection.Query().CountX(ctx)
 	_, manualLineRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "add_purchase_receipt_item", "manual-line", mustJSONRPCStruct(t, map[string]any{
 		"receipt_id":             float64(manualReceiptID),
 		"material_id":            float64(fixtures.materialID),
@@ -526,9 +570,17 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if err != nil {
 		t.Fatalf("expected nil err adding manual source line, got %v", err)
 	}
-	manualLine := jsonRPCNestedMap(t, manualLineRes, "purchase_receipt_item")
-	if got := manualLine["source_line_no"]; got != "1" {
-		t.Fatalf("expected source_line_no to be overwritten from purchase order line, got %#v", got)
+	if manualLineRes == nil || manualLineRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("receipt without stable supplier identity must reject a purchase order source line, got %#v", manualLineRes)
+	}
+	if got := client.PurchaseReceiptItem.Query().CountX(ctx); got != manualItemCount {
+		t.Fatalf("rejected manual source append changed item count: %d -> %d", manualItemCount, got)
+	}
+	if got := client.InventoryLot.Query().CountX(ctx); got != manualLotCount {
+		t.Fatalf("rejected manual source append changed lot count: %d -> %d", manualLotCount, got)
+	}
+	if got := client.QualityInspection.Query().CountX(ctx); got != manualInspectionCount {
+		t.Fatalf("rejected manual source append changed inspection count: %d -> %d", manualInspectionCount, got)
 	}
 	_, missingReceiptKeyRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "missing-key", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
@@ -713,15 +765,27 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	if receiptRes == nil || receiptRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled create OK, got %#v", receiptRes)
 	}
-	receiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id")
+	if manualReceiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id"); manualReceiptID <= 0 {
+		t.Fatalf("expected enabled manual receipt identity, got %d", manualReceiptID)
+	}
+	linkedReceipt, sourceItem := createPurchaseReceiptAppendSourceForServiceTest(
+		t,
+		ctx,
+		client,
+		j.inventoryUC,
+		fixtures,
+		"MODULE-ENABLED",
+	)
+	receiptID := linkedReceipt.ID
 	_, itemRes, err := j.handlePurchase(adminCtx, "add_purchase_receipt_item", "enabled-line", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":      float64(receiptID),
-		"material_id":     float64(fixtures.materialID),
-		"warehouse_id":    float64(fixtures.warehouseID),
-		"unit_id":         float64(fixtures.unitID),
-		"lot_no":          "PR-MODULE-ENABLED-LOT",
-		"quantity":        "2",
-		"idempotency_key": "jsonrpc-module-enabled-line",
+		"receipt_id":             float64(receiptID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(sourceItem.ID),
+		"lot_no":                 "PR-MODULE-ENABLED-LOT",
+		"quantity":               "2",
+		"idempotency_key":        "jsonrpc-module-enabled-line",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -761,6 +825,48 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	if getRes == nil || getRes.Code != errcode.OK.Code {
 		t.Fatalf("expected get to remain available for historical read, got %#v", getRes)
 	}
+}
+
+func createPurchaseReceiptAppendSourceForServiceTest(
+	t *testing.T,
+	ctx context.Context,
+	client *ent.Client,
+	uc *biz.InventoryUsecase,
+	fixtures inventoryTestFixtures,
+	suffix string,
+) (*biz.PurchaseReceipt, *ent.PurchaseOrderItem) {
+	t.Helper()
+	supplier := client.Supplier.Create().
+		SetCode("SUP-RECEIPT-APPEND-" + suffix).
+		SetName("追加来源供应商-" + suffix).
+		SetIsActive(true).
+		SaveX(ctx)
+	order := client.PurchaseOrder.Create().
+		SetPurchaseOrderNo("PO-RECEIPT-APPEND-" + suffix).
+		SetSupplierID(supplier.ID).
+		SetSupplierSnapshot(map[string]any{"name": supplier.Name}).
+		SetPurchaseDate(time.Date(2026, 6, 11, 0, 0, 0, 0, time.UTC)).
+		SetLifecycleStatus(biz.PurchaseOrderStatusApproved).
+		SaveX(ctx)
+	item := client.PurchaseOrderItem.Create().
+		SetPurchaseOrderID(order.ID).
+		SetLineNo(1).
+		SetMaterialID(fixtures.materialID).
+		SetUnitID(fixtures.unitID).
+		SetPurchasedQuantity(decimal.NewFromInt(10)).
+		SetLineStatus(biz.PurchaseOrderItemStatusOpen).
+		SaveX(ctx)
+	supplierID := supplier.ID
+	receipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PR-RECEIPT-APPEND-" + suffix,
+		SupplierID:   &supplierID,
+		SupplierName: supplier.Name,
+		ReceivedAt:   time.Date(2026, 6, 11, 0, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create source-linked purchase receipt draft failed: %v", err)
+	}
+	return receipt, item
 }
 
 func newPurchaseJSONRPCTestData(t *testing.T, data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {

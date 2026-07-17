@@ -211,8 +211,13 @@ function createRPC({
         qualityInspection.status = "SUBMITTED";
         return { quality_inspection: qualityInspection };
       case "pass_quality_inspection":
+        assert.equal(params.defect_rate_operator, "APPROX");
+        assert.equal(params.defect_rate_percent, "5");
+        assert.equal(typeof params.defect_rate_percent, "string");
         qualityInspection.status = "PASSED";
         qualityInspection.result = "PASS";
+        qualityInspection.defect_rate_operator = params.defect_rate_operator;
+        qualityInspection.defect_rate_percent = params.defect_rate_percent;
         return { quality_inspection: qualityInspection };
       case "create_stock_reservation_from_sales_order":
         return createRecord("stock_reservation", { status: "ACTIVE" });
@@ -381,6 +386,44 @@ test("phase-scoped apply executes the formal production chain and returns exact 
   assert.equal(
     calls.some((call) => call.method === "create_shipment_with_items"),
     false,
+  );
+});
+
+test("outsourcing quality apply sends the required approximate defect-rate pair", async () => {
+  const plan = buildSourceDrivenFactPlan(sourceReport(), {
+    instanceKey: "ROW-OUT-QUALITY",
+    enabledPhases: ["outsourcing"],
+  });
+  const { calls, rpc } = createRPC();
+
+  const report = await applySourceDrivenFactPlan(plan, {
+    rpc,
+    confirmation: sourceDrivenFactConfirmation(plan),
+  });
+
+  assert.equal(report.results.outsourcing.qualityInspection.status, "PASSED");
+  const decision = calls.find(
+    (call) => call.method === "pass_quality_inspection",
+  );
+  assert.deepEqual(decision?.params, {
+    customer_key: "yoyoosun",
+    id: report.results.outsourcing.qualityInspection.id,
+    result: "PASS",
+    defect_rate_operator: "APPROX",
+    defect_rate_percent: "5",
+    decision_note: "按订单办理。",
+  });
+  assert.equal(typeof decision.params.defect_rate_percent, "string");
+  assert.deepEqual(
+    FORMAL_RPC_PARAM_ALLOWLIST["quality.pass_quality_inspection"],
+    [
+      "customer_key",
+      "id",
+      "result",
+      "defect_rate_operator",
+      "defect_rate_percent",
+      "decision_note",
+    ],
   );
 });
 

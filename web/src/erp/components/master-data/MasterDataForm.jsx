@@ -20,6 +20,7 @@ import {
 import { useLineItemAppendScroll } from '../business-list/useLineItemAppendScroll.mjs'
 import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.jsx'
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
+import { productSKUParentFieldContract } from './productSKUParentField.mjs'
 
 function DefaultUnitSelect({
   form,
@@ -237,6 +238,7 @@ function paymentConditionRule({ form, methodField, termDaysField, field }) {
 export function MasterDataFormFields({
   form,
   type,
+  isEditing = false,
   products = [],
   productOptions = [],
   unitOptions = [],
@@ -245,10 +247,13 @@ export function MasterDataFormFields({
   materialColorOptions = [],
   processNameOptions = [],
   processCategoryOptions = [],
+  supplierProcessOptions = [],
   supplierTypeOptions = [],
   customerPaymentConditionOptions = [],
   onCustomerPaymentMethodChange,
 }) {
+  const productSKUParentField = productSKUParentFieldContract(isEditing)
+
   if (type === 'products') {
     return (
       <>
@@ -302,12 +307,14 @@ export function MasterDataFormFields({
       <>
         <Form.Item
           className="erp-business-action-form__field"
-          label="产品"
+          extra={productSKUParentField.helpText}
+          label="所属产品"
           name="product_id"
           rules={[{ required: true, message: '请选择产品' }]}
         >
           <Select
-            allowClear
+            allowClear={productSKUParentField.allowClear}
+            disabled={productSKUParentField.disabled}
             optionFilterProp="label"
             options={productOptions}
             placeholder="请选择产品"
@@ -414,7 +421,7 @@ export function MasterDataFormFields({
           <TextSuggestionInput
             className="erp-process-name-suggested-input"
             options={processNameOptions}
-            placeholder="如查货、手工、车缝、包装，也可直接输入新环节"
+            placeholder="如查货、车缝、手工、包装，也可直接输入新环节"
           />
         </Form.Item>
         <Form.Item
@@ -430,13 +437,15 @@ export function MasterDataFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
-          label="排序"
+          extra="只影响环节列表的展示顺序，不定义产品的生产先后顺序。"
+          label="列表显示顺序"
           name="sort_order"
         >
           <InputNumber min={0} precision={0} style={{ width: '100%' }} />
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
+          extra="可与“可内制”同时开启；这里只记录工序能力，具体订单仍由生产经理另行决定。"
           label="可委外"
           name="outsourcing_enabled"
           valuePropName="checked"
@@ -508,17 +517,47 @@ export function MasterDataFormFields({
         </Form.Item>
       )}
       {type === 'suppliers' ? (
-        <Form.Item
-          className="erp-business-action-form__field"
-          label="供应商类型"
-          name="supplier_type"
-        >
-          <Select
-            allowClear
-            options={supplierTypeOptions}
-            placeholder="请选择供应商类型"
-          />
-        </Form.Item>
+        <>
+          <Form.Item
+            className="erp-business-action-form__field"
+            label="供应商类型"
+            name="supplier_type"
+          >
+            <Select
+              allowClear
+              options={supplierTypeOptions}
+              placeholder="请选择供应商类型"
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field erp-business-action-form__field--full"
+            label="经营 / 加工地址"
+            name="address"
+          >
+            <Input.TextArea
+              allowClear
+              autoSize={{ minRows: 1, maxRows: 3 }}
+              maxLength={512}
+              placeholder="填写合同中需要带出的加工厂或供应商地址"
+              showCount
+            />
+          </Form.Item>
+          <Form.Item
+            className="erp-business-action-form__field erp-business-action-form__field--full"
+            extra="记录该加工厂声明可承接的工序，用于资料查询；具体订单仍需逐行选择工序。"
+            label="可加工工序"
+            name="process_ids"
+          >
+            <Select
+              allowClear
+              mode="multiple"
+              options={supplierProcessOptions}
+              optionFilterProp="label"
+              placeholder="请选择可承接的加工工序"
+              showSearch
+            />
+          </Form.Item>
+        </>
       ) : null}
       {type === 'customers' ? (
         <>

@@ -85,6 +85,12 @@ func (OutsourcingOrderItem) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(255),
+		// Processing item is the line-specific part/content (for example, face*1),
+		// while process_id identifies the reusable process master (for example, embroidery).
+		field.String("processing_item").
+			Optional().
+			Nillable().
+			MaxLen(255),
 		field.String("process_name_snapshot").
 			Optional().
 			Nillable().
@@ -151,6 +157,8 @@ func (OutsourcingOrderItem) Edges() []ent.Edge {
 			Field("unit_id").
 			Required().
 			Unique(),
+		edge.To("production_wip_outsourcing_allocations", ProductionWIPOutsourcingAllocation.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 

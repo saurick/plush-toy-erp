@@ -62,7 +62,7 @@ func (d *jsonrpcDispatcher) handlePurchaseReceipt(
 			return id, res, nil
 		}
 		in, ok := purchaseReceiptItemCreateFromParams(pm)
-		if !ok || in.IdempotencyKey == "" {
+		if !ok || in.PurchaseOrderItemID == nil || *in.PurchaseOrderItemID <= 0 || in.IdempotencyKey == "" {
 			return id, invalidParamResult(), nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "purchase_receipts", "quality_inspections", "inventory"); res != nil {

@@ -42,6 +42,8 @@ type ProductionOrderMaterialRequirement struct {
 	LossRateSnapshot decimal.Decimal `json:"loss_rate_snapshot,omitempty"`
 	// PlannedQuantity holds the value of the "planned_quantity" field.
 	PlannedQuantity decimal.Decimal `json:"planned_quantity,omitempty"`
+	// ProductionOperationCode holds the value of the "production_operation_code" field.
+	ProductionOperationCode *string `json:"production_operation_code,omitempty"`
 	// MaterialCodeSnapshot holds the value of the "material_code_snapshot" field.
 	MaterialCodeSnapshot string `json:"material_code_snapshot,omitempty"`
 	// MaterialNameSnapshot holds the value of the "material_name_snapshot" field.
@@ -74,9 +76,11 @@ type ProductionOrderMaterialRequirementEdges struct {
 	Material *Material `json:"material,omitempty"`
 	// Unit holds the value of the unit edge.
 	Unit *Unit `json:"unit,omitempty"`
+	// ProductionWipOutsourcingAllocations holds the value of the production_wip_outsourcing_allocations edge.
+	ProductionWipOutsourcingAllocations []*ProductionWIPOutsourcingAllocation `json:"production_wip_outsourcing_allocations,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [6]bool
+	loadedTypes [7]bool
 }
 
 // ProductionOrderOrErr returns the ProductionOrder value or an error if the edge
@@ -145,6 +149,15 @@ func (e ProductionOrderMaterialRequirementEdges) UnitOrErr() (*Unit, error) {
 	return nil, &NotLoadedError{edge: "unit"}
 }
 
+// ProductionWipOutsourcingAllocationsOrErr returns the ProductionWipOutsourcingAllocations value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionOrderMaterialRequirementEdges) ProductionWipOutsourcingAllocationsOrErr() ([]*ProductionWIPOutsourcingAllocation, error) {
+	if e.loadedTypes[6] {
+		return e.ProductionWipOutsourcingAllocations, nil
+	}
+	return nil, &NotLoadedError{edge: "production_wip_outsourcing_allocations"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*ProductionOrderMaterialRequirement) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -154,7 +167,7 @@ func (*ProductionOrderMaterialRequirement) scanValues(columns []string) ([]any, 
 			values[i] = new(decimal.Decimal)
 		case productionordermaterialrequirement.FieldID, productionordermaterialrequirement.FieldProductionOrderID, productionordermaterialrequirement.FieldProductionOrderItemID, productionordermaterialrequirement.FieldBomHeaderID, productionordermaterialrequirement.FieldBomItemID, productionordermaterialrequirement.FieldMaterialID, productionordermaterialrequirement.FieldUnitID:
 			values[i] = new(sql.NullInt64)
-		case productionordermaterialrequirement.FieldMaterialCodeSnapshot, productionordermaterialrequirement.FieldMaterialNameSnapshot, productionordermaterialrequirement.FieldUnitCodeSnapshot, productionordermaterialrequirement.FieldUnitNameSnapshot:
+		case productionordermaterialrequirement.FieldProductionOperationCode, productionordermaterialrequirement.FieldMaterialCodeSnapshot, productionordermaterialrequirement.FieldMaterialNameSnapshot, productionordermaterialrequirement.FieldUnitCodeSnapshot, productionordermaterialrequirement.FieldUnitNameSnapshot:
 			values[i] = new(sql.NullString)
 		case productionordermaterialrequirement.FieldCreatedAt, productionordermaterialrequirement.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -232,6 +245,13 @@ func (_m *ProductionOrderMaterialRequirement) assignValues(columns []string, val
 				return fmt.Errorf("unexpected type %T for field planned_quantity", values[i])
 			} else if value != nil {
 				_m.PlannedQuantity = *value
+			}
+		case productionordermaterialrequirement.FieldProductionOperationCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field production_operation_code", values[i])
+			} else if value.Valid {
+				_m.ProductionOperationCode = new(string)
+				*_m.ProductionOperationCode = value.String
 			}
 		case productionordermaterialrequirement.FieldMaterialCodeSnapshot:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -312,6 +332,11 @@ func (_m *ProductionOrderMaterialRequirement) QueryUnit() *UnitQuery {
 	return NewProductionOrderMaterialRequirementClient(_m.config).QueryUnit(_m)
 }
 
+// QueryProductionWipOutsourcingAllocations queries the "production_wip_outsourcing_allocations" edge of the ProductionOrderMaterialRequirement entity.
+func (_m *ProductionOrderMaterialRequirement) QueryProductionWipOutsourcingAllocations() *ProductionWIPOutsourcingAllocationQuery {
+	return NewProductionOrderMaterialRequirementClient(_m.config).QueryProductionWipOutsourcingAllocations(_m)
+}
+
 // Update returns a builder for updating this ProductionOrderMaterialRequirement.
 // Note that you need to call ProductionOrderMaterialRequirement.Unwrap() before calling this method if this ProductionOrderMaterialRequirement
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -361,6 +386,11 @@ func (_m *ProductionOrderMaterialRequirement) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("planned_quantity=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PlannedQuantity))
+	builder.WriteString(", ")
+	if v := _m.ProductionOperationCode; v != nil {
+		builder.WriteString("production_operation_code=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("material_code_snapshot=")
 	builder.WriteString(_m.MaterialCodeSnapshot)

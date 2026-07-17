@@ -4,6 +4,7 @@ export const yoyoosunFlowOrchestrationCoverage = Object.freeze({
   layers: Object.freeze([
     Object.freeze({ key: 'workflow_task', status: 'runtime_enabled', evidence: Object.freeze(['official_task_actions', 'owner_pool_scope', 'mobile_role_tasks']) }),
     Object.freeze({ key: 'process_runtime', status: 'runtime_enabled_partial', evidence: Object.freeze(['sales_order_acceptance', 'material_supply', 'finished_goods_delivery']) }),
+    Object.freeze({ key: 'production_wip', status: 'runtime_enabled_local', evidence: Object.freeze(['production_order_route_snapshot', 'explicit_wip_batches', 'inhouse_transfer_or_outsource_return', 'stage_quality_gates', 'conditional_customer_inspection']) }),
     Object.freeze({ key: 'business_flows', status: 'preview_only', evidence: Object.freeze(['sales_to_production', 'purchase_to_inventory', 'production_to_inventory', 'delivery_to_settlement']) }),
     Object.freeze({ key: 'state_machines', status: 'preview_only', evidence: Object.freeze(['sales_order_lifecycle', 'production_order_lifecycle', 'purchase_order_lifecycle']) }),
     Object.freeze({ key: 'process_policies', status: 'preview_only', evidence: Object.freeze(['skip_policy', 'auto_generate_policy', 'close_policy']) }),
@@ -21,6 +22,7 @@ export const yoyoosunFlowOrchestrationCoverage = Object.freeze({
     'customer_config_preview',
     'purchase_contract_print',
     'processing_contract_print',
+    'production_order_wip_execution',
   ]),
   signoffGates: Object.freeze([
     'customer_package_preview_boundary_passed',

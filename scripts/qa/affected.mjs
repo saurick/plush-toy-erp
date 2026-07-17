@@ -408,6 +408,7 @@ export function buildAffectedPlan(files, { root = DEFAULT_ROOT } = {}) {
             "scripts/qa/private-deployment-boundaries.test.mjs",
             "scripts/qa/private-deployment-package-closure.test.mjs",
             "scripts/qa/customer-package-lint.test.mjs",
+            "scripts/qa/customer-package-preview-boundary.test.mjs",
             "scripts/qa/customer-config-runtime-manifest.test.mjs",
             "scripts/qa/test-data-isolation-boundary.test.mjs",
           ];

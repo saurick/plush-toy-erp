@@ -52,6 +52,8 @@ export async function installAdminRpcMocks(
     baseURL = '',
     adminProfileOverride = null,
     effectiveSessionOverride = null,
+    workflowTaskFixtures = [],
+    workflowSourceTaskProducerFixtures = [],
   } = {}
 ) {
   const nowUnix = () => Math.floor(Date.now() / 1000)
@@ -158,8 +160,7 @@ export async function installAdminRpcMocks(
     ]
     return {
       ...item,
-      permission_class:
-        item.module === 'system' ? 'control_plane' : 'business',
+      permission_class: item.module === 'system' ? 'control_plane' : 'business',
       assignable: item.module !== 'system',
       usage: {
         pages: menus.map((menu) => ({
@@ -280,6 +281,8 @@ export async function installAdminRpcMocks(
     mockPdfBuffer,
     resolveDelayFromReferer,
     createMockAdminToken,
+    workflowTaskFixtures,
+    workflowSourceTaskProducerFixtures,
   }
 
   await installSystemRpcMocks(page, mockContext)

@@ -42,6 +42,11 @@ import {
   optionalContactPhoneRule,
 } from '../../utils/contactValidation.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
+import {
+  CATALOG_FILL_DUPLICATE_POLICIES,
+  CATALOG_FILL_MODES,
+  buildCatalogFillRowsPlan,
+} from '../../utils/catalogFillRows.mjs'
 
 function formatSummaryNumber(value, fractionDigits = 0) {
   if (!Number.isFinite(value) || value === 0) {
@@ -588,12 +593,18 @@ export function SalesOrderItemsFormSection({
               onCancel={() => setSkuImportOpen(false)}
               onImport={(selectedSKUs) => {
                 const currentLines = form.getFieldValue('items') || []
-                let nextLineNo = getNextLineNo(currentLines)
+                const nextLineNo = getNextLineNo(currentLines)
                 const startIndex = currentLines.length
-                const importedLines = selectedSKUs.map((sku) => {
-                  const line = createOrderLineFromSKU(sku, nextLineNo)
-                  nextLineNo += 1
-                  return line
+                const { rowsToAdd: importedLines } = buildCatalogFillRowsPlan({
+                  currentRows: currentLines,
+                  selectedRows: selectedSKUs,
+                  mode: CATALOG_FILL_MODES.APPEND,
+                  // 同一 SKU 可因交期、价格或客户要求拆成多行。
+                  duplicatePolicy: CATALOG_FILL_DUPLICATE_POLICIES.ALLOW,
+                  getCurrentSourceKey: (line) => line.product_sku_id,
+                  getSelectedSourceKey: (sku) => sku.id,
+                  mapSelectedRow: (sku, { acceptedIndex }) =>
+                    createOrderLineFromSKU(sku, nextLineNo + acceptedIndex),
                 })
                 importedLines.forEach(() => {
                   add()

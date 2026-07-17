@@ -5,6 +5,7 @@ import {
   buildProductionCompletionChoices,
   buildProductionCompletionLotOptions,
   buildProductionCompletionPayload,
+  compareProductionCompletionQuantity,
   findProductionCompletionResult,
   normalizeProductionCompletionCreateRequest,
 } from './productionCompletionAction.mjs'
@@ -49,6 +50,77 @@ test('production completion choices use posted facts as the remaining truth', ()
   assert.equal(choices[0].draft, '2')
   assert.equal(choices[0].remaining, '6')
   assert.match(choices[0].label, /剩余 6 件/u)
+})
+
+test('production completion is capped by accepted packaging WIP before planned quantity', () => {
+  const [choice] = buildProductionCompletionChoices(
+    [
+      {
+        id: 11,
+        planned_quantity: '100',
+        accepted_packaging_quantity: '40',
+        product_code_snapshot: 'P-001',
+        unit_name_snapshot: '件',
+      },
+    ],
+    [
+      {
+        fact_type: 'FINISHED_GOODS_RECEIPT',
+        source_type: 'PRODUCTION_ORDER',
+        source_line_id: 11,
+        status: 'POSTED',
+        quantity: '0.000001',
+      },
+    ]
+  )
+  assert.equal(choice.planned, '100')
+  assert.equal(choice.acceptedPackaging, '40')
+  assert.equal(choice.posted, '0.000001')
+  assert.equal(choice.remaining, '39.999999')
+  assert.match(choice.label, /剩余 39\.999999 件/u)
+  assert.equal(
+    compareProductionCompletionQuantity('39.999999', choice.remaining),
+    0
+  )
+  assert.equal(compareProductionCompletionQuantity('40', choice.remaining), 1)
+})
+
+test('production completion clamps fully consumed packaging quantity at zero', () => {
+  const choices = buildProductionCompletionChoices(
+    [
+      {
+        id: 11,
+        planned_quantity: '100',
+        accepted_packaging_quantity: '40',
+      },
+      {
+        id: 12,
+        planned_quantity: '100',
+        accepted_packaging_quantity: '40',
+      },
+    ],
+    [
+      {
+        fact_type: 'FINISHED_GOODS_RECEIPT',
+        source_type: 'PRODUCTION_ORDER',
+        source_line_id: 11,
+        status: 'POSTED',
+        quantity: '40',
+      },
+      {
+        fact_type: 'FINISHED_GOODS_RECEIPT',
+        source_type: 'PRODUCTION_ORDER',
+        source_line_id: 12,
+        status: 'POSTED',
+        quantity: '40.000001',
+      },
+    ]
+  )
+
+  for (const choice of choices) {
+    assert.equal(choice.remaining, '0')
+    assert.equal(choice.disabled, true)
+  }
 })
 
 test('production completion payload only submits source action fields', () => {

@@ -25,6 +25,8 @@ type Supplier struct {
 	ShortName *string `json:"short_name,omitempty"`
 	// SupplierType holds the value of the "supplier_type" field.
 	SupplierType *string `json:"supplier_type,omitempty"`
+	// Address holds the value of the "address" field.
+	Address *string `json:"address,omitempty"`
 	// TaxNo holds the value of the "tax_no" field.
 	TaxNo *string `json:"tax_no,omitempty"`
 	// IsActive holds the value of the "is_active" field.
@@ -49,9 +51,11 @@ type SupplierEdges struct {
 	PurchaseReceipts []*PurchaseReceipt `json:"purchase_receipts,omitempty"`
 	// OutsourcingOrders holds the value of the outsourcing_orders edge.
 	OutsourcingOrders []*OutsourcingOrder `json:"outsourcing_orders,omitempty"`
+	// ProcessCapabilities holds the value of the process_capabilities edge.
+	ProcessCapabilities []*Process `json:"process_capabilities,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [3]bool
+	loadedTypes [4]bool
 }
 
 // PurchaseOrdersOrErr returns the PurchaseOrders value or an error if the edge
@@ -81,6 +85,15 @@ func (e SupplierEdges) OutsourcingOrdersOrErr() ([]*OutsourcingOrder, error) {
 	return nil, &NotLoadedError{edge: "outsourcing_orders"}
 }
 
+// ProcessCapabilitiesOrErr returns the ProcessCapabilities value or an error if the edge
+// was not loaded in eager-loading.
+func (e SupplierEdges) ProcessCapabilitiesOrErr() ([]*Process, error) {
+	if e.loadedTypes[3] {
+		return e.ProcessCapabilities, nil
+	}
+	return nil, &NotLoadedError{edge: "process_capabilities"}
+}
+
 // scanValues returns the types for scanning values from sql.Rows.
 func (*Supplier) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
@@ -90,7 +103,7 @@ func (*Supplier) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case supplier.FieldID:
 			values[i] = new(sql.NullInt64)
-		case supplier.FieldCode, supplier.FieldName, supplier.FieldShortName, supplier.FieldSupplierType, supplier.FieldTaxNo, supplier.FieldNote:
+		case supplier.FieldCode, supplier.FieldName, supplier.FieldShortName, supplier.FieldSupplierType, supplier.FieldAddress, supplier.FieldTaxNo, supplier.FieldNote:
 			values[i] = new(sql.NullString)
 		case supplier.FieldCreatedAt, supplier.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -140,6 +153,13 @@ func (_m *Supplier) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.SupplierType = new(string)
 				*_m.SupplierType = value.String
+			}
+		case supplier.FieldAddress:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field address", values[i])
+			} else if value.Valid {
+				_m.Address = new(string)
+				*_m.Address = value.String
 			}
 		case supplier.FieldTaxNo:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -201,6 +221,11 @@ func (_m *Supplier) QueryOutsourcingOrders() *OutsourcingOrderQuery {
 	return NewSupplierClient(_m.config).QueryOutsourcingOrders(_m)
 }
 
+// QueryProcessCapabilities queries the "process_capabilities" edge of the Supplier entity.
+func (_m *Supplier) QueryProcessCapabilities() *ProcessQuery {
+	return NewSupplierClient(_m.config).QueryProcessCapabilities(_m)
+}
+
 // Update returns a builder for updating this Supplier.
 // Note that you need to call Supplier.Unwrap() before calling this method if this Supplier
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -237,6 +262,11 @@ func (_m *Supplier) String() string {
 	builder.WriteString(", ")
 	if v := _m.SupplierType; v != nil {
 		builder.WriteString("supplier_type=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.Address; v != nil {
+		builder.WriteString("address=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

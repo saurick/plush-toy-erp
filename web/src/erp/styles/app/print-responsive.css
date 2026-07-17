@@ -425,15 +425,6 @@
     width: 100%;
   }
 
-  .erp-processing-contract-attachments {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-processing-contract-attachments__item--attachment-1,
-  .erp-processing-contract-attachments__item--attachment-2 {
-    grid-column: auto;
-  }
-
   .erp-material-contract-stage {
     padding: 0.5rem;
   }

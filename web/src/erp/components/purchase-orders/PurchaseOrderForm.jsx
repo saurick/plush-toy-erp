@@ -19,8 +19,16 @@ import {
   isDateInputAfter,
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
-import { unixToDateInputValue } from '../../utils/masterDataOrderView.mjs'
+import {
+  buildPurchaseOrderItemSourceValuesFromMaterial,
+  unixToDateInputValue,
+} from '../../utils/masterDataOrderView.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
+import {
+  CATALOG_FILL_DUPLICATE_POLICIES,
+  CATALOG_FILL_MODES,
+  buildCatalogFillRowsPlan,
+} from '../../utils/catalogFillRows.mjs'
 
 function decimalNumber(value) {
   const numeric = Number(
@@ -125,11 +133,7 @@ export function createBlankPurchaseLine(lineNo = 1) {
 function createLineFromMaterial(material = {}, lineNo = 1) {
   return {
     ...createBlankPurchaseLine(lineNo),
-    material_id: material.id,
-    unit_id: material.default_unit_id,
-    material_code_snapshot: material.code || '',
-    material_name_snapshot: material.name || '',
-    color_snapshot: material.color || '',
+    ...buildPurchaseOrderItemSourceValuesFromMaterial(material),
   }
 }
 
@@ -389,12 +393,21 @@ export function PurchaseOrderFormFields({
               onCancel={() => setMaterialImportOpen(false)}
               onImport={(selectedMaterials) => {
                 const currentLines = form.getFieldValue('items') || []
-                let nextLineNo = getNextLineNo(currentLines)
+                const nextLineNo = getNextLineNo(currentLines)
                 const startIndex = currentLines.length
-                const importedLines = selectedMaterials.map((material) => {
-                  const line = createLineFromMaterial(material, nextLineNo)
-                  nextLineNo += 1
-                  return line
+                const { rowsToAdd: importedLines } = buildCatalogFillRowsPlan({
+                  currentRows: currentLines,
+                  selectedRows: selectedMaterials,
+                  mode: CATALOG_FILL_MODES.APPEND,
+                  // 同一材料可因交期、单价或批次承诺拆成多行。
+                  duplicatePolicy: CATALOG_FILL_DUPLICATE_POLICIES.ALLOW,
+                  getCurrentSourceKey: (line) => line.material_id,
+                  getSelectedSourceKey: (material) => material.id,
+                  mapSelectedRow: (material, { acceptedIndex }) =>
+                    createLineFromMaterial(
+                      material,
+                      nextLineNo + acceptedIndex
+                    ),
                 })
                 importedLines.forEach(() => {
                   add()

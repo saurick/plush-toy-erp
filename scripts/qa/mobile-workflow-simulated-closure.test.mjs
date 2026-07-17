@@ -44,8 +44,8 @@ test("mobile workflow simulated mobile closure plan stays simulated and workflow
   assert.equal(plan.tasks.approvalRejected.task_group, "order_approval");
   assert.equal(plan.tasks.quality.task_group, "finished_goods_qc");
   assert.equal(plan.tasks.warehouseInbound.task_group, "warehouse_inbound");
-  assert.equal(plan.tasks.shipmentRelease.task_group, "shipment_release");
-  assert.equal(plan.tasks.warehouseUrge.task_group, "shipment_release");
+  assert.equal(plan.tasks.shipmentRelease.task_group, "trial_warehouse_exception");
+  assert.equal(plan.tasks.warehouseUrge.task_group, "trial_warehouse_urge");
   assert.equal(
     plan.tasks.shipmentRelease.business_status_key,
     "shipment_pending",
@@ -297,7 +297,8 @@ test("mobile workflow simulated mobile closure input template is no-write", () =
     "order_approval",
     "finished_goods_qc",
     "warehouse_inbound",
-    "shipment_release",
+    "trial_warehouse_exception",
+    "trial_warehouse_urge",
   ]);
   assert(template.simulatedActions.includes("boss rejected with reason"));
   assert(

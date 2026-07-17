@@ -41,6 +41,10 @@ export const FIELD_LINKAGE_SCENARIO_CATALOG = [
     label: '基础资料选择清空同步清值',
   },
   {
+    key: 'master_record_profile_wired',
+    label: '基础资料维护字段接入表单和列表回显',
+  },
+  {
     key: 'derived_amount_recomputed',
     label: '数量与单价驱动金额重算',
   },
@@ -204,6 +208,14 @@ export const FIELD_LINKAGE_FIELD_CATALOG = [
     risk: 'P0',
     docLabels: ['供应商 / 加工厂', '客户/供应商'],
     requiredScenarioKeys: ['master_record_selection_synced'],
+  },
+  {
+    fieldKey: 'supplierProcessingProfile',
+    fieldLabel: '供应商经营地址 / 可加工工序',
+    category: '供应商主数据维护字段',
+    risk: 'P0',
+    docLabels: ['经营 / 加工地址', '可加工工序'],
+    requiredScenarioKeys: ['master_record_profile_wired'],
   },
   {
     fieldKey: 'productMasterSelection',
@@ -474,6 +486,15 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
   },
   {
+    caseId:
+      'FL_processing_contract_table_headers__paper_uses_shared_subject_aware_columns',
+    title: '加工合同纸面表头复用产品 / 材料主体感知的共享列合同',
+    fieldKeys: ['outsourcingSubject', 'printTemplateContract'],
+    scenarioKey: 'print_template_contract_declared',
+    layer: 'web',
+    testFile: 'web/src/erp/data/processingContractTemplate.test.mjs',
+  },
+  {
     caseId: 'FL_processing_contract_amount__keeps_manual_line_amount_snapshot',
     title: '加工合同已有委托加工金额时优先保留手工快照',
     fieldKeys: ['processingAmount'],
@@ -568,6 +589,15 @@ export const FIELD_LINKAGE_CASE_CATALOG = [
     title: '采购单和委外单供应商 / 加工厂主档选择同步业务快照',
     fieldKeys: ['supplierMasterSelection'],
     scenarioKey: 'master_record_selection_synced',
+    layer: 'web',
+    testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
+  },
+  {
+    caseId:
+      'FL_supplier_processing_profile__wires_address_and_process_capabilities',
+    title: '供应商资料表单和列表接入经营地址与可加工工序',
+    fieldKeys: ['supplierProcessingProfile'],
+    scenarioKey: 'master_record_profile_wired',
     layer: 'web',
     testFile: 'web/src/erp/utils/masterDataOrderView.test.mjs',
   },

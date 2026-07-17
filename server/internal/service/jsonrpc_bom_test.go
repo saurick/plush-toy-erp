@@ -26,7 +26,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	))
 	adminCtx := workflowJSONRPCAdminContext()
 
-	_, invalidDateRes, err := j.handleBOM(adminCtx, "create_bom_draft", "invalid-date", mustJSONRPCStruct(t, map[string]any{
+	_, invalidDateRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "invalid-date", mustJSONRPCStruct(t, map[string]any{
 		"product_id":     float64(fixtures.productID),
 		"version":        "BAD-DATE",
 		"effective_from": "2026-06-17",
@@ -39,7 +39,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 		t.Fatalf("expected invalid param for reversed BOM effective dates, got %#v", invalidDateRes)
 	}
 
-	_, draftRes, err := j.handleBOM(adminCtx, "create_bom_draft", "1", mustJSONRPCStruct(t, map[string]any{
+	_, draftRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "1", mustJSONRPCStruct(t, map[string]any{
 		"product_id":      float64(fixtures.productID),
 		"version":         "V1",
 		"source_order_no": "WL260102",
@@ -51,6 +51,18 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 		"auditor":         "审核人",
 		"hair_direction":  "单方向",
 		"note":            "首版工程资料",
+		"items": []any{map[string]any{
+			"material_id":               float64(fixtures.materialID),
+			"quantity":                  "1.25",
+			"unit_id":                   float64(fixtures.unitID),
+			"loss_rate":                 "0.10",
+			"position":                  "面料",
+			"piece_count":               "2",
+			"total_usage_snapshot":      "378.75",
+			"process_base":              "布底贴12g纸朴",
+			"process_method":            "热裁",
+			"production_operation_code": biz.ProductionWIPOperationFabricProcessing,
+		}},
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -69,29 +81,19 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if _, exists := draft["item_count"]; exists {
 		t.Fatalf("create response must not report an unloaded list item count: %#v", draft)
 	}
-
-	_, itemRes, err := j.handleBOM(adminCtx, "add_bom_item", "2", mustJSONRPCStruct(t, map[string]any{
-		"bom_header_id":        float64(headerID),
-		"material_id":          float64(fixtures.materialID),
-		"quantity":             "1.25",
-		"unit_id":              float64(fixtures.unitID),
-		"loss_rate":            "0.10",
-		"position":             "面料",
-		"piece_count":          "2",
-		"total_usage_snapshot": "378.75",
-		"process_base":         "布底贴12g纸朴",
-		"process_method":       "热裁",
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
+	items, ok := draft["items"].([]any)
+	if !ok || len(items) != 1 {
+		t.Fatalf("expected aggregate save item, got %#v", draft["items"])
 	}
-	if itemRes == nil || itemRes.Code != errcode.OK.Code {
-		t.Fatalf("expected add item OK, got %#v", itemRes)
+	item, ok := items[0].(map[string]any)
+	if !ok {
+		t.Fatalf("expected aggregate item map, got %#v", items[0])
 	}
-	item := jsonRPCNestedMap(t, itemRes, "bom_item")
-	itemID := jsonRPCInt(t, item, "id")
-	if item["piece_count"] != "2" || item["process_method"] != "热裁" {
+	if item["piece_count"] != "2" || item["process_method"] != "热裁" || item["production_operation_code"] != biz.ProductionWIPOperationFabricProcessing {
 		t.Fatalf("expected engineering item fields in BOM item, got %#v", item)
+	}
+	if editVersion, ok := draft["edit_version"].(float64); !ok || editVersion <= 0 {
+		t.Fatalf("expected positive edit_version, got %#v", draft["edit_version"])
 	}
 
 	_, activeRes, err := j.handleBOM(adminCtx, "activate_bom_version", "3", mustJSONRPCStruct(t, map[string]any{"id": float64(headerID)}))
@@ -103,12 +105,12 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 		t.Fatalf("expected active status, got %#v", status)
 	}
 
-	_, immutableRes, err := j.handleBOM(adminCtx, "update_bom_item", "4", mustJSONRPCStruct(t, map[string]any{
-		"id":          float64(itemID),
-		"material_id": float64(fixtures.materialID),
-		"quantity":    "1.5",
-		"unit_id":     float64(fixtures.unitID),
-		"loss_rate":   "0.02",
+	_, immutableRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "4", mustJSONRPCStruct(t, map[string]any{
+		"id":               float64(headerID),
+		"expected_version": active["edit_version"],
+		"product_id":       float64(fixtures.productID),
+		"version":          "V1",
+		"items":            []any{},
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -133,7 +135,7 @@ func TestJsonrpcDispatcher_BOMVersionLifecycle(t *testing.T) {
 	if copyVersion["source_order_no"] != "WL260102" || copyVersion["designer"] != "罗伟" {
 		t.Fatalf("expected copied engineering header fields, got %#v", copyVersion)
 	}
-	items, ok := copyVersion["items"].([]any)
+	items, ok = copyVersion["items"].([]any)
 	if !ok || len(items) != 1 {
 		t.Fatalf("expected copied item, got %#v", copyVersion["items"])
 	}
@@ -177,7 +179,7 @@ func TestJsonrpcDispatcher_BOMAPIRequiresDedicatedPermissions(t *testing.T) {
 	data, _ := openInventoryRepoTestData(t, "jsonrpc_bom_permissions")
 	j := newBOMJSONRPCTestData(t, data, workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionBOMRead))
 
-	_, createRes, err := j.handleBOM(workflowJSONRPCAdminContext(), "create_bom_draft", "1", mustJSONRPCStruct(t, map[string]any{
+	_, createRes, err := j.handleBOM(workflowJSONRPCAdminContext(), "save_bom_with_items", "1", mustJSONRPCStruct(t, map[string]any{
 		"product_id": float64(1),
 		"version":    "V1",
 	}))
@@ -194,6 +196,63 @@ func TestJsonrpcDispatcher_BOMAPIRequiresDedicatedPermissions(t *testing.T) {
 	}
 	if activateRes == nil || activateRes.Code != errcode.PermissionDenied.Code {
 		t.Fatalf("expected activate permission denied, got %#v", activateRes)
+	}
+}
+
+func TestJsonrpcDispatcher_BOMAggregateSaveRequiresExpectedVersionAndMapsConflict(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_bom_aggregate_cas")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	j := newBOMJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.EngineeringRoleKey},
+		biz.PermissionBOMCreate,
+		biz.PermissionBOMUpdate,
+	))
+	adminCtx := workflowJSONRPCAdminContext()
+	baseParams := map[string]any{
+		"product_id": float64(fixtures.productID),
+		"version":    "CAS-V1",
+		"items": []any{map[string]any{
+			"material_id": float64(fixtures.materialID),
+			"quantity":    "1",
+			"unit_id":     float64(fixtures.unitID),
+			"loss_rate":   "0",
+		}},
+	}
+	_, createResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "create", mustJSONRPCStruct(t, baseParams))
+	if err != nil || createResult == nil || createResult.Code != errcode.OK.Code {
+		t.Fatalf("create aggregate BOM result=%#v err=%v", createResult, err)
+	}
+	created := jsonRPCNestedMap(t, createResult, "bom_version")
+	headerID := jsonRPCInt(t, created, "id")
+	expectedVersion := created["edit_version"]
+
+	missingExpected := map[string]any{}
+	for key, value := range baseParams {
+		missingExpected[key] = value
+	}
+	missingExpected["id"] = float64(headerID)
+	_, missingResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "missing", mustJSONRPCStruct(t, missingExpected))
+	if err != nil || missingResult == nil || missingResult.Code != errcode.InvalidParam.Code {
+		t.Fatalf("missing expected_version result=%#v err=%v", missingResult, err)
+	}
+
+	updateParams := map[string]any{}
+	for key, value := range baseParams {
+		updateParams[key] = value
+	}
+	updateParams["id"] = float64(headerID)
+	updateParams["expected_version"] = expectedVersion
+	updateParams["version"] = "CAS-V2"
+	_, updateResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "update", mustJSONRPCStruct(t, updateParams))
+	if err != nil || updateResult == nil || updateResult.Code != errcode.OK.Code {
+		t.Fatalf("update aggregate BOM result=%#v err=%v", updateResult, err)
+	}
+
+	updateParams["version"] = "CAS-STALE"
+	_, staleResult, err := j.handleBOM(adminCtx, "save_bom_with_items", "stale", mustJSONRPCStruct(t, updateParams))
+	if err != nil || staleResult == nil || staleResult.Code != errcode.ResourceVersionConflict.Code || staleResult.Message != errcode.ResourceVersionConflict.Message {
+		t.Fatalf("stale aggregate BOM result=%#v err=%v", staleResult, err)
 	}
 }
 
@@ -223,7 +282,7 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 		"read_only",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, readOnlyConfig)
-	_, createRes, err := j.handleBOM(adminCtx, "create_bom_draft", "read-only-create", createParams)
+	_, createRes, err := j.handleBOM(adminCtx, "save_bom_with_items", "read-only-create", createParams)
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -249,7 +308,17 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 		"enabled",
 	)
 	activateOperationalFactTestCustomerConfig(t, j, enabledConfig)
-	_, createRes, err = j.handleBOM(adminCtx, "create_bom_draft", "enabled-create", createParams)
+	enabledCreateParams := map[string]any{
+		"product_id": float64(fixtures.productID),
+		"version":    "MODULE-GATE-V1",
+		"items": []any{map[string]any{
+			"material_id": float64(fixtures.materialID),
+			"quantity":    "2",
+			"unit_id":     float64(fixtures.unitID),
+			"loss_rate":   "0",
+		}},
+	}
+	_, createRes, err = j.handleBOM(adminCtx, "save_bom_with_items", "enabled-create", mustJSONRPCStruct(t, enabledCreateParams))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
@@ -257,19 +326,6 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 		t.Fatalf("expected enabled material_bom create OK, got %#v", createRes)
 	}
 	headerID := jsonRPCInt(t, jsonRPCNestedMap(t, createRes, "bom_version"), "id")
-	_, addItemRes, err := j.handleBOM(adminCtx, "add_bom_item", "enabled-add-item", mustJSONRPCStruct(t, map[string]any{
-		"bom_header_id": float64(headerID),
-		"material_id":   float64(fixtures.materialID),
-		"quantity":      "2",
-		"unit_id":       float64(fixtures.unitID),
-		"loss_rate":     "0",
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if addItemRes == nil || addItemRes.Code != errcode.OK.Code {
-		t.Fatalf("expected enabled material_bom add item OK, got %#v", addItemRes)
-	}
 
 	disabledConfig := customerConfigPublishParamsWithRevisionAndModuleState(
 		t,
@@ -295,6 +351,30 @@ func TestJsonrpcDispatcher_BOMAPIRequiresEnabledModule(t *testing.T) {
 	}
 	if status := jsonRPCNestedMap(t, getRes, "bom_version")["status"]; status != biz.BOMStatusDraft {
 		t.Fatalf("disabled material_bom must not activate BOM version, got status=%#v", status)
+	}
+}
+
+func TestJsonrpcDispatcher_BOMRetiredSplitWritesAreUnknown(t *testing.T) {
+	data, _ := openInventoryRepoTestData(t, "jsonrpc_bom_retired_split_writes")
+	j := newBOMJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.EngineeringRoleKey},
+		biz.PermissionBOMCreate,
+		biz.PermissionBOMUpdate,
+	))
+	for _, method := range []string{
+		"create_bom_draft",
+		"update_bom_draft",
+		"add_bom_item",
+		"update_bom_item",
+		"delete_bom_item",
+	} {
+		_, result, err := j.handleBOM(workflowJSONRPCAdminContext(), method, method, nil)
+		if err != nil {
+			t.Fatalf("%s returned transport error: %v", method, err)
+		}
+		if result == nil || result.Code != errcode.UnknownMethod.Code {
+			t.Fatalf("%s must be retired as unknown method, got %#v", method, result)
+		}
 	}
 }
 

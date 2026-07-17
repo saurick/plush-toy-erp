@@ -24,6 +24,13 @@ import {
 } from "./manual-acceptance-page-data-contract.mjs";
 import { manualAcceptanceOutsourcingInventoryCoverageIsComplete } from "./manual-acceptance-fact-report-contract.mjs";
 import {
+  MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS,
+  MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE,
+  MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
+  assertManualAcceptancePageDataContract,
+  buildManualAcceptancePageDataContract,
+} from "./manual-acceptance-page-data-contract.mjs";
+import {
   TASK_COPY_REVISION,
   TASK_CATALOG_SCENARIO_DIGEST,
   TASK_SOURCE_TYPE,

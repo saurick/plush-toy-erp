@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { requireWorkflowTaskCreateParams } from './workflowTaskCreateContract.mjs'
+import {
+  isReservedWorkflowSourceTaskNamespace,
+  requireWorkflowTaskCreateParams,
+} from './workflowTaskCreateContract.mjs'
 
 function baseParams(overrides = {}) {
   return {
@@ -21,9 +24,8 @@ test('workflow task public create defaults to the only executable initial state'
   assert.equal(params.payload && typeof params.payload, 'object')
 
   assert.equal(
-    requireWorkflowTaskCreateParams(
-      baseParams({ task_status_key: ' ready ' })
-    ).task_status_key,
+    requireWorkflowTaskCreateParams(baseParams({ task_status_key: ' ready ' }))
+      .task_status_key,
     'ready'
   )
 })
@@ -53,5 +55,33 @@ test('workflow task public create rejects non-initial states and lifecycle reaso
         baseParams({ blocked_reason: '不应由创建入口写入' })
       ),
     /任务资料包含无法识别的内容/u
+  )
+})
+
+test('workflow task public create reserves source-produced groups and task-code prefixes', () => {
+  for (const [taskGroup, taskCode] of [
+    ['production_scheduling', 'MANUAL-SCHEDULING'],
+    ['production_exception', 'MANUAL-EXCEPTION'],
+    ['shipment_release', 'MANUAL-SHIPMENT'],
+    ['trial_pmc_work', 'source-production-scheduling-71'],
+    ['trial_production_work', 'source-production-exception-81'],
+    ['trial_warehouse_work', 'source-shipment-release-92'],
+  ]) {
+    const params = baseParams({ task_group: taskGroup, task_code: taskCode })
+    assert.equal(isReservedWorkflowSourceTaskNamespace(params), true)
+    assert.throws(
+      () => requireWorkflowTaskCreateParams(params),
+      /该类任务由业务单据自动生成，不能手工创建/u
+    )
+  }
+
+  assert.equal(
+    isReservedWorkflowSourceTaskNamespace(
+      baseParams({
+        task_group: 'trial_pmc_work',
+        task_code: 'TRIAL-PMC-71',
+      })
+    ),
+    false
   )
 })

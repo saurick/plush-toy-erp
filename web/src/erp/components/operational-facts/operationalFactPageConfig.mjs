@@ -592,11 +592,7 @@ export function buildOperationalFactRelatedMenuItems({
   ) {
     items.push({ key: 'sales-order', label: '销售订单' })
   }
-  if (
-    ['production', 'outsourcing', 'shipments', 'reservations'].includes(
-      activeKey
-    )
-  ) {
+  if (['production', 'outsourcing', 'shipments'].includes(activeKey)) {
     items.push({ key: 'inventory', label: '库存台账' })
   }
   if (activeKey === 'shipments') {
@@ -604,7 +600,7 @@ export function buildOperationalFactRelatedMenuItems({
     items.push({ key: 'invoices', label: '发票管理' })
   }
   if (
-    activeKey === 'finance' &&
+    ['production', 'outsourcing', 'finance'].includes(activeKey) &&
     businessSourceRouteFor(
       activeSelectedRow.source_type,
       activeSelectedRow.source_id

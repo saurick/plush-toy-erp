@@ -3,12 +3,17 @@ import {
   CheckCircleOutlined,
   EyeOutlined,
   ExclamationCircleOutlined,
+  LinkOutlined,
   RedoOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { Button, Input, Modal, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
-import { useOutletContext } from 'react-router-dom'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
@@ -23,7 +28,6 @@ import {
   BusinessDataTable,
   BusinessOperationPanel,
   BusinessPageLayout,
-  CollaborationTaskPanel,
   DateRangeFilter,
   PageHeaderCard,
   SearchInput,
@@ -48,7 +52,10 @@ import {
   isWorkflowTaskMutationResultUnknown,
   verifyNewWorkflowTaskMutationAttempt,
 } from '../utils/workflowTaskMutation.mjs'
-import { formatWorkflowTaskSource } from '../utils/dashboardTaskDisplay.mjs'
+import {
+  formatWorkflowTaskSource,
+  resolveWorkflowTaskSourceEntryPath,
+} from '../utils/dashboardTaskDisplay.mjs'
 import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
 import {
   getTaskOwnerRoleKey,
@@ -111,8 +118,7 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   },
   'shipping-release': {
     taskGroup: 'shipment_release',
-    completionMessage:
-      '出货放行任务已完成，实际出货仍需在出货单中确认完成。',
+    completionMessage: '出货放行任务已完成，实际出货仍需在出货单中确认完成。',
     emptyText: '暂无出货放行任务。',
     ownerRoleOptions: [
       workflowRoleOption('warehouse'),
@@ -147,6 +153,8 @@ function getTaskID(task = {}) {
 }
 
 export default function WorkflowBusinessModulePage({ moduleKey }) {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const mutationAttemptsRef = useRef(null)
   mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
   const mutationInFlightRef = useRef(null)
@@ -170,7 +178,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   const [tasks, setTasks] = useState([])
   const [loading, setLoading] = useState(false)
   const [taskReasonModal, setTaskReasonModal] = useState(null)
-  const [keyword, setKeyword] = useState('')
+  const linkedKeyword = String(searchParams.get('link_keyword') || '').trim()
+  const [keyword, setKeyword] = useState(linkedKeyword)
   const [status, setStatus] = useState('')
   const [ownerRoleKey, setOwnerRoleKey] = useState('')
   const [dueFrom, setDueFrom] = useState('')
@@ -191,7 +200,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     adminProfile,
     'workflow.task.complete'
   )
-
   const loadWorkflowTasks = useCallback(async () => {
     if (!config || !canReadWorkflowTasks) {
       setTasks([])
@@ -228,6 +236,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
   useEffect(() => {
     loadWorkflowTasks()
   }, [loadWorkflowTasks])
+
+  useEffect(() => {
+    setKeyword(linkedKeyword)
+  }, [linkedKeyword])
 
   useEffect(() => {
     if (!moduleItem) return undefined
@@ -268,6 +280,9 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     [selectedTaskKeys, tasks]
   )
   const selectedTask = selectedTasks[0] || null
+  const selectedTaskSourceEntryPath = selectedTask
+    ? resolveWorkflowTaskSourceEntryPath(selectedTask)
+    : ''
 
   const stats = useMemo(() => {
     const activeCount = tasks.filter(
@@ -956,9 +971,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         dataSource={filteredTasks}
         scroll={{ x: 1000 }}
         emptyDescription={
-          canReadWorkflowTasks
-            ? config.emptyText
-            : '当前账号不能查看此类任务。'
+          canReadWorkflowTasks ? config.emptyText : '当前账号不能查看此类任务。'
         }
         rowSelection={{
           type: 'radio',

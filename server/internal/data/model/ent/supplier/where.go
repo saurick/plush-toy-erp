@@ -75,6 +75,11 @@ func SupplierType(v string) predicate.Supplier {
 	return predicate.Supplier(sql.FieldEQ(FieldSupplierType, v))
 }
 
+// Address applies equality check predicate on the "address" field. It's identical to AddressEQ.
+func Address(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldAddress, v))
+}
+
 // TaxNo applies equality check predicate on the "tax_no" field. It's identical to TaxNoEQ.
 func TaxNo(v string) predicate.Supplier {
 	return predicate.Supplier(sql.FieldEQ(FieldTaxNo, v))
@@ -380,6 +385,81 @@ func SupplierTypeContainsFold(v string) predicate.Supplier {
 	return predicate.Supplier(sql.FieldContainsFold(FieldSupplierType, v))
 }
 
+// AddressEQ applies the EQ predicate on the "address" field.
+func AddressEQ(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEQ(FieldAddress, v))
+}
+
+// AddressNEQ applies the NEQ predicate on the "address" field.
+func AddressNEQ(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNEQ(FieldAddress, v))
+}
+
+// AddressIn applies the In predicate on the "address" field.
+func AddressIn(vs ...string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldIn(FieldAddress, vs...))
+}
+
+// AddressNotIn applies the NotIn predicate on the "address" field.
+func AddressNotIn(vs ...string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotIn(FieldAddress, vs...))
+}
+
+// AddressGT applies the GT predicate on the "address" field.
+func AddressGT(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGT(FieldAddress, v))
+}
+
+// AddressGTE applies the GTE predicate on the "address" field.
+func AddressGTE(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldGTE(FieldAddress, v))
+}
+
+// AddressLT applies the LT predicate on the "address" field.
+func AddressLT(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLT(FieldAddress, v))
+}
+
+// AddressLTE applies the LTE predicate on the "address" field.
+func AddressLTE(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldLTE(FieldAddress, v))
+}
+
+// AddressContains applies the Contains predicate on the "address" field.
+func AddressContains(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldContains(FieldAddress, v))
+}
+
+// AddressHasPrefix applies the HasPrefix predicate on the "address" field.
+func AddressHasPrefix(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldHasPrefix(FieldAddress, v))
+}
+
+// AddressHasSuffix applies the HasSuffix predicate on the "address" field.
+func AddressHasSuffix(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldHasSuffix(FieldAddress, v))
+}
+
+// AddressIsNil applies the IsNil predicate on the "address" field.
+func AddressIsNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldIsNull(FieldAddress))
+}
+
+// AddressNotNil applies the NotNil predicate on the "address" field.
+func AddressNotNil() predicate.Supplier {
+	return predicate.Supplier(sql.FieldNotNull(FieldAddress))
+}
+
+// AddressEqualFold applies the EqualFold predicate on the "address" field.
+func AddressEqualFold(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldEqualFold(FieldAddress, v))
+}
+
+// AddressContainsFold applies the ContainsFold predicate on the "address" field.
+func AddressContainsFold(v string) predicate.Supplier {
+	return predicate.Supplier(sql.FieldContainsFold(FieldAddress, v))
+}
+
 // TaxNoEQ applies the EQ predicate on the "tax_no" field.
 func TaxNoEQ(v string) predicate.Supplier {
 	return predicate.Supplier(sql.FieldEQ(FieldTaxNo, v))
@@ -681,6 +761,29 @@ func HasOutsourcingOrders() predicate.Supplier {
 func HasOutsourcingOrdersWith(preds ...predicate.OutsourcingOrder) predicate.Supplier {
 	return predicate.Supplier(func(s *sql.Selector) {
 		step := newOutsourcingOrdersStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProcessCapabilities applies the HasEdge predicate on the "process_capabilities" edge.
+func HasProcessCapabilities() predicate.Supplier {
+	return predicate.Supplier(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, ProcessCapabilitiesTable, ProcessCapabilitiesPrimaryKey...),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProcessCapabilitiesWith applies the HasEdge predicate on the "process_capabilities" edge with a given conditions (other predicates).
+func HasProcessCapabilitiesWith(preds ...predicate.Process) predicate.Supplier {
+	return predicate.Supplier(func(s *sql.Selector) {
+		step := newProcessCapabilitiesStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

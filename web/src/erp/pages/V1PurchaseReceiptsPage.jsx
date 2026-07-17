@@ -6,7 +6,7 @@ import {
   EyeOutlined,
   LinkOutlined,
 } from '@ant-design/icons'
-import { Button, Dropdown, Form, Input, Popconfirm, Select, Tag } from 'antd'
+import { Button, Dropdown, Popconfirm, Tag } from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -17,7 +17,6 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
-  addPurchaseReceiptItem,
   cancelPurchaseReceipt,
   createPurchaseReceiptAdjustmentFromReceipt,
   createPurchaseReturnFromReceipt,
@@ -62,16 +61,7 @@ import {
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
-import {
-  buildPurchaseReceiptItemParams,
-  createBlankPurchaseReceiptItem,
-  decimalNumber,
-  formatQuantity,
-} from '../utils/businessLineItems.mjs'
-import {
-  createPurchaseReceiptMutationAttemptStore,
-  isPurchaseReceiptMutationResultUnknown,
-} from '../utils/purchaseReceiptMutation.mjs'
+import { decimalNumber, formatQuantity } from '../utils/businessLineItems.mjs'
 import {
   buildPurchaseReceiptAdjustmentPayload,
   buildPurchaseReturnFromReceiptPayload,
@@ -158,205 +148,6 @@ function receiptQuantityTotal(receipt = {}) {
   )
 }
 
-function formListName(field, name) {
-  return field ? [field.name, name] : name
-}
-
-function PurchaseReceiptItemFormFields({
-  field,
-  inventoryLotOptions = [],
-  materialOptions = [],
-  unitOptions = [],
-  warehouseOptions = [],
-}) {
-  return (
-    <>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="材料"
-        name={formListName(field, 'material_id')}
-        rules={[{ required: true, message: '请选择材料' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={materialOptions}
-          placeholder="请选择材料"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="仓库"
-        name={formListName(field, 'warehouse_id')}
-        rules={[{ required: true, message: '请选择仓库' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={warehouseOptions}
-          placeholder="请选择仓库"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="单位"
-        name={formListName(field, 'unit_id')}
-        rules={[{ required: true, message: '请选择单位' }]}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={unitOptions}
-          placeholder="请选择单位"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="入库数量"
-        name={formListName(field, 'quantity')}
-        rules={[{ required: true, message: '请填写入库数量' }]}
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="批次"
-        name={formListName(field, 'lot_id')}
-      >
-        <Select
-          allowClear
-          optionFilterProp="label"
-          options={inventoryLotOptions}
-          placeholder="请选择批次"
-          showSearch
-        />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="批次号"
-        name={formListName(field, 'lot_no')}
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="来源行号"
-        name={formListName(field, 'source_line_no')}
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="单价"
-        name={formListName(field, 'unit_price')}
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field"
-        label="金额"
-        name={formListName(field, 'amount')}
-      >
-        <Input allowClear autoComplete="off" />
-      </Form.Item>
-      <Form.Item
-        className="erp-business-action-form__field erp-business-action-form__field--wide"
-        label="备注"
-        name={formListName(field, 'note')}
-      >
-        <Input.TextArea autoSize={{ minRows: 1, maxRows: 3 }} />
-      </Form.Item>
-    </>
-  )
-}
-
-function PurchaseReceiptInlineItemEditor({
-  inventoryLotOptions = [],
-  materialOptions = [],
-  receipt,
-  saving,
-  unitOptions = [],
-  warehouseOptions = [],
-  onCancel,
-  onSave,
-}) {
-  const [form] = Form.useForm()
-  const editorRef = useRef(null)
-
-  useEffect(() => {
-    form.resetFields()
-    form.setFieldsValue(createBlankPurchaseReceiptItem(receipt?.id))
-    const timer = window.setTimeout(() => {
-      const firstControl = editorRef.current?.querySelector(
-        [
-          '.ant-select-selection-search-input:not([disabled])',
-          'input:not([type="hidden"]):not([disabled])',
-          'textarea:not([disabled])',
-          'button:not([disabled])',
-        ].join(', ')
-      )
-      firstControl?.focus?.({ preventScroll: true })
-    }, 60)
-    return () => window.clearTimeout(timer)
-  }, [form, receipt?.id])
-
-  const save = async () => {
-    let values
-    try {
-      values = await form.validateFields()
-    } catch {
-      return
-    }
-    await onSave(values)
-  }
-
-  return (
-    <section
-      ref={editorRef}
-      className="erp-purchase-receipt-inline-item-editor"
-    >
-      <div className="erp-purchase-receipt-inline-item-editor__head">
-        <div>
-          <strong>添加入库明细</strong>
-          <span>保存后写入当前入库草稿；库存将在入库过账后由系统更新。</span>
-        </div>
-        <Tag color="blue">{receipt?.receipt_no || '已选入库草稿'}</Tag>
-      </div>
-      <Form
-        form={form}
-        layout="vertical"
-        className="erp-business-action-form erp-purchase-receipt-inline-item-form"
-      >
-        <PurchaseReceiptItemFormFields
-          inventoryLotOptions={inventoryLotOptions}
-          materialOptions={materialOptions}
-          unitOptions={unitOptions}
-          warehouseOptions={warehouseOptions}
-        />
-      </Form>
-      <div className="erp-purchase-receipt-inline-item-editor__footer">
-        <Button
-          className="erp-purchase-receipt-inline-item-editor__button"
-          onClick={onCancel}
-        >
-          取消
-        </Button>
-        <Button
-          className="erp-purchase-receipt-inline-item-editor__button"
-          type="primary"
-          loading={saving}
-          onClick={save}
-        >
-          添加明细
-        </Button>
-      </div>
-    </section>
-  )
-}
-
 export default function V1PurchaseReceiptsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
@@ -390,9 +181,6 @@ export default function V1PurchaseReceiptsPage() {
   const [units, setUnits] = useState([])
   const [warehouses, setWarehouses] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
-  const mutationAttemptsRef = useRef(
-    createPurchaseReceiptMutationAttemptStore()
-  )
   const exceptionAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const financeSourceAttemptsRef = useRef(
     createSourceBusinessActionAttemptStore()
@@ -741,50 +529,6 @@ export default function V1PurchaseReceiptsPage() {
     return outletContext?.registerPageRefresh?.(loadRows)
   }, [loadRows, outletContext])
 
-  const openAddItem = useCallback((receipt) => {
-    if (!receipt?.id) return
-    setItemEditorReceipt(receipt)
-  }, [])
-
-  const closeItemEditor = useCallback(() => {
-    setItemEditorReceipt(null)
-  }, [])
-
-  const handleAddItem = useCallback(
-    async (values) => {
-      const receipt = itemEditorReceipt
-      if (!receipt?.id) return
-      const scope = `add-item:${receipt.id}`
-      let attempt
-      setSaving(true)
-      try {
-        attempt = mutationAttemptsRef.current.prepare(
-          scope,
-          buildPurchaseReceiptItemParams(receipt.id, values)
-        )
-        await addPurchaseReceiptItem(attempt.params)
-        mutationAttemptsRef.current.settle(scope, attempt)
-        message.success('入库明细已添加')
-        closeItemEditor()
-        await loadRows()
-      } catch (error) {
-        const retained = attempt
-          ? mutationAttemptsRef.current.settle(scope, attempt, error)
-          : isPurchaseReceiptMutationResultUnknown(error)
-        if (retained) {
-          message.warning(
-            '暂时无法确认是否处理成功，请保持内容不变后重试，避免重复记录'
-          )
-        } else {
-          message.error(getActionErrorMessage(error, '添加入库明细'))
-        }
-      } finally {
-        setSaving(false)
-      }
-    },
-    [closeItemEditor, itemEditorReceipt, loadRows]
-  )
-
   const runReceiptAction = useCallback(
     async (receipt, action, successText) => {
       if (!receipt?.id) return
@@ -1079,11 +823,11 @@ export default function V1PurchaseReceiptsPage() {
     openColumnOrder,
     columnOrderModal,
   } = useBusinessColumnOrder({
-      adminProfile,
-      moduleKey: 'inbound',
-      moduleTitle: '入库管理',
-      columns,
-    })
+    adminProfile,
+    moduleKey: 'inbound',
+    moduleTitle: '入库管理',
+    columns,
+  })
   const exportRows = useCallback(() => {
     downloadBusinessListCSV({
       filename: `采购入库-${new Date().toISOString().slice(0, 10)}.csv`,
@@ -1121,7 +865,7 @@ export default function V1PurchaseReceiptsPage() {
       <PageHeaderCard
         compact
         title="入库管理"
-        description="入库管理维护采购入库草稿和明细；确认过账后系统会更新库存数量、余额和批次，完成入库跟进任务不等于采购入库已经过账。"
+        description="入库管理查看从已审核采购订单生成的入库草稿，并继续办理收货、质检、退货、调整和确认过账；页面不提供脱离采购来源的手工入库明细。"
         tags={[
           <Tag color="gold" key="workflow">
             待办任务：入库跟进
@@ -1429,52 +1173,6 @@ export default function V1PurchaseReceiptsPage() {
           </Popconfirm>
         </SelectionActionBar>
       </BusinessOperationPanel>
-
-      {selectedRow ? (
-        <section className="erp-master-contact-list erp-purchase-receipt-inline-item-panel">
-          <div className="erp-master-contact-list__head">
-            <div>
-              <strong>入库明细</strong>
-              <span>在当前入库草稿下新增材料、仓库、批次和数量。</span>
-            </div>
-          </div>
-          {itemEditorReceipt ? (
-            <PurchaseReceiptInlineItemEditor
-              inventoryLotOptions={inventoryLotOptions}
-              materialOptions={materialOptions}
-              receipt={itemEditorReceipt}
-              saving={saving}
-              unitOptions={unitOptions}
-              warehouseOptions={warehouseOptions}
-              onCancel={closeItemEditor}
-              onSave={handleAddItem}
-            />
-          ) : null}
-          <BusinessLineItemsFooter
-            addLabel="添加明细"
-            addDisabled={
-              selectedRow.status !== 'DRAFT' ||
-              !canCreate ||
-              saving ||
-              Boolean(itemEditorReceipt)
-            }
-            onAdd={() => openAddItem(selectedRow)}
-            stats={[
-              {
-                key: 'count',
-                label: '已录入',
-                value: receiptItemCount(selectedRow),
-                suffix: '条',
-              },
-              {
-                key: 'quantity',
-                label: '数量合计',
-                value: formatQuantity(receiptQuantityTotal(selectedRow)),
-              },
-            ]}
-          />
-        </section>
-      ) : null}
 
       <BusinessDataTable
         rowKey="id"

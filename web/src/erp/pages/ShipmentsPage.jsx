@@ -2,11 +2,17 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   CheckCircleOutlined,
   CloseCircleOutlined,
+  DownOutlined,
   EyeOutlined,
+  LinkOutlined,
   PlusOutlined,
 } from '@ant-design/icons'
-import { Button, Form, Popconfirm, Tag, Typography } from 'antd'
-import { useOutletContext, useSearchParams } from 'react-router-dom'
+import { Button, Dropdown, Form, Popconfirm, Tag, Typography } from 'antd'
+import {
+  useNavigate,
+  useOutletContext,
+  useSearchParams,
+} from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -18,6 +24,7 @@ import {
   createShipmentWithItems,
   listShipments,
   shipShipment,
+  submitShipmentRelease,
 } from '../api/operationalFactApi.mjs'
 import {
   listCustomers,
@@ -28,6 +35,10 @@ import {
   listUnits,
 } from '../api/masterDataOrderApi.mjs'
 import { listInventoryLots } from '../api/inventoryApi.mjs'
+import {
+  createFinishedGoodsQualityInspectionDraft,
+  listFinishedGoodsQualityInspections,
+} from '../api/qualityApi.mjs'
 import {
   BusinessDataTable,
   BusinessOperationPanel,
@@ -50,6 +61,7 @@ import ShipmentBusinessModal, {
   sourceLineProductText,
 } from '../components/shipments/ShipmentBusinessModal.jsx'
 import ShipmentFinanceSourceModal from '../components/shipments/ShipmentFinanceSourceModal.jsx'
+import ShipmentQualityInspectionModal from '../components/quality-inspections/ShipmentQualityInspectionModal.jsx'
 import {
   buildShipmentColumns,
   SHIPMENT_DATE_FILTER_OPTIONS,
@@ -61,6 +73,7 @@ import {
   buildSequentialDraftCode,
   hasActionPermission,
   trimOptional,
+  V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
 import {
   buildShipmentItemParams,
@@ -90,9 +103,11 @@ import {
 } from '../utils/referenceSelectOptions.mjs'
 import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
 import {
+  routeWithQuery,
   searchParamPositiveIntText,
   searchParamText,
 } from '../utils/routeQuery.mjs'
+import { businessRecordInventoryRouteFor } from '../utils/businessSourceNavigation.mjs'
 import {
   calculateShipmentLineNetWeightG,
   hasFinalShipmentWeight,
@@ -108,8 +123,14 @@ import {
 } from '../utils/shipmentFinanceSourceAction.mjs'
 import {
   createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
+import {
+  buildShipmentQualityInspectionPayload,
+  buildShipmentQualityInspectionSources,
+  requireMatchingShipmentQualityInspectionDraft,
+} from '../utils/shipmentQualityInspectionSource.mjs'
 
 const { Text } = Typography
 
@@ -172,6 +193,7 @@ function shipmentFormValues(shipment = {}) {
 }
 
 export default function ShipmentsPage() {
+  const navigate = useNavigate()
   const outletContext = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = outletContext?.adminProfile || {}
@@ -192,6 +214,8 @@ export default function ShipmentsPage() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [financeSourceAction, setFinanceSourceAction] = useState(null)
   const [financeSourceLoading, setFinanceSourceLoading] = useState(false)
+  const [qualitySourceContext, setQualitySourceContext] = useState(null)
+  const [qualitySourceLoading, setQualitySourceLoading] = useState(false)
   const [shipmentModal, setShipmentModal] = useState(null)
   const [salesOrderSources, setSalesOrderSources] = useState([])
   const [salesOrderSourceItems, setSalesOrderSourceItems] = useState([])
@@ -211,6 +235,7 @@ export default function ShipmentsPage() {
     createSourceBusinessActionAttemptStore()
   )
   const financeSourceInFlightRef = useRef(false)
+  const qualitySourceInFlightRef = useRef(false)
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
   const routeSalesOrderID = searchParamPositiveIntText(
     searchParams,
@@ -226,10 +251,90 @@ export default function ShipmentsPage() {
 
   const canRead = hasActionPermission(adminProfile, 'shipment.read')
   const canCreate = hasActionPermission(adminProfile, 'shipment.create')
+  const canSubmitShipmentRelease = canRead && canCreate
   const canShip = hasActionPermission(adminProfile, 'shipment.ship')
   const canCancel = hasActionPermission(adminProfile, 'shipment.cancel')
   const canCreateReceivable = canConfirmFinanceFact(adminProfile, 'RECEIVABLE')
   const canCreateInvoice = canConfirmFinanceFact(adminProfile, 'INVOICE')
+  const canViewQualityInspections = hasActionPermission(
+    adminProfile,
+    'quality.inspection.read'
+  )
+  const canCreateFinishedGoodsQualityInspection =
+    canRead &&
+    canViewQualityInspections &&
+    hasActionPermission(adminProfile, 'quality.inspection.create')
+  const canViewSalesOrders = hasActionPermission(
+    adminProfile,
+    'sales.order.read'
+  )
+  const canViewInventory = hasActionPermission(
+    adminProfile,
+    'warehouse.inventory.read'
+  )
+  const canViewReceivables = hasActionPermission(
+    adminProfile,
+    'finance.receivable.read'
+  )
+  const canViewInvoices = hasActionPermission(
+    adminProfile,
+    'finance.invoice.read'
+  )
+  const relatedMenuItems = useMemo(() => {
+    if (!selectedRow?.id) return []
+    const items = []
+    if (canViewSalesOrders && selectedRow.sales_order_id) {
+      items.push({ key: 'sales-order', label: '来源销售订单' })
+    }
+    if (canViewInventory) {
+      items.push({ key: 'inventory', label: '库存记录' })
+    }
+    if (canViewReceivables) {
+      items.push({ key: 'receivables', label: '应收记录' })
+    }
+    if (canViewInvoices) {
+      items.push({ key: 'invoices', label: '开票记录' })
+    }
+    if (canViewQualityInspections) {
+      items.push({ key: 'quality-inspections', label: '出货前检验' })
+    }
+    return items
+  }, [
+    canViewInventory,
+    canViewInvoices,
+    canViewQualityInspections,
+    canViewReceivables,
+    canViewSalesOrders,
+    selectedRow,
+  ])
+  const openRelatedRecord = useCallback(
+    ({ key }) => {
+      if (!selectedRow?.id) return
+      const paths = {
+        'sales-order': routeWithQuery(V1_ROUTE_PATHS.salesOrders, {
+          sales_order_id: selectedRow.sales_order_id,
+        }),
+        inventory: businessRecordInventoryRouteFor('shipments', selectedRow.id),
+        receivables: routeWithQuery(V1_ROUTE_PATHS.receivables, {
+          source_type: 'SHIPMENT',
+          source_id: selectedRow.id,
+        }),
+        invoices: routeWithQuery(V1_ROUTE_PATHS.invoices, {
+          source_type: 'SHIPMENT',
+          source_id: selectedRow.id,
+        }),
+        'quality-inspections': routeWithQuery(
+          V1_ROUTE_PATHS.qualityInspections,
+          {
+            source_type: 'SHIPMENT',
+            source_id: selectedRow.id,
+          }
+        ),
+      }
+      if (paths[key]) navigate(paths[key])
+    },
+    [navigate, selectedRow]
+  )
   const customerOptions = useMemo(
     () => uniqueReferenceOptions(customers, customerOption),
     [customers]
@@ -237,6 +342,32 @@ export default function ShipmentsPage() {
   const inventoryLotOptions = useMemo(
     () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
     [inventoryLots]
+  )
+  const qualitySourceInventoryLots = useMemo(() => {
+    const byID = new Map(
+      [...inventoryLots, ...(qualitySourceContext?.inventoryLots || [])]
+        .map((lot) => [Number(lot?.id || 0), lot])
+        .filter(([lotID]) => Number.isSafeInteger(lotID) && lotID > 0)
+    )
+    return [...byID.values()]
+  }, [inventoryLots, qualitySourceContext?.inventoryLots])
+  const qualitySourceInventoryLotOptions = useMemo(
+    () =>
+      uniqueReferenceOptions(qualitySourceInventoryLots, inventoryLotOption),
+    [qualitySourceInventoryLots]
+  )
+  const qualityInspectionSources = useMemo(
+    () =>
+      buildShipmentQualityInspectionSources({
+        shipment: qualitySourceContext?.shipment,
+        inventoryLots: qualitySourceInventoryLots,
+        qualityInspections: qualitySourceContext?.qualityInspections,
+      }),
+    [
+      qualitySourceContext?.qualityInspections,
+      qualitySourceContext?.shipment,
+      qualitySourceInventoryLots,
+    ]
   )
   const productOptions = useMemo(
     () =>
@@ -814,6 +945,141 @@ export default function ShipmentsPage() {
     }
   }
 
+  const submitSelectedShipmentRelease = async () => {
+    if (
+      !canSubmitShipmentRelease ||
+      !selectedRow?.id ||
+      selectedRow.status !== 'DRAFT'
+    ) {
+      message.warning('请先选择待出货草稿，并确认当前岗位有提交放行权限')
+      return
+    }
+    try {
+      setSaving(true)
+      const result = await submitShipmentRelease({ id: selectedRow.id })
+      message.success(
+        result.created
+          ? '出货放行已提交，仓库待办已生成'
+          : '该出货单已有放行任务，本次未重复生成'
+      )
+      await loadRows()
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '提交出货放行'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const openShipmentQualitySource = async () => {
+    if (
+      !canCreateFinishedGoodsQualityInspection ||
+      !selectedRow?.id ||
+      selectedRow.status !== 'DRAFT'
+    ) {
+      message.warning('请先选择待出货草稿，并确认当前岗位有出货前检验权限')
+      return
+    }
+    const shipment = selectedRow
+    const request = beginLatestRequest('shipment-quality-source')
+    const lotIDs = [
+      ...new Set(
+        (Array.isArray(shipment.items) ? shipment.items : [])
+          .map((item) => Number(item?.lot_id || 0))
+          .filter((lotID) => Number.isSafeInteger(lotID) && lotID > 0)
+      ),
+    ]
+    setQualitySourceLoading(true)
+    try {
+      const [inspectionData, ...lotResults] = await Promise.all([
+        listFinishedGoodsQualityInspections(
+          { shipment_id: shipment.id, limit: 200 },
+          { signal: request.signal }
+        ),
+        ...lotIDs.map((lotID) =>
+          listInventoryLots(
+            { keyword: String(lotID), limit: 200 },
+            { signal: request.signal }
+          )
+        ),
+      ])
+      if (!request.isCurrent()) return
+      const lotIDSet = new Set(lotIDs)
+      const exactLots = lotResults
+        .flatMap((result) =>
+          Array.isArray(result?.inventory_lots) ? result.inventory_lots : []
+        )
+        .filter((lot) => lotIDSet.has(Number(lot?.id || 0)))
+      setQualitySourceContext({
+        shipment,
+        inventoryLots: exactLots,
+        qualityInspections: Array.isArray(inspectionData?.quality_inspections)
+          ? inspectionData.quality_inspections
+          : [],
+      })
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return
+      message.error(getActionErrorMessage(error, '加载出货前检验来源'))
+    } finally {
+      if (request.isCurrent()) {
+        setQualitySourceLoading(false)
+        request.finish()
+      }
+    }
+  }
+
+  const submitShipmentQualitySource = async (values, source) => {
+    const shipment = qualitySourceContext?.shipment
+    if (qualitySourceInFlightRef.current || !shipment?.id) return
+
+    let payload
+    try {
+      payload = buildShipmentQualityInspectionPayload(
+        values,
+        shipment,
+        source,
+        activeCustomerKey
+      )
+    } catch (error) {
+      message.error(getActionErrorMessage(error, '准备出货前成品检验'))
+      return
+    }
+
+    qualitySourceInFlightRef.current = true
+    setQualitySourceLoading(true)
+    try {
+      const result = await createFinishedGoodsQualityInspectionDraft(payload)
+      try {
+        requireMatchingShipmentQualityInspectionDraft(
+          result,
+          shipment,
+          source,
+          payload.inspection_no
+        )
+      } catch (error) {
+        error.isInvalidResponse = true
+        throw error
+      }
+      setQualitySourceContext(null)
+      message.success('已生成出货前成品检验草稿')
+      navigate(
+        routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
+          quality_inspection_id: result.id,
+        })
+      )
+    } catch (error) {
+      if (isSourceBusinessActionResultUnknown(error)) {
+        message.warning(
+          '暂时无法确认是否生成成功，当前检验单号和送检批次已保留，请原样重试'
+        )
+      } else {
+        message.error(getActionErrorMessage(error, '生成出货前成品检验'))
+      }
+    } finally {
+      qualitySourceInFlightRef.current = false
+      setQualitySourceLoading(false)
+    }
+  }
+
   const openShipmentFinanceSource = (action) => {
     const allowed =
       action === 'receivable' ? canCreateReceivable : canCreateInvoice
@@ -905,12 +1171,8 @@ export default function ShipmentsPage() {
     () => buildShipmentColumns({ salesOrdersByID }),
     [salesOrdersByID]
   )
-  const {
-    tableColumns,
-    exportColumns,
-    openColumnOrder,
-    columnOrderModal,
-  } = useBusinessColumnOrder({
+  const { tableColumns, exportColumns, openColumnOrder, columnOrderModal } =
+    useBusinessColumnOrder({
       adminProfile,
       moduleKey: SHIPMENTS_MODULE_KEY,
       moduleTitle: '出货单',
@@ -957,10 +1219,10 @@ export default function ShipmentsPage() {
       <PageHeaderCard
         compact
         title="出货单"
-        description="出货单维护出货信息和明细；只有确认出货后才会记录实际出货并更新库存。"
+        description="出货单维护出货信息和明细；草稿先提交仓库放行协同，放行完成后仍需确认出货才会记录实际出货并更新库存。"
         tags={[
           <Tag color="gold" key="release">
-            出货放行：可发货
+            出货放行：仓库协同
           </Tag>,
           <Tag color="blue" key="shipment">
             出货单：实际出货记录
@@ -1122,6 +1384,49 @@ export default function ShipmentsPage() {
           >
             查看明细
           </Button>
+          <Dropdown
+            trigger={['click']}
+            destroyOnHidden
+            disabled={!selectedRow || relatedMenuItems.length === 0}
+            menu={{ items: relatedMenuItems, onClick: openRelatedRecord }}
+          >
+            <Button
+              size="small"
+              icon={<LinkOutlined />}
+              disabled={!selectedRow || relatedMenuItems.length === 0}
+            >
+              相关单据 <DownOutlined />
+            </Button>
+          </Dropdown>
+          {selectedRow?.status === 'DRAFT' &&
+          canCreateFinishedGoodsQualityInspection ? (
+            <Button
+              size="small"
+              loading={qualitySourceLoading && !qualitySourceContext}
+              disabled={qualitySourceLoading || saving}
+              onClick={openShipmentQualitySource}
+            >
+              发起出货前检验
+            </Button>
+          ) : null}
+          <Popconfirm
+            title="提交后将生成仓库放行待办，但不会确认出货或扣减库存。是否继续？"
+            onConfirm={submitSelectedShipmentRelease}
+            okText="提交放行"
+            cancelText="取消"
+          >
+            <Button
+              size="small"
+              disabled={
+                !selectedRow ||
+                selectedRow.status !== 'DRAFT' ||
+                !canSubmitShipmentRelease ||
+                saving
+              }
+            >
+              提交出货放行
+            </Button>
+          </Popconfirm>
           <Popconfirm
             title="确认出货并扣减相应库存？"
             onConfirm={() =>
@@ -1145,9 +1450,17 @@ export default function ShipmentsPage() {
             </Button>
           </Popconfirm>
           <Popconfirm
-            title="确认取消出库并恢复相应库存？"
+            title={
+              selectedRow?.status === 'DRAFT'
+                ? '确认取消这张出货单？草稿取消不会扣减或恢复库存；如已提交放行，需先完成或退回放行待办。'
+                : '确认撤销已出货并恢复相应库存？'
+            }
             onConfirm={() =>
-              runShipmentAction(selectedRow, cancelShipment, '取消出货')
+              runShipmentAction(
+                selectedRow,
+                cancelShipment,
+                selectedRow?.status === 'DRAFT' ? '取消出货单' : '撤销已出货'
+              )
             }
             okText="确认"
             cancelText="取消"
@@ -1158,12 +1471,12 @@ export default function ShipmentsPage() {
               icon={<CloseCircleOutlined />}
               disabled={
                 !selectedRow ||
-                selectedRow.status !== 'SHIPPED' ||
+                !['DRAFT', 'SHIPPED'].includes(selectedRow.status) ||
                 !canCancel ||
                 saving
               }
             >
-              取消出货
+              {selectedRow?.status === 'DRAFT' ? '取消出货单' : '撤销已出货'}
             </Button>
           </Popconfirm>
           {selectedRow?.status === 'SHIPPED' &&
@@ -1265,6 +1578,21 @@ export default function ShipmentsPage() {
           if (!financeSourceInFlightRef.current) setFinanceSourceAction(null)
         }}
         onSubmit={submitShipmentFinanceSource}
+      />
+
+      <ShipmentQualityInspectionModal
+        open={Boolean(qualitySourceContext)}
+        shipment={qualitySourceContext?.shipment}
+        sources={qualityInspectionSources}
+        productOptions={productOptions}
+        productSKUOptions={productSKUOptions}
+        warehouseOptions={warehouseOptions}
+        inventoryLotOptions={qualitySourceInventoryLotOptions}
+        loading={qualitySourceLoading}
+        onCancel={() => {
+          if (!qualitySourceInFlightRef.current) setQualitySourceContext(null)
+        }}
+        onSubmit={submitShipmentQualitySource}
       />
     </BusinessPageLayout>
   )

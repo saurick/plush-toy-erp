@@ -9,6 +9,9 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorybalance"
+	"server/internal/data/model/ent/workflowbusinessstate"
+	"server/internal/data/model/ent/workflowtask"
+	"server/internal/data/model/ent/workflowtaskevent"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -78,6 +81,19 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	if _, err := factUC.PostProductionFact(ctx, rework.ID); err != nil {
 		t.Fatalf("post rework from rejected source lot: %v", err)
 	}
+	legacyTaskCode := biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskProductionExceptionGroup, rework.ID)
+	legacyTask := client.WorkflowTask.Query().Where(workflowtask.TaskCode(legacyTaskCode)).OnlyX(ctx)
+	client.WorkflowTaskEvent.Delete().Where(workflowtaskevent.TaskID(legacyTask.ID)).ExecX(ctx)
+	client.WorkflowBusinessState.Delete().Where(
+		workflowbusinessstate.SourceType(biz.WorkflowSourceTaskProductionFactSourceType),
+		workflowbusinessstate.SourceID(rework.ID),
+	).ExecX(ctx)
+	client.WorkflowTask.DeleteOne(legacyTask).ExecX(ctx)
+	backfill, err := reconcileMissingWorkflowSourceTasksWithClient(ctx, client)
+	if err != nil || backfill.ProductionExceptionCreated != 1 {
+		t.Fatalf("backfill posted REWORK source task result=%#v err=%v", backfill, err)
+	}
+	completeProductionExceptionTaskForTest(t, ctx, data, client, rework.ID, actor.ID)
 	if got := lotBalanceQuantity(t, ctx, client, fixtures.productID, fixtures.warehouseID, fixtures.unitID, *completion.LotID); !got.Equal(decimal.NewFromInt(2)) {
 		t.Fatalf("source lot balance after rework = %s, want 2", got)
 	}
@@ -113,6 +129,17 @@ func TestProductionReworkFromCompletionOwnsSourceQuantityAndReversal(t *testing.
 	if _, err := factUC.CancelPostedProductionFact(ctx, rework.ID); err != nil {
 		t.Fatalf("cancel rework after replacement reversal: %v", err)
 	}
+	cancelledTask := client.WorkflowTask.Query().Where(workflowtask.TaskCode(legacyTaskCode)).OnlyX(ctx)
+	if cancelledTask.BusinessStatusKey == nil || *cancelledTask.BusinessStatusKey != "cancelled" {
+		t.Fatalf("cancelled REWORK task projection = %#v", cancelledTask)
+	}
+	cancelledState := client.WorkflowBusinessState.Query().Where(
+		workflowbusinessstate.SourceType(biz.WorkflowSourceTaskProductionFactSourceType),
+		workflowbusinessstate.SourceID(rework.ID),
+	).OnlyX(ctx)
+	if cancelledState.BusinessStatusKey != "cancelled" || cancelledState.Payload["source_projection_action"] != "production_rework.cancel" {
+		t.Fatalf("cancelled REWORK business state = %#v", cancelledState)
+	}
 	if got := lotBalanceQuantity(t, ctx, client, fixtures.productID, fixtures.warehouseID, fixtures.unitID, *completion.LotID); !got.Equal(decimal.NewFromInt(6)) {
 		t.Fatalf("source lot balance after rework reversal = %s, want 6", got)
 	}
@@ -145,6 +172,7 @@ func TestProductionOrderCloseUsesNetCompletionAfterRework(t *testing.T) {
 	if err != nil {
 		t.Fatalf("release production order: %v", err)
 	}
+	completeProductionSchedulingTaskForTest(t, ctx, data, client, released.Order.ID, actor.ID)
 
 	firstLotNo := "CLOSE-NET-FIRST"
 	completion, err := factUC.CreateProductionCompletionFromOrder(ctx, &biz.ProductionCompletionFromOrderCreate{

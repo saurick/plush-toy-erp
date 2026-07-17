@@ -379,8 +379,8 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
   const productionOrders = plan.targets.find(
     (item) => item.group === "desktop" && item.key === "production-orders",
   );
-  assert.equal(productionOrders?.roleKey, "production");
-  assert.equal(productionOrders?.username, "demo_production");
+  assert.equal(productionOrders?.roleKey, "sales");
+  assert.equal(productionOrders?.username, "demo_sales");
   assert.equal(
     plan.targets.filter((item) => item.username === "demo_admin").length,
     2,

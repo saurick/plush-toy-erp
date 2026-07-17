@@ -51,11 +51,7 @@ test('workflowDashboardStats: 工作台岗位只读取有效会话真源并拒�
   )
   assert.deepEqual(
     getWorkflowWorkbenchRoleKeys({
-      roles: [
-        { role_key: 'warehouse' },
-        { key: 'boss' },
-        'sales',
-      ],
+      roles: [{ role_key: 'warehouse' }, { key: 'boss' }, 'sales'],
     }),
     ['warehouse']
   )
@@ -150,10 +146,7 @@ test('workflowDashboardStats: alert 暴露业务来源标签而不是内部 sour
     { nowMs: NOW_MS }
   )
 
-  assert.equal(
-    internalTaskNoAlert.source_label,
-    '出货放行 / 已关联业务来源'
-  )
+  assert.equal(internalTaskNoAlert.source_label, '出货放行 / 已关联业务来源')
   assert.equal(hashIdFallbackAlert.source_label, '委外订单 / 已关联业务来源')
   assert(!internalTaskNoAlert.source_label.includes('TASK-9'))
   assert(!hashIdFallbackAlert.source_label.includes('#10'))
@@ -254,13 +247,12 @@ test('workflowDashboardStats: 统计任务状态和 due_at 计算态', () => {
 })
 
 test('workflowDashboardStats: 终态任务不产生超时预警', () => {
-  const terminalTasks = ['done', 'rejected'].map(
-    (statusKey, index) =>
-      task({
-        id: index + 1,
-        task_status_key: statusKey,
-        due_at: NOW_SEC - 60,
-      })
+  const terminalTasks = ['done', 'rejected'].map((statusKey, index) =>
+    task({
+      id: index + 1,
+      task_status_key: statusKey,
+      due_at: NOW_SEC - 60,
+    })
   )
 
   terminalTasks.forEach((item) => {
@@ -642,6 +634,61 @@ test('workflowDashboardStats: 委外延期和回货预警进入对应桶', () =>
   assert.equal(stats.buckets.vendorDelay.length, 1)
   assert.equal(stats.buckets.outsourceReturnPending.length, 1)
   assert.equal(stats.buckets.outsourceReturnQcPending.length, 1)
+})
+
+test('workflowDashboardStats: 生产排程和返工异常进入来源任务预警桶', () => {
+  const productionScheduling = task({
+    id: 24,
+    source_type: 'production-orders',
+    owner_role_key: 'pmc',
+    task_group: 'production_scheduling',
+    business_status_key: 'production_ready',
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'production_scheduling_pending',
+    },
+  })
+  const productionException = task({
+    id: 25,
+    source_type: 'production-progress',
+    owner_role_key: 'production',
+    task_group: 'production_exception',
+    business_status_key: 'blocked',
+    payload: {
+      notification_type: 'task_created',
+      alert_type: 'rework_pending',
+    },
+  })
+
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(productionScheduling, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(productionScheduling, { nowMs: NOW_MS })
+        ?.alert_label,
+      buildWorkflowTaskAlert(productionScheduling, { nowMs: NOW_MS })
+        ?.alert_level,
+    ],
+    ['production_scheduling_pending', '生产排程待处理', 'warning']
+  )
+  assert.deepEqual(
+    [
+      buildWorkflowTaskAlert(productionException, { nowMs: NOW_MS })
+        ?.alert_type,
+      buildWorkflowTaskAlert(productionException, { nowMs: NOW_MS })
+        ?.alert_label,
+      buildWorkflowTaskAlert(productionException, { nowMs: NOW_MS })
+        ?.alert_level,
+    ],
+    ['rework_pending', '返工异常待处理', 'warning']
+  )
+
+  const stats = buildWorkflowDashboardStats(
+    [productionScheduling, productionException],
+    { nowMs: NOW_MS }
+  )
+  assert.equal(stats.buckets.productionSchedulingPending.length, 1)
+  assert.equal(stats.buckets.reworkPending.length, 1)
 })
 
 test('workflowDashboardStats: 成品抽检 入库 返工和待出货预警进入对应桶', () => {

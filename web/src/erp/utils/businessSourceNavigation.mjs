@@ -57,3 +57,21 @@ export function businessSourceRouteFor(sourceType, sourceID) {
   if (!target || !normalizedID) return ''
   return routeWithQuery(target.path, { [target.queryKey]: normalizedID })
 }
+
+const INVENTORY_SOURCE_TYPE_BY_RECORD_KIND = Object.freeze({
+  production: 'PRODUCTION_FACT',
+  outsourcing: 'OUTSOURCING_FACT',
+  shipments: 'SHIPMENT',
+})
+
+export function businessRecordInventoryRouteFor(recordKind, recordID) {
+  const sourceType =
+    INVENTORY_SOURCE_TYPE_BY_RECORD_KIND[String(recordKind || '').trim()]
+  const normalizedID = positiveSourceID(recordID)
+  if (!sourceType || !normalizedID) return ''
+  return routeWithQuery(V1_ROUTE_PATHS.inventory, {
+    source_type: sourceType,
+    source_id: normalizedID,
+    view: 'txns',
+  })
+}

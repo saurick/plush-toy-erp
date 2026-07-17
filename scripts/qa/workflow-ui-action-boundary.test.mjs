@@ -712,7 +712,7 @@ test("desktop workflow task actions explain backend access before submitting act
     });
     assert.match(
       source,
-      /task_id:\s*(?:selectedTask|task)\.id/u,
+      /task_id:\s*(?:selectedTask|task|taskSnapshot)\.id/u,
       `${expectation.relativePath} must submit formal task_id action payloads`,
     );
     assert(
@@ -793,7 +793,7 @@ test("workflow urge payloads do not replay frontend task source fields", () => {
   for (const relativePath of urgeActionFiles) {
     const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
     assert(
-      /mutate:\s*urgeWorkflowTask|actionMode === 'urge'[\s\S]*\?\s*urgeWorkflowTask/u.test(
+      /mutate:\s*urgeWorkflowTask|actionMode === 'urge'[\s\S]*\?\s*urgeWorkflowTask|const\s+mutate\s*=\s*[\s\S]*?\?\s*urgeWorkflowTask[\s\S]*?mutationAttemptsRef\.current\.run\(\{[\s\S]*?\bmutate,/u.test(
         source,
       ),
       `${relativePath} must pass the workflow urge API wrapper to the retained-attempt runner`,
@@ -840,6 +840,75 @@ test("business collaboration panel delegates mutation verification to action-own
     actionHandlerIndex >= 0 &&
       source.includes("if (succeeded !== false) closeActionDrawer()"),
     "collaboration panel must keep the drawer open when an action-owning handler rejects a new attempt",
+  );
+});
+
+test("business collaboration panel is limited to selected purchase and outsourcing records", () => {
+  const excludedPagePaths = [
+    "web/src/erp/pages/V1MasterDataPage.jsx",
+    "web/src/erp/pages/V1SalesOrdersPage.jsx",
+    "web/src/erp/pages/BOMVersionsPage.jsx",
+    "web/src/erp/pages/WorkflowBusinessModulePage.jsx",
+  ];
+  for (const relativePath of excludedPagePaths) {
+    const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
+    assert.doesNotMatch(
+      source,
+      /<CollaborationTaskPanel\b/u,
+      `${relativePath} must not mount an empty or duplicate collaboration panel`,
+    );
+  }
+
+  const contextualPagePaths = [
+    "web/src/erp/pages/V1PurchaseOrdersPage.jsx",
+    "web/src/erp/pages/V1OutsourcingOrdersPage.jsx",
+  ];
+  for (const relativePath of contextualPagePaths) {
+    const source = readFileSync(path.join(repoRoot, relativePath), "utf8");
+    assert.match(
+      source,
+      /loadBusinessCollaborationTasksForSource\(\{[\s\S]*?canRead:\s*canReadWorkflowTasks,[\s\S]*?listTasks:\s*listWorkflowTasks,[\s\S]*?sourceID:\s*requestedSourceID,[\s\S]*?sourceType:/u,
+      `${relativePath} must delegate a permission-gated current-record task request to the shared loader`,
+    );
+    assert.match(
+      source,
+      /<CollaborationTaskPanel[\s\S]*?workflowTaskLoadState === 'ready'[\s\S]*?onOpenTaskBoard=\{\(\) => navigate\('\/erp\/task-board'\)\}/u,
+      `${relativePath} must render only ready current-record tasks and keep the global task-board exit`,
+    );
+  }
+
+  const collaborationTaskSource = readFileSync(
+    path.join(erpSourceRoot, "utils/businessCollaborationTasks.mjs"),
+    "utf8",
+  );
+  assert.match(
+    collaborationTaskSource,
+    /source_type:\s*String\(sourceType[\s\S]*?source_id:\s*requestedSourceID,[\s\S]*?limit:\s*200/u,
+    "shared collaboration loader must query the exact current source record",
+  );
+
+  const panelSource = readFileSync(
+    path.join(
+      erpSourceRoot,
+      "components/business-list/CollaborationTaskPanel.jsx",
+    ),
+    "utf8",
+  );
+  assert(
+    panelSource.includes("<strong>当前记录任务</strong>") &&
+      panelSource.includes("label: '当前记录'") &&
+      panelSource.includes("label: '阻塞异常'") &&
+      panelSource.includes("任务中心") &&
+      panelSource.includes('aria-label="当前记录任务分类"') &&
+      panelSource.includes(
+        "if (!hasFocusedRecord || taskPanelModel.activeTaskCount === 0) return null",
+      ),
+    "collaboration panel must stay current-record-only and hide zero-task placeholders",
+  );
+  assert.doesNotMatch(
+    panelSource,
+    /label:\s*'本页待办'|selectedTasks/u,
+    "collaboration panel must not reintroduce page-wide or duplicate selected-task inputs",
   );
 });
 
@@ -1056,7 +1125,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "disabled={!selectedRow || saving}",
         "onClick={() => openShipmentDetails(selectedRow)}",
         "selectedRow.status !== 'DRAFT' ||\n                !canShip",
-        "selectedRow.status !== 'SHIPPED' ||\n                !canCancel",
+        "!['DRAFT', 'SHIPPED'].includes(selectedRow.status) ||\n                !canCancel",
         "canCreate={canCreate}",
         "isViewModal={isViewModal}",
       ],
@@ -1070,10 +1139,15 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "canCreate || hasActionPermission(adminProfile, 'warehouse.inbound.confirm')",
         "canUpload={canCreate || canPost}",
         "canDelete={canCreate || canPost}",
-        "selectedRow.status !== 'DRAFT' ||\n              !canCreate",
+        "页面不提供脱离采购来源的手工入库明细。",
         "selectedRow.status !== 'DRAFT' ||\n                !canPost",
         "selectedRow.status !== 'POSTED' ||\n                !canPost",
         "过账和取消均由系统按采购入库规则更新库存或生成撤销调整记录",
+      ],
+      forbiddenTokens: [
+        "addPurchaseReceiptItem",
+        "PurchaseReceiptInlineItemEditor",
+        "维护明细",
       ],
     },
     {
@@ -1088,7 +1162,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||\n              !canUpdate",
         "canUpload={canCreate || canUpdate}",
         "canDelete={canUpdate}",
-        "不会绕过规则直接修改批次状态或库存数量",
+        "不会绕过来源规则直接改写库存数量或生产事实",
       ],
     },
   ];

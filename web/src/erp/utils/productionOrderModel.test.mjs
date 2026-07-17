@@ -26,6 +26,8 @@ function aggregate() {
         product_id: 3,
         unit_id: 5,
         planned_quantity: '20.0000',
+        route_code: 'PLUSH_SEW_HAND_V1',
+        customer_inspection_required: false,
       },
     ],
     production_material_requirements: [
@@ -68,6 +70,11 @@ test('production order aggregate response binds order, status and every item', (
   const malformed = aggregate()
   malformed.production_order_items[0].production_order_id = 8
   assert.throws(() => validateProductionOrderAggregate(malformed))
+
+  const invalidCustomerGate = aggregate()
+  invalidCustomerGate.production_order_items[0].route_code = null
+  invalidCustomerGate.production_order_items[0].customer_inspection_required = true
+  assert.throws(() => validateProductionOrderAggregate(invalidCustomerGate))
 })
 
 test('production material requirement response binds order and quantity projection', () => {

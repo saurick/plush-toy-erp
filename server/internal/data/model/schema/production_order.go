@@ -133,6 +133,12 @@ func (ProductionOrder) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("material_requirements", ProductionOrderMaterialRequirement.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("operations", ProductionOrderOperation.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("wip_batches", ProductionWIPBatch.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("packaging_confirmations", ProductionPackagingConfirmation.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("events", ProductionOrderEvent.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("creator", AdminUser.Type).

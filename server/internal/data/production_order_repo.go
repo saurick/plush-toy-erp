@@ -19,6 +19,7 @@ import (
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
@@ -422,7 +423,25 @@ func (r *productionOrderRepo) ApplyProductionOrderAction(ctx context.Context, in
 		if affected != 1 {
 			return nil, productionOrderCASFailure(ctx, client, in.ID, in.ExpectedVersion, expectedStatus)
 		}
-		return loadProductionOrderAggregate(ctx, client, in.ID)
+		if in.CommandKey == biz.ProductionOrderCommandRelease {
+			if err := freezeProductionOrderWIPRoute(ctx, client, in.ID, in.ActorID); err != nil {
+				return nil, err
+			}
+		}
+		aggregate, err := loadProductionOrderAggregate(ctx, client, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		if in.CommandKey == biz.ProductionOrderCommandRelease {
+			task, state, err := biz.BuildProductionSchedulingSourceTask(aggregate)
+			if err != nil {
+				return nil, err
+			}
+			if _, _, err := ensureSourceWorkflowTaskWithClient(ctx, client, task, state, in.ActorID); err != nil {
+				return nil, err
+			}
+		}
+		return aggregate, nil
 	})
 }
 
@@ -461,6 +480,24 @@ func (r *productionOrderRepo) closeProductionOrder(ctx context.Context, in *biz.
 	if current.Status != biz.ProductionOrderStatusReleased {
 		return nil, biz.ErrProductionOrderInvalidState
 	}
+	releasedAggregate, err := loadProductionOrderAggregate(ctx, tx.client, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	schedulingTask, _, err := biz.BuildProductionSchedulingSourceTask(releasedAggregate)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireProductionSchedulingTaskTerminal(ctx, tx, schedulingTask, false); err != nil {
+		return nil, err
+	}
+	activeWIP, err := productionOrderHasActiveWIP(ctx, tx.client, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if activeWIP {
+		return nil, biz.ErrProductionOrderWIPActive
+	}
 	incomplete, err := productionOrderHasIncompleteFinishedGoods(ctx, tx.client, in.ID)
 	if err != nil {
 		return nil, err
@@ -491,6 +528,20 @@ func (r *productionOrderRepo) closeProductionOrder(ctx context.Context, in *biz.
 	if err != nil {
 		return nil, err
 	}
+	projectionPayload := map[string]any{
+		"source_document_status": biz.ProductionOrderStatusClosed,
+		"closed_at":              now.Unix(),
+		"closed_by":              in.ActorID,
+	}
+	if in.Reason != nil {
+		projectionPayload["close_reason"] = *in.Reason
+	}
+	if err := transitionSourceWorkflowProjection(
+		ctx, tx.client, schedulingTask, "closed", biz.PMCRoleKey, in.ActorID,
+		"production_order.close", projectionPayload,
+	); err != nil {
+		return nil, err
+	}
 	fromStatus := current.Status
 	if err := createProductionOrderReceipt(ctx, tx.client, aggregate, in.ActorID, in.CommandKey, &fromStatus, in.IdempotencyKey, in.IntentHash, in.Reason); err != nil {
 		rollbackInventoryDBTx(ctx, tx, r.log)
@@ -504,6 +555,28 @@ func (r *productionOrderRepo) closeProductionOrder(ctx context.Context, in *biz.
 	}
 	tx.sqlTx = nil
 	return aggregate, nil
+}
+
+func productionOrderHasActiveWIP(ctx context.Context, client *ent.Client, orderID int) (bool, error) {
+	rows, err := client.ProductionWIPBatch.Query().
+		Where(productionwipbatch.ProductionOrderID(orderID)).
+		All(ctx)
+	if err != nil {
+		return false, err
+	}
+	for _, row := range rows {
+		if row == nil {
+			return false, biz.ErrProductionWIPInvalidTransition
+		}
+		blocks, err := biz.ProductionWIPStatusBlocksOrderClose(row.Status)
+		if err != nil {
+			return false, err
+		}
+		if blocks {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 func productionOrderHasIncompleteFinishedGoods(ctx context.Context, client *ent.Client, orderID int) (bool, error) {
@@ -592,6 +665,7 @@ func (r *productionOrderRepo) cancelProductionOrder(ctx context.Context, in *biz
 	if current.Status != biz.ProductionOrderStatusDraft && current.Status != biz.ProductionOrderStatusReleased {
 		return nil, biz.ErrProductionOrderInvalidState
 	}
+	var schedulingTask *biz.WorkflowTaskCreate
 	if current.Status == biz.ProductionOrderStatusReleased {
 		hasPosted, err := tx.client.ProductionFact.Query().Where(
 			productionfact.SourceType(biz.ProductionOrderSourceType),
@@ -603,6 +677,17 @@ func (r *productionOrderRepo) cancelProductionOrder(ctx context.Context, in *biz
 		}
 		if hasPosted {
 			return nil, biz.ErrProductionOrderHasPostedFacts
+		}
+		releasedAggregate, err := loadProductionOrderAggregate(ctx, tx.client, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		schedulingTask, _, err = biz.BuildProductionSchedulingSourceTask(releasedAggregate)
+		if err != nil {
+			return nil, err
+		}
+		if err := requireProductionSchedulingTaskTerminal(ctx, tx, schedulingTask, true); err != nil {
+			return nil, err
 		}
 	}
 	now := time.Now().UTC()
@@ -623,6 +708,19 @@ func (r *productionOrderRepo) cancelProductionOrder(ctx context.Context, in *biz
 	aggregate, err := loadProductionOrderAggregate(ctx, tx.client, in.ID)
 	if err != nil {
 		return nil, err
+	}
+	if schedulingTask != nil {
+		if err := transitionSourceWorkflowProjection(
+			ctx, tx.client, schedulingTask, "cancelled", biz.PMCRoleKey, in.ActorID,
+			"production_order.cancel", map[string]any{
+				"source_document_status": biz.ProductionOrderStatusCancelled,
+				"cancelled_at":           now.Unix(),
+				"cancelled_by":           in.ActorID,
+				"cancel_reason":          *in.Reason,
+			},
+		); err != nil {
+			return nil, err
+		}
 	}
 	if err := createProductionOrderReceipt(ctx, tx.client, aggregate, in.ActorID, in.CommandKey, &current.Status, in.IdempotencyKey, in.IntentHash, in.Reason); err != nil {
 		rollbackInventoryDBTx(ctx, tx, r.log)
@@ -908,6 +1006,8 @@ func createProductionOrderItem(ctx context.Context, client *ent.Client, orderID 
 		SetPlannedQuantity(item.PlannedQuantity).
 		SetNillableSalesOrderItemID(item.SalesOrderItemID).
 		SetNillableBomHeaderID(item.BOMHeaderID).
+		SetNillableRouteCode(item.RouteCode).
+		SetCustomerInspectionRequired(item.CustomerInspectionRequired).
 		SetProductCodeSnapshot(snapshot.productCode).
 		SetProductNameSnapshot(snapshot.productName).
 		SetNillableSkuCodeSnapshot(snapshot.skuCode).
@@ -926,7 +1026,8 @@ func loadProductionOrderDraftItems(ctx context.Context, client *ent.Client, orde
 	for _, row := range rows {
 		items = append(items, biz.ProductionOrderDraftItem{
 			LineNo: row.LineNo, ProductID: row.ProductID, ProductSKUID: row.ProductSkuID, UnitID: row.UnitID,
-			PlannedQuantity: row.PlannedQuantity, SalesOrderItemID: row.SalesOrderItemID, BOMHeaderID: row.BomHeaderID, Note: row.Note,
+			PlannedQuantity: row.PlannedQuantity, SalesOrderItemID: row.SalesOrderItemID, BOMHeaderID: row.BomHeaderID,
+			RouteCode: row.RouteCode, CustomerInspectionRequired: row.CustomerInspectionRequired, Note: row.Note,
 		})
 	}
 	return items, nil
@@ -1012,7 +1113,8 @@ func resolveProductionOrderMaterialRequirementsState(
 		for _, bomRow := range bomRows {
 			requirement := byBOMItem[bomRow.ID]
 			if requirement == nil || requirement.BOMHeaderID != bomRow.BomHeaderID ||
-				requirement.MaterialID != bomRow.MaterialID || requirement.UnitID != bomRow.UnitID {
+				requirement.MaterialID != bomRow.MaterialID || requirement.UnitID != bomRow.UnitID ||
+				!equalProductionOrderOptionalString(requirement.ProductionOperationCode, bomRow.ProductionOperationCode) {
 				return biz.ProductionOrderMaterialRequirementsNeedsReview, nil
 			}
 		}
@@ -1097,6 +1199,7 @@ func freezeProductionOrderMaterialRequirements(ctx context.Context, client *ent.
 				SetBomItemID(bomRow.ID).
 				SetMaterialID(materialRow.ID).
 				SetUnitID(unitRow.ID).
+				SetNillableProductionOperationCode(bomRow.ProductionOperationCode).
 				SetUnitQuantitySnapshot(bomRow.Quantity).
 				SetLossRateSnapshot(bomRow.LossRate).
 				SetPlannedQuantity(planned).
@@ -1156,12 +1259,20 @@ func entProductionOrderMaterialRequirementToBiz(row *ent.ProductionOrderMaterial
 	return &biz.ProductionOrderMaterialRequirement{
 		ID: row.ID, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID,
 		BOMHeaderID: row.BomHeaderID, BOMItemID: row.BomItemID, MaterialID: row.MaterialID, UnitID: row.UnitID,
-		UnitQuantitySnapshot: row.UnitQuantitySnapshot, LossRateSnapshot: row.LossRateSnapshot,
+		ProductionOperationCode: row.ProductionOperationCode,
+		UnitQuantitySnapshot:    row.UnitQuantitySnapshot, LossRateSnapshot: row.LossRateSnapshot,
 		PlannedQuantity: row.PlannedQuantity, IssuedQuantity: issued, RemainingQuantity: row.PlannedQuantity.Sub(issued),
 		MaterialCodeSnapshot: row.MaterialCodeSnapshot, MaterialNameSnapshot: row.MaterialNameSnapshot,
 		UnitCodeSnapshot: row.UnitCodeSnapshot, UnitNameSnapshot: row.UnitNameSnapshot,
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
+}
+
+func equalProductionOrderOptionalString(left, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 func entProductionOrderToBiz(row *ent.ProductionOrder) *biz.ProductionOrder {
@@ -1186,6 +1297,7 @@ func entProductionOrderItemToBiz(row *ent.ProductionOrderItem) *biz.ProductionOr
 		ID: row.ID, ProductionOrderID: row.ProductionOrderID, LineNo: row.LineNo,
 		ProductID: row.ProductID, ProductSKUID: row.ProductSkuID, UnitID: row.UnitID,
 		PlannedQuantity: row.PlannedQuantity, SalesOrderItemID: row.SalesOrderItemID, BOMHeaderID: row.BomHeaderID,
+		RouteCode: row.RouteCode, CustomerInspectionRequired: row.CustomerInspectionRequired,
 		ProductCodeSnapshot: row.ProductCodeSnapshot, ProductNameSnapshot: row.ProductNameSnapshot,
 		SKUCodeSnapshot: row.SkuCodeSnapshot, UnitNameSnapshot: row.UnitNameSnapshot,
 		BOMVersionSnapshot: row.BomVersionSnapshot, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,

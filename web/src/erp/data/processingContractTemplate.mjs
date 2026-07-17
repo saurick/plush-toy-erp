@@ -1,5 +1,7 @@
+import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
+
 export const PROCESSING_CONTRACT_TEMPLATE_KEY = 'processing-contract'
-export const PROCESSING_CONTRACT_DRAFT_VERSION = 2
+export const PROCESSING_CONTRACT_DRAFT_VERSION = 4
 export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
   { key: 'contractNo', fieldKey: 'contractNo', label: '委外加工订单号' },
   { key: 'productOrderNo', fieldKey: 'productOrderNo', label: '来源订单编号' },
@@ -11,9 +13,9 @@ export const PROCESSING_CONTRACT_TABLE_COLUMNS = [
     multiline: true,
   },
   {
-    key: 'processName',
-    fieldKey: 'processName',
-    label: '工序名称',
+    key: 'processingItem',
+    fieldKey: 'processingItem',
+    label: '加工项目',
     multiline: true,
   },
   { key: 'supplierAlias', fieldKey: 'supplierAlias', label: '加工厂商' },
@@ -54,31 +56,7 @@ const PROCESSING_FACT_TYPE_LABELS = {
   REWORK: '返工',
 }
 
-export const processingContractAttachmentSlots = [
-  {
-    key: 'attachment-1',
-    title: '纸样 / 图样附件位 1',
-  },
-  {
-    key: 'attachment-2',
-    title: '纸样 / 图样附件位 2',
-  },
-]
-
-export function createEmptyProcessingAttachment() {
-  return {
-    name: '',
-    dataURL: '',
-    mimeType: '',
-  }
-}
-
-export function createEmptyProcessingAttachments() {
-  return processingContractAttachmentSlots.reduce((state, slot) => {
-    state[slot.key] = createEmptyProcessingAttachment()
-    return state
-  }, {})
-}
+const LEGACY_PROCESSING_ATTACHMENT_KEYS = ['attachment-1', 'attachment-2']
 
 const defaultLines = [
   {
@@ -86,7 +64,7 @@ const defaultLines = [
     productOrderNo: 'SIM-SO-001',
     productNo: 'SIM-PROD-001',
     productName: '合成玩偶甲',
-    processName: '面*1',
+    processingItem: '面*1',
     supplierAlias: '示例加工厂',
     processCategory: '电绣',
     unit: '片',
@@ -99,7 +77,7 @@ const defaultLines = [
     productOrderNo: 'SIM-SO-001',
     productNo: 'SIM-PROD-001',
     productName: '合成玩偶甲',
-    processName: '耳*2',
+    processingItem: '耳*2',
     supplierAlias: '示例加工厂',
     processCategory: '电绣',
     unit: '对',
@@ -112,7 +90,7 @@ const defaultLines = [
     productOrderNo: 'SIM-SO-001',
     productNo: 'SIM-PROD-001',
     productName: '合成玩偶甲',
-    processName: '底*1',
+    processingItem: '底*1',
     supplierAlias: '示例加工厂',
     processCategory: '电绣',
     unit: '片',
@@ -135,19 +113,19 @@ export const processingContractTemplateMeta = {
     '根据已确认的合同字段和纸面版式提供独立打印窗口；界面不会显示客户原始文件名。',
   scene: '委外加工下单、加工厂回签、财务对账留档',
   layout:
-    'A4 单页固定合同版式，包含双栏合同头、加工明细表、条款区、签字区和页底两处纸样 / 图样附件位。',
+    'A4 合同版式，包含双栏合同头、加工明细表、条款区、签字区和按顺序追加的末尾附图。',
   output: '在线预览 PDF / 下载 PDF / 打印',
   notes: [
     '加工合同和采购合同都使用独立打印窗口；其他汇总表和报表模板仍提供示例预览。',
     '先打开可编辑打印窗口，再预览、下载或打印 PDF。',
     '在明细上方或下方插入时会新增空白行，不会复制相邻行内容。',
-    '纸样 / 图样附件通过工作台独立上传，并同步进入右侧页底附件位，随 PDF / 打印一起输出。',
+    '末尾附图通过工作台统一管理：普通图片自动两张一行，长图自动整行，每张可切换排版，并随 PDF / 打印一起输出。',
   ],
   tags: ['固定版式', '合同内容', 'PDF / 打印', '可编辑窗口'],
   previewLines: [
     '合同头 / 加工商信息',
     '加工明细 / 合计',
-    '条款 / 签章 / 页底附件位',
+    '条款 / 签章 / 末尾附图',
   ],
   sourceFiles: [
     '来源样本：材料与加工合同工作簿（B类加工合同 / B类汇总表 / 加工厂商）',
@@ -155,9 +133,9 @@ export const processingContractTemplateMeta = {
   ],
   fieldTruth: [
     '合同编号、下单日期、回货日期、加工方名称和委托单位保留在当前合同中，不会修改加工厂或公司资料。',
-    '工序名称、工序类别、单价、委托加工数量和金额保留在当前合同中；金额默认按数量 × 单价计算，也可手工修改。',
+    '加工项目、工序类别、单价、委托加工数量和金额保留在当前合同中；加工项目记录部位或内容，工序类别来自工序档案，金额默认按数量 × 单价计算，也可手工修改。',
     '来货要求、合同约定、结算方式属于正式合同正文，不应只留在帮助文档里口头说明。',
-    '纸样 / 图样附件上传后显示在页底，并随当前 PDF 或打印件一起输出。',
+    '末尾附图上传后按当前顺序显示在合同最后，并随当前 PDF 或打印件一起输出。',
   ],
   fieldRequirements: [
     {
@@ -181,10 +159,11 @@ export const processingContractTemplateMeta = {
         '工序、数量、单价和金额保留在当前打印草稿中，不会自动生成发料、回货、库存或财务记录',
     },
     {
-      key: 'attachment_snapshots',
-      label: '纸样 / 图样附件',
-      source: '当前打印窗口上传的附件',
-      boundary: '图片随当前 PDF / 打印输出保留，不替代正式附件归档',
+      key: 'appendix_image_snapshots',
+      label: '末尾附图',
+      source: '当前打印窗口添加的图片',
+      boundary:
+        '图片数量不设业务上限；普通图片自动两张一行，长图自动整行，可逐张切换排版；只随当前草稿、PDF / 打印输出，不替代正式附件归档',
     },
     {
       key: 'contract_clauses',
@@ -199,7 +178,7 @@ export const processingContractTemplateMeta = {
     '顶部工具栏和左右编辑区用于调整当前合同内容。',
     '合同明细支持在工作台里选行、插行、删行；适合先调明细结构，再确认 PDF 和打印观感。',
     '加工合同明细当前最多支持 300 行，顶部计数会显示“当前行数/300”。',
-    '纸样 / 图样附件可通过工作台按钮上传并显示在页底；从业务单据进入时，合同信息、明细和附件会分别带入。',
+    '末尾附图可在工作台多选添加、前移、后移或移除；从业务单据进入时，合同信息、明细和图片会分别带入。',
   ],
 }
 
@@ -209,7 +188,7 @@ export function createEmptyProcessingLine() {
     productOrderNo: '',
     productNo: '',
     productName: '',
-    processName: '',
+    processingItem: '',
     supplierAlias: '',
     processCategory: '',
     unit: '',
@@ -330,7 +309,7 @@ export function normalizeProcessingLine(line = {}) {
     productOrderNo: normalizeText(line.productOrderNo),
     productNo: normalizeText(line.productNo),
     productName: normalizeText(line.productName),
-    processName: normalizeText(line.processName),
+    processingItem: normalizeText(line.processingItem),
     supplierAlias: normalizeText(line.supplierAlias),
     processCategory: normalizeText(line.processCategory),
     unit: normalizeText(line.unit),
@@ -341,23 +320,17 @@ export function normalizeProcessingLine(line = {}) {
   }
 }
 
-export function normalizeProcessingAttachmentSnapshot(attachment = {}) {
-  const normalizedDataURL = normalizeText(attachment.dataURL)
-  return {
-    name: normalizeText(attachment.name),
-    dataURL: normalizedDataURL.startsWith('data:') ? normalizedDataURL : '',
-    mimeType: normalizeText(attachment.mimeType),
+function resolveProcessingAppendixImages(draft = {}) {
+  if (Object.prototype.hasOwnProperty.call(draft, 'appendixImages')) {
+    return normalizePrintAppendixImages(draft.appendixImages)
   }
-}
-
-export function normalizeProcessingContractAttachments(attachments = {}) {
-  const source =
-    attachments && typeof attachments === 'object' ? attachments : {}
-
-  return processingContractAttachmentSlots.reduce((state, slot) => {
-    state[slot.key] = normalizeProcessingAttachmentSnapshot(source[slot.key])
-    return state
-  }, {})
+  const legacyAttachments =
+    draft?.attachments && typeof draft.attachments === 'object'
+      ? draft.attachments
+      : {}
+  return normalizePrintAppendixImages(
+    LEGACY_PROCESSING_ATTACHMENT_KEYS.map((key) => legacyAttachments[key])
+  )
 }
 
 export function normalizeProcessingContractClauses(clauses = {}) {
@@ -463,7 +436,7 @@ export function createProcessingContractDraft() {
     supplierSigner: '受托方签字人',
     buyerSignDateText: '2025-06-08',
     supplierSignDateText: '2025-06-08',
-    attachments: createEmptyProcessingAttachments(),
+    appendixImages: [],
     lines: defaultLines.map((line) => normalizeProcessingLine(line)),
     clauses: normalizeProcessingContractClauses(),
     merges: [],
@@ -489,22 +462,52 @@ export function createBlankProcessingContractDraft(draft = {}) {
     supplierSigner: '',
     buyerSignDateText: '',
     supplierSignDateText: '',
-    attachments: createEmptyProcessingAttachments(),
+    appendixImages: [],
     lines: [normalizeProcessingLine(createEmptyProcessingLine())],
     clauses: normalizeProcessingContractClauses(draft?.clauses),
     merges: [],
   }
 }
 
+export function normalizeProcessingContractDraft(draft = {}) {
+  const {
+    attachments: _legacyAttachments,
+    appendixImages: _appendixImages,
+    lines,
+    clauses,
+    merges,
+    ...rest
+  } = draft || {}
+  return {
+    ...createProcessingContractDraft(),
+    ...rest,
+    draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
+    lines: Array.isArray(lines)
+      ? lines.map((line) => normalizeProcessingLine(line))
+      : createProcessingContractDraft().lines,
+    clauses: normalizeProcessingContractClauses(clauses),
+    appendixImages: resolveProcessingAppendixImages(draft),
+    merges: Array.isArray(merges) ? merges : [],
+  }
+}
+
 export function createProcessingContractBusinessDraft(draft = {}) {
-  const { attachments, lines, clauses, merges, ...rest } = draft || {}
+  const {
+    attachments: _legacyAttachments,
+    appendixImages: _appendixImages,
+    lines,
+    clauses,
+    merges,
+    ...rest
+  } = draft || {}
   return {
     ...createBlankProcessingContractDraft({ clauses }),
     ...rest,
+    draftVersion: PROCESSING_CONTRACT_DRAFT_VERSION,
     lines: Array.isArray(lines)
       ? lines.map((line) => normalizeProcessingLine(line))
       : [normalizeProcessingLine(createEmptyProcessingLine())],
-    attachments: normalizeProcessingContractAttachments(attachments),
+    appendixImages: resolveProcessingAppendixImages(draft),
     merges: Array.isArray(merges) ? merges : [],
   }
 }
@@ -659,9 +662,7 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
       return normalizeProcessingLine({
         contractNo,
         productOrderNo:
-          (productSubject
-            ? normalizeText(item.product_order_no_snapshot)
-            : '') || sourceOrderNo,
+          normalizeText(item.product_order_no_snapshot) || sourceOrderNo,
         productNo: materialSubject
           ? normalizeText(item.material_code_snapshot)
           : productSubject
@@ -677,8 +678,10 @@ export function buildProcessingContractDraftFromOutsourcingOrder(
           : productSubject
             ? normalizeText(item.product_name_snapshot)
             : '',
-        processName: normalizeText(item.process_name_snapshot),
-        processCategory: normalizeText(item.process_category_snapshot),
+        processingItem: normalizeText(item.processing_item),
+        processCategory:
+          normalizeText(item.process_name_snapshot) ||
+          normalizeText(item.process_category_snapshot),
         supplierAlias: supplierName,
         unit: normalizeText(item.unit_name_snapshot),
         quantity: normalizeText(item.outsourcing_quantity),

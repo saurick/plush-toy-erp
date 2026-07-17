@@ -13,6 +13,7 @@ import {
 import {
   buildProductionCompletionChoices,
   buildProductionCompletionLotOptions,
+  compareProductionCompletionQuantity,
 } from '../../utils/productionCompletionAction.mjs'
 import {
   SOURCE_INBOUND_LOT_SELECTION,
@@ -36,6 +37,7 @@ export default function ProductionCompletionModal({
   open,
   order,
   items = [],
+  blockedItems = [],
   facts = [],
   warehouseOptions = [],
   lots = [],
@@ -106,6 +108,26 @@ export default function ProductionCompletionModal({
         showIcon
         message="系统会按生产订单明细核对完工数量、产品、规格和单位；过账后才会更新库存。"
       />
+      {blockedItems.length > 0 ? (
+        <Alert
+          type="warning"
+          showIcon
+          style={{ marginTop: 12 }}
+          message="部分路线明细暂不可登记"
+          description={blockedItems
+            .slice(0, 3)
+            .map(({ item, reason }) => {
+              const line = item?.line_no ? `第 ${item.line_no} 行` : '生产明细'
+              const product =
+                [item?.product_name_snapshot, item?.sku_code_snapshot]
+                  .map((value) => String(value || '').trim())
+                  .filter(Boolean)
+                  .join(' / ') || '产品已关联'
+              return `${line} · ${product}：${reason}`
+            })
+            .join('；')}
+        />
+      ) : null}
       <Descriptions
         size="small"
         column={1}
@@ -155,7 +177,8 @@ export default function ProductionCompletionModal({
         </Form.Item>
         {selectedChoice ? (
           <Text type="secondary">
-            计划 {selectedChoice.planned || '0'} / 已过账{' '}
+            计划 {selectedChoice.planned || '0'} / 当前可完工上限{' '}
+            {selectedChoice.acceptedPackaging || '0'} / 已过账{' '}
             {selectedChoice.posted || '0'} / 草稿 {selectedChoice.draft || '0'}
           </Text>
         ) : null}
@@ -166,22 +189,28 @@ export default function ProductionCompletionModal({
             { required: true, message: '请填写本次完工数量' },
             {
               validator: (_, value) => {
-                const quantity = Number(value)
-                const remaining = Number(selectedChoice?.remaining || 0)
-                if (!Number.isFinite(quantity) || quantity <= 0) {
+                try {
+                  if (
+                    compareProductionCompletionQuantity(
+                      value,
+                      selectedChoice?.remaining || '0'
+                    ) > 0
+                  ) {
+                    return Promise.reject(
+                      new Error(
+                        '本次数量不能超过当前可完工上限扣减已过账后的剩余数量'
+                      )
+                    )
+                  }
+                } catch {
                   return Promise.reject(new Error('完工数量必须大于 0'))
-                }
-                if (remaining > 0 && quantity > remaining) {
-                  return Promise.reject(
-                    new Error('本次数量不能超过剩余可完工数量')
-                  )
                 }
                 return Promise.resolve()
               },
             },
           ]}
         >
-          <Input inputMode="decimal" placeholder="例如：100" />
+          <Input inputMode="decimal" maxLength={21} placeholder="例如：100" />
         </Form.Item>
         <Form.Item
           name="warehouse_id"

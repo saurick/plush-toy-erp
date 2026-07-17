@@ -11,6 +11,9 @@ import (
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionorderoperation"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
+	"server/internal/data/model/ent/productionwipbatch"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -274,6 +277,51 @@ func (_c *ProductionOrderCreate) AddMaterialRequirements(v ...*ProductionOrderMa
 		ids[i] = v[i].ID
 	}
 	return _c.AddMaterialRequirementIDs(ids...)
+}
+
+// AddOperationIDs adds the "operations" edge to the ProductionOrderOperation entity by IDs.
+func (_c *ProductionOrderCreate) AddOperationIDs(ids ...int) *ProductionOrderCreate {
+	_c.mutation.AddOperationIDs(ids...)
+	return _c
+}
+
+// AddOperations adds the "operations" edges to the ProductionOrderOperation entity.
+func (_c *ProductionOrderCreate) AddOperations(v ...*ProductionOrderOperation) *ProductionOrderCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddOperationIDs(ids...)
+}
+
+// AddWipBatchIDs adds the "wip_batches" edge to the ProductionWIPBatch entity by IDs.
+func (_c *ProductionOrderCreate) AddWipBatchIDs(ids ...int) *ProductionOrderCreate {
+	_c.mutation.AddWipBatchIDs(ids...)
+	return _c
+}
+
+// AddWipBatches adds the "wip_batches" edges to the ProductionWIPBatch entity.
+func (_c *ProductionOrderCreate) AddWipBatches(v ...*ProductionWIPBatch) *ProductionOrderCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddWipBatchIDs(ids...)
+}
+
+// AddPackagingConfirmationIDs adds the "packaging_confirmations" edge to the ProductionPackagingConfirmation entity by IDs.
+func (_c *ProductionOrderCreate) AddPackagingConfirmationIDs(ids ...int) *ProductionOrderCreate {
+	_c.mutation.AddPackagingConfirmationIDs(ids...)
+	return _c
+}
+
+// AddPackagingConfirmations adds the "packaging_confirmations" edges to the ProductionPackagingConfirmation entity.
+func (_c *ProductionOrderCreate) AddPackagingConfirmations(v ...*ProductionPackagingConfirmation) *ProductionOrderCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddPackagingConfirmationIDs(ids...)
 }
 
 // AddEventIDs adds the "events" edge to the ProductionOrderEvent entity by IDs.
@@ -597,6 +645,54 @@ func (_c *ProductionOrderCreate) createSpec() (*ProductionOrder, *sqlgraph.Creat
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(productionordermaterialrequirement.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.OperationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.OperationsTable,
+			Columns: []string{productionorder.OperationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionorderoperation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.WipBatchesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.WipBatchesTable,
+			Columns: []string{productionorder.WipBatchesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.PackagingConfirmationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionorder.PackagingConfirmationsTable,
+			Columns: []string{productionorder.PackagingConfirmationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionpackagingconfirmation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

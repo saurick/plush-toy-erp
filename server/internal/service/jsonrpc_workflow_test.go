@@ -1587,6 +1587,16 @@ func TestJsonrpcDispatcher_WorkflowIdempotencyConflictUsesRegisteredError(t *tes
 	}
 }
 
+func TestJsonrpcDispatcher_SourceGeneratedTaskGroupReturnsSourceGuidance(t *testing.T) {
+	dispatcher := &jsonrpcDispatcher{
+		log: log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+	}
+	res := dispatcher.mapWorkflowError(context.Background(), biz.ErrWorkflowTaskSourceGeneratedOnly)
+	if res == nil || res.Code != errcode.InvalidParam.Code || res.Message != "该任务由业务来源生成，请回到对应业务页面办理" {
+		t.Fatalf("source-generated task group must return source guidance, got %#v", res)
+	}
+}
+
 func TestJsonrpcDispatcher_LinkedProcessReconciliationFailureKeepsMutationRetryable(t *testing.T) {
 	processID := 10
 	nodeID := 20

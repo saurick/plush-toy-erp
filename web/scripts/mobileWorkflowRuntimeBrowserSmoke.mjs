@@ -343,7 +343,7 @@ function buildSimulatedTaskPlan() {
     {
       ownerRoleKey: 'warehouse',
       assigneeRoleHint: 'boss',
-      taskGroup: 'shipment_release',
+      taskGroup: 'trial_warehouse_followup',
       browserAction: 'urge-only',
       expectedTaskStatusAfterAction: 'ready',
       forbiddenBrowserActions: ['block', 'complete'],
@@ -1121,9 +1121,9 @@ function buildSimulatedWarehouseTask(options, assigneeID) {
   const prefix = `${SIM_PREFIX}-${options.runId}`
   return {
     task_code: `${prefix}-WAREHOUSE`,
-    task_group: 'shipment_release',
-    task_name: `移动端浏览器模拟仓库放行 ${options.runId}`,
-    source_type: 'shipping-release',
+    task_group: 'trial_warehouse_followup',
+    task_name: `移动端浏览器模拟仓库跟进 ${options.runId}`,
+    source_type: 'trial-workflow',
     source_id: sourceID,
     source_no: `${prefix}-SHIP`,
     business_status_key: 'shipping_released',

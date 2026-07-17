@@ -12,6 +12,9 @@ import (
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/workflowbusinessstate"
+	"server/internal/data/model/ent/workflowtask"
+	"server/internal/data/model/ent/workflowtaskevent"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -65,6 +68,7 @@ func openProductionOrderRepoTest(t *testing.T, name string) productionOrderTestF
 		SetQuantity(decimal.NewFromInt(2)).
 		SetUnitID(unitRow.ID).
 		SetLossRate(decimal.RequireFromString("0.1")).
+		SetProductionOperationCode(biz.ProductionWIPOperationFabricProcessing).
 		SaveX(ctx)
 	repo := NewProductionOrderRepo(data, log.NewStdLogger(io.Discard))
 	return productionOrderTestFixture{
@@ -202,6 +206,27 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 		!released.MaterialRequirements[0].PlannedQuantity.Equal(decimal.RequireFromString("26.4")) {
 		t.Fatalf("release material requirements = %#v", released.MaterialRequirements)
 	}
+	schedulingTask := f.client.WorkflowTask.Query().Where(
+		workflowtask.TaskCode(biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskProductionSchedulingGroup, created.Order.ID)),
+	).OnlyX(ctx)
+	if schedulingTask.TaskGroup != biz.WorkflowSourceTaskProductionSchedulingGroup ||
+		schedulingTask.SourceType != biz.WorkflowSourceTaskProductionOrderSourceType ||
+		schedulingTask.SourceID != created.Order.ID ||
+		schedulingTask.OwnerRoleKey != biz.PMCRoleKey ||
+		schedulingTask.Payload["source_task_contract"] != biz.WorkflowSourceTaskContractV1 ||
+		schedulingTask.Payload["source_task_producer"] != biz.WorkflowSourceTaskProductionOrderReleaseProducer {
+		t.Fatalf("release scheduling task = %#v", schedulingTask)
+	}
+	if count := f.client.WorkflowTaskEvent.Query().Where(workflowtaskevent.TaskID(schedulingTask.ID), workflowtaskevent.EventType("created")).CountX(ctx); count != 1 {
+		t.Fatalf("release must atomically create one task event, count=%d", count)
+	}
+	schedulingState := f.client.WorkflowBusinessState.Query().Where(
+		workflowbusinessstate.SourceType(biz.WorkflowSourceTaskProductionOrderSourceType),
+		workflowbusinessstate.SourceID(created.Order.ID),
+	).OnlyX(ctx)
+	if schedulingState.BusinessStatusKey != "production_ready" {
+		t.Fatalf("release scheduling state = %#v", schedulingState)
+	}
 	replayedRelease, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 999, ActorID: f.actorID, IdempotencyKey: "release-replay"})
 	if err != nil || replayedRelease.Order.Version != 3 || len(replayedRelease.MaterialRequirements) != 1 || replayedRelease.MaterialRequirements[0].ID != released.MaterialRequirements[0].ID {
 		t.Fatalf("release exact replay = %#v, %v", replayedRelease, err)
@@ -209,16 +234,44 @@ func TestProductionOrderRepoAggregateLifecycleCASAndExactReplay(t *testing.T) {
 	if _, err := f.uc.SaveDraft(ctx, &biz.ProductionOrderSave{ID: created.Order.ID, ExpectedVersion: 3, Draft: f.draft("MO-REPO-001", 14), ActorID: f.actorID, IdempotencyKey: "save-after-release"}); !errors.Is(err, biz.ErrProductionOrderInvalidState) {
 		t.Fatalf("save after release error = %v", err)
 	}
-	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 3, ActorID: f.actorID, IdempotencyKey: "close-incomplete-without-reason"}); !errors.Is(err, biz.ErrProductionOrderCloseReasonRequired) {
-		t.Fatalf("incomplete close without reason error = %v", err)
+	activeCloseReason := "仍需收尾"
+	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 3, ActorID: f.actorID, IdempotencyKey: "close-active-scheduling", Reason: &activeCloseReason}); !errors.Is(err, biz.ErrProductionOrderSchedulingTaskActive) {
+		t.Fatalf("close with active scheduling task error = %v", err)
 	}
 	if count := f.client.ProductionOrderEvent.Query().Where(productionorderevent.ProductionOrderID(created.Order.ID), productionorderevent.CommandKey(biz.ProductionOrderCommandClose)).CountX(ctx); count != 0 {
 		t.Fatalf("failed close must write zero receipt, count=%d", count)
+	}
+	workflowUC := biz.NewWorkflowUsecase(NewWorkflowRepo(f.data, log.NewStdLogger(io.Discard)))
+	if _, err := workflowUC.UpdateTaskStatus(ctx, &biz.WorkflowTaskStatusUpdate{
+		ID: schedulingTask.ID, ExpectedVersion: schedulingTask.Version, TaskStatusKey: "done",
+		CommandKey: "complete_task_action", IdempotencyKey: "complete-scheduling-before-close",
+	}, f.actorID, biz.PMCRoleKey); err != nil {
+		t.Fatalf("complete scheduling task: %v", err)
+	}
+	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 3, ActorID: f.actorID, IdempotencyKey: "close-incomplete-without-reason"}); !errors.Is(err, biz.ErrProductionOrderCloseReasonRequired) {
+		t.Fatalf("incomplete close without reason error = %v", err)
 	}
 	reason := "计划已完成"
 	closed, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 3, ActorID: f.actorID, IdempotencyKey: "close-replay", Reason: &reason})
 	if err != nil || closed.Order.Status != biz.ProductionOrderStatusClosed || closed.Order.Version != 4 {
 		t.Fatalf("close = %#v, %v", closed, err)
+	}
+	closedTask := f.client.WorkflowTask.GetX(ctx, schedulingTask.ID)
+	if closedTask.BusinessStatusKey == nil || *closedTask.BusinessStatusKey != "closed" {
+		t.Fatalf("closed production order task projection = %#v", closedTask)
+	}
+	closedState := f.client.WorkflowBusinessState.Query().Where(
+		workflowbusinessstate.SourceType(biz.WorkflowSourceTaskProductionOrderSourceType),
+		workflowbusinessstate.SourceID(created.Order.ID),
+	).OnlyX(ctx)
+	if closedState.BusinessStatusKey != "closed" || closedState.Payload["source_projection_action"] != "production_order.close" {
+		t.Fatalf("closed production order business state = %#v", closedState)
+	}
+	if count := f.client.WorkflowTaskEvent.Query().Where(
+		workflowtaskevent.TaskID(schedulingTask.ID),
+		workflowtaskevent.EventType("source_state_changed"),
+	).CountX(ctx); count != 1 {
+		t.Fatalf("production order close source-state event count=%d, want 1", count)
 	}
 	changedCloseReason := "另一个关闭原因"
 	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 999, ActorID: f.actorID, IdempotencyKey: "close-replay", Reason: &changedCloseReason}); !errors.Is(err, biz.ErrIdempotencyConflict) {

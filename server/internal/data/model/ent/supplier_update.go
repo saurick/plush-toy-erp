@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/supplier"
@@ -96,6 +97,26 @@ func (_u *SupplierUpdate) SetNillableSupplierType(v *string) *SupplierUpdate {
 // ClearSupplierType clears the value of the "supplier_type" field.
 func (_u *SupplierUpdate) ClearSupplierType() *SupplierUpdate {
 	_u.mutation.ClearSupplierType()
+	return _u
+}
+
+// SetAddress sets the "address" field.
+func (_u *SupplierUpdate) SetAddress(v string) *SupplierUpdate {
+	_u.mutation.SetAddress(v)
+	return _u
+}
+
+// SetNillableAddress sets the "address" field if the given value is not nil.
+func (_u *SupplierUpdate) SetNillableAddress(v *string) *SupplierUpdate {
+	if v != nil {
+		_u.SetAddress(*v)
+	}
+	return _u
+}
+
+// ClearAddress clears the value of the "address" field.
+func (_u *SupplierUpdate) ClearAddress() *SupplierUpdate {
+	_u.mutation.ClearAddress()
 	return _u
 }
 
@@ -204,6 +225,21 @@ func (_u *SupplierUpdate) AddOutsourcingOrders(v ...*OutsourcingOrder) *Supplier
 	return _u.AddOutsourcingOrderIDs(ids...)
 }
 
+// AddProcessCapabilityIDs adds the "process_capabilities" edge to the Process entity by IDs.
+func (_u *SupplierUpdate) AddProcessCapabilityIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.AddProcessCapabilityIDs(ids...)
+	return _u
+}
+
+// AddProcessCapabilities adds the "process_capabilities" edges to the Process entity.
+func (_u *SupplierUpdate) AddProcessCapabilities(v ...*Process) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProcessCapabilityIDs(ids...)
+}
+
 // Mutation returns the SupplierMutation object of the builder.
 func (_u *SupplierUpdate) Mutation() *SupplierMutation {
 	return _u.mutation
@@ -272,6 +308,27 @@ func (_u *SupplierUpdate) RemoveOutsourcingOrders(v ...*OutsourcingOrder) *Suppl
 	return _u.RemoveOutsourcingOrderIDs(ids...)
 }
 
+// ClearProcessCapabilities clears all "process_capabilities" edges to the Process entity.
+func (_u *SupplierUpdate) ClearProcessCapabilities() *SupplierUpdate {
+	_u.mutation.ClearProcessCapabilities()
+	return _u
+}
+
+// RemoveProcessCapabilityIDs removes the "process_capabilities" edge to Process entities by IDs.
+func (_u *SupplierUpdate) RemoveProcessCapabilityIDs(ids ...int) *SupplierUpdate {
+	_u.mutation.RemoveProcessCapabilityIDs(ids...)
+	return _u
+}
+
+// RemoveProcessCapabilities removes "process_capabilities" edges to Process entities.
+func (_u *SupplierUpdate) RemoveProcessCapabilities(v ...*Process) *SupplierUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProcessCapabilityIDs(ids...)
+}
+
 // Save executes the query and returns the number of nodes affected by the update operation.
 func (_u *SupplierUpdate) Save(ctx context.Context) (int, error) {
 	_u.defaults()
@@ -330,6 +387,11 @@ func (_u *SupplierUpdate) check() error {
 			return &ValidationError{Name: "supplier_type", err: fmt.Errorf(`ent: validator failed for field "Supplier.supplier_type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Address(); ok {
+		if err := supplier.AddressValidator(v); err != nil {
+			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "Supplier.address": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.TaxNo(); ok {
 		if err := supplier.TaxNoValidator(v); err != nil {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Supplier.tax_no": %w`, err)}
@@ -372,6 +434,12 @@ func (_u *SupplierUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.SupplierTypeCleared() {
 		_spec.ClearField(supplier.FieldSupplierType, field.TypeString)
+	}
+	if value, ok := _u.mutation.Address(); ok {
+		_spec.SetField(supplier.FieldAddress, field.TypeString, value)
+	}
+	if _u.mutation.AddressCleared() {
+		_spec.ClearField(supplier.FieldAddress, field.TypeString)
 	}
 	if value, ok := _u.mutation.TaxNo(); ok {
 		_spec.SetField(supplier.FieldTaxNo, field.TypeString, value)
@@ -526,6 +594,51 @@ func (_u *SupplierUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ProcessCapabilitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   supplier.ProcessCapabilitiesTable,
+			Columns: supplier.ProcessCapabilitiesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(process.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProcessCapabilitiesIDs(); len(nodes) > 0 && !_u.mutation.ProcessCapabilitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   supplier.ProcessCapabilitiesTable,
+			Columns: supplier.ProcessCapabilitiesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(process.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProcessCapabilitiesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   supplier.ProcessCapabilitiesTable,
+			Columns: supplier.ProcessCapabilitiesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(process.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{supplier.Label}
@@ -611,6 +724,26 @@ func (_u *SupplierUpdateOne) SetNillableSupplierType(v *string) *SupplierUpdateO
 // ClearSupplierType clears the value of the "supplier_type" field.
 func (_u *SupplierUpdateOne) ClearSupplierType() *SupplierUpdateOne {
 	_u.mutation.ClearSupplierType()
+	return _u
+}
+
+// SetAddress sets the "address" field.
+func (_u *SupplierUpdateOne) SetAddress(v string) *SupplierUpdateOne {
+	_u.mutation.SetAddress(v)
+	return _u
+}
+
+// SetNillableAddress sets the "address" field if the given value is not nil.
+func (_u *SupplierUpdateOne) SetNillableAddress(v *string) *SupplierUpdateOne {
+	if v != nil {
+		_u.SetAddress(*v)
+	}
+	return _u
+}
+
+// ClearAddress clears the value of the "address" field.
+func (_u *SupplierUpdateOne) ClearAddress() *SupplierUpdateOne {
+	_u.mutation.ClearAddress()
 	return _u
 }
 
@@ -719,6 +852,21 @@ func (_u *SupplierUpdateOne) AddOutsourcingOrders(v ...*OutsourcingOrder) *Suppl
 	return _u.AddOutsourcingOrderIDs(ids...)
 }
 
+// AddProcessCapabilityIDs adds the "process_capabilities" edge to the Process entity by IDs.
+func (_u *SupplierUpdateOne) AddProcessCapabilityIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.AddProcessCapabilityIDs(ids...)
+	return _u
+}
+
+// AddProcessCapabilities adds the "process_capabilities" edges to the Process entity.
+func (_u *SupplierUpdateOne) AddProcessCapabilities(v ...*Process) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProcessCapabilityIDs(ids...)
+}
+
 // Mutation returns the SupplierMutation object of the builder.
 func (_u *SupplierUpdateOne) Mutation() *SupplierMutation {
 	return _u.mutation
@@ -785,6 +933,27 @@ func (_u *SupplierUpdateOne) RemoveOutsourcingOrders(v ...*OutsourcingOrder) *Su
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveOutsourcingOrderIDs(ids...)
+}
+
+// ClearProcessCapabilities clears all "process_capabilities" edges to the Process entity.
+func (_u *SupplierUpdateOne) ClearProcessCapabilities() *SupplierUpdateOne {
+	_u.mutation.ClearProcessCapabilities()
+	return _u
+}
+
+// RemoveProcessCapabilityIDs removes the "process_capabilities" edge to Process entities by IDs.
+func (_u *SupplierUpdateOne) RemoveProcessCapabilityIDs(ids ...int) *SupplierUpdateOne {
+	_u.mutation.RemoveProcessCapabilityIDs(ids...)
+	return _u
+}
+
+// RemoveProcessCapabilities removes "process_capabilities" edges to Process entities.
+func (_u *SupplierUpdateOne) RemoveProcessCapabilities(v ...*Process) *SupplierUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProcessCapabilityIDs(ids...)
 }
 
 // Where appends a list predicates to the SupplierUpdate builder.
@@ -858,6 +1027,11 @@ func (_u *SupplierUpdateOne) check() error {
 			return &ValidationError{Name: "supplier_type", err: fmt.Errorf(`ent: validator failed for field "Supplier.supplier_type": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.Address(); ok {
+		if err := supplier.AddressValidator(v); err != nil {
+			return &ValidationError{Name: "address", err: fmt.Errorf(`ent: validator failed for field "Supplier.address": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.TaxNo(); ok {
 		if err := supplier.TaxNoValidator(v); err != nil {
 			return &ValidationError{Name: "tax_no", err: fmt.Errorf(`ent: validator failed for field "Supplier.tax_no": %w`, err)}
@@ -917,6 +1091,12 @@ func (_u *SupplierUpdateOne) sqlSave(ctx context.Context) (_node *Supplier, err 
 	}
 	if _u.mutation.SupplierTypeCleared() {
 		_spec.ClearField(supplier.FieldSupplierType, field.TypeString)
+	}
+	if value, ok := _u.mutation.Address(); ok {
+		_spec.SetField(supplier.FieldAddress, field.TypeString, value)
+	}
+	if _u.mutation.AddressCleared() {
+		_spec.ClearField(supplier.FieldAddress, field.TypeString)
 	}
 	if value, ok := _u.mutation.TaxNo(); ok {
 		_spec.SetField(supplier.FieldTaxNo, field.TypeString, value)
@@ -1064,6 +1244,51 @@ func (_u *SupplierUpdateOne) sqlSave(ctx context.Context) (_node *Supplier, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(outsourcingorder.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProcessCapabilitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   supplier.ProcessCapabilitiesTable,
+			Columns: supplier.ProcessCapabilitiesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(process.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProcessCapabilitiesIDs(); len(nodes) > 0 && !_u.mutation.ProcessCapabilitiesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   supplier.ProcessCapabilitiesTable,
+			Columns: supplier.ProcessCapabilitiesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(process.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProcessCapabilitiesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2M,
+			Inverse: false,
+			Table:   supplier.ProcessCapabilitiesTable,
+			Columns: supplier.ProcessCapabilitiesPrimaryKey,
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(process.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

@@ -97,7 +97,7 @@ async function verifyProcessingContractEditing(page) {
     }
   )
 
-  await page.getByText('当前记录字段（可编辑）').waitFor({
+  await page.getByText('打印内容').waitFor({
     state: 'visible',
     timeout: 15_000,
   })

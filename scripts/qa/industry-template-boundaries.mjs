@@ -182,6 +182,50 @@ function validateTemplate(config) {
     assertNonEmptyString(item.note, `${path}.note`);
   }
 
+  const shipmentReleasePatterns = config.mobileTaskPatternTemplate.filter(
+    (item) => item.key === "shipment_release",
+  );
+  assert(
+    shipmentReleasePatterns.length === 1,
+    "mobileTaskPatternTemplate must include exactly one shipment_release pattern",
+  );
+  const shipmentRelease = shipmentReleasePatterns[0];
+  assert(
+    shipmentRelease.sourceGenerated === true &&
+      shipmentRelease.configurableProducer === false,
+    "shipment_release must stay source-generated with a non-configurable producer",
+  );
+  assert(
+    shipmentRelease.producer === "shipment.submit_release" &&
+      shipmentRelease.sourcePageKey === "shipments" &&
+      shipmentRelease.sourceAction === "submit_shipment_release",
+    "shipment_release must be produced only by shipment submit_release",
+  );
+  assert(
+    shipmentRelease.ownerRoleKey === "warehouse" &&
+      shipmentRelease.roles.length === 1 &&
+      shipmentRelease.roles[0] === "warehouse",
+    "shipment_release must be owned only by warehouse",
+  );
+  assertNonEmptyString(
+    shipmentRelease.precondition,
+    "shipment_release.precondition",
+  );
+  assertNonEmptyString(
+    shipmentRelease.downstream,
+    "shipment_release.downstream",
+  );
+  assert(
+    shipmentRelease.precondition.includes("成品检验") &&
+      shipmentRelease.precondition.includes("提交放行"),
+    "shipment_release precondition must keep quality before submit",
+  );
+  assert(
+    shipmentRelease.downstream.includes("SHIPPED") &&
+      shipmentRelease.downstream.includes("财务"),
+    "shipment_release downstream must keep finance after shipped",
+  );
+
   for (const [index, item] of config.fieldDisplayTemplate.entries()) {
     const path = `fieldDisplayTemplate[${index}]`;
     assertNonEmptyString(item.module, `${path}.module`);

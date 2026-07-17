@@ -49,7 +49,12 @@ export const SOURCE_DRIVEN_FACT_REPORT_CONTRACT =
 
 export function normalizeLocalBackendURL(value) {
   const url = new URL(String(value || "http://127.0.0.1:8300"));
-  if (url.protocol !== "http:" || !LOCAL_HOSTS.has(url.hostname) || url.username || url.password) {
+  if (
+    url.protocol !== "http:" ||
+    !LOCAL_HOSTS.has(url.hostname) ||
+    url.username ||
+    url.password
+  ) {
     throw new Error("attachment apply only accepts a loopback HTTP backend");
   }
   return url.origin;
@@ -99,17 +104,39 @@ export function assertAttachmentFixtureIntegrity({
 
 export function buildAttachmentFixtures({ includeNearLimit = true } = {}) {
   const fixtures = [
-    fixture("订单要求.pdf", "application/pdf", Buffer.from("%PDF-1.4\n% simulated acceptance evidence\n%%EOF\n")),
-    fixture("产品正面图.png", "image/png", Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=", "base64")),
-    fixture("包装唛头.jpg", "image/jpeg", Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==", "base64")),
-    fixture("数量交期表.xlsx", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", Buffer.from("PK\u0003\u0004simulated-xlsx-acceptance-sheet")),
+    fixture(
+      "订单要求.pdf",
+      "application/pdf",
+      Buffer.from("%PDF-1.4\n% simulated acceptance evidence\n%%EOF\n"),
+    ),
+    fixture(
+      "产品正面图.png",
+      "image/png",
+      Buffer.from(
+        "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=",
+        "base64",
+      ),
+    ),
+    fixture(
+      "包装唛头.jpg",
+      "image/jpeg",
+      Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2Q==", "base64"),
+    ),
+    fixture(
+      "数量交期表.xlsx",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      Buffer.from("PK\u0003\u0004simulated-xlsx-acceptance-sheet"),
+    ),
   ];
   if (includeNearLimit) {
     fixtures.push(
       fixture(
         "补充说明-云朵小熊大号礼盒装数量与交期.xlsx",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-        Buffer.concat([Buffer.from("PK\u0003\u0004"), Buffer.alloc(4_500_000, 0x41)]),
+        Buffer.concat([
+          Buffer.from("PK\u0003\u0004"),
+          Buffer.alloc(4_500_000, 0x41),
+        ]),
         "near-limit",
       ),
     );
@@ -122,7 +149,9 @@ function readJSON(file) {
 }
 
 function firstStepID(report, target) {
-  const step = report.steps?.find((item) => item.target === target && Number(item.id) > 0);
+  const step = report.steps?.find(
+    (item) => item.target === target && Number(item.id) > 0,
+  );
   if (!step) throw new Error(`source report is missing ${target}`);
   return Number(step.id);
 }
@@ -135,9 +164,12 @@ function sourceDrivenFactOwnerID(report, key) {
   }
   const id = Number(report?.referenceRecords?.attachmentOwners?.[key]);
   if (!Number.isSafeInteger(id) || id <= 0) {
-    throw new Error(`fact report is missing referenceRecords.attachmentOwners.${key}`);
+    throw new Error(
+      `fact report is missing referenceRecords.attachmentOwners.${key}`,
+    );
   }
-  const listKey = key === "productionFactId" ? "productionFacts" : "financeFacts";
+  const listKey =
+    key === "productionFactId" ? "productionFacts" : "financeFacts";
   const record = report?.referenceRecords?.[listKey]?.find(
     (item) => Number(item?.id) === id,
   );
@@ -162,8 +194,7 @@ export function resolveAttachmentCredentials({
   password,
   env = process.env,
 } = {}) {
-  const effectiveRolePassword =
-    rolePassword || env.MANUAL_ACCEPTANCE_PASSWORD;
+  const effectiveRolePassword = rolePassword || env.MANUAL_ACCEPTANCE_PASSWORD;
   if (typeof effectiveRolePassword !== "string" || !effectiveRolePassword) {
     throw new Error("MANUAL_ACCEPTANCE_PASSWORD is required");
   }
@@ -207,9 +238,15 @@ function validateAttachmentFactReport(report) {
   }
   if (
     !report.runtime ||
-    !requiredReportText(report.runtime.environment, "fact report runtime.environment") ||
+    !requiredReportText(
+      report.runtime.environment,
+      "fact report runtime.environment",
+    ) ||
     report.runtime.customerKey !== CUSTOMER_KEY ||
-    !requiredReportText(report.runtime.configRevision, "fact report runtime.configRevision") ||
+    !requiredReportText(
+      report.runtime.configRevision,
+      "fact report runtime.configRevision",
+    ) ||
     report.runtime.source !== "active_customer_config_revision"
   ) {
     throw new Error("fact report runtime is invalid");
@@ -221,7 +258,9 @@ function validateAttachmentFactReport(report) {
     }
     for (const [index, item] of items.entries()) {
       if (!Number.isSafeInteger(Number(item?.id)) || Number(item.id) <= 0) {
-        throw new Error(`fact report referenceRecords.${key}[${index}].id is invalid`);
+        throw new Error(
+          `fact report referenceRecords.${key}[${index}].id is invalid`,
+        );
       }
     }
   }
@@ -275,7 +314,9 @@ export function validateAttachmentReportBatch({
       String(report[key] || "").trim(),
     );
     if (new Set(values).size !== 1) {
-      throw new Error("source, fact, and task reports must use the same dataset batch");
+      throw new Error(
+        "source, fact, and task reports must use the same dataset batch",
+      );
     }
   }
   let policy;
@@ -317,14 +358,19 @@ export function validateAttachmentReportBatch({
         factReport.runtime.environment !== capabilities.environment ||
         factReport.runtime.targetAttestation?.source !== "out-of-band" ||
         factReport.runtime.targetAttestation?.release !== attestation.release ||
-        factReport.runtime.targetAttestation?.migration !== attestation.migration
+        factReport.runtime.targetAttestation?.migration !==
+          attestation.migration
       ) {
-        throw new Error("fact report runtime attestation does not match customer-trial-133");
+        throw new Error(
+          "fact report runtime attestation does not match customer-trial-133",
+        );
       }
       return { policy, attestation };
     }
     if (parsed) {
-      throw new Error("target attestation is only valid for customer-trial-133");
+      throw new Error(
+        "target attestation is only valid for customer-trial-133",
+      );
     }
     return { policy, attestation: undefined };
   } catch (error) {
@@ -332,8 +378,14 @@ export function validateAttachmentReportBatch({
   }
 }
 
-export function buildAttachmentTargets({ sourceReport, factReport, workflowTask }) {
-  const richSales = sourceReport.referenceRecords?.salesOrders?.find((item) => item.items?.length === 25);
+export function buildAttachmentTargets({
+  sourceReport,
+  factReport,
+  workflowTask,
+}) {
+  const richSales = sourceReport.referenceRecords?.salesOrders?.find(
+    (item) => item.items?.length === 25,
+  );
   const productionFactID = sourceDrivenFactOwnerID(
     factReport,
     "productionFactId",
@@ -344,20 +396,55 @@ export function buildAttachmentTargets({ sourceReport, factReport, workflowTask 
   }
   return [
     { owner_type: "sales_order", owner_id: Number(richSales.id), files: 5 },
-    { owner_type: "purchase_order", owner_id: firstStepID(sourceReport, "purchase_order"), files: 4 },
-    { owner_type: "outsourcing_order", owner_id: firstStepID(sourceReport, "outsourcing_order"), files: 4 },
-    { owner_type: "bom_header", owner_id: firstStepID(sourceReport, "bom_version"), files: 3 },
+    {
+      owner_type: "purchase_order",
+      owner_id: firstStepID(sourceReport, "purchase_order"),
+      files: 4,
+    },
+    {
+      owner_type: "outsourcing_order",
+      owner_id: firstStepID(sourceReport, "outsourcing_order"),
+      files: 4,
+    },
+    {
+      owner_type: "bom_header",
+      owner_id: firstStepID(sourceReport, "bom_version"),
+      files: 3,
+    },
     { owner_type: "production_fact", owner_id: productionFactID, files: 3 },
     { owner_type: "finance_fact", owner_id: financeFactID, files: 3 },
-    { owner_type: "workflow_task", owner_id: Number(workflowTask.id), expected_version: Number(workflowTask.version), files: 5 },
+    {
+      owner_type: "workflow_task",
+      owner_id: Number(workflowTask.id),
+      expected_version: Number(workflowTask.version),
+      files: 5,
+    },
   ];
 }
 
-export function selectAttachmentWorkflowTask(tasks = []) {
+export function selectAttachmentWorkflowTask(
+  tasks = [],
+  { sourceType, sourceID } = {},
+) {
+  const expectedSourceType = String(sourceType || "").trim();
+  const expectedSourceID = Number(sourceID);
+  if (
+    !expectedSourceType ||
+    !Number.isSafeInteger(expectedSourceID) ||
+    expectedSourceID <= 0
+  ) {
+    return undefined;
+  }
   return (Array.isArray(tasks) ? tasks : []).find(
     (item) =>
-      item.task_group === "production_scheduling" &&
-      item.task_status_key === "ready",
+      item?.task_group === "trial_pmc_work" &&
+      item?.task_status_key === "ready" &&
+      item?.owner_role_key === "pmc" &&
+      item?.source_type === expectedSourceType &&
+      Number(item?.source_id) === expectedSourceID &&
+      item?.payload?.simulated_only === true &&
+      item?.payload?.real_customer_data === false &&
+      item?.payload?.trial_task === true,
   );
 }
 
@@ -365,12 +452,22 @@ async function rpc({ backendURL, domain, method, params = {}, token = "" }) {
   const response = await fetch(`${backendURL}/rpc/${domain}`, {
     method: "POST",
     redirect: "error",
-    headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-    body: JSON.stringify({ jsonrpc: "2.0", id: `attachment-${Date.now()}`, method, params }),
+    headers: {
+      "content-type": "application/json",
+      ...(token ? { authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: `attachment-${Date.now()}`,
+      method,
+      params,
+    }),
   });
   const body = await response.json();
   if (!response.ok || body?.result?.code !== 0) {
-    throw new Error(`${domain}.${method} code=${body?.result?.code ?? response.status} message=${body?.result?.message || "request failed"}`);
+    throw new Error(
+      `${domain}.${method} code=${body?.result?.code ?? response.status} message=${body?.result?.message || "request failed"}`,
+    );
   }
   return body.result.data || {};
 }
@@ -388,7 +485,8 @@ export async function applyAttachmentData({
   targetConfirmation,
   targetAttestation,
 }) {
-  if (confirm !== CONFIRM_PHRASE) throw new Error(`confirmation must equal ${CONFIRM_PHRASE}`);
+  if (confirm !== CONFIRM_PHRASE)
+    throw new Error(`confirmation must equal ${CONFIRM_PHRASE}`);
   const sourceReport = readJSON(sourceReportPath);
   const factReport = readJSON(factReportPath);
   const taskReport = readJSON(taskReportPath);
@@ -452,7 +550,8 @@ export async function applyAttachmentData({
     params: { username: "demo_pmc", password: credentials.rolePassword },
   });
   const pmcToken = pmcLogin.access_token || pmcLogin.token;
-  if (!pmcToken) throw new Error("demo_pmc login response is missing access token");
+  if (!pmcToken)
+    throw new Error("demo_pmc login response is missing access token");
   const actorTokens = {
     sales_order: runtimeAdminToken,
     purchase_order: runtimeAdminToken,
@@ -500,9 +599,26 @@ export async function applyAttachmentData({
       },
     };
   }
-  const taskList = await rpc({ backendURL, domain: "workflow", method: "list_tasks", params: { source_type: taskReport.sourceType, source_id: taskReport.sourceID, limit: 200 }, token: actorTokens.workflow_task });
-  const workflowTask = selectAttachmentWorkflowTask(taskList.tasks);
-  const targets = buildAttachmentTargets({ sourceReport, factReport, workflowTask });
+  const taskList = await rpc({
+    backendURL,
+    domain: "workflow",
+    method: "list_tasks",
+    params: {
+      source_type: taskReport.sourceType,
+      source_id: taskReport.sourceID,
+      limit: 200,
+    },
+    token: actorTokens.workflow_task,
+  });
+  const workflowTask = selectAttachmentWorkflowTask(taskList.tasks, {
+    sourceType: taskReport.sourceType,
+    sourceID: taskReport.sourceID,
+  });
+  const targets = buildAttachmentTargets({
+    sourceReport,
+    factReport,
+    workflowTask,
+  });
   const fixtures = buildAttachmentFixtures();
   const steps = [];
   for (const target of targets) {
@@ -523,19 +639,29 @@ export async function applyAttachmentData({
       if (!attachment) {
         let uploaded;
         try {
-          uploaded = await rpc({ backendURL, domain: "attachment", method: "upload_attachment", params: {
-            customer_key: CUSTOMER_KEY,
-            owner_type: target.owner_type,
-            owner_id: target.owner_id,
-            ...(target.expected_version ? { expected_version: target.expected_version } : {}),
-            attachment_type: "manual_acceptance_evidence",
-            file_name: item.file_name,
-            mime_type: item.mime_type,
-            content_base64: item.content.toString("base64"),
-            note: ATTACHMENT_NOTE,
-          }, token: actorToken });
+          uploaded = await rpc({
+            backendURL,
+            domain: "attachment",
+            method: "upload_attachment",
+            params: {
+              customer_key: CUSTOMER_KEY,
+              owner_type: target.owner_type,
+              owner_id: target.owner_id,
+              ...(target.expected_version
+                ? { expected_version: target.expected_version }
+                : {}),
+              attachment_type: "manual_acceptance_evidence",
+              file_name: item.file_name,
+              mime_type: item.mime_type,
+              content_base64: item.content.toString("base64"),
+              note: ATTACHMENT_NOTE,
+            },
+            token: actorToken,
+          });
         } catch (error) {
-          throw new Error(`${target.owner_type}:${target.owner_id} upload ${item.file_name} failed: ${error.message}`);
+          throw new Error(
+            `${target.owner_type}:${target.owner_id} upload ${item.file_name} failed: ${error.message}`,
+          );
         }
         attachment = uploaded.attachment;
         operation = "upload";
@@ -556,20 +682,35 @@ export async function applyAttachmentData({
         fileSize: integrity.fileSize,
         sha256: integrity.sha256,
         operation,
-        actor:
-          target.owner_type === "workflow_task" ? "demo_pmc" : "admin",
+        actor: target.owner_type === "workflow_task" ? "demo_pmc" : "admin",
       });
     }
-    const verified = await rpc({ backendURL, domain: "attachment", method: "list_attachments", params: { owner_type: target.owner_type, owner_id: target.owner_id }, token: actorToken });
-    if ((verified.attachments || []).filter((item) => fixtures.some((fixtureItem) => fixtureItem.file_name === item.file_name)).length < target.files) {
-      throw new Error(`${target.owner_type}:${target.owner_id} attachment readback is incomplete`);
+    const verified = await rpc({
+      backendURL,
+      domain: "attachment",
+      method: "list_attachments",
+      params: { owner_type: target.owner_type, owner_id: target.owner_id },
+      token: actorToken,
+    });
+    if (
+      (verified.attachments || []).filter((item) =>
+        fixtures.some(
+          (fixtureItem) => fixtureItem.file_name === item.file_name,
+        ),
+      ).length < target.files
+    ) {
+      throw new Error(
+        `${target.owner_type}:${target.owner_id} attachment readback is incomplete`,
+      );
     }
   }
   return { scope: "manual-acceptance-attachment-data", customerKey: CUSTOMER_KEY, simulatedOnly: true, datasetKey: factReport.datasetKey, dataVersion: factReport.dataVersion, runId: factReport.runId, target: factReport.target, backendURL: policy.backendURL, databaseName: policy.databaseName, semanticDigest: factReport.semanticDigest, runtime, actorPolicy: { crossDomainSeed: "admin", workflowTask: "demo_pmc", rolePageAccessVerifiedElsewhere: true }, summary: { targets: targets.length, attachments: steps.length, uploaded: steps.filter((item) => item.operation === "upload").length, reused: steps.filter((item) => item.operation === "reuse").length }, steps };
 }
 
 async function main() {
-  const args = new Map(process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]));
+  const args = new Map(
+    process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]),
+  );
   const report = await applyAttachmentData({
     backendURL: args.get("--backend-url") || "http://127.0.0.1:8300",
     databaseName:
@@ -578,14 +719,30 @@ async function main() {
     adminPassword: process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     rolePassword: process.env.MANUAL_ACCEPTANCE_PASSWORD,
     confirm: process.env.MANUAL_ACCEPTANCE_ATTACHMENT_CONFIRM,
-    sourceReportPath: args.get("--source-report") || "output/qa/manual-acceptance/source-data/apply-report.json",
-    factReportPath: args.get("--fact-report") || "output/qa/manual-acceptance/fact-data/apply-report.json",
-    taskReportPath: args.get("--task-report") || "output/qa/manual-acceptance/task-data-production/apply-report.json",
+    sourceReportPath:
+      args.get("--source-report") ||
+      "output/qa/manual-acceptance/source-data/apply-report.json",
+    factReportPath:
+      args.get("--fact-report") ||
+      "output/qa/manual-acceptance/fact-data/apply-report.json",
+    taskReportPath:
+      args.get("--task-report") ||
+      "output/qa/manual-acceptance/task-data-production/apply-report.json",
   });
-  const out = args.get("--out") || "output/qa/manual-acceptance/attachment-data/apply-report.json";
+  const out =
+    args.get("--out") ||
+    "output/qa/manual-acceptance/attachment-data/apply-report.json";
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
-  process.stdout.write(`[qa:manual-acceptance-attachment-data] complete attachments=${report.summary.attachments} report=${out}\n`);
+  process.stdout.write(
+    `[qa:manual-acceptance-attachment-data] complete attachments=${report.summary.attachments} report=${out}\n`,
+  );
 }
 
-if (process.argv[1]?.endsWith("manual-acceptance-attachment-data.mjs")) main().catch((error) => { console.error(`[qa:manual-acceptance-attachment-data][fatal] ${error.stack || error}`); process.exitCode = 1; });
+if (process.argv[1]?.endsWith("manual-acceptance-attachment-data.mjs"))
+  main().catch((error) => {
+    console.error(
+      `[qa:manual-acceptance-attachment-data][fatal] ${error.stack || error}`,
+    );
+    process.exitCode = 1;
+  });

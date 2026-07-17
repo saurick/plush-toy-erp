@@ -160,6 +160,8 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "customer_key",
     "id",
     "result",
+    "defect_rate_operator",
+    "defect_rate_percent",
     "decision_note",
   ]),
   "operational_fact.create_stock_reservation_from_sales_order": Object.freeze([
@@ -1450,6 +1452,8 @@ async function ensureOutsourcingQuality(plan, rpc, returnFactID) {
         customerParams({
           id: inspection.id,
           result: "PASS",
+          defect_rate_operator: "APPROX",
+          defect_rate_percent: "5",
           decision_note: SIMULATED_NOTE,
         }),
       ),

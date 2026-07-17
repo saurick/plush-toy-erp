@@ -376,7 +376,7 @@ MANUAL_ACCEPTANCE_ADMIN_PASSWORD='<local-admin-password>' \
     --database-name plush_erp_acceptance_20260716_v5_dev
 ```
 
-手工验收数据不是压测数据。容量和压力入口只能使用一次性隔离数据库；共享开发库与 133 试用库都不得拿来压测。ignored 本地报告也不等于目标服务器的发布证据。
+手工验收数据不是压测数据。容量和压力入口只能使用一次性隔离数据库；共享开发库与 133 试用库都不得拿来压测。容量幂等探针必须通过 `--task-source-type / --task-source-id` 绑定同批 `trial_pmc_work` 模拟任务，并校验 `simulated_only / trial_task` 标记；不得借用正式来源生成任务。ignored 本地报告也不等于目标服务器的发布证据。
 
 ## 按影响面选择 / Affected Tests
 

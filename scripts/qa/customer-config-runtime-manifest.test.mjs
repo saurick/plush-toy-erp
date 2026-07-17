@@ -369,6 +369,7 @@ test("customer-config-runtime-manifest: finance and quality can reach outsourcin
 
   assert(pages.finance.includes("processing-contracts"));
   assert(pages.quality.includes("processing-contracts"));
+  assert(pages.quality.includes("shipments"));
 
   const finance = entitlementsFor("finance");
   for (const key of [
@@ -389,11 +390,14 @@ test("customer-config-runtime-manifest: finance and quality can reach outsourcin
   for (const key of [
     "outsourcing.order.read",
     "outsourcing.fact.read",
+    "shipment.read",
     "quality.inspection.create",
   ]) {
     assert(quality.has(key), `quality must receive ${key}`);
   }
   assert(!quality.has("outsourcing.order.update"));
+  assert(!quality.has("shipment.ship"));
+  assert(!quality.has("shipment.cancel"));
   assert(!quality.has("finance.payable.confirm"));
 });
 
@@ -413,15 +417,24 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(productionMenu?.items.includes("production-orders"));
 
   assert(pages.sales.includes("sales-orders"));
+  assert(pages.sales.includes("production-orders"));
   assert(entitlementsFor("sales").has("stock.reservation.create"));
+  assert(entitlementsFor("sales").has("production.wip.read"));
+  assert(
+    entitlementsFor("sales").has("production.packaging_material.confirm"),
+  );
+  assert(!entitlementsFor("sales").has("pmc.plan.read"));
+  assert(!entitlementsFor("sales").has("production.wip.assign"));
 
   assert(pages.quality.includes("inbound"));
   const quality = entitlementsFor("quality");
   assert(quality.has("purchase.return.read"));
   assert(quality.has("purchase.return.create"));
+  assert(quality.has("production.wip.read"));
 
   assert(pages.pmc.includes("production-progress"));
   assert(entitlementsFor("pmc").has("production.fact.read"));
+  assert(entitlementsFor("pmc").has("production.wip.read"));
 
   assert(pages.warehouse.includes("inbound"));
   const warehouse = entitlementsFor("warehouse");
@@ -435,6 +448,10 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   const production = entitlementsFor("production");
   for (const key of [
     "production.fact.read",
+    "production.wip.read",
+    "production.wip.assign",
+    "production.wip.execute",
+    "production.wip.rework",
     "production.completion.create",
     "production.material_issue.create",
     "production.rework.create",
@@ -454,6 +471,29 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(!finance.has("purchase.receipt.read"));
   assert(!finance.has("purchase.return.read"));
   assert(!finance.has("purchase.return.create"));
+});
+
+test("customer-config-runtime-manifest: production orders use PMC-read or WIP-read page access", () => {
+  const page = customerPackageCatalog.pages.find(
+    (item) => item.key === "production-orders",
+  );
+  assert.deepEqual(page.requiredCapabilityKeys, []);
+  assert.deepEqual(page.requiredAnyCapabilityKeys, [
+    "pmc.plan.read",
+    "production.wip.read",
+  ]);
+
+  const withoutEither = structuredClone(yoyoosunCustomerPackage);
+  const sales = withoutEither.roleProfiles.find(
+    (profile) => profile.roleKey === "sales",
+  );
+  sales.capabilityKeys = sales.capabilityKeys.filter(
+    (key) => key !== "production.wip.read",
+  );
+  assert.throws(
+    () => buildRuntimeManifest(withoutEither),
+    /sales page production-orders does not satisfy its required capability contract/u,
+  );
 });
 
 test("customer-config-runtime-manifest: finance pages use exact family read capabilities", () => {

@@ -77,6 +77,7 @@ func TestCancellationCompensationKeepsAuthenticatedActor(t *testing.T) {
 		if err != nil {
 			t.Fatalf("create shipment: %v", err)
 		}
+		submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 		if _, err := factUC.ShipShipment(ctx, shipment.ID); err != nil {
 			t.Fatalf("ship shipment: %v", err)
 		}

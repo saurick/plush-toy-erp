@@ -210,6 +210,10 @@ function createFakeSnapshotRoot() {
         },
         {
           cssText:
+            '.erp-print-appendix-images__row--full { grid-template-columns: minmax(0, 1fr); }',
+        },
+        {
+          cssText:
             '.erp-engineering-print-paper { box-sizing: border-box; width: 210mm; padding: 12mm 10mm; }',
         },
         {
@@ -923,6 +927,16 @@ test('printPdf: 仅预览模式会对大图快照开启降载', () => {
     ),
     false
   )
+  assert.equal(
+    __TEST_ONLY__.shouldOptimizeServerPdfImageSource(
+      `data:image/jpeg;base64,${'a'.repeat(200_000)}`,
+      {
+        snapshotMode: 'preview',
+        preserveRasterResolution: true,
+      }
+    ),
+    false
+  )
 })
 
 test('printPdf: SVG 与外链图片始终先本地栅格化，小型内嵌位图保持原样', () => {
@@ -1029,6 +1043,7 @@ test('printPdf: 服务端 PDF 快照固定为浅色纸面口径', () => {
   assert.match(inlineStyle.textContent, /erp-material-detail-paper/)
   assert.match(inlineStyle.textContent, /erp-color-card-paper__sheet/)
   assert.match(inlineStyle.textContent, /erp-work-instruction-paper__sheet/)
+  assert.match(inlineStyle.textContent, /erp-print-appendix-images__row--full/)
   assert.match(inlineStyle.textContent, /border: 1px solid #111827/)
   assert.match(inlineStyle.textContent, /@media print/)
   assert.match(inlineStyle.textContent, /box-shadow: none/)

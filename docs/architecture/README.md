@@ -14,6 +14,7 @@
 | 做出货或放行相关实现 | `状态工作流事实边界.md` | `OperationalFactUsecase`、Inventory usecase、RBAC、UI 回归 |
 | 做业务事实扩展 | `业务事实扩展总评审.md` | operational fact usecase、target evidence、产品能力台账 |
 | 设计生产订单源单 | `生产订单源单边界评审.md` | 销售订单、BOM、production facts、库存事实和产品能力台账 |
+| 设计生产工艺路线、WIP、逐工序内外发或分段质检 | `生产工艺路线与在制品边界评审.md` | 工序主数据、生产订单路线快照、生产 / 委外 / 质量 / 库存事实和客户流程基线 |
 | 做附件上传、现场证据或单据留档 | `业务附件证据边界评审.md` | attachment JSON-RPC、所属业务对象权限、页面接入回归 |
 
 ## 文档分组 / Document Groups
@@ -22,8 +23,8 @@
 | --- | --- |
 | 总边界 | `状态字典与生命周期索引.md`、`状态工作流事实边界.md`、`各类流程建模边界评审.md`、`主数据源单据事实边界评审.md`、`行业专表模型评审.md` |
 | Workflow usecase | `仓库入库工作流用例评审.md`、`成品入库工作流用例评审.md`；通用编排以 `状态工作流事实边界.md` 和 workflow/product 专文为准 |
-| MasterData / Source Document | `客户供应商主数据评审.md`、`订单采购边界评审.md`、`生产订单源单边界评审.md` |
-| Inventory / BOM / Quality | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md` |
+| MasterData / Source Document | `客户供应商主数据评审.md`、`订单采购边界评审.md`、`生产订单源单边界评审.md`、`生产工艺路线与在制品边界评审.md` |
+| Inventory / BOM / Quality | `材料成品物料清单与库存专表模型评审.md`、`产品款号物料清单边界评审.md`、`生产工艺路线与在制品边界评审.md` |
 | Shipment / Operational Fact | `状态工作流事实边界.md`、`业务事实扩展总评审.md` |
 | Reporting / Audit / Integration | `业务附件证据边界评审.md` |
 

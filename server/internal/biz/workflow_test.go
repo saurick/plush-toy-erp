@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"strconv"
+	"strings"
 	"sync/atomic"
 	"testing"
 )
@@ -205,6 +206,33 @@ func TestWorkflowUsecase_CreateTaskDefaultsReady(t *testing.T) {
 	}
 	if repo.createTaskInput.RequiredCapabilityKey == nil || *repo.createTaskInput.RequiredCapabilityKey != PermissionWorkflowTaskComplete {
 		t.Fatalf("expected required capability default complete, got %#v", repo.createTaskInput.RequiredCapabilityKey)
+	}
+}
+
+func TestWorkflowUsecase_CreateTaskRejectsSourceProducedGroups(t *testing.T) {
+	for _, taskGroup := range []string{
+		WorkflowSourceTaskProductionSchedulingGroup,
+		WorkflowSourceTaskProductionExceptionGroup,
+		WorkflowSourceTaskShipmentReleaseGroup,
+	} {
+		t.Run(taskGroup, func(t *testing.T) {
+			repo := &stubWorkflowRepo{}
+			uc := NewWorkflowUsecase(repo)
+			_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
+				TaskCode:     "MANUAL-" + taskGroup,
+				TaskGroup:    taskGroup,
+				TaskName:     "不应允许手工创建",
+				SourceType:   "manual",
+				SourceID:     1,
+				OwnerRoleKey: PMCRoleKey,
+			}, 7)
+			if !errors.Is(err, ErrWorkflowTaskSourceGeneratedOnly) {
+				t.Fatalf("CreateTask error = %v, want ErrWorkflowTaskSourceGeneratedOnly", err)
+			}
+			if repo.createTaskInput != nil {
+				t.Fatalf("reserved task group %q must not reach repo", taskGroup)
+			}
+		})
 	}
 }
 
@@ -815,8 +843,8 @@ func TestWorkflowUsecase_AcceptsShipmentPendingBusinessStatus(t *testing.T) {
 	createStatusKey := statusKey
 	_, err := uc.CreateTask(context.Background(), &WorkflowTaskCreate{
 		TaskCode:          "T-shipment-pending",
-		TaskGroup:         "shipment_release",
-		TaskName:          "出货放行 / 出货准备",
+		TaskGroup:         "generic_shipment_check",
+		TaskName:          "出货资料协同检查",
 		SourceType:        "production-progress",
 		SourceID:          1,
 		OwnerRoleKey:      "warehouse",
@@ -1756,10 +1784,10 @@ func shipmentReleaseWorkflowTask() *WorkflowTask {
 	statusKey := workflowShipmentPendingStatusKey
 	return &WorkflowTask{
 		ID:                1401,
-		TaskCode:          "shipment-release-101",
+		TaskCode:          WorkflowSourceTaskCode(WorkflowSourceTaskShipmentReleaseGroup, 101),
 		TaskGroup:         workflowShipmentReleaseTaskGroup,
 		TaskName:          "出货放行 / 出货准备",
-		SourceType:        workflowShippingReleaseModuleKey,
+		SourceType:        WorkflowSourceTaskShipmentSourceType,
 		SourceID:          101,
 		SourceNo:          &sourceNo,
 		BusinessStatusKey: &statusKey,
@@ -1767,21 +1795,25 @@ func shipmentReleaseWorkflowTask() *WorkflowTask {
 		OwnerRoleKey:      "warehouse",
 		Priority:          3,
 		Payload: map[string]any{
-			"record_title":          "小熊公仔出货放行",
-			"source_no":             "SO-2026-101",
-			"customer_name":         "成慧怡",
-			"style_no":              "ST-001",
-			"product_no":            "SKU-101",
-			"product_name":          "小熊公仔",
-			"quantity":              1200,
-			"unit":                  "只",
-			"due_date":              "2026-04-28",
-			"shipment_date":         "2026-04-30",
-			"warehouse_location":    "FG-A-01",
-			"packaging_requirement": "彩盒 12 只/箱",
-			"shipping_requirement":  "客户唛头",
-			"finished_goods":        true,
-			"shipment_release":      true,
+			"source_task_contract":    WorkflowSourceTaskContractV1,
+			"source_task_producer":    WorkflowSourceTaskShipmentSubmitReleaseProducer,
+			"source_task_intent_hash": strings.Repeat("a", 64),
+			"shipment_id":             101,
+			"record_title":            "小熊公仔出货放行",
+			"source_no":               "SO-2026-101",
+			"customer_name":           "成慧怡",
+			"style_no":                "ST-001",
+			"product_no":              "SKU-101",
+			"product_name":            "小熊公仔",
+			"quantity":                1200,
+			"unit":                    "只",
+			"due_date":                "2026-04-28",
+			"shipment_date":           "2026-04-30",
+			"warehouse_location":      "FG-A-01",
+			"packaging_requirement":   "彩盒 12 只/箱",
+			"shipping_requirement":    "客户唛头",
+			"finished_goods":          true,
+			"shipment_release":        true,
 		},
 	}
 }

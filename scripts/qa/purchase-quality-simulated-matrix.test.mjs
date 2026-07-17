@@ -669,6 +669,18 @@ test("receipt-created inspections start submitted, add a real draft, and include
   assert(linkedReceipt?.lotId > 0);
   assert.equal(linkedReceipt.receiptStatus, "POSTED");
   assert.equal(linkedReceipt.inspectionStatus, "PASSED");
+  const passedDecision = calls.find(
+    (call) => call.method === "pass_quality_inspection",
+  );
+  assert.equal(passedDecision?.params.defect_rate_operator, "APPROX");
+  assert.equal(passedDecision?.params.defect_rate_percent, "5");
+  assert.equal(typeof passedDecision?.params.defect_rate_percent, "string");
+  const rejectedDecision = calls.find(
+    (call) => call.method === "reject_quality_inspection",
+  );
+  assert.equal(rejectedDecision?.params.defect_rate_operator, "GT");
+  assert.equal(rejectedDecision?.params.defect_rate_percent, "50");
+  assert.equal(typeof rejectedDecision?.params.defect_rate_percent, "string");
   assert.equal(
     methods.filter((method) => method === "create_quality_inspection_draft")
       .length,

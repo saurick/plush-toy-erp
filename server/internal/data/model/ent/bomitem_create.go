@@ -125,6 +125,20 @@ func (_c *BOMItemCreate) SetNillableProcessMethod(v *string) *BOMItemCreate {
 	return _c
 }
 
+// SetProductionOperationCode sets the "production_operation_code" field.
+func (_c *BOMItemCreate) SetProductionOperationCode(v string) *BOMItemCreate {
+	_c.mutation.SetProductionOperationCode(v)
+	return _c
+}
+
+// SetNillableProductionOperationCode sets the "production_operation_code" field if the given value is not nil.
+func (_c *BOMItemCreate) SetNillableProductionOperationCode(v *string) *BOMItemCreate {
+	if v != nil {
+		_c.SetProductionOperationCode(*v)
+	}
+	return _c
+}
+
 // SetNote sets the "note" field.
 func (_c *BOMItemCreate) SetNote(v string) *BOMItemCreate {
 	_c.mutation.SetNote(v)
@@ -299,6 +313,11 @@ func (_c *BOMItemCreate) check() error {
 			return &ValidationError{Name: "process_method", err: fmt.Errorf(`ent: validator failed for field "BOMItem.process_method": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ProductionOperationCode(); ok {
+		if err := bomitem.ProductionOperationCodeValidator(v); err != nil {
+			return &ValidationError{Name: "production_operation_code", err: fmt.Errorf(`ent: validator failed for field "BOMItem.production_operation_code": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.Note(); ok {
 		if err := bomitem.NoteValidator(v); err != nil {
 			return &ValidationError{Name: "note", err: fmt.Errorf(`ent: validator failed for field "BOMItem.note": %w`, err)}
@@ -372,6 +391,10 @@ func (_c *BOMItemCreate) createSpec() (*BOMItem, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.ProcessMethod(); ok {
 		_spec.SetField(bomitem.FieldProcessMethod, field.TypeString, value)
 		_node.ProcessMethod = &value
+	}
+	if value, ok := _c.mutation.ProductionOperationCode(); ok {
+		_spec.SetField(bomitem.FieldProductionOperationCode, field.TypeString, value)
+		_node.ProductionOperationCode = &value
 	}
 	if value, ok := _c.mutation.Note(); ok {
 		_spec.SetField(bomitem.FieldNote, field.TypeString, value)

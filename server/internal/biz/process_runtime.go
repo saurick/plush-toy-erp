@@ -378,6 +378,13 @@ type ProcessDomainCommandHandler interface {
 	ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error)
 }
 
+// ProcessDomainCommandPayloadNormalizer canonicalizes command-specific values
+// before the immutable fingerprint is calculated. Implementations must not
+// read or write external state.
+type ProcessDomainCommandPayloadNormalizer interface {
+	NormalizeProcessDomainCommandPayload(payload map[string]any) (map[string]any, error)
+}
+
 type ProcessBranchPolicyHandler interface {
 	ResolveProcessBranch(ctx context.Context, in *ProcessBranchPolicyInput, actorID int) (*ProcessBranchPolicyResult, error)
 }
@@ -563,6 +570,9 @@ func (uc *ProcessRuntimeUsecase) CreateLinkedWorkflowTask(ctx context.Context, i
 	taskGroup := normalized.TaskGroup
 	if taskGroup == "" {
 		taskGroup = node.NodeKey
+	}
+	if err := ValidateWorkflowSourceTaskReservedNamespace(taskGroup, taskCode); err != nil {
+		return nil, err
 	}
 	taskName := normalized.TaskName
 	if taskName == "" {
@@ -995,6 +1005,13 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 		}
 		return nil, ErrBadParam
 	}
+	handler := uc.domainCommandHandlers[nodeCommandKey]
+	if normalizer, ok := handler.(ProcessDomainCommandPayloadNormalizer); ok {
+		normalized.Payload, err = normalizer.NormalizeProcessDomainCommandPayload(normalized.Payload)
+		if err != nil {
+			return nil, err
+		}
+	}
 	domainCommandFingerprint, err := processDomainCommandFingerprint(nodeCommandKey, normalized.IdempotencyKey, normalized.Payload)
 	if err != nil {
 		return nil, err
@@ -1018,7 +1035,6 @@ func (uc *ProcessRuntimeUsecase) ExecuteDomainCommandNode(ctx context.Context, i
 	} else if found {
 		return uc.settleActiveProcessDomainCommandResult(ctx, storedNode, domainCommandFingerprint, actorID)
 	}
-	handler := uc.domainCommandHandlers[nodeCommandKey]
 	if handler == nil {
 		return nil, ErrProcessDomainCommandHandlerNotFound
 	}
@@ -2254,6 +2270,9 @@ func normalizeProcessLinkedWorkflowTaskCreate(in ProcessLinkedWorkflowTaskCreate
 	in.TaskName = strings.TrimSpace(in.TaskName)
 	in.TaskStatusKey = strings.TrimSpace(in.TaskStatusKey)
 	in.OwnerRoleKey = NormalizeRoleKey(in.OwnerRoleKey)
+	if err := ValidateWorkflowSourceTaskReservedNamespace(in.TaskGroup, in.TaskCode); err != nil {
+		return ProcessLinkedWorkflowTaskCreate{}, err
+	}
 	if in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 {
 		return ProcessLinkedWorkflowTaskCreate{}, ErrBadParam
 	}

@@ -54,7 +54,12 @@ export const customerPackageCatalog = Object.freeze({
     { key: "inbound", label: "入库管理", requiredCapabilityKeys: ["purchase.receipt.read", "supplier.read", "material.read", "warehouse.inventory.read"] },
     { key: "inventory", label: "库存台账", requiredCapabilityKeys: ["warehouse.inventory.read", "material.read", "product.read"] },
     { key: "processing-contracts", label: "加工合同", requiredCapabilityKeys: ["outsourcing.order.read", "outsourcing.fact.read", "supplier.read", "contact.read", "material.read", "process.read", "product.read", "product_sku.read", "warehouse.inventory.read", "workflow.task.read"] },
-    { key: "production-orders", label: "生产订单", requiredCapabilityKeys: ["pmc.plan.read"] },
+    {
+      key: "production-orders",
+      label: "生产订单",
+      requiredCapabilityKeys: [],
+      requiredAnyCapabilityKeys: ["pmc.plan.read", "production.wip.read"],
+    },
     { key: "production-scheduling", label: "生产排程", requiredCapabilityKeys: ["pmc.plan.read"] },
     { key: "production-progress", label: "生产进度", requiredCapabilityKeys: ["pmc.plan.read"] },
     { key: "production-exceptions", label: "生产异常", requiredCapabilityKeys: ["pmc.risk.read"] },

@@ -32,6 +32,7 @@ test('FL_print_templates_sample__uses_generic_sample_values_without_customer_ide
     assert(template.fieldRequirements.length > 0)
     assert(template.helpNotes.length > 0)
     assert(template.sample)
+    assert.deepEqual(template.sample.appendixImages, [])
     assert.equal(getPrintTemplateByKey(template.key)?.title, template.title)
   })
 
@@ -42,10 +43,8 @@ test('FL_print_templates_sample__uses_generic_sample_values_without_customer_ide
   )
   const processingTemplate = getPrintTemplateByKey('processing-contract')
   assert.equal(processingTemplate?.title, '加工合同')
-  assert.deepEqual(Object.keys(processingTemplate?.sample.attachments || {}), [
-    'attachment-1',
-    'attachment-2',
-  ])
+  assert.deepEqual(processingTemplate?.sample.appendixImages, [])
+  assert(!Object.hasOwn(processingTemplate?.sample || {}, 'attachments'))
   assert.equal(processingTemplate?.sample.supplierName, '示例加工厂')
   assert.equal(processingTemplate?.sample.supplierContact, '加工厂联系人')
   assert.equal(processingTemplate?.sample.supplierPhone, '加工厂联系电话')
@@ -61,11 +60,6 @@ test('FL_print_templates_sample__uses_generic_sample_values_without_customer_ide
     assert.equal(line.supplierAlias, '示例加工厂')
     assert.notEqual(line.remark, '')
   })
-  assert.equal(
-    processingTemplate?.sample.attachments['attachment-1']?.dataURL,
-    ''
-  )
-
   const materialTemplate = getPrintTemplateByKey('material-purchase-contract')
   assert.equal(materialTemplate?.sample.supplierName, '示例供应商')
   assert.equal(materialTemplate?.sample.supplierContact, '供应商联系人')
@@ -102,7 +96,10 @@ test('FL_print_templates_sample__uses_generic_sample_values_without_customer_ide
   )
   assert.equal(workInstructionTemplate?.sample.companyName, '本公司')
   assert.deepEqual(workInstructionTemplate?.moduleKeys, ['material_bom'])
-  assert.match(workInstructionTemplate?.notes.join('\n') || '', /BOM 管理/)
+  assert.match(
+    workInstructionTemplate?.notes.join('\n') || '',
+    /物料清单（BOM）页面/
+  )
   assert.doesNotMatch(
     workInstructionTemplate?.notes.join('\n') || '',
     /委外订单页面/
@@ -126,6 +123,12 @@ test('FL_print_templates_contract__declares_field_requirements_and_pdf_module_gu
     assert(
       template.fieldRequirements.length > 0,
       `${template.key} fieldRequirements`
+    )
+    assert(
+      template.fieldRequirements.some(
+        (requirement) => requirement.key === 'appendix_image_snapshots'
+      ),
+      `${template.key} appendix_image_snapshots`
     )
 
     assert.match(

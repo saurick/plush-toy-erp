@@ -19,8 +19,9 @@ func (BOMItem) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"bom_items_quantity_positive":      "quantity > 0",
-				"bom_items_loss_rate_non_negative": "loss_rate >= 0",
+				"bom_items_quantity_positive":            "quantity > 0",
+				"bom_items_loss_rate_non_negative":       "loss_rate >= 0",
+				"bom_items_production_operation_allowed": "production_operation_code IS NULL OR production_operation_code = 'FABRIC_PROCESSING'",
 			},
 		},
 	}
@@ -56,6 +57,13 @@ func (BOMItem) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
+		// production_operation_code is an explicit, machine-readable route
+		// ownership marker. It must never be inferred from position or other
+		// free-text BOM fields.
+		field.String("production_operation_code").
+			Optional().
+			Nillable().
+			MaxLen(64),
 		field.String("note").
 			Optional().
 			Nillable().

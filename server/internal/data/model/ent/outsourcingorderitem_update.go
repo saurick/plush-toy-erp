@@ -12,6 +12,7 @@ import (
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/unit"
 	"time"
@@ -292,6 +293,26 @@ func (_u *OutsourcingOrderItemUpdate) ClearMaterialNameSnapshot() *OutsourcingOr
 	return _u
 }
 
+// SetProcessingItem sets the "processing_item" field.
+func (_u *OutsourcingOrderItemUpdate) SetProcessingItem(v string) *OutsourcingOrderItemUpdate {
+	_u.mutation.SetProcessingItem(v)
+	return _u
+}
+
+// SetNillableProcessingItem sets the "processing_item" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdate) SetNillableProcessingItem(v *string) *OutsourcingOrderItemUpdate {
+	if v != nil {
+		_u.SetProcessingItem(*v)
+	}
+	return _u
+}
+
+// ClearProcessingItem clears the value of the "processing_item" field.
+func (_u *OutsourcingOrderItemUpdate) ClearProcessingItem() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearProcessingItem()
+	return _u
+}
+
 // SetProcessNameSnapshot sets the "process_name_snapshot" field.
 func (_u *OutsourcingOrderItemUpdate) SetProcessNameSnapshot(v string) *OutsourcingOrderItemUpdate {
 	_u.mutation.SetProcessNameSnapshot(v)
@@ -496,6 +517,21 @@ func (_u *OutsourcingOrderItemUpdate) SetUnit(v *Unit) *OutsourcingOrderItemUpda
 	return _u.SetUnitID(v.ID)
 }
 
+// AddProductionWipOutsourcingAllocationIDs adds the "production_wip_outsourcing_allocations" edge to the ProductionWIPOutsourcingAllocation entity by IDs.
+func (_u *OutsourcingOrderItemUpdate) AddProductionWipOutsourcingAllocationIDs(ids ...int) *OutsourcingOrderItemUpdate {
+	_u.mutation.AddProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// AddProductionWipOutsourcingAllocations adds the "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *OutsourcingOrderItemUpdate) AddProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *OutsourcingOrderItemUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionWipOutsourcingAllocationIDs(ids...)
+}
+
 // Mutation returns the OutsourcingOrderItemMutation object of the builder.
 func (_u *OutsourcingOrderItemUpdate) Mutation() *OutsourcingOrderItemMutation {
 	return _u.mutation
@@ -535,6 +571,27 @@ func (_u *OutsourcingOrderItemUpdate) ClearProcess() *OutsourcingOrderItemUpdate
 func (_u *OutsourcingOrderItemUpdate) ClearUnit() *OutsourcingOrderItemUpdate {
 	_u.mutation.ClearUnit()
 	return _u
+}
+
+// ClearProductionWipOutsourcingAllocations clears all "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *OutsourcingOrderItemUpdate) ClearProductionWipOutsourcingAllocations() *OutsourcingOrderItemUpdate {
+	_u.mutation.ClearProductionWipOutsourcingAllocations()
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocationIDs removes the "production_wip_outsourcing_allocations" edge to ProductionWIPOutsourcingAllocation entities by IDs.
+func (_u *OutsourcingOrderItemUpdate) RemoveProductionWipOutsourcingAllocationIDs(ids ...int) *OutsourcingOrderItemUpdate {
+	_u.mutation.RemoveProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocations removes "production_wip_outsourcing_allocations" edges to ProductionWIPOutsourcingAllocation entities.
+func (_u *OutsourcingOrderItemUpdate) RemoveProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *OutsourcingOrderItemUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionWipOutsourcingAllocationIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -645,6 +702,11 @@ func (_u *OutsourcingOrderItemUpdate) check() error {
 			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProcessingItem(); ok {
+		if err := outsourcingorderitem.ProcessingItemValidator(v); err != nil {
+			return &ValidationError{Name: "processing_item", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.processing_item": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProcessNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProcessNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "process_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.process_name_snapshot": %w`, err)}
@@ -738,6 +800,12 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 	}
 	if _u.mutation.MaterialNameSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProcessingItem(); ok {
+		_spec.SetField(outsourcingorderitem.FieldProcessingItem, field.TypeString, value)
+	}
+	if _u.mutation.ProcessingItemCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldProcessingItem, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProcessNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProcessNameSnapshot, field.TypeString, value)
@@ -957,6 +1025,51 @@ func (_u *OutsourcingOrderItemUpdate) sqlSave(ctx context.Context) (_node int, e
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 && !_u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -1241,6 +1354,26 @@ func (_u *OutsourcingOrderItemUpdateOne) ClearMaterialNameSnapshot() *Outsourcin
 	return _u
 }
 
+// SetProcessingItem sets the "processing_item" field.
+func (_u *OutsourcingOrderItemUpdateOne) SetProcessingItem(v string) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.SetProcessingItem(v)
+	return _u
+}
+
+// SetNillableProcessingItem sets the "processing_item" field if the given value is not nil.
+func (_u *OutsourcingOrderItemUpdateOne) SetNillableProcessingItem(v *string) *OutsourcingOrderItemUpdateOne {
+	if v != nil {
+		_u.SetProcessingItem(*v)
+	}
+	return _u
+}
+
+// ClearProcessingItem clears the value of the "processing_item" field.
+func (_u *OutsourcingOrderItemUpdateOne) ClearProcessingItem() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearProcessingItem()
+	return _u
+}
+
 // SetProcessNameSnapshot sets the "process_name_snapshot" field.
 func (_u *OutsourcingOrderItemUpdateOne) SetProcessNameSnapshot(v string) *OutsourcingOrderItemUpdateOne {
 	_u.mutation.SetProcessNameSnapshot(v)
@@ -1445,6 +1578,21 @@ func (_u *OutsourcingOrderItemUpdateOne) SetUnit(v *Unit) *OutsourcingOrderItemU
 	return _u.SetUnitID(v.ID)
 }
 
+// AddProductionWipOutsourcingAllocationIDs adds the "production_wip_outsourcing_allocations" edge to the ProductionWIPOutsourcingAllocation entity by IDs.
+func (_u *OutsourcingOrderItemUpdateOne) AddProductionWipOutsourcingAllocationIDs(ids ...int) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.AddProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// AddProductionWipOutsourcingAllocations adds the "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *OutsourcingOrderItemUpdateOne) AddProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *OutsourcingOrderItemUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionWipOutsourcingAllocationIDs(ids...)
+}
+
 // Mutation returns the OutsourcingOrderItemMutation object of the builder.
 func (_u *OutsourcingOrderItemUpdateOne) Mutation() *OutsourcingOrderItemMutation {
 	return _u.mutation
@@ -1484,6 +1632,27 @@ func (_u *OutsourcingOrderItemUpdateOne) ClearProcess() *OutsourcingOrderItemUpd
 func (_u *OutsourcingOrderItemUpdateOne) ClearUnit() *OutsourcingOrderItemUpdateOne {
 	_u.mutation.ClearUnit()
 	return _u
+}
+
+// ClearProductionWipOutsourcingAllocations clears all "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *OutsourcingOrderItemUpdateOne) ClearProductionWipOutsourcingAllocations() *OutsourcingOrderItemUpdateOne {
+	_u.mutation.ClearProductionWipOutsourcingAllocations()
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocationIDs removes the "production_wip_outsourcing_allocations" edge to ProductionWIPOutsourcingAllocation entities by IDs.
+func (_u *OutsourcingOrderItemUpdateOne) RemoveProductionWipOutsourcingAllocationIDs(ids ...int) *OutsourcingOrderItemUpdateOne {
+	_u.mutation.RemoveProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocations removes "production_wip_outsourcing_allocations" edges to ProductionWIPOutsourcingAllocation entities.
+func (_u *OutsourcingOrderItemUpdateOne) RemoveProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *OutsourcingOrderItemUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionWipOutsourcingAllocationIDs(ids...)
 }
 
 // Where appends a list predicates to the OutsourcingOrderItemUpdate builder.
@@ -1607,6 +1776,11 @@ func (_u *OutsourcingOrderItemUpdateOne) check() error {
 			return &ValidationError{Name: "material_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.material_name_snapshot": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProcessingItem(); ok {
+		if err := outsourcingorderitem.ProcessingItemValidator(v); err != nil {
+			return &ValidationError{Name: "processing_item", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.processing_item": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.ProcessNameSnapshot(); ok {
 		if err := outsourcingorderitem.ProcessNameSnapshotValidator(v); err != nil {
 			return &ValidationError{Name: "process_name_snapshot", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrderItem.process_name_snapshot": %w`, err)}
@@ -1717,6 +1891,12 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 	}
 	if _u.mutation.MaterialNameSnapshotCleared() {
 		_spec.ClearField(outsourcingorderitem.FieldMaterialNameSnapshot, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProcessingItem(); ok {
+		_spec.SetField(outsourcingorderitem.FieldProcessingItem, field.TypeString, value)
+	}
+	if _u.mutation.ProcessingItemCleared() {
+		_spec.ClearField(outsourcingorderitem.FieldProcessingItem, field.TypeString)
 	}
 	if value, ok := _u.mutation.ProcessNameSnapshot(); ok {
 		_spec.SetField(outsourcingorderitem.FieldProcessNameSnapshot, field.TypeString, value)
@@ -1936,6 +2116,51 @@ func (_u *OutsourcingOrderItemUpdateOne) sqlSave(ctx context.Context) (_node *Ou
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(unit.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 && !_u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   outsourcingorderitem.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{outsourcingorderitem.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

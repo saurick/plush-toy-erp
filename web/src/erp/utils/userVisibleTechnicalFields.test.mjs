@@ -52,10 +52,7 @@ const formalOutsideErpVisibleFiles = [
   join(webSourceRoot, 'common/consts/brand.js'),
   join(webSourceRoot, 'common/consts/errorCodes.js'),
 ]
-const errorCodeVisibleFile = join(
-  webSourceRoot,
-  'common/consts/errorCodes.js'
-)
+const errorCodeVisibleFile = join(webSourceRoot, 'common/consts/errorCodes.js')
 const currentCustomerVisibleConfigFiles = [
   'config/customers/yoyoosun/menuConfig.mjs',
   'config/customers/yoyoosun/customer-config.example.js',
@@ -128,8 +125,7 @@ const invalidFeedbackStringPattern =
   /\b(?:invalidContract|invalidResponse|invalidSelection)\s*\(\s*(['"`])([^'"`]*?)\1/gu
 const invalidFeedbackDefaultPattern =
   /\bfunction\s+(?:invalidContract|invalidResponse|invalidSelection)\s*\([^)]*=\s*(['"`])([^'"`]*?)\1/gu
-const mappedErrorMessagePattern =
-  /\[[^\]\n]+\]\s*:\s*(['"`])([^'"`]*?)\1/gu
+const mappedErrorMessagePattern = /\[[^\]\n]+\]\s*:\s*(['"`])([^'"`]*?)\1/gu
 const formalFeedbackStringPatterns = Object.freeze([
   returnStringPattern,
   errorStringPattern,
@@ -311,10 +307,9 @@ test('正式页面可见文案不暴露开发实现和分析口径术语', () =>
   for (const filePath of files) {
     if (!statSync(filePath, { throwIfNoEntry: false })?.isFile()) continue
     const content = readFileSync(filePath, 'utf8')
-    for (const visibleText of
-      collectFormalVisibleText(content, {
-        includeMappedErrorMessages: filePath === errorCodeVisibleFile,
-      })) {
+    for (const visibleText of collectFormalVisibleText(content, {
+      includeMappedErrorMessages: filePath === errorCodeVisibleFile,
+    })) {
       for (const [term, pattern] of forbiddenFormalVisibleCopyPatterns) {
         if (pattern.test(visibleText)) {
           violations.push(
@@ -599,10 +594,7 @@ test('权限中心角色展示不把 role_key 当用户可见 fallback', () => {
   assert.doesNotMatch(content, /selectedRole\.name\s*\|\|\s*selectedRoleKey/u)
   assert.doesNotMatch(content, /<Text type="secondary">\{roleKey\}<\/Text>/u)
   assert.doesNotMatch(content, /<Tag>\{selectedRoleKey\}<\/Tag>/u)
-  assert.match(
-    content,
-    /该岗位决定可使用的页面、手机待办和业务操作/u
-  )
+  assert.match(content, /该岗位决定可使用的页面、手机待办和业务操作/u)
   assert.doesNotMatch(content, /岗位任务端/u)
 })
 
@@ -1227,7 +1219,8 @@ test('出货和入库正式页头不展示底层表名或状态 key', () => {
     )
   }
   for (const readablePurchaseReceiptHeaderText of [
-    '入库管理维护采购入库草稿和明细',
+    '从已审核采购订单生成的入库草稿',
+    '不提供脱离采购来源的手工入库明细',
     '待办任务：入库跟进',
     '入库单：正式入库记录',
     '过账后更新库存记录',
@@ -1262,10 +1255,10 @@ test('正式质量页和业务模块文案不暴露内部表名', () => {
   }
 
   for (const readableQualityHeaderText of [
-    '质量检验用于处理采购来料',
-    '已提交：批次冻结',
-    '通过：批次可用',
-    '不合格：批次不可用',
+    '质量检验集中办理采购到货',
+    '已提交：等待判定',
+    '通过：按来源规则继续',
+    '不合格：阻止对应后续',
   ]) {
     assert.match(
       qualityInspectionPageContent,
@@ -1429,10 +1422,7 @@ test('审计日志页使用业务可读摘要，不展示原始事件结构', ()
     /return isTechnicalAuditValueKey\(key\) \? '已记录' : String\(value\)/u
   )
   assert.match(content, /<Text type="secondary">下一步<\/Text>/u)
-  assert.match(
-    content,
-    /placeholder="操作人、相关账号或岗位、操作类型或说明"/u
-  )
+  assert.match(content, /placeholder="操作人、相关账号或岗位、操作类型或说明"/u)
   assert.match(content, /<span>\{meta\.label\}<\/span>/u)
   assert.match(content, /event\.target_label \|\| event\.target_name/u)
   assert.match(content, /fieldLabelMap\[key\] \|\| '字段变更'/u)

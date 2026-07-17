@@ -87,10 +87,9 @@ func TestQualityInspectionFromOutsourcingReturnReusesLifecycle(t *testing.T) {
 		t.Fatalf("submit outsourcing quality = %#v err=%v", submitted, err)
 	}
 	assertLotStatus(t, ctx, inventoryUC, *fact.LotID, biz.InventoryLotHold)
-	rejected, err := inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: draft.ID,
-		DecisionNote: stringPtr("尺寸超差"),
-	})
+	decision := approximateQualityInspectionDecision(draft.ID, biz.QualityInspectionResultReject)
+	decision.DecisionNote = stringPtr("尺寸超差")
+	rejected, err := inventoryUC.RejectQualityInspection(ctx, decision)
 	if err != nil || rejected.Status != biz.QualityInspectionStatusRejected || rejected.Result == nil || *rejected.Result != biz.QualityInspectionResultReject {
 		t.Fatalf("reject outsourcing quality = %#v err=%v", rejected, err)
 	}

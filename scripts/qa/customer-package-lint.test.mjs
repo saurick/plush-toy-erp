@@ -43,6 +43,26 @@ test("customer-package-lint: yoyoosun package stays preview-only", () => {
   validatePreview(preview);
 });
 
+test("customer-package-lint: page contracts may declare an any-capability gate", () => {
+  validateCatalog(customerPackageCatalog);
+  const productionOrders = customerPackageCatalog.pages.find(
+    (page) => page.key === "production-orders",
+  );
+  assert.deepEqual(productionOrders.requiredCapabilityKeys, []);
+  assert.deepEqual(productionOrders.requiredAnyCapabilityKeys, [
+    "pmc.plan.read",
+    "production.wip.read",
+  ]);
+
+  const invalid = structuredClone(customerPackageCatalog);
+  const invalidPage = invalid.pages.find((page) => page.key === "production-orders");
+  invalidPage.requiredAnyCapabilityKeys = [];
+  assert.throws(
+    () => validateCatalog(invalid),
+    /must declare requiredCapabilityKeys or requiredAnyCapabilityKeys/u,
+  );
+});
+
 test("customer-package-lint: demo package proves customer package validation is not yoyoosun-only", () => {
   validateCatalog(customerPackageCatalog);
   validatePackage(demoCustomerPackage);

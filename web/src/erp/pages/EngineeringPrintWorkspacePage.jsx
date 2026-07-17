@@ -9,6 +9,9 @@ import React, {
 import { Navigate, useParams, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import PrintAppendixImageManager, {
+  PrintAppendixImages,
+} from '../components/print/PrintAppendixImages.jsx'
 import PrintWorkspaceShell from '../components/print/PrintWorkspaceShell.jsx'
 import WorkInstructionImageAnnotationEditor, {
   WorkInstructionImageAnnotationLayer,
@@ -48,6 +51,7 @@ import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
+import { requiresExpandedWorkInstructionAnnotationLayout } from '../utils/workInstructionImageAnnotations.mjs'
 import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSnapshot.js'
 import {
   runSilentPrintWorkspaceDraftUpdate,
@@ -78,6 +82,7 @@ import {
   isMergeTopLeftCell,
   normalizeCellSelection,
 } from '../utils/detailCellMerge.mjs'
+import { normalizePrintAppendixImages } from '../utils/printAppendixImages.mjs'
 
 const ATTACHMENT_ACCEPT = 'image/*,.svg'
 
@@ -936,6 +941,13 @@ function ImageSlot({
       }${hasAnnotations ? ' erp-engineering-print-image-slot--annotated' : ''}${
         hasCallout ? ' erp-engineering-print-image-slot--with-callout' : ''
       }`}
+      data-work-instruction-annotation-layout={
+        hasAnnotations
+          ? hasExpandedAnnotationLayout
+            ? 'expanded'
+            : 'compact'
+          : undefined
+      }
       data-image-crop={hasCrop ? 'excel-src-rect' : undefined}
       style={
         hasCrop || layoutStyle
@@ -996,6 +1008,36 @@ function ImageSlot({
           />
         </>
       ) : null}
+    </div>
+  )
+}
+
+function WorkInstructionHeaderImages({ images = {} }) {
+  const populatedSlots = engineeringImageSlots.workInstruction
+    .map((slot) => ({ slot, snapshot: images?.[slot.key] }))
+    .filter(({ snapshot }) => Boolean(snapshot?.dataURL))
+  const visibleSlots = populatedSlots.length
+    ? populatedSlots
+    : [
+        {
+          slot: engineeringImageSlots.workInstruction[0],
+          snapshot: createEmptyEngineeringImageSlot(),
+        },
+      ]
+
+  return (
+    <div
+      className={`erp-work-instruction-paper__header-images erp-work-instruction-paper__header-images--count-${visibleSlots.length}`}
+      data-work-instruction-header-image-count={populatedSlots.length}
+    >
+      {visibleSlots.map(({ slot, snapshot }) => (
+        <ImageSlot
+          key={slot.key}
+          label={slot.label}
+          snapshot={snapshot}
+          showActions={false}
+        />
+      ))}
     </div>
   )
 }
@@ -1073,10 +1115,6 @@ function MaterialDetailPaper({
   paperRef,
 }) {
   const headerSlots = engineeringImageSlots.materialDetail.slice(0, 2)
-  const footerSlots = engineeringImageSlots.materialDetail.slice(2)
-  const visibleFooterSlots = footerSlots.filter(
-    (slot) => draft.images?.[slot.key]?.dataURL
-  )
   return (
     <div
       className="erp-engineering-print-paper erp-material-detail-paper"
@@ -1289,18 +1327,7 @@ function MaterialDetailPaper({
           />
         </div>
       </footer>
-      {visibleFooterSlots.length ? (
-        <div className="erp-material-detail-paper__bottom-images">
-          {visibleFooterSlots.map((slot) => (
-            <ImageSlot
-              key={slot.key}
-              label={slot.label}
-              snapshot={draft.images?.[slot.key]}
-              showActions={false}
-            />
-          ))}
-        </div>
-      ) : null}
+      <PrintAppendixImages images={draft.appendixImages} />
     </div>
   )
 }
@@ -1562,6 +1589,7 @@ function ColorCardPaper({
           </span>
         ))}
       </footer>
+      <PrintAppendixImages images={draft.appendixImages} />
     </div>
   )
 }
@@ -1579,7 +1607,6 @@ function WorkInstructionPaper({
   onInstructionRowImageFileChange,
   paperRef,
 }) {
-  const headerSlot = engineeringImageSlots.workInstruction[0]
   const continuationPages = Array.isArray(draft.continuationPages)
     ? draft.continuationPages
     : []
@@ -1910,11 +1937,7 @@ function WorkInstructionPaper({
               className="erp-work-instruction-paper__header-image-cell"
               rowSpan={6}
             >
-              <ImageSlot
-                label={headerSlot.label}
-                snapshot={draft.images?.[headerSlot.key]}
-                showActions={false}
-              />
+              <WorkInstructionHeaderImages images={draft.images} />
             </td>
           </tr>
           <tr
@@ -2035,7 +2058,7 @@ function WorkInstructionPaper({
           key={`work-instruction-continuation-${pageIndex}`}
           page={page}
           pageIndex={pageIndex}
-          headerImageSnapshot={draft.images?.[headerSlot.key]}
+          headerImages={draft.images}
           selectedInstructionRowTarget={selectedInstructionRowTarget}
           instructionRowSelectionMode={instructionRowSelectionMode}
           onSelectInstructionRow={onSelectInstructionRow}
@@ -2046,6 +2069,7 @@ function WorkInstructionPaper({
           onInstructionRowImageFileChange={onInstructionRowImageFileChange}
         />
       ))}
+      <PrintAppendixImages images={draft.appendixImages} />
     </div>
   )
 }
@@ -2053,7 +2077,7 @@ function WorkInstructionPaper({
 function WorkInstructionContinuationPage({
   page,
   pageIndex,
-  headerImageSnapshot,
+  headerImages,
   selectedInstructionRowTarget,
   instructionRowSelectionMode,
   onSelectInstructionRow,
@@ -2063,7 +2087,6 @@ function WorkInstructionContinuationPage({
   onInstructionRowImageInputRef,
   onInstructionRowImageFileChange,
 }) {
-  const headerSlot = engineeringImageSlots.workInstruction[0]
   const renderHeaderValue = (value) => <ReadOnlyText value={value} />
   const renderInstructionRows = (rows = []) =>
     rows.map((row, rowIndex) => {
@@ -2399,13 +2422,7 @@ function WorkInstructionContinuationPage({
                 className="erp-work-instruction-paper__header-image-cell"
                 rowSpan={6}
               >
-                <ImageSlot
-                  label={headerSlot.label}
-                  snapshot={
-                    headerImageSnapshot || createEmptyEngineeringImageSlot()
-                  }
-                  showActions={false}
-                />
+                <WorkInstructionHeaderImages images={headerImages} />
               </td>
             </tr>
             <tr
@@ -2546,7 +2563,7 @@ export default function EngineeringPrintWorkspacePage() {
   const stageWrapRef = useRef(null)
   const pdfPreviewPreloadRef = useRef(null)
   const materialImageInputRefs = useRef({})
-  const workInstructionHeaderImageInputRef = useRef(null)
+  const workInstructionHeaderImageInputRefs = useRef({})
   const instructionRowImageInputRefs = useRef({})
   const [pdfAction, setPdfAction] = useState('')
   const [pdfActionStartedAt, setPdfActionStartedAt] = useState(0)
@@ -3107,6 +3124,21 @@ export default function EngineeringPrintWorkspacePage() {
     })
   }
 
+  const handleAppendixImagesChange = (images) => {
+    let persisted = true
+    setDraft((current) => {
+      const nextDraft = {
+        ...current,
+        appendixImages: normalizePrintAppendixImages(images),
+      }
+      persisted =
+        !draftStorageKey ||
+        persistPrintWorkspaceDraftSnapshot(draftStorageKey, nextDraft)
+      return nextDraft
+    })
+    return persisted
+  }
+
   const updateMaterialColumnLabel = (columnIndex, value) => {
     setDraft((current) => {
       const labels = MATERIAL_DETAIL_COLUMNS.map(
@@ -3160,6 +3192,15 @@ export default function EngineeringPrintWorkspacePage() {
       message.warning('图片只能添加到编号行。')
       return
     }
+    const imageCount = Array.isArray(row.images)
+      ? row.images.filter((image) => image?.dataURL).length
+      : 0
+    if (imageCount >= ENGINEERING_PRINT_LIMITS.instructionRowImages) {
+      setToolbarStatus(
+        `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片。`
+      )
+      return
+    }
     setSelectedInstructionRowTarget(normalizedTarget)
     instructionRowImageInputRefs.current[
       instructionRowTargetKey(normalizedTarget)
@@ -3183,9 +3224,24 @@ export default function EngineeringPrintWorkspacePage() {
       message.warning('图片只能添加到编号行。')
       return
     }
+    const existingImageCount = Array.isArray(row.images)
+      ? row.images.filter((image) => image?.dataURL).length
+      : 0
+    const remainingImageCount = Math.max(
+      0,
+      ENGINEERING_PRINT_LIMITS.instructionRowImages - existingImageCount
+    )
+    const acceptedFiles = files.slice(0, remainingImageCount)
+    const omittedFileCount = files.length - acceptedFiles.length
+    if (!acceptedFiles.length) {
+      setToolbarStatus(
+        `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片。`
+      )
+      return
+    }
     try {
       const snapshots = []
-      for (const file of files) {
+      for (const file of acceptedFiles) {
         snapshots.push(await createImageSnapshot(file))
       }
       setDraft((current) =>
@@ -3207,7 +3263,11 @@ export default function EngineeringPrintWorkspacePage() {
       setToolbarStatus(
         `图片已更新，${formatInstructionRowTargetLabel(
           normalizedTarget
-        )}本次新增 ${snapshots.length} 张。`
+        )}本次新增 ${snapshots.length} 张${
+          omittedFileCount
+            ? `；另 ${omittedFileCount} 张未加入（每行最多 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张）`
+            : ''
+        }。`
       )
     } catch (error) {
       message.error(getActionErrorMessage(error, '上传工序图片失败'))
@@ -3219,8 +3279,13 @@ export default function EngineeringPrintWorkspacePage() {
     file,
     imageIndex = 0
   ) => {
-    if (targetOrSlotKey === 'header') {
-      await uploadImage('header', file)
+    if (
+      typeof targetOrSlotKey === 'string' &&
+      engineeringImageSlots.workInstruction.some(
+        (slot) => slot.key === targetOrSlotKey
+      )
+    ) {
+      await uploadImage(targetOrSlotKey, file)
       return
     }
     const normalizedTarget = normalizeInstructionRowTarget(targetOrSlotKey)
@@ -3258,8 +3323,13 @@ export default function EngineeringPrintWorkspacePage() {
   }
 
   const clearInstructionImage = (targetOrSlotKey, imageIndex = 0) => {
-    if (targetOrSlotKey === 'header') {
-      clearImage('header')
+    if (
+      typeof targetOrSlotKey === 'string' &&
+      engineeringImageSlots.workInstruction.some(
+        (slot) => slot.key === targetOrSlotKey
+      )
+    ) {
+      clearImage(targetOrSlotKey)
       return
     }
     const normalizedTarget = normalizeInstructionRowTarget(targetOrSlotKey)
@@ -3277,25 +3347,45 @@ export default function EngineeringPrintWorkspacePage() {
     )
   }
 
-  const clearInstructionRowImages = (target) => {
+  const openInstructionAnnotationEditor = (target) => {
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
-    setDraft((current) =>
-      updateInstructionRowByTarget(current, normalizedTarget, (row) => {
-        const baseRow =
-          row && typeof row === 'object' && !Array.isArray(row)
-            ? row
-            : { text: getInstructionTextRowValue(row), heightMm: null }
-        return {
-          ...baseRow,
-          images: [],
-        }
-      })
+    const row = getInstructionRowsForTarget(draft, normalizedTarget)[
+      normalizedTarget.rowIndex
+    ]
+    const firstImageIndex = Array.isArray(row?.images)
+      ? row.images.findIndex((image) => image?.dataURL)
+      : -1
+    if (!isWorkInstructionStepRow(row) || firstImageIndex < 0) {
+      message.warning('请先给当前编号行上传图片。')
+      return
+    }
+    setInstructionAnnotationEditorTarget({
+      ...normalizedTarget,
+      imageIndex: firstImageIndex,
+    })
+  }
+
+  const saveInstructionImages = (nextImages = []) => {
+    const target = normalizeInstructionRowTarget(
+      instructionAnnotationEditorTarget
     )
+    if (!target) return
+    const savedImages = (Array.isArray(nextImages) ? nextImages : [])
+      .filter((image) => image?.dataURL)
+      .map((image) => ({
+        ...image,
+        annotations: Array.isArray(image?.annotations) ? image.annotations : [],
+      }))
+    setDraft((current) =>
+      updateInstructionRowByTarget(current, target, (row) => ({
+        ...row,
+        images: savedImages,
+      }))
+    )
+    setInstructionAnnotationEditorTarget(null)
     setToolbarStatus(
-      `已清空作业指导书${formatInstructionRowTargetLabel(
-        normalizedTarget
-      )}图片。`
+      `已保存作业指导书${formatInstructionRowTargetLabel(target)}图片调整。`
     )
     if (
       isSameInstructionRowTarget(
@@ -3661,7 +3751,7 @@ export default function EngineeringPrintWorkspacePage() {
     templateKey === MATERIAL_DETAIL_TEMPLATE_KEY ? (
       <section className="erp-processing-contract-upload-bar">
         <div className="erp-processing-contract-upload-bar__copy">
-          物料明细右上产品图和底部补充图通过这里上传，会同步到右侧打印纸面；底部补充图未上传时不占用纸面空间。
+          物料明细右上两张产品图通过这里上传，会同步到右侧打印纸面。
         </div>
         <div className="erp-processing-contract-upload-bar__actions">
           {engineeringImageSlots.materialDetail.map((slot) => {
@@ -3721,7 +3811,7 @@ export default function EngineeringPrintWorkspacePage() {
     templateKey === WORK_INSTRUCTION_TEMPLATE_KEY ? (
       <section className="erp-processing-contract-upload-bar">
         <div className="erp-processing-contract-upload-bar__copy">
-          作业指导书右上产品图通过这里上传，会同步到右侧打印纸面。
+          作业指导书右上 1–2 张产品图通过这里上传，会同步到右侧打印纸面。
         </div>
         <div className="erp-processing-contract-upload-bar__actions">
           {engineeringImageSlots.workInstruction.map((slot) => {
@@ -3733,21 +3823,25 @@ export default function EngineeringPrintWorkspacePage() {
                 key={slot.key}
               >
                 <input
-                  ref={workInstructionHeaderImageInputRef}
+                  ref={(node) => {
+                    workInstructionHeaderImageInputRefs.current[slot.key] = node
+                  }}
                   className="erp-processing-contract-upload-bar__input"
                   type="file"
                   accept={ATTACHMENT_ACCEPT}
                   onChange={(event) => {
                     const file = event.target.files?.[0]
                     event.target.value = ''
-                    if (file) uploadInstructionImage('header', file)
+                    if (file) uploadInstructionImage(slot.key, file)
                   }}
                 />
                 <button
                   type="button"
                   className={getToolbarButtonClassName({ active: hasImage })}
                   onClick={() =>
-                    workInstructionHeaderImageInputRef.current?.click()
+                    workInstructionHeaderImageInputRefs.current[
+                      slot.key
+                    ]?.click()
                   }
                   title={
                     hasImage
@@ -3761,7 +3855,7 @@ export default function EngineeringPrintWorkspacePage() {
                   <button
                     type="button"
                     className={getToolbarButtonClassName()}
-                    onClick={() => clearInstructionImage('header')}
+                    onClick={() => clearInstructionImage(slot.key)}
                   >
                     清空
                   </button>
@@ -3779,8 +3873,16 @@ export default function EngineeringPrintWorkspacePage() {
       </section>
     ) : null
 
-  const panelActions =
-    materialImageUploadBar || workInstructionHeaderImageUploadBar
+  const panelActions = (
+    <div className="erp-print-panel-action-stack">
+      {materialImageUploadBar || workInstructionHeaderImageUploadBar}
+      <PrintAppendixImageManager
+        images={draft.appendixImages}
+        onImagesChange={handleAppendixImagesChange}
+        onStatusChange={setToolbarStatus}
+      />
+    </div>
+  )
 
   const warmupPreviewPDF = () => {
     if (!paperRef.current || pdfPreviewPreloadRef.current) return
@@ -4117,7 +4219,15 @@ export default function EngineeringPrintWorkspacePage() {
           className={getToolbarButtonClassName()}
           disabled={
             selectedWorkInstructionRowTarget === null ||
-            !selectedInstructionRowIsStep
+            !selectedInstructionRowIsStep ||
+            selectedInstructionRowImages.length >=
+              ENGINEERING_PRINT_LIMITS.instructionRowImages
+          }
+          title={
+            selectedInstructionRowImages.length >=
+            ENGINEERING_PRINT_LIMITS.instructionRowImages
+              ? `每个作业行最多支持 ${ENGINEERING_PRINT_LIMITS.instructionRowImages} 张图片`
+              : undefined
           }
           onClick={() =>
             handleInstructionRowImageUploadClick(
@@ -4130,16 +4240,17 @@ export default function EngineeringPrintWorkspacePage() {
         <button
           type="button"
           className={getToolbarButtonClassName()}
+          data-open-work-instruction-image-editor
           disabled={
             selectedWorkInstructionRowTarget === null ||
             !selectedInstructionRowIsStep ||
             selectedInstructionRowImages.length === 0
           }
           onClick={() =>
-            clearInstructionRowImages(selectedWorkInstructionRowTarget)
+            openInstructionAnnotationEditor(selectedWorkInstructionRowTarget)
           }
         >
-          清空当前行图片
+          管理当前行图片
         </button>
         <button
           type="button"

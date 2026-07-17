@@ -24,6 +24,9 @@ func (d *jsonrpcDispatcher) mapWorkflowError(ctx context.Context, err error) *v1
 	l := d.log.WithContext(ctx)
 
 	switch {
+	case errors.Is(err, biz.ErrWorkflowTaskSourceGeneratedOnly):
+		l.Warnf("[workflow] source-generated task create rejected err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该任务由业务来源生成，请回到对应业务页面办理"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[workflow] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}

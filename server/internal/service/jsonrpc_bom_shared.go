@@ -77,27 +77,14 @@ func bomHeaderUpdateFromParams(pm map[string]any) (*biz.BOMHeaderUpdate, bool) {
 	}, true
 }
 
-func bomItemCreateFromParams(pm map[string]any) (*biz.BOMItemCreate, bool) {
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+func bomVersionMutationFromParams(pm map[string]any) (*biz.BOMVersionMutation, bool) {
+	header, ok := bomHeaderUpdateFromParams(pm)
 	if !ok {
 		return nil, false
 	}
-	lossRate, ok := getRequiredJSONRPCDecimal(pm, "loss_rate")
-	if !ok {
-		return nil, false
-	}
-	return &biz.BOMItemCreate{
-		BOMHeaderID:        getInt(pm, "bom_header_id", 0),
-		MaterialID:         getInt(pm, "material_id", 0),
-		Quantity:           quantity,
-		UnitID:             getInt(pm, "unit_id", 0),
-		LossRate:           lossRate,
-		Position:           getWorkflowStringPtr(pm, "position"),
-		PieceCount:         getWorkflowStringPtr(pm, "piece_count"),
-		TotalUsageSnapshot: getWorkflowStringPtr(pm, "total_usage_snapshot"),
-		ProcessBase:        getWorkflowStringPtr(pm, "process_base"),
-		ProcessMethod:      getWorkflowStringPtr(pm, "process_method"),
-		Note:               getWorkflowStringPtr(pm, "note"),
+	return &biz.BOMVersionMutation{
+		ProductID:       getInt(pm, "product_id", 0),
+		BOMHeaderUpdate: *header,
 	}, true
 }
 
@@ -111,17 +98,45 @@ func bomItemUpdateFromParams(pm map[string]any) (*biz.BOMItemUpdate, bool) {
 		return nil, false
 	}
 	return &biz.BOMItemUpdate{
-		MaterialID:         getInt(pm, "material_id", 0),
-		Quantity:           quantity,
-		UnitID:             getInt(pm, "unit_id", 0),
-		LossRate:           lossRate,
-		Position:           getWorkflowStringPtr(pm, "position"),
-		PieceCount:         getWorkflowStringPtr(pm, "piece_count"),
-		TotalUsageSnapshot: getWorkflowStringPtr(pm, "total_usage_snapshot"),
-		ProcessBase:        getWorkflowStringPtr(pm, "process_base"),
-		ProcessMethod:      getWorkflowStringPtr(pm, "process_method"),
-		Note:               getWorkflowStringPtr(pm, "note"),
+		MaterialID:              getInt(pm, "material_id", 0),
+		Quantity:                quantity,
+		UnitID:                  getInt(pm, "unit_id", 0),
+		LossRate:                lossRate,
+		Position:                getWorkflowStringPtr(pm, "position"),
+		PieceCount:              getWorkflowStringPtr(pm, "piece_count"),
+		TotalUsageSnapshot:      getWorkflowStringPtr(pm, "total_usage_snapshot"),
+		ProcessBase:             getWorkflowStringPtr(pm, "process_base"),
+		ProcessMethod:           getWorkflowStringPtr(pm, "process_method"),
+		ProductionOperationCode: getWorkflowStringPtr(pm, "production_operation_code"),
+		Note:                    getWorkflowStringPtr(pm, "note"),
 	}, true
+}
+
+func bomItemSaveMutationsFromParams(pm map[string]any) ([]*biz.BOMItemSaveMutation, bool) {
+	raw, ok := pm["items"]
+	if !ok || raw == nil {
+		return []*biz.BOMItemSaveMutation{}, true
+	}
+	rawItems, ok := raw.([]any)
+	if !ok {
+		return nil, false
+	}
+	items := make([]*biz.BOMItemSaveMutation, 0, len(rawItems))
+	for _, rawItem := range rawItems {
+		itemMap, ok := rawItem.(map[string]any)
+		if !ok {
+			return nil, false
+		}
+		mutation, ok := bomItemUpdateFromParams(itemMap)
+		if !ok {
+			return nil, false
+		}
+		items = append(items, &biz.BOMItemSaveMutation{
+			ID:            getInt(itemMap, "id", 0),
+			BOMItemUpdate: *mutation,
+		})
+	}
+	return items, true
 }
 
 func bomHeaderFilterFromParams(pm map[string]any) biz.BOMHeaderFilter {
@@ -141,13 +156,6 @@ func bomVersionDetailResult(ctx context.Context, d *jsonrpcDispatcher, item *biz
 	return okData(map[string]any{"bom_version": bomVersionDetailToAny(item)})
 }
 
-func bomItemResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.BOMItem, err error) *v1.JsonrpcResult {
-	if err != nil {
-		return d.mapBOMError(ctx, err)
-	}
-	return okData(map[string]any{"bom_item": bomItemToAny(item)})
-}
-
 func (d *jsonrpcDispatcher) mapBOMError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
@@ -162,6 +170,8 @@ func (d *jsonrpcDispatcher) mapBOMError(ctx context.Context, err error) *v1.Json
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "已激活 BOM 不允许直接修改，请复制新版本"}
 	case errors.Is(err, biz.ErrBOMActiveConflict):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "同一产品已有其他激活 BOM 版本，请刷新后重试"}
+	case errors.Is(err, biz.ErrBOMVersionConflict):
+		return &v1.JsonrpcResult{Code: errcode.ResourceVersionConflict.Code, Message: errcode.ResourceVersionConflict.Message}
 	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该产品已停用，不能用于新 BOM 版本；历史 BOM 仍保留原引用"}
 	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):
@@ -219,6 +229,7 @@ func bomHeaderToAny(item *biz.BOMHeader) map[string]any {
 		"note":            optionalStringToAny(item.Note),
 		"created_at":      item.CreatedAt.Unix(),
 		"updated_at":      item.UpdatedAt.Unix(),
+		"edit_version":    item.EditVersion,
 	}
 	if item.ItemCount != nil {
 		out["item_count"] = *item.ItemCount
@@ -231,19 +242,20 @@ func bomItemToAny(item *biz.BOMItem) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                   item.ID,
-		"bom_header_id":        item.BOMHeaderID,
-		"material_id":          item.MaterialID,
-		"quantity":             item.Quantity.String(),
-		"unit_id":              item.UnitID,
-		"loss_rate":            item.LossRate.String(),
-		"position":             optionalStringToAny(item.Position),
-		"piece_count":          optionalStringToAny(item.PieceCount),
-		"total_usage_snapshot": optionalStringToAny(item.TotalUsageSnapshot),
-		"process_base":         optionalStringToAny(item.ProcessBase),
-		"process_method":       optionalStringToAny(item.ProcessMethod),
-		"note":                 optionalStringToAny(item.Note),
-		"created_at":           item.CreatedAt.Unix(),
-		"updated_at":           item.UpdatedAt.Unix(),
+		"id":                        item.ID,
+		"bom_header_id":             item.BOMHeaderID,
+		"material_id":               item.MaterialID,
+		"quantity":                  item.Quantity.String(),
+		"unit_id":                   item.UnitID,
+		"loss_rate":                 item.LossRate.String(),
+		"position":                  optionalStringToAny(item.Position),
+		"piece_count":               optionalStringToAny(item.PieceCount),
+		"total_usage_snapshot":      optionalStringToAny(item.TotalUsageSnapshot),
+		"process_base":              optionalStringToAny(item.ProcessBase),
+		"process_method":            optionalStringToAny(item.ProcessMethod),
+		"production_operation_code": optionalStringToAny(item.ProductionOperationCode),
+		"note":                      optionalStringToAny(item.Note),
+		"created_at":                item.CreatedAt.Unix(),
+		"updated_at":                item.UpdatedAt.Unix(),
 	}
 }

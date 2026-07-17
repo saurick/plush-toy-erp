@@ -87,7 +87,9 @@ export function createWorkflowWorkbenchSnapshot(
   return {
     scopeKey: String(scopeKey || ''),
     tasks: Array.isArray(tasks) ? tasks : [],
-    riskTaskIDs: new Set(riskTaskIDs instanceof Set ? riskTaskIDs : riskTaskIDs),
+    riskTaskIDs: new Set(
+      riskTaskIDs instanceof Set ? riskTaskIDs : riskTaskIDs
+    ),
   }
 }
 
@@ -270,6 +272,22 @@ export function isFinishedGoodsWorkflowTask(task = {}) {
   )
 }
 
+export function isProductionSchedulingPendingWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'production_scheduling' ||
+    payload.alert_type === 'production_scheduling_pending'
+  )
+}
+
+export function isProductionExceptionWorkflowTask(task = {}) {
+  const payload = payloadOf(task)
+  return (
+    String(task.task_group || '').trim() === 'production_exception' ||
+    payload.alert_type === 'rework_pending'
+  )
+}
+
 export function isFinishedGoodsReworkWorkflowTask(task = {}) {
   return String(task.task_group || '').trim() === 'finished_goods_rework'
 }
@@ -356,10 +374,7 @@ export function isApprovalWorkflowTask(task = {}) {
 }
 
 export function buildWorkflowTaskAlert(task = {}, options = {}) {
-  if (
-    !task ||
-    !ACTIVE_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))
-  ) {
+  if (!task || !ACTIVE_TASK_STATUS_KEYS.has(normalizeTaskStatusKey(task))) {
     return null
   }
 
@@ -456,6 +471,28 @@ export function buildWorkflowTaskAlert(task = {}, options = {}) {
       alert_type: 'vendor_delay',
       alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
       alert_label: '委外延期',
+    }
+  }
+
+  if (isProductionSchedulingPendingWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'task_created',
+      alert_type: 'production_scheduling_pending',
+      alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
+      alert_label:
+        dueStatus === 'overdue' ? '生产排程已超时' : '生产排程待处理',
+    }
+  }
+
+  if (isProductionExceptionWorkflowTask(task)) {
+    return {
+      ...base,
+      notification_type: payload.notification_type || 'task_created',
+      alert_type: 'rework_pending',
+      alert_level: dueStatus === 'overdue' ? 'critical' : 'warning',
+      alert_label:
+        dueStatus === 'overdue' ? '返工异常已超时' : '返工异常待处理',
     }
   }
 
@@ -756,6 +793,12 @@ export function buildWorkflowDashboardStats(tasks = [], options = {}) {
       ),
       vendorDelay: alerts.filter(
         (alert) => alert.alert_type === 'vendor_delay'
+      ),
+      productionSchedulingPending: alerts.filter(
+        (alert) => alert.alert_type === 'production_scheduling_pending'
+      ),
+      reworkPending: alerts.filter(
+        (alert) => alert.alert_type === 'rework_pending'
       ),
       outsourceReturnPending: alerts.filter(
         (alert) => alert.alert_type === 'outsource_return_pending'

@@ -5,10 +5,8 @@ import {
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
 
 const BLOCKING_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
-
-function normalizeTaskID(task = {}) {
-  return String(task.id || '').trim()
-}
+const BUSINESS_COLLABORATION_TASK_REQUEST_KEY =
+  'business-collaboration-tasks'
 
 function normalizeTaskSourceID(value) {
   const text = String(value ?? '').trim()
@@ -88,23 +86,103 @@ export function filterBusinessCollaborationTasksBySource({
   })
 }
 
+export async function loadBusinessCollaborationTasksForSource({
+  beginLatestRequest,
+  canRead,
+  isAbortError = () => false,
+  isCurrentSource = () => true,
+  listTasks,
+  onError = () => {},
+  setLoadState = () => {},
+  setTasks = () => {},
+  sourceID,
+  sourceType,
+} = {}) {
+  if (typeof beginLatestRequest !== 'function') {
+    throw new TypeError('beginLatestRequest must be a function')
+  }
+
+  const request = beginLatestRequest(
+    BUSINESS_COLLABORATION_TASK_REQUEST_KEY
+  )
+  const requestedSourceID = Number(sourceID || 0)
+  const requestIsCurrent = () =>
+    request.isCurrent() && isCurrentSource(requestedSourceID)
+
+  try {
+    if (!requestIsCurrent()) return { status: 'stale' }
+
+    setTasks([])
+    if (canRead !== true) {
+      setLoadState('forbidden')
+      return { status: 'forbidden', tasks: [] }
+    }
+    if (
+      !Number.isSafeInteger(requestedSourceID) ||
+      requestedSourceID <= 0
+    ) {
+      setLoadState('idle')
+      return { status: 'idle', tasks: [] }
+    }
+    if (typeof listTasks !== 'function') {
+      throw new TypeError('listTasks must be a function')
+    }
+
+    setLoadState('loading')
+    try {
+      const data = await listTasks(
+        {
+          source_type: String(sourceType || '').trim(),
+          source_id: requestedSourceID,
+          limit: 200,
+        },
+        { signal: request.signal }
+      )
+      if (!requestIsCurrent()) return { status: 'stale' }
+
+      const nextTasks = Array.isArray(data?.tasks) ? data.tasks : []
+      setTasks(nextTasks)
+      setLoadState('ready')
+      return { status: 'ready', tasks: nextTasks }
+    } catch (error) {
+      if (isAbortError(error) || !requestIsCurrent()) {
+        return { status: 'stale' }
+      }
+      setTasks([])
+      setLoadState('error')
+      onError(error)
+      return { status: 'error', error, tasks: [] }
+    }
+  } finally {
+    request.finish()
+  }
+}
+
+export function resolveBusinessCollaborationActionTask({
+  actionTask,
+  tasks = [],
+} = {}) {
+  const actionTaskID = String(actionTask?.id || '').trim()
+  if (!actionTaskID) return null
+
+  const latestTask = (Array.isArray(tasks) ? tasks : []).find(
+    (task) => String(task?.id || '').trim() === actionTaskID
+  )
+  if (!latestTask || isBusinessCollaborationTaskTerminal(latestTask)) {
+    return null
+  }
+  return latestTask
+}
+
 export function buildBusinessCollaborationTaskPanelModel({
   tasks = [],
-  selectedTasks = [],
   visibleLimit = 6,
 } = {}) {
   const allTasks = Array.isArray(tasks) ? tasks : []
-  const currentRecordTasks = Array.isArray(selectedTasks) ? selectedTasks : []
-  const currentTaskIDs = new Set(
-    currentRecordTasks.map(normalizeTaskID).filter(Boolean)
-  )
   const activeTasks = allTasks.filter(
     (task) => !isBusinessCollaborationTaskTerminal(task)
   )
-  const pageTasks = activeTasks.filter(
-    (task) => !currentTaskIDs.has(normalizeTaskID(task))
-  )
-  const blockedTasks = allTasks.filter(isBusinessCollaborationTaskBlocking)
+  const blockedTasks = activeTasks.filter(isBusinessCollaborationTaskBlocking)
   const doneTasks = allTasks.filter(isBusinessCollaborationTaskTerminal)
   const limit =
     Number.isFinite(visibleLimit) && visibleLimit > 0 ? visibleLimit : 6
@@ -113,12 +191,10 @@ export function buildBusinessCollaborationTaskPanelModel({
     totalTaskCount: allTasks.length,
     visibleLimit: limit,
     activeTaskCount: activeTasks.length,
-    pageTaskCount: pageTasks.length,
-    currentRecordTaskCount: currentRecordTasks.length,
+    currentRecordTaskCount: activeTasks.length,
     blockedTaskCount: blockedTasks.length,
     doneTaskCount: doneTasks.length,
-    currentRecordTasks: currentRecordTasks.slice(0, limit),
-    pageTasks: pageTasks.slice(0, limit),
+    currentRecordTasks: activeTasks.slice(0, limit),
     blockedTasks: blockedTasks.slice(0, limit),
     doneTasks: doneTasks.slice(0, limit),
   }

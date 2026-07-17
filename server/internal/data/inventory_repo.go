@@ -1103,6 +1103,7 @@ func (r *inventoryRepo) CreateBOMItem(ctx context.Context, in *biz.BOMItemCreate
 		SetNillableTotalUsageSnapshot(in.TotalUsageSnapshot).
 		SetNillableProcessBase(in.ProcessBase).
 		SetNillableProcessMethod(in.ProcessMethod).
+		SetNillableProductionOperationCode(in.ProductionOperationCode).
 		SetNillableNote(in.Note).
 		Save(ctx)
 	if err != nil {
@@ -1245,6 +1246,11 @@ func (r *inventoryRepo) UpdateBOMDraftItem(ctx context.Context, id int, in *biz.
 		update.ClearProcessMethod()
 	} else {
 		update.SetProcessMethod(*in.ProcessMethod)
+	}
+	if in.ProductionOperationCode == nil {
+		update.ClearProductionOperationCode()
+	} else {
+		update.SetProductionOperationCode(*in.ProductionOperationCode)
 	}
 	if in.Note == nil {
 		update.ClearNote()
@@ -1495,6 +1501,7 @@ func (r *inventoryRepo) CopyBOMVersion(ctx context.Context, sourceHeaderID int, 
 			SetNillableTotalUsageSnapshot(sourceItem.TotalUsageSnapshot).
 			SetNillableProcessBase(sourceItem.ProcessBase).
 			SetNillableProcessMethod(sourceItem.ProcessMethod).
+			SetNillableProductionOperationCode(sourceItem.ProductionOperationCode).
 			SetNillableNote(sourceItem.Note).
 			Save(ctx)
 		if err != nil {
@@ -1741,7 +1748,16 @@ func entBOMHeaderToBiz(row *ent.BOMHeader) *biz.BOMHeader {
 		Note:          row.Note,
 		CreatedAt:     row.CreatedAt,
 		UpdatedAt:     row.UpdatedAt,
+		EditVersion:   bomEditVersion(row.UpdatedAt),
 	}
+}
+
+func bomEditVersion(updatedAt time.Time) int64 {
+	version := updatedAt.UnixMicro()
+	if version <= 0 {
+		return 1
+	}
+	return version
 }
 
 func entBOMItemToBiz(row *ent.BOMItem) *biz.BOMItem {
@@ -1749,19 +1765,20 @@ func entBOMItemToBiz(row *ent.BOMItem) *biz.BOMItem {
 		return nil
 	}
 	return &biz.BOMItem{
-		ID:                 row.ID,
-		BOMHeaderID:        row.BomHeaderID,
-		MaterialID:         row.MaterialID,
-		Quantity:           row.Quantity,
-		UnitID:             row.UnitID,
-		LossRate:           row.LossRate,
-		Position:           row.Position,
-		PieceCount:         row.PieceCount,
-		TotalUsageSnapshot: row.TotalUsageSnapshot,
-		ProcessBase:        row.ProcessBase,
-		ProcessMethod:      row.ProcessMethod,
-		Note:               row.Note,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
+		ID:                      row.ID,
+		BOMHeaderID:             row.BomHeaderID,
+		MaterialID:              row.MaterialID,
+		Quantity:                row.Quantity,
+		UnitID:                  row.UnitID,
+		LossRate:                row.LossRate,
+		Position:                row.Position,
+		PieceCount:              row.PieceCount,
+		TotalUsageSnapshot:      row.TotalUsageSnapshot,
+		ProcessBase:             row.ProcessBase,
+		ProcessMethod:           row.ProcessMethod,
+		ProductionOperationCode: row.ProductionOperationCode,
+		Note:                    row.Note,
+		CreatedAt:               row.CreatedAt,
+		UpdatedAt:               row.UpdatedAt,
 	}
 }

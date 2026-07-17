@@ -11,7 +11,19 @@ import (
 	"server/internal/data/model/ent"
 
 	"github.com/go-kratos/kratos/v2/log"
+	"github.com/shopspring/decimal"
 )
+
+func approximateQualityInspectionDecision(inspectionID int, result string) *biz.QualityInspectionDecision {
+	operator := biz.QualityInspectionDefectRateOperatorApprox
+	percent := decimal.NewFromInt(5)
+	return &biz.QualityInspectionDecision{
+		InspectionID:       inspectionID,
+		Result:             result,
+		DefectRateOperator: &operator,
+		DefectRatePercent:  &percent,
+	}
+}
 
 func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	ctx := context.Background()
@@ -79,12 +91,20 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 
 	inspectedAt := time.Date(2026, 4, 26, 10, 30, 0, 0, time.UTC)
 	inspectorID := 7001
+	if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: draft.ID}); !errors.Is(err, biz.ErrBadParam) {
+		t.Fatalf("new submitted decision without defect-rate pair must fail, got %v", err)
+	}
+	assertLotStatus(t, ctx, uc, *passItem.LotID, biz.InventoryLotHold)
+	passRateOperator := biz.QualityInspectionDefectRateOperatorApprox
+	passRatePercent := mustDecimal(t, "5")
 	passed, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: draft.ID,
-		Result:       biz.QualityInspectionResultPass,
-		InspectedAt:  inspectedAt,
-		InspectorID:  &inspectorID,
-		DecisionNote: stringPtr("合格"),
+		InspectionID:       draft.ID,
+		Result:             biz.QualityInspectionResultPass,
+		InspectedAt:        inspectedAt,
+		InspectorID:        &inspectorID,
+		DefectRateOperator: &passRateOperator,
+		DefectRatePercent:  &passRatePercent,
+		DecisionNote:       stringPtr("合格"),
 	})
 	if err != nil {
 		t.Fatalf("pass quality inspection failed: %v", err)
@@ -92,12 +112,14 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	if passed.Status != biz.QualityInspectionStatusPassed ||
 		passed.Result == nil || *passed.Result != biz.QualityInspectionResultPass ||
 		passed.InspectedAt == nil || !passed.InspectedAt.Equal(inspectedAt) ||
-		passed.InspectorID == nil || *passed.InspectorID != inspectorID {
+		passed.InspectorID == nil || *passed.InspectorID != inspectorID ||
+		passed.DefectRateOperator == nil || *passed.DefectRateOperator != passRateOperator ||
+		passed.DefectRatePercent == nil || !passed.DefectRatePercent.Equal(passRatePercent) {
 		t.Fatalf("unexpected passed state: %+v", passed)
 	}
 	assertLotStatus(t, ctx, uc, *passItem.LotID, biz.InventoryLotActive)
 	assertInventoryTxnCount(t, ctx, client, beforeQualityTxnCount)
-	if replay, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: draft.ID}); err != nil || replay.Status != biz.QualityInspectionStatusPassed {
+	if replay, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: draft.ID, DefectRateOperator: &passRateOperator, DefectRatePercent: &passRatePercent}); err != nil || replay.Status != biz.QualityInspectionStatusPassed {
 		t.Fatalf("repeat pass should be idempotent passed, row=%v err=%v", replay, err)
 	}
 	if _, err := uc.CancelQualityInspection(ctx, draft.ID, nil); !errors.Is(err, biz.ErrBadParam) {
@@ -123,19 +145,24 @@ func TestInventoryRepo_QualityInspectionLifecycleAndLotStatus(t *testing.T) {
 	if _, err := uc.SubmitQualityInspection(ctx, rejectDraft.ID); err != nil {
 		t.Fatalf("submit reject fixture failed: %v", err)
 	}
-	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, DecisionNote: stringPtr("拒收")}); err != nil {
+	rejectRateOperator := biz.QualityInspectionDefectRateOperatorGT
+	rejectRatePercent := mustDecimal(t, "50")
+	if _, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, DefectRateOperator: &rejectRateOperator, DefectRatePercent: &rejectRatePercent, DecisionNote: stringPtr("拒收")}); err != nil {
 		t.Fatalf("reject quality inspection failed: %v", err)
 	}
 	rejected, err := uc.GetQualityInspection(ctx, rejectDraft.ID)
 	if err != nil {
 		t.Fatalf("get rejected inspection failed: %v", err)
 	}
-	if rejected.Status != biz.QualityInspectionStatusRejected || rejected.Result == nil || *rejected.Result != biz.QualityInspectionResultReject {
+	if rejected.Status != biz.QualityInspectionStatusRejected || rejected.Result == nil || *rejected.Result != biz.QualityInspectionResultReject ||
+		rejected.DefectRateOperator == nil || *rejected.DefectRateOperator != rejectRateOperator ||
+		rejected.DefectRatePercent == nil || !rejected.DefectRatePercent.Equal(rejectRatePercent) ||
+		rejected.SourceNo == nil || *rejected.SourceNo != rejectReceipt.ReceiptNo {
 		t.Fatalf("unexpected rejected state: %+v", rejected)
 	}
 	rejectItem := rejectReceipt.Items[0]
 	assertLotStatus(t, ctx, uc, *rejectItem.LotID, biz.InventoryLotRejected)
-	if replay, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID}); err != nil || replay.Status != biz.QualityInspectionStatusRejected {
+	if replay, err := uc.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectDraft.ID, DefectRateOperator: &rejectRateOperator, DefectRatePercent: &rejectRatePercent}); err != nil || replay.Status != biz.QualityInspectionStatusRejected {
 		t.Fatalf("repeat reject should be idempotent rejected, row=%v err=%v", replay, err)
 	}
 	if _, err := uc.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
@@ -370,22 +397,59 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 				LotID:       &productLot.ID,
 				Quantity:    mustDecimal(t, "3"),
 			},
+			{
+				ProductID:   fixtures.productID,
+				WarehouseID: fixtures.warehouseID,
+				UnitID:      fixtures.unitID,
+				LotID:       &productLot.ID,
+				Quantity:    mustDecimal(t, "2"),
+			},
 		},
 	})
 	if err != nil {
 		t.Fatalf("create shipment fixture failed: %v", err)
 	}
+	if len(shipment.Items) != 2 {
+		t.Fatalf("expected duplicate shipment tuple fixture to keep two source rows, got %+v", shipment.Items)
+	}
 	beforeQualityTxnCount := inventoryTxnCount(t, ctx, client)
 
-	draft, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &biz.QualityInspectionCreate{
+	createInput := &biz.QualityInspectionCreate{
 		InspectionNo:   "QI-FG-VALID",
 		SourceID:       shipment.ID,
 		InventoryLotID: productLot.ID,
 		WarehouseID:    fixtures.warehouseID,
 		SubjectID:      fixtures.productID,
-	})
+	}
+	draft, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, createInput)
 	if err != nil {
 		t.Fatalf("create finished goods quality inspection draft failed: %v", err)
+	}
+	replayed, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, createInput)
+	if err != nil || replayed.ID != draft.ID {
+		t.Fatalf("same finished goods inspection intent must replay id=%d, row=%+v err=%v", draft.ID, replayed, err)
+	}
+	changedIntent := *createInput
+	changedIntent.DecisionNote = stringPtr("变更后的重复请求")
+	if _, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &changedIntent); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("same inspection number with changed intent must conflict, got %v", err)
+	}
+	conflictInput := *createInput
+	conflictInput.InspectionNo = "QI-FG-GRAIN-CONFLICT"
+	if _, err := inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &conflictInput); !errors.Is(err, biz.ErrQualityInspectionSourceConflict) {
+		t.Fatalf("same active shipment quality grain must conflict, got %v", err)
+	}
+	if cancelled, err := inventoryUC.CancelQualityInspection(ctx, draft.ID, stringPtr("撤销后重新送检")); err != nil || cancelled.Status != biz.QualityInspectionStatusCancelled {
+		t.Fatalf("cancel finished goods inspection before rebuild row=%+v err=%v", cancelled, err)
+	}
+	rebuildInput := *createInput
+	rebuildInput.InspectionNo = "QI-FG-REBUILT"
+	draft, err = inventoryUC.CreateFinishedGoodsQualityInspectionDraft(ctx, &rebuildInput)
+	if err != nil {
+		t.Fatalf("cancelled finished goods inspection must allow rebuilt draft: %v", err)
+	}
+	if draft.ID == replayed.ID {
+		t.Fatalf("rebuilt finished goods inspection must create a new row, got id=%d", draft.ID)
 	}
 	if draft.Status != biz.QualityInspectionStatusDraft ||
 		draft.PurchaseReceiptID != 0 ||
@@ -496,6 +560,7 @@ func TestInventoryRepo_FinishedGoodsQualityInspectionReferenceValidation(t *test
 	if err != nil {
 		t.Fatalf("create shipped shipment fixture failed: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shippedShipment.ID)
 	if _, err := operationalUC.ShipShipment(ctx, shippedShipment.ID); err != nil {
 		t.Fatalf("ship shipment fixture failed: %v", err)
 	}
@@ -529,7 +594,7 @@ func TestInventoryRepo_QualityInspectionSubmittedUniquenessAndProtection(t *test
 	if _, err := uc.SubmitQualityInspection(ctx, second.ID); !errors.Is(err, biz.ErrBadParam) {
 		t.Fatalf("expected second submitted inspection for same lot to be rejected, got %v", err)
 	}
-	if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: first.ID}); err != nil {
+	if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(first.ID, biz.QualityInspectionResultPass)); err != nil {
 		t.Fatalf("pass first inspection failed: %v", err)
 	}
 	third := createQualityInspectionDraftFromReceipt(t, ctx, uc, "QI-UNIQ-THIRD", receipt, fixtures)

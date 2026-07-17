@@ -244,6 +244,15 @@
         background: var(--blue-soft);
       }
 
+      tbody tr[data-record-key] {
+        cursor: pointer;
+      }
+
+      tbody tr[data-record-key]:focus-visible {
+        outline: 3px solid rgb(31 111 229 / 28%);
+        outline-offset: -3px;
+      }
+
       .dock {
         position: sticky;
         bottom: 16px;
@@ -251,6 +260,11 @@
         display: flex;
         flex-direction: column;
         overflow: hidden;
+      }
+
+      .dock[hidden],
+      .tag[hidden] {
+        display: none;
       }
 
       .dock-grip {
@@ -392,17 +406,17 @@
     <main class="page">
       <section class="hero">
         <div>
-          <div class="eyebrow">组件样板 / 嵌入业务页底部</div>
-          <h1>协同入口只做一件事：处理本页相关任务。</h1>
+          <div class="eyebrow">组件样板 / 条件式嵌入业务页</div>
+          <h1>协同入口只处理当前选中记录的待办。</h1>
           <p>
-            不再做独立页面，不复制完整任务看板，也不承担事实写入。
-            它只是业务模块页里的轻量任务条：展开看本页待办，收起保留风险提示，不进入正式菜单。
+            仅当业务页存在真实 Workflow 关联，且当前选中记录有待办时显示。
+            无待办不保留固定栏；跨记录任务回到任务中心，库存、出货、财务等业务办理仍在对应页面完成。
           </p>
         </div>
-        <div class="chips">
-          <span class="tag blue">本页待办 3</span>
-          <span class="tag red">阻塞 1</span>
-          <span class="tag amber">今日到期 2</span>
+        <div class="chips" aria-live="polite">
+          <span class="tag blue" id="selectedRecordSummary">当前记录 SO-202606-018</span>
+          <span class="tag green" id="selectedTaskSummary">待办 2</span>
+          <span class="tag red" id="selectedBlockedSummary">阻塞 1</span>
         </div>
       </section>
 
@@ -411,7 +425,7 @@
           <div>
             <div class="eyebrow">ERP / 销售链路</div>
             <h2>销售订单</h2>
-            <p>主页面保持业务对象优先，协同入口只占用页面底部。</p>
+            <p>单击订单切换当前记录；只有该订单存在关联待办时，页面底部才显示协同入口。</p>
           </div>
           <button class="btn primary">新建订单</button>
         </div>
@@ -441,37 +455,50 @@
               </tr>
             </thead>
             <tbody>
-              <tr class="selected">
+              <tr
+                class="selected"
+                data-record-key="SO-202606-018"
+                tabindex="0"
+                aria-selected="true"
+              >
                 <td>SO-202606-018</td>
                 <td>样例客户 A</td>
                 <td>2026-06-18</td>
                 <td><span class="tag green">执行中</span></td>
-                <td>交期确认</td>
+                <td>交期确认、客户确认待回复</td>
               </tr>
-              <tr>
+              <tr
+                data-record-key="SO-202606-017"
+                tabindex="0"
+                aria-selected="false"
+              >
                 <td>SO-202606-017</td>
                 <td>东莞样例客户</td>
                 <td>2026-06-20</td>
                 <td><span class="tag amber">待确认</span></td>
-                <td>资料补齐</td>
+                <td>无待办</td>
               </tr>
-              <tr>
+              <tr
+                data-record-key="SO-202606-015"
+                tabindex="0"
+                aria-selected="false"
+              >
                 <td>SO-202606-015</td>
                 <td>香港样例客户</td>
                 <td>2026-06-25</td>
                 <td><span class="tag red">阻塞</span></td>
-                <td>入库异常</td>
+                <td>订单资料补齐</td>
               </tr>
             </tbody>
           </table>
         </div>
       </section>
 
-      <section class="dock" id="dock" aria-label="本页协同入口">
+      <section class="dock" id="dock" aria-label="当前记录协同入口">
         <div
           class="dock-grip"
           role="separator"
-          aria-label="拖动调整本页协同高度"
+          aria-label="拖动调整当前记录协同栏高度"
           aria-orientation="horizontal"
           aria-valuemin="320"
           aria-valuemax="560"
@@ -482,10 +509,11 @@
         </div>
         <div class="dock-head">
           <div class="dock-title">
-            <strong>本页协同</strong>
-            <span class="tag blue">待办 3</span>
-            <span class="tag red">阻塞 1</span>
-            <span class="muted">只显示当前页面相关任务</span>
+            <strong>当前记录协同</strong>
+            <span class="tag blue" id="dockRecord">SO-202606-018</span>
+            <span class="tag green" id="dockTaskCount">待办 2</span>
+            <span class="tag red" id="dockBlockedCount">阻塞 1</span>
+            <span class="muted">只显示当前选中记录关联的待办</span>
           </div>
           <div class="actions">
             <button class="btn text" id="toggle" type="button">收起</button>
@@ -493,11 +521,16 @@
           </div>
         </div>
         <div class="dock-body">
-          <div class="task-list" id="tasks"></div>
+          <div
+            class="task-list"
+            id="tasks"
+            role="listbox"
+            aria-label="当前记录待办"
+          ></div>
           <aside class="detail">
-            <div class="eyebrow">当前任务</div>
+            <div class="eyebrow">当前记录任务</div>
             <h3 id="detailTitle">交期确认</h3>
-            <p id="detailCopy">确认客户交期后，后续出货和财务事实仍回到正式 usecase。</p>
+            <p id="detailCopy">确认客户交期；实际出货、开票和收付款仍须在对应业务页面办理。</p>
             <div class="actions">
               <button class="btn primary">处理</button>
               <button class="btn">记录阻塞</button>
@@ -509,21 +542,52 @@
     </main>
 
     <script>
-      const tasks = [
-        ["交期确认", "SO-202606-018 / 业务 / 今天 18:00", "待处理", "blue", "确认客户交期后，后续出货和财务事实仍回到正式 usecase。"],
-        ["资料补齐", "SO-202606-017 / 业务 / 明天 10:00", "待处理", "amber", "补齐订单资料，不在协同入口里创建产品或库存事实。"],
-        ["入库异常", "SO-202606-015 / 仓库 / 已超时", "阻塞", "red", "记录阻塞原因并转回入库通知/检验/入库，不能直接把任务完成当库存入账。"],
-      ];
+      const tasksByRecord = {
+        "SO-202606-018": [
+          {
+            title: "交期确认",
+            meta: "业务 / 今天 18:00",
+            status: "待处理",
+            tone: "blue",
+            detail: "确认客户交期；实际出货、开票和收付款仍须在对应业务页面办理。",
+          },
+          {
+            title: "客户确认待回复",
+            meta: "业务 / 已超时",
+            status: "阻塞",
+            tone: "red",
+            detail: "记录等待原因并完成协同交接，不把任务完成当成出货或财务业务已办结。",
+          },
+        ],
+        "SO-202606-017": [],
+        "SO-202606-015": [
+          {
+            title: "订单资料补齐",
+            meta: "业务 / 明天 10:00",
+            status: "待处理",
+            tone: "amber",
+            detail: "补齐当前订单资料；产品、库存和其他业务记录仍在各自页面维护。",
+          },
+        ],
+      };
 
       const taskList = document.querySelector("#tasks");
       const detailTitle = document.querySelector("#detailTitle");
       const detailCopy = document.querySelector("#detailCopy");
       const dock = document.querySelector("#dock");
       const dockGrip = document.querySelector(".dock-grip");
+      const recordRows = [...document.querySelectorAll("[data-record-key]")];
+      const selectedRecordSummary = document.querySelector("#selectedRecordSummary");
+      const selectedTaskSummary = document.querySelector("#selectedTaskSummary");
+      const selectedBlockedSummary = document.querySelector("#selectedBlockedSummary");
+      const dockRecord = document.querySelector("#dockRecord");
+      const dockTaskCount = document.querySelector("#dockTaskCount");
+      const dockBlockedCount = document.querySelector("#dockBlockedCount");
       const minDockHeight = 320;
       const maxDockHeight = 560;
       let dockHeight = 320;
       let dragState = null;
+      let activeRecordTasks = [];
 
       function applyDockHeight(nextHeight) {
         dockHeight = Math.min(Math.max(nextHeight, minDockHeight), maxDockHeight);
@@ -533,25 +597,58 @@
 
       function renderTasks(selectedIndex = 0) {
         taskList.innerHTML = "";
-        tasks.forEach((task, index) => {
+        activeRecordTasks.forEach((task, index) => {
           const button = document.createElement("button");
           button.className = "task";
           button.type = "button";
+          button.setAttribute("role", "option");
           button.setAttribute("aria-selected", String(index === selectedIndex));
           button.innerHTML = `
             <span>
-              <strong>${task[0]}</strong>
-              <span class="muted">${task[1]}</span>
+              <strong>${task.title}</strong>
+              <span class="muted">${task.meta}</span>
             </span>
-            <span class="tag ${task[3]}">${task[2]}</span>
+            <span class="tag ${task.tone}">${task.status}</span>
           `;
           button.addEventListener("click", () => {
-            detailTitle.textContent = task[0];
-            detailCopy.textContent = task[4];
+            detailTitle.textContent = task.title;
+            detailCopy.textContent = task.detail;
             renderTasks(index);
           });
           taskList.appendChild(button);
         });
+
+        const selectedTask = activeRecordTasks[selectedIndex];
+        detailTitle.textContent = selectedTask.title;
+        detailCopy.textContent = selectedTask.detail;
+      }
+
+      function selectRecord(recordKey) {
+        activeRecordTasks = tasksByRecord[recordKey] || [];
+        const blockedCount = activeRecordTasks.filter(
+          (task) => task.status === "阻塞"
+        ).length;
+
+        recordRows.forEach((row) => {
+          const selected = row.dataset.recordKey === recordKey;
+          row.classList.toggle("selected", selected);
+          row.setAttribute("aria-selected", String(selected));
+        });
+
+        selectedRecordSummary.textContent = `当前记录 ${recordKey}`;
+        selectedTaskSummary.textContent = activeRecordTasks.length
+          ? `待办 ${activeRecordTasks.length}`
+          : "无关联待办";
+        selectedBlockedSummary.textContent = `阻塞 ${blockedCount}`;
+        selectedBlockedSummary.hidden = blockedCount === 0;
+
+        dockRecord.textContent = recordKey;
+        dockTaskCount.textContent = `待办 ${activeRecordTasks.length}`;
+        dockBlockedCount.textContent = `阻塞 ${blockedCount}`;
+        dockBlockedCount.hidden = blockedCount === 0;
+        dock.hidden = activeRecordTasks.length === 0;
+
+        if (activeRecordTasks.length > 0) renderTasks();
       }
 
       document.querySelector("#toggle").addEventListener("click", (event) => {
@@ -587,7 +684,17 @@
       dockGrip.addEventListener("pointerup", finishDockDrag);
       dockGrip.addEventListener("pointercancel", finishDockDrag);
 
-      renderTasks();
+      recordRows.forEach((row) => {
+        const selectCurrentRow = () => selectRecord(row.dataset.recordKey);
+        row.addEventListener("click", selectCurrentRow);
+        row.addEventListener("keydown", (event) => {
+          if (event.key !== "Enter" && event.key !== " ") return;
+          event.preventDefault();
+          selectCurrentRow();
+        });
+      });
+
+      selectRecord("SO-202606-018");
     </script>
   </body>
 </html>

@@ -106,6 +106,20 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '后台首页 / 工作台、任务看板、业务看板、模板打印中心和异常闭环等总控入口可参照；当前任务关联记录入口不是正式菜单替代表。',
   },
   {
+    key: 'admin-command-center-redesign-reference',
+    title: '后台工作台重设计方向图',
+    type: 'PNG',
+    statuses: [DEV_PROTOTYPE_STATUSES.DRAFT],
+    directory: 'admin-command-center-v1/images/',
+    assetPath:
+      'admin-command-center-v1/images/workbench-redesign-reference.png',
+    readmePath: 'admin-command-center-v1/README.md',
+    description:
+      '保留后台工作台重设计时的首屏层级、主从布局和操作密度方向，供 HTML 样板与运行态 review 对照。',
+    appliesTo:
+      '仅作为工作台视觉与信息架构参考；它不是 Current、运行时截图、正式菜单或业务能力真源。',
+  },
+  {
     key: 'core-menu-coverage',
     title: '产品核心菜单覆盖样板',
     type: 'HTML',
@@ -132,6 +146,47 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '我的任务、任务看板、异常 / 阻塞闭环、岗位任务端和业务页协同入口可参照；不复制业务菜单树，不把任务完成写成事实过账。',
   },
   {
+    key: 'task-command-center-redesign-reference',
+    title: '任务看板重设计方向图',
+    type: 'PNG',
+    statuses: [DEV_PROTOTYPE_STATUSES.DRAFT],
+    directory: 'task-command-center-v1/images/',
+    assetPath:
+      'task-command-center-v1/images/task-board-redesign-reference.png',
+    readmePath: 'task-command-center-v1/README.md',
+    description:
+      '保留任务看板重设计时的队列、泳道、当前任务详情和主操作层级方向，供 HTML 样板与运行态 review 对照。',
+    appliesTo:
+      '仅作为任务看板视觉与信息架构参考；它不定义任务权限、状态机、Workflow 动作或事实过账。',
+  },
+  {
+    key: 'workflow-task-action-flow',
+    title: 'Workflow 任务处理流程样板',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'workflow-task-action-flow-v1/',
+    assetPath: 'workflow-task-action-flow-v1/index.html',
+    readmePath: 'workflow-task-action-flow-v1/README.md',
+    description:
+      '把核对任务、选择处理、确认与结果收口为可直接导航的三步流程；催办只是处理动作，确认页受动作与原因校验约束。',
+    appliesTo:
+      '任务中心、岗位任务端和有真实 Workflow 关联的业务页协同入口可参照；可用动作、原因规则和提交权限仍以现有 action explain、RBAC、owner / assignee 与任务状态为准。',
+  },
+  {
+    key: 'workflow-task-action-flow-redesign-reference',
+    title: '任务处理流程重设计方向图',
+    type: 'PNG',
+    statuses: [DEV_PROTOTYPE_STATUSES.DRAFT],
+    directory: 'workflow-task-action-flow-v1/images/',
+    assetPath:
+      'workflow-task-action-flow-v1/images/task-action-flow-redesign-reference.png',
+    readmePath: 'workflow-task-action-flow-v1/README.md',
+    description:
+      '保留任务处理三步导航、动作选择、原因输入和确认回执的视觉方向，供可交互 HTML 与运行态 review 对照。',
+    appliesTo:
+      '仅作为共享任务处理流程的视觉参考；它不替代运行时组件、任务权限、API 或 Workflow / Fact 边界。',
+  },
+  {
     key: 'business-management-center',
     title: '业务管理中心样板',
     type: 'HTML',
@@ -143,6 +198,20 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
       '把业务管理菜单收敛为业务对象总控：按链路选择对象、查看风险、进入标准业务页或详情页。',
     appliesTo:
       '业务管理类总入口、业务看板下钻、正式入口壳和同类业务对象选择可参照；不恢复 business_records，不承诺未接 API 已完成。',
+  },
+  {
+    key: 'business-management-center-redesign-reference',
+    title: '业务看板重设计方向图',
+    type: 'PNG',
+    statuses: [DEV_PROTOTYPE_STATUSES.DRAFT],
+    directory: 'business-management-center-v1/images/',
+    assetPath:
+      'business-management-center-v1/images/business-board-redesign-reference.png',
+    readmePath: 'business-management-center-v1/README.md',
+    description:
+      '保留业务看板重设计时的业务分段、记录数量、办理边界和关注事项层级方向，供 HTML 样板与运行态 review 对照。',
+    appliesTo:
+      '仅作为业务看板视觉与信息架构参考；它不证明模块可用、业务数量真实或未接 API 已完成。',
   },
   {
     key: 'metric-card-interaction-standard',
@@ -192,9 +261,9 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-module-page-standard-v1/index.html',
     readmePath: 'business-module-page-standard-v1/README.md',
     description:
-      '保留标题摘要、少量筛选、表格、当前记录操作条和底部轻量协同入口。',
+      '保留标题摘要、少量筛选、表格和当前记录操作条；协同入口不作为所有标准页的默认固定栏。',
     appliesTo:
-      '客户档案、供应商档案、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照。',
+      '客户档案、供应商档案、产品、销售订单、采购订单、加工合同 / 委外下单、入库通知 / 检验 / 入库、库存、待出货 / 出货放行、出库、生产排单、生产进度、延期 / 返工 / 异常、品质检验、对账 / 结算、待付款 / 应付提醒、应收 / 开票登记和发票登记等同类列表页可参照列表骨架；不默认挂载协同入口。',
   },
   {
     key: 'print-template-center',
@@ -218,9 +287,9 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'business-module-page-standard-v1/task-collab-entry-v2.html',
     readmePath: 'business-module-page-standard-v1/README.md',
     description:
-      '作为业务页内组件样板：收起保留风险提示，展开处理本页相关任务。',
+      '作为条件式业务页内组件样板：只处理当前选中业务记录的关联待办，无待办时不显示固定栏。',
     appliesTo:
-      '嵌入有 Workflow 协同任务的业务页可参照；它是页内组件，不是独立菜单、路由或权限入口。',
+      '仅有真实 Workflow 关联、能定位当前选中业务记录待办的业务页可参照；跨记录任务由任务中心承接。它是页内组件，不是独立菜单、路由或权限入口。',
   },
   {
     key: 'business-detail-standard-page',
@@ -297,6 +366,19 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     readmePath: 'business-module-page-standard-v1/README.md',
     description: '早期协同入口方向图，用于说明长表格下方入口的可见性问题。',
     appliesTo: '仅用于业务页协同入口方案对比，不对应正式菜单或当前实现。',
+  },
+  {
+    key: 'mobile-role-tasks-v2',
+    title: '岗位任务中心 v2 原型',
+    type: 'HTML',
+    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    directory: 'mobile-role-tasks-v2/',
+    assetPath: 'mobile-role-tasks-v2/index.html',
+    readmePath: 'mobile-role-tasks-v2/README.md',
+    description:
+      '把移动岗位任务主路径收口为任务列表、全屏详情、全屏处理和结果回执，详情、处理、结果可直接导航。',
+    appliesTo:
+      '岗位任务端后续重构可参照；当前运行时仍以 mobile-role-tasks-v1 的 as-built 参考和真实代码为准，v2 不代表 API、RBAC、菜单或客户环境已改造。',
   },
   {
     key: 'mobile-role-tasks-implemented',

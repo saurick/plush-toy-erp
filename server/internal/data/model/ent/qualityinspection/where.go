@@ -8,6 +8,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"github.com/shopspring/decimal"
 )
 
 // ID filters vertices based on their ID field.
@@ -75,6 +76,16 @@ func InventoryLotID(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldInventoryLotID, v))
 }
 
+// ProductionWipBatchID applies equality check predicate on the "production_wip_batch_id" field. It's identical to ProductionWipBatchIDEQ.
+func ProductionWipBatchID(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldProductionWipBatchID, v))
+}
+
+// GateCode applies equality check predicate on the "gate_code" field. It's identical to GateCodeEQ.
+func GateCode(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldGateCode, v))
+}
+
 // MaterialID applies equality check predicate on the "material_id" field. It's identical to MaterialIDEQ.
 func MaterialID(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldMaterialID, v))
@@ -133,6 +144,16 @@ func InspectedAt(v time.Time) predicate.QualityInspection {
 // InspectorID applies equality check predicate on the "inspector_id" field. It's identical to InspectorIDEQ.
 func InspectorID(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldInspectorID, v))
+}
+
+// DefectRateOperator applies equality check predicate on the "defect_rate_operator" field. It's identical to DefectRateOperatorEQ.
+func DefectRateOperator(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldDefectRateOperator, v))
+}
+
+// DefectRatePercent applies equality check predicate on the "defect_rate_percent" field. It's identical to DefectRatePercentEQ.
+func DefectRatePercent(v decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldDefectRatePercent, v))
 }
 
 // DecisionNote applies equality check predicate on the "decision_note" field. It's identical to DecisionNoteEQ.
@@ -295,6 +316,121 @@ func InventoryLotIDNotIn(vs ...int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotIn(FieldInventoryLotID, vs...))
 }
 
+// InventoryLotIDIsNil applies the IsNil predicate on the "inventory_lot_id" field.
+func InventoryLotIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldInventoryLotID))
+}
+
+// InventoryLotIDNotNil applies the NotNil predicate on the "inventory_lot_id" field.
+func InventoryLotIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldInventoryLotID))
+}
+
+// ProductionWipBatchIDEQ applies the EQ predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldProductionWipBatchID, v))
+}
+
+// ProductionWipBatchIDNEQ applies the NEQ predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDNEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldProductionWipBatchID, v))
+}
+
+// ProductionWipBatchIDIn applies the In predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldProductionWipBatchID, vs...))
+}
+
+// ProductionWipBatchIDNotIn applies the NotIn predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDNotIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldProductionWipBatchID, vs...))
+}
+
+// ProductionWipBatchIDIsNil applies the IsNil predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldProductionWipBatchID))
+}
+
+// ProductionWipBatchIDNotNil applies the NotNil predicate on the "production_wip_batch_id" field.
+func ProductionWipBatchIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldProductionWipBatchID))
+}
+
+// GateCodeEQ applies the EQ predicate on the "gate_code" field.
+func GateCodeEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldGateCode, v))
+}
+
+// GateCodeNEQ applies the NEQ predicate on the "gate_code" field.
+func GateCodeNEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldGateCode, v))
+}
+
+// GateCodeIn applies the In predicate on the "gate_code" field.
+func GateCodeIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldGateCode, vs...))
+}
+
+// GateCodeNotIn applies the NotIn predicate on the "gate_code" field.
+func GateCodeNotIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldGateCode, vs...))
+}
+
+// GateCodeGT applies the GT predicate on the "gate_code" field.
+func GateCodeGT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldGateCode, v))
+}
+
+// GateCodeGTE applies the GTE predicate on the "gate_code" field.
+func GateCodeGTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldGateCode, v))
+}
+
+// GateCodeLT applies the LT predicate on the "gate_code" field.
+func GateCodeLT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldGateCode, v))
+}
+
+// GateCodeLTE applies the LTE predicate on the "gate_code" field.
+func GateCodeLTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldGateCode, v))
+}
+
+// GateCodeContains applies the Contains predicate on the "gate_code" field.
+func GateCodeContains(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContains(FieldGateCode, v))
+}
+
+// GateCodeHasPrefix applies the HasPrefix predicate on the "gate_code" field.
+func GateCodeHasPrefix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasPrefix(FieldGateCode, v))
+}
+
+// GateCodeHasSuffix applies the HasSuffix predicate on the "gate_code" field.
+func GateCodeHasSuffix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasSuffix(FieldGateCode, v))
+}
+
+// GateCodeIsNil applies the IsNil predicate on the "gate_code" field.
+func GateCodeIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldGateCode))
+}
+
+// GateCodeNotNil applies the NotNil predicate on the "gate_code" field.
+func GateCodeNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldGateCode))
+}
+
+// GateCodeEqualFold applies the EqualFold predicate on the "gate_code" field.
+func GateCodeEqualFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEqualFold(FieldGateCode, v))
+}
+
+// GateCodeContainsFold applies the ContainsFold predicate on the "gate_code" field.
+func GateCodeContainsFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContainsFold(FieldGateCode, v))
+}
+
 // MaterialIDEQ applies the EQ predicate on the "material_id" field.
 func MaterialIDEQ(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldMaterialID, v))
@@ -343,6 +479,16 @@ func WarehouseIDIn(vs ...int) predicate.QualityInspection {
 // WarehouseIDNotIn applies the NotIn predicate on the "warehouse_id" field.
 func WarehouseIDNotIn(vs ...int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotIn(FieldWarehouseID, vs...))
+}
+
+// WarehouseIDIsNil applies the IsNil predicate on the "warehouse_id" field.
+func WarehouseIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldWarehouseID))
+}
+
+// WarehouseIDNotNil applies the NotNil predicate on the "warehouse_id" field.
+func WarehouseIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldWarehouseID))
 }
 
 // SourceTypeEQ applies the EQ predicate on the "source_type" field.
@@ -975,6 +1121,131 @@ func InspectorIDNotNil() predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotNull(FieldInspectorID))
 }
 
+// DefectRateOperatorEQ applies the EQ predicate on the "defect_rate_operator" field.
+func DefectRateOperatorEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorNEQ applies the NEQ predicate on the "defect_rate_operator" field.
+func DefectRateOperatorNEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorIn applies the In predicate on the "defect_rate_operator" field.
+func DefectRateOperatorIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldDefectRateOperator, vs...))
+}
+
+// DefectRateOperatorNotIn applies the NotIn predicate on the "defect_rate_operator" field.
+func DefectRateOperatorNotIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldDefectRateOperator, vs...))
+}
+
+// DefectRateOperatorGT applies the GT predicate on the "defect_rate_operator" field.
+func DefectRateOperatorGT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorGTE applies the GTE predicate on the "defect_rate_operator" field.
+func DefectRateOperatorGTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorLT applies the LT predicate on the "defect_rate_operator" field.
+func DefectRateOperatorLT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorLTE applies the LTE predicate on the "defect_rate_operator" field.
+func DefectRateOperatorLTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorContains applies the Contains predicate on the "defect_rate_operator" field.
+func DefectRateOperatorContains(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContains(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorHasPrefix applies the HasPrefix predicate on the "defect_rate_operator" field.
+func DefectRateOperatorHasPrefix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasPrefix(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorHasSuffix applies the HasSuffix predicate on the "defect_rate_operator" field.
+func DefectRateOperatorHasSuffix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasSuffix(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorIsNil applies the IsNil predicate on the "defect_rate_operator" field.
+func DefectRateOperatorIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldDefectRateOperator))
+}
+
+// DefectRateOperatorNotNil applies the NotNil predicate on the "defect_rate_operator" field.
+func DefectRateOperatorNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldDefectRateOperator))
+}
+
+// DefectRateOperatorEqualFold applies the EqualFold predicate on the "defect_rate_operator" field.
+func DefectRateOperatorEqualFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEqualFold(FieldDefectRateOperator, v))
+}
+
+// DefectRateOperatorContainsFold applies the ContainsFold predicate on the "defect_rate_operator" field.
+func DefectRateOperatorContainsFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContainsFold(FieldDefectRateOperator, v))
+}
+
+// DefectRatePercentEQ applies the EQ predicate on the "defect_rate_percent" field.
+func DefectRatePercentEQ(v decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldDefectRatePercent, v))
+}
+
+// DefectRatePercentNEQ applies the NEQ predicate on the "defect_rate_percent" field.
+func DefectRatePercentNEQ(v decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldDefectRatePercent, v))
+}
+
+// DefectRatePercentIn applies the In predicate on the "defect_rate_percent" field.
+func DefectRatePercentIn(vs ...decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldDefectRatePercent, vs...))
+}
+
+// DefectRatePercentNotIn applies the NotIn predicate on the "defect_rate_percent" field.
+func DefectRatePercentNotIn(vs ...decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldDefectRatePercent, vs...))
+}
+
+// DefectRatePercentGT applies the GT predicate on the "defect_rate_percent" field.
+func DefectRatePercentGT(v decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldDefectRatePercent, v))
+}
+
+// DefectRatePercentGTE applies the GTE predicate on the "defect_rate_percent" field.
+func DefectRatePercentGTE(v decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldDefectRatePercent, v))
+}
+
+// DefectRatePercentLT applies the LT predicate on the "defect_rate_percent" field.
+func DefectRatePercentLT(v decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldDefectRatePercent, v))
+}
+
+// DefectRatePercentLTE applies the LTE predicate on the "defect_rate_percent" field.
+func DefectRatePercentLTE(v decimal.Decimal) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldDefectRatePercent, v))
+}
+
+// DefectRatePercentIsNil applies the IsNil predicate on the "defect_rate_percent" field.
+func DefectRatePercentIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldDefectRatePercent))
+}
+
+// DefectRatePercentNotNil applies the NotNil predicate on the "defect_rate_percent" field.
+func DefectRatePercentNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldDefectRatePercent))
+}
+
 // DecisionNoteEQ applies the EQ predicate on the "decision_note" field.
 func DecisionNoteEQ(v string) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldDecisionNote, v))
@@ -1191,6 +1462,29 @@ func HasInventoryLot() predicate.QualityInspection {
 func HasInventoryLotWith(preds ...predicate.InventoryLot) predicate.QualityInspection {
 	return predicate.QualityInspection(func(s *sql.Selector) {
 		step := newInventoryLotStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
+}
+
+// HasProductionWipBatch applies the HasEdge predicate on the "production_wip_batch" edge.
+func HasProductionWipBatch() predicate.QualityInspection {
+	return predicate.QualityInspection(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ProductionWipBatchTable, ProductionWipBatchColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasProductionWipBatchWith applies the HasEdge predicate on the "production_wip_batch" edge with a given conditions (other predicates).
+func HasProductionWipBatchWith(preds ...predicate.ProductionWIPBatch) predicate.QualityInspection {
+	return predicate.QualityInspection(func(s *sql.Selector) {
+		step := newProductionWipBatchStep()
 		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
 			for _, p := range preds {
 				p(s)

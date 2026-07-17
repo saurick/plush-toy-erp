@@ -317,9 +317,9 @@ func qualityInspectionMatchesCreate(row *ent.QualityInspection, in *biz.QualityI
 	return row.InspectionNo == in.InspectionNo &&
 		optionalIntValueOrZero(row.PurchaseReceiptID) == in.PurchaseReceiptID &&
 		sameOptionalInt(row.PurchaseReceiptItemID, in.PurchaseReceiptItemID) &&
-		row.InventoryLotID == in.InventoryLotID &&
+		optionalIntValueOrZero(row.InventoryLotID) == in.InventoryLotID &&
 		optionalIntValueOrZero(row.MaterialID) == in.MaterialID &&
-		row.WarehouseID == in.WarehouseID &&
+		optionalIntValueOrZero(row.WarehouseID) == in.WarehouseID &&
 		optionalStringValueOrEmpty(row.SourceType) == in.SourceType &&
 		optionalIntValueOrZero(row.SourceID) == in.SourceID &&
 		optionalStringValueOrEmpty(row.InspectionType) == in.InspectionType &&

@@ -8,6 +8,10 @@ import {
   isDateInputAfter,
   isDateInputBefore,
 } from '../../utils/dateRange.mjs'
+import {
+  BOM_PRODUCTION_OPERATION_OPTIONS,
+  normalizeBOMProductionOperationCode,
+} from '../../utils/bomProductionOperation.mjs'
 
 export function unixToDateInputValue(value) {
   if (!value) return ''
@@ -52,6 +56,9 @@ export function buildItemParams(values = {}, extra = {}) {
     ...extra,
     bom_header_id: Number(values.bom_header_id || extra.bom_header_id || 0),
     material_id: Number(values.material_id || 0),
+    production_operation_code: normalizeBOMProductionOperationCode(
+      values.production_operation_code
+    ),
     quantity: String(values.quantity || '').trim(),
     unit_id: Number(values.unit_id || 0),
     loss_rate: String(values.loss_rate ?? '0').trim(),
@@ -293,6 +300,18 @@ export function BOMItemFormFields({ materialOptions = [], unitOptions = [] }) {
           options={materialOptions}
           placeholder="请选择材料"
           showSearch
+        />
+      </Form.Item>
+      <Form.Item
+        className="erp-business-action-form__field"
+        label="生产工序归属"
+        name="production_operation_code"
+        extra="仅用于显式标记进入首道布料加工的材料，不按材料名称自动判断"
+      >
+        <Select
+          allowClear
+          options={BOM_PRODUCTION_OPERATION_OPTIONS}
+          placeholder="不指定"
         />
       </Form.Item>
       <Form.Item

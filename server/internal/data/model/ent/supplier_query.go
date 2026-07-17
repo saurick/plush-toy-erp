@@ -9,6 +9,7 @@ import (
 	"math"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/supplier"
@@ -22,13 +23,14 @@ import (
 // SupplierQuery is the builder for querying Supplier entities.
 type SupplierQuery struct {
 	config
-	ctx                   *QueryContext
-	order                 []supplier.OrderOption
-	inters                []Interceptor
-	predicates            []predicate.Supplier
-	withPurchaseOrders    *PurchaseOrderQuery
-	withPurchaseReceipts  *PurchaseReceiptQuery
-	withOutsourcingOrders *OutsourcingOrderQuery
+	ctx                     *QueryContext
+	order                   []supplier.OrderOption
+	inters                  []Interceptor
+	predicates              []predicate.Supplier
+	withPurchaseOrders      *PurchaseOrderQuery
+	withPurchaseReceipts    *PurchaseReceiptQuery
+	withOutsourcingOrders   *OutsourcingOrderQuery
+	withProcessCapabilities *ProcessQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -124,6 +126,28 @@ func (_q *SupplierQuery) QueryOutsourcingOrders() *OutsourcingOrderQuery {
 			sqlgraph.From(supplier.Table, supplier.FieldID, selector),
 			sqlgraph.To(outsourcingorder.Table, outsourcingorder.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, supplier.OutsourcingOrdersTable, supplier.OutsourcingOrdersColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryProcessCapabilities chains the current query on the "process_capabilities" edge.
+func (_q *SupplierQuery) QueryProcessCapabilities() *ProcessQuery {
+	query := (&ProcessClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(supplier.Table, supplier.FieldID, selector),
+			sqlgraph.To(process.Table, process.FieldID),
+			sqlgraph.Edge(sqlgraph.M2M, false, supplier.ProcessCapabilitiesTable, supplier.ProcessCapabilitiesPrimaryKey...),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -318,14 +342,15 @@ func (_q *SupplierQuery) Clone() *SupplierQuery {
 		return nil
 	}
 	return &SupplierQuery{
-		config:                _q.config,
-		ctx:                   _q.ctx.Clone(),
-		order:                 append([]supplier.OrderOption{}, _q.order...),
-		inters:                append([]Interceptor{}, _q.inters...),
-		predicates:            append([]predicate.Supplier{}, _q.predicates...),
-		withPurchaseOrders:    _q.withPurchaseOrders.Clone(),
-		withPurchaseReceipts:  _q.withPurchaseReceipts.Clone(),
-		withOutsourcingOrders: _q.withOutsourcingOrders.Clone(),
+		config:                  _q.config,
+		ctx:                     _q.ctx.Clone(),
+		order:                   append([]supplier.OrderOption{}, _q.order...),
+		inters:                  append([]Interceptor{}, _q.inters...),
+		predicates:              append([]predicate.Supplier{}, _q.predicates...),
+		withPurchaseOrders:      _q.withPurchaseOrders.Clone(),
+		withPurchaseReceipts:    _q.withPurchaseReceipts.Clone(),
+		withOutsourcingOrders:   _q.withOutsourcingOrders.Clone(),
+		withProcessCapabilities: _q.withProcessCapabilities.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
@@ -362,6 +387,17 @@ func (_q *SupplierQuery) WithOutsourcingOrders(opts ...func(*OutsourcingOrderQue
 		opt(query)
 	}
 	_q.withOutsourcingOrders = query
+	return _q
+}
+
+// WithProcessCapabilities tells the query-builder to eager-load the nodes that are connected to
+// the "process_capabilities" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *SupplierQuery) WithProcessCapabilities(opts ...func(*ProcessQuery)) *SupplierQuery {
+	query := (&ProcessClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withProcessCapabilities = query
 	return _q
 }
 
@@ -443,10 +479,11 @@ func (_q *SupplierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Sup
 	var (
 		nodes       = []*Supplier{}
 		_spec       = _q.querySpec()
-		loadedTypes = [3]bool{
+		loadedTypes = [4]bool{
 			_q.withPurchaseOrders != nil,
 			_q.withPurchaseReceipts != nil,
 			_q.withOutsourcingOrders != nil,
+			_q.withProcessCapabilities != nil,
 		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
@@ -487,6 +524,13 @@ func (_q *SupplierQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*Sup
 			func(n *Supplier, e *OutsourcingOrder) {
 				n.Edges.OutsourcingOrders = append(n.Edges.OutsourcingOrders, e)
 			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withProcessCapabilities; query != nil {
+		if err := _q.loadProcessCapabilities(ctx, query, nodes,
+			func(n *Supplier) { n.Edges.ProcessCapabilities = []*Process{} },
+			func(n *Supplier, e *Process) { n.Edges.ProcessCapabilities = append(n.Edges.ProcessCapabilities, e) }); err != nil {
 			return nil, err
 		}
 	}
@@ -583,6 +627,67 @@ func (_q *SupplierQuery) loadOutsourcingOrders(ctx context.Context, query *Outso
 			return fmt.Errorf(`unexpected referenced foreign-key "supplier_id" returned %v for node %v`, fk, n.ID)
 		}
 		assign(node, n)
+	}
+	return nil
+}
+func (_q *SupplierQuery) loadProcessCapabilities(ctx context.Context, query *ProcessQuery, nodes []*Supplier, init func(*Supplier), assign func(*Supplier, *Process)) error {
+	edgeIDs := make([]driver.Value, len(nodes))
+	byID := make(map[int]*Supplier)
+	nids := make(map[int]map[*Supplier]struct{})
+	for i, node := range nodes {
+		edgeIDs[i] = node.ID
+		byID[node.ID] = node
+		if init != nil {
+			init(node)
+		}
+	}
+	query.Where(func(s *sql.Selector) {
+		joinT := sql.Table(supplier.ProcessCapabilitiesTable)
+		s.Join(joinT).On(s.C(process.FieldID), joinT.C(supplier.ProcessCapabilitiesPrimaryKey[1]))
+		s.Where(sql.InValues(joinT.C(supplier.ProcessCapabilitiesPrimaryKey[0]), edgeIDs...))
+		columns := s.SelectedColumns()
+		s.Select(joinT.C(supplier.ProcessCapabilitiesPrimaryKey[0]))
+		s.AppendSelect(columns...)
+		s.SetDistinct(false)
+	})
+	if err := query.prepareQuery(ctx); err != nil {
+		return err
+	}
+	qr := QuerierFunc(func(ctx context.Context, q Query) (Value, error) {
+		return query.sqlAll(ctx, func(_ context.Context, spec *sqlgraph.QuerySpec) {
+			assign := spec.Assign
+			values := spec.ScanValues
+			spec.ScanValues = func(columns []string) ([]any, error) {
+				values, err := values(columns[1:])
+				if err != nil {
+					return nil, err
+				}
+				return append([]any{new(sql.NullInt64)}, values...), nil
+			}
+			spec.Assign = func(columns []string, values []any) error {
+				outValue := int(values[0].(*sql.NullInt64).Int64)
+				inValue := int(values[1].(*sql.NullInt64).Int64)
+				if nids[inValue] == nil {
+					nids[inValue] = map[*Supplier]struct{}{byID[outValue]: {}}
+					return assign(columns[1:], values[1:])
+				}
+				nids[inValue][byID[outValue]] = struct{}{}
+				return nil
+			}
+		})
+	})
+	neighbors, err := withInterceptors[[]*Process](ctx, query, qr, query.inters)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected "process_capabilities" node returned %v`, n.ID)
+		}
+		for kn := range nodes {
+			assign(kn, n)
+		}
 	}
 	return nil
 }

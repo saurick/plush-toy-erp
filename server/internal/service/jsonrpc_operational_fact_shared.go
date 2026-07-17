@@ -186,6 +186,8 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同或明细当前状态不允许登记或确认"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactQuantityExceeded):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次数量将超过委外合同明细剩余可办理数量"}
+	case errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该外发发料已用于在制生产，撤销后将不足，不能取消"}
 	case errors.Is(err, biz.ErrOutsourcingReturnQualityDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该委外回货已有未取消的质检单，请先完成或取消质检后再撤销回货"}
 	case errors.Is(err, biz.ErrOutsourcingReturnFinanceDependency):
@@ -206,6 +208,22 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"}
 	case errors.Is(err, biz.ErrShipmentFinanceDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有未取消的应收或发票记录，请先取消相关财务记录"}
+	case errors.Is(err, biz.ErrShipmentQualityPending):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"}
+	case errors.Is(err, biz.ErrShipmentQualityRejected):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单的出货前成品检验不合格，请先完成质量处置"}
+	case errors.Is(err, biz.ErrShipmentReleaseRequired):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先在出货单提交出货放行，再确认出货"}
+	case errors.Is(err, biz.ErrShipmentReleasePending):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务尚未完成，请先完成或解除阻塞"}
+	case errors.Is(err, biz.ErrShipmentReleaseRejected):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务已退回，请取消当前出货单后重新登记"}
+	case errors.Is(err, biz.ErrShipmentCancellationTaskActive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"}
+	case errors.Is(err, biz.ErrProductionExceptionTaskRequired):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该返工记录缺少来源生成的异常协同任务，请联系管理员核对"}
+	case errors.Is(err, biz.ErrProductionExceptionTaskActive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请先完成或退回生产异常任务，再取消已确认的返工记录"}
 	case errors.Is(err, biz.ErrStockReservationNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存预留不存在"}
 	case errors.Is(err, biz.ErrStockReservationSourceMismatch):

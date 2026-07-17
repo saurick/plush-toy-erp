@@ -233,6 +233,8 @@ func (d *jsonrpcDispatcher) Handle(
 		return d.handlePurchaseOrder(ctx, method, id, params)
 	case "production_order":
 		return d.handleProductionOrder(ctx, method, id, params)
+	case "production_wip":
+		return d.handleProductionWIP(ctx, method, id, params)
 	case "outsourcing_order":
 		return d.handleOutsourcingOrder(ctx, method, id, params)
 	case "purchase":

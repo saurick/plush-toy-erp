@@ -282,6 +282,7 @@ export function createBlankEngineeringDraft(templateKey) {
           createEmptyEngineeringImageSlot(),
         ])
       ),
+      appendixImages: [],
     })
   }
 
@@ -295,6 +296,7 @@ export function createBlankEngineeringDraft(templateKey) {
       auditor: '',
       reviewer: '',
       blocks: [createBlankColorCardBlock()],
+      appendixImages: [],
     })
   }
 
@@ -320,6 +322,7 @@ export function createBlankEngineeringDraft(templateKey) {
           createEmptyEngineeringImageSlot(),
         ])
       ),
+      appendixImages: [],
     })
   }
 

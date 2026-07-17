@@ -17,15 +17,50 @@ export const PRESSURE_LEVELS = Object.freeze([
 export function percentile(values, ratio) {
   if (!values.length) return 0;
   const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)];
+  return sorted[
+    Math.min(sorted.length - 1, Math.ceil(sorted.length * ratio) - 1)
+  ];
 }
 
 export function normalizeLoopbackURL(value) {
   const url = new URL(String(value || "http://127.0.0.1:8300"));
-  if (url.protocol !== "http:" || !LOCAL_HOSTS.has(url.hostname) || url.username || url.password) {
-    throw new Error("pressure target must be loopback HTTP without credentials");
+  if (
+    url.protocol !== "http:" ||
+    !LOCAL_HOSTS.has(url.hostname) ||
+    url.username ||
+    url.password
+  ) {
+    throw new Error(
+      "pressure target must be loopback HTTP without credentials",
+    );
   }
   return url.origin;
+}
+
+export function selectCapacityIdempotencyTask(
+  tasks = [],
+  { sourceType, sourceID } = {},
+) {
+  const expectedSourceType = String(sourceType || "").trim();
+  const expectedSourceID = Number(sourceID);
+  if (
+    !expectedSourceType ||
+    !Number.isSafeInteger(expectedSourceID) ||
+    expectedSourceID <= 0
+  ) {
+    return undefined;
+  }
+  return (Array.isArray(tasks) ? tasks : []).find(
+    (task) =>
+      task?.task_group === "trial_pmc_work" &&
+      task?.task_status_key === "ready" &&
+      task?.owner_role_key === "pmc" &&
+      task?.source_type === expectedSourceType &&
+      Number(task?.source_id) === expectedSourceID &&
+      task?.payload?.simulated_only === true &&
+      task?.payload?.real_customer_data === false &&
+      task?.payload?.trial_task === true,
+  );
 }
 
 async function readDatabaseStats(databaseURL) {
@@ -47,7 +82,10 @@ function startDatabaseSampler(databaseURL) {
   const run = async () => {
     if (stopped) return;
     try {
-      samples.push({ at: new Date().toISOString(), ...(await readDatabaseStats(databaseURL)) });
+      samples.push({
+        at: new Date().toISOString(),
+        ...(await readDatabaseStats(databaseURL)),
+      });
     } catch (error) {
       samples.push({ at: new Date().toISOString(), error: error.message });
     }
@@ -62,11 +100,26 @@ function startDatabaseSampler(databaseURL) {
     return {
       sampleCount: samples.length,
       sampleErrors: samples.filter((item) => item.error).length,
-      maxBackends: Math.max(0, ...valid.map((item) => Number(item.backends || 0))),
-      maxActiveQueries: Math.max(0, ...valid.map((item) => Number(item.active_queries || 0))),
-      maxLockWaiters: Math.max(0, ...valid.map((item) => Number(item.lock_waiters || 0))),
-      maxDeadlocks: Math.max(0, ...valid.map((item) => Number(item.deadlocks || 0))),
-      maxConflicts: Math.max(0, ...valid.map((item) => Number(item.conflicts || 0))),
+      maxBackends: Math.max(
+        0,
+        ...valid.map((item) => Number(item.backends || 0)),
+      ),
+      maxActiveQueries: Math.max(
+        0,
+        ...valid.map((item) => Number(item.active_queries || 0)),
+      ),
+      maxLockWaiters: Math.max(
+        0,
+        ...valid.map((item) => Number(item.lock_waiters || 0)),
+      ),
+      maxDeadlocks: Math.max(
+        0,
+        ...valid.map((item) => Number(item.deadlocks || 0)),
+      ),
+      maxConflicts: Math.max(
+        0,
+        ...valid.map((item) => Number(item.conflicts || 0)),
+      ),
     };
   };
 }
@@ -77,22 +130,43 @@ async function rpc({ baseURL, domain, method, params = {}, token = "" }) {
     const response = await fetch(`${baseURL}/rpc/${domain}`, {
       method: "POST",
       redirect: "error",
-      headers: { "content-type": "application/json", ...(token ? { authorization: `Bearer ${token}` } : {}) },
-      body: JSON.stringify({ jsonrpc: "2.0", id: `pressure-${Date.now()}-${Math.random()}`, method, params }),
+      headers: {
+        "content-type": "application/json",
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
+      },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: `pressure-${Date.now()}-${Math.random()}`,
+        method,
+        params,
+      }),
     });
     const body = await response.json();
     const durationMs = performance.now() - started;
     if (!response.ok || body?.result?.code !== 0) {
-      return { ok: false, durationMs, error: `${domain}.${method}:${body?.result?.code ?? response.status}:${body?.result?.message || "failed"}` };
+      return {
+        ok: false,
+        durationMs,
+        error: `${domain}.${method}:${body?.result?.code ?? response.status}:${body?.result?.message || "failed"}`,
+      };
     }
     return { ok: true, durationMs, data: body.result.data || {} };
   } catch (error) {
-    return { ok: false, durationMs: performance.now() - started, error: `${domain}.${method}:transport:${error.message}` };
+    return {
+      ok: false,
+      durationMs: performance.now() - started,
+      error: `${domain}.${method}:transport:${error.message}`,
+    };
   }
 }
 
 async function login(baseURL, username, password) {
-  const result = await rpc({ baseURL, domain: "auth", method: "admin_login", params: { username, password } });
+  const result = await rpc({
+    baseURL,
+    domain: "auth",
+    method: "admin_login",
+    params: { username, password },
+  });
   if (!result.ok) throw new Error(result.error);
   const token = result.data.access_token || result.data.token;
   if (!token) throw new Error(`${username} login response missing token`);
@@ -116,7 +190,9 @@ async function runLevel({ level, requestFactory }) {
   const successes = results.filter((item) => item.ok);
   const durations = results.map((item) => item.durationMs);
   const errors = Object.fromEntries(
-    [...new Set(results.filter((item) => !item.ok).map((item) => item.error))].map((error) => [
+    [
+      ...new Set(results.filter((item) => !item.ok).map((item) => item.error)),
+    ].map((error) => [
       error,
       results.filter((item) => item.error === error).length,
     ]),
@@ -140,41 +216,121 @@ async function runLevel({ level, requestFactory }) {
   };
 }
 
-export async function runIsolatedPressure({ baseURL, password, confirm, databaseName, databaseURL }) {
+export async function runIsolatedPressure({
+  baseURL,
+  password,
+  confirm,
+  databaseName,
+  databaseURL,
+  taskSourceType,
+  taskSourceID,
+}) {
   baseURL = normalizeLoopbackURL(baseURL);
-  if (confirm !== CONFIRM_PHRASE) throw new Error(`confirmation must equal ${CONFIRM_PHRASE}`);
+  if (confirm !== CONFIRM_PHRASE)
+    throw new Error(`confirmation must equal ${CONFIRM_PHRASE}`);
   if (!/^plush_erp_capacity_[a-z0-9_]+$/u.test(String(databaseName || ""))) {
-    throw new Error("databaseName must identify a disposable plush_erp_capacity_* database");
+    throw new Error(
+      "databaseName must identify a disposable plush_erp_capacity_* database",
+    );
   }
   const parsedDatabaseURL = new URL(String(databaseURL || ""));
   if (parsedDatabaseURL.pathname !== `/${databaseName}`) {
-    throw new Error("databaseURL must point to the declared disposable databaseName");
+    throw new Error(
+      "databaseURL must point to the declared disposable databaseName",
+    );
   }
-  if (!password) throw new Error("MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required");
+  if (!password)
+    throw new Error("MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required");
+  taskSourceType = String(taskSourceType || "").trim();
+  taskSourceID = Number(taskSourceID);
+  if (
+    !taskSourceType ||
+    !Number.isSafeInteger(taskSourceID) ||
+    taskSourceID <= 0
+  ) {
+    throw new Error(
+      "taskSourceType and taskSourceID must bind the simulated pressure task batch",
+    );
+  }
 
   const admin = await login(baseURL, "admin", password);
-  if (admin.profile.is_super_admin !== true) throw new Error("admin must be super admin for runtime guard");
-  const capabilities = await rpc({ baseURL, domain: "debug", method: "capabilities", token: admin.token });
-  if (!capabilities.ok || !new Set(["local", "dev"]).has(capabilities.data.environment)) throw new Error("runtime must report local/dev");
-  const session = await rpc({ baseURL, domain: "customer_config", method: "get_effective_session", params: { customer_key: "yoyoosun" }, token: admin.token });
-  if (!session.ok || session.data.session?.source !== "active_customer_config_revision") throw new Error("active yoyoosun revision is required");
+  if (admin.profile.is_super_admin !== true)
+    throw new Error("admin must be super admin for runtime guard");
+  const capabilities = await rpc({
+    baseURL,
+    domain: "debug",
+    method: "capabilities",
+    token: admin.token,
+  });
+  if (
+    !capabilities.ok ||
+    !new Set(["local", "dev"]).has(capabilities.data.environment)
+  )
+    throw new Error("runtime must report local/dev");
+  const session = await rpc({
+    baseURL,
+    domain: "customer_config",
+    method: "get_effective_session",
+    params: { customer_key: "yoyoosun" },
+    token: admin.token,
+  });
+  if (
+    !session.ok ||
+    session.data.session?.source !== "active_customer_config_revision"
+  )
+    throw new Error("active yoyoosun revision is required");
 
   const accounts = {};
-  for (const [key, username] of Object.entries({ pmc: "demo_pmc", production: "demo_production", finance: "demo_finance", sales: "demo_sales" })) {
+  for (const [key, username] of Object.entries({
+    pmc: "demo_pmc",
+    production: "demo_production",
+    finance: "demo_finance",
+    sales: "demo_sales",
+  })) {
     accounts[key] = await login(baseURL, username, password);
   }
 
   const probes = [
-    { key: "workflow", domain: "workflow", method: "list_tasks", token: accounts.pmc.token, params: (index) => ({ limit: 50, offset: (index * 50) % 4950 }) },
-    { key: "production", domain: "operational_fact", method: "list_production_facts", token: accounts.production.token, params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }) },
-    { key: "finance", domain: "operational_fact", method: "list_finance_facts", token: accounts.finance.token, params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }) },
-    { key: "attachments", domain: "attachment", method: "list_attachments", token: accounts.sales.token, params: () => ({ owner_type: "sales_order", owner_id: 47 }) },
+    {
+      key: "workflow",
+      domain: "workflow",
+      method: "list_tasks",
+      token: accounts.pmc.token,
+      params: (index) => ({ limit: 50, offset: (index * 50) % 4950 }),
+    },
+    {
+      key: "production",
+      domain: "operational_fact",
+      method: "list_production_facts",
+      token: accounts.production.token,
+      params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }),
+    },
+    {
+      key: "finance",
+      domain: "operational_fact",
+      method: "list_finance_facts",
+      token: accounts.finance.token,
+      params: (index) => ({ limit: 50, offset: (index * 50) % 1950 }),
+    },
+    {
+      key: "attachments",
+      domain: "attachment",
+      method: "list_attachments",
+      token: accounts.sales.token,
+      params: () => ({ owner_type: "sales_order", owner_id: 47 }),
+    },
   ];
   const baseline = {};
   for (const probe of probes) {
     const result = await rpc({ baseURL, ...probe, params: probe.params(0) });
-    if (!result.ok) throw new Error(`baseline ${probe.key} failed: ${result.error}`);
-    baseline[probe.key] = Number(result.data.total ?? result.data.attachments?.length ?? result.data[`${probe.key}_facts`]?.length ?? 0);
+    if (!result.ok)
+      throw new Error(`baseline ${probe.key} failed: ${result.error}`);
+    baseline[probe.key] = Number(
+      result.data.total ??
+        result.data.attachments?.length ??
+        result.data[`${probe.key}_facts`]?.length ??
+        0,
+    );
   }
 
   const databaseBefore = await readDatabaseStats(databaseURL);
@@ -186,15 +342,40 @@ export async function runIsolatedPressure({ baseURL, password, confirm, database
         level,
         requestFactory: (index) => {
           const probe = probes[index % probes.length];
-          return rpc({ baseURL, domain: probe.domain, method: probe.method, token: probe.token, params: probe.params(index) });
+          return rpc({
+            baseURL,
+            domain: probe.domain,
+            method: probe.method,
+            token: probe.token,
+            params: probe.params(index),
+          });
         },
       }),
     );
   }
 
-  const taskList = await rpc({ baseURL, domain: "workflow", method: "list_tasks", token: accounts.pmc.token, params: { task_group: "production_scheduling", task_status_key: "ready", limit: 20 } });
-  const task = taskList.data?.tasks?.[0];
-  if (!task?.id || !task?.version) throw new Error("idempotency probe task is missing");
+  const taskList = await rpc({
+    baseURL,
+    domain: "workflow",
+    method: "list_tasks",
+    token: accounts.pmc.token,
+    params: {
+      task_group: "trial_pmc_work",
+      task_status_key: "ready",
+      source_type: taskSourceType,
+      source_id: taskSourceID,
+      limit: 20,
+    },
+  });
+  const task = selectCapacityIdempotencyTask(taskList.data?.tasks, {
+    sourceType: taskSourceType,
+    sourceID: taskSourceID,
+  });
+  if (!task?.id || !task?.version) {
+    throw new Error(
+      "same-batch simulated trial_pmc_work idempotency probe task is missing",
+    );
+  }
   const idempotencyKey = `capacity-idempotency-${databaseName}-${task.id}`;
   const idempotencyInitialResults = await Promise.all(
     Array.from({ length: 20 }, () =>
@@ -238,7 +419,11 @@ export async function runIsolatedPressure({ baseURL, password, confirm, database
     ...idempotencyInitialResults.filter((item) => item.ok),
     ...idempotencyRetryResults.filter((item) => item.ok),
   ];
-  const idempotencyVersions = [...new Set(allSuccessfulIdempotencyResults.map((item) => item.data.task?.version))];
+  const idempotencyVersions = [
+    ...new Set(
+      allSuccessfulIdempotencyResults.map((item) => item.data.task?.version),
+    ),
+  ];
   const initialErrors = Object.fromEntries(
     [...new Set(initialFailures.map((item) => item.error))].map((error) => [
       error,
@@ -248,8 +433,14 @@ export async function runIsolatedPressure({ baseURL, password, confirm, database
   const after = {};
   for (const probe of probes) {
     const result = await rpc({ baseURL, ...probe, params: probe.params(0) });
-    if (!result.ok) throw new Error(`after ${probe.key} failed: ${result.error}`);
-    after[probe.key] = Number(result.data.total ?? result.data.attachments?.length ?? result.data[`${probe.key}_facts`]?.length ?? 0);
+    if (!result.ok)
+      throw new Error(`after ${probe.key} failed: ${result.error}`);
+    after[probe.key] = Number(
+      result.data.total ??
+        result.data.attachments?.length ??
+        result.data[`${probe.key}_facts`]?.length ??
+        0,
+    );
   }
   const databaseSampling = await stopDatabaseSampler();
   const databaseAfter = await readDatabaseStats(databaseURL);
@@ -267,17 +458,27 @@ export async function runIsolatedPressure({ baseURL, password, confirm, database
     levels,
     idempotency: {
       concurrency: 20,
-      initialSuccesses: idempotencyInitialResults.filter((item) => item.ok).length,
+      initialSuccesses: idempotencyInitialResults.filter((item) => item.ok)
+        .length,
       initialFailures: initialFailures.length,
       initialErrors,
       retryAttempts: idempotencyRetryResults.length,
       retrySuccesses: idempotencyRetryResults.filter((item) => item.ok).length,
-      eventualFailures: idempotencyRetryResults.filter((item) => !item.ok).length,
+      eventualFailures: idempotencyRetryResults.filter((item) => !item.ok)
+        .length,
       resultVersions: idempotencyVersions,
       singleResultVersion: idempotencyVersions.length === 1,
     },
-    consistency: { baseline, after, unchanged: JSON.stringify(baseline) === JSON.stringify(after) },
-    database: { before: databaseBefore, after: databaseAfter, sampling: databaseSampling },
+    consistency: {
+      baseline,
+      after,
+      unchanged: JSON.stringify(baseline) === JSON.stringify(after),
+    },
+    database: {
+      before: databaseBefore,
+      after: databaseAfter,
+      sampling: databaseSampling,
+    },
     passed:
       levels.every((item) => item.successRate === 1) &&
       idempotencyRetryResults.every((item) => item.ok) &&
@@ -294,19 +495,33 @@ export async function runIsolatedPressure({ baseURL, password, confirm, database
 }
 
 async function main() {
-  const args = new Map(process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]));
+  const args = new Map(
+    process.argv.slice(2).map((value, index, all) => [value, all[index + 1]]),
+  );
   const report = await runIsolatedPressure({
     baseURL: args.get("--base-url") || "http://127.0.0.1:8300",
     databaseName: args.get("--database-name"),
     databaseURL: process.env.MANUAL_ACCEPTANCE_PRESSURE_DATABASE_URL,
     password: process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     confirm: process.env.MANUAL_ACCEPTANCE_PRESSURE_CONFIRM,
+    taskSourceType: args.get("--task-source-type"),
+    taskSourceID: args.get("--task-source-id"),
   });
-  const out = args.get("--out") || "output/qa/manual-acceptance/capacity-pressure/report.json";
+  const out =
+    args.get("--out") ||
+    "output/qa/manual-acceptance/capacity-pressure/report.json";
   fs.mkdirSync(path.dirname(out), { recursive: true });
   fs.writeFileSync(out, `${JSON.stringify(report, null, 2)}\n`);
-  process.stdout.write(`[qa:manual-acceptance-capacity-pressure] passed=${report.passed} report=${out}\n`);
+  process.stdout.write(
+    `[qa:manual-acceptance-capacity-pressure] passed=${report.passed} report=${out}\n`,
+  );
   if (!report.passed) process.exitCode = 1;
 }
 
-if (process.argv[1]?.endsWith("manual-acceptance-capacity-pressure.mjs")) main().catch((error) => { console.error(`[qa:manual-acceptance-capacity-pressure][fatal] ${error.stack || error}`); process.exitCode = 1; });
+if (process.argv[1]?.endsWith("manual-acceptance-capacity-pressure.mjs"))
+  main().catch((error) => {
+    console.error(
+      `[qa:manual-acceptance-capacity-pressure][fatal] ${error.stack || error}`,
+    );
+    process.exitCode = 1;
+  });

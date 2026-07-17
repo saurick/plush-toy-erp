@@ -55,6 +55,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	staleProcessCategory := "客户端伪造分类"
 	staleUnitName := "客户端伪造单位"
 	productOrderNo := "SO-TRACE-001"
+	processingItem := "脸*1"
 	lineNote := "客户允许的独立加工说明"
 	created, err := uc.SaveOutsourcingOrderWithItems(ctx, 0, &biz.OutsourcingOrderMutation{
 		OutsourcingOrderNo: "OUT-SUBJECT-001",
@@ -72,6 +73,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 			SKUCodeSnapshot:         &staleSKUCode,
 			ProductOrderNoSnapshot:  &productOrderNo,
 			ProductNameSnapshot:     &staleProductName,
+			ProcessingItem:          &processingItem,
 			ProcessNameSnapshot:     &staleProcessName,
 			ProcessCategorySnapshot: &staleProcessCategory,
 			UnitNameSnapshot:        &staleUnitName,
@@ -90,6 +92,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 		productLine.SKUCodeSnapshot == nil || *productLine.SKUCodeSnapshot != productSKU.SkuCode ||
 		productLine.ProductNameSnapshot == nil || *productLine.ProductNameSnapshot != product.Name ||
 		productLine.ProductOrderNoSnapshot == nil || *productLine.ProductOrderNoSnapshot != productOrderNo ||
+		productLine.ProcessingItem == nil || *productLine.ProcessingItem != processingItem ||
 		productLine.ProcessNameSnapshot == nil || *productLine.ProcessNameSnapshot != process.Name ||
 		productLine.ProcessCategorySnapshot == nil || *productLine.ProcessCategorySnapshot != *process.Category ||
 		productLine.UnitNameSnapshot == nil || *productLine.UnitNameSnapshot != unit.Name ||
@@ -123,6 +126,7 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 			ProductNameSnapshot:     &staleProductName,
 			MaterialCodeSnapshot:    &staleMaterialCode,
 			MaterialNameSnapshot:    &staleMaterialName,
+			ProcessingItem:          &processingItem,
 			ProcessNameSnapshot:     &staleProcessName,
 			ProcessCategorySnapshot: &staleProcessCategory,
 			UnitNameSnapshot:        &staleUnitName,
@@ -140,10 +144,10 @@ func TestOutsourcingOrderRepoProductAndMaterialSubjects(t *testing.T) {
 	if line.SubjectType != biz.OutsourcingOrderSubjectMaterial || line.ProductID != nil || line.ProductSKUID != nil || line.SKUCodeSnapshot != nil || line.MaterialID == nil || *line.MaterialID != material.ID {
 		t.Fatalf("expected material subject exactly-one after switch, got %#v", line)
 	}
-	if line.ProductNoSnapshot != nil || line.ProductOrderNoSnapshot != nil || line.ProductNameSnapshot != nil || line.MaterialCodeSnapshot == nil || *line.MaterialCodeSnapshot != material.Code || line.MaterialNameSnapshot == nil || *line.MaterialNameSnapshot != material.Name {
-		t.Fatalf("expected product residue cleared and material snapshots persisted, got %#v", line)
+	if line.ProductNoSnapshot != nil || line.ProductOrderNoSnapshot == nil || *line.ProductOrderNoSnapshot != productOrderNo || line.ProductNameSnapshot != nil || line.MaterialCodeSnapshot == nil || *line.MaterialCodeSnapshot != material.Code || line.MaterialNameSnapshot == nil || *line.MaterialNameSnapshot != material.Name {
+		t.Fatalf("expected product identity residue cleared while source order trace and material snapshots persist, got %#v", line)
 	}
-	if line.ProcessNameSnapshot == nil || *line.ProcessNameSnapshot != process.Name || line.ProcessCategorySnapshot == nil || *line.ProcessCategorySnapshot != *process.Category || line.UnitNameSnapshot == nil || *line.UnitNameSnapshot != unit.Name || line.Note == nil || *line.Note != lineNote {
+	if line.ProcessingItem == nil || *line.ProcessingItem != processingItem || line.ProcessNameSnapshot == nil || *line.ProcessNameSnapshot != process.Name || line.ProcessCategorySnapshot == nil || *line.ProcessCategorySnapshot != *process.Category || line.UnitNameSnapshot == nil || *line.UnitNameSnapshot != unit.Name || line.Note == nil || *line.Note != lineNote {
 		t.Fatalf("expected canonical process/unit snapshots and independent note after subject switch, got %#v", line)
 	}
 	if err := client.Material.DeleteOneID(material.ID).Exec(ctx); !ent.IsConstraintError(err) {

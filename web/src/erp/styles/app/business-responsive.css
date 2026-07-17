@@ -130,12 +130,13 @@
   flex: 1 1 auto;
 }
 
-.erp-business-collaboration-task-panel__title-line > strong,
-.erp-business-collaboration-task-panel__title-line > .ant-typography {
+.erp-business-collaboration-task-panel__title-line > strong {
   flex: none;
 }
 
 .erp-business-collaboration-task-panel__title-line > .ant-typography {
+  min-width: 60px;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -888,7 +889,11 @@
   }
 
   .erp-business-collaboration-task-panel__summary-item:first-child {
-    max-width: 42%;
+    display: none;
+  }
+
+  .erp-business-collaboration-task-panel__summary-item--blocked {
+    display: none;
   }
 
   .erp-business-collaboration-task-panel__actions {

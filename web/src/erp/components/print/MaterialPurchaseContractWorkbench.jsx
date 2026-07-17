@@ -51,6 +51,10 @@ import {
   useFlushPrintWorkspaceDraftOnPageExit,
   usePersistentPrintWorkspaceDraft,
 } from '../../utils/usePersistentPrintWorkspaceDraft.js'
+import { normalizePrintAppendixImages } from '../../utils/printAppendixImages.mjs'
+import PrintAppendixImageManager, {
+  PrintAppendixImages,
+} from './PrintAppendixImages.jsx'
 
 const CLAUSE_SECTIONS = [
   { key: 'delivery', title: '一、来货要求' },
@@ -427,6 +431,21 @@ export default function MaterialPurchaseContractWorkbench({
     }))
   }
 
+  const handleAppendixImagesChange = (images) => {
+    let persisted = true
+    setDraft((currentDraft) => {
+      const nextDraft = {
+        ...currentDraft,
+        appendixImages: normalizePrintAppendixImages(images),
+      }
+      persisted =
+        !draftStorageKey ||
+        persistPrintWorkspaceDraftSnapshot(draftStorageKey, nextDraft)
+      return nextDraft
+    })
+    return persisted
+  }
+
   const handleLineCommit = (rowIndex, columnKey, nextValue, options = {}) => {
     setDraft((currentDraft) => ({
       ...currentDraft,
@@ -716,7 +735,7 @@ export default function MaterialPurchaseContractWorkbench({
     modal.confirm({
       title: '生成空白采购合同',
       content:
-        '将清空当前窗口中的字段值和明细，保留模板结构与合同条款。此操作不会修改业务记录。',
+        '将清空当前窗口中的字段值、明细和末尾图片，保留模板结构与合同条款。此操作不会修改业务记录。',
       okText: '生成空白模板',
       cancelText: '取消',
       onOk: () => {
@@ -966,8 +985,15 @@ export default function MaterialPurchaseContractWorkbench({
       title="采购合同"
       sourceTag={sourceTag}
       statusText={toolbarStatus}
-      panelTip="提示：左侧字段与右侧采购合同双向同步；右侧仅中间采购明细区保留表格，合同头、条款和签字区都按纸质合同排版。"
+      panelTip="提示：左侧字段与右侧采购合同双向同步；普通末尾图片自动两张一行，长图自动整行，每张可切换排版，并随 PDF / 打印一起输出。"
       prepareSignature={`${draftStorageKey}:${resetDraftOnOpen ? 'fresh' : 'restore'}`}
+      panelActions={
+        <PrintAppendixImageManager
+          images={draft.appendixImages}
+          onImagesChange={handleAppendixImagesChange}
+          onStatusChange={setToolbarStatus}
+        />
+      }
       detailEditor={detailEditor}
       fieldRows={fieldRows}
       formulaPanel={
@@ -1436,6 +1462,7 @@ export default function MaterialPurchaseContractWorkbench({
               </div>
             </div>
           </div>
+          <PrintAppendixImages images={draft.appendixImages} />
         </div>
       </div>
     </PrintWorkspaceShell>

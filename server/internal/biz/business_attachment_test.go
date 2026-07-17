@@ -1,9 +1,13 @@
 package biz
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
+	"image"
+	"image/jpeg"
+	"image/png"
 	"testing"
 )
 
@@ -12,6 +16,9 @@ type stubBusinessAttachmentRepo struct {
 	created      *BusinessAttachmentCreate
 	current      *BusinessAttachment
 	contentCalls int
+	clearCalls   int
+	clearProduct int
+	clearSlot    string
 }
 
 func (r *stubBusinessAttachmentRepo) CreateBusinessAttachment(_ context.Context, in *BusinessAttachmentCreate) (*BusinessAttachment, error) {
@@ -21,12 +28,20 @@ func (r *stubBusinessAttachmentRepo) CreateBusinessAttachment(_ context.Context,
 		OwnerType:      in.OwnerType,
 		OwnerID:        in.OwnerID,
 		AttachmentType: in.AttachmentType,
+		SlotKey:        in.SlotKey,
 		FileName:       in.FileName,
 		MimeType:       in.MimeType,
 		FileSize:       in.FileSize,
 		SHA256:         in.SHA256,
 		Content:        in.Content,
 	}, nil
+}
+
+func (r *stubBusinessAttachmentRepo) ClearProductImage(_ context.Context, productID int, slotKey string) error {
+	r.clearCalls++
+	r.clearProduct = productID
+	r.clearSlot = slotKey
+	return nil
 }
 
 func (r *stubBusinessAttachmentRepo) ListBusinessAttachments(context.Context, string, int) ([]*BusinessAttachment, error) {
@@ -130,6 +145,272 @@ func TestBusinessAttachmentUploadAllowsEvidenceMimeTypes(t *testing.T) {
 				t.Fatalf("unexpected mime type: %s", item.MimeType)
 			}
 		})
+	}
+}
+
+func TestBusinessAttachmentUploadAcceptsOnlyControlledProductImageSlotsAndFormats(t *testing.T) {
+	cases := []struct {
+		name     string
+		slotKey  string
+		fileName string
+		mimeType string
+	}{
+		{name: "primary png", slotKey: " PRIMARY ", fileName: "正面.png", mimeType: "image/png"},
+		{name: "secondary jpeg", slotKey: "secondary", fileName: "侧面.jpeg", mimeType: "image/jpeg"},
+		{name: "primary webp", slotKey: "primary", fileName: "背面.webp", mimeType: "image/webp"},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubBusinessAttachmentRepo{ownerExists: true}
+			uc := NewBusinessAttachmentUsecase(repo)
+			item, err := uc.UploadBusinessAttachment(context.Background(), &BusinessAttachmentUploadInput{
+				OwnerType:      BusinessAttachmentOwnerProduct,
+				OwnerID:        7,
+				AttachmentType: BusinessAttachmentTypeProductImage,
+				SlotKey:        &tc.slotKey,
+				FileName:       tc.fileName,
+				MimeType:       tc.mimeType,
+				ContentBase64:  base64.StdEncoding.EncodeToString(productImageTestContent(t, tc.mimeType, 1, 1)),
+			})
+			if err != nil {
+				t.Fatalf("product image upload should pass: %v", err)
+			}
+			if item.SlotKey == nil || !IsBusinessAttachmentProductImageSlotAllowed(*item.SlotKey) {
+				t.Fatalf("unexpected normalized product image slot: %#v", item)
+			}
+		})
+	}
+}
+
+func productImageTestContent(t *testing.T, mimeType string, width, height int) []byte {
+	t.Helper()
+	var buffer bytes.Buffer
+	switch mimeType {
+	case "image/png":
+		if err := png.Encode(&buffer, image.NewRGBA(image.Rect(0, 0, width, height))); err != nil {
+			t.Fatalf("encode PNG fixture: %v", err)
+		}
+	case "image/jpeg":
+		if err := jpeg.Encode(&buffer, image.NewRGBA(image.Rect(0, 0, width, height)), nil); err != nil {
+			t.Fatalf("encode JPEG fixture: %v", err)
+		}
+	case "image/webp":
+		if width != 1 || height != 1 {
+			t.Fatalf("WebP fixture is fixed at 1x1, got %dx%d", width, height)
+		}
+		content, err := base64.StdEncoding.DecodeString("UklGRiQAAABXRUJQVlA4IBgAAAAwAQCdASoBAAEAAgA0JaQAA3AA/vuUAAA=")
+		if err != nil {
+			t.Fatalf("decode WebP fixture: %v", err)
+		}
+		return content
+	default:
+		t.Fatalf("unsupported fixture mime type %q", mimeType)
+	}
+	return buffer.Bytes()
+}
+
+func truncatedProductImagePNGWithReadableConfig(t *testing.T) []byte {
+	t.Helper()
+	img := image.NewRGBA(image.Rect(0, 0, 64, 64))
+	value := uint32(1)
+	for i := range img.Pix {
+		value = value*1_664_525 + 1_013_904_223
+		img.Pix[i] = byte(value >> 24)
+	}
+	var buffer bytes.Buffer
+	if err := png.Encode(&buffer, img); err != nil {
+		t.Fatalf("encode PNG fixture: %v", err)
+	}
+	content := buffer.Bytes()
+	truncated := append([]byte(nil), content[:len(content)/2]...)
+	if _, err := png.DecodeConfig(bytes.NewReader(truncated)); err != nil {
+		t.Fatalf("truncated PNG must retain a readable config: %v", err)
+	}
+	if _, err := png.Decode(bytes.NewReader(truncated)); err == nil {
+		t.Fatal("truncated PNG must fail full decode")
+	}
+	return truncated
+}
+
+func TestBusinessAttachmentUploadRejectsProductImageContentThatDoesNotMatchDeclaredFormat(t *testing.T) {
+	primary := BusinessAttachmentProductImageSlotPrimary
+	for _, tc := range []struct {
+		name     string
+		fileName string
+		mimeType string
+		content  []byte
+	}{
+		{name: "html renamed to png", fileName: "product.png", mimeType: "image/png", content: []byte("<html>not an image</html>")},
+		{name: "forged png signature", fileName: "product.png", mimeType: "image/png", content: append([]byte("\x89PNG\r\n\x1a\n"), []byte("not-a-png")...)},
+		{name: "readable config with truncated png pixels", fileName: "product.png", mimeType: "image/png", content: truncatedProductImagePNGWithReadableConfig(t)},
+		{name: "truncated jpeg", fileName: "product.jpg", mimeType: "image/jpeg", content: []byte{0xff, 0xd8, 0xff, 0xdb}},
+		{name: "forged webp container", fileName: "product.webp", mimeType: "image/webp", content: []byte{'R', 'I', 'F', 'F', 0x04, 0x00, 0x00, 0x00, 'W', 'E', 'B', 'P'}},
+		{name: "jpeg declared as png", fileName: "product.png", mimeType: "image/png", content: productImageTestContent(t, "image/jpeg", 2, 2)},
+		{name: "png declared as webp", fileName: "product.webp", mimeType: "image/webp", content: productImageTestContent(t, "image/png", 2, 2)},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubBusinessAttachmentRepo{ownerExists: true}
+			_, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(context.Background(), &BusinessAttachmentUploadInput{
+				OwnerType:      BusinessAttachmentOwnerProduct,
+				OwnerID:        7,
+				AttachmentType: BusinessAttachmentTypeProductImage,
+				SlotKey:        &primary,
+				FileName:       tc.fileName,
+				MimeType:       tc.mimeType,
+				ContentBase64:  base64.StdEncoding.EncodeToString(tc.content),
+			})
+			if !errors.Is(err, ErrBusinessAttachmentProductImageContentInvalid) ||
+				!errors.Is(err, ErrBusinessAttachmentContentInvalid) {
+				t.Fatalf("error = %v, want invalid content", err)
+			}
+			if repo.created != nil {
+				t.Fatalf("mismatched product image must not reach repo: %#v", repo.created)
+			}
+		})
+	}
+}
+
+func TestBusinessAttachmentUploadRejectsMalformedProductImageBase64AsInvalidImageContent(t *testing.T) {
+	primary := BusinessAttachmentProductImageSlotPrimary
+	repo := &stubBusinessAttachmentRepo{ownerExists: true}
+	_, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(context.Background(), &BusinessAttachmentUploadInput{
+		OwnerType:      BusinessAttachmentOwnerProduct,
+		OwnerID:        7,
+		AttachmentType: BusinessAttachmentTypeProductImage,
+		SlotKey:        &primary,
+		FileName:       "product.png",
+		MimeType:       "image/png",
+		ContentBase64:  "%%%",
+	})
+	if !errors.Is(err, ErrBusinessAttachmentProductImageContentInvalid) {
+		t.Fatalf("error = %v, want product image content error", err)
+	}
+	if repo.created != nil {
+		t.Fatalf("malformed product image must not reach repo: %#v", repo.created)
+	}
+}
+
+func TestBusinessAttachmentUploadRejectsProductImageOutsideDimensionBudget(t *testing.T) {
+	primary := BusinessAttachmentProductImageSlotPrimary
+	repo := &stubBusinessAttachmentRepo{ownerExists: true}
+	content := productImageTestContent(t, "image/png", BusinessAttachmentProductImageMaxWidth+1, 1)
+	_, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(context.Background(), &BusinessAttachmentUploadInput{
+		OwnerType:      BusinessAttachmentOwnerProduct,
+		OwnerID:        7,
+		AttachmentType: BusinessAttachmentTypeProductImage,
+		SlotKey:        &primary,
+		FileName:       "product.png",
+		MimeType:       "image/png",
+		ContentBase64:  base64.StdEncoding.EncodeToString(content),
+	})
+	if !errors.Is(err, ErrBusinessAttachmentProductImageDimensionsInvalid) {
+		t.Fatalf("error = %v, want product image dimension error", err)
+	}
+	if repo.created != nil {
+		t.Fatalf("oversized product image must not reach repo: %#v", repo.created)
+	}
+}
+
+func TestBusinessAttachmentProductImageDimensionBudgetIsOverflowSafe(t *testing.T) {
+	maxInt := int(^uint(0) >> 1)
+	for _, tc := range []struct {
+		name          string
+		width, height int
+		want          bool
+	}{
+		{name: "normal", width: 2000, height: 2000, want: true},
+		{name: "exact pixel budget", width: 5000, height: 4000, want: true},
+		{name: "over pixel budget", width: 5001, height: 4000, want: false},
+		{name: "over width", width: BusinessAttachmentProductImageMaxWidth + 1, height: 1, want: false},
+		{name: "over height", width: 1, height: BusinessAttachmentProductImageMaxHeight + 1, want: false},
+		{name: "zero", width: 0, height: 1, want: false},
+		{name: "negative", width: 1, height: -1, want: false},
+		{name: "machine int maximum", width: maxInt, height: maxInt, want: false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := isBusinessAttachmentProductImageDimensionsAllowed(tc.width, tc.height); got != tc.want {
+				t.Fatalf("dimension %dx%d allowed = %v, want %v", tc.width, tc.height, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestBusinessAttachmentUploadRejectsInvalidProductImageContracts(t *testing.T) {
+	primary := BusinessAttachmentProductImageSlotPrimary
+	invalid := "gallery"
+	cases := []struct {
+		name    string
+		input   BusinessAttachmentUploadInput
+		wantErr error
+	}{
+		{
+			name: "product owner requires product image type",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerProduct, OwnerID: 7, AttachmentType: "evidence", SlotKey: &primary,
+				FileName: "正面.png", MimeType: "image/png"},
+			wantErr: ErrBadParam,
+		},
+		{
+			name: "product image type requires product owner",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerSalesOrder, OwnerID: 7, AttachmentType: BusinessAttachmentTypeProductImage, SlotKey: &primary,
+				FileName: "正面.png", MimeType: "image/png"},
+			wantErr: ErrBadParam,
+		},
+		{
+			name: "slot is required",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerProduct, OwnerID: 7, AttachmentType: BusinessAttachmentTypeProductImage,
+				FileName: "正面.png", MimeType: "image/png"},
+			wantErr: ErrBadParam,
+		},
+		{
+			name: "slot is fixed",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerProduct, OwnerID: 7, AttachmentType: BusinessAttachmentTypeProductImage, SlotKey: &invalid,
+				FileName: "正面.png", MimeType: "image/png"},
+			wantErr: ErrBadParam,
+		},
+		{
+			name: "gif is not a product image",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerProduct, OwnerID: 7, AttachmentType: BusinessAttachmentTypeProductImage, SlotKey: &primary,
+				FileName: "动图.gif", MimeType: "image/gif"},
+			wantErr: ErrBusinessAttachmentMimeNotAllowed,
+		},
+		{
+			name: "pdf is not a product image",
+			input: BusinessAttachmentUploadInput{OwnerType: BusinessAttachmentOwnerProduct, OwnerID: 7, AttachmentType: BusinessAttachmentTypeProductImage, SlotKey: &primary,
+				FileName: "资料.pdf", MimeType: "application/pdf"},
+			wantErr: ErrBusinessAttachmentMimeNotAllowed,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			tc.input.ContentBase64 = base64.StdEncoding.EncodeToString([]byte("product-image"))
+			repo := &stubBusinessAttachmentRepo{ownerExists: true}
+			_, err := NewBusinessAttachmentUsecase(repo).UploadBusinessAttachment(context.Background(), &tc.input)
+			if !errors.Is(err, tc.wantErr) {
+				t.Fatalf("error = %v, want %v", err, tc.wantErr)
+			}
+			if repo.created != nil {
+				t.Fatalf("invalid product image must not reach repo: %#v", repo.created)
+			}
+		})
+	}
+}
+
+func TestBusinessAttachmentClearProductImageNormalizesAndRestrictsSlot(t *testing.T) {
+	repo := &stubBusinessAttachmentRepo{ownerExists: true}
+	uc := NewBusinessAttachmentUsecase(repo)
+	if err := uc.ClearProductImage(context.Background(), 7, " SECONDARY "); err != nil {
+		t.Fatalf("clear product image: %v", err)
+	}
+	if repo.clearCalls != 1 || repo.clearProduct != 7 || repo.clearSlot != BusinessAttachmentProductImageSlotSecondary {
+		t.Fatalf("unexpected clear call: calls=%d product=%d slot=%q", repo.clearCalls, repo.clearProduct, repo.clearSlot)
+	}
+	if err := uc.ClearProductImage(context.Background(), 7, "gallery"); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("invalid clear slot error = %v, want bad param", err)
+	}
+	if repo.clearCalls != 1 {
+		t.Fatalf("invalid clear slot must not reach repo, got %d calls", repo.clearCalls)
 	}
 }
 

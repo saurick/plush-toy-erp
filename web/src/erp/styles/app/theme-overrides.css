@@ -170,7 +170,10 @@
 [data-erp-theme='dark'] .erp-business-board-source-item,
 [data-erp-theme='dark'] .erp-business-board-boundary-row,
 [data-erp-theme='dark'] .erp-business-board-alert-item,
-[data-erp-theme='dark'] .erp-exception-flow-step,
+[data-erp-theme='dark'] .erp-exception-workspace__metrics > span,
+[data-erp-theme='dark'] .erp-exception-workspace__queue,
+[data-erp-theme='dark'] .erp-exception-workspace__detail,
+[data-erp-theme='dark'] .erp-exception-workspace__item,
 [data-erp-theme='dark'] .erp-task-board-lane.ant-card,
 [data-erp-theme='dark'] .erp-task-board-card,
 [data-erp-theme='dark'] .erp-dev-docs-header,
@@ -335,7 +338,9 @@
 [data-erp-theme='dark'] .erp-task-action-drawer .ant-drawer-footer,
 [data-erp-theme='dark'] .erp-task-action-drawer__summary,
 [data-erp-theme='dark'] .erp-task-action-drawer__guide,
-[data-erp-theme='dark'] .erp-task-action-drawer__action-prompt {
+[data-erp-theme='dark'] .erp-task-action-drawer__action-prompt,
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option,
+[data-erp-theme='dark'] .erp-task-action-drawer__confirm-panel {
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
 }
@@ -348,6 +353,7 @@
 [data-erp-theme='dark'] .erp-task-action-drawer__step small,
 [data-erp-theme='dark'] .erp-task-action-drawer__guide-note span,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-prompt span,
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option small,
 [data-erp-theme='dark'] .erp-task-action-drawer__action-copy.ant-typography {
   color: var(--erp-text-muted);
 }
@@ -357,7 +363,10 @@
 [data-erp-theme='dark'] .erp-task-action-drawer__action-head strong,
 [data-erp-theme='dark'] .erp-task-action-drawer__meta-grid strong,
 [data-erp-theme='dark'] .erp-task-action-drawer__guide-note strong,
-[data-erp-theme='dark'] .erp-task-action-drawer__action-prompt strong {
+[data-erp-theme='dark'] .erp-task-action-drawer__action-prompt strong,
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option strong,
+[data-erp-theme='dark'] .erp-task-action-drawer__confirm-head strong,
+[data-erp-theme='dark'] .erp-task-action-drawer__confirm-list dd {
   color: var(--erp-text);
 }
 
@@ -390,6 +399,34 @@
 
 [data-erp-theme='dark'] .erp-task-action-drawer__step--active {
   background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .erp-task-action-drawer__step:hover:not(.erp-task-action-drawer__step--disabled),
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option:hover,
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option:focus-visible,
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option--selected {
+  border-color: var(--erp-primary-strong);
+  background: var(--erp-surface-bg-soft);
+}
+
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option--danger.erp-task-action-drawer__action-option--selected {
+  border-color: #ff9aa3;
+  background: rgb(255 154 163 / 0.12);
+}
+
+[data-erp-theme='dark'] .erp-task-action-drawer__action-option--warning.erp-task-action-drawer__action-option--selected {
+  border-color: #f2bd65;
+  background: rgb(242 189 101 / 0.12);
+}
+
+[data-erp-theme='dark'] .erp-task-action-drawer__confirm-head span,
+[data-erp-theme='dark'] .erp-task-action-drawer__confirm-list dt {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-task-action-drawer__confirm-list,
+[data-erp-theme='dark'] .erp-task-action-drawer__confirm-list > div + div {
+  border-color: var(--erp-border);
 }
 
 [data-erp-theme='dark'] .erp-task-action-drawer__step--active > span {
@@ -434,7 +471,18 @@
   color: var(--erp-text-muted);
 }
 
-[data-erp-theme='dark'] .erp-exception-flow-step--active {
+[data-erp-theme='dark'] .erp-exception-workspace__metrics strong,
+[data-erp-theme='dark'] .erp-exception-workspace__item {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-exception-workspace__metrics small,
+[data-erp-theme='dark'] .erp-exception-workspace__item small {
+  color: var(--erp-text-muted);
+}
+
+[data-erp-theme='dark'] .erp-exception-workspace__item:hover,
+[data-erp-theme='dark'] .erp-exception-workspace__item--active {
   border-color: var(--erp-primary-strong);
   background: var(--erp-surface-bg-soft);
   box-shadow: 0 0 0 2px rgb(74 222 128 / 0.14);

@@ -145,6 +145,18 @@ func TestNormalizeBOMItemCreateUsesCoreQuantityGuard(t *testing.T) {
 	if _, err := normalizeBOMItemCreate(in); err != nil {
 		t.Fatalf("normalizeBOMItemCreate() error = %v", err)
 	}
+	fabric := "  fabric_processing  "
+	in.ProductionOperationCode = &fabric
+	normalized, err := normalizeBOMItemCreate(in)
+	if err != nil || normalized.ProductionOperationCode == nil || *normalized.ProductionOperationCode != ProductionWIPOperationFabricProcessing {
+		t.Fatalf("production operation normalized=%#v err=%v", normalized.ProductionOperationCode, err)
+	}
+	unsupported := ProductionWIPOperationSewing
+	in.ProductionOperationCode = &unsupported
+	if _, err := normalizeBOMItemCreate(in); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected unsupported BOM operation rejected, got %v", err)
+	}
+	in.ProductionOperationCode = nil
 	in.Quantity = decimal.Zero
 	if _, err := normalizeBOMItemCreate(in); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected zero BOM item quantity rejected, got %v", err)

@@ -22,6 +22,9 @@ type stubAttachmentJSONRPCRepo struct {
 	getCalls     int
 	contentCalls int
 	deleteCalls  int
+	clearCalls   int
+	clearProduct int
+	clearSlot    string
 }
 
 func newAttachmentJSONRPCTestDispatcher(t *testing.T, repo *stubAttachmentJSONRPCRepo, admin *biz.AdminUser) *jsonrpcDispatcher {
@@ -91,6 +94,13 @@ func (r *stubAttachmentJSONRPCRepo) ListBusinessAttachments(_ context.Context, o
 	}, nil
 }
 
+func (r *stubAttachmentJSONRPCRepo) ClearProductImage(_ context.Context, productID int, slotKey string) error {
+	r.clearCalls++
+	r.clearProduct = productID
+	r.clearSlot = slotKey
+	return nil
+}
+
 func (r *stubAttachmentJSONRPCRepo) GetBusinessAttachmentMetadata(_ context.Context, id int) (*biz.BusinessAttachment, error) {
 	r.getCalls++
 	if r.current != nil {
@@ -140,6 +150,7 @@ func TestBusinessAttachmentOwnerModuleKeys(t *testing.T) {
 		{biz.BusinessAttachmentOwnerFinanceFact, []string{"finance"}},
 		{biz.BusinessAttachmentOwnerProductionFact, []string{"production"}},
 		{biz.BusinessAttachmentOwnerOutsourcingFact, []string{"outsourcing_orders"}},
+		{biz.BusinessAttachmentOwnerProduct, []string{"products"}},
 		{biz.BusinessAttachmentOwnerProductSKU, []string{"products"}},
 		{biz.BusinessAttachmentOwnerBOMHeader, []string{"material_bom"}},
 		{biz.BusinessAttachmentOwnerWorkflowTask, []string{"workflow_tasks"}},
@@ -151,6 +162,177 @@ func TestBusinessAttachmentOwnerModuleKeys(t *testing.T) {
 	}
 	if got := businessAttachmentOwnerModuleKeys("unknown"); got != nil {
 		t.Fatalf("unknown owner module keys = %#v, want nil", got)
+	}
+}
+
+func TestBusinessAttachmentProductOwnerPermissions(t *testing.T) {
+	if got := businessAttachmentReadPermissions(biz.BusinessAttachmentOwnerProduct); !reflect.DeepEqual(got, []string{biz.PermissionProductRead}) {
+		t.Fatalf("product attachment read permissions = %#v", got)
+	}
+	if got := businessAttachmentWritePermissions(biz.BusinessAttachmentOwnerProduct); !reflect.DeepEqual(got, []string{biz.PermissionProductUpdate}) {
+		t.Fatalf("product attachment write permissions = %#v", got)
+	}
+	if got := businessAttachmentWritePermissions(biz.BusinessAttachmentOwnerProductSKU); !reflect.DeepEqual(got, []string{biz.PermissionProductSKUCreate, biz.PermissionProductSKUUpdate}) {
+		t.Fatalf("product SKU attachment write permissions must remain unchanged: %#v", got)
+	}
+}
+
+func TestJsonrpcDispatcher_ProductImageValidationReturnsActionableMessages(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	for _, tc := range []struct {
+		name          string
+		fileName      string
+		mimeType      string
+		contentBase64 string
+		wantMessage   string
+	}{
+		{
+			name:          "unsupported product image format",
+			fileName:      "product.gif",
+			mimeType:      "image/gif",
+			contentBase64: "R0lGODlhAQABAAAAACw=",
+			wantMessage:   "产品图片仅支持 PNG、JPG/JPEG 或 WebP 格式，请重新选择图片",
+		},
+		{
+			name:          "unrecognizable product image content",
+			fileName:      "product.png",
+			mimeType:      "image/png",
+			contentBase64: "bm90LWEtcG5n",
+			wantMessage:   "无法识别产品图片内容，请确认文件未损坏，且实际格式与文件扩展名一致",
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			repo := &stubAttachmentJSONRPCRepo{}
+			dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+				[]string{biz.EngineeringRoleKey},
+				biz.PermissionProductUpdate,
+			))
+			_, res, err := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", tc.name, mustJSONRPCStruct(t, map[string]any{
+				"owner_type":      biz.BusinessAttachmentOwnerProduct,
+				"owner_id":        7,
+				"attachment_type": biz.BusinessAttachmentTypeProductImage,
+				"slot_key":        biz.BusinessAttachmentProductImageSlotPrimary,
+				"file_name":       tc.fileName,
+				"mime_type":       tc.mimeType,
+				"content_base64":  tc.contentBase64,
+			}))
+			if err != nil || res == nil || res.Code != errcode.InvalidParam.Code || res.Message != tc.wantMessage {
+				t.Fatalf("product image validation response = %#v, err=%v, want message %q", res, err, tc.wantMessage)
+			}
+			if repo.createCalls != 0 {
+				t.Fatalf("invalid product image must not reach repo, got %d calls", repo.createCalls)
+			}
+		})
+	}
+}
+
+func TestJsonrpcDispatcher_ProductImageMessagesDoNotChangeOrdinaryAttachmentErrors(t *testing.T) {
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, nil, workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionSalesOrderUpdate,
+	))
+	ctx := workflowJSONRPCAdminContext()
+	for _, ordinaryErr := range []error{
+		biz.ErrBusinessAttachmentMimeNotAllowed,
+		biz.ErrBusinessAttachmentContentInvalid,
+	} {
+		res := dispatcher.mapBusinessAttachmentError(ctx, ordinaryErr)
+		if res.Code != errcode.InvalidParam.Code || res.Message != errcode.InvalidParam.Message {
+			t.Fatalf("ordinary attachment error %v mapped to %#v", ordinaryErr, res)
+		}
+	}
+
+	dimensionRes := dispatcher.mapBusinessAttachmentError(ctx, biz.ErrBusinessAttachmentProductImageDimensionsInvalid)
+	wantDimensionMessage := "产品图片尺寸过大，请将宽高压缩至 8192 像素以内且总像素不超过 2000 万"
+	if dimensionRes.Code != errcode.InvalidParam.Code || dimensionRes.Message != wantDimensionMessage {
+		t.Fatalf("product image dimension error mapped to %#v", dimensionRes)
+	}
+}
+
+func TestJsonrpcDispatcher_ProductCreatePermissionCannotMutateSavedProductImages(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &stubAttachmentJSONRPCRepo{}
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.EngineeringRoleKey},
+		biz.PermissionProductCreate,
+	))
+	primary := biz.BusinessAttachmentProductImageSlotPrimary
+	uploadParams := mustJSONRPCStruct(t, map[string]any{
+		"owner_type":      biz.BusinessAttachmentOwnerProduct,
+		"owner_id":        7,
+		"attachment_type": biz.BusinessAttachmentTypeProductImage,
+		"slot_key":        primary,
+		"file_name":       "product.png",
+		"mime_type":       "image/png",
+		"content_base64":  "aW1hZ2U=",
+	})
+	_, uploadRes, err := dispatcher.handleBusinessAttachment(ctx, "upload_attachment", "create-only-upload", uploadParams)
+	if err != nil || uploadRes == nil || uploadRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("product.create must not upload to saved product: res=%#v err=%v", uploadRes, err)
+	}
+	if repo.createCalls != 0 {
+		t.Fatalf("create-only upload must not reach repo, got %d calls", repo.createCalls)
+	}
+
+	_, clearRes, err := dispatcher.handleBusinessAttachment(ctx, "clear_product_image", "create-only-clear", mustJSONRPCStruct(t, map[string]any{
+		"owner_id": 7,
+		"slot_key": primary,
+	}))
+	if err != nil || clearRes == nil || clearRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("product.create must not clear saved product image: res=%#v err=%v", clearRes, err)
+	}
+	if repo.clearCalls != 0 {
+		t.Fatalf("create-only clear must not reach repo, got %d calls", repo.clearCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_ClearProductImageUsesControlledProductBoundary(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	repo := &stubAttachmentJSONRPCRepo{}
+	dispatcher := newAttachmentJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.EngineeringRoleKey},
+		biz.PermissionProductUpdate,
+	))
+
+	_, res, err := dispatcher.handleBusinessAttachment(ctx, "clear_product_image", "clear-product-image", mustJSONRPCStruct(t, map[string]any{
+		"owner_id": 7,
+		"slot_key": " PRIMARY ",
+	}))
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("clear product image failed: res=%#v err=%v", res, err)
+	}
+	if res.Data == nil || res.Data.AsMap()["cleared"] != true {
+		t.Fatalf("clear product image response = %#v", res.Data)
+	}
+	if repo.clearCalls != 1 || repo.clearProduct != 7 || repo.clearSlot != biz.BusinessAttachmentProductImageSlotPrimary {
+		t.Fatalf("unexpected clear call: calls=%d product=%d slot=%q", repo.clearCalls, repo.clearProduct, repo.clearSlot)
+	}
+
+	_, invalidRes, err := dispatcher.handleBusinessAttachment(ctx, "clear_product_image", "invalid-slot", mustJSONRPCStruct(t, map[string]any{
+		"owner_id": 7,
+		"slot_key": "gallery",
+	}))
+	if err != nil || invalidRes == nil || invalidRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("invalid product image slot must fail closed: res=%#v err=%v", invalidRes, err)
+	}
+	if repo.clearCalls != 1 {
+		t.Fatalf("invalid slot must not reach repo, got %d calls", repo.clearCalls)
+	}
+
+	readOnlyRepo := &stubAttachmentJSONRPCRepo{}
+	readOnlyDispatcher := newAttachmentJSONRPCTestDispatcher(t, readOnlyRepo, workflowJSONRPCAdmin(
+		[]string{biz.EngineeringRoleKey},
+		biz.PermissionProductRead,
+	))
+	_, deniedRes, err := readOnlyDispatcher.handleBusinessAttachment(ctx, "clear_product_image", "read-only", mustJSONRPCStruct(t, map[string]any{
+		"owner_id": 7,
+		"slot_key": biz.BusinessAttachmentProductImageSlotSecondary,
+	}))
+	if err != nil || deniedRes == nil || deniedRes.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("product read permission must not clear image: res=%#v err=%v", deniedRes, err)
+	}
+	if readOnlyRepo.clearCalls != 0 {
+		t.Fatalf("unauthorized clear must not reach repo, got %d calls", readOnlyRepo.clearCalls)
 	}
 }
 
@@ -399,6 +581,7 @@ func TestJsonrpcDispatcher_AttachmentMethodsAreCanonicalAndDeleteIsUnavailable(t
 		"getAttachmentContent",
 		"delete_attachment",
 		"deleteAttachment",
+		"clearProductImage",
 	} {
 		_, res, err := dispatcher.handleBusinessAttachment(workflowJSONRPCAdminContext(), method, method, mustJSONRPCStruct(t, map[string]any{}))
 		if err != nil || res == nil || res.Code != errcode.UnknownMethod.Code {

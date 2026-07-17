@@ -7,11 +7,11 @@ import {
   FINISHED_GOODS_INBOUND_TASK_GROUP,
   FINISHED_GOODS_QC_TASK_GROUP,
   FINISHED_GOODS_REWORK_TASK_GROUP,
+  SHIPMENT_SOURCE_TYPE_KEY,
   SHIPMENT_RELEASE_TASK_GROUP,
   buildFinishedGoodsInboundTask,
   buildFinishedGoodsQcTask,
   buildFinishedGoodsReworkTask,
-  buildShipmentReleaseTask,
   hasActiveFinishedGoodsInboundTaskForRecord,
   hasActiveFinishedGoodsQcTaskForRecord,
   hasActiveShipmentReleaseTaskForRecord,
@@ -52,6 +52,26 @@ function productionRecord(overrides = {}) {
       finished: true,
       packaging_requirement: '彩盒 12 只/箱',
       shipping_requirement: '客户唛头',
+    },
+    ...overrides,
+  }
+}
+
+function shipmentReleaseSourceTask(sourceID = 42, overrides = {}) {
+  return {
+    id: 420,
+    version: 1,
+    task_code: `source-shipment-release-${sourceID}`,
+    task_group: SHIPMENT_RELEASE_TASK_GROUP,
+    source_type: SHIPMENT_SOURCE_TYPE_KEY,
+    source_id: sourceID,
+    business_status_key: 'shipment_pending',
+    task_status_key: 'ready',
+    owner_role_key: 'warehouse',
+    payload: {
+      source_task_contract: 'workflow.source-task/v1',
+      source_task_producer: 'shipment.submit_release',
+      shipment_id: sourceID,
     },
     ...overrides,
   }
@@ -225,20 +245,13 @@ test('finishedGoodsFlow: 移动端成品抽检状态动作不再本地创建下�
   )
 })
 
-test('finishedGoodsFlow: buildShipmentReleaseTask 仅保留 seed / test / demo / 未来出货辅助字段口径', () => {
-  const shipmentTask = buildShipmentReleaseTask(
-    productionRecord({ due_date: '' }),
-    { id: 200 },
-    { nowMs: NOW_MS }
-  )
-
+test('finishedGoodsFlow: canonical 出货放行来源任务保持只读识别', () => {
+  const shipmentTask = shipmentReleaseSourceTask()
   assert.equal(isShipmentReleaseTask(shipmentTask), true)
   assert.equal(shipmentTask.task_group, SHIPMENT_RELEASE_TASK_GROUP)
+  assert.equal(shipmentTask.source_type, SHIPMENT_SOURCE_TYPE_KEY)
   assert.equal(shipmentTask.business_status_key, 'shipment_pending')
   assert.equal(shipmentTask.owner_role_key, 'warehouse')
-  assert.equal(shipmentTask.due_at, NOW_SECONDS + 24 * 60 * 60)
-  assert.equal(shipmentTask.payload.confirm_role_key, 'sales')
-  assert.equal(shipmentTask.payload.next_module_key, 'shipping-release')
   assert.equal(
     resolveFinishedGoodsTaskBusinessStatus(shipmentTask, 'done'),
     'shipping_released'
@@ -250,6 +263,13 @@ test('finishedGoodsFlow: buildShipmentReleaseTask 仅保留 seed / test / demo /
   assert.equal(
     resolveFinishedGoodsTaskBusinessStatus(shipmentTask, 'rejected'),
     'blocked'
+  )
+  assert.equal(
+    isShipmentReleaseTask({
+      ...shipmentTask,
+      source_type: 'shipping-release',
+    }),
+    false
   )
 })
 
@@ -323,7 +343,7 @@ test('finishedGoodsFlow: 缺 source_no / document_no 时不崩溃', () => {
   )
 })
 
-test('finishedGoodsFlow: 非生产 / 入库 / 出货模块不误触发', () => {
+test('finishedGoodsFlow: 非生产模块不误生成成品抽检任务', () => {
   assert.equal(
     buildFinishedGoodsQcTask({
       id: 1,
@@ -331,10 +351,6 @@ test('finishedGoodsFlow: 非生产 / 入库 / 出货模块不误触发', () => {
       business_status_key: 'production_processing',
       payload: { finished: true },
     }),
-    null
-  )
-  assert.equal(
-    buildShipmentReleaseTask({ id: 1, module_key: 'receivables' }),
     null
   )
 })
@@ -345,9 +361,7 @@ test('finishedGoodsFlow: 已存在未完成任务时按记录去重', () => {
   const inboundTask = buildFinishedGoodsInboundTask(record, qcTask, {
     nowMs: NOW_MS,
   })
-  const shipmentTask = buildShipmentReleaseTask(record, inboundTask, {
-    nowMs: NOW_MS,
-  })
+  const shipmentTask = shipmentReleaseSourceTask(record.id)
 
   assert.equal(hasActiveFinishedGoodsQcTaskForRecord([qcTask], record), true)
   assert.equal(
@@ -357,6 +371,20 @@ test('finishedGoodsFlow: 已存在未完成任务时按记录去重', () => {
   assert.equal(
     hasActiveShipmentReleaseTaskForRecord([shipmentTask], record),
     true
+  )
+  assert.equal(
+    hasActiveShipmentReleaseTaskForRecord(
+      [{ ...shipmentTask, task_status_key: 'blocked' }],
+      record
+    ),
+    true
+  )
+  assert.equal(
+    hasActiveShipmentReleaseTaskForRecord(
+      [{ ...shipmentTask, task_status_key: 'done' }],
+      record
+    ),
+    false
   )
   assert.equal(
     hasActiveFinishedGoodsQcTaskForRecord(

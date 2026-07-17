@@ -61,3 +61,10 @@ test('posted purchase receipt payable uses the exact permission and source-bound
     /warehouse\.inbound\.confirm[\s\S]{0,160}生成应付/u
   )
 })
+
+test('purchase receipt rows remain source-generated and cannot append manual lines', () => {
+  assert.doesNotMatch(source, /addPurchaseReceiptItem/u)
+  assert.doesNotMatch(source, /添加明细|添加入库明细/u)
+  assert.match(source, /相关单据/u)
+  assert.match(source, /采购订单/u)
+})

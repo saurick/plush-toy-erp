@@ -239,6 +239,13 @@ test("affected: customer config changes select the T6 boundary suite", () => {
       item.args.includes("scripts/build/apply-customer-web-config.test.mjs"),
     ),
   );
+  assert(
+    plan.commands.some((item) =>
+      item.args.includes(
+        "scripts/qa/customer-package-preview-boundary.test.mjs",
+      ),
+    ),
+  );
 });
 
 test("affected: private deployment template changes include isolation boundaries", () => {

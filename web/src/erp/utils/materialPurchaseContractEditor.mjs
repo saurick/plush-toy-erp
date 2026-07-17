@@ -6,6 +6,7 @@ import {
   shiftMergesAfterInsert,
   splitTableCellMerge,
 } from './detailCellMerge.mjs'
+import { normalizePrintAppendixImages } from './printAppendixImages.mjs'
 
 export {
   findMergeAtCell,
@@ -315,6 +316,7 @@ export const buildMaterialPurchaseContractDraft = (sample = {}) => {
         ? sample.buyerStampVisible
         : false,
     merges: cloneDetailCellMerges(sample.merges),
+    appendixImages: normalizePrintAppendixImages(sample.appendixImages),
   }
 }
 
@@ -351,6 +353,7 @@ export const buildBlankMaterialPurchaseContractDraft = (draft = {}) => {
     lines: [normalizeMaterialPurchaseLine(createEmptyMaterialPurchaseLine())],
     buyerStampVisible: false,
     merges: [],
+    appendixImages: [],
   }
 }
 

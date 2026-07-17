@@ -113,7 +113,7 @@ export async function installMasterDataRpcMocks(page, context) {
       outsourcing_enabled: true,
       inhouse_enabled: true,
       quality_required: true,
-      sort_order: 10,
+      sort_order: 20,
       is_active: true,
       note: '',
       created_at: nowUnix(),
@@ -131,19 +131,19 @@ export async function installMasterDataRpcMocks(page, context) {
       },
       {
         ...process,
-        id: 12,
-        code: 'PROC-HANDWORK-L1',
-        name: '手工',
-        category: '手工',
+        id: 1,
+        code: 'PROC-SEWING-L1',
+        name: '车缝',
+        category: '车缝',
         quality_required: false,
         sort_order: 20,
       },
       {
         ...process,
-        id: 1,
-        code: 'PROC-SEWING-L1',
-        name: '车缝',
-        category: '车缝',
+        id: 12,
+        code: 'PROC-HANDWORK-L1',
+        name: '手工',
+        category: '手工',
         quality_required: false,
         sort_order: 30,
       },
@@ -257,6 +257,12 @@ export async function installMasterDataRpcMocks(page, context) {
       case 'set_supplier_active':
       case 'get_supplier':
         data = { supplier: { ...supplier, ...params } }
+        break
+      case 'create_product':
+      case 'update_product':
+      case 'set_product_active':
+      case 'get_product':
+        data = { product: { ...product, ...params } }
         break
       case 'create_contact':
       case 'update_contact':

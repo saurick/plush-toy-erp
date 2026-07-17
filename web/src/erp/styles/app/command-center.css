@@ -524,6 +524,43 @@
   overflow-wrap: anywhere;
 }
 
+.erp-task-processing-hint.ant-alert-with-description {
+  width: 100%;
+  padding: 8px 10px;
+}
+
+.erp-task-processing-hint.ant-alert-with-description .ant-alert-icon {
+  margin-top: 2px;
+  margin-inline-end: 8px;
+  font-size: 14px;
+}
+
+.erp-task-processing-hint .ant-alert-message {
+  margin-bottom: 2px;
+  font-size: 13px;
+  line-height: 1.35;
+}
+
+.erp-task-processing-hint .ant-alert-description {
+  font-size: 13px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.erp-task-processing-hint__head {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.erp-task-processing-hint__head .ant-typography {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
 .erp-workbench-detail-actions {
   width: 100%;
   padding-top: 2px;
@@ -595,31 +632,142 @@
   align-items: center;
 }
 
-.erp-exception-flow-steps {
+.erp-exception-workspace {
   display: grid;
-  grid-template-columns: repeat(5, minmax(140px, 1fr));
-  gap: 10px;
-  margin-top: 12px;
+  gap: 16px;
 }
 
-.erp-exception-flow-step {
+.erp-exception-workspace__summary,
+.erp-exception-workspace__section-head {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+  justify-content: space-between;
+  min-width: 0;
+}
+
+.erp-exception-workspace__metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(112px, 1fr));
+  gap: 10px;
+}
+
+.erp-exception-workspace__metrics > span {
   display: grid;
   gap: 4px;
+  min-width: 112px;
+  padding: 10px 12px;
+  border: 1px solid #e3e9f0;
+  border-radius: 10px;
+  background: #f8fafc;
+}
+
+.erp-exception-workspace__metrics small,
+.erp-exception-workspace__item small {
+  color: #64748b;
+}
+
+.erp-exception-workspace__metrics strong {
+  color: #172033;
+  font-size: 22px;
+  line-height: 1;
+}
+
+.erp-exception-workspace__main {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(300px, 0.8fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.erp-exception-workspace__queue,
+.erp-exception-workspace__detail {
   min-width: 0;
-  min-height: 76px;
+  padding: 16px;
+  border: 1px solid #e3e9f0;
+  border-radius: 12px;
+  background: #fff;
+}
+
+.erp-exception-workspace__detail {
+  position: sticky;
+  top: 0;
+}
+
+.erp-exception-workspace__section-head .ant-typography {
+  margin: 0;
+}
+
+.erp-exception-workspace__list {
+  display: grid;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.erp-exception-workspace__item {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 12px;
+  align-items: center;
+  min-width: 0;
+  min-height: 66px;
   padding: 10px 12px;
   color: inherit;
   text-align: left;
   cursor: pointer;
-  border: 1px solid #dfe9e1;
-  border-radius: 12px;
-  background: #f8fbf8;
+  border: 1px solid #e3e9f0;
+  border-radius: 10px;
+  background: #fff;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease,
+    box-shadow 160ms ease;
 }
 
-.erp-exception-flow-step--active {
-  border-color: #2f8f4b;
-  background: #eef8f0;
-  box-shadow: 0 0 0 2px rgb(47 143 75 / 12%);
+.erp-exception-workspace__item:hover {
+  border-color: #b8c8dc;
+  background: #f8fafc;
+}
+
+.erp-exception-workspace__item:focus-visible {
+  outline: 3px solid rgb(35 105 180 / 22%);
+  outline-offset: 2px;
+}
+
+.erp-exception-workspace__item--active {
+  border-color: #2369b4;
+  background: #eef5ff;
+  box-shadow: 0 0 0 2px rgb(35 105 180 / 10%);
+}
+
+.erp-exception-workspace__item-copy,
+.erp-exception-workspace__item-status {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.erp-exception-workspace__item-copy strong,
+.erp-exception-workspace__item-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-exception-workspace__item-status {
+  justify-items: end;
+}
+
+.erp-exception-workspace__item-status .ant-tag {
+  margin-inline-end: 0;
+}
+
+.erp-exception-workspace__detail-body {
+  margin-top: 14px;
+}
+
+.erp-exception-workspace__detail-body .ant-typography {
+  margin: 0;
 }
 
 .erp-business-board-hero {
@@ -791,6 +939,25 @@
   display: grid;
   grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.1fr);
   gap: 10px;
+}
+
+.erp-business-board-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 360px);
+  gap: 10px;
+  align-items: start;
+}
+
+.erp-business-board-attention-card.ant-card {
+  position: sticky;
+  top: 8px;
+}
+
+.erp-business-board-boundary-summary.ant-typography {
+  display: block;
+  margin: 0 4px;
+  font-size: 12px;
+  line-height: 1.55;
 }
 
 .erp-business-board-boundary-list,

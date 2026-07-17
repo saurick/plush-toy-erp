@@ -536,10 +536,7 @@ func TestPurchaseReceiptPostgresMaterialSupplyMultiLineQualityGate(t *testing.T)
 		t.Fatalf("submit postgres replacement line inspection failed: %v", err)
 	}
 	for _, inspection := range []*biz.QualityInspection{replacement, receipt.QualityInspections[1]} {
-		if _, err := uc.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-			InspectionID: inspection.ID,
-			Result:       biz.QualityInspectionResultPass,
-		}); err != nil {
+		if _, err := uc.PassQualityInspection(ctx, approximateQualityInspectionDecision(inspection.ID, biz.QualityInspectionResultPass)); err != nil {
 			t.Fatalf("pass postgres line inspection %d failed: %v", inspection.ID, err)
 		}
 	}

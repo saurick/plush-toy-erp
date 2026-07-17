@@ -3,6 +3,7 @@ import { Space, Tag, Typography } from 'antd'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
+import { formatQualityDefectRate } from '../../utils/qualityDefectRate.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
 const { Text } = Typography
@@ -30,12 +31,23 @@ export const QUALITY_INSPECTION_TYPE_FILTER_OPTIONS = [
   { label: '采购来料', value: 'INCOMING' },
   { label: '委外回货', value: 'OUTSOURCING_RETURN' },
   { label: '成品检验', value: 'FINISHED_GOODS' },
+  { label: '生产分段质检', value: 'PRODUCTION_STAGE' },
 ]
 
 export const QUALITY_INSPECTION_TYPE_LABELS = Object.freeze({
   INCOMING: '采购来料',
   OUTSOURCING_RETURN: '委外回货',
   FINISHED_GOODS: '成品检验',
+  PRODUCTION_STAGE: '生产分段质检',
+})
+
+export const QUALITY_PRODUCTION_GATE_LABELS = Object.freeze({
+  CUT_PIECE: '裁片检验',
+  SHELL: '皮套检验',
+  FINISHED_GOODS: '成品检验',
+  NEEDLE: '针检',
+  SAMPLING: '抽检',
+  CUSTOMER_ACCEPTANCE: '客户验货',
 })
 
 export const QUALITY_DATE_FILTER_OPTIONS = [
@@ -126,19 +138,78 @@ function inspectionTypeLabel(record) {
   return QUALITY_INSPECTION_TYPE_LABELS[key] || '质量检验'
 }
 
+function visibleBusinessText(value) {
+  if (value === undefined || value === null) return '—'
+  return String(value).trim() || '—'
+}
+
+export function productionQualityGateLabel(gateCode) {
+  const key = String(gateCode || '')
+    .trim()
+    .toUpperCase()
+  return QUALITY_PRODUCTION_GATE_LABELS[key] || '—'
+}
+
+export function isProductionStageQualityInspection(record) {
+  return (
+    String(record?.inspection_type || '').toUpperCase() ===
+      'PRODUCTION_STAGE' ||
+    String(record?.source_type || '').toUpperCase() === 'PRODUCTION_WIP'
+  )
+}
+
+function productionWipProductLabel(record) {
+  return `${visibleBusinessText(record?.product_code)} / ${visibleBusinessText(
+    record?.product_name
+  )}`
+}
+
+function productionWipSourceParts(record) {
+  return [
+    `生产订单：${visibleBusinessText(record?.production_order_no)}`,
+    `生产工序：${visibleBusinessText(record?.operation_name)}`,
+    `质量关口：${productionQualityGateLabel(record?.gate_code)}`,
+  ]
+}
+
+function productionWipSubjectParts(record) {
+  return [
+    productionWipProductLabel(record),
+    `在制批次：${visibleBusinessText(record?.wip_batch_no)}`,
+    `批次数量：${visibleBusinessText(record?.batch_quantity)}`,
+  ]
+}
+
+function qualityDefectRateText(record) {
+  return formatQualityDefectRate(record)
+}
+
+function qualityInspectorText(record) {
+  return inspectorLabel(record?.inspector_id)
+}
+
+function qualityRemarkText(record) {
+  return visibleBusinessText(record?.decision_note)
+}
+
 function sourceParts(
   record,
   purchaseReceiptOptions,
   allPurchaseReceiptItemOptions
 ) {
   const sourceType = String(record?.source_type || '').toUpperCase()
+  const sourceNo = String(record?.source_no || '').trim()
+  if (isProductionStageQualityInspection(record)) {
+    return productionWipSourceParts(record)
+  }
   if (sourceType === 'PURCHASE_RECEIPT') {
     return [
-      referenceLabel(
-        purchaseReceiptOptions,
-        record?.purchase_receipt_id,
-        '采购入库'
-      ),
+      sourceNo ||
+        referenceLabel(
+          purchaseReceiptOptions,
+          record?.purchase_receipt_id,
+          '采购入库'
+        ),
       referenceLabel(
         allPurchaseReceiptItemOptions,
         record?.purchase_receipt_item_id,
@@ -146,6 +217,7 @@ function sourceParts(
       ),
     ]
   }
+  if (sourceNo) return [sourceNo]
   if (sourceType === 'OUTSOURCING_FACT') {
     return ['委外回货记录已关联']
   }
@@ -156,6 +228,9 @@ function sourceParts(
 }
 
 function subjectLabel(record, materialOptions, productOptions) {
+  if (isProductionStageQualityInspection(record)) {
+    return productionWipProductLabel(record)
+  }
   const subjectType = String(record?.subject_type || '').toUpperCase()
   if (subjectType === 'PRODUCT') {
     return referenceLabel(productOptions, record?.subject_id, '产品')
@@ -174,6 +249,9 @@ function subjectParts(
   productOptions,
   warehouseOptions
 ) {
+  if (isProductionStageQualityInspection(record)) {
+    return productionWipSubjectParts(record)
+  }
   return [
     subjectLabel(record, materialOptions, productOptions),
     referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次'),
@@ -220,6 +298,15 @@ export function buildQualityInspectionExportColumns({
       render: qualityResultTag,
     },
     {
+      title: '估算不良比例',
+      exportTitle: '估算不良比例',
+      dataIndex: 'defect_rate_percent',
+      width: 140,
+      sortable: false,
+      exportValue: qualityDefectRateText,
+      render: (_value, record) => qualityDefectRateText(record),
+    },
+    {
       title: '检验来源',
       exportTitle: '检验来源',
       dataIndex: 'inspection_type',
@@ -235,8 +322,8 @@ export function buildQualityInspectionExportColumns({
         ].join(' / '),
     },
     {
-      title: '产品 / 材料',
-      exportTitle: '产品 / 材料',
+      title: '产品 / 材料 / 在制品',
+      exportTitle: '产品 / 材料 / 在制品',
       dataIndex: 'subject_type',
       width: 220,
       exportValue: (record) =>
@@ -248,9 +335,14 @@ export function buildQualityInspectionExportColumns({
       dataIndex: 'warehouse_id',
       width: 110,
       sortType: 'number',
-      render: (value) => referenceLabel(warehouseOptions, value, '仓库'),
+      render: (value, record) =>
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : referenceLabel(warehouseOptions, value, '仓库'),
       exportValue: (record) =>
-        referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : referenceLabel(warehouseOptions, record?.warehouse_id, '仓库'),
     },
     {
       title: '批次',
@@ -258,17 +350,32 @@ export function buildQualityInspectionExportColumns({
       dataIndex: 'inventory_lot_id',
       width: 150,
       sortType: 'number',
-      render: (value) => referenceLabel(inventoryLotOptions, value, '批次'),
+      render: (value, record) =>
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : referenceLabel(inventoryLotOptions, value, '批次'),
       exportValue: (record) =>
-        referenceLabel(inventoryLotOptions, record?.inventory_lot_id, '批次'),
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : referenceLabel(
+              inventoryLotOptions,
+              record?.inventory_lot_id,
+              '批次'
+            ),
     },
     {
       title: '原批次状态',
       exportTitle: '原批次状态',
       dataIndex: 'original_lot_status',
       width: 120,
-      render: (value) => lotStatusText(value) || '-',
-      exportValue: (record) => lotStatusText(record?.original_lot_status),
+      render: (value, record) =>
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : lotStatusText(value) || '-',
+      exportValue: (record) =>
+        isProductionStageQualityInspection(record)
+          ? '—'
+          : lotStatusText(record?.original_lot_status),
     },
     {
       title: '检验时间',
@@ -285,14 +392,16 @@ export function buildQualityInspectionExportColumns({
       dataIndex: 'inspector_id',
       width: 100,
       sortType: 'number',
-      render: inspectorLabel,
-      exportValue: (record) => inspectorLabel(record?.inspector_id),
+      render: (_value, record) => qualityInspectorText(record),
+      exportValue: qualityInspectorText,
     },
     {
       title: '判定备注',
       exportTitle: '判定备注',
       dataIndex: 'decision_note',
       width: 300,
+      render: (_value, record) => qualityRemarkText(record),
+      exportValue: qualityRemarkText,
     },
   ]
 }
@@ -333,6 +442,15 @@ export function buildQualityInspectionDataColumns({
       render: qualityResultTag,
     },
     {
+      title: '估算不良比例',
+      exportTitle: '估算不良比例',
+      dataIndex: 'defect_rate_percent',
+      width: 140,
+      sortable: false,
+      exportValue: qualityDefectRateText,
+      render: (_value, record) => qualityDefectRateText(record),
+    },
+    {
       title: '检验来源',
       exportTitle: '检验来源',
       dataIndex: 'inspection_type',
@@ -357,11 +475,10 @@ export function buildQualityInspectionDataColumns({
         ].join(' / '),
     },
     {
-      title: '产品 / 材料及批次',
-      exportTitle: '产品 / 材料及批次',
-      dataIndex: 'inventory_lot_id',
+      title: '产品 / 材料 / 在制品',
+      exportTitle: '产品 / 材料 / 在制品',
+      dataIndex: 'subject_type',
       width: 260,
-      sortType: 'number',
       render: (_value, record) => {
         const [subject, ...secondary] = subjectParts(
           record,
@@ -391,13 +508,10 @@ export function buildQualityInspectionDataColumns({
       sortType: 'date',
       render: (_value, record) =>
         renderStackCell(formatUnixDate(record?.inspected_at), [
-          record?.inspector_id ? inspectorLabel(record.inspector_id) : '',
+          qualityInspectorText(record),
         ]),
       exportValue: (record) =>
-        [
-          formatUnixDate(record?.inspected_at),
-          inspectorLabel(record?.inspector_id),
-        ]
+        [formatUnixDate(record?.inspected_at), qualityInspectorText(record)]
           .filter(Boolean)
           .join(' / '),
     },
@@ -406,6 +520,8 @@ export function buildQualityInspectionDataColumns({
       exportTitle: '判定备注',
       dataIndex: 'decision_note',
       width: 300,
+      render: (_value, record) => qualityRemarkText(record),
+      exportValue: qualityRemarkText,
     },
   ])
 }

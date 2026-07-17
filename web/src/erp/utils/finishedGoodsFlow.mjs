@@ -1,4 +1,3 @@
-import { BUSINESS_ROLE_KEY } from './roleKeys.mjs'
 import {
   formatWorkflowRelatedDocumentRef,
   resolveReadableWorkflowSourceNo,
@@ -7,6 +6,7 @@ import {
 export const PRODUCTION_PROGRESS_MODULE_KEY = 'production-progress'
 export const INBOUND_MODULE_KEY = 'inbound'
 export const SHIPPING_RELEASE_MODULE_KEY = 'shipping-release'
+export const SHIPMENT_SOURCE_TYPE_KEY = 'shipments'
 
 export const FINISHED_GOODS_QC_TASK_GROUP = 'finished_goods_qc'
 export const FINISHED_GOODS_INBOUND_TASK_GROUP = 'finished_goods_inbound'
@@ -133,12 +133,6 @@ function resolveShipmentDate(record = {}) {
 
 export function resolveFinishedGoodsQcDueAt(_record = {}, options = {}) {
   return nowSeconds(options) + 4 * HOUR_SECONDS
-}
-
-export function resolveShipmentDueAt(record = {}, options = {}) {
-  const shipmentSecond = parseBusinessDateEndSecond(resolveShipmentDate(record))
-  if (shipmentSecond) return shipmentSecond
-  return nowSeconds(options) + DAY_SECONDS
 }
 
 export function resolveFinishedGoodsPriority(record = {}, options = {}) {
@@ -330,37 +324,6 @@ export function buildFinishedGoodsReworkTask(
   }
 }
 
-export function buildShipmentReleaseTask(
-  record = {},
-  inboundTask = {},
-  options = {}
-) {
-  if (!resolveFinishedGoodsSourceType(record) || !record.id) return null
-  return {
-    task_code: taskCode('shipment-release', record, options),
-    task_group: SHIPMENT_RELEASE_TASK_GROUP,
-    task_name: '出货放行 / 出货准备',
-    ...baseTaskSource(record),
-    business_status_key: SHIPMENT_PENDING_STATUS_KEY,
-    task_status_key: 'ready',
-    owner_role_key: 'warehouse',
-    priority: resolveFinishedGoodsPriority(record, options),
-    due_at: resolveShipmentDueAt(record, options),
-    payload: {
-      ...commonPayload(record),
-      inbound_task_id: inboundTask?.id,
-      complete_condition: '确认出货数量、装箱、唛头、客户要求和出货状态',
-      related_documents: buildFinishedGoodsRelatedDocuments(record),
-      notification_type: 'task_created',
-      alert_type: 'shipment_pending',
-      critical_path: true,
-      finished_goods: true,
-      confirm_role_key: BUSINESS_ROLE_KEY,
-      next_module_key: SHIPPING_RELEASE_MODULE_KEY,
-    },
-  }
-}
-
 export function isFinishedGoodsQcTask(task = {}) {
   return (
     normalizeText(task.source_type) === PRODUCTION_PROGRESS_MODULE_KEY &&
@@ -384,7 +347,7 @@ export function isFinishedGoodsReworkTask(task = {}) {
 
 export function isShipmentReleaseTask(task = {}) {
   return (
-    FINISHED_GOODS_SOURCE_TYPE_KEYS.has(normalizeText(task.source_type)) &&
+    normalizeText(task.source_type) === SHIPMENT_SOURCE_TYPE_KEY &&
     normalizeText(task.task_group) === SHIPMENT_RELEASE_TASK_GROUP
   )
 }
@@ -469,5 +432,11 @@ export function hasActiveFinishedGoodsInboundTaskForRecord(
 }
 
 export function hasActiveShipmentReleaseTaskForRecord(tasks = [], record = {}) {
-  return hasActiveTaskForRecord(tasks, record, isShipmentReleaseTask)
+  if (!record?.id) return false
+  return (Array.isArray(tasks) ? tasks : []).some(
+    (task) =>
+      isShipmentReleaseTask(task) &&
+      String(task.source_id) === String(record.id) &&
+      ACTIVE_TASK_STATUS_KEYS.has(normalizeText(task.task_status_key))
+  )
 }

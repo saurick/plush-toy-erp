@@ -115,7 +115,12 @@ func (d *jsonrpcDispatcher) applyProductionOrderAction(ctx context.Context, pm m
 	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanUpdate); res != nil {
 		return res
 	}
-	if res := d.requireCustomerConfigModulesEnabled(ctx, "", productionOrderModuleKey); res != nil {
+	// Release creates the source scheduling task. Close/cancel can read and
+	// transition that task for RELEASED orders, so every action fails closed
+	// when the Workflow module is not writable instead of pre-reading state in
+	// the service and racing the repository transaction.
+	modules := []string{productionOrderModuleKey, workflowModuleKeyTasks}
+	if res := d.requireCustomerConfigModulesEnabled(ctx, "", modules...); res != nil {
 		return res
 	}
 	admin, res := d.CurrentAdmin(ctx)
@@ -158,7 +163,7 @@ func (d *jsonrpcDispatcher) getProductionOrder(ctx context.Context, pm map[strin
 	if !productionOrderAllowsOnly(pm, "production_order_id") {
 		return invalidParamResult()
 	}
-	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanRead); res != nil {
+	if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead); res != nil {
 		return res
 	}
 	if res := d.requireCustomerConfigModulesReadable(ctx, productionOrderModuleKey); res != nil {
@@ -176,7 +181,7 @@ func (d *jsonrpcDispatcher) listProductionOrders(ctx context.Context, pm map[str
 	if !productionOrderAllowsOnly(pm, "keyword", "status", "date_field", "date_from", "date_to", "sort_by", "sort_direction", "limit", "offset") {
 		return invalidParamResult()
 	}
-	if res := d.RequireAdminPermission(ctx, biz.PermissionPMCPlanRead); res != nil {
+	if res := d.RequireAdminAnyPermission(ctx, biz.PermissionPMCPlanRead, biz.PermissionProductionWIPRead); res != nil {
 		return res
 	}
 	if res := d.requireCustomerConfigModulesReadable(ctx, productionOrderModuleKey); res != nil {
@@ -315,7 +320,7 @@ func productionOrderDraftFromParams(pm map[string]any) (biz.ProductionOrderDraft
 	draftItems := make([]biz.ProductionOrderDraftItem, 0, len(items))
 	for _, raw := range items {
 		item, ok := raw.(map[string]any)
-		if !ok || !productionOrderAllowsOnly(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "note") {
+		if !ok || !productionOrderAllowsOnly(item, "line_no", "product_id", "product_sku_id", "unit_id", "planned_quantity", "sales_order_item_id", "bom_header_id", "route_code", "customer_inspection_required", "note") {
 			return biz.ProductionOrderDraft{}, "", false
 		}
 		lineNo, ok1 := productionOrderRequiredPositiveInt(item, "line_no")
@@ -325,11 +330,17 @@ func productionOrderDraftFromParams(pm map[string]any) (biz.ProductionOrderDraft
 		skuID, ok5 := productionOrderOptionalPositiveInt(item, "product_sku_id")
 		salesLineID, ok6 := productionOrderOptionalPositiveInt(item, "sales_order_item_id")
 		bomID, ok7 := productionOrderOptionalPositiveInt(item, "bom_header_id")
-		itemNote, ok8 := productionOrderOptionalString(item, "note", 255)
-		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 || !ok7 || !ok8 {
+		routeCode, ok8 := productionOrderOptionalString(item, "route_code", 64)
+		customerInspectionRequired, ok9 := productionOrderOptionalBool(item, "customer_inspection_required", false)
+		itemNote, ok10 := productionOrderOptionalString(item, "note", 255)
+		if !ok1 || !ok2 || !ok3 || !ok4 || !ok5 || !ok6 || !ok7 || !ok8 || !ok9 || !ok10 {
 			return biz.ProductionOrderDraft{}, "", false
 		}
-		draftItems = append(draftItems, biz.ProductionOrderDraftItem{LineNo: lineNo, ProductID: productID, ProductSKUID: skuID, UnitID: unitID, PlannedQuantity: quantity, SalesOrderItemID: salesLineID, BOMHeaderID: bomID, Note: itemNote})
+		draftItems = append(draftItems, biz.ProductionOrderDraftItem{
+			LineNo: lineNo, ProductID: productID, ProductSKUID: skuID, UnitID: unitID,
+			PlannedQuantity: quantity, SalesOrderItemID: salesLineID, BOMHeaderID: bomID,
+			RouteCode: routeCode, CustomerInspectionRequired: customerInspectionRequired, Note: itemNote,
+		})
 	}
 	return biz.ProductionOrderDraft{OrderNo: orderNo, PlannedStartAt: start, PlannedEndAt: end, Note: note, Items: draftItems}, key, true
 }
@@ -422,6 +433,15 @@ func productionOrderOptionalString(pm map[string]any, key string, maxLen int) (*
 		return nil, false
 	}
 	return &value, true
+}
+
+func productionOrderOptionalBool(pm map[string]any, key string, fallback bool) (bool, bool) {
+	raw, exists := pm[key]
+	if !exists {
+		return fallback, true
+	}
+	value, ok := raw.(bool)
+	return value, ok
 }
 
 func productionOrderOptionalExactString(pm map[string]any, key string) (string, bool) {
@@ -548,6 +568,7 @@ func productionOrderItemToMap(item *biz.ProductionOrderItem) map[string]any {
 		"id": item.ID, "production_order_id": item.ProductionOrderID, "line_no": item.LineNo, "product_id": item.ProductID,
 		"product_sku_id": optionalIntValue(item.ProductSKUID), "unit_id": item.UnitID, "planned_quantity": item.PlannedQuantity.String(),
 		"sales_order_item_id": optionalIntValue(item.SalesOrderItemID), "bom_header_id": optionalIntValue(item.BOMHeaderID),
+		"route_code": optionalStringValue(item.RouteCode), "customer_inspection_required": item.CustomerInspectionRequired,
 		"product_code_snapshot": optionalStringValue(item.ProductCodeSnapshot), "product_name_snapshot": optionalStringValue(item.ProductNameSnapshot),
 		"sku_code_snapshot": optionalStringValue(item.SKUCodeSnapshot), "unit_name_snapshot": optionalStringValue(item.UnitNameSnapshot),
 		"bom_version_snapshot": optionalStringValue(item.BOMVersionSnapshot), "note": optionalStringValue(item.Note),
@@ -570,6 +591,12 @@ func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该生产订单已有生效的生产入库记录，不能取消；请先按业务规则冲正或关闭"}
 	case errors.Is(err, biz.ErrProductionOrderCloseReasonRequired):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产数量尚未全部完成，请填写短关闭原因"}
+	case errors.Is(err, biz.ErrProductionOrderSchedulingTaskRequired):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该生产订单缺少来源生成的排产任务，不能继续；请检查订单发布链路"}
+	case errors.Is(err, biz.ErrProductionOrderSchedulingTaskActive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "排产任务尚未结束，请先到生产订单或任务中心完成处理"}
+	case errors.Is(err, biz.ErrProductionOrderWIPActive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仍有未结束的在制批次，请先完成对应工序、外发回仓或质量处理后再关闭生产订单"}
 	case errors.Is(err, biz.ErrProductionOrderQuantityExceeded), errors.Is(err, biz.ErrProductionOrderInvalidState), errors.Is(err, biz.ErrBadParam):
 		return invalidParamResult()
 	default:

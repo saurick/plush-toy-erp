@@ -16,6 +16,9 @@ test('qualityApi: uses dedicated quality JSON-RPC domain and admin auth', () => 
 test('qualityApi: exposes quality inspection methods only', () => {
   for (const methodName of [
     'list_quality_inspections',
+    'list_finished_goods_quality_inspections',
+    'list_production_stage_quality_inspections',
+    'create_finished_goods_quality_inspection_draft',
     'create_quality_inspection_draft',
     'create_quality_inspection_from_outsourcing_return',
     'list_outsourcing_return_quality_inspections',
@@ -38,6 +41,30 @@ test('qualityApi: exposes quality inspection methods only', () => {
   ]) {
     assert.doesNotMatch(source, new RegExp(forbiddenActionName))
   }
+})
+
+test('qualityApi: exposes dedicated shipment finished-goods quality commands', () => {
+  assert.match(
+    source,
+    /createFinishedGoodsQualityInspectionDraft[\s\S]*?create_finished_goods_quality_inspection_draft/u
+  )
+  assert.match(
+    source,
+    /listFinishedGoodsQualityInspections[\s\S]*?list_finished_goods_quality_inspections/u
+  )
+  assert.doesNotMatch(source, /createOperationalFact/u)
+})
+
+test('qualityApi: exposes the production-stage WIP read model without adding a second write path', () => {
+  assert.match(
+    source,
+    /listProductionStageQualityInspections[\s\S]*?list_production_stage_quality_inspections/u
+  )
+  assert.match(
+    source,
+    /listProductionStageQualityInspections\([\s\S]*?params[\s\S]*?options/u
+  )
+  assert.doesNotMatch(source, /createProductionStageQualityInspection/u)
 })
 
 test('qualityApi: exposes dedicated outsourcing return quality commands', () => {

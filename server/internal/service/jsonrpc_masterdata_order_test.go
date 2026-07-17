@@ -130,7 +130,7 @@ func (s *stubMasterDataJSONRPCRepo) SaveSupplierWithContacts(_ context.Context, 
 		})
 	}
 	return &biz.SupplierWithContacts{
-		Supplier: &biz.Supplier{ID: id, Code: in.Code, Name: in.Name, IsActive: true},
+		Supplier: &biz.Supplier{ID: id, Code: in.Code, Name: in.Name, Address: in.Address, ProcessIDs: in.ProcessIDs, IsActive: true},
 		Contacts: outContacts,
 	}, nil
 }
@@ -594,6 +594,65 @@ func TestJsonrpcDispatcher_SaveCustomerWithContactsUsesAggregateUsecase(t *testi
 	}
 }
 
+func TestJsonrpcDispatcher_SaveSupplierWithContactsRetainsAddressAndProcessCapabilities(t *testing.T) {
+	params := mustJSONRPCStruct(t, map[string]any{
+		"code":        "S-AGG",
+		"name":        "聚合加工厂",
+		"address":     "测试工业园 1 号",
+		"process_ids": []any{float64(3), float64(3)},
+		"contacts": []any{
+			map[string]any{
+				"name":       "主联系人",
+				"is_primary": true,
+			},
+		},
+	})
+	repo := &stubMasterDataJSONRPCRepo{}
+	j := newMasterDataJSONRPCTestData(t,
+		repo,
+		workflowJSONRPCAdmin(
+			[]string{biz.PurchaseRoleKey},
+			biz.PermissionSupplierCreate,
+			biz.PermissionContactCreate,
+			biz.PermissionContactUpdate,
+			biz.PermissionContactDisable,
+		),
+	)
+	_, res, err := j.handleMasterData(workflowJSONRPCAdminContext(), "save_supplier_with_contacts", "supplier-aggregate", params)
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("expected OK, got %#v", res)
+	}
+	if repo.savedSupplier == nil || repo.savedSupplier.Address == nil || *repo.savedSupplier.Address != "测试工业园 1 号" || len(repo.savedSupplier.ProcessIDs) != 1 || repo.savedSupplier.ProcessIDs[0] != 3 {
+		t.Fatalf("expected normalized supplier address and process capability forwarded, got %#v", repo.savedSupplier)
+	}
+	supplierData := res.Data.AsMap()["supplier"].(map[string]any)
+	if supplierData["address"] != "测试工业园 1 号" {
+		t.Fatalf("expected address in supplier response, got %#v", supplierData)
+	}
+	processIDs, ok := supplierData["process_ids"].([]any)
+	if !ok || len(processIDs) != 1 || processIDs[0] != float64(3) {
+		t.Fatalf("expected process_ids in supplier response, got %#v", supplierData["process_ids"])
+	}
+
+	invalidParams := mustJSONRPCStruct(t, map[string]any{
+		"code":        "S-BAD",
+		"name":        "非法加工厂",
+		"process_ids": []any{float64(1.5)},
+		"contacts":    []any{},
+	})
+	repo.savedSupplier = nil
+	_, invalidRes, err := j.handleMasterData(workflowJSONRPCAdminContext(), "save_supplier_with_contacts", "supplier-invalid-process", invalidParams)
+	if err != nil {
+		t.Fatalf("expected nil err for invalid params, got %v", err)
+	}
+	if invalidRes == nil || invalidRes.Code != errcode.InvalidParam.Code || repo.savedSupplier != nil {
+		t.Fatalf("expected invalid process_ids rejected before save, res=%#v supplier=%#v", invalidRes, repo.savedSupplier)
+	}
+}
+
 func TestJsonrpcDispatcher_MaterialAPIRequiresPermissionAndValidUnit(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{
 		"code":            "M001",
@@ -695,7 +754,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 		"name":                " 车缝 ",
 		"category":            " 委外车缝 ",
 		"outsourcing_enabled": true,
-		"inhouse_enabled":     false,
+		"inhouse_enabled":     true,
 		"quality_required":    true,
 		"sort_order":          float64(20),
 	})
@@ -730,7 +789,7 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 		repo.createdProcess.Category == nil ||
 		*repo.createdProcess.Category != "委外车缝" ||
 		repo.createdProcess.OutsourcingEnabled != true ||
-		repo.createdProcess.InhouseEnabled != false ||
+		repo.createdProcess.InhouseEnabled != true ||
 		repo.createdProcess.QualityRequired != true ||
 		repo.createdProcess.SortOrder != 20 {
 		t.Fatalf("unexpected process mutation %#v", repo.createdProcess)

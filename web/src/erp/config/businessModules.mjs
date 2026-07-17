@@ -106,14 +106,17 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/purchase/material-bom',
     shortLabel: '物料清单',
     pageKind: 'formal-v1',
-    description:
-      '物料清单（BOM）用于维护产品结构、材料用量、损耗和版本状态。',
+    description: '物料清单（BOM）用于维护产品结构、材料用量、损耗和版本状态。',
     primaryEntity: 'bom_headers / bom_items',
     factSource: 'bom_headers, bom_items, materials',
     boundary:
       '维护物料清单不会直接生成采购需求、采购入库或库存数量；同一产品只能保留一个当前生效版本。',
     sourceRefs: ['bom_headers', 'bom_items', 'materials', 'products'],
-    currentScope: ['产品结构版本', '材料用量和损耗率', '物料清单状态和生效规则'],
+    currentScope: [
+      '产品结构版本',
+      '材料用量和损耗率',
+      '物料清单状态和生效规则',
+    ],
   },
   {
     key: 'processes',
@@ -174,18 +177,25 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '入库',
     pageKind: 'formal-v1',
     description:
-      '入库管理用于采购收货、待检、退货和入库确认；确认过账后系统更新库存。',
+      '入库管理只接收从已审核采购订单生成的入库草稿，并继续办理收货、待检、退货、调整和入库确认；确认过账后系统更新库存。',
     primaryEntity: 'purchase_receipts / purchase_receipt_items',
     factSource: 'purchase_receipts, purchase_receipt_items, inventory_txns',
-    boundary:
-      '任务标记为完成不等于采购入库已经过账；请以入库单状态为准。',
+    boundary: '任务标记为完成不等于采购入库已经过账；请以入库单状态为准。',
     sourceRefs: [
+      'purchase_orders',
+      'purchase_order_items',
       'purchase_receipts',
       'purchase_returns',
       'inventory_lots',
       'inventory_txns',
     ],
-    currentScope: ['待收货', '待质检', '已入库', '退货 / 调整追溯'],
+    currentScope: [
+      '从已审核采购订单生成入库草稿',
+      '待收货',
+      '待质检',
+      '已入库',
+      '退货 / 调整追溯',
+    ],
   },
   {
     key: 'quality-inspections',
@@ -196,20 +206,24 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '质检',
     pageKind: 'formal-v1',
     description:
-      '质量检验用于采购来料、委外回货等业务的检验判定和批次状态处理；任务完成不能代替质检判定。',
+      '质量检验汇总办理采购到货、委外回货和出货前成品的一次检验判定；采购待检由入库准备生成，委外待检从回货记录发起，出货前成品检验从草稿出货单按产品规格、仓库和批次发起。',
     primaryEntity: 'quality_inspections',
     factSource: 'quality_inspections, inventory_lots',
-    boundary: '质检状态变化不会增减库存总量；不合格退供应商仍需办理采购退货。',
+    boundary:
+      '每张质检单只表达一次通用判定，不能代表裁片、皮套、针检、抽检或客户验货全部完成；估算不良比例不会自动换算退货数量；首次到货检验不合格会阻止入库，退供应商只适用于已入库后追加检验不合格；质检状态变化不会增减库存总量。',
     sourceRefs: [
       'quality_inspections',
       'inventory_lots',
       'purchase_receipts',
       'outsourcing_facts',
+      'shipments',
     ],
     currentScope: [
       '采购来料检验',
       '委外回货检验',
+      '出货单关联成品检验（页面来源入口待接入）',
       '质检判定',
+      '来源单据级估算不良比例（档位 / 自定义）',
       '批次冻结 / 可用 / 不合格状态',
     ],
   },
@@ -227,7 +241,7 @@ export const businessModuleDefinitions = Object.freeze([
     factSource:
       'inventory_txns, inventory_balances, inventory_lots, stock_reservations',
     boundary:
-      '库存台账只展示系统查询结果；入库、出库、预留、调拨和调整必须通过对应业务操作完成。',
+      '库存台账只展示系统查询结果；入库、生产、委外、出货和预留必须通过对应来源单据或业务记录办理，当前页面不提供盘点、调拨或通用库存调整入口。',
     sourceRefs: [
       'inventory_txns',
       'inventory_balances',
@@ -239,7 +253,7 @@ export const businessModuleDefinitions = Object.freeze([
       '已预留 / 可用量只读',
       '库存批次',
       '库存变动记录',
-      '盘点 / 调整规则',
+      '按来源单据和业务记录追溯',
     ],
   },
   {
@@ -272,7 +286,7 @@ export const businessModuleDefinitions = Object.freeze([
       '工序明细',
       '草稿 / 提交 / 确认 / 关闭 / 取消状态',
       '加工合同打印内容',
-      '导出筛选结果 / 列顺序 / 相关任务',
+      '导出筛选结果 / 列顺序 / 当前记录任务',
       '选择计量单位',
       '从已确认合同行生成委外发料 / 回货草稿',
       '从已过账回货发起质检 / 合格后生成应付',
@@ -287,12 +301,12 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '生产订单',
     pageKind: 'formal-v1',
     description:
-      '生产订单维护生产计划的草稿、发布、关闭和取消；已发布订单可在本页按已确认需求办理领料或完工入库草稿。',
+      '生产订单维护生产计划与固定工序路线；发布后按布料加工、车缝、手工、包装依次办理 WIP、逐工序内外发决策、分段质检与包材确认，并可生成领料或完工入库草稿。',
     primaryEntity: 'production_orders / production_order_items',
     factSource:
-      'production_orders, production_order_items, production_order_material_requirements, production_facts',
+      'production_orders, production_order_items, production_order_material_requirements, production_order_operations, production_wip_batches, production_wip_outsourcing_allocations, production_packaging_confirmations, quality_inspections, production_facts',
     boundary:
-      '生产订单只表达计划承诺；领料和完工必须由本页办理，草稿仍需在生产记录中确认后才会形成库存变动记录。',
+      '生产订单、工序路线、WIP 流转、内外发安排、质检状态和包材确认都不等于库存事实；领料与完工草稿仍需在生产记录中过账，只有已过账生产事实才会形成库存变动。',
     sourceRefs: [
       'production_orders',
       'production_order_items',
@@ -302,12 +316,22 @@ export const businessModuleDefinitions = Object.freeze([
       'sales_order_items',
       'bom_headers',
       'production_order_material_requirements',
+      'production_order_operations',
+      'production_wip_batches',
+      'production_wip_outsourcing_allocations',
+      'production_packaging_confirmations',
+      'quality_inspections',
       'production_facts',
     ],
     currentScope: [
       '生产计划草稿与明细',
       '发布、关闭和取消等状态操作',
+      '发布时原子生成 PMC 生产排程待办',
       '销售来源与当前生效 BOM 可读选择',
+      '固定路线：布料加工 → 车缝 → 手工 → 包装',
+      '按在制批次办理拆分、内外发安排与车间移交',
+      '布料整单外发与车缝 / 手工逐工序独立决策',
+      '裁片、皮套、成品分段质检与包材确认',
       '从冻结物料需求生成领料草稿',
       '从已发布订单行生成完工入库草稿',
     ],
@@ -321,17 +345,18 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '排程',
     pageKind: 'formal-v1',
     description:
-      '生产排程用于创建、筛选、完成、阻塞和催办排程任务；不会自动登记生产完工、领料或成品入库。',
+      '生产排程处理生产订单发布时生成的 PMC 待办；完成排程任务不会代写领料、完工或库存记录。',
     primaryEntity: 'workflow_tasks',
-    factSource: 'workflow_tasks 当前承载，生产排程事实规则待评审',
+    factSource: 'production_orders -> workflow_tasks',
     boundary:
-      '生产排程只管理计划和待办任务；完工、领料和成品入库需到对应页面登记。',
-    sourceRefs: ['workflow_tasks', 'sales_orders', 'bom_headers'],
+      '生产排程只管理已有计划待办；当前不提供通用新建任务，完工、领料和成品入库需到对应页面登记。',
+    sourceRefs: ['production_orders', 'workflow_tasks'],
     currentScope: [
-      '生产排程任务',
+      '生产订单发布生成的排程任务',
       '负责岗位',
       '到期跟进',
       '完成 / 阻塞 / 催办',
+      '返回来源生产订单',
     ],
   },
   {
@@ -348,11 +373,19 @@ export const businessModuleDefinitions = Object.freeze([
     factSource: 'production_facts, inventory_txns',
     boundary:
       '任务标记为完成不会自动生成生产发料、成品入库或返工记录；生产排程和异常也不会自动生成出货、应收或发票记录。',
-    sourceRefs: ['production_facts', 'inventory_txns', 'workflow_tasks'],
+    sourceRefs: [
+      'production_orders',
+      'production_order_items',
+      'production_facts',
+      'inventory_txns',
+      'workflow_tasks',
+    ],
     currentScope: [
+      '从已发布生产订单生成领料 / 完工草稿',
       '生产发料',
       '成品入库',
       '返工',
+      '返工记录过账时原子生成生产异常待办',
       '确认后更新库存，取消后生成撤销调整记录',
     ],
   },
@@ -364,17 +397,23 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/production/exceptions',
     shortLabel: '异常',
     pageKind: 'formal-v1',
-    description: '生产异常用于登记、筛选、完成、阻塞和催办异常任务。',
+    description:
+      '生产异常处理返工记录过账时生成的协同待办；完成异常任务不会代写返工、报废或库存调整。',
     primaryEntity: 'workflow_tasks / workflow_task_events',
     factSource: 'workflow_tasks, workflow_task_events',
     boundary:
-      '异常处理只更新当前任务；不会直接修改生产、库存、出货或财务记录，也不会新增客户工单。',
+      '异常处理只更新已有任务；当前不提供通用新建任务，也不会直接修改生产、库存、出货或财务记录。',
     sourceRefs: [
+      'production_facts',
       'workflow_tasks',
       'workflow_task_events',
       'workflow_business_states',
     ],
-    currentScope: ['延期', '返工', '阻塞', '退回和催办'],
+    currentScope: [
+      '返工记录过账生成的异常任务',
+      '退回和催办',
+      '返回来源生产记录',
+    ],
   },
   {
     key: 'shipping-release',
@@ -385,18 +424,17 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '放行',
     pageKind: 'formal-v1',
     description:
-      '出货放行用于创建、筛选、完成、阻塞和催办放行任务；放行不等于已出货。',
+      '出货放行处理草稿出货单显式提交后生成的仓库待办；放行完成不等于已出货。',
     primaryEntity: 'workflow_tasks / workflow_business_states',
-    factSource:
-      'workflow_tasks, workflow_business_states 当前承载，ShipmentUsecase 待评审',
+    factSource: 'shipments -> workflow_tasks, workflow_business_states',
     boundary:
-      '放行完成不等于已出货，不会自动扣减库存或生成应收、开票、收付款记录。',
-    sourceRefs: [
-      'workflow_business_states',
-      'sales_orders',
-      'inventory_balances',
+      '当前不提供通用新建任务；放行完成不等于已出货，不会自动扣减库存或生成应收、开票、收付款记录。',
+    sourceRefs: ['shipments', 'workflow_tasks', 'workflow_business_states'],
+    currentScope: [
+      '草稿出货单提交生成的待放行任务',
+      '完成 / 阻塞 / 催办',
+      '返回来源出货单',
     ],
-    currentScope: ['待放行订单', '缺料 / 质检 / 财务风险', '放行后出库状态'],
   },
   {
     key: 'outbound',
@@ -413,6 +451,8 @@ export const businessModuleDefinitions = Object.freeze([
     boundary:
       '出货放行和完成任务不等于出库；释放预留不会增减库存总量，确认出货才消耗预留，取消已发货后系统会保留调整记录。',
     sourceRefs: [
+      'sales_orders',
+      'sales_order_items',
       'shipments',
       'shipment_items',
       'stock_reservations',
@@ -420,7 +460,8 @@ export const businessModuleDefinitions = Object.freeze([
     ],
     currentScope: [
       '出货单草稿和发货',
-      '库存预留创建 / 释放，以及确认出货时自动扣减预留',
+      '草稿显式提交出货放行待办',
+      '从销售订单生成 / 释放库存预留，以及确认出货时自动扣减预留',
       '出货取消后的库存恢复规则',
     ],
   },
@@ -438,11 +479,19 @@ export const businessModuleDefinitions = Object.freeze([
     factSource: 'shipments, shipment_items, inventory_txns',
     boundary:
       '出货放行只表示可以发货；只有出货单确认发货后，才记录实际出货和库存出库。',
-    sourceRefs: ['shipments', 'shipment_items', 'inventory_txns'],
+    sourceRefs: [
+      'sales_orders',
+      'sales_order_items',
+      'shipments',
+      'shipment_items',
+      'inventory_txns',
+      'finance_facts',
+    ],
     currentScope: [
       '出货单列表和明细维护',
-      '新建草稿和添加商品明细',
+      '新建草稿和添加商品明细，可关联销售订单',
       '确认出货和取消追溯',
+      '从已出货记录生成应收 / 开票记录',
     ],
   },
   {
@@ -475,8 +524,7 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/payables',
     shortLabel: '应付',
     pageKind: 'formal-v1',
-    description:
-      '应付管理记录来源明确的应付款项，可过账、结清或取消。',
+    description: '应付管理记录来源明确的应付款项，可过账、结清或取消。',
     primaryEntity: 'finance_facts.PAYABLE',
     factSource: 'finance_facts',
     boundary:
@@ -498,8 +546,7 @@ export const businessModuleDefinitions = Object.freeze([
     path: '/erp/finance/receivables',
     shortLabel: '应收',
     pageKind: 'formal-v1',
-    description:
-      '应收管理记录已出货业务产生的应收款项，可过账、结清或取消。',
+    description: '应收管理记录已出货业务产生的应收款项，可过账、结清或取消。',
     primaryEntity: 'finance_facts.RECEIVABLE',
     factSource: 'finance_facts',
     boundary:

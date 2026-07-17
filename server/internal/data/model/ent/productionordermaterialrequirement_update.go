@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/productionordermaterialrequirement"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -34,9 +35,45 @@ func (_u *ProductionOrderMaterialRequirementUpdate) SetUpdatedAt(v time.Time) *P
 	return _u
 }
 
+// AddProductionWipOutsourcingAllocationIDs adds the "production_wip_outsourcing_allocations" edge to the ProductionWIPOutsourcingAllocation entity by IDs.
+func (_u *ProductionOrderMaterialRequirementUpdate) AddProductionWipOutsourcingAllocationIDs(ids ...int) *ProductionOrderMaterialRequirementUpdate {
+	_u.mutation.AddProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// AddProductionWipOutsourcingAllocations adds the "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *ProductionOrderMaterialRequirementUpdate) AddProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *ProductionOrderMaterialRequirementUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionWipOutsourcingAllocationIDs(ids...)
+}
+
 // Mutation returns the ProductionOrderMaterialRequirementMutation object of the builder.
 func (_u *ProductionOrderMaterialRequirementUpdate) Mutation() *ProductionOrderMaterialRequirementMutation {
 	return _u.mutation
+}
+
+// ClearProductionWipOutsourcingAllocations clears all "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *ProductionOrderMaterialRequirementUpdate) ClearProductionWipOutsourcingAllocations() *ProductionOrderMaterialRequirementUpdate {
+	_u.mutation.ClearProductionWipOutsourcingAllocations()
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocationIDs removes the "production_wip_outsourcing_allocations" edge to ProductionWIPOutsourcingAllocation entities by IDs.
+func (_u *ProductionOrderMaterialRequirementUpdate) RemoveProductionWipOutsourcingAllocationIDs(ids ...int) *ProductionOrderMaterialRequirementUpdate {
+	_u.mutation.RemoveProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocations removes "production_wip_outsourcing_allocations" edges to ProductionWIPOutsourcingAllocation entities.
+func (_u *ProductionOrderMaterialRequirementUpdate) RemoveProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *ProductionOrderMaterialRequirementUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionWipOutsourcingAllocationIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -116,8 +153,56 @@ func (_u *ProductionOrderMaterialRequirementUpdate) sqlSave(ctx context.Context)
 			}
 		}
 	}
+	if _u.mutation.ProductionOperationCodeCleared() {
+		_spec.ClearField(productionordermaterialrequirement.FieldProductionOperationCode, field.TypeString)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 && !_u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -145,9 +230,45 @@ func (_u *ProductionOrderMaterialRequirementUpdateOne) SetUpdatedAt(v time.Time)
 	return _u
 }
 
+// AddProductionWipOutsourcingAllocationIDs adds the "production_wip_outsourcing_allocations" edge to the ProductionWIPOutsourcingAllocation entity by IDs.
+func (_u *ProductionOrderMaterialRequirementUpdateOne) AddProductionWipOutsourcingAllocationIDs(ids ...int) *ProductionOrderMaterialRequirementUpdateOne {
+	_u.mutation.AddProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// AddProductionWipOutsourcingAllocations adds the "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *ProductionOrderMaterialRequirementUpdateOne) AddProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *ProductionOrderMaterialRequirementUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddProductionWipOutsourcingAllocationIDs(ids...)
+}
+
 // Mutation returns the ProductionOrderMaterialRequirementMutation object of the builder.
 func (_u *ProductionOrderMaterialRequirementUpdateOne) Mutation() *ProductionOrderMaterialRequirementMutation {
 	return _u.mutation
+}
+
+// ClearProductionWipOutsourcingAllocations clears all "production_wip_outsourcing_allocations" edges to the ProductionWIPOutsourcingAllocation entity.
+func (_u *ProductionOrderMaterialRequirementUpdateOne) ClearProductionWipOutsourcingAllocations() *ProductionOrderMaterialRequirementUpdateOne {
+	_u.mutation.ClearProductionWipOutsourcingAllocations()
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocationIDs removes the "production_wip_outsourcing_allocations" edge to ProductionWIPOutsourcingAllocation entities by IDs.
+func (_u *ProductionOrderMaterialRequirementUpdateOne) RemoveProductionWipOutsourcingAllocationIDs(ids ...int) *ProductionOrderMaterialRequirementUpdateOne {
+	_u.mutation.RemoveProductionWipOutsourcingAllocationIDs(ids...)
+	return _u
+}
+
+// RemoveProductionWipOutsourcingAllocations removes "production_wip_outsourcing_allocations" edges to ProductionWIPOutsourcingAllocation entities.
+func (_u *ProductionOrderMaterialRequirementUpdateOne) RemoveProductionWipOutsourcingAllocations(v ...*ProductionWIPOutsourcingAllocation) *ProductionOrderMaterialRequirementUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveProductionWipOutsourcingAllocationIDs(ids...)
 }
 
 // Where appends a list predicates to the ProductionOrderMaterialRequirementUpdate builder.
@@ -257,8 +378,56 @@ func (_u *ProductionOrderMaterialRequirementUpdateOne) sqlSave(ctx context.Conte
 			}
 		}
 	}
+	if _u.mutation.ProductionOperationCodeCleared() {
+		_spec.ClearField(productionordermaterialrequirement.FieldProductionOperationCode, field.TypeString)
+	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(productionordermaterialrequirement.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 && !_u.mutation.ProductionWipOutsourcingAllocationsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionWipOutsourcingAllocationsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   productionordermaterialrequirement.ProductionWipOutsourcingAllocationsTable,
+			Columns: []string{productionordermaterialrequirement.ProductionWipOutsourcingAllocationsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipoutsourcingallocation.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &ProductionOrderMaterialRequirement{config: _u.config}
 	_spec.Assign = _node.assignValues

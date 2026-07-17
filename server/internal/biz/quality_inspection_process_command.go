@@ -3,6 +3,8 @@ package biz
 import (
 	"context"
 	"strings"
+
+	"github.com/shopspring/decimal"
 )
 
 const (
@@ -20,6 +22,8 @@ const (
 	qualityInspectionProcessCommandPayloadFinishedGoodsLotID = "finished_goods_lot_id"
 	qualityInspectionProcessCommandPayloadResult             = "result"
 	qualityInspectionProcessCommandPayloadInspectedAt        = "inspected_at"
+	qualityInspectionProcessCommandPayloadDefectRateOperator = "defect_rate_operator"
+	qualityInspectionProcessCommandPayloadDefectRatePercent  = "defect_rate_percent"
 	qualityInspectionProcessCommandPayloadDecisionNote       = "decision_note"
 )
 
@@ -29,6 +33,24 @@ type incomingQualityGateProcessCommandHandler struct {
 
 type finishedGoodsQualityDecideProcessCommandHandler struct {
 	uc *InventoryUsecase
+}
+
+func (*finishedGoodsQualityDecideProcessCommandHandler) NormalizeProcessDomainCommandPayload(payload map[string]any) (map[string]any, error) {
+	normalized := make(map[string]any, len(payload))
+	for key, value := range payload {
+		normalized[key] = value
+	}
+	operator, percent, err := qualityInspectionDefectRateFromProcessCommandPayload(payload, false)
+	if err != nil {
+		return nil, err
+	}
+	delete(normalized, qualityInspectionProcessCommandPayloadDefectRateOperator)
+	delete(normalized, qualityInspectionProcessCommandPayloadDefectRatePercent)
+	if operator != nil && percent != nil {
+		normalized[qualityInspectionProcessCommandPayloadDefectRateOperator] = *operator
+		normalized[qualityInspectionProcessCommandPayloadDefectRatePercent] = percent.String()
+	}
+	return normalized, nil
 }
 
 type QualityInspectionProcessCommandRepo interface {
@@ -140,6 +162,8 @@ func (h *finishedGoodsQualityDecideProcessCommandHandler) ValidateProcessDomainC
 		qualityInspectionProcessCommandPayloadFinishedGoodsLotID,
 		qualityInspectionProcessCommandPayloadResult,
 		qualityInspectionProcessCommandPayloadInspectedAt,
+		qualityInspectionProcessCommandPayloadDefectRateOperator,
+		qualityInspectionProcessCommandPayloadDefectRatePercent,
 		qualityInspectionProcessCommandPayloadDecisionNote,
 	); err != nil {
 		return err
@@ -173,12 +197,19 @@ func (h *finishedGoodsQualityDecideProcessCommandHandler) ValidateProcessDomainC
 	if hasFinishedGoodsLotID && payloadFinishedGoodsLotID != inspection.InventoryLotID {
 		return ErrBadParam
 	}
+	defectRateOperator, defectRatePercent, err := qualityInspectionDefectRateFromProcessCommandPayload(in.Payload, inspection.Status == QualityInspectionStatusSubmitted)
+	if err != nil {
+		return err
+	}
 	inspectedAt, err := processCommandOptionalTimeFromPayload(in.Payload, qualityInspectionProcessCommandPayloadInspectedAt)
 	if err != nil {
 		return err
 	}
 	if inspection.Status == QualityInspectionStatusSubmitted {
 		return nil
+	}
+	if !qualityInspectionDefectRateMatchesInspection(inspection, defectRateOperator, defectRatePercent) {
+		return ErrIdempotencyConflict
 	}
 	targetStatus := QualityInspectionStatusPassed
 	if result == QualityInspectionResultReject {
@@ -226,13 +257,19 @@ func (h *finishedGoodsQualityDecideProcessCommandHandler) ExecuteProcessDomainCo
 	inspectionID, _ := qualityInspectionIDFromProcessCommandPayload(in.Payload)
 	result := strings.ToUpper(processCommandStringFromPayload(in.Payload, qualityInspectionProcessCommandPayloadResult))
 	inspectedAt, _ := processCommandOptionalTimeFromPayload(in.Payload, qualityInspectionProcessCommandPayloadInspectedAt)
+	defectRateOperator, defectRatePercent, err := qualityInspectionDefectRateFromProcessCommandPayload(in.Payload, false)
+	if err != nil {
+		return nil, err
+	}
 	inspectorID := actorID
 	decision := &QualityInspectionDecision{
-		InspectionID: inspectionID,
-		Result:       result,
-		InspectedAt:  inspectedAt,
-		InspectorID:  &inspectorID,
-		DecisionNote: processCommandOptionalStringPtrFromPayload(in.Payload, qualityInspectionProcessCommandPayloadDecisionNote),
+		InspectionID:       inspectionID,
+		Result:             result,
+		InspectedAt:        inspectedAt,
+		InspectorID:        &inspectorID,
+		DefectRateOperator: defectRateOperator,
+		DefectRatePercent:  defectRatePercent,
+		DecisionNote:       processCommandOptionalStringPtrFromPayload(in.Payload, qualityInspectionProcessCommandPayloadDecisionNote),
 	}
 	normalizedDecision, err := normalizeQualityInspectionDecision(*decision, result)
 	if err != nil {
@@ -277,6 +314,82 @@ func (h *finishedGoodsQualityDecideProcessCommandHandler) ExecuteProcessDomainCo
 	default:
 		return nil, ErrBadParam
 	}
+}
+
+func qualityInspectionDefectRateFromProcessCommandPayload(payload map[string]any, required bool) (*string, *decimal.Decimal, error) {
+	operatorRaw, operatorPresent := payload[qualityInspectionProcessCommandPayloadDefectRateOperator]
+	percentRaw, percentPresent := payload[qualityInspectionProcessCommandPayloadDefectRatePercent]
+	if !operatorPresent || operatorRaw == nil {
+		operatorPresent = false
+	}
+	if !percentPresent || percentRaw == nil {
+		percentPresent = false
+	}
+	if !operatorPresent && !percentPresent {
+		return NormalizeQualityInspectionDefectRate(nil, nil, required)
+	}
+	if !operatorPresent || !percentPresent {
+		return nil, nil, ErrBadParam
+	}
+	operatorText, ok := operatorRaw.(string)
+	if !ok {
+		return nil, nil, ErrBadParam
+	}
+	percentText, ok := percentRaw.(string)
+	if !ok {
+		return nil, nil, ErrBadParam
+	}
+	parsedPercent, ok := parseQualityInspectionDefectRatePercent(percentText)
+	if !ok {
+		return nil, nil, ErrBadParam
+	}
+	return NormalizeQualityInspectionDefectRate(&operatorText, &parsedPercent, required)
+}
+
+func parseQualityInspectionDefectRatePercent(value string) (decimal.Decimal, bool) {
+	text := strings.TrimSpace(value)
+	if text == "" {
+		return decimal.Zero, false
+	}
+	dotSeen := false
+	integerDigits := 0
+	fractionDigits := 0
+	for _, char := range text {
+		switch {
+		case char >= '0' && char <= '9':
+			if dotSeen {
+				fractionDigits++
+			} else {
+				integerDigits++
+			}
+		case char == '.' && !dotSeen:
+			dotSeen = true
+		default:
+			return decimal.Zero, false
+		}
+	}
+	if integerDigits == 0 || integerDigits > 14 || fractionDigits > 6 || (dotSeen && fractionDigits == 0) {
+		return decimal.Zero, false
+	}
+	parsed, err := decimal.NewFromString(text)
+	return parsed, err == nil
+}
+
+func qualityInspectionDefectRateMatchesInspection(inspection *QualityInspection, operator *string, percent *decimal.Decimal) bool {
+	if inspection == nil || !qualityInspectionSameOptionalString(inspection.DefectRateOperator, operator) {
+		return false
+	}
+	if inspection.DefectRatePercent == nil || percent == nil {
+		return inspection.DefectRatePercent == nil && percent == nil
+	}
+	return inspection.DefectRatePercent.Equal(*percent)
+}
+
+func qualityInspectionSameOptionalString(left, right *string) bool {
+	if left == nil || right == nil {
+		return left == nil && right == nil
+	}
+	return *left == *right
 }
 
 func qualityInspectionIDFromProcessCommandPayload(payload map[string]any) (int, error) {

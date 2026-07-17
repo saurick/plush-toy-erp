@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/inventorylot"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/productionwipbatch"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/purchasereturn"
@@ -19,6 +20,7 @@ import (
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
+	"github.com/shopspring/decimal"
 )
 
 // QualityInspectionUpdate is the builder for updating QualityInspection entities.
@@ -102,6 +104,52 @@ func (_u *QualityInspectionUpdate) SetNillableInventoryLotID(v *int) *QualityIns
 	return _u
 }
 
+// ClearInventoryLotID clears the value of the "inventory_lot_id" field.
+func (_u *QualityInspectionUpdate) ClearInventoryLotID() *QualityInspectionUpdate {
+	_u.mutation.ClearInventoryLotID()
+	return _u
+}
+
+// SetProductionWipBatchID sets the "production_wip_batch_id" field.
+func (_u *QualityInspectionUpdate) SetProductionWipBatchID(v int) *QualityInspectionUpdate {
+	_u.mutation.SetProductionWipBatchID(v)
+	return _u
+}
+
+// SetNillableProductionWipBatchID sets the "production_wip_batch_id" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableProductionWipBatchID(v *int) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetProductionWipBatchID(*v)
+	}
+	return _u
+}
+
+// ClearProductionWipBatchID clears the value of the "production_wip_batch_id" field.
+func (_u *QualityInspectionUpdate) ClearProductionWipBatchID() *QualityInspectionUpdate {
+	_u.mutation.ClearProductionWipBatchID()
+	return _u
+}
+
+// SetGateCode sets the "gate_code" field.
+func (_u *QualityInspectionUpdate) SetGateCode(v string) *QualityInspectionUpdate {
+	_u.mutation.SetGateCode(v)
+	return _u
+}
+
+// SetNillableGateCode sets the "gate_code" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableGateCode(v *string) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetGateCode(*v)
+	}
+	return _u
+}
+
+// ClearGateCode clears the value of the "gate_code" field.
+func (_u *QualityInspectionUpdate) ClearGateCode() *QualityInspectionUpdate {
+	_u.mutation.ClearGateCode()
+	return _u
+}
+
 // SetMaterialID sets the "material_id" field.
 func (_u *QualityInspectionUpdate) SetMaterialID(v int) *QualityInspectionUpdate {
 	_u.mutation.SetMaterialID(v)
@@ -133,6 +181,12 @@ func (_u *QualityInspectionUpdate) SetNillableWarehouseID(v *int) *QualityInspec
 	if v != nil {
 		_u.SetWarehouseID(*v)
 	}
+	return _u
+}
+
+// ClearWarehouseID clears the value of the "warehouse_id" field.
+func (_u *QualityInspectionUpdate) ClearWarehouseID() *QualityInspectionUpdate {
+	_u.mutation.ClearWarehouseID()
 	return _u
 }
 
@@ -345,6 +399,46 @@ func (_u *QualityInspectionUpdate) ClearInspectorID() *QualityInspectionUpdate {
 	return _u
 }
 
+// SetDefectRateOperator sets the "defect_rate_operator" field.
+func (_u *QualityInspectionUpdate) SetDefectRateOperator(v string) *QualityInspectionUpdate {
+	_u.mutation.SetDefectRateOperator(v)
+	return _u
+}
+
+// SetNillableDefectRateOperator sets the "defect_rate_operator" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableDefectRateOperator(v *string) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetDefectRateOperator(*v)
+	}
+	return _u
+}
+
+// ClearDefectRateOperator clears the value of the "defect_rate_operator" field.
+func (_u *QualityInspectionUpdate) ClearDefectRateOperator() *QualityInspectionUpdate {
+	_u.mutation.ClearDefectRateOperator()
+	return _u
+}
+
+// SetDefectRatePercent sets the "defect_rate_percent" field.
+func (_u *QualityInspectionUpdate) SetDefectRatePercent(v decimal.Decimal) *QualityInspectionUpdate {
+	_u.mutation.SetDefectRatePercent(v)
+	return _u
+}
+
+// SetNillableDefectRatePercent sets the "defect_rate_percent" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableDefectRatePercent(v *decimal.Decimal) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetDefectRatePercent(*v)
+	}
+	return _u
+}
+
+// ClearDefectRatePercent clears the value of the "defect_rate_percent" field.
+func (_u *QualityInspectionUpdate) ClearDefectRatePercent() *QualityInspectionUpdate {
+	_u.mutation.ClearDefectRatePercent()
+	return _u
+}
+
 // SetDecisionNote sets the "decision_note" field.
 func (_u *QualityInspectionUpdate) SetDecisionNote(v string) *QualityInspectionUpdate {
 	_u.mutation.SetDecisionNote(v)
@@ -384,6 +478,11 @@ func (_u *QualityInspectionUpdate) SetPurchaseReceiptItem(v *PurchaseReceiptItem
 // SetInventoryLot sets the "inventory_lot" edge to the InventoryLot entity.
 func (_u *QualityInspectionUpdate) SetInventoryLot(v *InventoryLot) *QualityInspectionUpdate {
 	return _u.SetInventoryLotID(v.ID)
+}
+
+// SetProductionWipBatch sets the "production_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *QualityInspectionUpdate) SetProductionWipBatch(v *ProductionWIPBatch) *QualityInspectionUpdate {
+	return _u.SetProductionWipBatchID(v.ID)
 }
 
 // SetMaterial sets the "material" edge to the Material entity.
@@ -431,6 +530,12 @@ func (_u *QualityInspectionUpdate) ClearPurchaseReceiptItem() *QualityInspection
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *QualityInspectionUpdate) ClearInventoryLot() *QualityInspectionUpdate {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearProductionWipBatch clears the "production_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *QualityInspectionUpdate) ClearProductionWipBatch() *QualityInspectionUpdate {
+	_u.mutation.ClearProductionWipBatch()
 	return _u
 }
 
@@ -531,6 +636,16 @@ func (_u *QualityInspectionUpdate) check() error {
 			return &ValidationError{Name: "inventory_lot_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inventory_lot_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductionWipBatchID(); ok {
+		if err := qualityinspection.ProductionWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "production_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.production_wip_batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.GateCode(); ok {
+		if err := qualityinspection.GateCodeValidator(v); err != nil {
+			return &ValidationError{Name: "gate_code", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.gate_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.MaterialID(); ok {
 		if err := qualityinspection.MaterialIDValidator(v); err != nil {
 			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.material_id": %w`, err)}
@@ -586,16 +701,15 @@ func (_u *QualityInspectionUpdate) check() error {
 			return &ValidationError{Name: "inspector_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspector_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefectRateOperator(); ok {
+		if err := qualityinspection.DefectRateOperatorValidator(v); err != nil {
+			return &ValidationError{Name: "defect_rate_operator", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.defect_rate_operator": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.DecisionNote(); ok {
 		if err := qualityinspection.DecisionNoteValidator(v); err != nil {
 			return &ValidationError{Name: "decision_note", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.decision_note": %w`, err)}
 		}
-	}
-	if _u.mutation.InventoryLotCleared() && len(_u.mutation.InventoryLotIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.inventory_lot"`)
-	}
-	if _u.mutation.WarehouseCleared() && len(_u.mutation.WarehouseIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.warehouse"`)
 	}
 	return nil
 }
@@ -614,6 +728,12 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if value, ok := _u.mutation.InspectionNo(); ok {
 		_spec.SetField(qualityinspection.FieldInspectionNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GateCode(); ok {
+		_spec.SetField(qualityinspection.FieldGateCode, field.TypeString, value)
+	}
+	if _u.mutation.GateCodeCleared() {
+		_spec.ClearField(qualityinspection.FieldGateCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.SourceType(); ok {
 		_spec.SetField(qualityinspection.FieldSourceType, field.TypeString, value)
@@ -677,6 +797,18 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if _u.mutation.InspectorIDCleared() {
 		_spec.ClearField(qualityinspection.FieldInspectorID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.DefectRateOperator(); ok {
+		_spec.SetField(qualityinspection.FieldDefectRateOperator, field.TypeString, value)
+	}
+	if _u.mutation.DefectRateOperatorCleared() {
+		_spec.ClearField(qualityinspection.FieldDefectRateOperator, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefectRatePercent(); ok {
+		_spec.SetField(qualityinspection.FieldDefectRatePercent, field.TypeOther, value)
+	}
+	if _u.mutation.DefectRatePercentCleared() {
+		_spec.ClearField(qualityinspection.FieldDefectRatePercent, field.TypeOther)
 	}
 	if value, ok := _u.mutation.DecisionNote(); ok {
 		_spec.SetField(qualityinspection.FieldDecisionNote, field.TypeString, value)
@@ -767,6 +899,35 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionWipBatchCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   qualityinspection.ProductionWipBatchTable,
+			Columns: []string{qualityinspection.ProductionWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionWipBatchIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   qualityinspection.ProductionWipBatchTable,
+			Columns: []string{qualityinspection.ProductionWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {
@@ -965,6 +1126,52 @@ func (_u *QualityInspectionUpdateOne) SetNillableInventoryLotID(v *int) *Quality
 	return _u
 }
 
+// ClearInventoryLotID clears the value of the "inventory_lot_id" field.
+func (_u *QualityInspectionUpdateOne) ClearInventoryLotID() *QualityInspectionUpdateOne {
+	_u.mutation.ClearInventoryLotID()
+	return _u
+}
+
+// SetProductionWipBatchID sets the "production_wip_batch_id" field.
+func (_u *QualityInspectionUpdateOne) SetProductionWipBatchID(v int) *QualityInspectionUpdateOne {
+	_u.mutation.SetProductionWipBatchID(v)
+	return _u
+}
+
+// SetNillableProductionWipBatchID sets the "production_wip_batch_id" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableProductionWipBatchID(v *int) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetProductionWipBatchID(*v)
+	}
+	return _u
+}
+
+// ClearProductionWipBatchID clears the value of the "production_wip_batch_id" field.
+func (_u *QualityInspectionUpdateOne) ClearProductionWipBatchID() *QualityInspectionUpdateOne {
+	_u.mutation.ClearProductionWipBatchID()
+	return _u
+}
+
+// SetGateCode sets the "gate_code" field.
+func (_u *QualityInspectionUpdateOne) SetGateCode(v string) *QualityInspectionUpdateOne {
+	_u.mutation.SetGateCode(v)
+	return _u
+}
+
+// SetNillableGateCode sets the "gate_code" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableGateCode(v *string) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetGateCode(*v)
+	}
+	return _u
+}
+
+// ClearGateCode clears the value of the "gate_code" field.
+func (_u *QualityInspectionUpdateOne) ClearGateCode() *QualityInspectionUpdateOne {
+	_u.mutation.ClearGateCode()
+	return _u
+}
+
 // SetMaterialID sets the "material_id" field.
 func (_u *QualityInspectionUpdateOne) SetMaterialID(v int) *QualityInspectionUpdateOne {
 	_u.mutation.SetMaterialID(v)
@@ -996,6 +1203,12 @@ func (_u *QualityInspectionUpdateOne) SetNillableWarehouseID(v *int) *QualityIns
 	if v != nil {
 		_u.SetWarehouseID(*v)
 	}
+	return _u
+}
+
+// ClearWarehouseID clears the value of the "warehouse_id" field.
+func (_u *QualityInspectionUpdateOne) ClearWarehouseID() *QualityInspectionUpdateOne {
+	_u.mutation.ClearWarehouseID()
 	return _u
 }
 
@@ -1208,6 +1421,46 @@ func (_u *QualityInspectionUpdateOne) ClearInspectorID() *QualityInspectionUpdat
 	return _u
 }
 
+// SetDefectRateOperator sets the "defect_rate_operator" field.
+func (_u *QualityInspectionUpdateOne) SetDefectRateOperator(v string) *QualityInspectionUpdateOne {
+	_u.mutation.SetDefectRateOperator(v)
+	return _u
+}
+
+// SetNillableDefectRateOperator sets the "defect_rate_operator" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableDefectRateOperator(v *string) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetDefectRateOperator(*v)
+	}
+	return _u
+}
+
+// ClearDefectRateOperator clears the value of the "defect_rate_operator" field.
+func (_u *QualityInspectionUpdateOne) ClearDefectRateOperator() *QualityInspectionUpdateOne {
+	_u.mutation.ClearDefectRateOperator()
+	return _u
+}
+
+// SetDefectRatePercent sets the "defect_rate_percent" field.
+func (_u *QualityInspectionUpdateOne) SetDefectRatePercent(v decimal.Decimal) *QualityInspectionUpdateOne {
+	_u.mutation.SetDefectRatePercent(v)
+	return _u
+}
+
+// SetNillableDefectRatePercent sets the "defect_rate_percent" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableDefectRatePercent(v *decimal.Decimal) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetDefectRatePercent(*v)
+	}
+	return _u
+}
+
+// ClearDefectRatePercent clears the value of the "defect_rate_percent" field.
+func (_u *QualityInspectionUpdateOne) ClearDefectRatePercent() *QualityInspectionUpdateOne {
+	_u.mutation.ClearDefectRatePercent()
+	return _u
+}
+
 // SetDecisionNote sets the "decision_note" field.
 func (_u *QualityInspectionUpdateOne) SetDecisionNote(v string) *QualityInspectionUpdateOne {
 	_u.mutation.SetDecisionNote(v)
@@ -1247,6 +1500,11 @@ func (_u *QualityInspectionUpdateOne) SetPurchaseReceiptItem(v *PurchaseReceiptI
 // SetInventoryLot sets the "inventory_lot" edge to the InventoryLot entity.
 func (_u *QualityInspectionUpdateOne) SetInventoryLot(v *InventoryLot) *QualityInspectionUpdateOne {
 	return _u.SetInventoryLotID(v.ID)
+}
+
+// SetProductionWipBatch sets the "production_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *QualityInspectionUpdateOne) SetProductionWipBatch(v *ProductionWIPBatch) *QualityInspectionUpdateOne {
+	return _u.SetProductionWipBatchID(v.ID)
 }
 
 // SetMaterial sets the "material" edge to the Material entity.
@@ -1294,6 +1552,12 @@ func (_u *QualityInspectionUpdateOne) ClearPurchaseReceiptItem() *QualityInspect
 // ClearInventoryLot clears the "inventory_lot" edge to the InventoryLot entity.
 func (_u *QualityInspectionUpdateOne) ClearInventoryLot() *QualityInspectionUpdateOne {
 	_u.mutation.ClearInventoryLot()
+	return _u
+}
+
+// ClearProductionWipBatch clears the "production_wip_batch" edge to the ProductionWIPBatch entity.
+func (_u *QualityInspectionUpdateOne) ClearProductionWipBatch() *QualityInspectionUpdateOne {
+	_u.mutation.ClearProductionWipBatch()
 	return _u
 }
 
@@ -1407,6 +1671,16 @@ func (_u *QualityInspectionUpdateOne) check() error {
 			return &ValidationError{Name: "inventory_lot_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inventory_lot_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductionWipBatchID(); ok {
+		if err := qualityinspection.ProductionWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "production_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.production_wip_batch_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.GateCode(); ok {
+		if err := qualityinspection.GateCodeValidator(v); err != nil {
+			return &ValidationError{Name: "gate_code", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.gate_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.MaterialID(); ok {
 		if err := qualityinspection.MaterialIDValidator(v); err != nil {
 			return &ValidationError{Name: "material_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.material_id": %w`, err)}
@@ -1462,16 +1736,15 @@ func (_u *QualityInspectionUpdateOne) check() error {
 			return &ValidationError{Name: "inspector_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspector_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.DefectRateOperator(); ok {
+		if err := qualityinspection.DefectRateOperatorValidator(v); err != nil {
+			return &ValidationError{Name: "defect_rate_operator", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.defect_rate_operator": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.DecisionNote(); ok {
 		if err := qualityinspection.DecisionNoteValidator(v); err != nil {
 			return &ValidationError{Name: "decision_note", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.decision_note": %w`, err)}
 		}
-	}
-	if _u.mutation.InventoryLotCleared() && len(_u.mutation.InventoryLotIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.inventory_lot"`)
-	}
-	if _u.mutation.WarehouseCleared() && len(_u.mutation.WarehouseIDs()) > 0 {
-		return errors.New(`ent: clearing a required unique edge "QualityInspection.warehouse"`)
 	}
 	return nil
 }
@@ -1507,6 +1780,12 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 	}
 	if value, ok := _u.mutation.InspectionNo(); ok {
 		_spec.SetField(qualityinspection.FieldInspectionNo, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.GateCode(); ok {
+		_spec.SetField(qualityinspection.FieldGateCode, field.TypeString, value)
+	}
+	if _u.mutation.GateCodeCleared() {
+		_spec.ClearField(qualityinspection.FieldGateCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.SourceType(); ok {
 		_spec.SetField(qualityinspection.FieldSourceType, field.TypeString, value)
@@ -1570,6 +1849,18 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 	}
 	if _u.mutation.InspectorIDCleared() {
 		_spec.ClearField(qualityinspection.FieldInspectorID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.DefectRateOperator(); ok {
+		_spec.SetField(qualityinspection.FieldDefectRateOperator, field.TypeString, value)
+	}
+	if _u.mutation.DefectRateOperatorCleared() {
+		_spec.ClearField(qualityinspection.FieldDefectRateOperator, field.TypeString)
+	}
+	if value, ok := _u.mutation.DefectRatePercent(); ok {
+		_spec.SetField(qualityinspection.FieldDefectRatePercent, field.TypeOther, value)
+	}
+	if _u.mutation.DefectRatePercentCleared() {
+		_spec.ClearField(qualityinspection.FieldDefectRatePercent, field.TypeOther)
 	}
 	if value, ok := _u.mutation.DecisionNote(); ok {
 		_spec.SetField(qualityinspection.FieldDecisionNote, field.TypeString, value)
@@ -1660,6 +1951,35 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(inventorylot.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ProductionWipBatchCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   qualityinspection.ProductionWipBatchTable,
+			Columns: []string{qualityinspection.ProductionWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ProductionWipBatchIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   qualityinspection.ProductionWipBatchTable,
+			Columns: []string{qualityinspection.ProductionWipBatchColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(productionwipbatch.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

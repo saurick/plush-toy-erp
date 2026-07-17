@@ -285,7 +285,7 @@ export default function OutsourcingOrderForm({
 
       <BusinessLineItemsSection
         title="加工明细"
-        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。加工布料等材料时，可将加工内容类型切换为“材料”。"
+        description="同一份加工合同内维护产品、工序、数量、单价和预计回货。加工布料等材料时，请在“加工品类”中选择“材料”。"
         emptyDescription="暂无加工明细"
         renderRow={({ add, field, fields, index, remove }) => (
           <div
@@ -335,8 +335,8 @@ export default function OutsourcingOrderForm({
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"
                 name={[field.name, 'subject_type']}
-                label="加工内容类型"
-                rules={[{ required: true, message: '请选择加工内容类型' }]}
+                label="加工品类"
+                rules={[{ required: true, message: '请选择加工品类' }]}
               >
                 <Select
                   options={[
@@ -429,7 +429,9 @@ export default function OutsourcingOrderForm({
                   const productID = Number(line.product_id || 0)
                   const currentSKUID = Number(line.product_sku_id || 0)
                   const options = productSKUs
-                    .filter((item) => Number(item?.product_id || 0) === productID)
+                    .filter(
+                      (item) => Number(item?.product_id || 0) === productID
+                    )
                     .map((item) => ({
                       value: item.id,
                       label: productSKULabel(item),
@@ -439,7 +441,9 @@ export default function OutsourcingOrderForm({
                     }))
                   if (
                     currentSKUID > 0 &&
-                    !options.some((option) => Number(option.value) === currentSKUID)
+                    !options.some(
+                      (option) => Number(option.value) === currentSKUID
+                    )
                   ) {
                     options.push({
                       value: currentSKUID,
@@ -469,29 +473,24 @@ export default function OutsourcingOrderForm({
                 }}
               </Form.Item>
               <Form.Item
-                noStyle
-                shouldUpdate={(previous, current) =>
-                  previous?.items?.[field.name]?.subject_type !==
-                  current?.items?.[field.name]?.subject_type
-                }
+                className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'product_order_no_snapshot']}
+                label="来源产品订单编号"
+                extra="产品或材料加工都可保留来源产品订单编号，用于合同逐行追溯。"
               >
-                {({ getFieldValue }) =>
-                  getFieldValue(['items', field.name, 'subject_type']) ===
-                  OUTSOURCING_ORDER_SUBJECT_TYPES.PRODUCT ? (
-                    <Form.Item
-                      className="erp-line-item-field erp-line-item-field--source"
-                      name={[field.name, 'product_order_no_snapshot']}
-                      label="产品订单编号"
-                      extra="来自销售订单、客户产品订单或委外加工汇总；用于加工合同逐行追溯。"
-                    >
-                      <Input
-                        allowClear
-                        maxLength={128}
-                        placeholder="如 SO-YOYO-TRIAL-001"
-                      />
-                    </Form.Item>
-                  ) : null
-                }
+                <Input
+                  allowClear
+                  maxLength={128}
+                  placeholder="如 SO-YOYO-TRIAL-001"
+                />
+              </Form.Item>
+              <Form.Item
+                className="erp-line-item-field erp-line-item-field--source"
+                name={[field.name, 'processing_item']}
+                label="加工项目"
+                extra="填写本行具体加工部位或内容，如“脸*1”“耳*2”；不要与工序混填。"
+              >
+                <Input allowClear maxLength={255} placeholder="如 脸*1" />
               </Form.Item>
               <Form.Item
                 className="erp-line-item-field erp-line-item-field--source"

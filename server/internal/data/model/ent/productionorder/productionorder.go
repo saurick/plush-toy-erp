@@ -53,6 +53,12 @@ const (
 	EdgeItems = "items"
 	// EdgeMaterialRequirements holds the string denoting the material_requirements edge name in mutations.
 	EdgeMaterialRequirements = "material_requirements"
+	// EdgeOperations holds the string denoting the operations edge name in mutations.
+	EdgeOperations = "operations"
+	// EdgeWipBatches holds the string denoting the wip_batches edge name in mutations.
+	EdgeWipBatches = "wip_batches"
+	// EdgePackagingConfirmations holds the string denoting the packaging_confirmations edge name in mutations.
+	EdgePackagingConfirmations = "packaging_confirmations"
 	// EdgeEvents holds the string denoting the events edge name in mutations.
 	EdgeEvents = "events"
 	// EdgeCreator holds the string denoting the creator edge name in mutations.
@@ -79,6 +85,27 @@ const (
 	MaterialRequirementsInverseTable = "production_order_material_requirements"
 	// MaterialRequirementsColumn is the table column denoting the material_requirements relation/edge.
 	MaterialRequirementsColumn = "production_order_id"
+	// OperationsTable is the table that holds the operations relation/edge.
+	OperationsTable = "production_order_operations"
+	// OperationsInverseTable is the table name for the ProductionOrderOperation entity.
+	// It exists in this package in order to avoid circular dependency with the "productionorderoperation" package.
+	OperationsInverseTable = "production_order_operations"
+	// OperationsColumn is the table column denoting the operations relation/edge.
+	OperationsColumn = "production_order_id"
+	// WipBatchesTable is the table that holds the wip_batches relation/edge.
+	WipBatchesTable = "production_wip_batches"
+	// WipBatchesInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	WipBatchesInverseTable = "production_wip_batches"
+	// WipBatchesColumn is the table column denoting the wip_batches relation/edge.
+	WipBatchesColumn = "production_order_id"
+	// PackagingConfirmationsTable is the table that holds the packaging_confirmations relation/edge.
+	PackagingConfirmationsTable = "production_packaging_confirmations"
+	// PackagingConfirmationsInverseTable is the table name for the ProductionPackagingConfirmation entity.
+	// It exists in this package in order to avoid circular dependency with the "productionpackagingconfirmation" package.
+	PackagingConfirmationsInverseTable = "production_packaging_confirmations"
+	// PackagingConfirmationsColumn is the table column denoting the packaging_confirmations relation/edge.
+	PackagingConfirmationsColumn = "production_order_id"
 	// EventsTable is the table that holds the events relation/edge.
 	EventsTable = "production_order_events"
 	// EventsInverseTable is the table name for the ProductionOrderEvent entity.
@@ -308,6 +335,48 @@ func ByMaterialRequirements(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOpt
 	}
 }
 
+// ByOperationsCount orders the results by operations count.
+func ByOperationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOperationsStep(), opts...)
+	}
+}
+
+// ByOperations orders the results by operations terms.
+func ByOperations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOperationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByWipBatchesCount orders the results by wip_batches count.
+func ByWipBatchesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newWipBatchesStep(), opts...)
+	}
+}
+
+// ByWipBatches orders the results by wip_batches terms.
+func ByWipBatches(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newWipBatchesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByPackagingConfirmationsCount orders the results by packaging_confirmations count.
+func ByPackagingConfirmationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newPackagingConfirmationsStep(), opts...)
+	}
+}
+
+// ByPackagingConfirmations orders the results by packaging_confirmations terms.
+func ByPackagingConfirmations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPackagingConfirmationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByEventsCount orders the results by events count.
 func ByEventsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -361,6 +430,27 @@ func newMaterialRequirementsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(MaterialRequirementsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, MaterialRequirementsTable, MaterialRequirementsColumn),
+	)
+}
+func newOperationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OperationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OperationsTable, OperationsColumn),
+	)
+}
+func newWipBatchesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(WipBatchesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, WipBatchesTable, WipBatchesColumn),
+	)
+}
+func newPackagingConfirmationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PackagingConfirmationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, PackagingConfirmationsTable, PackagingConfirmationsColumn),
 	)
 }
 func newEventsStep() *sqlgraph.Step {

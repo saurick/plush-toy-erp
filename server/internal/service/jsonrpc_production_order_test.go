@@ -31,6 +31,7 @@ func newProductionOrderJSONRPCTestData(t *testing.T, permissions ...string) (*js
 		log:               log.NewHelper(log.With(logger, "module", "service.jsonrpc.production_order.test")),
 		adminReader:       stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, permissions...)},
 		productionOrderUC: biz.NewProductionOrderUsecase(datarepo.NewProductionOrderRepo(data, logger)),
+		workflowUC:        biz.NewWorkflowUsecase(datarepo.NewWorkflowRepo(data, logger)),
 		customerConfigUC:  biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
 	}
 	activateOperationalFactTestCustomerConfig(t, dispatcher, customerConfigPublishParamsWithRevisionAndModuleState(
@@ -50,8 +51,25 @@ func productionOrderCreateParams(productID, unitID int, key string) map[string]a
 	}
 }
 
+type productionOrderActionModuleGateRepo struct {
+	biz.ProductionOrderRepo
+	actionCalls int
+}
+
+func (r *productionOrderActionModuleGateRepo) ApplyProductionOrderAction(context.Context, *biz.ProductionOrderActionCommand) (*biz.ProductionOrderAggregate, error) {
+	r.actionCalls++
+	return nil, biz.ErrBadParam
+}
+
 func TestProductionOrderJSONRPCCanonicalLifecycleReadAndReplay(t *testing.T) {
-	d, productID, unitID := newProductionOrderJSONRPCTestData(t, biz.PermissionPMCPlanRead, biz.PermissionPMCPlanCreate, biz.PermissionPMCPlanUpdate)
+	d, productID, unitID := newProductionOrderJSONRPCTestData(
+		t,
+		biz.PermissionPMCPlanRead,
+		biz.PermissionPMCPlanCreate,
+		biz.PermissionPMCPlanUpdate,
+		biz.PermissionWorkflowTaskRead,
+		biz.PermissionWorkflowTaskComplete,
+	)
 	ctx := workflowJSONRPCAdminContext()
 	params := productionOrderCreateParams(productID, unitID, "api-create-1")
 	_, created, err := d.handleProductionOrder(ctx, "create_production_order", "create", mustJSONRPCStruct(t, params))
@@ -101,6 +119,37 @@ func TestProductionOrderJSONRPCCanonicalLifecycleReadAndReplay(t *testing.T) {
 	}))
 	if released.Code != errcode.OK.Code || jsonRPCNestedMap(t, released, "production_order")["status"] != biz.ProductionOrderStatusReleased {
 		t.Fatalf("release=%#v", released)
+	}
+	_, schedulingTasks, err := d.handleWorkflow(ctx, "list_tasks", "list-scheduling-task", mustJSONRPCStruct(t, map[string]any{
+		"task_group":  biz.WorkflowSourceTaskProductionSchedulingGroup,
+		"source_type": biz.WorkflowSourceTaskProductionOrderSourceType,
+		"source_id":   float64(orderID),
+		"limit":       float64(20),
+	}))
+	if err != nil || schedulingTasks.Code != errcode.OK.Code {
+		t.Fatalf("list source scheduling task result=%#v err=%v", schedulingTasks, err)
+	}
+	tasks := schedulingTasks.Data.AsMap()["tasks"].([]any)
+	if len(tasks) != 1 {
+		t.Fatalf("source scheduling tasks=%#v", tasks)
+	}
+	schedulingTask := tasks[0].(map[string]any)
+	payload := schedulingTask["payload"].(map[string]any)
+	if schedulingTask["task_code"] != biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskProductionSchedulingGroup, orderID) ||
+		schedulingTask["owner_role_key"] != biz.PMCRoleKey ||
+		payload["source_task_contract"] != biz.WorkflowSourceTaskContractV1 ||
+		payload["source_task_producer"] != biz.WorkflowSourceTaskProductionOrderReleaseProducer {
+		t.Fatalf("source scheduling task lineage=%#v", schedulingTask)
+	}
+	_, completedScheduling, err := d.handleWorkflow(ctx, "complete_task_action", "complete-scheduling-task", mustJSONRPCStruct(t, map[string]any{
+		"task_id":          schedulingTask["id"],
+		"expected_version": schedulingTask["version"],
+		"idempotency_key":  "api-complete-scheduling-1",
+		"action_key":       "complete",
+		"payload":          map[string]any{"feedback": "排产已确认"},
+	}))
+	if err != nil || completedScheduling.Code != errcode.OK.Code || jsonRPCNestedMap(t, completedScheduling, "task")["task_status_key"] != "done" {
+		t.Fatalf("complete source scheduling task result=%#v err=%v", completedScheduling, err)
 	}
 	reason := "试产结束，按当前数量短关闭"
 	_, closed, _ := d.handleProductionOrder(ctx, "close_production_order", "close", mustJSONRPCStruct(t, map[string]any{
@@ -218,6 +267,46 @@ func TestProductionOrderJSONRPCAuthAndPermissions(t *testing.T) {
 	}
 }
 
+func TestProductionOrderJSONRPCWIPReadCanReadButCannotMaintainPlan(t *testing.T) {
+	d, productID, unitID := newProductionOrderJSONRPCTestData(
+		t,
+		biz.PermissionPMCPlanRead,
+		biz.PermissionPMCPlanCreate,
+	)
+	ctx := workflowJSONRPCAdminContext()
+	_, created, _ := d.handleProductionOrder(ctx, "create_production_order", "create-for-wip-reader", mustJSONRPCStruct(t, productionOrderCreateParams(productID, unitID, "create-for-wip-reader")))
+	if created.Code != errcode.OK.Code {
+		t.Fatalf("create production order=%#v", created)
+	}
+	orderID := jsonRPCInt(t, jsonRPCNestedMap(t, created, "production_order"), "id")
+
+	d.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+		[]string{biz.SalesRoleKey},
+		biz.PermissionProductionWIPRead,
+		biz.PermissionPackagingMaterialConfirm,
+	)}
+	_, list, _ := d.handleProductionOrder(ctx, "list_production_orders", "wip-list", mustJSONRPCStruct(t, map[string]any{}))
+	if list.Code != errcode.OK.Code {
+		t.Fatalf("WIP reader list=%#v", list)
+	}
+	_, detail, _ := d.handleProductionOrder(ctx, "get_production_order", "wip-detail", mustJSONRPCStruct(t, map[string]any{"production_order_id": float64(orderID)}))
+	if detail.Code != errcode.OK.Code {
+		t.Fatalf("WIP reader detail=%#v", detail)
+	}
+	_, options, _ := d.handleProductionOrder(ctx, "list_production_order_reference_options", "wip-options", mustJSONRPCStruct(t, map[string]any{
+		"reference_type": biz.ProductionOrderReferenceProduct,
+		"limit":          float64(20),
+		"offset":         float64(0),
+	}))
+	if options.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("WIP reader reference options=%#v", options)
+	}
+	_, createDenied, _ := d.handleProductionOrder(ctx, "create_production_order", "wip-create", mustJSONRPCStruct(t, productionOrderCreateParams(productID, unitID, "wip-create")))
+	if createDenied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("WIP reader create=%#v", createDenied)
+	}
+}
+
 func TestProductionOrderJSONRPCModuleStatesAndRoleMatrix(t *testing.T) {
 	d, productID, unitID := newProductionOrderJSONRPCTestData(t, biz.PermissionPMCPlanRead, biz.PermissionPMCPlanUpdate)
 	ctx := workflowJSONRPCAdminContext()
@@ -265,6 +354,54 @@ func TestProductionOrderJSONRPCModuleStatesAndRoleMatrix(t *testing.T) {
 	}
 }
 
+func TestProductionOrderJSONRPCSourceTaskActionsRequireWritableWorkflowModule(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	for _, workflowState := range []string{"read_only", "disabled"} {
+		t.Run(workflowState, func(t *testing.T) {
+			repo := &productionOrderActionModuleGateRepo{}
+			logger := log.NewStdLogger(io.Discard)
+			d := &jsonrpcDispatcher{
+				log:               log.NewHelper(log.With(logger, "module", "service.jsonrpc.production_order.module_gate.test")),
+				adminReader:       stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.PMCRoleKey}, biz.PermissionPMCPlanUpdate)},
+				productionOrderUC: biz.NewProductionOrderUsecase(repo),
+				customerConfigUC:  biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
+			}
+			activateOperationalFactTestCustomerConfig(t, d, customerConfigPublishParamsWithRevisionAndModuleState(
+				t,
+				customerConfigPublishParams(t),
+				fmt.Sprintf("2026.07.17.production-actions-workflow-%s", workflowState),
+				workflowModuleKeyTasks,
+				workflowState,
+			))
+
+			for _, action := range []struct {
+				method string
+				reason bool
+			}{
+				{method: "release_production_order"},
+				{method: "close_production_order", reason: true},
+				{method: "cancel_production_order", reason: true},
+			} {
+				params := map[string]any{
+					"production_order_id": float64(41),
+					"expected_version":    float64(3),
+					"idempotency_key":     workflowState + "-" + action.method,
+				}
+				if action.reason {
+					params["reason"] = "模块门禁契约验证"
+				}
+				_, result, err := d.handleProductionOrder(ctx, action.method, action.method, mustJSONRPCStruct(t, params))
+				if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+					t.Fatalf("%s workflow %s gate result=%#v err=%v", action.method, workflowState, result, err)
+				}
+			}
+			if repo.actionCalls != 0 {
+				t.Fatalf("workflow %s must stop production order source-task actions before usecase, calls=%d", workflowState, repo.actionCalls)
+			}
+		})
+	}
+}
+
 func TestProductionOrderJSONRPCFixedCustomerSuperAdminFailsClosedWithoutActiveRevision(t *testing.T) {
 	d, _, _ := newProductionOrderJSONRPCTestData(t, biz.PermissionPMCPlanRead)
 	d.adminReader = stubAdminAccountReader{admin: &biz.AdminUser{ID: 7, Username: "admin", IsSuperAdmin: true}}
@@ -280,6 +417,10 @@ func TestMapProductionOrderErrorUsesSharedVersionConflict(t *testing.T) {
 	result := d.mapProductionOrderError(context.Background(), biz.ErrProductionOrderConflict)
 	if result.Code != errcode.ResourceVersionConflict.Code || result.Message != errcode.ResourceVersionConflict.Message {
 		t.Fatalf("version conflict=%#v", result)
+	}
+	wipResult := d.mapProductionOrderError(context.Background(), biz.ErrProductionOrderWIPActive)
+	if wipResult.Code != errcode.InvalidParam.Code || wipResult.Message != "仍有未结束的在制批次，请先完成对应工序、外发回仓或质量处理后再关闭生产订单" {
+		t.Fatalf("active WIP=%#v", wipResult)
 	}
 }
 

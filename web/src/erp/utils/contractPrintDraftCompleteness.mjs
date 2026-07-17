@@ -63,7 +63,7 @@ export function completeProcessingContractDraft(draft = {}) {
       productOrderNo: valueOr(line.productOrderNo, '未关联产品订单'),
       productNo: valueOr(line.productNo, '未维护产品编号'),
       productName: valueOr(line.productName, '未维护产品名称'),
-      processName: valueOr(line.processName, '未维护工序名称'),
+      processingItem: valueOr(line.processingItem, '未维护加工项目'),
       supplierAlias: valueOr(line.supplierAlias, completed.supplierName || '未维护加工厂'),
       processCategory: valueOr(line.processCategory, '未维护工序类别'),
       unit: valueOr(line.unit, '未维护单位'),

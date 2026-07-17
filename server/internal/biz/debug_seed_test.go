@@ -183,6 +183,16 @@ func TestDebugBusinessChainScenariosOnlyUseCanonicalTaskStatuses(t *testing.T) {
 	}
 }
 
+func TestDebugBusinessChainScenariosDoNotForgeSourceProducedTaskGroups(t *testing.T) {
+	for scenarioKey, scenario := range debugBusinessChainScenarios {
+		for _, task := range scenario.tasks {
+			if IsSourceProducedWorkflowTaskGroup(task.group) {
+				t.Fatalf("scenario %s task %s forges source-produced group %q", scenarioKey, task.name, task.group)
+			}
+		}
+	}
+}
+
 func TestDebugUsecase_ClearBusinessDataUsesIndependentGuard(t *testing.T) {
 	repo := &fakeDebugRepo{}
 	uc := NewDebugUsecase(repo, DebugSafetyConfig{

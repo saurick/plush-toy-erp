@@ -152,11 +152,107 @@ func TestAllCustomerConfigExecuteMethodsUseProcessRevisionBoundary(t *testing.T)
 	}
 }
 
+func TestExecuteShipmentShipRejectsReadOnlyWorkflowTasksAtInstanceRevision(t *testing.T) {
+	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
+	ctx := customerConfigAdminCtx(7, "shipment-admin")
+	activatedAt := time.Date(2026, 7, 17, 9, 0, 0, 0, time.UTC)
+	admin := &biz.AdminUser{
+		ID:           7,
+		Username:     "shipment-admin",
+		IsSuperAdmin: true,
+		CreatedAt:    activatedAt,
+		UpdatedAt:    activatedAt,
+	}
+	dispatcher := newCustomerConfigTestDispatcher(admin, []string{biz.AdminRoleKey})
+
+	configRepo := newServiceCustomerConfigRepo()
+	configRepo.revisions[serviceCustomerConfigKey("yoyoosun", "shipment-r1")] = &biz.CustomerConfigRevision{
+		CustomerKey: "yoyoosun",
+		Revision:    "shipment-r1",
+		Status:      biz.CustomerConfigStatusActive,
+		ActivatedAt: &activatedAt,
+	}
+	configRepo.modules[serviceCustomerConfigKey("yoyoosun", "shipment-r1")] = serviceProcessRuntimeShipmentShipModules("read_only")
+	configUC := biz.NewCustomerConfigUsecase(configRepo)
+
+	processRepo := newServiceProcessRuntimeRepo()
+	processUC := biz.NewProcessRuntimeUsecase(processRepo, newServiceWorkflowRepo(), configUC)
+	handler := &processRevisionSalesSubmitHandler{wantRevision: "shipment-r1"}
+	if err := processUC.RegisterDomainCommandHandler(biz.ProcessDomainCommandShipmentShip, handler); err != nil {
+		t.Fatalf("register shipment handler: %v", err)
+	}
+	instance, _, err := processUC.CreateProcessInstance(ctx, &biz.ProcessInstanceCreate{
+		ProcessKey:      biz.ProcessKeyFinishedGoodsDelivery,
+		ProcessVersion:  "v1",
+		ConfigRevision:  "shipment-r1",
+		DefinitionHash:  strings.Repeat("b", 64),
+		BusinessRefType: "shipment",
+		BusinessRefID:   9001,
+		IdempotencyKey:  "shipment-r1-create",
+		ModuleContractSnapshot: map[string]any{
+			"source":          "active_customer_config",
+			"customer_key":    "yoyoosun",
+			"config_revision": "shipment-r1",
+		},
+		Nodes: []biz.ProcessNodeInstanceCreate{
+			{
+				NodeKey:        "shipment_execution",
+				NodeType:       biz.ProcessNodeTypeDomainCommand,
+				Status:         biz.ProcessNodeStatusWaiting,
+				PolicySnapshot: map[string]any{"command_key": biz.ProcessDomainCommandShipmentShip},
+			},
+			{NodeKey: "end", NodeType: biz.ProcessNodeTypeEnd, Status: biz.ProcessNodeStatusWaiting},
+		},
+	}, admin.ID)
+	if err != nil {
+		t.Fatalf("create process: %v", err)
+	}
+	activeNode, err := processUC.StartProcessInstance(ctx, &biz.ProcessInstanceStart{ID: instance.ID}, admin.ID)
+	if err != nil {
+		t.Fatalf("start process: %v", err)
+	}
+	dispatcher.customerConfigUC = configUC
+	dispatcher.processRuntimeUC = processUC
+
+	params, err := structpb.NewStruct(map[string]any{
+		"customer_key":             "yoyoosun",
+		"process_instance_id":      instance.ID,
+		"process_node_instance_id": activeNode.ID,
+		"expected_version":         activeNode.Version,
+		"shipment_id":              9001,
+		"idempotency_key":          "shipment-r1-ship",
+	})
+	if err != nil {
+		t.Fatalf("params: %v", err)
+	}
+	_, result, err := dispatcher.handleCustomerConfig(ctx, "execute_finished_goods_delivery_shipment_ship", "shipment-r1-ship", params)
+	if err != nil {
+		t.Fatalf("execute err: %v", err)
+	}
+	if result == nil || result.Code != errcode.InvalidParam.Code {
+		t.Fatalf("read_only workflow_tasks result=%#v, want invalid param", result)
+	}
+	if handler.executed != 0 {
+		t.Fatalf("read_only workflow_tasks executed shipment handler %d times", handler.executed)
+	}
+}
+
 func serviceProcessRuntimeSalesSubmitModules(workflowState string) []biz.DeploymentModuleStateInput {
 	return []biz.DeploymentModuleStateInput{
 		{ModuleKey: "customers", State: "enabled"},
 		{ModuleKey: "products", State: "enabled"},
 		{ModuleKey: "sales_orders", State: "enabled"},
+		{ModuleKey: "workflow_tasks", State: workflowState},
+	}
+}
+
+func serviceProcessRuntimeShipmentShipModules(workflowState string) []biz.DeploymentModuleStateInput {
+	return []biz.DeploymentModuleStateInput{
+		{ModuleKey: "customers", State: "enabled"},
+		{ModuleKey: "products", State: "enabled"},
+		{ModuleKey: "sales_orders", State: "enabled"},
+		{ModuleKey: "inventory", State: "enabled"},
+		{ModuleKey: "shipments", State: "enabled"},
 		{ModuleKey: "workflow_tasks", State: workflowState},
 	}
 }

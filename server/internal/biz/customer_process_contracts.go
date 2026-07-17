@@ -86,6 +86,9 @@ func normalizeCustomerProcessContracts(snapshot map[string]any) (map[string]any,
 				selection.BusinessRefType,
 			)
 		}
+		if err := validateCustomerProcessContractForPublish(contract); err != nil {
+			return nil, err
+		}
 		canonicalSelections = append(canonicalSelections, customerProcessSelectionMap(selection))
 		canonicalDefinitions[selection.ProcessKey] = customerProcessDefinitionFromContract(contract)
 	}
@@ -97,6 +100,21 @@ func normalizeCustomerProcessContracts(snapshot map[string]any) (map[string]any,
 	out["runtimeProcessSelections"] = canonicalSelections
 	out["processDefinitions"] = canonicalDefinitions
 	return out, nil
+}
+
+func validateCustomerProcessContractForPublish(contract customerProcessContract) error {
+	for _, node := range contract.Nodes {
+		if err := validateCustomerConfigProcessNode(
+			contract.Selection.ProcessKey,
+			contract.Selection.BusinessRefType,
+			node.NodeKey,
+			node.NodeType,
+			node.PolicySnapshot,
+		); err != nil {
+			return fmt.Errorf("%w: invalid Product Core process node %s", err, node.NodeKey)
+		}
+	}
+	return nil
 }
 
 func customerProcessSelectionsFromSnapshot(snapshot map[string]any) ([]customerProcessSelection, error) {

@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -14,6 +15,8 @@ import (
 	"server/internal/data/model/ent/outsourcingorderitem"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionwipbatch"
+	"server/internal/data/model/ent/productionwipoutsourcingallocation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
@@ -157,11 +160,20 @@ func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Conte
 	if id <= 0 || !biz.IsValidOutsourcingOrderStatus(lifecycleStatus) {
 		return nil, biz.ErrBadParam
 	}
+	dependencyBatchIDs, err := outsourcingOrderWIPDependencyBatchIDs(ctx, r.data.postgres, id)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := (&inventoryRepo{data: r.data, log: r.log}).beginInventoryDBTx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	for _, batchID := range dependencyBatchIDs {
+		if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", batchID, biz.ErrProductionWIPOutsourcingSourceDependency); err != nil {
+			return nil, err
+		}
+	}
 	if err := lockOperationalFactRow(ctx, tx, "outsourcing_orders", id, biz.ErrOutsourcingOrderNotFound); err != nil {
 		return nil, err
 	}
@@ -181,6 +193,23 @@ func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Conte
 	}
 	if !biz.IsOutsourcingOrderLifecycleTransitionAllowed(row.LifecycleStatus, lifecycleStatus) {
 		return nil, biz.ErrBadParam
+	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled && len(dependencyBatchIDs) > 0 {
+		return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusClosed && len(dependencyBatchIDs) > 0 {
+		batches, err := tx.client.ProductionWIPBatch.Query().Where(productionwipbatch.IDIn(dependencyBatchIDs...)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(batches) != len(dependencyBatchIDs) {
+			return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+		}
+		for _, batch := range batches {
+			if batch.Status != biz.ProductionWIPStatusAccepted && batch.Status != biz.ProductionWIPStatusRejected && batch.Status != biz.ProductionWIPStatusCancelled {
+				return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+			}
+		}
 	}
 	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
 		hasPostedFacts, err := tx.client.OutsourcingFact.Query().Where(
@@ -232,6 +261,13 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 
 	var orderRow *ent.OutsourcingOrder
 	if id > 0 {
+		dependencyBatchIDs, err := outsourcingOrderWIPDependencyBatchIDs(ctx, tx.Client(), id)
+		if err != nil {
+			return nil, err
+		}
+		if len(dependencyBatchIDs) > 0 {
+			return nil, biz.ErrProductionWIPOutsourcingSourceDependency
+		}
 		update := tx.OutsourcingOrder.Update().
 			Where(
 				outsourcingorder.ID(id),
@@ -358,6 +394,7 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			SetNillableProductNameSnapshot(mutation.ProductNameSnapshot).
 			SetNillableMaterialCodeSnapshot(mutation.MaterialCodeSnapshot).
 			SetNillableMaterialNameSnapshot(mutation.MaterialNameSnapshot).
+			SetNillableProcessingItem(mutation.ProcessingItem).
 			SetNillableProcessNameSnapshot(mutation.ProcessNameSnapshot).
 			SetNillableProcessCategorySnapshot(mutation.ProcessCategorySnapshot).
 			SetNillableUnitNameSnapshot(mutation.UnitNameSnapshot).
@@ -398,6 +435,33 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 		Order: entOutsourcingOrderToBiz(orderRow),
 		Items: entOutsourcingOrderItemsToBiz(itemRows),
 	}, nil
+}
+
+func outsourcingOrderWIPDependencyBatchIDs(ctx context.Context, client *ent.Client, orderID int) ([]int, error) {
+	if client == nil || orderID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	itemIDs, err := client.OutsourcingOrderItem.Query().Where(outsourcingorderitem.OutsourcingOrderID(orderID)).IDs(ctx)
+	if err != nil || len(itemIDs) == 0 {
+		return nil, err
+	}
+	rows, err := client.ProductionWIPOutsourcingAllocation.Query().Where(
+		productionwipoutsourcingallocation.OutsourcingOrderItemIDIn(itemIDs...),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	unique := make(map[int]struct{}, len(rows))
+	batchIDs := make([]int, 0, len(rows))
+	for _, row := range rows {
+		if _, exists := unique[row.ProductionWipBatchID]; exists {
+			continue
+		}
+		unique[row.ProductionWipBatchID] = struct{}{}
+		batchIDs = append(batchIDs, row.ProductionWipBatchID)
+	}
+	sort.Ints(batchIDs)
+	return batchIDs, nil
 }
 
 func outsourcingOrderLifecyclePredecessors(next string) []string {
@@ -500,7 +564,6 @@ func setCanonicalOutsourcingOrderItemSnapshots(ctx context.Context, tx *ent.Tx, 
 		in.ProductNoSnapshot = nil
 		in.ProductSKUID = nil
 		in.SKUCodeSnapshot = nil
-		in.ProductOrderNoSnapshot = nil
 		in.ProductNameSnapshot = nil
 		in.MaterialCodeSnapshot = outsourcingSnapshotString(materialRow.Code)
 		in.MaterialNameSnapshot = outsourcingSnapshotString(materialRow.Name)
@@ -689,6 +752,11 @@ func saveOutsourcingOrderItemUpdate(ctx context.Context, tx *ent.Tx, id int, in 
 	} else {
 		update.SetMaterialNameSnapshot(*in.MaterialNameSnapshot)
 	}
+	if in.ProcessingItem == nil {
+		update.ClearProcessingItem()
+	} else {
+		update.SetProcessingItem(*in.ProcessingItem)
+	}
 	if in.ProcessNameSnapshot == nil {
 		update.ClearProcessNameSnapshot()
 	} else {
@@ -784,6 +852,7 @@ func entOutsourcingOrderItemToBiz(row *ent.OutsourcingOrderItem) *biz.Outsourcin
 		ProductNameSnapshot:     row.ProductNameSnapshot,
 		MaterialCodeSnapshot:    row.MaterialCodeSnapshot,
 		MaterialNameSnapshot:    row.MaterialNameSnapshot,
+		ProcessingItem:          row.ProcessingItem,
 		ProcessNameSnapshot:     row.ProcessNameSnapshot,
 		ProcessCategorySnapshot: row.ProcessCategorySnapshot,
 		UnitNameSnapshot:        row.UnitNameSnapshot,

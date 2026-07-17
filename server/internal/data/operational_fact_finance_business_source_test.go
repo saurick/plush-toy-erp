@@ -194,10 +194,7 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 	if _, err := operationalUC.CreatePayableFromOutsourcingReturn(ctx, payableInput); !errors.Is(err, biz.ErrOutsourcingReturnQualityPending) {
 		t.Fatalf("create payable while outsourcing quality submitted error=%v", err)
 	}
-	if _, err := inventoryUC.PassQualityInspection(ctx, &biz.QualityInspectionDecision{
-		InspectionID: inspection.ID,
-		Result:       biz.QualityInspectionResultConcession,
-	}); err != nil {
+	if _, err := inventoryUC.PassQualityInspection(ctx, approximateQualityInspectionDecision(inspection.ID, biz.QualityInspectionResultConcession)); err != nil {
 		t.Fatalf("accept outsourcing return quality by concession before payable: %v", err)
 	}
 	// Corrupt the persisted source anchor directly to prove the read-side
@@ -259,7 +256,7 @@ func runOutsourcingReturnPayable(t *testing.T, ctx context.Context, data *Data, 
 	if _, err := inventoryUC.SubmitQualityInspection(ctx, rejectedInspection.ID); err != nil {
 		t.Fatalf("submit rejected outsourcing return quality: %v", err)
 	}
-	if _, err := inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{InspectionID: rejectedInspection.ID}); err != nil {
+	if _, err := inventoryUC.RejectQualityInspection(ctx, approximateQualityInspectionDecision(rejectedInspection.ID, biz.QualityInspectionResultReject)); err != nil {
 		t.Fatalf("reject outsourcing return quality: %v", err)
 	}
 	if _, err := operationalUC.CreatePayableFromOutsourcingReturn(ctx, &biz.FinanceFactFromOutsourcingReturnCreate{

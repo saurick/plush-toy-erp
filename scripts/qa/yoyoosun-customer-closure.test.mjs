@@ -129,9 +129,12 @@ const processingLinePrintFieldCoverage = Object.freeze([
   ['productOrderNo', '委外订单明细.product_order_no_snapshot'],
   ['productNo', '委外订单明细.product_no_snapshot'],
   ['productName', '委外订单明细.product_name_snapshot'],
-  ['processName', '委外订单明细.process_name_snapshot'],
+  ['processingItem', '委外订单明细.processing_item'],
   ['supplierAlias', '加工厂主数据快照.name'],
-  ['processCategory', '委外订单明细.process_category_snapshot'],
+  [
+    'processCategory',
+    '委外订单明细.process_name_snapshot，缺失时回退 process_category_snapshot',
+  ],
   ['unit', '单位主数据.name'],
   ['unitPrice', '委外订单明细.unit_price'],
   ['quantity', '委外订单明细.outsourcing_quantity'],
@@ -379,6 +382,19 @@ test('yoyoosun role flow matrix keeps workflow handling separate from facts', ()
   }
 })
 
+test('yoyoosun source task owners can reject invalid production handoffs', () => {
+  const roleByKey = new Map(
+    yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role])
+  )
+  for (const roleKey of ['pmc', 'production']) {
+    const role = roleByKey.get(roleKey)
+    assert.ok(
+      role?.capabilityKeys.includes('workflow.task.reject'),
+      `${roleKey} must be able to reject its own source-generated task before the source is cancelled`
+    )
+  }
+})
+
 test('yoyoosun production owns processing contract confirmation', () => {
   const roleByKey = new Map(
     yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role])
@@ -392,6 +408,40 @@ test('yoyoosun production owns processing contract confirmation', () => {
     purchaseRole.capabilityKeys.some((key) => key.startsWith('outsourcing.order.')),
     false,
     '永绅采购岗位不应越权确认生产 / 委外加工合同'
+  )
+})
+
+test('yoyoosun WIP role projection stays within Product Core ownership', () => {
+  const roleByKey = new Map(
+    yoyoosunRoleFlowMatrix.roles.map((role) => [role.roleKey, role])
+  )
+  const sales = roleByKey.get('sales')
+  const pmc = roleByKey.get('pmc')
+  const quality = roleByKey.get('quality')
+  const production = roleByKey.get('production')
+
+  assert(sales.menuSurfaces.includes('production-orders'))
+  assert(sales.capabilityKeys.includes('production.wip.read'))
+  assert(
+    sales.capabilityKeys.includes('production.packaging_material.confirm')
+  )
+  assert.equal(sales.capabilityKeys.includes('pmc.plan.read'), false)
+  assert.equal(sales.capabilityKeys.includes('production.wip.assign'), false)
+  assert(pmc.capabilityKeys.includes('production.wip.read'))
+  assert(quality.capabilityKeys.includes('production.wip.read'))
+  for (const key of [
+    'production.wip.read',
+    'production.wip.assign',
+    'production.wip.execute',
+    'production.wip.rework',
+  ]) {
+    assert(production.capabilityKeys.includes(key), `production needs ${key}`)
+  }
+  assert.equal(
+    production.capabilityKeys.includes(
+      'production.packaging_material.confirm'
+    ),
+    false
   )
 })
 
@@ -614,6 +664,7 @@ test('yoyoosun trial fixture covers core and customer flow domains', () => {
     inventoryLots: 3,
     shipments: 3,
     financeDrafts: 3,
+    productionWipScenarios: 10,
     workflowTasks: 5,
   }
 
@@ -626,20 +677,317 @@ test('yoyoosun trial fixture covers core and customer flow domains', () => {
   }
 })
 
+test('yoyoosun production WIP fixture covers route decisions, quality blocks, packaging separation and immutable snapshots', () => {
+  const scenarios = yoyoosunTrialDataFixture.productionWipScenarios
+  const byType = new Map(
+    scenarios.map((scenario) => [scenario.scenarioType, scenario])
+  )
+  const simulatedIdentityKeys = new Set([
+    'scenarioNo',
+    'productionOrderNo',
+    'productNo',
+    'parentBatchNo',
+    'executionNo',
+    'conditionRecordNo',
+    'ruleSourceNo',
+    'allocationNo',
+    'childBatchNo',
+    'inspectionNo',
+    'batchNo',
+    'reworkNo',
+    'originalExecutionNo',
+    'newExecutionNo',
+    'confirmationNo',
+    'packagingVersionNo',
+    'packagingMaterialLotNo',
+    'snapshotNo',
+    'routeCode',
+    'versionNo',
+    'currentVersionNo',
+    'executionRouteVersionNo',
+  ])
+
+  function assertSyntheticScenarioRecords(value, pathName) {
+    if (Array.isArray(value)) {
+      value.forEach((item, index) =>
+        assertSyntheticScenarioRecords(item, `${pathName}[${index}]`)
+      )
+      return
+    }
+    if (!value || typeof value !== 'object') return
+
+    const identityEntries = Object.entries(value).filter(([key]) =>
+      simulatedIdentityKeys.has(key)
+    )
+    if (identityEntries.length > 0) {
+      for (const [key, identity] of identityEntries) {
+        assert.match(String(identity), /^SIM-/u, `${pathName}.${key}`)
+      }
+      assertSyntheticSourceIds(value.sourceIds, pathName)
+    }
+    for (const [key, item] of Object.entries(value)) {
+      if (key !== 'sourceIds') {
+        assertSyntheticScenarioRecords(item, `${pathName}.${key}`)
+      }
+    }
+  }
+
+  assert.equal(scenarios.length, 10)
+  for (const [index, scenario] of scenarios.entries()) {
+    assert.match(scenario.scenarioNo, /^SIM-/u)
+    assert.match(scenario.productionOrderNo, /^SIM-/u)
+    assert.match(scenario.parentBatchNo, /^SIM-/u)
+    assertSyntheticSourceIds(
+      scenario.sourceIds,
+      `productionWipScenarios[${index}]`
+    )
+    assertSyntheticScenarioRecords(
+      scenario,
+      `productionWipScenarios[${index}]`
+    )
+  }
+
+  const allInhouse = byType.get(
+    'all_inhouse_customer_inspection_not_applicable'
+  )
+  assert.deepEqual(
+    allInhouse.stepExecutions.map((execution) => [
+      execution.stepCode,
+      execution.executionMode,
+      execution.movementType,
+    ]),
+    [
+      ['sewing', 'in_house', 'wip_transfer'],
+      ['handwork', 'in_house', 'wip_transfer'],
+    ]
+  )
+  assert.deepEqual(
+    {
+      required: allInhouse.customerInspection.required,
+      status: allInhouse.customerInspection.status,
+      finalPackagingAllowed:
+        allInhouse.customerInspection.finalPackagingAllowed,
+    },
+    {
+      required: false,
+      status: 'not_applicable',
+      finalPackagingAllowed: true,
+    }
+  )
+  assert.equal('inspectionNo' in allInhouse.customerInspection, false)
+
+  const sewingOutsourced = byType.get('sewing_outsourced_handwork_inhouse')
+  assert.deepEqual(
+    sewingOutsourced.stepExecutions.map((execution) => [
+      execution.stepCode,
+      execution.executionMode,
+      execution.movementType,
+    ]),
+    [
+      ['sewing', 'outsourced', 'outsourcing_return'],
+      ['handwork', 'in_house', 'wip_transfer'],
+    ]
+  )
+  assert.deepEqual(
+    [
+      sewingOutsourced.stepExecutions[0].status,
+      sewingOutsourced.qualityGate.gateCode,
+      sewingOutsourced.qualityGate.result,
+      sewingOutsourced.stepExecutions[1].status,
+    ],
+    ['returned', 'shell_inspection', 'passed', 'ready']
+  )
+
+  const handworkOutsourced = byType.get('sewing_inhouse_handwork_outsourced')
+  assert.deepEqual(
+    handworkOutsourced.stepExecutions.map((execution) => [
+      execution.stepCode,
+      execution.executionMode,
+      execution.movementType,
+    ]),
+    [
+      ['sewing', 'in_house', 'wip_transfer'],
+      ['handwork', 'outsourced', 'outsourcing_return'],
+    ]
+  )
+  assert.deepEqual(
+    [
+      handworkOutsourced.stepExecutions[0].status,
+      handworkOutsourced.qualityGate.gateCode,
+      handworkOutsourced.qualityGate.result,
+    ],
+    ['completed', 'shell_inspection', 'passed']
+  )
+
+  const split = byType.get('same_step_split')
+  assert.equal(split.stepCode, 'sewing')
+  assert.deepEqual(
+    new Set(split.allocations.map((allocation) => allocation.executionMode)),
+    new Set(['in_house', 'outsourced'])
+  )
+  assert.equal(
+    split.allocations.reduce(
+      (total, allocation) => total + Number(allocation.quantity),
+      0
+    ),
+    Number(split.quantity)
+  )
+  assert.equal(
+    new Set(split.allocations.map((allocation) => allocation.childBatchNo))
+      .size,
+    split.allocations.length
+  )
+
+  const shellRework = byType.get('shell_inspection_rework')
+  assert.deepEqual(
+    {
+      gateCode: shellRework.qualityGate.gateCode,
+      result: shellRework.qualityGate.result,
+      blockedStepCode: shellRework.qualityGate.blockedStepCode,
+      targetStepCode: shellRework.rework.targetStepCode,
+    },
+    {
+      gateCode: 'shell_inspection',
+      result: 'rejected',
+      blockedStepCode: 'handwork',
+      targetStepCode: 'sewing',
+    }
+  )
+  assert.notEqual(
+    shellRework.rework.originalExecutionNo,
+    shellRework.rework.newExecutionNo
+  )
+
+  const needleRejected = byType.get('needle_inspection_rejected')
+  assert.deepEqual(
+    {
+      gateCode: needleRejected.qualityGate.gateCode,
+      result: needleRejected.qualityGate.result,
+      blockedStepCode: needleRejected.qualityGate.blockedStepCode,
+      finalPackagingAllowed:
+        needleRejected.qualityGate.finalPackagingAllowed,
+    },
+    {
+      gateCode: 'needle_inspection',
+      result: 'rejected',
+      blockedStepCode: 'sampling_inspection',
+      finalPackagingAllowed: false,
+    }
+  )
+
+  const customerPassed = byType.get('customer_inspection_passed')
+  const customerBlocked = byType.get('customer_inspection_blocked')
+  assert.deepEqual(
+    [
+      [
+        allInhouse.customerInspection.required,
+        allInhouse.customerInspection.status,
+        allInhouse.customerInspection.finalPackagingAllowed,
+      ],
+      [
+        customerPassed.customerInspection.required,
+        customerPassed.customerInspection.status,
+        customerPassed.customerInspection.finalPackagingAllowed,
+      ],
+      [
+        customerBlocked.customerInspection.required,
+        customerBlocked.customerInspection.status,
+        customerBlocked.customerInspection.finalPackagingAllowed,
+      ],
+    ],
+    [
+      [false, 'not_applicable', true],
+      [true, 'passed', true],
+      [true, 'rejected', false],
+    ]
+  )
+  assert.equal(
+    customerBlocked.customerInspection.blockedStepCode,
+    'final_packaging'
+  )
+
+  const packaging = byType.get('packaging_business_quality_separated')
+  assert.deepEqual(
+    {
+      businessRole: packaging.businessConfirmation.roleKey,
+      businessResult: packaging.businessConfirmation.result,
+      qualityRole: packaging.qualityInspection.roleKey,
+      qualityResult: packaging.qualityInspection.result,
+      finalPackagingAllowed: packaging.finalPackagingAllowed,
+    },
+    {
+      businessRole: 'sales',
+      businessResult: 'confirmed',
+      qualityRole: 'quality',
+      qualityResult: 'rejected',
+      finalPackagingAllowed: false,
+    }
+  )
+
+  const routeSnapshot = byType.get('route_snapshot_immutable')
+  assert.deepEqual(routeSnapshot.routeSnapshot.orderedStepCodes, [
+    'fabric_processing',
+    'cut_piece_inspection',
+    'sewing',
+    'shell_inspection',
+    'handwork',
+    'finished_goods_inspection',
+    'needle_inspection',
+    'sampling_inspection',
+    'customer_inspection',
+    'final_packaging',
+    'finished_goods_inbound',
+  ])
+  assert.notEqual(
+    routeSnapshot.routeSnapshot.versionNo,
+    routeSnapshot.routeTemplateAfterRelease.currentVersionNo
+  )
+  assert.equal(
+    routeSnapshot.executionRouteVersionNo,
+    routeSnapshot.routeSnapshot.versionNo
+  )
+  assert.equal(routeSnapshot.snapshotChanged, false)
+})
+
 test('yoyoosun processing-contract fixture covers sewing fabric and handwork subjects', () => {
-  const lines = yoyoosunTrialDataFixture.outsourcingOrders.flatMap(
-    (order) => order.lines
+  const outsourcingOrders = yoyoosunTrialDataFixture.outsourcingOrders
+  const lines = outsourcingOrders.flatMap((order) => order.lines)
+  const sewingOrder = outsourcingOrders.find((order) =>
+    order.lines.some((line) => line.processName.includes('车缝'))
+  )
+  const handworkOrder = outsourcingOrders.find((order) =>
+    order.lines.some((line) => line.processName.includes('手工'))
   )
   const sewing = lines.find((line) => line.processName.includes('车缝'))
   const fabric = lines.find((line) => line.processName.includes('布料'))
   const handwork = lines.find((line) => line.processName.includes('手工'))
 
+  assert.ok(sewingOrder)
+  assert.ok(handworkOrder)
   assert.equal(sewing?.subjectType || 'PRODUCT', 'PRODUCT')
   assert.ok(sewing?.productNo)
   assert.equal(fabric?.subjectType, 'MATERIAL')
   assert.ok(fabric?.materialCode)
   assert.equal(handwork?.subjectType, 'PRODUCT')
   assert.ok(handwork?.productNo)
+  assert.equal(sewingOrder?.sourceOrderNo, handworkOrder?.sourceOrderNo)
+  assert.equal(sewing?.productNo, handwork?.productNo)
+  assert.ok(
+    handworkOrder?.orderDate > sewingOrder?.returnDate,
+    '手工委外样例必须在车缝回货之后下单'
+  )
+  const sewingPassedInspection =
+    yoyoosunTrialDataFixture.qualityInspections.find(
+      (inspection) =>
+        inspection.sourceNo === sewingOrder?.outsourcingOrderNo &&
+        inspection.result === 'passed'
+    )
+  assert.ok(sewingPassedInspection, '车缝回货必须有合格质检样例')
+  assert.ok(
+    sewingPassedInspection?.inspectedAt >= sewingOrder?.returnDate &&
+      sewingPassedInspection?.inspectedAt < handworkOrder?.orderDate,
+    '车缝回货通过检验后才能进入手工样例'
+  )
 })
 
 test('yoyoosun trial fixture uses short anonymized business copy and keeps SIM identities', () => {
@@ -677,8 +1025,41 @@ test('yoyoosun trial fixture uses short anonymized business copy and keeps SIM i
   assert.ok(
     yoyoosunTrialDataFixture.outsourcingOrders
       .flatMap((order) => order.lines)
-      .some((line) => line.processName === '裁片检验')
+      .some((line) => line.processName === '裁片加工')
   )
+  assert.ok(
+    yoyoosunTrialDataFixture.qualityInspections.some(
+      (inspection) =>
+        inspection.sourceNo === 'SIM-OS-002' &&
+        inspection.result === 'rejected'
+    )
+  )
+})
+
+test('yoyoosun fixture keeps quality and payable references on valid preview sources', () => {
+  const validQualitySources = new Set([
+    ...yoyoosunTrialDataFixture.purchaseReceipts.map(
+      (receipt) => receipt.receiptNo
+    ),
+    ...yoyoosunTrialDataFixture.outsourcingOrders.map(
+      (order) => order.outsourcingOrderNo
+    ),
+  ])
+  for (const inspection of yoyoosunTrialDataFixture.qualityInspections) {
+    assert.ok(validQualitySources.has(inspection.sourceNo))
+  }
+
+  const qualityResultBySource = new Map(
+    yoyoosunTrialDataFixture.qualityInspections.map((inspection) => [
+      inspection.sourceNo,
+      inspection.result,
+    ])
+  )
+  for (const draft of yoyoosunTrialDataFixture.financeDrafts.filter(
+    (item) => item.factType.startsWith('payable')
+  )) {
+    assert.equal(qualityResultBySource.get(draft.sourceNo), 'passed')
+  }
 })
 
 test('yoyoosun trial fixture covers manual regression states without claiming real import', () => {
@@ -719,6 +1100,15 @@ test('yoyoosun trial fixture covers manual regression states without claiming re
       yoyoosunTrialDataFixture.workflowTasks.map((task) => task.taskStatusKey)
     ),
     new Set(['ready', 'blocked', 'done'])
+  )
+  assert.equal(
+    yoyoosunTrialDataFixture.workflowTasks.some((task) =>
+      ['production_scheduling', 'production_exception', 'shipment_release'].includes(
+        task.taskGroup
+      )
+    ),
+    false,
+    'trial fixture must not forge source-produced workflow task groups'
   )
 })
 
@@ -820,6 +1210,7 @@ test('yoyoosun trial print fixtures have no empty critical print fields', () => 
     'productOrderNo',
     'productNo',
     'productName',
+    'processingItem',
     'processName',
     'unitCode',
     'quantity',
@@ -1045,6 +1436,7 @@ test('yoyoosun contract print field coverage maps every paper variable to busine
           subjectType === 'MATERIAL' ? line.materialName : undefined,
         material_category_snapshot:
           subjectType === 'MATERIAL' ? material?.category : undefined,
+        processing_item: line.processingItem,
         process_name_snapshot: line.processName,
         process_category_snapshot: line.processCategory,
         unit_name_snapshot: unit.name,
@@ -1329,6 +1721,7 @@ test('yoyoosun contract print drafts from trial business sources do not emit mis
           subjectType === 'MATERIAL' ? line.materialName : undefined,
         material_category_snapshot:
           subjectType === 'MATERIAL' ? material?.category : undefined,
+        processing_item: line.processingItem,
         process_name_snapshot: line.processName,
         process_category_snapshot: line.processCategory,
         unit_name_snapshot: unit.name,

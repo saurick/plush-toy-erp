@@ -30,6 +30,10 @@ const (
 	FieldSalesOrderItemID = "sales_order_item_id"
 	// FieldBomHeaderID holds the string denoting the bom_header_id field in the database.
 	FieldBomHeaderID = "bom_header_id"
+	// FieldRouteCode holds the string denoting the route_code field in the database.
+	FieldRouteCode = "route_code"
+	// FieldCustomerInspectionRequired holds the string denoting the customer_inspection_required field in the database.
+	FieldCustomerInspectionRequired = "customer_inspection_required"
 	// FieldProductCodeSnapshot holds the string denoting the product_code_snapshot field in the database.
 	FieldProductCodeSnapshot = "product_code_snapshot"
 	// FieldProductNameSnapshot holds the string denoting the product_name_snapshot field in the database.
@@ -50,6 +54,12 @@ const (
 	EdgeProductionOrder = "production_order"
 	// EdgeMaterialRequirements holds the string denoting the material_requirements edge name in mutations.
 	EdgeMaterialRequirements = "material_requirements"
+	// EdgeOperations holds the string denoting the operations edge name in mutations.
+	EdgeOperations = "operations"
+	// EdgeWipBatches holds the string denoting the wip_batches edge name in mutations.
+	EdgeWipBatches = "wip_batches"
+	// EdgePackagingConfirmation holds the string denoting the packaging_confirmation edge name in mutations.
+	EdgePackagingConfirmation = "packaging_confirmation"
 	// EdgeProduct holds the string denoting the product edge name in mutations.
 	EdgeProduct = "product"
 	// EdgeProductSku holds the string denoting the product_sku edge name in mutations.
@@ -76,6 +86,27 @@ const (
 	MaterialRequirementsInverseTable = "production_order_material_requirements"
 	// MaterialRequirementsColumn is the table column denoting the material_requirements relation/edge.
 	MaterialRequirementsColumn = "production_order_item_id"
+	// OperationsTable is the table that holds the operations relation/edge.
+	OperationsTable = "production_order_operations"
+	// OperationsInverseTable is the table name for the ProductionOrderOperation entity.
+	// It exists in this package in order to avoid circular dependency with the "productionorderoperation" package.
+	OperationsInverseTable = "production_order_operations"
+	// OperationsColumn is the table column denoting the operations relation/edge.
+	OperationsColumn = "production_order_item_id"
+	// WipBatchesTable is the table that holds the wip_batches relation/edge.
+	WipBatchesTable = "production_wip_batches"
+	// WipBatchesInverseTable is the table name for the ProductionWIPBatch entity.
+	// It exists in this package in order to avoid circular dependency with the "productionwipbatch" package.
+	WipBatchesInverseTable = "production_wip_batches"
+	// WipBatchesColumn is the table column denoting the wip_batches relation/edge.
+	WipBatchesColumn = "production_order_item_id"
+	// PackagingConfirmationTable is the table that holds the packaging_confirmation relation/edge.
+	PackagingConfirmationTable = "production_packaging_confirmations"
+	// PackagingConfirmationInverseTable is the table name for the ProductionPackagingConfirmation entity.
+	// It exists in this package in order to avoid circular dependency with the "productionpackagingconfirmation" package.
+	PackagingConfirmationInverseTable = "production_packaging_confirmations"
+	// PackagingConfirmationColumn is the table column denoting the packaging_confirmation relation/edge.
+	PackagingConfirmationColumn = "production_order_item_id"
 	// ProductTable is the table that holds the product relation/edge.
 	ProductTable = "production_order_items"
 	// ProductInverseTable is the table name for the Product entity.
@@ -124,6 +155,8 @@ var Columns = []string{
 	FieldPlannedQuantity,
 	FieldSalesOrderItemID,
 	FieldBomHeaderID,
+	FieldRouteCode,
+	FieldCustomerInspectionRequired,
 	FieldProductCodeSnapshot,
 	FieldProductNameSnapshot,
 	FieldSkuCodeSnapshot,
@@ -159,6 +192,10 @@ var (
 	SalesOrderItemIDValidator func(int) error
 	// BomHeaderIDValidator is a validator for the "bom_header_id" field. It is called by the builders before save.
 	BomHeaderIDValidator func(int) error
+	// RouteCodeValidator is a validator for the "route_code" field. It is called by the builders before save.
+	RouteCodeValidator func(string) error
+	// DefaultCustomerInspectionRequired holds the default value on creation for the "customer_inspection_required" field.
+	DefaultCustomerInspectionRequired bool
 	// ProductCodeSnapshotValidator is a validator for the "product_code_snapshot" field. It is called by the builders before save.
 	ProductCodeSnapshotValidator func(string) error
 	// ProductNameSnapshotValidator is a validator for the "product_name_snapshot" field. It is called by the builders before save.
@@ -227,6 +264,16 @@ func ByBomHeaderID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldBomHeaderID, opts...).ToFunc()
 }
 
+// ByRouteCode orders the results by the route_code field.
+func ByRouteCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldRouteCode, opts...).ToFunc()
+}
+
+// ByCustomerInspectionRequired orders the results by the customer_inspection_required field.
+func ByCustomerInspectionRequired(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCustomerInspectionRequired, opts...).ToFunc()
+}
+
 // ByProductCodeSnapshot orders the results by the product_code_snapshot field.
 func ByProductCodeSnapshot(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductCodeSnapshot, opts...).ToFunc()
@@ -288,6 +335,41 @@ func ByMaterialRequirements(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOpt
 	}
 }
 
+// ByOperationsCount orders the results by operations count.
+func ByOperationsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newOperationsStep(), opts...)
+	}
+}
+
+// ByOperations orders the results by operations terms.
+func ByOperations(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newOperationsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByWipBatchesCount orders the results by wip_batches count.
+func ByWipBatchesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newWipBatchesStep(), opts...)
+	}
+}
+
+// ByWipBatches orders the results by wip_batches terms.
+func ByWipBatches(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newWipBatchesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
+// ByPackagingConfirmationField orders the results by packaging_confirmation field.
+func ByPackagingConfirmationField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newPackagingConfirmationStep(), sql.OrderByField(field, opts...))
+	}
+}
+
 // ByProductField orders the results by product field.
 func ByProductField(field string, opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -334,6 +416,27 @@ func newMaterialRequirementsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(MaterialRequirementsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, MaterialRequirementsTable, MaterialRequirementsColumn),
+	)
+}
+func newOperationsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(OperationsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, OperationsTable, OperationsColumn),
+	)
+}
+func newWipBatchesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(WipBatchesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, WipBatchesTable, WipBatchesColumn),
+	)
+}
+func newPackagingConfirmationStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(PackagingConfirmationInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2O, false, PackagingConfirmationTable, PackagingConfirmationColumn),
 	)
 }
 func newProductStep() *sqlgraph.Step {

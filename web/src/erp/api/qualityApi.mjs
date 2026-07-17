@@ -21,6 +21,38 @@ export async function listQualityInspections(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listFinishedGoodsQualityInspections(
+  params = {},
+  options = {}
+) {
+  const result = await qualityRpc.call(
+    'list_finished_goods_quality_inspections',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function listProductionStageQualityInspections(
+  params = {},
+  options = {}
+) {
+  const result = await qualityRpc.call(
+    'list_production_stage_quality_inspections',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function createFinishedGoodsQualityInspectionDraft(params = {}) {
+  const result = await qualityRpc.call(
+    'create_finished_goods_quality_inspection_draft',
+    params
+  )
+  return dataOf(result)?.quality_inspection || null
+}
+
 export async function createQualityInspectionDraft(params = {}) {
   const result = await qualityRpc.call(
     'create_quality_inspection_draft',

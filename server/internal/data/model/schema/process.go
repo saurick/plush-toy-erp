@@ -64,6 +64,8 @@ func (Process) Fields() []ent.Field {
 func (Process) Edges() []ent.Edge {
 	return []ent.Edge{
 		edge.To("outsourcing_order_items", OutsourcingOrderItem.Type),
+		edge.From("capable_suppliers", Supplier.Type).
+			Ref("process_capabilities"),
 	}
 }
 

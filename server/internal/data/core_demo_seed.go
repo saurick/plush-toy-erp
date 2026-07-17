@@ -60,12 +60,13 @@ type CoreDemoProcessSeed struct {
 }
 
 type CoreDemoBOMItemSeed struct {
-	MaterialCode string
-	Quantity     string
-	UnitCode     string
-	LossRate     string
-	Position     string
-	Note         string
+	MaterialCode            string
+	Quantity                string
+	UnitCode                string
+	LossRate                string
+	Position                string
+	ProductionOperationCode string
+	Note                    string
 }
 
 type CoreDemoBOMSeed struct {
@@ -237,10 +238,10 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 			{Code: prefix + "-WIP-WH", Name: "核心演示在制仓", Type: "WORK_IN_PROCESS"},
 		},
 		Processes: []CoreDemoProcessSeed{
-			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, QualityRequired: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
-			{Code: prefix + "-PROC-HANDWORK", Name: "手工", Category: "手工", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 20, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
-			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 30, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
-			{Code: prefix + "-PROC-PACKAGING", Name: "包装", Category: "包装", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 40, Note: "毛绒玩具行业默认候选工序，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-CHECKING", Name: "查货", Category: "查货", OutsourcingEnabled: true, InhouseEnabled: true, QualityRequired: true, SortOrder: 10, Note: "毛绒玩具行业默认候选工序；排序仅供列表展示，不代表工艺路线，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-SEWING", Name: "车缝", Category: "车缝", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 20, Note: "毛绒玩具行业默认候选工序；排序仅供列表展示，不代表工艺路线，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-HANDWORK", Name: "手工", Category: "手工", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 30, Note: "毛绒玩具行业默认候选工序；排序仅供列表展示，不代表工艺路线，可按实际工厂调整委外 / 内制 / 质检标记。"},
+			{Code: prefix + "-PROC-PACKAGING", Name: "包装", Category: "包装", OutsourcingEnabled: true, InhouseEnabled: true, SortOrder: 40, Note: "毛绒玩具行业默认候选工序；排序仅供列表展示，不代表工艺路线，可按实际工厂调整委外 / 内制 / 质检标记。"},
 			{Code: prefix + "-PROC-CUTTING-DIE", Name: "制作刀模", Category: "刀模", OutsourcingEnabled: true, SortOrder: 50, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
 			{Code: prefix + "-PROC-CUT-PIECE-IQC", Name: "裁片IQC", Category: "裁片质检", OutsourcingEnabled: true, QualityRequired: true, SortOrder: 60, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
 			{Code: prefix + "-PROC-MACHINE-CUTTING", Name: "机裁", Category: "裁片", OutsourcingEnabled: true, SortOrder: 70, Note: "核心演示委外工序，可按实际工厂继续扩展。"},
@@ -255,11 +256,12 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Note:        "核心演示 BOM，只用于本地试用和 QA，不代表真实客户资料。",
 				Items: []CoreDemoBOMItemSeed{
 					{
-						MaterialCode: prefix + "-MAT-FABRIC",
-						Quantity:     "0.650000",
-						UnitCode:     meter,
-						LossRate:     "0.050000",
-						Position:     "面料",
+						MaterialCode:            prefix + "-MAT-FABRIC",
+						Quantity:                "0.650000",
+						UnitCode:                meter,
+						LossRate:                "0.050000",
+						Position:                "面料",
+						ProductionOperationCode: biz.ProductionWIPOperationFabricProcessing,
 					},
 					{
 						MaterialCode: prefix + "-MAT-FILLING",
@@ -291,11 +293,12 @@ func DefaultCoreDemoSeedDataset(prefix string) CoreDemoSeedDataset {
 				Note:        "核心演示 BOM，用于覆盖多材料、多单位和包装箱场景。",
 				Items: []CoreDemoBOMItemSeed{
 					{
-						MaterialCode: prefix + "-MAT-FABRIC",
-						Quantity:     "0.950000",
-						UnitCode:     meter,
-						LossRate:     "0.060000",
-						Position:     "面料",
+						MaterialCode:            prefix + "-MAT-FABRIC",
+						Quantity:                "0.950000",
+						UnitCode:                meter,
+						LossRate:                "0.060000",
+						Position:                "面料",
+						ProductionOperationCode: biz.ProductionWIPOperationFabricProcessing,
 					},
 					{
 						MaterialCode: prefix + "-MAT-FILLING",
@@ -752,14 +755,15 @@ LIMIT 1`, headerID, materialID).Scan(&id)
 	}
 	if err == sql.ErrNoRows {
 		_, err = tx.ExecContext(ctx, `
-INSERT INTO bom_items (bom_header_id, material_id, quantity, unit_id, loss_rate, position, note, created_at, updated_at)
-VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
+INSERT INTO bom_items (bom_header_id, material_id, quantity, unit_id, loss_rate, position, production_operation_code, note, created_at, updated_at)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, NOW(), NOW())`,
 			headerID,
 			materialID,
 			item.Quantity,
 			unitID,
 			item.LossRate,
 			nullString(item.Position),
+			nullString(item.ProductionOperationCode),
 			nullString(item.Note),
 		)
 		return err
@@ -768,9 +772,10 @@ VALUES ($1, $2, $3, $4, $5, $6, $7, NOW(), NOW())`,
 UPDATE bom_items
 SET quantity = $3,
   unit_id = $4,
-  loss_rate = $5,
-  position = $6,
-  note = $7,
+	  loss_rate = $5,
+	  position = $6,
+	  production_operation_code = $7,
+	  note = $8,
   updated_at = NOW()
 WHERE id = $1 AND material_id = $2`,
 		id,
@@ -779,6 +784,7 @@ WHERE id = $1 AND material_id = $2`,
 		unitID,
 		item.LossRate,
 		nullString(item.Position),
+		nullString(item.ProductionOperationCode),
 		nullString(item.Note),
 	)
 	return err

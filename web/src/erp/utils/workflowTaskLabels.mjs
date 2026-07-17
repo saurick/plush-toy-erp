@@ -17,6 +17,8 @@ const WORKFLOW_TASK_GROUP_LABELS = Object.freeze({
   purchase_quality_exception: '采购质量异常',
   purchase_reconciliation: '采购对账',
   receivable_registration: '应收登记',
+  production_exception: '生产异常',
+  production_scheduling: '生产排程',
   shipment_release: '出货放行',
   warehouse_inbound: '采购入库',
 })

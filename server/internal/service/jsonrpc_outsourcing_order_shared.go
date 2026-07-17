@@ -70,6 +70,7 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 		ProductNameSnapshot:     getWorkflowStringPtr(pm, "product_name_snapshot"),
 		MaterialCodeSnapshot:    getWorkflowStringPtr(pm, "material_code_snapshot"),
 		MaterialNameSnapshot:    getWorkflowStringPtr(pm, "material_name_snapshot"),
+		ProcessingItem:          getWorkflowStringPtr(pm, "processing_item"),
 		ProcessNameSnapshot:     getWorkflowStringPtr(pm, "process_name_snapshot"),
 		ProcessCategorySnapshot: getWorkflowStringPtr(pm, "process_category_snapshot"),
 		UnitNameSnapshot:        getWorkflowStringPtr(pm, "unit_name_snapshot"),
@@ -122,6 +123,8 @@ func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err er
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同明细不存在"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同已有已确认的发料或回货记录，请先取消相关委外记录"}
+	case errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同已关联在制批次，完成相关生产办理前不能取消、关闭或改写"}
 	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "加工厂不存在或已停用"}
 	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):
@@ -211,6 +214,7 @@ func outsourcingOrderItemToMap(item *biz.OutsourcingOrderItem) map[string]any {
 		"product_name_snapshot":     optionalStringValue(item.ProductNameSnapshot),
 		"material_code_snapshot":    optionalStringValue(item.MaterialCodeSnapshot),
 		"material_name_snapshot":    optionalStringValue(item.MaterialNameSnapshot),
+		"processing_item":           optionalStringValue(item.ProcessingItem),
 		"process_name_snapshot":     optionalStringValue(item.ProcessNameSnapshot),
 		"process_category_snapshot": optionalStringValue(item.ProcessCategorySnapshot),
 		"unit_name_snapshot":        optionalStringValue(item.UnitNameSnapshot),

@@ -168,14 +168,22 @@ func (r *masterDataRepo) CustomerExists(ctx context.Context, id int) (bool, erro
 }
 
 func (r *masterDataRepo) CreateSupplier(ctx context.Context, in *biz.SupplierMutation) (*biz.Supplier, error) {
-	row, err := r.data.postgres.Supplier.Create().
+	create := r.data.postgres.Supplier.Create().
 		SetCode(in.Code).
 		SetName(in.Name).
 		SetNillableShortName(in.ShortName).
 		SetNillableSupplierType(in.SupplierType).
+		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
-		SetNillableNote(in.Note).
-		Save(ctx)
+		SetNillableNote(in.Note)
+	if len(in.ProcessIDs) > 0 {
+		create.AddProcessCapabilityIDs(in.ProcessIDs...)
+	}
+	row, err := create.Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	row, err = r.data.postgres.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -196,6 +204,11 @@ func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.Sup
 	} else {
 		update.SetSupplierType(*in.SupplierType)
 	}
+	if in.Address == nil {
+		update.ClearAddress()
+	} else {
+		update.SetAddress(*in.Address)
+	}
 	if in.TaxNo == nil {
 		update.ClearTaxNo()
 	} else {
@@ -206,11 +219,21 @@ func (r *masterDataRepo) UpdateSupplier(ctx context.Context, id int, in *biz.Sup
 	} else {
 		update.SetNote(*in.Note)
 	}
+	if in.ProcessIDs != nil {
+		update.ClearProcessCapabilities()
+		if len(in.ProcessIDs) > 0 {
+			update.AddProcessCapabilityIDs(in.ProcessIDs...)
+		}
+	}
 	row, err := update.Save(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrSupplierNotFound
 		}
+		return nil, err
+	}
+	row, err = r.data.postgres.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
+	if err != nil {
 		return nil, err
 	}
 	return entSupplierToBiz(row), nil
@@ -236,6 +259,10 @@ func (r *masterDataRepo) SaveSupplierWithContacts(ctx context.Context, id int, i
 	if err != nil {
 		return nil, err
 	}
+	supplierRow, err = tx.Supplier.Query().Where(supplier.ID(supplierRow.ID)).WithProcessCapabilities().Only(ctx)
+	if err != nil {
+		return nil, err
+	}
 	out := &biz.SupplierWithContacts{
 		Supplier: entSupplierToBiz(supplierRow),
 		Contacts: savedContacts,
@@ -248,7 +275,7 @@ func (r *masterDataRepo) SaveSupplierWithContacts(ctx context.Context, id int, i
 }
 
 func (r *masterDataRepo) GetSupplier(ctx context.Context, id int) (*biz.Supplier, error) {
-	row, err := r.data.postgres.Supplier.Get(ctx, id)
+	row, err := r.data.postgres.Supplier.Query().Where(supplier.ID(id)).WithProcessCapabilities().Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrSupplierNotFound
@@ -265,6 +292,7 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 			supplier.CodeContains(filter.Keyword),
 			supplier.NameContains(filter.Keyword),
 			supplier.ShortNameContains(filter.Keyword),
+			supplier.AddressContains(filter.Keyword),
 		))
 	}
 	if filter.ActiveOnly {
@@ -274,7 +302,7 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(supplier.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.WithProcessCapabilities().Order(ent.Asc(supplier.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -287,6 +315,10 @@ func (r *masterDataRepo) SetSupplierActive(ctx context.Context, id int, active b
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrSupplierNotFound
 		}
+		return nil, err
+	}
+	row, err = r.data.postgres.Supplier.Query().Where(supplier.ID(row.ID)).WithProcessCapabilities().Only(ctx)
+	if err != nil {
 		return nil, err
 	}
 	return entSupplierToBiz(row), nil
@@ -1008,14 +1040,18 @@ func updateCustomerWithClient(ctx context.Context, client *ent.Client, id int, i
 }
 
 func createSupplierWithClient(ctx context.Context, client *ent.Client, in *biz.SupplierMutation) (*ent.Supplier, error) {
-	return client.Supplier.Create().
+	create := client.Supplier.Create().
 		SetCode(in.Code).
 		SetName(in.Name).
 		SetNillableShortName(in.ShortName).
 		SetNillableSupplierType(in.SupplierType).
+		SetNillableAddress(in.Address).
 		SetNillableTaxNo(in.TaxNo).
-		SetNillableNote(in.Note).
-		Save(ctx)
+		SetNillableNote(in.Note)
+	if len(in.ProcessIDs) > 0 {
+		create.AddProcessCapabilityIDs(in.ProcessIDs...)
+	}
+	return create.Save(ctx)
 }
 
 func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, in *biz.SupplierMutation) (*ent.Supplier, error) {
@@ -1032,6 +1068,11 @@ func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, i
 	} else {
 		update.SetSupplierType(*in.SupplierType)
 	}
+	if in.Address == nil {
+		update.ClearAddress()
+	} else {
+		update.SetAddress(*in.Address)
+	}
 	if in.TaxNo == nil {
 		update.ClearTaxNo()
 	} else {
@@ -1041,6 +1082,12 @@ func updateSupplierWithClient(ctx context.Context, client *ent.Client, id int, i
 		update.ClearNote()
 	} else {
 		update.SetNote(*in.Note)
+	}
+	if in.ProcessIDs != nil {
+		update.ClearProcessCapabilities()
+		if len(in.ProcessIDs) > 0 {
+			update.AddProcessCapabilityIDs(in.ProcessIDs...)
+		}
 	}
 	row, err := update.Save(ctx)
 	if err != nil {
@@ -1226,13 +1273,21 @@ func entSupplierToBiz(row *ent.Supplier) *biz.Supplier {
 	if row == nil {
 		return nil
 	}
+	processIDs := make([]int, 0, len(row.Edges.ProcessCapabilities))
+	for _, processItem := range row.Edges.ProcessCapabilities {
+		if processItem != nil {
+			processIDs = append(processIDs, processItem.ID)
+		}
+	}
 	return &biz.Supplier{
 		ID:           row.ID,
 		Code:         row.Code,
 		Name:         row.Name,
 		ShortName:    row.ShortName,
 		SupplierType: row.SupplierType,
+		Address:      row.Address,
 		TaxNo:        row.TaxNo,
+		ProcessIDs:   processIDs,
 		IsActive:     row.IsActive,
 		Note:         row.Note,
 		CreatedAt:    row.CreatedAt,

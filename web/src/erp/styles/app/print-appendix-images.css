@@ -1,0 +1,209 @@
+.erp-print-panel-action-stack {
+  display: grid;
+  gap: 10px;
+}
+
+.erp-print-appendix-manager {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid #c7d5ca;
+  border-radius: 10px;
+  background: rgb(245 248 245 / 96%);
+}
+
+.erp-print-appendix-manager__heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: #243b2a;
+}
+
+.erp-print-appendix-manager__heading > span,
+.erp-print-appendix-manager__empty,
+.erp-print-appendix-manager__item-copy > span {
+  color: #5c6f61;
+  font-size: 12px;
+}
+
+.erp-print-appendix-manager > p {
+  margin: 0;
+}
+
+.erp-print-appendix-manager__input {
+  display: none;
+}
+
+.erp-print-appendix-manager__list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.erp-print-appendix-manager__item {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px;
+  border: 1px solid #d9e2db;
+  border-radius: 8px;
+  background: #fff;
+}
+
+.erp-print-appendix-manager__item > img {
+  display: block;
+  width: 48px;
+  height: 48px;
+  border-radius: 6px;
+  background: #f8fafc;
+  object-fit: cover;
+}
+
+.erp-print-appendix-manager__item-copy {
+  display: grid;
+  min-width: 0;
+  gap: 2px;
+}
+
+.erp-print-appendix-manager__item-copy > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.erp-print-appendix-manager__item-actions {
+  display: flex;
+  grid-column: 1 / -1;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.erp-print-appendix-manager__layout-actions {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.erp-print-appendix-manager__item-actions button,
+.erp-print-appendix-manager__layout-actions button {
+  min-height: 30px;
+  padding: 4px 9px;
+  border: 1px solid #c5d1c8;
+  border-radius: 7px;
+  background: #fff;
+  color: #334b39;
+  cursor: pointer;
+}
+
+.erp-print-appendix-manager__layout-actions button[aria-pressed='true'] {
+  border-color: #2f8f4b;
+  background: #e8f5eb;
+  color: #1f6b38;
+  box-shadow: inset 0 0 0 1px rgb(47 143 75 / 16%);
+}
+
+.erp-print-appendix-manager__item-actions button:last-child {
+  border-color: #efcaca;
+  color: #a52a2a;
+}
+
+.erp-print-appendix-manager__item-actions button:disabled,
+.erp-print-appendix-manager__layout-actions button:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+
+.erp-print-appendix-manager__item-actions button:focus-visible,
+.erp-print-appendix-manager__layout-actions button:focus-visible,
+.erp-print-appendix-manager > button:focus-visible {
+  outline: 2px solid #1f7a3f;
+  outline-offset: 2px;
+}
+
+.erp-print-appendix-images {
+  display: block;
+  overflow: visible;
+  margin-top: 5.5mm;
+}
+
+.erp-print-appendix-images__row {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  column-gap: 7mm;
+  align-items: start;
+  margin: 0 0 7mm;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.erp-print-appendix-images__row:last-child {
+  margin-bottom: 0;
+}
+
+.erp-print-appendix-images__row--full {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.erp-print-appendix-images__row--segmented {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.erp-print-appendix-images__item {
+  display: grid;
+  align-self: start;
+  min-width: 0;
+  margin: 0;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.erp-print-appendix-images__item--full {
+  grid-column: 1 / -1;
+}
+
+.erp-print-appendix-images__item--segmented {
+  break-inside: auto;
+  page-break-inside: auto;
+}
+
+.erp-print-appendix-images__segment {
+  min-width: 0;
+  break-inside: avoid-page;
+  page-break-inside: avoid;
+}
+
+.erp-print-appendix-images__image {
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+@media print {
+  .erp-print-appendix-manager {
+    display: none;
+  }
+
+  .erp-print-appendix-images__row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .erp-print-appendix-images__row--full {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .erp-print-appendix-images__item--full.erp-print-appendix-images__item--segmented
+    .erp-print-appendix-images__segment
+    + .erp-print-appendix-images__segment {
+    break-before: page;
+    page-break-before: always;
+  }
+}

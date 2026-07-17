@@ -33,6 +33,7 @@ func (f productionOrderPGFixture) createReleasedOrder(t *testing.T, ctx context.
 	if err != nil {
 		t.Fatalf("release production order: %v", err)
 	}
+	completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, released.Order.ID, f.actorID)
 	return released
 }
 
@@ -339,6 +340,7 @@ func TestProductionOrderPostgresCloseChecksEveryLineIndependently(t *testing.T) 
 	if err != nil {
 		t.Fatalf("release multi-line order: %v", err)
 	}
+	completeProductionSchedulingTaskForTest(t, ctx, f.data, f.client, order.Order.ID, f.actorID)
 	f.createAndPostLinkedFact(t, ctx, order, 0, "close-multi-line-1", 3)
 	f.createAndPostLinkedFact(t, ctx, order, 1, "close-multi-line-2-part", 3)
 	if _, err := f.uc.Close(ctx, &biz.ProductionOrderAction{ID: order.Order.ID, ExpectedVersion: 2, ActorID: f.actorID, IdempotencyKey: "close-multi-incomplete-" + f.suffix}); !errors.Is(err, biz.ErrProductionOrderCloseReasonRequired) {

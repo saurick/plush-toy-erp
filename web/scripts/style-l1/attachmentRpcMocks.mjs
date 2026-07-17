@@ -23,6 +23,7 @@ export async function installAttachmentRpcMocks(page, context) {
     const dataByMethod = {
       list_attachments: { attachments: [] },
       upload_attachment: { attachment },
+      clear_product_image: { cleared: true },
       download_attachment: {
         attachment: {
           ...attachment,

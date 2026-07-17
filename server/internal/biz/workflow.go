@@ -31,6 +31,9 @@ func (uc *WorkflowUsecase) CreateTask(ctx context.Context, in *WorkflowTaskCreat
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
+	if err := ValidateWorkflowSourceTaskReservedNamespace(in.TaskGroup, in.TaskCode); err != nil {
+		return nil, err
+	}
 	normalized, err := normalizeWorkflowTaskCreate(*in)
 	if err != nil {
 		return nil, err
@@ -112,6 +115,14 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		}
 	} else if isFinishedGoodsReworkTask(current) {
 		if err := uc.applyFinishedGoodsReworkTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isProductionSchedulingSourceTask(current) {
+		if err := uc.applyProductionSchedulingSourceTaskTransition(current, in); err != nil {
+			return nil, err
+		}
+	} else if isProductionExceptionSourceTask(current) {
+		if err := uc.applyProductionExceptionSourceTaskTransition(current, in); err != nil {
 			return nil, err
 		}
 	} else if isShipmentReleaseTask(current) {
@@ -513,6 +524,75 @@ func (uc *WorkflowUsecase) applyFinishedGoodsReworkTransition(current *WorkflowT
 		in.Payload["finished_goods"] = true
 		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
 		in.SideEffects = buildFinishedGoodsReworkBlockedSideEffects(current, in.TaskStatusKey, reason)
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (uc *WorkflowUsecase) applyProductionSchedulingSourceTaskTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowProductionProcessingStatusKey
+		in.Payload["scheduling_task_id"] = current.ID
+		in.Payload["scheduling_result"] = "confirmed"
+		in.Payload["production_execution_required"] = true
+		in.Payload["production_fact_deferred"] = true
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildProductionSchedulingDoneSideEffects(workflowTaskWithPayload(current, in.Payload))
+	case "blocked", "rejected":
+		reason := workflowTransitionReason(in, in.TaskStatusKey)
+		if reason == "" {
+			return ErrBadParam
+		}
+		in.Reason = reason
+		in.BusinessStatusKey = workflowBlockedStatusKey
+		in.Payload["scheduling_task_id"] = current.ID
+		in.Payload["scheduling_result"] = in.TaskStatusKey
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = in.TaskStatusKey
+		in.Payload["transition_status"] = in.TaskStatusKey
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
+		in.SideEffects = buildProductionSchedulingBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), in.TaskStatusKey, reason)
+	default:
+		return nil
+	}
+	return nil
+}
+
+func (uc *WorkflowUsecase) applyProductionExceptionSourceTaskTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
+	productionOrderID, found, err := processCommandPositiveIntFromPayload(current.Payload, "production_order_id")
+	if err != nil || !found {
+		return ErrBadParam
+	}
+	switch in.TaskStatusKey {
+	case "done":
+		in.BusinessStatusKey = workflowProductionProcessingStatusKey
+		in.Payload["production_exception_task_id"] = current.ID
+		in.Payload["production_exception_result"] = "handled"
+		in.Payload["production_fact_correction_deferred"] = true
+		in.Payload["inventory_adjustment_deferred"] = true
+		in.Payload["quality_followup_deferred"] = true
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = "done"
+		in.Payload["transition_status"] = "done"
+		in.SideEffects = buildProductionExceptionDoneSideEffects(workflowTaskWithPayload(current, in.Payload), productionOrderID)
+	case "blocked", "rejected":
+		reason := workflowTransitionReason(in, in.TaskStatusKey)
+		if reason == "" {
+			return ErrBadParam
+		}
+		in.Reason = reason
+		in.BusinessStatusKey = workflowBlockedStatusKey
+		in.Payload["production_exception_task_id"] = current.ID
+		in.Payload["production_exception_result"] = in.TaskStatusKey
+		in.Payload["critical_path"] = true
+		in.Payload["decision"] = in.TaskStatusKey
+		in.Payload["transition_status"] = in.TaskStatusKey
+		setWorkflowTransitionReasonPayload(in.Payload, in.TaskStatusKey, reason)
+		in.SideEffects = buildProductionExceptionBlockedSideEffects(workflowTaskWithPayload(current, in.Payload), productionOrderID, in.TaskStatusKey, reason)
 	default:
 		return nil
 	}

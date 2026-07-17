@@ -316,7 +316,7 @@ test("manual acceptance catalog assigns production orders to production with sou
     (item) => item.title === "生产订单",
   );
 
-  assert.deepEqual(technical?.roleKeys, ["production"]);
+  assert.deepEqual(technical?.roleKeys, ["sales", "pmc", "production"]);
   assert.equal(technical?.minimumRecords, 45);
   assert.match(
     acceptance?.whatToDo.join("\n") || "",

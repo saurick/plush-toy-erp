@@ -117,6 +117,8 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 			"quality_inspection_id": float64(8001),
 			"finished_goods_lot_id": float64(7001),
 			"result":                QualityInspectionResultPass,
+			"defect_rate_operator":  QualityInspectionDefectRateOperatorApprox,
+			"defect_rate_percent":   "5",
 			"decision_note":         "成品质检通过，进入财务放行",
 		},
 	})

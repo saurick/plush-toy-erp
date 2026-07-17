@@ -11,12 +11,10 @@ import {
   Alert,
   Button,
   Card,
-  Col,
   Descriptions,
   Empty,
   Input,
   Pagination,
-  Row,
   Select,
   Space,
   Table,
@@ -86,34 +84,6 @@ import {
 import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
 
 const { Paragraph, Text, Title } = Typography
-
-const EXCEPTION_FLOW_STEPS = Object.freeze([
-  {
-    key: 'blocked',
-    title: '阻塞记录',
-    description: '必须填写原因和影响范围。',
-  },
-  {
-    key: 'assign',
-    title: '责任分派',
-    description: '按负责岗位或具体负责人接收。',
-  },
-  {
-    key: 'follow',
-    title: '处理跟进',
-    description: '催办、补充说明或转派。',
-  },
-  {
-    key: 'verify',
-    title: '验证恢复',
-    description: '确认任务可以继续推进。',
-  },
-  {
-    key: 'close',
-    title: '关闭归档',
-    description: '只关闭当前异常任务，不会改变相关业务记录。',
-  },
-])
 
 const WORKBENCH_QUEUE_OPTIONS = Object.freeze([
   { key: 'actionable', label: '待我处理', hint: '当前可推进' },
@@ -414,7 +384,11 @@ function TaskLane({
                   </Text>
                 ) : null}
                 <Space wrap>
-                  <Button size="small" onClick={() => onOpenTask(task)}>
+                  <Button
+                    size="small"
+                    aria-label={`查看${task.task_name || '任务'}详情`}
+                    onClick={() => onOpenTask(task)}
+                  >
                     查看
                   </Button>
                 </Space>
@@ -508,6 +482,36 @@ function WorkbenchQueueEmpty({ activeOption, fallbackOption, onSwitchQueue }) {
   )
 }
 
+function isWorkflowTaskAccessChecking(access = {}) {
+  return access.loading || access.source === 'fallback_checking'
+}
+
+function TaskProcessingHint({ task, access = {}, canOpenEntry = false }) {
+  const hint = getWorkflowTaskProcessingHint({
+    task,
+    allowedActionModes: access.allowedModes,
+    loading: isWorkflowTaskAccessChecking(access),
+    failed: access.failed || access.source === 'fallback_failed',
+    readonlyReason: access.readonlyReason,
+    canOpenEntry,
+  })
+
+  return (
+    <Alert
+      type="info"
+      showIcon
+      className="erp-task-processing-hint"
+      message={
+        <div className="erp-task-processing-hint__head">
+          <span>处理提示</span>
+          <Text type="secondary">系统按任务状态、可用操作和关联入口生成</Text>
+        </div>
+      }
+      description={hint}
+    />
+  )
+}
+
 export default function DashboardPage({ initialView = 'workbench' }) {
   const [loading, setLoading] = useState(false)
   const [workflowWorkbenchSnapshot, setWorkflowWorkbenchSnapshot] = useState(
@@ -520,15 +524,15 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [actionMode, setActionMode] = useState('')
   const [actionReason, setActionReason] = useState('')
   const [actionSaving, setActionSaving] = useState(false)
+  const selectedTaskRef = useRef(selectedTask)
+  selectedTaskRef.current = selectedTask
   const [activeView, setActiveView] = useState(initialView)
   const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
   const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
   const [selectedWorkbenchTaskId, setSelectedWorkbenchTaskId] = useState('')
+  const [selectedExceptionTaskId, setSelectedExceptionTaskId] = useState('')
   const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
     useState(0)
-  const [exceptionStepKey, setExceptionStepKey] = useState(
-    EXCEPTION_FLOW_STEPS[0].key
-  )
   const mountedRef = useRef(false)
   const dashboardLoadRequestSeqRef = useRef(0)
   const taskBoardLanesRef = useRef(null)
@@ -738,30 +742,57 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [filters.sourceType, taskBoardModel.sourceTypes]
   )
   const actionMeta = actionMode ? TASK_ACTION_META[actionMode] : null
-  const activeExceptionStep =
-    EXCEPTION_FLOW_STEPS.find((step) => step.key === exceptionStepKey) ||
-    EXCEPTION_FLOW_STEPS[0]
   const exceptionTasks = useMemo(
     () =>
-      workflowTasks
-        .filter((task) => {
-          const statusKey = getTaskStatusKey(task)
-          return (
-            !isTerminalWorkflowTask(task) &&
-            (statusKey === 'blocked' || Boolean(getWorkflowTaskReason(task)))
-          )
-        })
-        .slice(0, 8),
+      workflowTasks.filter((task) => {
+        const statusKey = getTaskStatusKey(task)
+        return (
+          !isTerminalWorkflowTask(task) &&
+          (statusKey === 'blocked' || Boolean(getWorkflowTaskReason(task)))
+        )
+      }),
     [workflowTasks]
   )
   const dueTasks = useMemo(
     () =>
-      workflowTasks
-        .filter((task) =>
-          ['overdue', 'due_soon'].includes(getWorkflowTaskDueStatus(task))
-        )
-        .slice(0, 8),
+      workflowTasks.filter((task) =>
+        ['overdue', 'due_soon'].includes(getWorkflowTaskDueStatus(task))
+      ),
     [workflowTasks]
+  )
+  const exceptionQueueTasks = useMemo(() => {
+    const tasksByKey = new Map()
+    ;[...exceptionTasks, ...dueTasks].forEach((task) => {
+      tasksByKey.set(getWorkflowTaskStableKey(task), task)
+    })
+    return [...tasksByKey.values()]
+      .sort((left, right) => {
+        const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
+        const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
+        if (leftDue !== rightDue) return leftDue - rightDue
+        return String(left.task_name || '').localeCompare(
+          String(right.task_name || '')
+        )
+      })
+      .slice(0, 12)
+  }, [dueTasks, exceptionTasks])
+  const selectedExceptionTask = useMemo(() => {
+    if (exceptionQueueTasks.length === 0) return null
+    return (
+      exceptionQueueTasks.find(
+        (task) => getWorkflowTaskStableKey(task) === selectedExceptionTaskId
+      ) || exceptionQueueTasks[0]
+    )
+  }, [exceptionQueueTasks, selectedExceptionTaskId])
+  const selectedExceptionStatusMeta = selectedExceptionTask
+    ? getWorkflowTaskStatusMeta(selectedExceptionTask)
+    : null
+  const selectedExceptionEntryPath = selectedExceptionTask
+    ? resolveWorkflowTaskEntryPath(selectedExceptionTask)
+    : ''
+  const selectedExceptionCanOpenEntry = canOpenWorkflowTaskEntry(
+    adminProfile,
+    selectedExceptionEntryPath
   )
   const taskCenterCurrentTask = useMemo(
     () =>
@@ -776,6 +807,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const taskCenterCurrentEntryPath = taskCenterCurrentTask
     ? resolveWorkflowTaskEntryPath(taskCenterCurrentTask)
     : ''
+  const taskCenterCurrentCanOpenEntry = canOpenWorkflowTaskEntry(
+    adminProfile,
+    taskCenterCurrentEntryPath
+  )
 
   useEffect(() => {
     if (!taskBoardReady || !selectedTaskBoardTaskId) return
@@ -931,18 +966,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const selectedWorkbenchEntryPath = selectedWorkbenchTask
     ? resolveWorkflowTaskEntryPath(selectedWorkbenchTask)
     : ''
+  const selectedWorkbenchCanOpenEntry = canOpenWorkflowTaskEntry(
+    adminProfile,
+    selectedWorkbenchEntryPath
+  )
   const selectedWorkbenchTaskAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: selectedWorkbenchTask,
     enabled: Boolean(selectedWorkbenchTask),
   })
-  const showSelectedWorkbenchTaskReadonlyAction =
-    !selectedWorkbenchTaskAccess.loading &&
-    selectedWorkbenchTaskAccess.allowedModes.length === 0
   const taskCenterCurrentTaskAccess = useWorkflowTaskActionAccess({
     adminProfile,
     task: taskCenterCurrentTask,
     enabled: Boolean(taskCenterCurrentTask),
+  })
+  const selectedExceptionTaskAccess = useWorkflowTaskActionAccess({
+    adminProfile,
+    task: selectedExceptionTask,
+    enabled: Boolean(selectedExceptionTask),
   })
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
@@ -1062,6 +1103,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }, [])
 
   const openTaskDrawer = (task, mode = '') => {
+    if (actionSaving) return
     const nextMode = TASK_ACTION_META[mode] ? mode : ''
     setSelectedTask(task)
     setActionMode(nextMode)
@@ -1069,6 +1111,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   }
 
   const closeTaskDrawer = () => {
+    if (actionSaving) return
     setSelectedTask(null)
     setActionMode('')
     setActionReason('')
@@ -1077,28 +1120,33 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const submitTaskAction = async () => {
     if (!selectedTask || !actionMode || !actionMeta) return
 
+    const taskSnapshot = selectedTask
+    const taskIdentity = getWorkflowTaskStableKey(taskSnapshot)
+    const actionModeSnapshot = actionMode
+    const actionMetaSnapshot = actionMeta
+    const actionAccessSnapshot = actionDrawerAccess
     const reason = actionReason.trim()
-    if (actionMeta.requireReason && !reason) {
-      message.warning(`${actionMeta.title}需要填写原因`)
+    if (actionMetaSnapshot.requireReason && !reason) {
+      message.warning(`${actionMetaSnapshot.title}需要填写原因`)
       return
     }
-    const scope = `${selectedTask.id}:${actionMode}`
-    const operation = actionMode
+    const scope = `${taskSnapshot.id}:${actionModeSnapshot}`
+    const operation = actionModeSnapshot
     const mutate =
-      actionMode === 'urge'
+      actionModeSnapshot === 'urge'
         ? urgeWorkflowTask
-        : actionMode === 'complete'
+        : actionModeSnapshot === 'complete'
           ? completeWorkflowTaskAction
-          : actionMode === 'block'
+          : actionModeSnapshot === 'block'
             ? blockWorkflowTaskAction
-            : actionMode === 'reject'
+            : actionModeSnapshot === 'reject'
               ? rejectWorkflowTaskAction
               : resumeWorkflowTaskAction
     const params =
-      actionMode === 'urge'
+      actionModeSnapshot === 'urge'
         ? {
-            task_id: selectedTask.id,
-            expected_version: selectedTask.version,
+            task_id: taskSnapshot.id,
+            expected_version: taskSnapshot.version,
             action: 'urge_task',
             reason,
             payload: {
@@ -1106,18 +1154,28 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             },
           }
         : {
-            task_id: selectedTask.id,
-            expected_version: selectedTask.version,
-            action_key: actionMode,
+            task_id: taskSnapshot.id,
+            expected_version: taskSnapshot.version,
+            action_key: actionModeSnapshot,
             reason,
             payload: {
               surface_key: 'desktop_task_board',
             },
           }
     const inFlightLease = mutationInFlightRef.current.acquire(
-      `task:${selectedTask.id}`
+      `task:${taskSnapshot.id}`
     )
     if (!inFlightLease) return
+    setActionSaving(true)
+    const closeSubmittedTaskDrawer = () => {
+      if (getWorkflowTaskStableKey(selectedTaskRef.current) !== taskIdentity) {
+        return false
+      }
+      setSelectedTask(null)
+      setActionMode('')
+      setActionReason('')
+      return true
+    }
     try {
       const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
         attemptStore: mutationAttemptsRef.current,
@@ -1125,24 +1183,24 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         operation,
         params,
         verify: async () => {
-          if (isTerminalWorkflowTask(selectedTask)) {
+          if (isTerminalWorkflowTask(taskSnapshot)) {
             message.warning('已结束任务不能继续处理')
             return false
           }
-          if (actionDrawerAccess.loading) {
+          if (actionAccessSnapshot.loading) {
             message.warning('正在确认这项操作是否可用，请稍后再提交')
             return false
           }
-          if (!actionDrawerAccess.canRun(actionMode)) {
+          if (!actionAccessSnapshot.canRun(actionModeSnapshot)) {
             message.warning(
-              actionDrawerAccess.getReason(actionMode) ||
-                getWorkflowTaskReadonlyReason(adminProfile, selectedTask)
+              actionAccessSnapshot.getReason(actionModeSnapshot) ||
+                getWorkflowTaskReadonlyReason(adminProfile, taskSnapshot)
             )
             return false
           }
           return verifyWorkflowTaskActionAccessBeforeSubmit({
-            task: selectedTask,
-            actionKey: actionMode,
+            task: taskSnapshot,
+            actionKey: actionModeSnapshot,
             reason,
             onWarning: message.warning,
             onError: message.error,
@@ -1151,38 +1209,34 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       })
       if (!accessVerified) return
 
-      setActionSaving(true)
       try {
-        try {
-          await mutationAttemptsRef.current.run({
-            scope,
-            operation,
-            mutate,
-            params,
-          })
-        } catch (error) {
-          if (isWorkflowTaskMutationResultUnknown(error)) {
-            message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
-          } else {
-            message.error(
-              getActionErrorMessage(error, `${actionMeta.title}失败`)
-            )
-            closeTaskDrawer()
-            await loadDashboardStats().catch(() => {})
-          }
-          return
+        await mutationAttemptsRef.current.run({
+          scope,
+          operation,
+          mutate,
+          params,
+        })
+      } catch (error) {
+        if (isWorkflowTaskMutationResultUnknown(error)) {
+          message.warning('提交结果暂未确认，已保留本次操作，可直接重试')
+        } else {
+          message.error(
+            getActionErrorMessage(error, `${actionMetaSnapshot.title}失败`)
+          )
+          closeSubmittedTaskDrawer()
+          await loadDashboardStats().catch(() => {})
         }
-        closeTaskDrawer()
-        message.success(actionMeta.successMessage)
-        try {
-          await loadDashboardStats()
-        } catch {
-          message.warning('操作已成功但列表刷新失败，请手动刷新')
-        }
-      } finally {
-        setActionSaving(false)
+        return
+      }
+      closeSubmittedTaskDrawer()
+      message.success(actionMetaSnapshot.successMessage)
+      try {
+        await loadDashboardStats()
+      } catch {
+        message.warning('操作已成功但列表刷新失败，请手动刷新')
       }
     } finally {
+      setActionSaving(false)
       mutationInFlightRef.current.release(inFlightLease)
     }
   }
@@ -1475,73 +1529,40 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           {getWorkflowTaskReason(selectedWorkbenchTask) || '-'}
                         </Descriptions.Item>
                       </Descriptions>
+                      <TaskProcessingHint
+                        task={selectedWorkbenchTask}
+                        access={selectedWorkbenchTaskAccess}
+                        canOpenEntry={selectedWorkbenchCanOpenEntry}
+                      />
                       <Space wrap className="erp-workbench-detail-actions">
-                        {selectedWorkbenchTaskAccess.loading ? (
+                        {isWorkflowTaskAccessChecking(
+                          selectedWorkbenchTaskAccess
+                        ) ? (
                           <Button disabled>正在确认可用操作</Button>
-                        ) : null}
-                        {!selectedWorkbenchTaskAccess.loading &&
-                        selectedWorkbenchTaskAccess.allowedModes.includes(
-                          'complete'
-                        ) ? (
+                        ) : (
                           <Button
-                            type="primary"
-                            onClick={() =>
-                              openTaskDrawer(selectedWorkbenchTask, 'complete')
+                            type={
+                              selectedWorkbenchTaskAccess.allowedModes.length >
+                              0
+                                ? 'primary'
+                                : 'default'
                             }
-                          >
-                            处理任务
-                          </Button>
-                        ) : null}
-                        {!selectedWorkbenchTaskAccess.loading &&
-                        selectedWorkbenchTaskAccess.allowedModes.includes(
-                          'block'
-                        ) ? (
-                          <Button
-                            danger
-                            onClick={() =>
-                              openTaskDrawer(selectedWorkbenchTask, 'block')
+                            title={
+                              selectedWorkbenchTaskAccess.allowedModes.length >
+                              0
+                                ? undefined
+                                : selectedWorkbenchTaskAccess.readonlyReason
                             }
-                          >
-                            标记阻塞
-                          </Button>
-                        ) : null}
-                        {!selectedWorkbenchTaskAccess.loading &&
-                        selectedWorkbenchTaskAccess.allowedModes.includes(
-                          'reject'
-                        ) ? (
-                          <Button
-                            danger
-                            onClick={() =>
-                              openTaskDrawer(selectedWorkbenchTask, 'reject')
-                            }
-                          >
-                            退回任务
-                          </Button>
-                        ) : null}
-                        {!selectedWorkbenchTaskAccess.loading &&
-                        selectedWorkbenchTaskAccess.allowedModes.includes(
-                          'resume'
-                        ) ? (
-                          <Button
-                            type="primary"
-                            onClick={() =>
-                              openTaskDrawer(selectedWorkbenchTask, 'resume')
-                            }
-                          >
-                            解除阻塞
-                          </Button>
-                        ) : null}
-                        {showSelectedWorkbenchTaskReadonlyAction ? (
-                          <Button
-                            title={selectedWorkbenchTaskAccess.readonlyReason}
                             onClick={() =>
                               openTaskDrawer(selectedWorkbenchTask)
                             }
                           >
-                            查看详情
+                            {selectedWorkbenchTaskAccess.allowedModes.length > 0
+                              ? '处理任务'
+                              : '查看详情'}
                           </Button>
-                        ) : null}
-                        {selectedWorkbenchEntryPath ? (
+                        )}
+                        {selectedWorkbenchCanOpenEntry ? (
                           <Button
                             onClick={() => openTaskEntry(selectedWorkbenchTask)}
                           >
@@ -1580,7 +1601,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
               : undefined
           }
         >
-          <Space direction="vertical" className="erp-dashboard-block" size={14}>
+          <div className="erp-dashboard-block">
             <div className="erp-task-center-overview">
               <section className="erp-task-center-summary">
                 <div>
@@ -1609,7 +1630,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                     value={
                       taskBoardReady ? taskBoardModel.counts.exception : '-'
                     }
-                    actionLabel="查看阻塞和退回任务"
+                    actionLabel="查看阻塞任务"
                     active={filters.lane === 'exception'}
                     danger={taskBoardModel.counts.exception > 0}
                     onClick={() => selectTaskBoardLane('exception')}
@@ -1676,79 +1697,39 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         {getWorkflowTaskReason(taskCenterCurrentTask)}
                       </Text>
                     ) : null}
+                    <TaskProcessingHint
+                      task={taskCenterCurrentTask}
+                      access={taskCenterCurrentTaskAccess}
+                      canOpenEntry={taskCenterCurrentCanOpenEntry}
+                    />
                     <Space wrap className="erp-task-center-current-actions">
-                      {taskCenterCurrentTaskAccess.loading ? (
+                      {isWorkflowTaskAccessChecking(
+                        taskCenterCurrentTaskAccess
+                      ) ? (
                         <Button size="small" disabled>
                           正在确认可用操作
                         </Button>
-                      ) : null}
-                      {!taskCenterCurrentTaskAccess.loading &&
-                      taskCenterCurrentTaskAccess.allowedModes.includes(
-                        'complete'
-                      ) ? (
+                      ) : (
                         <Button
                           size="small"
-                          type="primary"
-                          onClick={() =>
-                            openTaskDrawer(taskCenterCurrentTask, 'complete')
+                          type={
+                            taskCenterCurrentTaskAccess.allowedModes.length > 0
+                              ? 'primary'
+                              : 'default'
                           }
-                        >
-                          处理完成
-                        </Button>
-                      ) : null}
-                      {!taskCenterCurrentTaskAccess.loading &&
-                      taskCenterCurrentTaskAccess.allowedModes.includes(
-                        'block'
-                      ) ? (
-                        <Button
-                          size="small"
-                          danger
-                          onClick={() =>
-                            openTaskDrawer(taskCenterCurrentTask, 'block')
+                          title={
+                            taskCenterCurrentTaskAccess.allowedModes.length > 0
+                              ? undefined
+                              : taskCenterCurrentTaskAccess.readonlyReason
                           }
-                        >
-                          标记阻塞
-                        </Button>
-                      ) : null}
-                      {!taskCenterCurrentTaskAccess.loading &&
-                      taskCenterCurrentTaskAccess.allowedModes.includes(
-                        'reject'
-                      ) ? (
-                        <Button
-                          size="small"
-                          danger
-                          onClick={() =>
-                            openTaskDrawer(taskCenterCurrentTask, 'reject')
-                          }
-                        >
-                          退回任务
-                        </Button>
-                      ) : null}
-                      {!taskCenterCurrentTaskAccess.loading &&
-                      taskCenterCurrentTaskAccess.allowedModes.includes(
-                        'resume'
-                      ) ? (
-                        <Button
-                          size="small"
-                          type="primary"
-                          onClick={() =>
-                            openTaskDrawer(taskCenterCurrentTask, 'resume')
-                          }
-                        >
-                          解除阻塞
-                        </Button>
-                      ) : null}
-                      {!taskCenterCurrentTaskAccess.loading &&
-                      taskCenterCurrentTaskAccess.allowedModes.length === 0 ? (
-                        <Button
-                          size="small"
-                          title={taskCenterCurrentTaskAccess.readonlyReason}
                           onClick={() => openTaskDrawer(taskCenterCurrentTask)}
                         >
-                          查看详情
+                          {taskCenterCurrentTaskAccess.allowedModes.length > 0
+                            ? '处理任务'
+                            : '查看详情'}
                         </Button>
-                      ) : null}
-                      {taskCenterCurrentEntryPath ? (
+                      )}
+                      {taskCenterCurrentCanOpenEntry ? (
                         <Button
                           size="small"
                           onClick={() => openTaskEntry(taskCenterCurrentTask)}
@@ -1856,89 +1837,73 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 ))}
               </div>
             )}
-          </Space>
+          </div>
         </Card>
       ) : null}
 
       {activeView === 'exception-flow' ? (
-        <>
-          <Card
-            className="erp-dashboard-card erp-command-center-exception-card"
-            variant="borderless"
-          >
-            <Title level={3} className="erp-command-center-hero-title">
-              异常处理
-            </Title>
-            <Paragraph type="secondary" className="erp-dashboard-summary">
-              按“登记原因—分派负责人—跟进处理—确认恢复—关闭”的步骤处理异常。
-            </Paragraph>
-            <div className="erp-exception-flow-steps">
-              {EXCEPTION_FLOW_STEPS.map((step, index) => (
-                <button
-                  type="button"
-                  key={step.key}
-                  className={`erp-exception-flow-step${
-                    step.key === exceptionStepKey
-                      ? ' erp-exception-flow-step--active'
-                      : ''
-                  }`}
-                  onClick={() => setExceptionStepKey(step.key)}
-                >
-                  <Text strong>
-                    {index + 1}. {step.title}
-                  </Text>
-                  <Text type="secondary">{step.description}</Text>
-                </button>
-              ))}
-            </div>
-          </Card>
+        <Card
+          className="erp-dashboard-card erp-command-center-exception-card"
+          variant="borderless"
+          loading={loading}
+        >
+          <div className="erp-exception-workspace">
+            <section className="erp-exception-workspace__summary">
+              <div>
+                <Title level={3} className="erp-command-center-hero-title">
+                  异常处理
+                </Title>
+                <Paragraph className="erp-dashboard-summary">
+                  先处理阻塞和到期风险，再进入相关业务记录核对实际办理结果。
+                </Paragraph>
+              </div>
+              <div
+                className="erp-exception-workspace__metrics"
+                aria-label="异常处理摘要"
+              >
+                <span>
+                  <small>阻塞</small>
+                  <strong>{exceptionTasks.length}</strong>
+                </span>
+                <span>
+                  <small>到期风险</small>
+                  <strong>{dueTasks.length}</strong>
+                </span>
+              </div>
+            </section>
 
-          <Row gutter={[16, 16]}>
-            <Col xs={24} lg={12}>
-              <Card
-                className="erp-dashboard-card"
-                variant="borderless"
-                title={activeExceptionStep.title}
+            <Alert
+              type="warning"
+              showIcon
+              message="任务状态和业务办理结果分开确认"
+              description="完成、解除阻塞、退回和催办只更新当前任务；库存、出货、应收、开票和付款仍需进入对应业务页面处理。"
+            />
+
+            <div className="erp-exception-workspace__main">
+              <section
+                className="erp-exception-workspace__queue"
+                aria-label="风险任务"
               >
-                <Space
-                  direction="vertical"
-                  size={12}
-                  className="erp-dashboard-block"
-                >
-                  <Alert
-                    type="warning"
-                    showIcon
-                    message={activeExceptionStep.description}
-                    description="这里处理的是异常任务，不代表库存、出货、应收、开票、付款或会计凭证已经完成。"
-                  />
-                  <Descriptions size="small" column={1} bordered>
-                    <Descriptions.Item label="阻塞任务">
-                      {exceptionTasks.length}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="今日/超时任务">
-                      {dueTasks.length}
-                    </Descriptions.Item>
-                    <Descriptions.Item label="建议处理方式">
-                      选择一条任务后登记原因、催办、完成或进入关联记录核对。
-                    </Descriptions.Item>
-                  </Descriptions>
-                </Space>
-              </Card>
-            </Col>
-            <Col xs={24} lg={12}>
-              <Card
-                className="erp-dashboard-card"
-                variant="borderless"
-                title="异常任务列表"
-              >
-                <Space
-                  direction="vertical"
-                  size={10}
-                  className="erp-dashboard-block"
-                >
-                  {exceptionTasks.length > 0 ? (
-                    exceptionTasks.map((task) => {
+                <div className="erp-exception-workspace__section-head">
+                  <div>
+                    <Title level={5}>风险任务</Title>
+                    <Text type="secondary">
+                      单击查看，电脑端双击可直接打开任务详情。
+                    </Text>
+                  </div>
+                  <Tag color={exceptionQueueTasks.length > 0 ? 'red' : 'green'}>
+                    {exceptionQueueTasks.length} 项
+                  </Tag>
+                </div>
+                {exceptionQueueTasks.length > 0 ? (
+                  <div className="erp-exception-workspace__list">
+                    {exceptionQueueTasks.map((task) => {
+                      const taskKey = getWorkflowTaskStableKey(task)
                       const statusMeta = getWorkflowTaskStatusMeta(task)
+                      const dueStatus = getWorkflowTaskDueStatus(task)
+                      const active =
+                        taskKey ===
+                        getWorkflowTaskStableKey(selectedExceptionTask)
                       return (
                         <div
                           className="erp-command-center-focus-item"
@@ -1946,41 +1911,128 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                           data-task-code={task.task_code || undefined}
                           data-task-group={task.task_group || undefined}
                         >
-                          <div className="erp-command-center-focus-copy">
-                            <Text strong>{task.task_name || '未命名任务'}</Text>
-                            <Text type="secondary">
-                              {getWorkflowTaskReason(task)
-                                ? `${getWorkflowTaskReasonLabel(
-                                    task
-                                  )}：${getWorkflowTaskReason(task)}`
-                                : formatWorkflowTaskSource(task)}
-                            </Text>
-                          </div>
-                          <Space wrap>
-                            <Tag color={statusMeta.color}>
-                              {statusMeta.label}
-                            </Tag>
-                            <Button
-                              size="small"
-                              onClick={() => openTaskDrawer(task)}
+                          <span className="erp-exception-workspace__item-copy">
+                            <strong>{task.task_name || '未命名任务'}</strong>
+                            <small>{formatWorkflowTaskSource(task)}</small>
+                          </span>
+                          <span className="erp-exception-workspace__item-status">
+                            <Tag
+                              color={
+                                dueStatus === 'overdue'
+                                  ? 'red'
+                                  : dueStatus === 'due_soon'
+                                    ? 'orange'
+                                    : statusMeta.color
+                              }
                             >
                               查看处理
                             </Button>
                           </Space>
                         </div>
                       )
-                    })
+                    })}
+                  </div>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="当前没有阻塞或到期风险任务"
+                  />
+                )}
+              </section>
+
+              <aside
+                className="erp-exception-workspace__detail"
+                aria-label="当前风险任务"
+              >
+                <div className="erp-exception-workspace__section-head">
+                  <div>
+                    <Title level={5}>当前任务</Title>
+                    <Text type="secondary">核对原因和责任后再处理</Text>
+                  </div>
+                  {selectedExceptionStatusMeta ? (
+                    <Tag color={selectedExceptionStatusMeta.color}>
+                      {selectedExceptionStatusMeta.label}
+                    </Tag>
                   ) : (
-                    <Empty
-                      image={Empty.PRESENTED_IMAGE_SIMPLE}
-                      description="暂无阻塞任务"
-                    />
+                    <Tag>暂无任务</Tag>
                   )}
-                </Space>
-              </Card>
-            </Col>
-          </Row>
-        </>
+                </div>
+                {selectedExceptionTask ? (
+                  <Space
+                    direction="vertical"
+                    size={12}
+                    className="erp-dashboard-block erp-exception-workspace__detail-body"
+                  >
+                    <Title level={4}>
+                      {selectedExceptionTask.task_name || '未命名任务'}
+                    </Title>
+                    <Descriptions size="small" column={1}>
+                      <Descriptions.Item label="来源">
+                        {formatWorkflowTaskSource(selectedExceptionTask)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="负责岗位">
+                        {getWorkflowTaskOwnerRoleLabel(selectedExceptionTask)}
+                      </Descriptions.Item>
+                      <Descriptions.Item label="到期">
+                        {getWorkflowTaskDueLabel(selectedExceptionTask)}
+                      </Descriptions.Item>
+                      <Descriptions.Item
+                        label={getWorkflowTaskReasonLabel(
+                          selectedExceptionTask
+                        )}
+                      >
+                        {getWorkflowTaskReason(selectedExceptionTask) ||
+                          '暂无补充原因'}
+                      </Descriptions.Item>
+                    </Descriptions>
+                    <TaskProcessingHint
+                      task={selectedExceptionTask}
+                      access={selectedExceptionTaskAccess}
+                      canOpenEntry={selectedExceptionCanOpenEntry}
+                    />
+                    <Space wrap>
+                      {isWorkflowTaskAccessChecking(
+                        selectedExceptionTaskAccess
+                      ) ? (
+                        <Button disabled>正在确认可用操作</Button>
+                      ) : (
+                        <Button
+                          type={
+                            selectedExceptionTaskAccess.allowedModes.length > 0
+                              ? 'primary'
+                              : 'default'
+                          }
+                          title={
+                            selectedExceptionTaskAccess.allowedModes.length > 0
+                              ? undefined
+                              : selectedExceptionTaskAccess.readonlyReason
+                          }
+                          onClick={() => openTaskDrawer(selectedExceptionTask)}
+                        >
+                          {selectedExceptionTaskAccess.allowedModes.length > 0
+                            ? '处理任务'
+                            : '查看详情'}
+                        </Button>
+                      )}
+                      {selectedExceptionCanOpenEntry ? (
+                        <Button
+                          onClick={() => openTaskEntry(selectedExceptionTask)}
+                        >
+                          查看相关单据
+                        </Button>
+                      ) : null}
+                    </Space>
+                  </Space>
+                ) : (
+                  <Empty
+                    image={Empty.PRESENTED_IMAGE_SIMPLE}
+                    description="暂无需要处理的风险任务"
+                  />
+                )}
+              </aside>
+            </div>
+          </div>
+        </Card>
       ) : null}
 
       <WorkflowTaskActionDrawer
@@ -1988,6 +2040,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
         actionMode={actionMode}
         actionReason={actionReason}
         actionSaving={actionSaving}
+        actionAvailabilityLoading={
+          actionDrawerAccess.loading ||
+          actionDrawerAccess.source === 'fallback_checking'
+        }
         allowedActionModes={actionDrawerAccess.allowedModes}
         readonlyReason={
           actionDrawerAccess.loading

@@ -368,6 +368,66 @@ func (f ProductionOrderMaterialRequirementFunc) Mutate(ctx context.Context, m en
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionOrderMaterialRequirementMutation", m)
 }
 
+// The ProductionOrderOperationFunc type is an adapter to allow the use of ordinary
+// function as ProductionOrderOperation mutator.
+type ProductionOrderOperationFunc func(context.Context, *ent.ProductionOrderOperationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionOrderOperationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionOrderOperationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionOrderOperationMutation", m)
+}
+
+// The ProductionPackagingConfirmationFunc type is an adapter to allow the use of ordinary
+// function as ProductionPackagingConfirmation mutator.
+type ProductionPackagingConfirmationFunc func(context.Context, *ent.ProductionPackagingConfirmationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionPackagingConfirmationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionPackagingConfirmationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionPackagingConfirmationMutation", m)
+}
+
+// The ProductionWIPBatchFunc type is an adapter to allow the use of ordinary
+// function as ProductionWIPBatch mutator.
+type ProductionWIPBatchFunc func(context.Context, *ent.ProductionWIPBatchMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionWIPBatchFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionWIPBatchMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionWIPBatchMutation", m)
+}
+
+// The ProductionWIPEventFunc type is an adapter to allow the use of ordinary
+// function as ProductionWIPEvent mutator.
+type ProductionWIPEventFunc func(context.Context, *ent.ProductionWIPEventMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionWIPEventFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionWIPEventMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionWIPEventMutation", m)
+}
+
+// The ProductionWIPOutsourcingAllocationFunc type is an adapter to allow the use of ordinary
+// function as ProductionWIPOutsourcingAllocation mutator.
+type ProductionWIPOutsourcingAllocationFunc func(context.Context, *ent.ProductionWIPOutsourcingAllocationMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f ProductionWIPOutsourcingAllocationFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.ProductionWIPOutsourcingAllocationMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.ProductionWIPOutsourcingAllocationMutation", m)
+}
+
 // The PurchaseOrderFunc type is an adapter to allow the use of ordinary
 // function as PurchaseOrder mutator.
 type PurchaseOrderFunc func(context.Context, *ent.PurchaseOrderMutation) (ent.Value, error)

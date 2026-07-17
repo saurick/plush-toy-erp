@@ -127,18 +127,92 @@ function reports(overrides = {}) {
     runtime,
     ...identity,
     referenceRecords: {
-      productionOrders: [{ id: 101, orderNo: "SIM-SDF-PO-001", status: "RELEASED" }],
-      productionFacts: [{ id: 15, factNo: "SIM-SDF-PROD-001", factType: "MATERIAL_ISSUE", status: "POSTED", sourceType: "PRODUCTION_ORDER", sourceID: 101 }],
-      purchaseReceipts: [{ id: 201, receiptNo: "SIM-SDF-PR-001", status: "POSTED" }],
-      purchaseReturns: [{ id: 202, returnNo: "SIM-SDF-RET-001", status: "POSTED" }],
-      purchaseReceiptAdjustments: [{ id: 203, adjustmentNo: "SIM-SDF-ADJ-001", status: "POSTED", adjustType: "INCREASE" }],
-      qualityInspections: [{ id: 204, inspectionNo: "SIM-SDF-QI-001", status: "PASSED", sourceType: "PURCHASE_RECEIPT", sourceID: 201 }],
-      inventoryLots: [{ id: 205, lotNo: "SIM-SDF-LOT-001", status: "ACTIVE", subjectType: "MATERIAL", subjectID: 301 }],
-      inventoryBalances: [{ id: 206, subjectType: "MATERIAL", subjectID: 301, warehouseID: 401, lotID: 205, unitID: 501, quantity: "1" }],
-      inventoryTxns: [{ id: 207, txnType: "IN", sourceType: "PURCHASE_RECEIPT", sourceID: 201 }],
-      stockReservations: [{ id: 208, reservationNo: "SIM-SDF-RES-001", status: "ACTIVE", sourceType: "SALES_ORDER", sourceID: 11 }],
-      shipments: [{ id: 209, shipmentNo: "SIM-SDF-SHIP-001", status: "SHIPPED" }],
-      financeFacts: [{ id: 16, factNo: "SIM-SDF-AR-001", factType: "RECEIVABLE", status: "POSTED", sourceType: "SHIPMENT", sourceID: 209 }],
+      productionOrders: [
+        { id: 101, orderNo: "SIM-SDF-PO-001", status: "RELEASED" },
+      ],
+      productionFacts: [
+        {
+          id: 15,
+          factNo: "SIM-SDF-PROD-001",
+          factType: "MATERIAL_ISSUE",
+          status: "POSTED",
+          sourceType: "PRODUCTION_ORDER",
+          sourceID: 101,
+        },
+      ],
+      purchaseReceipts: [
+        { id: 201, receiptNo: "SIM-SDF-PR-001", status: "POSTED" },
+      ],
+      purchaseReturns: [
+        { id: 202, returnNo: "SIM-SDF-RET-001", status: "POSTED" },
+      ],
+      purchaseReceiptAdjustments: [
+        {
+          id: 203,
+          adjustmentNo: "SIM-SDF-ADJ-001",
+          status: "POSTED",
+          adjustType: "INCREASE",
+        },
+      ],
+      qualityInspections: [
+        {
+          id: 204,
+          inspectionNo: "SIM-SDF-QI-001",
+          status: "PASSED",
+          sourceType: "PURCHASE_RECEIPT",
+          sourceID: 201,
+        },
+      ],
+      inventoryLots: [
+        {
+          id: 205,
+          lotNo: "SIM-SDF-LOT-001",
+          status: "ACTIVE",
+          subjectType: "MATERIAL",
+          subjectID: 301,
+        },
+      ],
+      inventoryBalances: [
+        {
+          id: 206,
+          subjectType: "MATERIAL",
+          subjectID: 301,
+          warehouseID: 401,
+          lotID: 205,
+          unitID: 501,
+          quantity: "1",
+        },
+      ],
+      inventoryTxns: [
+        {
+          id: 207,
+          txnType: "IN",
+          sourceType: "PURCHASE_RECEIPT",
+          sourceID: 201,
+        },
+      ],
+      stockReservations: [
+        {
+          id: 208,
+          reservationNo: "SIM-SDF-RES-001",
+          status: "ACTIVE",
+          sourceType: "SALES_ORDER",
+          sourceID: 11,
+        },
+      ],
+      shipments: [
+        { id: 209, shipmentNo: "SIM-SDF-SHIP-001", status: "SHIPPED" },
+      ],
+      financeFacts: [
+        {
+          id: 16,
+          factNo: "SIM-SDF-AR-001",
+          factType: "RECEIVABLE",
+          status: "POSTED",
+          sourceType: "SHIPMENT",
+          sourceID: 209,
+        },
+      ],
       attachmentOwners: { productionFactId: 15, financeFactId: 16 },
     },
   };
@@ -155,15 +229,28 @@ function reports(overrides = {}) {
 }
 
 test("attachment apply URL fails closed outside loopback", () => {
-  assert.equal(normalizeLocalBackendURL("http://localhost:8300"), "http://localhost:8300");
-  for (const value of ["https://example.com", "http://192.168.0.133:8300", "http://user:pass@localhost:8300"]) assert.throws(() => normalizeLocalBackendURL(value));
+  assert.equal(
+    normalizeLocalBackendURL("http://localhost:8300"),
+    "http://localhost:8300",
+  );
+  for (const value of [
+    "https://example.com",
+    "http://192.168.0.133:8300",
+    "http://user:pass@localhost:8300",
+  ])
+    assert.throws(() => normalizeLocalBackendURL(value));
 });
 
 test("attachment fixtures include multiple formats and one near-limit sample", () => {
   const fixtures = buildAttachmentFixtures();
   assert.equal(fixtures.length, 5);
   assert(new Set(fixtures.map((item) => item.mime_type)).size >= 4);
-  assert(fixtures.some((item) => item.sizeClass === "near-limit" && item.content.length > 4_000_000));
+  assert(
+    fixtures.some(
+      (item) =>
+        item.sizeClass === "near-limit" && item.content.length > 4_000_000,
+    ),
+  );
 });
 
 test("same-name attachment reuse requires exact metadata and downloaded content", () => {
@@ -241,10 +328,21 @@ test("same-name attachment reuse requires exact metadata and downloaded content"
 
 test("attachment targets require seven business owners and workflow version", () => {
   const { sourceReport, factReport } = reports();
-  const targets = buildAttachmentTargets({ sourceReport, factReport, workflowTask: { id: 17, version: 3 } });
+  const targets = buildAttachmentTargets({
+    sourceReport,
+    factReport,
+    workflowTask: { id: 17, version: 3 },
+  });
   assert.equal(targets.length, 7);
-  assert.equal(targets.reduce((sum, item) => sum + item.files, 0), 27);
-  assert.equal(targets.find((item) => item.owner_type === "workflow_task")?.expected_version, 3);
+  assert.equal(
+    targets.reduce((sum, item) => sum + item.files, 0),
+    27,
+  );
+  assert.equal(
+    targets.find((item) => item.owner_type === "workflow_task")
+      ?.expected_version,
+    3,
+  );
 });
 
 test("attachment owners must be exact posted references from this fact report", () => {
@@ -402,13 +500,68 @@ test("attachment targets reject legacy generic-method fact reports", () => {
   );
 });
 
-test("attachment workflow target uses only a canonical ready task", () => {
+test("attachment workflow target uses only the same-batch ready trial PMC task", () => {
+  const batch = {
+    sourceType: "simulated-manual-acceptance-task-batch",
+    sourceID: 123456,
+  };
+  const payload = {
+    simulated_only: true,
+    real_customer_data: false,
+    trial_task: true,
+  };
   const tasks = [
-    { id: 1, task_group: "production_scheduling", task_status_key: "blocked" },
-    { id: 2, task_group: "production_scheduling", task_status_key: "done" },
-    { id: 3, task_group: "production_scheduling", task_status_key: "rejected" },
-    { id: 4, task_group: "production_scheduling", task_status_key: "ready" },
+    ...[
+      "production_scheduling",
+      "production_exception",
+      "shipment_release",
+    ].map((task_group, index) => ({
+      id: index + 1,
+      task_group,
+      task_status_key: "ready",
+      owner_role_key: "pmc",
+      source_type: batch.sourceType,
+      source_id: batch.sourceID,
+      payload,
+    })),
+    {
+      id: 4,
+      task_group: "trial_pmc_work",
+      task_status_key: "blocked",
+      owner_role_key: "pmc",
+      source_type: batch.sourceType,
+      source_id: batch.sourceID,
+      payload,
+    },
+    {
+      id: 5,
+      task_group: "trial_pmc_work",
+      task_status_key: "ready",
+      owner_role_key: "pmc",
+      source_type: batch.sourceType,
+      source_id: 999999,
+      payload,
+    },
+    {
+      id: 6,
+      task_group: "trial_pmc_work",
+      task_status_key: "ready",
+      owner_role_key: "pmc",
+      source_type: batch.sourceType,
+      source_id: batch.sourceID,
+      payload,
+    },
   ];
-  assert.equal(selectAttachmentWorkflowTask(tasks)?.id, 4);
-  assert.equal(selectAttachmentWorkflowTask(tasks.slice(0, 3)), undefined);
+  assert.equal(selectAttachmentWorkflowTask(tasks, batch)?.id, 6);
+  assert.equal(
+    selectAttachmentWorkflowTask(tasks.slice(0, 5), batch),
+    undefined,
+  );
+  assert.equal(
+    selectAttachmentWorkflowTask(
+      [{ ...tasks.at(-1), payload: { ...payload, trial_task: false } }],
+      batch,
+    ),
+    undefined,
+  );
 });

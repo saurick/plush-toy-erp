@@ -35,6 +35,8 @@ const PREVIEW_SNAPSHOT_IMAGE_JPEG_QUALITY = 0.72
 const PREVIEW_SNAPSHOT_IMAGE_MIN_DATA_URL_LENGTH = 180_000
 const SERVER_PDF_RASTER_DATA_URL_PATTERN =
   /^data:image\/(?:png|jpe?g|webp|gif);/i
+const SERVER_PDF_PRESERVE_RESOLUTION_ATTRIBUTE =
+  'data-server-pdf-preserve-resolution'
 const SERVER_PDF_SELECTION_CLASS_NAMES = [
   'erp-material-contract-table__row-selected',
   'erp-processing-contract-table__row--selected',
@@ -47,6 +49,7 @@ const SERVER_PDF_STYLESHEET_RULE_TOKENS = [
   'erp-contract-table',
   'erp-material-contract',
   'erp-material-detail',
+  'erp-print-appendix',
   'erp-print-clauses',
   'erp-print-meta-grid',
   'erp-print-paper',
@@ -578,6 +581,10 @@ function shouldOptimizeServerPdfImageSource(src, options = {}) {
     return true
   }
 
+  if (options?.preserveRasterResolution === true) {
+    return false
+  }
+
   if (
     normalizeServerPdfSnapshotOptions(options).snapshotMode !==
     SERVER_PDF_PREVIEW_SNAPSHOT_MODE
@@ -710,7 +717,13 @@ async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
   await Promise.all(
     imageElements.map(async (imageElement) => {
       const rawSrc = String(imageElement.getAttribute('src') || '').trim()
-      if (!shouldOptimizeServerPdfImageSource(rawSrc, options)) {
+      const imageOptions = {
+        ...options,
+        preserveRasterResolution: imageElement.hasAttribute(
+          SERVER_PDF_PRESERVE_RESOLUTION_ATTRIBUTE
+        ),
+      }
+      if (!shouldOptimizeServerPdfImageSource(rawSrc, imageOptions)) {
         return
       }
 
@@ -736,7 +749,7 @@ async function optimizeServerPdfSnapshotImages(clonedRoot, options = {}) {
         }
 
         if (
-          normalizeServerPdfSnapshotOptions(options).snapshotMode !==
+          normalizeServerPdfSnapshotOptions(imageOptions).snapshotMode !==
             SERVER_PDF_PREVIEW_SNAPSHOT_MODE &&
           SERVER_PDF_RASTER_DATA_URL_PATTERN.test(sourceToCompress)
         ) {

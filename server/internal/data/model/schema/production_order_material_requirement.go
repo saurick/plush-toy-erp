@@ -34,6 +34,7 @@ func (ProductionOrderMaterialRequirement) Annotations() []schema.Annotation {
 			"production_order_material_requirements_unit_quantity_positive":    "unit_quantity_snapshot > 0",
 			"production_order_material_requirements_loss_rate_non_negative":    "loss_rate_snapshot >= 0",
 			"production_order_material_requirements_planned_quantity_positive": "planned_quantity > 0",
+			"production_order_material_requirements_operation_allowed":         "production_operation_code IS NULL OR production_operation_code = 'FABRIC_PROCESSING'",
 		}},
 	}
 }
@@ -49,6 +50,7 @@ func (ProductionOrderMaterialRequirement) Fields() []ent.Field {
 		immutableDecimalQuantityField("unit_quantity_snapshot"),
 		immutableDecimalRateField("loss_rate_snapshot"),
 		immutableDecimalQuantityField("planned_quantity"),
+		field.String("production_operation_code").Optional().Nillable().MaxLen(64).Immutable(),
 		field.String("material_code_snapshot").NotEmpty().MaxLen(64).Immutable(),
 		field.String("material_name_snapshot").NotEmpty().MaxLen(255).Immutable(),
 		field.String("unit_code_snapshot").NotEmpty().MaxLen(32).Immutable(),
@@ -102,6 +104,8 @@ func (ProductionOrderMaterialRequirement) Edges() []ent.Edge {
 			Unique().
 			Immutable().
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("production_wip_outsourcing_allocations", ProductionWIPOutsourcingAllocation.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 	}
 }
 
@@ -110,5 +114,6 @@ func (ProductionOrderMaterialRequirement) Indexes() []ent.Index {
 		index.Fields("production_order_item_id", "bom_item_id").Unique(),
 		index.Fields("production_order_id", "production_order_item_id"),
 		index.Fields("material_id", "unit_id"),
+		index.Fields("production_order_item_id", "production_operation_code"),
 	}
 }

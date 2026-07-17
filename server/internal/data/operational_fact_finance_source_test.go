@@ -175,6 +175,7 @@ func TestOperationalFactRepoShipShipmentRefreshesFinanceSnapshotsAfterDraftSales
 		t.Fatalf("seed inventory: %v", err)
 	}
 
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 	shipment, err = operationalUC.ShipShipment(ctx, shipment.ID)
 	if err != nil {
 		t.Fatalf("ship shipment: %v", err)
@@ -594,6 +595,7 @@ func prepareShipmentFinanceSource(
 	if err != nil {
 		t.Fatalf("create shipment: %v", err)
 	}
+	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, shipment.ID)
 	shipment, err = repo.ShipShipment(ctx, shipment.ID)
 	if err != nil {
 		t.Fatalf("ship shipment: %v", err)

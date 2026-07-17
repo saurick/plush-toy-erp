@@ -41,6 +41,7 @@ func TestProductionCompletionFromOrderDerivesSourceAndReplays(t *testing.T) {
 	if err != nil {
 		t.Fatalf("release production order: %v", err)
 	}
+	completeProductionSchedulingTaskForTest(t, ctx, data, client, released.Order.ID, actor.ID)
 	line := released.Items[0]
 	lotNo := "PCO-COMPLETION-LOT"
 	input := &biz.ProductionCompletionFromOrderCreate{
@@ -114,6 +115,7 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if err != nil {
 		t.Fatalf("release production order: %v", err)
 	}
+	completeProductionSchedulingTaskForTest(t, ctx, data, client, released.Order.ID, actor.ID)
 	line := released.Items[0]
 
 	newFact := func(no, key string, quantity int64) *biz.OperationalFactMutation {

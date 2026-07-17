@@ -74,6 +74,10 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 		{name: "reservation split", err: biz.ErrShipmentReservationSplit, message: "本次出货小于对应的原子预留数量，请先释放并按本次出货数量重建预留"},
 		{name: "reservation source", err: biz.ErrStockReservationSourceMismatch, message: "库存预留与销售订单或订单行不一致，请刷新来源后重试"},
 		{name: "reservation quantity", err: biz.ErrStockReservationQuantityExceeded, message: "预留数量与已出货数量合计超过销售订单行数量"},
+		{name: "shipment quality pending", err: biz.ErrShipmentQualityPending, message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"},
+		{name: "shipment quality rejected", err: biz.ErrShipmentQualityRejected, message: "该出货单的出货前成品检验不合格，请先完成质量处置"},
+		{name: "shipment release rejected", err: biz.ErrShipmentReleaseRejected, message: "出货放行任务已退回，请取消当前出货单后重新登记"},
+		{name: "shipment cancellation task active", err: biz.ErrShipmentCancellationTaskActive, message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"},
 		{name: "outsourcing quality pending", err: biz.ErrOutsourcingReturnQualityPending, message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"},
 		{name: "outsourcing quality rejected", err: biz.ErrOutsourcingReturnQualityRejected, message: "该委外回货质检不合格，请先完成返工、退回等质量处置"},
 	}
@@ -455,6 +459,9 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	if shipRes == nil || shipRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled ship OK, got %#v", shipRes)
 	}
+	if repo.shipShipmentActorID != 7 {
+		t.Fatalf("expected authenticated direct shipment actor 7, got %d", repo.shipShipmentActorID)
+	}
 	_, cancelRes, err := j.handleOperationalFact(ctx, "cancel_shipment", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": 100}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -491,6 +498,27 @@ func TestJsonrpcDispatcher_ShipmentAPIRequiresEnabledModules(t *testing.T) {
 	}
 	if repo.shipShipmentCalls != 1 || repo.cancelShipmentCalls != 1 {
 		t.Fatalf("inventory read_only must not call ship/cancel again, ship=%d cancel=%d", repo.shipShipmentCalls, repo.cancelShipmentCalls)
+	}
+
+	for _, workflowState := range []string{"read_only", "disabled"} {
+		workflowConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+			t,
+			customerConfigPublishParams(t),
+			"2026.07.17.shipment-cancel-workflow-"+workflowState,
+			workflowModuleKeyTasks,
+			workflowState,
+		)
+		activateOperationalFactTestCustomerConfig(t, j, workflowConfig)
+		_, result, err := j.handleOperationalFact(ctx, "cancel_shipment", "workflow-"+workflowState+"-cancel", mustJSONRPCStruct(t, map[string]any{"id": 100}))
+		if err != nil {
+			t.Fatalf("workflow %s cancel transport error: %v", workflowState, err)
+		}
+		if result == nil || result.Code != errcode.InvalidParam.Code {
+			t.Fatalf("workflow %s must reject shipment cancel, got %#v", workflowState, result)
+		}
+		if repo.cancelShipmentCalls != 1 {
+			t.Fatalf("workflow %s must stop shipment cancel before usecase, calls=%d", workflowState, repo.cancelShipmentCalls)
+		}
 	}
 }
 
@@ -974,6 +1002,114 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 	}
 	if repo.postProductionFactCalls != 1 || repo.cancelProductionFactCalls != 1 {
 		t.Fatalf("disabled production must not call post/cancel again, post=%d cancel=%d", repo.postProductionFactCalls, repo.cancelProductionFactCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t *testing.T) {
+	ctx := workflowJSONRPCAdminContext()
+	admin := workflowJSONRPCAdmin(
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionFactPost,
+		biz.PermissionProductionFactCancel,
+	)
+	repo := &productionModuleGateOperationalFactRepo{
+		sourceTaskFactIDs: map[int]bool{501: true, 502: true},
+	}
+	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
+	reworkModuleConfig := func(revision, workflowState string) *structpb.Struct {
+		t.Helper()
+		params := customerConfigPublishParamsWithRevisionAndModuleState(
+			t,
+			customerConfigPublishParams(t),
+			revision,
+			"production",
+			"enabled",
+		)
+		return customerConfigPublishParamsWithRevisionAndModuleState(
+			t,
+			params,
+			"",
+			workflowModuleKeyTasks,
+			workflowState,
+		)
+	}
+
+	readOnlyWorkflowConfig := reworkModuleConfig(
+		"2026.07.17.production-rework-workflow-read-only",
+		"read_only",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, readOnlyWorkflowConfig)
+	_, blocked, err := j.handleOperationalFact(
+		ctx,
+		"post_production_fact",
+		"rework-workflow-read-only",
+		mustJSONRPCStruct(t, map[string]any{"id": 501}),
+	)
+	if err != nil {
+		t.Fatalf("read_only workflow gate transport error: %v", err)
+	}
+	if blocked == nil || blocked.Code != errcode.InvalidParam.Code || repo.postProductionFactCalls != 0 {
+		t.Fatalf("rework post bypassed workflow module gate: result=%#v calls=%d", blocked, repo.postProductionFactCalls)
+	}
+	_, cancelBlocked, err := j.handleOperationalFact(
+		ctx,
+		"cancel_production_fact",
+		"rework-cancel-workflow-read-only",
+		mustJSONRPCStruct(t, map[string]any{"id": 502}),
+	)
+	if err != nil {
+		t.Fatalf("read_only workflow cancel gate transport error: %v", err)
+	}
+	if cancelBlocked == nil || cancelBlocked.Code != errcode.InvalidParam.Code || repo.cancelProductionFactCalls != 0 {
+		t.Fatalf("rework cancel bypassed workflow module gate: result=%#v calls=%d", cancelBlocked, repo.cancelProductionFactCalls)
+	}
+
+	enabledWorkflowConfig := reworkModuleConfig(
+		"2026.07.17.production-rework-workflow-enabled",
+		"enabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, enabledWorkflowConfig)
+	_, posted, err := j.handleOperationalFact(
+		ctx,
+		"post_production_fact",
+		"rework-workflow-enabled",
+		mustJSONRPCStruct(t, map[string]any{"id": 501}),
+	)
+	if err != nil {
+		t.Fatalf("enabled workflow gate transport error: %v", err)
+	}
+	if posted == nil || posted.Code != errcode.OK.Code || repo.postProductionFactCalls != 1 {
+		t.Fatalf("enabled rework post result=%#v calls=%d", posted, repo.postProductionFactCalls)
+	}
+	_, cancelled, err := j.handleOperationalFact(
+		ctx,
+		"cancel_production_fact",
+		"rework-cancel-workflow-enabled",
+		mustJSONRPCStruct(t, map[string]any{"id": 502}),
+	)
+	if err != nil {
+		t.Fatalf("enabled workflow cancel transport error: %v", err)
+	}
+	if cancelled == nil || cancelled.Code != errcode.OK.Code || repo.cancelProductionFactCalls != 1 {
+		t.Fatalf("enabled rework cancel result=%#v calls=%d", cancelled, repo.cancelProductionFactCalls)
+	}
+
+	disabledWorkflowConfig := reworkModuleConfig(
+		"2026.07.17.production-rework-workflow-disabled",
+		"disabled",
+	)
+	activateOperationalFactTestCustomerConfig(t, j, disabledWorkflowConfig)
+	_, disabledCancel, err := j.handleOperationalFact(
+		ctx,
+		"cancel_production_fact",
+		"rework-cancel-workflow-disabled",
+		mustJSONRPCStruct(t, map[string]any{"id": 502}),
+	)
+	if err != nil {
+		t.Fatalf("disabled workflow cancel gate transport error: %v", err)
+	}
+	if disabledCancel == nil || disabledCancel.Code != errcode.InvalidParam.Code || repo.cancelProductionFactCalls != 1 {
+		t.Fatalf("disabled rework cancel bypassed workflow module gate: result=%#v calls=%d", disabledCancel, repo.cancelProductionFactCalls)
 	}
 }
 
@@ -1518,6 +1654,7 @@ type shipmentModuleGateOperationalFactRepo struct {
 	createShipmentWithItemsCalls int
 	lastShipmentCreate           *biz.ShipmentCreateWithItems
 	shipShipmentCalls            int
+	shipShipmentActorID          int
 	cancelShipmentCalls          int
 	cancelShipmentActorID        int
 }
@@ -1576,6 +1713,11 @@ func (r *shipmentModuleGateOperationalFactRepo) ShipShipment(_ context.Context, 
 		CreatedAt: now,
 		UpdatedAt: now,
 	}, nil
+}
+
+func (r *shipmentModuleGateOperationalFactRepo) ShipShipmentWithActor(ctx context.Context, shipmentID int, actorID int) (*biz.Shipment, error) {
+	r.shipShipmentActorID = actorID
+	return r.ShipShipment(ctx, shipmentID)
 }
 
 func (r *shipmentModuleGateOperationalFactRepo) CancelShippedShipment(_ context.Context, shipmentID int) (*biz.Shipment, error) {
@@ -1869,8 +2011,13 @@ type productionModuleGateOperationalFactRepo struct {
 	createProductionMaterialIssueCalls int
 	postProductionFactCalls            int
 	cancelProductionFactCalls          int
+	sourceTaskFactIDs                  map[int]bool
 	lastProductionFactCreate           *biz.OperationalFactMutation
 	lastProductionMaterialIssueCreate  *biz.ProductionMaterialIssueFromOrderCreate
+}
+
+func (r *productionModuleGateOperationalFactRepo) ProductionFactRequiresSourceTask(_ context.Context, id int) (bool, error) {
+	return r.sourceTaskFactIDs[id], nil
 }
 
 func (r *productionModuleGateOperationalFactRepo) CreateProductionMaterialIssueFromOrder(_ context.Context, in *biz.ProductionMaterialIssueFromOrderCreate) (*biz.ProductionFact, error) {

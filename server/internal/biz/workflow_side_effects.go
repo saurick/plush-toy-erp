@@ -432,6 +432,109 @@ func buildFinishedGoodsReworkBlockedSideEffects(current *WorkflowTask, taskStatu
 	}
 }
 
+func buildProductionSchedulingDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := ProductionRoleKey
+	statePayload := mergeWorkflowPayload(current.Payload, nil)
+	clearWorkflowTransitionReasonPayload(statePayload)
+	statePayload["scheduling_task_id"] = current.ID
+	statePayload["scheduling_result"] = "confirmed"
+	statePayload["production_execution_required"] = true
+	statePayload["production_fact_deferred"] = true
+	statePayload["critical_path"] = true
+	statePayload["decision"] = "done"
+	statePayload["transition_status"] = "done"
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			OrderID:           intPointer(current.SourceID),
+			BusinessStatusKey: workflowProductionProcessingStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "production_scheduling_done_to_production_processing",
+	}
+}
+
+func buildProductionSchedulingBlockedSideEffects(current *WorkflowTask, taskStatusKey string, reason string) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := PMCRoleKey
+	statePayload := mergeWorkflowPayload(current.Payload, nil)
+	statePayload["scheduling_task_id"] = current.ID
+	statePayload["scheduling_result"] = taskStatusKey
+	statePayload["critical_path"] = true
+	statePayload["decision"] = taskStatusKey
+	statePayload["transition_status"] = taskStatusKey
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			OrderID:           intPointer(current.SourceID),
+			BusinessStatusKey: workflowBlockedStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			BlockedReason:     &reason,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "production_scheduling_" + taskStatusKey + "_to_blocked",
+	}
+}
+
+func buildProductionExceptionDoneSideEffects(current *WorkflowTask, productionOrderID int) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := ProductionRoleKey
+	statePayload := mergeWorkflowPayload(current.Payload, nil)
+	clearWorkflowTransitionReasonPayload(statePayload)
+	statePayload["production_exception_task_id"] = current.ID
+	statePayload["production_exception_result"] = "handled"
+	statePayload["production_fact_correction_deferred"] = true
+	statePayload["inventory_adjustment_deferred"] = true
+	statePayload["quality_followup_deferred"] = true
+	statePayload["critical_path"] = true
+	statePayload["decision"] = "done"
+	statePayload["transition_status"] = "done"
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			OrderID:           intPointer(productionOrderID),
+			BusinessStatusKey: workflowProductionProcessingStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "production_exception_done_to_production_processing",
+	}
+}
+
+func buildProductionExceptionBlockedSideEffects(current *WorkflowTask, productionOrderID int, taskStatusKey string, reason string) *WorkflowTaskStatusSideEffects {
+	ownerRoleKey := ProductionRoleKey
+	statePayload := mergeWorkflowPayload(current.Payload, nil)
+	statePayload["production_exception_task_id"] = current.ID
+	statePayload["production_exception_result"] = taskStatusKey
+	statePayload["critical_path"] = true
+	statePayload["decision"] = taskStatusKey
+	statePayload["transition_status"] = taskStatusKey
+	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
+	return &WorkflowTaskStatusSideEffects{
+		BusinessState: &WorkflowBusinessStateUpsert{
+			SourceType:        current.SourceType,
+			SourceID:          current.SourceID,
+			SourceNo:          workflowTaskSourceNo(current),
+			OrderID:           intPointer(productionOrderID),
+			BusinessStatusKey: workflowBlockedStatusKey,
+			OwnerRoleKey:      &ownerRoleKey,
+			BlockedReason:     &reason,
+			Payload:           statePayload,
+		},
+		DerivedFromTaskID: current.ID,
+		WorkflowRuleKey:   "production_exception_" + taskStatusKey + "_to_blocked",
+	}
+}
+
 func buildShipmentReleaseDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
 	ownerRoleKey := "warehouse"
 	statePayload := workflowShipmentReleaseCommonPayload(current)

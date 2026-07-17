@@ -175,6 +175,37 @@ func TestQualityPermissionUsageCoversOutsourcingReturnSourceCommands(t *testing.
 	if !hasMethod(createUsage, "processing-contracts", "create_quality_inspection_from_outsourcing_return") {
 		t.Fatalf("quality create usage missing outsourcing return command: %#v", createUsage)
 	}
+	if !hasMethod(createUsage, "shipments", "create_finished_goods_quality_inspection_draft") {
+		t.Fatalf("quality create usage missing shipment finished goods command: %#v", createUsage)
+	}
+}
+
+func TestPurchaseReturnCreatePermissionUsageCoversReceiptAndQualitySources(t *testing.T) {
+	usage, ok := PermissionUsageFor(PermissionPurchaseReturnCreate)
+	if !ok || usage.BackendOnly {
+		t.Fatalf("purchase return create usage=%#v ok=%v", usage, ok)
+	}
+
+	hasMethod := func(pageKey, method string) bool {
+		for _, surface := range usage.Surfaces {
+			if surface.PageKey != pageKey {
+				continue
+			}
+			for _, backendMethod := range surface.BackendMethods {
+				if backendMethod.Domain == "purchase" && backendMethod.Method == method {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
+	if !hasMethod("inbound", "create_purchase_return_from_receipt") {
+		t.Fatalf("purchase return create usage missing receipt source: %#v", usage)
+	}
+	if !hasMethod("quality-inspections", "create_purchase_return_from_quality_inspection") {
+		t.Fatalf("purchase return create usage missing quality source: %#v", usage)
+	}
 }
 
 func TestFinancePayablePermissionUsageCoversSourcePages(t *testing.T) {

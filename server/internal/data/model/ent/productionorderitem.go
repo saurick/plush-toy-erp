@@ -8,6 +8,7 @@ import (
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderitem"
+	"server/internal/data/model/ent/productionpackagingconfirmation"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorderitem"
 	"server/internal/data/model/ent/unit"
@@ -40,6 +41,10 @@ type ProductionOrderItem struct {
 	SalesOrderItemID *int `json:"sales_order_item_id,omitempty"`
 	// BomHeaderID holds the value of the "bom_header_id" field.
 	BomHeaderID *int `json:"bom_header_id,omitempty"`
+	// RouteCode holds the value of the "route_code" field.
+	RouteCode *string `json:"route_code,omitempty"`
+	// CustomerInspectionRequired holds the value of the "customer_inspection_required" field.
+	CustomerInspectionRequired bool `json:"customer_inspection_required,omitempty"`
 	// ProductCodeSnapshot holds the value of the "product_code_snapshot" field.
 	ProductCodeSnapshot *string `json:"product_code_snapshot,omitempty"`
 	// ProductNameSnapshot holds the value of the "product_name_snapshot" field.
@@ -68,6 +73,12 @@ type ProductionOrderItemEdges struct {
 	ProductionOrder *ProductionOrder `json:"production_order,omitempty"`
 	// MaterialRequirements holds the value of the material_requirements edge.
 	MaterialRequirements []*ProductionOrderMaterialRequirement `json:"material_requirements,omitempty"`
+	// Operations holds the value of the operations edge.
+	Operations []*ProductionOrderOperation `json:"operations,omitempty"`
+	// WipBatches holds the value of the wip_batches edge.
+	WipBatches []*ProductionWIPBatch `json:"wip_batches,omitempty"`
+	// PackagingConfirmation holds the value of the packaging_confirmation edge.
+	PackagingConfirmation *ProductionPackagingConfirmation `json:"packaging_confirmation,omitempty"`
 	// Product holds the value of the product edge.
 	Product *Product `json:"product,omitempty"`
 	// ProductSku holds the value of the product_sku edge.
@@ -80,7 +91,7 @@ type ProductionOrderItemEdges struct {
 	BomHeader *BOMHeader `json:"bom_header,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [7]bool
+	loadedTypes [10]bool
 }
 
 // ProductionOrderOrErr returns the ProductionOrder value or an error if the edge
@@ -103,12 +114,41 @@ func (e ProductionOrderItemEdges) MaterialRequirementsOrErr() ([]*ProductionOrde
 	return nil, &NotLoadedError{edge: "material_requirements"}
 }
 
+// OperationsOrErr returns the Operations value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionOrderItemEdges) OperationsOrErr() ([]*ProductionOrderOperation, error) {
+	if e.loadedTypes[2] {
+		return e.Operations, nil
+	}
+	return nil, &NotLoadedError{edge: "operations"}
+}
+
+// WipBatchesOrErr returns the WipBatches value or an error if the edge
+// was not loaded in eager-loading.
+func (e ProductionOrderItemEdges) WipBatchesOrErr() ([]*ProductionWIPBatch, error) {
+	if e.loadedTypes[3] {
+		return e.WipBatches, nil
+	}
+	return nil, &NotLoadedError{edge: "wip_batches"}
+}
+
+// PackagingConfirmationOrErr returns the PackagingConfirmation value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e ProductionOrderItemEdges) PackagingConfirmationOrErr() (*ProductionPackagingConfirmation, error) {
+	if e.PackagingConfirmation != nil {
+		return e.PackagingConfirmation, nil
+	} else if e.loadedTypes[4] {
+		return nil, &NotFoundError{label: productionpackagingconfirmation.Label}
+	}
+	return nil, &NotLoadedError{edge: "packaging_confirmation"}
+}
+
 // ProductOrErr returns the Product value or an error if the edge
 // was not loaded in eager-loading, or loaded but was not found.
 func (e ProductionOrderItemEdges) ProductOrErr() (*Product, error) {
 	if e.Product != nil {
 		return e.Product, nil
-	} else if e.loadedTypes[2] {
+	} else if e.loadedTypes[5] {
 		return nil, &NotFoundError{label: product.Label}
 	}
 	return nil, &NotLoadedError{edge: "product"}
@@ -119,7 +159,7 @@ func (e ProductionOrderItemEdges) ProductOrErr() (*Product, error) {
 func (e ProductionOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 	if e.ProductSku != nil {
 		return e.ProductSku, nil
-	} else if e.loadedTypes[3] {
+	} else if e.loadedTypes[6] {
 		return nil, &NotFoundError{label: productsku.Label}
 	}
 	return nil, &NotLoadedError{edge: "product_sku"}
@@ -130,7 +170,7 @@ func (e ProductionOrderItemEdges) ProductSkuOrErr() (*ProductSKU, error) {
 func (e ProductionOrderItemEdges) UnitOrErr() (*Unit, error) {
 	if e.Unit != nil {
 		return e.Unit, nil
-	} else if e.loadedTypes[4] {
+	} else if e.loadedTypes[7] {
 		return nil, &NotFoundError{label: unit.Label}
 	}
 	return nil, &NotLoadedError{edge: "unit"}
@@ -141,7 +181,7 @@ func (e ProductionOrderItemEdges) UnitOrErr() (*Unit, error) {
 func (e ProductionOrderItemEdges) SalesOrderItemOrErr() (*SalesOrderItem, error) {
 	if e.SalesOrderItem != nil {
 		return e.SalesOrderItem, nil
-	} else if e.loadedTypes[5] {
+	} else if e.loadedTypes[8] {
 		return nil, &NotFoundError{label: salesorderitem.Label}
 	}
 	return nil, &NotLoadedError{edge: "sales_order_item"}
@@ -152,7 +192,7 @@ func (e ProductionOrderItemEdges) SalesOrderItemOrErr() (*SalesOrderItem, error)
 func (e ProductionOrderItemEdges) BomHeaderOrErr() (*BOMHeader, error) {
 	if e.BomHeader != nil {
 		return e.BomHeader, nil
-	} else if e.loadedTypes[6] {
+	} else if e.loadedTypes[9] {
 		return nil, &NotFoundError{label: bomheader.Label}
 	}
 	return nil, &NotLoadedError{edge: "bom_header"}
@@ -165,9 +205,11 @@ func (*ProductionOrderItem) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case productionorderitem.FieldPlannedQuantity:
 			values[i] = new(decimal.Decimal)
+		case productionorderitem.FieldCustomerInspectionRequired:
+			values[i] = new(sql.NullBool)
 		case productionorderitem.FieldID, productionorderitem.FieldProductionOrderID, productionorderitem.FieldLineNo, productionorderitem.FieldProductID, productionorderitem.FieldProductSkuID, productionorderitem.FieldUnitID, productionorderitem.FieldSalesOrderItemID, productionorderitem.FieldBomHeaderID:
 			values[i] = new(sql.NullInt64)
-		case productionorderitem.FieldProductCodeSnapshot, productionorderitem.FieldProductNameSnapshot, productionorderitem.FieldSkuCodeSnapshot, productionorderitem.FieldUnitNameSnapshot, productionorderitem.FieldBomVersionSnapshot, productionorderitem.FieldNote:
+		case productionorderitem.FieldRouteCode, productionorderitem.FieldProductCodeSnapshot, productionorderitem.FieldProductNameSnapshot, productionorderitem.FieldSkuCodeSnapshot, productionorderitem.FieldUnitNameSnapshot, productionorderitem.FieldBomVersionSnapshot, productionorderitem.FieldNote:
 			values[i] = new(sql.NullString)
 		case productionorderitem.FieldCreatedAt, productionorderitem.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -242,6 +284,19 @@ func (_m *ProductionOrderItem) assignValues(columns []string, values []any) erro
 			} else if value.Valid {
 				_m.BomHeaderID = new(int)
 				*_m.BomHeaderID = int(value.Int64)
+			}
+		case productionorderitem.FieldRouteCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field route_code", values[i])
+			} else if value.Valid {
+				_m.RouteCode = new(string)
+				*_m.RouteCode = value.String
+			}
+		case productionorderitem.FieldCustomerInspectionRequired:
+			if value, ok := values[i].(*sql.NullBool); !ok {
+				return fmt.Errorf("unexpected type %T for field customer_inspection_required", values[i])
+			} else if value.Valid {
+				_m.CustomerInspectionRequired = value.Bool
 			}
 		case productionorderitem.FieldProductCodeSnapshot:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -318,6 +373,21 @@ func (_m *ProductionOrderItem) QueryProductionOrder() *ProductionOrderQuery {
 // QueryMaterialRequirements queries the "material_requirements" edge of the ProductionOrderItem entity.
 func (_m *ProductionOrderItem) QueryMaterialRequirements() *ProductionOrderMaterialRequirementQuery {
 	return NewProductionOrderItemClient(_m.config).QueryMaterialRequirements(_m)
+}
+
+// QueryOperations queries the "operations" edge of the ProductionOrderItem entity.
+func (_m *ProductionOrderItem) QueryOperations() *ProductionOrderOperationQuery {
+	return NewProductionOrderItemClient(_m.config).QueryOperations(_m)
+}
+
+// QueryWipBatches queries the "wip_batches" edge of the ProductionOrderItem entity.
+func (_m *ProductionOrderItem) QueryWipBatches() *ProductionWIPBatchQuery {
+	return NewProductionOrderItemClient(_m.config).QueryWipBatches(_m)
+}
+
+// QueryPackagingConfirmation queries the "packaging_confirmation" edge of the ProductionOrderItem entity.
+func (_m *ProductionOrderItem) QueryPackagingConfirmation() *ProductionPackagingConfirmationQuery {
+	return NewProductionOrderItemClient(_m.config).QueryPackagingConfirmation(_m)
 }
 
 // QueryProduct queries the "product" edge of the ProductionOrderItem entity.
@@ -397,6 +467,14 @@ func (_m *ProductionOrderItem) String() string {
 		builder.WriteString("bom_header_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
+	builder.WriteString(", ")
+	if v := _m.RouteCode; v != nil {
+		builder.WriteString("route_code=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	builder.WriteString("customer_inspection_required=")
+	builder.WriteString(fmt.Sprintf("%v", _m.CustomerInspectionRequired))
 	builder.WriteString(", ")
 	if v := _m.ProductCodeSnapshot; v != nil {
 		builder.WriteString("product_code_snapshot=")

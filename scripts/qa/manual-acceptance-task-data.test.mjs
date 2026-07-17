@@ -456,13 +456,13 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
   assert.equal(plan.summary.actionCount, 59);
   assert.equal(
     plan.tasks.filter(
-      (task) => task.createParams.task_group === "production_scheduling",
+      (task) => task.createParams.task_group === "trial_pmc_work",
     ).length,
     25,
   );
   assert.equal(
     plan.tasks.filter(
-      (task) => task.createParams.task_group === "production_exception",
+      (task) => task.createParams.task_group === "trial_production_work",
     ).length,
     5,
   );
@@ -483,6 +483,14 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
         .map((task) => task.createParams.payload.acceptance_scenario_key),
     ),
     new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.production),
+  );
+  assert.equal(
+    plan.tasks.filter((task) =>
+      ["production_scheduling", "production_exception", "shipment_release"].includes(
+        task.createParams.task_group,
+      ),
+    ).length,
+    0,
   );
 
   for (const roleKey of TASK_ROLES) {
