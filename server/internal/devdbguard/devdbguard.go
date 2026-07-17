@@ -12,9 +12,10 @@ import (
 const AllowTestDBEnv = "ERP_ALLOW_TEST_DB_AS_DEV"
 
 const (
-	CustomerConfigLocalTestHost  = "192.168.0.106"
-	CustomerConfigLocalTestPort  = uint16(5432)
-	localDevelopmentDatabaseName = "plush_erp"
+	CustomerConfigLocalTestHost             = "192.168.0.106"
+	CustomerConfigLocalTestPort             = uint16(5432)
+	CustomerConfigLocalTestSystemIdentifier = "7572907083182862377"
+	localDevelopmentDatabaseName            = "plush_erp"
 )
 
 func IsDevConfigPath(confPath string) bool {
@@ -63,8 +64,11 @@ func RequireCustomerConfigLocalTestDSN(dsn string) error {
 // and the connected database identity bound together. PostgreSQL may report an
 // internal/NAT server address from inet_server_addr(), so the network allowlist
 // must be checked against the configured DSN while current_database() proves
-// that the live connection did not switch databases.
-func RequireCustomerConfigLocalTestRuntime(dsn string, currentDatabase string) error {
+// that the live connection did not switch databases. The PostgreSQL system
+// identifier additionally rejects a different cluster reached through the same
+// registered address and database name. A deliberate 106 cluster rebuild must
+// be verified out of band before updating the registered identifier.
+func RequireCustomerConfigLocalTestRuntime(dsn string, currentDatabase string, systemIdentifier string) error {
 	config, err := requireCustomerConfigLocalTestConfig(dsn)
 	if err != nil {
 		return err
@@ -76,6 +80,9 @@ func RequireCustomerConfigLocalTestRuntime(dsn string, currentDatabase string) e
 			strings.TrimSpace(config.Database),
 			currentDatabase,
 		)
+	}
+	if strings.TrimSpace(systemIdentifier) != CustomerConfigLocalTestSystemIdentifier {
+		return fmt.Errorf("customer config local-test runtime PostgreSQL cluster identity mismatch")
 	}
 	return nil
 }

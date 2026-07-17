@@ -1,16 +1,19 @@
 #!/usr/bin/env node
 
 import { pathToFileURL } from "node:url";
+import { buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 import { buildManualAcceptanceSourceDataPlan } from "./manual-acceptance-source-data.mjs";
 import { buildManualAcceptanceTaskDataPlan } from "./manual-acceptance-task-data.mjs";
 
-export const ATTACHMENT_FIXTURES = Object.freeze([
-  Object.freeze({ fileName: "试用-客户确认的订单要求.pdf", mimeType: "application/pdf", sizeClass: "small" }),
-  Object.freeze({ fileName: "试用-产品正面参考图.png", mimeType: "image/png", sizeClass: "medium" }),
-  Object.freeze({ fileName: "试用-包装与唛头参考图.jpg", mimeType: "image/jpeg", sizeClass: "medium" }),
-  Object.freeze({ fileName: "试用-数量与交期核对表.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sizeClass: "small" }),
-  Object.freeze({ fileName: "试用-补充说明-名称较长用于检查完整显示与下载.xlsx", mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", sizeClass: "near-limit" }),
-]);
+export const ATTACHMENT_FIXTURES = Object.freeze(
+  buildAttachmentFixtures().map((item) =>
+    Object.freeze({
+      fileName: item.file_name,
+      mimeType: item.mime_type,
+      sizeClass: item.sizeClass,
+    }),
+  ),
+);
 
 export const ATTACHMENT_OWNER_SCENARIOS = Object.freeze([
   Object.freeze({ ownerType: "sales_order", files: 5 }),

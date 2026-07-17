@@ -78,6 +78,7 @@ const PRINT_SUPPORT_DATASET = Object.freeze({
 export const MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS = Object.freeze({
   validAccountLogins: "valid-account-logins",
   bossDashboardActiveTasks: "boss-dashboard-active-tasks",
+  productionExceptionActiveTasks: "production-exception-active-tasks",
   mobileTaskTotal: "mobile-task-total",
   catalogPrintTemplates: "catalog-print-templates",
 });
@@ -85,6 +86,7 @@ export const MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS = Object.freeze({
 const PROBE_GENERATOR_STAGE = Object.freeze({
   customers: "source",
   suppliers: "source",
+  products: "source",
   "product-skus": "source",
   materials: "source",
   "sales-orders": "source",
@@ -113,8 +115,10 @@ const PROBE_GENERATOR_STAGE = Object.freeze({
   "valid-account-logins": "role",
   "boss-dashboard-tasks": "task",
   "boss-dashboard-active-tasks": "task",
+  "production-exception-active-tasks": "task",
   "mobile-task-total": "task",
   "catalog-print-templates": "catalog",
+  "business-dashboard-stats": "facts",
 });
 
 const WORKFLOW_TASK_GROUP_PROBES = Object.freeze({
@@ -253,7 +257,7 @@ function targetEvidence(item) {
       probeIds: [
         "customers",
         "suppliers",
-        "product-skus",
+        "products",
         "bom-versions",
         "sales-orders",
         "purchase-orders",
@@ -271,6 +275,7 @@ function targetEvidence(item) {
         "finance-payables",
         "finance-receivables",
         "finance-invoices",
+        "business-dashboard-stats",
       ],
       combine: "minimum",
       browserRequired: true,
@@ -280,11 +285,15 @@ function targetEvidence(item) {
   }
   if (item.key === "exception-flow") {
     return {
-      probeIds: ["workflow-tasks:production_exception"],
-      actualProbeId: "workflow-tasks:production_exception",
+      probeIds: [
+        "workflow-tasks:production_exception",
+        MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
+      ],
+      actualProbeId:
+        MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
       browserRequired: true,
       reason:
-        "当前账号可见任务的阻塞、今日或超时和可处理分布由同批岗位任务支撑；异常步骤和页面可见数量仍需页面确认。",
+        "完整异常生命周期与当前可处理异常分别按同批岗位任务核对；异常步骤和页面可见数量仍需页面确认。",
     };
   }
   const workflowProbeId = WORKFLOW_TASK_GROUP_PROBES[item.key];

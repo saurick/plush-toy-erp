@@ -1,9 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 
+import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
+import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   buildManualAcceptanceReadinessPlan,
+  evaluateBusinessDashboardProjection,
   evaluateManualAcceptanceDataset,
   MANUAL_ACCEPTANCE_ACCOUNT_STATE_EXPECTATIONS,
   parseManualAcceptanceReadinessArgs,
@@ -232,12 +235,43 @@ function factReferenceRecords(countOverrides = {}) {
       unitID: 400 + (index % 2),
       quantity: "10",
     })),
-    inventoryTxns: referenceRecords(count("inventoryTxns", 45), {
-      idBase: 80_000,
-      secondaryKey: "txnType",
-      secondaryValues: ["IN", "OUT", "REVERSAL"],
-      sourceType: "PRODUCTION_FACT",
-    }),
+    inventoryTxns: [
+      ...Array.from({ length: count("inventoryTxns", 45) }, (_, index) => ({
+        id: 80_000 + index,
+        txnType: "IN",
+        direction: 1,
+        quantity: "1",
+        sourceType: "OUTSOURCING_FACT",
+        sourceID: 130_045 + index,
+        sourceLineID: 130_045 + index,
+        lotID: 60_000 + index,
+      })),
+      {
+        id: 81_000,
+        txnType: "OUT",
+        direction: -1,
+        quantity: "1",
+        sourceType: "PRODUCTION_FACT",
+        sourceID: 1,
+        lotID: 60_000,
+      },
+      {
+        id: 81_001,
+        txnType: "REVERSAL",
+        direction: 1,
+        quantity: "1",
+        sourceType: "PRODUCTION_FACT",
+        sourceID: 2,
+        lotID: 60_001,
+      },
+    ],
+    outsourcingFacts: Array.from({ length: 90 }, (_, index) => ({
+      id: 130_000 + index,
+      factNo: `SIM-SDF-OUT-${index + 1}`,
+      factType: index < 45 ? "MATERIAL_ISSUE" : "RETURN_RECEIPT",
+      status: "POSTED",
+      ...(index < 45 ? {} : { lotID: 60_000 + index - 45 }),
+    })),
     stockReservations: referenceRecords(count("stockReservations", 45), {
       idBase: 110_000,
       numberKey: "reservationNo",
@@ -278,6 +312,9 @@ function factReport({ referenceCounts = {}, ...overrides } = {}) {
     (target === CUSTOMER_TRIAL_133_TARGET
       ? CUSTOMER_TRIAL_133_DATABASE
       : LOCAL_DATABASE_NAME);
+  const referenceRecords = factReferenceRecords(referenceCounts);
+  const outsourcingReturnInventoryCoverage =
+    evaluateManualAcceptanceOutsourcingInventoryCoverage(referenceRecords);
   return {
     reportContract: "source-driven-operational-facts-v1",
     mode: "apply",
@@ -298,7 +335,12 @@ function factReport({ referenceCounts = {}, ...overrides } = {}) {
       configApplyPurpose: LOCAL_MANUAL_ACCEPTANCE_CONFIG_APPLY_PURPOSE,
       source: "active_customer_config_revision",
     },
-    referenceRecords: factReferenceRecords(referenceCounts),
+    summary: {
+      businessDashboardInventoryTotal:
+        referenceRecords.inventoryBalances.length,
+      outsourcingReturnInventoryCoverage,
+    },
+    referenceRecords,
     ...overrides,
   };
 }
@@ -335,6 +377,15 @@ test("readiness fact contract requires bound identity, runtime, exact references
   assert.throws(
     () => buildManualAcceptanceReadinessPlan({ factReport: missingDataset }),
     /referenceRecords\.inventoryTxns/u,
+  );
+  const missingInventoryProjection = factReport();
+  delete missingInventoryProjection.summary.businessDashboardInventoryTotal;
+  assert.throws(
+    () =>
+      buildManualAcceptanceReadinessPlan({
+        factReport: missingInventoryProjection,
+      }),
+    /缺少完整的委外回货库存覆盖/u,
   );
   const staleOwner = factReport();
   staleOwner.referenceRecords.attachmentOwners.productionFactId = 999_999;
@@ -586,6 +637,7 @@ function createReadinessFetch(runtimeOptions = {}) {
   const listSpecs = {
     list_customers: ["customers", 60, "is_active", [true, false], "code"],
     list_suppliers: ["suppliers", 60, "is_active", [true, false], "code"],
+    list_products: ["products", 20, "is_active", [true, false], "code"],
     list_product_skus: [
       "product_skus",
       60,
@@ -751,6 +803,22 @@ function createReadinessFetch(runtimeOptions = {}) {
       return okResponse({
         events: records(30, "source", ["AUTH", "BUSINESS"]),
         total: 30,
+      });
+    }
+    if (body.method === "dashboard_stats") {
+      return okResponse({
+        modules: dashboardHealthModules.flatMap((module) =>
+          module.sources.map((source) => ({
+            module_key: source.key,
+            available: true,
+            total:
+              source.key === "products"
+                ? 20
+                : source.key === "production-scheduling"
+                  ? 25
+                  : 45,
+          })),
+        ),
       });
     }
     if (body.method === "list_tasks") {
@@ -1006,6 +1074,17 @@ test("default plan covers all 51 targets and never connects to a backend", async
     ).probeIds,
     ["workflow-tasks:shipment_release"],
   );
+  const exceptionFlow = result.plan.targets.find(
+    (item) => item.id === "desktopPages:exception-flow",
+  );
+  assert.deepEqual(exceptionFlow.probeIds, [
+    "workflow-tasks:production_exception",
+    "production-exception-active-tasks",
+  ]);
+  assert.equal(
+    exceptionFlow.actualProbeId,
+    "production-exception-active-tasks",
+  );
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
   );
@@ -1013,6 +1092,12 @@ test("default plan covers all 51 targets and never connects to a backend", async
   assert.equal(productionOrders.expectedMinimum, 45);
   assert.deepEqual(productionOrders.probeIds, ["production-orders"]);
   assert.equal(productionOrders.quantityNotProven, undefined);
+  const businessDashboard = result.plan.targets.find(
+    (item) => item.id === "desktopPages:business-dashboard",
+  );
+  assert.ok(businessDashboard.probeIds.includes("products"));
+  assert.ok(businessDashboard.probeIds.includes("business-dashboard-stats"));
+  assert.equal(businessDashboard.probeIds.includes("product-skus"), false);
   assert.equal(result.plan.expected.targets, 51);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
   const probesByID = new Map(
@@ -1022,6 +1107,60 @@ test("default plan covers all 51 targets and never connects to a backend", async
   assert.equal(
     probesByID.get("purchase-receipt-adjustments").includeCustomerKey,
     false,
+  );
+});
+
+test("business dashboard projection proves the exact runtime module set", () => {
+  const plan = buildManualAcceptanceReadinessPlan({
+    sourceReport: sourceReport(),
+    factReport: factReport(),
+    taskReport: taskReport(),
+  });
+  const probe = plan.probes.find(
+    (item) => item.id === "business-dashboard-stats",
+  );
+  assert.equal(probe.batchEvidence, "fresh_dataset_projection");
+  assert.deepEqual(probe.expectedModuleTotals, {
+    products: 20,
+    inventory: 45,
+    "production-scheduling": 25,
+  });
+  const modules = probe.expectedModuleKeys.map((moduleKey) => ({
+    module_key: moduleKey,
+    available: true,
+    total:
+      moduleKey === "products"
+        ? 20
+        : moduleKey === "production-scheduling"
+          ? 25
+          : 45,
+  }));
+  const passing = evaluateBusinessDashboardProjection(probe, { modules });
+  assert.equal(passing.status, "pass");
+  assert.equal(passing.moduleTotals.products, 20);
+  assert.equal(passing.moduleTotals.inventory, 45);
+  assert.equal(passing.moduleTotals["production-scheduling"], 25);
+
+  const stale = structuredClone(modules);
+  stale.find((item) => item.module_key === "production-scheduling").total = 20;
+  assert.equal(
+    evaluateBusinessDashboardProjection(probe, { modules: stale }).status,
+    "fail",
+  );
+  const pollutedInventory = structuredClone(modules);
+  pollutedInventory.find((item) => item.module_key === "inventory").total =
+    999;
+  assert.equal(
+    evaluateBusinessDashboardProjection(probe, {
+      modules: pollutedInventory,
+    }).status,
+    "fail",
+  );
+  assert.equal(
+    evaluateBusinessDashboardProjection(probe, {
+      modules: modules.slice(1),
+    }).status,
+    "fail",
   );
 });
 
@@ -1608,6 +1747,33 @@ test("explicit verification reports page data, nine role totals, and honest manu
     ),
     JSON.stringify(workflowPageProbes, null, 2),
   );
+  const activeProductionExceptions = report.probes.find(
+    (item) => item.id === "production-exception-active-tasks",
+  );
+  assert.equal(activeProductionExceptions.status, "pass");
+  assert.equal(activeProductionExceptions.expectedExact, 4);
+  assert.equal(activeProductionExceptions.actual, 4);
+  assert.deepEqual(activeProductionExceptions.statusCounts, {
+    BLOCKED: 1,
+    READY: 3,
+  });
+  assert.equal(activeProductionExceptions.exactOwnerRoleKey, "production");
+  assert.equal(
+    activeProductionExceptions.exactTaskGroup,
+    "production_exception",
+  );
+  const exceptionFlowTarget = report.targets.find(
+    (item) => item.id === "desktopPages:exception-flow",
+  );
+  assert.equal(exceptionFlowTarget.dataStatus, "pass");
+  assert.equal(exceptionFlowTarget.actual, 4);
+  assert.deepEqual(
+    exceptionFlowTarget.supporting.map((item) => item.id),
+    [
+      "workflow-tasks:production_exception",
+      "production-exception-active-tasks",
+    ],
+  );
   assert.equal(mobileProbes.length, 9);
   assert(
     mobileProbes.every(
@@ -1730,7 +1896,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   );
   assert(
     calls.every(({ method }) =>
-      /^(?:runtime_identity|admin_login|capabilities|get_effective_session|list|list_|rbac_options|audit_logs)/u.test(
+      /^(?:runtime_identity|admin_login|capabilities|get_effective_session|dashboard_stats|list|list_|rbac_options|audit_logs)/u.test(
         method,
       ),
     ),

@@ -24,6 +24,7 @@ import {
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
 } from "./manual-acceptance-catalog.mjs";
 import { DEFAULT_SOURCE_DATA_SCALE } from "./manual-acceptance-source-data.mjs";
+import { manualAcceptanceOutsourcingInventoryCoverageIsComplete } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
   MANUAL_ACCEPTANCE_DATASET_OUTPUT_ROOT,
@@ -1406,6 +1407,7 @@ async function prepareManualAcceptanceResume({
 
   const components = new Map();
   const completedStageKeys = [];
+  let refreshFactEvidence = false;
   let terminalStatus = null;
   let failedStage = null;
   for (const stage of prior.stages) {
@@ -1432,6 +1434,14 @@ async function prepareManualAcceptanceResume({
           `resume report ${stage.key} component path is not canonical`,
         );
       }
+      if (stage.key === "readiness") {
+        // Readiness is the final read-only query snapshot and is always rerun on
+        // resume. Its prior receipt still proves that the earlier run completed,
+        // while the fresh query is authoritative after verifier code changes.
+        // Every data-writing or reusable component remains digest-locked below.
+        completedStageKeys.push(stage.key);
+        continue;
+      }
       let componentReport;
       try {
         componentReport = JSON.parse(await readFile(expectedPath, "utf8"));
@@ -1448,6 +1458,23 @@ async function prepareManualAcceptanceResume({
         );
       }
       completedStageKeys.push(stage.key);
+      if (
+        stage.key === "facts" &&
+        !manualAcceptanceOutsourcingInventoryCoverageIsComplete(
+          componentReport,
+        )
+      ) {
+        // Earlier V5 reports omitted the outsourcing-return inventory lots.
+        // The original digest is still verified above, then the idempotent fact
+        // stage and its consumers are rerun to regenerate complete evidence.
+        refreshFactEvidence = true;
+      }
+      if (
+        refreshFactEvidence &&
+        ["facts", "purchase-quality", "attachments"].includes(stage.key)
+      ) {
+        continue;
+      }
       if (!["core", "readiness"].includes(stage.key)) {
         components.set(stage.key, {
           report: componentReport,
@@ -1492,6 +1519,9 @@ async function prepareManualAcceptanceResume({
       priorSucceeded: prior.ok === true,
       priorFailedStage: prior.failedStage || null,
       reusedStages: [...components.keys()],
+      refreshedStages: refreshFactEvidence
+        ? ["facts", "purchase-quality", "attachments", "readiness"]
+        : ["readiness"],
     },
   };
 }

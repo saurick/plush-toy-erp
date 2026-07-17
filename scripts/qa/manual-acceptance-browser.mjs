@@ -14,6 +14,7 @@ import {
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
   buildManualAcceptanceCatalog,
 } from "./manual-acceptance-catalog.mjs";
+import { buildManualAcceptancePageDataContract } from "./manual-acceptance-page-data-contract.mjs";
 import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
@@ -229,6 +230,34 @@ function accountForTarget(target) {
 const BUSINESS_DASHBOARD_PAGE_KEY_BY_SOURCE = Object.freeze({
   outbound: "shipments",
 });
+const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-dashboard-stats";
+
+const BUSINESS_DASHBOARD_PROBE_ID_BY_SOURCE = Object.freeze({
+  customers: "customers",
+  suppliers: "suppliers",
+  products: "products",
+  "material-bom": "bom-versions",
+  "sales-orders": "sales-orders",
+  "accessories-purchase": "purchase-orders",
+  inbound: "purchase-receipts",
+  "quality-inspections": "quality-inspections",
+  inventory: "inventory-balances",
+  "shipping-release": "workflow-tasks:shipment_release",
+  outbound: "shipments",
+  "production-orders": "production-orders",
+  "production-scheduling": "workflow-tasks:production_scheduling",
+  "production-progress": "production-facts",
+  "production-exceptions": "workflow-tasks:production_exception",
+  "processing-contracts": "outsourcing-orders",
+  reconciliation: "finance-reconciliation",
+  payables: "finance-payables",
+  receivables: "finance-receivables",
+  invoices: "finance-invoices",
+});
+
+const BUSINESS_DASHBOARD_AGGREGATED_SOURCE_KEYS = new Set([
+  "production-scheduling",
+]);
 
 function businessDashboardRequirements(catalog) {
   const desktopByKey = new Map(
@@ -244,10 +273,20 @@ function businessDashboardRequirements(catalog) {
           `业务看板来源 ${source.key} 没有正式页面数据合同`,
         );
       }
+      const probeId = BUSINESS_DASHBOARD_PROBE_ID_BY_SOURCE[source.key];
+      if (!probeId) {
+        throw new BrowserAcceptanceError(
+          `业务看板来源 ${source.key} 没有当前批次 readiness 映射`,
+        );
+      }
       return {
         key: source.key,
         label: source.label,
         minimumRecords: page.minimumRecords,
+        probeId,
+        exactCurrentBatchCount: !BUSINESS_DASHBOARD_AGGREGATED_SOURCE_KEYS.has(
+          source.key,
+        ),
       };
     }),
   );
@@ -255,9 +294,19 @@ function businessDashboardRequirements(catalog) {
 
 export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
   const catalog = buildManualAcceptanceCatalog();
+  const pageDataContract = buildManualAcceptancePageDataContract({ catalog });
+  const pageDataTargetByRoute = new Map(
+    pageDataContract.targets.map((target) => [target.route, target]),
+  );
   const dashboardRequirements = businessDashboardRequirements(catalog);
   const targets = flattenCatalogTargets(catalog).map((target) => {
     const account = accountForTarget(target);
+    const pageDataTarget = pageDataTargetByRoute.get(target.route);
+    if (!pageDataTarget || pageDataTarget.key !== target.key) {
+      throw new BrowserAcceptanceError(
+        `页面 ${target.route} 没有唯一的页面数据合同`,
+      );
+    }
     return {
       group: target.group,
       key: target.key,
@@ -268,6 +317,8 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
       minimumRecordUnit: target.minimumRecordUnit,
       roleKey: account?.roleKey || "anonymous",
       username: account?.username || "",
+      dataContractTargetId: pageDataTarget.id,
+      readinessProbeIds: [...pageDataTarget.probeIds],
       requiresDataEvidence:
         target.isList ||
         ["print-preview", "print-workspace"].includes(target.group) ||
@@ -309,6 +360,83 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
     },
     targets,
   };
+}
+
+function currentBatchProbeEvidence(probe = {}) {
+  return {
+    id: String(probe.id || ""),
+    status: String(probe.status || ""),
+    actual: Number.isSafeInteger(Number(probe.actual))
+      ? Number(probe.actual)
+      : null,
+    expectedMinimum: Number.isSafeInteger(Number(probe.expectedMinimum))
+      ? Number(probe.expectedMinimum)
+      : null,
+    expectedExact: Number.isSafeInteger(Number(probe.expectedExact))
+      ? Number(probe.expectedExact)
+      : null,
+    batchEvidence: String(probe.batchEvidence || "not_proven"),
+    batchPrefix: String(probe.batchPrefix || "") || null,
+    exactSourceType: String(probe.exactSourceType || "") || null,
+    exactSourceID: Number.isSafeInteger(Number(probe.exactSourceID))
+      ? Number(probe.exactSourceID)
+      : null,
+    exactTaskCodePrefix: String(probe.exactTaskCodePrefix || "") || null,
+    exactOwnerRoleKey: String(probe.exactOwnerRoleKey || "") || null,
+    exactTaskGroup: String(probe.exactTaskGroup || "") || null,
+    moduleTotals:
+      probe.moduleTotals && typeof probe.moduleTotals === "object"
+        ? Object.fromEntries(
+            Object.entries(probe.moduleTotals).map(([key, value]) => [
+              key,
+              Number(value),
+            ]),
+          )
+        : null,
+  };
+}
+
+export function buildManualAcceptanceCurrentBatchReadiness(readiness) {
+  const contract = buildManualAcceptancePageDataContract();
+  const readinessTargetById = new Map(
+    (Array.isArray(readiness?.targets) ? readiness.targets : []).map(
+      (target) => [target?.id, target],
+    ),
+  );
+  const readinessProbeById = new Map(
+    (Array.isArray(readiness?.probes) ? readiness.probes : []).map((probe) => [
+      probe?.id,
+      probe,
+    ]),
+  );
+  return Object.fromEntries(
+    contract.targets.map((contractTarget) => {
+      const readinessTarget = readinessTargetById.get(contractTarget.id);
+      const supportingById = new Map(
+        (Array.isArray(readinessTarget?.supporting)
+          ? readinessTarget.supporting
+          : []
+        ).map((probe) => [probe?.id, probe]),
+      );
+      return [
+        contractTarget.id,
+        {
+          targetId: contractTarget.id,
+          key: contractTarget.key,
+          dataStatus: String(readinessTarget?.dataStatus || "missing"),
+          expectedMinimum: Number(contractTarget.expectedMinimum),
+          actual: Number.isSafeInteger(Number(readinessTarget?.actual))
+            ? Number(readinessTarget.actual)
+            : null,
+          probes: contractTarget.probeIds.map((probeId) =>
+            currentBatchProbeEvidence(
+              readinessProbeById.get(probeId) || supportingById.get(probeId),
+            ),
+          ),
+        },
+      ];
+    }),
+  );
 }
 
 export function parseManualAcceptanceBrowserArgs(argv = []) {
@@ -784,8 +912,7 @@ export function buildPrintWorkspaceDataEvidence(proof, minimumRecords) {
 async function readPrintPreviewEvidence(page, target) {
   const entry = page.getByText("模板预览入口", { exact: true });
   const action = page.getByRole("button", {
-    name: "打开可编辑打印窗口",
-    exact: true,
+    name: /打开可编辑打印窗口/u,
   });
   const renderer = page
     .locator(
@@ -951,7 +1078,140 @@ export function evaluateBusinessDashboardEvidence(ariaLabels, requirements) {
   };
 }
 
-async function readDashboardEvidence(page, target) {
+export function evaluateBusinessDashboardCurrentBatchEvidence({
+  evidence,
+  currentBatch,
+  baselineProven = false,
+}) {
+  const probeById = new Map(
+    (currentBatch?.probes || []).map((probe) => [probe.id, probe]),
+  );
+  const projectionProbe = probeById.get(BUSINESS_DASHBOARD_PROJECTION_PROBE_ID);
+  const projectionProven =
+    baselineProven === true &&
+    projectionProbe?.status === "pass" &&
+    projectionProbe?.batchEvidence === "fresh_dataset_projection" &&
+    projectionProbe?.moduleTotals &&
+    typeof projectionProbe.moduleTotals === "object";
+  const sources = (evidence?.sources || []).map((source) => {
+    const probe = probeById.get(source.probeId);
+    const batchProven =
+      probe?.status === "pass" &&
+      probe?.batchEvidence !== "not_proven" &&
+      Number.isSafeInteger(probe?.actual);
+    const projectionActual = Number(
+      projectionProbe?.moduleTotals?.[source.key],
+    );
+    const projectionCountSatisfied =
+      projectionProven &&
+      Number.isSafeInteger(projectionActual) &&
+      source.actual === projectionActual;
+    const exactCurrentBatchCountSatisfied =
+      source.exactCurrentBatchCount === false ||
+      (batchProven && source.actual === probe.actual);
+    return {
+      ...source,
+      currentBatchActual: probe?.actual ?? null,
+      currentBatchEvidence: probe?.batchEvidence || "not_proven",
+      batchProven,
+      projectionActual: Number.isSafeInteger(projectionActual)
+        ? projectionActual
+        : null,
+      projectionCountSatisfied,
+      exactCurrentBatchCountSatisfied,
+    };
+  });
+  const currentBatchBound =
+    currentBatch?.dataStatus === "pass" &&
+    projectionProven &&
+    sources.length > 0 &&
+    sources.every(
+      (source) =>
+        source.batchProven &&
+        source.projectionCountSatisfied &&
+        source.exactCurrentBatchCountSatisfied,
+    );
+  const minimumSatisfied =
+    evidence?.minimumSatisfied === true && currentBatchBound;
+  return {
+    ...evidence,
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : sources.some((source) => Number(source.actual) > 0)
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource:
+      "business dashboard source aria labels bound to current-batch readiness probes",
+    sources,
+    projectionProven,
+    currentBatchBound,
+    minimumSatisfied,
+  };
+}
+
+export function evaluateDashboardTaskCurrentBatchEvidence({
+  evidence,
+  currentBatch,
+  roleKey,
+  taskGroup = null,
+  visibleTaskCodes = [],
+  currentBatchTaskCodes = [],
+}) {
+  const expectedPrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey];
+  const taskProbe = currentBatch?.probes?.find(
+    (probe) => probe.exactTaskCodePrefix === expectedPrefix,
+  );
+  const currentBatchBound =
+    currentBatch?.dataStatus === "pass" &&
+    taskProbe?.status === "pass" &&
+    taskProbe?.batchEvidence === "exact_source" &&
+    taskProbe?.exactSourceType === TASK_SOURCE_TYPE &&
+    Number.isSafeInteger(taskProbe?.exactSourceID) &&
+    taskProbe.exactSourceID > 0 &&
+    taskProbe?.exactOwnerRoleKey === roleKey &&
+    taskProbe?.exactTaskCodePrefix === expectedPrefix &&
+    (taskGroup === null || taskProbe?.exactTaskGroup === taskGroup);
+  const matchingCurrentBatchTaskCodes = visibleTaskCodes.filter((value) =>
+    String(value || "").startsWith(`${expectedPrefix}-`),
+  );
+  const exactCurrentBatchTaskCodes = currentBatchTaskCodes.filter((value) =>
+    String(value || "").startsWith(`${expectedPrefix}-`),
+  );
+  const currentBatchCountExact =
+    Number.isSafeInteger(currentBatch?.actual) &&
+    exactCurrentBatchTaskCodes.length === currentBatch.actual &&
+    new Set(exactCurrentBatchTaskCodes).size ===
+      exactCurrentBatchTaskCodes.length;
+  const currentBatchVisible = matchingCurrentBatchTaskCodes.length > 0;
+  const minimumSatisfied =
+    evidence?.minimumSatisfied === true &&
+    currentBatchBound &&
+    currentBatchCountExact &&
+    currentBatchVisible;
+  return {
+    ...evidence,
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : Number(evidence?.observedTotal) > 0
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource:
+      "dashboard totals and visible task-code metadata bound to the current exact-source batch",
+    currentBatchActual: currentBatch?.actual ?? null,
+    currentBatchBound,
+    currentBatchTaskCount: exactCurrentBatchTaskCodes.length,
+    currentBatchCountExact,
+    visibleCurrentBatchTaskCount: matchingCurrentBatchTaskCodes.length,
+    currentBatchVisible,
+    minimumSatisfied,
+  };
+}
+
+async function readDashboardEvidence(page, target, datasetBinding) {
+  const currentBatch = requireCurrentBatchTargetEvidence(
+    target,
+    datasetBinding,
+  );
   if (target.key === "global-dashboard") {
     await page.waitForFunction(
       () => {
@@ -972,22 +1232,56 @@ async function readDashboardEvidence(page, target) {
       null,
       { timeout: PAGE_TIMEOUT_MS },
     );
-    const metrics = await page.evaluate(() => ({
-      queueLabels: [
-        ...document.querySelectorAll(".erp-workbench-queue-filter[aria-label]"),
-      ].map((node) => node.getAttribute("aria-label") || ""),
-      visibleRows: [
-        ...document.querySelectorAll(".erp-workbench-task-row--openable"),
-      ].filter((node) => {
-        const rect = node.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      }).length,
-    }));
-    return evaluateGlobalDashboardEvidence(
-      metrics.queueLabels,
-      metrics.visibleRows,
-      target.minimumRecords,
+    const metrics = await page.evaluate(
+      (taskCodePrefix) => ({
+        queueLabels: [
+          ...document.querySelectorAll(
+            ".erp-workbench-queue-filter[aria-label]",
+          ),
+        ].map((node) => node.getAttribute("aria-label") || ""),
+        visibleRows: [
+          ...document.querySelectorAll(".erp-workbench-task-row--openable"),
+        ].filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        }).length,
+        visibleTaskCodes: [
+          ...document.querySelectorAll(
+            ".erp-workbench-task-row--openable[data-task-code]",
+          ),
+        ]
+          .filter((node) => {
+            const rect = node.getBoundingClientRect();
+            return rect.width > 0 && rect.height > 0;
+          })
+          .map((node) => node.getAttribute("data-task-code") || ""),
+        currentBatchTaskCodes: [
+          ...document.querySelectorAll(
+            '[data-testid="dashboard-workflow-task-evidence"] [data-task-code]',
+          ),
+        ]
+          .filter(
+            (node) =>
+              node.getAttribute("data-task-terminal") === "false" &&
+              (node.getAttribute("data-task-code") || "").startsWith(
+                `${taskCodePrefix}-`,
+              ),
+          )
+          .map((node) => node.getAttribute("data-task-code") || ""),
+      }),
+      TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
     );
+    return evaluateDashboardTaskCurrentBatchEvidence({
+      evidence: evaluateGlobalDashboardEvidence(
+        metrics.queueLabels,
+        metrics.visibleRows,
+        target.minimumRecords,
+      ),
+      currentBatch,
+      roleKey: "boss",
+      visibleTaskCodes: metrics.visibleTaskCodes,
+      currentBatchTaskCodes: metrics.currentBatchTaskCodes,
+    });
   }
   if (target.key === "business-dashboard") {
     await page.locator(".erp-business-dashboard-page").waitFor({
@@ -1014,10 +1308,15 @@ async function readDashboardEvidence(page, target) {
       .evaluateAll((nodes) =>
         nodes.map((node) => node.getAttribute("aria-label") || ""),
       );
-    const evidence = evaluateBusinessDashboardEvidence(
-      labels,
-      target.dataEvidenceRequirements,
-    );
+    const evidence = evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence: evaluateBusinessDashboardEvidence(
+        labels,
+        target.dataEvidenceRequirements,
+      ),
+      currentBatch,
+      baselineProven:
+        datasetBinding?.dataset?.baseline?.exactEmptyBusinessBaseline === true,
+    });
     const openable = page
       .locator(".erp-business-board-source-item[data-target-path]")
       .first();
@@ -1052,25 +1351,136 @@ async function readDashboardEvidence(page, target) {
       null,
       { timeout: PAGE_TIMEOUT_MS },
     );
-    const metrics = await page.evaluate(() => ({
-      bodyText: document.body?.innerText || "",
-      visibleItems: [
-        ...document.querySelectorAll(".erp-command-center-focus-item"),
-      ].filter((node) => {
-        const rect = node.getBoundingClientRect();
-        return rect.width > 0 && rect.height > 0;
-      }).length,
-    }));
-    return evaluateExceptionFlowEvidence(
-      metrics.bodyText,
-      metrics.visibleItems,
-      target.minimumRecords,
+    const metrics = await page.evaluate(
+      ({ taskCodePrefix, taskGroup }) => ({
+        bodyText: document.body?.innerText || "",
+        visibleItems: [
+          ...document.querySelectorAll(".erp-command-center-focus-item"),
+        ].filter((node) => {
+          const rect = node.getBoundingClientRect();
+          return rect.width > 0 && rect.height > 0;
+        }).length,
+        visibleTaskCodes: [
+          ...document.querySelectorAll(
+            ".erp-command-center-focus-item[data-task-code][data-task-group]",
+          ),
+        ]
+          .filter((node) => {
+            const rect = node.getBoundingClientRect();
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              node.getAttribute("data-task-group") === taskGroup
+            );
+          })
+          .map((node) => node.getAttribute("data-task-code") || ""),
+        currentBatchTaskCodes: [
+          ...document.querySelectorAll(
+            '[data-testid="dashboard-workflow-task-evidence"] [data-task-code][data-task-group]',
+          ),
+        ]
+          .filter(
+            (node) =>
+              node.getAttribute("data-task-terminal") === "false" &&
+              node.getAttribute("data-task-group") === taskGroup &&
+              (node.getAttribute("data-task-code") || "").startsWith(
+                `${taskCodePrefix}-`,
+              ),
+          )
+          .map((node) => node.getAttribute("data-task-code") || ""),
+      }),
+      {
+        taskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.production,
+        taskGroup: "production_exception",
+      },
     );
+    return evaluateDashboardTaskCurrentBatchEvidence({
+      evidence: evaluateExceptionFlowEvidence(
+        metrics.bodyText,
+        metrics.visibleItems,
+        target.minimumRecords,
+      ),
+      currentBatch,
+      roleKey: "production",
+      taskGroup: "production_exception",
+      visibleTaskCodes: metrics.visibleTaskCodes,
+      currentBatchTaskCodes: metrics.currentBatchTaskCodes,
+    });
   }
   throw new BrowserAcceptanceError(`${target.title} 缺少页面数据证据读取器`);
 }
 
-async function readMobileTaskEvidence(page, minimumRecords) {
+function requireCurrentBatchTargetEvidence(target, datasetBinding) {
+  const currentBatch =
+    datasetBinding?.readiness?.currentBatchTargets?.[
+      target.dataContractTargetId
+    ];
+  if (
+    !currentBatch ||
+    currentBatch.dataStatus !== "pass" ||
+    !Number.isSafeInteger(currentBatch.actual) ||
+    !Array.isArray(currentBatch.probes) ||
+    currentBatch.probes.length !== target.readinessProbeIds.length ||
+    currentBatch.probes.some(
+      (probe, index) =>
+        probe.id !== target.readinessProbeIds[index] || probe.status !== "pass",
+    )
+  ) {
+    throw new BrowserAcceptanceError(
+      `${target.title} 缺少当前 V5 批次 readiness 证据`,
+    );
+  }
+  return currentBatch;
+}
+
+export function evaluateMobileCurrentBatchEvidence({
+  roleKey,
+  todoCount,
+  doneCount,
+  minimumRecords,
+  currentBatch,
+}) {
+  const observedTotal = Number(todoCount) + Number(doneCount);
+  const taskProbe = currentBatch?.probes?.find(
+    (probe) => probe.id === `mobile-tasks:${roleKey}`,
+  );
+  const currentBatchBound =
+    currentBatch?.dataStatus === "pass" &&
+    currentBatch?.actual === minimumRecords &&
+    taskProbe?.status === "pass" &&
+    taskProbe?.batchEvidence === "exact_source" &&
+    taskProbe?.exactSourceType === TASK_SOURCE_TYPE &&
+    Number.isSafeInteger(taskProbe?.exactSourceID) &&
+    taskProbe.exactSourceID > 0 &&
+    taskProbe?.exactTaskCodePrefix ===
+      TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey] &&
+    taskProbe?.exactOwnerRoleKey === roleKey;
+  const minimumSatisfied =
+    currentBatchBound && observedTotal === currentBatch.actual;
+  return {
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : observedTotal > 0
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource:
+      "mobile DOM totals bound to exact-source readiness probe for the current batch",
+    todoCount: Number(todoCount) || 0,
+    doneCount: Number(doneCount) || 0,
+    observedTotal,
+    minimumRecords,
+    currentBatchActual: currentBatch?.actual ?? null,
+    currentBatchBound,
+    minimumSatisfied,
+  };
+}
+
+async function readMobileTaskEvidence(page, target, datasetBinding) {
+  const currentBatch = requireCurrentBatchTargetEvidence(
+    target,
+    datasetBinding,
+  );
+  const minimumRecords = target.minimumRecords;
   await page.getByTestId("mobile-role-bottom-nav").waitFor({
     state: "visible",
     timeout: PAGE_TIMEOUT_MS,
@@ -1124,28 +1534,243 @@ async function readMobileTaskEvidence(page, minimumRecords) {
   );
   const doneCount = await readCurrentTotal("done");
   await page.getByTestId("mobile-role-nav-todo").click();
-  const observedTotal = todoCount + doneCount;
-  return {
-    status:
-      observedTotal >= minimumRecords
-        ? "minimum_proven"
-        : observedTotal > 0
-          ? "page_has_data_minimum_not_proven"
-          : "not_proven",
-    evidenceSource: "mobile DOM read-only tabs",
+  return evaluateMobileCurrentBatchEvidence({
+    roleKey: target.roleKey,
     todoCount,
     doneCount,
-    observedTotal,
     minimumRecords,
-    minimumSatisfied: observedTotal >= minimumRecords,
+    currentBatch,
+  });
+}
+
+function sharedTextPrefix(values) {
+  const normalized = values.map((value) => String(value || "")).filter(Boolean);
+  if (normalized.length === 0) return "";
+  let prefix = normalized[0];
+  for (const value of normalized.slice(1)) {
+    while (prefix && !value.startsWith(prefix)) prefix = prefix.slice(0, -1);
+  }
+  return prefix;
+}
+
+export function resolveCurrentBatchListFilter(
+  target,
+  currentBatch,
+  datasetBinding,
+) {
+  if (target.key === "print-center") {
+    return { mode: "bound_catalog", identifier: null };
+  }
+  if (target.key === "shipments") {
+    return {
+      mode: "exact_business_number",
+      identifier: requiredText(
+        datasetBinding?.dataset?.shipments?.longShipmentNo,
+        "当前批次 25 行出货单号",
+      ),
+    };
+  }
+  if (["permission-center", "system-audit-logs"].includes(target.key)) {
+    const identifier = sharedTextPrefix(
+      [...FORMAL_BROWSER_ACCOUNTS, ...EXCEPTION_BROWSER_ACCOUNTS].map(
+        (account) => account.username,
+      ),
+    );
+    if (identifier.length < 5) {
+      throw new BrowserAcceptanceError("验收账号缺少稳定的当前批次搜索前缀");
+    }
+    return { mode: "account_prefix", identifier };
+  }
+  const taskProbe = currentBatch.probes.find(
+    (probe) =>
+      probe.batchEvidence === "exact_source" && probe.exactTaskCodePrefix,
+  );
+  if (taskProbe) {
+    return {
+      mode: "exact_task_prefix",
+      identifier: taskProbe.exactTaskCodePrefix,
+    };
+  }
+  const sourceProbe = currentBatch.probes.find(
+    (probe) => probe.batchEvidence === "prefix_filtered" && probe.batchPrefix,
+  );
+  if (sourceProbe) {
+    return { mode: "source_prefix", identifier: sourceProbe.batchPrefix };
+  }
+  const factIdentifier = String(
+    datasetBinding?.dataset?.currentBatchIdentifiers?.[target.key] || "",
+  ).trim();
+  if (factIdentifier) {
+    return { mode: "exact_business_number", identifier: factIdentifier };
+  }
+  throw new BrowserAcceptanceError(
+    `${target.title} 没有可在页面核对的当前批次标识`,
+  );
+}
+
+async function filterVisibleListToCurrentBatch(page, target, filter) {
+  const candidates = page.locator(
+    'input[placeholder*="搜索"],input[placeholder^="操作人"]',
+  );
+  let search = null;
+  for (let index = 0; index < (await candidates.count()); index += 1) {
+    const candidate = candidates.nth(index);
+    if (await candidate.isVisible()) {
+      search = candidate;
+      break;
+    }
+  }
+  if (!search) {
+    throw new BrowserAcceptanceError(
+      `${target.title} 没有可用于当前批次核对的搜索框`,
+    );
+  }
+  await search.fill(filter.identifier);
+  await page.keyboard.press("Enter");
+  const itemSelector = [
+    ".ant-table-tbody > tr:not(.ant-table-placeholder)",
+    ".erp-task-board-card",
+    ".erp-audit-event",
+  ].join(",");
+  await page.waitForFunction(
+    ({ selector, identifier }) => {
+      const marker = identifier.toLowerCase();
+      return [...document.querySelectorAll(selector)].some((node) => {
+        const rect = node.getBoundingClientRect();
+        const style = window.getComputedStyle(node);
+        const searchable = `${node.getAttribute("data-task-code") || ""} ${node.textContent || ""}`;
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.visibility !== "hidden" &&
+          searchable.toLowerCase().includes(marker)
+        );
+      });
+    },
+    { selector: itemSelector, identifier: filter.identifier },
+    { timeout: PAGE_TIMEOUT_MS },
+  );
+  if (target.key === "task-board") {
+    await page.waitForURL(
+      (url) => url.searchParams.get("q") === filter.identifier,
+      { timeout: PAGE_TIMEOUT_MS },
+    );
+    await page.evaluate(() => {
+      delete window.__manualAcceptanceTaskBoardStable;
+    });
+    await page.waitForFunction(
+      ({ selector, identifier }) => {
+        const marker = identifier.toLowerCase();
+        const signature = [...document.querySelectorAll(selector)]
+          .filter((node) => {
+            const rect = node.getBoundingClientRect();
+            const style = window.getComputedStyle(node);
+            return (
+              rect.width > 0 &&
+              rect.height > 0 &&
+              style.visibility !== "hidden" &&
+              `${node.getAttribute("data-task-code") || ""} ${node.textContent || ""}`
+                .toLowerCase()
+                .includes(marker)
+            );
+          })
+          .map((node) => node.getAttribute("data-task-code") || "")
+          .sort()
+          .join("|");
+        const now = performance.now();
+        const previous = window.__manualAcceptanceTaskBoardStable;
+        if (!signature || previous?.signature !== signature) {
+          window.__manualAcceptanceTaskBoardStable = {
+            signature,
+            since: now,
+          };
+          return false;
+        }
+        return now - previous.since >= 300;
+      },
+      { selector: itemSelector, identifier: filter.identifier },
+      { timeout: PAGE_TIMEOUT_MS, polling: 50 },
+    );
+  }
+  const snapshot = await page.evaluate(
+    ({ selector, identifier }) => {
+      const marker = identifier.toLowerCase();
+      const visible = (node) => {
+        const rect = node.getBoundingClientRect();
+        const style = window.getComputedStyle(node);
+        return (
+          rect.width > 0 && rect.height > 0 && style.visibility !== "hidden"
+        );
+      };
+      const items = [...document.querySelectorAll(selector)].filter(visible);
+      return {
+        visibleItems: items.length,
+        matchingCurrentBatchItems: items.filter((node) =>
+          `${node.getAttribute("data-task-code") || ""} ${node.textContent || ""}`
+            .toLowerCase()
+            .includes(marker),
+        ).length,
+      };
+    },
+    { selector: itemSelector, identifier: filter.identifier },
+  );
+  return {
+    ...filter,
+    ...snapshot,
+    currentBatchVisible: snapshot.matchingCurrentBatchItems > 0,
+  };
+}
+
+export function evaluateCurrentBatchListEvidence({
+  currentBatch,
+  currentBatchDOM,
+  renderedItems,
+  pageReportedTotal,
+  minimumRecords,
+  exactEvidencePassed = true,
+}) {
+  const currentBatchBound =
+    currentBatch?.dataStatus === "pass" &&
+    Number.isSafeInteger(currentBatch?.actual) &&
+    currentBatch.actual >= minimumRecords;
+  const currentBatchVisible =
+    currentBatchDOM?.mode === "bound_catalog"
+      ? Number(renderedItems) >= minimumRecords
+      : currentBatchDOM?.currentBatchVisible === true;
+  const minimumSatisfied =
+    currentBatchBound &&
+    currentBatchVisible &&
+    exactEvidencePassed &&
+    (currentBatchDOM?.mode !== "exact_task_prefix" ||
+      Number(pageReportedTotal) === currentBatch.actual);
+  return {
+    status: minimumSatisfied
+      ? "minimum_proven"
+      : Number(renderedItems) > 0
+        ? "page_has_data_minimum_not_proven"
+        : "not_proven",
+    evidenceSource:
+      "current-batch readiness probe plus filtered visible list DOM",
+    renderedItems: Number(renderedItems) || 0,
+    observedTotal: currentBatch?.actual ?? 0,
+    pageReportedTotal: Number(pageReportedTotal) || 0,
+    minimumRecords,
+    currentBatchBound,
+    currentBatchDOM,
+    minimumSatisfied,
   };
 }
 
 async function readListEvidence(page, target, datasetBinding) {
   let specializedEvidence = null;
+  let currentBatchDOM = null;
   if (target.group === "mobile") {
-    return readMobileTaskEvidence(page, target.minimumRecords);
+    return readMobileTaskEvidence(page, target, datasetBinding);
   }
+  const currentBatch = requireCurrentBatchTargetEvidence(
+    target,
+    datasetBinding,
+  );
   if (target.key === "permission-center") {
     const accountTab = page.getByRole("tab", { name: /员工账号/u });
     if (await accountTab.count()) {
@@ -1154,6 +1779,13 @@ async function readListEvidence(page, target, datasetBinding) {
         .locator(".erp-permission-section--admins .ant-table-tbody")
         .waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     }
+  }
+  if (target.key === "inventory") {
+    await page.getByRole("tab", { name: "库存批次", exact: true }).click();
+    await page.getByPlaceholder("搜索批次").waitFor({
+      state: "visible",
+      timeout: PAGE_TIMEOUT_MS,
+    });
   }
   if (target.key === "shipping-release") {
     const visibleCodePrefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE.warehouse;
@@ -1180,13 +1812,24 @@ async function readListEvidence(page, target, datasetBinding) {
       .locator(
         ".erp-workflow-business-page .ant-table-tbody > tr:not(.ant-table-placeholder)",
       )
-      .evaluateAll((rows) =>
-        rows.map((row) => ({
-          code:
-            row.querySelector("td:first-child strong")?.textContent?.trim() ||
-            "",
-          text: row.textContent?.replace(/\s+/gu, " ").trim() || "",
-        })),
+      .evaluateAll(
+        (rows, prefix) =>
+          rows
+            .map((row) => {
+              const text = row.textContent?.replace(/\s+/gu, " ").trim() || "";
+              const strongCode = [...row.querySelectorAll("td strong")]
+                .map((node) => node.textContent?.trim() || "")
+                .find((value) => value.startsWith(`${prefix}-`));
+              return {
+                code:
+                  strongCode ||
+                  text.match(new RegExp(`${prefix}-\\d{2}`, "u"))?.[0] ||
+                  "",
+                text,
+              };
+            })
+            .filter((row) => row.code),
+        visibleCodePrefix,
       );
     const visibleCodes = taskRows.map((row) => row.code);
     if (
@@ -1218,6 +1861,23 @@ async function readListEvidence(page, target, datasetBinding) {
         `出货放行页面未证明即将到期与已超时状态：${specializedEvidence.reason}`,
       );
     }
+    currentBatchDOM = {
+      mode: "exact_task_prefix",
+      identifier: visibleCodePrefix,
+      visibleItems: taskRows.length,
+      matchingCurrentBatchItems: taskRows.length,
+      currentBatchVisible: true,
+    };
+  } else if (target.key !== "shipments") {
+    const filter = resolveCurrentBatchListFilter(
+      target,
+      currentBatch,
+      datasetBinding,
+    );
+    currentBatchDOM =
+      filter.mode === "bound_catalog"
+        ? filter
+        : await filterVisibleListToCurrentBatch(page, target, filter);
   }
   const metrics = await page.evaluate(() => {
     const visible = (node) => {
@@ -1239,6 +1899,9 @@ async function readListEvidence(page, target, datasetBinding) {
     const taskCards = [
       ...document.querySelectorAll(".erp-task-board-card"),
     ].filter(visible).length;
+    const auditEvents = [
+      ...document.querySelectorAll(".erp-audit-event"),
+    ].filter(visible).length;
     const paginationTexts = [
       ...document.querySelectorAll(
         ".ant-pagination-total-text,.ant-pagination,.erp-audit-pagination",
@@ -1250,6 +1913,7 @@ async function readListEvidence(page, target, datasetBinding) {
       mobileRows,
       printTemplates,
       taskCards,
+      auditEvents,
       paginationTexts,
       bodyText,
     };
@@ -1259,8 +1923,9 @@ async function readListEvidence(page, target, datasetBinding) {
     metrics.mobileRows,
     metrics.printTemplates,
     metrics.taskCards,
+    metrics.auditEvents,
   );
-  const observedTotal = Math.max(
+  const pageReportedTotal = Math.max(
     renderedItems,
     largestTotalFromTexts([...metrics.paginationTexts, metrics.bodyText]),
     readBusinessSummaryTotal(target.key, metrics.bodyText),
@@ -1269,10 +1934,10 @@ async function readListEvidence(page, target, datasetBinding) {
     const expected = datasetBinding?.dataset?.shipments;
     if (
       expected?.exactCount !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT ||
-      observedTotal !== expected.exactCount
+      pageReportedTotal !== expected.exactCount
     ) {
       throw new BrowserAcceptanceError(
-        `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${observedTotal}`,
+        `出货页面必须精确显示 ${MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT} 张同批出货单，当前为 ${pageReportedTotal}`,
       );
     }
     const search = page.getByPlaceholder("搜索出货");
@@ -1284,7 +1949,7 @@ async function readListEvidence(page, target, datasetBinding) {
       .first();
     await row.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     await row.click();
-    await page.getByRole("button", { name: "查看明细", exact: true }).click();
+    await page.getByRole("button", { name: /查看明细/u }).click();
     const modal = page.getByRole("dialog", { name: "查看出货明细" });
     await modal.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     const lineTag = modal.getByText(
@@ -1294,25 +1959,32 @@ async function readListEvidence(page, target, datasetBinding) {
     await lineTag.waitFor({ state: "visible", timeout: PAGE_TIMEOUT_MS });
     specializedEvidence = {
       passed: true,
-      exactCount: observedTotal,
+      exactCount: pageReportedTotal,
       longShipmentNo: expected.longShipmentNo,
       longLineCount: MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
     };
+    currentBatchDOM = {
+      mode: "exact_business_number",
+      identifier: expected.longShipmentNo,
+      visibleItems: 1,
+      matchingCurrentBatchItems: 1,
+      currentBatchVisible: true,
+    };
     await modal.locator(".ant-modal-close").click();
   }
-  const minimumSatisfied =
-    observedTotal >= target.minimumRecords && renderedItems > 0;
-  return {
-    status: minimumSatisfied
-      ? "minimum_proven"
-      : renderedItems > 0
-        ? "page_has_data_minimum_not_proven"
-        : "not_proven",
-    evidenceSource: "visible table/list/pagination DOM",
+  const evidence = evaluateCurrentBatchListEvidence({
+    currentBatch,
+    currentBatchDOM,
     renderedItems,
-    observedTotal,
+    pageReportedTotal,
     minimumRecords: target.minimumRecords,
-    minimumSatisfied,
+    exactEvidencePassed:
+      !["shipping-release", "shipments"].includes(target.key) ||
+      (specializedEvidence?.passed === true &&
+        currentBatch.actual === target.minimumRecords),
+  });
+  return {
+    ...evidence,
     specializedEvidence,
   };
 }
@@ -1344,6 +2016,21 @@ export function evaluateShipmentReleaseEvidence(rows, schedule, nowMs) {
     ["YS-V5-CK-16", "已完成", null],
     ["YS-V5-CK-19", "退回", null],
   ];
+  const expectedCodes = requirements.map(([code]) => code);
+  const visibleCodes = (rows || []).map((item) => String(item?.code || ""));
+  if (
+    visibleCodes.length !== expectedCodes.length ||
+    new Set(visibleCodes).size !== visibleCodes.length ||
+    JSON.stringify([...visibleCodes].sort()) !==
+      JSON.stringify([...expectedCodes].sort())
+  ) {
+    return {
+      passed: false,
+      reason: `当前批次必须精确显示 ${expectedCodes.join(", ")}`,
+      observedCodes: visibleCodes,
+      requiredCodes: expectedCodes,
+    };
+  }
   const missing = requirements.filter(([code, status, dueLabel]) => {
     const row = (rows || []).find((item) => item.code === code);
     return (
@@ -1359,7 +2046,8 @@ export function evaluateShipmentReleaseEvidence(rows, schedule, nowMs) {
       : null,
     observedAtUtc: new Date(observedAt).toISOString(),
     validUntilUtc: schedule.dueSoonValidUntilUtc,
-    requiredCodes: requirements.map(([code]) => code),
+    observedCodes: visibleCodes,
+    requiredCodes: expectedCodes,
   };
 }
 
@@ -1455,7 +2143,27 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       "委外订单",
     ),
     bomVersion: exactLongRecord(
-      source?.referenceRecords?.bomVersions,
+      [
+        ...(Array.isArray(source?.referenceRecords?.bomVersions)
+          ? source.referenceRecords.bomVersions
+          : []),
+        ...(Array.isArray(source?.steps)
+          ? source.steps
+              .filter(
+                (item) =>
+                  item?.target === "bom_version" &&
+                  ["create", "reuse"].includes(item?.action) &&
+                  Number.isSafeInteger(item?.id) &&
+                  item.id > 0 &&
+                  Number.isSafeInteger(item?.items) &&
+                  item.items > 0,
+              )
+              .map((item) => ({
+                version: item.key,
+                items: Array.from({ length: item.items }, () => null),
+              }))
+          : []),
+      ],
       "version",
       "产品结构版本",
     ),
@@ -1731,12 +2439,14 @@ export function assertManualAcceptanceBrowserReadinessBinding(
   return {
     ...substrate,
     datasetRunnerRevision: MANUAL_ACCEPTANCE_DATASET_RUNNER_REVISION,
+    sourcePrefix: printInput.sourcePrefix,
     taskRunId: taskInput.runId,
     taskPrefix: taskInput.prefix,
     taskSourceType: taskInput.sourceType,
     taskSourceID: Number(taskInput.sourceID),
     taskVisibleCodePrefixes: { ...TASK_VISIBLE_CODE_PREFIX_BY_ROLE },
     taskGroupCoverage,
+    currentBatchTargets: buildManualAcceptanceCurrentBatchReadiness(readiness),
   };
 }
 
@@ -1771,6 +2481,62 @@ async function readJSONEvidence(reportPath, label) {
 
 function expectedDatasetTargetAlias(policyTarget) {
   return policyTarget === CUSTOMER_TRIAL_133_TARGET ? policyTarget : "local";
+}
+
+function firstCurrentBatchBusinessNo(records, fields, predicate = () => true) {
+  const record = (Array.isArray(records) ? records : []).find(predicate);
+  if (!record) return null;
+  for (const field of fields) {
+    const value = String(record?.[field] || "").trim();
+    if (value) return value;
+  }
+  return null;
+}
+
+function currentBatchFactIdentifiers(factReport) {
+  const records = factReport?.referenceRecords || {};
+  const financeNo = (factType) =>
+    firstCurrentBatchBusinessNo(
+      records.financeFacts,
+      ["fact_no", "factNo"],
+      (item) =>
+        String(item?.fact_type || item?.factType || "").toUpperCase() ===
+        factType,
+    );
+  return {
+    "quality-inspections": firstCurrentBatchBusinessNo(
+      records.qualityInspections,
+      ["inspection_no", "inspectionNo"],
+    ),
+    inbound: firstCurrentBatchBusinessNo(records.purchaseReceipts, [
+      "receipt_no",
+      "receiptNo",
+    ]),
+    inventory: firstCurrentBatchBusinessNo(records.inventoryLots, [
+      "lot_no",
+      "lotNo",
+    ]),
+    "production-orders": firstCurrentBatchBusinessNo(records.productionOrders, [
+      "order_no",
+      "orderNo",
+    ]),
+    "production-progress": firstCurrentBatchBusinessNo(
+      records.productionFacts,
+      ["fact_no", "factNo"],
+    ),
+    outbound: firstCurrentBatchBusinessNo(records.stockReservations, [
+      "reservation_no",
+      "reservationNo",
+    ]),
+    shipments: firstCurrentBatchBusinessNo(records.shipments, [
+      "shipment_no",
+      "shipmentNo",
+    ]),
+    reconciliation: financeNo("RECONCILIATION"),
+    payables: financeNo("PAYABLE"),
+    receivables: financeNo("RECEIVABLE"),
+    invoices: financeNo("INVOICE"),
+  };
 }
 
 export async function verifyManualAcceptanceDatasetApplyReportBinding({
@@ -2044,6 +2810,9 @@ export async function verifyManualAcceptanceDatasetApplyReportBinding({
       longShipmentNo,
       longLineCount: MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
     },
+    currentBatchIdentifiers: currentBatchFactIdentifiers(
+      components.facts.report,
+    ),
     attachments: {
       reportPath: path.relative(REPO_ROOT, components.attachments.path),
       componentDigest: componentDigests.attachments,
@@ -2816,7 +3585,7 @@ async function verifyTarget(
         ? await readListEvidence(page, target, datasetBinding)
         : target.group === "print-preview"
           ? await readPrintPreviewEvidence(page, target)
-          : await readDashboardEvidence(page, target)
+          : await readDashboardEvidence(page, target, datasetBinding)
       : {
           status: "not_applicable",
           evidenceSource: "covered by account or print-specific evidence",

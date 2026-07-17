@@ -7,6 +7,7 @@ import {
   CAPACITY_PROFILES,
   buildManualAcceptanceDataDepthReport,
 } from "./manual-acceptance-data-depth.mjs";
+import { buildAttachmentFixtures } from "./manual-acceptance-attachment-data.mjs";
 
 test("manual acceptance data has single, medium and 25-line documents", () => {
   const report = buildManualAcceptanceDataDepthReport();
@@ -35,6 +36,14 @@ test("contacts and production workflow pages cover empty, multiple and state-ric
 });
 
 test("attachment matrix requires multiple realistic files and workflow CAS", () => {
+  assert.deepEqual(
+    ATTACHMENT_FIXTURES,
+    buildAttachmentFixtures().map((item) => ({
+      fileName: item.file_name,
+      mimeType: item.mime_type,
+      sizeClass: item.sizeClass,
+    })),
+  );
   assert.equal(ATTACHMENT_FIXTURES.length, 5);
   assert(ATTACHMENT_FIXTURES.some((item) => item.sizeClass === "near-limit"));
   assert(new Set(ATTACHMENT_FIXTURES.map((item) => item.mimeType)).size >= 4);

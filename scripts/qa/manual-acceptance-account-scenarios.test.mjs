@@ -363,8 +363,7 @@ function passwordResetCalls(backend) {
 
 function rolePermissionCalls(backend) {
   return backend.calls.filter(
-    (call) =>
-      call.domain === "admin" && call.method === "set_role_permissions",
+    (call) => call.domain === "admin" && call.method === "set_role_permissions",
   );
 }
 
@@ -424,7 +423,9 @@ test("report-only plan keeps ten formal accounts and describes three clear scena
   assert.equal(plan.roleCapabilityBaseline.length, 9);
   assert.deepEqual(
     plan.roleCapabilityBaseline.map((item) => item.roleKey).sort(),
-    MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.map((item) => item.roleKey).sort(),
+    MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.map(
+      (item) => item.roleKey,
+    ).sort(),
   );
   assert.equal(
     plan.roleCapabilityBaseline.some((item) => item.roleKey === "admin"),
@@ -503,17 +504,14 @@ test("apply requires the exact confirmation before login", async () => {
   const plan = localPlan();
   try {
     await assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        plan,
-        {
-          password: "demo-pass",
-          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
-          fetchImpl: async () => {
-            fetchCount += 1;
-            throw new Error("must not fetch");
-          },
+      applyManualAcceptanceAccountScenarios(plan, {
+        password: "demo-pass",
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error("must not fetch");
         },
-      ),
+      }),
       /MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM=APPLY_SIMULATED_ACCOUNT_SCENARIOS/u,
     );
   } finally {
@@ -536,17 +534,14 @@ test("apply requires a separate local super-admin credential before login", asyn
   const plan = localPlan();
   try {
     await assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        plan,
-        {
-          password: "demo-pass",
-          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
-          fetchImpl: async () => {
-            fetchCount += 1;
-            throw new Error("must not fetch without the guard credential");
-          },
+      applyManualAcceptanceAccountScenarios(plan, {
+        password: "demo-pass",
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error("must not fetch without the guard credential");
         },
-      ),
+      }),
       /MANUAL_ACCEPTANCE_ADMIN_PASSWORD is required/u,
     );
   } finally {
@@ -564,10 +559,10 @@ test("redirected login is rejected and every request opts out of redirects", asy
   const backend = createBackend({ redirectLogin: true });
   await withConfirmation(() =>
     assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        localPlan(),
-        { password: "demo-pass", fetchImpl: backend.fetchImpl },
-      ),
+      applyManualAcceptanceAccountScenarios(localPlan(), {
+        password: "demo-pass",
+        fetchImpl: backend.fetchImpl,
+      }),
       /refused redirected response/u,
     ),
   );
@@ -582,10 +577,10 @@ test("non-local runtime and empty active revision perform zero account writes", 
   const nonLocal = createBackend({ environment: "prod" });
   await withConfirmation(() =>
     assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        localPlan(),
-        { password: "demo-pass", fetchImpl: nonLocal.fetchImpl },
-      ),
+      applyManualAcceptanceAccountScenarios(localPlan(), {
+        password: "demo-pass",
+        fetchImpl: nonLocal.fetchImpl,
+      }),
       /environment=prod/u,
     ),
   );
@@ -594,10 +589,10 @@ test("non-local runtime and empty active revision perform zero account writes", 
   const emptyRevision = createBackend({ revision: "   " });
   await withConfirmation(() =>
     assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        localPlan(),
-        { password: "demo-pass", fetchImpl: emptyRevision.fetchImpl },
-      ),
+      applyManualAcceptanceAccountScenarios(localPlan(), {
+        password: "demo-pass",
+        fetchImpl: emptyRevision.fetchImpl,
+      }),
       /active customer configuration is not the current runtime source/u,
     ),
   );
@@ -607,10 +602,10 @@ test("non-local runtime and empty active revision perform zero account writes", 
 test("local SQL runtime is accepted only through the shared debug-disabled policy", async () => {
   const backend = createBackend({ environment: "sql" });
   const report = await withConfirmation(() =>
-    applyManualAcceptanceAccountScenarios(
-      localPlan(),
-      { password: "demo-pass", fetchImpl: backend.fetchImpl },
-    ),
+    applyManualAcceptanceAccountScenarios(localPlan(), {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
   );
   assert.equal(report.runtime.target, "local-dev");
   assert.equal(report.runtime.environment, "sql");
@@ -830,19 +825,16 @@ test("scenario password policy rejects values outside 8 to 20 characters before 
     let fetchCount = 0;
     const plan = localPlan();
     await assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        plan,
-        {
-          password,
-          adminPassword: "guard-pass",
-          confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
-          targetConfirmation: manualAcceptanceTargetConfirmation(plan),
-          fetchImpl: async () => {
-            fetchCount += 1;
-            throw new Error("must not fetch");
-          },
+      applyManualAcceptanceAccountScenarios(plan, {
+        password,
+        adminPassword: "guard-pass",
+        confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error("must not fetch");
         },
-      ),
+      }),
       /8-20 characters/u,
     );
     assert.equal(fetchCount, 0);
@@ -864,12 +856,15 @@ test("local acceptance adds missing customer capabilities without replacing role
     ),
   });
   const first = await withConfirmation(() =>
-    applyManualAcceptanceAccountScenarios(
-      localPlan(),
-      { password: "demo-pass", fetchImpl: backend.fetchImpl },
-    ),
+    applyManualAcceptanceAccountScenarios(localPlan(), {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
   );
-  assert.equal(first.roleCapabilityBaseline.source, "yoyoosun-role-flow-matrix");
+  assert.equal(
+    first.roleCapabilityBaseline.source,
+    "yoyoosun-role-flow-matrix",
+  );
   assert.equal(first.roleCapabilityBaseline.updated, 3);
   assert.equal(first.roleCapabilityBaseline.unchanged, 6);
   assert.deepEqual(
@@ -879,7 +874,9 @@ test("local acceptance adds missing customer capabilities without replacing role
     ["finance", "pmc", "warehouse"],
   );
   for (const call of rolePermissionCalls(backend)) {
-    assert.ok(call.params.permission_keys.includes(retained[call.params.role_key]));
+    assert.ok(
+      call.params.permission_keys.includes(retained[call.params.role_key]),
+    );
     const baseline = MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE.find(
       (item) => item.roleKey === call.params.role_key,
     );
@@ -892,10 +889,10 @@ test("local acceptance adds missing customer capabilities without replacing role
 
   const roleWrites = rolePermissionCalls(backend).length;
   const second = await withConfirmation(() =>
-    applyManualAcceptanceAccountScenarios(
-      localPlan(),
-      { password: "demo-pass", fetchImpl: backend.fetchImpl },
-    ),
+    applyManualAcceptanceAccountScenarios(localPlan(), {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
   );
   assert.equal(second.roleCapabilityBaseline.updated, 0);
   assert.equal(second.roleCapabilityBaseline.unchanged, 9);
@@ -925,9 +922,7 @@ test("role and permission metadata are fully preflighted before the first accept
       options: {
         roleOptionsTransform: (roles) =>
           roles.map((item) =>
-            item.role_key === "pmc"
-              ? { ...item, role_type: "custom" }
-              : item,
+            item.role_key === "pmc" ? { ...item, role_type: "custom" } : item,
           ),
       },
     },
@@ -975,10 +970,10 @@ test("role and permission metadata are fully preflighted before the first accept
     });
     await withConfirmation(() =>
       assert.rejects(
-        applyManualAcceptanceAccountScenarios(
-          localPlan(),
-          { password: "demo-pass", fetchImpl: backend.fetchImpl },
-        ),
+        applyManualAcceptanceAccountScenarios(localPlan(), {
+          password: "demo-pass",
+          fetchImpl: backend.fetchImpl,
+        }),
         undefined,
         item.name,
       ),
@@ -1062,7 +1057,10 @@ test("audit minimum is filled with the disabled scenario account and replay skip
     (item) => item.username === "demo_uat_disabled",
   );
   assert.equal(disabled.disabled, true);
-  assert.deepEqual(disabled.roles.map((item) => item.role_key), ["sales"]);
+  assert.deepEqual(
+    disabled.roles.map((item) => item.role_key),
+    ["sales"],
+  );
   assert(
     backend.calls
       .filter(
@@ -1101,7 +1099,10 @@ test("CLI help points only to the dedicated current local acceptance database", 
   const help = await runManualAcceptanceAccountScenarioCli(["--help"]);
   assert.equal(help.exitCode, 0);
   assert.match(help.text, /http:\/\/127\.0\.0\.1:8310/u);
-  assert.match(help.text, /--database-name plush_erp_acceptance_20260716_v5_dev/u);
+  assert.match(
+    help.text,
+    /--database-name plush_erp_acceptance_20260716_v5_dev/u,
+  );
   assert.match(help.text, /--data-version 2026\.07\.16-v5/u);
   assert.match(help.text, /--run-id 20260716-V5/u);
   assert.doesNotMatch(help.text, /127\.0\.0\.1:8300/u);
@@ -1110,20 +1111,24 @@ test("CLI help points only to the dedicated current local acceptance database", 
 test("apply output reports password readiness without printing the password", async () => {
   const backend = createBackend();
   const result = await withConfirmation(() =>
-    runManualAcceptanceAccountScenarioCli([
-      "--apply",
-      "--json",
-      "--backend-url",
-      LOCAL_BACKEND_URL,
-      "--database-name",
-      LOCAL_DATABASE_NAME,
-    ], {
-      password: "demo-pass",
-      fetchImpl: backend.fetchImpl,
-    }),
+    runManualAcceptanceAccountScenarioCli(
+      [
+        "--apply",
+        "--json",
+        "--backend-url",
+        LOCAL_BACKEND_URL,
+        "--database-name",
+        LOCAL_DATABASE_NAME,
+      ],
+      {
+        password: "demo-pass",
+        fetchImpl: backend.fetchImpl,
+      },
+    ),
   );
   assert.match(result.text, /"passwordReset": 3/u);
   assert.doesNotMatch(result.text, /demo-pass/u);
+  assert.deepEqual(result.report, JSON.parse(result.text));
 });
 
 test("safely owned same-name accounts converge only the necessary fields", async () => {
@@ -1148,10 +1153,10 @@ test("safely owned same-name accounts converge only the necessary fields", async
   ];
   const backend = createBackend({ initialAccounts: existing });
   const report = await withConfirmation(() =>
-    applyManualAcceptanceAccountScenarios(
-      localPlan(),
-      { password: "demo-pass", fetchImpl: backend.fetchImpl },
-    ),
+    applyManualAcceptanceAccountScenarios(localPlan(), {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
   );
   assert.deepEqual(report.summary, {
     created: 0,
@@ -1189,10 +1194,10 @@ test("unsafe same-name ownership fails before the first account write", async ()
   const backend = createBackend({ initialAccounts: existing });
   await withConfirmation(() =>
     assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        localPlan(),
-        { password: "demo-pass", fetchImpl: backend.fetchImpl },
-      ),
+      applyManualAcceptanceAccountScenarios(localPlan(), {
+        password: "demo-pass",
+        fetchImpl: backend.fetchImpl,
+      }),
       /unrelated position/u,
     ),
   );
@@ -1205,10 +1210,10 @@ test("malformed list and mutation responses cannot be reported as success", asyn
   const listBackend = createBackend({ initialAccounts: malformedList });
   await withConfirmation(() =>
     assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        localPlan(),
-        { password: "demo-pass", fetchImpl: listBackend.fetchImpl },
-      ),
+      applyManualAcceptanceAccountScenarios(localPlan(), {
+        password: "demo-pass",
+        fetchImpl: listBackend.fetchImpl,
+      }),
       /missing valid account status/u,
     ),
   );
@@ -1219,13 +1224,10 @@ test("malformed list and mutation responses cannot be reported as success", asyn
   });
   await withConfirmation(() =>
     assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        localPlan(),
-        {
-          password: "demo-pass",
-          fetchImpl: createBackendWithMalformedResponse.fetchImpl,
-        },
-      ),
+      applyManualAcceptanceAccountScenarios(localPlan(), {
+        password: "demo-pass",
+        fetchImpl: createBackendWithMalformedResponse.fetchImpl,
+      }),
       /missing admin id/u,
     ),
   );
@@ -1248,10 +1250,10 @@ test("password reset response must contain the exact account identity and state"
     });
     await withConfirmation(() =>
       assert.rejects(
-        applyManualAcceptanceAccountScenarios(
-          localPlan(),
-          { password: "demo-pass", fetchImpl: backend.fetchImpl },
-        ),
+        applyManualAcceptanceAccountScenarios(localPlan(), {
+          password: "demo-pass",
+          fetchImpl: backend.fetchImpl,
+        }),
         expectedError,
       ),
     );
@@ -1266,10 +1268,10 @@ test("password reset response must contain the exact account identity and state"
   });
   await withConfirmation(() =>
     assert.rejects(
-      applyManualAcceptanceAccountScenarios(
-        localPlan(),
-        { password: "demo-pass", fetchImpl: wrongID.fetchImpl },
-      ),
+      applyManualAcceptanceAccountScenarios(localPlan(), {
+        password: "demo-pass",
+        fetchImpl: wrongID.fetchImpl,
+      }),
       /password reset returned another account/u,
     ),
   );

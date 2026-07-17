@@ -9,6 +9,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/customertrialconfig"
+	"server/internal/devdbguard"
 
 	"github.com/DATA-DOG/go-sqlmock"
 )
@@ -19,6 +20,7 @@ func expectActiveCustomerConfigVersion(
 	productVersion string,
 	markers map[string]string,
 	databaseName string,
+	systemIdentifier string,
 	queryErr error,
 ) (*sql.DB, sqlmock.Sqlmock) {
 	t.Helper()
@@ -32,7 +34,8 @@ SELECT revision,
 	       COALESCE(jsonb_extract_path_text(compiled_snapshot, 'applyPurpose'), ''),
 	       COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), ''),
 	       COALESCE(jsonb_extract_path_text(compiled_snapshot, 'target'), ''),
-	       current_database()
+	       current_database(),
+	       COALESCE((SELECT system_identifier::text FROM pg_control_system()), '')
 FROM customer_config_revisions
 WHERE customer_key = $1
   AND status = 'active'
@@ -42,8 +45,8 @@ LIMIT 1`)).WithArgs(customertrialconfig.ExpectedCustomerKey)
 		expectation.WillReturnError(queryErr)
 	} else {
 		expectation.WillReturnRows(
-			sqlmock.NewRows([]string{"revision", "product_version", "apply_purpose", "dataset_version", "target", "database_name"}).
-				AddRow(revision, productVersion, markers["applyPurpose"], markers["datasetVersion"], markers["target"], databaseName),
+			sqlmock.NewRows([]string{"revision", "product_version", "apply_purpose", "dataset_version", "target", "database_name", "system_identifier"}).
+				AddRow(revision, productVersion, markers["applyPurpose"], markers["datasetVersion"], markers["target"], databaseName, systemIdentifier),
 		)
 	}
 	return db, mock
@@ -59,7 +62,7 @@ func TestValidateActiveCustomerTrialConfigAllowsFormalOrMissingRevision(t *testi
 		{name: "no active revision", queryError: sql.ErrNoRows},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			db, mock := expectActiveCustomerConfigVersion(t, "formal-revision", tc.version, nil, "formal_database", tc.queryError)
+			db, mock := expectActiveCustomerConfigVersion(t, "formal-revision", tc.version, nil, "formal_database", "formal-system", tc.queryError)
 			defer func() { _ = db.Close() }()
 			if err := validateActiveCustomerTrialConfig(context.Background(), db, false, ""); err != nil {
 				t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
@@ -76,7 +79,7 @@ func TestValidateActiveCustomerTrialConfigRequiresExactRuntimeOptIn(t *testing.T
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "plush_erp_uat_20260716_v5", nil)
+	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
 	defer func() { _ = db.Close() }()
 	if err := validateActiveCustomerTrialConfig(context.Background(), db, false, ""); err == nil {
 		t.Fatal("expected active trial revision to be rejected while gate is disabled")
@@ -91,7 +94,7 @@ func TestValidateActiveCustomerTrialConfigAllowsExactEnabledRuntime(t *testing.T
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": customertrialconfig.DatasetVersion,
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "plush_erp_uat_20260716_v5", nil)
+	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
 	defer func() { _ = db.Close() }()
 	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err != nil {
 		t.Fatalf("validateActiveCustomerTrialConfig() error = %v", err)
@@ -106,7 +109,7 @@ func TestValidateActiveCustomerTrialConfigRejectsReservedVersionDrift(t *testing
 		"applyPurpose":   customertrialconfig.ApplyPurpose,
 		"datasetVersion": "2026.07.15-v1",
 		"target":         customertrialconfig.ExpectedTarget,
-	}, "plush_erp_uat_20260716_v5", nil)
+	}, "plush_erp_uat_20260716_v5", "trial-system", nil)
 	defer func() { _ = db.Close() }()
 	if err := validateActiveCustomerTrialConfig(context.Background(), db, true, ""); err == nil {
 		t.Fatal("expected reserved customer-trial version drift to be rejected")
@@ -125,6 +128,7 @@ func TestValidateActiveCustomerTrialConfigRequiresRegisteredLocalTestRuntime(t *
 		allow         string
 		configuredDSN string
 		databaseName  string
+		systemID      string
 		wantError     string
 	}{
 		{
@@ -167,15 +171,28 @@ func TestValidateActiveCustomerTrialConfigRequiresRegisteredLocalTestRuntime(t *
 			databaseName:  "plush_erp",
 			wantError:     "registered local development database family",
 		},
+		{
+			name:          "configured target and database match but cluster differs",
+			allow:         "1",
+			configuredDSN: localAcceptanceDSN,
+			databaseName:  acceptanceDatabase,
+			systemID:      "9999999999999999999",
+			wantError:     "registered local development database family",
+		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			t.Setenv(biz.CustomerConfigLocalTestAllowEnv, tc.allow)
+			systemID := tc.systemID
+			if systemID == "" {
+				systemID = devdbguard.CustomerConfigLocalTestSystemIdentifier
+			}
 			db, mock := expectActiveCustomerConfigVersion(
 				t,
 				"yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1",
 				biz.CustomerConfigLocalTestProductVersion,
 				localMarkers,
 				tc.databaseName,
+				systemID,
 				nil,
 			)
 			defer func() { _ = db.Close() }()
@@ -233,6 +250,7 @@ func TestValidateActiveCustomerTrialConfigRejectsIncompleteLocalTestMarker(t *te
 				tc.productVersion,
 				tc.markers,
 				"plush_erp_acceptance_20260716_v5_dev",
+				devdbguard.CustomerConfigLocalTestSystemIdentifier,
 				nil,
 			)
 			defer func() { _ = db.Close() }()

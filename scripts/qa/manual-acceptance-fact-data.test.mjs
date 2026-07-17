@@ -29,6 +29,7 @@ import {
 } from "./manual-acceptance-fact-data.mjs";
 import { MANUAL_ACCEPTANCE_CORE_WAREHOUSE_CODES } from "./manual-acceptance-source-data.mjs";
 import { buildSourceDrivenFactPlan } from "./manual-acceptance-source-driven-facts.mjs";
+import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   CURRENT_MANUAL_ACCEPTANCE_DATA_VERSION,
   CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
@@ -424,38 +425,49 @@ function factStage() {
       source_type: "PRODUCTION_ORDER",
       source_id: 8000 + (offset % 48),
     })),
-    outsourcingFacts: fakeRecords(90, 11000, {
-      fact_no: "OF",
+    outsourcingFacts: fakeRecords(90, 11000).map((item, offset) => ({
+      ...item,
+      fact_no: `OF-${offset + 1}`,
       status: "POSTED",
-      fact_type: "MATERIAL_ISSUE",
+      fact_type: offset < 45 ? "MATERIAL_ISSUE" : "RETURN_RECEIPT",
       source_type: "OUTSOURCING_ORDER",
-      source_id: 1301,
-    }),
+      source_id: 1301 + (offset % 45),
+      ...(offset < 45 ? {} : { lot_id: 13045 + offset - 45 }),
+    })),
     qualityInspections: fakeRecords(45, 12000, {
       inspection_no: "OQI",
       status: "PASSED",
       source_type: "OUTSOURCING_FACT",
       source_id: 11000,
     }),
-    inventoryLots: fakeRecords(45, 13000, {
-      lot_no: "FG",
+    inventoryLots: fakeRecords(90, 13000).map((item, offset) => ({
+      ...item,
+      lot_no: `FG-${offset + 1}`,
       status: "ACTIVE",
       subject_type: "PRODUCT",
       subject_id: 801,
-    }),
-    inventoryBalances: fakeRecords(45, 14000, {
+    })),
+    inventoryBalances: fakeRecords(90, 14000).map((item, offset) => ({
+      ...item,
       subject_type: "PRODUCT",
       subject_id: 801,
       product_sku_id: 901,
       warehouse_id: 302,
+      lot_id: 13000 + offset,
       unit_id: 1001,
       quantity: "2",
-    }),
+    })),
     inventoryTxns: fakeRecords(90, 15000).map((item, offset) => ({
       ...item,
-      txn_type: offset % 2 === 0 ? "IN" : "OUT",
-      source_type: "PRODUCTION_FACT",
-      source_id: 9000 + offset,
+      txn_type:
+        offset < 45 ? (offset % 2 === 0 ? "IN" : "OUT") : "IN",
+      direction: offset < 45 && offset % 2 !== 0 ? -1 : 1,
+      quantity: "1",
+      source_type:
+        offset < 45 ? "PRODUCTION_FACT" : "OUTSOURCING_FACT",
+      source_id: offset < 45 ? 9000 + offset : 11000 + offset,
+      ...(offset < 45 ? {} : { source_line_id: 11000 + offset }),
+      lot_id: 13000 + offset,
     })),
     stockReservations: fakeRecords(47, 17000).map((item, offset) => ({
       ...item,
@@ -1726,6 +1738,11 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
     ),
   );
   assert.ok(result.referenceRecords.financeFacts.length >= 180);
+  assert.equal(result.summary.outsourcingReturnInventoryCoverage.complete, true);
+  assert.equal(
+    result.summary.businessDashboardInventoryTotal,
+    result.referenceRecords.inventoryBalances.length,
+  );
   assert.ok(result.referenceRecords.attachmentOwners.productionFactId > 0);
   assert.ok(result.referenceRecords.attachmentOwners.financeFactId > 0);
   assert.deepEqual(Object.keys(result.statusCounts.productionOrders).sort(), [
@@ -1734,6 +1751,52 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
     "DRAFT",
     "RELEASED",
   ]);
+});
+
+test("outsourcing return inventory coverage rejects incomplete or unrelated evidence", () => {
+  const records = factStage();
+  assert.equal(
+    evaluateManualAcceptanceOutsourcingInventoryCoverage(records).complete,
+    true,
+  );
+  const missingBalance = {
+    ...records,
+    inventoryBalances: records.inventoryBalances.slice(0, -1),
+  };
+  assert.equal(
+    evaluateManualAcceptanceOutsourcingInventoryCoverage(missingBalance)
+      .complete,
+    false,
+  );
+  const matchingTxnIndex = records.inventoryTxns.findIndex(
+    (item) => item.source_type === "OUTSOURCING_FACT",
+  );
+  assert.ok(matchingTxnIndex >= 0);
+  for (const patch of [
+    { source_type: "PRODUCTION_FACT" },
+    { source_id: records.inventoryTxns[matchingTxnIndex].source_id + 1 },
+    {
+      source_line_id:
+        records.inventoryTxns[matchingTxnIndex].source_line_id + 1,
+    },
+    { txn_type: "OUT" },
+    { direction: -1 },
+    { quantity: "0" },
+  ]) {
+    const invalid = structuredClone(records);
+    Object.assign(invalid.inventoryTxns[matchingTxnIndex], patch);
+    assert.equal(
+      evaluateManualAcceptanceOutsourcingInventoryCoverage(invalid).complete,
+      false,
+      JSON.stringify(patch),
+    );
+  }
+  const missingTxn = structuredClone(records);
+  missingTxn.inventoryTxns.splice(matchingTxnIndex, 1);
+  assert.equal(
+    evaluateManualAcceptanceOutsourcingInventoryCoverage(missingTxn).complete,
+    false,
+  );
 });
 
 test("runtime revision drift fails before purchase or fact mutation", async () => {

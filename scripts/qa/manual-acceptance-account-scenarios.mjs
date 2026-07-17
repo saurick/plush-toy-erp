@@ -251,11 +251,10 @@ export function requireAdminAccountRecord(value, context = "admin") {
     throw new CliError(`${context} response missing valid account status`);
   }
   const disabled = accountStatus !== "active";
-  if (
-    typeof value.disabled === "boolean" &&
-    value.disabled !== disabled
-  ) {
-    throw new CliError(`${context} response contains conflicting account status`);
+  if (typeof value.disabled === "boolean" && value.disabled !== disabled) {
+    throw new CliError(
+      `${context} response contains conflicting account status`,
+    );
   }
   if (typeof value.is_super_admin !== "boolean") {
     throw new CliError(`${context} response missing super-admin status`);
@@ -684,7 +683,9 @@ async function readRoleControlPlane({ backendURL, token, fetchImpl }) {
       `admin.rbac_options roles[${index}]`,
     );
     if (roles.has(role.roleKey)) {
-      throw new CliError(`admin.rbac_options returned duplicate role ${role.roleKey}`);
+      throw new CliError(
+        `admin.rbac_options returned duplicate role ${role.roleKey}`,
+      );
     }
     roles.set(role.roleKey, role);
   }
@@ -733,7 +734,9 @@ function preflightRoleCapabilityBaseline(controlPlane, baseline) {
         permission.permissionClass !== "business" ||
         permission.nonProductionOnly
       ) {
-        throw new CliError(`岗位 ${role.roleKey} 包含不可用于验收的权限 ${key}`);
+        throw new CliError(
+          `岗位 ${role.roleKey} 包含不可用于验收的权限 ${key}`,
+        );
       }
     }
     return {
@@ -883,9 +886,7 @@ async function fillAuditEvidence({
       context: `admin.set_roles audit sample ${current.username}`,
     });
     if (!current.disabled || current.isSuperAdmin || current.phone) {
-      throw new CliError(
-        "已停用账号在准备审计样例时出现了不安全的状态变化",
-      );
+      throw new CliError("已停用账号在准备审计样例时出现了不安全的状态变化");
     }
     const nextTotal = await readAuditTotal({
       backendURL,
@@ -934,8 +935,8 @@ export async function applyManualAcceptanceAccountScenarios(
     confirmPhrase = process.env.MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM,
     targetConfirmation = process.env.MANUAL_ACCEPTANCE_TARGET_CONFIRM,
     targetAttestation = process.env.MANUAL_ACCEPTANCE_TARGET_ATTESTATION_JSON,
-    formalAccountConfirmation =
-      process.env.MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM,
+    formalAccountConfirmation = process.env
+      .MANUAL_ACCEPTANCE_FORMAL_ACCOUNT_CONFIRM,
     fetchImpl = fetch,
   } = {},
 ) {
@@ -1362,11 +1363,16 @@ export async function runManualAcceptanceAccountScenarioCli(argv, deps = {}) {
   const report = options.apply
     ? await applyManualAcceptanceAccountScenarios(plan, deps)
     : plan;
+  // The CLI contract is JSON, so return the same JSON-safe object that is
+  // emitted on stdout. Local runtime projections intentionally omit remote-only
+  // fields with undefined; keeping those JavaScript-only values in report made
+  // the dataset receipt fail after the account mutations had already succeeded.
+  const serializedReport = JSON.parse(JSON.stringify(report));
   return {
-    text: `${JSON.stringify(report, null, options.json ? 2 : 0)}\n`,
+    text: `${JSON.stringify(serializedReport, null, options.json ? 2 : 0)}\n`,
     exitCode: 0,
     plan,
-    report,
+    report: serializedReport,
   };
 }
 

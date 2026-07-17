@@ -293,6 +293,7 @@ function canonicalJSON(value) {
   }
   if (isPlainRecord(value)) {
     return `{${Object.keys(value)
+      .filter((key) => value[key] !== undefined)
       .sort()
       .map((key) => `${JSON.stringify(key)}:${canonicalJSON(value[key])}`)
       .join(",")}}`;

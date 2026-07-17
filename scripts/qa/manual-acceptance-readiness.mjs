@@ -6,6 +6,7 @@ import process from "node:process";
 import { fileURLToPath } from "node:url";
 
 import { expectedAccounts } from "./trial-account-rbac.mjs";
+import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import { MANUAL_ACCEPTANCE_ACCOUNT_SCENARIOS } from "./manual-acceptance-account-scenarios.mjs";
 import {
   MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT,
@@ -21,6 +22,7 @@ import {
   assertManualAcceptancePageDataContract,
   buildManualAcceptancePageDataContract,
 } from "./manual-acceptance-page-data-contract.mjs";
+import { manualAcceptanceOutsourcingInventoryCoverageIsComplete } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   TASK_COPY_REVISION,
   TASK_CATALOG_SCENARIO_DIGEST,
@@ -54,6 +56,12 @@ const DEFAULT_OUT_DIR = "output/qa/manual-acceptance/readiness";
 const MOBILE_TASK_TOTAL = 180;
 const MOBILE_TASKS_PER_ROLE = 20;
 const QUERY_LIMIT = 200;
+const BUSINESS_DASHBOARD_PROJECTION_PROBE_ID = "business-dashboard-stats";
+const BUSINESS_DASHBOARD_MODULE_KEYS = Object.freeze(
+  dashboardHealthModules.flatMap((module) =>
+    module.sources.map((source) => source.key),
+  ),
+);
 const RUNTIME_PREFLIGHT_USERNAME = "admin";
 const SOURCE_DRIVEN_FACT_REPORT_CONTRACT = "source-driven-operational-facts-v1";
 const TASK_REQUIRED_STATUSES = Object.freeze(
@@ -131,6 +139,7 @@ function totalTaskStatusCounts() {
 const SOURCE_EXPECTATION_KEYS = Object.freeze({
   customers: "customers",
   suppliers: "suppliers",
+  products: "products",
   materials: "materials",
   "product-skus": "productSkus",
   processes: "processes",
@@ -188,6 +197,16 @@ const DATASET_BLUEPRINTS = Object.freeze({
     domain: "masterdata",
     method: "list_suppliers",
     listKey: "suppliers",
+    statusField: "is_active",
+    requiredStatuses: ["ACTIVE", "INACTIVE"],
+    batchReport: "source",
+    batchMatchField: "code",
+  },
+  products: {
+    roleKey: "engineering",
+    domain: "masterdata",
+    method: "list_products",
+    listKey: "products",
     statusField: "is_active",
     requiredStatuses: ["ACTIVE", "INACTIVE"],
     batchReport: "source",
@@ -753,6 +772,12 @@ function validateFactReport(report) {
     throw new CliError("业务记录报告缺少 customer-trial-133 运行态证明", 2);
   }
   const normalizedReferenceRecords = normalizeFactReferenceRecords(report);
+  if (!manualAcceptanceOutsourcingInventoryCoverageIsComplete(report)) {
+    throw new CliError(
+      "业务记录报告缺少完整的委外回货库存覆盖与业务看板同批精确总数",
+      2,
+    );
+  }
   const shipments = report.referenceRecords.shipments;
   if (shipments.length !== MANUAL_ACCEPTANCE_SHIPMENT_FACT_COUNT) {
     throw new CliError(
@@ -1105,6 +1130,47 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       declaredMinimum: declared[id] ?? null,
       readOnly: true,
     };
+  });
+  probes.push({
+    id: BUSINESS_DASHBOARD_PROJECTION_PROBE_ID,
+    roleKey: "boss",
+    domain: "business",
+    method: "dashboard_stats",
+    listKey: "modules",
+    params: {},
+    includeCustomerKey: true,
+    batchEvidence:
+      sourceReport && factReport && taskReport
+        ? "fresh_dataset_projection"
+        : "not_proven",
+    batchNotProvenReason:
+      sourceReport && factReport && taskReport
+        ? null
+        : "缺少同批源数据、业务记录或岗位任务报告，不能把历史业务看板总数当成本批数据。",
+    expectedMinimum: BUSINESS_DASHBOARD_MODULE_KEYS.length,
+    expectedExact: BUSINESS_DASHBOARD_MODULE_KEYS.length,
+    expectedModuleKeys: [...BUSINESS_DASHBOARD_MODULE_KEYS],
+    expectedModuleTotals: {
+      ...(sourceReport
+        ? { products: Number(sourceReport.scale.products) }
+        : {}),
+      ...(factReport
+        ? {
+            inventory: Number(
+              factReport.summary.businessDashboardInventoryTotal,
+            ),
+          }
+        : {}),
+      ...(taskReport
+        ? {
+            "production-scheduling": Number(
+              taskReport.summary.byTaskGroup.production_scheduling,
+            ),
+          }
+        : {}),
+    },
+    declaredMinimum: null,
+    readOnly: true,
   });
   probes.push({
     id: "boss-dashboard-tasks",
@@ -1787,6 +1853,120 @@ export function evaluateManualAcceptanceDataset(probe, data) {
   };
 }
 
+export function evaluateBusinessDashboardProjection(probe, data) {
+  if (probe.batchEvidence === "not_proven") {
+    return {
+      id: probe.id,
+      status: "not_proven",
+      expectedMinimum: probe.expectedMinimum,
+      expectedExact: probe.expectedExact,
+      actual: null,
+      returned: 0,
+      statusCounts: {},
+      requiredStatuses: [],
+      missingStatuses: [],
+      enoughRecords: false,
+      enoughStatuses: true,
+      enoughSecondaryKinds: true,
+      batchEvidence: "not_proven",
+      moduleTotals: {},
+      missingModuleKeys: [...probe.expectedModuleKeys],
+      unexpectedModuleKeys: [],
+      unavailableModuleKeys: [],
+      moduleTotalMismatches: {},
+      notProvenReason: probe.batchNotProvenReason,
+      error: null,
+    };
+  }
+  const modules = Array.isArray(data?.modules) ? data.modules : null;
+  if (!modules) {
+    return {
+      id: probe.id,
+      status: "error",
+      expectedMinimum: probe.expectedMinimum,
+      expectedExact: probe.expectedExact,
+      actual: null,
+      returned: 0,
+      statusCounts: {},
+      requiredStatuses: [],
+      missingStatuses: [],
+      enoughRecords: false,
+      enoughStatuses: false,
+      enoughSecondaryKinds: true,
+      batchEvidence: probe.batchEvidence,
+      moduleTotals: {},
+      missingModuleKeys: [...probe.expectedModuleKeys],
+      unexpectedModuleKeys: [],
+      unavailableModuleKeys: [],
+      moduleTotalMismatches: {},
+      notProvenReason: null,
+      error: "查询结果缺少 modules",
+    };
+  }
+  const moduleTotals = Object.fromEntries(
+    modules.map((module) => [
+      String(module?.module_key || ""),
+      Number(module?.total),
+    ]),
+  );
+  const actualModuleKeys = modules.map((module) =>
+    String(module?.module_key || ""),
+  );
+  const missingModuleKeys = probe.expectedModuleKeys.filter(
+    (key) => !actualModuleKeys.includes(key),
+  );
+  const unexpectedModuleKeys = actualModuleKeys.filter(
+    (key) => !probe.expectedModuleKeys.includes(key),
+  );
+  const unavailableModuleKeys = modules
+    .filter(
+      (module) =>
+        module?.available !== true ||
+        !Number.isSafeInteger(Number(module?.total)) ||
+        Number(module.total) < 0,
+    )
+    .map((module) => String(module?.module_key || ""));
+  const moduleTotalMismatches = Object.fromEntries(
+    Object.entries(probe.expectedModuleTotals || {})
+      .filter(([key, expected]) => moduleTotals[key] !== Number(expected))
+      .map(([key, expected]) => [
+        key,
+        { expected: Number(expected), actual: moduleTotals[key] ?? null },
+      ]),
+  );
+  const exactModuleSet =
+    modules.length === probe.expectedExact &&
+    new Set(actualModuleKeys).size === modules.length &&
+    missingModuleKeys.length === 0 &&
+    unexpectedModuleKeys.length === 0;
+  const enoughRecords =
+    exactModuleSet &&
+    unavailableModuleKeys.length === 0 &&
+    Object.keys(moduleTotalMismatches).length === 0;
+  return {
+    id: probe.id,
+    status: enoughRecords ? "pass" : "fail",
+    expectedMinimum: probe.expectedMinimum,
+    expectedExact: probe.expectedExact,
+    actual: modules.length,
+    returned: modules.length,
+    statusCounts: {},
+    requiredStatuses: [],
+    missingStatuses: [],
+    enoughRecords,
+    enoughStatuses: true,
+    enoughSecondaryKinds: true,
+    batchEvidence: probe.batchEvidence,
+    moduleTotals,
+    missingModuleKeys,
+    unexpectedModuleKeys,
+    unavailableModuleKeys,
+    moduleTotalMismatches,
+    notProvenReason: null,
+    error: null,
+  };
+}
+
 function rpcURL(backendURL, domain) {
   return new URL(`/rpc/${domain}`, `${backendURL}/`).toString();
 }
@@ -2198,9 +2378,73 @@ function bossDashboardActiveResult(bossResult) {
     enoughStatuses: passed,
     enoughSecondaryKinds: true,
     batchEvidence: sourceProven ? "exact_source" : "not_proven",
+    exactSourceType: sourceProven ? bossResult.exactSourceType : null,
+    exactSourceID: sourceProven ? bossResult.exactSourceID : null,
+    exactTaskCodePrefix: sourceProven ? bossResult.exactTaskCodePrefix : null,
+    exactOwnerRoleKey: sourceProven ? bossResult.exactOwnerRoleKey : null,
+    exactTaskGroup: sourceProven ? bossResult.exactTaskGroup : null,
     notProvenReason: sourceProven
       ? null
       : "未提供老板岗位本批任务，不能证明工作台当前事项。",
+    error: null,
+  };
+}
+
+function productionExceptionActiveResult(exceptionResult) {
+  const terminalStatuses = new Set(["DONE", "REJECTED"]);
+  const expectedCounts = taskGroupStatusCountsForRole(
+    "production",
+    "production_exception",
+  );
+  const expectedMinimum = Object.entries(expectedCounts).reduce(
+    (sum, [status, count]) =>
+      terminalStatuses.has(status) ? sum : sum + Number(count || 0),
+    0,
+  );
+  const statusCounts = Object.fromEntries(
+    Object.entries(exceptionResult?.statusCounts || {}).filter(
+      ([status]) => !terminalStatuses.has(status),
+    ),
+  );
+  const actual = Object.values(statusCounts).reduce(
+    (sum, count) => sum + Number(count || 0),
+    0,
+  );
+  const sourceProven = exceptionResult?.batchEvidence === "exact_source";
+  const passed =
+    exceptionResult?.status === "pass" &&
+    sourceProven &&
+    actual === expectedMinimum;
+  return {
+    id: MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
+    status: passed ? "pass" : sourceProven ? "fail" : "not_proven",
+    expectedMinimum,
+    expectedExact: expectedMinimum,
+    actual: sourceProven ? actual : null,
+    returned: exceptionResult?.returned ?? 0,
+    statusField: "task_status_key",
+    statusCounts,
+    statusKinds: Object.keys(statusCounts).length,
+    requiredStatuses: Object.keys(expectedCounts).filter(
+      (status) => !terminalStatuses.has(status),
+    ),
+    missingStatuses: [],
+    enoughRecords: passed,
+    enoughStatuses: passed,
+    enoughSecondaryKinds: true,
+    batchEvidence: sourceProven ? "exact_source" : "not_proven",
+    exactSourceType: sourceProven ? exceptionResult.exactSourceType : null,
+    exactSourceID: sourceProven ? exceptionResult.exactSourceID : null,
+    exactTaskCodePrefix: sourceProven
+      ? exceptionResult.exactTaskCodePrefix
+      : null,
+    exactOwnerRoleKey: sourceProven
+      ? exceptionResult.exactOwnerRoleKey
+      : null,
+    exactTaskGroup: sourceProven ? exceptionResult.exactTaskGroup : null,
+    notProvenReason: sourceProven
+      ? null
+      : "未提供生产岗位本批异常任务，不能证明当前可处理异常。",
     error: null,
   };
 }
@@ -2508,7 +2752,10 @@ export async function verifyManualAcceptanceReadiness(
       });
       rawResults.push({
         probe,
-        result: evaluateManualAcceptanceDataset(probe, data),
+        result:
+          probe.id === BUSINESS_DASHBOARD_PROJECTION_PROBE_ID
+            ? evaluateBusinessDashboardProjection(probe, data)
+            : evaluateManualAcceptanceDataset(probe, data),
       });
     } catch (error) {
       rawResults.push({
@@ -2549,10 +2796,21 @@ export async function verifyManualAcceptanceReadiness(
   );
   const totalResult = mobileTotalResult(mobileResults);
   resultById.set(totalResult.id, totalResult);
-  const activeBossResult = bossDashboardActiveResult(
-    resultById.get("boss-dashboard-tasks"),
-  );
+  const activeBossResult = bossDashboardActiveResult({
+    ...plan.probes.find((probe) => probe.id === "boss-dashboard-tasks"),
+    ...resultById.get("boss-dashboard-tasks"),
+  });
   resultById.set(activeBossResult.id, activeBossResult);
+  const activeProductionExceptionResult = productionExceptionActiveResult({
+    ...plan.probes.find(
+      (probe) => probe.id === "workflow-tasks:production_exception",
+    ),
+    ...resultById.get("workflow-tasks:production_exception"),
+  });
+  resultById.set(
+    activeProductionExceptionResult.id,
+    activeProductionExceptionResult,
+  );
   const printCatalogResult = catalogPrintTemplateResult(plan);
   resultById.set(printCatalogResult.id, printCatalogResult);
 
@@ -2581,6 +2839,7 @@ export async function verifyManualAcceptanceReadiness(
     ...rawResults.map(({ probe, result }) => sanitizeProbe(probe, result)),
     loginResult,
     activeBossResult,
+    activeProductionExceptionResult,
     totalResult,
     printCatalogResult,
   ];

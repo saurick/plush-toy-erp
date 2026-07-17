@@ -367,6 +367,8 @@ function TaskLane({
                   isSelected ? ' erp-task-board-card--selected' : ''
                 }`}
                 key={`${lane.key}-${taskId || task.id}`}
+                data-task-code={task.task_code || undefined}
+                data-task-group={task.task_group || undefined}
                 data-open-on-double-click="true"
                 title="单击选中，双击查看任务详情"
                 onClick={() => onSelectTask(task)}
@@ -555,8 +557,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [adminProfile]
   )
   const workflowWorkbenchScopeKey = useMemo(
-    () =>
-      getWorkflowWorkbenchScopeKey(adminProfile, workflowWorkbenchRoleKeys),
+    () => getWorkflowWorkbenchScopeKey(adminProfile, workflowWorkbenchRoleKeys),
     [adminProfile, workflowWorkbenchRoleKeys]
   )
   const workflowWorkbenchScopeKeyRef = useRef(workflowWorkbenchScopeKey)
@@ -566,8 +567,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     workflowWorkbenchScopeKey
   )
   const workflowTasks = visibleWorkflowWorkbenchSnapshot.tasks
-  const workflowRiskTaskIDs =
-    visibleWorkflowWorkbenchSnapshot.riskTaskIDs
+  const workflowRiskTaskIDs = visibleWorkflowWorkbenchSnapshot.riskTaskIDs
   const filters = useMemo(
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
@@ -1271,6 +1271,20 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       size={16}
       className="erp-dashboard-page erp-command-center-page"
     >
+      <div
+        hidden
+        aria-hidden="true"
+        data-testid="dashboard-workflow-task-evidence"
+      >
+        {workflowTasks.map((task) => (
+          <span
+            key={task.id || task.task_code}
+            data-task-code={task.task_code || undefined}
+            data-task-group={task.task_group || undefined}
+            data-task-terminal={String(isTerminalWorkflowTask(task))}
+          />
+        ))}
+      </div>
       {shouldShowProductCoreDashboard ? (
         <ProductCoreDashboard onNavigate={openProductCoreEntry} />
       ) : null}
@@ -1381,6 +1395,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                   onRow={(record) => ({
                     tabIndex: 0,
                     title: '单击选中，双击查看任务详情',
+                    'data-task-code': record.task_code || undefined,
+                    'data-task-group': record.task_group || undefined,
                     'data-open-on-double-click': 'true',
                     onClick: () =>
                       setSelectedWorkbenchTaskId(
@@ -1927,6 +1943,8 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                         <div
                           className="erp-command-center-focus-item"
                           key={task.id || task.task_code}
+                          data-task-code={task.task_code || undefined}
+                          data-task-group={task.task_group || undefined}
                         >
                           <div className="erp-command-center-focus-copy">
                             <Text strong>{task.task_name || '未命名任务'}</Text>

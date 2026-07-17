@@ -27,6 +27,7 @@ import {
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_COUNT,
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
 } from "./manual-acceptance-catalog.mjs";
+import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
@@ -71,6 +72,7 @@ const REFERENCE_KEYS = Object.freeze([
   "inventoryLots",
   "inventoryBalances",
   "inventoryTxns",
+  "outsourcingFacts",
   "stockReservations",
   "shipments",
   "financeFacts",
@@ -1700,6 +1702,11 @@ async function readProductionPlan(rpc, sourcePlan, completionLotNo) {
 
 async function readOutsourcingPlan(rpc, sourcePlan) {
   const identities = sourcePlan.identities.outsourcing;
+  const returnLotNo = requiredText(
+    sourcePlan.phases?.outsourcing?.source?.return?.newLotNo,
+    "outsourcing.return.newLotNo",
+    64,
+  );
   const issue = await exactRequired({
     rpc,
     domain: "operational_fact",
@@ -1737,7 +1744,49 @@ async function readOutsourcingPlan(rpc, sourcePlan) {
       }),
     );
   }
-  return { facts: [issue, returned], inspection, finance };
+  const lot = await exactRequired({
+    rpc,
+    domain: "inventory",
+    method: "list_inventory_lots",
+    listKey: "inventory_lots",
+    businessField: "lot_no",
+    businessNo: returnLotNo,
+  });
+  if (Number(returned.lot_id) !== Number(lot.id)) {
+    throw new CliError(
+      `outsourcing return ${returned.fact_no} lot does not match ${returnLotNo}`,
+    );
+  }
+  const balanceData = await rpc({
+    domain: "inventory",
+    method: "list_inventory_balances",
+    params: { lot_id: lot.id, limit: 200, offset: 0 },
+  });
+  const balances = balanceData.inventory_balances || [];
+  if (Number(balanceData.total || balances.length) > balances.length) {
+    throw new CliError(
+      `outsourcing return lot ${returnLotNo} balance readback was truncated`,
+    );
+  }
+  const txnData = await rpc({
+    domain: "inventory",
+    method: "list_inventory_txns",
+    params: { lot_id: lot.id, limit: 200, offset: 0 },
+  });
+  const txns = txnData.inventory_txns || [];
+  if (Number(txnData.total || txns.length) > txns.length) {
+    throw new CliError(
+      `outsourcing return lot ${returnLotNo} transaction readback was truncated`,
+    );
+  }
+  return {
+    facts: [issue, returned],
+    inspection,
+    finance,
+    lot,
+    balances,
+    txns,
+  };
 }
 
 async function readSalesPlan(rpc, sourcePlan) {
@@ -3434,11 +3483,18 @@ export async function runSourceDrivenFactStage(
     qualityInspections: dedupeByID(
       outsourcingReadback.map((item) => item.inspection),
     ),
-    inventoryLots: dedupeByID(productionReadback.map((item) => item.lot)),
-    inventoryBalances: dedupeByID(
-      productionReadback.flatMap((item) => item.balances),
-    ),
-    inventoryTxns: dedupeByID(productionReadback.flatMap((item) => item.txns)),
+    inventoryLots: dedupeByID([
+      ...productionReadback.map((item) => item.lot),
+      ...outsourcingReadback.map((item) => item.lot),
+    ]),
+    inventoryBalances: dedupeByID([
+      ...productionReadback.flatMap((item) => item.balances),
+      ...outsourcingReadback.flatMap((item) => item.balances),
+    ]),
+    inventoryTxns: dedupeByID([
+      ...productionReadback.flatMap((item) => item.txns),
+      ...outsourcingReadback.flatMap((item) => item.txns),
+    ]),
     stockReservations: dedupeByID([
       ...salesReadback.map((item) => item.reservation),
       ...lifecycle.reservations,
@@ -3499,6 +3555,7 @@ function assertReferenceRecords(plan, records) {
     inventoryLots: 45,
     inventoryBalances: 45,
     inventoryTxns: 45,
+    outsourcingFacts: FACT_RUN_COUNT * 2,
     stockReservations: plan.expectedMinimums.stockReservations,
     shipments: plan.expectedMinimums.shipments,
   };
@@ -3640,6 +3697,13 @@ function assertReferenceRecords(plan, records) {
     productionFactId: productionOwner.id,
     financeFactId: financeOwner.id,
   };
+  const outsourcingReturnInventoryCoverage =
+    evaluateManualAcceptanceOutsourcingInventoryCoverage(records);
+  if (!outsourcingReturnInventoryCoverage.complete) {
+    throw new CliError(
+      `outsourcing return inventory coverage is incomplete: ${JSON.stringify(outsourcingReturnInventoryCoverage)}`,
+    );
+  }
   return records;
 }
 
@@ -3686,6 +3750,8 @@ function buildFactReport({
     financeFacts: dedupeByID(facts.financeFacts),
     outsourcingFacts: dedupeByID(facts.outsourcingFacts),
   });
+  const outsourcingReturnInventoryCoverage =
+    evaluateManualAcceptanceOutsourcingInventoryCoverage(referenceRecords);
   return {
     reportContract: FACT_REPORT_CONTRACT,
     mode,
@@ -3705,11 +3771,16 @@ function buildFactReport({
     semanticDigest: plan.semanticDigest,
     runtime,
     expectedMinimums: plan.expectedMinimums,
-    summary: Object.fromEntries(
-      Object.entries(referenceRecords)
-        .filter(([, value]) => Array.isArray(value))
-        .map(([key, value]) => [key, value.length]),
-    ),
+    summary: {
+      ...Object.fromEntries(
+        Object.entries(referenceRecords)
+          .filter(([, value]) => Array.isArray(value))
+          .map(([key, value]) => [key, value.length]),
+      ),
+      businessDashboardInventoryTotal:
+        referenceRecords.inventoryBalances.length,
+      outsourcingReturnInventoryCoverage,
+    },
     statusCounts: {
       purchaseReceipts: countBy(referenceRecords.purchaseReceipts, "status"),
       purchaseReturns: countBy(referenceRecords.purchaseReturns, "status"),

@@ -34,10 +34,12 @@ import {
   MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES,
   MANUAL_ACCEPTANCE_TARGET_ADAPTER_KEYS,
   assertManualAcceptanceDatasetReadinessBoundary,
+  digestManualAcceptanceDatasetComponentReport,
   verifyManualAcceptanceEmptyBaseline,
   verifyManualAcceptanceCoreReferences,
   manualAcceptanceDatasetStageReportPath,
 } from "./manual-acceptance-dataset-runner.mjs";
+import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
 import {
   CUSTOMER_TRIAL_133_CONFIG_APPLY_PURPOSE,
   CUSTOMER_TRIAL_133_CONFIG_DATA_VERSION,
@@ -52,6 +54,23 @@ const GENERATED_AT = "2026-07-15T01:02:03.000Z";
 const LOCAL_APPLY_BACKEND = "http://127.0.0.1:18376";
 const LOCAL_APPLY_DATABASE = "plush_erp_acceptance_20260716_v5_dev";
 let runnerOutputSequence = 0;
+
+test("component report digest treats undefined object fields as omitted JSON fields", () => {
+  assert.equal(
+    digestManualAcceptanceDatasetComponentReport({ ready: true }),
+    digestManualAcceptanceDatasetComponentReport({
+      ready: true,
+      remoteOnly: undefined,
+    }),
+  );
+  assert.throws(
+    () =>
+      digestManualAcceptanceDatasetComponentReport({
+        items: [undefined],
+      }),
+    /unsupported JSON value undefined/u,
+  );
+});
 
 function localApplyPlan(overrides = {}) {
   return buildManualAcceptanceDatasetTargetPlan({
@@ -132,6 +151,41 @@ function completedStageResult(
 }
 
 function fakeComponentReport({ stageKey, businessInput, targetAdapter }) {
+  const factReferenceRecords =
+    stageKey === "facts"
+      ? {
+          outsourcingFacts: Array.from({ length: 90 }, (_, index) => ({
+            id: 10_000 + index,
+            fact_no: `OUT-${index + 1}`,
+            fact_type: index < 45 ? "MATERIAL_ISSUE" : "RETURN_RECEIPT",
+            status: "POSTED",
+            ...(index < 45 ? {} : { lot_id: 20_000 + index - 45 }),
+          })),
+          inventoryLots: Array.from({ length: 45 }, (_, index) => ({
+            id: 20_000 + index,
+          })),
+          inventoryBalances: Array.from({ length: 45 }, (_, index) => ({
+            id: 30_000 + index,
+            lot_id: 20_000 + index,
+            quantity: "1",
+          })),
+          inventoryTxns: Array.from({ length: 45 }, (_, index) => ({
+            id: 40_000 + index,
+            lot_id: 20_000 + index,
+            txn_type: "IN",
+            direction: 1,
+            quantity: "1",
+            source_type: "OUTSOURCING_FACT",
+            source_id: 10_045 + index,
+            source_line_id: 10_045 + index,
+          })),
+        }
+      : null;
+  const factCoverage = factReferenceRecords
+    ? evaluateManualAcceptanceOutsourcingInventoryCoverage(
+        factReferenceRecords,
+      )
+    : null;
   return {
     mode: stageKey === "readiness" ? "verify" : "apply",
     scope: `fake-${stageKey}`,
@@ -150,11 +204,17 @@ function fakeComponentReport({ stageKey, businessInput, targetAdapter }) {
           ),
         }
       : {}),
+    ...(factReferenceRecords
+      ? { referenceRecords: factReferenceRecords }
+      : {}),
     summary:
       stageKey === "facts"
         ? {
             purchaseReceipts: 54,
             qualityInspections: 54,
+            businessDashboardInventoryTotal:
+              factReferenceRecords.inventoryBalances.length,
+            outsourcingReturnInventoryCoverage: factCoverage,
             records: 108,
           }
         : stageKey === "readiness"
@@ -1489,6 +1549,128 @@ test("resume fails closed for tampered component digests and current config drif
     );
     assert.ok(
       drifted.stages.slice(2).every((stage) => stage.status === "not_started"),
+    );
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("resume regenerates the read-only readiness snapshot after verifier changes", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-dataset-resume-readiness-refresh-"),
+  );
+  try {
+    const plan = localApplyPlan();
+    const first = await applyManualAcceptanceDataset(
+      plan,
+      localApplyBinding(plan),
+      durableRunnerDeps({ outputRoot }),
+    );
+    const readinessPath = manualAcceptanceDatasetStageReportPath({
+      outputRoot,
+      dataVersion: plan.dataVersion,
+      targetAlias: plan.target.alias,
+      stageKey: "readiness",
+    });
+    const staleReadiness = JSON.parse(await fs.readFile(readinessPath, "utf8"));
+    staleReadiness.verifierRevision = "new-read-only-contract";
+    await fs.writeFile(
+      readinessPath,
+      `${JSON.stringify(staleReadiness, null, 2)}\n`,
+      "utf8",
+    );
+
+    const calls = [];
+    const resumed = await applyManualAcceptanceDataset(
+      plan,
+      {
+        ...localApplyBinding(plan),
+        resumeReportPath: first.applyReportPath,
+      },
+      durableRunnerDeps({
+        outputRoot,
+        onCall(stageKey) {
+          calls.push(stageKey);
+        },
+      }),
+    );
+    assert.equal(resumed.ok, true);
+    assert.deepEqual(calls, ["core", "readiness"]);
+    assert.equal(resumed.resume.reusedStages.includes("readiness"), false);
+    const refreshedReadiness = JSON.parse(
+      await fs.readFile(readinessPath, "utf8"),
+    );
+    assert.equal("verifierRevision" in refreshedReadiness, false);
+  } finally {
+    await fs.rm(outputRoot, { recursive: true, force: true });
+  }
+});
+
+test("resume refreshes legacy fact evidence without weakening digest checks", async () => {
+  const outputRoot = await fs.mkdtemp(
+    path.join(os.tmpdir(), "plush-dataset-resume-fact-refresh-"),
+  );
+  try {
+    const plan = localApplyPlan();
+    const first = await applyManualAcceptanceDataset(
+      plan,
+      localApplyBinding(plan),
+      durableRunnerDeps({ outputRoot }),
+    );
+    const factsPath = manualAcceptanceDatasetStageReportPath({
+      outputRoot,
+      dataVersion: plan.dataVersion,
+      targetAlias: plan.target.alias,
+      stageKey: "facts",
+    });
+    const legacyFacts = JSON.parse(await fs.readFile(factsPath, "utf8"));
+    legacyFacts.summary.businessDashboardInventoryTotal = 148;
+    await fs.writeFile(
+      factsPath,
+      `${JSON.stringify(legacyFacts, null, 2)}\n`,
+      "utf8",
+    );
+    const prior = structuredClone(first);
+    prior.stages.find((stage) => stage.key === "facts").references.runner.componentDigest =
+      digestManualAcceptanceDatasetComponentReport(legacyFacts);
+    await fs.writeFile(
+      first.applyReportPath,
+      `${JSON.stringify(prior, null, 2)}\n`,
+      "utf8",
+    );
+
+    const calls = [];
+    const resumed = await applyManualAcceptanceDataset(
+      plan,
+      {
+        ...localApplyBinding(plan),
+        resumeReportPath: first.applyReportPath,
+      },
+      durableRunnerDeps({
+        outputRoot,
+        onCall(stageKey) {
+          calls.push(stageKey);
+        },
+      }),
+    );
+    assert.equal(resumed.ok, true);
+    assert.deepEqual(resumed.resume.reusedStages, [
+      "baseline",
+      "role",
+      "source",
+      "task",
+    ]);
+    assert.deepEqual(resumed.resume.refreshedStages, [
+      "facts",
+      "purchase-quality",
+      "attachments",
+      "readiness",
+    ]);
+    assert.deepEqual(calls, ["core", "facts", "attachments", "readiness"]);
+    const refreshedFacts = JSON.parse(await fs.readFile(factsPath, "utf8"));
+    assert.equal(
+      refreshedFacts.summary.businessDashboardInventoryTotal,
+      45,
     );
   } finally {
     await fs.rm(outputRoot, { recursive: true, force: true });

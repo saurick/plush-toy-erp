@@ -29,3 +29,19 @@ test('task board keeps selection on click and opens the same detail surface on d
   assert.match(source, /title="单击选中，双击查看任务详情"/u)
   assert.match(source, /电脑端可双击任务卡快速查看详情/u)
 })
+
+test('task surfaces expose the batch task code only as non-visible evidence metadata', () => {
+  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 4)
+  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 4)
+  assert.match(source, /data-task-code=\{task\.task_code \|\| undefined\}/u)
+  assert.match(
+    source,
+    /['"]data-task-code['"]:\s*record\.task_code \|\| undefined/u
+  )
+  assert.match(source, /data-testid="dashboard-workflow-task-evidence"/u)
+  assert.match(
+    source,
+    /data-task-terminal=\{String\(isTerminalWorkflowTask\(task\)\)\}/u
+  )
+  assert.doesNotMatch(source, />\s*\{task\.task_code\}\s*</u)
+})

@@ -154,7 +154,8 @@ function sourceDataAnchorDate(dataVersion, explicitAnchorDate) {
   const versionDate = String(dataVersion || "").match(
     /^(\d{4})[.-](\d{2})[.-](\d{2})(?:$|[-._])/u,
   );
-  const candidate = raw ||
+  const candidate =
+    raw ||
     (versionDate
       ? `${versionDate[1]}-${versionDate[2]}-${versionDate[3]}`
       : undefined);
@@ -169,7 +170,13 @@ function sourceDataAnchorDate(dataVersion, explicitAnchorDate) {
   return candidate;
 }
 
-function sourceSemanticDigest({ datasetKey, dataVersion, runId, prefix, records }) {
+function sourceSemanticDigest({
+  datasetKey,
+  dataVersion,
+  runId,
+  prefix,
+  records,
+}) {
   return createHash("sha256")
     .update(JSON.stringify({ datasetKey, dataVersion, runId, prefix, records }))
     .digest("hex");
@@ -229,7 +236,10 @@ function buildCustomers(prefix, count) {
     return {
       code: `${prefix}-KH-${pad(index, 3)}`,
       name,
-      short_name: name.replace(/^(东莞|深圳|广州|佛山|惠州|中山|珠海|厦门|杭州|苏州|宁波|成都)/u, ""),
+      short_name: name.replace(
+        /^(东莞|深圳|广州|佛山|惠州|中山|珠海|厦门|杭州|苏州|宁波|成都)/u,
+        "",
+      ),
       default_payment_method: index % 3 === 0 ? "月结" : "银行转账",
       default_payment_term_days: [0, 30, 45, 60][offset % 4],
       note: longBusinessNote(index),
@@ -341,9 +351,8 @@ function buildMaterials(prefix, count) {
     const displayColor =
       group === 1
         ? color
-        : ["雾蓝", "奶咖", "浅黄", "豆绿", "藕粉", "浅灰", "焦糖"][
-            group - 2
-          ] || `色号${group}`;
+        : ["雾蓝", "奶咖", "浅黄", "豆绿", "藕粉", "浅灰", "焦糖"][group - 2] ||
+          `色号${group}`;
     return {
       code: `${prefix}-WL-${pad(index, 3)}`,
       name: `${displayColor}${label}`,
@@ -442,7 +451,13 @@ function buildProcesses(prefix, count) {
       code: `${prefix}-GX-${pad(index, 3)}`,
       name,
       category: name,
-      outsourcing_enabled: !["检针", "成品抽检", "重量检查", "尺寸检查", "外观检查"].includes(name),
+      outsourcing_enabled: ![
+        "检针",
+        "成品抽检",
+        "重量检查",
+        "尺寸检查",
+        "外观检查",
+      ].includes(name),
       inhouse_enabled: true,
       quality_required: name.includes("检") || name.includes("确认"),
       sort_order: index * 10,
@@ -483,9 +498,11 @@ function buildSalesOrders(prefix, count, customers, products, anchorDate) {
           ordered_quantity: String(quantity),
           unit_price: unitPrice.toFixed(2),
           amount: (quantity * unitPrice).toFixed(2),
-          planned_delivery_date: isoDate(14 + (index % 20) + lineOffset, anchorDate),
-          note:
-            lineOffset === 0 ? longBusinessNote(index) : "按颜色分开装箱",
+          planned_delivery_date: isoDate(
+            14 + (index % 20) + lineOffset,
+            anchorDate,
+          ),
+          note: lineOffset === 0 ? longBusinessNote(index) : "按颜色分开装箱",
         };
       },
     );
@@ -494,9 +511,7 @@ function buildSalesOrders(prefix, count, customers, products, anchorDate) {
       customerRef: customer.code,
       customer_order_no: `${["MY", "SY", "XC", "TM", "QK"][offset % 5]}${anchorDate.slice(2, 7).replace("-", "")}${pad(index, 3)}`,
       customer_snapshot: { name: customer.name, simulated_only: true },
-      sales_owner: ["小陈", "小李", "小周", "小林", "小何", "小吴"][
-        index % 6
-      ],
+      sales_owner: ["小陈", "小李", "小周", "小林", "小何", "小吴"][index % 6],
       contact_snapshot: customer.contacts[0]
         ? {
             name: customer.contacts[0].name,
@@ -557,10 +572,7 @@ function buildPurchaseOrders(
             5 + (index % 15) + lineOffset,
             anchorDate,
           ),
-          note:
-            lineOffset === 0
-              ? longBusinessNote(index)
-              : "按订单分开送货",
+          note: lineOffset === 0 ? longBusinessNote(index) : "按订单分开送货",
         };
       },
     );
@@ -641,10 +653,7 @@ function buildOutsourcingOrders(
             7 + (index % 18) + lineOffset,
             anchorDate,
           ),
-          note:
-            lineOffset === 0
-              ? longBusinessNote(index)
-              : "回货后先检验",
+          note: lineOffset === 0 ? longBusinessNote(index) : "回货后先检验",
         };
       },
     );
@@ -706,8 +715,7 @@ function buildBOMVersions(prefix, count, products, materials, anchorDate) {
             total_usage_snapshot: String(120 + lineOffset * 15),
             process_base: lineOffset % 2 === 0 ? "常规底料" : "按色卡确认底料",
             process_method: ["热裁", "车缝", "充棉", "包装"][lineOffset % 4],
-            note:
-              lineOffset === 0 ? longBusinessNote(index) : "颜色按样板",
+            note: lineOffset === 0 ? longBusinessNote(index) : "颜色按样板",
           };
         },
       );
@@ -1455,14 +1463,7 @@ async function createMissingMasterRecords({ plan, tokens, fetchImpl, report }) {
       label: `material ${record.code}`,
       expected,
       actual: data.material,
-      fields: [
-        "code",
-        "name",
-        "category",
-        "spec",
-        "color",
-        "default_unit_id",
-      ],
+      fields: ["code", "name", "category", "spec", "color", "default_unit_id"],
     });
     materials.set(record.code, data.material);
     report.steps.push({
@@ -2672,9 +2673,7 @@ export function buildSourceDrivenFactReferences({
       customerSnapshot: customer.name,
     };
     for (const plannedLine of orderPlan.items) {
-      const line = items.find(
-        (item) => item.lineNo === plannedLine.line_no,
-      );
+      const line = items.find((item) => item.lineNo === plannedLine.line_no);
       if (!line?.salesOrderItemId) continue;
       const item = {
         id: line.salesOrderItemId,
@@ -2725,7 +2724,8 @@ export function buildSourceDrivenFactReferences({
     ) {
       continue;
     }
-    for (const item of sourceDocuments.outsourcingOrderItems.get(order.id) || []) {
+    for (const item of sourceDocuments.outsourcingOrderItems.get(order.id) ||
+      []) {
       if (!item?.outsourcingOrderItemId) continue;
       outsourcingCandidates.push({
         order: {
@@ -2750,7 +2750,8 @@ export function buildSourceDrivenFactReferences({
     ) {
       continue;
     }
-    for (const item of sourceDocuments.purchaseOrderItems?.get(order.id) || []) {
+    for (const item of sourceDocuments.purchaseOrderItems?.get(order.id) ||
+      []) {
       if (!item?.purchaseOrderItemId) continue;
       purchaseCandidates.push({
         order: {
@@ -3133,25 +3134,23 @@ export async function applyManualAcceptanceSourceData(
           items: sourceDocuments.outsourcingOrderItems.get(order.id) || [],
         };
       }),
-    bomVersions: plan.records.bomVersions
-      .filter((record) => record.targetStatus === "ACTIVE")
-      .map((record) => {
-        const bom = bomVersions.get(record.version);
-        return {
-          id: bom.id,
-          version: record.version,
-          status: "ACTIVE",
-          productCode: record.productRef,
-          productId: refs.products.get(record.productRef).id,
-          items: bom.items.map((item) => ({
-            id: item.id,
-            materialId: item.material_id,
-            unitId: item.unit_id,
-            quantity: item.quantity,
-            lossRate: item.loss_rate,
-          })),
-        };
-      }),
+    bomVersions: plan.records.bomVersions.map((record) => {
+      const bom = bomVersions.get(record.version);
+      return {
+        id: bom.id,
+        version: record.version,
+        status: record.targetStatus,
+        productCode: record.productRef,
+        productId: refs.products.get(record.productRef).id,
+        items: bom.items.map((item) => ({
+          id: item.id,
+          materialId: item.material_id,
+          unitId: item.unit_id,
+          quantity: item.quantity,
+          lossRate: item.loss_rate,
+        })),
+      };
+    }),
   };
   return report;
 }

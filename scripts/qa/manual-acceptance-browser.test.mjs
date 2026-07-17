@@ -16,6 +16,7 @@ import {
   assertManualAcceptanceBrowserReportPathBinding,
   assertBoundSimulatedPrintReports,
   buildManualAcceptanceBrowserPlan,
+  buildManualAcceptanceCurrentBatchReadiness,
   normalizeLocalBrowserURL,
   partitionTargetRuntimeEvents,
   summarizeManualAcceptance,
@@ -25,12 +26,17 @@ import {
   runManualAcceptanceBrowser,
   readBusinessSummaryTotal,
   readMobileLoadedTaskCount,
+  resolveCurrentBatchListFilter,
   evaluateBusinessDashboardEvidence,
+  evaluateBusinessDashboardCurrentBatchEvidence,
+  evaluateDashboardTaskCurrentBatchEvidence,
   evaluateExceptionFlowEvidence,
   evaluateGlobalDashboardEvidence,
   evaluatePrintPreviewEvidence,
   evaluatePrintSourceMinimumEvidence,
   evaluateShipmentReleaseEvidence,
+  evaluateCurrentBatchListEvidence,
+  evaluateMobileCurrentBatchEvidence,
   buildPrintWorkspaceDataEvidence,
   getManualAcceptanceBrowserHelp,
   verifyManualAcceptanceBrowserDatasetBinding,
@@ -47,6 +53,8 @@ import {
   manualAcceptanceDatasetStageReportPath,
 } from "./manual-acceptance-dataset-runner.mjs";
 import {
+  TASK_SOURCE_TYPE,
+  TASK_VISIBLE_CODE_PREFIX_BY_ROLE,
   buildManualAcceptanceTaskSchedule,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
@@ -619,6 +627,31 @@ test("bound print inputs stay in the acceptance report root and match the curren
     },
     runtimeAttestation: null,
   });
+  const activeOnlyBOMSource = {
+    ...source,
+    referenceRecords: {
+      ...source.referenceRecords,
+      bomVersions: [
+        { version: "YS5-BOM-001-2", items: Array.from({ length: 3 }) },
+      ],
+    },
+    steps: [
+      {
+        target: "bom_version",
+        key: "YS5-BOM-013-1",
+        action: "reuse",
+        id: 37,
+        items: 25,
+      },
+    ],
+  };
+  assert.deepEqual(
+    assertBoundSimulatedPrintReports(activeOnlyBOMSource, {
+      ...activeOnlyBOMSource,
+      reportContract: "source-driven-operational-facts-v1",
+    }),
+    assertBoundSimulatedPrintReports(source, fact),
+  );
   assert.throws(
     () =>
       assertBoundSimulatedPrintReports(source, {
@@ -1084,6 +1117,208 @@ test("shipment release browser evidence proves live due-soon and overdue categor
       .passed,
     false,
   );
+  assert.equal(
+    evaluateShipmentReleaseEvidence(
+      [...rows, { code: "YS-V5-CK-20", text: "其他仓库任务" }],
+      schedule,
+      2_000_000_100_000,
+    ).passed,
+    false,
+  );
+  assert.equal(
+    evaluateShipmentReleaseEvidence(
+      [rows[0], rows[0], rows[2], rows[3]],
+      schedule,
+      2_000_000_100_000,
+    ).passed,
+    false,
+  );
+});
+
+test("current-batch list evidence cannot be satisfied by an unrelated page total", () => {
+  const currentBatch = {
+    dataStatus: "pass",
+    actual: 60,
+    probes: [
+      {
+        id: "customers",
+        status: "pass",
+        batchEvidence: "prefix_filtered",
+        batchPrefix: "YS5",
+      },
+    ],
+  };
+  assert.equal(
+    evaluateCurrentBatchListEvidence({
+      currentBatch,
+      currentBatchDOM: {
+        mode: "source_prefix",
+        identifier: "YS5",
+        visibleItems: 20,
+        matchingCurrentBatchItems: 0,
+        currentBatchVisible: false,
+      },
+      renderedItems: 20,
+      pageReportedTotal: 999,
+      minimumRecords: 60,
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateCurrentBatchListEvidence({
+      currentBatch,
+      currentBatchDOM: {
+        mode: "source_prefix",
+        identifier: "YS5",
+        visibleItems: 20,
+        matchingCurrentBatchItems: 20,
+        currentBatchVisible: true,
+      },
+      renderedItems: 20,
+      pageReportedTotal: 60,
+      minimumRecords: 60,
+    }).minimumSatisfied,
+    true,
+  );
+});
+
+test("page-data contract and readiness expose current-batch list identifiers", () => {
+  const customers = buildManualAcceptanceBrowserPlan({}).targets.find(
+    (target) => target.key === "customers",
+  );
+  const readiness = {
+    targets: [
+      {
+        id: customers.dataContractTargetId,
+        dataStatus: "pass",
+        actual: 60,
+        supporting: [
+          {
+            id: "customers",
+            status: "pass",
+            actual: 60,
+            batchEvidence: "prefix_filtered",
+            batchPrefix: "YS5",
+          },
+        ],
+      },
+    ],
+    probes: [],
+  };
+  const currentBatch =
+    buildManualAcceptanceCurrentBatchReadiness(readiness)[
+      customers.dataContractTargetId
+    ];
+  assert.equal(currentBatch.dataStatus, "pass");
+  assert.equal(currentBatch.probes[0].batchPrefix, "YS5");
+  assert.deepEqual(resolveCurrentBatchListFilter(customers, currentBatch, {}), {
+    mode: "source_prefix",
+    identifier: "YS5",
+  });
+  assert.throws(
+    () =>
+      resolveCurrentBatchListFilter(
+        { ...customers, title: "客户" },
+        { ...currentBatch, probes: [] },
+        {},
+      ),
+    /没有可在页面核对的当前批次标识/u,
+  );
+});
+
+test("task board binds task-code metadata to the exact current-batch total", () => {
+  const taskBoard = buildManualAcceptanceBrowserPlan({}).targets.find(
+    (target) => target.key === "task-board",
+  );
+  const prefix = TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss;
+  const currentBatch = {
+    dataStatus: "pass",
+    actual: 20,
+    probes: [
+      {
+        id: "boss-dashboard-tasks",
+        status: "pass",
+        batchEvidence: "exact_source",
+        exactTaskCodePrefix: prefix,
+      },
+    ],
+  };
+  assert.deepEqual(resolveCurrentBatchListFilter(taskBoard, currentBatch, {}), {
+    mode: "exact_task_prefix",
+    identifier: prefix,
+  });
+  const base = {
+    currentBatch,
+    currentBatchDOM: {
+      mode: "exact_task_prefix",
+      identifier: prefix,
+      visibleItems: 20,
+      matchingCurrentBatchItems: 20,
+      currentBatchVisible: true,
+    },
+    renderedItems: 20,
+    minimumRecords: 20,
+  };
+  assert.equal(
+    evaluateCurrentBatchListEvidence({ ...base, pageReportedTotal: 20 })
+      .minimumSatisfied,
+    true,
+  );
+  assert.equal(
+    evaluateCurrentBatchListEvidence({ ...base, pageReportedTotal: 19 })
+      .minimumSatisfied,
+    false,
+  );
+});
+
+test("mobile current-batch proof requires exact role source and exact DOM total", () => {
+  const roleKey = "sales";
+  const currentBatch = {
+    dataStatus: "pass",
+    actual: 20,
+    probes: [
+      {
+        id: `mobile-tasks:${roleKey}`,
+        status: "pass",
+        batchEvidence: "exact_source",
+        exactSourceType: TASK_SOURCE_TYPE,
+        exactSourceID: 202607165,
+        exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey],
+        exactOwnerRoleKey: roleKey,
+      },
+    ],
+  };
+  const passing = evaluateMobileCurrentBatchEvidence({
+    roleKey,
+    todoCount: 14,
+    doneCount: 6,
+    minimumRecords: 20,
+    currentBatch,
+  });
+  assert.equal(passing.minimumSatisfied, true);
+  assert.equal(
+    evaluateMobileCurrentBatchEvidence({
+      roleKey,
+      todoCount: 20,
+      doneCount: 20,
+      minimumRecords: 20,
+      currentBatch,
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateMobileCurrentBatchEvidence({
+      roleKey,
+      todoCount: 14,
+      doneCount: 6,
+      minimumRecords: 20,
+      currentBatch: {
+        ...currentBatch,
+        probes: [{ ...currentBatch.probes[0], exactOwnerRoleKey: "purchase" }],
+      },
+    }).minimumSatisfied,
+    false,
+  );
 });
 
 test("dashboard data evidence fails closed for empty or unavailable sources", () => {
@@ -1132,6 +1367,225 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
       ["客户数量60", "出货放行数量3"],
       requirements,
     ).minimumSatisfied,
+    false,
+  );
+});
+
+test("dashboard task evidence requires a visible code from the exact current batch", () => {
+  const currentBatch = {
+    dataStatus: "pass",
+    actual: 18,
+    probes: [
+      {
+        id: "boss-dashboard-tasks",
+        status: "pass",
+        batchEvidence: "exact_source",
+        exactSourceType: TASK_SOURCE_TYPE,
+        exactSourceID: 202607165,
+        exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.boss,
+        exactOwnerRoleKey: "boss",
+        exactTaskGroup: null,
+      },
+    ],
+  };
+  const base = {
+    status: "minimum_proven",
+    observedTotal: 79,
+    minimumSatisfied: true,
+  };
+  const exactTaskCodes = Array.from(
+    { length: 18 },
+    (_, index) => `YS-V5-LD-${String(index + 1).padStart(2, "0")}`,
+  );
+  assert.equal(
+    evaluateDashboardTaskCurrentBatchEvidence({
+      evidence: base,
+      currentBatch,
+      roleKey: "boss",
+      visibleTaskCodes: ["YS-V5-LD-01"],
+      currentBatchTaskCodes: exactTaskCodes,
+    }).minimumSatisfied,
+    true,
+  );
+  assert.equal(
+    evaluateDashboardTaskCurrentBatchEvidence({
+      evidence: base,
+      currentBatch,
+      roleKey: "boss",
+      visibleTaskCodes: ["OLD-LD-01"],
+      currentBatchTaskCodes: exactTaskCodes,
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateDashboardTaskCurrentBatchEvidence({
+      evidence: base,
+      currentBatch,
+      roleKey: "boss",
+      visibleTaskCodes: ["YS-V5-LD-01"],
+      currentBatchTaskCodes: exactTaskCodes.slice(0, 17),
+    }).minimumSatisfied,
+    false,
+  );
+
+  const exceptionBatch = {
+    dataStatus: "pass",
+    actual: 4,
+    probes: [
+      {
+        id: "production-exception-active-tasks",
+        status: "pass",
+        batchEvidence: "exact_source",
+        exactSourceType: TASK_SOURCE_TYPE,
+        exactSourceID: 202607165,
+        exactTaskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.production,
+        exactOwnerRoleKey: "production",
+        exactTaskGroup: "production_exception",
+      },
+    ],
+  };
+  const exceptionCodes = [
+    "YS-V5-SC-01",
+    "YS-V5-SC-02",
+    "YS-V5-SC-03",
+    "YS-V5-SC-04",
+  ];
+  assert.equal(
+    evaluateDashboardTaskCurrentBatchEvidence({
+      evidence: base,
+      currentBatch: exceptionBatch,
+      roleKey: "production",
+      taskGroup: "production_exception",
+      visibleTaskCodes: ["YS-V5-SC-01"],
+      currentBatchTaskCodes: exceptionCodes,
+    }).minimumSatisfied,
+    true,
+  );
+  for (const invalidCodes of [
+    exceptionCodes.slice(0, 3),
+    [...exceptionCodes, "YS-V5-SC-05"],
+    [exceptionCodes[0], exceptionCodes[0], ...exceptionCodes.slice(2)],
+  ]) {
+    assert.equal(
+      evaluateDashboardTaskCurrentBatchEvidence({
+        evidence: base,
+        currentBatch: exceptionBatch,
+        roleKey: "production",
+        taskGroup: "production_exception",
+        visibleTaskCodes: ["YS-V5-SC-01"],
+        currentBatchTaskCodes: invalidCodes,
+      }).minimumSatisfied,
+      false,
+    );
+  }
+});
+
+test("business dashboard binds every card to the fresh projection and same-batch source", () => {
+  const requirements = [
+    {
+      key: "customers",
+      label: "客户",
+      minimumRecords: 60,
+      probeId: "customers",
+      exactCurrentBatchCount: true,
+    },
+    {
+      key: "products",
+      label: "产品",
+      minimumRecords: 20,
+      probeId: "products",
+      exactCurrentBatchCount: true,
+    },
+    {
+      key: "inventory",
+      label: "库存台账",
+      minimumRecords: 45,
+      probeId: "inventory-balances",
+      exactCurrentBatchCount: true,
+    },
+  ];
+  const evidence = evaluateBusinessDashboardEvidence(
+    ["客户数量60", "产品数量20", "库存台账数量193"],
+    requirements,
+  );
+  const currentBatch = {
+    dataStatus: "pass",
+    actual: 20,
+    probes: [
+      {
+        id: "customers",
+        status: "pass",
+        actual: 60,
+        batchEvidence: "prefix_filtered",
+      },
+      {
+        id: "products",
+        status: "pass",
+        actual: 20,
+        batchEvidence: "prefix_filtered",
+      },
+      {
+        id: "inventory-balances",
+        status: "pass",
+        actual: 193,
+        batchEvidence: "exact_references",
+      },
+      {
+        id: "business-dashboard-stats",
+        status: "pass",
+        actual: 20,
+        batchEvidence: "fresh_dataset_projection",
+        moduleTotals: { customers: 60, products: 20, inventory: 193 },
+      },
+    ],
+  };
+  assert.equal(
+    evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence,
+      currentBatch,
+      baselineProven: true,
+    }).minimumSatisfied,
+    true,
+  );
+  assert.equal(
+    evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence,
+      currentBatch: {
+        ...currentBatch,
+        probes: [
+          { ...currentBatch.probes[0], actual: 59 },
+          currentBatch.probes[1],
+          currentBatch.probes[2],
+          currentBatch.probes[3],
+        ],
+      },
+      baselineProven: true,
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence,
+      currentBatch: {
+        ...currentBatch,
+        probes: [
+          ...currentBatch.probes.slice(0, 3),
+          {
+            ...currentBatch.probes[3],
+            moduleTotals: { customers: 60, products: 20, inventory: 192 },
+          },
+        ],
+      },
+      baselineProven: true,
+    }).minimumSatisfied,
+    false,
+  );
+  assert.equal(
+    evaluateBusinessDashboardCurrentBatchEvidence({
+      evidence,
+      currentBatch,
+      baselineProven: false,
+    }).minimumSatisfied,
     false,
   );
 });
@@ -1376,6 +1830,16 @@ test("permission center evidence follows the current employee-account tab", asyn
   );
 });
 
+test("inventory current-batch evidence switches to the lot-number view", async () => {
+  const source = await fs.readFile(scriptPath, "utf8");
+  assert.match(source, /target\.key === "inventory"/u);
+  assert.match(
+    source,
+    /getByRole\("tab", \{ name: "库存批次", exact: true \}\)/u,
+  );
+  assert.match(source, /getByPlaceholder\("搜索批次"\)/u);
+});
+
 test("mobile role totals cannot overwrite a task board DOM minimum failure", () => {
   const taskBoard = {
     key: "task-board",
@@ -1488,6 +1952,10 @@ test("readiness binding cannot replace current DOM list minimum proof", async ()
     "utf8",
   );
   assert.match(source, /\.erp-task-board-card/u);
+  assert.match(source, /\.erp-audit-event/u);
+  assert.match(source, /row\.querySelectorAll\("td strong"\)/u);
+  assert.match(source, /name: \/打开可编辑打印窗口\/u/u);
+  assert.match(source, /name: \/查看明细\/u/u);
   assert.match(source, /getByRole\("tab", \{ name: \/员工账号/u);
   assert.match(source, /readinessReportSHA256/u);
   assert.match(source, /failedDataMinimums = dataEvidenceTargets\.filter/u);

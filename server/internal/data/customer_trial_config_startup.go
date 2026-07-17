@@ -30,14 +30,15 @@ func validateActiveCustomerTrialConfig(
 		return fmt.Errorf("customer trial config startup check requires PostgreSQL")
 	}
 	var revision, productVersion, applyPurpose, datasetVersion, target string
-	var databaseName string
+	var databaseName, systemIdentifier string
 	err := db.QueryRowContext(ctx, `
 SELECT revision,
        product_version,
 	   COALESCE(jsonb_extract_path_text(compiled_snapshot, 'applyPurpose'), ''),
 	   COALESCE(jsonb_extract_path_text(compiled_snapshot, 'datasetVersion'), ''),
 	   COALESCE(jsonb_extract_path_text(compiled_snapshot, 'target'), ''),
-	   current_database()
+	   current_database(),
+	   COALESCE((SELECT system_identifier::text FROM pg_control_system()), '')
 FROM customer_config_revisions
 WHERE customer_key = $1
   AND status = 'active'
@@ -49,6 +50,7 @@ LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
 		&datasetVersion,
 		&target,
 		&databaseName,
+		&systemIdentifier,
 	)
 	if err == sql.ErrNoRows {
 		return nil
@@ -64,7 +66,7 @@ LIMIT 1`, customertrialconfig.ExpectedCustomerKey).Scan(
 		if strings.TrimSpace(os.Getenv(biz.CustomerConfigLocalTestAllowEnv)) != "1" {
 			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the exact registered runtime opt-in")
 		}
-		if devdbguard.RequireCustomerConfigLocalTestRuntime(postgresDSN, databaseName) != nil {
+		if devdbguard.RequireCustomerConfigLocalTestRuntime(postgresDSN, databaseName, systemIdentifier) != nil {
 			return fmt.Errorf("customer trial config startup check failed: active local-test revision requires the registered local development database family")
 		}
 	}
