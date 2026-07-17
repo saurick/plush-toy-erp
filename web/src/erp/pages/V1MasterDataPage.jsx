@@ -1040,12 +1040,6 @@ export default function V1MasterDataPage({ type }) {
         onOpenRecord={openMasterDataRecord}
       />
 
-      <CollaborationTaskPanel
-        tasks={[]}
-        selectedTasks={[]}
-        selectedRecordLabel={getRecordName(selectedRecord, effectiveType) || ''}
-      />
-
       <BusinessFormModal
         size={showContactForm ? 'masterDataItems' : 'masterData'}
         title={

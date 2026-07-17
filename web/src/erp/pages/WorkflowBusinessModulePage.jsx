@@ -1005,27 +1005,6 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         onClose={() => setDetailTask(null)}
       />
 
-      <CollaborationTaskPanel
-        tasks={tasks}
-        selectedTasks={selectedTasks}
-        selectedRecordLabel={
-          selectedTasks[0]?.task_name ||
-          `请先选择一条${moduleItem.shortLabel}任务`
-        }
-        adminProfile={adminProfile}
-        onCompleteTask={
-          canCompleteWorkflowTasks ? completeWorkflowTask : undefined
-        }
-        onBlockTask={canUpdateWorkflowTasks ? blockWorkflowTask : undefined}
-        onRejectTask={canUpdateWorkflowTasks ? rejectWorkflowTask : undefined}
-        onResumeTask={canUpdateWorkflowTasks ? resumeWorkflowTask : undefined}
-        onUrgeTask={
-          canUpdateWorkflowTasks ? urgeWorkflowTaskFromPage : undefined
-        }
-        taskActionLoadingID={taskActionLoadingID}
-        urgingTaskID={urgingTaskID}
-      />
-
       <Modal
         className="erp-business-action-modal"
         width={520}

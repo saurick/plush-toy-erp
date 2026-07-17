@@ -1471,12 +1471,6 @@ export default function V1SalesOrdersPage() {
         onClose={() => setDetailOrder(null)}
       />
 
-      <CollaborationTaskPanel
-        tasks={[]}
-        selectedTasks={[]}
-        selectedRecordLabel={selectedOrder?.order_no || ''}
-      />
-
       <ColumnOrderModal
         open={columnOrderTarget === 'orders'}
         moduleTitle="销售订单列表"
