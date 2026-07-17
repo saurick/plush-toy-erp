@@ -142,12 +142,22 @@ generate_operation_id() {
 
 path_mode() {
   local path="$1"
-  stat -f '%Lp' "$path" 2>/dev/null || stat -c '%a' "$path" 2>/dev/null || true
+  local mode_value=""
+  mode_value="$(stat -c '%a' "$path" 2>/dev/null || true)"
+  if [[ -z "$mode_value" ]]; then
+    mode_value="$(stat -f '%Lp' "$path" 2>/dev/null || true)"
+  fi
+  printf '%s' "$mode_value"
 }
 
 path_owner_uid() {
   local path="$1"
-  stat -f '%u' "$path" 2>/dev/null || stat -c '%u' "$path" 2>/dev/null || true
+  local owner_uid=""
+  owner_uid="$(stat -c '%u' "$path" 2>/dev/null || true)"
+  if [[ -z "$owner_uid" ]]; then
+    owner_uid="$(stat -f '%u' "$path" 2>/dev/null || true)"
+  fi
+  printf '%s' "$owner_uid"
 }
 
 release_bootstrap_lock() {
@@ -550,7 +560,7 @@ cd "$root_dir"
 [[ -r "$env_file" ]] || fail "env 文件不可读"
 [[ -d "$compose_dir" ]] || fail "Compose 目录不存在"
 
-env_mode="$(stat -f '%Lp' "$env_file" 2>/dev/null || stat -c '%a' "$env_file" 2>/dev/null || true)"
+env_mode="$(path_mode "$env_file")"
 [[ "$env_mode" =~ ^[0-7]{3,4}$ ]] || fail "无法读取 env 文件权限"
 env_permissions=$((8#$env_mode))
 (((env_permissions & 077) == 0)) || fail "env 文件不得向 group/other 开放权限"

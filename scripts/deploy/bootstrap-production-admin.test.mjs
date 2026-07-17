@@ -587,6 +587,64 @@ function runHelper(fixture, options = {}) {
   });
 }
 
+function installGnuStatShim(fixture) {
+  const statPath = path.join(fixture.binDir, "stat");
+  fs.writeFileSync(
+    statPath,
+    `#!/usr/bin/env sh
+set -eu
+if [ "$#" -eq 3 ] && [ "$1" = "-c" ]; then
+  if /usr/bin/stat -c "$2" "$3" 2>/dev/null; then
+    exit 0
+  fi
+  case "$2" in
+  %a) exec /usr/bin/stat -f '%Lp' "$3" ;;
+  %u) exec /usr/bin/stat -f '%u' "$3" ;;
+  esac
+fi
+if [ "$#" -eq 3 ] && [ "$1" = "-f" ]; then
+  case "$2" in
+  %Lp|%u)
+    printf '  File: "%s"\nBlock size: 4096\n' "$3"
+    exit 1
+    ;;
+  esac
+fi
+exec /usr/bin/stat "$@"
+`,
+    "utf8",
+  );
+  fs.chmodSync(statPath, 0o755);
+}
+
+function installBsdStatShim(fixture) {
+  const statPath = path.join(fixture.binDir, "stat");
+  fs.writeFileSync(
+    statPath,
+    `#!/usr/bin/env sh
+set -eu
+if [ "$#" -eq 3 ] && [ "$1" = "-c" ]; then
+  exit 1
+fi
+if [ "$#" -eq 3 ] && [ "$1" = "-f" ]; then
+  case "$2" in
+  %Lp)
+    if /usr/bin/stat -c '%a' "$3" 2>/dev/null; then exit 0; fi
+    exec /usr/bin/stat -f '%Lp' "$3"
+    ;;
+  %u)
+    if /usr/bin/stat -c '%u' "$3" 2>/dev/null; then exit 0; fi
+    exec /usr/bin/stat -f '%u' "$3"
+    ;;
+  esac
+fi
+exec /usr/bin/stat "$@"
+`,
+    "utf8",
+  );
+  fs.chmodSync(statPath, 0o755);
+}
+
 function startHelper(fixture, options = {}) {
   const spec = helperRunSpec(fixture, options);
   const child = spawn("bash", spec.args, {
@@ -670,6 +728,35 @@ test("bootstrap production admin uses one secret-safe one-shot and reads back al
     .split(/\r?\n/u);
   assert.equal(secretCalls.length, 1);
   assert.match(secretCalls[0], / run -d -T --no-deps --rm --pull never /u);
+  assertSecretSafe(result, fixture);
+});
+
+test("bootstrap production admin reads scalar mode and owner with GNU stat semantics", (t) => {
+  const fixture = writeFixture(t);
+  installGnuStatShim(fixture);
+
+  const result = runHelper(fixture);
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /\[bootstrap-production-admin\] status=complete/u,
+  );
+  assert.doesNotMatch(result.stderr, /无法读取 env 文件权限/u);
+  assertSecretSafe(result, fixture);
+});
+
+test("bootstrap production admin falls back to scalar BSD stat semantics", (t) => {
+  const fixture = writeFixture(t);
+  installBsdStatShim(fixture);
+
+  const result = runHelper(fixture);
+
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  assert.match(
+    result.stdout,
+    /\[bootstrap-production-admin\] status=complete/u,
+  );
   assertSecretSafe(result, fixture);
 });
 
