@@ -122,7 +122,7 @@ byte_count() {
 read_scalar() {
   local query="$1"
   local output
-  if ! output="$(run_psql -c "$query" 2>/dev/null)"; then
+  if ! output="$(printf '%s\n' "$query" | run_psql -f - 2>/dev/null)"; then
     return 1
   fi
   output="$(printf '%s\n' "$output" | sed -e 's/\r$//' -e '/^[[:space:]]*$/d' -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//')"
@@ -441,16 +441,19 @@ cleanup() {
   APP_ADMIN_PASSWORD=""
   admin_password=""
   unset APP_ADMIN_PASSWORD || true
-  [[ -z "${env_snapshot:-}" ]] || rm -f "$env_snapshot"
-  [[ -z "${normalized_env:-}" ]] || rm -f "$normalized_env"
-  [[ -z "${normalized_env_after:-}" ]] || rm -f "$normalized_env_after"
   if [[ "$container_cleanup_failed" -eq 1 ]]; then
+    [[ -z "${env_snapshot:-}" ]] || rm -f "$env_snapshot"
+    [[ -z "${normalized_env:-}" ]] || rm -f "$normalized_env"
+    [[ -z "${normalized_env_after:-}" ]] || rm -f "$normalized_env_after"
     echo "[bootstrap-production-admin] ERROR: 一次性 bootstrap 容器发现、身份复核或清理不确定；保留 PostgreSQL advisory/file lock 现场，禁止重试；operation_id=${operation_id:-unknown} expected_name=${one_shot_name:-unknown} candidate_cid=${one_shot_cid:-unknown} application_name=${advisory_application_name:-unknown} backend_pid=${advisory_backend_pid:-unknown}" >&2
     exit 1
   fi
   if ! release_database_advisory_lock; then
     advisory_release_failed=1
   fi
+  [[ -z "${env_snapshot:-}" ]] || rm -f "$env_snapshot"
+  [[ -z "${normalized_env:-}" ]] || rm -f "$normalized_env"
+  [[ -z "${normalized_env_after:-}" ]] || rm -f "$normalized_env_after"
   if [[ "$advisory_release_failed" -eq 1 ]]; then
     echo "[bootstrap-production-admin] ERROR: PostgreSQL admin bootstrap advisory lock 无法证明已释放；保留 file lock 现场，禁止重试；application_name=${advisory_application_name:-unknown} backend_pid=${advisory_backend_pid:-unknown}" >&2
     exit 1

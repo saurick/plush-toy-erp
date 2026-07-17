@@ -289,6 +289,19 @@ if [[ "\${1:-}" != "compose" ]]; then
 fi
 
 args=" $* "
+if [[ "\${FAKE_REQUIRE_ENV_FILE:-0}" == "1" ]]; then
+  compose_env_file=""
+  previous=""
+  for argument in "$@"; do
+    if [[ "$previous" == "--env-file" ]]; then
+      compose_env_file="$argument"
+      break
+    fi
+    previous="$argument"
+  done
+  [[ -n "$compose_env_file" && -f "$compose_env_file" ]] || exit 45
+  [[ -z "\${FAKE_STEADY_ENV_FILE:-}" || "$compose_env_file" != "$FAKE_STEADY_ENV_FILE" ]] || exit 47
+fi
 if [[ "$args" == *' config -q '* ]]; then
   exit 0
 fi
@@ -363,6 +376,13 @@ if [[ "$args" == *' run -d -T --no-deps --rm --pull never '* ]]; then
 fi
 if [[ "$args" != *' exec -T postgres psql '* ]]; then
   exit 1
+fi
+if [[ "$args" == *' -c '* && "$args" == *":'admin_username'"* ]]; then
+  exit 46
+fi
+if [[ "$args" == *' -f - '* ]]; then
+  query_input="$(cat)"
+  args="$args $query_input "
 fi
 
 if [[ "$args" == *'pg_terminate_backend('* ]]; then
@@ -719,6 +739,8 @@ test("bootstrap production admin uses one secret-safe one-shot and reads back al
     /run -d -T --no-deps --rm --pull never .* --label erp\.plush\.admin-bootstrap\.operation=[0-9a-f]{32} -e APP_ADMIN_PASSWORD -e BOOTSTRAP_ADMIN_ONCE=true app-server/u,
   );
   assert.match(dockerLog, /compose -p plush-toy-erp-prod --env-file/u);
+  assert.match(dockerLog, /exec -T postgres psql .* -f -/u);
+  assert.doesNotMatch(dockerLog, /exec -T postgres psql .* -c /u);
   assert.doesNotMatch(dockerLog, / service-ports | -P | up /u);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "stopped")), true);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "removed")), true);
@@ -1344,11 +1366,19 @@ test("bootstrap production admin retains locks when random-operation discovery f
 
 test("bootstrap production admin releases locks after a compose run failure with no discovered container", (t) => {
   const fixture = writeFixture(t);
-  const result = runHelper(fixture, { env: { FAKE_RUN_FAIL: "1" } });
+  const result = runHelper(fixture, {
+    env: {
+      FAKE_RUN_FAIL: "1",
+      FAKE_REQUIRE_ENV_FILE: "1",
+      FAKE_STEADY_ENV_FILE: fixture.envFile,
+    },
+  });
 
   assert.notEqual(result.status, 0);
   assert.match(result.stderr, /一次性 app-server bootstrap 容器启动失败/u);
   assert.doesNotMatch(result.stderr, /容器发现、身份复核或清理不确定/u);
+  assert.doesNotMatch(result.stderr, /advisory lock 无法证明已释放/u);
+  assert.equal(fs.existsSync(path.join(fixture.stateDir, "advisory-lock")), false);
   assert.equal(fs.existsSync(path.join(fixture.stateDir, "started")), false);
   assert.equal(fs.existsSync(bootstrapLockPath(fixture)), false);
   assertSecretSafe(result, fixture);
