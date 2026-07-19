@@ -56,9 +56,10 @@ test("mobile workflow simulated mobile closure plan stays simulated and workflow
   assert.equal(plan.actions.warehouseUrged.action, "urge_task");
   assert.equal(plan.actions.warehouseUrged.role, "pmc");
   assert.equal(
-    plan.actions.warehouseUrged.payload.notification_type,
-    "urgent_escalation",
+    plan.actions.warehouseUrged.payload.surface_key,
+    "mobile_role_tasks",
   );
+  assert(!Object.hasOwn(plan.actions.warehouseUrged.payload, "notification_type"));
 });
 
 test("mobile workflow simulated mobile closure refuses real import flags", () => {
@@ -80,13 +81,37 @@ test("mobile workflow simulated mobile closure rejects credentialed backend URL"
   );
 });
 
-test("mobile workflow simulated mobile closure action payload records evidence and exception", () => {
-  const plan = buildPlan(parseCliArgs(["--run-id", "mobile evidence"]));
+test("mobile workflow simulated mobile closure action payload omits evidence refs and keeps feedback and exceptions", () => {
+  const plan = buildPlan(parseCliArgs(["--run-id", "mobile feedback"]));
 
-  assert.deepEqual(
-    plan.actions.qualityDone.payload.mobile_action_evidence_refs,
-    ["SIM-YOYOOSUN-MOBILE-WORKFLOW-MOBILE-EVIDENCE-PHOTO-QC"],
-  );
+  assert.equal(plan.newActionEvidenceRefs, "omitted");
+  for (const action of [
+    plan.actions.approvalDone,
+    plan.actions.approvalRejected,
+    plan.actions.qualityDone,
+    plan.actions.warehouseInboundDone,
+    plan.actions.shipmentReleaseBlocked,
+  ]) {
+    assert(!Object.hasOwn(action.payload, "mobile_action_evidence_refs"));
+    assert(!Object.hasOwn(action.payload, "mobile_action"));
+    assert.equal(action.payload.surface_key, "mobile_role_tasks");
+  }
+  for (const action of [
+    plan.actions.approvalDone,
+    plan.actions.qualityDone,
+    plan.actions.warehouseInboundDone,
+  ]) {
+    assert.equal(action.reason, "");
+    assert.equal(action.payload.feedback, action.feedback);
+    assert(!Object.hasOwn(action.payload, "mobile_exception_report"));
+  }
+  for (const action of [
+    plan.actions.approvalRejected,
+    plan.actions.shipmentReleaseBlocked,
+  ]) {
+    assert(!Object.hasOwn(action.payload, "feedback"));
+    assert.equal(action.payload.mobile_exception_report.reason, action.reason);
+  }
   assert.equal(
     plan.actions.shipmentReleaseBlocked.payload.mobile_exception_report
       .simulated_only,
@@ -98,22 +123,23 @@ test("mobile workflow simulated mobile closure action payload records evidence a
     true,
   );
   assert.equal(
-    plan.actions.approvalRejected.payload.mobile_action.action_key,
+    plan.actions.approvalRejected.payload.mobile_exception_report.action_key,
     "rejected",
+  );
+  assert(
+    !Object.hasOwn(
+      plan.actions.approvalRejected.payload.mobile_exception_report,
+      "evidence_refs",
+    ),
   );
   assert.match(
     plan.actions.shipmentReleaseBlocked.reason,
     /模拟出货唛头未确认/u,
   );
   assert.match(plan.actions.approvalRejected.reason, /资料不完整/u);
-  assert.equal(
-    plan.actions.warehouseUrged.payload.mobile_urge.simulated_only,
-    true,
-  );
-  assert.equal(
-    plan.actions.warehouseUrged.payload.mobile_urge.action_key,
-    "urge_task",
-  );
+  assert.deepEqual(plan.actions.warehouseUrged.payload, {
+    surface_key: "mobile_role_tasks",
+  });
 });
 
 test("mobile workflow simulated apply action params do not replay workflow payload snapshots", () => {
@@ -182,9 +208,14 @@ test("mobile workflow simulated apply action params do not replay workflow paylo
       );
     }
   }
-  assert.equal(completeParams.payload.mobile_role_key, "boss");
-  assert.equal(blockedParams.payload.mobile_role_key, "warehouse");
-  assert.equal(urgeParams.payload.mobile_role_key, "pmc");
+  assert.equal(completeParams.payload.feedback, plan.actions.approvalDone.feedback);
+  assert(!Object.hasOwn(completeParams, "reason"));
+  assert.equal(blockedParams.reason, plan.actions.shipmentReleaseBlocked.reason);
+  assert(!Object.hasOwn(blockedParams.payload, "feedback"));
+  for (const params of [completeParams, blockedParams, rejectedParams, urgeParams]) {
+    assert(!Object.hasOwn(params.payload, "mobile_action_evidence_refs"));
+    assert(!Object.hasOwn(params.payload, "mobile_role_key"));
+  }
   assert.equal(completeParams.action_key, "complete");
   assert.equal(blockedParams.action_key, "block");
   assert.equal(rejectedParams.action_key, "reject");
@@ -250,11 +281,15 @@ test("mobile workflow simulated urge requires an explicit formal action", () => 
   }
 });
 
-test("mobile workflow simulated apply report does not expose business status as action evidence", () => {
+test("mobile workflow simulated apply report records omitted evidence refs without exposing business status", () => {
   const source = readFileSync(scriptPath, "utf8");
 
   assert(!source.includes("business_status: updated.business_status_key"));
   assert(!source.includes("business=${step.business_status}"));
+  assert(source.includes("evidence_refs_omitted:"));
+  assert(source.includes("evidence_refs_omitted=true"));
+  assert(!source.includes("evidence_count:"));
+  assert(!source.includes(" evidence=${step.evidence_count}"));
   assert(
     source.includes("factPosting: false"),
     "report boundary must continue to state simulated actions do not post facts",

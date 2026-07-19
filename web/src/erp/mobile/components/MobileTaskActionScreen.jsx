@@ -22,32 +22,32 @@ const ACTION_OPTIONS = Object.freeze([
   {
     key: 'done',
     icon: CheckOutlined,
-    toneClass:
-      'border-emerald-200 bg-emerald-50 text-emerald-700 aria-pressed:border-emerald-600 aria-pressed:bg-emerald-600 aria-pressed:text-white',
+    toneClass: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+    selectedToneClass: 'border-emerald-500 ring-2 ring-emerald-500/20',
   },
   {
     key: 'blocked',
     icon: PauseOutlined,
-    toneClass:
-      'border-orange-200 bg-orange-50 text-orange-700 aria-pressed:border-orange-600 aria-pressed:bg-orange-600 aria-pressed:text-white',
+    toneClass: 'border-orange-200 bg-orange-50 text-orange-700',
+    selectedToneClass: 'border-orange-500 ring-2 ring-orange-500/20',
   },
   {
     key: 'resume',
     icon: RedoOutlined,
-    toneClass:
-      'border-blue-200 bg-blue-50 text-blue-700 aria-pressed:border-blue-600 aria-pressed:bg-blue-600 aria-pressed:text-white',
+    toneClass: 'border-blue-200 bg-blue-50 text-blue-700',
+    selectedToneClass: 'border-blue-500 ring-2 ring-blue-500/20',
   },
   {
     key: 'rejected',
     icon: StopOutlined,
-    toneClass:
-      'border-red-200 bg-red-50 text-red-700 aria-pressed:border-red-600 aria-pressed:bg-red-600 aria-pressed:text-white',
+    toneClass: 'border-red-200 bg-red-50 text-red-700',
+    selectedToneClass: 'border-red-500 ring-2 ring-red-500/20',
   },
   {
     key: 'urge',
     icon: BellOutlined,
-    toneClass:
-      'border-slate-200 bg-white text-slate-700 aria-pressed:border-blue-600 aria-pressed:bg-blue-600 aria-pressed:text-white',
+    toneClass: 'border-slate-200 bg-white text-slate-700',
+    selectedToneClass: 'border-blue-500 ring-2 ring-blue-500/20',
   },
 ])
 
@@ -116,12 +116,10 @@ export default function MobileTaskActionScreen({
   accessState = MOBILE_TASK_ACTION_ACCESS_STATES.CHECKING,
   availableActions = [],
   busy = false,
-  evidence = '',
   canViewReceipt = false,
   onActionChange = () => {},
   onBack = () => {},
   onCancel = null,
-  onEvidenceChange = () => {},
   onReasonChange = () => {},
   onRetryAccess = null,
   onSubmit = () => {},
@@ -146,11 +144,15 @@ export default function MobileTaskActionScreen({
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.URGE_ONLY
       ? normalizedActions.filter((option) => option.key === 'urge')
       : normalizedActions
-  const effectiveAction = visibleActions.some(
-    (option) => option.key === selectedAction
-  )
-    ? selectedAction
-    : ''
+  const singleVisibleAction =
+    visibleActions.length === 1 ? visibleActions[0] : null
+  const singleVisibleActionKey = singleVisibleAction?.key || ''
+  const SingleActionIcon = singleVisibleAction?.icon || BellOutlined
+  const effectiveAction = singleVisibleAction
+    ? singleVisibleAction.key
+    : visibleActions.some((option) => option.key === selectedAction)
+      ? selectedAction
+      : ''
   const canSubmit =
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.ACTIONABLE ||
     accessState === MOBILE_TASK_ACTION_ACCESS_STATES.URGE_ONLY
@@ -165,6 +167,29 @@ export default function MobileTaskActionScreen({
     : '任务状态暂不可用'
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
   const reasonRequired = REASON_REQUIRED_ACTIONS.has(effectiveAction)
+  const effectiveActionLabel = effectiveAction
+    ? resolveMobileActionLabel(effectiveAction)
+    : ''
+  const submitLabel = effectiveActionLabel
+    ? `确认${effectiveActionLabel}`
+    : '确认提交'
+  const busySubmitLabel = effectiveActionLabel
+    ? `正在${effectiveActionLabel}`
+    : '正在提交'
+
+  useEffect(() => {
+    if (
+      !canSubmit ||
+      !singleVisibleActionKey ||
+      selectedAction === singleVisibleActionKey
+    ) {
+      return
+    }
+    setValidationErrors((current) =>
+      current.action || current.reason ? { action: '', reason: '' } : current
+    )
+    onActionChange(singleVisibleActionKey)
+  }, [canSubmit, onActionChange, selectedAction, singleVisibleActionKey])
 
   useEffect(() => {
     const { visualViewport } = window
@@ -226,7 +251,6 @@ export default function MobileTaskActionScreen({
     }
     onSubmit({
       action: effectiveAction,
-      evidence: String(evidence || '').trim(),
       reason: String(reason || '').trim(),
     })
   }
@@ -330,52 +354,115 @@ export default function MobileTaskActionScreen({
 
         {canSubmit ? (
           <>
-            <fieldset className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-              <legend className="text-lg font-semibold text-slate-950">
-                选择处理方式
-              </legend>
-              <p className="mt-1 text-sm leading-6 text-slate-500">
-                请选择与现场处理情况一致的方式；提交前系统会再次确认您是否可以办理这条任务。
-              </p>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                {visibleActions.map((option, index) => {
-                  const ActionIcon = option.icon
-                  const selected = effectiveAction === option.key
-                  return (
-                    <button
-                      key={option.key}
-                      ref={index === 0 ? actionChoiceRef : null}
-                      type="button"
-                      className={`mobile-task-action-choice mobile-task-action-choice--${option.key} inline-flex min-h-[48px] min-w-0 items-center justify-center gap-2 rounded-xl border px-3 py-3 text-base font-semibold transition focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:opacity-50 ${option.toneClass}`}
-                      aria-pressed={selected}
-                      disabled={busy}
-                      onClick={() => handleActionChange(option.key)}
-                    >
-                      <ActionIcon className="shrink-0" aria-hidden="true" />
-                      <span className="break-words">
-                        {resolveMobileActionLabel(option.key)}
-                      </span>
-                    </button>
-                  )
-                })}
-              </div>
-              {validationErrors.action ? (
-                <p
-                  className="mt-3 text-sm font-medium text-red-600"
-                  role="alert"
+            {visibleActions.length > 1 ? (
+              <section
+                className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                data-testid="mobile-task-action-options"
+              >
+                <h2
+                  id={`${fieldID}-action-heading`}
+                  className="text-lg font-semibold text-slate-950"
                 >
-                  {validationErrors.action}
+                  选择处理方式
+                </h2>
+                <p
+                  id={`${fieldID}-action-help`}
+                  className="mt-1 text-sm leading-6 text-slate-500"
+                >
+                  请选择与现场处理情况一致的方式；提交前系统会再次确认您是否可以办理这条任务。
                 </p>
-              ) : null}
-              {visibleActions.length === 0 ? (
-                <p
-                  className="mt-3 text-sm font-medium text-amber-800"
-                  role="status"
+                <div
+                  className="mt-4 grid grid-cols-2 gap-3"
+                  role="radiogroup"
+                  aria-describedby={`${fieldID}-action-help${
+                    validationErrors.action ? ` ${fieldID}-action-error` : ''
+                  }`}
+                  aria-invalid={Boolean(validationErrors.action)}
+                  aria-labelledby={`${fieldID}-action-heading`}
+                  aria-required="true"
                 >
+                  {visibleActions.map((option, index) => {
+                    const ActionIcon = option.icon
+                    const selected = effectiveAction === option.key
+                    return (
+                      <label
+                        key={option.key}
+                        className={`mobile-task-action-choice mobile-task-action-choice--${option.key} flex min-h-[52px] min-w-0 cursor-pointer items-center gap-2 rounded-xl border px-3 py-3 text-base font-semibold transition has-[:disabled]:cursor-not-allowed has-[:disabled]:opacity-50 ${option.toneClass} ${
+                          selected ? option.selectedToneClass : ''
+                        }`}
+                        data-action-key={option.key}
+                        data-selected={selected ? 'true' : 'false'}
+                      >
+                        <input
+                          ref={index === 0 ? actionChoiceRef : null}
+                          type="radio"
+                          className="mobile-task-action-choice__radio"
+                          checked={selected}
+                          disabled={busy}
+                          name={`${fieldID}-action`}
+                          value={option.key}
+                          onChange={() => handleActionChange(option.key)}
+                        />
+                        <ActionIcon className="shrink-0" aria-hidden="true" />
+                        <span className="min-w-0 break-words">
+                          {resolveMobileActionLabel(option.key)}
+                        </span>
+                      </label>
+                    )
+                  })}
+                </div>
+                {validationErrors.action ? (
+                  <p
+                    id={`${fieldID}-action-error`}
+                    className="mt-3 text-sm font-medium text-red-600"
+                    role="alert"
+                  >
+                    {validationErrors.action}
+                  </p>
+                ) : null}
+              </section>
+            ) : singleVisibleAction ? (
+              <section
+                className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"
+                data-testid="mobile-task-single-action"
+              >
+                <h2 className="text-lg font-semibold text-slate-950">
+                  本次操作
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-500">
+                  当前只可执行这一项，无需再次选择；填写办理信息后再确认提交。
+                </p>
+                <div
+                  className="mobile-task-single-action__value mt-4 flex min-w-0 items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-4 py-3"
+                  data-testid="mobile-task-single-action-summary"
+                >
+                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-blue-700">
+                    <SingleActionIcon aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-slate-500">
+                      已确定的操作
+                    </div>
+                    <div className="break-words text-lg font-semibold text-slate-950">
+                      {effectiveActionLabel}
+                    </div>
+                  </div>
+                </div>
+              </section>
+            ) : (
+              <section
+                className="erp-mobile-card rounded-2xl border border-amber-200 bg-white p-4 shadow-sm"
+                data-testid="mobile-task-action-unavailable"
+                role="status"
+              >
+                <h2 className="text-lg font-semibold text-slate-950">
+                  暂不能提交
+                </h2>
+                <p className="mt-2 text-sm font-medium leading-6 text-amber-800">
                   当前没有可提交的处理方式，请返回任务详情重新确认。
                 </p>
-              ) : null}
-            </fieldset>
+              </section>
+            )}
 
             {effectiveAction ? (
               <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -427,45 +514,13 @@ export default function MobileTaskActionScreen({
                   </span>
                 </div>
 
-                <div className="mt-5 flex items-center justify-between gap-3">
-                  <label
-                    className="text-lg font-semibold text-slate-950"
-                    htmlFor={`${fieldID}-evidence`}
-                  >
-                    现场证据
-                  </label>
-                  <span className="text-sm font-semibold text-slate-400">
-                    可选
-                  </span>
-                </div>
-                <textarea
-                  id={`${fieldID}-evidence`}
-                  className="mt-3 min-h-[104px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base leading-6 text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-                  aria-describedby={`${fieldID}-evidence-help`}
-                  disabled={busy}
-                  maxLength={500}
-                  placeholder="填写照片、附件编号或链接；多条可换行"
-                  value={evidence}
-                  onChange={(event) => onEvidenceChange(event.target.value)}
-                />
-                <div className="mt-1 flex justify-end text-sm">
-                  <span className="shrink-0 text-slate-400">
-                    {String(evidence || '').length}/500
-                  </span>
-                </div>
-                <p
-                  id={`${fieldID}-evidence-help`}
-                  className="mt-2 text-sm leading-6 text-slate-500"
-                >
-                  这里只填写可核验线索；已上传的现场附件仍由任务附件区管理。
-                </p>
               </section>
             ) : null}
 
             <section className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm leading-6 text-blue-700">
               <div className="font-semibold">业务边界</div>
               <div className="mt-1 [overflow-wrap:anywhere]">
-                这里仅记录这条任务的办理情况；库存、质检、出货、开票和收付款仍需在对应单据中办理。
+                这里仅提交本次办理说明；任务附件统一在详情页查看或管理。库存、质检、出货、开票和收付款仍需在对应单据中办理。
               </div>
             </section>
           </>
@@ -488,11 +543,11 @@ export default function MobileTaskActionScreen({
         {canSubmit ? (
           <button
             type="submit"
-            className="inline-flex min-h-[48px] items-center justify-center gap-2 rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
+            className="inline-flex min-h-[48px] items-center justify-center gap-2 whitespace-nowrap rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500 disabled:cursor-not-allowed disabled:bg-slate-300"
             disabled={busy || visibleActions.length === 0}
           >
             {busy ? <LoadingOutlined spin /> : null}
-            {busy ? '正在提交' : '确认提交'}
+            <span>{busy ? busySubmitLabel : submitLabel}</span>
           </button>
         ) : null}
         {showFooterRetry ? (

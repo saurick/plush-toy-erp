@@ -10,7 +10,7 @@ import {
 } from '../../api/workflowApi.mjs'
 import {
   buildMobileTaskView,
-  buildMobileTaskActionEvidence,
+  buildMobileTaskActionPayload,
   normalizeMobileActionEvidenceRefs,
 } from '../../utils/mobileTaskView.mjs'
 import {
@@ -37,11 +37,8 @@ function resolveWorkflowTaskActionMode(action = '') {
   return ''
 }
 
-function buildMobileWorkflowActionPayload({ evidenceText, feedback }) {
-  return buildMobileTaskActionEvidence({
-    evidenceText,
-    feedback,
-  })
+function buildMobileWorkflowActionPayload({ feedback }) {
+  return buildMobileTaskActionPayload({ feedback })
 }
 
 const MOBILE_TASK_RECEIPT_STATUSES = new Set(['confirmed', 'failed', 'unknown'])
@@ -120,7 +117,6 @@ export default function useMobileRoleTaskActions({
   initialAction = '',
   initialActionReceipt = null,
   initialActionTaskID = null,
-  initialEvidence = '',
   initialReason = '',
   selectedTask,
   taskActionAccess,
@@ -138,7 +134,6 @@ export default function useMobileRoleTaskActions({
   const normalizedInitialAction = normalizeMobileTaskActionKey(initialAction)
   const normalizedInitialTaskID = Number(initialActionTaskID || 0)
   const normalizedInitialReason = String(initialReason || '')
-  const normalizedInitialEvidence = String(initialEvidence || '')
   const [taskActionReasonDrafts, setTaskActionReasonDrafts] = useState(() => {
     if (
       normalizedInitialTaskID <= 0 ||
@@ -166,16 +161,6 @@ export default function useMobileRoleTaskActions({
             normalizedReceiptScopeKey,
             normalizedInitialTaskID
           )]: normalizedInitialReason,
-        }
-      : {}
-  )
-  const [evidenceTextByTaskID, setEvidenceTextByTaskID] = useState(() =>
-    normalizedInitialTaskID > 0 && normalizedInitialEvidence
-      ? {
-          [mobileTaskScopedValueKey(
-            normalizedReceiptScopeKey,
-            normalizedInitialTaskID
-          )]: normalizedInitialEvidence,
         }
       : {}
   )
@@ -316,13 +301,7 @@ export default function useMobileRoleTaskActions({
         )
         return false
       }
-      const evidenceText = String(
-        evidenceTextByTaskID[
-          mobileTaskScopedValueKey(normalizedReceiptScopeKey, task.id)
-        ] || ''
-      ).trim()
       const payload = buildMobileWorkflowActionPayload({
-        evidenceText,
         feedback: completionFeedback,
       })
       const actionParams = {
@@ -382,10 +361,10 @@ export default function useMobileRoleTaskActions({
         if (isWorkflowTaskMutationResultUnknown(error)) {
           publishActionReceipt({
             action: taskStatusKey,
-            evidence_refs: payload.evidence_refs || [],
+            evidence_refs: [],
             feedback: completionFeedback,
             message:
-              '网络中断，本次办理结果暂未确认。已填写内容和证据已保留，可继续确认。',
+              '网络中断，本次办理结果暂未确认。已填写内容已保留，可继续确认。',
             reason: actionReason,
             status: 'unknown',
             task,
@@ -398,7 +377,7 @@ export default function useMobileRoleTaskActions({
           )
           publishActionReceipt({
             action: taskStatusKey,
-            evidence_refs: payload.evidence_refs || [],
+            evidence_refs: [],
             feedback: completionFeedback,
             message: errorMessage,
             reason: actionReason,
@@ -415,7 +394,7 @@ export default function useMobileRoleTaskActions({
           : null
       publishActionReceipt({
         action: taskStatusKey,
-        evidence_refs: payload.evidence_refs || [],
+        evidence_refs: [],
         feedback: completionFeedback,
         message: confirmedTask
           ? '任务办理结果已经确认。'
@@ -434,13 +413,6 @@ export default function useMobileRoleTaskActions({
         if (draftKey) {
           delete next[draftKey]
         }
-        return next
-      })
-      setEvidenceTextByTaskID((current) => {
-        const next = { ...current }
-        delete next[
-          mobileTaskScopedValueKey(normalizedReceiptScopeKey, task.id)
-        ]
         return next
       })
       message.success('任务状态已更新')
@@ -493,9 +465,7 @@ export default function useMobileRoleTaskActions({
         message.warning('请先填写催办原因')
         return false
       }
-      const mobileActionEvidence = buildMobileTaskActionEvidence({
-        evidenceText: evidenceTextByTaskID[scopedTaskKey] || '',
-      })
+      const mobileActionPayload = buildMobileTaskActionPayload()
       const scope = `${normalizedReceiptScopeKey}::${task.id}:urge`
       const operation = 'urge'
       const params = {
@@ -503,7 +473,7 @@ export default function useMobileRoleTaskActions({
         expected_version: task.version,
         action: resolveMobileUrgeAction(activeRoleKey, task),
         reason,
-        payload: mobileActionEvidence,
+        payload: mobileActionPayload,
       }
       const accessVerified = await verifyNewWorkflowTaskMutationAttempt({
         attemptStore: mutationAttempts,
@@ -537,9 +507,9 @@ export default function useMobileRoleTaskActions({
         if (isWorkflowTaskMutationResultUnknown(error)) {
           publishActionReceipt({
             action: 'urge',
-            evidence_refs: mobileActionEvidence.evidence_refs || [],
+            evidence_refs: [],
             message:
-              '网络中断，催办结果尚未确认。本次原因和证据已保留，可继续确认。',
+              '网络中断，催办结果尚未确认。本次原因已保留，可继续确认。',
             reason,
             status: 'unknown',
             task,
@@ -552,7 +522,7 @@ export default function useMobileRoleTaskActions({
           )
           publishActionReceipt({
             action: 'urge',
-            evidence_refs: mobileActionEvidence.evidence_refs || [],
+            evidence_refs: [],
             message: errorMessage,
             reason,
             status: 'failed',
@@ -568,7 +538,7 @@ export default function useMobileRoleTaskActions({
           : null
       publishActionReceipt({
         action: 'urge',
-        evidence_refs: mobileActionEvidence.evidence_refs || [],
+        evidence_refs: [],
         message: confirmedTask
           ? '催办结果已经确认。'
           : '催办已返回，但没有取得可确认的任务信息，请刷新任务列表核对。',
@@ -577,11 +547,6 @@ export default function useMobileRoleTaskActions({
         task: confirmedTask || task,
       })
       setUrgeReasonByTaskID((current) => {
-        const next = { ...current }
-        delete next[scopedTaskKey]
-        return next
-      })
-      setEvidenceTextByTaskID((current) => {
         const next = { ...current }
         delete next[scopedTaskKey]
         return next
@@ -682,9 +647,6 @@ export default function useMobileRoleTaskActions({
           reasonDrafts: taskActionReasonDrafts,
         })
     : ''
-  const detailEvidenceValue = selectedTask
-    ? evidenceTextByTaskID[selectedTaskScopedKey] || ''
-    : ''
   const savedEvidenceRefs = selectedTask
     ? normalizeMobileActionEvidenceRefs(
         selectedTask.mobile_action_evidence_refs
@@ -720,16 +682,8 @@ export default function useMobileRoleTaskActions({
     }))
   }
 
-  const updateEvidenceText = (value) => {
-    if (!selectedTask) return
-    setEvidenceTextByTaskID((current) => ({
-      ...current,
-      [selectedTaskScopedKey]: value,
-    }))
-  }
-
   const restoreActionDraft = useCallback(
-    ({ taskID, action, reason = '', evidence = '' } = {}) => {
+    ({ taskID, action, reason = '' } = {}) => {
       const normalizedTaskID = Number(taskID || 0)
       const normalizedAction = normalizeMobileTaskActionKey(action)
       if (
@@ -740,7 +694,6 @@ export default function useMobileRoleTaskActions({
         return false
       }
       const normalizedReason = String(reason || '')
-      const normalizedEvidence = String(evidence || '')
       const scopedTaskKey = mobileTaskScopedValueKey(
         normalizedReceiptScopeKey,
         normalizedTaskID
@@ -761,10 +714,6 @@ export default function useMobileRoleTaskActions({
           [draftKey]: normalizedReason,
         }))
       }
-      setEvidenceTextByTaskID((current) => ({
-        ...current,
-        [scopedTaskKey]: normalizedEvidence,
-      }))
       return true
     },
     [normalizedReceiptScopeKey]
@@ -850,7 +799,6 @@ export default function useMobileRoleTaskActions({
     appendQuickReason,
     actionReceipt: scopedActionReceipt,
     clearActionReceipt,
-    detailEvidenceValue,
     detailReasonValue,
     handleTaskAction,
     savedEvidenceRefs,
@@ -867,7 +815,6 @@ export default function useMobileRoleTaskActions({
     showTaskReceipt,
     submitDetailAction,
     updateDetailReason,
-    updateEvidenceText,
     updatingID,
     urgingID,
   }

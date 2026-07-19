@@ -1,11 +1,11 @@
 import React from 'react'
 import {
-  CameraOutlined,
   ClockCircleOutlined,
   ExclamationCircleFilled,
   FileTextOutlined,
   LinkOutlined,
   LoadingOutlined,
+  PaperClipOutlined,
   ReloadOutlined,
   RightOutlined,
 } from '@ant-design/icons'
@@ -38,6 +38,7 @@ export default function MobileTaskDetailScreen({
   onViewReceipt,
   roleLabel,
   savedEvidenceRefs,
+  selectedCanManageAttachments,
   selectedCanOperate,
   selectedCanUrge,
   selectedSeverity,
@@ -59,7 +60,7 @@ export default function MobileTaskDetailScreen({
     selectedTask,
     ''
   )
-  const canManageEvidence = selectedCanOperate
+  const canManageAttachments = selectedCanManageAttachments === true
   const canOpenProcess = selectedCanOperate || selectedCanUrge
   const canViewReceipt = typeof onViewReceipt === 'function'
   const retryAccess =
@@ -220,42 +221,51 @@ export default function MobileTaskDetailScreen({
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
-              <CameraOutlined className="text-emerald-500" aria-hidden="true" />
-              现场证据
+              <PaperClipOutlined
+                className="text-emerald-500"
+                aria-hidden="true"
+              />
+              任务附件
             </h2>
             <span className="text-xs font-semibold text-slate-400">
-              {canManageEvidence ? '可补充' : '只读'}
+              {canManageAttachments ? '可管理' : '只读'}
             </span>
           </div>
+          <p className="mt-3 text-sm leading-6 text-slate-500">
+            照片、异常截图和处理凭证统一在这里查看或管理；附件只记录任务办理情况。
+          </p>
           {savedEvidenceRefs.length > 0 ? (
             <div
-              data-testid="mobile-role-saved-evidence"
-              className="mt-3 flex flex-wrap gap-2"
+              data-testid="mobile-role-historical-evidence"
+              className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-3"
             >
-              {savedEvidenceRefs.map((ref) => (
-                <span
-                  key={ref}
-                  className="min-w-0 max-w-full break-all rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-sm font-semibold text-emerald-700"
-                >
-                  {ref}
-                </span>
-              ))}
+              <div className="text-sm font-semibold text-slate-600">
+                历史处理线索
+              </div>
+              <div className="mt-2 flex flex-wrap gap-2">
+                {savedEvidenceRefs.map((ref) => (
+                  <span
+                    key={ref}
+                    className="min-w-0 max-w-full break-all rounded-lg border border-slate-200 bg-white px-2 py-1 text-sm font-medium text-slate-600"
+                  >
+                    {ref}
+                  </span>
+                ))}
+              </div>
             </div>
-          ) : (
-            <p className="mt-3 text-sm leading-6 text-slate-500">
-              当前任务尚无可显示的处理证据。
-            </p>
-          )}
+          ) : null}
           <div className="mt-4">
             <BusinessAttachmentModalButton
               ownerType="workflow_task"
               ownerId={selectedTask.id}
               ownerVersion={selectedTask.version}
-              buttonText={canManageEvidence ? '管理现场附件' : '查看现场附件'}
-              modalTitle="现场附件"
-              panelTitle="现场附件"
-              description="现场照片、异常截图和处理凭证只用于记录任务办理情况，不会改变库存、质检、出货、开票或收付款结果。"
-              canUpload={canManageEvidence}
+              buttonText={
+                canManageAttachments ? '查看与补充附件' : '查看任务附件'
+              }
+              modalTitle="任务附件"
+              panelTitle="任务附件"
+              description="照片、异常截图和处理凭证只用于记录任务办理情况，不会改变库存、质检、出货、开票或收付款结果。"
+              canUpload={canManageAttachments}
               canDelete={false}
               disabled={!selectedTask}
               disabledReason="请先进入一条任务详情"

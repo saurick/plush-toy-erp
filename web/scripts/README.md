@@ -50,7 +50,7 @@ pnpm preview:yoyoosun
 - `mobileAuthLoginRouteSmoke.mjs --print-input-template` 只打印移动端认证回跳 smoke 所需输入、岗位任务端角色和命令模板，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。
 - `mobileAuthLoginRouteSmoke.mjs --preflight-report <path>` 只写本地前置报告，记录脚本是否存在、岗位任务端角色路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径；不启动 Vite / Playwright、不调用后端 / JSON-RPC、不读取密码、不登录、不保存 token 或 Authorization header、不写数据库，也不证明真实 RBAC / customer config active revision。
 - 真实 `smoke:mobile-auth-login-route` 使用 mock auth / workflow RPC 验证 `/m/<role>/tasks` 生产单端口路由、phone/iPad 布局和登录回跳。
-- `mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report <path>` 只写本地前置检查报告，记录后端 health 是否可达、是否存在演示密码 env、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，以及模拟任务动作计划是否覆盖老板阻塞 / 完成 / 退回、跨角色催办、reason 必填、完成反馈、异常上报、evidence refs 和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，报告不保存 token 或 Authorization header。
+- `mobileWorkflowRuntimeBrowserSmoke.mjs --preflight-report <path>` 只写本地前置检查报告，记录后端 health 是否可达、是否存在演示密码 env、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，以及模拟任务动作计划是否覆盖老板阻塞 / 完成 / 退回、跨角色催办、reason 必填、完成反馈、异常上报、动作页不出现证据输入、新动作不生成 evidence refs 和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，报告不保存 token 或 Authorization header。
 - `purchaseReceiptRealWriteBrowserE2E.mjs --print-input-template` 只打印采购入库页面真实写入 e2e 所需输入、持久测试数据确认、`PR-BROWSER-*` 记录边界和后续真实命令，不读取本地配置、不校验账号、不调用后端、不启动 Vite、不启动 Playwright、不登录、不写数据库。
 - `purchaseReceiptRealWriteBrowserE2E.mjs --preflight-report <path>` 只写本地前置检查报告，记录后端 health 是否可达、显式管理员账号密码 env 是否齐全、是否已确认持久测试数据、页面目标是否为本机或已显式允许外部测试目标；不读取本地配置、不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建或过账采购入库单、不写数据库，报告不保存 token 或 Authorization header。
 - 真实登录 smoke 可能读取本地开发配置中的管理员账号，也可能通过环境变量覆盖账号密码；不要把账号、token 或截图里的敏感信息提交。

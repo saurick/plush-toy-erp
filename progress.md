@@ -5,10 +5,28 @@
 ## 当前活跃事项
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
-- 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务和页面合同等改动统一按最终 `strict` 证据提交，不再把相邻差异拆算为独立未收口任务。
-- 固定生产路线 / WIP 的版本化 migration 已生成；登记的个人开发库已读回到 `20260718125909`、83 executed、pending 0，schema 与约束已生效，但固定路线所需的工序标准位置仍须通过工序页或受控 seed 显式绑定。共享库和目标环境没有本轮 apply 证据；本轮收口不执行数据库写入。
+- 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务和页面合同等改动统一按最终 `strict` 证据提交，不再把相邻差异拆算为独立未收口任务。冻结树首轮 `strict` 已输出 `status=complete`，本记录纳入后仍须对最终树再取得同一结果才允许提交。
+- 固定生产路线 / WIP 的版本化 migration 已生成；登记的个人开发库已读回到 `20260718125909`、83 executed、pending 0，schema 与约束已生效，但固定路线所需的工序标准位置仍须通过工序页或受控 seed 显式绑定。共享库和目标环境没有本轮 apply 证据；本轮不执行 schema / migration 或业务数据写入，角色演示账号密码重置是下述独立的本地认证数据写入。
 - 本轮已获得整树提交和推送授权；仍不创建分支、不部署、不执行共享库 / 目标库 migration 或 backfill，也不补做目标 health / smoke、真实岗位浏览器读回和客户 UAT。
 - 发布目标仍是内网测试机 `192.168.0.133`；本次提交推送不等于该目标环境已经发布或验收。
+
+## 2026-07-19 整树严格门禁与 Git 收口
+
+完成：按 full-worktree 范围冻结当前 45 个修改文件，两个独立只读审查覆盖完整 diff 与角色 seed 安全边界。审查发现的固定公开密码可进入高权限账号 / 非隔离目标问题已修复：公开值按实际密码值而不是输入来源判断，只允许登记的 `192.168.0.106:5432/plush_erp_*_dev`，账号集排除 admin / debug，debug、人工验收场景和 `--allow-prod` 均要求非默认密码；MVP、开发测试工作台和 README 的完整角色验收命令同步恢复为非默认密码占位。两路复核均无剩余提交阻断。
+
+当前验证：冻结树首轮 `bash scripts/qa/strict.sh` 输出 `status=complete`；其中 server quick `2630 / 2630`、关键 PostgreSQL `190 / 190`、server all `2784 / 2784` 均为 `0 fail / 0 skip`，scripts / Web 全量测试、Web production build、Chromium PDF 安全集成、数据库 fresh / populated upgrade、漏洞扫描、ShellCheck、shfmt、YAML 和 Web 零 warning 门禁完成。角色 seed / 文档 / MVP / 开发测试定向合同 `25 / 25`、secrets range gate 和 `git diff --check` 另行通过。本记录是首轮 strict 后唯一计划内改动；只有把它纳入最终树后再次取得 `strict status=complete` 才执行提交和推送。
+
+未做 / 风险：本地门禁不等于发布或客户验收；本次不部署 `192.168.0.133`，不 apply 共享库 / 目标库 migration，不执行目标 health / readback、真实岗位写入 smoke 或客户 UAT。角色公开值的目标保护当前绑定登记的 DSN 地址、端口和隔离库名，尚未增加连接后 PostgreSQL cluster system identifier 读回；这是本次审查确认的非阻断盲区。
+
+## 2026-07-19 角色演示账号密码与环境边界
+
+完成：标准 `demo_*` 角色账号 seed 入口保留无输入开发便利，但公开测试值 `12345678` 现在同时绑定登记的 `192.168.0.106:5432/plush_erp_*_dev` 隔离开发库和九个普通业务角色；无输入不会生成 `demo_admin` / `demo_debug`，也不会重置人工验收场景账号。`demo_admin`、调试账号、人工验收账号和完整角色验收必须显式提供非默认密码；公开测试值即使显式传入也不能离开登记的隔离开发库，`--allow-prod` 必须使用非默认密码。已有账号仍只有显式 `--reset-password` 才改密；同步更新 scripts / server / MVP 验收说明、永绅试用账号清单和开发测试合同。
+
+完成：安全边界收紧前，已在登记的个人开发库上用无输入命令真实重置十个角色账号，并完成 `admin_login + me` 的 `10 / 10` 读回；该历史执行只证明当时的个人开发库，不是当前代码允许无输入重建高权限账号的合同。收紧后的代码不会再以无输入默认处理 `demo_admin`，本次 Git 收口也没有再次连接数据库或改动任何账号。
+
+当前验证：`go test -count=1 ./cmd/seed-role-demo-admins ./internal/data -run 'RoleDemo|ManualAcceptancePasswords'`、完整 command 包测试、Node 角色文档 / MVP / 开发测试合同 `25 / 25`、文档清单与本地链接 `3 / 3`、脚本语法、secrets range gate 和 `git diff --check` 通过，均无 skip。真实永绅浏览器 smoke 已用 `demo_boss / 12345678` 成功登录并进入工作台，但因当前菜单未显示脚本期望的“业务看板”而在 15 秒后失败，未继续核对其余账号，不能写成浏览器 smoke 通过；该菜单漂移不影响本轮 API 级密码与角色登录证据。
+
+未做 / 风险：收紧代码不会自动轮换个人开发库里此前已重置的账号；如需改变既有密码，仍须在明确目标后显式执行 `--reset-password`。本轮未重置 `demo_debug`、三个 `demo_uat_*` 场景账号、133 或生产账号，未部署、未执行目标环境 readback 或客户 UAT。整树门禁与提交停止线见上方 Git 收口记录。
 
 ## 2026-07-19 外部审查问题与并行工作树集中收口
 
@@ -16,7 +34,7 @@
 
 完成：Atlas migration、Ent 生成物、正式架构 / 能力 / 客户交付文档与当前实现重新对齐。登记的个人开发库只读核对为 `20260718125909`、83 executed、pending 0；固定路线仍为 `0 / 4` 个标准工序位置已绑定，必须由工序页或受控 seed 显式完成，不能把 migration 已执行写成路线已可用。共享库和目标环境没有本轮 apply 证据。
 
-当前验证：Node `24.14.0` 下 scripts 全量 `1273 / 1273`、Web 全量 `1691 / 1691`，完整 Style L1 mock Chromium `154 / 154`，均为 `0 fail / 0 skip`；关键 PostgreSQL 矩阵连续 3 轮各 `190 / 190`，另完成 24 轮并发竞态复核。`make data` 没有生成额外 migration，Atlas validate、fresh / 存量升级、`db-guard` 和 schema 合同通过。最终提交停止条件是冻结树上的 `bash scripts/qa/strict.sh` 输出 `status=complete`；未达到该结果不提交、不推送。
+当前验证：Node `24.14.0` 下 scripts 全量 `1273 / 1273`、Web 全量 `1691 / 1691`，完整 Style L1 mock Chromium `154 / 154`，均为 `0 fail / 0 skip`；关键 PostgreSQL 矩阵连续 3 轮各 `190 / 190`，另完成 24 轮并发竞态复核。`make data` 没有生成额外 migration，Atlas validate、fresh / 存量升级、`db-guard` 和 schema 合同通过。整树冻结后的首轮 `bash scripts/qa/strict.sh` 已输出 `status=complete`；本记录纳入后的最终复核仍是提交停止线。
 
 未做 / 风险：本次只治理、验证、提交和推送当前代码库；未部署 `192.168.0.133`，未写入共享库或目标库，未执行目标环境 health / readback、真实岗位浏览器验收或客户 UAT。Atlas migrate lint 仍受 Pro 登录限制，已由 validate、fresh / 存量升级和 PostgreSQL 矩阵补证；超大前端页面拆分继续作为非阻断技术债，不在本轮扩展范围。
 
@@ -24,15 +42,17 @@
 
 完成：移动岗位任务端保留现有 v1 待办 / 已办 / 提醒 / 我的列表、主筛选、服务端游标分页 / 分批展开和任务卡片；选中任务后改由 v2 独立全屏“查看任务 → 处理任务 → 可信结果回执”承接，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。浏览器 / 系统返回、处理草稿、深分页任务恢复、重复游标 / 无新增页止损、窄屏、暗色、移动键盘和焦点返回均纳入同一流程合同。
 
-完成：处理动作只消费后端 action explain 投影；仅催办任务只显示催办，只读任务不展示假动作。完成反馈进入后端 `payload.feedback`，现场证据继续独立进入 `evidence_refs`；阻塞、退回、解除阻塞和催办继续按动作合同要求原因。回执只接受本次可信 mutation 的 `confirmed / unknown / failed` 结果，不从任务终态补造成功、处理人或时间；Workflow done 和附件上传都不等于业务 Fact 已生效。
+完成：处理动作只消费后端 action explain 投影；有多个可办动作时使用原生单选框选择，只有一个催办动作时不再显示“选择处理方式”或可点击的假“催办”选项，而是在卡片内显示非交互“本次操作：催办”摘要，真正的提交命令固定在底部“确认催办”。历史草稿或授权投影从其他动作收窄为唯一催办时，页面会同步受控动作并隔离旧动作原因，不会落入反复提示“处理方式已变化”却无选项可改的死路。只读任务不展示假动作。完成反馈进入后端 `payload.feedback`，阻塞、退回、解除阻塞和催办继续按动作合同要求原因；动作页不再收集自由文本证据或重复提供文件上传，新动作不生成 `evidence_refs`。回执只接受本次可信 mutation 的 `confirmed / unknown / failed` 结果，不从任务终态补造成功、处理人或时间；Workflow done 和附件上传都不等于业务 Fact 已生效。
+
+完成：详情页把原“现场证据”收敛为真实“任务附件”。只有任务可由当前岗位办理且账号具备 `workflow.task.update` 时才显示“查看与补充附件”，跨岗位催办、终态回执或无写权限场景只显示“查看任务附件”；只读弹窗不再渲染禁用的假上传按钮或隐藏文件输入。旧 `mobile_action_evidence_refs / evidence_refs` 继续只读归一化，并仅在确有数据时以“历史处理线索”展示；新动作和新回执不会复制这些历史引用。附件按钮的装饰图标已从可访问名称中移除。
 
 完成：终态动作把任务从待办 / 风险缓存移走后，结果回执仍可按同一账号、客户与权限 revision 的可信 canonical 快照回看只读详情，不重新开放处理。History 草稿、回执详情与 Back / Forward 恢复均要求完整 access scope 相等；稀疏筛选另存每个服务端视图的实际已加载数量，刷新时最多按 `20 x 50 = 1000` 条恢复，不再把筛选后可见条数误当服务端扫描深度。三位数任务计数在 390px 窄屏筛选条内保持裁切，无内部横向溢出。
 
-完成：原型与文档登记改为有意组合的主路径。`mobile-role-tasks-v1/implemented-reference.html` 是唯一 Current，范围只覆盖 v1 列表壳，文件内旧详情内处理仅作历史对照；`mobile-role-tasks-v2/index.html` 的选中任务流程已经接入本地运行时，继续保持 To Implement 只因为真实账号浏览器视觉验收和用户确认尚未完成，不表示未来要替换或移除 v1 列表。
+完成：原型与文档登记改为有意组合的当前主路径。`mobile-role-tasks-v1/implemented-reference.html` 与 `mobile-role-tasks-v2/index.html` 同时登记为 Current，分别描述当前列表基线和当前选中任务流程；v1 文件内旧详情只作历史对照，v2 不替换或移除 v1 列表。旧 `filter=to-implement&asset=mobile-role-tasks-v2` 深链会保留资产并自动迁移为 `filter=current`，不再把用户跳到待实现队列第一项。
 
-当前验证：移动专项 Node 合同 `154 / 154`、开发态原型登记合同 `20 / 20`、文档清单与本地链接 `3 / 3` 通过；定向 ESLint `--max-warnings=0`、Stylelint、`node --check` 和 `git diff --check` 均通过。Vite production build 通过并转换 `3319` 个模块，只有执行环境 Node `26.5.0` 与项目锁定 `24.14.x` 不一致的 engine warning。`mobile-yoyo-role-task-readonly-actions`、`mobile-tasks-dark`、`mobile-tasks-browser-back-stays-mobile` 三个 mock Chromium Style L1 场景 `3 / 3` 通过，新增覆盖 120 条非命中风险 + 30 条超时命中的稀疏筛选深分页、刷新 / Back / Forward、终态回执回看只读详情、三位数计数窄屏布局，并继续覆盖只读 / 仅催办和暗色；registry 与静态查看器均只有一个 Current。no-write runtime preflight 已确认本机前端 `15200`、后端 `8300`、yoyoosun 静态配置与 health / ready 可探测，但 `readyForRealSmoke=false`，唯一 blocker 是 `missing-demo-password-env`。
+当前验证：Node `24.14.0` 下动作、附件、回执、原型登记、模拟闭环和运行时 smoke 定向合同 `134 / 134`，当前共享树 Web 全量 `1697 / 1697`，均为 `0 fail / 0 skip`；文档 / MVP 定向合同 `7 / 7`、Web ESLint、Stylelint、`git diff --check` 通过，Vite production build 转换 `3319` 个模块并通过。`mobile-yoyo-role-task-projection`、`mobile-yoyo-boss-urge-only`、`mobile-yoyo-role-task-readonly-actions`、`mobile-tasks-dark`、`mobile-tasks-browser-back-stays-mobile` 五个 mock Chromium Style L1 场景 `5 / 5` 通过，覆盖 390 / 430px、多岗位、只读附件、无假上传、催办单一摘要、动作页无证据输入、暗色和返回恢复。真实本地浏览器复用已登录 `http://127.0.0.1:15200/m/boss/tasks` 做了只读核对：任务详情显示只读“任务附件”，弹窗没有上传按钮或 file input；进入催办页后只有“本次操作：催办”、一个催办原因文本框和底部“确认催办”，没有“选择处理方式”、radio、现场证据或 file input，文档横向宽度与视口一致；随后取消返回详情，未提交任何任务动作。`5175` 原型中心 live 核对显示 v1 与 v2 两项 Current，旧 v2 待实现深链自动规范为 Current 并保持选中 v2。
 
-未做 / 风险：未执行真实岗位账号登录后的浏览器 smoke、视觉确认、目标环境发布读回或客户 UAT；当前打开 `/m/boss/tasks` 只能到登录页，不能据此证明任务读取、处理或回执运行态。未改 schema / migration、后端 Fact、RBAC 权限码、正式菜单或客户数据，也未连接 / apply 数据库、提交、推送或部署。
+未做 / 风险：本轮没有在真实任务上点击“确认催办 / 完成 / 阻塞 / 退回”，也未执行会创建并变更 Workflow 模拟任务的真实岗位账号全流程 smoke，因此真实后端写入、回执读回和附件上传成功链仍未由本次浏览器核对证明。未完成目标环境发布读回或客户 UAT，未改 schema / migration、后端 Fact、RBAC 权限码、正式菜单或客户数据，也未连接 / apply 数据库或部署；移动切片的定向绿色已由上方整树 strict 补充本地门禁，但仍不替代真实写入、目标发布或 UAT。
 
 ## 2026-07-19 开发工作台覆盖状态与证据边界
 
@@ -114,7 +134,7 @@
 
 ## 近期已完成基线
 
-- 2026-07-19：`/m/<role>/tasks` 已形成有意组合的 v1 列表 + v2 选中任务流程；v1 Current 只登记列表基线，v2 To Implement 只保留真实账号浏览器验收和用户确认门禁。未删除 v1 列表，也不以整页替换 v1 作为 v2 完成条件。
+- 2026-07-19：`/m/<role>/tasks` 已形成有意组合的 v1 列表 + v2 选中任务流程；v1 与 v2 同为 Current，分别登记列表基线和选中任务流程。动作页只提交反馈 / 原因，任务附件统一在详情按权限管理，旧证据引用仅作历史线索；未删除 v1 列表，也不以整页替换 v1 作为 v2 完成条件。
 
 - 2026-07-18：出货来源导入改为服务端候选分页和十进制字符串，只有 `SHIPPED` 占用来源余量；公开流程只从销售订单、采购订单和出货单三类真实来源启动，旧无来源采购入库与入库单起流程入口退役。
 - 2026-07-18：外部代码审查 P1 / P2 集中治理时，Node 24.14.0 下 `strict.sh` 曾完成 scripts 1242 / 1242、Web 合同 200 / 200、server quick 2359 / 2359、Web 全量 1570 / 1570、关键 PostgreSQL 156 / 156、server-all 2493 / 2493，0 fail / 0 skip；这是后续密集并行修改前的历史基线，不证明当前工作树仍全绿。

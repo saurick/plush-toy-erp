@@ -516,23 +516,27 @@ const BusinessAttachmentPanel = forwardRef(
               {panelDescription}
             </Typography.Paragraph>
           </div>
-          <Button
-            type="primary"
-            icon={<UploadOutlined />}
-            loading={uploading}
-            disabled={uploadDisabled}
-            onClick={() => inputRef.current?.click()}
-          >
-            {uploadButtonText}
-          </Button>
-          <input
-            ref={inputRef}
-            hidden
-            multiple
-            type="file"
-            accept={ACCEPTED_ATTACHMENT_TYPES}
-            onChange={handleFileChange}
-          />
+          {canUpload ? (
+            <>
+              <Button
+                type="primary"
+                icon={<UploadOutlined />}
+                loading={uploading}
+                disabled={uploadDisabled}
+                onClick={() => inputRef.current?.click()}
+              >
+                {uploadButtonText}
+              </Button>
+              <input
+                ref={inputRef}
+                hidden
+                multiple
+                type="file"
+                accept={ACCEPTED_ATTACHMENT_TYPES}
+                onChange={handleFileChange}
+              />
+            </>
+          ) : null}
         </div>
         <List
           size="small"

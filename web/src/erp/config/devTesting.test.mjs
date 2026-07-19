@@ -293,6 +293,11 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   )
   assert.match(
     getPresetCopyText('trial-account-rbac'),
+    /replace-with-local-demo-password/
+  )
+  assert.doesNotMatch(getPresetCopyText('trial-account-rbac'), /12345678/)
+  assert.match(
+    getPresetCopyText('trial-account-rbac'),
     /--report output\/trial-account-rbac\/report\.json/
   )
   assert.match(
@@ -480,6 +485,14 @@ test('devTesting: 为常用预设和分层复制生成命令文本', () => {
   assert.match(
     getPresetCopyText('mobile-workflow-smoke'),
     /mobileWorkflowRuntimeBrowserSmoke\.mjs --preflight-report output\/mobile-workflow-runtime-browser-smoke\/preflight\.json/
+  )
+  assert.match(
+    getPresetCopyText('mobile-workflow-smoke'),
+    /replace-with-local-demo-password/
+  )
+  assert.doesNotMatch(
+    getPresetCopyText('mobile-workflow-smoke'),
+    /12345678/
   )
   assert.match(getPreset('mobile-workflow-smoke').description, /无写入输入模板/)
   assert.match(

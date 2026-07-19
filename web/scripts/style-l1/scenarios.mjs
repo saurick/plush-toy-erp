@@ -4474,27 +4474,56 @@ export function createStyleL1Scenarios(deps) {
               )
             })
           await expectText(page, '选择处理方式')
-          const actionMetrics = await actionScreen.evaluate((screen) => ({
-            actions: Array.from(
-              screen.querySelectorAll('button[aria-pressed]')
-            ).map((button) => ({
-              text: button.textContent?.replace(/\s+/g, ' ').trim() || '',
-              disabled: button.disabled,
-              selected: button.getAttribute('aria-pressed'),
-            })),
-            documentScrollWidth: document.documentElement.scrollWidth,
-            documentClientWidth: document.documentElement.clientWidth,
-          }))
+          const actionMetrics = await actionScreen.evaluate((screen) => {
+            const card = screen.querySelector(
+              '[data-testid="mobile-task-action-options"]'
+            )
+            const heading = card?.querySelector('h2')
+            const cardRect = card?.getBoundingClientRect()
+            const headingRect = heading?.getBoundingClientRect()
+            return {
+              actions: Array.from(
+                screen.querySelectorAll('label[data-action-key]')
+              ).map((choice) => ({
+                text: choice.textContent?.replace(/\s+/g, ' ').trim() || '',
+                disabled:
+                  choice.querySelector('input[type="radio"]')?.disabled ?? true,
+                selected:
+                  choice.querySelector('input[type="radio"]')?.checked ?? false,
+              })),
+              radiogroupCount: screen.querySelectorAll('[role="radiogroup"]')
+                .length,
+              fakeActionButtonCount: card?.querySelectorAll(
+                'button[aria-pressed]'
+              ).length,
+              cardContainsHeading: Boolean(
+                cardRect &&
+                  headingRect &&
+                  headingRect.top >= cardRect.top - 1 &&
+                  headingRect.bottom <= cardRect.bottom + 1 &&
+                  headingRect.left >= cardRect.left - 1 &&
+                  headingRect.right <= cardRect.right + 1
+              ),
+              cardOverflowX:
+                card instanceof HTMLElement
+                  ? card.scrollWidth - card.clientWidth
+                  : null,
+              documentScrollWidth: document.documentElement.scrollWidth,
+              documentClientWidth: document.documentElement.clientWidth,
+            }
+          })
           assert(
             actionMetrics.actions.some(
               (action) => action.text === '阻塞' && !action.disabled
             ) &&
               actionMetrics.actions.some(
                 (action) =>
-                  action.text === '完成' &&
-                  !action.disabled &&
-                  action.selected === 'true'
-              ),
+                  action.text === '完成' && !action.disabled && action.selected
+              ) &&
+              actionMetrics.radiogroupCount === 1 &&
+              actionMetrics.fakeActionButtonCount === 0 &&
+              actionMetrics.cardContainsHeading &&
+              actionMetrics.cardOverflowX <= 1,
             `${role.label}岗位独立处理页应提供可选的阻塞、完成动作: ${JSON.stringify(
               { actionDiagnostic, actionMetrics }
             )}`
@@ -4504,11 +4533,491 @@ export function createStyleL1Scenarios(deps) {
               actionMetrics.documentClientWidth + 1,
             `${role.label}岗位独立处理页不应横向溢出: ${JSON.stringify(actionMetrics)}`
           )
+          if (role.key === 'engineering') {
+            await actionScreen.screenshot({
+              path: path.join(
+                outputDir,
+                'mobile-yoyo-engineering-task-action-430.png'
+              ),
+            })
+          }
           await page.getByLabel('返回任务详情').click()
           await processButton.waitFor({ state: 'visible', timeout: 10_000 })
           await page.getByRole('button', { name: '任务列表' }).click()
           await expectText(page, role.taskName)
         }
+      },
+    },
+    {
+      name: 'mobile-yoyo-boss-urge-only',
+      path: '/m/boss/tasks',
+      auth: 'admin',
+      customerKey: 'yoyoosun',
+      effectiveSession: {
+        configRevision: 'style-l1-mobile-yoyo-boss-urge-only',
+        configHash: 'style-l1-mobile-yoyo-boss-urge-only-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: [
+          'workflow.task.create',
+          'workflow.task.read',
+          'workflow.task.update',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['engineering'],
+          'workflow.task.update': ['boss'],
+        },
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      adminProfile: {
+        username: 'style-l1-yoyo-boss-urge-only',
+        is_super_admin: false,
+        roles: [{ role_key: 'boss', name: '老板' }],
+        permissions: [
+          'mobile.boss.access',
+          'workflow.task.create',
+          'workflow.task.read',
+          'workflow.task.update',
+        ],
+        menus: [],
+      },
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        const taskName = '工程关键资料待催办任务'
+        const sourceID = 12_150
+        await page.evaluate(
+          async ({ sourceID: taskSourceID, taskName: targetTaskName }) => {
+            const response = await fetch('/rpc/workflow', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: 'mobile-yoyo-boss-urge-only-create',
+                method: 'create_task',
+                params: {
+                  task_code: 'STYLE-L1-YOYO-BOSS-URGE-ONLY',
+                  task_group: 'project-orders',
+                  task_name: targetTaskName,
+                  source_type: 'project-orders',
+                  source_id: taskSourceID,
+                  source_no: 'YOYO-BOSS-URGE-ONLY',
+                  business_status_key: 'project_pending',
+                  task_status_key: 'ready',
+                  owner_role_key: 'engineering',
+                  priority: 9,
+                  payload: {
+                    critical_path: true,
+                    due_date: '2026-07-18',
+                  },
+                },
+              }),
+            })
+            const payload = await response.json()
+            if (!response.ok || payload?.result?.code !== 0) {
+              throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
+            }
+          },
+          { sourceID, taskName }
+        )
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page
+          .getByTestId('mobile-role-bottom-nav')
+          .waitFor({ state: 'visible', timeout: 15_000 })
+          .catch(async (error) => {
+            const diagnostic = await page.evaluate(async () => {
+              const call = async (domain, method, params = {}) => {
+                const response = await fetch(`/rpc/${domain}`, {
+                  method: 'POST',
+                  headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: `mobile-yoyo-boss-diagnostic-${method}`,
+                    method,
+                    params,
+                  }),
+                })
+                return response.json()
+              }
+              const [profile, effectiveSession] = await Promise.all([
+                call('admin', 'me'),
+                call('customer_config', 'get_effective_session', {
+                  customer_key: 'yoyoosun',
+                }),
+              ])
+              return {
+                bodyText:
+                  document.body.textContent?.replace(/\s+/g, ' ').trim() || '',
+                effectiveSession,
+                path: window.location.pathname,
+                permissions: JSON.parse(
+                  localStorage.getItem('admin_permissions') || '[]'
+                ),
+                profile,
+                roles: JSON.parse(localStorage.getItem('admin_roles') || '[]'),
+              }
+            })
+            throw new Error(
+              `仅催办场景未进入岗位任务端: ${JSON.stringify(diagnostic)}`,
+              { cause: error }
+            )
+          })
+        await page.getByTestId('mobile-role-nav-messages').click()
+        await page.waitForFunction(() => {
+          const heading = document.querySelector('.mobile-role-tasks-page h1')
+          return heading?.textContent?.trim() === '提醒'
+        })
+        const taskRow = page
+          .locator('.mobile-role-message-card')
+          .filter({ hasText: taskName })
+          .first()
+        await taskRow.waitFor({ state: 'visible', timeout: 10_000 })
+        await taskRow.click()
+        await expectText(page, '这条任务由工程办理，您可以查看并发起催办。')
+
+        const actionDiagnostic = await page.evaluate(async (taskSourceID) => {
+          const call = async (method, params = {}) => {
+            const response = await fetch('/rpc/workflow', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: `mobile-yoyo-boss-urge-only-${method}`,
+                method,
+                params,
+              }),
+            })
+            return response.json()
+          }
+          const taskPayload = await call('list_tasks', {
+            source_id: taskSourceID,
+            limit: 10,
+          })
+          const task = taskPayload?.result?.data?.tasks?.[0]
+          const accessPayload = task
+            ? await call('explain_action_access', { task_id: task.id })
+            : null
+          return {
+            task: task
+              ? {
+                  id: task.id,
+                  ownerRoleKey: task.owner_role_key,
+                  statusKey: task.task_status_key,
+                }
+              : null,
+            actions: accessPayload?.result?.data?.actions || [],
+          }
+        }, sourceID)
+        assert.deepEqual(
+          actionDiagnostic.actions
+            .filter((action) => action.allowed === true)
+            .map((action) => action.action_key),
+          ['urge'],
+          `仅催办场景的后端允许动作必须精确为 urge: ${JSON.stringify(actionDiagnostic)}`
+        )
+
+        const viewTaskAttachments = page.getByRole('button', {
+          name: '查看任务附件',
+          exact: true,
+        })
+        assert.equal(
+          await viewTaskAttachments.count(),
+          1,
+          `仅催办角色应有一个只读任务附件入口: ${JSON.stringify(
+            await page.locator('button').allTextContents()
+          )}`
+        )
+        await viewTaskAttachments.click()
+        const attachmentDialog = page.getByRole('dialog', {
+          name: '任务附件',
+          exact: true,
+        })
+        await attachmentDialog.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await attachmentDialog
+            .getByRole('button', { name: '选择附件', exact: true })
+            .count(),
+          0,
+          '仅催办角色的任务附件弹窗不应显示假上传按钮'
+        )
+        assert.equal(
+          await attachmentDialog.locator('input[type="file"]').count(),
+          0,
+          '仅催办角色的任务附件弹窗不应渲染文件输入'
+        )
+        await attachmentDialog.locator('.ant-modal-close').click()
+        await attachmentDialog.waitFor({ state: 'hidden', timeout: 10_000 })
+
+        await page
+          .getByRole('button', { name: '处理任务', exact: true })
+          .click()
+        const actionScreen = page.getByTestId('mobile-task-action-screen')
+        await actionScreen.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.evaluate(() => {
+          const currentState = window.history.state || {}
+          window.history.replaceState(
+            {
+              ...currentState,
+              mobileRoleTasksAction: 'done',
+              mobileRoleTasksReason: '旧的完成反馈不应进入催办原因',
+            },
+            ''
+          )
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await actionScreen.waitFor({ state: 'visible', timeout: 15_000 })
+        await page.waitForFunction(
+          () => window.history.state?.mobileRoleTasksAction === 'urge',
+          undefined,
+          { timeout: 10_000 }
+        )
+        await expectText(page, '本次操作')
+        await expectText(page, '催办原因')
+        assert.equal(
+          await actionScreen.getByLabel('现场证据').count(),
+          0,
+          '仅催办处理页不应显示现场证据输入'
+        )
+        assert.equal(
+          await actionScreen.locator('input[type="file"]').count(),
+          0,
+          '仅催办处理页不应显示附件上传入口'
+        )
+        assert.equal(
+          await actionScreen.getByLabel('催办原因').inputValue(),
+          '',
+          '旧处理方式的草稿不能残留到唯一催办动作'
+        )
+        assert.equal(
+          await actionScreen.getByText('选择处理方式', { exact: true }).count(),
+          0,
+          '仅有催办动作时不应继续提示选择处理方式'
+        )
+        assert.equal(
+          await actionScreen.getByRole('radio').count(),
+          0,
+          '仅有催办动作时不应渲染单选组'
+        )
+        assert.equal(
+          await actionScreen
+            .getByRole('button', { name: '催办', exact: true })
+            .count(),
+          0,
+          '催办摘要不能伪装成单击即执行的按钮'
+        )
+
+        const singleActionMetrics = await actionScreen.evaluate((screen) => {
+          const card = screen.querySelector(
+            '[data-testid="mobile-task-single-action"]'
+          )
+          const summary = screen.querySelector(
+            '[data-testid="mobile-task-single-action-summary"]'
+          )
+          const heading = card?.querySelector('h2')
+          const submit = screen.querySelector('button[type="submit"]')
+          const cardRect = card?.getBoundingClientRect()
+          const summaryRect = summary?.getBoundingClientRect()
+          const headingRect = heading?.getBoundingClientRect()
+          const submitRect = submit?.getBoundingClientRect()
+          const contained = (outer, inner) =>
+            Boolean(
+              outer &&
+                inner &&
+                inner.top >= outer.top - 1 &&
+                inner.bottom <= outer.bottom + 1 &&
+                inner.left >= outer.left - 1 &&
+                inner.right <= outer.right + 1
+            )
+          return {
+            actionOptionsCount: screen.querySelectorAll(
+              '[data-testid="mobile-task-action-options"]'
+            ).length,
+            cardContainsHeading: contained(cardRect, headingRect),
+            cardContainsSummary: contained(cardRect, summaryRect),
+            cardOverflowX:
+              card instanceof HTMLElement
+                ? card.scrollWidth - card.clientWidth
+                : null,
+            screenOverflowX: screen.scrollWidth - screen.clientWidth,
+            documentOverflowX:
+              document.documentElement.scrollWidth -
+              document.documentElement.clientWidth,
+            headingText:
+              heading?.textContent?.replace(/\s+/g, ' ').trim() || '',
+            summaryText:
+              summary?.textContent?.replace(/\s+/g, ' ').trim() || '',
+            submitText: submit?.textContent?.replace(/\s+/g, ' ').trim() || '',
+            submitType: submit?.getAttribute('type') || '',
+            submitDisabled: submit?.disabled ?? true,
+            submitHeight: submitRect?.height || 0,
+          }
+        })
+        assert(
+          singleActionMetrics.actionOptionsCount === 0 &&
+            singleActionMetrics.headingText === '本次操作' &&
+            singleActionMetrics.summaryText.includes('催办') &&
+            singleActionMetrics.cardContainsHeading &&
+            singleActionMetrics.cardContainsSummary &&
+            singleActionMetrics.cardOverflowX <= 1 &&
+            singleActionMetrics.screenOverflowX <= 1 &&
+            singleActionMetrics.documentOverflowX <= 1 &&
+            singleActionMetrics.submitText === '确认催办' &&
+            singleActionMetrics.submitType === 'submit' &&
+            !singleActionMetrics.submitDisabled &&
+            singleActionMetrics.submitHeight >= 48,
+          `仅催办处理页的语义或布局异常: ${JSON.stringify(singleActionMetrics)}`
+        )
+        await actionScreen.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-boss-urge-only-action-390.png'
+          ),
+        })
+
+        await page.evaluate(async () => {
+          document.documentElement.setAttribute('data-erp-theme', 'dark')
+          await document.fonts?.ready
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+          await new Promise((resolve) => requestAnimationFrame(resolve))
+        })
+        await assertThemeReadable(page, {
+          scenarioName: 'mobile-yoyo-boss-urge-only-dark',
+          selector: '[data-testid="mobile-task-single-action"]',
+        })
+        await assertDarkThemeContrast(page, {
+          scenarioName: 'mobile-yoyo-boss-urge-only-dark',
+          selector: '[data-testid="mobile-task-single-action"]',
+          minRatio: 4.5,
+        })
+        const darkSubmitMetrics = await actionScreen
+          .getByRole('button', { name: '确认催办', exact: true })
+          .evaluate((button) => {
+            const buttonRect = button.getBoundingClientRect()
+            const textElement = button.querySelector('span:not(.anticon)')
+            const textRect = textElement?.getBoundingClientRect() || null
+            return {
+              buttonRect: {
+                bottom: buttonRect.bottom,
+                left: buttonRect.left,
+                right: buttonRect.right,
+                top: buttonRect.top,
+              },
+              clientHeight: button.clientHeight,
+              clientWidth: button.clientWidth,
+              scrollHeight: button.scrollHeight,
+              scrollWidth: button.scrollWidth,
+              text: button.innerText.trim(),
+              textRect: textRect
+                ? {
+                    bottom: textRect.bottom,
+                    left: textRect.left,
+                    right: textRect.right,
+                    top: textRect.top,
+                    width: textRect.width,
+                  }
+                : null,
+            }
+          })
+        assert(
+          darkSubmitMetrics.text === '确认催办' &&
+            darkSubmitMetrics.scrollWidth <= darkSubmitMetrics.clientWidth &&
+            darkSubmitMetrics.scrollHeight <= darkSubmitMetrics.clientHeight &&
+            darkSubmitMetrics.textRect?.width >= 56 &&
+            darkSubmitMetrics.textRect.left >=
+              darkSubmitMetrics.buttonRect.left - 1 &&
+            darkSubmitMetrics.textRect.right <=
+              darkSubmitMetrics.buttonRect.right + 1 &&
+            darkSubmitMetrics.textRect.top >=
+              darkSubmitMetrics.buttonRect.top - 1 &&
+            darkSubmitMetrics.textRect.bottom <=
+              darkSubmitMetrics.buttonRect.bottom + 1,
+          `深色模式不能截断真正的催办命令文案: ${JSON.stringify(darkSubmitMetrics)}`
+        )
+        await actionScreen.screenshot({
+          path: path.join(
+            outputDir,
+            'mobile-yoyo-boss-urge-only-action-dark-390.png'
+          ),
+        })
+        await page.evaluate(() => {
+          document.documentElement.setAttribute('data-erp-theme', 'light')
+        })
+
+        let urgeTaskCalls = 0
+        page.on('request', (request) => {
+          if (!new URL(request.url()).pathname.endsWith('/rpc/workflow')) return
+          if (request.postDataJSON()?.method === 'urge_task') urgeTaskCalls += 1
+        })
+        const confirmButton = actionScreen.getByRole('button', {
+          name: '确认催办',
+          exact: true,
+        })
+        await confirmButton.click()
+        await expectText(page, '催办原因为必填项')
+        assert.equal(urgeTaskCalls, 0, '催办原因缺失时不得发送催办请求')
+        const reasonInput = actionScreen.getByLabel('催办原因')
+        assert.equal(
+          await reasonInput.evaluate((node) => document.activeElement === node),
+          true,
+          '催办原因缺失时应聚焦对应输入框'
+        )
+        await reasonInput.fill('请在今天下班前补齐工程关键资料')
+        await confirmButton.click()
+        const receiptScreen = page.getByTestId('mobile-task-receipt-screen')
+        await receiptScreen.waitFor({ state: 'visible', timeout: 10_000 })
+        const receiptText = (await receiptScreen.innerText())
+          .replace(/\s+/g, ' ')
+          .trim()
+        assert(
+          receiptText.includes('任务办理已确认'),
+          `催办回执未确认: ${JSON.stringify({ receiptText, urgeTaskCalls })}`
+        )
+        await expectText(page, '催办')
+        assert.equal(urgeTaskCalls, 1, '确认催办只应发送一次 urge_task 请求')
+
+        const taskAfterUrge = await page.evaluate(async (taskSourceID) => {
+          const response = await fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'mobile-yoyo-boss-urge-only-after',
+              method: 'list_tasks',
+              params: { source_id: taskSourceID, limit: 10 },
+            }),
+          })
+          const payload = await response.json()
+          const task = payload?.result?.data?.tasks?.[0]
+          return task
+            ? {
+                statusKey: task.task_status_key,
+                urgeCount: task.payload?.urge_count || 0,
+                lastUrgeReason: task.payload?.last_urge_reason || '',
+              }
+            : null
+        }, sourceID)
+        assert.deepEqual(
+          taskAfterUrge,
+          {
+            statusKey: 'ready',
+            urgeCount: 1,
+            lastUrgeReason: '请在今天下班前补齐工程关键资料',
+          },
+          '催办只能记录催办事实，不能替责任岗位完成任务'
+        )
       },
     },
     {
@@ -4887,6 +5396,9 @@ export function createStyleL1Scenarios(deps) {
               customer_name: '暗色客户',
               style_no: '深色测试款',
               due_date: '2026-06-06',
+              mobile_action_evidence_refs: [
+                '上一班次处理线索：成品照片已上传，并完成现场交接核对',
+              ],
             },
           })
         })

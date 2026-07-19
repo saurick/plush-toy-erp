@@ -199,20 +199,10 @@ export function normalizeMobileActionEvidenceRefs(value) {
   return [...new Set(values.filter(Boolean))]
 }
 
-export function buildMobileTaskActionEvidence({
-  evidenceText = '',
-  evidenceRefs,
-  feedback = '',
-} = {}) {
-  const normalizedEvidenceRefs = normalizeMobileActionEvidenceRefs(
-    evidenceRefs || evidenceText
-  )
+export function buildMobileTaskActionPayload({ feedback = '' } = {}) {
   const normalizedFeedback = String(feedback || '').trim()
   return {
     ...(normalizedFeedback ? { feedback: normalizedFeedback } : {}),
-    ...(normalizedEvidenceRefs.length
-      ? { evidence_refs: normalizedEvidenceRefs }
-      : {}),
     surface_key: 'mobile_role_tasks',
   }
 }

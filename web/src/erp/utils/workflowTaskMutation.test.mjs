@@ -170,7 +170,8 @@ test('formal workflow action surfaces submit only canonical payload fields', () 
   assert.doesNotMatch(dashboard, /desktop_task_board_action/u)
   assert.match(workflowPage, /surface_key:\s*'workflow_business_module'/u)
   assert.doesNotMatch(workflowPage, /workflow_page_(?:action|scope)/u)
-  assert.match(mobile, /buildMobileTaskActionEvidence/u)
+  assert.match(mobile, /buildMobileTaskActionPayload/u)
+  assert.doesNotMatch(mobile, /evidenceText|updateEvidenceText/u)
   assert.doesNotMatch(
     mobile,
     /mobile_role_key|mobile_action_(?:key|recorded_at|role_key)|(?:approval|qc|shipment_release|receivable|invoice|payable|reconciliation)_result/u

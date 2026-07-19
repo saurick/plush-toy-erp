@@ -111,7 +111,7 @@ const MVP_PHASES = [
       "MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS MOBILE_WORKFLOW_SIM_PASSWORD='replace-with-demo-password' node scripts/qa/mobile-workflow-simulated-closure.mjs --apply --backend-url http://127.0.0.1:8300 --run-id target-yyyymmdd-mobile --out output/customers/yoyoosun/mobile-workflow-simulated-closure-target",
     ],
     acceptance: [
-      "只验证岗位协同、处理动作、异常和现场留痕。",
+      "只验证岗位协同、处理动作、反馈 / 原因、任务附件入口和新动作不生成历史证据引用。",
       "Workflow task done 不等于库存、出货或财务事实已过账。",
       "岗位任务端不绕过 WorkflowUsecase 或事实 usecase。",
     ],

@@ -371,14 +371,14 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     key: 'mobile-role-tasks-v2',
     title: '岗位任务中心 v2 原型',
     type: 'HTML',
-    statuses: [DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT],
+    statuses: [DEV_PROTOTYPE_STATUSES.CURRENT],
     directory: 'mobile-role-tasks-v2/',
     assetPath: 'mobile-role-tasks-v2/index.html',
     readmePath: 'mobile-role-tasks-v2/README.md',
     description:
       '保留 v1 列表壳，选中任务后进入 v2 全屏查看、处理和可信结果回执，结束后恢复原列表状态；无回执时不开放空结果。',
     appliesTo:
-      '选中任务流程已接入本地运行时；To Implement 仅表示真实账号浏览器验收和用户确认尚未完成，不表示未来要替换 v1 列表。',
+      '岗位任务端 `/m/<role>/tasks` 当前选中任务流程；与 v1 当前列表基线共同组成完整移动任务主路径。',
   },
   {
     key: 'mobile-role-tasks-implemented',
@@ -391,7 +391,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '覆盖当前仍在使用的待办 / 已办 / 提醒 / 我的、主筛选、分批展开和任务卡片；HTML 内旧详情内处理只作历史对照。',
     appliesTo:
-      '岗位任务端 `/m/<role>/tasks` 当前唯一 Current 列表基线；选中任务后的 v2 行为以真实代码、测试和运行态为准。',
+      '岗位任务端 `/m/<role>/tasks` 当前列表基线；与 v2 当前选中任务流程共同组成完整移动任务主路径。',
   },
   {
     key: 'mobile-role-tasks-list',
@@ -532,6 +532,29 @@ export function normalizeDevPrototypeStatusFilter(
   return DEV_PROTOTYPE_FILTER_OPTIONS.some((option) => option.value === filter)
     ? filter
     : DEV_PROTOTYPE_FILTERS.ALL
+}
+
+export function resolveDevPrototypeStatusFilterForSelection(
+  status = DEV_PROTOTYPE_FILTERS.ALL,
+  selectedKey = '',
+  items = []
+) {
+  const filter = normalizeDevPrototypeStatusFilter(status)
+  const itemKey = String(selectedKey || '')
+  if (filter === DEV_PROTOTYPE_FILTERS.ALL || !itemKey) return filter
+
+  const selectedItem = items.find((item) => item.key === itemKey)
+  if (!selectedItem) return filter
+  if (filterDevPrototypeItems([selectedItem], { status: filter }).length > 0) {
+    return filter
+  }
+  if (selectedItem.statuses.includes(DEV_PROTOTYPE_STATUSES.CURRENT)) {
+    return DEV_PROTOTYPE_FILTERS.CURRENT
+  }
+  if (selectedItem.statuses.includes(DEV_PROTOTYPE_STATUSES.TO_IMPLEMENT)) {
+    return DEV_PROTOTYPE_FILTERS.TO_IMPLEMENT
+  }
+  return DEV_PROTOTYPE_FILTERS.REFERENCE
 }
 
 export function normalizeDevPrototypeSelectedKey(selectedKey = '', items = []) {

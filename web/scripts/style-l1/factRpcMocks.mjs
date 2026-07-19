@@ -2500,15 +2500,36 @@ export async function installFactRpcMocks(page, context) {
           fail('任务已被其他人更新，请刷新后重试')
         } else {
           const { mutationParams, receipt, task } = request
+          const urgedAt = nowUnix()
+          const actorRoleKey =
+            String(
+              adminProfile?.roles?.[0]?.role_key ||
+                adminProfile?.roles?.[0]?.key ||
+                ''
+            ).trim() || 'system'
+          const escalationTarget =
+            mutationParams.action === 'escalate_to_boss'
+              ? 'boss'
+              : mutationParams.action === 'escalate_to_pmc'
+                ? 'pmc'
+                : ''
+          task.urge_count = Number(task.urge_count || 0) + 1
+          task.last_urged_at = urgedAt
+          task.last_urged_by = Math.max(1, Number(adminProfile?.id || 0))
+          task.last_urged_by_role_key = actorRoleKey
+          if (escalationTarget) {
+            task.escalated_at = urgedAt
+            task.escalate_target_role_key = escalationTarget
+          }
           task.payload = {
             ...(task.payload || {}),
             ...mutationParams.payload,
             urged: true,
-            urge_count: Number(task.payload?.urge_count || 0) + 1,
+            urge_count: task.urge_count,
             last_urge_action: mutationParams.action,
             last_urge_reason: mutationParams.reason,
           }
-          task.updated_at = nowUnix()
+          task.updated_at = urgedAt
           task.version += 1
           workflowMutationReceipts.set(receipt.receiptKey, {
             intent: receipt.intent,

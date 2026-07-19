@@ -28,11 +28,14 @@ type bootstrapConfig struct {
 	} `yaml:"data"`
 }
 
-const resetLocalSuperAdminConfirm = "RESET_LOCAL_SUPER_ADMIN_PASSWORD"
+const (
+	resetLocalSuperAdminConfirm = "RESET_LOCAL_SUPER_ADMIN_PASSWORD"
+	defaultRoleDemoPassword     = "12345678"
+)
 
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
-	password := flag.String("password", "", "demo account password; ERP_ROLE_DEMO_PASSWORD is preferred for local use")
+	password := flag.String("password", "", "demo account password; precedence: --password, ERP_ROLE_DEMO_PASSWORD, then the local demo default")
 	resetPassword := flag.Bool("reset-password", false, "reset password for existing demo accounts")
 	includeDebug := flag.Bool("include-debug", false, "also seed demo_debug with debug_operator role")
 	includeManualAcceptanceScenarios := flag.Bool("include-manual-acceptance-scenarios", false, "also reset the three existing manual acceptance scenario account passwords without changing roles or status")
@@ -61,18 +64,19 @@ func main() {
 		fail("%v", err)
 	}
 
-	effectivePassword := strings.TrimSpace(*password)
-	source := "--password"
-	if effectivePassword == "" {
-		effectivePassword = strings.TrimSpace(os.Getenv("ERP_ROLE_DEMO_PASSWORD"))
-		source = "ERP_ROLE_DEMO_PASSWORD"
+	effectivePassword, source := resolveRoleDemoPassword(*password, os.Getenv)
+	if err := validateRoleDemoPassword(effectivePassword, *allowProd); err != nil {
+		fail("%v", err)
 	}
-	if effectivePassword == "" {
-		fail("missing role demo password: set ERP_ROLE_DEMO_PASSWORD or pass --password")
+	if err := validateRoleDemoPasswordTarget(
+		effectivePassword,
+		dsn,
+		*includeDebug,
+		*includeManualAcceptanceScenarios,
+	); err != nil {
+		fail("%v", err)
 	}
-	if biz.ValidateAdminPassword(effectivePassword) != nil {
-		fail("role demo password must contain 8-20 characters")
-	}
+	accounts := roleDemoAccountsForPassword(effectivePassword, *includeDebug)
 
 	db, err := sql.Open("pgx", dsn)
 	if err != nil {
@@ -95,6 +99,7 @@ func main() {
 		Password:      effectivePassword,
 		ResetPassword: *resetPassword,
 		IncludeDebug:  *includeDebug,
+		Accounts:      accounts,
 	})
 	if err != nil {
 		fail("seed role demo admins failed: %v", err)
@@ -123,6 +128,67 @@ func main() {
 		}
 		fmt.Printf("- %s role=%s %s password_reset=%t\n", account.Username, account.RoleKey, action, account.PasswordReset)
 	}
+}
+
+func resolveRoleDemoPassword(flagPassword string, getenv func(string) string) (string, string) {
+	if password := strings.TrimSpace(flagPassword); password != "" {
+		return password, "--password"
+	}
+	if getenv != nil {
+		if password := strings.TrimSpace(getenv("ERP_ROLE_DEMO_PASSWORD")); password != "" {
+			return password, "ERP_ROLE_DEMO_PASSWORD"
+		}
+	}
+	return defaultRoleDemoPassword, "default"
+}
+
+func validateRoleDemoPassword(password string, allowProd bool) error {
+	if allowProd && password == defaultRoleDemoPassword {
+		return fmt.Errorf("a non-default explicit role demo password is required with --allow-prod")
+	}
+	if biz.ValidateAdminPassword(password) != nil {
+		return fmt.Errorf("role demo password must contain 8-20 characters")
+	}
+	return nil
+}
+
+func validateRoleDemoPasswordTarget(password, dsn string, includeDebug, includeManualAcceptanceScenarios bool) error {
+	if password == defaultRoleDemoPassword && includeDebug {
+		return fmt.Errorf("--include-debug requires a non-default explicit role demo password")
+	}
+	if password == defaultRoleDemoPassword && includeManualAcceptanceScenarios {
+		return fmt.Errorf("--include-manual-acceptance-scenarios requires a non-default explicit role demo password")
+	}
+	if password != defaultRoleDemoPassword {
+		return nil
+	}
+	if err := devdbguard.RequireLocalAdminResetDSN(dsn); err != nil {
+		return fmt.Errorf("the public role demo password is restricted to a registered isolated development database: %w", err)
+	}
+	u, err := url.Parse(strings.TrimSpace(dsn))
+	if err != nil {
+		return fmt.Errorf("parse postgres dsn for role demo password target failed: %w", err)
+	}
+	databaseName := strings.TrimPrefix(strings.TrimSpace(u.Path), "/")
+	if !strings.HasSuffix(databaseName, "_dev") {
+		return fmt.Errorf("the public role demo password requires an isolated development database ending in _dev")
+	}
+	return nil
+}
+
+func roleDemoAccountsForPassword(password string, includeDebug bool) []data.RoleDemoAdminAccountSpec {
+	accounts := data.DefaultRoleDemoAdminAccounts(includeDebug)
+	if password != defaultRoleDemoPassword {
+		return accounts
+	}
+	businessAccounts := make([]data.RoleDemoAdminAccountSpec, 0, len(accounts))
+	for _, account := range accounts {
+		if account.RoleKey == biz.AdminRoleKey || account.RoleKey == biz.DebugOperatorRoleKey {
+			continue
+		}
+		businessAccounts = append(businessAccounts, account)
+	}
+	return businessAccounts
 }
 
 func rejectStableAdminReset(requested bool, confirmation string) error {

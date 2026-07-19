@@ -210,10 +210,10 @@ function buildInputTemplate(options = {}) {
       "trial_warehouse_urge",
     ],
     simulatedActions: [
-      "boss done",
+      "boss done with feedback",
       "boss rejected with reason",
-      "quality done with evidence",
-      "warehouse done with evidence",
+      "quality done with feedback",
+      "warehouse done with feedback",
       "shipment release blocked with exception report",
       "pmc urges warehouse task without completing it",
     ],
@@ -238,28 +238,24 @@ function buildInputTemplate(options = {}) {
   };
 }
 
-function evidence(actionKey, roleKey, reason, evidenceRefs, nowSec) {
-  const refs = Array.isArray(evidenceRefs) ? evidenceRefs : [];
+function mobileActionPayload({
+  actionKey,
+  roleKey,
+  feedback,
+  reason,
+  nowSec,
+}) {
+  const normalizedFeedback = optionalText(feedback);
+  const normalizedReason = optionalText(reason);
   const payload = {
-    mobile_action: {
-      role_key: roleKey,
-      action_key: actionKey,
-      reason,
-      evidence_refs: refs,
-      recorded_at: nowSec,
-      simulated_only: true,
-    },
-    mobile_action_evidence_refs: refs,
-    mobile_action_recorded_at: nowSec,
-    mobile_action_role_key: roleKey,
-    mobile_action_key: actionKey,
+    ...(normalizedFeedback ? { feedback: normalizedFeedback } : {}),
+    surface_key: "mobile_role_tasks",
   };
   if (["blocked", "rejected"].includes(actionKey)) {
     payload.mobile_exception_report = {
       role_key: roleKey,
       action_key: actionKey,
-      reason,
-      evidence_refs: refs,
+      reason: normalizedReason,
       reported_at: nowSec,
       simulated_only: true,
     };
@@ -308,6 +304,7 @@ function buildPlan(options) {
     realCustomerImport: false,
     factPosting: false,
     customerAcceptanceRequiredForClosure: false,
+    newActionEvidenceRefs: "omitted",
     simulationPrefix: SIMULATION_PREFIX,
     runId: options.runId,
     backendURL: options.backendURL,
@@ -418,76 +415,66 @@ function buildPlan(options) {
         role: "boss",
         nextStatus: "done",
         reason: "",
-        payload: evidence(
-          "done",
-          "boss",
-          "",
-          [`${prefix}-PHOTO-APPROVAL`],
+        feedback: "Mobile workflow 模拟审批已确认。",
+        payload: mobileActionPayload({
+          actionKey: "done",
+          roleKey: "boss",
+          feedback: "Mobile workflow 模拟审批已确认。",
           nowSec,
-        ),
+        }),
       },
       approvalRejected: {
         role: "boss",
         nextStatus: "rejected",
         reason: "Mobile workflow 模拟资料不完整，退回销售补齐。",
-        payload: evidence(
-          "rejected",
-          "boss",
-          "Mobile workflow 模拟资料不完整，退回销售补齐。",
-          [`${prefix}-PHOTO-REJECT`],
+        payload: mobileActionPayload({
+          actionKey: "rejected",
+          roleKey: "boss",
+          reason: "Mobile workflow 模拟资料不完整，退回销售补齐。",
           nowSec,
-        ),
+        }),
       },
       qualityDone: {
         role: "quality",
         nextStatus: "done",
         reason: "",
-        payload: {
-          qc_result: "pass",
-          ...evidence("done", "quality", "", [`${prefix}-PHOTO-QC`], nowSec),
-        },
+        feedback: "Mobile workflow 模拟抽检办理完成。",
+        payload: mobileActionPayload({
+          actionKey: "done",
+          roleKey: "quality",
+          feedback: "Mobile workflow 模拟抽检办理完成。",
+          nowSec,
+        }),
       },
       warehouseInboundDone: {
         role: "warehouse",
         nextStatus: "done",
         reason: "",
-        payload: evidence(
-          "done",
-          "warehouse",
-          "",
-          [`${prefix}-PHOTO-WH-IN`],
+        feedback: "Mobile workflow 模拟入库任务办理完成。",
+        payload: mobileActionPayload({
+          actionKey: "done",
+          roleKey: "warehouse",
+          feedback: "Mobile workflow 模拟入库任务办理完成。",
           nowSec,
-        ),
+        }),
       },
       shipmentReleaseBlocked: {
         role: "warehouse",
         nextStatus: "blocked",
         reason: "Mobile workflow 模拟出货唛头未确认，只做本地模拟异常上报。",
-        payload: evidence(
-          "blocked",
-          "warehouse",
-          "Mobile workflow 模拟出货唛头未确认，只做本地模拟异常上报。",
-          [`${prefix}-PHOTO-SHIP-EXCEPTION`],
+        payload: mobileActionPayload({
+          actionKey: "blocked",
+          roleKey: "warehouse",
+          reason: "Mobile workflow 模拟出货唛头未确认，只做本地模拟异常上报。",
           nowSec,
-        ),
+        }),
       },
       warehouseUrged: {
         role: "pmc",
         action: "urge_task",
         reason: "Mobile workflow 模拟 PMC 催办仓库出货放行。",
         payload: {
-          mobile_urge: {
-            role_key: "pmc",
-            action_key: "urge_task",
-            reason: "Mobile workflow 模拟 PMC 催办仓库出货放行。",
-            simulated_only: true,
-            recorded_at: nowSec,
-          },
-          notification_type: "urgent_escalation",
-          alert_type: "urgent_escalation",
-          mobile_action_key: "urge_task",
-          mobile_action_role_key: "pmc",
-          mobile_action_recorded_at: nowSec,
+          surface_key: "mobile_role_tasks",
         },
       },
     },
@@ -593,11 +580,8 @@ function buildTaskStatusActionParams(task, action) {
     expected_version: expectedVersion,
     idempotency_key: `mobile-workflow-closure:${taskID}:${actionKey}`,
     action_key: actionKey,
-    reason: action.reason,
-    payload: {
-      ...action.payload,
-      mobile_role_key: action.role,
-    },
+    ...(action.reason ? { reason: action.reason } : {}),
+    payload: { ...action.payload },
   };
 }
 
@@ -649,10 +633,7 @@ function buildUrgeTaskParams(task, action) {
     idempotency_key: `mobile-workflow-closure:${taskID}:urge`,
     action: urgeAction,
     reason: action.reason,
-    payload: {
-      ...action.payload,
-      mobile_role_key: action.role,
-    },
+    payload: { ...action.payload },
   };
 }
 
@@ -692,7 +673,13 @@ async function applyPlan(plan, tokens) {
       label: `${label} update`,
       id: updated.id,
       status: updated.task_status_key,
-      evidence_count: updated.payload?.mobile_action_evidence_refs?.length || 0,
+      evidence_refs_omitted:
+        !Object.hasOwn(updated.payload || {}, "mobile_action_evidence_refs") &&
+        !Object.hasOwn(updated.payload?.mobile_action || {}, "evidence_refs") &&
+        !Object.hasOwn(
+          updated.payload?.mobile_exception_report || {},
+          "evidence_refs",
+        ),
       exception_reported: Boolean(updated.payload?.mobile_exception_report),
     });
   };
@@ -763,6 +750,7 @@ function buildMarkdownReport(report) {
     `- realCustomerImport: ${report.plan.realCustomerImport}`,
     `- factPosting: ${report.plan.factPosting}`,
     `- customerAcceptanceRequiredForClosure: ${report.plan.customerAcceptanceRequiredForClosure}`,
+    `- newActionEvidenceRefs: ${report.plan.newActionEvidenceRefs}`,
     "",
     "## Steps",
     "",
@@ -772,7 +760,7 @@ function buildMarkdownReport(report) {
   } else {
     for (const step of report.steps) {
       lines.push(
-        `- ${step.label}: status=${step.status}${step.evidence_count ? ` evidence=${step.evidence_count}` : ""}${step.exception_reported ? " exception_reported=true" : ""}${step.urge_count ? ` urge=${step.urge_count}` : ""}${step.notification_type ? ` notification=${step.notification_type}` : ""}`,
+        `- ${step.label}: status=${step.status}${step.evidence_refs_omitted === true ? " evidence_refs_omitted=true" : step.evidence_refs_omitted === false ? " evidence_refs_omitted=false" : ""}${step.exception_reported ? " exception_reported=true" : ""}${step.urge_count ? ` urge=${step.urge_count}` : ""}${step.notification_type ? ` notification=${step.notification_type}` : ""}`,
       );
     }
   }

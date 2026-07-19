@@ -213,7 +213,9 @@ export default function MobileTaskReceiptScreen({
             ) : null}
             {Array.isArray(evidenceRefs) && evidenceRefs.length > 0 ? (
               <div className="mobile-task-receipt-row mobile-task-receipt-row--long grid grid-cols-[104px_minmax(0,1fr)] gap-3 px-4 py-3">
-                <dt className="text-sm font-medium text-slate-500">证据线索</dt>
+                <dt className="text-sm font-medium text-slate-500">
+                  历史处理线索
+                </dt>
                 <dd className="min-w-0 space-y-1 text-right text-base font-semibold text-slate-950">
                   {evidenceRefs.map((reference) => (
                     <div

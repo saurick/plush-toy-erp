@@ -26,7 +26,7 @@ export default function BusinessAttachmentModalButton({
   const triggerButton = (
     <Button
       size="small"
-      icon={<PaperClipOutlined />}
+      icon={<PaperClipOutlined aria-hidden="true" />}
       {...buttonProps}
       disabled={actionDisabled}
       onClick={(event) => {

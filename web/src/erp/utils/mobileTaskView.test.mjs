@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
-  buildMobileTaskActionEvidence,
+  buildMobileTaskActionPayload,
   buildMobileTaskListForRole,
   buildMobileTaskSummary,
   buildMobileTaskView,
@@ -1013,7 +1013,7 @@ test('mobileTaskView: 预警摘要统计可用于移动端顶部卡片', () => {
   assert.deepEqual(normalizeRelatedDocuments('INV000001'), ['INV000001'])
 })
 
-test('mobileTaskView: 岗位处理 evidence 支持照片附件引用和去重', () => {
+test('mobileTaskView: 历史处理线索支持旧字符串归一化和去重', () => {
   assert.deepEqual(
     normalizeMobileActionEvidenceRefs('P-001\nP-002，P-001; https://e.test/a'),
     ['P-001', 'P-002', 'https://e.test/a']
@@ -1023,25 +1023,28 @@ test('mobileTaskView: 岗位处理 evidence 支持照片附件引用和去重', 
     ['PHOTO-001']
   )
 
-  const payload = buildMobileTaskActionEvidence({
-    evidenceText: 'PHOTO-001\nATT-002',
+  const payload = buildMobileTaskActionPayload({
+    evidenceRefs: ['PHOTO-001', 'ATT-002'],
+    feedback: '已完成并核对',
   })
 
   assert.deepEqual(payload, {
-    evidence_refs: ['PHOTO-001', 'ATT-002'],
+    feedback: '已完成并核对',
     surface_key: 'mobile_role_tasks',
   })
 })
 
-test('mobileTaskView: 移动动作只提交证据和界面上下文', () => {
-  const payload = buildMobileTaskActionEvidence({
-    evidenceRefs: ['QC-PHOTO-001'],
-  })
+test('mobileTaskView: 新移动动作不生产证据引用，历史 payload 仍可只读回显', () => {
+  const actionPayload = buildMobileTaskActionPayload()
 
-  assert.deepEqual(payload, {
-    evidence_refs: ['QC-PHOTO-001'],
+  assert.deepEqual(actionPayload, {
     surface_key: 'mobile_role_tasks',
   })
+
+  const payload = {
+    mobile_action_evidence_refs: ['QC-PHOTO-001'],
+    surface_key: 'mobile_role_tasks',
+  }
 
   const view = buildMobileTaskView(
     task({

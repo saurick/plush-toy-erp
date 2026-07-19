@@ -54,6 +54,34 @@ test('mobile task action screen fails closed and covers every backend-explained 
   assert.match(actionScreenSource, /availableActions\.includes\(option\.key\)/u)
 })
 
+test('mobile task action screen separates a single command from multiple choices', () => {
+  assert.match(
+    actionScreenSource,
+    /visibleActions\.length === 1 \? visibleActions\[0\] : null/u
+  )
+  assert.match(actionScreenSource, /visibleActions\.length > 1/u)
+  assert.match(
+    actionScreenSource,
+    /const singleVisibleActionKey = singleVisibleAction\?\.key \|\| ''/u
+  )
+  assert.match(
+    actionScreenSource,
+    /selectedAction === singleVisibleActionKey[\s\S]*onActionChange\(singleVisibleActionKey\)/u
+  )
+  assert.match(actionScreenSource, /role="radiogroup"/u)
+  assert.match(actionScreenSource, /type="radio"/u)
+  assert.match(actionScreenSource, /data-testid="mobile-task-action-options"/u)
+  assert.match(actionScreenSource, /data-testid="mobile-task-single-action"/u)
+  assert.match(
+    actionScreenSource,
+    /data-testid="mobile-task-single-action-summary"/u
+  )
+  assert.match(actionScreenSource, />\s*本次操作\s*</u)
+  assert.match(actionScreenSource, /`确认\$\{effectiveActionLabel\}`/u)
+  assert.doesNotMatch(actionScreenSource, /<legend/u)
+  assert.doesNotMatch(actionScreenSource, /aria-pressed/u)
+})
+
 test('mobile task action screen validates and focuses the first missing field', () => {
   assert.match(
     actionScreenSource,
@@ -65,8 +93,11 @@ test('mobile task action screen validates and focuses the first missing field', 
   )
   assert.match(actionScreenSource, /actionChoiceRef\.current\?\.focus\(\)/u)
   assert.match(actionScreenSource, /reasonRef\.current\?\.focus\(\)/u)
-  assert.match(actionScreenSource, />\s*现场证据\s*</u)
-  assert.doesNotMatch(actionScreenSource, /evidenceRequired/u)
+  assert.doesNotMatch(actionScreenSource, /现场证据|onEvidenceChange/u)
+  assert.match(
+    actionScreenSource,
+    /任务附件统一在详情页查看或管理/u
+  )
   assert.match(actionScreenSource, /aria-invalid=/u)
   assert.match(actionScreenSource, /noValidate/u)
   assert.match(actionScreenSource, /min-h-\[48px\]/u)
@@ -112,7 +143,7 @@ test('mobile task flow exposes one shared three-step navigation contract', () =>
 test('mobile task flow keeps Workflow and business Fact semantics separate', () => {
   assert.match(
     actionScreenSource,
-    /这里仅记录这条任务的办理情况；库存、质检、出货、开票和收付款仍需在对应单据中办理/u
+    /这里仅提交本次办理说明；任务附件统一在详情页查看或管理。库存、质检、出货、开票和收付款仍需在对应单据中办理/u
   )
   assert.match(
     receiptScreenSource,
@@ -126,6 +157,20 @@ test('mobile task detail keeps canonical completion feedback visible after reloa
   assert.match(detailScreenSource, /whitespace-pre-wrap/u)
 })
 
+test('mobile task detail separates real attachments from historical text references', () => {
+  assert.match(detailScreenSource, />\s*任务附件\s*</u)
+  assert.match(detailScreenSource, />\s*历史处理线索\s*</u)
+  assert.match(detailScreenSource, /data-testid="mobile-role-historical-evidence"/u)
+  assert.match(detailScreenSource, /查看与补充附件/u)
+  assert.match(detailScreenSource, /查看任务附件/u)
+  assert.match(detailScreenSource, /canUpload=\{canManageAttachments\}/u)
+  assert.doesNotMatch(detailScreenSource, /当前任务尚无可显示的处理证据/u)
+  assert.match(
+    roleTaskPageSource,
+    /selectedCanOperate &&[\s\S]*hasActionPermission\(adminProfile, 'workflow\.task\.update'\)/u
+  )
+})
+
 test('mobile task receipt has explicit outcomes without fabricated actor or timestamp', () => {
   assert.match(
     receiptScreenSource,
@@ -136,7 +181,7 @@ test('mobile task receipt has explicit outcomes without fabricated actor or time
   assert.match(receiptScreenSource, /查看任务/u)
   assert.match(receiptScreenSource, /完成反馈/u)
   assert.match(receiptScreenSource, /处理说明/u)
-  assert.match(receiptScreenSource, /证据线索/u)
+  assert.match(receiptScreenSource, /历史处理线索/u)
   assert.match(receiptScreenSource, /本次确认时的结果/u)
   assert.match(receiptScreenSource, /本次确认状态/u)
   assert.match(receiptScreenSource, /本次返回状态/u)

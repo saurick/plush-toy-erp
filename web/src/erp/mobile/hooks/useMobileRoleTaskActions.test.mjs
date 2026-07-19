@@ -185,23 +185,14 @@ module.exports = { useMobileRoleTaskActions }`,
         },
         '../../utils/mobileTaskView.mjs': {
           buildMobileTaskView: (task) => ({ ...task }),
-          buildMobileTaskActionEvidence: ({
-            evidenceText = '',
-            feedback = '',
-          } = {}) => {
-            const evidenceRefs = String(evidenceText)
-              .split(/[\n,，;；]/u)
-              .map((item) => item.trim())
-              .filter(Boolean)
-            return {
-              ...(String(feedback).trim()
-                ? { feedback: String(feedback).trim() }
-                : {}),
-              ...(evidenceRefs.length ? { evidence_refs: evidenceRefs } : {}),
-              surface_key: 'mobile_role_tasks',
-            }
-          },
-          normalizeMobileActionEvidenceRefs: () => [],
+          buildMobileTaskActionPayload: ({ feedback = '' } = {}) => ({
+            ...(String(feedback).trim()
+              ? { feedback: String(feedback).trim() }
+              : {}),
+            surface_key: 'mobile_role_tasks',
+          }),
+          normalizeMobileActionEvidenceRefs: (value) =>
+            Array.isArray(value) ? value.filter(Boolean) : [],
         },
         '../../utils/orderApprovalFlow.mjs': {
           isOrderApprovalTask: () => false,
@@ -270,7 +261,6 @@ function createHookHarness(options = {}) {
     initialAction: detailAction,
     initialActionReceipt: options.initialActionReceipt,
     initialActionTaskID: selectedTask.id,
-    initialEvidence: options.initialEvidence || '',
     initialReason: Object.hasOwn(options, 'initialReason')
       ? options.initialReason
       : detailAction === 'done'
@@ -419,6 +409,36 @@ test('useMobileRoleTaskActions: required completion feedback uses the canonical 
   assert.equal(view.actionReceipt.reason, '')
 })
 
+test('useMobileRoleTaskActions: new actions do not copy historical evidence refs', async () => {
+  const submitted = []
+  const harness = createHookHarness({
+    selectedTask: {
+      id: 42,
+      mobile_action_evidence_refs: ['OLD-PHOTO-42'],
+      owner_role_key: 'warehouse',
+      version: 5,
+    },
+    completeWorkflowTaskAction: async (params) => {
+      submitted.push(params)
+      return {
+        id: 42,
+        mobile_action_evidence_refs: ['OLD-PHOTO-42'],
+        owner_role_key: 'warehouse',
+        task_status_key: 'done',
+        version: 6,
+      }
+    },
+  })
+
+  let view = harness.render()
+  assert.deepEqual(view.savedEvidenceRefs, ['OLD-PHOTO-42'])
+  await view.submitDetailAction()
+  view = harness.render()
+
+  assert.equal(Object.hasOwn(submitted[0].payload, 'evidence_refs'), false)
+  assert.deepEqual(Array.from(view.actionReceipt.evidence_refs), [])
+})
+
 test('useMobileRoleTaskActions: completion is blocked when feedback is missing', async () => {
   let actionCalls = 0
   const messages = { errors: [], successes: [], warnings: [] }
@@ -501,20 +521,17 @@ test('useMobileRoleTaskActions: scope changes isolate receipts and drafts for th
   let view = harness.render()
   view.restoreActionDraft({
     action: 'blocked',
-    evidence: 'SCOPE-A-EVIDENCE',
     reason: '旧范围草稿',
     taskID: 42,
   })
   view = harness.render()
   assert.equal(view.actionReceipt?.reason, '旧范围回执')
   assert.equal(view.detailReasonValue, '旧范围草稿')
-  assert.equal(view.detailEvidenceValue, 'SCOPE-A-EVIDENCE')
 
   harness.setReceiptScopeKey('warehouse|account-b|revision-2')
   view = harness.render()
   assert.equal(view.actionReceipt, null)
   assert.equal(view.detailReasonValue, '')
-  assert.equal(view.detailEvidenceValue, '')
 })
 
 test('useMobileRoleTaskActions: restores a history draft for the exact task and action', () => {
@@ -524,7 +541,6 @@ test('useMobileRoleTaskActions: restores a history draft for the exact task and 
   assert.equal(
     view.restoreActionDraft({
       action: 'blocked',
-      evidence: 'PHOTO-42',
       reason: '等待现场确认',
       taskID: 42,
     }),
@@ -533,7 +549,6 @@ test('useMobileRoleTaskActions: restores a history draft for the exact task and 
   view = harness.render()
 
   assert.equal(view.detailReasonValue, '等待现场确认')
-  assert.equal(view.detailEvidenceValue, 'PHOTO-42')
 })
 
 test('useMobileRoleTaskActions: missing canonical task stays visibly unconfirmed', async () => {
@@ -685,15 +700,12 @@ test('useMobileRoleTaskActions: unknown network result reuses frozen key and pay
   })
 
   let view = harness.render()
-  view.updateEvidenceText('PHOTO-B\nPHOTO-A')
-  view = harness.render()
   await view.submitDetailAction()
   view = harness.render()
   assert.equal(submitted.length, 2)
   assert.equal(submitted[0].idempotency_key, submitted[1].idempotency_key)
   assert.deepEqual(submitted[0], submitted[1])
   assert.deepEqual(submitted[0].payload, {
-    evidence_refs: ['PHOTO-A', 'PHOTO-B'],
     feedback: '已完成并核对',
     surface_key: 'mobile_role_tasks',
   })

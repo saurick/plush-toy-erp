@@ -34,7 +34,7 @@
 | `scripts/qa/purchase-quality-simulated-matrix.mjs`     | 通过正式 JSON-RPC 和岗位演示账号生成带 `SIM-YOYOOSUN-PQ` 前缀的采购单、采购入库与质检多状态矩阵；显式确认后才写入，不执行真实客户导入 | 本机 local / dev 覆盖草稿、提交、审批、关闭、取消、检验通过 / 拒收、入库过账 / 取消等人工回归状态 |
 | `scripts/qa/trial-simulated-data.mjs`           | 模拟试用数据入口，支持 `--print-input-template` 只读输出前置；真实执行只创建标记为模拟的 V1 客户 / 供应商 / 联系人 / 销售订单数据 | 试用环境演练                                               |
 | `scripts/qa/operational-fact-simulated-closure.mjs`    | 旧业务事实模拟矩阵的只读输入 / 计划入口；`--apply` 已 fail-closed 退役，待生产订单、委外订单、销售订单、出货、采购入库和财务事实来源驱动 fixture 重建后才能恢复写入 | 审查旧模拟范围和来源驱动重建前置                  |
-| `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式 `trial_*` 模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、仓库出货异常、跨角色催办和现场留痕，不占用 `production_scheduling / production_exception / shipment_release` 保留组 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
+| `scripts/qa/mobile-workflow-simulated-closure.mjs`       | 模拟岗位任务闭环入口，支持 `--print-input-template` 只读输出前置；真实执行只创建和更新显式 `trial_*` 模拟 workflow 任务，覆盖审批完成 / 退回、质检完成、入库完成、仓库出货异常、跨角色催办及反馈 / 原因，并验证新动作不生成历史证据引用，不占用 `production_scheduling / production_exception / shipment_release` 保留组 | 岗位任务端回归 / 目标环境移动任务闭环验收                  |
 | `web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs`      | 真实浏览器岗位任务端模拟任务回归，创建 `simulated_only` 老板审批 / 退回 / 完成、品质完成、仓库入库完成和 `trial_warehouse_followup` 仓库出货跟进任务，分别登录 boss / quality / warehouse 岗位端验证完成、阻塞、退回、催办反馈和内部提醒线索；不创建正式 `shipment_release` | 本地 / 试用岗位任务端真实页面验收                         |
 | `scripts/qa/mvp-closure.mjs`                    | ERP MVP 闭环验收入口，默认只生成计划和本地 evidence，可选运行现有 no-write report-only 工具                     | MVP 主链路验收口径收口 / 试用前证据整理                  |
 | `scripts/qa/purchase-receipt-real-write-e2e.mjs` | 采购入库真实写入链路验收入口，支持 `--print-input-template` 只读输出前置和 `--preflight-report <path>` 本地脱敏前置报告；真实命令默认跑 JSON-RPC 创建 / 加行 / 过账 / 回显 / 库存事实 / 权限测试，可选追加本地 PostgreSQL 防呆测试 | MVP 第一条真实写入链路回归 / 采购入库事实验收 |
@@ -307,7 +307,7 @@ node scripts/qa/mobile-workflow-simulated-closure.mjs \
 
 `--print-input-template` 只输出 report-only / apply simulated mobile workflow tasks 所需的 runId、演示账号密码来源、岗位角色账号、模拟任务组和后续真实命令，不登录、不调用后端、不写报告、不写数据库、不创建 workflow 任务，也不写任何业务事实。
 
-若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 的 `trial_*` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、仓库出货异常上报、跨角色催办和现场留痕 evidence；它不创建或冒充 `production_scheduling / production_exception / shipment_release` 来源任务。所有状态 / 催办动作都使用读回的正整数 `expected_version` 和由 task/action 稳定生成的顶层 `idempotency_key`，缺版本时 fail closed。它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
+若要写入本地或目标试用环境，只能显式 `--apply`。该脚本使用 `demo_pmc` 创建 `SIM-YOYOOSUN-MOBILE-WORKFLOW` 的 `trial_*` 模拟 workflow 任务，再用 `demo_boss`、`demo_quality`、`demo_warehouse` 和 `demo_pmc` 分别处理老板审批完成、老板退回、成品抽检完成、仓库入库确认、仓库出货异常上报和跨角色催办；动作只提交本次反馈或原因，并验证新动作不生成 `mobile_action_evidence_refs`。真实任务附件统一在详情页按权限查看或管理，旧文本引用只作为历史处理线索只读展示。该脚本不创建或冒充 `production_scheduling / production_exception / shipment_release` 来源任务。所有状态 / 催办动作都使用读回的正整数 `expected_version` 和由 task/action 稳定生成的顶层 `idempotency_key`，缺版本时 fail closed。它不执行真实 import，不写 `business_records`，不生成 schema / migration，也不绕过 `WorkflowUsecase` 或 operational fact usecase：
 
 ```bash
 MOBILE_WORKFLOW_SIM_CONFIRM=APPLY_SIMULATED_MOBILE_WORKFLOW_TASKS \
@@ -436,25 +436,30 @@ bash /Users/simon/projects/plush-toy-erp/scripts/project-scan.sh --strict
 
 `demo_admin` 是普通演示角色账号，不是稳定超级管理员 `admin`。角色演示账号的 seed / reset 只处理 `demo_*`，不得顺带重置稳定管理员。
 
-管理员和演示账号的创建、重置密码统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界；生产环境仍应使用独立随机密码，不能复用本地默认值或测试账号密码。
+无显式密码时，脚本只允许连接登记的 `192.168.0.106:5432/plush_erp_*_dev` 隔离开发库，并使用公开测试密码 `12345678` 生成九个普通业务角色账号；不会生成 `demo_admin`、`demo_debug`，也不会重置人工验收场景账号。公开测试值一旦 seed 就是可登录凭据，不得用于共享、试用、staging 或生产目标。`demo_admin`、调试账号、人工验收账号和完整角色回归必须通过 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。管理员和演示账号的创建、重置密码仍统一要求 8～20 个 Unicode 字符，且 UTF-8 编码后不超过 bcrypt 的 72 字节边界。
 
 ```bash
-ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
+bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
+```
+
+如需生成包括 `demo_admin` 在内的完整角色账号，或覆盖公开测试默认值，必须显式传入密码：
+
+```bash
+ERP_ROLE_DEMO_PASSWORD='<explicit-demo-password>' \
   bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh
 ```
 
 已有账号重跑时会恢复 `disabled=false`、`is_super_admin=false` 和对应单一角色绑定；默认不重置已有账号密码。如需统一重置演示账号密码：
 
 ```bash
-ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password' \
-  bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh --reset-password
+bash /Users/simon/projects/plush-toy-erp/scripts/seed-role-demo-admins.sh --reset-password
 ```
 
-脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`，除非显式传 `--allow-prod`。常规开发和验收不要对生产库执行该脚本。
+无输入重置也只处理隔离 `*_dev` 库中的九个普通业务角色账号。重置 `demo_admin`、`demo_debug` 或人工验收场景账号时必须用 `--password` 或 `ERP_ROLE_DEMO_PASSWORD` 显式提供非默认密码。脚本默认拒绝 `configs/prod` 或 `APP_ENV / ERP_ENV / GO_ENV=prod|production`；公开测试值即使显式传入也不能离开登记的隔离开发库，`--allow-prod` 必须使用非默认密码。常规开发和验收不要对生产库执行该脚本。
 
 生成或重置演示账号后，可执行只读核对。该脚本不创建账号、不改密码、不写数据库，只通过真实 `/rpc/auth` 登录和 `me` 返回校验角色、`mobile.<role>.access`、`debug.*` 权限、`is_super_admin` 和 `disabled` 边界：
 
-如果还没有本地演示账号密码，先打印输入模板。该模式只输出所需环境变量、账号清单、可选脱敏报告路径、effective session 脱敏诊断读取计划和真实核对命令，不读密码、不登录、不调用后端、不启动浏览器、不启动 Vite、不读取客户配置脚本、不写报告、不写数据库：
+如果只想先核对输入和账号清单，可打印输入模板。该模式只输出所需环境变量、账号清单、可选脱敏报告路径、effective session 脱敏诊断读取计划和真实核对命令，不读密码、不登录、不调用后端、不启动浏览器、不启动 Vite、不读取客户配置脚本、不写报告、不写数据库：
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/scripts/qa/trial-account-rbac.mjs --print-input-template
@@ -561,7 +566,7 @@ node --test \
 node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs --print-input-template
 ```
 
-本地前置看起来齐全但还不确定能否跑真实浏览器 smoke 时，先写 no-write preflight 报告。该报告只探测 backend health、演示密码 env 是否存在、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；若显式传入 `MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当移动端任务端运行入口。报告还会记录模拟任务动作计划 coverage：老板阻塞、老板完成、老板退回、品质完成、仓库入库完成、跨角色催办、reason 必填、完成反馈、异常上报、evidence refs 和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，也不保存 token 或 Authorization header：
+本地前置看起来齐全但还不确定能否跑真实浏览器 smoke 时，先写 no-write preflight 报告。该报告只探测 backend health、演示密码 env 是否存在、是否需要脚本托管 Vite、试用 customer-config 脚本是否存在，并复用 `audit:yoyoosun-entry` 做只读端口审计；若显式传入 `MOBILE_WORKFLOW_BROWSER_SMOKE_BASE_URL`，该端口必须命中 yoyoosun config 和 yoyoosun asset，否则报告会以 `external-base-url-not-yoyoosun-entry` 阻止真实 smoke，避免把 Product Core、HTML fallback 或其他项目端口误当移动端任务端运行入口。报告还会记录模拟任务动作计划 coverage：老板阻塞、老板完成、老板退回、品质完成、仓库入库完成、跨角色催办、reason 必填、完成反馈、异常上报、动作页证据输入已移除、新动作 evidence refs 为空和内部 `notification_type` 线索；不读取密码值、不登录、不调用 JSON-RPC、不启动 Vite / Playwright、不创建 workflow 任务、不写数据库，也不保存 token 或 Authorization header：
 
 ```bash
 node /Users/simon/projects/plush-toy-erp/web/scripts/mobileWorkflowRuntimeBrowserSmoke.mjs \
@@ -581,7 +586,7 @@ MOBILE_WORKFLOW_BROWSER_SMOKE_PASSWORD='replace-with-local-demo-password' \
     --report output/mobile-workflow-runtime-browser-smoke/report.json
 ```
 
-该回归会通过 JSON-RPC 创建唯一的 `simulated_only` 老板审批任务、老板退回任务、老板完成任务、品质成品抽检任务、仓库入库任务和仓库放行任务，并为任务 payload 保留 `notification_type` 内部提醒线索；再用真实浏览器登录 `demo_boss`，在 `/m/boss/tasks` 打开详情、填写现场留痕、提交自有任务阻塞原因、退回原因，点击自有任务完成并在已办列表看到完成反馈，再验证 `owner_role_key=warehouse` 且 `assignee_id=demo_boss` 的跨角色任务只能催办、不能代办阻塞 / 完成；随后登录 `demo_quality` 和 `demo_warehouse`，分别完成品质成品抽检和仓库入库任务，并读回 evidence refs、完成反馈和已办列表。它只写本地/试用模拟 workflow 证据，不导入真实客户数据，也不写库存、采购、质检或财务事实。`--report` 只保存任务码、状态、动作结果、模拟任务计划 coverage 摘要、未证明项和脱敏布尔值，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不进入 release evidence。
+该回归会通过 JSON-RPC 创建唯一的 `simulated_only` 老板审批任务、老板退回任务、老板完成任务、品质成品抽检任务、仓库入库任务和仓库放行任务，并为任务 payload 保留 `notification_type` 内部提醒线索；再用真实浏览器登录 `demo_boss`，在 `/m/boss/tasks` 打开详情并确认任务附件入口，提交自有任务阻塞原因、退回原因和完成反馈，再验证新动作页没有自由文本证据框或文件上传入口、回执没有新增历史处理线索，以及 `owner_role_key=warehouse` 且 `assignee_id=demo_boss` 的跨角色任务只能催办、不能代办阻塞 / 完成；随后登录 `demo_quality` 和 `demo_warehouse`，分别完成品质成品抽检和仓库入库任务，并读回新动作没有 evidence refs、完成反馈和已办列表。它只写本地/试用模拟 workflow 证据，不导入真实客户数据，也不写库存、采购、质检或财务事实。`--report` 只保存任务码、状态、动作结果、模拟任务计划 coverage 摘要、未证明项和脱敏布尔值，不保存密码、token、Authorization header、raw customer package 或 action 列表，也不进入 release evidence。
 
 ### 2B. Customer Config 草案边界检查
 

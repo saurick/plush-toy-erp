@@ -608,6 +608,7 @@
       }
 
       .hero-card,
+      .action-card,
       .content-card,
       .notice-card,
       .receipt-card {
@@ -618,6 +619,7 @@
       }
 
       .hero-card,
+      .action-card,
       .content-card,
       .receipt-card {
         padding: 16px;
@@ -805,39 +807,45 @@
         color: var(--text);
       }
 
+      .button--full {
+        width: 100%;
+        margin-top: 12px;
+      }
+
       .button:disabled {
         opacity: 0.55;
       }
 
-      .process-intro {
-        margin-bottom: 12px;
+      .action-card__heading {
+        min-width: 0;
       }
 
-      .process-intro p {
+      .action-card__heading p {
         margin-top: 5px;
         color: var(--text-secondary);
         font-size: 13px;
         line-height: 1.55;
+        overflow-wrap: anywhere;
       }
 
       .action-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
         gap: 10px;
-      }
-
-      .action-grid--single {
-        grid-template-columns: minmax(0, 1fr);
+        margin-top: 14px;
       }
 
       .action-choice {
+        position: relative;
+        display: block;
         min-width: 0;
         min-height: 108px;
-        padding: 13px;
+        padding: 13px 42px 13px 13px;
         border: 1px solid var(--line);
         border-radius: 16px;
         background: var(--surface);
         color: var(--text);
+        cursor: pointer;
         text-align: left;
       }
 
@@ -845,9 +853,24 @@
         border-color: var(--line-strong);
       }
 
-      .action-choice[aria-pressed="true"] {
+      .action-choice[data-selected="true"] {
         border-color: var(--brand);
         box-shadow: 0 0 0 2px color-mix(in srgb, var(--brand) 16%, transparent);
+      }
+
+      .action-choice:focus-within {
+        outline: 3px solid color-mix(in srgb, var(--brand) 24%, transparent);
+        outline-offset: 2px;
+      }
+
+      .action-choice__radio {
+        position: absolute;
+        top: 15px;
+        right: 15px;
+        width: 18px;
+        height: 18px;
+        margin: 0;
+        accent-color: var(--brand);
       }
 
       .action-choice__icon {
@@ -899,6 +922,51 @@
         color: var(--text-secondary);
         font-size: 12px;
         line-height: 1.45;
+      }
+
+      .single-action-summary {
+        display: flex;
+        min-width: 0;
+        align-items: flex-start;
+        gap: 12px;
+        margin-top: 14px;
+        padding: 13px;
+        border: 1px solid color-mix(in srgb, var(--purple) 28%, var(--line));
+        border-radius: 16px;
+        background: color-mix(in srgb, var(--purple-soft) 74%, var(--surface));
+      }
+
+      .single-action-summary__icon {
+        display: grid;
+        width: 36px;
+        height: 36px;
+        flex: none;
+        place-items: center;
+        border-radius: 11px;
+        background: var(--purple-soft);
+        color: var(--purple);
+      }
+
+      .single-action-summary__copy {
+        min-width: 0;
+      }
+
+      .single-action-summary__copy strong,
+      .single-action-summary__copy span {
+        display: block;
+      }
+
+      .single-action-summary__copy strong {
+        font-size: 15px;
+        line-height: 1.4;
+      }
+
+      .single-action-summary__copy span {
+        margin-top: 3px;
+        color: var(--text-secondary);
+        font-size: 12px;
+        line-height: 1.5;
+        overflow-wrap: anywhere;
       }
 
       .form-card {
@@ -1243,10 +1311,8 @@
           description: '提交完成反馈，结束当前任务',
           icon: 'check',
           tone: 'success',
-          reasonRequired: false,
-          evidenceRequired: true,
-          reasonLabel: '完成说明',
-          evidenceLabel: '完成反馈',
+          reasonRequired: true,
+          reasonLabel: '完成反馈',
         },
         blocked: {
           label: '阻塞',
@@ -1255,9 +1321,7 @@
           icon: 'pause',
           tone: 'warning',
           reasonRequired: true,
-          evidenceRequired: false,
           reasonLabel: '阻塞原因',
-          evidenceLabel: '现场留痕',
         },
         rejected: {
           label: '退回',
@@ -1266,9 +1330,7 @@
           icon: 'reject',
           tone: 'danger',
           reasonRequired: true,
-          evidenceRequired: false,
           reasonLabel: '退回原因',
-          evidenceLabel: '现场留痕',
         },
         resume: {
           label: '解除阻塞',
@@ -1277,9 +1339,7 @@
           icon: 'resume',
           tone: 'brand',
           reasonRequired: true,
-          evidenceRequired: false,
           reasonLabel: '解除说明',
-          evidenceLabel: '现场留痕',
         },
         urge: {
           label: '催办',
@@ -1288,9 +1348,7 @@
           icon: 'bell',
           tone: 'purple',
           reasonRequired: true,
-          evidenceRequired: false,
           reasonLabel: '催办原因',
-          evidenceLabel: '补充留痕',
         },
       };
 
@@ -1435,7 +1493,7 @@
       function currentDraft() {
         const key = draftKey(state.selectedAction);
         if (!state.drafts[key]) {
-          state.drafts[key] = { reason: '', evidence: '' };
+          state.drafts[key] = { reason: '' };
         }
         return state.drafts[key];
       }
@@ -1604,7 +1662,11 @@
               '</div><div class="fact__value">' + escapeHTML(fact[1]) + '</div></div>';
           })
           .join('');
-        const nextLabel = task.actions.length === 0 ? '查看结果回执' : '选择处理方式';
+        const nextLabel = task.actions.length === 0
+          ? '查看结果回执'
+          : task.actions.length === 1
+            ? '填写' + ACTIONS[task.actions[0]].label + '原因'
+            : '选择处理方式';
         const nextStep = task.actions.length === 0 ? 'result' : 'process';
 
         return '<section class="screen" data-screen="detail">' +
@@ -1625,6 +1687,15 @@
           '<p class="source-line"><strong>' + escapeHTML(task.source) + '</strong><br />' + escapeHTML(task.summary) + '</p>' +
           '</section>' +
           '<section class="content-card">' +
+          '<div class="section-heading"><h2>任务附件</h2><span class="section-heading__label">按权限</span></div>' +
+          '<p class="source-line">照片、异常截图和处理凭证统一在任务详情查看或管理，不在处理表单重复填写。</p>' +
+          (task.receipt && task.receipt.evidence
+            ? '<p class="activity-line"><strong>历史处理线索</strong><br />' + escapeHTML(task.receipt.evidence) + '</p>'
+            : '') +
+          '<button class="button button--secondary button--full" type="button" data-attachment-preview>' +
+          (task.accessLabel === '可处理' ? '查看与补充附件' : '查看任务附件') + '</button>' +
+          '</section>' +
+          '<section class="content-card">' +
           '<div class="section-heading"><h2>最近动态</h2><span class="section-heading__label">最近一条</span></div>' +
           '<p class="activity-line"><strong>' + escapeHTML(task.status) + '</strong><br />' + escapeHTML(task.latest) + '</p>' +
           '</section>' +
@@ -1640,12 +1711,22 @@
       function actionChoice(actionKey) {
         const action = ACTIONS[actionKey];
         const selected = state.selectedAction === actionKey;
-        return '<button class="action-choice" type="button" data-action-key="' + actionKey +
-          '" data-tone="' + action.tone + '" aria-pressed="' + String(selected) + '">' +
+        return '<label class="action-choice" data-tone="' + action.tone + '" data-selected="' +
+          String(selected) + '">' +
+          '<input class="action-choice__radio" type="radio" name="task-action" value="' + actionKey +
+          '" data-action-key="' + actionKey + '" ' + (selected ? 'checked' : '') + '>' +
           '<span class="action-choice__icon">' + icon(action.icon) + '</span>' +
           '<strong>' + escapeHTML(action.title) + '</strong>' +
           '<span>' + escapeHTML(action.description) + '</span>' +
-          '</button>';
+          '</label>';
+      }
+
+      function singleActionSummary(action) {
+        return '<div class="single-action-summary" data-single-action-summary>' +
+          '<span class="single-action-summary__icon">' + icon(action.icon) + '</span>' +
+          '<span class="single-action-summary__copy"><strong>' + escapeHTML(action.label) + '</strong>' +
+          '<span>' + escapeHTML(action.description) + '</span></span>' +
+          '</div>';
       }
 
       function formField(id, label, required, value, placeholder, error) {
@@ -1686,12 +1767,23 @@
           state.selectedAction = null;
         }
         const action = state.selectedAction ? ACTIONS[state.selectedAction] : null;
-        const draft = action ? currentDraft() : { reason: '', evidence: '' };
-        const actionGrid = hasActions
-          ? '<div class="action-grid ' + (task.actions.length === 1 ? 'action-grid--single' : '') + '">' +
-            task.actions.map(actionChoice).join('') + '</div>'
-          : '<div class="notice-card notice-card--brand">' + icon('info') +
-            '<span>当前任务为只读状态，不能再次提交处理。步骤仍可直接切换，您可以回到详情或查看已有回执。</span></div>';
+        const draft = action ? currentDraft() : { reason: '' };
+        const hasMultipleActions = task.actions.length > 1;
+        const actionPanel = hasMultipleActions
+          ? '<section class="action-card" aria-labelledby="actionPanelHeading">' +
+            '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>选择处理方式</h1>' +
+            '<p>' + escapeHTML(task.title) + '；请选择与现场处理情况一致的方式。</p></div>' +
+            '<div class="action-grid" role="radiogroup" aria-labelledby="actionPanelHeading">' +
+            task.actions.map(actionChoice).join('') + '</div></section>'
+          : action
+            ? '<section class="action-card" aria-labelledby="actionPanelHeading">' +
+              '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>本次操作</h1>' +
+              '<p>' + escapeHTML(task.title) + '；填写原因后再确认，不会代替责任岗位完成任务。</p></div>' +
+              singleActionSummary(action) + '</section>'
+            : '<section class="action-card" aria-labelledby="actionPanelHeading">' +
+              '<div class="action-card__heading"><h1 id="actionPanelHeading" tabindex="-1" data-screen-heading>处理任务</h1></div>' +
+              '<div class="notice-card notice-card--brand">' + icon('info') +
+              '<span>当前任务为只读状态，不能再次提交处理。步骤仍可直接切换，您可以回到详情或查看已有回执。</span></div></section>';
         const actionForm = action
           ? '<section class="form-card" aria-label="' + escapeHTML(action.title) + '表单">' +
             formField(
@@ -1703,16 +1795,6 @@
               state.errors.reason
             ) +
             (action.reasonRequired ? quickReasons() : '') +
-            formField(
-              'evidenceInput',
-              action.evidenceLabel,
-              action.evidenceRequired,
-              draft.evidence,
-              action.evidenceRequired
-                ? '请填写完成反馈、照片编号、附件编号或链接；多条可换行'
-                : '可填写照片、附件编号或链接；多条可换行',
-              state.errors.evidence
-            ) +
             '</section>'
           : '';
         const footer = action
@@ -1721,7 +1803,7 @@
             (state.submitting ? 'disabled' : '') + '>返回详情</button>' +
             '<button class="button button--primary" type="button" data-submit ' +
             (state.submitting ? 'disabled aria-busy="true"' : '') + '>' +
-            (state.submitting ? icon('spinner') + ' 提交中' : '提交' + escapeHTML(action.label)) +
+            (state.submitting ? icon('spinner') + ' 确认中' : '确认' + escapeHTML(action.label)) +
             '</button></footer>'
           : '<footer class="screen-footer screen-footer--two">' +
             '<button class="button button--secondary" type="button" data-step="detail">返回详情</button>' +
@@ -1731,12 +1813,10 @@
         return '<section class="screen" data-screen="process">' +
           flowHeader('process', '处理任务') +
           '<main class="screen-main process-main">' +
-          '<div class="process-intro"><h1 tabindex="-1" data-screen-heading>选择处理方式</h1>' +
-          '<p>' + escapeHTML(task.title) + '</p></div>' +
-          actionGrid +
+          actionPanel +
           actionForm +
           (task.actions.includes('urge')
-            ? '<p class="receipt-note">选择催办只会提醒责任岗位，不会代替对方完成任务。</p>'
+            ? '<p class="receipt-note">催办只会提醒责任岗位，不会代替对方完成任务。</p>'
             : '') +
           '</main>' +
           footer +
@@ -1748,8 +1828,10 @@
           ['处理动作', receipt.actionLabel],
           ['当前结果', receipt.stateLabel],
           ['处理说明', receipt.reason || '未填写'],
-          ['现场留痕', receipt.evidence || '未填写'],
         ];
+        if (receipt.evidence) {
+          rows.push(['历史处理线索', receipt.evidence]);
+        }
         return rows
           .map(function (row) {
             return '<div class="receipt-row"><span class="receipt-row__label">' + escapeHTML(row[0]) +
@@ -1883,12 +1965,9 @@
         if (action.reasonRequired && !draft.reason.trim()) {
           errors.reason = '请先填写' + action.reasonLabel;
         }
-        if (action.evidenceRequired && !draft.evidence.trim()) {
-          errors.evidence = '请先填写' + action.evidenceLabel;
-        }
         state.errors = errors;
-        if (errors.reason || errors.evidence) {
-          setPendingFocus(errors.reason ? '#reasonInput' : '#evidenceInput');
+        if (errors.reason) {
+          setPendingFocus('#reasonInput');
           render();
           showToast('请补全必填信息');
           return;
@@ -1903,7 +1982,6 @@
             actionLabel: action.label,
             stateLabel: state.selectedAction === 'urge' ? '催办已记录' : '任务状态已更新',
             reason: draft.reason.trim(),
-            evidence: draft.evidence.trim(),
             message: state.selectedAction === 'urge'
               ? '催办已记录，责任岗位将收到提醒。'
               : '处理已确认，任务列表已同步。',
@@ -1978,6 +2056,10 @@
           showToast('任务已刷新');
           return;
         }
+        if (event.target.closest('[data-attachment-preview]')) {
+          showToast('正式页面会按当前账号权限打开任务附件');
+          return;
+        }
         const filterButton = event.target.closest('[data-filter]');
         if (filterButton) {
           state.filter = filterButton.dataset.filter;
@@ -1996,11 +2078,6 @@
         const stepButton = event.target.closest('[data-step]');
         if (stepButton) {
           goToStep(stepButton.dataset.step);
-          return;
-        }
-        const actionButton = event.target.closest('[data-action-key]');
-        if (actionButton) {
-          selectAction(actionButton.dataset.actionKey);
           return;
         }
         const quickReason = event.target.closest('[data-quick-reason]');
@@ -2024,15 +2101,18 @@
         }
       });
 
+      app.addEventListener('change', function (event) {
+        if (event.target.matches('input[type="radio"][data-action-key]')) {
+          selectAction(event.target.dataset.actionKey);
+        }
+      });
+
       app.addEventListener('input', function (event) {
         if (!state.selectedAction) return;
         const draft = currentDraft();
         if (event.target.id === 'reasonInput') {
           draft.reason = event.target.value;
           state.errors.reason = '';
-        } else if (event.target.id === 'evidenceInput') {
-          draft.evidence = event.target.value;
-          state.errors.evidence = '';
         } else {
           return;
         }

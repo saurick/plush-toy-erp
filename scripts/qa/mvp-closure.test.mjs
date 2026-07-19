@@ -23,6 +23,19 @@ test("mvp closure writes plan-only evidence without runtime effects", () => {
   assert.equal(result.report.finalDecision.canReplaceDomainTests, false);
   assert(result.report.phases.some((phase) => phase.key === "fact-foundation"));
   assert(result.report.phases.some((phase) => phase.key === "mobile-workflow"));
+  const rolePhase = result.report.phases.find((phase) => phase.key === "roles-and-seed");
+  assert(rolePhase);
+  assert(
+    rolePhase.commands.some((command) =>
+      command.includes("ERP_ROLE_DEMO_PASSWORD='replace-with-local-demo-password'"),
+    ),
+  );
+  assert.doesNotMatch(JSON.stringify(rolePhase.commands), /12345678/u);
+  const frontendPhase = result.report.phases.find(
+    (phase) => phase.key === "frontend-regression",
+  );
+  assert(frontendPhase);
+  assert.doesNotMatch(JSON.stringify(frontendPhase.commands), /12345678/u);
   assert(fs.existsSync(result.jsonPath));
   assert(fs.existsSync(result.mdPath));
 

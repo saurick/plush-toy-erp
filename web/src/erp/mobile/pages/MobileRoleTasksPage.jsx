@@ -34,6 +34,7 @@ import {
   settleMobileRoleTaskRequest,
 } from '../../utils/mobileTaskQueries.mjs'
 import { canMountCustomerRuntime } from '../../utils/adminProfileSync.mjs'
+import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
 import MobileTaskDetailScreen from '../components/MobileTaskDetailScreen.jsx'
 import MobileTaskActionScreen from '../components/MobileTaskActionScreen.jsx'
 import MobileTaskListScreen from '../components/MobileTaskListScreen.jsx'
@@ -75,7 +76,6 @@ const MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY =
   'mobileRoleTasksLoadedCountsByView'
 const MOBILE_TASK_HISTORY_SCOPE_KEY = 'mobileRoleTasksScope'
 const MOBILE_TASK_HISTORY_REASON_KEY = 'mobileRoleTasksReason'
-const MOBILE_TASK_HISTORY_EVIDENCE_KEY = 'mobileRoleTasksEvidence'
 const MOBILE_TASK_DRAFT_STORAGE_PREFIX = 'plush-toy-erp:mobile-task-draft:v1:'
 
 const MOBILE_TASK_HISTORY_SCREENS = new Set(['detail', 'action', 'receipt'])
@@ -108,7 +108,6 @@ function persistMobileTaskDraftBackup(scopeKey, draft) {
       storageKey,
       JSON.stringify({
         action,
-        evidence: String(draft?.evidence || ''),
         reason: String(draft?.reason || ''),
         scopeKey: String(scopeKey || '').trim(),
         taskID: String(draft.taskID),
@@ -139,7 +138,6 @@ function readMobileTaskDraftBackup(scopeKey, taskID) {
     }
     return {
       action: String(value.action),
-      evidence: String(value.evidence || ''),
       reason: String(value.reason || ''),
     }
   } catch {
@@ -644,7 +642,6 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null,
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: {},
         [MOBILE_TASK_HISTORY_REASON_KEY]: '',
-        [MOBILE_TASK_HISTORY_EVIDENCE_KEY]: '',
         [MOBILE_TASK_HISTORY_SCOPE_KEY]: taskScopeKey,
       },
       ''
@@ -670,7 +667,6 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_ACTION_KEY]: '',
         [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null,
         [MOBILE_TASK_HISTORY_REASON_KEY]: '',
-        [MOBILE_TASK_HISTORY_EVIDENCE_KEY]: '',
         [MOBILE_TASK_HISTORY_LIST_LIMITS_KEY]: {},
         [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: {},
         [MOBILE_TASK_HISTORY_SCOPE_KEY]: taskScopeKey,
@@ -832,7 +828,6 @@ export default function MobileRoleTasksPage() {
     actionReceipt,
     actionReceiptRetryable,
     clearActionReceipt,
-    detailEvidenceValue,
     detailReasonValue,
     handleTaskAction,
     restoreActionReceipt,
@@ -849,7 +844,6 @@ export default function MobileRoleTasksPage() {
     showTaskReceipt,
     submitDetailAction,
     updateDetailReason,
-    updateEvidenceText,
     updatingID,
     urgingID,
   } = useMobileRoleTaskActions({
@@ -867,10 +861,6 @@ export default function MobileRoleTasksPage() {
       initialHistoryScreen === 'action'
         ? initialHistoryState[MOBILE_TASK_HISTORY_TASK_KEY]
         : null,
-    initialEvidence:
-      initialHistoryScreen === 'action'
-        ? initialHistoryState[MOBILE_TASK_HISTORY_EVIDENCE_KEY]
-        : '',
     initialReason:
       initialHistoryScreen === 'action'
         ? initialHistoryState[MOBILE_TASK_HISTORY_REASON_KEY]
@@ -952,8 +942,6 @@ export default function MobileRoleTasksPage() {
     if (restoredScreen === 'action') {
       restoreActionDraft({
         action: restoredAction,
-        evidence:
-          initialHistoryCandidate[MOBILE_TASK_HISTORY_EVIDENCE_KEY] || '',
         reason:
           initialHistoryCandidate[MOBILE_TASK_HISTORY_REASON_KEY] || '',
         taskID: restoredTaskID,
@@ -975,13 +963,11 @@ export default function MobileRoleTasksPage() {
 
   const actionDraftHistoryRef = useRef({
     action: '',
-    evidence: '',
     reason: '',
     taskID: null,
   })
   actionDraftHistoryRef.current = {
     action: detailAction || '',
-    evidence: detailEvidenceValue,
     reason: detailReasonValue,
     taskID: selectedTask?.id || null,
   }
@@ -1009,7 +995,6 @@ export default function MobileRoleTasksPage() {
           ...currentState,
           [MOBILE_TASK_HISTORY_ACTION_KEY]: draft.action,
           [MOBILE_TASK_HISTORY_REASON_KEY]: draft.reason,
-          [MOBILE_TASK_HISTORY_EVIDENCE_KEY]: draft.evidence,
         },
         ''
       )
@@ -1047,7 +1032,6 @@ export default function MobileRoleTasksPage() {
   }, [
     actionReceipt,
     detailAction,
-    detailEvidenceValue,
     detailReasonValue,
     flushMobileTaskDraftHistory,
     selectedTask,
@@ -1126,7 +1110,6 @@ export default function MobileRoleTasksPage() {
         [MOBILE_TASK_HISTORY_ACTION_KEY]: '',
         [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null,
         [MOBILE_TASK_HISTORY_REASON_KEY]: '',
-        [MOBILE_TASK_HISTORY_EVIDENCE_KEY]: '',
       },
       ''
     )
@@ -1461,7 +1444,6 @@ export default function MobileRoleTasksPage() {
             [MOBILE_TASK_HISTORY_ACTION_KEY]: '',
             [MOBILE_TASK_HISTORY_RECEIPT_KEY]: null,
             [MOBILE_TASK_HISTORY_REASON_KEY]: '',
-            [MOBILE_TASK_HISTORY_EVIDENCE_KEY]: '',
             [MOBILE_TASK_HISTORY_LIST_LIMITS_KEY]: {},
             [MOBILE_TASK_HISTORY_LOADED_COUNTS_KEY]: {},
             [MOBILE_TASK_HISTORY_SCOPE_KEY]: taskScopeKey,
@@ -1514,14 +1496,10 @@ export default function MobileRoleTasksPage() {
         const reason = backupMatchesAction
           ? backup.reason
           : historyState[MOBILE_TASK_HISTORY_REASON_KEY] || ''
-        const evidence = backupMatchesAction
-          ? backup.evidence
-          : historyState[MOBILE_TASK_HISTORY_EVIDENCE_KEY] || ''
         restoringHistoryTaskRef.current = Boolean(targetTaskID)
         setSelectedTaskID(targetTaskID || null)
         restoreActionDraft({
           action: targetAction,
-          evidence,
           reason,
           taskID: targetTaskID,
         })
@@ -1532,7 +1510,6 @@ export default function MobileRoleTasksPage() {
               {
                 ...historyState,
                 [MOBILE_TASK_HISTORY_REASON_KEY]: reason,
-                [MOBILE_TASK_HISTORY_EVIDENCE_KEY]: evidence,
               },
               ''
             )
@@ -1685,10 +1662,8 @@ export default function MobileRoleTasksPage() {
         availableActions={availableActions}
         busy={actionBusy}
         canViewReceipt={Boolean(selectedTaskReceipt)}
-        evidence={detailEvidenceValue}
         onActionChange={(action) => handleTaskAction(selectedTask, action)}
         onBack={handleActionBack}
-        onEvidenceChange={updateEvidenceText}
         onReasonChange={updateDetailReason}
         onRetryAccess={selectedTaskActionAccess.retry}
         onSubmit={submitDetailAction}
@@ -1733,6 +1708,12 @@ export default function MobileRoleTasksPage() {
           Array.isArray(receiptDetailSnapshot?.evidence_refs)
             ? receiptDetailSnapshot.evidence_refs
             : savedEvidenceRefs
+        }
+        selectedCanManageAttachments={
+          receiptSnapshotOnly
+            ? false
+            : selectedCanOperate &&
+              hasActionPermission(adminProfile, 'workflow.task.update')
         }
         selectedCanOperate={receiptSnapshotOnly ? false : selectedCanOperate}
         selectedCanUrge={receiptSnapshotOnly ? false : selectedCanUrge}

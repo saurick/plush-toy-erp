@@ -1878,6 +1878,15 @@ test('style-l1 workflow mutations replay exact receipts before terminal and CAS 
     }
     const first = await call(item.method, params)
     assert.equal(first.result.code, 0, item.method)
+    if (item.method === 'urge_task') {
+      assert.equal(first.result.data.task.urge_count, 1)
+      assert.equal(first.result.data.task.last_urged_by, 1)
+      assert.equal(first.result.data.task.last_urged_by_role_key, 'sales')
+      assert(
+        Number.isSafeInteger(first.result.data.task.last_urged_at) &&
+          first.result.data.task.last_urged_at > 0
+      )
+    }
     const replay = await call(item.method, {
       ...params,
       expected_version: 999,

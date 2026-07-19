@@ -804,6 +804,49 @@
   overflow-wrap: anywhere;
 }
 
+.mobile-task-action-choice__radio {
+  display: grid;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+  place-content: center;
+  margin: 0;
+  appearance: none;
+  border: 2px solid currentcolor;
+  border-radius: 999px;
+  background: #fff;
+  transition:
+    border-color 160ms ease,
+    background-color 160ms ease;
+}
+
+#root .mobile-role-tasks-page input.mobile-task-action-choice__radio {
+  border-radius: 999px;
+  border-start-start-radius: 999px;
+  border-start-end-radius: 999px;
+  border-end-start-radius: 999px;
+  border-end-end-radius: 999px;
+}
+
+.mobile-task-action-choice__radio::before {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentcolor;
+  content: '';
+  transform: scale(0);
+  transition: transform 120ms ease;
+}
+
+.mobile-task-action-choice__radio:checked::before {
+  transform: scale(1);
+}
+
+.mobile-task-action-choice__radio:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 3px;
+}
+
 .mobile-task-flow-steps {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1381,6 +1424,10 @@
   color: #e2e8f0;
 }
 
+[data-erp-theme='dark'] .mobile-task-action-choice__radio {
+  background: var(--erp-surface-bg);
+}
+
 [data-erp-theme='dark'] .mobile-role-action-bar__button {
   min-width: 0;
 }
@@ -1488,7 +1535,7 @@
 
 [data-erp-theme='dark']
   .mobile-app-layout
-  .mobile-task-action-choice--done[aria-pressed='true'] {
+  .mobile-task-action-choice--done[data-selected='true'] {
   border-color: #34d399;
   background: #047857;
   color: #ecfdf5;
@@ -1496,7 +1543,7 @@
 
 [data-erp-theme='dark']
   .mobile-app-layout
-  .mobile-task-action-choice--blocked[aria-pressed='true'] {
+  .mobile-task-action-choice--blocked[data-selected='true'] {
   border-color: #fb923c;
   background: #c2410c;
   color: #fff7ed;
@@ -1504,7 +1551,7 @@
 
 [data-erp-theme='dark']
   .mobile-app-layout
-  .mobile-task-action-choice--resume[aria-pressed='true'] {
+  .mobile-task-action-choice--resume[data-selected='true'] {
   border-color: #60a5fa;
   background: #1d4ed8;
   color: #eff6ff;
@@ -1512,7 +1559,7 @@
 
 [data-erp-theme='dark']
   .mobile-app-layout
-  .mobile-task-action-choice--rejected[aria-pressed='true'] {
+  .mobile-task-action-choice--rejected[data-selected='true'] {
   border-color: #f87171;
   background: #b91c1c;
   color: #fef2f2;
@@ -1520,7 +1567,7 @@
 
 [data-erp-theme='dark']
   .mobile-app-layout
-  .mobile-task-action-choice--urge[aria-pressed='true'] {
+  .mobile-task-action-choice--urge[data-selected='true'] {
   border-color: #94a3b8;
   background: #334155;
   color: #f8fafc;

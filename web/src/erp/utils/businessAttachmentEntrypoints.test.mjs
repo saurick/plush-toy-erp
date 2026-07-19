@@ -46,6 +46,19 @@ test('BusinessAttachmentModalButton is the only page-level wrapper around Busine
   assert(source.includes('BusinessAttachmentPanel'))
   assert(source.includes('<Modal'))
   assert(source.includes('allowPendingAttachmentsWithoutOwner={false}'))
+  assert(source.includes('<PaperClipOutlined aria-hidden="true" />'))
+})
+
+test('read-only attachment panels do not expose a fake upload control', () => {
+  const source = readFileSync(
+    new URL(
+      '../components/business-list/BusinessAttachmentPanel.jsx',
+      import.meta.url
+    ),
+    'utf8'
+  )
+
+  assert.match(source, /\{canUpload \? \([\s\S]*<Button[\s\S]*<input[\s\S]*\) : null\}/u)
 })
 
 test('remaining direct attachment panels stay inside form-backed business modals', () => {

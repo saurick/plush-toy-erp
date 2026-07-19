@@ -53,7 +53,7 @@ const PREFLIGHT_NOT_PROVEN = Object.freeze([
   'browser rendering or mobile layout',
   'workflow task creation',
   'done / blocked / rejected / urge action submission',
-  'completion feedback payload / receipt, evidence refs, or internal notification display',
+  'completion feedback payload / receipt, removed action evidence input, or internal notification display',
   'target environment release evidence',
 ])
 const MOBILE_WORKFLOW_REPORT_STATUS_LABELS = Object.freeze({
@@ -135,6 +135,11 @@ function getWorkflowReportNotificationLabel(notificationType) {
     MOBILE_WORKFLOW_REPORT_NOTIFICATION_LABELS[notificationType] ||
     '内部通知提醒'
   )
+}
+
+function omitsNewMobileActionEvidenceRefs(task) {
+  const refs = task?.payload?.mobile_action_evidence_refs
+  return !Array.isArray(refs) || refs.length === 0
 }
 
 function sanitizeRunId(value) {
@@ -284,7 +289,8 @@ function buildSimulatedTaskPlan() {
       expectedTaskStatusAfterAction: 'blocked',
       requiresReason: true,
       expectsExceptionReport: true,
-      expectsEvidenceRefs: true,
+      hidesActionEvidenceInput: true,
+      omitsNewEvidenceRefs: true,
       notificationType: 'approval_required',
       simulatedOnly: true,
     },
@@ -298,7 +304,8 @@ function buildSimulatedTaskPlan() {
       requiresCompletionFeedback: true,
       expectsCompletionPayloadFeedback: true,
       expectsCompletionReceiptFeedback: true,
-      expectsEvidenceRefs: true,
+      hidesActionEvidenceInput: true,
+      omitsNewEvidenceRefs: true,
       notificationType: 'approval_required',
       simulatedOnly: true,
     },
@@ -310,7 +317,8 @@ function buildSimulatedTaskPlan() {
       expectedBusinessStatusAfterAction: 'project_pending',
       requiresReason: true,
       expectsExceptionReport: true,
-      expectsEvidenceRefs: true,
+      hidesActionEvidenceInput: true,
+      omitsNewEvidenceRefs: true,
       notificationType: 'approval_required',
       simulatedOnly: true,
     },
@@ -323,7 +331,8 @@ function buildSimulatedTaskPlan() {
       requiresCompletionFeedback: true,
       expectsCompletionPayloadFeedback: true,
       expectsCompletionReceiptFeedback: true,
-      expectsEvidenceRefs: true,
+      hidesActionEvidenceInput: true,
+      omitsNewEvidenceRefs: true,
       notificationType: 'finished_goods_qc_pending',
       simulatedOnly: true,
     },
@@ -336,7 +345,8 @@ function buildSimulatedTaskPlan() {
       requiresCompletionFeedback: true,
       expectsCompletionPayloadFeedback: true,
       expectsCompletionReceiptFeedback: true,
-      expectsEvidenceRefs: true,
+      hidesActionEvidenceInput: true,
+      omitsNewEvidenceRefs: true,
       notificationType: 'inbound_pending',
       simulatedOnly: true,
     },
@@ -349,7 +359,8 @@ function buildSimulatedTaskPlan() {
       forbiddenBrowserActions: ['block', 'complete'],
       requiresReason: true,
       expectsUrgeFeedback: true,
-      expectsEvidenceRefs: true,
+      hidesActionEvidenceInput: true,
+      omitsNewEvidenceRefs: true,
       notificationType: 'shipment_release_pending',
       simulatedOnly: true,
     },
@@ -368,11 +379,11 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
     completionActions.has(item.browserAction)
   )
   const allSimulatedOnly = plan.every((item) => item.simulatedOnly === true)
-  const allKeepEvidenceRefs = plan.every(
-    (item) => item.expectsEvidenceRefs === true
+  const allHideActionEvidenceInput = plan.every(
+    (item) => item.hidesActionEvidenceInput === true
   )
-  const allEvidenceInputsOptional = plan.every(
-    (item) => item.requiresEvidence !== true
+  const allOmitNewEvidenceRefs = plan.every(
+    (item) => item.omitsNewEvidenceRefs === true
   )
   const coversReasonRequiredActions = plan
     .filter((item) =>
@@ -395,12 +406,6 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
     completionItems.every(
       (item) => item.expectsCompletionReceiptFeedback === true
     )
-  const coversOptionalCompletionEvidence =
-    completionItems.length === 3 &&
-    completionItems.every(
-      (item) =>
-        item.expectsEvidenceRefs === true && item.requiresEvidence !== true
-    )
   const coverage = {
     taskCount: plan.length,
     actionLabels: [...actionSet]
@@ -410,8 +415,8 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
       .map((role) => getWorkflowReportRoleLabel(role))
       .sort(),
     allSimulatedOnly,
-    allKeepEvidenceRefs,
-    allEvidenceInputsOptional,
+    allHideActionEvidenceInput,
+    allOmitNewEvidenceRefs,
     coversBossBlock: actionSet.has('block'),
     coversBossComplete: actionSet.has('complete'),
     coversBossReject: actionSet.has('reject'),
@@ -422,7 +427,6 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
     coversRequiredCompletionFeedback,
     coversCompletionPayloadFeedback,
     coversCompletionReceiptFeedback,
-    coversOptionalCompletionEvidence,
     coversCompletionFeedback:
       coversRequiredCompletionFeedback &&
       coversCompletionPayloadFeedback &&
@@ -440,11 +444,11 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
   const blockers = []
   if (coverage.taskCount !== 6) blockers.push('expected-six-simulated-tasks')
   if (!coverage.allSimulatedOnly) blockers.push('task-plan-not-simulated-only')
-  if (!coverage.allKeepEvidenceRefs) {
-    blockers.push('missing-evidence-ref-coverage')
+  if (!coverage.allHideActionEvidenceInput) {
+    blockers.push('action-evidence-input-must-stay-removed')
   }
-  if (!coverage.allEvidenceInputsOptional) {
-    blockers.push('evidence-input-must-remain-optional')
+  if (!coverage.allOmitNewEvidenceRefs) {
+    blockers.push('mobile-actions-must-not-produce-evidence-refs')
   }
   if (!coverage.coversBossBlock) blockers.push('missing-boss-block-action')
   if (!coverage.coversBossComplete) {
@@ -471,9 +475,6 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
   }
   if (!coverage.coversCompletionReceiptFeedback) {
     blockers.push('missing-completion-receipt-feedback-coverage')
-  }
-  if (!coverage.coversOptionalCompletionEvidence) {
-    blockers.push('missing-independent-optional-completion-evidence-coverage')
   }
   if (!coverage.coversExceptionReport) {
     blockers.push('missing-exception-report-coverage')
@@ -503,8 +504,8 @@ function buildSimulatedTaskPlanSummary(plan = buildSimulatedTaskPlan()) {
     completionReceiptFeedbackExpected:
       item.expectsCompletionReceiptFeedback === true,
     exceptionReportExpected: item.expectsExceptionReport === true,
-    evidenceInputRequired: item.requiresEvidence === true,
-    evidenceRefExpected: item.expectsEvidenceRefs === true,
+    actionEvidenceInputHidden: item.hidesActionEvidenceInput === true,
+    newEvidenceRefsOmitted: item.omitsNewEvidenceRefs === true,
     notificationHint: getWorkflowReportNotificationLabel(item.notificationType),
     simulatedOnly: item.simulatedOnly === true,
   }))
@@ -859,10 +860,8 @@ function buildSmokeReport({
         actionLabel: getWorkflowReportActionLabel('blocked'),
         reasonRecorded:
           updatedBossTask.blocked_reason === browserResult.blockReason,
-        evidenceRefRecorded:
-          updatedBossTask.payload?.mobile_action_evidence_refs?.includes(
-            browserResult.blockEvidence
-          ) === true,
+        newEvidenceRefsOmitted:
+          omitsNewMobileActionEvidenceRefs(updatedBossTask),
         exceptionReportRecorded:
           updatedBossTask.payload?.mobile_exception_report?.reason ===
           browserResult.blockReason,
@@ -882,10 +881,8 @@ function buildSmokeReport({
         actionLabel: getWorkflowReportActionLabel('done'),
         completionFeedbackRecorded:
           updatedBossDoneTask.payload?.feedback === browserResult.doneFeedback,
-        evidenceRefRecorded:
-          updatedBossDoneTask.payload?.mobile_action_evidence_refs?.includes(
-            browserResult.doneEvidence
-          ) === true,
+        newEvidenceRefsOmitted:
+          omitsNewMobileActionEvidenceRefs(updatedBossDoneTask),
       },
       {
         key: 'boss-reject',
@@ -903,10 +900,8 @@ function buildSmokeReport({
         reasonRecorded:
           updatedBossRejectTask.payload?.mobile_exception_report?.reason ===
           browserResult.rejectReason,
-        evidenceRefRecorded:
-          updatedBossRejectTask.payload?.mobile_action_evidence_refs?.includes(
-            browserResult.rejectEvidence
-          ) === true,
+        newEvidenceRefsOmitted:
+          omitsNewMobileActionEvidenceRefs(updatedBossRejectTask),
         exceptionReportRecorded:
           updatedBossRejectTask.payload?.mobile_exception_report?.reason ===
           browserResult.rejectReason,
@@ -927,10 +922,8 @@ function buildSmokeReport({
         completionFeedbackRecorded:
           updatedQualityTask.payload?.feedback ===
           browserResult.qualityFeedback,
-        evidenceRefRecorded:
-          updatedQualityTask.payload?.mobile_action_evidence_refs?.includes(
-            browserResult.qualityEvidence
-          ) === true,
+        newEvidenceRefsOmitted:
+          omitsNewMobileActionEvidenceRefs(updatedQualityTask),
       },
       {
         key: 'warehouse-inbound-complete',
@@ -948,10 +941,8 @@ function buildSmokeReport({
         completionFeedbackRecorded:
           updatedWarehouseInboundTask.payload?.feedback ===
           browserResult.warehouseInboundFeedback,
-        evidenceRefRecorded:
-          updatedWarehouseInboundTask.payload?.mobile_action_evidence_refs?.includes(
-            browserResult.warehouseInboundEvidence
-          ) === true,
+        newEvidenceRefsOmitted:
+          omitsNewMobileActionEvidenceRefs(updatedWarehouseInboundTask),
       },
       {
         key: 'warehouse-urge',
@@ -971,10 +962,8 @@ function buildSmokeReport({
         urgeReasonRecorded:
           updatedWarehouseTask.payload?.last_urge_reason ===
           browserResult.urgeReason,
-        evidenceRefRecorded:
-          updatedWarehouseTask.payload?.mobile_action_evidence_refs?.includes(
-            browserResult.urgeEvidence
-          ) === true,
+        newEvidenceRefsOmitted:
+          omitsNewMobileActionEvidenceRefs(updatedWarehouseTask),
       },
     ],
     summary: {
@@ -989,7 +978,8 @@ function buildSmokeReport({
       completionFeedbackRequiredChecked: true,
       completionPayloadFeedbackChecked: true,
       completionReceiptFeedbackChecked: true,
-      optionalEvidenceRefsChecked: true,
+      actionEvidenceInputsRemovedChecked: true,
+      newEvidenceRefsOmittedChecked: true,
       receiptBackToListChecked: true,
       listStateRestoreChecked: true,
       noHorizontalOverflow:
@@ -1466,6 +1456,14 @@ async function openMobileTaskProcess(page, task, { detailCopy = '' } = {}) {
       timeout: 15_000,
     })
   }
+  await detailScreen
+    .getByRole('heading', { name: '任务附件', exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  assert.equal(
+    await detailScreen.getByText('历史处理线索', { exact: true }).count(),
+    0,
+    'new simulated tasks should not show historical action evidence refs'
+  )
   const detailSteps = detailScreen.getByTestId('mobile-task-flow-steps')
   assert.equal(
     await detailSteps.locator('.mobile-task-flow-step').count(),
@@ -1509,19 +1507,41 @@ async function submitMobileTaskAction(
     actionLabel,
     feedback = '',
     feedbackLabel = '完成反馈',
-    evidence,
-    evidenceLabel,
     reason = '',
     reasonLabel = '',
     requiredError = '',
   }
 ) {
-  const actionChoice = actionScreen.getByRole('button', {
+  const actionChoice = actionScreen.getByRole('radio', {
     name: actionLabel,
     exact: true,
   })
-  await actionChoice.click()
-  assert.equal(await actionChoice.getAttribute('aria-pressed'), 'true')
+  if ((await actionChoice.count()) === 1) {
+    await actionChoice.check()
+    assert.equal(await actionChoice.isChecked(), true)
+  } else {
+    const singleAction = actionScreen.getByTestId(
+      'mobile-task-single-action-summary'
+    )
+    assert.equal(
+      await singleAction.count(),
+      1,
+      `single action summary missing for ${actionLabel}`
+    )
+    await singleAction.getByText(actionLabel, { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
+    assert.equal(
+      await actionScreen
+        .getByRole('button', { name: actionLabel, exact: true })
+        .count(),
+      0,
+      'single action summary must not be rendered as an execution button'
+    )
+  }
+
+  const submitLabel = `确认${actionLabel}`
 
   if (feedback) {
     assert.equal(
@@ -1532,20 +1552,19 @@ async function submitMobileTaskAction(
       'completion feedback input should be required'
     )
   }
-  if (evidence) {
-    const evidenceInput = actionScreen.getByLabel(evidenceLabel, {
-      exact: true,
-    })
-    assert.equal(
-      await evidenceInput.evaluate((field) => field.required),
-      false,
-      'onsite evidence input should remain optional'
-    )
-    await evidenceInput.fill(evidence)
-  }
+  assert.equal(
+    await actionScreen.getByText('现场证据', { exact: true }).count(),
+    0,
+    'mobile task action must not expose a free-text evidence input'
+  )
+  assert.equal(
+    await actionScreen.locator('input[type="file"]').count(),
+    0,
+    'mobile task action must not duplicate the detail attachment entrypoint'
+  )
   if (requiredError) {
     await actionScreen
-      .getByRole('button', { name: '确认提交', exact: true })
+      .getByRole('button', { name: submitLabel, exact: true })
       .click()
     await actionScreen.getByText(requiredError, { exact: true }).waitFor({
       state: 'visible',
@@ -1559,7 +1578,7 @@ async function submitMobileTaskAction(
     await actionScreen.getByLabel(feedbackLabel, { exact: true }).fill(feedback)
   }
   await actionScreen
-    .getByRole('button', { name: '确认提交', exact: true })
+    .getByRole('button', { name: submitLabel, exact: true })
     .click()
 
   const receiptScreen = page.getByTestId('mobile-task-receipt-screen')
@@ -1570,7 +1589,7 @@ async function submitMobileTaskAction(
 async function verifyConfirmedReceipt(
   page,
   receiptScreen,
-  { actionLabel, evidence, feedback = '', reason = '', roleKey = 'boss', task }
+  { actionLabel, feedback = '', reason = '', roleKey = 'boss', task }
 ) {
   await receiptScreen
     .getByText('任务办理已确认', { exact: true })
@@ -1605,16 +1624,11 @@ async function verifyConfirmedReceipt(
       timeout: 15_000,
     })
   }
-  const evidenceRow = receiptScreen
-    .locator('.mobile-task-receipt-row')
-    .filter({ hasText: '证据线索' })
-  await evidenceRow
-    .getByText('证据线索', { exact: true })
-    .waitFor({ state: 'visible', timeout: 15_000 })
-  await evidenceRow.getByText(evidence, { exact: true }).waitFor({
-    state: 'visible',
-    timeout: 15_000,
-  })
+  assert.equal(
+    await receiptScreen.getByText('历史处理线索', { exact: true }).count(),
+    0,
+    'new mobile actions should not create historical evidence refs'
+  )
   assert.equal(
     await receiptScreen
       .locator('[data-step-key="result"]')
@@ -1713,13 +1727,9 @@ async function runBrowserScenario(
 ) {
   const { context, page, runtimeErrors } = await newMobilePage(browser)
   const blockReason = `移动端浏览器模拟阻塞 ${options.runId}`
-  const blockEvidence = `${bossTask.task_code}-PHOTO`
   const doneFeedback = `移动端浏览器模拟完成反馈 ${options.runId}`
-  const doneEvidence = `${bossDoneTask.task_code}-PHOTO`
   const rejectReason = `移动端浏览器模拟退回 ${options.runId}`
-  const rejectEvidence = `${bossRejectTask.task_code}-PHOTO`
   const urgeReason = `移动端浏览器模拟催办 ${options.runId}`
-  const urgeEvidence = `${warehouseTask.task_code}-PHOTO`
 
   try {
     await loginMobileBoss(page, { baseURL: options.baseURL, password })
@@ -1733,8 +1743,6 @@ async function runBrowserScenario(
       blockProcess.actionScreen,
       {
         actionLabel: '阻塞',
-        evidence: blockEvidence,
-        evidenceLabel: '现场证据',
         reason: blockReason,
         reasonLabel: '阻塞原因',
         requiredError: '阻塞原因为必填项',
@@ -1742,7 +1750,6 @@ async function runBrowserScenario(
     )
     const metrics = await verifyConfirmedReceipt(page, blockReceipt, {
       actionLabel: '阻塞',
-      evidence: blockEvidence,
       reason: blockReason,
       task: bossTask,
     })
@@ -1764,8 +1771,6 @@ async function runBrowserScenario(
       rejectProcess.actionScreen,
       {
         actionLabel: '退回',
-        evidence: rejectEvidence,
-        evidenceLabel: '现场证据',
         reason: rejectReason,
         reasonLabel: '退回原因',
         requiredError: '退回原因为必填项',
@@ -1773,7 +1778,6 @@ async function runBrowserScenario(
     )
     await verifyConfirmedReceipt(page, rejectReceipt, {
       actionLabel: '退回',
-      evidence: rejectEvidence,
       reason: rejectReason,
       task: bossRejectTask,
     })
@@ -1791,15 +1795,12 @@ async function runBrowserScenario(
         actionLabel: '完成',
         feedback: doneFeedback,
         feedbackLabel: '完成反馈',
-        evidence: doneEvidence,
-        evidenceLabel: '现场证据',
         requiredError: '完成反馈为必填项',
       }
     )
     await verifyConfirmedReceipt(page, doneReceipt, {
       actionLabel: '完成',
       feedback: doneFeedback,
-      evidence: doneEvidence,
       task: bossDoneTask,
     })
     await returnReceiptToList(page, doneReceipt)
@@ -1821,30 +1822,29 @@ async function runBrowserScenario(
     const urgeProcess = await openMobileTaskProcess(page, warehouseTask, {
       detailCopy: '这条任务由仓库办理，您可以查看并发起催办。',
     })
-    const urgeChoices = urgeProcess.actionScreen.locator(
-      '.mobile-task-action-choice'
-    )
+    const urgeChoices = urgeProcess.actionScreen.getByRole('radio')
     assert.equal(
       await urgeChoices.count(),
-      1,
-      'cross-role task should expose only the urge action'
+      0,
+      'cross-role single urge action should not render a choice group'
     )
-    const urgeChoice = urgeProcess.actionScreen.getByRole('button', {
-      name: '催办',
-      exact: true,
-    })
+    const urgeSummary = urgeProcess.actionScreen.getByTestId(
+      'mobile-task-single-action-summary'
+    )
     assert.equal(
-      await urgeChoice.isDisabled(),
-      false,
-      'cross-role urge action should be enabled'
+      await urgeSummary.count(),
+      1,
+      'cross-role task should expose one non-interactive urge summary'
     )
+    await urgeSummary.getByText('催办', { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
     const urgeReceipt = await submitMobileTaskAction(
       page,
       urgeProcess.actionScreen,
       {
         actionLabel: '催办',
-        evidence: urgeEvidence,
-        evidenceLabel: '现场证据',
         reason: urgeReason,
         reasonLabel: '催办原因',
         requiredError: '催办原因为必填项',
@@ -1852,7 +1852,6 @@ async function runBrowserScenario(
     )
     const urgeMetrics = await verifyConfirmedReceipt(page, urgeReceipt, {
       actionLabel: '催办',
-      evidence: urgeEvidence,
       reason: urgeReason,
       task: warehouseTask,
     })
@@ -1868,13 +1867,9 @@ async function runBrowserScenario(
     })
     return {
       blockReason,
-      blockEvidence,
       doneFeedback,
-      doneEvidence,
       rejectReason,
-      rejectEvidence,
       urgeReason,
-      urgeEvidence,
       metrics,
       urgeMetrics,
     }
@@ -1896,7 +1891,6 @@ async function runOwnedCompleteScenario(
 ) {
   const { context, page, runtimeErrors } = await newMobilePage(browser)
   const feedback = `${task.task_code}-FEEDBACK`
-  const evidence = `${task.task_code}-PHOTO`
 
   try {
     await loginMobileRole(page, {
@@ -1914,14 +1908,11 @@ async function runOwnedCompleteScenario(
       actionLabel: '完成',
       feedback,
       feedbackLabel: '完成反馈',
-      evidence,
-      evidenceLabel: '现场证据',
       requiredError: '完成反馈为必填项',
     })
     await verifyConfirmedReceipt(page, receipt, {
       actionLabel: '完成',
       feedback,
-      evidence,
       roleKey,
       task,
     })
@@ -1984,7 +1975,7 @@ async function runOwnedCompleteScenario(
       path: path.resolve(outputDir, `${task.task_code}-done.png`),
       fullPage: true,
     })
-    return { evidence, feedback, metrics }
+    return { feedback, metrics }
   } catch (error) {
     const debug = await capturePageDebug(page)
     if (debug) {
@@ -2152,10 +2143,8 @@ async function main() {
       username: 'demo_warehouse',
     })
     browserResult.qualityFeedback = qualityResult.feedback
-    browserResult.qualityEvidence = qualityResult.evidence
     browserResult.qualityMetrics = qualityResult.metrics
     browserResult.warehouseInboundFeedback = warehouseInboundResult.feedback
-    browserResult.warehouseInboundEvidence = warehouseInboundResult.evidence
     browserResult.warehouseInboundMetrics = warehouseInboundResult.metrics
     const updatedBossTask = await readTaskByCode({
       backendURL: options.backendURL,
@@ -2166,11 +2155,10 @@ async function main() {
     assert.equal(updatedBossTask.blocked_reason, browserResult.blockReason)
     assert.equal(updatedBossTask.payload?.mobile_action?.action_key, 'blocked')
     assert.equal(updatedBossTask.payload?.mobile_action?.role_key, 'boss')
-    assert(
-      updatedBossTask.payload?.mobile_action_evidence_refs?.includes(
-        browserResult.blockEvidence
-      ),
-      'blocked task should retain mobile action evidence ref'
+    assert.equal(
+      omitsNewMobileActionEvidenceRefs(updatedBossTask),
+      true,
+      'blocked task must not create mobile action evidence refs'
     )
     assert.equal(
       updatedBossTask.payload?.mobile_exception_report?.reason,
@@ -2189,11 +2177,10 @@ async function main() {
       browserResult.doneFeedback,
       'done task should retain completion feedback in payload.feedback'
     )
-    assert(
-      updatedBossDoneTask.payload?.mobile_action_evidence_refs?.includes(
-        browserResult.doneEvidence
-      ),
-      'done task should retain mobile action evidence ref'
+    assert.equal(
+      omitsNewMobileActionEvidenceRefs(updatedBossDoneTask),
+      true,
+      'done task must not create mobile action evidence refs'
     )
     const updatedBossRejectTask = await readTaskByCode({
       backendURL: options.backendURL,
@@ -2206,11 +2193,10 @@ async function main() {
       'rejected'
     )
     assert.equal(updatedBossRejectTask.payload?.mobile_action?.role_key, 'boss')
-    assert(
-      updatedBossRejectTask.payload?.mobile_action_evidence_refs?.includes(
-        browserResult.rejectEvidence
-      ),
-      'rejected task should retain mobile action evidence ref'
+    assert.equal(
+      omitsNewMobileActionEvidenceRefs(updatedBossRejectTask),
+      true,
+      'rejected task must not create mobile action evidence refs'
     )
     assert.equal(
       updatedBossRejectTask.payload?.mobile_exception_report?.reason,
@@ -2230,11 +2216,10 @@ async function main() {
       browserResult.qualityFeedback,
       'quality done task should retain completion feedback in payload.feedback'
     )
-    assert(
-      updatedQualityTask.payload?.mobile_action_evidence_refs?.includes(
-        browserResult.qualityEvidence
-      ),
-      'quality done task should retain mobile action evidence ref'
+    assert.equal(
+      omitsNewMobileActionEvidenceRefs(updatedQualityTask),
+      true,
+      'quality done task must not create mobile action evidence refs'
     )
     const updatedWarehouseInboundTask = await readTaskByCode({
       backendURL: options.backendURL,
@@ -2256,11 +2241,10 @@ async function main() {
       browserResult.warehouseInboundFeedback,
       'warehouse inbound done task should retain completion feedback in payload.feedback'
     )
-    assert(
-      updatedWarehouseInboundTask.payload?.mobile_action_evidence_refs?.includes(
-        browserResult.warehouseInboundEvidence
-      ),
-      'warehouse inbound done task should retain mobile action evidence ref'
+    assert.equal(
+      omitsNewMobileActionEvidenceRefs(updatedWarehouseInboundTask),
+      true,
+      'warehouse inbound done task must not create mobile action evidence refs'
     )
     const updatedWarehouseTask = await readTaskByCode({
       backendURL: options.backendURL,
@@ -2283,11 +2267,10 @@ async function main() {
       'urge'
     )
     assert.equal(updatedWarehouseTask.payload?.mobile_action?.role_key, 'boss')
-    assert(
-      updatedWarehouseTask.payload?.mobile_action_evidence_refs?.includes(
-        browserResult.urgeEvidence
-      ),
-      'urged task should retain mobile action evidence ref'
+    assert.equal(
+      omitsNewMobileActionEvidenceRefs(updatedWarehouseTask),
+      true,
+      'urged task must not create mobile action evidence refs'
     )
     if (options.report) {
       const report = buildSmokeReport({

@@ -42,8 +42,10 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   const trialBrowserSmokeTest = read("web/scripts/trialDemoAccountBrowserSmoke.test.mjs");
   const trialAccountAudit = read("scripts/qa/trial-account-rbac.mjs");
   const trialBrowserSmoke = read("web/scripts/trialDemoAccountBrowserSmoke.mjs");
+  const seedCommandSource = read("server/cmd/seed-role-demo-admins/main.go");
   const seedSource = read("server/internal/data/admin_role_demo_seed.go");
   const rbacSource = read("server/internal/biz/rbac.go");
+  const yoyoosunTrialAccountChecklist = read("docs/customers/yoyoosun/试用账号角色菜单核对清单.md");
 
   for (const [roleKey, username, permissionKey, mobilePath] of trialRoles) {
     assertIncludes(seedSource, username, "admin role demo seed");
@@ -72,6 +74,31 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   assertIncludes(serverConfigDoc, "demo_admin", "server config role demo account docs");
   assertIncludes(seedSource, "demo_admin", "admin role demo seed");
   assertIncludes(trialAccountAudit, "demo_admin", "trial account RBAC audit");
+  assert.match(
+    seedCommandSource,
+    /defaultRoleDemoPassword\s*=\s*"12345678"/u,
+    "role demo seed must keep the public default password",
+  );
+  assertIncludes(
+    seedCommandSource,
+    'getenv("ERP_ROLE_DEMO_PASSWORD")',
+    "role demo seed explicit password override",
+  );
+  assertIncludes(
+    scriptReadme,
+    "公开测试值一旦 seed 就是可登录凭据",
+    "scripts README public demo credential boundary",
+  );
+  assertIncludes(
+    serverConfigDoc,
+    "不会生成 `demo_admin`、`demo_debug`",
+    "server config privileged demo account boundary",
+  );
+  assertIncludes(
+    yoyoosunTrialAccountChecklist,
+    "客户试用环境必须显式提供独立的非默认密码",
+    "yoyoosun trial role demo credential boundary",
+  );
   assertIncludes(
     trialAccountAudit,
     "backend URL must not contain username or password",
@@ -230,7 +257,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     scriptReadme,
-    "如果还没有本地演示账号密码，先打印输入模板",
+    "如果只想先核对输入和账号清单，可打印输入模板",
     "scripts README trial account input template",
   );
   assertIncludes(

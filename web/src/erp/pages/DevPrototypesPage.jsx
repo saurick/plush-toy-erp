@@ -34,6 +34,7 @@ import {
   normalizeDevPrototypeSelectedKey,
   normalizeDevPrototypeStatusFilter,
   prepareDevPrototypeSandboxSource,
+  resolveDevPrototypeStatusFilterForSelection,
 } from '../config/devPrototypes.mjs'
 import { formatDevEnglishAnchor } from '../config/devVisibleLabels.mjs'
 
@@ -299,11 +300,16 @@ export default function DevPrototypesPage() {
     ? searchParams.get(FILTER_QUERY_KEY) || ''
     : readStoredString(DEV_PROTOTYPE_STATUS_FILTER_STORAGE_KEY) ||
       DEV_PROTOTYPE_FILTERS.ALL
-  const statusFilter = normalizeDevPrototypeStatusFilter(requestedStatusFilter)
   const keyword = searchParams.get(KEYWORD_QUERY_KEY) || ''
-  const requestedSelectedKey = searchParams.has(ASSET_QUERY_KEY)
+  const hasRequestedSelectedKey = searchParams.has(ASSET_QUERY_KEY)
+  const requestedSelectedKey = hasRequestedSelectedKey
     ? searchParams.get(ASSET_QUERY_KEY) || ''
     : readStoredString(DEV_PROTOTYPE_SELECTED_STORAGE_KEY) || ''
+  const statusFilter = resolveDevPrototypeStatusFilterForSelection(
+    normalizeDevPrototypeStatusFilter(requestedStatusFilter),
+    hasRequestedSelectedKey ? requestedSelectedKey : '',
+    items
+  )
   const selectedKey = normalizeDevPrototypeSelectedKey(
     requestedSelectedKey,
     items

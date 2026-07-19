@@ -88,7 +88,7 @@ TRIAL_ACCOUNT_PASSWORD='replace-with-local-demo-password' \
   node scripts/qa/trial-account-rbac.mjs
 ```
 
-验收点：角色账号绑定真实 RBAC 角色，核心 seed 只写单位、材料、产品、仓库和 BOM 模拟基础资料。
+验收点：完整 `demo_*` 角色账号使用显式提供的本地演示密码并绑定真实 RBAC 角色；无输入公开默认只允许登记的隔离 `*_dev` 库和九个普通业务角色，不用于完整验收。核心 seed 只写单位、材料、产品、仓库和 BOM 模拟基础资料。
 
 3. MVP 源单据试用数据
 
@@ -152,7 +152,7 @@ MOBILE_WORKFLOW_SIM_PASSWORD='replace-with-demo-password' \
     --out output/customers/yoyoosun/mobile-workflow-simulated-closure-target
 ```
 
-验收点：只验证岗位协同、处理动作、异常和现场留痕；Workflow task done 不等于库存、出货或财务事实已过账。
+验收点：只验证岗位协同、处理动作、反馈 / 原因、详情任务附件入口和新动作不生成历史证据引用；Workflow task done 不等于库存、出货或财务事实已过账。
 
 7. 前端菜单和浏览器回归
 
