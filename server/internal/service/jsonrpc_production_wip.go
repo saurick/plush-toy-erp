@@ -27,8 +27,6 @@ func (d *jsonrpcDispatcher) handleProductionWIP(ctx context.Context, method, id 
 	switch method {
 	case "get_production_wip":
 		return id, d.getProductionWIP(ctx, pm), nil
-	case "initialize_production_wip":
-		return id, d.initializeProductionWIP(ctx, pm), nil
 	case "execute_production_wip_action":
 		return id, d.executeProductionWIPAction(ctx, pm), nil
 	default:
@@ -54,36 +52,6 @@ func (d *jsonrpcDispatcher) getProductionWIP(ctx context.Context, pm map[string]
 	return d.productionWIPAggregateResult(ctx, aggregate, err)
 }
 
-func (d *jsonrpcDispatcher) initializeProductionWIP(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
-	if !productionOrderAllowsOnly(pm, "production_order_id", "idempotency_key") {
-		return invalidParamResult()
-	}
-	if res := d.RequireAdminPermission(ctx, biz.PermissionProductionWIPAssign); res != nil {
-		return res
-	}
-	if res := d.requireCustomerConfigModulesEnabled(ctx, "", productionOrderModuleKey, "quality_inspections"); res != nil {
-		return res
-	}
-	admin, res := d.CurrentAdmin(ctx)
-	if res != nil {
-		return res
-	}
-	orderID, ok := productionOrderRequiredPositiveInt(pm, "production_order_id")
-	if !ok {
-		return invalidParamResult()
-	}
-	key, ok := productionOrderRequiredString(pm, "idempotency_key", 128)
-	if !ok {
-		return invalidParamResult()
-	}
-	aggregate, err := d.productionOrderUC.InitializeProductionWIP(ctx, &biz.ProductionWIPInitialize{
-		ProductionOrderID: orderID,
-		ActorID:           admin.ID,
-		IdempotencyKey:    key,
-	})
-	return d.productionWIPAggregateResult(ctx, aggregate, err)
-}
-
 func (d *jsonrpcDispatcher) executeProductionWIPAction(ctx context.Context, pm map[string]any) *v1.JsonrpcResult {
 	action, ok := productionOrderRequiredString(pm, "action", 40)
 	if !ok {
@@ -104,8 +72,18 @@ func (d *jsonrpcDispatcher) executeProductionWIPAction(ctx context.Context, pm m
 	if !ok {
 		return invalidParamResult()
 	}
+	conditions := []string(nil)
 	if action == biz.ProductionWIPActionAssignExecution && in.ExecutionMode == biz.ProductionWIPExecutionOutsourced {
 		modules = append(modules, "outsourcing_orders")
+		conditions = append(conditions, biz.SourceReadConditionOutsourcedExecution)
+	}
+	if res := d.requireSourceActionReadPermissions(
+		ctx,
+		"production_wip",
+		"execute_production_wip_action",
+		conditions...,
+	); res != nil {
+		return res
 	}
 	if res := d.requireCustomerConfigModulesEnabled(ctx, "", modules...); res != nil {
 		return res
@@ -122,6 +100,8 @@ func productionWIPActionContract(action string) (string, []string, []string, boo
 		return biz.PermissionProductionWIPAssign, modules, append(base, "production_wip_batch_id", "splits"), true
 	case biz.ProductionWIPActionAssignExecution:
 		return biz.PermissionProductionWIPAssign, modules, append(base, "production_wip_batch_id", "execution_mode", "outsourcing_allocations"), true
+	case biz.ProductionWIPActionCancelBatch:
+		return biz.PermissionProductionWIPAssign, modules, append(base, "production_wip_batch_id", "reason"), true
 	case biz.ProductionWIPActionStartOperation,
 		biz.ProductionWIPActionCompleteOperation,
 		biz.ProductionWIPActionReceiveOutsourcingReturn:
@@ -206,6 +186,12 @@ func productionWIPActionFromParams(pm map[string]any, action string, actorID int
 		}
 		in.TargetOperationID = targetID
 		in.Quantity = quantity
+		in.Reason = reason
+	case biz.ProductionWIPActionCancelBatch:
+		reason, ok := productionOrderOptionalString(pm, "reason", 255)
+		if !ok || reason == nil {
+			return nil, false
+		}
 		in.Reason = reason
 	}
 	return in, true
@@ -381,7 +367,7 @@ func (d *jsonrpcDispatcher) mapProductionWIPError(ctx context.Context, err error
 	case errors.Is(err, biz.ErrProductionOrderNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单不存在"}
 	case errors.Is(err, biz.ErrProductionWIPInvalidRoute), errors.Is(err, biz.ErrProductionOrderReferenceInvalid):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产路线或工序档案不完整，请核对机裁、车缝、手工和包装工序"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产路线或工序档案不完整，请核对四个标准路线位置是否已分别绑定有效工序"}
 	case errors.Is(err, biz.ErrProductionWIPQuantityExceeded):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "办理数量超过当前在制批次可用数量"}
 	case errors.Is(err, biz.ErrProductionWIPExecutionModeNotAllowed):

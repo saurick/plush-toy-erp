@@ -26,7 +26,7 @@ import {
   PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
   PRODUCTION_ORDER_STATUS,
 } from '../../utils/productionOrderModel.mjs'
-import { PRODUCTION_WIP_ROUTE_KEY } from '../../utils/productionWipModel.mjs'
+import { PRODUCTION_WIP_ROUTE_CODE } from '../../utils/productionWipModel.mjs'
 
 const { Text } = Typography
 
@@ -254,7 +254,7 @@ function RowReference({ field, form, optionsByType, readOnly }) {
             disabled={readOnly}
             options={[
               {
-                value: PRODUCTION_WIP_ROUTE_KEY,
+                value: PRODUCTION_WIP_ROUTE_CODE,
                 label: '毛绒标准路线（先车缝、后手工）',
               },
             ]}
@@ -269,7 +269,7 @@ function RowReference({ field, form, optionsByType, readOnly }) {
           extra="仅订单明确要求时开启；不等同于系统验收。"
         >
           <Switch
-            disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_KEY}
+            disabled={readOnly || routeCode !== PRODUCTION_WIP_ROUTE_CODE}
             checkedChildren="需要"
             unCheckedChildren="不需要"
           />
@@ -462,7 +462,7 @@ export default function ProductionOrderFormModal({
                     add({
                       line_no: fields.length + 1,
                       planned_quantity: '1',
-                      route_code: PRODUCTION_WIP_ROUTE_KEY,
+                      route_code: PRODUCTION_WIP_ROUTE_CODE,
                       customer_inspection_required: false,
                     })
                   }

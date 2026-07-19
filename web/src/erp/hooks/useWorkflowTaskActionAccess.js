@@ -29,6 +29,7 @@ export default function useWorkflowTaskActionAccess({
     loading: false,
     failed: false,
   })
+  const [retryVersion, setRetryVersion] = useState(0)
 
   useEffect(() => {
     if (!enabled || !requestKey) {
@@ -79,11 +80,11 @@ export default function useWorkflowTaskActionAccess({
     return () => {
       controller.abort()
     }
-  }, [enabled, requestKey, taskID])
+  }, [enabled, requestKey, retryVersion, taskID])
 
   return useMemo(
-    () =>
-      buildWorkflowActionAccessState({
+    () => ({
+      ...buildWorkflowActionAccessState({
         adminProfile,
         task,
         explainData:
@@ -92,6 +93,12 @@ export default function useWorkflowTaskActionAccess({
         failed: remoteState.requestKey === requestKey && remoteState.failed,
         actionModes,
       }),
-    [actionModes, adminProfile, remoteState, requestKey, task]
+      retry() {
+        if (enabled && requestKey) {
+          setRetryVersion((current) => current + 1)
+        }
+      },
+    }),
+    [actionModes, adminProfile, enabled, remoteState, requestKey, task]
   )
 }

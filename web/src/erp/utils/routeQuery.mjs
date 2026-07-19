@@ -13,6 +13,13 @@ export function searchParamText(searchParams, key) {
 }
 
 export function searchParamPositiveIntText(searchParams, key) {
-  const value = Number(searchParams?.get(key) || 0)
-  return Number.isFinite(value) && value > 0 ? String(Math.trunc(value)) : ''
+  const rawValue = String(searchParams?.get(key) || '').trim()
+  if (!/^\d+$/u.test(rawValue)) return ''
+  const value = Number(rawValue)
+  return Number.isSafeInteger(value) && value > 0 ? String(value) : ''
+}
+
+export function searchParamPositiveInt(searchParams, key) {
+  const text = searchParamPositiveIntText(searchParams, key)
+  return text ? Number(text) : 0
 }

@@ -147,6 +147,7 @@ function sourceReport({ remote = false } = {}) {
       status: "ACTIVE",
       customerId: 601,
       customerSnapshot: "东莞美悦礼品",
+      paymentTermDays: 30,
     },
     item: {
       id: 701,
@@ -388,27 +389,60 @@ function factStage() {
   const shipmentStatuses = ["DRAFT", "SHIPPED", "CANCELLED"];
   const reservationStatuses = ["ACTIVE", "RELEASED"];
   const finance = [];
+  const paymentTerms = [
+    { payment_term: "CASH_ON_SHIPMENT", payment_term_days: 0 },
+    { payment_term: "EOM_30", payment_term_days: 30 },
+    { payment_term: "EOM_45", payment_term_days: 45 },
+    { payment_term_days: 60 },
+  ];
+  const invoiceCategories = [
+    "NONE",
+    "EXPORT_GENERAL",
+    "VAT_GENERAL_1",
+    "VAT_SPECIAL_3",
+    "VAT_SPECIAL_13",
+  ];
+  const cancellationAudit = (status, offset) =>
+    status === "CANCELLED"
+      ? {
+          cancelled_at: 1784300000 + offset,
+          cancelled_by_name: "demo_finance",
+          cancel_reason: "本笔取消",
+        }
+      : {};
   let id = 20000;
   for (const type of ["PAYABLE", "RECEIVABLE", "RECONCILIATION"]) {
     for (let offset = 0; offset < 48; offset += 1) {
+      const status = ["DRAFT", "POSTED", "SETTLED", "CANCELLED"][offset % 4];
       finance.push({
         id: id++,
         fact_no: `${type}-${offset}`,
         fact_type: type,
-        status: ["DRAFT", "POSTED", "SETTLED", "CANCELLED"][offset % 4],
+        status,
         source_type: type === "RECONCILIATION" ? "FINANCE_FACT" : "SHIPMENT",
         source_id: 9000 + offset,
+        ...(type === "RECEIVABLE"
+          ? {
+              collection_type: "ACCOUNTS_RECEIVABLE",
+              ...paymentTerms[offset % paymentTerms.length],
+            }
+          : {}),
+        ...cancellationAudit(status, offset),
       });
     }
   }
   for (let offset = 0; offset < 48; offset += 1) {
+    const status = ["DRAFT", "POSTED", "CANCELLED"][offset % 3];
     finance.push({
       id: id++,
       fact_no: `INVOICE-${offset}`,
       fact_type: "INVOICE",
-      status: ["DRAFT", "POSTED", "CANCELLED"][offset % 3],
+      status,
       source_type: "SHIPMENT",
       source_id: 10000 + offset,
+      invoice_category:
+        invoiceCategories[offset % invoiceCategories.length],
+      ...cancellationAudit(status, offset),
     });
   }
   return {
@@ -517,13 +551,19 @@ test("plan is target-bound, source-driven, and prepares 54 receipts plus 45 fact
   assert.equal(plan.directSQL, false);
   assert.equal(plan.retiredGenericFactWriter, false);
   assert.equal(plan.receipts.length, 54);
+  assert.ok(
+    plan.receipts.every(
+      (receipt) =>
+        receipt.supplierId > 0 && receipt.sourcePurchaseOrderNo?.length > 0,
+    ),
+  );
   assert.equal(plan.corrections.length, 12);
   assert.ok(
     plan.corrections.every((correction) => {
       const receipt = plan.receipts[correction.receiptIndex];
       return (
         receipt?.status === "POSTED" &&
-        receipt.linkedPurchaseOrder === undefined
+        receipt.sourcePurchaseOrderNo?.length > 0
       );
     }),
   );
@@ -1802,6 +1842,9 @@ test("apply emits the exact readiness contract and complete lifecycle matrices",
     ),
   );
   assert.ok(result.referenceRecords.financeFacts.length >= 180);
+  assert.equal(result.financeFieldContract.complete, true);
+  assert.equal(result.financeFieldContract.coveragePercent, 100);
+  assert.equal(result.summary.financeFieldCoverage, 100);
   assert.equal(result.summary.outsourcingReturnInventoryCoverage.complete, true);
   assert.equal(
     result.summary.businessDashboardInventoryTotal,

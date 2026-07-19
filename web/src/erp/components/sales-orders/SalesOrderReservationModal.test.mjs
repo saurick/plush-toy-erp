@@ -47,4 +47,8 @@ test('sales order reservation modal only edits operator-owned and local selectio
   )
   assert.match(source, /defaultSalesOrderReservationQuantity/u)
   assert.match(source, /订单剩余可预留数量/u)
+  assert.match(source, /numeric20Scale6Units\(value\)/u)
+  assert.match(source, /compareNumeric20Scale6Units\(quantity, available\)/u)
+  assert.match(source, /compareNumeric20Scale6Units\(quantity, reservable\)/u)
+  assert.doesNotMatch(source, /const quantity = Number\(value\)/u)
 })

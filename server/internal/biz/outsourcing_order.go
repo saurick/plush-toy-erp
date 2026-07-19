@@ -41,7 +41,6 @@ type OutsourcingOrder struct {
 	SupplierSnapshot      map[string]any
 	ContractPartySnapshot map[string]any
 	SourceOrderNo         *string
-	SourceSalesOrderID    *int
 	OrderDate             time.Time
 	ExpectedReturnDate    *time.Time
 	LifecycleStatus       string
@@ -91,7 +90,6 @@ type OutsourcingOrderMutation struct {
 	SupplierSnapshot      map[string]any
 	ContractPartySnapshot map[string]any
 	SourceOrderNo         *string
-	SourceSalesOrderID    *int
 	OrderDate             time.Time
 	ExpectedReturnDate    *time.Time
 	Note                  *string
@@ -398,9 +396,6 @@ func normalizeOutsourcingOrderMutation(in OutsourcingOrderMutation) (Outsourcing
 	}
 	if err := validateOptionalDateNotBefore(in.OrderDate, in.ExpectedReturnDate); err != nil {
 		return OutsourcingOrderMutation{}, err
-	}
-	if in.SourceSalesOrderID != nil && *in.SourceSalesOrderID <= 0 {
-		return OutsourcingOrderMutation{}, ErrBadParam
 	}
 	return in, nil
 }

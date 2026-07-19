@@ -41,6 +41,37 @@ test('BOM form no longer orchestrates split header and item writes', () => {
   }
 })
 
+test('BOM form is mounted before open handlers initialize its form instance', () => {
+  const modalStart = pageSource.indexOf(
+    '<BusinessFormModal\n        open={headerModalOpen}'
+  )
+  const modalContract = pageSource.slice(modalStart, modalStart + 1_200)
+
+  assert.ok(modalStart >= 0)
+  assert.match(modalContract, /forceRender/u)
+  assert.match(modalContract, /destroyOnHidden=\{false\}/u)
+  assert.match(pageSource, /const openCreate = \(\) => \{[\s\S]*headerForm\.resetFields/u)
+})
+
+test('BOM copy and catalog source choices are not truncated by fixed page limits', () => {
+  for (const completeReader of [
+    'listAllBOMVersions',
+    'listAllMaterials',
+    'listAllProducts',
+    'listAllUnits',
+  ]) {
+    assert.match(pageSource, new RegExp(completeReader, 'u'))
+  }
+  assert.doesNotMatch(
+    pageSource,
+    /listBOMVersions\(\{\s*product_id:[^}]*limit:\s*200/u
+  )
+  assert.doesNotMatch(
+    pageSource,
+    /list(?:Products|Materials|Units)\(\{[^}]*limit:\s*500/u
+  )
+})
+
 test('BOM material rows persist explicit fabric-processing ownership without name inference', () => {
   assert.match(formSource, /production_operation_code/u)
   assert.match(formSource, /normalizeBOMProductionOperationCode/u)

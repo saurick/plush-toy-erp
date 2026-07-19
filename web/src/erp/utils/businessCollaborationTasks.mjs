@@ -3,6 +3,7 @@ import {
   getWorkflowTaskReasonLabel,
 } from './workflowTaskReason.mjs'
 import { isTerminalWorkflowTask } from './workflowTaskLifecycle.mjs'
+import { listAllPaginatedRecords } from './referencePagination.mjs'
 
 const BLOCKING_TASK_STATUS_KEYS = new Set(['blocked', 'rejected'])
 const BUSINESS_COLLABORATION_TASK_REQUEST_KEY =
@@ -130,13 +131,18 @@ export async function loadBusinessCollaborationTasksForSource({
 
     setLoadState('loading')
     try {
-      const data = await listTasks(
+      const data = await listAllPaginatedRecords(
+        listTasks,
         {
           source_type: String(sourceType || '').trim(),
           source_id: requestedSourceID,
-          limit: 200,
         },
-        { signal: request.signal }
+        'tasks',
+        { signal: request.signal },
+        {
+          invalidResponseMessage:
+            '服务器返回的当前业务记录协同任务不完整，请刷新后重试',
+        }
       )
       if (!requestIsCurrent()) return { status: 'stale' }
 

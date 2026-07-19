@@ -35,6 +35,10 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+# ROOT_DIR pins the shared PostgreSQL contract; ShellCheck scans it separately.
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/qa/critical-postgres-tests.sh"
+
 bash "$ROOT_DIR/scripts/qa/agents-size.sh"
 
 if ! command -v node >/dev/null 2>&1; then
@@ -143,7 +147,7 @@ echo "[qa:fast] 运行 server 快速检查"
   node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind go --label server-quick -- \
     go test -count=1 -json \
-    -skip '^(Test.*Postgres.*|TestTemplatePDFChromiumSecurityIntegration)$' \
+    -skip "${CRITICAL_POSTGRES_TEST_PATTERN}|^TestTemplatePDFChromiumSecurityIntegration$" \
     ./internal/... ./pkg/...
 )
 

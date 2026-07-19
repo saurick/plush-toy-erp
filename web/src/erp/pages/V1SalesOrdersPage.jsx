@@ -38,24 +38,24 @@ import BusinessRecordDetailsModal from '../components/business-list/BusinessReco
 import SalesOrderReservationModal from '../components/sales-orders/SalesOrderReservationModal.jsx'
 import {
   getSalesOrder,
-  listCustomers,
-  listContactsByOwner,
-  listProductSKUs,
+  listAllCustomers,
+  listAllContactsByOwner,
+  listAllProductSKUs,
   listAllSalesOrderItems,
   listSalesOrderItemsPreview,
   listSalesOrders,
-  listUnits,
-  listWarehouses,
+  listAllUnits,
+  listAllWarehouses,
   saveSalesOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
   createStockReservationFromSalesOrder,
-  listShipments,
-  listStockReservations,
+  listAllShipments,
+  listAllStockReservations,
 } from '../api/operationalFactApi.mjs'
 import {
-  listInventoryBalances,
-  listInventoryLots,
+  listAllInventoryBalances,
+  listAllInventoryLots,
 } from '../api/inventoryApi.mjs'
 import {
   createBlankOrderLine,
@@ -111,11 +111,16 @@ import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
+  resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
+import { searchParamPositiveInt } from '../utils/routeQuery.mjs'
 import {
-  routeWithQuery,
-  searchParamPositiveIntText,
-} from '../utils/routeQuery.mjs'
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
 import {
   customerOption,
   referenceLabel,
@@ -160,7 +165,6 @@ function reservationInventoryParams(item = {}) {
     ...(Number(item.product_sku_id || 0) > 0
       ? { product_sku_id: Number(item.product_sku_id) }
       : {}),
-    limit: 500,
   }
 }
 
@@ -188,8 +192,8 @@ function enrichReservationBalances(balances = [], warehouses = [], lots = []) {
 async function loadReservationStockForItem(item = {}) {
   const params = reservationInventoryParams(item)
   const [balanceData, lotData] = await Promise.all([
-    listInventoryBalances(params),
-    listInventoryLots({ ...params, status: 'ACTIVE' }),
+    listAllInventoryBalances(params),
+    listAllInventoryLots({ ...params, status: 'ACTIVE' }),
   ])
   return {
     balances: Array.isArray(balanceData?.inventory_balances)
@@ -202,7 +206,7 @@ async function loadReservationStockForItem(item = {}) {
 export default function V1SalesOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -246,9 +250,28 @@ export default function V1SalesOrdersPage() {
     balances: [],
     warehouses: [],
   })
-  const routeSalesOrderID = searchParamPositiveIntText(
+  const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
     'sales_order_id'
+  )
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const resolvedRouteKeyword =
+    routeSalesOrderID &&
+    Number(selectedOrder?.id || 0) === Number(routeSalesOrderID)
+      ? String(selectedOrder?.order_no || '').trim()
+      : ''
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
   )
   const orderAttachmentRef = useRef(null)
   const contactLoadSeqRef = useRef(0)
@@ -427,11 +450,10 @@ export default function V1SalesOrdersPage() {
         return []
       }
       try {
-        const result = await listContactsByOwner({
+        const result = await listAllContactsByOwner({
           owner_type: CUSTOMER_CONTACT_OWNER_TYPE,
           owner_id: normalizedCustomerID,
           active_only: true,
-          limit: 200,
         })
         const nextContacts = Array.isArray(result?.contacts)
           ? result.contacts
@@ -477,9 +499,9 @@ export default function V1SalesOrdersPage() {
   const loadCustomers = useCallback(async () => {
     try {
       const [customerResult, skuResult, unitResult] = await Promise.all([
-        listCustomers({ active_only: true, limit: 200 }),
-        listProductSKUs({ active_only: true, limit: 200 }),
-        listUnits({ active_only: true, limit: 500 }),
+        listAllCustomers({ active_only: true }),
+        listAllProductSKUs({ active_only: true }),
+        listAllUnits({ active_only: true }),
       ])
       setCustomers(
         Array.isArray(customerResult?.customers) ? customerResult.customers : []
@@ -502,7 +524,11 @@ export default function V1SalesOrdersPage() {
       const [result, routeOrder] = await Promise.all([
         listSalesOrders(
           {
-            keyword,
+            keyword: linkedDocumentRequestKeyword({
+              localKeyword: keyword,
+              linkedKeyword,
+              hasExactContext: Boolean(routeSelectedID),
+            }),
             customer_id: customerFilter || undefined,
             lifecycle_status: statusFilter,
             date_field: dateFilterField,
@@ -524,19 +550,15 @@ export default function V1SalesOrdersPage() {
       const listedOrders = Array.isArray(result?.sales_orders)
         ? result.sales_orders
         : []
-      const nextOrders = routeOrder
-        ? [
-            routeOrder,
-            ...listedOrders.filter((item) => item.id !== routeOrder.id),
-          ]
-        : listedOrders
+      const exactPage = resolveExactRecordPage({
+        records: listedOrders,
+        exactRecord: routeOrder,
+        hasExactContext: routeSelectedID > 0,
+        total: Number(result?.total || listedOrders.length || 0),
+      })
+      const nextOrders = exactPage.records
       setOrders(nextOrders)
-      setTotal(
-        Number(result?.total || listedOrders.length || 0) +
-          (routeOrder && !listedOrders.some((item) => item.id === routeOrder.id)
-            ? 1
-            : 0)
-      )
+      setTotal(exactPage.total)
       setSelectedOrder((current) => {
         if (routeSelectedID > 0) {
           return routeOrder || null
@@ -564,6 +586,7 @@ export default function V1SalesOrdersPage() {
     dateFilterField,
     dateFilterStart,
     keyword,
+    linkedKeyword,
     pagination,
     routeSalesOrderID,
     sortFilter,
@@ -659,13 +682,12 @@ export default function V1SalesOrdersPage() {
         ? itemData.sales_order_items
         : []
       const [reservationData, shipmentData, warehouseData] = await Promise.all([
-        listStockReservations({
+        listAllStockReservations({
           source_id: orderID,
           status: 'ACTIVE',
-          limit: 200,
         }),
-        listShipments({ source_id: orderID, status: 'SHIPPED', limit: 200 }),
-        listWarehouses({ active_only: true, limit: 500 }),
+        listAllShipments({ source_id: orderID, status: 'SHIPPED' }),
+        listAllWarehouses({ active_only: true }),
       ])
       if (
         reservationContextRequestRef.current !== requestID ||
@@ -890,6 +912,7 @@ export default function V1SalesOrdersPage() {
 
   const saveOrder = async () => {
     const values = await orderForm.validateFields()
+    const isCreatingOrder = !editingOrder?.id
     const customer = customers.find((item) => item.id === values.customer_id)
     let params
     try {
@@ -970,11 +993,16 @@ export default function V1SalesOrdersPage() {
       )
       orderAttachmentRef.current?.clearPendingAttachments()
       setOrderModalOpen(false)
-      const refreshEffect = await settleSourceDocumentPostSaveEffect(loadOrders)
-      if (refreshEffect.status === 'rejected') {
-        message.warning(
-          getActionErrorMessage(refreshEffect.error, '刷新销售订单列表')
-        )
+      if (isCreatingOrder) {
+        resetBusinessPaginationCurrent(setPagination)
+      } else {
+        const refreshEffect =
+          await settleSourceDocumentPostSaveEffect(loadOrders)
+        if (refreshEffect.status === 'rejected') {
+          message.warning(
+            getActionErrorMessage(refreshEffect.error, '刷新销售订单列表')
+          )
+        }
       }
     } finally {
       setSaving(false)
@@ -1116,11 +1144,19 @@ export default function V1SalesOrdersPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
+      linkedKeyword ||
+      routeSalesOrderID ||
       statusFilter ||
       customerFilter ||
       dateFilterStart ||
       dateFilterEnd
   )
+  const clearRouteContext = useCallback(() => {
+    const nextParams = clearLinkedDocumentParams(searchParams)
+    nextParams.delete('sales_order_id')
+    setSearchParams(nextParams, { replace: true })
+    resetBusinessPaginationCurrent(setPagination)
+  }, [searchParams, setSearchParams])
   const clearFilters = useCallback(() => {
     setKeyword('')
     setStatusFilter('')
@@ -1129,7 +1165,8 @@ export default function V1SalesOrdersPage() {
     setDateFilterStart('')
     setDateFilterEnd('')
     resetBusinessPaginationCurrent(setPagination)
-  }, [])
+    clearRouteContext()
+  }, [clearRouteContext])
 
   const activeOrderCount = useMemo(
     () =>
@@ -1177,20 +1214,40 @@ export default function V1SalesOrdersPage() {
           },
         ]
       : []
-  const relatedMenuItems = [
-    { key: 'shipments', label: '出货单' },
-    { key: 'outbound', label: '出库 / 预留' },
-  ]
+  const relatedMenuItems = useMemo(
+    () =>
+      [
+        canOpenRelatedPath(V1_ROUTE_PATHS.shipments)
+          ? { key: 'shipments', label: '出货单' }
+          : null,
+        canOpenRelatedPath(V1_ROUTE_PATHS.outbound)
+          ? { key: 'outbound', label: '出库 / 预留' }
+          : null,
+      ].filter(Boolean),
+    [canOpenRelatedPath]
+  )
   const openRelatedTable = ({ key }) => {
     if (!selectedOrder) return
     const salesOrderID = selectedOrder.id
     const pathByKey = {
-      shipments: routeWithQuery(V1_ROUTE_PATHS.shipments, {
-        sales_order_id: salesOrderID,
-      }),
-      outbound: routeWithQuery(V1_ROUTE_PATHS.outbound, {
-        sales_order_id: salesOrderID,
-      }),
+      shipments: relatedDocumentRoute(
+        V1_ROUTE_PATHS.shipments,
+        { sales_order_id: salesOrderID },
+        {
+          keyword: selectedOrder.order_no,
+          source: 'sales-order',
+          fields: ['sales_order_no'],
+        }
+      ),
+      outbound: relatedDocumentRoute(
+        V1_ROUTE_PATHS.outbound,
+        { sales_order_id: salesOrderID },
+        {
+          keyword: selectedOrder.order_no,
+          source: 'sales-order',
+          fields: ['sales_order_no'],
+        }
+      ),
     }
     const targetPath = pathByKey[key]
     if (targetPath) {
@@ -1219,8 +1276,11 @@ export default function V1SalesOrdersPage() {
             <SearchInput
               placeholder="搜索订单"
               searchHint="可搜索：订单号、客户订单号、业务员、付款方式"
-              value={keyword}
+              value={resolvedRouteKeyword || linkedKeyword || keyword}
               onChange={(event) => {
+                if (linkedKeyword || routeSalesOrderID) {
+                  clearRouteContext()
+                }
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
@@ -1314,7 +1374,7 @@ export default function V1SalesOrdersPage() {
           <Button
             type="link"
             size="small"
-            disabled={!selectedOrder}
+            disabled={!selectedOrder || relatedMenuItems.length === 0}
             onClick={() => {
               setSelectedOrder(null)
             }}
@@ -1333,7 +1393,7 @@ export default function V1SalesOrdersPage() {
             <Button
               size="small"
               icon={<LinkOutlined />}
-              disabled={!selectedOrder}
+              disabled={!selectedOrder || relatedMenuItems.length === 0}
             >
               相关单据 <DownOutlined />
             </Button>

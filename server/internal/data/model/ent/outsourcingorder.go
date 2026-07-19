@@ -29,8 +29,6 @@ type OutsourcingOrder struct {
 	ContractPartySnapshot map[string]interface{} `json:"contract_party_snapshot,omitempty"`
 	// SourceOrderNo holds the value of the "source_order_no" field.
 	SourceOrderNo *string `json:"source_order_no,omitempty"`
-	// SourceSalesOrderID holds the value of the "source_sales_order_id" field.
-	SourceSalesOrderID *int `json:"source_sales_order_id,omitempty"`
 	// OrderDate holds the value of the "order_date" field.
 	OrderDate time.Time `json:"order_date,omitempty"`
 	// ExpectedReturnDate holds the value of the "expected_return_date" field.
@@ -89,7 +87,7 @@ func (*OutsourcingOrder) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case outsourcingorder.FieldSupplierSnapshot, outsourcingorder.FieldContractPartySnapshot:
 			values[i] = new([]byte)
-		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldSourceSalesOrderID, outsourcingorder.FieldVersion:
+		case outsourcingorder.FieldID, outsourcingorder.FieldSupplierID, outsourcingorder.FieldVersion:
 			values[i] = new(sql.NullInt64)
 		case outsourcingorder.FieldOutsourcingOrderNo, outsourcingorder.FieldSourceOrderNo, outsourcingorder.FieldLifecycleStatus, outsourcingorder.FieldNote:
 			values[i] = new(sql.NullString)
@@ -150,13 +148,6 @@ func (_m *OutsourcingOrder) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.SourceOrderNo = new(string)
 				*_m.SourceOrderNo = value.String
-			}
-		case outsourcingorder.FieldSourceSalesOrderID:
-			if value, ok := values[i].(*sql.NullInt64); !ok {
-				return fmt.Errorf("unexpected type %T for field source_sales_order_id", values[i])
-			} else if value.Valid {
-				_m.SourceSalesOrderID = new(int)
-				*_m.SourceSalesOrderID = int(value.Int64)
 			}
 		case outsourcingorder.FieldOrderDate:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -263,11 +254,6 @@ func (_m *OutsourcingOrder) String() string {
 	if v := _m.SourceOrderNo; v != nil {
 		builder.WriteString("source_order_no=")
 		builder.WriteString(*v)
-	}
-	builder.WriteString(", ")
-	if v := _m.SourceSalesOrderID; v != nil {
-		builder.WriteString("source_sales_order_id=")
-		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")
 	builder.WriteString("order_date=")

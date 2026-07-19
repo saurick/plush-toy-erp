@@ -2,6 +2,8 @@ package service
 
 import (
 	"context"
+	"strings"
+	"time"
 
 	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
@@ -14,6 +16,33 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
+	case "list_shipment_source_candidates":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, "", "shipments"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "sales_orders"); res != nil {
+			return id, res, nil
+		}
+		filter, ok := shipmentSourceCandidateFilterFromParams(pm)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		items, total, err := d.operationalFactUC.ListShipmentSourceCandidates(ctx, filter)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		return id, okData(map[string]any{
+			"shipment_source_candidates": shipmentSourceCandidatesToAny(items),
+			"total":                      total,
+			"limit":                      filter.Limit,
+			"offset":                     filter.Offset,
+		}), nil
 	case "create_shipment_with_items":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
@@ -25,10 +54,26 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
+		if shipmentCreateUsesSalesOrderSource(in) {
+			if res := d.requireSourceActionReadPermissions(
+				ctx,
+				"operational_fact",
+				method,
+				biz.SourceReadConditionShipmentSalesOrder,
+			); res != nil {
+				return id, res, nil
+			}
+			if res := d.requireCustomerConfigModulesReadable(ctx, "sales_orders"); res != nil {
+				return id, res, nil
+			}
+		}
 		item, err := d.operationalFactUC.CreateShipmentDraftWithItems(ctx, in)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "submit_shipment_release":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
 		if !shipmentItemAllowsOnly(pm, "customer_key", "id") {
@@ -64,6 +109,19 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		}
 		item, err := d.operationalFactUC.CancelShippedShipmentWithActor(ctx, getInt(pm, "id", 0), actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
+	case "get_shipment":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
+			return id, res, nil
+		}
+		if !shipmentItemAllowsOnly(pm, "id") {
+			return id, invalidParamResult(), nil
+		}
+		shipmentID, ok := getRequiredJSONRPCPositiveInt(pm, "id")
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		item, err := d.operationalFactUC.GetShipment(ctx, shipmentID)
+		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "list_shipments":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentRead); res != nil {
 			return id, res, nil
@@ -82,21 +140,55 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 	}
 }
 
+func shipmentCreateUsesSalesOrderSource(in *biz.ShipmentCreateWithItems) bool {
+	if in == nil || in.Shipment == nil {
+		return false
+	}
+	if in.Shipment.SalesOrderID != nil {
+		return true
+	}
+	for _, item := range in.Items {
+		if item != nil && item.SalesOrderItemID != nil {
+			return true
+		}
+	}
+	return false
+}
+
 func shipmentCreateFromParams(pm map[string]any) (*biz.ShipmentCreate, bool) {
-	plannedShipAt, _ := getOptionalJSONRPCTime(pm, "planned_ship_at")
+	plannedShipAt, ok := getOptionalShipmentTime(pm, "planned_ship_at")
+	if !ok {
+		return nil, false
+	}
 	totalNetWeightG, ok := getOptionalJSONRPCDecimalString(pm, "total_net_weight_g")
+	if !ok {
+		return nil, false
+	}
+	salesOrderID, ok := getOptionalShipmentPositiveInt(pm, "sales_order_id")
+	if !ok {
+		return nil, false
+	}
+	customerID, ok := getOptionalShipmentPositiveInt(pm, "customer_id")
+	if !ok {
+		return nil, false
+	}
+	customerSnapshot, ok := getOptionalShipmentString(pm, "customer_snapshot")
+	if !ok {
+		return nil, false
+	}
+	note, ok := getOptionalShipmentString(pm, "note")
 	if !ok {
 		return nil, false
 	}
 	return &biz.ShipmentCreate{
 		ShipmentNo:       getString(pm, "shipment_no"),
-		SalesOrderID:     getOptionalInt(pm, "sales_order_id"),
-		CustomerID:       getOptionalInt(pm, "customer_id"),
-		CustomerSnapshot: getWorkflowStringPtr(pm, "customer_snapshot"),
+		SalesOrderID:     salesOrderID,
+		CustomerID:       customerID,
+		CustomerSnapshot: customerSnapshot,
 		IdempotencyKey:   getString(pm, "idempotency_key"),
 		PlannedShipAt:    plannedShipAt,
 		TotalNetWeightG:  totalNetWeightG,
-		Note:             getWorkflowStringPtr(pm, "note"),
+		Note:             note,
 	}, true
 }
 
@@ -117,15 +209,43 @@ func shipmentItemCreateFromParams(pm map[string]any) (*biz.ShipmentItemCreate, b
 	if !ok {
 		return nil, false
 	}
+	salesOrderItemID, ok := getOptionalShipmentPositiveInt(pm, "sales_order_item_id")
+	if !ok {
+		return nil, false
+	}
+	productID, ok := getRequiredJSONRPCPositiveInt(pm, "product_id")
+	if !ok {
+		return nil, false
+	}
+	productSkuID, ok := getOptionalShipmentPositiveInt(pm, "product_sku_id")
+	if !ok {
+		return nil, false
+	}
+	warehouseID, ok := getRequiredJSONRPCPositiveInt(pm, "warehouse_id")
+	if !ok {
+		return nil, false
+	}
+	unitID, ok := getRequiredJSONRPCPositiveInt(pm, "unit_id")
+	if !ok {
+		return nil, false
+	}
+	lotID, ok := getOptionalShipmentPositiveInt(pm, "lot_id")
+	if !ok {
+		return nil, false
+	}
+	note, ok := getOptionalShipmentString(pm, "note")
+	if !ok {
+		return nil, false
+	}
 	return &biz.ShipmentItemCreate{
-		SalesOrderItemID: getOptionalInt(pm, "sales_order_item_id"),
-		ProductID:        getInt(pm, "product_id", 0),
-		ProductSkuID:     getOptionalInt(pm, "product_sku_id"),
-		WarehouseID:      getInt(pm, "warehouse_id", 0),
-		UnitID:           getInt(pm, "unit_id", 0),
-		LotID:            getOptionalInt(pm, "lot_id"),
+		SalesOrderItemID: salesOrderItemID,
+		ProductID:        productID,
+		ProductSkuID:     productSkuID,
+		WarehouseID:      warehouseID,
+		UnitID:           unitID,
+		LotID:            lotID,
 		Quantity:         quantity,
-		Note:             getWorkflowStringPtr(pm, "note"),
+		Note:             note,
 	}, true
 }
 
@@ -143,6 +263,25 @@ func shipmentItemAllowsOnly(pm map[string]any, keys ...string) bool {
 }
 
 func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWithItems, bool) {
+	if !shipmentItemAllowsOnly(pm,
+		"customer_key",
+		"shipment_no",
+		"sales_order_id",
+		"customer_id",
+		"customer_snapshot",
+		"idempotency_key",
+		"planned_ship_at",
+		"total_net_weight_g",
+		"note",
+		"items",
+	) {
+		return nil, false
+	}
+	if raw, exists := pm["customer_key"]; exists {
+		if _, ok := raw.(string); !ok {
+			return nil, false
+		}
+	}
 	rawItems, ok := pm["items"].([]any)
 	if !ok || len(rawItems) == 0 {
 		return nil, false
@@ -169,6 +308,108 @@ func shipmentCreateWithItemsFromParams(pm map[string]any) (*biz.ShipmentCreateWi
 	}, true
 }
 
+func shipmentSourceCandidateFilterFromParams(pm map[string]any) (biz.ShipmentSourceCandidateFilter, bool) {
+	if !shipmentItemAllowsOnly(pm, "keyword", "sales_order_id", "limit", "offset") {
+		return biz.ShipmentSourceCandidateFilter{}, false
+	}
+	keyword := ""
+	if raw, exists := pm["keyword"]; exists {
+		value, ok := raw.(string)
+		if !ok {
+			return biz.ShipmentSourceCandidateFilter{}, false
+		}
+		keyword = value
+	}
+	salesOrderID := 0
+	if _, exists := pm["sales_order_id"]; exists {
+		value, ok := getRequiredJSONRPCPositiveInt(pm, "sales_order_id")
+		if !ok {
+			return biz.ShipmentSourceCandidateFilter{}, false
+		}
+		salesOrderID = value
+	}
+	limit := 50
+	if _, exists := pm["limit"]; exists {
+		value, ok := getRequiredJSONRPCPositiveInt(pm, "limit")
+		if !ok || value > 200 {
+			return biz.ShipmentSourceCandidateFilter{}, false
+		}
+		limit = value
+	}
+	offset := 0
+	if _, exists := pm["offset"]; exists {
+		value, ok := getRequiredJSONRPCNonNegativeInt(pm, "offset")
+		if !ok {
+			return biz.ShipmentSourceCandidateFilter{}, false
+		}
+		offset = value
+	}
+	return biz.ShipmentSourceCandidateFilter{
+		Keyword:      keyword,
+		SalesOrderID: salesOrderID,
+		Limit:        limit,
+		Offset:       offset,
+	}, true
+}
+
+func getRequiredJSONRPCNonNegativeInt(pm map[string]any, key string) (int, bool) {
+	const maxJSONSafeInteger = float64(9007199254740991)
+	raw, ok := pm[key]
+	if !ok || raw == nil {
+		return 0, false
+	}
+	switch value := raw.(type) {
+	case float64:
+		if value < 0 || value > maxJSONSafeInteger || value != float64(int64(value)) {
+			return 0, false
+		}
+		return int(value), true
+	case int:
+		return value, value >= 0
+	default:
+		return 0, false
+	}
+}
+
+func getOptionalShipmentPositiveInt(pm map[string]any, key string) (*int, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	value, ok := getRequiredJSONRPCPositiveInt(pm, key)
+	if !ok {
+		return nil, false
+	}
+	return &value, true
+}
+
+func getOptionalShipmentString(pm map[string]any, key string) (*string, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	value, ok := raw.(string)
+	if !ok {
+		return nil, false
+	}
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, true
+	}
+	return &value, true
+}
+
+func getOptionalShipmentTime(pm map[string]any, key string) (*time.Time, bool) {
+	raw, exists := pm[key]
+	if !exists || raw == nil {
+		return nil, true
+	}
+	if numeric, ok := raw.(float64); ok && numeric != float64(int64(numeric)) {
+		return nil, false
+	}
+	return getOptionalJSONRPCTime(pm, key)
+}
+
 func operationalFactShipmentResult(ctx context.Context, d *jsonrpcDispatcher, item *biz.Shipment, err error) *v1.JsonrpcResult {
 	if err != nil {
 		return d.mapOperationalFactError(ctx, err)
@@ -182,6 +423,49 @@ func shipmentsToAny(items []*biz.Shipment) []any {
 		out = append(out, shipmentToAny(item))
 	}
 	return out
+}
+
+func shipmentSourceCandidatesToAny(items []*biz.ShipmentSourceCandidate) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, shipmentSourceCandidateToAny(item))
+	}
+	return out
+}
+
+func shipmentSourceCandidateToAny(item *biz.ShipmentSourceCandidate) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	return map[string]any{
+		"sales_order_id":        item.SalesOrderID,
+		"order_no":              item.OrderNo,
+		"order_status":          item.OrderStatus,
+		"order_version":         item.OrderVersion,
+		"customer_id":           item.CustomerID,
+		"customer_snapshot":     item.CustomerSnapshot,
+		"customer_name":         item.CustomerName,
+		"sales_order_item_id":   item.SalesOrderItemID,
+		"line_no":               item.LineNo,
+		"line_status":           item.LineStatus,
+		"product_id":            item.ProductID,
+		"product_sku_id":        optionalIntToAny(item.ProductSkuID),
+		"product_code":          item.ProductCode,
+		"product_name":          item.ProductName,
+		"product_code_snapshot": optionalStringToAny(item.ProductCodeSnapshot),
+		"product_name_snapshot": optionalStringToAny(item.ProductNameSnapshot),
+		"color_snapshot":        optionalStringToAny(item.ColorSnapshot),
+		"sku_code":              optionalStringToAny(item.SKUCode),
+		"sku_name":              optionalStringToAny(item.SKUName),
+		"unit_id":               item.UnitID,
+		"unit_code":             item.UnitCode,
+		"unit_name":             item.UnitName,
+		"ordered_quantity":      item.OrderedQuantity.String(),
+		"shipped_quantity":      item.ShippedQuantity.String(),
+		"remaining_quantity":    item.RemainingQuantity.String(),
+		"selectable":            item.Selectable,
+		"disabled_reason":       item.DisabledReason,
+	}
 }
 
 func shipmentToAny(item *biz.Shipment) map[string]any {

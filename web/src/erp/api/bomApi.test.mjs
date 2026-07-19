@@ -44,3 +44,11 @@ test('bomApi: exposes BOM version lifecycle methods only', () => {
     assert.doesNotMatch(source, new RegExp(forbiddenActionName))
   }
 })
+
+test('bomApi: copy-source suggestions can read every BOM version page', () => {
+  assert.match(source, /export async function listAllBOMVersions/u)
+  assert.match(
+    source,
+    /listAllPaginatedRecords\(\s*listBOMVersions,\s*params,\s*'bom_versions'/u
+  )
+})

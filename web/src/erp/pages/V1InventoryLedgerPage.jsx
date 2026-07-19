@@ -43,6 +43,12 @@ import {
 } from '../utils/masterDataOrderView.mjs'
 import { businessSourceRouteFor } from '../utils/businessSourceNavigation.mjs'
 import {
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+} from '../utils/relatedDocumentNavigation.mjs'
+import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
@@ -58,7 +64,7 @@ import {
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
 import {
-  searchParamPositiveIntText,
+  searchParamPositiveInt,
   searchParamText,
 } from '../utils/routeQuery.mjs'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
@@ -305,7 +311,10 @@ export default function V1InventoryLedgerPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const requestControllersRef = useRef({})
   const requestSequenceRef = useRef({})
   const [activeView, setActiveView] = useState(VIEW_BALANCES)
@@ -333,9 +342,23 @@ export default function V1InventoryLedgerPage() {
   const [selectedRow, setSelectedRow] = useState(null)
   const [detailRecord, setDetailRecord] = useState(null)
   const routeView = searchParamText(searchParams, 'view')
-  const routeLotID = searchParamPositiveIntText(searchParams, 'lot_id')
-  const routeSourceID = searchParamPositiveIntText(searchParams, 'source_id')
+  const routeLotID = searchParamPositiveInt(searchParams, 'lot_id')
+  const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
   const routeSourceType = searchParamText(searchParams, 'source_type')
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
+  )
 
   const beginLatestRequest = useCallback((key) => {
     requestControllersRef.current[key]?.abort()
@@ -377,7 +400,15 @@ export default function V1InventoryLedgerPage() {
         product_sku_id: productSkuID || undefined,
         warehouse_id: warehouseID || undefined,
         lot_id: lotID || routeLotID || undefined,
-        keyword: trimOptional(keyword),
+        keyword: trimOptional(
+          linkedDocumentRequestKeyword({
+            localKeyword: keyword,
+            linkedKeyword,
+            hasExactContext: Boolean(
+              routeLotID || (routeSourceType && routeSourceID)
+            ),
+          })
+        ),
         ...getBusinessPaginationParams(pagination),
       })
       let data
@@ -393,13 +424,19 @@ export default function V1InventoryLedgerPage() {
           { signal: request.signal }
         )
       } else if (activeView === VIEW_TXNS) {
+        const localSourceType = trimOptional(sourceType)
+        const routeSourceMatchesLocal =
+          !localSourceType ||
+          localSourceType.toUpperCase() ===
+            String(routeSourceType || '').trim().toUpperCase()
         data = await listInventoryTxns(
           compactParams({
             ...commonParams,
             txn_type: txnType,
-            source_type:
-              trimOptional(sourceType) || routeSourceType || undefined,
-            source_id: routeSourceID || undefined,
+            source_type: localSourceType || routeSourceType || undefined,
+            source_id: routeSourceMatchesLocal
+              ? routeSourceID || undefined
+              : undefined,
             date_field: 'occurred_at',
             date_from: dateFilterStart || undefined,
             date_to: dateFilterEnd || undefined,
@@ -439,6 +476,7 @@ export default function V1InventoryLedgerPage() {
     dateFilterEnd,
     dateFilterStart,
     keyword,
+    linkedKeyword,
     lotStatus,
     lotID,
     pagination,
@@ -496,18 +534,30 @@ export default function V1InventoryLedgerPage() {
     : undefined
   const relatedMenuItems = useMemo(() => {
     if (!selectedRow) return []
-    if (activeView === VIEW_TXNS && canOpenSourceDocument(selectedRow)) {
+    const sourcePath = businessSourceRouteFor(
+      selectedRow.source_type,
+      selectedRow.source_id
+    )
+    if (
+      activeView === VIEW_TXNS &&
+      canOpenSourceDocument(selectedRow) &&
+      canOpenRelatedPath(sourcePath)
+    ) {
       return [{ key: 'source', label: '来源单据' }]
     }
     return []
-  }, [activeView, selectedRow])
+  }, [activeView, canOpenRelatedPath, selectedRow])
 
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
     if (key === 'source') {
       const targetPath = businessSourceRouteFor(
         selectedRow.source_type,
-        selectedRow.source_id
+        selectedRow.source_id,
+        {
+          keyword: selectedRow.source_no,
+          source: 'inventory-ledger',
+        }
       )
       if (targetPath) navigate(targetPath)
     }
@@ -515,7 +565,7 @@ export default function V1InventoryLedgerPage() {
 
   const clearRouteContext = useCallback(
     (keys) => {
-      const nextParams = new URLSearchParams(searchParams)
+      const nextParams = clearLinkedDocumentParams(searchParams)
       const keysToDelete =
         Array.isArray(keys) && keys.length > 0
           ? keys
@@ -987,7 +1037,8 @@ export default function V1InventoryLedgerPage() {
       dateFilterEnd ||
       routeSourceID ||
       routeSourceType ||
-      routeLotID
+      routeLotID ||
+      linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1032,7 +1083,7 @@ export default function V1InventoryLedgerPage() {
         filters={
           <>
             <SearchInput
-              value={keyword}
+              value={linkedKeyword || keyword}
               placeholder={
                 activeView === VIEW_BALANCES
                   ? SEARCH_PLACEHOLDERS[VIEW_BALANCES]
@@ -1044,6 +1095,13 @@ export default function V1InventoryLedgerPage() {
                   : SEARCH_HINTS[activeView]
               }
               onChange={(event) => {
+                if (
+                  linkedKeyword ||
+                  routeLotID ||
+                  (routeSourceType && routeSourceID)
+                ) {
+                  clearRouteContext()
+                }
                 setKeyword(event.target.value)
                 resetCurrentPage()
               }}
@@ -1151,6 +1209,9 @@ export default function V1InventoryLedgerPage() {
                   value={sourceType}
                   options={SOURCE_TYPE_OPTIONS}
                   onChange={(nextType) => {
+                    if (routeSourceType || routeSourceID || linkedKeyword) {
+                      clearRouteContext(['source_type', 'source_id'])
+                    }
                     setSourceType(nextType)
                     resetCurrentPage()
                   }}

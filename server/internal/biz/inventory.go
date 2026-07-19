@@ -31,6 +31,7 @@ var (
 	ErrPurchaseReturnQuantityExceeded        = errors.New("purchase return quantity exceeds effective receipt quantity")
 	ErrPurchaseReceiptAdjustmentNotFound     = errors.New("purchase receipt adjustment not found")
 	ErrPurchaseReceiptAdjustmentItemNotFound = errors.New("purchase receipt adjustment item not found")
+	ErrPurchaseReceiptCorrectionDependency   = errors.New("purchase receipt has active correction documents")
 	ErrQualityInspectionNotFound             = errors.New("quality inspection not found")
 	ErrQualityInspectionSourceConflict       = errors.New("active quality inspection already exists for source")
 	ErrQualityInspectionSourceInvalid        = errors.New("quality inspection source is invalid")

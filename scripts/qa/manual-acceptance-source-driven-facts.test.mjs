@@ -97,6 +97,7 @@ function sourceReport({ includeFacts = true, includePurchase = true } = {}) {
         status: "ACTIVE",
         customerId: 402,
         customerSnapshot: "【试用】验收客户",
+        paymentTermDays: 30,
       },
       item: {
         id: 403,
@@ -230,11 +231,41 @@ function createRPC({
         return { shipment: record.item };
       }
       case "create_receivable_from_shipment":
+        return createRecord(
+          "finance_fact",
+          {
+            fact_no: params.fact_no,
+            fact_type: "RECEIVABLE",
+            collection_type: "ACCOUNTS_RECEIVABLE",
+            payment_term: "EOM_30",
+            payment_term_days: 30,
+          },
+          method,
+        );
       case "create_invoice_from_shipment":
+        assert.match(params.invoice_category, /^[A-Z0-9_]+$/u);
+        return createRecord(
+          "finance_fact",
+          {
+            fact_no: params.fact_no,
+            fact_type: "INVOICE",
+            invoice_category: params.invoice_category,
+          },
+          method,
+        );
       case "create_payable_from_outsourcing_return":
       case "create_payable_from_purchase_receipt":
+        return createRecord(
+          "finance_fact",
+          { fact_no: params.fact_no, fact_type: "PAYABLE" },
+          method,
+        );
       case "create_reconciliation_from_finance_fact":
-        return createRecord("finance_fact", {}, method);
+        return createRecord(
+          "finance_fact",
+          { fact_no: params.fact_no, fact_type: "RECONCILIATION" },
+          method,
+        );
       case "post_finance_fact": {
         const record = records.get(params.id);
         assert.equal(record?.key, "finance_fact");
@@ -399,6 +430,7 @@ test("outsourcing quality apply sends the required approximate defect-rate pair"
   const report = await applySourceDrivenFactPlan(plan, {
     rpc,
     confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
   });
 
   assert.equal(report.results.outsourcing.qualityInspection.status, "PASSED");

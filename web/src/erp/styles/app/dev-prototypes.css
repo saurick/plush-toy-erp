@@ -650,6 +650,303 @@
   place-items: center;
 }
 
+.erp-dev-testing-shell--coverage {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.erp-dev-testing-coverage-view {
+  display: grid;
+  min-height: 0;
+  align-content: start;
+  gap: 14px;
+  overflow: auto;
+  padding: 14px;
+}
+
+.erp-dev-testing-coverage-overview,
+.erp-dev-testing-coverage-identity,
+.erp-dev-testing-coverage-section,
+.erp-dev-testing-coverage-loading,
+.erp-dev-testing-coverage-empty {
+  border: 1px solid #dce8dd;
+  border-radius: 14px;
+  background: #fbfdfc;
+}
+
+.erp-dev-testing-coverage-overview {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+}
+
+.erp-dev-testing-coverage-actions {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+}
+
+.erp-dev-testing-coverage-actions > code {
+  min-width: 0;
+  flex: 1 1 auto;
+  border-radius: 8px;
+  background: #eef7ef;
+  color: #173f2a;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  padding: 8px 10px;
+}
+
+.erp-dev-testing-coverage-boundary.ant-typography {
+  margin: 0;
+  color: #647067;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.erp-dev-testing-coverage-loading,
+.erp-dev-testing-coverage-empty {
+  min-height: 260px;
+  padding: 18px;
+}
+
+.erp-dev-testing-coverage-empty {
+  display: grid;
+  place-items: center;
+}
+
+.erp-dev-testing-coverage-identity {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 8px;
+  padding: 12px;
+}
+
+.erp-dev-testing-coverage-identity > span {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 5px;
+  border-right: 1px solid #e4ede7;
+  padding-right: 8px;
+}
+
+.erp-dev-testing-coverage-identity small,
+.erp-dev-testing-coverage-card__metrics small {
+  color: #647067;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.erp-dev-testing-coverage-identity code,
+.erp-dev-testing-coverage-card__evidence code {
+  max-width: 100%;
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-coverage-status.ant-tag {
+  width: fit-content;
+  max-width: 100%;
+  margin-inline-end: 0;
+  white-space: normal;
+}
+
+.erp-dev-testing-coverage-section {
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.erp-dev-testing-coverage-section__head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.erp-dev-testing-coverage-section__head .ant-typography {
+  margin: 0;
+}
+
+.erp-dev-testing-coverage-section__head h3.ant-typography {
+  color: #172033;
+  font-size: 17px;
+}
+
+.erp-dev-testing-coverage-section__head p.ant-typography {
+  margin-top: 4px;
+  color: #647067;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.erp-dev-testing-coverage-grid,
+.erp-dev-testing-coverage-policy-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-dev-testing-coverage-grid--code {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.erp-dev-testing-coverage-card,
+.erp-dev-testing-coverage-policy-grid article {
+  display: grid;
+  min-width: 0;
+  align-content: start;
+  gap: 9px;
+  border: 1px solid #dce8dd;
+  border-radius: 12px;
+  background: #ffffff;
+  padding: 11px;
+  box-shadow: inset 3px 0 0 #94a3b8;
+}
+
+.erp-dev-testing-coverage-card--passed {
+  box-shadow: inset 3px 0 0 #16a34a;
+}
+
+.erp-dev-testing-coverage-card--collected {
+  box-shadow: inset 3px 0 0 #2563eb;
+}
+
+.erp-dev-testing-coverage-card--not_applicable {
+  border-style: dashed;
+  box-shadow: inset 3px 0 0 #94a3b8;
+}
+
+.erp-dev-testing-coverage-card--partial,
+.erp-dev-testing-coverage-card--stale,
+.erp-dev-testing-coverage-card--skipped {
+  box-shadow: inset 3px 0 0 #d97706;
+}
+
+.erp-dev-testing-coverage-card--failed,
+.erp-dev-testing-coverage-card--blocked {
+  box-shadow: inset 3px 0 0 #dc2626;
+}
+
+.erp-dev-testing-coverage-card__head {
+  display: flex;
+  min-width: 0;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.erp-dev-testing-coverage-card__head strong,
+.erp-dev-testing-coverage-policy-grid strong {
+  min-width: 0;
+  color: #172033;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-coverage-card__metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 7px;
+}
+
+.erp-dev-testing-coverage-card__metrics > span {
+  display: grid;
+  min-width: 0;
+  gap: 3px;
+  border-radius: 9px;
+  background: #f4f8f5;
+  padding: 7px 8px;
+}
+
+.erp-dev-testing-coverage-card__metrics b {
+  color: #172033;
+  font-size: 16px;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-coverage-card__counts,
+.erp-dev-testing-coverage-card__evidence {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.erp-dev-testing-coverage-card__counts span {
+  border: 1px solid #dce8dd;
+  border-radius: 999px;
+  color: #475569;
+  font-size: 12px;
+  padding: 3px 7px;
+}
+
+.erp-dev-testing-coverage-card__note,
+.erp-dev-testing-coverage-policy-grid p {
+  margin: 0;
+  color: #647067;
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+
+.erp-dev-testing-coverage-card__evidence code {
+  border-radius: 7px;
+  background: #eef7ef;
+  padding: 3px 6px;
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-overview,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-identity,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-section,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-loading,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-empty,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-policy-grid article {
+  border-color: var(--erp-border);
+  background: var(--erp-surface-bg);
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-actions > code,
+[data-erp-theme='dark'] :where(.erp-dev-testing-coverage-card__metrics > span),
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__evidence code {
+  background: var(--erp-interactive-bg-hover);
+  color: #99f6e4;
+}
+
+[data-erp-theme='dark'] :where(.erp-dev-testing-coverage-identity > span),
+[data-erp-theme='dark'] :where(.erp-dev-testing-coverage-card__counts span) {
+  border-color: var(--erp-border);
+}
+
+[data-erp-theme='dark']
+  .erp-dev-testing-coverage-section__head
+  h3.ant-typography,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__head strong,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__metrics b,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-policy-grid strong {
+  color: var(--erp-text);
+}
+
+[data-erp-theme='dark'] .erp-dev-testing-coverage-boundary.ant-typography,
+[data-erp-theme='dark']
+  .erp-dev-testing-coverage-section__head
+  p.ant-typography,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-identity small,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-identity code,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__metrics small,
+[data-erp-theme='dark'] :where(.erp-dev-testing-coverage-card__counts span),
+[data-erp-theme='dark'] .erp-dev-testing-coverage-card__note,
+[data-erp-theme='dark'] .erp-dev-testing-coverage-policy-grid p {
+  color: var(--erp-text-muted);
+}
+
 .erp-dev-prototypes-page {
   min-height: 100vh;
   background: #f3f7f2;

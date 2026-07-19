@@ -1,3 +1,5 @@
+import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+
 export function createQualitySourceActionScenarios(deps) {
   const {
     assert,
@@ -259,9 +261,7 @@ export function createQualitySourceActionScenarios(deps) {
             )
           }
 
-          const pageText = String(
-            (await page.locator('body').innerText()) || ''
-          )
+          await row.click()
           for (const technicalCopy of [
             'PRODUCTION_STAGE',
             'PRODUCTION_WIP',
@@ -274,10 +274,30 @@ export function createQualitySourceActionScenarios(deps) {
             String(productionInspection.production_wip_batch_id),
             String(productionInspection.production_order_item_id),
           ]) {
-            assert.equal(
-              pageText.includes(technicalCopy),
-              false,
-              `生产分段质检页面不应显示原始 ID 或技术字段 ${technicalCopy}`
+            const candidates = page.getByText(technicalCopy, {
+              exact: false,
+            })
+            const visibleMatches = []
+            for (
+              let index = 0;
+              index < (await candidates.count());
+              index += 1
+            ) {
+              const candidate = candidates.nth(index)
+              if (await candidate.isVisible()) {
+                visibleMatches.push(
+                  String((await candidate.innerText()) || '')
+                    .replace(/\s+/gu, ' ')
+                    .slice(0, 240)
+                )
+              }
+            }
+            assert.deepEqual(
+              visibleMatches,
+              [],
+              `生产分段质检页面不应显示原始 ID 或技术字段 ${technicalCopy}: ${visibleMatches.join(
+                ' | '
+              )}`
             )
           }
 
@@ -288,7 +308,6 @@ export function createQualitySourceActionScenarios(deps) {
             ),
             fullPage: true,
           })
-          await row.click()
           await clickSelectionAction(page, '判定合格')
           const modal = page
             .locator('.ant-modal:visible')
@@ -326,7 +345,9 @@ export function createQualitySourceActionScenarios(deps) {
               'quality-production-stage-decision-source-desktop.png'
             ),
           })
-          await page.keyboard.press('Escape')
+          await modal
+            .getByRole('button', { name: /关\s*闭/u })
+            .click()
           await modal.waitFor({ state: 'hidden', timeout: 10_000 })
           await page
             .getByRole('button', { name: '清空已选', exact: true })
@@ -696,8 +717,8 @@ export function createQualitySourceActionScenarios(deps) {
                     data: {
                       purchase_receipts: [],
                       total: 0,
-                      limit: 50,
-                      offset: 0,
+                      limit: Number(params.limit || 50),
+                      offset: Number(params.offset || 0),
                     },
                   },
                 }),
@@ -756,8 +777,8 @@ export function createQualitySourceActionScenarios(deps) {
                     data: {
                       purchase_returns: [],
                       total: 0,
-                      limit: 20,
-                      offset: 0,
+                      limit: Number(params.limit || 20),
+                      offset: Number(params.offset || 0),
                     },
                   },
                 }),
@@ -1148,10 +1169,10 @@ export function createQualitySourceActionScenarios(deps) {
         verify: async (page) => {
           await expectHeading(page, '委外订单')
           await selectRow(page, 'SIM-OUTSOURCE-CONTRACT-L1')
-          await clickSelectionAction(page, '相关回货记录')
+          await clickSelectionAction(page, '委外记录')
 
           const recordsModal = page
-            .getByRole('dialog', { name: /相关回货记录/u })
+            .getByRole('dialog', { name: /委外记录/u })
             .last()
           await recordsModal.waitFor({ state: 'visible', timeout: 10_000 })
           const postedRow = recordsModal
@@ -1238,7 +1259,7 @@ export function createQualitySourceActionScenarios(deps) {
           await qualityModal
             .getByRole('button', { name: '生成质检草稿' })
             .click()
-          await expectText(page, '质检草稿已生成，请在相关回货记录中继续办理')
+          await expectText(page, '质检草稿已生成，请在委外记录中继续办理')
 
           assert.equal(createParams.length, 1)
           const params = createParams[0]
@@ -1406,12 +1427,12 @@ export function createQualitySourceActionScenarios(deps) {
                 result: {
                   code: 0,
                   message: 'OK',
-                  data: {
-                    shipments: [shipment],
-                    total: 1,
-                    limit: 20,
-                    offset: 0,
-                  },
+                  data: stylePaginatedRpcData(
+                    [shipment],
+                    'shipments',
+                    body.params || {},
+                    20
+                  ),
                 },
               }),
             })
@@ -1430,12 +1451,11 @@ export function createQualitySourceActionScenarios(deps) {
                   result: {
                     code: 0,
                     message: 'OK',
-                    data: {
-                      quality_inspections: inspections,
-                      total: inspections.length,
-                      limit: 200,
-                      offset: 0,
-                    },
+                    data: stylePaginatedRpcData(
+                      inspections,
+                      'quality_inspections',
+                      params
+                    ),
                   },
                 }),
               })
@@ -1508,12 +1528,12 @@ export function createQualitySourceActionScenarios(deps) {
                   result: {
                     code: 0,
                     message: 'OK',
-                    data: {
-                      quality_inspections: [createdInspection],
-                      total: 1,
-                      limit: Number(params.limit || 20),
-                      offset: Number(params.offset || 0),
-                    },
+                    data: stylePaginatedRpcData(
+                      [createdInspection],
+                      'quality_inspections',
+                      params,
+                      20
+                    ),
                   },
                 }),
               })

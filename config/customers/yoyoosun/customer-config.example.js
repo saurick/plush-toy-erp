@@ -44,7 +44,7 @@ window.__PLUSH_ERP_CUSTOMER_CONFIG__ = Object.freeze({
         title: "财务管理",
         items: Object.freeze(["reconciliation", "payables", "receivables", "invoices"]),
       }),
-      Object.freeze({ title: "运营工具", items: Object.freeze(["print-center", "exception-flow"]) }),
+      Object.freeze({ title: "运营工具", items: Object.freeze(["print-center"]) }),
       Object.freeze({
         title: "系统管理",
         items: Object.freeze(["permission-center", "system-audit-logs"]),

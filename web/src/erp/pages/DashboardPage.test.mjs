@@ -31,8 +31,8 @@ test('task board keeps selection on click and opens the same detail surface on d
 })
 
 test('task surfaces expose the batch task code only as non-visible evidence metadata', () => {
-  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 4)
-  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 4)
+  assert.equal(source.match(/data-task-code(?:=|['"]:)/gu)?.length, 3)
+  assert.equal(source.match(/data-task-group(?:=|['"]:)/gu)?.length, 3)
   assert.match(source, /data-task-code=\{task\.task_code \|\| undefined\}/u)
   assert.match(
     source,

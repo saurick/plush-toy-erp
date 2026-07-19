@@ -352,8 +352,27 @@ func (r *inventoryRepo) CancelPostedPurchaseReceiptAdjustment(ctx context.Contex
 		tx = nil
 		return out, nil
 	}
+	wasDraft := adjustment.Status == biz.PurchaseReceiptAdjustmentStatusDraft
 	if err := lockPurchaseReceipt(ctx, tx, adjustment.PurchaseReceiptID); err != nil {
 		return nil, err
+	}
+	if wasDraft {
+		if err := updatePurchaseReceiptAdjustmentCancelled(ctx, tx, adjustment.ID); err != nil {
+			return nil, err
+		}
+		adjustment, err = tx.client.PurchaseReceiptAdjustment.Get(ctx, adjustment.ID)
+		if err != nil {
+			return nil, err
+		}
+		out, err := purchaseReceiptAdjustmentWithItems(ctx, tx.client, adjustment)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return out, nil
 	}
 	hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, adjustment.PurchaseReceiptID)
 	if err != nil {

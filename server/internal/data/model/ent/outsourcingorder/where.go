@@ -70,11 +70,6 @@ func SourceOrderNo(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceOrderNo, v))
 }
 
-// SourceSalesOrderID applies equality check predicate on the "source_sales_order_id" field. It's identical to SourceSalesOrderIDEQ.
-func SourceSalesOrderID(v int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceSalesOrderID, v))
-}
-
 // OrderDate applies equality check predicate on the "order_date" field. It's identical to OrderDateEQ.
 func OrderDate(v time.Time) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldEQ(FieldOrderDate, v))
@@ -288,56 +283,6 @@ func SourceOrderNoEqualFold(v string) predicate.OutsourcingOrder {
 // SourceOrderNoContainsFold applies the ContainsFold predicate on the "source_order_no" field.
 func SourceOrderNoContainsFold(v string) predicate.OutsourcingOrder {
 	return predicate.OutsourcingOrder(sql.FieldContainsFold(FieldSourceOrderNo, v))
-}
-
-// SourceSalesOrderIDEQ applies the EQ predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDEQ(v int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldEQ(FieldSourceSalesOrderID, v))
-}
-
-// SourceSalesOrderIDNEQ applies the NEQ predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDNEQ(v int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldNEQ(FieldSourceSalesOrderID, v))
-}
-
-// SourceSalesOrderIDIn applies the In predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDIn(vs ...int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldIn(FieldSourceSalesOrderID, vs...))
-}
-
-// SourceSalesOrderIDNotIn applies the NotIn predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDNotIn(vs ...int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldNotIn(FieldSourceSalesOrderID, vs...))
-}
-
-// SourceSalesOrderIDGT applies the GT predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDGT(v int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldGT(FieldSourceSalesOrderID, v))
-}
-
-// SourceSalesOrderIDGTE applies the GTE predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDGTE(v int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldGTE(FieldSourceSalesOrderID, v))
-}
-
-// SourceSalesOrderIDLT applies the LT predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDLT(v int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldLT(FieldSourceSalesOrderID, v))
-}
-
-// SourceSalesOrderIDLTE applies the LTE predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDLTE(v int) predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldLTE(FieldSourceSalesOrderID, v))
-}
-
-// SourceSalesOrderIDIsNil applies the IsNil predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDIsNil() predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldIsNull(FieldSourceSalesOrderID))
-}
-
-// SourceSalesOrderIDNotNil applies the NotNil predicate on the "source_sales_order_id" field.
-func SourceSalesOrderIDNotNil() predicate.OutsourcingOrder {
-	return predicate.OutsourcingOrder(sql.FieldNotNull(FieldSourceSalesOrderID))
 }
 
 // OrderDateEQ applies the EQ predicate on the "order_date" field.

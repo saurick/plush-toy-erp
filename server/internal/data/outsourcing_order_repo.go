@@ -184,6 +184,14 @@ func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Conte
 		}
 		return nil, err
 	}
+	// WIP assignment owns the batch -> outsourcing order lock order. Lifecycle
+	// settlement therefore locks the preflight batch set first, then the parent,
+	// and must fail closed if another batch dependency appeared in between. Do
+	// not lock newly discovered batches here: doing so after the parent would
+	// invert the authoritative lock order and can deadlock with assignment.
+	if err := requireStableOutsourcingOrderWIPDependencySet(ctx, tx.client, id, dependencyBatchIDs); err != nil {
+		return nil, err
+	}
 	if row.LifecycleStatus == lifecycleStatus {
 		if err := tx.sqlTx.Commit(); err != nil {
 			return nil, err
@@ -211,16 +219,32 @@ func (r *outsourcingOrderRepo) UpdateOutsourcingOrderLifecycle(ctx context.Conte
 			}
 		}
 	}
-	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
-		hasPostedFacts, err := tx.client.OutsourcingFact.Query().Where(
+	if lifecycleStatus == biz.OutsourcingOrderStatusClosed {
+		hasUnsettledFacts, err := tx.client.OutsourcingFact.Query().Where(
 			outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
 			outsourcingfact.SourceID(id),
-			outsourcingfact.Status(biz.OperationalFactStatusPosted),
+			outsourcingfact.StatusNotIn(
+				biz.OperationalFactStatusPosted,
+				biz.OperationalFactStatusCancelled,
+			),
 		).Exist(ctx)
 		if err != nil {
 			return nil, err
 		}
-		if hasPostedFacts {
+		if hasUnsettledFacts {
+			return nil, biz.ErrOutsourcingOrderFactDependency
+		}
+	}
+	if lifecycleStatus == biz.OutsourcingOrderStatusCanceled {
+		hasActiveFacts, err := tx.client.OutsourcingFact.Query().Where(
+			outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+			outsourcingfact.SourceID(id),
+			outsourcingfact.StatusNEQ(biz.OperationalFactStatusCancelled),
+		).Exist(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if hasActiveFacts {
 			return nil, biz.ErrOutsourcingOrderFactDependency
 		}
 	}
@@ -285,11 +309,6 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 		} else {
 			update.SetSourceOrderNo(*in.SourceOrderNo)
 		}
-		if in.SourceSalesOrderID == nil {
-			update.ClearSourceSalesOrderID()
-		} else {
-			update.SetSourceSalesOrderID(*in.SourceSalesOrderID)
-		}
 		if in.ExpectedReturnDate == nil {
 			update.ClearExpectedReturnDate()
 		} else {
@@ -331,7 +350,6 @@ func (r *outsourcingOrderRepo) SaveOutsourcingOrderWithItems(ctx context.Context
 			SetSupplierSnapshot(in.SupplierSnapshot).
 			SetContractPartySnapshot(in.ContractPartySnapshot).
 			SetNillableSourceOrderNo(in.SourceOrderNo).
-			SetNillableSourceSalesOrderID(in.SourceSalesOrderID).
 			SetOrderDate(in.OrderDate).
 			SetNillableExpectedReturnDate(in.ExpectedReturnDate).
 			SetLifecycleStatus(biz.OutsourcingOrderStatusDraft).
@@ -462,6 +480,22 @@ func outsourcingOrderWIPDependencyBatchIDs(ctx context.Context, client *ent.Clie
 	}
 	sort.Ints(batchIDs)
 	return batchIDs, nil
+}
+
+func requireStableOutsourcingOrderWIPDependencySet(ctx context.Context, client *ent.Client, orderID int, lockedBatchIDs []int) error {
+	currentBatchIDs, err := outsourcingOrderWIPDependencyBatchIDs(ctx, client, orderID)
+	if err != nil {
+		return err
+	}
+	if len(currentBatchIDs) != len(lockedBatchIDs) {
+		return biz.ErrProductionWIPOutsourcingSourceDependency
+	}
+	for index := range currentBatchIDs {
+		if currentBatchIDs[index] != lockedBatchIDs[index] {
+			return biz.ErrProductionWIPOutsourcingSourceDependency
+		}
+	}
+	return nil
 }
 
 func outsourcingOrderLifecyclePredecessors(next string) []string {
@@ -813,7 +847,6 @@ func entOutsourcingOrderToBiz(row *ent.OutsourcingOrder) *biz.OutsourcingOrder {
 		SupplierSnapshot:      row.SupplierSnapshot,
 		ContractPartySnapshot: row.ContractPartySnapshot,
 		SourceOrderNo:         row.SourceOrderNo,
-		SourceSalesOrderID:    row.SourceSalesOrderID,
 		OrderDate:             row.OrderDate,
 		ExpectedReturnDate:    row.ExpectedReturnDate,
 		LifecycleStatus:       row.LifecycleStatus,

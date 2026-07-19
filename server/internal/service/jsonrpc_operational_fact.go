@@ -42,6 +42,8 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"list_outsourcing_facts":
 		return d.handleOperationalFactOutsourcing(ctx, method, id, pm)
 	case "create_shipment_with_items",
+		"get_shipment",
+		"list_shipment_source_candidates",
 		"submit_shipment_release",
 		"ship_shipment",
 		"cancel_shipment",

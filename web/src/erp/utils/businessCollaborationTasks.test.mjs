@@ -300,6 +300,41 @@ test('businessCollaborationTasks: 请求失败不会回显旧任务并进入错�
   assert.deepEqual(visibleErrors, [expectedError])
 })
 
+test('businessCollaborationTasks: 当前来源超过 200 条时完整读取后续分页', async () => {
+  const coordinator = createLatestRequestCoordinator()
+  const allTasks = Array.from({ length: 201 }, (_, index) => ({
+    id: index + 1,
+    source_id: 1001,
+    task_status_key: index === 200 ? 'blocked' : 'done',
+  }))
+  const offsets = []
+  let visibleTasks = []
+
+  const result = await loadBusinessCollaborationTasksForSource({
+    beginLatestRequest: coordinator.begin,
+    canRead: true,
+    listTasks: async (params) => {
+      offsets.push(params.offset)
+      return {
+        tasks: allTasks.slice(params.offset, params.offset + params.limit),
+        total: allTasks.length,
+        limit: params.limit,
+        offset: params.offset,
+      }
+    },
+    setTasks: (nextTasks) => {
+      visibleTasks = nextTasks
+    },
+    sourceID: 1001,
+    sourceType: 'accessories-purchase',
+  })
+
+  assert.equal(result.status, 'ready')
+  assert.deepEqual(offsets, [0, 200])
+  assert.equal(visibleTasks.length, 201)
+  assert.equal(visibleTasks.at(-1).task_status_key, 'blocked')
+})
+
 test('businessCollaborationTasks: 快速切换记录时迟到响应不能覆盖当前任务', async () => {
   const coordinator = createLatestRequestCoordinator()
   const requests = new Map([
@@ -340,16 +375,32 @@ test('businessCollaborationTasks: 快速切换记录时迟到响应不能覆盖�
   assert.equal(requestSignals.get(1001)?.aborted, true)
   requests.get(1002).resolve({
     tasks: [{ id: 2, source_id: 1002, task_status_key: 'ready' }],
+    total: 1,
+    limit: 200,
+    offset: 0,
   })
   assert.equal((await secondLoad).status, 'ready')
   requests.get(1001).resolve({
     tasks: [{ id: 1, source_id: 1001, task_status_key: 'ready' }],
+    total: 1,
+    limit: 200,
+    offset: 0,
   })
   assert.equal((await firstLoad).status, 'stale')
 
   assert.deepEqual(requestedParams, [
-    { source_type: 'accessories-purchase', source_id: 1001, limit: 200 },
-    { source_type: 'accessories-purchase', source_id: 1002, limit: 200 },
+    {
+      source_type: 'accessories-purchase',
+      source_id: 1001,
+      limit: 200,
+      offset: 0,
+    },
+    {
+      source_type: 'accessories-purchase',
+      source_id: 1002,
+      limit: 200,
+      offset: 0,
+    },
   ])
   assert.deepEqual(visibleTasks, [
     { id: 2, source_id: 1002, task_status_key: 'ready' },

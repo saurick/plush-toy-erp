@@ -1,4 +1,9 @@
-import { PRODUCTION_WIP_ROUTE_KEY } from './productionWipModel.mjs'
+import { PRODUCTION_WIP_ROUTE_CODE } from './productionWipModel.mjs'
+import {
+  addNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from './numeric20Scale6.mjs'
 
 export const PRODUCTION_ORDER_STATUS = Object.freeze({
   DRAFT: 'DRAFT',
@@ -81,10 +86,10 @@ export function validateProductionOrderAggregate(data, expected = {}) {
       typeof item.planned_quantity !== 'string' ||
       !item.planned_quantity.trim() ||
       (item.route_code != null &&
-        item.route_code !== PRODUCTION_WIP_ROUTE_KEY) ||
+        item.route_code !== PRODUCTION_WIP_ROUTE_CODE) ||
       typeof item.customer_inspection_required !== 'boolean' ||
       (item.customer_inspection_required &&
-        item.route_code !== PRODUCTION_WIP_ROUTE_KEY)
+        item.route_code !== PRODUCTION_WIP_ROUTE_CODE)
     ) {
       throw invalidResponse()
     }
@@ -156,17 +161,14 @@ export function validateProductionMaterialRequirements(
     ) {
       throw invalidResponse()
     }
-    const planned = Number(requirement.planned_quantity)
-    const issued = Number(requirement.issued_quantity)
-    const remaining = Number(requirement.remaining_quantity)
+    const planned = numeric20Scale6Units(requirement.planned_quantity)
+    const issued = numeric20Scale6Units(requirement.issued_quantity)
+    const remaining = numeric20Scale6Units(requirement.remaining_quantity)
     if (
-      !Number.isFinite(planned) ||
-      planned <= 0 ||
-      !Number.isFinite(issued) ||
-      issued < 0 ||
-      !Number.isFinite(remaining) ||
-      remaining < 0 ||
-      Math.abs(planned - issued - remaining) > 0.000001
+      !isPositiveNumeric20Scale6Units(planned) ||
+      issued === null ||
+      remaining === null ||
+      addNumeric20Scale6Units(issued, remaining) !== planned
     ) {
       throw invalidResponse()
     }
@@ -214,13 +216,29 @@ export function validateProductionOrderList(data) {
   return data
 }
 
-export function validateProductionOrderOptions(data, referenceType) {
+export function validateProductionOrderOptions(
+  data,
+  referenceType,
+  expectedPage = {}
+) {
   if (
     !data ||
     data.reference_type !== referenceType ||
     !Array.isArray(data.options) ||
     !Number.isSafeInteger(data.total) ||
-    data.total < 0
+    data.total < 0 ||
+    !Number.isSafeInteger(data.limit) ||
+    data.limit < 1 ||
+    data.limit > 50 ||
+    !Number.isSafeInteger(data.offset) ||
+    data.offset < 0 ||
+    data.offset > data.total ||
+    data.options.length !==
+      Math.min(data.limit, Math.max(0, data.total - data.offset)) ||
+    (Number.isSafeInteger(expectedPage.limit) &&
+      data.limit !== expectedPage.limit) ||
+    (Number.isSafeInteger(expectedPage.offset) &&
+      data.offset !== expectedPage.offset)
   ) {
     throw invalidResponse()
   }

@@ -3,6 +3,7 @@ import test from 'node:test'
 
 import {
   buildPrintTemplateLineCells,
+  getPrintTemplateLineColumns,
   normalizePrintTemplatePreviewData,
   resolvePrintTemplateTotals,
 } from './printTemplateRendererModel.mjs'
@@ -13,6 +14,42 @@ const amountColumnMerge = {
   colStart: 10,
   colEnd: 10,
 }
+
+test('printTemplateRendererModel: 加工合同静态预览复用正式字段真源', () => {
+  const columns = getPrintTemplateLineColumns('processing')
+  const cells = buildPrintTemplateLineCells(
+    {
+      productOrderNo: 'SIM-SO-001',
+      productNo: 'SIM-PROD-001',
+      productName: '合成玩偶甲',
+      processingItem: '面*1',
+    },
+    0,
+    'processing'
+  )
+
+  assert.equal(
+    columns.find((column) => column.key === 'productOrderNo')?.label,
+    '来源订单编号'
+  )
+  assert.equal(
+    columns.find((column) => column.key === 'productNo')?.label,
+    '产品 / 材料编号'
+  )
+  assert.equal(
+    columns.find((column) => column.key === 'productName')?.label,
+    '产品 / 材料名称'
+  )
+  assert.equal(
+    columns.find((column) => column.key === 'processingItem')?.label,
+    '加工项目'
+  )
+  assert.equal(
+    cells.find((cell) => cell.key === 'processingItem')?.value,
+    '面*1'
+  )
+  assert.equal(cells.some((cell) => cell.key === 'processName'), false)
+})
 
 test('FL_print_template_preview_totals__skip_material_hidden_amount_cells printTemplateRendererModel: 采购合同静态预览合计不统计被合并覆盖金额', () => {
   const totals = resolvePrintTemplateTotals(

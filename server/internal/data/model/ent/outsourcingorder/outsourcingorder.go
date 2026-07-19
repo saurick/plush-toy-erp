@@ -24,8 +24,6 @@ const (
 	FieldContractPartySnapshot = "contract_party_snapshot"
 	// FieldSourceOrderNo holds the string denoting the source_order_no field in the database.
 	FieldSourceOrderNo = "source_order_no"
-	// FieldSourceSalesOrderID holds the string denoting the source_sales_order_id field in the database.
-	FieldSourceSalesOrderID = "source_sales_order_id"
 	// FieldOrderDate holds the string denoting the order_date field in the database.
 	FieldOrderDate = "order_date"
 	// FieldExpectedReturnDate holds the string denoting the expected_return_date field in the database.
@@ -70,7 +68,6 @@ var Columns = []string{
 	FieldSupplierSnapshot,
 	FieldContractPartySnapshot,
 	FieldSourceOrderNo,
-	FieldSourceSalesOrderID,
 	FieldOrderDate,
 	FieldExpectedReturnDate,
 	FieldLifecycleStatus,
@@ -97,8 +94,6 @@ var (
 	SupplierIDValidator func(int) error
 	// SourceOrderNoValidator is a validator for the "source_order_no" field. It is called by the builders before save.
 	SourceOrderNoValidator func(string) error
-	// SourceSalesOrderIDValidator is a validator for the "source_sales_order_id" field. It is called by the builders before save.
-	SourceSalesOrderIDValidator func(int) error
 	// DefaultLifecycleStatus holds the default value on creation for the "lifecycle_status" field.
 	DefaultLifecycleStatus string
 	// LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -138,11 +133,6 @@ func BySupplierID(opts ...sql.OrderTermOption) OrderOption {
 // BySourceOrderNo orders the results by the source_order_no field.
 func BySourceOrderNo(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldSourceOrderNo, opts...).ToFunc()
-}
-
-// BySourceSalesOrderID orders the results by the source_sales_order_id field.
-func BySourceSalesOrderID(opts ...sql.OrderTermOption) OrderOption {
-	return sql.OrderByField(FieldSourceSalesOrderID, opts...).ToFunc()
 }
 
 // ByOrderDate orders the results by the order_date field.

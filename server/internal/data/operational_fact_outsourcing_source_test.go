@@ -323,15 +323,34 @@ func TestOutsourcingFactFromOrderEnforcesPostedQuantityAndAllowsClosedSourceReve
 		t.Fatalf("post over-quantity issue error = %v, want quantity exceeded", err)
 	}
 
-	closed, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusClosed)
-	if err != nil || closed.LifecycleStatus != biz.OutsourcingOrderStatusClosed {
-		t.Fatalf("close order after posted issue = %#v, err=%v", closed, err)
+	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusClosed); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
+		t.Fatalf("failed over-quantity draft must block parent close, err=%v", err)
 	}
-	cancelled, err := uc.CancelPostedOutsourcingFact(ctx, first.ID)
+
+	closeSource := createOutsourcingFactSourceFixture(t, ctx, client, fixtures, "CLOSE-POSTED", decimal.NewFromInt(4))
+	closeFact, err := uc.CreateOutsourcingMaterialIssueFromOrder(ctx, &biz.OutsourcingFactFromOrderCreate{
+		FactNo:                 "OUT-ISSUE-CLOSE-POSTED",
+		OutsourcingOrderID:     closeSource.order.ID,
+		OutsourcingOrderItemID: closeSource.materialLine.ID,
+		WarehouseID:            fixtures.warehouseID,
+		Quantity:               decimal.NewFromInt(3),
+		IdempotencyKey:         "OUT-ISSUE-CLOSE-POSTED",
+	})
+	if err != nil {
+		t.Fatalf("create close source issue: %v", err)
+	}
+	if _, err := uc.PostOutsourcingFact(ctx, closeFact.ID); err != nil {
+		t.Fatalf("post close source issue: %v", err)
+	}
+	closed, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, closeSource.order.ID, biz.OutsourcingOrderStatusClosed)
+	if err != nil || closed.LifecycleStatus != biz.OutsourcingOrderStatusClosed {
+		t.Fatalf("close order after only posted issue = %#v, err=%v", closed, err)
+	}
+	cancelled, err := uc.CancelPostedOutsourcingFact(ctx, closeFact.ID)
 	if err != nil || cancelled.Status != biz.OperationalFactStatusCancelled {
 		t.Fatalf("cancel posted issue after parent close = %#v, err=%v", cancelled, err)
 	}
-	if got := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType), inventorytxn.SourceID(first.ID)).CountX(ctx); got != 2 {
+	if got := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.OutsourcingFactSourceType), inventorytxn.SourceID(closeFact.ID)).CountX(ctx); got != 2 {
 		t.Fatalf("expected outbound and reversal inventory rows, got %d", got)
 	}
 }
@@ -357,6 +376,9 @@ func TestOutsourcingOrderCancelRejectsPostedFactDependency(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("create return receipt: %v", err)
+	}
+	if _, err := orderRepo.UpdateOutsourcingOrderLifecycle(ctx, source.order.ID, biz.OutsourcingOrderStatusCanceled); !errors.Is(err, biz.ErrOutsourcingOrderFactDependency) {
+		t.Fatalf("cancel order with draft fact error = %v, want dependency", err)
 	}
 	if _, err := uc.PostOutsourcingFact(ctx, fact.ID); err != nil {
 		t.Fatalf("post return receipt: %v", err)

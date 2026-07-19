@@ -7,6 +7,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 )
 
 var workflowTestMutationSequence uint64
@@ -1367,10 +1368,15 @@ func TestWorkflowUsecase_ListTasksRejectsInvalidStatus(t *testing.T) {
 func TestWorkflowUsecase_ListTasksNormalizesTaskGroupFilter(t *testing.T) {
 	repo := &stubWorkflowRepo{}
 	uc := NewWorkflowUsecase(repo)
+	dueFrom := time.Date(2026, time.July, 18, 8, 0, 0, 999, time.FixedZone("CST", 8*60*60))
+	dueTo := dueFrom.Add(time.Hour)
 
 	_, _, err := uc.ListTasks(context.Background(), WorkflowTaskFilter{
+		Keyword:    " SHIP- ",
 		TaskGroup:  " shipment_release ",
 		SourceType: " shipping-release ",
+		DueFrom:    &dueFrom,
+		DueTo:      &dueTo,
 		Limit:      0,
 	})
 	if err != nil {
@@ -1384,6 +1390,69 @@ func TestWorkflowUsecase_ListTasksNormalizesTaskGroupFilter(t *testing.T) {
 	}
 	if repo.listTaskFilter.Limit != 50 {
 		t.Fatalf("expected default limit 50, got %d", repo.listTaskFilter.Limit)
+	}
+	if repo.listTaskFilter.Keyword != "SHIP-" {
+		t.Fatalf("expected normalized keyword, got %q", repo.listTaskFilter.Keyword)
+	}
+	if repo.listTaskFilter.DueFrom == nil || repo.listTaskFilter.DueFrom.Location() != time.UTC || repo.listTaskFilter.DueFrom.Nanosecond() != 0 ||
+		repo.listTaskFilter.DueTo == nil || repo.listTaskFilter.DueTo.Location() != time.UTC || repo.listTaskFilter.DueTo.Nanosecond() != 0 {
+		t.Fatalf("expected normalized UTC second due range, got from=%v to=%v", repo.listTaskFilter.DueFrom, repo.listTaskFilter.DueTo)
+	}
+}
+
+func TestWorkflowUsecase_ListTasksRejectsInvalidDueRange(t *testing.T) {
+	repo := &stubWorkflowRepo{}
+	uc := NewWorkflowUsecase(repo)
+	dueFrom := time.Date(2026, time.July, 19, 0, 0, 0, 0, time.UTC)
+	dueTo := dueFrom.Add(-time.Second)
+
+	_, _, err := uc.ListTasks(context.Background(), WorkflowTaskFilter{DueFrom: &dueFrom, DueTo: &dueTo})
+	if !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected ErrBadParam, got %v", err)
+	}
+	if repo.listTaskCalled {
+		t.Fatal("invalid due range must not reach repo")
+	}
+}
+
+func TestSelectWorkflowTaskTransitionHandlerRequiresAtMostOneMatch(t *testing.T) {
+	apply := func(*WorkflowUsecase, *WorkflowTask, *WorkflowTaskStatusUpdate) error { return nil }
+	never := func(*WorkflowTask) bool { return false }
+	always := func(*WorkflowTask) bool { return true }
+
+	t.Run("zero match keeps the generic transition path", func(t *testing.T) {
+		handler, err := selectWorkflowTaskTransitionHandlerFrom([]workflowTaskTransitionHandler{
+			{Key: "never", Match: never, Apply: apply},
+		}, &WorkflowTask{})
+		if err != nil || handler != nil {
+			t.Fatalf("handler=%#v err=%v, want no special handler", handler, err)
+		}
+	})
+
+	t.Run("one match selects its handler", func(t *testing.T) {
+		handler, err := selectWorkflowTaskTransitionHandlerFrom([]workflowTaskTransitionHandler{
+			{Key: "never", Match: never, Apply: apply},
+			{Key: "selected", Match: always, Apply: apply},
+		}, &WorkflowTask{})
+		if err != nil || handler == nil || handler.Key != "selected" {
+			t.Fatalf("handler=%#v err=%v, want selected", handler, err)
+		}
+	})
+
+	t.Run("multiple matches fail closed", func(t *testing.T) {
+		handler, err := selectWorkflowTaskTransitionHandlerFrom([]workflowTaskTransitionHandler{
+			{Key: "first", Match: always, Apply: apply},
+			{Key: "second", Match: always, Apply: apply},
+		}, &WorkflowTask{})
+		if handler != nil || !errors.Is(err, ErrBadParam) {
+			t.Fatalf("handler=%#v err=%v, want ErrBadParam", handler, err)
+		}
+	})
+}
+
+func TestWorkflowTaskTransitionHandlerRegistryIsValid(t *testing.T) {
+	if _, err := selectWorkflowTaskTransitionHandlerFrom(workflowTaskTransitionHandlers, &WorkflowTask{}); err != nil {
+		t.Fatalf("workflow transition handler registry invalid: %v", err)
 	}
 }
 

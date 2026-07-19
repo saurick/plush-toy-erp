@@ -130,7 +130,10 @@ func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *Oper
 	sourceType := ShipmentSourceType
 	sourceID := shipmentID
 	collectionType := FinanceCollectionAccountsReceivable
-	invoiceCategory := FinanceInvoiceCategoryNone
+	paymentTerm, paymentTermDays, err := uc.shipmentFinancePaymentTermSnapshot(ctx, shipmentID)
+	if err != nil {
+		return nil, err
+	}
 	normalized, err := normalizeFinanceFactCreate(&FinanceFactCreate{
 		FactNo:           factNo,
 		FactType:         FinanceFactReceivable,
@@ -139,7 +142,8 @@ func financeReceivableLeadCreateFromProcessCommand(ctx context.Context, uc *Oper
 		Amount:           amount,
 		Currency:         currency,
 		CollectionType:   &collectionType,
-		InvoiceCategory:  &invoiceCategory,
+		PaymentTerm:      paymentTerm,
+		PaymentTermDays:  paymentTermDays,
 		SourceType:       &sourceType,
 		SourceID:         &sourceID,
 		IdempotencyKey:   in.IdempotencyKey,

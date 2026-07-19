@@ -299,6 +299,22 @@ test("mobile workflow runtime browser smoke input template is no-write", () => {
     template.simulatedTaskPlanCoverage.coversCompletionFeedback,
     true,
   );
+  assert.equal(
+    template.simulatedTaskPlanCoverage.coversRequiredCompletionFeedback,
+    true,
+  );
+  assert.equal(
+    template.simulatedTaskPlanCoverage.coversCompletionPayloadFeedback,
+    true,
+  );
+  assert.equal(
+    template.simulatedTaskPlanCoverage.coversCompletionReceiptFeedback,
+    true,
+  );
+  assert.equal(
+    template.simulatedTaskPlanCoverage.coversOptionalCompletionEvidence,
+    true,
+  );
   assert.equal(template.simulatedTaskPlanCoverage.coversExceptionReport, true);
   assert.equal(template.simulatedTaskPlanCoverage.coversQualityComplete, true);
   assert.equal(
@@ -315,6 +331,11 @@ test("mobile workflow runtime browser smoke input template is no-write", () => {
         item.ownerRole === "老板" &&
         item.taskGroupLabel === "销售订单受理" &&
         item.actionLabel === "完成任务" &&
+        item.completionFeedbackRequired === true &&
+        item.completionPayloadFeedbackExpected === true &&
+        item.completionReceiptFeedbackExpected === true &&
+        item.evidenceInputRequired === false &&
+        item.evidenceRefExpected === true &&
         item.simulatedOnly === true,
     ),
   );
@@ -376,6 +397,7 @@ test("mobile workflow runtime browser smoke simulated task plan covers required 
   assert.deepEqual(coverage.ownerRoles, ["仓库", "品质", "老板"]);
   assert.equal(coverage.allSimulatedOnly, true);
   assert.equal(coverage.allKeepEvidenceRefs, true);
+  assert.equal(coverage.allEvidenceInputsOptional, true);
   assert.equal(coverage.coversBossBlock, true);
   assert.equal(coverage.coversBossComplete, true);
   assert.equal(coverage.coversBossReject, true);
@@ -383,6 +405,10 @@ test("mobile workflow runtime browser smoke simulated task plan covers required 
   assert.equal(coverage.coversWarehouseInboundComplete, true);
   assert.equal(coverage.coversCrossRoleUrge, true);
   assert.equal(coverage.coversReasonRequiredActions, true);
+  assert.equal(coverage.coversRequiredCompletionFeedback, true);
+  assert.equal(coverage.coversCompletionPayloadFeedback, true);
+  assert.equal(coverage.coversCompletionReceiptFeedback, true);
+  assert.equal(coverage.coversOptionalCompletionEvidence, true);
   assert.equal(coverage.coversCompletionFeedback, true);
   assert.equal(coverage.coversExceptionReport, true);
   assert.equal(coverage.coversInternalNotificationHints, true);
@@ -399,6 +425,39 @@ test("mobile workflow runtime browser smoke simulated task plan covers required 
   assert.equal(incompleteCoverage.ok, false);
   assert(incompleteCoverage.blockers.includes("missing-boss-reject-action"));
   assert(incompleteCoverage.blockers.includes("expected-six-simulated-tasks"));
+
+  const evidenceWithoutCompletionFeedback = buildSimulatedTaskPlanCoverage(
+    plan.map((item) =>
+      item.browserAction === "complete"
+        ? {
+            ...item,
+            requiresCompletionFeedback: false,
+            expectsCompletionPayloadFeedback: false,
+            expectsCompletionReceiptFeedback: false,
+          }
+        : item,
+    ),
+  );
+  assert.equal(evidenceWithoutCompletionFeedback.allKeepEvidenceRefs, true);
+  assert.equal(
+    evidenceWithoutCompletionFeedback.coversCompletionFeedback,
+    false,
+  );
+  assert(
+    evidenceWithoutCompletionFeedback.blockers.includes(
+      "missing-required-completion-feedback-input",
+    ),
+  );
+  assert(
+    evidenceWithoutCompletionFeedback.blockers.includes(
+      "missing-completion-payload-feedback-coverage",
+    ),
+  );
+  assert(
+    evidenceWithoutCompletionFeedback.blockers.includes(
+      "missing-completion-receipt-feedback-coverage",
+    ),
+  );
 });
 
 test("mobile workflow runtime browser smoke preflight report is no-write and redacted", async () => {
@@ -717,10 +776,13 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
   const browserResult = {
     blockReason: "阻塞原因",
     blockEvidence: "BLOCK-PHOTO",
+    doneFeedback: "DONE-FEEDBACK",
     doneEvidence: "DONE-PHOTO",
     rejectReason: "退回原因",
     rejectEvidence: "REJECT-PHOTO",
+    qualityFeedback: "QUALITY-FEEDBACK",
     qualityEvidence: "QUALITY-PHOTO",
+    warehouseInboundFeedback: "INBOUND-FEEDBACK",
     warehouseInboundEvidence: "INBOUND-PHOTO",
     urgeReason: "催办原因",
     urgeEvidence: "URGE-PHOTO",
@@ -756,6 +818,7 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
       task_status_key: "done",
       business_status_key: "project_approved",
       payload: {
+        feedback: browserResult.doneFeedback,
         mobile_action_evidence_refs: [browserResult.doneEvidence],
       },
     },
@@ -776,6 +839,7 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
       task_group: "finished_goods_qc",
       task_status_key: "done",
       payload: {
+        feedback: browserResult.qualityFeedback,
         mobile_action_evidence_refs: [browserResult.qualityEvidence],
       },
     },
@@ -785,6 +849,7 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
       task_group: "warehouse_inbound",
       task_status_key: "done",
       payload: {
+        feedback: browserResult.warehouseInboundFeedback,
         mobile_action_evidence_refs: [browserResult.warehouseInboundEvidence],
       },
     },
@@ -818,6 +883,14 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
   assert.equal(report.storesRedactedActionSummary, true);
   assert.equal(report.summary.totalTasks, 6);
   assert.equal(report.summary.done, 3);
+  assert.equal(report.summary.taskFlowScreensChecked, true);
+  assert.equal(report.summary.confirmedReceiptChecked, true);
+  assert.equal(report.summary.completionFeedbackRequiredChecked, true);
+  assert.equal(report.summary.completionPayloadFeedbackChecked, true);
+  assert.equal(report.summary.completionReceiptFeedbackChecked, true);
+  assert.equal(report.summary.optionalEvidenceRefsChecked, true);
+  assert.equal(report.summary.receiptBackToListChecked, true);
+  assert.equal(report.summary.listStateRestoreChecked, true);
   assert.equal(report.summary.noHorizontalOverflow, true);
   assert.equal(report.summary.simulatedTaskPlanCoverageOK, true);
   assert.deepEqual(report.summary.simulatedTaskPlanCoverageBlockers, []);
@@ -851,6 +924,22 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
   );
   assert.equal(report.simulatedTaskPlanCoverage.coversCrossRoleUrge, true);
   assert.equal(
+    report.simulatedTaskPlanCoverage.coversRequiredCompletionFeedback,
+    true,
+  );
+  assert.equal(
+    report.simulatedTaskPlanCoverage.coversCompletionPayloadFeedback,
+    true,
+  );
+  assert.equal(
+    report.simulatedTaskPlanCoverage.coversCompletionReceiptFeedback,
+    true,
+  );
+  assert.equal(
+    report.simulatedTaskPlanCoverage.coversOptionalCompletionEvidence,
+    true,
+  );
+  assert.equal(
     report.simulatedTaskPlanCoverage.coversInternalNotificationHints,
     true,
   );
@@ -876,6 +965,12 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
       ["warehouse-urge", "仓库", "业务协同", "待处理", "催办协同"],
     ],
   );
+  for (const task of report.tasks.filter((item) =>
+    item.key.endsWith("complete"),
+  )) {
+    assert.equal(task.completionFeedbackRecorded, true);
+    assert.equal(task.evidenceRefRecorded, true);
+  }
   assert.doesNotMatch(serialized, /Bearer/u);
   assert.doesNotMatch(serialized, /access_token/u);
   assert.doesNotMatch(serialized, /Authorization:\s*Bearer/iu);
@@ -899,6 +994,10 @@ test("mobile workflow runtime browser smoke report is redacted local evidence on
     /order_approval|finished_goods_qc|warehouse_inbound|shipment_release/u,
   );
   assert.doesNotMatch(serialized, /replace-with-local-demo-password/u);
+  assert.doesNotMatch(
+    serialized,
+    /DONE-FEEDBACK|QUALITY-FEEDBACK|INBOUND-FEEDBACK/u,
+  );
   assert.match(report.boundary, /不证明目标环境发布/u);
 });
 
@@ -1105,22 +1204,45 @@ test("mobile workflow runtime browser smoke does not contain real import or fact
 
   assert.match(source, /method: 'create_task'/u);
   assert.match(source, /URL must not contain username or password/u);
-  assert.match(source, /getByRole\('button', \{ name: \/阻塞\/u \}\)/u);
-  assert.match(source, /mobile-role-detail-reason-input/u);
-  assert.match(source, /请先填写阻塞或退回原因/u);
-  assert.match(mobileTaskActionHookSource, /请先填写完成反馈或附件线索/u);
+  assert.match(source, /getByTestId\('mobile-task-detail-screen'\)/u);
+  assert.match(source, /getByTestId\('mobile-task-action-screen'\)/u);
+  assert.match(source, /getByTestId\('mobile-task-receipt-screen'\)/u);
+  assert.match(source, /getByTestId\('mobile-task-flow-steps'\)/u);
+  assert.match(source, /actionLabel: '阻塞'/u);
+  assert.match(source, /reasonLabel: '阻塞原因'/u);
+  assert.match(source, /requiredError: '阻塞原因为必填项'/u);
+  assert.match(mobileTaskActionHookSource, /请先填写完成反馈/u);
   assert.match(mobileTaskActionHookSource, /requiresMobileActionFeedback/u);
-  assert.match(source, /getByRole\('button', \{ name: \/完成\/u \}\)/u);
+  assert.match(mobileTaskActionHookSource, /feedback: completionFeedback/u);
   assert.match(
     source,
-    /getByTestId\('mobile-role-evidence-input'\)\.fill\(doneEvidence\)[\s\S]+getByRole\('button', \{ name: \/完成\/u \}\)\.click\(\)[\s\S]+getByRole\('button', \{ name: '提交' \}\)\.click\(\)/u,
+    /actionLabel: '完成',[\s\S]+feedback: doneFeedback,[\s\S]+feedbackLabel: '完成反馈',[\s\S]+evidence: doneEvidence,[\s\S]+evidenceLabel: '现场证据',[\s\S]+requiredError: '完成反馈为必填项'/u,
   );
+  assert.match(source, /completion feedback input should be required/u);
+  assert.match(source, /onsite evidence input should remain optional/u);
+  assert.match(
+    source,
+    /filter\(\{ hasText: '完成反馈' \}\)[\s\S]+getByText\(feedback, \{ exact: true \}\)/u,
+  );
+  assert.match(
+    source,
+    /filter\(\{ hasText: '证据线索' \}\)[\s\S]+getByText\(evidence, \{ exact: true \}\)/u,
+  );
+  assert.match(source, /name: '确认提交', exact: true/u);
+  assert.match(source, /任务办理已确认/u);
+  assert.match(source, /\[data-step-key="result"\]/u);
+  assert.match(source, /window\.history\.back\(\)/u);
+  assert.match(source, /verifyRestoredListState/u);
   assert.match(source, /mobile-role-nav-done/u);
   assert.doesNotMatch(
     source,
     /updatedBoss(?:Done|Reject)Task\.business_status_key/u,
   );
   assert.match(source, /done task should retain mobile action evidence ref/u);
+  assert.match(
+    source,
+    /done task should retain completion feedback in payload\.feedback/u,
+  );
   assert.match(source, /username: 'demo_quality'/u);
   assert.match(source, /username: 'demo_warehouse'/u);
   assert.match(source, /buildSimulatedQualityTask/u);
@@ -1131,14 +1253,23 @@ test("mobile workflow runtime browser smoke does not contain real import or fact
   );
   assert.match(
     source,
+    /quality done task should retain completion feedback in payload\.feedback/u,
+  );
+  assert.match(
+    source,
     /warehouse inbound done task should retain mobile action evidence ref/u,
+  );
+  assert.match(
+    source,
+    /warehouse inbound done task should retain completion feedback in payload\.feedback/u,
   );
   assert.match(source, /qualityDone=\$\{createdQualityTask\.task_code\}/u);
   assert.match(
     source,
     /warehouseInboundDone=\$\{createdWarehouseInboundTask\.task_code\}/u,
   );
-  assert.match(source, /getByRole\('button', \{ name: \/退回当前任务\/u \}\)/u);
+  assert.match(source, /actionLabel: '退回'/u);
+  assert.match(source, /requiredError: '退回原因为必填项'/u);
   assert.match(
     source,
     /assert\.equal\(updatedBossRejectTask\.task_status_key, 'rejected'\)/u,
@@ -1147,10 +1278,10 @@ test("mobile workflow runtime browser smoke does not contain real import or fact
     source,
     /rejected task should retain mobile action evidence ref/u,
   );
-  assert.match(source, /mobile-role-action-bar__button--urge/u);
-  assert.match(source, /请先填写催办原因/u);
-  assert.match(source, /催办已记录/u);
-  assert.match(source, /您暂时不能处理这条任务，可以查看并催办/u);
+  assert.match(source, /cross-role task should expose only the urge action/u);
+  assert.match(source, /actionLabel: '催办'/u);
+  assert.match(source, /requiredError: '催办原因为必填项'/u);
+  assert.match(source, /这条任务由仓库办理，您可以查看并发起催办/u);
   assert.match(source, /last_urge_action/u);
   assert.match(source, /rejected=\$\{createdBossRejectTask\.task_code\}/u);
   assert.match(source, /done=\$\{createdBossDoneTask\.task_code\}/u);
@@ -1159,6 +1290,7 @@ test("mobile workflow runtime browser smoke does not contain real import or fact
   assert.match(source, /startsDevServer: false/u);
   assert.match(source, /createsWorkflowTasks: false/u);
   assert.doesNotMatch(source, /至少 5 个字/u);
+  assert.doesNotMatch(source, /完成反馈与证据/u);
   assert.doesNotMatch(source, /real[-_ ]?import/iu);
   assert.doesNotMatch(source, /\binventory_txns\b/u);
   assert.doesNotMatch(source, /\bpurchase_receipts\b/u);

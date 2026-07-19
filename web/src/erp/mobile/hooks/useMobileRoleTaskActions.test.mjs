@@ -26,7 +26,17 @@ test('mobile task page uses backend action projection and does not restore local
 
   assert.match(pageSource, /useWorkflowTaskActionAccess/u)
   assert.match(pageSource, /taskActionAccess:\s*selectedTaskActionAccess/u)
-  assert.match(detailSource, /const showRejected = selectedCanReject/u)
+  assert.match(
+    pageSource,
+    /workflowTaskAdminAccessRequestIdentity\(adminProfile\)/u
+  )
+  assert.match(pageSource, /taskScopeKey = `\$\{activeRoleKey\}\|access:/u)
+  assert.match(pageSource, /persistMobileTaskDraftBackup/u)
+  assert.match(pageSource, /readMobileTaskDraftBackup/u)
+  assert.match(pageSource, /restoreActionDraft/u)
+  assert.match(pageSource, /selectedCanReject \? 'rejected' : ''/u)
+  assert.match(detailSource, /selectedCanOperate/u)
+  assert.match(detailSource, /onOpenAction/u)
   assert.doesNotMatch(detailSource, /supportsRejectedAction/u)
   assert.doesNotMatch(hookSource, /canOpenMobileTaskDetailAction/u)
   assert.doesNotMatch(hookSource, /canRunWorkflowTaskAction/u)
@@ -56,7 +66,7 @@ test('mobile task page keeps load failures explicit and invalidates inactive vie
   assert.match(pageSource, /if \(rejectOnError\) throw error/u)
   assert.match(
     pageSource,
-    /loadTaskView\(activeTaskViewKey, \{ rejectOnError: true \}\)/u
+    /loadTaskView\(activeTaskViewKey,\s*\{\s*rejectOnError:\s*true,?\s*\}\)/u
   )
   assert.match(pageSource, /loadTasks: refreshTasksAfterMutation/u)
   assert.match(listSource, /role="alert"/u)
@@ -99,6 +109,9 @@ function createReactHookRuntime() {
         slots[slotIndex] = { type: 'ref', value: { current: initialValue } }
       }
       return slots[slotIndex].value
+    },
+    useCallback(callback) {
+      return callback
     },
     useState(initialValue) {
       const slotIndex = cursor
@@ -171,12 +184,19 @@ module.exports = { useMobileRoleTaskActions }`,
           urgeWorkflowTask,
         },
         '../../utils/mobileTaskView.mjs': {
-          buildMobileTaskActionEvidence: ({ evidenceText = '' } = {}) => {
+          buildMobileTaskView: (task) => ({ ...task }),
+          buildMobileTaskActionEvidence: ({
+            evidenceText = '',
+            feedback = '',
+          } = {}) => {
             const evidenceRefs = String(evidenceText)
               .split(/[\n,，;；]/u)
               .map((item) => item.trim())
               .filter(Boolean)
             return {
+              ...(String(feedback).trim()
+                ? { feedback: String(feedback).trim() }
+                : {}),
               ...(evidenceRefs.length ? { evidence_refs: evidenceRefs } : {}),
               surface_key: 'mobile_role_tasks',
             }
@@ -208,7 +228,7 @@ module.exports = { useMobileRoleTaskActions }`,
           getMobileTaskActionReasonDraftKey: (task, action) =>
             `${task?.id || ''}:${action || ''}`,
           normalizeMobileTaskActionKey: (action) => action,
-          requiresMobileActionFeedback: () => false,
+          requiresMobileActionFeedback: (action) => action === 'done',
           resolveMobileActionLabel: (action) => action,
           resolveMobileTaskActionReason: ({ task, action, reasonDrafts }) =>
             reasonDrafts[`${task?.id || ''}:${action || ''}`] || '',
@@ -238,6 +258,7 @@ function createHookHarness(options = {}) {
   const detailActionChanges = []
   const loadCalls = []
   let detailAction = options.detailAction || 'done'
+  let { receiptScopeKey } = options
   let selectedTask = options.selectedTask || {
     id: 42,
     owner_role_key: 'warehouse',
@@ -246,6 +267,15 @@ function createHookHarness(options = {}) {
   const { hook, reactRuntime } = loadMobileActionHook(options)
   const props = {
     activeRoleKey: 'warehouse',
+    initialAction: detailAction,
+    initialActionReceipt: options.initialActionReceipt,
+    initialActionTaskID: selectedTask.id,
+    initialEvidence: options.initialEvidence || '',
+    initialReason: Object.hasOwn(options, 'initialReason')
+      ? options.initialReason
+      : detailAction === 'done'
+        ? '已完成并核对'
+        : '',
     selectedTask,
     taskActionAccess: {
       canRun: (actionMode) =>
@@ -268,13 +298,16 @@ function createHookHarness(options = {}) {
     loadCalls,
     render() {
       reactRuntime.beginRender()
-      return hook({ ...props, detailAction, selectedTask })
+      return hook({ ...props, detailAction, receiptScopeKey, selectedTask })
     },
     setDetailAction(value) {
       detailAction = value
     },
     setSelectedTask(nextTask) {
       selectedTask = nextTask
+    },
+    setReceiptScopeKey(nextScopeKey) {
+      receiptScopeKey = nextScopeKey
     },
   }
 }
@@ -337,6 +370,185 @@ test('useMobileRoleTaskActions: resume requires an explanation and uses the resu
   assert.deepEqual(harness.loadCalls, [42])
 })
 
+test('useMobileRoleTaskActions: confirmed response exposes the canonical task receipt', async () => {
+  const harness = createHookHarness({
+    completeWorkflowTaskAction: async () => ({
+      id: 42,
+      owner_role_key: 'warehouse',
+      task_name: '成品入库确认',
+      task_status_key: 'done',
+      version: 6,
+    }),
+  })
+
+  let view = harness.render()
+  await view.submitDetailAction()
+  view = harness.render()
+
+  assert.equal(view.actionReceipt.status, 'confirmed')
+  assert.equal(view.actionReceipt.action, 'done')
+  assert.equal(view.actionReceipt.task.version, 6)
+  assert.equal(view.actionReceipt.task.task_status_key, 'done')
+})
+
+test('useMobileRoleTaskActions: required completion feedback uses the canonical payload field', async () => {
+  const submitted = []
+  const harness = createHookHarness({
+    completeWorkflowTaskAction: async (params) => {
+      submitted.push(params)
+      return {
+        id: 42,
+        owner_role_key: 'warehouse',
+        task_name: '成品入库确认',
+        task_status_key: 'done',
+        version: 6,
+      }
+    },
+  })
+
+  let view = harness.render()
+  view.updateDetailReason('现场数量与单据一致')
+  view = harness.render()
+  await view.submitDetailAction()
+  view = harness.render()
+
+  assert.equal(Object.hasOwn(submitted[0], 'reason'), false)
+  assert.equal(submitted[0].payload.feedback, '现场数量与单据一致')
+  assert.equal(view.actionReceipt.status, 'confirmed')
+  assert.equal(view.actionReceipt.feedback, '现场数量与单据一致')
+  assert.equal(view.actionReceipt.reason, '')
+})
+
+test('useMobileRoleTaskActions: completion is blocked when feedback is missing', async () => {
+  let actionCalls = 0
+  const messages = { errors: [], successes: [], warnings: [] }
+  const harness = createHookHarness({
+    initialReason: '',
+    messages,
+    completeWorkflowTaskAction: async () => {
+      actionCalls += 1
+    },
+  })
+
+  const view = harness.render()
+  assert.equal(await view.submitDetailAction(), false)
+  assert.equal(actionCalls, 0)
+  assert.deepEqual(messages.warnings, ['请先填写完成反馈'])
+})
+
+test('useMobileRoleTaskActions: result step never fabricates a receipt from task status', async () => {
+  const selectedTask = {
+    id: 42,
+    owner_role_key: 'warehouse',
+    task_status_key: 'done',
+    version: 6,
+  }
+  const harness = createHookHarness({ selectedTask })
+
+  let view = harness.render()
+  assert.equal(view.selectedTaskReceipt, null)
+  assert.equal(view.showTaskReceipt(selectedTask), null)
+
+  view = harness.render()
+  assert.equal(view.actionReceipt, null)
+})
+
+test('useMobileRoleTaskActions: history receipt requires an exact account scope', () => {
+  const receipt = {
+    action: 'done',
+    status: 'confirmed',
+    task: { id: 42, task_status_key: 'done', version: 6 },
+  }
+  const missingScope = createHookHarness({
+    initialActionReceipt: receipt,
+    receiptScopeKey: 'warehouse|admin:9|yoyoosun|revision-1|ready',
+  })
+  assert.equal(missingScope.render().actionReceipt, null)
+
+  const wrongAccount = createHookHarness({
+    initialActionReceipt: {
+      ...receipt,
+      scope_key: 'warehouse|admin:8|yoyoosun|revision-1|ready',
+    },
+    receiptScopeKey: 'warehouse|admin:9|yoyoosun|revision-1|ready',
+  })
+  assert.equal(wrongAccount.render().actionReceipt, null)
+
+  const sameAccount = createHookHarness({
+    initialActionReceipt: {
+      ...receipt,
+      scope_key: 'warehouse|admin:9|yoyoosun|revision-1|ready',
+    },
+    receiptScopeKey: 'warehouse|admin:9|yoyoosun|revision-1|ready',
+  })
+  assert.equal(sameAccount.render().actionReceipt?.status, 'confirmed')
+})
+
+test('useMobileRoleTaskActions: scope changes isolate receipts and drafts for the same task id', () => {
+  const scopeA = 'warehouse|account-a|revision-1'
+  const harness = createHookHarness({
+    detailAction: 'blocked',
+    initialActionReceipt: {
+      action: 'blocked',
+      reason: '旧范围回执',
+      scope_key: scopeA,
+      status: 'confirmed',
+      task: { id: 42, task_status_key: 'blocked', version: 6 },
+    },
+    receiptScopeKey: scopeA,
+  })
+
+  let view = harness.render()
+  view.restoreActionDraft({
+    action: 'blocked',
+    evidence: 'SCOPE-A-EVIDENCE',
+    reason: '旧范围草稿',
+    taskID: 42,
+  })
+  view = harness.render()
+  assert.equal(view.actionReceipt?.reason, '旧范围回执')
+  assert.equal(view.detailReasonValue, '旧范围草稿')
+  assert.equal(view.detailEvidenceValue, 'SCOPE-A-EVIDENCE')
+
+  harness.setReceiptScopeKey('warehouse|account-b|revision-2')
+  view = harness.render()
+  assert.equal(view.actionReceipt, null)
+  assert.equal(view.detailReasonValue, '')
+  assert.equal(view.detailEvidenceValue, '')
+})
+
+test('useMobileRoleTaskActions: restores a history draft for the exact task and action', () => {
+  const harness = createHookHarness({ detailAction: 'blocked' })
+
+  let view = harness.render()
+  assert.equal(
+    view.restoreActionDraft({
+      action: 'blocked',
+      evidence: 'PHOTO-42',
+      reason: '等待现场确认',
+      taskID: 42,
+    }),
+    true
+  )
+  view = harness.render()
+
+  assert.equal(view.detailReasonValue, '等待现场确认')
+  assert.equal(view.detailEvidenceValue, 'PHOTO-42')
+})
+
+test('useMobileRoleTaskActions: missing canonical task stays visibly unconfirmed', async () => {
+  const harness = createHookHarness({
+    completeWorkflowTaskAction: async () => undefined,
+  })
+
+  let view = harness.render()
+  await view.submitDetailAction()
+  view = harness.render()
+
+  assert.equal(view.actionReceipt.status, 'unknown')
+  assert.match(view.actionReceipt.message, /没有取得可确认的任务信息/u)
+})
+
 test('useMobileRoleTaskActions: rapid double submit runs one preflight and one action', async () => {
   const preflight = createDeferred()
   const action = createDeferred()
@@ -372,6 +584,7 @@ test('useMobileRoleTaskActions: rapid double submit runs one preflight and one a
   assert.equal(actionParams.expected_version, 5)
   assert.match(actionParams.idempotency_key, /^wf:42:complete:/u)
   assert.deepEqual(actionParams.payload, {
+    feedback: '已完成并核对',
     surface_key: 'mobile_role_tasks',
   })
 
@@ -481,11 +694,12 @@ test('useMobileRoleTaskActions: unknown network result reuses frozen key and pay
   assert.deepEqual(submitted[0], submitted[1])
   assert.deepEqual(submitted[0].payload, {
     evidence_refs: ['PHOTO-A', 'PHOTO-B'],
+    feedback: '已完成并核对',
     surface_key: 'mobile_role_tasks',
   })
   assert.deepEqual(harness.loadCalls, [])
   assert.deepEqual(messages.warnings, [
-    '提交结果暂未确认，已保留原因和证据，可直接重试',
+    '提交结果暂未确认，已保留填写内容，可直接重试',
   ])
 
   await view.submitDetailAction()
@@ -493,6 +707,47 @@ test('useMobileRoleTaskActions: unknown network result reuses frozen key and pay
   assert.equal(submitted[0].idempotency_key, submitted[2].idempotency_key)
   assert.deepEqual(submitted[0], submitted[2])
   assert.deepEqual(harness.loadCalls, [42])
+})
+
+test('useMobileRoleTaskActions: retained attempts never cross an access scope', async () => {
+  const submitted = []
+  let preflightCalls = 0
+  const networkError = Object.assign(new Error('network result unknown'), {
+    isNetworkError: true,
+  })
+  const harness = createHookHarness({
+    initialReason: '范围 A 完成反馈',
+    receiptScopeKey: 'scope-a',
+    completeWorkflowTaskAction: async (params) => {
+      submitted.push(params)
+      throw networkError
+    },
+    verifyWorkflowTaskActionAccessBeforeSubmit: async () => {
+      preflightCalls += 1
+      return true
+    },
+  })
+
+  let view = harness.render()
+  await view.submitDetailAction()
+  assert.equal(submitted.length, 2)
+  assert.equal(preflightCalls, 1)
+
+  harness.setReceiptScopeKey('scope-b')
+  view = harness.render()
+  assert.equal(view.actionReceipt, null)
+  assert.equal(view.detailReasonValue, '')
+  view.updateDetailReason('范围 B 完成反馈')
+  view = harness.render()
+  await view.submitDetailAction()
+
+  assert.equal(submitted.length, 4)
+  assert.equal(preflightCalls, 2)
+  assert.equal(submitted[0].idempotency_key, submitted[1].idempotency_key)
+  assert.equal(submitted[2].idempotency_key, submitted[3].idempotency_key)
+  assert.notEqual(submitted[0].idempotency_key, submitted[2].idempotency_key)
+  assert.equal(submitted[0].payload.feedback, '范围 A 完成反馈')
+  assert.equal(submitted[2].payload.feedback, '范围 B 完成反馈')
 })
 
 test('useMobileRoleTaskActions: action failure restores idle state and allows retry', async () => {
@@ -513,14 +768,14 @@ test('useMobileRoleTaskActions: action failure restores idle state and allows re
   view = harness.render()
   assert.equal(view.updatingID, null)
   assert.equal(actionCalls, 1)
-  assert.deepEqual(harness.loadCalls, [42])
+  assert.deepEqual(harness.loadCalls, [])
   assert.deepEqual(messages.errors, ['更新任务状态失败，请稍后重试'])
 
   await view.submitDetailAction()
   view = harness.render()
   assert.equal(view.updatingID, null)
   assert.equal(actionCalls, 2)
-  assert.deepEqual(harness.loadCalls, [42, 42])
+  assert.deepEqual(harness.loadCalls, [42])
   assert.deepEqual(harness.detailActionChanges, [null])
 })
 
@@ -615,6 +870,8 @@ test('useMobileRoleTaskActions: different tasks do not block each other', async 
   assert.equal(view.updatingID, 42)
 
   harness.setSelectedTask({ id: 43, owner_role_key: 'warehouse', version: 6 })
+  view = harness.render()
+  view.updateDetailReason('第二条任务已完成并核对')
   view = harness.render()
   const secondSubmit = view.submitDetailAction()
   view = harness.render()

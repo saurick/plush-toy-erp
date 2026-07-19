@@ -59,6 +59,14 @@ import { TERMINAL_TASK_STATUS_KEYS } from '../../utils/workflowTaskLifecycle.mjs
 
 export { TERMINAL_TASK_STATUS_KEYS }
 
+export const MOBILE_TASK_ACTION_ACCESS_STATES = Object.freeze({
+  ACTIONABLE: 'actionable',
+  CHECKING: 'checking',
+  FAILED: 'failed',
+  READONLY: 'readonly',
+  URGE_ONLY: 'urge-only',
+})
+
 const MOBILE_ROLE_ALIASES = Object.freeze({
   business: 'sales',
 })
@@ -256,6 +264,12 @@ export function resolveMobileTaskStatusLabel(task = {}) {
   return getWorkflowTaskStatusMeta(task).label || '未知状态'
 }
 
+export function resolveMobileTaskCompletionFeedback(task = {}) {
+  if (String(task.task_status_key || '').trim() !== 'done') return ''
+  const feedback = task.payload?.feedback
+  return typeof feedback === 'string' ? feedback.trim() : ''
+}
+
 function isBusinessReadableLabel(value) {
   return /[\u4e00-\u9fff]/u.test(String(value || ''))
 }
@@ -277,7 +291,7 @@ export function resolveTaskReasonLabel(task) {
 }
 
 export function resolveDetailActionLabel(action) {
-  if (action === 'done') return '完成说明（可选）'
+  if (action === 'done') return '完成反馈（必填）'
   if (action === 'blocked') return '阻塞原因（必填）'
   if (action === 'rejected') return '退回原因（必填）'
   if (action === 'resume') return '阻塞解除说明（必填）'

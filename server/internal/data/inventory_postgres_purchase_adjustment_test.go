@@ -230,6 +230,101 @@ func TestPurchaseReceiptAdjustmentPostgresShapeAndFlow(t *testing.T) {
 	}
 }
 
+func TestPurchaseReceiptAdjustmentPostgresDraftPostCancelConcurrency(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseOperationalPostgresTestData(t)
+	postgresFixtures := createPurchaseOperationalPostgresFixtures(t, ctx, client)
+	fixtures := inventoryTestFixtures{
+		unitID:      postgresFixtures.unitID,
+		materialID:  postgresFixtures.materialID,
+		productID:   postgresFixtures.productID,
+		warehouseID: postgresFixtures.warehouseID,
+	}
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+
+	for _, postFirst := range []bool{true, false} {
+		name := "cancel first"
+		if postFirst {
+			name = "post first"
+		}
+		t.Run(name, func(t *testing.T) {
+			suffix := fmt.Sprintf("%s-%t", postgresFixtures.suffix, postFirst)
+			receipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRA-DRAFT-RACE-IN-"+suffix, fixtures, stringPtr("PG-PRA-DRAFT-RACE-LOT-"+suffix), mustDecimal(t, "10"))
+			adjustment := createPurchaseReceiptAdjustmentDraft(t, ctx, uc, "PG-PRA-DRAFT-RACE-"+suffix, receipt.ID)
+			addPurchaseReceiptAdjustmentItem(t, ctx, uc, adjustment.ID, receipt.Items[0], biz.PurchaseReceiptAdjustmentQuantityDecrease, fixtures.warehouseID, receipt.Items[0].LotID, mustDecimal(t, "2"), nil)
+
+			blocker, err := data.sqldb.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatalf("begin adjustment lock blocker failed: %v", err)
+			}
+			blockerOpen := true
+			t.Cleanup(func() {
+				if blockerOpen {
+					_ = blocker.Rollback()
+				}
+			})
+			var lockedID int
+			if err := blocker.QueryRowContext(ctx, `SELECT id FROM purchase_receipt_adjustments WHERE id = $1 FOR UPDATE`, adjustment.ID).Scan(&lockedID); err != nil {
+				t.Fatalf("lock draft receipt adjustment failed: %v", err)
+			}
+
+			postDone := make(chan error, 1)
+			cancelDone := make(chan error, 1)
+			startPost := func() {
+				go func() { _, err := uc.PostPurchaseReceiptAdjustment(ctx, adjustment.ID); postDone <- err }()
+			}
+			startCancel := func() {
+				go func() { _, err := uc.CancelPostedPurchaseReceiptAdjustment(ctx, adjustment.ID); cancelDone <- err }()
+			}
+			if postFirst {
+				startPost()
+			} else {
+				startCancel()
+			}
+			waitForPostgresBlockedQueryCount(t, ctx, data.sqldb, "SELECT id FROM purchase_receipt_adjustments", 1)
+			if postFirst {
+				startCancel()
+			} else {
+				startPost()
+			}
+			waitForPostgresBlockedQueryCount(t, ctx, data.sqldb, "SELECT id FROM purchase_receipt_adjustments", 2)
+			if err := blocker.Rollback(); err != nil {
+				t.Fatalf("release adjustment lock blocker failed: %v", err)
+			}
+			blockerOpen = false
+			postErr := receivePurchaseOperationError(t, postDone, "purchase receipt adjustment post")
+			cancelErr := receivePurchaseOperationError(t, cancelDone, "purchase receipt adjustment cancel")
+
+			persisted := client.PurchaseReceiptAdjustment.GetX(ctx, adjustment.ID)
+			if persisted.Status != biz.PurchaseReceiptAdjustmentStatusCancelled {
+				t.Fatalf("final receipt adjustment status=%s, want CANCELLED", persisted.Status)
+			}
+			txnCount := client.InventoryTxn.Query().Where(
+				inventorytxn.SourceType(biz.PurchaseReceiptAdjustmentSourceType),
+				inventorytxn.SourceID(adjustment.ID),
+			).CountX(ctx)
+			balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+				SubjectType: biz.InventorySubjectMaterial,
+				SubjectID:   fixtures.materialID,
+				WarehouseID: fixtures.warehouseID,
+				LotID:       receipt.Items[0].LotID,
+				UnitID:      fixtures.unitID,
+			})
+			if err != nil {
+				t.Fatalf("get final adjustment lot balance failed: %v", err)
+			}
+			assertDecimalEqual(t, balance.Quantity, "10")
+			if postFirst {
+				if postErr != nil || cancelErr != nil || persisted.PostedAt == nil || txnCount != 2 {
+					t.Fatalf("post-first result post=%v cancel=%v posted_at=%v txns=%d", postErr, cancelErr, persisted.PostedAt, txnCount)
+				}
+			} else if !errors.Is(postErr, biz.ErrBadParam) || cancelErr != nil || persisted.PostedAt != nil || txnCount != 0 {
+				t.Fatalf("cancel-first result post=%v cancel=%v posted_at=%v txns=%d", postErr, cancelErr, persisted.PostedAt, txnCount)
+			}
+		})
+	}
+}
+
 func TestPurchaseReceiptAdjustmentPostgresAggregateCreateIdempotency(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseOperationalPostgresTestData(t)

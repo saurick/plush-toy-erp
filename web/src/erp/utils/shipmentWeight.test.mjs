@@ -369,6 +369,11 @@ test('shipmentWeight: SKU, shipment modal, list column, export and stale-clear U
     /所属产品或 SKU 默认单位已变更，SKU 单重已清空/u
   )
   assert.match(masterColumnsSource, /title: 'SKU 单重（净重）'/u)
+  assert.match(masterColumnsSource, /compareNumeric20Scale6Values\(/u)
+  assert.doesNotMatch(
+    masterColumnsSource,
+    /Number\(a\?\.unit_net_weight_g/u
+  )
   assert.match(
     masterColumnsSource,
     /exportTitle: 'SKU 单重（克）'/u

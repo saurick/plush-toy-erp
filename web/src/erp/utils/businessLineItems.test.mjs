@@ -8,7 +8,6 @@ import {
   buildShipmentProductChangePatch,
   buildShipmentSKUChangePatch,
   buildShipmentSourceItemChangePatch,
-  buildShipmentSourceRows,
   buildPurchaseReceiptItemParams,
   buildShipmentItemParams,
   createBlankPurchaseReceiptItem,
@@ -16,6 +15,7 @@ import {
   createShipmentItemFromSalesOrderItem,
   filterShipmentInventoryLotOptions,
   filterShipmentProductSKUOptions,
+  formatQuantity,
   isBlankShipmentItem,
 } from './businessLineItems.mjs'
 
@@ -316,44 +316,6 @@ test('businessLineItems: shipment item preserves SKU traceability from sales ord
   })
 })
 
-test('businessLineItems: shipment source rows show shipped and remaining quantities', () => {
-  const rows = buildShipmentSourceRows({
-    salesOrderItems: [
-      {
-        id: 31,
-        line_no: 1,
-        product_id: 7,
-        unit_id: 2,
-        ordered_quantity: '20',
-        line_status: 'open',
-      },
-      {
-        id: 32,
-        line_no: 2,
-        product_id: 8,
-        unit_id: 2,
-        ordered_quantity: '5',
-        line_status: 'closed',
-      },
-    ],
-    shipments: [
-      {
-        status: 'SHIPPED',
-        items: [{ sales_order_item_id: 31, quantity: '8.5' }],
-      },
-      {
-        status: 'CANCELLED',
-        items: [{ sales_order_item_id: 31, quantity: '3' }],
-      },
-    ],
-  })
-
-  assert.equal(rows[0].shippedQuantity, 8.5)
-  assert.equal(rows[0].remainingQuantity, 11.5)
-  assert.equal(rows[0].disabledReason, '')
-  assert.equal(rows[1].disabledReason, '来源行已关闭')
-})
-
 test('businessLineItems: shipment import defaults to remaining source quantity', () => {
   const item = createShipmentItemFromSalesOrderItem({
     id: 31,
@@ -368,6 +330,14 @@ test('businessLineItems: shipment import defaults to remaining source quantity',
   assert.equal(item.quantity, 11.5)
 })
 
+test('businessLineItems: quantity display preserves numeric(20,6) boundaries', () => {
+  assert.equal(formatQuantity('0.000001'), '0.000001')
+  assert.equal(
+    formatQuantity('99999999999999.999999'),
+    '99999999999999.999999'
+  )
+})
+
 test('businessLineItems: shipment source switching replaces dependent SKU fields and clears stale values', () => {
   const sourceItems = [
     {
@@ -376,6 +346,9 @@ test('businessLineItems: shipment source switching replaces dependent SKU fields
       product_sku_id: 11,
       unit_id: 2,
       ordered_quantity: '20',
+      remainingQuantity: '11.5',
+      selectable: true,
+      disabledReason: '',
       product_name_snapshot: '小熊',
     },
   ]
@@ -387,7 +360,7 @@ test('businessLineItems: shipment source switching replaces dependent SKU fields
     warehouse_id: undefined,
     lot_id: undefined,
     unit_id: 2,
-    quantity: '20',
+    quantity: '11.5',
     note: '来源销售订单行：小熊',
   })
   assert.deepEqual(buildShipmentSourceItemChangePatch('', sourceItems), {
@@ -399,6 +372,37 @@ test('businessLineItems: shipment source switching replaces dependent SKU fields
     quantity: '',
     note: '',
   })
+  assert.equal(
+    buildShipmentSourceItemChangePatch(31, [
+      {
+        id: 31,
+        product_id: 7,
+        product_sku_id: 11,
+        unit_id: 2,
+        ordered_quantity: '20',
+      },
+    ]).sales_order_item_id,
+    undefined
+  )
+  assert.deepEqual(
+    buildShipmentSourceItemChangePatch(31, [
+      {
+        ...sourceItems[0],
+        selectable: false,
+        disabledReason: '已全部确认出货',
+        remainingQuantity: '0',
+      },
+    ]),
+    {
+      sales_order_item_id: undefined,
+      product_id: undefined,
+      product_sku_id: undefined,
+      unit_id: undefined,
+      lot_id: undefined,
+      quantity: '',
+      note: '',
+    }
+  )
 })
 
 test('businessLineItems: manual product and SKU changes clear incompatible source and lot values', () => {

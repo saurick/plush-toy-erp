@@ -91,7 +91,11 @@ func TestOutsourcingFactRPCUsesExactPermissionsAndRetiresGenericCreate(t *testin
 		t.Fatalf("generic create must be retired: %#v", retired)
 	}
 
-	returnAdmin := workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionOutsourcingReturnReceiptCreate)
+	returnAdmin := workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionOutsourcingReturnReceiptCreate,
+		biz.PermissionOutsourcingOrderRead,
+	)
 	allowed := newOperationalFactJSONRPCTestDataWithRepo(t, returnAdmin, repo)
 	activateOperationalFactTestCustomerConfig(t, allowed, customerConfigPublishParamsWithRevisionAndModuleState(
 		t,

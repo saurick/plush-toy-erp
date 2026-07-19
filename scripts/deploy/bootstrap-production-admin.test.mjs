@@ -968,6 +968,7 @@ test("bootstrap production admin serializes the same Compose project and databas
 
 test("bootstrap production admin serializes the same database across different private file lock roots", async (t) => {
   const fixture = writeFixture(t);
+  const subprocessHandshakeTimeoutMs = 15_000;
   const releasePath = path.join(fixture.stateDir, "release-current-database");
   const first = startHelper(fixture, {
     env: { FAKE_BLOCK_CURRENT_DATABASE: "1" },
@@ -979,8 +980,14 @@ test("bootstrap production admin serializes the same database across different p
     if (first.child.exitCode === null) first.child.kill("SIGTERM");
   });
 
-  await waitForPath(path.join(fixture.stateDir, "advisory-ready"));
-  await waitForPath(path.join(fixture.stateDir, "current-database-entered"));
+  await waitForPath(
+    path.join(fixture.stateDir, "advisory-ready"),
+    subprocessHandshakeTimeoutMs,
+  );
+  await waitForPath(
+    path.join(fixture.stateDir, "current-database-entered"),
+    subprocessHandshakeTimeoutMs,
+  );
 
   const secondLockDir = path.join(fixture.root, "alternate-lock-root");
   fs.mkdirSync(secondLockDir, { mode: 0o700 });

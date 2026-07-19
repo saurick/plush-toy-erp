@@ -55,7 +55,10 @@ test('mobile auth login route smoke input template is no-write and covers all ro
   )
   assert.match(template.commands.join('\n'), /smoke:mobile-auth-login-route/)
   assert.match(template.boundary, /Neither mode starts Vite/)
-  assert.match(template.boundary, /mocked auth\/workflow RPC/)
+  assert.match(
+    template.boundary,
+    /mocked auth\/admin\/customer-config\/workflow RPC/
+  )
   assert.match(template.boundary, /proves real RBAC/)
 })
 
@@ -72,6 +75,14 @@ test('mobile auth login route smoke rejects credentialed base URL', () => {
       ),
     /MOBILE_AUTH_SMOKE_BASE_URL must not contain username or password/
   )
+})
+
+test('mobile auth login route smoke managed server uses one IPv4 host', () => {
+  const source = fs.readFileSync(scriptPath, 'utf8')
+
+  assert.match(source, /http:\/\/127\.0\.0\.1:\$\{devServerPort\}/u)
+  assert.match(source, /'--host',\s*'127\.0\.0\.1'/u)
+  assert.doesNotMatch(source, /http:\/\/localhost:\$\{devServerPort\}/u)
 })
 
 test('mobile auth login route smoke CLI input template does not start browser or dev server', () => {
@@ -210,13 +221,39 @@ test('mobile auth login route smoke keeps logout click guarded against route rer
   )
 })
 
-test('mobile auth login route smoke mocks customer runtime before loading task data', () => {
+test('mobile auth login route smoke refreshes admin and customer runtime before loading task data', () => {
   const source = fs.readFileSync(scriptPath, 'utf8')
+  const customerInitIndex = source.indexOf('await page.addInitScript')
+  const adminProfileRouteIndex = source.indexOf(
+    "await page.route('**/rpc/admin'"
+  )
+  const customerRuntimeRouteIndex = source.indexOf(
+    "await page.route('**/rpc/customer_config'"
+  )
+  const workflowRouteIndex = source.indexOf(
+    "await page.route('**/rpc/workflow'"
+  )
+  const firstNavigationIndex = source.indexOf('await page.goto(')
 
   assert.match(source, /__PLUSH_ERP_CUSTOMER_CONFIG__/u)
   assert.match(source, /customerKey: 'yoyoosun'/u)
+  assert.match(source, /'\*\*\/rpc\/admin'/u)
+  assert.match(source, /method !== 'me'/u)
+  assert.match(source, /admin\.me 应携带本轮登录 token/u)
   assert.match(source, /'\*\*\/rpc\/customer_config'/u)
   assert.match(source, /method !== 'get_effective_session'/u)
   assert.match(source, /customer: \{ key: 'yoyoosun', name: '永绅' \}/u)
-  assert.match(source, /source: 'mobile_auth_smoke_customer_runtime'/u)
+  assert.match(source, /source: 'active_customer_config_revision'/u)
+  assert(customerInitIndex >= 0, '应先注入客户入口配置')
+  assert(adminProfileRouteIndex >= 0, '应注册当前管理员 profile mock')
+  assert(customerRuntimeRouteIndex >= 0, '应注册客户运行配置 mock')
+  assert(workflowRouteIndex >= 0, '应注册任务数据 mock')
+  assert(firstNavigationIndex >= 0, '应存在页面导航')
+  assert(
+    customerInitIndex < adminProfileRouteIndex &&
+      adminProfileRouteIndex < customerRuntimeRouteIndex &&
+      customerRuntimeRouteIndex < workflowRouteIndex &&
+      workflowRouteIndex < firstNavigationIndex,
+    '管理员 profile、客户入口和有效运行配置必须在任务数据 mock 及页面导航前就绪'
+  )
 })

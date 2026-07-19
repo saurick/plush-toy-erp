@@ -19,7 +19,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReceivableConfirm); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "shipments"); res != nil {
 			return id, res, nil
 		}
 		in, ok := financeFactFromShipmentCreateFromParams(pm, false)
@@ -32,7 +38,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceInvoiceConfirm); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "shipments"); res != nil {
 			return id, res, nil
 		}
 		in, ok := financeFactFromShipmentCreateFromParams(pm, true)
@@ -45,7 +57,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance", "purchase_receipts"); res != nil {
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "purchase_receipts"); res != nil {
 			return id, res, nil
 		}
 		in, ok := financeFactFromPurchaseReceiptCreateFromParams(pm)
@@ -58,7 +76,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinancePayableConfirm); res != nil {
 			return id, res, nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance", "outsourcing_orders"); res != nil {
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "finance"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "outsourcing_orders", "quality_inspections"); res != nil {
 			return id, res, nil
 		}
 		in, ok := financeFactFromOutsourcingReturnCreateFromParams(pm)
@@ -77,6 +101,23 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 		in, ok := financeReconciliationFromFactCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
+		}
+		if res := d.requireAnySourceActionReadPermission(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		source, err := d.operationalFactUC.GetFinanceFact(ctx, in.FinanceFactID)
+		if err != nil {
+			return id, d.mapOperationalFactError(ctx, err), nil
+		}
+		if source == nil {
+			return id, d.mapOperationalFactError(ctx, biz.ErrFinanceFactNotFound), nil
+		}
+		condition, ok := biz.FinanceSourceReadCondition(source.FactType)
+		if !ok {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method, condition); res != nil {
+			return id, res, nil
 		}
 		item, err := d.operationalFactUC.CreateReconciliationFromFinanceFact(ctx, in)
 		return id, operationalFactFinanceFactResult(ctx, d, item, err), nil
@@ -202,13 +243,17 @@ func financeFactFromShipmentCreateFromParams(pm map[string]any, allowInvoiceCate
 	if !ok {
 		return nil, false
 	}
+	invoiceCategory := getWorkflowStringPtr(pm, "invoice_category")
+	if allowInvoiceCategory && invoiceCategory == nil {
+		return nil, false
+	}
 	return &biz.FinanceFactFromShipmentCreate{
 		FactNo:          getString(pm, "fact_no"),
 		ShipmentID:      getInt(pm, "shipment_id", 0),
 		IdempotencyKey:  getString(pm, "idempotency_key"),
 		OccurredAt:      optionalTimeValue(occurredAt),
 		Note:            getWorkflowStringPtr(pm, "note"),
-		InvoiceCategory: getWorkflowStringPtr(pm, "invoice_category"),
+		InvoiceCategory: invoiceCategory,
 	}, true
 }
 

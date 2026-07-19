@@ -11,6 +11,7 @@ import {
   statusText,
 } from '../../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
+import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 
 function compareText(a, b) {
   return String(a || '').localeCompare(String(b || ''))
@@ -184,14 +185,19 @@ export function buildSalesOrderItemColumns() {
       exportTitle: '订单数量',
       dataIndex: 'ordered_quantity',
       width: 120,
-      sorter: (a, b) => compareNumber(a?.ordered_quantity, b?.ordered_quantity),
+      sorter: (a, b) =>
+        compareNumeric20Scale6Values(
+          a?.ordered_quantity,
+          b?.ordered_quantity
+        ),
     },
     {
       title: '单价',
       exportTitle: '单价',
       dataIndex: 'unit_price',
       width: 100,
-      sorter: (a, b) => compareNumber(a?.unit_price, b?.unit_price),
+      sorter: (a, b) =>
+        compareNumeric20Scale6Values(a?.unit_price, b?.unit_price),
       render: (value) => displayOptionalValue(value),
     },
     {
@@ -199,7 +205,11 @@ export function buildSalesOrderItemColumns() {
       exportTitle: '金额',
       dataIndex: 'amount',
       width: 100,
-      sorter: (a, b) => compareNumber(a?.amount, b?.amount),
+      sorter: (a, b) =>
+        compareNumeric20Scale6Values(
+          deriveSalesOrderItemAmount(a),
+          deriveSalesOrderItemAmount(b)
+        ),
       render: (value, record) => displaySalesOrderItemAmount(record),
       exportValue: (record) => displaySalesOrderItemAmount(record, ''),
     },

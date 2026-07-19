@@ -827,6 +827,16 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 		submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, created.ID)
 		shipmentIDs = append(shipmentIDs, created.ID)
 	}
+	draftCandidates, draftTotal, err := operationalRepo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{
+		SalesOrderID: order.ID,
+		Limit:        50,
+	})
+	if err != nil || draftTotal != 1 || len(draftCandidates) != 1 {
+		t.Fatalf("list postgres shipment candidates before ship total=%d rows=%#v err=%v", draftTotal, draftCandidates, err)
+	}
+	if !draftCandidates[0].ShippedQuantity.IsZero() || !draftCandidates[0].RemainingQuantity.Equal(decimal.NewFromInt(3)) || !draftCandidates[0].Selectable {
+		t.Fatalf("draft shipments must not consume source candidate quantity: %#v", draftCandidates[0])
+	}
 
 	start := make(chan struct{})
 	errs := make(chan error, len(shipmentIDs))
@@ -864,12 +874,154 @@ func TestOperationalFactPostgresConcurrentShipmentsDoNotExceedSalesOrderLine(t *
 	if draftCount := client.Shipment.Query().Where(shipment.IDIn(shipmentIDs...), shipment.Status(biz.ShipmentStatusDraft)).CountX(ctx); draftCount != 1 {
 		t.Fatalf("draft count=%d, want 1", draftCount)
 	}
+	shippedCandidates, shippedTotal, err := operationalRepo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{
+		SalesOrderID: order.ID,
+		Limit:        50,
+	})
+	if err != nil || shippedTotal != 1 || len(shippedCandidates) != 1 {
+		t.Fatalf("list postgres shipment candidates after ship total=%d rows=%#v err=%v", shippedTotal, shippedCandidates, err)
+	}
+	if !shippedCandidates[0].ShippedQuantity.Equal(decimal.NewFromInt(2)) || !shippedCandidates[0].RemainingQuantity.Equal(decimal.NewFromInt(1)) || !shippedCandidates[0].Selectable {
+		t.Fatalf("candidate must reflect only committed SHIPPED quantity: %#v", shippedCandidates[0])
+	}
 	balance, err := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID})
 	if err != nil {
 		t.Fatalf("get postgres shipment balance failed: %v", err)
 	}
 	if !balance.Quantity.Equal(decimal.NewFromInt(1)) {
 		t.Fatalf("shipment balance=%s, want 1", balance.Quantity)
+	}
+}
+
+func TestOperationalFactPostgresCancelledShipmentRestoresSourceCandidateQuantity(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	inventoryRepo := NewInventoryRepo(data, log.NewStdLogger(io.Discard))
+	operationalRepo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
+	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
+	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+		TxnType: biz.InventoryTxnIn, Direction: 1, Quantity: decimal.NewFromInt(4), UnitID: fixtures.unitID,
+		SourceType: "SHIPMENT_CANCEL_RESTORE_PG", IdempotencyKey: "shipment-cancel-restore-pg-in-" + fixtures.suffix,
+	}); err != nil {
+		t.Fatalf("seed postgres shipment inventory failed: %v", err)
+	}
+	customer := createSalesOrderTestCustomer(t, ctx, client, "PG-C-SHIP-CANCEL-"+fixtures.suffix, true)
+	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
+		OrderNo: "PG-SO-SHIP-CANCEL-" + fixtures.suffix, CustomerID: customer.ID, OrderDate: time.Now(),
+	})
+	if err != nil {
+		t.Fatalf("create postgres sales order failed: %v", err)
+	}
+	item, err := salesUC.AddSalesOrderItem(ctx, &biz.SalesOrderItemMutation{
+		SalesOrderID: order.ID, LineNo: 1, ProductID: fixtures.productID, UnitID: fixtures.unitID, OrderedQuantity: decimal.NewFromInt(2),
+	})
+	if err != nil {
+		t.Fatalf("create postgres sales order item failed: %v", err)
+	}
+	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("submit postgres sales order failed: %v", err)
+	}
+	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("activate postgres sales order failed: %v", err)
+	}
+
+	createShipment := func(sequence int) *biz.Shipment {
+		t.Helper()
+		shipmentNo := fmt.Sprintf("PG-SHP-CANCEL-%s-%d", fixtures.suffix, sequence)
+		created, createErr := operationalRepo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+			Shipment: &biz.ShipmentCreate{
+				ShipmentNo: shipmentNo, SalesOrderID: &order.ID, CustomerID: &customer.ID, IdempotencyKey: shipmentNo,
+			},
+			Items: []*biz.ShipmentItemCreate{{
+				SalesOrderItemID: &item.ID, ProductID: fixtures.productID, WarehouseID: fixtures.warehouseID,
+				UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(2),
+			}},
+		})
+		if createErr != nil {
+			t.Fatalf("create postgres shipment %d failed: %v", sequence, createErr)
+		}
+		submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, created.ID)
+		return created
+	}
+	assertCandidate := func(stage string, shipped, remaining int64, selectable bool, disabledReason string) {
+		t.Helper()
+		candidates, total, listErr := operationalRepo.ListShipmentSourceCandidates(ctx, biz.ShipmentSourceCandidateFilter{
+			SalesOrderID: order.ID,
+			Limit:        50,
+		})
+		if listErr != nil || total != 1 || len(candidates) != 1 {
+			t.Fatalf("%s candidate total=%d rows=%#v err=%v", stage, total, candidates, listErr)
+		}
+		candidate := candidates[0]
+		if !candidate.ShippedQuantity.Equal(decimal.NewFromInt(shipped)) ||
+			!candidate.RemainingQuantity.Equal(decimal.NewFromInt(remaining)) ||
+			candidate.Selectable != selectable || candidate.DisabledReason != disabledReason {
+			t.Fatalf("%s candidate=%#v", stage, candidate)
+		}
+	}
+
+	first := createShipment(1)
+	first, err = operationalRepo.ShipShipment(ctx, first.ID)
+	if err != nil || first.Status != biz.ShipmentStatusShipped {
+		t.Fatalf("ship first postgres shipment=%#v err=%v", first, err)
+	}
+	assertCandidate("after first ship", 2, 0, false, biz.ShipmentSourceCandidateDisabledFullyShipped)
+	firstOutbound, err := client.InventoryTxn.Query().Where(
+		inventorytxn.SourceType(biz.ShipmentSourceType),
+		inventorytxn.SourceID(first.ID),
+		inventorytxn.TxnType(biz.InventoryTxnOut),
+	).Only(ctx)
+	if err != nil {
+		t.Fatalf("load first shipment outbound inventory transaction failed: %v", err)
+	}
+
+	first, err = operationalRepo.CancelShippedShipment(ctx, first.ID)
+	if err != nil || first.Status != biz.ShipmentStatusCancelled {
+		t.Fatalf("cancel first postgres shipment=%#v err=%v", first, err)
+	}
+	assertCandidate("after cancellation", 0, 2, true, "")
+	reversal, err := client.InventoryTxn.Query().Where(
+		inventorytxn.SourceType(biz.ShipmentSourceType),
+		inventorytxn.SourceID(first.ID),
+		inventorytxn.TxnType(biz.InventoryTxnReversal),
+		inventorytxn.ReversalOfTxnID(firstOutbound.ID),
+	).Only(ctx)
+	if err != nil {
+		t.Fatalf("load first shipment reversal inventory transaction failed: %v", err)
+	}
+	if reversal.Direction != 1 || !reversal.Quantity.Equal(decimal.NewFromInt(2)) || reversal.ReversalOfTxnID == nil || *reversal.ReversalOfTxnID != firstOutbound.ID {
+		t.Fatalf("first shipment reversal=%#v, outbound=%#v", reversal, firstOutbound)
+	}
+	if balance, balanceErr := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+	}); balanceErr != nil || !balance.Quantity.Equal(decimal.NewFromInt(4)) {
+		t.Fatalf("restored inventory balance=%#v err=%v, want 4", balance, balanceErr)
+	}
+
+	second := createShipment(2)
+	second, err = operationalRepo.ShipShipment(ctx, second.ID)
+	if err != nil || second.Status != biz.ShipmentStatusShipped {
+		t.Fatalf("ship replacement postgres shipment=%#v err=%v", second, err)
+	}
+	assertCandidate("after replacement ship", 2, 0, false, biz.ShipmentSourceCandidateDisabledFullyShipped)
+	if cancelledCount := client.Shipment.Query().Where(shipment.ID(first.ID), shipment.Status(biz.ShipmentStatusCancelled)).CountX(ctx); cancelledCount != 1 {
+		t.Fatalf("cancelled shipment count=%d, want 1", cancelledCount)
+	}
+	if shippedCount := client.Shipment.Query().Where(shipment.ID(second.ID), shipment.Status(biz.ShipmentStatusShipped)).CountX(ctx); shippedCount != 1 {
+		t.Fatalf("replacement shipped count=%d, want 1", shippedCount)
+	}
+	if transactionCount := client.InventoryTxn.Query().Where(
+		inventorytxn.SourceType(biz.ShipmentSourceType),
+		inventorytxn.SourceIDIn(first.ID, second.ID),
+	).CountX(ctx); transactionCount != 3 {
+		t.Fatalf("shipment inventory transaction count=%d, want outbound + reversal + outbound", transactionCount)
+	}
+	if balance, balanceErr := inventoryRepo.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+		SubjectType: biz.InventorySubjectProduct, SubjectID: fixtures.productID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID,
+	}); balanceErr != nil || !balance.Quantity.Equal(decimal.NewFromInt(2)) {
+		t.Fatalf("final inventory balance=%#v err=%v, want 2", balance, balanceErr)
 	}
 }
 

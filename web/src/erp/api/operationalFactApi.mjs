@@ -37,6 +37,7 @@ import {
   validateOutsourcingSourceFactResult,
 } from '../utils/outsourcingOrderFactAction.mjs'
 import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
+import { validateShipmentSourceCandidatePage } from '../utils/shipmentSourceCandidate.mjs'
 
 const operationalFactRpc = new JsonRpc({
   url: 'operational_fact',
@@ -55,6 +56,18 @@ export async function listProductionFacts(params = {}, options = {}) {
     options
   )
   return dataOf(result)
+}
+
+export async function listAllProductionFacts(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listProductionFacts,
+    params,
+    'production_facts',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的生产业务记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function listProductionOrderMaterialRequirements(
@@ -199,6 +212,27 @@ export async function listShipments(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function getShipment(params = {}, options = {}) {
+  const result = await operationalFactRpc.call('get_shipment', params, options)
+  return dataOf(result)?.shipment || null
+}
+
+export async function listAllShipments(params = {}, options = {}) {
+  return listAllPaginatedRecords(listShipments, params, 'shipments', options, {
+    invalidResponseMessage: '服务器返回的出货记录不完整，请刷新后重试',
+  })
+}
+
+export async function listShipmentSourceCandidates(params = {}, options = {}) {
+  const request = { limit: 50, offset: 0, ...params }
+  const result = await operationalFactRpc.call(
+    'list_shipment_source_candidates',
+    request,
+    options
+  )
+  return validateShipmentSourceCandidatePage(dataOf(result), request)
+}
+
 export async function createShipmentWithItems(params = {}) {
   const result = await operationalFactRpc.call(
     'create_shipment_with_items',
@@ -226,12 +260,25 @@ export async function cancelShipment(params = {}) {
   return dataOf(result)?.shipment || null
 }
 
-export async function listStockReservations(params = {}) {
+export async function listStockReservations(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
     'list_stock_reservations',
-    params
+    params,
+    options
   )
   return dataOf(result)
+}
+
+export async function listAllStockReservations(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listStockReservations,
+    params,
+    'stock_reservations',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的库存预留记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function createStockReservationFromSalesOrder(params = {}) {

@@ -70,6 +70,11 @@ func Category(v string) predicate.Process {
 	return predicate.Process(sql.FieldEQ(FieldCategory, v))
 }
 
+// ProductionRouteOperationCode applies equality check predicate on the "production_route_operation_code" field. It's identical to ProductionRouteOperationCodeEQ.
+func ProductionRouteOperationCode(v string) predicate.Process {
+	return predicate.Process(sql.FieldEQ(FieldProductionRouteOperationCode, v))
+}
+
 // OutsourcingEnabled applies equality check predicate on the "outsourcing_enabled" field. It's identical to OutsourcingEnabledEQ.
 func OutsourcingEnabled(v bool) predicate.Process {
 	return predicate.Process(sql.FieldEQ(FieldOutsourcingEnabled, v))
@@ -313,6 +318,81 @@ func CategoryEqualFold(v string) predicate.Process {
 // CategoryContainsFold applies the ContainsFold predicate on the "category" field.
 func CategoryContainsFold(v string) predicate.Process {
 	return predicate.Process(sql.FieldContainsFold(FieldCategory, v))
+}
+
+// ProductionRouteOperationCodeEQ applies the EQ predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeEQ(v string) predicate.Process {
+	return predicate.Process(sql.FieldEQ(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeNEQ applies the NEQ predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeNEQ(v string) predicate.Process {
+	return predicate.Process(sql.FieldNEQ(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeIn applies the In predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeIn(vs ...string) predicate.Process {
+	return predicate.Process(sql.FieldIn(FieldProductionRouteOperationCode, vs...))
+}
+
+// ProductionRouteOperationCodeNotIn applies the NotIn predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeNotIn(vs ...string) predicate.Process {
+	return predicate.Process(sql.FieldNotIn(FieldProductionRouteOperationCode, vs...))
+}
+
+// ProductionRouteOperationCodeGT applies the GT predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeGT(v string) predicate.Process {
+	return predicate.Process(sql.FieldGT(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeGTE applies the GTE predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeGTE(v string) predicate.Process {
+	return predicate.Process(sql.FieldGTE(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeLT applies the LT predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeLT(v string) predicate.Process {
+	return predicate.Process(sql.FieldLT(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeLTE applies the LTE predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeLTE(v string) predicate.Process {
+	return predicate.Process(sql.FieldLTE(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeContains applies the Contains predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeContains(v string) predicate.Process {
+	return predicate.Process(sql.FieldContains(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeHasPrefix applies the HasPrefix predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeHasPrefix(v string) predicate.Process {
+	return predicate.Process(sql.FieldHasPrefix(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeHasSuffix applies the HasSuffix predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeHasSuffix(v string) predicate.Process {
+	return predicate.Process(sql.FieldHasSuffix(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeIsNil applies the IsNil predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeIsNil() predicate.Process {
+	return predicate.Process(sql.FieldIsNull(FieldProductionRouteOperationCode))
+}
+
+// ProductionRouteOperationCodeNotNil applies the NotNil predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeNotNil() predicate.Process {
+	return predicate.Process(sql.FieldNotNull(FieldProductionRouteOperationCode))
+}
+
+// ProductionRouteOperationCodeEqualFold applies the EqualFold predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeEqualFold(v string) predicate.Process {
+	return predicate.Process(sql.FieldEqualFold(FieldProductionRouteOperationCode, v))
+}
+
+// ProductionRouteOperationCodeContainsFold applies the ContainsFold predicate on the "production_route_operation_code" field.
+func ProductionRouteOperationCodeContainsFold(v string) predicate.Process {
+	return predicate.Process(sql.FieldContainsFold(FieldProductionRouteOperationCode, v))
 }
 
 // OutsourcingEnabledEQ applies the EQ predicate on the "outsourcing_enabled" field.

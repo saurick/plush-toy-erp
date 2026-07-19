@@ -292,6 +292,29 @@ test("light check rejects customer documentation that leaks into the archive", a
   }
 });
 
+test("light check rejects committed delete-me and GitHub write-test markers", async () => {
+  const root = createFixtureRepo();
+  try {
+    writeFixtureFile(root, "notes/fixture_DELETE_ME.md", "temporary\n");
+    writeFixtureFile(root, "CHATGPT_GITHUB_WRITE_TEST.md", "temporary\n");
+    runGit(root, ["add", "."]);
+    runGit(root, ["commit", "-qm", "add temporary markers"]);
+    await assert.rejects(
+      () => runSourceArchiveReleaseCheck({ mode: "light" }, { repoRoot: root }),
+      (error) => {
+        assert.match(error.message, /inventory check failed/u);
+        assert.deepEqual(error.details.forbiddenPaths, [
+          "CHATGPT_GITHUB_WRITE_TEST.md",
+          "notes/fixture_DELETE_ME.md",
+        ]);
+        return true;
+      },
+    );
+  } finally {
+    removeFixtureRepo(root);
+  }
+});
+
 test("light check rejects symbolic links in the committed archive", async () => {
   const root = createFixtureRepo();
   try {

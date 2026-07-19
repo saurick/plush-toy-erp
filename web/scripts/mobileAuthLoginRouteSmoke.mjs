@@ -7,10 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { pathToFileURL } from 'node:url'
 
 import { chromium } from 'playwright'
-import {
-  loadDevPorts,
-  resolveDevAuxPort,
-} from '../../scripts/dev-ports.mjs'
+import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
 import { RpcErrorCode } from '../src/common/consts/errorCodes.generated.js'
 import { mobileRoleDefinitions } from '../src/erp/config/appRegistry.mjs'
 import { getRoleWorkbench } from '../src/erp/config/seedData.mjs'
@@ -46,7 +43,7 @@ const externalBaseURL = normalizeOptionalURL(
   process.env.MOBILE_AUTH_SMOKE_BASE_URL || '',
   'MOBILE_AUTH_SMOKE_BASE_URL'
 )
-const baseURL = externalBaseURL || `http://localhost:${devServerPort}`
+const baseURL = externalBaseURL || `http://127.0.0.1:${devServerPort}`
 const useSharedDevServer = !externalBaseURL
 const headless = process.env.HEADED !== '1'
 const viewportProfiles = [
@@ -123,10 +120,10 @@ export function buildInputTemplate() {
       'PATH=/usr/local/bin:$PATH node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
       suggestedMockSmokeCommand,
       "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
-      "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' MOBILE_AUTH_SMOKE_BASE_URL='http://localhost:5175' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
+      "MOBILE_AUTH_SMOKE_ROLE_KEY='boss' MOBILE_AUTH_SMOKE_BASE_URL='http://127.0.0.1:5175' PATH=/usr/local/bin:$PATH pnpm --dir web smoke:mobile-auth-login-route",
     ],
     boundary:
-      'This template only prints mobile auth route smoke prerequisites. The preflight report only writes a local JSON route plan. Neither mode starts Vite, starts Playwright, calls a real backend, logs in to a real account, writes database rows, or proves real RBAC/customer-config active revision. The real smoke uses mocked auth/workflow RPC responses to verify mobile route guards, login return paths, task UI, notifications, logout, phone/iPad layout, and production single-port /m/<role>/tasks routing.',
+      'This template only prints mobile auth route smoke prerequisites. The preflight report only writes a local JSON route plan. Neither mode starts Vite, starts Playwright, calls a real backend, logs in to a real account, writes database rows, or proves real RBAC/customer-config active revision. The real smoke uses mocked auth/admin/customer-config/workflow RPC responses to verify mobile route guards, session refresh, login return paths, task UI, reminders, logout, phone/iPad layout, and production single-port /m/<role>/tasks routing.',
   }
 }
 
@@ -242,7 +239,7 @@ function startDevServer() {
       '--config',
       'vite.config.mjs',
       '--host',
-      'localhost',
+      '127.0.0.1',
       '--port',
       String(devServerPort),
       '--strictPort',
@@ -346,6 +343,52 @@ async function runMobileAuthScenario(
     }
   })
 
+  await page.route('**/rpc/admin', async (route) => {
+    const body = route.request().postDataJSON() || {}
+    const { id = 'mock-id', method } = body
+    if (method !== 'me') {
+      await route.fallback()
+      return
+    }
+
+    const authorization = String(route.request().headers().authorization || '')
+    const isDesktopSession = authorization === `Bearer ${desktopLoginToken}`
+    assert(
+      authorization === `Bearer ${loginToken}` || isDesktopSession,
+      `${role.roleKey} admin.me 应携带本轮登录 token`
+    )
+    const profile = createMockAdminLoginData({
+      role,
+      token: isDesktopSession ? desktopLoginToken : loginToken,
+      username: isDesktopSession ? `${role.roleKey}-desktop-admin` : undefined,
+      menus: isDesktopSession
+        ? [{ path: '/erp/dashboard', label: '看板中心' }]
+        : undefined,
+    })
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        jsonrpc: '2.0',
+        id,
+        result: {
+          code: 0,
+          message: 'OK',
+          data: {
+            id: 1,
+            username: profile.username,
+            is_super_admin: profile.is_super_admin,
+            roles: profile.roles,
+            permissions: profile.permissions,
+            menus: profile.menus,
+            erp_preferences: profile.erp_preferences,
+          },
+        },
+      }),
+    })
+  })
+
   await page.route('**/rpc/customer_config', async (route) => {
     const body = route.request().postDataJSON() || {}
     const { id = 'mock-id', method } = body
@@ -369,7 +412,7 @@ async function runMobileAuthScenario(
               pages: ['global-dashboard'],
               actions: ['workflow.task.read'],
               work_pools: [role.roleKey],
-              source: 'mobile_auth_smoke_customer_runtime',
+              source: 'active_customer_config_revision',
             },
           },
         },
@@ -750,8 +793,10 @@ async function runMobileAuthScenario(
   await expectText(page, '待办')
   await expectText(page, '风险')
   await expectText(page, '已超时')
-  await expectText(page, '即将超时')
-  await expectText(page, '阻塞/高优先')
+  await expectText(page, '当前优先事项')
+  await expectText(page, '先处理 1 条超时任务')
+  await expectText(page, '数据时间')
+  await expectText(page, '任务最近更新')
   await expectText(page, 'STYLE-001')
   await expectText(page, 'OUT-001')
   await expectText(page, '登录回跳验证任务')
@@ -764,13 +809,13 @@ async function runMobileAuthScenario(
   await clickMobileMainTab(page, 'done', '已办任务')
   await expectText(page, '进度')
   await expectText(page, '待处理')
-  await expectText(page, '处理中')
   await expectText(page, '卡住')
+  await expectText(page, '已退回')
   await expectText(page, '完成')
   await expectText(page, '完成进度样本')
 
   await clickMobileMainTab(page, 'messages', '预警')
-  await expectText(page, '通知')
+  await expectText(page, '提醒')
   await expectText(page, '供应商延期')
 
   await clickMobileMainTab(page, 'todo', '待办')
@@ -890,7 +935,7 @@ async function runMobileAuthScenario(
   await waitForPath(page, tasksPath)
   await expectNoText(page, '说明')
 
-  await clickMobileMainTab(page, 'mine', '登录与安全')
+  await clickMobileMainTab(page, 'mine', '入口与安全')
   await clickAfterNavigationSettles(
     page,
     page.getByTestId('mobile-role-logout-button')
@@ -914,14 +959,16 @@ async function runMobileAuthScenario(
   const firstBackLeak = await captureTextsAfterNavigation(page, () =>
     page.goBack({ waitUntil: 'domcontentloaded' })
   )
-  assert.notEqual(
+  await waitForPath(page, tasksPath)
+  assert.equal(
     new URL(page.url()).pathname,
     tasksPath,
-    `${role.roleKey} 退出岗位端并登录后台后，浏览器返回不应恢复旧岗位任务端首页`
+    `${role.roleKey} 显式返回岗位任务端深链时不应被桌面入口记忆改写`
   )
   assert(
-    !firstBackLeak.includes('登录与安全'),
-    `${role.roleKey} 退出岗位端并登录后台后，浏览器返回不应短暂渲染旧岗位任务端：${firstBackLeak}`
+    !firstBackLeak.includes('看板中心') &&
+      !firstBackLeak.includes('今日工作台'),
+    `${role.roleKey} 返回岗位任务端时不应短暂渲染桌面后台：${firstBackLeak}`
   )
 
   await evaluateAfterNavigationSettles(page, () => {
@@ -959,7 +1006,17 @@ async function runMobileAuthScenario(
 
 async function expectText(page, text) {
   const locator = page.getByText(text, { exact: false })
-  await locator.first().waitFor({ state: 'visible', timeout: 10_000 })
+  try {
+    await locator.first().waitFor({ state: 'visible', timeout: 10_000 })
+  } catch (error) {
+    const diagnostics = await collectNavigationDiagnostics(page).catch(() => ({
+      path: '',
+      bodyText: '',
+    }))
+    throw new Error(`等待文案 ${text} 超时：${JSON.stringify(diagnostics)}`, {
+      cause: error,
+    })
+  }
 }
 
 async function clickMobileMainTab(page, tabKey, expectedText) {
@@ -1117,14 +1174,7 @@ function isRetriableClickDuringNavigationError(error) {
   )
 }
 
-async function waitForPath(page, expectedPath) {
-  const deadline = Date.now() + 10_000
-  while (Date.now() < deadline) {
-    if (new URL(page.url()).pathname === expectedPath) {
-      return
-    }
-    await delay(100)
-  }
+async function collectNavigationDiagnostics(page) {
   const diagnostics = await page
     .evaluate(() => {
       let storageKeys = []
@@ -1150,6 +1200,18 @@ async function waitForPath(page, expectedPath) {
   diagnostics.browserLogs = Array.isArray(page._mobileAuthDiagnostics)
     ? page._mobileAuthDiagnostics.slice(-20)
     : []
+  return diagnostics
+}
+
+async function waitForPath(page, expectedPath) {
+  const deadline = Date.now() + 10_000
+  while (Date.now() < deadline) {
+    if (new URL(page.url()).pathname === expectedPath) {
+      return
+    }
+    await delay(100)
+  }
+  const diagnostics = await collectNavigationDiagnostics(page)
   assert.equal(
     new URL(page.url()).pathname,
     expectedPath,
@@ -1368,7 +1430,7 @@ async function runCli() {
         '  node web/scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template',
         '  node web/scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json',
         '',
-        'The default command starts a local Vite server and Playwright with mocked auth/workflow RPC. The preflight report only writes a local no-write route plan.',
+        'The default command starts a local Vite server and Playwright with mocked auth/admin/customer-config/workflow RPC. The preflight report only writes a local no-write route plan.',
       ].join('\n')
     )
     return

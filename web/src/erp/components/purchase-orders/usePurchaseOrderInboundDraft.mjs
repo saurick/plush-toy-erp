@@ -4,7 +4,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   createPurchaseReceiptFromPurchaseOrder,
-  listPurchaseReceipts,
+  listAllPurchaseReceipts,
 } from '../../api/purchaseApi.mjs'
 import { V1_ROUTE_PATHS } from '../../utils/masterDataOrderView.mjs'
 import {
@@ -59,9 +59,8 @@ export function usePurchaseOrderInboundDraft({
       try {
         const [orderItems, receiptData] = await Promise.all([
           loadOrderItems(record),
-          listPurchaseReceipts({
+          listAllPurchaseReceipts({
             purchase_order_id: record.id,
-            limit: 200,
           }),
         ])
         setInboundDraftPreviewRows(

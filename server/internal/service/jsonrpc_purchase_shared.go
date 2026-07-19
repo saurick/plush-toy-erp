@@ -16,28 +16,6 @@ func unknownPurchaseResult(method string) *v1.JsonrpcResult {
 	return &v1.JsonrpcResult{Code: errcode.UnknownMethod.Code, Message: fmt.Sprintf("未知 purchase 接口 method=%s", method)}
 }
 
-func purchaseReceiptCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptCreate, bool) {
-	if _, ok := pm["business_record_id"]; ok {
-		return nil, false
-	}
-	// Manual receipt APIs have not yet adopted a stable supplier identity
-	// contract. Reject a misleading technical field instead of silently
-	// accepting it; these records intentionally keep supplier_id nil.
-	if _, ok := pm["supplier_id"]; ok {
-		return nil, false
-	}
-	receivedAt, ok := getOptionalJSONRPCTime(pm, "received_at")
-	if !ok {
-		return nil, false
-	}
-	return &biz.PurchaseReceiptCreate{
-		ReceiptNo:    getString(pm, "receipt_no"),
-		SupplierName: getString(pm, "supplier_name"),
-		ReceivedAt:   optionalTimeValue(receivedAt),
-		Note:         getWorkflowStringPtr(pm, "note"),
-	}, true
-}
-
 func purchaseReceiptFromPurchaseOrderCreateFromParams(pm map[string]any) (*biz.PurchaseReceiptFromPurchaseOrderCreate, bool) {
 	if _, ok := pm["business_record_id"]; ok {
 		return nil, false
@@ -70,15 +48,15 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 	if _, ok := pm["idempotency_payload_hash"]; ok {
 		return nil, false
 	}
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}
-	unitPrice, ok := getOptionalJSONRPCDecimal(pm, "unit_price")
+	unitPrice, ok := getOptionalJSONRPCDecimalString(pm, "unit_price")
 	if !ok {
 		return nil, false
 	}
-	amount, ok := getOptionalJSONRPCDecimal(pm, "amount")
+	amount, ok := getOptionalJSONRPCDecimalString(pm, "amount")
 	if !ok {
 		return nil, false
 	}
@@ -97,38 +75,6 @@ func purchaseReceiptItemCreateFromParams(pm map[string]any) (*biz.PurchaseReceip
 		Note:                getWorkflowStringPtr(pm, "note"),
 		IdempotencyKey:      strings.TrimSpace(getString(pm, "idempotency_key")),
 	}, true
-}
-
-func purchaseReceiptItemsCreateFromParams(pm map[string]any) ([]*biz.PurchaseReceiptItemCreate, bool) {
-	raw, ok := pm["items"]
-	if !ok || raw == nil {
-		return nil, false
-	}
-	rawItems, ok := raw.([]any)
-	if !ok || len(rawItems) == 0 {
-		return nil, false
-	}
-	items := make([]*biz.PurchaseReceiptItemCreate, 0, len(rawItems))
-	for _, rawItem := range rawItems {
-		itemMap, ok := rawItem.(map[string]any)
-		if !ok {
-			return nil, false
-		}
-		// The atomic batch path is an internal create boundary, not a per-line
-		// replay contract. Keep both server-owned retry fields out of this input.
-		if _, ok := itemMap["idempotency_key"]; ok {
-			return nil, false
-		}
-		if _, ok := itemMap["idempotency_payload_hash"]; ok {
-			return nil, false
-		}
-		item, ok := purchaseReceiptItemCreateFromParams(itemMap)
-		if !ok {
-			return nil, false
-		}
-		items = append(items, item)
-	}
-	return items, true
 }
 
 func purchaseReceiptFilterFromParams(pm map[string]any) (biz.PurchaseReceiptFilter, bool) {
@@ -199,6 +145,8 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整行不存在"}
+	case errors.Is(err, biz.ErrPurchaseReceiptCorrectionDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库仍有未取消的退货或调整单，不能取消"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityPending):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料质检尚未逐行完成，不能入库过账"}
 	case errors.Is(err, biz.ErrPurchaseReceiptQualityRejected):
@@ -250,6 +198,8 @@ func purchaseReceiptToAny(item *biz.PurchaseReceipt) map[string]any {
 	return map[string]any{
 		"id":                  item.ID,
 		"receipt_no":          item.ReceiptNo,
+		"purchase_order_id":   optionalIntToAny(item.PurchaseOrderID),
+		"purchase_order_no":   optionalStringToAny(item.PurchaseOrderNo),
 		"supplier_id":         optionalIntToAny(item.SupplierID),
 		"supplier_name":       item.SupplierName,
 		"status":              item.Status,

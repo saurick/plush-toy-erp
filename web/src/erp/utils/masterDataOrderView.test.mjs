@@ -56,6 +56,8 @@ import {
   resolvePaymentTermDays,
   statusText,
   SUPPLIER_CONTACT_OWNER_TYPE,
+  summarizeOutsourcingOrderLines,
+  summarizePurchaseOrderLines,
   summarizeSalesOrderLines,
   unixToDateInputValue,
 } from './masterDataOrderView.mjs'
@@ -309,6 +311,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       code: ' PROC-SEW ',
       name: ' 车缝 ',
       category: ' 委外车缝 ',
+      production_route_operation_code: ' SEWING ',
       outsourcing_enabled: true,
       inhouse_enabled: false,
       quality_required: true,
@@ -319,6 +322,7 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
       code: 'PROC-SEW',
       name: '车缝',
       category: '委外车缝',
+      production_route_operation_code: 'SEWING',
       outsourcing_enabled: true,
       inhouse_enabled: false,
       quality_required: true,
@@ -514,7 +518,6 @@ test('masterDataOrderView: params trim optional values without adding facts', ()
         buyerContact: '委外负责人',
       },
       source_order_no: ' SO-001 ',
-      source_sales_order_id: '',
       order_date: '2026-06-17',
       expected_return_date: '',
       note: ' ',
@@ -2114,7 +2117,8 @@ test('FL_print_supplier_contact_snapshot__purchase_and_outsourcing_pages_fetch_s
   )
 
   for (const source of [purchasePageSource, outsourcingPageSource]) {
-    assert.match(source, /listContactsByOwner/u)
+    assert.match(source, /\blistAllContactsByOwner\s*\(/u)
+    assert.doesNotMatch(source, /\blistContactsByOwner\s*\(/u)
     assert.match(source, /SUPPLIER_CONTACT_OWNER_TYPE/u)
     assert.match(source, /buildSupplierSnapshotWithContacts/u)
     assert.match(
@@ -2143,7 +2147,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
   )
 
   for (const sourceText of [
-    'listMaterials',
+    'listAllMaterials',
     'buildOutsourcingOrderSubjectSwitchValues',
     'buildOutsourcingOrderItemSourceValuesFromProduct',
     'buildOutsourcingOrderItemSourceValuesFromMaterial',
@@ -2156,6 +2160,7 @@ test('FL_outsourcing_subject_form__wires_product_and_material_sources masterData
       new RegExp(sourceText.replace(/[{}]/gu, '\\$&'), 'u')
     )
   }
+  assert.doesNotMatch(pageSource, /\blistMaterials\s*\(/u)
 
   for (const visibleText of [
     '加工品类',
@@ -2611,14 +2616,14 @@ test('FL_sales_order_line_summary__derives_header_totals_from_items masterDataOr
     ]),
     {
       count: 3,
-      quantity: 14.5,
-      amount: 48.5,
+      quantity: '14.5',
+      amount: '48.5',
     }
   )
   assert.deepEqual(summarizeSalesOrderLines(null), {
     count: 0,
-    quantity: 0,
-    amount: 0,
+    quantity: '0',
+    amount: '0',
   })
 })
 
@@ -2631,8 +2636,8 @@ test('FL_sales_order_line_summary__keeps_header_snapshot_without_current_items m
     }),
     {
       count: 2,
-      quantity: 5.5,
-      amount: 88.1,
+      quantity: '5.5',
+      amount: '88.1',
     }
   )
   assert.deepEqual(
@@ -2652,10 +2657,34 @@ test('FL_sales_order_line_summary__keeps_header_snapshot_without_current_items m
     ),
     {
       count: 1,
-      quantity: 3,
-      amount: 12,
+      quantity: '3',
+      amount: '12',
     }
   )
+})
+
+test('source document line summaries preserve numeric(20,6) boundary values exactly', () => {
+  const lines = [
+    {
+      purchased_quantity: '99999999999999.999999',
+      outsourcing_quantity: '99999999999999.999999',
+      unit_price: '',
+      amount: '99999999999999.999999',
+    },
+    {
+      purchased_quantity: '0.000001',
+      outsourcing_quantity: '0.000001',
+      unit_price: '',
+      amount: '0.000001',
+    },
+  ]
+  const expected = {
+    count: 2,
+    quantity: '100000000000000',
+    amount: '100000000000000',
+  }
+  assert.deepEqual(summarizePurchaseOrderLines(lines), expected)
+  assert.deepEqual(summarizeOutsourcingOrderLines(lines), expected)
 })
 
 test('masterDataOrderView: outsourcing order item amount derives from quantity and unit price', () => {

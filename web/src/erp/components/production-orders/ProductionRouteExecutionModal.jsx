@@ -29,7 +29,6 @@ import {
 import {
   executeProductionWipAction,
   getProductionWip,
-  initializeProductionWip,
 } from '../../api/productionWipApi.mjs'
 import {
   PRODUCTION_WIP_ACTION,
@@ -37,7 +36,7 @@ import {
   PRODUCTION_WIP_EXECUTION_MODE_META,
   PRODUCTION_WIP_FLOW_TYPE,
   PRODUCTION_WIP_QUANTITY_MAX_LENGTH,
-  PRODUCTION_WIP_ROUTE_KEY,
+  PRODUCTION_WIP_ROUTE_CODE,
   buildProductionWipConservingSplits,
   buildProductionWipFabricContractOptions,
   buildProductionWipOutsourcingCandidateOptions,
@@ -65,6 +64,7 @@ const { Text, Title } = Typography
 const ACTION_SUCCESS_TEXT = Object.freeze({
   [PRODUCTION_WIP_ACTION.SPLIT_BATCH]: '在制批次已拆分',
   [PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION]: '加工安排已保存',
+  [PRODUCTION_WIP_ACTION.CANCEL_BATCH]: '在制批次已取消',
   [PRODUCTION_WIP_ACTION.START_OPERATION]: '当前工序已开始',
   [PRODUCTION_WIP_ACTION.COMPLETE_OPERATION]: '本厂完工已登记',
   [PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN]: '外发回仓已登记',
@@ -76,6 +76,7 @@ const ACTION_SUCCESS_TEXT = Object.freeze({
 const ACTION_TITLE = Object.freeze({
   [PRODUCTION_WIP_ACTION.SPLIT_BATCH]: '拆分在制批次',
   [PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION]: '安排本厂或外发加工',
+  [PRODUCTION_WIP_ACTION.CANCEL_BATCH]: '取消在制批次',
   [PRODUCTION_WIP_ACTION.START_OPERATION]: '开始当前工序',
   [PRODUCTION_WIP_ACTION.COMPLETE_OPERATION]: '登记本厂完工',
   [PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN]: '登记外发回仓',
@@ -138,6 +139,8 @@ function actionButtonEnabled(
         status === 'PLANNED' && operation.operation_code !== 'FABRIC_PROCESSING'
       )
     case PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION:
+      return status === 'PLANNED'
+    case PRODUCTION_WIP_ACTION.CANCEL_BATCH:
       return status === 'PLANNED'
     case PRODUCTION_WIP_ACTION.START_OPERATION:
       return status === 'PLANNED' && Boolean(batch.execution_mode)
@@ -223,7 +226,6 @@ export default function ProductionRouteExecutionModal({
   const [outsourcingLoadState, setOutsourcingLoadState] = useState('idle')
   const [outsourcingLoadError, setOutsourcingLoadError] = useState('')
   const requestSequenceRef = useRef(0)
-  const initializationAttemptRef = useRef(null)
   const actionAttemptRef = useRef(null)
   const outsourcingAbortControllerRef = useRef(null)
   const outsourcingLoadStateRef = useRef('idle')
@@ -243,6 +245,7 @@ export default function ProductionRouteExecutionModal({
         [
           PRODUCTION_WIP_ACTION.SPLIT_BATCH,
           PRODUCTION_WIP_ACTION.ASSIGN_EXECUTION,
+          PRODUCTION_WIP_ACTION.CANCEL_BATCH,
         ].includes(action)
       ) {
         return canAssign
@@ -344,7 +347,6 @@ export default function ProductionRouteExecutionModal({
     outsourcingLoadStateRef.current = 'idle'
     outsourcingAbortControllerRef.current?.abort()
     outsourcingAbortControllerRef.current = null
-    initializationAttemptRef.current = null
     actionAttemptRef.current = null
     actionForm.resetFields()
     loadCurrentRoute({ signal: controller.signal })
@@ -510,31 +512,6 @@ export default function ProductionRouteExecutionModal({
     setActiveAction(action)
     if (selectedExecutionMode === PRODUCTION_WIP_EXECUTION_MODE.OUTSOURCED) {
       loadOutsourcingSources()
-    }
-  }
-
-  const initializeRoute = async () => {
-    if (!canAssign || !positiveSafeInteger(orderID)) return
-    if (!initializationAttemptRef.current) {
-      initializationAttemptRef.current = {
-        orderID,
-        idempotencyKey: productionWipUUID(),
-      }
-    }
-    setSaving(true)
-    try {
-      const nextAggregate = await initializeProductionWip(orderID, {
-        idempotencyKey: initializationAttemptRef.current.idempotencyKey,
-      })
-      initializationAttemptRef.current = null
-      setAggregate(nextAggregate)
-      setActiveAction('')
-      message.success('标准工序路线已建立')
-      onChanged?.(nextAggregate)
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '建立标准工序路线'))
-    } finally {
-      setSaving(false)
     }
   }
 
@@ -1053,6 +1030,25 @@ export default function ProductionRouteExecutionModal({
           />
         ) : null}
 
+        {activeAction === PRODUCTION_WIP_ACTION.CANCEL_BATCH ? (
+          <>
+            <Alert
+              showIcon
+              type="warning"
+              message="取消只终止当前尚未开工的批次，不会重新拆分数量，也不会撤销已经形成的发料、库存或质检记录。"
+            />
+            <Form.Item
+              name="reason"
+              label="取消原因"
+              rules={[
+                { required: true, whitespace: true, message: '请填写取消原因' },
+              ]}
+            >
+              <Input.TextArea rows={3} maxLength={255} showCount />
+            </Form.Item>
+          </>
+        ) : null}
+
         {activeAction === PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION ? (
           <Alert
             showIcon
@@ -1246,24 +1242,19 @@ export default function ProductionRouteExecutionModal({
         <Empty
           description={
             aggregate.items.some(
-              (item) => item.route_code === PRODUCTION_WIP_ROUTE_KEY
+              (item) => item.route_code === PRODUCTION_WIP_ROUTE_CODE
             )
-              ? '当前生产订单尚未建立工序路线'
+              ? '当前生产订单的工序路线不完整'
               : '当前生产订单未启用标准工序路线'
           }
           image={Empty.PRESENTED_IMAGE_SIMPLE}
         >
           {aggregate.items.some(
-            (item) => item.route_code === PRODUCTION_WIP_ROUTE_KEY
-          ) && canAssign ? (
-            <Button
-              type="primary"
-              disabled={saving}
-              loading={saving}
-              onClick={initializeRoute}
-            >
-              建立标准工序路线
-            </Button>
+            (item) => item.route_code === PRODUCTION_WIP_ROUTE_CODE
+          ) ? (
+            <Text type="secondary">
+              标准路线只在生产订单发布时冻结；请核对工序档案的标准路线绑定，并由管理员处理这条异常订单。
+            </Text>
           ) : null}
         </Empty>
       ) : aggregate?.initialized ? (
@@ -1360,6 +1351,25 @@ export default function ProductionRouteExecutionModal({
                         }
                       >
                         安排加工
+                      </Button>
+                      <Button
+                        danger
+                        disabled={
+                          saving ||
+                          !actionButtonEnabled(
+                            PRODUCTION_WIP_ACTION.CANCEL_BATCH,
+                            selectedBatch,
+                            currentOperation,
+                            nextOperation,
+                            selectedPackagingConfirmation,
+                            canAssign
+                          )
+                        }
+                        onClick={() =>
+                          selectAction(PRODUCTION_WIP_ACTION.CANCEL_BATCH)
+                        }
+                      >
+                        取消批次
                       </Button>
                     </>
                   ) : null}

@@ -7,12 +7,103 @@ import {
   buildMobileRoleTaskQuery,
   createMobileRoleTaskScopeState,
   createMobileRoleTaskSlots,
+  isMobileRoleTaskHistoryScope,
   mergeMobileRoleTaskPage,
+  readMobileRoleTaskLoadedCounts,
+  readMobileRoleTaskScopedHistoryState,
   readMobileRoleTaskScopeState,
+  reconcileMobileRoleTaskMutation,
+  resolveMobileRoleTaskReceiptDetailTask,
+  resolveMobileRoleTaskRestoreLimit,
   resolveMobileRoleTaskViewKey,
   resolveMobileRoleTaskViewState,
   settleMobileRoleTaskRequest,
 } from './mobileTaskQueries.mjs'
+
+test('mobileTaskQueries: 历史草稿只在完整访问范围一致时恢复', () => {
+  const oldHistory = {
+    mobileRoleTasksAction: 'done',
+    mobileRoleTasksEvidence: '旧账号证据',
+    mobileRoleTasksReason: '旧账号反馈',
+    mobileRoleTasksScope: 'boss|access:account-a:revision-1|ready',
+    mobileRoleTasksTaskID: 88,
+  }
+  assert.equal(
+    isMobileRoleTaskHistoryScope(
+      oldHistory,
+      'boss|access:account-a:revision-1|ready'
+    ),
+    true
+  )
+  assert.equal(
+    readMobileRoleTaskScopedHistoryState(
+      oldHistory,
+      'boss|access:account-b:revision-2|ready'
+    ).mobileRoleTasksReason,
+    undefined
+  )
+  assert.deepEqual(
+    readMobileRoleTaskScopedHistoryState(
+      oldHistory,
+      'boss|access:account-b:revision-2|ready'
+    ),
+    {}
+  )
+})
+
+test('mobileTaskQueries: 稀疏筛选按服务端已加载数量恢复深分页', () => {
+  assert.deepEqual(
+    readMobileRoleTaskLoadedCounts({ todo: 500, history: 25, bad: 900 }),
+    { todo: 500, history: 25 }
+  )
+  assert.equal(
+    resolveMobileRoleTaskRestoreLimit({
+      viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO,
+      loadedCounts: { todo: 500 },
+      visibleLimits: { 'todo:mine': 30 },
+    }),
+    500
+  )
+  assert.equal(
+    resolveMobileRoleTaskRestoreLimit({
+      viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.RISK,
+      loadedCounts: { risk: 2500 },
+      visibleLimits: { 'messages:overdue': 30 },
+    }),
+    1000
+  )
+})
+
+test('mobileTaskQueries: 回执详情快照必须匹配当前权限范围和选中任务', () => {
+  const task = { id: 88, task_name: '可信终态任务', task_status_key: 'done' }
+  const receipt = {
+    action: 'done',
+    scope_key: 'boss|access:revision-2|ready',
+    status: 'confirmed',
+    task,
+  }
+  assert.equal(
+    resolveMobileRoleTaskReceiptDetailTask({
+      receipt,
+      scopeKey: receipt.scope_key,
+      selectedTaskID: 88,
+    }),
+    task
+  )
+  for (const [scopeKey, selectedTaskID] of [
+    ['boss|access:revision-1|ready', 88],
+    [receipt.scope_key, 89],
+  ]) {
+    assert.equal(
+      resolveMobileRoleTaskReceiptDetailTask({
+        receipt,
+        scopeKey,
+        selectedTaskID,
+      }),
+      null
+    )
+  }
+})
 
 test('mobileTaskQueries: 岗位视图查询使用服务端游标合同', () => {
   assert.deepEqual(
@@ -227,6 +318,124 @@ test('mobileTaskQueries: append 快照漂移时拒绝拼接并保留原分页槽
       error.isInvalidResponse === true && /任务列表已更新/u.test(error.message)
   )
   assert.deepEqual(currentSlot, before)
+})
+
+test('mobileTaskQueries: append 拒绝重复游标，避免自动恢复无限请求', () => {
+  const currentSlot = mergeMobileRoleTaskPage(undefined, {
+    items: [{ id: 2 }],
+    next_cursor: 'page-2',
+    has_more: true,
+    server_time: 1_720_000_000,
+  })
+
+  assert.throws(
+    () =>
+      mergeMobileRoleTaskPage(
+        currentSlot,
+        {
+          items: [{ id: 1 }],
+          next_cursor: 'page-2',
+          has_more: true,
+          server_time: 1_720_000_000,
+        },
+        { append: true }
+      ),
+    (error) =>
+      error.isInvalidResponse === true && /分页结果异常/u.test(error.message)
+  )
+})
+
+test('mobileTaskQueries: append 拒绝无新增任务的循环页', () => {
+  const currentSlot = mergeMobileRoleTaskPage(undefined, {
+    items: [{ id: 2 }],
+    next_cursor: 'page-2',
+    has_more: true,
+    server_time: 1_720_000_000,
+  })
+
+  assert.throws(
+    () =>
+      mergeMobileRoleTaskPage(
+        currentSlot,
+        {
+          items: [{ id: 2 }],
+          next_cursor: 'page-3',
+          has_more: true,
+          server_time: 1_720_000_000,
+        },
+        { append: true }
+      ),
+    (error) =>
+      error.isInvalidResponse === true && /分页结果异常/u.test(error.message)
+  )
+})
+
+test('mobileTaskQueries: 已确认动作原位更新深分页缓存且保留游标', () => {
+  const scopeKey = 'sales|access-identity|ready'
+  const state = createMobileRoleTaskScopeState(scopeKey)
+  state.slots.todo = {
+    items: Array.from({ length: 250 }, (_, index) => ({
+      id: index + 1,
+      task_name: `任务 ${index + 1}`,
+      task_status_key: 'ready',
+    })),
+    next_cursor: 'page-6',
+    has_more: true,
+    server_time: 1_720_000_000,
+    loaded: true,
+    loading: true,
+    error: '旧错误',
+  }
+  state.slots.risk = {
+    ...state.slots.risk,
+    items: [{ id: 230, task_name: '风险缓存旧版本' }],
+    loaded: true,
+    loading: true,
+  }
+
+  const updated = reconcileMobileRoleTaskMutation(state, {
+    scopeKey,
+    viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO,
+    canonicalTask: {
+      id: 230,
+      task_name: '任务 230 已阻塞',
+      task_status_key: 'blocked',
+      version: 2,
+    },
+    keepInViews: { todo: true, risk: true, history: false },
+  })
+
+  assert.equal(updated.slots.todo.items.length, 250)
+  assert.equal(updated.slots.todo.items[229].task_name, '任务 230 已阻塞')
+  assert.equal(updated.slots.todo.next_cursor, 'page-6')
+  assert.equal(updated.slots.todo.has_more, true)
+  assert.equal(updated.slots.todo.server_time, 1_720_000_000)
+  assert.equal(updated.slots.todo.loading, false)
+  assert.equal(updated.slots.todo.error, '')
+  assert.equal(updated.slots.risk.loaded, false)
+  assert.equal(updated.slots.risk.loading, false)
+  assert.equal(updated.slots.risk.items[0].task_name, '任务 230 已阻塞')
+
+  const completed = reconcileMobileRoleTaskMutation(updated, {
+    scopeKey,
+    viewKey: MOBILE_ROLE_TASK_VIEW_KEYS.TODO,
+    canonicalTask: {
+      id: 230,
+      task_name: '任务 230 已完成',
+      task_status_key: 'done',
+      version: 3,
+    },
+    keepInActiveView: false,
+    keepInViews: { todo: false, risk: false, history: true },
+  })
+  assert.equal(completed.slots.todo.items.length, 249)
+  assert.equal(
+    completed.slots.todo.items.some((task) => task.id === 230),
+    false
+  )
+  assert.equal(completed.slots.todo.next_cursor, 'page-6')
+  assert.equal(completed.slots.todo.has_more, true)
+  assert.deepEqual(completed.slots.risk.items, [])
 })
 
 test('mobileTaskQueries: 切角色、客户或 revision 时同步隐藏旧范围任务', () => {

@@ -13,6 +13,10 @@ import {
   parseManualAcceptanceTargetAttestation,
   resolveManualAcceptanceTarget,
 } from "./manual-acceptance-target-policy.mjs";
+import {
+  financeInvoiceCategoryForKey,
+  inspectFinanceFieldContract,
+} from "./manual-acceptance-finance-field-contract.mjs";
 
 export const SOURCE_DRIVEN_FACT_DATA_VERSION = "2026.07.16-v5";
 export const SOURCE_DRIVEN_FACT_RUN_ID = "20260716-V5";
@@ -199,6 +203,7 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "shipment_id",
     "idempotency_key",
     "note",
+    "invoice_category",
   ]),
   "operational_fact.create_payable_from_outsourcing_return": Object.freeze([
     "customer_key",
@@ -244,6 +249,14 @@ function positiveID(value, name) {
   const parsed = Number(value);
   if (!Number.isSafeInteger(parsed) || parsed <= 0) {
     throw new SourceDrivenFactError(`${name} must be a positive safe integer`);
+  }
+  return parsed;
+}
+
+function nonNegativeInteger(value, name) {
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed) || parsed < 0) {
+    throw new SourceDrivenFactError(`${name} must be a non-negative safe integer`);
   }
   return parsed;
 }
@@ -528,6 +541,10 @@ function normalizeSales(source) {
         source?.order?.customerSnapshot,
         "sales.order.customerSnapshot",
         255,
+      ),
+      paymentTermDays: nonNegativeInteger(
+        source?.order?.paymentTermDays,
+        "sales.order.paymentTermDays",
       ),
     },
     item,
@@ -1483,6 +1500,7 @@ async function createPostedFinanceWithReconciliation({
   sourceParam,
   sourceID,
   identity,
+  createFields = {},
 }) {
   const finance = await createPostFact({
     rpc,
@@ -1492,6 +1510,7 @@ async function createPostedFinanceWithReconciliation({
       [sourceParam]: sourceID,
       idempotency_key: identity.idempotencyKey,
       note: SIMULATED_NOTE,
+      ...createFields,
     }),
     resultKey: "finance_fact",
     postMethod: "post_finance_fact",
@@ -1661,6 +1680,9 @@ async function applySales(plan, rpc) {
       ...identity.invoice,
       reconciliation: identity.invoiceReconciliation,
     },
+    createFields: {
+      invoice_category: financeInvoiceCategoryForKey(plan.instanceKey),
+    },
   });
   return {
     reservation,
@@ -1686,6 +1708,23 @@ async function applyPurchase(plan, rpc) {
       reconciliation: identity.reconciliation,
     },
   });
+}
+
+function financeFactsFromApplyResults(value, target = [], seen = new Set()) {
+  if (!value || typeof value !== "object" || seen.has(value)) return target;
+  seen.add(value);
+  if (
+    ["RECEIVABLE", "PAYABLE", "INVOICE", "RECONCILIATION"].includes(
+      String(value.fact_type || "").toUpperCase(),
+    )
+  ) {
+    target.push(value);
+    return target;
+  }
+  for (const nested of Object.values(value)) {
+    financeFactsFromApplyResults(nested, target, seen);
+  }
+  return target;
 }
 
 export async function applySourceDrivenFactPlan(
@@ -1744,6 +1783,20 @@ export async function applySourceDrivenFactPlan(
       results.sales = await applySales(plan, rpc);
     }
   }
+  const financeFieldContract = inspectFinanceFieldContract(
+    financeFactsFromApplyResults(results),
+  );
+  const financePhasesEnabled = plan.enabledPhases.some((phaseName) =>
+    ["outsourcing", "sales", "purchase"].includes(phaseName),
+  );
+  if (financePhasesEnabled && !financeFieldContract.complete) {
+    throw new SourceDrivenFactError(
+      `source-driven finance field contract failed: ${financeFieldContract.violations
+        .slice(0, 8)
+        .map((item) => `${item.factNo}.${item.field}=${item.message}`)
+        .join("; ")}`,
+    );
+  }
   return {
     ok: true,
     mode: "apply",
@@ -1762,6 +1815,7 @@ export async function applySourceDrivenFactPlan(
     enabledPhases: [...plan.enabledPhases],
     lifecycleProfile: plan.lifecycleProfile,
     preflight,
+    financeFieldContract,
     results,
   };
 }

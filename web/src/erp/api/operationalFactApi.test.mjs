@@ -27,7 +27,9 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'create_outsourcing_return_receipt_from_order',
     'post_outsourcing_fact',
     'cancel_outsourcing_fact',
+    'get_shipment',
     'list_shipments',
+    'list_shipment_source_candidates',
     'create_shipment_with_items',
     'submit_shipment_release',
     'ship_shipment',
@@ -78,6 +80,36 @@ test('operationalFactApi: outsourcing related records use strict complete pagina
   assert.match(
     source,
     /export async function listAllOutsourcingFacts\([\s\S]*?listAllPaginatedRecords\(\s*listOutsourcingFacts,\s*params,\s*'outsourcing_facts'/u
+  )
+})
+
+test('operationalFactApi: source-derived fact reads use strict complete pagination', () => {
+  for (const [functionName, pageFunction, recordKey] of [
+    ['listAllProductionFacts', 'listProductionFacts', 'production_facts'],
+    ['listAllShipments', 'listShipments', 'shipments'],
+    ['listAllStockReservations', 'listStockReservations', 'stock_reservations'],
+  ]) {
+    assert.match(
+      source,
+      new RegExp(
+        `export async function ${functionName}\\([\\s\\S]*?listAllPaginatedRecords\\(\\s*${pageFunction},\\s*params,\\s*'${recordKey}'`,
+        'u'
+      )
+    )
+  }
+})
+
+test('operationalFactApi: shipment source candidates use the typed server contract', () => {
+  assert.match(
+    source,
+    /export async function listShipmentSourceCandidates[\s\S]*?'list_shipment_source_candidates'[\s\S]*?validateShipmentSourceCandidatePage/u
+  )
+})
+
+test('operationalFactApi: shipment detail uses the exact read contract', () => {
+  assert.match(
+    source,
+    /export async function getShipment[\s\S]*?'get_shipment'[\s\S]*?dataOf\(result\)\?\.shipment \|\| null/u
   )
 })
 

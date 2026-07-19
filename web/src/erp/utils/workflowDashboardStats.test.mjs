@@ -154,7 +154,7 @@ test('workflowDashboardStats: alert 暴露业务来源标签而不是内部 sour
   assert(!hashIdFallbackAlert.source_label.includes('processing-contracts'))
 })
 
-test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式或 Workflow V1 对象页', () => {
+test('dashboardTaskDisplay: 普通任务只进入正式来源页，不进入保留 Workflow 收件箱', () => {
   const shippingReleaseEntryPath = resolveWorkflowTaskEntryPath(
     task({
       source_type: 'shipping-release',
@@ -167,6 +167,13 @@ test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式或 Wor
       source_type: 'production-scheduling',
       source_no: 'PLAN-001',
       source_id: 10,
+    })
+  )
+  const productionExceptionEntryPath = resolveWorkflowTaskEntryPath(
+    task({
+      source_type: 'production-exceptions',
+      source_no: 'EX-001',
+      source_id: 11,
     })
   )
   const payloadEntryPath = resolveWorkflowAlertEntryPath({
@@ -210,12 +217,10 @@ test('dashboardTaskDisplay: 看板任务导航只进入已登记的正式或 Wor
 
   assert.equal(
     shippingReleaseEntryPath,
-    '/erp/warehouse/shipping-release?link_keyword=OUT-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
+    ''
   )
-  assert.equal(
-    productionSchedulingEntryPath,
-    '/erp/production/scheduling?link_keyword=PLAN-001&link_source=task-dashboard&link_fields=document_no%2Csource_no'
-  )
+  assert.equal(productionSchedulingEntryPath, '')
+  assert.equal(productionExceptionEntryPath, '')
   assert.equal(payloadEntryPath, '')
   formalTaskEntries.forEach(([item, expectedPath]) => {
     assert.equal(resolveWorkflowTaskEntryPath(item), expectedPath)

@@ -63,7 +63,7 @@ func PostPurchaseReceipt(current string) (PostingDocumentTransition, bool) {
 }
 
 func CancelPurchaseReceipt(current string) (PostingDocumentTransition, bool) {
-	return cancelPostedDocument(current, PurchaseReceiptCancelled)
+	return cancelPostingDocument(current, PurchaseReceiptCancelled)
 }
 
 func PostPurchaseReturn(current string) (PostingDocumentTransition, bool) {
@@ -71,7 +71,7 @@ func PostPurchaseReturn(current string) (PostingDocumentTransition, bool) {
 }
 
 func CancelPurchaseReturn(current string) (PostingDocumentTransition, bool) {
-	return cancelPostedDocument(current, PurchaseReturnCancelled)
+	return cancelPostingDocument(current, PurchaseReturnCancelled)
 }
 
 func PostPurchaseReceiptAdjustment(current string) (PostingDocumentTransition, bool) {
@@ -79,7 +79,7 @@ func PostPurchaseReceiptAdjustment(current string) (PostingDocumentTransition, b
 }
 
 func CancelPurchaseReceiptAdjustment(current string) (PostingDocumentTransition, bool) {
-	return cancelPostedDocument(current, PurchaseReceiptAdjustmentCancelled)
+	return cancelPostingDocument(current, PurchaseReceiptAdjustmentCancelled)
 }
 
 func postDraftDocument(current string, postedStatus string) (PostingDocumentTransition, bool) {
@@ -93,9 +93,9 @@ func postDraftDocument(current string, postedStatus string) (PostingDocumentTran
 	}
 }
 
-func cancelPostedDocument(current string, cancelledStatus string) (PostingDocumentTransition, bool) {
+func cancelPostingDocument(current string, cancelledStatus string) (PostingDocumentTransition, bool) {
 	switch NormalizeUpperStatus(current) {
-	case "POSTED":
+	case "DRAFT", "POSTED":
 		return PostingDocumentTransition{Target: cancelledStatus, Changed: true}, true
 	case "CANCELLED":
 		return PostingDocumentTransition{Target: cancelledStatus}, true

@@ -209,20 +209,24 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 	defer mustCloseEntClient(t, client)
 
 	category := "委外车缝"
+	productionRouteOperationCode := biz.ProductionWIPOperationSewing
 	processItem, err := uc.CreateProcess(ctx, &biz.ProcessMutation{
-		Code:               "PROC-SEW",
-		Name:               "车缝",
-		Category:           &category,
-		OutsourcingEnabled: true,
-		InhouseEnabled:     false,
-		QualityRequired:    true,
-		SortOrder:          20,
+		Code:                         "PROC-SEW",
+		Name:                         "车缝",
+		Category:                     &category,
+		ProductionRouteOperationCode: &productionRouteOperationCode,
+		OutsourcingEnabled:           true,
+		InhouseEnabled:               false,
+		QualityRequired:              true,
+		SortOrder:                    20,
 	})
 	if err != nil {
 		t.Fatalf("create process failed: %v", err)
 	}
 	if processItem.Category == nil ||
 		*processItem.Category != category ||
+		processItem.ProductionRouteOperationCode == nil ||
+		*processItem.ProductionRouteOperationCode != biz.ProductionWIPOperationSewing ||
 		!processItem.OutsourcingEnabled ||
 		processItem.InhouseEnabled ||
 		!processItem.QualityRequired ||
@@ -231,6 +235,11 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 	}
 	if _, err := uc.CreateProcess(ctx, &biz.ProcessMutation{Code: "PROC-SEW", Name: "重复工序"}); !ent.IsConstraintError(err) {
 		t.Fatalf("expected duplicate process code rejected, got %v", err)
+	}
+	if _, err := uc.CreateProcess(ctx, &biz.ProcessMutation{
+		Code: "PROC-SEW-OTHER", Name: "另一道显示名", ProductionRouteOperationCode: &productionRouteOperationCode,
+	}); !ent.IsConstraintError(err) {
+		t.Fatalf("expected duplicate production route operation rejected, got %v", err)
 	}
 
 	note := "可外发也可内制"
@@ -247,6 +256,7 @@ func TestMasterDataRepoProcessCRUD(t *testing.T) {
 		t.Fatalf("update process failed: %v", err)
 	}
 	if updated.Category != nil ||
+		updated.ProductionRouteOperationCode != nil ||
 		!updated.OutsourcingEnabled ||
 		!updated.InhouseEnabled ||
 		updated.QualityRequired ||

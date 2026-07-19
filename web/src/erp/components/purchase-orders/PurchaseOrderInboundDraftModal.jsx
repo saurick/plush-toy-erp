@@ -29,6 +29,7 @@ export default function PurchaseOrderInboundDraftModal({
   rows,
   loading,
   submitting,
+  referenceDataReady = false,
   warehouseOptions,
   hasRemaining,
   resolveSupplierName,
@@ -107,7 +108,7 @@ export default function PurchaseOrderInboundDraftModal({
       cancelText="取消"
       confirmLoading={submitting}
       okButtonProps={{
-        disabled: loading || !hasRemaining,
+        disabled: loading || !referenceDataReady || !hasRemaining,
       }}
       onOk={onOk}
       onCancel={onCancel}
@@ -149,6 +150,7 @@ export default function PurchaseOrderInboundDraftModal({
       <Form
         form={form}
         layout="vertical"
+        disabled={!referenceDataReady}
         className="erp-business-form"
         style={{ marginTop: 16 }}
       >

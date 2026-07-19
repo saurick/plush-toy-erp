@@ -30,7 +30,7 @@ COPY web/src ./src
 COPY web/public ./public
 COPY web/index.html ./
 COPY web/vite*.mjs ./
-COPY web/devCustomerImportDryRunPlugin.mjs web/devCustomerConfigPlugin.mjs ./
+COPY web/devCustomerImportDryRunPlugin.mjs web/devCustomerConfigPlugin.mjs web/devQaCoveragePlugin.mjs ./
 COPY web/tailwind.config.js ./
 COPY web/postcss.config.js ./
 COPY config /config

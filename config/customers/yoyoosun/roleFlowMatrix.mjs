@@ -330,6 +330,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "receivables",
         "invoices",
         "processing-contracts",
+        "inbound",
         "shipments",
         "task-board",
         "print-center",
@@ -346,6 +347,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "process.read",
         "outsourcing.order.read",
         "outsourcing.fact.read",
+        "purchase.receipt.read",
         "quality.inspection.read",
         "sales_order.read",
         "sales_order_item.read",
@@ -373,7 +375,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "delivery_to_settlement.receivable_review",
       ]),
       guardrail:
-        "财务放行、应收 / 应付草稿和对账线索不等于税控、总账、收付款核销或完整财务系统。",
+        "入库页只用于核对采购入库来源，财务不能创建、调整、确认入库或办理采购退货；财务放行、应收 / 应付草稿和对账线索不等于税控、总账、收付款核销或完整财务系统。",
     }),
     Object.freeze({
       roleKey: "production",
@@ -384,7 +386,6 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "production-orders",
         "processing-contracts",
         "production-exceptions",
-        "exception-flow",
         "production-progress",
         "task-board",
         "print-center",

@@ -447,6 +447,27 @@ function dropUnchangedCheckOperations(
   }
 }
 
+function dropIndexesRemovedWithTheirOnlyTrackedColumn(tokenOperations) {
+  for (const [key, item] of tokenOperations) {
+    if (
+      item.kind !== "index" ||
+      item.operations.size !== 1 ||
+      !item.operations.has("drop")
+    ) {
+      continue;
+    }
+    const column = tokenOperations.get(`column:${item.token}`);
+    if (
+      column?.operations.size === 1 &&
+      column.operations.has("drop")
+    ) {
+      // PostgreSQL drops a single-column index together with its removed
+      // column. Atlas therefore emits only DROP COLUMN for this Ent diff.
+      tokenOperations.delete(key);
+    }
+  }
+}
+
 function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
   const source = currentOrBaselineSource(root, file);
   const table = schemaTableName(source, file);
@@ -530,6 +551,7 @@ function schemaDdlRequirements(root, file, range, untrackedFiles, entries) {
       range,
       tokenOperations,
     );
+    dropIndexesRemovedWithTheirOnlyTrackedColumn(tokenOperations);
   }
   const requirements = [];
   const allPhysicalTokens = [

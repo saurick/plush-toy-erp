@@ -78,6 +78,26 @@ func (_u *ProcessUpdate) ClearCategory() *ProcessUpdate {
 	return _u
 }
 
+// SetProductionRouteOperationCode sets the "production_route_operation_code" field.
+func (_u *ProcessUpdate) SetProductionRouteOperationCode(v string) *ProcessUpdate {
+	_u.mutation.SetProductionRouteOperationCode(v)
+	return _u
+}
+
+// SetNillableProductionRouteOperationCode sets the "production_route_operation_code" field if the given value is not nil.
+func (_u *ProcessUpdate) SetNillableProductionRouteOperationCode(v *string) *ProcessUpdate {
+	if v != nil {
+		_u.SetProductionRouteOperationCode(*v)
+	}
+	return _u
+}
+
+// ClearProductionRouteOperationCode clears the value of the "production_route_operation_code" field.
+func (_u *ProcessUpdate) ClearProductionRouteOperationCode() *ProcessUpdate {
+	_u.mutation.ClearProductionRouteOperationCode()
+	return _u
+}
+
 // SetOutsourcingEnabled sets the "outsourcing_enabled" field.
 func (_u *ProcessUpdate) SetOutsourcingEnabled(v bool) *ProcessUpdate {
 	_u.mutation.SetOutsourcingEnabled(v)
@@ -311,6 +331,11 @@ func (_u *ProcessUpdate) check() error {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Process.category": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductionRouteOperationCode(); ok {
+		if err := process.ProductionRouteOperationCodeValidator(v); err != nil {
+			return &ValidationError{Name: "production_route_operation_code", err: fmt.Errorf(`ent: validator failed for field "Process.production_route_operation_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SortOrder(); ok {
 		if err := process.SortOrderValidator(v); err != nil {
 			return &ValidationError{Name: "sort_order", err: fmt.Errorf(`ent: validator failed for field "Process.sort_order": %w`, err)}
@@ -347,6 +372,12 @@ func (_u *ProcessUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if _u.mutation.CategoryCleared() {
 		_spec.ClearField(process.FieldCategory, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductionRouteOperationCode(); ok {
+		_spec.SetField(process.FieldProductionRouteOperationCode, field.TypeString, value)
+	}
+	if _u.mutation.ProductionRouteOperationCodeCleared() {
+		_spec.ClearField(process.FieldProductionRouteOperationCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.OutsourcingEnabled(); ok {
 		_spec.SetField(process.FieldOutsourcingEnabled, field.TypeBool, value)
@@ -530,6 +561,26 @@ func (_u *ProcessUpdateOne) SetNillableCategory(v *string) *ProcessUpdateOne {
 // ClearCategory clears the value of the "category" field.
 func (_u *ProcessUpdateOne) ClearCategory() *ProcessUpdateOne {
 	_u.mutation.ClearCategory()
+	return _u
+}
+
+// SetProductionRouteOperationCode sets the "production_route_operation_code" field.
+func (_u *ProcessUpdateOne) SetProductionRouteOperationCode(v string) *ProcessUpdateOne {
+	_u.mutation.SetProductionRouteOperationCode(v)
+	return _u
+}
+
+// SetNillableProductionRouteOperationCode sets the "production_route_operation_code" field if the given value is not nil.
+func (_u *ProcessUpdateOne) SetNillableProductionRouteOperationCode(v *string) *ProcessUpdateOne {
+	if v != nil {
+		_u.SetProductionRouteOperationCode(*v)
+	}
+	return _u
+}
+
+// ClearProductionRouteOperationCode clears the value of the "production_route_operation_code" field.
+func (_u *ProcessUpdateOne) ClearProductionRouteOperationCode() *ProcessUpdateOne {
+	_u.mutation.ClearProductionRouteOperationCode()
 	return _u
 }
 
@@ -779,6 +830,11 @@ func (_u *ProcessUpdateOne) check() error {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Process.category": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ProductionRouteOperationCode(); ok {
+		if err := process.ProductionRouteOperationCodeValidator(v); err != nil {
+			return &ValidationError{Name: "production_route_operation_code", err: fmt.Errorf(`ent: validator failed for field "Process.production_route_operation_code": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.SortOrder(); ok {
 		if err := process.SortOrderValidator(v); err != nil {
 			return &ValidationError{Name: "sort_order", err: fmt.Errorf(`ent: validator failed for field "Process.sort_order": %w`, err)}
@@ -832,6 +888,12 @@ func (_u *ProcessUpdateOne) sqlSave(ctx context.Context) (_node *Process, err er
 	}
 	if _u.mutation.CategoryCleared() {
 		_spec.ClearField(process.FieldCategory, field.TypeString)
+	}
+	if value, ok := _u.mutation.ProductionRouteOperationCode(); ok {
+		_spec.SetField(process.FieldProductionRouteOperationCode, field.TypeString, value)
+	}
+	if _u.mutation.ProductionRouteOperationCodeCleared() {
+		_spec.ClearField(process.FieldProductionRouteOperationCode, field.TypeString)
 	}
 	if value, ok := _u.mutation.OutsourcingEnabled(); ok {
 		_spec.SetField(process.FieldOutsourcingEnabled, field.TypeBool, value)

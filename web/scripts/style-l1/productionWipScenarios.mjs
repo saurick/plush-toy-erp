@@ -15,17 +15,21 @@ function productionWipPermissions() {
 
 async function clickVisibleAction(page, text) {
   const pattern = text instanceof RegExp ? text : new RegExp(`^${text}$`, 'u')
-  let action = page.locator('button:visible', { hasText: pattern }).first()
-  if ((await action.count()) === 0) {
-    await page
-      .locator('button:visible', { hasText: /更多操作/u })
-      .first()
-      .click()
+  const compact = Number(page.viewportSize()?.width || 0) < 992
+  let action
+  if (compact) {
+    const more = page.locator(
+      '.erp-business-selection-action-bar__compact-more:visible'
+    )
+    await more.waitFor({ state: 'visible', timeout: 10_000 })
+    await more.click()
     const drawer = page
       .locator('.erp-business-selection-action-drawer:visible')
       .last()
     await drawer.waitFor({ state: 'visible', timeout: 10_000 })
     action = drawer.locator('button:visible', { hasText: pattern }).first()
+  } else {
+    action = page.locator('button:visible', { hasText: pattern }).first()
   }
   await action.waitFor({ state: 'visible', timeout: 10_000 })
   await action.click()
@@ -178,10 +182,16 @@ export function createProductionWipScenarios(deps) {
           .getByText(/SIM-OUTSOURCE-SEWING-CONFIRMED.*覆盖 2 项布料/u)
           .last()
           .click()
-        await page.keyboard.press('Escape')
+        await page
+          .locator('.ant-select-dropdown:visible')
+          .waitFor({ state: 'hidden', timeout: 10_000 })
         const fabricMainSelect = routeModal.getByLabel(
           'MAT-STYLE-L1 / 样式短毛绒布'
         )
+        const fabricMainField = routeModal
+          .locator('.ant-form-item')
+          .filter({ hasText: 'MAT-STYLE-L1 / 样式短毛绒布' })
+          .first()
         await fabricMainSelect.click()
         await page
           .getByText(/第 4 行.*MAT-STYLE-L1.*10\.2 米/u)
@@ -190,6 +200,10 @@ export function createProductionWipScenarios(deps) {
         const fabricLiningSelect = routeModal.getByLabel(
           'MAT-LINING-L1 / 样式里布'
         )
+        const fabricLiningField = routeModal
+          .locator('.ant-form-item')
+          .filter({ hasText: 'MAT-LINING-L1 / 样式里布' })
+          .first()
         await fabricLiningSelect.click()
         await page
           .getByText(/第 5 行.*MAT-LINING-L1.*5 米/u)
@@ -198,8 +212,18 @@ export function createProductionWipScenarios(deps) {
         await routeModal.getByText('安排布料整单外发', { exact: true }).click()
         await expectText(page, 'MAT-STYLE-L1 / 样式短毛绒布')
         await expectText(page, 'MAT-LINING-L1 / 样式里布')
-        assert.match(await fabricMainSelect.innerText(), /第 4 行/u)
-        assert.match(await fabricLiningSelect.innerText(), /第 5 行/u)
+        assert.match(
+          await fabricMainField
+            .locator('.ant-select-selection-item')
+            .innerText(),
+          /第 4 行/u
+        )
+        assert.match(
+          await fabricLiningField
+            .locator('.ant-select-selection-item')
+            .innerText(),
+          /第 5 行/u
+        )
         await expectText(page, '外发开工前还必须把合同对应材料发料过账')
         await routeModal.screenshot({
           path: path.resolve(
@@ -277,9 +301,60 @@ export function createProductionWipScenarios(deps) {
         await routeModal.waitFor({ state: 'hidden', timeout: 10_000 })
 
         await clickVisibleAction(page, '登记完工入库')
+        await page.waitForFunction(
+          () =>
+            Array.from(
+              document.querySelectorAll('.ant-modal .ant-modal-title')
+            ).some((node) => {
+              const rect = node.closest('.ant-modal')?.getBoundingClientRect()
+              return (
+                rect?.width > 0 &&
+                rect?.height > 0 &&
+                ['登记完工入库', '暂不能登记完工入库'].includes(
+                  String(node.textContent || '').trim()
+                )
+              )
+            }) ||
+            Array.from(
+              document.querySelectorAll('.ant-message-notice-content')
+            ).some((node) => {
+              const rect = node.getBoundingClientRect()
+              return (
+                rect.width > 0 &&
+                rect.height > 0 &&
+                String(node.textContent || '').includes('加载完工入库详情')
+              )
+            }),
+          undefined,
+          { timeout: 10_000 }
+        )
+        const visibleModalSummaries = await page
+          .locator('.ant-modal:visible')
+          .evaluateAll((nodes) =>
+            nodes.map((node) => ({
+              title:
+                node.querySelector('.ant-modal-title')?.textContent?.trim() ||
+                '',
+              text: String(node.textContent || '')
+                .replace(/\s+/gu, ' ')
+                .trim(),
+            }))
+          )
+        const visibleMessageTexts = await page
+          .locator('.ant-message-notice-content:visible')
+          .allInnerTexts()
+        assert(
+          visibleModalSummaries.some(
+            (item) => item.title === '登记完工入库'
+          ),
+          `完工入库未进入可办理弹窗: ${JSON.stringify({
+            modals: visibleModalSummaries,
+            messages: visibleMessageTexts,
+          })}`
+        )
         const completionModal = page
           .locator('.ant-modal:visible')
-          .filter({ hasText: '登记完工入库' })
+          .filter({ has: page.getByText('登记完工入库', { exact: true }) })
           .last()
         await completionModal.waitFor({ state: 'visible', timeout: 10_000 })
         await expectText(page, '部分路线明细暂不可登记')

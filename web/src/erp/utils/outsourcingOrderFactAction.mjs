@@ -3,6 +3,15 @@ import {
   buildSourceInboundLotFields,
   normalizeSourceInboundLotRequestFields,
 } from './sourceInboundLotSelection.mjs'
+import {
+  addNumeric20Scale6Units,
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  normalizePositiveNumeric20Scale6,
+  numeric20Scale6TextFromUnits,
+  numeric20Scale6Units,
+  subtractNumeric20Scale6Units,
+} from './numeric20Scale6.mjs'
 
 export const OUTSOURCING_SOURCE_ACTIONS = Object.freeze({
   MATERIAL_ISSUE: 'MATERIAL_ISSUE',
@@ -27,19 +36,14 @@ const RETURN_RECEIPT_CREATE_REQUEST_KEYS = new Set([
   'new_lot_no',
 ])
 
-function decimalNumber(value) {
-  const parsed = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(parsed) ? parsed : 0
+function quantityUnits(value) {
+  return numeric20Scale6Units(value) ?? '0'
 }
 
-function quantityText(value) {
-  const parsed = decimalNumber(value)
-  if (parsed <= 0) return ''
-  return String(Number(parsed.toFixed(4)))
+function positiveUnitsText(value) {
+  return isPositiveNumeric20Scale6Units(value)
+    ? numeric20Scale6TextFromUnits(value)
+    : ''
 }
 
 function positiveID(value) {
@@ -145,19 +149,34 @@ export function outsourcingSourceActionProcessedQuantity(
   item = {},
   facts = []
 ) {
+  const units = outsourcingSourceActionProcessedUnits(
+    actionType,
+    order,
+    item,
+    facts
+  )
+  return Number(numeric20Scale6TextFromUnits(units))
+}
+
+function outsourcingSourceActionProcessedUnits(
+  actionType,
+  order,
+  item,
+  facts
+) {
   const normalizedAction = normalizedActionType(actionType)
-  if (!normalizedAction) return 0
+  if (!normalizedAction) return '0'
   return (Array.isArray(facts) ? facts : []).reduce((total, fact) => {
     if (
       String(fact?.fact_type || '').toUpperCase() !== normalizedAction ||
-      String(fact?.status || '').toUpperCase() === 'CANCELLED' ||
+      String(fact?.status || '').toUpperCase() !== 'POSTED' ||
       positiveID(fact?.source_id) !== positiveID(order?.id) ||
       positiveID(fact?.source_line_id) !== positiveID(item?.id)
     ) {
       return total
     }
-    return total + decimalNumber(fact?.quantity)
-  }, 0)
+    return addNumeric20Scale6Units(total, quantityUnits(fact?.quantity))
+  }, '0')
 }
 
 export function outsourcingSourceActionQuantitySummary(
@@ -166,17 +185,18 @@ export function outsourcingSourceActionQuantitySummary(
   item = {},
   facts = []
 ) {
-  const planned = decimalNumber(item?.outsourcing_quantity)
-  const processed = outsourcingSourceActionProcessedQuantity(
+  const planned = quantityUnits(item?.outsourcing_quantity)
+  const processed = outsourcingSourceActionProcessedUnits(
     actionType,
     order,
     item,
     facts
   )
+  const remaining = subtractNumeric20Scale6Units(planned, processed)
   return {
-    planned: quantityText(planned) || '0',
-    processed: quantityText(processed) || '0',
-    remaining: quantityText(Math.max(0, planned - processed)) || '0',
+    planned: positiveUnitsText(planned) || '0',
+    processed: positiveUnitsText(processed) || '0',
+    remaining: positiveUnitsText(remaining) || '0',
   }
 }
 
@@ -192,7 +212,7 @@ export function buildOutsourcingSourceFactPayload(
     throw new Error('当前委外明细不允许办理该业务')
   }
   const warehouseID = positiveID(values.warehouse_id)
-  const quantity = quantityText(values.quantity)
+  const quantity = normalizePositiveNumeric20Scale6(values.quantity)
   if (!warehouseID) {
     throw new Error('请选择办理仓库')
   }
@@ -224,7 +244,12 @@ export function buildOutsourcingSourceFactPayload(
     item,
     facts
   )
-  if (decimalNumber(quantity) > decimalNumber(summary.remaining)) {
+  if (
+    compareNumeric20Scale6Units(
+      quantityUnits(quantity),
+      quantityUnits(summary.remaining)
+    ) > 0
+  ) {
     throw new Error('办理数量不能超过当前剩余数量')
   }
   const occurredAtText = String(values.occurred_at || '').trim()
@@ -274,7 +299,7 @@ export function normalizeOutsourcingSourceFactCreateRequest(
   const customerKey = optionalText(params.customer_key, 64)
   const occurredAt = optionalOccurredAt(params.occurred_at)
   const note = optionalText(params.note)
-  const quantity = quantityText(params.quantity)
+  const quantity = normalizePositiveNumeric20Scale6(params.quantity)
   if (!quantity) throw invalidContract()
   return {
     ...(customerKey ? { customer_key: customerKey } : {}),

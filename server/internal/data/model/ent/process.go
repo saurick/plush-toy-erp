@@ -23,6 +23,8 @@ type Process struct {
 	Name string `json:"name,omitempty"`
 	// Category holds the value of the "category" field.
 	Category *string `json:"category,omitempty"`
+	// ProductionRouteOperationCode holds the value of the "production_route_operation_code" field.
+	ProductionRouteOperationCode *string `json:"production_route_operation_code,omitempty"`
 	// OutsourcingEnabled holds the value of the "outsourcing_enabled" field.
 	OutsourcingEnabled bool `json:"outsourcing_enabled,omitempty"`
 	// InhouseEnabled holds the value of the "inhouse_enabled" field.
@@ -83,7 +85,7 @@ func (*Process) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case process.FieldID, process.FieldSortOrder:
 			values[i] = new(sql.NullInt64)
-		case process.FieldCode, process.FieldName, process.FieldCategory, process.FieldNote:
+		case process.FieldCode, process.FieldName, process.FieldCategory, process.FieldProductionRouteOperationCode, process.FieldNote:
 			values[i] = new(sql.NullString)
 		case process.FieldCreatedAt, process.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -126,6 +128,13 @@ func (_m *Process) assignValues(columns []string, values []any) error {
 			} else if value.Valid {
 				_m.Category = new(string)
 				*_m.Category = value.String
+			}
+		case process.FieldProductionRouteOperationCode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field production_route_operation_code", values[i])
+			} else if value.Valid {
+				_m.ProductionRouteOperationCode = new(string)
+				*_m.ProductionRouteOperationCode = value.String
 			}
 		case process.FieldOutsourcingEnabled:
 			if value, ok := values[i].(*sql.NullBool); !ok {
@@ -230,6 +239,11 @@ func (_m *Process) String() string {
 	builder.WriteString(", ")
 	if v := _m.Category; v != nil {
 		builder.WriteString("category=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.ProductionRouteOperationCode; v != nil {
+		builder.WriteString("production_route_operation_code=")
 		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")

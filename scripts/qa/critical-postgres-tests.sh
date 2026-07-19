@@ -1,0 +1,43 @@
+#!/usr/bin/env bash
+
+# One source of truth for the PostgreSQL integration families executed against
+# the disposable migrated database. Fast/full skip exactly these families
+# because test-critical executes them with real PostgreSQL and rejects skips.
+CRITICAL_POSTGRES_TEST_PATTERN='^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestPurchaseReturnPostgres|TestPurchaseReturnFromQualityInspectionPostgres|TestQualityInspectionPostgres|TestQualityInspectionFromOutsourcingReturnPostgres|TestProductionWIPQualityInspectionPostgres|TestSourceFinanceSnapshotBackfillMigrationPostgres|TestWorkflowPostgres|TestCustomerConfigPostgres|TestMasterDataSchemaPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestProductionMaterialIssuePostgres|TestProductionReworkPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestInventoryLotPostgres|TestBOMPostgres|TestOperationalFactPostgres|TestOutsourcingFactFromOrderPostgres|TestProcessRuntimePostgres|TestFinanceBusinessSourcesPostgres|TestOperationalFactRepoFinance.*Postgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)'
+
+CRITICAL_POSTGRES_REQUIRED_PREFIXES=(
+  TestPurchaseReceiptPostgres
+  TestPurchaseReceiptAdjustmentPostgres
+  TestPurchaseReturnPostgres
+  TestPurchaseReturnFromQualityInspectionPostgres
+  TestQualityInspectionPostgres
+  TestQualityInspectionFromOutsourcingReturnPostgres
+  TestProductionWIPQualityInspectionPostgres
+  TestSourceFinanceSnapshotBackfillMigrationPostgres
+  TestWorkflowPostgres
+  TestCustomerConfigPostgres
+  TestMasterDataSchemaPostgres
+  TestProductionOrderSchemaPostgres
+  TestProductionOrderPostgres
+  TestProductionMaterialIssuePostgres
+  TestProductionReworkPostgres
+  TestSourceDocumentPostgres
+  TestInventoryPostgres
+  TestInventoryLotPostgres
+  TestBOMPostgres
+  TestOperationalFactPostgres
+  TestOutsourcingFactFromOrderPostgres
+  TestProcessRuntimePostgres
+  TestFinanceBusinessSourcesPostgres
+  TestOperationalFactRepoFinance
+  TestFinanceFactCancelAuditPostgres
+  TestFinanceProcessCommandPostgres
+  TestSalesProcessCommandPostgres
+)
+
+# This file is a source-only contract. ShellCheck also scans it independently,
+# where the readonly exports have no local consumer.
+# shellcheck disable=SC2034
+readonly CRITICAL_POSTGRES_TEST_PATTERN
+# shellcheck disable=SC2034
+readonly -a CRITICAL_POSTGRES_REQUIRED_PREFIXES

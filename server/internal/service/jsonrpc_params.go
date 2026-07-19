@@ -102,37 +102,19 @@ func parseJSONRPCTime(raw any) (time.Time, bool) {
 	}
 }
 
-func getRequiredJSONRPCDecimal(pm map[string]any, key string) (decimal.Decimal, bool) {
-	if _, ok := pm[key]; !ok {
-		return decimal.Zero, false
-	}
-	return parseJSONRPCDecimal(pm[key])
-}
-
-// getRequiredJSONRPCNumeric20Scale6 bounds string inputs before constructing a
-// decimal. JSON numbers retain the existing compatibility contract and are
-// subsequently validated by the owning usecase.
+// getRequiredJSONRPCNumeric20Scale6 accepts the public numeric(20,6) contract:
+// a decimal string with at most 14 integer digits and 6 fractional digits.
+// JSON numbers are rejected so transport decoding cannot round business values.
 func getRequiredJSONRPCNumeric20Scale6(pm map[string]any, key string) (decimal.Decimal, bool) {
 	raw, ok := pm[key]
 	if !ok {
 		return decimal.Zero, false
 	}
-	if value, ok := raw.(string); ok {
-		return parseJSONRPCNumeric20Scale6String(value)
-	}
-	return parseJSONRPCDecimal(raw)
-}
-
-func getOptionalJSONRPCDecimal(pm map[string]any, key string) (*decimal.Decimal, bool) {
-	raw, ok := pm[key]
-	if !ok || raw == nil {
-		return nil, true
-	}
-	parsed, ok := parseJSONRPCDecimal(raw)
+	value, ok := raw.(string)
 	if !ok {
-		return nil, false
+		return decimal.Zero, false
 	}
-	return &parsed, true
+	return parseJSONRPCNumeric20Scale6String(value)
 }
 
 // getOptionalJSONRPCDecimalString preserves decimal precision for fields whose
@@ -158,7 +140,7 @@ func parseJSONRPCNumeric20Scale6String(value string) (decimal.Decimal, bool) {
 		return decimal.Zero, false
 	}
 	text := strings.TrimSpace(value)
-	if text == "" {
+	if text == "" || text != value {
 		return decimal.Zero, false
 	}
 
@@ -196,24 +178,6 @@ func parseJSONRPCNumeric20Scale6String(value string) (decimal.Decimal, bool) {
 	}
 	parsed, err := decimal.NewFromString(text)
 	return parsed, err == nil
-}
-
-func parseJSONRPCDecimal(raw any) (decimal.Decimal, bool) {
-	switch value := raw.(type) {
-	case float64:
-		return decimal.NewFromFloat(value), true
-	case int:
-		return decimal.NewFromInt(int64(value)), true
-	case string:
-		text := strings.TrimSpace(value)
-		if text == "" {
-			return decimal.Zero, false
-		}
-		parsed, err := decimal.NewFromString(text)
-		return parsed, err == nil
-	default:
-		return decimal.Zero, false
-	}
 }
 
 func optionalStringValue(value *string) any {

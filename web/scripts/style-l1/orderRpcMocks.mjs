@@ -1,4 +1,42 @@
-import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+import {
+  stylePaginatedRpcData,
+  styleRpcResult,
+  unsupportedRpcMethod,
+} from './rpcMockResult.mjs'
+
+export function mockSalesOrderItemsList(params = {}, salesOrderItem = null) {
+  const salesOrderID = Number(params.sales_order_id || 0)
+  if (!Number.isSafeInteger(salesOrderID) || salesOrderID <= 0) {
+    return unsupportedRpcMethod(
+      'sales_order',
+      'list_sales_order_items invalid params'
+    )
+  }
+  const requestedLimit = Number(params.limit || 50)
+  const limit =
+    Number.isSafeInteger(requestedLimit) &&
+    requestedLimit > 0 &&
+    requestedLimit <= 200
+      ? requestedLimit
+      : 50
+  const requestedOffset = Number(params.offset || 0)
+  const offset =
+    Number.isSafeInteger(requestedOffset) && requestedOffset >= 0
+      ? requestedOffset
+      : 0
+  const matchingItems =
+    salesOrderItem &&
+    Number(salesOrderItem.sales_order_id || 0) === salesOrderID &&
+    (!params.line_status || salesOrderItem.line_status === params.line_status)
+      ? [salesOrderItem]
+      : []
+  return {
+    sales_order_items: matchingItems.slice(offset, offset + limit),
+    total: matchingItems.length,
+    limit,
+    offset,
+  }
+}
 
 export async function installOrderRpcMocks(page, context) {
   const { nowUnix } = context
@@ -48,15 +86,10 @@ export async function installOrderRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_sales_orders':
-        data = { sales_orders: [salesOrder], total: 1, limit: 100, offset: 0 }
+        data = stylePaginatedRpcData([salesOrder], 'sales_orders', params)
         break
       case 'list_sales_order_items':
-        data = {
-          sales_order_items: [salesOrderItem],
-          total: 1,
-          limit: Number(params.limit || 50),
-          offset: Number(params.offset || 0),
-        }
+        data = mockSalesOrderItemsList(params, salesOrderItem)
         break
       case 'save_sales_order_with_items':
         data = {
@@ -139,20 +172,17 @@ export async function installOrderRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_purchase_orders':
-        data = {
-          purchase_orders: [purchaseOrder],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
+        data = stylePaginatedRpcData([purchaseOrder], 'purchase_orders', params)
         break
       case 'list_purchase_order_items':
-        data = {
-          purchase_order_items: [purchaseOrderItem],
-          total: 1,
-          limit: Number(params.limit || 50),
-          offset: Number(params.offset || 0),
-        }
+        data = stylePaginatedRpcData(
+          Number(params.purchase_order_id || 0) === purchaseOrder.id
+            ? [purchaseOrderItem]
+            : [],
+          'purchase_order_items',
+          params,
+          50
+        )
         break
       case 'save_purchase_order_with_items':
         data = {
@@ -208,7 +238,6 @@ export async function installOrderRpcMocks(page, context) {
         name: '样式加工厂',
       },
       source_order_no: 'SO-STYLE-L1',
-      source_sales_order_id: 1,
       order_date: nowUnix(),
       expected_return_date: nowUnix() + 86_400 * 7,
       lifecycle_status: 'draft',
@@ -528,12 +557,11 @@ export async function installOrderRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_bom_versions':
-        data = {
-          bom_versions: [bomVersion, bomDraft],
-          total: 2,
-          limit: 100,
-          offset: 0,
-        }
+        data = stylePaginatedRpcData(
+          [bomVersion, bomDraft],
+          'bom_versions',
+          params
+        )
         break
       case 'get_bom_version':
         data = {
@@ -1178,10 +1206,7 @@ export async function installOrderRpcMocks(page, context) {
       params.production_order_id !== productionOrder.id
     ) {
       data = unsupportedRpcMethod('production_wip', method)
-    } else if (
-      method === 'get_production_wip' ||
-      method === 'initialize_production_wip'
-    ) {
+    } else if (method === 'get_production_wip') {
       data = productionWipAggregate()
     } else if (method === 'execute_production_wip_action') {
       const batch = productionWipBatches.find(
@@ -1259,6 +1284,9 @@ export async function installOrderRpcMocks(page, context) {
             })
           }
         }
+        batch.version += 1
+      } else if (params.action === 'CANCEL_BATCH' && batch) {
+        batch.status = 'CANCELLED'
         batch.version += 1
       } else if (params.action === 'START_OPERATION' && batch) {
         batch.status =

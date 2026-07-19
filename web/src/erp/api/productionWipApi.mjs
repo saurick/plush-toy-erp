@@ -5,7 +5,6 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
   buildProductionWipActionParams,
   positiveSafeInteger,
-  productionWipUUID,
   validateProductionWipAggregate,
 } from '../utils/productionWipModel.mjs'
 
@@ -31,28 +30,6 @@ export async function getProductionWip(productionOrderID, options = {}) {
   const result = await rpc.call(
     'get_production_wip',
     { production_order_id: normalizedOrderID },
-    options
-  )
-  return validateProductionWipAggregate(dataOf(result), {
-    productionOrderID: normalizedOrderID,
-  })
-}
-
-export async function initializeProductionWip(
-  productionOrderID,
-  { idempotencyKey = productionWipUUID(), options = {} } = {}
-) {
-  const normalizedOrderID = requireProductionOrderID(productionOrderID)
-  const normalizedIdempotencyKey = String(idempotencyKey || '').trim()
-  if (!normalizedIdempotencyKey || [...normalizedIdempotencyKey].length > 128) {
-    throw new Error('生产工序路线不完整，请刷新后重试')
-  }
-  const result = await rpc.call(
-    'initialize_production_wip',
-    {
-      production_order_id: normalizedOrderID,
-      idempotency_key: normalizedIdempotencyKey,
-    },
     options
   )
   return validateProductionWipAggregate(dataOf(result), {

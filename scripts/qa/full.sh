@@ -71,6 +71,10 @@ fi
 ROOT_DIR="$(git rev-parse --show-toplevel)"
 cd "$ROOT_DIR"
 
+# ROOT_DIR pins the shared PostgreSQL contract; ShellCheck scans it separately.
+# shellcheck disable=SC1091
+source "$ROOT_DIR/scripts/qa/critical-postgres-tests.sh"
+
 if ! command -v node >/dev/null 2>&1; then
   echo "[qa:full] 未找到 node，请先安装 Node.js"
   exit 1
@@ -139,7 +143,7 @@ echo "[qa:full] 运行 server 全量检查"
   ERP_PDF_CHROMIUM_INTEGRATION=1 \
     node "$ROOT_DIR/scripts/qa/run-test-gate.mjs" \
     --kind go --label server-all -- \
-    go test -count=1 -json -skip '^Test.*Postgres.*$' ./...
+    go test -count=1 -json -skip "$CRITICAL_POSTGRES_TEST_PATTERN" ./...
   make build
 )
 

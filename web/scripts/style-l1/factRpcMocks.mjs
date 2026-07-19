@@ -14,7 +14,11 @@ import {
 } from '../../src/erp/utils/workflowTaskMutation.mjs'
 import { buildWorkflowTaskBoardMock } from '../../src/mocks/workflowTaskBoardMock.mjs'
 import { purchaseReceiptMutationSignature } from '../../src/erp/utils/purchaseReceiptMutation.mjs'
-import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+import {
+  stylePaginatedRpcData,
+  styleRpcResult,
+  unsupportedRpcMethod,
+} from './rpcMockResult.mjs'
 import { isMatchingShipmentReleaseFixture } from './workflowSourceTaskFixtures.mjs'
 
 const SALES_ORDER_RESERVATION_CREATE_KEYS = new Set([
@@ -86,13 +90,24 @@ const PRODUCTION_REWORK_CREATE_KEYS = new Set([
   'reason',
 ])
 
-const SHIPMENT_FINANCE_CREATE_KEYS = new Set([
+const SHIPMENT_RECEIVABLE_CREATE_KEYS = new Set([
   'customer_key',
   'fact_no',
   'shipment_id',
   'idempotency_key',
   'occurred_at',
   'note',
+])
+const SHIPMENT_INVOICE_CREATE_KEYS = new Set([
+  ...SHIPMENT_RECEIVABLE_CREATE_KEYS,
+  'invoice_category',
+])
+const SHIPMENT_INVOICE_CATEGORIES = new Set([
+  'NONE',
+  'EXPORT_GENERAL',
+  'VAT_GENERAL_1',
+  'VAT_SPECIAL_3',
+  'VAT_SPECIAL_13',
 ])
 
 const PURCHASE_RECEIPT_PAYABLE_CREATE_KEYS = new Set([
@@ -121,6 +136,76 @@ const SINGLE_FACT_RECONCILIATION_CREATE_KEYS = new Set([
   'occurred_at',
   'note',
 ])
+
+const SHIPMENT_SOURCE_CANDIDATE_LIST_KEYS = new Set([
+  'keyword',
+  'sales_order_id',
+  'limit',
+  'offset',
+])
+
+export function mockShipmentSourceCandidates(params = {}, candidates = []) {
+  if (
+    Object.keys(params || {}).some(
+      (key) => !SHIPMENT_SOURCE_CANDIDATE_LIST_KEYS.has(key)
+    )
+  ) {
+    return unsupportedRpcMethod(
+      'operational_fact',
+      'list_shipment_source_candidates invalid params'
+    )
+  }
+  const limit = Number(params.limit ?? 50)
+  const offset = Number(params.offset ?? 0)
+  const salesOrderID =
+    params.sales_order_id === undefined ? 0 : Number(params.sales_order_id || 0)
+  if (
+    !Number.isSafeInteger(limit) ||
+    limit <= 0 ||
+    limit > 200 ||
+    !Number.isSafeInteger(offset) ||
+    offset < 0 ||
+    (params.sales_order_id !== undefined &&
+      (!Number.isSafeInteger(salesOrderID) || salesOrderID <= 0))
+  ) {
+    return unsupportedRpcMethod(
+      'operational_fact',
+      'list_shipment_source_candidates invalid params'
+    )
+  }
+  const keyword = String(params.keyword || '')
+    .trim()
+    .toLowerCase()
+  const filtered = candidates.filter((candidate) => {
+    if (
+      salesOrderID &&
+      Number(candidate.sales_order_id || 0) !== salesOrderID
+    ) {
+      return false
+    }
+    if (!keyword) return true
+    return [
+      candidate.order_no,
+      candidate.customer_name,
+      candidate.product_code,
+      candidate.product_name,
+      candidate.product_code_snapshot,
+      candidate.product_name_snapshot,
+      candidate.sku_code,
+      candidate.sku_name,
+    ].some((value) =>
+      String(value || '')
+        .toLowerCase()
+        .includes(keyword)
+    )
+  })
+  return {
+    shipment_source_candidates: filtered.slice(offset, offset + limit),
+    total: filtered.length,
+    limit,
+    offset,
+  }
+}
 
 function validSourceFinanceCreate(params, allowedKeys, sourceIDKey) {
   const idempotencyKey = String(params?.idempotency_key || '').trim()
@@ -204,10 +289,12 @@ export async function installFactRpcMocks(page, context) {
   const createdProductionMaterialIssues = []
   const createdProductionReworks = []
   const createdOutsourcingFacts = []
+  const outsourcingFactStatusOverrides = new Map()
   const ambiguousInboundResponses = new Set()
   const productionCompletionAttempts = new Map()
   const productionReworkAttempts = new Map()
   const outsourcingSourceFactAttempts = new Map()
+  let shipmentStatus = 'DRAFT'
 
   await page.route('**/rpc/operational_fact', async (route) => {
     const body = route.request().postDataJSON() || {}
@@ -229,7 +316,7 @@ export async function installFactRpcMocks(page, context) {
     const shipment = {
       id: 1,
       shipment_no: 'SHIP-STYLE-L1',
-      status: 'DRAFT',
+      status: shipmentStatus,
       sales_order_id: 1,
       customer_id: 1,
       customer_snapshot: '暗色客户',
@@ -241,6 +328,42 @@ export async function installFactRpcMocks(page, context) {
       created_at: nowUnix(),
       updated_at: nowUnix(),
     }
+    const shipmentSourceCandidates = Array.from({ length: 21 }, (_, index) => {
+      const lineNo = index + 1
+      return {
+        sales_order_id: 1,
+        order_no: 'SO-STYLE-L1',
+        order_status: 'active',
+        order_version: 1,
+        customer_id: 1,
+        customer_snapshot: {
+          id: 1,
+          code: 'CUS-STYLE-L1',
+          name: '暗色客户',
+        },
+        customer_name: '暗色客户',
+        sales_order_item_id: lineNo,
+        line_no: lineNo,
+        line_status: 'open',
+        product_id: 1,
+        product_sku_id: 1,
+        product_code: `PROD-STYLE-L1-${String(lineNo).padStart(2, '0')}`,
+        product_name: `样式产品 ${lineNo}`,
+        product_code_snapshot: `PROD-STYLE-L1-${String(lineNo).padStart(2, '0')}`,
+        product_name_snapshot: `样式产品 ${lineNo}`,
+        color_snapshot: '深棕',
+        sku_code: 'SKU-STYLE-L1',
+        sku_name: '深棕',
+        unit_id: 1,
+        unit_code: 'PCS',
+        unit_name: '只',
+        ordered_quantity: '10',
+        shipped_quantity: '0',
+        remaining_quantity: '10',
+        selectable: true,
+        disabled_reason: '',
+      }
+    })
     const productionFact = {
       id: 1,
       fact_no: 'PROD-FACT-L1',
@@ -252,9 +375,9 @@ export async function installFactRpcMocks(page, context) {
       unit_id: 1,
       lot_id: 1,
       quantity: '6',
-      source_type: 'PRODUCTION_PROGRESS',
-      source_id: 1,
-      source_line_id: null,
+      source_type: 'PRODUCTION_ORDER',
+      source_id: 71,
+      source_line_id: 7100,
       idempotency_key: 'PROD-FACT-L1',
       occurred_at: nowUnix(),
       note: '样式生产事实',
@@ -427,12 +550,7 @@ export async function installFactRpcMocks(page, context) {
                 Number(fact.source_line_id || 0) ===
                   Number(params.source_line_id))
           )
-          data = {
-            production_facts: facts,
-            total: facts.length,
-            limit: Number(params.limit || 100),
-            offset: Number(params.offset || 0),
-          }
+          data = stylePaginatedRpcData(facts, 'production_facts', params)
         }
         break
       case 'create_production_completion_from_order':
@@ -679,16 +797,23 @@ export async function installFactRpcMocks(page, context) {
             outsourcingFact,
             postedOutsourcingReturn,
             ...createdOutsourcingFacts,
-          ].filter(
-            (fact) =>
-              (!params.source_type ||
-                fact.source_type === params.source_type) &&
-              (!params.source_id ||
-                Number(fact.source_id || 0) === Number(params.source_id)) &&
-              (!params.source_line_id ||
-                Number(fact.source_line_id || 0) ===
-                  Number(params.source_line_id))
-          )
+          ]
+            .map((fact) => ({
+              ...fact,
+              status:
+                outsourcingFactStatusOverrides.get(Number(fact.id)) ||
+                fact.status,
+            }))
+            .filter(
+              (fact) =>
+                (!params.source_type ||
+                  fact.source_type === params.source_type) &&
+                (!params.source_id ||
+                  Number(fact.source_id || 0) === Number(params.source_id)) &&
+                (!params.source_line_id ||
+                  Number(fact.source_line_id || 0) ===
+                    Number(params.source_line_id))
+            )
           const limit = Number(params.limit || 50)
           const offset = Number(params.offset || 0)
           data = {
@@ -780,25 +905,69 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'post_outsourcing_fact':
+      case 'cancel_outsourcing_fact': {
+        const factID = Number(params.id || 0)
+        const allowedKeys = new Set(['customer_key', 'id'])
+        const current = [
+          outsourcingFact,
+          postedOutsourcingReturn,
+          ...paginatedOutsourcingReturns,
+          ...createdOutsourcingFacts,
+        ].find((fact) => Number(fact.id) === factID)
+        const currentStatus =
+          outsourcingFactStatusOverrides.get(factID) || current?.status
+        const nextStatus =
+          method === 'post_outsourcing_fact' ? 'POSTED' : 'CANCELLED'
+        const validStatus =
+          method === 'post_outsourcing_fact'
+            ? currentStatus === 'DRAFT'
+            : ['DRAFT', 'POSTED'].includes(currentStatus)
+        if (
+          !current ||
+          !Number.isSafeInteger(factID) ||
+          factID <= 0 ||
+          !Object.keys(params).every((key) => allowedKeys.has(key)) ||
+          !validStatus
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            `${method} invalid params or status`
+          )
+          break
+        }
+        outsourcingFactStatusOverrides.set(factID, nextStatus)
         data = {
-          outsourcing_fact: { ...outsourcingFact, status: 'POSTED' },
+          outsourcing_fact: { ...current, status: nextStatus },
         }
         break
-      case 'cancel_outsourcing_fact':
-        data = {
-          outsourcing_fact: { ...outsourcingFact, status: 'CANCELLED' },
+      }
+      case 'list_shipment_source_candidates':
+        data = mockShipmentSourceCandidates(params, shipmentSourceCandidates)
+        break
+      case 'get_shipment':
+        if (
+          Object.keys(params).length !== 1 ||
+          !Number.isSafeInteger(params.id) ||
+          params.id <= 0 ||
+          params.id !== shipment.id
+        ) {
+          data = unsupportedRpcMethod(
+            'operational_fact',
+            'get_shipment invalid params'
+          )
+          break
         }
+        data = { shipment }
         break
       case 'list_shipments':
         {
           const shipments =
-            params.status && params.status !== shipment.status ? [] : [shipment]
-          data = {
-            shipments,
-            total: shipments.length,
-            limit: 100,
-            offset: 0,
-          }
+            (params.status && params.status !== shipment.status) ||
+            (params.source_id &&
+              Number(params.source_id) !== shipment.sales_order_id)
+              ? []
+              : [shipment]
+          data = stylePaginatedRpcData(shipments, 'shipments', params)
         }
         break
       case 'create_shipment_with_items':
@@ -861,17 +1030,26 @@ export async function installFactRpcMocks(page, context) {
         break
       }
       case 'ship_shipment':
-        data = { shipment: { ...shipment, status: 'SHIPPED' } }
+        shipmentStatus = 'SHIPPED'
+        data = { shipment: { ...shipment, status: shipmentStatus } }
         break
       case 'cancel_shipment':
-        data = { shipment: { ...shipment, status: 'CANCELLED' } }
+        shipmentStatus = 'CANCELLED'
+        data = { shipment: { ...shipment, status: shipmentStatus } }
         break
       case 'list_stock_reservations':
-        data = {
-          stock_reservations: [stockReservation],
-          total: 1,
-          limit: 100,
-          offset: 0,
+        {
+          const stockReservations =
+            (params.source_id &&
+              Number(params.source_id) !== stockReservation.sales_order_id) ||
+            (params.status && params.status !== stockReservation.status)
+              ? []
+              : [stockReservation]
+          data = stylePaginatedRpcData(
+            stockReservations,
+            'stock_reservations',
+            params
+          )
         }
         break
       case 'create_stock_reservation_from_sales_order':
@@ -914,7 +1092,8 @@ export async function installFactRpcMocks(page, context) {
               (!params.source_type ||
                 fact.source_type === params.source_type) &&
               (!params.source_id ||
-                Number(fact.source_id || 0) === Number(params.source_id))
+                (typeof params.source_id === 'number' &&
+                  Number(fact.source_id || 0) === params.source_id))
           )
           data = {
             finance_facts: facts,
@@ -928,7 +1107,7 @@ export async function installFactRpcMocks(page, context) {
         if (
           !validSourceFinanceCreate(
             params,
-            SHIPMENT_FINANCE_CREATE_KEYS,
+            SHIPMENT_RECEIVABLE_CREATE_KEYS,
             'shipment_id'
           )
         ) {
@@ -960,8 +1139,13 @@ export async function installFactRpcMocks(page, context) {
         if (
           !validSourceFinanceCreate(
             params,
-            SHIPMENT_FINANCE_CREATE_KEYS,
+            SHIPMENT_INVOICE_CREATE_KEYS,
             'shipment_id'
+          ) ||
+          !SHIPMENT_INVOICE_CATEGORIES.has(
+            String(params.invoice_category || '')
+              .trim()
+              .toUpperCase()
           )
         ) {
           data = unsupportedRpcMethod(
@@ -983,6 +1167,9 @@ export async function installFactRpcMocks(page, context) {
             source_type: 'SHIPMENT',
             source_id: Number(params.shipment_id),
             idempotency_key: params.idempotency_key,
+            invoice_category: String(params.invoice_category)
+              .trim()
+              .toUpperCase(),
             occurred_at: params.occurred_at || nowUnix(),
             note: params.note || '',
           },
@@ -1110,6 +1297,7 @@ export async function installFactRpcMocks(page, context) {
     id: 602,
     receipt_id: 601,
     source_line_no: '入库行 1',
+    purchase_order_item_id: 1,
     material_id: 1,
     material_name_snapshot: '样式材料',
     warehouse_id: 1,
@@ -1130,6 +1318,8 @@ export async function installFactRpcMocks(page, context) {
     {
       id: 601,
       receipt_no: 'PR-STYLE-L1',
+      purchase_order_id: 1,
+      purchase_order_no: 'PO-STYLE-L1',
       supplier_id: 1,
       supplier_name: '样式供应商',
       warehouse_id: 1,
@@ -1143,6 +1333,8 @@ export async function installFactRpcMocks(page, context) {
     {
       id: 603,
       receipt_no: 'PR-STYLE-L1-DRAFT',
+      purchase_order_id: 1,
+      purchase_order_no: 'PO-STYLE-L1',
       supplier_name: '样式草稿供应商',
       warehouse_id: 1,
       received_at: nowUnix(),
@@ -1254,46 +1446,6 @@ export async function installFactRpcMocks(page, context) {
           }
         }
         break
-      case 'create_purchase_receipt_with_items':
-        {
-          const receiptId = nextPurchaseReceiptId
-          nextPurchaseReceiptId += 1
-          const receipt = {
-            ...purchaseReceipts[0],
-            ...params,
-            id: receiptId,
-            status: 'DRAFT',
-            items: Array.isArray(params.items)
-              ? params.items.map((item) => {
-                  const itemId = nextPurchaseReceiptItemId
-                  nextPurchaseReceiptItemId += 1
-                  return {
-                    ...purchaseReceiptItem,
-                    ...item,
-                    id: itemId,
-                    purchase_receipt_id: receiptId,
-                  }
-                })
-              : [],
-            created_at: nowUnix(),
-            updated_at: nowUnix(),
-          }
-          purchaseReceipts.unshift(receipt)
-          data = { purchase_receipt: receipt }
-        }
-        break
-      case 'create_purchase_receipt_draft':
-        data = {
-          purchase_receipt: {
-            ...purchaseReceipts[0],
-            ...params,
-            id: nextPurchaseReceiptId,
-            status: 'DRAFT',
-            items: [],
-          },
-        }
-        nextPurchaseReceiptId += 1
-        break
       case 'create_purchase_receipt_from_purchase_order':
         {
           const purchaseOrderID = Number(params.purchase_order_id || 0)
@@ -1391,15 +1543,13 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       case 'list_purchase_returns':
-        data = {
-          purchase_returns:
-            Number(params.purchase_receipt_id || 0) === 601
-              ? [purchaseReturnRecord]
-              : [],
-          total: Number(params.purchase_receipt_id || 0) === 601 ? 1 : 0,
-          limit: Number(params.limit || 100),
-          offset: Number(params.offset || 0),
-        }
+        data = stylePaginatedRpcData(
+          Number(params.purchase_receipt_id || 0) === 601
+            ? [purchaseReturnRecord]
+            : [],
+          'purchase_returns',
+          params
+        )
         break
       case 'post_purchase_return':
         purchaseReturnRecord.status = 'POSTED'
@@ -1410,15 +1560,13 @@ export async function installFactRpcMocks(page, context) {
         data = { purchase_return: purchaseReturnRecord }
         break
       case 'list_purchase_receipt_adjustments':
-        data = {
-          purchase_receipt_adjustments:
-            Number(params.purchase_receipt_id || 0) === 601
-              ? [purchaseReceiptAdjustmentRecord]
-              : [],
-          total: Number(params.purchase_receipt_id || 0) === 601 ? 1 : 0,
-          limit: Number(params.limit || 100),
-          offset: Number(params.offset || 0),
-        }
+        data = stylePaginatedRpcData(
+          Number(params.purchase_receipt_id || 0) === 601
+            ? [purchaseReceiptAdjustmentRecord]
+            : [],
+          'purchase_receipt_adjustments',
+          params
+        )
         break
       case 'post_purchase_receipt_adjustment':
         purchaseReceiptAdjustmentRecord.status = 'POSTED'
@@ -1509,12 +1657,11 @@ export async function installFactRpcMocks(page, context) {
             .toLowerCase()
           const qualityInspections =
             keyword && !haystack.includes(keyword) ? [] : [qualityInspection]
-          data = {
-            quality_inspections: qualityInspections,
-            total: qualityInspections.length,
-            limit: 100,
-            offset: 0,
-          }
+          data = stylePaginatedRpcData(
+            qualityInspections,
+            'quality_inspections',
+            params
+          )
         }
         break
       case 'list_outsourcing_return_quality_inspections':
@@ -1536,12 +1683,12 @@ export async function installFactRpcMocks(page, context) {
               (!params.status || params.status === inspection.status) &&
               (!params.result || params.result === inspection.result)
           )
-          data = {
-            quality_inspections: qualityInspections,
-            total: qualityInspections.length,
-            limit: Number(params.limit || 50),
-            offset: Number(params.offset || 0),
-          }
+          data = stylePaginatedRpcData(
+            qualityInspections,
+            'quality_inspections',
+            params,
+            50
+          )
         }
         break
       case 'create_quality_inspection_draft':
@@ -1682,12 +1829,11 @@ export async function installFactRpcMocks(page, context) {
             )
               ? [inventoryBalance]
               : []
-          data = {
-            inventory_balances: inventoryBalances,
-            total: inventoryBalances.length,
-            limit: 100,
-            offset: 0,
-          }
+          data = stylePaginatedRpcData(
+            inventoryBalances,
+            'inventory_balances',
+            params
+          )
         }
         break
       case 'list_inventory_lots':
@@ -1721,10 +1867,13 @@ export async function installFactRpcMocks(page, context) {
               )
           )
           data = {
-            inventory_lots: inventoryLots,
+            inventory_lots: inventoryLots.slice(
+              Number(params.offset || 0),
+              Number(params.offset || 0) + Number(params.limit || 100)
+            ),
             total: inventoryLots.length,
-            limit: 100,
-            offset: 0,
+            limit: Number(params.limit || 100),
+            offset: Number(params.offset || 0),
           }
         }
         break
@@ -1746,12 +1895,7 @@ export async function installFactRpcMocks(page, context) {
             )
               ? [inventoryTxn]
               : []
-          data = {
-            inventory_txns: inventoryTxns,
-            total: inventoryTxns.length,
-            limit: 100,
-            offset: 0,
-          }
+          data = stylePaginatedRpcData(inventoryTxns, 'inventory_txns', params)
         }
         break
       default:
@@ -1781,6 +1925,7 @@ export async function installFactRpcMocks(page, context) {
     : []
   const workflowBusinessStates = []
   const workflowMutationReceipts = new Map()
+  const workflowRoleTaskSnapshotByCursor = new Map()
   let workflowTaskID = Math.max(
     1,
     ...workflowTasks.map((task) => Number(task.id || 0) + 1),
@@ -2037,7 +2182,13 @@ export async function installFactRpcMocks(page, context) {
         const roleKey = String(params.role_key || '').trim()
         const viewKey = String(params.view_key || '').trim()
         const limit = Math.min(Math.max(Number(params.limit || 50), 1), 100)
-        const beforeID = params.cursor ? Number(params.cursor) : 0
+        const cursor = String(params.cursor || '').trim()
+        const cursorSnapshotKey = `${viewKey}|${roleKey}|${cursor}`
+        const snapshotAt = cursor
+          ? workflowRoleTaskSnapshotByCursor.get(cursorSnapshotKey) ||
+            Number(nowUnix())
+          : Number(nowUnix())
+        const beforeID = cursor ? Number(cursor) : 0
         const terminalStatuses = new Set([
           'done',
           'rejected',
@@ -2081,14 +2232,19 @@ export async function installFactRpcMocks(page, context) {
           .sort((left, right) => right.id - left.id)
         const items = matchingTasks.slice(0, limit)
         const hasMore = matchingTasks.length > limit
+        const nextCursor =
+          hasMore && items.length > 0 ? String(items[items.length - 1].id) : ''
+        if (nextCursor) {
+          workflowRoleTaskSnapshotByCursor.set(
+            `${viewKey}|${roleKey}|${nextCursor}`,
+            snapshotAt
+          )
+        }
         data = {
           items,
-          next_cursor:
-            hasMore && items.length > 0
-              ? String(items[items.length - 1].id)
-              : '',
+          next_cursor: nextCursor,
           has_more: hasMore,
-          server_time: Number(nowUnix()),
+          server_time: snapshotAt,
         }
         break
       }

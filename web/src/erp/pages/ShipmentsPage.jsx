@@ -22,22 +22,23 @@ import {
   createInvoiceFromShipment,
   createReceivableFromShipment,
   createShipmentWithItems,
+  getShipment,
+  listShipmentSourceCandidates,
   listShipments,
   shipShipment,
   submitShipmentRelease,
 } from '../api/operationalFactApi.mjs'
 import {
-  listCustomers,
+  listAllCustomers,
+  listAllSalesOrders,
+  listAllUnits,
   listProductSKUs,
   listProducts,
-  listSalesOrderItems,
-  listSalesOrders,
-  listUnits,
 } from '../api/masterDataOrderApi.mjs'
-import { listInventoryLots } from '../api/inventoryApi.mjs'
+import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
   createFinishedGoodsQualityInspectionDraft,
-  listFinishedGoodsQualityInspections,
+  listAllFinishedGoodsQualityInspections,
 } from '../api/qualityApi.mjs'
 import {
   BusinessDataTable,
@@ -77,7 +78,6 @@ import {
 } from '../utils/masterDataOrderView.mjs'
 import {
   buildShipmentItemParams,
-  buildShipmentSourceRows,
   createBlankShipmentItem,
   createShipmentItemFromSalesOrderItem,
   formatQuantity,
@@ -85,9 +85,14 @@ import {
   positiveInt,
 } from '../utils/businessLineItems.mjs'
 import {
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../utils/numeric20Scale6.mjs'
+import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
+  resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
 import {
   customerOption,
@@ -103,11 +108,17 @@ import {
 } from '../utils/referenceSelectOptions.mjs'
 import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
 import {
-  routeWithQuery,
-  searchParamPositiveIntText,
+  searchParamPositiveInt,
   searchParamText,
 } from '../utils/routeQuery.mjs'
 import { businessRecordInventoryRouteFor } from '../utils/businessSourceNavigation.mjs'
+import {
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
 import {
   calculateShipmentLineNetWeightG,
   hasFinalShipmentWeight,
@@ -131,6 +142,12 @@ import {
   buildShipmentQualityInspectionSources,
   requireMatchingShipmentQualityInspectionDraft,
 } from '../utils/shipmentQualityInspectionSource.mjs'
+import {
+  SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
+  normalizeShipmentSourceCandidate,
+  shipmentSourceCandidateListParams,
+  shipmentSourceOrderFromCandidate,
+} from '../utils/shipmentSourceCandidate.mjs'
 
 const { Text } = Typography
 
@@ -196,7 +213,10 @@ export default function ShipmentsPage() {
   const navigate = useNavigate()
   const outletContext = useOutletContext()
   const [searchParams, setSearchParams] = useSearchParams()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -220,6 +240,10 @@ export default function ShipmentsPage() {
   const [salesOrderSources, setSalesOrderSources] = useState([])
   const [salesOrderSourceItems, setSalesOrderSourceItems] = useState([])
   const [shipmentSourceRows, setShipmentSourceRows] = useState([])
+  const [salesOrderSourceTotal, setSalesOrderSourceTotal] = useState(0)
+  const [salesOrderSourceCurrent, setSalesOrderSourceCurrent] = useState(1)
+  const [salesOrderSourceLoadFailed, setSalesOrderSourceLoadFailed] =
+    useState(false)
   const [customers, setCustomers] = useState([])
   const [inventoryLots, setInventoryLots] = useState([])
   const [products, setProducts] = useState([])
@@ -236,16 +260,35 @@ export default function ShipmentsPage() {
   )
   const financeSourceInFlightRef = useRef(false)
   const qualitySourceInFlightRef = useRef(false)
+  const salesOrderSourceQueryRef = useRef({ keyword: '', page: 1 })
   const selectedSalesOrderID = Form.useWatch('sales_order_id', shipmentForm)
-  const routeSalesOrderID = searchParamPositiveIntText(
+  const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
     'sales_order_id'
   )
   const routeShipmentID =
-    searchParamPositiveIntText(searchParams, 'shipment_id') ||
+    searchParamPositiveInt(searchParams, 'shipment_id') ||
     (searchParamText(searchParams, 'source_type').toUpperCase() === 'SHIPMENT'
-      ? searchParamPositiveIntText(searchParams, 'source_id')
+      ? searchParamPositiveInt(searchParams, 'source_id')
       : '')
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const resolvedRouteKeyword =
+    routeShipmentID && Number(selectedRow?.id || 0) === Number(routeShipmentID)
+      ? String(selectedRow?.shipment_no || '').trim()
+      : ''
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
+  )
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
@@ -266,8 +309,14 @@ export default function ShipmentsPage() {
     hasActionPermission(adminProfile, 'quality.inspection.create')
   const canViewSalesOrders = hasActionPermission(
     adminProfile,
-    'sales.order.read'
+    'sales_order.read'
   )
+  const canViewSalesOrderItems = hasActionPermission(
+    adminProfile,
+    'sales_order_item.read'
+  )
+  const canImportSalesOrderSource =
+    canCreate && canViewSalesOrders && canViewSalesOrderItems
   const canViewInventory = hasActionPermission(
     adminProfile,
     'warehouse.inventory.read'
@@ -283,19 +332,26 @@ export default function ShipmentsPage() {
   const relatedMenuItems = useMemo(() => {
     if (!selectedRow?.id) return []
     const items = []
-    if (canViewSalesOrders && selectedRow.sales_order_id) {
+    if (
+      canViewSalesOrders &&
+      selectedRow.sales_order_id &&
+      canOpenRelatedPath(V1_ROUTE_PATHS.salesOrders)
+    ) {
       items.push({ key: 'sales-order', label: '来源销售订单' })
     }
-    if (canViewInventory) {
+    if (canViewInventory && canOpenRelatedPath(V1_ROUTE_PATHS.inventory)) {
       items.push({ key: 'inventory', label: '库存记录' })
     }
-    if (canViewReceivables) {
+    if (canViewReceivables && canOpenRelatedPath(V1_ROUTE_PATHS.receivables)) {
       items.push({ key: 'receivables', label: '应收记录' })
     }
-    if (canViewInvoices) {
+    if (canViewInvoices && canOpenRelatedPath(V1_ROUTE_PATHS.invoices)) {
       items.push({ key: 'invoices', label: '开票记录' })
     }
-    if (canViewQualityInspections) {
+    if (
+      canViewQualityInspections &&
+      canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
+    ) {
       items.push({ key: 'quality-inspections', label: '出货前检验' })
     }
     return items
@@ -305,29 +361,55 @@ export default function ShipmentsPage() {
     canViewQualityInspections,
     canViewReceivables,
     canViewSalesOrders,
+    canOpenRelatedPath,
     selectedRow,
   ])
   const openRelatedRecord = useCallback(
     ({ key }) => {
       if (!selectedRow?.id) return
       const paths = {
-        'sales-order': routeWithQuery(V1_ROUTE_PATHS.salesOrders, {
-          sales_order_id: selectedRow.sales_order_id,
-        }),
-        inventory: businessRecordInventoryRouteFor('shipments', selectedRow.id),
-        receivables: routeWithQuery(V1_ROUTE_PATHS.receivables, {
-          source_type: 'SHIPMENT',
-          source_id: selectedRow.id,
-        }),
-        invoices: routeWithQuery(V1_ROUTE_PATHS.invoices, {
-          source_type: 'SHIPMENT',
-          source_id: selectedRow.id,
-        }),
-        'quality-inspections': routeWithQuery(
+        'sales-order': relatedDocumentRoute(
+          V1_ROUTE_PATHS.salesOrders,
+          { sales_order_id: selectedRow.sales_order_id },
+          {
+            keyword: selectedRow.sales_order_no,
+            source: 'shipment',
+            fields: ['sales_order_no'],
+          }
+        ),
+        inventory: businessRecordInventoryRouteFor(
+          'shipments',
+          selectedRow.id,
+          { keyword: selectedRow.shipment_no, source: 'shipment' }
+        ),
+        receivables: relatedDocumentRoute(
+          V1_ROUTE_PATHS.receivables,
+          { source_type: 'SHIPMENT', source_id: selectedRow.id },
+          {
+            keyword: selectedRow.shipment_no,
+            source: 'shipment',
+            fields: ['source_no'],
+          }
+        ),
+        invoices: relatedDocumentRoute(
+          V1_ROUTE_PATHS.invoices,
+          { source_type: 'SHIPMENT', source_id: selectedRow.id },
+          {
+            keyword: selectedRow.shipment_no,
+            source: 'shipment',
+            fields: ['source_no'],
+          }
+        ),
+        'quality-inspections': relatedDocumentRoute(
           V1_ROUTE_PATHS.qualityInspections,
           {
             source_type: 'SHIPMENT',
             source_id: selectedRow.id,
+          },
+          {
+            keyword: selectedRow.shipment_no,
+            source: 'shipment',
+            fields: ['source_no'],
           }
         ),
       }
@@ -503,36 +585,54 @@ export default function ShipmentsPage() {
     const request = beginLatestRequest('rows')
     setLoading(true)
     try {
-      const data = await listShipments(
-        compactParams({
-          status: statusFilter,
-          keyword: trimOptional(keyword) || routeShipmentID || undefined,
-          customer_id: customerFilter || undefined,
-          product_id: productFilter || undefined,
-          warehouse_id: warehouseFilter || undefined,
-          source_id: routeSalesOrderID || undefined,
-          date_field: dateFilterField,
-          date_from: dateFilterStart || undefined,
-          date_to: dateFilterEnd || undefined,
-          ...getBusinessPaginationParams(pagination),
-        }),
-        { signal: request.signal }
-      )
+      const routeSelectedID = Number(routeShipmentID || 0)
+      const [data, routeShipment] = await Promise.all([
+        listShipments(
+          compactParams({
+            status: statusFilter,
+            keyword: trimOptional(
+              linkedDocumentRequestKeyword({
+                localKeyword: keyword,
+                linkedKeyword,
+                hasExactContext: Boolean(routeShipmentID || routeSalesOrderID),
+              })
+            ),
+            customer_id: customerFilter || undefined,
+            product_id: productFilter || undefined,
+            warehouse_id: warehouseFilter || undefined,
+            source_id: routeSalesOrderID || undefined,
+            date_field: dateFilterField,
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
+            ...getBusinessPaginationParams(pagination),
+          }),
+          { signal: request.signal }
+        ),
+        routeSelectedID > 0
+          ? getShipment({ id: routeSelectedID }, { signal: request.signal })
+          : Promise.resolve(null),
+      ])
       if (!request.isCurrent()) {
         return
       }
-      const nextRows = Array.isArray(data?.shipments) ? data.shipments : []
+      const listedRows = Array.isArray(data?.shipments) ? data.shipments : []
+      const exactPage = resolveExactRecordPage({
+        records: listedRows,
+        exactRecord: routeShipment,
+        hasExactContext: routeSelectedID > 0,
+        total: Number(data?.total || 0),
+      })
+      const nextRows = exactPage.records
       setRows(nextRows)
       setSelectedRow((current) => {
-        const routeSelectedID = Number(routeShipmentID || 0)
         if (routeSelectedID > 0) {
-          return nextRows.find((item) => item.id === routeSelectedID) || null
+          return routeShipment
         }
         return current?.id
           ? nextRows.find((item) => item.id === current.id) || null
           : null
       })
-      setTotal(Number(data?.total || 0))
+      setTotal(exactPage.total)
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
@@ -551,6 +651,7 @@ export default function ShipmentsPage() {
     dateFilterStart,
     customerFilter,
     keyword,
+    linkedKeyword,
     pagination,
     productFilter,
     routeSalesOrderID,
@@ -561,7 +662,7 @@ export default function ShipmentsPage() {
 
   const clearRouteContext = useCallback(
     (keys) => {
-      const nextParams = new URLSearchParams(searchParams)
+      const nextParams = clearLinkedDocumentParams(searchParams)
       const keysToDelete =
         Array.isArray(keys) && keys.length > 0
           ? keys
@@ -587,12 +688,12 @@ export default function ShipmentsPage() {
         salesOrderResult,
         unitResult,
       ] = await Promise.all([
-        listCustomers({ limit: 500, active_only: true }),
-        listInventoryLots({ limit: 500 }),
+        listAllCustomers({ active_only: true }),
+        listAllInventoryLots(),
         listAllShipmentWeightReferenceRecords(listProducts, 'products'),
         listAllShipmentWeightReferenceRecords(listProductSKUs, 'product_skus'),
-        listSalesOrders({ limit: 500 }),
-        listUnits({ limit: 500 }),
+        listAllSalesOrders(),
+        listAllUnits(),
       ])
       setCustomers(
         Array.isArray(customerResult?.customers) ? customerResult.customers : []
@@ -624,39 +725,6 @@ export default function ShipmentsPage() {
   }, [loadReferenceOptions])
 
   useEffect(() => {
-    if (!shipmentModal) {
-      setSalesOrderItems([])
-      return undefined
-    }
-    const salesOrderID = Number(selectedSalesOrderID || 0)
-    if (!Number.isFinite(salesOrderID) || salesOrderID <= 0) {
-      setSalesOrderItems([])
-      return undefined
-    }
-
-    let cancelled = false
-    listSalesOrderItems({
-      sales_order_id: salesOrderID,
-      line_status: 'open',
-      limit: 200,
-    })
-      .then((data) => {
-        if (cancelled) return
-        setSalesOrderItems(
-          Array.isArray(data?.sales_order_items) ? data.sales_order_items : []
-        )
-      })
-      .catch((error) => {
-        if (cancelled) return
-        message.error(getActionErrorMessage(error, '加载销售订单明细'))
-        setSalesOrderItems([])
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [selectedSalesOrderID, shipmentModal])
-
-  useEffect(() => {
     return outletContext?.registerPageRefresh?.(loadRows)
   }, [loadRows, outletContext])
 
@@ -673,37 +741,12 @@ export default function ShipmentsPage() {
     () => salesOrdersByID.get(Number(selectedSalesOrderID || 0)) || null,
     [salesOrdersByID, selectedSalesOrderID]
   )
-  const handleShipmentSalesOrderChange = useCallback(
-    (nextSalesOrderID) => {
-      const order = salesOrdersByID.get(Number(nextSalesOrderID || 0)) || null
-      setSalesOrderItems([])
-      shipmentForm.setFieldsValue({
-        customer_id: order?.customer_id,
-        customer_snapshot: order ? salesOrderCustomerText(order) : '',
-        items: [createBlankShipmentItem()],
-      })
-    },
-    [salesOrdersByID, shipmentForm]
-  )
   const salesOrderImportColumns = useMemo(
     () => [
       {
         title: '销售订单号',
         width: 160,
-        render: (_, item) => {
-          const order = salesOrdersByID.get(Number(item.sales_order_id || 0))
-          return order?.order_no || order?.customer_order_no || '-'
-        },
-        searchText: (item) => {
-          const order = salesOrdersByID.get(Number(item.sales_order_id || 0))
-          return [
-            order?.order_no,
-            order?.customer_order_no,
-            salesOrderCustomerText(order),
-            item.line_no,
-            item.product_name_snapshot,
-          ].join(' ')
-        },
+        render: (_, item) => item.order_no || '-',
       },
       {
         title: '来源行',
@@ -714,10 +757,7 @@ export default function ShipmentsPage() {
       {
         title: '客户',
         width: 160,
-        render: (_, item) =>
-          salesOrderCustomerText(
-            salesOrdersByID.get(Number(item.sales_order_id || 0))
-          ) || '-',
+        render: (_, item) => salesOrderCustomerText(item) || '-',
       },
       {
         title: '产品 / SKU',
@@ -742,7 +782,7 @@ export default function ShipmentsPage() {
         dataIndex: 'remainingQuantity',
         width: 120,
         render: (value) =>
-          value > 0 ? (
+          isPositiveNumeric20Scale6Units(numeric20Scale6Units(value)) ? (
             <Text strong>{formatQuantity(value)}</Text>
           ) : (
             <Text type="secondary">0</Text>
@@ -754,73 +794,132 @@ export default function ShipmentsPage() {
         width: 100,
       },
     ],
-    [productOptions, productSKUOptions, salesOrdersByID]
+    [productOptions, productSKUOptions]
   )
 
-  const loadSalesOrderSources = useCallback(async () => {
-    setSourceLoading(true)
-    try {
-      const [orderData, itemData, shipmentData] = await Promise.all([
-        listSalesOrders({
-          lifecycle_status: 'active',
-          limit: 100,
-        }),
-        listSalesOrderItems({
-          limit: 500,
-        }),
-        listShipments({
-          limit: 500,
-        }),
-      ])
-      const nextOrders = Array.isArray(orderData?.sales_orders)
-        ? orderData.sales_orders
-        : []
-      const activeOrderIDs = new Set(
-        nextOrders.map((order) => Number(order?.id)).filter(Boolean)
-      )
-      const nextItems = (
-        Array.isArray(itemData?.sales_order_items)
-          ? itemData.sales_order_items
-          : []
-      ).filter((item) => activeOrderIDs.has(Number(item?.sales_order_id)))
-      const nextSourceRows = buildShipmentSourceRows({
-        salesOrderItems: nextItems,
-        shipments: Array.isArray(shipmentData?.shipments)
-          ? shipmentData.shipments
-          : [],
-      })
-      setSalesOrderSources(nextSourceRows)
-      setSalesOrderSourceItems(nextItems)
-      setShipmentSourceRows(nextSourceRows)
-      setSalesOrders((currentOrders) => {
-        const byID = new Map(
-          currentOrders
-            .map((order) => [Number(order?.id || 0), order])
-            .filter(([orderID]) => Number.isFinite(orderID) && orderID > 0)
-        )
-        nextOrders.forEach((order) => {
-          const orderID = Number(order?.id || 0)
-          if (Number.isFinite(orderID) && orderID > 0) {
-            byID.set(orderID, order)
-          }
+  const loadSalesOrderSources = useCallback(
+    async ({ keyword = '', page = 1 } = {}) => {
+      const normalizedKeyword = String(keyword || '').trim()
+      const normalizedPage = Number(page) || 1
+      const request = beginLatestRequest('shipment-source-candidates')
+      salesOrderSourceQueryRef.current = {
+        keyword: normalizedKeyword,
+        page: normalizedPage,
+      }
+      setSalesOrderSourceCurrent(normalizedPage)
+      setSalesOrderSourceLoadFailed(false)
+      setSourceLoading(true)
+      try {
+        const params = shipmentSourceCandidateListParams({
+          keyword: normalizedKeyword,
+          page: normalizedPage,
+          pageSize: SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE,
+          salesOrderID: shipmentForm.getFieldValue('sales_order_id'),
         })
-        return [...byID.values()]
-      })
-    } catch (error) {
-      message.error(getActionErrorMessage(error, '加载销售订单来源'))
-    } finally {
-      setSourceLoading(false)
-    }
-  }, [])
+        const data = await listShipmentSourceCandidates(params, {
+          signal: request.signal,
+        })
+        if (!request.isCurrent()) return
+        const nextSourceRows = data.shipment_source_candidates.map(
+          normalizeShipmentSourceCandidate
+        )
+        const nextOrders = nextSourceRows.map(shipmentSourceOrderFromCandidate)
+        setSalesOrderSources(nextSourceRows)
+        setSalesOrderSourceTotal(data.total)
+        setSalesOrderSourceItems((currentItems) => {
+          const byID = new Map(
+            currentItems.map((item) => [Number(item?.id || 0), item])
+          )
+          nextSourceRows.forEach((item) => byID.set(Number(item.id), item))
+          return [...byID.values()]
+        })
+        setShipmentSourceRows((currentRows) => {
+          const byID = new Map(
+            currentRows.map((item) => [Number(item?.id || 0), item])
+          )
+          nextSourceRows.forEach((item) => byID.set(Number(item.id), item))
+          return [...byID.values()]
+        })
+        setSalesOrders((currentOrders) => {
+          const byID = new Map(
+            currentOrders
+              .map((order) => [Number(order?.id || 0), order])
+              .filter(
+                ([orderID]) => Number.isSafeInteger(orderID) && orderID > 0
+              )
+          )
+          nextOrders.forEach((order) => byID.set(Number(order.id), order))
+          return [...byID.values()]
+        })
+      } catch (error) {
+        if (isRpcAbortError(error) || !request.isCurrent()) return
+        setSalesOrderSources([])
+        setSalesOrderSourceTotal(0)
+        setSalesOrderSourceLoadFailed(true)
+        message.error(getActionErrorMessage(error, '加载销售订单来源'))
+      } finally {
+        if (request.isCurrent()) {
+          setSourceLoading(false)
+          request.finish()
+        }
+      }
+    },
+    [beginLatestRequest, shipmentForm]
+  )
+
+  const handleSalesOrderSourceSearch = useCallback(
+    (keyword) => {
+      const normalizedKeyword = String(keyword || '').trim()
+      const currentQuery = salesOrderSourceQueryRef.current
+      if (
+        currentQuery.keyword === normalizedKeyword &&
+        currentQuery.page === 1
+      ) {
+        return
+      }
+      loadSalesOrderSources({ keyword: normalizedKeyword, page: 1 })
+    },
+    [loadSalesOrderSources]
+  )
+
+  const handleSalesOrderSourcePageChange = useCallback(
+    (page, _pageSize, keyword) => {
+      loadSalesOrderSources({ keyword, page })
+    },
+    [loadSalesOrderSources]
+  )
+
+  const handleSalesOrderSourceReload = useCallback(
+    (keyword, page) => {
+      loadSalesOrderSources({ keyword, page })
+    },
+    [loadSalesOrderSources]
+  )
 
   const openSalesOrderImport = () => {
+    if (!canImportSalesOrderSource) {
+      message.warning('当前账号不能读取销售订单来源行')
+      return
+    }
+    setSalesOrderSources([])
+    setSalesOrderSourceItems([])
+    setShipmentSourceRows([])
+    setSalesOrderSourceTotal(0)
+    setSalesOrderSourceCurrent(1)
+    setSalesOrderSourceLoadFailed(false)
+    salesOrderSourceQueryRef.current = { keyword: '', page: 1 }
     setSalesOrderImportOpen(true)
-    loadSalesOrderSources()
+    loadSalesOrderSources({ keyword: '', page: 1 })
   }
 
   const importSalesOrderToShipment = async (sourceItems = []) => {
     const importableItems = sourceItems.filter(
-      (item) => !item.disabledReason && item.remainingQuantity > 0
+      (item) =>
+        item.selectable === true &&
+        !item.disabledReason &&
+        isPositiveNumeric20Scale6Units(
+          numeric20Scale6Units(item.remainingQuantity)
+        )
     )
     if (importableItems.length === 0) {
       message.warning('请选择仍有剩余可出货数量的销售订单行')
@@ -834,6 +933,13 @@ export default function ShipmentsPage() {
       return
     }
     const sourceOrderID = [...sourceOrderIDs][0]
+    const currentSourceOrderID = positiveInt(
+      shipmentForm.getFieldValue('sales_order_id')
+    )
+    if (currentSourceOrderID && currentSourceOrderID !== sourceOrderID) {
+      message.warning('当前出货草稿只能继续导入同一张销售订单的来源行')
+      return
+    }
     const sourceOrder = salesOrdersByID.get(sourceOrderID)
     if (!sourceOrder?.id) return
     try {
@@ -850,10 +956,22 @@ export default function ShipmentsPage() {
       const currentItems = (shipmentForm.getFieldValue('items') || []).filter(
         (item) => !isBlankShipmentItem(item)
       )
+      const currentSourceItemIDs = new Set(
+        currentItems
+          .map((item) => positiveInt(item?.sales_order_item_id))
+          .filter(Boolean)
+      )
+      const newSourceItems = importableItems.filter(
+        (item) => !currentSourceItemIDs.has(positiveInt(item.id))
+      )
+      if (newSourceItems.length === 0) {
+        message.warning('所选销售订单来源行已在当前出货明细中')
+        return
+      }
       shipmentForm.setFieldsValue({
         items: [
           ...currentItems,
-          ...importableItems.map((item) =>
+          ...newSourceItems.map((item) =>
             createShipmentItemFromSalesOrderItem(item, {
               quantity: item.remainingQuantity,
             })
@@ -869,14 +987,30 @@ export default function ShipmentsPage() {
     }
   }
 
+  const resetShipmentSourceSelectionState = () => {
+    setSalesOrderItems([])
+    setSalesOrderSources([])
+    setSalesOrderSourceItems([])
+    setShipmentSourceRows([])
+    setSalesOrderSourceTotal(0)
+    setSalesOrderSourceCurrent(1)
+    setSalesOrderSourceLoadFailed(false)
+    setSalesOrderImportOpen(false)
+    salesOrderSourceQueryRef.current = { keyword: '', page: 1 }
+  }
+
   const openCreate = () => {
     shipmentAttachmentRef.current?.clearPendingAttachments()
+    resetShipmentSourceSelectionState()
     shipmentForm.resetFields()
     shipmentForm.setFieldsValue({
       shipment_no: buildSequentialDraftCode(rows, {
         prefix: 'SHIP',
         field: 'shipment_no',
       }),
+      sales_order_id: undefined,
+      customer_id: undefined,
+      customer_snapshot: '',
       idempotency_key: idempotencyKey('shipment'),
       planned_ship_at: new Date().toISOString().slice(0, 10),
       items: [createBlankShipmentItem()],
@@ -896,7 +1030,7 @@ export default function ShipmentsPage() {
 
   const closeShipmentModal = () => {
     shipmentAttachmentRef.current?.clearPendingAttachments()
-    setSalesOrderImportOpen(false)
+    resetShipmentSourceSelectionState()
     setShipmentModal(null)
     shipmentForm.resetFields()
   }
@@ -918,7 +1052,7 @@ export default function ShipmentsPage() {
           : '出货单已保存，未上传的附件请重新选择'
       )
       closeShipmentModal()
-      await loadRows()
+      resetBusinessPaginationCurrent(setPagination)
     } catch (error) {
       if (error?.errorFields) {
         return
@@ -991,13 +1125,13 @@ export default function ShipmentsPage() {
     setQualitySourceLoading(true)
     try {
       const [inspectionData, ...lotResults] = await Promise.all([
-        listFinishedGoodsQualityInspections(
-          { shipment_id: shipment.id, limit: 200 },
+        listAllFinishedGoodsQualityInspections(
+          { shipment_id: shipment.id },
           { signal: request.signal }
         ),
         ...lotIDs.map((lotID) =>
-          listInventoryLots(
-            { keyword: String(lotID), limit: 200 },
+          listAllInventoryLots(
+            { keyword: String(lotID) },
             { signal: request.signal }
           )
         ),
@@ -1062,9 +1196,15 @@ export default function ShipmentsPage() {
       setQualitySourceContext(null)
       message.success('已生成出货前成品检验草稿')
       navigate(
-        routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
-          quality_inspection_id: result.id,
-        })
+        relatedDocumentRoute(
+          V1_ROUTE_PATHS.qualityInspections,
+          { quality_inspection_id: result.id },
+          {
+            keyword: result.inspection_no,
+            source: 'shipment',
+            fields: ['inspection_no'],
+          }
+        )
       )
     } catch (error) {
       if (isSourceBusinessActionResultUnknown(error)) {
@@ -1106,7 +1246,7 @@ export default function ShipmentsPage() {
     try {
       config = shipmentFinanceSourceActionConfig(financeSourceAction)
       const payload = {
-        ...buildShipmentFinanceSourcePayload(values, selectedRow),
+        ...buildShipmentFinanceSourcePayload(values, selectedRow, config.key),
         customer_key: activeCustomerKey || undefined,
       }
       scope = `shipment-finance:${config.key}:${selectedRow.id}`
@@ -1194,7 +1334,8 @@ export default function ShipmentsPage() {
       dateFilterStart ||
       dateFilterEnd ||
       routeSalesOrderID ||
-      routeShipmentID
+      routeShipmentID ||
+      linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -1249,10 +1390,13 @@ export default function ShipmentsPage() {
         filters={
           <>
             <SearchInput
-              value={keyword}
+              value={resolvedRouteKeyword || linkedKeyword || keyword}
               placeholder="搜索出货"
               searchHint="可搜索：出货单号、客户、销售订单"
               onChange={(event) => {
+                if (linkedKeyword || routeSalesOrderID || routeShipmentID) {
+                  clearRouteContext()
+                }
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
@@ -1452,14 +1596,16 @@ export default function ShipmentsPage() {
           <Popconfirm
             title={
               selectedRow?.status === 'DRAFT'
-                ? '确认取消这张出货单？草稿取消不会扣减或恢复库存；如已提交放行，需先完成或退回放行待办。'
+                ? '确认作废这张出货草稿？草稿作废不会扣减或恢复库存；如已提交放行，需先完成或退回放行待办。'
                 : '确认撤销已出货并恢复相应库存？'
             }
             onConfirm={() =>
               runShipmentAction(
                 selectedRow,
                 cancelShipment,
-                selectedRow?.status === 'DRAFT' ? '取消出货单' : '撤销已出货'
+                selectedRow?.status === 'DRAFT'
+                  ? '作废出货草稿'
+                  : '撤销已出货'
               )
             }
             okText="确认"
@@ -1476,7 +1622,7 @@ export default function ShipmentsPage() {
                 saving
               }
             >
-              {selectedRow?.status === 'DRAFT' ? '取消出货单' : '撤销已出货'}
+              {selectedRow?.status === 'DRAFT' ? '作废草稿' : '撤销已出货'}
             </Button>
           </Popconfirm>
           {selectedRow?.status === 'SHIPPED' &&
@@ -1537,6 +1683,7 @@ export default function ShipmentsPage() {
 
       <ShipmentBusinessModal
         canCreate={canCreate}
+        canImportSalesOrderSource={canImportSalesOrderSource}
         customerOptions={customerOptions}
         form={shipmentForm}
         importSalesOrderToShipment={importSalesOrderToShipment}
@@ -1548,7 +1695,6 @@ export default function ShipmentsPage() {
         onCancel={closeShipmentModal}
         onOk={submitShipmentModal}
         onOpenSalesOrderImport={openSalesOrderImport}
-        onSalesOrderChange={handleShipmentSalesOrderChange}
         products={products}
         productOptions={productOptions}
         productSKUs={productSKUs}
@@ -1558,6 +1704,15 @@ export default function ShipmentsPage() {
         salesOrderItems={salesOrderItems}
         salesOrderItemOptions={salesOrderItemOptions}
         salesOrderOptions={salesOrderOptions}
+        salesOrderSourceCurrent={salesOrderSourceCurrent}
+        salesOrderSourceEmptyDescription={
+          salesOrderSourceLoadFailed
+            ? '加载失败，请重新搜索或关闭后重试'
+            : '暂无可导入销售订单行'
+        }
+        salesOrderSourceImportDisabled={salesOrderSourceLoadFailed}
+        salesOrderSourcePageSize={SHIPMENT_SOURCE_CANDIDATE_PAGE_SIZE}
+        salesOrderSourceTotal={salesOrderSourceTotal}
         salesOrderSources={salesOrderSources}
         saving={saving}
         selectedSalesOrder={selectedSalesOrder}
@@ -1565,6 +1720,9 @@ export default function ShipmentsPage() {
         shipmentAttachmentRef={shipmentAttachmentRef}
         shipmentSourceRows={shipmentSourceRows}
         sourceLoading={sourceLoading}
+        onSalesOrderSourcePageChange={handleSalesOrderSourcePageChange}
+        onSalesOrderSourceReload={handleSalesOrderSourceReload}
+        onSalesOrderSourceSearchChange={handleSalesOrderSourceSearch}
         unitOptions={unitOptions}
         warehouseOptions={warehouseOptions}
       />

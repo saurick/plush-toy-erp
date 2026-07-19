@@ -4,6 +4,7 @@ import { resolve } from 'path'
 import { fileURLToPath } from 'url'
 import { createDevCustomerImportDryRunPlugin } from './devCustomerImportDryRunPlugin.mjs'
 import { createDevCustomerConfigPlugin } from './devCustomerConfigPlugin.mjs'
+import { createDevQaCoveragePlugin } from './devQaCoveragePlugin.mjs'
 import { getAppDefinition } from './src/erp/config/appRegistry.mjs'
 import { loadDevPorts } from '../scripts/dev-ports.mjs'
 import { normalizeAPIOrigin } from '../scripts/local-runtime-preflight-core.mjs'
@@ -126,6 +127,9 @@ export function createERPViteConfig(appId) {
           ? createDevCustomerConfigPlugin({
               projectRoot: resolve(ROOT_DIR, '..'),
             })
+          : null,
+        isDev && command === 'serve'
+          ? createDevQaCoveragePlugin({ projectRoot: PROJECT_ROOT })
           : null,
       ].filter(Boolean),
       esbuild: {

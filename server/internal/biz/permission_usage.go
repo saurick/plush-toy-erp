@@ -281,24 +281,29 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 
 	// Sales orders.
+	salesOrderReadMethods := append(permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), permissionMethods("customer_config", "start_sales_order_acceptance_process")...)
 	add(PermissionSalesOrderRead,
-		menuPermissionSurface("sales-orders", "sales-orders", "销售订单", "sales-order-list", "销售订单列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), businessUsageConditions),
+		menuPermissionSurface("sales-orders", "sales-orders", "销售订单", "sales-order-list", "销售订单列表和详情", permissionControlPage, "允许进入并查看", salesOrderReadMethods, businessUsageConditions),
 		menuPermissionSurface("shipping-release", "sales-order-release-context", "销售订单", "sales-order-release-reference", "出货放行的订单依据", permissionControlSection, "允许查看", permissionMethods("sales_order", "get_sales_order", "list_sales_orders"), businessUsageConditions),
+		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-order-reference", "出货单可导入的销售订单", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
 	)
 	addMenu(PermissionSalesOrderCreate, "sales-orders", "sales-orders", "销售订单", "create-sales-order", "新建销售订单和表单", permissionControlButton, "显示并允许创建", permissionMethods("sales_order", "save_sales_order_with_items"), businessUsageConditions)
 	addMenu(PermissionSalesOrderUpdate, "sales-orders", "sales-orders", "销售订单", "edit-sales-order", "编辑销售订单和表单", permissionControlForm, "显示并允许编辑", permissionMethods("sales_order", "save_sales_order_with_items"), businessUsageConditions)
-	salesOrderSubmitMethods := append(permissionMethods("sales_order", "submit_sales_order"), permissionMethods("customer_config", "execute_sales_order_acceptance_submit")...)
+	salesOrderSubmitMethods := append(permissionMethods("sales_order", "submit_sales_order"), permissionMethods("customer_config", "start_sales_order_acceptance_process", "execute_sales_order_acceptance_submit")...)
 	addMenu(PermissionSalesOrderSubmit, "sales-orders", "sales-order-actions", "订单动作", "submit-sales-order", "提交销售订单", permissionControlButton, "显示并允许提交", salesOrderSubmitMethods, businessUsageConditions)
 	addMenu(PermissionSalesOrderActivate, "sales-orders", "sales-order-actions", "订单动作", "activate-sales-order", "生效销售订单", permissionControlButton, "显示并允许生效", permissionMethods("sales_order", "activate_sales_order"), businessUsageConditions)
 	addMenu(PermissionSalesOrderClose, "sales-orders", "sales-order-actions", "订单动作", "close-sales-order", "关闭销售订单", permissionControlButton, "显示并允许关闭", permissionMethods("sales_order", "close_sales_order"), businessUsageConditions)
 	addMenu(PermissionSalesOrderCancel, "sales-orders", "sales-order-actions", "订单动作", "cancel-sales-order", "取消销售订单", permissionControlButton, "显示并允许取消", permissionMethods("sales_order", "cancel_sales_order"), businessUsageConditions)
-	addMenu(PermissionSalesOrderItemRead, "sales-orders", "sales-order-items", "订单明细", "sales-order-item-list", "销售订单明细", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_items"), businessUsageConditions)
+	add(PermissionSalesOrderItemRead,
+		menuPermissionSurface("sales-orders", "sales-order-items", "订单明细", "sales-order-item-list", "销售订单明细", permissionControlSection, "允许查看", permissionMethods("sales_order", "list_sales_order_items"), businessUsageConditions),
+		menuPermissionSurface("shipments", "shipment-source", "销售订单来源", "shipment-source-item-reference", "出货单可导入的销售订单行", permissionControlSection, "允许查看", permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), businessUsageConditions),
+	)
 
 	// Workflow tasks.
 	workflowSurfaces := func(controlKey string, controlLabel string, controlType string, effect string, methods []PermissionBackendMethod) []PermissionUsageSurface {
 		return []PermissionUsageSurface{
+			menuPermissionSurface("global-dashboard", "task-actions", "工作台任务", "workbench-"+controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
 			menuPermissionSurface("task-board", "task-actions", "协同任务", controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
-			menuPermissionSurface("exception-flow", "task-actions", "异常与阻塞", "exception-"+controlKey, controlLabel, controlType, effect, methods, workflowUsageConditions),
 		}
 	}
 	add(PermissionWorkflowTaskRead, workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment"))...)
@@ -310,7 +315,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	add(PermissionWorkflowTaskComplete, workflowSurfaces("complete-task", "完成协同任务", permissionControlButton, "显示并允许完成", permissionMethods("workflow", "complete_task_action"))...)
 
 	// Purchase, outsourcing and inbound.
-	addMenu(PermissionPurchaseOrderRead, "accessories-purchase", "purchase-orders", "采购订单", "purchase-order-list", "采购订单列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("purchase_order", "get_purchase_order", "list_purchase_orders", "list_purchase_order_items"), businessUsageConditions)
+	add(PermissionPurchaseOrderRead,
+		menuPermissionSurface("accessories-purchase", "purchase-orders", "采购订单", "purchase-order-list", "采购订单列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("purchase_order", "get_purchase_order", "list_purchase_orders", "list_purchase_order_items"), businessUsageConditions),
+		menuPermissionSurface("inbound", "purchase-order-source", "采购订单来源", "purchase-receipt-source-reference", "采购入库可读取的采购订单与明细", permissionControlSection, "允许查看", append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...), businessUsageConditions),
+	)
 	addMenu(PermissionPurchaseOrderCreate, "accessories-purchase", "purchase-orders", "采购订单", "create-purchase-order", "新建采购订单和表单", permissionControlButton, "显示并允许创建", permissionMethods("purchase_order", "save_purchase_order_with_items"), businessUsageConditions)
 	addMenu(PermissionPurchaseOrderUpdate, "accessories-purchase", "purchase-orders", "采购订单", "edit-purchase-order", "编辑采购订单和表单", permissionControlForm, "显示并允许编辑", permissionMethods("purchase_order", "save_purchase_order_with_items", "submit_purchase_order", "close_purchase_order", "cancel_purchase_order"), businessUsageConditions)
 	addMenu(PermissionPurchaseOrderApprove, "accessories-purchase", "purchase-order-actions", "订单动作", "approve-purchase-order", "审批采购订单", permissionControlButton, "显示并允许审批", permissionMethods("purchase_order", "approve_purchase_order"), businessUsageConditions)
@@ -326,7 +334,8 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionOutsourcingFactCancel, "processing-contracts", "outsourcing-fact-actions", "委外动作", "cancel-outsourcing-fact", "取消委外记录", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_outsourcing_fact"), businessUsageConditions)
 
 	addMenu(PermissionPurchaseReceiptRead, "inbound", "purchase-receipts", "采购入库", "purchase-receipt-list", "采购入库列表和详情", permissionControlPage, "允许进入并查看", permissionMethods("purchase", "get_purchase_receipt", "list_purchase_receipts"), businessUsageConditions)
-	addMenu(PermissionPurchaseReceiptCreate, "inbound", "purchase-receipts", "采购入库", "create-purchase-receipt", "创建和维护采购入库", permissionControlForm, "显示并允许创建和维护", permissionMethods("purchase", "create_purchase_receipt_draft", "create_purchase_receipt_with_items", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item", "post_purchase_receipt", "cancel_purchase_receipt"), businessUsageConditions)
+	purchaseReceiptCreateMethods := append(permissionMethods("purchase", "create_purchase_receipt_from_purchase_order", "add_purchase_receipt_item", "post_purchase_receipt", "cancel_purchase_receipt"), permissionMethods("customer_config", "start_material_supply_purchase_order_process")...)
+	addMenu(PermissionPurchaseReceiptCreate, "inbound", "purchase-receipts", "采购入库", "create-purchase-receipt", "创建和维护采购入库", permissionControlForm, "显示并允许创建和维护", purchaseReceiptCreateMethods, businessUsageConditions)
 	addBackend(PermissionPurchaseReceiptAdjustmentRead, permissionMethods("purchase", "get_purchase_receipt_adjustment", "list_purchase_receipt_adjustments"), businessUsageConditions)
 	addMenu(PermissionPurchaseReceiptAdjustmentCreate, "inbound", "purchase-receipt-adjustments", "采购入库调整", "create-purchase-receipt-adjustment", "登记入库调整", permissionControlButton, "显示并允许登记", permissionMethods("purchase", "create_purchase_receipt_adjustment_from_receipt"), businessUsageConditions)
 	addMenu(PermissionPurchaseReceiptAdjustmentPost, "inbound", "purchase-receipt-adjustments", "采购入库调整", "post-purchase-receipt-adjustment", "确认入库调整", permissionControlButton, "显示并允许确认", permissionMethods("purchase", "post_purchase_receipt_adjustment"), businessUsageConditions)
@@ -359,8 +368,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		menuPermissionSurface("outbound", "warehouse-outbound", "出库管理", "release-stock-reservation", "释放库存预留", permissionControlButton, "显示并允许释放", permissionMethods("operational_fact", "release_stock_reservation"), businessUsageConditions),
 	)
 
-	addMenu(PermissionShipmentRead, "shipments", "shipments", "出货单", "shipment-list", "出货单列表", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "list_shipments"), businessUsageConditions)
-	addMenu(PermissionShipmentCreate, "shipments", "shipments", "出货单", "create-shipment", "创建出货单或提交出货放行", permissionControlButton, "显示并允许办理", permissionMethods("operational_fact", "create_shipment_with_items", "submit_shipment_release"), businessUsageConditions)
+	shipmentReadMethods := append(permissionMethods("operational_fact", "get_shipment", "list_shipments"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
+	shipmentCreateMethods := append(permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items", "submit_shipment_release"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
+	addMenu(PermissionShipmentRead, "shipments", "shipments", "出货单", "shipment-list", "出货单列表", permissionControlPage, "允许进入并查看", shipmentReadMethods, businessUsageConditions)
+	addMenu(PermissionShipmentCreate, "shipments", "shipments", "出货单", "create-shipment", "创建出货单或提交出货放行", permissionControlButton, "显示并允许办理", shipmentCreateMethods, businessUsageConditions)
 	addMenu(PermissionShipmentShip, "shipments", "shipment-actions", "出货动作", "ship-shipment", "确认出货", permissionControlButton, "显示并允许确认出货", permissionMethods("operational_fact", "ship_shipment"), businessUsageConditions)
 	addMenu(PermissionShipmentCancel, "shipments", "shipment-actions", "出货动作", "cancel-shipment", "取消出货单", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_shipment"), businessUsageConditions)
 
@@ -414,7 +425,7 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		permissionMethods("production_wip", "get_production_wip")...,
 	)
 	addMenu(PermissionProductionWIPRead, "production-orders", "production-wip", "工序办理", "view-production-wip", "查看生产订单、路线、在制批次和质量关口", permissionControlSection, "允许查看", productionWIPReadMethods, businessUsageConditions)
-	addMenu(PermissionProductionWIPAssign, "production-orders", "production-wip", "工序办理", "assign-production-wip", "拆分批次并安排本厂或外发", permissionControlButton, "显示并允许安排", permissionMethods("production_wip", "initialize_production_wip", "execute_production_wip_action"), businessUsageConditions)
+	addMenu(PermissionProductionWIPAssign, "production-orders", "production-wip", "工序办理", "assign-production-wip", "拆分、取消批次并安排本厂或外发", permissionControlButton, "显示并允许安排", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
 	addMenu(PermissionProductionWIPExecute, "production-orders", "production-wip", "工序办理", "execute-production-wip", "开始、完工、外发回仓和车间移交", permissionControlButton, "显示并允许办理", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
 	addMenu(PermissionProductionWIPRework, "production-orders", "production-wip", "工序办理", "rework-production-wip", "选择目标工序并安排返工", permissionControlButton, "显示并允许返工", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
 	addMenu(PermissionPackagingMaterialConfirm, "production-orders", "production-wip", "工序办理", "confirm-packaging-material", "确认包材版面与包装版本", permissionControlButton, "显示并允许业务确认", permissionMethods("production_wip", "execute_production_wip_action"), businessUsageConditions)
@@ -447,5 +458,34 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addBackend(PermissionDebugBusinessChainRun, permissionMethods("debug", "rebuild_business_chain_scenario", "seed_business_chain_scenario", "clear_business_chain_scenario", "cleanup_business_chain_scenario"), debugUsageConditions)
 	addBackend(PermissionDebugBusinessChainRead, permissionMethods("debug", "capabilities", "config"), debugUsageConditions)
 
+	applySourceActionReadPermissionUsages(out)
 	return out
+}
+
+func applySourceActionReadPermissionUsages(usages map[string]PermissionUsage) {
+	for _, contract := range PublicSourceActionReadPermissionContracts() {
+		method := PermissionBackendMethod{Domain: contract.Domain, Method: contract.Method}
+		for _, rule := range contract.Rules {
+			usage, ok := usages[rule.PermissionKey]
+			if !ok || len(usage.Surfaces) == 0 {
+				panic("source action references permission without usage: " + rule.PermissionKey)
+			}
+			if permissionUsageContainsBackendMethod(usage, method) {
+				continue
+			}
+			usage.Surfaces[0].BackendMethods = append(usage.Surfaces[0].BackendMethods, method)
+			usages[rule.PermissionKey] = usage
+		}
+	}
+}
+
+func permissionUsageContainsBackendMethod(usage PermissionUsage, method PermissionBackendMethod) bool {
+	for _, surface := range usage.Surfaces {
+		for _, candidate := range surface.BackendMethods {
+			if candidate == method {
+				return true
+			}
+		}
+	}
+	return false
 }

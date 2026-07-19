@@ -349,7 +349,7 @@
 .erp-business-page-header-card__stats .ant-typography {
   flex: 0 1 auto;
   min-width: 0;
-  max-width: calc(100% - 46px);
+  max-width: 100%;
   overflow: visible;
   overflow-wrap: break-word;
   text-overflow: clip;

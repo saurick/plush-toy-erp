@@ -43,4 +43,7 @@ test('production material issue modal enforces remaining quantity and matching l
   assert.match(source, /请选择匹配的材料批次/u)
   assert.match(source, /暂无匹配的可用批次/u)
   assert.match(source, /onWarehouseChange\?\.\(value\)/u)
+  assert.match(source, /numeric20Scale6Units\(value\)/u)
+  assert.match(source, /compareNumeric20Scale6Units\(quantity, remaining\)/u)
+  assert.doesNotMatch(source, /const quantity = Number\(value\)/u)
 })

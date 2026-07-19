@@ -180,8 +180,19 @@ func TestInventoryRepo_PurchaseReturnLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create draft return for cancel guard failed: %v", err)
 	}
-	if _, err := uc.CancelPostedPurchaseReturn(ctx, draftToCancel.ID); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("draft purchase return must not be cancellable, got %v", err)
+	draftCancelled, err := uc.CancelPostedPurchaseReturn(ctx, draftToCancel.ID)
+	if err != nil || draftCancelled.Status != biz.PurchaseReturnStatusCancelled || draftCancelled.PostedAt != nil {
+		t.Fatalf("cancel draft purchase return = %#v, err=%v", draftCancelled, err)
+	}
+	if _, err := uc.CancelPostedPurchaseReturn(ctx, draftToCancel.ID); err != nil {
+		t.Fatalf("repeat cancel draft purchase return failed: %v", err)
+	}
+	draftTxnCount, err := client.InventoryTxn.Query().Where(
+		inventorytxn.SourceType(biz.PurchaseReturnSourceType),
+		inventorytxn.SourceID(draftToCancel.ID),
+	).Count(ctx)
+	if err != nil || draftTxnCount != 0 {
+		t.Fatalf("draft purchase return cancellation inventory txn count=%d, err=%v", draftTxnCount, err)
 	}
 
 	cancelledReturn, err := uc.CancelPostedPurchaseReturn(ctx, returnDraft.ID)

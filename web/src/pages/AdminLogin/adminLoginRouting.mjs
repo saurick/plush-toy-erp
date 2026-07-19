@@ -4,6 +4,7 @@ import {
   hasDesktopEntryAccess,
   isMobileRoleEntryEnabled,
   rememberEntryChoice,
+  resolveAllowedMobileEntryPath,
   resolveMobileTasksPath,
 } from '../../erp/config/entryConfig.mjs'
 import {
@@ -66,18 +67,12 @@ export function resolveAdminPostLoginPath({
       }
       return resolveMobileTasksPath(requestedRoleKey)
     }
-    if (allowedRoleKeys.length === 1) {
+    const mobileEntryPath = resolveAllowedMobileEntryPath(allowedRoleKeys)
+    if (mobileEntryPath) {
       if (shouldRemember) {
         rememberChoice(ENTRY_TARGET.MOBILE_TASKS)
       }
-      return resolveMobileTasksPath(allowedRoleKeys[0])
-    }
-    if (allowedRoleKeys.length > 1) {
-      const defaultRoleKey = allowedRoleKeys[0]
-      if (shouldRemember) {
-        rememberChoice(ENTRY_TARGET.MOBILE_TASKS)
-      }
-      return resolveMobileTasksPath(defaultRoleKey)
+      return mobileEntryPath
     }
     if (hasDesktopEntryAccess(adminProfile, entryConfig)) {
       return '/entry?target=desktop'

@@ -101,10 +101,46 @@ test('production material requirement response binds order and quantity projecti
   )
 })
 
+test('production material requirement conservation is exact at numeric(20,6) boundaries', () => {
+  const tiny = aggregate()
+  tiny.production_material_requirements[0].planned_quantity = '0.000001'
+  tiny.production_material_requirements[0].issued_quantity = '0'
+  tiny.production_material_requirements[0].remaining_quantity = '0.000001'
+  assert.equal(
+    validateProductionMaterialRequirementsResponse({
+      material_requirements: tiny.production_material_requirements,
+    })[0].remaining_quantity,
+    '0.000001'
+  )
+
+  const maximum = aggregate()
+  maximum.production_material_requirements[0].planned_quantity =
+    '99999999999999.999999'
+  maximum.production_material_requirements[0].issued_quantity = '0.000001'
+  maximum.production_material_requirements[0].remaining_quantity =
+    '99999999999999.999998'
+  assert.equal(
+    validateProductionMaterialRequirementsResponse({
+      material_requirements: maximum.production_material_requirements,
+    })[0].planned_quantity,
+    '99999999999999.999999'
+  )
+
+  maximum.production_material_requirements[0].remaining_quantity =
+    '99999999999999.999997'
+  assert.throws(() =>
+    validateProductionMaterialRequirementsResponse({
+      material_requirements: maximum.production_material_requirements,
+    })
+  )
+})
+
 test('production order option response never accepts missing readable labels', () => {
   const valid = {
     reference_type: 'product',
     total: 1,
+    limit: 50,
+    offset: 0,
     options: [{ value: 3, label: 'P-003 · 毛绒小熊', selectable: true }],
   }
   assert.equal(validateProductionOrderOptions(valid, 'product').total, 1)
@@ -114,6 +150,50 @@ test('production order option response never accepts missing readable labels', (
       'product'
     )
   )
+})
+
+test('production order option response requires an exact complete page contract', () => {
+  const options = Array.from({ length: 50 }, (_, index) => ({
+    value: index + 1,
+    label: `选项 ${index + 1}`,
+    selectable: true,
+  }))
+  const firstPage = {
+    reference_type: 'product',
+    total: 51,
+    limit: 50,
+    offset: 0,
+    options,
+  }
+  assert.equal(
+    validateProductionOrderOptions(firstPage, 'product', {
+      limit: 50,
+      offset: 0,
+    }).options.length,
+    50
+  )
+  assert.equal(
+    validateProductionOrderOptions(
+      { ...firstPage, offset: 50, options: [options[0]] },
+      'product',
+      { limit: 50, offset: 50 }
+    ).options.length,
+    1
+  )
+  for (const malformed of [
+    { ...firstPage, limit: 0 },
+    { ...firstPage, offset: -1 },
+    { ...firstPage, options: options.slice(0, 49) },
+    { ...firstPage, total: 49 },
+    { ...firstPage, offset: 1 },
+  ]) {
+    assert.throws(() =>
+      validateProductionOrderOptions(malformed, 'product', {
+        limit: 50,
+        offset: 0,
+      })
+    )
+  }
 })
 
 test('production order list requires an exact non-negative safe item count', () => {

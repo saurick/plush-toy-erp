@@ -19,6 +19,13 @@ const STATUS_COLORS = Object.freeze({
   CANCELLED: 'red',
 })
 
+const FACT_TYPE_LABELS = Object.freeze({
+  MATERIAL_ISSUE: '委外发料',
+  RETURN_RECEIPT: '委外回货',
+})
+
+const OUTSOURCING_FACT_TYPES = new Set(Object.keys(FACT_TYPE_LABELS))
+
 function statusTag(value) {
   const status = String(value || '').toUpperCase()
   return (
@@ -57,28 +64,47 @@ function qualityGateTag(gate) {
   return <Tag color={colors[gate.state] || 'default'}>{gate.label}</Tag>
 }
 
+function normalizedFactType(fact) {
+  return String(fact?.fact_type || '').toUpperCase()
+}
+
+function normalizedFactStatus(fact) {
+  return String(fact?.status || '').toUpperCase()
+}
+
+function isPostedReturnReceipt(fact) {
+  return (
+    normalizedFactType(fact) === 'RETURN_RECEIPT' &&
+    normalizedFactStatus(fact) === 'POSTED'
+  )
+}
+
 export default function OutsourcingReturnRecordsModal({
   open,
   order,
   facts = [],
   loading = false,
+  actionLoading = '',
+  canPostFact = false,
+  canCancelFact = false,
   canCreatePayable = false,
   canViewPayable = false,
   canCreateQualityInspection = false,
   canViewQualityInspection = false,
   qualityInspectionByFactID = {},
   onCancel,
+  onPostFact,
+  onCancelFact,
   onCreateQualityInspection,
   onViewQualityInspection,
   onGeneratePayable,
   onViewPayable,
 }) {
   const [selected, setSelected] = useState(null)
-  const returnFacts = useMemo(
+  const orderFacts = useMemo(
     () =>
       (Array.isArray(facts) ? facts : []).filter(
-        (fact) =>
-          String(fact?.fact_type || '').toUpperCase() === 'RETURN_RECEIPT'
+        (fact) => OUTSOURCING_FACT_TYPES.has(normalizedFactType(fact))
       ),
     [facts]
   )
@@ -90,14 +116,16 @@ export default function OutsourcingReturnRecordsModal({
     }
     setSelected((current) =>
       current?.id
-        ? returnFacts.find((fact) => fact.id === current.id) || null
+        ? orderFacts.find((fact) => fact.id === current.id) || null
         : null
     )
-  }, [open, order?.id, returnFacts])
+  }, [open, order?.id, orderFacts])
 
-  const selectedPosted =
-    String(selected?.status || '').toUpperCase() === 'POSTED'
-  const selectedQualityInspections = selected?.id
+  const selectedStatus = normalizedFactStatus(selected)
+  const selectedDraft = selectedStatus === 'DRAFT'
+  const selectedPosted = selectedStatus === 'POSTED'
+  const selectedPostedReturn = isPostedReturnReceipt(selected)
+  const selectedQualityInspections = selectedPostedReturn && selected?.id
     ? qualityInspectionsForFact(qualityInspectionByFactID, selected.id)
     : []
   const hasActiveQualityInspection = selectedQualityInspections.some(
@@ -113,14 +141,21 @@ export default function OutsourcingReturnRecordsModal({
     selectedQualityInspections
   )
   const selectedPayableEligible =
-    selectedPosted &&
+    selectedPostedReturn &&
     selectedQualityGate.state ===
       OUTSOURCING_RETURN_QUALITY_GATE_STATES.ACCEPTED
+  const actionBusy = Boolean(actionLoading)
   const columns = [
     {
-      title: '回货单号',
+      title: '事实单号',
       dataIndex: 'fact_no',
       width: 180,
+    },
+    {
+      title: '业务类型',
+      dataIndex: 'fact_type',
+      width: 110,
+      render: (value) => FACT_TYPE_LABELS[String(value || '').toUpperCase()] || '-',
     },
     {
       title: '状态',
@@ -132,15 +167,17 @@ export default function OutsourcingReturnRecordsModal({
       title: '质检状态',
       key: 'quality_gate',
       width: 120,
-      render: (_value, fact) =>
-        qualityGateTag(
+      render: (_value, fact) => {
+        if (!isPostedReturnReceipt(fact)) return <Tag>不适用</Tag>
+        return qualityGateTag(
           resolveOutsourcingReturnQualityGate(
             qualityInspectionsForFact(qualityInspectionByFactID, fact?.id)
           )
-        ),
+        )
+      },
     },
     {
-      title: '回货数量',
+      title: '数量',
       dataIndex: 'quantity',
       width: 120,
     },
@@ -165,22 +202,57 @@ export default function OutsourcingReturnRecordsModal({
 
   return (
     <Modal
-      title={`相关回货记录 · ${order?.outsourcing_order_no || '当前委外订单'}`}
+      title={`委外记录 · ${order?.outsourcing_order_no || '当前委外订单'}`}
       open={open}
-      width={900}
+      width={980}
       footer={
         <Space wrap>
+          {selectedDraft && canPostFact ? (
+            <Button
+              type="primary"
+              loading={actionLoading === `post:${selected.id}`}
+              disabled={loading || actionBusy}
+              onClick={() => onPostFact?.(selected)}
+            >
+              过账
+            </Button>
+          ) : null}
+          {selectedDraft && canCancelFact ? (
+            <Button
+              danger
+              loading={actionLoading === `cancel:${selected.id}`}
+              disabled={loading || actionBusy}
+              onClick={() => onCancelFact?.(selected)}
+            >
+              作废草稿（库存零变动）
+            </Button>
+          ) : null}
+          {selectedPosted && canCancelFact ? (
+            <Button
+              danger
+              loading={actionLoading === `cancel:${selected.id}`}
+              disabled={loading || actionBusy}
+              onClick={() => onCancelFact?.(selected)}
+            >
+              取消过账（恢复至过账前库存）
+            </Button>
+          ) : null}
           {canCreateQualityInspection ? (
             <Button
               disabled={
-                !selectedPosted || hasActiveQualityInspection || loading
+                !selectedPostedReturn ||
+                hasActiveQualityInspection ||
+                loading ||
+                actionBusy
               }
               onClick={() => onCreateQualityInspection?.(selected)}
             >
               {hasActiveQualityInspection ? '已发起质检' : '发起质检'}
             </Button>
           ) : null}
-          {canViewQualityInspection && selectedQualityInspection ? (
+          {canViewQualityInspection &&
+          selectedPostedReturn &&
+          selectedQualityInspection ? (
             <Button
               onClick={() =>
                 onViewQualityInspection?.(selectedQualityInspection)
@@ -195,7 +267,7 @@ export default function OutsourcingReturnRecordsModal({
           ) : null}
           {canViewPayable ? (
             <Button
-              disabled={!selectedPosted}
+              disabled={!selectedPostedReturn || loading || actionBusy}
               onClick={() => onViewPayable?.(selected)}
             >
               查看应付
@@ -204,13 +276,15 @@ export default function OutsourcingReturnRecordsModal({
           {canCreatePayable ? (
             <Button
               type="primary"
-              disabled={!selectedPayableEligible || loading}
+              disabled={!selectedPayableEligible || loading || actionBusy}
               onClick={() => onGeneratePayable?.(selected)}
             >
               生成应付
             </Button>
           ) : null}
-          <Button onClick={onCancel}>关闭</Button>
+          <Button disabled={actionBusy} onClick={onCancel}>
+            关闭
+          </Button>
         </Space>
       }
       destroyOnHidden
@@ -219,24 +293,24 @@ export default function OutsourcingReturnRecordsModal({
       <Alert
         type="info"
         showIcon
-        message="已过账回货需先完成质检，判定合格或让步接收后才能生成应付；待检产品或材料、仓库、批次，以及应付供应商、金额和币种，均由系统根据本次回货确定。"
+        message="草稿可过账或作废，作废草稿不会改变库存；已过账记录取消后恢复至过账前库存。只有已过账的委外回货可发起质检，并在判定合格或让步接收后生成应付。"
         style={{ marginBottom: 12 }}
       />
       <Table
         rowKey="id"
         size="small"
         columns={columns}
-        dataSource={returnFacts}
+        dataSource={orderFacts}
         loading={loading}
         pagination={false}
-        scroll={{ x: 1110 }}
+        scroll={{ x: 1220 }}
         rowSelection={{
           type: 'radio',
           selectedRowKeys: selected ? [selected.id] : [],
           onChange: (_keys, rows) => setSelected(rows[0] || null),
         }}
         onRow={(record) => ({ onClick: () => setSelected(record) })}
-        locale={{ emptyText: '暂无委外回货记录' }}
+        locale={{ emptyText: '暂无委外记录' }}
       />
     </Modal>
   )

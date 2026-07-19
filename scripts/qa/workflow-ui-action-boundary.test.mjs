@@ -123,8 +123,12 @@ function assertPostSuccessRefreshIsolated({
     `message\\.success\\([^\\n]+\\)\\s*\\n\\s*try\\s*\\{\\s*\\n\\s*await ${escapedRefreshCall}\\s*\\n\\s*\\}\\s*catch\\s*\\{\\s*\\n\\s*message\\.warning\\(['\"]操作已成功但列表刷新失败，请手动刷新['\"]\\)`,
     "gu",
   );
+  const detachedPattern = new RegExp(
+    `message\\.success\\([^\\n]+\\)\\s*\\n\\s*${escapedRefreshCall}\\.catch\\(\\(\\)\\s*=>\\s*\\{\\s*\\n\\s*message\\.warning\\(['"]操作已成功但列表刷新失败，请手动刷新['"]\\)`,
+    "gu",
+  );
   assert.equal(
-    [...source.matchAll(pattern)].length,
+    [...source.matchAll(pattern), ...source.matchAll(detachedPattern)].length,
     expectedCount,
     `${relativePath} must keep every post-success refresh failure outside mutation unknown-result handling`,
   );
@@ -163,20 +167,42 @@ test("mobile task detail action bar does not expose unsupported processing actio
   );
 });
 
-test("mobile task detail latest event fallback hides raw owner role key", () => {
-  const detailScreenPath = path.join(
-    erpSourceRoot,
-    "mobile/components/MobileTaskDetailScreen.jsx",
+test("mobile task flow owner fallback hides raw owner role key", () => {
+  const screenSources = new Map(
+    [
+      "MobileTaskDetailScreen.jsx",
+      "MobileTaskActionScreen.jsx",
+      "MobileTaskReceiptScreen.jsx",
+    ].map((fileName) => [
+      fileName,
+      readFileSync(
+        path.join(erpSourceRoot, "mobile/components", fileName),
+        "utf8",
+      ),
+    ]),
   );
-  const source = readFileSync(detailScreenPath, "utf8");
+  const detailSource = screenSources.get("MobileTaskDetailScreen.jsx");
 
   assert(
-    source.includes(": `任务已流转至 ${ownerRoleLabel}`"),
-    "mobile detail latest event fallback must use the readable owner role label",
+    detailSource.includes(
+      "const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)",
+    ),
+    "mobile detail must translate owner_role_key through the shared readable role label helper",
   );
   assert(
-    !source.includes("任务已流转至 ${roleLabel} / ${"),
-    "mobile detail latest event fallback must not concatenate raw owner_role_key",
+    detailSource.includes(": `任务当前由${ownerRoleLabel}负责。`"),
+    "mobile detail current-owner fallback must render the readable owner role label",
+  );
+  for (const [fileName, source] of screenSources) {
+    assert.doesNotMatch(
+      source,
+      /(?:\$\{|\{)(?:selectedTask|task)\??\.owner_role_key\}/u,
+      `${fileName} must not render raw owner_role_key directly`,
+    );
+  }
+  assert(
+    !detailSource.includes("任务已流转至 ${roleLabel} / ${"),
+    "mobile detail must not concatenate raw owner_role_key with a readable label",
   );
 });
 
@@ -266,8 +292,10 @@ test("mobile task visibility copy stays readable and role task query uses server
     "view_key: normalizedViewKey",
     "role_key: normalizedRoleKey",
     "...(normalizedCursor ? { cursor: normalizedCursor } : {})",
-    "next_cursor: response.next_cursor || ''",
-    "has_more: response.has_more === true",
+    "const nextCursor = String(response.next_cursor || '').trim()",
+    "next_cursor: nextCursor",
+    "const hasMore = response.has_more === true",
+    "has_more: hasMore",
     "server_time: response.server_time || 0",
   ]) {
     assert(
@@ -472,7 +500,7 @@ test("mobile task actions explain backend access before submitting actions", () 
     "const accessVerified = await verifyNewWorkflowTaskMutationAttempt({",
   );
   const mutationRunIndex = source.indexOf(
-    "await mutationAttemptsRef.current.run({",
+    "await mutationAttempts.run({",
     retainedAttemptGuardIndex,
   );
   const urgeReasonGuardIndex = source.indexOf("if (!reason)");
@@ -481,7 +509,7 @@ test("mobile task actions explain backend access before submitting actions", () 
     retainedAttemptGuardIndex + 1,
   );
   const urgeMutationRunIndex = source.indexOf(
-    "await mutationAttemptsRef.current.run({",
+    "await mutationAttempts.run({",
     mutationRunIndex + 1,
   );
 
@@ -525,7 +553,7 @@ test("mobile task actions explain backend access before submitting actions", () 
   );
   assert.match(
     source,
-    /const actionParams\s*=\s*\{[\s\S]*reason:\s*reasonRequired\s*\?\s*actionReason\s*:\s*''[\s\S]*payload,/u,
+    /const actionParams\s*=\s*\{[\s\S]*\.\.\.\(actionReason\s*\?\s*\{\s*reason:\s*actionReason\s*\}\s*:\s*\{\}\)[\s\S]*payload,/u,
     "mobile status actions must submit the canonical top-level reason beside allowlisted evidence",
   );
   assert(
@@ -745,7 +773,7 @@ test("workflow task post-success refresh failures stay separate from mutation re
   const expectations = [
     {
       relativePath: "web/src/erp/mobile/hooks/useMobileRoleTaskActions.js",
-      refreshCall: "loadTasks()",
+      refreshCall: "loadTasks({ canonicalTask: confirmedTask })",
       expectedCount: 2,
     },
     {
@@ -883,8 +911,13 @@ test("business collaboration panel is limited to selected purchase and outsourci
   );
   assert.match(
     collaborationTaskSource,
-    /source_type:\s*String\(sourceType[\s\S]*?source_id:\s*requestedSourceID,[\s\S]*?limit:\s*200/u,
-    "shared collaboration loader must query the exact current source record",
+    /listAllPaginatedRecords\(\s*listTasks,\s*\{\s*source_type:\s*String\(sourceType[\s\S]*?source_id:\s*requestedSourceID,?\s*\},\s*['"]tasks['"],\s*\{\s*signal:\s*request\.signal\s*\}/u,
+    "shared collaboration loader must exhaust every page for the exact current source record and preserve request cancellation",
+  );
+  assert.doesNotMatch(
+    collaborationTaskSource,
+    /source_id:\s*requestedSourceID,[\s\S]{0,120}?limit:\s*200/u,
+    "shared collaboration loader must not truncate the selected record to the old fixed 200-task window",
   );
 
   const panelSource = readFileSync(
@@ -1024,10 +1057,10 @@ test("purchase order page keeps write buttons behind projected actions", () => {
     "purchase order page must pass projected permissions into operation panel, modal, and inbound draft guard",
   );
   assert(
-    panelSource.includes("disabled={!canCreate}") &&
+    panelSource.includes("disabled={!canCreate || !referenceDataReady}") &&
       panelSource.includes("loading={itemsLoading}") &&
       panelSource.includes(
-        "disabled={!selectedOrderCanEdit || itemsLoading}",
+        "!selectedOrderCanEdit || !referenceDataReady || itemsLoading",
       ) &&
       panelSource.includes(
         "disabled={\n                !canGenerateInboundDraft",
@@ -1141,8 +1174,8 @@ test("fact pages keep write buttons behind projected actions and status guards",
         "canDelete={canCreate || canPost}",
         "页面不提供脱离采购来源的手工入库明细。",
         "selectedRow.status !== 'DRAFT' ||\n                !canPost",
-        "selectedRow.status !== 'POSTED' ||\n                !canPost",
-        "过账和取消均由系统按采购入库规则更新库存或生成撤销调整记录",
+        "!['DRAFT', 'POSTED'].includes(selectedRow.status) ||\n                !canPost",
+        "草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存",
       ],
       forbiddenTokens: [
         "addPurchaseReceiptItem",
@@ -1156,7 +1189,7 @@ test("fact pages keep write buttons behind projected actions and status guards",
       tokens: [
         "const canCreate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.create'\n  )",
         "const canUpdate = hasActionPermission(\n    adminProfile,\n    'quality.inspection.update'\n  )",
-        "disabled={!canCreate}",
+        "disabled={!canCreate || referenceDataState !== 'ready'}",
         "selectedRow.status !== 'DRAFT' ||\n                !canUpdate",
         "selectedRow.status !== 'SUBMITTED' ||\n              !canUpdate",
         "!['DRAFT', 'SUBMITTED'].includes(selectedRow.status) ||\n              !canUpdate",

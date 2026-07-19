@@ -27,6 +27,10 @@ test('business source navigation emits the query owned by each direct target pag
     '/erp/purchase/processing-contracts?outsourcing_order_id=14'
   )
   assert.equal(
+    businessSourceRouteFor('OUTSOURCING_FACT', 141),
+    '/erp/purchase/processing-contracts?outsourcing_fact_id=141'
+  )
+  assert.equal(
     businessSourceRouteFor('PURCHASE_ORDER', 15),
     '/erp/purchase/accessories?purchase_order_id=15'
   )
@@ -44,10 +48,9 @@ test('business source navigation emits the query owned by each direct target pag
   )
 })
 
-test('business source navigation fails closed for indirect or ambiguous source ids', () => {
+test('business source navigation fails closed for unsupported or ambiguous source ids', () => {
   for (const sourceType of [
     'PRODUCTION_ORDER_MATERIAL_REQUIREMENT',
-    'OUTSOURCING_FACT',
     'PURCHASE_RETURN',
     'FINANCE_FACT',
     'unknown',
@@ -58,6 +61,16 @@ test('business source navigation fails closed for indirect or ambiguous source i
   }
   assert.equal(businessSourceRouteFor('SALES_ORDER', 0), '')
   assert.equal(businessSourceRouteFor('SALES_ORDER', 'not-an-id'), '')
+})
+
+test('business source navigation carries the readable source number beside the exact id', () => {
+  assert.equal(
+    businessSourceRouteFor('PURCHASE_RECEIPT', 16, {
+      keyword: 'PR-001',
+      source: 'finance-payable',
+    }),
+    '/erp/warehouse/inbound?receipt_id=16&link_keyword=PR-001&link_source=finance-payable&link_fields=document_no%2Csource_no'
+  )
 })
 
 test('business record inventory navigation uses the posted fact itself as the ledger source', () => {
@@ -92,6 +105,11 @@ test('direct source route keys are consumed by their target pages', () => {
       'outsourcing_order_id',
       'getOutsourcingOrder',
     ],
+    [
+      'V1OutsourcingOrdersPage.jsx',
+      'outsourcing_fact_id',
+      'listAllOutsourcingFacts',
+    ],
     ['V1PurchaseOrdersPage.jsx', 'purchase_order_id', 'getPurchaseOrder'],
     [
       'V1QualityInspectionsPage.jsx',
@@ -107,11 +125,14 @@ test('direct source route keys are consumed by their target pages', () => {
 
   const productionFacts = pageSource('OperationalFactsPage.jsx')
   assert.match(productionFacts, /'fact_id'/u)
+  assert.match(productionFacts, /await listAllProductionFacts\(\{/u)
   assert.match(
     productionFacts,
-    /key === 'production'[\s\S]{0,120}keyword: routeFactID/u
+    /Number\(item\?\.id \|\| 0\) === exactProductionFactID/u
   )
 
-  assert.match(pageSource('V1PurchaseReceiptsPage.jsx'), /'receipt_id'/u)
+  const purchaseReceipts = pageSource('V1PurchaseReceiptsPage.jsx')
+  assert.match(purchaseReceipts, /'receipt_id'/u)
+  assert.match(purchaseReceipts, /\bgetPurchaseReceipt\b/u)
   assert.match(pageSource('ShipmentsPage.jsx'), /'shipment_id'/u)
 })

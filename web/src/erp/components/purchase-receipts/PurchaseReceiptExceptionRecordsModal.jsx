@@ -7,12 +7,13 @@ import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   cancelPurchaseReceiptAdjustment,
   cancelPurchaseReturn,
-  listPurchaseReceiptAdjustments,
-  listPurchaseReturns,
+  listAllPurchaseReceiptAdjustments,
+  listAllPurchaseReturns,
   postPurchaseReceiptAdjustment,
   postPurchaseReturn,
 } from '../../api/purchaseApi.mjs'
 import useLatestRequestCoordinator from '../../hooks/useLatestRequestCoordinator.js'
+import { formatPurchaseReceiptQuantityTotal } from '../../utils/purchaseReceiptDecimal.mjs'
 import { isSourceBusinessActionResultUnknown } from '../../utils/sourceBusinessAction.mjs'
 
 const STATUS_LABELS = Object.freeze({
@@ -53,10 +54,7 @@ function formatDateTime(value) {
 
 function lineSummary(record, quantityLabel) {
   const items = Array.isArray(record?.items) ? record.items : []
-  const total = items.reduce((sum, item) => {
-    const quantity = Number(item?.quantity)
-    return Number.isFinite(quantity) ? sum + quantity : sum
-  }, 0)
+  const total = formatPurchaseReceiptQuantityTotal(items)
   return `${items.length} 行 / ${quantityLabel} ${total}`
 }
 
@@ -90,21 +88,17 @@ export default function PurchaseReceiptExceptionRecordsModal({
     try {
       const [returnResult, adjustmentResult] = await Promise.all([
         canReadReturns
-          ? listPurchaseReturns(
+          ? listAllPurchaseReturns(
               {
                 purchase_receipt_id: receipt.id,
-                limit: 100,
-                offset: 0,
               },
               { signal: request.signal }
             )
           : Promise.resolve({ purchase_returns: [] }),
         canReadAdjustments
-          ? listPurchaseReceiptAdjustments(
+          ? listAllPurchaseReceiptAdjustments(
               {
                 purchase_receipt_id: receipt.id,
-                limit: 100,
-                offset: 0,
               },
               { signal: request.signal }
             )
@@ -188,6 +182,10 @@ export default function PurchaseReceiptExceptionRecordsModal({
             ? kind === 'return'
               ? '采购退货已确认'
               : '入库调整已确认'
+            : record?.status === 'DRAFT'
+              ? kind === 'return'
+                ? '采购退货草稿已作废，未更新库存'
+                : '入库调整草稿已作废，未更新库存'
             : kind === 'return'
               ? '采购退货已取消，库存已恢复到退货前'
               : '入库调整已取消，库存已恢复到调整前'
@@ -221,30 +219,55 @@ export default function PurchaseReceiptExceptionRecordsModal({
     (kind, permissions) => ({
       title: '操作',
       key: 'actions',
-      width: 160,
+      width: 240,
       render: (_, record) => {
         if (record?.status === 'DRAFT') {
-          if (!permissions.post) return <span>待确认</span>
+          if (!permissions.post && !permissions.cancel) {
+            return <span>待确认</span>
+          }
           return (
-            <Popconfirm
-              title={
-                kind === 'return'
-                  ? '确认这笔退货？确认后相应库存会同步扣减。'
-                  : '确认这笔入库调整？确认后库存数量会按调整内容同步更新。'
-              }
-              okText="确认"
-              cancelText="取消"
-              onConfirm={() => runAction({ kind, action: 'post', record })}
-            >
-              <Button
-                size="small"
-                type="primary"
-                loading={savingKey === `${kind}:post:${record.id}`}
-                disabled={Boolean(savingKey)}
-              >
-                确认
-              </Button>
-            </Popconfirm>
+            <Space size="small">
+              {permissions.post ? (
+                <Popconfirm
+                  title={
+                    kind === 'return'
+                      ? '确认这笔退货？确认后相应库存会同步扣减。'
+                      : '确认这笔入库调整？确认后库存数量会按调整内容同步更新。'
+                  }
+                  okText="确认"
+                  cancelText="取消"
+                  onConfirm={() => runAction({ kind, action: 'post', record })}
+                >
+                  <Button
+                    size="small"
+                    type="primary"
+                    loading={savingKey === `${kind}:post:${record.id}`}
+                    disabled={Boolean(savingKey)}
+                  >
+                    确认
+                  </Button>
+                </Popconfirm>
+              ) : null}
+              {permissions.cancel ? (
+                <Popconfirm
+                  title="确认作废草稿？草稿尚未确认，不会变更库存。"
+                  okText="确认作废"
+                  cancelText="暂不作废"
+                  onConfirm={() =>
+                    runAction({ kind, action: 'cancel', record })
+                  }
+                >
+                  <Button
+                    size="small"
+                    danger
+                    loading={savingKey === `${kind}:cancel:${record.id}`}
+                    disabled={Boolean(savingKey)}
+                  >
+                    作废草稿
+                  </Button>
+                </Popconfirm>
+              ) : null}
+            </Space>
           )
         }
         if (record?.status === 'POSTED') {
@@ -397,7 +420,7 @@ export default function PurchaseReceiptExceptionRecordsModal({
       <Alert
         type="info"
         showIcon
-        message="确认草稿后库存会同步更新；取消已确认记录时会保留原记录，并将库存恢复到操作前。"
+        message="草稿可直接作废且不更新库存；确认草稿后库存会同步更新；取消已确认记录时会保留原记录，并将库存恢复到操作前。"
         style={{ marginBottom: 16 }}
       />
       {tabItems.length > 0 ? (

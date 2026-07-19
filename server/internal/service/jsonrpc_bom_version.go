@@ -68,6 +68,9 @@ func (d *jsonrpcDispatcher) handleBOMVersion(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionBOMCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "bom", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), bomModuleKeyMaterialBOM); res != nil {
 			return id, res, nil
 		}

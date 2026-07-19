@@ -77,6 +77,10 @@ export async function listCustomers(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllCustomers(params = {}, options = {}) {
+  return listAllReferenceRecords(listCustomers, params, 'customers', options)
+}
+
 export async function createCustomer(params = {}) {
   const result = await masterDataRpc.call('create_customer', params)
   return dataOf(result)?.customer || null
@@ -105,6 +109,10 @@ export async function setCustomerActive(params = {}) {
 export async function listSuppliers(params = {}, options = {}) {
   const result = await masterDataRpc.call('list_suppliers', params, options)
   return dataOf(result)
+}
+
+export async function listAllSuppliers(params = {}, options = {}) {
+  return listAllReferenceRecords(listSuppliers, params, 'suppliers', options)
 }
 
 export async function createSupplier(params = {}) {
@@ -137,14 +145,26 @@ export async function listMaterials(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllMaterials(params = {}, options = {}) {
+  return listAllReferenceRecords(listMaterials, params, 'materials', options)
+}
+
 export async function listUnits(params = {}, options = {}) {
   const result = await masterDataRpc.call('list_units', params, options)
   return dataOf(result)
 }
 
+export async function listAllUnits(params = {}, options = {}) {
+  return listAllReferenceRecords(listUnits, params, 'units', options)
+}
+
 export async function listWarehouses(params = {}, options = {}) {
   const result = await masterDataRpc.call('list_warehouses', params, options)
   return dataOf(result)
+}
+
+export async function listAllWarehouses(params = {}, options = {}) {
+  return listAllReferenceRecords(listWarehouses, params, 'warehouses', options)
 }
 
 export async function createMaterial(params = {}) {
@@ -172,6 +192,10 @@ export async function listProcesses(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllProcesses(params = {}, options = {}) {
+  return listAllReferenceRecords(listProcesses, params, 'processes', options)
+}
+
 export async function createProcess(params = {}) {
   const result = await masterDataRpc.call('create_process', params)
   return dataOf(result)?.process || null
@@ -195,6 +219,10 @@ export async function setProcessActive(params = {}) {
 export async function listProducts(params = {}, options = {}) {
   const result = await masterDataRpc.call('list_products', params, options)
   return dataOf(result)
+}
+
+export async function listAllProducts(params = {}, options = {}) {
+  return listAllReferenceRecords(listProducts, params, 'products', options)
 }
 
 export async function createProduct(params = {}) {
@@ -260,6 +288,15 @@ export async function listContactsByOwner(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllContactsByOwner(params = {}, options = {}) {
+  return listAllReferenceRecords(
+    listContactsByOwner,
+    params,
+    'contacts',
+    options
+  )
+}
+
 export async function createContact(params = {}) {
   const result = await masterDataRpc.call('create_contact', params)
   return dataOf(result)?.contact || null
@@ -285,14 +322,16 @@ export async function listSalesOrders(params = {}, options = {}) {
   return dataOf(result)
 }
 
-export async function createSalesOrder(params = {}) {
-  const result = await salesOrderRpc.call('create_sales_order', params)
-  return dataOf(result)?.sales_order || null
-}
-
-export async function updateSalesOrder(params = {}) {
-  const result = await salesOrderRpc.call('update_sales_order', params)
-  return dataOf(result)?.sales_order || null
+export async function listAllSalesOrders(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listSalesOrders,
+    params,
+    'sales_orders',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的销售订单列表不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function saveSalesOrderWithItems(params = {}) {
@@ -307,11 +346,6 @@ export async function saveSalesOrderWithItems(params = {}) {
 
 export async function getSalesOrder(params = {}, options = {}) {
   const result = await salesOrderRpc.call('get_sales_order', params, options)
-  return dataOf(result)?.sales_order || null
-}
-
-export async function submitSalesOrder(params = {}) {
-  const result = await salesOrderRpc.call('submit_sales_order', params)
   return dataOf(result)?.sales_order || null
 }
 
@@ -375,21 +409,6 @@ export async function listSalesOrderItemsPreview(params = {}, options = {}) {
         options
       ),
   })
-}
-
-export async function addSalesOrderItem(params = {}) {
-  const result = await salesOrderRpc.call('add_sales_order_item', params)
-  return dataOf(result)?.sales_order_item || null
-}
-
-export async function updateSalesOrderItem(params = {}) {
-  const result = await salesOrderRpc.call('update_sales_order_item', params)
-  return dataOf(result)?.sales_order_item || null
-}
-
-export async function removeSalesOrderItem(params = {}) {
-  const result = await salesOrderRpc.call('remove_sales_order_item', params)
-  return dataOf(result)?.sales_order_item || null
 }
 
 export async function listPurchaseOrders(params = {}, options = {}) {

@@ -358,7 +358,8 @@ function validateWorkflowTaskRevisionVisibilityContract() {
     );
   }
 
-  const customerConfigPath = "server/internal/biz/customer_config.go";
+  const customerConfigPath =
+    "server/internal/biz/customer_config_runtime.go";
   const customerConfigSource = readFileSync(
     repoPath(customerConfigPath),
     "utf8",

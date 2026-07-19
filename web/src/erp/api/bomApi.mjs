@@ -1,6 +1,7 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const bomRpc = new JsonRpc({
   url: 'bom',
@@ -12,9 +13,21 @@ function dataOf(result) {
   return result?.data || {}
 }
 
-export async function listBOMVersions(params = {}) {
-  const result = await bomRpc.call('list_bom_versions', params)
+export async function listBOMVersions(params = {}, options = {}) {
+  const result = await bomRpc.call('list_bom_versions', params, options)
   return dataOf(result)
+}
+
+export async function listAllBOMVersions(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listBOMVersions,
+    params,
+    'bom_versions',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的 BOM 版本不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function getBOMVersion(params = {}) {

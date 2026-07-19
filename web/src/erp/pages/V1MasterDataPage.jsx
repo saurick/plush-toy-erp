@@ -655,6 +655,9 @@ export default function V1MasterDataPage({ type }) {
 
   const saveRecord = async () => {
     const values = await recordForm.validateFields()
+    const isCreatingRecord = !editingRecord?.id
+    const shouldShowCreatedRecordOnFirstPage =
+      isCreatingRecord && effectiveType !== 'processes'
     setSaving(true)
     try {
       const extra = editingRecord?.id ? { id: editingRecord.id } : {}
@@ -698,7 +701,11 @@ export default function V1MasterDataPage({ type }) {
         if (Array.isArray(savedData?.contacts)) {
           setContacts(savedData.contacts)
         }
-        await loadRecords()
+        if (shouldShowCreatedRecordOnFirstPage) {
+          resetBusinessPaginationCurrent(setPagination)
+        } else {
+          await loadRecords()
+        }
         const currentImagesReloaded = productImagesReloaded
           ? true
           : (await productImageSlotsRef.current?.beginSession(saved?.id)) ===
@@ -728,7 +735,11 @@ export default function V1MasterDataPage({ type }) {
       if (Array.isArray(savedData?.contacts)) {
         setContacts(savedData.contacts)
       }
-      await loadRecords()
+      if (shouldShowCreatedRecordOnFirstPage) {
+        resetBusinessPaginationCurrent(setPagination)
+      } else {
+        await loadRecords()
+      }
     } catch (error) {
       message.error(getActionErrorMessage(error, `保存${entityLabel}`))
     } finally {

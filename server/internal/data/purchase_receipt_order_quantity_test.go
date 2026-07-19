@@ -18,6 +18,53 @@ import (
 	"github.com/shopspring/decimal"
 )
 
+func TestPurchaseReceiptProjectsSinglePurchaseOrderReference(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "purchase_receipt_order_reference")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	orderItem := createApprovedPurchaseOrderItemForReceiptTest(
+		t,
+		ctx,
+		client,
+		fixtures,
+		"REFERENCE",
+		mustDecimal(t, "10"),
+	)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	receipt := createLinkedPurchaseReceiptDraftForTest(
+		t,
+		ctx,
+		client,
+		uc,
+		fixtures,
+		orderItem.ID,
+		"PR-PO-REFERENCE",
+		mustDecimal(t, "4"),
+	)
+
+	loaded, err := uc.GetPurchaseReceipt(ctx, receipt.ID)
+	if err != nil {
+		t.Fatalf("get purchase receipt: %v", err)
+	}
+	if loaded.PurchaseOrderID == nil || *loaded.PurchaseOrderID != orderItem.PurchaseOrderID {
+		t.Fatalf("purchase_order_id=%v, want %d", loaded.PurchaseOrderID, orderItem.PurchaseOrderID)
+	}
+	if loaded.PurchaseOrderNo == nil || *loaded.PurchaseOrderNo != "PO-RECEIPT-REFERENCE" {
+		t.Fatalf("purchase_order_no=%v, want PO-RECEIPT-REFERENCE", loaded.PurchaseOrderNo)
+	}
+
+	listed, total, err := uc.ListPurchaseReceipts(ctx, biz.PurchaseReceiptFilter{Limit: 10})
+	if err != nil || total != 1 || len(listed) != 1 {
+		t.Fatalf("list purchase receipts: total=%d len=%d err=%v", total, len(listed), err)
+	}
+	if listed[0].PurchaseOrderID == nil || *listed[0].PurchaseOrderID != orderItem.PurchaseOrderID {
+		t.Fatalf("listed purchase_order_id=%v, want %d", listed[0].PurchaseOrderID, orderItem.PurchaseOrderID)
+	}
+	if listed[0].PurchaseOrderNo == nil || *listed[0].PurchaseOrderNo != "PO-RECEIPT-REFERENCE" {
+		t.Fatalf("listed purchase_order_no=%v, want PO-RECEIPT-REFERENCE", listed[0].PurchaseOrderNo)
+	}
+}
+
 func TestPurchaseReceiptOrderQuantityGuard(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "purchase_receipt_order_quantity_guard")
@@ -57,6 +104,13 @@ func TestPurchaseReceiptOrderQuantityGuard(t *testing.T) {
 	unlinked := createUnlinkedPurchaseReceiptDraftForTest(t, ctx, uc, fixtures, "PR-NO-PO", mustDecimal(t, "1000"))
 	if _, err := uc.PostPurchaseReceipt(ctx, unlinked.ID); err != nil {
 		t.Fatalf("non-public source-less fixture construction must remain available: %v", err)
+	}
+	loadedUnlinked, err := uc.GetPurchaseReceipt(ctx, unlinked.ID)
+	if err != nil {
+		t.Fatalf("get source-less receipt: %v", err)
+	}
+	if loadedUnlinked.PurchaseOrderID != nil || loadedUnlinked.PurchaseOrderNo != nil {
+		t.Fatalf("source-less receipt unexpectedly gained purchase order reference: %#v", loadedUnlinked)
 	}
 }
 
@@ -213,6 +267,9 @@ func TestCreatePurchaseReceiptFromPurchaseOrderIdempotencyReturnsOriginalFacts(t
 	if len(created.Items) != 1 || len(created.QualityInspections) != 1 {
 		t.Fatalf("expected one generated receipt line and quality fact, got %#v", created)
 	}
+	if created.PurchaseOrderID == nil || *created.PurchaseOrderID != orderItem.PurchaseOrderID || created.PurchaseOrderNo == nil || *created.PurchaseOrderNo != "PO-RECEIPT-IDEMPOTENCY" {
+		t.Fatalf("created receipt lost purchase order reference: %#v", created)
+	}
 	originalInspectionID := created.QualityInspections[0].ID
 	originalInspection := created.QualityInspections[0]
 	if _, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
@@ -251,6 +308,9 @@ func TestCreatePurchaseReceiptFromPurchaseOrderIdempotencyReturnsOriginalFacts(t
 	}
 	if replayed.ID != created.ID || len(replayed.Items) != 1 || replayed.Items[0].ID != created.Items[0].ID {
 		t.Fatalf("same-payload replay returned different receipt facts: created=%#v replayed=%#v", created, replayed)
+	}
+	if replayed.PurchaseOrderID == nil || *replayed.PurchaseOrderID != orderItem.PurchaseOrderID || replayed.PurchaseOrderNo == nil || *replayed.PurchaseOrderNo != "PO-RECEIPT-IDEMPOTENCY" {
+		t.Fatalf("same-payload replay lost purchase order reference: %#v", replayed)
 	}
 	if len(replayed.QualityInspections) != 1 || replayed.QualityInspections[0].ID != originalInspectionID {
 		t.Fatalf("same-payload replay returned different quality refs: %#v", replayed.QualityInspections)

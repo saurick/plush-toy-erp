@@ -157,12 +157,17 @@ export function requireWorkflowTaskMutationParams(
   if (Object.hasOwn(params, 'reason') && typeof params.reason !== 'string') {
     throw workflowTaskMutationInvalid()
   }
-  normalized.reason = String(params.reason || '').trim()
+  const normalizedReason = String(params.reason || '').trim()
   if (
     ['block', 'reject', 'resume', 'urge'].includes(normalizedOperation) &&
-    !normalized.reason
+    !normalizedReason
   ) {
     throw workflowTaskMutationInvalid()
+  }
+  if (normalizedReason) {
+    normalized.reason = normalizedReason
+  } else {
+    delete normalized.reason
   }
 
   if (normalizedOperation !== 'urge') {

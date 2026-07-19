@@ -183,8 +183,6 @@ const engineeringWorkInstructionPrintFieldCoverage = Object.freeze([
   ['productNo', 'BOM版本页.product_id -> 产品编号'],
   ['orderNo', 'BOM版本页.source_order_no'],
   ['productName', 'BOM版本页.product_id -> 产品名称'],
-  ['versionText', 'BOM版本页.version'],
-  ['processName', 'BOM明细.process_base/process_method 汇总'],
   ['department', '工程打印模板固定部门口径'],
   ['maker', 'BOM版本页.maker'],
   ['designer', 'BOM版本页.designer'],
@@ -1304,6 +1302,21 @@ test('yoyoosun engineering print field coverage maps every paper variable to BOM
       workInstructionDraft,
       engineeringWorkInstructionPrintFieldCoverage,
       `${bomVersion.bomNo}.workInstruction`
+    )
+    assert.equal(
+      workInstructionDraft.versionText,
+      '',
+      `${bomVersion.bomNo}.workInstruction.versionText must stay blank without a dedicated print edition source`
+    )
+    assert.equal(
+      workInstructionDraft.processName,
+      '',
+      `${bomVersion.bomNo}.workInstruction.processName must not aggregate BOM item processes`
+    )
+    assert.equal(
+      workInstructionDraft.processDateText,
+      '',
+      `${bomVersion.bomNo}.workInstruction.processDateText must stay blank without an explicit source`
     )
     assert.ok(workInstructionDraft.rows.length >= runtimeVersion.items.length, `${bomVersion.bomNo}.workInstruction rows must be generated from BOM items`)
     for (const [index, row] of workInstructionDraft.rows.entries()) {

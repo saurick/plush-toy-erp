@@ -39,6 +39,11 @@ const TASK_SOURCE_PATH_MAP = new Map([
   ...dashboardModules.map((moduleItem) => [moduleItem.key, moduleItem.path]),
 ])
 const TASK_LINK_MATCH_FIELDS = Object.freeze(['document_no', 'source_no'])
+const WORKFLOW_INBOX_SOURCE_TYPES = new Set([
+  'production-scheduling',
+  'production-exceptions',
+  'shipping-release',
+])
 const ACTIVE_TASK_ENTRY_PATHS = new Set([
   '/erp/business-dashboard',
   ...FORMAL_V1_TASK_ENTRY_MODULES.map((moduleItem) => moduleItem.path),
@@ -280,7 +285,12 @@ export function resolveWorkflowTaskEntryPath(task = {}) {
   }
   const payload = payloadOf(task)
   const entryPath = String(payload.entry_path || '').trim()
-  const sourceType = String(task.source_type || '').trim()
+  const sourceType = String(task.source_type || '')
+    .trim()
+    .toLowerCase()
+  if (WORKFLOW_INBOX_SOURCE_TYPES.has(sourceType)) {
+    return ''
+  }
   const sourcePath = TASK_SOURCE_PATH_MAP.get(sourceType) || ''
   const path = ACTIVE_TASK_ENTRY_PATHS.has(entryPath)
     ? entryPath

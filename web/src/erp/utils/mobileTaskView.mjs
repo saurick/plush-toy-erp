@@ -202,11 +202,14 @@ export function normalizeMobileActionEvidenceRefs(value) {
 export function buildMobileTaskActionEvidence({
   evidenceText = '',
   evidenceRefs,
+  feedback = '',
 } = {}) {
   const normalizedEvidenceRefs = normalizeMobileActionEvidenceRefs(
     evidenceRefs || evidenceText
   )
+  const normalizedFeedback = String(feedback || '').trim()
   return {
+    ...(normalizedFeedback ? { feedback: normalizedFeedback } : {}),
     ...(normalizedEvidenceRefs.length
       ? { evidence_refs: normalizedEvidenceRefs }
       : {}),
@@ -437,7 +440,11 @@ export function explainMobileTaskVisibility(
       '该任务存在高风险提醒，需要 PMC 关注。'
     )
     appendReason(reasons, taskView.is_urged, '该任务已被催办，需要 PMC 关注。')
-    appendReason(reasons, taskView.is_escalated, '该任务已升级，需要 PMC 关注。')
+    appendReason(
+      reasons,
+      taskView.is_escalated,
+      '该任务已升级，需要 PMC 关注。'
+    )
     appendReason(
       reasons,
       isHighPriorityWorkflowTask(taskView),
@@ -515,7 +522,11 @@ export function explainMobileTaskVisibility(
       '该任务由委外岗位参与，需要生产经理关注。'
     )
   } else if (normalizedRoleKey === 'finance') {
-    appendReason(reasons, isFinanceWorkflowTask(taskView), '这项任务与财务办理有关。')
+    appendReason(
+      reasons,
+      isFinanceWorkflowTask(taskView),
+      '这项任务与财务办理有关。'
+    )
   } else if (normalizedRoleKey === 'warehouse') {
     appendReason(
       reasons,
@@ -523,7 +534,11 @@ export function explainMobileTaskVisibility(
       '这项任务与仓库办理有关。'
     )
   } else if (normalizedRoleKey === 'quality') {
-    appendReason(reasons, isQualityWorkflowTask(taskView), '这项任务与品质检验有关。')
+    appendReason(
+      reasons,
+      isQualityWorkflowTask(taskView),
+      '这项任务与品质检验有关。'
+    )
   } else if (normalizedRoleKey === 'sales') {
     appendReason(
       reasons,
@@ -555,9 +570,7 @@ export function explainMobileTaskVisibility(
       blockers.push('该任务没有阻塞、超时、高优先级、催办或升级情况。')
     }
     if (normalizedRoleKey === 'boss') {
-      blockers.push(
-        '该任务没有高优先级、财务风险、出货风险、审批或升级事项。'
-      )
+      blockers.push('该任务没有高优先级、财务风险、出货风险、审批或升级事项。')
     }
     if (normalizedRoleKey === 'production') {
       blockers.push(
@@ -603,14 +616,14 @@ export function sortMobileTaskViews(left = {}, right = {}) {
 
 export function buildMobileTaskListForRole(
   tasks = [],
-  roleKey = '',
+  _roleKey = '',
   options = {}
 ) {
-  const taskViews = (Array.isArray(tasks) ? tasks : [])
+  // list_role_tasks 已在服务端完成 RBAC、岗位、直接指派和风险视图过滤。
+  // 前端再按岗位或领域过滤会丢失已授权的跨岗位任务。
+  return (Array.isArray(tasks) ? tasks : [])
     .map((task) => buildMobileTaskView(task, options))
-    .filter((taskView) => isMobileTaskVisibleForRole(taskView, roleKey))
     .sort(sortMobileTaskViews)
-  return taskViews
 }
 
 export function buildMobileTaskSummary(taskViews = []) {

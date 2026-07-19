@@ -39,15 +39,15 @@ func purchaseOrderMutationFromParams(pm map[string]any) (*biz.PurchaseOrderMutat
 }
 
 func purchaseOrderItemMutationFromParams(pm map[string]any) (*biz.PurchaseOrderItemMutation, bool) {
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "purchased_quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "purchased_quantity")
 	if !ok {
 		return nil, false
 	}
-	unitPrice, ok := getOptionalJSONRPCDecimal(pm, "unit_price")
+	unitPrice, ok := getOptionalJSONRPCDecimalString(pm, "unit_price")
 	if !ok {
 		return nil, false
 	}
-	amount, ok := getOptionalJSONRPCDecimal(pm, "amount")
+	amount, ok := getOptionalJSONRPCDecimalString(pm, "amount")
 	if !ok {
 		return nil, false
 	}
@@ -113,6 +113,12 @@ func (d *jsonrpcDispatcher) mapPurchaseOrderError(ctx context.Context, err error
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
 	case errors.Is(err, biz.ErrPurchaseOrderItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单行不存在"}
+	case errors.Is(err, biz.ErrPurchaseOrderCloseDraftReceiptDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单存在待入账的入库草稿，不能关闭"}
+	case errors.Is(err, biz.ErrPurchaseOrderCancelReceiptDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单已生成未取消的入库单，不能取消"}
+	case errors.Is(err, biz.ErrPurchaseOrderLifecycleProcessDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单仍有进行中的备料流程，不能关闭或取消"}
 	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "供应商不存在或已停用"}
 	case errors.Is(err, biz.ErrMaterialNotFound), errors.Is(err, biz.ErrMaterialInactive):

@@ -42,10 +42,6 @@ func (OutsourcingOrder) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			MaxLen(128),
-		field.Int("source_sales_order_id").
-			Optional().
-			Nillable().
-			Positive(),
 		field.Time("order_date"),
 		field.Time("expected_return_date").
 			Optional().
@@ -86,7 +82,6 @@ func (OutsourcingOrder) Indexes() []ent.Index {
 		index.Fields("outsourcing_order_no").Unique(),
 		index.Fields("supplier_id"),
 		index.Fields("source_order_no"),
-		index.Fields("source_sales_order_id"),
 		index.Fields("lifecycle_status"),
 		index.Fields("order_date"),
 		index.Fields("expected_return_date"),

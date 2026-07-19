@@ -566,6 +566,71 @@ test('printWorkspace: localStorage 无法写草稿时使用当前弹窗一次性
       initialDraft
     )
     assert.equal(popup.name, '')
+    assert.deepEqual(
+      readInitialPrintWorkspaceDraftFromWindowName(
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        'business-window-fallback',
+        popup
+      ),
+      initialDraft,
+      'React 初始化和挂载 effect 重复读取时必须保留同一窗口草稿'
+    )
+    assert.equal(
+      persistPrintWorkspaceDraftSnapshot(
+        buildPrintWorkspaceDraftStorageKey(
+          MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+          'business-window-fallback'
+        ),
+        initialDraft,
+        {
+          setItem() {
+            throw new DOMException('quota exceeded', 'QuotaExceededError')
+          },
+        },
+        popup
+      ),
+      false
+    )
+    assert.deepEqual(
+      readInitialPrintWorkspaceDraftFromWindowName(
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        'business-window-fallback',
+        popup
+      ),
+      initialDraft,
+      '持久化仍失败时必须保留初始化桥接缓存'
+    )
+
+    const persistedDraft = {
+      contractNo: 'CG202604240004-EDITED',
+      lines: [{ materialName: '编辑后面料' }],
+    }
+    const persistedStorage = new Map()
+    assert.equal(
+      persistPrintWorkspaceDraftSnapshot(
+        buildPrintWorkspaceDraftStorageKey(
+          MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+          'business-window-fallback'
+        ),
+        persistedDraft,
+        {
+          setItem(key, value) {
+            persistedStorage.set(key, value)
+          },
+        },
+        popup
+      ),
+      true
+    )
+    assert.equal(
+      readInitialPrintWorkspaceDraftFromWindowName(
+        MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY,
+        'business-window-fallback',
+        popup
+      ),
+      null,
+      '当前草稿成功持久化后，初始化桥接缓存不得遮挡新草稿'
+    )
   } finally {
     globalThis.window = originalWindow
   }

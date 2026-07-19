@@ -1,24 +1,20 @@
 import React from 'react'
 import {
-  BellOutlined,
   CameraOutlined,
-  CheckOutlined,
   ClockCircleOutlined,
   ExclamationCircleFilled,
   FileTextOutlined,
-  LeftOutlined,
   LinkOutlined,
-  PauseOutlined,
-  RedoOutlined,
+  LoadingOutlined,
+  ReloadOutlined,
+  RightOutlined,
 } from '@ant-design/icons'
 import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
 import {
-  QUICK_REASONS,
   buildTaskFactRows,
-  canOperateTask,
   getMobileRoleLabel,
-  resolveDetailActionLabel,
-  resolveMobileActionDisplayLabel,
+  isTaskRisk,
+  resolveMobileTaskCompletionFeedback,
   resolveMobileTaskStatusLabel,
   resolveTaskBusinessStatusLabel,
   resolveTaskReason,
@@ -27,6 +23,7 @@ import {
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import BusinessAttachmentModalButton from '../../components/business-list/BusinessAttachmentModalButton.jsx'
+import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 
 function mobileFactValueText(value) {
   if (value === null || value === undefined) return '-'
@@ -35,115 +32,122 @@ function mobileFactValueText(value) {
 }
 
 export default function MobileTaskDetailScreen({
-  activeRoleKey,
-  appendQuickReason,
-  detailAction,
-  detailEvidenceValue,
-  detailReasonValue,
-  handleTaskAction,
+  actionAccess,
+  onBack,
+  onOpenAction,
+  onViewReceipt,
   roleLabel,
   savedEvidenceRefs,
-  selectedCanBlock,
-  selectedCanComplete,
   selectedCanOperate,
-  selectedCanReject,
-  selectedCanResume,
   selectedCanUrge,
   selectedSeverity,
   selectedTask,
-  setDetailAction,
-  setSelectedTaskID,
-  submitDetailAction,
-  updateDetailReason,
-  updateEvidenceText,
-  updatingID,
-  urgingID,
 }) {
   if (!selectedTask || !selectedSeverity) return null
 
   const factRows = buildTaskFactRows(selectedTask)
+  const relatedDocuments = Array.isArray(selectedTask.related_documents)
+    ? selectedTask.related_documents
+    : []
   const relatedSource = resolveTaskSourceLabel(selectedTask)
-  const latestMobileAction = selectedTask.mobile_action
-  const latestMobileActionRoleLabel = latestMobileAction
-    ? getMobileRoleLabel(latestMobileAction.role_key || activeRoleKey)
-    : roleLabel
-  const latestMobileActionLabel = latestMobileAction
-    ? resolveMobileActionDisplayLabel(latestMobileAction)
-    : ''
-  const showRejected = selectedCanReject
-  const isUpdating = updatingID === selectedTask.id
-  const isUrging = urgingID === selectedTask.id
-  const isActionPending = isUpdating || isUrging
-  const isDoneDetailAction = detailAction === 'done'
   const ownerRoleLabel = getMobileRoleLabel(selectedTask.owner_role_key)
-  const currentRoleOwnsTask = canOperateTask(activeRoleKey, selectedTask)
   const taskReason = resolveTaskReason(selectedTask)
   const taskReasonLabel = resolveTaskReasonLabel(selectedTask)
   const taskStatusLabel = resolveMobileTaskStatusLabel(selectedTask)
+  const completionFeedback = resolveMobileTaskCompletionFeedback(selectedTask)
   const taskBusinessStatusLabel = resolveTaskBusinessStatusLabel(
     selectedTask,
     ''
   )
-  const actionGuidance = !selectedCanOperate
-    ? currentRoleOwnsTask
-      ? '您暂时不能处理这条任务，本页只供查看。'
-      : selectedCanUrge
-        ? `您暂时不能处理这条任务，可以查看并催办；阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
-        : `您暂时不能处理这条任务，只能查看；阻塞 / 完成 / 退回由${ownerRoleLabel}负责。`
-    : ''
+  const canManageEvidence = selectedCanOperate
+  const canOpenProcess = selectedCanOperate || selectedCanUrge
+  const canViewReceipt = typeof onViewReceipt === 'function'
+  const retryAccess =
+    actionAccess?.failed && typeof actionAccess?.retry === 'function'
+      ? actionAccess.retry
+      : null
+  const processUnavailableLabel = actionAccess?.loading
+    ? '正在确认权限'
+    : actionAccess?.failed
+      ? '权限确认失败'
+      : '当前仅供查看'
+  const actionGuidance = actionAccess?.loading
+    ? '正在确认当前账号的处理范围，请稍候。'
+    : actionAccess?.failed
+      ? '处理范围确认失败。可点击下方重新确认；系统不会在未确认权限时开放操作。'
+      : !selectedCanOperate
+        ? selectedCanUrge
+          ? `这条任务由${ownerRoleLabel}办理，您可以查看并发起催办。`
+          : actionAccess?.readonlyReason ||
+            `这条任务由${ownerRoleLabel}办理，当前页面只供查看。`
+        : ''
 
   return (
-    <div className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl">
-      <header className="mobile-role-detail-header shrink-0 border-b border-slate-200 bg-white/95 backdrop-blur">
-        <div className="grid grid-cols-[112px_minmax(0,1fr)_92px] items-center gap-2 px-4 py-4">
-          <button
-            type="button"
-            className="inline-flex items-center gap-2 text-lg text-slate-950"
-            onClick={() => {
-              setSelectedTaskID(null)
-              setDetailAction(null)
-            }}
+    <div
+      className="mobile-role-tasks-page mobile-role-tasks-page--detail surface-panel bg-white text-slate-950 md:rounded-[28px] md:border md:border-slate-200 md:shadow-xl"
+      data-testid="mobile-task-detail-screen"
+    >
+      <MobileTaskFlowHeader
+        canOpenProcess={canOpenProcess}
+        canOpenReceipt={canViewReceipt}
+        currentStep="detail"
+        onBack={onBack}
+        onOpenProcess={() =>
+          onOpenAction?.(
+            selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
+          )
+        }
+        onOpenReceipt={onViewReceipt}
+        processUnavailableLabel={processUnavailableLabel}
+        receiptUnavailableLabel="暂无可信回执"
+        title="任务详情"
+        trailing={
+          <span
+            className={`mobile-task-flow-status shrink-0 rounded-full px-3 py-1 text-sm font-semibold ${selectedSeverity.badgeClass}`}
           >
-            <LeftOutlined />
-            <span>任务列表</span>
-          </button>
-          <h1 className="truncate text-center text-2xl font-semibold text-slate-950">
-            {selectedTask.task_name}
-          </h1>
-          <div className="flex items-center justify-end">
-            <span
-              className={`rounded-full px-3 py-1 text-base font-semibold ${selectedSeverity.badgeClass}`}
-            >
-              {selectedSeverity.label}
-            </span>
-          </div>
-        </div>
-        <div className="flex min-w-0 items-center gap-2 px-5 pb-4 text-base text-slate-500">
-          <FileTextOutlined />
-          <span className="shrink-0">来源：</span>
-          <span className="min-w-0 break-all">{relatedSource}</span>
-        </div>
-      </header>
+            {selectedSeverity.label}
+          </span>
+        }
+      />
 
-      <main className="mobile-role-tasks-page__detail-main space-y-5 bg-slate-50 px-4 py-5">
+      <main className="mobile-role-tasks-page__detail-main space-y-4 bg-slate-50 px-4 py-4">
+        <section className="mobile-task-detail-hero erp-mobile-card rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="text-sm font-semibold text-blue-600">当前任务</div>
+          <h2 className="mt-2 break-words text-2xl font-semibold leading-tight text-slate-950 [overflow-wrap:anywhere]">
+            {selectedTask.task_name}
+          </h2>
+          <div className="mt-3 flex min-w-0 items-start gap-2 text-sm leading-6 text-slate-500">
+            <FileTextOutlined className="mt-1 shrink-0" aria-hidden="true" />
+            <span className="shrink-0">来源：</span>
+            <span className="min-w-0 break-all">{relatedSource}</span>
+          </div>
+        </section>
+
+        {actionGuidance ? (
+          <section
+            className="mobile-role-action-guidance"
+            data-testid="mobile-role-action-guidance"
+            role="note"
+          >
+            {actionGuidance}
+          </section>
+        ) : null}
+
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
-              <FileTextOutlined className="text-blue-500" />
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
+              <FileTextOutlined className="text-blue-500" aria-hidden="true" />
               任务关键信息
             </h2>
-            <span className="mobile-role-detail-meta text-sm font-semibold text-slate-400">
-              摘要
+            <span className="mobile-role-detail-meta text-xs font-semibold text-slate-400">
+              {roleLabel}
             </span>
           </div>
-          <div className="mobile-role-detail-fact-grid mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200">
-            {factRows.slice(0, 6).map(([label, value]) => (
-              <div
-                key={label}
-                className="min-h-[84px] border-b border-r border-slate-200 p-4 last:border-b-0"
-              >
-                <div className="text-base text-slate-500">{label}</div>
-                <div className="mt-2 break-words text-lg font-medium text-slate-950">
+          <div className="mobile-role-detail-fact-grid mt-4 grid grid-cols-1 overflow-hidden rounded-xl border border-slate-200 sm:grid-cols-2">
+            {factRows.map(([label, value]) => (
+              <div key={label} className="mobile-role-detail-fact-row p-4">
+                <div className="text-sm text-slate-500">{label}</div>
+                <div className="mt-1 break-words text-base font-medium leading-6 text-slate-950">
                   {mobileFactValueText(value)}
                 </div>
               </div>
@@ -151,70 +155,77 @@ export default function MobileTaskDetailScreen({
           </div>
         </section>
 
-        {taskBusinessStatusLabel || taskReason ? (
-          <section className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-lg font-semibold text-red-700">
-            <ExclamationCircleFilled className="mr-2" />
-            {taskBusinessStatusLabel || '任务需要处理'}
+        {isTaskRisk(selectedTask) &&
+        (taskBusinessStatusLabel || taskReason || selectedSeverity.label) ? (
+          <section className="mobile-role-detail-risk rounded-2xl border border-red-200 bg-red-50 px-4 py-4 text-base font-semibold leading-6 text-red-700">
+            <ExclamationCircleFilled className="mr-2" aria-hidden="true" />
+            {taskBusinessStatusLabel || selectedSeverity.label}
             {taskReason
               ? ` · ${taskReasonLabel}：${taskReason}`
-              : ' · 需要确认后继续流转'}
+              : ' · 请优先核对并处理'}
+          </section>
+        ) : null}
+
+        {selectedTask.complete_condition ? (
+          <section className="erp-mobile-card rounded-2xl border border-blue-200 bg-blue-50/70 p-4">
+            <div className="text-sm font-semibold text-blue-700">完成条件</div>
+            <p className="mt-2 break-words text-base leading-7 text-slate-800">
+              {selectedTask.complete_condition}
+            </p>
+          </section>
+        ) : null}
+
+        {completionFeedback ? (
+          <section className="erp-mobile-card rounded-2xl border border-emerald-200 bg-emerald-50/70 p-4">
+            <div className="text-sm font-semibold text-emerald-700">
+              完成反馈
+            </div>
+            <p className="mt-2 whitespace-pre-wrap break-words text-base leading-7 text-slate-800 [overflow-wrap:anywhere]">
+              {completionFeedback}
+            </p>
           </section>
         ) : null}
 
         {selectedTask.mobile_exception_report ? (
           <section className="mobile-role-detail-exception rounded-2xl border border-orange-200 bg-orange-50 px-4 py-4 text-base text-orange-800">
             <div className="font-semibold">异常上报</div>
-            <div className="mt-2 break-words">
+            <div className="mt-2 break-words leading-6">
               {selectedTask.mobile_exception_report.reason || '已记录异常'}
             </div>
           </section>
         ) : null}
 
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
-              <LinkOutlined className="text-purple-500" />
-              关联来源（1）
+          <div className="flex items-center gap-3">
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
+              <LinkOutlined className="text-purple-500" aria-hidden="true" />
+              关联来源（{relatedDocuments.length + 1}）
             </h2>
-            <span className="mobile-role-detail-meta text-sm font-semibold text-slate-400">
-              来源
-            </span>
           </div>
-          <div className="mobile-role-detail-related-item mt-4 flex items-center justify-between rounded-xl border border-slate-200 px-4 py-3 text-base text-slate-600">
-            <span className="min-w-0 break-all">
-              {resolveTaskRelatedSourceLabel(selectedTask)}
-            </span>
+          <div className="mt-4 space-y-2">
+            {[
+              resolveTaskRelatedSourceLabel(selectedTask),
+              ...relatedDocuments,
+            ].map((document, index) => (
+              <div
+                key={`${document}-${index}`}
+                className="mobile-role-detail-related-item rounded-xl border border-slate-200 px-4 py-3 text-sm leading-6 text-slate-600"
+              >
+                <span className="break-all">{document}</span>
+              </div>
+            ))}
           </div>
         </section>
 
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
-              <CameraOutlined className="text-emerald-500" />
-              {isDoneDetailAction ? '完成反馈' : '现场留痕'}
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
+              <CameraOutlined className="text-emerald-500" aria-hidden="true" />
+              现场证据
             </h2>
-            <span
-              className={`text-sm font-semibold ${
-                isDoneDetailAction ? 'text-red-500' : 'text-slate-400'
-              }`}
-            >
-              {isDoneDetailAction ? '必填' : '可选'}
+            <span className="text-xs font-semibold text-slate-400">
+              {canManageEvidence ? '可补充' : '只读'}
             </span>
-          </div>
-          <textarea
-            data-testid="mobile-role-evidence-input"
-            className="mt-4 min-h-[96px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20"
-            placeholder={
-              isDoneDetailAction
-                ? '请填写完成反馈、照片编号、附件编号或链接；多条可换行'
-                : '填写照片、附件编号或链接；多条可换行'
-            }
-            maxLength={500}
-            value={detailEvidenceValue}
-            onChange={(event) => updateEvidenceText(event.target.value)}
-          />
-          <div className="mt-1 text-right text-sm text-slate-400">
-            {detailEvidenceValue.length}/500
           </div>
           {savedEvidenceRefs.length > 0 ? (
             <div
@@ -230,199 +241,125 @@ export default function MobileTaskDetailScreen({
                 </span>
               ))}
             </div>
-          ) : null}
+          ) : (
+            <p className="mt-3 text-sm leading-6 text-slate-500">
+              当前任务尚无可显示的处理证据。
+            </p>
+          )}
           <div className="mt-4">
             <BusinessAttachmentModalButton
               ownerType="workflow_task"
               ownerId={selectedTask.id}
               ownerVersion={selectedTask.version}
-              buttonText="管理现场附件"
+              buttonText={canManageEvidence ? '管理现场附件' : '查看现场附件'}
               modalTitle="现场附件"
               panelTitle="现场附件"
-              description="上传现场照片、异常截图或处理凭证；附件只作为任务证据，不改变任务状态。"
-              canUpload={selectedCanOperate}
-              canDelete={selectedCanOperate}
+              description="现场照片、异常截图和处理凭证只用于记录任务办理情况，不会改变库存、质检、出货、开票或收付款结果。"
+              canUpload={canManageEvidence}
+              canDelete={false}
               disabled={!selectedTask}
               disabledReason="请先进入一条任务详情"
-              buttonProps={{ className: 'w-full justify-center' }}
+              buttonProps={{
+                className: 'w-full min-h-11 justify-center',
+                size: 'large',
+              }}
             />
           </div>
         </section>
 
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="flex items-center gap-2 text-2xl font-semibold text-slate-950">
-              <ClockCircleOutlined className="text-orange-500" />
-              最近动态
+            <h2 className="flex items-center gap-2 text-xl font-semibold text-slate-950">
+              <ClockCircleOutlined
+                className="text-orange-500"
+                aria-hidden="true"
+              />
+              当前办理状态
             </h2>
-            <span className="mobile-role-detail-meta text-sm font-semibold text-slate-400">
-              最近一条
+            <span className="mobile-role-detail-meta text-xs font-semibold text-slate-400">
+              {formatMobileTaskTime(selectedTask.updated_at)}
             </span>
           </div>
           <div className="mobile-role-detail-event mt-4 rounded-xl bg-slate-50 px-4 py-4">
             <div className="flex items-start gap-3">
-              <span className="mt-1 h-3 w-3 rounded-full bg-blue-500" />
+              <span className="mt-1.5 h-2.5 w-2.5 shrink-0 rounded-full bg-blue-500" />
               <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2 text-base font-semibold text-slate-950">
-                  <span>系统</span>
-                  <span className="rounded-md bg-blue-100 px-2 py-1 text-sm text-blue-700">
+                <div className="flex flex-wrap items-center gap-2 text-sm font-semibold text-slate-950">
+                  <span className="rounded-md bg-blue-100 px-2 py-1 text-blue-700">
                     {taskStatusLabel}
                   </span>
-                  <span className="text-sm text-slate-400">
-                    {formatMobileTaskTime(selectedTask.updated_at)}
-                  </span>
+                  {taskBusinessStatusLabel ? (
+                    <span className="text-slate-500">
+                      {taskBusinessStatusLabel}
+                    </span>
+                  ) : null}
                 </div>
-                <div className="mt-2 break-words text-base text-slate-700">
-                  {latestMobileAction
-                    ? `${latestMobileActionRoleLabel} 已执行 ${latestMobileActionLabel}${
-                        latestMobileAction.reason
-                          ? `：${latestMobileAction.reason}`
-                          : ''
-                      }`
-                    : `任务已流转至 ${ownerRoleLabel}`}
-                </div>
-                {latestMobileAction?.evidence_refs?.length > 0 ? (
-                  <div className="mt-2 break-words text-sm text-slate-500">
-                    留痕：{latestMobileAction.evidence_refs.join(' / ')}
-                  </div>
-                ) : null}
+                <p className="mt-2 break-words text-sm leading-6 text-slate-700">
+                  {taskReason
+                    ? `${taskReasonLabel}：${taskReason}`
+                    : `任务当前由${ownerRoleLabel}负责。`}
+                </p>
               </div>
             </div>
           </div>
         </section>
-
-        {detailAction ? (
-          <section className="rounded-t-[28px] border border-slate-200 bg-white p-4 shadow-[0_-8px_28px_rgba(15,23,42,0.10)]">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="text-2xl font-semibold text-slate-950">
-                {resolveDetailActionLabel(detailAction)}
-                <span className="ml-2 text-red-500">·</span>
-              </h2>
-              <button
-                type="button"
-                className="text-base text-slate-500"
-                onClick={() => setDetailAction(null)}
-              >
-                收起 ^
-              </button>
-            </div>
-            <textarea
-              data-testid="mobile-role-detail-reason-input"
-              className="mt-4 min-h-[128px] w-full resize-y rounded-xl border border-slate-200 px-3 py-3 text-base text-slate-950 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
-              placeholder={
-                isDoneDetailAction
-                  ? '可选填写完成说明；完成反馈请先在上方现场留痕填写照片、附件编号或链接'
-                  : '请填写原因，说明卡点、退回依据或催办诉求'
-              }
-              maxLength={500}
-              value={detailReasonValue}
-              onChange={(event) => updateDetailReason(event.target.value)}
-            />
-            <div className="mt-1 text-right text-sm text-slate-400">
-              {detailReasonValue.length}/500
-            </div>
-            {!isDoneDetailAction ? (
-              <>
-                <div className="mt-4 text-base text-slate-500">
-                  快捷选择（可选）
-                </div>
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {QUICK_REASONS.map((reason) => (
-                    <button
-                      key={reason}
-                      type="button"
-                      className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-base text-slate-600"
-                      onClick={() => appendQuickReason(reason)}
-                    >
-                      {reason}
-                    </button>
-                  ))}
-                </div>
-              </>
-            ) : null}
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button
-                type="button"
-                className="rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-600"
-                onClick={() => setDetailAction(null)}
-              >
-                取消
-              </button>
-              <button
-                type="button"
-                className="rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white disabled:opacity-50"
-                disabled={isActionPending}
-                onClick={submitDetailAction}
-              >
-                提交
-              </button>
-            </div>
-          </section>
-        ) : null}
       </main>
 
-      <div className="mobile-role-action-bar grid grid-cols-3 gap-3 border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur">
-        {actionGuidance ? (
-          <div
-            className="mobile-role-action-guidance col-span-3"
-            data-testid="mobile-role-action-guidance"
-            role="note"
-          >
-            {actionGuidance}
-          </div>
-        ) : null}
-        {selectedCanBlock ? (
+      <div
+        className={`mobile-role-action-bar grid border-t border-slate-200 bg-white/95 p-3 shadow-[0_-8px_24px_rgba(15,23,42,0.08)] backdrop-blur ${
+          canOpenProcess ||
+          canViewReceipt ||
+          retryAccess ||
+          actionAccess?.loading
+            ? 'grid-cols-2 gap-3'
+            : ''
+        }`}
+      >
+        <button
+          type="button"
+          className="mobile-role-action-bar__button min-h-12 w-full rounded-xl border border-slate-200 bg-white px-4 py-3 text-base font-semibold text-slate-700"
+          onClick={onBack}
+        >
+          返回列表
+        </button>
+        {canOpenProcess ? (
           <button
             type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--blocked rounded-xl bg-orange-500 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-            disabled={isActionPending}
-            onClick={() => handleTaskAction(selectedTask, 'blocked')}
+            className="mobile-role-action-bar__button mobile-role-action-bar__button--done min-h-12 w-full rounded-xl bg-emerald-600 px-4 py-3 text-base font-semibold text-white"
+            onClick={() =>
+              onOpenAction?.(
+                selectedCanUrge && !selectedCanOperate ? 'urge' : undefined
+              )
+            }
           >
-            <PauseOutlined className="mr-2" />
-            阻塞
+            处理任务
+            <RightOutlined className="ml-2" aria-hidden="true" />
           </button>
-        ) : null}
-        {selectedCanComplete ? (
+        ) : canViewReceipt ? (
           <button
             type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--done rounded-xl bg-emerald-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-            disabled={isActionPending}
-            onClick={() => handleTaskAction(selectedTask, 'done')}
+            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-base font-semibold text-blue-700"
+            onClick={onViewReceipt}
           >
-            <CheckOutlined className="mr-2" />
-            完成
+            查看结果回执
           </button>
-        ) : null}
-        {selectedCanResume ? (
+        ) : retryAccess ? (
           <button
             type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--resume rounded-xl bg-blue-600 px-3 py-4 text-lg font-semibold text-white disabled:opacity-50"
-            disabled={isActionPending}
-            onClick={() => handleTaskAction(selectedTask, 'resume')}
+            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-blue-600 px-4 py-3 text-base font-semibold text-white"
+            onClick={retryAccess}
           >
-            <RedoOutlined className="mr-2" />
-            解除阻塞
+            <ReloadOutlined className="mr-2" aria-hidden="true" />
+            重新确认
           </button>
-        ) : null}
-        {selectedCanUrge ? (
+        ) : actionAccess?.loading ? (
           <button
             type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--urge rounded-xl border border-slate-200 bg-white px-3 py-4 text-lg font-semibold text-slate-700 disabled:opacity-50"
-            disabled={isActionPending}
-            onClick={() => handleTaskAction(selectedTask, 'urge')}
+            className="mobile-role-action-bar__button min-h-12 w-full rounded-xl bg-slate-100 px-4 py-3 text-base font-semibold text-slate-500"
+            disabled
           >
-            <BellOutlined className="mr-2" />
-            催办
-          </button>
-        ) : null}
-        {showRejected ? (
-          <button
-            type="button"
-            className="mobile-role-action-bar__button mobile-role-action-bar__button--rejected col-span-3 rounded-xl border border-red-200 bg-red-50 px-3 py-4 text-base font-semibold text-red-600 disabled:opacity-50"
-            disabled={!selectedCanReject || isActionPending}
-            onClick={() => handleTaskAction(selectedTask, 'rejected')}
-          >
-            退回当前任务
+            <LoadingOutlined className="mr-2" spin aria-hidden="true" />
+            正在确认
           </button>
         ) : null}
       </div>

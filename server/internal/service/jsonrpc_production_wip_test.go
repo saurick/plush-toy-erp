@@ -15,21 +15,12 @@ import (
 
 type productionWIPJSONRPCRepo struct {
 	biz.ProductionOrderRepo
-	aggregate      *biz.ProductionWIPAggregate
-	err            error
-	initializeCall *biz.ProductionWIPInitializeCommand
-	actionCall     *biz.ProductionWIPCommand
+	aggregate  *biz.ProductionWIPAggregate
+	err        error
+	actionCall *biz.ProductionWIPCommand
 }
 
 func (r *productionWIPJSONRPCRepo) GetProductionWIP(context.Context, int) (*biz.ProductionWIPAggregate, error) {
-	return r.aggregate, r.err
-}
-
-func (r *productionWIPJSONRPCRepo) InitializeProductionWIP(_ context.Context, in *biz.ProductionWIPInitializeCommand) (*biz.ProductionWIPAggregate, error) {
-	if in != nil {
-		copy := *in
-		r.initializeCall = &copy
-	}
 	return r.aggregate, r.err
 }
 
@@ -109,7 +100,7 @@ func newProductionWIPJSONRPCTestDispatcher(t *testing.T, repo *productionWIPJSON
 	return dispatcher
 }
 
-func TestProductionWIPJSONRPCCanonicalReadInitializeAndSplit(t *testing.T) {
+func TestProductionWIPJSONRPCCanonicalReadCancelAndSplit(t *testing.T) {
 	repo := &productionWIPJSONRPCRepo{aggregate: productionWIPJSONRPCAggregate()}
 	dispatcher := newProductionWIPJSONRPCTestDispatcher(t, repo, workflowJSONRPCAdmin(
 		[]string{biz.ProductionRoleKey, biz.SalesRoleKey},
@@ -132,12 +123,19 @@ func TestProductionWIPJSONRPCCanonicalReadInitializeAndSplit(t *testing.T) {
 		t.Fatalf("unexpected aggregate=%#v", data)
 	}
 
-	_, initialized, _ := dispatcher.handleProductionWIP(ctx, "initialize_production_wip", "initialize", mustJSONRPCStruct(t, map[string]any{
-		"production_order_id": float64(1), "idempotency_key": "wip-init-1",
+	_, removedInitialize, _ := dispatcher.handleProductionWIP(ctx, "initialize_production_wip", "initialize", mustJSONRPCStruct(t, map[string]any{}))
+	if removedInitialize.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("removed initialize result=%#v", removedInitialize)
+	}
+
+	_, cancelled, _ := dispatcher.handleProductionWIP(ctx, "execute_production_wip_action", "cancel", mustJSONRPCStruct(t, map[string]any{
+		"action": biz.ProductionWIPActionCancelBatch, "production_order_id": float64(1),
+		"production_wip_batch_id": float64(201), "expected_version": float64(3), "idempotency_key": "wip-cancel-1",
+		"reason": "排程取消",
 	}))
-	if initialized.Code != errcode.OK.Code || repo.initializeCall == nil || repo.initializeCall.ActorID != 7 ||
-		repo.initializeCall.RouteCode != biz.ProductionWIPRoutePlushSewHandV1 || repo.initializeCall.IntentHash == "" {
-		t.Fatalf("initialize result=%#v call=%#v", initialized, repo.initializeCall)
+	if cancelled.Code != errcode.OK.Code || repo.actionCall == nil || repo.actionCall.Action != biz.ProductionWIPActionCancelBatch ||
+		repo.actionCall.Reason == nil || *repo.actionCall.Reason != "排程取消" || repo.actionCall.IntentHash == "" {
+		t.Fatalf("cancel result=%#v call=%#v", cancelled, repo.actionCall)
 	}
 
 	_, split, _ := dispatcher.handleProductionWIP(ctx, "execute_production_wip_action", "split", mustJSONRPCStruct(t, map[string]any{
@@ -166,6 +164,7 @@ func TestProductionWIPJSONRPCStrictActionContracts(t *testing.T) {
 		{"action": biz.ProductionWIPActionSplitBatch, "production_order_id": float64(1), "production_wip_batch_id": float64(201), "expected_version": float64(3), "idempotency_key": "k", "splits": []any{map[string]any{"quantity": "10.5"}}},
 		{"action": biz.ProductionWIPActionTransferToNextOperation, "production_order_id": float64(1), "production_wip_batch_id": float64(201), "target_operation_id": float64(102), "quantity": float64(10.5), "expected_version": float64(3), "idempotency_key": "k"},
 		{"action": biz.ProductionWIPActionConfirmPackagingMaterial, "production_order_id": float64(1), "production_order_item_id": float64(11), "packaging_version_snapshot": "", "expected_version": float64(1), "idempotency_key": "k"},
+		{"action": biz.ProductionWIPActionCancelBatch, "production_order_id": float64(1), "production_wip_batch_id": float64(201), "expected_version": float64(3), "idempotency_key": "k"},
 		{"action": biz.ProductionWIPActionStartOperation, "production_order_id": float64(1), "production_wip_batch_id": float64(201), "expected_version": float64(3), "idempotency_key": "k", "actor_id": float64(99)},
 	}
 	for index, params := range invalid {
@@ -200,7 +199,10 @@ func TestProductionWIPJSONRPCAuthPermissionAndOutsourcingModule(t *testing.T) {
 	}
 
 	dispatcher.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey}, biz.PermissionProductionWIPAssign,
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionWIPAssign,
+		biz.PermissionProductionWIPRead,
+		biz.PermissionOutsourcingOrderRead,
 	)}
 	assignParams := mustJSONRPCStruct(t, map[string]any{
 		"action": biz.ProductionWIPActionAssignExecution, "production_order_id": float64(1),

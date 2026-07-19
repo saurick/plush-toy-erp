@@ -38,3 +38,9 @@ test('purchase exception create modal freezes editing and closing while its requ
   assert.match(source, /maskClosable=\{!loading\}/u)
   assert.match(source, /if \(!loading\) onCancel\?\.\(\)/u)
 })
+
+test('purchase exception quantity uses the exact numeric(20,6) contract', () => {
+  assert.match(source, /numeric20Scale6Units\(value\)/u)
+  assert.match(source, /isPositiveNumeric20Scale6Units/u)
+  assert.doesNotMatch(source, /Number\(value\) > 0/u)
+})

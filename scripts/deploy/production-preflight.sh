@@ -69,21 +69,6 @@ byte_count() {
   LC_ALL=C printf "%s" "$1" | wc -c | tr -d '[:space:]'
 }
 
-utf8_codepoint_count() {
-  local value="$1"
-  local utf32_bytes
-  command -v iconv >/dev/null 2>&1 || fail "缺少 iconv，无法按 UTF-8 字符校验管理员密码"
-  if ! utf32_bytes="$(printf "%s" "$value" | iconv -f UTF-8 -t UTF-32LE 2>/dev/null | wc -c | tr -d '[:space:]')"; then
-    fail "APP_ADMIN_PASSWORD 必须是有效 UTF-8"
-  fi
-  [[ "$utf32_bytes" =~ ^[0-9]+$ && $((utf32_bytes % 4)) -eq 0 ]] || fail "APP_ADMIN_PASSWORD UTF-8 字符计数失败"
-  printf "%s" "$((utf32_bytes / 4))"
-}
-
-byte_count() {
-  LC_ALL=C printf "%s" "$1" | wc -c | tr -d '[:space:]'
-}
-
 trim() {
   local value="$1"
   value="${value#"${value%%[![:space:]]*}"}"

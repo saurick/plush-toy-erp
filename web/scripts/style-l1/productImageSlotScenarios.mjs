@@ -2,6 +2,14 @@ import { installAdminRpcMocks } from './adminRpcMocks.mjs'
 
 const PRODUCT_IMAGE_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII='
+const PRODUCT_IMAGE_LEGACY_MAX_BYTES = 5 * 1024 * 1024
+
+function createOversizedProductImageSourceBuffer() {
+  return Buffer.concat([
+    Buffer.from(PRODUCT_IMAGE_PNG_BASE64, 'base64'),
+    Buffer.alloc(PRODUCT_IMAGE_LEGACY_MAX_BYTES),
+  ])
+}
 
 function createDeferred() {
   let resolve
@@ -38,6 +46,10 @@ function createProductImageMockState() {
       productImageAttachment('primary', 101, '产品主图.png', nowUnix),
       productImageAttachment('secondary', 102, '产品辅图.png', nowUnix),
     ],
+    attachmentContents: new Map([
+      [101, PRODUCT_IMAGE_PNG_BASE64],
+      [102, PRODUCT_IMAGE_PNG_BASE64],
+    ]),
   }
 }
 
@@ -71,6 +83,9 @@ async function installProductImageAttachmentMocks(page, state) {
     if (method === 'list_attachments') {
       data = { attachments: state.attachments.map((item) => ({ ...item })) }
     } else if (method === 'upload_attachment') {
+      const replacedAttachments = state.attachments.filter(
+        (item) => item.slot_key === params.slot_key
+      )
       const attachment = productImageAttachment(
         params.slot_key,
         state.nextID,
@@ -80,6 +95,10 @@ async function installProductImageAttachmentMocks(page, state) {
       state.nextID += 1
       attachment.mime_type = params.mime_type
       attachment.file_size = Number(params.file_size || 0)
+      for (const replaced of replacedAttachments) {
+        state.attachmentContents.delete(replaced.id)
+      }
+      state.attachmentContents.set(attachment.id, params.content_base64)
       state.attachments = [
         attachment,
         ...state.attachments.filter(
@@ -88,6 +107,11 @@ async function installProductImageAttachmentMocks(page, state) {
       ]
       data = { attachment }
     } else if (method === 'clear_product_image') {
+      for (const cleared of state.attachments.filter(
+        (item) => item.slot_key === params.slot_key
+      )) {
+        state.attachmentContents.delete(cleared.id)
+      }
       state.attachments = state.attachments.filter(
         (item) => item.slot_key !== params.slot_key
       )
@@ -98,7 +122,7 @@ async function installProductImageAttachmentMocks(page, state) {
           ...state.attachments.find(
             (item) => item.id === Number(params.id || 0)
           ),
-          content_base64: PRODUCT_IMAGE_PNG_BASE64,
+          content_base64: state.attachmentContents.get(Number(params.id || 0)),
         },
       }
     }
@@ -134,18 +158,18 @@ async function openProductEditModal(page, assert) {
 async function readProductImageSlotMetrics(modal) {
   return modal.locator('.product-image-slots').evaluate((section) => {
     const cards = Array.from(section.querySelectorAll('.product-image-slot'))
-    const effectiveImageCount = cards.filter((card) => {
-      const placeholder = card.querySelector('.product-image-slot__placeholder')
-      return (
-        Boolean(card.querySelector('img')) ||
-        String(placeholder?.textContent || '').includes('已设置图片')
-      )
-    }).length
+    const effectiveImageCount = cards.filter((card) =>
+      Boolean(card.querySelector('img'))
+    ).length
+    const previewFailureCount = cards.filter((card) =>
+      String(card.textContent || '').includes('缩略图加载失败')
+    ).length
     const grid = section.querySelector('.product-image-slots__grid')
     const gridStyle = grid ? window.getComputedStyle(grid) : null
     return {
       cardCount: cards.length,
       effectiveImageCount,
+      previewFailureCount,
       sectionClientWidth: section.clientWidth,
       sectionScrollWidth: section.scrollWidth,
       gridTemplateColumns: gridStyle?.gridTemplateColumns || '',
@@ -197,6 +221,11 @@ export function createProductImageSlotScenarios(deps) {
           metrics.effectiveImageCount,
           2,
           '首次编辑应读取两张已保存产品图'
+        )
+        assert.equal(
+          metrics.previewFailureCount,
+          0,
+          '已保存产品图应显示真实缩略图'
         )
         assert(
           metrics.sectionScrollWidth <= metrics.sectionClientWidth + 1,
@@ -253,6 +282,19 @@ export function createProductImageSlotScenarios(deps) {
 
         modal = await openProductEditModal(page, assert)
         await modal.getByText('产品主图.png', { exact: true }).waitFor()
+        metrics = await readProductImageSlotMetrics(modal)
+        assert.equal(
+          metrics.effectiveImageCount,
+          2,
+          '取消后再次打开产品仍应下载并显示两张已保存产品图'
+        )
+        assert.equal(
+          desktopState.calls.filter(
+            (call) => call.method === 'download_attachment'
+          ).length,
+          4,
+          '两次打开产品应分别读取两个固定图片槽的内容'
+        )
         const savePrimarySlot = modal
           .locator('.product-image-slot')
           .filter({ hasText: '产品图 1（主图）' })
@@ -260,13 +302,14 @@ export function createProductImageSlotScenarios(deps) {
           .locator('.product-image-slot')
           .filter({ hasText: '产品图 2（辅图）' })
         await savePrimarySlot.locator('input[type="file"]').setInputFiles({
-          name: '新主图.png',
+          name: '超大新主图.png',
           mimeType: 'image/png',
-          buffer: Buffer.from(PRODUCT_IMAGE_PNG_BASE64, 'base64'),
+          buffer: createOversizedProductImageSourceBuffer(),
         })
         await savePrimarySlot
           .getByText('保存产品后替换', { exact: true })
           .waitFor()
+        await savePrimarySlot.getByText('已自动优化', { exact: true }).waitFor()
         await saveSecondarySlot.getByRole('button', { name: '清空' }).click()
         const writeGate = createDeferred()
         desktopState.nextWriteGate = writeGate
@@ -357,6 +400,61 @@ export function createProductImageSlotScenarios(deps) {
           ],
           '保存产品后才应按固定槽写入主图并清空辅图'
         )
+        const uploadCall = writeCalls.find(
+          (call) => call.method === 'upload_attachment'
+        )
+        assert.equal(
+          uploadCall.params.file_name,
+          '超大新主图.webp',
+          '超过旧 5MiB 限制的源图应转为 WEBP 保存'
+        )
+        assert.equal(uploadCall.params.mime_type, 'image/webp')
+        assert(
+          Number(uploadCall.params.file_size || 0) > 0 &&
+            Number(uploadCall.params.file_size || 0) <= 1024 * 1024,
+          `自动优化后的产品图应在 1MiB 快照预算内: ${uploadCall.params.file_size}`
+        )
+        const uploadedImageBytes = Buffer.from(
+          uploadCall.params.content_base64,
+          'base64'
+        )
+        assert.equal(
+          uploadedImageBytes.length,
+          Number(uploadCall.params.file_size),
+          '上传声明大小必须与实际解码内容一致'
+        )
+        assert.equal(
+          uploadedImageBytes.subarray(0, 4).toString('ascii'),
+          'RIFF',
+          '自动优化内容必须是 WEBP RIFF 容器'
+        )
+        assert.equal(
+          uploadedImageBytes.subarray(8, 12).toString('ascii'),
+          'WEBP',
+          '自动优化内容必须包含 WEBP 标识'
+        )
+
+        modal = await openProductEditModal(page, assert)
+        await modal.getByText('超大新主图.webp', { exact: true }).waitFor()
+        metrics = await readProductImageSlotMetrics(modal)
+        assert.equal(
+          metrics.effectiveImageCount,
+          1,
+          '超大源图保存后重新打开，应显示新主图并保持辅图已清空'
+        )
+        assert.equal(
+          metrics.previewFailureCount,
+          0,
+          '新主图重新打开时应显示真实缩略图'
+        )
+        assert.equal(
+          desktopState.calls.filter(
+            (call) => call.method === 'download_attachment'
+          ).length,
+          6,
+          '保存后的回读和第三次打开都应下载当前主图'
+        )
+        await closeBusinessFormModal(page, modal)
         await assertNoHorizontalOverflow(page, 'product-image-slots-desktop')
       },
     },
@@ -405,6 +503,19 @@ export function createProductImageSlotScenarios(deps) {
       viewport: { width: 1440, height: 900 },
       beforeNavigate: async (page) => {
         bomPrintState = createProductImageMockState()
+        await page.addInitScript(() => {
+          const originalSetItem = Storage.prototype.setItem
+          Storage.prototype.setItem = function setItem(key, value) {
+            if (
+              String(key || '').startsWith(
+                '__plush_erp_print_workspace_draft__:'
+              )
+            ) {
+              throw new DOMException('quota exceeded', 'QuotaExceededError')
+            }
+            return originalSetItem.call(this, key, value)
+          }
+        })
         await installProductImageAttachmentMocks(page, bomPrintState)
       },
       verify: async (page) => {
@@ -449,7 +560,7 @@ export function createProductImageSlotScenarios(deps) {
           assert.equal(
             await productImages.count(),
             2,
-            'BOM 打印草稿应显示产品主图和辅图快照'
+            'localStorage 满额降级后，BOM 打印草稿仍应显示产品主图和辅图快照'
           )
           for (let index = 0; index < 2; index += 1) {
             assert.match(

@@ -23,7 +23,7 @@ test('shipped shipment finance actions require their exact confirm projections',
 test('shipment finance submit uses source-owned APIs without frontend money fields', () => {
   assert.match(
     source,
-    /buildShipmentFinanceSourcePayload\(values, selectedRow\)/u
+    /buildShipmentFinanceSourcePayload\(values, selectedRow, config\.key\)/u
   )
   assert.match(source, /createReceivableFromShipment/u)
   assert.match(source, /createInvoiceFromShipment/u)
@@ -59,7 +59,7 @@ test('shipment page exposes exact upstream and downstream record routes', () => 
   assert.match(source, />\s*相关单据\s*<DownOutlined \/>/u)
   assert.match(
     source,
-    /businessRecordInventoryRouteFor\(\s*'shipments',\s*selectedRow\.id\s*\)/u
+    /businessRecordInventoryRouteFor\(\s*'shipments',\s*selectedRow\.id,/u
   )
   assert.match(source, /sales_order_id:\s*selectedRow\.sales_order_id/u)
   assert.match(source, /source_type:\s*'SHIPMENT'/u)
@@ -70,7 +70,7 @@ test('shipment page exposes exact upstream and downstream record routes', () => 
 
 test('shipment related records are permission-filtered and fail closed without a selection', () => {
   for (const permission of [
-    'sales.order.read',
+    'sales_order.read',
     'warehouse.inventory.read',
     'finance.receivable.read',
     'finance.invoice.read',
@@ -85,9 +85,109 @@ test('shipment related records are permission-filtered and fail closed without a
   )
 })
 
+test('shipment related route uses exact read and keeps the readable number presentation-only', () => {
+  assert.match(source, /getShipment\(\{ id: routeSelectedID \}/u)
+  assert.match(source, /const \[data, routeShipment\] = await Promise\.all/u)
+  assert.match(
+    source,
+    /linkedDocumentRequestKeyword\(\{[\s\S]*?hasExactContext: Boolean\(routeShipmentID \|\| routeSalesOrderID\)/u
+  )
+  assert.doesNotMatch(
+    source,
+    /linkedDocumentRequestKeyword\([\s\S]*?\)\s*\|\|\s*routeShipmentID/u
+  )
+  assert.match(
+    source,
+    /const exactPage = resolveExactRecordPage\(\{[\s\S]*?records: listedRows,[\s\S]*?exactRecord: routeShipment,[\s\S]*?hasExactContext: routeSelectedID > 0/u
+  )
+  assert.match(source, /const nextRows = exactPage\.records/u)
+  assert.match(source, /return routeShipment/u)
+  assert.match(
+    source,
+    /value=\{resolvedRouteKeyword \|\| linkedKeyword \|\| keyword\}/u
+  )
+  assert.match(
+    source,
+    /if \(linkedKeyword \|\| routeSalesOrderID \|\| routeShipmentID\) \{\s*clearRouteContext\(\)/u
+  )
+})
+
+test('shipment source import uses server candidates with remote search and pagination', () => {
+  assert.match(source, /listShipmentSourceCandidates/u)
+  assert.match(source, /shipmentSourceCandidateListParams/u)
+  assert.match(
+    source,
+    /salesOrderID:\s*shipmentForm\.getFieldValue\('sales_order_id'\)/u
+  )
+  assert.match(source, /normalizeShipmentSourceCandidate/u)
+  assert.match(source, /onSalesOrderSourcePageChange/u)
+  assert.match(source, /onSalesOrderSourceSearchChange/u)
+  assert.match(source, /onSalesOrderSourceReload/u)
+  assert.match(source, /salesOrderSourceLoadFailed/u)
+  assert.doesNotMatch(source, /listSalesOrderItems\(\{\s*limit:\s*500/u)
+  assert.doesNotMatch(source, /listAllSalesOrderItems/u)
+  assert.doesNotMatch(source, /listShipments\(\{\s*limit:\s*500/u)
+  assert.match(source, /currentSourceOrderID !== sourceOrderID/u)
+  assert.match(source, /item\.selectable === true/u)
+  assert.match(
+    source,
+    /isPositiveNumeric20Scale6Units\(numeric20Scale6Units\(value\)\)/u
+  )
+  assert.doesNotMatch(source, /remainingQuantity[\s\S]{0,160}value > 0/u)
+  assert.match(source, /currentSourceItemIDs/u)
+  assert.match(source, /newSourceItems/u)
+})
+
+test('new shipment drafts clear prior source selection and cached candidate state', () => {
+  const resetState = source.match(
+    /const resetShipmentSourceSelectionState = \(\) => \{([\s\S]*?)\n {2}\}/u
+  )?.[1]
+  assert.ok(resetState, '应集中清空出货来源选择状态')
+  for (const statement of [
+    'setSalesOrderItems([])',
+    'setSalesOrderSources([])',
+    'setSalesOrderSourceItems([])',
+    'setShipmentSourceRows([])',
+    'setSalesOrderSourceTotal(0)',
+    'setSalesOrderSourceCurrent(1)',
+    'setSalesOrderSourceLoadFailed(false)',
+    'setSalesOrderImportOpen(false)',
+    "salesOrderSourceQueryRef.current = { keyword: '', page: 1 }",
+  ]) {
+    assert.equal(resetState.includes(statement), true, statement)
+  }
+  assert.match(
+    source,
+    /const openCreate = \(\) => \{[\s\S]*?resetShipmentSourceSelectionState\(\)[\s\S]*?sales_order_id: undefined,[\s\S]*?customer_id: undefined,[\s\S]*?customer_snapshot: '',/u
+  )
+  assert.match(
+    source,
+    /const closeShipmentModal = \(\) => \{[\s\S]*?resetShipmentSourceSelectionState\(\)[\s\S]*?shipmentForm\.resetFields\(\)/u
+  )
+})
+
+test('shipment source import requires create and both source read permissions', () => {
+  assert.match(
+    source,
+    /hasActionPermission\(\s*adminProfile,\s*'sales_order\.read'\s*\)/u
+  )
+  assert.match(
+    source,
+    /hasActionPermission\(\s*adminProfile,\s*'sales_order_item\.read'\s*\)/u
+  )
+  assert.match(
+    source,
+    /canImportSalesOrderSource\s*=\s*canCreate\s*&&\s*canViewSalesOrders\s*&&\s*canViewSalesOrderItems/u
+  )
+  assert.match(
+    source,
+    /canImportSalesOrderSource=\{canImportSalesOrderSource\}/u
+  )
+})
+
 test('draft shipment can generate a source-bound finished-goods inspection', () => {
   assert.match(source, /createFinishedGoodsQualityInspectionDraft/u)
-  assert.match(source, /listFinishedGoodsQualityInspections/u)
+  assert.match(source, /listAllFinishedGoodsQualityInspections/u)
   assert.match(source, /buildShipmentQualityInspectionSources/u)
   assert.match(source, /buildShipmentQualityInspectionPayload/u)
   assert.match(source, /requireMatchingShipmentQualityInspectionDraft/u)
@@ -113,9 +213,10 @@ test('shipment cancellation distinguishes draft exit from shipped reversal', () 
     source,
     /!\['DRAFT', 'SHIPPED'\]\.includes\(selectedRow\.status\)/u
   )
-  assert.match(source, /草稿取消不会扣减或恢复库存/u)
+  assert.match(source, /草稿作废不会扣减或恢复库存/u)
   assert.match(source, /如已提交放行，需先完成或退回放行待办/u)
-  assert.match(source, /\? '取消出货单'\s*: '撤销已出货'/u)
+  assert.match(source, /\? '作废出货草稿'\s*: '撤销已出货'/u)
+  assert.match(source, /\? '作废草稿'\s*: '撤销已出货'/u)
   assert.match(
     source,
     /hasActionPermission\(adminProfile, 'shipment\.cancel'\)/u

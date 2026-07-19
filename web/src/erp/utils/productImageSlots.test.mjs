@@ -3,15 +3,20 @@ import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
 import {
-  PRODUCT_IMAGE_MAX_FILE_SIZE,
+  PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES,
+  PRODUCT_IMAGE_SNAPSHOT_MAX_EDGE,
+  PRODUCT_IMAGE_SNAPSHOT_MAX_PIXELS,
   PRODUCT_IMAGE_SLOT_DEFINITIONS,
+  buildOptimizedProductImageFileName,
   buildProductImageMutationPlan,
+  calculateProductImageSnapshotSize,
   createProductImageSession,
   inferProductImageMimeType,
   resetProductImageSession,
   selectSavedProductImages,
   stageProductImageClear,
   stageProductImageSelection,
+  shouldOptimizeProductImageSnapshot,
   validateProductImageFile,
 } from './productImageSlots.mjs'
 
@@ -113,26 +118,18 @@ test('product image edits create upload or clear plans and cancel restores backe
   )
 })
 
-test('product image validation accepts PNG, JPEG and WEBP up to 5MB', () => {
+test('product image validation accepts PNG, JPEG and WEBP source files without a configured size ceiling', () => {
   for (const [name, type] of [
     ['product.png', 'image/png'],
     ['product.jpg', 'image/jpeg'],
     ['product.jpeg', 'image/jpeg'],
     ['product.webp', 'image/webp'],
   ]) {
-    const file = { name, type, size: PRODUCT_IMAGE_MAX_FILE_SIZE }
+    const file = { name, type, size: Number.MAX_SAFE_INTEGER }
     assert.equal(inferProductImageMimeType(file), type)
     assert.equal(validateProductImageFile(file), '')
   }
 
-  assert.match(
-    validateProductImageFile({
-      name: 'too-large.png',
-      type: 'image/png',
-      size: PRODUCT_IMAGE_MAX_FILE_SIZE + 1,
-    }),
-    /超过 5MB/u
-  )
   assert.match(
     validateProductImageFile({
       name: 'product.gif',
@@ -151,16 +148,49 @@ test('product image validation accepts PNG, JPEG and WEBP up to 5MB', () => {
   )
 })
 
+test('product image snapshot sizing keeps print images inside the browser storage budget', () => {
+  assert.deepEqual(calculateProductImageSnapshotSize(1600, 900), {
+    width: 1600,
+    height: 900,
+    scale: 1,
+  })
+
+  const landscape = calculateProductImageSnapshotSize(12_000, 8_000)
+  assert(landscape.width <= PRODUCT_IMAGE_SNAPSHOT_MAX_EDGE)
+  assert(landscape.height <= PRODUCT_IMAGE_SNAPSHOT_MAX_EDGE)
+  assert(
+    landscape.width * landscape.height <= PRODUCT_IMAGE_SNAPSHOT_MAX_PIXELS
+  )
+  assert.equal(
+    shouldOptimizeProductImageSnapshot({
+      fileSize: PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES + 1,
+      width: 1600,
+      height: 900,
+    }),
+    true
+  )
+  assert.equal(
+    shouldOptimizeProductImageSnapshot({
+      fileSize: 128,
+      width: 1600,
+      height: 900,
+    }),
+    false
+  )
+  assert.equal(
+    buildOptimizedProductImageFileName('毛绒主图.PNG'),
+    '毛绒主图.webp'
+  )
+  assert.equal(buildOptimizedProductImageFileName(''), '产品图片.webp')
+})
+
 test('product page integrates dedicated slots without changing SKU attachment semantics', () => {
   const pageSource = readFileSync(
     new URL('../pages/V1MasterDataPage.jsx', import.meta.url),
     'utf8'
   )
   const componentSource = readFileSync(
-    new URL(
-      '../components/master-data/ProductImageSlots.jsx',
-      import.meta.url
-    ),
+    new URL('../components/master-data/ProductImageSlots.jsx', import.meta.url),
     'utf8'
   )
   const apiSource = readFileSync(
@@ -230,7 +260,8 @@ test('product page integrates dedicated slots without changing SKU attachment se
     /call\('clear_product_image',[\s\S]*?owner_id: productID/u
   )
   assert.doesNotMatch(
-    apiSource.match(/call\('clear_product_image',[\s\S]*?\n {2}\}\)/u)?.[0] || '',
+    apiSource.match(/call\('clear_product_image',[\s\S]*?\n {2}\}\)/u)?.[0] ||
+      '',
     /owner_type/u,
     'clear_product_image is already product-scoped and must not send owner_type'
   )

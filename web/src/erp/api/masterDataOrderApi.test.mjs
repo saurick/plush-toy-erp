@@ -39,6 +39,31 @@ test('product SKU reference loading uses complete 200-row pagination', () => {
   )
 })
 
+test('source-action reference loading exposes strict complete pagination', () => {
+  for (const [functionName, pageFunction, recordKey] of [
+    ['listAllCustomers', 'listCustomers', 'customers'],
+    ['listAllSuppliers', 'listSuppliers', 'suppliers'],
+    ['listAllMaterials', 'listMaterials', 'materials'],
+    ['listAllProcesses', 'listProcesses', 'processes'],
+    ['listAllUnits', 'listUnits', 'units'],
+    ['listAllWarehouses', 'listWarehouses', 'warehouses'],
+    ['listAllProducts', 'listProducts', 'products'],
+    ['listAllContactsByOwner', 'listContactsByOwner', 'contacts'],
+  ]) {
+    assert.match(
+      source,
+      new RegExp(
+        `export async function ${functionName}\\([\\s\\S]*?listAllReferenceRecords\\(\\s*${pageFunction},\\s*params,\\s*'${recordKey}'`,
+        'u'
+      )
+    )
+  }
+  assert.match(
+    source,
+    /export async function listAllSalesOrders[\s\S]*?listAllPaginatedRecords\(\s*listSalesOrders,\s*params,\s*'sales_orders'/u
+  )
+})
+
 test('confirmed outsourcing candidate loading uses complete strict pagination', () => {
   assert.match(
     source,
@@ -80,6 +105,10 @@ test('masterDataOrderApi: V1 API client uses 007 JSON-RPC urls', () => {
   assert.match(source, /url:\s*'purchase_order'/)
   assert.match(source, /url:\s*'outsourcing_order'/)
   assert.match(source, /authScope:\s*AUTH_SCOPE\.ADMIN/)
+})
+
+test('masterDataOrderApi: outsourcing contract has no retired sales-order foreign key', () => {
+  assert.doesNotMatch(source, /source_sales_order_id/u)
 })
 
 test('masterDataOrderApi: masterdata methods cover customers suppliers materials processes products sku contacts', () => {
@@ -145,23 +174,34 @@ test('V1MasterDataPage: owner and contacts save through backend aggregate API', 
   }
 })
 
-test('masterDataOrderApi: sales order methods do not expose shipment or finance actions', () => {
+test('masterDataOrderApi: sales orders expose only aggregate writes and lifecycle actions', () => {
   for (const methodName of [
     'list_sales_orders',
-    'create_sales_order',
-    'update_sales_order',
     'save_sales_order_with_items',
     'get_sales_order',
-    'submit_sales_order',
     'activate_sales_order',
     'close_sales_order',
     'cancel_sales_order',
     'list_sales_order_items',
-    'add_sales_order_item',
-    'update_sales_order_item',
-    'remove_sales_order_item',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
+  }
+
+  assert.doesNotMatch(source, /export async function submitSalesOrder\b/u)
+  assert.doesNotMatch(source, /call\(\s*'submit_sales_order'/u)
+
+  for (const [functionName, methodName] of [
+    ['createSalesOrder', 'create_sales_order'],
+    ['updateSalesOrder', 'update_sales_order'],
+    ['addSalesOrderItem', 'add_sales_order_item'],
+    ['updateSalesOrderItem', 'update_sales_order_item'],
+    ['removeSalesOrderItem', 'remove_sales_order_item'],
+  ]) {
+    assert.doesNotMatch(
+      source,
+      new RegExp(`export async function ${functionName}\\b`, 'u')
+    )
+    assert.doesNotMatch(source, new RegExp(`call\\(\\s*'${methodName}'`, 'u'))
   }
 
   const forbiddenActionNames = [

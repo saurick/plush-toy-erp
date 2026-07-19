@@ -16,6 +16,7 @@ import {
   resolveDetailActionLabel,
   resolveMobileActionDisplayLabel,
   resolveMobileActionLabel,
+  resolveMobileTaskCompletionFeedback,
   resolveMobileTaskDueLabel,
   resolveMobileTaskActionReason,
   resolveMobileTaskBusinessStatus,
@@ -222,7 +223,7 @@ test('mobileRoleTaskModel: 退回动作只开放给匹配业务岗位', () => {
 })
 
 test('mobileRoleTaskModel: 最近动态动作展示不透出技术 action key', () => {
-  assert.equal(resolveDetailActionLabel('done'), '完成说明（可选）')
+  assert.equal(resolveDetailActionLabel('done'), '完成反馈（必填）')
   assert.equal(requiresMobileActionFeedback('done'), true)
   assert.equal(requiresMobileActionFeedback('blocked'), false)
   assert.equal(resolveMobileActionLabel('blocked'), '阻塞')
@@ -286,6 +287,33 @@ test('mobileRoleTaskModel: 缺少状态 label 时移动端仍展示中文状态'
   assert.match(factRowsText, /状态：可执行/u)
   assert.match(unknownFactRowsText, /状态：未知状态/u)
   assert.doesNotMatch(unknownFactRowsText, /unknown_task_status_key/u)
+})
+
+test('mobileRoleTaskModel: 已办详情只展示服务端持久化的完成反馈', () => {
+  assert.equal(
+    resolveMobileTaskCompletionFeedback(
+      task({
+        task_status_key: 'done',
+        payload: { feedback: '  已完成复核并交接  ' },
+      })
+    ),
+    '已完成复核并交接'
+  )
+  assert.equal(
+    resolveMobileTaskCompletionFeedback(
+      task({
+        task_status_key: 'ready',
+        payload: { feedback: '不应显示的残值' },
+      })
+    ),
+    ''
+  )
+  assert.equal(
+    resolveMobileTaskCompletionFeedback(
+      task({ task_status_key: 'done', payload: { feedback: 42 } })
+    ),
+    ''
+  )
 })
 
 test('mobileRoleTaskModel: 业务状态详情不信任 raw label 并按 key 回补中文', () => {

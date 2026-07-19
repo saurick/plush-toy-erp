@@ -3,6 +3,10 @@ import { Alert, Button, Form, Input, Modal, Select, Space } from 'antd'
 import { MinusCircleOutlined, PlusOutlined } from '@ant-design/icons'
 
 import { PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS } from '../../utils/purchaseReceiptExceptionAction.mjs'
+import {
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 
 function receiptItemLabel(item, materialOptions = []) {
   const material = materialOptions.find(
@@ -156,7 +160,9 @@ export default function PurchaseReceiptExceptionModal({
                       { required: true, message: '请填写数量' },
                       {
                         validator: (_, value) =>
-                          Number(value) > 0
+                          isPositiveNumeric20Scale6Units(
+                            numeric20Scale6Units(value)
+                          )
                             ? Promise.resolve()
                             : Promise.reject(new Error('数量必须大于 0')),
                       },

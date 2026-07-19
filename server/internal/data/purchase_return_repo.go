@@ -352,9 +352,28 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 		tx = nil
 		return out, nil
 	}
+	wasDraft := purchaseReturn.Status == biz.PurchaseReturnStatusDraft
 	if purchaseReturn.PurchaseReceiptID != nil {
 		if err := lockPurchaseReceipt(ctx, tx, *purchaseReturn.PurchaseReceiptID); err != nil {
 			return nil, err
+		}
+		if wasDraft {
+			if err := updatePurchaseReturnCancelled(ctx, tx, purchaseReturn.ID); err != nil {
+				return nil, err
+			}
+			purchaseReturn, err = tx.client.PurchaseReturn.Get(ctx, purchaseReturn.ID)
+			if err != nil {
+				return nil, err
+			}
+			out, err := purchaseReturnWithItems(ctx, tx.client, purchaseReturn)
+			if err != nil {
+				return nil, err
+			}
+			if err := tx.sqlTx.Commit(); err != nil {
+				return nil, err
+			}
+			tx = nil
+			return out, nil
 		}
 		hasActivePayable, err := hasActiveFinanceFactForSource(ctx, tx.client, biz.FinanceFactPayable, biz.PurchaseReceiptSourceType, *purchaseReturn.PurchaseReceiptID)
 		if err != nil {
@@ -363,6 +382,24 @@ func (r *inventoryRepo) CancelPostedPurchaseReturn(ctx context.Context, returnID
 		if hasActivePayable {
 			return nil, biz.ErrPurchaseReceiptFinanceDependency
 		}
+	}
+	if wasDraft {
+		if err := updatePurchaseReturnCancelled(ctx, tx, purchaseReturn.ID); err != nil {
+			return nil, err
+		}
+		purchaseReturn, err = tx.client.PurchaseReturn.Get(ctx, purchaseReturn.ID)
+		if err != nil {
+			return nil, err
+		}
+		out, err := purchaseReturnWithItems(ctx, tx.client, purchaseReturn)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return out, nil
 	}
 
 	items, err := tx.client.PurchaseReturnItem.Query().

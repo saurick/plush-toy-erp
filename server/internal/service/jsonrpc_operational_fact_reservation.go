@@ -17,7 +17,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactReservation(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionStockReservationCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "inventory"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "sales_orders"); res != nil {
 			return id, res, nil
 		}
 		in, ok := stockReservationFromSalesOrderCreateFromParams(pm)
@@ -69,7 +75,7 @@ func stockReservationFromSalesOrderCreateFromParams(pm map[string]any) (*biz.Sto
 	) {
 		return nil, false
 	}
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}

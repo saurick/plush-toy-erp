@@ -26,6 +26,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 
 	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
 		biz.PermissionERPDashboardRead,
@@ -34,109 +35,18 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	j.inventoryUC = biz.NewInventoryUsecase(actorCaptureRepo)
 	adminCtx := workflowJSONRPCAdminContext()
 
-	_, legacyRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "legacy", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":         "PR-JSONRPC-LEGACY",
-		"supplier_name":      "归档供应商",
-		"business_record_id": float64(1),
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if legacyRes == nil || legacyRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("purchase API must reject business_record_id on new facts, got %#v", legacyRes)
-	}
-
-	_, atomicRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_with_items", "atomic", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":    "PR-JSONRPC-ATOMIC",
-		"supplier_name": "原子供应商",
-		"received_at":   "2026-06-11",
-		"items": []any{
-			map[string]any{
-				"material_id":    float64(fixtures.materialID),
-				"warehouse_id":   float64(fixtures.warehouseID),
-				"unit_id":        float64(fixtures.unitID),
-				"lot_no":         "JSONRPC-ATOMIC-LOT",
-				"quantity":       "3",
-				"source_line_no": "A1",
-			},
-		},
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err creating atomic receipt, got %v", err)
-	}
-	if atomicRes == nil || atomicRes.Code != errcode.OK.Code {
-		t.Fatalf("expected atomic create OK, got %#v", atomicRes)
-	}
-	atomicReceipt := jsonRPCNestedMap(t, atomicRes, "purchase_receipt")
-	atomicItems, ok := atomicReceipt["items"].([]any)
-	if !ok || len(atomicItems) != 1 {
-		t.Fatalf("expected atomic receipt to include one line, got %#v", atomicReceipt["items"])
-	}
-	atomicQualityInspections, ok := atomicReceipt["quality_inspections"].([]any)
-	if !ok || len(atomicQualityInspections) != 1 {
-		t.Fatalf("expected atomic receipt to include one generated line inspection, got %#v", atomicReceipt["quality_inspections"])
-	}
-	if atomicQualityInspections[0].(map[string]any)["status"] != biz.QualityInspectionStatusSubmitted {
-		t.Fatalf("expected generated inspection submitted, got %#v", atomicQualityInspections[0])
-	}
-	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
-		t.Fatalf("atomic draft purchase receipt must not write inventory txns, got %d", count)
+	for _, retiredMethod := range []string{
+		"create_purchase_receipt_draft",
+		"create_purchase_receipt_with_items",
+	} {
+		_, retiredRes, err := j.handlePurchase(adminCtx, retiredMethod, "retired", mustJSONRPCStruct(t, map[string]any{
+			"receipt_no": "PR-RETIRED",
+		}))
+		if err != nil || retiredRes == nil || retiredRes.Code != errcode.UnknownMethod.Code {
+			t.Fatalf("retired purchase receipt method %s must be unknown, result=%#v err=%v", retiredMethod, retiredRes, err)
+		}
 	}
 
-	beforeRollbackCount := client.PurchaseReceipt.Query().
-		Where(purchasereceipt.ReceiptNo("PR-JSONRPC-ROLLBACK")).
-		CountX(ctx)
-	_, rollbackRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_with_items", "atomic-rollback", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":    "PR-JSONRPC-ROLLBACK",
-		"supplier_name": "回滚供应商",
-		"received_at":   "2026-06-11",
-		"items": []any{
-			map[string]any{
-				"material_id":  float64(fixtures.materialID),
-				"warehouse_id": float64(fixtures.warehouseID),
-				"unit_id":      float64(fixtures.unitID),
-				"quantity":     "2",
-			},
-			map[string]any{
-				"material_id":  float64(999999),
-				"warehouse_id": float64(fixtures.warehouseID),
-				"unit_id":      float64(fixtures.unitID),
-				"quantity":     "2",
-			},
-		},
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err creating invalid atomic receipt, got %v", err)
-	}
-	if rollbackRes == nil || rollbackRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected invalid atomic create rejected, got %#v", rollbackRes)
-	}
-	afterRollbackCount := client.PurchaseReceipt.Query().
-		Where(purchasereceipt.ReceiptNo("PR-JSONRPC-ROLLBACK")).
-		CountX(ctx)
-	if afterRollbackCount != beforeRollbackCount {
-		t.Fatalf("invalid atomic receipt must rollback header, before=%d after=%d", beforeRollbackCount, afterRollbackCount)
-	}
-
-	_, receiptRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "1", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":    "PR-JSONRPC-001",
-		"supplier_name": "布料供应商",
-		"received_at":   "2026-06-11",
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if receiptRes == nil || receiptRes.Code != errcode.OK.Code {
-		t.Fatalf("expected create OK, got %#v", receiptRes)
-	}
-	manualReceiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id")
-	if manualReceiptID <= 0 {
-		t.Fatalf("expected manual receipt identity, got %d", manualReceiptID)
-	}
-
-	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
-		t.Fatalf("draft purchase receipt must not write inventory txns, got %d", count)
-	}
 	linkedReceipt, sourceItem := createPurchaseReceiptAppendSourceForServiceTest(
 		t,
 		ctx,
@@ -146,6 +56,9 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		"JSONRPC-API",
 	)
 	receiptID := linkedReceipt.ID
+	if count := client.InventoryTxn.Query().CountX(ctx); count != 0 {
+		t.Fatalf("source-bound draft purchase receipt must not write inventory txns, got %d", count)
+	}
 	itemCountBeforeMissingSource := client.PurchaseReceiptItem.Query().CountX(ctx)
 	lotCountBeforeMissingSource := client.InventoryLot.Query().CountX(ctx)
 	inspectionCountBeforeMissingSource := client.QualityInspection.Query().CountX(ctx)
@@ -380,6 +293,10 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if reversedListRes == nil || reversedListRes.Code != errcode.InvalidParam.Code {
 		t.Fatalf("expected invalid param for reversed purchase receipt date filter, got %#v", reversedListRes)
 	}
+	const wantReceiptTotal = 1
+	if total := client.PurchaseReceipt.Query().CountX(ctx); total != wantReceiptTotal {
+		t.Fatalf("expected one source-bound purchase receipt fixture, got %d", total)
+	}
 
 	_, dashboardRes, err := j.handleBusiness(adminCtx, "dashboard_stats", "6", nil)
 	if err != nil {
@@ -388,7 +305,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if dashboardRes == nil || dashboardRes.Code != errcode.OK.Code {
 		t.Fatalf("expected dashboard OK, got %#v", dashboardRes)
 	}
-	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, 3)
+	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, wantReceiptTotal)
 
 	_, cancelledRes, err := j.handlePurchase(adminCtx, "cancel_purchase_receipt", "7", mustJSONRPCStruct(t, map[string]any{"id": float64(receiptID)}))
 	if err != nil {
@@ -432,6 +349,28 @@ func (r *purchaseReceiptActorCaptureRepo) CancelPostedPurchaseReceiptWithActor(c
 		return nil, biz.ErrActorAwareCancellationUnavailable
 	}
 	return repo.CancelPostedPurchaseReceiptWithActor(ctx, receiptID, actorID)
+}
+
+type purchaseReceiptSourceCaptureRepo struct {
+	biz.InventoryRepo
+	createFromOrderCalls int
+	addItemCalls         int
+}
+
+func (r *purchaseReceiptSourceCaptureRepo) CreatePurchaseReceiptFromPurchaseOrder(ctx context.Context, in *biz.PurchaseReceiptFromPurchaseOrderCreate) (*biz.PurchaseReceipt, error) {
+	r.createFromOrderCalls++
+	if r.InventoryRepo == nil {
+		return nil, biz.ErrBadParam
+	}
+	return r.InventoryRepo.CreatePurchaseReceiptFromPurchaseOrder(ctx, in)
+}
+
+func (r *purchaseReceiptSourceCaptureRepo) AddPurchaseReceiptItem(ctx context.Context, in *biz.PurchaseReceiptItemCreate) (*biz.PurchaseReceiptItem, error) {
+	r.addItemCalls++
+	if r.InventoryRepo == nil {
+		return nil, biz.ErrBadParam
+	}
+	return r.InventoryRepo.AddPurchaseReceiptItem(ctx, in)
 }
 
 func TestPurchaseReceiptFilterFromParamsForwardsContextFilters(t *testing.T) {
@@ -479,18 +418,6 @@ func TestPurchaseReceiptRetrySafeParamsRejectClientPayloadHash(t *testing.T) {
 		t.Fatal("add receipt item must reject client idempotency_payload_hash")
 	}
 
-	batch := map[string]any{
-		"items": []any{map[string]any{
-			"material_id":     float64(2),
-			"warehouse_id":    float64(3),
-			"unit_id":         float64(4),
-			"quantity":        "1",
-			"idempotency_key": "item-attempt-1",
-		}},
-	}
-	if _, ok := purchaseReceiptItemsCreateFromParams(batch); ok {
-		t.Fatal("atomic batch items must not accept the public append retry key")
-	}
 }
 
 func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnly(t *testing.T) {
@@ -537,51 +464,11 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 
 	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
 		biz.PermissionERPDashboardRead,
 	))
-	_, manualReceiptRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_draft", "manual-receipt", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":    "PR-FROM-PO-MANUAL",
-		"supplier_name": "采购供应商",
-		"received_at":   "2026-06-17",
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err creating manual receipt, got %v", err)
-	}
-	manualReceipt := jsonRPCNestedMap(t, manualReceiptRes, "purchase_receipt")
-	manualReceiptID := jsonRPCInt(t, manualReceipt, "id")
-	if manualReceipt["supplier_id"] != nil {
-		t.Fatalf("manual receipt without stable supplier identity must return supplier_id=nil, got %#v", manualReceipt["supplier_id"])
-	}
-	manualItemCount := client.PurchaseReceiptItem.Query().CountX(ctx)
-	manualLotCount := client.InventoryLot.Query().CountX(ctx)
-	manualInspectionCount := client.QualityInspection.Query().CountX(ctx)
-	_, manualLineRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "add_purchase_receipt_item", "manual-line", mustJSONRPCStruct(t, map[string]any{
-		"receipt_id":             float64(manualReceiptID),
-		"material_id":            float64(fixtures.materialID),
-		"warehouse_id":           float64(fixtures.warehouseID),
-		"unit_id":                float64(fixtures.unitID),
-		"purchase_order_item_id": float64(saved.Items[0].ID),
-		"quantity":               "2",
-		"source_line_no":         "stale-client-line",
-		"idempotency_key":        "jsonrpc-manual-po-line-attempt-1",
-	}))
-	if err != nil {
-		t.Fatalf("expected nil err adding manual source line, got %v", err)
-	}
-	if manualLineRes == nil || manualLineRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("receipt without stable supplier identity must reject a purchase order source line, got %#v", manualLineRes)
-	}
-	if got := client.PurchaseReceiptItem.Query().CountX(ctx); got != manualItemCount {
-		t.Fatalf("rejected manual source append changed item count: %d -> %d", manualItemCount, got)
-	}
-	if got := client.InventoryLot.Query().CountX(ctx); got != manualLotCount {
-		t.Fatalf("rejected manual source append changed lot count: %d -> %d", manualLotCount, got)
-	}
-	if got := client.QualityInspection.Query().CountX(ctx); got != manualInspectionCount {
-		t.Fatalf("rejected manual source append changed inspection count: %d -> %d", manualInspectionCount, got)
-	}
 	_, missingReceiptKeyRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "missing-key", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),
 		"receipt_no":        "PR-FROM-PO-MISSING-KEY",
@@ -623,6 +510,12 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if got := jsonRPCInt(t, receipt, "supplier_id"); got != supplier.ID {
 		t.Fatalf("receipt supplier_id=%d, want source purchase order supplier %d", got, supplier.ID)
 	}
+	if got := jsonRPCInt(t, receipt, "purchase_order_id"); got != saved.Order.ID {
+		t.Fatalf("receipt purchase_order_id=%d, want %d", got, saved.Order.ID)
+	}
+	if got := receipt["purchase_order_no"]; got != saved.Order.PurchaseOrderNo {
+		t.Fatalf("receipt purchase_order_no=%v, want %s", got, saved.Order.PurchaseOrderNo)
+	}
 	items, ok := receipt["items"].([]any)
 	if !ok || len(items) != 1 {
 		t.Fatalf("expected one receipt line, got %#v", receipt["items"])
@@ -645,8 +538,15 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 	if err != nil || replayReceiptRes == nil || replayReceiptRes.Code != errcode.OK.Code {
 		t.Fatalf("expected create-from-order replay OK, result=%#v err=%v", replayReceiptRes, err)
 	}
-	if replayID := jsonRPCInt(t, jsonRPCNestedMap(t, replayReceiptRes, "purchase_receipt"), "id"); replayID != receiptID {
+	replayedReceipt := jsonRPCNestedMap(t, replayReceiptRes, "purchase_receipt")
+	if replayID := jsonRPCInt(t, replayedReceipt, "id"); replayID != receiptID {
 		t.Fatalf("create-from-order replay id=%d, want %d", replayID, receiptID)
+	}
+	if replayOrderID := jsonRPCInt(t, replayedReceipt, "purchase_order_id"); replayOrderID != saved.Order.ID {
+		t.Fatalf("create-from-order replay purchase_order_id=%d, want %d", replayOrderID, saved.Order.ID)
+	}
+	if replayOrderNo := replayedReceipt["purchase_order_no"]; replayOrderNo != saved.Order.PurchaseOrderNo {
+		t.Fatalf("create-from-order replay purchase_order_no=%v, want %s", replayOrderNo, saved.Order.PurchaseOrderNo)
 	}
 
 	_, duplicateRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "2", mustJSONRPCStruct(t, map[string]any{
@@ -697,9 +597,11 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions(t *testin
 	data, _ := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt_permissions")
 	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin([]string{biz.PurchaseRoleKey}, biz.PermissionPurchaseReceiptRead))
 
-	_, createRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_draft", "1", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":    "PR-DENIED",
-		"supplier_name": "供应商",
+	_, createRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "1", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(1),
+		"receipt_no":        "PR-DENIED",
+		"warehouse_id":      float64(1),
+		"idempotency_key":   "jsonrpc-permission-denied-receipt",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -717,18 +619,156 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresDomainPermissions(t *testin
 	}
 }
 
+func TestJsonrpcDispatcher_PurchaseReceiptSourceMethodsRequirePurchaseOrderRead(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt_source_permissions")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	logger := log.NewStdLogger(io.Discard)
+	baseRepo := datarepo.NewInventoryRepo(data, logger)
+	baseUC := biz.NewInventoryUsecase(baseRepo)
+	_, createSourceItem := createPurchaseReceiptAppendSourceForServiceTest(t, ctx, client, baseUC, fixtures, "SOURCE-PERMISSION-CREATE")
+	linkedReceipt, appendSourceItem := createPurchaseReceiptAppendSourceForServiceTest(t, ctx, client, baseUC, fixtures, "SOURCE-PERMISSION-ADD")
+	captureRepo := &purchaseReceiptSourceCaptureRepo{InventoryRepo: baseRepo}
+
+	createParams := mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(createSourceItem.PurchaseOrderID),
+		"receipt_no":        "PR-SOURCE-PERMISSION",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"idempotency_key":   "jsonrpc-source-permission-create",
+	})
+	addParams := mustJSONRPCStruct(t, map[string]any{
+		"receipt_id":             float64(linkedReceipt.ID),
+		"material_id":            float64(fixtures.materialID),
+		"warehouse_id":           float64(fixtures.warehouseID),
+		"unit_id":                float64(fixtures.unitID),
+		"purchase_order_item_id": float64(appendSourceItem.ID),
+		"lot_no":                 "SOURCE-PERMISSION-LOT",
+		"quantity":               "1",
+		"idempotency_key":        "jsonrpc-source-permission-add",
+	})
+
+	denied := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseReceiptCreate,
+	))
+	denied.inventoryUC = biz.NewInventoryUsecase(captureRepo)
+	for _, request := range []struct {
+		method string
+		params *structpb.Struct
+	}{
+		{method: "create_purchase_receipt_from_purchase_order", params: createParams},
+		{method: "add_purchase_receipt_item", params: addParams},
+	} {
+		_, result, err := denied.handlePurchase(workflowJSONRPCAdminContext(), request.method, "denied", request.params)
+		if err != nil || result == nil || result.Code != errcode.PermissionDenied.Code {
+			t.Fatalf("%s without purchase_order.read result=%#v err=%v", request.method, result, err)
+		}
+	}
+	if captureRepo.createFromOrderCalls != 0 || captureRepo.addItemCalls != 0 {
+		t.Fatalf("denied source methods reached inventory repository: create=%d add=%d", captureRepo.createFromOrderCalls, captureRepo.addItemCalls)
+	}
+
+	allowed := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionPurchaseReceiptCreate,
+		biz.PermissionPurchaseOrderRead,
+	))
+	allowed.inventoryUC = biz.NewInventoryUsecase(captureRepo)
+	for _, request := range []struct {
+		method string
+		params *structpb.Struct
+	}{
+		{method: "create_purchase_receipt_from_purchase_order", params: createParams},
+		{method: "add_purchase_receipt_item", params: addParams},
+	} {
+		_, result, err := allowed.handlePurchase(workflowJSONRPCAdminContext(), request.method, "allowed", request.params)
+		if err != nil || result == nil || result.Code != errcode.OK.Code {
+			t.Fatalf("%s with source permissions result=%#v err=%v", request.method, result, err)
+		}
+	}
+	if captureRepo.createFromOrderCalls != 1 || captureRepo.addItemCalls != 1 {
+		t.Fatalf("allowed source method calls: create=%d add=%d, want 1/1", captureRepo.createFromOrderCalls, captureRepo.addItemCalls)
+	}
+}
+
+func TestJsonrpcDispatcher_AddPurchaseReceiptItemRequiresEnabledPurchaseOrdersModule(t *testing.T) {
+	for _, sourceModule := range []struct {
+		name  string
+		state string
+	}{
+		{name: "missing"},
+		{name: "disabled", state: "disabled"},
+	} {
+		t.Run(sourceModule.name, func(t *testing.T) {
+			configRepo := newServiceCustomerConfigRepo()
+			revision := "2026.07.18.purchase-receipt-add-source-" + sourceModule.name
+			key := serviceCustomerConfigKey(biz.DefaultCustomerKey, revision)
+			configRepo.revisions[key] = &biz.CustomerConfigRevision{
+				CustomerKey: biz.DefaultCustomerKey,
+				Revision:    revision,
+				Status:      biz.CustomerConfigStatusActive,
+				CreatedAt:   time.Now(),
+				UpdatedAt:   time.Now(),
+			}
+			configRepo.modules[key] = []biz.DeploymentModuleStateInput{
+				{ModuleKey: "purchase_receipts", State: "enabled"},
+				{ModuleKey: "quality_inspections", State: "enabled"},
+				{ModuleKey: "inventory", State: "enabled"},
+			}
+			if sourceModule.state != "" {
+				configRepo.modules[key] = append(configRepo.modules[key], biz.DeploymentModuleStateInput{ModuleKey: "purchase_orders", State: sourceModule.state})
+			}
+			captureRepo := &purchaseReceiptSourceCaptureRepo{}
+			dispatcher := &jsonrpcDispatcher{
+				log: log.NewHelper(log.NewStdLogger(io.Discard)),
+				adminReader: stubAdminAccountReader{admin: &biz.AdminUser{
+					ID:           7,
+					Username:     "admin",
+					IsSuperAdmin: true,
+				}},
+				inventoryUC:      biz.NewInventoryUsecase(captureRepo),
+				customerConfigUC: biz.NewCustomerConfigUsecase(configRepo),
+			}
+			_, result, err := dispatcher.handlePurchase(workflowJSONRPCAdminContext(), "add_purchase_receipt_item", "module", mustJSONRPCStruct(t, map[string]any{
+				"receipt_id":             float64(1),
+				"material_id":            float64(2),
+				"warehouse_id":           float64(3),
+				"unit_id":                float64(4),
+				"purchase_order_item_id": float64(5),
+				"quantity":               "1",
+				"idempotency_key":        "module-gate-add-purchase-receipt-item",
+			}))
+			if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+				t.Fatalf("%s purchase_orders module result=%#v err=%v", sourceModule.name, result, err)
+			}
+			if captureRepo.addItemCalls != 0 {
+				t.Fatalf("%s purchase_orders module reached inventory repository", sourceModule.name)
+			}
+		})
+	}
+}
+
 func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "jsonrpc_purchase_receipt_module_gate")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
 	j := newPurchaseJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey, biz.WarehouseRoleKey},
+		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
 		biz.PermissionWarehouseInboundConfirm,
 		biz.PermissionWarehouseInboundRead,
 	))
 	adminCtx := workflowJSONRPCAdminContext()
+	_, gateSourceItem := createPurchaseReceiptAppendSourceForServiceTest(
+		t,
+		ctx,
+		client,
+		j.inventoryUC,
+		fixtures,
+		"MODULE-GATE-SOURCE",
+	)
 
 	readOnlyReceiptConfig := customerConfigPublishParamsWithRevisionAndModuleState(
 		t,
@@ -739,9 +779,11 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	)
 	activatePurchaseTestCustomerConfig(t, j, readOnlyReceiptConfig)
 
-	_, createRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "read-only-create", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":    "PR-MODULE-READONLY",
-		"supplier_name": "模块只读供应商",
+	_, createRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_from_purchase_order", "read-only-create", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(gateSourceItem.PurchaseOrderID),
+		"receipt_no":        "PR-MODULE-READONLY",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"idempotency_key":   "jsonrpc-module-read-only-create",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -755,9 +797,11 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 
 	enabledConfig := customerConfigPublishParamsForRevision(t, "2026.06.28.purchase-modules-enabled")
 	activatePurchaseTestCustomerConfig(t, j, enabledConfig)
-	_, receiptRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_draft", "enabled-create", mustJSONRPCStruct(t, map[string]any{
-		"receipt_no":    "PR-MODULE-ENABLED",
-		"supplier_name": "模块启用供应商",
+	_, receiptRes, err := j.handlePurchase(adminCtx, "create_purchase_receipt_from_purchase_order", "enabled-create", mustJSONRPCStruct(t, map[string]any{
+		"purchase_order_id": float64(gateSourceItem.PurchaseOrderID),
+		"receipt_no":        "PR-MODULE-ENABLED",
+		"warehouse_id":      float64(fixtures.warehouseID),
+		"idempotency_key":   "jsonrpc-module-enabled-create",
 	}))
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
@@ -765,8 +809,9 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	if receiptRes == nil || receiptRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled create OK, got %#v", receiptRes)
 	}
-	if manualReceiptID := jsonRPCInt(t, jsonRPCNestedMap(t, receiptRes, "purchase_receipt"), "id"); manualReceiptID <= 0 {
-		t.Fatalf("expected enabled manual receipt identity, got %d", manualReceiptID)
+	createdFromOrder := jsonRPCNestedMap(t, receiptRes, "purchase_receipt")
+	if sourceOrderID := jsonRPCInt(t, createdFromOrder, "purchase_order_id"); sourceOrderID != gateSourceItem.PurchaseOrderID {
+		t.Fatalf("expected enabled receipt source order %d, got %d", gateSourceItem.PurchaseOrderID, sourceOrderID)
 	}
 	linkedReceipt, sourceItem := createPurchaseReceiptAppendSourceForServiceTest(
 		t,
@@ -792,6 +837,27 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIRequiresEnabledModules(t *testing.T
 	}
 	if itemRes == nil || itemRes.Code != errcode.OK.Code {
 		t.Fatalf("expected enabled add item OK, got %#v", itemRes)
+	}
+
+	readOnlyQualityConfig := customerConfigPublishParamsWithRevisionAndModuleState(
+		t,
+		customerConfigPublishParams(t),
+		"2026.07.18.quality-read-only-cancel-receipt",
+		"quality_inspections",
+		"read_only",
+	)
+	activatePurchaseTestCustomerConfig(t, j, readOnlyQualityConfig)
+	_, cancelRes, err := j.handlePurchase(adminCtx, "cancel_purchase_receipt", "quality-read-only-cancel", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(receiptID),
+	}))
+	if err != nil {
+		t.Fatalf("expected nil err, got %v", err)
+	}
+	if cancelRes == nil || cancelRes.Code != errcode.InvalidParam.Code {
+		t.Fatalf("expected quality read_only draft cancellation rejected, got %#v", cancelRes)
+	}
+	if status := client.PurchaseReceipt.GetX(ctx, receiptID).Status; status != biz.PurchaseReceiptStatusDraft {
+		t.Fatalf("quality read_only cancellation changed receipt status to %s", status)
 	}
 
 	readOnlyInventoryConfig := customerConfigPublishParamsWithRevisionAndModuleState(

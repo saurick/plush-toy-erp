@@ -29,7 +29,7 @@ func (ProductionWIPEvent) Hooks() []ent.Hook {
 func (ProductionWIPEvent) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"production_wip_events_action_allowed":    "action IN ('INITIALIZE', 'SPLIT_BATCH', 'ASSIGN_EXECUTION', 'START_OPERATION', 'COMPLETE_OPERATION', 'WIP_TRANSFER', 'OUTSOURCE_RETURN', 'REWORK', 'CANCEL')",
+			"production_wip_events_action_allowed":    "action IN ('SPLIT_BATCH', 'ASSIGN_EXECUTION', 'START_OPERATION', 'COMPLETE_OPERATION', 'WIP_TRANSFER', 'OUTSOURCE_RETURN', 'REWORK', 'CANCEL')",
 			"production_wip_events_status_allowed":    "((from_status IS NULL OR from_status IN ('PLANNED', 'SPLIT', 'IN_PROGRESS', 'OUTSOURCED', 'WAITING_QUALITY', 'ACCEPTED', 'REJECTED', 'CANCELLED')) AND (to_status IN ('PLANNED', 'SPLIT', 'IN_PROGRESS', 'OUTSOURCED', 'WAITING_QUALITY', 'ACCEPTED', 'REJECTED', 'CANCELLED')))",
 			"production_wip_events_version_positive":  "batch_version > 0",
 			"production_wip_events_quantity_positive": "quantity > 0",

@@ -60,20 +60,6 @@ func (_c *OutsourcingOrderCreate) SetNillableSourceOrderNo(v *string) *Outsourci
 	return _c
 }
 
-// SetSourceSalesOrderID sets the "source_sales_order_id" field.
-func (_c *OutsourcingOrderCreate) SetSourceSalesOrderID(v int) *OutsourcingOrderCreate {
-	_c.mutation.SetSourceSalesOrderID(v)
-	return _c
-}
-
-// SetNillableSourceSalesOrderID sets the "source_sales_order_id" field if the given value is not nil.
-func (_c *OutsourcingOrderCreate) SetNillableSourceSalesOrderID(v *int) *OutsourcingOrderCreate {
-	if v != nil {
-		_c.SetSourceSalesOrderID(*v)
-	}
-	return _c
-}
-
 // SetOrderDate sets the "order_date" field.
 func (_c *OutsourcingOrderCreate) SetOrderDate(v time.Time) *OutsourcingOrderCreate {
 	_c.mutation.SetOrderDate(v)
@@ -260,11 +246,6 @@ func (_c *OutsourcingOrderCreate) check() error {
 			return &ValidationError{Name: "source_order_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_order_no": %w`, err)}
 		}
 	}
-	if v, ok := _c.mutation.SourceSalesOrderID(); ok {
-		if err := outsourcingorder.SourceSalesOrderIDValidator(v); err != nil {
-			return &ValidationError{Name: "source_sales_order_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_sales_order_id": %w`, err)}
-		}
-	}
 	if _, ok := _c.mutation.OrderDate(); !ok {
 		return &ValidationError{Name: "order_date", err: errors.New(`ent: missing required field "OutsourcingOrder.order_date"`)}
 	}
@@ -339,10 +320,6 @@ func (_c *OutsourcingOrderCreate) createSpec() (*OutsourcingOrder, *sqlgraph.Cre
 	if value, ok := _c.mutation.SourceOrderNo(); ok {
 		_spec.SetField(outsourcingorder.FieldSourceOrderNo, field.TypeString, value)
 		_node.SourceOrderNo = &value
-	}
-	if value, ok := _c.mutation.SourceSalesOrderID(); ok {
-		_spec.SetField(outsourcingorder.FieldSourceSalesOrderID, field.TypeInt, value)
-		_node.SourceSalesOrderID = &value
 	}
 	if value, ok := _c.mutation.OrderDate(); ok {
 		_spec.SetField(outsourcingorder.FieldOrderDate, field.TypeTime, value)

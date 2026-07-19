@@ -6,6 +6,7 @@ import {
   validatePurchaseReceiptDraft,
   validatePurchaseReceiptItem,
 } from '../utils/purchaseReceiptMutation.mjs'
+import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const purchaseRpc = new JsonRpc({
   url: 'purchase',
@@ -26,17 +27,16 @@ export async function listPurchaseReceipts(params = {}, options = {}) {
   return dataOf(result)
 }
 
-export async function createPurchaseReceiptDraft(params = {}) {
-  const result = await purchaseRpc.call('create_purchase_receipt_draft', params)
-  return dataOf(result)?.purchase_receipt || null
-}
-
-export async function createPurchaseReceiptWithItems(params = {}) {
-  const result = await purchaseRpc.call(
-    'create_purchase_receipt_with_items',
-    params
+export async function listAllPurchaseReceipts(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listPurchaseReceipts,
+    params,
+    'purchase_receipts',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的采购入库记录不完整，请刷新后重试',
+    }
   )
-  return dataOf(result)?.purchase_receipt || null
 }
 
 export async function createPurchaseReceiptFromPurchaseOrder(params = {}) {
@@ -61,8 +61,8 @@ export async function addPurchaseReceiptItem(params = {}) {
   })
 }
 
-export async function getPurchaseReceipt(params = {}) {
-  const result = await purchaseRpc.call('get_purchase_receipt', params)
+export async function getPurchaseReceipt(params = {}, options = {}) {
+  const result = await purchaseRpc.call('get_purchase_receipt', params, options)
   return dataOf(result)?.purchase_receipt || null
 }
 
@@ -108,6 +108,18 @@ export async function listPurchaseReturns(params = {}, options = {}) {
   return dataOf(result)
 }
 
+export async function listAllPurchaseReturns(params = {}, options = {}) {
+  return listAllPaginatedRecords(
+    listPurchaseReturns,
+    params,
+    'purchase_returns',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的采购退货记录不完整，请刷新后重试',
+    }
+  )
+}
+
 export async function postPurchaseReturn(params = {}) {
   const result = await purchaseRpc.call('post_purchase_return', params)
   return dataOf(result)?.purchase_return || null
@@ -145,6 +157,21 @@ export async function listPurchaseReceiptAdjustments(
     options
   )
   return dataOf(result)
+}
+
+export async function listAllPurchaseReceiptAdjustments(
+  params = {},
+  options = {}
+) {
+  return listAllPaginatedRecords(
+    listPurchaseReceiptAdjustments,
+    params,
+    'purchase_receipt_adjustments',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的采购入库调整记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function postPurchaseReceiptAdjustment(params = {}) {

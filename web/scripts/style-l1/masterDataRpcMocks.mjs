@@ -1,4 +1,17 @@
-import { styleRpcResult, unsupportedRpcMethod } from './rpcMockResult.mjs'
+import {
+  stylePaginatedRpcData,
+  styleRpcResult,
+  unsupportedRpcMethod,
+} from './rpcMockResult.mjs'
+
+export function stylePaginatedMasterData(
+  records,
+  recordKey,
+  params = {},
+  defaultLimit = 100
+) {
+  return stylePaginatedRpcData(records, recordKey, params, defaultLimit)
+}
 
 export async function installMasterDataRpcMocks(page, context) {
   const { nowUnix } = context
@@ -186,65 +199,31 @@ export async function installMasterDataRpcMocks(page, context) {
     let data = {}
     switch (method) {
       case 'list_customers':
-        data = { customers: [customer], total: 1, limit: 100, offset: 0 }
+        data = stylePaginatedMasterData([customer], 'customers', params)
         break
       case 'list_suppliers':
-        data = { suppliers: [supplier], total: 1, limit: 100, offset: 0 }
+        data = stylePaginatedMasterData([supplier], 'suppliers', params)
         break
       case 'list_contacts_by_owner':
-        data = { contacts: [contact], total: 1, limit: 100, offset: 0 }
+        data = stylePaginatedMasterData([contact], 'contacts', params)
         break
       case 'list_products':
-        data = { products: [product], total: 1, limit: 100, offset: 0 }
+        data = stylePaginatedMasterData([product], 'products', params)
         break
       case 'list_product_skus':
-        {
-          const requestedLimit = Number(params.limit || 50)
-          const limit =
-            Number.isInteger(requestedLimit) &&
-            requestedLimit > 0 &&
-            requestedLimit <= 200
-              ? requestedLimit
-              : 50
-          const requestedOffset = Number(params.offset || 0)
-          const offset =
-            Number.isInteger(requestedOffset) && requestedOffset >= 0
-              ? requestedOffset
-              : 0
-          data = {
-            product_skus: productSKUs.slice(offset, offset + limit),
-            total: productSKUs.length,
-            limit,
-            offset,
-          }
-        }
+        data = stylePaginatedMasterData(productSKUs, 'product_skus', params, 50)
         break
       case 'list_processes':
-        data = {
-          processes,
-          total: processes.length,
-          limit: 100,
-          offset: 0,
-        }
+        data = stylePaginatedMasterData(processes, 'processes', params)
         break
       case 'list_materials':
-        data = {
-          materials,
-          total: materials.length,
-          limit: 100,
-          offset: 0,
-        }
+        data = stylePaginatedMasterData(materials, 'materials', params)
         break
       case 'list_units':
-        data = { units: [unit], total: 1, limit: 100, offset: 0 }
+        data = stylePaginatedMasterData([unit], 'units', params)
         break
       case 'list_warehouses':
-        data = {
-          warehouses: [warehouse],
-          total: 1,
-          limit: 100,
-          offset: 0,
-        }
+        data = stylePaginatedMasterData([warehouse], 'warehouses', params)
         break
       case 'create_customer':
       case 'update_customer':

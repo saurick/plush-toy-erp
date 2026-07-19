@@ -38,7 +38,7 @@ func purchaseReturnFromReceiptCreateFromParams(pm map[string]any) (*biz.Purchase
 		if !ok {
 			return nil, false
 		}
-		quantity, ok := getRequiredJSONRPCDecimal(itemMap, "quantity")
+		quantity, ok := getRequiredJSONRPCNumeric20Scale6(itemMap, "quantity")
 		if !ok {
 			return nil, false
 		}
@@ -66,7 +66,7 @@ func purchaseReturnFromQualityInspectionCreateFromParams(pm map[string]any) (*bi
 	if !ok {
 		return nil, false
 	}
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}
@@ -115,7 +115,7 @@ func purchaseReceiptAdjustmentFromReceiptCreateFromParams(pm map[string]any) (*b
 		if !ok {
 			return nil, false
 		}
-		quantity, ok := getRequiredJSONRPCDecimal(itemMap, "quantity")
+		quantity, ok := getRequiredJSONRPCNumeric20Scale6(itemMap, "quantity")
 		if !ok {
 			return nil, false
 		}

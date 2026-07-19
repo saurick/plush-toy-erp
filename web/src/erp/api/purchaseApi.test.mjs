@@ -16,8 +16,6 @@ test('purchaseApi: uses dedicated purchase JSON-RPC domain and admin auth', () =
 test('purchaseApi: exposes purchase receipt methods only', () => {
   for (const methodName of [
     'list_purchase_receipts',
-    'create_purchase_receipt_draft',
-    'create_purchase_receipt_with_items',
     'create_purchase_receipt_from_purchase_order',
     'add_purchase_receipt_item',
     'get_purchase_receipt',
@@ -36,6 +34,13 @@ test('purchaseApi: exposes purchase receipt methods only', () => {
     'cancel_purchase_receipt_adjustment',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
+  }
+
+  for (const retiredMethodName of [
+    'create_purchase_receipt_draft',
+    'create_purchase_receipt_with_items',
+  ]) {
+    assert.doesNotMatch(source, new RegExp(retiredMethodName))
   }
 
   for (const forbiddenActionName of [
@@ -63,4 +68,22 @@ test('purchaseApi: retry-safe writes require hidden keys and validate business r
     /createPurchaseReturnFromQualityInspection[\s\S]*?requirePurchaseReceiptIdempotencyKey\(params\.idempotency_key\)[\s\S]*?create_purchase_return_from_quality_inspection/u
   )
   assert.doesNotMatch(source, /idempotency_payload_hash/u)
+})
+
+test('purchaseApi: purchase-order inbound preview uses complete receipt pagination', () => {
+  assert.match(
+    source,
+    /export async function listAllPurchaseReceipts[\s\S]*?listAllPaginatedRecords\(\s*listPurchaseReceipts,\s*params,\s*'purchase_receipts'/u
+  )
+})
+
+test('purchaseApi: receipt reversal records use complete pagination', () => {
+  assert.match(
+    source,
+    /export async function listAllPurchaseReturns[\s\S]*?listAllPaginatedRecords\(\s*listPurchaseReturns,\s*params,\s*'purchase_returns'/u
+  )
+  assert.match(
+    source,
+    /export async function listAllPurchaseReceiptAdjustments[\s\S]*?listAllPaginatedRecords\(\s*listPurchaseReceiptAdjustments,\s*params,\s*'purchase_receipt_adjustments'/u
+  )
 })

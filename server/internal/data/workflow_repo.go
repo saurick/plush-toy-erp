@@ -140,6 +140,9 @@ func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.Workflo
 	} else if filter.OwnerRoleKey != "" {
 		query = query.Where(workflowtask.OwnerRoleKey(filter.OwnerRoleKey))
 	}
+	if filter.Keyword != "" {
+		query = query.Where(workflowTaskKeywordPredicate(filter.Keyword))
+	}
 	if filter.TaskStatusKey != "" {
 		query = query.Where(workflowtask.TaskStatusKey(filter.TaskStatusKey))
 	}
@@ -151,6 +154,12 @@ func (r *workflowRepo) ListWorkflowTasks(ctx context.Context, filter biz.Workflo
 	}
 	if filter.SourceID > 0 {
 		query = query.Where(workflowtask.SourceID(filter.SourceID))
+	}
+	if filter.DueFrom != nil {
+		query = query.Where(workflowtask.DueAtGTE(*filter.DueFrom))
+	}
+	if filter.DueTo != nil {
+		query = query.Where(workflowtask.DueAtLTE(*filter.DueTo))
 	}
 
 	total, err := query.Clone().Count(ctx)

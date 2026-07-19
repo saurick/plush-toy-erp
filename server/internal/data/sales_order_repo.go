@@ -6,12 +6,18 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/customer"
+	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionorder"
+	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productsku"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/unit"
 
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -329,22 +335,31 @@ func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, 
 		return nil, err
 	}
 	defer rollbackEntTx(ctx, tx, r.log)
-	affected, err := tx.SalesOrder.Update().
-		Where(salesorder.ID(id), salesorder.LifecycleStatusIn(allowedCurrent...)).
-		SetLifecycleStatus(biz.SalesOrderStatusCanceled).
-		Save(ctx)
-	if err != nil {
-		return nil, err
+	query := tx.SalesOrder.Query().Where(salesorder.ID(id))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
 	}
-	row, err := tx.SalesOrder.Get(ctx, id)
+	row, err := query.Only(ctx)
 	if err != nil {
 		if ent.IsNotFound(err) {
 			return nil, biz.ErrSalesOrderNotFound
 		}
 		return nil, err
 	}
-	if affected == 0 && row.LifecycleStatus != biz.SalesOrderStatusCanceled {
+	if row.LifecycleStatus == biz.SalesOrderStatusCanceled {
+		return entSalesOrderToBiz(row), nil
+	}
+	if !containsString(allowedCurrent, row.LifecycleStatus) {
 		return nil, biz.ErrBadParam
+	}
+	if err := validateSalesOrderCancellationDependencies(ctx, tx, id); err != nil {
+		return nil, err
+	}
+	row, err = tx.SalesOrder.UpdateOneID(id).
+		SetLifecycleStatus(biz.SalesOrderStatusCanceled).
+		Save(ctx)
+	if err != nil {
+		return nil, err
 	}
 	if err := markProcessDomainCommandEffectCompensatedWithClient(
 		ctx,
@@ -361,6 +376,63 @@ func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, 
 		return nil, err
 	}
 	return entSalesOrderToBiz(row), nil
+}
+
+func validateSalesOrderCancellationDependencies(ctx context.Context, tx *ent.Tx, salesOrderID int) error {
+	hasShipment, err := tx.Shipment.Query().Where(
+		shipment.SalesOrderID(salesOrderID),
+		shipment.StatusNEQ(biz.ShipmentStatusCancelled),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasShipment {
+		return biz.ErrSalesOrderCancellationShipmentDependency
+	}
+	hasReservation, err := tx.StockReservation.Query().Where(
+		stockreservation.SalesOrderID(salesOrderID),
+		stockreservation.Status(biz.StockReservationStatusActive),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasReservation {
+		return biz.ErrSalesOrderCancellationReservationDependency
+	}
+	hasProduction, err := tx.ProductionOrder.Query().Where(
+		productionorder.StatusNEQ(biz.ProductionOrderStatusCancelled),
+		productionorder.HasItemsWith(
+			productionorderitem.HasSalesOrderItemWith(salesorderitem.SalesOrderID(salesOrderID)),
+		),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasProduction {
+		return biz.ErrSalesOrderCancellationProductionDependency
+	}
+	hasActiveProcess, err := tx.ProcessInstance.Query().Where(
+		processinstance.ProcessKey(biz.ProcessKeySalesOrderAcceptance),
+		processinstance.BusinessRefType("sales_order"),
+		processinstance.BusinessRefID(salesOrderID),
+		processinstance.Status(biz.ProcessStatusActive),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasActiveProcess {
+		return biz.ErrSalesOrderCancellationProcessDependency
+	}
+	return nil
+}
+
+func containsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (r *salesOrderRepo) AddSalesOrderItem(ctx context.Context, in *biz.SalesOrderItemMutation) (*biz.SalesOrderItem, error) {

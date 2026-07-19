@@ -47,10 +47,16 @@ import BusinessRecordDetailsModal from '../components/business-list/BusinessReco
 import FinanceBusinessSourceModal from '../components/finance/FinanceBusinessSourceModal.jsx'
 import ProductionReworkModal from '../components/production-facts/ProductionReworkModal.jsx'
 import {
-  routeWithQuery,
-  searchParamPositiveIntText,
+  searchParamPositiveInt,
   searchParamText,
 } from '../utils/routeQuery.mjs'
+import {
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
 import {
   PRINT_WORKSPACE_ENTRY_SOURCE,
   PROCESSING_CONTRACT_TEMPLATE_KEY,
@@ -61,13 +67,14 @@ import { canConfirmFinanceFact } from '../utils/financeFactPermissions.mjs'
 import {
   createProductionReworkFromCompletion,
   createReconciliationFromFinanceFact,
-  listProductionFacts,
+  listAllProductionFacts,
 } from '../api/operationalFactApi.mjs'
 import {
   FINANCE_BUSINESS_SOURCE_ACTIONS,
   buildFinanceBusinessSourcePayload,
   financeBusinessSourceActionConfig,
   financeBusinessSourceFormValuesFromRequest,
+  hasValidFinanceTransitionSource,
   isOutsourcingReturnPayableSource,
   isSingleFactReconciliationSource,
 } from '../utils/financeBusinessSourceAction.mjs'
@@ -86,10 +93,12 @@ import {
   hasAnyPermission,
   selectedLabelForKey,
 } from '../components/operational-facts/OperationalFactForms.jsx'
+import { hasRequiredOperationalFactDraftSource } from '../utils/operationalFactDraftSource.mjs'
 import {
   businessRecordInventoryRouteFor,
   businessSourceRouteFor,
 } from '../utils/businessSourceNavigation.mjs'
+import { resolveOperationalFactRouteRecord } from '../utils/operationalFactRelatedNavigation.mjs'
 import {
   DEFAULT_OPERATIONAL_FACT_PAGINATION,
   DEFAULT_OPERATIONAL_FACT_SUMMARY,
@@ -151,14 +160,29 @@ export function OperationalFactWorkspace({
   )
   const productionReworkInFlightRef = useRef(false)
   const productionReworkRequestRef = useRef(0)
-  const routeSalesOrderID = searchParamPositiveIntText(
+  const routeSalesOrderID = searchParamPositiveInt(
     searchParams,
     'sales_order_id'
   )
-  const routeSourceID = searchParamPositiveIntText(searchParams, 'source_id')
+  const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
   const routeSourceType = searchParamText(searchParams, 'source_type')
-  const routeFactID = searchParamPositiveIntText(searchParams, 'fact_id')
+  const routeFactID = searchParamPositiveInt(searchParams, 'fact_id')
   const routeView = searchParamText(searchParams, 'view')
+  const linkedContext = linkedDocumentContext(searchParams)
+  const linkedKeyword = linkedContext.keyword
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
+  )
 
   const baseConfigs = useMemo(() => buildOperationalFactViewConfigs(), [])
 
@@ -219,6 +243,27 @@ export function OperationalFactWorkspace({
   )
   const activeTotal = totalByKey[currentActiveKey] || 0
   const activeSelectedRow = selectedByKey[currentActiveKey] || null
+  const resolvedRouteRecord = useMemo(
+    () =>
+      resolveOperationalFactRouteRecord(activeRows, {
+        activeKey: currentActiveKey,
+        factID: routeFactID,
+        sourceType: routeSourceType,
+        sourceID: routeSourceID,
+        total: activeTotal,
+      }),
+    [
+      activeRows,
+      currentActiveKey,
+      routeFactID,
+      routeSourceID,
+      routeSourceType,
+      activeTotal,
+    ]
+  )
+  const resolvedRouteKeyword = String(
+    resolvedRouteRecord?.fact_no || resolvedRouteRecord?.shipment_no || ''
+  ).trim()
   const openOperationalFactDetails = useCallback(
     (record) => {
       if (!record?.id) return
@@ -284,9 +329,6 @@ export function OperationalFactWorkspace({
 
   const routeListParamsForKey = useCallback(
     (key) => {
-      if (key === 'production' && routeFactID) {
-        return { keyword: routeFactID }
-      }
       if (['shipments', 'reservations'].includes(key) && routeSalesOrderID) {
         return { source_id: routeSalesOrderID }
       }
@@ -308,7 +350,7 @@ export function OperationalFactWorkspace({
       }
       return {}
     },
-    [routeFactID, routeSalesOrderID, routeSourceID, routeSourceType]
+    [routeSalesOrderID, routeSourceID, routeSourceType]
   )
 
   const loadRows = useCallback(
@@ -335,21 +377,43 @@ export function OperationalFactWorkspace({
       setLoading(true)
       try {
         const pagination = paginationByKey[key] || activePagination
-        const data = await config.list(
-          compactParams({
-            status: statusFilter,
-            keyword: trimOptional(keyword),
-            date_field: dateFieldByKey[key] || config.defaultDateField,
-            date_from: dateRangeByKey[key]?.[0] || undefined,
-            date_to: dateRangeByKey[key]?.[1] || undefined,
-            ...(config.listParams || {}),
-            ...routeListParamsForKey(key),
-            ...getBusinessPaginationParams(pagination),
-          })
+        const exactRouteContext = Boolean(
+          routeFactID || routeSalesOrderID || (routeSourceType && routeSourceID)
         )
-        const nextRows = Array.isArray(data?.[config.listKey])
+        const exactProductionFactID =
+          key === 'production' ? Number(routeFactID || 0) : 0
+        const data =
+          exactProductionFactID > 0
+            ? await listAllProductionFacts({
+                keyword: String(exactProductionFactID),
+              })
+            : await config.list(
+                compactParams({
+                  status: statusFilter,
+                  keyword: trimOptional(
+                    linkedDocumentRequestKeyword({
+                      localKeyword: keyword,
+                      linkedKeyword,
+                      hasExactContext: exactRouteContext,
+                    })
+                  ),
+                  date_field: dateFieldByKey[key] || config.defaultDateField,
+                  date_from: dateRangeByKey[key]?.[0] || undefined,
+                  date_to: dateRangeByKey[key]?.[1] || undefined,
+                  ...(config.listParams || {}),
+                  ...routeListParamsForKey(key),
+                  ...getBusinessPaginationParams(pagination),
+                })
+              )
+        const listedRows = Array.isArray(data?.[config.listKey])
           ? data[config.listKey]
           : []
+        const nextRows =
+          exactProductionFactID > 0
+            ? listedRows.filter(
+                (item) => Number(item?.id || 0) === exactProductionFactID
+              )
+            : listedRows
         if (!shouldApplyRequest()) {
           return
         }
@@ -358,13 +422,24 @@ export function OperationalFactWorkspace({
           [key]: nextRows,
         }))
         setSelectedByKey((prev) => {
-          const routeSelectedID =
-            key === 'production' ? Number(routeFactID || 0) : 0
-          if (routeSelectedID > 0) {
+          const routeRecord = resolveOperationalFactRouteRecord(nextRows, {
+            activeKey: key,
+            factID: routeFactID,
+            sourceType: routeSourceType,
+            sourceID: routeSourceID,
+            total:
+              exactProductionFactID > 0
+                ? nextRows.length
+                : Number(data?.total || 0),
+          })
+          const hasRouteSelection = Boolean(
+            (key === 'production' && routeFactID) ||
+              (key === 'finance' && routeSourceType && routeSourceID)
+          )
+          if (hasRouteSelection) {
             return {
               ...prev,
-              [key]:
-                nextRows.find((item) => item.id === routeSelectedID) || null,
+              [key]: routeRecord,
             }
           }
           const current = prev[key]
@@ -375,7 +450,13 @@ export function OperationalFactWorkspace({
             [key]: refreshed || current,
           }
         })
-        setTotalByKey((prev) => ({ ...prev, [key]: Number(data?.total || 0) }))
+        setTotalByKey((prev) => ({
+          ...prev,
+          [key]:
+            exactProductionFactID > 0
+              ? nextRows.length
+              : Number(data?.total || 0),
+        }))
       } catch (error) {
         if (shouldApplyRequest()) {
           message.error(getActionErrorMessage(error, `加载${config.title}`))
@@ -394,9 +475,13 @@ export function OperationalFactWorkspace({
       dateFieldByKey,
       dateRangeByKey,
       keyword,
+      linkedKeyword,
       paginationByKey,
       routeFactID,
       routeListParamsForKey,
+      routeSalesOrderID,
+      routeSourceID,
+      routeSourceType,
       statusFilter,
     ]
   )
@@ -468,11 +553,9 @@ export function OperationalFactWorkspace({
     productionReworkRequestRef.current = requestID
     setProductionReworkLoading(true)
     try {
-      const data = await listProductionFacts({
+      const data = await listAllProductionFacts({
         source_type: 'PRODUCTION_FACT',
         source_id: source.id,
-        limit: 500,
-        offset: 0,
       })
       if (productionReworkRequestRef.current !== requestID) return
       const facts = Array.isArray(data?.production_facts)
@@ -534,11 +617,9 @@ export function OperationalFactWorkspace({
         }
         let currentFacts = []
         try {
-          const data = await listProductionFacts({
+          const data = await listAllProductionFacts({
             source_type: 'PRODUCTION_FACT',
             source_id: source.id,
-            limit: 500,
-            offset: 0,
           })
           currentFacts = Array.isArray(data?.production_facts)
             ? data.production_facts
@@ -565,7 +646,7 @@ export function OperationalFactWorkspace({
           ? '已重新读取并确认返工草稿，请核对后过账'
           : '返工草稿已生成，请核对后过账'
       )
-      await loadRows('production')
+      resetPaginationForKey('production')
     } finally {
       productionReworkInFlightRef.current = false
       setProductionReworkLoading(false)
@@ -586,7 +667,7 @@ export function OperationalFactWorkspace({
       activeConfig,
       activeSelectedRow,
       'cancel',
-      '取消',
+      activeSelectedRow?.status === 'DRAFT' ? '作废财务草稿' : '取消财务记录',
       { reason }
     )
     if (succeeded) {
@@ -638,7 +719,7 @@ export function OperationalFactWorkspace({
       financeSourceAttemptsRef.current.settle(scope, attempt, null)
       setFinanceSourceContext(null)
       message.success(config.successMessage)
-      await loadRows(currentActiveKey)
+      resetPaginationForKey(currentActiveKey)
     } catch (error) {
       const retained = financeSourceAttemptsRef.current.settle(
         scope,
@@ -659,12 +740,17 @@ export function OperationalFactWorkspace({
   }
 
   const viewOutsourcingPayable = (fact) => {
-    if (!fact?.id) return
+    if (!fact?.id || !canOpenRelatedPath(V1_ROUTE_PATHS.payables)) return
     navigate(
-      routeWithQuery(V1_ROUTE_PATHS.payables, {
-        source_type: 'OUTSOURCING_FACT',
-        source_id: fact.id,
-      })
+      relatedDocumentRoute(
+        V1_ROUTE_PATHS.payables,
+        { source_type: 'OUTSOURCING_FACT', source_id: fact.id },
+        {
+          keyword: fact.fact_no,
+          source: 'outsourcing-fact',
+          fields: ['source_no'],
+        }
+      )
     )
   }
 
@@ -711,10 +797,20 @@ export function OperationalFactWorkspace({
     currentActiveKey === 'finance'
       ? canConfirmFinanceFact(adminProfile, activeSelectedRow?.fact_type)
       : false
-  const canViewOutsourcingPayable = hasActionPermission(
-    adminProfile,
-    'finance.payable.read'
-  )
+  const financeDraftTransitionBlocked =
+    currentActiveKey === 'finance' &&
+    activeSelectedRow?.status === 'DRAFT' &&
+    !hasValidFinanceTransitionSource(activeSelectedRow)
+  const sourceBoundDraftTransitionBlocked =
+    ['production', 'outsourcing'].includes(currentActiveKey) &&
+    activeSelectedRow?.status === 'DRAFT' &&
+    !hasRequiredOperationalFactDraftSource(
+      currentActiveKey,
+      activeSelectedRow
+    )
+  const canViewOutsourcingPayable =
+    hasActionPermission(adminProfile, 'finance.payable.read') &&
+    canOpenRelatedPath(V1_ROUTE_PATHS.payables)
   const canCreateSingleReconciliation = hasActionPermission(
     adminProfile,
     'finance.reconciliation.confirm'
@@ -764,33 +860,62 @@ export function OperationalFactWorkspace({
       buildOperationalFactRelatedMenuItems({
         activeKey: currentActiveKey,
         activeSelectedRow,
+        canOpenPath: canOpenRelatedPath,
       }),
-    [currentActiveKey, activeSelectedRow]
+    [activeSelectedRow, canOpenRelatedPath, currentActiveKey]
   )
 
   const openRelatedTable = ({ key }) => {
     if (!activeSelectedRow) return
     const pathByKey = {
-      'sales-order': routeWithQuery(V1_ROUTE_PATHS.salesOrders, {
-        sales_order_id: activeSelectedRow.sales_order_id,
-      }),
+      'sales-order': relatedDocumentRoute(
+        V1_ROUTE_PATHS.salesOrders,
+        { sales_order_id: activeSelectedRow.sales_order_id },
+        {
+          keyword: activeSelectedRow.sales_order_no,
+          source: 'operational-fact',
+          fields: ['sales_order_no'],
+        }
+      ),
       inventory: businessRecordInventoryRouteFor(
         currentActiveKey,
-        activeSelectedRow.id
+        activeSelectedRow.id,
+        {
+          keyword:
+            activeSelectedRow.fact_no || activeSelectedRow.shipment_no || '',
+          source: 'operational-fact',
+        }
       ),
-      receivables: routeWithQuery(V1_ROUTE_PATHS.receivables, {
-        source_type: 'SHIPMENT',
-        source_id: activeSelectedRow.id,
-      }),
-      invoices: routeWithQuery(V1_ROUTE_PATHS.invoices, {
-        source_type: 'SHIPMENT',
-        source_id: activeSelectedRow.id,
-      }),
+      receivables: relatedDocumentRoute(
+        V1_ROUTE_PATHS.receivables,
+        { source_type: 'SHIPMENT', source_id: activeSelectedRow.id },
+        {
+          keyword: activeSelectedRow.shipment_no,
+          source: 'operational-fact',
+          fields: ['source_no'],
+        }
+      ),
+      invoices: relatedDocumentRoute(
+        V1_ROUTE_PATHS.invoices,
+        { source_type: 'SHIPMENT', source_id: activeSelectedRow.id },
+        {
+          keyword: activeSelectedRow.shipment_no,
+          source: 'operational-fact',
+          fields: ['source_no'],
+        }
+      ),
     }
     if (key === 'source') {
       const targetPath = businessSourceRouteFor(
         activeSelectedRow.source_type,
-        activeSelectedRow.source_id
+        activeSelectedRow.source_id,
+        {
+          keyword: activeSelectedRow.source_no,
+          source:
+            currentActiveKey === 'finance'
+              ? 'finance-fact'
+              : 'operational-fact',
+        }
       )
       if (targetPath) navigate(targetPath)
       return
@@ -802,7 +927,7 @@ export function OperationalFactWorkspace({
   }
   const clearRouteContext = useCallback(
     (keys) => {
-      const nextParams = new URLSearchParams(searchParams)
+      const nextParams = clearLinkedDocumentParams(searchParams)
       const keysToDelete =
         Array.isArray(keys) && keys.length > 0
           ? keys
@@ -821,7 +946,8 @@ export function OperationalFactWorkspace({
       routeSalesOrderID ||
       routeSourceType ||
       routeSourceID ||
-      routeFactID
+      routeFactID ||
+      linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -875,10 +1001,19 @@ export function OperationalFactWorkspace({
         filters={
           <>
             <SearchInput
-              value={keyword}
+              value={resolvedRouteKeyword || linkedKeyword || keyword}
               placeholder="搜索单号"
               searchHint="可搜索：单号、来源、备注"
               onChange={(event) => {
+                if (
+                  resolvedRouteKeyword ||
+                  linkedKeyword ||
+                  routeFactID ||
+                  routeSalesOrderID ||
+                  (routeSourceType && routeSourceID)
+                ) {
+                  clearRouteContext()
+                }
                 setKeyword(event.target.value)
                 resetPaginationForKey()
               }}
@@ -1017,9 +1152,15 @@ export function OperationalFactWorkspace({
                 size="small"
                 type="primary"
                 icon={<CheckCircleOutlined />}
+                title={
+                  sourceBoundDraftTransitionBlocked
+                    ? '该历史草稿缺少可核对来源，不能过账或作废'
+                    : undefined
+                }
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'DRAFT' ||
+                  sourceBoundDraftTransitionBlocked ||
                   !canPostActive ||
                   saving
                 }
@@ -1055,9 +1196,15 @@ export function OperationalFactWorkspace({
                 size="small"
                 type="primary"
                 icon={<CheckCircleOutlined />}
+                title={
+                  financeDraftTransitionBlocked
+                    ? '该历史草稿缺少可核对来源，不能确认或作废'
+                    : undefined
+                }
                 disabled={
                   !activeSelectedRow ||
                   activeSelectedRow.status !== 'DRAFT' ||
+                  financeDraftTransitionBlocked ||
                   !canFinanceAction ||
                   saving
                 }
@@ -1086,9 +1233,15 @@ export function OperationalFactWorkspace({
               size="small"
               danger
               icon={<CloseCircleOutlined />}
+              title={
+                financeDraftTransitionBlocked
+                  ? '该历史草稿缺少可核对来源，不能确认或作废'
+                  : undefined
+              }
               disabled={
                 !activeSelectedRow ||
-                activeSelectedRow.status !== 'POSTED' ||
+                !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                financeDraftTransitionBlocked ||
                 !canFinanceAction ||
                 saving
               }
@@ -1097,7 +1250,7 @@ export function OperationalFactWorkspace({
                 setFinanceCancelOpen(true)
               }}
             >
-              取消
+              {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
             </Button>
           ) : null}
           {currentActiveKey === 'outsourcing' ? (
@@ -1214,9 +1367,18 @@ export function OperationalFactWorkspace({
           ) : null}
           {['production', 'outsourcing'].includes(currentActiveKey) ? (
             <Popconfirm
-              title="确认取消并按系统规则生成撤销调整记录？"
+              title={
+                activeSelectedRow?.status === 'DRAFT'
+                  ? '确认作废草稿？草稿尚未过账，不会变更库存。'
+                  : '确认取消并按系统规则生成撤销调整记录？'
+              }
               onConfirm={() =>
-                runRowAction(activeConfig, activeSelectedRow, 'cancel', '取消')
+                runRowAction(
+                  activeConfig,
+                  activeSelectedRow,
+                  'cancel',
+                  activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'
+                )
               }
               okText="确认"
               cancelText="取消"
@@ -1225,26 +1387,38 @@ export function OperationalFactWorkspace({
                 size="small"
                 danger
                 icon={<CloseCircleOutlined />}
+                title={
+                  sourceBoundDraftTransitionBlocked
+                    ? '该历史草稿缺少可核对来源，不能过账或作废'
+                    : undefined
+                }
                 disabled={
                   !activeSelectedRow ||
-                  activeSelectedRow.status !== 'POSTED' ||
+                  !['DRAFT', 'POSTED'].includes(activeSelectedRow.status) ||
+                  sourceBoundDraftTransitionBlocked ||
                   !canCancelActive ||
                   saving
                 }
               >
-                取消
+                {activeSelectedRow?.status === 'DRAFT' ? '作废草稿' : '取消'}
               </Button>
             </Popconfirm>
           ) : null}
           {currentActiveKey === 'shipments' ? (
             <Popconfirm
-              title="确认取消出库并恢复相应库存？"
+              title={
+                activeSelectedRow?.status === 'DRAFT'
+                  ? '确认作废出货草稿？草稿尚未出库，不会变更库存。'
+                  : '确认取消出库并恢复相应库存？'
+              }
               onConfirm={() =>
                 runRowAction(
                   activeConfig,
                   activeSelectedRow,
                   'cancel',
-                  '取消发货'
+                  activeSelectedRow?.status === 'DRAFT'
+                    ? '作废出货草稿'
+                    : '取消发货'
                 )
               }
               okText="确认"
@@ -1256,12 +1430,14 @@ export function OperationalFactWorkspace({
                 icon={<CloseCircleOutlined />}
                 disabled={
                   !activeSelectedRow ||
-                  activeSelectedRow.status !== 'SHIPPED' ||
+                  !['DRAFT', 'SHIPPED'].includes(activeSelectedRow.status) ||
                   !canCancelActive ||
                   saving
                 }
               >
-                取消发货
+                {activeSelectedRow?.status === 'DRAFT'
+                  ? '作废草稿'
+                  : '取消发货'}
               </Button>
             </Popconfirm>
           ) : null}
@@ -1344,7 +1520,11 @@ export function OperationalFactWorkspace({
         onSubmit={submitProductionRework}
       />
       <Modal
-        title="取消财务记录"
+        title={
+          activeSelectedRow?.status === 'DRAFT'
+            ? '作废财务草稿'
+            : '取消财务记录'
+        }
         open={financeCancelOpen}
         okText="确认取消"
         cancelText="暂不取消"
@@ -1357,7 +1537,11 @@ export function OperationalFactWorkspace({
           }
         }}
       >
-        <p>取消后将保留原过账时间，并记录本次操作人、时间和原因。</p>
+        <p>
+          {activeSelectedRow?.status === 'DRAFT'
+            ? '草稿尚未确认，作废不会生成过账或库存变更；系统会记录操作人、时间和原因。'
+            : '取消后将保留原过账时间，并记录本次操作人、时间和原因。'}
+        </p>
         <Input.TextArea
           value={financeCancelReason}
           maxLength={255}

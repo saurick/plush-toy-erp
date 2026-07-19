@@ -3,6 +3,7 @@ export const PRODUCTION_WIP_ROUTE_CODE = 'PLUSH_SEW_HAND_V1'
 export const PRODUCTION_WIP_ACTION = Object.freeze({
   SPLIT_BATCH: 'SPLIT_BATCH',
   ASSIGN_EXECUTION: 'ASSIGN_EXECUTION',
+  CANCEL_BATCH: 'CANCEL_BATCH',
   START_OPERATION: 'START_OPERATION',
   COMPLETE_OPERATION: 'COMPLETE_OPERATION',
   RECEIVE_OUTSOURCING_RETURN: 'RECEIVE_OUTSOURCING_RETURN',
@@ -913,6 +914,14 @@ export function buildProductionWipActionParams(action, values = {}) {
     case PRODUCTION_WIP_ACTION.COMPLETE_OPERATION:
     case PRODUCTION_WIP_ACTION.RECEIVE_OUTSOURCING_RETURN:
       requireBatch()
+      break
+    case PRODUCTION_WIP_ACTION.CANCEL_BATCH:
+      requireBatch()
+      params.reason = requireActionText(
+        values.reason,
+        '取消原因',
+        MAX_REASON_LENGTH
+      )
       break
     case PRODUCTION_WIP_ACTION.TRANSFER_TO_NEXT_OPERATION:
       requireBatch()

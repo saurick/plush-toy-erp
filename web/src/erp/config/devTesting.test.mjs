@@ -6,6 +6,9 @@ import { fileURLToPath } from 'node:url'
 
 import {
   DEV_TESTING_COPY_PRESETS,
+  DEV_TESTING_COVERAGE_API_PATH,
+  DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+  DEV_TESTING_COVERAGE_WRITE_COMMAND,
   DEV_TESTING_CURRENT_DOC_PATHS,
   DEV_TESTING_ROUTE,
   DEV_TESTING_STRATEGY_SOURCE_PATH,
@@ -14,8 +17,11 @@ import {
   buildDevTestingSummary,
   extractDevTestingCommandBlocks,
   filterDevTestingDocs,
+  formatDevTestingCoverageMetric,
   getDevTestingCategoryOptions,
+  getDevTestingCoverageStatusMeta,
   isDevTestingEnabled,
+  normalizeDevTestingCoverageEnvelope,
   parseDevTestingStrategyTiers,
   resolveDevTestingSelectedDoc,
 } from './devTesting.mjs'
@@ -144,6 +150,15 @@ test('devTesting: 只通过开发态独立路径暴露', () => {
   assert.equal(isDevTestingEnabled({ DEV: true }), true)
   assert.equal(isDevTestingEnabled({ DEV: false }), false)
   assert(!DEV_TESTING_ROUTE.startsWith('/erp/'))
+  assert.equal(DEV_TESTING_COVERAGE_API_PATH, '/__dev/api/qa/coverage')
+  assert.equal(
+    DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+    'plush-test-coverage-report/v1'
+  )
+  assert.equal(
+    DEV_TESTING_COVERAGE_WRITE_COMMAND,
+    'node scripts/qa/test-coverage-report.mjs --write'
+  )
 })
 
 test('devTesting: 解析测试策略分层表和命令', () => {
@@ -943,4 +958,378 @@ test('devTesting: 支持分类和关键词筛选并汇总', () => {
     ),
     ['docs/product/自动化测试策略.md']
   )
+})
+
+test('devTesting: 覆盖报告分层归一化且不合并为全系统百分比', () => {
+  const result = normalizeDevTestingCoverageEnvelope({
+    status: 'current',
+    report: {
+      schemaVersion: DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+      generatedAt: '2026-07-19T01:02:03.000Z',
+      repository: {
+        commit: 'abcdef1234567890abcdef1234567890abcdef12',
+        dirty: false,
+        fingerprint:
+          '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+      },
+      codeCoverage: {
+        go: {
+          status: 'collected',
+          metrics: { statements: { covered: 91, total: 100 } },
+          evidence: ['output/qa/coverage/go.json'],
+        },
+        web: {
+          status: 'collected',
+          metrics: {
+            lines: { pct: 92.4 },
+            branches: { percentage: 86 },
+            functions: { covered: 47, total: 50 },
+          },
+        },
+      },
+      businessCoverage: {
+        status: 'partial',
+        domains: [
+          {
+            key: 'finance',
+            label: '财务',
+            status: 'passed',
+            total: 12,
+            passed: 12,
+          },
+        ],
+      },
+      gates: [
+        {
+          key: 'T0',
+          label: 'T0 静态检查',
+          status: 'passed',
+          executed: 3,
+          passed: 3,
+        },
+      ],
+      acceptance: {
+        postgres: { status: 'passed', executed: 2, passed: 2 },
+        browser: { status: 'stale', note: '绑定旧 commit' },
+        readiness: { status: 'blocked', note: '缺少专用数据库' },
+        targetEnvironment: { status: 'missing' },
+        uat: { status: 'not_collected' },
+      },
+      policy: {
+        businessContracts: { note: '适用业务合同与关键场景目标 100%' },
+        changedBusinessLogic: {
+          note: '新增或修改关键业务逻辑 lines / statements >= 90%、branches >= 85%',
+        },
+        repositoryBaseline: '基线未建立前只采集趋势，不设硬 gate',
+        requiredGates: '本轮 required gates 要求 100% executed + passed',
+        runtimeAcceptance:
+          '本轮承诺的 PostgreSQL、浏览器、readiness、目标环境和 UAT 分别要求 100%',
+      },
+    },
+  })
+
+  assert.equal(result.status, 'current')
+  assert.equal(
+    result.report.repository.commit,
+    'abcdef1234567890abcdef1234567890abcdef12'
+  )
+  assert.equal(result.report.codeCoverage.go.status, 'collected')
+  assert.equal(result.report.codeCoverage.web.status, 'collected')
+  assert.equal(
+    formatDevTestingCoverageMetric(
+      result.report.codeCoverage.go.metrics.statements
+    ),
+    '91/100 · 91%'
+  )
+  assert.equal(
+    formatDevTestingCoverageMetric(
+      result.report.codeCoverage.web.metrics.lines
+    ),
+    '92.4%'
+  )
+  assert.equal(result.report.businessCoverage.status, 'partial')
+  assert.equal(result.report.businessCoverage.domains[0].status, 'passed')
+  assert.equal(result.report.gates[0].status, 'passed')
+  assert.equal(result.report.acceptance.browser.status, 'stale')
+  assert.equal(result.report.acceptance.readiness.status, 'blocked')
+  assert.equal(result.report.acceptance.targetEnvironment.status, 'missing')
+  assert.equal(result.report.policy.length, 5)
+  assert.equal(result.report.policy[4].label, '运行态与验收')
+  assert.equal(result.report.totalPercentage, undefined)
+})
+
+test('devTesting: 未采集、跳过、受阻和零执行不能归一化为通过', () => {
+  const result = normalizeDevTestingCoverageEnvelope({
+    status: 'stale',
+    report: {
+      schemaVersion: DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+      codeCoverage: {},
+      businessCoverage: {
+        status: 'passed',
+        domains: [
+          { key: 'zero', status: 'passed', total: 0, passed: 0 },
+          {
+            key: 'skip',
+            status: 'passed',
+            total: 1,
+            passed: 0,
+            skipped: 1,
+          },
+          {
+            key: 'blocked',
+            status: 'passed',
+            total: 1,
+            passed: 0,
+            blocked: 1,
+          },
+        ],
+      },
+      gates: [{ key: 'T5', status: 'passed', executed: 0 }],
+      acceptance: {},
+    },
+  })
+
+  assert.equal(result.status, 'stale')
+  assert.equal(result.report.codeCoverage.go.status, 'not_collected')
+  assert.equal(
+    formatDevTestingCoverageMetric(
+      result.report.codeCoverage.web.metrics.branches
+    ),
+    '未采集'
+  )
+  assert.deepEqual(
+    result.report.businessCoverage.domains.map((item) => item.status),
+    ['not_collected', 'skipped', 'blocked']
+  )
+  assert.equal(result.report.gates[0].status, 'not_collected')
+  assert.equal(result.report.acceptance.postgres.status, 'not_collected')
+  assert.deepEqual(result.report.policy, [])
+})
+
+test('devTesting: passed 必须有正执行数，旧状态别名不升级为通过', () => {
+  const result = normalizeDevTestingCoverageEnvelope({
+    status: 'current',
+    report: {
+      schemaVersion: DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+      codeCoverage: {},
+      businessCoverage: {
+        domains: [
+          { key: 'missing-counts', status: 'passed' },
+          { key: 'legacy-success', status: 'success', executed: 2, passed: 2 },
+          { key: 'wrong-case', status: 'PASSED', executed: 2, passed: 2 },
+          {
+            key: 'missing-evidence',
+            status: 'passed',
+            requiredCount: 3,
+            passed: 2,
+            missingCases: 1,
+          },
+          {
+            key: 'canonical-pass',
+            status: 'passed',
+            applicableCount: 2,
+            passed: 2,
+          },
+          {
+            key: 'partial-pass-count',
+            status: 'passed',
+            executed: 2,
+            passed: 1,
+          },
+          {
+            key: 'required-gap',
+            status: 'passed',
+            total: 3,
+            executed: 2,
+            passed: 2,
+          },
+          {
+            key: 'passed-over-executed',
+            status: 'passed',
+            executed: 2,
+            passed: 3,
+          },
+          {
+            key: 'fractional-counts',
+            status: 'passed',
+            executed: 1.5,
+            passed: 1.5,
+          },
+          {
+            key: 'executed-over-total',
+            status: 'passed',
+            total: 1,
+            executed: 2,
+            passed: 2,
+          },
+        ],
+      },
+      gates: [],
+      acceptance: {},
+    },
+  })
+
+  assert.deepEqual(
+    result.report.businessCoverage.domains.map((item) => item.status),
+    [
+      'not_collected',
+      'not_collected',
+      'not_collected',
+      'partial',
+      'passed',
+      'partial',
+      'partial',
+      'failed',
+      'not_collected',
+      'failed',
+    ]
+  )
+  assert.equal(result.report.businessCoverage.domains[3].counts.total, 3)
+  assert.equal(result.report.businessCoverage.domains[3].counts.missing, 1)
+  assert.equal(result.report.businessCoverage.domains[4].counts.total, 2)
+  assert.notEqual(result.report.businessCoverage.domains[5].status, 'passed')
+  assert.notEqual(result.report.businessCoverage.domains[6].status, 'passed')
+  assert.notEqual(result.report.businessCoverage.domains[7].status, 'passed')
+  assert.equal(result.report.businessCoverage.domains[8].counts.executed, null)
+  assert.equal(result.report.businessCoverage.domains[8].counts.passed, null)
+  assert.equal(
+    result.report.businessCoverage.domains[8].status,
+    'not_collected'
+  )
+  assert.equal(result.report.businessCoverage.domains[9].status, 'failed')
+  assert.equal(getDevTestingCoverageStatusMeta('collected').tone, 'primary')
+})
+
+test('devTesting: 越界百分比和非法 covered total 均视为未采集', () => {
+  const result = normalizeDevTestingCoverageEnvelope({
+    status: 'current',
+    report: {
+      schemaVersion: DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+      codeCoverage: {
+        go: {
+          status: 'collected',
+          metrics: { statements: { percentage: 100.1 } },
+        },
+        web: {
+          status: 'collected',
+          metrics: {
+            lines: { covered: 4, total: 0 },
+            branches: { covered: 9, total: 8 },
+            functions: { covered: 0, total: 10 },
+          },
+        },
+      },
+      businessCoverage: {},
+      gates: [],
+      acceptance: {},
+    },
+  })
+
+  assert.equal(result.report.codeCoverage.go.status, 'not_collected')
+  assert.equal(
+    result.report.codeCoverage.go.metrics.statements.collected,
+    false
+  )
+  assert.equal(result.report.codeCoverage.web.status, 'collected')
+  assert.equal(result.report.codeCoverage.web.metrics.lines.collected, false)
+  assert.equal(result.report.codeCoverage.web.metrics.branches.collected, false)
+  assert.equal(
+    formatDevTestingCoverageMetric(
+      result.report.codeCoverage.web.metrics.functions
+    ),
+    '0/10 · 0%'
+  )
+})
+
+test('devTesting: N/A 只接受明确 required false 的 gate 且不保留百分比', () => {
+  const result = normalizeDevTestingCoverageEnvelope({
+    status: 'current',
+    report: {
+      schemaVersion: DEV_TESTING_COVERAGE_REPORT_SCHEMA,
+      codeCoverage: {},
+      businessCoverage: {
+        domains: [
+          {
+            key: 'finance',
+            status: 'not_applicable',
+            required: false,
+          },
+        ],
+      },
+      gates: [
+        {
+          key: 'T1',
+          status: 'not_applicable',
+          required: false,
+          metrics: { scenarios: { percentage: 100 } },
+        },
+        { key: 'T2', status: 'not_applicable', required: true },
+        { key: 'T3', status: 'not_applicable' },
+      ],
+      acceptance: {
+        postgres: { status: 'not_applicable', required: false },
+      },
+    },
+  })
+
+  assert.deepEqual(
+    result.report.gates.map((item) => item.status),
+    ['not_applicable', 'not_collected', 'not_collected']
+  )
+  assert.equal(result.report.gates[0].required, false)
+  assert.deepEqual(result.report.gates[0].metrics, {})
+  assert.equal(
+    result.report.businessCoverage.domains[0].status,
+    'not_collected'
+  )
+  assert.equal(result.report.acceptance.postgres.status, 'not_collected')
+  assert.equal(
+    getDevTestingCoverageStatusMeta('not_applicable').label,
+    '不适用 / N/A'
+  )
+})
+
+test('devTesting: 覆盖接口缺失、失败和错误 schema 均 fail closed', () => {
+  assert.deepEqual(
+    normalizeDevTestingCoverageEnvelope(
+      { status: 'missing', message: '尚未生成' },
+      { httpStatus: 404 }
+    ),
+    { status: 'missing', message: '尚未生成', report: null }
+  )
+  assert.deepEqual(
+    normalizeDevTestingCoverageEnvelope(
+      { status: 'failed', message: '读取失败' },
+      { httpStatus: 500 }
+    ),
+    { status: 'failed', message: '读取失败', report: null }
+  )
+  const invalid = normalizeDevTestingCoverageEnvelope({
+    status: 'current',
+    report: { schemaVersion: 'legacy/v0' },
+  })
+  assert.equal(invalid.status, 'failed')
+  assert.match(invalid.message, /合同不匹配/)
+  assert.equal(invalid.report, null)
+  const schemaAlias = normalizeDevTestingCoverageEnvelope({
+    status: 'current',
+    report: { schema: DEV_TESTING_COVERAGE_REPORT_SCHEMA },
+  })
+  assert.equal(schemaAlias.status, 'failed')
+  assert.equal(schemaAlias.report, null)
+  assert.equal(getDevTestingCoverageStatusMeta('blocked').tone, 'danger')
+  assert.equal(
+    getDevTestingCoverageStatusMeta('unexpected').label,
+    '未采集 / Not collected'
+  )
+})
+
+test('devTesting: 覆盖页只读取报告并提供复制生成命令', () => {
+  assert.match(testingPageSource, /const VIEW_COVERAGE = 'coverage'/)
+  assert.match(testingPageSource, /覆盖状态 \/ Coverage/)
+  assert.match(testingPageSource, /DEV_TESTING_COVERAGE_API_PATH/)
+  assert.match(testingPageSource, /DEV_TESTING_COVERAGE_WRITE_COMMAND/)
+  assert.match(testingPageSource, /method: 'GET'/)
+  assert.doesNotMatch(testingPageSource, /error\?\.message/)
+  assert.doesNotMatch(testingPageSource, /child_process|exec\(|spawn\(/)
 })

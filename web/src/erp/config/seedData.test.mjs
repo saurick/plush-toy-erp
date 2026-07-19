@@ -66,7 +66,7 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
     navigationSections
       .find((section) => section.title === '运营工具')
       ?.items.map((item) => item.path),
-    ['/erp/print-center', '/erp/operations/exceptions']
+    ['/erp/print-center']
   )
   assert.deepEqual(
     navigationSections
@@ -137,7 +137,7 @@ test('businessModules: 功能预览态阻断客户业务数据页', () => {
   assert.equal(isCustomerBusinessDataPageKey('processing-contracts'), true)
   assert.equal(isCustomerBusinessDataPageKey('shipments'), true)
   assert.equal(isCustomerBusinessDataPageKey('customers'), true)
-  assert.equal(isCustomerBusinessDataPageKey('exception-flow'), true)
+  assert.equal(isCustomerBusinessDataPageKey('exception-flow'), false)
 
   assert.equal(isCustomerBusinessDataPageKey('global-dashboard'), false)
   assert.equal(isCustomerBusinessDataPageKey('print-center'), false)
@@ -172,7 +172,6 @@ test('seedData: 未连接客户环境时只显示功能预览和系统设置', (
   assert(!productCorePaths.includes('/erp/business-dashboard'))
   assert(!productCorePaths.includes('/erp/task-board'))
   assert(!productCorePaths.includes('/erp/purchase/material-bom'))
-  assert(!productCorePaths.includes('/erp/operations/exceptions'))
   assert(!productCorePaths.includes('/erp/warehouse/shipments'))
 })
 
@@ -223,7 +222,6 @@ test('customerMenuConfig: runtime config keeps task board and hides advanced ent
         'production-scheduling',
         'production-exceptions',
         'shipping-release',
-        'exception-flow',
       ],
       sections: [
         {
@@ -260,12 +258,10 @@ test('customerMenuConfig: runtime config keeps task board and hides advanced ent
   assert(navPaths.includes('/erp/warehouse/outbound'))
   assert(navPaths.includes('/erp/warehouse/shipments'))
   assert(!navPaths.includes('/erp/business-dashboard'))
-  assert(!navPaths.includes('/erp/operations/exceptions'))
   assert(!navPaths.includes('/erp/production/scheduling'))
   assert(!navPaths.includes('/erp/production/exceptions'))
   assert(!navPaths.includes('/erp/warehouse/shipping-release'))
   assert(productCoreReviewPaths.includes('/erp/business-dashboard'))
-  assert(productCoreReviewPaths.includes('/erp/operations/exceptions'))
   assert(productCoreReviewPaths.includes('/erp/production/scheduling'))
   assert(productCoreReviewPaths.includes('/erp/production/exceptions'))
   assert(productCoreReviewPaths.includes('/erp/warehouse/shipping-release'))

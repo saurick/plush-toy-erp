@@ -28,13 +28,13 @@ import ProductionCompletionModal from '../components/production-orders/Productio
 import ProductionMaterialIssueModal from '../components/production-orders/ProductionMaterialIssueModal.jsx'
 import ProductionOrderFormModal from '../components/production-orders/ProductionOrderFormModal.jsx'
 import ProductionRouteExecutionModal from '../components/production-orders/ProductionRouteExecutionModal.jsx'
-import { listInventoryLots } from '../api/inventoryApi.mjs'
-import { listWarehouses } from '../api/masterDataOrderApi.mjs'
+import { listAllInventoryLots } from '../api/inventoryApi.mjs'
+import { listAllWarehouses } from '../api/masterDataOrderApi.mjs'
 import {
   createProductionCompletionFromOrder,
   createProductionMaterialIssueFromOrder,
+  listAllProductionFacts,
   listProductionOrderMaterialRequirements,
-  listProductionFacts,
 } from '../api/operationalFactApi.mjs'
 import {
   cancelProductionOrder,
@@ -74,7 +74,7 @@ import {
   unixToDateInput,
 } from '../utils/productionOrderModel.mjs'
 import {
-  PRODUCTION_WIP_ROUTE_KEY,
+  PRODUCTION_WIP_ROUTE_CODE,
   partitionProductionCompletionItems,
   productionWipCompletionEligibility,
   productionWipOrderItemLabel,
@@ -85,13 +85,18 @@ import {
 } from '../utils/referenceSelectOptions.mjs'
 import {
   routeWithQuery,
-  searchParamPositiveIntText,
+  searchParamPositiveInt,
 } from '../utils/routeQuery.mjs'
 import {
   createSourceBusinessActionAttemptStore,
   isSourceBusinessActionResultUnknown,
   sourceBusinessActionNo,
 } from '../utils/sourceBusinessAction.mjs'
+import {
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+} from '../utils/relatedDocumentNavigation.mjs'
+import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 
 const { Text } = Typography
 const EMPTY_COMPLETION_CONTEXT = Object.freeze({
@@ -236,10 +241,11 @@ export default function V1ProductionOrdersPage() {
   const adminProfile = outletContext?.adminProfile || {}
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const routeProductionOrderID = searchParamPositiveIntText(
+  const routeProductionOrderID = searchParamPositiveInt(
     searchParams,
     'production_order_id'
   )
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
   const [form] = Form.useForm()
   const [reasonForm] = Form.useForm()
   const [query, setQuery] = useState(() => queryFromSearchParams(searchParams))
@@ -250,6 +256,11 @@ export default function V1ProductionOrdersPage() {
   const [mutationLoading, setMutationLoading] = useState(false)
   const [selected, setSelected] = useState(null)
   const [aggregate, setAggregate] = useState(null)
+  const resolvedRouteKeyword =
+    routeProductionOrderID &&
+    Number(selected?.id || 0) === Number(routeProductionOrderID)
+      ? String(selected?.order_no || '').trim()
+      : ''
   const [formMode, setFormMode] = useState(null)
   const [formValues, setFormValues] = useState(null)
   const [reasonAction, setReasonAction] = useState(null)
@@ -351,7 +362,11 @@ export default function V1ProductionOrdersPage() {
       const [data, routeAggregate] = await Promise.all([
         listProductionOrders(
           {
-            keyword: query.keyword,
+            keyword: linkedDocumentRequestKeyword({
+              localKeyword: query.keyword,
+              linkedKeyword,
+              hasExactContext: Boolean(routeSelectedID),
+            }),
             status: query.status,
             date_field: query.date_field,
             date_from: dateInputToUnix(query.date_from),
@@ -370,19 +385,15 @@ export default function V1ProductionOrdersPage() {
       if (!request.isCurrent()) return
       const listedOrders = data.production_orders
       const routeOrder = routeAggregate?.order || null
-      const nextOrders = routeOrder
-        ? [
-            routeOrder,
-            ...listedOrders.filter((item) => item.id !== routeOrder.id),
-          ]
-        : listedOrders
+      const exactPage = resolveExactRecordPage({
+        records: listedOrders,
+        exactRecord: routeOrder,
+        hasExactContext: routeSelectedID > 0,
+        total: data.total,
+      })
+      const nextOrders = exactPage.records
       setOrders(nextOrders)
-      setTotal(
-        data.total +
-          (routeOrder && !listedOrders.some((item) => item.id === routeOrder.id)
-            ? 1
-            : 0)
-      )
+      setTotal(exactPage.total)
       if (routeSelectedID > 0) {
         setSelected(routeOrder)
         setAggregate(routeAggregate)
@@ -395,7 +406,13 @@ export default function V1ProductionOrdersPage() {
       if (request.isCurrent()) setLoading(false)
       request.finish()
     }
-  }, [beginLatestRequest, canRead, query, routeProductionOrderID])
+  }, [
+    beginLatestRequest,
+    canRead,
+    linkedKeyword,
+    query,
+    routeProductionOrderID,
+  ])
 
   useEffect(() => {
     loadOrders()
@@ -581,11 +598,10 @@ export default function V1ProductionOrdersPage() {
     try {
       const [nextAggregate, factData] = await Promise.all([
         getProductionOrder(orderID, { signal: request.signal }),
-        listProductionFacts(
+        listAllProductionFacts(
           {
             source_type: 'PRODUCTION_ORDER',
             source_id: orderID,
-            limit: 500,
           },
           { signal: request.signal }
         ),
@@ -657,18 +673,14 @@ export default function V1ProductionOrdersPage() {
             },
             { signal: request.signal }
           ),
-          listProductionFacts(
+          listAllProductionFacts(
             {
               source_type: 'PRODUCTION_ORDER',
               source_id: orderID,
-              limit: 500,
             },
             { signal: request.signal }
           ),
-          listWarehouses(
-            { active_only: true, limit: 500 },
-            { signal: request.signal }
-          ),
+          listAllWarehouses({ active_only: true }, { signal: request.signal }),
         ])
       if (
         !request.isCurrent() ||
@@ -715,13 +727,12 @@ export default function V1ProductionOrdersPage() {
       )
       const firstWarehouseID = Number(warehouseOptions[0]?.value || 0)
       const lotData = firstWarehouseID
-        ? await listInventoryLots(
+        ? await listAllInventoryLots(
             {
               subject_type: 'MATERIAL',
               subject_id: freshRequirement.material_id,
               warehouse_id: firstWarehouseID,
               status: 'ACTIVE',
-              limit: 500,
             },
             { signal: request.signal }
           )
@@ -783,13 +794,12 @@ export default function V1ProductionOrdersPage() {
     const request = beginLatestRequest('production-material-issue-lots')
     setMaterialIssueLotsLoading(true)
     try {
-      const lotData = await listInventoryLots(
+      const lotData = await listAllInventoryLots(
         {
           subject_type: 'MATERIAL',
           subject_id: requirement.material_id,
           warehouse_id: Number(warehouseID),
           status: 'ACTIVE',
-          limit: 500,
         },
         { signal: request.signal }
       )
@@ -892,10 +902,9 @@ export default function V1ProductionOrdersPage() {
           return
         }
         try {
-          const factData = await listProductionFacts({
+          const factData = await listAllProductionFacts({
             source_type: 'PRODUCTION_ORDER',
             source_id: order.id,
-            limit: 500,
           })
           result = findProductionMaterialIssueResult(
             factData?.production_facts,
@@ -961,7 +970,7 @@ export default function V1ProductionOrdersPage() {
         ? nextAggregate.items
         : []
       const hasRoutedItem = orderItems.some(
-        (item) => item.route_code === PRODUCTION_WIP_ROUTE_KEY
+        (item) => item.route_code === PRODUCTION_WIP_ROUTE_CODE
       )
       if (hasRoutedItem && !canReadProductionWip) {
         modal.warning({
@@ -973,13 +982,12 @@ export default function V1ProductionOrdersPage() {
       }
       const [factData, warehouseData, lotData, wipAggregate] =
         await Promise.all([
-          listProductionFacts({
+          listAllProductionFacts({
             source_type: 'PRODUCTION_ORDER',
             source_id: orderID,
-            limit: 500,
           }),
-          listWarehouses({ active_only: true, limit: 500 }),
-          listInventoryLots({ status: 'ACTIVE', limit: 500 }),
+          listAllWarehouses({ active_only: true }),
+          listAllInventoryLots({ status: 'ACTIVE' }),
           hasRoutedItem ? getProductionWip(orderID) : Promise.resolve(null),
         ])
       if (
@@ -1056,7 +1064,7 @@ export default function V1ProductionOrdersPage() {
     completionInFlightRef.current = true
     setCompletionLoading(true)
     try {
-      if (orderItem.route_code === PRODUCTION_WIP_ROUTE_KEY) {
+      if (orderItem.route_code === PRODUCTION_WIP_ROUTE_CODE) {
         if (!canReadProductionWip) {
           message.warning(
             '当前账号无法复核生产工序状态，请联系管理员调整岗位权限后重试'
@@ -1103,10 +1111,9 @@ export default function V1ProductionOrdersPage() {
           return
         }
         try {
-          const factData = await listProductionFacts({
+          const factData = await listAllProductionFacts({
             source_type: 'PRODUCTION_ORDER',
             source_id: completionContext.order.id,
-            limit: 500,
           })
           result = findProductionCompletionResult(
             factData?.production_facts,
@@ -1157,7 +1164,7 @@ export default function V1ProductionOrdersPage() {
         {
           line_no: 1,
           planned_quantity: '1',
-          route_code: PRODUCTION_WIP_ROUTE_KEY,
+          route_code: PRODUCTION_WIP_ROUTE_CODE,
           customer_inspection_required: false,
         },
       ],
@@ -1226,6 +1233,10 @@ export default function V1ProductionOrdersPage() {
     if (!ok) return
     setFormMode(null)
     setFormValues(null)
+    if (isCreate) {
+      writeQuery({ page: 1 })
+      return
+    }
     await refreshAfterSuccess()
   }
 
@@ -1315,7 +1326,7 @@ export default function V1ProductionOrdersPage() {
         filters={
           <>
             <SearchInput
-              value={query.keyword}
+              value={resolvedRouteKeyword || linkedKeyword || query.keyword}
               placeholder="搜索生产单号或备注"
               onChange={(event) =>
                 writeQuery({ keyword: event.target.value, page: 1 })

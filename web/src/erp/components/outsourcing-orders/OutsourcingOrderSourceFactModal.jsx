@@ -13,6 +13,11 @@ import {
   SOURCE_INBOUND_LOT_SELECTION,
   sourceInboundLotSelectionForOptions,
 } from '../../utils/sourceInboundLotSelection.mjs'
+import {
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 
 function localDateTimeValue() {
   const now = new Date()
@@ -109,7 +114,9 @@ export default function OutsourcingOrderSourceFactModal({
           : undefined,
       new_lot_no: undefined,
       quantity:
-        Number(quantitySummary.remaining || 0) > 0
+        isPositiveNumeric20Scale6Units(
+          numeric20Scale6Units(quantitySummary.remaining)
+        )
           ? quantitySummary.remaining
           : '',
       occurred_at: localDateTimeValue(),
@@ -284,12 +291,17 @@ export default function OutsourcingOrderSourceFactModal({
             { required: true, message: '请填写办理数量' },
             {
               validator: (_, value) => {
-                const quantity = Number(value)
-                const remaining = Number(quantitySummary.remaining || 0)
-                if (!Number.isFinite(quantity) || quantity <= 0) {
+                const quantity = numeric20Scale6Units(value)
+                const remaining = numeric20Scale6Units(
+                  quantitySummary.remaining
+                )
+                if (!isPositiveNumeric20Scale6Units(quantity)) {
                   return Promise.reject(new Error('办理数量必须大于 0'))
                 }
-                if (remaining >= 0 && quantity > remaining) {
+                if (
+                  remaining === null ||
+                  compareNumeric20Scale6Units(quantity, remaining) > 0
+                ) {
                   return Promise.reject(
                     new Error('办理数量不能超过当前剩余数量')
                   )

@@ -528,7 +528,7 @@ function scenarioDate(index) {
   return value.toISOString().slice(0, 10);
 }
 
-function receiptParams(plan, scenario, index) {
+function receiptSourceOrderParams(plan, scenario, index) {
   const labels = {
     DRAFT: "草稿待检",
     SUBMITTED: "已提交待判定",
@@ -538,17 +538,24 @@ function receiptParams(plan, scenario, index) {
     RECEIPT_CANCELLED: "入库已取消并冲回",
   };
   return {
-    receipt_no: `${plan.prefix}-PR-${String(index + 1).padStart(2, "0")}-${RECEIPT_SCENARIO_CODES[scenario.key]}`,
-    supplier_name: plan.names.supplier,
-    received_at: scenarioDate(index),
+    purchase_order_no: `${plan.prefix}-RPO-${String(index + 1).padStart(2, "0")}`,
+    supplier_id: plan.ids.supplierId,
+    supplier_snapshot: {
+      name: plan.names.supplier,
+      simulated_only: true,
+    },
+    purchase_date: scenarioDate(index),
+    note: `【试用】采购入库-${labels[scenario.key]}来源订单；模拟试用数据，请勿用于正式业务。`,
     items: [
       {
+        line_no: 1,
         material_id: plan.ids.materialId,
-        warehouse_id: plan.ids.warehouseId,
         unit_id: plan.ids.unitId,
-        lot_no: `${plan.prefix}-LOT-${String(index + 1).padStart(2, "0")}`,
-        quantity: String(10 + index * 2),
-        source_line_no: String(index + 1),
+        material_code_snapshot: `${plan.prefix}-MAT`,
+        material_name_snapshot: plan.names.material,
+        purchased_quantity: String(10 + index * 2),
+        unit_price: "3.20",
+        amount: ((10 + index * 2) * 3.2).toFixed(2),
         note: `【试用】采购入库-${labels[scenario.key]}`,
       },
     ],
@@ -561,37 +568,84 @@ function linkedReceiptParams(plan, scenario, index, approvedOrder) {
     receipt_no: `${plan.prefix}-PR-${String(index + 1).padStart(2, "0")}-${RECEIPT_SCENARIO_CODES[scenario.key]}`,
     warehouse_id: plan.ids.warehouseId,
     received_at: scenarioDate(index),
+    idempotency_key: `purchase-quality:${plan.runId}:receipt:${index + 1}`,
     note: "【试用】从已审批采购订单生成，核对来源订单和来源行。",
   };
 }
 
-async function createReceiptMatrix(plan, tokens, steps, fetchImpl, orders) {
-  const approvedOrder = orders.find((item) => item.targetStatus === "APPROVED");
-  if (!approvedOrder?.order?.id || !approvedOrder.items?.[0]?.id) {
-    throw new CliError(
-      "approved purchase order is missing persisted line references",
-    );
+async function createApprovedReceiptSourceOrder(
+  plan,
+  scenario,
+  index,
+  tokens,
+  steps,
+  fetchImpl,
+) {
+  const created = await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "purchase_order",
+    method: "save_purchase_order_with_items",
+    params: receiptSourceOrderParams(plan, scenario, index),
+    token: tokens.purchase,
+    fetchImpl,
+  });
+  const order = requireMutationRecord(
+    created,
+    "purchase_order",
+    "save_purchase_order_with_items",
+    "DRAFT",
+  ).item;
+  const items = created.purchase_order_items;
+  if (!order?.id || !Array.isArray(items) || !items[0]?.id) {
+    throw new CliError("receipt source purchase order is missing its first line");
   }
+  await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "purchase_order",
+    method: "submit_purchase_order",
+    params: { id: order.id },
+    token: tokens.purchase,
+    fetchImpl,
+  });
+  await rpcCall({
+    backendURL: plan.backendURL,
+    domain: "purchase_order",
+    method: "approve_purchase_order",
+    params: { id: order.id },
+    token: tokens.boss,
+    fetchImpl,
+  });
+  steps.push({
+    target: "purchase_receipt_source_order",
+    id: order.id,
+    expectedStatus: "APPROVED",
+    actualStatus: "APPROVED",
+  });
+  return { order, items };
+}
+
+async function createReceiptMatrix(plan, tokens, steps, fetchImpl) {
   for (const [index, scenario] of plan.receiptScenarios.entries()) {
-    const linkedToPurchaseOrder = scenario.key === "PASSED_POSTED";
+    const approvedOrder = await createApprovedReceiptSourceOrder(
+      plan,
+      scenario,
+      index,
+      tokens,
+      steps,
+      fetchImpl,
+    );
     const created = await rpcCall({
       backendURL: plan.backendURL,
       domain: "purchase",
-      method: linkedToPurchaseOrder
-        ? "create_purchase_receipt_from_purchase_order"
-        : "create_purchase_receipt_with_items",
-      params: linkedToPurchaseOrder
-        ? linkedReceiptParams(plan, scenario, index, approvedOrder)
-        : receiptParams(plan, scenario, index),
+      method: "create_purchase_receipt_from_purchase_order",
+      params: linkedReceiptParams(plan, scenario, index, approvedOrder),
       token: tokens.purchase,
       fetchImpl,
     });
     const createdReceipt = requireMutationRecord(
       created,
       "purchase_receipt",
-      linkedToPurchaseOrder
-        ? "create_purchase_receipt_from_purchase_order"
-        : "create_purchase_receipt_with_items",
+      "create_purchase_receipt_from_purchase_order",
       "DRAFT",
     );
     const receipt = createdReceipt.item;
@@ -611,12 +665,10 @@ async function createReceiptMatrix(plan, tokens, steps, fetchImpl, orders) {
         "receipt-created quality inspection is missing its receipt line or lot reference",
       );
     }
-    if (linkedToPurchaseOrder) {
-      if (receiptItem.purchase_order_item_id !== approvedOrder.items[0].id) {
-        throw new CliError(
-          "linked purchase receipt response is missing its purchase order line",
-        );
-      }
+    if (receiptItem.purchase_order_item_id !== approvedOrder.items[0].id) {
+      throw new CliError(
+        "linked purchase receipt response is missing its purchase order line",
+      );
     }
     let receiptStatus = createdReceipt.status;
     let inspection = autoInspection;
@@ -760,11 +812,9 @@ async function createReceiptMatrix(plan, tokens, steps, fetchImpl, orders) {
       inspectionId: inspection.id,
       autoInspectionId: autoInspection.id,
       scenario: scenario.key,
-      linkedToPurchaseOrder,
-      purchaseOrderId: linkedToPurchaseOrder ? approvedOrder.order.id : null,
-      purchaseOrderItemId: linkedToPurchaseOrder
-        ? approvedOrder.items[0].id
-        : null,
+      linkedToPurchaseOrder: true,
+      purchaseOrderId: approvedOrder.order.id,
+      purchaseOrderItemId: approvedOrder.items[0].id,
       receiptStatus,
       inspectionStatus,
     });
@@ -809,8 +859,8 @@ export async function applyPlan(plan, password, deps = {}) {
     fetchImpl,
   });
   const steps = [];
-  const orders = await createOrderMatrix(safePlan, tokens, steps, fetchImpl);
-  await createReceiptMatrix(safePlan, tokens, steps, fetchImpl, orders);
+  await createOrderMatrix(safePlan, tokens, steps, fetchImpl);
+  await createReceiptMatrix(safePlan, tokens, steps, fetchImpl);
   return steps;
 }
 

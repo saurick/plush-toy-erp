@@ -929,7 +929,6 @@ var (
 		{Name: "supplier_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "contract_party_snapshot", Type: field.TypeJSON, Nullable: true},
 		{Name: "source_order_no", Type: field.TypeString, Nullable: true, Size: 128},
-		{Name: "source_sales_order_id", Type: field.TypeInt, Nullable: true},
 		{Name: "order_date", Type: field.TypeTime},
 		{Name: "expected_return_date", Type: field.TypeTime, Nullable: true},
 		{Name: "lifecycle_status", Type: field.TypeString, Size: 32, Default: "draft"},
@@ -947,7 +946,7 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "outsourcing_orders_suppliers_outsourcing_orders",
-				Columns:    []*schema.Column{OutsourcingOrdersColumns[13]},
+				Columns:    []*schema.Column{OutsourcingOrdersColumns[12]},
 				RefColumns: []*schema.Column{SuppliersColumns[0]},
 				OnDelete:   schema.NoAction,
 			},
@@ -961,7 +960,7 @@ var (
 			{
 				Name:    "outsourcingorder_supplier_id",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[13]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[12]},
 			},
 			{
 				Name:    "outsourcingorder_source_order_no",
@@ -969,24 +968,19 @@ var (
 				Columns: []*schema.Column{OutsourcingOrdersColumns[4]},
 			},
 			{
-				Name:    "outsourcingorder_source_sales_order_id",
-				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[5]},
-			},
-			{
 				Name:    "outsourcingorder_lifecycle_status",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[8]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[7]},
 			},
 			{
 				Name:    "outsourcingorder_order_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[6]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[5]},
 			},
 			{
 				Name:    "outsourcingorder_expected_return_date",
 				Unique:  false,
-				Columns: []*schema.Column{OutsourcingOrdersColumns[7]},
+				Columns: []*schema.Column{OutsourcingOrdersColumns[6]},
 			},
 		},
 	}
@@ -1153,6 +1147,7 @@ var (
 		{Name: "code", Type: field.TypeString, Size: 64},
 		{Name: "name", Type: field.TypeString, Size: 255},
 		{Name: "category", Type: field.TypeString, Nullable: true, Size: 64},
+		{Name: "production_route_operation_code", Type: field.TypeString, Nullable: true, Size: 64},
 		{Name: "outsourcing_enabled", Type: field.TypeBool, Default: false},
 		{Name: "inhouse_enabled", Type: field.TypeBool, Default: true},
 		{Name: "quality_required", Type: field.TypeBool, Default: false},
@@ -1174,6 +1169,14 @@ var (
 				Columns: []*schema.Column{ProcessesColumns[1]},
 			},
 			{
+				Name:    "process_production_route_operation_code",
+				Unique:  true,
+				Columns: []*schema.Column{ProcessesColumns[4]},
+				Annotation: &entsql.IndexAnnotation{
+					Where: "production_route_operation_code IS NOT NULL",
+				},
+			},
+			{
 				Name:    "process_category",
 				Unique:  false,
 				Columns: []*schema.Column{ProcessesColumns[3]},
@@ -1181,22 +1184,22 @@ var (
 			{
 				Name:    "process_outsourcing_enabled",
 				Unique:  false,
-				Columns: []*schema.Column{ProcessesColumns[4]},
+				Columns: []*schema.Column{ProcessesColumns[5]},
 			},
 			{
 				Name:    "process_inhouse_enabled",
 				Unique:  false,
-				Columns: []*schema.Column{ProcessesColumns[5]},
+				Columns: []*schema.Column{ProcessesColumns[6]},
 			},
 			{
 				Name:    "process_is_active",
 				Unique:  false,
-				Columns: []*schema.Column{ProcessesColumns[9]},
+				Columns: []*schema.Column{ProcessesColumns[10]},
 			},
 			{
 				Name:    "process_sort_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ProcessesColumns[7], ProcessesColumns[0]},
+				Columns: []*schema.Column{ProcessesColumns[8], ProcessesColumns[0]},
 			},
 		},
 	}
@@ -4138,7 +4141,8 @@ func init() {
 	}
 	ProcessesTable.Annotation = &entsql.Annotation{}
 	ProcessesTable.Annotation.Checks = map[string]string{
-		"processes_sort_order_non_negative": "sort_order >= 0",
+		"processes_production_route_operation_allowed": "production_route_operation_code IS NULL OR production_route_operation_code IN ('FABRIC_PROCESSING', 'SEWING', 'HANDWORK', 'PACKAGING')",
+		"processes_sort_order_non_negative":            "sort_order >= 0",
 	}
 	ProcessInstancesTable.Annotation = &entsql.Annotation{}
 	ProcessInstancesTable.Annotation.Checks = map[string]string{
@@ -4287,7 +4291,7 @@ func init() {
 	ProductionWipEventsTable.ForeignKeys[1].RefTable = AdminUsersTable
 	ProductionWipEventsTable.Annotation = &entsql.Annotation{}
 	ProductionWipEventsTable.Annotation.Checks = map[string]string{
-		"production_wip_events_action_allowed":    "action IN ('INITIALIZE', 'SPLIT_BATCH', 'ASSIGN_EXECUTION', 'START_OPERATION', 'COMPLETE_OPERATION', 'WIP_TRANSFER', 'OUTSOURCE_RETURN', 'REWORK', 'CANCEL')",
+		"production_wip_events_action_allowed":    "action IN ('SPLIT_BATCH', 'ASSIGN_EXECUTION', 'START_OPERATION', 'COMPLETE_OPERATION', 'WIP_TRANSFER', 'OUTSOURCE_RETURN', 'REWORK', 'CANCEL')",
 		"production_wip_events_contract_v1":       "result_contract = 'production.wip-mutation-result/v1'",
 		"production_wip_events_hash_length":       "length(intent_hash) = 64",
 		"production_wip_events_key_present":       "length(trim(idempotency_key)) BETWEEN 1 AND 128",

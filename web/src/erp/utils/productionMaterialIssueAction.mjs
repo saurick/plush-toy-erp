@@ -2,6 +2,12 @@ import {
   positiveSafeInteger,
   PRODUCTION_MATERIAL_REQUIREMENTS_STATE,
 } from './productionOrderModel.mjs'
+import {
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  normalizePositiveNumeric20Scale6,
+  numeric20Scale6Units,
+} from './numeric20Scale6.mjs'
 
 const LIST_REQUEST_KEYS = new Set(['customer_key', 'production_order_id'])
 const CREATE_REQUEST_KEYS = new Set([
@@ -59,21 +65,8 @@ function requiredID(value) {
   return Number(value)
 }
 
-function decimalNumber(value) {
-  const text = String(value ?? '')
-    .replace(/,/gu, '')
-    .trim()
-  if (!/^(?:0\.(?:0*[1-9]\d*)|[1-9]\d*(?:\.\d+)?)$/u.test(text)) {
-    return 0
-  }
-  const parsed = Number(text)
-  return Number.isFinite(parsed) ? parsed : 0
-}
-
 function quantityText(value) {
-  const parsed = decimalNumber(value)
-  if (parsed <= 0) return ''
-  return String(Number(parsed.toFixed(6)))
+  return normalizePositiveNumeric20Scale6(value)
 }
 
 function optionalOccurredAt(value) {
@@ -136,7 +129,9 @@ export function isProductionMaterialIssueEligible(
       positiveSafeInteger(requirement?.production_order_item_id) &&
       positiveSafeInteger(requirement?.material_id) &&
       positiveSafeInteger(requirement?.unit_id) &&
-      decimalNumber(requirement?.remaining_quantity) > 0
+      isPositiveNumeric20Scale6Units(
+        numeric20Scale6Units(requirement?.remaining_quantity)
+      )
   )
 }
 
@@ -172,7 +167,12 @@ export function buildProductionMaterialIssuePayload(
   if (!positiveSafeInteger(warehouseID)) throw new Error('请选择领料仓库')
   if (!positiveSafeInteger(lotID)) throw new Error('请选择匹配的材料批次')
   if (!quantity) throw new Error('领料数量必须大于 0')
-  if (decimalNumber(quantity) > decimalNumber(requirement.remaining_quantity)) {
+  if (
+    compareNumeric20Scale6Units(
+      numeric20Scale6Units(quantity),
+      numeric20Scale6Units(requirement.remaining_quantity)
+    ) > 0
+  ) {
     throw new Error('领料数量不能超过当前剩余需求')
   }
   const occurredAtText = String(values.occurred_at || '').trim()

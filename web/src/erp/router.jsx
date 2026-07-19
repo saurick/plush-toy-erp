@@ -1,4 +1,4 @@
-import React, { Suspense, useLayoutEffect } from 'react'
+import React, { Suspense } from 'react'
 import {
   Navigate,
   Route,
@@ -27,13 +27,10 @@ import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
   getEntryConfig,
-  getLastEntryTarget,
   hasDesktopEntryAccess,
   isDesktopEntryEnabled,
-  parseMobileRoleFromPath,
+  resolveAllowedMobileEntryPath,
   resolveDefaultEntryTarget,
-  resolveMobileTasksPath,
-  shouldUseRememberedDesktopEntry,
 } from './config/entryConfig.mjs'
 import { getAllowedMobileRoleKeys } from './utils/mobileRolePermissions.mjs'
 import { canOpenPrintWorkspaceFromWindowState } from './utils/printWorkspace.js'
@@ -110,7 +107,6 @@ const DevCustomerConfigPage = import.meta.env.DEV
 const DevTestingPage = import.meta.env.DEV
   ? lazyRoute(() => import('./pages/DevTestingPage.jsx'))
   : null
-const LAST_MOBILE_ENTRY_PATH_KEY = 'erp:last_mobile_entry_path'
 function DesktopEntryRedirect() {
   return <Navigate to="/erp/dashboard" replace />
 }
@@ -141,7 +137,10 @@ function RootEntryRedirect() {
   )
   if (target === ENTRY_TARGET.MOBILE_TASKS && allowedMobileRoles.length > 0) {
     return (
-      <Navigate to={resolveMobileTasksPath(allowedMobileRoles[0])} replace />
+      <Navigate
+        to={resolveAllowedMobileEntryPath(allowedMobileRoles)}
+        replace
+      />
     )
   }
 
@@ -260,57 +259,18 @@ function buildLocationPath(location) {
   }`
 }
 
-function resolveMobileEntryPath(adminProfile, entryConfig, preferredPath = '') {
-  const preferredRoleKey = parseMobileRoleFromPath(preferredPath)
+function resolveMobileEntryPath(adminProfile, entryConfig) {
   const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)
   const allowedRoleKeys = getAllowedMobileRoleKeys(
     adminProfile,
     enabledRoleKeys
   )
-  if (preferredRoleKey && allowedRoleKeys.includes(preferredRoleKey)) {
-    return resolveMobileTasksPath(preferredRoleKey)
-  }
-  return allowedRoleKeys[0] ? resolveMobileTasksPath(allowedRoleKeys[0]) : ''
-}
-
-function readLastMobileEntryPath() {
-  try {
-    return window.sessionStorage?.getItem(LAST_MOBILE_ENTRY_PATH_KEY) || ''
-  } catch {
-    return ''
-  }
-}
-
-function rememberLastMobileEntryPath(path) {
-  try {
-    window.sessionStorage?.setItem(LAST_MOBILE_ENTRY_PATH_KEY, path)
-  } catch {
-    // sessionStorage is best-effort; the in-memory ref still covers SPA back.
-  }
-}
-
-function isBrowserHistoryRestore() {
-  const [navigationEntry] = performance.getEntriesByType('navigation')
-  return navigationEntry?.type === 'back_forward'
+  return resolveAllowedMobileEntryPath(allowedRoleKeys)
 }
 
 function DesktopShellRoute() {
-  const location = useLocation()
   const adminProfile = getStoredAdminProfile()
-  const lastEntryTarget = getLastEntryTarget()
   const entryConfig = getEntryConfig()
-
-  if (adminProfile && lastEntryTarget === ENTRY_TARGET.MOBILE_TASKS) {
-    const lastMobilePath =
-      readLastMobileEntryPath() ||
-      (isBrowserHistoryRestore() ? buildLocationPath(location) : '')
-    const mobileEntryPath = resolveMobileEntryPath(
-      adminProfile,
-      entryConfig,
-      lastMobilePath
-    )
-    return <Navigate to={mobileEntryPath || '/entry'} replace />
-  }
 
   if (adminProfile && !isDesktopEntryEnabled(entryConfig)) {
     const mobileEntryPath = resolveMobileEntryPath(adminProfile, entryConfig)
@@ -325,24 +285,6 @@ function DesktopShellRoute() {
 }
 
 function MobileShellRoute() {
-  const location = useLocation()
-  const adminProfile = getStoredAdminProfile()
-  const lastEntryTarget = getLastEntryTarget()
-  const entryConfig = getEntryConfig()
-  const currentPath = buildLocationPath(location)
-
-  useLayoutEffect(() => {
-    if (adminProfile && parseMobileRoleFromPath(location.pathname)) {
-      rememberLastMobileEntryPath(currentPath)
-    }
-  }, [adminProfile, currentPath, location.pathname])
-
-  if (
-    shouldUseRememberedDesktopEntry(adminProfile, lastEntryTarget, entryConfig)
-  ) {
-    return <Navigate to="/erp/dashboard" replace />
-  }
-
   return (
     <AuthGuard requireAdmin>
       <MobileAppLayout />
@@ -407,10 +349,6 @@ export default function ERPRouter() {
             <Route
               path="task-board"
               element={<DashboardPage initialView="task-board" />}
-            />
-            <Route
-              path="operations/exceptions"
-              element={<DashboardPage initialView="exception-flow" />}
             />
             <Route
               path="business-dashboard"

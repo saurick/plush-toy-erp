@@ -24,14 +24,12 @@ test('finance pages project only fields that belong to their fact type', () => {
     'currency',
     'collection_type',
     'payment_term',
-    'invoice_category',
   ])
   assert.deepEqual(financeColumnKeys('PAYABLE'), [
     'counterparty',
     'amount',
     'fee_amount',
     'currency',
-    'payment_term',
   ])
   assert.deepEqual(financeColumnKeys('INVOICE'), [
     'counterparty',
@@ -95,4 +93,25 @@ test('outsourcing fact list, post and cancel use their exact permissions', () =>
     /outsourcing:[\s\S]*readPermissions: ACTION_PERMISSIONS\.outsourcingRead[\s\S]*postPermissions: ACTION_PERMISSIONS\.outsourcingPost[\s\S]*cancelPermissions: ACTION_PERMISSIONS\.outsourcingCancel/u
   )
   assert.doesNotMatch(source, /ACTION_PERMISSIONS\.outsourcingWrite/u)
+})
+
+test('quantity and finance decimal columns sort, display and export exactly', () => {
+  assert.match(source, /compareOperationalFactDecimalValues/u)
+  for (const field of ['quantity', 'amount', 'fee_amount']) {
+    assert.match(
+      source,
+      new RegExp(
+        `sorter: \\(left, right\\) =>[\\s\\S]{0,140}compareOperationalFactDecimalValues\\([\\s\\S]{0,100}left\\?\\.${field},[\\s\\S]{0,80}right\\?\\.${field}`,
+        'u'
+      )
+    )
+    assert.match(
+      source,
+      new RegExp(
+        `exportValue: \\(record\\) => formatQuantity\\(record\\?\\.${field}\\)`,
+        'u'
+      )
+    )
+  }
+  assert.doesNotMatch(source, /decimalNumber/u)
 })

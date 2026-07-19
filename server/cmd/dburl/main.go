@@ -23,6 +23,7 @@ type bootstrapConfig struct {
 
 func main() {
 	confPath := flag.String("conf", "./configs/dev/config.yaml", "config yaml path")
+	safeTarget := flag.Bool("safe-target", false, "print only the non-secret database target")
 	flag.Parse()
 
 	dsn := strings.TrimSpace(os.Getenv("POSTGRES_DSN"))
@@ -66,6 +67,15 @@ func main() {
 		fail("%v", err)
 	}
 
+	if *safeTarget {
+		target, err := safePostgresTarget(normalized)
+		if err != nil {
+			fail("render safe postgres target failed: %v", err)
+		}
+		fmt.Print(target)
+		return
+	}
+
 	fmt.Print(normalized)
 }
 
@@ -87,6 +97,35 @@ func normalizePostgresURL(raw string) (string, error) {
 	u.Scheme = "postgres"
 	u.RawQuery = q.Encode()
 	return u.String(), nil
+}
+
+func safePostgresTarget(raw string) (string, error) {
+	u, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme != "postgres" && u.Scheme != "postgresql" {
+		return "", fmt.Errorf("unsupported scheme %q", u.Scheme)
+	}
+	host := strings.TrimSpace(u.Hostname())
+	database := strings.Trim(strings.TrimSpace(u.EscapedPath()), "/")
+	if host == "" || database == "" {
+		return "", fmt.Errorf("postgres target is incomplete")
+	}
+	port := strings.TrimSpace(u.Port())
+	if port == "" {
+		port = "5432"
+	}
+	sslMode := strings.TrimSpace(u.Query().Get("sslmode"))
+	if sslMode == "" {
+		sslMode = "disable"
+	}
+	switch sslMode {
+	case "disable", "allow", "prefer", "require", "verify-ca", "verify-full":
+	default:
+		return "", fmt.Errorf("unsupported sslmode %q", sslMode)
+	}
+	return fmt.Sprintf("host=%s port=%s database=%s sslmode=%s", host, port, database, sslMode), nil
 }
 
 func fail(format string, args ...any) {

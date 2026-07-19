@@ -53,20 +53,51 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := d.RequireAdminRBACPermission(ctx, biz.PermissionWorkflowTaskRead); res != nil {
 			return id, res, nil
 		}
+		if res := rejectUnknownWorkflowTaskParams(
+			pm,
+			method,
+			"keyword",
+			"owner_role_key",
+			"task_status_key",
+			"task_group",
+			"source_type",
+			"source_id",
+			"due_from",
+			"due_to",
+			"limit",
+			"offset",
+		); res != nil {
+			return id, res, nil
+		}
 		admin, adminRes := d.CurrentAdmin(ctx)
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
 		limit := getWorkflowLimit(pm)
 		offset := getWorkflowOffset(pm)
+		keyword, keywordRes := getOptionalWorkflowTaskBoardString(pm, "keyword", 200)
+		if keywordRes != nil {
+			return id, keywordRes, nil
+		}
+		dueFrom, dueFromOK := getWorkflowUnixTimePtr(pm, "due_from")
+		if !dueFromOK {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "due_from 必须是 Unix 秒时间戳"}, nil
+		}
+		dueTo, dueToOK := getWorkflowUnixTimePtr(pm, "due_to")
+		if !dueToOK {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "due_to 必须是 Unix 秒时间戳"}, nil
+		}
 		filter := biz.WorkflowTaskFilter{
 			Limit:         limit,
 			Offset:        offset,
+			Keyword:       keyword,
 			OwnerRoleKey:  getString(pm, "owner_role_key"),
 			TaskStatusKey: getString(pm, "task_status_key"),
 			TaskGroup:     getString(pm, "task_group"),
 			SourceType:    getString(pm, "source_type"),
 			SourceID:      getInt(pm, "source_id", 0),
+			DueFrom:       dueFrom,
+			DueTo:         dueTo,
 		}
 		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
 		if visibilityErr != nil {
@@ -201,6 +232,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		}
 		if res := validateWorkflowTaskWritePublicParams(method, pm); res != nil {
 			return id, res, nil
+		}
+		if err := biz.ValidatePublicWorkflowTaskNamespace(getString(pm, "task_group"), getString(pm, "task_code")); err != nil {
+			return id, d.mapWorkflowError(ctx, err), nil
 		}
 		payload, ok := getWorkflowPayload(pm, "payload")
 		if !ok {

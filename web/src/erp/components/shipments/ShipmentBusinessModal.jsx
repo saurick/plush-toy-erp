@@ -25,7 +25,6 @@ import {
   buildShipmentSKUChangePatch,
   buildShipmentSourceItemChangePatch,
   createBlankShipmentItem,
-  decimalNumber,
   filterShipmentInventoryLotOptions,
   filterShipmentProductSKUOptions,
   formatQuantity,
@@ -46,13 +45,14 @@ const EMPTY_SHIPMENT_ITEMS = Object.freeze([])
 
 export function salesOrderCustomerText(order = {}) {
   const snapshot = order.customer_snapshot
-  if (typeof snapshot === 'string') {
-    return snapshot
+  if (typeof snapshot === 'string' && snapshot.trim()) {
+    return snapshot.trim()
   }
   return (
     snapshot?.name ||
     snapshot?.short_name ||
     snapshot?.code ||
+    order.customer_name ||
     (order.customer_id ? '客户已关联' : '')
   )
 }
@@ -62,10 +62,22 @@ export function sourceLineProductText(
   productOptions = [],
   skuOptions = []
 ) {
+  const productSnapshot = [
+    item.product_code_snapshot,
+    item.product_name_snapshot,
+  ]
+    .filter(Boolean)
+    .join(' ')
+  const productText = [item.product_code, item.product_name]
+    .filter(Boolean)
+    .join(' ')
+  const skuText = [item.sku_code, item.sku_name].filter(Boolean).join(' ')
   return [
-    referenceLabel(productOptions, item.product_id, '产品'),
+    productSnapshot ||
+      productText ||
+      referenceLabel(productOptions, item.product_id, '产品'),
     item.product_sku_id
-      ? referenceLabel(skuOptions, item.product_sku_id, 'SKU')
+      ? skuText || referenceLabel(skuOptions, item.product_sku_id, 'SKU')
       : '',
   ]
     .filter(Boolean)
@@ -75,8 +87,8 @@ export function sourceLineProductText(
 function ShipmentFormFields({
   disabled = false,
   customerOptions = [],
-  onSalesOrderChange,
   salesOrderOptions = [],
+  sourceSelectionOnly = false,
   sourceLocked = false,
 }) {
   return (
@@ -101,12 +113,11 @@ function ShipmentFormFields({
       >
         <Select
           allowClear
-          disabled={disabled}
+          disabled={disabled || sourceSelectionOnly}
           optionFilterProp="label"
           options={salesOrderOptions}
           placeholder="请选择销售订单"
           showSearch
-          onChange={onSalesOrderChange}
         />
       </Form.Item>
       <Form.Item
@@ -185,10 +196,6 @@ function ShipmentSelectedSourceAlert({
           getFieldValue('items') || [],
           shipmentSourceRows
         )
-        const selectedSourceRemainingTotal = selectedSourceRows.reduce(
-          (total, item) => total + decimalNumber(item.remainingQuantity),
-          0
-        )
         return (
           <Alert
             className="erp-business-source-summary"
@@ -204,11 +211,7 @@ function ShipmentSelectedSourceAlert({
                 <Text>
                   {`客户：${
                     salesOrderCustomerText(selectedSalesOrder) || '-'
-                  }；已导入来源行：${
-                    selectedSourceRows.length
-                  } 行；当前来源行剩余可出货合计：${formatQuantity(
-                    selectedSourceRemainingTotal
-                  )}`}
+                  }；已导入来源行：${selectedSourceRows.length} 行`}
                 </Text>
                 <Text type="secondary">
                   出货草稿不占用剩余量；确认出货时系统会校验来源、产品 / SKU、
@@ -396,6 +399,7 @@ function ShipmentItemFormFields({
   productSKUOptions = [],
   salesOrderItems = [],
   salesOrderItemOptions = [],
+  sourceSelectionDisabled = false,
   unitOptions = [],
   warehouseOptions = [],
 }) {
@@ -439,6 +443,7 @@ function ShipmentItemFormFields({
       >
         <Select
           allowClear
+          disabled={sourceSelectionDisabled}
           optionFilterProp="label"
           options={salesOrderItemOptions}
           placeholder="请选择销售订单行"
@@ -644,6 +649,7 @@ function ShipmentItemsTable({
 
 export default function ShipmentBusinessModal({
   canCreate = false,
+  canImportSalesOrderSource = false,
   customerOptions = [],
   form,
   importSalesOrderToShipment,
@@ -655,7 +661,6 @@ export default function ShipmentBusinessModal({
   onCancel,
   onOk,
   onOpenSalesOrderImport,
-  onSalesOrderChange,
   products = [],
   productOptions = [],
   productSKUs = [],
@@ -666,6 +671,14 @@ export default function ShipmentBusinessModal({
   salesOrderItemOptions = [],
   salesOrderOptions = [],
   salesOrderSources = [],
+  salesOrderSourceTotal = 0,
+  salesOrderSourceCurrent = 1,
+  salesOrderSourceEmptyDescription = '暂无可导入销售订单行',
+  salesOrderSourceImportDisabled = false,
+  onSalesOrderSourcePageChange,
+  onSalesOrderSourceReload,
+  onSalesOrderSourceSearchChange,
+  salesOrderSourcePageSize = 20,
   saving = false,
   selectedSalesOrder,
   setSalesOrderImportOpen,
@@ -709,11 +722,8 @@ export default function ShipmentBusinessModal({
         <ShipmentFormFields
           customerOptions={customerOptions}
           disabled={!isCreateModal}
-          onSalesOrderChange={(nextSalesOrderID) => {
-            clearStaleManualWeight()
-            onSalesOrderChange?.(nextSalesOrderID)
-          }}
           salesOrderOptions={salesOrderOptions}
+          sourceSelectionOnly={isCreateModal}
           sourceLocked={Boolean(selectedSalesOrder)}
         />
         <BusinessAttachmentPanel
@@ -780,6 +790,7 @@ export default function ShipmentBusinessModal({
                   </div>
                   <Button
                     className="erp-line-items-form__import-button"
+                    disabled={!canImportSalesOrderSource}
                     onClick={onOpenSalesOrderImport}
                   >
                     从销售订单导入
@@ -793,6 +804,14 @@ export default function ShipmentBusinessModal({
                   columns={salesOrderImportColumns}
                   multiple
                   loading={sourceLoading}
+                  importDisabled={salesOrderSourceImportDisabled}
+                  serverPagination
+                  total={salesOrderSourceTotal}
+                  current={salesOrderSourceCurrent}
+                  pageSize={salesOrderSourcePageSize}
+                  onPageChange={onSalesOrderSourcePageChange}
+                  onReload={onSalesOrderSourceReload}
+                  onSearchChange={onSalesOrderSourceSearchChange}
                   getSelectedLabel={(item) =>
                     `第 ${item?.line_no || '-'} 行 / ${formatQuantity(
                       item?.remainingQuantity
@@ -801,8 +820,9 @@ export default function ShipmentBusinessModal({
                   getRowDisabledReason={(item) => item.disabledReason}
                   isRowDisabled={(item) => Boolean(item.disabledReason)}
                   searchPlaceholder="搜索订单"
+                  searchMaxLength={128}
                   searchHint="可搜索：销售订单号、客户订单号、客户、产品"
-                  emptyDescription="暂无可导入销售订单行"
+                  emptyDescription={salesOrderSourceEmptyDescription}
                   onCancel={() => setSalesOrderImportOpen(false)}
                   onImport={(sourceItems) => {
                     clearStaleManualWeight()
@@ -840,6 +860,7 @@ export default function ShipmentBusinessModal({
                           productSKUOptions={productSKUOptions}
                           salesOrderItems={salesOrderItems}
                           salesOrderItemOptions={salesOrderItemOptions}
+                          sourceSelectionDisabled={Boolean(selectedSalesOrder)}
                           unitOptions={unitOptions}
                           warehouseOptions={warehouseOptions}
                         />
@@ -848,6 +869,7 @@ export default function ShipmentBusinessModal({
                   ))}
                 </div>
                 <BusinessLineItemsFooter
+                  addDisabled={Boolean(selectedSalesOrder)}
                   addLabel="添加条目"
                   onAdd={() => {
                     add(createBlankShipmentItem())

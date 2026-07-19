@@ -74,7 +74,10 @@ func TestProductionReworkSourceParamsAndExactPermission(t *testing.T) {
 	}
 
 	allowed := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
-		[]string{biz.ProductionRoleKey}, biz.PermissionProductionReworkCreate,
+		[]string{biz.ProductionRoleKey},
+		biz.PermissionProductionReworkCreate,
+		biz.PermissionProductionFactRead,
+		biz.PermissionPMCPlanRead,
 	), repo)
 	activateOperationalFactTestCustomerConfig(t, allowed, customerConfigPublishParamsWithRevisionAndModuleState(
 		t, customerConfigPublishParams(t), "2026.07.14.production-rework-source-allowed", "production", "enabled",

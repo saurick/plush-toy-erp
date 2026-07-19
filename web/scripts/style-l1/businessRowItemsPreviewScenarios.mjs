@@ -89,6 +89,45 @@ export function createBusinessRowItemsPreviewScenarios(deps) {
             if (body.method === 'list_sales_order_items') {
               itemReadCalls += 1
               itemReadParams.push(body.params || {})
+              if (Number(body.params?.sales_order_id || 0) === 3) {
+                const now = Math.floor(Date.now() / 1000)
+                await route.fulfill({
+                  status: 200,
+                  contentType: 'application/json',
+                  body: JSON.stringify({
+                    jsonrpc: '2.0',
+                    id: body.id || 'mock-id',
+                    result: styleRpcResult({
+                      sales_order_items: [
+                        {
+                          id: 3,
+                          sales_order_id: 3,
+                          line_no: 1,
+                          product_id: 1,
+                          product_sku_id: 1,
+                          product_code_snapshot: 'PROD-STYLE-L1',
+                          product_name_snapshot: '样式产品',
+                          sku_code_snapshot: 'SKU-STYLE-L1',
+                          color_snapshot: '深棕',
+                          ordered_quantity: '10',
+                          unit_id: 1,
+                          unit_name_snapshot: '只',
+                          unit_price: '12.50',
+                          amount: '125.00',
+                          line_status: 'open',
+                          note: '',
+                          created_at: now,
+                          updated_at: now,
+                        },
+                      ],
+                      total: 1,
+                      limit: Number(body.params?.limit || 5),
+                      offset: Number(body.params?.offset || 0),
+                    }),
+                  }),
+                })
+                return
+              }
             }
             await route.fallback()
           })

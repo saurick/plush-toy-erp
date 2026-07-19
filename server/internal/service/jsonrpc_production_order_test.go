@@ -176,7 +176,22 @@ func TestProductionOrderJSONRPCCanonicalLifecycleReadAndReplay(t *testing.T) {
 }
 
 func TestProductionOrderJSONRPCStrictCanonicalParams(t *testing.T) {
-	d, productID, unitID := newProductionOrderJSONRPCTestData(t, biz.PermissionPMCPlanRead, biz.PermissionPMCPlanCreate, biz.PermissionPMCPlanUpdate)
+	d, productID, unitID := newProductionOrderJSONRPCTestData(
+		t,
+		biz.PermissionPMCPlanRead,
+		biz.PermissionPMCPlanCreate,
+		biz.PermissionPMCPlanUpdate,
+		biz.PermissionSalesOrderRead,
+		biz.PermissionSalesOrderItemRead,
+	)
+	d.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+		[]string{biz.PMCRoleKey, biz.SalesRoleKey},
+		biz.PermissionPMCPlanRead,
+		biz.PermissionPMCPlanCreate,
+		biz.PermissionPMCPlanUpdate,
+		biz.PermissionSalesOrderRead,
+		biz.PermissionSalesOrderItemRead,
+	)}
 	ctx := workflowJSONRPCAdminContext()
 	for _, method := range []string{"createProductionOrder", "saveProductionOrder", "getProductionOrder", "listProductionOrders", "listProductionOrderReferenceOptions"} {
 		_, res, _ := d.handleProductionOrder(ctx, method, method, mustJSONRPCStruct(t, map[string]any{}))

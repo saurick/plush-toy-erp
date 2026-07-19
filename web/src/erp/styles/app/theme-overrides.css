@@ -170,10 +170,6 @@
 [data-erp-theme='dark'] .erp-business-board-source-item,
 [data-erp-theme='dark'] .erp-business-board-boundary-row,
 [data-erp-theme='dark'] .erp-business-board-alert-item,
-[data-erp-theme='dark'] .erp-exception-workspace__metrics > span,
-[data-erp-theme='dark'] .erp-exception-workspace__queue,
-[data-erp-theme='dark'] .erp-exception-workspace__detail,
-[data-erp-theme='dark'] .erp-exception-workspace__item,
 [data-erp-theme='dark'] .erp-task-board-lane.ant-card,
 [data-erp-theme='dark'] .erp-task-board-card,
 [data-erp-theme='dark'] .erp-dev-docs-header,
@@ -469,23 +465,6 @@
 [data-erp-theme='dark'] .erp-business-module-variant-main p,
 [data-erp-theme='dark'] .erp-business-module-variant-lanes span {
   color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-exception-workspace__metrics strong,
-[data-erp-theme='dark'] .erp-exception-workspace__item {
-  color: var(--erp-text);
-}
-
-[data-erp-theme='dark'] .erp-exception-workspace__metrics small,
-[data-erp-theme='dark'] .erp-exception-workspace__item small {
-  color: var(--erp-text-muted);
-}
-
-[data-erp-theme='dark'] .erp-exception-workspace__item:hover,
-[data-erp-theme='dark'] .erp-exception-workspace__item--active {
-  border-color: var(--erp-primary-strong);
-  background: var(--erp-surface-bg-soft);
-  box-shadow: 0 0 0 2px rgb(74 222 128 / 0.14);
 }
 
 [data-erp-theme='dark'] .erp-business-board-mini-bar {
@@ -1502,13 +1481,21 @@
 [data-erp-theme='dark'] .erp-dev-capability-row__title,
 [data-erp-theme='dark'] .erp-dev-capability-detail__title.ant-typography,
 [data-erp-theme='dark'] .erp-dev-capability-panel__head,
-[data-erp-theme='dark'] .erp-dev-capability-bar__meta {
+[data-erp-theme='dark'] .erp-dev-capability-bar__meta,
+[data-erp-theme='dark'] .erp-dev-capability-maturity-guide__copy strong {
   color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-capability-summary.ant-typography,
 [data-erp-theme='dark'] .erp-dev-capability-metric__label,
 [data-erp-theme='dark'] .erp-dev-capability-metric__note,
+[data-erp-theme='dark'] .erp-dev-capability-filter-field > span,
+[data-erp-theme='dark']
+  .erp-dev-capability-maturity-guide__summary.ant-typography,
+[data-erp-theme='dark']
+  .erp-dev-capability-maturity-guide__note.ant-typography,
+[data-erp-theme='dark'] .erp-dev-capability-maturity-guide__copy,
+[data-erp-theme='dark'] .erp-dev-capability-maturity-guide__copy small,
 [data-erp-theme='dark'] .erp-dev-capability-row__meta,
 [data-erp-theme='dark'] .erp-dev-capability-detail__block .ant-typography,
 [data-erp-theme='dark'] .erp-dev-capability-relation__meta,
@@ -1551,6 +1538,20 @@
 
 [data-erp-theme='dark'] .erp-dev-capability-bar__fill {
   background: linear-gradient(90deg, #86efac, #38bdf8);
+}
+
+[data-erp-theme='dark'] .erp-dev-capability-maturity-guide__item {
+  border-color: var(--erp-border);
+}
+
+[data-erp-theme='dark'] .erp-dev-capability-maturity-guide__level {
+  background: var(--erp-interactive-bg-hover);
+  color: #bbf7d0;
+}
+
+[data-erp-theme='dark'] .erp-dev-capability-maturity-guide__note code {
+  background: var(--erp-surface-bg-soft);
+  color: var(--erp-text);
 }
 
 [data-erp-theme='dark'] .erp-dev-capability-row__id {

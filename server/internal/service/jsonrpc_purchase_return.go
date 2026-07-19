@@ -17,6 +17,9 @@ func (d *jsonrpcDispatcher) handlePurchaseReturn(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReturnCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "purchase", method); res != nil {
+			return id, res, nil
+		}
 		in, ok := purchaseReturnFromReceiptCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -28,6 +31,9 @@ func (d *jsonrpcDispatcher) handlePurchaseReturn(
 		return id, purchaseReturnResult(ctx, d, item, err), nil
 	case "create_purchase_return_from_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReturnCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "purchase", method); res != nil {
 			return id, res, nil
 		}
 		in, ok := purchaseReturnFromQualityInspectionCreateFromParams(pm)

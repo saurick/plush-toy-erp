@@ -416,10 +416,6 @@ func TestInventoryRepo_PurchaseReceiptTraceProtection(t *testing.T) {
 	if err != nil {
 		t.Fatalf("add trace receipt item failed: %v", err)
 	}
-	if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("draft receipt must not be cancellable, got %v", err)
-	}
-
 	passAllPurchaseReceiptQualityInspections(t, ctx, uc, receipt.ID)
 	posted, err := uc.PostPurchaseReceipt(ctx, receipt.ID)
 	if err != nil {

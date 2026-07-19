@@ -77,6 +77,7 @@ func TestMapOperationalFactError_ShipmentAndReservationGuards(t *testing.T) {
 		{name: "shipment quality pending", err: biz.ErrShipmentQualityPending, message: "该出货单已有待检或在检的出货前成品检验，请先完成检验判定"},
 		{name: "shipment quality rejected", err: biz.ErrShipmentQualityRejected, message: "该出货单的出货前成品检验不合格，请先完成质量处置"},
 		{name: "shipment release rejected", err: biz.ErrShipmentReleaseRejected, message: "出货放行任务已退回，请取消当前出货单后重新登记"},
+		{name: "shipment cancellation process active", err: biz.ErrShipmentCancellationProcessActive, message: "该出货单仍有进行中的成品出货流程，请先完成流程后再取消"},
 		{name: "shipment cancellation task active", err: biz.ErrShipmentCancellationTaskActive, message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"},
 		{name: "outsourcing quality pending", err: biz.ErrOutsourcingReturnQualityPending, message: "该委外回货尚未完成合格或让步接收判定，不能生成应付"},
 		{name: "outsourcing quality rejected", err: biz.ErrOutsourcingReturnQualityRejected, message: "该委外回货质检不合格，请先完成返工、退回等质量处置"},
@@ -179,8 +180,8 @@ func TestShipmentAggregateItemParamsPreserveProductSKUTraceability(t *testing.T)
 		"items": []any{map[string]any{
 			"product_id": 1, "warehouse_id": 1, "unit_id": 1, "quantity": float64(1.25),
 		}},
-	}); !ok || parsed == nil || !parsed.Items[0].Quantity.Equal(decimal.RequireFromString("1.25")) {
-		t.Fatalf("shipment JSON-number quantity compatibility parse = %#v ok=%t", parsed, ok)
+	}); ok || parsed != nil {
+		t.Fatalf("shipment JSON-number quantity must be rejected: %#v ok=%t", parsed, ok)
 	}
 }
 
@@ -528,6 +529,7 @@ func TestJsonrpcDispatcher_FinanceFactAPIRequiresEnabledModule(t *testing.T) {
 		[]string{biz.FinanceRoleKey},
 		biz.PermissionFinanceReceivableConfirm,
 		biz.PermissionFinanceReceivableRead,
+		biz.PermissionShipmentRead,
 	)
 	repo := &financeModuleGateOperationalFactRepo{}
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
@@ -713,6 +715,7 @@ func TestJsonrpcDispatcher_FinanceFactSourceMethodsOwnFactFields(t *testing.T) {
 		[]string{biz.FinanceRoleKey},
 		biz.PermissionFinanceReceivableConfirm,
 		biz.PermissionFinanceInvoiceConfirm,
+		biz.PermissionShipmentRead,
 	)
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
 	activateOperationalFactTestCustomerConfig(
@@ -907,6 +910,7 @@ func TestJsonrpcDispatcher_ProductionFactAPIRequiresEnabledModule(t *testing.T) 
 		biz.PermissionProductionFactPost,
 		biz.PermissionProductionFactCancel,
 		biz.PermissionProductionFactRead,
+		biz.PermissionPMCPlanRead,
 	)
 	repo := &productionModuleGateOperationalFactRepo{}
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
@@ -1011,6 +1015,7 @@ func TestJsonrpcDispatcher_ProductionReworkPostAndCancelRequireWorkflowModule(t 
 		[]string{biz.ProductionRoleKey},
 		biz.PermissionProductionFactPost,
 		biz.PermissionProductionFactCancel,
+		biz.PermissionProductionFactRead,
 	)
 	repo := &productionModuleGateOperationalFactRepo{
 		sourceTaskFactIDs: map[int]bool{501: true, 502: true},
@@ -1119,6 +1124,7 @@ func TestJsonrpcDispatcher_ProductionCompletionUsesDedicatedPermissionAndServerO
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.ProductionRoleKey},
 		biz.PermissionProductionCompletionCreate,
+		biz.PermissionPMCPlanRead,
 	)
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
 	enabledProductionConfig := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -1195,6 +1201,7 @@ func TestJsonrpcDispatcher_ProductionMaterialIssueUsesExactPermissionAndStrictSo
 		[]string{biz.ProductionRoleKey},
 		biz.PermissionProductionMaterialIssueCreate,
 		biz.PermissionProductionFactRead,
+		biz.PermissionPMCPlanRead,
 	)
 	j := newOperationalFactJSONRPCTestDataWithRepo(t, admin, repo)
 	enabledProductionConfig := customerConfigPublishParamsWithRevisionAndModuleState(
@@ -1282,6 +1289,7 @@ func TestJsonrpcDispatcher_OutsourcingFactAPIRequiresEnabledModule(t *testing.T)
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.PurchaseRoleKey, biz.WarehouseRoleKey},
 		biz.PermissionOutsourcingFactRead,
+		biz.PermissionOutsourcingOrderRead,
 		biz.PermissionOutsourcingMaterialIssueCreate,
 		biz.PermissionOutsourcingReturnReceiptCreate,
 		biz.PermissionOutsourcingFactPost,
@@ -1396,6 +1404,8 @@ func TestJsonrpcDispatcher_StockReservationAPIRequiresEnabledInventoryModule(t *
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.SalesRoleKey, biz.WarehouseRoleKey},
 		biz.PermissionWarehouseInventoryRead,
+		biz.PermissionSalesOrderRead,
+		biz.PermissionSalesOrderItemRead,
 		biz.PermissionStockReservationCreate,
 		biz.PermissionStockReservationRelease,
 	)
@@ -2325,6 +2335,11 @@ func TestFinanceFactFromShipmentParamsRejectForgedFactsAndAllowInvoiceCategory(t
 	}
 	if input.ShipmentID != 91 || input.InvoiceCategory == nil || *input.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 {
 		t.Fatalf("unexpected invoice category %#v", input.InvoiceCategory)
+	}
+	if _, ok := financeFactFromShipmentCreateFromParams(map[string]any{
+		"fact_no": "INV-MISSING-CATEGORY", "shipment_id": float64(91), "idempotency_key": "INV-MISSING-CATEGORY",
+	}, true); ok {
+		t.Fatal("source-driven invoice parser accepted missing invoice category")
 	}
 	if _, ok := financeFactFromShipmentCreateFromParams(map[string]any{
 		"fact_no": "AR-FORGED", "shipment_id": float64(91), "idempotency_key": "AR-FORGED", "amount": "999999",

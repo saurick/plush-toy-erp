@@ -417,7 +417,7 @@ function createReport(options, runs) {
     realCustomerImport: false,
     changesRuntime: false,
     coverage: [
-      "create_purchase_receipt_draft",
+      "create_purchase_receipt_from_purchase_order",
       "add_purchase_receipt_item",
       "post_purchase_receipt",
       "get_purchase_receipt",
@@ -432,6 +432,7 @@ function createReport(options, runs) {
       "purchase receipt writes inventory facts through InventoryUsecase",
       "workflow task done is not treated as purchase_receipt posted",
       "business_record_id is rejected by the new purchase API",
+      "public source-free receipt creation methods are retired as unknown methods",
       "PostgreSQL mode is local/test only and guarded by purchase-receipt-pg.sh",
     ],
     runs,

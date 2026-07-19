@@ -726,15 +726,45 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 		if err != nil {
 			return nil, err
 		}
-		if err := markProcessDomainCommandEffectCompensatedWithClient(
-			ctx,
-			tx.client,
-			biz.ProcessDomainCommandInventoryPostInbound,
-			"purchase_receipt",
-			receipt.ID,
-			"采购收货已取消并完成库存冲正，原入库流程结果需要核对",
-			actorID,
-		); err != nil {
+		if receipt.PostedAt != nil {
+			if err := markProcessDomainCommandEffectCompensatedWithClient(
+				ctx,
+				tx.client,
+				biz.ProcessDomainCommandInventoryPostInbound,
+				"purchase_receipt",
+				receipt.ID,
+				"采购收货已取消并完成库存冲正，原入库流程结果需要核对",
+				actorID,
+			); err != nil {
+				return nil, err
+			}
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return out, nil
+	}
+	if receipt.Status == biz.PurchaseReceiptStatusDraft {
+		items, err := tx.client.PurchaseReceiptItem.Query().
+			Where(purchasereceiptitem.ReceiptID(receipt.ID)).
+			Order(ent.Asc(purchasereceiptitem.FieldID)).
+			All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, receipt, items); err != nil {
+			return nil, err
+		}
+		if err := updatePurchaseReceiptCancelled(ctx, tx, receipt.ID); err != nil {
+			return nil, err
+		}
+		receipt, err = tx.client.PurchaseReceipt.Get(ctx, receipt.ID)
+		if err != nil {
+			return nil, err
+		}
+		out, err := purchaseReceiptWithItems(ctx, tx.client, receipt)
+		if err != nil {
 			return nil, err
 		}
 		if err := tx.sqlTx.Commit(); err != nil {
@@ -750,29 +780,29 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 	if hasActivePayable {
 		return nil, biz.ErrPurchaseReceiptFinanceDependency
 	}
-	hasPostedAdjustment, err := tx.client.PurchaseReceiptAdjustment.Query().
+	hasActiveAdjustment, err := tx.client.PurchaseReceiptAdjustment.Query().
 		Where(
 			purchasereceiptadjustment.PurchaseReceiptID(receipt.ID),
-			purchasereceiptadjustment.Status(biz.PurchaseReceiptAdjustmentStatusPosted),
+			purchasereceiptadjustment.StatusNEQ(biz.PurchaseReceiptAdjustmentStatusCancelled),
 		).
 		Exist(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if hasPostedAdjustment {
-		return nil, biz.ErrBadParam
+	if hasActiveAdjustment {
+		return nil, biz.ErrPurchaseReceiptCorrectionDependency
 	}
-	hasPostedReturn, err := tx.client.PurchaseReturn.Query().
+	hasActiveReturn, err := tx.client.PurchaseReturn.Query().
 		Where(
 			purchasereturn.PurchaseReceiptID(receipt.ID),
-			purchasereturn.Status(biz.PurchaseReturnStatusPosted),
+			purchasereturn.StatusNEQ(biz.PurchaseReturnStatusCancelled),
 		).
 		Exist(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if hasPostedReturn {
-		return nil, biz.ErrBadParam
+	if hasActiveReturn {
+		return nil, biz.ErrPurchaseReceiptCorrectionDependency
 	}
 	items, err := tx.client.PurchaseReceiptItem.Query().
 		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
@@ -843,6 +873,181 @@ func (r *inventoryRepo) cancelPostedPurchaseReceipt(ctx context.Context, receipt
 	return out, nil
 }
 
+func settleDraftPurchaseReceiptCancellation(
+	ctx context.Context,
+	tx *inventoryDBTx,
+	receipt *ent.PurchaseReceipt,
+	items []*ent.PurchaseReceiptItem,
+) error {
+	if tx == nil || tx.client == nil || receipt == nil || receipt.Status != biz.PurchaseReceiptStatusDraft {
+		return biz.ErrBadParam
+	}
+
+	itemsByID := make(map[int]*ent.PurchaseReceiptItem, len(items))
+	preparedLotItems := make(map[int][]*ent.PurchaseReceiptItem, len(items))
+	lotIDs := make(map[int]struct{}, len(items))
+	for _, item := range items {
+		if item == nil || item.ReceiptID != receipt.ID || item.LotID == nil || *item.LotID <= 0 {
+			return biz.ErrBadParam
+		}
+		itemsByID[item.ID] = item
+		preparedLotItems[*item.LotID] = append(preparedLotItems[*item.LotID], item)
+		lotIDs[*item.LotID] = struct{}{}
+	}
+
+	inspectionIDs, err := tx.client.QualityInspection.Query().Where(
+		qualityinspection.Or(
+			qualityinspection.PurchaseReceiptID(receipt.ID),
+			qualityinspection.And(
+				qualityinspection.SourceType(biz.QualityInspectionSourcePurchaseReceipt),
+				qualityinspection.SourceID(receipt.ID),
+			),
+		),
+	).Order(ent.Asc(qualityinspection.FieldID)).IDs(ctx)
+	if err != nil {
+		return err
+	}
+	inspections := make([]*ent.QualityInspection, 0, len(inspectionIDs))
+	for _, inspectionID := range inspectionIDs {
+		inspection, err := getLockedQualityInspection(ctx, tx, inspectionID)
+		if err != nil {
+			return err
+		}
+		if err := validateDraftPurchaseReceiptCancellationInspection(receipt, itemsByID, inspection); err != nil {
+			return err
+		}
+		inspections = append(inspections, inspection)
+		lotIDs[*inspection.InventoryLotID] = struct{}{}
+	}
+
+	orderedLotIDs := make([]int, 0, len(lotIDs))
+	for lotID := range lotIDs {
+		orderedLotIDs = append(orderedLotIDs, lotID)
+	}
+	sort.Ints(orderedLotIDs)
+	lotsByID := make(map[int]*ent.InventoryLot, len(orderedLotIDs))
+	for _, lotID := range orderedLotIDs {
+		if err := lockInventoryLot(ctx, tx, lotID); err != nil {
+			return err
+		}
+		lot, err := tx.client.InventoryLot.Get(ctx, lotID)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return biz.ErrInventoryLotNotFound
+			}
+			return err
+		}
+		lotsByID[lotID] = lot
+	}
+
+	preparedLotIDs := make([]int, 0, len(preparedLotItems))
+	for lotID, linkedItems := range preparedLotItems {
+		lot := lotsByID[lotID]
+		if lot == nil || !biz.IsValidInventoryLotStatus(lot.Status) {
+			return biz.ErrBadParam
+		}
+		for _, item := range linkedItems {
+			if lot.SubjectType != biz.InventorySubjectMaterial || lot.SubjectID != item.MaterialID {
+				return biz.ErrBadParam
+			}
+		}
+		linkedElsewhere, err := tx.client.PurchaseReceiptItem.Query().Where(
+			purchasereceiptitem.LotID(lotID),
+			purchasereceiptitem.ReceiptIDNEQ(receipt.ID),
+		).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if linkedElsewhere {
+			return biz.ErrBadParam
+		}
+		preparedLotIDs = append(preparedLotIDs, lotID)
+	}
+	sort.Ints(preparedLotIDs)
+	if len(preparedLotIDs) > 0 {
+		hasNonZeroBalance, err := tx.client.InventoryBalance.Query().Where(
+			inventorybalance.LotIDIn(preparedLotIDs...),
+			inventorybalance.QuantityNEQ(decimal.Zero),
+		).Exist(ctx)
+		if err != nil {
+			return err
+		}
+		if hasNonZeroBalance {
+			return biz.ErrBadParam
+		}
+	}
+
+	for _, inspection := range inspections {
+		switch inspection.Status {
+		case biz.QualityInspectionStatusDraft:
+			if err := updateQualityInspectionCancelled(ctx, tx, inspection.ID, inspection.DecisionNote); err != nil {
+				return err
+			}
+		case biz.QualityInspectionStatusSubmitted:
+			lot := lotsByID[*inspection.InventoryLotID]
+			if lot == nil || lot.Status != biz.InventoryLotHold {
+				return biz.ErrBadParam
+			}
+			if err := updateQualityInspectionCancelled(ctx, tx, inspection.ID, inspection.DecisionNote); err != nil {
+				return err
+			}
+			if _, prepared := preparedLotItems[lot.ID]; !prepared {
+				originalStatus := inspection.OriginalLotStatus
+				if originalStatus == "" {
+					originalStatus = lot.Status
+				}
+				if !biz.IsValidInventoryLotStatus(originalStatus) || originalStatus == biz.InventoryLotDisabled {
+					return biz.ErrBadParam
+				}
+				if originalStatus != lot.Status {
+					if err := updateInventoryLotStatus(ctx, tx, lot.ID, originalStatus); err != nil {
+						return err
+					}
+				}
+			}
+		case biz.QualityInspectionStatusPassed, biz.QualityInspectionStatusRejected, biz.QualityInspectionStatusCancelled:
+		default:
+			return biz.ErrBadParam
+		}
+	}
+	for _, lotID := range preparedLotIDs {
+		if err := updateInventoryLotStatus(ctx, tx, lotID, biz.InventoryLotDisabled); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func validateDraftPurchaseReceiptCancellationInspection(
+	receipt *ent.PurchaseReceipt,
+	itemsByID map[int]*ent.PurchaseReceiptItem,
+	inspection *ent.QualityInspection,
+) error {
+	if receipt == nil || inspection == nil ||
+		optionalIntValueOrZero(inspection.PurchaseReceiptID) != receipt.ID ||
+		optionalStringValueOrEmpty(inspection.SourceType) != biz.QualityInspectionSourcePurchaseReceipt ||
+		optionalIntValueOrZero(inspection.SourceID) != receipt.ID ||
+		optionalStringValueOrEmpty(inspection.InspectionType) != biz.QualityInspectionTypeIncoming ||
+		optionalStringValueOrEmpty(inspection.SubjectType) != biz.QualityInspectionSubjectMaterial ||
+		inspection.InventoryLotID == nil || *inspection.InventoryLotID <= 0 ||
+		inspection.MaterialID == nil || *inspection.MaterialID <= 0 ||
+		inspection.WarehouseID == nil || *inspection.WarehouseID <= 0 ||
+		optionalIntValueOrZero(inspection.SubjectID) != *inspection.MaterialID {
+		return biz.ErrBadParam
+	}
+	if inspection.PurchaseReceiptItemID == nil {
+		return nil
+	}
+	item := itemsByID[*inspection.PurchaseReceiptItemID]
+	if item == nil || item.LotID == nil ||
+		*item.LotID != *inspection.InventoryLotID ||
+		item.MaterialID != *inspection.MaterialID ||
+		item.WarehouseID != *inspection.WarehouseID {
+		return biz.ErrBadParam
+	}
+	return nil
+}
+
 func (r *inventoryRepo) GetPurchaseReceipt(ctx context.Context, id int) (*biz.PurchaseReceipt, error) {
 	receipt, err := r.data.postgres.PurchaseReceipt.Get(ctx, id)
 	if err != nil {
@@ -909,14 +1114,25 @@ func (r *inventoryRepo) ListPurchaseReceipts(ctx context.Context, filter biz.Pur
 		Order(ent.Desc(purchasereceipt.FieldReceivedAt), ent.Desc(purchasereceipt.FieldID)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
+		WithItems(func(query *ent.PurchaseReceiptItemQuery) {
+			query.
+				Order(ent.Asc(purchasereceiptitem.FieldID)).
+				WithPurchaseOrderItem(func(orderItemQuery *ent.PurchaseOrderItemQuery) {
+					orderItemQuery.WithPurchaseOrder()
+				})
+		}).
 		All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
 	out := make([]*biz.PurchaseReceipt, 0, len(rows))
 	for _, row := range rows {
-		item, err := purchaseReceiptWithItems(ctx, r.data.postgres, row)
+		items, err := row.Edges.ItemsOrErr()
 		if err != nil {
+			return nil, 0, err
+		}
+		item := entPurchaseReceiptToBiz(row, items)
+		if err := projectPurchaseReceiptPurchaseOrderReference(item, items); err != nil {
 			return nil, 0, err
 		}
 		out = append(out, item)
@@ -1209,6 +1425,9 @@ func resolvePurchaseReceiptFromPurchaseOrderReplay(
 		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
 		Order(ent.Asc(purchasereceiptitem.FieldID)).
 		Limit(*receipt.IdempotencyItemCount).
+		WithPurchaseOrderItem(func(query *ent.PurchaseOrderItemQuery) {
+			query.WithPurchaseOrder()
+		}).
 		All(ctx)
 	if err != nil {
 		return nil, true, err
@@ -1217,6 +1436,9 @@ func resolvePurchaseReceiptFromPurchaseOrderReplay(
 		return nil, true, fmt.Errorf("purchase receipt %d idempotency result item set is incomplete", receipt.ID)
 	}
 	out := entPurchaseReceiptToBiz(receipt, items)
+	if err := projectPurchaseReceiptPurchaseOrderReference(out, items); err != nil {
+		return nil, true, err
+	}
 	out.QualityInspections, err = purchaseReceiptInitialQualityInspectionsForItems(ctx, client, receipt.ID, items)
 	if err != nil {
 		return nil, true, err
@@ -1717,11 +1939,47 @@ func purchaseReceiptWithItems(ctx context.Context, client *ent.Client, receipt *
 	items, err := client.PurchaseReceiptItem.Query().
 		Where(purchasereceiptitem.ReceiptID(receipt.ID)).
 		Order(ent.Asc(purchasereceiptitem.FieldID)).
+		WithPurchaseOrderItem(func(query *ent.PurchaseOrderItemQuery) {
+			query.WithPurchaseOrder()
+		}).
 		All(ctx)
 	if err != nil {
 		return nil, err
 	}
-	return entPurchaseReceiptToBiz(receipt, items), nil
+	out := entPurchaseReceiptToBiz(receipt, items)
+	if err := projectPurchaseReceiptPurchaseOrderReference(out, items); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func projectPurchaseReceiptPurchaseOrderReference(
+	out *biz.PurchaseReceipt,
+	items []*ent.PurchaseReceiptItem,
+) error {
+	orderIDs := make(map[int]*ent.PurchaseOrder)
+	for _, item := range items {
+		if item.PurchaseOrderItemID == nil {
+			continue
+		}
+		orderItem, edgeErr := item.Edges.PurchaseOrderItemOrErr()
+		if edgeErr != nil {
+			return edgeErr
+		}
+		order, edgeErr := orderItem.Edges.PurchaseOrderOrErr()
+		if edgeErr != nil {
+			return edgeErr
+		}
+		orderIDs[order.ID] = order
+	}
+	if len(orderIDs) == 1 {
+		for orderID, order := range orderIDs {
+			out.PurchaseOrderID = &orderID
+			orderNo := order.PurchaseOrderNo
+			out.PurchaseOrderNo = &orderNo
+		}
+	}
+	return nil
 }
 
 func entPurchaseReceiptToBiz(row *ent.PurchaseReceipt, items []*ent.PurchaseReceiptItem) *biz.PurchaseReceipt {

@@ -27,9 +27,7 @@ func (d *jsonrpcDispatcher) handlePurchase(
 	}
 
 	switch method {
-	case "create_purchase_receipt_draft",
-		"create_purchase_receipt_with_items",
-		"create_purchase_receipt_from_purchase_order",
+	case "create_purchase_receipt_from_purchase_order",
 		"add_purchase_receipt_item",
 		"post_purchase_receipt",
 		"cancel_purchase_receipt",

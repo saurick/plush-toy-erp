@@ -1,3 +1,13 @@
+import {
+  addNumeric20Scale6Units,
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  normalizePositiveNumeric20Scale6,
+  numeric20Scale6TextFromUnits,
+  numeric20Scale6Units,
+  subtractNumeric20Scale6Units,
+} from './numeric20Scale6.mjs'
+
 const MAX_FACT_NO_LENGTH = 64
 const MAX_REASON_LENGTH = 255
 const MAX_IDEMPOTENCY_KEY_LENGTH = 128
@@ -15,14 +25,14 @@ function positiveID(value) {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
 }
 
-function decimalNumber(value) {
-  const parsed = Number(normalizedText(value).replace(/,/gu, ''))
-  return Number.isFinite(parsed) ? parsed : 0
+function quantityUnits(value) {
+  return numeric20Scale6Units(value) ?? '0'
 }
 
-function quantityText(value) {
-  const parsed = decimalNumber(value)
-  return parsed > 0 ? String(Number(parsed.toFixed(4))) : ''
+function positiveUnitsText(value) {
+  return isPositiveNumeric20Scale6Units(value)
+    ? numeric20Scale6TextFromUnits(value)
+    : ''
 }
 
 function invalidResponse(message = '返工记录返回结果无法确认') {
@@ -51,7 +61,9 @@ function optionalOccurredAt(value) {
 }
 
 function sameQuantity(left, right) {
-  return Math.abs(decimalNumber(left) - decimalNumber(right)) < 0.000001
+  const leftUnits = numeric20Scale6Units(left)
+  const rightUnits = numeric20Scale6Units(right)
+  return leftUnits !== null && rightUnits !== null && leftUnits === rightUnits
 }
 
 export function isPostedProductionCompletion(fact = {}) {
@@ -66,12 +78,12 @@ export function isPostedProductionCompletion(fact = {}) {
       normalizedUpperText(fact?.source_type) === 'PRODUCTION_ORDER' &&
       positiveID(fact?.source_id) > 0 &&
       positiveID(fact?.source_line_id) > 0 &&
-      decimalNumber(fact?.quantity) > 0
+      isPositiveNumeric20Scale6Units(quantityUnits(fact?.quantity))
   )
 }
 
 export function productionReworkQuantitySummary(source = {}, facts = []) {
-  const completed = decimalNumber(source?.quantity)
+  const completed = quantityUnits(source?.quantity)
   const postedRework = (Array.isArray(facts) ? facts : []).reduce(
     (total, fact) => {
       if (
@@ -82,22 +94,24 @@ export function productionReworkQuantitySummary(source = {}, facts = []) {
       ) {
         return total
       }
-      return total + decimalNumber(fact?.quantity)
+      return addNumeric20Scale6Units(total, quantityUnits(fact?.quantity))
     },
-    0
+    '0'
   )
-  const remaining = Math.max(0, completed - postedRework)
+  const remaining = subtractNumeric20Scale6Units(completed, postedRework)
   return {
-    completed: quantityText(completed) || '0',
-    postedRework: quantityText(postedRework) || '0',
-    remaining: quantityText(remaining) || '0',
+    completed: positiveUnitsText(completed) || '0',
+    postedRework: positiveUnitsText(postedRework) || '0',
+    remaining: positiveUnitsText(remaining) || '0',
   }
 }
 
 export function isProductionReworkEligible(source = {}, facts = []) {
   return (
     isPostedProductionCompletion(source) &&
-    decimalNumber(productionReworkQuantitySummary(source, facts).remaining) > 0
+    isPositiveNumeric20Scale6Units(
+      quantityUnits(productionReworkQuantitySummary(source, facts).remaining)
+    )
   )
 }
 
@@ -122,9 +136,14 @@ export function buildProductionReworkPayload(
     throw new Error('仅已过账且来源完整的成品入库记录可以发起返工')
   }
   const summary = productionReworkQuantitySummary(source, facts)
-  const quantity = quantityText(values.quantity)
+  const quantity = normalizePositiveNumeric20Scale6(values.quantity)
   if (!quantity) throw new Error('返工数量必须大于 0')
-  if (decimalNumber(quantity) > decimalNumber(summary.remaining)) {
+  if (
+    compareNumeric20Scale6Units(
+      quantityUnits(quantity),
+      quantityUnits(summary.remaining)
+    ) > 0
+  ) {
     throw new Error('本次返工数量不能超过剩余可返工数量')
   }
   const factNo = boundedText(values.fact_no, '返工业务编号', MAX_FACT_NO_LENGTH)
@@ -159,7 +178,7 @@ export function normalizeProductionReworkRequest(params = {}) {
     throw invalidResponse('返工内容有误，请刷新页面后重新填写')
   }
   const sourceCompletionFactID = positiveID(params.source_completion_fact_id)
-  const quantity = quantityText(params.quantity)
+  const quantity = normalizePositiveNumeric20Scale6(params.quantity)
   const customerKey = normalizedText(params.customer_key)
   const idempotencyKey = normalizedText(params.idempotency_key)
   if (
@@ -221,7 +240,7 @@ export function productionReworkFormValuesFromRequest(request = {}) {
   const date = occurredAt ? new Date(occurredAt) : null
   return {
     fact_no: normalizedText(request?.fact_no),
-    quantity: quantityText(request?.quantity),
+    quantity: normalizePositiveNumeric20Scale6(request?.quantity),
     occurred_at:
       date && Number.isFinite(date.getTime())
         ? localProductionReworkDateTimeInputValue(date)

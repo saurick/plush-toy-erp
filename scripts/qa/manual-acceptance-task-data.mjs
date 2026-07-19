@@ -92,33 +92,35 @@ const SINGLE_TASK_GROUP_BY_ROLE = Object.freeze({
   boss: "trial_boss_work",
   sales: "trial_sales_work",
   purchase: "trial_purchase_work",
+  production: "trial_production_work",
+  warehouse: "trial_warehouse_work",
   finance: "trial_finance_work",
-  pmc: "production_scheduling",
+  pmc: "trial_pmc_work",
   quality: "trial_quality_work",
   engineering: "trial_engineering_work",
 });
 const TASK_GROUP_OVERRIDES_BY_ROLE_SCENARIO = Object.freeze({
   production: Object.freeze({
-    today_production: "production_scheduling",
-    outsourcing_return: "outsource_return_tracking",
-    rework: "finished_goods_rework",
-    production_exception: "production_exception",
-  }),
-  warehouse: Object.freeze({
-    receiving: "outsource_warehouse_inbound",
-    inbound: "warehouse_inbound",
-    material_picking: "trial_warehouse_work",
-    shipping: "shipment_release",
-    exception: "trial_warehouse_work",
+    // “今日生产”仍由生产计划视角展示，但它只是模拟任务，不能占用
+    // production_scheduling 的正式来源任务组或 source-* 编号前缀。
+    today_production: "trial_pmc_work",
   }),
 });
 // Primary desktop group only. Role-wide coverage must use the scenario mapping
 // helpers below because production and warehouse intentionally span groups.
 export const TASK_GROUP_BY_ROLE = Object.freeze({
   ...SINGLE_TASK_GROUP_BY_ROLE,
-  production: "production_exception",
-  warehouse: "shipment_release",
 });
+const FORMAL_SOURCE_TASK_GROUPS = Object.freeze([
+  "production_scheduling",
+  "production_exception",
+  "shipment_release",
+]);
+const FORMAL_SOURCE_TASK_CODE_PREFIXES = Object.freeze([
+  "source-production-scheduling-",
+  "source-production-exception-",
+  "source-shipment-release-",
+]);
 const BUSINESS_STATUS_OVERRIDES_BY_ROLE_SCENARIO = Object.freeze({
   production: Object.freeze({
     today_production: "production_processing",
@@ -1200,6 +1202,15 @@ export function validateManualAcceptanceTaskPlan(plan) {
       }
       seenCodes.add(params.task_code);
       if (
+        FORMAL_SOURCE_TASK_CODE_PREFIXES.some((prefix) =>
+          params.task_code.startsWith(prefix),
+        )
+      ) {
+        throw new CliError(
+          `${task.key} simulated task must not use a formal source task code`,
+        );
+      }
+      if (
         params.task_code !==
         `${TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]}-${pad(task.index)}`
       ) {
@@ -1239,6 +1250,14 @@ export function validateManualAcceptanceTaskPlan(plan) {
           `${task.key} task group does not match scenario ${scenarioKey}`,
         );
       }
+      if (
+        !params.task_group.startsWith("trial_") ||
+        FORMAL_SOURCE_TASK_GROUPS.includes(params.task_group)
+      ) {
+        throw new CliError(
+          `${task.key} simulated task must stay in the trial_* namespace`,
+        );
+      }
       const expectedBusinessStatus = getManualAcceptanceTaskBusinessStatus(
         roleKey,
         scenarioKey,
@@ -1249,22 +1268,6 @@ export function validateManualAcceptanceTaskPlan(plan) {
         );
       }
       scenarioCounts[scenarioKey] += 1;
-      if (
-        params.task_group === "shipment_release" &&
-        (roleKey !== "warehouse" || scenarioKey !== "shipping")
-      ) {
-        throw new CliError(
-          `${task.key} shipment_release is reserved for the shipping scenario`,
-        );
-      }
-      if (
-        params.task_group === "production_exception" &&
-        (roleKey !== "production" || scenarioKey !== "production_exception")
-      ) {
-        throw new CliError(
-          `${task.key} production_exception is reserved for the exception scenario`,
-        );
-      }
       if (
         params.source_type !== SOURCE_TYPE ||
         params.source_id !== plan.sourceID

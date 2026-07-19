@@ -9,6 +9,7 @@ import {
   hasDesktopEntryAccess,
   isMobileRoleEntryEnabled,
   parseMobileRoleFromPath,
+  resolveAllowedMobileEntryPath,
   resolveDefaultEntryTarget,
   resolveMobileTasksPath,
   shouldUseRememberedDesktopEntry,
@@ -193,6 +194,26 @@ test('entryConfig: 岗位任务端角色路径解析和生成稳定', () => {
   assert.equal(parseMobileRoleFromPath('/m/warehouse/tasks'), 'warehouse')
   assert.equal(resolveMobileTasksPath('quality'), '/m/quality/tasks')
   assert.equal(resolveMobileTasksPath('engineering'), '/m/engineering/tasks')
+})
+
+test('entryConfig: 多岗位直接进入首个可用岗位且尊重明确岗位', () => {
+  assert.equal(
+    resolveAllowedMobileEntryPath(['warehouse']),
+    '/m/warehouse/tasks'
+  )
+  assert.equal(
+    resolveAllowedMobileEntryPath(['warehouse', 'quality']),
+    '/m/warehouse/tasks'
+  )
+  assert.equal(
+    resolveAllowedMobileEntryPath(['warehouse', 'quality'], 'quality'),
+    '/m/quality/tasks'
+  )
+  assert.equal(
+    resolveAllowedMobileEntryPath(['warehouse', 'quality'], 'finance'),
+    '/m/warehouse/tasks'
+  )
+  assert.equal(resolveAllowedMobileEntryPath([]), '')
 })
 
 test('entryConfig: 平板识别覆盖 iPad 桌面 UA', () => {

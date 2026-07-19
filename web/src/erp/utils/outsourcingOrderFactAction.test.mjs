@@ -286,6 +286,13 @@ test('outsourcing source payload respects existing non-cancelled facts', () => {
       source_line_id: 11,
       quantity: '9',
     },
+    {
+      fact_type: 'MATERIAL_ISSUE',
+      status: 'DRAFT',
+      source_id: 7,
+      source_line_id: 11,
+      quantity: '3.999999',
+    },
   ]
   assert.deepEqual(
     outsourcingSourceActionQuantitySummary(
@@ -311,6 +318,82 @@ test('outsourcing source payload respects existing non-cancelled facts', () => {
         facts
       ),
     /剩余数量/u
+  )
+})
+
+test('outsourcing source quantities preserve numeric(20,6) boundaries exactly', () => {
+  const tinyItem = { ...materialItem, outsourcing_quantity: '0.000001' }
+  assert.deepEqual(
+    outsourcingSourceActionQuantitySummary(
+      OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE,
+      order,
+      tinyItem,
+      []
+    ),
+    { planned: '0.000001', processed: '0', remaining: '0.000001' }
+  )
+  assert.equal(
+    buildOutsourcingSourceFactPayload(
+      OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE,
+      { warehouse_id: 3, lot_id: 4, quantity: '0.000001' },
+      order,
+      tinyItem,
+      []
+    ).quantity,
+    '0.000001'
+  )
+
+  const maximum = '99999999999999.999999'
+  const maximumItem = { ...materialItem, outsourcing_quantity: maximum }
+  const facts = [
+    {
+      fact_type: 'MATERIAL_ISSUE',
+      status: 'POSTED',
+      source_id: 7,
+      source_line_id: 11,
+      quantity: '0.000001',
+    },
+    {
+      fact_type: 'MATERIAL_ISSUE',
+      status: 'DRAFT',
+      source_id: 7,
+      source_line_id: 11,
+      quantity: maximum,
+    },
+    {
+      fact_type: 'MATERIAL_ISSUE',
+      status: 'CANCELLED',
+      source_id: 7,
+      source_line_id: 11,
+      quantity: maximum,
+    },
+  ]
+  assert.deepEqual(
+    outsourcingSourceActionQuantitySummary(
+      OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE,
+      order,
+      maximumItem,
+      facts
+    ),
+    {
+      planned: maximum,
+      processed: '0.000001',
+      remaining: '99999999999999.999998',
+    }
+  )
+  assert.equal(
+    buildOutsourcingSourceFactPayload(
+      OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE,
+      {
+        warehouse_id: 3,
+        lot_id: 4,
+        quantity: '99999999999999.999998',
+      },
+      order,
+      maximumItem,
+      facts
+    ).quantity,
+    '99999999999999.999998'
   )
 })
 

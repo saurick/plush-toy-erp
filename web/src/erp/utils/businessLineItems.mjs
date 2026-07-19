@@ -1,4 +1,9 @@
 import { compactParams, trimOptional } from './masterDataOrderView.mjs'
+import {
+  formatNumeric20Scale6,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from './numeric20Scale6.mjs'
 
 export function positiveInt(value) {
   const numberValue = Number(value || 0)
@@ -11,75 +16,8 @@ export function requiredInt(value) {
   return positiveInt(value) || 0
 }
 
-export function decimalNumber(value) {
-  const numeric = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(numeric) ? numeric : 0
-}
-
 export function formatQuantity(value) {
-  const numeric = Number(value || 0)
-  if (!Number.isFinite(numeric) || numeric === 0) return '0'
-  return String(Number(numeric.toFixed(4)))
-}
-
-export function quantityBySourceItemID({
-  records = [],
-  itemKey = 'sales_order_item_id',
-  cancelledStatuses = ['CANCELLED', 'canceled'],
-} = {}) {
-  const cancelledStatusSet = new Set(
-    cancelledStatuses.map((status) => String(status || '').trim())
-  )
-  const quantityByID = new Map()
-  ;(Array.isArray(records) ? records : []).forEach((record) => {
-    if (cancelledStatusSet.has(String(record?.status || '').trim())) {
-      return
-    }
-    const recordItems = Array.isArray(record?.items) ? record.items : []
-    recordItems.forEach((item) => {
-      const sourceItemID = positiveInt(item?.[itemKey])
-      if (!sourceItemID) return
-      quantityByID.set(
-        sourceItemID,
-        (quantityByID.get(sourceItemID) || 0) + decimalNumber(item?.quantity)
-      )
-    })
-  })
-  return quantityByID
-}
-
-export function buildShipmentSourceRows({
-  salesOrderItems = [],
-  shipments = [],
-} = {}) {
-  const shippedBySalesOrderItemID = quantityBySourceItemID({
-    records: shipments,
-    itemKey: 'sales_order_item_id',
-    cancelledStatuses: ['CANCELLED'],
-  })
-  return (Array.isArray(salesOrderItems) ? salesOrderItems : []).map((item) => {
-    const orderedQuantity = decimalNumber(item?.ordered_quantity)
-    const shippedQuantity = shippedBySalesOrderItemID.get(Number(item?.id)) || 0
-    const remainingQuantity = Math.max(0, orderedQuantity - shippedQuantity)
-    const lineStatus = String(item?.line_status || 'open')
-    const disabledReason =
-      lineStatus !== 'open'
-        ? '来源行已关闭'
-        : remainingQuantity <= 0
-          ? '已全部生成出货'
-          : ''
-    return {
-      ...item,
-      orderedQuantity,
-      shippedQuantity,
-      remainingQuantity,
-      disabledReason,
-    }
-  })
+  return formatNumeric20Scale6(value)
 }
 
 export function buildPurchaseReceiptItemParams(receiptID, values = {}) {
@@ -175,7 +113,16 @@ export function buildShipmentSourceItemChangePatch(
   salesOrderItems = []
 ) {
   const sourceItem = recordByID(salesOrderItems, salesOrderItemID)
-  if (!sourceItem) {
+  const remainingQuantity = numeric20Scale6Units(
+    sourceItem?.remainingQuantity
+  )
+  if (
+    !sourceItem ||
+    sourceItem.selectable !== true ||
+    sourceItem.disabledReason ||
+    remainingQuantity === null ||
+    !isPositiveNumeric20Scale6Units(remainingQuantity)
+  ) {
     return {
       sales_order_item_id: undefined,
       product_id: undefined,
@@ -187,10 +134,7 @@ export function buildShipmentSourceItemChangePatch(
     }
   }
   return createShipmentItemFromSalesOrderItem(sourceItem, {
-    quantity:
-      sourceItem.remainingQuantity === undefined
-        ? sourceItem.ordered_quantity
-        : sourceItem.remainingQuantity,
+    quantity: sourceItem.remainingQuantity,
   })
 }
 

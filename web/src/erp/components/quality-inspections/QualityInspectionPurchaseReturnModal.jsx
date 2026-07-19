@@ -5,6 +5,10 @@ import {
   sourceBusinessActionNo,
   sourceBusinessActionUUID,
 } from '../../utils/sourceBusinessAction.mjs'
+import {
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 
 function localDateTimeValue() {
   const now = new Date()
@@ -17,6 +21,7 @@ export default function QualityInspectionPurchaseReturnModal({
   inspection,
   sourceSummary = {},
   loading = false,
+  referenceDataReady = false,
   onCancel,
   onSubmit,
 }) {
@@ -55,6 +60,7 @@ export default function QualityInspectionPurchaseReturnModal({
       okText="生成退货草稿"
       cancelText="取消"
       confirmLoading={loading}
+      okButtonProps={{ disabled: !referenceDataReady }}
       closable={!loading}
       destroyOnHidden
       forceRender
@@ -107,7 +113,12 @@ export default function QualityInspectionPurchaseReturnModal({
           },
         ]}
       />
-      <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+      <Form
+        form={form}
+        layout="vertical"
+        preserve={false}
+        disabled={loading || !referenceDataReady}
+      >
         <Form.Item
           name="return_no"
           label="退货单号（自动）"
@@ -124,7 +135,7 @@ export default function QualityInspectionPurchaseReturnModal({
             { required: true, message: '请填写退货数量' },
             {
               validator: (_, value) =>
-                Number(value) > 0
+                isPositiveNumeric20Scale6Units(numeric20Scale6Units(value))
                   ? Promise.resolve()
                   : Promise.reject(new Error('退货数量必须大于 0')),
             },

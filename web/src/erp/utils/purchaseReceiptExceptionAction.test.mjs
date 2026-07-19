@@ -108,3 +108,33 @@ test('purchase exception payloads reject unknown receipt lines', () => {
     )
   )
 })
+
+test('purchase exception quantities preserve numeric(20,6) boundaries exactly', () => {
+  assert.equal(
+    buildPurchaseReturnFromReceiptPayload(
+      {
+        items: [
+          { purchase_receipt_item_id: 11, quantity: '0.000001' },
+        ],
+      },
+      receipt
+    ).items[0].quantity,
+    '0.000001'
+  )
+  assert.deepEqual(
+    buildPurchaseReceiptAdjustmentPayload(
+      {
+        reason: '边界数量调整',
+        items: [
+          {
+            purchase_receipt_item_id: 11,
+            adjust_type: 'QUANTITY_INCREASE',
+            quantity: '99999999999999.999999',
+          },
+        ],
+      },
+      receipt
+    ).items[0].quantity,
+    '99999999999999.999999'
+  )
+})

@@ -60,6 +60,11 @@ const DATA_BOUNDARY_LABELS = Object.freeze({
   [DASHBOARD_TRUTH_KINDS.BUSINESS_FACT]: '办理结果',
   [DASHBOARD_TRUTH_KINDS.COLLABORATION]: '待办事项',
 })
+const BUSINESS_ATTENTION_LANES = Object.freeze(
+  TASK_BOARD_LANE_DEFINITIONS.filter(
+    (definition) => definition.key === 'exception' || definition.key === 'due'
+  )
+)
 
 function formatCount(value) {
   return Number.isSafeInteger(value) && value >= 0
@@ -163,16 +168,6 @@ export default function BusinessDashboardPage() {
     () => buildDashboardModuleRows(dashboardHealthModules, moduleStats),
     [moduleStats]
   )
-  const businessSourceRows = useMemo(
-    () =>
-      moduleRows.flatMap((moduleRow) =>
-        moduleRow.sources.map((source) => ({
-          ...source,
-          module: moduleRow.module,
-        }))
-      ),
-    [moduleRows]
-  )
   const summary = useMemo(() => buildDashboardSummary(moduleRows), [moduleRows])
   const isSuperAdmin = outletContext?.adminProfile?.is_super_admin === true
   const allowedMenuPaths = useMemo(
@@ -181,8 +176,30 @@ export default function BusinessDashboardPage() {
         Array.isArray(outletContext?.allowedMenuPaths)
           ? outletContext.allowedMenuPaths
           : []
-      ),
+    ),
     [outletContext?.allowedMenuPaths]
+  )
+  const businessSourceRows = useMemo(
+    () =>
+      moduleRows.flatMap((moduleRow) =>
+        moduleRow.sources.map((source) => {
+          const pageKey = PAGE_KEY_BY_DASHBOARD_SOURCE[source.key] || source.key
+          const rbacAllowsPath =
+            isSuperAdmin || allowedMenuPaths.has(source.path)
+          const canOpen =
+            rbacAllowsPath &&
+            effectiveSessionAllowsPage(outletContext?.adminProfile, pageKey, {
+              isLocalDev: false,
+              isSuperAdmin,
+            })
+          return {
+            ...source,
+            module: moduleRow.module,
+            canOpen,
+          }
+        })
+      ),
+    [allowedMenuPaths, isSuperAdmin, moduleRows, outletContext?.adminProfile]
   )
   const collaborationRisk = taskBoardReady
     ? Number(taskBoard?.counts?.exception || 0) +
@@ -227,67 +244,6 @@ export default function BusinessDashboardPage() {
       navigate(entryPath)
     }
   }
-
-  const renderSourceDetails = (record) => (
-    <div className="erp-business-board-source-grid">
-      {record.sources.map((source) => {
-        const pageKey = PAGE_KEY_BY_DASHBOARD_SOURCE[source.key] || source.key
-        const rbacAllowsPath = isSuperAdmin || allowedMenuPaths.has(source.path)
-        const canOpen =
-          rbacAllowsPath &&
-          effectiveSessionAllowsPage(outletContext?.adminProfile, pageKey, {
-            isLocalDev: false,
-            isSuperAdmin,
-          })
-        return (
-          <div
-            className={`erp-business-board-source-item${
-              canOpen ? ' erp-business-board-source-item--openable' : ''
-            }`}
-            key={source.key}
-            data-open-on-double-click={canOpen ? 'true' : undefined}
-            data-target-path={canOpen ? source.path : undefined}
-            title={canOpen ? `双击进入${source.label}` : undefined}
-            onDoubleClick={
-              canOpen
-                ? (event) =>
-                    openDashboardItemOnDoubleClick(event, () =>
-                      navigate(source.path)
-                    )
-                : undefined
-            }
-          >
-            <div className="erp-business-board-source-meta">
-              <Text>{source.label}</Text>
-              <strong
-                className="erp-business-board-source-count"
-                aria-label={`${source.label}数量${
-                  source.available ? formatCount(source.total) : '暂不可用'
-                }`}
-              >
-                {source.available ? formatCount(source.total) : '暂不可用'}
-              </strong>
-            </div>
-            {canOpen ? (
-              <Button
-                type="link"
-                size="small"
-                className="erp-business-board-source-entry"
-                onClick={() => navigate(source.path)}
-                aria-label={`查看${source.label}`}
-              >
-                查看{source.label}
-              </Button>
-            ) : (
-              <Text type="secondary" className="erp-business-board-source-readonly">
-                只读
-              </Text>
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
 
   return (
     <Space
@@ -360,7 +316,7 @@ export default function BusinessDashboardPage() {
           ) : null}
           <Paragraph type="secondary" className="erp-business-board-table-note">
             每项分别统计；0 表示当前确实为零，—
-            表示统计暂不可用。点击“查看业务记录”进入，电脑端也可双击整行。
+            表示统计暂不可用。有“查看业务记录”的项目可进入，电脑端也可双击整行；其他项目仅显示数量。
           </Paragraph>
           <Table
             size="middle"
@@ -371,15 +327,24 @@ export default function BusinessDashboardPage() {
             pagination={false}
             rowKey="key"
             scroll={{ x: 760 }}
-            rowClassName="erp-business-board-source-item--openable"
-            onRow={(source) => ({
-              'data-open-on-double-click': 'true',
-              title: `双击进入${source.label}`,
-              onDoubleClick: (event) =>
-                openDashboardItemOnDoubleClick(event, () =>
-                  navigate(source.path)
-                ),
-            })}
+            rowClassName={(source) =>
+              source.canOpen
+                ? 'erp-business-board-source-item--openable'
+                : ''
+            }
+            onRow={(source) =>
+              source.canOpen
+                ? {
+                    'data-open-on-double-click': 'true',
+                    'data-target-path': source.path,
+                    title: `双击进入${source.label}`,
+                    onDoubleClick: (event) =>
+                      openDashboardItemOnDoubleClick(event, () =>
+                        navigate(source.path)
+                      ),
+                  }
+                : {}
+            }
             columns={[
               {
                 title: '业务环节',
@@ -421,67 +386,29 @@ export default function BusinessDashboardPage() {
                 key: 'entry',
                 width: 150,
                 fixed: 'right',
-                render: (_, source) => (
-                  <Button
-                    type="link"
-                    size="small"
-                    className="erp-business-board-source-entry"
-                    onClick={() => navigate(source.path)}
-                    aria-label={`查看${source.label}`}
-                  >
-                    查看业务记录
-                  </Button>
-                ),
+                render: (_, source) =>
+                  source.canOpen ? (
+                    <Button
+                      type="link"
+                      size="small"
+                      className="erp-business-board-source-entry"
+                      onClick={() => navigate(source.path)}
+                      aria-label={`查看${source.label}`}
+                    >
+                      查看业务记录
+                    </Button>
+                  ) : (
+                    <Text
+                      type="secondary"
+                      className="erp-business-board-source-readonly"
+                    >
+                      只读
+                    </Text>
+                  ),
               },
             ]}
             dataSource={businessSourceRows}
           />
-        ) : null}
-        <Paragraph type="secondary" className="erp-business-board-table-note">
-          每一项单独统计；有“查看”的项目可进入，其他项目仅显示数量。
-        </Paragraph>
-        <Table
-          size="middle"
-          loading={{
-            spinning: loading,
-            indicator: <Spin size="small" />,
-          }}
-          pagination={false}
-          rowKey="key"
-          scroll={{ x: 680 }}
-          columns={[
-            {
-              title: '业务分类',
-              dataIndex: 'module',
-              fixed: 'left',
-              width: 180,
-              render: (value) => <Text strong>{value}</Text>,
-            },
-            {
-              title: '数据明细',
-              key: 'sources',
-              render: (_, record) => renderSourceDetails(record),
-            },
-          ]}
-          dataSource={moduleRows}
-        />
-      </Card>
-
-      <div className="erp-business-board-lower-grid">
-        <Card className="erp-dashboard-card" variant="borderless">
-          <Space direction="vertical" className="erp-dashboard-block" size={8}>
-            <Title level={5} className="erp-dashboard-section-title">
-              数字说明
-            </Title>
-            <div className="erp-business-board-boundary-list">
-              {DATA_BOUNDARIES.map((item) => (
-                <div className="erp-business-board-boundary-row" key={item.key}>
-                  <Text strong>{item.title}</Text>
-                  <Text type="secondary">{item.description}</Text>
-                </div>
-              ))}
-            </div>
-          </Space>
         </Card>
 
         <Card

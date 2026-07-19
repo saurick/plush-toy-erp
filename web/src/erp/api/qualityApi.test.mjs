@@ -78,3 +78,14 @@ test('qualityApi: exposes dedicated outsourcing return quality commands', () => 
   )
   assert.doesNotMatch(source, /createOperationalFact/u)
 })
+
+test('qualityApi: source actions reread all related quality inspections', () => {
+  assert.match(
+    source,
+    /export async function listAllFinishedGoodsQualityInspections[\s\S]*?listAllPaginatedRecords\(\s*listFinishedGoodsQualityInspections,\s*params,\s*'quality_inspections'/u
+  )
+  assert.match(
+    source,
+    /export async function listAllOutsourcingReturnQualityInspections[\s\S]*?listAllPaginatedRecords\(\s*listOutsourcingReturnQualityInspections,\s*params,\s*'quality_inspections'/u
+  )
+})

@@ -835,8 +835,10 @@
 }
 
 .erp-work-instruction-paper__company {
+  justify-content: center;
   font-size: 21.33px;
   font-weight: 700;
+  text-align: center;
 }
 
 .erp-work-instruction-paper__title-cell {

@@ -29,7 +29,10 @@ import {
 export default function PurchaseOrderOperationPanel({
   applySelectedRowKeys,
   canCreate = false,
+  referenceDataReady = false,
   canGenerateInboundDraft = false,
+  hasInboundWarehouse = false,
+  inboundReferenceDataState = 'loading',
   clearFilters,
   dateFilterEnd = '',
   dateFilterField = 'purchase_date',
@@ -45,6 +48,7 @@ export default function PurchaseOrderOperationPanel({
   openEditModal,
   openInboundDraftModal,
   openRelatedTable,
+  relatedMenuItems = PURCHASE_ORDER_RELATED_MENU_ITEMS,
   orders = [],
   primaryLifecycleAction,
   printPurchaseContract,
@@ -135,7 +139,10 @@ export default function PurchaseOrderOperationPanel({
             className="erp-business-filter-control--sort"
             value={sortValue}
             options={PURCHASE_ORDER_SORT_OPTIONS}
-            onChange={setSortValue}
+            onChange={(value) => {
+              resetPagination()
+              setSortValue(value)
+            }}
           />
         </>
       }
@@ -161,7 +168,10 @@ export default function PurchaseOrderOperationPanel({
           type="primary"
           className="erp-business-list-toolbar__primary-action"
           icon={<PlusOutlined />}
-          disabled={!canCreate}
+          disabled={!canCreate || !referenceDataReady}
+          title={
+            !referenceDataReady ? '采购基础资料加载完成后可新建' : undefined
+          }
           onClick={openCreateModal}
         >
           新建采购订单
@@ -189,7 +199,12 @@ export default function PurchaseOrderOperationPanel({
           size="small"
           icon={<EditOutlined />}
           loading={itemsLoading}
-          disabled={!selectedOrderCanEdit || itemsLoading}
+          disabled={
+            !selectedOrderCanEdit || !referenceDataReady || itemsLoading
+          }
+          title={
+            !referenceDataReady ? '采购基础资料加载完成后可编辑' : undefined
+          }
           onClick={() => openEditModal(singleSelectedOrder)}
         >
           编辑
@@ -197,16 +212,24 @@ export default function PurchaseOrderOperationPanel({
         <Dropdown
           trigger={['click']}
           destroyOnHidden
-          disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
+          disabled={
+            selectedRowKeys.length !== 1 ||
+            !singleSelectedOrder ||
+            relatedMenuItems.length === 0
+          }
           menu={{
-            items: PURCHASE_ORDER_RELATED_MENU_ITEMS,
+            items: relatedMenuItems,
             onClick: openRelatedTable,
           }}
         >
           <Button
             size="small"
             icon={<LinkOutlined />}
-            disabled={selectedRowKeys.length !== 1 || !singleSelectedOrder}
+            disabled={
+              selectedRowKeys.length !== 1 ||
+              !singleSelectedOrder ||
+              relatedMenuItems.length === 0
+            }
           >
             相关单据 <DownOutlined />
           </Button>
@@ -231,9 +254,15 @@ export default function PurchaseOrderOperationPanel({
         ) : null}
         <Tooltip
           title={
-            canGenerateInboundDraft
-              ? '按当前采购订单剩余明细生成采购入库草稿'
-              : '仅已审核采购订单且具备采购入库创建权限时可生成'
+            !canGenerateInboundDraft
+              ? '仅已审核采购订单且具备采购入库创建权限时可生成'
+              : inboundReferenceDataState !== 'ready'
+                ? inboundReferenceDataState === 'loading'
+                  ? '入库仓库资料加载完成后可生成'
+                  : '入库仓库资料加载失败，请刷新当前页后重试'
+                : !hasInboundWarehouse
+                  ? '请先维护至少一个启用的入库仓库'
+                  : '按当前采购订单剩余明细生成采购入库草稿'
           }
         >
           <span>
@@ -243,6 +272,8 @@ export default function PurchaseOrderOperationPanel({
               icon={<ImportOutlined />}
               disabled={
                 !canGenerateInboundDraft ||
+                inboundReferenceDataState !== 'ready' ||
+                !hasInboundWarehouse ||
                 selectedRowKeys.length !== 1 ||
                 !singleSelectedOrder
               }

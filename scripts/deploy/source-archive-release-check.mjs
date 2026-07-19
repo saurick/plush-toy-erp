@@ -80,6 +80,8 @@ const ALLOWED_ENV_FILES = new Set([
   "web/.env.development",
   "web/.env.production",
 ]);
+const TEMPORARY_MARKER_PATH_PATTERN =
+  /(?:^|\/)(?:[^/]*_DELETE_ME(?:\.[^/]*)?|[^/]*GITHUB_WRITE_TEST[^/]*)$/iu;
 
 const USAGE = `Source archive release check
 
@@ -410,6 +412,9 @@ function scanArchiveInventory({ archiveRoot, customer }) {
     `config/customers/${customer}/public-assets`,
   ].filter((relativePath) => !existsSync(path.join(archiveRoot, relativePath)));
   const forbiddenPaths = inventory.files.filter((relativePath) => {
+    if (TEMPORARY_MARKER_PATH_PATTERN.test(relativePath)) {
+      return true;
+    }
     if (relativePath.startsWith("docs/customers/")) {
       return true;
     }

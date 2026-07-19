@@ -15,6 +15,7 @@ import {
   buildManualAcceptanceCatalog,
 } from "./manual-acceptance-catalog.mjs";
 import { buildManualAcceptancePageDataContract } from "./manual-acceptance-page-data-contract.mjs";
+import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import {
   MANUAL_ACCEPTANCE_DATASET_APPLY_REPORT_CONTRACT,
@@ -322,7 +323,7 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
       requiresDataEvidence:
         target.isList ||
         ["print-preview", "print-workspace"].includes(target.group) ||
-        ["global-dashboard", "business-dashboard", "exception-flow"].includes(
+        ["global-dashboard", "business-dashboard"].includes(
           target.key,
         ),
       ...(target.key === "business-dashboard"
@@ -332,8 +333,8 @@ export function buildManualAcceptanceBrowserPlan({ baseURL, backendURL } = {}) {
   });
   assert.equal(
     targets.length,
-    51,
-    "手工验收浏览器计划必须覆盖当前 51 个正式目标",
+    50,
+    "手工验收浏览器计划必须覆盖当前 50 个正式目标",
   );
   return {
     scope: "manual-acceptance-browser-plan",
@@ -1008,37 +1009,6 @@ export function evaluateGlobalDashboardEvidence(
   };
 }
 
-export function evaluateExceptionFlowEvidence(
-  bodyText,
-  visibleItems,
-  minimumRecords,
-) {
-  const blockedMatch = String(bodyText || "").match(/阻塞任务\s*(\d+)/u);
-  const dueMatch = String(bodyText || "").match(/今日\/超时任务\s*(\d+)/u);
-  const blockedCount = blockedMatch ? Number(blockedMatch[1]) : 0;
-  const dueCount = dueMatch ? Number(dueMatch[1]) : 0;
-  const observedTotal = blockedCount;
-  const minimumSatisfied =
-    blockedCount >= minimumRecords &&
-    dueCount > 0 &&
-    Number(visibleItems) > 0 &&
-    !String(bodyText || "").includes("暂无阻塞任务");
-  return {
-    status: minimumSatisfied
-      ? "minimum_proven"
-      : blockedCount > 0 || dueCount > 0 || Number(visibleItems) > 0
-        ? "page_has_data_minimum_not_proven"
-        : "not_proven",
-    evidenceSource: "exception summary and visible exception items",
-    blockedCount,
-    dueCount,
-    visibleItems: Number(visibleItems) || 0,
-    observedTotal,
-    minimumRecords,
-    minimumSatisfied,
-  };
-}
-
 export function evaluateBusinessDashboardEvidence(ariaLabels, requirements) {
   const parsedByLabel = new Map(
     (ariaLabels || []).flatMap((ariaLabel) => {
@@ -1339,73 +1309,6 @@ async function readDashboardEvidence(page, target, datasetBinding) {
         passed: new URL(page.url()).pathname === expectedPath,
       },
     };
-  }
-  if (target.key === "exception-flow") {
-    await page.waitForFunction(
-      () => {
-        const text = document.body?.innerText || "";
-        return (
-          /阻塞任务\s*\d+/u.test(text) && /今日\/超时任务\s*\d+/u.test(text)
-        );
-      },
-      null,
-      { timeout: PAGE_TIMEOUT_MS },
-    );
-    const metrics = await page.evaluate(
-      ({ taskCodePrefix, taskGroup }) => ({
-        bodyText: document.body?.innerText || "",
-        visibleItems: [
-          ...document.querySelectorAll(".erp-command-center-focus-item"),
-        ].filter((node) => {
-          const rect = node.getBoundingClientRect();
-          return rect.width > 0 && rect.height > 0;
-        }).length,
-        visibleTaskCodes: [
-          ...document.querySelectorAll(
-            ".erp-command-center-focus-item[data-task-code][data-task-group]",
-          ),
-        ]
-          .filter((node) => {
-            const rect = node.getBoundingClientRect();
-            return (
-              rect.width > 0 &&
-              rect.height > 0 &&
-              node.getAttribute("data-task-group") === taskGroup
-            );
-          })
-          .map((node) => node.getAttribute("data-task-code") || ""),
-        currentBatchTaskCodes: [
-          ...document.querySelectorAll(
-            '[data-testid="dashboard-workflow-task-evidence"] [data-task-code][data-task-group]',
-          ),
-        ]
-          .filter(
-            (node) =>
-              node.getAttribute("data-task-terminal") === "false" &&
-              node.getAttribute("data-task-group") === taskGroup &&
-              (node.getAttribute("data-task-code") || "").startsWith(
-                `${taskCodePrefix}-`,
-              ),
-          )
-          .map((node) => node.getAttribute("data-task-code") || ""),
-      }),
-      {
-        taskCodePrefix: TASK_VISIBLE_CODE_PREFIX_BY_ROLE.production,
-        taskGroup: "production_exception",
-      },
-    );
-    return evaluateDashboardTaskCurrentBatchEvidence({
-      evidence: evaluateExceptionFlowEvidence(
-        metrics.bodyText,
-        metrics.visibleItems,
-        target.minimumRecords,
-      ),
-      currentBatch,
-      roleKey: "production",
-      taskGroup: "production_exception",
-      visibleTaskCodes: metrics.visibleTaskCodes,
-      currentBatchTaskCodes: metrics.currentBatchTaskCodes,
-    });
   }
   throw new BrowserAcceptanceError(`${target.title} 缺少页面数据证据读取器`);
 }
@@ -1761,6 +1664,104 @@ export function evaluateCurrentBatchListEvidence({
   };
 }
 
+const FINANCE_BROWSER_PAGE_CONTRACT = Object.freeze({
+  receivables: Object.freeze({
+    factType: "RECEIVABLE",
+    requiredHeaders: Object.freeze(["收款分类", "账期", "取消记录"]),
+    forbiddenHeaders: Object.freeze(["发票类别"]),
+  }),
+  payables: Object.freeze({
+    factType: "PAYABLE",
+    requiredHeaders: Object.freeze(["取消记录"]),
+    forbiddenHeaders: Object.freeze(["收款分类", "账期", "发票类别"]),
+  }),
+  invoices: Object.freeze({
+    factType: "INVOICE",
+    requiredHeaders: Object.freeze(["发票类别", "取消记录"]),
+    forbiddenHeaders: Object.freeze(["收款分类", "账期"]),
+  }),
+  reconciliation: Object.freeze({
+    factType: "RECONCILIATION",
+    requiredHeaders: Object.freeze(["取消记录"]),
+    forbiddenHeaders: Object.freeze(["收款分类", "账期", "发票类别"]),
+  }),
+});
+
+export function evaluateFinanceFieldBrowserEvidence({
+  targetKey,
+  headers = [],
+  rows = [],
+  representatives = {},
+}) {
+  const contract = FINANCE_BROWSER_PAGE_CONTRACT[targetKey];
+  if (!contract) return { passed: true, applicable: false };
+  const normalizedHeaders = headers.map((item) => String(item || "").trim());
+  const missingHeaders = contract.requiredHeaders.filter(
+    (header) => !normalizedHeaders.includes(header),
+  );
+  const forbiddenHeaders = contract.forbiddenHeaders.filter((header) =>
+    normalizedHeaders.includes(header),
+  );
+  const representative =
+    representatives?.[contract.factType]?.active ||
+    representatives?.[contract.factType]?.value;
+  const factNo = String(representative?.factNo || "").trim();
+  const row = rows.find((cells) =>
+    cells.some((cell) => String(cell || "").includes(factNo)),
+  );
+  const cellAt = (header) => {
+    const index = normalizedHeaders.indexOf(header);
+    return index < 0 || !row ? "" : String(row[index] || "").trim();
+  };
+  const valueMismatches = [];
+  if (!factNo || !row) valueMismatches.push("代表单号未显示");
+  if (row && cellAt("取消记录") !== "-") {
+    valueMismatches.push("非取消代表行的取消记录必须为 -");
+  }
+  if (row && contract.factType === "RECEIVABLE") {
+    if (cellAt("收款分类") !== "应收款") {
+      valueMismatches.push("应收收款分类未显示为应收款");
+    }
+    const termLabels = {
+      CASH_ON_SHIPMENT: "出货即收",
+      EOM_30: "月结 30 天",
+      EOM_45: "月结 45 天",
+    };
+    const expectedTerm = representative.paymentTerm
+      ? `${termLabels[representative.paymentTerm] || "待核对"} / ${representative.paymentTermDays} 天`
+      : `自定义账期 / ${representative.paymentTermDays} 天`;
+    if (cellAt("账期") !== expectedTerm) {
+      valueMismatches.push(`应收账期未显示为 ${expectedTerm}`);
+    }
+  }
+  if (row && contract.factType === "INVOICE") {
+    const categoryLabels = {
+      NONE: "不开票",
+      EXPORT_GENERAL: "出口普票",
+      VAT_GENERAL_1: "1% 普票",
+      VAT_SPECIAL_3: "3% 专票",
+      VAT_SPECIAL_13: "13% 专票",
+    };
+    const expectedCategory = categoryLabels[representative.invoiceCategory];
+    if (!expectedCategory || cellAt("发票类别") !== expectedCategory) {
+      valueMismatches.push("发票类别未按合同显示");
+    }
+  }
+  const passed =
+    missingHeaders.length === 0 &&
+    forbiddenHeaders.length === 0 &&
+    valueMismatches.length === 0;
+  return {
+    passed,
+    applicable: true,
+    factType: contract.factType,
+    factNo: factNo || null,
+    missingHeaders,
+    forbiddenHeaders,
+    valueMismatches,
+  };
+}
+
 async function readListEvidence(page, target, datasetBinding) {
   let specializedEvidence = null;
   let currentBatchDOM = null;
@@ -1885,11 +1886,20 @@ async function readListEvidence(page, target, datasetBinding) {
       const style = window.getComputedStyle(node);
       return rect.width > 0 && rect.height > 0 && style.visibility !== "hidden";
     };
-    const tableRows = [
+    const tableRowNodes = [
       ...document.querySelectorAll(".ant-table-tbody > tr"),
     ].filter(
       (row) => visible(row) && !row.classList.contains("ant-table-placeholder"),
-    ).length;
+    );
+    const tableRows = tableRowNodes.length;
+    const tableHeaders = [
+      ...document.querySelectorAll(".ant-table-thead th"),
+    ].map((node) => node.textContent?.replace(/\s+/gu, " ").trim() || "");
+    const tableRowCells = tableRowNodes.map((row) =>
+      [...row.querySelectorAll("td")].map(
+        (cell) => cell.textContent?.replace(/\s+/gu, " ").trim() || "",
+      ),
+    );
     const mobileRows = [
       ...document.querySelectorAll(".erp-mobile-list-item"),
     ].filter(visible).length;
@@ -1916,6 +1926,8 @@ async function readListEvidence(page, target, datasetBinding) {
       auditEvents,
       paginationTexts,
       bodyText,
+      tableHeaders,
+      tableRowCells,
     };
   });
   const renderedItems = Math.max(
@@ -1972,6 +1984,28 @@ async function readListEvidence(page, target, datasetBinding) {
     };
     await modal.locator(".ant-modal-close").click();
   }
+  if (FINANCE_BROWSER_PAGE_CONTRACT[target.key]) {
+    specializedEvidence = evaluateFinanceFieldBrowserEvidence({
+      targetKey: target.key,
+      headers: metrics.tableHeaders,
+      rows: metrics.tableRowCells,
+      representatives: datasetBinding?.readiness?.financeRepresentatives,
+    });
+    if (!specializedEvidence.passed) {
+      throw new BrowserAcceptanceError(
+        `财务页面字段证据不完整：${[
+          ...specializedEvidence.missingHeaders,
+          ...specializedEvidence.forbiddenHeaders,
+          ...specializedEvidence.valueMismatches,
+        ].join("；")}`,
+      );
+    }
+  }
+  const specializedTarget = [
+    "shipping-release",
+    "shipments",
+    ...Object.keys(FINANCE_BROWSER_PAGE_CONTRACT),
+  ].includes(target.key);
   const evidence = evaluateCurrentBatchListEvidence({
     currentBatch,
     currentBatchDOM,
@@ -1979,7 +2013,7 @@ async function readListEvidence(page, target, datasetBinding) {
     pageReportedTotal,
     minimumRecords: target.minimumRecords,
     exactEvidencePassed:
-      !["shipping-release", "shipments"].includes(target.key) ||
+      !specializedTarget ||
       (specializedEvidence?.passed === true &&
         currentBatch.actual === target.minimumRecords),
   });
@@ -2089,6 +2123,15 @@ export function assertBoundSimulatedPrintReports(source, fact) {
             requiredText(factAttestation?.[field], `fact report ${field}`),
         )
       : !sourceAttestation && !factAttestation;
+  const financeFieldContract = inspectFinanceFieldContract(
+    fact?.referenceRecords?.financeFacts || [],
+  );
+  const financeFieldContractMatches =
+    financeFieldContract.complete &&
+    financeFieldContract.coveragePercent === 100 &&
+    fact?.financeFieldContract?.complete === true &&
+    fact?.financeFieldContract?.coveragePercent === 100 &&
+    fact?.financeFieldContract?.digest === financeFieldContract.digest;
   if (
     source?.mode !== "apply" ||
     fact?.mode !== "apply" ||
@@ -2099,7 +2142,8 @@ export function assertBoundSimulatedPrintReports(source, fact) {
     fact?.reportContract !== SOURCE_DRIVEN_FACT_REPORT_CONTRACT ||
     !identityMatches ||
     !runtimeMatches ||
-    !runtimeAttestationMatches
+    !runtimeAttestationMatches ||
+    !financeFieldContractMatches
   ) {
     throw new BrowserAcceptanceError(
       "打印验收只接受同一批次、同一运行配置的本机模拟业务记录",
@@ -2189,6 +2233,8 @@ export function assertBoundSimulatedPrintReports(source, fact) {
       source?.runtime?.configRevision,
       "source report configRevision",
     ),
+    financeFieldDigest: financeFieldContract.digest,
+    financeRepresentatives: financeFieldContract.representatives,
     printRecords,
     runtimeAttestation:
       target === CUSTOMER_TRIAL_133_TARGET
@@ -2415,6 +2461,12 @@ export function assertManualAcceptanceBrowserReadinessBinding(
     readiness?.runtimePreflight?.customerKey === CUSTOMER_KEY &&
     readiness?.runtimePreflight?.configRevision === printInput.configRevision &&
     factInput?.runtime?.configRevision === printInput.configRevision;
+  const financeFieldMatches =
+    summary.financeFieldEvidenceComplete === true &&
+    readiness?.financeFieldContract?.complete === true &&
+    readiness?.financeFieldContract?.coveragePercent === 100 &&
+    readiness?.financeFieldContract?.digest === printInput.financeFieldDigest &&
+    factInput?.financeFieldContract?.digest === printInput.financeFieldDigest;
   const reportedAttestation = factInput?.runtime?.targetAttestation;
   const remoteAttestationMatches =
     printInput.target === CUSTOMER_TRIAL_133_TARGET
@@ -2430,6 +2482,7 @@ export function assertManualAcceptanceBrowserReadinessBinding(
     !sourceMatches ||
     !taskMatches ||
     !runtimeMatches ||
+    !financeFieldMatches ||
     !remoteAttestationMatches
   ) {
     throw new BrowserAcceptanceError(
@@ -2446,6 +2499,8 @@ export function assertManualAcceptanceBrowserReadinessBinding(
     taskSourceID: Number(taskInput.sourceID),
     taskVisibleCodePrefixes: { ...TASK_VISIBLE_CODE_PREFIX_BY_ROLE },
     taskGroupCoverage,
+    financeFieldDigest: printInput.financeFieldDigest,
+    financeRepresentatives: printInput.financeRepresentatives,
     currentBatchTargets: buildManualAcceptanceCurrentBatchReadiness(readiness),
   };
 }
@@ -2495,14 +2550,20 @@ function firstCurrentBatchBusinessNo(records, fields, predicate = () => true) {
 
 function currentBatchFactIdentifiers(factReport) {
   const records = factReport?.referenceRecords || {};
-  const financeNo = (factType) =>
-    firstCurrentBatchBusinessNo(
+  const financeNo = (factType) => {
+    const representative =
+      factReport?.financeFieldContract?.representatives?.[factType]?.active ||
+      factReport?.financeFieldContract?.representatives?.[factType]?.value;
+    const representativeNo = String(representative?.factNo || "").trim();
+    if (representativeNo) return representativeNo;
+    return firstCurrentBatchBusinessNo(
       records.financeFacts,
       ["fact_no", "factNo"],
       (item) =>
         String(item?.fact_type || item?.factType || "").toUpperCase() ===
         factType,
     );
+  };
   return {
     "quality-inspections": firstCurrentBatchBusinessNo(
       records.qualityInspections,

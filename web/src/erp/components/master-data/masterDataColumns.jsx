@@ -3,6 +3,7 @@ import { Tag } from 'antd'
 
 import { applyBusinessColumnSorters } from '../../utils/moduleTableColumns.mjs'
 import { formatProductUnitNetWeight } from '../../utils/masterDataOrderView.mjs'
+import { compareNumeric20Scale6Values } from '../../utils/numeric20Scale6.mjs'
 import { referenceLabel } from '../../utils/referenceSelectOptions.mjs'
 
 export const SUPPLIER_TYPE_OPTIONS = Object.freeze([
@@ -17,6 +18,13 @@ const SUPPLIER_TYPE_LABELS = Object.freeze(
     SUPPLIER_TYPE_OPTIONS.map((item) => [item.value, item.label])
   )
 )
+
+const PRODUCTION_ROUTE_OPERATION_LABELS = Object.freeze({
+  FABRIC_PROCESSING: '布料加工（首道）',
+  SEWING: '车缝',
+  HANDWORK: '手工',
+  PACKAGING: '包装',
+})
 
 function compareText(a, b) {
   return String(a || '').localeCompare(String(b || ''))
@@ -101,7 +109,10 @@ function productColumns({ unitDisplay }) {
       dataIndex: 'unit_net_weight_g',
       width: 190,
       sorter: (a, b) =>
-        Number(a?.unit_net_weight_g || 0) - Number(b?.unit_net_weight_g || 0),
+        compareNumeric20Scale6Values(
+          a?.unit_net_weight_g,
+          b?.unit_net_weight_g
+        ),
       render: (value) => formatProductUnitNetWeight(value),
       exportValue: (record) => String(record?.unit_net_weight_g ?? '').trim(),
     },
@@ -221,6 +232,33 @@ function processColumns() {
       width: 150,
       sorter: (a, b) => compareText(a?.category, b?.category),
       render: (value) => value || '-',
+    },
+    {
+      title: '标准路线位置',
+      exportTitle: '标准路线位置',
+      dataIndex: 'production_route_operation_code',
+      width: 170,
+      sorter: (a, b) =>
+        compareText(
+          PRODUCTION_ROUTE_OPERATION_LABELS[
+            a?.production_route_operation_code
+          ],
+          PRODUCTION_ROUTE_OPERATION_LABELS[
+            b?.production_route_operation_code
+          ]
+        ),
+      exportValue: (record) =>
+        PRODUCTION_ROUTE_OPERATION_LABELS[
+          record?.production_route_operation_code
+        ] || '',
+      render: (value) =>
+        value ? (
+          <Tag color="purple">
+            {PRODUCTION_ROUTE_OPERATION_LABELS[value] || value}
+          </Tag>
+        ) : (
+          '-'
+        ),
     },
     {
       title: '可委外',

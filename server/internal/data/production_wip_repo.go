@@ -63,36 +63,6 @@ func (r *productionOrderRepo) GetProductionWIP(ctx context.Context, productionOr
 	return aggregate, nil
 }
 
-// InitializeProductionWIP is deliberately a read-after-lock operation. Route
-// snapshots are frozen atomically by RELEASE; this method may verify and return
-// that frozen result, but it must never infer a route for a legacy order.
-func (r *productionOrderRepo) InitializeProductionWIP(ctx context.Context, in *biz.ProductionWIPInitializeCommand) (*biz.ProductionWIPAggregate, error) {
-	if r == nil || r.data == nil || r.data.sqldb == nil || in == nil || in.ProductionOrderID <= 0 || in.ActorID <= 0 ||
-		strings.TrimSpace(in.IdempotencyKey) == "" || len(in.IntentHash) != 64 ||
-		in.RouteCode != biz.ProductionWIPRoutePlushSewHandV1 || in.RouteVersion != biz.ProductionWIPRoutePlushSewHandV1Version {
-		return nil, biz.ErrBadParam
-	}
-	tx, err := r.beginProductionOrderCommandTx(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.sqlTx.Rollback() }()
-	if err := r.lockProductionOrderCommandSource(ctx, tx.sqlTx, in.ProductionOrderID); err != nil {
-		return nil, err
-	}
-	aggregate, err := loadProductionWIPAggregate(ctx, tx.client, in.ProductionOrderID)
-	if err != nil {
-		return nil, err
-	}
-	if aggregate.ProductionOrder == nil || aggregate.ProductionOrder.Status != biz.ProductionOrderStatusReleased || len(aggregate.Operations) == 0 {
-		return nil, biz.ErrProductionWIPInvalidRoute
-	}
-	if err := tx.sqlTx.Commit(); err != nil {
-		return nil, err
-	}
-	return aggregate, nil
-}
-
 func productionWIPClientForSQLTx(data *Data, sqlTx *stdsql.Tx) *ent.Client {
 	sqlDialect := data.sqlDialect
 	if sqlDialect == "" {
@@ -257,21 +227,17 @@ func requireProductionWIPRouteEmpty(ctx context.Context, client *ent.Client, ord
 }
 
 func resolveProductionWIPRouteProcesses(ctx context.Context, client *ent.Client) (map[string]biz.ProductionWIPProcessReference, error) {
-	semantics := []struct {
-		operationCode string
-		labels        []string
-	}{
-		{biz.ProductionWIPOperationFabricProcessing, []string{"机裁", "裁片"}},
-		{biz.ProductionWIPOperationSewing, []string{"车缝"}},
-		{biz.ProductionWIPOperationHandwork, []string{"手工"}},
-		{biz.ProductionWIPOperationPackaging, []string{"包装"}},
+	operationCodes := []string{
+		biz.ProductionWIPOperationFabricProcessing,
+		biz.ProductionWIPOperationSewing,
+		biz.ProductionWIPOperationHandwork,
+		biz.ProductionWIPOperationPackaging,
 	}
-	resolved := make(map[string]biz.ProductionWIPProcessReference, len(semantics))
-	used := make(map[int]struct{}, len(semantics))
-	for _, semantic := range semantics {
+	resolved := make(map[string]biz.ProductionWIPProcessReference, len(operationCodes))
+	for _, operationCode := range operationCodes {
 		rows, err := client.Process.Query().Where(
 			process.IsActive(true),
-			process.Or(process.NameIn(semantic.labels...), process.CategoryIn(semantic.labels...)),
+			process.ProductionRouteOperationCode(operationCode),
 		).All(ctx)
 		if err != nil {
 			return nil, err
@@ -280,11 +246,7 @@ func resolveProductionWIPRouteProcesses(ctx context.Context, client *ent.Client)
 			return nil, biz.ErrProductionWIPInvalidRoute
 		}
 		row := rows[0]
-		if _, duplicate := used[row.ID]; duplicate {
-			return nil, biz.ErrProductionWIPInvalidRoute
-		}
-		used[row.ID] = struct{}{}
-		resolved[semantic.operationCode] = biz.ProductionWIPProcessReference{
+		resolved[operationCode] = biz.ProductionWIPProcessReference{
 			ID: row.ID, Code: row.Code, Name: row.Name, InhouseEnabled: row.InhouseEnabled,
 			OutsourcingEnabled: row.OutsourcingEnabled, IsActive: row.IsActive,
 		}
@@ -755,6 +717,22 @@ func applyProductionWIPBatchMutation(
 	operation := entProductionOrderOperationToBiz(operationRow)
 	fromStatus := batch.Status
 	switch in.Action {
+	case biz.ProductionWIPActionCancelBatch:
+		nextStatus, err := biz.NextProductionWIPBatchStatus(in.Action, batch, operation, nil, 0)
+		if err != nil {
+			return nil, err
+		}
+		affected, err := client.ProductionWIPBatch.Update().Where(
+			productionwipbatch.ID(batch.ID),
+			productionwipbatch.Version(in.ExpectedVersion),
+			productionwipbatch.Status(biz.ProductionWIPStatusPlanned),
+		).SetStatus(nextStatus).AddVersion(1).Save(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if affected != 1 {
+			return nil, biz.ErrProductionWIPInvalidTransition
+		}
 	case biz.ProductionWIPActionSplitBatch:
 		children, err := client.ProductionWIPBatch.Query().
 			Where(productionwipbatch.SourceBatchID(batch.ID), productionwipbatch.StatusNEQ(biz.ProductionWIPStatusCancelled)).
@@ -824,6 +802,12 @@ func applyProductionWIPBatchMutation(
 			return nil, biz.ErrProductionWIPInvalidTransition
 		}
 	case biz.ProductionWIPActionStartOperation:
+		// Reject stale/terminal batches before loading execution dependencies.
+		// This keeps the state machine as the first boundary and avoids returning
+		// an unrelated outsourcing or packaging error for a cancelled batch.
+		if batch.Status != biz.ProductionWIPStatusPlanned {
+			return nil, biz.ErrProductionWIPInvalidTransition
+		}
 		allocations, err := loadProductionWIPBatchAllocations(ctx, client, batch.ID)
 		if err != nil {
 			return nil, err

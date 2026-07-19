@@ -17,6 +17,9 @@ func (d *jsonrpcDispatcher) handlePurchaseReceiptAdjustment(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptAdjustmentCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "purchase", method); res != nil {
+			return id, res, nil
+		}
 		in, ok := purchaseReceiptAdjustmentFromReceiptCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil

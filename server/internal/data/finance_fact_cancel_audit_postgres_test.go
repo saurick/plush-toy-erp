@@ -44,7 +44,7 @@ func TestFinanceFactCancelAuditPostgresPreservesPostingAndReplaysExactly(t *test
 	}
 }
 
-func TestFinanceFactCancelAuditPostgresRejectsInvalidStatesWithoutPartialWrite(t *testing.T) {
+func TestFinanceFactCancelAuditPostgresAllowsDraftAndRejectsInvalidStatesWithoutPartialWrite(t *testing.T) {
 	ctx := context.Background()
 	data, client := openPurchaseReceiptPostgresTestData(t)
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
@@ -52,10 +52,11 @@ func TestFinanceFactCancelAuditPostgresRejectsInvalidStatesWithoutPartialWrite(t
 	actor := client.AdminUser.Create().SetUsername("finance-invalid-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 
 	draft := createFinanceFactDraftForCancelAudit(t, ctx, data, client, "DRAFT-"+suffix, suffix+"-draft")
-	if _, err := repo.CancelPostedFinanceFact(ctx, draft.ID, actor.ID, "草稿不可取消"); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("draft cancellation error=%v", err)
+	cancelledDraft, err := repo.CancelPostedFinanceFact(ctx, draft.ID, actor.ID, "草稿来源不再办理")
+	if err != nil || cancelledDraft.Status != biz.OperationalFactStatusCancelled || cancelledDraft.PostedAt != nil ||
+		cancelledDraft.CancelledAt == nil || cancelledDraft.CancelledBy == nil || *cancelledDraft.CancelledBy != actor.ID {
+		t.Fatalf("draft cancellation=%#v error=%v", cancelledDraft, err)
 	}
-	assertFinanceFactHasNoCancelAudit(t, ctx, client, draft.ID, biz.OperationalFactStatusDraft)
 
 	settled := createPostedFinanceFactForCancelAudit(t, ctx, data, client, repo, suffix+"-settled")
 	if _, err := repo.SettleFinanceFact(ctx, settled.ID); err != nil {

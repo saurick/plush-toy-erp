@@ -23,13 +23,7 @@ import {
   buildManualAcceptancePageDataContract,
 } from "./manual-acceptance-page-data-contract.mjs";
 import { manualAcceptanceOutsourcingInventoryCoverageIsComplete } from "./manual-acceptance-fact-report-contract.mjs";
-import {
-  MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS,
-  MANUAL_ACCEPTANCE_DESKTOP_DATASET_BY_PAGE,
-  MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT,
-  assertManualAcceptancePageDataContract,
-  buildManualAcceptancePageDataContract,
-} from "./manual-acceptance-page-data-contract.mjs";
+import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import {
   TASK_COPY_REVISION,
   TASK_CATALOG_SCENARIO_DIGEST,
@@ -40,7 +34,6 @@ import {
   getManualAcceptanceTaskGroupCount,
   getManualAcceptanceTaskGroupScenarioCounts,
   getManualAcceptanceTaskGroupScenarios,
-  getManualAcceptanceTaskGroupStatusCounts,
   getManualAcceptanceTaskStatusCounts,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
@@ -102,14 +95,6 @@ function taskStatusCountsForRole(roleKey) {
     Object.entries(getManualAcceptanceTaskStatusCounts(roleKey))
       .filter(([, count]) => count > 0)
       .map(([status, count]) => [status.toUpperCase(), count]),
-  );
-}
-
-function taskGroupStatusCountsForRole(roleKey, taskGroup) {
-  return Object.fromEntries(
-    Object.entries(
-      getManualAcceptanceTaskGroupStatusCounts(roleKey, taskGroup),
-    ).map(([status, count]) => [status.toUpperCase(), count]),
   );
 }
 
@@ -543,6 +528,10 @@ function normalizeFactReference(record, key, index) {
       normalized[outputKey] = reportPositiveID(value, `${name}.${aliases[0]}`);
     }
   };
+  const nullableValue = (outputKey, ...aliases) => {
+    const value = reportValue(record, ...aliases);
+    normalized[outputKey] = value == null ? null : value;
+  };
   switch (key) {
     case "productionOrders":
       textField("order_no", "orderNo", "order_no");
@@ -648,6 +637,25 @@ function normalizeFactReference(record, key, index) {
         reportValue(record, "sourceID", "sourceId", "source_id"),
         `${name}.sourceID`,
       );
+      nullableValue("collection_type", "collectionType", "collection_type");
+      nullableValue("payment_term", "paymentTerm", "payment_term");
+      nullableValue(
+        "payment_term_days",
+        "paymentTermDays",
+        "payment_term_days",
+      );
+      nullableValue(
+        "invoice_category",
+        "invoiceCategory",
+        "invoice_category",
+      );
+      nullableValue("cancelled_at", "cancelledAt", "cancelled_at");
+      nullableValue(
+        "cancelled_by_name",
+        "cancelledByName",
+        "cancelled_by_name",
+      );
+      nullableValue("cancel_reason", "cancelReason", "cancel_reason");
       break;
     default:
       throw new CliError(`未知业务记录引用 ${key}`, 2);
@@ -779,6 +787,17 @@ function validateFactReport(report) {
     throw new CliError("业务记录报告缺少 customer-trial-133 运行态证明", 2);
   }
   const normalizedReferenceRecords = normalizeFactReferenceRecords(report);
+  const financeFieldContract = inspectFinanceFieldContract(
+    normalizedReferenceRecords.financeFacts,
+  );
+  if (
+    !financeFieldContract.complete ||
+    report.financeFieldContract?.complete !== true ||
+    report.financeFieldContract?.coveragePercent !== 100 ||
+    report.financeFieldContract?.digest !== financeFieldContract.digest
+  ) {
+    throw new CliError("业务记录报告缺少完整且可复核的财务字段合同", 2);
+  }
   if (!manualAcceptanceOutsourcingInventoryCoverageIsComplete(report)) {
     throw new CliError(
       "业务记录报告缺少完整的委外回货库存覆盖与业务看板同批精确总数",
@@ -925,14 +944,6 @@ function catalogMinimum(catalog, pageKey) {
   );
   if (!item) throw new CliError(`验收目录缺少页面 ${pageKey}`);
   return item.minimumRecords;
-}
-
-function catalogTaskScenarios(catalog, pageKey) {
-  const item = catalog.technicalManifest.desktopPages.find(
-    (candidate) => candidate.key === pageKey,
-  );
-  if (!item) throw new CliError(`验收目录缺少页面 ${pageKey}`);
-  return [...(item.requiredTaskScenarios || [])];
 }
 
 function declaredExpectations(sourceReport, factReport) {
@@ -1168,13 +1179,6 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
             ),
           }
         : {}),
-      ...(taskReport
-        ? {
-            "production-scheduling": Number(
-              taskReport.summary.byTaskGroup.production_scheduling,
-            ),
-          }
-        : {}),
     },
     declaredMinimum: null,
     readOnly: true,
@@ -1265,23 +1269,27 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       readOnly: true,
     });
   }
-  for (const [pageKey, roleKey, taskGroup] of [
-    ["production-scheduling", "pmc", "production_scheduling"],
-    ["production-exceptions", "production", "production_exception"],
-    ["shipping-release", "warehouse", "shipment_release"],
+  for (const [pageKey, roleKey, taskGroup, requiredStatuses] of [
+    [
+      "production-scheduling",
+      "pmc",
+      "production_scheduling",
+      ["ready", "blocked", "done"],
+    ],
+    [
+      "production-exceptions",
+      "production",
+      "production_exception",
+      ["ready", "blocked", "done"],
+    ],
+    [
+      "shipping-release",
+      "warehouse",
+      "shipment_release",
+      ["ready", "blocked", "done", "rejected"],
+    ],
   ]) {
-    const expectedCount = getManualAcceptanceTaskGroupCount(roleKey, taskGroup);
-    const requiredScenarios =
-      getManualAcceptanceTaskGroupScenarios(roleKey)[taskGroup];
-    const declaredScenarios = catalogTaskScenarios(catalog, pageKey);
-    if (
-      catalogMinimum(catalog, pageKey) !== expectedCount ||
-      JSON.stringify(declaredScenarios) !== JSON.stringify(requiredScenarios)
-    ) {
-      throw new CliError(
-        `验收目录页面 ${pageKey} 与 ${roleKey}/${taskGroup} 任务映射不一致`,
-      );
-    }
+    const expectedCount = catalogMinimum(catalog, pageKey);
     probes.push({
       id: `workflow-tasks:${taskGroup}`,
       roleKey,
@@ -1290,41 +1298,27 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       method: "list_tasks",
       listKey: "tasks",
       statusField: "task_status_key",
-      requiredStatuses: Object.keys(
-        taskGroupStatusCountsForRole(roleKey, taskGroup),
-      ),
-      requiredStatusCounts: taskGroupStatusCountsForRole(roleKey, taskGroup),
+      requiredStatuses,
+      requiredStatusCounts: {},
       expectedMinimum: expectedCount,
-      expectedExact: expectedCount,
       declaredMinimum: null,
       params: {
         owner_role_key: roleKey,
         task_group: taskGroup,
-        ...(taskReport
-          ? {
-              source_type: taskReport.sourceType,
-              source_id: taskReport.sourceID,
-            }
-          : {}),
         limit: QUERY_LIMIT,
         offset: 0,
       },
-      batchEvidence: taskReport ? "exact_source" : "not_proven",
-      exactSourceType: taskReport?.sourceType || null,
-      exactSourceID: taskReport?.sourceID || null,
-      exactTaskCodePrefix: taskReport
-        ? TASK_VISIBLE_CODE_PREFIX_BY_ROLE[roleKey]
-        : null,
-      exactOwnerRoleKey: taskReport ? roleKey : null,
-      exactTaskGroup: taskReport ? taskGroup : null,
+      batchEvidence: "not_proven",
+      exactSourceType: null,
+      exactSourceID: null,
+      exactTaskCodePrefix: null,
+      exactOwnerRoleKey: roleKey,
+      exactTaskGroup: taskGroup,
       requiredTaskGroups: [taskGroup],
-      requiredScenarios: [...requiredScenarios],
-      requiredScenariosByTaskGroup: {
-        [taskGroup]: [...requiredScenarios],
-      },
-      batchNotProvenReason: taskReport
-        ? null
-        : "未提供本次岗位任务写入报告，不能用历史任务数量代替本批任务。",
+      requiredScenarios: [],
+      requiredScenariosByTaskGroup: { [taskGroup]: [] },
+      batchNotProvenReason:
+        "正式协同页只接受来源动作生成的任务；模拟岗位任务报告不能证明本批正式来源任务。",
       readOnly: true,
     });
   }
@@ -1404,6 +1398,7 @@ export function buildManualAcceptanceReadinessPlan(options = {}) {
             backendURL: factReport.backendURL,
             databaseName: factReport.databaseName,
             semanticDigest: factReport.semanticDigest,
+            financeFieldContract: factReport.financeFieldContract,
             runtime: factReport.runtime,
           }
         : null,
@@ -2399,10 +2394,7 @@ function bossDashboardActiveResult(bossResult) {
 
 function productionExceptionActiveResult(exceptionResult) {
   const terminalStatuses = new Set(["DONE", "REJECTED"]);
-  const expectedCounts = taskGroupStatusCountsForRole(
-    "production",
-    "production_exception",
-  );
+  const expectedCounts = exceptionResult?.requiredStatusCounts || {};
   const expectedMinimum = Object.entries(expectedCounts).reduce(
     (sum, [status, count]) =>
       terminalStatuses.has(status) ? sum : sum + Number(count || 0),
@@ -2706,6 +2698,7 @@ export async function verifyManualAcceptanceReadiness(
     });
   }
   const rawResults = [];
+  const liveFinanceFactsByID = new Map();
   for (const probe of plan.probes) {
     if (probe.batchEvidence === "not_proven") {
       rawResults.push({
@@ -2757,12 +2750,35 @@ export async function verifyManualAcceptanceReadiness(
         token,
         fetchImpl,
       });
+      let result =
+        probe.id === BUSINESS_DASHBOARD_PROJECTION_PROBE_ID
+          ? evaluateBusinessDashboardProjection(probe, data)
+          : evaluateManualAcceptanceDataset(probe, data);
+      if (probe.listKey === "finance_facts") {
+        for (const item of data?.finance_facts || []) {
+          if (Number.isSafeInteger(Number(item?.id)) && Number(item.id) > 0) {
+            liveFinanceFactsByID.set(Number(item.id), item);
+          }
+        }
+        const financeFieldContract = inspectFinanceFieldContract(
+          data?.finance_facts || [],
+        );
+        if (!financeFieldContract.complete) {
+          result = {
+            ...result,
+            status: "fail",
+            enoughRecords: false,
+            error: `财务字段合同不完整：${financeFieldContract.violations
+              .slice(0, 8)
+              .map((item) => `${item.factNo}.${item.field}`)
+              .join(", ")}`,
+          };
+        }
+        result.financeFieldContract = financeFieldContract;
+      }
       rawResults.push({
         probe,
-        result:
-          probe.id === BUSINESS_DASHBOARD_PROJECTION_PROBE_ID
-            ? evaluateBusinessDashboardProjection(probe, data)
-            : evaluateManualAcceptanceDataset(probe, data),
+        result,
       });
     } catch (error) {
       rawResults.push({
@@ -2789,6 +2805,15 @@ export async function verifyManualAcceptanceReadiness(
       });
     }
   }
+  const financeFieldContract = inspectFinanceFieldContract([
+    ...liveFinanceFactsByID.values(),
+  ]);
+  const expectedFinanceFieldDigest =
+    plan.reportInputs?.factReport?.financeFieldContract?.digest || null;
+  const financeFieldEvidenceComplete =
+    financeFieldContract.complete &&
+    financeFieldContract.coveragePercent === 100 &&
+    financeFieldContract.digest === expectedFinanceFieldDigest;
   const resultById = new Map(
     rawResults.map(({ probe, result }) => [probe.id, result]),
   );
@@ -2835,7 +2860,9 @@ export async function verifyManualAcceptanceReadiness(
   ).length;
   const queryableTargetsReady = failedTargetData === 0;
   const allTargetDataProven =
-    queryableTargetsReady && notProvenTargetData === 0;
+    queryableTargetsReady &&
+    notProvenTargetData === 0 &&
+    financeFieldEvidenceComplete;
   const mobileActualByRole = Object.fromEntries(
     mobileResults.map((item) => [
       item.id.replace("mobile-tasks:", ""),
@@ -2894,7 +2921,9 @@ export async function verifyManualAcceptanceReadiness(
       mobileTaskTotalExpected: MOBILE_TASK_TOTAL,
       mobileTaskTotalActual: totalResult.actual,
       taskGroupCoverage,
+      financeFieldEvidenceComplete,
     },
+    financeFieldContract,
     accountChecks: accounts.results,
     probes,
     targets,

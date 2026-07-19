@@ -22,6 +22,7 @@ const PRINT_WORKSPACE_SHELL_PATH = '/print-window-shell.html'
 const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX =
   '__plush_erp_print_initial_draft__:'
 const PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_VERSION = 1
+const initialPrintWorkspaceDraftCache = new WeakMap()
 
 export const PRINT_WORKSPACE_DRAFT_MODE = Object.freeze({
   RESTORE: 'restore',
@@ -136,6 +137,15 @@ export function readInitialPrintWorkspaceDraftFromWindowName(
     return null
   }
 
+  const cacheKey = buildPrintWorkspaceDraftStorageKey(
+    normalizedTemplateKey,
+    normalizedStateID
+  )
+  const cachedDrafts = initialPrintWorkspaceDraftCache.get(targetWindow)
+  if (cachedDrafts?.has(cacheKey)) {
+    return cachedDrafts.get(cacheKey)
+  }
+
   const rawName = String(targetWindow.name || '')
   if (!rawName.startsWith(PRINT_WORKSPACE_INITIAL_DRAFT_WINDOW_NAME_PREFIX)) {
     return null
@@ -155,9 +165,31 @@ export function readInitialPrintWorkspaceDraftFromWindowName(
     ) {
       return null
     }
+    const nextCachedDrafts = cachedDrafts || new Map()
+    nextCachedDrafts.set(cacheKey, payload.draft)
+    if (!cachedDrafts) {
+      initialPrintWorkspaceDraftCache.set(targetWindow, nextCachedDrafts)
+    }
     return payload.draft
   } catch {
     return null
+  }
+}
+
+function clearInitialPrintWorkspaceDraftCache(storageKey, windowLike) {
+  const targetWindow =
+    windowLike || (typeof window !== 'undefined' ? window : null)
+  const normalizedStorageKey = String(storageKey || '').trim()
+  if (!targetWindow || !normalizedStorageKey) {
+    return
+  }
+
+  const cachedDrafts = initialPrintWorkspaceDraftCache.get(targetWindow)
+  if (!cachedDrafts?.delete(normalizedStorageKey)) {
+    return
+  }
+  if (cachedDrafts.size <= 0) {
+    initialPrintWorkspaceDraftCache.delete(targetWindow)
   }
 }
 
@@ -453,7 +485,8 @@ export function canOpenPrintWorkspaceFromWindowState(
 export function persistPrintWorkspaceDraftSnapshot(
   storageKey,
   draft,
-  storageLike
+  storageLike,
+  windowLike
 ) {
   const normalizedStorageKey = String(storageKey || '').trim()
   const storage =
@@ -465,6 +498,7 @@ export function persistPrintWorkspaceDraftSnapshot(
 
   try {
     storage.setItem(normalizedStorageKey, JSON.stringify(draft))
+    clearInitialPrintWorkspaceDraftCache(normalizedStorageKey, windowLike)
     return true
   } catch {
     return false

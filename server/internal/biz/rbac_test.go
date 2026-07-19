@@ -167,10 +167,13 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
 				PermissionWorkflowTaskReject,
+				PermissionPurchaseReceiptRead,
+				PermissionPurchaseReceiptAdjustmentRead,
+				PermissionPurchaseReturnRead,
 				PermissionShipmentRead,
 				PermissionMobileFinanceAccess,
 			},
-			omits: []string{PermissionWorkflowTaskApprove, PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderApprove, PermissionDebugBusinessClear},
+			omits: []string{PermissionWorkflowTaskApprove, PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderApprove, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: PMCRoleKey,
@@ -264,8 +267,8 @@ func TestBuiltinRoleOperationalFactPermissionProjection(t *testing.T) {
 	assertPermissionSetOmits(t, quality, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionShipmentCreate, PermissionShipmentShip, PermissionShipmentCancel, PermissionFinancePayableConfirm)
 
 	finance := builtinRolePermissionSet(t, FinanceRoleKey)
-	assertPermissionSetContains(t, finance, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionQualityInspectionRead, PermissionFinancePayableConfirm)
-	assertPermissionSetOmits(t, finance, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionQualityInspectionCreate)
+	assertPermissionSetContains(t, finance, PermissionOutsourcingOrderRead, PermissionOutsourcingFactRead, PermissionPurchaseReceiptRead, PermissionPurchaseReceiptAdjustmentRead, PermissionPurchaseReturnRead, PermissionQualityInspectionRead, PermissionFinancePayableConfirm)
+	assertPermissionSetOmits(t, finance, PermissionOutsourcingOrderCreate, PermissionOutsourcingOrderUpdate, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionQualityInspectionCreate)
 
 	assertPermissionSetContains(t, production, PermissionProductSKURead, PermissionWarehouseInventoryRead, PermissionOutsourcingFactRead)
 }
@@ -328,12 +331,6 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 			permissions: []string{PermissionERPDashboardRead},
 		},
 		{
-			key:         "exception-flow",
-			label:       "异常 / 阻塞闭环",
-			path:        "/erp/operations/exceptions",
-			permissions: []string{PermissionWorkflowTaskRead},
-		},
-		{
 			key:         "receivables",
 			label:       "应收管理",
 			path:        "/erp/finance/receivables",
@@ -376,6 +373,9 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 				t.Fatalf("expected %s permissions to contain %#v, got %#v", tt.key, tt.permissions, menuPermissions)
 			}
 		})
+	}
+	if _, ok := menusByKey["exception-flow"]; ok {
+		t.Fatal("retired exception-flow menu must not remain registered")
 	}
 }
 

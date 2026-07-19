@@ -464,7 +464,7 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     plan.tasks.filter(
       (task) => task.createParams.task_group === "trial_production_work",
     ).length,
-    5,
+    15,
   );
   const productionExceptionTopics = plan.tasks
     .filter((task) => task.roleKey === "production")
@@ -485,12 +485,12 @@ test("builds exactly 20 readable tasks for each of nine trial roles", () => {
     new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.production),
   );
   assert.equal(
-    plan.tasks.filter((task) =>
-      ["production_scheduling", "production_exception", "shipment_release"].includes(
-        task.createParams.task_group,
-      ),
-    ).length,
-    0,
+    plan.tasks.every(
+      (task) =>
+        task.createParams.task_group.startsWith("trial_") &&
+        !task.createParams.task_code.startsWith("source-"),
+    ),
+    true,
   );
 
   for (const roleKey of TASK_ROLES) {
@@ -666,7 +666,7 @@ test("uses short yoyoosun-style copy while keeping every task visibly synthetic"
   }
 });
 
-test("warehouse scenarios use their own groups and only shipping fills the shipping release page", () => {
+test("warehouse scenarios stay in the trial namespace and never fill the formal shipping release page", () => {
   const plan = buildManualAcceptanceTaskDataPlan({
     runId: "20260716-V5",
     dataVersion: "2026.07.16-v5",
@@ -678,26 +678,8 @@ test("warehouse scenarios use their own groups and only shipping fills the shipp
 
   assert.equal(TASK_COPY_REVISION, "PLAIN5");
   assert.equal(warehouseTasks.length, 20);
-  const shippingTasks = warehouseTasks.filter(
-    (task) => task.createParams.task_group === "shipment_release",
-  );
-  assert.equal(plan.summary.byTaskGroup.shipment_release, 4);
-  assert.deepEqual(
-    shippingTasks.map((task) => task.createParams.task_code),
-    ["YS-V5-CK-02", "YS-V5-CK-13", "YS-V5-CK-16", "YS-V5-CK-19"],
-  );
-  assert.deepEqual(
-    new Set(shippingTasks.map((task) => task.targetStatus)),
-    new Set(["ready", "blocked", "done", "rejected"]),
-  );
-  assert.equal(
-    shippingTasks.some((task) => task.dueScenario === "due_soon"),
-    true,
-  );
-  assert.equal(
-    shippingTasks.some((task) => task.dueScenario === "overdue"),
-    true,
-  );
+  assert.equal(plan.summary.byTaskGroup.trial_warehouse_work, 20);
+  assert.equal(plan.summary.byTaskGroup.shipment_release, undefined);
   assert(
     warehouseTasks.every((task) => {
       const scenarioKey = task.createParams.payload.acceptance_scenario_key;
@@ -727,12 +709,8 @@ test("warehouse scenarios use their own groups and only shipping fills the shipp
     Object.keys(getManualAcceptanceTaskGroupScenarios("warehouse")),
   );
   assert.deepEqual(
-    plan.coverage.scenariosByRoleTaskGroup.warehouse.shipment_release,
-    { shipping: 4 },
-  );
-  assert.deepEqual(
     plan.coverage.scenariosByRoleTaskGroup.warehouse.trial_warehouse_work,
-    { material_picking: 4, exception: 4 },
+    { receiving: 4, inbound: 4, material_picking: 4, shipping: 4, exception: 4 },
   );
   assert.equal(
     plan.coverage.catalogScenarioDigest,
@@ -771,7 +749,7 @@ test("task plan fails closed when a catalog role scenario is missing", () => {
   );
 });
 
-test("formal desktop groups reject unrelated role scenarios", () => {
+test("formal source task groups and codes are rejected from simulated plans", () => {
   const shippingMismatch = buildManualAcceptanceTaskDataPlan({
     runId: "SHIPPING-GROUP-GUARD",
     nowSec: NOW_SEC,
@@ -800,6 +778,17 @@ test("formal desktop groups reject unrelated role scenarios", () => {
   assert.throws(
     () => validateManualAcceptanceTaskPlan(productionMismatch),
     /task group does not match scenario today_production/u,
+  );
+
+  const formalCode = buildManualAcceptanceTaskDataPlan({
+    runId: "SOURCE-CODE-GUARD",
+    nowSec: NOW_SEC,
+  });
+  const first = formalCode.tasks[0];
+  first.createParams.task_code = "source-shipment-release-41";
+  assert.throws(
+    () => validateManualAcceptanceTaskPlan(formalCode),
+    /formal source task code/u,
   );
 });
 

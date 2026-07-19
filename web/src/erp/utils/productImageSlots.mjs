@@ -1,4 +1,6 @@
-export const PRODUCT_IMAGE_MAX_FILE_SIZE = 5 * 1024 * 1024
+export const PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES = 1024 * 1024
+export const PRODUCT_IMAGE_SNAPSHOT_MAX_EDGE = 2560
+export const PRODUCT_IMAGE_SNAPSHOT_MAX_PIXELS = 4_000_000
 
 export const PRODUCT_IMAGE_SLOT_DEFINITIONS = Object.freeze([
   Object.freeze({ key: 'primary', label: '产品图 1（主图）' }),
@@ -37,13 +39,49 @@ export function validateProductImageFile(file = {}) {
   if (fileSize <= 0) {
     return `${fileName} 内容为空，请重新选择`
   }
-  if (fileSize > PRODUCT_IMAGE_MAX_FILE_SIZE) {
-    return `${fileName} 超过 5MB，请压缩后再选择`
-  }
   if (!PRODUCT_IMAGE_MIME_TYPES.has(mimeType)) {
     return `${fileName} 格式不支持，请选择 PNG、JPEG 或 WEBP 图片`
   }
   return ''
+}
+
+export function calculateProductImageSnapshotSize(width, height) {
+  const sourceWidth = Math.round(Number(width || 0))
+  const sourceHeight = Math.round(Number(height || 0))
+  if (sourceWidth <= 0 || sourceHeight <= 0) {
+    return { width: 0, height: 0, scale: 0 }
+  }
+
+  const edgeScale =
+    PRODUCT_IMAGE_SNAPSHOT_MAX_EDGE / Math.max(sourceWidth, sourceHeight)
+  const pixelScale = Math.sqrt(
+    PRODUCT_IMAGE_SNAPSHOT_MAX_PIXELS / (sourceWidth * sourceHeight)
+  )
+  const scale = Math.min(1, edgeScale, pixelScale)
+  return {
+    width: Math.max(1, Math.floor(sourceWidth * scale)),
+    height: Math.max(1, Math.floor(sourceHeight * scale)),
+    scale,
+  }
+}
+
+export function shouldOptimizeProductImageSnapshot({
+  fileSize,
+  width,
+  height,
+} = {}) {
+  const snapshotSize = calculateProductImageSnapshotSize(width, height)
+  return (
+    Number(fileSize || 0) > PRODUCT_IMAGE_SNAPSHOT_MAX_BYTES ||
+    snapshotSize.width !== Math.round(Number(width || 0)) ||
+    snapshotSize.height !== Math.round(Number(height || 0))
+  )
+}
+
+export function buildOptimizedProductImageFileName(fileName = '') {
+  const normalized = String(fileName || '').trim()
+  const baseName = normalized.replace(/\.[^.]+$/u, '') || '产品图片'
+  return `${baseName}.webp`
 }
 
 export function selectSavedProductImages(attachments = []) {

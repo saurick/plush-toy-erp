@@ -7,6 +7,7 @@ import {
   buildPurchaseReceiptPayablePayload,
   buildSingleFactReconciliationPayload,
   financeBusinessSourceActionConfig,
+  hasValidFinanceTransitionSource,
   isOutsourcingReturnPayableSource,
   isSingleFactReconciliationSource,
   normalizeOutsourcingReturnPayableRequest,
@@ -130,6 +131,35 @@ test('payable and single reconciliation eligibility fail closed', () => {
       }),
     /应收、应付或发票/u
   )
+})
+
+test('finance draft transitions require the exact formal source contract', () => {
+  const validSources = [
+    ['RECEIVABLE', 'SHIPMENT'],
+    ['INVOICE', 'SHIPMENT'],
+    ['PAYABLE', 'PURCHASE_RECEIPT'],
+    ['PAYABLE', 'OUTSOURCING_FACT'],
+    ['RECONCILIATION', 'FINANCE_FACT'],
+  ]
+  for (const [factType, sourceType] of validSources) {
+    assert.equal(
+      hasValidFinanceTransitionSource({
+        fact_type: factType,
+        source_type: sourceType,
+        source_id: '81',
+      }),
+      true
+    )
+  }
+  for (const record of [
+    null,
+    { fact_type: 'RECEIVABLE', source_type: 'MANUAL', source_id: 81 },
+    { fact_type: 'PAYABLE', source_type: 'PURCHASE_RECEIPT' },
+    { fact_type: 'INVOICE', source_type: 'SHIPMENT', source_id: 1.5 },
+    { fact_type: 'PAYMENT', source_type: 'FINANCE_FACT', source_id: 81 },
+  ]) {
+    assert.equal(hasValidFinanceTransitionSource(record), false)
+  }
 })
 
 test('strict request normalizers drop server-owned and unknown fields', () => {

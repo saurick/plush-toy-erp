@@ -81,3 +81,11 @@ test('outsourcing material issue remains existing-lot only', () => {
     /returnReceipt \? \([\s\S]*name="lot_selection"[\s\S]*\) : null/u
   )
 })
+
+test('outsourcing source fact quantity defaults and validation stay exact', () => {
+  assert.match(source, /isPositiveNumeric20Scale6Units/u)
+  assert.match(source, /numeric20Scale6Units\(value\)/u)
+  assert.match(source, /compareNumeric20Scale6Units\(quantity, remaining\)/u)
+  assert.doesNotMatch(source, /Number\(quantitySummary\.remaining/u)
+  assert.doesNotMatch(source, /const quantity = Number\(value\)/u)
+})

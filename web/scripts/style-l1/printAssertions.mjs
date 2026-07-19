@@ -556,8 +556,8 @@ export function createPrintAssertions({
         timeout: 5_000,
       }
     )
-    await page.keyboard.press('End')
-    await page.keyboard.type(insertedText)
+    await editableCell.press('End')
+    await editableCell.pressSequentially(insertedText)
     await page.evaluate(
       () =>
         new Promise((resolve) => {
@@ -565,7 +565,7 @@ export function createPrintAssertions({
         })
     )
     if (commit) {
-      await page.keyboard.press('Tab')
+      await editableCell.press('Tab')
     }
 
     const nextText = normalizeInlineText(await editableCell.textContent())

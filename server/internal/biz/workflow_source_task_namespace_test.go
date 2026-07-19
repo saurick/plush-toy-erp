@@ -7,6 +7,23 @@ import (
 )
 
 func TestValidateWorkflowSourceTaskReservedNamespace(t *testing.T) {
+	seenTransitionGroups := make(map[string]struct{}, len(workflowTransitionTaskGroups))
+	for _, taskGroup := range workflowTransitionTaskGroups {
+		if _, duplicate := seenTransitionGroups[taskGroup]; duplicate {
+			t.Fatalf("duplicate transition task group %q", taskGroup)
+		}
+		seenTransitionGroups[taskGroup] = struct{}{}
+		if err := ValidatePublicWorkflowTaskNamespace(" "+taskGroup+" ", "MANUAL"); !errors.Is(err, ErrWorkflowTaskSourceGeneratedOnly) {
+			t.Fatalf("transition group %q error = %v, want ErrWorkflowTaskSourceGeneratedOnly", taskGroup, err)
+		}
+	}
+	if got, want := len(seenTransitionGroups), 19; got != want {
+		t.Fatalf("transition task group count = %d, want %d", got, want)
+	}
+	if IsReservedWorkflowSourceTaskNamespace(workflowOrderApprovalTaskGroup, "MANUAL") {
+		t.Fatal("internal ProcessRuntime transition groups must not be classified as source-task namespaces")
+	}
+
 	for _, taskGroup := range workflowSourceTaskGroups {
 		t.Run("group "+taskGroup, func(t *testing.T) {
 			if err := ValidateWorkflowSourceTaskReservedNamespace(" "+taskGroup+" ", "MANUAL"); !errors.Is(err, ErrWorkflowTaskSourceGeneratedOnly) {

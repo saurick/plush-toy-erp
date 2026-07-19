@@ -17,6 +17,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingMaterialIssueCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
@@ -28,6 +31,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 		return id, operationalFactOutsourcingFactResult(ctx, d, item, err), nil
 	case "create_outsourcing_return_receipt_from_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingReturnReceiptCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders"); res != nil {
@@ -92,7 +98,7 @@ func outsourcingFactFromOrderCreateFromParams(pm map[string]any) (*biz.Outsourci
 	) {
 		return nil, false
 	}
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}

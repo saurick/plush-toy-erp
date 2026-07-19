@@ -343,6 +343,7 @@ test("style cleanup SIGKILLs a surviving owned group without touching an unrelat
 });
 
 test("fixed full and strict gates cannot disappear behind file or package probes", () => {
+  const criticalPostgres = read("scripts/qa/critical-postgres-tests.sh");
   const full = read("scripts/qa/full.sh");
   const pdfChromiumIntegration = read(
     "server/internal/server/template_pdf_chromium_integration_test.go",
@@ -360,8 +361,17 @@ test("fixed full and strict gates cannot disappear behind file or package probes
     full,
     /ERP_PDF_CHROMIUM_INTEGRATION=1\s+\\\s+node "\$ROOT_DIR\/scripts\/qa\/run-test-gate\.mjs"/u,
   );
-  assert.match(full, /go test -count=1 -json -skip '\^Test\.\*Postgres\.\*\$' \.\/\.\.\./u);
+  assert.match(
+    full,
+    /source "\$ROOT_DIR\/scripts\/qa\/critical-postgres-tests\.sh"/u,
+  );
+  assert.match(
+    full,
+    /go test -count=1 -json -skip "\$CRITICAL_POSTGRES_TEST_PATTERN" \.\/\.\.\./u,
+  );
   assert.match(full, /purchase-receipt-pg\.sh" test-critical-disposable/u);
+  assert.match(criticalPostgres, /TestProductionWIPQualityInspectionPostgres/u);
+  assert.match(criticalPostgres, /TestOperationalFactPostgres/u);
   assert.doesNotMatch(
     full,
     /make purchase_return_(?:pg_createdb|migrate_apply|pg_test)/u,
@@ -415,6 +425,7 @@ test("full, strict, and pre-push have no synthetic coverage path", () => {
 });
 
 test("fixed Node and Go gates require fail-closed execution summaries", () => {
+  const criticalPostgres = read("scripts/qa/critical-postgres-tests.sh");
   const fast = read("scripts/qa/fast.sh");
   const full = read("scripts/qa/full.sh");
 
@@ -424,12 +435,23 @@ test("fixed Node and Go gates require fail-closed execution summaries", () => {
   assert.match(fast, /--kind go --label server-quick/u);
   assert.match(
     fast,
-    /go test -count=1 -json\s+\\\s+-skip '\^\(Test\.\*Postgres\.\*\|TestTemplatePDFChromiumSecurityIntegration\)\$'\s+\\\s+\.\/internal\/\.\.\. \.\/pkg\/\.\.\./u,
+    /go test -count=1 -json\s+\\\s+-skip "\$\{CRITICAL_POSTGRES_TEST_PATTERN\}\|\^TestTemplatePDFChromiumSecurityIntegration\$"\s+\\\s+\.\/internal\/\.\.\. \.\/pkg\/\.\.\./u,
   );
   assert.match(full, /--kind node --label web-all/u);
   assert.match(full, /"\$PNPM_BIN" test --test-reporter=tap/u);
   assert.match(full, /--kind go --label server-all/u);
-  assert.match(full, /go test -count=1 -json -skip '\^Test\.\*Postgres\.\*\$' \.\/\.\.\./u);
+  assert.match(
+    full,
+    /go test -count=1 -json -skip "\$CRITICAL_POSTGRES_TEST_PATTERN" \.\/\.\.\./u,
+  );
   assert.match(full, /purchase-receipt-pg\.sh" test-critical-disposable/u);
   assert.match(full, /ERP_PDF_CHROMIUM_INTEGRATION=1/u);
+  assert.match(
+    criticalPostgres,
+    /readonly CRITICAL_POSTGRES_TEST_PATTERN/u,
+  );
+  assert.match(
+    criticalPostgres,
+    /readonly -a CRITICAL_POSTGRES_REQUIRED_PREFIXES/u,
+  );
 });

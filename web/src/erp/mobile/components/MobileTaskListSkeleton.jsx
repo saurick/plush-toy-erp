@@ -18,13 +18,11 @@ export default function MobileTaskListSkeleton({
       data-skeleton-row-count={rows.length}
       aria-hidden="true"
     >
-      <div className="mobile-role-skeleton__metrics grid grid-cols-4 divide-x divide-slate-200 rounded-2xl border border-slate-200 bg-white py-5 text-center shadow-sm">
-        {[0, 1, 2, 3].map((item) => (
-          <div key={item} className="mobile-role-skeleton__metric min-w-0 px-2">
-            <SkeletonBlock className="mobile-role-skeleton__metric-value" />
-            <SkeletonBlock className="mobile-role-skeleton__metric-label" />
-          </div>
-        ))}
+      <div className="mobile-role-skeleton__focus rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+        <SkeletonBlock className="mobile-role-skeleton__focus-kicker" />
+        <SkeletonBlock className="mobile-role-skeleton__focus-title" />
+        <SkeletonBlock className="mobile-role-skeleton__focus-copy" />
+        <SkeletonBlock className="mobile-role-skeleton__focus-counts" />
       </div>
 
       <div className="mobile-role-skeleton__filters mt-4 grid grid-cols-4 rounded-2xl bg-slate-100 p-1 shadow-inner">

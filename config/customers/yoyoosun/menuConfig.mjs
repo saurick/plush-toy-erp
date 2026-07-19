@@ -61,7 +61,7 @@ export const yoyoosunMenuConfig = Object.freeze({
       },
       {
         title: "运营工具",
-        items: ["print-center", "exception-flow"],
+        items: ["print-center"],
       },
       {
         title: "系统管理",

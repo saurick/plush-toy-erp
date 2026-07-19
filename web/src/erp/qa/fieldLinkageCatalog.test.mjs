@@ -123,18 +123,99 @@ test('FL_contract_terms__excluded_from_non_contract_business_scope fieldLinkageC
 })
 
 test('fieldLinkageCatalog: 覆盖报告视图能区分已覆盖、部分覆盖和未覆盖字段', () => {
+  const skippedSingleCase = FIELD_LINKAGE_CASE_CATALOG.find(
+    (candidate, index) =>
+      index >= 3 &&
+      candidate.fieldKeys.some(
+        (fieldKey) =>
+          FIELD_LINKAGE_CASE_CATALOG.filter(
+            (item) =>
+              item.scenarioKey === candidate.scenarioKey &&
+              item.fieldKeys.includes(fieldKey)
+          ).length === 1
+      )
+  )
+  assert(skippedSingleCase, '目录至少需要一个单 case field scenario')
   const report = buildFieldLinkageCoverageViewModel({
     generatedAt: '2026-04-24T10:00:00+08:00',
-    cases: FIELD_LINKAGE_CASE_CATALOG.slice(0, 3).map((item) => ({
-      caseId: item.caseId,
-      status: 'pass',
-      durationMs: 1,
-      failureMessages: [],
-    })),
+    cases: [
+      ...FIELD_LINKAGE_CASE_CATALOG.slice(0, 3).map((item) => ({
+        caseId: item.caseId,
+        status: 'pass',
+        durationMs: 1,
+        failureMessages: [],
+      })),
+      {
+        caseId: skippedSingleCase.caseId,
+        status: 'skip',
+        durationMs: 1,
+        failureMessages: [],
+      },
+    ],
   })
 
   assert.equal(report.summary.totalFields, FIELD_LINKAGE_FIELD_CATALOG.length)
   assert(report.summary.partialFields > 0)
   assert(report.summary.missingFields > 0)
   assert.equal(report.cases[0].status, 'pass')
+  assert.equal(
+    report.summary.totalScenarios,
+    report.summary.passedScenarios +
+      report.summary.failedScenarios +
+      report.summary.skippedScenarios +
+      report.summary.missingScenarios
+  )
+  for (const field of report.fields) {
+    assert.equal(
+      field.totalScenarios,
+      field.passedScenarios +
+        field.failedScenarios +
+        field.skippedScenarios +
+        field.missingScenarios,
+      field.fieldKey
+    )
+  }
+})
+
+test('fieldLinkageCatalog: 多用例场景仅在所有关联用例通过时通过', () => {
+  const target = FIELD_LINKAGE_FIELD_CATALOG.flatMap((field) =>
+    field.requiredScenarioKeys.map((scenarioKey) => ({ field, scenarioKey }))
+  ).find(({ field, scenarioKey }) => {
+    const caseCount = FIELD_LINKAGE_CASE_CATALOG.filter(
+      (item) =>
+        item.scenarioKey === scenarioKey &&
+        item.fieldKeys.includes(field.fieldKey)
+    ).length
+    return caseCount >= 2
+  })
+  assert(target, '目录至少需要一个关联多个 case 的 field scenario')
+
+  const relatedCases = FIELD_LINKAGE_CASE_CATALOG.filter(
+    (item) =>
+      item.scenarioKey === target.scenarioKey &&
+      item.fieldKeys.includes(target.field.fieldKey)
+  )
+  const scenarioStatus = (statusByCaseId) => {
+    const report = buildFieldLinkageCoverageViewModel({
+      cases: relatedCases.flatMap((item) => {
+        const status = statusByCaseId.get(item.caseId)
+        return status ? [{ caseId: item.caseId, status }] : []
+      }),
+    })
+    return report.fields
+      .find((field) => field.fieldKey === target.field.fieldKey)
+      .scenarios.find((scenario) => scenario.scenarioKey === target.scenarioKey)
+      .status
+  }
+
+  const allPass = new Map(relatedCases.map((item) => [item.caseId, 'pass']))
+  assert.equal(scenarioStatus(allPass), 'pass')
+
+  const passAndSkip = new Map(allPass)
+  passAndSkip.set(relatedCases[0].caseId, 'skip')
+  assert.equal(scenarioStatus(passAndSkip), 'skip')
+
+  const passAndMissing = new Map(allPass)
+  passAndMissing.delete(relatedCases[0].caseId)
+  assert.equal(scenarioStatus(passAndMissing), 'missing')
 })

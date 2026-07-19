@@ -70,6 +70,14 @@ func (d *jsonrpcDispatcher) createProductionOrder(ctx context.Context, pm map[st
 	if !ok {
 		return invalidParamResult()
 	}
+	if res := d.requireSourceActionReadPermissions(
+		ctx,
+		"production_order",
+		"create_production_order",
+		productionOrderDraftSourceReadConditions(draft)...,
+	); res != nil {
+		return res
+	}
 	aggregate, err := d.productionOrderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: draft, ActorID: admin.ID, IdempotencyKey: key})
 	return d.productionOrderAggregateResult(ctx, aggregate, err)
 }
@@ -99,6 +107,14 @@ func (d *jsonrpcDispatcher) saveProductionOrder(ctx context.Context, pm map[stri
 	draft, key, ok := productionOrderDraftFromParams(pm)
 	if !ok {
 		return invalidParamResult()
+	}
+	if res := d.requireSourceActionReadPermissions(
+		ctx,
+		"production_order",
+		"save_production_order",
+		productionOrderDraftSourceReadConditions(draft)...,
+	); res != nil {
+		return res
 	}
 	aggregate, err := d.productionOrderUC.SaveDraft(ctx, &biz.ProductionOrderSave{ID: orderID, ExpectedVersion: version, Draft: draft, ActorID: admin.ID, IdempotencyKey: key})
 	return d.productionOrderAggregateResult(ctx, aggregate, err)
@@ -142,6 +158,11 @@ func (d *jsonrpcDispatcher) applyProductionOrderAction(ctx context.Context, pm m
 	reason, ok := productionOrderOptionalString(pm, "reason", 255)
 	if !ok || (command == biz.ProductionOrderCommandCancel && reason == nil) {
 		return invalidParamResult()
+	}
+	if command == biz.ProductionOrderCommandRelease {
+		if res := d.requireSourceActionReadPermissions(ctx, "production_order", "release_production_order"); res != nil {
+			return res
+		}
 	}
 	in := &biz.ProductionOrderAction{ID: orderID, ExpectedVersion: version, ActorID: admin.ID, IdempotencyKey: key, Reason: reason}
 	var aggregate *biz.ProductionOrderAggregate
@@ -215,6 +236,14 @@ func (d *jsonrpcDispatcher) listProductionOrderReferenceOptions(ctx context.Cont
 	filter, ok := productionOrderReferenceFilterFromParams(pm)
 	if !ok {
 		return invalidParamResult()
+	}
+	if res := d.requireSourceActionReadPermissions(
+		ctx,
+		"production_order",
+		"list_production_order_reference_options",
+		productionOrderReferenceSourceReadConditions(filter.ReferenceType)...,
+	); res != nil {
+		return res
 	}
 	options, total, err := d.productionOrderUC.ListReferenceOptions(ctx, filter)
 	if err != nil {
@@ -514,13 +543,7 @@ func productionOrderOptionalUnixTime(pm map[string]any, key string) (*time.Time,
 }
 
 func productionOrderRequiredDecimalString(pm map[string]any, key string) (decimal.Decimal, bool) {
-	raw, exists := pm[key]
-	value, ok := raw.(string)
-	if !exists || !ok || value == "" || value != strings.TrimSpace(value) {
-		return decimal.Zero, false
-	}
-	parsed, err := decimal.NewFromString(value)
-	return parsed, err == nil && parsed.GreaterThan(decimal.Zero)
+	return getRequiredJSONRPCNumeric20Scale6(pm, key)
 }
 
 func (d *jsonrpcDispatcher) productionOrderAggregateResult(ctx context.Context, aggregate *biz.ProductionOrderAggregate, err error) *v1.JsonrpcResult {
@@ -589,6 +612,8 @@ func (d *jsonrpcDispatcher) mapProductionOrderError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单引用的产品、规格、单位、销售明细或 BOM 已失效，请刷新后检查"}
 	case errors.Is(err, biz.ErrProductionOrderHasPostedFacts):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该生产订单已有生效的生产入库记录，不能取消；请先按业务规则冲正或关闭"}
+	case errors.Is(err, biz.ErrProductionOrderFactDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单仍有未过账或未取消的领料、完工或返工记录，请先处理后再关闭或取消"}
 	case errors.Is(err, biz.ErrProductionOrderCloseReasonRequired):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产数量尚未全部完成，请填写短关闭原因"}
 	case errors.Is(err, biz.ErrProductionOrderSchedulingTaskRequired):

@@ -1,9 +1,11 @@
-import React, { useEffect, useMemo } from 'react'
+import React, { useEffect, useMemo, useState } from 'react'
 import { Alert, Button, Card, Space, Typography } from 'antd'
 import { DesktopOutlined, UnorderedListOutlined } from '@ant-design/icons'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { getStoredAdminProfile } from '@/common/auth/auth'
+import { AUTH_SCOPE, getStoredAdminProfile, logout } from '@/common/auth/auth'
 import { getActiveERPBrand } from '@/common/consts/brand'
+import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
+import { JsonRpc } from '@/common/utils/jsonRpc'
 import {
   ENTRY_TARGET,
   getEnabledMobileRoleKeys,
@@ -19,10 +21,12 @@ const { Title } = Typography
 export default function EntrySelectionPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const [loggingOut, setLoggingOut] = useState(false)
   const adminProfile = getStoredAdminProfile()
   const entryConfig = useMemo(() => getEntryConfig(), [])
   const activeBrand = useMemo(() => getActiveERPBrand(), [])
   const preferredTarget = searchParams.get('target')
+  const entryReason = searchParams.get('reason')
 
   const desktopVisible =
     entryConfig.desktop === true &&
@@ -40,6 +44,15 @@ export default function EntrySelectionPage() {
     entryConfig.mobileTasks === true && allowedMobileRoleKeys.length > 0
   const defaultMobileRoleKey = allowedMobileRoleKeys[0] || ''
   const hasAnyEntry = desktopVisible || mobileVisible
+  const authRpc = useMemo(
+    () =>
+      new JsonRpc({
+        url: 'auth',
+        basePath: ADMIN_BASE_PATH,
+        authScope: AUTH_SCOPE.ADMIN,
+      }),
+    []
+  )
 
   const enterDesktop = () => {
     rememberEntryChoice(ENTRY_TARGET.DESKTOP)
@@ -58,6 +71,19 @@ export default function EntrySelectionPage() {
   const enterMobileTasks = () => {
     if (defaultMobileRoleKey) {
       enterMobileRole(defaultMobileRoleKey)
+    }
+  }
+
+  const handleLogout = async () => {
+    if (loggingOut) return
+    setLoggingOut(true)
+    try {
+      await authRpc.call('logout')
+    } catch (error) {
+      console.warn('工作入口 logout 失败', error)
+    } finally {
+      logout(AUTH_SCOPE.ADMIN)
+      navigate('/admin-login', { replace: true })
     }
   }
 
@@ -97,6 +123,24 @@ export default function EntrySelectionPage() {
             />
           ) : null}
 
+          {entryReason === 'mobile-role-unavailable' ? (
+            <Alert
+              type="info"
+              showIcon
+              message="该岗位未向当前账号开放"
+              description="登录状态已保留，请从下方选择当前账号可用的工作入口。"
+            />
+          ) : null}
+
+          {entryReason === 'mobile-runtime-unavailable' ? (
+            <Alert
+              type="info"
+              showIcon
+              message="手机待办暂时无法连接"
+              description="登录状态已保留，您可以选择电脑端或退出后联系管理员。"
+            />
+          ) : null}
+
           {desktopVisible ? (
             <Button
               block
@@ -120,6 +164,16 @@ export default function EntrySelectionPage() {
               手机待办
             </Button>
           ) : null}
+
+          <Button
+            block
+            size="large"
+            onClick={handleLogout}
+            loading={loggingOut}
+            disabled={loggingOut}
+          >
+            退出登录
+          </Button>
         </Space>
       </Card>
     </div>

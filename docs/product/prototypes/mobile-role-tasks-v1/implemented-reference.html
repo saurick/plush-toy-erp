@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>岗位任务端当前实现参考</title>
+    <title>岗位任务端当前列表基线</title>
     <style>
       :root {
         --bg: #eef4ef;
@@ -538,6 +538,14 @@
         margin-top: 10px;
       }
 
+      button.done-card {
+        display: block;
+        width: 100%;
+        border: 1px solid var(--line);
+        color: var(--text);
+        text-align: left;
+      }
+
       .message-card.warning {
         border: 1px solid #fed7aa;
         background: #fff7ed;
@@ -722,6 +730,12 @@
         resize: vertical;
       }
 
+      .textarea:disabled {
+        background: #f1f5f9;
+        color: var(--muted);
+        cursor: not-allowed;
+      }
+
       .event {
         display: flex;
         gap: 10px;
@@ -804,12 +818,26 @@
       .action-bar {
         display: grid;
         flex: 0 0 auto;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
+        grid-template-columns: minmax(0, 1fr);
         gap: 10px;
         border-top: 1px solid var(--line);
         background: rgb(255 255 255 / 95%);
         padding: 10px;
         box-shadow: 0 -8px 24px rgb(15 23 42 / 8%);
+      }
+
+      .action-bar.action-bar--empty {
+        grid-template-columns: minmax(0, 1fr);
+      }
+
+      .action-guidance {
+        grid-column: 1 / -1;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: var(--surface-soft);
+        color: var(--muted);
+        padding: 10px 12px;
+        font-size: 14px;
       }
 
       .action {
@@ -832,6 +860,17 @@
         border: 1px solid var(--line);
         background: #fff;
         color: var(--text);
+      }
+
+      .action.resume {
+        background: var(--blue);
+      }
+
+      .action.rejected {
+        grid-column: 1 / -1;
+        border: 1px solid #fecaca;
+        background: var(--red-soft);
+        color: var(--red);
       }
 
       .note {
@@ -861,7 +900,7 @@
   </head>
   <body>
     <main class="page">
-      <section class="phone" aria-label="岗位任务端当前实现参考">
+      <section class="phone" aria-label="岗位任务端当前列表基线">
         <section class="screen active" id="listScreen">
           <div class="main-scroll" id="mainScroll">
             <header class="header">
@@ -914,6 +953,9 @@
           </header>
 
           <main class="detail-main">
+            <p style="margin: 0 0 14px; color: #52616f; line-height: 1.6">
+              历史对照：本 HTML 中的旧详情内处理仅用于追溯 v1。当前运行态从列表选中任务后，进入 v2 的“查看任务 → 处理任务 → 结果回执”，结束后恢复原列表状态。
+            </p>
             <section class="panel" style="margin: 0">
               <div style="display: flex; justify-content: space-between; gap: 12px">
                 <h2>▤ 任务关键信息</h2>
@@ -930,7 +972,7 @@
             </section>
 
             <section class="risk-box" id="detailRisk">! 质检不合格 · 需要确认后继续流转</section>
-            <section class="exception-box">
+            <section class="exception-box" id="detailExceptionSection">
               <strong>异常上报</strong>
               <div id="detailException" style="margin-top: 6px; font-weight: 500">生产确认返工完成后重新提交成品抽检。</div>
             </section>
@@ -946,9 +988,9 @@
             <section class="panel" style="margin: 14px 0 0">
               <div style="display: flex; justify-content: space-between">
                 <h2>▧ 现场留痕</h2>
-                <span style="color: var(--muted); font-size: 13px">可选</span>
+                <span id="detailEvidenceState" style="color: var(--muted); font-size: 13px">可选</span>
               </div>
-              <textarea class="textarea" placeholder="填写照片、附件编号或链接；多条可换行"></textarea>
+              <textarea class="textarea" id="detailEvidenceInput" placeholder="填写照片、附件编号或链接；多条可换行"></textarea>
               <div style="text-align: right; color: var(--muted); font-size: 13px">0/500</div>
             </section>
 
@@ -960,13 +1002,15 @@
               <div class="event">
                 <span class="event-dot"></span>
                 <div>
-                  <strong>系统 <span class="chip">待处理</span></strong>
-                  <div style="margin-top: 6px; color: var(--muted)">
+                  <strong>系统 <span class="chip" id="detailEventStatus">待处理</span></strong>
+                  <div id="detailEventText" style="margin-top: 6px; color: var(--muted)">
                     任务已流转至仓库
                   </div>
                 </div>
               </div>
             </section>
+
+            <p class="note">完成、阻塞、退回、解除阻塞或催办只更新 Workflow 协同任务；库存、质检、出货和财务事实仍须在对应业务页面办理。</p>
 
             <section class="reason-sheet" id="reasonSheet">
               <div style="display: flex; justify-content: space-between">
@@ -990,16 +1034,40 @@
             </section>
           </main>
 
-          <div class="action-bar">
-            <button class="action block" data-action="blocked" data-action-label="阻塞原因（必填）" aria-expanded="false">Ⅱ 阻塞</button>
-            <button class="action done" data-action="done" data-action-label="完成反馈（必填）" aria-expanded="false">✓ 完成</button>
-            <button class="action urge" data-action="urge" data-action-label="催办原因（必填）" aria-expanded="false">◔ 催办</button>
-          </div>
+          <div class="action-bar" id="actionBar" aria-label="当前任务可用操作"></div>
         </section>
       </section>
     </main>
 
     <script>
+      const ACTIONS = {
+        blocked: {
+          label: "Ⅱ 阻塞",
+          sheetLabel: "阻塞原因（必填）",
+          className: "block",
+        },
+        done: {
+          label: "✓ 完成",
+          sheetLabel: "完成反馈（必填）",
+          className: "done",
+        },
+        rejected: {
+          label: "退回当前任务",
+          sheetLabel: "退回原因（必填）",
+          className: "rejected",
+        },
+        resume: {
+          label: "↻ 解除阻塞",
+          sheetLabel: "阻塞解除说明（必填）",
+          className: "resume",
+        },
+        urge: {
+          label: "◔ 催办",
+          sheetLabel: "催办原因（必填）",
+          className: "urge",
+        },
+      };
+
       const tasks = [
         {
           id: "task-rework-018",
@@ -1012,6 +1080,10 @@
           status: "已阻塞",
           due: "04/25 18:00",
           mine: true,
+          listView: "todo",
+          accessMode: "actionable",
+          actions: ["resume", "urge"],
+          guidance: "任务已阻塞，本岗位可填写解除说明后恢复处理，也可催办相关协作岗位。",
           risk: "质检不合格 · 已超时",
           blockedReason: "生产确认返工完成，重新提交成品抽检",
           exception: "生产确认返工完成后重新提交成品抽检。",
@@ -1027,6 +1099,10 @@
           status: "待处理",
           due: "04/27 15:00",
           mine: true,
+          listView: "todo",
+          accessMode: "actionable",
+          actions: ["blocked", "done", "urge"],
+          guidance: "本岗位可以阻塞、完成或催办；提交前仍需由服务端复核当前状态和权限。",
           risk: "生产确认返工完成 · 需尽快确认",
         },
         {
@@ -1040,6 +1116,10 @@
           status: "待处理",
           due: "04/24 17:30",
           mine: false,
+          listView: "todo",
+          accessMode: "urge-only",
+          actions: ["urge"],
+          guidance: "当前任务由财务岗位负责，仓库只能查看并催办，不能代替财务完成或退回。",
           risk: "应收登记已超时",
         },
         {
@@ -1053,7 +1133,11 @@
           status: "待处理",
           due: "04/28 10:00",
           mine: false,
-          risk: "成品抽检即将到期",
+          listView: "todo",
+          accessMode: "readonly",
+          actions: [],
+          guidance: "当前任务由品质岗位负责，本岗位只能查看，不能处理或催办。",
+          risk: "",
         },
         {
           id: "task-inbound-028",
@@ -1066,6 +1150,10 @@
           status: "待处理",
           due: "04/29 09:30",
           mine: true,
+          listView: "todo",
+          accessMode: "actionable",
+          actions: ["blocked", "done", "urge", "rejected"],
+          guidance: "本岗位可核对入库任务并选择阻塞、完成、退回或催办。",
           risk: "",
         },
         {
@@ -1079,6 +1167,44 @@
           status: "待处理",
           due: "04/29 11:00",
           mine: true,
+          listView: "todo",
+          accessMode: "actionable",
+          actions: ["blocked", "done", "urge"],
+          guidance: "本岗位可处理当前审核任务，动作只更新协同任务状态。",
+          risk: "",
+        },
+        {
+          id: "task-inbound-done-026",
+          title: "仓库入库确认",
+          source: "PR-202607-026",
+          meta: "物料：水洗棉 ｜ 数量：80包 ｜ 仓位：原料A区",
+          badge: "已完成",
+          tone: "",
+          chip: "入库确认",
+          status: "已完成",
+          due: "04/26 16:20",
+          mine: true,
+          listView: "history",
+          accessMode: "readonly",
+          actions: [],
+          guidance: "任务已完成，当前只保留详情和处理留痕，不能再次修改任务状态。",
+          risk: "",
+        },
+        {
+          id: "task-inbound-rejected-024",
+          title: "包装破损来料确认",
+          source: "PR-202607-024",
+          meta: "物料：短毛绒 ｜ 数量：12卷 ｜ 结果：已退回",
+          badge: "已退回",
+          tone: "alert",
+          chip: "来料核对",
+          status: "已退回",
+          due: "04/26 15:10",
+          mine: true,
+          listView: "history",
+          accessMode: "readonly",
+          actions: [],
+          guidance: "任务已退回并结束当前处理，当前只读；后续业务结果仍以来源单据为准。",
           risk: "",
         },
       ];
@@ -1092,15 +1218,23 @@
       let activeTask = null;
       let actionSubmitting = false;
 
+      function todoTasks() {
+        return tasks.filter((task) => task.listView === "todo");
+      }
+
+      function historyTasks() {
+        return tasks.filter((task) => task.listView === "history");
+      }
+
       const tabData = {
         todo: {
           title: "待办",
-          summary: "共 18 条待处理",
+          summary: `共 ${todoTasks().length} 条待处理`,
           content: renderTodo(),
         },
         done: {
           title: "已办",
-          summary: "共 6 条已办",
+          summary: `共 ${historyTasks().length} 条已办`,
           content: renderDone(),
         },
         messages: {
@@ -1133,12 +1267,41 @@
       const detailSourceText = document.querySelector("#detailSourceText");
       const detailFacts = document.querySelector("#detailFacts");
       const detailRisk = document.querySelector("#detailRisk");
+      const detailExceptionSection = document.querySelector("#detailExceptionSection");
       const detailException = document.querySelector("#detailException");
       const detailLinkedSource = document.querySelector("#detailLinkedSource");
+      const detailEvidenceInput = document.querySelector("#detailEvidenceInput");
+      const detailEvidenceState = document.querySelector("#detailEvidenceState");
+      const detailEventStatus = document.querySelector("#detailEventStatus");
+      const detailEventText = document.querySelector("#detailEventText");
       const backButton = document.querySelector("#backButton");
+      const actionBar = document.querySelector("#actionBar");
+
+      function renderActionBar(task) {
+        const actions = Array.isArray(task.actions) ? task.actions : [];
+        const primaryActionCount = actions.filter(
+          (actionKey) => actionKey !== "rejected",
+        ).length;
+        const columnCount = Math.max(1, Math.min(3, primaryActionCount));
+        const guidance = task.guidance
+          ? `<div class="action-guidance" role="note">${task.guidance}</div>`
+          : "";
+        actionBar.classList.toggle("action-bar--empty", actions.length === 0);
+        actionBar.style.gridTemplateColumns = `repeat(${columnCount}, minmax(0, 1fr))`;
+        actionBar.innerHTML = [
+          guidance,
+          ...actions.map((actionKey) => {
+            const action = ACTIONS[actionKey];
+            if (!action) return "";
+            return `<button class="action ${action.className}" data-action="${actionKey}" data-action-label="${action.sheetLabel}" aria-expanded="false">${action.label}</button>`;
+          }),
+        ].join("");
+      }
 
       function renderTaskDetail(task) {
         activeTask = task;
+        activeActionButton = null;
+        closeReasonSheet();
         const metadataFacts = task.meta.split(" ｜ ").map((item) => {
           const [label, ...valueParts] = item.split("：");
           return [label, valueParts.join("：")];
@@ -1157,11 +1320,24 @@
         detailLinkedSource.textContent = `来源：${task.source}`;
         detailRisk.hidden = !task.risk;
         detailRisk.textContent = task.risk ? `! ${task.risk}` : "";
+        detailExceptionSection.hidden = !task.exception;
         detailException.textContent =
           task.exception || "请按当前任务要求处理，并在提交前核对业务信息。";
-        document.querySelectorAll("[data-action]").forEach((button) => {
-          button.disabled = Boolean(task.actionLocked);
-        });
+        const isReadonly = task.accessMode === "readonly";
+        detailEvidenceInput.disabled = isReadonly;
+        detailEvidenceInput.value = "";
+        detailEvidenceInput.placeholder = isReadonly
+          ? "当前任务只读，现场留痕不可编辑"
+          : "填写照片、附件编号或链接；多条可换行";
+        detailEvidenceState.textContent = isReadonly ? "只读" : "可选";
+        detailEventStatus.textContent = task.status;
+        detailEventText.textContent =
+          task.status === "已完成"
+            ? "任务已完成，当前只保留协同处理留痕。"
+            : task.status === "已退回"
+              ? "任务已退回并结束当前处理。"
+              : `任务已流转至${task.mine ? "仓库" : "责任岗位"}`;
+        renderActionBar(task);
         detailFacts.replaceChildren(
           ...factRows.map(([label, value]) => {
             const item = document.createElement("div");
@@ -1177,12 +1353,17 @@
       }
 
       function filteredTasks() {
-        if (activeFilter === "risk") return tasks.filter((task) => task.tone);
-        if (activeFilter === "overdue") {
-          return tasks.filter((task) => task.tone === "overdue");
+        const currentTodoTasks = todoTasks();
+        if (activeFilter === "risk") {
+          return currentTodoTasks.filter((task) => task.tone);
         }
-        if (activeFilter === "mine") return tasks.filter((task) => task.mine);
-        return tasks;
+        if (activeFilter === "overdue") {
+          return currentTodoTasks.filter((task) => task.tone === "overdue");
+        }
+        if (activeFilter === "mine") {
+          return currentTodoTasks.filter((task) => task.mine);
+        }
+        return currentTodoTasks;
       }
 
       function renderTaskRows() {
@@ -1225,9 +1406,10 @@
       }
 
       function renderTodo() {
-        const riskCount = tasks.filter((task) => task.risk).length;
-        const overdueCount = tasks.filter((task) => task.tone === "overdue").length;
-        const blockedCount = tasks.filter((task) => task.status === "已阻塞").length;
+        const currentTodoTasks = todoTasks();
+        const riskCount = currentTodoTasks.filter((task) => task.risk).length;
+        const overdueCount = currentTodoTasks.filter((task) => task.tone === "overdue").length;
+        const blockedCount = currentTodoTasks.filter((task) => task.status === "已阻塞").length;
         return `
           <section class="metrics">
             <div class="metric"><strong style="color:var(--orange)">${riskCount}</strong><span>风险</span></div>
@@ -1236,10 +1418,10 @@
             <div class="metric"><strong style="color:var(--red)">${blockedCount}</strong><span>阻塞/高优先</span></div>
           </section>
           <div class="filters">
-            <button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">全部(${tasks.length})</button>
-            <button class="filter ${activeFilter === "risk" ? "active" : ""}" data-filter="risk">风险(${tasks.filter((task) => task.tone).length})</button>
-            <button class="filter ${activeFilter === "overdue" ? "active" : ""}" data-filter="overdue">超时(${tasks.filter((task) => task.tone === "overdue").length})</button>
-            <button class="filter ${activeFilter === "mine" ? "active" : ""}" data-filter="mine">我负责(${tasks.filter((task) => task.mine).length})</button>
+            <button class="filter ${activeFilter === "all" ? "active" : ""}" data-filter="all">全部(${currentTodoTasks.length})</button>
+            <button class="filter ${activeFilter === "risk" ? "active" : ""}" data-filter="risk">风险(${currentTodoTasks.filter((task) => task.tone).length})</button>
+            <button class="filter ${activeFilter === "overdue" ? "active" : ""}" data-filter="overdue">超时(${currentTodoTasks.filter((task) => task.tone === "overdue").length})</button>
+            <button class="filter ${activeFilter === "mine" ? "active" : ""}" data-filter="mine">我负责(${currentTodoTasks.filter((task) => task.mine).length})</button>
           </div>
           ${renderTaskRows()}
         `;
@@ -1294,23 +1476,28 @@
       }
 
       function renderDone() {
+        const completedTasks = historyTasks();
         return `
           <section class="panel">
             <div style="display:flex;justify-content:space-between">
-              <h2>进度</h2><span style="color:var(--muted)">42%</span>
+              <h2>协同任务概览</h2><span style="color:var(--muted)">当前样例</span>
             </div>
             <div class="progress-bar"><span></span></div>
             <section class="metrics" style="margin:16px 0 0">
-              <div class="metric"><strong>8</strong><span>待处理</span></div>
-              <div class="metric"><strong>1</strong><span>处理中</span></div>
-              <div class="metric"><strong>1</strong><span>卡住</span></div>
-              <div class="metric"><strong style="color:var(--green)">6</strong><span>完成</span></div>
+              <div class="metric"><strong>${todoTasks().length}</strong><span>待处理</span></div>
+              <div class="metric"><strong>${todoTasks().filter((task) => task.status === "已阻塞").length}</strong><span>已阻塞</span></div>
+              <div class="metric"><strong>${completedTasks.filter((task) => task.status === "已退回").length}</strong><span>已退回</span></div>
+              <div class="metric"><strong style="color:var(--green)">${completedTasks.filter((task) => task.status === "已完成").length}</strong><span>已完成</span></div>
             </section>
           </section>
           <section class="panel">
             <h2>已办任务</h2>
-            <div class="done-card"><strong>仓库入库确认</strong><br><span style="color:var(--muted)">已完成 · 04/26 16:20</span></div>
-            <div class="done-card"><strong>包装发料确认</strong><br><span style="color:var(--muted)">已完成 · 04/26 17:40</span></div>
+            ${completedTasks
+              .map((task) => {
+                const taskIndex = tasks.indexOf(task);
+                return `<button class="done-card" data-open-detail="${taskIndex}"><strong>${task.title}</strong><br><span style="color:var(--muted)">${task.status} · ${task.due}</span></button>`;
+              })
+              .join("")}
           </section>
         `;
       }
@@ -1357,13 +1544,17 @@
         tabSummary.textContent = options.loading
           ? "正在加载任务"
           : tab === "todo"
-            ? `共 ${tasks.length} 条待处理`
-            : data.summary;
+            ? `共 ${todoTasks().length} 条待处理`
+            : tab === "done"
+              ? `共 ${historyTasks().length} 条已办`
+              : data.summary;
         tabContent.innerHTML = options.loading && tab === "todo"
           ? renderLoading()
           : tab === "todo"
             ? renderTodo()
-            : data.content;
+            : tab === "done"
+              ? renderDone()
+              : data.content;
         mainScroll.setAttribute("aria-busy", options.loading ? "true" : "false");
         document.querySelectorAll("[data-tab]").forEach((button) => {
           button.classList.toggle("active", button.dataset.tab === tab);
@@ -1409,21 +1600,20 @@
         );
       });
 
-      document.querySelectorAll("[data-action]").forEach((button) => {
-        button.addEventListener("click", () => {
-          if (actionSubmitting || button.disabled || activeTask?.actionLocked) return;
-          activeActionButton = button;
-          reasonTitle.textContent = `${button.dataset.actionLabel} ·`;
-          reasonInput.value = "";
-          reasonCount.textContent = "0/500";
-          actionFeedback.className = "action-feedback";
-          actionFeedback.textContent = "";
-          reasonSheet.classList.add("visible");
-          button.setAttribute("aria-expanded", "true");
-          requestAnimationFrame(() =>
-            reasonInput.focus({ preventScroll: true }),
-          );
-        });
+      actionBar.addEventListener("click", (event) => {
+        const button = event.target.closest("[data-action]");
+        if (!button || actionSubmitting || button.disabled) return;
+        activeActionButton = button;
+        reasonTitle.textContent = `${button.dataset.actionLabel} ·`;
+        reasonInput.value = "";
+        reasonCount.textContent = "0/500";
+        actionFeedback.className = "action-feedback";
+        actionFeedback.textContent = "";
+        reasonSheet.classList.add("visible");
+        button.setAttribute("aria-expanded", "true");
+        requestAnimationFrame(() =>
+          reasonInput.focus({ preventScroll: true }),
+        );
       });
 
       function closeReasonSheet({ restoreFocus = false } = {}) {
@@ -1468,7 +1658,7 @@
         document
           .querySelectorAll("[data-action]")
           .forEach((button) => {
-            button.disabled = submitting || Boolean(activeTask?.actionLocked);
+            button.disabled = submitting;
           });
         document
           .querySelectorAll("[data-quick-reason], #cancelReasonButton, #closeReasonButton")
@@ -1493,16 +1683,41 @@
         const submittedActionLabel = submittedActionButton.textContent.trim();
         setActionSubmitting(true);
         window.setTimeout(() => {
-          submittedTask.actionLocked = true;
           if (action === "blocked") {
             submittedTask.status = "已阻塞";
             submittedTask.blockedReason = reason;
             submittedTask.risk = `${submittedTask.chip} · 已阻塞`;
             submittedTask.badge = "阻塞";
             submittedTask.tone = "alert";
+            submittedTask.actions = ["resume", "urge"];
+            submittedTask.guidance =
+              "任务已阻塞，本岗位可填写解除说明后恢复处理，也可催办相关协作岗位。";
           } else if (action === "done") {
-            const submittedTaskIndex = tasks.indexOf(submittedTask);
-            if (submittedTaskIndex >= 0) tasks.splice(submittedTaskIndex, 1);
+            submittedTask.status = "已完成";
+            submittedTask.badge = "已完成";
+            submittedTask.tone = "";
+            submittedTask.listView = "history";
+            submittedTask.accessMode = "readonly";
+            submittedTask.actions = [];
+            submittedTask.guidance =
+              "任务已完成，当前只保留详情和处理留痕，不能再次修改任务状态。";
+          } else if (action === "rejected") {
+            submittedTask.status = "已退回";
+            submittedTask.badge = "已退回";
+            submittedTask.tone = "alert";
+            submittedTask.listView = "history";
+            submittedTask.accessMode = "readonly";
+            submittedTask.actions = [];
+            submittedTask.guidance =
+              "任务已退回并结束当前处理，当前只读；后续业务结果仍以来源单据为准。";
+          } else if (action === "resume") {
+            submittedTask.status = "待处理";
+            submittedTask.blockedReason = "";
+            submittedTask.badge = "预警";
+            submittedTask.tone = "alert";
+            submittedTask.actions = ["blocked", "done", "urge"];
+            submittedTask.guidance =
+              "阻塞已解除，本岗位可以继续阻塞、完成或催办；提交前仍需服务端复核。";
           }
           setActionSubmitting(false);
           closeReasonSheet();

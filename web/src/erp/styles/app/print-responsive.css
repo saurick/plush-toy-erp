@@ -138,6 +138,12 @@
     grid-template-columns: 1fr;
   }
 
+  .erp-dev-testing-coverage-identity,
+  .erp-dev-testing-coverage-grid,
+  .erp-dev-testing-coverage-policy-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .erp-dev-governance-answer-grid,
   .erp-dev-governance-task-grid {
     grid-template-columns: 1fr;
@@ -338,13 +344,37 @@
 
   .erp-dev-testing-reader__toolbar .ant-segmented-group {
     display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
 
   .erp-dev-testing-reader__toolbar .ant-segmented-item-label {
     min-height: 32px;
     padding-inline: 6px;
+  }
+
+  .erp-dev-testing-coverage-actions,
+  .erp-dev-testing-coverage-section__head,
+  .erp-dev-testing-coverage-card__head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-dev-testing-coverage-actions .ant-btn {
+    width: 100%;
+  }
+
+  .erp-dev-testing-coverage-identity,
+  .erp-dev-testing-coverage-grid,
+  .erp-dev-testing-coverage-grid--code,
+  .erp-dev-testing-coverage-policy-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .erp-dev-testing-coverage-identity > span {
+    border-right: 0;
+    border-bottom: 1px solid #e4ede7;
+    padding: 0 0 8px;
   }
 
   .erp-dev-prototypes-reader__meta,

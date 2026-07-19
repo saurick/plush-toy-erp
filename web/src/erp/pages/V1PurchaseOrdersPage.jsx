@@ -30,14 +30,15 @@ import PurchaseOrderInboundDraftModal from '../components/purchase-orders/Purcha
 import PurchaseOrderOperationPanel from '../components/purchase-orders/PurchaseOrderOperationPanel.jsx'
 import { buildPurchaseOrderColumns } from '../components/purchase-orders/purchaseOrderColumns.jsx'
 import {
-  listMaterials,
-  listContactsByOwner,
+  listAllMaterials,
+  listAllContactsByOwner,
   listAllPurchaseOrderItems,
   listPurchaseOrderItemsPreview,
   listPurchaseOrders,
   getPurchaseOrder,
-  listSuppliers,
-  listUnits,
+  listAllSuppliers,
+  listAllUnits,
+  listAllWarehouses,
   savePurchaseOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
@@ -54,7 +55,6 @@ import {
 import { usePurchaseOrderContractPrint } from '../components/purchase-orders/usePurchaseOrderContractPrint.mjs'
 import { usePurchaseOrderInboundDraft } from '../components/purchase-orders/usePurchaseOrderInboundDraft.mjs'
 import { usePurchaseOrderWorkflowActions } from '../components/purchase-orders/usePurchaseOrderWorkflowActions.mjs'
-import { listInventoryLots } from '../api/inventoryApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
 import {
@@ -105,16 +105,21 @@ import {
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
 import { getEffectivePrintTemplateDefaults } from '../utils/adminProfileSync.mjs'
+import { searchParamPositiveInt } from '../utils/routeQuery.mjs'
 import {
-  routeWithQuery,
-  searchParamPositiveIntText,
-} from '../utils/routeQuery.mjs'
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
+import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 import { MATERIAL_PURCHASE_CONTRACT_TEMPLATE_KEY } from '../utils/printWorkspace.js'
 
 export default function V1PurchaseOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -162,7 +167,10 @@ export default function V1PurchaseOrdersPage() {
   const [suppliers, setSuppliers] = useState([])
   const [materials, setMaterials] = useState([])
   const [units, setUnits] = useState([])
-  const [inventoryLots, setInventoryLots] = useState([])
+  const [warehouses, setWarehouses] = useState([])
+  const [referenceDataState, setReferenceDataState] = useState('loading')
+  const [inboundReferenceDataState, setInboundReferenceDataState] =
+    useState('loading')
   const [keyword, setKeyword] = useState('')
   const [status, setStatus] = useState('')
   const [supplierFilter, setSupplierFilter] = useState('')
@@ -175,9 +183,28 @@ export default function V1PurchaseOrdersPage() {
   const [detailOrder, setDetailOrder] = useState(null)
   const [modalOpen, setModalOpen] = useState(false)
   const orderAttachmentRef = useRef(null)
-  const routePurchaseOrderID = searchParamPositiveIntText(
+  const routePurchaseOrderID = searchParamPositiveInt(
     searchParams,
     'purchase_order_id'
+  )
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const resolvedRouteKeyword =
+    routePurchaseOrderID &&
+    Number(selectedOrder?.id || 0) === Number(routePurchaseOrderID)
+      ? String(selectedOrder?.purchase_order_no || '').trim()
+      : ''
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
   )
   const supplierOptions = useMemo(
     () => uniqueReferenceOptions(suppliers, supplierOption),
@@ -287,28 +314,56 @@ export default function V1PurchaseOrdersPage() {
     emptyDescription: '当前采购订单暂无明细',
   })
   const warehouseOptions = useMemo(
-    () => uniqueReferenceOptions(inventoryLots, warehouseOptionFromRecord),
-    [inventoryLots]
+    () => uniqueReferenceOptions(warehouses, warehouseOptionFromRecord),
+    [warehouses]
   )
 
   const loadReferenceData = useCallback(async () => {
+    const request = beginLatestRequest('reference-data')
+    setReferenceDataState('loading')
     try {
-      const [supplierData, materialData, unitData, lotData] = await Promise.all(
-        [
-          listSuppliers({ active_only: true, limit: 200 }),
-          listMaterials({ active_only: true, limit: 200 }),
-          listUnits({ limit: 500 }),
-          listInventoryLots({ limit: 500 }),
-        ]
-      )
+      const [supplierData, materialData, unitData] = await Promise.all([
+        listAllSuppliers({ active_only: true }, { signal: request.signal }),
+        listAllMaterials({ active_only: true }, { signal: request.signal }),
+        listAllUnits({}, { signal: request.signal }),
+      ])
+      if (!request.isCurrent()) return false
       setSuppliers(supplierData?.suppliers || [])
       setMaterials(materialData?.materials || [])
       setUnits(unitData?.units || [])
-      setInventoryLots(lotData?.inventory_lots || [])
+      setReferenceDataState('ready')
+      return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return false
+      setReferenceDataState('error')
       message.error(getActionErrorMessage(error, '加载采购基础资料失败'))
+      return false
+    } finally {
+      if (request.isCurrent()) request.finish()
     }
-  }, [])
+  }, [beginLatestRequest])
+
+  const loadInboundReferenceData = useCallback(async () => {
+    const request = beginLatestRequest('inbound-reference-data')
+    setInboundReferenceDataState('loading')
+    try {
+      const warehouseData = await listAllWarehouses(
+        { active_only: true },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) return false
+      setWarehouses(warehouseData?.warehouses || [])
+      setInboundReferenceDataState('ready')
+      return true
+    } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return false
+      setInboundReferenceDataState('error')
+      message.error(getActionErrorMessage(error, '加载采购入库仓库资料失败'))
+      return false
+    } finally {
+      if (request.isCurrent()) request.finish()
+    }
+  }, [beginLatestRequest])
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
@@ -319,7 +374,11 @@ export default function V1PurchaseOrdersPage() {
       const [data, routeOrder] = await Promise.all([
         listPurchaseOrders(
           {
-            keyword,
+            keyword: linkedDocumentRequestKeyword({
+              localKeyword: keyword,
+              linkedKeyword,
+              hasExactContext: Boolean(routeSelectedID),
+            }),
             supplier_id: supplierFilter || undefined,
             lifecycle_status: status,
             date_field: dateFilterField,
@@ -340,26 +399,22 @@ export default function V1PurchaseOrdersPage() {
           : Promise.resolve(null),
       ])
       if (!request.isCurrent()) {
-        return
+        return false
       }
       const listedOrders = data?.purchase_orders || []
-      const nextOrders = routeOrder
-        ? [
-            routeOrder,
-            ...listedOrders.filter((item) => item.id !== routeOrder.id),
-          ]
-        : listedOrders
+      const exactPage = resolveExactRecordPage({
+        records: listedOrders,
+        exactRecord: routeOrder,
+        hasExactContext: routeSelectedID > 0,
+        total: Number(data?.total || 0),
+      })
+      const nextOrders = exactPage.records
       setOrders(nextOrders)
-      setTotal(
-        Number(data?.total || 0) +
-          (routeOrder && !listedOrders.some((item) => item.id === routeOrder.id)
-            ? 1
-            : 0)
-      )
+      setTotal(exactPage.total)
       if (routeSelectedID > 0) {
         applySelectedRowKeys(routeOrder ? [routeSelectedID] : [])
         setSelectedOrder(routeOrder)
-        return
+        return true
       }
       const validKeys = selectedRowKeysRef.current.filter((key) =>
         nextOrders.some((item) => item.id === key)
@@ -370,11 +425,13 @@ export default function V1PurchaseOrdersPage() {
       } else {
         setSelectedOrder(null)
       }
+      return true
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
-        return
+        return false
       }
       message.error(getActionErrorMessage(error, '加载采购订单失败'))
+      return false
     } finally {
       if (request.isCurrent()) {
         setLoading(false)
@@ -388,6 +445,7 @@ export default function V1PurchaseOrdersPage() {
     dateFilterField,
     dateFilterStart,
     keyword,
+    linkedKeyword,
     pagination,
     routePurchaseOrderID,
     sortValue,
@@ -443,8 +501,8 @@ export default function V1PurchaseOrdersPage() {
 
   const loadPrintReferenceData = useCallback(async () => {
     const [materialData, unitData] = await Promise.all([
-      listMaterials({ active_only: true, limit: 200 }),
-      listUnits({ limit: 500 }),
+      listAllMaterials({ active_only: true }),
+      listAllUnits(),
     ])
     const nextMaterials = materialData?.materials || []
     const nextUnits = unitData?.units || []
@@ -468,18 +526,47 @@ export default function V1PurchaseOrdersPage() {
   }, [loadReferenceData])
 
   useEffect(() => {
+    loadInboundReferenceData()
+  }, [loadInboundReferenceData])
+
+  useEffect(() => {
     loadOrders()
   }, [loadOrders])
 
   const refreshPageData = useCallback(async () => {
-    await Promise.all([loadOrders(), loadWorkflowTasks()])
-  }, [loadOrders, loadWorkflowTasks])
+    const [ordersOK, referencesOK, inboundReferencesOK, workflowResult] =
+      await Promise.all([
+        loadOrders(),
+        loadReferenceData(),
+        loadInboundReferenceData(),
+        loadWorkflowTasks(),
+      ])
+    return (
+      ordersOK !== false &&
+      referencesOK !== false &&
+      inboundReferencesOK !== false &&
+      workflowResult?.status !== 'error'
+    )
+  }, [
+    loadInboundReferenceData,
+    loadOrders,
+    loadReferenceData,
+    loadWorkflowTasks,
+  ])
 
   useEffect(() => {
     return outletContext?.registerPageRefresh?.(refreshPageData)
   }, [outletContext, refreshPageData])
 
   const openCreateModal = () => {
+    if (referenceDataState !== 'ready') {
+      message.warning(
+        referenceDataState === 'loading'
+          ? '采购基础资料正在加载，请稍后再新建采购订单'
+          : '采购基础资料加载失败，请先刷新当前页后重试'
+      )
+      return
+    }
     sourceDocumentOpenEditController.invalidate()
     orderAttachmentRef.current?.clearPendingAttachments()
     setEditingOrder(null)
@@ -503,6 +590,14 @@ export default function V1PurchaseOrdersPage() {
   }
 
   const openEditModal = async (record) => {
+    if (referenceDataState !== 'ready') {
+      message.warning(
+        referenceDataState === 'loading'
+          ? '采购基础资料正在加载，请稍后再编辑采购订单'
+          : '采购基础资料加载失败，请先刷新当前页后重试'
+      )
+      return
+    }
     const editResult = await openSourceDocumentEditWithAccessGate({
       canUpdate,
       document: record,
@@ -588,11 +683,10 @@ export default function V1PurchaseOrdersPage() {
         return baseSnapshot
       }
       try {
-        const data = await listContactsByOwner({
+        const data = await listAllContactsByOwner({
           owner_type: SUPPLIER_CONTACT_OWNER_TYPE,
           owner_id: supplier.id,
           active_only: true,
-          limit: 50,
         })
         return buildSupplierSnapshotWithContacts(supplier, data?.contacts || [])
       } catch (error) {
@@ -643,6 +737,11 @@ export default function V1PurchaseOrdersPage() {
   }
 
   const handleSave = async () => {
+    if (referenceDataState !== 'ready') {
+      message.warning('采购基础资料尚未就绪，本次未保存，请刷新后重试')
+      return
+    }
+    const isCreatingOrder = !editingOrder?.id
     setSaving(true)
     try {
       let params
@@ -726,11 +825,16 @@ export default function V1PurchaseOrdersPage() {
           getActionErrorMessage(detailEffect.error, '刷新采购订单明细')
         )
       }
-      const refreshEffect = await settleSourceDocumentPostSaveEffect(loadOrders)
-      if (refreshEffect.status === 'rejected') {
-        message.warning(
-          getActionErrorMessage(refreshEffect.error, '刷新采购订单列表')
-        )
+      if (isCreatingOrder) {
+        setPagination((current) => ({ ...current, current: 1 }))
+      } else {
+        const refreshEffect =
+          await settleSourceDocumentPostSaveEffect(loadOrders)
+        if (refreshEffect.status === 'rejected') {
+          message.warning(
+            getActionErrorMessage(refreshEffect.error, '刷新采购订单列表')
+          )
+        }
       }
     } finally {
       setSaving(false)
@@ -884,11 +988,19 @@ export default function V1PurchaseOrdersPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
+      linkedKeyword ||
+      routePurchaseOrderID ||
       status ||
       supplierFilter ||
       dateFilterStart ||
       dateFilterEnd
   )
+  const clearRouteContext = useCallback(() => {
+    const nextParams = clearLinkedDocumentParams(searchParams)
+    nextParams.delete('purchase_order_id')
+    setSearchParams(nextParams, { replace: true })
+    setPagination((current) => ({ ...current, current: 1 }))
+  }, [searchParams, setSearchParams])
   const clearFilters = useCallback(() => {
     setKeyword('')
     setStatus('')
@@ -897,7 +1009,8 @@ export default function V1PurchaseOrdersPage() {
     setDateFilterStart('')
     setDateFilterEnd('')
     setPagination((current) => ({ ...current, current: 1 }))
-  }, [])
+    clearRouteContext()
+  }, [clearRouteContext])
 
   const selectedOrders = useMemo(
     () => orders.filter((record) => selectedRowKeys.includes(record.id)),
@@ -946,7 +1059,7 @@ export default function V1PurchaseOrdersPage() {
     inboundDraftModalOpen,
     inboundDraftPreviewLoading,
     inboundDraftPreviewRows,
-    openInboundDraftModal,
+    openInboundDraftModal: openInboundDraftModalWithReadySource,
   } = usePurchaseOrderInboundDraft({
     form: inboundDraftForm,
     loadOrderItems,
@@ -955,6 +1068,46 @@ export default function V1PurchaseOrdersPage() {
     selectedOrder: singleSelectedOrder,
     unitOptions,
   })
+  const inboundReferenceDataReady = inboundReferenceDataState === 'ready'
+  const hasInboundWarehouse = warehouseOptions.length > 0
+  const openInboundDraftModal = useCallback(
+    (record) => {
+      if (!inboundReferenceDataReady) {
+        message.warning(
+          inboundReferenceDataState === 'loading'
+            ? '入库仓库资料正在加载，请稍后再生成采购入库草稿'
+            : '入库仓库资料加载失败，请先刷新当前页后重试'
+        )
+        return
+      }
+      if (!hasInboundWarehouse) {
+        message.warning('请先维护至少一个启用的入库仓库')
+        return
+      }
+      openInboundDraftModalWithReadySource(record)
+    },
+    [
+      hasInboundWarehouse,
+      inboundReferenceDataReady,
+      inboundReferenceDataState,
+      openInboundDraftModalWithReadySource,
+    ]
+  )
+  const createInboundDraftWithReadySource = useCallback(() => {
+    if (!inboundReferenceDataReady) {
+      message.warning('入库仓库资料尚未就绪，本次未生成，请刷新后重试')
+      return
+    }
+    if (!hasInboundWarehouse) {
+      message.warning('请先维护至少一个启用的入库仓库')
+      return
+    }
+    return createInboundDraftFromOrder()
+  }, [
+    createInboundDraftFromOrder,
+    hasInboundWarehouse,
+    inboundReferenceDataReady,
+  ])
   const selectedOrderWorkflowTasks = useMemo(
     () =>
       singleSelectedOrder?.id
@@ -987,6 +1140,19 @@ export default function V1PurchaseOrdersPage() {
     canCreatePurchaseReceipt,
     order: singleSelectedOrder,
   })
+  const relatedMenuItems = useMemo(
+    () =>
+      [
+        { key: 'order-items', label: '采购订单明细' },
+        canOpenRelatedPath(V1_ROUTE_PATHS.purchaseReceipts)
+          ? { key: 'purchase-receipts', label: '采购入库' }
+          : null,
+        canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
+          ? { key: 'quality-inspections', label: '来料质检' }
+          : null,
+      ].filter(Boolean),
+    [canOpenRelatedPath]
+  )
   const openRelatedTable = ({ key }) => {
     if (!singleSelectedOrder) {
       return
@@ -997,17 +1163,29 @@ export default function V1PurchaseOrdersPage() {
     }
     if (key === 'purchase-receipts') {
       navigate(
-        routeWithQuery(V1_ROUTE_PATHS.purchaseReceipts, {
-          purchase_order_id: singleSelectedOrder.id,
-        })
+        relatedDocumentRoute(
+          V1_ROUTE_PATHS.purchaseReceipts,
+          { purchase_order_id: singleSelectedOrder.id },
+          {
+            keyword: singleSelectedOrder.purchase_order_no,
+            source: 'purchase-order',
+            fields: ['purchase_order_no'],
+          }
+        )
       )
       return
     }
     if (key === 'quality-inspections') {
       navigate(
-        routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
-          purchase_order_id: singleSelectedOrder.id,
-        })
+        relatedDocumentRoute(
+          V1_ROUTE_PATHS.qualityInspections,
+          { purchase_order_id: singleSelectedOrder.id },
+          {
+            keyword: singleSelectedOrder.purchase_order_no,
+            source: 'purchase-order',
+            fields: ['source_no'],
+          }
+        )
       )
     }
   }
@@ -1057,7 +1235,10 @@ export default function V1PurchaseOrdersPage() {
       <PurchaseOrderOperationPanel
         applySelectedRowKeys={applySelectedRowKeys}
         canCreate={canCreate}
+        referenceDataReady={referenceDataState === 'ready'}
         canGenerateInboundDraft={canGenerateInboundDraft}
+        hasInboundWarehouse={hasInboundWarehouse}
+        inboundReferenceDataState={inboundReferenceDataState}
         clearFilters={clearFilters}
         dateFilterEnd={dateFilterEnd}
         dateFilterField={dateFilterField}
@@ -1066,13 +1247,14 @@ export default function V1PurchaseOrdersPage() {
         generatingInboundDraft={generatingInboundDraft}
         hasActiveFilters={hasActiveFilters}
         itemsLoading={itemsLoading}
-        keyword={keyword}
+        keyword={resolvedRouteKeyword || linkedKeyword || keyword}
         lifecycleMenuItems={lifecycleMenuItems}
         loadOrders={loadOrders}
         openCreateModal={openCreateModal}
         openEditModal={openEditModal}
         openInboundDraftModal={openInboundDraftModal}
         openRelatedTable={openRelatedTable}
+        relatedMenuItems={relatedMenuItems}
         orders={orders}
         primaryLifecycleAction={primaryLifecycleAction}
         printPurchaseContract={printPurchaseContract}
@@ -1088,7 +1270,12 @@ export default function V1PurchaseOrdersPage() {
         setDateFilterEnd={setDateFilterEnd}
         setDateFilterField={setDateFilterField}
         setDateFilterStart={setDateFilterStart}
-        setKeyword={setKeyword}
+        setKeyword={(nextKeyword) => {
+          if (linkedKeyword || routePurchaseOrderID) {
+            clearRouteContext()
+          }
+          setKeyword(nextKeyword)
+        }}
         setPagination={setPagination}
         setSelectedOrder={setSelectedOrder}
         setSortValue={setSortValue}
@@ -1211,6 +1398,7 @@ export default function V1PurchaseOrdersPage() {
         editingOrder={editingOrder}
         saving={saving}
         itemsLoading={itemsLoading}
+        referenceDataReady={referenceDataState === 'ready'}
         orderAttachmentRef={orderAttachmentRef}
         suppliers={suppliers}
         materials={materials}
@@ -1233,10 +1421,11 @@ export default function V1PurchaseOrdersPage() {
         rows={inboundDraftPreviewRows}
         loading={inboundDraftPreviewLoading}
         submitting={generatingInboundDraft}
+        referenceDataReady={inboundReferenceDataReady}
         warehouseOptions={warehouseOptions}
         hasRemaining={hasInboundDraftRemaining}
         resolveSupplierName={resolveSupplierName}
-        onOk={createInboundDraftFromOrder}
+        onOk={createInboundDraftWithReadySource}
         onCancel={closeInboundDraftModal}
       />
     </BusinessPageLayout>

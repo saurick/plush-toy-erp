@@ -51,9 +51,46 @@ func TestGetOptionalJSONRPCDecimalStringPreservesPrecisionAndRejectsNumbers(t *t
 			t.Fatalf("optional null/missing parse = %v ok=%t, want nil true", parsed, ok)
 		}
 	}
-	quantity, ok := getRequiredJSONRPCNumeric20Scale6(map[string]any{"quantity": float64(1.25)}, "quantity")
-	if !ok || !quantity.Equal(decimal.RequireFromString("1.25")) {
-		t.Fatalf("shipment JSON-number quantity compatibility parse = %s ok=%t", quantity, ok)
+}
+
+func TestGetRequiredJSONRPCNumeric20Scale6StringOnlyContract(t *testing.T) {
+	for _, value := range []string{
+		"0",
+		"-1",
+		"0.000001",
+		"99999999999999.999999",
+	} {
+		t.Run("accept_"+strings.ReplaceAll(value, ".", "_"), func(t *testing.T) {
+			parsed, ok := getRequiredJSONRPCNumeric20Scale6(map[string]any{"quantity": value}, "quantity")
+			if !ok || !parsed.Equal(decimal.RequireFromString(value)) {
+				t.Fatalf("parse %q = %s ok=%t", value, parsed, ok)
+			}
+		})
+	}
+
+	for _, tc := range []struct {
+		name  string
+		value any
+	}{
+		{name: "json-number-float", value: float64(1.25)},
+		{name: "json-number-integer", value: int(1)},
+		{name: "exponent", value: "1e-6"},
+		{name: "too-many-fraction-digits", value: "0.0000001"},
+		{name: "too-many-integer-digits", value: "100000000000000"},
+		{name: "empty", value: ""},
+		{name: "whitespace", value: " 1"},
+		{name: "unknown-type", value: true},
+		{name: "null", value: nil},
+	} {
+		t.Run("reject_"+tc.name, func(t *testing.T) {
+			parsed, ok := getRequiredJSONRPCNumeric20Scale6(map[string]any{"quantity": tc.value}, "quantity")
+			if ok || !parsed.IsZero() {
+				t.Fatalf("parse %T(%v) = %s ok=%t, want zero false", tc.value, tc.value, parsed, ok)
+			}
+		})
+	}
+	if parsed, ok := getRequiredJSONRPCNumeric20Scale6(map[string]any{}, "quantity"); ok || !parsed.IsZero() {
+		t.Fatalf("missing parse = %s ok=%t, want zero false", parsed, ok)
 	}
 }
 

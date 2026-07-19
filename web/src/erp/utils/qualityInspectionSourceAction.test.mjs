@@ -8,10 +8,68 @@ import {
   groupOutsourcingReturnQualityInspections,
   isMatchingOutsourcingReturnQualityInspection,
   isPostedOutsourcingReturn,
+  isQualityInspectionRouteSourceCompatible,
   isRejectedIncomingInspection,
   OUTSOURCING_RETURN_QUALITY_GATE_STATES,
+  qualityInspectionRouteSourceParams,
   resolveOutsourcingReturnQualityGate,
 } from './qualityInspectionSourceAction.mjs'
+
+test('quality inspection route source compatibility follows inspection grain', () => {
+  for (const [inspectionType, sourceType, expected] of [
+    ['', 'SHIPMENT', true],
+    ['', 'UNKNOWN_SOURCE', true],
+    ['INCOMING', 'PURCHASE_RECEIPT', true],
+    ['INCOMING', 'SHIPMENT', false],
+    ['FINISHED_GOODS', 'SHIPMENT', true],
+    ['FINISHED_GOODS', 'PURCHASE_RECEIPT', false],
+    ['OUTSOURCING_RETURN', 'OUTSOURCING_FACT', true],
+    ['OUTSOURCING_RETURN', 'SHIPMENT', false],
+    ['PRODUCTION_STAGE', 'PRODUCTION_WIP', false],
+    ['UNKNOWN_TYPE', 'SHIPMENT', false],
+  ]) {
+    assert.equal(
+      isQualityInspectionRouteSourceCompatible(inspectionType, sourceType),
+      expected,
+      `${inspectionType || 'blank'} should ${expected ? '' : 'not '}accept ${sourceType}`
+    )
+  }
+})
+
+test('quality inspection route source params preserve exact grain and translate outsourcing fact', () => {
+  assert.deepEqual(
+    qualityInspectionRouteSourceParams({
+      inspectionType: '',
+      sourceType: 'shipment',
+      sourceID: '41',
+    }),
+    { source_type: 'SHIPMENT', source_id: 41 }
+  )
+  assert.deepEqual(
+    qualityInspectionRouteSourceParams({
+      inspectionType: 'OUTSOURCING_RETURN',
+      sourceType: 'OUTSOURCING_FACT',
+      sourceID: '42',
+    }),
+    { fact_id: 42 }
+  )
+  assert.deepEqual(
+    qualityInspectionRouteSourceParams({
+      inspectionType: 'OUTSOURCING_RETURN',
+      sourceType: 'SHIPMENT',
+      sourceID: 43,
+    }),
+    {}
+  )
+  assert.deepEqual(
+    qualityInspectionRouteSourceParams({
+      inspectionType: 'PRODUCTION_STAGE',
+      sourceType: 'PRODUCTION_WIP',
+      sourceID: 44,
+    }),
+    {}
+  )
+})
 
 test('outsourcing return quality payload keeps source grain server-derived', () => {
   const fact = {

@@ -3,6 +3,11 @@ import { Alert, Descriptions, Form, Input, Modal } from 'antd'
 
 import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
 import {
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
+import {
   localProductionReworkDateTimeInputValue,
   productionReworkQuantitySummary,
   suggestedProductionReworkNo,
@@ -120,12 +125,15 @@ export default function ProductionReworkModal({
             { required: true, message: '请填写返工数量' },
             {
               validator: (_, value) => {
-                const quantity = Number(value)
-                const remaining = Number(summary.remaining || 0)
-                if (!Number.isFinite(quantity) || quantity <= 0) {
+                const quantity = numeric20Scale6Units(value)
+                const remaining = numeric20Scale6Units(summary.remaining)
+                if (!isPositiveNumeric20Scale6Units(quantity)) {
                   return Promise.reject(new Error('返工数量必须大于 0'))
                 }
-                if (quantity > remaining) {
+                if (
+                  remaining === null ||
+                  compareNumeric20Scale6Units(quantity, remaining) > 0
+                ) {
                   return Promise.reject(
                     new Error('本次返工数量不能超过剩余可返工数量')
                   )

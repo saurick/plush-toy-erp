@@ -77,6 +77,7 @@ const oldEntryLabels = [
   '对账/结算',
   '待付款/应付提醒',
   '应收/开票登记',
+  '异常处理',
   '帮助中心',
   '开发与验收',
   '高级文档',
@@ -159,7 +160,7 @@ const desktopAccounts = [
       '采购订单',
       '模板打印中心',
       '出货放行',
-      '异常处理',
+      '生产异常',
     ],
   },
 ]
@@ -392,8 +393,8 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
       plan.customerHiddenMenuLabels.length === 0 &&
       bossDesktop?.visibleExpectedMenus.includes('业务看板') &&
       warehouseDesktop?.visibleExpectedMenus.includes('出货放行') &&
-      productionDesktop?.visibleExpectedMenus.includes('异常处理') &&
-      ['业务看板', '出货放行', '异常处理'].every((label) =>
+      productionDesktop?.visibleExpectedMenus.includes('生产异常') &&
+      ['业务看板', '出货放行', '生产异常', '异常处理'].every((label) =>
         adminDesktop?.forbiddenMenus.includes(label)
       ),
     coversLegacyMenuCleanup:

@@ -71,7 +71,6 @@ export const customerPackageCatalog = Object.freeze({
     { key: "receivables", label: "应收台账", requiredCapabilityKeys: ["finance.receivable.read"] },
     { key: "invoices", label: "发票台账", requiredCapabilityKeys: ["finance.invoice.read"] },
     { key: "print-center", label: "打印中心", requiredCapabilityKeys: ["erp.print_template.read"] },
-    { key: "exception-flow", label: "异常处理", requiredCapabilityKeys: ["workflow.task.read"] },
     { key: "permission-center", label: "权限中心", requiredCapabilityKeys: ["system.user.read", "system.role.read"] },
     { key: "system-audit-logs", label: "系统操作记录", requiredCapabilityKeys: ["system.audit.read"] },
   ]),

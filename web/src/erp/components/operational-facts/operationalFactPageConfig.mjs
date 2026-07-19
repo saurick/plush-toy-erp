@@ -15,18 +15,26 @@ import {
   settleFinanceFact,
   shipShipment,
 } from '../../api/operationalFactApi.mjs'
-import { formatUnixDate } from '../../utils/masterDataOrderView.mjs'
+import {
+  formatUnixDate,
+  V1_ROUTE_PATHS,
+} from '../../utils/masterDataOrderView.mjs'
 import { financeCancelAuditText as buildFinanceCancelAuditText } from '../../utils/financeCancellation.mjs'
+import {
+  financeCollectionTypeText,
+  financeInvoiceCategoryText,
+  financePaymentTermText,
+} from '../../utils/financeFactDisplay.mjs'
 import {
   ACTION_PERMISSIONS,
   FINANCE_COLLECTION_TYPE_LABELS,
   FINANCE_INVOICE_CATEGORY_LABELS,
   FINANCE_PAYMENT_TERM_LABELS,
-  decimalNumber,
   formatQuantity,
   businessSourceRouteFor,
   statusTag,
 } from './OperationalFactForms.jsx'
+import { compareOperationalFactDecimalValues } from './operationalFactDecimal.mjs'
 
 export const DEFAULT_OPERATIONAL_FACT_PAGINATION = Object.freeze({
   current: 1,
@@ -99,14 +107,12 @@ const FINANCE_COLUMN_KEYS_BY_FACT_TYPE = Object.freeze({
     'currency',
     'collection_type',
     'payment_term',
-    'invoice_category',
   ]),
   PAYABLE: Object.freeze([
     'counterparty',
     'amount',
     'fee_amount',
     'currency',
-    'payment_term',
   ]),
   INVOICE: Object.freeze([
     'counterparty',
@@ -336,7 +342,8 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       exportTitle: '数量',
       dataIndex: 'quantity',
       width: 120,
-      sortValue: (record) => decimalNumber(record?.quantity),
+      sorter: (left, right) =>
+        compareOperationalFactDecimalValues(left?.quantity, right?.quantity),
       render: formatQuantity,
       exportValue: (record) => formatQuantity(record?.quantity),
     },
@@ -393,15 +400,26 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
     },
     amount: {
       title: '金额',
+      exportTitle: '金额',
       dataIndex: 'amount',
       width: 120,
-      sortValue: (record) => decimalNumber(record?.amount),
+      sorter: (left, right) =>
+        compareOperationalFactDecimalValues(left?.amount, right?.amount),
+      render: formatQuantity,
+      exportValue: (record) => formatQuantity(record?.amount),
     },
     fee_amount: {
       title: '手续费',
+      exportTitle: '手续费',
       dataIndex: 'fee_amount',
       width: 120,
-      sortValue: (record) => decimalNumber(record?.fee_amount),
+      sorter: (left, right) =>
+        compareOperationalFactDecimalValues(
+          left?.fee_amount,
+          right?.fee_amount
+        ),
+      render: formatQuantity,
+      exportValue: (record) => formatQuantity(record?.fee_amount),
     },
     currency: {
       title: '币种',
@@ -415,21 +433,22 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       width: 130,
       sortType: 'text',
       render: (value) =>
-        FINANCE_COLLECTION_TYPE_LABELS[value] || (value ? '收款分类' : '-'),
+        financeCollectionTypeText(value, FINANCE_COLLECTION_TYPE_LABELS),
+      exportValue: (record) =>
+        financeCollectionTypeText(
+          record?.collection_type,
+          FINANCE_COLLECTION_TYPE_LABELS
+        ),
     },
     payment_term: {
       title: '账期',
       dataIndex: 'payment_term',
       width: 150,
       sortType: 'text',
-      render: (value, record) => {
-        const label =
-          FINANCE_PAYMENT_TERM_LABELS[value] || (value ? '账期' : '-')
-        return record?.payment_term_days === null ||
-          record?.payment_term_days === undefined
-          ? label
-          : `${label} / ${record.payment_term_days} 天`
-      },
+      render: (_, record) =>
+        financePaymentTermText(record, FINANCE_PAYMENT_TERM_LABELS),
+      exportValue: (record) =>
+        financePaymentTermText(record, FINANCE_PAYMENT_TERM_LABELS),
     },
     invoice_category: {
       title: '发票类别',
@@ -437,7 +456,12 @@ export function buildOperationalFactColumns(activeKey, financeFactType = '') {
       width: 130,
       sortType: 'text',
       render: (value) =>
-        FINANCE_INVOICE_CATEGORY_LABELS[value] || (value ? '发票类别' : '-'),
+        financeInvoiceCategoryText(value, FINANCE_INVOICE_CATEGORY_LABELS),
+      exportValue: (record) =>
+        financeInvoiceCategoryText(
+          record?.invoice_category,
+          FINANCE_INVOICE_CATEGORY_LABELS
+        ),
     },
   }
   const financeColumnKeys =
@@ -583,28 +607,37 @@ export function getOperationalFactAttachmentOwnerType(activeKey) {
 export function buildOperationalFactRelatedMenuItems({
   activeKey,
   activeSelectedRow,
+  canOpenPath = () => true,
 }) {
   if (!activeSelectedRow) return []
   const items = []
   if (
     ['shipments', 'reservations'].includes(activeKey) &&
-    activeSelectedRow.sales_order_id
+    activeSelectedRow.sales_order_id &&
+    canOpenPath(V1_ROUTE_PATHS.salesOrders)
   ) {
     items.push({ key: 'sales-order', label: '销售订单' })
   }
-  if (['production', 'outsourcing', 'shipments'].includes(activeKey)) {
+  if (
+    ['production', 'outsourcing', 'shipments'].includes(activeKey) &&
+    canOpenPath(V1_ROUTE_PATHS.inventory)
+  ) {
     items.push({ key: 'inventory', label: '库存台账' })
   }
-  if (activeKey === 'shipments') {
+  if (activeKey === 'shipments' && canOpenPath(V1_ROUTE_PATHS.receivables)) {
     items.push({ key: 'receivables', label: '应收管理' })
+  }
+  if (activeKey === 'shipments' && canOpenPath(V1_ROUTE_PATHS.invoices)) {
     items.push({ key: 'invoices', label: '发票管理' })
   }
+  const sourceRoute = businessSourceRouteFor(
+    activeSelectedRow.source_type,
+    activeSelectedRow.source_id
+  )
   if (
     ['production', 'outsourcing', 'finance'].includes(activeKey) &&
-    businessSourceRouteFor(
-      activeSelectedRow.source_type,
-      activeSelectedRow.source_id
-    )
+    sourceRoute &&
+    canOpenPath(sourceRoute)
   ) {
     items.push({ key: 'source', label: '来源单据' })
   }

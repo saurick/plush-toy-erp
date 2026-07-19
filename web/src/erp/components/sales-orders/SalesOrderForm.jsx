@@ -47,15 +47,7 @@ import {
   CATALOG_FILL_MODES,
   buildCatalogFillRowsPlan,
 } from '../../utils/catalogFillRows.mjs'
-
-function formatSummaryNumber(value, fractionDigits = 0) {
-  if (!Number.isFinite(value) || value === 0) {
-    return fractionDigits > 0 ? Number(0).toFixed(fractionDigits) : '0'
-  }
-  return fractionDigits > 0
-    ? value.toFixed(fractionDigits)
-    : String(Number(value.toFixed(4)))
-}
+import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 
 function skuLabel(sku = {}) {
   return (
@@ -1007,7 +999,7 @@ export function SalesOrderItemsFormSection({
                     <BusinessLineItemsSummaryValue
                       summarize={summarizeSalesOrderLines}
                       select={(summary) =>
-                        formatSummaryNumber(summary.quantity)
+                        formatNumeric20Scale6Summary(summary.quantity)
                       }
                     />
                   ),
@@ -1019,7 +1011,7 @@ export function SalesOrderItemsFormSection({
                     <BusinessLineItemsSummaryValue
                       summarize={summarizeSalesOrderLines}
                       select={(summary) =>
-                        formatSummaryNumber(summary.amount, 2)
+                        formatNumeric20Scale6Summary(summary.amount, 2)
                       }
                     />
                   ),

@@ -1,3 +1,5 @@
+import { normalizePositiveNumeric20Scale6 } from './numeric20Scale6.mjs'
+
 export const PURCHASE_RECEIPT_ADJUSTMENT_OPTIONS = Object.freeze([
   { value: 'QUANTITY_INCREASE', label: '数量增加' },
   { value: 'QUANTITY_DECREASE', label: '数量减少' },
@@ -15,10 +17,7 @@ function positiveID(value) {
 }
 
 function quantityText(value) {
-  const parsed = Number(String(value ?? '').replace(/,/g, '').trim())
-  return Number.isFinite(parsed) && parsed > 0
-    ? String(Number(parsed.toFixed(4)))
-    : ''
+  return normalizePositiveNumeric20Scale6(value)
 }
 
 function optionalNote(value) {

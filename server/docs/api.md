@@ -70,42 +70,52 @@ HTTP 路由：
 - `reject_task_action`
 - `urge_task`
 
-用途：读取和处理 Workflow 协同任务。`create_task` 只用于普通、无流程关联的协同任务；生产排程、生产异常和出货放行使用保留 task group 与确定性编号，不能通过该方法、ProcessRuntime 节点或客户流程配置伪造。
+用途：读取和处理 Workflow 协同任务。`create_task` 只用于普通、无流程关联的协同任务；公开入口精确拒绝 registry 中全部 19 个可驱动领域 transition 或生成下游任务的 task group，不会因更换 task code / payload 而绕过。生产排程、生产异常和出货放行还使用保留的确定性编号前缀；入口防伪不影响受信领域事务 / ProcessRuntime producer 创建真实任务。
 
 ### `operational_fact`
 
 该域承载已登记的生产、委外、出货、库存预留和财务事实方法。出货主路径当前包括：
 
+- `list_shipment_source_candidates`
 - `create_shipment_with_items`
 - `submit_shipment_release`
 - `ship_shipment`
 - `cancel_shipment`
+- `get_shipment`
 - `list_shipments`
 
-用途：创建出货草稿、显式提交放行、确认真实出货、取消已出货单并冲正库存，以及查询出货单。`submit_shipment_release` 生成 Workflow 任务，`ship_shipment` 才写 `SHIPPED` 与库存 `OUT`，两步不能合并理解。
+用途：查询可出货销售订单行、创建出货草稿、显式提交放行、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 与绑定销售订单或订单行的 `create_shipment_with_items` 都要求 `shipment.create + sales_order.read + sales_order_item.read`。`shipments=enabled` 的正式依赖闭包要求 `sales_orders=enabled`；手工漂移为 `read_only / disabled / 缺失` 都会阻断且不调用出货仓储。无销售来源的手工草稿不追加销售来源读取权限，但仍服从 `shipments` 的正式模块依赖闭包。来源候选按关键词、销售订单和分页返回来源身份、订单数量、仅由 `SHIPPED` 累计的已出货量、剩余量与不可选原因；数量均为 `numeric(20,6)` 十进制字符串，不能用无范围的订单明细列表替代。来源绑定的新建请求在同一事务中锁定并校验 ACTIVE 订单、OPEN 来源行、客户、产品 / SKU、单位及本次数量；客户展示快照由服务端从销售订单不可变快照派生，客户端提交值不能覆盖。`get_shipment` 与 `list_shipments` 均只读且要求 `shipment.read`；`submit_shipment_release` 生成 Workflow 任务，`ship_shipment` 才写 `SHIPPED` 与库存 `OUT`，两步不能合并理解。
+
+`cancel_shipment` 按原状态分支：`DRAFT -> CANCELLED` 只终止未出库草稿，不写库存；`SHIPPED -> CANCELLED` 才逐行写库存 `REVERSAL`。active `finished_goods_delivery` 流程、未结成品质检、active 出货放行任务或非取消应收 / 发票都会阻断取消；草稿已提交放行时，须先将任务完成或退回。重复取消依真实 `shipped_at` 判断是否曾出库，不会把草稿取消误写成库存冲正。
+
+候选响应的 `total` 是相同关键词 / 销售订单过滤条件下的完整结果数，`items` 只包含当前 `limit / offset` 页；前端必须使用服务端分页、远程搜索与该 `total`，不得再客户端拼接有上限的销售订单、明细和出货列表。
+
+生产、委外和财务的状态方法继续使用 canonical RPC：`post_production_fact / cancel_production_fact`、`post_outsourcing_fact / cancel_outsourcing_fact`、`post_finance_fact / settle_finance_fact / cancel_finance_fact`。生产 / 委外取消接受来源完整的 `DRAFT / POSTED`，财务取消接受正式来源的 `DRAFT / POSTED`；`CANCELLED` 只允许精确幂等重放，`SETTLED` 财务事实不能直接取消。`settle_finance_fact` 只对该 RPC 允许的事实类型开放，发票页不提供直接 settle 动作；发票对账通过 `create_reconciliation_from_finance_fact` 生成对账事实表达。草稿取消不写库存，库存型事实只有已过账取消才写反向流水；财务取消写操作人、时间和原因审计，不写库存。
+
+API 存在不代表正式 Web UI 可达：`add_purchase_receipt_item`、`material_supply` 4 个以及 `finished_goods_delivery` 5 个公开方法当前都是 `partial / backend-only`；销售订单正式提交则只走 `start_sales_order_acceptance_process + execute_sales_order_acceptance_submit`，不保留直连 `submit_sales_order` 的 Web 双轨。
 
 ### `production_wip`
 
 该域承载固定 `PLUSH_SEW_HAND_V1` v1 的路线快照、WIP 批次和工序动作：
 
 - `get_production_wip`
-- `initialize_production_wip`
 - `execute_production_wip_action`
 
 `get_production_wip` 需要 `production.wip.read`；生产订单的 `get_production_order` / `list_production_orders` 同时接受 `pmc.plan.read` 或 `production.wip.read`，但新建、编辑、发布、关闭、取消和引用选项仍只属于 PMC 计划权限。这样业务岗位可进入生产订单页只读核对路线并办理包材确认，不会获得生产计划维护权。
 
-`initialize_production_wip` 需要 `production.wip.assign`。`execute_production_wip_action` 的通用参数是 `action`、`production_order_id`、`expected_version` 和 `idempotency_key`，动作合同如下：
+固定路线和首个 WIP 批次只在生产订单发布事务中冻结；缺失或损坏的路线必须修复工序主档绑定后重新发布，不提供事后初始化接口。工序主档以唯一 `production_route_operation_code` 显式绑定四个标准路线位置，不从名称、类别、普通工序编码或排序推断。`execute_production_wip_action` 的通用参数是 `action`、`production_order_id`、`expected_version` 和 `idempotency_key`，动作合同如下：
 
 | action | 追加参数 | 权限 |
 | --- | --- | --- |
 | `SPLIT_BATCH` | `production_wip_batch_id`、`splits[]` | `production.wip.assign` |
 | `ASSIGN_EXECUTION` | `production_wip_batch_id`、`execution_mode`、`outsourcing_allocations[]` | `production.wip.assign` |
+| `CANCEL_BATCH` | `production_wip_batch_id`、`reason` | `production.wip.assign` |
 | `START_OPERATION` / `COMPLETE_OPERATION` / `RECEIVE_OUTSOURCING_RETURN` | `production_wip_batch_id` | `production.wip.execute` |
 | `TRANSFER_TO_NEXT_OPERATION` | `production_wip_batch_id`、`target_operation_id`、`quantity` | `production.wip.execute` |
 | `REWORK` | `production_wip_batch_id`、`target_operation_id`、`quantity`、`reason` | `production.wip.rework` |
 | `CONFIRM_PACKAGING_MATERIAL` | `production_order_item_id`、`packaging_version_snapshot`、可选 `note` | `production.packaging_material.confirm` |
 
-`production_orders` 与 `quality_inspections` 必须处于可读 / 可写的对应模块状态；外发安排和外发回仓还要求 `outsourcing_orders` 可写。批次拆分是一次原子动作，至少两个子批且总量必须精确等于父批；首道 `FABRIC_PROCESSING` 正常流禁止拆分，只能按生产订单行整单外发。其 allocation 必须且只能逐条覆盖冻结需求中显式标记 `production_operation_code=FABRIC_PROCESSING` 的 MATERIAL 合同行，开始前还要有足量已过账委外发料，不按材料名称或类别文本推断。裁片关口 `PASS` 并转入 `SEWING` 后，产品数量才可拆批；车缝和手工各自决定本厂或外发。返工回到 FABRIC 后若再次外发，返工批次使用新的 PRODUCT 合同行，不复用正常流 MATERIAL 行。生产订单仍有 `PLANNED / IN_PROGRESS / OUTSOURCED / WAITING_QUALITY` 批次时，`close_production_order` 即使带短关闭原因也会失败；`SPLIT` 父批由子批承接，只有其非终态子批继续阻断，系统不会在关闭时自动取消 WIP、冲正发料或替代外发收口。
+`production_orders` 与 `quality_inspections` 必须处于可读 / 可写的对应模块状态；外发安排和外发回仓还要求 `outsourcing_orders` 可写。`CANCEL_BATCH` 只接受尚未开工的 `PLANNED` 批次，要求非空取消原因，以 CAS 和幂等事件把状态改为 `CANCELLED`；它不重新拆分数量，也不冲正外发、库存或其它事实。批次拆分是一次原子动作，至少两个子批且总量必须精确等于父批；首道 `FABRIC_PROCESSING` 正常流禁止拆分，只能按生产订单行整单外发。其 allocation 必须且只能逐条覆盖冻结需求中显式标记 `production_operation_code=FABRIC_PROCESSING` 的 MATERIAL 合同行，开始前还要有足量已过账委外发料，不按材料名称或类别文本推断。裁片关口 `PASS` 并转入 `SEWING` 后，产品数量才可拆批；车缝和手工各自决定本厂或外发。返工回到 FABRIC 后若再次外发，返工批次使用新的 PRODUCT 合同行，不复用正常流 MATERIAL 行。生产订单仍有 `PLANNED / IN_PROGRESS / OUTSOURCED / WAITING_QUALITY` 批次时，`close_production_order` 和 `cancel_production_order` 都会失败；`SPLIT` 父批由子批承接，只有其非终态子批继续阻断，系统不会在关闭或取消订单时自动取消 WIP、冲正发料或替代外发收口。
 
 内部完成后的下一道流转记录为 `WIP_TRANSFER`；只有外发完成返回记录为 `OUTSOURCE_RETURN`。裁片、皮套、成品、针检、抽检和订单条件性客户验货是独立质量关口，当前只有 `PASSED + PASS` 可继续转序，通用 `CONCESSION` 对生产 WIP fail closed。包装开始前还必须有独立包材业务确认；路线订单的最终完工入库数量不得超过已验收包装 WIP。
 
@@ -113,7 +123,43 @@ HTTP 路由：
 
 `list_production_stage_quality_inspections` 以 `production_wip_batch_id`、`gate_code`、状态、结果、关键字和日期范围读取生产分段质检，要求 `quality.inspection.read`，并要求 `production_orders` 与 `quality_inspections` 模块可读。生产关口质检仍使用通用 `submit_quality_inspection`、`pass_quality_inspection`、`reject_quality_inspection` 和 `cancel_quality_inspection` 办理，但生产 WIP 的推进规则只接受最终 `PASS`，不把其他来源侧链现有的让步语义扩到生产路线。
 
-上述路线 / WIP / 分段质检合同当前是本地源码和版本化 Atlas migrations 证据；migrations 尚未 apply 到共享开发库或目标客户数据库，也没有目标环境发布、health / smoke 或客户 UAT 证据。
+上述路线 / WIP / 分段质检合同当前是本地源码和版本化 Atlas migrations 证据；`20260718110227_migrate.sql` 已在一次性 PostgreSQL 18 隔离库完成完整迁移链 apply 与约束读回，登记的个人开发库仍停在 `20260717043625` 并显示该文件 pending。没有目标客户数据库 apply、目标环境发布、health / smoke 或客户 UAT 证据。
+
+## 来源动作、流程启动与结算
+
+公开接口从既有单据 / 事实查询候选或派生下游对象时，必须同时通过目标动作权限、精确来源读权限和来源 / 目标模块状态。统一 registry 覆盖 BOM 复制、采购入库 / 退货 / 调整、四类质检来源、生产 / WIP / 委外 / 库存预留、出货、财务与 ProcessRuntime wrapper；未登记的新来源动作、无精确读权请求或不可读 / 不可写模块会在进入来源 repository / write usecase 前 fail closed。条件来源按请求实际绑定项加权；对账先以候选读权收窄可探测范围，再按服务端读回的 authoritative FactType 要求对应应付 / 应收 / 发票读权限，不做宽泛 any-of 授权。registry 同时生成 permission usage；测试会逐项删除来源读权并断言写用例未调用，AST handler guard 还会验证每个注册 action 的真实 handler 分支调用了来源读 guard。
+
+`customer_config` 公开启动只保留三条：
+
+| 方法 | 来源与新建状态 | 权限 |
+| --- | --- | --- |
+| `start_sales_order_acceptance_process` | `DRAFT` 销售订单 | `sales_order.submit + sales_order.read` |
+| `start_material_supply_purchase_order_process` | `APPROVED` 采购订单 | `purchase.receipt.create + purchase_order.read` |
+| `start_finished_goods_delivery_process` | `DRAFT` 出货单 | `shipment.create + shipment.read` |
+
+创建事务锁定真实来源，从来源派生 canonical 单号并复核状态；只有完全匹配的已创建流程可精确重放。旧 `start_material_supply_process` 和公开无来源 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 均按 unknown method 处理。
+
+事实取消不是通用删除，状态与库存合同如下：
+
+| 事实 | `DRAFT -> CANCELLED` | `POSTED -> CANCELLED` | 下游阻断 |
+| --- | --- | --- | --- |
+| 采购入库 | 锁定关联 IQC / 批次，取消 `DRAFT / SUBMITTED` IQC；仅在预备批次余额精确为零时停用；不写库存 | 逐行写 `REVERSAL` | 任一未取消退货 / 调整或应付阻断已过账取消 |
+| 采购退货 / 入库调整 | 锁定子单和父收货，只改子单终态；不写库存 | 按原交易写 `REVERSAL` | 草稿子单取消后解除父收货阻断；既有应付约束仍生效 |
+| 生产事实 | 重验订单、来源行 / 物料需求或完工事实坐标；不写库存 | 写事实自身来源的库存反向流水 | active REWORK、来源异常任务、父订单 WIP / 结算约束继续生效 |
+| 委外事实 | 重验已确认委外订单行；不写库存 | 写事实自身来源的库存反向流水 | 回货的 active 质检 / 应付、发料的 WIP 分配继续生效 |
+| 正式来源财务事实 | 写 `cancelled_at / cancelled_by / cancel_reason`；不写库存 | 保留同一取消审计；不写库存 | 非取消对账子事实阻断；相同 actor + reason 精确重放，变更意图冲突 |
+
+以上状态动作都在同一事务锁定事实行，并按领域固定顺序追加父单、来源、批次或下游依赖锁。并发 post / cancel 只有两种合法串行结果：cancel-first 时 post 失败且没有库存流水；post-first 时先过账，再完成全量反向流水或财务取消审计。不能出现半笔库存、只改状态未冲正或缺失审计字段。
+
+| 生命周期动作 | 事务内阻断条件 |
+| --- | --- |
+| 销售订单取消 | 未取消出货、active 预留、未取消生产订单或 active 销售审批流程 |
+| 采购订单关闭 / 取消 | 关闭阻断入库草稿；取消阻断任一未取消入库；两者都阻断 active 备料流程；入库草稿取消后解除该依赖 |
+| 生产 / 委外订单关闭 | 任一子事实不是 `POSTED / CANCELLED` |
+| 生产 / 委外订单取消 | 任一子事实不是 `CANCELLED`；子草稿逐笔取消后才解除父单阻断 |
+| 已过账采购入库取消 | 任一采购退货 / 入库调整未 `CANCELLED`，或既有应付依赖；子修正草稿取消后解除父收货阻断，不自动取消其它子事实 |
+
+委外订单的 `source_order_no / product_order_no_snapshot` 只是可读快照，不是销售订单外键；公开输入 / 输出不再接受 `source_sales_order_id`，`20260718125909_migrate.sql` 用新 Atlas revision 从目标 schema 删除该列。该 migration 文件存在不等于已 apply 到任一共享、测试或目标数据库。
 
 ## 来源任务与出货放行合同
 

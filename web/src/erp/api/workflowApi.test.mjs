@@ -650,6 +650,9 @@ test('workflow task callers own a frozen user-intent attempt store', () => {
     '../components/outsourcing-orders/useOutsourcingOrderWorkflowActions.mjs',
   ]) {
     const source = read(path)
+    const runPattern = path.includes('useMobileRoleTaskActions')
+      ? /const mutationAttempts = mutationAttemptsRef\.current[\s\S]*?mutationAttempts\.run/u
+      : /mutationAttemptsRef\.current\.run/u
     assert.match(
       source,
       /createTaskMutationAttemptStore/u,
@@ -657,7 +660,7 @@ test('workflow task callers own a frozen user-intent attempt store', () => {
     )
     assert.match(
       source,
-      /mutationAttemptsRef\.current\.run/u,
+      runPattern,
       `${path} must route task mutations through the frozen attempt`
     )
     assert.match(

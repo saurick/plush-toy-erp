@@ -974,6 +974,14 @@ export function BusinessDataTable({
     () => resolveBusinessTableRowSelection(rowSelection),
     [rowSelection]
   )
+  const hasPageLocalSorter = React.useMemo(
+    () =>
+      Boolean(
+        pagination &&
+          resolvedColumns.some((column) => typeof column?.sorter === 'function')
+      ),
+    [pagination, resolvedColumns]
+  )
   const resolvedScroll = React.useMemo(() => {
     const baseScroll =
       scroll && typeof scroll === 'object' && !Array.isArray(scroll)
@@ -1023,6 +1031,9 @@ export function BusinessDataTable({
         onRow={resolvedOnRow}
         onChange={onChange}
         pagination={pagination}
+        showSorterTooltip={
+          hasPageLocalSorter ? { title: '仅排序当前页' } : undefined
+        }
         locale={{
           emptyText: <Empty description={emptyDescription} />,
         }}

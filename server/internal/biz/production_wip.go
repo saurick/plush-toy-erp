@@ -57,9 +57,9 @@ const (
 	ProductionPackagingConfirmationPending   = "PENDING"
 	ProductionPackagingConfirmationConfirmed = "CONFIRMED"
 
-	ProductionWIPActionInitialize               = "INITIALIZE"
 	ProductionWIPActionSplitBatch               = "SPLIT_BATCH"
 	ProductionWIPActionAssignExecution          = "ASSIGN_EXECUTION"
+	ProductionWIPActionCancelBatch              = "CANCEL_BATCH"
 	ProductionWIPActionStartOperation           = "START_OPERATION"
 	ProductionWIPActionCompleteOperation        = "COMPLETE_OPERATION"
 	ProductionWIPActionTransferToNextOperation  = "TRANSFER_TO_NEXT_OPERATION"
@@ -69,6 +69,7 @@ const (
 
 	ProductionWIPEventActionTransfer          = "WIP_TRANSFER"
 	ProductionWIPEventActionOutsourcingReturn = "OUTSOURCE_RETURN"
+	ProductionWIPEventActionCancel            = "CANCEL"
 )
 
 var (
@@ -198,21 +199,6 @@ type ProductionWIPAggregate struct {
 	QualityInspections     []*ProductionWIPQualityInspectionSummary
 }
 
-type ProductionWIPInitialize struct {
-	ProductionOrderID int
-	ActorID           int
-	IdempotencyKey    string
-}
-
-type ProductionWIPInitializeCommand struct {
-	ProductionOrderID int
-	ActorID           int
-	IdempotencyKey    string
-	RouteCode         string
-	RouteVersion      int
-	IntentHash        string
-}
-
 type ProductionWIPSplit struct {
 	Quantity decimal.Decimal
 }
@@ -244,7 +230,6 @@ type ProductionWIPCommand struct {
 // Keeping it optional avoids a new provider and preserves existing constructors.
 type ProductionWIPRepo interface {
 	GetProductionWIP(ctx context.Context, productionOrderID int) (*ProductionWIPAggregate, error)
-	InitializeProductionWIP(ctx context.Context, in *ProductionWIPInitializeCommand) (*ProductionWIPAggregate, error)
 	ApplyProductionWIPCommand(ctx context.Context, in *ProductionWIPCommand) (*ProductionWIPAggregate, error)
 }
 
@@ -266,6 +251,22 @@ func plushSewHandV1Route(customerInspectionRequired bool) []productionWIPRouteSt
 		{StepNo: 20, OperationCode: ProductionWIPOperationSewing, OutputCode: ProductionWIPOutputShell, InhouseAllowed: true, OutsourcingAllowed: true, RequiredQualityGates: []string{ProductionWIPQualityGateShell}},
 		{StepNo: 30, OperationCode: ProductionWIPOperationHandwork, OutputCode: ProductionWIPOutputFinishedGoods, InhouseAllowed: true, OutsourcingAllowed: true, RequiredQualityGates: handworkGates},
 		{StepNo: 40, OperationCode: ProductionWIPOperationPackaging, OutputCode: ProductionWIPOutputPackedGoods, InhouseAllowed: true, BusinessConfirmationCode: &packagingConfirmation},
+	}
+}
+
+// NormalizeProductionRouteOperationCode validates the stable semantic role
+// assigned to a process master record. It deliberately does not inspect the
+// process display name, category, ordinary process code, or sort order.
+func NormalizeProductionRouteOperationCode(value string) (string, error) {
+	code := strings.ToUpper(strings.TrimSpace(value))
+	switch code {
+	case ProductionWIPOperationFabricProcessing,
+		ProductionWIPOperationSewing,
+		ProductionWIPOperationHandwork,
+		ProductionWIPOperationPackaging:
+		return code, nil
+	default:
+		return "", ErrBadParam
 	}
 }
 
@@ -412,33 +413,6 @@ func (uc *ProductionOrderUsecase) GetProductionWIP(ctx context.Context, producti
 	return repo.GetProductionWIP(ctx, productionOrderID)
 }
 
-func (uc *ProductionOrderUsecase) InitializeProductionWIP(ctx context.Context, in *ProductionWIPInitialize) (*ProductionWIPAggregate, error) {
-	if uc == nil || uc.repo == nil || in == nil || in.ProductionOrderID <= 0 || in.ActorID <= 0 {
-		return nil, ErrBadParam
-	}
-	repo, ok := uc.repo.(ProductionWIPRepo)
-	if !ok {
-		return nil, ErrProductionWIPUnavailable
-	}
-	key := strings.TrimSpace(in.IdempotencyKey)
-	if key == "" || len(key) > 128 {
-		return nil, ErrBadParam
-	}
-	command := &ProductionWIPInitializeCommand{
-		ProductionOrderID: in.ProductionOrderID,
-		ActorID:           in.ActorID,
-		IdempotencyKey:    key,
-		RouteCode:         ProductionWIPRoutePlushSewHandV1,
-		RouteVersion:      ProductionWIPRoutePlushSewHandV1Version,
-	}
-	hash, err := productionWIPIntentHash(command)
-	if err != nil {
-		return nil, err
-	}
-	command.IntentHash = hash
-	return repo.InitializeProductionWIP(ctx, command)
-}
-
 func (uc *ProductionOrderUsecase) ApplyProductionWIPAction(ctx context.Context, in *ProductionWIPAction) (*ProductionWIPAggregate, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
@@ -469,6 +443,10 @@ func (uc *ProductionOrderUsecase) SplitProductionWIPBatch(ctx context.Context, i
 
 func (uc *ProductionOrderUsecase) AssignProductionWIPExecution(ctx context.Context, in *ProductionWIPAction) (*ProductionWIPAggregate, error) {
 	return uc.applyNamedProductionWIPAction(ctx, in, ProductionWIPActionAssignExecution)
+}
+
+func (uc *ProductionOrderUsecase) CancelProductionWIPBatch(ctx context.Context, in *ProductionWIPAction) (*ProductionWIPAggregate, error) {
+	return uc.applyNamedProductionWIPAction(ctx, in, ProductionWIPActionCancelBatch)
 }
 
 func (uc *ProductionOrderUsecase) StartProductionWIPOperation(ctx context.Context, in *ProductionWIPAction) (*ProductionWIPAggregate, error) {
@@ -561,6 +539,10 @@ func normalizeProductionWIPAction(in ProductionWIPAction) (ProductionWIPAction, 
 		}
 	case ProductionWIPActionStartOperation, ProductionWIPActionCompleteOperation, ProductionWIPActionReceiveOutsourcingReturn:
 		if in.TargetOperationID != 0 || in.ExecutionMode != "" || len(in.OutsourcingAllocations) != 0 || len(in.Splits) != 0 || !in.Quantity.IsZero() || in.Reason != nil {
+			return ProductionWIPAction{}, ErrBadParam
+		}
+	case ProductionWIPActionCancelBatch:
+		if in.TargetOperationID != 0 || in.ExecutionMode != "" || len(in.OutsourcingAllocations) != 0 || len(in.Splits) != 0 || !in.Quantity.IsZero() || in.Reason == nil {
 			return ProductionWIPAction{}, ErrBadParam
 		}
 	case ProductionWIPActionRework:
@@ -804,13 +786,14 @@ func leftPadProductionWIPOrdinal(ordinal int) string {
 // from the semantic append-only event names used for movement audit.
 func ProductionWIPEventActionForCommand(commandAction string) (string, error) {
 	switch strings.ToUpper(strings.TrimSpace(commandAction)) {
-	case ProductionWIPActionInitialize,
-		ProductionWIPActionSplitBatch,
+	case ProductionWIPActionSplitBatch,
 		ProductionWIPActionAssignExecution,
 		ProductionWIPActionStartOperation,
 		ProductionWIPActionCompleteOperation,
 		ProductionWIPActionRework:
 		return strings.ToUpper(strings.TrimSpace(commandAction)), nil
+	case ProductionWIPActionCancelBatch:
+		return ProductionWIPEventActionCancel, nil
 	case ProductionWIPActionTransferToNextOperation:
 		return ProductionWIPEventActionTransfer, nil
 	case ProductionWIPActionReceiveOutsourcingReturn:
@@ -870,6 +853,10 @@ func NextProductionWIPBatchStatus(action string, batch *ProductionWIPBatch, oper
 		return ProductionWIPStatusAccepted
 	}
 	switch action {
+	case ProductionWIPActionCancelBatch:
+		if batch.Status == ProductionWIPStatusPlanned {
+			return ProductionWIPStatusCancelled, nil
+		}
 	case ProductionWIPActionSplitBatch:
 		if batch.Status == ProductionWIPStatusPlanned {
 			return ProductionWIPStatusSplit, nil

@@ -1,4 +1,7 @@
-import { calculateProcessingContractTotals } from '../../data/processingContractTemplate.mjs'
+import {
+  calculateProcessingContractTotals,
+  PROCESSING_CONTRACT_TABLE_COLUMNS,
+} from '../../data/processingContractTemplate.mjs'
 import {
   computeMaterialPurchaseTotals,
   MATERIAL_PURCHASE_DETAIL_COLUMNS,
@@ -13,20 +16,10 @@ export const PRINT_TEMPLATE_LINE_COLUMNS = Object.freeze({
     key,
     label,
   })),
-  processing: [
-    { key: 'contractNo', label: '委外加工订单号' },
-    { key: 'productOrderNo', label: '产品订单编号' },
-    { key: 'productNo', label: '产品编号' },
-    { key: 'productName', label: '产品名称' },
-    { key: 'processName', label: '工序名称' },
-    { key: 'supplierAlias', label: '加工厂商' },
-    { key: 'processCategory', label: '工序类别' },
-    { key: 'unit', label: '单位' },
-    { key: 'unitPrice', label: '单价' },
-    { key: 'quantity', label: '委托加工数量' },
-    { key: 'amount', label: '委托加工金额' },
-    { key: 'remark', label: '备注' },
-  ],
+  processing: PROCESSING_CONTRACT_TABLE_COLUMNS.map(({ key, label }) => ({
+    key,
+    label,
+  })),
 })
 
 export function getPrintTemplateLineColumns(kind) {

@@ -12,7 +12,7 @@ import (
 )
 
 func operationalFactMutationFromParams(pm map[string]any) (*biz.OperationalFactMutation, bool) {
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}
@@ -218,6 +218,8 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务尚未完成，请先完成或解除阻塞"}
 	case errors.Is(err, biz.ErrShipmentReleaseRejected):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务已退回，请取消当前出货单后重新登记"}
+	case errors.Is(err, biz.ErrShipmentCancellationProcessActive):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该出货单仍有进行中的成品出货流程，请先完成流程后再取消"}
 	case errors.Is(err, biz.ErrShipmentCancellationTaskActive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货放行任务尚未结束，请先完成或退回放行待办，再取消出货单"}
 	case errors.Is(err, biz.ErrProductionExceptionTaskRequired):
@@ -236,6 +238,10 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "财务记录缺少有效业务来源，不能过账或结清"}
 	case errors.Is(err, biz.ErrFinanceFactShipmentAmountInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "出货金额快照不完整或币种不一致，不能生成财务记录"}
+	case errors.Is(err, biz.ErrFinanceFactPaymentTermMissing):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单未填写账期天数，请先补齐后再生成应收"}
+	case errors.Is(err, biz.ErrFinanceFactInvoiceCategoryMissing):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "请选择发票类别"}
 	case errors.Is(err, biz.ErrFinanceFactSourceAmountInvalid):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来源单据金额不完整或有效金额不大于零，不能生成财务记录"}
 	case errors.Is(err, biz.ErrPurchaseReceiptFinanceDependency):

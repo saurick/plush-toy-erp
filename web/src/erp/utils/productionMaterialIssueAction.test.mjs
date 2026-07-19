@@ -190,3 +190,59 @@ test('production material issue response and unknown-result reread bind source r
     )
   )
 })
+
+test('production material issue preserves numeric(20,6) boundaries exactly', () => {
+  const tinyRequirement = {
+    ...requirement,
+    remaining_quantity: '0.000001',
+  }
+  assert.equal(
+    isProductionMaterialIssueEligible(order, 'READY', tinyRequirement),
+    true
+  )
+  assert.equal(
+    buildProductionMaterialIssuePayload(
+      { warehouse_id: 2, lot_id: 41, quantity: '0.000001' },
+      order,
+      'READY',
+      tinyRequirement
+    ).quantity,
+    '0.000001'
+  )
+  assert.equal(
+    normalizeProductionMaterialIssueCreateRequest({
+      fact_no: 'PROD-MI-MAX',
+      production_order_id: 7,
+      production_order_item_id: 11,
+      production_order_material_requirement_id: 31,
+      warehouse_id: 2,
+      lot_id: 41,
+      quantity: '99999999999999.999999',
+      idempotency_key: 'request-max',
+    }).quantity,
+    '99999999999999.999999'
+  )
+  assert.equal(
+    buildProductionMaterialIssuePayload(
+      {
+        warehouse_id: 2,
+        lot_id: 41,
+        quantity: '99999999999999.999999',
+      },
+      order,
+      'READY',
+      { ...requirement, remaining_quantity: '99999999999999.999999' }
+    ).quantity,
+    '99999999999999.999999'
+  )
+  assert.throws(
+    () =>
+      buildProductionMaterialIssuePayload(
+        { warehouse_id: 2, lot_id: 41, quantity: '0.000002' },
+        order,
+        'READY',
+        tinyRequirement
+      ),
+    /不能超过/u
+  )
+})

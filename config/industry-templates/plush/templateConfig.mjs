@@ -147,9 +147,9 @@ export const plushIndustryTemplateConfig = Object.freeze({
       },
       {
         title: "运营工具",
-        items: Object.freeze(["print-center", "exception-flow"]),
+        items: Object.freeze(["print-center"]),
         classification: "customer_sample_only",
-        boundary: "当前只保留既有两套模板入口；不把单客户合同样式升成行业默认模板。",
+        boundary: "当前只保留既有打印模板入口；不把单客户合同样式升成行业默认模板。",
       },
       {
         title: "系统管理",

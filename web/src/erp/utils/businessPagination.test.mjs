@@ -6,6 +6,7 @@ import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
+  resolveExactRecordPage,
 } from './businessPagination.mjs'
 
 test('businessPagination: builds limit and offset from current page', () => {
@@ -42,4 +43,36 @@ test('businessPagination: resets current page without changing page size', () =>
     nextValue = updater({ current: 4, pageSize: 50 })
   })
   assert.deepEqual(nextValue, { current: 1, pageSize: 50 })
+})
+
+test('businessPagination: exact route context is a one-record page without duplicate totals', () => {
+  const records = Array.from({ length: 20 }, (_, index) => ({ id: index + 1 }))
+  const exactRecord = { id: 45 }
+
+  assert.deepEqual(
+    resolveExactRecordPage({
+      records,
+      exactRecord,
+      hasExactContext: true,
+      total: 45,
+    }),
+    { records: [exactRecord], total: 1 }
+  )
+  assert.deepEqual(
+    resolveExactRecordPage({
+      records,
+      exactRecord: null,
+      hasExactContext: true,
+      total: 45,
+    }),
+    { records: [], total: 0 }
+  )
+})
+
+test('businessPagination: ordinary pages preserve server rows and total', () => {
+  const records = [{ id: 2 }, { id: 1 }]
+  assert.deepEqual(resolveExactRecordPage({ records, total: 22 }), {
+    records,
+    total: 22,
+  })
 })

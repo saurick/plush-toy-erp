@@ -17,7 +17,7 @@ import (
 	"github.com/go-kratos/kratos/v2/log"
 )
 
-func TestPurchaseReceiptCancelRequiresPostedAdjustmentsToBeCancelledFirst(t *testing.T) {
+func TestPurchaseReceiptCancelRequiresActiveAdjustmentsToBeCancelledFirst(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "purchase_receipt_adjustment_cancel_order")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
@@ -42,11 +42,20 @@ func TestPurchaseReceiptCancelRequiresPostedAdjustmentsToBeCancelledFirst(t *tes
 		biz.PurchaseReceiptAdjustmentQuantityDecrease,
 		mustDecimal(t, "1"),
 	)
+	if _, err := uc.CancelPostedPurchaseReceipt(ctx, posted.ID); !errors.Is(err, biz.ErrPurchaseReceiptCorrectionDependency) {
+		t.Fatalf("receipt with a draft adjustment must not be cancelled, got %v", err)
+	}
+	if status := purchaseReceiptStatusForTest(t, ctx, client, posted.ID); status != biz.PurchaseReceiptStatusPosted {
+		t.Fatalf("draft dependency rejection must keep receipt POSTED, got %s", status)
+	}
+	if status := purchaseReceiptAdjustmentStatusForTest(t, ctx, client, adjustment.ID); status != biz.PurchaseReceiptAdjustmentStatusDraft {
+		t.Fatalf("draft dependency rejection changed adjustment, got %s", status)
+	}
 	if _, err := uc.PostPurchaseReceiptAdjustment(ctx, adjustment.ID); err != nil {
 		t.Fatalf("post purchase receipt adjustment failed: %v", err)
 	}
 
-	if _, err := uc.CancelPostedPurchaseReceipt(ctx, posted.ID); !errors.Is(err, biz.ErrBadParam) {
+	if _, err := uc.CancelPostedPurchaseReceipt(ctx, posted.ID); !errors.Is(err, biz.ErrPurchaseReceiptCorrectionDependency) {
 		t.Fatalf("receipt with a posted adjustment must not be cancelled, got %v", err)
 	}
 	if status := purchaseReceiptStatusForTest(t, ctx, client, posted.ID); status != biz.PurchaseReceiptStatusPosted {
@@ -340,29 +349,17 @@ func TestPurchaseReceiptPostgresAdjustmentPostAndReceiptCancelSerialize(t *testi
 	close(start)
 	wg.Wait()
 
-	if postErr == nil {
-		if !errors.Is(cancelErr, biz.ErrBadParam) {
-			t.Fatalf("posted adjustment must make concurrent receipt cancellation reject, got %v", cancelErr)
-		}
-		if status := purchaseReceiptStatusForTest(t, ctx, client, posted.ID); status != biz.PurchaseReceiptStatusPosted {
-			t.Fatalf("posted adjustment outcome must keep receipt POSTED, got %s", status)
-		}
-		if status := purchaseReceiptAdjustmentStatusForTest(t, ctx, client, adjustment.ID); status != biz.PurchaseReceiptAdjustmentStatusPosted {
-			t.Fatalf("expected adjustment POSTED, got %s", status)
-		}
-		return
+	if postErr != nil {
+		t.Fatalf("existing draft adjustment must remain postable: %v", postErr)
 	}
-	if !errors.Is(postErr, biz.ErrBadParam) {
-		t.Fatalf("unexpected concurrent adjustment post error: %v", postErr)
+	if !errors.Is(cancelErr, biz.ErrPurchaseReceiptCorrectionDependency) {
+		t.Fatalf("active adjustment must make concurrent receipt cancellation reject, got %v", cancelErr)
 	}
-	if cancelErr != nil {
-		t.Fatalf("receipt cancellation must succeed when it wins the parent lock: %v", cancelErr)
+	if status := purchaseReceiptStatusForTest(t, ctx, client, posted.ID); status != biz.PurchaseReceiptStatusPosted {
+		t.Fatalf("active adjustment outcome must keep receipt POSTED, got %s", status)
 	}
-	if status := purchaseReceiptStatusForTest(t, ctx, client, posted.ID); status != biz.PurchaseReceiptStatusCancelled {
-		t.Fatalf("expected receipt CANCELLED, got %s", status)
-	}
-	if status := purchaseReceiptAdjustmentStatusForTest(t, ctx, client, adjustment.ID); status != biz.PurchaseReceiptAdjustmentStatusDraft {
-		t.Fatalf("rejected adjustment post must remain DRAFT, got %s", status)
+	if status := purchaseReceiptAdjustmentStatusForTest(t, ctx, client, adjustment.ID); status != biz.PurchaseReceiptAdjustmentStatusPosted {
+		t.Fatalf("expected adjustment POSTED, got %s", status)
 	}
 }
 

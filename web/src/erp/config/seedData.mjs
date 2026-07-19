@@ -64,13 +64,6 @@ const navItemRegistry = {
     shortLabel: '打印',
     description: '统一查看合同、物料明细、色卡和作业指导书等固定打印模板。',
   },
-  'exception-flow': {
-    key: 'exception-flow',
-    label: '异常处理',
-    path: '/erp/operations/exceptions',
-    shortLabel: '异常',
-    description: '集中查看需要登记、催办、处理、确认和关闭的异常任务。',
-  },
   'permission-center': {
     key: 'permission-center',
     label: '权限管理',
@@ -109,10 +102,7 @@ function getDefaultNavigationSections() {
     ...businessNavigationSections,
     {
       title: '运营工具',
-      items: [
-        navItemRegistry['print-center'],
-        navItemRegistry['exception-flow'],
-      ],
+      items: [navItemRegistry['print-center']],
     },
     {
       title: '系统管理',

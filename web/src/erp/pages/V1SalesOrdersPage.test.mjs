@@ -27,21 +27,21 @@ test('active sales orders expose a permission-bound reservation action', () => {
 test('reservation context uses existing facts and matching available stock', () => {
   assert.match(
     page,
-    /listStockReservations\(\{[\s\S]*source_id: orderID,[\s\S]*status: 'ACTIVE',[\s\S]*limit: 200,[\s\S]*\}\)/u
+    /listAllStockReservations\(\{[\s\S]*source_id: orderID,[\s\S]*status: 'ACTIVE',[\s\S]*\}\)/u
   )
   assert.match(
     page,
-    /listShipments\(\{ source_id: orderID, status: 'SHIPPED', limit: 200 \}\)/u
+    /listAllShipments\(\{ source_id: orderID, status: 'SHIPPED' \}\)/u
   )
   assert.match(page, /firstReservableItem/u)
   assert.match(page, /相关预留或出货记录未完整加载，暂不能新增预留/u)
   assert.match(page, /shipments=\{reservationContext\.shipments\}/u)
   assert.match(page, /subject_type: 'PRODUCT'/u)
   assert.match(page, /subject_id: Number\(item\.product_id/u)
-  assert.match(page, /listInventoryBalances\(params\)/u)
+  assert.match(page, /listAllInventoryBalances\(params\)/u)
   assert.match(
     page,
-    /listInventoryLots\(\{ \.\.\.params, status: 'ACTIVE' \}\)/u
+    /listAllInventoryLots\(\{ \.\.\.params, status: 'ACTIVE' \}\)/u
   )
   assert.match(page, /enrichReservationBalances/u)
   assert.match(modal, /当前生效预留/u)

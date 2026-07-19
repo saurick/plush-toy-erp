@@ -31,7 +31,6 @@ const repoRoot = path.resolve(webDir, '..')
 
 const runID = `PR-BROWSER-${Date.now()}`
 const receiptNo = runID
-const lotNo = `${runID}-LOT`
 const quantity = '2'
 const argv = process.argv.slice(2)
 const args = new Set(argv)
@@ -164,7 +163,7 @@ async function main() {
     name: 'purchase-receipt-real-write-browser-e2e',
     run_id: runID,
     receipt_no: receiptNo,
-    lot_no: lotNo,
+    lot_no: null,
     seed_core_demo: seedCoreDemo,
     base_url: runtime.baseURL,
     persistent_test_data_accepted: persistentTestDataAccepted,
@@ -194,6 +193,7 @@ async function main() {
 
         const refs = await resolveReferenceData(page)
         report.references = {
+          supplier_id: refs.supplier.id,
           material_id: refs.material.id,
           unit_id: refs.unit.id,
           warehouse_id: refs.warehouse.id,
@@ -206,8 +206,10 @@ async function main() {
           runtime.baseURL
         )
         report.receipt_id = draftReceipt.id
+        report.purchase_order_id = draftReceipt.purchase_order_id
+        report.lot_no = draftReceipt.items?.[0]?.lot_no || null
         report.steps.push({
-          key: 'create-draft-with-item-rpc',
+          key: 'create-source-bound-draft-rpc',
           status: 'pass',
         })
 
@@ -510,6 +512,10 @@ function runCommand(command, args, { cwd }) {
 }
 
 async function resolveReferenceData(page) {
+  const suppliersData = await rpc(page, 'masterdata', 'list_suppliers', {
+    active_only: true,
+    limit: 500,
+  })
   const materialsData = await rpc(page, 'masterdata', 'list_materials', {
     active_only: true,
     limit: 500,
@@ -520,19 +526,21 @@ async function resolveReferenceData(page) {
     limit: 500,
   })
 
+  const suppliers = suppliersData?.suppliers || []
   const materials = materialsData?.materials || []
   const units = unitsData?.units || []
   const warehouses = warehousesData?.warehouses || []
+  const supplier = suppliers.find((item) => item?.id > 0)
   const material = materials.find((item) => item?.id > 0)
   const unit =
     units.find((item) => item?.id === material?.default_unit_id) ||
     units.find((item) => item?.id > 0)
   const warehouse = warehouses.find((item) => item?.id > 0)
 
-  if (!material || !unit || !warehouse) {
+  if (!supplier || !material || !unit || !warehouse) {
     throw new Error(
       [
-        '采购入库浏览器 e2e 缺少材料 / 单位 / 仓库前置数据。',
+        '采购入库浏览器 e2e 缺少供应商 / 材料 / 单位 / 仓库前置数据。',
         '本地开发库可先执行：',
         '  bash /Users/simon/projects/plush-toy-erp/scripts/seed-core-demo-data.sh',
         '或本脚本追加参数：',
@@ -541,36 +549,67 @@ async function resolveReferenceData(page) {
     )
   }
 
-  return { material, unit, warehouse }
+  return { supplier, material, unit, warehouse }
 }
 
 async function createReceiptWithItemForUI(page, refs, baseURL) {
-  const data = await rpc(
+  const sourceOrderData = await rpc(
     page,
-    'purchase',
-    'create_purchase_receipt_with_items',
+    'purchase_order',
+    'save_purchase_order_with_items',
     {
-      receipt_no: receiptNo,
-      supplier_name: '浏览器 e2e 供应商',
-      received_at: new Date().toISOString().slice(0, 10),
-      note: `browser e2e ${runID}`,
+      purchase_order_no: `PO-${runID}`,
+      supplier_id: refs.supplier.id,
+      supplier_snapshot: {
+        code: refs.supplier.code,
+        name: refs.supplier.name,
+      },
+      purchase_date: new Date().toISOString().slice(0, 10),
+      note: `browser e2e source ${runID}`,
       items: [
         {
+          line_no: 1,
           material_id: refs.material.id,
-          warehouse_id: refs.warehouse.id,
           unit_id: refs.unit.id,
-          lot_no: lotNo,
-          quantity,
-          source_line_no: 'BROWSER-E2E-1',
+          material_code_snapshot: refs.material.code,
+          material_name_snapshot: refs.material.name,
+          purchased_quantity: quantity,
           unit_price: '3.50',
           amount: '7.00',
-          note: 'browser e2e line item',
         },
       ],
     }
   )
+  const sourceOrder = sourceOrderData?.purchase_order
+  const sourceOrderItem = sourceOrderData?.purchase_order_items?.[0]
+  assert.ok(
+    sourceOrder?.id && sourceOrderItem?.id,
+    `创建采购订单来源失败: ${JSON.stringify(sourceOrderData)}`
+  )
+  await rpc(page, 'purchase_order', 'submit_purchase_order', {
+    id: sourceOrder.id,
+  })
+  await rpc(page, 'purchase_order', 'approve_purchase_order', {
+    id: sourceOrder.id,
+  })
+
+  const data = await rpc(
+    page,
+    'purchase',
+    'create_purchase_receipt_from_purchase_order',
+    {
+      purchase_order_id: sourceOrder.id,
+      receipt_no: receiptNo,
+      warehouse_id: refs.warehouse.id,
+      received_at: new Date().toISOString().slice(0, 10),
+      note: `browser e2e ${runID}`,
+      idempotency_key: `browser-e2e:${runID}:receipt`,
+    }
+  )
   const receipt = data?.purchase_receipt
   assert.ok(receipt?.id, `创建采购入库测试草稿失败: ${JSON.stringify(data)}`)
+  assert.equal(receipt.purchase_order_id, sourceOrder.id)
+  assert.equal(receipt.items?.[0]?.purchase_order_item_id, sourceOrderItem.id)
 
   await page.goto(new URL('/erp/warehouse/inbound', `${baseURL}/`).toString(), {
     waitUntil: 'domcontentloaded',

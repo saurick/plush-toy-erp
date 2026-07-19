@@ -68,11 +68,15 @@ func TestPostingDocumentCancelTransitions(t *testing.T) {
 		wantChanged bool
 		wantOK      bool
 	}{
+		{name: "receipt draft cancels", fn: CancelPurchaseReceipt, current: PurchaseReceiptDraft, wantTarget: PurchaseReceiptCancelled, wantChanged: true, wantOK: true},
 		{name: "receipt posted cancels", fn: CancelPurchaseReceipt, current: PurchaseReceiptPosted, wantTarget: PurchaseReceiptCancelled, wantChanged: true, wantOK: true},
 		{name: "receipt cancelled idempotent", fn: CancelPurchaseReceipt, current: PurchaseReceiptCancelled, wantTarget: PurchaseReceiptCancelled, wantOK: true},
-		{name: "receipt draft cannot cancel", fn: CancelPurchaseReceipt, current: PurchaseReceiptDraft},
+		{name: "return draft cancels", fn: CancelPurchaseReturn, current: PurchaseReturnDraft, wantTarget: PurchaseReturnCancelled, wantChanged: true, wantOK: true},
 		{name: "return posted cancels", fn: CancelPurchaseReturn, current: PurchaseReturnPosted, wantTarget: PurchaseReturnCancelled, wantChanged: true, wantOK: true},
+		{name: "return cancelled idempotent", fn: CancelPurchaseReturn, current: PurchaseReturnCancelled, wantTarget: PurchaseReturnCancelled, wantOK: true},
+		{name: "adjustment draft cancels", fn: CancelPurchaseReceiptAdjustment, current: PurchaseReceiptAdjustmentDraft, wantTarget: PurchaseReceiptAdjustmentCancelled, wantChanged: true, wantOK: true},
 		{name: "adjustment posted cancels", fn: CancelPurchaseReceiptAdjustment, current: PurchaseReceiptAdjustmentPosted, wantTarget: PurchaseReceiptAdjustmentCancelled, wantChanged: true, wantOK: true},
+		{name: "adjustment cancelled idempotent", fn: CancelPurchaseReceiptAdjustment, current: PurchaseReceiptAdjustmentCancelled, wantTarget: PurchaseReceiptAdjustmentCancelled, wantOK: true},
 		{name: "unknown rejected", fn: CancelPurchaseReturn, current: "READY"},
 	}
 	for _, tt := range tests {

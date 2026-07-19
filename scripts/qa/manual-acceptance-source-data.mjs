@@ -669,7 +669,6 @@ function buildOutsourcingOrders(
         buyerSigner: "生产部",
       },
       source_order_no: sourceOrder.customer_order_no,
-      sourceSalesOrderRef: sourceOrder.order_no,
       order_date: isoDate(-index + 4, anchorDate),
       expected_return_date: isoDate(7 + (index % 18), anchorDate),
       note: longBusinessNote(index),
@@ -2317,7 +2316,6 @@ async function createSourceDocuments({
       "supplier_snapshot",
       "contract_party_snapshot",
       "source_order_no",
-      "source_sales_order_id",
       "order_date",
       "expected_return_date",
       "note",
@@ -2353,9 +2351,7 @@ async function createSourceDocuments({
     resolveParams: (record) => ({
       ...record,
       supplier_id: refs.suppliers.get(record.supplierRef).id,
-      source_sales_order_id: sales.get(record.sourceSalesOrderRef)?.id,
       supplierRef: undefined,
-      sourceSalesOrderRef: undefined,
       targetStatus: undefined,
       items: record.items.map((item) => ({
         ...item,
@@ -2694,6 +2690,7 @@ export function buildSourceDrivenFactReferences({
       status: "ACTIVE",
       customerId: customer.id,
       customerSnapshot: customer.name,
+      paymentTermDays: order.payment_term_days,
     };
     for (const plannedLine of orderPlan.items) {
       const line = items.find((item) => item.lineNo === plannedLine.line_no);

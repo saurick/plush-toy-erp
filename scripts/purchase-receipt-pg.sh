@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
+script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# script_dir pins the shared PostgreSQL contract; ShellCheck scans it separately.
+# shellcheck disable=SC1091
+source "$script_dir/qa/critical-postgres-tests.sh"
+
 cmd="${1:-}"
 if [ -z "$cmd" ]; then
   echo "usage: $0 {createdb|status|apply|test|test-workflow|test-critical|test-critical-disposable|test-populated-upgrade|dropdb}" >&2
@@ -163,36 +168,13 @@ test-critical)
     BOM_LOT_PG_TEST=1 BOM_LOT_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
     PURCHASE_RETURN_PG_TEST=1 PURCHASE_RETURN_PG_TEST_DB_URL="$PURCHASE_RECEIPT_PG_DB_URL" \
     go test -json ./internal/data \
-    -run '^(TestPurchaseReceiptPostgres|TestPurchaseReceiptAdjustmentPostgres|TestPurchaseReturnPostgres|TestPurchaseReturnFromQualityInspectionPostgres|TestQualityInspectionPostgres|TestQualityInspectionFromOutsourcingReturnPostgres|TestSourceFinanceSnapshotBackfillMigrationPostgres|TestWorkflowPostgres|TestCustomerConfigPostgres|TestMasterDataSchemaPostgres|TestProductionOrderSchemaPostgres|TestProductionOrderPostgres|TestProductionMaterialIssuePostgres|TestProductionReworkPostgres|TestSourceDocumentPostgres|TestInventoryPostgres|TestInventoryLotPostgres|TestBOMPostgres|TestOperationalFactPostgres|TestOutsourcingFactFromOrderPostgres|TestProcessRuntimePostgres|TestFinanceBusinessSourcesPostgres|TestOperationalFactRepoFinance.*Postgres|TestFinanceFactCancelAuditPostgres|TestFinanceProcessCommandPostgres|TestSalesProcessCommandPostgres)' \
+    -run "$CRITICAL_POSTGRES_TEST_PATTERN" \
     -count=1 | tee "$report_file"
-  node ../scripts/qa/verify-go-test-json.mjs \
-    --report "$report_file" \
-    --require-prefix TestPurchaseReceiptPostgres \
-    --require-prefix TestPurchaseReceiptAdjustmentPostgres \
-    --require-prefix TestPurchaseReturnPostgres \
-    --require-prefix TestPurchaseReturnFromQualityInspectionPostgres \
-    --require-prefix TestQualityInspectionPostgres \
-    --require-prefix TestQualityInspectionFromOutsourcingReturnPostgres \
-    --require-prefix TestSourceFinanceSnapshotBackfillMigrationPostgres \
-    --require-prefix TestWorkflowPostgres \
-    --require-prefix TestCustomerConfigPostgres \
-    --require-prefix TestMasterDataSchemaPostgres \
-    --require-prefix TestProductionOrderSchemaPostgres \
-    --require-prefix TestProductionOrderPostgres \
-    --require-prefix TestProductionMaterialIssuePostgres \
-    --require-prefix TestProductionReworkPostgres \
-    --require-prefix TestSourceDocumentPostgres \
-    --require-prefix TestInventoryPostgres \
-    --require-prefix TestInventoryLotPostgres \
-    --require-prefix TestBOMPostgres \
-    --require-prefix TestOperationalFactPostgres \
-    --require-prefix TestOutsourcingFactFromOrderPostgres \
-    --require-prefix TestProcessRuntimePostgres \
-    --require-prefix TestFinanceBusinessSourcesPostgres \
-    --require-prefix TestOperationalFactRepoFinance \
-    --require-prefix TestFinanceFactCancelAuditPostgres \
-    --require-prefix TestFinanceProcessCommandPostgres \
-    --require-prefix TestSalesProcessCommandPostgres
+  verify_args=(--report "$report_file")
+  for test_prefix in "${CRITICAL_POSTGRES_REQUIRED_PREFIXES[@]}"; do
+    verify_args+=(--require-prefix "$test_prefix")
+  done
+  node ../scripts/qa/verify-go-test-json.mjs "${verify_args[@]}"
   ;;
 test-critical-disposable)
   run_disposable_critical_gate

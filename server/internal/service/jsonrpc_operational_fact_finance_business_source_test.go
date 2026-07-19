@@ -77,6 +77,12 @@ func TestFinanceBusinessSourceRPCUsesExactPermissions(t *testing.T) {
 	payable := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
 		[]string{biz.FinanceRoleKey},
 		biz.PermissionFinancePayableConfirm,
+		biz.PermissionPurchaseReceiptRead,
+		biz.PermissionPurchaseReceiptAdjustmentRead,
+		biz.PermissionPurchaseReturnRead,
+		biz.PermissionOutsourcingFactRead,
+		biz.PermissionOutsourcingOrderRead,
+		biz.PermissionQualityInspectionRead,
 	), payableRepo)
 	activateOperationalFactTestCustomerConfig(t, payable, config)
 	for _, tc := range []struct {
@@ -106,6 +112,7 @@ func TestFinanceBusinessSourceRPCUsesExactPermissions(t *testing.T) {
 	reconciliation := newOperationalFactJSONRPCTestDataWithRepo(t, workflowJSONRPCAdmin(
 		[]string{biz.FinanceRoleKey},
 		biz.PermissionFinanceReconciliationConfirm,
+		biz.PermissionFinanceReceivableRead,
 	), reconciliationRepo)
 	activateOperationalFactTestCustomerConfig(t, reconciliation, customerConfigPublishParamsForRevision(t, "2026.07.14.finance-single-reconciliation"))
 	_, res, err := reconciliation.handleOperationalFact(ctx, "create_reconciliation_from_finance_fact", "reconciliation", mustJSONRPCStruct(t, map[string]any{

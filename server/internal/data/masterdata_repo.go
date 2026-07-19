@@ -145,7 +145,7 @@ func (r *masterDataRepo) ListCustomers(ctx context.Context, filter biz.MasterDat
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(customer.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(ent.Desc(customer.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -302,7 +302,7 @@ func (r *masterDataRepo) ListSuppliers(ctx context.Context, filter biz.MasterDat
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.WithProcessCapabilities().Order(ent.Asc(supplier.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.WithProcessCapabilities().Order(ent.Desc(supplier.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -402,7 +402,7 @@ func (r *masterDataRepo) ListMaterials(ctx context.Context, filter biz.MasterDat
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(material.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(ent.Desc(material.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -435,7 +435,7 @@ func (r *masterDataRepo) ListUnits(ctx context.Context, filter biz.MasterDataFil
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(unit.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(ent.Desc(unit.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -458,7 +458,7 @@ func (r *masterDataRepo) ListWarehouses(ctx context.Context, filter biz.MasterDa
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(warehouse.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(ent.Desc(warehouse.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -470,6 +470,7 @@ func (r *masterDataRepo) CreateProcess(ctx context.Context, in *biz.ProcessMutat
 		SetCode(in.Code).
 		SetName(in.Name).
 		SetNillableCategory(in.Category).
+		SetNillableProductionRouteOperationCode(in.ProductionRouteOperationCode).
 		SetOutsourcingEnabled(in.OutsourcingEnabled).
 		SetInhouseEnabled(in.InhouseEnabled).
 		SetQualityRequired(in.QualityRequired).
@@ -490,6 +491,11 @@ func (r *masterDataRepo) UpdateProcess(ctx context.Context, id int, in *biz.Proc
 		SetInhouseEnabled(in.InhouseEnabled).
 		SetQualityRequired(in.QualityRequired).
 		SetSortOrder(in.SortOrder)
+	if in.ProductionRouteOperationCode == nil {
+		update.ClearProductionRouteOperationCode()
+	} else {
+		update.SetProductionRouteOperationCode(*in.ProductionRouteOperationCode)
+	}
 	if in.Category == nil {
 		update.ClearCategory()
 	} else {
@@ -528,6 +534,7 @@ func (r *masterDataRepo) ListProcesses(ctx context.Context, filter biz.MasterDat
 			process.CodeContains(filter.Keyword),
 			process.NameContains(filter.Keyword),
 			process.CategoryContains(filter.Keyword),
+			process.ProductionRouteOperationCodeContains(filter.Keyword),
 			process.NoteContains(filter.Keyword),
 		))
 	}
@@ -643,7 +650,7 @@ func (r *masterDataRepo) ListProducts(ctx context.Context, filter biz.MasterData
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(product.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(ent.Desc(product.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -785,7 +792,7 @@ func (r *masterDataRepo) ListProductSKUs(ctx context.Context, filter biz.Product
 	if err != nil {
 		return nil, 0, err
 	}
-	rows, err := query.Order(ent.Asc(productsku.FieldProductID), ent.Asc(productsku.FieldID)).
+	rows, err := query.Order(ent.Desc(productsku.FieldID)).
 		Limit(filter.Limit).
 		Offset(filter.Offset).
 		All(ctx)
@@ -1380,18 +1387,19 @@ func entProcessToBiz(row *ent.Process) *biz.Process {
 		return nil
 	}
 	return &biz.Process{
-		ID:                 row.ID,
-		Code:               row.Code,
-		Name:               row.Name,
-		Category:           row.Category,
-		OutsourcingEnabled: row.OutsourcingEnabled,
-		InhouseEnabled:     row.InhouseEnabled,
-		QualityRequired:    row.QualityRequired,
-		SortOrder:          row.SortOrder,
-		Note:               row.Note,
-		IsActive:           row.IsActive,
-		CreatedAt:          row.CreatedAt,
-		UpdatedAt:          row.UpdatedAt,
+		ID:                           row.ID,
+		Code:                         row.Code,
+		Name:                         row.Name,
+		Category:                     row.Category,
+		ProductionRouteOperationCode: row.ProductionRouteOperationCode,
+		OutsourcingEnabled:           row.OutsourcingEnabled,
+		InhouseEnabled:               row.InhouseEnabled,
+		QualityRequired:              row.QualityRequired,
+		SortOrder:                    row.SortOrder,
+		Note:                         row.Note,
+		IsActive:                     row.IsActive,
+		CreatedAt:                    row.CreatedAt,
+		UpdatedAt:                    row.UpdatedAt,
 	}
 }
 

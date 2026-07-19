@@ -388,6 +388,94 @@ BEGIN
     END IF;
   END IF;
 
+  -- 20260717035245 first stored one outsourcing item directly on each WIP
+  -- batch. 20260717043625 replaced that column with the allocation table. A
+  -- database paused between the two revisions must not silently discard a live
+  -- association, and a database already past the cutover must not contain an
+  -- outsourced active batch whose durable allocation is missing.
+  IF to_regclass('public.production_wip_batches') IS NOT NULL THEN
+    SELECT count(*)
+      INTO column_count
+      FROM information_schema.columns
+     WHERE table_schema = 'public'
+       AND table_name = 'production_wip_batches'
+       AND column_name = 'outsourcing_order_item_id';
+
+    IF column_count = 1 THEN
+      IF to_regclass('public.production_wip_outsourcing_allocations') IS NOT NULL THEN
+        blockers := array_append(
+          blockers,
+          'production WIP outsourcing schema is partially cut over: legacy column and allocation table both exist'
+        );
+      END IF;
+
+      EXECUTE $sql$
+        SELECT count(*)
+          FROM public.production_wip_batches
+         WHERE outsourcing_order_item_id IS NOT NULL
+      $sql$ INTO invalid_count;
+      IF invalid_count > 0 THEN
+        blockers := array_append(
+          blockers,
+          format(
+            'production_wip_batches has %s legacy outsourcing links that would be dropped by 20260717043625; backfill and verify allocations before apply',
+            invalid_count
+          )
+        );
+      END IF;
+    ELSIF column_count = 0 THEN
+      IF to_regclass('public.production_wip_outsourcing_allocations') IS NULL THEN
+        blockers := array_append(
+          blockers,
+          'production WIP outsourcing schema is incomplete: neither legacy link column nor allocation table exists'
+        );
+      ELSE
+        EXECUTE $sql$
+          SELECT count(*)
+            FROM public.production_wip_batches AS batch
+           WHERE batch.execution_mode::text = 'OUTSOURCED'
+             AND batch.status::text <> 'CANCELLED'
+             AND NOT EXISTS (
+               SELECT 1
+                 FROM public.production_wip_outsourcing_allocations AS allocation
+                WHERE allocation.production_wip_batch_id = batch.id
+             )
+        $sql$ INTO invalid_count;
+        IF invalid_count > 0 THEN
+          blockers := array_append(
+            blockers,
+            format(
+              'production_wip_batches has %s active OUTSOURCED batches without durable allocations after 20260717043625',
+              invalid_count
+            )
+          );
+        END IF;
+
+        EXECUTE $sql$
+          SELECT count(*)
+            FROM public.production_wip_outsourcing_allocations AS allocation
+            JOIN public.production_wip_batches AS batch
+              ON batch.id = allocation.production_wip_batch_id
+           WHERE batch.execution_mode::text IS DISTINCT FROM 'OUTSOURCED'
+        $sql$ INTO invalid_count;
+        IF invalid_count > 0 THEN
+          blockers := array_append(
+            blockers,
+            format(
+              'production_wip_outsourcing_allocations has %s rows bound to non-OUTSOURCED batches',
+              invalid_count
+            )
+          );
+        END IF;
+      END IF;
+    ELSE
+      blockers := array_append(
+        blockers,
+        'production_wip_batches.outsourcing_order_item_id has an unexpected duplicate column definition'
+      );
+    END IF;
+  END IF;
+
   IF cardinality(blockers) > 0 THEN
     RAISE EXCEPTION
       'populated upgrade preflight failed: %',

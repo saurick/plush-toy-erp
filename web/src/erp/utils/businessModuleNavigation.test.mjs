@@ -118,13 +118,13 @@ test('workflow business modules: 三页不冒充事实写入', () => {
     'listWorkflowTasks',
     'completeWorkflowTaskAction',
     'blockWorkflowTaskAction',
+    'rejectWorkflowTaskAction',
+    'resumeWorkflowTaskAction',
     'urgeWorkflowTask',
     "taskGroup: 'shipment_release'",
     "surface_key: 'workflow_business_module'",
     "entry_path: moduleItem?.path || ''",
     'BusinessListToolbarActions',
-    'resolveWorkflowTaskSourceEntryPath',
-    '查看来源',
     '当前页面只用于处理任务，暂不提供业务数据导出。',
     '当前操作只更新任务状态；生产、库存、出货、财务、开票和收付款仍需在对应业务页面完成。',
   ]) {
@@ -132,6 +132,18 @@ test('workflow business modules: 三页不冒充事实写入', () => {
       source.includes(text),
       true,
       `workflow V1 page should expose real workflow scope: ${text}`
+    )
+  }
+
+  for (const text of [
+    'resolveWorkflowTaskSourceEntryPath',
+    'selectedTaskSourceEntryPath',
+    '查看来源',
+  ]) {
+    assert.equal(
+      source.includes(text),
+      false,
+      `workflow V1 page should not keep retired source navigation without a visible consumer: ${text}`
     )
   }
 
@@ -171,14 +183,24 @@ test('workflow business modules: 三页不冒充事实写入', () => {
   )
 })
 
-test('workflow business modules: 桌面页按唯一任务分组读取不同来源的协同任务', () => {
+test('workflow business modules: 桌面页把唯一任务分组交给服务端查询与响应校验', () => {
   const source = readFileSync(
     new URL('../pages/WorkflowBusinessModulePage.jsx', import.meta.url),
     'utf8'
   )
 
   assert.equal(source.includes('source_type: moduleKey'), false)
-  assert.equal(source.includes('task.task_group === config.taskGroup'), true)
+  for (const text of [
+    'buildWorkflowBusinessTaskQuery({',
+    'taskGroup: config.taskGroup',
+    'requireWorkflowBusinessTaskPage(data, {',
+  ]) {
+    assert.equal(
+      source.includes(text),
+      true,
+      `workflow desktop page should preserve the server task-group contract: ${text}`
+    )
+  }
 })
 
 test('business list toolbar: 不提供通用删除和回收站壳能力', () => {

@@ -8,6 +8,8 @@ import (
 	"strings"
 	"testing"
 
+	"server/internal/biz"
+
 	"github.com/DATA-DOG/go-sqlmock"
 )
 
@@ -190,19 +192,25 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 		outsourcing bool
 		inhouse     bool
 		quality     bool
+		operation   string
 	}{
 		"查货": {outsourcing: true, inhouse: true, quality: true},
-		"手工": {outsourcing: true, inhouse: true},
-		"车缝": {outsourcing: true, inhouse: true},
-		"包装": {outsourcing: true, inhouse: true},
+		"手工": {outsourcing: true, inhouse: true, operation: biz.ProductionWIPOperationHandwork},
+		"车缝": {outsourcing: true, inhouse: true, operation: biz.ProductionWIPOperationSewing},
+		"包装": {outsourcing: true, inhouse: true, operation: biz.ProductionWIPOperationPackaging},
 	}
 	defaultProcessSortOrder := map[string]int{}
+	routeOperations := map[string]string{}
 	for _, process := range dataset.Processes {
+		if process.ProductionRouteOperationCode != "" {
+			routeOperations[process.ProductionRouteOperationCode] = process.Code
+		}
 		expected, ok := requiredProcesses[process.Name]
 		if !ok {
 			continue
 		}
 		if process.Category != process.Name ||
+			process.ProductionRouteOperationCode != expected.operation ||
 			process.OutsourcingEnabled != expected.outsourcing ||
 			process.InhouseEnabled != expected.inhouse ||
 			process.QualityRequired != expected.quality {
@@ -219,6 +227,16 @@ func TestDefaultCoreDemoSeedDatasetIsSimulatedAndComplete(t *testing.T) {
 	}
 	if defaultProcessSortOrder["车缝"] >= defaultProcessSortOrder["手工"] {
 		t.Fatalf("default process display order must show sewing before handwork: %#v", defaultProcessSortOrder)
+	}
+	for _, operationCode := range []string{
+		biz.ProductionWIPOperationFabricProcessing,
+		biz.ProductionWIPOperationSewing,
+		biz.ProductionWIPOperationHandwork,
+		biz.ProductionWIPOperationPackaging,
+	} {
+		if routeOperations[operationCode] == "" {
+			t.Fatalf("missing explicit production route operation binding %q: %#v", operationCode, routeOperations)
+		}
 	}
 	requiredMaterialCategories := map[string]bool{
 		"fabric":    false,
@@ -326,7 +344,7 @@ func TestSeedCoreDemoDataUpsertsMinimalDataset(t *testing.T) {
 		WithArgs("SIM-TEST-FG", "成品仓", "FINISHED_GOODS").
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(41))
 	mock.ExpectQuery("INSERT INTO processes").
-		WithArgs("SIM-TEST-PROC-SEWING", "车缝", sqlmock.AnyArg(), true, false, false, 10, sqlmock.AnyArg()).
+		WithArgs("SIM-TEST-PROC-SEWING", "车缝", sqlmock.AnyArg(), sqlmock.AnyArg(), true, false, false, 10, sqlmock.AnyArg()).
 		WillReturnRows(sqlmock.NewRows([]string{"id"}).AddRow(45))
 	mock.ExpectQuery("INSERT INTO bom_headers").
 		WithArgs(31, "SIM-TEST-BOM-V1", "ACTIVE", sqlmock.AnyArg()).

@@ -19,8 +19,16 @@ test('quality page uses exact purchase return permission and dedicated source co
 })
 
 test('quality rejection return retries safely and validates the returned source trace', () => {
-  assert.match(source, /listPurchaseReceipts\(\{ limit: 200 \}\)/u)
-  assert.doesNotMatch(source, /listPurchaseReceipts\(\{ limit: 500 \}\)/u)
+  assert.match(
+    source,
+    /listAllPurchaseReceipts\(\{\}, \{ signal: request\.signal \}\)/u
+  )
+  assert.doesNotMatch(source, /listPurchaseReceipts\(\{ limit:/u)
+  assert.match(
+    source,
+    /listAllPurchaseReturns\(\s*compactParams\(\{[\s\S]*?quality_inspection_id: inspection\.id/u
+  )
+  assert.doesNotMatch(source, /listPurchaseReturns\([\s\S]{0,180}limit:\s*20/u)
   assert.match(source, /getPurchaseReceipt\(\{ id: receiptID \}\)/u)
   assert.match(source, /selectedRowPurchaseReceiptRequestRef/u)
   assert.match(source, /未能确认来源收货已入库，暂不能生成采购退货/u)
@@ -53,6 +61,37 @@ test('quality rejection return retries safely and validates the returned source 
   )
 })
 
+test('quality source references use latest-wins readiness and fail closed for source-driven creation', () => {
+  const loader = source.slice(
+    source.indexOf('const loadReferenceOptions'),
+    source.indexOf('const clearRouteContext')
+  )
+  assert.match(source, /useState\('loading'\)/u)
+  assert.match(loader, /beginLatestRequest\('reference-options'\)/u)
+  for (const functionName of [
+    'listAllPurchaseReceipts',
+    'listAllInventoryLots',
+    'listAllMaterials',
+    'listAllProducts',
+    'listAllWarehouses',
+  ]) {
+    assert.match(
+      loader,
+      new RegExp(`${functionName}\\([\\s\\S]*?signal: request\\.signal`, 'u')
+    )
+  }
+  assert.match(loader, /if \(!request\.isCurrent\(\)\) return false/u)
+  assert.match(loader, /setReferenceDataState\('ready'\)/u)
+  assert.match(loader, /setReferenceDataState\('error'\)/u)
+  assert.match(
+    source,
+    /Promise\.all\(\[\s*loadRows\(\),\s*loadReferenceOptions\(\)/u
+  )
+  assert.match(source, /referenceDataState !== 'ready'/u)
+  assert.match(source, /质检来源资料加载失败，请先刷新当前页后重试/u)
+  assert.match(source, /referenceDataReady=\{referenceDataState === 'ready'\}/u)
+})
+
 test('incoming quality create submits only source selectors and customer context', () => {
   const createAction = source.slice(
     source.indexOf('const handleCreateInspection'),
@@ -78,6 +117,17 @@ test('quality page mounts the return modal and marks a successful source once', 
   assert.match(source, /已生成退货/u)
 })
 
+test('quality page preserves the source receipt numeric(20,6) quantity string', () => {
+  assert.match(
+    source,
+    /formatQuantity\(\s*selectedPurchaseReceiptItem\.quantity\s*\)/u
+  )
+  assert.doesNotMatch(
+    source,
+    /decimalNumber\(selectedPurchaseReceiptItem\.quantity/u
+  )
+})
+
 test('quality page names and filters the shared read model by business inspection type', () => {
   assert.match(source, /title="质量检验"/u)
   assert.match(source, /QUALITY_INSPECTION_TYPE_FILTER_OPTIONS/u)
@@ -88,7 +138,7 @@ test('quality page names and filters the shared read model by business inspectio
   assert.match(source, /inspectionTypeFilter === 'OUTSOURCING_RETURN'/u)
   assert.match(source, /inspectionTypeFilter === 'FINISHED_GOODS'/u)
   assert.match(source, /inspectionTypeFilter === 'PRODUCTION_STAGE'/u)
-  assert.match(source, /listProducts/u)
+  assert.match(source, /listAllProducts/u)
   assert.match(source, /productOptions/u)
   assert.match(source, /selectedSourceType === 'PURCHASE_RECEIPT'/u)
   assert.match(source, /source_type: selectedRow\.source_type/u)
@@ -163,11 +213,11 @@ test('production-stage decision summary displays backend business snapshots and 
   )
   assert.match(
     source,
-    /selectedSourceType === 'PRODUCTION_WIP'[\s\S]*?\? \[\]/u
+    /if \(selectedSourceType === 'PRODUCTION_WIP'\) return \[\]/u
   )
   assert.match(
-    source,
-    /if \(isProductionStageQualityInspection\(inspection\)\) return/u
+    summary,
+    /if \(isProductionStageQualityInspection\(inspection\)\)\s*\{\s*return\s*\{/u
   )
   assert.match(
     source,

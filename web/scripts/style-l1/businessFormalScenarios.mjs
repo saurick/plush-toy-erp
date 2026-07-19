@@ -10,6 +10,7 @@ import { createProductionReworkScenarios } from './productionReworkScenarios.mjs
 import { createProductImageSlotScenarios } from './productImageSlotScenarios.mjs'
 import { createProductionWipScenarios } from './productionWipScenarios.mjs'
 import { createQualitySourceActionScenarios } from './qualitySourceActionScenarios.mjs'
+import { stylePaginatedRpcData } from './rpcMockResult.mjs'
 import { createWorkflowSourceTaskFixture } from './workflowSourceTaskFixtures.mjs'
 
 export function createBusinessFormalScenarios(deps) {
@@ -44,6 +45,8 @@ export function createBusinessFormalScenarios(deps) {
     verifySourceImportPicker,
     customerRuntimeEffectiveSession,
   } = deps
+  const compactVisibleText = (value) =>
+    String(value || '').replace(/\s+/gu, '')
   const {
     assertLineItemAddActionScrollsToNewRow,
     assertLineItemDuplicateAction,
@@ -61,6 +64,82 @@ export function createBusinessFormalScenarios(deps) {
       assert,
       assertAntdModalCentered,
     })
+
+  const findSelectionActionButton = async (page, actionName) => {
+    const directButtons = page.locator('button').filter({ hasText: actionName })
+    for (let index = 0; index < (await directButtons.count()); index += 1) {
+      const candidate = directButtons.nth(index)
+      if (
+        (await candidate.isVisible()) &&
+        compactVisibleText(await candidate.innerText()) ===
+          compactVisibleText(actionName)
+      ) {
+        return candidate
+      }
+    }
+
+    const moreButtons = page.getByRole('button', { name: /更多操作/u })
+    let moreButton = null
+    for (let index = 0; index < (await moreButtons.count()); index += 1) {
+      const candidate = moreButtons.nth(index)
+      if (await candidate.isVisible()) moreButton = candidate
+    }
+    if (!moreButton) {
+      const metrics = await page.evaluate(() => ({
+        selectedRows: Array.from(
+          document.querySelectorAll('.ant-table-row-selected')
+        ).map((row) => String(row.textContent || '').replace(/\s+/gu, ' ').trim()),
+        actionBars: Array.from(
+          document.querySelectorAll('.erp-business-module-current-action')
+        ).map((bar) => ({
+          text: String(bar.textContent || '').replace(/\s+/gu, ' ').trim(),
+          buttons: Array.from(bar.querySelectorAll('button')).map((button) => ({
+            text: String(button.textContent || '').replace(/\s+/gu, ' ').trim(),
+            disabled: button.disabled,
+            visible: Boolean(button.offsetWidth || button.offsetHeight),
+          })),
+        })),
+      }))
+      throw new Error(
+        `未找到可触达的操作“${actionName}”: ${JSON.stringify(metrics)}`
+      )
+    }
+    await moreButton.click()
+    const drawer = page.locator('.erp-business-selection-action-drawer:visible')
+    await drawer.waitFor({ state: 'visible' })
+    const overflowButtons = drawer
+      .locator('button')
+      .filter({ hasText: actionName })
+    for (let index = 0; index < (await overflowButtons.count()); index += 1) {
+      const candidate = overflowButtons.nth(index)
+      if (
+        compactVisibleText(await candidate.innerText()) ===
+        compactVisibleText(actionName)
+      ) {
+        await candidate.waitFor({ state: 'visible' })
+        return candidate
+      }
+    }
+    throw new Error(`更多操作中缺少“${actionName}”`)
+  }
+
+  const confirmVisiblePopconfirm = async (page) => {
+    const popconfirm = page.locator('.ant-popconfirm:visible').last()
+    await popconfirm.waitFor({ state: 'visible' })
+    const buttons = popconfirm.locator('button')
+    for (let index = 0; index < (await buttons.count()); index += 1) {
+      const candidate = buttons.nth(index)
+      if (compactVisibleText(await candidate.innerText()) === '确认') {
+        await candidate.click()
+        return
+      }
+    }
+    throw new Error(
+      `确认弹层缺少“确认”按钮: ${String((await popconfirm.innerText()) || '')
+        .replace(/\s+/gu, ' ')
+        .trim()}`
+    )
+  }
 
   const assertBusinessViewTabNeutralStyle = async (
     page,
@@ -536,6 +615,204 @@ export function createBusinessFormalScenarios(deps) {
     )
   }
 
+  const installShipmentSourceCandidateContract = async (page) => {
+    let failShipmentSourcesOnce = true
+    const shipmentSourceCandidateParams = []
+    const unscopedSalesOrderItemRequests = []
+    page.on('request', (request) => {
+      if (!request.url().includes('/rpc/sales_order')) return
+      try {
+        const body = request.postDataJSON() || {}
+        if (
+          body.method === 'list_sales_order_items' &&
+          !Number(body.params?.sales_order_id || 0)
+        ) {
+          unscopedSalesOrderItemRequests.push(body.params || {})
+        }
+      } catch {
+        // 非 JSON-RPC 请求不参与来源合同断言。
+      }
+    })
+    await page.route('**/rpc/operational_fact', async (route) => {
+      const body = route.request().postDataJSON() || {}
+      if (body.method === 'list_shipment_source_candidates') {
+        shipmentSourceCandidateParams.push(body.params || {})
+        if (!failShipmentSourcesOnce) {
+          await route.fallback()
+          return
+        }
+        failShipmentSourcesOnce = false
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            jsonrpc: '2.0',
+            id: body.id || 'business-v1-shipment-source-error',
+            result: {
+              code: 50000,
+              message: '加载销售订单来源失败',
+              data: {},
+            },
+          }),
+        })
+        return
+      }
+      await route.fallback()
+    })
+    return { shipmentSourceCandidateParams, unscopedSalesOrderItemRequests }
+  }
+
+  const verifyShipmentSourceCandidateContract = async (
+    page,
+    modal,
+    { shipmentSourceCandidateParams, unscopedSalesOrderItemRequests }
+  ) => {
+    const sourceTrigger = modal
+      .getByRole('button', { name: '从销售订单导入' })
+      .first()
+    await sourceTrigger.click()
+    const failedPicker = page
+      .locator('.erp-source-import-picker-modal.ant-modal:visible')
+      .last()
+    await failedPicker.waitFor({ state: 'visible', timeout: 10_000 })
+    await expectText(page, '加载销售订单来源失败')
+    await failedPicker.locator('.ant-input').first().fill('SO-STYLE-L1')
+    await failedPicker
+      .getByText('SO-STYLE-L1', { exact: true })
+      .first()
+      .waitFor({ timeout: 10_000 })
+    assert.equal(
+      await failedPicker.isVisible(),
+      true,
+      '出货来源首次加载失败后应保留弹窗，并允许搜索重试'
+    )
+    await failedPicker
+      .getByText('从销售订单导入出货明细', { exact: true })
+      .waitFor({ state: 'visible' })
+    for (const headerText of [
+      '销售订单号',
+      '来源行',
+      '客户',
+      '产品 / SKU',
+      '剩余可出货',
+    ]) {
+      await failedPicker
+        .locator('.ant-table-thead th')
+        .getByText(headerText, { exact: true })
+        .waitFor({ state: 'visible' })
+    }
+    const sourceTable = failedPicker.locator('.ant-table-container')
+    await sourceTable
+      .getByText('SO-STYLE-L1', { exact: true })
+      .first()
+      .waitFor({ state: 'visible' })
+    await sourceTable
+      .getByText('PROD-STYLE-L1-01', { exact: false })
+      .first()
+      .waitFor({ state: 'visible' })
+    const searchInput = failedPicker.locator('.ant-input').first()
+    await searchInput.fill('NO-SOURCE-IMPORT-RESULT')
+    await failedPicker
+      .getByText('暂无可导入销售订单行', { exact: true })
+      .waitFor({ state: 'visible', timeout: 10_000 })
+    await searchInput.fill('')
+    const firstPageSourceRow = failedPicker
+      .locator('.ant-table-row')
+      .filter({ hasText: 'PROD-STYLE-L1-01' })
+      .first()
+    await firstPageSourceRow.waitFor({ state: 'visible', timeout: 10_000 })
+    await firstPageSourceRow
+      .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
+      .first()
+      .click()
+    await expectText(page, '已选 1 条')
+    await failedPicker.locator('.ant-pagination-item-2').click()
+    const secondPageSourceRow = failedPicker
+      .locator('.ant-table-row')
+      .filter({ hasText: 'PROD-STYLE-L1-21' })
+      .first()
+    await secondPageSourceRow.waitFor({ state: 'visible', timeout: 10_000 })
+    await secondPageSourceRow
+      .locator('.ant-checkbox-wrapper, .ant-radio-wrapper')
+      .first()
+      .click()
+    await expectText(page, '已选 2 条')
+    await failedPicker
+      .locator('.erp-source-import-picker__footer-actions .ant-btn-primary')
+      .last()
+      .click()
+    await failedPicker.waitFor({ state: 'hidden', timeout: 10_000 })
+    await expectText(page, '已导入销售订单来源行和剩余可出货数量')
+    await modal.waitFor({ state: 'visible', timeout: 10_000 })
+    await expectText(page, '销售订单行追溯')
+    assert.equal(
+      await modal.getByText('销售订单行追溯', { exact: true }).count(),
+      2,
+      '跨页选择的两条销售订单来源行都应导入出货明细'
+    )
+    assert.equal(
+      await modal.getByRole('button', { name: '添加条目' }).isDisabled(),
+      true,
+      '导入销售订单来源后应锁定为同一来源，禁止手工混加无来源明细'
+    )
+    assert.equal(
+      unscopedSalesOrderItemRequests.length,
+      0,
+      `出货来源选择器不得回退无 sales_order_id 的明细列表: ${JSON.stringify(
+        unscopedSalesOrderItemRequests
+      )}`
+    )
+    assert(
+      shipmentSourceCandidateParams.length >= 4,
+      `出货来源选择器应覆盖打开失败、搜索重试、空结果和恢复导入: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    const allowedSourceKeys = new Set([
+      'keyword',
+      'sales_order_id',
+      'limit',
+      'offset',
+    ])
+    for (const params of shipmentSourceCandidateParams) {
+      assert(
+        Object.keys(params).every((key) => allowedSourceKeys.has(key)),
+        `出货来源候选请求包含非合同字段: ${JSON.stringify(params)}`
+      )
+      assert(
+        Number(params.limit || 0) > 0 &&
+          Number(params.limit || 0) <= 200 &&
+          Number(params.offset || 0) >= 0,
+        `出货来源候选必须使用服务端分页: ${JSON.stringify(params)}`
+      )
+    }
+    assert(
+      shipmentSourceCandidateParams.some(
+        (params) => params.keyword === 'SO-STYLE-L1'
+      ),
+      `出货来源搜索必须发送服务端 keyword: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    assert(
+      shipmentSourceCandidateParams.some(
+        (params) => params.keyword === 'NO-SOURCE-IMPORT-RESULT'
+      ),
+      `出货来源空结果必须来自服务端搜索: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    assert(
+      shipmentSourceCandidateParams.some(
+        (params) => Number(params.offset) === 20
+      ),
+      `出货来源第二页必须发送 offset=20: ${JSON.stringify(
+        shipmentSourceCandidateParams
+      )}`
+    )
+    await assertTextAbsent(page, 'sales_order_item_id 追溯')
+  }
+
   return [
     ...createOutsourcingSourceFactScenarios(deps),
     ...createProductionSourceInboundLotScenarios(deps),
@@ -887,7 +1164,7 @@ export function createBusinessFormalScenarios(deps) {
               .trim(),
           }))
         assert(
-          weightColumnMetrics.headers.includes('总净重（克）') &&
+          weightColumnMetrics.headers.includes('实际/最终总净重（克）') &&
             weightColumnMetrics.text.includes('待确认'),
           `出货列表应显示总净重列和草稿待确认状态: ${JSON.stringify(
             weightColumnMetrics
@@ -1043,7 +1320,10 @@ export function createBusinessFormalScenarios(deps) {
         configHash: 'style-l1-bom-person-field-labels-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: [],
-        actions: ['workflow.task.create', 'workflow.task.read'],
+        actions: [
+          'workflow.task.create',
+          'workflow.task.read',
+        ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['engineering'],
         },
@@ -1206,10 +1486,19 @@ export function createBusinessFormalScenarios(deps) {
           scenarioName: 'business-row-double-click-quality-inspection',
           screenshotName:
             'business-v1-quality-inspection-double-click-details',
-          afterModalOpen: async () => {
-            await expectText(page, 'PR-STYLE-L1')
-            await expectText(page, 'INV-LOT-001')
-            await expectText(page, '质检附件')
+          afterModalOpen: async (modal) => {
+            await modal
+              .getByText('PR-STYLE-L1', { exact: false })
+              .first()
+              .waitFor({ state: 'visible' })
+            await modal
+              .getByText('INV-LOT-001', { exact: false })
+              .first()
+              .waitFor({ state: 'visible' })
+            await modal
+              .getByText('质检附件', { exact: false })
+              .first()
+              .waitFor({ state: 'visible' })
           },
         })
 
@@ -1230,6 +1519,33 @@ export function createBusinessFormalScenarios(deps) {
       },
     },
     {
+      name: 'shipment-source-candidates-desktop',
+      path: '/erp/warehouse/shipments',
+      auth: 'admin',
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '出货单')
+        await expectButton(page, '新建草稿')
+        const shipmentSourceContract =
+          await installShipmentSourceCandidateContract(page)
+        await verifyBusinessActionFormModal(page, {
+          buttonName: '新建草稿',
+          titleText: '新建出货单',
+          minFieldCount: 12,
+          screenshotName: 'shipment-source-candidates-desktop',
+          expectedTexts: ['出货明细', '从销售订单导入', '产品', '仓库'],
+          afterOpen: async (modal) => {
+            await verifyShipmentSourceCandidateContract(
+              page,
+              modal,
+              shipmentSourceContract
+            )
+          },
+        })
+      },
+    },
+    {
       name: 'business-core-pages-desktop',
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
@@ -1238,7 +1554,11 @@ export function createBusinessFormalScenarios(deps) {
         configHash: 'style-l1-business-core-pages-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: [],
-        actions: ['workflow.task.create', 'workflow.task.read'],
+        actions: [
+          'production.fact.cancel',
+          'workflow.task.create',
+          'workflow.task.read',
+        ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['production', 'warehouse', 'sales'],
         },
@@ -1596,6 +1916,7 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '375 克')
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-standard-product-skus',
+          unsortableHeaders: ['SKU 单重（净重）'],
         })
         await page.getByRole('button', { name: '新建产品规格' }).click()
         await expectText(page, '新建产品规格')
@@ -1686,7 +2007,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessHeaderStatsSingleLine(page, {
           scenarioName: 'business-standard-bom',
-          expectedLabels: ['总BOM', '本页显示', '已激活'],
+          expectedLabels: ['物料清单总数', '本页显示', '已生效'],
         })
         await assertBusinessFormModalKeyboardRecovery(page, {
           triggerName: '新建草稿',
@@ -2163,7 +2484,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '库存台账')
         await expectText(page, '余额只读')
-        await expectText(page, '页面模式')
+        await expectText(page, '查看内容')
         await expectText(page, '12.5')
         await expectText(page, '已预留')
         await expectText(page, '4')
@@ -2202,12 +2523,14 @@ export function createBusinessFormalScenarios(deps) {
             !selects[2]?.classList.contains('ant-select-disabled')
           )
         })
-        await inventoryFilterSelects.nth(2).click()
-        await page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+        const inventorySKUFilter = inventoryFilterSelects.nth(2)
+        await inventorySKUFilter.click()
+        await inventorySKUFilter.locator('input').fill('SKU-STYLE-L1')
+        await page.keyboard.press('Enter')
+        await inventorySKUFilter
+          .locator('.ant-select-selection-item')
           .filter({ hasText: 'SKU-STYLE-L1' })
-          .click()
-        await expectText(page, 'SKU-STYLE-L1')
+          .waitFor({ state: 'visible' })
         const inventorySKUMetrics = await page.evaluate(() => {
           const filters = document.querySelector(
             '.erp-v1-inventory-ledger-page .erp-business-operation-panel__filters'
@@ -2336,12 +2659,11 @@ export function createBusinessFormalScenarios(deps) {
                 result: {
                   code: 0,
                   message: 'OK',
-                  data: {
-                    inventory_balances: [],
-                    total: 0,
-                    limit: 100,
-                    offset: 0,
-                  },
+                  data: stylePaginatedRpcData(
+                    [],
+                    'inventory_balances',
+                    body.params || {}
+                  ),
                 },
               }),
             })
@@ -2383,8 +2705,8 @@ export function createBusinessFormalScenarios(deps) {
         await expectText(page, '撤销调整')
         await expectText(page, '其他来源')
         await expectText(page, '未提供业务单号')
-        await expectText(page, '已关联来源行')
-        await expectText(page, '已关联原流水')
+        await expectText(page, '已关联来源明细')
+        await expectText(page, '已关联原库存变动记录')
         await expectText(page, 'ledger seed')
         await assertTextAbsent(page, 'MANUAL_SEED')
         await assertTextAbsent(page, 'INV-TXN-001')
@@ -2405,7 +2727,11 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
         await assertTextAbsent(page, 'quality_inspections')
-        await expectText(page, '不合格退供应商仍走采购退货')
+        await expectText(page, '首次到货检验不合格会阻止本单入库')
+        await expectText(
+          page,
+          '退供应商草稿只适用于已入库后追加检验不合格'
+        )
         await expectText(page, 'QI-STYLE-L1')
         await expectText(page, 'PR-STYLE-L1')
         await expectText(page, 'INV-LOT-001')
@@ -2432,8 +2758,9 @@ export function createBusinessFormalScenarios(deps) {
             '质检单号',
             '状态',
             '判定',
+            '估算不良比例',
             '检验来源',
-            '检验对象 / 批次',
+            '产品 / 材料 / 在制品',
             '检验信息',
             '判定备注',
           ],
@@ -2456,7 +2783,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-v1-quality-inspections',
-          unsortableHeaders: ['判定备注'],
+          unsortableHeaders: ['估算不良比例', '判定备注'],
         })
         await assertNoListDeleteTrashToolbar(page)
         let forceEmptyQualityInspections = false
@@ -2477,12 +2804,11 @@ export function createBusinessFormalScenarios(deps) {
                 result: {
                   code: 0,
                   message: 'OK',
-                  data: {
-                    quality_inspections: [],
-                    total: 0,
-                    limit: 100,
-                    offset: 0,
-                  },
+                  data: stylePaginatedRpcData(
+                    [],
+                    'quality_inspections',
+                    body.params || {}
+                  ),
                 },
               }),
             })
@@ -2567,9 +2893,24 @@ export function createBusinessFormalScenarios(deps) {
         })
         await expectHeading(page, '出货单')
         await expectButton(page, '新建草稿')
-        await expectText(page, '计划出货日期')
-        await expectText(page, '实际出货日期')
-        await expectText(page, '总净重（克）')
+        for (const headerText of [
+          '实际 / 最终总净重（克）',
+          '计划出货日期 / 实际出货日期',
+        ]) {
+          const header = page
+            .locator(
+              '.erp-v1-shipments-page .erp-business-data-table-card .ant-table-thead th'
+            )
+            .filter({ hasText: headerText })
+            .first()
+          await header.waitFor({ state: 'visible' })
+          const headerLabel = header.getByText(headerText, { exact: true })
+          await headerLabel.waitFor({ state: 'visible' })
+          assert.equal(
+            String(await headerLabel.textContent()).trim(),
+            headerText
+          )
+        }
         await expectText(page, '待确认')
         await expectText(page, 'SHIP-STYLE-L1')
         await assertUnifiedListToolbarShell(page, {
@@ -2578,7 +2919,25 @@ export function createBusinessFormalScenarios(deps) {
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'business-v1-shipments',
         })
-        await page.getByText('SHIP-STYLE-L1', { exact: true }).click()
+        const shipmentDraftRow = page
+          .locator(
+            '.erp-v1-shipments-page .erp-business-data-table-card .ant-table-tbody .ant-table-row'
+          )
+          .filter({ hasText: 'SHIP-STYLE-L1' })
+          .first()
+        await shipmentDraftRow.click()
+        await shipmentDraftRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible' })
+        const cancelShipmentDraftButton = await findSelectionActionButton(
+          page,
+          '作废草稿'
+        )
+        assert.equal(await cancelShipmentDraftButton.isDisabled(), false)
+        await cancelShipmentDraftButton.click()
+        await confirmVisiblePopconfirm(page)
+        await expectText(page, '作废出货草稿已完成')
+        await expectText(page, '已取消')
         let emptiedShipmentsOnce = false
         await page.route('**/rpc/operational_fact', async (route) => {
           const body = route.request().postDataJSON() || {}
@@ -2597,7 +2956,11 @@ export function createBusinessFormalScenarios(deps) {
                 result: {
                   code: 0,
                   message: 'OK',
-                  data: { shipments: [], total: 0, limit: 100, offset: 0 },
+                  data: stylePaginatedRpcData(
+                    [],
+                    'shipments',
+                    body.params || {}
+                  ),
                 },
               }),
             })
@@ -2635,32 +2998,8 @@ export function createBusinessFormalScenarios(deps) {
           titleText: '新建出货单',
           scenarioName: 'business-v1-shipments',
         })
-        let emptyShipmentSourcesOnce = false
-        await page.route('**/rpc/operational_fact', async (route) => {
-          const body = route.request().postDataJSON() || {}
-          if (
-            !emptyShipmentSourcesOnce &&
-            body.method === 'list_shipments' &&
-            Number(body.params?.limit || 0) === 500
-          ) {
-            emptyShipmentSourcesOnce = true
-            await route.fulfill({
-              status: 200,
-              contentType: 'application/json',
-              body: JSON.stringify({
-                jsonrpc: '2.0',
-                id: body.id || 'business-v1-shipment-source-import',
-                result: {
-                  code: 0,
-                  message: 'OK',
-                  data: { shipments: [], total: 0, limit: 500, offset: 0 },
-                },
-              }),
-            })
-            return
-          }
-          await route.fallback()
-        })
+        const shipmentSourceContract =
+          await installShipmentSourceCandidateContract(page)
         await verifyBusinessActionFormModal(page, {
           buttonName: '新建草稿',
           titleText: '新建出货单',
@@ -2675,36 +3014,22 @@ export function createBusinessFormalScenarios(deps) {
             '实际总净重（克）',
           ],
           afterOpen: async (modal) => {
-            await verifySourceImportPicker(page, {
-              parentModal: modal,
-              triggerButton: '从销售订单导入',
-              titleText: '从销售订单导入出货明细',
-              expectedTexts: [
-                '销售订单号',
-                '来源行',
-                '客户',
-                '剩余可出货',
-                'SO-STYLE-L1',
-                'PROD-STYLE-L1',
-              ],
-              emptyDescriptionText: '暂无可导入销售订单行',
-              selectText: 'SO-STYLE-L1',
-              importAndExpectText: '销售订单行追溯',
-              scenarioName: 'shipment-source-import-picker',
-            })
-            await assertTextAbsent(page, 'sales_order_item_id 追溯')
-            await expectText(page, '预计总净重：4250 克')
-            await modal.screenshot({
-              path: path.join(
-                outputDir,
-                'business-v1-shipment-create-predicted-weight.png'
-              ),
-            })
             await assertLineItemAddActionScrollsToNewRow(modal, {
               scenarioName: 'business-v1-shipment-create-form-modal',
               targetRowCount: 5,
               listSelector: '.erp-master-contact-list__items',
               rowSelector: '.erp-master-contact-list__row',
+            })
+            await verifyShipmentSourceCandidateContract(
+              page,
+              modal,
+              shipmentSourceContract
+            )
+            await modal.screenshot({
+              path: path.join(
+                outputDir,
+                'business-v1-shipment-create-predicted-weight.png'
+              ),
             })
           },
         })
@@ -2761,7 +3086,7 @@ export function createBusinessFormalScenarios(deps) {
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'business-v1-shipments',
-          unsortableHeaders: ['备注'],
+          unsortableHeaders: ['实际 / 最终总净重（克）', '备注'],
         })
         await assertNoHorizontalOverflow(page, 'business-v1-shipments')
 
@@ -3071,7 +3396,16 @@ export function createBusinessFormalScenarios(deps) {
             await assertWorkflowDueDateRangeFilterLayout(page, {
               scenarioName: 'business-workflow-shipping-release',
             })
-            await expectText(page, '待办')
+            const shippingReleaseTaskRow = page
+              .locator(
+                '.erp-business-data-table-card .ant-table-tbody .ant-table-row'
+              )
+              .filter({ hasText: 'SHIP-REL-L1' })
+              .first()
+            await shippingReleaseTaskRow.waitFor({ state: 'visible' })
+            await shippingReleaseTaskRow
+              .getByText('可执行', { exact: true })
+              .waitFor({ state: 'visible' })
             await expectText(page, '出货放行协同确认')
             await expectText(page, 'SHIP-REL-L1')
             await assertTextAbsent(page, '同来源非放行任务')
@@ -3080,8 +3414,8 @@ export function createBusinessFormalScenarios(deps) {
               scenarioName:
                 'business-workflow-shipping-release-attachment-modal',
               rowText: 'SHIP-REL-L1',
-              modalTitle: '协同任务附件',
-              panelTitle: '协同任务附件',
+              modalTitle: '任务附件',
+              panelTitle: '任务附件',
             })
 
             let failedListTasksOnce = false
@@ -3107,7 +3441,7 @@ export function createBusinessFormalScenarios(deps) {
               await route.fallback()
             })
             await page.getByRole('button', { name: '刷新当前页' }).click()
-            await expectText(page, '加载出货放行协同任务失败')
+            await expectText(page, '加载出货放行任务失败')
             await expectText(page, '暂无出货放行任务。')
             await assertTextAbsent(page, '出货放行协同确认')
 
@@ -3122,14 +3456,22 @@ export function createBusinessFormalScenarios(deps) {
               .filter({ hasText: '出货放行刷新后协同确认' })
               .first()
             await refreshedTaskRow.click()
-            await expectButton(page, '查看任务')
+            const viewTaskButton = await findSelectionActionButton(
+              page,
+              '查看任务'
+            )
             assert.equal(
-              await page
-                .getByRole('button', { name: '查看任务', exact: true })
-                .isDisabled(),
+              await viewTaskButton.isDisabled(),
               false,
               '选中主任务表记录后应允许查看当前任务'
             )
+            const actionDrawer = page.locator(
+              '.erp-business-selection-action-drawer:visible'
+            )
+            if (await actionDrawer.count()) {
+              await page.keyboard.press('Escape')
+              await actionDrawer.waitFor({ state: 'hidden' })
+            }
             await expectNoButton(page, '处理')
 
             let emptiedListTasksOnce = false
@@ -3245,6 +3587,22 @@ export function createBusinessFormalScenarios(deps) {
         await assertTextAbsent(page, '登记生产事实')
         await assertTextAbsent(page, '幂等键')
         await assertTextAbsent(page, '内部引用')
+        const productionDraftRow = page
+          .locator('.erp-business-data-table-card .ant-table-tbody .ant-table-row')
+          .filter({ hasText: 'PROD-FACT-L1' })
+          .first()
+        await productionDraftRow.click()
+        await productionDraftRow
+          .and(page.locator('.ant-table-row-selected'))
+          .waitFor({ state: 'visible' })
+        const cancelProductionDraftButton = await findSelectionActionButton(
+          page,
+          '作废草稿'
+        )
+        assert.equal(await cancelProductionDraftButton.isDisabled(), false)
+        await cancelProductionDraftButton.click()
+        await confirmVisiblePopconfirm(page)
+        await expectText(page, '作废草稿已完成')
         await assertNoHorizontalOverflow(
           page,
           'business-v1-production-progress'
@@ -3997,7 +4355,7 @@ export function createBusinessFormalScenarios(deps) {
           )
           await releaseButton.click()
           await page.getByRole('button', { name: '确认发布' }).click()
-          await expectText(page, '生产订单发布成功')
+          await expectText(page, '生产订单已发布，排程任务已进入 PMC 待办')
 
           await page
             .getByText('MO-STYLE-L1-20260713', { exact: true })
@@ -4013,13 +4371,26 @@ export function createBusinessFormalScenarios(deps) {
           await detailModal
             .getByText(/物料需求已按发布时的 BOM 冻结/u)
             .waitFor()
-          await detailModal
-            .getByText('MAT-STYLE-L1', { exact: false })
-            .waitFor()
-          await detailModal
-            .getByText('样式短毛绒布', { exact: false })
-            .waitFor()
-          await detailModal.getByText('8.000000', { exact: true }).waitFor()
+          const materialRequirementCells = detailModal
+            .locator('.ant-table-cell:visible')
+            .filter({ hasText: 'MAT-STYLE-L1 / 样式短毛绒布' })
+          await materialRequirementCells.first().waitFor()
+          assert(
+            (await materialRequirementCells.allInnerTexts()).every(
+              (text) => text.trim() === 'MAT-STYLE-L1 / 样式短毛绒布'
+            ),
+            '生产订单详情中的物料需求单元格应保持代码与名称完整'
+          )
+          const remainingQuantityCells = detailModal
+            .locator('.ant-table-cell:visible')
+            .filter({ hasText: /^8\.000000$/u })
+          await remainingQuantityCells.first().waitFor()
+          assert(
+            (await remainingQuantityCells.allInnerTexts()).every(
+              (text) => text.trim() === '8.000000'
+            ),
+            '生产订单详情中的剩余可领数量应保持定点小数展示'
+          )
           if (
             (await detailModal
               .getByRole('button', { name: /领\s*料/u })
@@ -4102,7 +4473,8 @@ export function createBusinessFormalScenarios(deps) {
               subject_id: 1,
               warehouse_id: 1,
               status: 'ACTIVE',
-              limit: 500,
+              limit: 200,
+              offset: 0,
             },
           ])
           assert.equal(
@@ -4220,12 +4592,12 @@ export function createBusinessFormalScenarios(deps) {
                   result: {
                     code: 0,
                     message: 'OK',
-                    data: {
-                      tasks: [readonlyShipmentReleaseTask],
-                      total: 1,
-                      limit: 100,
-                      offset: 0,
-                    },
+                    data: stylePaginatedRpcData(
+                      [readonlyShipmentReleaseTask],
+                      'tasks',
+                      body.params || {},
+                      10
+                    ),
                   },
                 }),
               })
@@ -4346,14 +4718,16 @@ export function createBusinessFormalScenarios(deps) {
             exportDisabled: true,
             exportTooltip: '当前页面只用于处理任务，暂不提供业务数据导出。',
           })
-          await expectText(page, '待办')
           await expectText(page, '出货放行只读协同确认')
           await expectText(page, 'SHIP-REL-READONLY')
-          await page
+          const readonlyShippingReleaseRow = page
             .locator('.ant-table-row')
             .filter({ hasText: '出货放行只读协同确认' })
             .first()
-            .click()
+          await readonlyShippingReleaseRow
+            .getByText('可执行', { exact: true })
+            .waitFor({ state: 'visible' })
+          await readonlyShippingReleaseRow.click()
           for (const actionLabel of [
             '完成任务',
             '标记阻塞',

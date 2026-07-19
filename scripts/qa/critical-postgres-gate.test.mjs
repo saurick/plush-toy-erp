@@ -13,9 +13,11 @@ function read(relativePath) {
 
 test('full and strict require the isolated PostgreSQL critical transaction gate', () => {
   const full = read('scripts/qa/full.sh')
+  const fast = read('scripts/qa/fast.sh')
   const strict = read('scripts/qa/strict.sh')
   const makefile = read('server/Makefile')
   const pgScript = read('scripts/purchase-receipt-pg.sh')
+  const criticalTestConfig = read('scripts/qa/critical-postgres-tests.sh')
   const workflowConcurrency = read(
     'server/internal/data/workflow_repo_postgres_concurrency_test.go',
   )
@@ -31,6 +33,9 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   )
   const productionOrderConcurrency = read(
     'server/internal/data/production_order_postgres_concurrency_test.go',
+  )
+  const productionWIPQualityConcurrency = read(
+    'server/internal/data/production_wip_quality_inspection_repo_test.go',
   )
 
   assert.match(
@@ -119,6 +124,33 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
   assert.match(pgScript, /PURCHASE_RETURN_PG_TEST=1/u)
   assert.match(pgScript, /go test -json/u)
   assert.match(pgScript, /verify-go-test-json\.mjs/u)
+  for (const gateSource of [full, fast, pgScript]) {
+    assert.match(gateSource, /critical-postgres-tests\.sh/u)
+    assert.match(gateSource, /CRITICAL_POSTGRES_TEST_PATTERN/u)
+  }
+  assert.doesNotMatch(full, /\^Test\.\*Postgres\.\*\$/u)
+  assert.doesNotMatch(fast, /Test\.\*Postgres/u)
+  const patternSource = criticalTestConfig.match(
+    /CRITICAL_POSTGRES_TEST_PATTERN='([^']+)'/u,
+  )?.[1]
+  assert.ok(patternSource, 'critical PostgreSQL shared pattern must be declared')
+  const criticalPattern = new RegExp(patternSource, 'u')
+  for (const testName of [
+    'TestSourceDocumentPostgresShipmentCreateVsSalesCancelUsesOneSourceLock',
+    'TestProcessRuntimePostgresSourceTransitionRace',
+  ]) {
+    assert.equal(criticalPattern.test(testName), true, testName)
+  }
+  for (const ordinaryTestName of [
+    'TestSafePostgresIdentifier',
+    'TestPostgresSQLSpanRedaction',
+  ]) {
+    assert.equal(
+      criticalPattern.test(ordinaryTestName),
+      false,
+      `${ordinaryTestName} is a normal unit test and must remain in fast/full`,
+    )
+  }
   assert.match(
     pgScript,
     /INVENTORY_PG_TEST_DB_URL="\$PURCHASE_RECEIPT_PG_DB_URL"/u,
@@ -131,6 +163,7 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     'TestPurchaseReturnFromQualityInspectionPostgres',
     'TestQualityInspectionPostgres',
     'TestQualityInspectionFromOutsourcingReturnPostgres',
+    'TestProductionWIPQualityInspectionPostgres',
     'TestSourceFinanceSnapshotBackfillMigrationPostgres',
     'TestWorkflowPostgres',
     'TestCustomerConfigPostgres',
@@ -152,7 +185,10 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
     'TestFinanceProcessCommandPostgres',
     'TestSalesProcessCommandPostgres',
   ]) {
-    assert(pgScript.includes(testPrefix), `critical PostgreSQL gate must include ${testPrefix}`)
+    assert(
+      criticalTestConfig.includes(testPrefix),
+      `critical PostgreSQL gate must include ${testPrefix}`,
+    )
   }
 
   for (const testName of [
@@ -213,6 +249,12 @@ test('full and strict require the isolated PostgreSQL critical transaction gate'
       `critical PostgreSQL contract must keep ${testName}`,
     )
   }
+
+  assert.match(
+    productionWIPQualityConcurrency,
+    /func TestProductionWIPQualityInspectionPostgresConcurrentDecision\(/u,
+    'critical PostgreSQL contract must keep the WIP quality decision concurrency winner',
+  )
 })
 
 test('full and strict require the fail-closed populated upgrade PostgreSQL gate', () => {

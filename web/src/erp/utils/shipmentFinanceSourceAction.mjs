@@ -13,9 +13,22 @@ const ACTIONS = Object.freeze({
     okText: '生成开票草稿',
     factType: 'INVOICE',
     factNoPrefix: 'INV',
+    requiresInvoiceCategory: true,
     successMessage: '开票记录草稿已生成，请到发票管理核对并确认',
   }),
 })
+
+export const SHIPMENT_FINANCE_INVOICE_CATEGORY_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'NONE', label: '不开票' }),
+  Object.freeze({ value: 'EXPORT_GENERAL', label: '出口普通发票' }),
+  Object.freeze({ value: 'VAT_GENERAL_1', label: '增值税普通发票 1%' }),
+  Object.freeze({ value: 'VAT_SPECIAL_3', label: '增值税专用发票 3%' }),
+  Object.freeze({ value: 'VAT_SPECIAL_13', label: '增值税专用发票 13%' }),
+])
+
+const SHIPMENT_FINANCE_INVOICE_CATEGORIES = new Set(
+  SHIPMENT_FINANCE_INVOICE_CATEGORY_OPTIONS.map((item) => item.value)
+)
 
 function positiveID(value) {
   const parsed = Number(value || 0)
@@ -40,7 +53,12 @@ export function localDateTimeInputValue(now = new Date()) {
   return new Date(timestamp - offset).toISOString().slice(0, 16)
 }
 
-export function buildShipmentFinanceSourcePayload(values = {}, shipment = {}) {
+export function buildShipmentFinanceSourcePayload(
+  values = {},
+  shipment = {},
+  action = 'receivable'
+) {
+  const config = shipmentFinanceSourceActionConfig(action)
   if (String(shipment?.status || '').toUpperCase() !== 'SHIPPED') {
     throw new Error('仅已确认出货的出货单可以生成财务记录')
   }
@@ -63,9 +81,23 @@ export function buildShipmentFinanceSourcePayload(values = {}, shipment = {}) {
   const note = String(values.note || '').trim()
   if ([...note].length > 255) throw new Error('备注不能超过 255 个字符')
 
+  const invoiceCategory = String(values.invoice_category || '')
+    .trim()
+    .toUpperCase()
+  if (config.requiresInvoiceCategory) {
+    if (!SHIPMENT_FINANCE_INVOICE_CATEGORIES.has(invoiceCategory)) {
+      throw new Error('请选择有效的发票类别')
+    }
+  } else if (invoiceCategory) {
+    throw new Error('应收记录不填写发票类别')
+  }
+
   return {
     shipment_id: shipmentID,
     ...(occurredAt ? { occurred_at: occurredAt } : {}),
     ...(note ? { note } : {}),
+    ...(config.requiresInvoiceCategory
+      ? { invoice_category: invoiceCategory }
+      : {}),
   }
 }

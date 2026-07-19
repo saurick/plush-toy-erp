@@ -750,13 +750,14 @@ func TestJsonrpcDispatcher_ListWarehousesUsesInventoryReadPermission(t *testing.
 
 func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *testing.T) {
 	params := mustJSONRPCStruct(t, map[string]any{
-		"code":                " PROC-SEW ",
-		"name":                " 车缝 ",
-		"category":            " 委外车缝 ",
-		"outsourcing_enabled": true,
-		"inhouse_enabled":     true,
-		"quality_required":    true,
-		"sort_order":          float64(20),
+		"code":                            " PROC-SEW ",
+		"name":                            " 车缝 ",
+		"category":                        " 委外车缝 ",
+		"production_route_operation_code": " sewing ",
+		"outsourcing_enabled":             true,
+		"inhouse_enabled":                 true,
+		"quality_required":                true,
+		"sort_order":                      float64(20),
 	})
 
 	j := newMasterDataJSONRPCTestData(t,
@@ -788,6 +789,8 @@ func TestJsonrpcDispatcher_ProcessAPIRequiresPermissionAndKeepsFlexibleFlags(t *
 		repo.createdProcess.Name != "车缝" ||
 		repo.createdProcess.Category == nil ||
 		*repo.createdProcess.Category != "委外车缝" ||
+		repo.createdProcess.ProductionRouteOperationCode == nil ||
+		*repo.createdProcess.ProductionRouteOperationCode != biz.ProductionWIPOperationSewing ||
 		repo.createdProcess.OutsourcingEnabled != true ||
 		repo.createdProcess.InhouseEnabled != true ||
 		repo.createdProcess.QualityRequired != true ||

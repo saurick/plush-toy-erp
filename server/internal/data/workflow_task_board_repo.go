@@ -184,23 +184,7 @@ func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.W
 
 func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) (*ent.WorkflowTaskQuery, error) {
 	if filter.Keyword != "" {
-		query = query.Where(workflowtask.Or(
-			workflowtask.TaskCodeContainsFold(filter.Keyword),
-			workflowtask.TaskGroupContainsFold(filter.Keyword),
-			workflowtask.TaskNameContainsFold(filter.Keyword),
-			workflowtask.SourceTypeContainsFold(filter.Keyword),
-			workflowtask.SourceNoContainsFold(filter.Keyword),
-			workflowtask.BusinessStatusKeyContainsFold(filter.Keyword),
-			workflowtask.OwnerRoleKeyContainsFold(filter.Keyword),
-			workflowTaskBoardPayloadKeywordPredicate(filter.Keyword, "record_title", "module_title"),
-			workflowtask.And(
-				workflowtask.TaskStatusKeyIn("blocked", "rejected"),
-				workflowtask.Or(
-					workflowtask.BlockedReasonContainsFold(filter.Keyword),
-					workflowTaskBoardPayloadKeywordPredicate(filter.Keyword, "blocked_reason", "rejected_reason"),
-				),
-			),
-		))
+		query = query.Where(workflowTaskKeywordPredicate(filter.Keyword))
 	}
 	if filter.SourceType != "" {
 		query = query.Where(workflowtask.SourceType(filter.SourceType))
@@ -222,7 +206,27 @@ func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.Work
 	return query, nil
 }
 
-func workflowTaskBoardPayloadKeywordPredicate(keyword string, paths ...string) predicate.WorkflowTask {
+func workflowTaskKeywordPredicate(keyword string) predicate.WorkflowTask {
+	return workflowtask.Or(
+		workflowtask.TaskCodeContainsFold(keyword),
+		workflowtask.TaskGroupContainsFold(keyword),
+		workflowtask.TaskNameContainsFold(keyword),
+		workflowtask.SourceTypeContainsFold(keyword),
+		workflowtask.SourceNoContainsFold(keyword),
+		workflowtask.BusinessStatusKeyContainsFold(keyword),
+		workflowtask.OwnerRoleKeyContainsFold(keyword),
+		workflowTaskPayloadKeywordPredicate(keyword, "record_title", "module_title"),
+		workflowtask.And(
+			workflowtask.TaskStatusKeyIn("blocked", "rejected"),
+			workflowtask.Or(
+				workflowtask.BlockedReasonContainsFold(keyword),
+				workflowTaskPayloadKeywordPredicate(keyword, "blocked_reason", "rejected_reason"),
+			),
+		),
+	)
+}
+
+func workflowTaskPayloadKeywordPredicate(keyword string, paths ...string) predicate.WorkflowTask {
 	return predicate.WorkflowTask(func(selector *entsql.Selector) {
 		predicates := make([]*entsql.Predicate, 0, len(paths))
 		for _, path := range paths {

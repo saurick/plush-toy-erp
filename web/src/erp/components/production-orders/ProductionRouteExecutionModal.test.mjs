@@ -10,7 +10,7 @@ const source = readFileSync(
 test('production route modal is a self-contained production-order surface', () => {
   assert.match(source, /BusinessFormModal/u)
   assert.match(source, /getProductionWip/u)
-  assert.match(source, /initializeProductionWip/u)
+  assert.doesNotMatch(source, /initializeProductionWip/u)
   assert.match(source, /executeProductionWipAction/u)
   for (const permissionProp of [
     'canAssign',
@@ -24,16 +24,16 @@ test('production route modal is a self-contained production-order surface', () =
   assert.match(source, /title="生产工序办理"/u)
 })
 
-test('route actions use separate business permissions and initialization is assign-only', () => {
+test('route actions use separate business permissions and cancellation is assign-only', () => {
   assert.match(source, /canRunAction/u)
-  assert.match(
-    source,
-    /if \(!canAssign \|\| !positiveSafeInteger\(orderID\)\) return/u
-  )
+  assert.match(source, /PRODUCTION_WIP_ACTION\.CANCEL_BATCH/u)
   assert.match(source, /canAssign \? \(/u)
   assert.match(source, /canExecute \? \(/u)
   assert.match(source, /canConfirmPackaging \? \(/u)
   assert.match(source, /canRework \? \(/u)
+  assert.match(source, /取消只终止当前尚未开工的批次/u)
+  assert.match(source, /不会重新拆分数量/u)
+  assert.match(source, /请填写取消原因/u)
   assert.doesNotMatch(source, /canManage/u)
 })
 
@@ -130,19 +130,21 @@ test('packaging confirmation is item-level and shows only business evidence', ()
   assert.doesNotMatch(source, /confirmed_by_name/u)
 })
 
-test('initialization and actions retain one idempotency key across uncertain retries', () => {
-  assert.match(source, /initializationAttemptRef/u)
+test('actions retain one idempotency key across uncertain retries', () => {
+  assert.doesNotMatch(source, /initializationAttemptRef/u)
   assert.match(source, /actionAttemptRef/u)
   assert.match(source, /idempotencyKey:\s*productionWipUUID\(\)/u)
-  assert.match(
-    source,
-    /initializeProductionWip\(orderID,\s*\{[\s\S]*?idempotencyKey:\s*initializationAttemptRef\.current\.idempotencyKey/u
-  )
   assert.match(source, /const signature = JSON\.stringify/u)
   assert.match(
     source,
     /idempotency_key:\s*actionAttemptRef\.current\.idempotencyKey/u
   )
+})
+
+test('missing released route is an integrity error and cannot be initialized from the page', () => {
+  assert.match(source, /当前生产订单的工序路线不完整/u)
+  assert.match(source, /标准路线只在生产订单发布时冻结/u)
+  assert.doesNotMatch(source, /建立标准工序路线/u)
 })
 
 test('stale route reads are aborted and raw technical IDs are not visible labels', () => {

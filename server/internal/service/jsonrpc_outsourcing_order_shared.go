@@ -18,6 +18,22 @@ func unknownOutsourcingOrderResult(method string) *v1.JsonrpcResult {
 }
 
 func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderMutation, bool) {
+	if !outsourcingOrderAllowsOnly(pm,
+		"customer_key",
+		"id",
+		"expected_version",
+		"outsourcing_order_no",
+		"supplier_id",
+		"supplier_snapshot",
+		"contract_party_snapshot",
+		"source_order_no",
+		"order_date",
+		"expected_return_date",
+		"note",
+		"items",
+	) {
+		return nil, false
+	}
 	orderDate, ok := getRequiredJSONRPCTime(pm, "order_date")
 	if !ok {
 		return nil, false
@@ -32,7 +48,6 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 		SupplierSnapshot:      getMap(pm, "supplier_snapshot"),
 		ContractPartySnapshot: getMap(pm, "contract_party_snapshot"),
 		SourceOrderNo:         getWorkflowStringPtr(pm, "source_order_no"),
-		SourceSalesOrderID:    getOptionalPositiveIntPtr(pm, "source_sales_order_id"),
 		OrderDate:             orderDate,
 		ExpectedReturnDate:    expectedReturnDate,
 		Note:                  getWorkflowStringPtr(pm, "note"),
@@ -40,15 +55,43 @@ func outsourcingOrderMutationFromParams(pm map[string]any) (*biz.OutsourcingOrde
 }
 
 func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.OutsourcingOrderItemMutation, bool) {
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "outsourcing_quantity")
+	if !outsourcingOrderAllowsOnly(pm,
+		"id",
+		"outsourcing_order_id",
+		"line_no",
+		"subject_type",
+		"product_id",
+		"product_sku_id",
+		"material_id",
+		"process_id",
+		"unit_id",
+		"product_no_snapshot",
+		"sku_code_snapshot",
+		"product_order_no_snapshot",
+		"product_name_snapshot",
+		"material_code_snapshot",
+		"material_name_snapshot",
+		"processing_item",
+		"process_name_snapshot",
+		"process_category_snapshot",
+		"unit_name_snapshot",
+		"outsourcing_quantity",
+		"unit_price",
+		"amount",
+		"expected_return_date",
+		"note",
+	) {
+		return nil, false
+	}
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "outsourcing_quantity")
 	if !ok {
 		return nil, false
 	}
-	unitPrice, ok := getOptionalJSONRPCDecimal(pm, "unit_price")
+	unitPrice, ok := getOptionalJSONRPCDecimalString(pm, "unit_price")
 	if !ok {
 		return nil, false
 	}
-	amount, ok := getOptionalJSONRPCDecimal(pm, "amount")
+	amount, ok := getOptionalJSONRPCDecimalString(pm, "amount")
 	if !ok {
 		return nil, false
 	}
@@ -80,6 +123,19 @@ func outsourcingOrderItemMutationFromParams(pm map[string]any) (*biz.Outsourcing
 		ExpectedReturnDate:      expectedReturnDate,
 		Note:                    getWorkflowStringPtr(pm, "note"),
 	}, true
+}
+
+func outsourcingOrderAllowsOnly(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
 }
 
 func outsourcingOrderItemSaveMutationsFromParams(pm map[string]any) ([]*biz.OutsourcingOrderItemSaveMutation, bool) {
@@ -122,7 +178,7 @@ func (d *jsonrpcDispatcher) mapOutsourcingOrderError(ctx context.Context, err er
 	case errors.Is(err, biz.ErrOutsourcingOrderItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同明细不存在"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactDependency):
-		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同已有已确认的发料或回货记录，请先取消相关委外记录"}
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同仍有未结清的发料或回货记录；关闭前请完成或取消草稿，取消合同前请先取消或冲正相关记录"}
 	case errors.Is(err, biz.ErrProductionWIPOutsourcingSourceDependency):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同已关联在制批次，完成相关生产办理前不能取消、关闭或改写"}
 	case errors.Is(err, biz.ErrSupplierNotFound), errors.Is(err, biz.ErrSupplierInactive):
@@ -171,7 +227,6 @@ func outsourcingOrderToMap(item *biz.OutsourcingOrder) map[string]any {
 		"supplier_snapshot":       item.SupplierSnapshot,
 		"contract_party_snapshot": item.ContractPartySnapshot,
 		"source_order_no":         optionalStringValue(item.SourceOrderNo),
-		"source_sales_order_id":   optionalIntValue(item.SourceSalesOrderID),
 		"order_date":              item.OrderDate.Unix(),
 		"expected_return_date":    optionalUnix(item.ExpectedReturnDate),
 		"lifecycle_status":        item.LifecycleStatus,

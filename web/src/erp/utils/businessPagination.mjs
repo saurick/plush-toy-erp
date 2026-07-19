@@ -35,3 +35,22 @@ export function resetBusinessPaginationCurrent(setPagination) {
     current: 1,
   }))
 }
+
+export function resolveExactRecordPage({
+  records = [],
+  exactRecord = null,
+  hasExactContext = false,
+  total = 0,
+} = {}) {
+  const listedRecords = Array.isArray(records) ? records : []
+  if (!hasExactContext) {
+    return {
+      records: listedRecords,
+      total: Math.max(Number(total) || 0, 0),
+    }
+  }
+  return {
+    records: exactRecord ? [exactRecord] : [],
+    total: exactRecord ? 1 : 0,
+  }
+}

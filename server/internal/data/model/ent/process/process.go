@@ -20,6 +20,8 @@ const (
 	FieldName = "name"
 	// FieldCategory holds the string denoting the category field in the database.
 	FieldCategory = "category"
+	// FieldProductionRouteOperationCode holds the string denoting the production_route_operation_code field in the database.
+	FieldProductionRouteOperationCode = "production_route_operation_code"
 	// FieldOutsourcingEnabled holds the string denoting the outsourcing_enabled field in the database.
 	FieldOutsourcingEnabled = "outsourcing_enabled"
 	// FieldInhouseEnabled holds the string denoting the inhouse_enabled field in the database.
@@ -62,6 +64,7 @@ var Columns = []string{
 	FieldCode,
 	FieldName,
 	FieldCategory,
+	FieldProductionRouteOperationCode,
 	FieldOutsourcingEnabled,
 	FieldInhouseEnabled,
 	FieldQualityRequired,
@@ -95,6 +98,8 @@ var (
 	NameValidator func(string) error
 	// CategoryValidator is a validator for the "category" field. It is called by the builders before save.
 	CategoryValidator func(string) error
+	// ProductionRouteOperationCodeValidator is a validator for the "production_route_operation_code" field. It is called by the builders before save.
+	ProductionRouteOperationCodeValidator func(string) error
 	// DefaultOutsourcingEnabled holds the default value on creation for the "outsourcing_enabled" field.
 	DefaultOutsourcingEnabled bool
 	// DefaultInhouseEnabled holds the default value on creation for the "inhouse_enabled" field.
@@ -138,6 +143,11 @@ func ByName(opts ...sql.OrderTermOption) OrderOption {
 // ByCategory orders the results by the category field.
 func ByCategory(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCategory, opts...).ToFunc()
+}
+
+// ByProductionRouteOperationCode orders the results by the production_route_operation_code field.
+func ByProductionRouteOperationCode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldProductionRouteOperationCode, opts...).ToFunc()
 }
 
 // ByOutsourcingEnabled orders the results by the outsourcing_enabled field.

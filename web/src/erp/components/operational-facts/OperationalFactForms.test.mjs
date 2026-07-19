@@ -73,3 +73,12 @@ test('OperationalFactForms keeps outsourcing fact permissions exact', () => {
     /outsourcingWrite:\s*\['purchase\.order\.update',\s*'warehouse\.adjustment\.create'\]/u
   )
 })
+
+test('OperationalFactForms formats fact decimals without Number rounding', () => {
+  assert.match(source, /formatOperationalFactDecimal/u)
+  assert.match(
+    source,
+    /export function formatQuantity\(value\) \{\s*return formatOperationalFactDecimal\(value\)/u
+  )
+  assert.doesNotMatch(source, /decimalNumber|toFixed|Number\(value/u)
+})

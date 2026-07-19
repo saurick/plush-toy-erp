@@ -61,8 +61,16 @@ func TestPurchaseReturnPostgresMigrationShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create postgres purchase return shape draft failed: %v", err)
 	}
-	if _, err := uc.CancelPostedPurchaseReturn(ctx, returnDraft.ID); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("expected postgres draft return cancel to be rejected, got %v", err)
+	draftToCancel, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
+		ReturnNo:     "PG-PRTN-SHAPE-CANCEL-" + fixtures.suffix,
+		SupplierName: "PG退货供应商",
+		ReturnedAt:   time.Date(2026, 4, 26, 12, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create postgres purchase return cancellation draft failed: %v", err)
+	}
+	if cancelled, err := uc.CancelPostedPurchaseReturn(ctx, draftToCancel.ID); err != nil || cancelled.Status != biz.PurchaseReturnStatusCancelled {
+		t.Fatalf("cancel postgres draft purchase return = %#v, err=%v", cancelled, err)
 	}
 	if _, err := uc.CreatePurchaseReturnDraft(ctx, &biz.PurchaseReturnCreate{
 		ReturnNo:     "PG-PRTN-SHAPE-" + fixtures.suffix,
@@ -352,6 +360,98 @@ func TestPurchaseReturnPostgresFlow(t *testing.T) {
 	}
 	if reversalCount != 1 {
 		t.Fatalf("expected one postgres return reversal after repeat cancel, got %d", reversalCount)
+	}
+}
+
+func TestPurchaseReturnPostgresDraftPostCancelConcurrency(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseOperationalPostgresTestData(t)
+	postgresFixtures := createPurchaseOperationalPostgresFixtures(t, ctx, client)
+	fixtures := inventoryTestFixtures{
+		unitID:      postgresFixtures.unitID,
+		materialID:  postgresFixtures.materialID,
+		productID:   postgresFixtures.productID,
+		warehouseID: postgresFixtures.warehouseID,
+	}
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+
+	for _, postFirst := range []bool{true, false} {
+		name := "cancel first"
+		if postFirst {
+			name = "post first"
+		}
+		t.Run(name, func(t *testing.T) {
+			suffix := fmt.Sprintf("%s-%t", postgresFixtures.suffix, postFirst)
+			receipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-PRTN-DRAFT-RACE-IN-"+suffix, fixtures, stringPtr("PG-PRTN-DRAFT-RACE-LOT-"+suffix), mustDecimal(t, "10"))
+			purchaseReturn := createLinkedPurchaseReturn(t, ctx, uc, "PG-PRTN-DRAFT-RACE-"+suffix, receipt.ID, receipt.Items[0], fixtures, mustDecimal(t, "2"))
+
+			blocker, err := data.sqldb.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatalf("begin return lock blocker failed: %v", err)
+			}
+			blockerOpen := true
+			t.Cleanup(func() {
+				if blockerOpen {
+					_ = blocker.Rollback()
+				}
+			})
+			var lockedID int
+			if err := blocker.QueryRowContext(ctx, `SELECT id FROM purchase_returns WHERE id = $1 FOR UPDATE`, purchaseReturn.ID).Scan(&lockedID); err != nil {
+				t.Fatalf("lock draft purchase return failed: %v", err)
+			}
+
+			postDone := make(chan error, 1)
+			cancelDone := make(chan error, 1)
+			startPost := func() { go func() { _, err := uc.PostPurchaseReturn(ctx, purchaseReturn.ID); postDone <- err }() }
+			startCancel := func() {
+				go func() { _, err := uc.CancelPostedPurchaseReturn(ctx, purchaseReturn.ID); cancelDone <- err }()
+			}
+			if postFirst {
+				startPost()
+			} else {
+				startCancel()
+			}
+			waitForPostgresBlockedQueryCount(t, ctx, data.sqldb, "SELECT id FROM purchase_returns", 1)
+			if postFirst {
+				startCancel()
+			} else {
+				startPost()
+			}
+			waitForPostgresBlockedQueryCount(t, ctx, data.sqldb, "SELECT id FROM purchase_returns", 2)
+			if err := blocker.Rollback(); err != nil {
+				t.Fatalf("release return lock blocker failed: %v", err)
+			}
+			blockerOpen = false
+			postErr := receivePurchaseOperationError(t, postDone, "purchase return post")
+			cancelErr := receivePurchaseOperationError(t, cancelDone, "purchase return cancel")
+
+			persisted := client.PurchaseReturn.GetX(ctx, purchaseReturn.ID)
+			if persisted.Status != biz.PurchaseReturnStatusCancelled {
+				t.Fatalf("final purchase return status=%s, want CANCELLED", persisted.Status)
+			}
+			txnCount := client.InventoryTxn.Query().Where(
+				inventorytxn.SourceType(biz.PurchaseReturnSourceType),
+				inventorytxn.SourceID(purchaseReturn.ID),
+			).CountX(ctx)
+			balance, err := uc.GetInventoryBalance(ctx, biz.InventoryBalanceKey{
+				SubjectType: biz.InventorySubjectMaterial,
+				SubjectID:   fixtures.materialID,
+				WarehouseID: fixtures.warehouseID,
+				LotID:       receipt.Items[0].LotID,
+				UnitID:      fixtures.unitID,
+			})
+			if err != nil {
+				t.Fatalf("get final purchase return lot balance failed: %v", err)
+			}
+			assertDecimalEqual(t, balance.Quantity, "10")
+			if postFirst {
+				if postErr != nil || cancelErr != nil || persisted.PostedAt == nil || txnCount != 2 {
+					t.Fatalf("post-first result post=%v cancel=%v posted_at=%v txns=%d", postErr, cancelErr, persisted.PostedAt, txnCount)
+				}
+			} else if !errors.Is(postErr, biz.ErrBadParam) || cancelErr != nil || persisted.PostedAt != nil || txnCount != 0 {
+				t.Fatalf("cancel-first result post=%v cancel=%v posted_at=%v txns=%d", postErr, cancelErr, persisted.PostedAt, txnCount)
+			}
+		})
 	}
 }
 

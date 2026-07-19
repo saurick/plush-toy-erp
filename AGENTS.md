@@ -33,6 +33,15 @@
 - 开始和收口均检查 worktree。其他会话的非本轮改动只记录和隔离，不回退、格式化、删除、stage 或宣称为成果。
 - 本仓库不恢复单独执行规格目录、短任务模板或本地审查报告目录。
 
+### 多任务、Subagent 与 Worktree
+
+- 不依赖模型名称或推理档位保证并行。非平凡任务存在至少两个可独立执行，且并行能明显改善速度或质量的探索、审查、测试或日志分析切片时，主 Agent 应使用 subagents；不因当前不是 Ultra 而跳过，也不为简单任务机械拆分。
+- 同一顶层任务的 subagents 由主 Agent 统一编排并共享该任务 checkout，不为每个 subagent 单独创建 Worktree 或分支。Subagent 优先承担只读分析、测试和互不重叠路径；重叠文件只允许一个 writer。
+- 同一 Local checkout 同时只允许一个独立顶层写任务；只读任务可以并存。额外顶层写任务必须等待，或使用 Worktree 隔离。
+- 用户明确要求并行分发多个独立编码任务时，保留一个 Local 顶层任务，其余顶层任务使用 Worktree；默认不因此创建分支。
+- Worktree 任务完成相关验证后只报告可以 Hand off，不自动 Hand off、合并、提交或推送。只有用户明确要求且 Local writer 已结束时，才把任务和代码带回 Local。
+- Git index、commit 和 push 始终由一个收口 owner 串行执行；收口前等待其他 writer 结束，并重新读取 `git status` 与相关 diff。
+
 ## 过程记录
 
 - 完成代码或正式文档改动后更新 `progress.md`，至少包含完成、下一步、阻塞/风险；仅讨论可跳过。

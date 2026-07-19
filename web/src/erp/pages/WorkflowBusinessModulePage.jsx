@@ -3,19 +3,15 @@ import {
   CheckCircleOutlined,
   EyeOutlined,
   ExclamationCircleOutlined,
-  LinkOutlined,
   RedoOutlined,
   SendOutlined,
 } from '@ant-design/icons'
 import { Button, Input, Modal, Space, Tag } from 'antd'
 import dayjs from 'dayjs'
-import {
-  useNavigate,
-  useOutletContext,
-  useSearchParams,
-} from 'react-router-dom'
+import { useOutletContext, useSearchParams } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
 import {
   blockWorkflowTaskAction,
   completeWorkflowTaskAction,
@@ -41,6 +37,7 @@ import {
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
@@ -52,13 +49,18 @@ import {
   isWorkflowTaskMutationResultUnknown,
   verifyNewWorkflowTaskMutationAttempt,
 } from '../utils/workflowTaskMutation.mjs'
+import { formatWorkflowTaskSource } from '../utils/dashboardTaskDisplay.mjs'
 import {
-  formatWorkflowTaskSource,
-  resolveWorkflowTaskSourceEntryPath,
-} from '../utils/dashboardTaskDisplay.mjs'
-import { isTerminalWorkflowTask } from '../utils/workflowTaskLifecycle.mjs'
+  createBusinessTablePagination,
+  resetBusinessPaginationCurrent,
+} from '../utils/businessPagination.mjs'
 import {
-  getTaskOwnerRoleKey,
+  buildWorkflowBusinessTaskQuery,
+  buildWorkflowBusinessTaskStats,
+  reconcileWorkflowBusinessTaskPage,
+  requireWorkflowBusinessTaskPage,
+} from '../utils/workflowBusinessModuleModel.mjs'
+import {
   getWorkflowTaskCodeLabel,
   getWorkflowTaskDueLabel,
   getWorkflowTaskOwnerRoleLabel,
@@ -130,12 +132,6 @@ const MODULE_WORKFLOW_CONFIG = Object.freeze({
   },
 })
 
-function normalizeText(value = '') {
-  return String(value || '')
-    .trim()
-    .toLowerCase()
-}
-
 function toUnixSeconds(value) {
   if (!value) return undefined
   const parsed = dayjs(String(value).trim())
@@ -153,8 +149,8 @@ function getTaskID(task = {}) {
 }
 
 export default function WorkflowBusinessModulePage({ moduleKey }) {
-  const navigate = useNavigate()
   const [searchParams] = useSearchParams()
+  const beginLatestRequest = useLatestRequestCoordinator()
   const mutationAttemptsRef = useRef(null)
   mutationAttemptsRef.current ||= createTaskMutationAttemptStore()
   const mutationInFlightRef = useRef(null)
@@ -176,6 +172,8 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     [outletContext?.adminProfile]
   )
   const [tasks, setTasks] = useState([])
+  const [total, setTotal] = useState(0)
+  const [pagination, setPagination] = useState({ current: 1, pageSize: 10 })
   const [loading, setLoading] = useState(false)
   const [taskReasonModal, setTaskReasonModal] = useState(null)
   const linkedKeyword = String(searchParams.get('link_keyword') || '').trim()
@@ -201,26 +199,70 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     'workflow.task.complete'
   )
   const loadWorkflowTasks = useCallback(async () => {
+    const request = beginLatestRequest('workflow-business-tasks')
     if (!config || !canReadWorkflowTasks) {
-      setTasks([])
+      if (request.isCurrent()) {
+        setTasks([])
+        setTotal(0)
+        setSelectedTaskKeys([])
+        setDetailTask(null)
+        setLoading(false)
+        request.finish()
+      }
       return false
     }
     setLoading(true)
     try {
-      const data = await listWorkflowTasks({
-        task_group: config.taskGroup,
-        limit: 200,
+      const query = buildWorkflowBusinessTaskQuery({
+        taskGroup: config.taskGroup,
+        keyword,
+        status,
+        ownerRoleKey,
+        dueFrom: toUnixStartSeconds(dueFrom),
+        dueTo: toUnixSeconds(dueTo),
+        pagination,
       })
-      const nextTasks = (data?.tasks || []).filter(
-        (task) => task.task_group === config.taskGroup
+      const data = await listWorkflowTasks(query, { signal: request.signal })
+      if (!request.isCurrent()) return false
+      const page = requireWorkflowBusinessTaskPage(data, {
+        taskGroup: config.taskGroup,
+        limit: query.limit,
+        offset: query.offset,
+      })
+      const pageState = reconcileWorkflowBusinessTaskPage({
+        tasks: page.tasks,
+        total: page.total,
+        pagination,
+      })
+      setTotal(page.total)
+      setTasks(pageState.tasks)
+      setSelectedTaskKeys(
+        (current) =>
+          reconcileWorkflowBusinessTaskPage({
+            tasks: page.tasks,
+            total: page.total,
+            pagination,
+            selectedTaskKeys: current,
+          }).selectedTaskKeys
       )
-      setTasks(nextTasks)
-      setSelectedTaskKeys((current) =>
-        current.filter((key) => nextTasks.some((task) => task.id === key))
+      setDetailTask((current) =>
+        current
+          ? pageState.tasks.find((task) => task.id === current.id) || null
+          : null
       )
+      if (pageState.shouldRetreat) {
+        setPagination((current) => ({
+          ...current,
+          current: pageState.current,
+        }))
+      }
       return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) return false
       setTasks([])
+      setTotal(0)
+      setSelectedTaskKeys([])
+      setDetailTask(null)
       message.error(
         getActionErrorMessage(
           error,
@@ -229,9 +271,23 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
       )
       return false
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
-  }, [canReadWorkflowTasks, config, moduleItem?.title])
+  }, [
+    beginLatestRequest,
+    canReadWorkflowTasks,
+    config,
+    dueFrom,
+    dueTo,
+    keyword,
+    moduleItem?.title,
+    ownerRoleKey,
+    pagination,
+    status,
+  ])
 
   useEffect(() => {
     loadWorkflowTasks()
@@ -239,6 +295,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
 
   useEffect(() => {
     setKeyword(linkedKeyword)
+    resetBusinessPaginationCurrent(setPagination)
   }, [linkedKeyword])
 
   useEffect(() => {
@@ -252,52 +309,16 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     })
   }, [loadWorkflowTasks, moduleItem, outletContext])
 
-  const filteredTasks = useMemo(() => {
-    const normalizedKeyword = normalizeText(keyword)
-    const dueFromUnix = toUnixStartSeconds(dueFrom)
-    const dueToUnix = toUnixSeconds(dueTo)
-    return tasks.filter((task) => {
-      if (status && task.task_status_key !== status) return false
-      if (ownerRoleKey && getTaskOwnerRoleKey(task) !== ownerRoleKey) {
-        return false
-      }
-      const dueAt = Number(task.due_at || 0)
-      if (dueFromUnix && (!dueAt || dueAt < dueFromUnix)) return false
-      if (dueToUnix && (!dueAt || dueAt > dueToUnix)) return false
-      if (!normalizedKeyword) return true
-      return [
-        task.task_code,
-        task.task_name,
-        task.source_no,
-        task.business_status_key,
-        getWorkflowTaskReason(task),
-      ].some((item) => normalizeText(item).includes(normalizedKeyword))
-    })
-  }, [dueFrom, dueTo, keyword, ownerRoleKey, status, tasks])
-
   const selectedTasks = useMemo(
     () => tasks.filter((task) => selectedTaskKeys.includes(task.id)),
     [selectedTaskKeys, tasks]
   )
   const selectedTask = selectedTasks[0] || null
-  const selectedTaskSourceEntryPath = selectedTask
-    ? resolveWorkflowTaskSourceEntryPath(selectedTask)
-    : ''
 
-  const stats = useMemo(() => {
-    const activeCount = tasks.filter(
-      (task) => !isTerminalWorkflowTask(task)
-    ).length
-    const blockedCount = tasks.filter((task) =>
-      ['blocked', 'rejected'].includes(task.task_status_key)
-    ).length
-    return [
-      { key: 'total', label: '任务总数', value: tasks.length },
-      { key: 'active', label: '待处理', value: activeCount },
-      { key: 'blocked', label: '阻塞 / 退回', value: blockedCount },
-      { key: 'shown', label: '筛选结果', value: filteredTasks.length },
-    ]
-  }, [filteredTasks.length, tasks])
+  const stats = useMemo(
+    () => buildWorkflowBusinessTaskStats({ total, pageCount: tasks.length }),
+    [tasks.length, total]
+  )
 
   const selectedTaskLabel = selectedTask
     ? `${getWorkflowTaskCodeLabel(selectedTask)} / ${
@@ -774,6 +795,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
     setOwnerRoleKey('')
     setDueFrom('')
     setDueTo('')
+    resetBusinessPaginationCurrent(setPagination)
   }, [])
 
   if (!moduleItem || !config) {
@@ -814,13 +836,19 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
               placeholder="搜索任务"
               searchHint="可搜索：任务、来源号、原因"
               value={keyword}
-              onChange={(event) => setKeyword(event.target.value)}
+              onChange={(event) => {
+                setKeyword(event.target.value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
             />
             <SelectFilter
               aria-label="任务状态"
               value={status}
               options={TASK_STATUS_OPTIONS}
-              onChange={setStatus}
+              onChange={(value) => {
+                setStatus(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
             />
             <SelectFilter
               aria-label="负责岗位"
@@ -829,15 +857,24 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
                 { label: '全部岗位', value: '' },
                 ...config.ownerRoleOptions,
               ]}
-              onChange={setOwnerRoleKey}
+              onChange={(value) => {
+                setOwnerRoleKey(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
             />
             <DateRangeFilter
               options={DUE_DATE_FILTER_OPTIONS}
               value="due_at"
               startValue={dueFrom}
               endValue={dueTo}
-              onStartChange={setDueFrom}
-              onEndChange={setDueTo}
+              onStartChange={(value) => {
+                setDueFrom(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
+              onEndChange={(value) => {
+                setDueTo(value)
+                resetBusinessPaginationCurrent(setPagination)
+              }}
             />
           </>
         }
@@ -968,7 +1005,7 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         rowKey="id"
         loading={loading}
         columns={tableColumns}
-        dataSource={filteredTasks}
+        dataSource={tasks}
         scroll={{ x: 1000 }}
         emptyDescription={
           canReadWorkflowTasks ? config.emptyText : '当前账号不能查看此类任务。'
@@ -988,11 +1025,15 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
           setSelectedTaskKeys([record.id])
           setDetailTask(record)
         }}
-        pagination={{
-          pageSize: 10,
-          showSizeChanger: false,
-          showTotal: (total) => `共 ${total} 条`,
-        }}
+        pagination={createBusinessTablePagination({
+          pagination,
+          total,
+          onChange: (current, pageSize) => {
+            setSelectedTaskKeys([])
+            setDetailTask(null)
+            setPagination({ current, pageSize })
+          },
+        })}
       />
       {columnOrderModal}
 

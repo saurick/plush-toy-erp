@@ -7,10 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
-import {
-  loadDevPorts,
-  resolveDevAuxPort,
-} from '../../scripts/dev-ports.mjs'
+import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
 import {
   buildYoyoosunLocalEntryAudit,
   defaultYoyoosunEntryAuditPorts,
@@ -56,7 +53,7 @@ const PREFLIGHT_NOT_PROVEN = Object.freeze([
   'browser rendering or mobile layout',
   'workflow task creation',
   'done / blocked / rejected / urge action submission',
-  'completion feedback or internal notification display',
+  'completion feedback payload / receipt, evidence refs, or internal notification display',
   'target environment release evidence',
 ])
 const MOBILE_WORKFLOW_REPORT_STATUS_LABELS = Object.freeze({
@@ -298,8 +295,9 @@ function buildSimulatedTaskPlan() {
       expectedTaskStatusAfterAction: 'done',
       expectedBusinessStatusAfterAction: 'project_approved',
       requiresReason: false,
-      expectsCompletionFeedback: true,
-      expectsDoneListFeedback: true,
+      requiresCompletionFeedback: true,
+      expectsCompletionPayloadFeedback: true,
+      expectsCompletionReceiptFeedback: true,
       expectsEvidenceRefs: true,
       notificationType: 'approval_required',
       simulatedOnly: true,
@@ -322,8 +320,9 @@ function buildSimulatedTaskPlan() {
       browserAction: 'quality-complete',
       expectedTaskStatusAfterAction: 'done',
       requiresReason: false,
-      expectsCompletionFeedback: true,
-      expectsDoneListFeedback: true,
+      requiresCompletionFeedback: true,
+      expectsCompletionPayloadFeedback: true,
+      expectsCompletionReceiptFeedback: true,
       expectsEvidenceRefs: true,
       notificationType: 'finished_goods_qc_pending',
       simulatedOnly: true,
@@ -334,8 +333,9 @@ function buildSimulatedTaskPlan() {
       browserAction: 'warehouse-inbound-complete',
       expectedTaskStatusAfterAction: 'done',
       requiresReason: false,
-      expectsCompletionFeedback: true,
-      expectsDoneListFeedback: true,
+      requiresCompletionFeedback: true,
+      expectsCompletionPayloadFeedback: true,
+      expectsCompletionReceiptFeedback: true,
       expectsEvidenceRefs: true,
       notificationType: 'inbound_pending',
       simulatedOnly: true,
@@ -359,9 +359,20 @@ function buildSimulatedTaskPlan() {
 function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
   const actionSet = new Set(plan.map((item) => item.browserAction))
   const roleSet = new Set(plan.map((item) => item.ownerRoleKey))
+  const completionActions = new Set([
+    'complete',
+    'quality-complete',
+    'warehouse-inbound-complete',
+  ])
+  const completionItems = plan.filter((item) =>
+    completionActions.has(item.browserAction)
+  )
   const allSimulatedOnly = plan.every((item) => item.simulatedOnly === true)
   const allKeepEvidenceRefs = plan.every(
     (item) => item.expectsEvidenceRefs === true
+  )
+  const allEvidenceInputsOptional = plan.every(
+    (item) => item.requiresEvidence !== true
   )
   const coversReasonRequiredActions = plan
     .filter((item) =>
@@ -371,6 +382,25 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
   const coversNotificationTypes = [
     ...new Set(plan.map((item) => item.notificationType).filter(Boolean)),
   ].sort()
+  const coversRequiredCompletionFeedback =
+    completionItems.length === 3 &&
+    completionItems.every((item) => item.requiresCompletionFeedback === true)
+  const coversCompletionPayloadFeedback =
+    completionItems.length === 3 &&
+    completionItems.every(
+      (item) => item.expectsCompletionPayloadFeedback === true
+    )
+  const coversCompletionReceiptFeedback =
+    completionItems.length === 3 &&
+    completionItems.every(
+      (item) => item.expectsCompletionReceiptFeedback === true
+    )
+  const coversOptionalCompletionEvidence =
+    completionItems.length === 3 &&
+    completionItems.every(
+      (item) =>
+        item.expectsEvidenceRefs === true && item.requiresEvidence !== true
+    )
   const coverage = {
     taskCount: plan.length,
     actionLabels: [...actionSet]
@@ -381,6 +411,7 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
       .sort(),
     allSimulatedOnly,
     allKeepEvidenceRefs,
+    allEvidenceInputsOptional,
     coversBossBlock: actionSet.has('block'),
     coversBossComplete: actionSet.has('complete'),
     coversBossReject: actionSet.has('reject'),
@@ -388,14 +419,14 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
     coversWarehouseInboundComplete: actionSet.has('warehouse-inbound-complete'),
     coversCrossRoleUrge: actionSet.has('urge-only'),
     coversReasonRequiredActions,
-    coversCompletionFeedback: plan.some(
-      (item) =>
-        ['complete', 'quality-complete', 'warehouse-inbound-complete'].includes(
-          item.browserAction
-        ) &&
-        item.expectsCompletionFeedback === true &&
-        item.expectsDoneListFeedback === true
-    ),
+    coversRequiredCompletionFeedback,
+    coversCompletionPayloadFeedback,
+    coversCompletionReceiptFeedback,
+    coversOptionalCompletionEvidence,
+    coversCompletionFeedback:
+      coversRequiredCompletionFeedback &&
+      coversCompletionPayloadFeedback &&
+      coversCompletionReceiptFeedback,
     coversExceptionReport: plan.some(
       (item) =>
         ['block', 'reject'].includes(item.browserAction) &&
@@ -411,6 +442,9 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
   if (!coverage.allSimulatedOnly) blockers.push('task-plan-not-simulated-only')
   if (!coverage.allKeepEvidenceRefs) {
     blockers.push('missing-evidence-ref-coverage')
+  }
+  if (!coverage.allEvidenceInputsOptional) {
+    blockers.push('evidence-input-must-remain-optional')
   }
   if (!coverage.coversBossBlock) blockers.push('missing-boss-block-action')
   if (!coverage.coversBossComplete) {
@@ -429,8 +463,17 @@ function buildSimulatedTaskPlanCoverage(plan = buildSimulatedTaskPlan()) {
   if (!coverage.coversReasonRequiredActions) {
     blockers.push('missing-reason-required-coverage')
   }
-  if (!coverage.coversCompletionFeedback) {
-    blockers.push('missing-completion-feedback-coverage')
+  if (!coverage.coversRequiredCompletionFeedback) {
+    blockers.push('missing-required-completion-feedback-input')
+  }
+  if (!coverage.coversCompletionPayloadFeedback) {
+    blockers.push('missing-completion-payload-feedback-coverage')
+  }
+  if (!coverage.coversCompletionReceiptFeedback) {
+    blockers.push('missing-completion-receipt-feedback-coverage')
+  }
+  if (!coverage.coversOptionalCompletionEvidence) {
+    blockers.push('missing-independent-optional-completion-evidence-coverage')
   }
   if (!coverage.coversExceptionReport) {
     blockers.push('missing-exception-report-coverage')
@@ -454,8 +497,13 @@ function buildSimulatedTaskPlanSummary(plan = buildSimulatedTaskPlan()) {
       item.expectedTaskStatusAfterAction
     ),
     reasonRequired: item.requiresReason === true,
-    completionFeedbackExpected: item.expectsCompletionFeedback === true,
+    completionFeedbackRequired: item.requiresCompletionFeedback === true,
+    completionPayloadFeedbackExpected:
+      item.expectsCompletionPayloadFeedback === true,
+    completionReceiptFeedbackExpected:
+      item.expectsCompletionReceiptFeedback === true,
     exceptionReportExpected: item.expectsExceptionReport === true,
+    evidenceInputRequired: item.requiresEvidence === true,
     evidenceRefExpected: item.expectsEvidenceRefs === true,
     notificationHint: getWorkflowReportNotificationLabel(item.notificationType),
     simulatedOnly: item.simulatedOnly === true,
@@ -832,6 +880,8 @@ function buildSmokeReport({
           updatedBossDoneTask.task_status_key
         ),
         actionLabel: getWorkflowReportActionLabel('done'),
+        completionFeedbackRecorded:
+          updatedBossDoneTask.payload?.feedback === browserResult.doneFeedback,
         evidenceRefRecorded:
           updatedBossDoneTask.payload?.mobile_action_evidence_refs?.includes(
             browserResult.doneEvidence
@@ -874,6 +924,9 @@ function buildSmokeReport({
           updatedQualityTask.task_status_key
         ),
         actionLabel: getWorkflowReportActionLabel('done'),
+        completionFeedbackRecorded:
+          updatedQualityTask.payload?.feedback ===
+          browserResult.qualityFeedback,
         evidenceRefRecorded:
           updatedQualityTask.payload?.mobile_action_evidence_refs?.includes(
             browserResult.qualityEvidence
@@ -892,6 +945,9 @@ function buildSmokeReport({
           updatedWarehouseInboundTask.task_status_key
         ),
         actionLabel: getWorkflowReportActionLabel('done'),
+        completionFeedbackRecorded:
+          updatedWarehouseInboundTask.payload?.feedback ===
+          browserResult.warehouseInboundFeedback,
         evidenceRefRecorded:
           updatedWarehouseInboundTask.payload?.mobile_action_evidence_refs?.includes(
             browserResult.warehouseInboundEvidence
@@ -928,6 +984,14 @@ function buildSmokeReport({
       rejected: 1,
       urged: 1,
       browserLayoutChecked: true,
+      taskFlowScreensChecked: true,
+      confirmedReceiptChecked: true,
+      completionFeedbackRequiredChecked: true,
+      completionPayloadFeedbackChecked: true,
+      completionReceiptFeedbackChecked: true,
+      optionalEvidenceRefsChecked: true,
+      receiptBackToListChecked: true,
+      listStateRestoreChecked: true,
       noHorizontalOverflow:
         detailNoOverflow &&
         urgeNoOverflow &&
@@ -1379,6 +1443,270 @@ async function loginMobileBoss(page, { baseURL, password }) {
   })
 }
 
+async function openMobileTaskProcess(page, task, { detailCopy = '' } = {}) {
+  const taskButton = page
+    .locator(`[data-mobile-task-id="${String(task.id)}"]`)
+    .filter({ hasText: task.task_name })
+    .first()
+  await taskButton.waitFor({ state: 'visible', timeout: 15_000 })
+  const listScrollTop = await page.evaluate(() => {
+    const main = document.querySelector('.mobile-role-tasks-page__scroll')
+    return main?.scrollTop || 0
+  })
+  await taskButton.click()
+
+  const detailScreen = page.getByTestId('mobile-task-detail-screen')
+  await detailScreen.waitFor({ state: 'visible', timeout: 15_000 })
+  await detailScreen
+    .getByRole('heading', { name: task.task_name, exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  if (detailCopy) {
+    await detailScreen.getByText(detailCopy, { exact: false }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
+  }
+  const detailSteps = detailScreen.getByTestId('mobile-task-flow-steps')
+  assert.equal(
+    await detailSteps.locator('.mobile-task-flow-step').count(),
+    3,
+    'task detail should expose the three-step workflow'
+  )
+  assert.equal(
+    await detailSteps
+      .locator('[data-step-key="detail"]')
+      .getAttribute('data-state'),
+    'current'
+  )
+  assert.equal(
+    await detailSteps
+      .locator('[data-step-key="result"]')
+      .getAttribute('data-state'),
+    'locked'
+  )
+
+  await detailScreen
+    .getByRole('button', { name: '处理任务', exact: true })
+    .click()
+  const actionScreen = page.getByTestId('mobile-task-action-screen')
+  await actionScreen.waitFor({ state: 'visible', timeout: 15_000 })
+  await actionScreen
+    .getByRole('heading', { name: task.task_name, exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  assert.equal(
+    await actionScreen
+      .locator('[data-step-key="process"]')
+      .getAttribute('data-state'),
+    'current'
+  )
+  return { actionScreen, listScrollTop }
+}
+
+async function submitMobileTaskAction(
+  page,
+  actionScreen,
+  {
+    actionLabel,
+    feedback = '',
+    feedbackLabel = '完成反馈',
+    evidence,
+    evidenceLabel,
+    reason = '',
+    reasonLabel = '',
+    requiredError = '',
+  }
+) {
+  const actionChoice = actionScreen.getByRole('button', {
+    name: actionLabel,
+    exact: true,
+  })
+  await actionChoice.click()
+  assert.equal(await actionChoice.getAttribute('aria-pressed'), 'true')
+
+  if (feedback) {
+    assert.equal(
+      await actionScreen
+        .getByLabel(feedbackLabel, { exact: true })
+        .evaluate((field) => field.required),
+      true,
+      'completion feedback input should be required'
+    )
+  }
+  if (evidence) {
+    const evidenceInput = actionScreen.getByLabel(evidenceLabel, {
+      exact: true,
+    })
+    assert.equal(
+      await evidenceInput.evaluate((field) => field.required),
+      false,
+      'onsite evidence input should remain optional'
+    )
+    await evidenceInput.fill(evidence)
+  }
+  if (requiredError) {
+    await actionScreen
+      .getByRole('button', { name: '确认提交', exact: true })
+      .click()
+    await actionScreen.getByText(requiredError, { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
+  }
+  if (reason) {
+    await actionScreen.getByLabel(reasonLabel, { exact: true }).fill(reason)
+  }
+  if (feedback) {
+    await actionScreen.getByLabel(feedbackLabel, { exact: true }).fill(feedback)
+  }
+  await actionScreen
+    .getByRole('button', { name: '确认提交', exact: true })
+    .click()
+
+  const receiptScreen = page.getByTestId('mobile-task-receipt-screen')
+  await receiptScreen.waitFor({ state: 'visible', timeout: 15_000 })
+  return receiptScreen
+}
+
+async function verifyConfirmedReceipt(
+  page,
+  receiptScreen,
+  { actionLabel, evidence, feedback = '', reason = '', roleKey = 'boss', task }
+) {
+  await receiptScreen
+    .getByText('任务办理已确认', { exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  await receiptScreen
+    .getByText(task.task_name, { exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  await receiptScreen
+    .getByText(actionLabel, { exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  if (reason) {
+    const reasonRow = receiptScreen
+      .locator('.mobile-task-receipt-row')
+      .filter({ hasText: '处理说明' })
+    await reasonRow
+      .getByText('处理说明', { exact: true })
+      .waitFor({ state: 'visible', timeout: 15_000 })
+    await reasonRow.getByText(reason, { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
+  }
+  if (feedback) {
+    const feedbackRow = receiptScreen
+      .locator('.mobile-task-receipt-row')
+      .filter({ hasText: '完成反馈' })
+    await feedbackRow
+      .getByText('完成反馈', { exact: true })
+      .waitFor({ state: 'visible', timeout: 15_000 })
+    await feedbackRow.getByText(feedback, { exact: true }).waitFor({
+      state: 'visible',
+      timeout: 15_000,
+    })
+  }
+  const evidenceRow = receiptScreen
+    .locator('.mobile-task-receipt-row')
+    .filter({ hasText: '证据线索' })
+  await evidenceRow
+    .getByText('证据线索', { exact: true })
+    .waitFor({ state: 'visible', timeout: 15_000 })
+  await evidenceRow.getByText(evidence, { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 15_000,
+  })
+  assert.equal(
+    await receiptScreen
+      .locator('[data-step-key="result"]')
+      .getAttribute('data-state'),
+    'current'
+  )
+
+  const metrics = await page.evaluate(() => {
+    const shell = document.querySelector(
+      '[data-testid="mobile-task-receipt-screen"]'
+    )
+    const actionBar = shell?.querySelector('.mobile-role-action-bar')
+    const main = shell?.querySelector('.mobile-role-tasks-page__detail-main')
+    const shellRect = shell?.getBoundingClientRect()
+    const actionRect = actionBar?.getBoundingClientRect()
+    const mainRect = main?.getBoundingClientRect()
+    return {
+      path: window.location.pathname,
+      scrollWidth: document.documentElement.scrollWidth,
+      clientWidth: document.documentElement.clientWidth,
+      shell: shellRect
+        ? {
+            top: shellRect.top,
+            bottom: shellRect.bottom,
+            height: shellRect.height,
+          }
+        : null,
+      main: mainRect
+        ? {
+            bottom: mainRect.bottom,
+            height: mainRect.height,
+          }
+        : null,
+      actionBar: actionRect
+        ? {
+            top: actionRect.top,
+            bottom: actionRect.bottom,
+            height: actionRect.height,
+          }
+        : null,
+      stepCount: shell?.querySelectorAll('.mobile-task-flow-step').length || 0,
+    }
+  })
+  assert.equal(metrics.path, `/m/${roleKey}/tasks`)
+  assert(metrics.shell, `receipt shell missing: ${JSON.stringify(metrics)}`)
+  assert(metrics.main, `receipt main missing: ${JSON.stringify(metrics)}`)
+  assert(
+    metrics.actionBar,
+    `receipt action bar missing: ${JSON.stringify(metrics)}`
+  )
+  assert.equal(metrics.stepCount, 3)
+  assert(
+    metrics.scrollWidth <= metrics.clientWidth + 1,
+    `mobile receipt should not overflow horizontally: ${JSON.stringify(metrics)}`
+  )
+  assert(
+    metrics.main.bottom <= metrics.actionBar.top + 1.5,
+    `receipt content should not overlap action bar: ${JSON.stringify(metrics)}`
+  )
+  return metrics
+}
+
+async function returnReceiptToList(page, receiptScreen) {
+  await receiptScreen
+    .getByRole('button', { name: '返回列表', exact: true })
+    .click()
+  await page.getByTestId('mobile-role-bottom-nav').waitFor({
+    state: 'visible',
+    timeout: 15_000,
+  })
+}
+
+async function verifyRestoredListState(page, task, listScrollTop) {
+  await page.waitForFunction(
+    ({ expectedScrollTop, taskID }) => {
+      const main = document.querySelector('.mobile-role-tasks-page__scroll')
+      const activeTaskButton = document.activeElement?.closest?.(
+        '[data-mobile-task-id]'
+      )
+      return (
+        Math.abs((main?.scrollTop || 0) - expectedScrollTop) <= 2 &&
+        activeTaskButton?.getAttribute('data-mobile-task-id') === taskID
+      )
+    },
+    {
+      expectedScrollTop: listScrollTop,
+      taskID: String(task.id),
+    },
+    { timeout: 15_000 }
+  )
+}
+
 async function runBrowserScenario(
   browser,
   { options, bossDoneTask, bossRejectTask, bossTask, warehouseTask, password }
@@ -1386,6 +1714,7 @@ async function runBrowserScenario(
   const { context, page, runtimeErrors } = await newMobilePage(browser)
   const blockReason = `移动端浏览器模拟阻塞 ${options.runId}`
   const blockEvidence = `${bossTask.task_code}-PHOTO`
+  const doneFeedback = `移动端浏览器模拟完成反馈 ${options.runId}`
   const doneEvidence = `${bossDoneTask.task_code}-PHOTO`
   const rejectReason = `移动端浏览器模拟退回 ${options.runId}`
   const rejectEvidence = `${bossRejectTask.task_code}-PHOTO`
@@ -1398,166 +1727,82 @@ async function runBrowserScenario(
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByText(bossTask.task_name, { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText(bossTask.task_name, { exact: true }).click()
-    await page
-      .locator('.mobile-role-tasks-page--detail')
-      .waitFor({ state: 'visible', timeout: 15_000 })
-    await page.getByRole('heading', { name: bossTask.task_name }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByTestId('mobile-role-evidence-input').fill(blockEvidence)
-    await assertNoVisibleText(page, '处理')
-    await page.getByRole('button', { name: /阻塞/u }).click()
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('请先填写阻塞或退回原因').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByTestId('mobile-role-detail-reason-input').fill(blockReason)
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('任务状态已更新').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText('异常上报').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText(blockReason, { exact: false }).first().waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText(blockEvidence, { exact: false }).first().waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-
-    const metrics = await page.evaluate(() => {
-      const shell = document.querySelector('.mobile-role-tasks-page--detail')
-      const actionBar = document.querySelector('.mobile-role-action-bar')
-      const main = document.querySelector(
-        '.mobile-role-tasks-page__detail-main'
-      )
-      const shellRect = shell?.getBoundingClientRect()
-      const actionRect = actionBar?.getBoundingClientRect()
-      const mainRect = main?.getBoundingClientRect()
-      return {
-        path: window.location.pathname,
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth,
-        shell: shellRect
-          ? {
-              top: shellRect.top,
-              bottom: shellRect.bottom,
-              height: shellRect.height,
-            }
-          : null,
-        main: mainRect
-          ? {
-              bottom: mainRect.bottom,
-              height: mainRect.height,
-            }
-          : null,
-        actionBar: actionRect
-          ? {
-              top: actionRect.top,
-              bottom: actionRect.bottom,
-              height: actionRect.height,
-            }
-          : null,
-        actionButtons: actionBar?.querySelectorAll('button').length || 0,
+    const blockProcess = await openMobileTaskProcess(page, bossTask)
+    const blockReceipt = await submitMobileTaskAction(
+      page,
+      blockProcess.actionScreen,
+      {
+        actionLabel: '阻塞',
+        evidence: blockEvidence,
+        evidenceLabel: '现场证据',
+        reason: blockReason,
+        reasonLabel: '阻塞原因',
+        requiredError: '阻塞原因为必填项',
       }
+    )
+    const metrics = await verifyConfirmedReceipt(page, blockReceipt, {
+      actionLabel: '阻塞',
+      evidence: blockEvidence,
+      reason: blockReason,
+      task: bossTask,
     })
-    assert.equal(metrics.path, '/m/boss/tasks')
-    assert(metrics.shell, `detail shell missing: ${JSON.stringify(metrics)}`)
-    assert(metrics.main, `detail main missing: ${JSON.stringify(metrics)}`)
-    assert(metrics.actionBar, `action bar missing: ${JSON.stringify(metrics)}`)
-    assert.equal(
-      metrics.actionButtons,
-      4,
-      `boss order approval detail should expose block/done/urge/reject buttons: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.scrollWidth <= metrics.clientWidth + 1,
-      `mobile detail should not overflow horizontally: ${JSON.stringify(metrics)}`
-    )
-    assert(
-      metrics.main.bottom <= metrics.actionBar.top + 1.5,
-      `detail content should not overlap action bar: ${JSON.stringify(metrics)}`
-    )
-
     await page.screenshot({
       path: path.resolve(outputDir, `${bossTask.task_code}-blocked.png`),
       fullPage: true,
     })
 
-    await page.getByRole('button', { name: /任务列表/u }).click()
-    await page.getByText(bossRejectTask.task_name, { exact: true }).waitFor({
+    await page.evaluate(() => window.history.back())
+    await page.getByTestId('mobile-role-bottom-nav').waitFor({
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByText(bossRejectTask.task_name, { exact: true }).click()
-    await page
-      .getByRole('heading', { name: bossRejectTask.task_name })
-      .waitFor({
-        state: 'visible',
-        timeout: 15_000,
-      })
-    await page.getByTestId('mobile-role-evidence-input').fill(rejectEvidence)
-    await page.getByRole('button', { name: /退回当前任务/u }).click()
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('请先填写阻塞或退回原因').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByTestId('mobile-role-detail-reason-input').fill(rejectReason)
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('任务状态已更新').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText('异常上报').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText(rejectReason, { exact: false }).first().waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText(rejectEvidence, { exact: false }).first().waitFor({
-      state: 'visible',
-      timeout: 15_000,
+    await verifyRestoredListState(page, bossTask, blockProcess.listScrollTop)
+
+    const rejectProcess = await openMobileTaskProcess(page, bossRejectTask)
+    const rejectReceipt = await submitMobileTaskAction(
+      page,
+      rejectProcess.actionScreen,
+      {
+        actionLabel: '退回',
+        evidence: rejectEvidence,
+        evidenceLabel: '现场证据',
+        reason: rejectReason,
+        reasonLabel: '退回原因',
+        requiredError: '退回原因为必填项',
+      }
+    )
+    await verifyConfirmedReceipt(page, rejectReceipt, {
+      actionLabel: '退回',
+      evidence: rejectEvidence,
+      reason: rejectReason,
+      task: bossRejectTask,
     })
     await page.screenshot({
       path: path.resolve(outputDir, `${bossRejectTask.task_code}-rejected.png`),
       fullPage: true,
     })
+    await returnReceiptToList(page, rejectReceipt)
 
-    await page.getByRole('button', { name: /任务列表/u }).click()
-    await page.getByText(bossDoneTask.task_name, { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
+    const doneProcess = await openMobileTaskProcess(page, bossDoneTask)
+    const doneReceipt = await submitMobileTaskAction(
+      page,
+      doneProcess.actionScreen,
+      {
+        actionLabel: '完成',
+        feedback: doneFeedback,
+        feedbackLabel: '完成反馈',
+        evidence: doneEvidence,
+        evidenceLabel: '现场证据',
+        requiredError: '完成反馈为必填项',
+      }
+    )
+    await verifyConfirmedReceipt(page, doneReceipt, {
+      actionLabel: '完成',
+      feedback: doneFeedback,
+      evidence: doneEvidence,
+      task: bossDoneTask,
     })
-    await page.getByText(bossDoneTask.task_name, { exact: true }).click()
-    await page.getByRole('heading', { name: bossDoneTask.task_name }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByTestId('mobile-role-evidence-input').fill(doneEvidence)
-    await page.getByRole('button', { name: /完成/u }).click()
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('任务状态已更新').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page
-      .getByTestId('mobile-role-bottom-nav')
-      .waitFor({ state: 'visible', timeout: 15_000 })
+    await returnReceiptToList(page, doneReceipt)
     await page.getByTestId('mobile-role-nav-done').click()
     await page.getByText('已办任务').waitFor({
       state: 'visible',
@@ -1573,77 +1818,44 @@ async function runBrowserScenario(
     })
 
     await page.getByTestId('mobile-role-nav-todo').click()
-    await page.getByText(warehouseTask.task_name, { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
+    const urgeProcess = await openMobileTaskProcess(page, warehouseTask, {
+      detailCopy: '这条任务由仓库办理，您可以查看并发起催办。',
     })
-    await page.getByText(warehouseTask.task_name, { exact: true }).click()
-    await page.getByRole('heading', { name: warehouseTask.task_name }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page
-      .getByText('您暂时不能处理这条任务，可以查看并催办', {
-        exact: false,
-      })
-      .waitFor({ state: 'visible', timeout: 15_000 })
-    const blockButton = page.locator('.mobile-role-action-bar__button--blocked')
-    const doneButton = page.locator('.mobile-role-action-bar__button--done')
-    const urgeButton = page.locator('.mobile-role-action-bar__button--urge')
-    assert.equal(
-      await blockButton.isDisabled(),
-      true,
-      'boss should not be able to block warehouse-owned task'
+    const urgeChoices = urgeProcess.actionScreen.locator(
+      '.mobile-task-action-choice'
     )
     assert.equal(
-      await doneButton.isDisabled(),
-      true,
-      'boss should not be able to complete warehouse-owned task'
+      await urgeChoices.count(),
+      1,
+      'cross-role task should expose only the urge action'
     )
+    const urgeChoice = urgeProcess.actionScreen.getByRole('button', {
+      name: '催办',
+      exact: true,
+    })
     assert.equal(
-      await urgeButton.isDisabled(),
+      await urgeChoice.isDisabled(),
       false,
-      'boss should be able to urge high priority warehouse-owned task'
+      'cross-role urge action should be enabled'
     )
-    await page.getByTestId('mobile-role-evidence-input').fill(urgeEvidence)
-    await urgeButton.click()
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('请先填写催办原因').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByTestId('mobile-role-detail-reason-input').fill(urgeReason)
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('催办已记录').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText(urgeReason, { exact: false }).first().waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page.getByText(urgeEvidence, { exact: false }).first().waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    const urgeMetrics = await page.evaluate(() => {
-      const actionBar = document.querySelector('.mobile-role-action-bar')
-      const buttons = [...(actionBar?.querySelectorAll('button') || [])].map(
-        (button) => ({
-          text: button.textContent?.trim() || '',
-          disabled: button.disabled,
-        })
-      )
-      return {
-        scrollWidth: document.documentElement.scrollWidth,
-        clientWidth: document.documentElement.clientWidth,
-        buttons,
+    const urgeReceipt = await submitMobileTaskAction(
+      page,
+      urgeProcess.actionScreen,
+      {
+        actionLabel: '催办',
+        evidence: urgeEvidence,
+        evidenceLabel: '现场证据',
+        reason: urgeReason,
+        reasonLabel: '催办原因',
+        requiredError: '催办原因为必填项',
       }
-    })
-    assert(
-      urgeMetrics.scrollWidth <= urgeMetrics.clientWidth + 1,
-      `cross-role urge detail should not overflow horizontally: ${JSON.stringify(urgeMetrics)}`
     )
+    const urgeMetrics = await verifyConfirmedReceipt(page, urgeReceipt, {
+      actionLabel: '催办',
+      evidence: urgeEvidence,
+      reason: urgeReason,
+      task: warehouseTask,
+    })
     assert.deepEqual(
       runtimeErrors,
       [],
@@ -1657,6 +1869,7 @@ async function runBrowserScenario(
     return {
       blockReason,
       blockEvidence,
+      doneFeedback,
       doneEvidence,
       rejectReason,
       rejectEvidence,
@@ -1682,6 +1895,7 @@ async function runOwnedCompleteScenario(
   { options, password, roleKey, task, username }
 ) {
   const { context, page, runtimeErrors } = await newMobilePage(browser)
+  const feedback = `${task.task_code}-FEEDBACK`
   const evidence = `${task.task_code}-PHOTO`
 
   try {
@@ -1695,28 +1909,23 @@ async function runOwnedCompleteScenario(
       state: 'visible',
       timeout: 15_000,
     })
-    await page.getByText(task.task_name, { exact: true }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
+    const process = await openMobileTaskProcess(page, task)
+    const receipt = await submitMobileTaskAction(page, process.actionScreen, {
+      actionLabel: '完成',
+      feedback,
+      feedbackLabel: '完成反馈',
+      evidence,
+      evidenceLabel: '现场证据',
+      requiredError: '完成反馈为必填项',
     })
-    await page.getByText(task.task_name, { exact: true }).click()
-    await page
-      .locator('.mobile-role-tasks-page--detail')
-      .waitFor({ state: 'visible', timeout: 15_000 })
-    await page.getByRole('heading', { name: task.task_name }).waitFor({
-      state: 'visible',
-      timeout: 15_000,
+    await verifyConfirmedReceipt(page, receipt, {
+      actionLabel: '完成',
+      feedback,
+      evidence,
+      roleKey,
+      task,
     })
-    await page.getByTestId('mobile-role-evidence-input').fill(evidence)
-    await page.getByRole('button', { name: /完成/u }).click()
-    await page.getByRole('button', { name: '提交' }).click()
-    await page.getByText('任务状态已更新').waitFor({
-      state: 'visible',
-      timeout: 15_000,
-    })
-    await page
-      .getByTestId('mobile-role-bottom-nav')
-      .waitFor({ state: 'visible', timeout: 15_000 })
+    await returnReceiptToList(page, receipt)
     await page.getByTestId('mobile-role-nav-done').click()
     await page.getByText('已办任务').waitFor({
       state: 'visible',
@@ -1775,7 +1984,7 @@ async function runOwnedCompleteScenario(
       path: path.resolve(outputDir, `${task.task_code}-done.png`),
       fullPage: true,
     })
-    return { evidence, metrics }
+    return { evidence, feedback, metrics }
   } catch (error) {
     const debug = await capturePageDebug(page)
     if (debug) {
@@ -1801,17 +2010,6 @@ async function capturePageDebug(page) {
   } catch {
     return ''
   }
-}
-
-async function assertNoVisibleText(page, text) {
-  const matches = await page.getByText(text, { exact: true }).all()
-  let visibleCount = 0
-  for (const match of matches) {
-    if (await match.isVisible().catch(() => false)) {
-      visibleCount += 1
-    }
-  }
-  assert.equal(visibleCount, 0, `页面不应显示文案: ${text}`)
 }
 
 async function screenshotOnFailure(page, fileName) {
@@ -1953,8 +2151,10 @@ async function main() {
       task: createdWarehouseInboundTask,
       username: 'demo_warehouse',
     })
+    browserResult.qualityFeedback = qualityResult.feedback
     browserResult.qualityEvidence = qualityResult.evidence
     browserResult.qualityMetrics = qualityResult.metrics
+    browserResult.warehouseInboundFeedback = warehouseInboundResult.feedback
     browserResult.warehouseInboundEvidence = warehouseInboundResult.evidence
     browserResult.warehouseInboundMetrics = warehouseInboundResult.metrics
     const updatedBossTask = await readTaskByCode({
@@ -1984,6 +2184,11 @@ async function main() {
     assert.equal(updatedBossDoneTask.task_status_key, 'done')
     assert.equal(updatedBossDoneTask.payload?.mobile_action?.action_key, 'done')
     assert.equal(updatedBossDoneTask.payload?.mobile_action?.role_key, 'boss')
+    assert.equal(
+      updatedBossDoneTask.payload?.feedback,
+      browserResult.doneFeedback,
+      'done task should retain completion feedback in payload.feedback'
+    )
     assert(
       updatedBossDoneTask.payload?.mobile_action_evidence_refs?.includes(
         browserResult.doneEvidence
@@ -2020,6 +2225,11 @@ async function main() {
     assert.equal(updatedQualityTask.owner_role_key, 'quality')
     assert.equal(updatedQualityTask.payload?.mobile_action?.action_key, 'done')
     assert.equal(updatedQualityTask.payload?.mobile_action?.role_key, 'quality')
+    assert.equal(
+      updatedQualityTask.payload?.feedback,
+      browserResult.qualityFeedback,
+      'quality done task should retain completion feedback in payload.feedback'
+    )
     assert(
       updatedQualityTask.payload?.mobile_action_evidence_refs?.includes(
         browserResult.qualityEvidence
@@ -2040,6 +2250,11 @@ async function main() {
     assert.equal(
       updatedWarehouseInboundTask.payload?.mobile_action?.role_key,
       'warehouse'
+    )
+    assert.equal(
+      updatedWarehouseInboundTask.payload?.feedback,
+      browserResult.warehouseInboundFeedback,
+      'warehouse inbound done task should retain completion feedback in payload.feedback'
     )
     assert(
       updatedWarehouseInboundTask.payload?.mobile_action_evidence_refs?.includes(

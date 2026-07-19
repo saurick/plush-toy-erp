@@ -103,3 +103,34 @@ test('strict pagination collects outsourcing facts beyond the backend default an
   assert.equal(result.limit, 200)
   assert.equal(result.offset, 0)
 })
+
+test('strict pagination keeps an active quality return beyond the old 20-row window and across pages', async () => {
+  const offsets = []
+  const allReturns = records(1, 201).map((record, index) => ({
+    ...record,
+    status: index === 200 ? 'DRAFT' : 'CANCELLED',
+  }))
+  const result = await listAllPaginatedRecords(
+    async (params) => {
+      offsets.push(params.offset)
+      return {
+        purchase_returns: allReturns.slice(
+          params.offset,
+          params.offset + params.limit
+        ),
+        total: allReturns.length,
+        limit: params.limit,
+        offset: params.offset,
+      }
+    },
+    { quality_inspection_id: 9, limit: 20 },
+    'purchase_returns'
+  )
+
+  assert.deepEqual(offsets, [0, 200])
+  assert.equal(result.purchase_returns.length, 201)
+  assert.equal(
+    result.purchase_returns.find((item) => item.status !== 'CANCELLED')?.id,
+    201
+  )
+})

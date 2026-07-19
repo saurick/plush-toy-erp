@@ -468,9 +468,6 @@ test("business-visible fixture copy uses trial-user wording without developer ja
   const productByRef = new Map(
     plan.records.products.map((product) => [product.code, product]),
   );
-  const salesByRef = new Map(
-    plan.records.salesOrders.map((order) => [order.order_no, order]),
-  );
   for (const order of plan.records.salesOrders) {
     for (const item of order.items) {
       const product = productByRef.get(item.productRef);
@@ -498,7 +495,10 @@ test("business-visible fixture copy uses trial-user wording without developer ja
     }
   }
   for (const order of plan.records.outsourcingOrders) {
-    const sourceOrder = salesByRef.get(order.sourceSalesOrderRef);
+    const sourceOrder = plan.records.salesOrders.find(
+      (candidate) => candidate.customer_order_no === order.source_order_no,
+    );
+    assert.ok(sourceOrder);
     assert.equal(order.source_order_no, sourceOrder.customer_order_no);
     for (const item of order.items.filter(
       (candidate) => candidate.subject_type === "PRODUCT",
@@ -1178,7 +1178,11 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
   const purchasePlan = plan.records.purchaseOrders.find(
     (record) => record.targetStatus === "APPROVED",
   );
-  const salesOrder = { id: 1001, lifecycle_status: "ACTIVE" };
+  const salesOrder = {
+    id: 1001,
+    lifecycle_status: "ACTIVE",
+    payment_term_days: salesPlan.payment_term_days,
+  };
   const outsourcingOrder = { id: 2001, lifecycle_status: "CONFIRMED" };
   const purchaseOrder = { id: 2501, lifecycle_status: "APPROVED" };
   const sourceDocuments = {
@@ -1297,6 +1301,10 @@ test("source report exposes read-back candidates but blocks every Fact phase mis
     "129",
   );
   assert.equal(sourceDrivenFacts.sourceCandidates.sales.order.customerId, 5001);
+  assert.equal(
+    sourceDrivenFacts.sourceCandidates.sales.order.paymentTermDays,
+    salesPlan.payment_term_days,
+  );
   assert.equal(
     sourceDrivenFacts.sourceCandidates.outsourcing.item.quantity,
     "112",

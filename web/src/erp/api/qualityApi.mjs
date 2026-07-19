@@ -1,6 +1,7 @@
 import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
+import { listAllPaginatedRecords } from '../utils/referencePagination.mjs'
 
 const qualityRpc = new JsonRpc({
   url: 'quality',
@@ -31,6 +32,21 @@ export async function listFinishedGoodsQualityInspections(
     options
   )
   return dataOf(result)
+}
+
+export async function listAllFinishedGoodsQualityInspections(
+  params = {},
+  options = {}
+) {
+  return listAllPaginatedRecords(
+    listFinishedGoodsQualityInspections,
+    params,
+    'quality_inspections',
+    options,
+    {
+      invalidResponseMessage: '服务器返回的成品质检记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function listProductionStageQualityInspections(
@@ -81,6 +97,22 @@ export async function listOutsourcingReturnQualityInspections(
     options
   )
   return dataOf(result)
+}
+
+export async function listAllOutsourcingReturnQualityInspections(
+  params = {},
+  options = {}
+) {
+  return listAllPaginatedRecords(
+    listOutsourcingReturnQualityInspections,
+    params,
+    'quality_inspections',
+    options,
+    {
+      invalidResponseMessage:
+        '服务器返回的委外回货质检记录不完整，请刷新后重试',
+    }
+  )
 }
 
 export async function submitQualityInspection(params = {}) {

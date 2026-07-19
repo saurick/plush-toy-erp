@@ -102,5 +102,8 @@ test('orderApprovalFlow: 移动端老板审批不再本地创建下游任务', (
     mobileRoleTasksPageSource.includes('runOrderApprovalFollowUp'),
     false
   )
-  assert.match(mobileRoleTaskActionsSource, /await loadTasks\(\)/)
+  assert.match(
+    mobileRoleTaskActionsSource,
+    /loadTasks\(\{\s*canonicalTask: confirmedTask\s*\}\)\.catch/
+  )
 })

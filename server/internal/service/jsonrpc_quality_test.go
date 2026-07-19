@@ -26,6 +26,7 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 		biz.PermissionQualityInspectionRead,
 		biz.PermissionQualityInspectionCreate,
 		biz.PermissionQualityInspectionUpdate,
+		biz.PermissionPurchaseReceiptRead,
 	))
 	adminCtx := workflowJSONRPCAdminContext()
 
@@ -179,6 +180,8 @@ func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *t
 		biz.PermissionQualityInspectionRead,
 		biz.PermissionQualityInspectionCreate,
 		biz.PermissionQualityInspectionUpdate,
+		biz.PermissionOutsourcingFactRead,
+		biz.PermissionOutsourcingOrderRead,
 	)
 	j := newQualityJSONRPCTestData(t, data, admin)
 	activateQualityTestCustomerConfig(t, j, customerConfigPublishParamsWithRevisionAndModuleState(
@@ -364,6 +367,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionAPIBindsShipmentFact(t 
 		biz.PermissionQualityInspectionRead,
 		biz.PermissionQualityInspectionCreate,
 		biz.PermissionQualityInspectionUpdate,
+		biz.PermissionShipmentRead,
 	))
 	adminCtx := workflowJSONRPCAdminContext()
 
@@ -511,6 +515,7 @@ func TestJsonrpcDispatcher_QualityInspectionAPIRequiresEnabledModules(t *testing
 		biz.PermissionQualityInspectionRead,
 		biz.PermissionQualityInspectionCreate,
 		biz.PermissionQualityInspectionUpdate,
+		biz.PermissionPurchaseReceiptRead,
 	))
 	adminCtx := workflowJSONRPCAdminContext()
 	receipt, item, lotID := createPostedQualityReceipt(t, ctx, j.inventoryUC, fixtures, "QI-MODULE-IN-READONLY", "QI-MODULE-LOT-READONLY")
@@ -585,6 +590,7 @@ func TestJsonrpcDispatcher_FinishedGoodsQualityInspectionRequiresShipmentModuleE
 	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
 		[]string{biz.QualityRoleKey},
 		biz.PermissionQualityInspectionCreate,
+		biz.PermissionShipmentRead,
 	))
 	lot, err := j.inventoryUC.CreateInventoryLot(ctx, &biz.InventoryLotCreate{
 		SubjectType: biz.InventorySubjectProduct,

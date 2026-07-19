@@ -440,11 +440,8 @@ function normalizeWorkInstructionPage(page = {}) {
       DEFAULT_WORK_INSTRUCTION_SAMPLE.productNo
     ),
     versionText: toText(page.versionText),
-    processName: textWithDefault(
-      page,
-      'processName',
-      DEFAULT_WORK_INSTRUCTION_SAMPLE.processName
-    ),
+    processName: toText(page.processName),
+    processDateText: toText(page.processDateText),
     department: textWithDefault(
       page,
       'department',
@@ -674,7 +671,8 @@ export const DEFAULT_WORK_INSTRUCTION_SAMPLE = {
   productNo: '25251#',
   versionText: '',
   processName: '车缝',
-  department: '生产部 / 品质部',
+  processDateText: '',
+  department: '生产部/品质部',
   maker: '制表人',
   designer: '设计师',
   auditor: '审核人',
@@ -907,6 +905,11 @@ export function createWorkInstructionDraft(input = {}) {
       'processName',
       DEFAULT_WORK_INSTRUCTION_SAMPLE.processName
     ),
+    processDateText: textWithDefault(
+      input,
+      'processDateText',
+      DEFAULT_WORK_INSTRUCTION_SAMPLE.processDateText
+    ),
     department: textWithDefault(
       input,
       'department',
@@ -1028,6 +1031,33 @@ function sourceProductSnapshot(
       record.product_code || productRecord?.code || code || record.product_no
     ),
     productName: productName || toText(productLabel),
+  }
+}
+
+function workInstructionProductSnapshot(
+  record = {},
+  { productOptions = [], products = [] } = {}
+) {
+  const productRecord = recordByID(products, record.product_id)
+  const productLabel = optionLabelByID(productOptions, record.product_id)
+  const [optionCode = '', ...optionNameParts] = productLabel.split(' / ')
+  return {
+    productNo: toText(
+      productRecord?.style_no ||
+        productRecord?.customer_style_no ||
+        record.product_no ||
+        record.product_no_snapshot ||
+        optionCode ||
+        record.product_code ||
+        productRecord?.code
+    ),
+    productName: toText(
+      productRecord?.name ||
+        record.product_name ||
+        record.product_name_snapshot ||
+        optionNameParts[0] ||
+        productLabel
+    ),
   }
 }
 
@@ -1169,7 +1199,10 @@ export function buildWorkInstructionDraftFromBOMVersion(
     productImages = {},
   } = {}
 ) {
-  const product = sourceProductSnapshot(version, { productOptions, products })
+  const product = workInstructionProductSnapshot(version, {
+    productOptions,
+    products,
+  })
   const materialByID = new Map(
     (Array.isArray(materials) ? materials : []).map((material) => [
       Number(material?.id || 0),
@@ -1213,22 +1246,15 @@ export function buildWorkInstructionDraftFromBOMVersion(
       heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
     }
   })
-  const processName = compactTextParts(
-    activeItems.flatMap((item) => [
-      item.process_method || item.processMethod,
-      item.process_base || item.processBase,
-    ])
-  )
   return createWorkInstructionDraft({
     companyName,
     productNo: product.productNo,
     productName: product.productName,
-    orderNo:
-      version.source_order_no ||
-      (version.version ? `BOM ${version.version}` : ''),
-    versionText: version.version ? `BOM ${version.version}` : '',
-    processName,
-    department: '生产部 / 品质部',
+    orderNo: version.source_order_no || '',
+    versionText: '',
+    processName: '',
+    processDateText: '',
+    department: DEFAULT_WORK_INSTRUCTION_SAMPLE.department,
     maker: version.maker || '',
     designer: version.designer || '',
     auditor: version.auditor || '',
@@ -1252,6 +1278,15 @@ function isCanceledLineStatus(value) {
   return normalized === 'canceled' || normalized === 'cancelled'
 }
 
+function singleDistinctText(values = []) {
+  const distinct = [
+    ...new Set(
+      (Array.isArray(values) ? values : []).map(toText).filter(Boolean)
+    ),
+  ]
+  return distinct.length === 1 ? distinct[0] : ''
+}
+
 function summarizeOutsourcingInstructionItem(item = {}, index = 0) {
   const productText = compactTextParts(
     [
@@ -1268,6 +1303,9 @@ function summarizeOutsourcingInstructionItem(item = {}, index = 0) {
   const parts = [
     toText(item.processing_item)
       ? `加工项目：${toText(item.processing_item)}`
+      : '',
+    toText(item.process_name_snapshot)
+      ? `工序：${toText(item.process_name_snapshot)}`
       : '',
     productText ? `产品：${productText}` : '',
     quantityText ? `数量：${quantityText}` : '',
@@ -1296,15 +1334,21 @@ export function buildWorkInstructionDraftFromOutsourcingOrder(
       : {}
   const supplierName =
     toText(supplierSnapshot.short_name) || toText(supplierSnapshot.name)
-  const productNos = activeItems.map((item) =>
-    compactTextParts([item.product_no_snapshot, item.sku_code_snapshot], ' / ')
-  )
+  const productNos = activeItems.map((item) => toText(item.product_no_snapshot))
   const productNames = activeItems.map((item) => item.product_name_snapshot)
   const processNames = activeItems.map((item) => item.process_name_snapshot)
   const orderNo = toText(order.outsourcing_order_no)
   const sourceOrderNo = toText(order.source_order_no)
   const expectedReturnDate = formatWorkInstructionDate(
     order.expected_return_date
+  )
+  const contextText = compactTextParts(
+    [
+      supplierName ? `加工厂：${supplierName}` : '',
+      sourceOrderNo ? `来源订单：${sourceOrderNo}` : '',
+      expectedReturnDate ? `回货日期：${expectedReturnDate}` : '',
+    ],
+    '；'
   )
   const contextRows = activeItems.length
     ? [
@@ -1313,6 +1357,15 @@ export function buildWorkInstructionDraftFromOutsourcingOrder(
           text: '外发加工信息',
           heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
         },
+        ...(contextText
+          ? [
+              {
+                type: WORK_INSTRUCTION_ROW_TYPES.text,
+                text: contextText,
+                heightMm: WORK_INSTRUCTION_DEFAULT_ROW_HEIGHT_MM,
+              },
+            ]
+          : []),
         ...activeItems.map(summarizeOutsourcingInstructionItem),
       ]
     : []
@@ -1321,8 +1374,9 @@ export function buildWorkInstructionDraftFromOutsourcingOrder(
     companyName,
     productNo: compactTextParts(productNos, ' / '),
     productName: compactTextParts(productNames, ' / '),
-    versionText: expectedReturnDate ? `回货日期：${expectedReturnDate}` : '',
-    processName: compactTextParts(processNames, ' / '),
+    versionText: '',
+    processName: singleDistinctText(processNames),
+    processDateText: '',
     department: DEFAULT_WORK_INSTRUCTION_SAMPLE.department,
     maker: '',
     designer: '',

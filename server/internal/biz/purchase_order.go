@@ -25,11 +25,14 @@ const (
 )
 
 var (
-	ErrPurchaseOrderNotFound     = errors.New("purchase order not found")
-	ErrPurchaseOrderItemNotFound = errors.New("purchase order item not found")
-	ErrPurchaseOrderConflict     = errors.New("purchase order version conflict")
-	ErrMaterialInactive          = errors.New("material inactive")
-	ErrSupplierInactive          = errors.New("supplier inactive")
+	ErrPurchaseOrderNotFound                    = errors.New("purchase order not found")
+	ErrPurchaseOrderItemNotFound                = errors.New("purchase order item not found")
+	ErrPurchaseOrderConflict                    = errors.New("purchase order version conflict")
+	ErrPurchaseOrderCloseDraftReceiptDependency = errors.New("purchase order close blocked by draft receipt")
+	ErrPurchaseOrderCancelReceiptDependency     = errors.New("purchase order cancellation blocked by receipt")
+	ErrPurchaseOrderLifecycleProcessDependency  = errors.New("purchase order lifecycle blocked by active process")
+	ErrMaterialInactive                         = errors.New("material inactive")
+	ErrSupplierInactive                         = errors.New("supplier inactive")
 )
 
 type PurchaseOrder struct {

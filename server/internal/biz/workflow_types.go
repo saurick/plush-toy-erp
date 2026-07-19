@@ -54,6 +54,7 @@ type WorkflowTask struct {
 type WorkflowTaskFilter struct {
 	Limit                int
 	Offset               int
+	Keyword              string
 	OwnerRoleKey         string
 	VisibleOwnerRoleKeys []string
 	VisibleAssigneeID    *int
@@ -62,6 +63,8 @@ type WorkflowTaskFilter struct {
 	TaskGroup            string
 	SourceType           string
 	SourceID             int
+	DueFrom              *time.Time
+	DueTo                *time.Time
 }
 
 type WorkflowTaskBoardQuery struct {

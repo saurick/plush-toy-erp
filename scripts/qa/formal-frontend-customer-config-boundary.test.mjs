@@ -151,7 +151,7 @@ test("formal frontend customer config boundary: page, action, and field projecti
   );
   assert(businessModuleSource.includes("isCustomerBusinessDataPageKey"));
   assert(businessModuleSource.includes("business-dashboard"));
-  assert(businessModuleSource.includes("exception-flow"));
+  assert(!businessModuleSource.includes("exception-flow"));
   assert(businessModuleSource.includes("businessModuleDefinitions.map"));
 
   const seedDataSource = readRelative("web/src/erp/config/seedData.mjs");
@@ -199,9 +199,13 @@ test("formal frontend customer config boundary: page, action, and field projecti
   assert(mobileTasksSource.includes("canMountCustomerRuntime"));
   assert(mobileTasksSource.includes("canMountCustomerTasks"));
   assert(mobileTasksSource.includes("if (!canMountCustomerTasks)"));
+  assert(
+    mobileTasksSource.includes("workflowTaskAdminAccessRequestIdentity"),
+    "mobile task scope must reuse the complete admin access identity",
+  );
   assert.match(
     mobileTasksSource,
-    /const taskScopeKey = `\$\{activeRoleKey\}\|\$\{customerKey\}\|\$\{customerConfigRevision\}\|/u,
+    /const taskAccessIdentity =\s*workflowTaskAdminAccessRequestIdentity\(adminProfile\)[\s\S]*const taskScopeKey = `\$\{activeRoleKey\}\|access:\$\{taskAccessIdentity\}\|\$\{canMountCustomerTasks \? 'ready' : 'blocked'\}`/u,
     "role, customer, revision, or runtime access changes must invalidate the visible task scope",
   );
   assert.match(
@@ -304,13 +308,21 @@ test("formal frontend customer config boundary: page, action, and field projecti
   );
 
   const routerSource = readRelative("web/src/erp/router.jsx");
-  assert(routerSource.includes("shouldUseRememberedDesktopEntry"));
+  assert(routerSource.includes("hasDesktopEntryAccess"));
   assert(routerSource.includes("isDesktopEntryEnabled(entryConfig)"));
+  assert.match(
+    routerSource,
+    /target === ENTRY_TARGET\.DESKTOP &&\s*hasDesktopEntryAccess\(admin, entryConfig\)/u,
+    "the root desktop entry must stay gated by the current admin profile and enabled desktop entry",
+  );
+  assert.match(
+    routerSource,
+    /getAllowedMobileRoleKeys\(\s*admin,\s*getEnabledMobileRoleKeys\(entryConfig\)\s*\)/u,
+    "the root mobile entry must stay gated by the current admin profile and enabled role projection",
+  );
   assert(
-    !routerSource.includes(
-      "adminProfile && lastEntryTarget === ENTRY_TARGET.DESKTOP",
-    ),
-    "mobile route must not follow a remembered desktop entry unless the current admin has desktop menu access",
+    !routerSource.includes("shouldUseRememberedDesktopEntry"),
+    "explicit desktop and mobile routes must not be redirected by a remembered entry target",
   );
 });
 

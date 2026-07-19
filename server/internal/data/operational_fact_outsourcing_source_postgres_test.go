@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -134,17 +135,68 @@ func TestOutsourcingFactFromOrderPostgresOrderCancelRaceKeepsValidState(t *testi
 	if err != nil {
 		t.Fatalf("reload race fact: %v", err)
 	}
-	switch {
-	case pErr == nil:
-		if !errors.Is(cErr, biz.ErrOutsourcingOrderFactDependency) || storedOrder.LifecycleStatus != biz.OutsourcingOrderStatusConfirmed || storedFact.Status != biz.OperationalFactStatusPosted {
-			t.Fatalf("post-won race invalid: post=%v cancel=%v order=%s fact=%s", pErr, cErr, storedOrder.LifecycleStatus, storedFact.Status)
+	if pErr != nil || !errors.Is(cErr, biz.ErrOutsourcingOrderFactDependency) {
+		t.Fatalf("existing draft must post and reject parent cancellation: post=%v cancel=%v", pErr, cErr)
+	}
+	if storedOrder.LifecycleStatus != biz.OutsourcingOrderStatusConfirmed || storedFact.Status != biz.OperationalFactStatusPosted {
+		t.Fatalf("invalid final state: order=%s fact=%s", storedOrder.LifecycleStatus, storedFact.Status)
+	}
+}
+
+func TestOutsourcingFactFromOrderPostgresCreateAndSettleNeverLeavesActiveDraftOnSettledOrder(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryPostgresTestData(t)
+	fixtures := createInventoryPostgresFixtures(t, ctx, client)
+	logger := log.NewStdLogger(io.Discard)
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, logger))
+	orderRepo := NewOutsourcingOrderRepo(data, logger)
+
+	for _, target := range []string{biz.OutsourcingOrderStatusClosed, biz.OutsourcingOrderStatusCanceled} {
+		for iteration := 0; iteration < 8; iteration++ {
+			label := fmt.Sprintf("CREATE-SETTLE-%s-%d-%s", target, iteration, fixtures.suffix)
+			order, line := createPostgresOutsourcingProductSource(t, ctx, client, fixtures, label, decimal.NewFromInt(5))
+			lotNo := "PG-OUT-" + label
+			input := &biz.OutsourcingFactFromOrderCreate{
+				FactNo: "PG-OUT-" + label, OutsourcingOrderID: order.ID, OutsourcingOrderItemID: line.ID,
+				WarehouseID: fixtures.warehouseID, NewLotNo: &lotNo, Quantity: decimal.NewFromInt(2),
+				IdempotencyKey: "PG-OUT-" + label,
+			}
+			start := make(chan struct{})
+			var fact *biz.OutsourcingFact
+			var createErr, settleErr error
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				<-start
+				fact, createErr = uc.CreateOutsourcingReturnReceiptFromOrder(ctx, input)
+			}()
+			go func() {
+				defer wg.Done()
+				<-start
+				_, settleErr = orderRepo.UpdateOutsourcingOrderLifecycle(ctx, order.ID, target)
+			}()
+			close(start)
+			wg.Wait()
+
+			orderRow := client.OutsourcingOrder.GetX(ctx, order.ID)
+			facts := client.OutsourcingFact.Query().Where(
+				outsourcingfact.SourceType(biz.OutsourcingOrderSourceType),
+				outsourcingfact.SourceID(order.ID),
+			).AllX(ctx)
+			switch {
+			case settleErr == nil:
+				if !errors.Is(createErr, biz.ErrOutsourcingOrderFactInvalidState) || orderRow.LifecycleStatus != target || len(facts) != 0 || fact != nil {
+					t.Fatalf("%s settle winner escaped invariant: create=%v settle=%v order=%s facts=%#v fact=%#v", target, createErr, settleErr, orderRow.LifecycleStatus, facts, fact)
+				}
+			case createErr == nil:
+				if !errors.Is(settleErr, biz.ErrOutsourcingOrderFactDependency) || orderRow.LifecycleStatus != biz.OutsourcingOrderStatusConfirmed || len(facts) != 1 || facts[0].Status != biz.OperationalFactStatusDraft || fact == nil || fact.ID != facts[0].ID {
+					t.Fatalf("%s create winner escaped invariant: create=%v settle=%v order=%s facts=%#v fact=%#v", target, createErr, settleErr, orderRow.LifecycleStatus, facts, fact)
+				}
+			default:
+				t.Fatalf("%s race has no legal winner: create=%v settle=%v order=%s facts=%#v", target, createErr, settleErr, orderRow.LifecycleStatus, facts)
+			}
 		}
-	case cErr == nil:
-		if !errors.Is(pErr, biz.ErrOutsourcingOrderFactInvalidState) || storedOrder.LifecycleStatus != biz.OutsourcingOrderStatusCanceled || storedFact.Status != biz.OperationalFactStatusDraft {
-			t.Fatalf("cancel-won race invalid: post=%v cancel=%v order=%s fact=%s", pErr, cErr, storedOrder.LifecycleStatus, storedFact.Status)
-		}
-	default:
-		t.Fatalf("race must have one successful command: post=%v cancel=%v", pErr, cErr)
 	}
 }
 

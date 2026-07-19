@@ -1,286 +1,134 @@
 # plush-toy-erp progress
 
-本文件只保留当前活跃事项、最近完成记录和归档索引；历史流水已归档到 `docs/archive/`。`progress.md` 是过程交接线索，不是正式需求、数据模型或部署真源。
+本文件只保留当前活跃事项、最近完成记录和归档索引；历史流水已完整归档到 `docs/archive/`。`progress.md` 是过程交接线索，不是正式需求、数据模型、迁移或部署真源。
 
 ## 当前活跃事项
 
-- 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试。
-- 三类 Workflow 来源任务与固定生产路线 / WIP 已完成同一 worktree 本地闭环，`full / strict`、隔离迁移和浏览器合同场景通过；仍待真实后端岗位浏览器读回、明确目标开发库后的 migration / backfill 预演与发布验收。
-- 公开 `create_purchase_receipt_draft / create_purchase_receipt_with_items` 仍可创建无采购订单来源的入库草稿，继续作为独立来源边界治理项。
-- 当前共享 worktree 含大量其他会话改动；本轮保留并验证固定生产路线、WIP、质量、包装、完工入库及来源任务相关切片，不回退、不 stage，也不把共享整树全部改动归为本轮成果。
-- 发布目标是内网测试机 `192.168.0.133`；提交、推送、部署、migration / backfill apply、目标 smoke 与客户岗位验收均需独立授权和证据。
+- 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
+- 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务和页面合同等改动统一按最终 `strict` 证据提交，不再把相邻差异拆算为独立未收口任务。
+- 固定生产路线 / WIP 的版本化 migration 已生成；登记的个人开发库已读回到 `20260718125909`、83 executed、pending 0，schema 与约束已生效，但固定路线所需的工序标准位置仍须通过工序页或受控 seed 显式绑定。共享库和目标环境没有本轮 apply 证据；本轮收口不执行数据库写入。
+- 本轮已获得整树提交和推送授权；仍不创建分支、不部署、不执行共享库 / 目标库 migration 或 backfill，也不补做目标 health / smoke、真实岗位浏览器读回和客户 UAT。
+- 发布目标仍是内网测试机 `192.168.0.133`；本次提交推送不等于该目标环境已经发布或验收。
 
-## 2026-07-16 Ent migration 会话收口与暂存门禁
+## 2026-07-19 外部审查问题与并行工作树集中收口
 
-完成：项目 `AGENTS.md` 将 Ent schema 变更收口固定为 `make data` 生成与审查 Ent 产物、versioned migration 和 `atlas.sum`，再执行 `db-guard`；缺 migration 或生成零漂移证据只能报告 `incomplete`。`migrate_apply` 与生成门禁分离：只对已确认归属的本地/隔离开发库按 `status -> apply -> status / 结构读回` 执行，共享、测试、生产或归属不明库仍需先确认。
+完成：按外部审查优先级收口固定生产路线、WIP migration / command、来源单据与业务事实血缘、岗位任务、客户配置、页面和验收合同；固定路线改用稳定工序代码与版本化绑定，WIP 关联迁移保留可追溯的数据转换边界，初始化命令的幂等语义与事件合同一致。同步修正并行开发后暴露的移动任务刷新、客户配置身份、来源只读分页、Ant Design 表单挂载及 QA 静态合同漂移，没有通过放宽权限、来源、状态或幂等条件换取测试绿色。
 
-完成：`pre-commit` 在已有 staged index 快照内强制执行 `QA_BASE_RANGE=HEAD...HEAD` 的 `db-guard`，只检查本次暂存 transition；守卫不可通过环境中的 `SKIP_DB_GUARD=1` 被静默跳过，且保持 check-only，不运行 `make data`、`migrate_apply`或 `git add`。集成回归用真实 `db-guard` 先证明只暂存结构 schema 时 hook 失败，再证明补齐对应 migration 与 `atlas.sum` 后同一 staged 变更通过。
+完成：Atlas migration、Ent 生成物、正式架构 / 能力 / 客户交付文档与当前实现重新对齐。登记的个人开发库只读核对为 `20260718125909`、83 executed、pending 0；固定路线仍为 `0 / 4` 个标准工序位置已绑定，必须由工序页或受控 seed 显式完成，不能把 migration 已执行写成路线已可用。共享库和目标环境没有本轮 apply 证据。
 
-验证：`node --test scripts/qa/db-guard.test.mjs scripts/git-hooks/pre-commit.test.mjs` 29 / 29 通过，0 fail / 0 skip；`bash -n`、定向 shfmt / shellcheck、Node 语法、`git diff --check` 和 AGENTS 体积门禁通过，当前项目 `AGENTS.md` 为 12,554 bytes。`affected` 将仓库级 hook 变更保守归为 T8；定向绿色不替代推送前最终冻结树的 `full.sh`。
+当前验证：Node `24.14.0` 下 scripts 全量 `1273 / 1273`、Web 全量 `1691 / 1691`，完整 Style L1 mock Chromium `154 / 154`，均为 `0 fail / 0 skip`；关键 PostgreSQL 矩阵连续 3 轮各 `190 / 190`，另完成 24 轮并发竞态复核。`make data` 没有生成额外 migration，Atlas validate、fresh / 存量升级、`db-guard` 和 schema 合同通过。最终提交停止条件是冻结树上的 `bash scripts/qa/strict.sh` 输出 `status=complete`；未达到该结果不提交、不推送。
 
-下一步：后续任务只要修改 Ent schema，就必须在本轮内完成生成、migration 审查、静态守卫和 apply 状态报告；提交推送前仍按最终整树执行 `full.sh`。
+未做 / 风险：本次只治理、验证、提交和推送当前代码库；未部署 `192.168.0.133`，未写入共享库或目标库，未执行目标环境 health / readback、真实岗位浏览器验收或客户 UAT。Atlas migrate lint 仍受 Pro 登录限制，已由 validate、fresh / 存量升级和 PostgreSQL 矩阵补证；超大前端页面拆分继续作为非阻断技术债，不在本轮扩展范围。
 
-阻塞/风险：本轮没有修改 Ent schema 或 migration，没有 apply 任何本地、共享、133 或生产数据库；共享工作树中已有的净重 schema / migration 与手工验收改动均原样保留，不属于本轮成果。本轮未 stage、commit、push、deploy 或客户验收。
+## 2026-07-19 移动岗位任务 v1 列表 + v2 选中任务流
 
-## 2026-07-16 全页面验收数据同源生成与密码范围收口
+完成：移动岗位任务端保留现有 v1 待办 / 已办 / 提醒 / 我的列表、主筛选、服务端游标分页 / 分批展开和任务卡片；选中任务后改由 v2 独立全屏“查看任务 → 处理任务 → 可信结果回执”承接，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。浏览器 / 系统返回、处理草稿、深分页任务恢复、重复游标 / 无新增页止损、窄屏、暗色、移动键盘和焦点返回均纳入同一流程合同。
 
-完成：新增唯一 `manual-acceptance-dataset-runner-v1`，local 与 `customer-trial-133` 共用同一串行阶段 registry、target-free 业务输入和严格组件回执；目标 adapter 只提供 endpoint、数据库身份、凭据、确认串、attestation 与报告目录。顺序固定为 `core → role → source → task → facts → purchase-quality → attachments → readiness`：先通过 admin 只读 RPC 回读 `debug.capabilities.databaseName`，并精确核对 `SIM-PLUSH-CORE-PCS` 和四个稳定仓库码，再允许任何账号或业务写入。local apply 必须显式提供非 8300 的专用后端、`plush_erp_acceptance_*` 数据库名及数据库绑定确认串；运行态数据库名不一致时 fail closed。默认 runner 不再执行不绑定后端的 core / role seed shell；十个正式岗位账号缺失即阻断，三类异常账号统一由 account-scenarios 正式 API 调和。采购收货与质检只从同批 facts 报告派生，不再保留独立造数分支；任务远端门禁改为 migration floor + 当前运行态 / 读回，不再把历史 review commit 当作唯一允许 release。
+完成：处理动作只消费后端 action explain 投影；仅催办任务只显示催办，只读任务不展示假动作。完成反馈进入后端 `payload.feedback`，现场证据继续独立进入 `evidence_refs`；阻塞、退回、解除阻塞和催办继续按动作合同要求原因。回执只接受本次可信 mutation 的 `confirmed / unknown / failed` 结果，不从任务终态补造成功、处理人或时间；Workflow done 和附件上传都不等于业务 Fact 已生效。
 
-完成：新增 48 个正式页面的数据归属合同，每页只能消费共享 `role / source / task / facts / catalog` 阶段及其 readback probe；漏页、重复页、孤立 probe、页面自有 builder / 脚本或阶段入口分叉全部 fail closed。双环境 dry-run 得到同一 semantic digest `2836b37bf723a43fae94a49cf1cdc04610cec0f46441c458c9a1fffcf5ecb9b4`，数据库 ID 仍各自独立。管理员与演示账号的创建、初始化、重置和生产 preflight 密码范围统一为 8～20 个 Unicode 字符且 UTF-8 编码后不超过 72 字节；登录既有账号不因该创建策略被前端提前拦截。
+完成：终态动作把任务从待办 / 风险缓存移走后，结果回执仍可按同一账号、客户与权限 revision 的可信 canonical 快照回看只读详情，不重新开放处理。History 草稿、回执详情与 Back / Forward 恢复均要求完整 access scope 相等；稀疏筛选另存每个服务端视图的实际已加载数量，刷新时最多按 `20 x 50 = 1000` 条恢复，不再把筛选后可见条数误当服务端扫描深度。三位数任务计数在 390px 窄屏筛选条内保持裁切，无内部横向溢出。
 
-验证：Node 24 手工验收与 production preflight 定向测试 252 / 252、相关 Go 7 个包通过。`bash scripts/qa/affected.sh --run` 判定 41 文件 / T8 并完整通过 full；最终 `bash scripts/qa/strict.sh` 也从头通过：scripts Node 1021 / 1021、Web 合同 195 / 195、Web 全量 1258 / 1258、关键 PostgreSQL 154 / 154、server-all 2097 / 2097、真实 Chromium、Web / Go build、shellcheck、shfmt、yamllint 与两次 govulncheck 均通过，0 fail / 0 skip。较早一次漏洞库刷新曾遇到瞬时 `EOF`，随后单独复检和两轮完整门禁均确认 0 个可调用漏洞，未跳过检查。
+完成：原型与文档登记改为有意组合的主路径。`mobile-role-tasks-v1/implemented-reference.html` 是唯一 Current，范围只覆盖 v1 列表壳，文件内旧详情内处理仅作历史对照；`mobile-role-tasks-v2/index.html` 的选中任务流程已经接入本地运行时，继续保持 To Implement 只因为真实账号浏览器视觉验收和用户确认尚未完成，不表示未来要替换或移除 v1 列表。
 
-下一步：取得提交推送与发布授权后，先冻结 commit / image / migration；再让专用本地验收后端绑定独立验收库执行 v3 并读回，随后部署同一不可变版本到 133、重放同一 semantic digest，补 readiness / browser / PDF 证据。确认 v3 完整后，133 旧 v1 批次只按生命周期退出，不物理删除。
+当前验证：移动专项 Node 合同 `154 / 154`、开发态原型登记合同 `20 / 20`、文档清单与本地链接 `3 / 3` 通过；定向 ESLint `--max-warnings=0`、Stylelint、`node --check` 和 `git diff --check` 均通过。Vite production build 通过并转换 `3319` 个模块，只有执行环境 Node `26.5.0` 与项目锁定 `24.14.x` 不一致的 engine warning。`mobile-yoyo-role-task-readonly-actions`、`mobile-tasks-dark`、`mobile-tasks-browser-back-stays-mobile` 三个 mock Chromium Style L1 场景 `3 / 3` 通过，新增覆盖 120 条非命中风险 + 30 条超时命中的稀疏筛选深分页、刷新 / Back / Forward、终态回执回看只读详情、三位数计数窄屏布局，并继续覆盖只读 / 仅催办和暗色；registry 与静态查看器均只有一个 Current。no-write runtime preflight 已确认本机前端 `15200`、后端 `8300`、yoyoosun 静态配置与 health / ready 可探测，但 `readyForRealSmoke=false`，唯一 blocker 是 `missing-demo-password-env`。
 
-阻塞/风险：当前 `8300` 指向共享开发库，不能作为专用验收写入目标；133 当前仍是 v3 配置配合 v1 数据，缺同批 v3 facts / attachments / readiness 证据。本轮未写本地或 133 业务数据，未提交、推送或部署，不能把代码和本地门禁绿色写成目标数据已同步或客户验收完成。
+未做 / 风险：未执行真实岗位账号登录后的浏览器 smoke、视觉确认、目标环境发布读回或客户 UAT；当前打开 `/m/boss/tasks` 只能到登录页，不能据此证明任务读取、处理或回执运行态。未改 schema / migration、后端 Fact、RBAC 权限码、正式菜单或客户数据，也未连接 / apply 数据库、提交、推送或部署。
 
-## 2026-07-15 本地开发端口与并行启动治理
+## 2026-07-19 开发工作台覆盖状态与证据边界
 
-完成：按甲方确认口径固化 `PLUSH_SEW_HAND_V1`：布料加工（仅委外）→ 裁片 WIP 质检 → 车缝（本厂 / 委外）→ 皮套 WIP 质检 → 手工（本厂 / 委外）→ 成品、针检、抽检及条件式客户验货 → 包材版面 / 版本确认 → 包装 WIP → 成品入库。车缝与手工分别由生产经理决策去向，允许同批拆分内部 / 委外子批；内部流转称“车间移交 / WIP 转移”，只有委外返回称“外发回仓”。
+完成：开发工作台新增整个 Product Core 的只读覆盖视图，按 Go / Web 代码、业务域场景、T0-T8 门禁和运行态 / UAT 分层展示，不把财务专项或局部绿色合成“全系统覆盖率”。开发态固定 GET 接口只读 ignored latest 报告，严格校验 loopback / Host、schema、大小、敏感字段和仓库指纹；原有 `web/public/qa` 跟踪报告已删除，不再进入生产构建。
 
-完成：BOM 与生产需求新增显式布料加工工序归属，禁止按名称或顺序猜测；WIP 与委外合同通过独立分配表关联。普通布料加工必须在同一已确认加工合同内完整覆盖显式布料需求，车缝 / 手工委外必须匹配产品、规格、工序、单位和子批数量；返工显式记录目标与数量。委外合同在仍有 WIP 分配或活跃批次时不能取消 / 关闭，生产订单存在活跃 WIP 时不能关闭。
+完成：新增共享 repository identity、字段联动 runner 和整仓聚合器。指纹同时绑定 commit、tracked diff 字节和稳定的 untracked 内容；测试运行前后变动、错误 schema、计数冲突、跳过 / 取消 / todo、零执行、过期 artifact 和缺失证据均 fail closed。当前字段联动专项业务场景为 `66 / 68`，另 `2` 项明确保持 missing；这只是 Frontend 字段联动切片，不等于整仓覆盖。
 
-完成：生产工序质检仅接受 `PASSED + PASS`，让步结论不能放行；针检、抽检和条件式客户验货保持独立关口。包材外观 / 版面确认归业务动作，不冒充品质 IQC。完工上限以已验收包装 WIP 减已过账成品入库事实计算，使用 `numeric(20,6)` 等价精确数量算法；生产构建使用兼容 ES2018 的 BigInt 构造写法。
+当前验证：Node `24.14.0` 下覆盖报告、安全接口、字段目录和工作台定向合同 `82 / 82`、文档清单 `3 / 3`通过；Prettier、ESLint、Stylelint、Vite production build 和生产产物泄露扫描通过。覆盖页亮色 / 暗色、loading、missing、current + stale 和移动端共 `5 / 5` 个 mock Chromium Style L1 场景通过。
 
-完成：生产订单页接入路线初始化、拆批、内转 / 委外、质检阻断、返工、包装确认和完工上限；补齐生产、销售、品质、PMC 的 WIP 只读 / 执行权限与菜单投影。同步当前真源、能力台账、客户差异、API 和架构边界文档，并生成三页移动版正式报告 `output/pdf/plush_factory_formal_report_v4_mobile.pdf`，已逐页渲染检查。
+未做 / 风险：当前 Go / Web 行与分支覆盖制品、T0-T8 全部门禁回执、PostgreSQL、真实浏览器业务读回、readiness、目标环境和客户 UAT 仍为 missing，不用 `0%` 或局部通过掩盖。共享 worktree 因其他任务改动已升级到 T8 风险，本任务未运行或宣称整树 full / strict 通过，也未连接 / apply 数据库、提交、推送、部署或执行客户验收。
 
-验证：`make data` 完成且未产生额外 schema 漂移，Atlas migration `20260717035245`、`20260717043625` 已生成，`db-guard` 通过。最终 `bash scripts/qa/strict.sh` 全绿：前端全量 1450 / 1450、服务端全量 2279 / 2279，生产构建、隔离全量迁移及 populated-upgrade、PostgreSQL 并发 / 事务、扩展浏览器场景、lint / stylelint / shellcheck / shfmt / yamllint、密钥检查和 `govulncheck` 均通过。
+## 2026-07-19 相关单据连续往返与数字参数合同
 
-未做 / 风险：上述 migration 未向共享开发库、测试库或生产库 apply；未执行目标环境部署、health / smoke、真实账号岗位读回或客户 UAT。甲方确认的是高层业务流程，不等于系统已发布或客户已验收。当前未 stage、commit、push 或 deploy。
+完成：修复发票管理 -> 出货单 -> 发票管理的连续相关单据跳转。每一跳都从目标页自己的精确关系重新建立筛选，不再依赖上一页残留状态；URL 中的精确 ID 在请求边界统一转为 JSON number，避免 Go 严格参数解析把字符串 ID 当成 0。发票页按 `INVOICE + SHIPMENT / source_id` 的事实真源筛选，只有一条可确定的有效记录时自动选中并回显规范发票号；存在多条取消历史且无法唯一确定时不臆选。用户编辑或清空筛选后仍会退出相关单据上下文。相同数值 ID 合同同步覆盖销售、采购、生产、委外、收货、质检、出货、库存和 Operational Fact 相关跳转。
 
-## 2026-07-17 三类 Workflow 任务接入真实业务生产者
+当前验证：Node `24.14.0` 下相关页面和导航合同 `97 / 97`、Web ESLint、Vite production build、`git diff --check` 均通过；定向 Style L1 `发票 -> 出货 -> 发票 -> 出货 -> 发票` mock Chromium 场景 `1 / 1` 通过，覆盖 URL 精确参数、RPC number 类型、规范业务单号回显、唯一记录自动选中、清空恢复、无错误提示和无横向溢出，并保存 3 张 `1440 x 900` 视觉证据。Web 全量单测 `1669 / 1671` 通过，另 2 项失败来自共享 worktree 中已退役桌面“异常处理”入口后的旧菜单数 `30 -> 29` 与 Dashboard 元数据数 `4 -> 3` 断言，未加载本轮相关单据代码。
 
-完成：生产订单由 `DRAFT -> RELEASED` 同一事务生成 `production_scheduling` 任务、created event 与 `production_ready` 协同状态，责任岗位为 PMC；订单关闭必须排程任务已完成，已发布订单取消必须任务已完成或已退回，来源取消不伪造任务终态。只有真实发布动作能生成任务，试用任务改用 `trial_*` 组。
+未做 / 风险：本轮未改 schema / migration、后端 Fact / RBAC / menu，也未连接或 apply 数据库。本机 `5175` 当前是未连接客户数据的 Product Core preview，无法提供真实业务记录运行态验收；Style L1 是 mock Chromium，不能替代真实客户 runtime、133 发布读回或客户 UAT。共享工作树 `affected --plan` 因 520 个跨任务文件达到 T8，本任务没有运行或宣称整树 `full / strict` 通过，也未提交、推送或部署。
 
-完成：只有 REWORK 生产事实从 `DRAFT -> POSTED` 时，才在同一库存 / 事实事务生成 `production_exception` 任务，异常原因取返工事实备注快照，责任岗位为生产；任务完成不代替返工、报废、库存调整或 Fact posted。已过账返工冲销要求异常任务先进入完成或退回终态，草稿返工取消不造任务。
+## 2026-07-19 提醒页统一显示更多与刷新边界
 
-完成：草稿出货单新增“提交出货放行”，在锁定出货单、校验明细和可选成品质检结果后生成 `shipment_release` 任务，责任岗位为仓库。任务完成只写 `shipping_released` 协同状态，不确认出货、不扣库存、不生成应收 / 发票；实际出货路径要求放行任务已完成。提交放行后不再允许补造出货前质检，避免放行快照之后改变检验集合。
+完成：移动岗位任务页不再同时显示“分批展开”和“继续加载风险任务”两个入口。待办、已办、预警、提醒统一使用一个“显示更多”按钮：先展开当前已加载内容，接近已加载边界且服务端仍有下一页时，由同一按钮按原 `server_time` 游标快照续取并直接显示新批次；顶部刷新继续使用无游标请求，单独负责获取最新快照。移除了“当前只显示已加载内容”等实现性说明，保留加载中禁用、失败后可重试、全部显示后的收起行为。
 
-完成：来源对象终态与任务结论保持分离。排程 / 异常任务完成只推进协同投影，不代替生产事实；生产订单关闭 / 取消、返工事实取消会在同一事务核对精确来源任务并推进来源投影。出货草稿无任务可直接取消且不写库存，存在进行中放行任务时拒绝，任务已完成 / 退回时保留任务结论再取消；只有已出货取消才写库存冲正。ProcessRuntime 的 `shipment.ship` 同样要求 `workflow_tasks` 模块，不能绕过普通 API 放行门禁。
+当前验证：Node `24.14.0` 下分页、快照漂移、失败保留与 Style L1 RPC mock 定向测试 `39 / 39` 通过，Web ESLint 和 CSS lint 通过；`mobile-tasks-dark` mock Chromium 场景 `1 / 1` 通过，真实点击验证页面始终只有一个列表控制，跨首个 50 条服务端页后预警已加载数由 50 增至 62、可见条目继续增加，并保存折叠态与跨页态截图。Web 全量单测 `1651 / 1653` 通过，另 2 项失败来自共享 worktree 中已退役桌面“异常处理”入口后的旧菜单数 `30 -> 29` 与 Dashboard 元数据数 `4 -> 3` 断言，未加载本轮移动提醒页代码。
 
-完成：三类任务统一使用 `workflow.source-task/v1`、确定性 task code、producer 和 intent hash；同意图重放返回原任务，不同意图冲突并回滚。公开 `workflow.create_task`、ProcessRuntime 显式 / 默认任务、客户流程配置、seed、mock 和试用数据均拒绝三个保留任务组与编号前缀。PMC / 生产岗位补齐来源任务退回权限，后端仍校验 owner / assignee、责任池和客户 scope。前端补齐生产订单发布、返工过账和出货提交的岗位文案、严格响应校验、精确来源跳转、任务标签、页面血缘，以及 yoyoosun PMC 的生产订单菜单投影；没有恢复通用“新建任务 / 新建事实”。
+未做 / 风险：本轮未改 schema / migration、RBAC、Workflow / Fact、正式 API 或菜单，没有连接或 apply 数据库；浏览器证据使用本地 mock，不能替代真实后端岗位账号、133 发布读回或客户 UAT。共享工作树 `affected --plan` 因 513 个跨任务文件达到 T8，本任务没有运行或宣称整树 `full / strict` 通过，也未提交、推送或部署。
 
-完成：新增 `backfill-workflow-source-tasks` 受控修复命令，默认事务 dry-run，apply 必须确认精确数据库名；只补当前 `RELEASED` 生产订单和当前 `POSTED REWORK` 返工事实，不回补 `DRAFT` 出货单，不猜测历史任务终态，遇到意图冲突或任务包不完整时整批失败。
+## 2026-07-18 通用异常总控入口退役
 
-验证：后端 `go test ./internal/biz -count=1`、`./internal/data -count=1`、`./internal/service -count=1`、`./internal/core/status -count=1` 与 `./cmd/backfill-workflow-source-tasks -count=1` 通过。来源任务 / 页面血缘前端 Node 69 / 69 通过；行业模板、文档清单、试用数据隔离和 yoyoosun 角色闭环 Node 76 / 76 通过。`shipment-release-source-handoff-desktop` 本地 Style L1 真实渲染 1 / 1 通过，并人工核对来源出货页和伪造合同 fail-closed 截图；当前运行 Node v26.5.0 与项目要求 Node 24.14.x 不同，命令有 engine warning，不能替代目标运行时证据。
+完成：移除与工作台、任务看板重复的通用异常总控菜单、路由、页面投影和专用样式，不保留旧路由重定向或权限别名。跨模块待处理和阻塞 / 逾期风险统一由工作台风险队列、任务看板、岗位任务端及相关业务页承接；领域 `生产异常` 页面、`production_exception` 来源任务、Workflow 动作权限和 Fact 边界保持不变。
 
-下一步：用真实本地后端执行生产订单下达、返工过账、出货提交 / 放行 / 出货 / 取消的浏览器与数据库读回；在确认目标开发库后先跑 backfill dry-run，不自动 apply。当前同一 worktree 的 `db-guard`、`full / strict` 已通过；精确提交推送、目标环境 health / smoke 和客户岗位验收仍是后续独立关口。
+完成：同步前后端内置菜单、客户配置、角色投影、权限使用面、正式产品文档和 yoyoosun 培训 / 菜单 / 验收资料。正式手工验收目录从 51 项收敛为 50 项，桌面页面从 30 项收敛为 29 项；`production-exception-active-tasks` 探针改归保留的生产异常页。产品核心原型的 51 个内部覆盖细项不是页面验收数量，继续保持原口径。
 
-阻塞/风险：当前没有本切片代码级阻塞；来源任务本身未新增 schema / migration，固定生产路线 / WIP 的 Ent 与 Atlas migration 已生成并通过隔离迁移和整树严格门禁，但未向共享开发库或任何目标环境 apply。真实后端浏览器、开发库 backfill / migration apply、目标环境 health / smoke 和客户验收均未执行。未 stage、commit、push 或 deploy。
+当前验证：`git diff --check` 通过；`go test ./internal/biz -count=1` 通过；菜单与客户配置 Node 合同 75 / 75、手工验收 catalog / browser / readiness / dataset 合同 110 / 110、文档清单 3 / 3 均通过且无跳过；Web lint、CSS lint、Vite build 通过。`erp-yoyo-global-dashboard-desktop`、`erp-task-board-desktop`、`business-menu-groups-desktop` 三个 Style L1 浏览器场景通过，证明工作台和任务看板承接路径仍可用，侧栏不显示通用“异常处理”且保留“生产异常”。
+
+未做 / 风险：旧书签会按明确退役策略失效，不提供兼容跳转；本轮未改 schema / migration、未连接或 apply 数据库，也未提交、推送、部署、执行 133 readback 或客户 UAT。共享工作树的 `affected --plan` 因 488 个跨任务文件达到 T8，本任务没有把其他 writer 的 schema / 发布影响算入自身，也没有以定向绿色声明整树 `full / strict` 通过。
+
+## 2026-07-18 财务字段真源与分层验收合同收口
+
+完成：财务列表不再以“每个单元格都非空”为目标，而是按 FactType 固定字段适用性。出货应收从销售订单冻结收款分类与精确账期天数，`0 / 30 / 45` 天分别投影为现款、月结 30 天、月结 45 天，其他合法天数保留为“自定义账期 / N 天”，不猜测枚举；发票由操作人从正式类别中必填，发票类别不再误写到应收。当前采购 / 委外来源没有可证明的付款方式、账期与发票类别真源，因此应付保持不适用空值；对账同样不展示这些非本类型字段。非取消记录的取消审计为空属于正确语义，取消记录必须完整保存取消时间、操作人和原因。
+
+完成：服务端来源创建、流程命令和事务内读回统一执行上述合同。应收在写入前锁定并复核出货、销售订单、客户和账期；发票缺类别会 fail closed；自定义账期保留精确天数。Web 页面只展示本 FactType 适用列，并区分“不适用”“历史未记录”“待核对”；出货来源动作只允许发票提交发票类别，服务端拥有的金额、客户、账期等字段继续禁止由前端补造。
+
+完成：新增共享财务字段验收合同，贯穿 source-data、source-driven facts、fact-data、readiness 与 browser 报告。数据集与 readiness 对本批全部财务引用逐行校验，要求字段合同覆盖率 `100%` 且摘要 digest 一致；浏览器自动化要求应收、应付、发票、对账 4 / 4 页面列投影正确，并验证代表记录的有效值与非取消记录的取消字段 `-`。正式业务场景、数据集、目标环境验收与客户必验项均要求 `100%`；行覆盖率 `>= 90%`、分支覆盖率 `>= 85%` 只作辅助质量指标，不能替代业务场景覆盖。
+
+当前验证：`cd server && go test ./internal/biz ./internal/data ./internal/service -count=1` 通过；Node `24.14.0` 下财务字段、来源动作、页面投影、验收 catalog / dataset / readiness / browser 合同定向测试 `181 / 181`，相邻 API / Style L1 mock / 财务来源合同测试 `41 / 41`，均为 `0 fail / 0 skip`；`web/src` ESLint 通过，`git diff --check` 通过。自动化证明代码合同与报告门禁，不代表已对真实目标数据库生成新批次或完成浏览器运行态验收。
+
+未做 / 风险：未 apply 或清理任何数据库，未改 schema / migration，未重建当前截图中的历史财务事实。财务事实不可为补齐展示字段而直接覆写；旧 V5 报告不满足新合同，应在确认归属的专用验收库用新数据身份重新生成并完成 dataset -> readiness -> browser 证据链。当前共享 worktree 还有大量其他会话改动，因此没有把定向绿色写成当前整树 `full / strict` 通过；也尚未提交、推送、部署、执行 133 readback 或客户 UAT。
+
+## 2026-07-18 来源血缘、草稿事实退出与结算边界收口
+
+完成：采购入库、采购退货、采购入库调整、生产事实、委外事实和正式来源财务事实均支持 `DRAFT -> CANCELLED`。草稿取消只终止未过账记录，不写库存流水；`POSTED -> CANCELLED` 仍按各领域既有合同写库存 `REVERSAL` 或保留财务取消审计，不能把两条路径合并描述为“删除”或“统一冲正”。取消终态重放保持幂等，来源坐标损坏、无正式来源的财务草稿或改 actor / reason 的财务重放均 fail closed。
+
+完成：采购入库草稿取消会在同一事务锁定收货、关联来料质检和涉及批次，校验 `PURCHASE_RECEIPT / INCOMING / MATERIAL` 的精确来源形状；`DRAFT / SUBMITTED` IQC 转为 `CANCELLED`，已判定或已取消 IQC 保留审计。仅由该草稿准备且没有其他收货引用的批次，必须确认所有余额精确为零后才改为 `DISABLED`；任一非零余额或来源形状异常会整笔回滚。采购退货 / 调整草稿取消会同时锁定父收货，终止草稿但不写库存；子修正全部 `CANCELLED` 后，父收货取消依赖解除。采购收货草稿取消后也不再阻断采购订单关闭 / 取消。
+
+完成：生产订单来源的领料、完工和返工草稿可直接取消且零库存；已过账完工仍受未取消返工事实阻断，已过账返工仍受来源异常任务终态约束。生产父单关闭要求子事实处于 `POSTED / CANCELLED`，取消要求全部子事实 `CANCELLED`；草稿事实取消后父单对应关闭 / 取消路径解除。委外订单来源的发料 / 回货草稿同样零库存退出，关闭 / 取消父单分别要求子事实 `POSTED / CANCELLED` 或全部 `CANCELLED`；委外回货无论草稿或已过账，只要仍有非取消质检或应付就阻断取消，委外发料已过账取消还继续服从 WIP 外发分配依赖。
+
+完成：正式来源财务草稿（出货应收 / 发票、采购或委外应付、财务事实对账）取消会写 `cancelled_at / cancelled_by / cancel_reason`，不写库存；非取消对账子事实继续阻断上游财务事实取消。并发 post / cancel 通过相同事实行锁串行：cancel-first 时后续 post 失败且不产生库存，post-first 时取消在过账后执行既有反向路径；最终只允许 `CANCELLED`，不会留下半笔库存变动或缺失财务取消审计。
+
+完成：公开来源动作的读取能力由服务端共享 registry 统一声明，handler 在进入来源 repository / usecase 前同时执行目标动作权限、精确来源读权限和对应模块的 enabled / readable 门禁；条件来源只按请求真实引用项加权，动态财务来源先做候选读权收窄，再按服务端读回的 authoritative FactType 校验精确读权。registry 与 permission usage 同步测试、逐项缺权测试和 AST handler guard 阻止“登记了来源动作但 handler 漏调 guard”；流程启动还验证来源模块无效时不会读取来源或写 ProcessRuntime。
+
+完成：页面血缘已重新区分“服务端实现”与“正式 Web 可达”。`add_purchase_receipt_item`、物料供应 4 个和成品交付 5 个公开动作统一标为 `partial / backend-only`；销售订单正式提交只登记 ProcessRuntime start + execute，不把服务端 `submit_sales_order` 冒充为第二条页面链路；发票不再误登 `settle_finance_fact`，从发票生成对账事实仍是正式路径。
+
+完成：加工合同页新增统一“委外记录”入口，展示 `MATERIAL_ISSUE / RETURN_RECEIPT`。页面按 `outsourcing.fact.read / post / cancel` 精确权限和 canonical `list / post / cancel_outsourcing_fact` 办理状态：`DRAFT` 可过账或作废，`POSTED` 可取消，`CANCELLED` 只读；草稿作废与已过账取消分别提示“库存零变动”和“恢复至过账前库存”。写请求返回后必须重新读取并确认目标 ID / 状态，未知结果不允许提示成功或盲目重试。质检 / 应付只对 `POSTED RETURN_RECEIPT` 开放，应付继续要求质检合格或让步接收。
+
+完成：通用业务记录页对历史无合法来源的草稿收口。生产 / 委外 `DRAFT` 缺必需来源坐标时，过账与作废同时禁用；财务 `DRAFT` 缺正式来源时，确认与作废同时禁用。来源完整的合法草稿仍可过账 / 确认或零库存作废，不用必然失败的请求来掩盖历史数据缺口。出货服务端同时明确支持 `DRAFT -> CANCELLED` 零库存，`SHIPPED -> CANCELLED` 才写库存冲正；正式出货页已分别显示“作废草稿”和“撤销已出货”，并在取消 RPC 后重新加载列表。
+
+完成：采购订单页不再把基础资料加载竞态显示成“暂无材料”。供应商 / 材料 / 单位的表单 readiness 与启用仓库的入库草稿 readiness 分开；库存批次不参与这两条准备链。未 ready 或失败时，对应新建、编辑、来源导入、保存或生成入库草稿操作 fail closed；刷新页面会重试并传递失败，不误报刷新成功。重叠请求使用 latest-wins，只有最新请求成功 ready 后的零条才是合法空结果；已打开表单和保存 handler 仍有第二层禁用 / 拦截。
+
+完成：浏览器恢复态回归发现并修正出货来源残值。用户查看过销售来源单后再新建出货草稿，页面会显式清空 `sales_order_id`、客户带值和来源候选 / 行选择缓存，不会将上一张单的锁定来源泄漏到新草稿。Workflow 场景同步当前可见口径“可执行 / 任务附件 / 更多操作”；生产草稿 fixture 使用 canonical `PRODUCTION_ORDER + source_line_id` 来源，并只精确授予 `production.fact.cancel`，没有为让场景通过而放宽来源、状态或权限。
+
+当前验证（本轮直接相关）：PATH 锁定 Node `24.14.0` 后，实际当前树与冻结快照的来源链 mock Chromium 均为 `business-core 1 / 1 + 来源链 33 / 33 = 34 / 34`，失败关闭与竞态证据一致；相关前端合同 `450 / 450`，以上均 `0 fail / 0 skip`。冻结来源链快照的 Web lint 通过；最新实际共享树的 CSS lint 和 Vite production build（`3319 modules`）通过，但 Web lint 被 3 个共享树外部移动端错误阻断：`useMobileRoleTaskActions.test.mjs:261` 违反 `prefer-destructuring`，`MobileRoleTasksPage.jsx:28` 的 `resolveMobileRoleTaskReceiptDetailTask` 和 `MobileRoleTasksPage.jsx:275` 的 `receiptDetailSnapshot` 未使用；因此不声明最新共享树 Web lint 通过。`go test ./...` 通过，`go test ./internal/biz ./internal/data ./internal/service -count=1` 冻结后重跑通过；一次性 PostgreSQL 整组 `190 / 190`、关键并发集 `5 / 5`，均 `0 fail / 0 skip`。`make data`、`db-guard`、`git diff --check` 和 `agents-size` 通过。
+
+整树门禁未全绿：前一次完整 frontend 为 `1673 / 1682`、`9 fail / 0 skip`；Node `24.14.0` 下当前完整复跑 `pnpm test --test-reporter=tap` 的新鲜结果为 `1679 / 1686`、`7 fail / 0 skip`。7 个失败分别是 frozen user-intent attempt store 静态断言、devCustomerConfig 菜单数、task surfaces metadata 数、3 个移动端流程旧 `loadTasks` 断言，以及正式页“响应快照”文案。审计未发现 Document / Fact / Workflow 边界被破坏，但这 7 项仍是当前整树的真实失败，不因与本轮来源链无关而删除或写成通过。
+
+`strict.sh` 最后一次完整执行在修复前阻断于 `full -> fast` 的 scripts Node tests：`1263 / 1273`、`10 fail / 0 skip`，原失败包含 formal frontend customer config boundary、fixed full / strict gate、fixed Node / Go summaries、2 个 local-test manifest / session、3 个 mobile workflow copy / access / refresh、purchase projected actions、fact action / status guards。其中 2 个本轮相关的 gate-orchestration 旧硬编码断言已修正，现会验证共享 critical PostgreSQL 清单被 fast / full 消费，对应文件定向 `7 / 7` 通过。修复后已完整复跑 scripts Node tests，新鲜结果为 `1265 / 1273`、`8 fail / 0 skip`，失败正是上述剩余 8 个共享树外部面。该结果只更新 scripts Node tests 层；strict 未从头重跑，后续 secrets、web-all、build、browser、PostgreSQL、server-all 和 govulncheck 仍未执行，本轮不声明 `full / strict passed`。
+
+未做 / 风险：整树 frontend 和 `full / strict` 仍有上述失败与未执行阶段；本轮尚未提交、推送或部署，未 apply 任何个人开发库、共享库或 133 migration，未执行目标环境 health / smoke、真实岗位浏览器读回或客户 UAT。已过账委外取消目前由页面 / 组件合同覆盖，mock Chromium 没有代替真实后端持久写入和数据库库存冲正读回；因此可以写“页面可达”，不能写“真实后端库存冲正已浏览器验收”。
+
+## 近期已完成基线
+
+- 2026-07-19：`/m/<role>/tasks` 已形成有意组合的 v1 列表 + v2 选中任务流程；v1 Current 只登记列表基线，v2 To Implement 只保留真实账号浏览器验收和用户确认门禁。未删除 v1 列表，也不以整页替换 v1 作为 v2 完成条件。
+
+- 2026-07-18：出货来源导入改为服务端候选分页和十进制字符串，只有 `SHIPPED` 占用来源余量；公开流程只从销售订单、采购订单和出货单三类真实来源启动，旧无来源采购入库与入库单起流程入口退役。
+- 2026-07-18：外部代码审查 P1 / P2 集中治理时，Node 24.14.0 下 `strict.sh` 曾完成 scripts 1242 / 1242、Web 合同 200 / 200、server quick 2359 / 2359、Web 全量 1570 / 1570、关键 PostgreSQL 156 / 156、server-all 2493 / 2493，0 fail / 0 skip；这是后续密集并行修改前的历史基线，不证明当前工作树仍全绿。
+- 2026-07-17：三类确定性 Workflow 来源任务已接入真实领域 producer；`production_scheduling / production_exception / shipment_release` 使用 `workflow.source-task/v1`，任务完成仍不代写生产、库存、出货或财务事实。
+
+## 下一步与停止条件
+
+1. 收口或隔离共享树尚存的 scripts / frontend 失败，冻结后从头重跑 frontend 全量与 `strict.sh`；只有 strict 后续 secrets、web-all、build、browser、PostgreSQL、server-all、govulncheck 全部真实执行并通过后，才能声明 `full / strict passed`。本轮来源链定向绿色不覆盖该停止线。
+2. 以真实后端岗位账号补做委外 `DRAFT` 过账 / 作废、`POSTED` 取消和数据库库存流水读回；mock 场景与静态合同不能替代该层。
+3. 由单一 Git owner 核对最终 `git status / diff`，只在用户授权后精确 stage、提交和推送；发布、迁移、133 smoke 和客户验收继续作为独立关口。
 
 ## 归档索引
 
-- `docs/archive/progress-2026-06-28-before-runtime-manifest.md` 至 `docs/archive/progress-2026-07-08-before-runtime-lazy-import-retry.md`：历史过程记录索引见各归档、`docs/archive/README.md` 和 Git 历史。
-- `docs/archive/progress-2026-07-11-before-manual-regression-deploy.md`：本轮全场景手工回归数据、提交推送和 133 部署收口前的历史流水。
-- `docs/archive/progress-2026-07-12-before-agents-size-gate.md`：自定义 Skills 与项目 AGENTS 首轮治理过程记录。
+- `docs/archive/progress-2026-07-18-before-source-lineage-draft-cancellation-closeout.md`：本轮来源血缘和草稿取消集中收口前的完整过程记录；归档前为 382 行 / 80,765 bytes，SHA-256 `e12b6a5716423623d3766fbbe3bbb365b5ae3376d272a44077758630fba1a31a`。
+- `docs/archive/progress-2026-07-17-before-workflow-source-task-producers.md`：三类 Workflow 真实业务 producer 接入前的完整过程记录。
 - `docs/archive/progress-2026-07-15-before-local-admin-default-policy.md`：本地管理员默认凭据稳定化前的完整过程记录；归档前为 395 行 / 81,622 bytes。
-
-## 2026-07-15 来源驱动业务闭环全工作树收口
-
-完成：复核原 Codex 任务、其引用的 GPT 会话和最终全工作树差异后，按生产、委外、销售、采购、质量、出货与财务来源动作的既定边界完成收口。数据库守卫现已正确处理 PostgreSQL 63-byte 标识符截断；生产 / 委外 / 财务事实补齐只读来源编号；出货在真实发货事务内重新锁定并刷新销售来源金额快照；质检退供应商与质量门禁统一锁顺序；销售预留页面按订单剩余量、已生效预留和已出货量 fail closed。委外回货 transport 校验不再把缺失的 SKU 上下文误判为明确无 SKU，同时保留页面真实来源行与材料发料的严格 SKU 边界。
-
-完成：Ent / Atlas migration 链为 75 个文件，`make data` 前后内容指纹一致；隔离 fresh 数据库从 0 应用到 75，upgrade 数据库从 74 升到 75，个人开发库也已升至 75 / 75、pending 0。yoyoosun preview 已纳入生产订单菜单及所需岗位动作，当前 manifest 为 17 个模块、9 个角色、197 个 entitlement；`pnpm start:yoyoosun` 已通过 database、backend health / ready、customer config / asset 预检并启动 Vite，验证后停止本轮测试 Vite，未执行 customer config publish / activate。
-
-验证：来源驱动 Style L1 的 12 个页面场景覆盖 13 个业务方法并全部通过；关键 PostgreSQL 门禁 154 / 154、server-all 1917 / 1917、web-all 1211 / 1211、脚本自动发现 862 / 862，均为 0 fail / 0 skip。production build 完成 3281 个模块，lint、CSS、shellcheck、shfmt、yamllint、零 warning、Go build、govulncheck、docs inventory、`bash scripts/qa/full.sh` 和 `bash scripts/qa/strict.sh` 均通过。
-
-下一步：提交后仍须以该 commit / image 为目标环境发布真源，串行执行发布 migration、health / ready、业务 smoke、回滚点记录、yoyoosun 配置发布 / 激活以及真实岗位人工验收。
-
-阻塞/风险：本地代码、migration、运行预检和自动化门禁已闭环，但本轮没有部署目标环境、没有发布或激活 yoyoosun draft config，也没有取得客户签收。12 个来源驱动浏览器场景使用 current-worktree mock RPC，不能替代真实岗位账号对 13 个后端方法的持久写入 E2E。完整付款 / 核销、多单对账、总账、税控、完整 MRP / APS / MES、任意库存调整和 WMS 仍为明确非目标。
-
-## 2026-07-15 委外 SKU 与本地客户工作台收口
-
-完成：委外回货事实现在由后端按完整来源元组 `OUTSOURCING_ORDER + source_id + source_line_id + product_sku_id` 批量读取委外订单来源行的 `sku_code_snapshot`；来源类型非规范、缺少父单或行、跨单同 SKU、SKU 不一致及历史快照缺失均 fail closed，不回填当前主数据，也不串用其他来源行。列表、首次创建、幂等重放、并发重放、过账和取消响应统一复用该只读投影。回货记录、回货质检和应付来源弹窗统一消费冻结快照；SKU 参照与委外相关事实均改为严格的 200 条完整分页收集，第二页记录不会再因后端默认上限丢失。
-
-完成：修复 `start:yoyoosun` 与桌面客户门禁的开发态合同错位。前端 DEV 构建在后端成功返回同 customer key 的 `builtin_rbac_fallback` 时只挂载带明确警示的本地桌面预览壳，避免把成功登录误报为“暂时无法进入工作台”；fallback 仍不属于 active customer runtime，工作台、任务看板和客户业务数据页只显示零 Workflow RPC 的 Product Core 能力审阅，移动岗位端和正式构建仍只接受 `active_customer_config_revision`。真实 5177 登录态复核中 `admin.me` 与 `get_effective_session` 均为 HTTP / 业务成功，`/erp/dashboard` 显示“工作台 能力审阅”、不显示任务队列，且没有客户运行态不可用页。委外开单的材料 / 产品条件选择器增加稳定组件身份，消除相同数值 ID 在条件切换时复用旧 label 的 Ant Select 控制台告警。
-
-验证：本轮追加前 `progress.md` 为 321 行 / 65,188 bytes，未达到 600 行或 80 KiB 归档阈值。Node 24.14.0 下 `go test -count=1 ./internal/biz ./internal/data ./internal/service ./internal/server` 通过；Web 全量测试 1219 / 1219、lint 和 production build 3283 modules 通过；docs inventory 与 dev-entry boundary 9 / 9 通过。合并 Style L1 6 / 6 通过，覆盖本地 fallback 工作台、持续同步失败 fail closed、委外开单第二页 SKU、委外来源回货、回货质检和应付来源；fallback 场景另断言 Workflow 请求数为 0，委外开单场景控制台无 warning / error。`local-runtime-preflight` 通过 schema / migration guard、开发库 75 / 75 pending 0、backend health / ready。
-
-下一步：yoyoosun 客户配置包仍是 draft / preview-only；正式或静态预览环境必须完成受控 manifest 评审、publish / activate、effective session 读回及岗位人工验收，不能依赖本地 builtin fallback。目标环境发布仍需绑定本次 commit / image、migration、health / ready、业务 smoke 和回滚点。
-
-阻塞/风险：本轮没有新增或改写 schema / migration，没有发布或激活客户配置，没有目标环境部署或客户签收。SKU Style L1 使用 mock RPC；后端来源投影与写入响应一致性由 repo / service 测试证明，尚未用真实岗位账号写入新的委外回货记录做浏览器 E2E。另一任务的时区、存量升级和客户版本锁治理已迁到独立 detached worktree，不纳入本轮提交或成果口径。
-
-## 2026-07-15 永绅本地客户运行态可重复应用
-
-完成：本地后端的 `make run / make dev / make dev_restart` 默认固定 `ERP_CUSTOMER_KEY=yoyoosun`，显式 `ERP_CUSTOMER_KEY=demo` 仍可覆盖；`pnpm start:yoyoosun` 保持只预检和启动，不自动写库。登录后的开发控制台现在可在匹配的客户开发上下文与 loopback API 下，显式生成并应用内容寻址、长度不超过 64 的 `local_test_apply` revision。后端默认拒绝该 manifest 及其 check / activate / rollback，只有本地 Make 入口显式开放；gate 开启时启动预检使用 pgx 的最终连接配置，只接受 `192.168.0.106:5432` 的 `plush_erp` / `plush_erp_*_dev` 开发库，不受 `ERP_ALLOW_TEST_DB_AS_DEV` 影响，133、query override、multi-host fallback、其他数据库和 loopback tunnel 均拒绝。production 配置携带此开关也会失败，正式 validator / executor 同样拒绝该 marker。biz normalization 同步锁住 customer key / revision / product version 的 64 / 64 / 128 schema 长度和 local-test purpose / product identity 配对。应用链复用后端 validate / publish / transition / activate 或 rollback / effective-session readback，支持相同内容幂等重放及 A-B-A 回切；生产订单模块同时收口到独立 `production_orders` catalog / runtime gate，避免永绅 manifest 因模块依赖闭包漂移被拒绝。首次进入工作台时，`admin.me` 与有效配置只读请求会对 network / 非 4xx invalid response / HTTP 5xx / internal 瞬时错误按 200ms、600ms 做两次短重试；权限、认证、未激活配置和用户取消仍立即 fail closed，实例 active guard 同时阻止真实卸载后的旧请求回写，并让 React StrictMode 重挂载复用同一个 single-flight。
-
-运行态证据：共享开发 PostgreSQL 当前 `yoyoosun-customer-package-v7.local-57b75a53ba779a6f.runtime-v1` 为 active，先前过长的测试 revision 为 superseded；同一 revision 重复应用成功且没有新增版本。真实 5177 管理员登录态完成编译、校验、发布、切换、激活和有效配置读回；随后 `/erp/dashboard` 不再显示“暂时无法进入工作台”或本地 fallback，永绅品牌、27 个页面投影、生产订单等业务菜单及真实工作队列正常挂载。
-
-验证：Node 定向合同 109 / 109、`adminProfileSync` 36 / 36、Go `internal/biz + internal/service + cmd/server` 客户配置、生产订单、字段长度和 production fail-closed 定向测试、目标 ESLint、production build（3283 modules）和 `git diff --check` 通过；Style L1 首次同步 2 / 2，证明前两次 `get_effective_session` internal 失败后第三次成功且不显示阻断页，同时持续失败仍保持 fail closed。重启后的真实后端再次完成相同 revision 幂等应用与 active readback，真实浏览器另验证首次应用、dashboard 恢复与整页刷新。`affected.sh --plan` 将当前改动最高归为 T8，并要求 push 前由 `full.sh` 兜底；本轮没有把定向绿色写成 full / strict、正式发布或目标环境验收。
-
-下一步：提交推送前在冻结工作树执行项目 Git 收口门禁，并与 detached worktree 中等待集成的全量测试治理补丁协调顺序；随后如要进入正式交付，再绑定 commit / image 独立执行正式 customer config publish / activate、目标环境 migration、health / ready、业务 smoke、回滚点和岗位人工验收。
-
-阻塞/风险：当前本地配置写入的是共享开发库，active 切换会被其他同库开发者看到；严格并行隔离仍需独立 PostgreSQL。正式 publish / activate、目标环境部署和客户签收均未执行。当前改动尚未 stage、commit 或 push。
-
-## 2026-07-15 BOM 人员字段文案明确化
-
-完成：BOM 新建 / 编辑表单的 `maker`、`auditor` 可见标签由“制表 / 审核”明确为“制表人 / 审核人”，让工程岗位直接理解这里填写人员姓名。后端字段、保存与回显链路、打印纸面签字栏及审批流程边界均未改变；打印模板仍按单据习惯保留“制表 / 审核”。现有 `business-core-pages-desktop` 浏览器场景新增两项字段文案断言。
-
-验证：使用项目锁定的 Node 24.14.0 / pnpm 10.13.1 运行 `pnpm lint` 与 Web 全量测试，1224 / 1224 通过，0 fail / 0 skip；`STYLE_L1_SCENARIOS=bom-person-field-labels-desktop pnpm style:l1` 通过 1 / 1。浏览器默认态确认“制表人 / 审核人”标签完整显示；长姓名与审核人聚焦态确认两个值槽均保持在字段容器内、输入值不丢失，截图为 `bom-person-field-labels-default.png` 与 `bom-person-field-labels-boundary.png`。大场景 `business-core-pages-desktop` 在到达 BOM 前被既有 SKU 单重列不可排序断言阻断，本轮不把它计为 BOM 失败或通过。
-
-下一步：如后续需要把自由文本升级为人员选择器，应另行评审人员真源、历史快照和权限边界。
-
-阻塞/风险：本轮只调整表单可见文案，不表示系统新增 BOM 审批流，也不改变历史数据。共享工作树中的其他会话改动均保留，本轮不提交、不推送、不部署。
-
-## 2026-07-15 永绅本地、133 试用与存量升级三方收口
-
-完成：把永绅可重复本地配置应用、133 隔离试用数据和全量测试治理三个切片合并为单一闭包。local-test 与 customer-trial 使用独立显式 identity / runtime gate；trial 分类器只占用 `customer-trial-` / `customer_trial_` 命名空间，不再把通用 `datasetVersion` 或本地 `local_test_apply` 误判为远端试用。两类 purpose / product 必须原子配对，本地身份夹带远端 `datasetVersion / target`、未知 trial 命名空间、未开放环境或目标数据库漂移均 fail closed。133 active revision 启动守卫改为通过已登记试用边界参数化查询 customer key，不在 Product Core data SQL 中硬编码客户规则。工作台首次 profile 同步只对 network、非 4xx 非法响应、5xx 和 internal 做 200ms / 600ms 短重试；认证、权限、未激活配置和卸载继续立即停止，React StrictMode 复用 single-flight。
-
-完成：存量升级治理新增 `20260714055504` populated-upgrade 与 `20260714055825` customer-config-cutover 两项只读 preflight；线上 migration 固定为 status → 两项审计 → dry-run → apply，同一私有锁内任一失败即停止且不自动 DML。恢复演练、release evidence gate、critical PostgreSQL profile 和 affected/full 共同锁住跨 migration 的审计状态、版本、脱敏 artifact、回滚证据及非空测试执行；fresh schema、静态 DDL 和空库迁移不再冒充 populated upgrade 证明。永绅 Private 仓版本锁、Product Core 配置和正式发布仍保持各自真源，不因本轮合并形成运行时私有仓依赖。
-
-运行态证据：133 隔离试用曾在数据库 `plush_erp_uat_20260715` 激活 `yoyoosun-customer-trial-133-package-v1.runtime-manifest-v1`，以同一 `2026.07.15-v1 / 20260715-V1` 语义数据生成 60 客户、60 供应商、80 材料、60 SKU、30 工序、销售 / 采购 / 委外 / BOM 各 45，以及 180 条 Workflow（ready 121、blocked 27、done 24、rejected 8）；source 与 task 重放均 0 新建、全量复用，Fact 保持 plan-only。该证据绑定旧基线 `929ec0b3` 的隔离试用镜像，不是本次最终集成 commit/image 的发布读回，报告仍为 `releaseReady=false`，不能写成正式部署或客户签收。
-
-验证：Node 24.14.0 下 acceptance 定向 108 / 108、governance 定向 129 / 129、dashboard / local-test 合同 82 / 82，Go 7 包定向全绿；工作台瞬时恢复与持续失败两项 Style L1 为 2 / 2。最终隔离树 `affected.sh --plan` 识别 111 个路径、最高 T8；`bash scripts/qa/full.sh` 完整通过，包含脚本自动发现 935 / 935、Web 合同 194 / 194、server-all 2036 / 2036、fresh / populated-upgrade、关键 PostgreSQL、浏览器、lint / CSS、Go build 和 govulncheck，0 fail / 0 skip。首次 full 发现并阻止 data SQL 硬编码客户 key，参数化修正并补测试后复跑全绿。
-
-下一步：取得提交推送授权后精确提交当前 111 个路径；再以新 commit 构建固定 digest 镜像，在 133 隔离验收库重新执行 migration、customer-trial publish / activate、数据重放、health / ready、岗位浏览器读回和密码轮换校验，替换旧基线 attestation。正式交付仍需走正式 customer config / release evidence、备份恢复、回滚点和客户签收，不能复用 local-test 或 customer-trial 开关。
-
-阻塞/风险：本地共享开发库的 active revision 会影响同库使用者；133 当前 trial active revision 与模拟数据只属于隔离验收环境。最终集成树尚未 stage、commit、push、构建新镜像或重新部署，现有 133 证据不绑定最终代码；Fact 数据未写入，完整付款 / 核销、总账、税控和完整 MRP / APS / MES 仍不在本轮范围。
-
-## 2026-07-15 业务看板数量真源治理
-
-完成：业务看板后端数量收口为 20 模块只读 projection，每项固定返回 `module_key / available / total`。客户、供应商、产品与 BOM 读取 MasterData，销售、采购、生产与委外读取 Source Document，入库、库存、质检、生产、出货和财务读取各自 Fact；财务对账、应付、应收、发票按精确 FactType 分开计数。出货放行、生产排程和生产异常按 Workflow task group 计数，并复用 `workflow.task.read`、active / stored revision、owner / assignee 可见性。成功零值与暂不可用明确区分，不再从有界列表、前端状态分组或 Workflow payload 反推业务总量；相关 server 与原型 README 已同步四类独立口径、20 模块入口和 `get_task_board` 全量计数边界。
-
-验证：最终共享工作树执行 `go test -count=1 ./internal/biz ./internal/service`，两个 package 均通过；Node 24.14.0 下看板 API / 页面 / 统计 / 任务展示合同 21 / 21、ESLint、CSS、三个 Style L1 脚本语法和 `git diff --check` 均通过。独立端口自托管 mock 的真实 Chromium 6 / 6 通过并人工核图，覆盖默认态 `191 / 135 / 0 / 93`、暗色、移动端、七位大数字、业务统计首次失败后刷新恢复、协同统计首次失败后刷新恢复及客户入口下钻；恢复场景会等临时提示层退出后再留图，避免把截图合成过渡态当成页面故障。全面试用模拟数据已经 ready；共享开发库只读核对的 Workflow 四个互斥泳道为常规待办 `55`、阻塞 `27`、到期提醒 `66`、已结束 `32`。这些数字证明当前模拟数据批次与全库只读投影可用于页面复核，不是客户真实业务事实或发布证据。
-
-下一步：保持当前工作树不提交、不推送、不部署。若后续另行授权发布，须先冻结提交范围并补当前整树 full / strict，再绑定新 commit / image 对目标环境执行 migration、health / ready、业务 smoke、回滚点和岗位验收；`192.168.0.133` 当前只作旧基线试用数据与数量交叉核对，不能复用为本次页面代码的发布证据。
-
-阻塞/风险：本轮没有 schema / migration 变化，没有 stage、commit、push、部署或新的 133 发布证据。当前 Fact 为 0 是本轮模拟数据边界，不代表 Fact 页面不可用，也不代表真实客户没有业务事实；`dashboard_stats` 任一已接入查询失败会整次 fail closed，协同模块没有 `workflow.task.read` 时显示不可用，均不应被解释为真实 0。
-
-## 2026-07-15 明细列条数统一
-
-完成：销售订单、采购订单、加工合同、生产订单、BOM、采购入库、出货单统一在“明细”列显示“箭头 + N条”；精确 0 显示不可操作的“0条”，未知显示“查看”，无权限不显示数量。五个按需读取域由后端对当前页一次 GROUP BY 计数，销售条数受 `sales_order_item.read` 约束；入库与出货复用随列表返回的明细数组。原重复计数列退出表格但保留 CSV。未改 schema、migration、RBAC、Workflow / Fact、菜单或原型状态。
-
-验证：`go test -count=1 ./internal/biz ./internal/data ./internal/service` 通过；Node 24.14.0 下 Web 全量 1246 / 1246、lint、CSS 通过。Style L1 5 / 5 覆盖正数、0、未知加载、无权限、长数字、完整明细弹窗、移动暗色和入库列表列宽；生产与 BOM 也已锁定每页固定 3 次 SELECT，防止 N+1。
-
-下一步：如需发布，先在共享工作树收敛提交范围，再绑定 commit / image 执行目标环境检查。
-
-阻塞/风险：本轮未 stage、commit、push、deploy 或客户验收；共享工作树其他改动均保留，当前证据只证明本地 T3-T5。
-
-## 2026-07-15 全站用户文案治理
-
-完成：正式页面、登录、客户品牌及错误提示改用岗位业务语言，并扩展防回归扫描；未改数据、权限或路由。
-验证：Web 1254/1254、lint、CSS、build 及浏览器 20/20 通过。
-下一步/风险：如需上线须另行授权发布；浏览器使用本地 mock，未提交、推送、部署或客户验收。
-
-## 2026-07-15 本地管理员默认凭据稳定化
-
-完成：确认反复登录失败不是页面问题，而是人工验收密码批量轮换把稳定超级管理员 `admin` 与 `demo_*` 同批改密。登记开发库现在只在管理员字段未显式配置时使用 `admin / adminadmin`，`config.local.yaml` 和环境变量显式值仍优先；公共 dev 配置及本机私有覆盖均不再重复写默认凭据。启动初始化继续保持 create-only，不覆盖已有账号。人工验收批量轮换默认只处理 `demo_*`；133 如确需改稳定管理员，必须额外启用独立开关和目标绑定确认。本地新增无生产逃逸的专用重置命令，生产 Go 启动门禁和 shell preflight 均拒绝已知本地默认密码。复发后进一步定位到旧临时验收副本与主后端共用 `plush_erp_simon_dev`，其旧轮换器再次覆盖 `admin`；并发任务已停止该写入边界。普通角色演示 seed 已删除稳定管理员改密开关，数据层同时在事务前拒绝把 `admin` 当作演示账号创建或改密。
-
-运行态与验证：已在登记开发库 `plush_erp_simon_dev` 再次执行 `make reset_local_admin_password`，认证版本递增、旧会话撤销；`8300` 直连及用户页面实际代理 `5178 → 8300` 的 `/rpc/auth admin_login` 均返回 HTTP 200、业务 code 0 和非空认证数据，响应输出未保存 token。应用内真实浏览器从 `/erp/admin/login` 填写默认凭据后进入 `/erp/dashboard`，页面显示“超级管理员 admin”，控制台无 error / warn。角色演示 seed / 密码事务定向 Go 测试通过，新增用例证明误传 `admin` 时在数据库事务前失败；production preflight 23 / 23、docs inventory 3 / 3、`project-scan --strict`、YAML 解析、bash / shfmt、定向 `git diff --check` 均通过。归档前 `progress.md` 为 395 行 / 81,622 bytes，原文以 SHA-256 `79bd024995cc15d9df6ddd66d54008deeb897ba960e8f25fe3ce83d9b0c0e1d3` 完整保存到新归档。
-
-下一步：若要提交推送，先按共享工作树实际归属精确收敛本轮文件并执行冻结树门禁；若要发布，再绑定 commit / image 独立完成目标 migration、health / ready、业务 smoke、回滚点和岗位验收。
-
-阻塞/风险：固定凭据只适用于项目登记的受信开发库，不适用于 133 或生产。已有账号不会被服务重启静默改回默认值，显式改密后应继续使用显式值；复制到临时目录的旧代码不会自动继承主工作区修复，验收任务必须使用隔离库或只使用 `demo_*`，不得再轮换共享库稳定管理员。本轮未执行全工作树 `full.sh` / `strict.sh`，未 stage、commit、push、deploy 或客户验收。
-
-## 2026-07-15 全量工作树提交前收口
-
-完成：冻结全部并行写入后，以共享 `main` 为唯一收口树，精确合并本地客户运行态、永绅试用模拟数据、业务看板、订单 / Fact 闭环、全站用户文案、管理员稳定凭据和全量测试治理。验收数据统一为 `2026.07.15-v3 / 20260715-V3`，本地开发使用独立验收库，轮换器默认只处理 `demo_*`；稳定超级管理员 `admin` 不进入本地批量轮换，133 的稳定管理员变更仍要求显式开关和目标绑定二次确认。合并时保留生产 / 委外明细计数、当前“业务管理 / 电脑端业务管理 / 手机端待办”文案、skill 健康检查与生产默认密码门禁，没有整包覆盖旧 worktree。首轮门禁发现的审计、移动任务、Workflow / Fact 和客户菜单旧文案断言已同步到“撤销、库存数量、基础资料、财务管理”等岗位语言，同时继续禁止 raw reason / summary 和技术 key 进入用户界面。
-
-验证：`server/make data` 确认 Atlas migration 与 Ent schema 同步且无生成 diff；验收与客户配置 Node 定向 283 / 283、Go 7 个相关 package、文案 / Workflow / 审计定向 42 / 42、客户配置定向 20 / 20 均通过。最终 `bash scripts/qa/strict.sh` 完整通过，包含 scripts Node 1000 / 1000、Web 关键合同 195 / 195、Web 全量测试与构建、lint / CSS、自托管无头 Chromium、fresh / populated-upgrade 与关键 PostgreSQL、server-all 2075 / 2075、Go build、shellcheck、shfmt、yamllint、零 warning 和 govulncheck；全部 0 fail / 0 skip，migration preflight 为 pending 0、out_of_order 0。
-
-下一步：按用户授权一次性暂存全部工作树、运行提交钩子、提交并推送 `main`；push 前由仓库钩子再次执行 `full.sh`。若后续要更新 133，必须基于新 commit / image 在隔离验收库重跑 migration、试用配置 publish / activate、v3 数据回放、health / ready、岗位浏览器读回与回滚验证，不能复用旧基线证据。
-
-阻塞/风险：本轮不部署、不写 133、不轮换共享开发库稳定管理员，也不把模拟数据描述为客户真实事实或签收结果。目标环境发布与客户验收仍是提交推送后的独立事项。
-
-## 2026-07-16 产品与出货净重统一为克
-
-完成：产品与 SKU 单重、出货行确认快照、整单人工 / 自动 / 最终总净重的 schema、Ent、biz、repo、JSON-RPC、前端表单 / 列表 / 明细 / CSV、浏览器 mock、测试和正式文档统一从 kg 改为 g。新增 Atlas migration 原位重命名四组重量字段，并把已有非空产品、SKU、出货快照、总净重和幂等请求快照乘 1000；迁移在转换前检查 numeric 上限，禁止 Atlas 的删列重建路径。默认单位变化后的单重清空、SKU 优先 / 产品回退、缺任一行不计算部分总重、已出货快照冻结与取消保留边界不变。
-
-验证：`make data` 生成并同步 Ent / Atlas；Go `internal/biz + internal/data + internal/service` 通过，定向重量纯逻辑、repo、JSON-RPC 和迁移结构测试通过。一次性 PostgreSQL populated migration 演练从旧 revision 写入 `0.425 kg / 4.25 kg / 9.9 kg`，升级后读回 `425 g / 4250 g / 9900 g`，旧 kg 列不存在，临时数据库已删除；fresh PostgreSQL 的产品 / SKU / 出货约束和真实出货冻结 3 / 3 通过，0 skip。项目锁定 Node 24.14.0 下 Web 全量 1258 / 1258、lint、CSS 通过。组合 Style L1 被既有 SKU 单重列排序入口断言提前阻断，不计为本轮通过；已改用独立 `shipment-net-weight-desktop` 场景复核出货净重页面。
-
-下一步：目标环境发布前必须绑定 commit / image，先备份并执行 migration dry-run / apply，再核对产品单重与历史出货快照抽样、health / ready、业务 smoke 和回滚点；迁移未 apply 的环境不能运行新 API / 前端合同。
-
-阻塞/风险：本轮未修改材料采购等独立的千克计量单位，也未自动 apply 到共享开发库、133 或生产；未提交、推送、部署或客户签收。共享工作树中既有端口与浏览器门禁改动保持原样，不属于本轮成果。
-
-## 2026-07-16 净重单位中文显示修正
-
-完成：产品、SKU 与出货净重的用户可见单位由小写 `g` 统一显示为中文“克”，避免小写字形在当前字体和缩放下产生被裁切的误读；列表、表单、详情、预计 / 实际 / 最终总重及 CSV 标题同步更新。进一步移除净重值后重复拼接的默认计量单位：默认单位仍单独显示“件、千克”等业务数量单位，产品 / SKU / 确认出货单重只显示重量单位“克”，不再出现“克 / 千克”的维度矛盾。新建产品和 SKU 默认优先选择标准计件单位 `PCS / PC / EA` 或“件 / 个 / 只”，不再因为历史记录常用千克而自动选中千克；没有计件单位时才回退原有常用单位推断，材料不受影响，用户仍可手工选择千克。内部数据库、API 与计算字段仍使用标准 `*_g` 命名和按默认单位计算的现有合同，没有新增 schema、migration 或单位限制。
-
-验证：项目锁定 Node 24.14.0 下 Web 全量 1258 / 1258、定向合同 131 / 131、ESLint、CSS、场景脚本语法和 `git diff --check` 均通过；产品单重与出货净重两个 Style L1 场景合计 2 / 2。产品浏览器场景用“历史产品默认单位为千克、单位字典同时有件和千克”的边界，确认新建产品先选中件；随后填入 425 克再手工切为千克，确认旧单重被清空、后缀仍只显示“克”且横纵向无裁切，截图为 `product-net-weight-unit-suffix.png`。`affected.sh --plan` 因共享工作树 108 个变更路径判定最高 T8，该结果只用于说明整树推送前仍需 full，不把其他会话改动算作本轮成果。
-
-下一步：如需发布，先收敛共享工作树归属并绑定 commit / image，再执行目标环境检查。
-
-阻塞/风险：应用内浏览器只能到登录页且没有可复用登录态，本轮没有输入或重置凭据；页面证据来自项目自托管 mock 浏览器场景。未 stage、commit、push、deploy 或客户验收。
-
-## 2026-07-16 看板中心双击查看
-
-完成：看板中心的工作台任务行、任务看板任务卡、业务看板单一目标来源项与可下钻待办项新增电脑端双击查看捷径；原“查看”按钮继续保留为键盘、触屏和明确操作入口。共享过滤器排除按钮、链接、输入、选择、分页等内部控件，避免双击冒泡重复打开；只读指标和包含多个目标的业务分类整行不增加虚假点击语义。业务来源项补齐浅色 / 暗色 hover 与 focus 反馈、尺寸稳定检查和“电脑端双击”提示，未修改 API、RBAC、路由、Workflow / Fact、schema、migration 或客户配置。
-
-验证：项目锁定 Node 24.14.0 下定向合同 11 / 11、两页 JSX 定向 ESLint、两份 CSS 定向 stylelint、场景脚本语法和定向 `git diff --check` 通过。`erp-business-dashboard-desktop + erp-business-dashboard-mobile` 两个 L1 场景 2 / 2 通过，实测来源项 hover 的背景 / 边框发生变化且尺寸、溢出稳定，双击来源项与“查看客户”按钮进入同一路由，移动端仍显示按钮。工作台和任务看板 L1 分别在到达本轮双击步骤前被既有“等待交接”和“阻塞 / 退回”文案断言阻断，不能计为浏览器通过；源码合同已证明两处接线与内部控件过滤。
-
-下一步：full-worktree closeout owner 在冻结树门禁前先决定现有 L1 文案断言与当前页面真源哪一侧需要修正，再重跑工作台和任务看板双击步骤；本切片不代替全量 Web、full / strict、目标环境或客户验收。
-
-阻塞/风险：本轮按共享收口协调冻结后不再扩范围；未运行 PostgreSQL、full、strict 或全量浏览器门禁，未 stage、commit、push、deploy 或写入 133，当前没有在途测试或写入进程。
-
-## 2026-07-16 全工作区收口与 133 模拟验收数据准备
-
-完成：以稳定 `main` 为基线精确合并共享工作区全部冻结成果与 `customer-trial-133` 模拟验收数据链路，保留本地客户配置、远程试用配置和正式发布三条互斥的 fail-closed 边界。验收数据继续使用 `2026.07.15-v3 / 20260715-V3 / SIM-YOYOOSUN-UAT-20260715-V3`，演示账号只覆盖 `demo_*`，共享开发库稳定超级管理员 `admin` 不进入轮换。新增运行态提交 / migration / debug 身份证明、串行数据阶段、幂等重放、精确数量读回、页面就绪清单、同批次浏览器证据和清理入口；产品、订单、Workflow、采购、质检、生产、库存、出货、财务与附件均读取各自正式真源，不用 Workflow payload 伪造 Fact。同步完成看板双击查看、工艺图片标注、用户文案、净重克单位迁移及其前后端和文档合同。
-
-验证：`bash scripts/qa/full.sh` 与 `bash scripts/qa/strict.sh` 均完整通过且 0 fail / 0 skip。证据包含 scripts 自动发现、Web 合同与 1276 项全量测试、Web 构建、lint / CSS、真实浏览器 smoke、server quick / all（1993 / 1993、2101 / 2101）、fresh / populated-upgrade / current-schema 独立 PostgreSQL、Go build、shellcheck、shfmt、yamllint、零 warning 和 govulncheck。净重旧 kg 数据升级演练覆盖非空值精确乘 1000、NULL 保留、旧列退出、新约束生效与非法更新拒绝；门禁数据库每次使用唯一临时库并完成清理。正式源码归档首次严格扫描识别出三个旧测试幂等键的通用密钥误报，已改为短且明确的测试占位值；对应 Go 包通过，重建归档后的 gitleaks 为 0 命中，没有新增 allowlist 或跳过规则。
-
-下一步：按用户授权提交并推送 `main`，从最终提交构建固定 `linux/amd64` 镜像；随后只在 133 试用环境执行备份校验、正式 migration、health / ready、同版 v3 数据幂等重放、数量读回、岗位页面与五类打印浏览器复核。133 现有旧数据和旧镜像证据不得冒充本次提交的发布证据。
-
-阻塞/风险：当前代码与本地全量门禁已完成，但本节记录时尚未推送、构建或部署。模拟数据只用于甲方试用，不是客户真实业务事实或签收；人工业务判断仍需甲方实际操作确认。发布失败必须停在原镜像 / 备份回滚点，不得放宽目标身份、运行态提交、migration 或试用配置门禁；本地共享开发库 `admin / adminadmin` 不得由验收流程改写。
-
-## 2026-07-16 133 验收运行环境合同修正
-
-完成：修正 `customer-trial-133` 首次数据执行在业务写入前暴露的环境口径混用。部署 attestation 继续精确要求 `environment=prod`，服务端 `debug.capabilities` 归一化运行态改为精确要求 `environment=remote`；共享 helper 统一完成 attestation 到运行能力的安全映射，并同步数据源、任务、附件、退役、readiness 与数据集执行测试。没有改变 133 服务环境、数据库、调试开关、目标身份、客户配置或管理员账号。
-
-验证：项目锁定 Node 24.14.0 下 `node --test scripts/qa/manual-acceptance-*.test.mjs` 为 231 / 231，0 fail / 0 skip；`affected.sh --plan` 判定 12 个 QA 脚本路径为 T1，`git diff --check` 通过。
-
-下一步：先提交并推送本修正，使实际数据执行工具具备不可变代码身份；随后只通过登记的 SSH 隧道向 133 隔离试用库执行 `2026.07.15-v3 / 20260715-V3`，保存首次写入、幂等重放、数量读回、页面与打印证据。
-
-阻塞/风险：本节记录时尚未执行本轮 133 业务数据写入或页面复核。attestation 的 `prod` 与运行能力的 `remote` 是两层不同事实，不得全局替换，也不得借修正降低 debug mutation、release、migration、数据库或 active customer-config 门禁。
-
-## 2026-07-16 133 readiness JSON 证据收口
-
-完成：133 首次 v3 执行已完成核心、岗位、源数据、任务、Fact、采购质检与附件阶段，readiness 的 38 项只读查询也通过；最终 receipt 因报告内存对象包含可选 `undefined` 而按严格 JSON 合同阻断。现将 probe 与 supporting 的可选字段统一显式归一为 `null`、空对象或空数组，避免磁盘报告与内存 receipt 语义不一致，并新增整份报告 JSON 往返等价断言。
-
-验证：项目锁定 Node 24.14.0 下 readiness + dataset 定向 39 / 39、人工验收脚本全量 231 / 231，均 0 fail / 0 skip；首轮组件证据已冻结到独立 `customer-trial-133-run1` 输出目录。
-
-下一步：提交推送本修正后执行同批幂等重放，核对 source 全 reuse、task 零创建 / 零动作、附件零上传、Fact 精确 ID 集不变，再启动 133 Web 并完成 48 页与 5 份真实 PDF 自动浏览器验收。
-
-阻塞/风险：本节记录时业务底座已真实写入 133，但顶层 readiness receipt 尚未转绿，不能宣称全页面完成；模拟数据可由数据库 pre-dataset 备份整体回滚，现有 forward-only retire 不能替代已过账 Fact 的数据库回滚。
-
-## 2026-07-16 133 同版模拟验收数据与浏览器收口
-
-完成：在 133 隔离试用库 `plush_erp_uat_20260715` 以固定身份 `yoyoosun-manual-acceptance / 2026.07.15-v3 / 20260715-V3 / SIM-YOYOOSUN-UAT-20260715-V3` 完成八阶段执行与同批幂等重放，运行态绑定产品 release `51dd98ec3c0e25fab3a410943af8cbd6d3d43860`、migration `20260715161753` 和 active customer-trial revision。写入前已建立可校验数据库备份；稳定 `admin` 未进入密码轮换，正式岗位与异常场景继续只使用 `demo_*` 账号。源数据实际覆盖客户 60、供应商 60、材料 80、产品 20、SKU 60、工艺 30、销售 / 采购 / 委外 / BOM 各 45；任务 180 条，状态为待处理 121、阻塞 27、完成 24、退回 8。Fact 读回为生产订单 47、生产事实 222、采购收货 54、退货 12、调整 12、质检 169、库存批次 166、结存 148、流水 453、预留 47、出货 47、财务事实 274、委外事实 90；附件 27 份绑定 7 类业务对象。
-
-幂等与运行态证据：第二次执行八阶段全部 completed，源单 300 个步骤全部复用，任务新增 0 / 恢复 0 / 重复动作 0 / 最终态复用 180，附件上传 0 / 复用 27；首轮与重放的精确业务 ID 集、状态与类型计数一致。133 PostgreSQL 与独立验收 Web 容器保持 healthy、重启 0，server 容器运行且重启 0；healthz、客户配置和永绅图标均返回 200。浏览器同一报告中正式账号 10 / 10、移动岗位 9 / 9、异常账号 3 / 3、页面 48 / 48、列表数据下限 35 / 35 全部通过。采购合同、加工合同、物料明细、色卡和作业指导书 5 / 5 均从同批业务记录打开工作台并取得 HTTP 200、`application/pdf`、非空 `%PDF` 内容和 request ID。
-
-测试治理：修正浏览器脚本对权限中心旧“管理员账号”页签、异常账号旧文案、打印页内部调试钩子和单一来源标签的过期假设；打印验证改为公开路由 / 永绅品牌 / `source=business` / 精确记录 / 稳定选中 / PDF 响应合同，并在长页面遍历前使用新登录态执行。搜索与选择只做最多三次的有界稳定重试，认证、权限、路由、运行态和 PDF 错误仍 fail closed。项目锁定 Node 24.14.0 下人工验收脚本 234 / 234、浏览器定向 24 / 24、语法和 `git diff --check` 通过；真实 133 浏览器终态 0 fail / 0 skip。
-
-下一步：按用户授权提交并推送本轮 QA 与进度收口；甲方可使用现有岗位账号在 133 进行人工业务判断。后续正式发布仍须以目标 commit / image 独立绑定 migration、容器编排、health / ready 和回滚点，不能把本次模拟试用数据当成客户真实业务或签收记录。
-
-阻塞/风险：自动化已证明当前数据底座、页面、权限入口与五类 PDF 技术链路，不替代甲方逐字段业务确认、每模板多样本排版检查、25 行长单据、下载 / 浏览器打印和最终签收。当前验收 Web 为不改 root-only compose 环境而独立启动的同镜像容器，旧 Web 容器保留为回滚点；如要转为长期 133 编排，需另行取得受控环境配置并按发布流程重建，不能临时放宽文件权限。模拟数据的 forward-only retire 只适合停止继续使用，完整回滚应使用写入前数据库备份。
-
-## 2026-07-17 全页面 V5 模拟验收数据治理
-
-完成：重新以正式可访问路由审查验收全集，发现业务看板、出货放行和异常处理虽被永绅菜单隐藏但仍可直接访问，旧版 48 项目录因此存在漏页。V5 将验收合同扩为 51 项，并把页面数据证据与“是否列表页”解耦：业务看板必须逐项有来源，异常处理必须有阻塞与到期事项，出货放行必须精确读回 20 条 `shipment_release` Workflow 任务及可见行，不能再用 47 条 Shipment Fact 冒充放行任务。仓库岗位原有 20 / 180 条任务原位改为放行任务，不增加重复任务；生产异常标题改为延期、返工、质量、设备和缺料等真实异常语义；其他标题、说明和原因继续使用数量、质检、箱唛、地址、时间等普通使用者能直接理解的永绅业务语言。完成放行仍只表示 `shipping_released`，不伪造已出货、扣库存或收款。本地与 133 浏览器现在都强制绑定同批 readiness，目录测试同时反查真实 router；验收密码工具永久只处理 `demo_*`，不再提供任何稳定 `admin` 轮换开关。数据身份升级为 `2026.07.16-v5 / 20260716-V5`，两端必须绑定同一业务编号集和 semantic digest。
-
-验证：V4 预审树的定向测试、`full.sh` 与 `strict.sh` 曾完整通过且 0 fail / 0 skip，并在本地专用库完成首次写入与幂等重放；随后独立 diff 审查发现上述 readiness、异常语义、管理员轮换和 router 自证缺口，旧绿色已降级为发现前证据，不作为 V5 最终结论。V5 定向、整树门禁与双环境运行态仍须重新执行。
-
-下一步：在全新本地 V5 专用库重跑八阶段、幂等复跑和 51 项浏览器，再完成同一最终树 full / strict、提交推送并构建固定 `linux/amd64` 镜像；备份并发布到 133 后，发布 / 激活 V5 试用配置、重放同一 V5 数据集、执行第二次幂等复跑、51 项页面与 5 类 PDF 浏览器验收，最后读回两端数量与业务编号 digest。
-
-阻塞/风险：本节记录时本地 V5 尚未重放，133 仍是旧 commit / image 与 V3 数据，不能把 V4 本地绿色、编号相同或旧 133 证据表述为双环境完成。发布与造数必须继续保护本地和 133 稳定 `admin`，不得放宽 target、release、migration、active revision 或 debug mutation 门禁；失败时停在原镜像、原 active revision 与写入前数据库备份回滚点。
-
-## 2026-07-17 V5 全页面造数逻辑复核与发布前收口
-
-完成：重新按页面真实查询条件核对 V5 数据归属，修正“仓库 20 条任务全部作为出货放行”的语义假绿。九岗位仍各 20 条、合计 180 条，但仓库任务现按委外回货、入库、备料、出货和异常分别进入对应 task group；只有 4 条真实出货场景进入 `shipment_release`，精确编号 `YS-V5-CK-02/13/16/19`，覆盖待处理、阻塞、完成、退回，并同时包含临期和逾期。生产岗位 20 条任务同样按生产排程、委外回货、返工和生产异常拆分，只有 5 条进入 `production_exception`；PMC 生产排程页面仍精确读取自己的 20 条任务。出货管理继续独立读取 47 张 Shipment Fact，其中一张为 25 行长单，Workflow 放行与出货 Fact 不互相凑数。
-
-数据执行器新增每目标、版本和别名唯一的 `dataset/.apply.lock` 原子排他锁，fresh / resume 共用；竞争进程会在 runner / RPC 前停止，锁只由 owner 释放，异常遗留锁必须确认进程退出后改名归档，不能自动删除。readiness、页面最低数量、业务看板、手工清单和执行手册已同步真实数量；本地数据库精确锁定 `plush_erp_acceptance_20260716_v5_dev`，133 数据库精确锁定 `plush_erp_uat_20260716_v5`，旧端口 `5435` 不再被 V5 密码工具接受。
-
-验证：项目锁定 Node 24.14.0 下人工验收脚本与隔离边界 284 / 284，0 fail / 0 skip。最终 `bash scripts/qa/full.sh` 和 `bash scripts/qa/strict.sh` 均完整通过且 0 fail / 0 skip；包含 93 个自动发现 scripts Node 测试文件、195 项 Web 合同、Web 全量、lint / CSS / build、2144 项 server-all、fresh / populated-upgrade / current-schema PostgreSQL、真实 Chromium、Go build、shellcheck、shfmt、yamllint、零 warning 与 govulncheck。最终只读差异复核未发现 P0 / P1 阻断。
-
-下一步：按用户授权提交并推送当前整树，基于新的 40 位 commit 构建固定 `linux/amd64` server / web 镜像；随后分别创建全新本地 V5 专用库与 133 V5 独立栈，执行 migration、试用配置激活、core 基础资料、同版完整 dataset、幂等重放、readiness、51 / 51 浏览器页面和 5 / 5 真实 PDF 验收，再回写与 commit / image 绑定的运行证据。
-
-阻塞/风险：本节记录时发布前代码与门禁已经完成，但新 commit / image、本地 V5 和 133 V5 的实际 apply / readback / browser 尚未执行，不能提前宣称双环境已造数。共享开发库的稳定 `admin/adminadmin` 不得被验收流程修改；133 使用独立强密码和独立栈，旧 V3 栈保留回滚，不执行 `down -v`。
-
-## 2026-07-17 V5 发布树最终门禁复核
-
-完成：把全页面 V5 合同进一步锁定为 51 个真实目标，出货放行只接受 `YS-V5-CK-02/13/16/19` 四条 Workflow 任务并覆盖待处理、阻塞、完成、退回、临期和逾期；出货管理独立要求 47 张 Shipment Fact，且恰有一张 25 行长单。数据计划采用一次捕获的受控排期锚点，fresh 持久化、resume 校验并复用，时间或报告被篡改会在任何写入阶段前失败。浏览器、readiness、数据集报告和静态隔离门禁均使用同一精确合同，避免页面有路由但无数据、用 Fact 冒充 Workflow 或只靠数量下限形成假绿。验收角色计划不再调用任何本地超级管理员重置路径，密码轮换器永久只选择 `demo_*`。
-
-验证：首次 full 揭示旧静态边界对新 Fact 数据结构的长正则误判，已拆成采购收货、质检、出货、库存流水和附件归属的独立语义检查，并新增原子防回归测试。修正后在同一精确工作树重新执行 `bash scripts/qa/full.sh` 与 `bash scripts/qa/strict.sh`，两者均以 `status=complete` 结束；覆盖 scripts 自动发现、Web 合同 195 / 195、Web 全量 1276 / 1276、server-all 2161 / 2161、关键 PostgreSQL 154 / 154、fresh / populated-upgrade、Web 构建、真实 Chromium、Go build、shellcheck、shfmt、yamllint、零 warning 和 govulncheck，0 fail / 0 skip。
-
-下一步：提交并推送当前精确工作树，以 40 位 commit 构建固定 `linux/amd64` server / web 镜像；随后只对本地与 133 的 V5 隔离库执行 migration、客户试用配置、core 基础资料、完整数据集、幂等重放、readiness、51 / 51 页面和 5 / 5 PDF 验收。
-
-阻塞/风险：当前仅发布树与门禁已完成，双环境运行态尚未据此新 commit / image 重建，因此仍不能宣称本地和 133 已完成 V5 造数。共享开发库及其稳定 `admin/adminadmin` 必须保持不变；133 旧栈与旧数据只作回滚点，不停服、不删卷、不冒充本次证据。
+- `docs/archive/progress-2026-06-28-before-runtime-manifest.md` 至 `docs/archive/progress-2026-07-12-before-doc-code-consistency-audit.md`：更早历史过程记录索引见各归档、`docs/archive/README.md`、`docs/文档清单.md` 和 Git 历史。

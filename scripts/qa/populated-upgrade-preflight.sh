@@ -26,7 +26,8 @@ usage() {
 
 行为:
   只读检查:
-  --audit populated-upgrade 检查 20260714055504 的目标约束与待删除字段。
+  --audit populated-upgrade 检查 20260714055504 的目标约束、待删除字段，
+                            以及 WIP 20260717035245 -> 20260717043625 委外关联切换。
   --audit customer-config-cutover 检查 20260714055825 的显式切换前置条件。
   audit 只接受上述固定值；默认 populated-upgrade。
   不修改业务数据、不执行 migration，也不输出数据库连接串。

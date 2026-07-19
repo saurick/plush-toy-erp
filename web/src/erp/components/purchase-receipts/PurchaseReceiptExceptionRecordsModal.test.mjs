@@ -7,10 +7,10 @@ const source = readFileSync(
   'utf8'
 )
 
-test('purchase exception records modal completes the draft post and posted cancellation paths', () => {
+test('purchase exception records modal loads complete paginated records and completes reversal actions', () => {
   for (const operation of [
-    'listPurchaseReturns',
-    'listPurchaseReceiptAdjustments',
+    'listAllPurchaseReturns',
+    'listAllPurchaseReceiptAdjustments',
     'postPurchaseReturn',
     'cancelPurchaseReturn',
     'postPurchaseReceiptAdjustment',
@@ -18,6 +18,17 @@ test('purchase exception records modal completes the draft post and posted cance
   ]) {
     assert.match(source, new RegExp(operation, 'u'))
   }
+  assert.doesNotMatch(source, /\blistPurchaseReturns\(/u)
+  assert.doesNotMatch(source, /\blistPurchaseReceiptAdjustments\(/u)
+  assert.doesNotMatch(source, /\b(?:limit|offset):\s*\d+/u)
+  assert.match(
+    source,
+    /listAllPurchaseReturns\(\s*\{\s*purchase_receipt_id: receipt\.id,?\s*\},\s*\{ signal: request\.signal \}\s*\)/u
+  )
+  assert.match(
+    source,
+    /listAllPurchaseReceiptAdjustments\(\s*\{\s*purchase_receipt_id: receipt\.id,?\s*\},\s*\{ signal: request\.signal \}\s*\)/u
+  )
   assert.match(source, /record\?\.status === 'DRAFT'/u)
   assert.match(source, /record\?\.status === 'POSTED'/u)
   assert.match(
@@ -28,7 +39,10 @@ test('purchase exception records modal completes the draft post and posted cance
     source,
     /Number\(nextRecord\?\.id \|\| 0\) !== Number\(record\.id\)/u
   )
-  assert.match(source, /确认草稿后库存会同步更新/u)
+  assert.match(source, /草稿可直接作废且不更新库存/u)
+  assert.match(source, /record\?\.status === 'DRAFT'/u)
+  assert.match(source, /采购退货草稿已作废，未更新库存/u)
+  assert.match(source, /入库调整草稿已作废，未更新库存/u)
   assert.match(source, /取消已确认记录时会保留原记录，并将库存恢复到操作前/u)
 })
 
@@ -59,6 +73,7 @@ test('purchase exception records modal presents business labels without technica
     '退货单号',
     '调整单号',
     '调整原因',
+    '作废草稿',
     '取消并恢复库存',
   ]) {
     assert.match(source, new RegExp(label, 'u'))
@@ -74,4 +89,9 @@ test('purchase exception records modal presents business labels without technica
     assert.equal(source.includes(`title: '${forbiddenLabel}'`), false)
   }
   assert.doesNotMatch(source, /写库存|库存流水|库存冲正|反向库存流水/u)
+})
+
+test('purchase exception quantity summaries use exact numeric(20,6) formatting', () => {
+  assert.match(source, /formatPurchaseReceiptQuantityTotal\(items\)/u)
+  assert.doesNotMatch(source, /Number\(item\?\.quantity\)/u)
 })

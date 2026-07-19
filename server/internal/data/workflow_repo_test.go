@@ -3,9 +3,11 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -455,6 +457,78 @@ func TestWorkflowRepo_ListWorkflowTasksFiltersByTaskGroup(t *testing.T) {
 	if tasks[0].TaskGroup != "shipment_release" || tasks[0].SourceType != "shipping-release" {
 		t.Fatalf("unexpected task %#v", tasks[0])
 	}
+}
+
+func TestWorkflowRepo_ListWorkflowTasksUsesServerFiltersAndPaginationBeyondTwoHundred(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo_server_pagination?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+
+	repo := NewWorkflowRepo(
+		&Data{postgres: client},
+		log.NewStdLogger(io.Discard),
+	)
+	dueAt := time.Date(2026, time.July, 18, 12, 0, 0, 0, time.UTC)
+	for index := 1; index <= 205; index++ {
+		if _, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+			TaskCode:      fmt.Sprintf("SCHEDULE-%03d", index),
+			TaskGroup:     "production_scheduling",
+			TaskName:      "生产排程任务",
+			SourceType:    "production-order",
+			SourceID:      index,
+			TaskStatusKey: "ready",
+			OwnerRoleKey:  biz.PMCRoleKey,
+			DueAt:         &dueAt,
+			Payload:       map[string]any{},
+		}, 7); err != nil {
+			t.Fatalf("create matching task %d failed: %v", index, err)
+		}
+	}
+	outsideDueAt := dueAt.Add(48 * time.Hour)
+	if _, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
+		TaskCode:      "SCHEDULE-OUTSIDE-DUE",
+		TaskGroup:     "production_scheduling",
+		TaskName:      "不在日期范围内",
+		SourceType:    "production-order",
+		SourceID:      999,
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.PMCRoleKey,
+		DueAt:         &outsideDueAt,
+		Payload:       map[string]any{},
+	}, 7); err != nil {
+		t.Fatalf("create out-of-range task failed: %v", err)
+	}
+
+	filter := biz.WorkflowTaskFilter{
+		Keyword:       "schedule-",
+		TaskGroup:     "production_scheduling",
+		TaskStatusKey: "ready",
+		OwnerRoleKey:  biz.PMCRoleKey,
+		DueFrom:       timePointer(dueAt.Add(-time.Hour)),
+		DueTo:         timePointer(dueAt.Add(time.Hour)),
+		Limit:         10,
+		Offset:        10,
+	}
+	secondPage, total, err := repo.ListWorkflowTasks(ctx, filter)
+	if err != nil {
+		t.Fatalf("list second page failed: %v", err)
+	}
+	if total != 205 || len(secondPage) != 10 {
+		t.Fatalf("second page total=%d len=%d, want total=205 len=10", total, len(secondPage))
+	}
+
+	filter.Offset = 200
+	tailPage, total, err := repo.ListWorkflowTasks(ctx, filter)
+	if err != nil {
+		t.Fatalf("list tail page failed: %v", err)
+	}
+	if total != 205 || len(tailPage) != 5 {
+		t.Fatalf("tail page total=%d len=%d, want total=205 len=5", total, len(tailPage))
+	}
+}
+
+func timePointer(value time.Time) *time.Time {
+	return &value
 }
 
 func TestWorkflowRepo_ListWorkflowTasksAppliesVisibilityScope(t *testing.T) {

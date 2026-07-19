@@ -125,6 +125,11 @@ test("populated upgrade SQL is read-only and covers every 055504 data boundary",
     "workflow_tasks.version is missing after migration 20260711063237",
     "workflow_tasks has %s non-positive versions",
     "'ready', 'blocked', 'done', 'rejected'",
+    "production_wip_batches",
+    "outsourcing_order_item_id",
+    "production_wip_outsourcing_allocations",
+    "legacy outsourcing links that would be dropped by 20260717043625",
+    "active OUTSOURCED batches without durable allocations after 20260717043625",
     "BEGIN TRANSACTION READ ONLY",
     "atlas_schema_revisions.atlas_schema_revisions",
   ]) {
@@ -166,6 +171,7 @@ test("populated upgrade preflight help declares read-only scope", () => {
   assert.match(result.stdout, /只读检查/u);
   assert.match(result.stdout, /populated-upgrade/u);
   assert.match(result.stdout, /customer-config-cutover/u);
+  assert.match(result.stdout, /WIP 20260717035245 -> 20260717043625/u);
   assert.match(result.stdout, /固定值/u);
   assert.match(result.stdout, /不修改业务数据/u);
   assert.match(result.stdout, /不输出数据库连接串/u);

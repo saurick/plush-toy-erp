@@ -1,8 +1,18 @@
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 
-import { installFactRpcMocks } from './factRpcMocks.mjs'
+import {
+  installFactRpcMocks,
+  mockShipmentSourceCandidates,
+} from './factRpcMocks.mjs'
+import { styleRpcResult } from './rpcMockResult.mjs'
 import { createWorkflowSourceTaskFixture } from './workflowSourceTaskFixtures.mjs'
+
+const factMockSource = readFileSync(
+  new URL('./factRpcMocks.mjs', import.meta.url),
+  'utf8'
+)
 
 function workflowScopes(roleKey, actions) {
   return Object.fromEntries(actions.map((action) => [action, [roleKey]]))
@@ -200,6 +210,24 @@ async function qualityMockHarness() {
   }
 }
 
+test('style-l1 primary production draft has a canonical order source', async () => {
+  const call = await operationalFactMockHarness()
+  const response = await call('list_production_facts', {
+    customer_key: 'yoyoosun',
+    limit: 100,
+    offset: 0,
+  })
+  assert.equal(response.result.code, 0)
+  const draft = response.result.data.production_facts.find(
+    (fact) => fact.fact_no === 'PROD-FACT-L1'
+  )
+  assert.equal(draft.status, 'DRAFT')
+  assert.equal(draft.fact_type, 'FINISHED_GOODS_RECEIPT')
+  assert.equal(draft.source_type, 'PRODUCTION_ORDER')
+  assert.equal(draft.source_id, 71)
+  assert.equal(draft.source_line_id, 7100)
+})
+
 test('style-l1 quality mock serves the strict outsourcing return read contract', async () => {
   const call = await qualityMockHarness()
   const valid = await call('list_outsourcing_return_quality_inspections', {
@@ -218,6 +246,34 @@ test('style-l1 quality mock serves the strict outsourcing return read contract',
     source_type: 'OUTSOURCING_FACT',
   })
   assert.equal(forged.result.code, 40010)
+})
+
+test('style-l1 quality lists preserve total while slicing requested pages', async () => {
+  const call = await qualityMockHarness()
+  const qualityPage = await call('list_quality_inspections', {
+    limit: 1,
+    offset: 1,
+  })
+  assert.equal(qualityPage.result.code, 0)
+  assert.equal(qualityPage.result.data.total, 1)
+  assert.equal(qualityPage.result.data.limit, 1)
+  assert.equal(qualityPage.result.data.offset, 1)
+  assert.deepEqual(qualityPage.result.data.quality_inspections, [])
+
+  const outsourcingPage = await call(
+    'list_outsourcing_return_quality_inspections',
+    {
+      customer_key: 'yoyoosun',
+      fact_id: 3,
+      limit: 1,
+      offset: 1,
+    }
+  )
+  assert.equal(outsourcingPage.result.code, 0)
+  assert.equal(outsourcingPage.result.data.total, 1)
+  assert.equal(outsourcingPage.result.data.limit, 1)
+  assert.equal(outsourcingPage.result.data.offset, 1)
+  assert.deepEqual(outsourcingPage.result.data.quality_inspections, [])
 })
 
 test('style-l1 purchase mock enforces retry-safe receipt mutations', async () => {
@@ -290,6 +346,42 @@ test('style-l1 purchase mock enforces retry-safe receipt mutations', async () =>
   assert.equal(created.result.data.purchase_receipt.items.length, 1)
 })
 
+test('style-l1 purchase exception lists preserve source filters and slices', async () => {
+  const call = await purchaseMockHarness()
+  for (const [method, recordKey] of [
+    ['list_purchase_returns', 'purchase_returns'],
+    ['list_purchase_receipt_adjustments', 'purchase_receipt_adjustments'],
+  ]) {
+    const firstPage = await call(method, {
+      purchase_receipt_id: 601,
+      limit: 1,
+      offset: 0,
+    })
+    assert.equal(firstPage.result.code, 0)
+    assert.equal(firstPage.result.data.total, 1)
+    assert.equal(firstPage.result.data.limit, 1)
+    assert.equal(firstPage.result.data.offset, 0)
+    assert.equal(firstPage.result.data[recordKey].length, 1)
+
+    const exhaustedPage = await call(method, {
+      purchase_receipt_id: 601,
+      limit: 1,
+      offset: 1,
+    })
+    assert.equal(exhaustedPage.result.data.total, 1)
+    assert.equal(exhaustedPage.result.data.offset, 1)
+    assert.deepEqual(exhaustedPage.result.data[recordKey], [])
+
+    const unrelatedPage = await call(method, {
+      purchase_receipt_id: 999,
+      limit: 200,
+      offset: 0,
+    })
+    assert.equal(unrelatedPage.result.data.total, 0)
+    assert.equal(unrelatedPage.result.data.limit, 200)
+  }
+})
+
 test('style-l1 operational fact mock only accepts source-bound reservation fields', async () => {
   const call = await operationalFactMockHarness()
   const params = {
@@ -322,6 +414,175 @@ test('style-l1 operational fact mock only accepts source-bound reservation field
 
   const retired = await call('create_stock_reservation', params)
   assert.equal(retired.result.code, 40010)
+})
+
+test('style-l1 shipment source candidates enforce remote query and paging params', async () => {
+  const candidate = {
+    sales_order_id: 7,
+    order_no: 'SO-007',
+    customer_snapshot: { code: 'C-008', name: '示例客户' },
+    customer_name: '示例客户',
+    sales_order_item_id: 31,
+    product_code_snapshot: 'P-009',
+    product_name_snapshot: '小熊',
+    sku_code: '',
+    sku_name: '',
+  }
+  assert.deepEqual(
+    mockShipmentSourceCandidates({ keyword: '小熊', limit: 20, offset: 0 }, [
+      candidate,
+    ]),
+    {
+      shipment_source_candidates: [candidate],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    }
+  )
+  assert.equal(
+    styleRpcResult(mockShipmentSourceCandidates({ limit: 500 }, [candidate]))
+      .code,
+    40010
+  )
+  assert.equal(
+    styleRpcResult(
+      mockShipmentSourceCandidates({ unexpected: true }, [candidate])
+    ).code,
+    40010
+  )
+})
+
+test('style-l1 operational fact mock serves the shipment source candidate RPC', async () => {
+  const call = await operationalFactMockHarness()
+  const result = await call('list_shipment_source_candidates', {
+    keyword: 'SO-STYLE-L1',
+    limit: 20,
+    offset: 0,
+  })
+  assert.equal(result.result.code, 0)
+  assert.equal(result.result.data.total, 21)
+  assert.equal(result.result.data.shipment_source_candidates.length, 20)
+  assert.equal(
+    result.result.data.shipment_source_candidates[0].remaining_quantity,
+    '10'
+  )
+  const secondPage = await call('list_shipment_source_candidates', {
+    keyword: 'SO-STYLE-L1',
+    limit: 20,
+    offset: 20,
+  })
+  assert.equal(secondPage.result.code, 0)
+  assert.equal(secondPage.result.data.shipment_source_candidates.length, 1)
+  assert.equal(
+    secondPage.result.data.shipment_source_candidates[0].sales_order_item_id,
+    21
+  )
+  const invalid = await call('list_shipment_source_candidates', {
+    limit: 500,
+    offset: 0,
+  })
+  assert.equal(invalid.result.code, 40010)
+})
+
+test('style-l1 shipment draft cancellation is visible on the canonical reread', async () => {
+  const call = await operationalFactMockHarness()
+  const before = await call('get_shipment', { id: 1 })
+  assert.equal(before.result.data.shipment.status, 'DRAFT')
+
+  const cancelled = await call('cancel_shipment', { id: 1 })
+  assert.equal(cancelled.result.data.shipment.status, 'CANCELLED')
+
+  const reread = await call('list_shipments', { limit: 20, offset: 0 })
+  assert.equal(reread.result.data.shipments[0].status, 'CANCELLED')
+})
+
+test('style-l1 production fact list preserves source filters, total and requested slices', async () => {
+  const call = await operationalFactMockHarness()
+  const firstPage = await call('list_production_facts', {
+    limit: 1,
+    offset: 0,
+  })
+  const secondPage = await call('list_production_facts', {
+    limit: 1,
+    offset: 1,
+  })
+  assert.ok(firstPage.result.data.total > 1)
+  assert.equal(secondPage.result.data.total, firstPage.result.data.total)
+  assert.equal(firstPage.result.data.limit, 1)
+  assert.equal(secondPage.result.data.offset, 1)
+  assert.equal(firstPage.result.data.production_facts.length, 1)
+  assert.equal(secondPage.result.data.production_facts.length, 1)
+  assert.notEqual(
+    firstPage.result.data.production_facts[0].id,
+    secondPage.result.data.production_facts[0].id
+  )
+
+  const unrelated = await call('list_production_facts', {
+    source_type: 'PRODUCTION_ORDER',
+    source_id: 999,
+    limit: 200,
+    offset: 0,
+  })
+  assert.equal(unrelated.result.data.total, 0)
+  assert.equal(unrelated.result.data.limit, 200)
+  assert.deepEqual(unrelated.result.data.production_facts, [])
+})
+
+test('style-l1 source aggregate mocks preserve full-read paging and source filters', async () => {
+  const call = await operationalFactMockHarness()
+  const shipments = await call('list_shipments', {
+    source_id: 1,
+    limit: 200,
+    offset: 0,
+  })
+  assert.equal(shipments.result.code, 0)
+  assert.equal(shipments.result.data.limit, 200)
+  assert.equal(shipments.result.data.offset, 0)
+  assert.equal(shipments.result.data.shipments.length, 1)
+
+  const unrelatedShipments = await call('list_shipments', {
+    source_id: 999,
+    limit: 200,
+    offset: 0,
+  })
+  assert.equal(unrelatedShipments.result.data.total, 0)
+
+  const reservations = await call('list_stock_reservations', {
+    source_id: 1,
+    status: 'ACTIVE',
+    limit: 200,
+    offset: 0,
+  })
+  assert.equal(reservations.result.code, 0)
+  assert.equal(reservations.result.data.limit, 200)
+  assert.equal(reservations.result.data.offset, 0)
+  assert.equal(reservations.result.data.stock_reservations.length, 1)
+
+  const unrelatedReservations = await call('list_stock_reservations', {
+    source_id: 999,
+    status: 'ACTIVE',
+    limit: 200,
+    offset: 0,
+  })
+  assert.equal(unrelatedReservations.result.data.total, 0)
+})
+
+test('style-l1 inventory aggregate mocks use the shared paging response contract', () => {
+  for (const [method, nextMethod, recordKey] of [
+    ['list_inventory_balances', 'list_inventory_lots', 'inventory_balances'],
+    ['list_inventory_txns', 'default:', 'inventory_txns'],
+  ]) {
+    const listCase = factMockSource.slice(
+      factMockSource.indexOf(`case '${method}'`),
+      factMockSource.indexOf(
+        nextMethod.startsWith('list_') ? `case '${nextMethod}'` : nextMethod,
+        factMockSource.indexOf(`case '${method}'`)
+      )
+    )
+    assert.match(listCase, /stylePaginatedRpcData/u)
+    assert.match(listCase, new RegExp(`'${recordKey}'`, 'u'))
+    assert.match(listCase, /params/u)
+  }
 })
 
 test('style-l1 operational fact mock enforces production requirement and issue allowlists', async () => {
@@ -559,6 +820,54 @@ test('style-l1 operational fact mock only accepts source-bound outsourcing field
   assert.equal(returnReceipt.result.data.outsourcing_fact.product_sku_id, 201)
   assert.equal(materialIssue.result.data.outsourcing_fact.product_sku_id, null)
 
+  const postedMaterialIssue = await call('post_outsourcing_fact', {
+    customer_key: 'yoyoosun',
+    id: materialIssue.result.data.outsourcing_fact.id,
+  })
+  assert.equal(postedMaterialIssue.result.code, 0)
+  assert.equal(
+    postedMaterialIssue.result.data.outsourcing_fact.status,
+    'POSTED'
+  )
+  const materialIssueReread = await call('list_outsourcing_facts', {
+    customer_key: 'yoyoosun',
+    source_type: 'OUTSOURCING_ORDER',
+    source_id: 1,
+    source_line_id: 11,
+    limit: 100,
+    offset: 0,
+  })
+  assert.equal(
+    materialIssueReread.result.data.outsourcing_facts.find(
+      (fact) => fact.id === materialIssue.result.data.outsourcing_fact.id
+    )?.status,
+    'POSTED'
+  )
+
+  const voidedReturnReceipt = await call('cancel_outsourcing_fact', {
+    customer_key: 'yoyoosun',
+    id: returnReceipt.result.data.outsourcing_fact.id,
+  })
+  assert.equal(voidedReturnReceipt.result.code, 0)
+  assert.equal(
+    voidedReturnReceipt.result.data.outsourcing_fact.status,
+    'CANCELLED'
+  )
+  const returnReceiptReread = await call('list_outsourcing_facts', {
+    customer_key: 'yoyoosun',
+    source_type: 'OUTSOURCING_ORDER',
+    source_id: 1,
+    source_line_id: 12,
+    limit: 100,
+    offset: 0,
+  })
+  assert.equal(
+    returnReceiptReread.result.data.outsourcing_facts.find(
+      (fact) => fact.id === returnReceipt.result.data.outsourcing_fact.id
+    )?.status,
+    'CANCELLED'
+  )
+
   const changedIntent = await call(
     'create_outsourcing_return_receipt_from_order',
     {
@@ -668,10 +977,30 @@ test('style-l1 operational fact mock enforces strict finance source commands', a
     ...common,
     fact_no: 'INV-SHIP-L1',
     shipment_id: 1,
+    invoice_category: 'VAT_SPECIAL_13',
   })
   assert.equal(invoice.result.code, 0)
   assert.equal(invoice.result.data.finance_fact.fact_type, 'INVOICE')
   assert.equal(invoice.result.data.finance_fact.source_type, 'SHIPMENT')
+  assert.equal(
+    invoice.result.data.finance_fact.invoice_category,
+    'VAT_SPECIAL_13'
+  )
+
+  const invoiceWithoutCategory = await call('create_invoice_from_shipment', {
+    ...common,
+    fact_no: 'INV-SHIP-NO-CATEGORY-L1',
+    shipment_id: 1,
+  })
+  assert.equal(invoiceWithoutCategory.result.code, 40010)
+
+  const receivableWithCategory = await call('create_receivable_from_shipment', {
+    ...common,
+    fact_no: 'AR-SHIP-WITH-CATEGORY-L1',
+    shipment_id: 1,
+    invoice_category: 'VAT_SPECIAL_13',
+  })
+  assert.equal(receivableWithCategory.result.code, 40010)
 
   const purchase = await call('create_payable_from_purchase_receipt', {
     ...common,
@@ -705,16 +1034,22 @@ test('style-l1 operational fact mock enforces strict finance source commands', a
     'RECONCILIATION'
   )
 
-  for (const [method, sourceKey, sourceID] of [
-    ['create_receivable_from_shipment', 'shipment_id', 1],
-    ['create_invoice_from_shipment', 'shipment_id', 1],
-    ['create_payable_from_purchase_receipt', 'purchase_receipt_id', 601],
-    ['create_payable_from_outsourcing_return', 'outsourcing_fact_id', 3],
-    ['create_reconciliation_from_finance_fact', 'finance_fact_id', 1],
+  for (const [method, sourceKey, sourceID, extra] of [
+    ['create_receivable_from_shipment', 'shipment_id', 1, {}],
+    [
+      'create_invoice_from_shipment',
+      'shipment_id',
+      1,
+      { invoice_category: 'VAT_SPECIAL_13' },
+    ],
+    ['create_payable_from_purchase_receipt', 'purchase_receipt_id', 601, {}],
+    ['create_payable_from_outsourcing_return', 'outsourcing_fact_id', 3, {}],
+    ['create_reconciliation_from_finance_fact', 'finance_fact_id', 1, {}],
   ]) {
     const forged = await call(method, {
       ...common,
       [sourceKey]: sourceID,
+      ...extra,
       amount: '999999',
     })
     assert.equal(forged.result.code, 40010, method)
@@ -1123,6 +1458,10 @@ test('style-l1 workflow role task view mock applies role, view and cursor bounda
   )
   assert.equal(secondTodoPage.result.data.has_more, false)
   assert.equal(secondTodoPage.result.data.next_cursor, '')
+  assert.equal(
+    secondTodoPage.result.data.server_time,
+    firstTodoPage.result.data.server_time
+  )
 
   const riskPage = await call('list_role_tasks', {
     view_key: 'risk',

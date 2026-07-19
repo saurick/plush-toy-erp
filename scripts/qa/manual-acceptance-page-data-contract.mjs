@@ -2,7 +2,7 @@ import { buildManualAcceptanceCatalog } from "./manual-acceptance-catalog.mjs";
 
 export const MANUAL_ACCEPTANCE_PAGE_DATA_CONTRACT =
   "manual-acceptance-page-data-ownership-v2";
-export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 51;
+export const MANUAL_ACCEPTANCE_PAGE_TARGET_COUNT = 50;
 
 export const MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS = Object.freeze([
   "role",
@@ -283,7 +283,7 @@ function targetEvidence(item) {
         "基础资料、业务单据、办理结果和当前待办分别按共享批次核对；页面四类数字与跳转仍需页面确认。",
     };
   }
-  if (item.key === "exception-flow") {
+  if (item.key === "production-exceptions") {
     return {
       probeIds: [
         "workflow-tasks:production_exception",
@@ -293,7 +293,7 @@ function targetEvidence(item) {
         MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
       browserRequired: true,
       reason:
-        "完整异常生命周期与当前可处理异常分别按同批岗位任务核对；异常步骤和页面可见数量仍需页面确认。",
+        "完整生产异常任务矩阵与当前可处理任务分别按同批岗位任务核对；页面筛选、详情和处理动作仍需页面确认。",
     };
   }
   const workflowProbeId = WORKFLOW_TASK_GROUP_PROBES[item.key];

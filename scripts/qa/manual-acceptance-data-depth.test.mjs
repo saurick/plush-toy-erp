@@ -31,8 +31,12 @@ test("contacts and production workflow pages cover empty, multiple and state-ric
     assert(Number(report.evidence.contactDepth[key][1]) > 0);
     assert(Number(report.evidence.contactDepth[key][2]) > 0);
   }
-  assert.equal(report.evidence.taskGroups.production_scheduling, 25);
-  assert.equal(report.evidence.taskGroups.production_exception, 5);
+  assert.equal(report.evidence.taskGroups.trial_pmc_work, 25);
+  assert.equal(report.evidence.taskGroups.trial_production_work, 15);
+  assert.equal(report.evidence.taskGroups.trial_warehouse_work, 20);
+  assert.equal(report.evidence.taskGroups.production_scheduling, undefined);
+  assert.equal(report.evidence.taskGroups.production_exception, undefined);
+  assert.equal(report.evidence.taskGroups.shipment_release, undefined);
 });
 
 test("attachment matrix requires multiple realistic files and workflow CAS", () => {

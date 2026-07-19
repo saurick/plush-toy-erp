@@ -1,5 +1,9 @@
 import { effectiveSessionAllowsAction } from './adminProfileSync.mjs'
 import { normalizeMaterialPurchaseUnitText } from './materialPurchaseContractEditor.mjs'
+import {
+  normalizeNumeric20Scale6,
+  sumNumeric20Scale6Values,
+} from './numeric20Scale6.mjs'
 
 export const V1_ROUTE_PATHS = Object.freeze({
   customers: '/erp/master/partners/customers',
@@ -307,39 +311,49 @@ export function deriveOutsourcingOrderItemAmount(values = {}) {
   return deriveOrderItemAmount(values, 'outsourcing_quantity')
 }
 
-function decimalNumber(value) {
-  const numeric = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(numeric) ? numeric : 0
-}
-
-function snapshotDecimalNumber(snapshot, keys) {
+function snapshotValue(snapshot, keys) {
   const source = snapshot && typeof snapshot === 'object' ? snapshot : {}
-  const value = keys
+  return keys
     .map((key) => source[key])
     .find((item) => String(item ?? '').trim() !== '')
-  return decimalNumber(value)
+}
+
+function snapshotCount(snapshot, keys) {
+  const value = Number(snapshotValue(snapshot, keys) || 0)
+  return Number.isFinite(value) ? value : 0
+}
+
+function snapshotNumeric20Scale6(snapshot, keys) {
+  return normalizeNumeric20Scale6(snapshotValue(snapshot, keys)) || '0'
+}
+
+function summarizeOrderLines(lines, quantityField, deriveAmount) {
+  const items = Array.isArray(lines) ? lines : []
+  return {
+    count: items.length,
+    quantity: sumNumeric20Scale6Values(
+      items.map((line) => line?.[quantityField])
+    ),
+    amount: sumNumeric20Scale6Values(items.map((line) => deriveAmount(line))),
+  }
 }
 
 export function summarizeSalesOrderLines(lines = [], snapshot = {}) {
   const items = Array.isArray(lines) ? lines : []
   if (items.length === 0) {
     return {
-      count: snapshotDecimalNumber(snapshot, [
+      count: snapshotCount(snapshot, [
         'count',
         'item_count',
         'line_count',
       ]),
-      quantity: snapshotDecimalNumber(snapshot, [
+      quantity: snapshotNumeric20Scale6(snapshot, [
         'quantity',
         'header_quantity',
         'quantity_total',
         'total_quantity',
       ]),
-      amount: snapshotDecimalNumber(snapshot, [
+      amount: snapshotNumeric20Scale6(snapshot, [
         'amount',
         'header_amount',
         'amount_total',
@@ -347,14 +361,26 @@ export function summarizeSalesOrderLines(lines = [], snapshot = {}) {
       ]),
     }
   }
-  return items.reduce(
-    (summary, line) => ({
-      count: summary.count + 1,
-      quantity: summary.quantity + decimalNumber(line?.ordered_quantity),
-      amount:
-        summary.amount + decimalNumber(deriveSalesOrderItemAmount(line) || 0),
-    }),
-    { count: 0, quantity: 0, amount: 0 }
+  return summarizeOrderLines(
+    items,
+    'ordered_quantity',
+    deriveSalesOrderItemAmount
+  )
+}
+
+export function summarizePurchaseOrderLines(lines = []) {
+  return summarizeOrderLines(
+    lines,
+    'purchased_quantity',
+    derivePurchaseOrderItemAmount
+  )
+}
+
+export function summarizeOutsourcingOrderLines(lines = []) {
+  return summarizeOrderLines(
+    lines,
+    'outsourcing_quantity',
+    deriveOutsourcingOrderItemAmount
   )
 }
 
@@ -935,6 +961,9 @@ export function buildProcessParams(values = {}, extra = {}) {
     code: trimOptional(values.code),
     name: trimOptional(values.name),
     category: trimOptional(values.category),
+    production_route_operation_code: trimOptional(
+      values.production_route_operation_code
+    ),
     outsourcing_enabled: values.outsourcing_enabled === true,
     inhouse_enabled: values.inhouse_enabled !== false,
     quality_required: values.quality_required === true,
@@ -1211,12 +1240,6 @@ export function buildOutsourcingOrderParams(values = {}, extra = {}) {
         : {},
     contract_party_snapshot: buildOptionalContractPartySnapshotParam(values),
     source_order_no: trimOptional(values.source_order_no),
-    source_sales_order_id:
-      values.source_sales_order_id === undefined ||
-      values.source_sales_order_id === null ||
-      values.source_sales_order_id === ''
-        ? undefined
-        : Number(values.source_sales_order_id || 0),
     order_date: trimOptional(values.order_date),
     expected_return_date: trimOptional(values.expected_return_date),
     note: trimOptional(values.note),

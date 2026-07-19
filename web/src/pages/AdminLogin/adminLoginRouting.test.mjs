@@ -95,3 +95,19 @@ test('adminLoginRouting: 固定岗位任务端不再回跳旧 /tasks 路径', ()
 
   assert.equal(path, '/m/sales/tasks')
 })
+
+test('adminLoginRouting: 多个手机岗位登录后直接进入首个可用岗位', () => {
+  const path = resolveAdminPostLoginPath({
+    adminProfile: {
+      ...buildAdminProfile(),
+      permissions: ['mobile.sales.access', 'mobile.quality.access'],
+    },
+    entryTarget: ENTRY_TARGET.MOBILE_TASKS,
+    entryConfig,
+    redirectTo: '',
+    defaultRedirect: '/erp/dashboard',
+    shouldRemember: false,
+  })
+
+  assert.equal(path, '/m/sales/tasks')
+})

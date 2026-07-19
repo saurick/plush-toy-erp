@@ -302,6 +302,32 @@ func TestJsonrpcDispatcher_OutsourcingOrderAPISavesListsAndTransitions(t *testin
 	}
 }
 
+func TestOutsourcingOrderPublicContractRejectsAndOmitsRetiredSalesOrderSourceID(t *testing.T) {
+	repo := newStubOutsourcingOrderJSONRPCRepo()
+	dispatcher := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
+		[]string{biz.PurchaseRoleKey},
+		biz.PermissionOutsourcingOrderCreate,
+	))
+	params := outsourcingOrderJSONRPCSaveParams(t, "OUT-RETIRED-SALES-SOURCE").AsMap()
+	params["source_sales_order_id"] = float64(1)
+
+	_, result, err := dispatcher.handleOutsourcingOrder(
+		workflowJSONRPCAdminContext(),
+		"save_outsourcing_order_with_items",
+		"retired-source",
+		mustJSONRPCStruct(t, params),
+	)
+	if err != nil || result == nil || result.Code != errcode.InvalidParam.Code {
+		t.Fatalf("retired sales-order source id must be rejected: result=%#v err=%v", result, err)
+	}
+	if repo.saveCalls != 0 {
+		t.Fatalf("retired sales-order source id reached repository: calls=%d", repo.saveCalls)
+	}
+	if _, exposed := outsourcingOrderToMap(&biz.OutsourcingOrder{})["source_sales_order_id"]; exposed {
+		t.Fatal("outsourcing order response exposed retired sales-order source id")
+	}
+}
+
 func TestJsonrpcDispatcher_OutsourcingOrderAPISavesMaterialSubjectAndRequiresMaterialModule(t *testing.T) {
 	repo := newStubOutsourcingOrderJSONRPCRepo()
 	j := newOutsourcingOrderJSONRPCTestData(t, repo, workflowJSONRPCAdmin(
@@ -622,7 +648,6 @@ func outsourcingOrderFromMutation(id int, status string, in *biz.OutsourcingOrde
 		SupplierSnapshot:      in.SupplierSnapshot,
 		ContractPartySnapshot: in.ContractPartySnapshot,
 		SourceOrderNo:         in.SourceOrderNo,
-		SourceSalesOrderID:    in.SourceSalesOrderID,
 		OrderDate:             in.OrderDate,
 		ExpectedReturnDate:    in.ExpectedReturnDate,
 		LifecycleStatus:       status,

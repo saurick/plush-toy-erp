@@ -45,6 +45,24 @@ func TestOperationalFactRepoShipmentItemFinanceSnapshotsComeFromSalesOrderLine(t
 	if err != nil {
 		t.Fatalf("create sales order item: %v", err)
 	}
+	fallbackUnitPrice := decimal.NewFromInt(7)
+	fallbackOrderItem, err := client.SalesOrderItem.Create().
+		SetSalesOrderID(order.ID).
+		SetLineNo(2).
+		SetProductID(product.ID).
+		SetUnitID(unit.ID).
+		SetOrderedQuantity(orderedQuantity).
+		SetUnitPrice(fallbackUnitPrice).
+		Save(ctx)
+	if err != nil {
+		t.Fatalf("create unit-price-only sales order item: %v", err)
+	}
+	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("submit sales order: %v", err)
+	}
+	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("activate sales order: %v", err)
+	}
 	repo := NewOperationalFactRepo(data, log.NewStdLogger(io.Discard))
 	quantity := decimal.RequireFromString("1.5")
 	shipment, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
@@ -66,18 +84,6 @@ func TestOperationalFactRepoShipmentItemFinanceSnapshotsComeFromSalesOrderLine(t
 	wantAmount := decimal.NewFromInt(15)
 	if item.AmountSnapshot == nil || !item.AmountSnapshot.Equal(wantAmount) || item.CurrencySnapshot == nil || *item.CurrencySnapshot != biz.FinanceCurrencyCNY {
 		t.Fatalf("amount/currency snapshots=%#v want amount=%s CNY", item, wantAmount)
-	}
-	fallbackUnitPrice := decimal.NewFromInt(7)
-	fallbackOrderItem, err := client.SalesOrderItem.Create().
-		SetSalesOrderID(order.ID).
-		SetLineNo(2).
-		SetProductID(product.ID).
-		SetUnitID(unit.ID).
-		SetOrderedQuantity(orderedQuantity).
-		SetUnitPrice(fallbackUnitPrice).
-		Save(ctx)
-	if err != nil {
-		t.Fatalf("create unit-price-only sales order item: %v", err)
 	}
 	fallbackShipment, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
 		Shipment: &biz.ShipmentCreate{
@@ -107,7 +113,7 @@ func TestOperationalFactRepoShipmentItemFinanceSnapshotsComeFromSalesOrderLine(t
 	}
 }
 
-func TestOperationalFactRepoShipShipmentRefreshesFinanceSnapshotsAfterDraftSalesOrderPriceChange(t *testing.T) {
+func TestOperationalFactRepoShipShipmentKeepsFinanceSnapshotsFromActiveSalesOrder(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "shipment_finance_snapshot_refresh")
 	unit := createTestUnit(t, ctx, client, "PCS-SNAPSHOT-REFRESH")
@@ -116,8 +122,9 @@ func TestOperationalFactRepoShipShipmentRefreshesFinanceSnapshotsAfterDraftSales
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-SNAPSHOT-REFRESH", true)
 	logger := log.NewStdLogger(io.Discard)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, logger))
+	paymentTermDays := 60
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo: "SO-SNAPSHOT-REFRESH", CustomerID: customer.ID, OrderDate: time.Now().UTC(),
+		OrderNo: "SO-SNAPSHOT-REFRESH", CustomerID: customer.ID, OrderDate: time.Now().UTC(), PaymentTermDays: &paymentTermDays,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)
@@ -133,6 +140,20 @@ func TestOperationalFactRepoShipShipmentRefreshesFinanceSnapshotsAfterDraftSales
 		t.Fatalf("create sales order item: %v", err)
 	}
 
+	updatedUnitPrice := decimal.NewFromInt(12)
+	updatedAmount := decimal.NewFromInt(60)
+	if _, err := salesUC.UpdateSalesOrderItem(ctx, orderItem.ID, &biz.SalesOrderItemMutation{
+		SalesOrderID: order.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
+		OrderedQuantity: orderedQuantity, UnitPrice: &updatedUnitPrice, Amount: &updatedAmount,
+	}); err != nil {
+		t.Fatalf("update draft sales order price: %v", err)
+	}
+	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("submit sales order: %v", err)
+	}
+	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
+		t.Fatalf("activate sales order: %v", err)
+	}
 	operationalRepo := NewOperationalFactRepo(data, logger)
 	operationalUC := biz.NewOperationalFactUsecase(operationalRepo)
 	shipment, err := operationalUC.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
@@ -148,23 +169,8 @@ func TestOperationalFactRepoShipShipmentRefreshesFinanceSnapshotsAfterDraftSales
 	if err != nil {
 		t.Fatalf("create shipment draft: %v", err)
 	}
-	if shipment.Items[0].AmountSnapshot == nil || !shipment.Items[0].AmountSnapshot.Equal(decimal.NewFromInt(20)) {
-		t.Fatalf("initial shipment amount snapshot=%#v, want 20", shipment.Items[0].AmountSnapshot)
-	}
-
-	updatedUnitPrice := decimal.NewFromInt(12)
-	updatedAmount := decimal.NewFromInt(60)
-	if _, err := salesUC.UpdateSalesOrderItem(ctx, orderItem.ID, &biz.SalesOrderItemMutation{
-		SalesOrderID: order.ID, LineNo: 1, ProductID: product.ID, UnitID: unit.ID,
-		OrderedQuantity: orderedQuantity, UnitPrice: &updatedUnitPrice, Amount: &updatedAmount,
-	}); err != nil {
-		t.Fatalf("update draft sales order price: %v", err)
-	}
-	if _, err := salesUC.SubmitSalesOrder(ctx, order.ID); err != nil {
-		t.Fatalf("submit sales order: %v", err)
-	}
-	if _, err := salesUC.ActivateSalesOrder(ctx, order.ID); err != nil {
-		t.Fatalf("activate sales order: %v", err)
+	if shipment.Items[0].AmountSnapshot == nil || !shipment.Items[0].AmountSnapshot.Equal(decimal.NewFromInt(24)) {
+		t.Fatalf("active-order shipment amount snapshot=%#v, want 24", shipment.Items[0].AmountSnapshot)
 	}
 	inventoryRepo := NewInventoryRepo(data, logger)
 	if _, err := inventoryRepo.ApplyInventoryTxnAndUpdateBalance(ctx, &biz.InventoryTxnCreate{
@@ -192,13 +198,21 @@ func TestOperationalFactRepoShipShipmentRefreshesFinanceSnapshotsAfterDraftSales
 		t.Fatalf("create receivable: %v", err)
 	}
 	invoice, err := operationalUC.CreateInvoiceFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
-		FactNo: "INV-SNAPSHOT-REFRESH", ShipmentID: shipment.ID, IdempotencyKey: "inv-snapshot-refresh",
+		FactNo: "INV-SNAPSHOT-REFRESH", ShipmentID: shipment.ID, IdempotencyKey: "inv-snapshot-refresh", InvoiceCategory: stringPointer(biz.FinanceInvoiceCategoryVATSpecial13),
 	})
 	if err != nil {
 		t.Fatalf("create invoice: %v", err)
 	}
 	if !receivable.Amount.Equal(decimal.NewFromInt(24)) || !invoice.Amount.Equal(decimal.NewFromInt(24)) {
 		t.Fatalf("derived finance amounts receivable=%s invoice=%s, want 24", receivable.Amount, invoice.Amount)
+	}
+	if receivable.CollectionType == nil || *receivable.CollectionType != biz.FinanceCollectionAccountsReceivable ||
+		receivable.PaymentTerm != nil || receivable.PaymentTermDays == nil || *receivable.PaymentTermDays != 60 || receivable.InvoiceCategory != nil {
+		t.Fatalf("derived receivable dimensions=%#v", receivable)
+	}
+	if invoice.InvoiceCategory == nil || *invoice.InvoiceCategory != biz.FinanceInvoiceCategoryVATSpecial13 ||
+		invoice.CollectionType != nil || invoice.PaymentTerm != nil || invoice.PaymentTermDays != nil {
+		t.Fatalf("derived invoice dimensions=%#v", invoice)
 	}
 	listed, total, err := operationalUC.ListFinanceFacts(ctx, biz.OperationalFactFilter{
 		SourceType: biz.ShipmentSourceType,
@@ -224,7 +238,10 @@ func TestOperationalFactRepoFinanceFromShipmentLifecycleAndCancellationGuardSQLi
 	if err != nil {
 		t.Fatalf("create receivable: %v", err)
 	}
-	if created.Status != biz.OperationalFactStatusDraft || !created.Amount.Equal(decimal.NewFromInt(20)) || created.CounterpartyID == nil || *created.CounterpartyID != *shipment.CustomerID {
+	if created.Status != biz.OperationalFactStatusDraft || !created.Amount.Equal(decimal.NewFromInt(20)) || created.CounterpartyID == nil || *created.CounterpartyID != *shipment.CustomerID ||
+		created.CollectionType == nil || *created.CollectionType != biz.FinanceCollectionAccountsReceivable ||
+		created.PaymentTerm == nil || *created.PaymentTerm != biz.FinancePaymentTermEOM30 ||
+		created.PaymentTermDays == nil || *created.PaymentTermDays != 30 || created.InvoiceCategory != nil {
 		t.Fatalf("source-derived receivable=%#v", created)
 	}
 	replayed, err := uc.CreateReceivableFromShipment(ctx, input)
@@ -353,7 +370,7 @@ func TestOperationalFactRepoSettleRejectsInvoiceAndPayment(t *testing.T) {
 	data, client := openInventoryRepoTestData(t, "finance_settle_type_guard")
 	repo, uc, shipment, _ := prepareShipmentFinanceSource(t, ctx, data, client, "settle-guard")
 	invoice, err := uc.CreateInvoiceFromShipment(ctx, &biz.FinanceFactFromShipmentCreate{
-		FactNo: "INV-SETTLE-GUARD", ShipmentID: shipment.ID, IdempotencyKey: "inv-settle-guard",
+		FactNo: "INV-SETTLE-GUARD", ShipmentID: shipment.ID, IdempotencyKey: "inv-settle-guard", InvoiceCategory: stringPointer(biz.FinanceInvoiceCategoryVATGeneral1),
 	})
 	if err != nil {
 		t.Fatalf("create invoice: %v", err)
@@ -550,8 +567,9 @@ func prepareShipmentFinanceSource(
 	customer := createSalesOrderTestCustomer(t, ctx, client, "C-"+suffix, true)
 	actor := client.AdminUser.Create().SetUsername("finance-actor-" + suffix).SetPasswordHash("test-password-hash").SaveX(ctx)
 	salesUC := biz.NewSalesOrderUsecase(NewSalesOrderRepo(data, log.NewStdLogger(io.Discard)))
+	paymentTermDays := 30
 	order, err := salesUC.CreateSalesOrder(ctx, &biz.SalesOrderMutation{
-		OrderNo: "SO-" + suffix, CustomerID: customer.ID, OrderDate: time.Now().UTC(),
+		OrderNo: "SO-" + suffix, CustomerID: customer.ID, OrderDate: time.Now().UTC(), PaymentTermDays: &paymentTermDays,
 	})
 	if err != nil {
 		t.Fatalf("create sales order: %v", err)

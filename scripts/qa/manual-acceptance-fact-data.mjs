@@ -28,6 +28,7 @@ import {
   MANUAL_ACCEPTANCE_SHIPMENT_LONG_RECORD_LINE_COUNT,
 } from "./manual-acceptance-catalog.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
+import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 
 const CUSTOMER_KEY = "yoyoosun";
 const DEFAULT_BACKEND_URL = "http://127.0.0.1:8300";
@@ -504,6 +505,15 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
           ? shortBusinessNo(report, "ZJ", 900 + index)
           : undefined,
       linkedPurchaseOrder: linked ? linkedOrders[offset] : undefined,
+      sourcePurchaseOrderNo: linked
+        ? linkedOrders[offset].orderNo
+        : shortBusinessNo(report, "PR", 1000 + index),
+      supplierId: positiveID(
+        linked
+          ? linkedOrders[offset].supplierId
+          : (refs.suppliers || [])[offset % refs.suppliers.length]?.id,
+        "receipt.supplierId",
+      ),
       supplierName: linked
         ? linkedOrders[offset].supplierName
         : (refs.suppliers || [])[offset % refs.suppliers.length]?.name,
@@ -652,7 +662,11 @@ export function manualAcceptanceFactRole(domain, method) {
   // and Facts use the independently verified super admin so an existing editable
   // business-role selection is never overwritten just to manufacture fixtures.
   // Role-facing access remains a separate browser/readiness assertion.
-  if (domain === "production_order" || domain === "operational_fact")
+  if (
+    domain === "purchase_order" ||
+    domain === "production_order" ||
+    domain === "operational_fact"
+  )
     return "admin";
   return "sales";
 }
@@ -915,6 +929,8 @@ async function advanceQuality(rpc, inspection, target, plan) {
       method: "pass_quality_inspection",
       params: {
         result: "PASS",
+        defect_rate_operator: "APPROX",
+        defect_rate_percent: "5",
         inspected_at: plan.anchorDate,
         decision_note: "到货先检验",
       },
@@ -923,6 +939,8 @@ async function advanceQuality(rpc, inspection, target, plan) {
       method: "reject_quality_inspection",
       params: {
         result: "REJECT",
+        defect_rate_operator: "GT",
+        defect_rate_percent: "50",
         inspected_at: plan.anchorDate,
         decision_note: "颜色不符，先退回",
       },
@@ -1076,26 +1094,87 @@ export async function verifyReceiptQualities(rpc, receipt, receiptPlan) {
   return generated;
 }
 
-function manualReceiptParams(receipt, plan) {
+function receiptSourcePurchaseOrderParams(receipt, plan) {
   return {
-    receipt_no: receipt.receiptNo,
-    supplier_name: requiredText(
-      receipt.supplierName || "嘉顺布行",
-      "supplierName",
-      255,
+    purchase_order_no: requiredText(
+      receipt.sourcePurchaseOrderNo,
+      "sourcePurchaseOrderNo",
+      64,
     ),
-    received_at: plan.anchorDate,
-    note: "到货先检验",
+    supplier_id: positiveID(receipt.supplierId, "receipt.supplierId"),
+    supplier_snapshot: {
+      name: requiredText(
+        receipt.supplierName || "嘉顺布行",
+        "supplierName",
+        255,
+      ),
+    },
+    purchase_date: plan.anchorDate,
+    note: "人工验收采购入库的已审核来源订单",
     items: receipt.items.map((item, offset) => ({
+      line_no: offset + 1,
       material_id: item.materialId,
-      warehouse_id: receipt.warehouseId,
       unit_id: item.unitId,
-      lot_no: item.lotNo,
-      quantity: item.quantity,
-      source_line_no: String(offset + 1),
+      material_name_snapshot: item.materialName,
+      purchased_quantity: item.quantity,
       note: "到货先检验",
     })),
   };
+}
+
+async function createOrReadReceiptSourcePurchaseOrder(rpc, receiptPlan, plan) {
+  if (receiptPlan.linkedPurchaseOrder) return receiptPlan.linkedPurchaseOrder;
+  let order = await exactByBusinessNo({
+    rpc,
+    domain: "purchase_order",
+    method: "list_purchase_orders",
+    listKey: "purchase_orders",
+    businessField: "purchase_order_no",
+    businessNo: receiptPlan.sourcePurchaseOrderNo,
+  });
+  if (!order) {
+    const created = await rpc({
+      domain: "purchase_order",
+      method: "save_purchase_order_with_items",
+      params: receiptSourcePurchaseOrderParams(receiptPlan, plan),
+    });
+    order = resultItem(
+      created,
+      "purchase_order",
+      "save_purchase_order_with_items",
+    );
+  }
+  let status = String(order.lifecycle_status || order.status || "").toUpperCase();
+  if (status === "DRAFT") {
+    order = resultItem(
+      await rpc({
+        domain: "purchase_order",
+        method: "submit_purchase_order",
+        params: { id: order.id },
+      }),
+      "purchase_order",
+      "submit_purchase_order",
+    );
+    status = String(order.lifecycle_status || order.status || "").toUpperCase();
+  }
+  if (status === "SUBMITTED") {
+    order = resultItem(
+      await rpc({
+        domain: "purchase_order",
+        method: "approve_purchase_order",
+        params: { id: order.id },
+      }),
+      "purchase_order",
+      "approve_purchase_order",
+    );
+    status = String(order.lifecycle_status || order.status || "").toUpperCase();
+  }
+  if (status !== "APPROVED") {
+    throw new CliError(
+      `${receiptPlan.sourcePurchaseOrderNo} cannot supply a purchase receipt from ${status || "missing"}`,
+    );
+  }
+  return order;
 }
 
 async function createOrReadReceipt(rpc, receiptPlan, plan) {
@@ -1108,20 +1187,20 @@ async function createOrReadReceipt(rpc, receiptPlan, plan) {
     businessNo: receiptPlan.receiptNo,
   });
   if (!receipt) {
-    const linked = receiptPlan.linkedPurchaseOrder;
-    const method = linked
-      ? "create_purchase_receipt_from_purchase_order"
-      : "create_purchase_receipt_with_items";
-    const params = linked
-      ? {
-          purchase_order_id: positiveID(linked.id, "purchaseOrder.id"),
-          receipt_no: receiptPlan.receiptNo,
-          warehouse_id: receiptPlan.warehouseId,
-          received_at: plan.anchorDate,
-          idempotency_key: `manual-acceptance:${plan.dataVersion}:receipt:${receiptPlan.index}`,
-          note: "到货先检验",
-        }
-      : manualReceiptParams(receiptPlan, plan);
+    const sourceOrder = await createOrReadReceiptSourcePurchaseOrder(
+      rpc,
+      receiptPlan,
+      plan,
+    );
+    const method = "create_purchase_receipt_from_purchase_order";
+    const params = {
+      purchase_order_id: positiveID(sourceOrder.id, "purchaseOrder.id"),
+      receipt_no: receiptPlan.receiptNo,
+      warehouse_id: receiptPlan.warehouseId,
+      received_at: plan.anchorDate,
+      idempotency_key: `manual-acceptance:${plan.dataVersion}:receipt:${receiptPlan.index}`,
+      note: "到货先检验",
+    };
     try {
       receipt = resultItem(
         await rpc({ domain: "purchase", method, params }),
@@ -2844,6 +2923,9 @@ async function createFinanceDraft(rpc, plan, source, suffix, apply) {
           [sourceKey]: source.source_id,
           idempotency_key: expectedIdempotencyKey,
           note: "按单核对",
+          ...(source.fact_type === "INVOICE"
+            ? { invoice_category: source.invoice_category }
+            : {}),
         },
       }),
       "finance_fact",
@@ -3682,6 +3764,17 @@ function assertReferenceRecords(plan, records) {
     if (!invoiceStatuses.has(status))
       throw new CliError(`finance INVOICE is missing ${status}`);
   }
+  const financeFieldContract = inspectFinanceFieldContract(
+    records.financeFacts,
+  );
+  if (!financeFieldContract.complete) {
+    throw new CliError(
+      `finance field contract is incomplete: ${financeFieldContract.violations
+        .slice(0, 12)
+        .map((item) => `${item.factNo}.${item.field}=${item.message}`)
+        .join("; ")}`,
+    );
+  }
   const productionOwner = records.productionFacts.find(
     (item) => String(item.status || "").toUpperCase() === "POSTED",
   );
@@ -3752,6 +3845,9 @@ function buildFactReport({
   });
   const outsourcingReturnInventoryCoverage =
     evaluateManualAcceptanceOutsourcingInventoryCoverage(referenceRecords);
+  const financeFieldContract = inspectFinanceFieldContract(
+    referenceRecords.financeFacts,
+  );
   return {
     reportContract: FACT_REPORT_CONTRACT,
     mode,
@@ -3780,7 +3876,9 @@ function buildFactReport({
       businessDashboardInventoryTotal:
         referenceRecords.inventoryBalances.length,
       outsourcingReturnInventoryCoverage,
+      financeFieldCoverage: financeFieldContract.coveragePercent,
     },
+    financeFieldContract,
     statusCounts: {
       purchaseReceipts: countBy(referenceRecords.purchaseReceipts, "status"),
       purchaseReturns: countBy(referenceRecords.purchaseReturns, "status"),

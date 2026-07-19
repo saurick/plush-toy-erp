@@ -22,6 +22,13 @@ import BusinessLineItemsFooter from '../business-list/BusinessLineItemsFooter.js
 import FieldWithUnitSuffix from '../business-list/FieldWithUnitSuffix.jsx'
 import { productSKUParentFieldContract } from './productSKUParentField.mjs'
 
+const PRODUCTION_ROUTE_OPERATION_OPTIONS = Object.freeze([
+  Object.freeze({ value: 'FABRIC_PROCESSING', label: '布料加工（首道）' }),
+  Object.freeze({ value: 'SEWING', label: '车缝' }),
+  Object.freeze({ value: 'HANDWORK', label: '手工' }),
+  Object.freeze({ value: 'PACKAGING', label: '包装' }),
+])
+
 function DefaultUnitSelect({
   form,
   required = false,
@@ -437,6 +444,18 @@ export function MasterDataFormFields({
         </Form.Item>
         <Form.Item
           className="erp-business-action-form__field"
+          label="标准生产路线位置"
+          name="production_route_operation_code"
+          extra="仅用于把这条工序明确绑定到固定生产路线；每个位置只能绑定一条启用工序，不能根据名称、类别或排序自动推断。"
+        >
+          <Select
+            allowClear
+            options={PRODUCTION_ROUTE_OPERATION_OPTIONS}
+            placeholder="不参与标准生产路线"
+          />
+        </Form.Item>
+        <Form.Item
+          className="erp-business-action-form__field"
           extra="只影响环节列表的展示顺序，不定义产品的生产先后顺序。"
           label="列表显示顺序"
           name="sort_order"
@@ -464,7 +483,7 @@ export function MasterDataFormFields({
           className="erp-business-action-form__field"
           label="需质检"
           name="quality_required"
-          extra="这里只标记该工序后续可能需要质检；合格、不合格、让步、返工等结果仍需到质检或异常处理页面登记。"
+          extra="这里只标记该工序后续可能需要质检；合格、不合格、让步、返工等结果仍需到质检或对应业务页面登记。"
           valuePropName="checked"
         >
           <Switch />

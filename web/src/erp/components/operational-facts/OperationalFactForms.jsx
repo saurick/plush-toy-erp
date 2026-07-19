@@ -2,6 +2,7 @@ import React from 'react'
 import { Tag } from 'antd'
 
 import { hasActionPermission } from '../../utils/masterDataOrderView.mjs'
+import { formatOperationalFactDecimal } from './operationalFactDecimal.mjs'
 
 export {
   businessSourceRouteFor,
@@ -97,19 +98,8 @@ export function statusTag(status) {
   )
 }
 
-export function decimalNumber(value) {
-  const numeric = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(numeric) ? numeric : 0
-}
-
 export function formatQuantity(value) {
-  const numeric = Number(value || 0)
-  if (!Number.isFinite(numeric) || numeric === 0) return '0'
-  return String(Number(numeric.toFixed(4)))
+  return formatOperationalFactDecimal(value)
 }
 
 const RECORD_FALLBACK_LABELS = Object.freeze({

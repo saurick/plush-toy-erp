@@ -205,7 +205,7 @@ func (r *productionOrderRepo) ListProductionOrders(ctx context.Context, filter b
 	if filter.SortDirection == "asc" {
 		order = ent.Asc(sortField)
 	}
-	rows, err := query.Order(order, ent.Asc(productionorder.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	rows, err := query.Order(order, ent.Desc(productionorder.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -498,6 +498,20 @@ func (r *productionOrderRepo) closeProductionOrder(ctx context.Context, in *biz.
 	if activeWIP {
 		return nil, biz.ErrProductionOrderWIPActive
 	}
+	hasUnsettledFacts, err := tx.client.ProductionFact.Query().Where(
+		productionfact.SourceType(biz.ProductionOrderSourceType),
+		productionfact.SourceID(in.ID),
+		productionfact.StatusNotIn(
+			biz.OperationalFactStatusPosted,
+			biz.OperationalFactStatusCancelled,
+		),
+	).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasUnsettledFacts {
+		return nil, biz.ErrProductionOrderFactDependency
+	}
 	incomplete, err := productionOrderHasIncompleteFinishedGoods(ctx, tx.client, in.ID)
 	if err != nil {
 		return nil, err
@@ -665,19 +679,30 @@ func (r *productionOrderRepo) cancelProductionOrder(ctx context.Context, in *biz
 	if current.Status != biz.ProductionOrderStatusDraft && current.Status != biz.ProductionOrderStatusReleased {
 		return nil, biz.ErrProductionOrderInvalidState
 	}
+	hasPosted, err := tx.client.ProductionFact.Query().Where(
+		productionfact.SourceType(biz.ProductionOrderSourceType),
+		productionfact.SourceID(in.ID),
+		productionfact.Status(biz.OperationalFactStatusPosted),
+	).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasPosted {
+		return nil, biz.ErrProductionOrderHasPostedFacts
+	}
+	hasUnsettledFacts, err := tx.client.ProductionFact.Query().Where(
+		productionfact.SourceType(biz.ProductionOrderSourceType),
+		productionfact.SourceID(in.ID),
+		productionfact.StatusNEQ(biz.OperationalFactStatusCancelled),
+	).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if hasUnsettledFacts {
+		return nil, biz.ErrProductionOrderFactDependency
+	}
 	var schedulingTask *biz.WorkflowTaskCreate
 	if current.Status == biz.ProductionOrderStatusReleased {
-		hasPosted, err := tx.client.ProductionFact.Query().Where(
-			productionfact.SourceType(biz.ProductionOrderSourceType),
-			productionfact.SourceID(in.ID),
-			productionfact.Status(biz.OperationalFactStatusPosted),
-		).Exist(ctx)
-		if err != nil {
-			return nil, err
-		}
-		if hasPosted {
-			return nil, biz.ErrProductionOrderHasPostedFacts
-		}
 		releasedAggregate, err := loadProductionOrderAggregate(ctx, tx.client, in.ID)
 		if err != nil {
 			return nil, err
@@ -688,6 +713,13 @@ func (r *productionOrderRepo) cancelProductionOrder(ctx context.Context, in *biz
 		}
 		if err := requireProductionSchedulingTaskTerminal(ctx, tx, schedulingTask, true); err != nil {
 			return nil, err
+		}
+		activeWIP, err := productionOrderHasActiveWIP(ctx, tx.client, in.ID)
+		if err != nil {
+			return nil, err
+		}
+		if activeWIP {
+			return nil, biz.ErrProductionOrderWIPActive
 		}
 	}
 	now := time.Now().UTC()

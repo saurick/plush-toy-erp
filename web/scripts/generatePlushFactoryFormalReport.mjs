@@ -427,8 +427,8 @@ const html = String.raw`<!doctype html>
         <tbody>
           <tr><td>固定路线</td><td><span class="code">PLUSH_SEW_HAND_V1 / route_version=1</span></td><td>布料加工 → 车缝 → 手工 → 包装；订单行冻结路线与“是否客户验货”。首道布料加工整单外发，车缝与手工才允许拆量。</td></tr>
           <tr><td>布料材料归属</td><td><span class="code">bom_items / production_order_material_requirements.production_operation_code</span></td><td>只认 BOM 中明确标记为 FABRIC_PROCESSING 的冻结材料需求，不从部位或备注猜测；每项必须精确绑定同一已确认合同的 MATERIAL 行。</td></tr>
-          <tr><td>工序快照</td><td><span class="code">production_order_operations</span></td><td>冻结步骤号、工序主档快照、产出类型、内外发允许范围、质量关口；不按列表排序猜路线。</td></tr>
-          <tr><td>在制品执行</td><td><span class="code">production_wip_batches / production_wip_events</span></td><td>保存父子批、数量、步骤、执行方式、版本与事件；拆量、转序、外发回仓和返工均保留审计。</td></tr>
+          <tr><td>工序快照</td><td><span class="code">processes.production_route_operation_code → production_order_operations</span></td><td>四个标准位置由工序主档显式唯一绑定，发布时冻结步骤号、工序主档快照、产出类型、内外发允许范围和质量关口；不按名称、类别、普通编码或列表排序猜路线。</td></tr>
+          <tr><td>在制品执行</td><td><span class="code">production_wip_batches / production_wip_events</span></td><td>保存父子批、数量、步骤、执行方式、版本与事件；拆量、取消、转序、外发回仓和返工均保留审计，取消不重新拆分数量。</td></tr>
           <tr><td>逐步内外发</td><td><span class="code">execution_mode + production_wip_outsourcing_allocations</span></td><td>正常布料加工逐条绑定 MATERIAL 行且须有足量已过账委外发料；车缝、手工及布料返工绑定 PRODUCT 行，本厂不伪造外发回仓。</td></tr>
           <tr><td>质量关口</td><td><span class="code">quality_inspections.production_wip_batch_id + gate_code</span></td><td>裁片、皮套、成品、针检、抽检、条件客户验货逐关口推进；当前 WIP 关口只接受 PASS，未通过不能转序。</td></tr>
           <tr><td>包材确认</td><td><span class="code">production_packaging_confirmations</span></td><td>业务版面 / 版本确认独立保存；来料品质仍复用材料批次 IQC，不相互替代。</td></tr>
@@ -440,11 +440,11 @@ const html = String.raw`<!doctype html>
       <div class="evidence">
         <div class="card">
           <h3>正式入口</h3>
-          <p class="code">production_wip.get_production_wip<br />production_wip.initialize_production_wip<br />production_wip.execute_production_wip_action<br />quality.list_production_stage_quality_inspections</p>
+          <p class="code">production_wip.get_production_wip<br />production_wip.execute_production_wip_action<br />quality.list_production_stage_quality_inspections</p>
         </div>
         <div class="card">
           <h3>页面办理</h3>
-          <p>生产订单页打开“工艺执行”，办理拆批、分流、开始、完成、外发回仓、转序、返工与包材确认；质量检验页按生产关口查询并判定。</p>
+          <p>生产订单发布时冻结固定路线；页面打开“工艺执行”，办理拆批、分流、取消未开工批次、开始、完成、外发回仓、转序、返工与包材确认；质量检验页按生产关口查询并判定。</p>
         </div>
         <div class="card">
           <h3>本地验证范围</h3>

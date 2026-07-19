@@ -100,5 +100,8 @@ export async function listProductionOrderReferenceOptions(
     { ...params, reference_type: referenceType },
     options
   )
-  return validateProductionOrderOptions(dataOf(result), referenceType)
+  return validateProductionOrderOptions(dataOf(result), referenceType, {
+    limit: params.limit,
+    offset: params.offset,
+  })
 }

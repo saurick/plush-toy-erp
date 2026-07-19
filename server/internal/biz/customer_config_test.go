@@ -1047,7 +1047,7 @@ func TestCustomerConfigUsecaseEffectiveSessionFiltersProjectionByEnabledModules(
 }
 
 func TestWorkflowTaskPagesFollowModuleReadBoundaryTogether(t *testing.T) {
-	pages := []string{"task-board", "shipping-release", "exception-flow"}
+	pages := []string{"task-board", "shipping-release"}
 	disabled := map[string]struct{}{}
 	readable := map[string]struct{}{"workflow_tasks": {}}
 	for _, pageKey := range pages {

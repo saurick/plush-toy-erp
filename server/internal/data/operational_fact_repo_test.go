@@ -13,8 +13,6 @@ import (
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/stockreservation"
-	"server/internal/data/model/ent/workflowbusinessstate"
-	"server/internal/data/model/ent/workflowtask"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/shopspring/decimal"
@@ -1173,13 +1171,25 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 		return created
 	}
 
-	mismatched := createShipment("SHP-SOURCE-MISMATCH", otherCustomer.ID, decimal.NewFromInt(1))
-	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, mismatched.ID)
-	if _, err := repo.ShipShipment(ctx, mismatched.ID); !errors.Is(err, biz.ErrShipmentSourceMismatch) {
-		t.Fatalf("ship mismatched customer error = %v, want ErrShipmentSourceMismatch", err)
+	if _, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "SHP-SOURCE-MISMATCH",
+			SalesOrderID:   &order.ID,
+			CustomerID:     &otherCustomer.ID,
+			IdempotencyKey: "SHP-SOURCE-MISMATCH",
+		},
+		Items: []*biz.ShipmentItemCreate{{
+			SalesOrderItemID: &orderItem.ID,
+			ProductID:        fixtures.productID,
+			WarehouseID:      fixtures.warehouseID,
+			UnitID:           fixtures.unitID,
+			Quantity:         decimal.NewFromInt(1),
+		}},
+	}); !errors.Is(err, biz.ErrShipmentSourceMismatch) {
+		t.Fatalf("create shipment with mismatched customer error = %v, want ErrShipmentSourceMismatch", err)
 	}
-	if got := client.Shipment.GetX(ctx, mismatched.ID).Status; got != biz.ShipmentStatusDraft {
-		t.Fatalf("mismatched shipment status = %s, want DRAFT", got)
+	if count := client.Shipment.Query().Where(shipment.ShipmentNo("SHP-SOURCE-MISMATCH")).CountX(ctx); count != 0 {
+		t.Fatalf("mismatched source create wrote %d shipment rows", count)
 	}
 
 	first := createShipment("SHP-SOURCE-FIRST", customer.ID, decimal.NewFromInt(2))
@@ -1187,13 +1197,25 @@ func TestOperationalFactRepo_ShipmentSourceIntegrityAndCumulativeQuantity(t *tes
 	if _, err := repo.ShipShipment(ctx, first.ID); err != nil {
 		t.Fatalf("ship first partial shipment failed: %v", err)
 	}
-	second := createShipment("SHP-SOURCE-OVER", customer.ID, decimal.NewFromInt(2))
-	submitAndCompleteShipmentReleaseTaskForTest(t, ctx, data, client, second.ID)
-	if _, err := repo.ShipShipment(ctx, second.ID); !errors.Is(err, biz.ErrShipmentQuantityExceeded) {
-		t.Fatalf("ship cumulative over-quantity error = %v, want ErrShipmentQuantityExceeded", err)
+	if _, err := repo.CreateShipmentDraftWithItems(ctx, &biz.ShipmentCreateWithItems{
+		Shipment: &biz.ShipmentCreate{
+			ShipmentNo:     "SHP-SOURCE-OVER",
+			SalesOrderID:   &order.ID,
+			CustomerID:     &customer.ID,
+			IdempotencyKey: "SHP-SOURCE-OVER",
+		},
+		Items: []*biz.ShipmentItemCreate{{
+			SalesOrderItemID: &orderItem.ID,
+			ProductID:        fixtures.productID,
+			WarehouseID:      fixtures.warehouseID,
+			UnitID:           fixtures.unitID,
+			Quantity:         decimal.NewFromInt(2),
+		}},
+	}); !errors.Is(err, biz.ErrShipmentQuantityExceeded) {
+		t.Fatalf("create cumulative over-quantity shipment error = %v, want ErrShipmentQuantityExceeded", err)
 	}
-	if got := client.Shipment.GetX(ctx, second.ID).Status; got != biz.ShipmentStatusDraft {
-		t.Fatalf("over-quantity shipment status = %s, want DRAFT", got)
+	if count := client.Shipment.Query().Where(shipment.ShipmentNo("SHP-SOURCE-OVER")).CountX(ctx); count != 0 {
+		t.Fatalf("over-quantity create wrote %d shipment rows", count)
 	}
 	if count := client.InventoryTxn.Query().Where(inventorytxn.SourceType(biz.ShipmentSourceType)).CountX(ctx); count != 1 {
 		t.Fatalf("expected only first shipment to write inventory, got %d txns", count)

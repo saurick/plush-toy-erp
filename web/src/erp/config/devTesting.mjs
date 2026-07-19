@@ -1,5 +1,61 @@
 export { DEV_TESTING_ROUTE } from './devRoutes.mjs'
 export const DEV_TESTING_STRATEGY_SOURCE_PATH = 'docs/product/自动化测试策略.md'
+export const DEV_TESTING_COVERAGE_API_PATH = '/__dev/api/qa/coverage'
+export const DEV_TESTING_COVERAGE_REPORT_SCHEMA =
+  'plush-test-coverage-report/v1'
+export const DEV_TESTING_COVERAGE_WRITE_COMMAND =
+  'node scripts/qa/test-coverage-report.mjs --write'
+
+export const DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS = Object.freeze([
+  Object.freeze({ key: 'postgres', label: 'PostgreSQL' }),
+  Object.freeze({ key: 'browser', label: '浏览器回归 / Browser' }),
+  Object.freeze({ key: 'readiness', label: '验收就绪 / Readiness' }),
+  Object.freeze({
+    key: 'targetEnvironment',
+    label: '目标环境 / Target Environment',
+  }),
+  Object.freeze({ key: 'uat', label: '客户验收 / UAT' }),
+])
+
+const COVERAGE_STATUS_META = Object.freeze({
+  current: Object.freeze({ label: '当前报告 / Current', tone: 'success' }),
+  collected: Object.freeze({ label: '已采集 / Collected', tone: 'primary' }),
+  passed: Object.freeze({ label: '通过 / Passed', tone: 'success' }),
+  partial: Object.freeze({ label: '部分覆盖 / Partial', tone: 'warning' }),
+  stale: Object.freeze({ label: '报告过期 / Stale', tone: 'warning' }),
+  missing: Object.freeze({ label: '报告缺失 / Missing', tone: 'default' }),
+  failed: Object.freeze({ label: '失败 / Failed', tone: 'danger' }),
+  skipped: Object.freeze({ label: '已跳过 / Skipped', tone: 'warning' }),
+  blocked: Object.freeze({ label: '受阻 / Blocked', tone: 'danger' }),
+  not_applicable: Object.freeze({ label: '不适用 / N/A', tone: 'default' }),
+  not_collected: Object.freeze({
+    label: '未采集 / Not collected',
+    tone: 'default',
+  }),
+})
+
+const COVERAGE_STATUS_ALIASES = Object.freeze({
+  collected: 'collected',
+  passed: 'passed',
+  partial: 'partial',
+  stale: 'stale',
+  missing: 'missing',
+  failed: 'failed',
+  skipped: 'skipped',
+  blocked: 'blocked',
+  not_applicable: 'not_applicable',
+  not_collected: 'not_collected',
+})
+
+const COVERAGE_POLICY_LABELS = Object.freeze({
+  businessContracts: '适用业务合同与关键场景',
+  businessScenarios: '适用业务合同与关键场景',
+  changedBusinessLogic: '新增或修改关键业务逻辑',
+  codeCoverage: '新增或修改关键业务逻辑',
+  repositoryBaseline: '仓库整体覆盖基线',
+  requiredGates: '本轮必跑 T0-T8',
+  runtimeAcceptance: '运行态与验收',
+})
 
 export const DEV_TESTING_CURRENT_DOC_PATHS = Object.freeze([
   DEV_TESTING_STRATEGY_SOURCE_PATH,
@@ -737,5 +793,351 @@ export function buildDevTestingSummary({ tiers = [], docs = [] } = {}) {
     commandCount,
     docsWithCommands,
     strategyCommandCount: strategyDoc?.commandCount || 0,
+  }
+}
+
+function coverageText(value) {
+  return typeof value === 'string' ? value.trim() : ''
+}
+
+function coverageNumber(value) {
+  if (value === '' || value === null || value === undefined) return null
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  const number = Number(value)
+  return Number.isFinite(number) && number >= 0 ? number : null
+}
+
+function normalizeCoverageStatus(value) {
+  const normalized = coverageText(value)
+  return COVERAGE_STATUS_ALIASES[normalized] || 'not_collected'
+}
+
+function normalizeCoverageEvidence(value) {
+  const values = Array.isArray(value) ? value : value ? [value] : []
+  return values
+    .map((item) => {
+      if (typeof item === 'string') return item.trim()
+      if (!item || typeof item !== 'object') return ''
+      return coverageText(
+        item.label || item.path || item.command || item.note || item.name
+      )
+    })
+    .filter(Boolean)
+}
+
+function normalizeCoverageMetric(value) {
+  if (typeof value === 'number' || typeof value === 'string') {
+    const percentage = coverageNumber(value)
+    return {
+      collected: percentage !== null && percentage <= 100,
+      covered: null,
+      total: null,
+      percentage: percentage !== null && percentage <= 100 ? percentage : null,
+    }
+  }
+
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return { collected: false, covered: null, total: null, percentage: null }
+  }
+
+  const covered = coverageNumber(
+    value.covered ?? value.passed ?? value.hit ?? value.count
+  )
+  const total = coverageNumber(value.total ?? value.found)
+  let percentage = coverageNumber(
+    value.percentage ?? value.percent ?? value.pct ?? value.rate
+  )
+  const ratioWasProvided =
+    value.covered !== undefined ||
+    value.passed !== undefined ||
+    value.hit !== undefined ||
+    value.count !== undefined ||
+    value.total !== undefined ||
+    value.found !== undefined
+  const validRatio =
+    covered !== null && total !== null && total > 0 && covered <= total
+  if (ratioWasProvided && !validRatio) {
+    return { collected: false, covered: null, total: null, percentage: null }
+  }
+  if (percentage !== null && percentage > 100) {
+    return { collected: false, covered: null, total: null, percentage: null }
+  }
+  if (percentage === null && validRatio) {
+    percentage = (covered / total) * 100
+  }
+
+  return {
+    collected: validRatio || percentage !== null,
+    covered: validRatio ? covered : null,
+    total: validRatio ? total : null,
+    percentage,
+  }
+}
+
+function normalizeCoverageMetrics(metrics, expectedKeys = []) {
+  const source =
+    metrics && typeof metrics === 'object' && !Array.isArray(metrics)
+      ? metrics
+      : {}
+  const keys = Array.from(new Set([...expectedKeys, ...Object.keys(source)]))
+  return Object.fromEntries(
+    keys.map((key) => [key, normalizeCoverageMetric(source[key])])
+  )
+}
+
+function coverageCount(source, keys) {
+  for (const key of keys) {
+    const value = coverageNumber(source?.[key])
+    if (value !== null && Number.isSafeInteger(value)) return value
+  }
+  return null
+}
+
+function normalizeCoverageCounts(source = {}) {
+  return {
+    total: coverageCount(source, [
+      'total',
+      'totalTests',
+      'testCount',
+      'requiredCount',
+      'applicableCount',
+    ]),
+    executed: coverageCount(source, ['executed', 'executedTests', 'run']),
+    passed: coverageCount(source, ['passed', 'passedTests']),
+    failed: coverageCount(source, ['failed', 'failedTests']),
+    skipped: coverageCount(source, ['skipped', 'skippedTests']),
+    blocked: coverageCount(source, ['blocked', 'blockedTests']),
+    missing: coverageCount(source, ['missing', 'missingTests', 'missingCases']),
+  }
+}
+
+function protectCoverageEvidenceStatus(rawStatus, counts) {
+  const status = normalizeCoverageStatus(rawStatus)
+  if (status !== 'passed') return status
+
+  if ((counts.blocked || 0) > 0) return 'blocked'
+  if ((counts.failed || 0) > 0) return 'failed'
+  if ((counts.skipped || 0) > 0) return 'skipped'
+  if ((counts.missing || 0) > 0) return 'partial'
+
+  const executed = counts.executed ?? counts.total
+  if (executed === null || executed === 0 || counts.passed === null) {
+    return 'not_collected'
+  }
+  if (counts.passed > executed) return 'failed'
+  if (counts.total !== null && counts.total < executed) return 'failed'
+  if (counts.passed < executed) return 'partial'
+  if (counts.total !== null && counts.total > executed) return 'partial'
+  return 'passed'
+}
+
+function normalizeCoverageItem(
+  value,
+  {
+    key = '',
+    label = '',
+    expectedMetricKeys = [],
+    allowNotApplicable = false,
+  } = {}
+) {
+  const source =
+    value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  const counts = normalizeCoverageCounts(source)
+  let metrics = normalizeCoverageMetrics(source.metrics, expectedMetricKeys)
+  let status = protectCoverageEvidenceStatus(source.status, counts)
+  if (
+    status === 'not_applicable' &&
+    (!allowNotApplicable || source.required !== false)
+  ) {
+    status = 'not_collected'
+  }
+  if (status === 'not_applicable') metrics = {}
+  if (
+    status === 'collected' &&
+    !Object.values(metrics).some((metric) => metric.collected)
+  ) {
+    status = 'not_collected'
+  }
+  return {
+    key: coverageText(source.key || source.id || key) || key,
+    label:
+      coverageText(source.label || source.name || source.title || label) ||
+      label ||
+      key,
+    status,
+    required: typeof source.required === 'boolean' ? source.required : null,
+    note: coverageText(source.note || source.message || source.description),
+    evidence: normalizeCoverageEvidence(source.evidence || source.evidences),
+    metrics,
+    counts,
+  }
+}
+
+function normalizeCoveragePolicy(policy) {
+  if (!policy) return []
+
+  const entries = Array.isArray(policy)
+    ? policy.map((item, index) => [String(index), item])
+    : typeof policy === 'object'
+      ? Object.entries(policy)
+      : []
+
+  return entries
+    .map(([key, value]) => {
+      const source = value && typeof value === 'object' ? value : {}
+      const rawNote =
+        typeof value === 'string'
+          ? value
+          : source.note ||
+            source.description ||
+            source.target ||
+            source.requirement ||
+            ''
+      const label = coverageText(
+        source.label || source.name || COVERAGE_POLICY_LABELS[key] || key
+      )
+      const note = coverageText(rawNote)
+      if (!label && !note) return null
+      return {
+        key: coverageText(source.key || key),
+        label: label || '覆盖策略',
+        note: note || '报告未提供具体策略说明',
+      }
+    })
+    .filter(Boolean)
+}
+
+function normalizeCoverageReport(report) {
+  const businessCoverage =
+    report.businessCoverage && typeof report.businessCoverage === 'object'
+      ? report.businessCoverage
+      : {}
+  const acceptance =
+    report.acceptance && typeof report.acceptance === 'object'
+      ? report.acceptance
+      : {}
+  const repository =
+    report.repository && typeof report.repository === 'object'
+      ? report.repository
+      : {}
+  const codeCoverage =
+    report.codeCoverage && typeof report.codeCoverage === 'object'
+      ? report.codeCoverage
+      : {}
+
+  return {
+    schemaVersion: coverageText(report.schemaVersion),
+    generatedAt: coverageText(report.generatedAt),
+    repository: {
+      commit: coverageText(repository.commit),
+      dirty: typeof repository.dirty === 'boolean' ? repository.dirty : null,
+      fingerprint: coverageText(repository.fingerprint),
+    },
+    codeCoverage: {
+      go: normalizeCoverageItem(codeCoverage.go, {
+        key: 'go',
+        label: '后端 Go',
+        expectedMetricKeys: ['statements'],
+      }),
+      web: normalizeCoverageItem(codeCoverage.web, {
+        key: 'web',
+        label: '前端 Web',
+        expectedMetricKeys: ['lines', 'branches', 'functions'],
+      }),
+    },
+    businessCoverage: {
+      ...normalizeCoverageItem(businessCoverage, {
+        key: 'business',
+        label: '业务合同与关键场景',
+      }),
+      domains: Array.isArray(businessCoverage.domains)
+        ? businessCoverage.domains.map((item, index) =>
+            normalizeCoverageItem(item, {
+              key: `domain-${index + 1}`,
+              label: `业务域 ${index + 1}`,
+            })
+          )
+        : [],
+    },
+    gates: Array.isArray(report.gates)
+      ? report.gates.map((item, index) =>
+          normalizeCoverageItem(item, {
+            key: `gate-${index + 1}`,
+            label: `验证门禁 ${index + 1}`,
+            allowNotApplicable: true,
+          })
+        )
+      : [],
+    acceptance: Object.fromEntries(
+      DEV_TESTING_COVERAGE_ACCEPTANCE_ITEMS.map(({ key, label }) => [
+        key,
+        normalizeCoverageItem(acceptance[key], { key, label }),
+      ])
+    ),
+    policy: normalizeCoveragePolicy(report.policy),
+  }
+}
+
+export function getDevTestingCoverageStatusMeta(status) {
+  return COVERAGE_STATUS_META[status] || COVERAGE_STATUS_META.not_collected
+}
+
+export function formatDevTestingCoverageMetric(metric) {
+  if (!metric?.collected) return '未采集'
+  const percentage = coverageNumber(metric.percentage)
+  const ratio =
+    metric.covered !== null && metric.total !== null
+      ? `${metric.covered}/${metric.total}`
+      : ''
+  if (percentage === null) return ratio || '未采集'
+  const rounded = Math.round(percentage * 10) / 10
+  return ratio ? `${ratio} · ${rounded}%` : `${rounded}%`
+}
+
+export function normalizeDevTestingCoverageEnvelope(
+  payload,
+  { httpStatus = 200 } = {}
+) {
+  const source = payload && typeof payload === 'object' ? payload : {}
+  const rawStatus = coverageText(source.status)
+  const message = coverageText(source.message)
+
+  if (httpStatus === 404 || rawStatus === 'missing') {
+    return {
+      status: 'missing',
+      message: message || '尚未生成覆盖报告',
+      report: null,
+    }
+  }
+  if (httpStatus >= 400 || rawStatus === 'failed') {
+    return {
+      status: 'failed',
+      message: message || '覆盖报告读取失败',
+      report: null,
+    }
+  }
+  if (rawStatus !== 'current' && rawStatus !== 'stale') {
+    return {
+      status: 'failed',
+      message: message || '覆盖报告接口返回了无法识别的状态',
+      report: null,
+    }
+  }
+
+  const reportSource =
+    source.report && typeof source.report === 'object' ? source.report : null
+  const schemaVersion = coverageText(reportSource?.schemaVersion)
+  if (!reportSource || schemaVersion !== DEV_TESTING_COVERAGE_REPORT_SCHEMA) {
+    return {
+      status: 'failed',
+      message: `覆盖报告合同不匹配，期望 ${DEV_TESTING_COVERAGE_REPORT_SCHEMA}`,
+      report: null,
+    }
+  }
+
+  return {
+    status: rawStatus,
+    message,
+    report: normalizeCoverageReport(reportSource),
   }
 }

@@ -1,8 +1,9 @@
 import React, { useEffect } from 'react'
-import { Alert, Descriptions, Form, Input, Modal } from 'antd'
+import { Alert, Descriptions, Form, Input, Modal, Select } from 'antd'
 
 import {
   localDateTimeInputValue,
+  SHIPMENT_FINANCE_INVOICE_CATEGORY_OPTIONS,
   shipmentFinanceSourceActionConfig,
 } from '../../utils/shipmentFinanceSourceAction.mjs'
 
@@ -49,7 +50,7 @@ export default function ShipmentFinanceSourceModal({
       <Alert
         type="info"
         showIcon
-        message="客户与明细由出货单确定，金额由系统核算；提交后只生成待确认草稿。"
+        message="客户、金额和应收账期由来源单据确定；提交后只生成待确认草稿。"
       />
       <Descriptions
         size="small"
@@ -69,6 +70,18 @@ export default function ShipmentFinanceSourceModal({
         ]}
       />
       <Form form={form} layout="vertical" preserve={false} disabled={loading}>
+        {config.requiresInvoiceCategory ? (
+          <Form.Item
+            name="invoice_category"
+            label="发票类别"
+            rules={[{ required: true, message: '请选择发票类别' }]}
+          >
+            <Select
+              placeholder="请选择发票类别"
+              options={SHIPMENT_FINANCE_INVOICE_CATEGORY_OPTIONS}
+            />
+          </Form.Item>
+        ) : null}
         <Form.Item name="occurred_at" label="发生时间">
           <Input type="datetime-local" />
         </Form.Item>

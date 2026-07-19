@@ -541,6 +541,41 @@ test("db guard requires DROP proof for removed fields", async () => {
   });
 });
 
+test("db guard accepts Atlas DROP COLUMN as proof for its single-column index", async () => {
+  await withRepository(async (root) => {
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Fields() []ent.Field { return []ent.Field{field.String(\"name\")} }",
+        "func (Item) Indexes() []ent.Index { return []ent.Index{index.Fields(\"name\")} }",
+        "",
+      ].join("\n"),
+    );
+    commitAll(root, "field and index removal baseline");
+    await write(
+      root,
+      "server/internal/data/model/schema/item.go",
+      [
+        "package schema",
+        "func (Item) Fields() []ent.Field { return nil }",
+        "func (Item) Indexes() []ent.Index { return nil }",
+        "",
+      ].join("\n"),
+    );
+    await write(
+      root,
+      "server/internal/data/model/migrate/20260102000000_migrate.sql",
+      "ALTER TABLE items DROP COLUMN name;\n",
+    );
+    await write(root, "server/internal/data/model/migrate/atlas.sum", "h1:next\n");
+
+    const result = evaluateDbGuard({ root, range: "HEAD...HEAD" });
+    assert.equal(result.ok, true, JSON.stringify(result, null, 2));
+  });
+});
+
 test("db guard requires statement-local and operation-aware field proof", async () => {
   for (const migration of [
     "ALTER TABLE items ADD COLUMN unrelated text; ALTER TABLE other_items ADD COLUMN name text;\n",

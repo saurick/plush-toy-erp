@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { CopyOutlined, DeleteOutlined } from '@ant-design/icons'
 import { Button, Form, Input, Select, Space } from 'antd'
 
@@ -21,6 +21,7 @@ import {
 } from '../../utils/dateRange.mjs'
 import {
   buildPurchaseOrderItemSourceValuesFromMaterial,
+  summarizePurchaseOrderLines,
   unixToDateInputValue,
 } from '../../utils/masterDataOrderView.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
@@ -29,44 +30,7 @@ import {
   CATALOG_FILL_MODES,
   buildCatalogFillRowsPlan,
 } from '../../utils/catalogFillRows.mjs'
-
-function decimalNumber(value) {
-  const numeric = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(numeric) ? numeric : 0
-}
-
-function formatSummaryNumber(value, fractionDigits = 0) {
-  if (!Number.isFinite(value) || value === 0) {
-    return fractionDigits > 0 ? Number(0).toFixed(fractionDigits) : '0'
-  }
-  return fractionDigits > 0
-    ? value.toFixed(fractionDigits)
-    : String(Number(value.toFixed(4)))
-}
-
-function purchaseLineAmount(line = {}) {
-  const explicitAmount = decimalNumber(line.amount)
-  if (explicitAmount > 0) {
-    return explicitAmount
-  }
-  return decimalNumber(line.purchased_quantity) * decimalNumber(line.unit_price)
-}
-
-function summarizePurchaseLines(lines = []) {
-  const items = Array.isArray(lines) ? lines : []
-  return items.reduce(
-    (summary, line) => ({
-      count: summary.count + 1,
-      quantity: summary.quantity + decimalNumber(line?.purchased_quantity),
-      amount: summary.amount + purchaseLineAmount(line),
-    }),
-    { count: 0, quantity: 0, amount: 0 }
-  )
-}
+import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 
 function getNextLineNo(lines = []) {
   const maxLineNo = lines.reduce((maxValue, line) => {
@@ -167,11 +131,15 @@ export function PurchaseOrderFormFields({
   suppliers,
   materials,
   unitOptions,
+  referenceDataReady = true,
   attachmentPanel,
   onSupplierChange,
   onMaterialChange,
 }) {
   const [materialImportOpen, setMaterialImportOpen] = useState(false)
+  useEffect(() => {
+    if (!referenceDataReady) setMaterialImportOpen(false)
+  }, [referenceDataReady])
   const purchaseDate = Form.useWatch('purchase_date', form)
   const expectedArrivalDate = Form.useWatch('expected_arrival_date', form)
   const { registerLineItemRow, requestLineItemScroll } =
@@ -234,6 +202,7 @@ export function PurchaseOrderFormFields({
     <Form
       form={form}
       layout="vertical"
+      disabled={!referenceDataReady}
       preserve={false}
       className="erp-business-action-form"
     >
@@ -373,6 +342,12 @@ export function PurchaseOrderFormFields({
               </div>
               <Button
                 className="erp-line-items-form__import-button"
+                disabled={!referenceDataReady}
+                title={
+                  !referenceDataReady
+                    ? '采购基础资料加载完成后可选择材料'
+                    : undefined
+                }
                 onClick={() => setMaterialImportOpen(true)}
               >
                 从材料库添加
@@ -648,8 +623,10 @@ export function PurchaseOrderFormFields({
               label: '数量合计',
               value: (
                 <BusinessLineItemsSummaryValue
-                  summarize={summarizePurchaseLines}
-                  select={(summary) => formatSummaryNumber(summary.quantity)}
+                  summarize={summarizePurchaseOrderLines}
+                  select={(summary) =>
+                    formatNumeric20Scale6Summary(summary.quantity)
+                  }
                 />
               ),
             },
@@ -658,8 +635,10 @@ export function PurchaseOrderFormFields({
               label: '金额合计',
               value: (
                 <BusinessLineItemsSummaryValue
-                  summarize={summarizePurchaseLines}
-                  select={(summary) => formatSummaryNumber(summary.amount, 2)}
+                  summarize={summarizePurchaseOrderLines}
+                  select={(summary) =>
+                    formatNumeric20Scale6Summary(summary.amount, 2)
+                  }
                 />
               ),
             },

@@ -1639,12 +1639,8 @@ func init() {
 	outsourcingorderDescSourceOrderNo := outsourcingorderFields[4].Descriptor()
 	// outsourcingorder.SourceOrderNoValidator is a validator for the "source_order_no" field. It is called by the builders before save.
 	outsourcingorder.SourceOrderNoValidator = outsourcingorderDescSourceOrderNo.Validators[0].(func(string) error)
-	// outsourcingorderDescSourceSalesOrderID is the schema descriptor for source_sales_order_id field.
-	outsourcingorderDescSourceSalesOrderID := outsourcingorderFields[5].Descriptor()
-	// outsourcingorder.SourceSalesOrderIDValidator is a validator for the "source_sales_order_id" field. It is called by the builders before save.
-	outsourcingorder.SourceSalesOrderIDValidator = outsourcingorderDescSourceSalesOrderID.Validators[0].(func(int) error)
 	// outsourcingorderDescLifecycleStatus is the schema descriptor for lifecycle_status field.
-	outsourcingorderDescLifecycleStatus := outsourcingorderFields[8].Descriptor()
+	outsourcingorderDescLifecycleStatus := outsourcingorderFields[7].Descriptor()
 	// outsourcingorder.DefaultLifecycleStatus holds the default value on creation for the lifecycle_status field.
 	outsourcingorder.DefaultLifecycleStatus = outsourcingorderDescLifecycleStatus.Default.(string)
 	// outsourcingorder.LifecycleStatusValidator is a validator for the "lifecycle_status" field. It is called by the builders before save.
@@ -1664,21 +1660,21 @@ func init() {
 		}
 	}()
 	// outsourcingorderDescVersion is the schema descriptor for version field.
-	outsourcingorderDescVersion := outsourcingorderFields[9].Descriptor()
+	outsourcingorderDescVersion := outsourcingorderFields[8].Descriptor()
 	// outsourcingorder.DefaultVersion holds the default value on creation for the version field.
 	outsourcingorder.DefaultVersion = outsourcingorderDescVersion.Default.(int)
 	// outsourcingorder.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	outsourcingorder.VersionValidator = outsourcingorderDescVersion.Validators[0].(func(int) error)
 	// outsourcingorderDescNote is the schema descriptor for note field.
-	outsourcingorderDescNote := outsourcingorderFields[10].Descriptor()
+	outsourcingorderDescNote := outsourcingorderFields[9].Descriptor()
 	// outsourcingorder.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	outsourcingorder.NoteValidator = outsourcingorderDescNote.Validators[0].(func(string) error)
 	// outsourcingorderDescCreatedAt is the schema descriptor for created_at field.
-	outsourcingorderDescCreatedAt := outsourcingorderFields[11].Descriptor()
+	outsourcingorderDescCreatedAt := outsourcingorderFields[10].Descriptor()
 	// outsourcingorder.DefaultCreatedAt holds the default value on creation for the created_at field.
 	outsourcingorder.DefaultCreatedAt = outsourcingorderDescCreatedAt.Default.(func() time.Time)
 	// outsourcingorderDescUpdatedAt is the schema descriptor for updated_at field.
-	outsourcingorderDescUpdatedAt := outsourcingorderFields[12].Descriptor()
+	outsourcingorderDescUpdatedAt := outsourcingorderFields[11].Descriptor()
 	// outsourcingorder.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	outsourcingorder.DefaultUpdatedAt = outsourcingorderDescUpdatedAt.Default.(func() time.Time)
 	// outsourcingorder.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
@@ -1947,38 +1943,42 @@ func init() {
 	processDescCategory := processFields[2].Descriptor()
 	// process.CategoryValidator is a validator for the "category" field. It is called by the builders before save.
 	process.CategoryValidator = processDescCategory.Validators[0].(func(string) error)
+	// processDescProductionRouteOperationCode is the schema descriptor for production_route_operation_code field.
+	processDescProductionRouteOperationCode := processFields[3].Descriptor()
+	// process.ProductionRouteOperationCodeValidator is a validator for the "production_route_operation_code" field. It is called by the builders before save.
+	process.ProductionRouteOperationCodeValidator = processDescProductionRouteOperationCode.Validators[0].(func(string) error)
 	// processDescOutsourcingEnabled is the schema descriptor for outsourcing_enabled field.
-	processDescOutsourcingEnabled := processFields[3].Descriptor()
+	processDescOutsourcingEnabled := processFields[4].Descriptor()
 	// process.DefaultOutsourcingEnabled holds the default value on creation for the outsourcing_enabled field.
 	process.DefaultOutsourcingEnabled = processDescOutsourcingEnabled.Default.(bool)
 	// processDescInhouseEnabled is the schema descriptor for inhouse_enabled field.
-	processDescInhouseEnabled := processFields[4].Descriptor()
+	processDescInhouseEnabled := processFields[5].Descriptor()
 	// process.DefaultInhouseEnabled holds the default value on creation for the inhouse_enabled field.
 	process.DefaultInhouseEnabled = processDescInhouseEnabled.Default.(bool)
 	// processDescQualityRequired is the schema descriptor for quality_required field.
-	processDescQualityRequired := processFields[5].Descriptor()
+	processDescQualityRequired := processFields[6].Descriptor()
 	// process.DefaultQualityRequired holds the default value on creation for the quality_required field.
 	process.DefaultQualityRequired = processDescQualityRequired.Default.(bool)
 	// processDescSortOrder is the schema descriptor for sort_order field.
-	processDescSortOrder := processFields[6].Descriptor()
+	processDescSortOrder := processFields[7].Descriptor()
 	// process.DefaultSortOrder holds the default value on creation for the sort_order field.
 	process.DefaultSortOrder = processDescSortOrder.Default.(int)
 	// process.SortOrderValidator is a validator for the "sort_order" field. It is called by the builders before save.
 	process.SortOrderValidator = processDescSortOrder.Validators[0].(func(int) error)
 	// processDescNote is the schema descriptor for note field.
-	processDescNote := processFields[7].Descriptor()
+	processDescNote := processFields[8].Descriptor()
 	// process.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	process.NoteValidator = processDescNote.Validators[0].(func(string) error)
 	// processDescIsActive is the schema descriptor for is_active field.
-	processDescIsActive := processFields[8].Descriptor()
+	processDescIsActive := processFields[9].Descriptor()
 	// process.DefaultIsActive holds the default value on creation for the is_active field.
 	process.DefaultIsActive = processDescIsActive.Default.(bool)
 	// processDescCreatedAt is the schema descriptor for created_at field.
-	processDescCreatedAt := processFields[9].Descriptor()
+	processDescCreatedAt := processFields[10].Descriptor()
 	// process.DefaultCreatedAt holds the default value on creation for the created_at field.
 	process.DefaultCreatedAt = processDescCreatedAt.Default.(func() time.Time)
 	// processDescUpdatedAt is the schema descriptor for updated_at field.
-	processDescUpdatedAt := processFields[10].Descriptor()
+	processDescUpdatedAt := processFields[11].Descriptor()
 	// process.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	process.DefaultUpdatedAt = processDescUpdatedAt.Default.(func() time.Time)
 	// process.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

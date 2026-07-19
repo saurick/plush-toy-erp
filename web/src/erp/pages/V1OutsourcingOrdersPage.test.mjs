@@ -6,6 +6,22 @@ const source = readFileSync(
   new URL('./V1OutsourcingOrdersPage.jsx', import.meta.url),
   'utf8'
 )
+const formSource = readFileSync(
+  new URL(
+    '../components/outsourcing-orders/OutsourcingOrderForm.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
+const orderViewSource = readFileSync(
+  new URL('../utils/masterDataOrderView.mjs', import.meta.url),
+  'utf8'
+)
+
+test('outsourcing page has no retired sales-order foreign-key field', () => {
+  assert.doesNotMatch(formSource, /source_sales_order_id/u)
+  assert.doesNotMatch(orderViewSource, /source_sales_order_id/u)
+})
 
 test('outsourcing order source actions use exact capabilities and dedicated commands', () => {
   for (const permission of [
@@ -38,6 +54,9 @@ test('outsourcing order source actions stay on the matching confirmed open line'
   assert.match(source, /label: '登记回货'/u)
   assert.match(source, /isOutsourcingSourceActionEligible/u)
   assert.match(source, /filterOutsourcingSourceActionLots/u)
+  assert.match(source, /sourceAction && view === 'details'/u)
+  assert.doesNotMatch(source, /sourceAction && view !== 'preview'/u)
+  assert.doesNotMatch(source, /sourceAction && view === 'modal'/u)
 })
 
 test('outsourcing page explains follow-up work in business language', () => {
@@ -57,7 +76,10 @@ test('outsourcing order source modal uses retry-safe attempts and clears closed 
   assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
   assert.match(source, /findOutsourcingSourceFactResult/u)
   assert.match(source, /保持内容不变后重试，避免重复记录/u)
-  assert.match(source, /已重新读取并确认委外回货草稿/u)
+  assert.match(
+    source,
+    /已重新读取并确认委外回货草稿，可在委外记录中继续办理/u
+  )
   assert.match(source, /sourceFactRequestRef\.current \+= 1/u)
   assert.match(source, /setSourceFactContext\(EMPTY_SOURCE_FACT_CONTEXT\)/u)
   assert.match(source, /<OutsourcingOrderSourceFactModal/u)
@@ -71,6 +93,45 @@ test('outsourcing order source modal uses retry-safe attempts and clears closed 
   assert.match(source, /productSKUs=\{productSKUs\}/u)
   assert.match(source, /handleProductSKUChange/u)
   assert.match(source, /sku_code_snapshot/u)
+})
+
+test('outsourcing page delegates complete paginated datasets to listAll contracts', () => {
+  for (const functionName of [
+    'listAllSuppliers',
+    'listAllProducts',
+    'listAllProductSKUs',
+    'listAllMaterials',
+    'listAllProcesses',
+    'listAllUnits',
+    'listAllWarehouses',
+    'listAllContactsByOwner',
+    'listAllOutsourcingOrderItems',
+    'listAllOutsourcingFacts',
+    'listAllInventoryLots',
+    'listAllOutsourcingReturnQualityInspections',
+  ]) {
+    assert.match(source, new RegExp(`\\b${functionName}\\s*\\(`, 'u'))
+  }
+
+  for (const singlePageFunctionName of [
+    'listSuppliers',
+    'listProducts',
+    'listProductSKUs',
+    'listMaterials',
+    'listProcesses',
+    'listUnits',
+    'listWarehouses',
+    'listContactsByOwner',
+    'listOutsourcingOrderItems',
+    'listOutsourcingFacts',
+    'listInventoryLots',
+    'listOutsourcingReturnQualityInspections',
+  ]) {
+    assert.doesNotMatch(
+      source,
+      new RegExp(`\\b${singlePageFunctionName}\\s*\\(`, 'u')
+    )
+  }
 })
 
 test('outsourcing order source actions submit only source-owned form values', () => {
@@ -98,7 +159,7 @@ test('outsourcing order source actions submit only source-owned form values', ()
 })
 
 test('posted outsourcing returns expose source-bound payable through related records', () => {
-  assert.match(source, /相关回货记录/u)
+  assert.match(source, />\s*委外记录\s*</u)
   assert.match(source, /finance\.payable\.confirm/u)
   assert.match(source, /buildOutsourcingReturnPayablePayload\(values, fact\)/u)
   assert.match(source, /createPayableFromOutsourcingReturn\(attempt\.params\)/u)
@@ -113,13 +174,41 @@ test('posted outsourcing returns expose source-bound payable through related rec
   assert.match(source, /<FinanceBusinessSourceModal/u)
 })
 
+test('outsourcing record lifecycle uses exact permissions, canonical commands, and write-then-reread confirmation', () => {
+  for (const permission of [
+    'outsourcing.fact.post',
+    'outsourcing.fact.cancel',
+  ]) {
+    assert.match(source, new RegExp(permission.replaceAll('.', '\\.'), 'u'))
+  }
+  assert.match(source, /postOutsourcingFact/u)
+  assert.match(source, /cancelOutsourcingFact/u)
+  assert.match(source, /const mutateOutsourcingFact/u)
+  assert.match(source, /isSourceBusinessActionResultUnknown\(error\)/u)
+  assert.match(
+    source,
+    /currentFacts = await loadRelatedOutsourcingFacts\([\s\S]*setRelatedReturnFacts\(currentFacts\)/u
+  )
+  assert.match(source, /isMatchingOutsourcingFactState/u)
+  assert.match(source, /写入后重新读取仍未确认目标状态/u)
+  assert.match(source, /作废不会产生任何库存变动/u)
+  assert.match(source, /库存已恢复至过账前状态/u)
+  assert.match(source, /canPostFact=\{canPostOutsourcingFact\}/u)
+  assert.match(source, /canCancelFact=\{canCancelOutsourcingFact\}/u)
+  assert.match(source, /onPostFact=\{postSelectedOutsourcingFact\}/u)
+  assert.match(source, /onCancelFact=\{cancelSelectedOutsourcingFact\}/u)
+})
+
 test('posted outsourcing returns expose source-bound quality inspection', () => {
   assert.match(source, /quality\.inspection\.create/u)
   assert.match(source, /quality\.inspection\.read/u)
   assert.match(source, /createQualityInspectionFromOutsourcingReturn/u)
-  assert.match(source, /listOutsourcingReturnQualityInspections/u)
+  assert.match(source, /listAllOutsourcingReturnQualityInspections/u)
+  assert.doesNotMatch(
+    source,
+    /\blistOutsourcingReturnQualityInspections\s*\(/u
+  )
   assert.match(source, /fact_id: fact\.id/u)
-  assert.match(source, /limit: 200/u)
   assert.match(source, /buildOutsourcingReturnQualityInspectionPayload/u)
   assert.match(source, /isMatchingOutsourcingReturnQualityInspection/u)
   assert.match(source, /qualitySourceInFlightRef\.current/u)
@@ -155,4 +244,19 @@ test('outsourcing return quality request only accepts source-owned business fiel
       new RegExp(`values\\.${forbiddenFormValue}`, 'u')
     )
   }
+})
+
+test('resolved related contract number is isolated by the exact route key', () => {
+  assert.match(
+    source,
+    /const linkedRouteKey = `\$\{routeOutsourcingOrderID\}:\$\{routeOutsourcingFactID\}`/u
+  )
+  assert.match(
+    source,
+    /resolvedLinkedContext\.routeKey === linkedRouteKey/u
+  )
+  assert.match(
+    source,
+    /setResolvedLinkedContext\(\{ routeKey: requestRouteKey, keyword: '' \}\)/u
+  )
 })

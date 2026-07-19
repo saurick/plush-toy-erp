@@ -198,3 +198,46 @@ test('reservation payload rejects an inactive order or closed order line', () =>
     )
   )
 })
+
+test('reservation quantities preserve numeric(20,6) boundaries exactly', () => {
+  const tinyItem = { ...item, ordered_quantity: '0.000001' }
+  const tinyBalance = { ...balance, available_quantity: '0.000001' }
+  const [tinyChoice] = buildSalesOrderReservationItemChoices([tinyItem])
+  assert.equal(tinyChoice.ordered, '0.000001')
+  assert.equal(tinyChoice.reservable, '0.000001')
+  assert.equal(tinyChoice.disabled, false)
+  assert.equal(
+    defaultSalesOrderReservationQuantity(tinyChoice, {
+      available: '0.000001',
+    }),
+    '0.000001'
+  )
+  assert.equal(
+    buildSalesOrderReservationPayload(
+      {
+        sales_order_item_id: 11,
+        balance_id: 21,
+        quantity: '0.000001',
+      },
+      { id: 5, lifecycle_status: 'active' },
+      [tinyItem],
+      [tinyBalance]
+    ).quantity,
+    '0.000001'
+  )
+
+  const maximum = '99999999999999.999999'
+  const [maximumChoice] = buildSalesOrderReservationItemChoices(
+    [{ ...item, ordered_quantity: maximum }],
+    [{ sales_order_item_id: 11, status: 'ACTIVE', quantity: '0.000001' }]
+  )
+  assert.equal(maximumChoice.ordered, maximum)
+  assert.equal(maximumChoice.reservable, '99999999999999.999998')
+  assert.equal(
+    buildReservationBalanceChoices(
+      [{ ...balance, available_quantity: maximum }],
+      { productID: 7, productSkuID: 8 }
+    )[0].available,
+    maximum
+  )
+})

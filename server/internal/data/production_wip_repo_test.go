@@ -24,10 +24,11 @@ import (
 
 func createProductionWIPRouteProcesses(t *testing.T, ctx context.Context, client *ent.Client) map[string]*ent.Process {
 	t.Helper()
-	create := func(code, name, category string, inhouse, outsourced bool, sortOrder int) *ent.Process {
+	create := func(code, name, category, operationCode string, inhouse, outsourced bool, sortOrder int) *ent.Process {
 		builder := client.Process.Create().
 			SetCode(code).
 			SetName(name).
+			SetProductionRouteOperationCode(operationCode).
 			SetInhouseEnabled(inhouse).
 			SetOutsourcingEnabled(outsourced).
 			SetSortOrder(sortOrder).
@@ -38,10 +39,10 @@ func createProductionWIPRouteProcesses(t *testing.T, ctx context.Context, client
 		return builder.SaveX(ctx)
 	}
 	return map[string]*ent.Process{
-		biz.ProductionWIPOperationFabricProcessing: create("WIP-CUT", "机裁", "裁片", false, true, 400),
-		biz.ProductionWIPOperationSewing:           create("WIP-SEW", "车缝", "车缝", true, true, 10),
-		biz.ProductionWIPOperationHandwork:         create("WIP-HAND", "手工", "手工", true, true, 300),
-		biz.ProductionWIPOperationPackaging:        create("WIP-PACK", "包装", "包装", true, false, 20),
+		biz.ProductionWIPOperationFabricProcessing: create("WIP-CUT", "机裁", "裁片", biz.ProductionWIPOperationFabricProcessing, false, true, 400),
+		biz.ProductionWIPOperationSewing:           create("WIP-SEW", "车缝", "车缝", biz.ProductionWIPOperationSewing, true, true, 10),
+		biz.ProductionWIPOperationHandwork:         create("WIP-HAND", "手工", "手工", biz.ProductionWIPOperationHandwork, true, true, 300),
+		biz.ProductionWIPOperationPackaging:        create("WIP-PACK", "包装", "包装", biz.ProductionWIPOperationPackaging, true, false, 20),
 	}
 }
 
@@ -121,6 +122,12 @@ func TestProductionWIPReleaseFreezesExactRouteAndRollsBackInvalidResolution(t *t
 		ctx := context.Background()
 		f := openProductionOrderRepoTest(t, "production_wip_release_success")
 		processes := createProductionWIPRouteProcesses(t, ctx, f.client)
+		processes[biz.ProductionWIPOperationSewing] = f.client.Process.UpdateOneID(processes[biz.ProductionWIPOperationSewing].ID).
+			SetCode("WIP-NEEDLEWORK").
+			SetName("针车").
+			SetCategory("针车组").
+			SetSortOrder(999).
+			SaveX(ctx)
 		aggregate := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-RELEASE", 10, true)
 		if aggregate.ProductionOrder.Status != biz.ProductionOrderStatusReleased || len(aggregate.ProductionOrderItems) != 1 ||
 			len(aggregate.Operations) != 4 || len(aggregate.Batches) != 1 || len(aggregate.PackagingConfirmations) != 1 {
@@ -145,6 +152,10 @@ func TestProductionWIPReleaseFreezesExactRouteAndRollsBackInvalidResolution(t *t
 		handwork := productionWIPOperationForCode(t, aggregate, biz.ProductionWIPOperationHandwork)
 		if len(handwork.RequiredQualityGates) != 4 || handwork.RequiredQualityGates[3] != biz.ProductionWIPQualityGateCustomerAcceptance {
 			t.Fatalf("customer inspection gate snapshot = %#v", handwork.RequiredQualityGates)
+		}
+		sewing := productionWIPOperationForCode(t, aggregate, biz.ProductionWIPOperationSewing)
+		if sewing.ProcessCodeSnapshot != "WIP-NEEDLEWORK" || sewing.ProcessNameSnapshot != "针车" {
+			t.Fatalf("renamed sewing process was not resolved from semantic binding: %#v", sewing)
 		}
 		root := aggregate.Batches[0]
 		if root.SourceBatchID != nil || root.ProductionOrderOperationID != aggregate.Operations[0].ID || root.Status != biz.ProductionWIPStatusPlanned ||
@@ -180,48 +191,48 @@ func TestProductionWIPReleaseFreezesExactRouteAndRollsBackInvalidResolution(t *t
 		}
 	})
 
-	for _, test := range []struct {
-		name      string
-		ambiguous bool
-	}{
-		{name: "missing semantic process"},
-		{name: "ambiguous semantic process", ambiguous: true},
-	} {
-		t.Run(test.name, func(t *testing.T) {
-			ctx := context.Background()
-			f := openProductionOrderRepoTest(t, "production_wip_release_"+fmt.Sprint(test.ambiguous))
-			if test.ambiguous {
-				createProductionWIPRouteProcesses(t, ctx, f.client)
-				f.client.Process.Create().SetCode("WIP-CUT-DUP").SetName("裁片").SetOutsourcingEnabled(true).SetInhouseEnabled(false).SaveX(ctx)
-			}
-			route := biz.ProductionWIPRoutePlushSewHandV1
-			draft := f.draft("MO-WIP-ROLLBACK-"+fmt.Sprint(test.ambiguous), 10)
-			draft.Items[0].RouteCode = &route
-			created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: draft, ActorID: f.actorID, IdempotencyKey: "rollback-create"})
-			if err != nil {
-				t.Fatalf("create rollback fixture: %v", err)
-			}
-			if _, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "rollback-release"}); !errors.Is(err, biz.ErrProductionWIPInvalidRoute) {
-				t.Fatalf("release error = %v", err)
-			}
-			order := f.client.ProductionOrder.GetX(ctx, created.Order.ID)
-			if order.Status != biz.ProductionOrderStatusDraft || order.Version != 1 {
-				t.Fatalf("failed release changed source order: %#v", order)
-			}
-			if count := f.client.ProductionOrderOperation.Query().Where(productionorderoperation.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
-				t.Fatalf("rolled-back operation count = %d", count)
-			}
-			if count := f.client.ProductionWIPBatch.Query().Where(productionwipbatch.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
-				t.Fatalf("rolled-back WIP count = %d", count)
-			}
-			if count := f.client.ProductionPackagingConfirmation.Query().Where(productionpackagingconfirmation.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
-				t.Fatalf("rolled-back confirmation count = %d", count)
-			}
-			if count := f.client.ProductionOrderMaterialRequirement.Query().Where(productionordermaterialrequirement.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
-				t.Fatalf("rolled-back material freeze count = %d", count)
-			}
-		})
-	}
+	t.Run("missing semantic process", func(t *testing.T) {
+		ctx := context.Background()
+		f := openProductionOrderRepoTest(t, "production_wip_release_missing_semantic")
+		route := biz.ProductionWIPRoutePlushSewHandV1
+		draft := f.draft("MO-WIP-ROLLBACK-MISSING", 10)
+		draft.Items[0].RouteCode = &route
+		created, err := f.uc.CreateDraft(ctx, &biz.ProductionOrderCreate{Draft: draft, ActorID: f.actorID, IdempotencyKey: "rollback-create"})
+		if err != nil {
+			t.Fatalf("create rollback fixture: %v", err)
+		}
+		if _, err := f.uc.Release(ctx, &biz.ProductionOrderAction{ID: created.Order.ID, ExpectedVersion: 1, ActorID: f.actorID, IdempotencyKey: "rollback-release"}); !errors.Is(err, biz.ErrProductionWIPInvalidRoute) {
+			t.Fatalf("release error = %v", err)
+		}
+		order := f.client.ProductionOrder.GetX(ctx, created.Order.ID)
+		if order.Status != biz.ProductionOrderStatusDraft || order.Version != 1 {
+			t.Fatalf("failed release changed source order: %#v", order)
+		}
+		if count := f.client.ProductionOrderOperation.Query().Where(productionorderoperation.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
+			t.Fatalf("rolled-back operation count = %d", count)
+		}
+		if count := f.client.ProductionWIPBatch.Query().Where(productionwipbatch.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
+			t.Fatalf("rolled-back WIP count = %d", count)
+		}
+		if count := f.client.ProductionPackagingConfirmation.Query().Where(productionpackagingconfirmation.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
+			t.Fatalf("rolled-back confirmation count = %d", count)
+		}
+		if count := f.client.ProductionOrderMaterialRequirement.Query().Where(productionordermaterialrequirement.ProductionOrderID(order.ID)).CountX(ctx); count != 0 {
+			t.Fatalf("rolled-back material freeze count = %d", count)
+		}
+	})
+
+	t.Run("duplicate display names do not create route ambiguity", func(t *testing.T) {
+		ctx := context.Background()
+		f := openProductionOrderRepoTest(t, "production_wip_release_duplicate_labels")
+		createProductionWIPRouteProcesses(t, ctx, f.client)
+		f.client.Process.Create().SetCode("WIP-CUT-SAME-LABEL").SetName("机裁").SetCategory("裁片").SetOutsourcingEnabled(true).SaveX(ctx)
+		aggregate := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-DUPLICATE-LABELS", 10, false)
+		fabric := productionWIPOperationForCode(t, aggregate, biz.ProductionWIPOperationFabricProcessing)
+		if fabric.ProcessCodeSnapshot != "WIP-CUT" {
+			t.Fatalf("fabric route resolved from display label instead of semantic binding: %#v", fabric)
+		}
+	})
 }
 
 func TestProductionOrderCloseBlocksActiveWIPAndAllowsTerminalSplitLineage(t *testing.T) {
@@ -292,6 +303,67 @@ func TestProductionOrderCloseBlocksActiveWIPAndAllowsTerminalSplitLineage(t *tes
 			t.Fatalf("close terminal split lineage = %+v err=%v", closed, err)
 		}
 	})
+}
+
+func TestProductionWIPCancelReceiptAndProductionOrderCancelBoundary(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderRepoTest(t, "production_wip_cancel")
+	createProductionWIPRouteProcesses(t, ctx, f.client)
+	aggregate := releaseProductionWIPRoute(t, ctx, f, "MO-WIP-CANCEL", 10, false)
+	completeProductionSchedulingTaskForWIPClose(t, ctx, f, aggregate.ProductionOrderID)
+	orderCancelReason := "生产计划取消"
+	if _, err := f.uc.Cancel(ctx, &biz.ProductionOrderAction{
+		ID: aggregate.ProductionOrderID, ExpectedVersion: aggregate.ProductionOrder.Version,
+		ActorID: f.actorID, IdempotencyKey: "order-cancel-active-wip", Reason: &orderCancelReason,
+	}); !errors.Is(err, biz.ErrProductionOrderWIPActive) {
+		t.Fatalf("cancel order with active WIP error = %v", err)
+	}
+
+	root := aggregate.Batches[0]
+	batchCancelReason := "尚未开工，撤销批次"
+	cancelInput := &biz.ProductionWIPAction{
+		ProductionOrderID: aggregate.ProductionOrderID, BatchID: root.ID, ExpectedVersion: root.Version,
+		ActorID: f.actorID, IdempotencyKey: "cancel-planned-batch", Reason: &batchCancelReason,
+	}
+	cancelled, err := f.uc.CancelProductionWIPBatch(ctx, cancelInput)
+	if err != nil {
+		t.Fatalf("cancel planned batch: %v", err)
+	}
+	cancelledRoot := productionWIPBatchByID(t, cancelled, root.ID)
+	if cancelledRoot.Status != biz.ProductionWIPStatusCancelled || cancelledRoot.Version != root.Version+1 {
+		t.Fatalf("cancelled batch = %#v", cancelledRoot)
+	}
+	event := f.client.ProductionWIPEvent.Query().Where(
+		productionwipevent.ProductionWipBatchID(root.ID),
+		productionwipevent.Action(biz.ProductionWIPEventActionCancel),
+	).OnlyX(ctx)
+	if event.Reason == nil || *event.Reason != batchCancelReason || event.ToStatus != biz.ProductionWIPStatusCancelled {
+		t.Fatalf("cancel event = %#v", event)
+	}
+	replay := *cancelInput
+	replay.ExpectedVersion = 999
+	if replayed, err := f.uc.CancelProductionWIPBatch(ctx, &replay); err != nil || productionWIPBatchByID(t, replayed, root.ID).Version != cancelledRoot.Version {
+		t.Fatalf("cancel exact replay = %#v err=%v", replayed, err)
+	}
+	changedReason := "不同取消原因"
+	replay.Reason = &changedReason
+	if _, err := f.uc.CancelProductionWIPBatch(ctx, &replay); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed cancel intent error = %v", err)
+	}
+	if _, err := f.uc.StartProductionWIPOperation(ctx, &biz.ProductionWIPAction{
+		ProductionOrderID: aggregate.ProductionOrderID, BatchID: root.ID, ExpectedVersion: cancelledRoot.Version,
+		ActorID: f.actorID, IdempotencyKey: "start-cancelled-batch",
+	}); !errors.Is(err, biz.ErrProductionWIPInvalidTransition) {
+		t.Fatalf("start cancelled batch error = %v", err)
+	}
+
+	cancelledOrder, err := f.uc.Cancel(ctx, &biz.ProductionOrderAction{
+		ID: aggregate.ProductionOrderID, ExpectedVersion: aggregate.ProductionOrder.Version,
+		ActorID: f.actorID, IdempotencyKey: "order-cancel-terminal-wip", Reason: &orderCancelReason,
+	})
+	if err != nil || cancelledOrder.Order.Status != biz.ProductionOrderStatusCancelled {
+		t.Fatalf("cancel order after WIP terminal = %#v err=%v", cancelledOrder, err)
+	}
 }
 
 func TestProductionWIPAggregateReadRejectsConcessionDrift(t *testing.T) {

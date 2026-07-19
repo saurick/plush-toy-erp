@@ -4,7 +4,7 @@ import { businessModuleDefinitions } from './businessModules.mjs'
  * @typedef {'owner' | 'source_document_owner' | 'source_generated' | 'fact_owner' | 'fact_processing' | 'read_model' | 'workflow_inbox'} BusinessPageRole
  * @typedef {'implemented' | 'partial' | 'deferred'} BusinessPageAvailability
  * @typedef {'not_applicable' | 'implemented' | 'partial' | 'deferred'} WorkflowTaskProducerStatus
- * @typedef {'catalog_fill' | 'source_link' | 'domain_generate' | 'external_import' | 'post_fact' | 'read_projection' | 'source_navigation' | 'print_snapshot'} BusinessFlowType
+ * @typedef {'catalog_fill' | 'source_link' | 'source_query' | 'domain_generate' | 'unscoped_mutation' | 'external_import' | 'post_fact' | 'fact_reversal' | 'lifecycle_transition' | 'process_orchestration' | 'read_projection' | 'source_navigation' | 'print_snapshot'} BusinessFlowType
  *
  * @typedef {object} BusinessFlowContract
  * @property {string} flowKey
@@ -12,7 +12,7 @@ import { businessModuleDefinitions } from './businessModules.mjs'
  * @property {string} fromPageKey Empty only for a future external_import flow.
  * @property {string} toPageKey
  * @property {string} externalSourceKey Required only for external_import.
- * @property {string} action RPC or aggregate-save action; required for domain_generate, external_import, and post_fact.
+ * @property {string} action RPC or aggregate-save action; required for source_query, domain_generate, unscoped_mutation, external_import, post_fact, fact_reversal, lifecycle_transition, and process_orchestration.
  * @property {string} sourceType Canonical discriminator used by read_projection or source_navigation.
  * @property {BusinessPageAvailability} availability
  * @property {string} availabilityNote Required when availability is not implemented.
@@ -59,13 +59,34 @@ export const WORKFLOW_TASK_PRODUCER_STATUS = Object.freeze({
 export const BUSINESS_FLOW_TYPES = Object.freeze({
   CATALOG_FILL: 'catalog_fill',
   SOURCE_LINK: 'source_link',
+  SOURCE_QUERY: 'source_query',
   DOMAIN_GENERATE: 'domain_generate',
+  UNSCOPED_MUTATION: 'unscoped_mutation',
   EXTERNAL_IMPORT: 'external_import',
   POST_FACT: 'post_fact',
+  FACT_REVERSAL: 'fact_reversal',
+  LIFECYCLE_TRANSITION: 'lifecycle_transition',
+  PROCESS_ORCHESTRATION: 'process_orchestration',
   READ_PROJECTION: 'read_projection',
   SOURCE_NAVIGATION: 'source_navigation',
   PRINT_SNAPSHOT: 'print_snapshot',
 })
+
+const BACKEND_ONLY_FORMAL_UI_ACTIONS = new Set([
+  'add_purchase_receipt_item',
+  'start_material_supply_purchase_order_process',
+  'execute_material_supply_purchase_receipt_create',
+  'execute_material_supply_quality_gate',
+  'execute_material_supply_post_inbound',
+  'start_finished_goods_delivery_process',
+  'execute_finished_goods_delivery_quality_decide',
+  'execute_finished_goods_delivery_finance_release',
+  'execute_finished_goods_delivery_shipment_ship',
+  'execute_finished_goods_delivery_receivable_lead',
+])
+
+const BACKEND_ONLY_FORMAL_UI_NOTE =
+  '服务端 JSON-RPC 已实现，但当前正式 Web UI 无调用入口；该动作仅登记为 backend-only 能力，不得作为页面可达的 implemented 链路。'
 
 function businessFlow(definition) {
   const normalized = {
@@ -76,6 +97,10 @@ function businessFlow(definition) {
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     availabilityNote: '',
     ...definition,
+  }
+  if (BACKEND_ONLY_FORMAL_UI_ACTIONS.has(normalized.action)) {
+    normalized.availability = BUSINESS_PAGE_AVAILABILITY.PARTIAL
+    normalized.availabilityNote = BACKEND_ONLY_FORMAL_UI_NOTE
   }
   const flowKey = [
     normalized.flowType,
@@ -124,7 +149,14 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['materials', 'inbound'],
         ['materials', 'inventory'],
         ['sales-orders', 'production-orders'],
+        ['sales-orders', 'shipments'],
         ['material-bom', 'production-orders'],
+        [
+          'processing-contracts',
+          'production-progress',
+          BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
+          'WIP 外发分配把已确认委外合同行持久化为 outsourcing_order_item_id 分配锚点。',
+        ],
         ['accessories-purchase', 'inbound'],
         ['inbound', 'quality-inspections'],
         ['quality-inspections', 'inventory'],
@@ -159,13 +191,93 @@ export const businessPageFlowDefinitions = Object.freeze(
     )
     .concat(
       [
+        // Server-owned candidate and source-specific read models. These reads
+        // do not create the target record and must remain separate from the
+        // persisted source_link and the later aggregate save.
+        [
+          'sales-orders',
+          'production-orders',
+          'list_production_order_reference_options',
+        ],
+        [
+          'production-orders',
+          'production-progress',
+          'list_production_order_material_requirements',
+        ],
+        [
+          'sales-orders',
+          'shipments',
+          'list_shipment_source_candidates',
+        ],
+        [
+          'processing-contracts',
+          'quality-inspections',
+          'list_outsourcing_return_quality_inspections',
+        ],
+        [
+          'production-progress',
+          'quality-inspections',
+          'list_production_stage_quality_inspections',
+        ],
+        [
+          'shipments',
+          'quality-inspections',
+          'list_finished_goods_quality_inspections',
+        ],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.SOURCE_QUERY,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
+      )
+    )
+    .concat(
+      [
         // Explicit backend actions that create a downstream record or draft.
-        ['sales-orders', 'production-orders', 'create_production_order'],
+        ['material-bom', 'material-bom', 'copy_bom_version'],
         [
           'accessories-purchase',
           'inbound',
           'create_purchase_receipt_from_purchase_order',
         ],
+        [
+          'accessories-purchase',
+          'quality-inspections',
+          'create_purchase_receipt_from_purchase_order',
+        ],
+        [
+          'accessories-purchase',
+          'inventory',
+          'create_purchase_receipt_from_purchase_order',
+        ],
+        [
+          'accessories-purchase',
+          'inbound',
+          'execute_material_supply_purchase_receipt_create',
+        ],
+        [
+          'accessories-purchase',
+          'quality-inspections',
+          'execute_material_supply_purchase_receipt_create',
+        ],
+        [
+          'accessories-purchase',
+          'inventory',
+          'execute_material_supply_purchase_receipt_create',
+        ],
+        [
+          'accessories-purchase',
+          'inbound',
+          'add_purchase_receipt_item',
+        ],
+        [
+          'accessories-purchase',
+          'quality-inspections',
+          'add_purchase_receipt_item',
+        ],
+        ['accessories-purchase', 'inventory', 'add_purchase_receipt_item'],
         ['inbound', 'inbound', 'create_purchase_return_from_receipt'],
         [
           'quality-inspections',
@@ -178,11 +290,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           'create_purchase_receipt_adjustment_from_receipt',
         ],
         ['inbound', 'quality-inspections', 'create_quality_inspection_draft'],
-        [
-          'accessories-purchase',
-          'quality-inspections',
-          'create_purchase_receipt_from_purchase_order',
-        ],
         [
           'processing-contracts',
           'quality-inspections',
@@ -199,13 +306,43 @@ export const businessPageFlowDefinitions = Object.freeze(
           'create_production_completion_from_order',
         ],
         [
+          'production-orders',
+          'inventory',
+          'create_production_completion_from_order',
+        ],
+        [
           'production-progress',
           'production-progress',
           'create_production_rework_from_completion',
         ],
         [
+          'production-progress',
+          'quality-inspections',
+          'execute_production_wip_action',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'create_outsourcing_material_issue_from_order',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'create_outsourcing_return_receipt_from_order',
+        ],
+        [
+          'processing-contracts',
+          'inventory',
+          'create_outsourcing_return_receipt_from_order',
+        ],
+        [
           'production-orders',
           'production-scheduling',
+          'release_production_order',
+        ],
+        [
+          'production-orders',
+          'production-progress',
           'release_production_order',
         ],
         [
@@ -218,7 +355,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           'outbound',
           'create_stock_reservation_from_sales_order',
         ],
-        ['sales-orders', 'shipments', 'create_shipment_with_items'],
         ['shipments', 'shipping-release', 'submit_shipment_release'],
         ['inbound', 'payables', 'create_payable_from_purchase_receipt'],
         [
@@ -227,6 +363,11 @@ export const businessPageFlowDefinitions = Object.freeze(
           'create_payable_from_outsourcing_return',
         ],
         ['shipments', 'receivables', 'create_receivable_from_shipment'],
+        [
+          'shipments',
+          'receivables',
+          'execute_finished_goods_delivery_receivable_lead',
+        ],
         ['shipments', 'invoices', 'create_invoice_from_shipment'],
         [
           'payables',
@@ -270,19 +411,19 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['inbound', 'inventory', 'post_purchase_receipt'],
         ['inbound', 'inventory', 'post_purchase_return'],
         ['inbound', 'inventory', 'post_purchase_receipt_adjustment'],
-        [
-          'quality-inspections',
-          'quality-inspections',
-          'pass_quality_inspection',
-        ],
-        [
-          'quality-inspections',
-          'quality-inspections',
-          'reject_quality_inspection',
-        ],
         ['production-progress', 'inventory', 'post_production_fact'],
         ['processing-contracts', 'inventory', 'post_outsourcing_fact'],
         ['shipments', 'inventory', 'ship_shipment'],
+        [
+          'shipments',
+          'inventory',
+          'execute_finished_goods_delivery_shipment_ship',
+        ],
+        [
+          'inbound',
+          'inventory',
+          'execute_material_supply_post_inbound',
+        ],
         ['payables', 'payables', 'post_finance_fact'],
         ['receivables', 'receivables', 'post_finance_fact'],
         ['invoices', 'invoices', 'post_finance_fact'],
@@ -290,6 +431,231 @@ export const businessPageFlowDefinitions = Object.freeze(
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
           flowType: BUSINESS_FLOW_TYPES.POST_FACT,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
+      )
+    )
+    .concat(
+      [
+        // Cancelling a posted inventory-affecting fact writes an auditable
+        // reversal instead of deleting or merely relabelling the source fact.
+        ['inbound', 'inventory', 'cancel_purchase_receipt'],
+        ['inbound', 'inventory', 'cancel_purchase_return'],
+        ['inbound', 'inventory', 'cancel_purchase_receipt_adjustment'],
+        ['production-progress', 'inventory', 'cancel_production_fact'],
+        ['processing-contracts', 'inventory', 'cancel_outsourcing_fact'],
+        ['shipments', 'inventory', 'cancel_shipment'],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.FACT_REVERSAL,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
+      )
+    )
+    .concat(
+      [
+        // Source-document and Fact lifecycle changes are not downstream
+        // generation. Fact reversals above remain separately visible from
+        // their source record's lifecycle transition.
+        ['material-bom', 'material-bom', 'activate_bom_version'],
+        ['material-bom', 'material-bom', 'archive_bom_version'],
+        [
+          'sales-orders',
+          'sales-orders',
+          'execute_sales_order_acceptance_submit',
+        ],
+        ['sales-orders', 'sales-orders', 'activate_sales_order'],
+        ['sales-orders', 'sales-orders', 'close_sales_order'],
+        ['sales-orders', 'sales-orders', 'cancel_sales_order'],
+        [
+          'accessories-purchase',
+          'accessories-purchase',
+          'submit_purchase_order',
+        ],
+        [
+          'accessories-purchase',
+          'accessories-purchase',
+          'approve_purchase_order',
+        ],
+        [
+          'accessories-purchase',
+          'accessories-purchase',
+          'close_purchase_order',
+        ],
+        [
+          'accessories-purchase',
+          'accessories-purchase',
+          'cancel_purchase_order',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'submit_outsourcing_order',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'confirm_outsourcing_order',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'close_outsourcing_order',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'cancel_outsourcing_order',
+        ],
+        ['production-orders', 'production-orders', 'release_production_order'],
+        ['production-orders', 'production-orders', 'close_production_order'],
+        [
+          'production-orders',
+          'production-scheduling',
+          'close_production_order',
+        ],
+        ['production-orders', 'production-orders', 'cancel_production_order'],
+        [
+          'production-orders',
+          'production-scheduling',
+          'cancel_production_order',
+        ],
+        ['inbound', 'inbound', 'cancel_purchase_receipt'],
+        ['inbound', 'inbound', 'cancel_purchase_return'],
+        ['inbound', 'inbound', 'cancel_purchase_receipt_adjustment'],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'submit_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'inventory',
+          'submit_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'cancel_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'inventory',
+          'cancel_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'pass_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'inventory',
+          'pass_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'production-progress',
+          'pass_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'reject_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'inventory',
+          'reject_quality_inspection',
+        ],
+        [
+          'quality-inspections',
+          'production-progress',
+          'reject_quality_inspection',
+        ],
+        [
+          'shipments',
+          'quality-inspections',
+          'execute_finished_goods_delivery_quality_decide',
+        ],
+        [
+          'quality-inspections',
+          'inventory',
+          'execute_finished_goods_delivery_quality_decide',
+        ],
+        [
+          'production-progress',
+          'production-progress',
+          'execute_production_wip_action',
+        ],
+        [
+          'production-progress',
+          'production-progress',
+          'cancel_production_fact',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'cancel_outsourcing_fact',
+        ],
+        ['outbound', 'outbound', 'release_stock_reservation'],
+        ['shipments', 'shipping-release', 'ship_shipment'],
+        ['shipments', 'shipments', 'cancel_shipment'],
+        ['shipments', 'shipping-release', 'cancel_shipment'],
+        ['payables', 'payables', 'settle_finance_fact'],
+        ['payables', 'payables', 'cancel_finance_fact'],
+        ['receivables', 'receivables', 'settle_finance_fact'],
+        ['receivables', 'receivables', 'cancel_finance_fact'],
+        ['invoices', 'invoices', 'cancel_finance_fact'],
+        ['reconciliation', 'reconciliation', 'settle_finance_fact'],
+        ['reconciliation', 'reconciliation', 'cancel_finance_fact'],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
+      )
+    )
+    .concat(
+      [
+        // Customer-config process runtime may orchestrate the same domain
+        // records. Start/gate/release actions listed here only advance the
+        // process; domain-writing wrappers stay classified by their actual
+        // generate/post/lifecycle effect above.
+        [
+          'sales-orders',
+          'sales-orders',
+          'start_sales_order_acceptance_process',
+        ],
+        [
+          'accessories-purchase',
+          'accessories-purchase',
+          'start_material_supply_purchase_order_process',
+        ],
+        [
+          'shipments',
+          'shipments',
+          'start_finished_goods_delivery_process',
+        ],
+        [
+          'shipments',
+          'shipments',
+          'execute_finished_goods_delivery_finance_release',
+        ],
+        [
+          'inbound',
+          'inbound',
+          'execute_material_supply_quality_gate',
+        ],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.PROCESS_ORCHESTRATION,
           fromPageKey,
           toPageKey,
           action,
@@ -324,6 +690,21 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['quality-inspections', 'shipments', 'SHIPMENT'],
         ['production-progress', 'production-orders', 'PRODUCTION_ORDER'],
         ['production-progress', 'production-progress', 'PRODUCTION_FACT'],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'OUTSOURCING_ORDER',
+        ],
+        [
+          'processing-contracts',
+          'processing-contracts',
+          'OUTSOURCING_FACT',
+        ],
+        [
+          'quality-inspections',
+          'processing-contracts',
+          'OUTSOURCING_FACT',
+        ],
         ['outbound', 'sales-orders', 'SALES_ORDER'],
         ['shipments', 'sales-orders', 'SALES_ORDER'],
         ['inventory', 'inbound', 'PURCHASE_RECEIPT'],
@@ -452,7 +833,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   'material-bom': {
     pageRole: BUSINESS_PAGE_ROLES.OWNER,
     upstreamPageKeys: ['products', 'materials'],
-    producerActions: ['save_bom_with_items'],
+    producerActions: ['save_bom_with_items', 'copy_bom_version'],
     sourceTypes: [],
     downstreamPageKeys: ['production-orders'],
     taskGroups: [],
@@ -478,7 +859,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     upstreamPageKeys: ['suppliers', 'materials'],
     producerActions: ['save_purchase_order_with_items'],
     sourceTypes: [],
-    downstreamPageKeys: ['inbound'],
+    downstreamPageKeys: ['inbound', 'quality-inspections', 'inventory'],
     taskGroups: [],
     allowsGenericPageCreate: true,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
@@ -490,6 +871,8 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     upstreamPageKeys: ['accessories-purchase', 'quality-inspections'],
     producerActions: [
       'create_purchase_receipt_from_purchase_order',
+      'execute_material_supply_purchase_receipt_create',
+      'add_purchase_receipt_item',
       'create_purchase_return_from_receipt',
       'create_purchase_return_from_quality_inspection',
       'create_purchase_receipt_adjustment_from_receipt',
@@ -500,7 +883,8 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     allowsGenericPageCreate: false,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
-    availabilityNote: '',
+    availabilityNote:
+      '正式页面和公开写接口均只允许从已审核采购订单生成；追加行继续强制同一采购订单行来源。',
   },
   'quality-inspections': {
     pageRole: BUSINESS_PAGE_ROLES.SOURCE_GENERATED,
@@ -508,28 +892,45 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
       'accessories-purchase',
       'inbound',
       'processing-contracts',
+      'production-progress',
       'shipments',
     ],
     producerActions: [
       'create_purchase_receipt_from_purchase_order',
+      'execute_material_supply_purchase_receipt_create',
+      'add_purchase_receipt_item',
       'create_quality_inspection_draft',
       'create_quality_inspection_from_outsourcing_return',
+      'execute_production_wip_action',
       'create_finished_goods_quality_inspection_draft',
     ],
-    sourceTypes: ['PURCHASE_RECEIPT', 'OUTSOURCING_FACT', 'SHIPMENT'],
-    downstreamPageKeys: ['inbound', 'inventory', 'shipments', 'payables'],
+    sourceTypes: [
+      'PURCHASE_RECEIPT',
+      'OUTSOURCING_FACT',
+      'PRODUCTION_WIP',
+      'SHIPMENT',
+    ],
+    downstreamPageKeys: [
+      'inbound',
+      'inventory',
+      'production-progress',
+      'shipments',
+      'payables',
+    ],
     taskGroups: [],
     allowsGenericPageCreate: false,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
     availabilityNote:
-      '采购来料由入库准备生成，委外回货从委外页面发起；出货前成品检验从草稿出货单按送检批次发起。三者都生成独立质检 Fact，不由 Workflow 任务完成代写。',
+      '采购来料由入库准备生成，委外回货从委外页面发起；生产 WIP 完工/回仓在工序需要质量关口时原子生成检验草稿；出货前成品检验从草稿出货单按送检批次发起。它们都生成独立质检 Fact，不由 Workflow 任务完成代写。',
   },
   inventory: {
     pageRole: BUSINESS_PAGE_ROLES.READ_MODEL,
     upstreamPageKeys: [
+      'accessories-purchase',
       'inbound',
       'processing-contracts',
+      'production-orders',
       'production-progress',
       'outbound',
       'shipments',
@@ -553,9 +954,18 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   'processing-contracts': {
     pageRole: BUSINESS_PAGE_ROLES.SOURCE_DOCUMENT_OWNER,
     upstreamPageKeys: ['suppliers', 'products', 'materials', 'processes'],
-    producerActions: ['save_outsourcing_order_with_items'],
+    producerActions: [
+      'save_outsourcing_order_with_items',
+      'create_outsourcing_material_issue_from_order',
+      'create_outsourcing_return_receipt_from_order',
+    ],
     sourceTypes: [],
-    downstreamPageKeys: ['quality-inspections', 'inventory', 'payables'],
+    downstreamPageKeys: [
+      'production-progress',
+      'quality-inspections',
+      'inventory',
+      'payables',
+    ],
     taskGroups: [],
     allowsGenericPageCreate: true,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
@@ -567,7 +977,11 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     upstreamPageKeys: ['sales-orders', 'material-bom', 'products'],
     producerActions: ['create_production_order'],
     sourceTypes: [],
-    downstreamPageKeys: ['production-scheduling', 'production-progress'],
+    downstreamPageKeys: [
+      'production-scheduling',
+      'production-progress',
+      'inventory',
+    ],
     taskGroups: [],
     allowsGenericPageCreate: true,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
@@ -589,8 +1003,9 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   },
   'production-progress': {
     pageRole: BUSINESS_PAGE_ROLES.FACT_PROCESSING,
-    upstreamPageKeys: ['production-orders'],
+    upstreamPageKeys: ['production-orders', 'processing-contracts'],
     producerActions: [
+      'release_production_order',
       'create_production_material_issue_from_order',
       'create_production_completion_from_order',
       'create_production_rework_from_completion',
@@ -601,7 +1016,8 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     allowsGenericPageCreate: false,
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
-    availabilityNote: '',
+    availabilityNote:
+      'WIP 外发分配持久化已确认委外合同行锚点，外发回仓按该锚点重验来源，不从名称或前端快照猜测合同。',
   },
   'production-exceptions': {
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,
@@ -690,7 +1106,10 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   receivables: {
     pageRole: BUSINESS_PAGE_ROLES.FACT_PROCESSING,
     upstreamPageKeys: ['shipments'],
-    producerActions: ['create_receivable_from_shipment'],
+    producerActions: [
+      'create_receivable_from_shipment',
+      'execute_finished_goods_delivery_receivable_lead',
+    ],
     sourceTypes: ['SHIPMENT'],
     downstreamPageKeys: ['reconciliation'],
     taskGroups: [],

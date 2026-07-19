@@ -66,14 +66,14 @@ import {
   getOutsourcingOrder,
   listOutsourcingOrderItemsPreview,
   listOutsourcingOrders,
-  listMaterials,
-  listProcesses,
-  listProducts,
+  listAllMaterials,
+  listAllProcesses,
+  listAllProducts,
   listAllProductSKUs,
-  listContactsByOwner,
-  listSuppliers,
-  listUnits,
-  listWarehouses,
+  listAllContactsByOwner,
+  listAllSuppliers,
+  listAllUnits,
+  listAllWarehouses,
   saveOutsourcingOrderWithItems,
 } from '../api/masterDataOrderApi.mjs'
 import {
@@ -84,12 +84,14 @@ import {
   createOutsourcingMaterialIssueFromOrder,
   createOutsourcingReturnReceiptFromOrder,
   createPayableFromOutsourcingReturn,
+  cancelOutsourcingFact,
   listAllOutsourcingFacts,
+  postOutsourcingFact,
 } from '../api/operationalFactApi.mjs'
-import { listInventoryLots } from '../api/inventoryApi.mjs'
+import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
   createQualityInspectionFromOutsourcingReturn,
-  listOutsourcingReturnQualityInspections,
+  listAllOutsourcingReturnQualityInspections,
 } from '../api/qualityApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import { listWorkflowTasks } from '../api/workflowApi.mjs'
@@ -195,10 +197,15 @@ import {
   OUTSOURCING_RETURN_QUALITY_GATE_STATES,
   resolveOutsourcingReturnQualityGate,
 } from '../utils/qualityInspectionSourceAction.mjs'
+import { searchParamPositiveInt } from '../utils/routeQuery.mjs'
 import {
-  routeWithQuery,
-  searchParamPositiveIntText,
-} from '../utils/routeQuery.mjs'
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
+import { resolveExactRecordPage } from '../utils/businessPagination.mjs'
 
 const EMPTY_SOURCE_FACT_CONTEXT = Object.freeze({
   actionType: '',
@@ -208,10 +215,23 @@ const EMPTY_SOURCE_FACT_CONTEXT = Object.freeze({
   facts: [],
 })
 
+function invalidOutsourcingFactLifecycleResponse() {
+  const error = new Error('委外记录操作结果不完整')
+  error.isInvalidResponse = true
+  return error
+}
+
+function isMatchingOutsourcingFactState(fact, expectedID, expectedStatus) {
+  return (
+    Number(fact?.id || 0) === Number(expectedID || 0) &&
+    String(fact?.status || '').toUpperCase() === expectedStatus
+  )
+}
+
 export default function V1OutsourcingOrdersPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -263,6 +283,8 @@ export default function V1OutsourcingOrdersPage() {
   const [returnRecordsLoading, setReturnRecordsLoading] = useState(false)
   const [returnRecordsOrder, setReturnRecordsOrder] = useState(null)
   const [relatedReturnFacts, setRelatedReturnFacts] = useState([])
+  const [returnRecordActionLoading, setReturnRecordActionLoading] =
+    useState('')
   const [qualityInspectionByFactID, setQualityInspectionByFactID] = useState({})
   const [qualitySourceFact, setQualitySourceFact] = useState(null)
   const [qualitySourceLoading, setQualitySourceLoading] = useState(false)
@@ -276,9 +298,49 @@ export default function V1OutsourcingOrdersPage() {
   )
   const financeSourceInFlightRef = useRef(false)
   const qualitySourceInFlightRef = useRef(false)
-  const routeOutsourcingOrderID = searchParamPositiveIntText(
+  const returnRecordActionInFlightRef = useRef(false)
+  const routeOutsourcingOrderID = searchParamPositiveInt(
     searchParams,
     'outsourcing_order_id'
+  )
+  const routeOutsourcingFactID = searchParamPositiveInt(
+    searchParams,
+    'outsourcing_fact_id'
+  )
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const linkedRouteKey = `${routeOutsourcingOrderID}:${routeOutsourcingFactID}`
+  const [resolvedLinkedContext, setResolvedLinkedContext] = useState({
+    routeKey: '',
+    keyword: '',
+  })
+  const resolvedLinkedKeyword =
+    resolvedLinkedContext.routeKey === linkedRouteKey
+      ? resolvedLinkedContext.keyword
+      : ''
+  const canReadOutsourcingFacts = hasActionPermission(
+    adminProfile,
+    'outsourcing.fact.read'
+  )
+  const canPostOutsourcingFact = hasActionPermission(
+    adminProfile,
+    'outsourcing.fact.post'
+  )
+  const canCancelOutsourcingFact = hasActionPermission(
+    adminProfile,
+    'outsourcing.fact.cancel'
+  )
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
   )
   const beginLatestRequest = useLatestRequestCoordinator()
   const sourceDocumentOpenEditController = useMemo(
@@ -363,13 +425,13 @@ export default function V1OutsourcingOrdersPage() {
         unitData,
         warehouseData,
       ] = await Promise.all([
-        listSuppliers({ active_only: true, limit: 200 }),
-        listProducts({ active_only: true, limit: 200 }),
+        listAllSuppliers({ active_only: true }),
+        listAllProducts({ active_only: true }),
         listAllProductSKUs(),
-        listMaterials({ active_only: true, limit: 200 }),
-        listProcesses({ active_only: true, limit: 200 }),
-        listUnits({ limit: 200 }),
-        listWarehouses({ active_only: true, limit: 200 }),
+        listAllMaterials({ active_only: true }),
+        listAllProcesses({ active_only: true }),
+        listAllUnits(),
+        listAllWarehouses({ active_only: true }),
       ])
       setSuppliers(supplierData?.suppliers || [])
       setProducts(productData?.products || [])
@@ -385,15 +447,49 @@ export default function V1OutsourcingOrdersPage() {
 
   const loadOrders = useCallback(async () => {
     const request = beginLatestRequest('orders')
+    const routeSelectedID = Number(routeOutsourcingOrderID || 0)
+    const routeFactID = Number(routeOutsourcingFactID || 0)
+    const requestRouteKey = `${routeOutsourcingOrderID}:${routeOutsourcingFactID}`
+    setResolvedLinkedContext({ routeKey: requestRouteKey, keyword: '' })
     setLoading(true)
     try {
       const { sortBy, sortDirection } =
         parseOutsourcingOrderSortValue(sortValue)
-      const routeSelectedID = Number(routeOutsourcingOrderID || 0)
+      const loadRouteOrder = async () => {
+        if (routeSelectedID > 0) {
+          return getOutsourcingOrder(
+            { id: routeSelectedID },
+            { signal: request.signal }
+          )
+        }
+        if (routeFactID <= 0 || !canReadOutsourcingFacts) return null
+        const factData = await listAllOutsourcingFacts(
+          { keyword: String(routeFactID) },
+          { signal: request.signal }
+        )
+        const sourceFact = (factData?.outsourcing_facts || []).find(
+          (fact) => Number(fact?.id || 0) === routeFactID
+        )
+        if (
+          String(sourceFact?.source_type || '').toUpperCase() !==
+            'OUTSOURCING_ORDER' ||
+          Number(sourceFact?.source_id || 0) <= 0
+        ) {
+          return null
+        }
+        return getOutsourcingOrder(
+          { id: Number(sourceFact.source_id) },
+          { signal: request.signal }
+        )
+      }
       const [data, routeOrder] = await Promise.all([
         listOutsourcingOrders(
           {
-            keyword,
+            keyword: linkedDocumentRequestKeyword({
+              localKeyword: keyword,
+              linkedKeyword,
+              hasExactContext: Boolean(routeSelectedID || routeFactID),
+            }),
             supplier_id: supplierFilter || undefined,
             lifecycle_status: statusFilter,
             date_field: dateField,
@@ -406,40 +502,39 @@ export default function V1OutsourcingOrdersPage() {
           },
           { signal: request.signal }
         ),
-        routeSelectedID > 0
-          ? getOutsourcingOrder(
-              { id: routeSelectedID },
-              { signal: request.signal }
-            )
-          : Promise.resolve(null),
+        loadRouteOrder(),
       ])
       if (!request.isCurrent()) {
         return
       }
       const listedRows = data?.outsourcing_orders || []
-      const nextRows = routeOrder
-        ? [
-            routeOrder,
-            ...listedRows.filter((item) => item.id !== routeOrder.id),
-          ]
-        : listedRows
+      const exactPage = resolveExactRecordPage({
+        records: listedRows,
+        exactRecord: routeOrder,
+        hasExactContext: routeSelectedID > 0 || routeFactID > 0,
+        total: Number(data?.total || 0),
+      })
+      const nextRows = exactPage.records
       setRows(nextRows)
-      setTotal(
-        Number(data?.total || 0) +
-          (routeOrder && !listedRows.some((item) => item.id === routeOrder.id)
-            ? 1
-            : 0)
-      )
+      setTotal(exactPage.total)
       setSelectedRow((prev) => {
-        if (routeSelectedID > 0) return routeOrder
+        if (routeSelectedID > 0 || routeFactID > 0) return routeOrder
         return prev
           ? nextRows.find((item) => item.id === prev.id) || null
           : null
+      })
+      setResolvedLinkedContext({
+        routeKey: requestRouteKey,
+        keyword:
+          routeSelectedID > 0 || routeFactID > 0
+            ? routeOrder?.outsourcing_order_no || ''
+            : '',
       })
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
       }
+      setResolvedLinkedContext({ routeKey: requestRouteKey, keyword: '' })
       message.error(getActionErrorMessage(error, '加载委外订单失败'))
     } finally {
       if (request.isCurrent()) {
@@ -452,7 +547,10 @@ export default function V1OutsourcingOrdersPage() {
     dateField,
     dateRange,
     keyword,
+    linkedKeyword,
     pagination,
+    canReadOutsourcingFacts,
+    routeOutsourcingFactID,
     routeOutsourcingOrderID,
     sortValue,
     statusFilter,
@@ -490,10 +588,6 @@ export default function V1OutsourcingOrdersPage() {
     adminProfile,
     'outsourcing.order.update'
   )
-  const canReadOutsourcingFacts = hasActionPermission(
-    adminProfile,
-    'outsourcing.fact.read'
-  )
   const canCreateMaterialIssue = hasActionPermission(
     adminProfile,
     'outsourcing.material_issue.create'
@@ -510,13 +604,17 @@ export default function V1OutsourcingOrdersPage() {
     adminProfile,
     'quality.inspection.read'
   )
+  const canOpenQualityInspection =
+    canReadQualityInspection &&
+    canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)
   const canCreatePayable = hasActionPermission(
     adminProfile,
     'finance.payable.confirm'
   )
   const canViewPayable =
-    canCreatePayable ||
-    hasActionPermission(adminProfile, 'finance.payable.read')
+    (canCreatePayable ||
+      hasActionPermission(adminProfile, 'finance.payable.read')) &&
+    canOpenRelatedPath(V1_ROUTE_PATHS.payables)
   const canReadWorkflowTasks = hasActionPermission(
     adminProfile,
     'workflow.task.read'
@@ -558,10 +656,9 @@ export default function V1OutsourcingOrdersPage() {
       const inspections = (
         await Promise.all(
           postedFacts.map(async (fact) => {
-            const data = await listOutsourcingReturnQualityInspections({
+            const data = await listAllOutsourcingReturnQualityInspections({
               customer_key: activeCustomerKey || undefined,
               fact_id: fact.id,
-              limit: 200,
             })
             return Array.isArray(data?.quality_inspections)
               ? data.quality_inspections
@@ -604,7 +701,7 @@ export default function V1OutsourcingOrdersPage() {
           message.warning(getActionErrorMessage(error, '读取关联质检记录'))
         }
       } catch (error) {
-        message.error(getActionErrorMessage(error, '读取委外回货记录'))
+        message.error(getActionErrorMessage(error, '读取委外记录'))
       } finally {
         setReturnRecordsLoading(false)
       }
@@ -619,6 +716,7 @@ export default function V1OutsourcingOrdersPage() {
   const closeRelatedReturnRecords = useCallback(() => {
     if (
       returnRecordsLoading ||
+      returnRecordActionInFlightRef.current ||
       financeSourceInFlightRef.current ||
       qualitySourceInFlightRef.current
     ) {
@@ -629,6 +727,145 @@ export default function V1OutsourcingOrdersPage() {
     setRelatedReturnFacts([])
     setQualityInspectionByFactID({})
   }, [returnRecordsLoading])
+
+  const mutateOutsourcingFact = useCallback(
+    async (action, fact) => {
+      const factID = Number(fact?.id || 0)
+      const currentStatus = String(fact?.status || '').toUpperCase()
+      const isPost = action === 'post'
+      const allowed = isPost
+        ? canPostOutsourcingFact && currentStatus === 'DRAFT'
+        : action === 'cancel' &&
+          canCancelOutsourcingFact &&
+          ['DRAFT', 'POSTED'].includes(currentStatus)
+      if (
+        returnRecordActionInFlightRef.current ||
+        !allowed ||
+        !factID ||
+        !returnRecordsOrder?.id
+      ) {
+        if (!returnRecordActionInFlightRef.current && !allowed) {
+          message.warning('当前委外记录状态或账号权限不允许该操作')
+        }
+        return
+      }
+
+      const expectedStatus = isPost ? 'POSTED' : 'CANCELLED'
+      const command = isPost ? postOutsourcingFact : cancelOutsourcingFact
+      const actionLabel = isPost ? '过账委外记录' : '取消委外记录'
+      let resultWasUnknown = false
+
+      returnRecordActionInFlightRef.current = true
+      setReturnRecordActionLoading(`${action}:${factID}`)
+      try {
+        try {
+          const result = await command({
+            id: factID,
+            customer_key: activeCustomerKey || undefined,
+          })
+          if (!isMatchingOutsourcingFactState(result, factID, expectedStatus)) {
+            throw invalidOutsourcingFactLifecycleResponse()
+          }
+        } catch (error) {
+          if (!isSourceBusinessActionResultUnknown(error)) {
+            message.error(getActionErrorMessage(error, actionLabel))
+            return
+          }
+          resultWasUnknown = true
+        }
+
+        let currentFacts
+        try {
+          currentFacts = await loadRelatedOutsourcingFacts(
+            returnRecordsOrder.id
+          )
+          setRelatedReturnFacts(currentFacts)
+        } catch (error) {
+          message.warning(
+            resultWasUnknown
+              ? '操作结果仍无法确认，请勿重复操作，稍后重新打开委外记录核对'
+              : getActionErrorMessage(
+                  error,
+                  '操作已提交，但重新读取委外记录失败，请稍后核对'
+                )
+          )
+          return
+        }
+
+        const confirmed = currentFacts.find((item) =>
+          isMatchingOutsourcingFactState(item, factID, expectedStatus)
+        )
+        if (!confirmed) {
+          message.warning(
+            '写入后重新读取仍未确认目标状态，请勿重复操作，稍后重新打开委外记录核对'
+          )
+          return
+        }
+
+        if (canReadQualityInspection) {
+          try {
+            setQualityInspectionByFactID(
+              await loadRelatedOutsourcingQualityInspections(currentFacts)
+            )
+          } catch (error) {
+            message.warning(getActionErrorMessage(error, '刷新关联质检记录'))
+          }
+        } else {
+          setQualityInspectionByFactID({})
+        }
+
+        message.success(
+          isPost
+            ? '委外记录已过账'
+            : currentStatus === 'DRAFT'
+              ? '委外草稿已作废，库存未发生变动'
+              : '委外记录已取消，库存已恢复至过账前状态'
+        )
+      } finally {
+        returnRecordActionInFlightRef.current = false
+        setReturnRecordActionLoading('')
+      }
+    },
+    [
+      activeCustomerKey,
+      canCancelOutsourcingFact,
+      canPostOutsourcingFact,
+      canReadQualityInspection,
+      loadRelatedOutsourcingFacts,
+      loadRelatedOutsourcingQualityInspections,
+      returnRecordsOrder,
+    ]
+  )
+
+  const postSelectedOutsourcingFact = useCallback(
+    (fact) => mutateOutsourcingFact('post', fact),
+    [mutateOutsourcingFact]
+  )
+
+  const cancelSelectedOutsourcingFact = useCallback(
+    (fact) => {
+      const status = String(fact?.status || '').toUpperCase()
+      if (
+        !canCancelOutsourcingFact ||
+        !['DRAFT', 'POSTED'].includes(status)
+      ) {
+        message.warning('当前委外记录状态或账号权限不允许取消')
+        return
+      }
+      const isDraft = status === 'DRAFT'
+      modal.confirm({
+        title: isDraft ? '确认作废委外草稿？' : '确认取消已过账委外记录？',
+        content: isDraft
+          ? '草稿尚未过账，本次作废不会产生任何库存变动。'
+          : '取消后将冲正本次过账，并把库存恢复至过账前状态。',
+        okText: isDraft ? '确认作废' : '确认取消过账',
+        cancelText: '返回',
+        okButtonProps: { danger: true },
+        onOk: () => mutateOutsourcingFact('cancel', fact),
+      })
+    },
+    [canCancelOutsourcingFact, mutateOutsourcingFact]
+  )
 
   const openOutsourcingReturnQualityInspection = useCallback(
     (fact) => {
@@ -698,10 +935,9 @@ export default function V1OutsourcingOrdersPage() {
             return
           }
           try {
-            const reread = await listOutsourcingReturnQualityInspections({
+            const reread = await listAllOutsourcingReturnQualityInspections({
               customer_key: activeCustomerKey || undefined,
               fact_id: fact.id,
-              limit: 50,
             })
             created = (reread?.quality_inspections || []).find(
               (inspection) =>
@@ -727,7 +963,7 @@ export default function V1OutsourcingOrdersPage() {
         message.success(
           confirmedByReread
             ? '已重新读取并确认质检草稿'
-            : '质检草稿已生成，请在相关回货记录中继续办理'
+            : '质检草稿已生成，请在委外记录中继续办理'
         )
 
         if (returnRecordsOrder?.id) {
@@ -763,14 +999,20 @@ export default function V1OutsourcingOrdersPage() {
 
   const viewOutsourcingReturnQualityInspection = useCallback(
     (inspection) => {
-      if (!inspection?.id) return
+      if (!inspection?.id || !canOpenQualityInspection) return
       navigate(
-        routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
-          quality_inspection_id: inspection.id,
-        })
+        relatedDocumentRoute(
+          V1_ROUTE_PATHS.qualityInspections,
+          { quality_inspection_id: inspection.id },
+          {
+            keyword: inspection.inspection_no,
+            source: 'outsourcing-order',
+            fields: ['inspection_no'],
+          }
+        )
       )
     },
-    [navigate]
+    [canOpenQualityInspection, navigate]
   )
 
   const openOutsourcingReturnPayable = useCallback(
@@ -854,15 +1096,20 @@ export default function V1OutsourcingOrdersPage() {
 
   const viewOutsourcingReturnPayable = useCallback(
     (fact) => {
-      if (!fact?.id) return
+      if (!fact?.id || !canViewPayable) return
       navigate(
-        routeWithQuery(V1_ROUTE_PATHS.payables, {
-          source_type: 'OUTSOURCING_FACT',
-          source_id: fact.id,
-        })
+        relatedDocumentRoute(
+          V1_ROUTE_PATHS.payables,
+          { source_type: 'OUTSOURCING_FACT', source_id: fact.id },
+          {
+            keyword: fact.fact_no,
+            source: 'outsourcing-order',
+            fields: ['source_no'],
+          }
+        )
       )
     },
-    [navigate]
+    [canViewPayable, navigate]
   )
 
   const openOutsourcingSourceFact = useCallback(
@@ -882,17 +1129,16 @@ export default function V1OutsourcingOrdersPage() {
             ? Number(item.material_id || 0)
             : Number(item.product_id || 0)
         const [lotData, facts, warehouseData] = await Promise.all([
-          listInventoryLots({
+          listAllInventoryLots({
             subject_type: subjectType,
             subject_id: subjectID,
             ...(Number(item.product_sku_id || 0) > 0
               ? { product_sku_id: Number(item.product_sku_id) }
               : {}),
             status: 'ACTIVE',
-            limit: 500,
           }),
           loadRelatedOutsourcingFacts(order.id),
-          listWarehouses({ active_only: true, limit: 500 }),
+          listAllWarehouses({ active_only: true }),
         ])
         if (sourceFactRequestRef.current !== requestID) {
           return
@@ -1027,7 +1273,7 @@ export default function V1OutsourcingOrdersPage() {
         ...(view !== 'preview'
           ? [{ label: '备注', value: item?.note, wide: true }]
           : []),
-        ...(sourceAction && view === 'modal'
+        ...(sourceAction && view === 'details'
           ? [{ label: '业务操作', value: sourceAction, wide: true }]
           : []),
       ]
@@ -1208,11 +1454,11 @@ export default function V1OutsourcingOrdersPage() {
         message.success(
           confirmedByReread
             ? actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
-              ? '已重新读取并确认委外发料草稿，请到委外记录核对并过账'
-              : '已重新读取并确认委外回货草稿，请到委外记录核对并过账'
+              ? '已重新读取并确认委外发料草稿，可在委外记录中继续办理'
+              : '已重新读取并确认委外回货草稿，可在委外记录中继续办理'
             : actionType === OUTSOURCING_SOURCE_ACTIONS.MATERIAL_ISSUE
-              ? '委外发料草稿已生成，请到委外记录核对并过账'
-              : '委外回货草稿已生成，请到委外记录核对并过账'
+              ? '委外发料草稿已生成，可在委外记录中继续办理'
+              : '委外回货草稿已生成，可在委外记录中继续办理'
         )
       } finally {
         sourceFactInFlightRef.current = false
@@ -1472,11 +1718,10 @@ export default function V1OutsourcingOrdersPage() {
         return baseSnapshot
       }
       try {
-        const data = await listContactsByOwner({
+        const data = await listAllContactsByOwner({
           owner_type: SUPPLIER_CONTACT_OWNER_TYPE,
           owner_id: supplier.id,
           active_only: true,
-          limit: 50,
         })
         return buildSupplierSnapshotWithContacts(supplier, data?.contacts || [])
       } catch (error) {
@@ -1506,6 +1751,7 @@ export default function V1OutsourcingOrdersPage() {
   }
 
   const submitForm = async () => {
+    const isCreatingOrder = !editingRow?.id
     setSaving(true)
     try {
       let payload
@@ -1584,8 +1830,15 @@ export default function V1OutsourcingOrdersPage() {
           : '加工合同已保存，未上传的附件请重新选择'
       )
       closeModal()
-      const refreshEffect = await settleSourceDocumentPostSaveEffect(() =>
-        Promise.all([loadOrders(), loadWorkflowTasks()])
+      const refreshEffect = await settleSourceDocumentPostSaveEffect(
+        async () => {
+          if (isCreatingOrder) {
+            setPagination((current) => ({ ...current, current: 1 }))
+            await loadWorkflowTasks()
+            return
+          }
+          await Promise.all([loadOrders(), loadWorkflowTasks()])
+        }
       )
       if (refreshEffect.status === 'rejected') {
         message.warning(
@@ -1846,11 +2099,22 @@ export default function V1OutsourcingOrdersPage() {
 
   const hasActiveFilters = Boolean(
     keyword.trim() ||
+      linkedKeyword ||
+      routeOutsourcingOrderID ||
+      routeOutsourcingFactID ||
       statusFilter ||
       supplierFilter ||
       dateRange?.[0] ||
       dateRange?.[1]
   )
+  const clearRouteContext = useCallback(() => {
+    const nextParams = clearLinkedDocumentParams(searchParams)
+    nextParams.delete('outsourcing_order_id')
+    nextParams.delete('outsourcing_fact_id')
+    setSearchParams(nextParams, { replace: true })
+    setResolvedLinkedContext({ routeKey: '', keyword: '' })
+    setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
+  }, [searchParams, setSearchParams])
   const clearFilters = useCallback(() => {
     setKeyword('')
     setStatusFilter('')
@@ -1858,7 +2122,8 @@ export default function V1OutsourcingOrdersPage() {
     setDateField('order_date')
     setDateRange([null, null])
     setPagination((current) => ({ ...current, current: 1 }))
-  }, [])
+    clearRouteContext()
+  }, [clearRouteContext])
 
   const selectedWorkflowTasks = useMemo(
     () =>
@@ -1946,10 +2211,17 @@ export default function V1OutsourcingOrdersPage() {
         filters={
           <>
             <SearchInput
-              value={keyword}
+              value={resolvedLinkedKeyword || linkedKeyword || keyword}
               placeholder="搜索合同"
               searchHint="可搜索：合同号、来源订单"
               onChange={(event) => {
+                if (
+                  linkedKeyword ||
+                  routeOutsourcingOrderID ||
+                  routeOutsourcingFactID
+                ) {
+                  clearRouteContext()
+                }
                 setPagination(DEFAULT_OUTSOURCING_ORDER_PAGINATION)
                 setKeyword(event.target.value)
               }}
@@ -2076,7 +2348,7 @@ export default function V1OutsourcingOrdersPage() {
               loading={returnRecordsLoading}
               onClick={() => openRelatedReturnRecords(selectedRow)}
             >
-              相关回货记录
+              委外记录
             </Button>
           ) : null}
           {primaryLifecycleAction ? (
@@ -2239,12 +2511,17 @@ export default function V1OutsourcingOrdersPage() {
         order={returnRecordsOrder}
         facts={relatedReturnFacts}
         loading={returnRecordsLoading}
+        actionLoading={returnRecordActionLoading}
+        canPostFact={canPostOutsourcingFact}
+        canCancelFact={canCancelOutsourcingFact}
         canCreateQualityInspection={canCreateQualityInspection}
-        canViewQualityInspection={canReadQualityInspection}
+        canViewQualityInspection={canOpenQualityInspection}
         qualityInspectionByFactID={qualityInspectionByFactID}
         canCreatePayable={canCreatePayable}
         canViewPayable={canViewPayable}
         onCancel={closeRelatedReturnRecords}
+        onPostFact={postSelectedOutsourcingFact}
+        onCancelFact={cancelSelectedOutsourcingFact}
         onCreateQualityInspection={openOutsourcingReturnQualityInspection}
         onViewQualityInspection={viewOutsourcingReturnQualityInspection}
         onGeneratePayable={openOutsourcingReturnPayable}

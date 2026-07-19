@@ -1,5 +1,5 @@
 import { V1_ROUTE_PATHS } from './masterDataOrderView.mjs'
-import { routeWithQuery } from './routeQuery.mjs'
+import { relatedDocumentRoute } from './relatedDocumentNavigation.mjs'
 
 const DIRECT_SOURCE_ROUTES = Object.freeze({
   SALES_ORDER: Object.freeze({
@@ -17,6 +17,10 @@ const DIRECT_SOURCE_ROUTES = Object.freeze({
   OUTSOURCING_ORDER: Object.freeze({
     path: V1_ROUTE_PATHS.processingContracts,
     queryKey: 'outsourcing_order_id',
+  }),
+  OUTSOURCING_FACT: Object.freeze({
+    path: V1_ROUTE_PATHS.processingContracts,
+    queryKey: 'outsourcing_fact_id',
   }),
   PURCHASE_ORDER: Object.freeze({
     path: V1_ROUTE_PATHS.purchaseOrders,
@@ -51,11 +55,23 @@ export function sourceRouteFor(sourceType) {
   return DIRECT_SOURCE_ROUTES[normalizedSourceType(sourceType)]?.path || ''
 }
 
-export function businessSourceRouteFor(sourceType, sourceID) {
+export function businessSourceRouteFor(
+  sourceType,
+  sourceID,
+  { keyword = '', source = '' } = {}
+) {
   const target = DIRECT_SOURCE_ROUTES[normalizedSourceType(sourceType)]
   const normalizedID = positiveSourceID(sourceID)
   if (!target || !normalizedID) return ''
-  return routeWithQuery(target.path, { [target.queryKey]: normalizedID })
+  return relatedDocumentRoute(
+    target.path,
+    { [target.queryKey]: normalizedID },
+    {
+      keyword,
+      source,
+      fields: ['document_no', 'source_no'],
+    }
+  )
 }
 
 const INVENTORY_SOURCE_TYPE_BY_RECORD_KIND = Object.freeze({
@@ -64,14 +80,22 @@ const INVENTORY_SOURCE_TYPE_BY_RECORD_KIND = Object.freeze({
   shipments: 'SHIPMENT',
 })
 
-export function businessRecordInventoryRouteFor(recordKind, recordID) {
+export function businessRecordInventoryRouteFor(
+  recordKind,
+  recordID,
+  { keyword = '', source = '' } = {}
+) {
   const sourceType =
     INVENTORY_SOURCE_TYPE_BY_RECORD_KIND[String(recordKind || '').trim()]
   const normalizedID = positiveSourceID(recordID)
   if (!sourceType || !normalizedID) return ''
-  return routeWithQuery(V1_ROUTE_PATHS.inventory, {
-    source_type: sourceType,
-    source_id: normalizedID,
-    view: 'txns',
-  })
+  return relatedDocumentRoute(
+    V1_ROUTE_PATHS.inventory,
+    {
+      source_type: sourceType,
+      source_id: normalizedID,
+      view: 'txns',
+    },
+    { keyword, source, fields: ['source_no'] }
+  )
 }

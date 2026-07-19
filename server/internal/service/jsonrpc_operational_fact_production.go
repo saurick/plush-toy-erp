@@ -18,7 +18,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionCompletionCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
 			return id, res, nil
 		}
 		in, ok := productionCompletionFromOrderCreateFromParams(pm)
@@ -31,7 +37,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionMaterialIssueCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
 			return id, res, nil
 		}
 		in, ok := productionMaterialIssueFromOrderCreateFromParams(pm)
@@ -44,7 +56,13 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionReworkCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
 		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "production"); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production_orders"); res != nil {
 			return id, res, nil
 		}
 		in, ok := productionReworkFromCompletionCreateFromParams(pm)
@@ -55,6 +73,9 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		return id, operationalFactProductionFactResult(ctx, d, item, err), nil
 	case "post_production_fact":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactPost); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
 			return id, res, nil
 		}
 		factID := getInt(pm, "id", 0)
@@ -106,6 +127,12 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionFactRead); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "production", "production_orders"); res != nil {
+			return id, res, nil
+		}
 		if !productionCompletionAllowsOnly(pm, "customer_key", "production_order_id") {
 			return id, invalidParamResult(), nil
 		}
@@ -136,7 +163,7 @@ func productionMaterialIssueFromOrderCreateFromParams(pm map[string]any) (*biz.P
 	) {
 		return nil, false
 	}
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}
@@ -175,7 +202,7 @@ func productionCompletionFromOrderCreateFromParams(pm map[string]any) (*biz.Prod
 	) {
 		return nil, false
 	}
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}
@@ -210,7 +237,7 @@ func productionReworkFromCompletionCreateFromParams(pm map[string]any) (*biz.Pro
 	) {
 		return nil, false
 	}
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}

@@ -95,14 +95,6 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-exception-workspace__main {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-exception-workspace__detail {
-    position: static;
-  }
-
   .erp-business-board-alert-grid {
     grid-template-columns: 1fr;
   }
@@ -208,30 +200,6 @@
   .erp-command-center-focus-item {
     flex-direction: column;
     align-items: stretch;
-  }
-
-  .erp-exception-workspace__summary,
-  .erp-exception-workspace__section-head {
-    align-items: stretch;
-    flex-direction: column;
-  }
-
-  .erp-exception-workspace__metrics {
-    width: 100%;
-  }
-
-  .erp-exception-workspace__metrics > span {
-    min-width: 0;
-  }
-
-  .erp-exception-workspace__item {
-    grid-template-columns: 1fr;
-  }
-
-  .erp-exception-workspace__item-status {
-    grid-template-columns: auto 1fr;
-    align-items: center;
-    justify-items: start;
   }
 
   .erp-task-board-lanes {

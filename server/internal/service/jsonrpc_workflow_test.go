@@ -551,6 +551,56 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 	}
 }
 
+func TestWorkflowJSONRPCCreateTaskRejectsTransitionDrivingIdentity(t *testing.T) {
+	repo := &stubWorkflowJSONRPCRepo{}
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskCreate)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	base := map[string]any{
+		"task_code":           "SPOOF-ORDER-APPROVAL-101",
+		"task_group":          "order_approval",
+		"task_name":           "伪造老板审批",
+		"source_type":         "project-orders",
+		"source_id":           float64(101),
+		"business_status_key": "project_pending",
+		"task_status_key":     "ready",
+		"owner_role_key":      "boss",
+		"priority":            float64(1),
+		"payload":             map[string]any{},
+	}
+	for _, tc := range []struct {
+		name   string
+		mutate func(map[string]any)
+	}{
+		{name: "exact matcher", mutate: func(map[string]any) {}},
+		{name: "mutable field bypass", mutate: func(params map[string]any) {
+			params["business_status_key"] = "closed"
+			params["payload"] = map[string]any{"note": "先占用任务组"}
+		}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			params := make(map[string]any, len(base))
+			for key, value := range base {
+				params[key] = value
+			}
+			tc.mutate(params)
+			_, res, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "create_task", "spoof-transition", mustJSONRPCStruct(t, params))
+			if err != nil {
+				t.Fatalf("expected nil transport error, got %v", err)
+			}
+			if res == nil || res.Code != errcode.InvalidParam.Code {
+				t.Fatalf("expected transition identity rejected, got %#v", res)
+			}
+			if repo.createInput != nil {
+				t.Fatalf("spoofed transition task must not reach repo, got %#v", repo.createInput)
+			}
+		})
+	}
+}
+
 func TestGetWorkflowUnixTimePtrRequiresCanonicalPostgresUnixSecond(t *testing.T) {
 	valid, ok := getWorkflowUnixTimePtr(map[string]any{"due_at": float64(1_800_000_000)}, "due_at")
 	if !ok || valid == nil || valid.Unix() != 1_800_000_000 {
@@ -858,10 +908,18 @@ func TestJsonrpcDispatcher_WorkflowListTasksPassesTaskGroupFilter(t *testing.T) 
 		workflowUC:       biz.NewWorkflowUsecase(repo),
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 	}
+	dueFrom := time.Date(2026, time.July, 18, 0, 0, 0, 0, time.UTC)
+	dueTo := dueFrom.Add(24*time.Hour - time.Second)
 	params, err := structpb.NewStruct(map[string]any{
-		"source_type": "shipping-release",
-		"task_group":  "shipment_release",
-		"limit":       float64(25),
+		"keyword":         " SHIP- ",
+		"source_type":     "shipping-release",
+		"task_group":      "shipment_release",
+		"task_status_key": "ready",
+		"owner_role_key":  biz.WarehouseRoleKey,
+		"due_from":        float64(dueFrom.Unix()),
+		"due_to":          float64(dueTo.Unix()),
+		"limit":           float64(25),
+		"offset":          float64(50),
 	})
 	if err != nil {
 		t.Fatalf("build params failed: %v", err)
@@ -882,6 +940,16 @@ func TestJsonrpcDispatcher_WorkflowListTasksPassesTaskGroupFilter(t *testing.T) 
 	}
 	if repo.listTaskFilter.Limit != 25 {
 		t.Fatalf("expected limit 25, got %d", repo.listTaskFilter.Limit)
+	}
+	if repo.listTaskFilter.Offset != 50 || repo.listTaskFilter.Keyword != "SHIP-" {
+		t.Fatalf("expected server page/keyword filters, got %#v", repo.listTaskFilter)
+	}
+	if repo.listTaskFilter.TaskStatusKey != "ready" || repo.listTaskFilter.OwnerRoleKey != biz.WarehouseRoleKey {
+		t.Fatalf("expected status/owner filters, got %#v", repo.listTaskFilter)
+	}
+	if repo.listTaskFilter.DueFrom == nil || !repo.listTaskFilter.DueFrom.Equal(dueFrom) ||
+		repo.listTaskFilter.DueTo == nil || !repo.listTaskFilter.DueTo.Equal(dueTo) {
+		t.Fatalf("expected due range filters, got %#v", repo.listTaskFilter)
 	}
 	visibilityScope := repo.listTaskFilter.VisibilityScope
 	if visibilityScope == nil || len(visibilityScope.StandaloneVisibleOwnerRoleKeys) != 1 || visibilityScope.StandaloneVisibleOwnerRoleKeys[0] != biz.WarehouseRoleKey {

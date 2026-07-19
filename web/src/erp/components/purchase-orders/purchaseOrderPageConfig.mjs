@@ -4,8 +4,8 @@ import {
   closePurchaseOrder,
   submitPurchaseOrder,
 } from '../../api/masterDataOrderApi.mjs'
-import { decimalNumber } from '../../utils/businessLineItems.mjs'
 import { isDraftSourceDocument } from '../../utils/sourceDocumentEditing.mjs'
+import { buildPurchaseInboundDraftPreviewRows } from '../../utils/purchaseOrderInboundPreview.mjs'
 import {
   PURCHASE_ORDER_STATUS_LABELS,
   statusText,
@@ -89,57 +89,7 @@ export function workflowPayloadOf(task = {}) {
   return task.payload && typeof task.payload === 'object' ? task.payload : {}
 }
 
-function referenceName(options, id, fallbackLabel = '记录') {
-  const option = (Array.isArray(options) ? options : []).find(
-    (item) => String(item.value) === String(id)
-  )
-  return option?.label || (id ? `${fallbackLabel}已关联` : '-')
-}
-
-export function buildInboundDraftPreviewRows({
-  orderItems = [],
-  receipts = [],
-  materialOptions = [],
-  unitOptions = [],
-}) {
-  const receivedByOrderItemID = new Map()
-  receipts
-    .filter((receipt) => String(receipt?.status || '') !== 'CANCELLED')
-    .forEach((receipt) => {
-      const receiptItems = receipt?.items || []
-      receiptItems.forEach((item) => {
-        const sourceItemID = Number(item?.purchase_order_item_id || 0)
-        if (!sourceItemID) return
-        const current = receivedByOrderItemID.get(sourceItemID) || 0
-        receivedByOrderItemID.set(
-          sourceItemID,
-          current + decimalNumber(item?.quantity)
-        )
-      })
-    })
-
-  return orderItems
-    .filter((item) => String(item?.line_status || 'open') === 'open')
-    .map((item) => {
-      const purchasedQuantity = decimalNumber(item?.purchased_quantity)
-      const receivedQuantity = receivedByOrderItemID.get(Number(item?.id)) || 0
-      const remainingQuantity = Math.max(
-        0,
-        purchasedQuantity - receivedQuantity
-      )
-      const disabledReason = remainingQuantity <= 0 ? '已全部生成入库' : ''
-      return {
-        key: item.id || item.line_no,
-        lineNo: item.line_no,
-        material: referenceName(materialOptions, item.material_id, '材料'),
-        unit: referenceName(unitOptions, item.unit_id, '单位'),
-        purchasedQuantity,
-        receivedQuantity,
-        remainingQuantity,
-        disabledReason,
-      }
-    })
-}
+export const buildInboundDraftPreviewRows = buildPurchaseInboundDraftPreviewRows
 
 export function getSingleSelectedPurchaseOrder({
   selectedOrder,

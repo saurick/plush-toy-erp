@@ -52,6 +52,7 @@ var (
 	ErrProductionOrderMaterialRequirementsNeedReview = errors.New("production order material requirements need review")
 	ErrProductionOrderMaterialIssueQuantityExceeded  = errors.New("production order material issue quantity exceeded")
 	ErrProductionOrderHasPostedFacts                 = errors.New("production order has posted facts")
+	ErrProductionOrderFactDependency                 = errors.New("production order has unsettled facts")
 	ErrProductionOrderCloseReasonRequired            = errors.New("production order close reason required")
 	ErrProductionOrderSchedulingTaskRequired         = errors.New("production order scheduling task required")
 	ErrProductionOrderSchedulingTaskActive           = errors.New("production order scheduling task active")

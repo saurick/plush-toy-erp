@@ -5,13 +5,19 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"strings"
 	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
+	"server/internal/data/model/ent/purchaseorder"
+	"server/internal/data/model/ent/salesorder"
+	"server/internal/data/model/ent/shipment"
 
+	"entgo.io/ent/dialect"
+	entsql "entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 )
 
@@ -29,6 +35,7 @@ func NewProcessRuntimeRepo(d *Data, logger log.Logger) *processRuntimeRepo {
 
 var _ biz.ProcessRuntimeRepo = (*processRuntimeRepo)(nil)
 var _ biz.ProcessRuntimeDomainCommandResultRepo = (*processRuntimeRepo)(nil)
+var _ biz.ProcessRuntimeSourceCreateRepo = (*processRuntimeRepo)(nil)
 
 func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
 	if in == nil || !biz.IsCreatableProcessStatus(in.Status) {
@@ -59,6 +66,34 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 	}
 	defer rollbackEntTx(ctx, tx, r.log)
 
+	row, nodes, err := createProcessInstanceRowsInTx(ctx, tx, in, actorID)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			existing, existingNodes, findErr := r.getProcessInstanceByBusinessRef(ctx, in.ProcessKey, in.BusinessRefType, in.BusinessRefID)
+			if findErr == nil && existing.IdempotencyKey == in.IdempotencyKey {
+				if processInstanceMatchesCreate(existing, existingNodes, in) {
+					return existing, existingNodes, nil
+				}
+				return nil, nil, biz.ErrIdempotencyConflict
+			}
+			return nil, nil, biz.ErrProcessInstanceExists
+		}
+		return nil, nil, err
+	}
+
+	if err := tx.Commit(); err != nil {
+		return nil, nil, err
+	}
+	tx = nil
+	return entProcessInstanceToBiz(row), nodes, nil
+}
+
+func createProcessInstanceRowsInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	in *biz.ProcessInstanceCreate,
+	actorID int,
+) (*ent.ProcessInstance, []*biz.ProcessNodeInstance, error) {
 	builder := tx.ProcessInstance.Create().
 		SetProcessKey(in.ProcessKey).
 		SetProcessVersion(in.ProcessVersion).
@@ -77,16 +112,6 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 	}
 	row, err := builder.Save(ctx)
 	if err != nil {
-		if ent.IsConstraintError(err) {
-			existing, existingNodes, findErr := r.getProcessInstanceByBusinessRef(ctx, in.ProcessKey, in.BusinessRefType, in.BusinessRefID)
-			if findErr == nil && existing.IdempotencyKey == in.IdempotencyKey {
-				if processInstanceMatchesCreate(existing, existingNodes, in) {
-					return existing, existingNodes, nil
-				}
-				return nil, nil, biz.ErrIdempotencyConflict
-			}
-			return nil, nil, biz.ErrProcessInstanceExists
-		}
 		return nil, nil, err
 	}
 
@@ -106,18 +131,174 @@ func (r *processRuntimeRepo) CreateProcessInstance(ctx context.Context, in *biz.
 			SetNillableDueAt(nodeIn.DueAt)
 		node, err := nodeBuilder.Save(ctx)
 		if err != nil {
-			if ent.IsConstraintError(err) {
-				return nil, nil, biz.ErrProcessInstanceExists
-			}
 			return nil, nil, err
 		}
 		nodes = append(nodes, entProcessNodeInstanceToBiz(node))
 	}
+	return row, nodes, nil
+}
 
+func (r *processRuntimeRepo) CreateProcessInstanceFromSource(
+	ctx context.Context,
+	in *biz.ProcessInstanceCreate,
+	actorID int,
+) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
+	if in == nil || !biz.IsCreatableProcessStatus(in.Status) || r == nil || r.data == nil || r.data.postgres == nil {
+		return nil, nil, biz.ErrBadParam
+	}
+	for i := range in.Nodes {
+		if !biz.IsCreatableProcessNodeStatus(in.Nodes[i].Status) {
+			return nil, nil, biz.ErrBadParam
+		}
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+
+	refNo, sourceStatus, err := r.lockProcessSourceInTx(ctx, tx, in)
+	if err != nil {
+		return nil, nil, err
+	}
+	canonical := *in
+	canonical.BusinessRefNo = &refNo
+
+	existing, existingNodes, err := r.getProcessInstanceByBusinessRefInTx(ctx, tx, canonical.ProcessKey, canonical.BusinessRefType, canonical.BusinessRefID)
+	if err == nil {
+		if !processSourceStatusAllowed(&canonical, sourceStatus, true) {
+			return nil, nil, biz.ErrBadParam
+		}
+		if existing.IdempotencyKey != canonical.IdempotencyKey {
+			return nil, nil, biz.ErrProcessInstanceExists
+		}
+		if !processInstanceMatchesCreate(existing, existingNodes, &canonical) {
+			return nil, nil, biz.ErrIdempotencyConflict
+		}
+		return existing, existingNodes, nil
+	}
+	if !errors.Is(err, biz.ErrProcessInstanceNotFound) {
+		return nil, nil, err
+	}
+	if !processSourceStatusAllowed(&canonical, sourceStatus, false) {
+		return nil, nil, biz.ErrBadParam
+	}
+
+	row, nodes, err := createProcessInstanceRowsInTx(ctx, tx, &canonical, actorID)
+	if err != nil {
+		if ent.IsConstraintError(err) {
+			return nil, nil, biz.ErrProcessInstanceExists
+		}
+		return nil, nil, err
+	}
 	if err := tx.Commit(); err != nil {
 		return nil, nil, err
 	}
 	tx = nil
+	return entProcessInstanceToBiz(row), nodes, nil
+}
+
+func (r *processRuntimeRepo) lockProcessSourceInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	in *biz.ProcessInstanceCreate,
+) (string, string, error) {
+	lock := func(selector *entsql.Selector) {
+		if r.data.sqlDialect == dialect.Postgres {
+			selector.ForUpdate()
+		}
+	}
+	switch {
+	case in.ProcessKey == biz.ProcessKeySalesOrderAcceptance && in.BusinessRefType == "sales_order":
+		row, err := tx.SalesOrder.Query().Where(salesorder.ID(in.BusinessRefID)).Where(lock).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return "", "", biz.ErrSalesOrderNotFound
+			}
+			return "", "", err
+		}
+		return requiredProcessSourceNo(row.OrderNo, row.LifecycleStatus)
+	case in.ProcessKey == biz.ProcessKeyMaterialSupply && in.BusinessRefType == "purchase_order":
+		row, err := tx.PurchaseOrder.Query().Where(purchaseorder.ID(in.BusinessRefID)).Where(lock).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return "", "", biz.ErrPurchaseOrderNotFound
+			}
+			return "", "", err
+		}
+		return requiredProcessSourceNo(row.PurchaseOrderNo, row.LifecycleStatus)
+	case in.ProcessKey == biz.ProcessKeyFinishedGoodsDelivery && in.BusinessRefType == "shipment":
+		row, err := tx.Shipment.Query().Where(shipment.ID(in.BusinessRefID)).Where(lock).Only(ctx)
+		if err != nil {
+			if ent.IsNotFound(err) {
+				return "", "", biz.ErrShipmentNotFound
+			}
+			return "", "", err
+		}
+		return requiredProcessSourceNo(row.ShipmentNo, row.Status)
+	default:
+		return "", "", biz.ErrBadParam
+	}
+}
+
+func requiredProcessSourceNo(refNo, status string) (string, string, error) {
+	refNo = strings.TrimSpace(refNo)
+	status = strings.TrimSpace(status)
+	if refNo == "" || status == "" {
+		return "", "", biz.ErrBadParam
+	}
+	return refNo, status, nil
+}
+
+func processSourceStatusAllowed(in *biz.ProcessInstanceCreate, status string, replay bool) bool {
+	if in == nil {
+		return false
+	}
+	switch {
+	case in.ProcessKey == biz.ProcessKeySalesOrderAcceptance && in.BusinessRefType == "sales_order":
+		return status == biz.SalesOrderStatusDraft || (replay && status == biz.SalesOrderStatusSubmitted)
+	case in.ProcessKey == biz.ProcessKeyMaterialSupply && in.BusinessRefType == "purchase_order":
+		return status == biz.PurchaseOrderStatusApproved
+	case in.ProcessKey == biz.ProcessKeyFinishedGoodsDelivery && in.BusinessRefType == "shipment":
+		return status == biz.ShipmentStatusDraft || (replay && status == biz.ShipmentStatusShipped)
+	default:
+		return false
+	}
+}
+
+func (r *processRuntimeRepo) getProcessInstanceByBusinessRefInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	processKey string,
+	businessRefType string,
+	businessRefID int,
+) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
+	query := tx.ProcessInstance.Query().Where(
+		processinstance.ProcessKey(processKey),
+		processinstance.BusinessRefType(businessRefType),
+		processinstance.BusinessRefID(businessRefID),
+	)
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *entsql.Selector) { selector.ForUpdate() })
+	}
+	row, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, nil, biz.ErrProcessInstanceNotFound
+		}
+		return nil, nil, err
+	}
+	nodeRows, err := tx.ProcessNodeInstance.Query().
+		Where(processnodeinstance.ProcessInstanceID(row.ID)).
+		Order(ent.Asc(processnodeinstance.FieldID)).
+		All(ctx)
+	if err != nil {
+		return nil, nil, err
+	}
+	nodes := make([]*biz.ProcessNodeInstance, 0, len(nodeRows))
+	for _, node := range nodeRows {
+		nodes = append(nodes, entProcessNodeInstanceToBiz(node))
+	}
 	return entProcessInstanceToBiz(row), nodes, nil
 }
 

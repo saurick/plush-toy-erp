@@ -179,8 +179,19 @@ func TestInventoryRepo_PurchaseReceiptAdjustmentQuantityLifecycleAndProtection(t
 	if err != nil {
 		t.Fatalf("create draft adjustment for cancel guard failed: %v", err)
 	}
-	if _, err := uc.CancelPostedPurchaseReceiptAdjustment(ctx, draftToCancel.ID); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("draft adjustment must not be cancellable, got %v", err)
+	draftCancelled, err := uc.CancelPostedPurchaseReceiptAdjustment(ctx, draftToCancel.ID)
+	if err != nil || draftCancelled.Status != biz.PurchaseReceiptAdjustmentStatusCancelled || draftCancelled.PostedAt != nil {
+		t.Fatalf("cancel draft receipt adjustment = %#v, err=%v", draftCancelled, err)
+	}
+	if _, err := uc.CancelPostedPurchaseReceiptAdjustment(ctx, draftToCancel.ID); err != nil {
+		t.Fatalf("repeat cancel draft receipt adjustment failed: %v", err)
+	}
+	draftTxnCount, err := client.InventoryTxn.Query().Where(
+		inventorytxn.SourceType(biz.PurchaseReceiptAdjustmentSourceType),
+		inventorytxn.SourceID(draftToCancel.ID),
+	).Count(ctx)
+	if err != nil || draftTxnCount != 0 {
+		t.Fatalf("draft receipt adjustment cancellation inventory txn count=%d, err=%v", draftTxnCount, err)
 	}
 
 	cancelled, err := uc.CancelPostedPurchaseReceiptAdjustment(ctx, adjustment.ID)

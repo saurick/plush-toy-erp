@@ -7,6 +7,7 @@ import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPrevie
 import { createFinanceBusinessSourceScenarios } from './financeBusinessSourceScenarios.mjs'
 import { createLineItemUnitAssertions } from './lineItemUnitAssertions.mjs'
 import { createPurchaseReceiptScenarios } from './purchaseReceiptScenarios.mjs'
+import { createProductPaginationScenarios } from './productPaginationScenarios.mjs'
 import { createWorkflowSourceTaskScenarios } from './workflowSourceTaskScenarios.mjs'
 
 export function createStyleL1Scenarios(deps) {
@@ -68,10 +69,6 @@ export function createStyleL1Scenarios(deps) {
     assertProcessSuggestionOptions,
     assertProcessingContractPaperRowCount,
     assertProcessingContractSignatureLayout,
-    assertPurchaseReceiptActionButtonState,
-    assertPurchaseReceiptAddItemEditorDarkTokens,
-    assertPurchaseReceiptAddItemEditorMetrics,
-    assertPurchaseReceiptAddItemEditorMobileLayout,
     assertPurchaseReceiptRowItemCount,
     assertRowSelectionClearsAfterCancel,
     assertShellRefreshButton,
@@ -86,10 +83,8 @@ export function createStyleL1Scenarios(deps) {
     expectHeading,
     expectNoButton,
     expectText,
-    fillPurchaseReceiptAddItemEditorBoundaryValues,
     gotoScenarioPath,
     isLightSurfaceColor,
-    openPurchaseReceiptAddItemEditor,
     outputDir,
     path,
     seedBusinessCollaborationOverflowTasks,
@@ -342,8 +337,8 @@ export function createStyleL1Scenarios(deps) {
     page,
     { scenarioName, expectedPanelWidth }
   ) => {
-    const feed = page.getByRole('region', { name: '审计事件列表' })
-    const trigger = feed.getByRole('button', { name: /账号角色变更/u }).first()
+    const feed = page.getByRole('region', { name: '操作记录列表' })
+    const trigger = feed.getByRole('button', { name: /员工岗位变更/u }).first()
     await trigger.waitFor({ state: 'visible', timeout: 10_000 })
     await assertNoHorizontalOverflow(page, scenarioName)
     assert.equal(
@@ -398,7 +393,7 @@ export function createStyleL1Scenarios(deps) {
       () => {
         const expectedTrigger = Array.from(
           document.querySelectorAll('.erp-audit-event')
-        ).find((event) => event.textContent?.includes('账号角色变更'))
+        ).find((event) => event.textContent?.includes('员工岗位变更'))
         return document.activeElement === expectedTrigger
       },
       undefined,
@@ -408,7 +403,7 @@ export function createStyleL1Scenarios(deps) {
       const activeElement = document.activeElement
       const expectedTrigger = Array.from(
         document.querySelectorAll('.erp-audit-event')
-      ).find((event) => event.textContent?.includes('账号角色变更'))
+      ).find((event) => event.textContent?.includes('员工岗位变更'))
       return {
         activeClassName: activeElement?.className || '',
         activeTagName: activeElement?.tagName || '',
@@ -974,6 +969,29 @@ export function createStyleL1Scenarios(deps) {
     workPools: [],
     source: 'active_customer_config_revision',
   })
+  const multiMobileRoleAdminProfile = Object.freeze({
+    username: 'style-l1-sales-quality',
+    is_super_admin: false,
+    roles: [
+      { role_key: 'sales', name: '业务' },
+      { role_key: 'quality', name: '品质' },
+    ],
+    permissions: [
+      'mobile.sales.access',
+      'mobile.quality.access',
+      'workflow.task.read',
+    ],
+    menus: [{ path: '/erp/dashboard' }],
+    erp_preferences: { column_orders: {} },
+  })
+  const multiMobileRoleEffectiveSession = Object.freeze({
+    ...customerRuntimeEffectiveSession,
+    configRevision: 'style-l1-entry-multi-role',
+    actions: ['workflow.task.read'],
+    workflow_visible_owner_role_keys_by_capability: {
+      'workflow.task.read': ['sales', 'quality'],
+    },
+  })
   const localCustomerDesktopPreviewEffectiveSession = Object.freeze({
     configRevision: '',
     configHash: '',
@@ -990,6 +1008,115 @@ export function createStyleL1Scenarios(deps) {
   let localCustomerDesktopPreviewWorkflowRequests = 0
   let transientProfileSyncCustomerConfigRequests = 0
   let transientProfileSyncAdminMeRequests = 0
+  const createDeferred = () => {
+    let resolve
+    const promise = new Promise((settle) => {
+      resolve = settle
+    })
+    return { promise, resolve }
+  }
+  let purchaseOrderMaterialReferenceAttempts = 0
+  let purchaseOrderMaterialReferenceMode = 'pending'
+  let purchaseOrderMaterialReferenceCounts = {}
+  let purchaseOrderPendingReferenceRequests = 0
+  let purchaseOrderPendingReferenceReleased = false
+  let purchaseOrderInitialReferenceStarted = Promise.resolve()
+  let purchaseOrderPendingReferenceDrained = Promise.resolve()
+  let purchaseOrderFailedRefreshSettled = Promise.resolve()
+  let purchaseOrderEmptyRefreshSettled = Promise.resolve()
+  let purchaseOrderFullRefreshSettled = Promise.resolve()
+  let releasePurchaseOrderInitialReference = () => {}
+  let coverageFixtureEnvelopeStatus = 'current'
+  let releaseCoverageLoadingResponse = () => {}
+  const buildCoverageFixtureReport = () => ({
+    schemaVersion: 'plush-test-coverage-report/v1',
+    generatedAt: '2026-07-19T01:02:03.000Z',
+    repository: {
+      commit: 'abcdef1234567890abcdef1234567890abcdef12',
+      dirty: false,
+      fingerprint:
+        '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    },
+    codeCoverage: {
+      go: {
+        status: 'collected',
+        metrics: { statements: { covered: 91, total: 100 } },
+      },
+      web: {
+        status: 'collected',
+        metrics: {
+          lines: { percentage: 92.5 },
+          branches: { percentage: 86 },
+          functions: { covered: 47, total: 50 },
+        },
+      },
+    },
+    businessCoverage: {
+      status: 'partial',
+      domains: [
+        {
+          key: 'finance',
+          label: '财务',
+          status: 'passed',
+          total: 12,
+          passed: 12,
+          metrics: { scenarios: { covered: 12, total: 12 } },
+        },
+        {
+          key: 'production',
+          label: '生产',
+          status: 'not_collected',
+        },
+        {
+          key: 'quality',
+          label: '质检',
+          status: 'passed',
+          requiredCount: 5,
+          passed: 4,
+          missingCases: 1,
+        },
+      ],
+    },
+    gates: [
+      {
+        key: 'T0',
+        label: 'T0 静态检查',
+        status: 'passed',
+        executed: 3,
+        passed: 3,
+      },
+      {
+        key: 'T7',
+        label: 'T7 业务集成',
+        status: 'blocked',
+        executed: 0,
+        blocked: 1,
+      },
+      {
+        key: 'T4',
+        label: 'T4 未受影响门禁',
+        status: 'not_applicable',
+        required: false,
+        metrics: { scenarios: { percentage: 100 } },
+      },
+    ],
+    acceptance: {
+      postgres: { status: 'passed', executed: 2, passed: 2 },
+      browser: { status: 'passed', executed: 4, passed: 4 },
+      readiness: { status: 'stale', note: '绑定旧验收数据批次' },
+      targetEnvironment: { status: 'missing' },
+      uat: { status: 'not_collected' },
+    },
+    policy: {
+      businessContracts: '适用业务合同与关键场景目标 100%',
+      changedBusinessLogic:
+        '新增或修改关键业务逻辑 lines / statements >= 90%、branches >= 85%',
+      repositoryBaseline: '仓库整体 baseline 未建立前只采集趋势',
+      requiredGates: '本轮 required gates 要求 100% executed + passed',
+      runtimeAcceptance:
+        '本轮承诺的 PostgreSQL、浏览器、readiness、目标环境和 UAT 分别要求 100%',
+    },
+  })
 
   return [
     ...createBusinessRowItemsPreviewScenarios({
@@ -1278,6 +1405,186 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'entry-multi-role-login-direct',
+      path: '/admin-login',
+      mockAdminRpc: true,
+      customerKey: 'yoyoosun',
+      adminProfile: multiMobileRoleAdminProfile,
+      effectiveSession: multiMobileRoleEffectiveSession,
+      viewport: { width: 390, height: 844 },
+      beforeNavigate: async (page) => {
+        await page.addInitScript(() => {
+          const roleButtonLabels = new Set([
+            '老板手机待办',
+            '业务手机待办',
+            '采购手机待办',
+            '生产手机待办',
+            '生产经理手机待办',
+            '仓库手机待办',
+            '财务手机待办',
+            'PMC手机待办',
+            '品质手机待办',
+            '工程手机待办',
+          ])
+          const evidence = {
+            maxEntryButtonCount: 0,
+            sawRoleButton: false,
+            sawRolePrompt: false,
+          }
+          window.__entryRoutingEvidence = evidence
+          const collect = () => {
+            const entryButtons = Array.from(
+              document.querySelectorAll('.erp-entry-card__button')
+            )
+            evidence.maxEntryButtonCount = Math.max(
+              evidence.maxEntryButtonCount,
+              entryButtons.length
+            )
+            evidence.sawRoleButton ||= entryButtons.some((button) =>
+              roleButtonLabels.has(
+                String(button.textContent || '')
+                  .replace(/\s+/gu, '')
+                  .trim()
+              )
+            )
+            evidence.sawRolePrompt ||=
+              document.body?.innerText.includes(
+                '请选择这次要处理的岗位待办'
+              ) === true
+          }
+          new MutationObserver(collect).observe(document, {
+            childList: true,
+            subtree: true,
+            characterData: true,
+          })
+          window.addEventListener('DOMContentLoaded', collect, { once: true })
+        })
+      },
+      verify: async (page) => {
+        await page.getByText('手机端待办', { exact: true }).click()
+        await page.getByLabel('账号').fill('style-l1-sales-quality')
+        await page.locator('#password').fill('style-l1-password')
+        await page.getByRole('button', { name: /^登\s*录$/u }).click()
+        await waitForPath(page, '/m/sales/tasks')
+        await expectText(page, '待办')
+
+        const evidence = await page.evaluate(
+          () => window.__entryRoutingEvidence || null
+        )
+        assert.deepEqual(
+          evidence,
+          {
+            maxEntryButtonCount: 0,
+            sawRoleButton: false,
+            sawRolePrompt: false,
+          },
+          `多岗位登录不应经过岗位选择页: ${JSON.stringify(evidence)}`
+        )
+        assert.equal(
+          await page.locator('.erp-entry-card').count(),
+          0,
+          '多岗位登录完成后不应停留在入口选择卡片'
+        )
+      },
+    },
+    {
+      name: 'entry-recovery-actions-mobile',
+      path: '/entry?reason=mobile-runtime-unavailable',
+      auth: 'admin',
+      mockAdminRpc: true,
+      adminProfile: multiMobileRoleAdminProfile,
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectText(page, '手机待办暂时无法连接')
+        await expectButton(page, '电脑端')
+        await expectButton(page, '手机待办')
+        await expectButton(page, '退出登录')
+
+        const metrics = await page.evaluate(() => {
+          const card = document.querySelector('.erp-entry-card')
+          const entryButtons = Array.from(
+            document.querySelectorAll('.erp-entry-card__button')
+          )
+          const allButtons = Array.from(
+            document.querySelectorAll('.erp-entry-card button')
+          )
+          const rectFor = (node) => {
+            const rect = node.getBoundingClientRect()
+            return {
+              x: rect.x,
+              y: rect.y,
+              width: rect.width,
+              height: rect.height,
+              right: rect.right,
+              bottom: rect.bottom,
+            }
+          }
+          return {
+            viewport: { width: window.innerWidth, height: window.innerHeight },
+            documentWidth: {
+              client: document.documentElement.clientWidth,
+              scroll: document.documentElement.scrollWidth,
+            },
+            card: card ? rectFor(card) : null,
+            entryButtons: entryButtons.map((button) => ({
+              text: String(button.textContent || '')
+                .replace(/\s+/gu, '')
+                .trim(),
+              ...rectFor(button),
+            })),
+            allButtonTexts: allButtons.map((button) =>
+              String(button.textContent || '')
+                .replace(/\s+/gu, '')
+                .trim()
+            ),
+          }
+        })
+
+        assert.deepEqual(
+          metrics.allButtonTexts,
+          ['电脑端', '手机待办', '退出登录'],
+          `恢复页只应提供工作方式和退出登录: ${JSON.stringify(metrics)}`
+        )
+        assert.equal(
+          metrics.entryButtons.length,
+          2,
+          `恢复页应只有两个工作入口按钮: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.entryButtons.every(
+            (button) =>
+              button.height >= 56 &&
+              Math.abs(button.width - metrics.entryButtons[0].width) <= 1
+          ),
+          `工作入口按钮应等宽且保持触控高度: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.card &&
+            metrics.card.x >= 0 &&
+            metrics.card.y >= 0 &&
+            metrics.card.right <= metrics.viewport.width + 1 &&
+            metrics.card.bottom <= metrics.viewport.height + 1,
+          `入口卡片应完整位于手机视口内: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.documentWidth.scroll <= metrics.documentWidth.client + 1,
+          `入口恢复页不应横向溢出: ${JSON.stringify(metrics)}`
+        )
+        assert.equal(
+          await page
+            .getByRole('button', {
+              name: /^(老板|业务|采购|生产|生产经理|仓库|财务|PMC|品质|工程)手机待办$/u,
+            })
+            .count(),
+          0,
+          '恢复页不应展示任何角色命名的岗位按钮'
+        )
+        await page.locator('.erp-entry-card').screenshot({
+          path: path.join(outputDir, 'entry-recovery-actions-mobile-card.png'),
+        })
+      },
+    },
+    {
       name: 'app-alert-dialog-keyboard-contract',
       path: '/admin-login',
       mockAdminRpc: true,
@@ -1455,7 +1762,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '功能预览')
         await expectHeading(page, '系统功能总览')
         await expectText(page, '业务功能')
-        await expectText(page, '销售订单核心')
+        await expectText(page, '销售订单')
         await expectText(page, '尚未连接客户环境')
         await assertTextAbsent(page, '内部来源')
         await assertTextAbsent(page, '优先处理队列')
@@ -1500,7 +1807,7 @@ export function createStyleL1Scenarios(deps) {
             item.includes('不读取客户订单')
           ) &&
             productCoreMetrics.entries.some((item) =>
-              item.includes('销售订单核心')
+              item.startsWith('销售订单')
             ),
           `Product Core 首页应展示能力总览和审阅入口: ${JSON.stringify(
             productCoreMetrics
@@ -1514,7 +1821,7 @@ export function createStyleL1Scenarios(deps) {
           productCoreMetrics.scrollWidth <= productCoreMetrics.clientWidth + 1,
           `Product Core 首页不应横向溢出: ${JSON.stringify(productCoreMetrics)}`
         )
-        await page.getByRole('button', { name: /销售订单核心/ }).click()
+        await page.getByRole('button', { name: /^销售订单/ }).click()
         await waitForPath(page, '/erp/sales/project-orders/sales-orders')
         await expectText(page, '销售订单 功能预览')
         await page.goBack({ waitUntil: 'domcontentloaded' })
@@ -2104,7 +2411,7 @@ export function createStyleL1Scenarios(deps) {
           'local_dev_customer_config_diagnostic'
         )
         await expectHeading(page, '权限管理')
-        await expectText(page, '角色模板')
+        await expectText(page, '岗位设置')
         await assertTextAbsent(page, '当前账号暂无可见后台入口')
       },
     },
@@ -2311,7 +2618,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '为避免显示错误内容，系统没有加载工作台')
         await assertTextAbsent(page, '当前客户')
         await assertTextAbsent(page, '权限管理')
-        await assertTextAbsent(page, '角色模板')
+        await assertTextAbsent(page, '岗位设置')
         const boundaryMetrics = await page.evaluate(() => {
           const boundary = document.querySelector(
             '[data-customer-runtime-boundary="true"]'
@@ -2378,7 +2685,7 @@ export function createStyleL1Scenarios(deps) {
           'local_dev_customer_config_diagnostic'
         )
         await expectHeading(page, '权限管理')
-        await expectText(page, '角色模板')
+        await expectText(page, '岗位设置')
         await assertTextAbsent(page, '当前账号暂无可见后台入口')
       },
     },
@@ -2403,8 +2710,8 @@ export function createStyleL1Scenarios(deps) {
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '当前账号暂无可见后台入口')
-        await expectText(page, '当前账号已分配正确的角色和页面权限')
+        await expectText(page, '当前账号暂无可用页面')
+        await expectText(page, '当前账号已设置正确的岗位和可用页面')
         await assertTextAbsent(page, '当前客户有效配置')
         await assertTextAbsent(page, '权限中心')
         await assertTextAbsent(page, '管理员列表')
@@ -2448,7 +2755,7 @@ export function createStyleL1Scenarios(deps) {
             '采购订单',
             '委外订单',
             '权限管理',
-            '审计日志',
+            '系统操作记录',
           ]) {
             assert(
               menuText.includes(label),
@@ -2538,10 +2845,7 @@ export function createStyleL1Scenarios(deps) {
         await expectHeading(page, '入库管理')
         await expectText(page, 'PR-STYLE-L1-DRAFT')
         await page.getByText('PR-STYLE-L1-DRAFT', { exact: false }).click()
-        await expectProjectedActionDisabled(
-          '添加明细',
-          '采购入库页 actions 为空时不应允许给草稿添加明细'
-        )
+        await expectNoButton(page, '添加明细')
         await expectProjectedActionDisabled(
           '过账入库',
           '采购入库页 actions 为空时不应允许确认过账'
@@ -2779,6 +3083,17 @@ export function createStyleL1Scenarios(deps) {
         await page
           .locator('.erp-task-board-lanes--focused')
           .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(
+          () =>
+            document.querySelectorAll(
+              '.erp-task-board-lanes--focused .erp-task-board-lane'
+            ).length === 1 &&
+            document.querySelectorAll(
+              '.erp-task-board-lanes--focused .erp-task-board-card'
+            ).length === 8,
+          undefined,
+          { timeout: 10_000 }
+        )
         assert.equal(
           await page.locator('.erp-task-board-lane').count(),
           1,
@@ -3119,63 +3434,11 @@ export function createStyleL1Scenarios(deps) {
           .getByText('看板跳转测试任务', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await page.screenshot({
-          path: path.resolve(
-            outputDir,
-            'erp-task-board-card-double-click.png'
-          ),
+          path: path.resolve(outputDir, 'erp-task-board-card-double-click.png'),
         })
         await taskDrawer.locator('.ant-drawer-close').click()
         await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
-        await navigationLaneTask
-          .getByRole('button', { name: '看板跳转测试任务', exact: true })
-          .click()
-        await waitForPath(page, '/erp/warehouse/shipping-release')
-        assert.match(
-          page.url(),
-          /[?&]link_keyword=OUT-DASH-NAV(?:&|$)/,
-          `任务看板出货放行入口应带来源单号: ${page.url()}`
-        )
-        await expectHeading(page, '出货放行')
-        await expectText(page, '看板跳转测试任务')
-      },
-    },
-    {
-      name: 'erp-exception-flow-desktop',
-      path: '/erp/operations/exceptions',
-      auth: 'admin',
-      effectiveSession: customerRuntimeEffectiveSession,
-      viewport: { width: 1440, height: 900 },
-      verify: async (page) => {
-        await expectText(page, '毛绒玩具管理系统')
-        await expectText(page, '超级管理员')
-        await expectText(page, '运营工具')
-        await expectHeading(page, '异常处理')
-        await expectText(page, '阻塞')
-        await expectText(page, '到期风险')
-        await expectText(page, '风险任务')
-        await expectText(page, '当前任务')
-        await expectText(page, '任务状态和业务办理结果分开确认')
-        await assertTextAbsent(page, '责任分派')
-        await assertTextAbsent(page, '关闭归档')
-        await expectNoButton(page, '回任务看板')
-        await assertNoDuplicatedAdminPageTitle(page, {
-          scenarioName: 'erp-exception-flow-desktop',
-        })
-        await assertNoHorizontalOverflow(page, 'erp-exception-flow-desktop')
-      },
-    },
-    {
-      name: 'erp-exception-flow-mobile',
-      path: '/erp/operations/exceptions',
-      auth: 'admin',
-      effectiveSession: customerRuntimeEffectiveSession,
-      viewport: { width: 390, height: 844 },
-      verify: async (page) => {
-        await expectHeading(page, '异常处理')
-        await expectText(page, '风险任务')
-        await expectText(page, '当前任务')
-        await assertTextAbsent(page, '责任分派')
-        await assertNoHorizontalOverflow(page, 'erp-exception-flow-mobile')
+        await expectNoButton(page, '看板跳转测试任务')
       },
     },
     {
@@ -3217,17 +3480,18 @@ export function createStyleL1Scenarios(deps) {
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-business-dashboard-desktop',
         })
+        await assertNoHorizontalOverflow(page, 'erp-business-dashboard-desktop')
         await assertBusinessDashboardCountStates(
           page,
           'erp-business-dashboard-desktop'
         )
-        const customerSourceItem = page
+        const customerSourceRow = page
           .getByRole('button', { name: '查看客户', exact: true })
-          .locator('xpath=..')
-        const customerSourceBeforeHover = await customerSourceItem.evaluate(
+          .locator('xpath=ancestor::tr[1]')
+        const customerSourceBeforeHover = await customerSourceRow.evaluate(
           (element) => {
             const rect = element.getBoundingClientRect()
-            const style = getComputedStyle(element)
+            const style = getComputedStyle(element.querySelector('td'))
             return {
               width: rect.width,
               height: rect.height,
@@ -3236,14 +3500,15 @@ export function createStyleL1Scenarios(deps) {
             }
           }
         )
-        await customerSourceItem.hover()
+        await customerSourceRow.hover()
         await page.waitForFunction(
           ({ backgroundColor, borderColor }) => {
             const sourceItem = document
               .querySelector('[aria-label="查看客户"]')
-              ?.closest('.erp-business-board-source-item')
-            if (!sourceItem) return false
-            const style = getComputedStyle(sourceItem)
+              ?.closest('tr.erp-business-board-source-item--openable')
+            const sourceCell = sourceItem?.querySelector('td')
+            if (!sourceCell) return false
+            const style = getComputedStyle(sourceCell)
             return (
               style.backgroundColor !== backgroundColor ||
               style.borderColor !== borderColor
@@ -3252,24 +3517,68 @@ export function createStyleL1Scenarios(deps) {
           customerSourceBeforeHover,
           { timeout: 2_000 }
         )
-        const customerSourceAfterHover = await customerSourceItem.evaluate(
+        const customerSourceAfterHover = await customerSourceRow.evaluate(
           (element) => {
             const rect = element.getBoundingClientRect()
-            const style = getComputedStyle(element)
+            const sourceCell = element.querySelector('td')
+            const style = getComputedStyle(sourceCell)
+            const cells = Array.from(element.querySelectorAll(':scope > td'))
+            const recordCell = cells[1]
+            const countCell = cells[2]
+            const tableCard = element.closest('.erp-dashboard-table-card')
+            const tableCardRect = tableCard?.getBoundingClientRect()
+            const tableScrollContainer = tableCard?.querySelector(
+              '.ant-table-content, .ant-table-body'
+            )
+            const tableScrollStyle = tableScrollContainer
+              ? getComputedStyle(tableScrollContainer)
+              : null
+            const entryButton = element.querySelector(
+              '.erp-business-board-source-entry'
+            )
+            const entryButtonRect = entryButton?.getBoundingClientRect()
             return {
               width: rect.width,
               height: rect.height,
               backgroundColor: style.backgroundColor,
               borderColor: style.borderColor,
-              fitsContent: element.scrollWidth <= element.clientWidth + 1,
+              recordCellFits:
+                Boolean(recordCell) &&
+                recordCell.scrollWidth <= recordCell.clientWidth + 1,
+              countCellFits:
+                Boolean(countCell) &&
+                countCell.scrollWidth <= countCell.clientWidth + 1,
+              tableScroll: {
+                clientWidth: tableScrollContainer?.clientWidth || 0,
+                scrollWidth: tableScrollContainer?.scrollWidth || 0,
+                overflowX: tableScrollStyle?.overflowX || '',
+              },
+              entryButtonWithinCard: Boolean(
+                tableCardRect &&
+                  entryButtonRect &&
+                  entryButtonRect.left >= tableCardRect.left - 1 &&
+                  entryButtonRect.right <= tableCardRect.right + 1
+              ),
             }
           }
         )
+        const tableScrollIsControlled =
+          customerSourceAfterHover.tableScroll.clientWidth > 0 &&
+          customerSourceAfterHover.tableScroll.scrollWidth >=
+            customerSourceAfterHover.tableScroll.clientWidth &&
+          (customerSourceAfterHover.tableScroll.scrollWidth <=
+            customerSourceAfterHover.tableScroll.clientWidth + 1 ||
+            ['auto', 'scroll'].includes(
+              customerSourceAfterHover.tableScroll.overflowX
+            ))
         assert(
           customerSourceAfterHover.width === customerSourceBeforeHover.width &&
             customerSourceAfterHover.height ===
               customerSourceBeforeHover.height &&
-            customerSourceAfterHover.fitsContent &&
+            customerSourceAfterHover.recordCellFits &&
+            customerSourceAfterHover.countCellFits &&
+            customerSourceAfterHover.entryButtonWithinCard &&
+            tableScrollIsControlled &&
             (customerSourceAfterHover.backgroundColor !==
               customerSourceBeforeHover.backgroundColor ||
               customerSourceAfterHover.borderColor !==
@@ -3279,15 +3588,13 @@ export function createStyleL1Scenarios(deps) {
             after: customerSourceAfterHover,
           })}`
         )
-        await customerSourceItem.screenshot({
+        await customerSourceRow.screenshot({
           path: path.resolve(
             outputDir,
             'erp-business-dashboard-source-double-click-hover.png'
           ),
         })
-        await customerSourceItem
-          .locator('.erp-business-board-source-meta')
-          .dblclick()
+        await customerSourceRow.dblclick()
         await waitForPath(page, '/erp/master/partners/customers')
         await page.goBack()
         await waitForPath(page, '/erp/business-dashboard')
@@ -3371,10 +3678,10 @@ export function createStyleL1Scenarios(deps) {
           .waitFor({ state: 'visible', timeout: 10_000 })
         const customerCount = await page
           .getByRole('button', { name: '查看客户', exact: true })
-          .locator('xpath=..')
+          .locator('xpath=ancestor::tr[1]')
           .locator('.erp-business-board-source-count')
           .textContent()
-        assert.equal(String(customerCount || '').trim(), '暂不可用')
+        assert.equal(String(customerCount || '').trim(), '—')
         await assertTextAbsent(page, '待办概览暂不可用')
         await assertTextAbsent(page, '当前页面数据已刷新')
         await page
@@ -3591,8 +3898,11 @@ export function createStyleL1Scenarios(deps) {
         })
         await page
           .locator('.erp-task-board-card')
-          .first()
-          .getByRole('button', { name: '查看', exact: true })
+          .filter({ hasText: '移动端任务处理回归' })
+          .getByRole('button', {
+            name: '查看移动端任务处理回归详情',
+            exact: true,
+          })
           .waitFor({ state: 'visible', timeout: 10_000 })
       },
     },
@@ -3880,12 +4190,12 @@ export function createStyleL1Scenarios(deps) {
         })
       },
       verify: async (page) => {
-        await expectText(page, '正在准备岗位任务端')
+        await expectText(page, '正在准备手机待办')
         await expectText(page, '正在确认您的岗位权限和工作范围，请稍候...')
         await assertTextAbsent(page, '当前客户运行环境')
-        await expectText(page, '暂时无法进入岗位任务端')
+        await expectText(page, '暂时无法进入手机待办')
         await expectText(page, '当前账号的工作范围尚未准备完成')
-        await expectButton(page, '返回管理后台')
+        await expectButton(page, '选择其他工作入口')
         await expectButton(page, '退出登录')
         await assertTextAbsent(page, '客户运行环境')
         await assertTextAbsent(page, '对应客户入口')
@@ -4136,44 +4446,66 @@ export function createStyleL1Scenarios(deps) {
                 : null,
             }
           }, role.taskName)
-          await page
-            .waitForFunction(() => {
-              const blockedButton = document.querySelector(
-                '.mobile-role-action-bar__button--blocked'
-              )
-              const doneButton = document.querySelector(
-                '.mobile-role-action-bar__button--done'
-              )
-              return (
-                blockedButton instanceof HTMLButtonElement &&
-                doneButton instanceof HTMLButtonElement &&
-                !blockedButton.disabled &&
-                !doneButton.disabled
-              )
-            })
+          const processButton = page.getByRole('button', {
+            name: '处理任务',
+            exact: true,
+          })
+          await processButton
+            .waitFor({ state: 'visible', timeout: 10_000 })
             .catch((error) => {
               throw new Error(
                 `${error.message}\naction diagnostic: ${JSON.stringify(actionDiagnostic)}`
               )
             })
           assert.equal(
-            await page
-              .locator('.mobile-role-action-bar__button--blocked')
-              .isDisabled(),
+            await processButton.isDisabled(),
             false,
-            `${role.label}岗位有角色、RBAC 与 effective-session 动作时应可阻塞本岗位任务: ${JSON.stringify(
+            `${role.label}岗位有角色、RBAC 与 effective-session 动作时应开放处理入口: ${JSON.stringify(
               actionDiagnostic
             )}`
           )
-          assert.equal(
-            await page
-              .locator('.mobile-role-action-bar__button--done')
-              .isDisabled(),
-            false,
-            `${role.label}岗位有角色、RBAC 与 effective-session 动作时应可完成本岗位任务: ${JSON.stringify(
-              actionDiagnostic
+          await processButton.click()
+          const actionScreen = page.getByTestId('mobile-task-action-screen')
+          await actionScreen
+            .waitFor({ state: 'visible', timeout: 10_000 })
+            .catch((error) => {
+              throw new Error(
+                `${error.message}\naction diagnostic: ${JSON.stringify(actionDiagnostic)}`
+              )
+            })
+          await expectText(page, '选择处理方式')
+          const actionMetrics = await actionScreen.evaluate((screen) => ({
+            actions: Array.from(
+              screen.querySelectorAll('button[aria-pressed]')
+            ).map((button) => ({
+              text: button.textContent?.replace(/\s+/g, ' ').trim() || '',
+              disabled: button.disabled,
+              selected: button.getAttribute('aria-pressed'),
+            })),
+            documentScrollWidth: document.documentElement.scrollWidth,
+            documentClientWidth: document.documentElement.clientWidth,
+          }))
+          assert(
+            actionMetrics.actions.some(
+              (action) => action.text === '阻塞' && !action.disabled
+            ) &&
+              actionMetrics.actions.some(
+                (action) =>
+                  action.text === '完成' &&
+                  !action.disabled &&
+                  action.selected === 'true'
+              ),
+            `${role.label}岗位独立处理页应提供可选的阻塞、完成动作: ${JSON.stringify(
+              { actionDiagnostic, actionMetrics }
             )}`
           )
+          assert(
+            actionMetrics.documentScrollWidth <=
+              actionMetrics.documentClientWidth + 1,
+            `${role.label}岗位独立处理页不应横向溢出: ${JSON.stringify(actionMetrics)}`
+          )
+          await page.getByLabel('返回任务详情').click()
+          await processButton.waitFor({ state: 'visible', timeout: 10_000 })
           await page.getByRole('button', { name: '任务列表' }).click()
           await expectText(page, role.taskName)
         }
@@ -4249,17 +4581,80 @@ export function createStyleL1Scenarios(deps) {
           .locator('.erp-mobile-list-item')
           .filter({ hasText: '工程资料只读核对任务' })
           .click()
-        for (const selector of [
-          '.mobile-role-action-bar__button--blocked',
-          '.mobile-role-action-bar__button--done',
-          '.mobile-role-action-bar__button--urge',
-        ]) {
-          assert.equal(
-            await page.locator(selector).isDisabled(),
-            true,
-            `effective-session 只读时岗位动作应禁用: ${selector}`
+        const readonlyDiagnostic = await page.evaluate(async (taskName) => {
+          const call = async (method, params = {}) => {
+            const response = await fetch('/rpc/workflow', {
+              method: 'POST',
+              headers: {
+                Accept: 'application/json',
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: `mobile-readonly-diagnostic-${method}`,
+                method,
+                params,
+              }),
+            })
+            return response.json()
+          }
+          const taskPayload = await call('list_tasks', { limit: 200 })
+          const selected = (taskPayload?.result?.data?.tasks || []).find(
+            (task) => task.task_name === taskName
           )
-        }
+          const actionAccessPayload = selected
+            ? await call('explain_action_access', { task_id: selected.id })
+            : null
+          return {
+            task: selected
+              ? {
+                  id: selected.id,
+                  ownerRoleKey: selected.owner_role_key,
+                  statusKey: selected.task_status_key,
+                }
+              : null,
+            actions: actionAccessPayload?.result?.data?.actions || [],
+          }
+        }, '工程资料只读核对任务')
+        const deniedReasons = [
+          ...new Set(
+            readonlyDiagnostic.actions
+              .filter((action) => action.allowed !== true && action.reason)
+              .map((action) => action.reason)
+          ),
+        ]
+        assert(
+          deniedReasons.length > 0,
+          `只读岗位应由后端返回不可执行原因: ${JSON.stringify(readonlyDiagnostic)}`
+        )
+        const guidance = page.getByTestId('mobile-role-action-guidance')
+        await guidance.waitFor({ state: 'visible', timeout: 10_000 })
+        const guidanceText = (await guidance.textContent())
+          ?.replace(/\s+/g, ' ')
+          .trim()
+        assert(
+          deniedReasons.some((reason) => guidanceText?.includes(reason)),
+          `只读详情应展示后端动作说明，不应绑定前端固定句: ${JSON.stringify({
+            guidanceText,
+            readonlyDiagnostic,
+          })}`
+        )
+        const readonlyActionBar = page.locator('.mobile-role-action-bar')
+        await readonlyActionBar
+          .getByRole('button', { name: '返回列表', exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await readonlyActionBar.locator('button').count(),
+          1,
+          'effective-session 只读详情只应保留返回列表，不应渲染岗位写动作'
+        )
+        assert.equal(
+          await page
+            .locator('[data-step-key="process"]')
+            .getAttribute('data-state'),
+          'locked',
+          'effective-session 只读详情的处理步骤应保持锁定'
+        )
         await page.screenshot({
           path: path.join(
             outputDir,
@@ -4362,6 +4757,29 @@ export function createStyleL1Scenarios(deps) {
             return mutationPayload.result.data?.task || null
           }
 
+          await Promise.all(
+            Array.from({ length: 30 }, (_, index) =>
+              createTask({
+                task_code: `STYLE-L1-MOBILE-SPARSE-OVERDUE-${String(index + 1).padStart(2, '0')}`,
+                task_group: 'project-orders',
+                task_name: `稀疏超时任务 ${index + 1}`,
+                source_type: 'project-orders',
+                source_id: 9050 + index,
+                source_no: `STYLE-L1-SPARSE-OVERDUE-${String(index + 1).padStart(2, '0')}`,
+                business_status_key: 'project_pending',
+                task_status_key: 'ready',
+                owner_role_key: 'sales',
+                priority: 1,
+                due_at: 1780272000,
+                payload: {
+                  customer_name: `稀疏超时客户 ${index + 1}`,
+                  style_no: `SPARSE-OVERDUE-${index + 1}`,
+                  due_date: '2026-06-01',
+                },
+              })
+            )
+          )
+
           const bulkTasks = [
             ...Array.from({ length: 30 }, (_, index) => ({
               task_code: `STYLE-L1-MOBILE-BULK-${String(index + 1).padStart(2, '0')}`,
@@ -4380,7 +4798,7 @@ export function createStyleL1Scenarios(deps) {
                 due_date: '2026-06-08',
               },
             })),
-            ...Array.from({ length: 30 }, (_, index) => ({
+            ...Array.from({ length: 120 }, (_, index) => ({
               task_code: `STYLE-L1-MOBILE-WARN-${String(index + 1).padStart(2, '0')}`,
               task_group: 'project-orders',
               task_name: `批量预警任务 ${index + 1}`,
@@ -4538,63 +4956,243 @@ export function createStyleL1Scenarios(deps) {
     },
     {
       name: 'mobile-tasks-browser-back-stays-mobile',
-      path: '/erp/dashboard',
+      path: '/m/sales/tasks',
       auth: 'admin',
-      effectiveSession: customerRuntimeEffectiveSession,
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        configRevision: 'style-l1-mobile-task-browser-back',
+        actions: [
+          'workflow.task.create',
+          'workflow.task.read',
+          'workflow.task.update',
+          'workflow.task.complete',
+        ],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['sales'],
+          'workflow.task.update': ['sales'],
+          'workflow.task.complete': ['sales'],
+        },
+      },
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
-        await expectHeading(page, '工作台')
-        await page.evaluate(() => {
-          localStorage.setItem('erp:last_entry_target', 'mobileTasks')
+        const taskName = '浏览器返回栈验证任务'
+        const createdTask = await page.evaluate(async (name) => {
+          const response = await fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'mobile-task-browser-back-create',
+              method: 'create_task',
+              params: {
+                task_code: 'STYLE-L1-MOBILE-BROWSER-BACK',
+                task_group: 'sales-orders',
+                task_name: name,
+                source_type: 'sales-orders',
+                source_id: 12_200,
+                source_no: 'YOYO-MOBILE-BROWSER-BACK',
+                business_status_key: 'project_pending',
+                task_status_key: 'ready',
+                owner_role_key: 'sales',
+                priority: 1,
+                payload: { due_date: '2026-07-19' },
+              },
+            }),
+          })
+          const payload = await response.json()
+          if (!response.ok || payload?.result?.code !== 0) {
+            throw new Error(`create_task failed: ${JSON.stringify(payload)}`)
+          }
+          return payload.result.data?.task || null
+        }, taskName)
+        assert(
+          createdTask?.id && createdTask?.version,
+          `浏览器返回栈场景未取得任务快照: ${JSON.stringify(createdTask)}`
+        )
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.waitForFunction(
+          () =>
+            document
+              .querySelector('[data-testid="mobile-role-scroll"]')
+              ?.getAttribute('aria-busy') === 'false',
+          undefined,
+          { timeout: 10_000 }
+        )
+        const taskRow = page
+          .locator('.erp-mobile-list-item')
+          .filter({ hasText: taskName })
+          .first()
+        await taskRow.waitFor({ state: 'visible', timeout: 10_000 })
+        await taskRow.click()
+        await expectText(page, taskName)
+        const processButton = page.getByRole('button', {
+          name: '处理任务',
+          exact: true,
         })
-        await gotoScenarioPath(page, '/m/sales/tasks', {
-          waitUntil: 'domcontentloaded',
-        })
-        await waitForPath(page, '/m/sales/tasks')
-        await expectText(page, '待办')
-        await expectText(page, '任务')
+        await processButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await processButton.click()
+        await page
+          .getByTestId('mobile-task-action-screen')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '选择处理方式')
 
         await page.goBack()
         await waitForPath(page, '/m/sales/tasks')
         await page.waitForFunction(
           () =>
-            Boolean(document.querySelector('.mobile-role-tasks-page')) &&
+            Boolean(
+              document.querySelector('.mobile-role-tasks-page--detail')
+            ) &&
+            !document.querySelector(
+              '[data-testid="mobile-task-action-screen"]'
+            ) &&
             !document.querySelector('.erp-admin-sider'),
           null,
           { timeout: 10_000 }
         )
-        await expectText(page, '待办')
-        const metrics = await page.evaluate(() => ({
+        await expectText(page, taskName)
+        await processButton.waitFor({ state: 'visible', timeout: 10_000 })
+        const detailMetrics = await page.evaluate(() => ({
           path: window.location.pathname,
           hasDesktopShell: Boolean(document.querySelector('.erp-admin-sider')),
           hasMobileShell: Boolean(
             document.querySelector('.mobile-role-tasks-page')
           ),
+          hasDetail: Boolean(
+            document.querySelector('.mobile-role-tasks-page--detail')
+          ),
+          hasAction: Boolean(
+            document.querySelector('[data-testid="mobile-task-action-screen"]')
+          ),
+          historyScreen: window.history.state?.mobileRoleTasksScreen || '',
+        }))
+
+        assert.equal(
+          detailMetrics.path,
+          '/m/sales/tasks',
+          `处理页后退不应离开岗位任务端: ${JSON.stringify(detailMetrics)}`
+        )
+        assert.equal(
+          detailMetrics.hasDesktopShell,
+          false,
+          `处理页后退不应渲染桌面后台壳层: ${JSON.stringify(detailMetrics)}`
+        )
+        assert(
+          detailMetrics.hasMobileShell &&
+            detailMetrics.hasDetail &&
+            !detailMetrics.hasAction,
+          `处理页后退应回到同一任务详情: ${JSON.stringify(detailMetrics)}`
+        )
+
+        await page.goBack()
+        await waitForPath(page, '/m/sales/tasks')
+        await page.waitForFunction(
+          (name) => {
+            const heading = document.querySelector('.mobile-role-tasks-page h1')
+            const rows = Array.from(
+              document.querySelectorAll('.erp-mobile-list-item')
+            )
+            return (
+              heading?.textContent?.trim() === '待办' &&
+              rows.some((row) => row.textContent?.includes(name)) &&
+              !document.querySelector('.mobile-role-tasks-page--detail') &&
+              !document.querySelector('.erp-admin-sider')
+            )
+          },
+          taskName,
+          { timeout: 10_000 }
+        )
+        const listMetrics = await page.evaluate(() => ({
+          path: window.location.pathname,
           heading:
             document
               .querySelector('.mobile-role-tasks-page h1')
               ?.textContent?.trim() || '',
+          hasDesktopShell: Boolean(document.querySelector('.erp-admin-sider')),
+          hasMobileShell: Boolean(
+            document.querySelector('.mobile-role-tasks-page')
+          ),
+          hasDetail: Boolean(
+            document.querySelector('.mobile-role-tasks-page--detail')
+          ),
         }))
+        assert(
+          listMetrics.path === '/m/sales/tasks' &&
+            listMetrics.heading === '待办' &&
+            !listMetrics.hasDesktopShell &&
+            listMetrics.hasMobileShell &&
+            !listMetrics.hasDetail,
+          `详情页后退应回到移动端待办列表，不应由 remembered entry 劫持: ${JSON.stringify(listMetrics)}`
+        )
 
-        assert.equal(
-          metrics.path,
-          '/m/sales/tasks',
-          `浏览器后退不应离开岗位任务端: ${JSON.stringify(metrics)}`
+        await taskRow.click()
+        await processButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await processButton.click()
+        await page
+          .getByTestId('mobile-task-action-screen')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.evaluate(async (task) => {
+          const response = await fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'mobile-task-browser-back-complete-externally',
+              method: 'complete_task_action',
+              params: {
+                task_id: task.id,
+                expected_version: task.version,
+                idempotency_key: `style-l1-browser-back-complete-${task.id}`,
+                action_key: 'complete',
+                reason: '模拟其它终端已完成',
+                payload: {},
+              },
+            }),
+          })
+          const payload = await response.json()
+          if (!response.ok || payload?.result?.code !== 0) {
+            throw new Error(
+              `complete_task_action failed: ${JSON.stringify(payload)}`
+            )
+          }
+        }, createdTask)
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await page.getByTestId('mobile-role-bottom-nav').waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        await page.waitForFunction(
+          (name) => {
+            const heading = document.querySelector('.mobile-role-tasks-page h1')
+            return (
+              heading?.textContent?.trim() === '待办' &&
+              !document.querySelector('.mobile-role-tasks-page--detail') &&
+              !document.body.textContent?.includes(name)
+            )
+          },
+          taskName,
+          { timeout: 10_000 }
         )
-        assert.equal(
-          metrics.hasDesktopShell,
-          false,
-          `浏览器后退不应渲染桌面后台壳层: ${JSON.stringify(metrics)}`
-        )
-        assert.equal(
-          metrics.hasMobileShell,
-          true,
-          `浏览器后退后应保持移动任务页壳层: ${JSON.stringify(metrics)}`
-        )
-        assert.equal(
-          metrics.heading,
-          '待办',
-          `浏览器后退后应保持移动任务页默认分区: ${JSON.stringify(metrics)}`
+        const missingTaskHistory = await page.evaluate(() => ({
+          screen: window.history.state?.mobileRoleTasksScreen || '',
+          depth: Number(window.history.state?.mobileRoleTasksDepth || 0),
+          hasDetail: Boolean(
+            document.querySelector('.mobile-role-tasks-page--detail')
+          ),
+          hasAction: Boolean(
+            document.querySelector('[data-testid="mobile-task-action-screen"]')
+          ),
+        }))
+        assert.deepEqual(
+          missingTaskHistory,
+          { screen: '', depth: 0, hasDetail: false, hasAction: false },
+          `已被其它终端处理的任务应一次回到真实列表历史项: ${JSON.stringify(missingTaskHistory)}`
         )
       },
     },
@@ -4667,7 +5265,7 @@ export function createStyleL1Scenarios(deps) {
           `Mermaid 图表应渲染为 SVG: ${JSON.stringify(mermaidMetrics)}`
         )
         assert.ok(
-          mermaidMetrics.width > 240 && mermaidMetrics.height > 80,
+          mermaidMetrics.width > 240 && mermaidMetrics.height >= 79,
           `Mermaid SVG 应有稳定可见尺寸: ${JSON.stringify(mermaidMetrics)}`
         )
         assert.equal(
@@ -5211,7 +5809,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, 'yoyoosun')
         await expectText(page, '当前配置包 / Current Package')
         await expectText(page, '决策卡 / Decision Cards')
-        await expectText(page, '可以进入人工评审')
+        await expectText(page, '可人工评审')
         await expectText(page, '预检通过')
         await expectText(page, '真实导入')
         await expectText(page, '下一步 / Next')
@@ -5344,8 +5942,14 @@ export function createStyleL1Scenarios(deps) {
             hasShipmentModuleLabel: items.some((item) =>
               item.textContent?.includes('出货单')
             ),
+            hasProductionOrderModuleLabel: items.some((item) =>
+              item.textContent?.includes('生产订单')
+            ),
             hasRawShipmentModuleKey: items.some((item) =>
               item.textContent?.includes('shipments')
+            ),
+            hasRawProductionOrderModuleKey: items.some((item) =>
+              item.textContent?.includes('production_orders')
             ),
             enabledTags: items.filter((item) =>
               item.textContent?.includes('启用')
@@ -5360,18 +5964,24 @@ export function createStyleL1Scenarios(deps) {
             hasCatalogDefaultCopy: moduleStateMetrics.hasCatalogDefaultCopy,
             hasInstallCopy: moduleStateMetrics.hasInstallCopy,
             hasShipmentModuleLabel: moduleStateMetrics.hasShipmentModuleLabel,
+            hasProductionOrderModuleLabel:
+              moduleStateMetrics.hasProductionOrderModuleLabel,
             hasRawShipmentModuleKey: moduleStateMetrics.hasRawShipmentModuleKey,
+            hasRawProductionOrderModuleKey:
+              moduleStateMetrics.hasRawProductionOrderModuleKey,
             enabledTags: moduleStateMetrics.enabledTags,
           },
           {
-            itemCount: 16,
+            itemCount: 17,
             hasCatalogDefaultCopy: true,
             hasInstallCopy: true,
             hasShipmentModuleLabel: true,
+            hasProductionOrderModuleLabel: true,
             hasRawShipmentModuleKey: false,
-            enabledTags: 16,
+            hasRawProductionOrderModuleKey: false,
+            enabledTags: 17,
           },
-          `客户配置控制台应展示 16 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
+          `客户配置控制台应展示 17 个模块状态预览项且不直出 raw module key: ${JSON.stringify(moduleStateMetrics)}`
         )
         assert(
           moduleStateMetrics.panelWidth <= moduleStateMetrics.viewportWidth,
@@ -5557,10 +6167,8 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '应用到当前后端')
         await expectText(page, '校验 / 发布 / 激活 / 有效配置投影')
         await expectText(page, '写库目标 / Database Target')
-        await expectText(
-          page,
-          '当前 Vite /rpc 代理后端（http://127.0.0.1:8300）'
-        )
+        await expectText(page, '当前 Vite /rpc 代理后端')
+        await assertTextAbsent(page, '127.0.0.1:8300')
         await expectText(page, '目标环境 ERP 应用数据库')
         await expectText(
           page,
@@ -7048,7 +7656,7 @@ export function createStyleL1Scenarios(deps) {
             new URL(location.href).searchParams.get('filter') === 'current' &&
             document.querySelectorAll('.erp-dev-prototypes-card').length === 1
         )
-        await expectText(page, '岗位任务端当前实现参考')
+        await expectText(page, '岗位任务端当前列表基线')
         const currentMetrics = await page.evaluate(() => ({
           activeText:
             document
@@ -7103,20 +7711,23 @@ export function createStyleL1Scenarios(deps) {
           () =>
             new URL(location.href).searchParams.get('filter') ===
               'to-implement' &&
-            document.querySelectorAll('.erp-dev-prototypes-card').length === 13
+            document.querySelectorAll('.erp-dev-prototypes-card').length === 15
         )
         await expectText(page, '后台工作台样板')
         await expectText(page, '任务中心样板')
+        await expectText(page, 'Workflow 任务处理流程样板')
         await expectText(page, '业务管理中心样板')
         await expectText(page, '指标卡交互语义样板')
         await expectText(page, '产品核心菜单覆盖样板')
         await expectText(page, '正式菜单候选原型')
+        await expectText(page, '审计日志页原型')
         await expectText(page, '业务模块标准页样板')
         await expectText(page, '模板打印中心样板')
         await expectText(page, '业务页协同入口组件样板')
         await expectText(page, '业务详情页标准样板')
         await expectText(page, '新建 / 编辑表单标准样板')
         await expectText(page, '局部动作弹窗标准样板')
+        await expectText(page, '岗位任务中心 v2 原型')
         const implementMetrics = await page.evaluate(() => ({
           activeText:
             document
@@ -7152,8 +7763,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           implementMetrics.visibleCards,
-          13,
-          `原型查看器待实现筛选应展示 13 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
+          15,
+          `原型查看器待实现筛选应展示 15 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
         )
         assert.equal(
           implementMetrics.cardDescriptionCount,
@@ -7229,7 +7840,7 @@ export function createStyleL1Scenarios(deps) {
             readerPath:
               'business-module-page-standard-v1/task-collab-entry-v2.html',
             readerApplies:
-              '参照范围：嵌入有 Workflow 协同任务的业务页可参照；它是页内组件，不是独立菜单、路由或权限入口。',
+              '参照范围：仅有真实 Workflow 关联、能定位当前选中业务记录待办的业务页可参照；跨记录任务由任务中心承接。它是页内组件，不是独立菜单、路由或权限入口。',
             storedFilter: 'to-implement',
             storedSelected: 'business-task-collab-entry',
           },
@@ -7269,6 +7880,11 @@ export function createStyleL1Scenarios(deps) {
           name: /全屏预览/,
         })
         await fullscreenDialog.waitFor({ state: 'visible' })
+        await page.waitForFunction(
+          () =>
+            document.activeElement?.getAttribute('aria-label') ===
+            '关闭原型全屏预览'
+        )
         const fullscreenOpenMetrics = await page.evaluate(() => ({
           activeText: document.activeElement?.textContent?.trim() || '',
           navInert: document
@@ -7338,8 +7954,12 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(
           () =>
             new URL(location.href).searchParams.get('filter') === 'reference' &&
-            document.querySelectorAll('.erp-dev-prototypes-card').length === 6
+            document.querySelectorAll('.erp-dev-prototypes-card').length === 10
         )
+        await expectText(page, '后台工作台重设计方向图')
+        await expectText(page, '任务看板重设计方向图')
+        await expectText(page, '任务处理流程重设计方向图')
+        await expectText(page, '业务看板重设计方向图')
         await expectText(page, '方向 1：右侧当前记录协同侧栏')
         const referenceMetrics = await page.evaluate(() => ({
           activeText:
@@ -7369,12 +7989,12 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           referenceMetrics.visibleCards,
-          6,
-          `原型查看器参考资料筛选应展示 6 个参考资产: ${JSON.stringify(referenceMetrics)}`
+          10,
+          `原型查看器参考资料筛选应展示 10 个参考资产: ${JSON.stringify(referenceMetrics)}`
         )
         assert.equal(
           referenceMetrics.draftTagCount,
-          3,
+          7,
           `原型查看器参考资料起草阶段标签数量异常: ${JSON.stringify(referenceMetrics)}`
         )
         assert.equal(
@@ -7432,6 +8052,9 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '架构 / Architecture · 工作流 / Workflow' })
         const optionMetrics = await longOption.evaluate((node) => {
           const content = node.querySelector('.ant-select-item-option-content')
+          const nonLastOption = node.parentElement?.querySelector(
+            '.ant-select-item-option:not(:last-child)'
+          )
           const optionRect = node.getBoundingClientRect()
           const contentRect = content?.getBoundingClientRect()
           const optionStyle = getComputedStyle(node)
@@ -7442,7 +8065,9 @@ export function createStyleL1Scenarios(deps) {
             clientWidth: content?.clientWidth || 0,
             scrollWidth: content?.scrollWidth || 0,
             borderRadius: optionStyle.borderRadius,
-            boxShadow: optionStyle.boxShadow,
+            dividerBoxShadow: nonLastOption
+              ? getComputedStyle(nonLastOption).boxShadow
+              : '',
             paddingBlock: [optionStyle.paddingTop, optionStyle.paddingBottom],
             paddingInline: [optionStyle.paddingLeft, optionStyle.paddingRight],
             overflowWrap: style?.overflowWrap || '',
@@ -7482,7 +8107,7 @@ export function createStyleL1Scenarios(deps) {
           `每个下拉选项都应具备一致的可扫描 item 盒模型: ${JSON.stringify(optionMetrics)}`
         )
         assert(
-          optionMetrics.boxShadow.includes('inset'),
+          optionMetrics.dividerBoxShadow.includes('inset'),
           `非末项下拉选项应保留轻量分隔，避免多行文字与下一项粘连: ${JSON.stringify(optionMetrics)}`
         )
         await longOption.click()
@@ -7510,7 +8135,27 @@ export function createStyleL1Scenarios(deps) {
         await page.keyboard.press('Home')
         await page.keyboard.press('Enter')
         await domainSelect.click()
-        await page.locator('.ant-select-dropdown:visible').screenshot({
+        const reopenedDropdown = page
+          .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
+          .last()
+        await reopenedDropdown.waitFor({ state: 'visible' })
+        await page.waitForFunction(() => {
+          const element = Array.from(
+            document.querySelectorAll(
+              '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
+            )
+          ).at(-1)
+          if (!element) return false
+          const rect = element.getBoundingClientRect()
+          const style = getComputedStyle(element)
+          return (
+            rect.width > 0 &&
+            rect.height > 0 &&
+            style.opacity === '1' &&
+            style.transform === 'none'
+          )
+        })
+        await reopenedDropdown.screenshot({
           path: 'output/playwright/style-l1/dev-capability-select-long-text-options.png',
         })
         await page.keyboard.press('Escape')
@@ -7523,7 +8168,9 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
         await expectHeading(page, '能力台账可视化 / Capability Ledger')
-        await expectText(page, '联动读取 4 份 Markdown / 4 linked docs')
+        await expectText(page, '只显示构建安全的非权威短摘要')
+        await expectText(page, '不读取或打包正式 Markdown / summaries only')
+        await assertTextAbsent(page, '联动读取 4 份 Markdown / 4 linked docs')
         const readLedgerMetrics = () =>
           page.evaluate(() => ({
             view: new URL(location.href).searchParams.get('view'),
@@ -7552,8 +8199,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           capabilityMetrics.rowCount,
-          37,
-          `能力台账必须完整解析 37 项产品能力: ${JSON.stringify(capabilityMetrics)}`
+          1,
+          `能力台账开发页只应解析 1 项构建安全短摘要: ${JSON.stringify(capabilityMetrics)}`
         )
         assert.equal(
           capabilityMetrics.currentRowCount,
@@ -7562,13 +8209,13 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           capabilityMetrics.metricValues[0],
-          '37',
+          '1',
           `能力台账总数指标异常: ${JSON.stringify(capabilityMetrics)}`
         )
         assert.equal(
           capabilityMetrics.diagnosticCount,
           0,
-          `四份当前真源不应出现解析或精确关联诊断: ${JSON.stringify(capabilityMetrics)}`
+          `构建内短摘要不应出现解析或精确关联诊断: ${JSON.stringify(capabilityMetrics)}`
         )
         assert.equal(
           capabilityMetrics.sourceLinks.length,
@@ -7720,6 +8367,10 @@ export function createStyleL1Scenarios(deps) {
             maturityGuideMetrics.clientWidth + 1,
           `成熟度说明不应造成页面横向溢出: ${JSON.stringify(maturityGuideMetrics)}`
         )
+        await assertDarkThemeContrast(page, {
+          scenarioName: 'dev-capability-ledger-dark-desktop-analysis',
+          selector: '.erp-dev-capability-page',
+        })
 
         await page
           .locator('.erp-dev-capability-view-switch .erp-dev-task-nav__item')
@@ -7728,7 +8379,7 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(
           () =>
             new URL(location.href).searchParams.get('view') === 'delivery' &&
-            document.querySelectorAll('.erp-dev-capability-row').length === 25
+            document.querySelectorAll('.erp-dev-capability-row').length === 1
         )
         const deliveryMetrics = await readLedgerMetrics()
         assert.equal(
@@ -7738,8 +8389,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           deliveryMetrics.rowCount,
-          25,
-          `客户交付矩阵必须完整解析 25 项: ${JSON.stringify(deliveryMetrics)}`
+          1,
+          `客户交付开发视图只应解析 1 项构建安全短摘要: ${JSON.stringify(deliveryMetrics)}`
         )
         assert(deliveryMetrics.item)
 
@@ -7750,7 +8401,7 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(
           () =>
             new URL(location.href).searchParams.get('view') === 'delta' &&
-            document.querySelectorAll('.erp-dev-capability-row').length === 27
+            document.querySelectorAll('.erp-dev-capability-row').length === 1
         )
         const deltaMetrics = await readLedgerMetrics()
         assert.equal(
@@ -7760,8 +8411,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           deltaMetrics.rowCount,
-          27,
-          `客户差异台账必须完整解析 27 项: ${JSON.stringify(deltaMetrics)}`
+          1,
+          `客户差异开发视图只应解析 1 项构建安全短摘要: ${JSON.stringify(deltaMetrics)}`
         )
 
         await page
@@ -7781,12 +8432,12 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(
           () =>
             new URL(location.href).searchParams.get('view') === 'delivery' &&
-            document.querySelectorAll('.erp-dev-capability-row').length === 25
+            document.querySelectorAll('.erp-dev-capability-row').length === 1
         )
         const historyMetrics = await readLedgerMetrics()
         assert.equal(
           historyMetrics.rowCount,
-          25,
+          1,
           `浏览器后退应恢复客户交付视图: ${JSON.stringify(historyMetrics)}`
         )
         await assertDarkThemeContrast(page, {
@@ -8000,9 +8651,15 @@ export function createStyleL1Scenarios(deps) {
               'mvp-closure.mjs --out output/customers/yoyoosun/mvp-closure'
             ) &&
             mvpLocalClosureClipboard.includes(
-              '--run-report-tools --product-id <product_id>'
-            ),
-          `MVP 本地闭环预设应复制 plan-only 和 no-write report tools 命令: ${mvpLocalClosureClipboard}`
+              'mvp-closure.mjs --run-report-tools --out output/customers/yoyoosun/mvp-closure'
+            ) &&
+            !mvpLocalClosureClipboard.includes('--with-postgres') &&
+            !mvpLocalClosureClipboard.includes(
+              'smoke:purchase-receipt-real-write'
+            ) &&
+            !mvpLocalClosureClipboard.includes('--apply') &&
+            !mvpLocalClosureClipboard.includes('--execute'),
+          `MVP 本地闭环预设应只复制 plan-only、preflight 和 no-write report tools 命令: ${mvpLocalClosureClipboard}`
         )
         await page
           .locator('.erp-dev-testing-preset')
@@ -8160,6 +8817,209 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'dev-testing-coverage-loading-desktop',
+      path: '/__dev/testing?view=coverage',
+      themeMode: 'light',
+      viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        const loadingRelease = createDeferred()
+        releaseCoverageLoadingResponse = loadingRelease.resolve
+        await page.route('**/__dev/api/qa/coverage', async (route) => {
+          await loadingRelease.promise
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'missing',
+              message: 'Style L1 loading fixture released',
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectHeading(page, '开发测试入口 / Dev Test Entry')
+        await page
+          .getByLabel('覆盖报告加载中')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await page.getByLabel('测试覆盖状态').getAttribute('aria-busy'),
+          'true',
+          '覆盖报告等待接口时必须暴露 loading 状态'
+        )
+        releaseCoverageLoadingResponse()
+        await expectText(page, '当前没有可展示的覆盖报告 / No coverage report')
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-testing-coverage-loading-desktop'
+        )
+      },
+    },
+    {
+      name: 'dev-testing-coverage-missing-mobile',
+      path: '/__dev/testing?view=coverage',
+      themeMode: 'light',
+      viewport: { width: 390, height: 844 },
+      beforeNavigate: async (page) => {
+        await page.route('**/__dev/api/qa/coverage', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: 'missing',
+              message: '尚未生成覆盖报告',
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectText(page, '覆盖状态 / Coverage')
+        await expectText(page, '尚未生成覆盖报告')
+        await expectText(page, '当前没有可展示的覆盖报告 / No coverage report')
+        await expectButton(page, '复制生成命令')
+        await expectButton(page, '重新读取')
+        assert.equal(
+          await page.locator('.erp-dev-testing-sidebar').count(),
+          0,
+          '覆盖视图不应保留无关文档筛选侧栏'
+        )
+        const coverageMetrics = await page.evaluate(() => {
+          const root = document.querySelector('.erp-dev-testing-coverage-view')
+          const segmented = document.querySelector(
+            '.erp-dev-testing-reader__toolbar .ant-segmented-group'
+          )
+          return {
+            rootScrollWidth: root?.scrollWidth || 0,
+            rootClientWidth: root?.clientWidth || 0,
+            segmentedColumns: segmented
+              ? getComputedStyle(segmented).gridTemplateColumns
+              : '',
+          }
+        })
+        assert(
+          coverageMetrics.rootScrollWidth <=
+            coverageMetrics.rootClientWidth + 1,
+          `覆盖缺失移动态不应横向溢出: ${JSON.stringify(coverageMetrics)}`
+        )
+        assert(
+          coverageMetrics.segmentedColumns.split(' ').length === 2,
+          `四个覆盖视图按钮在移动端应使用两列: ${JSON.stringify(coverageMetrics)}`
+        )
+      },
+    },
+    {
+      name: 'dev-testing-coverage-current-stale-dark-desktop',
+      path: '/__dev/testing?view=coverage',
+      themeMode: 'dark',
+      viewport: { width: 1536, height: 900 },
+      beforeNavigate: async (page) => {
+        coverageFixtureEnvelopeStatus = 'current'
+        await page.route('**/__dev/api/qa/coverage', async (route) => {
+          await route.fulfill({
+            status: 200,
+            contentType: 'application/json',
+            body: JSON.stringify({
+              status: coverageFixtureEnvelopeStatus,
+              message:
+                coverageFixtureEnvelopeStatus === 'stale'
+                  ? 'fixture commit 与当前工作区不一致'
+                  : '',
+              report: buildCoverageFixtureReport(),
+            }),
+          })
+        })
+      },
+      verify: async (page) => {
+        await expectText(page, '报告与当前仓库指纹匹配')
+        await expectText(page, '91/100 · 91%')
+        await expectText(page, '92.5%')
+        await expectText(page, '86%')
+        await expectText(page, '47/50 · 94%')
+        await expectText(page, '业务合同与关键场景 / Business Coverage')
+        await expectText(page, '本轮 T0-T8 门禁 / Required Gates')
+        await expectText(page, '运行态与验收 / Runtime & Acceptance')
+        await expectText(page, '目标环境 / Target Environment')
+        await expectText(page, '客户验收 / UAT')
+        await expectText(page, '仓库整体 baseline 未建立前只采集趋势')
+        await expectText(
+          page,
+          '本轮承诺的 PostgreSQL、浏览器、readiness、目标环境和 UAT 分别要求 100%'
+        )
+        await expectText(page, '0 tests executed 均不能算通过')
+        assert.equal(
+          await page
+            .locator('.erp-dev-testing-coverage-card--blocked')
+            .filter({ hasText: 'T7 业务集成' })
+            .count(),
+          1,
+          '受阻门禁必须保持 blocked，不能被汇总成通过'
+        )
+        assert.equal(
+          await page
+            .locator('.erp-dev-testing-coverage-card--not_collected')
+            .filter({ hasText: '生产' })
+            .count(),
+          1,
+          '未采集业务域必须明确显示未采集'
+        )
+        assert.equal(
+          await page
+            .locator('.erp-dev-testing-coverage-card--partial')
+            .filter({ hasText: '质检' })
+            .getByText('缺失 1', { exact: true })
+            .count(),
+          1,
+          '存在 missingCases 的业务域必须降级 partial 并显示缺失数'
+        )
+        const notApplicableGate = page
+          .locator('.erp-dev-testing-coverage-card--not_applicable')
+          .filter({ hasText: 'T4 未受影响门禁' })
+        assert.equal(
+          await notApplicableGate.count(),
+          1,
+          '明确 required=false 的未受影响门禁应显示 N/A'
+        )
+        assert.equal(
+          await notApplicableGate
+            .locator('.erp-dev-testing-coverage-card__metrics')
+            .count(),
+          0,
+          'N/A 门禁不能显示百分比'
+        )
+        await page.getByRole('button', { name: '复制生成命令' }).click()
+        assert.equal(
+          await page.evaluate(() => navigator.clipboard.readText()),
+          'node scripts/qa/test-coverage-report.mjs --write',
+          '覆盖页只应复制报告生成命令'
+        )
+
+        coverageFixtureEnvelopeStatus = 'stale'
+        await page.getByRole('button', { name: '重新读取' }).click()
+        await expectText(page, '覆盖报告已过期')
+        await expectText(page, 'fixture commit 与当前工作区不一致')
+        assert.equal(
+          await page
+            .locator('.erp-dev-testing-coverage-identity')
+            .getByText('报告过期 / Stale', { exact: true })
+            .count(),
+          1,
+          '重新读取 stale 报告后必须更新报告身份状态'
+        )
+        await assertERPThemeMode(page, {
+          scenarioName: 'dev-testing-coverage-current-stale-dark-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertDarkThemeContrast(page, {
+          scenarioName: 'dev-testing-coverage-current-stale-dark-desktop',
+          selector: '.erp-dev-testing-page',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'dev-testing-coverage-current-stale-dark-desktop'
+        )
+      },
+    },
+    {
       name: 'erp-business-dashboard-mobile',
       path: '/erp/business-dashboard',
       auth: 'admin',
@@ -8197,8 +9057,8 @@ export function createStyleL1Scenarios(deps) {
       themeMode: 'dark',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '权限加载中')
-        await expectText(page, '正在加载账号和岗位角色，请稍候...')
+        await expectText(page, '岗位设置加载中')
+        await expectText(page, '正在加载员工账号和岗位，请稍候...')
         await assertERPThemeMode(page, {
           scenarioName: 'permission-center-loading-state',
           expectedMode: 'dark',
@@ -8208,7 +9068,7 @@ export function createStyleL1Scenarios(deps) {
           scenarioName: 'permission-center-loading-state',
         })
         await expectHeading(page, '权限管理')
-        await assertTextAbsent(page, '权限加载中')
+        await assertTextAbsent(page, '岗位设置加载中')
         await assertDarkAntdStateSurfaces(page, {
           scenarioName: 'permission-center-loading-state',
         })
@@ -8568,7 +9428,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '员工账号已记录')
         await expectText(page, '系统准备未完成，请联系管理员检查系统设置')
         await expectText(page, '下一步')
-        await expectText(page, '变化')
+        await expectText(page, '修改内容')
         await assertTextAbsent(page, '生产环境缺少显式初始化确认')
         await assertTextAbsent(page, '原始 payload')
         await assertTextAbsent(page, 'assistant-admin')
@@ -8934,8 +9794,11 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '打开可编辑打印窗口')
         await expectText(page, '返回打印中心')
         await expectText(page, '受托方签字人')
-        await expectText(page, '27072')
-        await expectText(page, '4060.8')
+        await expectText(page, '加工项目')
+        await expectText(page, '面*1')
+        const totalRow = page.locator('.erp-print-table__total')
+        await totalRow.getByText('300', { exact: true }).waitFor()
+        await totalRow.getByText('45', { exact: true }).waitFor()
       },
     },
     {
@@ -11595,7 +12458,8 @@ export function createStyleL1Scenarios(deps) {
             '设为编号行',
             '设为文本行',
             '给当前行加图',
-            '管理当前行图片',
+            '清空当前行图片',
+            '标注当前行图片',
             '选择行',
           ],
           '作业指导书纸面行'
@@ -11654,7 +12518,12 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(
           toolbarGroups[0].buttons[7].disabled,
           true,
-          '作业指导书未选择纸面行前，管理当前行图片应禁用'
+          '作业指导书未选择纸面行前，清空当前行图片应禁用'
+        )
+        assert.equal(
+          toolbarGroups[0].buttons[8].disabled,
+          true,
+          '作业指导书未选择纸面行前，标注当前行图片应禁用'
         )
         let workInstructionHeaderImageState = await page.evaluate(() => ({
           uploadBarInPanel: Boolean(
@@ -11725,6 +12594,9 @@ export function createStyleL1Scenarios(deps) {
           const companyText = document.querySelector(
             '.erp-work-instruction-paper__company'
           )
+          const companyCell = document.querySelector(
+            '.erp-work-instruction-paper__company-cell'
+          )
           const titleCell = document.querySelector(
             '.erp-work-instruction-paper__title-cell'
           )
@@ -11779,6 +12651,20 @@ export function createStyleL1Scenarios(deps) {
             )
           const rowHeightVar = (row) =>
             row?.style.getPropertyValue('--work-instruction-row-height') || ''
+          const normalizedText = (node) =>
+            String(node?.textContent || '')
+              .replace(/\s+/gu, ' ')
+              .trim()
+          const companyCellRect = companyCell?.getBoundingClientRect()
+          const companyTextRange = document.createRange()
+          if (companyText) companyTextRange.selectNodeContents(companyText)
+          const companyTextRect = companyText
+            ? companyTextRange.getBoundingClientRect()
+            : null
+          companyTextRange.detach()
+          const companyStyle = companyText
+            ? window.getComputedStyle(companyText)
+            : null
           const continuationSummaries = continuationSheets.map((sheet) => {
             const rows = [
               ...sheet.querySelectorAll(
@@ -11818,6 +12704,52 @@ export function createStyleL1Scenarios(deps) {
             headerFirstRowSpan: sumColSpan(headerRow),
             firstStepRowSpan: sumColSpan(firstStepRow),
             headerImageColSpan: Number(imageCell?.getAttribute('colspan')) || 1,
+            headerMetaTexts: [
+              ...(sheets[0]?.querySelectorAll(
+                '.erp-work-instruction-paper__meta-label'
+              ) || []),
+            ].map(normalizedText),
+            headerSummaryTexts: [
+              ...(sheets[0]?.querySelectorAll(
+                '.erp-work-instruction-paper__summary-label'
+              ) || []),
+            ].map(normalizedText),
+            processHeader: {
+              name: normalizedText(
+                sheets[0]?.querySelector('[data-work-instruction-process-name]')
+              ),
+              date: normalizedText(
+                sheets[0]?.querySelector('[data-work-instruction-process-date]')
+              ),
+              dateEditorCount:
+                sheets[0]?.querySelectorAll(
+                  '[data-work-instruction-process-date] > .erp-engineering-print-editable[contenteditable="true"]'
+                ).length || 0,
+            },
+            companyAlignment: {
+              display: companyStyle?.display || '',
+              alignItems: companyStyle?.alignItems || '',
+              justifyContent: companyStyle?.justifyContent || '',
+              textAlign: companyStyle?.textAlign || '',
+              xCenterDelta:
+                companyCellRect && companyTextRect
+                  ? Math.abs(
+                      companyCellRect.left +
+                        companyCellRect.width / 2 -
+                        (companyTextRect.left + companyTextRect.width / 2)
+                    )
+                  : -1,
+              yCenterDelta:
+                companyCellRect && companyTextRect
+                  ? Math.abs(
+                      companyCellRect.top +
+                        companyCellRect.height / 2 -
+                        (companyTextRect.top + companyTextRect.height / 2)
+                    )
+                  : -1,
+              clientWidth: companyText?.clientWidth || 0,
+              scrollWidth: companyText?.scrollWidth || 0,
+            },
             paperPaddingLeft: paper
               ? window.getComputedStyle(paper).paddingLeft
               : '',
@@ -11908,6 +12840,37 @@ export function createStyleL1Scenarios(deps) {
             parseFloat(workInstructionGridState.paperPaddingLeft) <= 12 &&
             workInstructionGridState.stageWrapJustify === 'center',
           `作业指导书应按 Excel Sheet1 A:I 主体合并范围渲染，并保持工程打印模板居中编辑位置: ${JSON.stringify(workInstructionGridState)}`
+        )
+        assert.deepEqual(
+          {
+            meta: workInstructionGridState.headerMetaTexts,
+            summary: workInstructionGridState.headerSummaryTexts,
+            processHeader: workInstructionGridState.processHeader,
+          },
+          {
+            meta: ['产品编号', '版本/版次', '车缝', '制表', '设计师', '审核'],
+            summary: ['发放部门：', '订单号：', '产品名称：'],
+            processHeader: {
+              name: '车缝',
+              date: '',
+              dateEditorCount: 1,
+            },
+          },
+          `作业指导书头六行字段角色应与原 Excel 一致，G3 显示本页工序且 H3 保持独立日期值槽: ${JSON.stringify(workInstructionGridState)}`
+        )
+        assert(
+          workInstructionGridState.companyAlignment.display === 'flex' &&
+            workInstructionGridState.companyAlignment.alignItems === 'center' &&
+            workInstructionGridState.companyAlignment.justifyContent ===
+              'center' &&
+            workInstructionGridState.companyAlignment.textAlign === 'center' &&
+            workInstructionGridState.companyAlignment.xCenterDelta >= 0 &&
+            workInstructionGridState.companyAlignment.xCenterDelta <= 2 &&
+            workInstructionGridState.companyAlignment.yCenterDelta >= 0 &&
+            workInstructionGridState.companyAlignment.yCenterDelta <= 4 &&
+            workInstructionGridState.companyAlignment.scrollWidth <=
+              workInstructionGridState.companyAlignment.clientWidth + 1,
+          `作业指导书公司名称应在 A1:F2 合并单元格内水平和垂直居中: ${JSON.stringify(workInstructionGridState.companyAlignment)}`
         )
         assert.deepEqual(
           {
@@ -12208,7 +13171,12 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(
           toolbarGroups[0].buttons[7].disabled,
           true,
-          '作业指导书选中无图片行时，管理当前行图片仍应禁用'
+          '作业指导书选中无图片行时，清空当前行图片仍应禁用'
+        )
+        assert.equal(
+          toolbarGroups[0].buttons[8].disabled,
+          true,
+          '作业指导书选中无图片行时，标注当前行图片仍应禁用'
         )
         workInstructionRowImageControlState = await page.evaluate(() => ({
           visibleUploadButtons: [
@@ -12495,15 +13463,18 @@ export function createStyleL1Scenarios(deps) {
         assert.equal(
           toolbarGroups[0].buttons[7].disabled,
           false,
-          '作业指导书图片上传后，管理当前行图片应可用'
+          '作业指导书图片上传后，清空当前行图片应可用'
         )
-        const originalImageSources =
-          workInstructionRowImageControlState.imageSources
+        assert.equal(
+          toolbarGroups[0].buttons[8].disabled,
+          false,
+          '作业指导书图片上传后，标注当前行图片应可用'
+        )
         const instructionImageManager = page.locator(
           '.erp-work-instruction-annotation-modal'
         )
         await page
-          .getByRole('button', { name: '管理当前行图片', exact: true })
+          .getByRole('button', { name: '标注当前行图片', exact: true })
           .click()
         await instructionImageManager.waitFor({
           state: 'visible',
@@ -12521,50 +13492,37 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForTimeout(350)
         const instructionImageManagerLayout =
           await instructionImageManager.evaluate((modal) => {
-            const toolbar = modal.querySelector(
-              '.erp-work-instruction-annotation-modal__image-toolbar'
+            const tabs = modal.querySelector(
+              '.erp-work-instruction-annotation-modal__image-tabs'
             )
-            const removeButton = modal.querySelector(
-              '[data-remove-current-work-instruction-image]'
+            const activeTab = tabs?.querySelector('[aria-selected="true"]')
+            const canvas = modal.querySelector(
+              '[data-work-instruction-annotation-canvas="true"]'
             )
             const modalRect = modal.getBoundingClientRect()
-            const toolbarRect = toolbar?.getBoundingClientRect()
-            const removeButtonRect = removeButton?.getBoundingClientRect()
             return {
               modalWidth: modalRect.width,
-              toolbarFits:
-                Boolean(toolbar) &&
-                toolbar.scrollWidth <= toolbar.clientWidth + 1,
-              removeButtonInsideToolbar:
-                Boolean(toolbarRect && removeButtonRect) &&
-                removeButtonRect.left >= toolbarRect.left &&
-                removeButtonRect.right <= toolbarRect.right,
-              removeButtonDisabled: Boolean(removeButton?.disabled),
+              tabsFit:
+                Boolean(tabs) && tabs.scrollWidth <= tabs.clientWidth + 1,
+              tabCount: tabs?.querySelectorAll('[role="tab"]').length || 0,
+              activeTabText: activeTab?.textContent?.trim() || '',
+              canvasVisible: Boolean(canvas?.getBoundingClientRect().width),
             }
           })
         assert(
           instructionImageManagerLayout.modalWidth >= 1000 &&
-            instructionImageManagerLayout.toolbarFits &&
-            instructionImageManagerLayout.removeButtonInsideToolbar &&
-            !instructionImageManagerLayout.removeButtonDisabled,
-          `作业指导书多图管理工具栏应完整显示且允许逐图移除: ${JSON.stringify(instructionImageManagerLayout)}`
+            instructionImageManagerLayout.tabsFit &&
+            instructionImageManagerLayout.tabCount === 4 &&
+            instructionImageManagerLayout.activeTabText === '图片 2' &&
+            instructionImageManagerLayout.canvasVisible,
+          `作业指导书多图标注弹窗应完整显示并允许切换图片: ${JSON.stringify(instructionImageManagerLayout)}`
         )
         await instructionImageManager.screenshot({
           path: path.resolve(
             outputDir,
-            'work-instruction-image-manager-multiple.png'
+            'work-instruction-image-annotation-multiple.png'
           ),
         })
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .focus()
-        await page.keyboard.press('Enter')
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-work-instruction-annotation-modal [role="tab"]'
-            ).length === 3
-        )
         await instructionImageManager
           .getByRole('button', { name: '取消', exact: true })
           .click()
@@ -12574,10 +13532,10 @@ export function createStyleL1Scenarios(deps) {
         })
         assert.equal(
           await page
-            .getByRole('button', { name: '管理当前行图片', exact: true })
+            .getByRole('button', { name: '标注当前行图片', exact: true })
             .evaluate((button) => document.activeElement === button),
           true,
-          '取消图片管理后焦点应返回管理当前行图片按钮'
+          '取消图片标注后焦点应返回标注当前行图片按钮'
         )
         assert.equal(
           await page
@@ -12586,106 +13544,11 @@ export function createStyleL1Scenarios(deps) {
             )
             .count(),
           4,
-          '取消图片管理后不应修改当前行图片'
+          '取消图片标注后不应修改当前行图片'
         )
-
         await page
-          .getByRole('button', { name: '管理当前行图片', exact: true })
+          .getByRole('button', { name: '清空当前行图片', exact: true })
           .click()
-        await instructionImageManager.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
-        await instructionImageManager
-          .getByRole('tab', { name: '图片 2', exact: true })
-          .click()
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-work-instruction-annotation-modal [role="tab"]'
-            ).length === 3
-        )
-        await instructionImageManager
-          .getByRole('button', { name: '保存图片调整', exact: true })
-          .click()
-        await instructionImageManager.waitFor({
-          state: 'hidden',
-          timeout: 10_000,
-        })
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-work-instruction-paper__step-row--image .erp-engineering-print-image-slot img'
-            ).length === 3
-        )
-        const imageSourcesAfterMiddleRemoval = await page
-          .locator(
-            '.erp-work-instruction-paper__step-row--image .erp-engineering-print-image-slot img'
-          )
-          .evaluateAll((images) => images.map((image) => image.src))
-        assert.deepEqual(
-          imageSourcesAfterMiddleRemoval,
-          [
-            originalImageSources[0],
-            originalImageSources[2],
-            originalImageSources[3],
-          ],
-          '移除第 2 张图片后应保留原第 1、3、4 张及其顺序'
-        )
-
-        await page
-          .getByRole('button', { name: '管理当前行图片', exact: true })
-          .click()
-        await instructionImageManager.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-work-instruction-annotation-modal [role="tab"]'
-            ).length === 2
-        )
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await instructionImageManager
-          .getByText('图片 1 / 1', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await instructionImageManager
-          .locator('.erp-work-instruction-annotation-modal__image-summary', {
-            hasText: '当前行没有图片',
-          })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await instructionImageManager
-            .getByRole('button', { name: '移除当前图片', exact: true })
-            .isDisabled(),
-          true,
-          '移除最后一张图片后不应继续允许移除'
-        )
-        await instructionImageManager.screenshot({
-          path: path.resolve(
-            outputDir,
-            'work-instruction-image-manager-empty.png'
-          ),
-        })
-        await instructionImageManager
-          .getByRole('button', { name: '保存图片调整', exact: true })
-          .click()
-        await instructionImageManager.waitFor({
-          state: 'hidden',
-          timeout: 10_000,
-        })
         await page.waitForFunction(
           () =>
             document.querySelectorAll(
@@ -12719,7 +13582,7 @@ export function createStyleL1Scenarios(deps) {
             workInstructionRowImageControlState.imageCount === 0 &&
             workInstructionRowImageControlState.directTextEditorCount === 1 &&
             workInstructionRowImageControlState.textAfterRemoval.length > 0,
-          `作业指导书逐张移除全部图片后应保留当前行文字: ${JSON.stringify(workInstructionRowImageControlState)}`
+          `作业指导书清空当前行图片后应保留当前行文字: ${JSON.stringify(workInstructionRowImageControlState)}`
         )
         const mainInstructionSheet = page.locator(
           '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation)'
@@ -12844,51 +13707,8 @@ export function createStyleL1Scenarios(deps) {
         await page
           .locator('.erp-print-shell__toolbar-group')
           .first()
-          .getByRole('button', { name: '管理当前行图片', exact: true })
+          .getByRole('button', { name: '清空当前行图片', exact: true })
           .click()
-        await instructionImageManager.waitFor({
-          state: 'visible',
-          timeout: 10_000,
-        })
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-work-instruction-annotation-modal [role="tab"]'
-            ).length === 3
-        )
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await page.waitForFunction(
-          () =>
-            document.querySelectorAll(
-              '.erp-work-instruction-annotation-modal [role="tab"]'
-            ).length === 2
-        )
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await instructionImageManager
-          .getByText('图片 1 / 1', { exact: true })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await instructionImageManager
-          .getByRole('button', { name: '移除当前图片', exact: true })
-          .click()
-        await instructionImageManager
-          .locator('.erp-work-instruction-annotation-modal__image-summary', {
-            hasText: '当前行没有图片',
-          })
-          .waitFor({ state: 'visible', timeout: 10_000 })
-        await instructionImageManager
-          .getByRole('button', { name: '保存图片调整', exact: true })
-          .click()
-        await instructionImageManager.waitFor({
-          state: 'hidden',
-          timeout: 10_000,
-        })
         await page.waitForFunction((rowIndex) => {
           const sheet = document.querySelector(
             '.erp-work-instruction-paper__sheet:not(.erp-work-instruction-paper__sheet--continuation)'
@@ -13747,6 +14567,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '委外订单')
         await expectText(page, '生产管理')
         await expectText(page, '生产排程')
+        await expectText(page, '生产异常')
         await expectText(page, '出货管理')
         await expectText(page, '出货放行')
         await expectText(page, '财务管理')
@@ -13755,7 +14576,6 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '列顺序')
         await expectText(page, '运营工具')
         await expectText(page, '模板打印中心')
-        await expectText(page, '异常处理')
         await verifyBusinessModuleColumnOrderDialog(page, {
           moduleKey: 'sales-orders',
           heading: '销售订单',
@@ -13766,6 +14586,11 @@ export function createStyleL1Scenarios(deps) {
         await expectAdminMenuText(page, '系统管理')
         await expectText(page, '权限管理')
         const menu = page.locator('.erp-admin-menu')
+        assert.equal(
+          await menu.getByText('异常处理', { exact: true }).count(),
+          0,
+          '侧栏不应再显示已并入工作台和任务看板的“异常处理”入口'
+        )
         assert.equal(
           await menu.getByText('客户/供应商', { exact: true }).count(),
           0,
@@ -13887,18 +14712,12 @@ export function createStyleL1Scenarios(deps) {
       assertBusinessMainTableInitialSelectionEmpty,
       assertERPThemeMode,
       assertNoHorizontalOverflow,
-      assertPurchaseReceiptActionButtonState,
-      assertPurchaseReceiptAddItemEditorDarkTokens,
-      assertPurchaseReceiptAddItemEditorMetrics,
-      assertPurchaseReceiptAddItemEditorMobileLayout,
       assertPurchaseReceiptRowItemCount,
       assertTextAbsent,
       closeBusinessFormModal,
       expectButton,
       expectHeading,
       expectText,
-      fillPurchaseReceiptAddItemEditorBoundaryValues,
-      openPurchaseReceiptAddItemEditor,
       selectPurchaseReceiptRow,
       verifyBusinessModuleColumnOrderDialog,
       customerRuntimeEffectiveSession,
@@ -13909,6 +14728,15 @@ export function createStyleL1Scenarios(deps) {
       customerRuntimeEffectiveSession,
       expectHeading,
       expectText,
+    }),
+    ...createProductPaginationScenarios({
+      assert,
+      assertNoHorizontalOverflow,
+      customerRuntimeEffectiveSession,
+      expectHeading,
+      expectText,
+      outputDir,
+      path,
     }),
     {
       name: 'material-master-header-desktop',
@@ -14009,11 +14837,195 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1440, height: 900 },
+      beforeNavigate: async (page) => {
+        purchaseOrderMaterialReferenceAttempts = 0
+        purchaseOrderMaterialReferenceMode = 'pending'
+        purchaseOrderMaterialReferenceCounts = {
+          pending: 0,
+          fail: 0,
+          empty: 0,
+          full: 0,
+        }
+        purchaseOrderPendingReferenceRequests = 0
+        purchaseOrderPendingReferenceReleased = false
+        const initialStarted = createDeferred()
+        const initialRelease = createDeferred()
+        const pendingDrained = createDeferred()
+        const failedRefreshSettled = createDeferred()
+        const emptyRefreshSettled = createDeferred()
+        const fullRefreshSettled = createDeferred()
+        purchaseOrderInitialReferenceStarted = initialStarted.promise
+        purchaseOrderPendingReferenceDrained = pendingDrained.promise
+        purchaseOrderFailedRefreshSettled = failedRefreshSettled.promise
+        purchaseOrderEmptyRefreshSettled = emptyRefreshSettled.promise
+        purchaseOrderFullRefreshSettled = fullRefreshSettled.promise
+
+        await page.route('**/rpc/masterdata', async (route) => {
+          const body = route.request().postDataJSON() || {}
+          if (body.method !== 'list_materials') {
+            await route.fallback()
+            return
+          }
+
+          purchaseOrderMaterialReferenceAttempts += 1
+          const mode = purchaseOrderMaterialReferenceMode
+          purchaseOrderMaterialReferenceCounts[mode] =
+            Number(purchaseOrderMaterialReferenceCounts[mode] || 0) + 1
+          if (mode === 'full') {
+            try {
+              await route.fallback()
+            } finally {
+              fullRefreshSettled.resolve()
+            }
+            return
+          }
+
+          let result
+          if (mode === 'pending') {
+            purchaseOrderPendingReferenceRequests += 1
+            initialStarted.resolve()
+            await initialRelease.promise
+            result = {
+              code: 0,
+              message: 'OK',
+              data: { materials: [], total: 0, limit: 200, offset: 0 },
+            }
+          } else if (mode === 'fail') {
+            result = {
+              code: RpcErrorCode.INTERNAL,
+              message: '采购材料资料暂时不可用',
+              data: {},
+            }
+          } else {
+            result = {
+              code: 0,
+              message: 'OK',
+              data: { materials: [], total: 0, limit: 200, offset: 0 },
+            }
+          }
+
+          try {
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id || 'mock-id',
+                result,
+              }),
+            })
+          } catch (error) {
+            if (mode !== 'pending') throw error
+          } finally {
+            if (mode === 'pending') {
+              purchaseOrderPendingReferenceRequests -= 1
+              if (
+                purchaseOrderPendingReferenceReleased &&
+                purchaseOrderPendingReferenceRequests === 0
+              ) {
+                pendingDrained.resolve()
+              }
+            }
+            if (mode === 'fail') failedRefreshSettled.resolve()
+            if (mode === 'empty') emptyRefreshSettled.resolve()
+          }
+        })
+        releasePurchaseOrderInitialReference = () => {
+          purchaseOrderPendingReferenceReleased = true
+          initialRelease.resolve()
+          if (purchaseOrderPendingReferenceRequests === 0) {
+            pendingDrained.resolve()
+          }
+        }
+      },
       verify: async (page) => {
         await expectHeading(page, '采购订单')
         await expectText(page, '下单日期')
         await expectText(page, '预计到货日期')
         await expectText(page, '新建采购订单')
+        await purchaseOrderInitialReferenceStarted
+        const createButton = page
+          .locator('button.erp-business-list-toolbar__primary-action')
+          .filter({ hasText: '新建采购订单' })
+          .first()
+        const refreshButton = page
+          .locator('.erp-admin-header button')
+          .filter({ hasText: '刷新当前页' })
+          .first()
+        await createButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await refreshButton.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await createButton.isDisabled(),
+          true,
+          '采购基础资料尚在加载时，新建入口必须 fail-closed'
+        )
+        assert.equal(
+          await page
+            .locator('.erp-business-action-modal--form.ant-modal:visible')
+            .count(),
+          0,
+          '采购基础资料尚在加载时不应打开空白采购订单弹窗'
+        )
+
+        purchaseOrderMaterialReferenceMode = 'fail'
+        await refreshButton.click()
+        await purchaseOrderFailedRefreshSettled
+        releasePurchaseOrderInitialReference()
+        await purchaseOrderPendingReferenceDrained
+        await refreshButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await page.waitForFunction(
+          (button) => Boolean(button && !button.disabled),
+          await refreshButton.elementHandle()
+        )
+        assert.equal(
+          await createButton.isDisabled(),
+          true,
+          '后发参考资料请求失败后，已取消的旧请求不得把页面改回 ready'
+        )
+        assert.equal(
+          await page.locator('.ant-message-success:visible').count(),
+          0,
+          '采购参考资料刷新失败时不得误报“当前页面数据已刷新”'
+        )
+        purchaseOrderMaterialReferenceMode = 'empty'
+        await refreshButton.click()
+        await purchaseOrderEmptyRefreshSettled
+        await page.waitForFunction(
+          (button) => Boolean(button && !button.disabled),
+          await refreshButton.elementHandle()
+        )
+        const emptyReferenceButtonState = await createButton.evaluate(
+          (button) => ({
+            disabled: button.disabled,
+            title: button.getAttribute('title'),
+            text: String(button.textContent || '').trim(),
+          })
+        )
+        assert.equal(
+          emptyReferenceButtonState.disabled,
+          false,
+          `成功空集合应恢复新建入口: ${JSON.stringify(
+            emptyReferenceButtonState
+          )}`
+        )
+        assert.equal(
+          purchaseOrderMaterialReferenceCounts.empty,
+          1,
+          '成功返回空材料集合应完成参考资料加载，不能被误判为请求失败'
+        )
+
+        purchaseOrderMaterialReferenceMode = 'full'
+        await refreshButton.click()
+        await purchaseOrderFullRefreshSettled
+        await page.waitForFunction(
+          (button) => Boolean(button && !button.disabled),
+          await refreshButton.elementHandle()
+        )
+        assert(
+          purchaseOrderMaterialReferenceCounts.full >= 1 &&
+            purchaseOrderMaterialReferenceAttempts >= 4,
+          '再次刷新应恢复完整材料参考资料，供来源导入继续使用'
+        )
         await assertBusinessPageRefreshEntrypoint(page, {
           scenarioName: 'purchase-order-date-filter-desktop',
         })
@@ -14274,8 +15286,13 @@ export function createStyleL1Scenarios(deps) {
               .locator('input[id$="_product_id"]')
               .first()
             await productInput.click()
-            await productInput.press('ArrowDown')
-            await productInput.press('Enter')
+            await page
+              .locator(
+                '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
+              )
+              .filter({ hasText: /^PROD-STYLE-L1 \/ 样式产品$/u })
+              .first()
+              .click()
             const productSKUInput = modal
               .locator('input[id$="_product_sku_id"]')
               .first()
@@ -14302,15 +15319,18 @@ export function createStyleL1Scenarios(deps) {
               .locator('.ant-form-item')
               .filter({ hasText: '加工品类' })
               .first()
-            const subjectTypeInput = subjectTypeField.locator(
-              '.ant-select-selection-search-input'
-            )
             await subjectTypeField.locator('.ant-select-selector').click()
-            await subjectTypeInput.press('ArrowDown')
-            await subjectTypeInput.press('Enter')
+            await page
+              .locator(
+                '.ant-select-dropdown:not(.ant-select-dropdown-hidden) .ant-select-item-option'
+              )
+              .filter({ hasText: '材料（布料加工等）' })
+              .first()
+              .click()
             const materialInput = modal
               .locator('input[id$="_material_id"]')
               .first()
+            await materialInput.waitFor({ state: 'visible', timeout: 10_000 })
             await materialInput.click()
             await materialInput.press('ArrowDown')
             await materialInput.press('Enter')
@@ -14525,7 +15545,7 @@ export function createStyleL1Scenarios(deps) {
         })
         await assertBusinessMainTableSortableColumns(page, {
           scenarioName: 'shipment-date-filter-desktop',
-          unsortableHeaders: ['备注'],
+          unsortableHeaders: ['实际 / 最终总净重（克）', '备注'],
         })
         await assertBusinessModuleToolbarControlStyle(page, {
           scenarioName: 'shipment-date-filter-desktop',

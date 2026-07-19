@@ -7,17 +7,11 @@ export function createPurchaseReceiptScenarios(deps) {
     assertBusinessMainTableInitialSelectionEmpty,
     assertERPThemeMode,
     assertNoHorizontalOverflow,
-    assertPurchaseReceiptActionButtonState,
-    assertPurchaseReceiptAddItemEditorDarkTokens,
-    assertPurchaseReceiptAddItemEditorMetrics,
-    assertPurchaseReceiptAddItemEditorMobileLayout,
     assertPurchaseReceiptRowItemCount,
     assertTextAbsent,
     expectButton,
     expectHeading,
     expectText,
-    fillPurchaseReceiptAddItemEditorBoundaryValues,
-    openPurchaseReceiptAddItemEditor,
     selectPurchaseReceiptRow,
     verifyBusinessModuleColumnOrderDialog,
     customerRuntimeEffectiveSession,
@@ -393,7 +387,7 @@ export function createPurchaseReceiptScenarios(deps) {
       },
     },
     {
-      name: 'purchase-receipt-add-item-inline-draft-desktop',
+      name: 'purchase-receipt-source-generated-boundary-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
@@ -401,7 +395,10 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await expectText(page, 'PR-STYLE-L1-DRAFT')
+        await expectText(page, '不提供脱离采购来源的手工入库明细')
         await assertTextAbsent(page, '维护明细')
+        await assertTextAbsent(page, '添加明细')
+        await assertTextAbsent(page, '添加入库明细')
 
         const draftRow = page
           .getByRole('row')
@@ -421,57 +418,64 @@ export function createPurchaseReceiptScenarios(deps) {
           1
         )
         await expectText(page, '已显示 1 / 1 条')
-
-        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1')
-        await assertPurchaseReceiptActionButtonState(page, {
-          name: '添加明细',
-          disabled: true,
-          scenarioName: 'purchase-receipt-add-item-posted-disabled',
-        })
-
-        await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-CANCELLED')
-        await assertPurchaseReceiptActionButtonState(page, {
-          name: '添加明细',
-          disabled: true,
-          scenarioName: 'purchase-receipt-add-item-cancelled-disabled',
-        })
-
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
-        await expectText(page, '已录入')
-        await expectText(page, '数量合计')
         await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
-        await assertPurchaseReceiptActionButtonState(page, {
-          name: '添加明细',
-          disabled: false,
-          scenarioName: 'purchase-receipt-add-item-draft-enabled',
+        await page.getByRole('button', { name: /相关单据/u }).click()
+        const purchaseOrderMenuItem = page.getByRole('menuitem', {
+          name: '采购订单',
+          exact: true,
         })
-        const editor = await openPurchaseReceiptAddItemEditor(page)
-        await expectText(page, '添加入库明细')
-        await assertTextAbsent(page, '编辑入库明细')
-        await editor.getByRole('button', { name: '添加明细' }).click()
-        await expectText(page, '请选择材料')
-        await expectText(page, '请选择仓库')
-        await expectText(page, '请选择单位')
-        await expectText(page, '请填写入库数量')
-
-        await fillPurchaseReceiptAddItemEditorBoundaryValues(page, editor)
-        await assertPurchaseReceiptAddItemEditorMetrics(page, editor, {
-          scenarioName: 'purchase-receipt-add-item-inline-draft-desktop',
+        await purchaseOrderMenuItem.waitFor({
+          state: 'visible',
+          timeout: 10_000,
         })
-        await editor.getByRole('button', { name: '添加明细' }).click()
-        await expectText(page, '入库明细已添加')
-        await editor.waitFor({ state: 'hidden', timeout: 10_000 })
-        await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 2)
-        await draftPreview.waitFor({ state: 'visible', timeout: 10_000 })
-        assert.equal(
-          await draftPreview.locator('.erp-business-row-item-card').count(),
-          2,
-          '主表版本不变时，展开区也必须同步新增后的嵌入明细'
+        await page.keyboard.press('Escape')
+        await purchaseOrderMenuItem.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        const actionBar = page.locator(
+          '.erp-business-selection-action-bar__actions'
         )
-        await expectText(page, '已显示 2 / 2 条')
+        const actionBarText = String(await actionBar.innerText()).replace(
+          /\s+/gu,
+          ''
+        )
+        assert.match(
+          actionBarText,
+          /作废草稿/u,
+          `选中采购入库草稿后必须保留作废入口: ${actionBarText}`
+        )
+        const discardDraftButton = actionBar.getByRole('button', {
+          name: /作废草稿/u,
+        })
+        await discardDraftButton.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await discardDraftButton.isDisabled(),
+          false,
+          `采购入库草稿作废入口不应被禁用: ${actionBarText}`
+        )
+        await discardDraftButton.click()
+        const visiblePopover = page
+          .locator('.ant-popover:visible')
+          .filter({ hasText: '确认作废采购入库草稿' })
+          .last()
+        await visiblePopover.waitFor({ state: 'visible', timeout: 10_000 })
+        const confirmDiscardButton = visiblePopover
+          .locator('button')
+          .filter({ hasText: /确\s*认/u })
+          .last()
+        await confirmDiscardButton.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        assert.equal(await confirmDiscardButton.isDisabled(), false)
+        await confirmDiscardButton.click()
+        await expectText(page, '采购入库草稿已作废，未更新库存')
+        await assertTextAbsent(page, '添加明细')
         await assertNoHorizontalOverflow(
           page,
-          'purchase-receipt-add-item-inline-draft-desktop-recovery'
+          'purchase-receipt-source-generated-boundary-desktop'
         )
       },
     },
@@ -555,7 +559,7 @@ export function createPurchaseReceiptScenarios(deps) {
       },
     },
     {
-      name: 'purchase-receipt-add-item-inline-dark-desktop',
+      name: 'purchase-receipt-source-generated-boundary-dark-desktop',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
@@ -564,59 +568,37 @@ export function createPurchaseReceiptScenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '入库管理')
         await assertERPThemeMode(page, {
-          scenarioName: 'purchase-receipt-add-item-inline-dark-desktop',
+          scenarioName: 'purchase-receipt-source-generated-boundary-dark-desktop',
           expectedMode: 'dark',
           expectedEffectiveTheme: 'dark',
         })
+        await expectText(page, '不提供脱离采购来源的手工入库明细')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
-        const editor = await openPurchaseReceiptAddItemEditor(page)
-        await expectText(page, '添加入库明细')
-        await fillPurchaseReceiptAddItemEditorBoundaryValues(page, editor)
-        await assertPurchaseReceiptAddItemEditorMetrics(page, editor, {
-          scenarioName: 'purchase-receipt-add-item-inline-dark-desktop',
-        })
-        await assertPurchaseReceiptAddItemEditorDarkTokens(page, editor, {
-          scenarioName: 'purchase-receipt-add-item-inline-dark-desktop',
-        })
-        await editor.evaluate((node) => {
-          node
-            .querySelector(
-              '.erp-purchase-receipt-inline-item-editor__footer button'
-            )
-            ?.click()
-        })
-        await editor.waitFor({ state: 'hidden', timeout: 10_000 })
+        await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
+        await assertTextAbsent(page, '添加明细')
+        await assertTextAbsent(page, '添加入库明细')
+        await assertNoHorizontalOverflow(
+          page,
+          'purchase-receipt-source-generated-boundary-dark-desktop'
+        )
       },
     },
     {
-      name: 'purchase-receipt-add-item-inline-mobile',
+      name: 'purchase-receipt-source-generated-boundary-mobile',
       path: '/erp/warehouse/inbound',
       auth: 'admin',
       effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 390, height: 844 },
       verify: async (page) => {
         await expectHeading(page, '入库管理')
+        await expectText(page, '不提供脱离采购来源的手工入库明细')
         await selectPurchaseReceiptRow(page, 'PR-STYLE-L1-DRAFT')
-        const editor = await openPurchaseReceiptAddItemEditor(page)
-        await expectText(page, '添加入库明细')
-        await fillPurchaseReceiptAddItemEditorBoundaryValues(page, editor)
-        await assertPurchaseReceiptAddItemEditorMetrics(page, editor, {
-          scenarioName: 'purchase-receipt-add-item-inline-mobile',
-        })
-        await assertPurchaseReceiptAddItemEditorMobileLayout(page, editor, {
-          scenarioName: 'purchase-receipt-add-item-inline-mobile',
-        })
-        await editor.evaluate((node) => {
-          node
-            .querySelector(
-              '.erp-purchase-receipt-inline-item-editor__footer button'
-            )
-            ?.click()
-        })
-        await editor.waitFor({ state: 'hidden', timeout: 10_000 })
+        await assertPurchaseReceiptRowItemCount(page, 'PR-STYLE-L1-DRAFT', 1)
+        await assertTextAbsent(page, '添加明细')
+        await assertTextAbsent(page, '添加入库明细')
         await assertNoHorizontalOverflow(
           page,
-          'purchase-receipt-add-item-inline-mobile-recovery'
+          'purchase-receipt-source-generated-boundary-mobile'
         )
       },
     },

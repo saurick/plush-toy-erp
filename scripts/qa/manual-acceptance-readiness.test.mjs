@@ -1,9 +1,11 @@
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import test from "node:test";
 
 import { dashboardHealthModules } from "../../web/src/erp/config/dashboardModules.mjs";
 import { MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS } from "./manual-acceptance-catalog.mjs";
 import { evaluateManualAcceptanceOutsourcingInventoryCoverage } from "./manual-acceptance-fact-report-contract.mjs";
+import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 import {
   buildManualAcceptanceReadinessPlan,
   evaluateBusinessDashboardProjection,
@@ -43,6 +45,18 @@ import {
 
 const LOCAL_BACKEND_URL = "http://127.0.0.1:8310";
 const LOCAL_DATABASE_NAME = "plush_erp_acceptance_20260716_v5_dev";
+
+test("readiness imports the shared page-data contract exactly once", async () => {
+  const source = await readFile(
+    new URL("./manual-acceptance-readiness.mjs", import.meta.url),
+    "utf8",
+  );
+  assert.equal(
+    source.match(/from "\.\/manual-acceptance-page-data-contract\.mjs";/gu)
+      ?.length,
+    1,
+  );
+});
 
 function localTargetConfirmation() {
   return manualAcceptanceTargetConfirmation({
@@ -158,6 +172,19 @@ function factReferenceRecords(countOverrides = {}) {
     secondaryValues: ["MATERIAL_ISSUE", "FINISHED_GOODS_RECEIPT", "REWORK"],
     sourceType: "PRODUCTION_ORDER",
   });
+  const paymentTerms = [
+    { paymentTerm: "CASH_ON_SHIPMENT", paymentTermDays: 0 },
+    { paymentTerm: "EOM_30", paymentTermDays: 30 },
+    { paymentTerm: "EOM_45", paymentTermDays: 45 },
+    { paymentTermDays: 60 },
+  ];
+  const invoiceCategories = [
+    "NONE",
+    "EXPORT_GENERAL",
+    "VAT_GENERAL_1",
+    "VAT_SPECIAL_3",
+    "VAT_SPECIAL_13",
+  ];
   const financeFacts = [
     ["PAYABLE", ["DRAFT", "POSTED", "SETTLED", "CANCELLED"]],
     ["RECEIVABLE", ["DRAFT", "POSTED", "SETTLED", "CANCELLED"]],
@@ -172,7 +199,28 @@ function factReferenceRecords(countOverrides = {}) {
       secondaryKey: "factType",
       secondaryValues: [factType],
       sourceType: factType === "PAYABLE" ? "OUTSOURCING_FACT" : "SHIPMENT",
-    }),
+    }).map((item, index) => ({
+      ...item,
+      ...(factType === "RECEIVABLE"
+        ? {
+            collectionType: "ACCOUNTS_RECEIVABLE",
+            ...paymentTerms[index % paymentTerms.length],
+          }
+        : {}),
+      ...(factType === "INVOICE"
+        ? {
+            invoiceCategory:
+              invoiceCategories[index % invoiceCategories.length],
+          }
+        : {}),
+      ...(item.status === "CANCELLED"
+        ? {
+            cancelledAt: 1784300000 + index,
+            cancelledByName: "demo_finance",
+            cancelReason: "本笔取消",
+          }
+        : {}),
+    })),
   );
   const records = {
     productionOrders: referenceRecords(count("productionOrders", 45), {
@@ -315,6 +363,9 @@ function factReport({ referenceCounts = {}, ...overrides } = {}) {
   const referenceRecords = factReferenceRecords(referenceCounts);
   const outsourcingReturnInventoryCoverage =
     evaluateManualAcceptanceOutsourcingInventoryCoverage(referenceRecords);
+  const financeFieldContract = inspectFinanceFieldContract(
+    referenceRecords.financeFacts,
+  );
   return {
     reportContract: "source-driven-operational-facts-v1",
     mode: "apply",
@@ -340,6 +391,7 @@ function factReport({ referenceCounts = {}, ...overrides } = {}) {
         referenceRecords.inventoryBalances.length,
       outsourcingReturnInventoryCoverage,
     },
+    financeFieldContract,
     referenceRecords,
     ...overrides,
   };
@@ -631,6 +683,13 @@ function createReadinessFetch(runtimeOptions = {}) {
         fact_type: item.factType,
         source_type: item.sourceType,
         source_id: item.sourceID,
+        collection_type: item.collectionType,
+        payment_term: item.paymentTerm,
+        payment_term_days: item.paymentTermDays,
+        invoice_category: item.invoiceCategory,
+        cancelled_at: item.cancelledAt,
+        cancelled_by_name: item.cancelledByName,
+        cancel_reason: item.cancelReason,
       })),
     ],
   };
@@ -923,7 +982,7 @@ function createReadinessFetch(runtimeOptions = {}) {
   return { fetchImpl, calls };
 }
 
-test("all 51 formal targets are owned by shared generator stages", () => {
+test("all 50 formal targets are owned by shared generator stages", () => {
   const contract = buildManualAcceptancePageDataContract();
   const plan = buildManualAcceptanceReadinessPlan();
   const ownershipByID = new Map(
@@ -936,7 +995,7 @@ test("all 51 formal targets are owned by shared generator stages", () => {
     ]),
   );
 
-  assert.equal(contract.targets.length, 51);
+  assert.equal(contract.targets.length, 50);
   assert.deepEqual(
     Object.keys(contract.generatorStages).sort(),
     [...MANUAL_ACCEPTANCE_GENERATOR_STAGE_KEYS].sort(),
@@ -1003,7 +1062,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   missingPage.targets.pop();
   assert.throws(
     () => assertManualAcceptancePageDataContract(missingPage),
-    /必须恰好覆盖 51 个正式目标/u,
+    /必须恰好覆盖 50 个正式目标/u,
   );
 
   const unknownProbe = structuredClone(contract);
@@ -1030,7 +1089,7 @@ test("page data ownership fails closed for missing pages, unknown probes, and pa
   );
 });
 
-test("default plan covers all 51 targets and never connects to a backend", async () => {
+test("default plan covers all 50 targets and never connects to a backend", async () => {
   let fetchCalls = 0;
   const result = await runManualAcceptanceReadinessCli([], {
     fetchImpl: async () => {
@@ -1044,7 +1103,7 @@ test("default plan covers all 51 targets and never connects to a backend", async
   assert.equal(result.plan.callsBackend, false);
   assert.equal(result.plan.writesBackend, false);
   assert.equal(result.plan.directSQL, false);
-  assert.equal(result.plan.targets.length, 51);
+  assert.equal(result.plan.targets.length, 50);
   assert.equal(
     result.plan.targets.filter(
       (item) => item.catalogGroup === "mobileRolePages",
@@ -1066,24 +1125,16 @@ test("default plan covers all 51 targets and never connects to a backend", async
     result.plan.targets.find(
       (item) => item.id === "desktopPages:production-exceptions",
     ).probeIds,
-    ["workflow-tasks:production_exception"],
+    [
+      "workflow-tasks:production_exception",
+      "production-exception-active-tasks",
+    ],
   );
   assert.deepEqual(
     result.plan.targets.find(
       (item) => item.id === "desktopPages:shipping-release",
     ).probeIds,
     ["workflow-tasks:shipment_release"],
-  );
-  const exceptionFlow = result.plan.targets.find(
-    (item) => item.id === "desktopPages:exception-flow",
-  );
-  assert.deepEqual(exceptionFlow.probeIds, [
-    "workflow-tasks:production_exception",
-    "production-exception-active-tasks",
-  ]);
-  assert.equal(
-    exceptionFlow.actualProbeId,
-    "production-exception-active-tasks",
   );
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
@@ -1098,7 +1149,7 @@ test("default plan covers all 51 targets and never connects to a backend", async
   assert.ok(businessDashboard.probeIds.includes("products"));
   assert.ok(businessDashboard.probeIds.includes("business-dashboard-stats"));
   assert.equal(businessDashboard.probeIds.includes("product-skus"), false);
-  assert.equal(result.plan.expected.targets, 51);
+  assert.equal(result.plan.expected.targets, 50);
   assert.equal(result.plan.expected.mobileTaskTotal, 180);
   const probesByID = new Map(
     result.plan.probes.map((probe) => [probe.id, probe]),
@@ -1123,7 +1174,6 @@ test("business dashboard projection proves the exact runtime module set", () => 
   assert.deepEqual(probe.expectedModuleTotals, {
     products: 20,
     inventory: 45,
-    "production-scheduling": 25,
   });
   const modules = probe.expectedModuleKeys.map((moduleKey) => ({
     module_key: moduleKey,
@@ -1145,7 +1195,7 @@ test("business dashboard projection proves the exact runtime module set", () => 
   stale.find((item) => item.module_key === "production-scheduling").total = 20;
   assert.equal(
     evaluateBusinessDashboardProjection(probe, { modules: stale }).status,
-    "fail",
+    "pass",
   );
   const pollutedInventory = structuredClone(modules);
   pollutedInventory.find((item) => item.module_key === "inventory").total =
@@ -1259,7 +1309,7 @@ test("apply reports may raise minimums while the shipment dataset stays exact", 
     /岗位任务报告不是有效/u,
   );
   const missingScenario = structuredClone(taskReport());
-  missingScenario.coverage.scenariosByRoleTaskGroup.production.outsource_return_tracking.outsourcing_return = 0;
+  missingScenario.coverage.scenariosByRoleTaskGroup.production.trial_production_work.outsourcing_return = 0;
   assert.throws(
     () => buildManualAcceptanceReadinessPlan({ taskReport: missingScenario }),
     /岗位任务报告不是有效/u,
@@ -1650,10 +1700,10 @@ test("explicit verification reports page data, nine role totals, and honest manu
     }),
   );
 
-  assert.equal(report.summary.totalTargets, 51);
+  assert.equal(report.summary.totalTargets, 50);
   assert.equal(
     report.summary.passedTargetData,
-    41,
+    36,
     JSON.stringify(
       report.targets
         .filter((item) => item.dataStatus !== "pass")
@@ -1665,9 +1715,12 @@ test("explicit verification reports page data, nine role totals, and honest manu
     ),
   );
   assert.equal(report.summary.failedTargetData, 0);
-  assert.equal(report.summary.notProvenTargetData, 10);
+  assert.equal(report.summary.notProvenTargetData, 14);
   assert.equal(report.summary.queryChecksPassed, true);
   assert.equal(report.summary.queryEvidenceComplete, false);
+  assert.equal(report.summary.financeFieldEvidenceComplete, true);
+  assert.equal(report.financeFieldContract.complete, true);
+  assert.equal(report.financeFieldContract.coveragePercent, 100);
   assert.equal(report.summary.browserChecksCompleted, 0);
   assert.equal(report.summary.manualAcceptanceCompleted, false);
   assert.equal(report.summary.mobileRolePages, 9);
@@ -1683,8 +1736,8 @@ test("explicit verification reports page data, nine role totals, and honest manu
   );
   assert.deepEqual(
     report.summary.taskGroupCoverage.byRole.production.groups
-      .production_exception.requiredScenarios,
-    ["production_exception"],
+      .trial_production_work.requiredScenarios,
+    ["outsourcing_return", "rework", "production_exception"],
   );
   assert.deepEqual(
     new Set(
@@ -1695,7 +1748,8 @@ test("explicit verification reports page data, nine role totals, and honest manu
     new Set(MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.production),
   );
   assert.deepEqual(
-    report.summary.taskGroupCoverage.byRole.warehouse.groups.shipment_release
+    report.summary.taskGroupCoverage.byRole.warehouse.groups
+      .trial_warehouse_work
       .missingScenarios,
     [],
   );
@@ -1703,7 +1757,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
     new Set(Object.values(report.summary.mobileActualByRole)),
     new Set([20]),
   );
-  assert.equal(report.targets.length, 51);
+  assert.equal(report.targets.length, 50);
   assert.equal(report.runtimePreflight.environment, "local");
   assert.equal(report.runtimePreflight.customerKey, "yoyoosun");
   assert.equal(
@@ -1732,16 +1786,12 @@ test("explicit verification reports page data, nine role totals, and honest manu
     item.id.startsWith("workflow-tasks:"),
   );
   assert.equal(workflowPageProbes.length, 3);
-  const expectedWorkflowPageCounts = new Map([
-    ["workflow-tasks:production_scheduling", 20],
-    ["workflow-tasks:production_exception", 5],
-    ["workflow-tasks:shipment_release", 4],
-  ]);
   assert(
     workflowPageProbes.every(
       (item) =>
-        item.status === "pass" &&
-        item.actual === expectedWorkflowPageCounts.get(item.id) &&
+        item.status === "not_proven" &&
+        item.actual === null &&
+        item.batchEvidence === "not_proven" &&
         item.exactTaskGroup &&
         item.params.task_group === item.exactTaskGroup,
     ),
@@ -1750,30 +1800,10 @@ test("explicit verification reports page data, nine role totals, and honest manu
   const activeProductionExceptions = report.probes.find(
     (item) => item.id === "production-exception-active-tasks",
   );
-  assert.equal(activeProductionExceptions.status, "pass");
-  assert.equal(activeProductionExceptions.expectedExact, 4);
-  assert.equal(activeProductionExceptions.actual, 4);
-  assert.deepEqual(activeProductionExceptions.statusCounts, {
-    BLOCKED: 1,
-    READY: 3,
-  });
-  assert.equal(activeProductionExceptions.exactOwnerRoleKey, "production");
-  assert.equal(
-    activeProductionExceptions.exactTaskGroup,
-    "production_exception",
-  );
-  const exceptionFlowTarget = report.targets.find(
-    (item) => item.id === "desktopPages:exception-flow",
-  );
-  assert.equal(exceptionFlowTarget.dataStatus, "pass");
-  assert.equal(exceptionFlowTarget.actual, 4);
-  assert.deepEqual(
-    exceptionFlowTarget.supporting.map((item) => item.id),
-    [
-      "workflow-tasks:production_exception",
-      "production-exception-active-tasks",
-    ],
-  );
+  assert.equal(activeProductionExceptions.status, "not_proven");
+  assert.equal(activeProductionExceptions.expectedExact, 0);
+  assert.equal(activeProductionExceptions.actual, null);
+  assert.deepEqual(activeProductionExceptions.statusCounts, {});
   assert.equal(mobileProbes.length, 9);
   assert(
     mobileProbes.every(
@@ -2391,7 +2421,7 @@ test("customer-facing report uses ordinary business wording", async () => {
   assert.match(markdown, /九个岗位任务合计：180 \/ 180/u);
   assert.match(markdown, /尚未证明/u);
   assert.match(markdown, /人工验收：未完成/u);
-  assert.match(markdown, /页面操作已完成：0 \/ 51/u);
+  assert.match(markdown, /页面操作已完成：0 \/ 50/u);
   assert.doesNotMatch(
     markdown,
     /Workflow|Fact|JSON-RPC|RBAC|schema|raw\s*id|甲方/iu,

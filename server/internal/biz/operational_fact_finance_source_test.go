@@ -65,6 +65,52 @@ func TestOperationalFactUsecaseFinanceFromShipmentRejectsCallerOwnedFactFields(t
 	}
 }
 
+func TestOperationalFactUsecaseInvoiceFromShipmentRequiresCategory(t *testing.T) {
+	repo := &financeFromShipmentRepoStub{productionCompletionRepoStub: &productionCompletionRepoStub{}}
+	uc := NewOperationalFactUsecase(repo)
+	_, err := uc.CreateInvoiceFromShipment(context.Background(), &FinanceFactFromShipmentCreate{
+		FactNo: "INV-SHIPMENT-MISSING-CATEGORY", ShipmentID: 91, IdempotencyKey: "inv-shipment-missing-category",
+	})
+	if !errors.Is(err, ErrFinanceFactInvoiceCategoryMissing) || repo.createdSource != nil {
+		t.Fatalf("missing invoice category error=%v source=%#v", err, repo.createdSource)
+	}
+}
+
+func TestFinancePaymentTermSnapshotFromDays(t *testing.T) {
+	tests := []struct {
+		name     string
+		days     *int
+		wantTerm *string
+		wantDays *int
+		wantErr  error
+	}{
+		{name: "missing", wantErr: ErrFinanceFactPaymentTermMissing},
+		{name: "cash", days: processTestIntPtr(0), wantTerm: stringTestPtr(FinancePaymentTermCashOnShipment), wantDays: processTestIntPtr(0)},
+		{name: "thirty", days: processTestIntPtr(30), wantTerm: stringTestPtr(FinancePaymentTermEOM30), wantDays: processTestIntPtr(30)},
+		{name: "forty five", days: processTestIntPtr(45), wantTerm: stringTestPtr(FinancePaymentTermEOM45), wantDays: processTestIntPtr(45)},
+		{name: "custom sixty", days: processTestIntPtr(60), wantDays: processTestIntPtr(60)},
+		{name: "negative", days: processTestIntPtr(-1), wantErr: ErrBadParam},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			term, days, err := FinancePaymentTermSnapshotFromDays(tt.days)
+			if !errors.Is(err, tt.wantErr) || !optionalStringEqual(term, tt.wantTerm) || !optionalIntEqual(days, tt.wantDays) {
+				t.Fatalf("term=%#v days=%#v err=%v", term, days, err)
+			}
+		})
+	}
+}
+
+func stringTestPtr(value string) *string { return &value }
+
+func optionalStringEqual(left, right *string) bool {
+	return left == nil && right == nil || left != nil && right != nil && *left == *right
+}
+
+func optionalIntEqual(left, right *int) bool {
+	return left == nil && right == nil || left != nil && right != nil && *left == *right
+}
+
 func TestOperationalFactUsecaseSettleFinanceFactAllowsOnlyBalanceTypes(t *testing.T) {
 	tests := []struct {
 		factType string

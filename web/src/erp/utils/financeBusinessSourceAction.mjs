@@ -46,6 +46,13 @@ const RECONCILIATION_SOURCE_TYPES = new Set([
   'INVOICE',
 ])
 
+const FINANCE_TRANSITION_SOURCE_TYPES = Object.freeze({
+  RECEIVABLE: new Set(['SHIPMENT']),
+  PAYABLE: new Set(['PURCHASE_RECEIPT', 'OUTSOURCING_FACT']),
+  INVOICE: new Set(['SHIPMENT']),
+  RECONCILIATION: new Set(['FINANCE_FACT']),
+})
+
 function normalizedText(value) {
   return String(value ?? '').trim()
 }
@@ -57,6 +64,16 @@ function normalizedUpperText(value) {
 function positiveID(value) {
   const parsed = Number(value || 0)
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
+}
+
+export function hasValidFinanceTransitionSource(fact = {}) {
+  const record = fact && typeof fact === 'object' ? fact : {}
+  const sourceTypes =
+    FINANCE_TRANSITION_SOURCE_TYPES[normalizedUpperText(record.fact_type)]
+  return Boolean(
+    sourceTypes?.has(normalizedUpperText(record.source_type)) &&
+      positiveID(record.source_id)
+  )
 }
 
 function boundedFactNo(value) {

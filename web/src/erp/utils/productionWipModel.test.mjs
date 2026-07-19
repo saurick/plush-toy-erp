@@ -723,6 +723,31 @@ test('production WIP rework requires target, quantity and reason', () => {
   )
 })
 
+test('planned WIP cancellation requires one auditable reason', () => {
+  const input = {
+    production_order_id: 7,
+    production_wip_batch_id: 32,
+    expected_version: 2,
+    reason: '排程调整，批次尚未开工',
+    idempotency_key: 'cancel-1',
+  }
+  assert.deepEqual(
+    buildProductionWipActionParams(PRODUCTION_WIP_ACTION.CANCEL_BATCH, input),
+    {
+      action: 'CANCEL_BATCH',
+      ...input,
+    }
+  )
+  assert.throws(
+    () =>
+      buildProductionWipActionParams(PRODUCTION_WIP_ACTION.CANCEL_BATCH, {
+        ...input,
+        reason: '   ',
+      }),
+    /取消原因/u
+  )
+})
+
 test('production WIP labels show business line snapshots and never raw IDs', () => {
   const aggregate = validateProductionWipAggregate(aggregateFixture())
   const batch = aggregate.batches[0]

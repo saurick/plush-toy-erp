@@ -152,7 +152,10 @@ test('purchaseInboundFlow: 移动端 IQC 状态动作不再本地创建下游任
     mobileRoleTasksPageSource.includes('runPurchaseInboundFollowUp'),
     false
   )
-  assert.match(mobileRoleTaskActionsSource, /await loadTasks\(\)/)
+  assert.match(
+    mobileRoleTaskActionsSource,
+    /loadTasks\(\{\s*canonicalTask: confirmedTask\s*\}\)\.catch/
+  )
 })
 
 test('purchaseInboundFlow: 移动端采购 warehouse_inbound 状态动作交给后端', () => {

@@ -262,11 +262,13 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	}
 	processCategory := " 委外车缝 "
 	processNote := "  "
-	processInput, err := normalizeProcessMutation(ProcessMutation{Code: " PR-001 ", Name: " 车缝 ", Category: &processCategory, SortOrder: -1, Note: &processNote})
+	operationCode := " sewing "
+	processInput, err := normalizeProcessMutation(ProcessMutation{Code: " PR-001 ", Name: " 车缝 ", Category: &processCategory, ProductionRouteOperationCode: &operationCode, SortOrder: -1, Note: &processNote})
 	if err != nil {
 		t.Fatalf("expected process mutation valid, got %v", err)
 	}
-	if processInput.Code != "PR-001" || processInput.Name != "车缝" || processInput.Category == nil || *processInput.Category != "委外车缝" || processInput.SortOrder != 0 {
+	if processInput.Code != "PR-001" || processInput.Name != "车缝" || processInput.Category == nil || *processInput.Category != "委外车缝" ||
+		processInput.ProductionRouteOperationCode == nil || *processInput.ProductionRouteOperationCode != ProductionWIPOperationSewing || processInput.SortOrder != 0 {
 		t.Fatalf("expected normalized process, got %#v", processInput)
 	}
 	if processInput.Note != nil {
@@ -274,6 +276,10 @@ func TestMasterDataUsecaseNormalizesCustomerSupplierAndContactInput(t *testing.T
 	}
 	if _, err := normalizeProcessMutation(ProcessMutation{Code: " ", Name: "车缝"}); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("expected empty process code rejected, got %v", err)
+	}
+	unknownOperation := "CUTTING_BY_NAME"
+	if _, err := normalizeProcessMutation(ProcessMutation{Code: "PR-002", Name: "裁片", ProductionRouteOperationCode: &unknownOperation}); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("expected invalid production route operation rejected, got %v", err)
 	}
 	styleNo := "  BEAR-BASE  "
 	customerStyleNo := " "

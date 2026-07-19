@@ -306,6 +306,7 @@ export function createBlankEngineeringDraft(templateKey) {
       productNo: '',
       versionText: '',
       processName: '',
+      processDateText: '',
       department: '',
       maker: '',
       designer: '',

@@ -30,7 +30,10 @@ test('quality purchase return modal only asks for return business intent', () =>
   ]) {
     assert.doesNotMatch(source, new RegExp(`name="${derivedField}"`, 'u'))
   }
-  assert.match(source, /供应商、材料、仓库、批次和单位会根据这次不合格检验自动带入/u)
+  assert.match(
+    source,
+    /供应商、材料、仓库、批次和单位会根据这次不合格检验自动带入/u
+  )
   assert.match(source, /确认退货后，相应批次的库存会同步扣减/u)
   assert.doesNotMatch(source, /写库存|库存流水|库存冲正/u)
 })
@@ -43,9 +46,16 @@ test('quality purchase return modal prevents duplicate submission and stale fiel
   )
   assert.match(source, /form\.resetFields\(\)/u)
   assert.match(source, /confirmLoading=\{loading\}/u)
+  assert.match(source, /okButtonProps=\{\{ disabled: !referenceDataReady \}\}/u)
   assert.match(source, /forceRender/u)
-  assert.match(source, /disabled=\{loading\}/u)
+  assert.match(source, /disabled=\{loading \|\| !referenceDataReady\}/u)
   assert.match(source, /closable=\{!loading\}/u)
   assert.match(source, /keyboard=\{!loading\}/u)
   assert.match(source, /maskClosable=\{!loading\}/u)
+})
+
+test('quality purchase return quantity uses the exact numeric(20,6) contract', () => {
+  assert.match(source, /numeric20Scale6Units\(value\)/u)
+  assert.match(source, /isPositiveNumeric20Scale6Units/u)
+  assert.doesNotMatch(source, /Number\(value\) > 0/u)
 })

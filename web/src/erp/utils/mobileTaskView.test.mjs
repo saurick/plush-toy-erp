@@ -165,50 +165,97 @@ test('mobileTaskView: 空 payload 不报错并提供安全默认值', () => {
   assert.deepEqual(view.related_documents, [])
 })
 
-test('mobileTaskView: 角色任务列表按扩展规则过滤', () => {
-  const tasks = [
-    task({ id: 1, owner_role_key: 'quality' }),
-    task({
-      id: 2,
-      owner_role_key: 'warehouse',
-      source_type: 'shipping-release',
-      due_at: NOW_SEC + 60 * 60,
-    }),
-    task({
-      id: 3,
-      owner_role_key: 'finance',
-      source_type: 'receivables',
-      due_at: NOW_SEC - 60,
-    }),
-    task({
-      id: 4,
-      owner_role_key: 'purchase',
-      source_type: 'accessories-purchase',
-      task_status_key: 'blocked',
-    }),
-  ]
+test('mobileTaskView: 服务端授权的 todo history risk 只做映射和排序', () => {
+  const todoViews = buildMobileTaskListForRole(
+    [
+      task({
+        id: 101,
+        owner_role_key: 'quality',
+        assignee_id: 7,
+        source_type: 'quality-inspections',
+        priority: 0,
+        due_at: NOW_SEC + 10 * 24 * 60 * 60,
+        updated_at: 10,
+      }),
+      task({
+        id: 102,
+        owner_role_key: 'warehouse',
+        source_type: 'inventory',
+        priority: 2,
+        due_at: NOW_SEC + 10 * 24 * 60 * 60,
+        updated_at: 20,
+      }),
+    ],
+    'warehouse',
+    { nowMs: NOW_MS }
+  )
+  const historyViews = buildMobileTaskListForRole(
+    [
+      task({
+        id: 201,
+        owner_role_key: 'sales',
+        task_status_key: 'done',
+        business_status_key: '',
+        priority: 0,
+        due_at: 0,
+        updated_at: 10,
+      }),
+      task({
+        id: 202,
+        owner_role_key: 'purchase',
+        task_status_key: 'done',
+        business_status_key: '',
+        priority: 1,
+        due_at: 0,
+        updated_at: 20,
+      }),
+    ],
+    'boss',
+    { nowMs: NOW_MS }
+  )
+  const riskViews = buildMobileTaskListForRole(
+    [
+      task({
+        id: 301,
+        owner_role_key: 'purchase',
+        source_type: 'accessories-purchase',
+        task_status_key: 'blocked',
+        priority: 0,
+        updated_at: 10,
+      }),
+      task({
+        id: 302,
+        owner_role_key: 'finance',
+        source_type: 'receivables',
+        priority: 3,
+        updated_at: 20,
+      }),
+    ],
+    'boss',
+    { nowMs: NOW_MS }
+  )
 
   assert.deepEqual(
-    buildMobileTaskListForRole(tasks, 'quality', { nowMs: NOW_MS }).map(
-      (item) => item.id
-    ),
-    [1]
+    todoViews.map((item) => item.id),
+    [102, 101]
   )
-  assert(
-    buildMobileTaskListForRole(tasks, 'pmc', { nowMs: NOW_MS })
-      .map((item) => item.id)
-      .includes(4)
-  )
-  assert(
-    buildMobileTaskListForRole(tasks, 'boss', { nowMs: NOW_MS })
-      .map((item) => item.id)
-      .includes(3)
+  assert.equal(todoViews.find((item) => item.id === 101).assignee_id, 7)
+  assert.equal(
+    todoViews.find((item) => item.id === 101).owner_role_key,
+    'quality'
   )
   assert.deepEqual(
-    buildMobileTaskListForRole(tasks, 'finance', { nowMs: NOW_MS }).map(
-      (item) => item.id
-    ),
-    [3]
+    historyViews.map((item) => item.id),
+    [202, 201]
+  )
+  assert.equal(historyViews[0].task_status_label, '已完成')
+  assert.deepEqual(
+    riskViews.map((item) => item.id),
+    [301, 302]
+  )
+  assert.equal(
+    riskViews.find((item) => item.id === 301).alert_label,
+    '任务阻塞'
   )
 })
 
@@ -385,7 +432,7 @@ test('mobileTaskView: 委外回货任务按生产 品质 仓库 PMC 视角展示
     buildMobileTaskListForRole(tasks, 'production', { nowMs: NOW_MS }).map(
       (item) => item.id
     ),
-    [24, 21]
+    [24, 21, 22, 23]
   )
 
   const qualityViews = buildMobileTaskListForRole(tasks, 'quality', {
@@ -513,7 +560,7 @@ test('mobileTaskView: 成品抽检 入库 出货任务按角色视角展示', ()
   )
   assert.deepEqual(
     warehouseViews.map((item) => item.id),
-    [32, 33]
+    [34, 31, 32, 33]
   )
   assert.deepEqual(
     warehouseViews.find((item) => item.id === 32).related_documents,
@@ -643,7 +690,7 @@ test('mobileTaskView: 财务应收和开票任务按财务 PMC 老板视角展�
   )
   assert.equal(
     bossViews.some((item) => item.id === 42),
-    false
+    true
   )
 })
 
@@ -836,9 +883,7 @@ test('mobileTaskView: explainMobileTaskVisibility 解释负责岗位和已结束
       item.includes('品质是这项任务的负责岗位')
     )
   )
-  assert(
-    explanation.warnings.some((item) => item.includes('任务已完成或退回'))
-  )
+  assert(explanation.warnings.some((item) => item.includes('任务已完成或退回')))
   assertNoVisibleTechnicalTaskFields(explanation)
 })
 

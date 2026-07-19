@@ -26,6 +26,14 @@ export function getColumnLabel(column = {}) {
   return String(column.exportTitle || column.title || column.key || '').trim()
 }
 
+export function getColumnDisplayLabel(column = {}) {
+  if (typeof column.title === 'string' || typeof column.title === 'number') {
+    const title = String(column.title).trim()
+    if (title) return title
+  }
+  return getColumnLabel(column)
+}
+
 export function ColumnOrderHeaderMenu({
   column = {},
   columns = [],
@@ -34,7 +42,7 @@ export function ColumnOrderHeaderMenu({
   onChange,
   onOpenPanel,
 }) {
-  const label = getColumnLabel(column) || '当前列'
+  const label = getColumnDisplayLabel(column) || '当前列'
   const normalizedOrder = useMemo(() => {
     const sanitizedOrder = sanitizeModuleColumnOrder(order, columns)
     return sanitizedOrder.length > 0
@@ -243,7 +251,7 @@ export function ColumnOrderModal({
       >
         {orderedColumns.map((column, index) => {
           const key = resolveModuleColumnKey(column, columns)
-          const label = getColumnLabel(column)
+          const label = getColumnDisplayLabel(column)
           const isFirst = index === 0
           const isLast = index === orderedColumns.length - 1
           return (

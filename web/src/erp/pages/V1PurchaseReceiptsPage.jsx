@@ -20,16 +20,17 @@ import {
   cancelPurchaseReceipt,
   createPurchaseReceiptAdjustmentFromReceipt,
   createPurchaseReturnFromReceipt,
+  getPurchaseReceipt,
   listPurchaseReceipts,
   postPurchaseReceipt,
 } from '../api/purchaseApi.mjs'
 import { createPayableFromPurchaseReceipt } from '../api/operationalFactApi.mjs'
-import { listInventoryLots } from '../api/inventoryApi.mjs'
+import { listAllInventoryLots } from '../api/inventoryApi.mjs'
 import {
-  listMaterials,
-  listSuppliers,
-  listUnits,
-  listWarehouses,
+  listAllMaterials,
+  listAllSuppliers,
+  listAllUnits,
+  listAllWarehouses,
 } from '../api/masterDataOrderApi.mjs'
 import {
   BusinessOperationPanel,
@@ -48,7 +49,6 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
-import BusinessLineItemsFooter from '../components/business-list/BusinessLineItemsFooter.jsx'
 import { useBusinessRowItemsPreview } from '../components/business-list/BusinessRowItemsPreview.jsx'
 import PurchaseReceiptExceptionModal from '../components/purchase-receipts/PurchaseReceiptExceptionModal.jsx'
 import PurchaseReceiptExceptionRecordsModal from '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx'
@@ -61,7 +61,11 @@ import {
   trimOptional,
   V1_ROUTE_PATHS,
 } from '../utils/masterDataOrderView.mjs'
-import { decimalNumber, formatQuantity } from '../utils/businessLineItems.mjs'
+import { formatQuantity } from '../utils/businessLineItems.mjs'
+import {
+  comparePurchaseReceiptQuantityTotals,
+  sumPurchaseReceiptQuantities,
+} from '../utils/purchaseReceiptDecimal.mjs'
 import {
   buildPurchaseReceiptAdjustmentPayload,
   buildPurchaseReturnFromReceiptPayload,
@@ -80,6 +84,7 @@ import {
   createBusinessTablePagination,
   getBusinessPaginationParams,
   resetBusinessPaginationCurrent,
+  resolveExactRecordPage,
 } from '../utils/businessPagination.mjs'
 import { applyBusinessColumnSorters } from '../utils/moduleTableColumns.mjs'
 import {
@@ -91,10 +96,16 @@ import {
   warehouseOptionFromRecord,
 } from '../utils/referenceSelectOptions.mjs'
 import {
-  routeWithQuery,
-  searchParamPositiveIntText,
+  searchParamPositiveInt,
   searchParamText,
 } from '../utils/routeQuery.mjs'
+import {
+  canOpenRelatedDocumentPath,
+  clearLinkedDocumentParams,
+  linkedDocumentContext,
+  linkedDocumentRequestKeyword,
+  relatedDocumentRoute,
+} from '../utils/relatedDocumentNavigation.mjs'
 
 const STATUS_OPTIONS = [
   { label: '全部状态', value: '' },
@@ -142,17 +153,17 @@ function receiptItemCount(receipt = {}) {
 }
 
 function receiptQuantityTotal(receipt = {}) {
-  return (receipt.items || []).reduce(
-    (total, item) => total + decimalNumber(item?.quantity),
-    0
-  )
+  return sumPurchaseReceiptQuantities(receipt.items)
 }
 
 export default function V1PurchaseReceiptsPage() {
   const outletContext = useOutletContext()
   const navigate = useNavigate()
   const [searchParams, setSearchParams] = useSearchParams()
-  const adminProfile = outletContext?.adminProfile || {}
+  const adminProfile = useMemo(
+    () => outletContext?.adminProfile || {},
+    [outletContext?.adminProfile]
+  )
   const activeCustomerKey = adminProfile?.effective_session?.customer?.key || ''
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -170,7 +181,6 @@ export default function V1PurchaseReceiptsPage() {
   const [saving, setSaving] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [detailReceipt, setDetailReceipt] = useState(null)
-  const [itemEditorReceipt, setItemEditorReceipt] = useState(null)
   const [receiptExceptionMode, setReceiptExceptionMode] = useState(null)
   const [receiptExceptionRecordsOpen, setReceiptExceptionRecordsOpen] =
     useState(false)
@@ -186,16 +196,34 @@ export default function V1PurchaseReceiptsPage() {
     createSourceBusinessActionAttemptStore()
   )
   const financeSourceInFlightRef = useRef(false)
-  const routePurchaseOrderID = searchParamPositiveIntText(
+  const routePurchaseOrderID = searchParamPositiveInt(
     searchParams,
     'purchase_order_id'
   )
   const routeReceiptID =
-    searchParamPositiveIntText(searchParams, 'receipt_id') ||
+    searchParamPositiveInt(searchParams, 'receipt_id') ||
     (searchParamText(searchParams, 'source_type').toUpperCase() ===
     'PURCHASE_RECEIPT'
-      ? searchParamPositiveIntText(searchParams, 'source_id')
+      ? searchParamPositiveInt(searchParams, 'source_id')
       : '')
+  const linkedKeyword = linkedDocumentContext(searchParams).keyword
+  const resolvedRouteKeyword =
+    routeReceiptID && Number(selectedRow?.id || 0) === Number(routeReceiptID)
+      ? String(selectedRow?.receipt_no || '').trim()
+      : ''
+  const allowedMenuPaths = useMemo(
+    () => outletContext?.allowedMenuPaths || [],
+    [outletContext?.allowedMenuPaths]
+  )
+  const canOpenRelatedPath = useCallback(
+    (path) =>
+      canOpenRelatedDocumentPath({
+        path,
+        adminProfile,
+        allowedMenuPaths,
+      }),
+    [adminProfile, allowedMenuPaths]
+  )
 
   const beginLatestRequest = useLatestRequestCoordinator()
 
@@ -240,13 +268,25 @@ export default function V1PurchaseReceiptsPage() {
     'finance.payable.confirm'
   )
   const canViewPayable =
-    canCreatePayable ||
-    hasActionPermission(adminProfile, 'finance.payable.read')
-  const relatedMenuItems = [
-    { key: 'purchase-orders', label: '采购订单' },
-    { key: 'quality-inspections', label: '来料质检' },
-    { key: 'inventory', label: '库存台账' },
-  ]
+    (canCreatePayable ||
+      hasActionPermission(adminProfile, 'finance.payable.read')) &&
+    canOpenRelatedPath(V1_ROUTE_PATHS.payables)
+  const relatedMenuItems = useMemo(() => {
+    const items = []
+    if (
+      selectedRow?.purchase_order_id &&
+      canOpenRelatedPath(V1_ROUTE_PATHS.purchaseOrders)
+    ) {
+      items.push({ key: 'purchase-orders', label: '采购订单' })
+    }
+    if (canOpenRelatedPath(V1_ROUTE_PATHS.qualityInspections)) {
+      items.push({ key: 'quality-inspections', label: '来料质检' })
+    }
+    if (canOpenRelatedPath(V1_ROUTE_PATHS.inventory)) {
+      items.push({ key: 'inventory', label: '库存台账' })
+    }
+    return items
+  }, [canOpenRelatedPath, selectedRow?.purchase_order_id])
   const materialOptions = useMemo(
     () => uniqueReferenceOptions(materials, materialOption),
     [materials]
@@ -279,7 +319,7 @@ export default function V1PurchaseReceiptsPage() {
   )
   const getPurchaseReceiptItemSummary = useCallback(
     (item) =>
-      `数量 ${formatQuantity(decimalNumber(item?.quantity))} / 金额 ${optionalText(item?.amount)}`,
+      `数量 ${formatQuantity(item?.quantity)} / 金额 ${optionalText(item?.amount)}`,
     []
   )
   const getPurchaseReceiptItemFields = useCallback(
@@ -310,7 +350,7 @@ export default function V1PurchaseReceiptsPage() {
       {
         key: 'quantity',
         label: '数量',
-        value: formatQuantity(decimalNumber(item?.quantity)),
+        value: formatQuantity(item?.quantity),
       },
       {
         key: 'unit_price',
@@ -359,15 +399,37 @@ export default function V1PurchaseReceiptsPage() {
   const openRelatedTable = ({ key }) => {
     if (!selectedRow) return
     const pathByKey = {
-      'purchase-orders': V1_ROUTE_PATHS.purchaseOrders,
-      'quality-inspections': routeWithQuery(V1_ROUTE_PATHS.qualityInspections, {
-        purchase_receipt_id: selectedRow.id,
-      }),
-      inventory: routeWithQuery(V1_ROUTE_PATHS.inventory, {
-        source_type: 'PURCHASE_RECEIPT',
-        source_id: selectedRow.id,
-        view: 'txns',
-      }),
+      'purchase-orders': relatedDocumentRoute(
+        V1_ROUTE_PATHS.purchaseOrders,
+        { purchase_order_id: selectedRow.purchase_order_id },
+        {
+          keyword: selectedRow.purchase_order_no,
+          source: 'purchase-receipt',
+          fields: ['purchase_order_no'],
+        }
+      ),
+      'quality-inspections': relatedDocumentRoute(
+        V1_ROUTE_PATHS.qualityInspections,
+        { purchase_receipt_id: selectedRow.id },
+        {
+          keyword: selectedRow.receipt_no,
+          source: 'purchase-receipt',
+          fields: ['source_no'],
+        }
+      ),
+      inventory: relatedDocumentRoute(
+        V1_ROUTE_PATHS.inventory,
+        {
+          source_type: 'PURCHASE_RECEIPT',
+          source_id: selectedRow.id,
+          view: 'txns',
+        },
+        {
+          keyword: selectedRow.receipt_no,
+          source: 'purchase-receipt',
+          fields: ['source_no'],
+        }
+      ),
     }
     const targetPath = pathByKey[key]
     if (targetPath) {
@@ -379,39 +441,62 @@ export default function V1PurchaseReceiptsPage() {
     const request = beginLatestRequest('rows')
     setLoading(true)
     try {
-      const data = await listPurchaseReceipts(
-        compactParams({
-          status: statusFilter,
-          keyword: trimOptional(keyword) || routeReceiptID || undefined,
-          supplier_name: supplierFilter || undefined,
-          date_field: dateFilterField,
-          date_from: dateFilterStart || undefined,
-          date_to: dateFilterEnd || undefined,
-          material_id: materialFilter || undefined,
-          warehouse_id: warehouseFilter || undefined,
-          lot_id: lotFilter || undefined,
-          purchase_order_id: routePurchaseOrderID || undefined,
-          ...getBusinessPaginationParams(pagination),
-        }),
-        { signal: request.signal }
-      )
+      const routeSelectedID = Number(routeReceiptID || 0)
+      const [data, routeReceipt] = await Promise.all([
+        listPurchaseReceipts(
+          compactParams({
+            status: statusFilter,
+            keyword: trimOptional(
+              linkedDocumentRequestKeyword({
+                localKeyword: keyword,
+                linkedKeyword,
+                hasExactContext: Boolean(
+                  routeReceiptID || routePurchaseOrderID
+                ),
+              })
+            ),
+            supplier_name: supplierFilter || undefined,
+            date_field: dateFilterField,
+            date_from: dateFilterStart || undefined,
+            date_to: dateFilterEnd || undefined,
+            material_id: materialFilter || undefined,
+            warehouse_id: warehouseFilter || undefined,
+            lot_id: lotFilter || undefined,
+            purchase_order_id: routePurchaseOrderID || undefined,
+            ...getBusinessPaginationParams(pagination),
+          }),
+          { signal: request.signal }
+        ),
+        routeSelectedID > 0
+          ? getPurchaseReceipt(
+              { id: routeSelectedID },
+              { signal: request.signal }
+            )
+          : Promise.resolve(null),
+      ])
       if (!request.isCurrent()) {
         return
       }
-      const nextRows = Array.isArray(data?.purchase_receipts)
+      const listedRows = Array.isArray(data?.purchase_receipts)
         ? data.purchase_receipts
         : []
+      const exactPage = resolveExactRecordPage({
+        records: listedRows,
+        exactRecord: routeReceipt,
+        hasExactContext: routeSelectedID > 0,
+        total: Number(data?.total || 0),
+      })
+      const nextRows = exactPage.records
       setRows(nextRows)
       setSelectedRow((current) => {
-        const routeSelectedID = Number(routeReceiptID || 0)
         if (routeSelectedID > 0) {
-          return nextRows.find((item) => item.id === routeSelectedID) || null
+          return routeReceipt
         }
         return current?.id
           ? nextRows.find((item) => item.id === current.id) || null
           : null
       })
-      setTotal(Number(data?.total || 0))
+      setTotal(exactPage.total)
     } catch (error) {
       if (isRpcAbortError(error) || !request.isCurrent()) {
         return
@@ -429,6 +514,7 @@ export default function V1PurchaseReceiptsPage() {
     dateFilterField,
     dateFilterStart,
     keyword,
+    linkedKeyword,
     lotFilter,
     materialFilter,
     pagination,
@@ -441,7 +527,7 @@ export default function V1PurchaseReceiptsPage() {
 
   const clearRouteContext = useCallback(
     (keys) => {
-      const nextParams = new URLSearchParams(searchParams)
+      const nextParams = clearLinkedDocumentParams(searchParams)
       const keysToDelete =
         Array.isArray(keys) && keys.length > 0
           ? keys
@@ -471,17 +557,11 @@ export default function V1PurchaseReceiptsPage() {
         attempt += 1
       ) {
         try {
-          materialResult = await listMaterials({
-            limit: 500,
-            active_only: true,
-          })
-          supplierResult = await listSuppliers({ limit: 500 })
-          unitResult = await listUnits({ limit: 500 })
-          warehouseResult = await listWarehouses({
-            limit: 500,
-            active_only: true,
-          })
-          lotResult = await listInventoryLots({ limit: 500 })
+          materialResult = await listAllMaterials({ active_only: true })
+          supplierResult = await listAllSuppliers()
+          unitResult = await listAllUnits()
+          warehouseResult = await listAllWarehouses({ active_only: true })
+          lotResult = await listAllInventoryLots()
           lastError = null
           break
         } catch (error) {
@@ -721,10 +801,15 @@ export default function V1PurchaseReceiptsPage() {
     (receipt) => {
       if (!receipt?.id) return
       navigate(
-        routeWithQuery(V1_ROUTE_PATHS.payables, {
-          source_type: 'PURCHASE_RECEIPT',
-          source_id: receipt.id,
-        })
+        relatedDocumentRoute(
+          V1_ROUTE_PATHS.payables,
+          { source_type: 'PURCHASE_RECEIPT', source_id: receipt.id },
+          {
+            keyword: receipt.receipt_no,
+            source: 'purchase-receipt',
+            fields: ['source_no'],
+          }
+        )
       )
     },
     [navigate]
@@ -803,6 +888,8 @@ export default function V1PurchaseReceiptsPage() {
           key: 'quantity_total',
           width: 120,
           sortValue: receiptQuantityTotal,
+          sorter: (left, right) =>
+            comparePurchaseReceiptQuantityTotals(left?.items, right?.items),
           render: (_, record) => formatQuantity(receiptQuantityTotal(record)),
           exportValue: (record) => formatQuantity(receiptQuantityTotal(record)),
         },
@@ -845,7 +932,8 @@ export default function V1PurchaseReceiptsPage() {
       dateFilterStart ||
       dateFilterEnd ||
       routePurchaseOrderID ||
-      routeReceiptID
+      routeReceiptID ||
+      linkedKeyword
   )
   const clearFilters = useCallback(() => {
     setKeyword('')
@@ -900,10 +988,18 @@ export default function V1PurchaseReceiptsPage() {
         filters={
           <>
             <SearchInput
-              value={keyword}
+              value={resolvedRouteKeyword || linkedKeyword || keyword}
               placeholder="搜索入库单"
               searchHint="可搜索：入库单号、供应商"
               onChange={(event) => {
+                if (
+                  resolvedRouteKeyword ||
+                  linkedKeyword ||
+                  routeReceiptID ||
+                  routePurchaseOrderID
+                ) {
+                  clearRouteContext()
+                }
                 setKeyword(event.target.value)
                 resetBusinessPaginationCurrent(setPagination)
               }}
@@ -1022,7 +1118,7 @@ export default function V1PurchaseReceiptsPage() {
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedRowLabel}
-          boundaryText="过账和取消均由系统按采购入库规则更新库存或生成撤销调整记录；页面不会绕过这些规则直接修改库存。"
+          boundaryText="草稿作废不更新库存；已过账入库取消由系统按采购入库规则恢复库存。页面不会绕过这些规则直接修改库存。"
         >
           <Button
             type="link"
@@ -1146,12 +1242,18 @@ export default function V1PurchaseReceiptsPage() {
             </Button>
           </Popconfirm>
           <Popconfirm
-            title="确认取消已过账入库并同步冲减相应库存？"
+            title={
+              selectedRow?.status === 'DRAFT'
+                ? '确认作废采购入库草稿？草稿尚未过账，不会变更库存。'
+                : '确认取消已过账入库并恢复相应库存？'
+            }
             onConfirm={() =>
               runReceiptAction(
                 selectedRow,
                 cancelPurchaseReceipt,
-                '采购入库已取消'
+                selectedRow?.status === 'DRAFT'
+                  ? '采购入库草稿已作废，未更新库存'
+                  : '采购入库已取消，库存已恢复'
               )
             }
             okText="确认"
@@ -1163,12 +1265,12 @@ export default function V1PurchaseReceiptsPage() {
               icon={<CloseCircleOutlined />}
               disabled={
                 !selectedRow ||
-                selectedRow.status !== 'POSTED' ||
+                !['DRAFT', 'POSTED'].includes(selectedRow.status) ||
                 !canPost ||
                 saving
               }
             >
-              取消入库
+              {selectedRow?.status === 'DRAFT' ? '作废草稿' : '取消入库'}
             </Button>
           </Popconfirm>
         </SelectionActionBar>

@@ -2,11 +2,19 @@ import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import test from 'node:test'
+import { transformWithEsbuild } from 'vite'
 
 const source = readFileSync(
   fileURLToPath(new URL('./BusinessDashboardPage.jsx', import.meta.url)),
   'utf8'
 )
+
+test('business dashboard remains valid JSX', async () => {
+  await transformWithEsbuild(source, 'BusinessDashboardPage.jsx', {
+    loader: 'jsx',
+    jsx: 'automatic',
+  })
+})
 
 test('business dashboard loads business totals and account-visible collaboration independently', () => {
   assert.match(source, /Promise\.allSettled/u)
@@ -49,13 +57,13 @@ test('business dashboard renders unavailable counts distinctly from true zero', 
 })
 
 test('business dashboard avoids cross-boundary family totals and keeps every source visible', () => {
-  assert.match(source, /每一项单独统计/u)
-  assert.match(source, /record\.sources\.map/u)
+  assert.match(source, /每项分别统计/u)
+  assert.match(source, /moduleRow\.sources\.map/u)
   assert.match(source, /effectiveSessionAllowsPage/u)
   assert.match(source, /allowedMenuPaths\.has\(source\.path\)/u)
   assert.match(source, /rbacAllowsPath\s*&&\s*effectiveSessionAllowsPage/u)
   assert.match(source, /isLocalDev:\s*false/u)
-  assert.match(source, /canOpen\s*\?\s*\(/u)
+  assert.match(source, /source\.canOpen\s*\?\s*\(/u)
   assert.match(source, />\s*只读\s*</u)
   assert.match(source, /aria-label=\{`查看\$\{source\.label\}`\}/u)
   assert.doesNotMatch(source, /title: '记录合计'/u)
@@ -79,8 +87,8 @@ test('business dashboard keeps explicit entries and adds guarded double-click sh
   assert.match(source, /erp-business-board-source-item--openable/u)
   assert.match(source, /erp-business-board-alert-item--openable/u)
   assert.match(source, /data-open-on-double-click/u)
-  assert.match(source, /data-target-path=\{canOpen \? source\.path : undefined\}/u)
-  assert.match(source, /title=\{canOpen \? `双击进入\$\{source\.label\}` : undefined\}/u)
+  assert.match(source, /source\.canOpen[\s\S]*?'data-target-path': source\.path/u)
+  assert.match(source, /source\.canOpen[\s\S]*?title: `双击进入\$\{source\.label\}`/u)
   assert.match(
     source,
     /openDashboardItemOnDoubleClick\(event,\s*\(\) =>[\s\S]*?navigate\(source\.path\)[\s\S]*?\)/u
@@ -89,6 +97,7 @@ test('business dashboard keeps explicit entries and adds guarded double-click sh
     source,
     /openDashboardItemOnDoubleClick\(event,\s*\(\) =>\s*openTaskEntry\(task\)/u
   )
-  assert.match(source, /有“查看”的项目可进入，其他项目仅显示数量/u)
+  assert.match(source, /有“查看业务记录”的项目可进入/u)
+  assert.match(source, /其他项目仅显示数量/u)
   assert.match(source, /aria-label=\{`查看\$\{source\.label\}`\}/u)
 })

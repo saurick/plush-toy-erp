@@ -206,7 +206,7 @@ export const businessModuleDefinitions = Object.freeze([
     shortLabel: '质检',
     pageKind: 'formal-v1',
     description:
-      '质量检验汇总办理采购到货、委外回货和出货前成品的一次检验判定；采购待检由入库准备生成，委外待检从回货记录发起，出货前成品检验从草稿出货单按产品规格、仓库和批次发起。',
+      '质量检验汇总办理采购来料、委外回货、生产工序和出货前成品的检验判定；各类质检均从对应来源记录或在制批次发起，办理状态变化不会代替实际检验。',
     primaryEntity: 'quality_inspections',
     factSource: 'quality_inspections, inventory_lots',
     boundary:
@@ -216,12 +216,14 @@ export const businessModuleDefinitions = Object.freeze([
       'inventory_lots',
       'purchase_receipts',
       'outsourcing_facts',
+      'production_wip_batches',
       'shipments',
     ],
     currentScope: [
       '采购来料检验',
       '委外回货检验',
-      '出货单关联成品检验（页面来源入口待接入）',
+      '生产 WIP 分段质检',
+      '出货前成品检验',
       '质检判定',
       '来源单据级估算不良比例（档位 / 自定义）',
       '批次冻结 / 可用 / 不合格状态',
@@ -304,7 +306,7 @@ export const businessModuleDefinitions = Object.freeze([
       '生产订单维护生产计划与固定工序路线；发布后按布料加工、车缝、手工、包装依次办理 WIP、逐工序内外发决策、分段质检与包材确认，并可生成领料或完工入库草稿。',
     primaryEntity: 'production_orders / production_order_items',
     factSource:
-      'production_orders, production_order_items, production_order_material_requirements, production_order_operations, production_wip_batches, production_wip_outsourcing_allocations, production_packaging_confirmations, quality_inspections, production_facts',
+      'production_orders, production_order_items, production_order_material_requirements, production_order_operations, production_wip_batches, production_wip_outsourcing_allocations, outsourcing_orders, outsourcing_order_items, production_packaging_confirmations, quality_inspections, production_facts',
     boundary:
       '生产订单、工序路线、WIP 流转、内外发安排、质检状态和包材确认都不等于库存事实；领料与完工草稿仍需在生产记录中过账，只有已过账生产事实才会形成库存变动。',
     sourceRefs: [
@@ -319,6 +321,8 @@ export const businessModuleDefinitions = Object.freeze([
       'production_order_operations',
       'production_wip_batches',
       'production_wip_outsourcing_allocations',
+      'outsourcing_orders',
+      'outsourcing_order_items',
       'production_packaging_confirmations',
       'quality_inspections',
       'production_facts',
@@ -589,7 +593,6 @@ export function getBusinessModule(moduleKey) {
 
 const productCoreReviewBlockedPageKeys = new Set([
   'business-dashboard',
-  'exception-flow',
   ...businessModuleDefinitions.map((moduleItem) => moduleItem.key),
 ])
 

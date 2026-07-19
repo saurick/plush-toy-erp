@@ -1152,12 +1152,13 @@ const normalizeCaseStatus = (status) => {
   return 'missing'
 }
 
-const mergeScenarioStatus = (currentStatus, nextStatus) => {
-  const priority = { fail: 3, pass: 2, skip: 1, missing: 0 }
-  if (!currentStatus) return nextStatus
-  return priority[nextStatus] > priority[currentStatus]
-    ? nextStatus
-    : currentStatus
+const resolveScenarioStatus = (matchingCases = []) => {
+  if (matchingCases.length === 0) return 'missing'
+  const statuses = matchingCases.map((item) => normalizeCaseStatus(item.status))
+  if (statuses.includes('fail')) return 'fail'
+  if (statuses.includes('missing')) return 'missing'
+  if (statuses.includes('skip')) return 'skip'
+  return statuses.every((status) => status === 'pass') ? 'pass' : 'missing'
 }
 
 const resolveFieldStatus = (scenarios = []) => {
@@ -1183,14 +1184,10 @@ const buildFieldScenarioStatusList = (fieldItem, relatedCases) =>
     const matchingCases = relatedCases.filter(
       (item) => item.scenarioKey === scenarioKey
     )
-    let status = 'missing'
-    for (const item of matchingCases) {
-      status = mergeScenarioStatus(status, normalizeCaseStatus(item.status))
-    }
     return {
       scenarioKey,
       scenarioLabel: scenarioMetaMap.get(scenarioKey)?.label || scenarioKey,
-      status,
+      status: resolveScenarioStatus(matchingCases),
       caseIds: matchingCases.map((item) => item.caseId),
     }
   })
@@ -1222,6 +1219,12 @@ export const buildFieldLinkageCoverageViewModel = (report = {}) => {
       passedCases: relatedCases.filter((item) => item.status === 'pass').length,
       totalCases: relatedCases.length,
       passedScenarios: scenarios.filter((item) => item.status === 'pass')
+        .length,
+      failedScenarios: scenarios.filter((item) => item.status === 'fail')
+        .length,
+      skippedScenarios: scenarios.filter((item) => item.status === 'skip')
+        .length,
+      missingScenarios: scenarios.filter((item) => item.status === 'missing')
         .length,
       totalScenarios: scenarios.length,
       scenarios,
@@ -1255,6 +1258,18 @@ export const buildFieldLinkageCoverageViewModel = (report = {}) => {
     ),
     passedScenarios: fields.reduce(
       (sum, item) => sum + (item.passedScenarios || 0),
+      0
+    ),
+    failedScenarios: fields.reduce(
+      (sum, item) => sum + (item.failedScenarios || 0),
+      0
+    ),
+    skippedScenarios: fields.reduce(
+      (sum, item) => sum + (item.skippedScenarios || 0),
+      0
+    ),
+    missingScenarios: fields.reduce(
+      (sum, item) => sum + (item.missingScenarios || 0),
       0
     ),
   }

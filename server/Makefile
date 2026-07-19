@@ -147,7 +147,11 @@ migrate_apply:
 	elif [ -n "$$DB_URL" ]; then \
 		echo "DB_URL is set but ignored by default. Set USE_ENV_DB_URL=1 to use it."; \
 	fi; \
-	echo "using DB_URL=$$URL"; \
+	SAFE_TARGET=$$(POSTGRES_DSN="$$URL" go run ./cmd/dburl -conf ./configs/dev/config.yaml -safe-target); \
+	echo "using database target $$SAFE_TARGET"; \
+	POPULATED_UPGRADE_DATABASE_URL="$$URL" sh ../scripts/qa/populated-upgrade-preflight.sh \
+		--audit populated-upgrade \
+		--database-url-env POPULATED_UPGRADE_DATABASE_URL; \
 	atlas migrate apply \
 		--dir "file://internal/data/model/migrate" \
 		--url "$$URL"
@@ -178,7 +182,8 @@ migrate_status:
 	elif [ -n "$$DB_URL" ]; then \
 		echo "DB_URL is set but ignored by default. Set USE_ENV_DB_URL=1 to use it."; \
 	fi; \
-	echo "using DB_URL=$$URL"; \
+	SAFE_TARGET=$$(POSTGRES_DSN="$$URL" go run ./cmd/dburl -conf ./configs/dev/config.yaml -safe-target); \
+	echo "using database target $$SAFE_TARGET"; \
 	atlas migrate status --dir "file://internal/data/model/migrate" --url "$$URL"
 
 .PHONY: migrate_set

@@ -157,11 +157,11 @@ export function createWorkflowSourceTaskScenarios({
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '工作台')
-        await page.getByRole('button', { name: '刷新当前页' }).click()
         const riskQueue = page.getByRole('button', {
-          name: /阻塞\/逾期，\d+ 项，先补原因/u,
+          name: /阻塞\/逾期，[1-9]\d* 项，先补原因/u,
         })
-        if ((await riskQueue.count()) > 0) {
+        await riskQueue.waitFor({ state: 'visible', timeout: 10_000 })
+        if ((await riskQueue.getAttribute('aria-pressed')) !== 'true') {
           await riskQueue.click()
         }
         await expectText(page, '确认出货放行 SHIP-STYLE-L1')
@@ -199,11 +199,16 @@ export function createWorkflowSourceTaskScenarios({
           waitUntil: 'domcontentloaded',
         })
         await expectHeading(page, '工作台')
-        await page.getByRole('button', { name: '刷新当前页' }).click()
         const riskQueueAfterReturn = page.getByRole('button', {
-          name: /阻塞\/逾期，\d+ 项，先补原因/u,
+          name: /阻塞\/逾期，[1-9]\d* 项，先补原因/u,
         })
-        if ((await riskQueueAfterReturn.count()) > 0) {
+        await riskQueueAfterReturn.waitFor({
+          state: 'visible',
+          timeout: 10_000,
+        })
+        if (
+          (await riskQueueAfterReturn.getAttribute('aria-pressed')) !== 'true'
+        ) {
           await riskQueueAfterReturn.click()
         }
         const forgedRow = page

@@ -548,12 +548,7 @@ test("receipt-created inspections start submitted, add a real draft, and include
           lifecycle_status: statuses[body.method],
         },
       };
-    } else if (
-      [
-        "create_purchase_receipt_with_items",
-        "create_purchase_receipt_from_purchase_order",
-      ].includes(body.method)
-    ) {
+    } else if (body.method === "create_purchase_receipt_from_purchase_order") {
       receiptId += 1;
       const purchaseOrderItemId = body.params.purchase_order_id
         ? orderItemByOrderId.get(body.params.purchase_order_id)?.id
@@ -641,28 +636,30 @@ test("receipt-created inspections start submitted, add a real draft, and include
   assert.equal(
     methods.filter((method) => method === "create_purchase_receipt_with_items")
       .length,
-    5,
+    0,
   );
   assert.equal(
     methods.filter(
       (method) => method === "create_purchase_receipt_from_purchase_order",
     ).length,
-    1,
+    6,
   );
   for (const call of calls.filter((item) =>
-    [
-      "create_purchase_receipt_with_items",
-      "create_purchase_receipt_from_purchase_order",
-    ].includes(item.method),
+    item.method === "create_purchase_receipt_from_purchase_order",
   )) {
     assert(String(call.params.receipt_no).length <= 64);
-    for (const item of call.params.items || []) {
-      assert(String(item.lot_no).length <= 64);
-    }
+    assert(call.params.purchase_order_id > 0);
+    assert.match(call.params.idempotency_key, /^purchase-quality:/u);
   }
+  assert.equal(
+    steps.filter((item) => item.target === "purchase_receipt_source_order")
+      .length,
+    6,
+  );
   const linkedReceipt = steps.find(
     (item) =>
-      item.target === "purchase_receipt_quality" && item.linkedToPurchaseOrder,
+      item.target === "purchase_receipt_quality" &&
+      item.scenario === "PASSED_POSTED",
   );
   assert(linkedReceipt?.purchaseOrderId > 0);
   assert(linkedReceipt?.purchaseOrderItemId > 0);

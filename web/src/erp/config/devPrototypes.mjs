@@ -143,7 +143,7 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     description:
       '把任务菜单收敛为职责处理台：待我处理、我发起的、阻塞交接、当前任务详情、任务处理抽屉和关联业务对象。',
     appliesTo:
-      '我的任务、任务看板、异常 / 阻塞闭环、岗位任务端和业务页协同入口可参照；不复制业务菜单树，不把任务完成写成事实过账。',
+      '我的任务、任务看板、工作台风险队列、岗位任务端和业务页协同入口可参照；不复制业务菜单树，不把任务完成写成事实过账。',
   },
   {
     key: 'task-command-center-redesign-reference',
@@ -376,22 +376,22 @@ export const DEV_PROTOTYPE_ASSETS = Object.freeze([
     assetPath: 'mobile-role-tasks-v2/index.html',
     readmePath: 'mobile-role-tasks-v2/README.md',
     description:
-      '把移动岗位任务主路径收口为任务列表、全屏详情、全屏处理和结果回执，详情、处理、结果可直接导航。',
+      '保留 v1 列表壳，选中任务后进入 v2 全屏查看、处理和可信结果回执，结束后恢复原列表状态；无回执时不开放空结果。',
     appliesTo:
-      '岗位任务端后续重构可参照；当前运行时仍以 mobile-role-tasks-v1 的 as-built 参考和真实代码为准，v2 不代表 API、RBAC、菜单或客户环境已改造。',
+      '选中任务流程已接入本地运行时；To Implement 仅表示真实账号浏览器验收和用户确认尚未完成，不表示未来要替换 v1 列表。',
   },
   {
     key: 'mobile-role-tasks-implemented',
-    title: '岗位任务端当前实现参考',
+    title: '岗位任务端当前列表基线',
     type: 'HTML',
     statuses: [DEV_PROTOTYPE_STATUSES.CURRENT],
     directory: 'mobile-role-tasks-v1/',
     assetPath: 'mobile-role-tasks-v1/implemented-reference.html',
     readmePath: 'mobile-role-tasks-v1/README.md',
     description:
-      '覆盖待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板和底部动作栏。',
+      '覆盖当前仍在使用的待办 / 已办 / 提醒 / 我的、主筛选、分批展开和任务卡片；HTML 内旧详情内处理只作历史对照。',
     appliesTo:
-      '岗位任务端 `/m/<role>/tasks` 当前实现参考；岗位入口按任务和职责投影，不复制桌面菜单树。',
+      '岗位任务端 `/m/<role>/tasks` 当前唯一 Current 列表基线；选中任务后的 v2 行为以真实代码、测试和运行态为准。',
   },
   {
     key: 'mobile-role-tasks-list',

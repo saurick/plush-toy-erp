@@ -19,7 +19,7 @@ test('shipment finance action config keeps receivable and invoice drafts explici
   assert.throws(() => shipmentFinanceSourceActionConfig('payment'))
 })
 
-test('shipment finance payload only submits operator-owned fields', () => {
+test('shipment receivable payload only submits operator-owned fields', () => {
   const payload = buildShipmentFinanceSourcePayload(
     {
       occurred_at: '2026-07-14T15:30:00.000Z',
@@ -38,6 +38,35 @@ test('shipment finance payload only submits operator-owned fields', () => {
     occurred_at: '2026-07-14T15:30:00.000Z',
     note: '客户账款复核',
   })
+})
+
+test('shipment invoice payload requires and submits a valid invoice category', () => {
+  assert.deepEqual(
+    buildShipmentFinanceSourcePayload(
+      { invoice_category: 'vat_special_13' },
+      { id: 7, shipment_no: 'SHIP-007', status: 'SHIPPED' },
+      'invoice'
+    ),
+    { shipment_id: 7, invoice_category: 'VAT_SPECIAL_13' }
+  )
+  assert.throws(
+    () =>
+      buildShipmentFinanceSourcePayload(
+        {},
+        { id: 7, shipment_no: 'SHIP-007', status: 'SHIPPED' },
+        'invoice'
+      ),
+    /请选择有效的发票类别/u
+  )
+  assert.throws(
+    () =>
+      buildShipmentFinanceSourcePayload(
+        { invoice_category: 'VAT_SPECIAL_13' },
+        { id: 7, shipment_no: 'SHIP-007', status: 'SHIPPED' },
+        'receivable'
+      ),
+    /应收记录不填写发票类别/u
+  )
 })
 
 test('shipment finance payload rejects stale source state and invalid time', () => {

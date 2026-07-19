@@ -1,16 +1,22 @@
-function decimalNumber(value) {
-  const parsed = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(parsed) ? parsed : 0
+import {
+  addNumeric20Scale6Units,
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  minNumeric20Scale6Units,
+  normalizePositiveNumeric20Scale6,
+  numeric20Scale6TextFromUnits,
+  numeric20Scale6Units,
+  subtractNumeric20Scale6Units,
+} from './numeric20Scale6.mjs'
+
+function quantityUnits(value) {
+  return numeric20Scale6Units(value) ?? '0'
 }
 
-function quantityText(value) {
-  const parsed = decimalNumber(value)
-  if (parsed <= 0) return ''
-  return String(Number(parsed.toFixed(4)))
+function positiveUnitsText(value) {
+  return isPositiveNumeric20Scale6Units(value)
+    ? numeric20Scale6TextFromUnits(value)
+    : ''
 }
 
 function positiveID(value) {
@@ -30,8 +36,10 @@ export function buildSalesOrderReservationItemChoices(
     if (!lineID) continue
     activeReservedByLine.set(
       lineID,
-      (activeReservedByLine.get(lineID) || 0) +
-        decimalNumber(reservation.quantity)
+      addNumeric20Scale6Units(
+        activeReservedByLine.get(lineID) || '0',
+        quantityUnits(reservation.quantity)
+      )
     )
   }
   const shippedByLine = new Map()
@@ -42,16 +50,20 @@ export function buildSalesOrderReservationItemChoices(
       if (!lineID) continue
       shippedByLine.set(
         lineID,
-        (shippedByLine.get(lineID) || 0) + decimalNumber(line.quantity)
+        addNumeric20Scale6Units(
+          shippedByLine.get(lineID) || '0',
+          quantityUnits(line.quantity)
+        )
       )
     }
   }
   return (Array.isArray(items) ? items : []).map((item, index) => {
     const itemID = positiveID(item?.id)
-    const ordered = decimalNumber(item?.ordered_quantity)
-    const activeReserved = activeReservedByLine.get(itemID) || 0
-    const shipped = shippedByLine.get(itemID) || 0
-    const reservable = Math.max(0, ordered - activeReserved - shipped)
+    const ordered = quantityUnits(item?.ordered_quantity)
+    const activeReserved = activeReservedByLine.get(itemID) || '0'
+    const shipped = shippedByLine.get(itemID) || '0'
+    const committed = addNumeric20Scale6Units(activeReserved, shipped)
+    const reservable = subtractNumeric20Scale6Units(ordered, committed)
     const productText =
       [item?.product_code_snapshot, item?.product_name_snapshot]
         .map((value) => String(value || '').trim())
@@ -61,17 +73,17 @@ export function buildSalesOrderReservationItemChoices(
     const unitText = String(item?.unit_name_snapshot || '').trim()
     return {
       value: itemID,
-      label: `${productText}${skuText ? ` / ${skuText}` : ''} · 订单 ${quantityText(ordered)}${unitText ? ` ${unitText}` : ''}`,
+      label: `${productText}${skuText ? ` / ${skuText}` : ''} · 订单 ${positiveUnitsText(ordered)}${unitText ? ` ${unitText}` : ''}`,
       item,
-      ordered: quantityText(ordered),
-      activeReserved: quantityText(activeReserved),
-      shipped: quantityText(shipped),
-      reservable: quantityText(reservable),
+      ordered: positiveUnitsText(ordered),
+      activeReserved: positiveUnitsText(activeReserved),
+      shipped: positiveUnitsText(shipped),
+      reservable: positiveUnitsText(reservable),
       disabled:
         itemID <= 0 ||
         String(item?.line_status || '').toLowerCase() !== 'open' ||
-        ordered <= 0 ||
-        reservable <= 0,
+        !isPositiveNumeric20Scale6Units(ordered) ||
+        !isPositiveNumeric20Scale6Units(reservable),
     }
   })
 }
@@ -80,10 +92,10 @@ export function defaultSalesOrderReservationQuantity(
   itemChoice = {},
   balanceChoice = {}
 ) {
-  return quantityText(
-    Math.min(
-      decimalNumber(itemChoice?.reservable),
-      decimalNumber(balanceChoice?.available)
+  return positiveUnitsText(
+    minNumeric20Scale6Units(
+      quantityUnits(itemChoice?.reservable),
+      quantityUnits(balanceChoice?.available)
     )
   )
 }
@@ -103,7 +115,7 @@ export function buildReservationBalanceChoices(
         : balanceSkuID === 0
     })
     .map((balance) => {
-      const available = decimalNumber(balance?.available_quantity)
+      const available = quantityUnits(balance?.available_quantity)
       const warehouseText =
         String(balance?.warehouse_name || '').trim() || '仓库已关联'
       const lotText =
@@ -111,10 +123,12 @@ export function buildReservationBalanceChoices(
         (positiveID(balance?.lot_id) ? '批次已关联' : '无批次')
       return {
         value: positiveID(balance?.id),
-        label: `${warehouseText} / ${lotText} · 可用 ${quantityText(available) || '0'}`,
+        label: `${warehouseText} / ${lotText} · 可用 ${positiveUnitsText(available) || '0'}`,
         balance,
-        available: quantityText(available),
-        disabled: positiveID(balance?.id) <= 0 || available <= 0,
+        available: positiveUnitsText(available),
+        disabled:
+          positiveID(balance?.id) <= 0 ||
+          !isPositiveNumeric20Scale6Units(available),
       }
     })
 }
@@ -133,7 +147,7 @@ export function buildSalesOrderReservationPayload(
   const orderID = positiveID(order?.id)
   const itemID = positiveID(values.sales_order_item_id)
   const balanceID = positiveID(values.balance_id)
-  const quantity = quantityText(values.quantity)
+  const quantity = normalizePositiveNumeric20Scale6(values.quantity)
   const item = (Array.isArray(items) ? items : []).find(
     (candidate) => positiveID(candidate?.id) === itemID
   )
@@ -160,11 +174,17 @@ export function buildSalesOrderReservationPayload(
   ) {
     throw new Error('请选择与销售明细一致的可用库存')
   }
-  const available = decimalNumber(balance.available_quantity)
-  if (decimalNumber(quantity) > available) {
+  const quantityValue = quantityUnits(quantity)
+  const available = quantityUnits(balance.available_quantity)
+  if (compareNumeric20Scale6Units(quantityValue, available) > 0) {
     throw new Error('预留数量不能超过当前可用库存')
   }
-  if (decimalNumber(quantity) > decimalNumber(itemChoice.reservable)) {
+  if (
+    compareNumeric20Scale6Units(
+      quantityValue,
+      quantityUnits(itemChoice.reservable)
+    ) > 0
+  ) {
     throw new Error('预留数量不能超过订单剩余可预留数量')
   }
   const reservedAtText = String(values.reserved_at || '').trim()

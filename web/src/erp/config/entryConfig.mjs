@@ -155,6 +155,26 @@ export function resolveMobileTasksPath(roleKey = '') {
   return normalizedRoleKey ? `/m/${normalizedRoleKey}/tasks` : ''
 }
 
+export function resolveAllowedMobileEntryPath(
+  roleKeys = [],
+  preferredRoleKey = ''
+) {
+  const allowedRoleKeys = [
+    ...new Set(
+      (Array.isArray(roleKeys) ? roleKeys : [])
+        .map((roleKey) => normalizeRoleKey(roleKey))
+        .filter(Boolean)
+    ),
+  ]
+  const preferredRole = normalizeRoleKey(preferredRoleKey)
+  if (preferredRole && allowedRoleKeys.includes(preferredRole)) {
+    return resolveMobileTasksPath(preferredRole)
+  }
+  return allowedRoleKeys.length > 0
+    ? resolveMobileTasksPath(allowedRoleKeys[0])
+    : ''
+}
+
 export function detectEntryDeviceType({ userAgent, maxTouchPoints } = {}) {
   const ua =
     userAgent ||

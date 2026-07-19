@@ -21,41 +21,10 @@ import {
   OUTSOURCING_ORDER_SUBJECT_TYPES,
   createBlankOutsourcingLine,
   deriveOutsourcingOrderItemAmount,
+  summarizeOutsourcingOrderLines,
 } from '../../utils/masterDataOrderView.mjs'
 import { createDuplicatedDraftLineItem } from '../../utils/businessLineItems.mjs'
-
-function decimalNumber(value) {
-  const numeric = Number(
-    String(value ?? '')
-      .replace(/,/g, '')
-      .trim()
-  )
-  return Number.isFinite(numeric) ? numeric : 0
-}
-
-function formatSummaryNumber(value, fractionDigits = 0) {
-  if (!Number.isFinite(value) || value === 0) {
-    return fractionDigits > 0 ? Number(0).toFixed(fractionDigits) : '0'
-  }
-  return fractionDigits > 0
-    ? value.toFixed(fractionDigits)
-    : String(Number(value.toFixed(4)))
-}
-
-function lineAmount(line = {}) {
-  return decimalNumber(deriveOutsourcingOrderItemAmount(line))
-}
-
-function summarizeLines(lines = []) {
-  return (Array.isArray(lines) ? lines : []).reduce(
-    (summary, line) => ({
-      count: summary.count + 1,
-      quantity: summary.quantity + decimalNumber(line?.outsourcing_quantity),
-      amount: summary.amount + lineAmount(line),
-    }),
-    { count: 0, quantity: 0, amount: 0 }
-  )
-}
+import { formatNumeric20Scale6Summary } from '../../utils/numeric20Scale6.mjs'
 
 function quantityPrecisionRule({ form, fieldName, unitOptions }) {
   return {
@@ -191,9 +160,6 @@ export default function OutsourcingOrderForm({
         label="来源订单号"
       >
         <Input maxLength={128} placeholder="如产品订单编号 / 销售订单号" />
-      </Form.Item>
-      <Form.Item name="source_sales_order_id" hidden>
-        <Input />
       </Form.Item>
       <Form.Item
         className="erp-business-action-form__field"
@@ -676,8 +642,10 @@ export default function OutsourcingOrderForm({
               label: '数量合计',
               value: (
                 <BusinessLineItemsSummaryValue
-                  summarize={summarizeLines}
-                  select={(summary) => formatSummaryNumber(summary.quantity, 3)}
+                  summarize={summarizeOutsourcingOrderLines}
+                  select={(summary) =>
+                    formatNumeric20Scale6Summary(summary.quantity, 3)
+                  }
                 />
               ),
             },
@@ -686,8 +654,10 @@ export default function OutsourcingOrderForm({
               label: '金额合计',
               value: (
                 <BusinessLineItemsSummaryValue
-                  summarize={summarizeLines}
-                  select={(summary) => formatSummaryNumber(summary.amount, 2)}
+                  summarize={summarizeOutsourcingOrderLines}
+                  select={(summary) =>
+                    formatNumeric20Scale6Summary(summary.amount, 2)
+                  }
                 />
               ),
             },

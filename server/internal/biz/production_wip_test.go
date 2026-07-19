@@ -241,6 +241,20 @@ func TestProductionWIPActionNormalizationAndSemanticEvents(t *testing.T) {
 	if event, err := ProductionWIPEventActionForCommand(ProductionWIPActionReceiveOutsourcingReturn); err != nil || event != ProductionWIPEventActionOutsourcingReturn {
 		t.Fatalf("return event=%q err=%v", event, err)
 	}
+	cancel := base
+	cancel.Action = ProductionWIPActionCancelBatch
+	cancel.Reason = productionWIPTestString("  排程取消  ")
+	normalized, err = normalizeProductionWIPAction(cancel)
+	if err != nil || normalized.Reason == nil || *normalized.Reason != "排程取消" {
+		t.Fatalf("cancel=%+v err=%v", normalized, err)
+	}
+	if event, err := ProductionWIPEventActionForCommand(cancel.Action); err != nil || event != ProductionWIPEventActionCancel {
+		t.Fatalf("cancel event=%q err=%v", event, err)
+	}
+	cancel.Reason = nil
+	if _, err := normalizeProductionWIPAction(cancel); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("cancel reason error=%v", err)
+	}
 	confirmation := ProductionWIPAction{
 		Action:            ProductionWIPActionConfirmPackagingMaterial,
 		ProductionOrderID: 1, ProductionOrderItemID: 8, ExpectedVersion: 1,
@@ -258,6 +272,9 @@ func TestProductionWIPActionNormalizationAndSemanticEvents(t *testing.T) {
 	}
 	if _, err := ProductionWIPEventActionForCommand(ProductionWIPActionConfirmPackagingMaterial); !errors.Is(err, ErrBadParam) {
 		t.Fatalf("confirmation must not be stored as WIP batch event: %v", err)
+	}
+	if _, err := ProductionWIPEventActionForCommand("INITIALIZE"); !errors.Is(err, ErrBadParam) {
+		t.Fatalf("removed initialize event should be rejected: %v", err)
 	}
 }
 
@@ -346,6 +363,28 @@ func TestProductionWIPSplitIsAtomicTerminalAndQuantityConserving(t *testing.T) {
 	fabric.OperationCode = ProductionWIPOperationFabricProcessing
 	if err := ValidateProductionWIPSplit(batch, &fabric, decimal.Zero, exact); !errors.Is(err, ErrProductionWIPInvalidTransition) {
 		t.Fatalf("fabric split error=%v", err)
+	}
+}
+
+func TestProductionWIPCancelOnlyAllowsPlannedBatch(t *testing.T) {
+	operation := &ProductionOrderOperation{ID: 10, OperationCode: ProductionWIPOperationSewing}
+	batch := &ProductionWIPBatch{ID: 1, ProductionOrderOperationID: 10, Status: ProductionWIPStatusPlanned}
+	if status, err := NextProductionWIPBatchStatus(ProductionWIPActionCancelBatch, batch, operation, nil, 0); err != nil || status != ProductionWIPStatusCancelled {
+		t.Fatalf("planned cancel status=%q err=%v", status, err)
+	}
+	for _, status := range []string{
+		ProductionWIPStatusSplit,
+		ProductionWIPStatusInProgress,
+		ProductionWIPStatusOutsourced,
+		ProductionWIPStatusWaitingQuality,
+		ProductionWIPStatusAccepted,
+		ProductionWIPStatusRejected,
+		ProductionWIPStatusCancelled,
+	} {
+		batch.Status = status
+		if _, err := NextProductionWIPBatchStatus(ProductionWIPActionCancelBatch, batch, operation, nil, 0); !errors.Is(err, ErrProductionWIPInvalidTransition) {
+			t.Fatalf("status=%s cancel error=%v", status, err)
+		}
 	}
 }
 
@@ -528,7 +567,6 @@ type productionWIPTestRepo struct {
 	ProductionOrderRepo
 	aggregate  *ProductionWIPAggregate
 	getOrderID int
-	initialize *ProductionWIPInitializeCommand
 	command    *ProductionWIPCommand
 }
 
@@ -537,27 +575,26 @@ func (r *productionWIPTestRepo) GetProductionWIP(_ context.Context, productionOr
 	return r.aggregate, nil
 }
 
-func (r *productionWIPTestRepo) InitializeProductionWIP(_ context.Context, in *ProductionWIPInitializeCommand) (*ProductionWIPAggregate, error) {
-	r.initialize = in
-	return r.aggregate, nil
-}
-
 func (r *productionWIPTestRepo) ApplyProductionWIPCommand(_ context.Context, in *ProductionWIPCommand) (*ProductionWIPAggregate, error) {
 	r.command = in
 	return r.aggregate, nil
 }
 
-func TestProductionWIPUsecaseExposesGetInitializeAndCanonicalTransfer(t *testing.T) {
+func TestProductionWIPUsecaseExposesGetCancelAndCanonicalTransfer(t *testing.T) {
 	repo := &productionWIPTestRepo{aggregate: &ProductionWIPAggregate{ProductionOrderID: 9}}
 	uc := NewProductionOrderUsecase(repo)
 	if _, err := uc.GetProductionWIP(context.Background(), 9); err != nil || repo.getOrderID != 9 {
 		t.Fatalf("get id=%d err=%v", repo.getOrderID, err)
 	}
-	if _, err := uc.InitializeProductionWIP(context.Background(), &ProductionWIPInitialize{ProductionOrderID: 9, ActorID: 2, IdempotencyKey: "init"}); err != nil {
+	reason := "计划调整"
+	if _, err := uc.CancelProductionWIPBatch(context.Background(), &ProductionWIPAction{
+		ProductionOrderID: 9, BatchID: 3, ExpectedVersion: 1,
+		ActorID: 2, IdempotencyKey: "cancel", Reason: &reason,
+	}); err != nil {
 		t.Fatal(err)
 	}
-	if repo.initialize == nil || repo.initialize.RouteCode != ProductionWIPRoutePlushSewHandV1 || len(repo.initialize.IntentHash) != 64 {
-		t.Fatalf("initialize=%+v", repo.initialize)
+	if repo.command == nil || repo.command.Action != ProductionWIPActionCancelBatch || repo.command.Reason == nil || *repo.command.Reason != reason || len(repo.command.IntentHash) != 64 {
+		t.Fatalf("cancel command=%+v", repo.command)
 	}
 	if _, err := uc.TransferProductionWIPToNextOperation(context.Background(), &ProductionWIPAction{
 		ProductionOrderID: 9, BatchID: 3, TargetOperationID: 30,

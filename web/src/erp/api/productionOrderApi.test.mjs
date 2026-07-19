@@ -34,3 +34,12 @@ test('production order mutation wrappers fail closed before clearing attempts', 
   assert.match(source, /positiveSafeInteger\(params\.expected_version\)/u)
   assert.match(source, /validateProductionOrderAggregate/u)
 })
+
+test('production order reference API binds response pagination to the request', () => {
+  assert.match(
+    source,
+    /validateProductionOrderOptions\(dataOf\(result\), referenceType, \{/u
+  )
+  assert.match(source, /limit: params\.limit/u)
+  assert.match(source, /offset: params\.offset/u)
+})

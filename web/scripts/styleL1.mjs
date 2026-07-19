@@ -151,10 +151,6 @@ function getScenarios() {
     assertProcessSuggestionOptions,
     assertProcessingContractPaperRowCount,
     assertProcessingContractSignatureLayout,
-    assertPurchaseReceiptActionButtonState,
-    assertPurchaseReceiptAddItemEditorDarkTokens,
-    assertPurchaseReceiptAddItemEditorMetrics,
-    assertPurchaseReceiptAddItemEditorMobileLayout,
     assertBusinessFormModalKeyboardRecovery,
     assertPurchaseReceiptRowItemCount,
     assertRowSelectionClearsAfterCancel,
@@ -170,10 +166,8 @@ function getScenarios() {
     expectHeading,
     expectNoButton,
     expectText,
-    fillPurchaseReceiptAddItemEditorBoundaryValues,
     gotoScenarioPath,
     isLightSurfaceColor,
-    openPurchaseReceiptAddItemEditor,
     outputDir,
     path,
     seedBusinessCollaborationOverflowTasks,
@@ -731,6 +725,12 @@ async function runScenarioOnce(browser, scenario) {
       const text = message.text()
       if (!isIgnorableDevServerError(text)) {
         const location = message.location()
+        let pagePath = ''
+        try {
+          pagePath = new URL(page.url()).pathname
+        } catch {
+          pagePath = page.url()
+        }
         const source = [
           location.url,
           location.lineNumber,
@@ -738,7 +738,11 @@ async function runScenarioOnce(browser, scenario) {
         ]
           .filter((part) => part !== undefined && part !== '')
           .join(':')
-        errors.push(`console error: ${text}${source ? ` @ ${source}` : ''}`)
+        errors.push(
+          `console error${pagePath ? ` [path=${pagePath}]` : ''}: ${text}${
+            source ? ` @ ${source}` : ''
+          }`
+        )
       }
     }
   })
@@ -1653,7 +1657,23 @@ async function assertMobileTaskRefreshFeedback(page, { scenarioName }) {
     .filter({ hasText: '刷新' })
     .first()
   await refreshButton.waitFor({ state: 'visible', timeout: 10_000 })
+  const refreshRequestPromise = page.waitForRequest(
+    (request) => {
+      if (!request.url().includes('/rpc/workflow')) return false
+      try {
+        return request.postDataJSON()?.method === 'list_role_tasks'
+      } catch {
+        return false
+      }
+    },
+    { timeout: 10_000 }
+  )
   await refreshButton.click()
+  const refreshRequestBody = (await refreshRequestPromise).postDataJSON() || {}
+  assert(
+    !String(refreshRequestBody?.params?.cursor || '').trim(),
+    `${scenarioName} 顶部刷新应重新获取最新快照，不应携带续页游标: ${JSON.stringify(refreshRequestBody)}`
+  )
   await expectText(page, '数据已刷新')
   const beforeFailureMetrics = await readMobileTaskVisibleListMetrics(
     page,
@@ -2505,13 +2525,7 @@ async function assertOutsourcingProcessSelectOptions(
 
 const {
   selectPurchaseReceiptRow,
-  assertPurchaseReceiptActionButtonState,
   assertPurchaseReceiptRowItemCount,
-  openPurchaseReceiptAddItemEditor,
-  fillPurchaseReceiptAddItemEditorBoundaryValues,
-  assertPurchaseReceiptAddItemEditorMetrics,
-  assertPurchaseReceiptAddItemEditorDarkTokens,
-  assertPurchaseReceiptAddItemEditorMobileLayout,
   assertLineItemsUnifiedHorizontalScroll,
 } = createPurchaseReceiptAssertions({
   assert,
@@ -3077,7 +3091,7 @@ async function verifyBusinessRowDoubleClickModal(
   )
   await expectText(page, titleText)
   if (afterModalOpen) {
-    await afterModalOpen()
+    await afterModalOpen(modal)
   }
   if (screenshotName) {
     await page.screenshot({
@@ -3790,37 +3804,33 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
 
 async function assertAntdModalCenteredImpl(page, modalLocator, scenarioName) {
   await modalLocator.waitFor({ state: 'visible', timeout: 10_000 })
-  await modalLocator
-    .waitFor({
-      state: 'visible',
-      timeout: 10_000,
-    })
-    .catch(() => {})
-  await page.waitForFunction(
-    (selector) => {
-      const modals = Array.from(document.querySelectorAll(selector)).filter(
-        (node) => {
-          const rect = node.getBoundingClientRect()
-          const style = window.getComputedStyle(node)
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.display !== 'none' &&
-            style.visibility !== 'hidden'
-          )
-        }
-      )
-      const modal = modals.at(-1)
-      if (!modal) return false
-      const className = String(modal.className || '')
-      return (
-        !className.includes('ant-zoom-enter') &&
-        !className.includes('ant-zoom-appear')
-      )
-    },
-    '.ant-modal',
-    { timeout: 10_000 }
+  const modalHandle = await modalLocator.elementHandle()
+  assert(
+    modalHandle,
+    `${scenarioName} 缺少可等待动画结束的 Ant Design 弹窗`
   )
+  try {
+    await page.waitForFunction(
+      (modal) => {
+        if (!(modal instanceof HTMLElement) || !modal.isConnected) return false
+        const rect = modal.getBoundingClientRect()
+        const style = window.getComputedStyle(modal)
+        const className = String(modal.className || '')
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          !className.includes('ant-zoom-enter') &&
+          !className.includes('ant-zoom-appear')
+        )
+      },
+      modalHandle,
+      { timeout: 10_000 }
+    )
+  } finally {
+    await modalHandle.dispose()
+  }
 
   const metrics = await modalLocator.evaluate((node) => {
     const modal =
@@ -5904,6 +5914,30 @@ async function assertTaskActionDrawerLayout(
     await expectText(page, expectedActionText)
   }
   await expectText(page, '处理范围：')
+  await page.waitForFunction(
+    ({ expectedTaskText: taskText }) => {
+      const drawerElement = Array.from(
+        document.querySelectorAll('.erp-task-action-drawer')
+      ).find((node) => {
+        const rect = node.getBoundingClientRect()
+        const style = getComputedStyle(node)
+        return (
+          rect.width > 0 &&
+          rect.height > 0 &&
+          style.display !== 'none' &&
+          style.visibility !== 'hidden' &&
+          String(node.textContent || '').includes(taskText)
+        )
+      })
+      return (
+        drawerElement?.querySelectorAll(
+          '.erp-task-action-drawer__footer button'
+        ).length >= 2
+      )
+    },
+    { expectedTaskText },
+    { timeout: 10_000 }
+  )
 
   const metrics = await page.evaluate(
     ({ expectedTaskText: taskText }) => {
@@ -7642,6 +7676,8 @@ const {
   isLightSurfaceColor,
   isTransparentColor,
   isWarningBorderColor,
+  outputDir,
+  path,
 })
 
 async function assertThemeReadable(page, { scenarioName, selector }) {
@@ -7866,12 +7902,12 @@ async function assertLoginSegmentedReadable(page, { scenarioName }) {
   )
   assert.equal(
     metrics.entrySegmentedAriaLabel,
-    '登录入口',
-    `${scenarioName} 登录入口 Segmented 缺少可访问名称: ${JSON.stringify(metrics)}`
+    '工作方式',
+    `${scenarioName} 工作方式 Segmented 缺少可访问名称: ${JSON.stringify(metrics)}`
   )
   assert(
-    !metrics.visibleFormLabels.includes('登录入口'),
-    `${scenarioName} 登录页不应显示重复的“登录入口”表单标签: ${JSON.stringify(metrics)}`
+    !metrics.visibleFormLabels.includes('工作方式'),
+    `${scenarioName} 登录页不应显示重复的“工作方式”表单标签: ${JSON.stringify(metrics)}`
   )
 }
 

@@ -6,11 +6,15 @@ import (
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/material"
+	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/purchaseorderitem"
+	"server/internal/data/model/ent/purchasereceipt"
+	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
 
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql"
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -197,6 +201,9 @@ func purchaseOrderSortOrder(filter biz.PurchaseOrderFilter) purchaseorder.OrderO
 }
 
 func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.PurchaseOrder, error) {
+	if lifecycleStatus == biz.PurchaseOrderStatusClosed || lifecycleStatus == biz.PurchaseOrderStatusCanceled {
+		return r.settlePurchaseOrderLifecycle(ctx, id, lifecycleStatus)
+	}
 	allowedCurrent := purchaseOrderLifecyclePredecessors(lifecycleStatus)
 	if len(allowedCurrent) == 0 {
 		return nil, biz.ErrBadParam
@@ -222,6 +229,85 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 		return nil, biz.ErrBadParam
 	}
 	return entPurchaseOrderToBiz(row), nil
+}
+
+func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.PurchaseOrder, error) {
+	allowedCurrent := purchaseOrderLifecyclePredecessors(lifecycleStatus)
+	if len(allowedCurrent) == 0 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(id))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	row, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderNotFound
+		}
+		return nil, err
+	}
+	if row.LifecycleStatus == lifecycleStatus {
+		return entPurchaseOrderToBiz(row), nil
+	}
+	if !containsString(allowedCurrent, row.LifecycleStatus) {
+		return nil, biz.ErrBadParam
+	}
+	if err := validatePurchaseOrderSettlementDependencies(ctx, tx, id, lifecycleStatus); err != nil {
+		return nil, err
+	}
+	row, err = tx.PurchaseOrder.UpdateOneID(id).SetLifecycleStatus(lifecycleStatus).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return entPurchaseOrderToBiz(row), nil
+}
+
+func validatePurchaseOrderSettlementDependencies(ctx context.Context, tx *ent.Tx, purchaseOrderID int, lifecycleStatus string) error {
+	receiptQuery := tx.PurchaseReceipt.Query().Where(
+		purchasereceipt.HasItemsWith(
+			purchasereceiptitem.HasPurchaseOrderItemWith(purchaseorderitem.PurchaseOrderID(purchaseOrderID)),
+		),
+	)
+	switch lifecycleStatus {
+	case biz.PurchaseOrderStatusClosed:
+		receiptQuery = receiptQuery.Where(purchasereceipt.Status(biz.PurchaseReceiptStatusDraft))
+	case biz.PurchaseOrderStatusCanceled:
+		receiptQuery = receiptQuery.Where(purchasereceipt.StatusNEQ(biz.PurchaseReceiptStatusCancelled))
+	default:
+		return biz.ErrBadParam
+	}
+	hasReceipt, err := receiptQuery.Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasReceipt {
+		if lifecycleStatus == biz.PurchaseOrderStatusClosed {
+			return biz.ErrPurchaseOrderCloseDraftReceiptDependency
+		}
+		return biz.ErrPurchaseOrderCancelReceiptDependency
+	}
+	hasActiveProcess, err := tx.ProcessInstance.Query().Where(
+		processinstance.ProcessKey(biz.ProcessKeyMaterialSupply),
+		processinstance.BusinessRefType("purchase_order"),
+		processinstance.BusinessRefID(purchaseOrderID),
+		processinstance.Status(biz.ProcessStatusActive),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasActiveProcess {
+		return biz.ErrPurchaseOrderLifecycleProcessDependency
+	}
+	return nil
 }
 
 func (r *purchaseOrderRepo) AddPurchaseOrderItem(ctx context.Context, in *biz.PurchaseOrderItemMutation) (*biz.PurchaseOrderItem, error) {

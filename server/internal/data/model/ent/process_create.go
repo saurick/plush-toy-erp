@@ -48,6 +48,20 @@ func (_c *ProcessCreate) SetNillableCategory(v *string) *ProcessCreate {
 	return _c
 }
 
+// SetProductionRouteOperationCode sets the "production_route_operation_code" field.
+func (_c *ProcessCreate) SetProductionRouteOperationCode(v string) *ProcessCreate {
+	_c.mutation.SetProductionRouteOperationCode(v)
+	return _c
+}
+
+// SetNillableProductionRouteOperationCode sets the "production_route_operation_code" field if the given value is not nil.
+func (_c *ProcessCreate) SetNillableProductionRouteOperationCode(v *string) *ProcessCreate {
+	if v != nil {
+		_c.SetProductionRouteOperationCode(*v)
+	}
+	return _c
+}
+
 // SetOutsourcingEnabled sets the "outsourcing_enabled" field.
 func (_c *ProcessCreate) SetOutsourcingEnabled(v bool) *ProcessCreate {
 	_c.mutation.SetOutsourcingEnabled(v)
@@ -278,6 +292,11 @@ func (_c *ProcessCreate) check() error {
 			return &ValidationError{Name: "category", err: fmt.Errorf(`ent: validator failed for field "Process.category": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ProductionRouteOperationCode(); ok {
+		if err := process.ProductionRouteOperationCodeValidator(v); err != nil {
+			return &ValidationError{Name: "production_route_operation_code", err: fmt.Errorf(`ent: validator failed for field "Process.production_route_operation_code": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.OutsourcingEnabled(); !ok {
 		return &ValidationError{Name: "outsourcing_enabled", err: errors.New(`ent: missing required field "Process.outsourcing_enabled"`)}
 	}
@@ -346,6 +365,10 @@ func (_c *ProcessCreate) createSpec() (*Process, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Category(); ok {
 		_spec.SetField(process.FieldCategory, field.TypeString, value)
 		_node.Category = &value
+	}
+	if value, ok := _c.mutation.ProductionRouteOperationCode(); ok {
+		_spec.SetField(process.FieldProductionRouteOperationCode, field.TypeString, value)
+		_node.ProductionRouteOperationCode = &value
 	}
 	if value, ok := _c.mutation.OutsourcingEnabled(); ok {
 		_spec.SetField(process.FieldOutsourcingEnabled, field.TypeBool, value)

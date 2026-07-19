@@ -22,6 +22,7 @@ const pageSources = [
     recordOpenCall: /onOpenRecord=\{openSalesOrderRecord\}/u,
     detailsOpenStart: 'const openSalesOrderDetails = (order) => {',
     detailsOpenEnd: 'const openSalesOrderRecord = (order) => {',
+    detailsModalEnd: '<ColumnOrderModal',
     detailsOpenCall: /openSalesOrderDetails\(order\)/u,
     recordOpenStart: 'const openSalesOrderRecord = (order) => {',
     recordOpenEditCall: /openEditOrder\(order\)/u,
@@ -45,6 +46,7 @@ const pageSources = [
     recordOpenCall: /onOpenRecord=\{openPurchaseOrderRecord\}/u,
     detailsOpenStart: 'const openPurchaseOrderDetails = (record) => {',
     detailsOpenEnd: 'const openPurchaseOrderRecord = (record) => {',
+    detailsModalEnd: '<CollaborationTaskPanel',
     detailsOpenCall: /openPurchaseOrderDetails\(record\)/u,
     recordOpenStart: 'const openPurchaseOrderRecord = (record) => {',
     recordOpenEditCall: /openEditModal\(record\)/u,
@@ -68,6 +70,7 @@ const pageSources = [
     recordOpenCall: /onOpenRecord=\{openOutsourcingOrderRecord\}/u,
     detailsOpenStart: 'const openOutsourcingOrderDetails = (record) => {',
     detailsOpenEnd: 'const openOutsourcingOrderRecord = (record) => {',
+    detailsModalEnd: '<CollaborationTaskPanel',
     detailsOpenCall: /openOutsourcingOrderDetails\(record\)/u,
     recordOpenStart: 'const openOutsourcingOrderRecord = (record) => {',
     recordOpenEditCall: /openEdit\(record\)/u,
@@ -204,7 +207,7 @@ test('sales and purchase edit actions expose item-read loading and disable repea
   assert.match(purchaseOperationPanelSource, /loading=\{itemsLoading\}/u)
   assert.match(
     purchaseOperationPanelSource,
-    /disabled=\{!selectedOrderCanEdit \|\| itemsLoading\}/u
+    /disabled=\{\s*!selectedOrderCanEdit \|\| !referenceDataReady \|\| itemsLoading\s*\}/u
   )
   assert.match(
     purchaseOperationPanelSource,
@@ -222,7 +225,7 @@ test('source-document read-only modals load complete line items', () => {
     const detailsModal = functionSlice(
       page.source,
       '<BusinessRecordDetailsModal',
-      '<CollaborationTaskPanel'
+      page.detailsModalEnd
     )
     assert.match(detailsModal, /lineItems=\{/u)
     assert.match(detailsModal, new RegExp(`load: ${page.detailsItemsLoader}`))

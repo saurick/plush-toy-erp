@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"sync"
 	"testing"
@@ -10,6 +11,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
@@ -63,8 +65,16 @@ func TestPurchaseReceiptPostgresMigrationShape(t *testing.T) {
 	if err != nil {
 		t.Fatalf("create postgres purchase receipt shape draft failed: %v", err)
 	}
-	if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); !errors.Is(err, biz.ErrBadParam) {
-		t.Fatalf("expected postgres draft receipt cancel to be rejected, got %v", err)
+	draftToCancel, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+		ReceiptNo:    "PG-PR-SHAPE-CANCEL-" + fixtures.suffix,
+		SupplierName: "PG供应商",
+		ReceivedAt:   time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC),
+	})
+	if err != nil {
+		t.Fatalf("create postgres purchase receipt cancellation draft failed: %v", err)
+	}
+	if cancelled, err := uc.CancelPostedPurchaseReceipt(ctx, draftToCancel.ID); err != nil || cancelled.Status != biz.PurchaseReceiptStatusCancelled {
+		t.Fatalf("cancel postgres draft purchase receipt = %#v, err=%v", cancelled, err)
 	}
 	if _, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
 		ReceiptNo:    "PG-PR-SHAPE-" + fixtures.suffix,
@@ -345,6 +355,111 @@ func TestPurchaseReceiptPostgresFlow(t *testing.T) {
 	}
 	if reversalCount != 1 {
 		t.Fatalf("expected one postgres reversal after repeat cancel, got %d", reversalCount)
+	}
+}
+
+func TestPurchaseReceiptPostgresDraftPostCancelConcurrency(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	postgresFixtures := createPurchaseReceiptPostgresFixtures(t, ctx, client)
+	fixtures := inventoryTestFixtures{
+		unitID:      postgresFixtures.unitID,
+		materialID:  postgresFixtures.materialID,
+		productID:   postgresFixtures.productID,
+		warehouseID: postgresFixtures.warehouseID,
+	}
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+
+	for _, postFirst := range []bool{true, false} {
+		name := "cancel first"
+		if postFirst {
+			name = "post first"
+		}
+		t.Run(name, func(t *testing.T) {
+			suffix := fmt.Sprintf("%s-%t", postgresFixtures.suffix, postFirst)
+			receipt, err := uc.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{
+				ReceiptNo:    "PG-PR-DRAFT-POST-CANCEL-" + suffix,
+				SupplierName: "PG并发供应商",
+				ReceivedAt:   time.Date(2026, 7, 18, 10, 0, 0, 0, time.UTC),
+			})
+			if err != nil {
+				t.Fatalf("create draft receipt failed: %v", err)
+			}
+			item, err := uc.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+				ReceiptID:      receipt.ID,
+				MaterialID:     fixtures.materialID,
+				WarehouseID:    fixtures.warehouseID,
+				UnitID:         fixtures.unitID,
+				LotNo:          stringPtr("PG-PR-DRAFT-POST-CANCEL-LOT-" + suffix),
+				Quantity:       mustDecimal(t, "3"),
+				IdempotencyKey: "test:postgres:receipt:draft-post-cancel:" + suffix,
+			})
+			if err != nil || item.LotID == nil {
+				t.Fatalf("add draft receipt item = %#v, err=%v", item, err)
+			}
+			passAllPurchaseReceiptQualityInspections(t, ctx, uc, receipt.ID)
+
+			blocker, err := data.sqldb.BeginTx(ctx, nil)
+			if err != nil {
+				t.Fatalf("begin receipt lock blocker failed: %v", err)
+			}
+			blockerOpen := true
+			t.Cleanup(func() {
+				if blockerOpen {
+					_ = blocker.Rollback()
+				}
+			})
+			var lockedID int
+			if err := blocker.QueryRowContext(ctx, `SELECT id FROM purchase_receipts WHERE id = $1 FOR UPDATE`, receipt.ID).Scan(&lockedID); err != nil {
+				t.Fatalf("lock draft receipt failed: %v", err)
+			}
+
+			postDone := make(chan error, 1)
+			cancelDone := make(chan error, 1)
+			startPost := func() { go func() { _, err := uc.PostPurchaseReceipt(ctx, receipt.ID); postDone <- err }() }
+			startCancel := func() { go func() { _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); cancelDone <- err }() }
+			if postFirst {
+				startPost()
+			} else {
+				startCancel()
+			}
+			waitForPostgresBlockedQueryCount(t, ctx, data.sqldb, "SELECT id FROM purchase_receipts", 1)
+			if postFirst {
+				startCancel()
+			} else {
+				startPost()
+			}
+			waitForPostgresBlockedQueryCount(t, ctx, data.sqldb, "SELECT id FROM purchase_receipts", 2)
+			if err := blocker.Rollback(); err != nil {
+				t.Fatalf("release receipt lock blocker failed: %v", err)
+			}
+			blockerOpen = false
+			postErr := receivePurchaseOperationError(t, postDone, "purchase receipt post")
+			cancelErr := receivePurchaseOperationError(t, cancelDone, "purchase receipt cancel")
+
+			persisted := client.PurchaseReceipt.GetX(ctx, receipt.ID)
+			if persisted.Status != biz.PurchaseReceiptStatusCancelled {
+				t.Fatalf("final receipt status=%s, want CANCELLED", persisted.Status)
+			}
+			txnCount := client.InventoryTxn.Query().Where(
+				inventorytxn.SourceType(biz.PurchaseReceiptSourceType),
+				inventorytxn.SourceID(receipt.ID),
+			).CountX(ctx)
+			balances := client.InventoryBalance.Query().Where(inventorybalance.LotID(*item.LotID)).AllX(ctx)
+			for _, balance := range balances {
+				if !balance.Quantity.IsZero() {
+					t.Fatalf("final receipt lot balance=%s, want zero", balance.Quantity)
+				}
+			}
+			lot := client.InventoryLot.GetX(ctx, *item.LotID)
+			if postFirst {
+				if postErr != nil || cancelErr != nil || persisted.PostedAt == nil || txnCount != 2 || lot.Status != biz.InventoryLotActive {
+					t.Fatalf("post-first result post=%v cancel=%v posted_at=%v txns=%d lot=%s", postErr, cancelErr, persisted.PostedAt, txnCount, lot.Status)
+				}
+			} else if !errors.Is(postErr, biz.ErrBadParam) || cancelErr != nil || persisted.PostedAt != nil || txnCount != 0 || lot.Status != biz.InventoryLotDisabled {
+				t.Fatalf("cancel-first result post=%v cancel=%v posted_at=%v txns=%d lot=%s", postErr, cancelErr, persisted.PostedAt, txnCount, lot.Status)
+			}
+		})
 	}
 }
 

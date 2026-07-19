@@ -6,12 +6,15 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"sync"
 	"testing"
 	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
 	"server/internal/data/model/ent/inventorytxn"
+	"server/internal/data/model/ent/purchasereceiptadjustment"
+	"server/internal/data/model/ent/purchasereturn"
 
 	"github.com/go-kratos/kratos/v2/log"
 )
@@ -48,10 +51,13 @@ func TestPurchaseReturnPostgresReceiptCancelDependencyAndConcurrency(t *testing.
 			invFixtures,
 			mustDecimal(t, "4"),
 		)
+		if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); !errors.Is(err, biz.ErrPurchaseReceiptCorrectionDependency) {
+			t.Fatalf("draft purchase return must block source receipt cancellation, got %v", err)
+		}
 		if _, err := uc.PostPurchaseReturn(ctx, purchaseReturn.ID); err != nil {
 			t.Fatalf("post linked purchase return failed: %v", err)
 		}
-		if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); !errors.Is(err, biz.ErrBadParam) {
+		if _, err := uc.CancelPostedPurchaseReceipt(ctx, receipt.ID); !errors.Is(err, biz.ErrPurchaseReceiptCorrectionDependency) {
 			t.Fatalf("posted purchase return must block source receipt cancellation, got %v", err)
 		}
 		persisted, err := client.PurchaseReceipt.Get(ctx, receipt.ID)
@@ -194,36 +200,122 @@ func runPurchaseReturnReceiptCancelRace(
 		t.Fatalf("get inventory balance after race failed: %v", err)
 	}
 
-	if postFirst {
-		if postErr != nil {
-			t.Fatalf("purchase return post should win parent lock, got %v", postErr)
-		}
-		if !errors.Is(cancelErr, biz.ErrBadParam) {
-			t.Fatalf("receipt cancellation must reject the committed return dependency, got %v", cancelErr)
-		}
-		if persistedReceipt.Status != biz.PurchaseReceiptStatusPosted || persistedReturn.Status != biz.PurchaseReturnStatusPosted {
-			t.Fatalf("post-first statuses receipt=%s return=%s, want POSTED/POSTED", persistedReceipt.Status, persistedReturn.Status)
-		}
-		if returnTxnCount != 1 || receiptReversalCount != 0 {
-			t.Fatalf("post-first inventory evidence return_txns=%d receipt_reversals=%d, want 1/0", returnTxnCount, receiptReversalCount)
-		}
-		assertDecimalEqual(t, balance.Quantity, "6")
-		return
+	if postErr != nil {
+		t.Fatalf("purchase return post must remain legal with active source receipt, got %v", postErr)
+	}
+	if !errors.Is(cancelErr, biz.ErrPurchaseReceiptCorrectionDependency) {
+		t.Fatalf("receipt cancellation must reject the active return dependency, got %v", cancelErr)
+	}
+	if persistedReceipt.Status != biz.PurchaseReceiptStatusPosted || persistedReturn.Status != biz.PurchaseReturnStatusPosted {
+		t.Fatalf("%v-first statuses receipt=%s return=%s, want POSTED/POSTED", map[bool]string{true: "post", false: "cancel"}[postFirst], persistedReceipt.Status, persistedReturn.Status)
+	}
+	if returnTxnCount != 1 || receiptReversalCount != 0 {
+		t.Fatalf("active dependency inventory evidence return_txns=%d receipt_reversals=%d, want 1/0", returnTxnCount, receiptReversalCount)
+	}
+	assertDecimalEqual(t, balance.Quantity, "6")
+}
+
+func TestPurchaseReceiptPostgresChildCreateAndCancelNeverLeavesActiveDraftOnCancelledReceipt(t *testing.T) {
+	ctx := context.Background()
+	data, client := openPurchaseOperationalPostgresTestData(t)
+	fixtures := createPurchaseOperationalPostgresFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	invFixtures := inventoryTestFixtures{
+		unitID: fixtures.unitID, materialID: fixtures.materialID,
+		productID: fixtures.productID, warehouseID: fixtures.warehouseID,
 	}
 
-	if cancelErr != nil {
-		t.Fatalf("purchase receipt cancellation should win parent lock, got %v", cancelErr)
+	t.Run("purchase return", func(t *testing.T) {
+		for iteration := 0; iteration < 8; iteration++ {
+			suffix := fmt.Sprintf("%s-RETURN-CREATE-CANCEL-%d", fixtures.suffix, iteration)
+			receipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-"+suffix, invFixtures, stringPtr("PG-LOT-"+suffix), mustDecimal(t, "10"))
+			input := &biz.PurchaseReturnFromReceiptCreate{
+				ReturnNo: "PG-RET-" + suffix, PurchaseReceiptID: receipt.ID,
+				ReturnedAt: time.Now().UTC(), IdempotencyKey: "pg-ret-" + suffix,
+				Items: []biz.PurchaseReturnFromReceiptItemCreate{{PurchaseReceiptItemID: receipt.Items[0].ID, Quantity: mustDecimal(t, "1")}},
+			}
+			start := make(chan struct{})
+			var created *biz.PurchaseReturn
+			var createErr, cancelErr error
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() { defer wg.Done(); <-start; created, createErr = uc.CreatePurchaseReturnFromReceipt(ctx, input) }()
+			go func() { defer wg.Done(); <-start; _, cancelErr = uc.CancelPostedPurchaseReceipt(ctx, receipt.ID) }()
+			close(start)
+			wg.Wait()
+
+			receiptRow := client.PurchaseReceipt.GetX(ctx, receipt.ID)
+			children := client.PurchaseReturn.Query().Where(purchasereturn.PurchaseReceiptID(receipt.ID)).AllX(ctx)
+			assertPurchaseReceiptChildCreateCancelInvariant(t, receiptRow.Status, childrenStatus(children), created != nil, createErr, cancelErr)
+		}
+	})
+
+	t.Run("purchase receipt adjustment", func(t *testing.T) {
+		for iteration := 0; iteration < 8; iteration++ {
+			suffix := fmt.Sprintf("%s-ADJUST-CREATE-CANCEL-%d", fixtures.suffix, iteration)
+			receipt := createAndPostPurchaseReceipt(t, ctx, uc, "PG-"+suffix, invFixtures, stringPtr("PG-LOT-"+suffix), mustDecimal(t, "10"))
+			input := &biz.PurchaseReceiptAdjustmentFromReceiptCreate{
+				AdjustmentNo: "PG-ADJ-" + suffix, PurchaseReceiptID: receipt.ID,
+				AdjustedAt: time.Now().UTC(), IdempotencyKey: "pg-adj-" + suffix,
+				Items: []biz.PurchaseReceiptAdjustmentFromReceiptItemCreate{{
+					PurchaseReceiptItemID: receipt.Items[0].ID,
+					AdjustType:            biz.PurchaseReceiptAdjustmentQuantityDecrease, Quantity: mustDecimal(t, "1"),
+				}},
+			}
+			start := make(chan struct{})
+			var created *biz.PurchaseReceiptAdjustment
+			var createErr, cancelErr error
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				<-start
+				created, createErr = uc.CreatePurchaseReceiptAdjustmentFromReceipt(ctx, input)
+			}()
+			go func() { defer wg.Done(); <-start; _, cancelErr = uc.CancelPostedPurchaseReceipt(ctx, receipt.ID) }()
+			close(start)
+			wg.Wait()
+
+			receiptRow := client.PurchaseReceipt.GetX(ctx, receipt.ID)
+			children := client.PurchaseReceiptAdjustment.Query().Where(purchasereceiptadjustment.PurchaseReceiptID(receipt.ID)).AllX(ctx)
+			statuses := make([]string, 0, len(children))
+			for _, child := range children {
+				statuses = append(statuses, child.Status)
+			}
+			assertPurchaseReceiptChildCreateCancelInvariant(t, receiptRow.Status, statuses, created != nil, createErr, cancelErr)
+		}
+	})
+}
+
+func childrenStatus(children []*ent.PurchaseReturn) []string {
+	statuses := make([]string, 0, len(children))
+	for _, child := range children {
+		statuses = append(statuses, child.Status)
 	}
-	if !errors.Is(postErr, biz.ErrBadParam) {
-		t.Fatalf("return posting must reject the re-read cancelled source receipt, got %v", postErr)
+	return statuses
+}
+
+func assertPurchaseReceiptChildCreateCancelInvariant(
+	t *testing.T,
+	receiptStatus string,
+	childStatuses []string,
+	created bool,
+	createErr error,
+	cancelErr error,
+) {
+	t.Helper()
+	switch {
+	case cancelErr == nil:
+		if !errors.Is(createErr, biz.ErrBadParam) || receiptStatus != biz.PurchaseReceiptStatusCancelled || len(childStatuses) != 0 || created {
+			t.Fatalf("cancel winner escaped invariant: create=%v cancel=%v receipt=%s children=%#v created=%v", createErr, cancelErr, receiptStatus, childStatuses, created)
+		}
+	case createErr == nil:
+		if !errors.Is(cancelErr, biz.ErrPurchaseReceiptCorrectionDependency) || receiptStatus != biz.PurchaseReceiptStatusPosted || len(childStatuses) != 1 || childStatuses[0] != biz.PurchaseReturnStatusDraft || !created {
+			t.Fatalf("create winner escaped invariant: create=%v cancel=%v receipt=%s children=%#v created=%v", createErr, cancelErr, receiptStatus, childStatuses, created)
+		}
+	default:
+		t.Fatalf("race has no legal winner: create=%v cancel=%v receipt=%s children=%#v", createErr, cancelErr, receiptStatus, childStatuses)
 	}
-	if persistedReceipt.Status != biz.PurchaseReceiptStatusCancelled || persistedReturn.Status != biz.PurchaseReturnStatusDraft {
-		t.Fatalf("cancel-first statuses receipt=%s return=%s, want CANCELLED/DRAFT", persistedReceipt.Status, persistedReturn.Status)
-	}
-	if returnTxnCount != 0 || receiptReversalCount != 1 {
-		t.Fatalf("cancel-first inventory evidence return_txns=%d receipt_reversals=%d, want 0/1", returnTxnCount, receiptReversalCount)
-	}
-	assertDecimalEqual(t, balance.Quantity, "0")
 }
 
 func waitForPostgresBlockedQueryCount(t *testing.T, ctx context.Context, db *sql.DB, fragment string, want int) {

@@ -39,3 +39,14 @@ test('inventoryApi: exposes read-only inventory ledger methods only', () => {
     assert.doesNotMatch(source, new RegExp(forbiddenActionName))
   }
 })
+
+test('inventoryApi: source eligibility reads use strict complete pagination', () => {
+  assert.match(
+    source,
+    /export async function listAllInventoryBalances[\s\S]*?listAllPaginatedRecords\(\s*listInventoryBalances,\s*params,\s*'inventory_balances'/u
+  )
+  assert.match(
+    source,
+    /export async function listAllInventoryLots[\s\S]*?listAllPaginatedRecords\(\s*listInventoryLots,\s*params,\s*'inventory_lots'/u
+  )
+})

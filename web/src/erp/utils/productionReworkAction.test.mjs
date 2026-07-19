@@ -203,3 +203,50 @@ test('production rework result and unknown reread stay bound to the source compl
   assert.match(occurredAtInput, /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/u)
   assert.equal(new Date(occurredAtInput).toISOString(), occurredAtInstant)
 })
+
+test('production rework quantities preserve numeric(20,6) boundaries exactly', () => {
+  const tinySource = { ...source, quantity: '0.000001' }
+  assert.deepEqual(productionReworkQuantitySummary(tinySource, []), {
+    completed: '0.000001',
+    postedRework: '0',
+    remaining: '0.000001',
+  })
+  assert.equal(isProductionReworkEligible(tinySource, []), true)
+  assert.equal(
+    buildProductionReworkPayload(
+      { fact_no: 'RW-TINY', quantity: '0.000001', reason: '微量返工' },
+      tinySource,
+      []
+    ).quantity,
+    '0.000001'
+  )
+
+  const maximum = '99999999999999.999999'
+  const maximumSource = { ...source, quantity: maximum }
+  const posted = [
+    {
+      fact_type: 'REWORK',
+      status: 'POSTED',
+      source_type: 'PRODUCTION_FACT',
+      source_id: 81,
+      quantity: '0.000001',
+    },
+  ]
+  assert.deepEqual(productionReworkQuantitySummary(maximumSource, posted), {
+    completed: maximum,
+    postedRework: '0.000001',
+    remaining: '99999999999999.999998',
+  })
+  assert.equal(
+    buildProductionReworkPayload(
+      {
+        fact_no: 'RW-MAX',
+        quantity: '99999999999999.999998',
+        reason: '边界返工',
+      },
+      maximumSource,
+      posted
+    ).quantity,
+    '99999999999999.999998'
+  )
+})

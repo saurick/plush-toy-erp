@@ -88,6 +88,7 @@ var (
 	ErrShipmentReleasePending               = errors.New("shipment release task is not completed")
 	ErrShipmentReleaseRejected              = errors.New("shipment release task was rejected")
 	ErrShipmentReleaseAlreadySubmitted      = errors.New("shipment release was already submitted")
+	ErrShipmentCancellationProcessActive    = errors.New("shipment finished goods delivery process is still active")
 	ErrShipmentCancellationTaskActive       = errors.New("shipment release task is still active")
 	ErrProductionExceptionTaskRequired      = errors.New("production exception task is required")
 	ErrProductionExceptionTaskActive        = errors.New("production exception task is still active")
@@ -98,6 +99,8 @@ var (
 	ErrFinanceFactSourceInvalid             = errors.New("finance fact source invalid")
 	ErrFinanceFactSourceConflict            = errors.New("active finance fact already exists for source")
 	ErrFinanceFactShipmentAmountInvalid     = errors.New("shipment finance amount snapshot is incomplete")
+	ErrFinanceFactPaymentTermMissing        = errors.New("shipment sales order payment term is missing")
+	ErrFinanceFactInvoiceCategoryMissing    = errors.New("invoice category is required")
 	ErrFinanceFactSettlementNotAllowed      = errors.New("finance fact type cannot be settled")
 )
 
@@ -540,6 +543,13 @@ type ProductionReworkFromCompletionRepo interface {
 // a stale source read.
 type FinanceFactFromShipmentRepo interface {
 	CreateFinanceFactDraftFromShipment(ctx context.Context, factType string, in *FinanceFactFromShipmentCreate) (*FinanceFact, error)
+}
+
+// FinanceFactShipmentPaymentTermRepo resolves the authoritative sales-order
+// payment-term snapshot for process-command producers. The repository repeats
+// the same validation while holding the shipment lock before persisting.
+type FinanceFactShipmentPaymentTermRepo interface {
+	GetShipmentPaymentTermDays(ctx context.Context, shipmentID int) (*int, error)
 }
 
 // OutsourcingFactFromOrderRepo owns source locking, source-field derivation
@@ -1013,11 +1023,32 @@ func (uc *OperationalFactUsecase) createFinanceFactFromShipment(ctx context.Cont
 	if err != nil {
 		return nil, err
 	}
+	if factType == FinanceFactReceivable && normalized.InvoiceCategory != nil {
+		return nil, ErrBadParam
+	}
+	if factType == FinanceFactInvoice && normalized.InvoiceCategory == nil {
+		return nil, ErrFinanceFactInvoiceCategoryMissing
+	}
 	repo, ok := uc.repo.(FinanceFactFromShipmentRepo)
 	if !ok {
 		return nil, ErrBadParam
 	}
 	return repo.CreateFinanceFactDraftFromShipment(ctx, factType, normalized)
+}
+
+func (uc *OperationalFactUsecase) shipmentFinancePaymentTermSnapshot(ctx context.Context, shipmentID int) (*string, *int, error) {
+	if uc == nil || uc.repo == nil || shipmentID <= 0 {
+		return nil, nil, ErrBadParam
+	}
+	repo, ok := uc.repo.(FinanceFactShipmentPaymentTermRepo)
+	if !ok {
+		return nil, nil, ErrBadParam
+	}
+	days, err := repo.GetShipmentPaymentTermDays(ctx, shipmentID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return FinancePaymentTermSnapshotFromDays(days)
 }
 
 func (uc *OperationalFactUsecase) PostFinanceFact(ctx context.Context, id int) (*FinanceFact, error) {
@@ -1109,6 +1140,31 @@ var financePaymentTerms = map[string]int{
 	FinancePaymentTermCashOnShipment: 0,
 	FinancePaymentTermEOM30:          30,
 	FinancePaymentTermEOM45:          45,
+}
+
+// FinancePaymentTermSnapshotFromDays freezes the exact sales-order term.
+// Known terms keep their display code; non-standard terms intentionally keep
+// only the exact day count instead of being guessed into a different enum.
+func FinancePaymentTermSnapshotFromDays(days *int) (*string, *int, error) {
+	if days == nil {
+		return nil, nil, ErrFinanceFactPaymentTermMissing
+	}
+	dayCount := *days
+	if dayCount < 0 {
+		return nil, nil, ErrBadParam
+	}
+	var term string
+	switch dayCount {
+	case 0:
+		term = FinancePaymentTermCashOnShipment
+	case 30:
+		term = FinancePaymentTermEOM30
+	case 45:
+		term = FinancePaymentTermEOM45
+	default:
+		return nil, &dayCount, nil
+	}
+	return &term, &dayCount, nil
 }
 
 var financeInvoiceCategories = map[string]struct{}{

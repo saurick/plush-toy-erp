@@ -16,17 +16,19 @@ import (
 )
 
 type PurchaseReceipt struct {
-	ID           int
-	ReceiptNo    string
-	SupplierID   *int
-	SupplierName string
-	Status       string
-	ReceivedAt   time.Time
-	PostedAt     *time.Time
-	Note         *string
-	CreatedAt    time.Time
-	UpdatedAt    time.Time
-	Items        []*PurchaseReceiptItem
+	ID              int
+	ReceiptNo       string
+	PurchaseOrderID *int
+	PurchaseOrderNo *string
+	SupplierID      *int
+	SupplierName    string
+	Status          string
+	ReceivedAt      time.Time
+	PostedAt        *time.Time
+	Note            *string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Items           []*PurchaseReceiptItem
 	// QualityInspections is populated by the receipt preparation command so the
 	// process runtime can record every generated line inspection as a linked ref.
 	QualityInspections []*QualityInspection

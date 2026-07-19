@@ -32,9 +32,8 @@ pnpm install
 | ------------- | ----------------------------------------------------------------- |
 | `src/common/` | 通用认证、组件、hooks、状态、常量与工具函数                       |
 | `src/erp/`    | 毛绒 ERP 桌面后台、业务页、岗位任务端页面和打印工作台             |
-| `src/erp/qa/` | 字段联动等前端 QA catalog 与 latest 报告生成依赖                  |
+| `src/erp/qa/` | 字段联动等前端 QA catalog 与报告生成依赖                         |
 | `src/pages/`  | 根路由重定向、登录、注册、管理员登录                              |
-| `public/qa/`  | 字段联动覆盖等 latest 结构化报告，供后台验收页读取                |
 | `scripts/`    | 前端本地服务、浏览器级回归和 smoke 脚本，详见 `scripts/README.md` |
 | `build/`      | 构建产物，不作为业务真源                                          |
 
@@ -68,7 +67,7 @@ http://127.0.0.1:5175/m/quality/tasks
 http://127.0.0.1:5175/m/engineering/tasks
 ```
 
-`/admin-login` 统一承接后台和岗位任务端登录。手机默认选择岗位任务端，电脑默认选择后台，平板没有历史选择时保留入口选择；用户手动选择入口优先于设备默认，并在刷新后保持。入口显隐由 `web/src/erp/config/entryConfig.mjs` 控制，并可通过 `window.__PLUSH_ERP_ENTRY_CONFIG__` 覆盖。用户不在登录前手选岗位，岗位任务端登录后按当前账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位；是否真正可进入仍由后端返回的 `permissions / menus` 决定。短信登录入口由后端 `auth.capabilities` 决定，前端不自行决定认证方式是否可用；用户手动选择的“密码登录 / 短信登录”会随浏览器刷新保持，短信验证码发送后的前端倒计时在当前标签页刷新后继续显示。前端只在后端明确返回 `mock_delivery=true` 时展示临时验证码；provider 模式下按后端错误码展示中文提示，例如发送过于频繁、短信服务额度已用完、短信服务暂不可用、验证码错误或验证码过期，不透传阿里云原始错误。后端仍负责真实频控和验证码校验。
+`/admin-login` 统一承接后台和岗位任务端登录。手机默认选择岗位任务端，电脑默认选择后台，平板没有历史选择时保留入口选择；用户手动选择入口优先于设备默认，并在刷新后保持。入口显隐由 `web/src/erp/config/entryConfig.mjs` 控制，并可通过 `window.__PLUSH_ERP_ENTRY_CONFIG__` 覆盖。用户不在登录前手选岗位角色；岗位任务端登录后优先进入已授权的明确岗位深链，否则自动进入当前账号第一个可用 `mobile.<role>.access` 岗位。是否真正可进入仍由后端刷新后的管理员状态、`permissions / menus` 与客户 effective session 决定。短信登录入口由后端 `auth.capabilities` 决定，前端不自行决定认证方式是否可用；用户手动选择的“密码登录 / 短信登录”会随浏览器刷新保持，短信验证码发送后的前端倒计时在当前标签页刷新后继续显示。前端只在后端明确返回 `mock_delivery=true` 时展示临时验证码；provider 模式下按后端错误码展示中文提示，例如发送过于频繁、短信服务额度已用完、短信服务暂不可用、验证码错误或验证码过期，不透传阿里云原始错误。后端仍负责真实频控和验证码校验。
 
 当前前端不提供普通协作账号自助注册、登录或管理入口；登录主路径是 `/admin-login`，旧 `/login`、`/admin-accounts` 与 `/admin-users` 已不再注册路由或重定向。后端普通 `users` 表和 `user` JSON-RPC 域已退出，账号、岗位任务端和 RBAC 主路径统一使用 `admin_users`、角色和权限码。
 
@@ -290,7 +289,7 @@ pnpm smoke:processing-contract-real-login
 
 - 上述真实登录烟测都会打开管理员登录页，使用 `server/configs/dev/config.local.yaml` 或 `config.yaml` 中的管理员账号登录
 - 若本地账号不在配置文件中，可通过环境变量 `REAL_LOGIN_ADMIN_USERNAME` / `REAL_LOGIN_ADMIN_PASSWORD` 覆盖
-- 桌面管理员登录页和岗位任务端登录页始终保留密码登录；短信登录只有在后端 `auth.capabilities` 返回可用时展示。用户不在登录前手选岗位角色，岗位任务端登录后按当前账号已有 `mobile.<role>.access` 权限自动进入第一个可用岗位，固定 `/m/<role>/tasks` 直达入口仍校验对应岗位授权，短信登录额外依赖手机号绑定
+- 桌面管理员登录页和岗位任务端登录页始终保留密码登录；短信登录只有在后端 `auth.capabilities` 返回可用时展示。用户不在登录前手选岗位；岗位任务端登录后优先进入已授权的固定 `/m/<role>/tasks` 深链，否则自动进入当前账号第一个可用岗位，短信登录额外依赖手机号绑定
 - 可通过 `REAL_LOGIN_PREVIEW_MAX_MS` 覆盖默认 `10000ms` 的 PDF 预览时延阈值
 - 采购入库真实写入 e2e 会验证：登录成功、通过采购入库 RPC 准备测试草稿、入库管理页面可处理该草稿、过账写 `inventory_txns`、取消入库写冲正、列表回显已取消；该脚本会写本地 / 开发库的模拟采购入库事实，采购入库单据不可物理删除，收尾口径是取消冲正并保留 `PR-BROWSER-*` 可追踪记录。入库管理页不提供页面级“新建入库单”，正式入库草稿应从采购订单“生成入库”入口产生。`pnpm smoke:purchase-receipt-real-write` 已显式传入 `--accept-persistent-test-data`，直接 `node` 执行时也必须显式传入该参数或设置 `PURCHASE_RECEIPT_E2E_ACCEPT_PERSISTENT_TEST_DATA=1`。脚本默认只允许 localhost / 127.0.0.1 页面目标；如确需跑准备好的开发 / 测试环境，必须额外传入 `--allow-external-base-url`，禁止直接跑生产或目标客户环境。若缺少单位、材料或仓库，可显式执行 `pnpm smoke:purchase-receipt-real-write -- --seed-core-demo` 先补核心演示主数据
 - 采购合同烟测会验证：登录成功、采购合同工作台可打开、采购金额可手工修改、改单价后金额会按公式重算、在线 PDF 预览在阈值内打开
@@ -302,7 +301,7 @@ pnpm smoke:processing-contract-real-login
 - 管理员登录
 - 登录页主题三态、暗色后台看板、暗色业务页中性 hover / focus、暗色开发文档查看器、暗色客户配置包预检页、暗色打印中心 / 预览入口和暗色岗位任务端核心路径
 - 未登录访问桌面后台的重定向
-- 桌面工作台、任务看板和异常 / 阻塞闭环，包括协同任务筛选、任务详情抽屉、阻塞 / 退回原因面板、催办、基于 `complete_task_action` / `block_task_action` / `reject_task_action` 的任务动作和运营工具入口
+- 桌面工作台和任务看板，包括待我处理、阻塞 / 逾期风险队列、协同任务筛选、任务详情抽屉、阻塞 / 退回原因面板、催办，以及基于 `complete_task_action` / `block_task_action` / `reject_task_action` 的任务动作
 - 桌面业务看板和模板打印中心
 - 当前正式业务页连续回归，包括客户档案、供应商档案、销售订单 V1 页面、采购订单日期筛选和出货单日期筛选（桌面 / 窄屏）
 - 当前正式业务页表格、筛选、列顺序账号偏好、弹窗布局和协同入口
@@ -311,9 +310,9 @@ pnpm smoke:processing-contract-real-login
 - 采购合同打印工作台
 - 加工合同打印工作台
 
-`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、任务 / 预警 / 通知 / 进度展示、岗位任务端不显示说明 / 角色文案，以及退出登录清空登录态。
+`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、`admin.me` 与客户 effective session 刷新、当前优先事项 / 风险提醒 / 已办进度展示、岗位任务端不显示技术说明，以及退出登录清空登录态。
 
-缺少浏览器运行条件或只想确认移动端认证回跳 smoke 的执行范围时，可先执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template`。该命令只打印岗位任务端角色、phone / iPad 视口、可选环境变量和真实回归命令，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。需要留下可保存的 no-write 前置记录时，执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json`；该报告只写本地 JSON，记录脚本存在性、岗位任务端路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径，不调用后端 / JSON-RPC、不读取密码、不保存 token、不写数据库。真实 `pnpm smoke:mobile-auth-login-route` 使用 mock auth / workflow RPC 验证生产单端口 `/m/<role>/tasks` 路由和登录回跳，不证明真实后端 RBAC、真实账号或 customer config active revision。
+缺少浏览器运行条件或只想确认移动端认证回跳 smoke 的执行范围时，可先执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template`。该命令只打印岗位任务端角色、phone / iPad 视口、可选环境变量和真实回归命令，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。需要留下可保存的 no-write 前置记录时，执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json`；该报告只写本地 JSON，记录脚本存在性、岗位任务端路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径，不调用后端 / JSON-RPC、不读取密码、不保存 token、不写数据库。真实 `pnpm smoke:mobile-auth-login-route` 使用 mock auth / admin / customer-config / workflow RPC 验证生产单端口 `/m/<role>/tasks` 路由、会话刷新和登录回跳，不证明真实后端 RBAC、真实账号或 customer config active revision。
 
 `pnpm smoke:mobile-workflow-runtime-browser` 使用真实后端和真实浏览器创建 `simulated_only` 老板审批任务、老板退回任务、老板完成任务、品质成品抽检任务、仓库入库任务与仓库放行任务，登录 `demo_boss` 后在 `/m/boss/tasks` 验证自有任务阻塞、退回、完成反馈、现场留痕、异常上报，以及 `owner_role_key=warehouse` 且 `assignee_id=demo_boss` 的跨角色任务只能催办、不能代办阻塞 / 完成；随后登录 `demo_quality` 和 `demo_warehouse`，分别验证品质岗位完成、仓库入库完成、完成反馈、已办列表和 evidence refs。该回归只覆盖本地 / 试用模拟 workflow 证据，不代表真实客户导入、生产写入或 Fact 落账。
 
@@ -391,10 +390,12 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 #### 测试入口 `/__dev/testing`
 
-- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，展示 T0-T8、命令块和常用预设。
+- 该页只读解析自动化测试策略、`scripts/README.md`、`web/scripts/README.md`、前后端 README 和部署说明等 9 份当前白名单文档，展示 T0-T8、命令块、常用预设和独立的“覆盖状态 / Coverage”视图。
 - `docs/reference/**` 和 `docs/archive/**` 默认不进入可复制命令来源，避免把历史或未来命令写成当前测试入口。
 - 多行命令会保留完整续行参数；不完整且以反斜杠结尾的命令不会进入复制结果。命令区按内容高度展示，不再被网格压缩裁切；筛选无结果时文档详情同步为空。
-- 复制按钮不在浏览器内执行 shell；`docs/product/自动化测试策略.md` 仍是测试选择真源。
+- 覆盖视图从 dev-only `GET /__dev/api/qa/coverage` 读取固定 `output/qa/coverage/latest.json`，按 Go、Web、业务域、T0-T8、PostgreSQL、浏览器、readiness、目标环境和 UAT 分栏；未采集、过期、失败、跳过、阻塞和零执行不会折算为通过，也不会合并成一个总百分比。
+- 报告接口仅在 development serve 且请求来源与 Host 都是 loopback 时可用，返回 `no-store` 脱敏摘要；生产 build 不包含 `output/qa/**`，也不再从 `public/qa` 携带本机路径或覆盖报告。
+- 先运行 `node scripts/qa/erp-field-linkage.mjs`，再运行 `node scripts/qa/test-coverage-report.mjs --write` 刷新本地报告。字段联动 runner 会前后校验仓库指纹；仓库在运行期变动时 fail closed，不生成冒充当前的证据。页面复制按钮不会执行 shell，聚合命令也不会自动执行 full / strict、数据库或浏览器写入测试；`docs/product/自动化测试策略.md` 仍是测试选择和覆盖门槛真源。
 
 #### 客户配置包预检与发布 `/__dev/customer-config`
 
@@ -415,20 +416,21 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 - 桌面后台不再保留角色切换、角色首页或角色入口菜单；统一登录页和 `/entry` 只做后台 / 岗位任务端入口选择
 - 桌面后台管理员已接入 RBAC 权限中心；普通管理员通过 `roles` 获得 `permissions`，后端返回 `menus`，桌面菜单、岗位任务端入口和后端接口统一消费 permission code
 - 桌面后台主业务菜单按当前产品设计保留看板中心、主数据、销售管理、产品工程、采购管理、质检管理、库存管理、委外管理、生产管理、出货管理、财务业务、运营工具和系统管理；系统管理当前包含权限管理和审计日志。客户档案 / 供应商档案走正式 MasterData V1 API，销售订单走正式 SalesOrder V1 API，采购订单走正式 PurchaseOrder V1 API。正式业务列表统一为单击行选中、双击行进入编辑 / 主操作弹窗；详情抽屉只由显式详情入口打开。采购订单页面支持列表、关键词 / 状态 / 采购日期或预计到货日期范围筛选、详情、订单头与明细保存、提交、审批、关闭和取消，但只表达采购承诺，不写库存、批次或财务事实。入库、来料质检、库存台账、委外订单、出货单、生产进度、生产排程、生产异常、出货放行、出库管理和财务业务已分别接入正式 V1、Workflow V1 或收窄 Operational Fact V1 页面；出货单页面支持状态 / 计划出货或实际出货日期范围筛选、事务内聚合新建草稿、只读查看明细、显式提交放行、确认出货和已出货取消冲正。品质岗位可在提交放行前从 `DRAFT` 出货单按产品规格、仓库和批次发起出货前成品检验；一旦存在检验，未完成合格 / 让步判定时后端会阻止提交，提交成功后也不再允许补建检验。提交返回必须通过前端对任务编号、任务组、来源、责任岗位、状态、来源合同和意图摘要的完整校验，结构不可信时不冒充成功。没有发起检验仍按当前可选检验策略提交；创建检验不会启动 Workflow。放行任务完成只表示允许仓库执行，`SHIPPED` 才是真实出货事实。草稿逐行追加已退出，避免重复提交和多行半保存。审计日志页面只读展示启动初始化和账号 / 角色 / 权限等系统控制面事件，不替代业务事实流水。生产排程、生产异常和出货放行由 Workflow V1 协同页承接读取、完成、阻塞和催办；任务分别由生产订单下达、返工事实过账和出货单显式提交放行生成，页面不提供通用新建入口。三类保留任务组和确定性任务编号不能由普通任务创建、流程节点或客户流程配置占用。任务终态只更新协同投影；来源随后关闭、取消或真实出货时，页面读取的来源投影可继续显示 `closed / cancelled / shipped`，但不改写任务处理结论。三者不读取或写入旧 `business_records`，也不提供删除、回收站、业务数据导出或生产 / 出货 / 库存 / 财务领域事实写入主路径。旧预览壳页、旧通用业务页、旧业务模块路由和旧入口退出页已删除。
+- 正式业务页的“相关单据”支持连续往返。每一跳都以目标页拥有的数值 ID 或来源类型 + 来源 ID 重新建立精确筛选，业务单号只用于筛选框回显，不参与精确请求。目标关系只有一条可确定记录时自动选中并回显目标单号，用户编辑或清空筛选后退出关联上下文；存在多条取消历史且无法唯一确定时不臆选。
 - 生产订单页的“工序办理”已接固定 `PLUSH_SEW_HAND_V1` v1：布料加工正常流整单外发且首道不可拆，只有裁片检验 `PASS` 转入车缝后才可按产品数量拆批；车缝和手工按“先车缝、后手工”分别选择本厂或外发。内部完成使用“车间移交 / WIP 转移”，外发完成返回才使用“外发回仓”。首道外发只允许选择逐条精确覆盖显式 `FABRIC_PROCESSING` 冻结材料需求的 MATERIAL 合同行，并在开始前核对已过账委外发料；FABRIC 返工再次外发改用新的 PRODUCT 合同行。生产、品质、业务和 PMC 分别按 WIP 执行、分段质检、包材业务确认和只读跟进权限进入对应入口，业务岗位可凭 `production.wip.read` 打开生产订单页，但新建、编辑、发布、关闭、取消和引用选项仍只认 PMC 计划权限。
 - 质量检验页已把生产 WIP 纳入独立读模型，按裁片、皮套、成品、针检、抽检和订单条件性客户验货逐关口展示；每张单只代表当前批次当前关口，生产路线当前只有 `PASS` 可推进，`CONCESSION` fail closed。包材版面 / 包装版本由业务独立确认，不替代正式品质检验；路线订单的完工入库入口会重新核对已验收包装 WIP 数量。
-- 上述生产路线、WIP、分段质检和岗位投影当前只证明本地源码与定向合同已经接入；对应 Atlas migrations 尚未 apply 到共享开发库或目标客户数据库，也没有目标环境部署、health / smoke 或客户 UAT 证据。
-- P0/P1 业务页已接入共享业务附件面板：销售订单、采购订单、委外订单、采购入库、来料质检、出货单、收窄财务 / 生产 / 委外事实、SKU、BOM、Workflow V1 桌面页和岗位任务端详情可上传、下载附件。普通已上传附件删除入口已退出，避免无持久审计地抹除业务证据；待上传文件仍可在保存前移除。产品基础信息页另提供 `产品图 1（主图）/ 产品图 2（辅图）` 两个可替换媒体槽，只允许 PNG / JPEG / WEBP，单边不超过 8192px、总像素不超过 2000 万；同槽替换 / 清空是产品媒体的窄例外，不恢复普通证据附件删除。单个附件上限 5MB；普通证据允许格式覆盖常见图片、HEIC / HEIF、PDF、Word、Excel、CSV、文本、ZIP、邮件证据和 WPS 文件；PNG / JPG / WEBP / GIF / PDF 支持轻量预览，其他格式下载后查看。单据编辑弹窗中的附件默认作为备注 / 交付 / 合同资料 / 凭证附近的紧凑证据行放在明细区之前，页面级选中记录附件仍可保留独立区块。附件必须挂到已保存业务记录，不改变 Source Document、Fact、Workflow、库存、质检或财务状态。
+- 上述生产路线、WIP、分段质检和岗位投影当前只证明本地源码与定向合同已经接入；完整 Atlas 迁移链已在一次性 PostgreSQL 18 隔离库 apply 并读回，登记的个人开发库仍有 `20260718110227` pending，目标客户数据库没有本轮 apply、部署、health / smoke 或客户 UAT 证据。
+- P0/P1 业务页已接入共享业务附件面板：销售订单、采购订单、委外订单、采购入库、来料质检、出货单、收窄财务 / 生产 / 委外事实、SKU、BOM、Workflow V1 桌面页和岗位任务端详情可上传、下载附件。普通已上传附件删除入口已退出，避免无持久审计地抹除业务证据；待上传文件仍可在保存前移除。产品基础信息页另提供 `产品图 1（主图）/ 产品图 2（辅图）` 两个可替换媒体槽，只允许 PNG / JPEG / WEBP；源图选择不设文件大小上限，超过打印快照预算时浏览器会自动优化为不超过 1MiB、长边不超过 2560px、总像素不超过 400 万的 WEBP。服务端仍对最终快照执行 5MB、单边 8192px 和总像素 2000 万的纵深门禁；同槽替换 / 清空是产品媒体的窄例外，不恢复普通证据附件删除。普通证据附件上限仍为 5MB，允许格式覆盖常见图片、HEIC / HEIF、PDF、Word、Excel、CSV、文本、ZIP、邮件证据和 WPS 文件；PNG / JPG / WEBP / GIF / PDF 支持轻量预览，其他格式下载后查看。单据编辑弹窗中的附件默认作为备注 / 交付 / 合同资料 / 凭证附近的紧凑证据行放在明细区之前，页面级选中记录附件仍可保留独立区块。附件必须挂到已保存业务记录，不改变 Source Document、Fact、Workflow、库存、质检或财务状态。
 - 桌面后台已移除 `帮助中心`、`开发与验收` 和 `高级文档` 分组；前端不再承接 Markdown 文档页、业务链路调试页或协同任务调试页
 - 岗位任务端本地和生产环境统一走 `5175` 的 `/m/<role>/tasks`；不再保留按角色拆端口入口，也不拆第二个仓库
 - 岗位任务端只保留任务页，不展示角色说明、端口说明、技术字段、状态字典或帮助文案；根路径和未知路径统一进入任务页
-- 岗位任务页读取真实 workflow API，展示任务、预警、通知、进度和现场附件；完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色；桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因，列表行即时按钮仍保留本地 helper fallback；移动端不再回写 `business_records` 状态，附件上传不代表任务完成
+- 岗位任务页读取真实 workflow API，采用有意组合的移动主路径：保留 v1 的待办 / 已办 / 提醒 / 我的列表、主筛选、服务端游标分页 / 分批展开和任务卡片；选中任务后进入 v2 独立全屏查看、处理和可信结果回执，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。`todo / risk / history` 仍是各自服务端查询视图，不在前端拼成第二套任务真源。完成 / 阻塞 / 退回分别走 `complete_task_action` / `block_task_action` / `reject_task_action`，均由服务端按当前管理员和任务责任推导角色。桌面任务看板、Workflow V1 页面、业务协同 Drawer 和岗位任务端提交前预检已消费 `explainWorkflowActionAccess` / `explainWorkflowTaskAssignment` 的后端只读原因；移动端不再回写 `business_records` 状态，附件上传和 Workflow done 都不代表业务 Fact 已生效
 - 正式完成 / 阻塞 / 退回 / 催办入口为一次用户 intent 冻结业务参数、`expected_version` 和安全 UUID `idempotency_key`；HTTPS 优先使用 `crypto.randomUUID()`，内网 HTTP 浏览器使用 `crypto.getRandomValues()` 生成 RFC 4122 v4 key，不允许退回 `Math.random()`。只有新 intent 执行 explain 预检；HTTP 408、网络中断、5xx 或结构不合法的 success response 都保留原 attempt、抽屉、原因、证据和同一 key，原样读取 / 重放 receipt，不刷新列表也不把未知结果误报为失败。后端在每次请求仍重新校验登录、RBAC、客户 scope、任务可见性和 receipt，前端跳过重复 explain 不构成授权绕过
 - Dashboard、Workflow V1 页面、岗位任务端、采购订单与委外订单协同入口共用 task 级同步 in-flight guard：同一 task 的首个动作在任何 await 前取得 lease，完成 / 阻塞 / 退回 / 催办跨动作双击不会发出第二个请求，`finally` 只释放本次持有的 lease。Go 与 JS 已共同消费 `scripts/qa/workflow-task-mutation-intent-v1.vectors.json`，锁住 mixed evidence 类型 / 顺序、raw whitespace key、mobile 精确重复 key 和 changed-intent relations；Node 24.14 定向 util + mobile + purchase / outsourcing guard 为 33/33，联合 Workflow API / caller 为 62/62，受影响 ESLint 0 error。该结果不代表 final full/strict/L1 或目标环境证据已经完成
 - 岗位任务端复用管理员登录态，登录页固定提供密码登录，并在后端启用短信能力时提供短信登录；账号未授权当前角色、手机号未绑定或未授权当前角色、登录失效时进入 `/admin-login`，登录后回到任务页，并提供退出登录按钮
 - 模板打印当前由对应业务页选中记录后带值打开；产品页维护的 0–2 张产品图会在 BOM 生成物料明细 / 作业指导书时冻结到右上角，委外订单仅在全部有效产品行归属同一产品时自动带图。打印中心保留默认样例，并已按原型复核后的轻量两栏承接左侧模板导航、右侧纸面预览和打印窗口入口；字段和当前草稿图片编辑在独立打印窗口内完成。
 - 扩展硬件链路、PDA、条码枪、图片识别继续 deferred
-- `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心，`/erp/operations/exceptions` 是异常 / 阻塞闭环；工作台和业务看板保留后台运营中枢导航。未获用户明确确认前，不能把该资产改成 Current。
+- `docs/product/prototypes/admin-command-center-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已吸收主要运行时骨架：`/erp/dashboard` 是后台首页 / 工作台，并承接待我处理与阻塞 / 逾期风险队列；`/erp/task-board` 是任务看板，`/erp/business-dashboard` 是业务看板，`/erp/print-center` 是模板打印中心。工作台和业务看板保留后台运营中枢导航；不再提供重复的通用异常总控页。未获用户明确确认前，不能把该资产改成 Current。
 - `docs/product/prototypes/print-template-center-v1/` 按 `待实现 / To Implement` 登记，补齐模板打印中心独立样板；当前运行时已按原型复核后的轻量两栏保留模板导航 / 预览和打印窗口入口，字段编辑回到独立打印窗口。该原型不新增样品确认单、字段映射配置、后端 API、RBAC、schema、migration 或 Fact 写入。
 - `/erp/task-board` 任务看板的关键词、状态、角色、到期、来源、泳道和页码使用 URL query 保存，支持复制链接、刷新恢复和一键清空。页面读取服务端 `get_task_board` 全量投影，顶部指标与下方“常规待办 / 阻塞与退回 / 到期提醒 / 已结束”四个互斥泳道一一对应，四项之和等于当前筛选的真实总数。总览每栏最多展示 5 条并标明“已显示 / 共多少条”，单栏聚焦后按 8 条分页；不再把 `list_tasks(limit: 200)` 的当前页长度冒充全量统计，也不在前端循环拉取全部任务。这些筛选和投影只影响看板展示，不写用户偏好、Workflow 任务状态或 Fact 表。
 - `docs/product/prototypes/business-module-page-standard-v1/` 仍按 `待实现 / To Implement` 登记。当前运行时已经由客户、供应商、产品、材料、SKU、BOM、销售订单、采购订单、采购入库、来料质检、委外订单和出货单等正式 V1 页面复用业务页骨架，收窄 Fact / Workflow 页面继续遵守各自事实边界；旧 `BusinessModulePage`、旧通用业务页路由和旧只读变体页已删除。`/__dev/prototypes` 仍保留待实现队列，未获用户明确确认前不清空队列、不晋级 Current。

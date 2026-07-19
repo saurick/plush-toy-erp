@@ -89,11 +89,11 @@ func bomVersionMutationFromParams(pm map[string]any) (*biz.BOMVersionMutation, b
 }
 
 func bomItemUpdateFromParams(pm map[string]any) (*biz.BOMItemUpdate, bool) {
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "quantity")
 	if !ok {
 		return nil, false
 	}
-	lossRate, ok := getRequiredJSONRPCDecimal(pm, "loss_rate")
+	lossRate, ok := getRequiredJSONRPCNumeric20Scale6(pm, "loss_rate")
 	if !ok {
 		return nil, false
 	}

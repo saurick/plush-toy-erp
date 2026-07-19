@@ -30,7 +30,7 @@ import {
   evaluateBusinessDashboardEvidence,
   evaluateBusinessDashboardCurrentBatchEvidence,
   evaluateDashboardTaskCurrentBatchEvidence,
-  evaluateExceptionFlowEvidence,
+  evaluateFinanceFieldBrowserEvidence,
   evaluateGlobalDashboardEvidence,
   evaluatePrintPreviewEvidence,
   evaluatePrintSourceMinimumEvidence,
@@ -58,6 +58,7 @@ import {
   buildManualAcceptanceTaskSchedule,
   manualAcceptanceTaskBatchIdentity,
 } from "./manual-acceptance-task-data.mjs";
+import { inspectFinanceFieldContract } from "./manual-acceptance-finance-field-contract.mjs";
 
 const repoRoot = path.resolve(
   path.dirname(fileURLToPath(import.meta.url)),
@@ -79,6 +80,34 @@ const TASK_COVERAGE_ROLES = Object.freeze([
   "sales",
   "warehouse",
 ]);
+
+function financeFieldFixture() {
+  return [
+    {
+      id: 91_001,
+      factNo: "AR-FIELD-001",
+      factType: "RECEIVABLE",
+      status: "POSTED",
+      collectionType: "ACCOUNTS_RECEIVABLE",
+      paymentTerm: "EOM_30",
+      paymentTermDays: 30,
+    },
+    { id: 92_001, factNo: "AP-FIELD-001", factType: "PAYABLE", status: "POSTED" },
+    {
+      id: 93_001,
+      factNo: "INV-FIELD-001",
+      factType: "INVOICE",
+      status: "POSTED",
+      invoiceCategory: "VAT_SPECIAL_13",
+    },
+    {
+      id: 94_001,
+      factNo: "REC-FIELD-001",
+      factType: "RECONCILIATION",
+      status: "POSTED",
+    },
+  ];
+}
 
 function taskGroupCoverageFixture(catalogScenarioDigest = "c".repeat(64)) {
   const byRole = {};
@@ -125,6 +154,8 @@ async function datasetApplyEvidenceFixture() {
   const datasetSemanticDigest = "e".repeat(64);
   const taskCoverage = taskGroupCoverageFixture();
   const taskSchedule = buildManualAcceptanceTaskSchedule(2_000_000_000);
+  const financeFacts = financeFieldFixture();
+  const financeFieldContract = inspectFinanceFieldContract(financeFacts);
   const printInput = {
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion,
@@ -136,6 +167,8 @@ async function datasetApplyEvidenceFixture() {
     semanticDigest: "d".repeat(64),
     sourcePrefix: "YS5",
     configRevision: "local-config-v5",
+    financeFieldDigest: financeFieldContract.digest,
+    financeRepresentatives: financeFieldContract.representatives,
     runtimeAttestation: null,
   };
   const baseReport = (stageKey) => ({
@@ -234,7 +267,9 @@ async function datasetApplyEvidenceFixture() {
             }))
           : [],
     })),
+    financeFacts,
   };
+  reports.facts.financeFieldContract = financeFieldContract;
   reports.readiness.customerKey = "yoyoosun";
   reports.readiness.runtimePreflight = {
     target: printInput.target,
@@ -242,6 +277,9 @@ async function datasetApplyEvidenceFixture() {
     configRevision: printInput.configRevision,
   };
   reports.readiness.reportInputs = {
+    factReport: {
+      financeFieldContract,
+    },
     taskReport: {
       taskGroupCoverageDigest: taskCoverage.catalogScenarioDigest,
     },
@@ -250,7 +288,9 @@ async function datasetApplyEvidenceFixture() {
   reports.readiness.summary = {
     ...reports.readiness.summary,
     taskGroupCoverage: taskCoverage.summary,
+    financeFieldEvidenceComplete: true,
   };
+  reports.readiness.financeFieldContract = financeFieldContract;
   reports.attachments.summary = { attachments: 27, ownerObjects: 7 };
 
   const stages = [];
@@ -347,7 +387,7 @@ async function datasetApplyEvidenceFixture() {
   };
 }
 
-test("manual acceptance browser plan covers all 51 catalog targets and ten formal accounts", () => {
+test("manual acceptance browser plan covers all 50 catalog targets and ten formal accounts", () => {
   const plan = buildManualAcceptanceBrowserPlan({
     baseURL: "http://127.0.0.1:15200",
     backendURL: "http://localhost:8300",
@@ -355,16 +395,16 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
 
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.clicksBusinessWriteActions, false);
-  assert.equal(plan.summary.totalTargets, 51);
+  assert.equal(plan.summary.totalTargets, 50);
   assert.deepEqual(plan.summary, {
     entryPages: 2,
-    desktopPages: 30,
+    desktopPages: 29,
     mobileRolePages: 9,
     printPreviewPages: 5,
     printWorkspacePages: 5,
-    totalTargets: 51,
+    totalTargets: 50,
   });
-  assert.equal(plan.targets.length, 51);
+  assert.equal(plan.targets.length, 50);
   assert.equal(plan.formalAccounts.length, 10);
   assert.equal(FORMAL_BROWSER_ACCOUNTS.length, 10);
   assert.equal(EXCEPTION_BROWSER_ACCOUNTS.length, 3);
@@ -374,7 +414,7 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
   );
   assert.equal(
     plan.targets.filter((item) => item.group === "desktop").length,
-    30,
+    29,
   );
   const productionOrders = plan.targets.find(
     (item) => item.group === "desktop" && item.key === "production-orders",
@@ -398,10 +438,6 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
     "demo_warehouse",
   );
   assert.equal(
-    plan.targets.find((item) => item.key === "exception-flow")?.username,
-    "demo_production",
-  );
-  assert.equal(
     plan.targets
       .filter((item) => item.group === "print-preview")
       .every((item) => item.requiresDataEvidence && item.minimumRecords === 1),
@@ -419,6 +455,30 @@ test("manual acceptance browser plan covers all 51 catalog targets and ten forma
     ),
     true,
   );
+});
+
+test("finance browser evidence binds page headers and representative values", () => {
+  const financeFieldContract = inspectFinanceFieldContract(
+    financeFieldFixture(),
+  );
+  const receivable = evaluateFinanceFieldBrowserEvidence({
+    targetKey: "receivables",
+    headers: ["单号", "收款分类", "账期", "取消记录"],
+    rows: [
+      ["AR-FIELD-001", "应收款", "月结 30 天 / 30 天", "-"],
+    ],
+    representatives: financeFieldContract.representatives,
+  });
+  assert.equal(receivable.passed, true);
+
+  const payable = evaluateFinanceFieldBrowserEvidence({
+    targetKey: "payables",
+    headers: ["单号", "账期", "取消记录"],
+    rows: [["AP-FIELD-001", "历史未记录", "-"]],
+    representatives: financeFieldContract.representatives,
+  });
+  assert.equal(payable.passed, false);
+  assert.deepEqual(payable.forbiddenHeaders, ["账期"]);
 });
 
 test("manual acceptance browser boundary is explicitly read-only", () => {
@@ -604,9 +664,16 @@ test("bound print inputs stay in the acceptance report root and match the curren
       ],
     },
   };
+  const financeFacts = financeFieldFixture();
+  const financeFieldContract = inspectFinanceFieldContract(financeFacts);
   const fact = {
     ...source,
     reportContract: "source-driven-operational-facts-v1",
+    referenceRecords: {
+      ...source.referenceRecords,
+      financeFacts,
+    },
+    financeFieldContract,
   };
   assert.deepEqual(assertBoundSimulatedPrintReports(source, fact), {
     datasetKey: "yoyoosun-manual-acceptance",
@@ -620,6 +687,8 @@ test("bound print inputs stay in the acceptance report root and match the curren
     semanticDigest: "digest-v5",
     sourcePrefix: "YS5",
     configRevision: "customer-config-v5",
+    financeFieldDigest: financeFieldContract.digest,
+    financeRepresentatives: financeFieldContract.representatives,
     printRecords: {
       purchaseOrder: { recordQuery: "YS5-CG-013", lineCount: 25 },
       outsourcingOrder: { recordQuery: "YS5-WW-013", lineCount: 25 },
@@ -649,6 +718,11 @@ test("bound print inputs stay in the acceptance report root and match the curren
     assertBoundSimulatedPrintReports(activeOnlyBOMSource, {
       ...activeOnlyBOMSource,
       reportContract: "source-driven-operational-facts-v1",
+      referenceRecords: {
+        ...activeOnlyBOMSource.referenceRecords,
+        financeFacts,
+      },
+      financeFieldContract,
     }),
     assertBoundSimulatedPrintReports(source, fact),
   );
@@ -679,6 +753,9 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     release: "a".repeat(40),
     migration: "20260714165115",
   };
+  const financeFieldContract = inspectFinanceFieldContract(
+    financeFieldFixture(),
+  );
   const printInput = {
     datasetKey: "yoyoosun-manual-acceptance",
     dataVersion: "2026.07.16-v5",
@@ -690,10 +767,12 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
     semanticDigest: "digest-v5",
     sourcePrefix: "YS5",
     configRevision: "customer-trial-v5",
+    financeFieldDigest: financeFieldContract.digest,
+    financeRepresentatives: financeFieldContract.representatives,
     runtimeAttestation,
   };
   const targets = [
-    ...Array.from({ length: 41 }, (_, index) => ({
+    ...Array.from({ length: 40 }, (_, index) => ({
       id: `desktopPages:query-${index}`,
       catalogGroup: "desktopPages",
       dataStatus: "pass",
@@ -745,6 +824,7 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
         backendURL: printInput.backendURL,
         databaseName: printInput.databaseName,
         semanticDigest: printInput.semanticDigest,
+        financeFieldContract,
         runtime: {
           configRevision: printInput.configRevision,
           targetAttestation: runtimeAttestation,
@@ -764,16 +844,18 @@ test("remote browser evidence binds the exact readiness batch and canonical repo
       },
     },
     summary: {
-      totalTargets: 51,
-      passedTargetData: 41,
+      totalTargets: 50,
+      passedTargetData: 40,
       failedTargetData: 0,
       notProvenTargetData: 10,
       queryChecksPassed: true,
       queryEvidenceComplete: false,
+      financeFieldEvidenceComplete: true,
       manualAcceptanceCompleted: false,
       taskGroupCoverage: taskCoverage.summary,
     },
     probes: taskCoverage.probes,
+    financeFieldContract,
     targets,
   };
   const binding = assertManualAcceptanceBrowserReadinessBinding(
@@ -1328,21 +1410,6 @@ test("dashboard data evidence fails closed for empty or unavailable sources", ()
     20,
   );
   assert.equal(global.minimumSatisfied, true);
-
-  const exception = evaluateExceptionFlowEvidence(
-    "阻塞任务 3 今日/超时任务 2",
-    3,
-    3,
-  );
-  assert.equal(exception.minimumSatisfied, true);
-  assert.equal(
-    evaluateExceptionFlowEvidence(
-      "阻塞任务 0 今日/超时任务 0 暂无阻塞任务",
-      0,
-      3,
-    ).minimumSatisfied,
-    false,
-  );
 
   const requirements = [
     { key: "customers", label: "客户", minimumRecords: 60 },
@@ -2007,7 +2074,7 @@ test("plan mode needs no password and starts no browser", () => {
   );
   assert.equal(result.status, 0, result.stderr);
   const plan = JSON.parse(result.stdout);
-  assert.equal(plan.summary.totalTargets, 51);
+  assert.equal(plan.summary.totalTargets, 50);
   assert.equal(plan.writesDatabase, false);
   assert.equal(plan.formalAccounts.length, 10);
 });

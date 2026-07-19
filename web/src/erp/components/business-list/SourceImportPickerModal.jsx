@@ -72,12 +72,14 @@ export default function SourceImportPickerModal({
   description,
   searchPlaceholder = '搜索要导入的记录',
   searchHint,
+  searchMaxLength,
   rows = [],
   columns = [],
   rowKey = 'id',
   multiple = true,
   loading = false,
   importText = '导入',
+  importDisabled = false,
   cancelText = '取消',
   selectedNoun = '来源',
   emptyDescription = '暂无可导入记录',
@@ -87,8 +89,15 @@ export default function SourceImportPickerModal({
   getRowDisabledReason,
   onCancel,
   onImport,
+  onReload,
   width = ERP_MODAL_WIDTHS.localAction,
   pageSize = 5,
+  serverPagination = false,
+  total: serverTotal = 0,
+  current: serverCurrentPage,
+  onPageChange,
+  onSearchChange,
+  searchDebounceMs = 250,
 }) {
   const [keyword, setKeyword] = useState('')
   const [selectedRowKeys, setSelectedRowKeys] = useState([])
@@ -96,6 +105,10 @@ export default function SourceImportPickerModal({
     () => new Map()
   )
   const [currentPage, setCurrentPage] = useState(1)
+  const effectiveCurrentPage =
+    serverPagination && Number.isSafeInteger(serverCurrentPage)
+      ? serverCurrentPage
+      : currentPage
 
   useEffect(() => {
     if (open) {
@@ -112,6 +125,7 @@ export default function SourceImportPickerModal({
   )
 
   const filteredRows = useMemo(() => {
+    if (serverPagination) return rows
     const query = normalizeText(keyword)
     if (!query) return rows
     return rows.filter((row) => {
@@ -121,7 +135,7 @@ export default function SourceImportPickerModal({
           : defaultRowSearchText(row, columns)
       return normalizeText(text).includes(query)
     })
-  }, [columns, getSearchText, keyword, rows])
+  }, [columns, getSearchText, keyword, rows, serverPagination])
 
   const rowsByKey = useMemo(
     () => new Map(rows.map((row) => [String(getKey(row)), row])),
@@ -133,15 +147,30 @@ export default function SourceImportPickerModal({
     .filter(Boolean)
 
   useEffect(() => {
-    if (filteredRows.length === 0) {
+    const totalRows = serverPagination ? serverTotal : filteredRows.length
+    if (totalRows === 0) {
       setCurrentPage(1)
+      if (serverPagination && effectiveCurrentPage !== 1) {
+        onPageChange?.(1, pageSize, keyword)
+      }
       return
     }
-    const totalPages = Math.max(1, Math.ceil(filteredRows.length / pageSize))
-    if (currentPage > totalPages) {
+    const totalPages = Math.max(1, Math.ceil(totalRows / pageSize))
+    if (effectiveCurrentPage > totalPages) {
       setCurrentPage(totalPages)
+      if (serverPagination) {
+        onPageChange?.(totalPages, pageSize, keyword)
+      }
     }
-  }, [currentPage, filteredRows.length, pageSize])
+  }, [
+    effectiveCurrentPage,
+    filteredRows.length,
+    pageSize,
+    keyword,
+    onPageChange,
+    serverPagination,
+    serverTotal,
+  ])
 
   const selectedSummaryItems = useMemo(
     () =>
@@ -156,13 +185,33 @@ export default function SourceImportPickerModal({
   )
 
   const pagedRows = useMemo(() => {
-    const start = (currentPage - 1) * pageSize
+    if (serverPagination) return filteredRows
+    const start = (effectiveCurrentPage - 1) * pageSize
     return filteredRows.slice(start, start + pageSize)
-  }, [currentPage, filteredRows, pageSize])
+  }, [effectiveCurrentPage, filteredRows, pageSize, serverPagination])
 
   const handleKeywordChange = (event) => {
-    setKeyword(event.target.value)
+    const rawKeyword = event.target.value
+    const nextKeyword = Number.isSafeInteger(searchMaxLength)
+      ? [...rawKeyword].slice(0, searchMaxLength).join('')
+      : rawKeyword
+    setKeyword(nextKeyword)
     setCurrentPage(1)
+  }
+
+  useEffect(() => {
+    if (!open || !serverPagination || typeof onSearchChange !== 'function') {
+      return undefined
+    }
+    const timeoutID = window.setTimeout(
+      () => onSearchChange(keyword),
+      searchDebounceMs
+    )
+    return () => window.clearTimeout(timeoutID)
+  }, [keyword, onSearchChange, open, searchDebounceMs, serverPagination])
+  const handlePageChange = (page) => {
+    setCurrentPage(page)
+    onPageChange?.(page, pageSize, keyword)
   }
   const searchAccessibleLabel = searchHint || searchPlaceholder
 
@@ -235,10 +284,18 @@ export default function SourceImportPickerModal({
       footer={
         <div className="erp-source-import-picker__footer">
           <div className="erp-source-import-picker__footer-actions">
+            {typeof onReload === 'function' ? (
+              <Button
+                disabled={loading}
+                onClick={() => onReload(keyword, effectiveCurrentPage)}
+              >
+                重新加载
+              </Button>
+            ) : null}
             <Button onClick={onCancel}>{cancelText}</Button>
             <Button
               type="primary"
-              disabled={selectedRows.length === 0}
+              disabled={loading || importDisabled || selectedRows.length === 0}
               onClick={handleImport}
             >
               {importText}
@@ -371,16 +428,20 @@ export default function SourceImportPickerModal({
         />
         <div className="erp-source-import-picker__pagination">
           <Text type="secondary">
-            {formatPaginationTotal(filteredRows.length, currentPage, pageSize)}
+            {formatPaginationTotal(
+              serverPagination ? serverTotal : filteredRows.length,
+              effectiveCurrentPage,
+              pageSize
+            )}
           </Text>
           <Pagination
-            current={currentPage}
+            current={effectiveCurrentPage}
             pageSize={pageSize}
-            total={filteredRows.length}
+            total={serverPagination ? serverTotal : filteredRows.length}
             hideOnSinglePage={false}
             showSizeChanger={false}
             showLessItems
-            onChange={(page) => setCurrentPage(page)}
+            onChange={handlePageChange}
           />
         </div>
       </div>

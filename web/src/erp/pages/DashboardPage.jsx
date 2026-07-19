@@ -82,6 +82,8 @@ import {
   writeWorkflowTaskBoardFiltersToSearch,
 } from '../utils/workflowTaskBoard.mjs'
 import { openDashboardItemOnDoubleClick } from '../utils/dashboardDoubleClick.mjs'
+import { canOpenWorkflowTaskEntry } from '../utils/workflowTaskEntryAccess.mjs'
+import { getWorkflowTaskProcessingHint } from '../utils/workflowTaskProcessingHint.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -530,7 +532,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   const [workbenchQueueKey, setWorkbenchQueueKey] = useState('actionable')
   const [workbenchQueuePage, setWorkbenchQueuePage] = useState(1)
   const [selectedWorkbenchTaskId, setSelectedWorkbenchTaskId] = useState('')
-  const [selectedExceptionTaskId, setSelectedExceptionTaskId] = useState('')
   const [taskBoardTransitionMinHeight, setTaskBoardTransitionMinHeight] =
     useState(0)
   const mountedRef = useRef(false)
@@ -742,58 +743,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     [filters.sourceType, taskBoardModel.sourceTypes]
   )
   const actionMeta = actionMode ? TASK_ACTION_META[actionMode] : null
-  const exceptionTasks = useMemo(
-    () =>
-      workflowTasks.filter((task) => {
-        const statusKey = getTaskStatusKey(task)
-        return (
-          !isTerminalWorkflowTask(task) &&
-          (statusKey === 'blocked' || Boolean(getWorkflowTaskReason(task)))
-        )
-      }),
-    [workflowTasks]
-  )
-  const dueTasks = useMemo(
-    () =>
-      workflowTasks.filter((task) =>
-        ['overdue', 'due_soon'].includes(getWorkflowTaskDueStatus(task))
-      ),
-    [workflowTasks]
-  )
-  const exceptionQueueTasks = useMemo(() => {
-    const tasksByKey = new Map()
-    ;[...exceptionTasks, ...dueTasks].forEach((task) => {
-      tasksByKey.set(getWorkflowTaskStableKey(task), task)
-    })
-    return [...tasksByKey.values()]
-      .sort((left, right) => {
-        const leftDue = Number(left.due_at || Number.MAX_SAFE_INTEGER)
-        const rightDue = Number(right.due_at || Number.MAX_SAFE_INTEGER)
-        if (leftDue !== rightDue) return leftDue - rightDue
-        return String(left.task_name || '').localeCompare(
-          String(right.task_name || '')
-        )
-      })
-      .slice(0, 12)
-  }, [dueTasks, exceptionTasks])
-  const selectedExceptionTask = useMemo(() => {
-    if (exceptionQueueTasks.length === 0) return null
-    return (
-      exceptionQueueTasks.find(
-        (task) => getWorkflowTaskStableKey(task) === selectedExceptionTaskId
-      ) || exceptionQueueTasks[0]
-    )
-  }, [exceptionQueueTasks, selectedExceptionTaskId])
-  const selectedExceptionStatusMeta = selectedExceptionTask
-    ? getWorkflowTaskStatusMeta(selectedExceptionTask)
-    : null
-  const selectedExceptionEntryPath = selectedExceptionTask
-    ? resolveWorkflowTaskEntryPath(selectedExceptionTask)
-    : ''
-  const selectedExceptionCanOpenEntry = canOpenWorkflowTaskEntry(
-    adminProfile,
-    selectedExceptionEntryPath
-  )
   const taskCenterCurrentTask = useMemo(
     () =>
       taskBoardVisibleTasks.find(
@@ -979,11 +928,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     adminProfile,
     task: taskCenterCurrentTask,
     enabled: Boolean(taskCenterCurrentTask),
-  })
-  const selectedExceptionTaskAccess = useWorkflowTaskActionAccess({
-    adminProfile,
-    task: selectedExceptionTask,
-    enabled: Boolean(selectedExceptionTask),
   })
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
@@ -1837,200 +1781,6 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 ))}
               </div>
             )}
-          </div>
-        </Card>
-      ) : null}
-
-      {activeView === 'exception-flow' ? (
-        <Card
-          className="erp-dashboard-card erp-command-center-exception-card"
-          variant="borderless"
-          loading={loading}
-        >
-          <div className="erp-exception-workspace">
-            <section className="erp-exception-workspace__summary">
-              <div>
-                <Title level={3} className="erp-command-center-hero-title">
-                  异常处理
-                </Title>
-                <Paragraph className="erp-dashboard-summary">
-                  先处理阻塞和到期风险，再进入相关业务记录核对实际办理结果。
-                </Paragraph>
-              </div>
-              <div
-                className="erp-exception-workspace__metrics"
-                aria-label="异常处理摘要"
-              >
-                <span>
-                  <small>阻塞</small>
-                  <strong>{exceptionTasks.length}</strong>
-                </span>
-                <span>
-                  <small>到期风险</small>
-                  <strong>{dueTasks.length}</strong>
-                </span>
-              </div>
-            </section>
-
-            <Alert
-              type="warning"
-              showIcon
-              message="任务状态和业务办理结果分开确认"
-              description="完成、解除阻塞、退回和催办只更新当前任务；库存、出货、应收、开票和付款仍需进入对应业务页面处理。"
-            />
-
-            <div className="erp-exception-workspace__main">
-              <section
-                className="erp-exception-workspace__queue"
-                aria-label="风险任务"
-              >
-                <div className="erp-exception-workspace__section-head">
-                  <div>
-                    <Title level={5}>风险任务</Title>
-                    <Text type="secondary">
-                      单击查看，电脑端双击可直接打开任务详情。
-                    </Text>
-                  </div>
-                  <Tag color={exceptionQueueTasks.length > 0 ? 'red' : 'green'}>
-                    {exceptionQueueTasks.length} 项
-                  </Tag>
-                </div>
-                {exceptionQueueTasks.length > 0 ? (
-                  <div className="erp-exception-workspace__list">
-                    {exceptionQueueTasks.map((task) => {
-                      const taskKey = getWorkflowTaskStableKey(task)
-                      const statusMeta = getWorkflowTaskStatusMeta(task)
-                      const dueStatus = getWorkflowTaskDueStatus(task)
-                      const active =
-                        taskKey ===
-                        getWorkflowTaskStableKey(selectedExceptionTask)
-                      return (
-                        <div
-                          className="erp-command-center-focus-item"
-                          key={task.id || task.task_code}
-                          data-task-code={task.task_code || undefined}
-                          data-task-group={task.task_group || undefined}
-                        >
-                          <span className="erp-exception-workspace__item-copy">
-                            <strong>{task.task_name || '未命名任务'}</strong>
-                            <small>{formatWorkflowTaskSource(task)}</small>
-                          </span>
-                          <span className="erp-exception-workspace__item-status">
-                            <Tag
-                              color={
-                                dueStatus === 'overdue'
-                                  ? 'red'
-                                  : dueStatus === 'due_soon'
-                                    ? 'orange'
-                                    : statusMeta.color
-                              }
-                            >
-                              查看处理
-                            </Button>
-                          </Space>
-                        </div>
-                      )
-                    })}
-                  </div>
-                ) : (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="当前没有阻塞或到期风险任务"
-                  />
-                )}
-              </section>
-
-              <aside
-                className="erp-exception-workspace__detail"
-                aria-label="当前风险任务"
-              >
-                <div className="erp-exception-workspace__section-head">
-                  <div>
-                    <Title level={5}>当前任务</Title>
-                    <Text type="secondary">核对原因和责任后再处理</Text>
-                  </div>
-                  {selectedExceptionStatusMeta ? (
-                    <Tag color={selectedExceptionStatusMeta.color}>
-                      {selectedExceptionStatusMeta.label}
-                    </Tag>
-                  ) : (
-                    <Tag>暂无任务</Tag>
-                  )}
-                </div>
-                {selectedExceptionTask ? (
-                  <Space
-                    direction="vertical"
-                    size={12}
-                    className="erp-dashboard-block erp-exception-workspace__detail-body"
-                  >
-                    <Title level={4}>
-                      {selectedExceptionTask.task_name || '未命名任务'}
-                    </Title>
-                    <Descriptions size="small" column={1}>
-                      <Descriptions.Item label="来源">
-                        {formatWorkflowTaskSource(selectedExceptionTask)}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="负责岗位">
-                        {getWorkflowTaskOwnerRoleLabel(selectedExceptionTask)}
-                      </Descriptions.Item>
-                      <Descriptions.Item label="到期">
-                        {getWorkflowTaskDueLabel(selectedExceptionTask)}
-                      </Descriptions.Item>
-                      <Descriptions.Item
-                        label={getWorkflowTaskReasonLabel(
-                          selectedExceptionTask
-                        )}
-                      >
-                        {getWorkflowTaskReason(selectedExceptionTask) ||
-                          '暂无补充原因'}
-                      </Descriptions.Item>
-                    </Descriptions>
-                    <TaskProcessingHint
-                      task={selectedExceptionTask}
-                      access={selectedExceptionTaskAccess}
-                      canOpenEntry={selectedExceptionCanOpenEntry}
-                    />
-                    <Space wrap>
-                      {isWorkflowTaskAccessChecking(
-                        selectedExceptionTaskAccess
-                      ) ? (
-                        <Button disabled>正在确认可用操作</Button>
-                      ) : (
-                        <Button
-                          type={
-                            selectedExceptionTaskAccess.allowedModes.length > 0
-                              ? 'primary'
-                              : 'default'
-                          }
-                          title={
-                            selectedExceptionTaskAccess.allowedModes.length > 0
-                              ? undefined
-                              : selectedExceptionTaskAccess.readonlyReason
-                          }
-                          onClick={() => openTaskDrawer(selectedExceptionTask)}
-                        >
-                          {selectedExceptionTaskAccess.allowedModes.length > 0
-                            ? '处理任务'
-                            : '查看详情'}
-                        </Button>
-                      )}
-                      {selectedExceptionCanOpenEntry ? (
-                        <Button
-                          onClick={() => openTaskEntry(selectedExceptionTask)}
-                        >
-                          查看相关单据
-                        </Button>
-                      ) : null}
-                    </Space>
-                  </Space>
-                ) : (
-                  <Empty
-                    image={Empty.PRESENTED_IMAGE_SIMPLE}
-                    description="暂无需要处理的风险任务"
-                  />
-                )}
-              </aside>
-            </div>
           </div>
         </Card>
       ) : null}

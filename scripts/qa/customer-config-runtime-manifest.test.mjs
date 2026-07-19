@@ -318,7 +318,6 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
   for (const key of [
     "business-dashboard",
     "shipping-release",
-    "exception-flow",
   ]) {
     assert(manifest.compiled_snapshot.pages.includes(key));
   }
@@ -332,15 +331,9 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
       "shipping-release",
     ),
   );
-  assert(
-    manifest.compiled_snapshot.rolePageProjections.production.includes(
-      "exception-flow",
-    ),
-  );
   for (const [pageKey, expectedOwner] of [
     ["business-dashboard", "boss"],
     ["shipping-release", "warehouse"],
-    ["exception-flow", "production"],
   ]) {
     const owners = Object.entries(
       manifest.compiled_snapshot.rolePageProjections,
@@ -467,8 +460,13 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   }
 
   const finance = entitlementsFor("finance");
-  assert(!pages.finance.includes("inbound"));
-  assert(!finance.has("purchase.receipt.read"));
+  assert(pages.finance.includes("inbound"));
+  assert(finance.has("purchase.receipt.read"));
+  assert(!finance.has("purchase.receipt.create"));
+  assert(!finance.has("purchase.receipt.adjustment.read"));
+  assert(!finance.has("purchase.receipt.adjustment.create"));
+  assert(!finance.has("warehouse.inbound.read"));
+  assert(!finance.has("warehouse.inbound.confirm"));
   assert(!finance.has("purchase.return.read"));
   assert(!finance.has("purchase.return.create"));
 });

@@ -104,7 +104,6 @@ const navIconRegistry = {
   reconciliation: <WalletOutlined />,
   payables: <WalletOutlined />,
   'print-center': <PrinterOutlined />,
-  'exception-flow': <AlertOutlined />,
   'permission-center': <SettingOutlined />,
   'system-audit-logs': <FileSearchOutlined />,
 }
@@ -116,13 +115,6 @@ const productCoreReviewFallbackByPageKey = {
     currentScope: ['看板入口', '页面权限', '数字分类', '客户数据连接状态'],
     boundary:
       '当前只显示看板功能说明；连接客户业务数据后才会显示实际数字。',
-  },
-  'exception-flow': {
-    title: '异常处理',
-    description: '异常处理用于查看阻塞任务、登记原因、分派负责人并跟进处理。',
-    currentScope: ['异常入口', '负责岗位', '阻塞状态', '可用操作'],
-    boundary:
-      '任务状态只代表异常事项的处理进度；库存、出货和财务结果请以对应业务页面为准。',
   },
 }
 
@@ -225,7 +217,6 @@ const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   DEFAULT_DESKTOP_ENTRY.path,
   '/erp/task-board',
   '/erp/business-dashboard',
-  '/erp/operations/exceptions',
   '/erp/print-center',
   '/erp/system/permissions',
   '/erp/system/audit-logs',

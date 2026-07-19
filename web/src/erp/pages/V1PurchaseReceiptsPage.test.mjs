@@ -6,6 +6,13 @@ const source = readFileSync(
   new URL('./V1PurchaseReceiptsPage.jsx', import.meta.url),
   'utf8'
 )
+const exceptionRecordsSource = readFileSync(
+  new URL(
+    '../components/purchase-receipts/PurchaseReceiptExceptionRecordsModal.jsx',
+    import.meta.url
+  ),
+  'utf8'
+)
 
 test('purchase receipt exception actions follow backend read and manage permission projections', () => {
   for (const permission of [
@@ -24,6 +31,12 @@ test('purchase receipt exception actions follow backend read and manage permissi
   assert.match(source, /canCancelReturns=\{canCancelReturn\}/u)
   assert.match(source, /canPostAdjustments=\{canPostAdjustment\}/u)
   assert.match(source, /canCancelAdjustments=\{canCancelAdjustment\}/u)
+})
+
+test('purchase receipt exception history reads every reversal page', () => {
+  assert.match(exceptionRecordsSource, /listAllPurchaseReturns/u)
+  assert.match(exceptionRecordsSource, /listAllPurchaseReceiptAdjustments/u)
+  assert.doesNotMatch(exceptionRecordsSource, /limit:\s*100/u)
 })
 
 test('purchase receipt exception creation binds the customer and validates the returned draft', () => {
@@ -67,4 +80,21 @@ test('purchase receipt rows remain source-generated and cannot append manual lin
   assert.doesNotMatch(source, /添加明细|添加入库明细/u)
   assert.match(source, /相关单据/u)
   assert.match(source, /采购订单/u)
+})
+
+test('purchase receipt drafts have a truthful no-inventory cancellation exit', () => {
+  assert.match(
+    source,
+    /!\['DRAFT', 'POSTED'\]\.includes\(selectedRow\.status\)/u
+  )
+  assert.match(source, /采购入库草稿已作废，未更新库存/u)
+  assert.match(source, /草稿作废不更新库存/u)
+  assert.match(source, /确认作废采购入库草稿/u)
+})
+
+test('purchase receipt quantity display and sorting use exact numeric helpers', () => {
+  assert.match(source, /sumPurchaseReceiptQuantities\(receipt\.items\)/u)
+  assert.match(source, /comparePurchaseReceiptQuantityTotals/u)
+  assert.match(source, /formatQuantity\(item\?\.quantity\)/u)
+  assert.doesNotMatch(source, /decimalNumber\(item\?\.quantity\)/u)
 })

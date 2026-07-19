@@ -3,6 +3,53 @@ function positiveID(value) {
   return Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 0
 }
 
+function normalizedUpperText(value) {
+  return String(value || '')
+    .trim()
+    .toUpperCase()
+}
+
+const ROUTE_SOURCE_TYPE_BY_INSPECTION_TYPE = Object.freeze({
+  FINISHED_GOODS: 'SHIPMENT',
+  INCOMING: 'PURCHASE_RECEIPT',
+  OUTSOURCING_RETURN: 'OUTSOURCING_FACT',
+})
+
+export function isQualityInspectionRouteSourceCompatible(
+  inspectionType,
+  sourceType
+) {
+  const normalizedInspectionType = normalizedUpperText(inspectionType)
+  if (!normalizedInspectionType) return true
+  return (
+    ROUTE_SOURCE_TYPE_BY_INSPECTION_TYPE[normalizedInspectionType] ===
+    normalizedUpperText(sourceType)
+  )
+}
+
+export function qualityInspectionRouteSourceParams({
+  inspectionType,
+  sourceType,
+  sourceID,
+} = {}) {
+  const normalizedSourceType = normalizedUpperText(sourceType)
+  const normalizedSourceID = positiveID(sourceID)
+  if (
+    !normalizedSourceType ||
+    !normalizedSourceID ||
+    !isQualityInspectionRouteSourceCompatible(inspectionType, sourceType)
+  ) {
+    return {}
+  }
+  if (normalizedUpperText(inspectionType) === 'OUTSOURCING_RETURN') {
+    return { fact_id: normalizedSourceID }
+  }
+  return {
+    source_type: normalizedSourceType,
+    source_id: normalizedSourceID,
+  }
+}
+
 function requiredText(value, message) {
   const text = String(value || '').trim()
   if (!text) throw new Error(message)

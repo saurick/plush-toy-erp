@@ -14,6 +14,11 @@ import {
   buildSalesOrderReservationItemChoices,
   defaultSalesOrderReservationQuantity,
 } from '../../utils/salesOrderReservationAction.mjs'
+import {
+  compareNumeric20Scale6Units,
+  isPositiveNumeric20Scale6Units,
+  numeric20Scale6Units,
+} from '../../utils/numeric20Scale6.mjs'
 
 const { Text } = Typography
 
@@ -214,16 +219,26 @@ export default function SalesOrderReservationModal({
             { required: true, message: '请填写预留数量' },
             {
               validator: (_, value) => {
-                const quantity = Number(value)
-                const available = Number(selectedBalance?.available || 0)
-                if (!Number.isFinite(quantity) || quantity <= 0) {
+                const quantity = numeric20Scale6Units(value)
+                const available = numeric20Scale6Units(
+                  selectedBalance?.available
+                )
+                if (!isPositiveNumeric20Scale6Units(quantity)) {
                   return Promise.reject(new Error('预留数量必须大于 0'))
                 }
-                if (available > 0 && quantity > available) {
+                if (
+                  !isPositiveNumeric20Scale6Units(available) ||
+                  compareNumeric20Scale6Units(quantity, available) > 0
+                ) {
                   return Promise.reject(new Error('预留数量不能超过可用库存'))
                 }
-                const reservable = Number(selectedChoice?.reservable || 0)
-                if (reservable <= 0 || quantity > reservable) {
+                const reservable = numeric20Scale6Units(
+                  selectedChoice?.reservable
+                )
+                if (
+                  !isPositiveNumeric20Scale6Units(reservable) ||
+                  compareNumeric20Scale6Units(quantity, reservable) > 0
+                ) {
                   return Promise.reject(
                     new Error('预留数量不能超过订单剩余可预留数量')
                   )

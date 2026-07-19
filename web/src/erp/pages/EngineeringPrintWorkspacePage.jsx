@@ -51,7 +51,6 @@ import {
   syncPrintPageMarginForPaper,
   watchPrintPageMarginForPaper,
 } from '../utils/printPageMargin.mjs'
-import { requiresExpandedWorkInstructionAnnotationLayout } from '../utils/workInstructionImageAnnotations.mjs'
 import usePrintWorkspaceWindowSnapshot from '../utils/usePrintWorkspaceWindowSnapshot.js'
 import {
   runSilentPrintWorkspaceDraftUpdate,
@@ -941,13 +940,6 @@ function ImageSlot({
       }${hasAnnotations ? ' erp-engineering-print-image-slot--annotated' : ''}${
         hasCallout ? ' erp-engineering-print-image-slot--with-callout' : ''
       }`}
-      data-work-instruction-annotation-layout={
-        hasAnnotations
-          ? hasExpandedAnnotationLayout
-            ? 'expanded'
-            : 'compact'
-          : undefined
-      }
       data-image-crop={hasCrop ? 'excel-src-rect' : undefined}
       style={
         hasCrop || layoutStyle
@@ -1961,11 +1953,22 @@ function WorkInstructionPaper({
             <td className="erp-work-instruction-paper__title-cell" colSpan={6}>
               作业指导书
             </td>
-            <td className="erp-work-instruction-paper__meta-label">工序</td>
-            <td className="erp-work-instruction-paper__meta-value">
+            <td
+              className="erp-work-instruction-paper__meta-label"
+              data-work-instruction-process-name
+            >
               <EditableText
                 value={draft.processName}
                 onCommit={(value) => onFieldChange('processName', value)}
+              />
+            </td>
+            <td
+              className="erp-work-instruction-paper__meta-value"
+              data-work-instruction-process-date
+            >
+              <EditableText
+                value={draft.processDateText}
+                onCommit={(value) => onFieldChange('processDateText', value)}
               />
             </td>
           </tr>
@@ -2450,9 +2453,17 @@ function WorkInstructionContinuationPage({
               >
                 作业指导书
               </td>
-              <td className="erp-work-instruction-paper__meta-label">工序</td>
-              <td className="erp-work-instruction-paper__meta-value">
+              <td
+                className="erp-work-instruction-paper__meta-label"
+                data-work-instruction-process-name
+              >
                 {renderHeaderValue(page.processName)}
+              </td>
+              <td
+                className="erp-work-instruction-paper__meta-value"
+                data-work-instruction-process-date
+              >
+                {renderHeaderValue(page.processDateText)}
               </td>
             </tr>
             <tr
@@ -3347,45 +3358,25 @@ export default function EngineeringPrintWorkspacePage() {
     )
   }
 
-  const openInstructionAnnotationEditor = (target) => {
+  const clearInstructionRowImages = (target) => {
     const normalizedTarget = normalizeInstructionRowTarget(target)
     if (!normalizedTarget) return
-    const row = getInstructionRowsForTarget(draft, normalizedTarget)[
-      normalizedTarget.rowIndex
-    ]
-    const firstImageIndex = Array.isArray(row?.images)
-      ? row.images.findIndex((image) => image?.dataURL)
-      : -1
-    if (!isWorkInstructionStepRow(row) || firstImageIndex < 0) {
-      message.warning('请先给当前编号行上传图片。')
-      return
-    }
-    setInstructionAnnotationEditorTarget({
-      ...normalizedTarget,
-      imageIndex: firstImageIndex,
-    })
-  }
-
-  const saveInstructionImages = (nextImages = []) => {
-    const target = normalizeInstructionRowTarget(
-      instructionAnnotationEditorTarget
-    )
-    if (!target) return
-    const savedImages = (Array.isArray(nextImages) ? nextImages : [])
-      .filter((image) => image?.dataURL)
-      .map((image) => ({
-        ...image,
-        annotations: Array.isArray(image?.annotations) ? image.annotations : [],
-      }))
     setDraft((current) =>
-      updateInstructionRowByTarget(current, target, (row) => ({
-        ...row,
-        images: savedImages,
-      }))
+      updateInstructionRowByTarget(current, normalizedTarget, (row) => {
+        const baseRow =
+          row && typeof row === 'object' && !Array.isArray(row)
+            ? row
+            : { text: getInstructionTextRowValue(row), heightMm: null }
+        return {
+          ...baseRow,
+          images: [],
+        }
+      })
     )
-    setInstructionAnnotationEditorTarget(null)
     setToolbarStatus(
-      `已保存作业指导书${formatInstructionRowTargetLabel(target)}图片调整。`
+      `已清空作业指导书${formatInstructionRowTargetLabel(
+        normalizedTarget
+      )}图片。`
     )
     if (
       isSameInstructionRowTarget(
@@ -3718,7 +3709,8 @@ export default function EngineeringPrintWorkspacePage() {
     createDraftFieldRow({ key: 'companyName', label: '公司名称' }),
     createDraftFieldRow({ key: 'productNo', label: '产品编号' }),
     createDraftFieldRow({ key: 'versionText', label: '版本/版次' }),
-    createDraftFieldRow({ key: 'processName', label: '工序' }),
+    createDraftFieldRow({ key: 'processName', label: '本页工序' }),
+    createDraftFieldRow({ key: 'processDateText', label: '工序日期' }),
     createDraftFieldRow({ key: 'department', label: '发放部门' }),
     createDraftFieldRow({ key: 'orderNo', label: '订单号' }),
     createDraftFieldRow({ key: 'productName', label: '产品名称' }),
@@ -4240,17 +4232,16 @@ export default function EngineeringPrintWorkspacePage() {
         <button
           type="button"
           className={getToolbarButtonClassName()}
-          data-open-work-instruction-image-editor
           disabled={
             selectedWorkInstructionRowTarget === null ||
             !selectedInstructionRowIsStep ||
             selectedInstructionRowImages.length === 0
           }
           onClick={() =>
-            openInstructionAnnotationEditor(selectedWorkInstructionRowTarget)
+            clearInstructionRowImages(selectedWorkInstructionRowTarget)
           }
         >
-          管理当前行图片
+          清空当前行图片
         </button>
         <button
           type="button"

@@ -25,14 +25,18 @@ const (
 )
 
 var (
-	ErrSalesOrderNotFound     = errors.New("sales order not found")
-	ErrSalesOrderItemNotFound = errors.New("sales order item not found")
-	ErrSalesOrderConflict     = errors.New("sales order version conflict")
-	ErrProductNotFound        = errors.New("product not found")
-	ErrProductInactive        = errors.New("product inactive")
-	ErrUnitNotFound           = errors.New("unit not found")
-	ErrUnitInactive           = errors.New("unit inactive")
-	ErrCustomerInactive       = errors.New("customer inactive")
+	ErrSalesOrderNotFound                          = errors.New("sales order not found")
+	ErrSalesOrderItemNotFound                      = errors.New("sales order item not found")
+	ErrSalesOrderConflict                          = errors.New("sales order version conflict")
+	ErrSalesOrderCancellationShipmentDependency    = errors.New("sales order cancellation blocked by shipment")
+	ErrSalesOrderCancellationReservationDependency = errors.New("sales order cancellation blocked by active stock reservation")
+	ErrSalesOrderCancellationProductionDependency  = errors.New("sales order cancellation blocked by production order")
+	ErrSalesOrderCancellationProcessDependency     = errors.New("sales order cancellation blocked by active process")
+	ErrProductNotFound                             = errors.New("product not found")
+	ErrProductInactive                             = errors.New("product inactive")
+	ErrUnitNotFound                                = errors.New("unit not found")
+	ErrUnitInactive                                = errors.New("unit inactive")
+	ErrCustomerInactive                            = errors.New("customer inactive")
 )
 
 type SalesOrder struct {

@@ -2,7 +2,10 @@ package biz
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
+	"unicode/utf8"
 )
 
 func (uc *WorkflowUsecase) Metadata() (taskStates, businessStates []WorkflowStateOption) {
@@ -15,6 +18,12 @@ func (uc *WorkflowUsecase) ListTasks(ctx context.Context, filter WorkflowTaskFil
 	}
 	filter = normalizeWorkflowTaskFilter(filter)
 	if filter.TaskStatusKey != "" && !IsKnownWorkflowTaskState(filter.TaskStatusKey) {
+		return nil, 0, ErrBadParam
+	}
+	if utf8.RuneCountInString(filter.Keyword) > 200 ||
+		(filter.DueFrom != nil && filter.DueFrom.IsZero()) ||
+		(filter.DueTo != nil && filter.DueTo.IsZero()) ||
+		(filter.DueFrom != nil && filter.DueTo != nil && filter.DueFrom.After(*filter.DueTo)) {
 		return nil, 0, ErrBadParam
 	}
 	return uc.repo.ListWorkflowTasks(ctx, filter)
@@ -31,11 +40,11 @@ func (uc *WorkflowUsecase) CreateTask(ctx context.Context, in *WorkflowTaskCreat
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
-	if err := ValidateWorkflowSourceTaskReservedNamespace(in.TaskGroup, in.TaskCode); err != nil {
-		return nil, err
-	}
 	normalized, err := normalizeWorkflowTaskCreate(*in)
 	if err != nil {
+		return nil, err
+	}
+	if err := ValidateWorkflowSourceTaskReservedNamespace(normalized.TaskGroup, normalized.TaskCode); err != nil {
 		return nil, err
 	}
 	return uc.repo.CreateWorkflowTask(ctx, &normalized, actorID)
@@ -77,72 +86,12 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 	default:
 		clearWorkflowTransitionReasonPayload(in.Payload)
 	}
-	if isBossOrderApprovalTask(current) {
-		if err := uc.applyBossApprovalTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isPurchaseIQCTask(current) {
-		if err := uc.applyPurchaseIQCTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isPurchaseWarehouseInboundTask(current) {
-		if err := uc.applyPurchaseWarehouseInboundTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isOutsourceReturnTrackingTask(current) {
-		if err := uc.applyOutsourceReturnTrackingTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isOutsourceReturnQCTask(current) {
-		if err := uc.applyOutsourceReturnQCTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isOutsourceWarehouseInboundTask(current) {
-		if err := uc.applyOutsourceWarehouseInboundTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isOutsourceReworkTask(current) {
-		if err := uc.applyOutsourceReworkTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isFinishedGoodsQCTask(current) {
-		if err := uc.applyFinishedGoodsQCTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isFinishedGoodsInboundTask(current) {
-		if err := uc.applyFinishedGoodsInboundTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isFinishedGoodsReworkTask(current) {
-		if err := uc.applyFinishedGoodsReworkTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isProductionSchedulingSourceTask(current) {
-		if err := uc.applyProductionSchedulingSourceTaskTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isProductionExceptionSourceTask(current) {
-		if err := uc.applyProductionExceptionSourceTaskTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isShipmentReleaseTask(current) {
-		if err := uc.applyShipmentReleaseTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isReceivableRegistrationTask(current) {
-		if err := uc.applyReceivableRegistrationTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isInvoiceRegistrationTask(current) {
-		if err := uc.applyInvoiceRegistrationTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isPayableRegistrationTask(current) {
-		if err := uc.applyPayableRegistrationTransition(current, in); err != nil {
-			return nil, err
-		}
-	} else if isPayableReconciliationTask(current) {
-		if err := uc.applyPayableReconciliationTransition(current, in); err != nil {
+	handler, err := selectWorkflowTaskTransitionHandler(current)
+	if err != nil {
+		return nil, err
+	}
+	if handler != nil {
+		if err := handler.Apply(uc, current, in); err != nil {
 			return nil, err
 		}
 	}
@@ -153,6 +102,60 @@ func (uc *WorkflowUsecase) UpdateTaskStatus(ctx context.Context, in *WorkflowTas
 		return nil, ErrNumberedImplementationStageLabel
 	}
 	return uc.repo.UpdateWorkflowTaskStatus(ctx, in, actorID, strings.TrimSpace(actorRoleKey))
+}
+
+type workflowTaskTransitionHandler struct {
+	Key   string
+	Match func(*WorkflowTask) bool
+	Apply func(*WorkflowUsecase, *WorkflowTask, *WorkflowTaskStatusUpdate) error
+}
+
+var workflowTaskTransitionHandlers = []workflowTaskTransitionHandler{
+	{Key: "boss_order_approval", Match: isBossOrderApprovalTask, Apply: (*WorkflowUsecase).applyBossApprovalTransition},
+	{Key: "purchase_iqc", Match: isPurchaseIQCTask, Apply: (*WorkflowUsecase).applyPurchaseIQCTransition},
+	{Key: "purchase_warehouse_inbound", Match: isPurchaseWarehouseInboundTask, Apply: (*WorkflowUsecase).applyPurchaseWarehouseInboundTransition},
+	{Key: "outsource_return_tracking", Match: isOutsourceReturnTrackingTask, Apply: (*WorkflowUsecase).applyOutsourceReturnTrackingTransition},
+	{Key: "outsource_return_qc", Match: isOutsourceReturnQCTask, Apply: (*WorkflowUsecase).applyOutsourceReturnQCTransition},
+	{Key: "outsource_warehouse_inbound", Match: isOutsourceWarehouseInboundTask, Apply: (*WorkflowUsecase).applyOutsourceWarehouseInboundTransition},
+	{Key: "outsource_rework", Match: isOutsourceReworkTask, Apply: (*WorkflowUsecase).applyOutsourceReworkTransition},
+	{Key: "finished_goods_qc", Match: isFinishedGoodsQCTask, Apply: (*WorkflowUsecase).applyFinishedGoodsQCTransition},
+	{Key: "finished_goods_inbound", Match: isFinishedGoodsInboundTask, Apply: (*WorkflowUsecase).applyFinishedGoodsInboundTransition},
+	{Key: "finished_goods_rework", Match: isFinishedGoodsReworkTask, Apply: (*WorkflowUsecase).applyFinishedGoodsReworkTransition},
+	{Key: "production_scheduling", Match: isProductionSchedulingSourceTask, Apply: (*WorkflowUsecase).applyProductionSchedulingSourceTaskTransition},
+	{Key: "production_exception", Match: isProductionExceptionSourceTask, Apply: (*WorkflowUsecase).applyProductionExceptionSourceTaskTransition},
+	{Key: "shipment_release", Match: isShipmentReleaseTask, Apply: (*WorkflowUsecase).applyShipmentReleaseTransition},
+	{Key: "receivable_registration", Match: isReceivableRegistrationTask, Apply: (*WorkflowUsecase).applyReceivableRegistrationTransition},
+	{Key: "invoice_registration", Match: isInvoiceRegistrationTask, Apply: (*WorkflowUsecase).applyInvoiceRegistrationTransition},
+	{Key: "payable_registration", Match: isPayableRegistrationTask, Apply: (*WorkflowUsecase).applyPayableRegistrationTransition},
+	{Key: "payable_reconciliation", Match: isPayableReconciliationTask, Apply: (*WorkflowUsecase).applyPayableReconciliationTransition},
+}
+
+func selectWorkflowTaskTransitionHandler(current *WorkflowTask) (*workflowTaskTransitionHandler, error) {
+	return selectWorkflowTaskTransitionHandlerFrom(workflowTaskTransitionHandlers, current)
+}
+
+func selectWorkflowTaskTransitionHandlerFrom(handlers []workflowTaskTransitionHandler, current *WorkflowTask) (*workflowTaskTransitionHandler, error) {
+	var matched *workflowTaskTransitionHandler
+	keys := make(map[string]struct{}, len(handlers))
+	for index := range handlers {
+		handler := &handlers[index]
+		key := strings.TrimSpace(handler.Key)
+		if key == "" || handler.Match == nil || handler.Apply == nil {
+			return nil, fmt.Errorf("%w: invalid workflow transition handler registration", ErrBadParam)
+		}
+		if _, exists := keys[key]; exists {
+			return nil, fmt.Errorf("%w: duplicate workflow transition handler %s", ErrBadParam, key)
+		}
+		keys[key] = struct{}{}
+		if !handler.Match(current) {
+			continue
+		}
+		if matched != nil {
+			return nil, fmt.Errorf("%w: workflow transition handlers %s and %s both matched", ErrBadParam, matched.Key, handler.Key)
+		}
+		matched = handler
+	}
+	return matched, nil
 }
 
 func (uc *WorkflowUsecase) applyBossApprovalTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
@@ -817,12 +820,15 @@ func (uc *WorkflowUsecase) UpsertBusinessState(ctx context.Context, in *Workflow
 }
 
 func normalizeWorkflowTaskFilter(filter WorkflowTaskFilter) WorkflowTaskFilter {
+	filter.Keyword = strings.TrimSpace(filter.Keyword)
 	filter.OwnerRoleKey = NormalizeRoleKey(filter.OwnerRoleKey)
 	filter.VisibleOwnerRoleKeys = normalizeWorkflowVisibleOwnerRoleKeys(filter.VisibleOwnerRoleKeys)
 	filter.VisibilityScope = NormalizeWorkflowTaskVisibilityScope(filter.VisibilityScope)
 	filter.TaskStatusKey = strings.TrimSpace(filter.TaskStatusKey)
 	filter.TaskGroup = strings.TrimSpace(filter.TaskGroup)
 	filter.SourceType = strings.TrimSpace(filter.SourceType)
+	filter.DueFrom = normalizeWorkflowFilterTime(filter.DueFrom)
+	filter.DueTo = normalizeWorkflowFilterTime(filter.DueTo)
 	if filter.Limit <= 0 {
 		filter.Limit = 50
 	}
@@ -833,6 +839,14 @@ func normalizeWorkflowTaskFilter(filter WorkflowTaskFilter) WorkflowTaskFilter {
 		filter.Offset = 0
 	}
 	return filter
+}
+
+func normalizeWorkflowFilterTime(value *time.Time) *time.Time {
+	if value == nil {
+		return nil
+	}
+	normalized := time.Unix(value.Unix(), 0).UTC()
+	return &normalized
 }
 
 func normalizeWorkflowVisibleOwnerRoleKeys(roleKeys []string) []string {

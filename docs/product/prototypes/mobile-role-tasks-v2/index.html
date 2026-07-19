@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
     <meta name="color-scheme" content="light dark" />
-    <title>岗位任务中心 v2 · To Implement</title>
+    <title>岗位任务中心 v2 · Current</title>
     <style>
       :root {
         font-family:
@@ -502,8 +502,8 @@
       }
 
       .topbar .icon-button {
-        width: 42px;
-        height: 42px;
+        width: 44px;
+        height: 44px;
         border-color: transparent;
         background: transparent;
       }
@@ -595,6 +595,12 @@
         color: #ffffff;
       }
 
+      .step-button:disabled {
+        background: transparent;
+        color: var(--text-muted);
+        opacity: 0.52;
+      }
+
       .detail-main,
       .process-main,
       .result-main {
@@ -604,8 +610,7 @@
       .hero-card,
       .content-card,
       .notice-card,
-      .receipt-card,
-      .empty-receipt {
+      .receipt-card {
         min-width: 0;
         border: 1px solid var(--line);
         border-radius: 18px;
@@ -614,8 +619,7 @@
 
       .hero-card,
       .content-card,
-      .receipt-card,
-      .empty-receipt {
+      .receipt-card {
         padding: 16px;
       }
 
@@ -996,39 +1000,12 @@
         font-weight: 700;
       }
 
-      .empty-receipt {
-        display: grid;
-        min-height: 300px;
-        align-content: center;
-        justify-items: center;
-        color: var(--text-secondary);
-        text-align: center;
-      }
-
-      .empty-receipt__icon,
       .receipt-mark {
         display: grid;
         width: 62px;
         height: 62px;
         place-items: center;
         border-radius: 20px;
-      }
-
-      .empty-receipt__icon {
-        background: var(--surface-muted);
-        color: var(--text-muted);
-      }
-
-      .empty-receipt h1 {
-        margin-top: 16px;
-      }
-
-      .empty-receipt p {
-        max-width: 280px;
-        margin-top: 8px;
-        color: var(--text-secondary);
-        font-size: 13px;
-        line-height: 1.6;
       }
 
       .receipt-hero {
@@ -1043,7 +1020,7 @@
         color: var(--success);
       }
 
-      .receipt-mark--pending {
+      .receipt-mark--warning {
         background: var(--warning-soft);
         color: var(--warning);
       }
@@ -1068,7 +1045,7 @@
         font-size: 12px;
       }
 
-      .receipt-status--pending {
+      .receipt-status--warning {
         background: var(--warning-soft);
         color: var(--warning);
       }
@@ -1329,6 +1306,7 @@
           severity: 'warning',
           severityLabel: '即将超时',
           due: '今天 18:30',
+          views: ['todo'],
           actions: ['done', 'blocked', 'rejected', 'urge'],
           facts: [
             ['负责岗位', '仓库'],
@@ -1351,6 +1329,7 @@
           severity: 'danger',
           severityLabel: '已超时',
           due: '昨天 16:00',
+          views: ['todo', 'risk'],
           actions: ['urge'],
           facts: [
             ['负责岗位', '品质'],
@@ -1373,6 +1352,7 @@
           severity: 'success',
           severityLabel: '已完成',
           due: '07/12 17:42',
+          views: ['history'],
           actions: [],
           facts: [
             ['负责岗位', '仓库'],
@@ -1383,12 +1363,10 @@
           guidance: '任务已结束，第 2 步只解释只读原因；可直接进入第 3 步查看回执。',
           latest: '仓库已提交完成反馈并结束任务。',
           receipt: {
-            status: 'success',
+            status: 'confirmed',
             action: 'done',
             actionLabel: '完成',
             stateLabel: '任务已完成',
-            actor: '仓库值班员',
-            time: '2026/07/12 17:42',
             reason: '数量和包装核对无误，已放入成品仓 B-03。',
             evidence: '现场照片：FG-112-A / 入库签收单：FG-112',
             message: '处理已确认，任务列表已同步。',
@@ -1405,6 +1383,7 @@
           severity: 'warning',
           severityLabel: '需关注',
           due: '今天 20:00',
+          views: ['todo', 'risk'],
           actions: ['done', 'blocked', 'urge'],
           facts: [
             ['负责岗位', '仓库'],
@@ -1415,12 +1394,10 @@
           guidance: '本岗位可以继续处理。上次提交结果尚未确认，可先查看回执，再决定刷新结果或返回处理。',
           latest: '上次提交返回结果待确认，原因与留痕已保留，可返回第 2 步重试。',
           receipt: {
-            status: 'pending',
+            status: 'unknown',
             action: 'done',
             actionLabel: '完成',
             stateLabel: '提交结果待确认',
-            actor: '仓库值班员',
-            time: '2026/07/16 16:08',
             reason: '已核对 7 个批次，其中 2 个批次标签被运输单覆盖，按现场记录补录；临时放置在待检隔离区西侧长货架，等待复检确认后再转运。',
             evidence: '照片：PR-041-01 至 PR-041-09 / 现场复核表：PR-041-CHECK',
             message: '网络中断前已发起提交，系统尚未确认最终结果。请刷新结果或返回处理页重试。',
@@ -1432,7 +1409,7 @@
         screen: 'list',
         selectedIndex: null,
         selectedAction: null,
-        filter: 'all',
+        filter: 'todo',
         theme: 'light',
         drafts: {},
         errors: {},
@@ -1485,6 +1462,7 @@
       }
 
       function stepNavigation(currentStep) {
+        const task = currentTask();
         const definitions = [
           ['detail', '1', '查看任务', '核对信息'],
           ['process', '2', '处理任务', '选择动作'],
@@ -1495,9 +1473,11 @@
             .map(function (item) {
               const key = item[0];
               const current = key === currentStep;
+              const unavailable = key === 'result' && !task?.receipt;
               return '<button class="step-button" type="button" data-step="' + key + '"' +
                 (current ? ' aria-current="step"' : '') +
-                ' aria-label="第 ' + item[1] + ' 步，' + item[2] + '">' +
+                (unavailable ? ' disabled aria-disabled="true"' : '') +
+                ' aria-label="第 ' + item[1] + ' 步，' + item[2] + (unavailable ? '，提交后开放' : '') + '">' +
                 '<span class="step-number">' + item[1] + '</span>' +
                 '<span class="step-copy"><strong>' + item[2] + '</strong><small>' + item[3] + '</small></span>' +
                 '</button>';
@@ -1518,20 +1498,9 @@
       }
 
       function filterTasks() {
-        if (state.filter === 'mine') {
-          return tasks.filter(function (task) {
-            return task.actions.some(function (action) { return action !== 'urge'; });
-          });
-        }
-        if (state.filter === 'risk') {
-          return tasks.filter(function (task) {
-            return task.severity === 'danger' || task.severity === 'warning';
-          });
-        }
-        if (state.filter === 'receipt') {
-          return tasks.filter(function (task) { return Boolean(task.receipt); });
-        }
-        return tasks;
+        return tasks.filter(function (task) {
+          return task.views.includes(state.filter);
+        });
       }
 
       function severityClass(task) {
@@ -1574,11 +1543,16 @@
           return task.severity === 'warning';
         }).length;
         const filterDefinitions = [
-          ['all', '全部', tasks.length],
-          ['mine', '我负责', tasks.filter(function (task) { return task.actions.some(function (action) { return action !== 'urge'; }); }).length],
-          ['risk', '风险', tasks.filter(function (task) { return task.severity === 'danger' || task.severity === 'warning'; }).length],
-          ['receipt', '已有回执', tasks.filter(function (task) { return Boolean(task.receipt); }).length],
+          ['todo', '当前待办', tasks.filter(function (task) { return task.views.includes('todo'); }).length],
+          ['risk', '风险关注', tasks.filter(function (task) { return task.views.includes('risk'); }).length],
+          ['history', '已办回执', tasks.filter(function (task) { return task.views.includes('history'); }).length],
         ];
+        const focusCopy = state.filter === 'history'
+          ? '<div><strong>查看 ' + visibleTasks.length + ' 条已办回执</strong><br />终态任务只读，不再显示处理动作</div>'
+          : state.filter === 'risk'
+            ? '<div><strong>关注 ' + visibleTasks.length + ' 条风险任务</strong><br />先核对超时、阻塞和结果待确认事项</div>'
+            : '<div><strong>先处理 ' + overdueCount + ' 条超时任务</strong><br />另有 ' +
+              attentionCount + ' 条任务需要今天关注</div>';
         const cards = visibleTasks.length
           ? visibleTasks.map(taskCard).join('')
           : '<div class="empty-list"><strong>当前筛选下没有任务</strong><p class="helper">可切换其他筛选继续查看。</p></div>';
@@ -1592,13 +1566,12 @@
           themeButton() +
           '</div>' +
           '</div>' +
-          '<div class="role-line"><span class="role-pill">仓库岗位</span><span class="sync-text">' + escapeHTML(state.lastSync) + ' · 共 ' + tasks.length + ' 条相关任务</span></div>' +
+          '<div class="role-line"><span class="role-pill">仓库岗位</span><span class="sync-text">' + escapeHTML(state.lastSync) + ' · 当前视图 ' + visibleTasks.length + ' 条</span></div>' +
           '</header>' +
           '<main class="screen-main list-main">' +
           '<div class="focus-strip">' +
           '<span class="focus-strip__icon">' + icon('alert') + '</span>' +
-          '<div><strong>先处理 ' + overdueCount + ' 条超时任务</strong><br />另有 ' +
-          attentionCount + ' 条任务需要今天关注</div>' +
+          focusCopy +
           '</div>' +
           '<div class="filter-scroller" role="group" aria-label="任务筛选">' +
           filterDefinitions
@@ -1762,7 +1735,9 @@
           '<p>' + escapeHTML(task.title) + '</p></div>' +
           actionGrid +
           actionForm +
-          '<p class="receipt-note">选择催办只会提醒责任岗位，不会代替对方完成任务。</p>' +
+          (task.actions.includes('urge')
+            ? '<p class="receipt-note">选择催办只会提醒责任岗位，不会代替对方完成任务。</p>'
+            : '') +
           '</main>' +
           footer +
           '</section>';
@@ -1772,8 +1747,6 @@
         const rows = [
           ['处理动作', receipt.actionLabel],
           ['当前结果', receipt.stateLabel],
-          ['处理人员', receipt.actor],
-          ['提交时间', receipt.time],
           ['处理说明', receipt.reason || '未填写'],
           ['现场留痕', receipt.evidence || '未填写'],
         ];
@@ -1790,26 +1763,13 @@
         if (!task) return renderList();
         const receipt = task.receipt;
         if (!receipt) {
-          const actionable = task.actions.length > 0;
-          return '<section class="screen" data-screen="result">' +
-            flowHeader('result', '结果回执') +
-            '<main class="screen-main result-main">' +
-            '<div class="empty-receipt">' +
-            '<span class="empty-receipt__icon">' + icon('receipt') + '</span>' +
-            '<h1 tabindex="-1" data-screen-heading>暂时没有处理回执</h1>' +
-            '<p>您可以直接回到第 1 步核对任务；有处理权限时，也可以进入第 2 步选择动作并提交。</p>' +
-            '</div>' +
-            '</main>' +
-            '<footer class="screen-footer screen-footer--two">' +
-            '<button class="button button--secondary" type="button" data-step="detail">查看任务</button>' +
-            '<button class="button button--primary" type="button" data-step="' + (actionable ? 'process' : 'detail') + '">' +
-            (actionable ? '去处理' : '返回详情') + '</button>' +
-            '</footer>' +
-            '</section>';
+          return task.actions.length > 0 ? renderProcess() : renderDetail();
         }
 
-        const pending = receipt.status === 'pending';
-        const footer = pending
+        const unknown = receipt.status === 'unknown';
+        const failed = receipt.status === 'failed';
+        const needsConfirmation = unknown || failed;
+        const footer = needsConfirmation
           ? '<footer class="screen-footer screen-footer--two">' +
             '<button class="button button--secondary" type="button" data-step="process">返回处理</button>' +
             '<button class="button button--primary" type="button" data-refresh-result>刷新结果</button>' +
@@ -1823,11 +1783,12 @@
           flowHeader('result', '结果回执') +
           '<main class="screen-main result-main">' +
           '<div class="receipt-hero">' +
-          '<span class="receipt-mark ' + (pending ? 'receipt-mark--pending' : '') + '">' +
-          icon(pending ? 'clock' : 'check') + '</span>' +
-          '<h1 tabindex="-1" data-screen-heading>' + escapeHTML(pending ? '提交结果待确认' : '处理已提交') + '</h1>' +
+          '<span class="receipt-mark ' + (needsConfirmation ? 'receipt-mark--warning' : '') + '">' +
+          icon(needsConfirmation ? 'clock' : 'check') + '</span>' +
+          '<h1 tabindex="-1" data-screen-heading>' +
+          escapeHTML(failed ? '结果确认失败' : unknown ? '提交结果待确认' : '处理已提交') + '</h1>' +
           '<p>' + escapeHTML(receipt.message) + '</p>' +
-          '<span class="receipt-status ' + (pending ? 'receipt-status--pending' : '') + '">' +
+          '<span class="receipt-status ' + (needsConfirmation ? 'receipt-status--warning' : '') + '">' +
           escapeHTML(receipt.stateLabel) + '</span>' +
           '</div>' +
           '<section class="receipt-card" aria-label="处理回执明细">' + receiptRows(receipt) + '</section>' +
@@ -1880,8 +1841,13 @@
       }
 
       function goToStep(step) {
-        if (!currentTask()) return;
+        const task = currentTask();
+        if (!task) return;
         if (!['detail', 'process', 'result'].includes(step)) return;
+        if (step === 'result' && !task.receipt) {
+          showToast('提交处理后才会生成结果回执');
+          return;
+        }
         state.errors = {};
         state.screen = step;
         setPendingFocus('[data-screen-heading]');
@@ -1931,21 +1897,11 @@
         state.submitting = true;
         render();
         window.setTimeout(function () {
-          const now = new Intl.DateTimeFormat('zh-CN', {
-            year: 'numeric',
-            month: '2-digit',
-            day: '2-digit',
-            hour: '2-digit',
-            minute: '2-digit',
-            hour12: false,
-          }).format(new Date());
           task.receipt = {
-            status: 'success',
+            status: 'confirmed',
             action: state.selectedAction,
             actionLabel: action.label,
             stateLabel: state.selectedAction === 'urge' ? '催办已记录' : '任务状态已更新',
-            actor: '仓库值班员',
-            time: now,
             reason: draft.reason.trim(),
             evidence: draft.evidence.trim(),
             message: state.selectedAction === 'urge'
@@ -1987,8 +1943,8 @@
 
       function refreshPendingResult() {
         const task = currentTask();
-        if (!task || !task.receipt || task.receipt.status !== 'pending') return;
-        task.receipt.status = 'success';
+        if (!task || !task.receipt || !['unknown', 'failed'].includes(task.receipt.status)) return;
+        task.receipt.status = 'confirmed';
         task.receipt.stateLabel = '处理结果已确认';
         task.receipt.message = '系统已确认上次提交，任务列表已同步。';
         task.status = '已完成';

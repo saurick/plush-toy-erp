@@ -186,10 +186,6 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if _, err := factUC.CancelPostedProductionFact(ctx, over.ID); err != nil {
 		t.Fatalf("cancel formerly over-limit linked fact: %v", err)
 	}
-	pending, err := factUC.CreateProductionFactDraft(ctx, newFact("PF-MO-PENDING", "pf-mo-pending", 1))
-	if err != nil {
-		t.Fatalf("create pending linked fact: %v", err)
-	}
 	cancelled, err := orderUC.Cancel(ctx, &biz.ProductionOrderAction{ID: released.Order.ID, ExpectedVersion: 2, ActorID: actor.ID, IdempotencyKey: "cancel-after-reversal", Reason: &cancelReason})
 	if err != nil || cancelled.Order.Status != biz.ProductionOrderStatusCancelled {
 		t.Fatalf("cancel order after all reversals = %#v, %v", cancelled, err)
@@ -198,11 +194,74 @@ func TestProductionOrderFactLinkageQuantityReversalAndCancellation(t *testing.T)
 	if err != nil || replayedCancel.Order.Version != cancelled.Order.Version {
 		t.Fatalf("released cancellation exact replay = %#v, %v", replayedCancel, err)
 	}
-	if _, err := factUC.PostProductionFact(ctx, pending.ID); !errors.Is(err, biz.ErrProductionOrderInvalidState) {
-		t.Fatalf("pending fact must not post after order cancellation, error = %v", err)
+	if _, err := factUC.CreateProductionFactDraft(ctx, newFact("PF-MO-PENDING", "pf-mo-pending", 1)); !errors.Is(err, biz.ErrProductionOrderInvalidState) {
+		t.Fatalf("cancelled order must reject a new pending fact, error = %v", err)
 	}
 	if replay, err := factUC.CreateProductionFactDraft(ctx, fact1Input); err != nil || replay.ID != fact1.ID {
 		t.Fatalf("fact receipt replay must survive later order cancellation: %#v, %v", replay, err)
+	}
+}
+
+func TestProductionOrderDraftCancelFailsClosedForActiveLinkedFacts(t *testing.T) {
+	ctx := context.Background()
+	for _, status := range []string{
+		biz.OperationalFactStatusDraft,
+		biz.OperationalFactStatusPosted,
+		biz.OperationalFactStatusCancelled,
+	} {
+		t.Run(status, func(t *testing.T) {
+			data, client := openInventoryRepoTestData(t, "production_order_draft_cancel_"+status)
+			logger := log.NewStdLogger(io.Discard)
+			actor := client.AdminUser.Create().SetUsername("production-draft-cancel-" + status).SetPasswordHash("test-password-hash").SaveX(ctx)
+			unitRow := createTestUnit(t, ctx, client, "PDC-U-"+status)
+			productRow := createTestProduct(t, ctx, client, unitRow.ID, "PDC-P-"+status)
+			warehouseRow := createTestWarehouse(t, ctx, client, "PDC-WH-"+status)
+			orderUC := biz.NewProductionOrderUsecase(NewProductionOrderRepo(data, logger))
+			created, err := orderUC.CreateDraft(ctx, &biz.ProductionOrderCreate{
+				Draft: biz.ProductionOrderDraft{OrderNo: "MO-DRAFT-CANCEL-" + status, Items: []biz.ProductionOrderDraftItem{{
+					LineNo: 1, ProductID: productRow.ID, UnitID: unitRow.ID, PlannedQuantity: decimal.NewFromInt(1),
+				}}},
+				ActorID: actor.ID, IdempotencyKey: "mo-draft-cancel-" + status,
+			})
+			if err != nil {
+				t.Fatalf("create draft order: %v", err)
+			}
+			client.ProductionFact.Create().
+				SetFactNo("PF-DRAFT-CANCEL-" + status).
+				SetFactType(biz.ProductionFactFinishedGoodsReceipt).
+				SetStatus(status).
+				SetSubjectType(biz.InventorySubjectProduct).
+				SetSubjectID(productRow.ID).
+				SetWarehouseID(warehouseRow.ID).
+				SetUnitID(unitRow.ID).
+				SetQuantity(decimal.NewFromInt(1)).
+				SetSourceType(biz.ProductionOrderSourceType).
+				SetSourceID(created.Order.ID).
+				SetSourceLineID(created.Items[0].ID).
+				SetIdempotencyKey("pf-draft-cancel-" + status).
+				SetOccurredAt(time.Now().UTC()).
+				SetOccurredAtSpecified(true).
+				SaveX(ctx)
+			reason := "草稿取消依赖验证"
+			cancelled, err := orderUC.Cancel(ctx, &biz.ProductionOrderAction{
+				ID: created.Order.ID, ExpectedVersion: 1, ActorID: actor.ID,
+				IdempotencyKey: "cancel-draft-order-" + status, Reason: &reason,
+			})
+			switch status {
+			case biz.OperationalFactStatusDraft:
+				if !errors.Is(err, biz.ErrProductionOrderFactDependency) || cancelled != nil {
+					t.Fatalf("draft child cancellation result=%#v err=%v", cancelled, err)
+				}
+			case biz.OperationalFactStatusPosted:
+				if !errors.Is(err, biz.ErrProductionOrderHasPostedFacts) || cancelled != nil {
+					t.Fatalf("posted child cancellation result=%#v err=%v", cancelled, err)
+				}
+			case biz.OperationalFactStatusCancelled:
+				if err != nil || cancelled == nil || cancelled.Order.Status != biz.ProductionOrderStatusCancelled {
+					t.Fatalf("cancelled child cancellation result=%#v err=%v", cancelled, err)
+				}
+			}
+		})
 	}
 }
 

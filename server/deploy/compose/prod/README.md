@@ -326,10 +326,10 @@ apply 窗口只停止 V5 `app-server`，并保持 V5 PostgreSQL 运行供宿主 
 三种调用的证据边界不同：
 
 - `--status-only` 只输出 Atlas status，不运行存量审计、dry-run 或 apply。
-- 默认调用在 status 后依次执行 `--audit populated-upgrade` 和 `--audit customer-config-cutover`，两项都通过才继续 Atlas dry-run，不执行正式 migration。
+- 默认调用在 status 后依次执行 `--audit populated-upgrade` 和 `--audit customer-config-cutover`，两项都通过才继续 Atlas dry-run，不执行正式 migration；前一项同时覆盖 WIP `20260717035245 -> 20260717043625` 委外关联切换。
 - `--apply` 仍要求停写、停止 `app-server` 并显式设置 `MIGRATION_MAINTENANCE_CONFIRMED=1`；只有 status、两项只读审计和 dry-run 全部成功才进入 apply。
 
-升级链包含 `20260714055504_migrate.sql` 时，`populated-upgrade` 审计定位不满足目标 CHECK、外键、状态、版本、取消审计束或即将被删除时间字段的现存行；包含 `20260714055825_customer_config_append_only_and_role_backfill.sql` 时，`customer-config-cutover` 审计定位必须显式治理的流程运行态和任务配置锚点。两项事务都是 read-only，不自动修复数据。出现 blocker 时立即停止：需保留的正式记录必须进入单独评审的人工治理，明确映射、操作者、审计记录、备份、回滚点和失败条件；不得在迁移脚本或发布脚本中追加自动 DML。fresh schema、静态 DDL、Atlas validate 或空库从零迁移只能证明目标结构和迁移链，不证明 populated upgrade。
+升级链包含 `20260714055504_migrate.sql` 时，`populated-upgrade` 审计定位不满足目标 CHECK、外键、状态、版本、取消审计束或即将被删除时间字段的现存行；跨越 WIP `20260717035245 -> 20260717043625` 时，同一审计还会阻断旧列中的未迁移委外链接，以及切换后没有 durable allocation 的活动外发批次；包含 `20260714055825_customer_config_append_only_and_role_backfill.sql` 时，`customer-config-cutover` 审计定位必须显式治理的流程运行态和任务配置锚点。两项事务都是 read-only，不自动修复数据。出现 blocker 时立即停止：需保留的正式记录必须进入单独评审的人工治理，明确映射、操作者、审计记录、备份、回滚点和失败条件；不得在迁移脚本或发布脚本中追加自动 DML。fresh schema、静态 DDL、Atlas validate 或空库从零迁移只能证明目标结构和迁移链，不证明 populated upgrade。
 
 备份恢复演练遵循同一边界：dump 恢复到隔离 PostgreSQL 后，先记录 pre-apply status，再运行两项适用的只读审计；只有审计通过才允许 apply。恢复链跨越对应 revision 时，脚本会在 `backup-evidence.md`、`backup-restore-report.json` 和 `command-summary.txt` 中分别记录审计通过状态，release gate 会交叉核对字段、步骤和 migrationBefore / migrationAfter；任一缺失都不能作为完整证据。正式证据还必须绑定本次备份、release 和 migration version，不能由 fresh 结果替代。
 

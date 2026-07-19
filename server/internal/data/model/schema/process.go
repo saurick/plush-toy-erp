@@ -19,7 +19,8 @@ func (Process) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"processes_sort_order_non_negative": "sort_order >= 0",
+				"processes_sort_order_non_negative":            "sort_order >= 0",
+				"processes_production_route_operation_allowed": "production_route_operation_code IS NULL OR production_route_operation_code IN ('FABRIC_PROCESSING', 'SEWING', 'HANDWORK', 'PACKAGING')",
 			},
 		},
 	}
@@ -34,6 +35,14 @@ func (Process) Fields() []ent.Field {
 			NotEmpty().
 			MaxLen(255),
 		field.String("category").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		// production_route_operation_code is the explicit, machine-readable
+		// binding between a process master record and a Product Core production
+		// route operation. Display names, categories, codes, and sort order are
+		// intentionally not used to infer this semantic role.
+		field.String("production_route_operation_code").
 			Optional().
 			Nillable().
 			MaxLen(64),
@@ -72,6 +81,9 @@ func (Process) Edges() []ent.Edge {
 func (Process) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("code").Unique(),
+		index.Fields("production_route_operation_code").
+			Unique().
+			Annotations(entsql.IndexWhere("production_route_operation_code IS NOT NULL")),
 		index.Fields("category"),
 		index.Fields("outsourcing_enabled"),
 		index.Fields("inhouse_enabled"),

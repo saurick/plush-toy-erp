@@ -9,7 +9,8 @@ const source = readFileSync(
 )
 
 test('finance cancellation requires a bounded business reason and sends it to the canonical action', () => {
-  assert.match(source, /title="取消财务记录"/)
+  assert.match(source, /'作废财务草稿'/)
+  assert.match(source, /'取消财务记录'/)
   assert.match(source, /placeholder="请填写客户、供应商或账款调整的业务原因"/)
   assert.match(source, /maxLength=\{255\}/)
   assert.match(source, /\{ reason \}/)
@@ -17,6 +18,53 @@ test('finance cancellation requires a bounded business reason and sends it to th
   assert.match(source, /\['production', 'outsourcing'\]\.includes/)
   assert.doesNotMatch(source, /\['production', 'outsourcing', 'finance'\]/)
   assert.match(source, /canConfirmFinanceFact\(adminProfile/)
+})
+
+test('draft facts can exit without pretending an inventory reversal happened', () => {
+  assert.match(
+    source,
+    /!\['DRAFT', 'POSTED'\]\.includes\(activeSelectedRow\.status\)/u
+  )
+  assert.match(source, /草稿尚未过账，不会变更库存/u)
+  assert.match(source, /草稿尚未确认，作废不会生成过账或库存变更/u)
+  assert.match(source, />\s*\{activeSelectedRow\?\.status === 'DRAFT' \? '作废草稿' : '取消'\}\s*</u)
+})
+
+test('finance draft actions fail closed when a historical row lacks a formal source', () => {
+  assert.match(source, /hasValidFinanceTransitionSource/u)
+  assert.match(
+    source,
+    /const financeDraftTransitionBlocked\s*=\s*[\s\S]*activeSelectedRow\?\.status === 'DRAFT'[\s\S]*!hasValidFinanceTransitionSource\(activeSelectedRow\)/u
+  )
+  assert.match(source, /该历史草稿缺少可核对来源，不能确认或作废/u)
+  assert.equal(
+    source.match(/financeDraftTransitionBlocked \|\|/gu)?.length,
+    2,
+    'finance confirm and draft cancellation must share the same source guard'
+  )
+})
+
+test('production and outsourcing historical drafts fail closed without source coordinates', () => {
+  assert.match(source, /hasRequiredOperationalFactDraftSource/u)
+  assert.match(
+    source,
+    /const sourceBoundDraftTransitionBlocked\s*=\s*[\s\S]*\['production', 'outsourcing'\]\.includes\(currentActiveKey\)[\s\S]*hasRequiredOperationalFactDraftSource/u
+  )
+  assert.match(source, /该历史草稿缺少可核对来源，不能过账或作废/u)
+  assert.equal(
+    source.match(/sourceBoundDraftTransitionBlocked \|\|/gu)?.length,
+    2,
+    'post and draft cancellation must share the same source guard'
+  )
+})
+
+test('shipment drafts can be voided without claiming an inventory reversal', () => {
+  assert.match(source, /确认作废出货草稿？草稿尚未出库，不会变更库存/u)
+  assert.match(
+    source,
+    /!\['DRAFT', 'SHIPPED'\]\.includes\(activeSelectedRow\.status\)/u
+  )
+  assert.match(source, /activeSelectedRow\?\.status === 'DRAFT'[\s\S]{0,100}'作废出货草稿'/u)
 })
 
 test('finance page derives projection, permission and settlement from the filtered fact type', () => {

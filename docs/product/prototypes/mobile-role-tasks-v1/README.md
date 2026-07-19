@@ -1,27 +1,29 @@
-# 岗位任务端原型 / Mobile Role Tasks Prototype
+# 岗位任务端当前列表基线 / Mobile Role Tasks Current List Baseline
 
-本目录归档岗位任务端改版时使用的三张 PNG 原型图。
+本目录保存岗位任务端当前仍在使用的 v1 列表壳 as-built HTML，以及三张早期 PNG 原型图。`Current` 只覆盖列表首屏；同一 HTML 中保留的旧详情内处理仅作历史对照，不再定义选中任务后的当前主路径。
 
 ## 文件说明
 
-| 文件 | 说明 |
-| --- | --- |
-| `implemented-reference.html` | 当前实现参考：覆盖首屏加载占位、待办 / 已办 / 消息 / 我的、主筛选、分批展开、任务详情、现场留痕、原因面板，以及阻塞 / 完成 / 催办底部动作栏。 |
-| `images/mobile-role-tasks-list-reference.png` | 早期视觉方向 / 历史参考：待办列表页参考，包含岗位胶囊、刷新、同步信息、四项指标、筛选、任务列表和底部导航。 |
-| `images/mobile-role-task-detail-reference.png` | 早期视觉方向 / 历史参考：任务详情页参考，包含任务关键信息、风险提示、关联来源、最近动态、原因输入和底部动作栏。 |
-| `images/mobile-role-risk-dashboard-reference.png` | 早期视觉方向 / 历史参考：风险分组页参考，包含今日必须处理、卡点、等待他人、催办和已完成等分组。 |
+| 文件                                              | 说明                                                                                                                                                    |
+| ------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `implemented-reference.html`                      | 当前列表基线：覆盖首屏加载占位、待办 / 已办 / 提醒 / 我的、主筛选、分批展开和任务卡片；文件内旧详情与处理交互仅保留为历史对照。                       |
+| `images/mobile-role-tasks-list-reference.png`     | 早期视觉方向 / 历史参考：待办列表页参考，包含岗位胶囊、刷新、同步信息、四项指标、筛选、任务列表和底部导航。                                             |
+| `images/mobile-role-task-detail-reference.png`    | 早期视觉方向 / 历史参考：任务详情页参考，包含任务关键信息、风险提示、关联来源、最近动态、原因输入和底部动作栏。                                         |
+| `images/mobile-role-risk-dashboard-reference.png` | 早期视觉方向 / 历史参考：风险分组页参考，包含今日必须处理、卡点、等待他人、催办和已完成等分组。                                                         |
 
 ## HTML 口径
 
-当前补充一个“当前实现参考”HTML，不把三张 PNG 分别机械转成三份 HTML。
+保留一个“当前列表基线”HTML，不把三张 PNG 分别机械转成三份 HTML。
 
 原因：
 
 - 这批 PNG 已作为岗位任务端改版参考，真实实现入口已经落到 `web/src/erp/mobile/pages/MobileRoleTasksPage.jsx`，且与早期 PNG 略有差异。
-- `implemented-reference.html` 用于记录真实页面吸收早期方向后的 as-built 形态。
+- `implemented-reference.html` 用于记录真实页面吸收早期方向后的当前列表首屏。
 - 该 HTML 保持可直接在浏览器打开；脚本状态必须先于首屏内容初始化，不能让演示页因初始化顺序错误停在空白或半渲染状态。
-- 真实页面继续以运行时代码、自动化测试和浏览器回归结果为准，HTML 只作为可打开的设计参考。
-- 岗位任务中心的重新设计已单独进入 [`../mobile-role-tasks-v2/`](../mobile-role-tasks-v2/)；v2 保持 To Implement，不覆盖本目录的 Current 参考或历史 PNG。
+- 当前运行态继续保留本参考的 v1 列表标签、筛选、分页 / 分批展开和任务卡片；真实行为继续以运行时代码、自动化测试和浏览器回归结果为准。
+- 选中任务后进入 v2 的“查看任务 → 处理任务 → 结果回执”全屏流程，结束后恢复原列表的筛选、已加载分页、滚动位置和焦点。HTML 内的旧详情、原因面板和条件动作栏只用于追溯上一版交互，不属于 `Current` 范围。
+- 完成、阻塞、退回、解除阻塞或催办只更新 Workflow 协同任务，不等于库存、质检、出货或财务 Fact 已过账。
+- [`../mobile-role-tasks-v2/`](../mobile-role-tasks-v2/) 的选中任务流程已接入本地运行时代码。v2 继续保持 To Implement，只表示真实账号视觉验收和用户 Current 确认尚未完成，不表示后续要替换或移除 v1 列表；本 HTML 的列表范围保持唯一 Current，三张 PNG 保持 History / Evidence。
 
 ## 边界
 

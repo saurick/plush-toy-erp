@@ -22,6 +22,7 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 		},
 	}
 	operationalFactRepo := &finishedGoodsDeliveryGoldenChainOperationalFactRepo{
+		paymentTermDays: processTestIntPtr(30),
 		shipment: &Shipment{
 			ID:         9001,
 			ShipmentNo: "SHIP-GOLDEN-001",
@@ -243,12 +244,24 @@ func assertFinishedGoodsProcessNode(t *testing.T, repo *memProcessRuntimeRepo, n
 type finishedGoodsDeliveryGoldenChainOperationalFactRepo struct {
 	OperationalFactRepo
 	shipment               *Shipment
+	paymentTermDays        *int
 	fetchedShipmentIDs     []int
 	shippedShipmentID      int
 	createdFinanceFact     *FinanceFactCreate
 	postedFinanceFactID    int
 	settledFinanceFactID   int
 	cancelledFinanceFactID int
+}
+
+func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) GetShipmentPaymentTermDays(_ context.Context, shipmentID int) (*int, error) {
+	if r.shipment == nil || r.shipment.ID != shipmentID {
+		return nil, ErrShipmentNotFound
+	}
+	if r.paymentTermDays == nil {
+		return nil, ErrFinanceFactPaymentTermMissing
+	}
+	days := *r.paymentTermDays
+	return &days, nil
 }
 
 func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) GetShipment(_ context.Context, shipmentID int) (*Shipment, error) {

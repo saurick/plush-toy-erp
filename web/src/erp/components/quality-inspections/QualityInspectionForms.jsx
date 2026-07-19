@@ -61,12 +61,14 @@ export function QualityInspectionCreateForm({
   form,
   purchaseReceiptOptions,
   purchaseReceiptItemOptions,
+  disabled = false,
   onReceiptChange,
 }) {
   return (
     <Form
       form={form}
       layout="vertical"
+      disabled={disabled}
       className="erp-business-action-form erp-business-action-form--grid"
     >
       <Form.Item

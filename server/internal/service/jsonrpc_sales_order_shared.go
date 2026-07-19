@@ -43,15 +43,15 @@ func salesOrderMutationFromParams(pm map[string]any) (*biz.SalesOrderMutation, b
 }
 
 func salesOrderItemMutationFromParams(pm map[string]any) (*biz.SalesOrderItemMutation, bool) {
-	quantity, ok := getRequiredJSONRPCDecimal(pm, "ordered_quantity")
+	quantity, ok := getRequiredJSONRPCNumeric20Scale6(pm, "ordered_quantity")
 	if !ok {
 		return nil, false
 	}
-	unitPrice, ok := getOptionalJSONRPCDecimal(pm, "unit_price")
+	unitPrice, ok := getOptionalJSONRPCDecimalString(pm, "unit_price")
 	if !ok {
 		return nil, false
 	}
-	amount, ok := getOptionalJSONRPCDecimal(pm, "amount")
+	amount, ok := getOptionalJSONRPCDecimalString(pm, "amount")
 	if !ok {
 		return nil, false
 	}
@@ -115,6 +115,14 @@ func (d *jsonrpcDispatcher) mapSalesOrderError(ctx context.Context, err error) *
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单不存在"}
 	case errors.Is(err, biz.ErrSalesOrderItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单行不存在"}
+	case errors.Is(err, biz.ErrSalesOrderCancellationShipmentDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单已有未取消的出货单，不能取消"}
+	case errors.Is(err, biz.ErrSalesOrderCancellationReservationDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单仍有生效库存预留，请先释放后再取消"}
+	case errors.Is(err, biz.ErrSalesOrderCancellationProductionDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单已有未取消的生产订单，不能取消"}
+	case errors.Is(err, biz.ErrSalesOrderCancellationProcessDependency):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单仍有进行中的审批流程，不能取消"}
 	case errors.Is(err, biz.ErrCustomerNotFound), errors.Is(err, biz.ErrCustomerInactive):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "客户不存在或已停用"}
 	case errors.Is(err, biz.ErrProductNotFound), errors.Is(err, biz.ErrProductInactive):

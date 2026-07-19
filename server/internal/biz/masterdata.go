@@ -91,18 +91,19 @@ type Material struct {
 }
 
 type Process struct {
-	ID                 int
-	Code               string
-	Name               string
-	Category           *string
-	OutsourcingEnabled bool
-	InhouseEnabled     bool
-	QualityRequired    bool
-	SortOrder          int
-	Note               *string
-	IsActive           bool
-	CreatedAt          time.Time
-	UpdatedAt          time.Time
+	ID                           int
+	Code                         string
+	Name                         string
+	Category                     *string
+	ProductionRouteOperationCode *string
+	OutsourcingEnabled           bool
+	InhouseEnabled               bool
+	QualityRequired              bool
+	SortOrder                    int
+	Note                         *string
+	IsActive                     bool
+	CreatedAt                    time.Time
+	UpdatedAt                    time.Time
 }
 
 type Product struct {
@@ -185,14 +186,15 @@ type MaterialMutation struct {
 }
 
 type ProcessMutation struct {
-	Code               string
-	Name               string
-	Category           *string
-	OutsourcingEnabled bool
-	InhouseEnabled     bool
-	QualityRequired    bool
-	SortOrder          int
-	Note               *string
+	Code                         string
+	Name                         string
+	Category                     *string
+	ProductionRouteOperationCode *string
+	OutsourcingEnabled           bool
+	InhouseEnabled               bool
+	QualityRequired              bool
+	SortOrder                    int
+	Note                         *string
 }
 
 type ProductMutation struct {
@@ -875,6 +877,14 @@ func normalizeProcessMutation(in ProcessMutation) (ProcessMutation, error) {
 	in.Code = strings.TrimSpace(in.Code)
 	in.Name = strings.TrimSpace(in.Name)
 	in.Category = normalizeOptionalString(in.Category)
+	in.ProductionRouteOperationCode = normalizeOptionalString(in.ProductionRouteOperationCode)
+	if in.ProductionRouteOperationCode != nil {
+		operationCode, err := NormalizeProductionRouteOperationCode(*in.ProductionRouteOperationCode)
+		if err != nil {
+			return ProcessMutation{}, ErrBadParam
+		}
+		in.ProductionRouteOperationCode = &operationCode
+	}
 	in.Note = normalizeOptionalString(in.Note)
 	if in.SortOrder < 0 {
 		in.SortOrder = 0

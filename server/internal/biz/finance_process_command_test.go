@@ -12,6 +12,7 @@ import (
 func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &financeProcessOperationalFactRepoStub{
+		paymentTermDays: processTestIntPtr(60),
 		shipment: &Shipment{
 			ID:         9001,
 			CustomerID: processTestIntPtr(501),
@@ -83,7 +84,13 @@ func TestFinanceProcessDomainCommandReceivableLeadBindsUsecase(t *testing.T) {
 		operationalFactRepo.createdFinanceFact.CounterpartyID == nil ||
 		*operationalFactRepo.createdFinanceFact.CounterpartyID != 501 ||
 		!operationalFactRepo.createdFinanceFact.Amount.Equal(decimal.RequireFromString("12888.00")) ||
-		operationalFactRepo.createdFinanceFact.IdempotencyKey != "process:10:node:20:receivable-lead" {
+		operationalFactRepo.createdFinanceFact.IdempotencyKey != "process:10:node:20:receivable-lead" ||
+		operationalFactRepo.createdFinanceFact.CollectionType == nil ||
+		*operationalFactRepo.createdFinanceFact.CollectionType != FinanceCollectionAccountsReceivable ||
+		operationalFactRepo.createdFinanceFact.PaymentTerm != nil ||
+		operationalFactRepo.createdFinanceFact.PaymentTermDays == nil ||
+		*operationalFactRepo.createdFinanceFact.PaymentTermDays != 60 ||
+		operationalFactRepo.createdFinanceFact.InvoiceCategory != nil {
 		t.Fatalf("unexpected finance fact create input %#v", operationalFactRepo.createdFinanceFact)
 	}
 	if operationalFactRepo.postedFinanceFactID != 0 || operationalFactRepo.settledFinanceFactID != 0 || operationalFactRepo.cancelledFinanceFactID != 0 {
@@ -242,12 +249,25 @@ func TestOperationalFactUsecaseCancelFinanceRequiresActorAndTrimmedReason(t *tes
 type financeProcessOperationalFactRepoStub struct {
 	OperationalFactRepo
 	shipment                    *Shipment
+	paymentTermDays             *int
 	createdFinanceFact          *FinanceFactCreate
 	postedFinanceFactID         int
 	settledFinanceFactID        int
 	cancelledFinanceFactID      int
 	cancelledFinanceFactActorID int
 	cancelledFinanceFactReason  string
+}
+
+func (r *financeProcessOperationalFactRepoStub) GetShipmentPaymentTermDays(_ context.Context, shipmentID int) (*int, error) {
+	if r.shipment == nil || r.shipment.ID != shipmentID {
+		return nil, ErrShipmentNotFound
+	}
+	if r.paymentTermDays == nil {
+		days := 30
+		return &days, nil
+	}
+	days := *r.paymentTermDays
+	return &days, nil
 }
 
 func (r *financeProcessOperationalFactRepoStub) GetShipment(_ context.Context, shipmentID int) (*Shipment, error) {

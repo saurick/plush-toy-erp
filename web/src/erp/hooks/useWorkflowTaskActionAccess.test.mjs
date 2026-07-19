@@ -21,7 +21,7 @@ test('useWorkflowTaskActionAccess: version-aware request identity still sends on
     source,
     /`\$\{taskRequestKey\}\|\$\{adminKey\}\|\$\{actionModeKey\}`/u
   )
-  assert.match(source, /\[enabled, requestKey, taskID\]/u)
+  assert.match(source, /\[enabled, requestKey, retryVersion, taskID\]/u)
   assert.match(source, /remoteState\.requestKey === requestKey/u)
   assert.match(source, /\{ task_id: taskID \}/u)
   assert.doesNotMatch(source, /task_version/u)
@@ -227,4 +227,30 @@ test('useWorkflowTaskActionAccess: revision changes re-request and stale respons
   view = runtime.render({ adminProfile: nextProfile, task })
   assert.equal(view.loading, false)
   assert.equal(view.explainData, currentProjection)
+})
+
+test('useWorkflowTaskActionAccess: failed projection can be explicitly retried', async () => {
+  const requests = []
+  const runtime = loadHookRuntime((params) => {
+    const deferred = createDeferred()
+    requests.push({ deferred, params })
+    return deferred.promise
+  })
+  const props = {
+    adminProfile: {
+      id: 7,
+      roles: [{ role_key: 'warehouse' }],
+      permissions: ['workflow.task.complete'],
+    },
+    task: { id: 42, version: 3 },
+  }
+
+  let view = runtime.render(props)
+  assert.equal(requests.length, 1)
+  assert.equal(typeof view.retry, 'function')
+  view.retry()
+  view = runtime.render(props)
+  assert.equal(requests.length, 2)
+  assert.equal(requests[0].params.task_id, 42)
+  assert.equal(requests[1].params.task_id, 42)
 })

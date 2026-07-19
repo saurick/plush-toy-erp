@@ -42,6 +42,9 @@ test('production rework modal exposes only operator-owned business fields', () =
   assert.match(source, /本次返工数量不能超过剩余可返工数量/u)
   assert.match(source, /请填写返工原因/u)
   assert.match(source, /返工原因不能超过 255 个字符/u)
+  assert.match(source, /numeric20Scale6Units\(value\)/u)
+  assert.match(source, /compareNumeric20Scale6Units\(quantity, remaining\)/u)
+  assert.doesNotMatch(source, /const quantity = Number\(value\)/u)
 })
 
 test('production rework modal resets closed form state and handles validation locally', () => {

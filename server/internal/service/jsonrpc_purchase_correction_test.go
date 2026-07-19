@@ -80,6 +80,7 @@ func TestJsonrpcDispatcher_RejectedQualityInspectionCreatesTraceablePurchaseRetu
 		biz.PermissionPurchaseReturnCreate,
 		biz.PermissionPurchaseReturnPost,
 		biz.PermissionPurchaseReceiptRead,
+		biz.PermissionQualityInspectionRead,
 	))
 	receipt, item, lotID := createPostedQualityReceipt(t, ctx, j.inventoryUC, fixtures, "PR-JSONRPC-QI-RETURN", "PR-JSONRPC-QI-RETURN-LOT")
 	draft, err := j.inventoryUC.CreateQualityInspectionFromPurchaseReceipt(ctx, &biz.QualityInspectionFromPurchaseReceiptCreate{

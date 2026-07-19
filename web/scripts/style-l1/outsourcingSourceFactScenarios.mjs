@@ -1,3 +1,5 @@
+import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+
 export function createOutsourcingSourceFactScenarios(deps) {
   const {
     assert,
@@ -13,6 +15,7 @@ export function createOutsourcingSourceFactScenarios(deps) {
     name,
     actionType,
     productLotAvailable = true,
+    recordAction = '',
     viewport,
   }) => {
     const materialIssue = actionType === 'MATERIAL_ISSUE'
@@ -38,6 +41,8 @@ export function createOutsourcingSourceFactScenarios(deps) {
         permissions: [
           'outsourcing.order.read',
           'outsourcing.fact.read',
+          'outsourcing.fact.post',
+          'outsourcing.fact.cancel',
           'outsourcing.material_issue.create',
           'outsourcing.return_receipt.create',
         ],
@@ -48,6 +53,8 @@ export function createOutsourcingSourceFactScenarios(deps) {
           ...(customerRuntimeEffectiveSession?.actions || []),
           'outsourcing.order.read',
           'outsourcing.fact.read',
+          'outsourcing.fact.post',
+          'outsourcing.fact.cancel',
           'outsourcing.material_issue.create',
           'outsourcing.return_receipt.create',
         ],
@@ -82,7 +89,6 @@ export function createOutsourcingSourceFactScenarios(deps) {
               name: '源单加工厂',
             },
             source_order_no: 'SO-SOURCE-L1',
-            source_sales_order_id: 1,
             order_date: 1_784_000_000,
             expected_return_date: 1_784_604_800,
             lifecycle_status: 'confirmed',
@@ -137,21 +143,17 @@ export function createOutsourcingSourceFactScenarios(deps) {
           ]
           let data
           if (method === 'list_outsourcing_orders') {
-            data = {
-              outsourcing_orders: [order],
-              total: 1,
-              limit: Number(params.limit || 100),
-              offset: Number(params.offset || 0),
-            }
+            data = stylePaginatedRpcData([order], 'outsourcing_orders', params)
           } else if (method === 'get_outsourcing_order') {
             data = { outsourcing_order: order }
           } else if (method === 'list_outsourcing_order_items') {
-            data = {
-              outsourcing_order_items: items,
-              total: items.length,
-              limit: Number(params.limit || 100),
-              offset: Number(params.offset || 0),
-            }
+            data = stylePaginatedRpcData(
+              Number(params.outsourcing_order_id || 0) === order.id
+                ? items
+                : [],
+              'outsourcing_order_items',
+              params
+            )
           } else {
             await route.fallback()
             return
@@ -198,6 +200,8 @@ export function createOutsourcingSourceFactScenarios(deps) {
               status: 'ACTIVE',
             },
           ].filter((lot) => productLotAvailable || lot.id !== 412)
+          const limit = Number(body.params?.limit || 200)
+          const offset = Number(body.params?.offset || 0)
           await route.fulfill({
             status: 200,
             contentType: 'application/json',
@@ -208,10 +212,10 @@ export function createOutsourcingSourceFactScenarios(deps) {
                 code: 0,
                 message: 'OK',
                 data: {
-                  inventory_lots: lots,
+                  inventory_lots: lots.slice(offset, offset + limit),
                   total: lots.length,
-                  limit: 100,
-                  offset: 0,
+                  limit,
+                  offset,
                 },
               },
             }),
@@ -235,32 +239,78 @@ export function createOutsourcingSourceFactScenarios(deps) {
         await productCard.waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await materialCard.getByRole('button', { name: '委外发料' }).count(),
-          1,
-          '材料明细应只提供委外发料入口'
-        )
-        assert.equal(
-          await materialCard.getByRole('button', { name: '登记回货' }).count(),
           0,
-          '材料明细不得提供产品回货入口'
+          '行内明细快速预览应保持只读，不承载委外发料'
         )
         assert.equal(
           await productCard.getByRole('button', { name: '登记回货' }).count(),
-          1,
-          '产品明细应只提供登记回货入口'
-        )
-        assert.equal(
-          await productCard.getByRole('button', { name: '委外发料' }).count(),
           0,
-          '产品明细不得提供任意材料发料入口'
+          '行内明细快速预览应保持只读，不承载委外回货'
         )
 
-        const sourceCard = materialIssue ? materialCard : productCard
+        await page.getByText('OUT-SOURCE-L1', { exact: true }).first().dblclick()
+        const detailModal = page
+          .locator('.erp-business-action-modal--form.ant-modal:visible')
+          .filter({ hasText: '加工合同详情' })
+          .last()
+        await detailModal.waitFor({ state: 'visible', timeout: 10_000 })
+        const detailMaterialCard = detailModal
+          .locator('.erp-business-row-item-card')
+          .filter({ hasText: 'MAT-SOURCE-L1' })
+          .first()
+        const detailProductCard = detailModal
+          .locator('.erp-business-row-item-card')
+          .filter({ hasText: 'PROD-SOURCE-L1' })
+          .first()
+        await detailMaterialCard.waitFor({ state: 'visible', timeout: 10_000 })
+        await detailProductCard.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await detailMaterialCard
+            .getByRole('button', { name: '委外发料' })
+            .count(),
+          1,
+          '完整详情中的材料明细应只提供委外发料入口'
+        )
+        assert.equal(
+          await detailMaterialCard
+            .getByRole('button', { name: '登记回货' })
+            .count(),
+          0,
+          '完整详情中的材料明细不得提供产品回货入口'
+        )
+        assert.equal(
+          await detailProductCard
+            .getByRole('button', { name: '登记回货' })
+            .count(),
+          1,
+          '完整详情中的产品明细应只提供登记回货入口'
+        )
+        assert.equal(
+          await detailProductCard
+            .getByRole('button', { name: '委外发料' })
+            .count(),
+          0,
+          '完整详情中的产品明细不得提供任意材料发料入口'
+        )
+
+        const sourceCard = materialIssue
+          ? detailMaterialCard
+          : detailProductCard
         await sourceCard.getByRole('button', { name: actionLabel }).click()
         const modal = page
-          .locator('.ant-modal')
-          .filter({ hasText: actionLabel })
+          .locator('.erp-outsourcing-source-fact-modal.ant-modal:visible')
           .last()
-        await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        try {
+          await modal.waitFor({ state: 'visible', timeout: 10_000 })
+        } catch (error) {
+          const notices = await page
+            .locator('.ant-message-notice')
+            .allInnerTexts()
+            .catch(() => [])
+          throw new Error(
+            `${error.message}; 当前消息=${JSON.stringify(notices)}; 委外事实请求=${JSON.stringify(operationalFactMethods)}`
+          )
+        }
         const modalText = String((await modal.innerText()) || '').replace(
           /\s+/gu,
           ' '
@@ -356,8 +406,8 @@ export function createOutsourcingSourceFactScenarios(deps) {
         await modal.getByRole('button', { name: `确认${actionLabel}` }).click()
         const successText =
           !materialIssue && !productLotAvailable
-            ? '已重新读取并确认委外回货草稿，请到委外记录核对并过账'
-            : `${materialIssue ? '委外发料' : '委外回货'}草稿已生成`
+            ? '已重新读取并确认委外回货草稿，可在委外记录中继续办理'
+            : `${materialIssue ? '委外发料' : '委外回货'}草稿已生成，可在委外记录中继续办理`
         try {
           await expectText(page, successText)
         } catch (error) {
@@ -427,6 +477,83 @@ export function createOutsourcingSourceFactScenarios(deps) {
         ]) {
           assert.equal(serverDerivedField in params, false)
         }
+
+        if (recordAction) {
+          await detailModal.locator('.ant-modal-close').click()
+          await detailModal.waitFor({ state: 'hidden', timeout: 10_000 })
+          const recordsEntry = page.getByRole('button', {
+            name: '委外记录',
+            exact: true,
+          })
+          if (await recordsEntry.isDisabled()) {
+            await page
+              .getByText('OUT-SOURCE-L1', { exact: true })
+              .first()
+              .click()
+          }
+          await recordsEntry.click()
+          const recordsModal = page
+            .locator('.ant-modal:visible')
+            .filter({ hasText: '委外记录 · OUT-SOURCE-L1' })
+            .last()
+          await recordsModal.waitFor({ state: 'visible', timeout: 10_000 })
+          const factRow = recordsModal
+            .locator('.ant-table-row')
+            .filter({ hasText: params.fact_no })
+            .first()
+          await factRow.scrollIntoViewIfNeeded()
+          await factRow.click()
+
+          if (['post', 'post-and-void'].includes(recordAction)) {
+            const postButton = recordsModal.getByRole('button', {
+              name: /过\s*账/u,
+            })
+            if ((await postButton.count()) === 0) {
+              throw new Error(
+                `${name} 选中草稿后未显示过账动作: ${String(await recordsModal.innerText()).replace(/\s+/gu, ' ')}`
+              )
+            }
+            await postButton.click()
+            await expectText(page, '委外记录已过账')
+            await expectText(factRow, '已过账')
+            assert.equal(
+              operationalFactMethods.includes('post_outsourcing_fact'),
+              true,
+              `${name} 必须调用委外事实过账 RPC`
+            )
+          }
+
+          if (['void', 'post-and-void'].includes(recordAction)) {
+            const voidRow =
+              recordAction === 'post-and-void'
+                ? recordsModal
+                    .locator('.ant-table-row')
+                    .filter({ hasText: 'OUTSOURCE-FACT-L1' })
+                    .first()
+                : factRow
+            await voidRow.scrollIntoViewIfNeeded()
+            await voidRow.click()
+            await recordsModal
+              .getByRole('button', {
+                name: '作废草稿（库存零变动）',
+                exact: true,
+              })
+              .click()
+            const confirm = page.locator('.ant-modal-confirm:visible').last()
+            await confirm.waitFor({ state: 'visible', timeout: 10_000 })
+            await expectText(confirm, '本次作废不会产生任何库存变动')
+            await confirm
+              .getByRole('button', { name: '确认作废', exact: true })
+              .click()
+            await expectText(page, '委外草稿已作废，库存未发生变动')
+            await expectText(voidRow, '已取消')
+            assert.equal(
+              operationalFactMethods.includes('cancel_outsourcing_fact'),
+              true,
+              `${name} 必须调用委外草稿作废 RPC`
+            )
+          }
+        }
         await assertNoHorizontalOverflow(page, name)
       },
     }
@@ -436,6 +563,7 @@ export function createOutsourcingSourceFactScenarios(deps) {
     createScenario({
       name: 'outsourcing-source-material-issue-desktop',
       actionType: 'MATERIAL_ISSUE',
+      recordAction: 'post-and-void',
       viewport: { width: 1440, height: 900 },
     }),
     createScenario({

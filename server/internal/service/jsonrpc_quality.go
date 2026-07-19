@@ -36,6 +36,9 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
+			return id, res, nil
+		}
 		in, ok := qualityInspectionFromPurchaseReceiptCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -49,6 +52,9 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
+			return id, res, nil
+		}
 		in, ok := qualityInspectionFromOutsourcingReturnCreateFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -60,6 +66,9 @@ func (d *jsonrpcDispatcher) handleQuality(
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "create_finished_goods_quality_inspection_draft":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
 			return id, res, nil
 		}
 		in, ok := finishedGoodsQualityInspectionCreateFromParams(pm)
@@ -143,6 +152,12 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireCustomerConfigModulesReadable(ctx, "quality_inspections", "shipments"); res != nil {
+			return id, res, nil
+		}
 		filter, ok := finishedGoodsQualityInspectionFilterFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
@@ -161,11 +176,14 @@ func (d *jsonrpcDispatcher) handleQuality(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
+			return id, res, nil
+		}
 		filter, ok := outsourcingReturnQualityInspectionFilterFromParams(pm)
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "outsourcing_orders", "quality_inspections"); res != nil {
+		if res := d.requireCustomerConfigModulesReadable(ctx, "quality_inspections", "outsourcing_orders"); res != nil {
 			return id, res, nil
 		}
 		items, total, err := d.inventoryUC.ListOutsourcingReturnQualityInspections(ctx, filter)
@@ -180,6 +198,9 @@ func (d *jsonrpcDispatcher) handleQuality(
 		}), nil
 	case "list_production_stage_quality_inspections":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "quality", method); res != nil {
 			return id, res, nil
 		}
 		filter, ok := productionStageQualityInspectionFilterFromParams(pm)

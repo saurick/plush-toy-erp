@@ -1152,6 +1152,7 @@ export default function PermissionCenterPage() {
           : '员工账号已创建'
       )
       closeCreateModal()
+      setTablePagination((prev) => ({ ...prev, current: 1 }))
       await loadData()
     } catch (err) {
       message.error(getActionErrorMessage(err, '创建员工账号'))

@@ -297,6 +297,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSalesOrderSubmit); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -310,11 +313,19 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
 		createIn.CustomerKey = resolvedCustomerKey
+		if res := d.requireCustomerConfigModulesEnabled(ctx, resolvedCustomerKey, "sales_orders"); res != nil {
+			return id, res, nil
+		}
+		businessRefNo, err := d.salesOrderProcessSourceRefNo(ctx, createIn.BusinessRefID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		createIn.BusinessRefNo = businessRefNo
 		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		instance, nodes, err := d.processRuntimeUC.CreateProcessInstance(ctx, processCreate, admin.ID)
+		instance, nodes, err := d.processRuntimeUC.CreateProcessInstanceFromSource(ctx, processCreate, admin.ID)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -344,6 +355,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_sales_order_acceptance_submit":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -382,61 +396,11 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			}),
 		}, nil
 
-	case "start_material_supply_process":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
-			return id, res, nil
-		}
-		admin, res := d.CurrentAdmin(ctx)
-		if res != nil {
-			return id, res, nil
-		}
-		createIn, ok := materialSupplyProcessInputFromParams(pm)
-		if !ok {
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
-		}
-		resolvedCustomerKey, err := runtimeCustomerKey(createIn.CustomerKey)
-		if err != nil {
-			return id, d.mapCustomerConfigError(ctx, err), nil
-		}
-		createIn.CustomerKey = resolvedCustomerKey
-		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
-		if err != nil {
-			return id, d.mapCustomerConfigError(ctx, err), nil
-		}
-		instance, nodes, err := d.processRuntimeUC.CreateProcessInstance(ctx, processCreate, admin.ID)
-		if err != nil {
-			return id, d.mapCustomerConfigError(ctx, err), nil
-		}
-		startedNode, err := d.processRuntimeUC.StartProcessInstance(ctx, &biz.ProcessInstanceStart{ID: instance.ID}, admin.ID)
-		if err != nil {
-			return id, d.mapCustomerConfigError(ctx, err), nil
-		}
-		if refreshedNodes, err := d.processRuntimeUC.ListProcessNodeInstances(ctx, instance.ID); err == nil {
-			nodes = refreshedNodes
-		}
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: errcode.OK.Message,
-			Data: newDataStruct(map[string]any{
-				"process_instance": processInstanceToMap(instance),
-				"started_node":     processNodeInstanceToMap(startedNode),
-				"nodes":            processNodeInstancesToMaps(nodes),
-				"runtime_boundary": map[string]any{
-					"source":                             "active_customer_config",
-					"process_key":                        biz.ProcessKeyMaterialSupply,
-					"started_only":                       true,
-					"executes_domain_command":            false,
-					"writes_purchase_receipt_source_doc": false,
-					"writes_quality_or_inventory_fact":   false,
-					"writes_shipment_or_finance_fact":    false,
-					"workflow_task_done_posts_fact":      false,
-					"scope":                              "existing_purchase_receipt_to_quality_and_inbound",
-				},
-			}),
-		}, nil
-
 	case "start_material_supply_purchase_order_process":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionPurchaseReceiptCreate); res != nil {
+			return id, res, nil
+		}
+		if res := d.requireSourceActionReadPermissions(ctx, "customer_config", method); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)
@@ -452,11 +416,19 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
 		createIn.CustomerKey = resolvedCustomerKey
+		if res := d.requireCustomerConfigModulesEnabled(ctx, resolvedCustomerKey, "purchase_orders"); res != nil {
+			return id, res, nil
+		}
+		businessRefNo, err := d.purchaseOrderProcessSourceRefNo(ctx, createIn.BusinessRefID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		createIn.BusinessRefNo = businessRefNo
 		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		instance, nodes, err := d.processRuntimeUC.CreateProcessInstance(ctx, processCreate, admin.ID)
+		instance, nodes, err := d.processRuntimeUC.CreateProcessInstanceFromSource(ctx, processCreate, admin.ID)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -495,6 +467,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSourceActionReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -508,11 +483,19 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
 		createIn.CustomerKey = resolvedCustomerKey
+		if res := d.requireCustomerConfigModulesEnabled(ctx, resolvedCustomerKey, "shipments"); res != nil {
+			return id, res, nil
+		}
+		businessRefNo, err := d.shipmentProcessSourceRefNo(ctx, createIn.BusinessRefID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		createIn.BusinessRefNo = businessRefNo
 		processCreate, err := d.customerConfigUC.BuildProcessInstanceCreateFromActiveCustomerConfig(ctx, createIn)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
-		instance, nodes, err := d.processRuntimeUC.CreateProcessInstance(ctx, processCreate, admin.ID)
+		instance, nodes, err := d.processRuntimeUC.CreateProcessInstanceFromSource(ctx, processCreate, admin.ID)
 		if err != nil {
 			return id, d.mapCustomerConfigError(ctx, err), nil
 		}
@@ -545,6 +528,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_finished_goods_delivery_quality_decide":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -584,6 +570,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_finished_goods_delivery_finance_release":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -623,6 +612,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_finished_goods_delivery_shipment_ship":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -663,6 +655,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_finished_goods_delivery_receivable_lead":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -703,6 +698,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_material_supply_purchase_receipt_create":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -751,6 +749,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_material_supply_quality_gate":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -791,6 +792,9 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 		}, nil
 
 	case "execute_material_supply_post_inbound":
+		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
+			return id, res, nil
+		}
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
 			return id, res, nil
@@ -1025,6 +1029,9 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	case errors.Is(err, biz.ErrSalesOrderNotFound):
 		l.Warnf("[customer_config] sales order not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "销售订单不存在"}
+	case errors.Is(err, biz.ErrPurchaseOrderNotFound):
+		l.Warnf("[customer_config] purchase order not found err=%v", err)
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购订单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptNotFound):
 		l.Warnf("[customer_config] purchase receipt not found err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库单不存在"}
@@ -1043,6 +1050,58 @@ func (d *jsonrpcDispatcher) mapCustomerConfigError(ctx context.Context, err erro
 	}
 }
 
+func (d *jsonrpcDispatcher) salesOrderProcessSourceRefNo(ctx context.Context, salesOrderID int) (*string, error) {
+	if d == nil || d.salesOrderUC == nil || salesOrderID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	order, err := d.salesOrderUC.GetSalesOrder(ctx, salesOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil || order.ID != salesOrderID ||
+		(order.LifecycleStatus != biz.SalesOrderStatusDraft && order.LifecycleStatus != biz.SalesOrderStatusSubmitted) {
+		return nil, biz.ErrBadParam
+	}
+	return requiredProcessSourceRefNo(order.OrderNo)
+}
+
+func (d *jsonrpcDispatcher) purchaseOrderProcessSourceRefNo(ctx context.Context, purchaseOrderID int) (*string, error) {
+	if d == nil || d.purchaseOrderUC == nil || purchaseOrderID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	order, err := d.purchaseOrderUC.GetPurchaseOrder(ctx, purchaseOrderID)
+	if err != nil {
+		return nil, err
+	}
+	if order == nil || order.ID != purchaseOrderID || order.LifecycleStatus != biz.PurchaseOrderStatusApproved {
+		return nil, biz.ErrBadParam
+	}
+	return requiredProcessSourceRefNo(order.PurchaseOrderNo)
+}
+
+func (d *jsonrpcDispatcher) shipmentProcessSourceRefNo(ctx context.Context, shipmentID int) (*string, error) {
+	if d == nil || d.operationalFactUC == nil || shipmentID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	shipment, err := d.operationalFactUC.GetShipment(ctx, shipmentID)
+	if err != nil {
+		return nil, err
+	}
+	if shipment == nil || shipment.ID != shipmentID ||
+		(shipment.Status != biz.ShipmentStatusDraft && shipment.Status != biz.ShipmentStatusShipped) {
+		return nil, biz.ErrBadParam
+	}
+	return requiredProcessSourceRefNo(shipment.ShipmentNo)
+}
+
+func requiredProcessSourceRefNo(value string) (*string, error) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return nil, biz.ErrBadParam
+	}
+	return &value, nil
+}
+
 func salesOrderAcceptanceProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
 	salesOrderID := getInt(pm, "sales_order_id", 0)
 	if salesOrderID <= 0 {
@@ -1052,17 +1111,12 @@ func salesOrderAcceptanceProcessInputFromParams(pm map[string]any) (biz.ProcessI
 	if salesOrderID <= 0 || idempotencyKey == "" {
 		return biz.ProcessInstanceFromCustomerConfigInput{}, false
 	}
-	businessRefNo := optionalRPCStringPointer(getString(pm, "business_ref_no"))
-	if businessRefNo == nil {
-		businessRefNo = optionalRPCStringPointer(getString(pm, "source_no"))
-	}
 	return biz.ProcessInstanceFromCustomerConfigInput{
 		CustomerKey:     getString(pm, "customer_key"),
 		ProcessKey:      biz.ProcessKeySalesOrderAcceptance,
 		ProcessVersion:  getString(pm, "process_version"),
 		BusinessRefType: "sales_order",
 		BusinessRefID:   salesOrderID,
-		BusinessRefNo:   businessRefNo,
 		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
 		IdempotencyKey:  idempotencyKey,
 	}, true
@@ -1089,31 +1143,6 @@ func salesOrderAcceptanceSubmitExecutionFromParams(pm map[string]any) (*biz.Proc
 	}, true
 }
 
-func materialSupplyProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
-	purchaseReceiptID := getInt(pm, "purchase_receipt_id", 0)
-	if purchaseReceiptID <= 0 {
-		purchaseReceiptID = getInt(pm, "business_ref_id", 0)
-	}
-	idempotencyKey := strings.TrimSpace(getString(pm, "idempotency_key"))
-	if purchaseReceiptID <= 0 || idempotencyKey == "" {
-		return biz.ProcessInstanceFromCustomerConfigInput{}, false
-	}
-	businessRefNo := optionalRPCStringPointer(getString(pm, "business_ref_no"))
-	if businessRefNo == nil {
-		businessRefNo = optionalRPCStringPointer(getString(pm, "receipt_no"))
-	}
-	return biz.ProcessInstanceFromCustomerConfigInput{
-		CustomerKey:     getString(pm, "customer_key"),
-		ProcessKey:      biz.ProcessKeyMaterialSupply,
-		ProcessVersion:  getString(pm, "process_version"),
-		BusinessRefType: "purchase_receipt",
-		BusinessRefID:   purchaseReceiptID,
-		BusinessRefNo:   businessRefNo,
-		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
-		IdempotencyKey:  idempotencyKey,
-	}, true
-}
-
 func materialSupplyPurchaseOrderProcessInputFromParams(pm map[string]any) (biz.ProcessInstanceFromCustomerConfigInput, bool) {
 	purchaseOrderID := getInt(pm, "purchase_order_id", 0)
 	if purchaseOrderID <= 0 {
@@ -1123,17 +1152,12 @@ func materialSupplyPurchaseOrderProcessInputFromParams(pm map[string]any) (biz.P
 	if purchaseOrderID <= 0 || idempotencyKey == "" {
 		return biz.ProcessInstanceFromCustomerConfigInput{}, false
 	}
-	businessRefNo := optionalRPCStringPointer(getString(pm, "business_ref_no"))
-	if businessRefNo == nil {
-		businessRefNo = optionalRPCStringPointer(getString(pm, "purchase_order_no"))
-	}
 	return biz.ProcessInstanceFromCustomerConfigInput{
 		CustomerKey:     getString(pm, "customer_key"),
 		ProcessKey:      biz.ProcessKeyMaterialSupply,
 		ProcessVersion:  getString(pm, "process_version"),
 		BusinessRefType: "purchase_order",
 		BusinessRefID:   purchaseOrderID,
-		BusinessRefNo:   businessRefNo,
 		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
 		IdempotencyKey:  idempotencyKey,
 	}, true
@@ -1148,17 +1172,12 @@ func finishedGoodsDeliveryProcessInputFromParams(pm map[string]any) (biz.Process
 	if shipmentID <= 0 || idempotencyKey == "" {
 		return biz.ProcessInstanceFromCustomerConfigInput{}, false
 	}
-	businessRefNo := optionalRPCStringPointer(getString(pm, "business_ref_no"))
-	if businessRefNo == nil {
-		businessRefNo = optionalRPCStringPointer(getString(pm, "shipment_no"))
-	}
 	return biz.ProcessInstanceFromCustomerConfigInput{
 		CustomerKey:     getString(pm, "customer_key"),
 		ProcessKey:      biz.ProcessKeyFinishedGoodsDelivery,
 		ProcessVersion:  getString(pm, "process_version"),
 		BusinessRefType: "shipment",
 		BusinessRefID:   shipmentID,
-		BusinessRefNo:   businessRefNo,
 		CorrelationKey:  optionalRPCStringPointer(getString(pm, "correlation_key")),
 		IdempotencyKey:  idempotencyKey,
 	}, true

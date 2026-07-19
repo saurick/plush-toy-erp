@@ -198,17 +198,74 @@ func TestProductionOrderPostgresCancellationAndFactPostingOneWinner(t *testing.T
 
 		orderRow := f.client.ProductionOrder.Query().Where(productionorder.ID(order.Order.ID)).OnlyX(ctx)
 		factRow := f.client.ProductionFact.GetX(ctx, fact.ID)
-		switch {
-		case postErr == nil && errors.Is(cancelErr, biz.ErrProductionOrderHasPostedFacts):
-			if orderRow.Status != biz.ProductionOrderStatusReleased || factRow.Status != biz.OperationalFactStatusPosted {
-				t.Fatalf("post winner state mismatch: order=%s fact=%s", orderRow.Status, factRow.Status)
+		if postErr != nil || (!errors.Is(cancelErr, biz.ErrProductionOrderInvalidState) &&
+			!errors.Is(cancelErr, biz.ErrProductionOrderHasPostedFacts) &&
+			!errors.Is(cancelErr, biz.ErrProductionOrderFactDependency)) {
+			t.Fatalf("iteration %d must post the existing draft and reject parent cancellation: post=%v cancel=%v", iteration, postErr, cancelErr)
+		}
+		if orderRow.Status != biz.ProductionOrderStatusReleased || factRow.Status != biz.OperationalFactStatusPosted {
+			t.Fatalf("iteration %d invalid final state: order=%s fact=%s", iteration, orderRow.Status, factRow.Status)
+		}
+	}
+}
+
+func TestProductionOrderPostgresCreateAndSettleNeverLeavesActiveDraftOnSettledOrder(t *testing.T) {
+	ctx := context.Background()
+	f := openProductionOrderPGFixture(t)
+	for _, target := range []string{biz.ProductionOrderStatusClosed, biz.ProductionOrderStatusCancelled} {
+		for iteration := 0; iteration < 8; iteration++ {
+			label := fmt.Sprintf("create-settle-%s-%d", target, iteration)
+			order := f.createReleasedOrder(t, ctx, label)
+			lotNo := "PG-PF-" + label + "-" + f.suffix
+			input := &biz.ProductionCompletionFromOrderCreate{
+				FactNo: "PF-" + label + "-" + f.suffix, ProductionOrderID: order.Order.ID,
+				ProductionOrderItemID: order.Items[0].ID, WarehouseID: f.warehouseID,
+				NewLotNo: &lotNo, Quantity: decimal.NewFromInt(1), IdempotencyKey: "pf-" + label + "-" + f.suffix,
 			}
-		case cancelErr == nil && errors.Is(postErr, biz.ErrProductionOrderInvalidState):
-			if orderRow.Status != biz.ProductionOrderStatusCancelled || factRow.Status != biz.OperationalFactStatusDraft {
-				t.Fatalf("cancel winner state mismatch: order=%s fact=%s", orderRow.Status, factRow.Status)
+			reason := "并发结算验证"
+			start := make(chan struct{})
+			var fact *biz.ProductionFact
+			var createErr, settleErr error
+			var wg sync.WaitGroup
+			wg.Add(2)
+			go func() {
+				defer wg.Done()
+				<-start
+				fact, createErr = f.factUC.CreateProductionCompletionFromOrder(ctx, input)
+			}()
+			go func() {
+				defer wg.Done()
+				<-start
+				action := &biz.ProductionOrderAction{
+					ID: order.Order.ID, ExpectedVersion: 2, ActorID: f.actorID,
+					IdempotencyKey: "settle-" + label + "-" + f.suffix, Reason: &reason,
+				}
+				if target == biz.ProductionOrderStatusClosed {
+					_, settleErr = f.uc.Close(ctx, action)
+				} else {
+					_, settleErr = f.uc.Cancel(ctx, action)
+				}
+			}()
+			close(start)
+			wg.Wait()
+
+			orderRow := f.client.ProductionOrder.GetX(ctx, order.Order.ID)
+			facts := f.client.ProductionFact.Query().Where(
+				productionfact.SourceType(biz.ProductionOrderSourceType),
+				productionfact.SourceID(order.Order.ID),
+			).AllX(ctx)
+			switch {
+			case settleErr == nil:
+				if !errors.Is(createErr, biz.ErrProductionOrderInvalidState) || orderRow.Status != target || len(facts) != 0 || fact != nil {
+					t.Fatalf("%s settle winner escaped invariant: create=%v settle=%v order=%s facts=%#v fact=%#v", target, createErr, settleErr, orderRow.Status, facts, fact)
+				}
+			case createErr == nil:
+				if !errors.Is(settleErr, biz.ErrProductionOrderFactDependency) || orderRow.Status != biz.ProductionOrderStatusReleased || len(facts) != 1 || facts[0].Status != biz.OperationalFactStatusDraft || fact == nil || fact.ID != facts[0].ID {
+					t.Fatalf("%s create winner escaped invariant: create=%v settle=%v order=%s facts=%#v fact=%#v", target, createErr, settleErr, orderRow.Status, facts, fact)
+				}
+			default:
+				t.Fatalf("%s race has no legal winner: create=%v settle=%v order=%s facts=%#v", target, createErr, settleErr, orderRow.Status, facts)
 			}
-		default:
-			t.Fatalf("iteration %d must have one legal winner: post=%v cancel=%v order=%s fact=%s", iteration, postErr, cancelErr, orderRow.Status, factRow.Status)
 		}
 	}
 }
@@ -455,7 +512,7 @@ func TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal(t *testin
 			if orderRow.Status != biz.ProductionOrderStatusClosed || factRow.Status != biz.OperationalFactStatusPosted {
 				t.Fatalf("serialized post then close mismatch: order=%s fact=%s", orderRow.Status, factRow.Status)
 			}
-		case errors.Is(closeErr, biz.ErrProductionOrderCloseReasonRequired):
+		case errors.Is(closeErr, biz.ErrProductionOrderFactDependency):
 			if orderRow.Status != biz.ProductionOrderStatusReleased || factRow.Status != biz.OperationalFactStatusPosted {
 				t.Fatalf("close-before-post failure mismatch: order=%s fact=%s", orderRow.Status, factRow.Status)
 			}
@@ -502,7 +559,7 @@ func TestProductionOrderPostgresCloseSerializesWithFactPostAndReversal(t *testin
 		if closeErr == nil && closeReceiptCount != 1 {
 			t.Fatalf("successful concurrent close receipt count=%d", closeReceiptCount)
 		}
-		if errors.Is(closeErr, biz.ErrProductionOrderCloseReasonRequired) && closeReceiptCount != 0 {
+		if errors.Is(closeErr, biz.ErrProductionOrderInvalidState) && closeReceiptCount != 0 {
 			t.Fatalf("failed concurrent close receipt count=%d", closeReceiptCount)
 		}
 	}

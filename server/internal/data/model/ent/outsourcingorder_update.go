@@ -102,33 +102,6 @@ func (_u *OutsourcingOrderUpdate) ClearSourceOrderNo() *OutsourcingOrderUpdate {
 	return _u
 }
 
-// SetSourceSalesOrderID sets the "source_sales_order_id" field.
-func (_u *OutsourcingOrderUpdate) SetSourceSalesOrderID(v int) *OutsourcingOrderUpdate {
-	_u.mutation.ResetSourceSalesOrderID()
-	_u.mutation.SetSourceSalesOrderID(v)
-	return _u
-}
-
-// SetNillableSourceSalesOrderID sets the "source_sales_order_id" field if the given value is not nil.
-func (_u *OutsourcingOrderUpdate) SetNillableSourceSalesOrderID(v *int) *OutsourcingOrderUpdate {
-	if v != nil {
-		_u.SetSourceSalesOrderID(*v)
-	}
-	return _u
-}
-
-// AddSourceSalesOrderID adds value to the "source_sales_order_id" field.
-func (_u *OutsourcingOrderUpdate) AddSourceSalesOrderID(v int) *OutsourcingOrderUpdate {
-	_u.mutation.AddSourceSalesOrderID(v)
-	return _u
-}
-
-// ClearSourceSalesOrderID clears the value of the "source_sales_order_id" field.
-func (_u *OutsourcingOrderUpdate) ClearSourceSalesOrderID() *OutsourcingOrderUpdate {
-	_u.mutation.ClearSourceSalesOrderID()
-	return _u
-}
-
 // SetOrderDate sets the "order_date" field.
 func (_u *OutsourcingOrderUpdate) SetOrderDate(v time.Time) *OutsourcingOrderUpdate {
 	_u.mutation.SetOrderDate(v)
@@ -329,11 +302,6 @@ func (_u *OutsourcingOrderUpdate) check() error {
 			return &ValidationError{Name: "source_order_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_order_no": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.SourceSalesOrderID(); ok {
-		if err := outsourcingorder.SourceSalesOrderIDValidator(v); err != nil {
-			return &ValidationError{Name: "source_sales_order_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_sales_order_id": %w`, err)}
-		}
-	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
 		if err := outsourcingorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.lifecycle_status": %w`, err)}
@@ -387,15 +355,6 @@ func (_u *OutsourcingOrderUpdate) sqlSave(ctx context.Context) (_node int, err e
 	}
 	if _u.mutation.SourceOrderNoCleared() {
 		_spec.ClearField(outsourcingorder.FieldSourceOrderNo, field.TypeString)
-	}
-	if value, ok := _u.mutation.SourceSalesOrderID(); ok {
-		_spec.SetField(outsourcingorder.FieldSourceSalesOrderID, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSourceSalesOrderID(); ok {
-		_spec.AddField(outsourcingorder.FieldSourceSalesOrderID, field.TypeInt, value)
-	}
-	if _u.mutation.SourceSalesOrderIDCleared() {
-		_spec.ClearField(outsourcingorder.FieldSourceSalesOrderID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.OrderDate(); ok {
 		_spec.SetField(outsourcingorder.FieldOrderDate, field.TypeTime, value)
@@ -587,33 +546,6 @@ func (_u *OutsourcingOrderUpdateOne) SetNillableSourceOrderNo(v *string) *Outsou
 // ClearSourceOrderNo clears the value of the "source_order_no" field.
 func (_u *OutsourcingOrderUpdateOne) ClearSourceOrderNo() *OutsourcingOrderUpdateOne {
 	_u.mutation.ClearSourceOrderNo()
-	return _u
-}
-
-// SetSourceSalesOrderID sets the "source_sales_order_id" field.
-func (_u *OutsourcingOrderUpdateOne) SetSourceSalesOrderID(v int) *OutsourcingOrderUpdateOne {
-	_u.mutation.ResetSourceSalesOrderID()
-	_u.mutation.SetSourceSalesOrderID(v)
-	return _u
-}
-
-// SetNillableSourceSalesOrderID sets the "source_sales_order_id" field if the given value is not nil.
-func (_u *OutsourcingOrderUpdateOne) SetNillableSourceSalesOrderID(v *int) *OutsourcingOrderUpdateOne {
-	if v != nil {
-		_u.SetSourceSalesOrderID(*v)
-	}
-	return _u
-}
-
-// AddSourceSalesOrderID adds value to the "source_sales_order_id" field.
-func (_u *OutsourcingOrderUpdateOne) AddSourceSalesOrderID(v int) *OutsourcingOrderUpdateOne {
-	_u.mutation.AddSourceSalesOrderID(v)
-	return _u
-}
-
-// ClearSourceSalesOrderID clears the value of the "source_sales_order_id" field.
-func (_u *OutsourcingOrderUpdateOne) ClearSourceSalesOrderID() *OutsourcingOrderUpdateOne {
-	_u.mutation.ClearSourceSalesOrderID()
 	return _u
 }
 
@@ -830,11 +762,6 @@ func (_u *OutsourcingOrderUpdateOne) check() error {
 			return &ValidationError{Name: "source_order_no", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_order_no": %w`, err)}
 		}
 	}
-	if v, ok := _u.mutation.SourceSalesOrderID(); ok {
-		if err := outsourcingorder.SourceSalesOrderIDValidator(v); err != nil {
-			return &ValidationError{Name: "source_sales_order_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.source_sales_order_id": %w`, err)}
-		}
-	}
 	if v, ok := _u.mutation.LifecycleStatus(); ok {
 		if err := outsourcingorder.LifecycleStatusValidator(v); err != nil {
 			return &ValidationError{Name: "lifecycle_status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingOrder.lifecycle_status": %w`, err)}
@@ -905,15 +832,6 @@ func (_u *OutsourcingOrderUpdateOne) sqlSave(ctx context.Context) (_node *Outsou
 	}
 	if _u.mutation.SourceOrderNoCleared() {
 		_spec.ClearField(outsourcingorder.FieldSourceOrderNo, field.TypeString)
-	}
-	if value, ok := _u.mutation.SourceSalesOrderID(); ok {
-		_spec.SetField(outsourcingorder.FieldSourceSalesOrderID, field.TypeInt, value)
-	}
-	if value, ok := _u.mutation.AddedSourceSalesOrderID(); ok {
-		_spec.AddField(outsourcingorder.FieldSourceSalesOrderID, field.TypeInt, value)
-	}
-	if _u.mutation.SourceSalesOrderIDCleared() {
-		_spec.ClearField(outsourcingorder.FieldSourceSalesOrderID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.OrderDate(); ok {
 		_spec.SetField(outsourcingorder.FieldOrderDate, field.TypeTime, value)

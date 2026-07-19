@@ -19,7 +19,7 @@ import (
 )
 
 func newCustomerConfigTestDispatcher(admin *biz.AdminUser, roleKeys []string) *jsonrpcDispatcher {
-	return newCustomerConfigTestDispatcherWithSalesOrderRepo(admin, roleKeys, newServiceSalesOrderRepo(nil))
+	return newCustomerConfigTestDispatcherWithSalesOrderRepo(admin, roleKeys, newDefaultServiceSalesOrderRepo())
 }
 
 func newCustomerConfigTestDispatcherWithSalesOrderRepo(admin *biz.AdminUser, roleKeys []string, salesOrderRepo *serviceSalesOrderRepo) *jsonrpcDispatcher {
@@ -27,15 +27,15 @@ func newCustomerConfigTestDispatcherWithSalesOrderRepo(admin *biz.AdminUser, rol
 }
 
 func newCustomerConfigTestDispatcherWithInventoryRepo(admin *biz.AdminUser, roleKeys []string, inventoryRepo biz.InventoryRepo) *jsonrpcDispatcher {
-	return newCustomerConfigTestDispatcherWithRepos(admin, roleKeys, newServiceSalesOrderRepo(nil), inventoryRepo, nil)
+	return newCustomerConfigTestDispatcherWithRepos(admin, roleKeys, newDefaultServiceSalesOrderRepo(), inventoryRepo, nil)
 }
 
 func newCustomerConfigTestDispatcherWithOperationalFactRepo(admin *biz.AdminUser, roleKeys []string, operationalFactRepo biz.OperationalFactRepo) *jsonrpcDispatcher {
-	return newCustomerConfigTestDispatcherWithRepos(admin, roleKeys, newServiceSalesOrderRepo(nil), nil, operationalFactRepo)
+	return newCustomerConfigTestDispatcherWithRepos(admin, roleKeys, newDefaultServiceSalesOrderRepo(), nil, operationalFactRepo)
 }
 
 func newCustomerConfigTestDispatcherWithRuntimeRepo(admin *biz.AdminUser, roleKeys []string) (*jsonrpcDispatcher, *serviceProcessRuntimeRepo) {
-	return newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, newServiceSalesOrderRepo(nil), nil, nil)
+	return newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, newDefaultServiceSalesOrderRepo(), nil, nil)
 }
 
 func newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
@@ -43,7 +43,7 @@ func newCustomerConfigTestDispatcherWithOperationalFactAndRuntimeRepo(
 	roleKeys []string,
 	operationalFactRepo biz.OperationalFactRepo,
 ) (*jsonrpcDispatcher, *serviceProcessRuntimeRepo) {
-	return newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, newServiceSalesOrderRepo(nil), nil, operationalFactRepo)
+	return newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(admin, roleKeys, newDefaultServiceSalesOrderRepo(), nil, operationalFactRepo)
 }
 
 func newCustomerConfigTestDispatcherWithRepos(admin *biz.AdminUser, roleKeys []string, salesOrderRepo *serviceSalesOrderRepo, inventoryRepo biz.InventoryRepo, operationalFactRepo biz.OperationalFactRepo) *jsonrpcDispatcher {
@@ -74,6 +74,9 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 	processRuntimeRepo := newServiceProcessRuntimeRepo()
 	processRuntimeUC := biz.NewProcessRuntimeUsecase(processRuntimeRepo, newServiceWorkflowRepo(), customerConfigUC)
 	salesOrderUC := biz.NewSalesOrderUsecase(salesOrderRepo)
+	purchaseOrderUC := biz.NewPurchaseOrderUsecase(newServicePurchaseOrderSourceRepo(map[int]*biz.PurchaseOrder{
+		5001: {ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusApproved},
+	}))
 	if err := biz.RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC, salesOrderUC); err != nil {
 		panic(err)
 	}
@@ -99,6 +102,12 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		if err := biz.RegisterFinanceProcessDomainCommandHandlers(processRuntimeUC, operationalFactUC); err != nil {
 			panic(err)
 		}
+	} else {
+		// Start handlers still read the authoritative source document even when a
+		// focused runtime-command test intentionally omits command registrations.
+		operationalFactUC = biz.NewOperationalFactUsecase(&customerConfigShipmentOperationalFactRepo{
+			shipment: &biz.Shipment{ID: 9001, ShipmentNo: "SHIP-9001", Status: biz.ShipmentStatusDraft},
+		})
 	}
 	return &jsonrpcDispatcher{
 		log:               log.NewHelper(logger),
@@ -106,6 +115,7 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 		customerConfigUC:  customerConfigUC,
 		processRuntimeUC:  processRuntimeUC,
 		salesOrderUC:      salesOrderUC,
+		purchaseOrderUC:   purchaseOrderUC,
 		inventoryUC:       inventoryUC,
 		operationalFactUC: operationalFactUC,
 		adminReader:       adminRepo,
@@ -139,6 +149,12 @@ type serviceWorkflowRepo struct {
 type serviceSalesOrderRepo struct {
 	orders     map[int]*biz.SalesOrder
 	nextStatus string
+}
+
+type servicePurchaseOrderSourceRepo struct {
+	biz.PurchaseOrderRepo
+	orders   map[int]*biz.PurchaseOrder
+	getCalls int
 }
 
 type serviceMaterialSupplyInventoryRepo struct {
@@ -557,6 +573,19 @@ func newServiceSalesOrderRepo(orders map[int]*biz.SalesOrder) *serviceSalesOrder
 	return &serviceSalesOrderRepo{orders: orders}
 }
 
+func newDefaultServiceSalesOrderRepo() *serviceSalesOrderRepo {
+	return newServiceSalesOrderRepo(map[int]*biz.SalesOrder{
+		42: {ID: 42, OrderNo: "SO-42", LifecycleStatus: biz.SalesOrderStatusDraft},
+	})
+}
+
+func newServicePurchaseOrderSourceRepo(orders map[int]*biz.PurchaseOrder) *servicePurchaseOrderSourceRepo {
+	if orders == nil {
+		orders = map[int]*biz.PurchaseOrder{}
+	}
+	return &servicePurchaseOrderSourceRepo{orders: orders}
+}
+
 func (r *serviceProcessRuntimeRepo) CreateProcessInstance(_ context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
 	for _, item := range r.processes {
 		if item.ProcessKey != in.ProcessKey || item.BusinessRefType != in.BusinessRefType || item.BusinessRefID != in.BusinessRefID {
@@ -628,6 +657,10 @@ func (r *serviceProcessRuntimeRepo) CreateProcessInstance(_ context.Context, in 
 		nodes = append(nodes, cloneServiceProcessNodeInstance(node))
 	}
 	return cloneServiceProcessInstance(instance), nodes, nil
+}
+
+func (r *serviceProcessRuntimeRepo) CreateProcessInstanceFromSource(ctx context.Context, in *biz.ProcessInstanceCreate, actorID int) (*biz.ProcessInstance, []*biz.ProcessNodeInstance, error) {
+	return r.CreateProcessInstance(ctx, in, actorID)
 }
 
 func (r *serviceProcessRuntimeRepo) GetProcessInstance(_ context.Context, id int) (*biz.ProcessInstance, error) {
@@ -1034,6 +1067,16 @@ func (r *serviceSalesOrderRepo) ProductSKUIsActiveForProduct(context.Context, in
 
 func (r *serviceSalesOrderRepo) UnitIsActive(context.Context, int) (bool, error) {
 	return false, biz.ErrBadParam
+}
+
+func (r *servicePurchaseOrderSourceRepo) GetPurchaseOrder(_ context.Context, id int) (*biz.PurchaseOrder, error) {
+	r.getCalls++
+	item := r.orders[id]
+	if item == nil {
+		return nil, biz.ErrPurchaseOrderNotFound
+	}
+	cloned := *item
+	return &cloned, nil
 }
 
 func (r *serviceMaterialSupplyInventoryRepo) GetQualityInspection(_ context.Context, id int) (*biz.QualityInspection, error) {
@@ -2200,7 +2243,7 @@ func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryProcess(t *testing.T) {
 	startParams, _ := structpb.NewStruct(map[string]any{
 		"customer_key":    biz.DefaultCustomerKey,
 		"shipment_id":     float64(9001),
-		"shipment_no":     "SHIP-9001",
+		"shipment_no":     "FORGED-SHIPMENT-NO",
 		"idempotency_key": "finished-goods-delivery/SHIP-9001",
 		"correlation_key": "sales_order:1001",
 		"process_version": "v1",
@@ -2219,7 +2262,8 @@ func TestCustomerConfigJSONRPCStartFinishedGoodsDeliveryProcess(t *testing.T) {
 	}
 	if instance["process_key"] != biz.ProcessKeyFinishedGoodsDelivery ||
 		instance["business_ref_type"] != "shipment" ||
-		instance["business_ref_id"] != float64(9001) {
+		instance["business_ref_id"] != float64(9001) ||
+		instance["business_ref_no"] != "SHIP-9001" {
 		t.Fatalf("process_instance = %#v", instance)
 	}
 	startedNode, ok := data["started_node"].(map[string]any)
@@ -2913,7 +2957,6 @@ func TestCustomerConfigJSONRPCEveryCustomerScopedEntryRejectsRuntimeCustomerOver
 		{method: "explain_module_status", payload: map[string]any{"customer_key": "demo", "module_key": "sales_orders"}},
 		{method: "explain_process_definition", payload: map[string]any{"customer_key": "demo", "process_key": biz.ProcessKeySalesOrderAcceptance}},
 		{method: "start_sales_order_acceptance_process", payload: map[string]any{"customer_key": "demo", "sales_order_id": float64(1), "idempotency_key": "guard/sales"}},
-		{method: "start_material_supply_process", payload: map[string]any{"customer_key": "demo", "purchase_receipt_id": float64(1), "idempotency_key": "guard/receipt"}},
 		{method: "start_material_supply_purchase_order_process", payload: map[string]any{"customer_key": "demo", "purchase_order_id": float64(1), "idempotency_key": "guard/purchase"}},
 		{method: "start_finished_goods_delivery_process", payload: map[string]any{"customer_key": "demo", "shipment_id": float64(1), "idempotency_key": "guard/shipment"}},
 	}
@@ -2983,6 +3026,14 @@ func (r *customerConfigShipmentOperationalFactRepo) GetShipment(_ context.Contex
 	}
 	copied := *r.shipment
 	return &copied, nil
+}
+
+func (r *customerConfigShipmentOperationalFactRepo) GetShipmentPaymentTermDays(_ context.Context, shipmentID int) (*int, error) {
+	if r.shipment == nil || r.shipment.ID != shipmentID {
+		return nil, biz.ErrShipmentNotFound
+	}
+	days := 30
+	return &days, nil
 }
 
 func (r *customerConfigShipmentOperationalFactRepo) CreateFinanceFactDraft(_ context.Context, in *biz.FinanceFactCreate) (*biz.FinanceFact, error) {
@@ -3244,7 +3295,7 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 	startParams, _ := structpb.NewStruct(map[string]any{
 		"customer_key":    biz.DefaultCustomerKey,
 		"sales_order_id":  float64(42),
-		"business_ref_no": "SO-42",
+		"business_ref_no": "FORGED-SALES-ORDER-NO",
 		"idempotency_key": "sales-order-acceptance/SO-42",
 	})
 	_, startRes, err := dispatcher.handleCustomerConfig(ctx, "start_sales_order_acceptance_process", "start", startParams)
@@ -3261,7 +3312,8 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcess(t *testing.T) {
 	}
 	if instance["process_key"] != biz.ProcessKeySalesOrderAcceptance ||
 		instance["business_ref_type"] != "sales_order" ||
-		instance["business_ref_id"] != float64(42) {
+		instance["business_ref_id"] != float64(42) ||
+		instance["business_ref_no"] != "SO-42" {
 		t.Fatalf("process_instance = %#v", instance)
 	}
 	startedNode, ok := data["started_node"].(map[string]any)
@@ -3524,47 +3576,26 @@ func TestCustomerConfigJSONRPCStartSalesOrderAcceptanceProcessRequiresSubmitPerm
 	}
 }
 
-func TestCustomerConfigJSONRPCRejectsUnselectedDirectReceiptMaterialSupplyProcess(t *testing.T) {
-	dispatcher := newCustomerConfigTestDispatcherWithInventoryRepo(
+func TestCustomerConfigJSONRPCRetiresDirectReceiptMaterialSupplyStart(t *testing.T) {
+	dispatcher, runtimeRepo := newCustomerConfigTestDispatcherWithRuntimeRepo(
 		&biz.AdminUser{ID: 1, Username: "admin", IsSuperAdmin: true, CreatedAt: time.Now(), UpdatedAt: time.Now()},
 		[]string{},
-		&serviceMaterialSupplyInventoryRepo{},
 	)
-	ctx := customerConfigAdminCtx(1, "admin")
-	_, publishRes, err := dispatcher.handleCustomerConfig(ctx, "publish_customer_config", "publish", customerConfigPublishParamsWithMaterialSupplyRuntimeProcess(t))
-	if err != nil {
-		t.Fatalf("publish err = %v", err)
-	}
-	if publishRes.Code != errcode.OK.Code {
-		t.Fatalf("publish code = %d msg=%s", publishRes.Code, publishRes.Message)
-	}
-	activateParams, _ := structpb.NewStruct(map[string]any{
-		"customer_key":             biz.DefaultCustomerKey,
-		"revision":                 "2026.06.28.1",
-		"expected_config_hash":     customerConfigHashFromPublishResult(t, publishRes),
-		"expected_product_version": "test",
-		"expected_active_revision": "",
-	})
-	_, activateRes, err := dispatcher.handleCustomerConfig(ctx, "activate_customer_config", "activate", activateParams)
-	if err != nil {
-		t.Fatalf("activate err = %v", err)
-	}
-	if activateRes.Code != errcode.OK.Code {
-		t.Fatalf("activate code = %d msg=%s", activateRes.Code, activateRes.Message)
-	}
-
 	startParams, _ := structpb.NewStruct(map[string]any{
 		"customer_key":        biz.DefaultCustomerKey,
 		"purchase_receipt_id": float64(6001),
 		"business_ref_no":     "PR-6001",
 		"idempotency_key":     "material-supply/PR-6001",
 	})
-	_, startRes, err := dispatcher.handleCustomerConfig(ctx, "start_material_supply_process", "start", startParams)
+	_, startRes, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "admin"), "start_material_supply_process", "start", startParams)
 	if err != nil {
 		t.Fatalf("start err = %v", err)
 	}
-	if startRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("unselected purchase-receipt start code = %d msg=%s, want invalid param", startRes.Code, startRes.Message)
+	if startRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("retired purchase-receipt start code = %d msg=%s, want unknown method", startRes.Code, startRes.Message)
+	}
+	if len(runtimeRepo.processes) != 0 || len(runtimeRepo.nodes) != 0 {
+		t.Fatalf("retired start must not touch process runtime: processes=%d nodes=%d", len(runtimeRepo.processes), len(runtimeRepo.nodes))
 	}
 }
 
@@ -3623,7 +3654,7 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 	startParams, _ := structpb.NewStruct(map[string]any{
 		"customer_key":       biz.DefaultCustomerKey,
 		"purchase_order_id":  float64(5001),
-		"purchase_order_no":  "PO-5001",
+		"purchase_order_no":  "FORGED-PURCHASE-ORDER-NO",
 		"idempotency_key":    "material-supply/PO-5001",
 		"correlation_key":    "sales_order:1001",
 		"process_version":    "v1",
@@ -3640,7 +3671,8 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 	instance := startData["process_instance"].(map[string]any)
 	if instance["process_key"] != biz.ProcessKeyMaterialSupply ||
 		instance["business_ref_type"] != "purchase_order" ||
-		instance["business_ref_id"] != float64(5001) {
+		instance["business_ref_id"] != float64(5001) ||
+		instance["business_ref_no"] != "PO-5001" {
 		t.Fatalf("process_instance = %#v", instance)
 	}
 	startedNode := startData["started_node"].(map[string]any)
@@ -3754,26 +3786,6 @@ func TestCustomerConfigJSONRPCExecuteMaterialSupplyPurchaseOrderToQualityAndInbo
 	endNode := inboundNodes[3].(map[string]any)
 	if endNode["node_key"] != "end" || endNode["status"] != biz.ProcessNodeStatusCompleted {
 		t.Fatalf("end node = %#v", endNode)
-	}
-}
-
-func TestCustomerConfigJSONRPCStartMaterialSupplyProcessRequiresPurchasePermission(t *testing.T) {
-	dispatcher := newCustomerConfigTestDispatcherWithInventoryRepo(
-		&biz.AdminUser{ID: 1, Username: "sales", CreatedAt: time.Now(), UpdatedAt: time.Now()},
-		[]string{biz.SalesRoleKey},
-		&serviceMaterialSupplyInventoryRepo{},
-	)
-	params, _ := structpb.NewStruct(map[string]any{
-		"customer_key":        biz.DefaultCustomerKey,
-		"purchase_receipt_id": float64(6001),
-		"idempotency_key":     "material-supply/PR-6001",
-	})
-	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, "sales"), "start_material_supply_process", "start", params)
-	if err != nil {
-		t.Fatalf("handleCustomerConfig err = %v", err)
-	}
-	if res.Code != errcode.PermissionDenied.Code {
-		t.Fatalf("code = %d, want permission denied", res.Code)
 	}
 }
 

@@ -5,7 +5,6 @@ import {
   DashboardOutlined,
   PrinterOutlined,
   UnorderedListOutlined,
-  WarningOutlined,
 } from '@ant-design/icons'
 import { Typography } from 'antd'
 import { useNavigate } from 'react-router-dom'
@@ -18,7 +17,6 @@ const COMMAND_CENTER_ICON_MAP = Object.freeze({
   'task-board': UnorderedListOutlined,
   'business-board': BarChartOutlined,
   'print-center': PrinterOutlined,
-  'exception-flow': WarningOutlined,
 })
 
 export default function CommandCenterNav({ activeKey, onSelect }) {

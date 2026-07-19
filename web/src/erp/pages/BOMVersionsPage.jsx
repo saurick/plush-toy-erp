@@ -19,6 +19,7 @@ import {
   archiveBOMVersion,
   copyBOMVersion,
   getBOMVersion,
+  listAllBOMVersions,
   listBOMVersions,
   saveBOMWithItems,
 } from '../api/bomApi.mjs'
@@ -28,9 +29,9 @@ import {
 } from '../api/attachmentApi.mjs'
 import { setERPColumnOrder } from '../api/erpPreferenceApi.mjs'
 import {
-  listMaterials,
-  listProducts,
-  listUnits,
+  listAllMaterials,
+  listAllProducts,
+  listAllUnits,
 } from '../api/masterDataOrderApi.mjs'
 import {
   BusinessDataTable,
@@ -744,9 +745,9 @@ export default function BOMVersionsPage() {
   const loadReferenceOptions = useCallback(async () => {
     try {
       const [productResult, materialResult, unitResult] = await Promise.all([
-        listProducts({ limit: 500, active_only: true }),
-        listMaterials({ limit: 500, active_only: true }),
-        listUnits({ limit: 500 }),
+        listAllProducts({ active_only: true }),
+        listAllMaterials({ active_only: true }),
+        listAllUnits(),
       ])
       setProducts(
         Array.isArray(productResult?.products) ? productResult.products : []
@@ -803,7 +804,7 @@ export default function BOMVersionsPage() {
       loading: true,
       loaded: false,
     })
-    listBOMVersions({ product_id: nextProductID, limit: 200 })
+    listAllBOMVersions({ product_id: nextProductID })
       .then((result) => {
         if (cancelled) return
         setHeaderVersionCandidates({
@@ -1025,6 +1026,7 @@ export default function BOMVersionsPage() {
 
   const saveHeader = async () => {
     const values = await headerForm.validateFields()
+    const isCreatingVersion = headerMode !== 'edit'
     setSaving(true)
     try {
       let savedVersion = null
@@ -1069,7 +1071,11 @@ export default function BOMVersionsPage() {
       )
       headerAttachmentRef.current?.clearPendingAttachments()
       setHeaderModalOpen(false)
-      await loadVersions()
+      if (isCreatingVersion) {
+        resetBusinessPaginationCurrent(setPagination)
+      } else {
+        await loadVersions()
+      }
     } catch (error) {
       message.error(getActionErrorMessage(error, '保存 BOM 版本'))
     } finally {
@@ -1497,6 +1503,8 @@ export default function BOMVersionsPage() {
 
       <BusinessFormModal
         open={headerModalOpen}
+        forceRender
+        destroyOnHidden={false}
         title={
           headerMode === 'copy'
             ? '复制 BOM 新版本'
