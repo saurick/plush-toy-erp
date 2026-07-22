@@ -11,6 +11,7 @@ import { createProductImageSlotScenarios } from './productImageSlotScenarios.mjs
 import { createProductionWipScenarios } from './productionWipScenarios.mjs'
 import { createQualitySourceActionScenarios } from './qualitySourceActionScenarios.mjs'
 import { stylePaginatedRpcData } from './rpcMockResult.mjs'
+import { createSalesOrderSkuGrainScenarios } from './salesOrderSkuGrainScenarios.mjs'
 import { createWorkflowSourceTaskFixture } from './workflowSourceTaskFixtures.mjs'
 
 export function createBusinessFormalScenarios(deps) {
@@ -814,6 +815,7 @@ export function createBusinessFormalScenarios(deps) {
   }
 
   return [
+    ...createSalesOrderSkuGrainScenarios(deps),
     ...createOutsourcingSourceFactScenarios(deps),
     ...createProductionSourceInboundLotScenarios(deps),
     ...createProductionReworkScenarios(deps),
@@ -1316,20 +1318,17 @@ export function createBusinessFormalScenarios(deps) {
       path: '/erp/purchase/material-bom',
       auth: 'admin',
       effectiveSession: {
+        ...customerRuntimeEffectiveSession,
         configRevision: 'style-l1-bom-person-field-labels',
         configHash: 'style-l1-bom-person-field-labels-hash',
-        customer: { key: 'yoyoosun', name: '永绅' },
-        pages: [],
         actions: [
+          ...customerRuntimeEffectiveSession.actions,
           'workflow.task.create',
           'workflow.task.read',
         ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['engineering'],
         },
-        fieldPolicies: {},
-        workPools: [],
-        source: 'active_customer_config_revision',
       },
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
@@ -1550,11 +1549,11 @@ export function createBusinessFormalScenarios(deps) {
       path: '/erp/master/partners/suppliers',
       auth: 'admin',
       effectiveSession: {
+        ...customerRuntimeEffectiveSession,
         configRevision: 'style-l1-business-core-pages',
         configHash: 'style-l1-business-core-pages-hash',
-        customer: { key: 'yoyoosun', name: '永绅' },
-        pages: [],
         actions: [
+          ...customerRuntimeEffectiveSession.actions,
           'production.fact.cancel',
           'workflow.task.create',
           'workflow.task.read',
@@ -1562,9 +1561,6 @@ export function createBusinessFormalScenarios(deps) {
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': ['production', 'warehouse', 'sales'],
         },
-        fieldPolicies: {},
-        workPools: [],
-        source: 'active_customer_config_revision',
       },
       workflowTaskFixtures: [
         createWorkflowSourceTaskFixture({
@@ -3806,7 +3802,7 @@ export function createBusinessFormalScenarios(deps) {
         username: 'style-l1-no-workflow-read',
         is_super_admin: false,
         roles: [{ role_key: 'warehouse', name: '仓库' }],
-        permissions: ['erp.dashboard.read'],
+        permissions: ['erp.workbench.read'],
         menus: [
           {
             key: 'shipping-release',
@@ -4556,7 +4552,7 @@ export function createBusinessFormalScenarios(deps) {
           username: 'style-l1-workflow-readonly',
           is_super_admin: false,
           roles: [{ role_key: 'warehouse', name: '仓库' }],
-          permissions: ['erp.dashboard.read', 'workflow.task.read'],
+          permissions: ['erp.workbench.read', 'workflow.task.read'],
           menus: [
             {
               key: 'shipping-release',

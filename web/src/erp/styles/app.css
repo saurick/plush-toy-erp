@@ -1,6 +1,7 @@
 @import './app/shell-admin.css';
 @import './app/tabs-motion.css';
 @import './app/dashboard-surface.css';
+@import './app/help-center.css';
 @import './app/command-center.css';
 @import './app/task-center.css';
 @import './app/dev-task-actions.css';

@@ -32,6 +32,7 @@ var (
 	ErrPermissionNotDelegable            = errors.New("permission is not delegable")
 	ErrDebugRoleProductionForbidden      = errors.New("debug role is forbidden outside non-production")
 	ErrRoleVersionConflict               = errors.New("role version conflict")
+	ErrRoleDataScopeResourceNotFound     = errors.New("role data scope resource not found")
 )
 
 type AdminRoleAssignmentContext struct {
@@ -325,7 +326,73 @@ func AdminAuditRoleSnapshot(role *AdminRole) map[string]any {
 		"version":         role.Version,
 		"disabled":        role.Disabled,
 		"permission_keys": NormalizePermissionKeys(role.Permissions),
+		"data_scopes":     role.DataScopes,
 	}
+}
+
+func (uc *AdminManageUsecase) EffectiveWarehouseDataScope(ctx context.Context, admin *AdminUser) (WarehouseDataScope, error) {
+	if admin == nil || !admin.IsActive() {
+		return WarehouseDataScope{Mode: DataScopeModeNone, WarehouseIDs: []int{}}, ErrForbidden
+	}
+	if admin.IsSuperAdmin {
+		return EffectiveWarehouseDataScope(true, nil), nil
+	}
+	roleKeys := AdminRoleKeys(admin)
+	if len(roleKeys) == 0 {
+		return EffectiveWarehouseDataScope(false, nil), nil
+	}
+	scopeRepo, ok := uc.repo.(RoleDataScopeRepo)
+	if !ok {
+		return EffectiveWarehouseDataScope(false, nil), nil
+	}
+	scopes, err := scopeRepo.ListRoleDataScopesByRoleKeys(ctx, roleKeys)
+	if err != nil {
+		return WarehouseDataScope{}, err
+	}
+	return EffectiveWarehouseDataScope(false, scopes), nil
+}
+
+func (uc *AdminManageUsecase) SetRoleDataScopes(
+	ctx context.Context,
+	roleKey string,
+	scopes []RoleDataScope,
+	expectedVersion int,
+) (*AdminRole, error) {
+	operator, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	roleKey = NormalizeRoleKey(roleKey)
+	if roleKey == "" || expectedVersion <= 0 {
+		return nil, ErrBadParam
+	}
+	if !operator.IsSuperAdmin && AdminHasRole(operator, roleKey) {
+		return nil, ErrAdminSelfRolePermissionForbidden
+	}
+	role, err := uc.repo.GetRoleByKey(ctx, roleKey)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil || role.Disabled {
+		return nil, ErrRoleNotFound
+	}
+	if IsSystemManagedRole(*role) {
+		return nil, ErrSystemRoleImmutable
+	}
+	if role.Version != expectedVersion {
+		return nil, ErrRoleVersionConflict
+	}
+	normalized, err := NormalizeRoleDataScopes(scopes)
+	if err != nil {
+		return nil, err
+	}
+	scopeRepo, ok := uc.repo.(RoleDataScopeRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	return scopeRepo.SetRoleDataScopesWithAudit(ctx, &RoleDataScopesChangeCommand{
+		RoleKey: roleKey, OperatorID: operator.ID, ExpectedVersion: expectedVersion, Scopes: normalized,
+	})
 }
 
 func (uc *AdminManageUsecase) RecordWorkflowBreakGlassAudit(
@@ -763,6 +830,17 @@ func (uc *AdminManageUsecase) normalizeAssignableAdminRoleKeys(
 func (uc *AdminManageUsecase) ListRoles(ctx context.Context) ([]AdminRole, error) {
 	roles, _, err := uc.ListRolesWithAccess(ctx)
 	return roles, err
+}
+
+func (uc *AdminManageUsecase) GetRoleForAccessExplanation(ctx context.Context, roleKey string) (*AdminRole, error) {
+	if _, err := uc.requireActiveAdmin(ctx); err != nil {
+		return nil, err
+	}
+	roleKey = NormalizeRoleKey(roleKey)
+	if roleKey == "" {
+		return nil, ErrRoleNotFound
+	}
+	return uc.repo.GetRoleByKey(ctx, roleKey)
 }
 
 func (uc *AdminManageUsecase) ListRolesWithAccess(ctx context.Context) ([]AdminRole, map[string]AdminRoleAccess, error) {

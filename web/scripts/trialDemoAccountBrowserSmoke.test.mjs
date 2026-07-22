@@ -128,6 +128,32 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     )
   )
   assert.equal(template.menuProjectionPlan.mobileAccounts.length, 9)
+  assert.equal(template.routeAccessPlan.accountCount, 9)
+  assert(template.routeAccessPlan.formalPageCount > 20)
+  for (const account of template.routeAccessPlan.accounts) {
+    const allowedKeys = account.allowedPages.map((page) => page.key)
+    const forbiddenKeys = account.forbiddenPages.map((page) => page.key)
+    assert.equal(
+      new Set([...allowedKeys, ...forbiddenKeys]).size,
+      template.routeAccessPlan.formalPageCount,
+      `${account.username} 允许与禁止页面必须覆盖正式页面全集`
+    )
+    assert.equal(
+      allowedKeys.filter((key) => forbiddenKeys.includes(key)).length,
+      0,
+      `${account.username} 允许与禁止页面不能重叠`
+    )
+    assert(
+      account.allowedPages.every(
+        (page) => page.key && page.label && page.path.startsWith('/erp/')
+      )
+    )
+    assert(
+      account.forbiddenPages.every(
+        (page) => page.key && page.label && page.path.startsWith('/erp/')
+      )
+    )
+  }
   assert(
     template.menuProjectionPlan.mobileDeniedAccounts.some(
       (account) =>
@@ -222,7 +248,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
   const adminPlan = template.menuProjectionPlan.desktopAccounts.find(
     (account) => account.username === 'demo_admin'
   )
-  assert.deepEqual(adminPlan.visibleExpectedMenus, ['权限管理'])
+  assert.deepEqual(adminPlan.visibleExpectedMenus, ['权限管理', '系统操作记录'])
   assert.match(adminPlan.forbiddenMenus.join('\n'), /工作台/u)
   assert(
     template.desktopAccounts
@@ -247,6 +273,7 @@ test('trial demo account browser smoke CLI input template is no-write', () => {
     (account) => account.username === 'demo_engineering'
   )
   assert.deepEqual(engineeringPlan.visibleExpectedMenus, [
+    '工作台',
     '产品档案',
     '材料档案',
     '加工环节',

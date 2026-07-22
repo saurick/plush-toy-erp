@@ -1,5 +1,6 @@
 import { Buffer } from 'node:buffer'
 
+import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
 
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
@@ -959,12 +960,22 @@ export function createStyleL1Scenarios(deps) {
     )
   }
 
+  const customerRuntimePages = Object.freeze([
+    ...new Set(
+      yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.menuSurfaces || [])
+    ),
+  ])
+  const customerRuntimeActions = Object.freeze([
+    ...new Set(
+      yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys || [])
+    ),
+  ])
   const customerRuntimeEffectiveSession = Object.freeze({
     configRevision: 'style-l1-customer-runtime',
     configHash: 'style-l1-customer-runtime-hash',
     customer: { key: 'yoyoosun', name: '永绅' },
-    pages: [],
-    actions: [],
+    pages: customerRuntimePages,
+    actions: customerRuntimeActions,
     fieldPolicies: {},
     workPools: [],
     source: 'active_customer_config_revision',
@@ -997,7 +1008,7 @@ export function createStyleL1Scenarios(deps) {
     configHash: '',
     customer: { key: 'yoyoosun', name: '永绅' },
     pages: ['global-dashboard'],
-    actions: ['erp.dashboard.read', 'workflow.task.read'],
+    actions: ['erp.workbench.read', 'workflow.task.read'],
     workflow_visible_owner_role_keys_by_capability: {
       'workflow.task.read': ['boss'],
     },
@@ -1384,6 +1395,8 @@ export function createStyleL1Scenarios(deps) {
       path: '/m/sales/tasks',
       expectPath: '/admin-login',
       mockAdminRpc: true,
+      customerKey: 'yoyoosun',
+      effectiveSession: customerRuntimeEffectiveSession,
       viewport: { width: 1280, height: 800 },
       verify: async (page) => {
         await expectText(page, '业务管理')
@@ -1392,7 +1405,7 @@ export function createStyleL1Scenarios(deps) {
         await page.locator('#password').fill('style-l1-password')
         await page.getByRole('button', { name: /^登\s*录$/ }).click()
         await waitForPath(page, '/erp/dashboard')
-        await expectHeading(page, '系统功能总览')
+        await expectHeading(page, '工作台')
 
         const rememberedEntry = await page.evaluate(() =>
           window.localStorage.getItem('erp:last_entry_target')
@@ -1838,7 +1851,7 @@ export function createStyleL1Scenarios(deps) {
         customer: { key: 'yoyoosun', name: '永绅' },
         pages: ['global-dashboard', 'task-board'],
         actions: [
-          'erp.dashboard.read',
+          'erp.workbench.read',
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
@@ -1858,7 +1871,7 @@ export function createStyleL1Scenarios(deps) {
         is_super_admin: false,
         roles: [{ role_key: 'boss', name: '老板' }],
         permissions: [
-          'erp.dashboard.read',
+          'erp.workbench.read',
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
@@ -1869,7 +1882,7 @@ export function createStyleL1Scenarios(deps) {
             key: 'global-dashboard',
             label: '全局看板',
             path: '/erp/dashboard',
-            required_any: ['erp.dashboard.read'],
+            required_any: ['erp.workbench.read'],
             required_all: [],
           },
           {
@@ -2245,8 +2258,14 @@ export function createStyleL1Scenarios(deps) {
         configRevision: 'style-l1-effective-session',
         configHash: 'style-l1-hash',
         customer: { key: 'yoyoosun', name: '永绅' },
-        pages: ['global-dashboard'],
-        actions: [],
+        pages: ['global-dashboard', 'shipments'],
+        actions: [
+          'shipment.read',
+          'shipment.create',
+          'shipment.cancel',
+          'shipment.ship',
+          'sales_order.read',
+        ],
         fieldPolicies: {},
         workPools: [],
         source: 'active_customer_config_revision',
@@ -2423,13 +2442,13 @@ export function createStyleL1Scenarios(deps) {
         username: 'style-l1-yoyo-preview-boss',
         is_super_admin: false,
         roles: [{ role_key: 'boss', name: '老板' }],
-        permissions: ['erp.dashboard.read', 'workflow.task.read'],
+        permissions: ['erp.workbench.read', 'workflow.task.read'],
         menus: [
           {
             key: 'global-dashboard',
             label: '全局看板',
             path: '/erp/dashboard',
-            required_any: ['erp.dashboard.read'],
+            required_any: ['erp.workbench.read'],
             required_all: [],
           },
         ],
@@ -2494,7 +2513,7 @@ export function createStyleL1Scenarios(deps) {
       auth: 'admin',
       adminProfile: {
         is_super_admin: false,
-        permissions: ['erp.dashboard.read', 'workflow.task.read'],
+        permissions: ['erp.workbench.read', 'workflow.task.read'],
         menus: [{ key: 'global-dashboard', path: '/erp/dashboard' }],
       },
       customerKey: 'yoyoosun',
@@ -2533,7 +2552,7 @@ export function createStyleL1Scenarios(deps) {
                       configHash: 'style-l1-transient-recovery-hash',
                       customer: { key: 'yoyoosun', name: '永绅' },
                       pages: ['global-dashboard'],
-                      actions: ['erp.dashboard.read', 'workflow.task.read'],
+                      actions: ['erp.workbench.read', 'workflow.task.read'],
                       fieldPolicies: {},
                       workPools: [],
                       source: 'active_customer_config_revision',
@@ -2690,7 +2709,7 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'erp-no-visible-menu-blocks-outlet',
+      name: 'erp-no-permission-menu-falls-back-help-center',
       path: '/erp/system/permissions',
       auth: 'admin',
       adminProfile: {
@@ -2708,10 +2727,10 @@ export function createStyleL1Scenarios(deps) {
         workPools: [],
         source: 'active_customer_config_revision',
       },
+      expectPath: '/erp/help-center',
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
-        await expectText(page, '当前账号暂无可用页面')
-        await expectText(page, '当前账号已设置正确的岗位和可用页面')
+        await expectText(page, '岗位使用帮助')
         await assertTextAbsent(page, '当前客户有效配置')
         await assertTextAbsent(page, '权限中心')
         await assertTextAbsent(page, '管理员列表')
@@ -2919,7 +2938,17 @@ export function createStyleL1Scenarios(deps) {
           'workflow.task.complete',
         ],
         workflow_visible_owner_role_keys_by_capability: {
-          'workflow.task.read': ['warehouse'],
+          'workflow.task.read': [
+            'boss',
+            'sales',
+            'purchase',
+            'engineering',
+            'production',
+            'warehouse',
+            'finance',
+            'pmc',
+            'quality',
+          ],
           'workflow.task.update': ['warehouse'],
           'workflow.task.complete': ['warehouse'],
         },
@@ -3225,7 +3254,41 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(() =>
           new URLSearchParams(window.location.search).has('q')
         )
-        await page.getByText('全部岗位').click()
+        await page.evaluate(async () => {
+          const response = await fetch('/rpc/workflow', {
+            method: 'POST',
+            headers: {
+              Accept: 'application/json',
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              jsonrpc: '2.0',
+              id: 'dashboard-task-role-filter-sales',
+              method: 'create_task',
+              params: {
+                task_code: 'style-l1-dashboard-role-filter-sales',
+                task_group: 'trial_sales_work',
+                task_name: '业务岗位筛选边界任务',
+                source_type: 'project-orders',
+                source_id: 9011,
+                source_no: 'SO-ROLE-FILTER',
+                business_status_key: 'shipment_pending',
+                task_status_key: 'ready',
+                owner_role_key: 'sales',
+                payload: {},
+              },
+            }),
+          })
+          const body = await response.json()
+          if (!response.ok || body?.result?.code !== 0) {
+            throw new Error(
+              `create sales role task failed: ${JSON.stringify(body?.result || body)}`
+            )
+          }
+        })
+        await page.reload({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '任务看板')
+        await page.getByText('全部可见岗位').click()
         await page.getByTitle('仓库', { exact: true }).click()
         await page.reload({ waitUntil: 'domcontentloaded' })
         await waitForPath(page, '/erp/task-board')
@@ -3439,6 +3502,77 @@ export function createStyleL1Scenarios(deps) {
         await taskDrawer.locator('.ant-drawer-close').click()
         await taskDrawer.waitFor({ state: 'hidden', timeout: 10_000 })
         await expectNoButton(page, '看板跳转测试任务')
+      },
+    },
+    {
+      name: 'erp-task-board-single-role-scope-desktop',
+      path: '/erp/task-board?role=sales',
+      auth: 'admin',
+      effectiveSession: {
+        configRevision: 'style-l1-task-board-warehouse-scope',
+        configHash: 'style-l1-task-board-warehouse-scope-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        roles: ['warehouse'],
+        pages: ['task-board'],
+        actions: ['workflow.task.read'],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': ['warehouse'],
+        },
+        fieldPolicies: {},
+        workPools: ['warehouse'],
+        source: 'active_customer_config_revision',
+      },
+      adminProfile: {
+        id: 42,
+        username: 'style-l1-warehouse-board',
+        is_super_admin: false,
+        roles: [{ role_key: 'warehouse', name: '仓库' }],
+        permissions: ['workflow.task.read'],
+        menus: [
+          {
+            key: 'task-board',
+            label: '任务看板',
+            path: '/erp/task-board',
+            required_any: ['workflow.task.read'],
+            required_all: [],
+          },
+        ],
+      },
+      viewport: { width: 1440, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '任务看板')
+        await page.waitForFunction(
+          () => !new URLSearchParams(window.location.search).has('role')
+        )
+        assert.equal(
+          await page.getByLabel('负责岗位').count(),
+          0,
+          '普通单岗位账号不应显示可切换岗位的筛选控件'
+        )
+        assert.equal(
+          await page.getByText('全部可见岗位', { exact: true }).count(),
+          0,
+          '普通单岗位账号不应出现全部岗位入口'
+        )
+        const filterMetrics = await page
+          .locator('.erp-task-board-filters')
+          .evaluate((element) => ({
+            clientWidth: element.clientWidth,
+            scrollWidth: element.scrollWidth,
+            roleSelectCount: element.querySelectorAll('[aria-label="负责岗位"]')
+              .length,
+          }))
+        assert.equal(filterMetrics.roleSelectCount, 0)
+        assert(
+          filterMetrics.scrollWidth <= filterMetrics.clientWidth + 1,
+          `单岗位筛选区不应溢出: ${JSON.stringify(filterMetrics)}`
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'erp-task-board-single-role-scope-desktop.png'
+          ),
+        })
       },
     },
     {
@@ -8166,9 +8300,12 @@ export function createStyleL1Scenarios(deps) {
         await page.waitForFunction(
           () =>
             new URL(location.href).searchParams.get('filter') === 'current' &&
-            document.querySelectorAll('.erp-dev-prototypes-card').length === 1
+            document
+              .querySelector('.erp-dev-prototypes-filter__item--active')
+              ?.textContent?.includes('当前实现')
         )
         await expectText(page, '岗位任务端当前列表基线')
+        await expectText(page, '岗位任务中心 v2 原型')
         const currentMetrics = await page.evaluate(() => ({
           activeText:
             document
@@ -8195,12 +8332,12 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           currentMetrics.visibleCards,
-          1,
-          `原型查看器当前实现筛选只应展示岗位任务端资产: ${JSON.stringify(currentMetrics)}`
+          2,
+          `原型查看器当前实现筛选应展示岗位任务端列表和处理流程资产: ${JSON.stringify(currentMetrics)}`
         )
         assert.equal(
           currentMetrics.currentTagCount,
-          1,
+          2,
           `原型查看器当前实现标签数量异常: ${JSON.stringify(currentMetrics)}`
         )
         assert.equal(
@@ -8223,7 +8360,7 @@ export function createStyleL1Scenarios(deps) {
           () =>
             new URL(location.href).searchParams.get('filter') ===
               'to-implement' &&
-            document.querySelectorAll('.erp-dev-prototypes-card').length === 15
+            document.querySelectorAll('.erp-dev-prototypes-card').length === 14
         )
         await expectText(page, '后台工作台样板')
         await expectText(page, '任务中心样板')
@@ -8239,7 +8376,6 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '业务详情页标准样板')
         await expectText(page, '新建 / 编辑表单标准样板')
         await expectText(page, '局部动作弹窗标准样板')
-        await expectText(page, '岗位任务中心 v2 原型')
         const implementMetrics = await page.evaluate(() => ({
           activeText:
             document
@@ -8275,8 +8411,8 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.equal(
           implementMetrics.visibleCards,
-          15,
-          `原型查看器待实现筛选应展示 15 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
+          14,
+          `原型查看器待实现筛选应展示 14 个产品内核 HTML 样板: ${JSON.stringify(implementMetrics)}`
         )
         assert.equal(
           implementMetrics.cardDescriptionCount,
@@ -9603,23 +9739,22 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '可用功能')
         await expectText(page, '数据范围')
         await expectText(page, '敏感字段')
-        await expectText(page, '功能影响')
+        await expectText(page, '最终有效权限')
         await expectText(page, '选择这个岗位可以使用的功能')
         await page.getByRole('tab', { name: '数据范围' }).click()
-        await expectText(page, '数据查看范围暂不可设置')
-        await expectText(page, '任务')
+        await expectText(page, '仓库与库存查看范围已生效')
+        await expectText(page, '仓库范围模式')
         await page.getByRole('tab', { name: '敏感字段' }).click()
-        await expectText(page, '敏感信息权限暂不可单独设置')
-        await expectText(page, '成本与毛利')
+        await expectText(page, '敏感字段由独立权限控制')
+        await expectText(page, '销售商业')
         await page.waitForTimeout(350)
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-policy-tabs.png',
           fullPage: true,
         })
-        await page.getByRole('tab', { name: '功能影响' }).click()
-        await expectText(page, '这里按业务页面说明每项功能的影响范围')
-        await expectText(page, '适用页面')
-        await expectText(page, '可用操作')
+        await page.getByRole('tab', { name: '最终有效权限' }).click()
+        await expectText(page, '当前客户已启用版本')
+        await expectText(page, '当前可用结果')
         const permissionMapMetrics = await page.evaluate(() => {
           const table = document.querySelector(
             '.erp-role-policy-tabs .ant-table'
@@ -9642,10 +9777,9 @@ export function createStyleL1Scenarios(deps) {
           path: 'output/playwright/style-l1/permission-center-permission-map.png',
           fullPage: true,
         })
-        await expectText(page, '可使用的页面')
-        await expectText(page, '可以使用')
-        await expectText(page, '暂不可使用')
-        await expectText(page, '最终可用页面以公司当前设置为准')
+        await expectText(page, '当前勾选的功能影响')
+        await expectText(page, '可使用')
+        await expectText(page, '不可使用')
         await page.getByRole('tab', { name: '可用功能' }).click()
         await assertTextAbsent(page, '当前角色权限尚未保存')
         await assertTextAbsent(page, '角色名称可按岗位调整，职责权限保持统一')
@@ -15130,11 +15264,8 @@ export function createStyleL1Scenarios(deps) {
           0,
           '侧栏不应再显示“开发与验收”分组'
         )
-        assert.equal(
-          await page.getByText('帮助中心', { exact: true }).count(),
-          0,
-          '侧栏不应再显示“帮助中心”分组'
-        )
+        await expectText(page, '使用帮助')
+        await expectText(page, '岗位使用帮助')
         assert.equal(
           await page.getByText('高级文档', { exact: true }).count(),
           0,
@@ -15952,6 +16083,7 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: {
         ...customerRuntimeEffectiveSession,
         actions: [
+          ...customerRuntimeEffectiveSession.actions,
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',
@@ -16128,6 +16260,7 @@ export function createStyleL1Scenarios(deps) {
       effectiveSession: {
         ...customerRuntimeEffectiveSession,
         actions: [
+          ...customerRuntimeEffectiveSession.actions,
           'workflow.task.create',
           'workflow.task.read',
           'workflow.task.update',

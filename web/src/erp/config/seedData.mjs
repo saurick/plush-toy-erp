@@ -78,6 +78,14 @@ const navItemRegistry = {
     shortLabel: '审计',
     description: '只读查看系统管理操作记录。',
   },
+  'help-center': {
+    key: 'help-center',
+    label: '岗位使用帮助',
+    path: '/erp/help-center',
+    shortLabel: '帮助',
+    description: '根据当前账号的岗位查看工作重点、办理顺序、交接和常见问题。',
+    access: 'authenticated',
+  },
 }
 
 export const navigationItemRegistry = navItemRegistry
@@ -126,6 +134,16 @@ export function getProductCoreNavigationSections() {
         navItemRegistry['permission-center'],
         navItemRegistry['system-audit-logs'],
       ],
+    },
+  ]
+}
+
+export function getAuthenticatedNavigationSections() {
+  return [
+    {
+      key: 'help',
+      title: '使用帮助',
+      items: [navItemRegistry['help-center']],
     },
   ]
 }

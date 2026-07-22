@@ -289,11 +289,10 @@ function targetEvidence(item) {
         "workflow-tasks:production_exception",
         MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
       ],
-      actualProbeId:
-        MANUAL_ACCEPTANCE_DERIVED_PROBE_IDS.productionExceptionActiveTasks,
+      actualProbeId: "workflow-tasks:production_exception",
       browserRequired: true,
       reason:
-        "完整生产异常任务矩阵与当前可处理任务分别按同批岗位任务核对；页面筛选、详情和处理动作仍需页面确认。",
+        "完整生产异常来源任务与当前可处理任务分别按同批岗位任务核对；页面数量采用完整来源任务，当前没有可处理任务也不能抹掉已完成异常记录。",
     };
   }
   const workflowProbeId = WORKFLOW_TASK_GROUP_PROBES[item.key];
@@ -429,11 +428,7 @@ export function assertManualAcceptancePageDataContract(contract, options = {}) {
       new Set(target.probeIds).size === target.probeIds.length,
       `页面 ${target.id} 存在重复数据核验 probe`,
     );
-    if (
-      target.catalogGroup === "mobileRolePages" ||
-      (target.probeIds.length === 1 &&
-        target.probeIds[0].startsWith("workflow-tasks:"))
-    ) {
+    if (target.catalogGroup === "mobileRolePages") {
       assertContract(
         Array.isArray(target.requiredTaskScenarios) &&
           target.requiredTaskScenarios.length > 0 &&

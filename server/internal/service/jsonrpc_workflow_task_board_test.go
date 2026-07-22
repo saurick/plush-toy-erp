@@ -48,7 +48,8 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsScopedOverview(t *testing.
 				{Key: biz.WorkflowTaskBoardLaneDue, Total: 143, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 3, TaskStatusKey: "ready", Payload: map[string]any{}}}},
 				{Key: biz.WorkflowTaskBoardLaneFinished, Total: 81, Limit: 5, Tasks: []*biz.WorkflowTask{{ID: 4, TaskStatusKey: "rejected", Payload: map[string]any{}}}},
 			},
-			SourceTypes: []string{"project-orders", "shipping-release"},
+			SourceTypes:   []string{"project-orders", "shipping-release"},
+			OwnerRoleKeys: []string{biz.SalesRoleKey},
 		},
 	}
 	dispatcher := &jsonrpcDispatcher{
@@ -101,6 +102,10 @@ func TestJsonrpcDispatcher_WorkflowGetTaskBoardReturnsScopedOverview(t *testing.
 	sourceTypes, ok := data["source_types"].([]any)
 	if !ok || len(sourceTypes) != 2 || sourceTypes[0] != "project-orders" || sourceTypes[1] != "shipping-release" {
 		t.Fatalf("filtered board must retain the complete scoped source facets, got %#v", data["source_types"])
+	}
+	ownerRoleKeys, ok := data["owner_role_keys"].([]any)
+	if !ok || len(ownerRoleKeys) != 1 || ownerRoleKeys[0] != biz.SalesRoleKey {
+		t.Fatalf("board must return the visible owner role facet, got %#v", data["owner_role_keys"])
 	}
 }
 

@@ -71,6 +71,7 @@
 | `scripts/qa/frontend-error-message-boundary.test.mjs` + `web/src/common/utils/errorMessage.test.mjs` + `web/src/erp/utils/userVisibleTechnicalFields.test.mjs` + `web/src/erp/utils/dashboardTaskDisplay.test.mjs` | 扫描正式前端页面、组件、岗位任务端和共享 PDF 预览工具，防止用户可见错误提示直接透传 `error.message`；同时锁住统一中文错误 helper、业务界面不展示 raw id / 内部字段，以及任务来源筛选不展示 `source_type` 原始 key | 调整正式页面错误提示、打印工作台、移动端动作、错误 helper、业务字段回显、任务来源展示或技术字段可见性后 |
 | `scripts/qa/phase-label-boundaries.mjs` + `.test.mjs`  | 全仓扫描活跃代码、脚本和正式文档，阻止完整 Phase 编号、紧凑 phase 编号、P 子阶段编号和 P 编号发布目标等阶段命名；允许 P0/P1 风险等级、p95 百分位和产品编码，跳过归档、外部资料、发布证据及生成产物 | 调整命名、脚本、API、运行时代码或治理文档后                 |
 | `scripts/qa/docs-inventory.test.mjs`                   | 自动扫描当前维护 Markdown，确认已登记到 `docs/文档清单.md`                                                     | 新增、删除、重命名或调整长期维护 Markdown 后                |
+| `scripts/qa/yoyoosun-role-flow-handbook.test.mjs`      | 锁住永绅角色手册与 9 岗位、241 条权限分配、菜单、职责、客户包流程、编排覆盖、甲方流程检查点、缺口和隐私边界逐项同步 | 调整永绅岗位、权限、流程、客户包或角色手册后                |
 | `scripts/inventory-pg.sh`                              | 库存事实本地 PostgreSQL migration / 集成测试防呆入口                                                             | 验证库存流水、余额、SKU、预留、出货、冲正和并发边界        |
 | `scripts/bom-lot-pg.sh`                                | BOM 与批次库存本地 PostgreSQL migration / 集成测试防呆入口                                                       | 验证 BOM schema 和批次库存行为                            |
 | `scripts/purchase-receipt-pg.sh`                       | 采购入库本地 PostgreSQL migration / 全链关键事务并发测试防呆入口；full 通过该入口创建同批唯一临时库，并在历史升级库验证 kg→g 存量转换 | 验证采购、库存/出货、ProcessRuntime、源单、Workflow CAS / receipt 并发及迁移数据保持 |
@@ -78,6 +79,7 @@
 | `scripts/doctor.sh`                                    | 检查本机依赖和 hooks 是否齐全                                                                                     | 环境初始化 / 异常排查                                      |
 | `scripts/qa/fast.sh`                                   | 高频快速检查，包含正式前端客户配置投影、角色菜单 / seedData、开发入口、试用账号、客户导入、运行时 manifest、文档清单和模拟数据边界；server quick 过滤由 full 单独执行的 PostgreSQL 与 Chromium PDF 集成用例，其余 Go 用例仍要求非零执行且零 skip | 日常开发                                                   |
 | `scripts/qa/trial-account-rbac.mjs`                    | 只读验证角色演示账号的真实登录、角色、岗位任务端入口权限和 debug 权限边界；`--preflight-report` 会先写本地 no-write 前置报告，核对后端健康、密码 env 和静态角色投影；真实运行可选 `--report` 写本地脱敏报告，不保存密码或 token | 生成试用 / 演示账号后                                      |
+| `scripts/qa/yoyoosun-role-jsonrpc-access.mjs`          | 九岗位真实登录访问门禁：每个账号执行一条允许读取、一个预期 `PermissionDenied` 的安全写探针及前后总数核对；只允许本机后端，不保存密码或 token，登录会产生正常认证会话但预期业务写入为零 | 调整永绅岗位 RBAC、协作只读权限或演示账号后                 |
 | `scripts/qa/customer-config-boundaries.mjs`            | 只读验证 customer config 草案仍是 draft，未放开 runtime / schema / import / RBAC 边界，并扫描后端 Product Core 运行时代码没有嵌入 yoyoosun / 永绅客户专属规则 | 调整客户配置草案、客户配置 runtime 或后端客户差异边界后 |
 | `scripts/qa/customer-config-effective-session-probe.mjs` | 无 Authorization 的 `customer_config.get_effective_session` 本地只读探针；可写 `output/customers/yoyoosun/customer-config-effective-session-probe/current.json`，确认本地后端可达和 `40302 未登录` / 缺真实登录证据边界，不读取 token、不证明 active revision | yoyoosun 本地入口已命中但还没有演示密码 / token，需要解释为什么不能证明后端 active revision 时 |
 | `scripts/qa/customer-package-lint.mjs`                 | 验证客户配置包结构、流程预览、状态机预览、策略预览和 preview-only 打印 party defaults 仍只做 lint / preview，不接 Workflow / Fact runtime，不覆盖供应商业务快照 | 调整 `config/catalog`、`config/schemas` 或客户包流程 / 打印配置草案后 |
@@ -837,7 +839,7 @@ node --test /Users/simon/projects/plush-toy-erp/web/src/erp/utils/adminProfileSy
 node --test /Users/simon/projects/plush-toy-erp/scripts/qa/formal-frontend-customer-config-boundary.test.mjs
 
 cd /Users/simon/projects/plush-toy-erp/web
-STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-visible-menu-blocks-outlet,erp-effective-session-action-projection-business-pages pnpm style:l1
+STYLE_L1_SCENARIOS=erp-effective-session-super-admin-product-core,erp-effective-session-direct-url-local-dev-diagnostic,erp-effective-session-configured-customer-sync-failure-blocked,erp-effective-session-empty-pages-local-dev-diagnostic,erp-no-permission-menu-falls-back-help-center,erp-effective-session-action-projection-business-pages pnpm style:l1
 ```
 
 `adminProfileSync` 测试负责证明正式普通账号按 RBAC 菜单与 active revision 页面清单交集收窄，隐藏 URL 需要跳转，active revision 空页面清单不回退 RBAC-only，以及模块 disabled 后端投影隐藏业务页时正式账号需要跳转。`style:l1` 运行在前端 DEV 构建态，只证明本地开发诊断、super admin 产品核心看全、sync failure 诊断、无可见菜单空态，以及普通账号页面可见但 `effective_session.actions=[]` 时出货 / 质检 / 采购入库写按钮禁用的真实页面渲染；不要把本地 DEV 诊断场景当成正式客户放开证据，也不要把前端 helper 跳转或按钮禁用当成后端 RBAC / usecase 授权边界。

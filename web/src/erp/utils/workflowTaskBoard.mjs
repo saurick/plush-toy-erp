@@ -31,7 +31,6 @@ export const TASK_BOARD_STATUS_OPTIONS = Object.freeze([
 ])
 
 export const TASK_BOARD_ROLE_OPTIONS = Object.freeze([
-  { value: 'all', label: '全部岗位' },
   { value: 'boss', label: '老板' },
   { value: 'sales', label: '业务' },
   { value: 'purchase', label: '采购' },
@@ -42,6 +41,19 @@ export const TASK_BOARD_ROLE_OPTIONS = Object.freeze([
   { value: 'pmc', label: 'PMC' },
   { value: 'quality', label: '品质' },
 ])
+
+export function buildWorkflowTaskBoardRoleOptions(ownerRoleKeys = []) {
+  const availableRoleKeys = new Set(
+    (Array.isArray(ownerRoleKeys) ? ownerRoleKeys : [])
+      .map((roleKey) => String(roleKey || '').trim())
+      .filter(Boolean)
+  )
+  const options = TASK_BOARD_ROLE_OPTIONS.filter((option) =>
+    availableRoleKeys.has(option.value)
+  )
+  if (options.length <= 1) return options
+  return [{ value: 'all', label: '全部可见岗位' }, ...options]
+}
 
 export const TASK_BOARD_DUE_OPTIONS = Object.freeze([
   { value: 'all', label: '全部截止时间' },
@@ -106,9 +118,10 @@ const FILTER_QUERY_KEYS = Object.freeze({
 const STATUS_FILTER_VALUES = new Set(
   TASK_BOARD_STATUS_OPTIONS.map((item) => item.value)
 )
-const ROLE_FILTER_VALUES = new Set(
-  TASK_BOARD_ROLE_OPTIONS.map((item) => item.value)
-)
+const ROLE_FILTER_VALUES = new Set([
+  'all',
+  ...TASK_BOARD_ROLE_OPTIONS.map((item) => item.value),
+])
 const DUE_FILTER_VALUES = new Set(
   TASK_BOARD_DUE_OPTIONS.map((item) => item.value)
 )
@@ -498,6 +511,11 @@ export function buildWorkflowTaskBoardModel(response = {}, filters = {}) {
     sourceTypes: Array.isArray(normalizedResponse.source_types)
       ? normalizedResponse.source_types
           .map((sourceType) => String(sourceType || '').trim())
+          .filter(Boolean)
+      : [],
+    ownerRoleKeys: Array.isArray(normalizedResponse.owner_role_keys)
+      ? normalizedResponse.owner_role_keys
+          .map((roleKey) => String(roleKey || '').trim())
           .filter(Boolean)
       : [],
   }

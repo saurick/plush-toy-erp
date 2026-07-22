@@ -21,6 +21,13 @@ type RolePermissionsChange struct {
 	PermissionKeys  []string
 }
 
+type RoleDataScopesChangeCommand struct {
+	RoleKey         string
+	OperatorID      int
+	ExpectedVersion int
+	Scopes          []RoleDataScope
+}
+
 type AdminPhoneChange struct {
 	AdminID    int
 	OperatorID int

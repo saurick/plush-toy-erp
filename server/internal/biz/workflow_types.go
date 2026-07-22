@@ -98,11 +98,12 @@ type WorkflowTaskBoardLane struct {
 }
 
 type WorkflowTaskBoard struct {
-	SnapshotAt  time.Time
-	Total       int
-	Counts      WorkflowTaskBoardCounts
-	Lanes       []WorkflowTaskBoardLane
-	SourceTypes []string
+	SnapshotAt    time.Time
+	Total         int
+	Counts        WorkflowTaskBoardCounts
+	Lanes         []WorkflowTaskBoardLane
+	SourceTypes   []string
+	OwnerRoleKeys []string
 }
 
 type WorkflowTaskCreate struct {

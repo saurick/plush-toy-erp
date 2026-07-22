@@ -1061,6 +1061,11 @@ test('devPrototypes: asset、filter 和关键词由 canonical query 驱动', () 
     prototypesPageSource,
     /setSearchParams\(nextParams, \{ replace: true \}\)/
   )
+  assert.match(
+    prototypesPageSource,
+    /filterDevPrototypeItems\(\[requestedItem\], \{ status: nextFilter \}\)[\s\S]*?nextParams\.delete\(ASSET_QUERY_KEY\)/,
+    'an explicit status-filter choice must clear an incompatible deep-linked asset'
+  )
   assert.doesNotMatch(
     prototypesPageSource,
     /\[\s*statusFilter\s*,\s*setStatusFilter\s*\]/

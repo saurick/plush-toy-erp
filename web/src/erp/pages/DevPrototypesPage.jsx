@@ -418,7 +418,18 @@ export default function DevPrototypesPage() {
 
   const selectStatusFilter = (filter) => {
     const nextParams = new URLSearchParams(searchParams)
-    nextParams.set(FILTER_QUERY_KEY, normalizeDevPrototypeStatusFilter(filter))
+    const nextFilter = normalizeDevPrototypeStatusFilter(filter)
+    nextParams.set(FILTER_QUERY_KEY, nextFilter)
+    const requestedItem = items.find(
+      (item) => item.key === nextParams.get(ASSET_QUERY_KEY)
+    )
+    if (
+      requestedItem &&
+      filterDevPrototypeItems([requestedItem], { status: nextFilter })
+        .length === 0
+    ) {
+      nextParams.delete(ASSET_QUERY_KEY)
+    }
     setSearchParams(nextParams)
   }
 

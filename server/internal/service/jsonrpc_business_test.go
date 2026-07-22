@@ -20,7 +20,7 @@ func TestJsonrpcDispatcher_BusinessDashboardStatsReadsDomainProjection(t *testin
 	j := newCompleteBusinessDashboardDispatcher(
 		workflowJSONRPCAdmin(
 			[]string{biz.WarehouseRoleKey},
-			biz.PermissionERPDashboardRead,
+			biz.PermissionERPBusinessDashboardRead,
 			biz.PermissionWorkflowTaskRead,
 		),
 		&businessDashboardMasterDataRepo{},
@@ -89,7 +89,7 @@ func TestJsonrpcDispatcher_BusinessDashboardWorkflowModulesUnavailableWithoutRea
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
 	workflowRepo := &businessDashboardWorkflowRepo{}
 	j := newCompleteBusinessDashboardDispatcher(
-		workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionERPDashboardRead),
+		workflowJSONRPCAdmin([]string{biz.WarehouseRoleKey}, biz.PermissionERPBusinessDashboardRead),
 		&businessDashboardMasterDataRepo{},
 		workflowRepo,
 		&businessDashboardOperationalFactRepo{},
@@ -162,7 +162,7 @@ func TestJsonrpcDispatcher_BusinessDashboardBossReadsGlobalWorkflowAggregateOnly
 	t.Setenv("ERP_CUSTOMER_KEY", "yoyoosun")
 	admin := workflowJSONRPCAdmin(
 		[]string{biz.BossRoleKey},
-		biz.PermissionERPDashboardRead,
+		biz.PermissionERPBusinessDashboardRead,
 		biz.PermissionWorkflowTaskRead,
 	)
 	workflowRepo := &businessDashboardWorkflowRepo{}
@@ -224,7 +224,7 @@ func TestJsonrpcDispatcher_BusinessDashboardBossReadsGlobalWorkflowAggregateOnly
 func TestJsonrpcDispatcher_BusinessDashboardSuccessfulZeroIsAvailableAndMissingUsecaseIsUnavailable(t *testing.T) {
 	j := &jsonrpcDispatcher{
 		log:          businessDashboardTestLogger(),
-		adminReader:  stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionERPDashboardRead)},
+		adminReader:  stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionERPBusinessDashboardRead)},
 		masterDataUC: biz.NewMasterDataUsecase(&businessDashboardMasterDataRepo{zeroTotals: true}),
 	}
 
@@ -250,7 +250,7 @@ func TestJsonrpcDispatcher_BusinessDashboardSuccessfulZeroIsAvailableAndMissingU
 func TestJsonrpcDispatcher_BusinessDashboardQueryErrorFailsClosed(t *testing.T) {
 	j := &jsonrpcDispatcher{
 		log:         businessDashboardTestLogger(),
-		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionERPDashboardRead)},
+		adminReader: stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionERPBusinessDashboardRead)},
 		masterDataUC: biz.NewMasterDataUsecase(&businessDashboardMasterDataRepo{
 			listProductsErr: errors.New("products unavailable"),
 		}),
@@ -370,7 +370,7 @@ func businessDashboardCustomerConfigUC(customerKeys ...string) *biz.CustomerConf
 		{
 			revision:    "rev-b",
 			status:      biz.CustomerConfigStatusActive,
-			permissions: []string{biz.PermissionERPDashboardRead},
+			permissions: []string{biz.PermissionERPBusinessDashboardRead},
 		},
 	} {
 		key := serviceCustomerConfigKey(customerKey, item.revision)
@@ -406,7 +406,7 @@ func businessDashboardCustomerConfigUC(customerKeys ...string) *biz.CustomerConf
 		}
 		activeKey := serviceCustomerConfigKey(customerKey, "rev-b")
 		for _, permissionKey := range []string{
-			biz.PermissionERPDashboardRead,
+			biz.PermissionERPBusinessDashboardRead,
 			biz.PermissionWorkflowTaskRead,
 		} {
 			repo.entitlements[activeKey] = append(

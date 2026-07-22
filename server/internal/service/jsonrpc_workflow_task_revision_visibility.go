@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	v1 "server/api/jsonrpc/v1"
 	"server/internal/biz"
 )
 
@@ -68,6 +69,39 @@ func (d *jsonrpcDispatcher) workflowTaskQueryVisibilityScope(
 		}
 	}
 	return biz.NormalizeWorkflowTaskVisibilityScope(scope), nil
+}
+
+func expandWorkflowTaskVisibilityForSupervision(
+	scope *biz.WorkflowTaskVisibilityScope,
+	canSupervise bool,
+) *biz.WorkflowTaskVisibilityScope {
+	normalized := biz.NormalizeWorkflowTaskVisibilityScope(scope)
+	if normalized == nil || !canSupervise {
+		return normalized
+	}
+	normalized.VisibleAssigneeID = nil
+	normalized.StandaloneAllowAllOwnerRoles = true
+	normalized.StandaloneVisibleOwnerRoleKeys = nil
+	for index := range normalized.RevisionRoleScopes {
+		normalized.RevisionRoleScopes[index].AllowAllOwnerRoles = true
+		normalized.RevisionRoleScopes[index].VisibleOwnerRoleKeys = nil
+	}
+	return biz.NormalizeWorkflowTaskVisibilityScope(normalized)
+}
+
+func (d *jsonrpcDispatcher) workflowTaskReadVisibilityScope(
+	ctx context.Context,
+	admin *biz.AdminUser,
+) (*biz.WorkflowTaskVisibilityScope, *v1.JsonrpcResult) {
+	scope, err := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
+	if err != nil {
+		return nil, d.mapCustomerConfigError(ctx, err)
+	}
+	canSupervise, permissionResult := d.AdminHasPermission(ctx, biz.PermissionWorkflowTaskSupervise)
+	if permissionResult != nil {
+		return nil, permissionResult
+	}
+	return expandWorkflowTaskVisibilityForSupervision(scope, canSupervise), nil
 }
 
 func (d *jsonrpcDispatcher) workflowTaskRoleVisibilityForTask(

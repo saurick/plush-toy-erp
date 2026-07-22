@@ -212,53 +212,63 @@ func (d *jsonrpcDispatcher) Handle(
 		if _, res := d.requireLogin(ctx); res != nil {
 			return id, res, nil
 		}
+		if res := d.requireSensitiveFieldMutationPermission(ctx, url, method); res != nil {
+			return id, res, nil
+		}
 	}
 
-	switch url {
-	case "system":
-		return d.handleSystem(ctx, id, method, params)
-	case "auth":
-		return d.handleAuth(ctx, method, id, params)
-	case "admin":
-		return d.handleAdmin(ctx, method, id, params)
-	case "workflow":
-		return d.handleWorkflow(ctx, method, id, params)
-	case "business":
-		return d.handleBusiness(ctx, method, id, params)
-	case "masterdata":
-		return d.handleMasterData(ctx, method, id, params)
-	case "sales_order":
-		return d.handleSalesOrder(ctx, method, id, params)
-	case "purchase_order":
-		return d.handlePurchaseOrder(ctx, method, id, params)
-	case "production_order":
-		return d.handleProductionOrder(ctx, method, id, params)
-	case "production_wip":
-		return d.handleProductionWIP(ctx, method, id, params)
-	case "outsourcing_order":
-		return d.handleOutsourcingOrder(ctx, method, id, params)
-	case "purchase":
-		return d.handlePurchase(ctx, method, id, params)
-	case "inventory":
-		return d.handleInventory(ctx, method, id, params)
-	case "quality":
-		return d.handleQuality(ctx, method, id, params)
-	case "bom":
-		return d.handleBOM(ctx, method, id, params)
-	case "operational_fact":
-		return d.handleOperationalFact(ctx, method, id, params)
-	case "attachment":
-		return d.handleBusinessAttachment(ctx, method, id, params)
-	case "customer_config":
-		return d.handleCustomerConfig(ctx, method, id, params)
-	case "debug":
-		return d.handleDebug(ctx, method, id, params)
-	default:
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.JSONRPCUnknownURL.Code,
-			Message: fmt.Sprintf("unknown jsonrpc url=%s", url),
-		}, nil
+	dispatch := func() (string, *v1.JsonrpcResult, error) {
+		switch url {
+		case "system":
+			return d.handleSystem(ctx, id, method, params)
+		case "auth":
+			return d.handleAuth(ctx, method, id, params)
+		case "admin":
+			return d.handleAdmin(ctx, method, id, params)
+		case "workflow":
+			return d.handleWorkflow(ctx, method, id, params)
+		case "business":
+			return d.handleBusiness(ctx, method, id, params)
+		case "masterdata":
+			return d.handleMasterData(ctx, method, id, params)
+		case "sales_order":
+			return d.handleSalesOrder(ctx, method, id, params)
+		case "purchase_order":
+			return d.handlePurchaseOrder(ctx, method, id, params)
+		case "production_order":
+			return d.handleProductionOrder(ctx, method, id, params)
+		case "production_wip":
+			return d.handleProductionWIP(ctx, method, id, params)
+		case "outsourcing_order":
+			return d.handleOutsourcingOrder(ctx, method, id, params)
+		case "purchase":
+			return d.handlePurchase(ctx, method, id, params)
+		case "inventory":
+			return d.handleInventory(ctx, method, id, params)
+		case "quality":
+			return d.handleQuality(ctx, method, id, params)
+		case "bom":
+			return d.handleBOM(ctx, method, id, params)
+		case "operational_fact":
+			return d.handleOperationalFact(ctx, method, id, params)
+		case "attachment":
+			return d.handleBusinessAttachment(ctx, method, id, params)
+		case "customer_config":
+			return d.handleCustomerConfig(ctx, method, id, params)
+		case "debug":
+			return d.handleDebug(ctx, method, id, params)
+		default:
+			return id, &v1.JsonrpcResult{
+				Code:    errcode.JSONRPCUnknownURL.Code,
+				Message: fmt.Sprintf("unknown jsonrpc url=%s", url),
+			}, nil
+		}
 	}
+	resultID, result, err := dispatch()
+	if err == nil && result != nil && !d.isPublic(url, method) {
+		d.applySensitiveFieldReadPolicy(ctx, url, method, result)
+	}
+	return resultID, result, err
 }
 
 func (r *jsonrpcDispatcher) handleSystem(

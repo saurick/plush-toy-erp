@@ -48,6 +48,7 @@ import (
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/roleprofile"
 	"server/internal/data/model/ent/runtimeauditevent"
@@ -4273,6 +4274,62 @@ func init() {
 	role.DefaultUpdatedAt = roleDescUpdatedAt.Default.(func() time.Time)
 	// role.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
 	role.UpdateDefaultUpdatedAt = roleDescUpdatedAt.UpdateDefault.(func() time.Time)
+	roledatascopeFields := schema.RoleDataScope{}.Fields()
+	_ = roledatascopeFields
+	// roledatascopeDescRoleID is the schema descriptor for role_id field.
+	roledatascopeDescRoleID := roledatascopeFields[0].Descriptor()
+	// roledatascope.RoleIDValidator is a validator for the "role_id" field. It is called by the builders before save.
+	roledatascope.RoleIDValidator = roledatascopeDescRoleID.Validators[0].(func(int) error)
+	// roledatascopeDescResourceType is the schema descriptor for resource_type field.
+	roledatascopeDescResourceType := roledatascopeFields[1].Descriptor()
+	// roledatascope.ResourceTypeValidator is a validator for the "resource_type" field. It is called by the builders before save.
+	roledatascope.ResourceTypeValidator = func() func(string) error {
+		validators := roledatascopeDescResourceType.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(resource_type string) error {
+			for _, fn := range fns {
+				if err := fn(resource_type); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// roledatascopeDescMode is the schema descriptor for mode field.
+	roledatascopeDescMode := roledatascopeFields[2].Descriptor()
+	// roledatascope.ModeValidator is a validator for the "mode" field. It is called by the builders before save.
+	roledatascope.ModeValidator = func() func(string) error {
+		validators := roledatascopeDescMode.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(mode string) error {
+			for _, fn := range fns {
+				if err := fn(mode); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// roledatascopeDescResourceIds is the schema descriptor for resource_ids field.
+	roledatascopeDescResourceIds := roledatascopeFields[3].Descriptor()
+	// roledatascope.DefaultResourceIds holds the default value on creation for the resource_ids field.
+	roledatascope.DefaultResourceIds = roledatascopeDescResourceIds.Default.([]int)
+	// roledatascopeDescCreatedAt is the schema descriptor for created_at field.
+	roledatascopeDescCreatedAt := roledatascopeFields[4].Descriptor()
+	// roledatascope.DefaultCreatedAt holds the default value on creation for the created_at field.
+	roledatascope.DefaultCreatedAt = roledatascopeDescCreatedAt.Default.(func() time.Time)
+	// roledatascopeDescUpdatedAt is the schema descriptor for updated_at field.
+	roledatascopeDescUpdatedAt := roledatascopeFields[5].Descriptor()
+	// roledatascope.DefaultUpdatedAt holds the default value on creation for the updated_at field.
+	roledatascope.DefaultUpdatedAt = roledatascopeDescUpdatedAt.Default.(func() time.Time)
+	// roledatascope.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.
+	roledatascope.UpdateDefaultUpdatedAt = roledatascopeDescUpdatedAt.UpdateDefault.(func() time.Time)
 	rolepermissionFields := schema.RolePermission{}.Fields()
 	_ = rolepermissionFields
 	// rolepermissionDescRoleID is the schema descriptor for role_id field.

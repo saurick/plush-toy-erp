@@ -322,6 +322,10 @@ type MasterDataRepo interface {
 	DisableContact(ctx context.Context, id int) (*Contact, error)
 }
 
+type WarehouseAccessRepo interface {
+	ListWarehousesForAccess(ctx context.Context, filter MasterDataFilter, scope WarehouseDataScope) ([]*Warehouse, int, error)
+}
+
 type MasterDataUsecase struct {
 	repo MasterDataRepo
 }
@@ -516,6 +520,17 @@ func (uc *MasterDataUsecase) ListWarehouses(ctx context.Context, filter MasterDa
 		return nil, 0, ErrBadParam
 	}
 	return uc.repo.ListWarehouses(ctx, normalizeMasterDataFilter(filter))
+}
+
+func (uc *MasterDataUsecase) ListWarehousesForAccess(ctx context.Context, filter MasterDataFilter, scope WarehouseDataScope) ([]*Warehouse, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	repo, ok := uc.repo.(WarehouseAccessRepo)
+	if !ok {
+		return nil, 0, ErrDataScopeForbidden
+	}
+	return repo.ListWarehousesForAccess(ctx, normalizeMasterDataFilter(filter), NormalizeWarehouseDataScope(scope))
 }
 
 func (uc *MasterDataUsecase) CreateProcess(ctx context.Context, in *ProcessMutation) (*Process, error) {

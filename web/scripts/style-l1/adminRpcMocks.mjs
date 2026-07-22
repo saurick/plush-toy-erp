@@ -104,7 +104,41 @@ export async function installAdminRpcMocks(
       name: '管理角色权限',
       module: 'system',
     },
-    { permission_key: 'erp.dashboard.read', name: '查看看板', module: 'erp' },
+    {
+      permission_key: 'customer_config.read',
+      name: '查看客户配置',
+      module: 'customer_config',
+    },
+    {
+      permission_key: 'field.party_private.read',
+      name: '查看往来单位隐私字段',
+      module: 'field',
+    },
+    {
+      permission_key: 'field.sales_commercial.read',
+      name: '查看销售商业字段',
+      module: 'field',
+    },
+    {
+      permission_key: 'field.procurement_commercial.read',
+      name: '查看采购商业字段',
+      module: 'field',
+    },
+    {
+      permission_key: 'field.finance_settlement.read',
+      name: '查看财务结算字段',
+      module: 'field',
+    },
+    {
+      permission_key: 'erp.workbench.read',
+      name: '查看岗位工作台',
+      module: 'erp',
+    },
+    {
+      permission_key: 'erp.business_dashboard.read',
+      name: '查看业务看板',
+      module: 'erp',
+    },
     {
       permission_key: 'workflow.task.read',
       name: '查看任务',
@@ -204,9 +238,14 @@ export async function installAdminRpcMocks(
     disabled: false,
     sort_order: 20,
     permissions: [
-      'erp.dashboard.read',
+      'erp.workbench.read',
+      'field.party_private.read',
+      'field.sales_commercial.read',
       'workflow.task.read',
       'mobile.sales.access',
+    ],
+    data_scopes: [
+      { resource_type: 'warehouse', mode: 'ALL', resource_ids: [] },
     ],
   }
   const adminRole = {

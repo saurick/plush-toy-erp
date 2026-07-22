@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/roledatascope"
 	"time"
 
 	"entgo.io/ent/dialect/sql/sqlgraph"
@@ -142,6 +143,21 @@ func (_c *RoleCreate) SetNillableUpdatedAt(v *time.Time) *RoleCreate {
 		_c.SetUpdatedAt(*v)
 	}
 	return _c
+}
+
+// AddDataScopeIDs adds the "data_scopes" edge to the RoleDataScope entity by IDs.
+func (_c *RoleCreate) AddDataScopeIDs(ids ...int) *RoleCreate {
+	_c.mutation.AddDataScopeIDs(ids...)
+	return _c
+}
+
+// AddDataScopes adds the "data_scopes" edges to the RoleDataScope entity.
+func (_c *RoleCreate) AddDataScopes(v ...*RoleDataScope) *RoleCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddDataScopeIDs(ids...)
 }
 
 // Mutation returns the RoleMutation object of the builder.
@@ -335,6 +351,22 @@ func (_c *RoleCreate) createSpec() (*Role, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.UpdatedAt(); ok {
 		_spec.SetField(role.FieldUpdatedAt, field.TypeTime, value)
 		_node.UpdatedAt = value
+	}
+	if nodes := _c.mutation.DataScopesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   role.DataScopesTable,
+			Columns: []string{role.DataScopesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roledatascope.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

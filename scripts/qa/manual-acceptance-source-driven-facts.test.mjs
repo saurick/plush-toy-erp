@@ -127,6 +127,7 @@ function createRPC({
   const records = new Map();
   let nextID = 1000;
   let qualityInspection;
+  let shipmentReleaseTask;
 
   const createRecord = (key, extra = {}, method = "") => {
     const item = {
@@ -224,6 +225,24 @@ function createRPC({
         return createRecord("stock_reservation", { status: "ACTIVE" });
       case "create_shipment_with_items":
         return createRecord("shipment");
+      case "submit_shipment_release":
+        shipmentReleaseTask ||= {
+          id: nextID++,
+          version: 1,
+          task_status_key: "ready",
+        };
+        return { workflow_task: shipmentReleaseTask, created: true };
+      case "complete_task_action":
+        assert.equal(domain, "workflow");
+        assert.equal(params.task_id, shipmentReleaseTask.id);
+        assert.equal(params.expected_version, shipmentReleaseTask.version);
+        assert.equal(params.action_key, "complete");
+        shipmentReleaseTask = {
+          ...shipmentReleaseTask,
+          version: shipmentReleaseTask.version + 1,
+          task_status_key: "done",
+        };
+        return { task: shipmentReleaseTask };
       case "ship_shipment": {
         const record = records.get(params.id);
         assert.equal(record?.key, "shipment");
@@ -348,6 +367,7 @@ test("every allowlisted method is present in the current formal JSON-RPC dispatc
       "../../server/internal/service/jsonrpc_operational_fact_shipment.go",
       "../../server/internal/service/jsonrpc_operational_fact_finance.go",
       "../../server/internal/service/jsonrpc_quality.go",
+      "../../server/internal/service/jsonrpc_workflow_task.go",
     ].map((relative) => readFile(new URL(relative, import.meta.url), "utf8")),
   );
   const dispatchers = files.join("\n");
@@ -457,6 +477,38 @@ test("outsourcing quality apply sends the required approximate defect-rate pair"
       "decision_note",
     ],
   );
+});
+
+test("sales apply completes the source-generated warehouse release task before shipping", async () => {
+  const plan = buildSourceDrivenFactPlan(sourceReport(), {
+    instanceKey: "ROW-SALES-RELEASE",
+    enabledPhases: ["sales"],
+  });
+  const { calls, rpc } = createRPC();
+
+  const report = await applySourceDrivenFactPlan(plan, {
+    rpc,
+    confirmation: sourceDrivenFactConfirmation(plan),
+    targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+  });
+
+  assert.equal(report.results.sales.shipment.status, "SHIPPED");
+  const orderedMethods = calls.map((call) => call.method);
+  const submitIndex = orderedMethods.indexOf("submit_shipment_release");
+  const completeIndex = orderedMethods.indexOf("complete_task_action");
+  const shipIndex = orderedMethods.indexOf("ship_shipment");
+  assert.ok(submitIndex >= 0);
+  assert.ok(completeIndex > submitIndex);
+  assert.ok(shipIndex > completeIndex);
+  const completion = calls[completeIndex];
+  assert.equal(completion.domain, "workflow");
+  assert.deepEqual(Object.keys(completion.params).sort(), [
+    "action_key",
+    "expected_version",
+    "idempotency_key",
+    "payload",
+    "task_id",
+  ]);
 });
 
 test("idempotent create responses already POSTED are reused without a second post", async () => {

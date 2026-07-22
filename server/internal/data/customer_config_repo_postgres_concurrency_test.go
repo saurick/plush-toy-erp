@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"server/internal/biz"
+	"server/internal/data/model/ent/workflowtask"
 
 	"github.com/go-kratos/kratos/v2/log"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -126,6 +127,144 @@ WHERE source = 'customer_config'
 	}
 	if auditCount != 1 {
 		t.Fatalf("activation audit count = %d, want 1", auditCount)
+	}
+}
+
+func TestCustomerConfigPostgresCountOpenWorkflowTasksUsesRuntimeTaskCategoriesAndFallbackRoles(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	repo := NewCustomerConfigRepo(data, log.NewStdLogger(io.Discard))
+	suffix := strings.ToLower(postgresTestSuffix())
+	taskCodePrefix := "customer-config-open-" + suffix
+	sourceType := "config-transition-test-" + suffix
+	activeRevision := "rev-active-" + suffix
+	otherRevision := "rev-other-" + suffix
+	ownerPoolKey := "pool-active-" + suffix
+	otherPoolKey := "pool-other-" + suffix
+	ownerPool := ownerPoolKey
+	otherPool := otherPoolKey
+	blankPool := "  "
+	processIDs := []int{}
+	nodeIDs := []int{}
+	t.Cleanup(func() {
+		cleanupCtx, cleanupCancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cleanupCancel()
+		if _, err := client.WorkflowTask.Delete().Where(workflowtask.SourceType(sourceType)).Exec(cleanupCtx); err != nil {
+			t.Errorf("cleanup workflow task fixtures: %v", err)
+		}
+		for index := len(nodeIDs) - 1; index >= 0; index-- {
+			if err := client.ProcessNodeInstance.DeleteOneID(nodeIDs[index]).Exec(cleanupCtx); err != nil {
+				t.Errorf("cleanup process node fixture %d: %v", nodeIDs[index], err)
+			}
+		}
+		for index := len(processIDs) - 1; index >= 0; index-- {
+			if err := client.ProcessInstance.DeleteOneID(processIDs[index]).Exec(cleanupCtx); err != nil {
+				t.Errorf("cleanup process fixture %d: %v", processIDs[index], err)
+			}
+		}
+	})
+	createAnchor := func(label, revision string, businessRefID int) (int, int) {
+		t.Helper()
+		key := "cc-count-" + label + "-" + suffix
+		instance, err := client.ProcessInstance.Create().
+			SetProcessKey(key).
+			SetProcessVersion("v1").
+			SetConfigRevision(revision).
+			SetDefinitionHash("sha256:" + key).
+			SetBusinessRefType("customer-config-count").
+			SetBusinessRefID(businessRefID).
+			SetIdempotencyKey(key + ":v1").
+			SetStatus(biz.ProcessStatusActive).
+			Save(ctx)
+		if err != nil {
+			t.Fatalf("create process anchor %s: %v", label, err)
+		}
+		processIDs = append(processIDs, instance.ID)
+		node, err := client.ProcessNodeInstance.Create().
+			SetProcessInstanceID(instance.ID).
+			SetNodeKey("workflow-task").
+			SetNodeType(biz.ProcessNodeTypeHumanTask).
+			SetAttempt(1).
+			SetStatus(biz.ProcessNodeStatusWaiting).
+			SetPolicySnapshot(map[string]any{}).
+			Save(ctx)
+		if err != nil {
+			t.Fatalf("create process node anchor %s: %v", label, err)
+		}
+		nodeIDs = append(nodeIDs, node.ID)
+		return instance.ID, node.ID
+	}
+	activeProcessID, activeNodeID := createAnchor("active", activeRevision, 1)
+	nullRevisionProcessID, nullRevisionNodeID := createAnchor("null-revision", activeRevision, 2)
+	otherProcessID, otherNodeID := createAnchor("other", otherRevision, 3)
+	intPointer := func(value int) *int { return &value }
+
+	fixtures := []struct {
+		revision              *string
+		poolKey               *string
+		ownerRoleKey          string
+		status                string
+		processInstanceID     *int
+		processNodeInstanceID *int
+	}{
+		{revision: &activeRevision, poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready", processInstanceID: intPointer(activeProcessID), processNodeInstanceID: intPointer(activeNodeID)},
+		{revision: &activeRevision, poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready"},
+		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready"},
+		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "blocked"},
+		{ownerRoleKey: biz.SalesRoleKey, status: "ready"},
+		{poolKey: &blankPool, ownerRoleKey: biz.SalesRoleKey, status: "blocked"},
+		{poolKey: &otherPool, ownerRoleKey: biz.SalesRoleKey, status: "ready"},
+		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready", processInstanceID: intPointer(nullRevisionProcessID), processNodeInstanceID: intPointer(nullRevisionNodeID)},
+		{revision: &otherRevision, poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready", processInstanceID: intPointer(otherProcessID), processNodeInstanceID: intPointer(otherNodeID)},
+		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "done"},
+		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "rejected"},
+		{ownerRoleKey: biz.FinanceRoleKey, status: "ready"},
+	}
+	for index, fixture := range fixtures {
+		builder := client.WorkflowTask.Create().
+			SetTaskCode(taskCodePrefix + fmt.Sprintf("-%d", index)).
+			SetTaskGroup("config_transition_test").
+			SetTaskName("配置切换任务计数").
+			SetSourceType(sourceType).
+			SetSourceID(index + 1).
+			SetTaskStatusKey(fixture.status).
+			SetOwnerRoleKey(fixture.ownerRoleKey).
+			SetNillableOwnerPoolKey(fixture.poolKey).
+			SetNillableProcessInstanceID(fixture.processInstanceID).
+			SetNillableProcessNodeInstanceID(fixture.processNodeInstanceID)
+		if fixture.revision != nil {
+			builder.SetConfigRevision(*fixture.revision)
+		}
+		if _, err := builder.Save(ctx); err != nil {
+			t.Fatalf("insert workflow task fixture %d: %v", index, err)
+		}
+	}
+
+	checks := []struct {
+		name     string
+		poolKeys []string
+		roleKeys []string
+		want     int
+	}{
+		{name: "combined", poolKeys: []string{ownerPoolKey}, roleKeys: []string{biz.SalesRoleKey}, want: 5},
+		{name: "explicit pool only", poolKeys: []string{ownerPoolKey}, want: 3},
+		{name: "fallback role only", roleKeys: []string{biz.SalesRoleKey}, want: 2},
+	}
+	for _, check := range checks {
+		count, err := repo.CountOpenWorkflowTasksByResponsibilities(
+			ctx,
+			biz.DefaultCustomerKey,
+			activeRevision,
+			check.poolKeys,
+			check.roleKeys,
+		)
+		if err != nil {
+			t.Fatalf("%s: CountOpenWorkflowTasksByResponsibilities() error = %v", check.name, err)
+		}
+		if count != check.want {
+			t.Fatalf("%s: CountOpenWorkflowTasksByResponsibilities() = %d, want %d", check.name, count, check.want)
+		}
 	}
 }
 

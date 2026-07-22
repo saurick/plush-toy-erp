@@ -102,6 +102,8 @@ type Tx struct {
 	QualityInspection *QualityInspectionClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
+	// RoleDataScope is the client for interacting with the RoleDataScope builders.
+	RoleDataScope *RoleDataScopeClient
 	// RolePermission is the client for interacting with the RolePermission builders.
 	RolePermission *RolePermissionClient
 	// RoleProfile is the client for interacting with the RoleProfile builders.
@@ -312,6 +314,7 @@ func (tx *Tx) init() {
 	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)
 	tx.QualityInspection = NewQualityInspectionClient(tx.config)
 	tx.Role = NewRoleClient(tx.config)
+	tx.RoleDataScope = NewRoleDataScopeClient(tx.config)
 	tx.RolePermission = NewRolePermissionClient(tx.config)
 	tx.RoleProfile = NewRoleProfileClient(tx.config)
 	tx.RuntimeAuditEvent = NewRuntimeAuditEventClient(tx.config)

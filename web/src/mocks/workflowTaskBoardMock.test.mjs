@@ -42,6 +42,7 @@ test('workflowTaskBoardMock: 四泳道互斥且 rejected 只投影为已结束',
   })
 
   assert.equal(board.total, 5)
+  assert.deepEqual(board.owner_role_keys, ['engineering'])
   assert.deepEqual(board.counts, {
     actionable: 1,
     exception: 1,
@@ -79,6 +80,7 @@ test('workflowTaskBoardMock: 服务端筛选、source options 与聚焦分页口
 
   assert.equal(board.total, 23)
   assert.deepEqual(board.source_types, ['inbound', 'project-orders'])
+  assert.deepEqual(board.owner_role_keys, ['engineering'])
   assert.equal(board.lanes.length, 1)
   assert.equal(board.lanes[0].total, 23)
   assert.deepEqual(

@@ -29,7 +29,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
-		biz.PermissionERPDashboardRead,
+		biz.PermissionERPWorkbenchRead,
 	))
 	actorCaptureRepo := &purchaseReceiptActorCaptureRepo{InventoryRepo: datarepo.NewInventoryRepo(data, log.NewStdLogger(io.Discard))}
 	j.inventoryUC = biz.NewInventoryUsecase(actorCaptureRepo)
@@ -191,7 +191,7 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		[]string{biz.WarehouseRoleKey},
 		biz.PermissionWarehouseInboundConfirm,
 		biz.PermissionWarehouseInboundRead,
-		biz.PermissionERPDashboardRead,
+		biz.PermissionERPWorkbenchRead,
 	)}
 
 	_, postedRes, err := j.handlePurchase(adminCtx, "post_purchase_receipt", "3", mustJSONRPCStruct(t, map[string]any{"id": float64(receiptID)}))
@@ -297,6 +297,10 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 	if total := client.PurchaseReceipt.Query().CountX(ctx); total != wantReceiptTotal {
 		t.Fatalf("expected one source-bound purchase receipt fixture, got %d", total)
 	}
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+		[]string{biz.BossRoleKey},
+		biz.PermissionERPBusinessDashboardRead,
+	)}
 
 	_, dashboardRes, err := j.handleBusiness(adminCtx, "dashboard_stats", "6", nil)
 	if err != nil {
@@ -306,6 +310,12 @@ func TestJsonrpcDispatcher_PurchaseReceiptAPIClosesInboundInventoryFact(t *testi
 		t.Fatalf("expected dashboard OK, got %#v", dashboardRes)
 	}
 	assertDashboardInboundPurchaseReceiptProjection(t, dashboardRes, wantReceiptTotal)
+	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin(
+		[]string{biz.WarehouseRoleKey},
+		biz.PermissionWarehouseInboundConfirm,
+		biz.PermissionWarehouseInboundRead,
+		biz.PermissionERPWorkbenchRead,
+	)}
 
 	_, cancelledRes, err := j.handlePurchase(adminCtx, "cancel_purchase_receipt", "7", mustJSONRPCStruct(t, map[string]any{"id": float64(receiptID)}))
 	if err != nil {
@@ -467,7 +477,7 @@ func TestJsonrpcDispatcher_CreatePurchaseReceiptFromPurchaseOrderCreatesDraftOnl
 		biz.PermissionPurchaseOrderRead,
 		biz.PermissionPurchaseReceiptCreate,
 		biz.PermissionPurchaseReceiptRead,
-		biz.PermissionERPDashboardRead,
+		biz.PermissionERPWorkbenchRead,
 	))
 	_, missingReceiptKeyRes, err := j.handlePurchase(workflowJSONRPCAdminContext(), "create_purchase_receipt_from_purchase_order", "missing-key", mustJSONRPCStruct(t, map[string]any{
 		"purchase_order_id": float64(saved.Order.ID),

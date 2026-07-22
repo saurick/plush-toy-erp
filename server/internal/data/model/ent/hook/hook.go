@@ -548,6 +548,18 @@ func (f RoleFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error)
 	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RoleMutation", m)
 }
 
+// The RoleDataScopeFunc type is an adapter to allow the use of ordinary
+// function as RoleDataScope mutator.
+type RoleDataScopeFunc func(context.Context, *ent.RoleDataScopeMutation) (ent.Value, error)
+
+// Mutate calls f(ctx, m).
+func (f RoleDataScopeFunc) Mutate(ctx context.Context, m ent.Mutation) (ent.Value, error) {
+	if mv, ok := m.(*ent.RoleDataScopeMutation); ok {
+		return f(ctx, mv)
+	}
+	return nil, fmt.Errorf("unexpected mutation type %T. expect *ent.RoleDataScopeMutation", m)
+}
+
 // The RolePermissionFunc type is an adapter to allow the use of ordinary
 // function as RolePermission mutator.
 type RolePermissionFunc func(context.Context, *ent.RolePermissionMutation) (ent.Value, error)

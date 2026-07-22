@@ -453,6 +453,15 @@ type InventoryRepo interface {
 	EvaluatePurchaseReceiptQualityGate(ctx context.Context, receiptID int) (*PurchaseReceiptQualityGate, error)
 }
 
+// InventoryWarehouseAccessRepo applies warehouse predicates before counting
+// and pagination. Authenticated entry points must use these methods instead of
+// the unrestricted repository methods used by trusted fact-posting internals.
+type InventoryWarehouseAccessRepo interface {
+	ListInventoryBalancesForAccess(ctx context.Context, filter InventoryBalanceFilter, scope WarehouseDataScope) ([]*InventoryBalance, int, error)
+	ListInventoryLotsForAccess(ctx context.Context, filter InventoryLotFilter, scope WarehouseDataScope) ([]*InventoryLot, int, error)
+	ListInventoryTxnsForAccess(ctx context.Context, filter InventoryTxnFilter, scope WarehouseDataScope) ([]*InventoryTxn, int, error)
+}
+
 // PurchaseReceiptCancellationActorRepo keeps the authenticated operator on the
 // process-command compensation written with a posted receipt reversal.
 type PurchaseReceiptCancellationActorRepo interface {
@@ -523,12 +532,40 @@ func (uc *InventoryUsecase) CreateInventoryTxn(ctx context.Context, in *Inventor
 	return uc.repo.CreateInventoryTxn(ctx, &normalized)
 }
 
+func (uc *InventoryUsecase) CreateInventoryTxnForAccess(ctx context.Context, in *InventoryTxnCreate, scope WarehouseDataScope) (*InventoryTxn, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeInventoryTxnCreate(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateWarehouseDataScopeAccess(scope, normalized.WarehouseID); err != nil {
+		return nil, err
+	}
+	return uc.repo.CreateInventoryTxn(ctx, &normalized)
+}
+
 func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalance(ctx context.Context, in *InventoryTxnCreate) (*InventoryTxnApplyResult, error) {
 	if uc == nil || uc.repo == nil || in == nil {
 		return nil, ErrBadParam
 	}
 	normalized, err := normalizeInventoryTxnCreate(*in)
 	if err != nil {
+		return nil, err
+	}
+	return uc.repo.ApplyInventoryTxnAndUpdateBalance(ctx, &normalized)
+}
+
+func (uc *InventoryUsecase) ApplyInventoryTxnAndUpdateBalanceForAccess(ctx context.Context, in *InventoryTxnCreate, scope WarehouseDataScope) (*InventoryTxnApplyResult, error) {
+	if uc == nil || uc.repo == nil || in == nil {
+		return nil, ErrBadParam
+	}
+	normalized, err := normalizeInventoryTxnCreate(*in)
+	if err != nil {
+		return nil, err
+	}
+	if err := ValidateWarehouseDataScopeAccess(scope, normalized.WarehouseID); err != nil {
 		return nil, err
 	}
 	return uc.repo.ApplyInventoryTxnAndUpdateBalance(ctx, &normalized)
@@ -545,6 +582,20 @@ func (uc *InventoryUsecase) GetInventoryBalance(ctx context.Context, key Invento
 	return uc.repo.GetInventoryBalance(ctx, key)
 }
 
+func (uc *InventoryUsecase) GetInventoryBalanceForAccess(ctx context.Context, key InventoryBalanceKey, scope WarehouseDataScope) (*InventoryBalance, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, ErrBadParam
+	}
+	key = normalizeInventoryBalanceKey(key)
+	if !isValidInventoryBalanceKey(key) {
+		return nil, ErrBadParam
+	}
+	if err := ValidateWarehouseDataScopeAccess(scope, key.WarehouseID); err != nil {
+		return nil, err
+	}
+	return uc.repo.GetInventoryBalance(ctx, key)
+}
+
 func (uc *InventoryUsecase) ListInventoryBalances(ctx context.Context, filter InventoryBalanceFilter) ([]*InventoryBalance, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
@@ -554,6 +605,25 @@ func (uc *InventoryUsecase) ListInventoryBalances(ctx context.Context, filter In
 		return nil, 0, err
 	}
 	return uc.repo.ListInventoryBalances(ctx, normalized)
+}
+
+func (uc *InventoryUsecase) ListInventoryBalancesForAccess(ctx context.Context, filter InventoryBalanceFilter, scope WarehouseDataScope) ([]*InventoryBalance, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeInventoryBalanceFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	scope = NormalizeWarehouseDataScope(scope)
+	if err := ValidateWarehouseDataScopeAccess(scope, normalized.WarehouseID); err != nil {
+		return nil, 0, err
+	}
+	repo, ok := uc.repo.(InventoryWarehouseAccessRepo)
+	if !ok {
+		return nil, 0, ErrDataScopeForbidden
+	}
+	return repo.ListInventoryBalancesForAccess(ctx, normalized, scope)
 }
 
 func (uc *InventoryUsecase) ListInventoryLots(ctx context.Context, filter InventoryLotFilter) ([]*InventoryLot, int, error) {
@@ -567,6 +637,25 @@ func (uc *InventoryUsecase) ListInventoryLots(ctx context.Context, filter Invent
 	return uc.repo.ListInventoryLots(ctx, normalized)
 }
 
+func (uc *InventoryUsecase) ListInventoryLotsForAccess(ctx context.Context, filter InventoryLotFilter, scope WarehouseDataScope) ([]*InventoryLot, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeInventoryLotFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	scope = NormalizeWarehouseDataScope(scope)
+	if err := ValidateWarehouseDataScopeAccess(scope, normalized.WarehouseID); err != nil {
+		return nil, 0, err
+	}
+	repo, ok := uc.repo.(InventoryWarehouseAccessRepo)
+	if !ok {
+		return nil, 0, ErrDataScopeForbidden
+	}
+	return repo.ListInventoryLotsForAccess(ctx, normalized, scope)
+}
+
 func (uc *InventoryUsecase) ListInventoryTxns(ctx context.Context, filter InventoryTxnFilter) ([]*InventoryTxn, int, error) {
 	if uc == nil || uc.repo == nil {
 		return nil, 0, ErrBadParam
@@ -576,6 +665,25 @@ func (uc *InventoryUsecase) ListInventoryTxns(ctx context.Context, filter Invent
 		return nil, 0, err
 	}
 	return uc.repo.ListInventoryTxns(ctx, normalized)
+}
+
+func (uc *InventoryUsecase) ListInventoryTxnsForAccess(ctx context.Context, filter InventoryTxnFilter, scope WarehouseDataScope) ([]*InventoryTxn, int, error) {
+	if uc == nil || uc.repo == nil {
+		return nil, 0, ErrBadParam
+	}
+	normalized, err := normalizeInventoryTxnFilter(filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	scope = NormalizeWarehouseDataScope(scope)
+	if err := ValidateWarehouseDataScopeAccess(scope, normalized.WarehouseID); err != nil {
+		return nil, 0, err
+	}
+	repo, ok := uc.repo.(InventoryWarehouseAccessRepo)
+	if !ok {
+		return nil, 0, ErrDataScopeForbidden
+	}
+	return repo.ListInventoryTxnsForAccess(ctx, normalized, scope)
 }
 
 func (uc *InventoryUsecase) CreateBOMHeader(ctx context.Context, in *BOMHeaderCreate) (*BOMHeader, error) {

@@ -639,6 +639,12 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
     }),
     { customer_key: "yoyoosun", id: 1 },
   );
+  assert.deepEqual(
+    manualAcceptanceFactRPCParams("workflow", "list_tasks", {
+      task_group: "production_scheduling",
+    }),
+    { task_group: "production_scheduling" },
+  );
   for (const method of [
     "list_purchase_returns",
     "list_purchase_receipt_adjustments",
@@ -678,6 +684,24 @@ test("strict RPC params follow endpoint allowlists without broad customer inject
       "create_receivable_from_shipment",
     ),
     "admin",
+  );
+  assert.equal(
+    manualAcceptanceFactRole("workflow", "list_tasks", {
+      task_group: "production_scheduling",
+    }),
+    "pmc",
+  );
+  assert.equal(
+    manualAcceptanceFactRole("workflow", "complete_task_action", {
+      payload: { surface_key: "shipment-release" },
+    }),
+    "warehouse",
+  );
+  assert.equal(
+    manualAcceptanceFactRole("workflow", "complete_task_action", {
+      payload: { surface_key: "production-exception" },
+    }),
+    "production",
   );
 });
 
@@ -908,6 +932,15 @@ test("final inventory readback runs after all facts and rejects truncated pages"
   const calls = [];
   const rpc = async ({ method, params }) => {
     calls.push({ method, params });
+    if (method === "list_inventory_lots") {
+      const id = Number(params.keyword.split("-").at(-1));
+      return {
+        inventory_lots: [
+          { id, lot_no: params.keyword, status: id === 1 ? "HOLD" : "REJECTED" },
+        ],
+        total: 1,
+      };
+    }
     if (method === "list_inventory_balances") {
       return {
         inventory_balances: [{ id: params.lot_id * 10, lot_id: params.lot_id }],
@@ -932,6 +965,10 @@ test("final inventory readback runs after all facts and rejects truncated pages"
     [2, 1],
   );
   assert.deepEqual(
+    result.inventoryLots.map((item) => item.status),
+    ["REJECTED", "HOLD"],
+  );
+  assert.deepEqual(
     result.inventoryBalances.map((item) => item.id),
     [20, 10],
   );
@@ -939,17 +976,20 @@ test("final inventory readback runs after all facts and rejects truncated pages"
     result.inventoryTxns.map((item) => item.id),
     [200, 100],
   );
-  assert.equal(calls.length, 4);
+  assert.equal(calls.length, 6);
 
   await assert.rejects(
     readManualAcceptanceFinalInventoryReferences(
       async ({ method }) => {
+        if (method === "list_inventory_lots") {
+          return { inventory_lots: [{ id: 1, lot_no: "LOT-1" }], total: 1 };
+        }
         if (method === "list_inventory_balances") {
           return { inventory_balances: [{ id: 10 }], total: 2 };
         }
         return { inventory_txns: [], total: 0 };
       },
-      [{ id: 1 }],
+      [{ id: 1, lot_no: "LOT-1" }],
     ),
     /balance readback was truncated/u,
   );

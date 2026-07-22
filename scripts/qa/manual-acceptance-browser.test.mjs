@@ -430,6 +430,10 @@ test("manual acceptance browser plan covers all 50 catalog targets and ten forma
     "demo_boss",
   );
   assert.equal(
+    plan.targets.find((item) => item.key === "global-dashboard")?.username,
+    "demo_boss",
+  );
+  assert.equal(
     plan.targets.find((item) => item.key === "task-board")?.username,
     "demo_boss",
   );
@@ -1107,6 +1111,39 @@ test("taskGroup coverage fails closed for missing or unknown scenarios", () => {
   );
 });
 
+test("taskGroup coverage ignores source workflow probes without role scenarios", () => {
+  const taskCoverage = taskGroupCoverageFixture();
+  const readiness = {
+    reportInputs: {
+      taskReport: {
+        taskGroupCoverageDigest: taskCoverage.catalogScenarioDigest,
+      },
+    },
+    summary: { taskGroupCoverage: taskCoverage.summary },
+    probes: [
+      ...taskCoverage.probes,
+      {
+        id: "workflow-tasks:shipment_release",
+        requiredScenarios: [],
+        requiredTaskGroups: [],
+        taskGroupCounts: {},
+        missingTaskGroups: [],
+        unknownTaskGroups: [],
+        enoughTaskGroups: true,
+        scenarioCounts: {},
+        missingScenarios: [],
+        unknownScenarios: [],
+        enoughScenarios: true,
+      },
+    ],
+  };
+
+  assert.equal(
+    assertManualAcceptanceTaskGroupCoverage(readiness).complete,
+    true,
+  );
+});
+
 test("fresh print workspaces never hide render-pdf failures by route or status", () => {
   const events = [
     {
@@ -1353,7 +1390,7 @@ test("task board binds task-code metadata to the exact current-batch total", () 
   );
 });
 
-test("mobile current-batch proof requires exact role source and exact DOM total", () => {
+test("mobile current-batch proof requires an exact role source and a visible current-batch task", () => {
   const roleKey = "sales";
   const currentBatch = {
     dataStatus: "pass",
@@ -1374,6 +1411,7 @@ test("mobile current-batch proof requires exact role source and exact DOM total"
     roleKey,
     todoCount: 14,
     doneCount: 6,
+    visibleCurrentBatchTaskCount: 1,
     minimumRecords: 20,
     currentBatch,
   });
@@ -1383,6 +1421,18 @@ test("mobile current-batch proof requires exact role source and exact DOM total"
       roleKey,
       todoCount: 20,
       doneCount: 20,
+      visibleCurrentBatchTaskCount: 1,
+      minimumRecords: 20,
+      currentBatch,
+    }).minimumSatisfied,
+    true,
+  );
+  assert.equal(
+    evaluateMobileCurrentBatchEvidence({
+      roleKey,
+      todoCount: 20,
+      doneCount: 20,
+      visibleCurrentBatchTaskCount: 0,
       minimumRecords: 20,
       currentBatch,
     }).minimumSatisfied,
@@ -1393,6 +1443,7 @@ test("mobile current-batch proof requires exact role source and exact DOM total"
       roleKey,
       todoCount: 14,
       doneCount: 6,
+      visibleCurrentBatchTaskCount: 1,
       minimumRecords: 20,
       currentBatch: {
         ...currentBatch,
@@ -2020,7 +2071,10 @@ test("readiness binding cannot replace current DOM list minimum proof", async ()
   );
   assert.match(source, /\.erp-task-board-card/u);
   assert.match(source, /\.erp-audit-event/u);
-  assert.match(source, /row\.querySelectorAll\("td strong"\)/u);
+  assert.match(
+    source,
+    /\.ant-table-tbody > tr:not\(\.ant-table-placeholder\)/u,
+  );
   assert.match(source, /name: \/打开可编辑打印窗口\/u/u);
   assert.match(source, /name: \/查看明细\/u/u);
   assert.match(source, /getByRole\("tab", \{ name: \/员工账号/u);

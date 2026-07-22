@@ -45,124 +45,6 @@ const RUNTIME_FIELD_POLICY_KEYS_BY_SURFACE = Object.freeze({
   ]),
 })
 
-const PRODUCT_CORE_ACTION_KEYS = new Set([
-  'bom.activate',
-  'bom.create',
-  'bom.read',
-  'bom.update',
-  'contact.create',
-  'contact.disable',
-  'contact.read',
-  'contact.set_primary',
-  'contact.update',
-  'customer.create',
-  'customer.disable',
-  'customer.read',
-  'customer.update',
-  'customer_config.activate',
-  'customer_config.publish',
-  'customer_config.read',
-  'customer_config.rollback',
-  'erp.business_chain_debug.read',
-  'erp.dashboard.read',
-  'erp.print_template.read',
-  'finance.payable.confirm',
-  'finance.payable.read',
-  'finance.invoice.confirm',
-  'finance.invoice.read',
-  'finance.receivable.confirm',
-  'finance.receivable.read',
-  'finance.reconciliation.confirm',
-  'finance.reconciliation.read',
-  'finance.report.read',
-  'material.create',
-  'material.disable',
-  'material.read',
-  'material.update',
-  'outsourcing.order.confirm',
-  'outsourcing.order.create',
-  'outsourcing.order.read',
-  'outsourcing.order.update',
-  'outsourcing.fact.cancel',
-  'outsourcing.fact.post',
-  'outsourcing.fact.read',
-  'outsourcing.material_issue.create',
-  'outsourcing.return_receipt.create',
-  'pmc.plan.create',
-  'pmc.plan.read',
-  'pmc.plan.update',
-  'pmc.risk.handle',
-  'pmc.risk.read',
-  'production.material_issue.create',
-  'process.create',
-  'process.disable',
-  'process.read',
-  'process.update',
-  'product.create',
-  'product.disable',
-  'product.read',
-  'product.update',
-  'product_sku.create',
-  'product_sku.disable',
-  'product_sku.read',
-  'product_sku.update',
-  'purchase.order.approve',
-  'purchase.order.create',
-  'purchase.order.read',
-  'purchase.order.update',
-  'purchase.receipt.create',
-  'purchase.receipt.adjustment.cancel',
-  'purchase.receipt.adjustment.create',
-  'purchase.receipt.adjustment.post',
-  'purchase.receipt.adjustment.read',
-  'purchase.receipt.read',
-  'purchase.return.cancel',
-  'purchase.return.create',
-  'purchase.return.post',
-  'purchase.return.read',
-  'quality.exception.handle',
-  'quality.inspection.create',
-  'quality.inspection.read',
-  'quality.inspection.update',
-  'sales_order.activate',
-  'sales_order.cancel',
-  'sales_order.close',
-  'sales_order.create',
-  'sales_order.read',
-  'sales_order.submit',
-  'sales_order.update',
-  'sales_order_item.read',
-  'shipment.cancel',
-  'shipment.create',
-  'shipment.read',
-  'shipment.ship',
-  'supplier.create',
-  'supplier.disable',
-  'supplier.read',
-  'supplier.update',
-  'system.audit.read',
-  'system.role.permission.manage',
-  'system.permission.read',
-  'system.role.read',
-  'system.user.create',
-  'system.user.disable',
-  'system.user.read',
-  'system.user.update',
-  'warehouse.adjustment.create',
-  'warehouse.inbound.confirm',
-  'warehouse.inbound.read',
-  'warehouse.inventory.read',
-  'warehouse.outbound.confirm',
-  'warehouse.outbound.read',
-  'workflow.task.approve',
-  'workflow.task.assign',
-  'workflow.task.complete',
-  'workflow.task.create',
-  'workflow.task.read',
-  'workflow.task.reject',
-  'workflow.task.update',
-])
-
 function isLocalDevRuntime() {
   return import.meta.env?.DEV === true
 }
@@ -472,8 +354,7 @@ export function resolveEffectiveSessionCustomerKey(activeBrand = {}) {
 
 export function resolveEffectiveSessionPageAccess(
   adminProfile,
-  pageKey,
-  { isSuperAdmin = false, isLocalDev = isLocalDevRuntime() } = {}
+  pageKey
 ) {
   const normalizedPageKey = typeof pageKey === 'string' ? pageKey.trim() : ''
   if (!normalizedPageKey) {
@@ -485,28 +366,10 @@ export function resolveEffectiveSessionPageAccess(
   const session = adminProfile?.effective_session
   const pages = session?.pages
   if (!Array.isArray(pages)) {
-    if (isLocalDev) {
-      return { allowed: true, reason: 'local_dev_customer_config_diagnostic' }
-    }
-    if (isSuperAdmin) {
-      return { allowed: true, reason: 'super_admin_product_core' }
-    }
     return { allowed: false, reason: 'effective_session_pages_missing' }
   }
   if (pages.includes(normalizedPageKey)) {
     return { allowed: true, reason: 'effective_session_page' }
-  }
-  if (isLocalDev) {
-    return {
-      allowed: true,
-      reason:
-        session?.source === EFFECTIVE_SESSION_SYNC_FAILED_SOURCE
-          ? 'local_dev_sync_failed_diagnostic'
-          : 'local_dev_customer_config_diagnostic',
-    }
-  }
-  if (isSuperAdmin) {
-    return { allowed: true, reason: 'super_admin_product_core' }
   }
   return { allowed: false, reason: 'effective_session_page_blocked' }
 }
@@ -602,17 +465,6 @@ export function effectiveSessionAllowsAction(adminProfile, actionKey) {
     return false
   }
   const session = adminProfile?.effective_session
-  const sessionActions = Array.isArray(session?.actions) ? session.actions : []
-  const rbacActions = Array.isArray(adminProfile?.permissions)
-    ? adminProfile.permissions
-    : []
-  if (adminProfile?.is_super_admin === true) {
-    return (
-      PRODUCT_CORE_ACTION_KEYS.has(normalizedActionKey) ||
-      sessionActions.includes(normalizedActionKey) ||
-      rbacActions.includes(normalizedActionKey)
-    )
-  }
   if (!session || typeof session !== 'object') {
     return false
   }
@@ -828,10 +680,7 @@ export async function loadProfileSyncReadWithRetry(
     try {
       return await load()
     } catch (error) {
-      if (
-        !isTransientProfileSyncError(error) ||
-        retryIndex >= delays.length
-      ) {
+      if (!isTransientProfileSyncError(error) || retryIndex >= delays.length) {
         throw error
       }
       const delayMs = delays[retryIndex]

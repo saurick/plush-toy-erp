@@ -6,6 +6,7 @@ import {
   isCustomerBusinessDataPageKey,
 } from './businessModules.mjs'
 import {
+  getAuthenticatedNavigationSections,
   getNavigationSections,
   getProductCoreNavigationSections,
   getRoleWorkbench,
@@ -27,7 +28,7 @@ test('seedData: 每个岗位任务端入口都有运行时角色标签', () => {
   assert.equal(getRoleWorkbench('missing-role'), null)
 })
 
-test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
+test('seedData: 权限菜单不混入前端文档、开发验收或通用帮助入口', () => {
   const navigationSections = getNavigationSections()
   const navPaths = navigationSections.flatMap((section) =>
     section.items.map((item) => item.path)
@@ -77,6 +78,27 @@ test('seedData: 桌面导航移除前端文档与开发验收入口', () => {
   assert(!navPaths.includes('/erp/help-center'))
   assert(!navPaths.some((path) => path.startsWith('/erp/docs/')))
   assert(!navPaths.some((path) => path.startsWith('/erp/qa/')))
+})
+
+test('seedData: 已登录账号统一获得岗位使用帮助入口', () => {
+  const authenticatedSections = getAuthenticatedNavigationSections()
+  assert.deepEqual(authenticatedSections, [
+    {
+      key: 'help',
+      title: '使用帮助',
+      items: [
+        {
+          key: 'help-center',
+          label: '岗位使用帮助',
+          path: '/erp/help-center',
+          shortLabel: '帮助',
+          description:
+            '根据当前账号的岗位查看工作重点、办理顺序、交接和常见问题。',
+          access: 'authenticated',
+        },
+      ],
+    },
+  ])
 })
 
 test('businessModules: 业务页菜单按毛绒业务收口且不依赖前端文档链接', () => {

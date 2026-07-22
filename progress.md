@@ -5,10 +5,84 @@
 ## 当前活跃事项
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
-- 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务和页面合同等改动统一按最终 `strict` 证据提交，不再把相邻差异拆算为独立未收口任务。冻结树首轮 `strict` 已输出 `status=complete`，本记录纳入后仍须对最终树再取得同一结果才允许提交。
-- 固定生产路线 / WIP 的版本化 migration 已生成；登记的个人开发库已读回到 `20260718125909`、83 executed、pending 0，schema 与约束已生效，但固定路线所需的工序标准位置仍须通过工序页或受控 seed 显式绑定。共享库和目标环境没有本轮 apply 证据；本轮不执行 schema / migration 或业务数据写入，角色演示账号密码重置是下述独立的本地认证数据写入。
-- 本轮已获得整树提交和推送授权；仍不创建分支、不部署、不执行共享库 / 目标库 migration 或 backfill，也不补做目标 health / smoke、真实岗位浏览器读回和客户 UAT。
+- 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务、九角色权限和页面合同按同一最终树核对，不把相邻差异拆算为独立已交付任务。最新完整 `strict` 已输出 `status=complete`；本记录写入后只需完成文档、diff、数据库守卫和证据一致性收口。
+- 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 已从空库应用到 `20260722000505`、90 executed、pending 0，并重新生成 fresh baseline、九阶段数据和浏览器证据；上一份模拟验收库保留为可恢复归档 `plush_erp_acceptance_v5_archive_20260722_0754`。共享库、133 和生产均没有本轮 apply 证据。
+- 当前请求没有授权提交或推送；仍不创建分支、不部署、不执行共享库 / 目标库 migration 或 backfill。提交推送必须先再次取得用户明确同意，目标 health / smoke、固定镜像 readback 和客户 UAT 仍是独立关口。
 - 发布目标仍是内网测试机 `192.168.0.133`；本次提交推送不等于该目标环境已经发布或验收。
+
+## 2026-07-22 永绅九角色 P0 权限与本地验收闭环
+
+完成：以 Product Core RBAC、永绅角色矩阵、客户配置投影和正式角色手册为同一链路，补齐老板、销售、工程、PMC、采购、仓库、品质、财务、生产九岗位的主责操作、协作只读、工作台、任务看板和上下游穿透。最终为 9 个角色、280 条角色权限分配、119 个唯一权限；全部业务岗位有工作台和任务看板，业务看板仅老板与 PMC。权限中心显示后端 RBAC、客户启用模块、角色页面投影和最终有效结果及阻断原因；直接 URL 访问继续 fail closed。后端新增仓库 Data Scope 的 `ALL / ASSIGNED / NONE` 强制查询边界，以及往来隐私、销售商业、采购商业、财务结算四组敏感字段读取权限，不用前端隐藏冒充安全控制。
+
+完成：补齐采购与仓库的采购退货 / 入库调整生命周期权限、工程材料建档维护、销售 / 采购联系人停用与主联系人设置、销售草稿取消、老板 / PMC 跨岗位任务监督等闭环。对应 Atlas migration 已完整进入 `20260721134123` 与 `20260722000500..00505`，fresh 和 populated-upgrade 均覆盖。角色手册 `docs/customers/yoyoosun/角色能力与流程矩阵.md` 逐角色列出职责、精确权限、菜单、责任池、协作交接和 Source Document / Workflow / Fact 边界，并使用表格和 Mermaid 保持可审查；客户包仍是 draft / preview-only，local-test 激活不改变正式发布状态。
+
+运行态证据：旧本地验收 revision 的同批 resume 因 `resume_baseline_config_mismatch` 正确失败，没有复用旧 baseline。随后将精确专用模拟库可恢复地重命名归档，重建同名空库并完成 90 / 90 migration、内容寻址配置 `yoyoosun-customer-package-v7.local-cb388f5a72dd9f59.runtime-v1` 的 validate / publish / transition / activate / effective-session readback，以及 1 个单位、4 个仓库、24 类业务对象为 0 的 fresh baseline。九阶段 runner 全部 completed，出货精确 47 张；九账号 JSON-RPC 门禁 9 / 9 完成允许读取、预期 `40304 PermissionDenied` 写探针和前后总数一致，业务写入为 0。
+
+浏览器循环：首轮 50 页验收为 49 / 50，真实暴露 BOM 搜索的旧异步响应覆盖新结果，导致色卡 25 行源单选择失败；没有重跑成偶然绿色。BOM 页面接入共享 latest-request coordinator，以 abort + sequence 双守卫禁止旧响应覆盖 rows / total / loading，并加入共享乱序回归合同。修复后从头重跑为正式桌面账号 10 / 10、移动岗位 9 / 9、异常账号 3 / 3、页面 50 / 50、页面数据证据 48 / 48；5 份业务来源 PDF 均为 HTTP 200、有效 PDF、25 行。独立角色菜单 smoke 同时为桌面 10 / 10、岗位任务端 9 / 9、管理员拒绝态 1 / 1，绑定上述新 revision。
+
+验证：最终从头执行 `bash scripts/qa/strict.sh`，脚本自动发现、Web 合同、Web 全量、fresh / populated-upgrade、关键 PostgreSQL、server quick / all、构建、扩展 Chromium、ShellCheck、shfmt、YAML、Web 零 warning 和 govulncheck 全部实际执行；Web 合同 209 / 209、server all 2808 / 2808，均为 0 fail / 0 skip，最终输出 `full status=complete` 与 `strict status=complete`。govulncheck 调用路径为 0 漏洞；`golang.org/x/text` 已升级到 0.39.0。定向 BOM 乱序合同 11 / 11、完整 Style L1 157 / 157 也通过。
+
+未做 / 风险：没有提交、推送或部署，没有在 133 / 生产应用 migration、激活 customer config、重放数据或执行目标角色 smoke，也没有客户 UAT。当前运行态证据只属于登记的本地专用模拟库；可恢复归档库尚未清理。正式发布仍须绑定最终 commit / image、目标 migration、health / ready、回滚点、目标岗位浏览器 / PDF 和客户签收。
+
+## 2026-07-22 按岗位区分的用户帮助中心
+
+完成：恢复 `/erp/help-center` 单一登录态入口，为老板、业务、采购、生产经理、仓库、财务、PMC、品质、工程和系统管理员提供不同的当日重点、推荐顺序、交接、注意事项和常见问题。帮助页优先消费当前客户有效岗位投影；多岗位可切换，单岗位不显示切换器，未知自定义岗位使用中性帮助且不暴露内部 key。常用页面捷径与当前账号已开放菜单取交集，手机待办按岗位权限显示。该入口由已登录壳层提供，不恢复旧 `erp.help_center.read`、后端 RBAC、客户配置菜单或 Markdown docs registry。
+
+验证：项目锁定 Node `24.14.0` 下帮助内容、导航、权限边界和页面合同定向测试 `31 / 31`，`pnpm lint`、`pnpm css`、生产构建、文档清单 `3 / 3` 和 `git diff --check` 通过。Chromium 已实测管理员从业务切换到仓库帮助，以及单岗位业务账号的 390px 暗色移动布局；两种布局均无横向溢出、页面控制台错误为 0。当前共享树的 Web 全量测试被另一组未收口 `PermissionCenterPage` 可见文案与 `userVisibleTechnicalFields.test.mjs` 断言不一致阻断；该失败不在本次帮助中心修改路径内，未作宽松处理或误报全量绿色。
+
+未做 / 风险：未改 schema、migration、后端权限、客户配置、Workflow 或 Fact，未连接或写入数据库，未部署 133，也未完成目标环境真实岗位登录、发布读回或客户 UAT。项目中没有对应帮助中心原型，本次按现有设计系统直接实现，不伪造原型状态。
+
+## 2026-07-22 任务看板负责岗位筛选按可见范围收口
+
+完成：修复桌面任务看板把九个业务岗位静态展示成可选项的问题。`get_task_board` 现在从与任务查询相同的 revision、责任池、角色和本人指派可见性条件中返回 `owner_role_keys` facet；前端只用该服务端投影生成“负责岗位”筛选，不再把筛选误呈现为账号角色切换。普通单岗位账号不显示无意义的岗位下拉；当前可见范围包含多个岗位时显示“全部可见岗位”和相应岗位；直接输入不在可见范围内的 `role` URL 参数会在安全的空结果读回后自动清除。现有 Workflow owner / assignee / RBAC 校验、任务动作和 Fact 边界未改变。
+
+验证：项目锁定 Node `24.14.0` 下，前端任务看板 API、响应合同、模型和 mock 定向测试 `38 / 38`，Web 全量 `1710 / 1710`，均为零失败、零跳过；`pnpm lint`、`pnpm css`、`git diff --check` 通过。后端 `go test ./internal/biz ./internal/data ./internal/service` 通过，数据层覆盖本岗责任池、跨岗位本人指派、岗位筛选切换和稳定 owner facet。Chromium Style L1 的全岗位可见与仓库单岗位两个场景 `2 / 2` 通过：单岗位从 `?role=sales` 进入后 URL 收敛、岗位控件为 0，筛选容器无横向溢出；多岗位仍可选择“全部可见岗位 / 仓库”。本轮定向与 Web 全量已使用 canonical Node，但仍不替代最终整树 strict、目标发布或客户验收。
+
+未做 / 风险：未改 schema、migration、角色权限、客户配置、Workflow 状态或 Fact；未连接或 apply 数据库，未部署 133，也未完成目标环境真实岗位登录、发布读回或客户 UAT。任务看板原型已经明确“当前可见范围”语义，本次是运行时合同修复，未修改或升级原型状态。当前共享 worktree 仍含客户角色、权限、迁移和销售订单等其他会话改动，本节只归属任务看板 API / UI / 测试文件，不把相邻 diff 或历史 strict 结果算作本次成果。
+
+## 2026-07-22 永绅九角色菜单、权限与本地运行态收口
+
+完成：把永绅九个业务岗位的主责入口和现有 Product Core RBAC 可安全支撑的协作只读入口一次性补齐。最终叶子菜单数为老板 19、销售 9、采购 12、生产 13、仓库 9、品质 12、财务 15、PMC 11、工程 7；全部岗位均有工作台和任务看板，业务看板仅老板、PMC。销售订单、采购金额、联系人和财务数据没有为“菜单更多”而向缺少服务端字段隔离的岗位扩散。`production-exceptions` 的页面合同改为 PMC 风险读取或品质检验读取任一满足，未把 PMC 风险权限错误授予品质。
+
+完成：修正两处运行态根因。客户配置切换原先把 entitlement 变化误算为责任池迁移，导致 148 条未结 Workflow 任务错误阻断纯权限版本；现在责任变化只比较角色责任、责任池和成员关系，并新增“存在未结任务时 entitlement-only 变更仍允许切换”的回归。存量 `business_default` 角色按设计不会被启动 seed 覆盖，因此新增 `20260722000500_reconcile_business_role_collaboration_permissions.sql`，只补齐当前 Product Core 默认角色范围内缺失的协作权限，不触碰 custom / system 角色。登记开发库按 `status → apply → status` 升级为 85 executed、0 pending。
+
+运行态证据：通过永绅开发控制台完成 validate、publish、CAS transition、activate 和 effective-session readback，当前本地 active revision 为 `yoyoosun-customer-package-v7.local-2d67add376fa18b4.runtime-v1`。真实 Chromium 重新登录 10 个桌面账号并验证 9 个岗位任务端、1 个管理员岗位端拒绝态；九业务账号的左侧全部叶子菜单集合、`visibleMenuItems`、`pages` 和 revision 均逐角色精确相等，报告为桌面 10 / 10、岗位端 9 / 9、拒绝态 1 / 1、diagnostic blocker 0。浏览器脚本已从“只等预期项出现”收紧为精确集合比较，越权多菜单也会失败。
+
+验证：角色配置 / 手册 / manifest 定向合同 86 / 86，运行态相关定向合同 75 / 75，客户配置 transition Go 回归通过。全量门禁循环复核先后真实发现并修正函数重命名后的静态守卫漂移、以及新增角色权限 reconciliation migration 导致 populated-upgrade 角色 version 读回合同过期；存量升级门禁单独复跑为 latest、pending 0、out-of-order 0。修正后从头执行最终 `strict`，scripts Node 1282 / 1282、Web 1698 / 1698、server quick 2631 / 2631、关键 PostgreSQL 191 / 191、server all 2785 / 2785 均为 0 fail / 0 skip，full、ShellCheck、shfmt、YAML、Web 零 warning、构建、fresh / populated upgrade、漏洞扫描与扩展浏览器门禁全部通过，最终输出 `strict status=complete`。
+
+未做 / 风险：没有部署到 133 或生产，没有目标环境 active revision、目标角色 smoke 或客户 UAT。通用本人 / 部门 / 指定仓库 Data Scope 与价格、成本、账户、联系方式字段级后端策略仍未实现；本轮只开放已有 Product Core 后端权限允许且经敏感信息评审的整页，其余协作继续通过任务摘要或后续脱敏 read model 解决。本轮尚未提交或推送。
+
+## 2026-07-21 持续质量 Worktree Handoff
+
+完成：从 `codex/continuous-quality` 按当前 `main` 结构选择性移植两组质量修复，没有整分支 merge、整提交 cherry-pick 或覆盖本地并行改动。销售订单编辑不再依据产品、单位和历史快照为 `product_sku_id=NULL` 的未分规格行自动推断 SKU；只有用户显式选择时才写入精确 SKU，历史未分规格真源保持不变。客户配置模块状态与 activate / rollback preflight 的开放 Workflow 任务计数由仅责任池扩为“责任池 + 无责任池时的 owner role 回退”：只统计 `ready / blocked`，ProcessRuntime 任务要求当前 revision 与成对有效锚点，standalone 来源任务要求 revision / process / node 三项均为空，显式责任池不按角色重复回退。该计数只用于配置切换与停用门禁，不修改 Workflow 任务，更不写入 Fact。
+
+验证：项目锁定 Node `24.14.0` 下前端定向合同 `77 / 77`、0 skip，销售订单历史 NULL SKU 的 Chromium Style L1 `1 / 1` 通过并停留在销售订单恢复态取证，Web production build 完成 `3319 modules transformed`；服务端 `go test ./internal/biz ./internal/data ./internal/service` 通过。一次性 PostgreSQL disposable critical gate 从 fresh migration 到当前本地 revision，状态为 executed 84、pending 0；关键 PostgreSQL `191 / 191`、0 skip、0 fail，其中新增客户配置责任计数用例真实执行通过，临时数据库已删除。定向语法检查和 `git diff --check` 通过。
+
+下一步：由当前单一 Git owner 将本节与同一冻结树其余改动统一运行最终 `strict` 后收口；不要单独 cherry-pick 旧 Worktree 的 `fafc5852` 或回灌旧 `progress.md`。如需发布，仍须绑定最终 commit / image，在目标环境独立完成 migration、health / ready、业务 smoke、回滚点与客户岗位验收。
+
+阻塞/风险：本次没有 schema / migration 新增，也没有向个人、共享、133 或生产数据库 apply；PostgreSQL 门禁使用的是一次性本机隔离库。当前共享工作树仍含本轮外的客户角色、权限、QA 和 migration 改动，本节测试证明当前组合树的相应切片，不把相邻差异归为本次 Handoff，也不代表最终 `full / strict`、提交推送、目标发布或客户 UAT 已完成。
+
+## 2026-07-21 永绅岗位工作台与协作菜单复核
+
+完成：把原来同时控制岗位工作台和跨部门业务看板的 `erp.dashboard.read` 拆为 `erp.workbench.read` 与 `erp.business_dashboard.read`；`dashboard_stats` 后端只接受业务看板权限，任务看板继续独立使用 `workflow.task.read`。新增受控 Atlas data migration：旧权限持有者迁到岗位工作台，只有原本持有旧权限的老板 / PMC 迁入业务看板，自定义角色的显式选择不由 seed 扩权。永绅 9 个业务岗位全部增加岗位工作台，业务看板只给老板和 PMC。
+
+完成：按已有后端只读权限补齐协作入口。PMC 增加生产异常；采购增加材料、库存与所需产品只读；品质增加生产订单和库存；财务增加销售订单、质检和库存；生产增加排程和库存。销售、工程、仓库增加岗位工作台。没有把通用 Data Scope 或角色级敏感字段做成 UI 假开关，相关后端强制链仍作为正式缺口。同步角色手册为 9 岗位、218 条分配、103 个唯一权限，并给同步测试增加菜单 / 权限重复项阻断。
+
+当前验证：`make data` 显示 migration 目录与 Ent 目标同步且生成完成；新增 populated-upgrade 场景从旧 `erp.dashboard.read` 绑定读回为 3 个岗位工作台绑定、2 个老板 / PMC 业务看板绑定，旧权限为 0，角色 version 精确递增，并由一次完整 `full` 的 fresh / populated upgrade 再次覆盖。后端定向测试通过；角色手册 / 客户配置定向合同 `94 / 94`、Web 关键合同 `207 / 207`、scripts 全量 `1281 / 1281`、Web all `1697 / 1697`、server quick `2630 / 2630`、server all `2784 / 2784` 均为零失败、零跳过。首次 `full` 真实发现工程岗位浏览器 smoke 仍使用旧菜单清单，修正后重新运行完整 `affected.sh --run`，最终输出 `full status=complete`。Chromium Style L1 已用 canonical Node 运行工作台、业务看板、菜单分组三个场景，`3 / 3` 通过；本记录写入后执行的最终 `strict` 也输出 `status=complete`，覆盖 full、ShellCheck、shfmt、YAML、Web 零 warning、构建、fresh / populated upgrade、漏洞扫描与扩展浏览器门禁。
+
+完成：scripts Node 测试入口固定为 `--test-concurrency=1`，并增加自测锁定该合同。原因是原入口并发运行大量 shell / Docker 模拟子进程时出现随机 `SIGTERM 143`；临时串行诊断无业务断言失败，标准串行入口随后真实完成 `1281 / 1281`，不再用偶发重跑作为绿色证据。
+
+未做 / 风险：未对个人、共享、目标或生产数据库执行 migration apply；客户包仍为 preview，未 publish / activate；没有目标 effective session、9 岗位真实登录、敏感字段红线、发布或 UAT 证据。本轮尚未提交或推送。
+
+## 2026-07-19 永绅角色、权限与全流程协作手册
+
+完成：以 Product Core 当前代码 / 测试、永绅客户配置和客户 Private 仓 17 份受控原件为分层真源，重写 `docs/customers/yoyoosun/角色能力与流程矩阵.md`。手册当前逐角色列出 9 个业务岗位、218 条精确权限分配（103 个唯一权限）、菜单、职责、责任池和与其他角色的交接；按 Source Document / Workflow / Fact 边界整理 22 类流程，并用 16 幅 Mermaid 图和表格展示销售、工程、PMC、采购、仓库、品质、生产、委外、出货、财务及控制角色的协作。同步补齐文档导航、流程编排矩阵和决策日志，不把客户图、预览配置或本地实现冒充目标运行事实。
+
+完成：新增手册同步测试并接入 docs affected gate 与 gate profile，动态读取 `roleFlowMatrix`、`customerPackage`、`flowOrchestrationCoverage` 和后端 144 个权限 key，逐角色核对精确权限集合、菜单、职责、工作流节点 / 命令、ProcessRuntime、甲方流程锚点、已知缺口、Mermaid 数量、敏感信息与最终验证占位。独立只读审查按事实边界、可读性和假绿风险循环复核；发现问题后回改并从受影响层重跑。
+
+当前验证：手册同步测试 7 / 7、客户配置 / readiness / 验收等定向 Node 测试 122 / 122、客户源 manifest / extract 工具测试 52 / 52、Mermaid 11 Chromium 解析 16 / 16、scripts 1280 / 1280、Web contracts 207 / 207、Web all 1697 / 1697、disposable PostgreSQL critical suite 190 / 190、server quick 2630 / 2630、server all 2784 / 2784 均为零失败、零跳过；`affected.sh --run` 5 / 5 命令组（docs 10 / 10、direct 42 / 42）、当前 worktree Chromium 3 / 3、`full.sh status=complete` 和 `strict.sh status=complete` 均通过。strict 还真实完成 ShellCheck、shfmt、YAML、Web 零 warning 与末尾严格漏洞扫描；Private 正式 pin 因 lock 指向旧 Product Core 而按设计 fail closed，不能计作通过。
+
+未做 / 风险：永绅客户包仍是 `runtimeEnabled=false` / `previewOnly=true`，未 publish / activate；未执行目标 migration、active revision / effective session 读回、9 岗位真实登录与写入 smoke、采购 / 加工合同实物 PDF、目标发布或客户 UAT。首次来料拒绝回路、客户普通岗位的采购退货 / 调整全生命周期权限、财务放行 Web 入口、包材独立事实、外部 QC 门户、PAYMENT / 银行多单核销 / 总账税控等缺口已在手册显式登记。本轮未提交、未推送、未部署，也未写入共享库、目标库或客户业务数据。
 
 ## 2026-07-19 整树严格门禁与 Git 收口
 

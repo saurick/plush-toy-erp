@@ -87,6 +87,10 @@ export function classifyNodeTestResult(result) {
   return { exitCode: summary.ok ? 0 : 1, summary }
 }
 
+export function buildNodeTestArgs(tests) {
+  return ['--test', '--test-reporter=tap', '--test-concurrency=1', ...tests]
+}
+
 function printHelp() {
   console.log(`Repository scripts Node test runner
 
@@ -127,7 +131,7 @@ async function main() {
   console.log(`[qa:node-tests] running=${tests.length}`)
   const result = spawnSync(
     process.execPath,
-    ['--test', '--test-reporter=tap', ...tests],
+    buildNodeTestArgs(tests),
     {
       cwd: path.resolve(options.rootDir, '..'),
       encoding: 'utf8',

@@ -872,7 +872,19 @@ async function waitForPath(page, expectedPath) {
 
 async function expectHeading(page, text) {
   const locator = page.getByRole('heading', { name: text }).first()
-  await locator.waitFor({ state: 'visible', timeout: 20_000 })
+  try {
+    await locator.waitFor({ state: 'visible', timeout: 20_000 })
+  } catch (error) {
+    const snapshot = await page
+      .locator('body')
+      .innerText()
+      .then((value) => String(value).replace(/\s+/gu, ' ').slice(0, 600))
+      .catch(() => '')
+    throw new Error(
+      `${error.message}\n当前地址: ${page.url()}\n页面摘要: ${snapshot}`,
+      { cause: error }
+    )
+  }
 }
 
 async function expectButton(page, name) {

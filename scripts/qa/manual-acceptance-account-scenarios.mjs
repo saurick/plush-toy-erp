@@ -204,6 +204,21 @@ function requireAdminRoleRecord(value, context) {
     disabled: value.disabled,
     permissionsEditable,
     permissionKeys: normalizePermissionKeys(value.permissions, context),
+    dataScopes: Array.isArray(value.data_scopes)
+      ? value.data_scopes.map((scope, index) => ({
+          resourceType: requiredText(
+            scope?.resource_type,
+            `${context}.data_scopes[${index}].resource_type`,
+          ),
+          mode: requiredText(
+            scope?.mode,
+            `${context}.data_scopes[${index}].mode`,
+          ),
+          resourceIds: Array.isArray(scope?.resource_ids)
+            ? [...new Set(scope.resource_ids.map(Number))].sort((a, b) => a - b)
+            : [],
+        }))
+      : [],
   };
 }
 
@@ -702,7 +717,99 @@ async function readRoleControlPlane({ backendURL, token, fetchImpl }) {
     }
     permissions.set(permission.permissionKey, permission);
   }
-  return { roles, permissions };
+  const warehouseIds = Array.isArray(data.warehouse_scope_options)
+    ? data.warehouse_scope_options
+        .map((item) => Number(item?.id))
+        .filter((id) => Number.isSafeInteger(id) && id > 0)
+        .sort((a, b) => a - b)
+    : [];
+  return { roles, permissions, warehouseIds };
+}
+
+function sameNumberList(left, right) {
+  return (
+    left.length === right.length &&
+    left.every((value, index) => value === right[index])
+  );
+}
+
+async function alignAcceptanceWarehouseScopes({
+  backendURL,
+  token,
+  fetchImpl,
+  allowMutation = true,
+}) {
+  const controlPlane = await readRoleControlPlane({
+    backendURL,
+    token,
+    fetchImpl,
+  });
+  if (controlPlane.warehouseIds.length !== 4) {
+    throw new CliError(
+      `验收数据范围要求精确 4 个核心仓库，当前为 ${controlPlane.warehouseIds.length}`,
+      2,
+    );
+  }
+  const actions = [];
+  for (const roleKey of ["warehouse", "quality"]) {
+    let role = controlPlane.roles.get(roleKey);
+    if (!role || role.disabled || role.roleType !== "business_default") {
+      throw new CliError(`岗位 ${roleKey} 不能配置验收仓库范围`, 2);
+    }
+    const current = role.dataScopes.find(
+      (scope) => scope.resourceType === "warehouse",
+    );
+    const alreadyAssigned =
+      current?.mode === "ASSIGNED" &&
+      sameNumberList(current.resourceIds, controlPlane.warehouseIds);
+    if (alreadyAssigned) {
+      actions.push({ roleKey, action: "unchanged" });
+      continue;
+    }
+    if (!allowMutation) {
+      throw new CliError(`岗位 ${roleKey} 的仓库数据范围未绑定当前 4 个核心仓库`, 2);
+    }
+    const updatedData = await rpcCall({
+      backendURL,
+      domain: "admin",
+      method: "set_role_data_scopes",
+      params: {
+        role_key: roleKey,
+        data_scopes: [
+          {
+            resource_type: "warehouse",
+            mode: "ASSIGNED",
+            resource_ids: controlPlane.warehouseIds,
+          },
+        ],
+        expected_version: role.version,
+      },
+      token,
+      fetchImpl,
+    });
+    role = requireAdminRoleRecord(
+      updatedData.role,
+      `admin.set_role_data_scopes ${roleKey}`,
+    );
+    const readback = role.dataScopes.find(
+      (scope) => scope.resourceType === "warehouse",
+    );
+    if (
+      readback?.mode !== "ASSIGNED" ||
+      !sameNumberList(readback.resourceIds, controlPlane.warehouseIds)
+    ) {
+      throw new CliError(`岗位 ${roleKey} 的仓库数据范围写入不完整`);
+    }
+    actions.push({ roleKey, action: "updated" });
+  }
+  return {
+    source: "manual-acceptance-core-warehouses",
+    mode: allowMutation ? "reconcile" : "verify-only",
+    warehouseIds: controlPlane.warehouseIds,
+    updated: actions.filter((item) => item.action === "updated").length,
+    unchanged: actions.filter((item) => item.action === "unchanged").length,
+    actions,
+  };
 }
 
 function preflightRoleCapabilityBaseline(controlPlane, baseline) {
@@ -1011,6 +1118,12 @@ export async function applyManualAcceptanceAccountScenarios(
     baseline: safePlan.roleCapabilityBaseline,
     allowMutation: !resolvedTarget.external,
   });
+  const roleDataScopeBaseline = await alignAcceptanceWarehouseScopes({
+    backendURL: safePlan.backendURL,
+    token: guardToken,
+    fetchImpl,
+    allowMutation: !resolvedTarget.external,
+  });
   const formalAccountBootstrap = await bootstrapMissingFormalAccounts({
     plan: safePlan,
     token: guardToken,
@@ -1256,6 +1369,7 @@ export async function applyManualAcceptanceAccountScenarios(
         }
       : null,
     roleCapabilityBaseline,
+    roleDataScopeBaseline,
     formalAccountBootstrap,
     protectedAccounts: formalBefore,
     scenarios,

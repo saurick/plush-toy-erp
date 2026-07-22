@@ -14,8 +14,10 @@ import (
 	"server/internal/data/model/ent/adminuserrole"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/runtimeauditevent"
+	"server/internal/data/model/ent/warehouse"
 	"server/internal/data/model/ent/workflowtask"
 
 	"entgo.io/ent/dialect"
@@ -36,6 +38,7 @@ func NewAdminManageRepo(d *Data, logger log.Logger) *adminManageRepo {
 }
 
 var _ biz.AdminManageRepo = (*adminManageRepo)(nil)
+var _ biz.RoleDataScopeRepo = (*adminManageRepo)(nil)
 
 const (
 	defaultRuntimeAuditListLimit = 50
@@ -295,6 +298,10 @@ ORDER BY sort_order ASC, id ASC`)
 		if err != nil {
 			return nil, err
 		}
+		item.DataScopes, err = r.loadRoleDataScopes(ctx, item.ID)
+		if err != nil {
+			return nil, err
+		}
 		out = append(out, item)
 	}
 	return out, rows.Err()
@@ -326,6 +333,29 @@ ORDER BY p.module ASC, p.permission_key ASC`, roleID)
 		return nil, err
 	}
 	return biz.NormalizePermissionKeys(out), nil
+}
+
+func (r *adminManageRepo) loadRoleDataScopes(ctx context.Context, roleID int) ([]biz.RoleDataScope, error) {
+	rows, err := r.data.postgres.RoleDataScope.Query().
+		Where(roledatascope.RoleID(roleID)).
+		Order(roledatascope.ByResourceType()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]biz.RoleDataScope, 0, len(rows))
+	for _, row := range rows {
+		normalized, normalizeErr := biz.NormalizeRoleDataScope(biz.RoleDataScope{
+			ResourceType: row.ResourceType,
+			Mode:         row.Mode,
+			ResourceIDs:  row.ResourceIds,
+		})
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		out = append(out, normalized)
+	}
+	return out, nil
 }
 
 func (r *adminManageRepo) ListPermissions(ctx context.Context) ([]biz.AdminPermission, error) {
@@ -382,7 +412,147 @@ FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(&item.ID, &item.Key, &ite
 	if err != nil {
 		return nil, err
 	}
+	item.DataScopes, err = r.loadRoleDataScopes(ctx, item.ID)
+	if err != nil {
+		return nil, err
+	}
 	return &item, nil
+}
+
+func (r *adminManageRepo) ListRoleDataScopesByRoleKeys(ctx context.Context, roleKeys []string) ([]biz.RoleDataScope, error) {
+	roleKeys = biz.NormalizeAdminRoleKeys(roleKeys)
+	if len(roleKeys) == 0 {
+		return []biz.RoleDataScope{}, nil
+	}
+	rows, err := r.data.postgres.RoleDataScope.Query().
+		Where(roledatascope.HasRoleWith(role.RoleKeyIn(roleKeys...), role.Disabled(false))).
+		Order(roledatascope.ByRoleID(), roledatascope.ByResourceType()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]biz.RoleDataScope, 0, len(rows))
+	for _, row := range rows {
+		normalized, normalizeErr := biz.NormalizeRoleDataScope(biz.RoleDataScope{
+			ResourceType: row.ResourceType,
+			Mode:         row.Mode,
+			ResourceIDs:  row.ResourceIds,
+		})
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		out = append(out, normalized)
+	}
+	return out, nil
+}
+
+func (r *adminManageRepo) SetRoleDataScopesWithAudit(ctx context.Context, change *biz.RoleDataScopesChangeCommand) (*biz.AdminRole, error) {
+	if change == nil || change.OperatorID <= 0 || change.ExpectedVersion <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	roleKey := biz.NormalizeRoleKey(change.RoleKey)
+	scopes, err := biz.NormalizeRoleDataScopes(change.Scopes)
+	if roleKey == "" || err != nil {
+		return nil, biz.ErrBadParam
+	}
+
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { r.rollbackAdminManageTx(ctx, tx) }()
+
+	operator, err := r.loadOperatorForUpdate(ctx, tx, change.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+	if !operator.IsSuperAdmin && biz.AdminHasRole(operator, roleKey) {
+		return nil, biz.ErrAdminSelfRolePermissionForbidden
+	}
+	roleRow, err := r.loadRoleForUpdate(ctx, tx, roleKey)
+	if err != nil {
+		return nil, err
+	}
+	if roleRow.Disabled {
+		return nil, biz.ErrRoleNotFound
+	}
+	if biz.IsSystemManagedRole(mapEntAdminRole(roleRow)) {
+		return nil, biz.ErrSystemRoleImmutable
+	}
+	if roleRow.Version != change.ExpectedVersion {
+		return nil, biz.ErrRoleVersionConflict
+	}
+	before, err := r.loadRoleSnapshotFromRowInTx(ctx, tx, roleRow)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateWarehouseDataScopeResourcesInTx(ctx, tx, scopes[0]); err != nil {
+		return nil, err
+	}
+
+	affected, err := tx.Role.Update().Where(
+		role.ID(roleRow.ID),
+		role.Version(change.ExpectedVersion),
+		role.Disabled(false),
+	).AddVersion(1).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		return nil, biz.ErrRoleVersionConflict
+	}
+	if _, err := tx.RoleDataScope.Delete().Where(
+		roledatascope.RoleID(roleRow.ID),
+		roledatascope.ResourceType(scopes[0].ResourceType),
+	).Exec(ctx); err != nil {
+		return nil, err
+	}
+	if _, err := tx.RoleDataScope.Create().
+		SetRoleID(roleRow.ID).
+		SetResourceType(scopes[0].ResourceType).
+		SetMode(scopes[0].Mode).
+		SetResourceIds(scopes[0].ResourceIDs).
+		Save(ctx); err != nil {
+		return nil, err
+	}
+	after, err := r.loadRoleSnapshotInTx(ctx, tx, roleRow.ID)
+	if err != nil {
+		return nil, err
+	}
+	auditEvent, err := biz.BuildAdminControlAuditEvent(
+		operator,
+		"role.data_scopes.set",
+		"role",
+		after.ID,
+		after.Key,
+		biz.AdminAuditRoleSnapshot(before),
+		biz.AdminAuditRoleSnapshot(after),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := createRuntimeAuditEventInTx(ctx, tx, auditEvent); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return after, nil
+}
+
+func validateWarehouseDataScopeResourcesInTx(ctx context.Context, tx *ent.Tx, scope biz.RoleDataScope) error {
+	if scope.Mode != biz.DataScopeModeAssigned {
+		return nil
+	}
+	count, err := tx.Warehouse.Query().Where(warehouse.IDIn(scope.ResourceIDs...)).Count(ctx)
+	if err != nil {
+		return err
+	}
+	if count != len(scope.ResourceIDs) {
+		return biz.ErrRoleDataScopeResourceNotFound
+	}
+	return nil
 }
 
 func (r *adminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, change *biz.RolePermissionsChange) (*biz.AdminRole, error) {
@@ -871,6 +1041,25 @@ func (r *adminManageRepo) loadRoleSnapshotFromRowInTx(
 		return nil, err
 	}
 	item.Permissions = permissionKeys
+	scopeRows, err := tx.RoleDataScope.Query().
+		Where(roledatascope.RoleID(row.ID)).
+		Order(roledatascope.ByResourceType()).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	item.DataScopes = make([]biz.RoleDataScope, 0, len(scopeRows))
+	for _, scopeRow := range scopeRows {
+		normalized, normalizeErr := biz.NormalizeRoleDataScope(biz.RoleDataScope{
+			ResourceType: scopeRow.ResourceType,
+			Mode:         scopeRow.Mode,
+			ResourceIDs:  scopeRow.ResourceIds,
+		})
+		if normalizeErr != nil {
+			return nil, normalizeErr
+		}
+		item.DataScopes = append(item.DataScopes, normalized)
+	}
 	return &item, nil
 }
 
@@ -938,6 +1127,7 @@ func mapEntAdminRole(row *ent.Role) biz.AdminRole {
 		Type:        biz.NormalizeRoleType(biz.RoleType(row.RoleType), roleKey, row.Builtin),
 		Version:     row.Version,
 		Permissions: []string{},
+		DataScopes:  []biz.RoleDataScope{},
 	}
 }
 

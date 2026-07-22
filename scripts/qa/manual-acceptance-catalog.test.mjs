@@ -172,7 +172,7 @@ test("manual acceptance catalog keeps technical routing separate from customer-f
     assert(item.title);
     assert(item.roles.length > 0);
     assert(item.minimumData);
-    assert(item.keyStates.length >= 4);
+    assert(item.keyStates.length >= 1);
     assert(item.whatToDo.length >= 2);
     assert(item.whatToSee.length >= 2);
     assert(item.whatToDo.every((step) => step.startsWith("你要")));
@@ -216,10 +216,10 @@ test("manual acceptance catalog locks the current deliverable data quantity for 
       inventory: 45,
       "processing-contracts": 45,
       "production-orders": 45,
-      "production-scheduling": 20,
+      "production-scheduling": 45,
       "production-progress": 45,
-      "production-exceptions": 5,
-      "shipping-release": 4,
+      "production-exceptions": 1,
+      "shipping-release": 46,
       outbound: 45,
       shipments: 47,
       reconciliation: 45,
@@ -303,7 +303,7 @@ test("production collaboration pages match the roles' executable task states", (
   assert.match(exceptions.whatToDo.join("\n"), /资料不足、等待补充/u);
 });
 
-test("manual acceptance catalog assigns production orders to production with source-driven actions", () => {
+test("manual acceptance catalog gives quality production context without changing source-driven actions", () => {
   const catalog = buildManualAcceptanceCatalog();
   const technical = catalog.technicalManifest.desktopPages.find(
     (item) => item.key === "production-orders",
@@ -312,7 +312,13 @@ test("manual acceptance catalog assigns production orders to production with sou
     (item) => item.title === "生产订单",
   );
 
-  assert.deepEqual(technical?.roleKeys, ["sales", "pmc", "production"]);
+  assert.deepEqual(technical?.roleKeys, [
+    "sales",
+    "boss",
+    "pmc",
+    "quality",
+    "production",
+  ]);
   assert.equal(technical?.minimumRecords, 45);
   assert.match(
     acceptance?.whatToDo.join("\n") || "",
@@ -384,17 +390,17 @@ test("mobile acceptance copy only asks each role to use supported task actions",
   const desktopByKey = new Map(
     catalog.technicalManifest.desktopPages.map((item) => [item.key, item]),
   );
-  assert.deepEqual(
+  assert.equal(
     desktopByKey.get("production-scheduling")?.requiredTaskScenarios,
-    MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.pmc,
+    undefined,
   );
-  assert.deepEqual(
+  assert.equal(
     desktopByKey.get("production-exceptions")?.requiredTaskScenarios,
-    ["production_exception"],
+    undefined,
   );
-  assert.deepEqual(
+  assert.equal(
     desktopByKey.get("shipping-release")?.requiredTaskScenarios,
-    ["shipping"],
+    undefined,
   );
 });
 

@@ -1,4 +1,4 @@
-h1:3aN6WSwklgA9g74rYq7+njT3c8Q9LjpMIJ/vIfgxAc4=
+h1:CkaFpCM0XzFfzYKI65cfvHXbEEfeJQZrUNxBRzGuMik=
 20260315161316_migrate.sql h1:aW9ynfMUR5IdFF5E6zkq5zQdgTv9YEtXjRiZTSF6f+I=
 20260421140457_migrate.sql h1:Znvhutjs+bPceNgWeN7W2TxKXHUQtyBH+Yr1b5kmXwE=
 20260423081607_migrate.sql h1:ZXYJO5Kvb2GkCOhWtMP/2nIV3stabZ5wFouUxOPbzhM=
@@ -82,3 +82,10 @@ h1:3aN6WSwklgA9g74rYq7+njT3c8Q9LjpMIJ/vIfgxAc4=
 20260717043625_migrate.sql h1:bLq+iS+k5Jz8KR0lM2jMeeHPrCNeaIbHtnlmJ7mCMFA=
 20260718110227_migrate.sql h1:BzETOre6zi3JuawBpYzbvRqOJNhmIjGW8IcgwLaozbU=
 20260718125909_migrate.sql h1:oOry61A5dvayq6SpZdGLKCJGYPCMBOHlHMteBu7KuAA=
+20260721134123_split_workbench_business_dashboard_permission.sql h1:tkMyAnWUJS+dwwS7FeDf4AHhF4rd2QTE3j1SYtjNEmM=
+20260722000500_reconcile_business_role_collaboration_permissions.sql h1:eKDfqnEmZbkK5xIb6+jTP4oQDBGDlSDf5FnUZEjc23w=
+20260722000501_migrate.sql h1:9bOAosvjO0AeKAzJTzTM/o+RiI1RaAyIVlwS+dlEoM8=
+20260722000502_add_sensitive_field_permissions.sql h1:yYGxKw80WxtRoTX/npJeUxIUNyTw3PsVuUY6S9YrlLU=
+20260722000503_migrate.sql h1:Vt/faH8iOUAMgxUTuV+jhbzr7TSUUWqUY/6gEKZZ/Aw=
+20260722000504_add_workflow_task_supervision.sql h1:Ge3TAj90mf6XFtgtufqSz5Rp6jJn2ZUNHo0SnnwjHdI=
+20260722000505_grant_engineering_material_management.sql h1:kfP8TLqXEQWhy3CHugT0tqA41Lmr4EwFd1v3pKI+mUA=

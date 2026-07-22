@@ -266,6 +266,7 @@ export default function MobileTaskListScreen({
         key={task.id}
         type="button"
         data-mobile-task-id={task.id}
+        data-task-code={task.task_code || undefined}
         className={`erp-mobile-list-item grid w-full grid-cols-[64px_minmax(0,1fr)_94px] gap-3 px-5 py-4 text-left transition hover:bg-emerald-50/60 focus:outline-none focus:ring-2 focus:ring-emerald-500/50 ${severity.rowClass} ${
           isSelected ? 'ring-2 ring-emerald-500/40' : ''
         }`}
@@ -453,6 +454,7 @@ export default function MobileTaskListScreen({
         key={task.id}
         type="button"
         data-mobile-task-id={task.id}
+        data-task-code={task.task_code || undefined}
         className="erp-mobile-list-item w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left"
         aria-label={`查看${task.task_name}处理结果`}
         onClick={() => {

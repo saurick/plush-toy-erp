@@ -183,6 +183,13 @@ func (s *stubMasterDataJSONRPCRepo) ListWarehouses(context.Context, biz.MasterDa
 	return []*biz.Warehouse{{ID: 1, Code: "RM-01", Name: "原料仓", Type: "RAW_MATERIAL", IsActive: true, CreatedAt: time.Unix(1, 0), UpdatedAt: time.Unix(1, 0)}}, 1, nil
 }
 
+func (s *stubMasterDataJSONRPCRepo) ListWarehousesForAccess(ctx context.Context, filter biz.MasterDataFilter, scope biz.WarehouseDataScope) ([]*biz.Warehouse, int, error) {
+	if !biz.NormalizeWarehouseDataScope(scope).Allows(1) && !biz.NormalizeWarehouseDataScope(scope).IsAll() {
+		return []*biz.Warehouse{}, 0, nil
+	}
+	return s.ListWarehouses(ctx, filter)
+}
+
 func (s *stubMasterDataJSONRPCRepo) UnitIsActive(context.Context, int) (bool, error) {
 	if !s.unitActive {
 		return false, biz.ErrUnitNotFound
@@ -416,6 +423,7 @@ func newMasterDataJSONRPCTestData(t *testing.T, repo *stubMasterDataJSONRPCRepo,
 		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.masterdata.test")),
 		adminReader:      stubAdminAccountReader{admin: admin},
 		masterDataUC:     biz.NewMasterDataUsecase(repo),
+		adminManageUC:    newAllWarehouseScopeAdminUsecase(),
 		customerConfigUC: biz.NewCustomerConfigUsecase(newServiceCustomerConfigRepo()),
 	}
 	params := customerConfigPublishParams(t)

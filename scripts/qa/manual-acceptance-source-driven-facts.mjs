@@ -189,6 +189,17 @@ export const FORMAL_RPC_PARAM_ALLOWLIST = Object.freeze({
     "note",
     "items",
   ]),
+  "operational_fact.submit_shipment_release": Object.freeze([
+    "customer_key",
+    "id",
+  ]),
+  "workflow.complete_task_action": Object.freeze([
+    "task_id",
+    "expected_version",
+    "idempotency_key",
+    "action_key",
+    "payload",
+  ]),
   "operational_fact.ship_shipment": Object.freeze(["customer_key", "id"]),
   "operational_fact.create_receivable_from_shipment": Object.freeze([
     "customer_key",
@@ -1648,6 +1659,44 @@ async function applySales(plan, rpc) {
     "DRAFT",
     "create_shipment_with_items",
   );
+  const releaseData = await invoke(
+    rpc,
+    "operational_fact",
+    "submit_shipment_release",
+    customerParams({ id: shipmentDraft.id }),
+  );
+  let releaseTask = requireResult(
+    releaseData,
+    "workflow_task",
+    null,
+    "submit_shipment_release",
+  );
+  const releaseStatus = String(
+    releaseTask.task_status_key || "",
+  ).toLowerCase();
+  if (releaseStatus === "ready") {
+    const completed = await invoke(rpc, "workflow", "complete_task_action", {
+      task_id: releaseTask.id,
+      expected_version: positiveID(
+        releaseTask.version,
+        "submit_shipment_release.workflow_task.version",
+      ),
+      idempotency_key: `${identity.shipment.idempotencyKey}:release`,
+      action_key: "complete",
+      payload: { feedback: "已核对本批出货放行条件。" },
+    });
+    releaseTask = requireResult(
+      completed,
+      "task",
+      null,
+      "complete_task_action",
+    );
+  }
+  if (String(releaseTask.task_status_key || "").toLowerCase() !== "done") {
+    throw new SourceDrivenFactError(
+      `shipment release task expected done, got ${releaseTask.task_status_key || "missing"}`,
+    );
+  }
   const shipment = requireResult(
     await invoke(
       rpc,

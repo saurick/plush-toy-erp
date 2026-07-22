@@ -21,6 +21,7 @@ import (
 	"server/internal/data/model/ent/product"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productsku"
+	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/stockreservation"
 	"server/internal/data/model/ent/supplier"
 	"server/internal/data/model/ent/unit"
@@ -51,6 +52,7 @@ func NewInventoryRepo(d *Data, logger log.Logger) *inventoryRepo {
 }
 
 var _ biz.InventoryRepo = (*inventoryRepo)(nil)
+var _ biz.InventoryWarehouseAccessRepo = (*inventoryRepo)(nil)
 var _ biz.PurchaseReceiptCancellationActorRepo = (*inventoryRepo)(nil)
 var _ biz.PurchaseReceiptCreateProcessCommandRepo = (*inventoryRepo)(nil)
 var _ biz.InventoryPostInboundProcessCommandRepo = (*inventoryRepo)(nil)
@@ -332,7 +334,22 @@ func (r *inventoryRepo) GetInventoryBalance(ctx context.Context, key biz.Invento
 }
 
 func (r *inventoryRepo) ListInventoryBalances(ctx context.Context, filter biz.InventoryBalanceFilter) ([]*biz.InventoryBalance, int, error) {
+	return r.listInventoryBalances(ctx, filter, biz.WarehouseDataScope{Mode: biz.DataScopeModeAll})
+}
+
+func (r *inventoryRepo) ListInventoryBalancesForAccess(ctx context.Context, filter biz.InventoryBalanceFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryBalance, int, error) {
+	return r.listInventoryBalances(ctx, filter, biz.NormalizeWarehouseDataScope(scope))
+}
+
+func (r *inventoryRepo) listInventoryBalances(ctx context.Context, filter biz.InventoryBalanceFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryBalance, int, error) {
 	query := r.data.postgres.InventoryBalance.Query()
+	switch scope.Mode {
+	case biz.DataScopeModeAssigned:
+		query = query.Where(inventorybalance.WarehouseIDIn(scope.WarehouseIDs...))
+	case biz.DataScopeModeAll:
+	default:
+		return []*biz.InventoryBalance{}, 0, nil
+	}
 	if filter.SubjectType != "" {
 		query = query.Where(inventorybalance.SubjectTypeEQ(filter.SubjectType))
 	}
@@ -400,7 +417,29 @@ func activeReservedQuantityForBalance(ctx context.Context, client *ent.Client, r
 }
 
 func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.InventoryLotFilter) ([]*biz.InventoryLot, int, error) {
+	return r.listInventoryLots(ctx, filter, biz.WarehouseDataScope{Mode: biz.DataScopeModeAll})
+}
+
+func (r *inventoryRepo) ListInventoryLotsForAccess(ctx context.Context, filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryLot, int, error) {
+	return r.listInventoryLots(ctx, filter, biz.NormalizeWarehouseDataScope(scope))
+}
+
+func (r *inventoryRepo) listInventoryLots(ctx context.Context, filter biz.InventoryLotFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryLot, int, error) {
 	query := r.data.postgres.InventoryLot.Query()
+	switch scope.Mode {
+	case biz.DataScopeModeAssigned:
+		query = query.Where(inventorylot.Or(
+			inventorylot.HasInventoryBalancesWith(
+				inventorybalance.WarehouseIDIn(scope.WarehouseIDs...),
+			),
+			inventorylot.HasPurchaseReceiptItemsWith(
+				purchasereceiptitem.WarehouseIDIn(scope.WarehouseIDs...),
+			),
+		))
+	case biz.DataScopeModeAll:
+	default:
+		return []*biz.InventoryLot{}, 0, nil
+	}
 	if filter.SubjectType != "" {
 		query = query.Where(inventorylot.SubjectTypeEQ(filter.SubjectType))
 	}
@@ -459,7 +498,22 @@ func (r *inventoryRepo) ListInventoryLots(ctx context.Context, filter biz.Invent
 }
 
 func (r *inventoryRepo) ListInventoryTxns(ctx context.Context, filter biz.InventoryTxnFilter) ([]*biz.InventoryTxn, int, error) {
+	return r.listInventoryTxns(ctx, filter, biz.WarehouseDataScope{Mode: biz.DataScopeModeAll})
+}
+
+func (r *inventoryRepo) ListInventoryTxnsForAccess(ctx context.Context, filter biz.InventoryTxnFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryTxn, int, error) {
+	return r.listInventoryTxns(ctx, filter, biz.NormalizeWarehouseDataScope(scope))
+}
+
+func (r *inventoryRepo) listInventoryTxns(ctx context.Context, filter biz.InventoryTxnFilter, scope biz.WarehouseDataScope) ([]*biz.InventoryTxn, int, error) {
 	query := r.data.postgres.InventoryTxn.Query()
+	switch scope.Mode {
+	case biz.DataScopeModeAssigned:
+		query = query.Where(inventorytxn.WarehouseIDIn(scope.WarehouseIDs...))
+	case biz.DataScopeModeAll:
+	default:
+		return []*biz.InventoryTxn{}, 0, nil
+	}
 	if filter.SubjectType != "" {
 		query = query.Where(inventorytxn.SubjectTypeEQ(filter.SubjectType))
 	}

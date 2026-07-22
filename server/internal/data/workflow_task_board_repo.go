@@ -72,12 +72,33 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 		return nil, biz.ErrBadParam
 	}
 
+	roleFacetFilter := query
+	roleFacetFilter.OwnerRoleKey = ""
+	roleFacetQuery := client.WorkflowTask.Query()
+	roleFacetQuery = applyWorkflowTaskBoardVisibility(roleFacetQuery, roleFacetFilter)
+	var ownerRoleRows []struct {
+		OwnerRoleKey string `json:"owner_role_key"`
+	}
+	err := roleFacetQuery.
+		Unique(true).
+		Order(ent.Asc(workflowtask.FieldOwnerRoleKey)).
+		Select(workflowtask.FieldOwnerRoleKey).
+		Scan(ctx, &ownerRoleRows)
+	if err != nil {
+		return nil, err
+	}
+	ownerRoleKeys := make([]string, 0, len(ownerRoleRows))
+	for _, row := range ownerRoleRows {
+		ownerRoleKeys = append(ownerRoleKeys, row.OwnerRoleKey)
+	}
+	ownerRoleKeys = normalizeWorkflowTaskBoardOwnerRoleKeys(ownerRoleKeys)
+
 	visibleQuery := client.WorkflowTask.Query()
 	visibleQuery = applyWorkflowTaskBoardVisibility(visibleQuery, query)
 	var sourceRows []struct {
 		SourceType string `json:"source_type"`
 	}
-	err := visibleQuery.Clone().
+	err = visibleQuery.Clone().
 		Unique(true).
 		Order(ent.Asc(workflowtask.FieldSourceType)).
 		Select(workflowtask.FieldSourceType).
@@ -156,11 +177,12 @@ func loadWorkflowTaskBoard(ctx context.Context, client *ent.Client, query biz.Wo
 	}
 
 	return &biz.WorkflowTaskBoard{
-		SnapshotAt:  query.SnapshotAt,
-		Total:       total,
-		Counts:      counts,
-		Lanes:       lanes,
-		SourceTypes: sourceTypes,
+		SnapshotAt:    query.SnapshotAt,
+		Total:         total,
+		Counts:        counts,
+		Lanes:         lanes,
+		SourceTypes:   sourceTypes,
+		OwnerRoleKeys: ownerRoleKeys,
 	}, nil
 }
 
@@ -350,4 +372,8 @@ func normalizeWorkflowTaskBoardSourceTypes(values []string) []string {
 	}
 	sort.Strings(out)
 	return out
+}
+
+func normalizeWorkflowTaskBoardOwnerRoleKeys(values []string) []string {
+	return biz.NormalizeAdminRoleKeys(values)
 }

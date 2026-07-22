@@ -318,7 +318,13 @@ func (uc *CustomerConfigUsecase) ExplainModuleStatus(ctx context.Context, custom
 	} else {
 		out.InFlightProcessCount = count
 	}
-	if count, err := uc.repo.CountOpenWorkflowTasksByPools(ctx, customerKey, active.Revision, out.ReferencedWorkPoolKeys); err != nil {
+	if count, err := uc.repo.CountOpenWorkflowTasksByResponsibilities(
+		ctx,
+		customerKey,
+		active.Revision,
+		out.ReferencedWorkPoolKeys,
+		out.ReferencedRoleKeys,
+	); err != nil {
 		return nil, err
 	} else {
 		out.OpenTaskCount = count

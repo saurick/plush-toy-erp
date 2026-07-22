@@ -29,10 +29,24 @@ const FIXED_COMMANDS = {
     "diff",
     "--check",
   ]),
-  docs: command("docs-inventory", "T1", "检查长期文档登记", "node", [
-    "--test",
-    "scripts/qa/docs-inventory.test.mjs",
-  ]),
+  docs: command(
+    "docs-inventory",
+    "T1",
+    "检查长期文档登记与永绅角色手册同步",
+    "node",
+    [
+      "scripts/qa/run-test-gate.mjs",
+      "--kind",
+      "node",
+      "--label",
+      "docs-affected",
+      "--",
+      "node",
+      "--test",
+      "scripts/qa/docs-inventory.test.mjs",
+      "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
+    ],
+  ),
   skillHealth: command(
     "skill-health",
     "T1",
@@ -208,6 +222,13 @@ function addNodeTests(state, files, reason, level) {
   state.commands.set(
     id,
     command(id, commandLevel, "运行直接关联的 Node 测试", "node", [
+      "scripts/qa/run-test-gate.mjs",
+      "--kind",
+      "node",
+      "--label",
+      "affected-direct",
+      "--",
+      "node",
       "--test",
       ...normalized,
     ]),

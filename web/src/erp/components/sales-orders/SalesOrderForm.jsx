@@ -135,24 +135,6 @@ function getNextLineNo(lines = []) {
   return maxLineNo + 1
 }
 
-function findOrderLineSKU(line = {}, productSKUs = []) {
-  if (line.product_sku_id) {
-    return productSKUs.find((sku) => sku.id === line.product_sku_id)
-  }
-  const productID = Number(line.product_id || 0)
-  const unitID = Number(line.unit_id || 0)
-  const code = String(line.product_code_snapshot || '').trim()
-  const color = String(line.color_snapshot || '').trim()
-  return productSKUs.find((sku) => {
-    if (productID <= 0 || unitID <= 0) return false
-    if (sku.product_id !== productID) return false
-    if (sku.default_unit_id !== unitID) return false
-    if (code && sku.sku_code !== code) return false
-    if (color && sku.color !== color) return false
-    return true
-  })
-}
-
 function setOrderLineSourceFromSKU(form, lineIndex, sku) {
   const currentLines = form.getFieldValue('items') || []
   const nextLines = [...currentLines]
@@ -500,23 +482,6 @@ export function SalesOrderItemsFormSection({
       form.setFieldsValue({ items: nextLines })
     }
   }, [defaultUnitID, form])
-  useEffect(() => {
-    const currentLines = form.getFieldValue('items') || []
-    let changed = false
-    const nextLines = currentLines.map((line) => {
-      if (line?.product_sku_id) return line
-      const matchedSKU = findOrderLineSKU(line, productSKUs)
-      if (!matchedSKU) return line
-      changed = true
-      return {
-        ...line,
-        product_sku_id: matchedSKU.id,
-      }
-    })
-    if (changed) {
-      form.setFieldsValue({ items: nextLines })
-    }
-  }, [form, productSKUs])
   const skuOptions = productSKUs.map((sku) => ({
     label: skuLabel(sku),
     value: sku.id,

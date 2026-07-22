@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"slices"
@@ -85,6 +86,9 @@ ON CONFLICT (role_key) DO UPDATE SET
 		); err != nil {
 			return err
 		}
+		if err := seedBuiltinRoleWarehouseDataScopeIfMissing(ctx, db, role.Key, now); err != nil {
+			return err
+		}
 		// Business and custom role selections survive restart. System roles are
 		// code-managed: seed reconciles their exact permission set and increments
 		// the CAS version only when that set actually changes.
@@ -99,6 +103,54 @@ ON CONFLICT (role_key) DO UPDATE SET
 		l.Infof("rbac seed completed permissions=%d roles=%d", len(biz.BuiltinPermissions()), len(biz.BuiltinRoles()))
 	}
 	return nil
+}
+
+func seedBuiltinRoleWarehouseDataScopeIfMissing(ctx context.Context, db *sql.DB, roleKey string, now time.Time) error {
+	mode := biz.DataScopeModeNone
+	resourceIDs := []int{}
+	switch biz.NormalizeRoleKey(roleKey) {
+	case "boss", "sales", "pmc", "purchase", "finance", "production":
+		mode = biz.DataScopeModeAll
+	case "warehouse", "quality":
+		rows, err := db.QueryContext(ctx, `SELECT id FROM warehouses ORDER BY id ASC`)
+		if err != nil {
+			return err
+		}
+		for rows.Next() {
+			var id int
+			if err := rows.Scan(&id); err != nil {
+				_ = rows.Close()
+				return err
+			}
+			resourceIDs = append(resourceIDs, id)
+		}
+		if err := rows.Err(); err != nil {
+			_ = rows.Close()
+			return err
+		}
+		_ = rows.Close()
+		if len(resourceIDs) > 0 {
+			mode = biz.DataScopeModeAssigned
+		}
+	}
+	encodedIDs, err := json.Marshal(resourceIDs)
+	if err != nil {
+		return err
+	}
+	_, err = db.ExecContext(ctx, `
+INSERT INTO role_data_scopes (role_id, resource_type, mode, resource_ids, created_at, updated_at)
+SELECT id, $1, $2, $3, $4, $5
+FROM roles
+WHERE role_key = $6
+ON CONFLICT (role_id, resource_type) DO NOTHING`,
+		biz.DataScopeResourceWarehouse,
+		mode,
+		string(encodedIDs),
+		now,
+		now,
+		biz.NormalizeRoleKey(roleKey),
+	)
+	return err
 }
 
 func pruneStaleBuiltinPermissions(ctx context.Context, db *sql.DB) error {

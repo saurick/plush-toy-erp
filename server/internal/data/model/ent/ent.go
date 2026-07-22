@@ -52,6 +52,7 @@ import (
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/roleprofile"
 	"server/internal/data/model/ent/runtimeauditevent"
@@ -179,6 +180,7 @@ func checkColumn(t, c string) error {
 			purchasereturnitem.Table:                 purchasereturnitem.ValidColumn,
 			qualityinspection.Table:                  qualityinspection.ValidColumn,
 			role.Table:                               role.ValidColumn,
+			roledatascope.Table:                      roledatascope.ValidColumn,
 			rolepermission.Table:                     rolepermission.ValidColumn,
 			roleprofile.Table:                        roleprofile.ValidColumn,
 			runtimeauditevent.Table:                  runtimeauditevent.ValidColumn,

@@ -107,6 +107,7 @@ const FAST_REQUIRED_FILES = Object.freeze([
   "scripts/deploy/deployment-package-lint.mjs",
   "scripts/qa/test-data-isolation-boundary.test.mjs",
   "scripts/qa/docs-inventory.test.mjs",
+  "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
   "scripts/qa/customer-source-repository-boundary.test.mjs",
   "scripts/qa/critical-postgres-gate.test.mjs",
   "scripts/qa/verify-go-test-json.mjs",

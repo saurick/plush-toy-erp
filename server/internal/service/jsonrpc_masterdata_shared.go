@@ -34,7 +34,11 @@ func (d *jsonrpcDispatcher) handleMasterDataReference(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.masterDataUC.ListWarehouses(ctx, masterDataFilterFromParams(pm))
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		items, total, err := d.masterDataUC.ListWarehousesForAccess(ctx, masterDataFilterFromParams(pm), scope)
 		if err != nil {
 			return id, d.mapMasterDataError(ctx, err), nil
 		}
@@ -61,6 +65,8 @@ func masterDataFilterFromParams(pm map[string]any) biz.MasterDataFilter {
 func (d *jsonrpcDispatcher) mapMasterDataError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrDataScopeForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[masterdata] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}

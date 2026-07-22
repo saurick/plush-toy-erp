@@ -1769,7 +1769,12 @@ function expectedBusinessStatusKey(task, plannedTask) {
     : plannedTask.createParams.business_status_key;
 }
 
-function assertTaskIdentity(task, plannedTask, accounts) {
+function assertTaskIdentity(
+  task,
+  plannedTask,
+  accounts,
+  { allowCommercialRedaction = false } = {},
+) {
   const expected = plannedTask.createParams;
   for (const key of [
     "task_code",
@@ -1798,6 +1803,13 @@ function assertTaskIdentity(task, plannedTask, accounts) {
     );
   }
   for (const [key, value] of Object.entries(expected.payload || {})) {
+    if (
+      allowCommercialRedaction &&
+      key === "amount" &&
+      task?.payload?.[key] === undefined
+    ) {
+      continue;
+    }
     if (task?.payload?.[key] !== value) {
       throw new CliError(
         `${plannedTask.key} persisted payload.${key} does not match the plan`,
@@ -1934,13 +1946,31 @@ async function createPlannedTask({ plan, plannedTask, accounts, fetchImpl }) {
     fetchImpl,
   });
   const created = requireTaskRecord(data, "create_task");
-  assertTaskIdentity(created, plannedTask, accounts);
+  // PMC owns task creation but intentionally cannot read finance commercial
+  // values. Validate its redacted receipt, then bind the task to the owner's
+  // full readback before any action or final-state assertion.
+  assertTaskIdentity(created, plannedTask, accounts, {
+    allowCommercialRedaction: true,
+  });
   if (created.task_status_key !== plannedTask.createParams.task_status_key) {
     throw new CliError(
       `${plannedTask.key} create expected ${plannedTask.createParams.task_status_key}, got ${created.task_status_key}`,
     );
   }
-  return created;
+  const ownerTasks = await listRoleBatch({
+    plan,
+    roleKey: plannedTask.roleKey,
+    account: accounts[plannedTask.roleKey],
+    fetchImpl,
+  });
+  const ownerVisibleTask = ownerTasks.find((item) => item.id === created.id);
+  if (!ownerVisibleTask) {
+    throw new CliError(
+      `${plannedTask.key} owner readback did not return the created task`,
+    );
+  }
+  assertTaskIdentity(ownerVisibleTask, plannedTask, accounts);
+  return ownerVisibleTask;
 }
 
 async function applyPlannedAction({

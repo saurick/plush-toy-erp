@@ -327,13 +327,18 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
     ),
   );
   assert(
+    manifest.compiled_snapshot.rolePageProjections.pmc.includes(
+      "business-dashboard",
+    ),
+  );
+  assert(
     manifest.compiled_snapshot.rolePageProjections.warehouse.includes(
       "shipping-release",
     ),
   );
-  for (const [pageKey, expectedOwner] of [
-    ["business-dashboard", "boss"],
-    ["shipping-release", "warehouse"],
+  for (const [pageKey, expectedOwners] of [
+    ["business-dashboard", ["boss", "pmc"]],
+    ["shipping-release", ["warehouse"]],
   ]) {
     const owners = Object.entries(
       manifest.compiled_snapshot.rolePageProjections,
@@ -341,7 +346,7 @@ test("customer-config-runtime-manifest: visible menu pages and module states com
       .filter(([, pageKeys]) => pageKeys.includes(pageKey))
       .map(([roleKey]) => roleKey)
       .sort();
-    assert.deepEqual(owners, [expectedOwner]);
+    assert.deepEqual(owners, expectedOwners);
   }
   assert.equal(manifest.module_states.length, customerPackageCatalog.modules.length);
   assert.equal(
@@ -412,6 +417,9 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
   assert(pages.sales.includes("sales-orders"));
   assert(pages.sales.includes("production-orders"));
   assert(entitlementsFor("sales").has("stock.reservation.create"));
+  assert(entitlementsFor("sales").has("sales_order.cancel"));
+  assert(entitlementsFor("sales").has("contact.disable"));
+  assert(entitlementsFor("sales").has("contact.set_primary"));
   assert(entitlementsFor("sales").has("production.wip.read"));
   assert(
     entitlementsFor("sales").has("production.packaging_material.confirm"),
@@ -431,10 +439,34 @@ test("customer-config-runtime-manifest: source action projections stay within Pr
 
   assert(pages.warehouse.includes("inbound"));
   const warehouse = entitlementsFor("warehouse");
-  assert(warehouse.has("purchase.return.read"));
-  assert(warehouse.has("purchase.receipt.adjustment.read"));
-  assert(!warehouse.has("purchase.return.create"));
-  assert(!warehouse.has("purchase.receipt.adjustment.create"));
+  for (const key of [
+    "purchase.return.read",
+    "purchase.return.create",
+    "purchase.return.post",
+    "purchase.return.cancel",
+    "purchase.receipt.adjustment.read",
+    "purchase.receipt.adjustment.create",
+    "purchase.receipt.adjustment.post",
+    "purchase.receipt.adjustment.cancel",
+  ]) {
+    assert(warehouse.has(key), `warehouse must receive ${key}`);
+  }
+
+  const purchase = entitlementsFor("purchase");
+  assert(purchase.has("contact.disable"));
+  assert(purchase.has("contact.set_primary"));
+  for (const key of [
+    "purchase.return.read",
+    "purchase.return.create",
+    "purchase.return.post",
+    "purchase.return.cancel",
+    "purchase.receipt.adjustment.read",
+    "purchase.receipt.adjustment.create",
+    "purchase.receipt.adjustment.post",
+    "purchase.receipt.adjustment.cancel",
+  ]) {
+    assert(purchase.has(key), `purchase must receive ${key}`);
+  }
 
   assert(pages.production.includes("production-orders"));
   assert(pages.production.includes("processing-contracts"));

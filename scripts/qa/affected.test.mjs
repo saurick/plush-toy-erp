@@ -54,6 +54,21 @@ test("affected: docs-only changes stay at T1", () => {
   });
 
   assert.deepEqual(ids(plan), ["diff-check", "docs-inventory"]);
+  const docsCommand = plan.commands.find(
+    (item) => item.id === "docs-inventory",
+  );
+  assert.deepEqual(docsCommand?.args, [
+    "scripts/qa/run-test-gate.mjs",
+    "--kind",
+    "node",
+    "--label",
+    "docs-affected",
+    "--",
+    "node",
+    "--test",
+    "scripts/qa/docs-inventory.test.mjs",
+    "scripts/qa/yoyoosun-role-flow-handbook.test.mjs",
+  ]);
   assert.equal(plan.highestLevel, "T1");
   assert.equal(plan.requiresFull, false);
 });
@@ -150,6 +165,19 @@ test("affected: a web helper with a sibling test uses the focused test", () => {
   assert(
     ids(plan).some((id) => id.includes("web/src/erp/utils/dateRange.test.mjs")),
   );
+  const focusedCommand = plan.commands.find((item) =>
+    item.id.includes("web/src/erp/utils/dateRange.test.mjs"),
+  );
+  assert.deepEqual(focusedCommand?.args.slice(0, 8), [
+    "scripts/qa/run-test-gate.mjs",
+    "--kind",
+    "node",
+    "--label",
+    "affected-direct",
+    "--",
+    "node",
+    "--test",
+  ]);
   assert.equal(ids(plan).includes("web-test"), false);
   assert.equal(plan.highestLevel, "T5");
 });

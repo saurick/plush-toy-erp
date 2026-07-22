@@ -11,6 +11,7 @@ import {
   InboxOutlined,
   MenuOutlined,
   PrinterOutlined,
+  QuestionCircleOutlined,
   ReloadOutlined,
   ScheduleOutlined,
   SettingOutlined,
@@ -52,6 +53,7 @@ import {
 } from '../config/businessModules.mjs'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
 import {
+  getAuthenticatedNavigationSections,
   getNavigationSections,
   getProductCoreNavigationSections,
 } from '../config/seedData.mjs'
@@ -106,6 +108,7 @@ const navIconRegistry = {
   'print-center': <PrinterOutlined />,
   'permission-center': <SettingOutlined />,
   'system-audit-logs': <FileSearchOutlined />,
+  'help-center': <QuestionCircleOutlined />,
 }
 
 const productCoreReviewFallbackByPageKey = {
@@ -113,8 +116,7 @@ const productCoreReviewFallbackByPageKey = {
     title: '业务看板',
     description: '业务看板汇总订单、库存、待办、出货和财务等业务数量。',
     currentScope: ['看板入口', '页面权限', '数字分类', '客户数据连接状态'],
-    boundary:
-      '当前只显示看板功能说明；连接客户业务数据后才会显示实际数字。',
+    boundary: '当前只显示看板功能说明；连接客户业务数据后才会显示实际数字。',
   },
 }
 
@@ -220,6 +222,7 @@ const SELF_CONTAINED_PAGE_HEAD_PATHS = new Set([
   '/erp/print-center',
   '/erp/system/permissions',
   '/erp/system/audit-logs',
+  '/erp/help-center',
 ])
 const LOCAL_CUSTOMER_PREVIEW_GUARDED_PAGE_KEYS = new Set([
   'global-dashboard',
@@ -311,16 +314,21 @@ export default function ERPLayout() {
     !requiresConfiguredCustomerRuntime &&
     !effectiveSessionCustomerKey
   const routeNavigationSections = useMemo(
-    () => getNavigationSections(isSuperAdmin ? null : undefined),
+    () => [
+      ...getNavigationSections(isSuperAdmin ? null : undefined),
+      ...getAuthenticatedNavigationSections(),
+    ],
     [isSuperAdmin]
   )
-  const menuNavigationSections = useMemo(
-    () =>
-      shouldUseProductCoreNavigation
-        ? getProductCoreNavigationSections()
-        : routeNavigationSections,
-    [routeNavigationSections, shouldUseProductCoreNavigation]
-  )
+  const menuNavigationSections = useMemo(() => {
+    if (!shouldUseProductCoreNavigation) {
+      return routeNavigationSections
+    }
+    return [
+      ...getProductCoreNavigationSections(),
+      ...getAuthenticatedNavigationSections(),
+    ]
+  }, [routeNavigationSections, shouldUseProductCoreNavigation])
   const currentNavigationEntry = useMemo(
     () =>
       resolveCurrentNavigationEntry({
@@ -537,23 +545,65 @@ export default function ERPLayout() {
   )
 
   const visibleSections = useMemo(() => {
-    return filterNavigationSectionsByAdminProfile({
-      navigationSections: menuNavigationSections,
-      adminProfile,
-      allowedMenuPaths,
-      isSuperAdmin,
-    })
-  }, [adminProfile, allowedMenuPaths, isSuperAdmin, menuNavigationSections])
+    const buildSectionsByAccess = (matchesAccess) =>
+      menuNavigationSections
+        .map((section) => ({
+          ...section,
+          items: (section.items || []).filter(matchesAccess),
+        }))
+        .filter((section) => section.items.length > 0)
+    const permissionGovernedSections = buildSectionsByAccess(
+      (item) => item.access !== 'authenticated'
+    )
+    const authenticatedSections = buildSectionsByAccess(
+      (item) => item.access === 'authenticated'
+    )
+    return [
+      ...(shouldUseProductCoreNavigation
+        ? permissionGovernedSections
+        : filterNavigationSectionsByAdminProfile({
+            navigationSections: permissionGovernedSections,
+            adminProfile,
+            allowedMenuPaths,
+            isSuperAdmin,
+          })),
+      ...authenticatedSections,
+    ]
+  }, [
+    adminProfile,
+    allowedMenuPaths,
+    isSuperAdmin,
+    menuNavigationSections,
+    shouldUseProductCoreNavigation,
+  ])
+
+  const permissionGovernedVisibleSections = useMemo(
+    () =>
+      visibleSections
+        .map((section) => ({
+          ...section,
+          items: (section.items || []).filter(
+            (item) => item.access !== 'authenticated'
+          ),
+        }))
+        .filter((section) => section.items.length > 0),
+    [visibleSections]
+  )
 
   const effectiveSessionDiagnostic = useMemo(
     () =>
       buildEffectiveSessionDiagnosticSummary({
         adminProfile,
         allowedMenuPaths,
-        visibleSections,
+        visibleSections: permissionGovernedVisibleSections,
         isSuperAdmin,
       }),
-    [adminProfile, allowedMenuPaths, isSuperAdmin, visibleSections]
+    [
+      adminProfile,
+      allowedMenuPaths,
+      isSuperAdmin,
+      permissionGovernedVisibleSections,
+    ]
   )
 
   useEffect(() => {
@@ -572,37 +622,49 @@ export default function ERPLayout() {
     [location.pathname]
   )
 
-  const currentPageShouldRedirect = useMemo(
-    () =>
-      shouldRedirectFromCurrentNavigation({
-        profileLoading,
-        adminProfile,
-        allowedMenuPaths,
-        isSuperAdmin,
-        currentMenuPath,
-        currentPageKey: currentNavigationEntry.pageKey,
-        currentNavigationMatched: currentNavigationEntry.matched,
-      }),
-    [
+  const currentPageShouldRedirect = useMemo(() => {
+    if (currentEntry?.access === 'authenticated') {
+      return false
+    }
+    if (shouldUseProductCoreNavigation) {
+      return currentNavigationEntry.matched !== true
+    }
+    return shouldRedirectFromCurrentNavigation({
       profileLoading,
       adminProfile,
       allowedMenuPaths,
       isSuperAdmin,
       currentMenuPath,
-      currentNavigationEntry.pageKey,
-      currentNavigationEntry.matched,
-    ]
-  )
+      currentPageKey: currentNavigationEntry.pageKey,
+      currentNavigationMatched: currentNavigationEntry.matched,
+    })
+  }, [
+    profileLoading,
+    adminProfile,
+    allowedMenuPaths,
+    isSuperAdmin,
+    currentMenuPath,
+    currentNavigationEntry.pageKey,
+    currentNavigationEntry.matched,
+    currentEntry?.access,
+    shouldUseProductCoreNavigation,
+  ])
 
   useEffect(() => {
-    if (!currentPageShouldRedirect) {
+    if (customerRuntimeBootstrapPending || !currentPageShouldRedirect) {
       return
     }
     const fallbackPath = visibleSections[0]?.items[0]?.path || ''
     if (fallbackPath && fallbackPath !== location.pathname) {
       navigate(fallbackPath, { replace: true })
     }
-  }, [currentPageShouldRedirect, location.pathname, navigate, visibleSections])
+  }, [
+    currentPageShouldRedirect,
+    customerRuntimeBootstrapPending,
+    location.pathname,
+    navigate,
+    visibleSections,
+  ])
 
   const menuItems = useMemo(
     () =>
@@ -813,7 +875,7 @@ export default function ERPLayout() {
         .join(' / ') || '普通管理员'
   const displayUsername =
     adminProfile?.username || tokenAdmin?.username || 'admin'
-  const noVisibleMenus = visibleSections.length === 0
+  const noVisibleMenus = permissionGovernedVisibleSections.length === 0
   const shouldBlockOutlet = noVisibleMenus && currentPageShouldRedirect
   const shouldGuardProductCoreBusinessData =
     shouldGuardCustomerBusinessPageRuntime({

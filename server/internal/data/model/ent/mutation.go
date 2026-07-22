@@ -52,6 +52,7 @@ import (
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/roleprofile"
 	"server/internal/data/model/ent/runtimeauditevent"
@@ -131,6 +132,7 @@ const (
 	TypePurchaseReturnItem                 = "PurchaseReturnItem"
 	TypeQualityInspection                  = "QualityInspection"
 	TypeRole                               = "Role"
+	TypeRoleDataScope                      = "RoleDataScope"
 	TypeRolePermission                     = "RolePermission"
 	TypeRoleProfile                        = "RoleProfile"
 	TypeRuntimeAuditEvent                  = "RuntimeAuditEvent"
@@ -64651,25 +64653,28 @@ func (m *QualityInspectionMutation) ResetEdge(name string) error {
 // RoleMutation represents an operation that mutates the Role nodes in the graph.
 type RoleMutation struct {
 	config
-	op            Op
-	typ           string
-	id            *int
-	role_key      *string
-	name          *string
-	description   *string
-	builtin       *bool
-	role_type     *role.RoleType
-	disabled      *bool
-	sort_order    *int
-	addsort_order *int
-	version       *int
-	addversion    *int
-	created_at    *time.Time
-	updated_at    *time.Time
-	clearedFields map[string]struct{}
-	done          bool
-	oldValue      func(context.Context) (*Role, error)
-	predicates    []predicate.Role
+	op                 Op
+	typ                string
+	id                 *int
+	role_key           *string
+	name               *string
+	description        *string
+	builtin            *bool
+	role_type          *role.RoleType
+	disabled           *bool
+	sort_order         *int
+	addsort_order      *int
+	version            *int
+	addversion         *int
+	created_at         *time.Time
+	updated_at         *time.Time
+	clearedFields      map[string]struct{}
+	data_scopes        map[int]struct{}
+	removeddata_scopes map[int]struct{}
+	cleareddata_scopes bool
+	done               bool
+	oldValue           func(context.Context) (*Role, error)
+	predicates         []predicate.Role
 }
 
 var _ ent.Mutation = (*RoleMutation)(nil)
@@ -65170,6 +65175,60 @@ func (m *RoleMutation) ResetUpdatedAt() {
 	m.updated_at = nil
 }
 
+// AddDataScopeIDs adds the "data_scopes" edge to the RoleDataScope entity by ids.
+func (m *RoleMutation) AddDataScopeIDs(ids ...int) {
+	if m.data_scopes == nil {
+		m.data_scopes = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.data_scopes[ids[i]] = struct{}{}
+	}
+}
+
+// ClearDataScopes clears the "data_scopes" edge to the RoleDataScope entity.
+func (m *RoleMutation) ClearDataScopes() {
+	m.cleareddata_scopes = true
+}
+
+// DataScopesCleared reports if the "data_scopes" edge to the RoleDataScope entity was cleared.
+func (m *RoleMutation) DataScopesCleared() bool {
+	return m.cleareddata_scopes
+}
+
+// RemoveDataScopeIDs removes the "data_scopes" edge to the RoleDataScope entity by IDs.
+func (m *RoleMutation) RemoveDataScopeIDs(ids ...int) {
+	if m.removeddata_scopes == nil {
+		m.removeddata_scopes = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.data_scopes, ids[i])
+		m.removeddata_scopes[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedDataScopes returns the removed IDs of the "data_scopes" edge to the RoleDataScope entity.
+func (m *RoleMutation) RemovedDataScopesIDs() (ids []int) {
+	for id := range m.removeddata_scopes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// DataScopesIDs returns the "data_scopes" edge IDs in the mutation.
+func (m *RoleMutation) DataScopesIDs() (ids []int) {
+	for id := range m.data_scopes {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetDataScopes resets all changes to the "data_scopes" edge.
+func (m *RoleMutation) ResetDataScopes() {
+	m.data_scopes = nil
+	m.cleareddata_scopes = false
+	m.removeddata_scopes = nil
+}
+
 // Where appends a list predicates to the RoleMutation builder.
 func (m *RoleMutation) Where(ps ...predicate.Role) {
 	m.predicates = append(m.predicates, ps...)
@@ -65483,50 +65542,755 @@ func (m *RoleMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *RoleMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.data_scopes != nil {
+		edges = append(edges, role.EdgeDataScopes)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *RoleMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case role.EdgeDataScopes:
+		ids := make([]ent.Value, 0, len(m.data_scopes))
+		for id := range m.data_scopes {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *RoleMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.removeddata_scopes != nil {
+		edges = append(edges, role.EdgeDataScopes)
+	}
 	return edges
 }
 
 // RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
 // the given name in this mutation.
 func (m *RoleMutation) RemovedIDs(name string) []ent.Value {
+	switch name {
+	case role.EdgeDataScopes:
+		ids := make([]ent.Value, 0, len(m.removeddata_scopes))
+		for id := range m.removeddata_scopes {
+			ids = append(ids, id)
+		}
+		return ids
+	}
 	return nil
 }
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *RoleMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.cleareddata_scopes {
+		edges = append(edges, role.EdgeDataScopes)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *RoleMutation) EdgeCleared(name string) bool {
+	switch name {
+	case role.EdgeDataScopes:
+		return m.cleareddata_scopes
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *RoleMutation) ClearEdge(name string) error {
+	switch name {
+	}
 	return fmt.Errorf("unknown Role unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *RoleMutation) ResetEdge(name string) error {
+	switch name {
+	case role.EdgeDataScopes:
+		m.ResetDataScopes()
+		return nil
+	}
 	return fmt.Errorf("unknown Role edge %s", name)
+}
+
+// RoleDataScopeMutation represents an operation that mutates the RoleDataScope nodes in the graph.
+type RoleDataScopeMutation struct {
+	config
+	op                 Op
+	typ                string
+	id                 *int
+	resource_type      *string
+	mode               *string
+	resource_ids       *[]int
+	appendresource_ids []int
+	created_at         *time.Time
+	updated_at         *time.Time
+	clearedFields      map[string]struct{}
+	role               *int
+	clearedrole        bool
+	done               bool
+	oldValue           func(context.Context) (*RoleDataScope, error)
+	predicates         []predicate.RoleDataScope
+}
+
+var _ ent.Mutation = (*RoleDataScopeMutation)(nil)
+
+// roledatascopeOption allows management of the mutation configuration using functional options.
+type roledatascopeOption func(*RoleDataScopeMutation)
+
+// newRoleDataScopeMutation creates new mutation for the RoleDataScope entity.
+func newRoleDataScopeMutation(c config, op Op, opts ...roledatascopeOption) *RoleDataScopeMutation {
+	m := &RoleDataScopeMutation{
+		config:        c,
+		op:            op,
+		typ:           TypeRoleDataScope,
+		clearedFields: make(map[string]struct{}),
+	}
+	for _, opt := range opts {
+		opt(m)
+	}
+	return m
+}
+
+// withRoleDataScopeID sets the ID field of the mutation.
+func withRoleDataScopeID(id int) roledatascopeOption {
+	return func(m *RoleDataScopeMutation) {
+		var (
+			err   error
+			once  sync.Once
+			value *RoleDataScope
+		)
+		m.oldValue = func(ctx context.Context) (*RoleDataScope, error) {
+			once.Do(func() {
+				if m.done {
+					err = errors.New("querying old values post mutation is not allowed")
+				} else {
+					value, err = m.Client().RoleDataScope.Get(ctx, id)
+				}
+			})
+			return value, err
+		}
+		m.id = &id
+	}
+}
+
+// withRoleDataScope sets the old RoleDataScope of the mutation.
+func withRoleDataScope(node *RoleDataScope) roledatascopeOption {
+	return func(m *RoleDataScopeMutation) {
+		m.oldValue = func(context.Context) (*RoleDataScope, error) {
+			return node, nil
+		}
+		m.id = &node.ID
+	}
+}
+
+// Client returns a new `ent.Client` from the mutation. If the mutation was
+// executed in a transaction (ent.Tx), a transactional client is returned.
+func (m RoleDataScopeMutation) Client() *Client {
+	client := &Client{config: m.config}
+	client.init()
+	return client
+}
+
+// Tx returns an `ent.Tx` for mutations that were executed in transactions;
+// it returns an error otherwise.
+func (m RoleDataScopeMutation) Tx() (*Tx, error) {
+	if _, ok := m.driver.(*txDriver); !ok {
+		return nil, errors.New("ent: mutation is not running in a transaction")
+	}
+	tx := &Tx{config: m.config}
+	tx.init()
+	return tx, nil
+}
+
+// ID returns the ID value in the mutation. Note that the ID is only available
+// if it was provided to the builder or after it was returned from the database.
+func (m *RoleDataScopeMutation) ID() (id int, exists bool) {
+	if m.id == nil {
+		return
+	}
+	return *m.id, true
+}
+
+// IDs queries the database and returns the entity ids that match the mutation's predicate.
+// That means, if the mutation is applied within a transaction with an isolation level such
+// as sql.LevelSerializable, the returned ids match the ids of the rows that will be updated
+// or updated by the mutation.
+func (m *RoleDataScopeMutation) IDs(ctx context.Context) ([]int, error) {
+	switch {
+	case m.op.Is(OpUpdateOne | OpDeleteOne):
+		id, exists := m.ID()
+		if exists {
+			return []int{id}, nil
+		}
+		fallthrough
+	case m.op.Is(OpUpdate | OpDelete):
+		return m.Client().RoleDataScope.Query().Where(m.predicates...).IDs(ctx)
+	default:
+		return nil, fmt.Errorf("IDs is not allowed on %s operations", m.op)
+	}
+}
+
+// SetRoleID sets the "role_id" field.
+func (m *RoleDataScopeMutation) SetRoleID(i int) {
+	m.role = &i
+}
+
+// RoleID returns the value of the "role_id" field in the mutation.
+func (m *RoleDataScopeMutation) RoleID() (r int, exists bool) {
+	v := m.role
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldRoleID returns the old "role_id" field's value of the RoleDataScope entity.
+// If the RoleDataScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleDataScopeMutation) OldRoleID(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldRoleID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldRoleID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldRoleID: %w", err)
+	}
+	return oldValue.RoleID, nil
+}
+
+// ResetRoleID resets all changes to the "role_id" field.
+func (m *RoleDataScopeMutation) ResetRoleID() {
+	m.role = nil
+}
+
+// SetResourceType sets the "resource_type" field.
+func (m *RoleDataScopeMutation) SetResourceType(s string) {
+	m.resource_type = &s
+}
+
+// ResourceType returns the value of the "resource_type" field in the mutation.
+func (m *RoleDataScopeMutation) ResourceType() (r string, exists bool) {
+	v := m.resource_type
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResourceType returns the old "resource_type" field's value of the RoleDataScope entity.
+// If the RoleDataScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleDataScopeMutation) OldResourceType(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResourceType is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResourceType requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResourceType: %w", err)
+	}
+	return oldValue.ResourceType, nil
+}
+
+// ResetResourceType resets all changes to the "resource_type" field.
+func (m *RoleDataScopeMutation) ResetResourceType() {
+	m.resource_type = nil
+}
+
+// SetMode sets the "mode" field.
+func (m *RoleDataScopeMutation) SetMode(s string) {
+	m.mode = &s
+}
+
+// Mode returns the value of the "mode" field in the mutation.
+func (m *RoleDataScopeMutation) Mode() (r string, exists bool) {
+	v := m.mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldMode returns the old "mode" field's value of the RoleDataScope entity.
+// If the RoleDataScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleDataScopeMutation) OldMode(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldMode: %w", err)
+	}
+	return oldValue.Mode, nil
+}
+
+// ResetMode resets all changes to the "mode" field.
+func (m *RoleDataScopeMutation) ResetMode() {
+	m.mode = nil
+}
+
+// SetResourceIds sets the "resource_ids" field.
+func (m *RoleDataScopeMutation) SetResourceIds(i []int) {
+	m.resource_ids = &i
+	m.appendresource_ids = nil
+}
+
+// ResourceIds returns the value of the "resource_ids" field in the mutation.
+func (m *RoleDataScopeMutation) ResourceIds() (r []int, exists bool) {
+	v := m.resource_ids
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResourceIds returns the old "resource_ids" field's value of the RoleDataScope entity.
+// If the RoleDataScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleDataScopeMutation) OldResourceIds(ctx context.Context) (v []int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResourceIds is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResourceIds requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResourceIds: %w", err)
+	}
+	return oldValue.ResourceIds, nil
+}
+
+// AppendResourceIds adds i to the "resource_ids" field.
+func (m *RoleDataScopeMutation) AppendResourceIds(i []int) {
+	m.appendresource_ids = append(m.appendresource_ids, i...)
+}
+
+// AppendedResourceIds returns the list of values that were appended to the "resource_ids" field in this mutation.
+func (m *RoleDataScopeMutation) AppendedResourceIds() ([]int, bool) {
+	if len(m.appendresource_ids) == 0 {
+		return nil, false
+	}
+	return m.appendresource_ids, true
+}
+
+// ResetResourceIds resets all changes to the "resource_ids" field.
+func (m *RoleDataScopeMutation) ResetResourceIds() {
+	m.resource_ids = nil
+	m.appendresource_ids = nil
+}
+
+// SetCreatedAt sets the "created_at" field.
+func (m *RoleDataScopeMutation) SetCreatedAt(t time.Time) {
+	m.created_at = &t
+}
+
+// CreatedAt returns the value of the "created_at" field in the mutation.
+func (m *RoleDataScopeMutation) CreatedAt() (r time.Time, exists bool) {
+	v := m.created_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldCreatedAt returns the old "created_at" field's value of the RoleDataScope entity.
+// If the RoleDataScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleDataScopeMutation) OldCreatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldCreatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldCreatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldCreatedAt: %w", err)
+	}
+	return oldValue.CreatedAt, nil
+}
+
+// ResetCreatedAt resets all changes to the "created_at" field.
+func (m *RoleDataScopeMutation) ResetCreatedAt() {
+	m.created_at = nil
+}
+
+// SetUpdatedAt sets the "updated_at" field.
+func (m *RoleDataScopeMutation) SetUpdatedAt(t time.Time) {
+	m.updated_at = &t
+}
+
+// UpdatedAt returns the value of the "updated_at" field in the mutation.
+func (m *RoleDataScopeMutation) UpdatedAt() (r time.Time, exists bool) {
+	v := m.updated_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldUpdatedAt returns the old "updated_at" field's value of the RoleDataScope entity.
+// If the RoleDataScope object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleDataScopeMutation) OldUpdatedAt(ctx context.Context) (v time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldUpdatedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldUpdatedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldUpdatedAt: %w", err)
+	}
+	return oldValue.UpdatedAt, nil
+}
+
+// ResetUpdatedAt resets all changes to the "updated_at" field.
+func (m *RoleDataScopeMutation) ResetUpdatedAt() {
+	m.updated_at = nil
+}
+
+// ClearRole clears the "role" edge to the Role entity.
+func (m *RoleDataScopeMutation) ClearRole() {
+	m.clearedrole = true
+	m.clearedFields[roledatascope.FieldRoleID] = struct{}{}
+}
+
+// RoleCleared reports if the "role" edge to the Role entity was cleared.
+func (m *RoleDataScopeMutation) RoleCleared() bool {
+	return m.clearedrole
+}
+
+// RoleIDs returns the "role" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// RoleID instead. It exists only for internal usage by the builders.
+func (m *RoleDataScopeMutation) RoleIDs() (ids []int) {
+	if id := m.role; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetRole resets all changes to the "role" edge.
+func (m *RoleDataScopeMutation) ResetRole() {
+	m.role = nil
+	m.clearedrole = false
+}
+
+// Where appends a list predicates to the RoleDataScopeMutation builder.
+func (m *RoleDataScopeMutation) Where(ps ...predicate.RoleDataScope) {
+	m.predicates = append(m.predicates, ps...)
+}
+
+// WhereP appends storage-level predicates to the RoleDataScopeMutation builder. Using this method,
+// users can use type-assertion to append predicates that do not depend on any generated package.
+func (m *RoleDataScopeMutation) WhereP(ps ...func(*sql.Selector)) {
+	p := make([]predicate.RoleDataScope, len(ps))
+	for i := range ps {
+		p[i] = ps[i]
+	}
+	m.Where(p...)
+}
+
+// Op returns the operation name.
+func (m *RoleDataScopeMutation) Op() Op {
+	return m.op
+}
+
+// SetOp allows setting the mutation operation.
+func (m *RoleDataScopeMutation) SetOp(op Op) {
+	m.op = op
+}
+
+// Type returns the node type of this mutation (RoleDataScope).
+func (m *RoleDataScopeMutation) Type() string {
+	return m.typ
+}
+
+// Fields returns all fields that were changed during this mutation. Note that in
+// order to get all numeric fields that were incremented/decremented, call
+// AddedFields().
+func (m *RoleDataScopeMutation) Fields() []string {
+	fields := make([]string, 0, 6)
+	if m.role != nil {
+		fields = append(fields, roledatascope.FieldRoleID)
+	}
+	if m.resource_type != nil {
+		fields = append(fields, roledatascope.FieldResourceType)
+	}
+	if m.mode != nil {
+		fields = append(fields, roledatascope.FieldMode)
+	}
+	if m.resource_ids != nil {
+		fields = append(fields, roledatascope.FieldResourceIds)
+	}
+	if m.created_at != nil {
+		fields = append(fields, roledatascope.FieldCreatedAt)
+	}
+	if m.updated_at != nil {
+		fields = append(fields, roledatascope.FieldUpdatedAt)
+	}
+	return fields
+}
+
+// Field returns the value of a field with the given name. The second boolean
+// return value indicates that this field was not set, or was not defined in the
+// schema.
+func (m *RoleDataScopeMutation) Field(name string) (ent.Value, bool) {
+	switch name {
+	case roledatascope.FieldRoleID:
+		return m.RoleID()
+	case roledatascope.FieldResourceType:
+		return m.ResourceType()
+	case roledatascope.FieldMode:
+		return m.Mode()
+	case roledatascope.FieldResourceIds:
+		return m.ResourceIds()
+	case roledatascope.FieldCreatedAt:
+		return m.CreatedAt()
+	case roledatascope.FieldUpdatedAt:
+		return m.UpdatedAt()
+	}
+	return nil, false
+}
+
+// OldField returns the old value of the field from the database. An error is
+// returned if the mutation operation is not UpdateOne, or the query to the
+// database failed.
+func (m *RoleDataScopeMutation) OldField(ctx context.Context, name string) (ent.Value, error) {
+	switch name {
+	case roledatascope.FieldRoleID:
+		return m.OldRoleID(ctx)
+	case roledatascope.FieldResourceType:
+		return m.OldResourceType(ctx)
+	case roledatascope.FieldMode:
+		return m.OldMode(ctx)
+	case roledatascope.FieldResourceIds:
+		return m.OldResourceIds(ctx)
+	case roledatascope.FieldCreatedAt:
+		return m.OldCreatedAt(ctx)
+	case roledatascope.FieldUpdatedAt:
+		return m.OldUpdatedAt(ctx)
+	}
+	return nil, fmt.Errorf("unknown RoleDataScope field %s", name)
+}
+
+// SetField sets the value of a field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoleDataScopeMutation) SetField(name string, value ent.Value) error {
+	switch name {
+	case roledatascope.FieldRoleID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetRoleID(v)
+		return nil
+	case roledatascope.FieldResourceType:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResourceType(v)
+		return nil
+	case roledatascope.FieldMode:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetMode(v)
+		return nil
+	case roledatascope.FieldResourceIds:
+		v, ok := value.([]int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResourceIds(v)
+		return nil
+	case roledatascope.FieldCreatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetCreatedAt(v)
+		return nil
+	case roledatascope.FieldUpdatedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetUpdatedAt(v)
+		return nil
+	}
+	return fmt.Errorf("unknown RoleDataScope field %s", name)
+}
+
+// AddedFields returns all numeric fields that were incremented/decremented during
+// this mutation.
+func (m *RoleDataScopeMutation) AddedFields() []string {
+	var fields []string
+	return fields
+}
+
+// AddedField returns the numeric value that was incremented/decremented on a field
+// with the given name. The second boolean return value indicates that this field
+// was not set, or was not defined in the schema.
+func (m *RoleDataScopeMutation) AddedField(name string) (ent.Value, bool) {
+	switch name {
+	}
+	return nil, false
+}
+
+// AddField adds the value to the field with the given name. It returns an error if
+// the field is not defined in the schema, or if the type mismatched the field
+// type.
+func (m *RoleDataScopeMutation) AddField(name string, value ent.Value) error {
+	switch name {
+	}
+	return fmt.Errorf("unknown RoleDataScope numeric field %s", name)
+}
+
+// ClearedFields returns all nullable fields that were cleared during this
+// mutation.
+func (m *RoleDataScopeMutation) ClearedFields() []string {
+	return nil
+}
+
+// FieldCleared returns a boolean indicating if a field with the given name was
+// cleared in this mutation.
+func (m *RoleDataScopeMutation) FieldCleared(name string) bool {
+	_, ok := m.clearedFields[name]
+	return ok
+}
+
+// ClearField clears the value of the field with the given name. It returns an
+// error if the field is not defined in the schema.
+func (m *RoleDataScopeMutation) ClearField(name string) error {
+	return fmt.Errorf("unknown RoleDataScope nullable field %s", name)
+}
+
+// ResetField resets all changes in the mutation for the field with the given name.
+// It returns an error if the field is not defined in the schema.
+func (m *RoleDataScopeMutation) ResetField(name string) error {
+	switch name {
+	case roledatascope.FieldRoleID:
+		m.ResetRoleID()
+		return nil
+	case roledatascope.FieldResourceType:
+		m.ResetResourceType()
+		return nil
+	case roledatascope.FieldMode:
+		m.ResetMode()
+		return nil
+	case roledatascope.FieldResourceIds:
+		m.ResetResourceIds()
+		return nil
+	case roledatascope.FieldCreatedAt:
+		m.ResetCreatedAt()
+		return nil
+	case roledatascope.FieldUpdatedAt:
+		m.ResetUpdatedAt()
+		return nil
+	}
+	return fmt.Errorf("unknown RoleDataScope field %s", name)
+}
+
+// AddedEdges returns all edge names that were set/added in this mutation.
+func (m *RoleDataScopeMutation) AddedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.role != nil {
+		edges = append(edges, roledatascope.EdgeRole)
+	}
+	return edges
+}
+
+// AddedIDs returns all IDs (to other nodes) that were added for the given edge
+// name in this mutation.
+func (m *RoleDataScopeMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case roledatascope.EdgeRole:
+		if id := m.role; id != nil {
+			return []ent.Value{*id}
+		}
+	}
+	return nil
+}
+
+// RemovedEdges returns all edge names that were removed in this mutation.
+func (m *RoleDataScopeMutation) RemovedEdges() []string {
+	edges := make([]string, 0, 1)
+	return edges
+}
+
+// RemovedIDs returns all IDs (to other nodes) that were removed for the edge with
+// the given name in this mutation.
+func (m *RoleDataScopeMutation) RemovedIDs(name string) []ent.Value {
+	return nil
+}
+
+// ClearedEdges returns all edge names that were cleared in this mutation.
+func (m *RoleDataScopeMutation) ClearedEdges() []string {
+	edges := make([]string, 0, 1)
+	if m.clearedrole {
+		edges = append(edges, roledatascope.EdgeRole)
+	}
+	return edges
+}
+
+// EdgeCleared returns a boolean which indicates if the edge with the given name
+// was cleared in this mutation.
+func (m *RoleDataScopeMutation) EdgeCleared(name string) bool {
+	switch name {
+	case roledatascope.EdgeRole:
+		return m.clearedrole
+	}
+	return false
+}
+
+// ClearEdge clears the value of the edge with the given name. It returns an error
+// if that edge is not defined in the schema.
+func (m *RoleDataScopeMutation) ClearEdge(name string) error {
+	switch name {
+	case roledatascope.EdgeRole:
+		m.ClearRole()
+		return nil
+	}
+	return fmt.Errorf("unknown RoleDataScope unique edge %s", name)
+}
+
+// ResetEdge resets all changes to the edge with the given name in this mutation.
+// It returns an error if the edge is not defined in the schema.
+func (m *RoleDataScopeMutation) ResetEdge(name string) error {
+	switch name {
+	case roledatascope.EdgeRole:
+		m.ResetRole()
+		return nil
+	}
+	return fmt.Errorf("unknown RoleDataScope edge %s", name)
 }
 
 // RolePermissionMutation represents an operation that mutates the RolePermission nodes in the graph.

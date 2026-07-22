@@ -315,7 +315,7 @@ const DATASET_BLUEPRINTS = Object.freeze({
     statusField: "status",
     requiredStatuses: ["DRAFT", "POSTED", "CANCELLED"],
     secondaryField: "items.adjust_type",
-    requiredSecondaryKinds: ["QUANTITY_INCREASE", "QUANTITY_DECREASE"],
+    requiredSecondaryKinds: ["QUANTITY_DECREASE"],
     batchReport: "fact",
     factReferenceKey: "purchaseReceiptAdjustments",
   },
@@ -1082,6 +1082,10 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
     }
     return {
       referenceKey: `${item.id}:${item[businessField] || referenceKey}`,
+      ...(datasetId === "quality-inspections" &&
+      item.source_type === "OUTSOURCING_FACT"
+        ? { method: "list_outsourcing_return_quality_inspections" }
+        : {}),
       params,
     };
   });
@@ -1091,6 +1095,90 @@ function factReferenceEvidence(datasetId, blueprint, factReport) {
     batchNotProvenReason: null,
     expectedReferences,
     referenceQueries,
+  };
+}
+
+function sourceWorkflowTaskEvidence(taskGroup, factReport) {
+  if (!factReport) {
+    return {
+      batchEvidence: "not_proven",
+      batchNotProvenReason:
+        "未提供同批业务记录报告，不能证明来源动作生成的协同任务。",
+      expectedReferences: [],
+      referenceQueries: [],
+      expectedMinimum: 0,
+      expectedExact: null,
+      requiredStatuses: [],
+    };
+  }
+  let sourceType;
+  let ownerRoleKey;
+  let records;
+  let expectedStatus;
+  if (taskGroup === "production_scheduling") {
+    sourceType = "production-orders";
+    ownerRoleKey = "pmc";
+    records = factReport.normalizedReferenceRecords.productionOrders.filter(
+      (item) => ["RELEASED", "CLOSED"].includes(item.status),
+    );
+    expectedStatus = (item) => (item.status === "CLOSED" ? "done" : "ready");
+  } else if (taskGroup === "production_exception") {
+    sourceType = "production-progress";
+    ownerRoleKey = "production";
+    records = factReport.normalizedReferenceRecords.productionFacts.filter(
+      (item) => item.fact_type === "REWORK" && item.status === "CANCELLED",
+    );
+    expectedStatus = () => "done";
+  } else if (taskGroup === "shipment_release") {
+    sourceType = "shipments";
+    ownerRoleKey = "warehouse";
+    records = factReport.normalizedReferenceRecords.shipments.filter((item) =>
+      ["SHIPPED", "CANCELLED"].includes(item.status),
+    );
+    expectedStatus = () => "done";
+  } else {
+    throw new CliError(`未知来源协同任务组 ${taskGroup}`, 2);
+  }
+  const expectedReferences = records.map((item) => {
+    const taskCode = `source-${taskGroup.replaceAll("_", "-")}-${item.id}`;
+    return {
+      key: `${taskCode}:${sourceType}:${item.id}`,
+      id: null,
+      businessField: "task_code",
+      businessNo: taskCode,
+      expectedFields: {
+        task_group: taskGroup,
+        source_type: sourceType,
+        source_id: item.id,
+        owner_role_key: ownerRoleKey,
+        task_status_key: expectedStatus(item),
+      },
+    };
+  });
+  const requiredStatuses = [
+    ...new Set(
+      expectedReferences.map((item) =>
+        item.expectedFields.task_status_key.toUpperCase(),
+      ),
+    ),
+  ];
+  return {
+    batchEvidence: "exact_references",
+    batchNotProvenReason: null,
+    expectedReferences,
+    referenceQueries: records.map((item) => ({
+      referenceKey: `${taskGroup}:${sourceType}:${item.id}`,
+      params: {
+        task_group: taskGroup,
+        source_type: sourceType,
+        source_id: item.id,
+        limit: QUERY_LIMIT,
+        offset: 0,
+      },
+    })),
+    expectedMinimum: expectedReferences.length,
+    expectedExact: expectedReferences.length,
+    requiredStatuses,
   };
 }
 
@@ -1189,6 +1277,7 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
     username: "demo_boss",
     domain: "workflow",
     method: "list_tasks",
+    includeCustomerKey: false,
     listKey: "tasks",
     statusField: "task_status_key",
     requiredStatuses: taskRequiredStatusesForRole("boss"),
@@ -1233,6 +1322,7 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       username,
       domain: "workflow",
       method: "list_tasks",
+      includeCustomerKey: false,
       listKey: "tasks",
       statusField: "task_status_key",
       requiredStatuses: taskRequiredStatusesForRole(roleKey),
@@ -1269,7 +1359,7 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       readOnly: true,
     });
   }
-  for (const [pageKey, roleKey, taskGroup, requiredStatuses] of [
+  for (const [, roleKey, taskGroup] of [
     [
       "production-scheduling",
       "pmc",
@@ -1289,18 +1379,20 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
       ["ready", "blocked", "done", "rejected"],
     ],
   ]) {
-    const expectedCount = catalogMinimum(catalog, pageKey);
+    const sourceEvidence = sourceWorkflowTaskEvidence(taskGroup, factReport);
     probes.push({
       id: `workflow-tasks:${taskGroup}`,
       roleKey,
       username: `demo_${roleKey}`,
       domain: "workflow",
       method: "list_tasks",
+      includeCustomerKey: false,
       listKey: "tasks",
       statusField: "task_status_key",
-      requiredStatuses,
+      requiredStatuses: sourceEvidence.requiredStatuses,
       requiredStatusCounts: {},
-      expectedMinimum: expectedCount,
+      expectedMinimum: sourceEvidence.expectedMinimum,
+      expectedExact: sourceEvidence.expectedExact,
       declaredMinimum: null,
       params: {
         owner_role_key: roleKey,
@@ -1308,17 +1400,18 @@ function buildDatasetProbes(catalog, sourceReport, factReport, taskReport) {
         limit: QUERY_LIMIT,
         offset: 0,
       },
-      batchEvidence: "not_proven",
+      batchEvidence: sourceEvidence.batchEvidence,
+      expectedReferences: sourceEvidence.expectedReferences,
+      referenceQueries: sourceEvidence.referenceQueries,
       exactSourceType: null,
       exactSourceID: null,
       exactTaskCodePrefix: null,
       exactOwnerRoleKey: roleKey,
       exactTaskGroup: taskGroup,
-      requiredTaskGroups: [taskGroup],
+      requiredTaskGroups: [],
       requiredScenarios: [],
-      requiredScenariosByTaskGroup: { [taskGroup]: [] },
-      batchNotProvenReason:
-        "正式协同页只接受来源动作生成的任务；模拟岗位任务报告不能证明本批正式来源任务。",
+      requiredScenariosByTaskGroup: {},
+      batchNotProvenReason: sourceEvidence.batchNotProvenReason,
       readOnly: true,
     });
   }
@@ -1602,7 +1695,8 @@ export function evaluateManualAcceptanceDataset(probe, data) {
     for (const expected of probe.expectedReferences || []) {
       const item = items.find(
         (candidate) =>
-          Number(candidate?.id) === Number(expected.id) &&
+          (expected.id == null ||
+            Number(candidate?.id) === Number(expected.id)) &&
           (!expected.businessField ||
             String(candidate?.[expected.businessField] || "") ===
               expected.businessNo),
@@ -2042,7 +2136,7 @@ async function readProbeData({ backendURL, probe, token, fetchImpl }) {
     const data = await rpcCall({
       backendURL,
       domain: probe.domain,
-      method: probe.method,
+      method: query.method || probe.method,
       params: query.params,
       includeCustomerKey: probe.includeCustomerKey !== false,
       token,
@@ -2409,7 +2503,9 @@ function productionExceptionActiveResult(exceptionResult) {
     (sum, count) => sum + Number(count || 0),
     0,
   );
-  const sourceProven = exceptionResult?.batchEvidence === "exact_source";
+  const sourceProven = ["exact_source", "exact_references"].includes(
+    exceptionResult?.batchEvidence,
+  );
   const passed =
     exceptionResult?.status === "pass" &&
     sourceProven &&
@@ -2431,7 +2527,9 @@ function productionExceptionActiveResult(exceptionResult) {
     enoughRecords: passed,
     enoughStatuses: passed,
     enoughSecondaryKinds: true,
-    batchEvidence: sourceProven ? "exact_source" : "not_proven",
+    batchEvidence: sourceProven
+      ? exceptionResult.batchEvidence
+      : "not_proven",
     exactSourceType: sourceProven ? exceptionResult.exactSourceType : null,
     exactSourceID: sourceProven ? exceptionResult.exactSourceID : null,
     exactTaskCodePrefix: sourceProven

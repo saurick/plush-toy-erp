@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -34,8 +35,17 @@ const (
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
 	FieldUpdatedAt = "updated_at"
+	// EdgeDataScopes holds the string denoting the data_scopes edge name in mutations.
+	EdgeDataScopes = "data_scopes"
 	// Table holds the table name of the role in the database.
 	Table = "roles"
+	// DataScopesTable is the table that holds the data_scopes relation/edge.
+	DataScopesTable = "role_data_scopes"
+	// DataScopesInverseTable is the table name for the RoleDataScope entity.
+	// It exists in this package in order to avoid circular dependency with the "roledatascope" package.
+	DataScopesInverseTable = "role_data_scopes"
+	// DataScopesColumn is the table column denoting the data_scopes relation/edge.
+	DataScopesColumn = "role_id"
 )
 
 // Columns holds all SQL columns for role fields.
@@ -173,4 +183,25 @@ func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByUpdatedAt orders the results by the updated_at field.
 func ByUpdatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldUpdatedAt, opts...).ToFunc()
+}
+
+// ByDataScopesCount orders the results by data_scopes count.
+func ByDataScopesCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newDataScopesStep(), opts...)
+	}
+}
+
+// ByDataScopes orders the results by data_scopes terms.
+func ByDataScopes(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newDataScopesStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+func newDataScopesStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(DataScopesInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, DataScopesTable, DataScopesColumn),
+	)
 }

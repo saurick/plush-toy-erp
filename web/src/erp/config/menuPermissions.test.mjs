@@ -153,7 +153,7 @@ test('menuPermissions: 打印预览子路由按打印中心权限归属', () => 
   )
 })
 
-test('menuPermissions: 旧帮助、文档和验收路径不再映射到正式权限', () => {
+test('menuPermissions: 岗位帮助不新增业务权限，旧文档和验收路径不再映射', () => {
   assert.equal(resolveMenuPermissionKey('/erp/mobile-workbenches'), '')
   assert.equal(resolveMenuPermissionKey('/erp/help-center'), '')
   assert.equal(resolveMenuPermissionKey('/erp/docs/mobile-roles'), '')
@@ -231,7 +231,7 @@ test('menuPermissions: 前端角色预设覆盖工程和系统管理员', () => 
   ])
 })
 
-test('menuPermissions: 当前权限项不包含前端文档或开发验收路径', () => {
+test('menuPermissions: 当前权限项不包含通用帮助、前端文档或开发验收路径', () => {
   const permissionKeys = ERP_MENU_PERMISSION_OPTIONS.map((item) => item.key)
 
   assert(permissionKeys.includes('/erp/task-board'))
@@ -257,7 +257,6 @@ test('menuPermissions: 旧入口不保留路由重定向', () => {
     'path="operations/facts"',
     'path="operations/exceptions"',
     'path="flows/overview"',
-    'path="help-center"',
     'path="mobile-workbenches"',
     'path="roles/:roleKey"',
     'path="source-readiness"',
@@ -273,4 +272,18 @@ test('menuPermissions: 旧入口不保留路由重定向', () => {
       `router must not keep retired route ${pathToken}`
     )
   }
+})
+
+test('menuPermissions: 岗位帮助恢复为单一已登录路由且不恢复旧文档路由', () => {
+  const routerSource = readRepoFile('web/src/erp/router.jsx')
+  assert.match(
+    routerSource,
+    /const HelpCenterPage = lazyRoute\(\(\) =>[\s\S]*HelpCenterPage\.jsx/u
+  )
+  assert.match(
+    routerSource,
+    /<Route path="help-center" element=\{<HelpCenterPage \/>\} \/>/u
+  )
+  assert.equal(routerSource.includes('path="docs/*"'), false)
+  assert.equal(routerSource.includes('path="qa/*"'), false)
 })

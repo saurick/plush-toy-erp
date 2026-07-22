@@ -6,6 +6,7 @@ import {
   TASK_BOARD_OVERVIEW_LIMIT,
   buildWorkflowTaskBoardModel,
   buildWorkflowTaskBoardRequest,
+  buildWorkflowTaskBoardRoleOptions,
   getWorkflowTaskBoardRequestKey,
   canRunWorkflowTaskAction,
   getWorkflowTaskActionPermission,
@@ -164,6 +165,21 @@ test('workflowTaskBoard: 岗位筛选包含工程岗位', () => {
   )
 })
 
+test('workflowTaskBoard: 负责岗位筛选只展示服务端当前可见范围', () => {
+  assert.deepEqual(buildWorkflowTaskBoardRoleOptions(['warehouse']), [
+    { value: 'warehouse', label: '仓库' },
+  ])
+  assert.deepEqual(
+    buildWorkflowTaskBoardRoleOptions(['warehouse', 'sales', 'unknown']),
+    [
+      { value: 'all', label: '全部可见岗位' },
+      { value: 'sales', label: '业务' },
+      { value: 'warehouse', label: '仓库' },
+    ]
+  )
+  assert.deepEqual(buildWorkflowTaskBoardRoleOptions([]), [])
+})
+
 test('workflowTaskBoard: 任务编号缺失时不拼内部 ID', () => {
   assert.equal(
     getWorkflowTaskCodeLabel({ id: 88, task_code: 'TASK-BIZ-001' }),
@@ -219,6 +235,7 @@ test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', (
       },
     ],
     source_types: ['inbound', 'project-orders'],
+    owner_role_keys: ['warehouse', 'finance'],
   }
   const model = buildWorkflowTaskBoardModel(response)
   assert.deepEqual(
@@ -235,6 +252,7 @@ test('workflowTaskBoard: 使用服务端互斥计数构建四个运营泳道', (
   assert.equal(model.lanes[0].hiddenCount, 1)
   assert.equal(model.visibleLanes.length, 4)
   assert.deepEqual(model.sourceTypes, ['inbound', 'project-orders'])
+  assert.deepEqual(model.ownerRoleKeys, ['warehouse', 'finance'])
 })
 
 test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', () => {
@@ -345,6 +363,7 @@ test('workflowTaskBoard: lane/page 切换不会把上一请求响应交给新筛
       tasks: [],
     })),
     source_types: [],
+    owner_role_keys: [],
   }
   const responseState = {
     requestKey: getWorkflowTaskBoardRequestKey(overviewRequest),
@@ -386,6 +405,7 @@ test('workflowTaskBoard: 聚焦页保留服务端总数并把越界展示页收�
       },
     ],
     source_types: ['inbound'],
+    owner_role_keys: ['warehouse'],
   }
   const model = buildWorkflowTaskBoardModel(response, {
     lane: 'due',

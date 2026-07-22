@@ -5,6 +5,7 @@ import path from 'node:path'
 import test from 'node:test'
 
 import {
+  buildNodeTestArgs,
   classifyNodeTestResult,
   discoverNodeTests,
   parseArgs,
@@ -57,6 +58,15 @@ test('runner CLI options fail closed', () => {
   })
   assert.throws(() => parseArgs(['--root']), /requires a directory/u)
   assert.throws(() => parseArgs(['--unknown']), /unknown option/u)
+})
+
+test('runner serializes Node tests to avoid cross-test process contention', () => {
+  assert.deepEqual(buildNodeTestArgs(['a.test.mjs']), [
+    '--test',
+    '--test-reporter=tap',
+    '--test-concurrency=1',
+    'a.test.mjs',
+  ])
 })
 
 test('runner outcome fails closed when a discovered test is skipped', () => {

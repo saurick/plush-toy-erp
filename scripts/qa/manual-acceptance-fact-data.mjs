@@ -537,7 +537,11 @@ export function buildManualAcceptanceFactPlan(sourceReport) {
     adjustmentNo: shortBusinessNo(report, "TZ", offset + 1),
     returnStatus: correctionStatus(offset),
     adjustmentStatus: correctionStatus(offset + 1),
-    adjustType: offset % 2 === 0 ? "QUANTITY_INCREASE" : "QUANTITY_DECREASE",
+    // The current source-driven receipt API always receives the full remaining
+    // purchase-order quantity. A successful increase would therefore be an
+    // over-receipt, so the executable acceptance chain uses the valid decrease
+    // correction; increase rejection remains covered by repository tests.
+    adjustType: "QUANTITY_DECREASE",
   }));
   return Object.freeze({
     scope: "manual-acceptance-fact-data",
@@ -650,7 +654,7 @@ async function login({ backendURL, username, password, fetchImpl }) {
   );
 }
 
-export function manualAcceptanceFactRole(domain, method) {
+export function manualAcceptanceFactRole(domain, method, params = {}) {
   if (domain === "purchase") {
     return /purchase_return|receipt_adjustment/u.test(method)
       ? "admin"
@@ -658,6 +662,24 @@ export function manualAcceptanceFactRole(domain, method) {
   }
   if (domain === "quality") return "quality";
   if (domain === "inventory") return "warehouse";
+  if (domain === "workflow") {
+    const surfaceKey = String(
+      params?.task_group || params?.payload?.surface_key || "",
+    ).toLowerCase();
+    if (
+      surfaceKey.includes("production_scheduling") ||
+      surfaceKey.includes("production-scheduling")
+    ) {
+      return "pmc";
+    }
+    if (
+      surfaceKey.includes("production_exception") ||
+      surfaceKey.includes("production-exception")
+    ) {
+      return "production";
+    }
+    return "warehouse";
+  }
   // This runner prepares one cross-domain acceptance dataset. Production orders
   // and Facts use the independently verified super admin so an existing editable
   // business-role selection is never overwritten just to manufacture fixtures.
@@ -674,6 +696,7 @@ export function manualAcceptanceFactRole(domain, method) {
 export function manualAcceptanceFactRPCParams(domain, method, params = {}) {
   if (
     domain === "auth" ||
+    domain === "workflow" ||
     domain === "production_order" ||
     RAW_RPC_ENDPOINTS.has(`${domain}.${method}`)
   ) {
@@ -780,7 +803,7 @@ async function createExecutionContext(plan, options = {}) {
       domain,
       method,
       params: manualAcceptanceFactRPCParams(domain, method, params),
-      token: tokens[manualAcceptanceFactRole(domain, method)],
+      token: tokens[manualAcceptanceFactRole(domain, method, params)],
       fetchImpl,
     });
   return {
@@ -807,6 +830,65 @@ function resultItem(data, key, operation) {
   const item = data?.[key];
   if (!item?.id) throw new CliError(`${operation} response is missing ${key}`);
   return item;
+}
+
+async function completeExactSourceTask({
+  rpc,
+  taskGroup,
+  sourceType,
+  sourceID,
+  surfaceKey,
+  idempotencyKey,
+  feedback,
+}) {
+  const taskData = await rpc({
+    domain: "workflow",
+    method: "list_tasks",
+    params: {
+      task_group: taskGroup,
+      source_type: sourceType,
+      source_id: sourceID,
+      limit: 20,
+      offset: 0,
+    },
+  });
+  const tasks = Array.isArray(taskData?.tasks)
+    ? taskData.tasks.filter(
+        (task) =>
+          String(task.task_group || "") === taskGroup &&
+          String(task.source_type || "") === sourceType &&
+          Number(task.source_id) === Number(sourceID),
+      )
+    : [];
+  if (tasks.length !== 1) {
+    throw new CliError(
+      `${taskGroup} ${sourceType}:${sourceID} expected one task, got ${tasks.length}`,
+    );
+  }
+  let task = tasks[0];
+  if (String(task.task_status_key || "").toLowerCase() === "ready") {
+    task = resultItem(
+      await rpc({
+        domain: "workflow",
+        method: "complete_task_action",
+        params: {
+          task_id: task.id,
+          expected_version: task.version,
+          idempotency_key: idempotencyKey,
+          action_key: "complete",
+          payload: { surface_key: surfaceKey, feedback },
+        },
+      }),
+      "task",
+      "complete_task_action",
+    );
+  }
+  if (String(task.task_status_key || "").toLowerCase() !== "done") {
+    throw new CliError(
+      `${taskGroup} ${sourceType}:${sourceID} expected done, got ${task.task_status_key || "missing"}`,
+    );
+  }
+  return task;
 }
 
 async function exactByBusinessNo({
@@ -1526,11 +1608,33 @@ async function inventoryReferences(rpc, receipts) {
 }
 
 export async function readManualAcceptanceFinalInventoryReferences(rpc, lots) {
-  const inventoryLots = dedupeByID(lots);
+  const expectedLots = dedupeByID(lots);
+  const inventoryLots = [];
   const inventoryBalances = [];
   const inventoryTxns = [];
-  for (const lot of inventoryLots) {
+  for (const lot of expectedLots) {
     const lotID = positiveID(lot.id, "inventory_lot.id");
+    const lotData = await rpc({
+      domain: "inventory",
+      method: "list_inventory_lots",
+      params: {
+        ...(lot.subject_type ? { subject_type: lot.subject_type } : {}),
+        ...(lot.subject_id ? { subject_id: lot.subject_id } : {}),
+        ...(lot.product_sku_id
+          ? { product_sku_id: lot.product_sku_id }
+          : {}),
+        keyword: requiredText(lot.lot_no, "inventory_lot.lot_no", 128),
+        limit: 200,
+        offset: 0,
+      },
+    });
+    const currentLot = (lotData.inventory_lots || []).find(
+      (candidate) => Number(candidate.id) === lotID,
+    );
+    if (!currentLot) {
+      throw new CliError(`inventory lot ${lotID} final readback is missing`);
+    }
+    inventoryLots.push(currentLot);
     const balanceData = await rpc({
       domain: "inventory",
       method: "list_inventory_balances",
@@ -1557,7 +1661,7 @@ export async function readManualAcceptanceFinalInventoryReferences(rpc, lots) {
     inventoryTxns.push(...txns);
   }
   return {
-    inventoryLots,
+    inventoryLots: dedupeByID(inventoryLots),
     inventoryBalances: dedupeByID(inventoryBalances),
     inventoryTxns: dedupeByID(inventoryTxns),
   };
@@ -1805,7 +1909,7 @@ async function readOutsourcingPlan(rpc, sourcePlan) {
   const inspection = await exactRequired({
     rpc,
     domain: "quality",
-    method: "list_quality_inspections",
+    method: "list_outsourcing_return_quality_inspections",
     listKey: "quality_inspections",
     businessField: "inspection_no",
     businessNo: identities.quality.businessNo,
@@ -1985,7 +2089,7 @@ export function sourceDrivenPhaseIdentitySpecs(sourcePlan, phase) {
       ),
       phaseIdentitySpec({
         domain: "quality",
-        method: "list_quality_inspections",
+        method: "list_outsourcing_return_quality_inspections",
         listKey: "quality_inspections",
         businessField: "inspection_no",
         identity: identity.quality,
@@ -2020,7 +2124,7 @@ export function sourceDrivenPhaseIdentitySpecs(sourcePlan, phase) {
         listKey: "shipments",
         businessField: "shipment_no",
         identity: identity.shipment,
-        statuses: ["SHIPPED"],
+        statuses: ["DRAFT", "SHIPPED"],
       }),
       ...[
         identity.receivable,
@@ -2610,6 +2714,15 @@ async function ensureProductionFactSpecimen(
     String(fact.status).toUpperCase() === "POSTED" &&
     apply
   ) {
+    await completeExactSourceTask({
+      rpc,
+      taskGroup: "production_exception",
+      sourceType: "production-progress",
+      sourceID: fact.id,
+      surfaceKey: "production-exception",
+      idempotencyKey: `manual-acceptance:${plan.dataVersion}:production-exception:${fact.id}`,
+      feedback: "已完成本批生产异常处置。",
+    });
     fact = resultItem(
       await rpc({
         domain: "operational_fact",
@@ -2773,6 +2886,20 @@ async function ensureShipmentSpecimen(
     String(shipment.status).toUpperCase() === "DRAFT" &&
     apply
   ) {
+    await rpc({
+      domain: "operational_fact",
+      method: "submit_shipment_release",
+      params: { id: shipment.id },
+    });
+    await completeExactSourceTask({
+      rpc,
+      taskGroup: "shipment_release",
+      sourceType: "shipments",
+      sourceID: shipment.id,
+      surfaceKey: "shipment-release",
+      idempotencyKey: `manual-acceptance:${plan.dataVersion}:shipment-release:${suffix}`,
+      feedback: "已完成本批出货放行核对。",
+    });
     shipment = resultItem(
       await rpc({
         domain: "operational_fact",
@@ -3211,6 +3338,15 @@ async function applyLifecycleSpecimens({
   const closeCandidate = productionReadback[0].order;
   let closed = closeCandidate;
   if (String(closed.status).toUpperCase() === "RELEASED" && apply) {
+    await completeExactSourceTask({
+      rpc,
+      taskGroup: "production_scheduling",
+      sourceType: "production-orders",
+      sourceID: closed.id,
+      surfaceKey: "production-scheduling",
+      idempotencyKey: `manual-acceptance:${plan.dataVersion}:production-scheduling:${closed.id}`,
+      feedback: "已完成本批排产确认。",
+    });
     closed = resultItem(
       await rpc({
         domain: "production_order",
@@ -3724,7 +3860,7 @@ function assertReferenceRecords(plan, records) {
       ),
     ),
   );
-  for (const type of ["QUANTITY_INCREASE", "QUANTITY_DECREASE"]) {
+  for (const type of ["QUANTITY_DECREASE"]) {
     if (!adjustTypes.has(type))
       throw new CliError(`purchaseReceiptAdjustments is missing ${type}`);
   }

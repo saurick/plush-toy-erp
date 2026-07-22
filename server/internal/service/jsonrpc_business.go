@@ -25,7 +25,7 @@ func (d *jsonrpcDispatcher) handleBusiness(
 
 	switch method {
 	case "dashboard_stats":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionERPDashboardRead); res != nil {
+		if res := d.RequireAdminPermission(ctx, biz.PermissionERPBusinessDashboardRead); res != nil {
 			return id, res, nil
 		}
 		admin, res := d.CurrentAdmin(ctx)

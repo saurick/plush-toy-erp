@@ -42,7 +42,7 @@ func TestSeedBuiltinRBACPrunesStaleBuiltinPermissions(t *testing.T) {
 	assertPermissionRowCount(t, ctx, db, "business.record.delete", 0)
 	assertPermissionRowCount(t, ctx, db, "erp.help_center.read", 0)
 	assertPermissionRowCount(t, ctx, db, "custom.local.debug", 1)
-	assertPermissionRowCount(t, ctx, db, biz.PermissionERPDashboardRead, 1)
+	assertPermissionRowCount(t, ctx, db, biz.PermissionERPWorkbenchRead, 1)
 	assertPermissionBindingCount(t, ctx, db, 1, 0)
 	assertPermissionBindingCount(t, ctx, db, 2, 0)
 	assertPermissionBindingCount(t, ctx, db, 3, 1)
@@ -107,7 +107,7 @@ WHERE role_id = (SELECT id FROM roles WHERE role_key = $1)`, biz.SalesRoleKey); 
 INSERT INTO role_permissions (role_id, permission_id, created_at)
 SELECT r.id, p.id, CURRENT_TIMESTAMP
 FROM roles r, permissions p
-WHERE r.role_key = $1 AND p.permission_key = $2`, biz.SalesRoleKey, biz.PermissionERPDashboardRead); err != nil {
+WHERE r.role_key = $1 AND p.permission_key = $2`, biz.SalesRoleKey, biz.PermissionERPWorkbenchRead); err != nil {
 		t.Fatalf("set selected sales permission failed: %v", err)
 	}
 
@@ -135,7 +135,7 @@ WHERE r.role_key = $1`, biz.SalesRoleKey)
 	if err := rows.Err(); err != nil {
 		t.Fatalf("iterate selected sales permissions failed: %v", err)
 	}
-	if len(got) != 1 || got[0] != biz.PermissionERPDashboardRead {
+	if len(got) != 1 || got[0] != biz.PermissionERPWorkbenchRead {
 		t.Fatalf("startup seed overwrote permission-center selection: %#v", got)
 	}
 }
@@ -245,6 +245,21 @@ func createRBACPermissionTestSchema(t *testing.T, ctx context.Context, db *sql.D
 			permission_id integer not null,
 			created_at timestamp null,
 			unique(role_id, permission_id)
+		)`,
+		`CREATE TABLE warehouses (
+			id integer primary key,
+			code text not null unique,
+			name text not null default ''
+		)`,
+		`CREATE TABLE role_data_scopes (
+			id integer primary key,
+			role_id integer not null,
+			resource_type text not null,
+			mode text not null,
+			resource_ids text not null default '[]',
+			created_at timestamp null,
+			updated_at timestamp null,
+			unique(role_id, resource_type)
 		)`,
 	} {
 		if _, err := db.ExecContext(ctx, stmt); err != nil {

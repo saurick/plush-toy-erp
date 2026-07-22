@@ -262,9 +262,10 @@ func TestJsonrpcDispatcher_InventoryLedgerRequiresInventoryReadPermission(t *tes
 func newInventoryJSONRPCTestData(data *datarepo.Data, admin *biz.AdminUser) *jsonrpcDispatcher {
 	logger := log.NewStdLogger(io.Discard)
 	return &jsonrpcDispatcher{
-		log:         log.NewHelper(log.With(logger, "module", "service.jsonrpc.inventory.test")),
-		adminReader: stubAdminAccountReader{admin: admin},
-		inventoryUC: biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.inventory.test")),
+		adminReader:   stubAdminAccountReader{admin: admin},
+		adminManageUC: newAllWarehouseScopeAdminUsecase(),
+		inventoryUC:   biz.NewInventoryUsecase(datarepo.NewInventoryRepo(data, logger)),
 	}
 }
 

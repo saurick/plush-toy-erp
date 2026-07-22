@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 // ID filters vertices based on their ID field.
@@ -492,6 +493,29 @@ func UpdatedAtLT(v time.Time) predicate.Role {
 // UpdatedAtLTE applies the LTE predicate on the "updated_at" field.
 func UpdatedAtLTE(v time.Time) predicate.Role {
 	return predicate.Role(sql.FieldLTE(FieldUpdatedAt, v))
+}
+
+// HasDataScopes applies the HasEdge predicate on the "data_scopes" edge.
+func HasDataScopes() predicate.Role {
+	return predicate.Role(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, DataScopesTable, DataScopesColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasDataScopesWith applies the HasEdge predicate on the "data_scopes" edge with a given conditions (other predicates).
+func HasDataScopesWith(preds ...predicate.RoleDataScope) predicate.Role {
+	return predicate.Role(func(s *sql.Selector) {
+		step := newDataScopesStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

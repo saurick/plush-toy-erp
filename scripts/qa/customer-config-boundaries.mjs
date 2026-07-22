@@ -303,10 +303,27 @@ function validateBackendProcessContractOwnership() {
 function validateWorkflowTaskRevisionVisibilityContract() {
   const servicePath = "server/internal/service/jsonrpc_workflow_task.go";
   const serviceSource = readFileSync(repoPath(servicePath), "utf8");
+  const visibilityPath =
+    "server/internal/service/jsonrpc_workflow_task_revision_visibility.go";
+  const visibilitySource = readFileSync(repoPath(visibilityPath), "utf8");
   assert(
     (serviceSource.match(/workflowTaskQueryVisibilityScope\(/g) || [])
-      .length === 3,
-    `${servicePath} list, role-view and board entry points must share the revision-aware query scope`,
+      .length === 1 &&
+      (serviceSource.match(/workflowTaskReadVisibilityScope\(/g) || [])
+        .length === 2 &&
+      visibilitySource.includes(
+        "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)",
+      ),
+    `${servicePath} list and board must use the supervised read scope while role-view uses the base revision-aware scope`,
+  );
+  assert(
+    visibilitySource.includes(
+      "d.AdminHasPermission(ctx, biz.PermissionWorkflowTaskSupervise)",
+    ) &&
+      visibilitySource.includes(
+        "expandWorkflowTaskVisibilityForSupervision(scope, canSupervise)",
+      ),
+    `${visibilityPath} supervision must remain an explicit read-only expansion of the revision-aware scope`,
   );
   for (const legacyActiveFilter of [
     "filter.VisibleOwnerRoleKeys = d.workflowVisibleOwnerRoleKeys(",
@@ -397,7 +414,7 @@ function validateCustomerConfigRepositoryContract() {
   const repoPathName = "server/internal/data/customer_config_repo.go";
   const repoSource = readFileSync(repoPath(repoPathName), "utf8");
   const openTaskCounter = repoSource.match(
-    /func \(r \*customerConfigRepo\) CountOpenWorkflowTasksByPools[\s\S]*?\n}\n/,
+    /func \(r \*customerConfigRepo\) CountOpenWorkflowTasksByResponsibilities[\s\S]*?\n}\n/,
   )?.[0];
   assert(
     openTaskCounter?.includes("task_status_key IN ('ready', 'blocked')"),

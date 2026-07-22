@@ -22,6 +22,7 @@ function overviewResponse() {
       ],
     })),
     source_types: ['inbound', 'project-orders'],
+    owner_role_keys: ['warehouse', 'sales'],
   }
 }
 
@@ -47,6 +48,8 @@ test('workflowTaskBoardContract: 畸形成功响应 fail closed', () => {
       ),
     },
     { ...overviewResponse(), source_types: ['inbound', 'inbound'] },
+    { ...overviewResponse(), owner_role_keys: ['sales', 'sales'] },
+    { ...overviewResponse(), owner_role_keys: [''] },
     {
       ...overviewResponse(),
       lanes: overviewResponse().lanes.map((lane, index) =>

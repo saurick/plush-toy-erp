@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"server/internal/data/model/ent/predicate"
 	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/roledatascope"
 	"time"
 
 	"entgo.io/ent/dialect/sql"
@@ -160,9 +161,45 @@ func (_u *RoleUpdate) SetUpdatedAt(v time.Time) *RoleUpdate {
 	return _u
 }
 
+// AddDataScopeIDs adds the "data_scopes" edge to the RoleDataScope entity by IDs.
+func (_u *RoleUpdate) AddDataScopeIDs(ids ...int) *RoleUpdate {
+	_u.mutation.AddDataScopeIDs(ids...)
+	return _u
+}
+
+// AddDataScopes adds the "data_scopes" edges to the RoleDataScope entity.
+func (_u *RoleUpdate) AddDataScopes(v ...*RoleDataScope) *RoleUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddDataScopeIDs(ids...)
+}
+
 // Mutation returns the RoleMutation object of the builder.
 func (_u *RoleUpdate) Mutation() *RoleMutation {
 	return _u.mutation
+}
+
+// ClearDataScopes clears all "data_scopes" edges to the RoleDataScope entity.
+func (_u *RoleUpdate) ClearDataScopes() *RoleUpdate {
+	_u.mutation.ClearDataScopes()
+	return _u
+}
+
+// RemoveDataScopeIDs removes the "data_scopes" edge to RoleDataScope entities by IDs.
+func (_u *RoleUpdate) RemoveDataScopeIDs(ids ...int) *RoleUpdate {
+	_u.mutation.RemoveDataScopeIDs(ids...)
+	return _u
+}
+
+// RemoveDataScopes removes "data_scopes" edges to RoleDataScope entities.
+func (_u *RoleUpdate) RemoveDataScopes(v ...*RoleDataScope) *RoleUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveDataScopeIDs(ids...)
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -275,6 +312,51 @@ func (_u *RoleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(role.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DataScopesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   role.DataScopesTable,
+			Columns: []string{role.DataScopesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roledatascope.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedDataScopesIDs(); len(nodes) > 0 && !_u.mutation.DataScopesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   role.DataScopesTable,
+			Columns: []string{role.DataScopesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roledatascope.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.DataScopesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   role.DataScopesTable,
+			Columns: []string{role.DataScopesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roledatascope.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
@@ -428,9 +510,45 @@ func (_u *RoleUpdateOne) SetUpdatedAt(v time.Time) *RoleUpdateOne {
 	return _u
 }
 
+// AddDataScopeIDs adds the "data_scopes" edge to the RoleDataScope entity by IDs.
+func (_u *RoleUpdateOne) AddDataScopeIDs(ids ...int) *RoleUpdateOne {
+	_u.mutation.AddDataScopeIDs(ids...)
+	return _u
+}
+
+// AddDataScopes adds the "data_scopes" edges to the RoleDataScope entity.
+func (_u *RoleUpdateOne) AddDataScopes(v ...*RoleDataScope) *RoleUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddDataScopeIDs(ids...)
+}
+
 // Mutation returns the RoleMutation object of the builder.
 func (_u *RoleUpdateOne) Mutation() *RoleMutation {
 	return _u.mutation
+}
+
+// ClearDataScopes clears all "data_scopes" edges to the RoleDataScope entity.
+func (_u *RoleUpdateOne) ClearDataScopes() *RoleUpdateOne {
+	_u.mutation.ClearDataScopes()
+	return _u
+}
+
+// RemoveDataScopeIDs removes the "data_scopes" edge to RoleDataScope entities by IDs.
+func (_u *RoleUpdateOne) RemoveDataScopeIDs(ids ...int) *RoleUpdateOne {
+	_u.mutation.RemoveDataScopeIDs(ids...)
+	return _u
+}
+
+// RemoveDataScopes removes "data_scopes" edges to RoleDataScope entities.
+func (_u *RoleUpdateOne) RemoveDataScopes(v ...*RoleDataScope) *RoleUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveDataScopeIDs(ids...)
 }
 
 // Where appends a list predicates to the RoleUpdate builder.
@@ -573,6 +691,51 @@ func (_u *RoleUpdateOne) sqlSave(ctx context.Context) (_node *Role, err error) {
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(role.FieldUpdatedAt, field.TypeTime, value)
+	}
+	if _u.mutation.DataScopesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   role.DataScopesTable,
+			Columns: []string{role.DataScopesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roledatascope.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedDataScopesIDs(); len(nodes) > 0 && !_u.mutation.DataScopesCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   role.DataScopesTable,
+			Columns: []string{role.DataScopesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roledatascope.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.DataScopesIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   role.DataScopesTable,
+			Columns: []string{role.DataScopesColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(roledatascope.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &Role{config: _u.config}
 	_spec.Assign = _node.assignValues

@@ -162,6 +162,13 @@ export function buildWorkflowTaskBoardMock({
     throw new TypeError(`unsupported workflow task board due filter: ${due}`)
   }
   const ownerRoleKey = normalizeText(params.owner_role_key)
+  const ownerRoleKeys = [
+    ...new Set(
+      (Array.isArray(tasks) ? tasks : [])
+        .map((task) => normalizeText(task.owner_role_key))
+        .filter(Boolean)
+    ),
+  ].sort((left, right) => left.localeCompare(right))
   const visibleTasks = (Array.isArray(tasks) ? tasks : []).filter(
     (task) =>
       !ownerRoleKey || normalizeText(task.owner_role_key) === ownerRoleKey
@@ -214,5 +221,6 @@ export function buildWorkflowTaskBoardMock({
       tasks: laneTasks[key].slice(offset, offset + limit),
     })),
     source_types: sourceTypes,
+    owner_role_keys: ownerRoleKeys,
   }
 }

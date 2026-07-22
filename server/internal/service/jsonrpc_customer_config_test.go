@@ -1415,7 +1415,7 @@ func (r *serviceCustomerConfigRepo) CountInFlightProcessInstances(context.Contex
 	return 0, nil
 }
 
-func (r *serviceCustomerConfigRepo) CountOpenWorkflowTasksByPools(context.Context, string, string, []string) (int, error) {
+func (r *serviceCustomerConfigRepo) CountOpenWorkflowTasksByResponsibilities(context.Context, string, string, []string, []string) (int, error) {
 	return 0, nil
 }
 

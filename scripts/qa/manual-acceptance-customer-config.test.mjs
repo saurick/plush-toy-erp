@@ -174,7 +174,7 @@ function buildFetch({ activeRevision = "", alter } = {}) {
           configHashVersion: 1,
           source: "active_customer_config_revision",
           pages: [...currentPreview.compiled_snapshot.pages],
-          actions: ["erp.dashboard.read"],
+          actions: ["erp.workbench.read"],
           workPools: ["boss"],
           fieldPolicies: Object.fromEntries(
             Object.keys(

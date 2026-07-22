@@ -62,9 +62,9 @@ import {
   verifyNewWorkflowTaskMutationAttempt,
 } from '../utils/workflowTaskMutation.mjs'
 import {
-  TASK_BOARD_ROLE_OPTIONS,
   TASK_BOARD_DUE_OPTIONS,
   TASK_BOARD_STATUS_OPTIONS,
+  buildWorkflowTaskBoardRoleOptions,
   buildWorkflowTaskBoardModel,
   buildWorkflowTaskBoardRequest,
   getTaskStatusKey,
@@ -742,6 +742,10 @@ export default function DashboardPage({ initialView = 'workbench' }) {
       ]),
     [filters.sourceType, taskBoardModel.sourceTypes]
   )
+  const roleOptions = useMemo(
+    () => buildWorkflowTaskBoardRoleOptions(taskBoardModel.ownerRoleKeys),
+    [taskBoardModel.ownerRoleKeys]
+  )
   const actionMeta = actionMode ? TASK_ACTION_META[actionMode] : null
   const taskCenterCurrentTask = useMemo(
     () =>
@@ -774,6 +778,30 @@ export default function DashboardPage({ initialView = 'workbench' }) {
   useEffect(() => {
     setTaskBoardKeywordDraft(filters.keyword)
   }, [filters.keyword])
+
+  useEffect(() => {
+    if (
+      !taskBoardReady ||
+      filters.role === 'all' ||
+      taskBoardModel.ownerRoleKeys.includes(filters.role)
+    ) {
+      return
+    }
+    setSearchParams(
+      writeWorkflowTaskBoardFiltersToSearch(searchParams, {
+        ...filters,
+        role: 'all',
+        page: 1,
+      }),
+      { replace: true }
+    )
+  }, [
+    filters,
+    searchParams,
+    setSearchParams,
+    taskBoardModel.ownerRoleKeys,
+    taskBoardReady,
+  ])
 
   useLayoutEffect(() => {
     const pendingScroll = pendingTaskBoardPageScrollRef.current
@@ -1711,11 +1739,14 @@ export default function DashboardPage({ initialView = 'workbench' }) {
                 options={TASK_BOARD_STATUS_OPTIONS}
                 onChange={(value) => updateFilter('status', value)}
               />
-              <Select
-                value={filters.role}
-                options={TASK_BOARD_ROLE_OPTIONS}
-                onChange={(value) => updateFilter('role', value)}
-              />
+              {roleOptions.length > 1 ? (
+                <Select
+                  aria-label="负责岗位"
+                  value={filters.role}
+                  options={roleOptions}
+                  onChange={(value) => updateFilter('role', value)}
+                />
+              ) : null}
               <Select
                 value={filters.due}
                 options={TASK_BOARD_DUE_OPTIONS}

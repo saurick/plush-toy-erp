@@ -14,6 +14,8 @@ import { Button, Form, Input, Popconfirm, Select, Space } from 'antd'
 import { useOutletContext } from 'react-router-dom'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
+import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import {
   activateBOMVersion,
   archiveBOMVersion,
@@ -506,6 +508,7 @@ const BOMLineItemsForm = React.memo(
 
 export default function BOMVersionsPage() {
   const outletContext = useOutletContext()
+  const beginLatestRequest = useLatestRequestCoordinator()
   const adminProfile = useMemo(
     () => outletContext?.adminProfile || {},
     [outletContext?.adminProfile]
@@ -696,20 +699,29 @@ export default function BOMVersionsPage() {
   )
 
   const loadVersions = useCallback(async () => {
+    const request = beginLatestRequest('versions')
     if (!canRead) {
       setVersions([])
       setSelectedVersion(null)
       applySelectedRowKeys([])
+      setLoading(false)
+      request.finish()
       return false
     }
     setLoading(true)
     try {
-      const result = await listBOMVersions({
-        keyword,
-        status,
-        product_id: productID || undefined,
-        ...getBusinessPaginationParams(pagination),
-      })
+      const result = await listBOMVersions(
+        {
+          keyword,
+          status,
+          product_id: productID || undefined,
+          ...getBusinessPaginationParams(pagination),
+        },
+        { signal: request.signal }
+      )
+      if (!request.isCurrent()) {
+        return false
+      }
       const nextVersions = Array.isArray(result?.bom_versions)
         ? result.bom_versions
         : []
@@ -727,13 +739,20 @@ export default function BOMVersionsPage() {
       }
       return true
     } catch (error) {
+      if (isRpcAbortError(error) || !request.isCurrent()) {
+        return false
+      }
       message.error(getActionErrorMessage(error, '加载 BOM 版本'))
       return false
     } finally {
-      setLoading(false)
+      if (request.isCurrent()) {
+        setLoading(false)
+        request.finish()
+      }
     }
   }, [
     applySelectedRowKeys,
+    beginLatestRequest,
     canRead,
     keyword,
     loadDetail,

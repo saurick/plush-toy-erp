@@ -70,10 +70,10 @@ function readERPSource(relativePath) {
   )
 }
 
-test('masterDataOrderView: action permissions require projected actions for normal accounts', () => {
+test('masterDataOrderView: action permissions fail closed without projected actions', () => {
   assert.equal(
     hasActionPermission({ is_super_admin: true }, 'sales_order.create'),
-    true
+    false
   )
   assert.equal(
     hasActionPermission({ is_super_admin: true }, 'unknown.future.action'),
@@ -95,7 +95,7 @@ test('masterDataOrderView: action permissions require projected actions for norm
   )
 })
 
-test('masterDataOrderView: active session actions narrow normal accounts but not super admin', () => {
+test('masterDataOrderView: active session actions narrow every account', () => {
   assert.equal(
     hasActionPermission(
       {
@@ -104,7 +104,7 @@ test('masterDataOrderView: active session actions narrow normal accounts but not
       },
       'sales_order.create'
     ),
-    true
+    false
   )
   assert.equal(
     hasActionPermission(
@@ -128,7 +128,7 @@ test('masterDataOrderView: active session actions narrow normal accounts but not
   )
 })
 
-test('masterDataOrderView: super admin keeps all actions during diagnostic projection', () => {
+test('masterDataOrderView: diagnostic and narrowed projections fail closed for every account', () => {
   assert.equal(
     hasActionPermission(
       {
@@ -141,7 +141,7 @@ test('masterDataOrderView: super admin keeps all actions during diagnostic proje
       },
       'sales_order.create'
     ),
-    true
+    false
   )
   assert.equal(
     hasActionPermission(
@@ -170,7 +170,7 @@ test('masterDataOrderView: super admin keeps all actions during diagnostic proje
       },
       'workflow.task.complete'
     ),
-    true
+    false
   )
 })
 
@@ -2367,6 +2367,41 @@ test('FL_sales_order_item_source_snapshot__retains_product_sku_snapshots masterD
       unit_id: 2,
       ordered_quantity: '6',
     }
+  )
+})
+
+test('masterDataOrderView: editing does not infer a SKU for a historical unallocated line', () => {
+  const params = buildSalesOrderItemParams({
+    line_no: 6,
+    product_id: 12,
+    product_sku_id: null,
+    unit_id: 2,
+    product_code_snapshot: '',
+    product_name_snapshot: '历史未分规格产品',
+    color_snapshot: '',
+    ordered_quantity: '6',
+  })
+
+  assert.deepEqual(params, {
+    line_no: 6,
+    product_id: 12,
+    unit_id: 2,
+    product_name_snapshot: '历史未分规格产品',
+    ordered_quantity: '6',
+  })
+  assert.equal(Object.hasOwn(params, 'product_sku_id'), false)
+
+  const formSource = readERPSource(
+    '../components/sales-orders/SalesOrderForm.jsx'
+  )
+  assert.doesNotMatch(formSource, /function findOrderLineSKU\b/u)
+  assert.doesNotMatch(
+    formSource,
+    /const matchedSKU = findOrderLineSKU[\s\S]*product_sku_id: matchedSKU\.id/u
+  )
+  assert.match(
+    formSource,
+    /name=\{\[field\.name, 'product_sku_id'\]\}[\s\S]*onChange=\{\(value, option\) => \{[\s\S]*setOrderLineSourceFromSKU\(form, field\.name, sku\)/u
   )
 })
 

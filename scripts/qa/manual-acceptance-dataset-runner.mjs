@@ -200,6 +200,7 @@ export const MANUAL_ACCEPTANCE_EMPTY_BASELINE_PROBES = Object.freeze(
       domain: "workflow",
       method: "list_tasks",
       listKey: "tasks",
+      includeCustomerKey: false,
     },
   ].map((probe) => Object.freeze(probe)),
 );

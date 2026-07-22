@@ -236,12 +236,18 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addBackend(PermissionCustomerConfigRollback, permissionMethods("customer_config", "rollback_customer_config"), []string{"仍受可回滚 revision 和部署客户边界限制"})
 
 	// Shared ERP entries.
-	add(PermissionERPDashboardRead,
-		menuPermissionSurface("global-dashboard", "business-overview", "业务总览", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "dashboard_stats"), businessUsageConditions),
+	add(PermissionERPWorkbenchRead,
+		menuPermissionSurface("global-dashboard", "role-workbench", "岗位工作台", "dashboard-content", "工作台内容", permissionControlPage, "允许进入并查看", nil, workflowUsageConditions),
+	)
+	add(PermissionERPBusinessDashboardRead,
 		menuPermissionSurface("business-dashboard", "business-overview", "业务总览", "business-dashboard-content", "业务看板内容", permissionControlPage, "允许进入并查看", permissionMethods("business", "dashboard_stats"), businessUsageConditions),
 	)
 	addMenu(PermissionERPPrintTemplateRead, "print-center", "print-templates", "打印模板", "print-template-list", "模板打印中心", permissionControlPage, "允许进入并查看", nil, businessUsageConditions)
 	addBackend(PermissionERPBusinessChainDebugRead, permissionMethods("debug", "capabilities", "config"), debugUsageConditions)
+	addBackend(PermissionFieldPartyPrivateRead, nil, []string{"服务端返回客户、供应商和联系人资料时保留电话、地址、税号及账户等隐私字段；缺失时统一脱敏"})
+	addBackend(PermissionFieldSalesCommercialRead, nil, []string{"服务端返回销售单据、出货来源和打印数据时保留销售价格与金额；缺失时统一脱敏"})
+	addBackend(PermissionFieldProcurementCommercialRead, nil, []string{"服务端返回采购、委外、入库来源和打印数据时保留采购价格与金额；缺失时统一脱敏"})
+	addBackend(PermissionFieldFinanceSettlementRead, nil, []string{"服务端返回应收、应付、发票、对账和收付款数据时保留结算金额及账户字段；缺失时统一脱敏"})
 
 	// Master data. Method names are explicit; no permission suffix inference is used.
 	addCRUD(PermissionCustomerRead, PermissionCustomerCreate, PermissionCustomerUpdate, PermissionCustomerDisable, "customers", "customers", "客户档案", "客户", "masterdata", []string{"get_customer", "list_customers"}, []string{"create_customer", "save_customer_with_contacts"}, []string{"update_customer", "save_customer_with_contacts"}, []string{"set_customer_active"})
@@ -307,6 +313,12 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 		}
 	}
 	add(PermissionWorkflowTaskRead, workflowSurfaces("task-list", "任务列表、看板和详情", permissionControlPage, "允许进入并查看", permissionMethods("workflow", "list_tasks", "get_task_board", "metadata", "list_business_states", "explain_action_access", "explain_task_assignment"))...)
+	add(PermissionWorkflowTaskSupervise,
+		menuPermissionSurface("task-board", "task-supervision", "协同任务", "cross-role-task-list", "跨岗位任务监督", permissionControlSection, "允许只读查看其他责任岗位任务", permissionMethods("workflow", "list_tasks", "get_task_board"), workflowUsageConditions),
+		menuPermissionSurface("production-scheduling", "task-supervision", "生产排程", "cross-role-scheduling-list", "跨岗位排程任务监督", permissionControlSection, "允许只读查看其他责任岗位排程任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
+		menuPermissionSurface("production-exceptions", "task-supervision", "生产异常", "cross-role-exception-list", "跨岗位异常任务监督", permissionControlSection, "允许只读查看其他责任岗位异常任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
+		menuPermissionSurface("shipping-release", "task-supervision", "出货放行", "cross-role-release-list", "跨岗位放行任务监督", permissionControlSection, "允许只读查看其他责任岗位放行任务", permissionMethods("workflow", "list_tasks"), workflowUsageConditions),
+	)
 	add(PermissionWorkflowTaskCreate, workflowSurfaces("create-task", "创建协同任务", permissionControlButton, "显示并允许创建", permissionMethods("workflow", "create_task"))...)
 	add(PermissionWorkflowTaskUpdate, workflowSurfaces("update-task", "更新、阻塞和恢复任务", permissionControlForm, "显示并允许更新", permissionMethods("workflow", "block_task_action", "resume_task_action", "urge_task"))...)
 	add(PermissionWorkflowTaskAssign, workflowSurfaces("assign-task", "指派协同任务", permissionControlButton, "显示并允许指派", permissionMethods("workflow", "explain_task_assignment"))...)

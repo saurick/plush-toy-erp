@@ -237,7 +237,7 @@ type CustomerConfigRepo interface {
 	ListWorkPoolMembershipsByPools(ctx context.Context, customerKey, revision string, poolKeys []string) ([]WorkPoolMembershipInput, error)
 	ListWorkflowTaskAuthorizationRevisions(ctx context.Context, customerKey string) ([]WorkflowTaskAuthorizationRevision, error)
 	CountInFlightProcessInstances(ctx context.Context, customerKey, revision string, processKeys []string) (int, error)
-	CountOpenWorkflowTasksByPools(ctx context.Context, customerKey, revision string, poolKeys []string) (int, error)
+	CountOpenWorkflowTasksByResponsibilities(ctx context.Context, customerKey, revision string, poolKeys, fallbackOwnerRoleKeys []string) (int, error)
 	CountOpenBusinessDocumentsByModules(ctx context.Context, customerKey string, moduleKeys []string) (int, error)
 }
 

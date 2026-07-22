@@ -52,7 +52,8 @@ const MODULE_KEY_BY_POOL = Object.freeze({
 
 const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
   boss: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
+    "erp.business_dashboard.read",
     "erp.print_template.read",
     "supplier.read",
     "contact.read",
@@ -67,7 +68,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.boss.access",
   ]),
   sales: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
     "erp.print_template.read",
     "customer.read",
     "customer.create",
@@ -96,7 +97,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.sales.access",
   ]),
   purchase: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
     "erp.print_template.read",
     "supplier.read",
     "supplier.create",
@@ -114,7 +115,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.purchase.access",
   ]),
   warehouse: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
     "customer.read",
     "supplier.read",
     "material.read",
@@ -139,7 +140,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.warehouse.access",
   ]),
   quality: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
     "supplier.read",
     "contact.read",
     "material.read",
@@ -163,7 +164,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.quality.access",
   ]),
   finance: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
     "erp.print_template.read",
     "customer.read",
     "supplier.read",
@@ -196,7 +197,8 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.finance.access",
   ]),
   pmc: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
+    "erp.business_dashboard.read",
     "material.read",
     "product.read",
     "product.create",
@@ -219,7 +221,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.pmc.access",
   ]),
   engineering: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
     "erp.print_template.read",
     "material.read",
     "process.read",
@@ -241,7 +243,7 @@ const ROLE_CAPABILITY_KEYS_BY_POOL = Object.freeze({
     "mobile.engineering.access",
   ]),
   production: Object.freeze([
-    "erp.dashboard.read",
+    "erp.workbench.read",
     "erp.print_template.read",
     "supplier.read",
     "outsourcing.order.read",

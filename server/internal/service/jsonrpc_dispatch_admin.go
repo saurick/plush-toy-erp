@@ -119,16 +119,63 @@ func (d *jsonrpcDispatcher) handleAdmin(
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
+		warehouseScopeOptions := []any{}
+		if d.masterDataUC != nil {
+			warehouses, _, listErr := d.masterDataUC.ListWarehouses(ctx, biz.MasterDataFilter{Limit: 1000})
+			if listErr != nil {
+				return id, d.mapMasterDataError(ctx, listErr), nil
+			}
+			warehouseScopeOptions = warehousesToAny(warehouses)
+		}
 		return id, &v1.JsonrpcResult{
 			Code:    errcode.OK.Code,
 			Message: errcode.OK.Message,
 			Data: newDataStruct(map[string]any{
-				"roles":              roleOptionsToAny(roles, roleAccess),
-				"permissions":        permissionOptionsToAny(permissions),
-				"menus":              menuOptionsToAny(biz.BuiltinAdminMenus()),
-				"role_options":       roleOptionsToAny(roles, roleAccess),
-				"permission_options": permissionOptionsToAny(permissions),
-				"menu_options":       menuOptionsToAny(biz.BuiltinAdminMenus()),
+				"roles":                   roleOptionsToAny(roles, roleAccess),
+				"permissions":             permissionOptionsToAny(permissions),
+				"menus":                   menuOptionsToAny(biz.BuiltinAdminMenus()),
+				"role_options":            roleOptionsToAny(roles, roleAccess),
+				"permission_options":      permissionOptionsToAny(permissions),
+				"menu_options":            menuOptionsToAny(biz.BuiltinAdminMenus()),
+				"warehouse_scope_options": warehouseScopeOptions,
+			}),
+		}, nil
+
+	case "effective_role_access":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRoleRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemPermissionRead); res != nil {
+			return id, res, nil
+		}
+		if res := d.RequireAdminPermission(ctx, biz.PermissionCustomerConfigRead); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "role_key"); res != nil {
+			return id, res, nil
+		}
+		role, err := d.adminManageUC.GetRoleForAccessExplanation(ctx, getString(pm, "role_key"))
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		customerKey, err := runtimeCustomerKey("")
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		explanation, err := d.customerConfigUC.ExplainRoleEffectiveAccess(
+			ctx,
+			customerKey,
+			*role,
+			runtimeCustomerConfigRequiresActiveRevision(),
+		)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"effective_access": roleEffectiveAccessExplanationToMap(explanation),
 			}),
 		}, nil
 
@@ -172,6 +219,33 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			return id, invalidAdminParamResult(), nil
 		}
 		role, err := d.adminManageUC.SetRolePermissions(ctx, getString(pm, "role_key"), permissionKeys, expectedVersion)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"role": adminRoleToMap(*role, true),
+			}),
+		}, nil
+
+	case "set_role_data_scopes":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRolePermissionManage); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "role_key", "data_scopes", "expected_version"); res != nil {
+			return id, res, nil
+		}
+		dataScopes, ok := getStrictRoleDataScopes(pm, "data_scopes")
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		role, err := d.adminManageUC.SetRoleDataScopes(ctx, getString(pm, "role_key"), dataScopes, expectedVersion)
 		if err != nil {
 			return id, d.mapAdminManageError(ctx, err), nil
 		}
@@ -389,7 +463,7 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 	case errors.Is(err, biz.ErrForbidden), errors.Is(err, biz.ErrNoPermission):
 		l.Warnf("[admin] permission denied err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
-	case errors.Is(err, biz.ErrBadParam):
+	case errors.Is(err, biz.ErrBadParam), errors.Is(err, biz.ErrRoleDataScopeResourceNotFound):
 		l.Warnf("[admin] invalid param err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}
 	case errors.Is(err, biz.ErrInvalidPhoneNumber):
@@ -448,4 +522,51 @@ func (d *jsonrpcDispatcher) mapAdminManageError(ctx context.Context, err error) 
 		l.Errorf("[admin] internal err=%v", err)
 		return &v1.JsonrpcResult{Code: errcode.Internal.Code, Message: errcode.Internal.Message}
 	}
+}
+
+func getStrictRoleDataScopes(pm map[string]any, key string) ([]biz.RoleDataScope, bool) {
+	rawItems, ok := pm[key].([]any)
+	if !ok || len(rawItems) != 1 {
+		return nil, false
+	}
+	item, ok := rawItems[0].(map[string]any)
+	if !ok || len(item) < 2 || len(item) > 3 {
+		return nil, false
+	}
+	for itemKey := range item {
+		if itemKey != "resource_type" && itemKey != "mode" && itemKey != "resource_ids" {
+			return nil, false
+		}
+	}
+	ids := []int{}
+	if rawIDs, exists := item["resource_ids"]; exists {
+		values, ok := rawIDs.([]any)
+		if !ok {
+			return nil, false
+		}
+		for _, value := range values {
+			id, ok := strictJSONRPCPositiveInt(value)
+			if !ok {
+				return nil, false
+			}
+			ids = append(ids, id)
+		}
+	}
+	normalized, err := biz.NormalizeRoleDataScope(biz.RoleDataScope{
+		ResourceType: getString(item, "resource_type"),
+		Mode:         getString(item, "mode"),
+		ResourceIDs:  ids,
+	})
+	if err != nil {
+		return nil, false
+	}
+	return []biz.RoleDataScope{normalized}, true
+}
+
+func strictJSONRPCPositiveInt(value any) (int, bool) {
+	number, ok := value.(float64)
+	if !ok || number <= 0 || number != float64(int(number)) {
+		return 0, false
+	}
+	return int(number), true
 }

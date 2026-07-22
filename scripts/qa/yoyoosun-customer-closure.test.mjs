@@ -31,6 +31,18 @@ const requiredSourceCategories = new Set([
 const forbiddenRuntimeFactCommitClaims =
   /自动过账|直接过账|直接写库存|直接写出货|直接写财务/
 
+const expectedRoleMenuSurfaces = Object.freeze({
+  sales: ['global-dashboard', 'customers', 'sales-orders', 'products', 'production-orders', 'inventory', 'shipments', 'task-board', 'print-center'],
+  boss: ['global-dashboard', 'business-dashboard', 'task-board', 'sales-orders', 'accessories-purchase', 'processing-contracts', 'inbound', 'quality-inspections', 'inventory', 'production-orders', 'production-scheduling', 'production-progress', 'production-exceptions', 'shipments', 'reconciliation', 'payables', 'receivables', 'invoices', 'print-center'],
+  engineering: ['global-dashboard', 'products', 'materials', 'processes', 'material-bom', 'task-board', 'print-center'],
+  pmc: ['global-dashboard', 'business-dashboard', 'products', 'materials', 'processes', 'material-bom', 'production-orders', 'production-scheduling', 'production-progress', 'production-exceptions', 'task-board'],
+  purchase: ['global-dashboard', 'suppliers', 'materials', 'products', 'processes', 'material-bom', 'inventory', 'accessories-purchase', 'processing-contracts', 'inbound', 'task-board', 'print-center'],
+  warehouse: ['global-dashboard', 'materials', 'products', 'inventory', 'inbound', 'shipping-release', 'outbound', 'shipments', 'task-board'],
+  quality: ['global-dashboard', 'materials', 'products', 'processes', 'quality-inspections', 'production-orders', 'production-exceptions', 'inventory', 'shipments', 'inbound', 'processing-contracts', 'task-board'],
+  finance: ['global-dashboard', 'customers', 'suppliers', 'reconciliation', 'payables', 'receivables', 'invoices', 'processing-contracts', 'sales-orders', 'quality-inspections', 'inventory', 'inbound', 'shipments', 'task-board', 'print-center'],
+  production: ['global-dashboard', 'suppliers', 'materials', 'products', 'processes', 'production-orders', 'production-scheduling', 'inventory', 'processing-contracts', 'production-exceptions', 'production-progress', 'task-board', 'print-center'],
+})
+
 function assertNoPositiveRuntimeFactCommitClaim(text, context) {
   const normalizedText = String(text || '').replace(
     /(?:不|不能|不得|禁止)直接写(?:库存|出货|财务)(?:事实|流水|数据)?/g,
@@ -46,6 +58,18 @@ function assertSyntheticSourceIds(sourceIds, context) {
     `${context} must be marked as synthetic trial data only`
   )
 }
+
+test('yoyoosun locks the exact nine-role desktop menu matrix', () => {
+  assert.deepEqual(
+    Object.fromEntries(
+      yoyoosunRoleFlowMatrix.roles.map((role) => [
+        role.roleKey,
+        [...role.menuSurfaces],
+      ])
+    ),
+    expectedRoleMenuSurfaces
+  )
+})
 
 function buildYoyoosunPrintTemplateDefaults() {
   return {
@@ -370,7 +394,7 @@ test('yoyoosun role flow matrix keeps workflow handling separate from facts', ()
     assert.ok(role.roleKey)
     assert.ok(role.displayName)
     assert.ok(role.ownerPools.length > 0)
-    assert.ok(role.capabilityKeys.includes('erp.dashboard.read'), `${role.roleKey} needs dashboard access`)
+    assert.ok(role.capabilityKeys.includes('erp.workbench.read'), `${role.roleKey} needs workbench access`)
     assert.ok(role.capabilityKeys.includes('workflow.task.read'), `${role.roleKey} needs workflow.task.read`)
     assert.match(role.guardrail, /不|不能|只有|必须/)
     assertNoPositiveRuntimeFactCommitClaim(
@@ -402,11 +426,18 @@ test('yoyoosun production owns processing contract confirmation', () => {
 
   assert.ok(productionRole.capabilityKeys.includes('outsourcing.order.confirm'))
   assert.ok(productionRole.printTemplates.includes('processing-contract'))
-  assert.equal(
-    purchaseRole.capabilityKeys.some((key) => key.startsWith('outsourcing.order.')),
-    false,
-    '永绅采购岗位不应越权确认生产 / 委外加工合同'
-  )
+  assert.ok(purchaseRole.capabilityKeys.includes('outsourcing.order.read'))
+  for (const permissionKey of [
+    'outsourcing.order.create',
+    'outsourcing.order.update',
+    'outsourcing.order.confirm',
+  ]) {
+    assert.equal(
+      purchaseRole.capabilityKeys.includes(permissionKey),
+      false,
+      `永绅采购岗位不应越权获得 ${permissionKey}`
+    )
+  }
 })
 
 test('yoyoosun WIP role projection stays within Product Core ownership', () => {

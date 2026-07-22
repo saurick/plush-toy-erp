@@ -33,7 +33,8 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
     typeof response.counts !== 'object' ||
     Array.isArray(response.counts) ||
     !Array.isArray(response.lanes) ||
-    !Array.isArray(response.source_types)
+    !Array.isArray(response.source_types) ||
+    !Array.isArray(response.owner_role_keys)
   ) {
     return invalidTaskBoardResponse()
   }
@@ -110,6 +111,16 @@ export function requireWorkflowTaskBoardResponse(response, request = {}) {
   if (
     normalizedSourceTypes.some((sourceType) => !sourceType) ||
     new Set(normalizedSourceTypes).size !== normalizedSourceTypes.length
+  ) {
+    return invalidTaskBoardResponse()
+  }
+
+  const normalizedOwnerRoleKeys = response.owner_role_keys.map((roleKey) =>
+    String(roleKey || '').trim()
+  )
+  if (
+    normalizedOwnerRoleKeys.some((roleKey) => !roleKey) ||
+    new Set(normalizedOwnerRoleKeys).size !== normalizedOwnerRoleKeys.length
   ) {
     return invalidTaskBoardResponse()
   }

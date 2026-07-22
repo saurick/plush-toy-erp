@@ -480,7 +480,7 @@ func TestCustomerConfigRepoSwitchIdentityFailuresRollBackBeforeWrites(t *testing
 	}
 }
 
-func TestCountOpenWorkflowTasksByPoolsUsesReadyBlockedContract(t *testing.T) {
+func TestCountOpenWorkflowTasksByResponsibilitiesUsesRuntimeTaskCategoriesAndFallbackRoles(t *testing.T) {
 	db, mock, err := sqlmock.New()
 	if err != nil {
 		t.Fatalf("sqlmock.New() error = %v", err)
@@ -490,23 +490,41 @@ func TestCountOpenWorkflowTasksByPoolsUsesReadyBlockedContract(t *testing.T) {
 	mock.ExpectQuery(regexp.QuoteMeta(`
 SELECT COUNT(*)
 FROM workflow_tasks
-WHERE config_revision = $1
-  AND owner_pool_key IN ($2, $3)
-  AND task_status_key IN ('ready', 'blocked')`)).
-		WithArgs("rev-1", "finance", "sales").
+WHERE task_status_key IN ('ready', 'blocked')
+  AND (
+    (
+      config_revision = $1
+      AND process_instance_id > 0
+      AND process_node_instance_id > 0
+    )
+    OR (
+      config_revision IS NULL
+      AND process_instance_id IS NULL
+      AND process_node_instance_id IS NULL
+    )
+  )
+  AND (
+    owner_pool_key IN ($2, $3)
+    OR (
+      NULLIF(BTRIM(owner_pool_key), '') IS NULL
+      AND owner_role_key IN ($4, $5)
+    )
+  )`)).
+		WithArgs("rev-1", "finance_pool", "sales_pool", "finance", "sales").
 		WillReturnRows(sqlmock.NewRows([]string{"count"}).AddRow(2))
 
-	count, err := repo.CountOpenWorkflowTasksByPools(
+	count, err := repo.CountOpenWorkflowTasksByResponsibilities(
 		context.Background(),
 		"yoyoosun",
 		"rev-1",
+		[]string{"sales_pool", "finance_pool"},
 		[]string{"sales", "finance"},
 	)
 	if err != nil {
-		t.Fatalf("CountOpenWorkflowTasksByPools() error = %v", err)
+		t.Fatalf("CountOpenWorkflowTasksByResponsibilities() error = %v", err)
 	}
 	if count != 2 {
-		t.Fatalf("CountOpenWorkflowTasksByPools() = %d, want 2", count)
+		t.Fatalf("CountOpenWorkflowTasksByResponsibilities() = %d, want 2", count)
 	}
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatalf("workflow task open-state query drifted: %v", err)

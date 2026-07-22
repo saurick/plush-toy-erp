@@ -33,7 +33,11 @@ func (d *jsonrpcDispatcher) handleInventory(
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
 		}
-		items, total, err := d.inventoryUC.ListInventoryBalances(ctx, inventoryBalanceFilterFromParams(pm))
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		items, total, err := d.inventoryUC.ListInventoryBalancesForAccess(ctx, inventoryBalanceFilterFromParams(pm), scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
@@ -51,7 +55,11 @@ func (d *jsonrpcDispatcher) handleInventory(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.inventoryUC.ListInventoryLots(ctx, filter)
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		items, total, err := d.inventoryUC.ListInventoryLotsForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
@@ -69,7 +77,11 @@ func (d *jsonrpcDispatcher) handleInventory(
 		if !ok {
 			return id, invalidParamResult(), nil
 		}
-		items, total, err := d.inventoryUC.ListInventoryTxns(ctx, filter)
+		scope, scopeResult := d.currentWarehouseDataScope(ctx)
+		if scopeResult != nil {
+			return id, scopeResult, nil
+		}
+		items, total, err := d.inventoryUC.ListInventoryTxnsForAccess(ctx, filter, scope)
 		if err != nil {
 			return id, d.mapInventoryError(ctx, err), nil
 		}
@@ -149,6 +161,8 @@ func inventoryTxnFilterFromParams(pm map[string]any) (biz.InventoryTxnFilter, bo
 func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v1.JsonrpcResult {
 	l := d.log.WithContext(ctx)
 	switch {
+	case errors.Is(err, biz.ErrDataScopeForbidden):
+		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[inventory] invalid param err=%v", err)
 		return invalidParamResult()

@@ -31,6 +31,7 @@ func NewMasterDataRepo(d *Data, logger log.Logger) *masterDataRepo {
 }
 
 var _ biz.MasterDataRepo = (*masterDataRepo)(nil)
+var _ biz.WarehouseAccessRepo = (*masterDataRepo)(nil)
 
 func (r *masterDataRepo) CreateCustomer(ctx context.Context, in *biz.CustomerMutation) (*biz.Customer, error) {
 	row, err := r.data.postgres.Customer.Create().
@@ -443,7 +444,22 @@ func (r *masterDataRepo) ListUnits(ctx context.Context, filter biz.MasterDataFil
 }
 
 func (r *masterDataRepo) ListWarehouses(ctx context.Context, filter biz.MasterDataFilter) ([]*biz.Warehouse, int, error) {
+	return r.listWarehouses(ctx, filter, biz.WarehouseDataScope{Mode: biz.DataScopeModeAll})
+}
+
+func (r *masterDataRepo) ListWarehousesForAccess(ctx context.Context, filter biz.MasterDataFilter, scope biz.WarehouseDataScope) ([]*biz.Warehouse, int, error) {
+	return r.listWarehouses(ctx, filter, biz.NormalizeWarehouseDataScope(scope))
+}
+
+func (r *masterDataRepo) listWarehouses(ctx context.Context, filter biz.MasterDataFilter, scope biz.WarehouseDataScope) ([]*biz.Warehouse, int, error) {
 	query := r.data.postgres.Warehouse.Query()
+	switch scope.Mode {
+	case biz.DataScopeModeAssigned:
+		query = query.Where(warehouse.IDIn(scope.WarehouseIDs...))
+	case biz.DataScopeModeAll:
+	default:
+		return []*biz.Warehouse{}, 0, nil
+	}
 	if filter.Keyword != "" {
 		query = query.Where(warehouse.Or(
 			warehouse.CodeContains(filter.Keyword),

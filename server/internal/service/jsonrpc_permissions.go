@@ -348,12 +348,33 @@ func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any 
 		"sort_order":           item.SortOrder,
 		"role_type":            string(item.Type),
 		"version":              item.Version,
+		"data_scopes":          roleDataScopesToAny(item.DataScopes),
 		"permissions_editable": !item.Disabled && !isSystemRole,
 		"assignable":           !item.Disabled && (!isSystemRole || isDebugRole),
 		"non_production_only":  isDebugRole,
 	}
 	if includePermissions {
 		out["permissions"] = toAnySliceString(item.Permissions)
+	}
+	return out
+}
+
+func roleDataScopesToAny(items []biz.RoleDataScope) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, map[string]any{
+			"resource_type": item.ResourceType,
+			"mode":          item.Mode,
+			"resource_ids":  toAnySliceInt(item.ResourceIDs),
+		})
+	}
+	return out
+}
+
+func toAnySliceInt(items []int) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, item)
 	}
 	return out
 }
@@ -480,6 +501,61 @@ func menuOptionsToAny(items []biz.AdminMenu) []any {
 			"required_any": toAnySliceString(item.RequiredAny),
 			"required_all": toAnySliceString(item.RequiredAll),
 		})
+	}
+	return out
+}
+
+func roleEffectiveAccessExplanationToMap(item *biz.RoleEffectiveAccessExplanation) map[string]any {
+	if item == nil {
+		return map[string]any{}
+	}
+	permissions := make([]any, 0, len(item.Permissions))
+	for _, decision := range item.Permissions {
+		permissions = append(permissions, map[string]any{
+			"permission_key": decision.PermissionKey,
+			"class":          string(decision.Class),
+			"rbac_granted":   decision.RBACGranted,
+			"effective":      decision.Effective,
+			"reasons":        accessDecisionReasonsToAny(decision.Reasons),
+		})
+	}
+	pages := make([]any, 0, len(item.Pages))
+	for _, decision := range item.Pages {
+		pages = append(pages, map[string]any{
+			"key":          decision.Key,
+			"label":        decision.Label,
+			"path":         decision.Path,
+			"required_any": toAnySliceString(decision.RequiredAny),
+			"required_all": toAnySliceString(decision.RequiredAll),
+			"missing_any":  toAnySliceString(decision.MissingAny),
+			"missing_all":  toAnySliceString(decision.MissingAll),
+			"rbac_granted": decision.RBACGranted,
+			"effective":    decision.Effective,
+			"reasons":      accessDecisionReasonsToAny(decision.Reasons),
+		})
+	}
+	return map[string]any{
+		"customer_key":        item.CustomerKey,
+		"role_key":            item.RoleKey,
+		"role_name":           item.RoleName,
+		"role_type":           string(item.RoleType),
+		"role_version":        item.RoleVersion,
+		"role_disabled":       item.RoleDisabled,
+		"source":              item.Source,
+		"is_final":            item.IsFinal,
+		"config_revision":     item.ConfigRevision,
+		"config_hash":         item.ConfigHash,
+		"config_hash_version": item.ConfigHashVersion,
+		"product_version":     item.ProductVersion,
+		"permissions":         permissions,
+		"pages":               pages,
+	}
+}
+
+func accessDecisionReasonsToAny(items []biz.AccessDecisionReason) []any {
+	out := make([]any, 0, len(items))
+	for _, item := range items {
+		out = append(out, map[string]any{"code": item.Code, "label": item.Label})
 	}
 	return out
 }

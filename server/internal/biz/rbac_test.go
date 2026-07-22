@@ -132,9 +132,13 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 		},
 		{
 			roleKey: EngineeringRoleKey,
-			has: []string{
-				PermissionERPPrintTemplateRead,
-				PermissionProcessRead,
+				has: []string{
+					PermissionERPPrintTemplateRead,
+					PermissionMaterialRead,
+					PermissionMaterialCreate,
+					PermissionMaterialUpdate,
+					PermissionMaterialDisable,
+					PermissionProcessRead,
 				PermissionProcessCreate,
 				PermissionProductRead,
 				PermissionBOMRead,
@@ -283,7 +287,7 @@ func TestAdminVisibleMenusFiltersByPermissionCode(t *testing.T) {
 	admin := &AdminUser{
 		ID:          2,
 		Username:    "manager",
-		Permissions: []string{PermissionERPDashboardRead},
+		Permissions: []string{PermissionERPWorkbenchRead},
 	}
 
 	menus := AdminVisibleMenus(admin)
@@ -316,7 +320,7 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 			key:         "global-dashboard",
 			label:       "工作台",
 			path:        "/erp/dashboard",
-			permissions: []string{PermissionERPDashboardRead},
+			permissions: []string{PermissionERPWorkbenchRead},
 		},
 		{
 			key:         "task-board",
@@ -328,7 +332,7 @@ func TestBuiltinAdminMenusAlignCurrentRuntimeNavigation(t *testing.T) {
 			key:         "business-dashboard",
 			label:       "业务看板",
 			path:        "/erp/business-dashboard",
-			permissions: []string{PermissionERPDashboardRead},
+			permissions: []string{PermissionERPBusinessDashboardRead},
 		},
 		{
 			key:         "receivables",

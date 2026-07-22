@@ -155,6 +155,7 @@ pnpm style:l1
 - 产品台账索引：[docs/product/产品台账索引.md](docs/product/产品台账索引.md)
 - 产品能力进度台账：[docs/product/产品能力进度台账.md](docs/product/产品能力进度台账.md)
 - 标准样例客户工程参考：[docs/customers/reference-customer/README.md](docs/customers/reference-customer/README.md)
+- 永绅角色、权限与协作流程手册：[docs/customers/yoyoosun/角色能力与流程矩阵.md](docs/customers/yoyoosun/角色能力与流程矩阵.md)
 - 永绅 yoyoosun 客户交付矩阵：[docs/customers/yoyoosun/客户交付矩阵.md](docs/customers/yoyoosun/客户交付矩阵.md)
 - 永绅 yoyoosun 客户差异台账：[docs/customers/yoyoosun/客户差异台账.md](docs/customers/yoyoosun/客户差异台账.md)
 - 状态 / Workflow / Fact 边界：[docs/architecture/状态工作流事实边界.md](docs/architecture/状态工作流事实边界.md)

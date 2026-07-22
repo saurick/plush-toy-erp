@@ -148,6 +148,7 @@ test('workflowApi: task board uses the dedicated server projection contract', as
       },
     ],
     source_types: ['inbound', 'project-orders'],
+    owner_role_keys: ['warehouse'],
   }
   const api = await loadWorkflowApi(async (method, params) => {
     calls.push({ method, params })
@@ -176,6 +177,7 @@ test('workflowApi: task board rejects malformed successful responses', async () 
       counts: { actionable: 1, exception: 0, due: 0, finished: 0 },
       lanes: [],
       source_types: [],
+      owner_role_keys: [],
     },
   }))
 

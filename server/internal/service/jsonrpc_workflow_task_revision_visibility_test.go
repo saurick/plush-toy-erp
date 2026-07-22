@@ -84,6 +84,35 @@ func TestWorkflowTaskQueryVisibilityScopeKeepsRevisionPairsAcrossAllEntryPoints(
 	}
 }
 
+func TestExpandWorkflowTaskVisibilityForSupervisionBroadensReadOnlyScope(t *testing.T) {
+	adminID := 7
+	base := &biz.WorkflowTaskVisibilityScope{
+		VisibleAssigneeID:              &adminID,
+		StandaloneVisibleOwnerRoleKeys: []string{biz.BossRoleKey},
+		RevisionRoleScopes: []biz.WorkflowTaskRevisionRoleScope{
+			{ConfigRevision: "rev-a", Status: biz.CustomerConfigStatusSuperseded, VisibleOwnerRoleKeys: []string{biz.BossRoleKey}},
+			{ConfigRevision: "rev-b", Status: biz.CustomerConfigStatusActive, VisibleOwnerRoleKeys: []string{biz.BossRoleKey}},
+		},
+	}
+
+	ordinary := expandWorkflowTaskVisibilityForSupervision(base, false)
+	if ordinary == nil || ordinary.VisibleAssigneeID == nil || ordinary.StandaloneAllowAllOwnerRoles {
+		t.Fatalf("ordinary scope=%#v", ordinary)
+	}
+	supervised := expandWorkflowTaskVisibilityForSupervision(base, true)
+	if supervised == nil || supervised.VisibleAssigneeID != nil || !supervised.StandaloneAllowAllOwnerRoles {
+		t.Fatalf("supervised scope=%#v", supervised)
+	}
+	for _, revision := range supervised.RevisionRoleScopes {
+		if !revision.AllowAllOwnerRoles || len(revision.VisibleOwnerRoleKeys) != 0 {
+			t.Fatalf("supervised revision=%#v", revision)
+		}
+	}
+	if base.VisibleAssigneeID == nil || base.StandaloneAllowAllOwnerRoles {
+		t.Fatalf("input scope mutated=%#v", base)
+	}
+}
+
 func TestWorkflowTaskRoleVisibilityUsesImmutableRevisionForReadUpdateActionUrgeAndAssignee(t *testing.T) {
 	t.Setenv("ERP_CUSTOMER_KEY", biz.DefaultCustomerKey)
 	admin := workflowJSONRPCAdmin(

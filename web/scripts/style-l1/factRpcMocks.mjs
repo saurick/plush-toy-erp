@@ -2330,6 +2330,7 @@ export async function installFactRpcMocks(page, context) {
               tasks: [representativeTasks[key]],
             })),
             source_types: ['sales-orders'],
+            owner_role_keys: ['sales'],
           }
           break
         }

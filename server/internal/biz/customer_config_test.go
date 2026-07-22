@@ -10,29 +10,31 @@ import (
 )
 
 type memCustomerConfigRepo struct {
-	activeErr     error
-	revisions     map[string]*CustomerConfigRevision
-	modules       map[string][]DeploymentModuleStateInput
-	roles         map[string][]RoleProfileInput
-	entitlements  map[string][]AccessEntitlementInput
-	pools         map[string][]WorkPoolInput
-	memberships   map[string][]WorkPoolMembershipInput
-	processCount  map[string]int
-	taskCount     map[string]int
-	businessCount map[string]int
+	activeErr             error
+	revisions             map[string]*CustomerConfigRevision
+	modules               map[string][]DeploymentModuleStateInput
+	roles                 map[string][]RoleProfileInput
+	entitlements          map[string][]AccessEntitlementInput
+	pools                 map[string][]WorkPoolInput
+	memberships           map[string][]WorkPoolMembershipInput
+	processCount          map[string]int
+	taskCount             map[string]int
+	taskFallbackRoleCount map[string]int
+	businessCount         map[string]int
 }
 
 func newMemCustomerConfigRepo() *memCustomerConfigRepo {
 	return &memCustomerConfigRepo{
-		revisions:     map[string]*CustomerConfigRevision{},
-		modules:       map[string][]DeploymentModuleStateInput{},
-		roles:         map[string][]RoleProfileInput{},
-		entitlements:  map[string][]AccessEntitlementInput{},
-		pools:         map[string][]WorkPoolInput{},
-		memberships:   map[string][]WorkPoolMembershipInput{},
-		processCount:  map[string]int{},
-		taskCount:     map[string]int{},
-		businessCount: map[string]int{},
+		revisions:             map[string]*CustomerConfigRevision{},
+		modules:               map[string][]DeploymentModuleStateInput{},
+		roles:                 map[string][]RoleProfileInput{},
+		entitlements:          map[string][]AccessEntitlementInput{},
+		pools:                 map[string][]WorkPoolInput{},
+		memberships:           map[string][]WorkPoolMembershipInput{},
+		processCount:          map[string]int{},
+		taskCount:             map[string]int{},
+		taskFallbackRoleCount: map[string]int{},
+		businessCount:         map[string]int{},
 	}
 }
 
@@ -257,10 +259,17 @@ func (r *memCustomerConfigRepo) CountInFlightProcessInstances(_ context.Context,
 	return count, nil
 }
 
-func (r *memCustomerConfigRepo) CountOpenWorkflowTasksByPools(_ context.Context, customerKey, revision string, poolKeys []string) (int, error) {
+func (r *memCustomerConfigRepo) CountOpenWorkflowTasksByResponsibilities(
+	_ context.Context,
+	customerKey, revision string,
+	poolKeys, fallbackOwnerRoleKeys []string,
+) (int, error) {
 	count := 0
 	for _, poolKey := range normalizeStringList(poolKeys) {
 		count += r.taskCount[customerRevisionKey(customerKey, revision)+"/"+poolKey]
+	}
+	for _, roleKey := range NormalizeAdminRoleKeys(fallbackOwnerRoleKeys) {
+		count += r.taskFallbackRoleCount[customerRevisionKey(customerKey, revision)+"/"+roleKey]
 	}
 	return count, nil
 }
@@ -1408,9 +1417,12 @@ func TestCustomerConfigUsecaseExplainModuleStatusCountsRuntimeGuards(t *testing.
 	repo := newMemCustomerConfigRepo()
 	uc := NewCustomerConfigUsecase(repo)
 	in := validCustomerConfigInput()
+	in.WorkPools[0].PoolKey = "sales_approval"
+	in.WorkPoolMemberships[0].PoolKey = "sales_approval"
 	revisionKey := customerRevisionKey(in.CustomerKey, in.Revision)
 	repo.processCount[revisionKey+"/"+ProcessKeySalesOrderAcceptance] = 2
-	repo.taskCount[revisionKey+"/sales"] = 3
+	repo.taskCount[revisionKey+"/sales_approval"] = 2
+	repo.taskFallbackRoleCount[revisionKey+"/"+SalesRoleKey] = 1
 	repo.businessCount[in.CustomerKey+"/sales_orders"] = 4
 	if _, err := uc.PublishCustomerConfig(ctx, in, 99); err != nil {
 		t.Fatalf("PublishCustomerConfig error = %v", err)
@@ -1428,6 +1440,10 @@ func TestCustomerConfigUsecaseExplainModuleStatusCountsRuntimeGuards(t *testing.
 	}
 	if status.InFlightProcessCount != 2 || status.OpenTaskCount != 3 || status.OpenBusinessDocCount != 4 {
 		t.Fatalf("runtime counts = %#v", status)
+	}
+	if len(status.ReferencedWorkPoolKeys) != 1 || status.ReferencedWorkPoolKeys[0] != "sales_approval" ||
+		len(status.ReferencedRoleKeys) != 1 || status.ReferencedRoleKeys[0] != SalesRoleKey {
+		t.Fatalf("separate responsibility keys = pools:%#v roles:%#v", status.ReferencedWorkPoolKeys, status.ReferencedRoleKeys)
 	}
 	reasons := map[string]bool{}
 	for _, reason := range status.DisableBlockedReasons {

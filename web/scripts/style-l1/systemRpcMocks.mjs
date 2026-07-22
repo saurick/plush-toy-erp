@@ -77,6 +77,7 @@ export async function installSystemRpcMocks(page, context) {
         }
         break
       case 'set_role_permissions':
+        salesRole.version += 1
         data = {
           role: {
             ...salesRole,
@@ -86,6 +87,13 @@ export async function installSystemRpcMocks(page, context) {
               : salesRole.permissions,
           },
         }
+        break
+      case 'set_role_data_scopes':
+        salesRole.version += 1
+        salesRole.data_scopes = Array.isArray(params.data_scopes)
+          ? params.data_scopes
+          : salesRole.data_scopes
+        data = { role: { ...salesRole } }
         break
       case 'set_erp_column_order': {
         const moduleKey = String(params?.module_key || '').trim()
@@ -119,6 +127,36 @@ export async function installSystemRpcMocks(page, context) {
           role_options: [salesRole, adminRole],
           permission_options: mockPermissions,
           menu_options: mockMenus,
+          warehouse_scope_options: [
+            { id: 1, code: 'RAW', name: '原料仓', is_active: true },
+            { id: 2, code: 'FG', name: '成品仓', is_active: true },
+          ],
+        }
+        break
+      case 'effective_role_access':
+        data = {
+          effective_access: {
+            role_key: params.role_key || salesRole.role_key,
+            source: 'active_customer_config_revision',
+            is_final: true,
+            config_revision: 'style-l1-active-revision',
+            pages: [
+              {
+                key: 'global-dashboard',
+                label: '工作台',
+                rbac_granted: true,
+                effective: true,
+                reasons: [],
+              },
+              {
+                key: 'business-dashboard',
+                label: '业务看板',
+                rbac_granted: false,
+                effective: false,
+                reasons: [{ label: '岗位基础权限未授予' }],
+              },
+            ],
+          },
         }
         break
       case 'audit_logs':

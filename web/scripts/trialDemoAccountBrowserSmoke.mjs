@@ -7,10 +7,7 @@ import { setTimeout as delay } from 'node:timers/promises'
 import { fileURLToPath } from 'node:url'
 
 import { chromium } from 'playwright'
-import {
-  loadDevPorts,
-  resolveDevAuxPort,
-} from '../../scripts/dev-ports.mjs'
+import { loadDevPorts, resolveDevAuxPort } from '../../scripts/dev-ports.mjs'
 import { yoyoosunMenuConfig } from '../../config/customers/yoyoosun/menuConfig.mjs'
 import { yoyoosunRoleFlowMatrix } from '../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { businessModuleDefinitions } from '../src/erp/config/businessModules.mjs'
@@ -58,6 +55,9 @@ const shouldCheckEffectiveSessionDiagnostic =
   process.env.TRIAL_BROWSER_SMOKE_EFFECTIVE_SESSION_DIAGNOSTIC !== 'off' &&
   (!externalBaseURL ||
     process.env.TRIAL_BROWSER_SMOKE_EXPECT_EFFECTIVE_SESSION_DIAGNOSTIC === '1')
+const expectedConfigRevision = String(
+  process.env.TRIAL_BROWSER_SMOKE_EXPECT_CONFIG_REVISION || ''
+).trim()
 
 const oldEntryLabels = [
   '客户/供应商',
@@ -78,7 +78,6 @@ const oldEntryLabels = [
   '待付款/应付提醒',
   '应收/开票登记',
   '异常处理',
-  '帮助中心',
   '开发与验收',
   '高级文档',
 ]
@@ -90,6 +89,13 @@ const menuLabelByKey = new Map([
   ]),
   ...businessModuleDefinitions.map((item) => [item.key, item.label]),
 ])
+const pageDefinitionByKey = new Map([
+  ...Object.values(navigationItemRegistry).map((item) => [item.key, item]),
+  ...businessModuleDefinitions.map((item) => [item.key, item]),
+])
+const authenticatedMenuLabels = Object.values(navigationItemRegistry)
+  .filter((item) => item.access === 'authenticated')
+  .map((item) => item.label)
 
 function expectedMenusForRole(roleKey) {
   const profile = yoyoosunRoleFlowMatrix.roles.find(
@@ -149,7 +155,7 @@ const desktopAccounts = [
   },
   {
     username: 'demo_admin',
-    expectedMenus: ['权限管理'],
+    expectedMenus: ['权限管理', '系统操作记录'],
     forbiddenMenus: [
       '工作台',
       '任务看板',
@@ -189,6 +195,41 @@ const visibleCustomerMenuLabelSet = new Set(
     .filter((key) => !hiddenCustomerMenuLabelSet.has(menuLabelByKey.get(key)))
     .map((key) => menuLabelByKey.get(key))
     .filter(Boolean)
+)
+const formalCustomerPageKeys = uniqueStrings(
+  (yoyoosunMenuConfig.desktopMenu?.sections || []).flatMap(
+    (section) => section.items || []
+  )
+).filter((key) => !hiddenCustomerMenuLabelSet.has(menuLabelByKey.get(key)))
+
+function pageRouteTarget(pageKey) {
+  const definition = pageDefinitionByKey.get(pageKey)
+  assert(definition?.path, `missing formal page path: ${pageKey}`)
+  return {
+    key: pageKey,
+    label: definition.label,
+    title: definition.title || definition.label,
+    path: definition.path,
+  }
+}
+
+function buildRoleRouteAccessPlan() {
+  return yoyoosunRoleFlowMatrix.roles.map((profile) => {
+    const allowedKeySet = new Set(profile.menuSurfaces)
+    return {
+      roleKey: profile.roleKey,
+      username: `demo_${profile.roleKey}`,
+      allowedPages: profile.menuSurfaces.map(pageRouteTarget),
+      forbiddenPages: formalCustomerPageKeys
+        .filter((pageKey) => !allowedKeySet.has(pageKey))
+        .map(pageRouteTarget),
+    }
+  })
+}
+
+const roleRouteAccessPlan = buildRoleRouteAccessPlan()
+const roleRouteAccessByUsername = new Map(
+  roleRouteAccessPlan.map((entry) => [entry.username, entry])
 )
 const forbiddenLegacyMenuLabels = oldEntryLabels.filter(
   (label) => !visibleCustomerMenuLabelSet.has(label)
@@ -279,6 +320,7 @@ const usage = `用法:
 function buildInputTemplate() {
   const menuProjectionPlan = buildMenuProjectionPlan()
   const menuProjectionCoverage = buildMenuProjectionCoverage(menuProjectionPlan)
+  const routeAccessPlan = buildRouteAccessPlanSummary()
   const effectiveSessionDiagnosticPlan = buildEffectiveSessionDiagnosticPlan()
   const yoyoosunEntryAuditPlan = buildYoyoosunEntryAuditPlan()
   return {
@@ -311,6 +353,7 @@ function buildInputTemplate() {
     ),
     menuProjectionPlan,
     menuProjectionCoverage,
+    routeAccessPlan,
     effectiveSessionDiagnosticPlan,
     yoyoosunEntryAuditPlan,
     realSmokeRequires: [...realSmokeRequires],
@@ -348,6 +391,20 @@ function buildMenuProjectionPlan() {
   }
 }
 
+function buildRouteAccessPlanSummary() {
+  return {
+    formalPageCount: formalCustomerPageKeys.length,
+    accountCount: roleRouteAccessPlan.length,
+    accounts: roleRouteAccessPlan.map((entry) => ({
+      username: entry.username,
+      allowedPages: entry.allowedPages.map((page) => ({ ...page })),
+      forbiddenPages: entry.forbiddenPages.map((page) => ({ ...page })),
+    })),
+    boundary:
+      'Every allowed role menu surface is opened through its visible menu item. Every other formal yoyoosun customer page is requested directly and must redirect to an allowed role page or the authenticated help page before it can be used.',
+  }
+}
+
 function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
   const adminDesktop = plan.desktopAccounts.find(
     (account) => account.username === 'demo_admin'
@@ -371,8 +428,10 @@ function buildMenuProjectionCoverage(plan = buildMenuProjectionPlan()) {
     coversAllDesktopAccounts: plan.desktopAccounts.length === 10,
     coversAllMobileAccounts: plan.mobileAccounts.length === 9,
     coversAdminDesktopPermissionCenter:
-      adminDesktop?.visibleExpectedMenus.length === 1 &&
-      adminDesktop.visibleExpectedMenus.includes('权限管理'),
+      adminDesktop?.visibleExpectedMenus.length === 2 &&
+      ['权限管理', '系统操作记录'].every((label) =>
+        adminDesktop.visibleExpectedMenus.includes(label)
+      ),
     coversAdminBusinessMenuDenial: [
       '工作台',
       '任务看板',
@@ -758,6 +817,15 @@ function buildRealSmokeReport({
         hiddenCustomerMenuLabels.length +
         forbiddenLegacyMenuLabels.length,
       verified: verifiedDesktop.includes(account.username),
+      ...(roleRouteAccessByUsername.has(account.username)
+        ? {
+            allowedPageCount: roleRouteAccessByUsername.get(account.username)
+              .allowedPages.length,
+            forbiddenDirectRouteCount: roleRouteAccessByUsername.get(
+              account.username
+            ).forbiddenPages.length,
+          }
+        : {}),
     })),
     mobileAccounts: mobileAccounts.map((account) =>
       buildMobileAccountSummary(account, verifiedMobile)
@@ -1030,6 +1098,24 @@ async function verifyDesktopAccount(browser, account) {
         .getByText(label, { exact: true })
         .waitFor({ state: 'visible', timeout: 15_000 })
     }
+    const expectedVisibleMenus = visibleCustomerMenuLabels(
+      account.expectedMenus
+    ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    const expectedVisibleLeafMenus = uniqueStrings([
+      ...expectedVisibleMenus,
+      ...authenticatedMenuLabels,
+    ]).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    const actualVisibleMenus = (
+      await page.locator('.erp-admin-menu .ant-menu-item').allTextContents()
+    )
+      .map((label) => label.trim())
+      .filter(Boolean)
+      .sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    assert.deepEqual(
+      actualVisibleMenus,
+      expectedVisibleLeafMenus,
+      `${account.username} 左侧叶子菜单必须与角色投影精确一致`
+    )
     for (const label of account.forbiddenMenus || []) {
       await assertNotVisibleInMenu(page, label, account.username)
     }
@@ -1039,10 +1125,16 @@ async function verifyDesktopAccount(browser, account) {
     for (const label of forbiddenLegacyMenuLabels) {
       await assertNotVisibleInMenu(page, label, account.username)
     }
-    const diagnostic = await verifyEffectiveSessionDiagnostic(
-      page,
-      account.username
-    )
+    const routeAccess = roleRouteAccessByUsername.get(account.username)
+    if (routeAccess) {
+      await verifyAllowedRolePages(page, routeAccess)
+      await verifyForbiddenRolePages(page, routeAccess)
+    }
+    const diagnostic = await verifyEffectiveSessionDiagnostic(page, {
+      username: account.username,
+      expectedMenuCount: expectedVisibleMenus.length,
+      assertExactCounts: account.username !== 'demo_admin',
+    })
     await page.screenshot({
       path: path.resolve(outputDir, `${account.username}-desktop.png`),
       fullPage: true,
@@ -1057,11 +1149,79 @@ async function verifyDesktopAccount(browser, account) {
   }
 }
 
+async function verifyAllowedRolePages(page, routeAccess) {
+  for (const target of routeAccess.allowedPages) {
+    const menuItem = page
+      .locator('.erp-admin-menu .ant-menu-item')
+      .filter({ hasText: target.label })
+      .first()
+    await menuItem.waitFor({ state: 'visible', timeout: 15_000 })
+    await menuItem.click()
+    await page.waitForURL((url) => url.pathname === target.path, {
+      timeout: 15_000,
+    })
+    await page.getByRole('main').waitFor({ state: 'visible', timeout: 15_000 })
+    await page
+      .locator('.loading-page--erp')
+      .waitFor({ state: 'hidden', timeout: 15_000 })
+      .catch(() => {})
+    await page.waitForFunction(
+      (label) =>
+        [...document.querySelectorAll('.erp-admin-menu .ant-menu-item')].some(
+          (node) =>
+            node.classList.contains('ant-menu-item-selected') &&
+            (node.textContent || '').trim().includes(label)
+        ),
+      target.label,
+      { timeout: 15_000 }
+    )
+    const selectedLabels = (
+      await page
+        .locator('.erp-admin-menu .ant-menu-item-selected')
+        .allTextContents()
+    ).map((label) => label.trim())
+    assert(
+      selectedLabels.includes(target.label),
+      `${routeAccess.username} 打开 ${target.label} 后菜单未保持选中`
+    )
+    const mainText = await page.getByRole('main').innerText()
+    assert.doesNotMatch(
+      mainText,
+      /页面加载失败|页面暂时无法显示|当前页面不可访问/u,
+      `${routeAccess.username} 打开 ${target.label} 后页面未正常加载`
+    )
+  }
+}
+
+async function verifyForbiddenRolePages(page, routeAccess) {
+  const allowedPaths = new Set(
+    routeAccess.allowedPages.map((target) => target.path)
+  )
+  const safeRedirectPaths = new Set([...allowedPaths, '/erp/help-center'])
+  for (const target of routeAccess.forbiddenPages) {
+    await page.goto(new URL(target.path, `${baseURL}/`).toString(), {
+      waitUntil: 'domcontentloaded',
+    })
+    await page.waitForURL(
+      (url) =>
+        url.pathname !== target.path && safeRedirectPaths.has(url.pathname),
+      { timeout: 15_000 }
+    )
+    assert(
+      safeRedirectPaths.has(new URL(page.url()).pathname),
+      `${routeAccess.username} 直达禁止页面 ${target.label} 后未回到安全页面`
+    )
+  }
+}
+
 function visibleCustomerMenuLabels(labels = []) {
   return labels.filter((label) => !hiddenCustomerMenuLabelSet.has(label))
 }
 
-async function verifyEffectiveSessionDiagnostic(page, username) {
+async function verifyEffectiveSessionDiagnostic(
+  page,
+  { username, expectedMenuCount, assertExactCounts }
+) {
   if (!shouldCheckEffectiveSessionDiagnostic) {
     return null
   }
@@ -1119,10 +1279,30 @@ async function verifyEffectiveSessionDiagnostic(page, username) {
     diagnostic.counts && typeof diagnostic.counts === 'object',
     `${username} effective session 诊断缺少 counts`
   )
-  assert(
-    Number(diagnostic.counts.visibleMenuItems) > 0,
-    `${username} effective session 诊断没有可见菜单计数`
-  )
+  if (assertExactCounts) {
+    assert.equal(
+      Number(diagnostic.counts.visibleMenuItems),
+      expectedMenuCount,
+      `${username} effective session 可见菜单计数必须与角色投影一致`
+    )
+    assert.equal(
+      Number(diagnostic.counts.pages),
+      expectedMenuCount,
+      `${username} effective session 页面计数必须与角色投影一致`
+    )
+  } else {
+    assert(
+      Number(diagnostic.counts.visibleMenuItems) > 0,
+      `${username} effective session 诊断没有可见菜单计数`
+    )
+  }
+  if (expectedConfigRevision) {
+    assert.equal(
+      diagnostic.configRevision,
+      expectedConfigRevision,
+      `${username} effective session revision 必须等于本轮已激活 revision`
+    )
+  }
   const serialized = JSON.stringify(diagnostic)
   assert.doesNotMatch(
     serialized,

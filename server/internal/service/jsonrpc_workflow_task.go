@@ -99,9 +99,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			DueFrom:       dueFrom,
 			DueTo:         dueTo,
 		}
-		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
-		if visibilityErr != nil {
-			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
+		visibilityScope, visibilityResult := d.workflowTaskReadVisibilityScope(ctx, admin)
+		if visibilityResult != nil {
+			return id, visibilityResult, nil
 		}
 		filter.VisibilityScope = visibilityScope
 		tasks, total, err := d.workflowUC.ListTasks(ctx, filter)
@@ -212,9 +212,9 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if adminRes != nil {
 			return id, adminRes, nil
 		}
-		visibilityScope, visibilityErr := d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)
-		if visibilityErr != nil {
-			return id, d.mapCustomerConfigError(ctx, visibilityErr), nil
+		visibilityScope, visibilityResult := d.workflowTaskReadVisibilityScope(ctx, admin)
+		if visibilityResult != nil {
+			return id, visibilityResult, nil
 		}
 		query.VisibilityScope = visibilityScope
 		board, err := d.workflowUC.GetTaskBoard(ctx, query)
@@ -513,8 +513,9 @@ func workflowTaskBoardToMap(board *biz.WorkflowTaskBoard) map[string]any {
 			"due":        board.Counts.Due,
 			"finished":   board.Counts.Finished,
 		},
-		"lanes":        lanes,
-		"source_types": toAnySliceString(board.SourceTypes),
+		"lanes":           lanes,
+		"source_types":    toAnySliceString(board.SourceTypes),
+		"owner_role_keys": toAnySliceString(board.OwnerRoleKeys),
 	}
 }
 

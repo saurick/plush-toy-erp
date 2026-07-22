@@ -678,21 +678,45 @@ WHERE config_revision = $1
 	return count, nil
 }
 
-func (r *customerConfigRepo) CountOpenWorkflowTasksByPools(ctx context.Context, customerKey, revision string, poolKeys []string) (int, error) {
+func (r *customerConfigRepo) CountOpenWorkflowTasksByResponsibilities(
+	ctx context.Context,
+	customerKey, revision string,
+	poolKeys, fallbackOwnerRoleKeys []string,
+) (int, error) {
 	poolKeys = normalizeDataStringList(poolKeys)
+	fallbackOwnerRoleKeys = normalizeDataStringList(fallbackOwnerRoleKeys)
 	revision = strings.TrimSpace(revision)
-	if revision == "" || len(poolKeys) == 0 {
+	if revision == "" || (len(poolKeys) == 0 && len(fallbackOwnerRoleKeys) == 0) {
 		return 0, nil
 	}
-	poolClause, args := buildStringInClause(2, poolKeys)
-	queryArgs := append([]any{revision}, args...)
+	poolClause, poolArgs := buildStringInClause(2, poolKeys)
+	roleClause, roleArgs := buildStringInClause(2+len(poolArgs), fallbackOwnerRoleKeys)
+	queryArgs := append([]any{revision}, poolArgs...)
+	queryArgs = append(queryArgs, roleArgs...)
 	var count int
 	if err := r.data.sqldb.QueryRowContext(ctx, `
 SELECT COUNT(*)
 FROM workflow_tasks
-WHERE config_revision = $1
-  AND owner_pool_key IN (`+poolClause+`)
-  AND task_status_key IN ('ready', 'blocked')`, queryArgs...).Scan(&count); err != nil {
+WHERE task_status_key IN ('ready', 'blocked')
+  AND (
+    (
+      config_revision = $1
+      AND process_instance_id > 0
+      AND process_node_instance_id > 0
+    )
+    OR (
+      config_revision IS NULL
+      AND process_instance_id IS NULL
+      AND process_node_instance_id IS NULL
+    )
+  )
+  AND (
+    owner_pool_key IN (`+poolClause+`)
+    OR (
+      NULLIF(BTRIM(owner_pool_key), '') IS NULL
+      AND owner_role_key IN (`+roleClause+`)
+    )
+  )`, queryArgs...).Scan(&count); err != nil {
 		return 0, err
 	}
 	return count, nil

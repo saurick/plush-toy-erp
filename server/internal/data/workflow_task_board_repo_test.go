@@ -112,6 +112,9 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	if got, want := board.SourceTypes, []string{"alpha", "beta", "gamma"}; fmt.Sprint(got) != fmt.Sprint(want) {
 		t.Fatalf("source types=%v, want %v", got, want)
 	}
+	if got, want := board.OwnerRoleKeys, []string{biz.QualityRoleKey, biz.SalesRoleKey}; fmt.Sprint(got) != fmt.Sprint(want) {
+		t.Fatalf("owner role keys=%v, want %v", got, want)
+	}
 	historicalDone, err := repo.GetWorkflowTask(ctx, createdIDs["BOARD-F-1"])
 	if err != nil {
 		t.Fatalf("get historical done task: %v", err)
@@ -197,6 +200,9 @@ func TestWorkflowRepo_GetWorkflowTaskBoardAppliesVisibilityAndRejectsRemovedStat
 	if board.Total != 2 || board.Counts.Actionable != 2 || fmt.Sprint(board.SourceTypes) != "[assigned-source sales-source]" {
 		t.Fatalf("unexpected visible board total=%d counts=%#v sources=%v", board.Total, board.Counts, board.SourceTypes)
 	}
+	if fmt.Sprint(board.OwnerRoleKeys) != "[finance sales]" {
+		t.Fatalf("owner role facet must include role-pool and self-assigned scopes, got %v", board.OwnerRoleKeys)
+	}
 	ownerFiltered, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{
 		OwnerRoleKey:         biz.FinanceRoleKey,
 		Limit:                5,
@@ -212,6 +218,9 @@ func TestWorkflowRepo_GetWorkflowTaskBoardAppliesVisibilityAndRejectsRemovedStat
 	}
 	if fmt.Sprint(ownerFiltered.SourceTypes) != "[assigned-source]" {
 		t.Fatalf("source facets must honor owner and self-assignee scope, got %v", ownerFiltered.SourceTypes)
+	}
+	if fmt.Sprint(ownerFiltered.OwnerRoleKeys) != "[finance sales]" {
+		t.Fatalf("owner role facet must remain stable while switching role filters, got %v", ownerFiltered.OwnerRoleKeys)
 	}
 
 	for _, status := range []string{"pending", "processing", "cancelled", "closed"} {
@@ -379,13 +388,13 @@ func TestWorkflowRepo_GetWorkflowTaskBoardUsesDistinctFacetAndBoundedQueries(t *
 	if _, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{Limit: 5, SnapshotAt: snapshotAt}); err != nil {
 		t.Fatalf("get overview query shape: %v", err)
 	}
-	assertQueryShape(t, readLogs(), 10)
+	assertQueryShape(t, readLogs(), 11)
 
 	resetLogs()
 	if _, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{LaneKey: biz.WorkflowTaskBoardLaneException, Limit: 20, SnapshotAt: snapshotAt}); err != nil {
 		t.Fatalf("get focused query shape: %v", err)
 	}
-	assertQueryShape(t, readLogs(), 8)
+	assertQueryShape(t, readLogs(), 9)
 }
 
 func TestWorkflowPostgresTaskBoardCounts478AndKeepsCompletionReasonOnlyInEvent(t *testing.T) {

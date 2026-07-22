@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useOutletContext } from 'react-router-dom'
 import {
   Alert,
@@ -37,7 +37,6 @@ import {
 } from '../utils/contactValidation.mjs'
 import { adminPasswordPolicyRule } from '../utils/adminPasswordPolicy.mjs'
 import { getPermissionModuleTitle } from '../utils/permissionModuleLabels.mjs'
-import { isMenuVisibleForPermissionKeys } from '../utils/menuAccessProjection.mjs'
 import {
   buildAssignableRoleOptions,
   filterAssignableBusinessPermissions,
@@ -59,6 +58,7 @@ const IS_PRODUCTION_BUILD = import.meta.env.PROD === true
 const READ_USER_PERMISSION = 'system.user.read'
 const READ_ROLE_PERMISSION = 'system.role.read'
 const READ_PERMISSION_PERMISSION = 'system.permission.read'
+const READ_CUSTOMER_CONFIG_PERMISSION = 'customer_config.read'
 const MANAGE_ROLE_PERMISSION = 'system.role.permission.manage'
 const UPDATE_USER_PERMISSION = 'system.user.update'
 const ASSIGN_USER_ROLE_PERMISSION = 'system.user.role.assign'
@@ -86,6 +86,32 @@ function normalizeStringList(values = []) {
 
 function buildPermissionSignature(values = []) {
   return normalizeStringList(values).sort().join('\n')
+}
+
+function getRoleWarehouseScope(role = {}) {
+  const scope = (Array.isArray(role?.data_scopes) ? role.data_scopes : []).find(
+    (item) => item?.resource_type === 'warehouse'
+  )
+  const mode = ['ALL', 'ASSIGNED', 'NONE'].includes(scope?.mode)
+    ? scope.mode
+    : 'NONE'
+  const warehouseIds = Array.isArray(scope?.resource_ids)
+    ? [...new Set(scope.resource_ids.map(Number).filter((id) => id > 0))].sort(
+        (left, right) => left - right
+      )
+    : []
+  return {
+    mode: mode === 'ASSIGNED' && warehouseIds.length === 0 ? 'NONE' : mode,
+    warehouseIds: mode === 'ASSIGNED' ? warehouseIds : [],
+  }
+}
+
+function buildWarehouseScopeSignature(mode, warehouseIds = []) {
+  return `${mode}:${warehouseIds
+    .map(Number)
+    .filter((id) => id > 0)
+    .sort((a, b) => a - b)
+    .join(',')}`
 }
 
 function getRoleKey(role = {}) {
@@ -174,92 +200,7 @@ function buildPermissionDetailMap(permissions = []) {
   return detailMap
 }
 
-function buildRoleMenuProjection(menus = [], permissionKeys = []) {
-  return (Array.isArray(menus) ? menus : [])
-    .map((menu) => {
-      return {
-        key: String(menu?.key || menu?.path || '').trim(),
-        label: String(menu?.label || '').trim() || '未命名菜单',
-        visible: isMenuVisibleForPermissionKeys(menu, permissionKeys),
-      }
-    })
-    .filter((menu) => menu.key)
-}
-
-function RoleCapabilityOverview({ menus = [], permissionKeys = [] }) {
-  const projectedMenus = useMemo(
-    () => buildRoleMenuProjection(menus, permissionKeys),
-    [menus, permissionKeys]
-  )
-  const visibleMenus = projectedMenus.filter((menu) => menu.visible)
-  const hiddenMenus = projectedMenus.filter((menu) => !menu.visible)
-
-  return (
-    <section
-      className="erp-role-capability-overview"
-      aria-labelledby="erp-role-capability-overview-title"
-    >
-      <div className="erp-role-capability-overview__head">
-        <div>
-          <Text strong id="erp-role-capability-overview-title">
-            可使用的页面
-          </Text>
-          <Paragraph type="secondary">
-            根据已选功能预览这个岗位可进入的页面，实际页面以公司当前启用功能为准。
-          </Paragraph>
-        </div>
-        <Tag color="green">{visibleMenus.length} 个页面</Tag>
-      </div>
-
-      <div className="erp-role-capability-overview__grid">
-        <div className="erp-role-capability-card erp-role-capability-card--enabled">
-          <div className="erp-role-capability-card__title">
-            <Text strong>可以使用</Text>
-            <Tag color="green">{visibleMenus.length}</Tag>
-          </div>
-          <div className="erp-role-capability-card__items">
-            {visibleMenus.length > 0 ? (
-              visibleMenus.map((menu) => (
-                <Tag key={menu.key} color="green">
-                  {menu.label}
-                </Tag>
-              ))
-            ) : (
-              <Text type="secondary">当前岗位还没有可使用的页面</Text>
-            )}
-          </div>
-        </div>
-
-        <div className="erp-role-capability-card">
-          <div className="erp-role-capability-card__title">
-            <Text strong>暂不可使用</Text>
-            <Tag>{hiddenMenus.length}</Tag>
-          </div>
-          <div className="erp-role-capability-card__items erp-role-capability-card__items--muted">
-            {hiddenMenus.length > 0 ? (
-              hiddenMenus.map((menu) => <Tag key={menu.key}>{menu.label}</Tag>)
-            ) : (
-              <Text type="secondary">当前岗位已可使用全部页面</Text>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <Alert
-        type="info"
-        showIcon
-        message="最终可用页面以公司当前设置为准"
-        description="公司可关闭暂不使用的页面和操作；岗位设置不会因此扩大。"
-      />
-    </section>
-  )
-}
-
-function PermissionImpactMap({
-  permissions = [],
-  menus = [],
-  permissionKeys = [],
-}) {
+function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
   const selected = normalizeStringList(permissionKeys)
     .map((key) => permissions.find((item) => item.key === key))
     .filter(Boolean)
@@ -350,71 +291,180 @@ function PermissionImpactMap({
           },
         ]}
       />
-      <RoleCapabilityOverview menus={menus} permissionKeys={permissionKeys} />
     </Space>
   )
 }
 
-function DataScopeOverview() {
+function EffectiveRoleAccessOverview({ access = null, loading = false }) {
+  const pages = Array.isArray(access?.pages) ? access.pages : []
+  const pageRows = pages.map((item, index) => ({
+    ...item,
+    rowID: `effective-page-${index + 1}`,
+  }))
+  const effectiveCount = pages.filter((item) => item?.effective === true).length
+  const sourceLabel =
+    access?.source === 'active_customer_config_revision'
+      ? '当前客户已启用版本'
+      : access?.source === 'control_plane_rbac'
+        ? '系统管理权限'
+        : access?.source === 'builtin_rbac_fallback'
+          ? '产品默认权限预览'
+          : access?.source === 'role_disabled'
+            ? '岗位已停用'
+            : '缺少当前客户启用版本'
+
+  return (
+    <Space direction="vertical" size={12} style={{ width: '100%' }}>
+      <Alert
+        type={access?.is_final === true ? 'success' : 'warning'}
+        showIcon
+        message={`${sourceLabel}：${effectiveCount} 个最终可用页面`}
+        description={
+          access?.config_revision
+            ? `当前设置版本：${access.config_revision}`
+            : '这里不会把岗位基础权限或未保存的勾选冒充为客户最终权限。'
+        }
+      />
+      <Table
+        rowKey="rowID"
+        size="small"
+        loading={loading}
+        pagination={false}
+        dataSource={pageRows}
+        locale={{ emptyText: <Empty description="暂无最终权限解释" /> }}
+        columns={[
+          { title: '页面', dataIndex: 'label', width: 190 },
+          {
+            title: '岗位已选功能',
+            dataIndex: 'rbac_granted',
+            width: 130,
+            render: (value) =>
+              value === true ? (
+                <Tag color="blue">已具备</Tag>
+              ) : (
+                <Tag>未具备</Tag>
+              ),
+          },
+          {
+            title: '当前可用结果',
+            dataIndex: 'effective',
+            width: 130,
+            render: (value) =>
+              value === true ? (
+                <Tag color="green">可使用</Tag>
+              ) : (
+                <Tag color="red">不可使用</Tag>
+              ),
+          },
+          {
+            title: '原因',
+            dataIndex: 'reasons',
+            render: (reasons = []) =>
+              Array.isArray(reasons) && reasons.length > 0
+                ? reasons
+                    .map((reason) => reason?.label)
+                    .filter(Boolean)
+                    .join('；')
+                : '已符合公司当前设置和岗位功能要求',
+          },
+        ]}
+      />
+    </Space>
+  )
+}
+
+function DataScopeOverview({
+  mode,
+  warehouseIds,
+  warehouseOptions,
+  disabled,
+  onModeChange,
+  onWarehouseIdsChange,
+}) {
   return (
     <div className="erp-role-policy-boundary">
       <Alert
-        type="warning"
+        type="info"
         showIcon
-        message="数据查看范围暂不可设置"
-        description="目前岗位按功能控制；客户、订单、仓库、采购和财务资料还不能按本人、负责人或指定范围细分。"
+        message="仓库与库存查看范围已生效"
+        description="可选择全部仓库、指定仓库或不允许查看；选择指定仓库但未勾选具体仓库时，将按不允许查看处理。"
       />
       <div className="erp-role-policy-boundary__grid">
         <div>
-          <Text strong>任务</Text>
+          <Text strong>仓库范围模式</Text>
+          <Select
+            value={mode}
+            disabled={disabled}
+            style={{ width: '100%' }}
+            options={[
+              { value: 'ALL', label: '全部仓库' },
+              { value: 'ASSIGNED', label: '指定仓库' },
+              { value: 'NONE', label: '不允许查看' },
+            ]}
+            onChange={onModeChange}
+          />
+        </div>
+        <div>
+          <Text strong>允许的仓库</Text>
+          <Select
+            mode="multiple"
+            value={warehouseIds}
+            disabled={disabled || mode !== 'ASSIGNED'}
+            style={{ width: '100%' }}
+            placeholder="请选择仓库"
+            options={warehouseOptions}
+            onChange={onWarehouseIdsChange}
+          />
+        </div>
+        <div>
+          <Text strong>任务范围</Text>
           <Tag color="green">按负责人限制</Tag>
-          <Text type="secondary">责任岗位或指定处理人</Text>
+          <Text type="secondary">继续由责任岗位、责任池或指定处理人控制</Text>
         </div>
         <div>
-          <Text strong>业务单据</Text>
+          <Text strong>其他业务单据</Text>
           <Tag color="gold">按可用功能</Tag>
-          <Text type="secondary">暂不能按负责人或指定范围细分</Text>
-        </div>
-        <div>
-          <Text strong>仓库数据</Text>
-          <Tag color="gold">按可用功能</Tag>
-          <Text type="secondary">暂不能按指定仓库细分</Text>
-        </div>
-        <div>
-          <Text strong>财务数据</Text>
-          <Tag color="gold">按可用功能</Tag>
-          <Text type="secondary">暂不能按查看范围细分</Text>
+          <Text type="secondary">本轮不虚构本人、部门或客户集合范围</Text>
         </div>
       </div>
     </div>
   )
 }
 
-function SensitiveFieldOverview() {
+function SensitiveFieldOverview({ permissionKeys = [] }) {
+  const selected = new Set(normalizeStringList(permissionKeys))
+  const groups = [
+    ['field.party_private.read', '客商隐私', '电话、地址、税号和账户'],
+    ['field.sales_commercial.read', '销售商业', '销售单价、折扣和金额'],
+    [
+      'field.procurement_commercial.read',
+      '采购商业',
+      '采购与委外单价、折扣和金额',
+    ],
+    [
+      'field.finance_settlement.read',
+      '财务结算',
+      '应收、应付、发票、核销和结算账户',
+    ],
+  ]
   return (
     <div className="erp-role-policy-boundary">
       <Alert
-        type="warning"
+        type="info"
         showIcon
-        message="敏感信息权限暂不可单独设置"
-        description="成本、结算账户和联系方式等内容目前不能按岗位分别开放，系统会按现有页面规则统一显示或隐藏。"
+        message="敏感字段由独立权限控制"
+        description="电话、地址、单价、金额和结算资料会按岗位统一控制，列表、相关单据和打印保持一致。请在“可用功能”中勾选对应字段组。"
       />
       <div className="erp-role-policy-boundary__grid">
-        <div>
-          <Text strong>成本与毛利</Text>
-          <Tag>尚未开放</Tag>
-          <Text type="secondary">成本、单价、毛利和毛利率</Text>
-        </div>
-        <div>
-          <Text strong>财务与结算</Text>
-          <Tag>尚未开放</Tag>
-          <Text type="secondary">应收应付、账户、发票和税务信息</Text>
-        </div>
-        <div>
-          <Text strong>客商敏感信息</Text>
-          <Tag>尚未开放</Tag>
-          <Text type="secondary">手机号、详细地址、内部评级和风险备注</Text>
-        </div>
+        {groups.map(([key, label, description]) => (
+          <div key={key}>
+            <Text strong>{label}</Text>
+            <Tag color={selected.has(key) ? 'green' : 'default'}>
+              {selected.has(key) ? '允许查看' : '不可查看'}
+            </Tag>
+            <Text type="secondary">{description}</Text>
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -667,7 +717,11 @@ export default function PermissionCenterPage() {
   const [admins, setAdmins] = useState([])
   const [roles, setRoles] = useState([])
   const [permissions, setPermissions] = useState([])
-  const [menus, setMenus] = useState([])
+  const [warehouseScopeOptions, setWarehouseScopeOptions] = useState([])
+  const [effectiveRoleAccess, setEffectiveRoleAccess] = useState(null)
+  const effectiveRoleAccessRequestRef = useRef(0)
+  const [effectiveRoleAccessLoading, setEffectiveRoleAccessLoading] =
+    useState(false)
   const [adminSearchKeyword, setAdminSearchKeyword] = useState('')
   const [adminStatusFilter, setAdminStatusFilter] = useState(
     ADMIN_STATUS_FILTERS.ALL
@@ -693,6 +747,9 @@ export default function PermissionCenterPage() {
   const [selectedRolePermissionKeys, setSelectedRolePermissionKeys] = useState(
     []
   )
+  const [selectedWarehouseScopeMode, setSelectedWarehouseScopeMode] =
+    useState('NONE')
+  const [selectedWarehouseScopeIDs, setSelectedWarehouseScopeIDs] = useState([])
   const [roleSaveConflict, setRoleSaveConflict] = useState(null)
   const [activeTabKey, setActiveTabKey] = useState(
     PERMISSION_CENTER_TAB_KEYS.ROLES
@@ -743,10 +800,37 @@ export default function PermissionCenterPage() {
   const rolePermissionsDirty =
     buildPermissionSignature(selectedRolePermissionKeys) !==
     buildPermissionSignature(selectedRoleSavedPermissionKeys)
+  const selectedRoleSavedWarehouseScope = useMemo(
+    () => getRoleWarehouseScope(selectedRole || {}),
+    [selectedRole]
+  )
+  const roleDataScopeDirty =
+    buildWarehouseScopeSignature(
+      selectedWarehouseScopeMode,
+      selectedWarehouseScopeIDs
+    ) !==
+    buildWarehouseScopeSignature(
+      selectedRoleSavedWarehouseScope.mode,
+      selectedRoleSavedWarehouseScope.warehouseIds
+    )
+  const roleConfigurationDirty = rolePermissionsDirty || roleDataScopeDirty
+  const roleDataScopeInvalid =
+    selectedWarehouseScopeMode === 'ASSIGNED' &&
+    selectedWarehouseScopeIDs.length === 0
+  const warehouseScopeSelectOptions = useMemo(
+    () =>
+      warehouseScopeOptions
+        .map((warehouse) => ({
+          value: Number(warehouse?.id),
+          label: [warehouse?.code, warehouse?.name].filter(Boolean).join(' · '),
+        }))
+        .filter((option) => option.value > 0),
+    [warehouseScopeOptions]
+  )
 
   const confirmDiscardRoleChanges = useCallback(
     ({ title, content, onDiscard, onKeepEditing }) => {
-      if (!rolePermissionsDirty) {
+      if (!roleConfigurationDirty) {
         onDiscard?.()
         return
       }
@@ -758,13 +842,21 @@ export default function PermissionCenterPage() {
         cancelText: '继续编辑',
         onOk: () => {
           setSelectedRolePermissionKeys(selectedRoleSavedPermissionKeys)
+          setSelectedWarehouseScopeMode(selectedRoleSavedWarehouseScope.mode)
+          setSelectedWarehouseScopeIDs(
+            selectedRoleSavedWarehouseScope.warehouseIds
+          )
           setRoleSaveConflict(null)
           onDiscard?.()
         },
         onCancel: onKeepEditing,
       })
     },
-    [rolePermissionsDirty, selectedRoleSavedPermissionKeys]
+    [
+      roleConfigurationDirty,
+      selectedRoleSavedPermissionKeys,
+      selectedRoleSavedWarehouseScope,
+    ]
   )
 
   const confirmLeavePermissionCenter = useCallback(
@@ -816,8 +908,11 @@ export default function PermissionCenterPage() {
   )
   const canReadUsers = hasPermission(currentAdmin, READ_USER_PERMISSION)
   const canReadRoleTemplates =
-    hasPermission(currentAdmin, READ_ROLE_PERMISSION) ||
+    hasPermission(currentAdmin, READ_ROLE_PERMISSION) &&
     hasPermission(currentAdmin, READ_PERMISSION_PERMISSION)
+  const canReadEffectiveRoleAccess =
+    canReadRoleTemplates &&
+    hasPermission(currentAdmin, READ_CUSTOMER_CONFIG_PERMISSION)
   const canCreateUsers = hasPermission(currentAdmin, CREATE_USER_PERMISSION)
   const canManageUsers = hasPermission(currentAdmin, UPDATE_USER_PERMISSION)
   const canAssignUserRoles = hasPermission(
@@ -870,7 +965,7 @@ export default function PermissionCenterPage() {
         READ_USER_PERMISSION
       )
       const shouldLoadRBACOptions =
-        hasPermission(nextCurrentAdmin, READ_ROLE_PERMISSION) ||
+        hasPermission(nextCurrentAdmin, READ_ROLE_PERMISSION) &&
         hasPermission(nextCurrentAdmin, READ_PERMISSION_PERMISSION)
       const [listResult, optionsResult] = await Promise.all([
         shouldLoadAdmins ? adminRpc.call('list', {}) : Promise.resolve(null),
@@ -891,9 +986,9 @@ export default function PermissionCenterPage() {
           ? optionsResult.data.permissions
           : []
       )
-      setMenus(
-        Array.isArray(optionsResult?.data?.menus)
-          ? optionsResult.data.menus
+      setWarehouseScopeOptions(
+        Array.isArray(optionsResult?.data?.warehouse_scope_options)
+          ? optionsResult.data.warehouse_scope_options
           : []
       )
       setSelectedRoleKey((current) => current || getRoleKey(nextRoles[0]))
@@ -905,6 +1000,40 @@ export default function PermissionCenterPage() {
       setLoading(false)
     }
   }, [adminRpc])
+
+  const loadEffectiveRoleAccess = useCallback(
+    async (roleKey) => {
+      const normalizedRoleKey = getRoleKey({ role_key: roleKey })
+      const requestID = effectiveRoleAccessRequestRef.current + 1
+      effectiveRoleAccessRequestRef.current = requestID
+      if (!normalizedRoleKey || !canReadEffectiveRoleAccess) {
+        setEffectiveRoleAccess(null)
+        setEffectiveRoleAccessLoading(false)
+        return false
+      }
+      setEffectiveRoleAccessLoading(true)
+      try {
+        const result = await adminRpc.call('effective_role_access', {
+          role_key: normalizedRoleKey,
+        })
+        if (effectiveRoleAccessRequestRef.current === requestID) {
+          setEffectiveRoleAccess(result?.data?.effective_access || null)
+        }
+        return true
+      } catch (err) {
+        if (effectiveRoleAccessRequestRef.current === requestID) {
+          setEffectiveRoleAccess(null)
+          message.error(getActionErrorMessage(err, '加载岗位最终权限'))
+        }
+        return false
+      } finally {
+        if (effectiveRoleAccessRequestRef.current === requestID) {
+          setEffectiveRoleAccessLoading(false)
+        }
+      }
+    },
+    [adminRpc, canReadEffectiveRoleAccess]
+  )
 
   const selectRoleTemplate = (roleKey) => {
     const nextRoleKey = getRoleKey({ role_key: roleKey })
@@ -967,12 +1096,12 @@ export default function PermissionCenterPage() {
 
   useEffect(() => {
     return outletContext?.registerPageLeaveGuard?.(
-      rolePermissionsDirty ? confirmLeavePermissionCenter : null
+      roleConfigurationDirty ? confirmLeavePermissionCenter : null
     )
-  }, [confirmLeavePermissionCenter, outletContext, rolePermissionsDirty])
+  }, [confirmLeavePermissionCenter, outletContext, roleConfigurationDirty])
 
   useEffect(() => {
-    if (!rolePermissionsDirty) {
+    if (!roleConfigurationDirty) {
       return undefined
     }
     const warnBeforeUnload = (event) => {
@@ -981,7 +1110,7 @@ export default function PermissionCenterPage() {
     }
     window.addEventListener('beforeunload', warnBeforeUnload)
     return () => window.removeEventListener('beforeunload', warnBeforeUnload)
-  }, [rolePermissionsDirty])
+  }, [roleConfigurationDirty])
 
   useEffect(() => {
     if (!selectedRole) {
@@ -992,11 +1121,14 @@ export default function PermissionCenterPage() {
       return
     }
     setSelectedRolePermissionKeys(selectedRoleSavedPermissionKeys)
+    setSelectedWarehouseScopeMode(selectedRoleSavedWarehouseScope.mode)
+    setSelectedWarehouseScopeIDs(selectedRoleSavedWarehouseScope.warehouseIds)
   }, [
     roleSaveConflict,
     selectedRole,
     selectedRoleKey,
     selectedRoleSavedPermissionKeys,
+    selectedRoleSavedWarehouseScope,
   ])
 
   useEffect(() => {
@@ -1009,6 +1141,10 @@ export default function PermissionCenterPage() {
     }
     setSelectedRoleKey(getRoleKey(roles[0]))
   }, [roles, selectedRoleKey])
+
+  useEffect(() => {
+    loadEffectiveRoleAccess(selectedRoleKey)
+  }, [loadEffectiveRoleAccess, selectedRoleKey])
 
   useEffect(() => {
     const totalPages = Math.max(
@@ -1229,7 +1365,12 @@ export default function PermissionCenterPage() {
 
   const saveRolePermissions = async () => {
     const expectedVersion = getPermissionCenterRoleVersion(selectedRole || {})
-    if (!selectedRoleKey || selectedRoleReadOnly || !expectedVersion) {
+    if (
+      !selectedRoleKey ||
+      selectedRoleReadOnly ||
+      !expectedVersion ||
+      !roleConfigurationDirty
+    ) {
       if (selectedRoleReadOnlyReason) {
         message.info(selectedRoleReadOnlyReason)
       }
@@ -1237,14 +1378,38 @@ export default function PermissionCenterPage() {
     }
     setSaving(true)
     try {
-      await adminRpc.call('set_role_permissions', {
-        role_key: selectedRoleKey,
-        permission_keys: normalizeStringList(selectedRolePermissionKeys),
-        expected_version: expectedVersion,
-      })
+      let nextVersion = expectedVersion
+      if (rolePermissionsDirty) {
+        const permissionResult = await adminRpc.call('set_role_permissions', {
+          role_key: selectedRoleKey,
+          permission_keys: normalizeStringList(selectedRolePermissionKeys),
+          expected_version: nextVersion,
+        })
+        nextVersion = Number(permissionResult?.data?.role?.version || 0)
+        if (!Number.isInteger(nextVersion) || nextVersion <= expectedVersion) {
+          throw new Error('岗位版本回读失败')
+        }
+      }
+      if (roleDataScopeDirty) {
+        await adminRpc.call('set_role_data_scopes', {
+          role_key: selectedRoleKey,
+          data_scopes: [
+            {
+              resource_type: 'warehouse',
+              mode: selectedWarehouseScopeMode,
+              resource_ids:
+                selectedWarehouseScopeMode === 'ASSIGNED'
+                  ? selectedWarehouseScopeIDs
+                  : [],
+            },
+          ],
+          expected_version: nextVersion,
+        })
+      }
       message.success('岗位可用功能已更新')
       setRoleSaveConflict(null)
       await loadData()
+      await loadEffectiveRoleAccess(selectedRoleKey)
     } catch (err) {
       if (Number(err?.code) === RpcErrorCode.RESOURCE_VERSION_CONFLICT) {
         setRoleSaveConflict({
@@ -1742,8 +1907,8 @@ export default function PermissionCenterPage() {
                   </Paragraph>
                 </div>
                 <div className="erp-role-center-actions">
-                  <Tag color={rolePermissionsDirty ? 'orange' : 'green'}>
-                    {rolePermissionsDirty ? '有未保存调整' : '已保存'}
+                  <Tag color={roleConfigurationDirty ? 'orange' : 'green'}>
+                    {roleConfigurationDirty ? '有未保存调整' : '已保存'}
                   </Tag>
                   <Button
                     type="primary"
@@ -1751,7 +1916,8 @@ export default function PermissionCenterPage() {
                     disabled={
                       !canManageRolePermissions ||
                       !selectedRoleKey ||
-                      !rolePermissionsDirty ||
+                      !roleConfigurationDirty ||
+                      roleDataScopeInvalid ||
                       selectedRoleReadOnly
                     }
                     onClick={saveRolePermissions}
@@ -1888,22 +2054,57 @@ export default function PermissionCenterPage() {
                   {
                     key: 'data-scope',
                     label: '数据范围',
-                    children: <DataScopeOverview />,
+                    children: (
+                      <DataScopeOverview
+                        mode={selectedWarehouseScopeMode}
+                        warehouseIds={selectedWarehouseScopeIDs}
+                        warehouseOptions={warehouseScopeSelectOptions}
+                        disabled={
+                          !canManageRolePermissions || selectedRoleReadOnly
+                        }
+                        onModeChange={(nextMode) => {
+                          setSelectedWarehouseScopeMode(nextMode)
+                          if (nextMode !== 'ASSIGNED') {
+                            setSelectedWarehouseScopeIDs([])
+                          }
+                        }}
+                        onWarehouseIdsChange={setSelectedWarehouseScopeIDs}
+                      />
+                    ),
                   },
                   {
                     key: 'sensitive-fields',
                     label: '敏感字段',
-                    children: <SensitiveFieldOverview />,
+                    children: (
+                      <SensitiveFieldOverview
+                        permissionKeys={selectedRolePermissionKeys}
+                      />
+                    ),
                   },
                   {
                     key: 'effective-pages',
-                    label: '功能影响',
+                    label: '最终有效权限',
                     children: (
-                      <PermissionImpactMap
-                        permissions={[...permissionDetailMap.values()]}
-                        menus={menus}
-                        permissionKeys={selectedRolePermissionKeys}
-                      />
+                      <Space
+                        direction="vertical"
+                        size={20}
+                        style={{ width: '100%' }}
+                      >
+                        <EffectiveRoleAccessOverview
+                          access={effectiveRoleAccess}
+                          loading={effectiveRoleAccessLoading}
+                        />
+                        <div>
+                          <Text strong>当前勾选的功能影响</Text>
+                          <Paragraph type="secondary">
+                            根据已选功能预览这个岗位可进入的页面；保存后还会结合公司当前启用范围。
+                          </Paragraph>
+                          <PermissionImpactMap
+                            permissions={[...permissionDetailMap.values()]}
+                            permissionKeys={selectedRolePermissionKeys}
+                          />
+                        </div>
+                      </Space>
                     ),
                   },
                 ]}

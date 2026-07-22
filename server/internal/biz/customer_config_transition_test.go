@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -15,6 +16,8 @@ func TestCustomerConfigTransitionCheckAllowsUnchangedPublishedRevision(t *testin
 
 	activeInput := validCustomerConfigInput()
 	activeInput.Revision = "rev-a"
+	activeInput.WorkPools[0].PoolKey = "sales_approval"
+	activeInput.WorkPoolMemberships[0].PoolKey = "sales_approval"
 	active, err := uc.PublishCustomerConfig(ctx, activeInput, 10)
 	if err != nil {
 		t.Fatalf("publish active: %v", err)
@@ -24,6 +27,8 @@ func TestCustomerConfigTransitionCheckAllowsUnchangedPublishedRevision(t *testin
 	}
 	targetInput := validCustomerConfigInput()
 	targetInput.Revision = "rev-b"
+	targetInput.WorkPools[0].PoolKey = "sales_approval"
+	targetInput.WorkPoolMemberships[0].PoolKey = "sales_approval"
 	target, err := uc.PublishCustomerConfig(ctx, targetInput, 11)
 	if err != nil {
 		t.Fatalf("publish target: %v", err)
@@ -45,6 +50,50 @@ func TestCustomerConfigTransitionCheckAllowsUnchangedPublishedRevision(t *testin
 	}
 }
 
+func TestCustomerConfigTransitionCheckAllowsEntitlementOnlyChangeWithOpenTasks(t *testing.T) {
+	ctx := context.Background()
+	repo := newMemCustomerConfigRepo()
+	uc := NewCustomerConfigUsecase(repo)
+
+	activeInput := validCustomerConfigInput()
+	activeInput.Revision = "rev-a"
+	active, err := uc.PublishCustomerConfig(ctx, activeInput, 10)
+	if err != nil {
+		t.Fatalf("publish active: %v", err)
+	}
+	if _, err := uc.ActivateCustomerConfig(ctx, active.CustomerKey, active.Revision, active.ConfigHash, active.ProductVersion, "", 10); err != nil {
+		t.Fatalf("activate rev-a: %v", err)
+	}
+
+	targetInput := validCustomerConfigInput()
+	targetInput.Revision = "rev-b"
+	targetInput.AccessEntitlements = append(targetInput.AccessEntitlements, AccessEntitlementInput{
+		RoleKey:       SalesRoleKey,
+		CapabilityKey: PermissionContactRead,
+		Enabled:       true,
+	})
+	target, err := uc.PublishCustomerConfig(ctx, targetInput, 11)
+	if err != nil {
+		t.Fatalf("publish target: %v", err)
+	}
+	repo.taskCount[customerRevisionKey(active.CustomerKey, active.Revision)+"/sales"] = 3
+
+	check, err := uc.CheckCustomerConfigTransition(ctx, CustomerConfigTransitionCheckInput{
+		Action:                 CustomerConfigTransitionActivate,
+		CustomerKey:            target.CustomerKey,
+		TargetRevision:         target.Revision,
+		ExpectedConfigHash:     target.ConfigHash,
+		ExpectedProductVersion: target.ProductVersion,
+		ExpectedActiveRevision: active.Revision,
+	})
+	if err != nil {
+		t.Fatalf("CheckCustomerConfigTransition() error = %v", err)
+	}
+	if !check.Allowed || check.Noop || len(check.Blockers) != 0 {
+		t.Fatalf("entitlement-only change must not remap open task responsibility: %#v", check)
+	}
+}
+
 func TestCustomerConfigTransitionCheckBlocksRuntimeBreakingChanges(t *testing.T) {
 	ctx := context.Background()
 	repo := newMemCustomerConfigRepo()
@@ -52,6 +101,8 @@ func TestCustomerConfigTransitionCheckBlocksRuntimeBreakingChanges(t *testing.T)
 
 	activeInput := validCustomerConfigInput()
 	activeInput.Revision = "rev-a"
+	activeInput.WorkPools[0].PoolKey = "sales_approval"
+	activeInput.WorkPoolMemberships[0].PoolKey = "sales_approval"
 	addRuntimeProcessSelection(
 		&activeInput,
 		ProcessKeySalesOrderAcceptance,
@@ -69,6 +120,8 @@ func TestCustomerConfigTransitionCheckBlocksRuntimeBreakingChanges(t *testing.T)
 
 	targetInput := validCustomerConfigInput()
 	targetInput.Revision = "rev-b"
+	targetInput.WorkPools[0].PoolKey = "sales_approval"
+	targetInput.WorkPoolMemberships[0].PoolKey = "sales_approval"
 	addRuntimeProcessSelection(
 		&targetInput,
 		ProcessKeySalesOrderAcceptance,
@@ -91,7 +144,8 @@ func TestCustomerConfigTransitionCheckBlocksRuntimeBreakingChanges(t *testing.T)
 		t.Fatalf("publish target: %v", err)
 	}
 	repo.processCount[customerRevisionKey(active.CustomerKey, active.Revision)+"/"+ProcessKeySalesOrderAcceptance] = 2
-	repo.taskCount[customerRevisionKey(active.CustomerKey, active.Revision)+"/sales"] = 3
+	repo.taskCount[customerRevisionKey(active.CustomerKey, active.Revision)+"/sales_approval"] = 2
+	repo.taskFallbackRoleCount[customerRevisionKey(active.CustomerKey, active.Revision)+"/"+SalesRoleKey] = 1
 	repo.businessCount[active.CustomerKey+"/production"] = 4
 
 	check, err := uc.CheckCustomerConfigTransition(ctx, CustomerConfigTransitionCheckInput{
@@ -109,7 +163,11 @@ func TestCustomerConfigTransitionCheckBlocksRuntimeBreakingChanges(t *testing.T)
 		t.Fatalf("breaking transition must be blocked: %#v", check)
 	}
 	assertCustomerConfigTransitionBlocker(t, check, "in_flight_processes_for_changed_contracts", 2)
-	assertCustomerConfigTransitionBlocker(t, check, "open_workflow_tasks_for_changed_responsibility", 3)
+	responsibilityBlocker := assertCustomerConfigTransitionBlocker(t, check, "open_workflow_tasks_for_changed_responsibility", 3)
+	if responsibilityBlocker.ScopeType != "responsibility" ||
+		!slices.Equal(responsibilityBlocker.ScopeKeys, []string{"finance", "sales", "sales_approval"}) {
+		t.Fatalf("responsibility blocker scope = %#v", responsibilityBlocker)
+	}
 	assertCustomerConfigTransitionBlocker(t, check, "open_business_documents_for_disabled_modules", 4)
 }
 
@@ -315,15 +373,16 @@ func TestCustomerConfigTransitionCheckFailsClosedOnRepoError(t *testing.T) {
 	}
 }
 
-func assertCustomerConfigTransitionBlocker(t *testing.T, check *CustomerConfigTransitionCheck, code string, count int) {
+func assertCustomerConfigTransitionBlocker(t *testing.T, check *CustomerConfigTransitionCheck, code string, count int) CustomerConfigTransitionBlocker {
 	t.Helper()
 	for _, blocker := range check.Blockers {
 		if blocker.Code == code {
 			if blocker.Count != count {
 				t.Fatalf("blocker %s count = %d, want %d", code, blocker.Count, count)
 			}
-			return
+			return blocker
 		}
 	}
 	t.Fatalf("missing blocker %s in %#v", code, check.Blockers)
+	return CustomerConfigTransitionBlocker{}
 }

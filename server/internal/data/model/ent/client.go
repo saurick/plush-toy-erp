@@ -56,6 +56,7 @@ import (
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/role"
+	"server/internal/data/model/ent/roledatascope"
 	"server/internal/data/model/ent/rolepermission"
 	"server/internal/data/model/ent/roleprofile"
 	"server/internal/data/model/ent/runtimeauditevent"
@@ -175,6 +176,8 @@ type Client struct {
 	QualityInspection *QualityInspectionClient
 	// Role is the client for interacting with the Role builders.
 	Role *RoleClient
+	// RoleDataScope is the client for interacting with the RoleDataScope builders.
+	RoleDataScope *RoleDataScopeClient
 	// RolePermission is the client for interacting with the RolePermission builders.
 	RolePermission *RolePermissionClient
 	// RoleProfile is the client for interacting with the RoleProfile builders.
@@ -265,6 +268,7 @@ func (c *Client) init() {
 	c.PurchaseReturnItem = NewPurchaseReturnItemClient(c.config)
 	c.QualityInspection = NewQualityInspectionClient(c.config)
 	c.Role = NewRoleClient(c.config)
+	c.RoleDataScope = NewRoleDataScopeClient(c.config)
 	c.RolePermission = NewRolePermissionClient(c.config)
 	c.RoleProfile = NewRoleProfileClient(c.config)
 	c.RuntimeAuditEvent = NewRuntimeAuditEventClient(c.config)
@@ -419,6 +423,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
 		QualityInspection:                  NewQualityInspectionClient(cfg),
 		Role:                               NewRoleClient(cfg),
+		RoleDataScope:                      NewRoleDataScopeClient(cfg),
 		RolePermission:                     NewRolePermissionClient(cfg),
 		RoleProfile:                        NewRoleProfileClient(cfg),
 		RuntimeAuditEvent:                  NewRuntimeAuditEventClient(cfg),
@@ -500,6 +505,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
 		QualityInspection:                  NewQualityInspectionClient(cfg),
 		Role:                               NewRoleClient(cfg),
+		RoleDataScope:                      NewRoleDataScopeClient(cfg),
 		RolePermission:                     NewRolePermissionClient(cfg),
 		RoleProfile:                        NewRoleProfileClient(cfg),
 		RuntimeAuditEvent:                  NewRuntimeAuditEventClient(cfg),
@@ -559,11 +565,11 @@ func (c *Client) Use(hooks ...Hook) {
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
-		c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder,
-		c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier,
-		c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
-		c.WorkflowTask, c.WorkflowTaskEvent,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RoleDataScope,
+		c.RolePermission, c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker,
+		c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation,
+		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
+		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -586,11 +592,11 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
 		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RolePermission,
-		c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder,
-		c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation, c.Supplier,
-		c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership, c.WorkflowBusinessState,
-		c.WorkflowTask, c.WorkflowTaskEvent,
+		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RoleDataScope,
+		c.RolePermission, c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker,
+		c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation,
+		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
+		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -689,6 +695,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.QualityInspection.mutate(ctx, m)
 	case *RoleMutation:
 		return c.Role.mutate(ctx, m)
+	case *RoleDataScopeMutation:
+		return c.RoleDataScope.mutate(ctx, m)
 	case *RolePermissionMutation:
 		return c.RolePermission.mutate(ctx, m)
 	case *RoleProfileMutation:
@@ -9476,6 +9484,22 @@ func (c *RoleClient) GetX(ctx context.Context, id int) *Role {
 	return obj
 }
 
+// QueryDataScopes queries the data_scopes edge of a Role.
+func (c *RoleClient) QueryDataScopes(_m *Role) *RoleDataScopeQuery {
+	query := (&RoleDataScopeClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(role.Table, role.FieldID, id),
+			sqlgraph.To(roledatascope.Table, roledatascope.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, role.DataScopesTable, role.DataScopesColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // Hooks returns the client hooks.
 func (c *RoleClient) Hooks() []Hook {
 	return c.hooks.Role
@@ -9498,6 +9522,155 @@ func (c *RoleClient) mutate(ctx context.Context, m *RoleMutation) (Value, error)
 		return (&RoleDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown Role mutation op: %q", m.Op())
+	}
+}
+
+// RoleDataScopeClient is a client for the RoleDataScope schema.
+type RoleDataScopeClient struct {
+	config
+}
+
+// NewRoleDataScopeClient returns a client for the RoleDataScope from the given config.
+func NewRoleDataScopeClient(c config) *RoleDataScopeClient {
+	return &RoleDataScopeClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `roledatascope.Hooks(f(g(h())))`.
+func (c *RoleDataScopeClient) Use(hooks ...Hook) {
+	c.hooks.RoleDataScope = append(c.hooks.RoleDataScope, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `roledatascope.Intercept(f(g(h())))`.
+func (c *RoleDataScopeClient) Intercept(interceptors ...Interceptor) {
+	c.inters.RoleDataScope = append(c.inters.RoleDataScope, interceptors...)
+}
+
+// Create returns a builder for creating a RoleDataScope entity.
+func (c *RoleDataScopeClient) Create() *RoleDataScopeCreate {
+	mutation := newRoleDataScopeMutation(c.config, OpCreate)
+	return &RoleDataScopeCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of RoleDataScope entities.
+func (c *RoleDataScopeClient) CreateBulk(builders ...*RoleDataScopeCreate) *RoleDataScopeCreateBulk {
+	return &RoleDataScopeCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *RoleDataScopeClient) MapCreateBulk(slice any, setFunc func(*RoleDataScopeCreate, int)) *RoleDataScopeCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &RoleDataScopeCreateBulk{err: fmt.Errorf("calling to RoleDataScopeClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*RoleDataScopeCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &RoleDataScopeCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for RoleDataScope.
+func (c *RoleDataScopeClient) Update() *RoleDataScopeUpdate {
+	mutation := newRoleDataScopeMutation(c.config, OpUpdate)
+	return &RoleDataScopeUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *RoleDataScopeClient) UpdateOne(_m *RoleDataScope) *RoleDataScopeUpdateOne {
+	mutation := newRoleDataScopeMutation(c.config, OpUpdateOne, withRoleDataScope(_m))
+	return &RoleDataScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *RoleDataScopeClient) UpdateOneID(id int) *RoleDataScopeUpdateOne {
+	mutation := newRoleDataScopeMutation(c.config, OpUpdateOne, withRoleDataScopeID(id))
+	return &RoleDataScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for RoleDataScope.
+func (c *RoleDataScopeClient) Delete() *RoleDataScopeDelete {
+	mutation := newRoleDataScopeMutation(c.config, OpDelete)
+	return &RoleDataScopeDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *RoleDataScopeClient) DeleteOne(_m *RoleDataScope) *RoleDataScopeDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *RoleDataScopeClient) DeleteOneID(id int) *RoleDataScopeDeleteOne {
+	builder := c.Delete().Where(roledatascope.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &RoleDataScopeDeleteOne{builder}
+}
+
+// Query returns a query builder for RoleDataScope.
+func (c *RoleDataScopeClient) Query() *RoleDataScopeQuery {
+	return &RoleDataScopeQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeRoleDataScope},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a RoleDataScope entity by its id.
+func (c *RoleDataScopeClient) Get(ctx context.Context, id int) (*RoleDataScope, error) {
+	return c.Query().Where(roledatascope.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *RoleDataScopeClient) GetX(ctx context.Context, id int) *RoleDataScope {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryRole queries the role edge of a RoleDataScope.
+func (c *RoleDataScopeClient) QueryRole(_m *RoleDataScope) *RoleQuery {
+	query := (&RoleClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(roledatascope.Table, roledatascope.FieldID, id),
+			sqlgraph.To(role.Table, role.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, roledatascope.RoleTable, roledatascope.RoleColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *RoleDataScopeClient) Hooks() []Hook {
+	return c.hooks.RoleDataScope
+}
+
+// Interceptors returns the client interceptors.
+func (c *RoleDataScopeClient) Interceptors() []Interceptor {
+	return c.inters.RoleDataScope
+}
+
+func (c *RoleDataScopeClient) mutate(ctx context.Context, m *RoleDataScopeMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&RoleDataScopeCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&RoleDataScopeUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&RoleDataScopeUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&RoleDataScopeDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown RoleDataScope mutation op: %q", m.Op())
 	}
 }
 
@@ -12757,9 +12930,9 @@ type (
 		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
+		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
+		Shipment, ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
 		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Hook
 	}
@@ -12775,9 +12948,9 @@ type (
 		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
 		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RolePermission, RoleProfile,
-		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, Shipment,
-		ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
+		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
+		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
+		Shipment, ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
 		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Interceptor
 	}

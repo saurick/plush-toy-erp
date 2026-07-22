@@ -64,6 +64,13 @@ const pageCases = [
     requestKey: 'rows',
     listFunction: 'listQualityInspections',
   },
+  {
+    title: '物料清单',
+    path: '../pages/BOMVersionsPage.jsx',
+    loader: 'loadVersions',
+    requestKey: 'versions',
+    listFunction: 'listBOMVersions',
+  },
 ]
 
 test('business list request lifecycle: shared hook delegates begin and unmount cleanup', () => {

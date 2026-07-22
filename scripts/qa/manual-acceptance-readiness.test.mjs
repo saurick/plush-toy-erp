@@ -624,6 +624,16 @@ function createReadinessFetch(runtimeOptions = {}) {
         source_id: item.sourceID,
       })),
     ],
+    list_outsourcing_return_quality_inspections: [
+      "quality_inspections",
+      factRefs.qualityInspections.map((item) => ({
+        id: item.id,
+        inspection_no: item.inspectionNo,
+        status: item.status,
+        source_type: item.sourceType,
+        source_id: item.sourceID,
+      })),
+    ],
     list_inventory_lots: [
       "inventory_lots",
       factRefs.inventoryLots.map((item) => ({
@@ -881,6 +891,49 @@ function createReadinessFetch(runtimeOptions = {}) {
       });
     }
     if (body.method === "list_tasks") {
+      if (
+        [
+          "production_scheduling",
+          "production_exception",
+          "shipment_release",
+        ].includes(body.params.task_group)
+      ) {
+        const taskGroup = body.params.task_group;
+        const sourceID = Number(body.params.source_id);
+        const sourceRecord =
+          taskGroup === "production_scheduling"
+            ? factRefs.productionOrders.find((item) => item.id === sourceID)
+            : taskGroup === "production_exception"
+              ? factRefs.productionFacts.find((item) => item.id === sourceID)
+              : factRefs.shipments.find((item) => item.id === sourceID);
+        const status =
+          taskGroup === "production_scheduling" &&
+          sourceRecord?.status === "RELEASED"
+            ? "ready"
+            : "done";
+        return okResponse({
+          tasks: sourceRecord
+            ? [
+                {
+                  id: 500_000 + sourceID,
+                  task_code: `source-${taskGroup.replaceAll("_", "-")}-${sourceID}`,
+                  task_group: taskGroup,
+                  source_type: body.params.source_type,
+                  source_id: sourceID,
+                  owner_role_key:
+                    taskGroup === "production_scheduling"
+                      ? "pmc"
+                      : taskGroup === "production_exception"
+                        ? "production"
+                        : "warehouse",
+                  task_status_key: status,
+                  payload: {},
+                },
+              ]
+            : [],
+          total: sourceRecord ? 1 : 0,
+        });
+      }
       const roleKey =
         runtimeOptions.taskOwnerRoleKey || body.params.owner_role_key;
       const taskPlan = buildManualAcceptanceTaskDataPlan({
@@ -1139,7 +1192,13 @@ test("default plan covers all 50 targets and never connects to a backend", async
   const productionOrders = result.plan.targets.find(
     (item) => item.id === "desktopPages:production-orders",
   );
-  assert.deepEqual(productionOrders.roleKeys, ["sales", "pmc", "production"]);
+  assert.deepEqual(productionOrders.roleKeys, [
+    "sales",
+    "boss",
+    "pmc",
+    "quality",
+    "production",
+  ]);
   assert.equal(productionOrders.expectedMinimum, 45);
   assert.deepEqual(productionOrders.probeIds, ["production-orders"]);
   assert.equal(productionOrders.quantityNotProven, undefined);
@@ -1703,7 +1762,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert.equal(report.summary.totalTargets, 50);
   assert.equal(
     report.summary.passedTargetData,
-    36,
+    40,
     JSON.stringify(
       report.targets
         .filter((item) => item.dataStatus !== "pass")
@@ -1715,7 +1774,7 @@ test("explicit verification reports page data, nine role totals, and honest manu
     ),
   );
   assert.equal(report.summary.failedTargetData, 0);
-  assert.equal(report.summary.notProvenTargetData, 14);
+  assert.equal(report.summary.notProvenTargetData, 10);
   assert.equal(report.summary.queryChecksPassed, true);
   assert.equal(report.summary.queryEvidenceComplete, false);
   assert.equal(report.summary.financeFieldEvidenceComplete, true);
@@ -1789,9 +1848,9 @@ test("explicit verification reports page data, nine role totals, and honest manu
   assert(
     workflowPageProbes.every(
       (item) =>
-        item.status === "not_proven" &&
-        item.actual === null &&
-        item.batchEvidence === "not_proven" &&
+        item.status === "pass" &&
+        item.actual === item.expectedExact &&
+        item.batchEvidence === "exact_references" &&
         item.exactTaskGroup &&
         item.params.task_group === item.exactTaskGroup,
     ),
@@ -1800,9 +1859,9 @@ test("explicit verification reports page data, nine role totals, and honest manu
   const activeProductionExceptions = report.probes.find(
     (item) => item.id === "production-exception-active-tasks",
   );
-  assert.equal(activeProductionExceptions.status, "not_proven");
+  assert.equal(activeProductionExceptions.status, "pass");
   assert.equal(activeProductionExceptions.expectedExact, 0);
-  assert.equal(activeProductionExceptions.actual, null);
+  assert.equal(activeProductionExceptions.actual, 0);
   assert.deepEqual(activeProductionExceptions.statusCounts, {});
   assert.equal(mobileProbes.length, 9);
   assert(
@@ -1915,13 +1974,30 @@ test("explicit verification reports page data, nine role totals, and honest manu
     calls
       .filter((item) => item.method === "list_tasks")
       .every(
-        (item) =>
-          item.params.source_type ===
-            "simulated-manual-acceptance-task-batch" &&
-          item.params.source_id ===
-            manualAcceptanceTaskBatchIdentity(CURRENT_MANUAL_ACCEPTANCE_RUN_ID)
-              .sourceID &&
-          Boolean(item.params.owner_role_key),
+        (item) => {
+          if (item.params.task_group) {
+            return (
+              [
+                "production_scheduling",
+                "production_exception",
+                "shipment_release",
+              ].includes(item.params.task_group) &&
+              Boolean(item.params.source_type) &&
+              Number(item.params.source_id) > 0 &&
+              !("customer_key" in item.params)
+            );
+          }
+          return (
+            item.params.source_type ===
+              "simulated-manual-acceptance-task-batch" &&
+            item.params.source_id ===
+              manualAcceptanceTaskBatchIdentity(
+                CURRENT_MANUAL_ACCEPTANCE_RUN_ID,
+              ).sourceID &&
+            Boolean(item.params.owner_role_key) &&
+            !("customer_key" in item.params)
+          );
+        },
       ),
   );
   assert(
@@ -2005,7 +2081,11 @@ test("CLI verification uses strict non-green exit codes for not-proven and wrong
   });
   assert.equal(noTask.exitCode, 1);
   assert.equal(noTask.report.summary.mobileTaskTotalActual, null);
-  assert(!noTaskRuntime.calls.some((item) => item.method === "list_tasks"));
+  assert(
+    noTaskRuntime.calls
+      .filter((item) => item.method === "list_tasks")
+      .every((item) => Boolean(item.params.task_group)),
+  );
 });
 
 test("CLI and exported verification reject external backends before the first fetch", async () => {

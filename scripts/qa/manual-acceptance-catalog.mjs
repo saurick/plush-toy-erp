@@ -404,10 +404,9 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "production-scheduling": {
     isList: true,
-    minimumRecords: 20,
-    minimumRecordUnit: "生产排程协同任务",
-    taskScenarios: MANUAL_ACCEPTANCE_ROLE_TASK_SCENARIOS.pmc,
-    keyStates: ["待处理", "可执行", "阻塞", "已完成", "临近到期", "已逾期"],
+    minimumRecords: 45,
+    minimumRecordUnit: "生产订单发布后生成的排程协同任务",
+    keyStates: ["可执行", "已完成"],
     whatToDo: [
       "你要按任务编号、状态、责任岗位和到期日期查找，打开正常排程、缺料、插单和延期任务。",
       "你要完成一条资料齐全的排程任务，阻塞一条缺料任务并填写具体原因，再催办一条临近到期任务。",
@@ -419,10 +418,9 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "production-exceptions": {
     isList: true,
-    minimumRecords: 5,
-    minimumRecordUnit: "生产异常协同任务",
-    taskScenarios: Object.freeze(["production_exception"]),
-    keyStates: ["待处理", "可执行", "阻塞", "已完成", "已逾期"],
+    minimumRecords: 1,
+    minimumRecordUnit: "返工取消后生成的生产异常协同任务",
+    keyStates: ["已完成"],
     whatToDo: [
       "你要按任务编号、状态、责任岗位和到期日期查找，分别打开延期、返工、质量、设备和缺料异常。",
       "你要查看一条资料不足、等待补充的异常任务，并阻塞一条等待其他岗位处理的任务。",
@@ -434,10 +432,9 @@ const DESKTOP_PLANS = Object.freeze({
   },
   "shipping-release": {
     isList: true,
-    minimumRecords: 4,
-    minimumRecordUnit: "出货放行任务",
-    taskScenarios: Object.freeze(["shipping"]),
-    keyStates: ["可执行", "阻塞", "退回", "已完成", "临近到期", "已经逾期"],
+    minimumRecords: 46,
+    minimumRecordUnit: "出货单提交后生成的放行任务",
+    keyStates: ["已完成"],
     whatToDo: [
       "你要按任务编号、状态、负责岗位和到期日期查找，打开数量、质检、箱唛、地址和出货时间等任务。",
       "你要核对一条资料齐全的放行任务，并查看阻塞、退回和已完成任务写明的原因或结果。",

@@ -154,7 +154,12 @@ const mockPermissions = [
     name: '管理角色权限',
     module: 'system',
   },
-  { permission_key: 'erp.dashboard.read', name: '查看任务看板', module: 'erp' },
+  { permission_key: 'erp.workbench.read', name: '查看岗位工作台', module: 'erp' },
+  {
+    permission_key: 'erp.business_dashboard.read',
+    name: '查看业务看板',
+    module: 'erp',
+  },
   {
     permission_key: 'workflow.task.read',
     name: '查看协同任务',
@@ -222,7 +227,7 @@ const mockRoles = [
     role_key: 'sales',
     name: '业务',
     permissions: [
-      'erp.dashboard.read',
+      'erp.workbench.read',
       'workflow.task.read',
       'mobile.sales.access',
     ],
@@ -231,7 +236,7 @@ const mockRoles = [
     role_key: 'purchase',
     name: '采购',
     permissions: [
-      'erp.dashboard.read',
+      'erp.workbench.read',
       'workflow.task.read',
       'mobile.purchase.access',
     ],
@@ -240,7 +245,7 @@ const mockRoles = [
     role_key: 'engineering',
     name: '工程',
     permissions: [
-      'erp.dashboard.read',
+      'erp.workbench.read',
       'workflow.task.read',
       'workflow.task.complete',
       'mobile.engineering.access',
@@ -253,7 +258,7 @@ const mockMenus = [
     key: 'global-dashboard',
     label: '任务看板',
     path: '/erp/dashboard',
-    required_any: ['erp.dashboard.read'],
+    required_any: ['erp.workbench.read'],
     required_all: [],
   },
   {

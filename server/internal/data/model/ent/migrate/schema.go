@@ -3035,6 +3035,42 @@ var (
 			},
 		},
 	}
+	// RoleDataScopesColumns holds the columns for the "role_data_scopes" table.
+	RoleDataScopesColumns = []*schema.Column{
+		{Name: "id", Type: field.TypeInt, Increment: true},
+		{Name: "resource_type", Type: field.TypeString, Size: 32},
+		{Name: "mode", Type: field.TypeString, Size: 16},
+		{Name: "resource_ids", Type: field.TypeJSON},
+		{Name: "created_at", Type: field.TypeTime},
+		{Name: "updated_at", Type: field.TypeTime},
+		{Name: "role_id", Type: field.TypeInt},
+	}
+	// RoleDataScopesTable holds the schema information for the "role_data_scopes" table.
+	RoleDataScopesTable = &schema.Table{
+		Name:       "role_data_scopes",
+		Columns:    RoleDataScopesColumns,
+		PrimaryKey: []*schema.Column{RoleDataScopesColumns[0]},
+		ForeignKeys: []*schema.ForeignKey{
+			{
+				Symbol:     "role_data_scopes_roles_data_scopes",
+				Columns:    []*schema.Column{RoleDataScopesColumns[6]},
+				RefColumns: []*schema.Column{RolesColumns[0]},
+				OnDelete:   schema.NoAction,
+			},
+		},
+		Indexes: []*schema.Index{
+			{
+				Name:    "roledatascope_role_id_resource_type",
+				Unique:  true,
+				Columns: []*schema.Column{RoleDataScopesColumns[6], RoleDataScopesColumns[1]},
+			},
+			{
+				Name:    "roledatascope_resource_type_mode",
+				Unique:  false,
+				Columns: []*schema.Column{RoleDataScopesColumns[1], RoleDataScopesColumns[2]},
+			},
+		},
+	}
 	// RolePermissionsColumns holds the columns for the "role_permissions" table.
 	RolePermissionsColumns = []*schema.Column{
 		{Name: "id", Type: field.TypeInt, Increment: true},
@@ -4006,6 +4042,7 @@ var (
 		PurchaseReturnItemsTable,
 		QualityInspectionsTable,
 		RolesTable,
+		RoleDataScopesTable,
 		RolePermissionsTable,
 		RoleProfilesTable,
 		RuntimeAuditEventsTable,
@@ -4397,6 +4434,12 @@ func init() {
 	RolesTable.Annotation.Checks = map[string]string{
 		"roles_role_type_allowed": "role_type IN ('system', 'business_default', 'custom')",
 		"roles_version_positive":  "version > 0",
+	}
+	RoleDataScopesTable.ForeignKeys[0].RefTable = RolesTable
+	RoleDataScopesTable.Annotation = &entsql.Annotation{}
+	RoleDataScopesTable.Annotation.Checks = map[string]string{
+		"role_data_scopes_mode_allowed":          "mode IN ('ALL', 'ASSIGNED', 'NONE')",
+		"role_data_scopes_resource_type_allowed": "resource_type IN ('warehouse')",
 	}
 	SalesOrdersTable.ForeignKeys[0].RefTable = CustomersTable
 	SalesOrdersTable.Annotation = &entsql.Annotation{}

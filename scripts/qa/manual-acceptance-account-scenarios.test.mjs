@@ -110,6 +110,17 @@ function acceptanceRoles(overrides = {}) {
     disabled: false,
     permissions_editable: true,
     permissions_editable_by_current_admin: true,
+    data_scopes: [
+      {
+        resource_type: "warehouse",
+        mode: ["warehouse", "quality"].includes(item.roleKey)
+          ? "ASSIGNED"
+          : "ALL",
+        resource_ids: ["warehouse", "quality"].includes(item.roleKey)
+          ? [1, 2, 3, 4]
+          : [],
+      },
+    ],
     permissions: [
       ...(Object.hasOwn(overrides, item.roleKey)
         ? overrides[item.roleKey]
@@ -287,6 +298,11 @@ function createBackend({
         {
           roles: roleOptionsTransform(structuredClone(roleState)),
           permissions: permissionOptionsTransform(permissionOptions()),
+          warehouse_scope_options: [1, 2, 3, 4].map((id) => ({
+            id,
+            code: `YS5-CK-0${id}`,
+            name: `仓库 ${id}`,
+          })),
         },
         url,
       );
@@ -298,6 +314,17 @@ function createBackend({
       assert(selected);
       assert.equal(body.params.expected_version, selected.version);
       selected.permissions = [...body.params.permission_keys].sort();
+      selected.version += 1;
+      auditTotal += 1;
+      return ok({ role: structuredClone(selected) }, url);
+    }
+    if (domain === "admin" && body.method === "set_role_data_scopes") {
+      const selected = roleState.find(
+        (item) => item.role_key === body.params.role_key,
+      );
+      assert(selected);
+      assert.equal(body.params.expected_version, selected.version);
+      selected.data_scopes = structuredClone(body.params.data_scopes);
       selected.version += 1;
       auditTotal += 1;
       return ok({ role: structuredClone(selected) }, url);
@@ -364,6 +391,12 @@ function passwordResetCalls(backend) {
 function rolePermissionCalls(backend) {
   return backend.calls.filter(
     (call) => call.domain === "admin" && call.method === "set_role_permissions",
+  );
+}
+
+function roleDataScopeCalls(backend) {
+  return backend.calls.filter(
+    (call) => call.domain === "admin" && call.method === "set_role_data_scopes",
   );
 }
 
@@ -843,8 +876,8 @@ test("scenario password policy rejects values outside 8 to 20 characters before 
 
 test("local acceptance adds missing customer capabilities without replacing role selections", async () => {
   const retained = {
-    warehouse: "erp.dashboard.read",
-    pmc: "erp.dashboard.read",
+    warehouse: "erp.workbench.read",
+    pmc: "erp.workbench.read",
     finance: "finance.report.read",
   };
   const backend = createBackend({
@@ -897,6 +930,52 @@ test("local acceptance adds missing customer capabilities without replacing role
   assert.equal(second.roleCapabilityBaseline.updated, 0);
   assert.equal(second.roleCapabilityBaseline.unchanged, 9);
   assert.equal(rolePermissionCalls(backend).length, roleWrites);
+});
+
+test("local acceptance binds warehouse and quality to the exact four seeded warehouses", async () => {
+  const backend = createBackend();
+  for (const roleKey of ["warehouse", "quality"]) {
+    const selected = backend.roleState.find((item) => item.role_key === roleKey);
+    selected.data_scopes = [
+      { resource_type: "warehouse", mode: "NONE", resource_ids: [] },
+    ];
+  }
+
+  const first = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(localPlan(), {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
+  );
+  assert.equal(first.roleDataScopeBaseline.updated, 2);
+  assert.equal(first.roleDataScopeBaseline.unchanged, 0);
+  assert.deepEqual(
+    roleDataScopeCalls(backend).map((call) => ({
+      roleKey: call.params.role_key,
+      dataScopes: call.params.data_scopes,
+    })),
+    ["warehouse", "quality"].map((roleKey) => ({
+      roleKey,
+      dataScopes: [
+        {
+          resource_type: "warehouse",
+          mode: "ASSIGNED",
+          resource_ids: [1, 2, 3, 4],
+        },
+      ],
+    })),
+  );
+
+  const writesAfterFirst = roleDataScopeCalls(backend).length;
+  const second = await withConfirmation(() =>
+    applyManualAcceptanceAccountScenarios(localPlan(), {
+      password: "demo-pass",
+      fetchImpl: backend.fetchImpl,
+    }),
+  );
+  assert.equal(second.roleDataScopeBaseline.updated, 0);
+  assert.equal(second.roleDataScopeBaseline.unchanged, 2);
+  assert.equal(roleDataScopeCalls(backend).length, writesAfterFirst);
 });
 
 test("role and permission metadata are fully preflighted before the first acceptance write", async () => {
@@ -965,7 +1044,7 @@ test("role and permission metadata are fully preflighted before the first accept
 
   for (const item of cases) {
     const backend = createBackend({
-      initialRolePermissions: { warehouse: ["erp.dashboard.read"] },
+      initialRolePermissions: { warehouse: ["erp.workbench.read"] },
       ...item.options,
     });
     await withConfirmation(() =>

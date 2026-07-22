@@ -165,7 +165,7 @@ func (uc *CustomerConfigUsecase) CheckCustomerConfigTransition(
 		}
 	}
 
-	responsibilityChanged, activePoolKeys, err := uc.customerConfigTransitionResponsibilityChanged(
+	responsibilityChanged, activePoolKeys, activeRoleKeys, err := uc.customerConfigTransitionResponsibilityChanged(
 		ctx,
 		customerKey,
 		active.Revision,
@@ -174,13 +174,20 @@ func (uc *CustomerConfigUsecase) CheckCustomerConfigTransition(
 	if err != nil {
 		return nil, err
 	}
-	if responsibilityChanged && len(activePoolKeys) > 0 {
-		count, err := uc.repo.CountOpenWorkflowTasksByPools(ctx, customerKey, active.Revision, activePoolKeys)
+	if responsibilityChanged && (len(activePoolKeys) > 0 || len(activeRoleKeys) > 0) {
+		count, err := uc.repo.CountOpenWorkflowTasksByResponsibilities(
+			ctx,
+			customerKey,
+			active.Revision,
+			activePoolKeys,
+			activeRoleKeys,
+		)
 		if err != nil {
 			return nil, err
 		}
 		if count > 0 {
-			out.addBlocker("open_workflow_tasks_for_changed_responsibility", "work_pool", activePoolKeys, count)
+			responsibilityKeys := append(append([]string{}, activePoolKeys...), activeRoleKeys...)
+			out.addBlocker("open_workflow_tasks_for_changed_responsibility", "responsibility", responsibilityKeys, count)
 		}
 	}
 	return out.finalize(), nil
@@ -295,7 +302,6 @@ func customerConfigTransitionProcessDefinitions(snapshot map[string]any) map[str
 
 type customerConfigTransitionResponsibility struct {
 	RoleProfiles        []json.RawMessage `json:"role_profiles"`
-	AccessEntitlements  []json.RawMessage `json:"access_entitlements"`
 	WorkPools           []json.RawMessage `json:"work_pools"`
 	WorkPoolMemberships []json.RawMessage `json:"work_pool_memberships"`
 }
@@ -303,45 +309,41 @@ type customerConfigTransitionResponsibility struct {
 func (uc *CustomerConfigUsecase) customerConfigTransitionResponsibilityChanged(
 	ctx context.Context,
 	customerKey, activeRevision, targetRevision string,
-) (bool, []string, error) {
-	active, activePools, err := uc.loadCustomerConfigTransitionResponsibility(ctx, customerKey, activeRevision)
+) (bool, []string, []string, error) {
+	active, activePools, activeRoles, err := uc.loadCustomerConfigTransitionResponsibility(ctx, customerKey, activeRevision)
 	if err != nil {
-		return false, nil, err
+		return false, nil, nil, err
 	}
-	target, _, err := uc.loadCustomerConfigTransitionResponsibility(ctx, customerKey, targetRevision)
+	target, _, _, err := uc.loadCustomerConfigTransitionResponsibility(ctx, customerKey, targetRevision)
 	if err != nil {
-		return false, nil, err
+		return false, nil, nil, err
 	}
 	activePayload, err := json.Marshal(active)
 	if err != nil {
-		return false, nil, err
+		return false, nil, nil, err
 	}
 	targetPayload, err := json.Marshal(target)
 	if err != nil {
-		return false, nil, err
+		return false, nil, nil, err
 	}
-	return !bytes.Equal(activePayload, targetPayload), activePools, nil
+	return !bytes.Equal(activePayload, targetPayload), activePools, activeRoles, nil
 }
 
 func (uc *CustomerConfigUsecase) loadCustomerConfigTransitionResponsibility(
 	ctx context.Context,
 	customerKey, revision string,
-) (customerConfigTransitionResponsibility, []string, error) {
+) (customerConfigTransitionResponsibility, []string, []string, error) {
 	roles, err := uc.repo.ListRoleProfiles(ctx, customerKey, revision)
 	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
+		return customerConfigTransitionResponsibility{}, nil, nil, err
 	}
 	roleKeys := []string{}
 	for _, item := range roles {
 		roleKeys = append(roleKeys, item.RoleKey)
 	}
-	entitlements, err := uc.repo.ListAccessEntitlements(ctx, customerKey, revision, roleKeys)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
-	}
 	pools, err := uc.repo.ListWorkPools(ctx, customerKey, revision)
 	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
+		return customerConfigTransitionResponsibility{}, nil, nil, err
 	}
 	poolKeys := []string{}
 	for _, item := range pools {
@@ -350,28 +352,23 @@ func (uc *CustomerConfigUsecase) loadCustomerConfigTransitionResponsibility(
 	poolKeys = normalizeStringList(poolKeys)
 	memberships, err := uc.repo.ListWorkPoolMembershipsByPools(ctx, customerKey, revision, poolKeys)
 	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
+		return customerConfigTransitionResponsibility{}, nil, nil, err
 	}
 	canonicalRoles, err := canonicalCustomerConfigList(roles)
 	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
-	}
-	canonicalEntitlements, err := canonicalCustomerConfigList(entitlements)
-	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
+		return customerConfigTransitionResponsibility{}, nil, nil, err
 	}
 	canonicalPools, err := canonicalCustomerConfigList(pools)
 	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
+		return customerConfigTransitionResponsibility{}, nil, nil, err
 	}
 	canonicalMemberships, err := canonicalCustomerConfigList(memberships)
 	if err != nil {
-		return customerConfigTransitionResponsibility{}, nil, err
+		return customerConfigTransitionResponsibility{}, nil, nil, err
 	}
 	return customerConfigTransitionResponsibility{
 		RoleProfiles:        canonicalRoles,
-		AccessEntitlements:  canonicalEntitlements,
 		WorkPools:           canonicalPools,
 		WorkPoolMemberships: canonicalMemberships,
-	}, poolKeys, nil
+	}, poolKeys, NormalizeAdminRoleKeys(roleKeys), nil
 }

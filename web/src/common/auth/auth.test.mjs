@@ -126,14 +126,14 @@ test('auth: 缺失 is_super_admin 不会被误判成超级管理员', () => {
     {
       access_token: createMockAdminToken('legacy-admin'),
       username: 'legacy-admin',
-      permissions: ['erp.dashboard.read'],
+      permissions: ['erp.workbench.read'],
     },
     AUTH_SCOPE.ADMIN
   )
 
   const profile = getStoredAdminProfile()
   assert.equal(profile.is_super_admin, false)
-  assert.deepEqual(profile.permissions, ['erp.dashboard.read'])
+  assert.deepEqual(profile.permissions, ['erp.workbench.read'])
 })
 
 test('auth: 显式 is_super_admin=true 仍保留超级管理员身份和 RBAC 元数据', () => {
