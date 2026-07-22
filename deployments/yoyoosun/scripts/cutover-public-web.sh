@@ -17,13 +17,34 @@ fail() {
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-  --image) image="${2:-}"; shift 2 ;;
-  --release) release="${2:-}"; shift 2 ;;
-  --current-container) current_container="${2:-}"; shift 2 ;;
-  --endpoint) endpoint="${2:-}"; shift 2 ;;
-  --network) network="${2:-}"; shift 2 ;;
-  --execute) execute=1; shift ;;
-  --confirm) confirmation="${2:-}"; shift 2 ;;
+  --image)
+    image="${2:-}"
+    shift 2
+    ;;
+  --release)
+    release="${2:-}"
+    shift 2
+    ;;
+  --current-container)
+    current_container="${2:-}"
+    shift 2
+    ;;
+  --endpoint)
+    endpoint="${2:-}"
+    shift 2
+    ;;
+  --network)
+    network="${2:-}"
+    shift 2
+    ;;
+  --execute)
+    execute=1
+    shift
+    ;;
+  --confirm)
+    confirmation="${2:-}"
+    shift 2
+    ;;
   -h | --help)
     echo "用法: bash deployments/yoyoosun/scripts/cutover-public-web.sh --image <immutable-web-image> --release <40sha> --current-container <name> --endpoint <https-url> [--execute --confirm PUBLIC_WEB_CUTOVER:<old>:<40sha>]"
     exit 0
@@ -65,6 +86,17 @@ cleanup_candidate() {
 }
 trap cleanup_candidate EXIT
 
+wait_http_health() {
+  local url="$1"
+  local http_code=""
+  for _ in $(seq 1 30); do
+    http_code="$(curl -fsS -o /dev/null -w '%{http_code}' "$url" || true)"
+    [[ "$http_code" == "200" ]] && return 0
+    sleep 1
+  done
+  return 1
+}
+
 docker run -d \
   --name "$candidate" \
   --network "$network" \
@@ -73,11 +105,7 @@ docker run -d \
   -p 127.0.0.1:15175:5175 \
   "$image" >/dev/null
 
-for _ in $(seq 1 30); do
-  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$candidate" 2>/dev/null || true)" == "healthy" ]] && break
-  sleep 1
-done
-[[ "$(docker inspect --format '{{.State.Health.Status}}' "$candidate" 2>/dev/null || true)" == "healthy" ]] || fail "候选前端未健康"
+wait_http_health "http://127.0.0.1:15175/healthz" || fail "候选前端未健康"
 
 assert_provider_capabilities() {
   local base_url="$1"
@@ -113,11 +141,7 @@ if ! docker run -d \
   fail "新公网容器启动失败，已尝试恢复旧入口"
 fi
 
-for _ in $(seq 1 30); do
-  [[ "$(docker inspect --format '{{.State.Health.Status}}' "$next_container" 2>/dev/null || true)" == "healthy" ]] && break
-  sleep 1
-done
-if [[ "$(docker inspect --format '{{.State.Health.Status}}' "$next_container" 2>/dev/null || true)" != "healthy" ]] || \
+if ! wait_http_health "http://127.0.0.1:5175/healthz" ||
   ! assert_provider_capabilities "$endpoint"; then
   rollback_old
   fail "公网切流后验证失败，已尝试恢复旧入口"
