@@ -102,6 +102,30 @@ func (r *workflowRepo) GetWorkflowTaskByTaskCode(ctx context.Context, taskCode s
 	return entWorkflowTaskToBiz(row), nil
 }
 
+func (r *workflowRepo) ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int) ([]*biz.WorkflowTaskEvent, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || taskID <= 0 || limit < 1 || limit > 100 {
+		return nil, biz.ErrBadParam
+	}
+	rows, err := r.data.postgres.WorkflowTaskEvent.Query().
+		Where(workflowtaskevent.TaskID(taskID)).
+		Order(ent.Desc(workflowtaskevent.FieldID)).
+		Limit(limit).
+		All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	events := make([]*biz.WorkflowTaskEvent, 0, len(rows))
+	for _, row := range rows {
+		events = append(events, &biz.WorkflowTaskEvent{
+			ID: row.ID, TaskID: row.TaskID, TaskVersion: row.TaskVersion,
+			EventType: row.EventType, FromStatusKey: row.FromStatusKey, ToStatusKey: row.ToStatusKey,
+			ActorRoleKey: row.ActorRoleKey, ActorID: row.ActorID, Reason: row.Reason,
+			Payload: copyWorkflowPayload(row.Payload), CreatedAt: row.CreatedAt,
+		})
+	}
+	return events, nil
+}
+
 func (r *workflowRepo) ResolveWorkflowTaskMutation(
 	ctx context.Context,
 	taskID int,

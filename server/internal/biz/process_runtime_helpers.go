@@ -654,6 +654,18 @@ func normalizeProcessNodeInstanceCreate(in ProcessNodeInstanceCreate) (ProcessNo
 		!IsCreatableProcessNodeStatus(in.Status) {
 		return ProcessNodeInstanceCreate{}, ErrBadParam
 	}
+	if in.RequiredCapabilityKey != nil {
+		capability := strings.TrimSpace(*in.RequiredCapabilityKey)
+		if capability == "" {
+			in.RequiredCapabilityKey = nil
+		} else {
+			in.RequiredCapabilityKey = &capability
+		}
+	}
+	if in.NodeType == ProcessNodeTypeApproval &&
+		(in.RequiredCapabilityKey == nil || *in.RequiredCapabilityKey != PermissionWorkflowTaskApprove) {
+		return ProcessNodeInstanceCreate{}, ErrBadParam
+	}
 	if in.PolicySnapshot == nil {
 		in.PolicySnapshot = map[string]any{}
 	}

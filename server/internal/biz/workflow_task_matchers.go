@@ -42,6 +42,20 @@ func isBossOrderApprovalTask(task *WorkflowTask) bool {
 		strings.TrimSpace(task.OwnerRoleKey) == "boss"
 }
 
+// IsWorkflowApprovalTask classifies approval work from the server-owned
+// capability contract. ProcessRuntime approval nodes and legacy sales-order
+// approval tasks therefore share one permission boundary without relying on a
+// role, task-group, or page-specific name.
+func IsWorkflowApprovalTask(task *WorkflowTask) bool {
+	if task == nil {
+		return false
+	}
+	if task.RequiredCapabilityKey != nil && strings.TrimSpace(*task.RequiredCapabilityKey) == PermissionWorkflowTaskApprove {
+		return true
+	}
+	return isBossOrderApprovalTask(task)
+}
+
 func isPurchaseIQCTask(task *WorkflowTask) bool {
 	if task == nil || task.SourceID <= 0 {
 		return false

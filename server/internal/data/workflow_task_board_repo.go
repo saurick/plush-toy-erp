@@ -205,6 +205,19 @@ func applyWorkflowTaskBoardVisibility(query *ent.WorkflowTaskQuery, filter biz.W
 }
 
 func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.WorkflowTaskBoardQuery) (*ent.WorkflowTaskQuery, error) {
+	if filter.ApprovalOnly {
+		query = query.Where(
+			workflowtask.TaskStatusKeyIn("ready", "blocked"),
+			workflowtask.Or(
+				workflowtask.RequiredCapabilityKey(biz.PermissionWorkflowTaskApprove),
+				workflowtask.And(
+					workflowtask.SourceType("project-orders"),
+					workflowtask.TaskGroup("order_approval"),
+					workflowtask.OwnerRoleKey(biz.BossRoleKey),
+				),
+			),
+		)
+	}
 	if filter.Keyword != "" {
 		query = query.Where(workflowTaskKeywordPredicate(filter.Keyword))
 	}

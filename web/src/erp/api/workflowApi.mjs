@@ -139,7 +139,8 @@ function workflowTaskUrgeResultInvalid(params, task) {
     return true
   }
 
-  const escalationTarget = WORKFLOW_TASK_ESCALATION_TARGET_BY_ACTION[params.action]
+  const escalationTarget =
+    WORKFLOW_TASK_ESCALATION_TARGET_BY_ACTION[params.action]
   return Boolean(
     escalationTarget &&
       (!Number.isSafeInteger(task.escalated_at) ||
@@ -177,6 +178,20 @@ function requireWorkflowTaskMutationResult(operation, params, result) {
 export async function listWorkflowTasks(params = {}, options = {}) {
   const result = await workflowRpc.call('list_tasks', params, options)
   return dataOf(result)
+}
+
+export async function listWorkflowTaskEvents(taskId, options = {}) {
+  const normalizedTaskId = Number(taskId)
+  if (!Number.isSafeInteger(normalizedTaskId) || normalizedTaskId <= 0) {
+    throw new Error('任务轨迹参数无效')
+  }
+  const result = await workflowRpc.call(
+    'list_task_events',
+    { task_id: normalizedTaskId, limit: 100 },
+    options
+  )
+  const data = dataOf(result)
+  return Array.isArray(data?.items) ? data.items : []
 }
 
 export async function listWorkflowRoleTasks(params = {}) {

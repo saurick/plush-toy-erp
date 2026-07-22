@@ -3520,9 +3520,10 @@ func TestProcessDomainCommandFingerprintCanonicalizesPayloadMapOrder(t *testing.
 
 func TestNormalizeProcessNodeInstanceCreateCanonicalizesDueAtToPostgresPrecision(t *testing.T) {
 	dueAt := time.Date(2026, 7, 10, 12, 34, 56, 123456789, time.FixedZone("UTC+8", 8*60*60))
+	requiredCapability := PermissionWorkflowTaskApprove
 	normalized, err := normalizeProcessNodeInstanceCreate(ProcessNodeInstanceCreate{
 		NodeKey: "approval", NodeType: ProcessNodeTypeApproval, Attempt: 1,
-		Status: ProcessNodeStatusWaiting, DueAt: &dueAt,
+		Status: ProcessNodeStatusWaiting, DueAt: &dueAt, RequiredCapabilityKey: &requiredCapability,
 	})
 	if err != nil {
 		t.Fatalf("normalize process node failed: %v", err)
@@ -3530,6 +3531,19 @@ func TestNormalizeProcessNodeInstanceCreateCanonicalizesDueAtToPostgresPrecision
 	expected := dueAt.UTC().Truncate(time.Microsecond)
 	if normalized.DueAt == nil || normalized.DueAt.Location() != time.UTC || !normalized.DueAt.Equal(expected) || normalized.DueAt.Nanosecond()%1000 != 0 {
 		t.Fatalf("due_at must canonicalize to UTC microseconds, got %#v want %v", normalized.DueAt, expected)
+	}
+}
+
+func TestNormalizeProcessNodeInstanceCreateRejectsApprovalWithoutApproveCapability(t *testing.T) {
+	wrongCapability := PermissionWorkflowTaskComplete
+	for _, capability := range []*string{nil, &wrongCapability} {
+		_, err := normalizeProcessNodeInstanceCreate(ProcessNodeInstanceCreate{
+			NodeKey: "approval", NodeType: ProcessNodeTypeApproval,
+			Status: ProcessNodeStatusWaiting, RequiredCapabilityKey: capability,
+		})
+		if !errors.Is(err, ErrBadParam) {
+			t.Fatalf("approval capability %#v must fail closed, got %v", capability, err)
+		}
 	}
 }
 

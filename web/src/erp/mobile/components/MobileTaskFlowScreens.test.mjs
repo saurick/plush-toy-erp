@@ -89,15 +89,15 @@ test('mobile task action screen validates and focuses the first missing field', 
   )
   assert.match(
     actionScreenSource,
-    /if \(action === 'done'\) return '完成反馈'/u
+    /if \(action === 'done'\) return approvalTask \? '审批意见' : '完成反馈'/u
   )
+  assert.match(actionScreenSource, /isWorkflowApprovalTask\(task\)/u)
+  assert.match(actionScreenSource, /\? '审批通过'/u)
+  assert.match(actionScreenSource, /说明通过依据、核对结果和需要交接的信息/u)
   assert.match(actionScreenSource, /actionChoiceRef\.current\?\.focus\(\)/u)
   assert.match(actionScreenSource, /reasonRef\.current\?\.focus\(\)/u)
   assert.doesNotMatch(actionScreenSource, /现场证据|onEvidenceChange/u)
-  assert.match(
-    actionScreenSource,
-    /任务附件统一在详情页查看或管理/u
-  )
+  assert.match(actionScreenSource, /任务附件统一在详情页查看或管理/u)
   assert.match(actionScreenSource, /aria-invalid=/u)
   assert.match(actionScreenSource, /noValidate/u)
   assert.match(actionScreenSource, /min-h-\[48px\]/u)
@@ -160,7 +160,10 @@ test('mobile task detail keeps canonical completion feedback visible after reloa
 test('mobile task detail separates real attachments from historical text references', () => {
   assert.match(detailScreenSource, />\s*任务附件\s*</u)
   assert.match(detailScreenSource, />\s*历史处理线索\s*</u)
-  assert.match(detailScreenSource, /data-testid="mobile-role-historical-evidence"/u)
+  assert.match(
+    detailScreenSource,
+    /data-testid="mobile-role-historical-evidence"/u
+  )
   assert.match(detailScreenSource, /查看与补充附件/u)
   assert.match(detailScreenSource, /查看任务附件/u)
   assert.match(detailScreenSource, /canUpload=\{canManageAttachments\}/u)

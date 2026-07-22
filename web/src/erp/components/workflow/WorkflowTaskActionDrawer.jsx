@@ -5,7 +5,17 @@ import {
   LinkOutlined,
   SendOutlined,
 } from '@ant-design/icons'
-import { Alert, Button, Drawer, Input, Space, Tag, Typography } from 'antd'
+import {
+  Alert,
+  Button,
+  Drawer,
+  Input,
+  Space,
+  Tag,
+  Timeline,
+  Typography,
+} from 'antd'
+import { listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
 import {
   formatWorkflowTaskSource,
   resolveWorkflowTaskEntryPath,
@@ -25,6 +35,9 @@ import {
   resolveWorkflowTaskActionInitialStep,
   resolveWorkflowTaskActionStep,
 } from '../../utils/workflowTaskActionFlow.mjs'
+import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
+import { getRoleDisplayName } from '../../utils/roleKeys.mjs'
+import { getActionErrorMessage } from '@/common/utils/errorMessage'
 
 const { Paragraph, Title } = Typography
 const { TextArea } = Input
@@ -61,6 +74,55 @@ export const TASK_ACTION_META = Object.freeze({
     requireReason: true,
   },
 })
+
+export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
+  const base = TASK_ACTION_META[actionMode]
+  if (!base || !isWorkflowApprovalTask(task)) return base || null
+  if (actionMode === 'complete') {
+    return {
+      ...base,
+      title: '审批通过',
+      buttonLabel: '确认通过',
+      successMessage: '审批已通过',
+    }
+  }
+  if (actionMode === 'reject') {
+    return {
+      ...base,
+      title: '审批退回',
+      buttonLabel: '确认退回',
+      successMessage: '审批已退回',
+    }
+  }
+  return base
+}
+
+const EVENT_LABELS = Object.freeze({
+  created: '审批已发起',
+  complete: '审批已通过',
+  block: '审批已阻塞',
+  reject: '审批已退回',
+  resume: '审批已恢复',
+  urge_task: '已催办',
+  urge_role: '已催办岗位',
+  urge_assignee: '已催办处理人',
+})
+
+function getApprovalEventLabel(event = {}) {
+  if (event.event_type === 'status_changed') {
+    if (event.to_status_key === 'done') return EVENT_LABELS.complete
+    if (event.to_status_key === 'rejected') return EVENT_LABELS.reject
+    if (event.to_status_key === 'blocked') return EVENT_LABELS.block
+    if (event.to_status_key === 'ready') return EVENT_LABELS.resume
+  }
+  return EVENT_LABELS[event.event_type] || '审批状态已更新'
+}
+
+function formatEventTime(value) {
+  const timestamp = Number(value || 0)
+  if (!Number.isFinite(timestamp) || timestamp <= 0) return '时间未记录'
+  return new Date(timestamp * 1000).toLocaleString('zh-CN', { hour12: false })
+}
 
 const TASK_DRAWER_STEPS = Object.freeze([
   {
@@ -130,7 +192,8 @@ export default function WorkflowTaskActionDrawer({
   onOpenEntry,
   onSubmit,
 }) {
-  const actionMeta = actionMode ? TASK_ACTION_META[actionMode] : null
+  const actionMeta = getWorkflowTaskActionMeta(task, actionMode)
+  const approvalTask = isWorkflowApprovalTask(task)
   const statusMeta = task ? getWorkflowTaskStatusMeta(task) : null
   const isTerminal = task ? isTerminalWorkflowTask(task) : false
   const entryPath = task ? resolveWorkflowTaskEntryPath(task) : ''
@@ -147,6 +210,9 @@ export default function WorkflowTaskActionDrawer({
     ? String(task.id || task.task_code || task.task_name || '')
     : ''
   const [activeStepKey, setActiveStepKey] = React.useState('context')
+  const [taskEvents, setTaskEvents] = React.useState([])
+  const [taskEventsState, setTaskEventsState] = React.useState('idle')
+  const [taskEventsError, setTaskEventsError] = React.useState('')
   const previousTaskIdentityRef = React.useRef('')
   const stepButtonRefs = React.useRef(new Map())
   const actionOptionRefs = React.useRef(new Map())
@@ -180,6 +246,30 @@ export default function WorkflowTaskActionDrawer({
       setActiveStepKey('context')
     }
   }, [task])
+
+  React.useEffect(() => {
+    if (!task?.id || !approvalTask) {
+      setTaskEvents([])
+      setTaskEventsState('idle')
+      setTaskEventsError('')
+      return undefined
+    }
+    const controller = new AbortController()
+    setTaskEventsState('loading')
+    setTaskEventsError('')
+    listWorkflowTaskEvents(task.id, { limit: 100, signal: controller.signal })
+      .then((items) => {
+        setTaskEvents(items)
+        setTaskEventsState('ready')
+      })
+      .catch((error) => {
+        if (controller.signal.aborted) return
+        setTaskEvents([])
+        setTaskEventsState('error')
+        setTaskEventsError(getActionErrorMessage(error, '加载审批轨迹失败'))
+      })
+    return () => controller.abort()
+  }, [approvalTask, task?.id])
 
   React.useEffect(() => {
     if (stepAvailability[activeStepKey]) return
@@ -276,7 +366,7 @@ export default function WorkflowTaskActionDrawer({
     <Drawer
       title={
         <div className="erp-task-action-drawer__title">
-          <span>任务处理</span>
+          <span>{approvalTask ? '审批办理' : '任务处理'}</span>
           <strong>{actionMeta?.title || '查看任务详情'}</strong>
         </div>
       }
@@ -479,7 +569,7 @@ export default function WorkflowTaskActionDrawer({
             className="erp-task-action-drawer__step-panel"
           >
             <div className="erp-task-action-drawer__action-prompt">
-              <strong>核对任务信息</strong>
+              <strong>{approvalTask ? '核对审批事项' : '核对任务信息'}</strong>
               <span>
                 请确认任务、来源、负责岗位、截止时间和已有原因；查看本页不会修改任务或业务记录。
               </span>
@@ -500,6 +590,52 @@ export default function WorkflowTaskActionDrawer({
               />
             ) : null}
           </section>
+
+          {approvalTask ? (
+            <section
+              className="erp-task-action-drawer__step-panel"
+              aria-label="审批轨迹"
+            >
+              <div className="erp-task-action-drawer__action-prompt">
+                <strong>最近审批记录</strong>
+                <span>按时间倒序展示最近 100 条处理岗位、意见、状态和版本。</span>
+              </div>
+              {taskEventsState === 'loading' ? (
+                <Alert type="info" showIcon message="正在加载审批轨迹" />
+              ) : taskEventsState === 'error' ? (
+                <Alert type="error" showIcon message={taskEventsError} />
+              ) : taskEvents.length > 0 ? (
+                <Timeline
+                  items={taskEvents.map((event) => ({
+                    color:
+                      event.to_status_key === 'rejected' ||
+                      event.to_status_key === 'blocked'
+                        ? 'red'
+                        : 'blue',
+                    children: (
+                      <div>
+                        <strong>
+                          {getApprovalEventLabel(event)}
+                        </strong>
+                        <Paragraph type="secondary">
+                          {getRoleDisplayName(event.actor_role_key, '系统')} ·{' '}
+                          {formatEventTime(event.created_at)}
+                          {event.task_version
+                            ? ` · 版本 ${event.task_version}`
+                            : ''}
+                        </Paragraph>
+                        {event.reason ? (
+                          <Paragraph>{event.reason}</Paragraph>
+                        ) : null}
+                      </div>
+                    ),
+                  }))}
+                />
+              ) : (
+                <Alert type="info" showIcon message="暂无可展示的审批轨迹" />
+              )}
+            </section>
+          ) : null}
 
           <section
             id="erp-task-action-step-action"
@@ -526,7 +662,7 @@ export default function WorkflowTaskActionDrawer({
                   aria-label="处理方式"
                 >
                   {visibleActionModes.map((mode, index) => {
-                    const meta = TASK_ACTION_META[mode]
+                    const meta = getWorkflowTaskActionMeta(task, mode)
                     const selected = actionMode === mode
                     return (
                       <button

@@ -188,6 +188,14 @@
 
 当前验证：`go test ./cmd/server`、`run-smoke-script.test.mjs` 7 / 7、`production-preflight.test.mjs` 76 / 76、`release-evidence-gate.test.mjs` 67 / 67 通过；公网切流脚本通过 `bash -n`，`git diff --check` 通过。下一步是提交推送当前固定版本，在本地构建 amd64 镜像并传输到 133，安全迁移原有 provider Secret、执行目标 runtime preflight、切流和公网 smoke。真实短信发送仍需受控测试手机号，capabilities 读回不等于阿里云实际送达证明。
 
+## 2026-07-22 审批产品层通用入口与领域缺口审计
+
+完成：ProcessRuntime `approval` 节点现在必须声明 `workflow.task.approve`，Workflow 完成动作按服务端 capability 通用识别，不再硬编码老板销售订单组合。桌面任务看板新增服务端完整集合“待我审批”筛选；共享任务 Drawer 对审批显示“审批通过 / 审批退回”，并通过新增只读 `workflow.list_task_events` 展示岗位、意见、状态、任务版本和时间轨迹。事件读取沿用任务 revision / owner / assignee 可见性，写动作继续服从 RBAC、active / superseded instance revision、expected_version、idempotency receipt 和审计事件。
+
+验证：T4 `go test -count=1 ./internal/core/... ./internal/biz ./internal/data ./internal/service ./internal/server` 通过；Web 全量 `1714 / 1714`、文档合同 `10 / 10`、最终审批定向 `35 / 35` 均为 0 fail / 0 skip，ESLint 与 `git diff --check` 通过。`erp-task-board-desktop` Chromium L1 场景验证统一入口、返回态与 DOM 无溢出，并输出 `erp-task-board-approval-inbox.png`。T7 隔离 PostgreSQL 首次因旧测试数据污染得到 1 个计数失败；按专用 Makefile 目标重建 `plush_erp_purchase_receipt_test`、应用 90 个 migration 后，关键事务门禁 `191 / 191` 通过，0 fail / 0 skip。schema 未变化，因此未运行 `make data` 或生成 migration。
+
+未闭环 / fail-closed：销售 approval task done 尚未由同一领域合同把 SalesOrder 从 `SUBMITTED` 推进为 `ACTIVE`，直连 activate 仍可能绕过；采购审批唯一真源仍是 `PurchaseOrderUsecase.ApprovePurchaseOrder`，客户 Workflow 仍 preview-only，未进入统一审批箱；出货财务放行仍是 backend-only EffectNone，不是 Shipment 强制门禁。PAYMENT 没有写真源，生产 WIP 质量让步没有关口级审批合同，均未造假开放。本轮未提交、推送、部署、执行目标库 migration、133 readback 或客户 UAT。
+
 ## 2026-07-19 提醒页统一显示更多与刷新边界
 
 完成：移动岗位任务页不再同时显示“分批展开”和“继续加载风险任务”两个入口。待办、已办、预警、提醒统一使用一个“显示更多”按钮：先展开当前已加载内容，接近已加载边界且服务端仍有下一页时，由同一按钮按原 `server_time` 游标快照续取并直接显示新批次；顶部刷新继续使用无游标请求，单独负责获取最新快照。移除了“当前只显示已加载内容”等实现性说明，保留加载中禁用、失败后可重试、全部显示后的收起行为。

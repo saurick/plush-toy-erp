@@ -121,6 +121,22 @@ func workflowTaskToMap(task *biz.WorkflowTask) map[string]any {
 	}
 }
 
+func workflowTaskEventsToAny(items []*biz.WorkflowTaskEvent) []any {
+	out := make([]any, 0, len(items))
+	for _, event := range items {
+		if event == nil {
+			continue
+		}
+		out = append(out, map[string]any{
+			"id": event.ID, "task_id": event.TaskID, "task_version": workflowIntValue(event.TaskVersion),
+			"event_type": event.EventType, "from_status_key": workflowStringValue(event.FromStatusKey),
+			"to_status_key": workflowStringValue(event.ToStatusKey), "actor_role_key": workflowStringValue(event.ActorRoleKey),
+			"reason": workflowStringValue(event.Reason), "payload": workflowMapValue(event.Payload), "created_at": event.CreatedAt.Unix(),
+		})
+	}
+	return out
+}
+
 func workflowBusinessStatesToAny(items []*biz.WorkflowBusinessState) []any {
 	out := make([]any, 0, len(items))
 	for _, item := range items {

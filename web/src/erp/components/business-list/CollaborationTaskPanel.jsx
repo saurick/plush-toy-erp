@@ -9,7 +9,7 @@ import { Button, Card, Space, Tag, Typography } from 'antd'
 import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import WorkflowTaskActionDrawer, {
-  TASK_ACTION_META,
+  getWorkflowTaskActionMeta,
 } from '../workflow/WorkflowTaskActionDrawer.jsx'
 import useWorkflowTaskActionAccess from '../../hooks/useWorkflowTaskActionAccess.js'
 import { isWorkflowTaskMutationResultUnknown } from '../../utils/workflowTaskMutation.mjs'
@@ -173,11 +173,7 @@ export function CollaborationTaskPanel({
   const statusLabels = taskStatusLabels || DEFAULT_TASK_STATUS_LABELS
   const hasAdminProfile = adminProfile && typeof adminProfile === 'object'
   const hasActionHandler = Boolean(
-    onCompleteTask ||
-      onBlockTask ||
-      onRejectTask ||
-      onResumeTask ||
-      onUrgeTask
+    onCompleteTask || onBlockTask || onRejectTask || onResumeTask || onUrgeTask
   )
   const actionDrawerAccess = useWorkflowTaskActionAccess({
     adminProfile,
@@ -333,7 +329,10 @@ export function CollaborationTaskPanel({
   }, [actionDrawerTask, closeActionDrawer, tasks])
   const submitActionDrawer = React.useCallback(async () => {
     if (!actionDrawerTask || !actionDrawerMode) return
-    const actionMeta = TASK_ACTION_META[actionDrawerMode]
+    const actionMeta = getWorkflowTaskActionMeta(
+      actionDrawerTask,
+      actionDrawerMode
+    )
     if (!actionMeta) return
     if (actionDrawerAccess.loading) {
       message.warning('正在确认这项操作是否可用，请稍后再提交')

@@ -30,6 +30,7 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import WorkflowTaskActionDrawer, {
   TASK_ACTION_META,
+  getWorkflowTaskActionMeta,
 } from '../components/workflow/WorkflowTaskActionDrawer.jsx'
 import {
   blockWorkflowTaskAction,
@@ -577,6 +578,7 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => readWorkflowTaskBoardFiltersFromSearch(searchParams),
     [searchParams]
   )
+  const approvalInboxActive = filters.mode === 'approval'
   const isTaskBoardView = initialView === 'task-board'
   const taskBoardRequest = useMemo(
     () => buildWorkflowTaskBoardRequest(filters),
@@ -746,7 +748,9 @@ export default function DashboardPage({ initialView = 'workbench' }) {
     () => buildWorkflowTaskBoardRoleOptions(taskBoardModel.ownerRoleKeys),
     [taskBoardModel.ownerRoleKeys]
   )
-  const actionMeta = actionMode ? TASK_ACTION_META[actionMode] : null
+  const actionMeta = actionMode
+    ? getWorkflowTaskActionMeta(selectedTask, actionMode)
+    : null
   const taskCenterCurrentTask = useMemo(
     () =>
       taskBoardVisibleTasks.find(
@@ -1577,11 +1581,26 @@ export default function DashboardPage({ initialView = 'workbench' }) {
             <div className="erp-task-center-overview">
               <section className="erp-task-center-summary">
                 <div>
-                  <Title level={3} className="erp-command-center-hero-title">
-                    任务看板
-                  </Title>
+                  <Space wrap align="center">
+                    <Title level={3} className="erp-command-center-hero-title">
+                      {approvalInboxActive ? '待我审批' : '任务看板'}
+                    </Title>
+                    <Button
+                      type={approvalInboxActive ? 'primary' : 'default'}
+                      onClick={() =>
+                        updateFilter(
+                          'mode',
+                          approvalInboxActive ? 'all' : 'approval'
+                        )
+                      }
+                    >
+                      {approvalInboxActive ? '返回全部任务' : '待我审批'}
+                    </Button>
+                  </Space>
                   <Paragraph className="erp-dashboard-summary">
-                    看清谁该处理、哪里卡住、哪些已经超时；电脑端可双击任务卡快速查看详情。
+                    {approvalInboxActive
+                      ? '只显示服务端登记为审批节点且当前账号可见的事项；审批仍受岗位、指定处理人、配置版本和单据状态约束。'
+                      : '看清谁该处理、哪里卡住、哪些已经超时；电脑端可双击任务卡快速查看详情。'}
                   </Paragraph>
                 </div>
                 <div
