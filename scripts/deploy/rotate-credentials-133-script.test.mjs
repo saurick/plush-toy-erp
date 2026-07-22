@@ -41,12 +41,17 @@ esac
     `#!/usr/bin/env bash
 set -euo pipefail
 printf '%s\\n' "$*" >"$FAKE_SSH_LOG"
-IFS= read -r admin_secret
-IFS= read -r demo_secret
-IFS= read -r phone_secret
+IFS= read -r admin_assignment
+IFS= read -r demo_assignment
+IFS= read -r phone_assignment
+IFS= read -r export_line
 cat >/dev/null
-[[ "$admin_secret" == "adminadmin" ]]
-[[ "$demo_secret" == "12345678" ]]
+[[ "$admin_assignment" == "MANUAL_ACCEPTANCE_ADMIN_PASSWORD=adminadmin" ]]
+[[ "$demo_assignment" == "MANUAL_ACCEPTANCE_PASSWORD=12345678" ]]
+[[ "$export_line" == "export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE" ]]
+[[ "$phone_assignment" == MANUAL_ACCEPTANCE_SMS_PHONE=* ]]
+eval "$phone_assignment"
+phone_secret="$MANUAL_ACCEPTANCE_SMS_PHONE"
 phone_bound=false
 if [[ -n "$phone_secret" ]]; then
   [[ "$phone_secret" == "\${FAKE_SMS_PHONE:-13800138000}" ]]
@@ -114,7 +119,9 @@ test("133 credential rotation wrapper streams registered test credentials and wr
     fs.readFileSync(f.sshLog, "utf8"),
   ].join("\n");
   assert.doesNotMatch(observable, /adminadmin|12345678|13800138000/u);
-  assert.match(fs.readFileSync(f.sshLog, "utf8"), new RegExp(operationId, "u"));
+  const sshArgs = fs.readFileSync(f.sshLog, "utf8");
+  assert.match(sshArgs, /bash -s --/u);
+  assert.match(sshArgs, new RegExp(`${operationId} .*pre-rotation\\.dump ${backupSha}`, "u"));
 });
 
 test("133 credential rotation wrapper accepts a missing optional SMS phone", (t) => {

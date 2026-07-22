@@ -28,7 +28,11 @@
 
 完成：正式 smoke 对合同 hash、目标库、dataset 及 11 / 11 账号逐一执行真实 JSON-RPC 登录；每个响应必须精确匹配 JSON-RPC id、业务码、账号身份，并验证 11 个不同 token。仅当 SMS 手机号已人工配置时才额外核对 admin 手机号。发布 gate 交叉核对完整 40 位 commit、migration、目标、账号集合、auth version、可选手机号绑定和脱敏字段；造数、恢复或回滚后缺轮换回执、任一密码账号失败或合同漂移都会 fail closed。
 
-验证：定向 Go 包覆盖 133 / 本地精确目标密码、其他目标拒绝、SMS 缺省与非法手机号；脚本覆盖版本化合同、SSH stdin、未知结果幂等回放、可选手机号、JSON-RPC 响应严格性、11 账号登录矩阵及 release evidence gate。最终整仓 `strict` 从头完成，scripts Node 1318 / 1318、server all 2820 / 2820、Web contract 209 / 209、Web all 1711 / 1711，均为零失败、零跳过；构建、真实 Chromium、fresh / populated migration、PostgreSQL、ShellCheck、shfmt、YAML、密钥扫描和 govulncheck 同轮通过。当前修改仍只证明本地代码合同；尚未提交、推送、构建不可变镜像或重新部署 133，目标数据库密码也尚未按新合同轮换。后续必须在取得 Git 收口确认后完成受控备份、发布、事务轮换和公网 11 / 11 登录，SMS 未人工录入时不要求发送或投递验证。
+验证：定向 Go 包覆盖 133 / 本地精确目标密码、其他目标拒绝、SMS 缺省与非法手机号；脚本覆盖版本化合同、SSH stdin、未知结果幂等回放、可选手机号、JSON-RPC 响应严格性、11 账号登录矩阵及 release evidence gate。最终整仓 `strict` 从头完成，scripts Node 1318 / 1318、server all 2820 / 2820、Web contract 209 / 209、Web all 1711 / 1711，均为零失败、零跳过；构建、真实 Chromium、fresh / populated migration、PostgreSQL、ShellCheck、shfmt、YAML、密钥扫描和 govulncheck 同轮通过。代码合同提交 `152f958b781fc8e7ab067df724df992d302c4c72` 后，真实 OpenSSH 暴露 wrapper 参数边界缺陷；安全检查在写账号前阻断，随后以 `2683cbfd54c2f5c8b9fe64839159d9a7062206cd` 修正为 stdin 脚本与独立 argv，补充回归并推送。
+
+133 已从最终 clean commit 构建并加载 `linux/amd64` server / web 不可变镜像，源码包和镜像包在本机与目标机 SHA-256 一致。运行 env 只更新两项镜像引用，旧 `81ac70f1` 源码、镜像及公网容器保持为回滚点；静态与 runtime preflight、SMS provider 能力、health / ready、非 root 和 Chromium 安全配置均通过。目标库保持 Atlas `20260722000505`、90 executed、0 pending，populated upgrade 与 customer config cutover 只读审计通过，正式 apply 为 no-op。
+
+凭据轮换前备份为 `/home/simon/plush-toy-erp-v5/backups/pre-credential-rotation-152f958b-319d2fa0-3ebe-4e60-a75c-ef25e654c914.dump`，SHA-256 `a400fe6a1fcca434e71df08b0ebef824c99c90ab5ba267e5a255126fe700a407`，已通过 `pg_restore --list`。operation `319d2fa0-3ebe-4e60-a75c-ef25e654c914` 事务轮换 1 个 admin 与 10 个 demo、递增 auth version、撤销 68 个旧会话并写脱敏回执。SMS 手机号未人工录入，因此未绑定、未发送短信且不阻断密码门禁。切流前后 smoke 的 7 项检查全部通过；公网 `https://admin.yoyoosun.net/rpc/auth` 再次逐一真实登录 11 / 11 且 token 唯一。公网入口已切到 `plush-toy-erp-web-public-2683cbfd`，旧 `plush-toy-erp-web-public-81ac70f1` 停止保留。该结论是 `customer-trial-133` 技术试用发布证据，不等于正式生产或客户 UAT。
 
 ## 2026-07-22 GitHub CI Linux 测试夹具修复
 

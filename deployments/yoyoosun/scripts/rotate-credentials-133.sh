@@ -208,7 +208,10 @@ cleanup() {
 trap cleanup EXIT HUP INT TERM
 
 {
-  printf '%s\n%s\n%s\n' "$admin_password" "$demo_password" "$sms_phone"
+  printf 'MANUAL_ACCEPTANCE_ADMIN_PASSWORD=%q\n' "$admin_password"
+  printf 'MANUAL_ACCEPTANCE_PASSWORD=%q\n' "$demo_password"
+  printf 'MANUAL_ACCEPTANCE_SMS_PHONE=%q\n' "$sms_phone"
+  printf '%s\n' 'export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE'
   cat <<'REMOTE_SCRIPT'
 set -euo pipefail
 expected_release="$1"
@@ -246,8 +249,7 @@ docker compose \
     --confirm ROTATE_SIMULATED_ACCEPTANCE_ACCOUNTS:customer-trial-133:2026.07.16-v5
 REMOTE_SCRIPT
 } | ssh -o BatchMode=yes -o ConnectTimeout=10 "$ssh_target" \
-  bash -c 'set -euo pipefail; IFS= read -r MANUAL_ACCEPTANCE_ADMIN_PASSWORD; IFS= read -r MANUAL_ACCEPTANCE_PASSWORD; IFS= read -r MANUAL_ACCEPTANCE_SMS_PHONE; export MANUAL_ACCEPTANCE_ADMIN_PASSWORD MANUAL_ACCEPTANCE_PASSWORD MANUAL_ACCEPTANCE_SMS_PHONE; exec bash -s -- "$@"' \
-  _ "$expected_release" "$expected_migration" "$operation_id" "$backup_file" "$backup_sha256" >"$report_tmp"
+  bash -s -- "$expected_release" "$expected_migration" "$operation_id" "$backup_file" "$backup_sha256" >"$report_tmp"
 
 node - "$report_tmp" "$expected_release" "$expected_migration" "$operation_id" "$phone_expected" <<'NODE'
 const fs = require("node:fs");
