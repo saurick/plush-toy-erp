@@ -366,6 +366,62 @@ func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandCompensatedBy(v *in
 	return _c
 }
 
+// SetDomainCommandRecoveryDecision sets the "domain_command_recovery_decision" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandRecoveryDecision(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandRecoveryDecision(v)
+	return _c
+}
+
+// SetNillableDomainCommandRecoveryDecision sets the "domain_command_recovery_decision" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandRecoveryDecision(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandRecoveryDecision(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandRecoveryHash sets the "domain_command_recovery_hash" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandRecoveryHash(v string) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandRecoveryHash(v)
+	return _c
+}
+
+// SetNillableDomainCommandRecoveryHash sets the "domain_command_recovery_hash" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandRecoveryHash(v *string) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandRecoveryHash(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandRecoveredAt sets the "domain_command_recovered_at" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandRecoveredAt(v time.Time) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandRecoveredAt(v)
+	return _c
+}
+
+// SetNillableDomainCommandRecoveredAt sets the "domain_command_recovered_at" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandRecoveredAt(v *time.Time) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandRecoveredAt(*v)
+	}
+	return _c
+}
+
+// SetDomainCommandRecoveredBy sets the "domain_command_recovered_by" field.
+func (_c *ProcessNodeInstanceCreate) SetDomainCommandRecoveredBy(v int) *ProcessNodeInstanceCreate {
+	_c.mutation.SetDomainCommandRecoveredBy(v)
+	return _c
+}
+
+// SetNillableDomainCommandRecoveredBy sets the "domain_command_recovered_by" field if the given value is not nil.
+func (_c *ProcessNodeInstanceCreate) SetNillableDomainCommandRecoveredBy(v *int) *ProcessNodeInstanceCreate {
+	if v != nil {
+		_c.SetDomainCommandRecoveredBy(*v)
+	}
+	return _c
+}
+
 // SetVersion sets the "version" field.
 func (_c *ProcessNodeInstanceCreate) SetVersion(v int) *ProcessNodeInstanceCreate {
 	_c.mutation.SetVersion(v)
@@ -602,6 +658,21 @@ func (_c *ProcessNodeInstanceCreate) check() error {
 			return &ValidationError{Name: "domain_command_compensated_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_compensated_by": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.DomainCommandRecoveryDecision(); ok {
+		if err := processnodeinstance.DomainCommandRecoveryDecisionValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_recovery_decision", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_recovery_decision": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandRecoveryHash(); ok {
+		if err := processnodeinstance.DomainCommandRecoveryHashValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_recovery_hash", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_recovery_hash": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.DomainCommandRecoveredBy(); ok {
+		if err := processnodeinstance.DomainCommandRecoveredByValidator(v); err != nil {
+			return &ValidationError{Name: "domain_command_recovered_by", err: fmt.Errorf(`ent: validator failed for field "ProcessNodeInstance.domain_command_recovered_by": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Version(); !ok {
 		return &ValidationError{Name: "version", err: errors.New(`ent: missing required field "ProcessNodeInstance.version"`)}
 	}
@@ -752,6 +823,22 @@ func (_c *ProcessNodeInstanceCreate) createSpec() (*ProcessNodeInstance, *sqlgra
 	if value, ok := _c.mutation.DomainCommandCompensatedBy(); ok {
 		_spec.SetField(processnodeinstance.FieldDomainCommandCompensatedBy, field.TypeInt, value)
 		_node.DomainCommandCompensatedBy = &value
+	}
+	if value, ok := _c.mutation.DomainCommandRecoveryDecision(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandRecoveryDecision, field.TypeString, value)
+		_node.DomainCommandRecoveryDecision = &value
+	}
+	if value, ok := _c.mutation.DomainCommandRecoveryHash(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandRecoveryHash, field.TypeString, value)
+		_node.DomainCommandRecoveryHash = &value
+	}
+	if value, ok := _c.mutation.DomainCommandRecoveredAt(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandRecoveredAt, field.TypeTime, value)
+		_node.DomainCommandRecoveredAt = &value
+	}
+	if value, ok := _c.mutation.DomainCommandRecoveredBy(); ok {
+		_spec.SetField(processnodeinstance.FieldDomainCommandRecoveredBy, field.TypeInt, value)
+		_node.DomainCommandRecoveredBy = &value
 	}
 	if value, ok := _c.mutation.Version(); ok {
 		_spec.SetField(processnodeinstance.FieldVersion, field.TypeInt, value)

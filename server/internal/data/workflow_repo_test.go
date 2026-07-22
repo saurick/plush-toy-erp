@@ -21,6 +21,53 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+func TestWorkflowRepo_PublicCreateTaskReplaysFirstSnapshot(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_create_replay?mode=memory&cache=shared&_fk=1&_busy_timeout=5000")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	uc := biz.NewWorkflowUsecase(repo)
+	create := &biz.WorkflowTaskCreate{
+		IdempotencyKey: "public-create-replay-1",
+		TaskCode:       "PUBLIC-CREATE-REPLAY-1",
+		TaskGroup:      "generic",
+		TaskName:       "首次创建快照",
+		SourceType:     "generic-source",
+		SourceID:       101,
+		OwnerRoleKey:   biz.SalesRoleKey,
+		Payload:        map[string]any{"note": "first"},
+	}
+	first, err := uc.CreateTask(ctx, create, 7)
+	if err != nil {
+		t.Fatalf("first create: %v", err)
+	}
+	if _, err := client.WorkflowTask.UpdateOneID(first.ID).SetTaskName("后续已修改").AddVersion(1).Save(ctx); err != nil {
+		t.Fatalf("mutate task after create: %v", err)
+	}
+	replayed, err := uc.CreateTask(ctx, create, 7)
+	if err != nil {
+		t.Fatalf("exact create replay: %v", err)
+	}
+	if replayed.ID != first.ID || replayed.Version != 1 || replayed.TaskName != "首次创建快照" {
+		t.Fatalf("replay must return first snapshot, first=%#v replayed=%#v", first, replayed)
+	}
+	if count := client.WorkflowTask.Query().CountX(ctx); count != 1 {
+		t.Fatalf("exact replay created %d tasks", count)
+	}
+
+	changed := *create
+	changed.Payload = map[string]any{"note": "changed"}
+	if _, err := uc.CreateTask(ctx, &changed, 7); !errors.Is(err, biz.ErrIdempotencyConflict) {
+		t.Fatalf("changed create intent error = %v, want idempotency conflict", err)
+	}
+
+	newKey := *create
+	newKey.IdempotencyKey = "public-create-replay-2"
+	if _, err := uc.CreateTask(ctx, &newKey, 7); !errors.Is(err, biz.ErrWorkflowTaskExists) {
+		t.Fatalf("same task code with new key error = %v, want task exists", err)
+	}
+}
+
 func TestWorkflowRepo_CreateAndUpdateTaskStatus(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_repo?mode=memory&cache=shared&_fk=1")

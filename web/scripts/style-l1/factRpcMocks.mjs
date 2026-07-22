@@ -1103,6 +1103,58 @@ export async function installFactRpcMocks(page, context) {
           }
         }
         break
+      case 'list_finance_payments':
+        data = {
+          payments: [
+            {
+              id: 41,
+              payment_no: 'PAY-STYLE-L1',
+              direction: 'RECEIPT',
+              status: 'DRAFT',
+              counterparty_type: 'CUSTOMER',
+              counterparty_id: 1,
+              amount: '1200.00',
+              currency: 'CNY',
+              account_ref: '银行账户尾号 6688',
+              evidence_ref: '回单 STYLE-L1',
+              version: 1,
+              occurred_at: nowUnix(),
+              allocations: [],
+            },
+          ],
+          total: 1,
+          limit: Number(params.limit || 50),
+          offset: Number(params.offset || 0),
+        }
+        break
+      case 'list_finance_credit_notes':
+        data = {
+          credit_notes: [],
+          total: 0,
+          limit: Number(params.limit || 50),
+          offset: Number(params.offset || 0),
+        }
+        break
+      case 'list_sales_returns':
+        data = {
+          sales_returns: [
+            {
+              id: 51,
+              return_no: 'RMA-STYLE-L1',
+              shipment_id: 1,
+              customer_name: '暗色客户',
+              status: 'APPROVED',
+              reason: '客户验收后发现包装破损',
+              version: 2,
+              items: [{ id: 511, quantity: '2' }],
+              approved_at: nowUnix(),
+            },
+          ],
+          total: 1,
+          limit: Number(params.limit || 50),
+          offset: Number(params.offset || 0),
+        }
+        break
       case 'create_receivable_from_shipment':
         if (
           !validSourceFinanceCreate(

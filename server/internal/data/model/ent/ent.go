@@ -18,19 +18,26 @@ import (
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/customerconfigrevision"
 	"server/internal/data/model/ent/deploymentmodulestate"
+	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
+	"server/internal/data/model/ent/financepayment"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventoryoperation"
+	"server/internal/data/model/ent/inventoryoperationitem"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
@@ -48,6 +55,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
@@ -59,6 +67,8 @@ import (
 	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/salesreturn"
+	"server/internal/data/model/ent/salesreturnitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -146,20 +156,27 @@ func checkColumn(t, c string) error {
 			customer.Table:                           customer.ValidColumn,
 			customerconfigrevision.Table:             customerconfigrevision.ValidColumn,
 			deploymentmodulestate.Table:              deploymentmodulestate.ValidColumn,
+			financeallocation.Table:                  financeallocation.ValidColumn,
+			financecreditnote.Table:                  financecreditnote.ValidColumn,
 			financefact.Table:                        financefact.ValidColumn,
+			financepayment.Table:                     financepayment.ValidColumn,
 			inventorybalance.Table:                   inventorybalance.ValidColumn,
 			inventorylot.Table:                       inventorylot.ValidColumn,
+			inventoryoperation.Table:                 inventoryoperation.ValidColumn,
+			inventoryoperationitem.Table:             inventoryoperationitem.ValidColumn,
 			inventorytxn.Table:                       inventorytxn.ValidColumn,
 			material.Table:                           material.ValidColumn,
 			outsourcingfact.Table:                    outsourcingfact.ValidColumn,
 			outsourcingorder.Table:                   outsourcingorder.ValidColumn,
 			outsourcingorderitem.Table:               outsourcingorderitem.ValidColumn,
+			outsourcingreturndisposition.Table:       outsourcingreturndisposition.ValidColumn,
 			permission.Table:                         permission.ValidColumn,
 			process.Table:                            process.ValidColumn,
 			processinstance.Table:                    processinstance.ValidColumn,
 			processnodeinstance.Table:                processnodeinstance.ValidColumn,
 			product.Table:                            product.ValidColumn,
 			productsku.Table:                         productsku.ValidColumn,
+			productionexceptiondecision.Table:        productionexceptiondecision.ValidColumn,
 			productionfact.Table:                     productionfact.ValidColumn,
 			productionorder.Table:                    productionorder.ValidColumn,
 			productionorderevent.Table:               productionorderevent.ValidColumn,
@@ -176,6 +193,7 @@ func checkColumn(t, c string) error {
 			purchasereceiptadjustment.Table:          purchasereceiptadjustment.ValidColumn,
 			purchasereceiptadjustmentitem.Table:      purchasereceiptadjustmentitem.ValidColumn,
 			purchasereceiptitem.Table:                purchasereceiptitem.ValidColumn,
+			purchaserejectiondisposition.Table:       purchaserejectiondisposition.ValidColumn,
 			purchasereturn.Table:                     purchasereturn.ValidColumn,
 			purchasereturnitem.Table:                 purchasereturnitem.ValidColumn,
 			qualityinspection.Table:                  qualityinspection.ValidColumn,
@@ -187,6 +205,8 @@ func checkColumn(t, c string) error {
 			runtimemarker.Table:                      runtimemarker.ValidColumn,
 			salesorder.Table:                         salesorder.ValidColumn,
 			salesorderitem.Table:                     salesorderitem.ValidColumn,
+			salesreturn.Table:                        salesreturn.ValidColumn,
+			salesreturnitem.Table:                    salesreturnitem.ValidColumn,
 			shipment.Table:                           shipment.ValidColumn,
 			shipmentitem.Table:                       shipmentitem.ValidColumn,
 			stockreservation.Table:                   stockreservation.ValidColumn,

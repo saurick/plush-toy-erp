@@ -34,12 +34,22 @@ type Tx struct {
 	CustomerConfigRevision *CustomerConfigRevisionClient
 	// DeploymentModuleState is the client for interacting with the DeploymentModuleState builders.
 	DeploymentModuleState *DeploymentModuleStateClient
+	// FinanceAllocation is the client for interacting with the FinanceAllocation builders.
+	FinanceAllocation *FinanceAllocationClient
+	// FinanceCreditNote is the client for interacting with the FinanceCreditNote builders.
+	FinanceCreditNote *FinanceCreditNoteClient
 	// FinanceFact is the client for interacting with the FinanceFact builders.
 	FinanceFact *FinanceFactClient
+	// FinancePayment is the client for interacting with the FinancePayment builders.
+	FinancePayment *FinancePaymentClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
 	InventoryLot *InventoryLotClient
+	// InventoryOperation is the client for interacting with the InventoryOperation builders.
+	InventoryOperation *InventoryOperationClient
+	// InventoryOperationItem is the client for interacting with the InventoryOperationItem builders.
+	InventoryOperationItem *InventoryOperationItemClient
 	// InventoryTxn is the client for interacting with the InventoryTxn builders.
 	InventoryTxn *InventoryTxnClient
 	// Material is the client for interacting with the Material builders.
@@ -50,6 +60,8 @@ type Tx struct {
 	OutsourcingOrder *OutsourcingOrderClient
 	// OutsourcingOrderItem is the client for interacting with the OutsourcingOrderItem builders.
 	OutsourcingOrderItem *OutsourcingOrderItemClient
+	// OutsourcingReturnDisposition is the client for interacting with the OutsourcingReturnDisposition builders.
+	OutsourcingReturnDisposition *OutsourcingReturnDispositionClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
 	// Process is the client for interacting with the Process builders.
@@ -62,6 +74,8 @@ type Tx struct {
 	Product *ProductClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
 	ProductSKU *ProductSKUClient
+	// ProductionExceptionDecision is the client for interacting with the ProductionExceptionDecision builders.
+	ProductionExceptionDecision *ProductionExceptionDecisionClient
 	// ProductionFact is the client for interacting with the ProductionFact builders.
 	ProductionFact *ProductionFactClient
 	// ProductionOrder is the client for interacting with the ProductionOrder builders.
@@ -94,6 +108,8 @@ type Tx struct {
 	PurchaseReceiptAdjustmentItem *PurchaseReceiptAdjustmentItemClient
 	// PurchaseReceiptItem is the client for interacting with the PurchaseReceiptItem builders.
 	PurchaseReceiptItem *PurchaseReceiptItemClient
+	// PurchaseRejectionDisposition is the client for interacting with the PurchaseRejectionDisposition builders.
+	PurchaseRejectionDisposition *PurchaseRejectionDispositionClient
 	// PurchaseReturn is the client for interacting with the PurchaseReturn builders.
 	PurchaseReturn *PurchaseReturnClient
 	// PurchaseReturnItem is the client for interacting with the PurchaseReturnItem builders.
@@ -116,6 +132,10 @@ type Tx struct {
 	SalesOrder *SalesOrderClient
 	// SalesOrderItem is the client for interacting with the SalesOrderItem builders.
 	SalesOrderItem *SalesOrderItemClient
+	// SalesReturn is the client for interacting with the SalesReturn builders.
+	SalesReturn *SalesReturnClient
+	// SalesReturnItem is the client for interacting with the SalesReturnItem builders.
+	SalesReturnItem *SalesReturnItemClient
 	// Shipment is the client for interacting with the Shipment builders.
 	Shipment *ShipmentClient
 	// ShipmentItem is the client for interacting with the ShipmentItem builders.
@@ -280,20 +300,27 @@ func (tx *Tx) init() {
 	tx.Customer = NewCustomerClient(tx.config)
 	tx.CustomerConfigRevision = NewCustomerConfigRevisionClient(tx.config)
 	tx.DeploymentModuleState = NewDeploymentModuleStateClient(tx.config)
+	tx.FinanceAllocation = NewFinanceAllocationClient(tx.config)
+	tx.FinanceCreditNote = NewFinanceCreditNoteClient(tx.config)
 	tx.FinanceFact = NewFinanceFactClient(tx.config)
+	tx.FinancePayment = NewFinancePaymentClient(tx.config)
 	tx.InventoryBalance = NewInventoryBalanceClient(tx.config)
 	tx.InventoryLot = NewInventoryLotClient(tx.config)
+	tx.InventoryOperation = NewInventoryOperationClient(tx.config)
+	tx.InventoryOperationItem = NewInventoryOperationItemClient(tx.config)
 	tx.InventoryTxn = NewInventoryTxnClient(tx.config)
 	tx.Material = NewMaterialClient(tx.config)
 	tx.OutsourcingFact = NewOutsourcingFactClient(tx.config)
 	tx.OutsourcingOrder = NewOutsourcingOrderClient(tx.config)
 	tx.OutsourcingOrderItem = NewOutsourcingOrderItemClient(tx.config)
+	tx.OutsourcingReturnDisposition = NewOutsourcingReturnDispositionClient(tx.config)
 	tx.Permission = NewPermissionClient(tx.config)
 	tx.Process = NewProcessClient(tx.config)
 	tx.ProcessInstance = NewProcessInstanceClient(tx.config)
 	tx.ProcessNodeInstance = NewProcessNodeInstanceClient(tx.config)
 	tx.Product = NewProductClient(tx.config)
 	tx.ProductSKU = NewProductSKUClient(tx.config)
+	tx.ProductionExceptionDecision = NewProductionExceptionDecisionClient(tx.config)
 	tx.ProductionFact = NewProductionFactClient(tx.config)
 	tx.ProductionOrder = NewProductionOrderClient(tx.config)
 	tx.ProductionOrderEvent = NewProductionOrderEventClient(tx.config)
@@ -310,6 +337,7 @@ func (tx *Tx) init() {
 	tx.PurchaseReceiptAdjustment = NewPurchaseReceiptAdjustmentClient(tx.config)
 	tx.PurchaseReceiptAdjustmentItem = NewPurchaseReceiptAdjustmentItemClient(tx.config)
 	tx.PurchaseReceiptItem = NewPurchaseReceiptItemClient(tx.config)
+	tx.PurchaseRejectionDisposition = NewPurchaseRejectionDispositionClient(tx.config)
 	tx.PurchaseReturn = NewPurchaseReturnClient(tx.config)
 	tx.PurchaseReturnItem = NewPurchaseReturnItemClient(tx.config)
 	tx.QualityInspection = NewQualityInspectionClient(tx.config)
@@ -321,6 +349,8 @@ func (tx *Tx) init() {
 	tx.RuntimeMarker = NewRuntimeMarkerClient(tx.config)
 	tx.SalesOrder = NewSalesOrderClient(tx.config)
 	tx.SalesOrderItem = NewSalesOrderItemClient(tx.config)
+	tx.SalesReturn = NewSalesReturnClient(tx.config)
+	tx.SalesReturnItem = NewSalesReturnItemClient(tx.config)
 	tx.Shipment = NewShipmentClient(tx.config)
 	tx.ShipmentItem = NewShipmentItemClient(tx.config)
 	tx.StockReservation = NewStockReservationClient(tx.config)

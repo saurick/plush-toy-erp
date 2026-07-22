@@ -195,6 +195,16 @@ func CreatedBy(v int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldCreatedBy, v))
 }
 
+// CreateIdempotencyKey applies equality check predicate on the "create_idempotency_key" field. It's identical to CreateIdempotencyKeyEQ.
+func CreateIdempotencyKey(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIntentHash applies equality check predicate on the "create_intent_hash" field. It's identical to CreateIntentHashEQ.
+func CreateIntentHash(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldCreateIntentHash, v))
+}
+
 // UpdatedBy applies equality check predicate on the "updated_by" field. It's identical to UpdatedByEQ.
 func UpdatedBy(v int) predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldEQ(FieldUpdatedBy, v))
@@ -1788,6 +1798,156 @@ func CreatedByIsNil() predicate.WorkflowTask {
 // CreatedByNotNil applies the NotNil predicate on the "created_by" field.
 func CreatedByNotNil() predicate.WorkflowTask {
 	return predicate.WorkflowTask(sql.FieldNotNull(FieldCreatedBy))
+}
+
+// CreateIdempotencyKeyEQ applies the EQ predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyNEQ applies the NEQ predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyIn applies the In predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldCreateIdempotencyKey, vs...))
+}
+
+// CreateIdempotencyKeyNotIn applies the NotIn predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldCreateIdempotencyKey, vs...))
+}
+
+// CreateIdempotencyKeyGT applies the GT predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyGTE applies the GTE predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyLT applies the LT predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyLTE applies the LTE predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyContains applies the Contains predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyHasPrefix applies the HasPrefix predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyHasSuffix applies the HasSuffix predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyIsNil applies the IsNil predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldCreateIdempotencyKey))
+}
+
+// CreateIdempotencyKeyNotNil applies the NotNil predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldCreateIdempotencyKey))
+}
+
+// CreateIdempotencyKeyEqualFold applies the EqualFold predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIdempotencyKeyContainsFold applies the ContainsFold predicate on the "create_idempotency_key" field.
+func CreateIdempotencyKeyContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldCreateIdempotencyKey, v))
+}
+
+// CreateIntentHashEQ applies the EQ predicate on the "create_intent_hash" field.
+func CreateIntentHashEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEQ(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashNEQ applies the NEQ predicate on the "create_intent_hash" field.
+func CreateIntentHashNEQ(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNEQ(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashIn applies the In predicate on the "create_intent_hash" field.
+func CreateIntentHashIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIn(FieldCreateIntentHash, vs...))
+}
+
+// CreateIntentHashNotIn applies the NotIn predicate on the "create_intent_hash" field.
+func CreateIntentHashNotIn(vs ...string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotIn(FieldCreateIntentHash, vs...))
+}
+
+// CreateIntentHashGT applies the GT predicate on the "create_intent_hash" field.
+func CreateIntentHashGT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGT(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashGTE applies the GTE predicate on the "create_intent_hash" field.
+func CreateIntentHashGTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldGTE(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashLT applies the LT predicate on the "create_intent_hash" field.
+func CreateIntentHashLT(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLT(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashLTE applies the LTE predicate on the "create_intent_hash" field.
+func CreateIntentHashLTE(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldLTE(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashContains applies the Contains predicate on the "create_intent_hash" field.
+func CreateIntentHashContains(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContains(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashHasPrefix applies the HasPrefix predicate on the "create_intent_hash" field.
+func CreateIntentHashHasPrefix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasPrefix(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashHasSuffix applies the HasSuffix predicate on the "create_intent_hash" field.
+func CreateIntentHashHasSuffix(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldHasSuffix(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashIsNil applies the IsNil predicate on the "create_intent_hash" field.
+func CreateIntentHashIsNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldIsNull(FieldCreateIntentHash))
+}
+
+// CreateIntentHashNotNil applies the NotNil predicate on the "create_intent_hash" field.
+func CreateIntentHashNotNil() predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldNotNull(FieldCreateIntentHash))
+}
+
+// CreateIntentHashEqualFold applies the EqualFold predicate on the "create_intent_hash" field.
+func CreateIntentHashEqualFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldEqualFold(FieldCreateIntentHash, v))
+}
+
+// CreateIntentHashContainsFold applies the ContainsFold predicate on the "create_intent_hash" field.
+func CreateIntentHashContainsFold(v string) predicate.WorkflowTask {
+	return predicate.WorkflowTask(sql.FieldContainsFold(FieldCreateIntentHash, v))
 }
 
 // UpdatedByEQ applies the EQ predicate on the "updated_by" field.

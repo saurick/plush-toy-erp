@@ -76,6 +76,7 @@ import BusinessFormModal from '../components/business-list/BusinessFormModal.jsx
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import QualityInspectionPurchaseReturnModal from '../components/quality-inspections/QualityInspectionPurchaseReturnModal.jsx'
+import PurchaseRejectionDispositionModal from '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
 import {
   QualityInspectionCreateForm,
   QualityInspectionDecisionForm,
@@ -351,6 +352,8 @@ export default function V1QualityInspectionsPage() {
   const [inspectionModal, setInspectionModal] = useState(null)
   const [detailInspection, setDetailInspection] = useState(null)
   const [purchaseReturnModal, setPurchaseReturnModal] = useState(null)
+  const [rejectionDispositionOpen, setRejectionDispositionOpen] =
+    useState(false)
   const [purchaseReturnLoading, setPurchaseReturnLoading] = useState(false)
   const [selectedRowPurchaseReceipt, setSelectedRowPurchaseReceipt] =
     useState(null)
@@ -444,6 +447,14 @@ export default function V1QualityInspectionsPage() {
   const canReadPurchaseReturn = hasActionPermission(
     adminProfile,
     'purchase.return.read'
+  )
+  const canPostPurchaseReturn = hasActionPermission(
+    adminProfile,
+    'purchase.return.post'
+  )
+  const canCancelPurchaseReturn = hasActionPermission(
+    adminProfile,
+    'purchase.return.cancel'
   )
   const canReadPurchaseReceipt = hasActionPermission(
     adminProfile,
@@ -546,6 +557,10 @@ export default function V1QualityInspectionsPage() {
       selectedRow,
       selectedRowPurchaseReceipt
     )
+  const selectedRowCanCreateRejectionDisposition = Boolean(
+    isRejectedIncomingInspection(selectedRow) &&
+      String(selectedRowPurchaseReceipt?.status || '').toUpperCase() === 'DRAFT'
+  )
   const selectedPurchaseReceiptItem = useMemo(
     () =>
       findByPositiveID(selectedPurchaseReceiptItemID, purchaseReceiptItems) ||
@@ -1440,7 +1455,7 @@ export default function V1QualityInspectionsPage() {
       <PageHeaderCard
         compact
         title="质量检验"
-        description="质量检验集中办理采购到货、委外回货、出货关联成品和生产 WIP 分段关口的质量判定。生产分段质检按裁片、皮套、成品、针检、抽检及订单要求的客户验货分别记录；每张质检单只代表当前在制批次和当前关口，不代表其他关口已经完成。首次到货检验不合格会阻止本单入库，现有退供应商草稿只适用于已入库后追加检验不合格。"
+        description="质量检验集中办理采购到货、委外回货、出货关联成品和生产 WIP 分段关口的质量判定。生产 WIP 依次覆盖裁片、皮套、成品、针检、抽检及订单要求的客户验货，每张质检单只代表当前在制批次和当前关口。首次到货检验不合格可办理退厂或补换，确认后取消尚未入库的收货草稿；已入库后的不合格仍生成采购退货并形成库存追溯。"
         tags={[
           <Tag color="gold" key="hold">
             已提交：等待判定
@@ -1795,6 +1810,29 @@ export default function V1QualityInspectionsPage() {
           {canCreatePurchaseReturn ? (
             <Button
               size="small"
+              disabled={
+                !selectedRow ||
+                !selectedRowCanCreateRejectionDisposition ||
+                selectedRowPurchaseReceiptLoading ||
+                saving
+              }
+              title={
+                selectedRow && isRejectedIncomingInspection(selectedRow)
+                  ? selectedRowPurchaseReceiptLoading
+                    ? '正在核对来源收货状态'
+                    : selectedRowCanCreateRejectionDisposition
+                      ? undefined
+                      : '该入口只适用于尚未入库的首次来料不合格'
+                  : '请选择已判定不合格的来料质检单'
+              }
+              onClick={() => setRejectionDispositionOpen(true)}
+            >
+              首次来料退厂
+            </Button>
+          ) : null}
+          {canCreatePurchaseReturn ? (
+            <Button
+              size="small"
               icon={<RollbackOutlined />}
               disabled={
                 !selectedRow ||
@@ -1887,6 +1925,15 @@ export default function V1QualityInspectionsPage() {
         referenceDataReady={referenceDataState === 'ready'}
         onCancel={closePurchaseReturn}
         onSubmit={submitPurchaseReturn}
+      />
+
+      <PurchaseRejectionDispositionModal
+        open={rejectionDispositionOpen}
+        inspection={selectedRow}
+        canPost={canPostPurchaseReturn}
+        canCancel={canCancelPurchaseReturn}
+        onClose={() => setRejectionDispositionOpen(false)}
+        onChanged={() => loadRows()}
       />
 
       <BusinessRecordDetailsModal

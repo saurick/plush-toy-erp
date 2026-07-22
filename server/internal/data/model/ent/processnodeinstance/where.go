@@ -180,6 +180,26 @@ func DomainCommandCompensatedBy(v int) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandCompensatedBy, v))
 }
 
+// DomainCommandRecoveryDecision applies equality check predicate on the "domain_command_recovery_decision" field. It's identical to DomainCommandRecoveryDecisionEQ.
+func DomainCommandRecoveryDecision(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryHash applies equality check predicate on the "domain_command_recovery_hash" field. It's identical to DomainCommandRecoveryHashEQ.
+func DomainCommandRecoveryHash(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveredAt applies equality check predicate on the "domain_command_recovered_at" field. It's identical to DomainCommandRecoveredAtEQ.
+func DomainCommandRecoveredAt(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveredAt, v))
+}
+
+// DomainCommandRecoveredBy applies equality check predicate on the "domain_command_recovered_by" field. It's identical to DomainCommandRecoveredByEQ.
+func DomainCommandRecoveredBy(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveredBy, v))
+}
+
 // Version applies equality check predicate on the "version" field. It's identical to VersionEQ.
 func Version(v int) predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldVersion, v))
@@ -1753,6 +1773,256 @@ func DomainCommandCompensatedByIsNil() predicate.ProcessNodeInstance {
 // DomainCommandCompensatedByNotNil applies the NotNil predicate on the "domain_command_compensated_by" field.
 func DomainCommandCompensatedByNotNil() predicate.ProcessNodeInstance {
 	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldDomainCommandCompensatedBy))
+}
+
+// DomainCommandRecoveryDecisionEQ applies the EQ predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionNEQ applies the NEQ predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionNEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionIn applies the In predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldDomainCommandRecoveryDecision, vs...))
+}
+
+// DomainCommandRecoveryDecisionNotIn applies the NotIn predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionNotIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldDomainCommandRecoveryDecision, vs...))
+}
+
+// DomainCommandRecoveryDecisionGT applies the GT predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionGT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionGTE applies the GTE predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionGTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionLT applies the LT predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionLT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionLTE applies the LTE predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionLTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionContains applies the Contains predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionContains(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContains(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionHasPrefix applies the HasPrefix predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionHasPrefix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasPrefix(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionHasSuffix applies the HasSuffix predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionHasSuffix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasSuffix(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionIsNil applies the IsNil predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldDomainCommandRecoveryDecision))
+}
+
+// DomainCommandRecoveryDecisionNotNil applies the NotNil predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldDomainCommandRecoveryDecision))
+}
+
+// DomainCommandRecoveryDecisionEqualFold applies the EqualFold predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionEqualFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEqualFold(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryDecisionContainsFold applies the ContainsFold predicate on the "domain_command_recovery_decision" field.
+func DomainCommandRecoveryDecisionContainsFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContainsFold(FieldDomainCommandRecoveryDecision, v))
+}
+
+// DomainCommandRecoveryHashEQ applies the EQ predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashNEQ applies the NEQ predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashNEQ(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashIn applies the In predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldDomainCommandRecoveryHash, vs...))
+}
+
+// DomainCommandRecoveryHashNotIn applies the NotIn predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashNotIn(vs ...string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldDomainCommandRecoveryHash, vs...))
+}
+
+// DomainCommandRecoveryHashGT applies the GT predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashGT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashGTE applies the GTE predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashGTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashLT applies the LT predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashLT(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashLTE applies the LTE predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashLTE(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashContains applies the Contains predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashContains(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContains(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashHasPrefix applies the HasPrefix predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashHasPrefix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasPrefix(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashHasSuffix applies the HasSuffix predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashHasSuffix(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldHasSuffix(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashIsNil applies the IsNil predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldDomainCommandRecoveryHash))
+}
+
+// DomainCommandRecoveryHashNotNil applies the NotNil predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldDomainCommandRecoveryHash))
+}
+
+// DomainCommandRecoveryHashEqualFold applies the EqualFold predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashEqualFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEqualFold(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveryHashContainsFold applies the ContainsFold predicate on the "domain_command_recovery_hash" field.
+func DomainCommandRecoveryHashContainsFold(v string) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldContainsFold(FieldDomainCommandRecoveryHash, v))
+}
+
+// DomainCommandRecoveredAtEQ applies the EQ predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveredAt, v))
+}
+
+// DomainCommandRecoveredAtNEQ applies the NEQ predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtNEQ(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldDomainCommandRecoveredAt, v))
+}
+
+// DomainCommandRecoveredAtIn applies the In predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldDomainCommandRecoveredAt, vs...))
+}
+
+// DomainCommandRecoveredAtNotIn applies the NotIn predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtNotIn(vs ...time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldDomainCommandRecoveredAt, vs...))
+}
+
+// DomainCommandRecoveredAtGT applies the GT predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtGT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldDomainCommandRecoveredAt, v))
+}
+
+// DomainCommandRecoveredAtGTE applies the GTE predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtGTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldDomainCommandRecoveredAt, v))
+}
+
+// DomainCommandRecoveredAtLT applies the LT predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtLT(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldDomainCommandRecoveredAt, v))
+}
+
+// DomainCommandRecoveredAtLTE applies the LTE predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtLTE(v time.Time) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldDomainCommandRecoveredAt, v))
+}
+
+// DomainCommandRecoveredAtIsNil applies the IsNil predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldDomainCommandRecoveredAt))
+}
+
+// DomainCommandRecoveredAtNotNil applies the NotNil predicate on the "domain_command_recovered_at" field.
+func DomainCommandRecoveredAtNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldDomainCommandRecoveredAt))
+}
+
+// DomainCommandRecoveredByEQ applies the EQ predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldEQ(FieldDomainCommandRecoveredBy, v))
+}
+
+// DomainCommandRecoveredByNEQ applies the NEQ predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByNEQ(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNEQ(FieldDomainCommandRecoveredBy, v))
+}
+
+// DomainCommandRecoveredByIn applies the In predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIn(FieldDomainCommandRecoveredBy, vs...))
+}
+
+// DomainCommandRecoveredByNotIn applies the NotIn predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByNotIn(vs ...int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotIn(FieldDomainCommandRecoveredBy, vs...))
+}
+
+// DomainCommandRecoveredByGT applies the GT predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByGT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGT(FieldDomainCommandRecoveredBy, v))
+}
+
+// DomainCommandRecoveredByGTE applies the GTE predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByGTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldGTE(FieldDomainCommandRecoveredBy, v))
+}
+
+// DomainCommandRecoveredByLT applies the LT predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByLT(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLT(FieldDomainCommandRecoveredBy, v))
+}
+
+// DomainCommandRecoveredByLTE applies the LTE predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByLTE(v int) predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldLTE(FieldDomainCommandRecoveredBy, v))
+}
+
+// DomainCommandRecoveredByIsNil applies the IsNil predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByIsNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldIsNull(FieldDomainCommandRecoveredBy))
+}
+
+// DomainCommandRecoveredByNotNil applies the NotNil predicate on the "domain_command_recovered_by" field.
+func DomainCommandRecoveredByNotNil() predicate.ProcessNodeInstance {
+	return predicate.ProcessNodeInstance(sql.FieldNotNull(FieldDomainCommandRecoveredBy))
 }
 
 // VersionEQ applies the EQ predicate on the "version" field.

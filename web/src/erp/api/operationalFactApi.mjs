@@ -359,6 +359,114 @@ export async function postFinanceFact(params = {}) {
   return dataOf(result)?.finance_fact || null
 }
 
+export async function listSalesReturns(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_sales_returns',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function createSalesReturn(params = {}) {
+  const result = await operationalFactRpc.call('create_sales_return', params)
+  return dataOf(result)?.sales_return || null
+}
+
+export async function approveSalesReturn(params = {}) {
+  const result = await operationalFactRpc.call('approve_sales_return', params)
+  return dataOf(result)?.sales_return || null
+}
+
+export async function receiveSalesReturn(params = {}) {
+  const result = await operationalFactRpc.call('receive_sales_return', params)
+  return dataOf(result)?.sales_return || null
+}
+
+export async function cancelSalesReturn(params = {}) {
+  const result = await operationalFactRpc.call('cancel_sales_return', params)
+  return dataOf(result)?.sales_return || null
+}
+
+export async function getSalesReturn(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'get_sales_return',
+    params,
+    options
+  )
+  return dataOf(result)?.sales_return || null
+}
+
+export async function createFinancePayment(params = {}) {
+  const result = await operationalFactRpc.call('create_finance_payment', params)
+  return dataOf(result)?.payment || null
+}
+
+export async function postFinancePayment(params = {}) {
+  const result = await operationalFactRpc.call('post_finance_payment', params)
+  return dataOf(result)?.payment || null
+}
+
+export async function reverseFinancePayment(params = {}) {
+  const result = await operationalFactRpc.call(
+    'reverse_finance_payment',
+    params
+  )
+  return dataOf(result)?.payment || null
+}
+
+export async function getFinancePayment(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'get_finance_payment',
+    params,
+    options
+  )
+  return dataOf(result)?.payment || null
+}
+
+export async function listFinancePayments(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_finance_payments',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function createFinanceCreditNote(params = {}) {
+  const result = await operationalFactRpc.call(
+    'create_finance_credit_note',
+    params
+  )
+  return dataOf(result)?.credit_note || null
+}
+
+export async function getFinanceCreditNote(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'get_finance_credit_note',
+    params,
+    options
+  )
+  return dataOf(result)?.credit_note || null
+}
+
+export async function listFinanceCreditNotes(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_finance_credit_notes',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function reverseFinanceCreditNote(params = {}) {
+  const result = await operationalFactRpc.call(
+    'reverse_finance_credit_note',
+    params
+  )
+  return dataOf(result)?.credit_note || null
+}
+
 export async function settleFinanceFact(params = {}) {
   const result = await operationalFactRpc.call('settle_finance_fact', params)
   return dataOf(result)?.finance_fact || null

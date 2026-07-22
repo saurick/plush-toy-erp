@@ -59,6 +59,9 @@ const (
 	ProcessDomainCommandEffectStateNone        = "none"
 	ProcessDomainCommandEffectStateApplied     = "applied"
 	ProcessDomainCommandEffectStateCompensated = "compensated"
+
+	ProcessDomainCommandRecoveryTerminateAndWithdraw = "terminate_and_withdraw_downstream"
+	ProcessDomainCommandRecoveryWithdrawnOutcome     = "domain_command.recovery_withdrawn"
 )
 
 type ProcessInstance struct {
@@ -113,6 +116,10 @@ type ProcessNodeInstance struct {
 	DomainCommandCompensationHash *string
 	DomainCommandCompensatedAt    *time.Time
 	DomainCommandCompensatedBy    *int
+	DomainCommandRecoveryDecision *string
+	DomainCommandRecoveryHash     *string
+	DomainCommandRecoveredAt      *time.Time
+	DomainCommandRecoveredBy      *int
 	Version                       int
 	CreatedAt                     time.Time
 	UpdatedAt                     time.Time
@@ -275,6 +282,16 @@ type ProcessNodeDomainCommandCompensationMark struct {
 	CompensationHash         string
 }
 
+type ProcessDomainCommandRecovery struct {
+	ProcessInstanceID        int
+	ProcessNodeInstanceID    int
+	ExpectedVersion          int
+	Decision                 string
+	ExpectedResultHash       string
+	ExpectedCompensationHash string
+	RecoveryHash             string
+}
+
 type ProcessBranchPolicyInput struct {
 	ProcessInstance *ProcessInstance
 	CompletedNode   *ProcessNodeInstance
@@ -365,6 +382,10 @@ type ProcessRuntimeDomainCommandResultRepo interface {
 	GetProcessNodeDomainCommandResult(ctx context.Context, processInstanceID int, processNodeInstanceID int, domainCommandFingerprint string) (*ProcessNodeInstance, bool, error)
 	RecordProcessNodeDomainCommandResult(ctx context.Context, in *ProcessNodeDomainCommandResultRecord, actorID int) (*ProcessNodeInstance, error)
 	MarkProcessNodeDomainCommandCompensated(ctx context.Context, in *ProcessNodeDomainCommandCompensationMark, actorID int) (*ProcessNodeInstance, error)
+}
+
+type ProcessRuntimeCompensationRecoveryRepo interface {
+	RecoverProcessDomainCommandCompensation(ctx context.Context, in *ProcessDomainCommandRecovery, actorID int) (*ProcessNodeInstance, error)
 }
 
 type ProcessRuntimeOwnerRoleResolver interface {

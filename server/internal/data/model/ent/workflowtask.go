@@ -78,6 +78,10 @@ type WorkflowTask struct {
 	Version int `json:"version,omitempty"`
 	// CreatedBy holds the value of the "created_by" field.
 	CreatedBy *int `json:"created_by,omitempty"`
+	// CreateIdempotencyKey holds the value of the "create_idempotency_key" field.
+	CreateIdempotencyKey *string `json:"create_idempotency_key,omitempty"`
+	// CreateIntentHash holds the value of the "create_intent_hash" field.
+	CreateIntentHash *string `json:"create_intent_hash,omitempty"`
 	// UpdatedBy holds the value of the "updated_by" field.
 	UpdatedBy *int `json:"updated_by,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -145,7 +149,7 @@ func (*WorkflowTask) scanValues(columns []string) ([]any, error) {
 			values[i] = new(sql.NullBool)
 		case workflowtask.FieldID, workflowtask.FieldSourceID, workflowtask.FieldProcessInstanceID, workflowtask.FieldProcessNodeInstanceID, workflowtask.FieldAssigneeID, workflowtask.FieldPriority, workflowtask.FieldUrgeCount, workflowtask.FieldLastUrgedBy, workflowtask.FieldVersion, workflowtask.FieldCreatedBy, workflowtask.FieldUpdatedBy:
 			values[i] = new(sql.NullInt64)
-		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason, workflowtask.FieldLastUrgedByRoleKey, workflowtask.FieldEscalateTargetRoleKey:
+		case workflowtask.FieldTaskCode, workflowtask.FieldTaskGroup, workflowtask.FieldTaskName, workflowtask.FieldSourceType, workflowtask.FieldSourceNo, workflowtask.FieldBusinessStatusKey, workflowtask.FieldTaskStatusKey, workflowtask.FieldOwnerRoleKey, workflowtask.FieldOwnerPoolKey, workflowtask.FieldRequiredCapabilityKey, workflowtask.FieldConfigRevision, workflowtask.FieldBlockedReason, workflowtask.FieldLastUrgedByRoleKey, workflowtask.FieldEscalateTargetRoleKey, workflowtask.FieldCreateIdempotencyKey, workflowtask.FieldCreateIntentHash:
 			values[i] = new(sql.NullString)
 		case workflowtask.FieldDueAt, workflowtask.FieldCompletedAt, workflowtask.FieldLastUrgedAt, workflowtask.FieldEscalatedAt, workflowtask.FieldCreatedAt, workflowtask.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -363,6 +367,20 @@ func (_m *WorkflowTask) assignValues(columns []string, values []any) error {
 				_m.CreatedBy = new(int)
 				*_m.CreatedBy = int(value.Int64)
 			}
+		case workflowtask.FieldCreateIdempotencyKey:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field create_idempotency_key", values[i])
+			} else if value.Valid {
+				_m.CreateIdempotencyKey = new(string)
+				*_m.CreateIdempotencyKey = value.String
+			}
+		case workflowtask.FieldCreateIntentHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field create_intent_hash", values[i])
+			} else if value.Valid {
+				_m.CreateIntentHash = new(string)
+				*_m.CreateIntentHash = value.String
+			}
 		case workflowtask.FieldUpdatedBy:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field updated_by", values[i])
@@ -552,6 +570,16 @@ func (_m *WorkflowTask) String() string {
 	if v := _m.CreatedBy; v != nil {
 		builder.WriteString("created_by=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CreateIdempotencyKey; v != nil {
+		builder.WriteString("create_idempotency_key=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.CreateIntentHash; v != nil {
+		builder.WriteString("create_intent_hash=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.UpdatedBy; v != nil {

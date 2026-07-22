@@ -22,19 +22,26 @@ import (
 	"server/internal/data/model/ent/customer"
 	"server/internal/data/model/ent/customerconfigrevision"
 	"server/internal/data/model/ent/deploymentmodulestate"
+	"server/internal/data/model/ent/financeallocation"
+	"server/internal/data/model/ent/financecreditnote"
 	"server/internal/data/model/ent/financefact"
+	"server/internal/data/model/ent/financepayment"
 	"server/internal/data/model/ent/inventorybalance"
 	"server/internal/data/model/ent/inventorylot"
+	"server/internal/data/model/ent/inventoryoperation"
+	"server/internal/data/model/ent/inventoryoperationitem"
 	"server/internal/data/model/ent/inventorytxn"
 	"server/internal/data/model/ent/material"
 	"server/internal/data/model/ent/outsourcingfact"
 	"server/internal/data/model/ent/outsourcingorder"
 	"server/internal/data/model/ent/outsourcingorderitem"
+	"server/internal/data/model/ent/outsourcingreturndisposition"
 	"server/internal/data/model/ent/permission"
 	"server/internal/data/model/ent/process"
 	"server/internal/data/model/ent/processinstance"
 	"server/internal/data/model/ent/processnodeinstance"
 	"server/internal/data/model/ent/product"
+	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorder"
 	"server/internal/data/model/ent/productionorderevent"
@@ -52,6 +59,7 @@ import (
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptadjustmentitem"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/purchasereturnitem"
 	"server/internal/data/model/ent/qualityinspection"
@@ -63,6 +71,8 @@ import (
 	"server/internal/data/model/ent/runtimemarker"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/salesorderitem"
+	"server/internal/data/model/ent/salesreturn"
+	"server/internal/data/model/ent/salesreturnitem"
 	"server/internal/data/model/ent/shipment"
 	"server/internal/data/model/ent/shipmentitem"
 	"server/internal/data/model/ent/stockreservation"
@@ -108,12 +118,22 @@ type Client struct {
 	CustomerConfigRevision *CustomerConfigRevisionClient
 	// DeploymentModuleState is the client for interacting with the DeploymentModuleState builders.
 	DeploymentModuleState *DeploymentModuleStateClient
+	// FinanceAllocation is the client for interacting with the FinanceAllocation builders.
+	FinanceAllocation *FinanceAllocationClient
+	// FinanceCreditNote is the client for interacting with the FinanceCreditNote builders.
+	FinanceCreditNote *FinanceCreditNoteClient
 	// FinanceFact is the client for interacting with the FinanceFact builders.
 	FinanceFact *FinanceFactClient
+	// FinancePayment is the client for interacting with the FinancePayment builders.
+	FinancePayment *FinancePaymentClient
 	// InventoryBalance is the client for interacting with the InventoryBalance builders.
 	InventoryBalance *InventoryBalanceClient
 	// InventoryLot is the client for interacting with the InventoryLot builders.
 	InventoryLot *InventoryLotClient
+	// InventoryOperation is the client for interacting with the InventoryOperation builders.
+	InventoryOperation *InventoryOperationClient
+	// InventoryOperationItem is the client for interacting with the InventoryOperationItem builders.
+	InventoryOperationItem *InventoryOperationItemClient
 	// InventoryTxn is the client for interacting with the InventoryTxn builders.
 	InventoryTxn *InventoryTxnClient
 	// Material is the client for interacting with the Material builders.
@@ -124,6 +144,8 @@ type Client struct {
 	OutsourcingOrder *OutsourcingOrderClient
 	// OutsourcingOrderItem is the client for interacting with the OutsourcingOrderItem builders.
 	OutsourcingOrderItem *OutsourcingOrderItemClient
+	// OutsourcingReturnDisposition is the client for interacting with the OutsourcingReturnDisposition builders.
+	OutsourcingReturnDisposition *OutsourcingReturnDispositionClient
 	// Permission is the client for interacting with the Permission builders.
 	Permission *PermissionClient
 	// Process is the client for interacting with the Process builders.
@@ -136,6 +158,8 @@ type Client struct {
 	Product *ProductClient
 	// ProductSKU is the client for interacting with the ProductSKU builders.
 	ProductSKU *ProductSKUClient
+	// ProductionExceptionDecision is the client for interacting with the ProductionExceptionDecision builders.
+	ProductionExceptionDecision *ProductionExceptionDecisionClient
 	// ProductionFact is the client for interacting with the ProductionFact builders.
 	ProductionFact *ProductionFactClient
 	// ProductionOrder is the client for interacting with the ProductionOrder builders.
@@ -168,6 +192,8 @@ type Client struct {
 	PurchaseReceiptAdjustmentItem *PurchaseReceiptAdjustmentItemClient
 	// PurchaseReceiptItem is the client for interacting with the PurchaseReceiptItem builders.
 	PurchaseReceiptItem *PurchaseReceiptItemClient
+	// PurchaseRejectionDisposition is the client for interacting with the PurchaseRejectionDisposition builders.
+	PurchaseRejectionDisposition *PurchaseRejectionDispositionClient
 	// PurchaseReturn is the client for interacting with the PurchaseReturn builders.
 	PurchaseReturn *PurchaseReturnClient
 	// PurchaseReturnItem is the client for interacting with the PurchaseReturnItem builders.
@@ -190,6 +216,10 @@ type Client struct {
 	SalesOrder *SalesOrderClient
 	// SalesOrderItem is the client for interacting with the SalesOrderItem builders.
 	SalesOrderItem *SalesOrderItemClient
+	// SalesReturn is the client for interacting with the SalesReturn builders.
+	SalesReturn *SalesReturnClient
+	// SalesReturnItem is the client for interacting with the SalesReturnItem builders.
+	SalesReturnItem *SalesReturnItemClient
 	// Shipment is the client for interacting with the Shipment builders.
 	Shipment *ShipmentClient
 	// ShipmentItem is the client for interacting with the ShipmentItem builders.
@@ -234,20 +264,27 @@ func (c *Client) init() {
 	c.Customer = NewCustomerClient(c.config)
 	c.CustomerConfigRevision = NewCustomerConfigRevisionClient(c.config)
 	c.DeploymentModuleState = NewDeploymentModuleStateClient(c.config)
+	c.FinanceAllocation = NewFinanceAllocationClient(c.config)
+	c.FinanceCreditNote = NewFinanceCreditNoteClient(c.config)
 	c.FinanceFact = NewFinanceFactClient(c.config)
+	c.FinancePayment = NewFinancePaymentClient(c.config)
 	c.InventoryBalance = NewInventoryBalanceClient(c.config)
 	c.InventoryLot = NewInventoryLotClient(c.config)
+	c.InventoryOperation = NewInventoryOperationClient(c.config)
+	c.InventoryOperationItem = NewInventoryOperationItemClient(c.config)
 	c.InventoryTxn = NewInventoryTxnClient(c.config)
 	c.Material = NewMaterialClient(c.config)
 	c.OutsourcingFact = NewOutsourcingFactClient(c.config)
 	c.OutsourcingOrder = NewOutsourcingOrderClient(c.config)
 	c.OutsourcingOrderItem = NewOutsourcingOrderItemClient(c.config)
+	c.OutsourcingReturnDisposition = NewOutsourcingReturnDispositionClient(c.config)
 	c.Permission = NewPermissionClient(c.config)
 	c.Process = NewProcessClient(c.config)
 	c.ProcessInstance = NewProcessInstanceClient(c.config)
 	c.ProcessNodeInstance = NewProcessNodeInstanceClient(c.config)
 	c.Product = NewProductClient(c.config)
 	c.ProductSKU = NewProductSKUClient(c.config)
+	c.ProductionExceptionDecision = NewProductionExceptionDecisionClient(c.config)
 	c.ProductionFact = NewProductionFactClient(c.config)
 	c.ProductionOrder = NewProductionOrderClient(c.config)
 	c.ProductionOrderEvent = NewProductionOrderEventClient(c.config)
@@ -264,6 +301,7 @@ func (c *Client) init() {
 	c.PurchaseReceiptAdjustment = NewPurchaseReceiptAdjustmentClient(c.config)
 	c.PurchaseReceiptAdjustmentItem = NewPurchaseReceiptAdjustmentItemClient(c.config)
 	c.PurchaseReceiptItem = NewPurchaseReceiptItemClient(c.config)
+	c.PurchaseRejectionDisposition = NewPurchaseRejectionDispositionClient(c.config)
 	c.PurchaseReturn = NewPurchaseReturnClient(c.config)
 	c.PurchaseReturnItem = NewPurchaseReturnItemClient(c.config)
 	c.QualityInspection = NewQualityInspectionClient(c.config)
@@ -275,6 +313,8 @@ func (c *Client) init() {
 	c.RuntimeMarker = NewRuntimeMarkerClient(c.config)
 	c.SalesOrder = NewSalesOrderClient(c.config)
 	c.SalesOrderItem = NewSalesOrderItemClient(c.config)
+	c.SalesReturn = NewSalesReturnClient(c.config)
+	c.SalesReturnItem = NewSalesReturnItemClient(c.config)
 	c.Shipment = NewShipmentClient(c.config)
 	c.ShipmentItem = NewShipmentItemClient(c.config)
 	c.StockReservation = NewStockReservationClient(c.config)
@@ -389,20 +429,27 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		Customer:                           NewCustomerClient(cfg),
 		CustomerConfigRevision:             NewCustomerConfigRevisionClient(cfg),
 		DeploymentModuleState:              NewDeploymentModuleStateClient(cfg),
+		FinanceAllocation:                  NewFinanceAllocationClient(cfg),
+		FinanceCreditNote:                  NewFinanceCreditNoteClient(cfg),
 		FinanceFact:                        NewFinanceFactClient(cfg),
+		FinancePayment:                     NewFinancePaymentClient(cfg),
 		InventoryBalance:                   NewInventoryBalanceClient(cfg),
 		InventoryLot:                       NewInventoryLotClient(cfg),
+		InventoryOperation:                 NewInventoryOperationClient(cfg),
+		InventoryOperationItem:             NewInventoryOperationItemClient(cfg),
 		InventoryTxn:                       NewInventoryTxnClient(cfg),
 		Material:                           NewMaterialClient(cfg),
 		OutsourcingFact:                    NewOutsourcingFactClient(cfg),
 		OutsourcingOrder:                   NewOutsourcingOrderClient(cfg),
 		OutsourcingOrderItem:               NewOutsourcingOrderItemClient(cfg),
+		OutsourcingReturnDisposition:       NewOutsourcingReturnDispositionClient(cfg),
 		Permission:                         NewPermissionClient(cfg),
 		Process:                            NewProcessClient(cfg),
 		ProcessInstance:                    NewProcessInstanceClient(cfg),
 		ProcessNodeInstance:                NewProcessNodeInstanceClient(cfg),
 		Product:                            NewProductClient(cfg),
 		ProductSKU:                         NewProductSKUClient(cfg),
+		ProductionExceptionDecision:        NewProductionExceptionDecisionClient(cfg),
 		ProductionFact:                     NewProductionFactClient(cfg),
 		ProductionOrder:                    NewProductionOrderClient(cfg),
 		ProductionOrderEvent:               NewProductionOrderEventClient(cfg),
@@ -419,6 +466,7 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		PurchaseReceiptAdjustment:          NewPurchaseReceiptAdjustmentClient(cfg),
 		PurchaseReceiptAdjustmentItem:      NewPurchaseReceiptAdjustmentItemClient(cfg),
 		PurchaseReceiptItem:                NewPurchaseReceiptItemClient(cfg),
+		PurchaseRejectionDisposition:       NewPurchaseRejectionDispositionClient(cfg),
 		PurchaseReturn:                     NewPurchaseReturnClient(cfg),
 		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
 		QualityInspection:                  NewQualityInspectionClient(cfg),
@@ -430,6 +478,8 @@ func (c *Client) Tx(ctx context.Context) (*Tx, error) {
 		RuntimeMarker:                      NewRuntimeMarkerClient(cfg),
 		SalesOrder:                         NewSalesOrderClient(cfg),
 		SalesOrderItem:                     NewSalesOrderItemClient(cfg),
+		SalesReturn:                        NewSalesReturnClient(cfg),
+		SalesReturnItem:                    NewSalesReturnItemClient(cfg),
 		Shipment:                           NewShipmentClient(cfg),
 		ShipmentItem:                       NewShipmentItemClient(cfg),
 		StockReservation:                   NewStockReservationClient(cfg),
@@ -471,20 +521,27 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		Customer:                           NewCustomerClient(cfg),
 		CustomerConfigRevision:             NewCustomerConfigRevisionClient(cfg),
 		DeploymentModuleState:              NewDeploymentModuleStateClient(cfg),
+		FinanceAllocation:                  NewFinanceAllocationClient(cfg),
+		FinanceCreditNote:                  NewFinanceCreditNoteClient(cfg),
 		FinanceFact:                        NewFinanceFactClient(cfg),
+		FinancePayment:                     NewFinancePaymentClient(cfg),
 		InventoryBalance:                   NewInventoryBalanceClient(cfg),
 		InventoryLot:                       NewInventoryLotClient(cfg),
+		InventoryOperation:                 NewInventoryOperationClient(cfg),
+		InventoryOperationItem:             NewInventoryOperationItemClient(cfg),
 		InventoryTxn:                       NewInventoryTxnClient(cfg),
 		Material:                           NewMaterialClient(cfg),
 		OutsourcingFact:                    NewOutsourcingFactClient(cfg),
 		OutsourcingOrder:                   NewOutsourcingOrderClient(cfg),
 		OutsourcingOrderItem:               NewOutsourcingOrderItemClient(cfg),
+		OutsourcingReturnDisposition:       NewOutsourcingReturnDispositionClient(cfg),
 		Permission:                         NewPermissionClient(cfg),
 		Process:                            NewProcessClient(cfg),
 		ProcessInstance:                    NewProcessInstanceClient(cfg),
 		ProcessNodeInstance:                NewProcessNodeInstanceClient(cfg),
 		Product:                            NewProductClient(cfg),
 		ProductSKU:                         NewProductSKUClient(cfg),
+		ProductionExceptionDecision:        NewProductionExceptionDecisionClient(cfg),
 		ProductionFact:                     NewProductionFactClient(cfg),
 		ProductionOrder:                    NewProductionOrderClient(cfg),
 		ProductionOrderEvent:               NewProductionOrderEventClient(cfg),
@@ -501,6 +558,7 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		PurchaseReceiptAdjustment:          NewPurchaseReceiptAdjustmentClient(cfg),
 		PurchaseReceiptAdjustmentItem:      NewPurchaseReceiptAdjustmentItemClient(cfg),
 		PurchaseReceiptItem:                NewPurchaseReceiptItemClient(cfg),
+		PurchaseRejectionDisposition:       NewPurchaseRejectionDispositionClient(cfg),
 		PurchaseReturn:                     NewPurchaseReturnClient(cfg),
 		PurchaseReturnItem:                 NewPurchaseReturnItemClient(cfg),
 		QualityInspection:                  NewQualityInspectionClient(cfg),
@@ -512,6 +570,8 @@ func (c *Client) BeginTx(ctx context.Context, opts *sql.TxOptions) (*Tx, error) 
 		RuntimeMarker:                      NewRuntimeMarkerClient(cfg),
 		SalesOrder:                         NewSalesOrderClient(cfg),
 		SalesOrderItem:                     NewSalesOrderItemClient(cfg),
+		SalesReturn:                        NewSalesReturnClient(cfg),
+		SalesReturnItem:                    NewSalesReturnItemClient(cfg),
 		Shipment:                           NewShipmentClient(cfg),
 		ShipmentItem:                       NewShipmentItemClient(cfg),
 		StockReservation:                   NewStockReservationClient(cfg),
@@ -554,22 +614,26 @@ func (c *Client) Use(hooks ...Hook) {
 	for _, n := range []interface{ Use(...Hook) }{
 		c.AccessEntitlement, c.AdminSession, c.AdminUser, c.AdminUserRole, c.BOMHeader,
 		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
-		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceFact,
-		c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
-		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
+		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceAllocation,
+		c.FinanceCreditNote, c.FinanceFact, c.FinancePayment, c.InventoryBalance,
+		c.InventoryLot, c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn,
+		c.Material, c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
+		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
 		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
 		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
 		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
 		c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
-		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RoleDataScope,
-		c.RolePermission, c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker,
-		c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation,
-		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
-		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
+		c.PurchaseRejectionDisposition, c.PurchaseReturn, c.PurchaseReturnItem,
+		c.QualityInspection, c.Role, c.RoleDataScope, c.RolePermission, c.RoleProfile,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.SalesReturn, c.SalesReturnItem, c.Shipment, c.ShipmentItem,
+		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkPool,
+		c.WorkPoolMembership, c.WorkflowBusinessState, c.WorkflowTask,
+		c.WorkflowTaskEvent,
 	} {
 		n.Use(hooks...)
 	}
@@ -581,22 +645,26 @@ func (c *Client) Intercept(interceptors ...Interceptor) {
 	for _, n := range []interface{ Intercept(...Interceptor) }{
 		c.AccessEntitlement, c.AdminSession, c.AdminUser, c.AdminUserRole, c.BOMHeader,
 		c.BOMItem, c.BusinessAttachment, c.Contact, c.Customer,
-		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceFact,
-		c.InventoryBalance, c.InventoryLot, c.InventoryTxn, c.Material,
-		c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem, c.Permission,
-		c.Process, c.ProcessInstance, c.ProcessNodeInstance, c.Product, c.ProductSKU,
+		c.CustomerConfigRevision, c.DeploymentModuleState, c.FinanceAllocation,
+		c.FinanceCreditNote, c.FinanceFact, c.FinancePayment, c.InventoryBalance,
+		c.InventoryLot, c.InventoryOperation, c.InventoryOperationItem, c.InventoryTxn,
+		c.Material, c.OutsourcingFact, c.OutsourcingOrder, c.OutsourcingOrderItem,
+		c.OutsourcingReturnDisposition, c.Permission, c.Process, c.ProcessInstance,
+		c.ProcessNodeInstance, c.Product, c.ProductSKU, c.ProductionExceptionDecision,
 		c.ProductionFact, c.ProductionOrder, c.ProductionOrderEvent,
 		c.ProductionOrderItem, c.ProductionOrderMaterialRequirement,
 		c.ProductionOrderOperation, c.ProductionPackagingConfirmation,
 		c.ProductionWIPBatch, c.ProductionWIPEvent,
 		c.ProductionWIPOutsourcingAllocation, c.PurchaseOrder, c.PurchaseOrderItem,
 		c.PurchaseReceipt, c.PurchaseReceiptAdjustment,
-		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem, c.PurchaseReturn,
-		c.PurchaseReturnItem, c.QualityInspection, c.Role, c.RoleDataScope,
-		c.RolePermission, c.RoleProfile, c.RuntimeAuditEvent, c.RuntimeMarker,
-		c.SalesOrder, c.SalesOrderItem, c.Shipment, c.ShipmentItem, c.StockReservation,
-		c.Supplier, c.Unit, c.Warehouse, c.WorkPool, c.WorkPoolMembership,
-		c.WorkflowBusinessState, c.WorkflowTask, c.WorkflowTaskEvent,
+		c.PurchaseReceiptAdjustmentItem, c.PurchaseReceiptItem,
+		c.PurchaseRejectionDisposition, c.PurchaseReturn, c.PurchaseReturnItem,
+		c.QualityInspection, c.Role, c.RoleDataScope, c.RolePermission, c.RoleProfile,
+		c.RuntimeAuditEvent, c.RuntimeMarker, c.SalesOrder, c.SalesOrderItem,
+		c.SalesReturn, c.SalesReturnItem, c.Shipment, c.ShipmentItem,
+		c.StockReservation, c.Supplier, c.Unit, c.Warehouse, c.WorkPool,
+		c.WorkPoolMembership, c.WorkflowBusinessState, c.WorkflowTask,
+		c.WorkflowTaskEvent,
 	} {
 		n.Intercept(interceptors...)
 	}
@@ -627,12 +695,22 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.CustomerConfigRevision.mutate(ctx, m)
 	case *DeploymentModuleStateMutation:
 		return c.DeploymentModuleState.mutate(ctx, m)
+	case *FinanceAllocationMutation:
+		return c.FinanceAllocation.mutate(ctx, m)
+	case *FinanceCreditNoteMutation:
+		return c.FinanceCreditNote.mutate(ctx, m)
 	case *FinanceFactMutation:
 		return c.FinanceFact.mutate(ctx, m)
+	case *FinancePaymentMutation:
+		return c.FinancePayment.mutate(ctx, m)
 	case *InventoryBalanceMutation:
 		return c.InventoryBalance.mutate(ctx, m)
 	case *InventoryLotMutation:
 		return c.InventoryLot.mutate(ctx, m)
+	case *InventoryOperationMutation:
+		return c.InventoryOperation.mutate(ctx, m)
+	case *InventoryOperationItemMutation:
+		return c.InventoryOperationItem.mutate(ctx, m)
 	case *InventoryTxnMutation:
 		return c.InventoryTxn.mutate(ctx, m)
 	case *MaterialMutation:
@@ -643,6 +721,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.OutsourcingOrder.mutate(ctx, m)
 	case *OutsourcingOrderItemMutation:
 		return c.OutsourcingOrderItem.mutate(ctx, m)
+	case *OutsourcingReturnDispositionMutation:
+		return c.OutsourcingReturnDisposition.mutate(ctx, m)
 	case *PermissionMutation:
 		return c.Permission.mutate(ctx, m)
 	case *ProcessMutation:
@@ -655,6 +735,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.Product.mutate(ctx, m)
 	case *ProductSKUMutation:
 		return c.ProductSKU.mutate(ctx, m)
+	case *ProductionExceptionDecisionMutation:
+		return c.ProductionExceptionDecision.mutate(ctx, m)
 	case *ProductionFactMutation:
 		return c.ProductionFact.mutate(ctx, m)
 	case *ProductionOrderMutation:
@@ -687,6 +769,8 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.PurchaseReceiptAdjustmentItem.mutate(ctx, m)
 	case *PurchaseReceiptItemMutation:
 		return c.PurchaseReceiptItem.mutate(ctx, m)
+	case *PurchaseRejectionDispositionMutation:
+		return c.PurchaseRejectionDisposition.mutate(ctx, m)
 	case *PurchaseReturnMutation:
 		return c.PurchaseReturn.mutate(ctx, m)
 	case *PurchaseReturnItemMutation:
@@ -709,6 +793,10 @@ func (c *Client) Mutate(ctx context.Context, m Mutation) (Value, error) {
 		return c.SalesOrder.mutate(ctx, m)
 	case *SalesOrderItemMutation:
 		return c.SalesOrderItem.mutate(ctx, m)
+	case *SalesReturnMutation:
+		return c.SalesReturn.mutate(ctx, m)
+	case *SalesReturnItemMutation:
+		return c.SalesReturnItem.mutate(ctx, m)
 	case *ShipmentMutation:
 		return c.Shipment.mutate(ctx, m)
 	case *ShipmentItemMutation:
@@ -2343,6 +2431,290 @@ func (c *DeploymentModuleStateClient) mutate(ctx context.Context, m *DeploymentM
 	}
 }
 
+// FinanceAllocationClient is a client for the FinanceAllocation schema.
+type FinanceAllocationClient struct {
+	config
+}
+
+// NewFinanceAllocationClient returns a client for the FinanceAllocation from the given config.
+func NewFinanceAllocationClient(c config) *FinanceAllocationClient {
+	return &FinanceAllocationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `financeallocation.Hooks(f(g(h())))`.
+func (c *FinanceAllocationClient) Use(hooks ...Hook) {
+	c.hooks.FinanceAllocation = append(c.hooks.FinanceAllocation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `financeallocation.Intercept(f(g(h())))`.
+func (c *FinanceAllocationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.FinanceAllocation = append(c.inters.FinanceAllocation, interceptors...)
+}
+
+// Create returns a builder for creating a FinanceAllocation entity.
+func (c *FinanceAllocationClient) Create() *FinanceAllocationCreate {
+	mutation := newFinanceAllocationMutation(c.config, OpCreate)
+	return &FinanceAllocationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of FinanceAllocation entities.
+func (c *FinanceAllocationClient) CreateBulk(builders ...*FinanceAllocationCreate) *FinanceAllocationCreateBulk {
+	return &FinanceAllocationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *FinanceAllocationClient) MapCreateBulk(slice any, setFunc func(*FinanceAllocationCreate, int)) *FinanceAllocationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &FinanceAllocationCreateBulk{err: fmt.Errorf("calling to FinanceAllocationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*FinanceAllocationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &FinanceAllocationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for FinanceAllocation.
+func (c *FinanceAllocationClient) Update() *FinanceAllocationUpdate {
+	mutation := newFinanceAllocationMutation(c.config, OpUpdate)
+	return &FinanceAllocationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *FinanceAllocationClient) UpdateOne(_m *FinanceAllocation) *FinanceAllocationUpdateOne {
+	mutation := newFinanceAllocationMutation(c.config, OpUpdateOne, withFinanceAllocation(_m))
+	return &FinanceAllocationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *FinanceAllocationClient) UpdateOneID(id int) *FinanceAllocationUpdateOne {
+	mutation := newFinanceAllocationMutation(c.config, OpUpdateOne, withFinanceAllocationID(id))
+	return &FinanceAllocationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for FinanceAllocation.
+func (c *FinanceAllocationClient) Delete() *FinanceAllocationDelete {
+	mutation := newFinanceAllocationMutation(c.config, OpDelete)
+	return &FinanceAllocationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *FinanceAllocationClient) DeleteOne(_m *FinanceAllocation) *FinanceAllocationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *FinanceAllocationClient) DeleteOneID(id int) *FinanceAllocationDeleteOne {
+	builder := c.Delete().Where(financeallocation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &FinanceAllocationDeleteOne{builder}
+}
+
+// Query returns a query builder for FinanceAllocation.
+func (c *FinanceAllocationClient) Query() *FinanceAllocationQuery {
+	return &FinanceAllocationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeFinanceAllocation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a FinanceAllocation entity by its id.
+func (c *FinanceAllocationClient) Get(ctx context.Context, id int) (*FinanceAllocation, error) {
+	return c.Query().Where(financeallocation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *FinanceAllocationClient) GetX(ctx context.Context, id int) *FinanceAllocation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryPayment queries the payment edge of a FinanceAllocation.
+func (c *FinanceAllocationClient) QueryPayment(_m *FinanceAllocation) *FinancePaymentQuery {
+	query := (&FinancePaymentClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financeallocation.Table, financeallocation.FieldID, id),
+			sqlgraph.To(financepayment.Table, financepayment.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, financeallocation.PaymentTable, financeallocation.PaymentColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *FinanceAllocationClient) Hooks() []Hook {
+	hooks := c.hooks.FinanceAllocation
+	return append(hooks[:len(hooks):len(hooks)], financeallocation.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *FinanceAllocationClient) Interceptors() []Interceptor {
+	return c.inters.FinanceAllocation
+}
+
+func (c *FinanceAllocationClient) mutate(ctx context.Context, m *FinanceAllocationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&FinanceAllocationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&FinanceAllocationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&FinanceAllocationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&FinanceAllocationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown FinanceAllocation mutation op: %q", m.Op())
+	}
+}
+
+// FinanceCreditNoteClient is a client for the FinanceCreditNote schema.
+type FinanceCreditNoteClient struct {
+	config
+}
+
+// NewFinanceCreditNoteClient returns a client for the FinanceCreditNote from the given config.
+func NewFinanceCreditNoteClient(c config) *FinanceCreditNoteClient {
+	return &FinanceCreditNoteClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `financecreditnote.Hooks(f(g(h())))`.
+func (c *FinanceCreditNoteClient) Use(hooks ...Hook) {
+	c.hooks.FinanceCreditNote = append(c.hooks.FinanceCreditNote, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `financecreditnote.Intercept(f(g(h())))`.
+func (c *FinanceCreditNoteClient) Intercept(interceptors ...Interceptor) {
+	c.inters.FinanceCreditNote = append(c.inters.FinanceCreditNote, interceptors...)
+}
+
+// Create returns a builder for creating a FinanceCreditNote entity.
+func (c *FinanceCreditNoteClient) Create() *FinanceCreditNoteCreate {
+	mutation := newFinanceCreditNoteMutation(c.config, OpCreate)
+	return &FinanceCreditNoteCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of FinanceCreditNote entities.
+func (c *FinanceCreditNoteClient) CreateBulk(builders ...*FinanceCreditNoteCreate) *FinanceCreditNoteCreateBulk {
+	return &FinanceCreditNoteCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *FinanceCreditNoteClient) MapCreateBulk(slice any, setFunc func(*FinanceCreditNoteCreate, int)) *FinanceCreditNoteCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &FinanceCreditNoteCreateBulk{err: fmt.Errorf("calling to FinanceCreditNoteClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*FinanceCreditNoteCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &FinanceCreditNoteCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for FinanceCreditNote.
+func (c *FinanceCreditNoteClient) Update() *FinanceCreditNoteUpdate {
+	mutation := newFinanceCreditNoteMutation(c.config, OpUpdate)
+	return &FinanceCreditNoteUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *FinanceCreditNoteClient) UpdateOne(_m *FinanceCreditNote) *FinanceCreditNoteUpdateOne {
+	mutation := newFinanceCreditNoteMutation(c.config, OpUpdateOne, withFinanceCreditNote(_m))
+	return &FinanceCreditNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *FinanceCreditNoteClient) UpdateOneID(id int) *FinanceCreditNoteUpdateOne {
+	mutation := newFinanceCreditNoteMutation(c.config, OpUpdateOne, withFinanceCreditNoteID(id))
+	return &FinanceCreditNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for FinanceCreditNote.
+func (c *FinanceCreditNoteClient) Delete() *FinanceCreditNoteDelete {
+	mutation := newFinanceCreditNoteMutation(c.config, OpDelete)
+	return &FinanceCreditNoteDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *FinanceCreditNoteClient) DeleteOne(_m *FinanceCreditNote) *FinanceCreditNoteDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *FinanceCreditNoteClient) DeleteOneID(id int) *FinanceCreditNoteDeleteOne {
+	builder := c.Delete().Where(financecreditnote.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &FinanceCreditNoteDeleteOne{builder}
+}
+
+// Query returns a query builder for FinanceCreditNote.
+func (c *FinanceCreditNoteClient) Query() *FinanceCreditNoteQuery {
+	return &FinanceCreditNoteQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeFinanceCreditNote},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a FinanceCreditNote entity by its id.
+func (c *FinanceCreditNoteClient) Get(ctx context.Context, id int) (*FinanceCreditNote, error) {
+	return c.Query().Where(financecreditnote.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *FinanceCreditNoteClient) GetX(ctx context.Context, id int) *FinanceCreditNote {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *FinanceCreditNoteClient) Hooks() []Hook {
+	hooks := c.hooks.FinanceCreditNote
+	return append(hooks[:len(hooks):len(hooks)], financecreditnote.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *FinanceCreditNoteClient) Interceptors() []Interceptor {
+	return c.inters.FinanceCreditNote
+}
+
+func (c *FinanceCreditNoteClient) mutate(ctx context.Context, m *FinanceCreditNoteMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&FinanceCreditNoteCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&FinanceCreditNoteUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&FinanceCreditNoteUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&FinanceCreditNoteDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown FinanceCreditNote mutation op: %q", m.Op())
+	}
+}
+
 // FinanceFactClient is a client for the FinanceFact schema.
 type FinanceFactClient struct {
 	config
@@ -2490,6 +2862,156 @@ func (c *FinanceFactClient) mutate(ctx context.Context, m *FinanceFactMutation) 
 		return (&FinanceFactDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown FinanceFact mutation op: %q", m.Op())
+	}
+}
+
+// FinancePaymentClient is a client for the FinancePayment schema.
+type FinancePaymentClient struct {
+	config
+}
+
+// NewFinancePaymentClient returns a client for the FinancePayment from the given config.
+func NewFinancePaymentClient(c config) *FinancePaymentClient {
+	return &FinancePaymentClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `financepayment.Hooks(f(g(h())))`.
+func (c *FinancePaymentClient) Use(hooks ...Hook) {
+	c.hooks.FinancePayment = append(c.hooks.FinancePayment, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `financepayment.Intercept(f(g(h())))`.
+func (c *FinancePaymentClient) Intercept(interceptors ...Interceptor) {
+	c.inters.FinancePayment = append(c.inters.FinancePayment, interceptors...)
+}
+
+// Create returns a builder for creating a FinancePayment entity.
+func (c *FinancePaymentClient) Create() *FinancePaymentCreate {
+	mutation := newFinancePaymentMutation(c.config, OpCreate)
+	return &FinancePaymentCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of FinancePayment entities.
+func (c *FinancePaymentClient) CreateBulk(builders ...*FinancePaymentCreate) *FinancePaymentCreateBulk {
+	return &FinancePaymentCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *FinancePaymentClient) MapCreateBulk(slice any, setFunc func(*FinancePaymentCreate, int)) *FinancePaymentCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &FinancePaymentCreateBulk{err: fmt.Errorf("calling to FinancePaymentClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*FinancePaymentCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &FinancePaymentCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for FinancePayment.
+func (c *FinancePaymentClient) Update() *FinancePaymentUpdate {
+	mutation := newFinancePaymentMutation(c.config, OpUpdate)
+	return &FinancePaymentUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *FinancePaymentClient) UpdateOne(_m *FinancePayment) *FinancePaymentUpdateOne {
+	mutation := newFinancePaymentMutation(c.config, OpUpdateOne, withFinancePayment(_m))
+	return &FinancePaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *FinancePaymentClient) UpdateOneID(id int) *FinancePaymentUpdateOne {
+	mutation := newFinancePaymentMutation(c.config, OpUpdateOne, withFinancePaymentID(id))
+	return &FinancePaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for FinancePayment.
+func (c *FinancePaymentClient) Delete() *FinancePaymentDelete {
+	mutation := newFinancePaymentMutation(c.config, OpDelete)
+	return &FinancePaymentDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *FinancePaymentClient) DeleteOne(_m *FinancePayment) *FinancePaymentDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *FinancePaymentClient) DeleteOneID(id int) *FinancePaymentDeleteOne {
+	builder := c.Delete().Where(financepayment.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &FinancePaymentDeleteOne{builder}
+}
+
+// Query returns a query builder for FinancePayment.
+func (c *FinancePaymentClient) Query() *FinancePaymentQuery {
+	return &FinancePaymentQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeFinancePayment},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a FinancePayment entity by its id.
+func (c *FinancePaymentClient) Get(ctx context.Context, id int) (*FinancePayment, error) {
+	return c.Query().Where(financepayment.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *FinancePaymentClient) GetX(ctx context.Context, id int) *FinancePayment {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryAllocations queries the allocations edge of a FinancePayment.
+func (c *FinancePaymentClient) QueryAllocations(_m *FinancePayment) *FinanceAllocationQuery {
+	query := (&FinanceAllocationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(financepayment.Table, financepayment.FieldID, id),
+			sqlgraph.To(financeallocation.Table, financeallocation.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, financepayment.AllocationsTable, financepayment.AllocationsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *FinancePaymentClient) Hooks() []Hook {
+	hooks := c.hooks.FinancePayment
+	return append(hooks[:len(hooks):len(hooks)], financepayment.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *FinancePaymentClient) Interceptors() []Interceptor {
+	return c.inters.FinancePayment
+}
+
+func (c *FinancePaymentClient) mutate(ctx context.Context, m *FinancePaymentMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&FinancePaymentCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&FinancePaymentUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&FinancePaymentUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&FinancePaymentDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown FinancePayment mutation op: %q", m.Op())
 	}
 }
 
@@ -2997,6 +3519,306 @@ func (c *InventoryLotClient) mutate(ctx context.Context, m *InventoryLotMutation
 		return (&InventoryLotDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown InventoryLot mutation op: %q", m.Op())
+	}
+}
+
+// InventoryOperationClient is a client for the InventoryOperation schema.
+type InventoryOperationClient struct {
+	config
+}
+
+// NewInventoryOperationClient returns a client for the InventoryOperation from the given config.
+func NewInventoryOperationClient(c config) *InventoryOperationClient {
+	return &InventoryOperationClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `inventoryoperation.Hooks(f(g(h())))`.
+func (c *InventoryOperationClient) Use(hooks ...Hook) {
+	c.hooks.InventoryOperation = append(c.hooks.InventoryOperation, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `inventoryoperation.Intercept(f(g(h())))`.
+func (c *InventoryOperationClient) Intercept(interceptors ...Interceptor) {
+	c.inters.InventoryOperation = append(c.inters.InventoryOperation, interceptors...)
+}
+
+// Create returns a builder for creating a InventoryOperation entity.
+func (c *InventoryOperationClient) Create() *InventoryOperationCreate {
+	mutation := newInventoryOperationMutation(c.config, OpCreate)
+	return &InventoryOperationCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of InventoryOperation entities.
+func (c *InventoryOperationClient) CreateBulk(builders ...*InventoryOperationCreate) *InventoryOperationCreateBulk {
+	return &InventoryOperationCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *InventoryOperationClient) MapCreateBulk(slice any, setFunc func(*InventoryOperationCreate, int)) *InventoryOperationCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &InventoryOperationCreateBulk{err: fmt.Errorf("calling to InventoryOperationClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*InventoryOperationCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &InventoryOperationCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for InventoryOperation.
+func (c *InventoryOperationClient) Update() *InventoryOperationUpdate {
+	mutation := newInventoryOperationMutation(c.config, OpUpdate)
+	return &InventoryOperationUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *InventoryOperationClient) UpdateOne(_m *InventoryOperation) *InventoryOperationUpdateOne {
+	mutation := newInventoryOperationMutation(c.config, OpUpdateOne, withInventoryOperation(_m))
+	return &InventoryOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *InventoryOperationClient) UpdateOneID(id int) *InventoryOperationUpdateOne {
+	mutation := newInventoryOperationMutation(c.config, OpUpdateOne, withInventoryOperationID(id))
+	return &InventoryOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for InventoryOperation.
+func (c *InventoryOperationClient) Delete() *InventoryOperationDelete {
+	mutation := newInventoryOperationMutation(c.config, OpDelete)
+	return &InventoryOperationDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *InventoryOperationClient) DeleteOne(_m *InventoryOperation) *InventoryOperationDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *InventoryOperationClient) DeleteOneID(id int) *InventoryOperationDeleteOne {
+	builder := c.Delete().Where(inventoryoperation.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &InventoryOperationDeleteOne{builder}
+}
+
+// Query returns a query builder for InventoryOperation.
+func (c *InventoryOperationClient) Query() *InventoryOperationQuery {
+	return &InventoryOperationQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeInventoryOperation},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a InventoryOperation entity by its id.
+func (c *InventoryOperationClient) Get(ctx context.Context, id int) (*InventoryOperation, error) {
+	return c.Query().Where(inventoryoperation.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *InventoryOperationClient) GetX(ctx context.Context, id int) *InventoryOperation {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryItems queries the items edge of a InventoryOperation.
+func (c *InventoryOperationClient) QueryItems(_m *InventoryOperation) *InventoryOperationItemQuery {
+	query := (&InventoryOperationItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventoryoperation.Table, inventoryoperation.FieldID, id),
+			sqlgraph.To(inventoryoperationitem.Table, inventoryoperationitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, inventoryoperation.ItemsTable, inventoryoperation.ItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *InventoryOperationClient) Hooks() []Hook {
+	hooks := c.hooks.InventoryOperation
+	return append(hooks[:len(hooks):len(hooks)], inventoryoperation.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *InventoryOperationClient) Interceptors() []Interceptor {
+	return c.inters.InventoryOperation
+}
+
+func (c *InventoryOperationClient) mutate(ctx context.Context, m *InventoryOperationMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&InventoryOperationCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&InventoryOperationUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&InventoryOperationUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&InventoryOperationDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown InventoryOperation mutation op: %q", m.Op())
+	}
+}
+
+// InventoryOperationItemClient is a client for the InventoryOperationItem schema.
+type InventoryOperationItemClient struct {
+	config
+}
+
+// NewInventoryOperationItemClient returns a client for the InventoryOperationItem from the given config.
+func NewInventoryOperationItemClient(c config) *InventoryOperationItemClient {
+	return &InventoryOperationItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `inventoryoperationitem.Hooks(f(g(h())))`.
+func (c *InventoryOperationItemClient) Use(hooks ...Hook) {
+	c.hooks.InventoryOperationItem = append(c.hooks.InventoryOperationItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `inventoryoperationitem.Intercept(f(g(h())))`.
+func (c *InventoryOperationItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.InventoryOperationItem = append(c.inters.InventoryOperationItem, interceptors...)
+}
+
+// Create returns a builder for creating a InventoryOperationItem entity.
+func (c *InventoryOperationItemClient) Create() *InventoryOperationItemCreate {
+	mutation := newInventoryOperationItemMutation(c.config, OpCreate)
+	return &InventoryOperationItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of InventoryOperationItem entities.
+func (c *InventoryOperationItemClient) CreateBulk(builders ...*InventoryOperationItemCreate) *InventoryOperationItemCreateBulk {
+	return &InventoryOperationItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *InventoryOperationItemClient) MapCreateBulk(slice any, setFunc func(*InventoryOperationItemCreate, int)) *InventoryOperationItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &InventoryOperationItemCreateBulk{err: fmt.Errorf("calling to InventoryOperationItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*InventoryOperationItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &InventoryOperationItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for InventoryOperationItem.
+func (c *InventoryOperationItemClient) Update() *InventoryOperationItemUpdate {
+	mutation := newInventoryOperationItemMutation(c.config, OpUpdate)
+	return &InventoryOperationItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *InventoryOperationItemClient) UpdateOne(_m *InventoryOperationItem) *InventoryOperationItemUpdateOne {
+	mutation := newInventoryOperationItemMutation(c.config, OpUpdateOne, withInventoryOperationItem(_m))
+	return &InventoryOperationItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *InventoryOperationItemClient) UpdateOneID(id int) *InventoryOperationItemUpdateOne {
+	mutation := newInventoryOperationItemMutation(c.config, OpUpdateOne, withInventoryOperationItemID(id))
+	return &InventoryOperationItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for InventoryOperationItem.
+func (c *InventoryOperationItemClient) Delete() *InventoryOperationItemDelete {
+	mutation := newInventoryOperationItemMutation(c.config, OpDelete)
+	return &InventoryOperationItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *InventoryOperationItemClient) DeleteOne(_m *InventoryOperationItem) *InventoryOperationItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *InventoryOperationItemClient) DeleteOneID(id int) *InventoryOperationItemDeleteOne {
+	builder := c.Delete().Where(inventoryoperationitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &InventoryOperationItemDeleteOne{builder}
+}
+
+// Query returns a query builder for InventoryOperationItem.
+func (c *InventoryOperationItemClient) Query() *InventoryOperationItemQuery {
+	return &InventoryOperationItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeInventoryOperationItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a InventoryOperationItem entity by its id.
+func (c *InventoryOperationItemClient) Get(ctx context.Context, id int) (*InventoryOperationItem, error) {
+	return c.Query().Where(inventoryoperationitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *InventoryOperationItemClient) GetX(ctx context.Context, id int) *InventoryOperationItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryOperation queries the operation edge of a InventoryOperationItem.
+func (c *InventoryOperationItemClient) QueryOperation(_m *InventoryOperationItem) *InventoryOperationQuery {
+	query := (&InventoryOperationClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(inventoryoperationitem.Table, inventoryoperationitem.FieldID, id),
+			sqlgraph.To(inventoryoperation.Table, inventoryoperation.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, inventoryoperationitem.OperationTable, inventoryoperationitem.OperationColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *InventoryOperationItemClient) Hooks() []Hook {
+	hooks := c.hooks.InventoryOperationItem
+	return append(hooks[:len(hooks):len(hooks)], inventoryoperationitem.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *InventoryOperationItemClient) Interceptors() []Interceptor {
+	return c.inters.InventoryOperationItem
+}
+
+func (c *InventoryOperationItemClient) mutate(ctx context.Context, m *InventoryOperationItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&InventoryOperationItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&InventoryOperationItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&InventoryOperationItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&InventoryOperationItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown InventoryOperationItem mutation op: %q", m.Op())
 	}
 }
 
@@ -4080,6 +4902,140 @@ func (c *OutsourcingOrderItemClient) mutate(ctx context.Context, m *OutsourcingO
 		return (&OutsourcingOrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown OutsourcingOrderItem mutation op: %q", m.Op())
+	}
+}
+
+// OutsourcingReturnDispositionClient is a client for the OutsourcingReturnDisposition schema.
+type OutsourcingReturnDispositionClient struct {
+	config
+}
+
+// NewOutsourcingReturnDispositionClient returns a client for the OutsourcingReturnDisposition from the given config.
+func NewOutsourcingReturnDispositionClient(c config) *OutsourcingReturnDispositionClient {
+	return &OutsourcingReturnDispositionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `outsourcingreturndisposition.Hooks(f(g(h())))`.
+func (c *OutsourcingReturnDispositionClient) Use(hooks ...Hook) {
+	c.hooks.OutsourcingReturnDisposition = append(c.hooks.OutsourcingReturnDisposition, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `outsourcingreturndisposition.Intercept(f(g(h())))`.
+func (c *OutsourcingReturnDispositionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.OutsourcingReturnDisposition = append(c.inters.OutsourcingReturnDisposition, interceptors...)
+}
+
+// Create returns a builder for creating a OutsourcingReturnDisposition entity.
+func (c *OutsourcingReturnDispositionClient) Create() *OutsourcingReturnDispositionCreate {
+	mutation := newOutsourcingReturnDispositionMutation(c.config, OpCreate)
+	return &OutsourcingReturnDispositionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of OutsourcingReturnDisposition entities.
+func (c *OutsourcingReturnDispositionClient) CreateBulk(builders ...*OutsourcingReturnDispositionCreate) *OutsourcingReturnDispositionCreateBulk {
+	return &OutsourcingReturnDispositionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *OutsourcingReturnDispositionClient) MapCreateBulk(slice any, setFunc func(*OutsourcingReturnDispositionCreate, int)) *OutsourcingReturnDispositionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &OutsourcingReturnDispositionCreateBulk{err: fmt.Errorf("calling to OutsourcingReturnDispositionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*OutsourcingReturnDispositionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &OutsourcingReturnDispositionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for OutsourcingReturnDisposition.
+func (c *OutsourcingReturnDispositionClient) Update() *OutsourcingReturnDispositionUpdate {
+	mutation := newOutsourcingReturnDispositionMutation(c.config, OpUpdate)
+	return &OutsourcingReturnDispositionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *OutsourcingReturnDispositionClient) UpdateOne(_m *OutsourcingReturnDisposition) *OutsourcingReturnDispositionUpdateOne {
+	mutation := newOutsourcingReturnDispositionMutation(c.config, OpUpdateOne, withOutsourcingReturnDisposition(_m))
+	return &OutsourcingReturnDispositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *OutsourcingReturnDispositionClient) UpdateOneID(id int) *OutsourcingReturnDispositionUpdateOne {
+	mutation := newOutsourcingReturnDispositionMutation(c.config, OpUpdateOne, withOutsourcingReturnDispositionID(id))
+	return &OutsourcingReturnDispositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for OutsourcingReturnDisposition.
+func (c *OutsourcingReturnDispositionClient) Delete() *OutsourcingReturnDispositionDelete {
+	mutation := newOutsourcingReturnDispositionMutation(c.config, OpDelete)
+	return &OutsourcingReturnDispositionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *OutsourcingReturnDispositionClient) DeleteOne(_m *OutsourcingReturnDisposition) *OutsourcingReturnDispositionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *OutsourcingReturnDispositionClient) DeleteOneID(id int) *OutsourcingReturnDispositionDeleteOne {
+	builder := c.Delete().Where(outsourcingreturndisposition.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &OutsourcingReturnDispositionDeleteOne{builder}
+}
+
+// Query returns a query builder for OutsourcingReturnDisposition.
+func (c *OutsourcingReturnDispositionClient) Query() *OutsourcingReturnDispositionQuery {
+	return &OutsourcingReturnDispositionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeOutsourcingReturnDisposition},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a OutsourcingReturnDisposition entity by its id.
+func (c *OutsourcingReturnDispositionClient) Get(ctx context.Context, id int) (*OutsourcingReturnDisposition, error) {
+	return c.Query().Where(outsourcingreturndisposition.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *OutsourcingReturnDispositionClient) GetX(ctx context.Context, id int) *OutsourcingReturnDisposition {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *OutsourcingReturnDispositionClient) Hooks() []Hook {
+	hooks := c.hooks.OutsourcingReturnDisposition
+	return append(hooks[:len(hooks):len(hooks)], outsourcingreturndisposition.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *OutsourcingReturnDispositionClient) Interceptors() []Interceptor {
+	return c.inters.OutsourcingReturnDisposition
+}
+
+func (c *OutsourcingReturnDispositionClient) mutate(ctx context.Context, m *OutsourcingReturnDispositionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&OutsourcingReturnDispositionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&OutsourcingReturnDispositionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&OutsourcingReturnDispositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&OutsourcingReturnDispositionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown OutsourcingReturnDisposition mutation op: %q", m.Op())
 	}
 }
 
@@ -5230,6 +6186,140 @@ func (c *ProductSKUClient) mutate(ctx context.Context, m *ProductSKUMutation) (V
 		return (&ProductSKUDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown ProductSKU mutation op: %q", m.Op())
+	}
+}
+
+// ProductionExceptionDecisionClient is a client for the ProductionExceptionDecision schema.
+type ProductionExceptionDecisionClient struct {
+	config
+}
+
+// NewProductionExceptionDecisionClient returns a client for the ProductionExceptionDecision from the given config.
+func NewProductionExceptionDecisionClient(c config) *ProductionExceptionDecisionClient {
+	return &ProductionExceptionDecisionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `productionexceptiondecision.Hooks(f(g(h())))`.
+func (c *ProductionExceptionDecisionClient) Use(hooks ...Hook) {
+	c.hooks.ProductionExceptionDecision = append(c.hooks.ProductionExceptionDecision, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `productionexceptiondecision.Intercept(f(g(h())))`.
+func (c *ProductionExceptionDecisionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.ProductionExceptionDecision = append(c.inters.ProductionExceptionDecision, interceptors...)
+}
+
+// Create returns a builder for creating a ProductionExceptionDecision entity.
+func (c *ProductionExceptionDecisionClient) Create() *ProductionExceptionDecisionCreate {
+	mutation := newProductionExceptionDecisionMutation(c.config, OpCreate)
+	return &ProductionExceptionDecisionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of ProductionExceptionDecision entities.
+func (c *ProductionExceptionDecisionClient) CreateBulk(builders ...*ProductionExceptionDecisionCreate) *ProductionExceptionDecisionCreateBulk {
+	return &ProductionExceptionDecisionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *ProductionExceptionDecisionClient) MapCreateBulk(slice any, setFunc func(*ProductionExceptionDecisionCreate, int)) *ProductionExceptionDecisionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &ProductionExceptionDecisionCreateBulk{err: fmt.Errorf("calling to ProductionExceptionDecisionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*ProductionExceptionDecisionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &ProductionExceptionDecisionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for ProductionExceptionDecision.
+func (c *ProductionExceptionDecisionClient) Update() *ProductionExceptionDecisionUpdate {
+	mutation := newProductionExceptionDecisionMutation(c.config, OpUpdate)
+	return &ProductionExceptionDecisionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *ProductionExceptionDecisionClient) UpdateOne(_m *ProductionExceptionDecision) *ProductionExceptionDecisionUpdateOne {
+	mutation := newProductionExceptionDecisionMutation(c.config, OpUpdateOne, withProductionExceptionDecision(_m))
+	return &ProductionExceptionDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *ProductionExceptionDecisionClient) UpdateOneID(id int) *ProductionExceptionDecisionUpdateOne {
+	mutation := newProductionExceptionDecisionMutation(c.config, OpUpdateOne, withProductionExceptionDecisionID(id))
+	return &ProductionExceptionDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for ProductionExceptionDecision.
+func (c *ProductionExceptionDecisionClient) Delete() *ProductionExceptionDecisionDelete {
+	mutation := newProductionExceptionDecisionMutation(c.config, OpDelete)
+	return &ProductionExceptionDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *ProductionExceptionDecisionClient) DeleteOne(_m *ProductionExceptionDecision) *ProductionExceptionDecisionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *ProductionExceptionDecisionClient) DeleteOneID(id int) *ProductionExceptionDecisionDeleteOne {
+	builder := c.Delete().Where(productionexceptiondecision.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &ProductionExceptionDecisionDeleteOne{builder}
+}
+
+// Query returns a query builder for ProductionExceptionDecision.
+func (c *ProductionExceptionDecisionClient) Query() *ProductionExceptionDecisionQuery {
+	return &ProductionExceptionDecisionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeProductionExceptionDecision},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a ProductionExceptionDecision entity by its id.
+func (c *ProductionExceptionDecisionClient) Get(ctx context.Context, id int) (*ProductionExceptionDecision, error) {
+	return c.Query().Where(productionexceptiondecision.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *ProductionExceptionDecisionClient) GetX(ctx context.Context, id int) *ProductionExceptionDecision {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *ProductionExceptionDecisionClient) Hooks() []Hook {
+	hooks := c.hooks.ProductionExceptionDecision
+	return append(hooks[:len(hooks):len(hooks)], productionexceptiondecision.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *ProductionExceptionDecisionClient) Interceptors() []Interceptor {
+	return c.inters.ProductionExceptionDecision
+}
+
+func (c *ProductionExceptionDecisionClient) mutate(ctx context.Context, m *ProductionExceptionDecisionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&ProductionExceptionDecisionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&ProductionExceptionDecisionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&ProductionExceptionDecisionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&ProductionExceptionDecisionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown ProductionExceptionDecision mutation op: %q", m.Op())
 	}
 }
 
@@ -8718,6 +9808,140 @@ func (c *PurchaseReceiptItemClient) mutate(ctx context.Context, m *PurchaseRecei
 	}
 }
 
+// PurchaseRejectionDispositionClient is a client for the PurchaseRejectionDisposition schema.
+type PurchaseRejectionDispositionClient struct {
+	config
+}
+
+// NewPurchaseRejectionDispositionClient returns a client for the PurchaseRejectionDisposition from the given config.
+func NewPurchaseRejectionDispositionClient(c config) *PurchaseRejectionDispositionClient {
+	return &PurchaseRejectionDispositionClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `purchaserejectiondisposition.Hooks(f(g(h())))`.
+func (c *PurchaseRejectionDispositionClient) Use(hooks ...Hook) {
+	c.hooks.PurchaseRejectionDisposition = append(c.hooks.PurchaseRejectionDisposition, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `purchaserejectiondisposition.Intercept(f(g(h())))`.
+func (c *PurchaseRejectionDispositionClient) Intercept(interceptors ...Interceptor) {
+	c.inters.PurchaseRejectionDisposition = append(c.inters.PurchaseRejectionDisposition, interceptors...)
+}
+
+// Create returns a builder for creating a PurchaseRejectionDisposition entity.
+func (c *PurchaseRejectionDispositionClient) Create() *PurchaseRejectionDispositionCreate {
+	mutation := newPurchaseRejectionDispositionMutation(c.config, OpCreate)
+	return &PurchaseRejectionDispositionCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of PurchaseRejectionDisposition entities.
+func (c *PurchaseRejectionDispositionClient) CreateBulk(builders ...*PurchaseRejectionDispositionCreate) *PurchaseRejectionDispositionCreateBulk {
+	return &PurchaseRejectionDispositionCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *PurchaseRejectionDispositionClient) MapCreateBulk(slice any, setFunc func(*PurchaseRejectionDispositionCreate, int)) *PurchaseRejectionDispositionCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &PurchaseRejectionDispositionCreateBulk{err: fmt.Errorf("calling to PurchaseRejectionDispositionClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*PurchaseRejectionDispositionCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &PurchaseRejectionDispositionCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for PurchaseRejectionDisposition.
+func (c *PurchaseRejectionDispositionClient) Update() *PurchaseRejectionDispositionUpdate {
+	mutation := newPurchaseRejectionDispositionMutation(c.config, OpUpdate)
+	return &PurchaseRejectionDispositionUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *PurchaseRejectionDispositionClient) UpdateOne(_m *PurchaseRejectionDisposition) *PurchaseRejectionDispositionUpdateOne {
+	mutation := newPurchaseRejectionDispositionMutation(c.config, OpUpdateOne, withPurchaseRejectionDisposition(_m))
+	return &PurchaseRejectionDispositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *PurchaseRejectionDispositionClient) UpdateOneID(id int) *PurchaseRejectionDispositionUpdateOne {
+	mutation := newPurchaseRejectionDispositionMutation(c.config, OpUpdateOne, withPurchaseRejectionDispositionID(id))
+	return &PurchaseRejectionDispositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for PurchaseRejectionDisposition.
+func (c *PurchaseRejectionDispositionClient) Delete() *PurchaseRejectionDispositionDelete {
+	mutation := newPurchaseRejectionDispositionMutation(c.config, OpDelete)
+	return &PurchaseRejectionDispositionDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *PurchaseRejectionDispositionClient) DeleteOne(_m *PurchaseRejectionDisposition) *PurchaseRejectionDispositionDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *PurchaseRejectionDispositionClient) DeleteOneID(id int) *PurchaseRejectionDispositionDeleteOne {
+	builder := c.Delete().Where(purchaserejectiondisposition.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &PurchaseRejectionDispositionDeleteOne{builder}
+}
+
+// Query returns a query builder for PurchaseRejectionDisposition.
+func (c *PurchaseRejectionDispositionClient) Query() *PurchaseRejectionDispositionQuery {
+	return &PurchaseRejectionDispositionQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypePurchaseRejectionDisposition},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a PurchaseRejectionDisposition entity by its id.
+func (c *PurchaseRejectionDispositionClient) Get(ctx context.Context, id int) (*PurchaseRejectionDisposition, error) {
+	return c.Query().Where(purchaserejectiondisposition.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *PurchaseRejectionDispositionClient) GetX(ctx context.Context, id int) *PurchaseRejectionDisposition {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// Hooks returns the client hooks.
+func (c *PurchaseRejectionDispositionClient) Hooks() []Hook {
+	hooks := c.hooks.PurchaseRejectionDisposition
+	return append(hooks[:len(hooks):len(hooks)], purchaserejectiondisposition.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *PurchaseRejectionDispositionClient) Interceptors() []Interceptor {
+	return c.inters.PurchaseRejectionDisposition
+}
+
+func (c *PurchaseRejectionDispositionClient) mutate(ctx context.Context, m *PurchaseRejectionDispositionMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&PurchaseRejectionDispositionCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&PurchaseRejectionDispositionUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&PurchaseRejectionDispositionUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&PurchaseRejectionDispositionDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown PurchaseRejectionDisposition mutation op: %q", m.Op())
+	}
+}
+
 // PurchaseReturnClient is a client for the PurchaseReturn schema.
 type PurchaseReturnClient struct {
 	config
@@ -10631,6 +11855,306 @@ func (c *SalesOrderItemClient) mutate(ctx context.Context, m *SalesOrderItemMuta
 		return (&SalesOrderItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
 	default:
 		return nil, fmt.Errorf("ent: unknown SalesOrderItem mutation op: %q", m.Op())
+	}
+}
+
+// SalesReturnClient is a client for the SalesReturn schema.
+type SalesReturnClient struct {
+	config
+}
+
+// NewSalesReturnClient returns a client for the SalesReturn from the given config.
+func NewSalesReturnClient(c config) *SalesReturnClient {
+	return &SalesReturnClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `salesreturn.Hooks(f(g(h())))`.
+func (c *SalesReturnClient) Use(hooks ...Hook) {
+	c.hooks.SalesReturn = append(c.hooks.SalesReturn, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `salesreturn.Intercept(f(g(h())))`.
+func (c *SalesReturnClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SalesReturn = append(c.inters.SalesReturn, interceptors...)
+}
+
+// Create returns a builder for creating a SalesReturn entity.
+func (c *SalesReturnClient) Create() *SalesReturnCreate {
+	mutation := newSalesReturnMutation(c.config, OpCreate)
+	return &SalesReturnCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SalesReturn entities.
+func (c *SalesReturnClient) CreateBulk(builders ...*SalesReturnCreate) *SalesReturnCreateBulk {
+	return &SalesReturnCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SalesReturnClient) MapCreateBulk(slice any, setFunc func(*SalesReturnCreate, int)) *SalesReturnCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SalesReturnCreateBulk{err: fmt.Errorf("calling to SalesReturnClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SalesReturnCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SalesReturnCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SalesReturn.
+func (c *SalesReturnClient) Update() *SalesReturnUpdate {
+	mutation := newSalesReturnMutation(c.config, OpUpdate)
+	return &SalesReturnUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SalesReturnClient) UpdateOne(_m *SalesReturn) *SalesReturnUpdateOne {
+	mutation := newSalesReturnMutation(c.config, OpUpdateOne, withSalesReturn(_m))
+	return &SalesReturnUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SalesReturnClient) UpdateOneID(id int) *SalesReturnUpdateOne {
+	mutation := newSalesReturnMutation(c.config, OpUpdateOne, withSalesReturnID(id))
+	return &SalesReturnUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SalesReturn.
+func (c *SalesReturnClient) Delete() *SalesReturnDelete {
+	mutation := newSalesReturnMutation(c.config, OpDelete)
+	return &SalesReturnDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SalesReturnClient) DeleteOne(_m *SalesReturn) *SalesReturnDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SalesReturnClient) DeleteOneID(id int) *SalesReturnDeleteOne {
+	builder := c.Delete().Where(salesreturn.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SalesReturnDeleteOne{builder}
+}
+
+// Query returns a query builder for SalesReturn.
+func (c *SalesReturnClient) Query() *SalesReturnQuery {
+	return &SalesReturnQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSalesReturn},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SalesReturn entity by its id.
+func (c *SalesReturnClient) Get(ctx context.Context, id int) (*SalesReturn, error) {
+	return c.Query().Where(salesreturn.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SalesReturnClient) GetX(ctx context.Context, id int) *SalesReturn {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QueryItems queries the items edge of a SalesReturn.
+func (c *SalesReturnClient) QueryItems(_m *SalesReturn) *SalesReturnItemQuery {
+	query := (&SalesReturnItemClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesreturn.Table, salesreturn.FieldID, id),
+			sqlgraph.To(salesreturnitem.Table, salesreturnitem.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, salesreturn.ItemsTable, salesreturn.ItemsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *SalesReturnClient) Hooks() []Hook {
+	hooks := c.hooks.SalesReturn
+	return append(hooks[:len(hooks):len(hooks)], salesreturn.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *SalesReturnClient) Interceptors() []Interceptor {
+	return c.inters.SalesReturn
+}
+
+func (c *SalesReturnClient) mutate(ctx context.Context, m *SalesReturnMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SalesReturnCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SalesReturnUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SalesReturnUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SalesReturnDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SalesReturn mutation op: %q", m.Op())
+	}
+}
+
+// SalesReturnItemClient is a client for the SalesReturnItem schema.
+type SalesReturnItemClient struct {
+	config
+}
+
+// NewSalesReturnItemClient returns a client for the SalesReturnItem from the given config.
+func NewSalesReturnItemClient(c config) *SalesReturnItemClient {
+	return &SalesReturnItemClient{config: c}
+}
+
+// Use adds a list of mutation hooks to the hooks stack.
+// A call to `Use(f, g, h)` equals to `salesreturnitem.Hooks(f(g(h())))`.
+func (c *SalesReturnItemClient) Use(hooks ...Hook) {
+	c.hooks.SalesReturnItem = append(c.hooks.SalesReturnItem, hooks...)
+}
+
+// Intercept adds a list of query interceptors to the interceptors stack.
+// A call to `Intercept(f, g, h)` equals to `salesreturnitem.Intercept(f(g(h())))`.
+func (c *SalesReturnItemClient) Intercept(interceptors ...Interceptor) {
+	c.inters.SalesReturnItem = append(c.inters.SalesReturnItem, interceptors...)
+}
+
+// Create returns a builder for creating a SalesReturnItem entity.
+func (c *SalesReturnItemClient) Create() *SalesReturnItemCreate {
+	mutation := newSalesReturnItemMutation(c.config, OpCreate)
+	return &SalesReturnItemCreate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// CreateBulk returns a builder for creating a bulk of SalesReturnItem entities.
+func (c *SalesReturnItemClient) CreateBulk(builders ...*SalesReturnItemCreate) *SalesReturnItemCreateBulk {
+	return &SalesReturnItemCreateBulk{config: c.config, builders: builders}
+}
+
+// MapCreateBulk creates a bulk creation builder from the given slice. For each item in the slice, the function creates
+// a builder and applies setFunc on it.
+func (c *SalesReturnItemClient) MapCreateBulk(slice any, setFunc func(*SalesReturnItemCreate, int)) *SalesReturnItemCreateBulk {
+	rv := reflect.ValueOf(slice)
+	if rv.Kind() != reflect.Slice {
+		return &SalesReturnItemCreateBulk{err: fmt.Errorf("calling to SalesReturnItemClient.MapCreateBulk with wrong type %T, need slice", slice)}
+	}
+	builders := make([]*SalesReturnItemCreate, rv.Len())
+	for i := 0; i < rv.Len(); i++ {
+		builders[i] = c.Create()
+		setFunc(builders[i], i)
+	}
+	return &SalesReturnItemCreateBulk{config: c.config, builders: builders}
+}
+
+// Update returns an update builder for SalesReturnItem.
+func (c *SalesReturnItemClient) Update() *SalesReturnItemUpdate {
+	mutation := newSalesReturnItemMutation(c.config, OpUpdate)
+	return &SalesReturnItemUpdate{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOne returns an update builder for the given entity.
+func (c *SalesReturnItemClient) UpdateOne(_m *SalesReturnItem) *SalesReturnItemUpdateOne {
+	mutation := newSalesReturnItemMutation(c.config, OpUpdateOne, withSalesReturnItem(_m))
+	return &SalesReturnItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// UpdateOneID returns an update builder for the given id.
+func (c *SalesReturnItemClient) UpdateOneID(id int) *SalesReturnItemUpdateOne {
+	mutation := newSalesReturnItemMutation(c.config, OpUpdateOne, withSalesReturnItemID(id))
+	return &SalesReturnItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// Delete returns a delete builder for SalesReturnItem.
+func (c *SalesReturnItemClient) Delete() *SalesReturnItemDelete {
+	mutation := newSalesReturnItemMutation(c.config, OpDelete)
+	return &SalesReturnItemDelete{config: c.config, hooks: c.Hooks(), mutation: mutation}
+}
+
+// DeleteOne returns a builder for deleting the given entity.
+func (c *SalesReturnItemClient) DeleteOne(_m *SalesReturnItem) *SalesReturnItemDeleteOne {
+	return c.DeleteOneID(_m.ID)
+}
+
+// DeleteOneID returns a builder for deleting the given entity by its id.
+func (c *SalesReturnItemClient) DeleteOneID(id int) *SalesReturnItemDeleteOne {
+	builder := c.Delete().Where(salesreturnitem.ID(id))
+	builder.mutation.id = &id
+	builder.mutation.op = OpDeleteOne
+	return &SalesReturnItemDeleteOne{builder}
+}
+
+// Query returns a query builder for SalesReturnItem.
+func (c *SalesReturnItemClient) Query() *SalesReturnItemQuery {
+	return &SalesReturnItemQuery{
+		config: c.config,
+		ctx:    &QueryContext{Type: TypeSalesReturnItem},
+		inters: c.Interceptors(),
+	}
+}
+
+// Get returns a SalesReturnItem entity by its id.
+func (c *SalesReturnItemClient) Get(ctx context.Context, id int) (*SalesReturnItem, error) {
+	return c.Query().Where(salesreturnitem.ID(id)).Only(ctx)
+}
+
+// GetX is like Get, but panics if an error occurs.
+func (c *SalesReturnItemClient) GetX(ctx context.Context, id int) *SalesReturnItem {
+	obj, err := c.Get(ctx, id)
+	if err != nil {
+		panic(err)
+	}
+	return obj
+}
+
+// QuerySalesReturn queries the sales_return edge of a SalesReturnItem.
+func (c *SalesReturnItemClient) QuerySalesReturn(_m *SalesReturnItem) *SalesReturnQuery {
+	query := (&SalesReturnClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(salesreturnitem.Table, salesreturnitem.FieldID, id),
+			sqlgraph.To(salesreturn.Table, salesreturn.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, salesreturnitem.SalesReturnTable, salesreturnitem.SalesReturnColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
+// Hooks returns the client hooks.
+func (c *SalesReturnItemClient) Hooks() []Hook {
+	hooks := c.hooks.SalesReturnItem
+	return append(hooks[:len(hooks):len(hooks)], salesreturnitem.Hooks[:]...)
+}
+
+// Interceptors returns the client interceptors.
+func (c *SalesReturnItemClient) Interceptors() []Interceptor {
+	return c.inters.SalesReturnItem
+}
+
+func (c *SalesReturnItemClient) mutate(ctx context.Context, m *SalesReturnItemMutation) (Value, error) {
+	switch m.Op() {
+	case OpCreate:
+		return (&SalesReturnItemCreate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdate:
+		return (&SalesReturnItemUpdate{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpUpdateOne:
+		return (&SalesReturnItemUpdateOne{config: c.config, hooks: c.Hooks(), mutation: m}).Save(ctx)
+	case OpDelete, OpDeleteOne:
+		return (&SalesReturnItemDelete{config: c.config, hooks: c.Hooks(), mutation: m}).Exec(ctx)
+	default:
+		return nil, fmt.Errorf("ent: unknown SalesReturnItem mutation op: %q", m.Op())
 	}
 }
 
@@ -12921,37 +14445,43 @@ type (
 	hooks struct {
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
-		DeploymentModuleState, FinanceFact, InventoryBalance, InventoryLot,
-		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
-		OutsourcingOrderItem, Permission, Process, ProcessInstance,
-		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
+		DeploymentModuleState, FinanceAllocation, FinanceCreditNote, FinanceFact,
+		FinancePayment, InventoryBalance, InventoryLot, InventoryOperation,
+		InventoryOperationItem, InventoryTxn, Material, OutsourcingFact,
+		OutsourcingOrder, OutsourcingOrderItem, OutsourcingReturnDisposition,
+		Permission, Process, ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
+		ProductionExceptionDecision, ProductionFact, ProductionOrder,
 		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
 		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
 		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
-		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
-		Shipment, ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
-		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
+		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, SalesReturn,
+		SalesReturnItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
+		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Hook
 	}
 	inters struct {
 		AccessEntitlement, AdminSession, AdminUser, AdminUserRole, BOMHeader, BOMItem,
 		BusinessAttachment, Contact, Customer, CustomerConfigRevision,
-		DeploymentModuleState, FinanceFact, InventoryBalance, InventoryLot,
-		InventoryTxn, Material, OutsourcingFact, OutsourcingOrder,
-		OutsourcingOrderItem, Permission, Process, ProcessInstance,
-		ProcessNodeInstance, Product, ProductSKU, ProductionFact, ProductionOrder,
+		DeploymentModuleState, FinanceAllocation, FinanceCreditNote, FinanceFact,
+		FinancePayment, InventoryBalance, InventoryLot, InventoryOperation,
+		InventoryOperationItem, InventoryTxn, Material, OutsourcingFact,
+		OutsourcingOrder, OutsourcingOrderItem, OutsourcingReturnDisposition,
+		Permission, Process, ProcessInstance, ProcessNodeInstance, Product, ProductSKU,
+		ProductionExceptionDecision, ProductionFact, ProductionOrder,
 		ProductionOrderEvent, ProductionOrderItem, ProductionOrderMaterialRequirement,
 		ProductionOrderOperation, ProductionPackagingConfirmation, ProductionWIPBatch,
 		ProductionWIPEvent, ProductionWIPOutsourcingAllocation, PurchaseOrder,
 		PurchaseOrderItem, PurchaseReceipt, PurchaseReceiptAdjustment,
-		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem, PurchaseReturn,
-		PurchaseReturnItem, QualityInspection, Role, RoleDataScope, RolePermission,
-		RoleProfile, RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem,
-		Shipment, ShipmentItem, StockReservation, Supplier, Unit, Warehouse, WorkPool,
-		WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
+		PurchaseReceiptAdjustmentItem, PurchaseReceiptItem,
+		PurchaseRejectionDisposition, PurchaseReturn, PurchaseReturnItem,
+		QualityInspection, Role, RoleDataScope, RolePermission, RoleProfile,
+		RuntimeAuditEvent, RuntimeMarker, SalesOrder, SalesOrderItem, SalesReturn,
+		SalesReturnItem, Shipment, ShipmentItem, StockReservation, Supplier, Unit,
+		Warehouse, WorkPool, WorkPoolMembership, WorkflowBusinessState, WorkflowTask,
 		WorkflowTaskEvent []ent.Interceptor
 	}
 )

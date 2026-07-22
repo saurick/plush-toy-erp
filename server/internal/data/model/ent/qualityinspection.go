@@ -60,6 +60,14 @@ type QualityInspection struct {
 	InspectedAt *time.Time `json:"inspected_at,omitempty"`
 	// InspectorID holds the value of the "inspector_id" field.
 	InspectorID *int `json:"inspector_id,omitempty"`
+	// CorrectionOfInspectionID holds the value of the "correction_of_inspection_id" field.
+	CorrectionOfInspectionID *int `json:"correction_of_inspection_id,omitempty"`
+	// SupersededAt holds the value of the "superseded_at" field.
+	SupersededAt *time.Time `json:"superseded_at,omitempty"`
+	// SupersededBy holds the value of the "superseded_by" field.
+	SupersededBy *int `json:"superseded_by,omitempty"`
+	// SupersededReason holds the value of the "superseded_reason" field.
+	SupersededReason *string `json:"superseded_reason,omitempty"`
 	// DefectRateOperator holds the value of the "defect_rate_operator" field.
 	DefectRateOperator *string `json:"defect_rate_operator,omitempty"`
 	// DefectRatePercent holds the value of the "defect_rate_percent" field.
@@ -179,11 +187,11 @@ func (*QualityInspection) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case qualityinspection.FieldDefectRatePercent:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
-		case qualityinspection.FieldID, qualityinspection.FieldPurchaseReceiptID, qualityinspection.FieldPurchaseReceiptItemID, qualityinspection.FieldInventoryLotID, qualityinspection.FieldProductionWipBatchID, qualityinspection.FieldMaterialID, qualityinspection.FieldWarehouseID, qualityinspection.FieldSourceID, qualityinspection.FieldSubjectID, qualityinspection.FieldInspectorID:
+		case qualityinspection.FieldID, qualityinspection.FieldPurchaseReceiptID, qualityinspection.FieldPurchaseReceiptItemID, qualityinspection.FieldInventoryLotID, qualityinspection.FieldProductionWipBatchID, qualityinspection.FieldMaterialID, qualityinspection.FieldWarehouseID, qualityinspection.FieldSourceID, qualityinspection.FieldSubjectID, qualityinspection.FieldInspectorID, qualityinspection.FieldCorrectionOfInspectionID, qualityinspection.FieldSupersededBy:
 			values[i] = new(sql.NullInt64)
-		case qualityinspection.FieldInspectionNo, qualityinspection.FieldGateCode, qualityinspection.FieldSourceType, qualityinspection.FieldInspectionType, qualityinspection.FieldSubjectType, qualityinspection.FieldStatus, qualityinspection.FieldResult, qualityinspection.FieldOriginalLotStatus, qualityinspection.FieldDefectRateOperator, qualityinspection.FieldDecisionNote:
+		case qualityinspection.FieldInspectionNo, qualityinspection.FieldGateCode, qualityinspection.FieldSourceType, qualityinspection.FieldInspectionType, qualityinspection.FieldSubjectType, qualityinspection.FieldStatus, qualityinspection.FieldResult, qualityinspection.FieldOriginalLotStatus, qualityinspection.FieldSupersededReason, qualityinspection.FieldDefectRateOperator, qualityinspection.FieldDecisionNote:
 			values[i] = new(sql.NullString)
-		case qualityinspection.FieldInspectedAt, qualityinspection.FieldCreatedAt, qualityinspection.FieldUpdatedAt:
+		case qualityinspection.FieldInspectedAt, qualityinspection.FieldSupersededAt, qualityinspection.FieldCreatedAt, qualityinspection.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -328,6 +336,34 @@ func (_m *QualityInspection) assignValues(columns []string, values []any) error 
 			} else if value.Valid {
 				_m.InspectorID = new(int)
 				*_m.InspectorID = int(value.Int64)
+			}
+		case qualityinspection.FieldCorrectionOfInspectionID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field correction_of_inspection_id", values[i])
+			} else if value.Valid {
+				_m.CorrectionOfInspectionID = new(int)
+				*_m.CorrectionOfInspectionID = int(value.Int64)
+			}
+		case qualityinspection.FieldSupersededAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field superseded_at", values[i])
+			} else if value.Valid {
+				_m.SupersededAt = new(time.Time)
+				*_m.SupersededAt = value.Time
+			}
+		case qualityinspection.FieldSupersededBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field superseded_by", values[i])
+			} else if value.Valid {
+				_m.SupersededBy = new(int)
+				*_m.SupersededBy = int(value.Int64)
+			}
+		case qualityinspection.FieldSupersededReason:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field superseded_reason", values[i])
+			} else if value.Valid {
+				_m.SupersededReason = new(string)
+				*_m.SupersededReason = value.String
 			}
 		case qualityinspection.FieldDefectRateOperator:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -515,6 +551,26 @@ func (_m *QualityInspection) String() string {
 	if v := _m.InspectorID; v != nil {
 		builder.WriteString("inspector_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.CorrectionOfInspectionID; v != nil {
+		builder.WriteString("correction_of_inspection_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.SupersededAt; v != nil {
+		builder.WriteString("superseded_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.SupersededBy; v != nil {
+		builder.WriteString("superseded_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.SupersededReason; v != nil {
+		builder.WriteString("superseded_reason=")
+		builder.WriteString(*v)
 	}
 	builder.WriteString(", ")
 	if v := _m.DefectRateOperator; v != nil {

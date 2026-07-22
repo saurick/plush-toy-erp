@@ -72,6 +72,10 @@ const (
 	FieldVersion = "version"
 	// FieldCreatedBy holds the string denoting the created_by field in the database.
 	FieldCreatedBy = "created_by"
+	// FieldCreateIdempotencyKey holds the string denoting the create_idempotency_key field in the database.
+	FieldCreateIdempotencyKey = "create_idempotency_key"
+	// FieldCreateIntentHash holds the string denoting the create_intent_hash field in the database.
+	FieldCreateIntentHash = "create_intent_hash"
 	// FieldUpdatedBy holds the string denoting the updated_by field in the database.
 	FieldUpdatedBy = "updated_by"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -141,6 +145,8 @@ var Columns = []string{
 	FieldPayload,
 	FieldVersion,
 	FieldCreatedBy,
+	FieldCreateIdempotencyKey,
+	FieldCreateIntentHash,
 	FieldUpdatedBy,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -209,6 +215,10 @@ var (
 	VersionValidator func(int) error
 	// CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	CreatedByValidator func(int) error
+	// CreateIdempotencyKeyValidator is a validator for the "create_idempotency_key" field. It is called by the builders before save.
+	CreateIdempotencyKeyValidator func(string) error
+	// CreateIntentHashValidator is a validator for the "create_intent_hash" field. It is called by the builders before save.
+	CreateIntentHashValidator func(string) error
 	// UpdatedByValidator is a validator for the "updated_by" field. It is called by the builders before save.
 	UpdatedByValidator func(int) error
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
@@ -365,6 +375,16 @@ func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 // ByCreatedBy orders the results by the created_by field.
 func ByCreatedBy(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedBy, opts...).ToFunc()
+}
+
+// ByCreateIdempotencyKey orders the results by the create_idempotency_key field.
+func ByCreateIdempotencyKey(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCreateIdempotencyKey, opts...).ToFunc()
+}
+
+// ByCreateIntentHash orders the results by the create_intent_hash field.
+func ByCreateIntentHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCreateIntentHash, opts...).ToFunc()
 }
 
 // ByUpdatedBy orders the results by the updated_by field.

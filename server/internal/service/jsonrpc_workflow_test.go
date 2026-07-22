@@ -21,6 +21,7 @@ import (
 type stubWorkflowJSONRPCRepo struct {
 	createInput        *biz.WorkflowTaskCreate
 	createActorID      int
+	createTask         func(*biz.WorkflowTaskCreate, int) (*biz.WorkflowTask, error)
 	urgeInput          *biz.WorkflowTaskUrge
 	urgeActorID        int
 	urgeActorRoleKey   string
@@ -122,6 +123,9 @@ func (s *stubWorkflowJSONRPCRepo) ListWorkflowTasks(_ context.Context, filter bi
 func (s *stubWorkflowJSONRPCRepo) CreateWorkflowTask(_ context.Context, in *biz.WorkflowTaskCreate, actorID int) (*biz.WorkflowTask, error) {
 	s.createInput = in
 	s.createActorID = actorID
+	if s.createTask != nil {
+		return s.createTask(in, actorID)
+	}
 	return &biz.WorkflowTask{ID: 1, TaskStatusKey: in.TaskStatusKey, Payload: in.Payload}, nil
 }
 
@@ -330,6 +334,7 @@ func TestJsonrpcDispatcher_WorkflowWriteAPIRequiresEnabledModule(t *testing.T) {
 	}
 	ctx := workflowJSONRPCAdminContext()
 	createParams := mustJSONRPCStruct(t, map[string]any{
+		"idempotency_key": "workflow-module-create-001",
 		"task_code":       "WF-MODULE-001",
 		"task_group":      "generic",
 		"task_name":       "模块门禁测试任务",
@@ -465,6 +470,7 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 	}
 	ctx := workflowJSONRPCAdminContext()
 	baseParams := map[string]any{
+		"idempotency_key": "workflow-public-create-001",
 		"task_code":       "WF-PUBLIC-CREATE-001",
 		"task_group":      "generic",
 		"task_name":       "普通协同任务",
@@ -511,7 +517,6 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 	}
 
 	for _, key := range []string{
-		"idempotency_key",
 		"expected_version",
 		"command_key",
 		"intent_hash",
@@ -539,6 +544,18 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 		})
 	}
 
+	missingKeyParams := make(map[string]any, len(baseParams)-1)
+	for key, value := range baseParams {
+		if key != "idempotency_key" {
+			missingKeyParams[key] = value
+		}
+	}
+	repo.createInput = nil
+	_, missingKeyRes, err := dispatcher.handleWorkflow(ctx, "create_task", "missing-idempotency-key", mustJSONRPCStruct(t, missingKeyParams))
+	if err != nil || missingKeyRes == nil || missingKeyRes.Code != errcode.InvalidParam.Code || repo.createInput != nil {
+		t.Fatalf("missing idempotency_key must be rejected before create, result=%#v input=%#v err=%v", missingKeyRes, repo.createInput, err)
+	}
+
 	_, res, err := dispatcher.handleWorkflow(ctx, "create_task", "manual-task", mustJSONRPCStruct(t, baseParams))
 	if err != nil {
 		t.Fatalf("expected nil err for manual task, got %v", err)
@@ -551,6 +568,65 @@ func TestJsonrpcDispatcher_WorkflowCreateTaskRejectsProcessRuntimeAnchors(t *tes
 	}
 }
 
+func TestJsonrpcDispatcher_WorkflowCreateTaskReplayContract(t *testing.T) {
+	var storedHash string
+	created := &biz.WorkflowTask{
+		ID: 91, TaskCode: "WF-CREATE-REPLAY-91", TaskGroup: "generic", TaskName: "网络重放任务",
+		SourceType: "generic-source", SourceID: 91, TaskStatusKey: "ready", OwnerRoleKey: biz.SalesRoleKey,
+		Payload: map[string]any{"note": "first"}, Version: 1,
+	}
+	repo := &stubWorkflowJSONRPCRepo{}
+	repo.createTask = func(in *biz.WorkflowTaskCreate, actorID int) (*biz.WorkflowTask, error) {
+		if actorID != 7 || strings.TrimSpace(in.IdempotencyKey) == "" || len(in.IntentHash) != 64 {
+			return nil, biz.ErrBadParam
+		}
+		if storedHash == "" {
+			storedHash = in.IntentHash
+			return created, nil
+		}
+		if storedHash != in.IntentHash {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		return created, nil
+	}
+	dispatcher := &jsonrpcDispatcher{
+		log:              log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+		adminReader:      stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.SalesRoleKey}, biz.PermissionWorkflowTaskCreate)},
+		workflowUC:       biz.NewWorkflowUsecase(repo),
+		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
+	}
+	params := map[string]any{
+		"idempotency_key": "workflow-create-replay-91",
+		"task_code":       created.TaskCode,
+		"task_group":      created.TaskGroup,
+		"task_name":       created.TaskName,
+		"source_type":     created.SourceType,
+		"source_id":       float64(created.SourceID),
+		"task_status_key": created.TaskStatusKey,
+		"owner_role_key":  created.OwnerRoleKey,
+		"payload":         created.Payload,
+	}
+	for _, requestID := range []string{"first", "exact-replay"} {
+		_, result, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "create_task", requestID, mustJSONRPCStruct(t, params))
+		if err != nil || result == nil || result.Code != errcode.OK.Code {
+			t.Fatalf("%s create result=%#v err=%v", requestID, result, err)
+		}
+		if task := jsonRPCNestedMap(t, result, "task"); jsonRPCInt(t, task, "id") != created.ID {
+			t.Fatalf("%s returned task %#v", requestID, task)
+		}
+	}
+
+	changed := make(map[string]any, len(params))
+	for key, value := range params {
+		changed[key] = value
+	}
+	changed["task_name"] = "同 key 的另一创建意图"
+	_, conflict, err := dispatcher.handleWorkflow(workflowJSONRPCAdminContext(), "create_task", "changed-intent", mustJSONRPCStruct(t, changed))
+	if err != nil || conflict == nil || conflict.Code != errcode.IdempotencyConflict.Code {
+		t.Fatalf("changed create intent result=%#v err=%v", conflict, err)
+	}
+}
+
 func TestWorkflowJSONRPCCreateTaskRejectsTransitionDrivingIdentity(t *testing.T) {
 	repo := &stubWorkflowJSONRPCRepo{}
 	dispatcher := &jsonrpcDispatcher{
@@ -560,6 +636,7 @@ func TestWorkflowJSONRPCCreateTaskRejectsTransitionDrivingIdentity(t *testing.T)
 		customerConfigUC: workflowCustomerConfigUCWithWorkflowTasksState(t, "enabled"),
 	}
 	base := map[string]any{
+		"idempotency_key":     "workflow-spoof-transition-101",
 		"task_code":           "SPOOF-ORDER-APPROVAL-101",
 		"task_group":          "order_approval",
 		"task_name":           "伪造老板审批",

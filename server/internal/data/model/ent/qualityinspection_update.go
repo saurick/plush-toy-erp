@@ -399,6 +399,73 @@ func (_u *QualityInspectionUpdate) ClearInspectorID() *QualityInspectionUpdate {
 	return _u
 }
 
+// SetSupersededAt sets the "superseded_at" field.
+func (_u *QualityInspectionUpdate) SetSupersededAt(v time.Time) *QualityInspectionUpdate {
+	_u.mutation.SetSupersededAt(v)
+	return _u
+}
+
+// SetNillableSupersededAt sets the "superseded_at" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableSupersededAt(v *time.Time) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetSupersededAt(*v)
+	}
+	return _u
+}
+
+// ClearSupersededAt clears the value of the "superseded_at" field.
+func (_u *QualityInspectionUpdate) ClearSupersededAt() *QualityInspectionUpdate {
+	_u.mutation.ClearSupersededAt()
+	return _u
+}
+
+// SetSupersededBy sets the "superseded_by" field.
+func (_u *QualityInspectionUpdate) SetSupersededBy(v int) *QualityInspectionUpdate {
+	_u.mutation.ResetSupersededBy()
+	_u.mutation.SetSupersededBy(v)
+	return _u
+}
+
+// SetNillableSupersededBy sets the "superseded_by" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableSupersededBy(v *int) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetSupersededBy(*v)
+	}
+	return _u
+}
+
+// AddSupersededBy adds value to the "superseded_by" field.
+func (_u *QualityInspectionUpdate) AddSupersededBy(v int) *QualityInspectionUpdate {
+	_u.mutation.AddSupersededBy(v)
+	return _u
+}
+
+// ClearSupersededBy clears the value of the "superseded_by" field.
+func (_u *QualityInspectionUpdate) ClearSupersededBy() *QualityInspectionUpdate {
+	_u.mutation.ClearSupersededBy()
+	return _u
+}
+
+// SetSupersededReason sets the "superseded_reason" field.
+func (_u *QualityInspectionUpdate) SetSupersededReason(v string) *QualityInspectionUpdate {
+	_u.mutation.SetSupersededReason(v)
+	return _u
+}
+
+// SetNillableSupersededReason sets the "superseded_reason" field if the given value is not nil.
+func (_u *QualityInspectionUpdate) SetNillableSupersededReason(v *string) *QualityInspectionUpdate {
+	if v != nil {
+		_u.SetSupersededReason(*v)
+	}
+	return _u
+}
+
+// ClearSupersededReason clears the value of the "superseded_reason" field.
+func (_u *QualityInspectionUpdate) ClearSupersededReason() *QualityInspectionUpdate {
+	_u.mutation.ClearSupersededReason()
+	return _u
+}
+
 // SetDefectRateOperator sets the "defect_rate_operator" field.
 func (_u *QualityInspectionUpdate) SetDefectRateOperator(v string) *QualityInspectionUpdate {
 	_u.mutation.SetDefectRateOperator(v)
@@ -701,6 +768,16 @@ func (_u *QualityInspectionUpdate) check() error {
 			return &ValidationError{Name: "inspector_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspector_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupersededBy(); ok {
+		if err := qualityinspection.SupersededByValidator(v); err != nil {
+			return &ValidationError{Name: "superseded_by", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.superseded_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SupersededReason(); ok {
+		if err := qualityinspection.SupersededReasonValidator(v); err != nil {
+			return &ValidationError{Name: "superseded_reason", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.superseded_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.DefectRateOperator(); ok {
 		if err := qualityinspection.DefectRateOperatorValidator(v); err != nil {
 			return &ValidationError{Name: "defect_rate_operator", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.defect_rate_operator": %w`, err)}
@@ -797,6 +874,30 @@ func (_u *QualityInspectionUpdate) sqlSave(ctx context.Context) (_node int, err 
 	}
 	if _u.mutation.InspectorIDCleared() {
 		_spec.ClearField(qualityinspection.FieldInspectorID, field.TypeInt)
+	}
+	if _u.mutation.CorrectionOfInspectionIDCleared() {
+		_spec.ClearField(qualityinspection.FieldCorrectionOfInspectionID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.SupersededAt(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededAt, field.TypeTime, value)
+	}
+	if _u.mutation.SupersededAtCleared() {
+		_spec.ClearField(qualityinspection.FieldSupersededAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SupersededBy(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSupersededBy(); ok {
+		_spec.AddField(qualityinspection.FieldSupersededBy, field.TypeInt, value)
+	}
+	if _u.mutation.SupersededByCleared() {
+		_spec.ClearField(qualityinspection.FieldSupersededBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.SupersededReason(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededReason, field.TypeString, value)
+	}
+	if _u.mutation.SupersededReasonCleared() {
+		_spec.ClearField(qualityinspection.FieldSupersededReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.DefectRateOperator(); ok {
 		_spec.SetField(qualityinspection.FieldDefectRateOperator, field.TypeString, value)
@@ -1421,6 +1522,73 @@ func (_u *QualityInspectionUpdateOne) ClearInspectorID() *QualityInspectionUpdat
 	return _u
 }
 
+// SetSupersededAt sets the "superseded_at" field.
+func (_u *QualityInspectionUpdateOne) SetSupersededAt(v time.Time) *QualityInspectionUpdateOne {
+	_u.mutation.SetSupersededAt(v)
+	return _u
+}
+
+// SetNillableSupersededAt sets the "superseded_at" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableSupersededAt(v *time.Time) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetSupersededAt(*v)
+	}
+	return _u
+}
+
+// ClearSupersededAt clears the value of the "superseded_at" field.
+func (_u *QualityInspectionUpdateOne) ClearSupersededAt() *QualityInspectionUpdateOne {
+	_u.mutation.ClearSupersededAt()
+	return _u
+}
+
+// SetSupersededBy sets the "superseded_by" field.
+func (_u *QualityInspectionUpdateOne) SetSupersededBy(v int) *QualityInspectionUpdateOne {
+	_u.mutation.ResetSupersededBy()
+	_u.mutation.SetSupersededBy(v)
+	return _u
+}
+
+// SetNillableSupersededBy sets the "superseded_by" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableSupersededBy(v *int) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetSupersededBy(*v)
+	}
+	return _u
+}
+
+// AddSupersededBy adds value to the "superseded_by" field.
+func (_u *QualityInspectionUpdateOne) AddSupersededBy(v int) *QualityInspectionUpdateOne {
+	_u.mutation.AddSupersededBy(v)
+	return _u
+}
+
+// ClearSupersededBy clears the value of the "superseded_by" field.
+func (_u *QualityInspectionUpdateOne) ClearSupersededBy() *QualityInspectionUpdateOne {
+	_u.mutation.ClearSupersededBy()
+	return _u
+}
+
+// SetSupersededReason sets the "superseded_reason" field.
+func (_u *QualityInspectionUpdateOne) SetSupersededReason(v string) *QualityInspectionUpdateOne {
+	_u.mutation.SetSupersededReason(v)
+	return _u
+}
+
+// SetNillableSupersededReason sets the "superseded_reason" field if the given value is not nil.
+func (_u *QualityInspectionUpdateOne) SetNillableSupersededReason(v *string) *QualityInspectionUpdateOne {
+	if v != nil {
+		_u.SetSupersededReason(*v)
+	}
+	return _u
+}
+
+// ClearSupersededReason clears the value of the "superseded_reason" field.
+func (_u *QualityInspectionUpdateOne) ClearSupersededReason() *QualityInspectionUpdateOne {
+	_u.mutation.ClearSupersededReason()
+	return _u
+}
+
 // SetDefectRateOperator sets the "defect_rate_operator" field.
 func (_u *QualityInspectionUpdateOne) SetDefectRateOperator(v string) *QualityInspectionUpdateOne {
 	_u.mutation.SetDefectRateOperator(v)
@@ -1736,6 +1904,16 @@ func (_u *QualityInspectionUpdateOne) check() error {
 			return &ValidationError{Name: "inspector_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspector_id": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.SupersededBy(); ok {
+		if err := qualityinspection.SupersededByValidator(v); err != nil {
+			return &ValidationError{Name: "superseded_by", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.superseded_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.SupersededReason(); ok {
+		if err := qualityinspection.SupersededReasonValidator(v); err != nil {
+			return &ValidationError{Name: "superseded_reason", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.superseded_reason": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.DefectRateOperator(); ok {
 		if err := qualityinspection.DefectRateOperatorValidator(v); err != nil {
 			return &ValidationError{Name: "defect_rate_operator", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.defect_rate_operator": %w`, err)}
@@ -1849,6 +2027,30 @@ func (_u *QualityInspectionUpdateOne) sqlSave(ctx context.Context) (_node *Quali
 	}
 	if _u.mutation.InspectorIDCleared() {
 		_spec.ClearField(qualityinspection.FieldInspectorID, field.TypeInt)
+	}
+	if _u.mutation.CorrectionOfInspectionIDCleared() {
+		_spec.ClearField(qualityinspection.FieldCorrectionOfInspectionID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.SupersededAt(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededAt, field.TypeTime, value)
+	}
+	if _u.mutation.SupersededAtCleared() {
+		_spec.ClearField(qualityinspection.FieldSupersededAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.SupersededBy(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedSupersededBy(); ok {
+		_spec.AddField(qualityinspection.FieldSupersededBy, field.TypeInt, value)
+	}
+	if _u.mutation.SupersededByCleared() {
+		_spec.ClearField(qualityinspection.FieldSupersededBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.SupersededReason(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededReason, field.TypeString, value)
+	}
+	if _u.mutation.SupersededReasonCleared() {
+		_spec.ClearField(qualityinspection.FieldSupersededReason, field.TypeString)
 	}
 	if value, ok := _u.mutation.DefectRateOperator(); ok {
 		_spec.SetField(qualityinspection.FieldDefectRateOperator, field.TypeString, value)

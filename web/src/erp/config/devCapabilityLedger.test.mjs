@@ -350,12 +350,12 @@ test('devCapabilityLedger: 真实四份 Markdown 保持可解析且能力标题�
     currentDeliveryMarkdown
   )
   const deltaResult = parseCustomerDeltaLedgerMarkdown(currentDeltaMarkdown)
-  assert.equal(evidenceResult.items.length, 39)
+  assert.equal(evidenceResult.items.length, 40)
   assert.equal(
     evidenceResult.items.filter((item) => item.structured).length,
-    39
+    40
   )
-  assert.equal(capabilityResult.items.length, 39)
+  assert.equal(capabilityResult.items.length, 40)
   assert.equal(capabilityResult.maturityDefinitions.length, 9)
   assert.equal(deliveryResult.items.length, 25)
   assert.equal(deltaResult.items.length, 29)

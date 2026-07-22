@@ -58,6 +58,58 @@ func TestJsonrpcDispatcher_RequireAdmin_DisabledAdminUsesAdminDisabled(t *testin
 	}
 }
 
+func TestJsonrpcDispatcher_HandleWorkflowRequiresActiveAdmin(t *testing.T) {
+	tests := []struct {
+		name        string
+		ctx         context.Context
+		adminReader stubAdminAccountReader
+		wantCode    int32
+	}{
+		{
+			name:     "not logged in",
+			ctx:      context.Background(),
+			wantCode: errcode.AuthRequired.Code,
+		},
+		{
+			name: "disabled admin",
+			ctx: biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+				UserID: 1,
+				Role:   biz.RoleAdmin,
+			}),
+			adminReader: stubAdminAccountReader{admin: &biz.AdminUser{ID: 1, Username: "disabled", Disabled: true}},
+			wantCode:    errcode.AdminDisabled.Code,
+		},
+		{
+			name: "non admin",
+			ctx: biz.NewContextWithClaims(context.Background(), &biz.AuthClaims{
+				UserID: 2,
+				Role:   biz.RoleUser,
+			}),
+			wantCode: errcode.AdminRequired.Code,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dispatcher := &jsonrpcDispatcher{
+				log:         log.NewHelper(log.With(log.NewStdLogger(io.Discard), "module", "service.jsonrpc.test")),
+				adminReader: tt.adminReader,
+				// Keep the usecase nil so the expected auth result also proves that
+				// handleWorkflow stops before dispatching into Workflow logic.
+				workflowUC: nil,
+			}
+
+			_, result, err := dispatcher.handleWorkflow(tt.ctx, "metadata", tt.name, nil)
+			if err != nil {
+				t.Fatalf("handleWorkflow() error = %v", err)
+			}
+			if result == nil || result.Code != tt.wantCode {
+				t.Fatalf("handleWorkflow() result = %#v, want code %d", result, tt.wantCode)
+			}
+		})
+	}
+}
+
 func TestJsonrpcDispatcher_GetCurrentAdminUsesVerifiedMiddlewareIdentity(t *testing.T) {
 	j := &jsonrpcDispatcher{}
 	claims := &biz.AuthClaims{UserID: 7, Username: "verified", Role: biz.RoleAdmin}

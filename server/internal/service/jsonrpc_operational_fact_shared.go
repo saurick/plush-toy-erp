@@ -152,6 +152,12 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该仓库已停用，不能用于新业务"}
 	case errors.Is(err, biz.ErrProductionFactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产事实不存在"}
+	case errors.Is(err, biz.ErrProductionExceptionNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常审批不存在"}
+	case errors.Is(err, biz.ErrProductionExceptionConflict), errors.Is(err, biz.ErrProductionExceptionInvalidState):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常审批状态已变化，请刷新后重试"}
+	case errors.Is(err, biz.ErrProductionExceptionSourceInvalid), errors.Is(err, biz.ErrProductionExceptionApprovalAmount):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产异常来源或批准数量不符合当前业务状态"}
 	case errors.Is(err, biz.ErrProductionOrderNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "生产订单不存在"}
 	case errors.Is(err, biz.ErrProductionOrderFactSourceInvalid):
@@ -178,6 +184,14 @@ func (d *jsonrpcDispatcher) mapOperationalFactError(ctx context.Context, err err
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "该完工记录已有未取消的返工，请先取消返工后再撤销完工"}
 	case errors.Is(err, biz.ErrOutsourcingFactNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外事实不存在"}
+	case errors.Is(err, biz.ErrOutsourcingDispositionNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货异常处置不存在"}
+	case errors.Is(err, biz.ErrOutsourcingDispositionConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "委外回货异常处置已被其他人处理，请刷新后重试"}
+	case errors.Is(err, biz.ErrOutsourcingDispositionState):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货异常处置状态已变化，请刷新后重试"}
+	case errors.Is(err, biz.ErrOutsourcingDispositionSourceInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外回货、质检或返工批次来源不一致"}
 	case errors.Is(err, biz.ErrOutsourcingOrderNotFound), errors.Is(err, biz.ErrOutsourcingOrderItemNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "委外合同或明细不存在"}
 	case errors.Is(err, biz.ErrOutsourcingOrderFactSourceInvalid):

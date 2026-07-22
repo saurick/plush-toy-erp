@@ -15,8 +15,10 @@ function loadJsonRpcModule({ token = 'stored-token' } = {}) {
     constructor(message, extra = {}) {
       super(message)
       this.code = extra.code ?? null
+      this.httpStatus = extra.httpStatus ?? null
       this.isNetworkError = !!extra.isNetworkError
       this.isAbortError = !!extra.isAbortError
+      this.isInvalidResponse = !!extra.isInvalidResponse
       this.cause = extra.cause
     }
 
@@ -174,6 +176,54 @@ test('jsonRpc: AbortError 标记为取消请求而不是网络错误', async () 
       return true
     }
   )
+})
+
+test('jsonRpc: 只接受版本、请求 id 和对象 result 完整匹配的成功响应', async () => {
+  const invalidResponses = [
+    null,
+    [],
+    {},
+    { jsonrpc: '1.0', id: '1', result: { code: 0 } },
+    { jsonrpc: '2.0', id: 'other', result: { code: 0 } },
+    { jsonrpc: '2.0', id: '1' },
+    { jsonrpc: '2.0', id: '1', result: null },
+    { jsonrpc: '2.0', id: '1', result: [] },
+    { jsonrpc: '2.0', id: '1', result: 'ok' },
+  ]
+
+  for (const responseBody of invalidResponses) {
+    const harness = loadJsonRpcModule()
+    harness.setFetch(async () => ({
+      ok: true,
+      status: 200,
+      async json() {
+        return responseBody
+      },
+    }))
+    const rpc = new harness.JsonRpc({ url: 'business', authScope: 'admin' })
+
+    await assert.rejects(
+      () => rpc.call('list'),
+      (error) => {
+        assert.equal(error.isInvalidResponse, true)
+        assert.equal(error.httpStatus, 200)
+        assert.equal(
+          error.message,
+          'Invalid JSON-RPC success response from server'
+        )
+        return true
+      }
+    )
+  }
+})
+
+test('jsonRpc: 返回匹配请求 id 的对象 result', async () => {
+  const harness = loadJsonRpcModule()
+  const rpc = new harness.JsonRpc({ url: 'business', authScope: 'admin' })
+
+  const result = await rpc.call('list')
+
+  assert.deepEqual(result, { code: 0, data: { ok: true } })
 })
 
 test('jsonRpc: withAuth=false 的鉴权错误不触发全局重新登录弹窗', async () => {

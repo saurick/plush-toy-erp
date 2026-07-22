@@ -15,6 +15,10 @@ func (d *jsonrpcDispatcher) handleOperationalFactFinance(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
+	case "create_finance_payment", "post_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
+		return d.handleFinancePaymentV1(ctx, method, id, pm, actorID)
+	}
+	switch method {
 	case "create_receivable_from_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionFinanceReceivableConfirm); res != nil {
 			return id, res, nil

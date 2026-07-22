@@ -773,10 +773,35 @@ async function runScenarioOnce(browser, scenario) {
     await assertVisibleSearchPlaceholdersFit(page, scenario.name)
     await assertVisibleBusinessFormControlHeight(page, scenario.name)
     await assertNoHorizontalOverflow(page, scenario.name)
-    assert.deepEqual(errors, [], `${scenario.name} 出现控制台或运行时错误`)
+    const expectedConsoleErrorPatterns = Array.isArray(
+      scenario.expectedConsoleErrorPatterns
+    )
+      ? scenario.expectedConsoleErrorPatterns
+      : []
+    for (const pattern of expectedConsoleErrorPatterns) {
+      assert(
+        pattern instanceof RegExp &&
+          errors.some((error) => pattern.test(error)),
+        `${scenario.name} 未出现声明的预期浏览器错误: ${String(pattern)}`
+      )
+    }
+    const unexpectedErrors = errors.filter(
+      (error) =>
+        !expectedConsoleErrorPatterns.some((pattern) => pattern.test(error))
+    )
+    assert.deepEqual(
+      unexpectedErrors,
+      [],
+      `${scenario.name} 出现未声明的控制台或运行时错误`
+    )
 
     const screenshotPath = path.resolve(outputDir, `${scenario.name}.png`)
     await page.screenshot({ path: screenshotPath, fullPage: true })
+  } catch (error) {
+    if (errors.length > 0) {
+      error.message = `${error.message}\n浏览器错误：\n${errors.join('\n')}`
+    }
+    throw error
   } finally {
     await page
       .evaluate(() => {
@@ -3817,10 +3842,7 @@ async function assertAdminRoleModalLayout(page, { scenarioName, title }) {
 async function assertAntdModalCenteredImpl(page, modalLocator, scenarioName) {
   await modalLocator.waitFor({ state: 'visible', timeout: 10_000 })
   const modalHandle = await modalLocator.elementHandle()
-  assert(
-    modalHandle,
-    `${scenarioName} 缺少可等待动画结束的 Ant Design 弹窗`
-  )
+  assert(modalHandle, `${scenarioName} 缺少可等待动画结束的 Ant Design 弹窗`)
   try {
     await page.waitForFunction(
       (modal) => {

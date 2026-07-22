@@ -121,6 +121,7 @@ test('roleHelpContent: 快捷入口按当前账号可用页面收口', () => {
       ['/erp/master/partners/customers', true],
       ['/erp/sales/project-orders/sales-orders', true],
       ['/erp/warehouse/shipments', false],
+      ['/erp/sales/customer-returns', false],
     ]
   )
   assert(

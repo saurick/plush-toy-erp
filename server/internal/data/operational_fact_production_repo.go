@@ -8,6 +8,7 @@ import (
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
+	"server/internal/data/model/ent/productionexceptiondecision"
 	"server/internal/data/model/ent/productionfact"
 	"server/internal/data/model/ent/productionorderitem"
 	"server/internal/data/model/ent/productionorderoperation"
@@ -729,7 +730,22 @@ func validateProductionOrderMaterialIssueQuantity(
 		}
 		issued = issued.Add(row.Quantity)
 	}
-	if issued.Add(additional).GreaterThan(requirement.PlannedQuantity) {
+	approvedRows, err := client.ProductionExceptionDecision.Query().Where(
+		productionexceptiondecision.DecisionType(biz.ProductionExceptionOverIssue),
+		productionexceptiondecision.Status(biz.ProductionExceptionApproved),
+		productionexceptiondecision.ProductionMaterialRequirementID(requirement.ID),
+	).All(ctx)
+	if err != nil {
+		return err
+	}
+	approved := decimal.Zero
+	for _, row := range approvedRows {
+		if row.ProductionOrderID != requirement.ProductionOrderID || row.ProductionOrderItemID != requirement.ProductionOrderItemID || row.ApprovedQuantity == nil {
+			return biz.ErrProductionExceptionSourceInvalid
+		}
+		approved = approved.Add(*row.ApprovedQuantity)
+	}
+	if issued.Add(additional).GreaterThan(requirement.PlannedQuantity.Add(approved)) {
 		return biz.ErrProductionOrderMaterialIssueQuantityExceeded
 	}
 	return nil

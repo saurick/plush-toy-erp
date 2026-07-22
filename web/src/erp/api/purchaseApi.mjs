@@ -169,7 +169,8 @@ export async function listAllPurchaseReceiptAdjustments(
     'purchase_receipt_adjustments',
     options,
     {
-      invalidResponseMessage: '服务器返回的采购入库调整记录不完整，请刷新后重试',
+      invalidResponseMessage:
+        '服务器返回的采购入库调整记录不完整，请刷新后重试',
     }
   )
 }
@@ -188,4 +189,41 @@ export async function cancelPurchaseReceiptAdjustment(params = {}) {
     params
   )
   return dataOf(result)?.purchase_receipt_adjustment || null
+}
+
+export async function createPurchaseRejectionDisposition(params = {}) {
+  requirePurchaseReceiptIdempotencyKey(params.idempotency_key)
+  const result = await purchaseRpc.call(
+    'create_purchase_rejection_disposition',
+    params
+  )
+  return dataOf(result)?.purchase_rejection_disposition || null
+}
+
+export async function postPurchaseRejectionDisposition(params = {}) {
+  const result = await purchaseRpc.call(
+    'post_purchase_rejection_disposition',
+    params
+  )
+  return dataOf(result)?.purchase_rejection_disposition || null
+}
+
+export async function cancelPurchaseRejectionDisposition(params = {}) {
+  const result = await purchaseRpc.call(
+    'cancel_purchase_rejection_disposition',
+    params
+  )
+  return dataOf(result)?.purchase_rejection_disposition || null
+}
+
+export async function getPurchaseRejectionDisposition(
+  params = {},
+  options = {}
+) {
+  const result = await purchaseRpc.call(
+    'get_purchase_rejection_disposition',
+    params,
+    options
+  )
+  return dataOf(result)?.purchase_rejection_disposition || null
 }

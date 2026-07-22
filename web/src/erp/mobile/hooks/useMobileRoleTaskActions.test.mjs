@@ -257,7 +257,7 @@ function createHookHarness(options = {}) {
   }
   const { hook, reactRuntime } = loadMobileActionHook(options)
   const props = {
-    activeRoleKey: 'warehouse',
+    activeRoleKey: options.activeRoleKey || 'warehouse',
     initialAction: detailAction,
     initialActionReceipt: options.initialActionReceipt,
     initialActionTaskID: selectedTask.id,
@@ -719,6 +719,90 @@ test('useMobileRoleTaskActions: unknown network result reuses frozen key and pay
   assert.equal(submitted[0].idempotency_key, submitted[2].idempotency_key)
   assert.deepEqual(submitted[0], submitted[2])
   assert.deepEqual(harness.loadCalls, [42])
+})
+
+test('useMobileRoleTaskActions: nine roles share transport, permission and stale recovery semantics', async () => {
+  const cases = [
+    { roleKey: 'boss', error: { isNetworkError: true }, status: 'unknown' },
+    { roleKey: 'sales', error: { httpStatus: 408 }, status: 'unknown' },
+    { roleKey: 'purchase', error: { httpStatus: 503 }, status: 'unknown' },
+    {
+      roleKey: 'production',
+      error: { httpStatus: 200, isInvalidResponse: true },
+      status: 'unknown',
+    },
+    {
+      roleKey: 'warehouse',
+      error: { code: 40304, httpStatus: 403 },
+      status: 'failed',
+    },
+    {
+      roleKey: 'finance',
+      error: { code: 40922, httpStatus: 200 },
+      status: 'failed',
+    },
+    { roleKey: 'pmc', error: { isNetworkError: true }, status: 'unknown' },
+    { roleKey: 'quality', error: { httpStatus: 408 }, status: 'unknown' },
+    {
+      roleKey: 'engineering',
+      error: { httpStatus: 200, isInvalidResponse: true },
+      status: 'unknown',
+    },
+  ]
+
+  for (const scenario of cases) {
+    const submitted = []
+    const messages = { errors: [], successes: [], warnings: [] }
+    const resultUnknown = scenario.status === 'unknown'
+    const harness = createHookHarness({
+      activeRoleKey: scenario.roleKey,
+      receiptScopeKey: `${scenario.roleKey}|matrix`,
+      messages,
+      completeWorkflowTaskAction: async (params) => {
+        submitted.push(params)
+        const failureLimit = resultUnknown ? 2 : 1
+        if (submitted.length <= failureLimit) {
+          throw Object.assign(
+            new Error(`${scenario.roleKey} failure`),
+            scenario.error
+          )
+        }
+        return {
+          id: 42,
+          owner_role_key: scenario.roleKey,
+          task_name: `${scenario.roleKey} recovery task`,
+          task_status_key: 'done',
+          version: 6,
+        }
+      },
+    })
+
+    let view = harness.render()
+    await view.submitDetailAction()
+    view = harness.render()
+    assert.equal(view.actionReceipt.status, scenario.status, scenario.roleKey)
+    assert.equal(view.detailReasonValue, '已完成并核对', scenario.roleKey)
+    assert.deepEqual(harness.loadCalls, [], scenario.roleKey)
+
+    await view.submitDetailAction()
+    view = harness.render()
+    assert.equal(view.actionReceipt.status, 'confirmed', scenario.roleKey)
+    assert.equal(view.actionReceipt.task.owner_role_key, scenario.roleKey)
+    assert.deepEqual(harness.loadCalls, [42], scenario.roleKey)
+    if (resultUnknown) {
+      assert.equal(
+        new Set(submitted.map((params) => params.idempotency_key)).size,
+        1,
+        `${scenario.roleKey} unknown retry must reuse one intent`
+      )
+    } else {
+      assert.equal(
+        new Set(submitted.map((params) => params.idempotency_key)).size,
+        2,
+        `${scenario.roleKey} deterministic failure must start a new intent`
+      )
+    }
+  }
 })
 
 test('useMobileRoleTaskActions: retained attempts never cross an access scope', async () => {

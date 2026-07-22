@@ -47,6 +47,9 @@ func (uc *WorkflowUsecase) CreateTask(ctx context.Context, in *WorkflowTaskCreat
 	if err := ValidateWorkflowSourceTaskReservedNamespace(normalized.TaskGroup, normalized.TaskCode); err != nil {
 		return nil, err
 	}
+	if err := prepareWorkflowTaskCreateIdempotency(&normalized, actorID); err != nil {
+		return nil, err
+	}
 	return uc.repo.CreateWorkflowTask(ctx, &normalized, actorID)
 }
 

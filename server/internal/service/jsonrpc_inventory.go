@@ -21,7 +21,8 @@ func (d *jsonrpcDispatcher) handleInventory(
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if _, res := d.requireAdmin(ctx); res != nil {
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
 		return id, res, nil
 	}
 	if d.inventoryUC == nil {
@@ -29,6 +30,8 @@ func (d *jsonrpcDispatcher) handleInventory(
 	}
 
 	switch method {
+	case "create_inventory_operation", "post_inventory_operation", "cancel_inventory_operation", "get_inventory_operation":
+		return d.handleInventoryOperation(ctx, method, id, pm, claims.UserID)
 	case "list_inventory_balances":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionWarehouseInventoryRead); res != nil {
 			return id, res, nil
@@ -163,6 +166,18 @@ func (d *jsonrpcDispatcher) mapInventoryError(ctx context.Context, err error) *v
 	switch {
 	case errors.Is(err, biz.ErrDataScopeForbidden):
 		return &v1.JsonrpcResult{Code: errcode.PermissionDenied.Code, Message: errcode.PermissionDenied.Message}
+	case errors.Is(err, biz.ErrIdempotencyConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: errcode.IdempotencyConflict.Message}
+	case errors.Is(err, biz.ErrInventoryOperationNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存作业单不存在"}
+	case errors.Is(err, biz.ErrInventoryOperationVersionConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "库存作业已被其他人处理，请刷新后重试"}
+	case errors.Is(err, biz.ErrInventoryOperationStaleCount):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "盘点期间账面库存已变化，请刷新后重新盘点"}
+	case errors.Is(err, biz.ErrInventoryOperationApprovalMissing):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "人工库存调整必须填写审批依据"}
+	case errors.Is(err, biz.ErrInventoryInsufficientStock):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "库存不足，无法完成本次库存作业"}
 	case errors.Is(err, biz.ErrBadParam):
 		l.Warnf("[inventory] invalid param err=%v", err)
 		return invalidParamResult()

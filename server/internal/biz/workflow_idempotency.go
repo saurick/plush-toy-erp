@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"sort"
 	"strings"
+	"time"
 	"unicode/utf8"
 )
 
@@ -14,6 +15,7 @@ const (
 	workflowTaskIdempotencyKeyMaxLength  = 128
 	workflowTaskCommandKeyMaxLength      = 128
 	workflowTaskMutationIntentContractV1 = "workflow.task-mutation/v1"
+	workflowTaskCreateIntentContractV1   = "workflow.task-create/v1"
 )
 
 var workflowTaskIntentTopLevelIgnoredKeys = map[string]struct{}{
@@ -58,6 +60,65 @@ type workflowTaskBreakGlassDigest struct {
 	ActionKey string `json:"action_key"`
 	Reason    string `json:"reason"`
 	ExpiresAt string `json:"expires_at"`
+}
+
+type workflowTaskCreateIntent struct {
+	Contract              string         `json:"contract"`
+	ActorID               int            `json:"actor_id"`
+	TaskCode              string         `json:"task_code"`
+	TaskGroup             string         `json:"task_group"`
+	TaskName              string         `json:"task_name"`
+	SourceType            string         `json:"source_type"`
+	SourceID              int            `json:"source_id"`
+	SourceNo              *string        `json:"source_no,omitempty"`
+	BusinessStatusKey     *string        `json:"business_status_key,omitempty"`
+	TaskStatusKey         string         `json:"task_status_key"`
+	OwnerRoleKey          string         `json:"owner_role_key"`
+	OwnerPoolKey          *string        `json:"owner_pool_key,omitempty"`
+	RequiredCapabilityKey *string        `json:"required_capability_key,omitempty"`
+	ConfigRevision        *string        `json:"config_revision,omitempty"`
+	ProcessInstanceID     *int           `json:"process_instance_id,omitempty"`
+	ProcessNodeInstanceID *int           `json:"process_node_instance_id,omitempty"`
+	AssigneeID            *int           `json:"assignee_id,omitempty"`
+	Priority              int16          `json:"priority"`
+	CriticalPath          bool           `json:"critical_path"`
+	DueAt                 *string        `json:"due_at,omitempty"`
+	Payload               map[string]any `json:"payload"`
+}
+
+func prepareWorkflowTaskCreateIdempotency(in *WorkflowTaskCreate, actorID int) error {
+	if in == nil {
+		return ErrBadParam
+	}
+	in.IdempotencyKey = strings.TrimSpace(in.IdempotencyKey)
+	if in.IdempotencyKey == "" {
+		in.IntentHash = ""
+		return nil
+	}
+	if actorID <= 0 || utf8.RuneCountInString(in.IdempotencyKey) > workflowTaskIdempotencyKeyMaxLength {
+		return ErrBadParam
+	}
+	var dueAt *string
+	if in.DueAt != nil {
+		value := in.DueAt.UTC().Format(time.RFC3339Nano)
+		dueAt = &value
+	}
+	hash, err := workflowTaskIntentHash(workflowTaskCreateIntent{
+		Contract: workflowTaskCreateIntentContractV1, ActorID: actorID,
+		TaskCode: in.TaskCode, TaskGroup: in.TaskGroup, TaskName: in.TaskName,
+		SourceType: in.SourceType, SourceID: in.SourceID, SourceNo: in.SourceNo,
+		BusinessStatusKey: in.BusinessStatusKey, TaskStatusKey: in.TaskStatusKey,
+		OwnerRoleKey: in.OwnerRoleKey, OwnerPoolKey: in.OwnerPoolKey,
+		RequiredCapabilityKey: in.RequiredCapabilityKey, ConfigRevision: in.ConfigRevision,
+		ProcessInstanceID: in.ProcessInstanceID, ProcessNodeInstanceID: in.ProcessNodeInstanceID,
+		AssigneeID: in.AssigneeID, Priority: in.Priority, CriticalPath: in.CriticalPath,
+		DueAt: dueAt, Payload: in.Payload,
+	})
+	if err != nil {
+		return err
+	}
+	in.IntentHash = hash
+	return nil
 }
 
 func (uc *WorkflowUsecase) ResolveTaskStatusMutationReplay(
@@ -191,7 +252,7 @@ func workflowTaskBreakGlassIntentDigest(in *WorkflowTaskBreakGlassIntent) *workf
 	}
 }
 
-func workflowTaskIntentHash(intent workflowTaskMutationIntent) (string, error) {
+func workflowTaskIntentHash(intent any) (string, error) {
 	encoded, err := json.Marshal(intent)
 	if err != nil {
 		return "", ErrBadParam

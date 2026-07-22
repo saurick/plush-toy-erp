@@ -46,6 +46,21 @@ test('operationalFactApi: exposes production, outsourcing, shipment, reservation
     'post_finance_fact',
     'settle_finance_fact',
     'cancel_finance_fact',
+    'list_sales_returns',
+    'create_sales_return',
+    'approve_sales_return',
+    'receive_sales_return',
+    'cancel_sales_return',
+    'get_sales_return',
+    'list_finance_payments',
+    'get_finance_credit_note',
+    'list_finance_credit_notes',
+    'create_finance_payment',
+    'post_finance_payment',
+    'reverse_finance_payment',
+    'get_finance_payment',
+    'create_finance_credit_note',
+    'reverse_finance_credit_note',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }

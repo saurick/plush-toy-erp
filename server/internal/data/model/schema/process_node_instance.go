@@ -22,6 +22,7 @@ func (ProcessNodeInstance) Annotations() []schema.Annotation {
 			"process_node_instances_status_allowed":   "status IN ('waiting', 'active', 'completed', 'blocked')",
 			"process_node_instances_version_positive": "version > 0",
 			"process_node_instances_lifecycle_bundle": "((status = 'waiting' AND started_at IS NULL AND completed_at IS NULL) OR (status = 'active' AND started_at IS NOT NULL AND completed_at IS NULL) OR (status = 'completed' AND started_at IS NOT NULL AND completed_at IS NOT NULL) OR (status = 'blocked' AND started_at IS NOT NULL AND completed_at IS NULL))",
+			"process_node_instances_recovery_bundle":  "((domain_command_recovery_decision IS NULL AND domain_command_recovery_hash IS NULL AND domain_command_recovered_at IS NULL AND domain_command_recovered_by IS NULL) OR (domain_command_recovery_decision = 'terminate_and_withdraw_downstream' AND domain_command_recovery_hash IS NOT NULL AND length(domain_command_recovery_hash) = 64 AND domain_command_recovered_at IS NOT NULL AND domain_command_recovered_by IS NOT NULL AND node_type = 'domain_command' AND status = 'completed' AND domain_command_effect_state = 'compensated' AND domain_command_result_hash IS NOT NULL AND domain_command_compensation_hash IS NOT NULL))",
 		}},
 	}
 }
@@ -124,6 +125,22 @@ func (ProcessNodeInstance) Fields() []ent.Field {
 			Optional().
 			Nillable(),
 		field.Int("domain_command_compensated_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("domain_command_recovery_decision").
+			Optional().
+			Nillable().
+			MaxLen(64),
+		field.String("domain_command_recovery_hash").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64),
+		field.Time("domain_command_recovered_at").
+			Optional().
+			Nillable(),
+		field.Int("domain_command_recovered_by").
 			Optional().
 			Nillable().
 			Positive(),

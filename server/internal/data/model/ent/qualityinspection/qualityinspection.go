@@ -51,6 +51,14 @@ const (
 	FieldInspectedAt = "inspected_at"
 	// FieldInspectorID holds the string denoting the inspector_id field in the database.
 	FieldInspectorID = "inspector_id"
+	// FieldCorrectionOfInspectionID holds the string denoting the correction_of_inspection_id field in the database.
+	FieldCorrectionOfInspectionID = "correction_of_inspection_id"
+	// FieldSupersededAt holds the string denoting the superseded_at field in the database.
+	FieldSupersededAt = "superseded_at"
+	// FieldSupersededBy holds the string denoting the superseded_by field in the database.
+	FieldSupersededBy = "superseded_by"
+	// FieldSupersededReason holds the string denoting the superseded_reason field in the database.
+	FieldSupersededReason = "superseded_reason"
 	// FieldDefectRateOperator holds the string denoting the defect_rate_operator field in the database.
 	FieldDefectRateOperator = "defect_rate_operator"
 	// FieldDefectRatePercent holds the string denoting the defect_rate_percent field in the database.
@@ -149,6 +157,10 @@ var Columns = []string{
 	FieldOriginalLotStatus,
 	FieldInspectedAt,
 	FieldInspectorID,
+	FieldCorrectionOfInspectionID,
+	FieldSupersededAt,
+	FieldSupersededBy,
+	FieldSupersededReason,
 	FieldDefectRateOperator,
 	FieldDefectRatePercent,
 	FieldDecisionNote,
@@ -211,6 +223,12 @@ var (
 	OriginalLotStatusValidator func(string) error
 	// InspectorIDValidator is a validator for the "inspector_id" field. It is called by the builders before save.
 	InspectorIDValidator func(int) error
+	// CorrectionOfInspectionIDValidator is a validator for the "correction_of_inspection_id" field. It is called by the builders before save.
+	CorrectionOfInspectionIDValidator func(int) error
+	// SupersededByValidator is a validator for the "superseded_by" field. It is called by the builders before save.
+	SupersededByValidator func(int) error
+	// SupersededReasonValidator is a validator for the "superseded_reason" field. It is called by the builders before save.
+	SupersededReasonValidator func(string) error
 	// DefectRateOperatorValidator is a validator for the "defect_rate_operator" field. It is called by the builders before save.
 	DefectRateOperatorValidator func(string) error
 	// DecisionNoteValidator is a validator for the "decision_note" field. It is called by the builders before save.
@@ -319,6 +337,26 @@ func ByInspectedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByInspectorID orders the results by the inspector_id field.
 func ByInspectorID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldInspectorID, opts...).ToFunc()
+}
+
+// ByCorrectionOfInspectionID orders the results by the correction_of_inspection_id field.
+func ByCorrectionOfInspectionID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldCorrectionOfInspectionID, opts...).ToFunc()
+}
+
+// BySupersededAt orders the results by the superseded_at field.
+func BySupersededAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupersededAt, opts...).ToFunc()
+}
+
+// BySupersededBy orders the results by the superseded_by field.
+func BySupersededBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupersededBy, opts...).ToFunc()
+}
+
+// BySupersededReason orders the results by the superseded_reason field.
+func BySupersededReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldSupersededReason, opts...).ToFunc()
 }
 
 // ByDefectRateOperator orders the results by the defect_rate_operator field.

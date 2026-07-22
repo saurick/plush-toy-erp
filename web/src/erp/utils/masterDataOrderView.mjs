@@ -11,6 +11,7 @@ export const V1_ROUTE_PATHS = Object.freeze({
   materials: '/erp/master/materials',
   processes: '/erp/engineering/processes',
   salesOrders: '/erp/sales/project-orders/sales-orders',
+  salesReturns: '/erp/sales/customer-returns',
   purchaseOrders: '/erp/purchase/accessories',
   purchaseReceipts: '/erp/warehouse/inbound',
   qualityInspections: '/erp/production/quality-inspections',
@@ -24,6 +25,7 @@ export const V1_ROUTE_PATHS = Object.freeze({
   payables: '/erp/finance/payables',
   invoices: '/erp/finance/invoices',
   reconciliation: '/erp/finance/reconciliation',
+  financePayments: '/erp/finance/payments',
 })
 
 export const SALES_ORDER_STATUS_LABELS = Object.freeze({
@@ -342,11 +344,7 @@ export function summarizeSalesOrderLines(lines = [], snapshot = {}) {
   const items = Array.isArray(lines) ? lines : []
   if (items.length === 0) {
     return {
-      count: snapshotCount(snapshot, [
-        'count',
-        'item_count',
-        'line_count',
-      ]),
+      count: snapshotCount(snapshot, ['count', 'item_count', 'line_count']),
       quantity: snapshotNumeric20Scale6(snapshot, [
         'quantity',
         'header_quantity',
@@ -949,9 +947,7 @@ export function buildProductParams(values = {}, extra = {}) {
       values.default_unit_id === undefined
         ? undefined
         : Number(values.default_unit_id || 0),
-    unit_net_weight_g: normalizeOptionalDecimalString(
-      values.unit_net_weight_g
-    ),
+    unit_net_weight_g: normalizeOptionalDecimalString(values.unit_net_weight_g),
   })
 }
 
@@ -991,9 +987,7 @@ export function buildProductSKUParams(values = {}, extra = {}) {
       values.default_unit_id === undefined || values.default_unit_id === null
         ? undefined
         : Number(values.default_unit_id || 0),
-    unit_net_weight_g: normalizeOptionalDecimalString(
-      values.unit_net_weight_g
-    ),
+    unit_net_weight_g: normalizeOptionalDecimalString(values.unit_net_weight_g),
   })
 }
 

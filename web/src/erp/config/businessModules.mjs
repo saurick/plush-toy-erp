@@ -99,6 +99,33 @@ export const businessModuleDefinitions = Object.freeze([
     boundary: '销售订单不会自动生成出货单、库存变动、应收、发票或收付款记录。',
   },
   {
+    key: 'sales-returns',
+    sectionKey: 'sales',
+    label: '客户退货（RMA）',
+    title: '客户退货（RMA）',
+    path: '/erp/sales/customer-returns',
+    shortLabel: '客户退货',
+    pageKind: 'formal-v1',
+    description:
+      '客户退货从已出货记录发起，依次办理审核、实物收回和取消；确认收回后才形成库存恢复记录。',
+    primaryEntity: 'sales_returns / sales_return_items',
+    factSource: 'sales_returns, sales_return_items, shipments, inventory_txns',
+    boundary:
+      '客户提出退货、销售任务完成或退货审核都不等于库存已收回；只有退货单确认收回后才增加库存，取消已收回退货会通过反向库存记录恢复。',
+    sourceRefs: [
+      'shipments',
+      'shipment_items',
+      'sales_returns',
+      'inventory_txns',
+    ],
+    currentScope: [
+      '从已出货记录发起客户退货',
+      '退货审核',
+      '确认收回并恢复库存',
+      '取消和并发版本校验',
+    ],
+  },
+  {
     key: 'material-bom',
     sectionKey: 'engineering',
     label: '物料清单（BOM）',
@@ -243,7 +270,7 @@ export const businessModuleDefinitions = Object.freeze([
     factSource:
       'inventory_txns, inventory_balances, inventory_lots, stock_reservations',
     boundary:
-      '库存台账只展示系统查询结果；入库、生产、委外、出货和预留必须通过对应来源单据或业务记录办理，当前页面不提供盘点、调拨或通用库存调整入口。',
+      '入库、生产、委外、出货和预留必须通过对应来源单据或业务记录办理；本页只额外提供盘点、仓间调拨和有权限的人工调整，过账后才改变库存。',
     sourceRefs: [
       'inventory_txns',
       'inventory_balances',
@@ -256,6 +283,8 @@ export const businessModuleDefinitions = Object.freeze([
       '库存批次',
       '库存变动记录',
       '按来源单据和业务记录追溯',
+      '盘点差异、仓间调拨和受控人工调整',
+      '调整草稿过账、取消和并发版本校验',
     ],
   },
   {
@@ -518,6 +547,35 @@ export const businessModuleDefinitions = Object.freeze([
       '过账',
       '完成核对',
       '取消',
+    ],
+  },
+  {
+    key: 'finance-payments',
+    sectionKey: 'finance',
+    label: '收付款与核销',
+    title: '收付款与核销',
+    path: '/erp/finance/payments',
+    shortLabel: '收付款',
+    pageKind: 'formal-v1',
+    description:
+      '登记真实收款或付款，并按同一往来方和币种对多张应收或应付进行核销。',
+    primaryEntity:
+      'finance_payments / finance_allocations / finance_credit_notes',
+    factSource:
+      'finance_payments, finance_allocations, finance_credit_notes, finance_facts',
+    boundary:
+      '收付款过账才形成核销；冲销和红冲保留原记录及反向审计，不提供物理删除，也不替代总账凭证、税控或银行对账。',
+    sourceRefs: [
+      'finance_facts',
+      'finance_payments',
+      'finance_allocations',
+      'finance_credit_notes',
+    ],
+    currentScope: [
+      '真实收款和付款登记',
+      '同一往来方和币种的多单核销',
+      '已过账收付款冲销',
+      '应收 / 应付红冲及红冲撤销',
     ],
   },
   {

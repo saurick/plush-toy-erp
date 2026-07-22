@@ -272,6 +272,62 @@ func (_c *QualityInspectionCreate) SetNillableInspectorID(v *int) *QualityInspec
 	return _c
 }
 
+// SetCorrectionOfInspectionID sets the "correction_of_inspection_id" field.
+func (_c *QualityInspectionCreate) SetCorrectionOfInspectionID(v int) *QualityInspectionCreate {
+	_c.mutation.SetCorrectionOfInspectionID(v)
+	return _c
+}
+
+// SetNillableCorrectionOfInspectionID sets the "correction_of_inspection_id" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableCorrectionOfInspectionID(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetCorrectionOfInspectionID(*v)
+	}
+	return _c
+}
+
+// SetSupersededAt sets the "superseded_at" field.
+func (_c *QualityInspectionCreate) SetSupersededAt(v time.Time) *QualityInspectionCreate {
+	_c.mutation.SetSupersededAt(v)
+	return _c
+}
+
+// SetNillableSupersededAt sets the "superseded_at" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableSupersededAt(v *time.Time) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetSupersededAt(*v)
+	}
+	return _c
+}
+
+// SetSupersededBy sets the "superseded_by" field.
+func (_c *QualityInspectionCreate) SetSupersededBy(v int) *QualityInspectionCreate {
+	_c.mutation.SetSupersededBy(v)
+	return _c
+}
+
+// SetNillableSupersededBy sets the "superseded_by" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableSupersededBy(v *int) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetSupersededBy(*v)
+	}
+	return _c
+}
+
+// SetSupersededReason sets the "superseded_reason" field.
+func (_c *QualityInspectionCreate) SetSupersededReason(v string) *QualityInspectionCreate {
+	_c.mutation.SetSupersededReason(v)
+	return _c
+}
+
+// SetNillableSupersededReason sets the "superseded_reason" field if the given value is not nil.
+func (_c *QualityInspectionCreate) SetNillableSupersededReason(v *string) *QualityInspectionCreate {
+	if v != nil {
+		_c.SetSupersededReason(*v)
+	}
+	return _c
+}
+
 // SetDefectRateOperator sets the "defect_rate_operator" field.
 func (_c *QualityInspectionCreate) SetDefectRateOperator(v string) *QualityInspectionCreate {
 	_c.mutation.SetDefectRateOperator(v)
@@ -545,6 +601,21 @@ func (_c *QualityInspectionCreate) check() error {
 			return &ValidationError{Name: "inspector_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.inspector_id": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.CorrectionOfInspectionID(); ok {
+		if err := qualityinspection.CorrectionOfInspectionIDValidator(v); err != nil {
+			return &ValidationError{Name: "correction_of_inspection_id", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.correction_of_inspection_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SupersededBy(); ok {
+		if err := qualityinspection.SupersededByValidator(v); err != nil {
+			return &ValidationError{Name: "superseded_by", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.superseded_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.SupersededReason(); ok {
+		if err := qualityinspection.SupersededReasonValidator(v); err != nil {
+			return &ValidationError{Name: "superseded_reason", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.superseded_reason": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.DefectRateOperator(); ok {
 		if err := qualityinspection.DefectRateOperatorValidator(v); err != nil {
 			return &ValidationError{Name: "defect_rate_operator", err: fmt.Errorf(`ent: validator failed for field "QualityInspection.defect_rate_operator": %w`, err)}
@@ -634,6 +705,22 @@ func (_c *QualityInspectionCreate) createSpec() (*QualityInspection, *sqlgraph.C
 	if value, ok := _c.mutation.InspectorID(); ok {
 		_spec.SetField(qualityinspection.FieldInspectorID, field.TypeInt, value)
 		_node.InspectorID = &value
+	}
+	if value, ok := _c.mutation.CorrectionOfInspectionID(); ok {
+		_spec.SetField(qualityinspection.FieldCorrectionOfInspectionID, field.TypeInt, value)
+		_node.CorrectionOfInspectionID = &value
+	}
+	if value, ok := _c.mutation.SupersededAt(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededAt, field.TypeTime, value)
+		_node.SupersededAt = &value
+	}
+	if value, ok := _c.mutation.SupersededBy(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededBy, field.TypeInt, value)
+		_node.SupersededBy = &value
+	}
+	if value, ok := _c.mutation.SupersededReason(); ok {
+		_spec.SetField(qualityinspection.FieldSupersededReason, field.TypeString, value)
+		_node.SupersededReason = &value
 	}
 	if value, ok := _c.mutation.DefectRateOperator(); ok {
 		_spec.SetField(qualityinspection.FieldDefectRateOperator, field.TypeString, value)

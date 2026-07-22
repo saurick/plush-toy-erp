@@ -15,6 +15,7 @@ import (
 	"server/internal/data/model/ent/purchaseorder"
 	"server/internal/data/model/ent/salesorder"
 	"server/internal/data/model/ent/shipment"
+	"server/internal/data/model/ent/workflowtask"
 
 	"entgo.io/ent/dialect"
 	entsql "entgo.io/ent/dialect/sql"
@@ -730,6 +731,212 @@ func markProcessNodeDomainCommandCompensatedWithClient(
 	return existing, nil
 }
 
+func (r *processRuntimeRepo) RecoverProcessDomainCommandCompensation(
+	ctx context.Context,
+	in *biz.ProcessDomainCommandRecovery,
+	actorID int,
+) (*biz.ProcessNodeInstance, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || in == nil || actorID <= 0 ||
+		in.ProcessInstanceID <= 0 || in.ProcessNodeInstanceID <= 0 || in.ExpectedVersion <= 0 ||
+		strings.TrimSpace(in.Decision) == "" ||
+		len(in.ExpectedResultHash) != 64 || len(in.ExpectedCompensationHash) != 64 || len(in.RecoveryHash) != 64 {
+		return nil, biz.ErrBadParam
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	origin, err := tx.ProcessNodeInstance.Query().Where(
+		processnodeinstance.ID(in.ProcessNodeInstanceID),
+		processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+	).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessNodeInstanceNotFound
+		}
+		return nil, err
+	}
+	if origin.DomainCommandRecoveryDecision != nil || origin.DomainCommandRecoveryHash != nil || origin.DomainCommandRecoveredAt != nil || origin.DomainCommandRecoveredBy != nil {
+		if origin.Version != in.ExpectedVersion+1 {
+			return nil, biz.ErrProcessNodeInstanceConflict
+		}
+		if origin.DomainCommandRecoveryDecision == nil || origin.DomainCommandRecoveryHash == nil || origin.DomainCommandRecoveredAt == nil || origin.DomainCommandRecoveredBy == nil ||
+			*origin.DomainCommandRecoveryDecision != in.Decision || *origin.DomainCommandRecoveryHash != in.RecoveryHash ||
+			origin.DomainCommandResultHash == nil || *origin.DomainCommandResultHash != in.ExpectedResultHash ||
+			origin.DomainCommandCompensationHash == nil || *origin.DomainCommandCompensationHash != in.ExpectedCompensationHash {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		return entProcessNodeInstanceToBiz(origin), nil
+	}
+	if origin.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	if in.Decision != biz.ProcessDomainCommandRecoveryTerminateAndWithdraw {
+		return nil, biz.ErrBadParam
+	}
+	if origin.NodeType != biz.ProcessNodeTypeDomainCommand || origin.Status != biz.ProcessNodeStatusCompleted ||
+		origin.DomainCommandProtocolVersion == nil || *origin.DomainCommandProtocolVersion != biz.ProcessDomainCommandProtocolVersionCurrent ||
+		origin.DomainCommandResultHash == nil || *origin.DomainCommandResultHash != in.ExpectedResultHash ||
+		origin.DomainCommandEffectState == nil || *origin.DomainCommandEffectState != biz.ProcessDomainCommandEffectStateCompensated ||
+		origin.DomainCommandCompensationHash == nil || *origin.DomainCommandCompensationHash != in.ExpectedCompensationHash ||
+		origin.DomainCommandCompensation == nil || origin.DomainCommandCompensatedAt == nil {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+
+	instance, err := tx.ProcessInstance.Query().Where(processinstance.ID(in.ProcessInstanceID)).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrProcessInstanceNotFound
+		}
+		return nil, err
+	}
+	if instance.Status == biz.ProcessStatusCompleted {
+		return nil, biz.ErrProcessDomainCommandRecoveryRequired
+	}
+	allNodes, err := tx.ProcessNodeInstance.Query().Where(
+		processnodeinstance.ProcessInstanceID(in.ProcessInstanceID),
+	).Order(ent.Asc(processnodeinstance.FieldID)).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	originIndex := -1
+	for index, node := range allNodes {
+		if node.Attempt != 1 || processRuntimeNodeUsesNonSequentialRouting(node) {
+			return nil, biz.ErrProcessDomainCommandRecoveryRequired
+		}
+		if node.ID == origin.ID {
+			originIndex = index
+		}
+	}
+	if originIndex < 0 {
+		return nil, biz.ErrProcessNodeInstanceNotFound
+	}
+	nodes := allNodes[originIndex+1:]
+	withdraw := make([]*ent.ProcessNodeInstance, 0, len(nodes))
+	for _, node := range nodes {
+		if node.Status == biz.ProcessNodeStatusCompleted || processRuntimeNodeHasDomainEvidence(node) {
+			return nil, biz.ErrProcessDomainCommandRecoveryRequired
+		}
+		if node.Status == biz.ProcessNodeStatusWaiting || node.Status == biz.ProcessNodeStatusActive || node.Status == biz.ProcessNodeStatusBlocked {
+			withdraw = append(withdraw, node)
+		}
+	}
+	tasksByNode := make(map[int][]*ent.WorkflowTask, len(withdraw))
+	for _, node := range withdraw {
+		tasks, taskErr := tx.WorkflowTask.Query().Where(workflowtask.ProcessNodeInstanceID(node.ID)).All(ctx)
+		if taskErr != nil {
+			return nil, taskErr
+		}
+		for _, task := range tasks {
+			if task.TaskStatusKey == "done" {
+				return nil, biz.ErrProcessDomainCommandRecoveryRequired
+			}
+		}
+		tasksByNode[node.ID] = tasks
+	}
+	now := time.Now()
+	reason := "上游领域动作已取消或冲正，流程已终止并撤回下游任务"
+	updatedOrigin, err := tx.ProcessNodeInstance.Update().Where(
+		processnodeinstance.ID(origin.ID), processnodeinstance.Version(in.ExpectedVersion),
+		processnodeinstance.DomainCommandRecoveryDecisionIsNil(), processnodeinstance.DomainCommandRecoveryHashIsNil(),
+	).SetDomainCommandRecoveryDecision(in.Decision).SetDomainCommandRecoveryHash(in.RecoveryHash).
+		SetDomainCommandRecoveredAt(now).SetDomainCommandRecoveredBy(actorID).SetVersion(in.ExpectedVersion + 1).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if updatedOrigin != 1 {
+		current, getErr := tx.ProcessNodeInstance.Get(ctx, origin.ID)
+		if getErr != nil {
+			return nil, getErr
+		}
+		if current.Version == in.ExpectedVersion+1 && current.DomainCommandRecoveryDecision != nil && current.DomainCommandRecoveryHash != nil &&
+			*current.DomainCommandRecoveryDecision == in.Decision && *current.DomainCommandRecoveryHash == in.RecoveryHash {
+			return entProcessNodeInstanceToBiz(current), nil
+		}
+		if current.DomainCommandRecoveryDecision != nil || current.DomainCommandRecoveryHash != nil {
+			return nil, biz.ErrIdempotencyConflict
+		}
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	for _, node := range withdraw {
+		for _, task := range tasksByNode[node.ID] {
+			if task.TaskStatusKey != "ready" && task.TaskStatusKey != "blocked" {
+				continue
+			}
+			updated, updateErr := tx.WorkflowTask.Update().Where(
+				workflowtask.ID(task.ID), workflowtask.Version(task.Version), workflowtask.TaskStatusKey(task.TaskStatusKey),
+			).SetTaskStatusKey("rejected").SetBlockedReason(reason).SetCompletedAt(now).
+				SetUpdatedBy(actorID).SetVersion(task.Version + 1).Save(ctx)
+			if updateErr != nil {
+				return nil, updateErr
+			}
+			if updated != 1 {
+				return nil, biz.ErrProcessNodeInstanceConflict
+			}
+			if _, eventErr := tx.WorkflowTaskEvent.Create().SetTaskID(task.ID).SetTaskVersion(task.Version + 1).
+				SetEventType("recovery_withdrawn").SetFromStatusKey(task.TaskStatusKey).SetToStatusKey("rejected").
+				SetActorID(actorID).SetReason(reason).SetPayload(map[string]any{"recovery_decision": in.Decision}).Save(ctx); eventErr != nil {
+				return nil, eventErr
+			}
+		}
+		update := tx.ProcessNodeInstance.Update().Where(
+			processnodeinstance.ID(node.ID), processnodeinstance.Version(node.Version), processnodeinstance.Status(node.Status),
+		).SetStatus(biz.ProcessNodeStatusBlocked).SetOutcome(biz.ProcessDomainCommandRecoveryWithdrawnOutcome).
+			SetVersion(node.Version + 1)
+		if node.Status == biz.ProcessNodeStatusWaiting {
+			update.SetStartedAt(now)
+		}
+		updated, updateErr := update.Save(ctx)
+		if updateErr != nil {
+			return nil, updateErr
+		}
+		if updated != 1 {
+			return nil, biz.ErrProcessNodeInstanceConflict
+		}
+	}
+	updatedProcess, err := tx.ProcessInstance.Update().Where(
+		processinstance.ID(instance.ID), processinstance.StatusIn(biz.ProcessStatusActive, biz.ProcessStatusBlocked),
+	).SetStatus(biz.ProcessStatusBlocked).SetUpdatedBy(actorID).Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if updatedProcess != 1 {
+		return nil, biz.ErrProcessInstanceSettled
+	}
+	result, err := tx.ProcessNodeInstance.Get(ctx, origin.ID)
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return entProcessNodeInstanceToBiz(result), nil
+}
+
+func processRuntimeNodeHasDomainEvidence(node *ent.ProcessNodeInstance) bool {
+	return node != nil && (node.DomainCommandFingerprint != nil || node.DomainCommandProtocolVersion != nil ||
+		node.DomainCommandResultState != nil || node.DomainCommandResult != nil || node.DomainCommandResultHash != nil ||
+		node.DomainCommandEffectState != nil || node.DomainCommandEffectRefType != nil || node.DomainCommandEffectRefID != nil ||
+		node.DomainCommandCompensation != nil || node.DomainCommandCompensationHash != nil)
+}
+
+func processRuntimeNodeUsesNonSequentialRouting(node *ent.ProcessNodeInstance) bool {
+	if node == nil {
+		return true
+	}
+	for _, key := range []string{
+		"branch_policy_key", "fan_out_node_keys", "join_node_key", "join_policy",
+		"join_source_node_keys", "return_to_node_key", "return_outcomes", "return_max_attempts",
+	} {
+		if _, exists := node.PolicySnapshot[key]; exists {
+			return true
+		}
+	}
+	return false
+}
+
 func getProcessNodeInstanceWithClient(ctx context.Context, client *ent.Client, id int) (*biz.ProcessNodeInstance, error) {
 	if client == nil || id <= 0 {
 		return nil, biz.ErrBadParam
@@ -1161,6 +1368,10 @@ func entProcessNodeInstanceToBiz(row *ent.ProcessNodeInstance) *biz.ProcessNodeI
 		DomainCommandCompensationHash: row.DomainCommandCompensationHash,
 		DomainCommandCompensatedAt:    row.DomainCommandCompensatedAt,
 		DomainCommandCompensatedBy:    row.DomainCommandCompensatedBy,
+		DomainCommandRecoveryDecision: row.DomainCommandRecoveryDecision,
+		DomainCommandRecoveryHash:     row.DomainCommandRecoveryHash,
+		DomainCommandRecoveredAt:      row.DomainCommandRecoveredAt,
+		DomainCommandRecoveredBy:      row.DomainCommandRecoveredBy,
 		Version:                       row.Version,
 		CreatedAt:                     row.CreatedAt,
 		UpdatedAt:                     row.UpdatedAt,

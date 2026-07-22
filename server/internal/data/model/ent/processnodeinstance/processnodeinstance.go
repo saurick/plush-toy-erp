@@ -70,6 +70,14 @@ const (
 	FieldDomainCommandCompensatedAt = "domain_command_compensated_at"
 	// FieldDomainCommandCompensatedBy holds the string denoting the domain_command_compensated_by field in the database.
 	FieldDomainCommandCompensatedBy = "domain_command_compensated_by"
+	// FieldDomainCommandRecoveryDecision holds the string denoting the domain_command_recovery_decision field in the database.
+	FieldDomainCommandRecoveryDecision = "domain_command_recovery_decision"
+	// FieldDomainCommandRecoveryHash holds the string denoting the domain_command_recovery_hash field in the database.
+	FieldDomainCommandRecoveryHash = "domain_command_recovery_hash"
+	// FieldDomainCommandRecoveredAt holds the string denoting the domain_command_recovered_at field in the database.
+	FieldDomainCommandRecoveredAt = "domain_command_recovered_at"
+	// FieldDomainCommandRecoveredBy holds the string denoting the domain_command_recovered_by field in the database.
+	FieldDomainCommandRecoveredBy = "domain_command_recovered_by"
 	// FieldVersion holds the string denoting the version field in the database.
 	FieldVersion = "version"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
@@ -129,6 +137,10 @@ var Columns = []string{
 	FieldDomainCommandCompensationHash,
 	FieldDomainCommandCompensatedAt,
 	FieldDomainCommandCompensatedBy,
+	FieldDomainCommandRecoveryDecision,
+	FieldDomainCommandRecoveryHash,
+	FieldDomainCommandRecoveredAt,
+	FieldDomainCommandRecoveredBy,
 	FieldVersion,
 	FieldCreatedAt,
 	FieldUpdatedAt,
@@ -189,6 +201,12 @@ var (
 	DomainCommandCompensationHashValidator func(string) error
 	// DomainCommandCompensatedByValidator is a validator for the "domain_command_compensated_by" field. It is called by the builders before save.
 	DomainCommandCompensatedByValidator func(int) error
+	// DomainCommandRecoveryDecisionValidator is a validator for the "domain_command_recovery_decision" field. It is called by the builders before save.
+	DomainCommandRecoveryDecisionValidator func(string) error
+	// DomainCommandRecoveryHashValidator is a validator for the "domain_command_recovery_hash" field. It is called by the builders before save.
+	DomainCommandRecoveryHashValidator func(string) error
+	// DomainCommandRecoveredByValidator is a validator for the "domain_command_recovered_by" field. It is called by the builders before save.
+	DomainCommandRecoveredByValidator func(int) error
 	// DefaultVersion holds the default value on creation for the "version" field.
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
@@ -332,6 +350,26 @@ func ByDomainCommandCompensatedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByDomainCommandCompensatedBy orders the results by the domain_command_compensated_by field.
 func ByDomainCommandCompensatedBy(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDomainCommandCompensatedBy, opts...).ToFunc()
+}
+
+// ByDomainCommandRecoveryDecision orders the results by the domain_command_recovery_decision field.
+func ByDomainCommandRecoveryDecision(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandRecoveryDecision, opts...).ToFunc()
+}
+
+// ByDomainCommandRecoveryHash orders the results by the domain_command_recovery_hash field.
+func ByDomainCommandRecoveryHash(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandRecoveryHash, opts...).ToFunc()
+}
+
+// ByDomainCommandRecoveredAt orders the results by the domain_command_recovered_at field.
+func ByDomainCommandRecoveredAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandRecoveredAt, opts...).ToFunc()
+}
+
+// ByDomainCommandRecoveredBy orders the results by the domain_command_recovered_by field.
+func ByDomainCommandRecoveredBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldDomainCommandRecoveredBy, opts...).ToFunc()
 }
 
 // ByVersion orders the results by the version field.

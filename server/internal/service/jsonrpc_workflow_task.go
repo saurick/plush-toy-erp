@@ -25,6 +25,7 @@ var workflowTaskCreateProcessRuntimeAnchorKeys = []string{
 }
 
 var workflowTaskCreatePublicParamKeys = map[string]struct{}{
+	"idempotency_key":         {},
 	"task_code":               {},
 	"task_group":              {},
 	"task_name":               {},
@@ -233,6 +234,10 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 		if res := validateWorkflowTaskWritePublicParams(method, pm); res != nil {
 			return id, res, nil
 		}
+		idempotencyKey, ok := pm["idempotency_key"].(string)
+		if !ok || strings.TrimSpace(idempotencyKey) == "" {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "idempotency_key 必须是非空文本"}, nil
+		}
 		if err := biz.ValidatePublicWorkflowTaskNamespace(getString(pm, "task_group"), getString(pm, "task_code")); err != nil {
 			return id, d.mapWorkflowError(ctx, err), nil
 		}
@@ -249,6 +254,7 @@ func (d *jsonrpcDispatcher) handleWorkflowTask(
 			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "due_at 必须是 Unix 秒时间戳"}, nil
 		}
 		task, err := d.workflowUC.CreateTask(ctx, &biz.WorkflowTaskCreate{
+			IdempotencyKey:        idempotencyKey,
 			TaskCode:              getString(pm, "task_code"),
 			TaskGroup:             getString(pm, "task_group"),
 			TaskName:              getString(pm, "task_name"),

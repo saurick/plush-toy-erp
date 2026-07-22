@@ -13,11 +13,15 @@ test('inventoryApi: uses dedicated inventory JSON-RPC domain and admin auth', ()
   assert.match(source, /authScope:\s*AUTH_SCOPE\.ADMIN/)
 })
 
-test('inventoryApi: exposes read-only inventory ledger methods only', () => {
+test('inventoryApi: exposes ledger reads and controlled inventory operations only', () => {
   for (const methodName of [
     'list_inventory_balances',
     'list_inventory_lots',
     'list_inventory_txns',
+    'create_inventory_operation',
+    'post_inventory_operation',
+    'cancel_inventory_operation',
+    'get_inventory_operation',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }

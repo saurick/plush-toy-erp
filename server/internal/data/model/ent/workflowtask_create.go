@@ -365,6 +365,34 @@ func (_c *WorkflowTaskCreate) SetNillableCreatedBy(v *int) *WorkflowTaskCreate {
 	return _c
 }
 
+// SetCreateIdempotencyKey sets the "create_idempotency_key" field.
+func (_c *WorkflowTaskCreate) SetCreateIdempotencyKey(v string) *WorkflowTaskCreate {
+	_c.mutation.SetCreateIdempotencyKey(v)
+	return _c
+}
+
+// SetNillableCreateIdempotencyKey sets the "create_idempotency_key" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableCreateIdempotencyKey(v *string) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetCreateIdempotencyKey(*v)
+	}
+	return _c
+}
+
+// SetCreateIntentHash sets the "create_intent_hash" field.
+func (_c *WorkflowTaskCreate) SetCreateIntentHash(v string) *WorkflowTaskCreate {
+	_c.mutation.SetCreateIntentHash(v)
+	return _c
+}
+
+// SetNillableCreateIntentHash sets the "create_intent_hash" field if the given value is not nil.
+func (_c *WorkflowTaskCreate) SetNillableCreateIntentHash(v *string) *WorkflowTaskCreate {
+	if v != nil {
+		_c.SetCreateIntentHash(*v)
+	}
+	return _c
+}
+
 // SetUpdatedBy sets the "updated_by" field.
 func (_c *WorkflowTaskCreate) SetUpdatedBy(v int) *WorkflowTaskCreate {
 	_c.mutation.SetUpdatedBy(v)
@@ -638,6 +666,16 @@ func (_c *WorkflowTaskCreate) check() error {
 			return &ValidationError{Name: "created_by", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.created_by": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.CreateIdempotencyKey(); ok {
+		if err := workflowtask.CreateIdempotencyKeyValidator(v); err != nil {
+			return &ValidationError{Name: "create_idempotency_key", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.create_idempotency_key": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.CreateIntentHash(); ok {
+		if err := workflowtask.CreateIntentHashValidator(v); err != nil {
+			return &ValidationError{Name: "create_intent_hash", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.create_intent_hash": %w`, err)}
+		}
+	}
 	if v, ok := _c.mutation.UpdatedBy(); ok {
 		if err := workflowtask.UpdatedByValidator(v); err != nil {
 			return &ValidationError{Name: "updated_by", err: fmt.Errorf(`ent: validator failed for field "WorkflowTask.updated_by": %w`, err)}
@@ -782,6 +820,14 @@ func (_c *WorkflowTaskCreate) createSpec() (*WorkflowTask, *sqlgraph.CreateSpec)
 	if value, ok := _c.mutation.CreatedBy(); ok {
 		_spec.SetField(workflowtask.FieldCreatedBy, field.TypeInt, value)
 		_node.CreatedBy = &value
+	}
+	if value, ok := _c.mutation.CreateIdempotencyKey(); ok {
+		_spec.SetField(workflowtask.FieldCreateIdempotencyKey, field.TypeString, value)
+		_node.CreateIdempotencyKey = &value
+	}
+	if value, ok := _c.mutation.CreateIntentHash(); ok {
+		_spec.SetField(workflowtask.FieldCreateIntentHash, field.TypeString, value)
+		_node.CreateIntentHash = &value
 	}
 	if value, ok := _c.mutation.UpdatedBy(); ok {
 		_spec.SetField(workflowtask.FieldUpdatedBy, field.TypeInt, value)

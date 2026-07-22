@@ -85,6 +85,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         path: '/erp/warehouse/shipments',
         actionLabel: '打开出货单',
       },
+      {
+        title: '办理客户退货',
+        description: '从已出货记录发起退货，并跟进审核和实物收回。',
+        path: '/erp/sales/customer-returns',
+        actionLabel: '打开客户退货',
+      },
     ],
     workflow: [
       '确认客户和联系人资料完整。',
@@ -220,7 +226,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     cautions: [
       '出货放行只表示可以继续发货，不等于已经出库。',
       '释放预留不会增加库存总量，确认发货才会扣减库存。',
-      '库存台账是只读结果，调整必须从对应来源业务办理。',
+      '盘点、调拨和人工调整要在库存台账创建草稿并确认过账；未过账不会改变库存。',
     ],
     questions: commonQuestions,
   },
@@ -244,24 +250,24 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         actionLabel: '打开应收管理',
       },
       {
-        title: '办理单笔核对',
-        description: '从已过账应收、应付或发票生成核对记录。',
-        path: '/erp/finance/reconciliation',
-        actionLabel: '打开对账管理',
+        title: '办理收付款与核销',
+        description: '登记真实收付款，并按往来方和币种选择多笔应收或应付核销。',
+        path: '/erp/finance/payments',
+        actionLabel: '打开收付款',
       },
     ],
     workflow: [
       '先核对来源单号、往来方、金额和业务状态。',
       '从符合条件的入库、委外回货或出货记录生成财务记录。',
       '确认无误后过账，再按实际进展结清或取消。',
-      '需要核对时，从已过账记录生成单笔对账。',
+      '真实收付款到账后登记并选择多笔应收或应付核销；差异核对另到对账页面办理。',
     ],
     handoff:
       '采购与仓库提供已入库来源，业务与仓库提供已出货来源；金额或往来方异常先退回来源岗位核对。',
     cautions: [
       '应收只从已出货记录生成，应付只从符合条件的入库或委外回货生成。',
       '系统发票记录不等于税控开票已经完成。',
-      '对账记录不会自动生成付款、收款或会计凭证。',
+      '收付款和核销不会自动生成总账凭证；错误记录使用冲销或红冲，不能删除原事实。',
     ],
     questions: commonQuestions,
   },

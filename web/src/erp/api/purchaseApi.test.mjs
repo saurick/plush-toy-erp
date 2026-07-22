@@ -32,6 +32,10 @@ test('purchaseApi: exposes purchase receipt methods only', () => {
     'list_purchase_receipt_adjustments',
     'post_purchase_receipt_adjustment',
     'cancel_purchase_receipt_adjustment',
+    'create_purchase_rejection_disposition',
+    'post_purchase_rejection_disposition',
+    'cancel_purchase_rejection_disposition',
+    'get_purchase_rejection_disposition',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }

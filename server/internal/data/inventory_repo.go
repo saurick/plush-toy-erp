@@ -886,7 +886,7 @@ func isProductionReworkDispositionTxn(ctx context.Context, client *ent.Client, i
 		}
 		return false, err
 	}
-	return row.FactType == biz.ProductionFactRework, nil
+	return row.FactType == biz.ProductionFactRework || row.FactType == biz.ProductionFactScrap, nil
 }
 
 func validateInventoryLotStatusForTxn(status string, in *biz.InventoryTxnCreate, allowBlockedLotDisposition bool) error {
@@ -901,7 +901,7 @@ func validateInventoryLotStatusForTxn(status string, in *biz.InventoryTxnCreate,
 			return biz.ErrInventoryLotStatusBlocked
 		}
 	}
-	if in.SourceType == biz.PurchaseReturnSourceType && in.TxnType == biz.InventoryTxnOut {
+	if (in.SourceType == biz.PurchaseReturnSourceType || in.SourceType == biz.OutsourcingDispositionSourceType) && in.TxnType == biz.InventoryTxnOut {
 		switch status {
 		case biz.InventoryLotActive, biz.InventoryLotHold, biz.InventoryLotRejected:
 			return nil
