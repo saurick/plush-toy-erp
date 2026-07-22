@@ -75,6 +75,14 @@ type ProcessNodeInstance struct {
 	DomainCommandCompensatedAt *time.Time `json:"domain_command_compensated_at,omitempty"`
 	// DomainCommandCompensatedBy holds the value of the "domain_command_compensated_by" field.
 	DomainCommandCompensatedBy *int `json:"domain_command_compensated_by,omitempty"`
+	// DomainCommandRecoveryDecision holds the value of the "domain_command_recovery_decision" field.
+	DomainCommandRecoveryDecision *string `json:"domain_command_recovery_decision,omitempty"`
+	// DomainCommandRecoveryHash holds the value of the "domain_command_recovery_hash" field.
+	DomainCommandRecoveryHash *string `json:"domain_command_recovery_hash,omitempty"`
+	// DomainCommandRecoveredAt holds the value of the "domain_command_recovered_at" field.
+	DomainCommandRecoveredAt *time.Time `json:"domain_command_recovered_at,omitempty"`
+	// DomainCommandRecoveredBy holds the value of the "domain_command_recovered_by" field.
+	DomainCommandRecoveredBy *int `json:"domain_command_recovered_by,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
@@ -125,11 +133,11 @@ func (*ProcessNodeInstance) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case processnodeinstance.FieldPolicySnapshot, processnodeinstance.FieldDomainCommandResult, processnodeinstance.FieldDomainCommandCompensation:
 			values[i] = new([]byte)
-		case processnodeinstance.FieldID, processnodeinstance.FieldProcessInstanceID, processnodeinstance.FieldAttempt, processnodeinstance.FieldDomainCommandProtocolVersion, processnodeinstance.FieldDomainCommandEffectRefID, processnodeinstance.FieldDomainCommandResultRecordedBy, processnodeinstance.FieldDomainCommandCompensatedBy, processnodeinstance.FieldVersion:
+		case processnodeinstance.FieldID, processnodeinstance.FieldProcessInstanceID, processnodeinstance.FieldAttempt, processnodeinstance.FieldDomainCommandProtocolVersion, processnodeinstance.FieldDomainCommandEffectRefID, processnodeinstance.FieldDomainCommandResultRecordedBy, processnodeinstance.FieldDomainCommandCompensatedBy, processnodeinstance.FieldDomainCommandRecoveredBy, processnodeinstance.FieldVersion:
 			values[i] = new(sql.NullInt64)
-		case processnodeinstance.FieldNodeKey, processnodeinstance.FieldNodeType, processnodeinstance.FieldStatus, processnodeinstance.FieldOwnerPoolKey, processnodeinstance.FieldRequiredCapabilityKey, processnodeinstance.FieldFormProfileKey, processnodeinstance.FieldActionSetKey, processnodeinstance.FieldOutcome, processnodeinstance.FieldDomainCommandFingerprint, processnodeinstance.FieldDomainCommandResultState, processnodeinstance.FieldDomainCommandResultHash, processnodeinstance.FieldDomainCommandEffectState, processnodeinstance.FieldDomainCommandEffectRefType, processnodeinstance.FieldDomainCommandCompensationHash:
+		case processnodeinstance.FieldNodeKey, processnodeinstance.FieldNodeType, processnodeinstance.FieldStatus, processnodeinstance.FieldOwnerPoolKey, processnodeinstance.FieldRequiredCapabilityKey, processnodeinstance.FieldFormProfileKey, processnodeinstance.FieldActionSetKey, processnodeinstance.FieldOutcome, processnodeinstance.FieldDomainCommandFingerprint, processnodeinstance.FieldDomainCommandResultState, processnodeinstance.FieldDomainCommandResultHash, processnodeinstance.FieldDomainCommandEffectState, processnodeinstance.FieldDomainCommandEffectRefType, processnodeinstance.FieldDomainCommandCompensationHash, processnodeinstance.FieldDomainCommandRecoveryDecision, processnodeinstance.FieldDomainCommandRecoveryHash:
 			values[i] = new(sql.NullString)
-		case processnodeinstance.FieldDueAt, processnodeinstance.FieldStartedAt, processnodeinstance.FieldCompletedAt, processnodeinstance.FieldDomainCommandResultRecordedAt, processnodeinstance.FieldDomainCommandCompensatedAt, processnodeinstance.FieldCreatedAt, processnodeinstance.FieldUpdatedAt:
+		case processnodeinstance.FieldDueAt, processnodeinstance.FieldStartedAt, processnodeinstance.FieldCompletedAt, processnodeinstance.FieldDomainCommandResultRecordedAt, processnodeinstance.FieldDomainCommandCompensatedAt, processnodeinstance.FieldDomainCommandRecoveredAt, processnodeinstance.FieldCreatedAt, processnodeinstance.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -346,6 +354,34 @@ func (_m *ProcessNodeInstance) assignValues(columns []string, values []any) erro
 				_m.DomainCommandCompensatedBy = new(int)
 				*_m.DomainCommandCompensatedBy = int(value.Int64)
 			}
+		case processnodeinstance.FieldDomainCommandRecoveryDecision:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_recovery_decision", values[i])
+			} else if value.Valid {
+				_m.DomainCommandRecoveryDecision = new(string)
+				*_m.DomainCommandRecoveryDecision = value.String
+			}
+		case processnodeinstance.FieldDomainCommandRecoveryHash:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_recovery_hash", values[i])
+			} else if value.Valid {
+				_m.DomainCommandRecoveryHash = new(string)
+				*_m.DomainCommandRecoveryHash = value.String
+			}
+		case processnodeinstance.FieldDomainCommandRecoveredAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_recovered_at", values[i])
+			} else if value.Valid {
+				_m.DomainCommandRecoveredAt = new(time.Time)
+				*_m.DomainCommandRecoveredAt = value.Time
+			}
+		case processnodeinstance.FieldDomainCommandRecoveredBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field domain_command_recovered_by", values[i])
+			} else if value.Valid {
+				_m.DomainCommandRecoveredBy = new(int)
+				*_m.DomainCommandRecoveredBy = int(value.Int64)
+			}
 		case processnodeinstance.FieldVersion:
 			if value, ok := values[i].(*sql.NullInt64); !ok {
 				return fmt.Errorf("unexpected type %T for field version", values[i])
@@ -531,6 +567,26 @@ func (_m *ProcessNodeInstance) String() string {
 	builder.WriteString(", ")
 	if v := _m.DomainCommandCompensatedBy; v != nil {
 		builder.WriteString("domain_command_compensated_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandRecoveryDecision; v != nil {
+		builder.WriteString("domain_command_recovery_decision=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandRecoveryHash; v != nil {
+		builder.WriteString("domain_command_recovery_hash=")
+		builder.WriteString(*v)
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandRecoveredAt; v != nil {
+		builder.WriteString("domain_command_recovered_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.DomainCommandRecoveredBy; v != nil {
+		builder.WriteString("domain_command_recovered_by=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

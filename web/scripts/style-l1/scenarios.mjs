@@ -4793,6 +4793,214 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
+      name: 'mobile-nine-role-request-recovery-matrix',
+      path: '/m/engineering/tasks',
+      auth: 'admin',
+      customerKey: 'yoyoosun',
+      effectiveSession: {
+        configRevision: 'style-l1-mobile-nine-role-request-recovery-matrix',
+        configHash: 'style-l1-mobile-nine-role-request-recovery-matrix-hash',
+        customer: { key: 'yoyoosun', name: '永绅' },
+        pages: [],
+        actions: ['workflow.task.read'],
+        workflow_visible_owner_role_keys_by_capability: {
+          'workflow.task.read': [
+            'boss',
+            'sales',
+            'purchase',
+            'pmc',
+            'production',
+            'warehouse',
+            'quality',
+            'finance',
+            'engineering',
+          ],
+        },
+        fieldPolicies: {},
+        workPools: [],
+        source: 'active_customer_config_revision',
+      },
+      adminProfile: {
+        username: 'style-l1-nine-role-recovery-user',
+        is_super_admin: false,
+        roles: [
+          { role_key: 'boss', name: '老板' },
+          { role_key: 'sales', name: '业务' },
+          { role_key: 'purchase', name: '采购' },
+          { role_key: 'pmc', name: 'PMC' },
+          { role_key: 'production', name: '生产经理' },
+          { role_key: 'warehouse', name: '仓库' },
+          { role_key: 'quality', name: '品质' },
+          { role_key: 'finance', name: '财务' },
+          { role_key: 'engineering', name: '工程' },
+        ],
+        permissions: [
+          'mobile.boss.access',
+          'mobile.sales.access',
+          'mobile.purchase.access',
+          'mobile.pmc.access',
+          'mobile.production.access',
+          'mobile.warehouse.access',
+          'mobile.quality.access',
+          'mobile.finance.access',
+          'mobile.engineering.access',
+          'workflow.task.read',
+        ],
+        menus: [],
+      },
+      viewport: { width: 390, height: 844 },
+      expectedConsoleErrorPatterns: [
+        /console error \[path=\/m\/boss\/tasks\]: Failed to load resource: net::ERR_FAILED/u,
+        /console error \[path=\/m\/sales\/tasks\]: Failed to load resource: the server responded with a status of 408/u,
+        /console error \[path=\/m\/purchase\/tasks\]: Failed to load resource: the server responded with a status of 503/u,
+        /console error \[path=\/m\/warehouse\/tasks\]: Failed to load resource: the server responded with a status of 403/u,
+        /console error \[path=\/m\/pmc\/tasks\]: Failed to load resource: net::ERR_FAILED/u,
+        /console error \[path=\/m\/quality\/tasks\]: Failed to load resource: the server responded with a status of 408/u,
+      ],
+      verify: async (page) => {
+        const cases = [
+          { roleKey: 'boss', roleLabel: '老板', failure: 'network' },
+          { roleKey: 'sales', roleLabel: '业务', failure: 'timeout' },
+          {
+            roleKey: 'purchase',
+            roleLabel: '采购',
+            failure: 'unavailable',
+          },
+          {
+            roleKey: 'production',
+            roleLabel: '生产经理',
+            failure: 'invalid-success',
+          },
+          {
+            roleKey: 'warehouse',
+            roleLabel: '仓库',
+            failure: 'permission',
+          },
+          { roleKey: 'finance', roleLabel: '财务', failure: 'stale' },
+          { roleKey: 'pmc', roleLabel: 'PMC', failure: 'network' },
+          { roleKey: 'quality', roleLabel: '品质', failure: 'timeout' },
+          {
+            roleKey: 'engineering',
+            roleLabel: '工程',
+            failure: 'invalid-success',
+          },
+        ]
+
+        for (const testCase of cases) {
+          let failureCount = 0
+          let allowRecovery = false
+          const workflowFailureRoute = async (route) => {
+            const body = route.request().postDataJSON() || {}
+            const isTargetRequest =
+              body.method === 'list_role_tasks' &&
+              body.params?.role_key === testCase.roleKey
+            if (!isTargetRequest || allowRecovery) {
+              await route.fallback()
+              return
+            }
+            failureCount += 1
+            if (testCase.failure === 'network') {
+              await route.abort('failed')
+              return
+            }
+            if (testCase.failure === 'timeout') {
+              await route.fulfill({
+                status: 408,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  code: RpcErrorCode.INTERNAL,
+                  message: '请求超时',
+                }),
+              })
+              return
+            }
+            if (testCase.failure === 'unavailable') {
+              await route.fulfill({
+                status: 503,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  code: RpcErrorCode.INTERNAL,
+                  message: '服务暂不可用',
+                }),
+              })
+              return
+            }
+            if (testCase.failure === 'permission') {
+              await route.fulfill({
+                status: 403,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  code: RpcErrorCode.PERMISSION_DENIED,
+                  message: '当前岗位无权读取任务',
+                }),
+              })
+              return
+            }
+            if (testCase.failure === 'stale') {
+              await route.fulfill({
+                status: 200,
+                contentType: 'application/json',
+                body: JSON.stringify({
+                  jsonrpc: '2.0',
+                  id: body.id,
+                  result: {
+                    code: 40922,
+                    message: '任务已被其他处理人更新，请刷新后重试',
+                    data: {},
+                  },
+                }),
+              })
+              return
+            }
+            await route.fulfill({
+              status: 200,
+              contentType: 'application/json',
+              body: JSON.stringify({
+                jsonrpc: '2.0',
+                id: body.id,
+                result: null,
+              }),
+            })
+          }
+          await page.route('**/rpc/workflow', workflowFailureRoute)
+          try {
+            await gotoScenarioPath(
+              page,
+              `/m/${testCase.roleKey}/tasks?style_l1_failure=${testCase.failure}`,
+              { waitUntil: 'domcontentloaded' }
+            )
+            await waitForPath(page, `/m/${testCase.roleKey}/tasks`)
+            await page
+              .locator('.mobile-role-load-error')
+              .waitFor({ state: 'visible', timeout: 10_000 })
+            await expectText(page, testCase.roleLabel)
+            await expectText(page, '任务加载失败')
+            await expectButton(page, '重新加载')
+            allowRecovery = true
+            await page.getByRole('button', { name: '重新加载' }).click()
+            await page
+              .locator('.mobile-role-load-error')
+              .waitFor({ state: 'hidden', timeout: 10_000 })
+            await page.waitForFunction(
+              () =>
+                document
+                  .querySelector('[data-testid="mobile-role-scroll"]')
+                  ?.getAttribute('aria-busy') === 'false',
+              undefined,
+              { timeout: 10_000 }
+            )
+            assert.equal(
+              failureCount > 0,
+              true,
+              `${testCase.roleLabel}岗位应命中 ${testCase.failure} 失败注入`
+            )
+          } finally {
+            await page.unroute('**/rpc/workflow', workflowFailureRoute)
+          }
+        }
+      },
+    },
+    {
       name: 'mobile-yoyo-boss-urge-only',
       path: '/m/boss/tasks',
       auth: 'admin',
@@ -16542,6 +16750,112 @@ export function createStyleL1Scenarios(deps) {
           },
         })
         await assertNoHorizontalOverflow(page, 'textarea-show-count-layout')
+      },
+    },
+    {
+      name: 'exception-inventory-operation-dark-desktop',
+      path: '/erp/warehouse/inventory',
+      auth: 'admin',
+      themeMode: 'dark',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: [...customerRuntimeEffectiveSession.pages, 'inventory'],
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'warehouse.adjustment.create',
+        ],
+      },
+      viewport: { width: 1600, height: 900 },
+      verify: async (page) => {
+        await expectHeading(page, '库存台账')
+        await page.locator('.ant-table-row').first().click()
+        const cycleCountButton = page
+          .locator('button:visible')
+          .filter({ hasText: /盘\s*点/u })
+          .first()
+        await cycleCountButton.waitFor({ state: 'visible', timeout: 10_000 })
+        await cycleCountButton.click()
+        await page
+          .getByRole('dialog')
+          .getByText('登记库存盘点', { exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '过账时会再次核对账面数量')
+        await page.screenshot({
+          path: path.join(
+            outputDir,
+            'exception-inventory-operation-dark-desktop.png'
+          ),
+          fullPage: true,
+        })
+        await assertERPThemeMode(page, {
+          scenarioName: 'exception-inventory-operation-dark-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'exception-inventory-operation-dark-desktop'
+        )
+      },
+    },
+    {
+      name: 'exception-sales-return-mobile',
+      path: '/erp/sales/customer-returns',
+      auth: 'admin',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: [...customerRuntimeEffectiveSession.pages, 'sales-returns'],
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'sales_return.read',
+          'sales_return.create',
+          'sales_return.approve',
+          'sales_return.receive',
+          'sales_return.cancel',
+        ],
+      },
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '客户退货 / RMA')
+        await expectText(page, 'RMA-STYLE-L1')
+        await expectText(page, 'SHIP-STYLE-L1')
+        await expectButton(page, '新建客户退货')
+        await assertNoHorizontalOverflow(page, 'exception-sales-return-mobile')
+      },
+    },
+    {
+      name: 'exception-finance-payment-dark-desktop',
+      path: '/erp/finance/payments',
+      auth: 'admin',
+      themeMode: 'dark',
+      effectiveSession: {
+        ...customerRuntimeEffectiveSession,
+        pages: [...customerRuntimeEffectiveSession.pages, 'finance-payments'],
+        actions: [
+          ...customerRuntimeEffectiveSession.actions,
+          'finance.payment.read',
+          'finance.payment.create',
+          'finance.payment.post',
+          'finance.payment.reverse',
+          'finance.credit_note.create',
+          'finance.credit_note.reverse',
+        ],
+      },
+      viewport: { width: 1280, height: 800 },
+      verify: async (page) => {
+        await expectHeading(page, '收付款与核销')
+        await expectText(page, 'PAY-STYLE-L1')
+        await expectText(page, '回单 STYLE-L1')
+        await expectButton(page, '登记收付款')
+        await assertERPThemeMode(page, {
+          scenarioName: 'exception-finance-payment-dark-desktop',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'exception-finance-payment-dark-desktop'
+        )
       },
     },
     ...createWorkflowSourceTaskScenarios({

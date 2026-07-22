@@ -233,6 +233,35 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			Data:    newDataStruct(map[string]any{"revision": customerConfigRevisionToMap(item)}),
 		}, nil
 
+	case "recover_compensated_process_domain_command":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionProcessRuntimeRecover); res != nil {
+			return id, res, nil
+		}
+		admin, res := d.CurrentAdmin(ctx)
+		if res != nil {
+			return id, res, nil
+		}
+		in := &biz.ProcessDomainCommandRecovery{
+			ProcessInstanceID:        getInt(pm, "process_instance_id", 0),
+			ProcessNodeInstanceID:    getInt(pm, "process_node_instance_id", 0),
+			ExpectedVersion:          getInt(pm, "expected_version", 0),
+			Decision:                 getString(pm, "decision"),
+			ExpectedResultHash:       getString(pm, "expected_result_hash"),
+			ExpectedCompensationHash: getString(pm, "expected_compensation_hash"),
+		}
+		if !customerConfigAllowsOnly(pm, "process_instance_id", "process_node_instance_id", "expected_version", "decision", "expected_result_hash", "expected_compensation_hash") {
+			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
+		}
+		item, err := d.processRuntimeUC.RecoverCompensatedDomainCommand(ctx, in, admin.ID)
+		if err != nil {
+			return id, d.mapCustomerConfigError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data:    newDataStruct(map[string]any{"recovered_node": processNodeInstanceToMap(item)}),
+		}, nil
+
 	case "get_effective_session":
 		admin, res := d.CurrentAdmin(ctx)
 		if res != nil {
@@ -1865,4 +1894,17 @@ func toAnyMapStringString(values map[string]string) map[string]any {
 		out[key] = value
 	}
 	return out
+}
+
+func customerConfigAllowsOnly(pm map[string]any, keys ...string) bool {
+	allowed := make(map[string]struct{}, len(keys))
+	for _, key := range keys {
+		allowed[key] = struct{}{}
+	}
+	for key := range pm {
+		if _, ok := allowed[key]; !ok {
+			return false
+		}
+	}
+	return true
 }

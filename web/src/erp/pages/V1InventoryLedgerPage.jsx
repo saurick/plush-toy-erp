@@ -1,6 +1,19 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { DownOutlined, EyeOutlined, LinkOutlined } from '@ant-design/icons'
-import { Button, Card, Dropdown, Empty, Table, Tabs, Tag } from 'antd'
+import {
+  Alert,
+  Button,
+  Card,
+  Dropdown,
+  Empty,
+  Input,
+  Modal,
+  Popconfirm,
+  Space,
+  Table,
+  Tabs,
+  Tag,
+} from 'antd'
 import {
   useNavigate,
   useOutletContext,
@@ -10,8 +23,12 @@ import { message } from '@/common/utils/antdApp'
 import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   listInventoryBalances,
+  cancelInventoryOperation,
+  createInventoryOperation,
+  getInventoryOperation,
   listInventoryLots,
   listInventoryTxns,
+  postInventoryOperation,
 } from '../api/inventoryApi.mjs'
 import {
   listProductSKUs,
@@ -35,10 +52,12 @@ import {
   useBusinessColumnOrder,
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import InventoryOperationModal from '../components/inventory/InventoryOperationModal.jsx'
 import {
   compactParams,
   formatUnixDate,
   formatUnixDateTime,
+  hasActionPermission,
   trimOptional,
 } from '../utils/masterDataOrderView.mjs'
 import { businessSourceRouteFor } from '../utils/businessSourceNavigation.mjs'
@@ -68,10 +87,16 @@ import {
   searchParamText,
 } from '../utils/routeQuery.mjs'
 import { isRpcAbortError } from '@/common/utils/jsonRpc'
+import {
+  createSourceBusinessActionAttemptStore,
+  isSourceBusinessActionResultUnknown,
+} from '../utils/sourceBusinessAction.mjs'
 
 const VIEW_BALANCES = 'balances'
 const VIEW_LOTS = 'lots'
 const VIEW_TXNS = 'txns'
+const INVENTORY_OPERATION_SESSION_PREFIX =
+  'plush-erp:inventory-operation:last:v1:'
 
 const VIEW_ITEMS = [
   { key: VIEW_BALANCES, label: '库存余额', children: null },
@@ -317,6 +342,7 @@ export default function V1InventoryLedgerPage() {
   )
   const requestControllersRef = useRef({})
   const requestSequenceRef = useRef({})
+  const operationAttemptsRef = useRef(createSourceBusinessActionAttemptStore())
   const [activeView, setActiveView] = useState(VIEW_BALANCES)
   const [rows, setRows] = useState([])
   const [total, setTotal] = useState(0)
@@ -341,6 +367,12 @@ export default function V1InventoryLedgerPage() {
   const [loading, setLoading] = useState(false)
   const [selectedRow, setSelectedRow] = useState(null)
   const [detailRecord, setDetailRecord] = useState(null)
+  const [operationType, setOperationType] = useState('')
+  const [operationLoading, setOperationLoading] = useState(false)
+  const [currentOperation, setCurrentOperation] = useState(null)
+  const [operationRecoveryError, setOperationRecoveryError] = useState('')
+  const [operationCancelOpen, setOperationCancelOpen] = useState(false)
+  const [operationCancelReason, setOperationCancelReason] = useState('')
   const routeView = searchParamText(searchParams, 'view')
   const routeLotID = searchParamPositiveInt(searchParams, 'lot_id')
   const routeSourceID = searchParamPositiveInt(searchParams, 'source_id')
@@ -349,6 +381,19 @@ export default function V1InventoryLedgerPage() {
   const allowedMenuPaths = useMemo(
     () => outletContext?.allowedMenuPaths || [],
     [outletContext?.allowedMenuPaths]
+  )
+  const operationSessionKey = useMemo(() => {
+    const adminID = Number(adminProfile?.id || 0)
+    const customerKey = String(
+      adminProfile?.effective_session?.customer?.key || 'default'
+    ).trim()
+    return adminID > 0
+      ? `${INVENTORY_OPERATION_SESSION_PREFIX}${adminID}:${customerKey}`
+      : ''
+  }, [adminProfile])
+  const canCreateInventoryOperation = hasActionPermission(
+    adminProfile,
+    'warehouse.adjustment.create'
   )
   const canOpenRelatedPath = useCallback(
     (path) =>
@@ -390,6 +435,45 @@ export default function V1InventoryLedgerPage() {
     }
   }, [])
 
+  const rememberInventoryOperation = useCallback(
+    (operation) => {
+      setCurrentOperation(operation || null)
+      setOperationRecoveryError('')
+      if (!operationSessionKey || !operation?.id) return
+      window.sessionStorage.setItem(operationSessionKey, String(operation.id))
+    },
+    [operationSessionKey]
+  )
+
+  const recoverInventoryOperation = useCallback(
+    async (operationID, { quiet = false } = {}) => {
+      const id = Number(operationID || 0)
+      if (!id) return null
+      try {
+        const operation = await getInventoryOperation({ id })
+        if (!operation?.id) throw new Error('库存作业回执不完整')
+        rememberInventoryOperation(operation)
+        return operation
+      } catch (error) {
+        const text = getActionErrorMessage(error, '恢复最近库存作业')
+        setOperationRecoveryError(text)
+        if (!quiet) message.error(text)
+        return null
+      }
+    },
+    [rememberInventoryOperation]
+  )
+
+  useEffect(() => {
+    if (!operationSessionKey) return
+    const operationID = Number(
+      window.sessionStorage.getItem(operationSessionKey) || 0
+    )
+    if (operationID > 0) {
+      recoverInventoryOperation(operationID, { quiet: true })
+    }
+  }, [operationSessionKey, recoverInventoryOperation])
+
   const loadRows = useCallback(async () => {
     const request = beginLatestRequest('rows')
     setLoading(true)
@@ -428,7 +512,9 @@ export default function V1InventoryLedgerPage() {
         const routeSourceMatchesLocal =
           !localSourceType ||
           localSourceType.toUpperCase() ===
-            String(routeSourceType || '').trim().toUpperCase()
+            String(routeSourceType || '')
+              .trim()
+              .toUpperCase()
         data = await listInventoryTxns(
           compactParams({
             ...commonParams,
@@ -688,6 +774,128 @@ export default function V1InventoryLedgerPage() {
     () => uniqueReferenceOptions(inventoryLots, inventoryLotOption),
     [inventoryLots]
   )
+  const openInventoryOperation = useCallback(
+    (type) => {
+      if (!selectedRow || activeView !== VIEW_BALANCES) {
+        message.warning('请先在库存余额中选择一条库存记录')
+        return
+      }
+      setOperationType(type)
+    },
+    [activeView, selectedRow]
+  )
+
+  const submitInventoryOperation = useCallback(
+    async (values) => {
+      if (!selectedRow || !operationType) return
+      const item = compactParams({
+        line_no: '1',
+        subject_type: selectedRow.subject_type,
+        subject_id: selectedRow.subject_id,
+        product_sku_id: selectedRow.product_sku_id || undefined,
+        from_warehouse_id: selectedRow.warehouse_id,
+        from_lot_id: selectedRow.lot_id || undefined,
+        to_warehouse_id: values.to_warehouse_id || undefined,
+        to_lot_id: values.to_lot_id || undefined,
+        unit_id: selectedRow.unit_id,
+        expected_quantity:
+          operationType === 'CYCLE_COUNT'
+            ? String(selectedRow.quantity ?? '0')
+            : undefined,
+        counted_quantity:
+          operationType === 'CYCLE_COUNT'
+            ? String(values.counted_quantity || '').trim()
+            : undefined,
+        adjustment_quantity:
+          operationType === 'CYCLE_COUNT'
+            ? undefined
+            : String(values.adjustment_quantity || '').trim(),
+        note: trimOptional(values.note),
+      })
+      const payload = compactParams({
+        operation_no: trimOptional(values.operation_no),
+        operation_type: operationType,
+        reason: trimOptional(values.reason),
+        approval_ref: trimOptional(values.approval_ref),
+        items: [item],
+      })
+      const scope = `${operationType}:${selectedRow.subject_type}:${selectedRow.subject_id}:${selectedRow.product_sku_id || 0}:${selectedRow.warehouse_id}:${selectedRow.lot_id || 0}`
+      const attempt = operationAttemptsRef.current.prepare(scope, payload)
+      setOperationLoading(true)
+      try {
+        const operation = await createInventoryOperation(attempt.params)
+        if (!operation?.id || operation.status !== 'DRAFT') {
+          throw Object.assign(new Error('库存作业结果暂时无法确认'), {
+            isInvalidResponse: true,
+          })
+        }
+        operationAttemptsRef.current.settle(scope, attempt, null)
+        rememberInventoryOperation(operation)
+        setOperationType('')
+        message.success('库存作业草稿已生成，请核对后过账')
+      } catch (error) {
+        const retained = operationAttemptsRef.current.settle(
+          scope,
+          attempt,
+          error
+        )
+        message[retained ? 'warning' : 'error'](
+          retained
+            ? '提交结果暂时无法确认，请保持填写内容不变后重试'
+            : getActionErrorMessage(error, '生成库存作业')
+        )
+      } finally {
+        setOperationLoading(false)
+      }
+    },
+    [operationType, rememberInventoryOperation, selectedRow]
+  )
+
+  const transitionInventoryOperation = useCallback(
+    async (action, reason = '') => {
+      if (!currentOperation?.id || !currentOperation?.version) return
+      setOperationLoading(true)
+      try {
+        const params = {
+          id: currentOperation.id,
+          expected_version: currentOperation.version,
+          ...(reason ? { reason: reason.trim() } : {}),
+        }
+        const next =
+          action === 'post'
+            ? await postInventoryOperation(params)
+            : await cancelInventoryOperation(params)
+        if (!next?.id) throw new Error('库存作业结果暂时无法确认')
+        rememberInventoryOperation(next)
+        setOperationCancelOpen(false)
+        setOperationCancelReason('')
+        await loadRows()
+        message.success(action === 'post' ? '库存作业已过账' : '库存作业已取消')
+      } catch (error) {
+        if (isSourceBusinessActionResultUnknown(error)) {
+          const recovered = await recoverInventoryOperation(
+            currentOperation.id,
+            {
+              quiet: true,
+            }
+          )
+          if (recovered?.status !== currentOperation.status) {
+            message.success('已重新读取库存作业结果')
+            return
+          }
+        }
+        message.error(getActionErrorMessage(error, '处理库存作业'))
+      } finally {
+        setOperationLoading(false)
+      }
+    },
+    [
+      currentOperation,
+      loadRows,
+      recoverInventoryOperation,
+      rememberInventoryOperation,
+    ]
+  )
   const renderSubjectReference = useCallback(
     (value, record) => {
       if (record?.subject_type === 'PRODUCT') {
@@ -722,6 +930,23 @@ export default function V1InventoryLedgerPage() {
   const renderUnitReference = useCallback(
     (value) => referenceLabel(unitOptions, value, '单位'),
     [unitOptions]
+  )
+  const operationSourceLabels = useMemo(
+    () => ({
+      subject: selectedRow
+        ? renderSubjectReference(selectedRow.subject_id, selectedRow)
+        : '',
+      warehouse: selectedRow
+        ? renderWarehouseReference(selectedRow.warehouse_id)
+        : '',
+      lot: selectedRow ? renderLotReference(selectedRow.lot_id) : '',
+    }),
+    [
+      renderLotReference,
+      renderSubjectReference,
+      renderWarehouseReference,
+      selectedRow,
+    ]
   )
 
   const stats = useMemo(
@@ -1060,7 +1285,7 @@ export default function V1InventoryLedgerPage() {
       <PageHeaderCard
         compact
         title="库存台账"
-        description="可分别查看库存余额、库存批次和库存变动记录；按仓库筛选批次时只显示当前有余额的批次，历史变动请到库存变动记录中查询。本页只用于查询和追溯。"
+        description="可查询余额、批次和库存变动，也可从选中的真实库存余额登记盘点、调拨和经审批的人工调整；作业草稿只有过账后才会形成库存变动。"
         tags={[
           <Tag color="blue" key="balances">
             余额只读
@@ -1071,10 +1296,72 @@ export default function V1InventoryLedgerPage() {
           <Tag color="green" key="txns">
             变动追溯
           </Tag>,
-          <Tag key="mode">不会改变库存</Tag>,
+          <Tag key="mode">草稿不改变库存</Tag>,
         ]}
         stats={stats}
       />
+
+      {currentOperation || operationRecoveryError ? (
+        <Alert
+          className="erp-inventory-operation-receipt"
+          type={operationRecoveryError ? 'warning' : 'info'}
+          showIcon
+          message={
+            currentOperation
+              ? `最近库存作业：${currentOperation.operation_no || '已登记'} / ${
+                  {
+                    DRAFT: '草稿',
+                    POSTED: '已过账',
+                    CANCELLED: '已取消',
+                  }[currentOperation.status] || '状态待核对'
+                }`
+              : '最近库存作业暂时无法恢复'
+          }
+          description={
+            operationRecoveryError ||
+            (currentOperation?.status === 'DRAFT'
+              ? '请核对作业内容后过账，或填写原因取消；过账前库存不会变化。'
+              : currentOperation?.cancel_reason ||
+                currentOperation?.reason ||
+                '')
+          }
+          action={
+            currentOperation?.status === 'DRAFT' ? (
+              <Space wrap>
+                <Popconfirm
+                  title="确认过账这张库存作业？"
+                  okText="确认过账"
+                  cancelText="返回"
+                  onConfirm={() => transitionInventoryOperation('post')}
+                >
+                  <Button
+                    type="primary"
+                    size="small"
+                    loading={operationLoading}
+                  >
+                    过账
+                  </Button>
+                </Popconfirm>
+                <Button
+                  danger
+                  size="small"
+                  disabled={operationLoading}
+                  onClick={() => setOperationCancelOpen(true)}
+                >
+                  取消作业
+                </Button>
+              </Space>
+            ) : currentOperation?.id ? (
+              <Button
+                size="small"
+                onClick={() => recoverInventoryOperation(currentOperation.id)}
+              >
+                重新读取
+              </Button>
+            ) : null
+          }
+        />
+      ) : null}
 
       <BusinessOperationPanel
         compact
@@ -1260,19 +1547,44 @@ export default function V1InventoryLedgerPage() {
           </>
         }
         actions={
-          <BusinessListToolbarActions
-            moduleTitle="库存台账"
-            onExport={exportRows}
-            exportDisabled={rows.length === 0}
-            onOpenColumnOrder={openColumnOrder}
-          />
+          <Space size={8} wrap>
+            {canCreateInventoryOperation ? (
+              <>
+                <Button
+                  type="primary"
+                  disabled={!selectedRow || activeView !== VIEW_BALANCES}
+                  onClick={() => openInventoryOperation('CYCLE_COUNT')}
+                >
+                  盘点
+                </Button>
+                <Button
+                  disabled={!selectedRow || activeView !== VIEW_BALANCES}
+                  onClick={() => openInventoryOperation('TRANSFER')}
+                >
+                  调拨
+                </Button>
+                <Button
+                  disabled={!selectedRow || activeView !== VIEW_BALANCES}
+                  onClick={() => openInventoryOperation('MANUAL_ADJUSTMENT')}
+                >
+                  人工调整
+                </Button>
+              </>
+            ) : null}
+            <BusinessListToolbarActions
+              moduleTitle="库存台账"
+              onExport={exportRows}
+              exportDisabled={rows.length === 0}
+              onOpenColumnOrder={openColumnOrder}
+            />
+          </Space>
         }
       >
         <SelectionActionBar
           embedded
           selectedCount={selectedRow ? 1 : 0}
           selectedLabel={selectedLabelFor(activeView, selectedRow)}
-          boundaryText="当前页仅供查询和追溯；不能在这里更改库存、进行盘点调整、确认出库、修改批次状态或自动扣减预留数量。"
+          boundaryText="盘点、调拨和人工调整只从所选库存余额生成受控作业；草稿不会改变库存，确认出库、批次状态和预留仍由各自业务入口处理。"
         >
           <Button
             type="link"
@@ -1367,6 +1679,43 @@ export default function V1InventoryLedgerPage() {
         title={`${activeLabel}详情`}
         onClose={() => setDetailRecord(null)}
       />
+      <InventoryOperationModal
+        open={Boolean(operationType)}
+        operationType={operationType}
+        sourceRecord={selectedRow}
+        sourceLabels={operationSourceLabels}
+        warehouseOptions={warehouseOptions}
+        lotOptions={inventoryLotOptions}
+        loading={operationLoading}
+        onCancel={() => setOperationType('')}
+        onSubmit={submitInventoryOperation}
+      />
+      <Modal
+        title="取消库存作业"
+        open={operationCancelOpen}
+        okText="确认取消"
+        cancelText="返回"
+        okButtonProps={{ danger: true }}
+        confirmLoading={operationLoading}
+        closable={!operationLoading}
+        onCancel={() => !operationLoading && setOperationCancelOpen(false)}
+        onOk={() => {
+          if (!operationCancelReason.trim()) {
+            message.warning('请填写取消原因')
+            return
+          }
+          transitionInventoryOperation('cancel', operationCancelReason)
+        }}
+      >
+        <Input.TextArea
+          value={operationCancelReason}
+          rows={3}
+          maxLength={255}
+          showCount
+          placeholder="请填写取消原因"
+          onChange={(event) => setOperationCancelReason(event.target.value)}
+        />
+      </Modal>
     </BusinessPageLayout>
   )
 }

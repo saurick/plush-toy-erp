@@ -141,6 +141,14 @@ func (d *jsonrpcDispatcher) mapPurchaseError(ctx context.Context, err error) *v1
 		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "该不合格质检已生成未取消的采购退货单"}
 	case errors.Is(err, biz.ErrPurchaseReturnQuantityExceeded):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "本次退货数量超过该入库行剩余可退数量"}
+	case errors.Is(err, biz.ErrPurchaseRejectionDispositionNotFound):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "来料拒收处置单不存在"}
+	case errors.Is(err, biz.ErrPurchaseRejectionSourceInvalid):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "拒收质检与待入库单据不一致，请刷新后重试"}
+	case errors.Is(err, biz.ErrPurchaseRejectionSourceState):
+		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "仅首次来料未入库且质检不合格时可办理退厂处置"}
+	case errors.Is(err, biz.ErrPurchaseRejectionConflict):
+		return &v1.JsonrpcResult{Code: errcode.IdempotencyConflict.Code, Message: "来料拒收处置已被其他人处理，或该质检已有有效处置单，请刷新后重试"}
 	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentNotFound):
 		return &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: "采购入库调整单不存在"}
 	case errors.Is(err, biz.ErrPurchaseReceiptAdjustmentItemNotFound):

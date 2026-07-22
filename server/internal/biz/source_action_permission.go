@@ -54,6 +54,7 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "operational_fact", Method: "create_stock_reservation_from_sales_order", Rules: sourceReadRules(PermissionSalesOrderRead, PermissionSalesOrderItemRead)},
 	{Domain: "operational_fact", Method: "create_receivable_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "operational_fact", Method: "create_invoice_from_shipment", Rules: sourceReadRules(PermissionShipmentRead)},
+	{Domain: "operational_fact", Method: "create_sales_return", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_purchase_receipt", Rules: sourceReadRules(PermissionPurchaseReceiptRead, PermissionPurchaseReturnRead, PermissionPurchaseReceiptAdjustmentRead)},
 	{Domain: "operational_fact", Method: "create_payable_from_outsourcing_return", Rules: sourceReadRules(PermissionOutsourcingFactRead, PermissionOutsourcingOrderRead, PermissionQualityInspectionRead)},
 	{

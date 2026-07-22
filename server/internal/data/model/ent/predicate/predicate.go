@@ -39,14 +39,29 @@ type CustomerConfigRevision func(*sql.Selector)
 // DeploymentModuleState is the predicate function for deploymentmodulestate builders.
 type DeploymentModuleState func(*sql.Selector)
 
+// FinanceAllocation is the predicate function for financeallocation builders.
+type FinanceAllocation func(*sql.Selector)
+
+// FinanceCreditNote is the predicate function for financecreditnote builders.
+type FinanceCreditNote func(*sql.Selector)
+
 // FinanceFact is the predicate function for financefact builders.
 type FinanceFact func(*sql.Selector)
+
+// FinancePayment is the predicate function for financepayment builders.
+type FinancePayment func(*sql.Selector)
 
 // InventoryBalance is the predicate function for inventorybalance builders.
 type InventoryBalance func(*sql.Selector)
 
 // InventoryLot is the predicate function for inventorylot builders.
 type InventoryLot func(*sql.Selector)
+
+// InventoryOperation is the predicate function for inventoryoperation builders.
+type InventoryOperation func(*sql.Selector)
+
+// InventoryOperationItem is the predicate function for inventoryoperationitem builders.
+type InventoryOperationItem func(*sql.Selector)
 
 // InventoryTxn is the predicate function for inventorytxn builders.
 type InventoryTxn func(*sql.Selector)
@@ -62,6 +77,9 @@ type OutsourcingOrder func(*sql.Selector)
 
 // OutsourcingOrderItem is the predicate function for outsourcingorderitem builders.
 type OutsourcingOrderItem func(*sql.Selector)
+
+// OutsourcingReturnDisposition is the predicate function for outsourcingreturndisposition builders.
+type OutsourcingReturnDisposition func(*sql.Selector)
 
 // Permission is the predicate function for permission builders.
 type Permission func(*sql.Selector)
@@ -80,6 +98,9 @@ type Product func(*sql.Selector)
 
 // ProductSKU is the predicate function for productsku builders.
 type ProductSKU func(*sql.Selector)
+
+// ProductionExceptionDecision is the predicate function for productionexceptiondecision builders.
+type ProductionExceptionDecision func(*sql.Selector)
 
 // ProductionFact is the predicate function for productionfact builders.
 type ProductionFact func(*sql.Selector)
@@ -129,6 +150,9 @@ type PurchaseReceiptAdjustmentItem func(*sql.Selector)
 // PurchaseReceiptItem is the predicate function for purchasereceiptitem builders.
 type PurchaseReceiptItem func(*sql.Selector)
 
+// PurchaseRejectionDisposition is the predicate function for purchaserejectiondisposition builders.
+type PurchaseRejectionDisposition func(*sql.Selector)
+
 // PurchaseReturn is the predicate function for purchasereturn builders.
 type PurchaseReturn func(*sql.Selector)
 
@@ -161,6 +185,12 @@ type SalesOrder func(*sql.Selector)
 
 // SalesOrderItem is the predicate function for salesorderitem builders.
 type SalesOrderItem func(*sql.Selector)
+
+// SalesReturn is the predicate function for salesreturn builders.
+type SalesReturn func(*sql.Selector)
+
+// SalesReturnItem is the predicate function for salesreturnitem builders.
+type SalesReturnItem func(*sql.Selector)
 
 // Shipment is the predicate function for shipment builders.
 type Shipment func(*sql.Selector)

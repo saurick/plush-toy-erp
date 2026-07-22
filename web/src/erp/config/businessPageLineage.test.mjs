@@ -22,9 +22,7 @@ function serviceMethodActions(relativePaths) {
   for (const relativePath of relativePaths) {
     const source = readFileSync(new URL(relativePath, import.meta.url), 'utf8')
     for (const match of source.matchAll(casePattern)) {
-      for (const actionMatch of match[1].matchAll(
-        /"([a-z][a-z0-9_]+)"/gu
-      )) {
+      for (const actionMatch of match[1].matchAll(/"([a-z][a-z0-9_]+)"/gu)) {
         actions.add(actionMatch[1])
       }
     }
@@ -65,6 +63,13 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'get_purchase_receipt_adjustment',
   'get_purchase_return',
   'get_quality_inspection',
+  'get_finance_payment',
+  'get_finance_credit_note',
+  'get_inventory_operation',
+  'get_outsourcing_return_disposition',
+  'get_production_exception',
+  'get_purchase_rejection_disposition',
+  'get_sales_return',
   'get_sales_order',
   'get_shipment',
   'get_supplier',
@@ -72,6 +77,11 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_contacts_by_owner',
   'list_customers',
   'list_finance_facts',
+  'list_finance_credit_notes',
+  'list_finance_payments',
+  'list_inventory_balances',
+  'list_inventory_lots',
+  'list_inventory_txns',
   'list_materials',
   'list_outsourcing_facts',
   'list_outsourcing_order_items',
@@ -89,6 +99,7 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_quality_inspections',
   'list_sales_order_items',
   'list_sales_orders',
+  'list_sales_returns',
   'list_shipments',
   'list_stock_reservations',
   'list_suppliers',
@@ -156,6 +167,15 @@ const NON_LINEAGE_BACKEND_ONLY_ACTIONS = Object.freeze([
   // start + execute command. Keep the server command, but do not advertise a
   // second direct UI lifecycle path.
   'submit_sales_order',
+  'approve_production_exception',
+  'cancel_outsourcing_return_disposition',
+  'cancel_production_exception',
+  'correct_quality_inspection_result',
+  'create_outsourcing_return_disposition',
+  'post_outsourcing_return_disposition',
+  'recover_compensated_process_domain_command',
+  'reject_production_exception',
+  'submit_production_exception',
 ])
 
 test('business page lineage: exactly covers every formal-v1 business module once', () => {
@@ -163,7 +183,7 @@ test('business page lineage: exactly covers every formal-v1 business module once
     (definition) => definition.pageKey
   )
 
-  assert.equal(formalModuleKeys.length, 23)
+  assert.equal(formalModuleKeys.length, 25)
   assert.equal(new Set(lineageKeys).size, lineageKeys.length)
   assert.deepEqual([...lineageKeys].sort(), [...formalModuleKeys].sort())
   assert.equal(getBusinessPageLineage('inbound')?.pageRole, 'source_generated')
@@ -469,6 +489,7 @@ test('business page lineage: producer and typed flow actions are backed by curre
   const contractSource = [
     '../api/bomApi.mjs',
     '../api/customerConfigApi.mjs',
+    '../api/inventoryApi.mjs',
     '../api/masterDataOrderApi.mjs',
     '../api/operationalFactApi.mjs',
     '../api/productionOrderApi.mjs',
@@ -515,9 +536,9 @@ test('business page lineage: every source-derived action is covered by the serve
     'utf8'
   )
   const contractedActions = new Set(
-    [...sourcePermissionContract.matchAll(/Method:\s*"([a-z][a-z0-9_]+)"/gu)].map(
-      (match) => match[1]
-    )
+    [
+      ...sourcePermissionContract.matchAll(/Method:\s*"([a-z][a-z0-9_]+)"/gu),
+    ].map((match) => match[1])
   )
   const sourceDerivedFlowTypes = new Set([
     BUSINESS_FLOW_TYPES.SOURCE_QUERY,
@@ -583,6 +604,7 @@ test('business page lineage: real source and lifecycle service actions are class
   const apiActions = apiMethodActions([
     '../api/bomApi.mjs',
     '../api/customerConfigApi.mjs',
+    '../api/inventoryApi.mjs',
     '../api/masterDataOrderApi.mjs',
     '../api/operationalFactApi.mjs',
     '../api/productionOrderApi.mjs',
@@ -631,8 +653,7 @@ test('business page lineage: real source and lifecycle service actions are class
   }
   const unclassifiedActions = [...discoveredActions]
     .filter(
-      (action) =>
-        !registeredActions.has(action) && !excludedActions.has(action)
+      (action) => !registeredActions.has(action) && !excludedActions.has(action)
     )
     .sort()
   assert.deepEqual(
@@ -707,8 +728,7 @@ test('business page lineage: sales-order submit has one formal UI path through p
     assert.equal(
       actionFlows.every(
         (flowDefinition) =>
-          flowDefinition.availability ===
-          BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED
+          flowDefinition.availability === BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED
       ),
       true,
       action
@@ -737,9 +757,7 @@ test('business page lineage: sales-order submit has one formal UI path through p
 
 test('business page lineage: invoice facts cannot advertise settlement', () => {
   const settledPageKeys = businessPageFlowDefinitions
-    .filter(
-      (flowDefinition) => flowDefinition.action === 'settle_finance_fact'
-    )
+    .filter((flowDefinition) => flowDefinition.action === 'settle_finance_fact')
     .map((flowDefinition) => flowDefinition.fromPageKey)
 
   assert.deepEqual(settledPageKeys, [
@@ -838,8 +856,7 @@ test('business page lineage: carry-over, generation, WIP quality, and reversal s
     assert.equal(
       flowsForAction(action).some(
         (flowDefinition) =>
-          flowDefinition.flowType ===
-          BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION
+          flowDefinition.flowType === BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION
       ),
       true,
       action
@@ -962,10 +979,7 @@ test('business page lineage: source lifecycle actions preserve every workflow pr
         flowDefinition.toPageKey === toPageKey
     )
 
-  for (const action of [
-    'close_production_order',
-    'cancel_production_order',
-  ]) {
+  for (const action of ['close_production_order', 'cancel_production_order']) {
     assert.equal(
       hasFlow(
         action,

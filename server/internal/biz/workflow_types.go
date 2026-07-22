@@ -108,6 +108,8 @@ type WorkflowTaskBoard struct {
 }
 
 type WorkflowTaskCreate struct {
+	IdempotencyKey        string
+	IntentHash            string
 	TaskCode              string
 	TaskGroup             string
 	TaskName              string

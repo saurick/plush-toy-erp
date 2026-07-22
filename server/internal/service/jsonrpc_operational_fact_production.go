@@ -14,6 +14,8 @@ func (d *jsonrpcDispatcher) handleOperationalFactProduction(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
+	case "submit_production_exception", "approve_production_exception", "reject_production_exception", "cancel_production_exception", "get_production_exception":
+		return d.handleProductionException(ctx, method, id, pm, actorID)
 	case "create_production_completion_from_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionProductionCompletionCreate); res != nil {
 			return id, res, nil

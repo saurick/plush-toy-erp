@@ -24,7 +24,8 @@ func (d *jsonrpcDispatcher) handleQuality(
 	if params != nil {
 		pm = params.AsMap()
 	}
-	if _, res := d.requireAdmin(ctx); res != nil {
+	claims, res := d.requireAdmin(ctx)
+	if res != nil {
 		return id, res, nil
 	}
 	if d.inventoryUC == nil {
@@ -123,6 +124,22 @@ func (d *jsonrpcDispatcher) handleQuality(
 			return id, res, nil
 		}
 		item, err := d.inventoryUC.CancelQualityInspection(ctx, getInt(pm, "id", 0), getWorkflowStringPtr(pm, "decision_note"))
+		return id, qualityInspectionResult(ctx, d, item, err), nil
+	case "correct_quality_inspection_result":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityExceptionHandle); res != nil {
+			return id, res, nil
+		}
+		if !jsonRPCParamsAllowed(pm, "customer_key", "id", "correction_inspection_no", "reason") {
+			return id, invalidParamResult(), nil
+		}
+		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "quality_inspections"); res != nil {
+			return id, res, nil
+		}
+		item, err := d.inventoryUC.CorrectQualityInspectionResult(ctx, &biz.QualityInspectionCorrectionCreate{
+			InspectionID:           getInt(pm, "id", 0),
+			CorrectionInspectionNo: getString(pm, "correction_inspection_no"),
+			Reason:                 getString(pm, "reason"),
+		}, claims.UserID)
 		return id, qualityInspectionResult(ctx, d, item, err), nil
 	case "get_quality_inspection":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionQualityInspectionRead); res != nil {
@@ -513,39 +530,43 @@ func qualityInspectionToAny(item *biz.QualityInspection) map[string]any {
 		return map[string]any{}
 	}
 	return map[string]any{
-		"id":                       item.ID,
-		"inspection_no":            item.InspectionNo,
-		"purchase_receipt_id":      positiveIntToAny(item.PurchaseReceiptID),
-		"purchase_receipt_item_id": optionalIntToAny(item.PurchaseReceiptItemID),
-		"inventory_lot_id":         positiveIntToAny(item.InventoryLotID),
-		"production_wip_batch_id":  optionalIntToAny(item.ProductionWIPBatchID),
-		"gate_code":                optionalStringToAny(item.GateCode),
-		"material_id":              positiveIntToAny(item.MaterialID),
-		"warehouse_id":             positiveIntToAny(item.WarehouseID),
-		"source_type":              optionalStringToAny(item.SourceType),
-		"source_id":                optionalIntToAny(item.SourceID),
-		"source_no":                optionalStringToAny(item.SourceNo),
-		"inspection_type":          optionalStringToAny(item.InspectionType),
-		"subject_type":             optionalStringToAny(item.SubjectType),
-		"subject_id":               optionalIntToAny(item.SubjectID),
-		"status":                   item.Status,
-		"result":                   optionalStringToAny(item.Result),
-		"original_lot_status":      item.OriginalLotStatus,
-		"inspected_at":             optionalUnix(item.InspectedAt),
-		"inspector_id":             optionalIntToAny(item.InspectorID),
-		"defect_rate_operator":     optionalStringToAny(item.DefectRateOperator),
-		"defect_rate_percent":      optionalDecimalString(item.DefectRatePercent),
-		"decision_note":            optionalStringToAny(item.DecisionNote),
-		"production_order_no":      optionalStringToAny(item.ProductionOrderNo),
-		"production_order_item_id": optionalIntToAny(item.ProductionOrderItemID),
-		"product_code":             optionalStringToAny(item.ProductCode),
-		"product_name":             optionalStringToAny(item.ProductName),
-		"operation_code":           optionalStringToAny(item.OperationCode),
-		"operation_name":           optionalStringToAny(item.OperationName),
-		"wip_batch_no":             optionalStringToAny(item.WIPBatchNo),
-		"batch_quantity":           optionalDecimalString(item.BatchQuantity),
-		"created_at":               item.CreatedAt.Unix(),
-		"updated_at":               item.UpdatedAt.Unix(),
+		"id":                          item.ID,
+		"inspection_no":               item.InspectionNo,
+		"purchase_receipt_id":         positiveIntToAny(item.PurchaseReceiptID),
+		"purchase_receipt_item_id":    optionalIntToAny(item.PurchaseReceiptItemID),
+		"inventory_lot_id":            positiveIntToAny(item.InventoryLotID),
+		"production_wip_batch_id":     optionalIntToAny(item.ProductionWIPBatchID),
+		"gate_code":                   optionalStringToAny(item.GateCode),
+		"material_id":                 positiveIntToAny(item.MaterialID),
+		"warehouse_id":                positiveIntToAny(item.WarehouseID),
+		"source_type":                 optionalStringToAny(item.SourceType),
+		"source_id":                   optionalIntToAny(item.SourceID),
+		"source_no":                   optionalStringToAny(item.SourceNo),
+		"inspection_type":             optionalStringToAny(item.InspectionType),
+		"subject_type":                optionalStringToAny(item.SubjectType),
+		"subject_id":                  optionalIntToAny(item.SubjectID),
+		"status":                      item.Status,
+		"result":                      optionalStringToAny(item.Result),
+		"original_lot_status":         item.OriginalLotStatus,
+		"inspected_at":                optionalUnix(item.InspectedAt),
+		"inspector_id":                optionalIntToAny(item.InspectorID),
+		"defect_rate_operator":        optionalStringToAny(item.DefectRateOperator),
+		"defect_rate_percent":         optionalDecimalString(item.DefectRatePercent),
+		"decision_note":               optionalStringToAny(item.DecisionNote),
+		"correction_of_inspection_id": optionalIntToAny(item.CorrectionOfInspectionID),
+		"superseded_at":               optionalUnix(item.SupersededAt),
+		"superseded_by":               optionalIntToAny(item.SupersededBy),
+		"superseded_reason":           optionalStringToAny(item.SupersededReason),
+		"production_order_no":         optionalStringToAny(item.ProductionOrderNo),
+		"production_order_item_id":    optionalIntToAny(item.ProductionOrderItemID),
+		"product_code":                optionalStringToAny(item.ProductCode),
+		"product_name":                optionalStringToAny(item.ProductName),
+		"operation_code":              optionalStringToAny(item.OperationCode),
+		"operation_name":              optionalStringToAny(item.OperationName),
+		"wip_batch_no":                optionalStringToAny(item.WIPBatchNo),
+		"batch_quantity":              optionalDecimalString(item.BatchQuantity),
+		"created_at":                  item.CreatedAt.Unix(),
+		"updated_at":                  item.UpdatedAt.Unix(),
 	}
 }
 

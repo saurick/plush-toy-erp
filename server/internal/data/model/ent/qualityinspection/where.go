@@ -146,6 +146,26 @@ func InspectorID(v int) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldInspectorID, v))
 }
 
+// CorrectionOfInspectionID applies equality check predicate on the "correction_of_inspection_id" field. It's identical to CorrectionOfInspectionIDEQ.
+func CorrectionOfInspectionID(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldCorrectionOfInspectionID, v))
+}
+
+// SupersededAt applies equality check predicate on the "superseded_at" field. It's identical to SupersededAtEQ.
+func SupersededAt(v time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSupersededAt, v))
+}
+
+// SupersededBy applies equality check predicate on the "superseded_by" field. It's identical to SupersededByEQ.
+func SupersededBy(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSupersededBy, v))
+}
+
+// SupersededReason applies equality check predicate on the "superseded_reason" field. It's identical to SupersededReasonEQ.
+func SupersededReason(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSupersededReason, v))
+}
+
 // DefectRateOperator applies equality check predicate on the "defect_rate_operator" field. It's identical to DefectRateOperatorEQ.
 func DefectRateOperator(v string) predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldEQ(FieldDefectRateOperator, v))
@@ -1119,6 +1139,231 @@ func InspectorIDIsNil() predicate.QualityInspection {
 // InspectorIDNotNil applies the NotNil predicate on the "inspector_id" field.
 func InspectorIDNotNil() predicate.QualityInspection {
 	return predicate.QualityInspection(sql.FieldNotNull(FieldInspectorID))
+}
+
+// CorrectionOfInspectionIDEQ applies the EQ predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldCorrectionOfInspectionID, v))
+}
+
+// CorrectionOfInspectionIDNEQ applies the NEQ predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDNEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldCorrectionOfInspectionID, v))
+}
+
+// CorrectionOfInspectionIDIn applies the In predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldCorrectionOfInspectionID, vs...))
+}
+
+// CorrectionOfInspectionIDNotIn applies the NotIn predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDNotIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldCorrectionOfInspectionID, vs...))
+}
+
+// CorrectionOfInspectionIDGT applies the GT predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDGT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldCorrectionOfInspectionID, v))
+}
+
+// CorrectionOfInspectionIDGTE applies the GTE predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDGTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldCorrectionOfInspectionID, v))
+}
+
+// CorrectionOfInspectionIDLT applies the LT predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDLT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldCorrectionOfInspectionID, v))
+}
+
+// CorrectionOfInspectionIDLTE applies the LTE predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDLTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldCorrectionOfInspectionID, v))
+}
+
+// CorrectionOfInspectionIDIsNil applies the IsNil predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldCorrectionOfInspectionID))
+}
+
+// CorrectionOfInspectionIDNotNil applies the NotNil predicate on the "correction_of_inspection_id" field.
+func CorrectionOfInspectionIDNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldCorrectionOfInspectionID))
+}
+
+// SupersededAtEQ applies the EQ predicate on the "superseded_at" field.
+func SupersededAtEQ(v time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSupersededAt, v))
+}
+
+// SupersededAtNEQ applies the NEQ predicate on the "superseded_at" field.
+func SupersededAtNEQ(v time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldSupersededAt, v))
+}
+
+// SupersededAtIn applies the In predicate on the "superseded_at" field.
+func SupersededAtIn(vs ...time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldSupersededAt, vs...))
+}
+
+// SupersededAtNotIn applies the NotIn predicate on the "superseded_at" field.
+func SupersededAtNotIn(vs ...time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldSupersededAt, vs...))
+}
+
+// SupersededAtGT applies the GT predicate on the "superseded_at" field.
+func SupersededAtGT(v time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldSupersededAt, v))
+}
+
+// SupersededAtGTE applies the GTE predicate on the "superseded_at" field.
+func SupersededAtGTE(v time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldSupersededAt, v))
+}
+
+// SupersededAtLT applies the LT predicate on the "superseded_at" field.
+func SupersededAtLT(v time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldSupersededAt, v))
+}
+
+// SupersededAtLTE applies the LTE predicate on the "superseded_at" field.
+func SupersededAtLTE(v time.Time) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldSupersededAt, v))
+}
+
+// SupersededAtIsNil applies the IsNil predicate on the "superseded_at" field.
+func SupersededAtIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldSupersededAt))
+}
+
+// SupersededAtNotNil applies the NotNil predicate on the "superseded_at" field.
+func SupersededAtNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldSupersededAt))
+}
+
+// SupersededByEQ applies the EQ predicate on the "superseded_by" field.
+func SupersededByEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSupersededBy, v))
+}
+
+// SupersededByNEQ applies the NEQ predicate on the "superseded_by" field.
+func SupersededByNEQ(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldSupersededBy, v))
+}
+
+// SupersededByIn applies the In predicate on the "superseded_by" field.
+func SupersededByIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldSupersededBy, vs...))
+}
+
+// SupersededByNotIn applies the NotIn predicate on the "superseded_by" field.
+func SupersededByNotIn(vs ...int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldSupersededBy, vs...))
+}
+
+// SupersededByGT applies the GT predicate on the "superseded_by" field.
+func SupersededByGT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldSupersededBy, v))
+}
+
+// SupersededByGTE applies the GTE predicate on the "superseded_by" field.
+func SupersededByGTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldSupersededBy, v))
+}
+
+// SupersededByLT applies the LT predicate on the "superseded_by" field.
+func SupersededByLT(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldSupersededBy, v))
+}
+
+// SupersededByLTE applies the LTE predicate on the "superseded_by" field.
+func SupersededByLTE(v int) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldSupersededBy, v))
+}
+
+// SupersededByIsNil applies the IsNil predicate on the "superseded_by" field.
+func SupersededByIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldSupersededBy))
+}
+
+// SupersededByNotNil applies the NotNil predicate on the "superseded_by" field.
+func SupersededByNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldSupersededBy))
+}
+
+// SupersededReasonEQ applies the EQ predicate on the "superseded_reason" field.
+func SupersededReasonEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEQ(FieldSupersededReason, v))
+}
+
+// SupersededReasonNEQ applies the NEQ predicate on the "superseded_reason" field.
+func SupersededReasonNEQ(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNEQ(FieldSupersededReason, v))
+}
+
+// SupersededReasonIn applies the In predicate on the "superseded_reason" field.
+func SupersededReasonIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIn(FieldSupersededReason, vs...))
+}
+
+// SupersededReasonNotIn applies the NotIn predicate on the "superseded_reason" field.
+func SupersededReasonNotIn(vs ...string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotIn(FieldSupersededReason, vs...))
+}
+
+// SupersededReasonGT applies the GT predicate on the "superseded_reason" field.
+func SupersededReasonGT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGT(FieldSupersededReason, v))
+}
+
+// SupersededReasonGTE applies the GTE predicate on the "superseded_reason" field.
+func SupersededReasonGTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldGTE(FieldSupersededReason, v))
+}
+
+// SupersededReasonLT applies the LT predicate on the "superseded_reason" field.
+func SupersededReasonLT(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLT(FieldSupersededReason, v))
+}
+
+// SupersededReasonLTE applies the LTE predicate on the "superseded_reason" field.
+func SupersededReasonLTE(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldLTE(FieldSupersededReason, v))
+}
+
+// SupersededReasonContains applies the Contains predicate on the "superseded_reason" field.
+func SupersededReasonContains(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContains(FieldSupersededReason, v))
+}
+
+// SupersededReasonHasPrefix applies the HasPrefix predicate on the "superseded_reason" field.
+func SupersededReasonHasPrefix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasPrefix(FieldSupersededReason, v))
+}
+
+// SupersededReasonHasSuffix applies the HasSuffix predicate on the "superseded_reason" field.
+func SupersededReasonHasSuffix(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldHasSuffix(FieldSupersededReason, v))
+}
+
+// SupersededReasonIsNil applies the IsNil predicate on the "superseded_reason" field.
+func SupersededReasonIsNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldIsNull(FieldSupersededReason))
+}
+
+// SupersededReasonNotNil applies the NotNil predicate on the "superseded_reason" field.
+func SupersededReasonNotNil() predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldNotNull(FieldSupersededReason))
+}
+
+// SupersededReasonEqualFold applies the EqualFold predicate on the "superseded_reason" field.
+func SupersededReasonEqualFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldEqualFold(FieldSupersededReason, v))
+}
+
+// SupersededReasonContainsFold applies the ContainsFold predicate on the "superseded_reason" field.
+func SupersededReasonContainsFold(v string) predicate.QualityInspection {
+	return predicate.QualityInspection(sql.FieldContainsFold(FieldSupersededReason, v))
 }
 
 // DefectRateOperatorEQ applies the EQ predicate on the "defect_rate_operator" field.

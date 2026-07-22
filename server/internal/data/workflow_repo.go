@@ -241,11 +241,21 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 		!biz.IsCreatableWorkflowTaskState(in.TaskStatusKey) || in.BlockedReason != nil {
 		return nil, biz.ErrBadParam
 	}
+	publicCreate := strings.TrimSpace(in.IdempotencyKey) != ""
+	if publicCreate && (actorID <= 0 || in.IdempotencyKey != strings.TrimSpace(in.IdempotencyKey) ||
+		!workflowTaskIntentHashValid(in.IntentHash)) {
+		return nil, biz.ErrBadParam
+	}
 	tx, err := r.data.postgres.Tx(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer rollbackEntTx(ctx, tx, r.log)
+	if publicCreate {
+		if replayed, found, err := resolveWorkflowTaskCreateInTx(ctx, tx, actorID, in.IdempotencyKey, in.IntentHash); err != nil || found {
+			return replayed, err
+		}
+	}
 
 	builder := tx.WorkflowTask.Create().
 		SetTaskCode(in.TaskCode).
@@ -271,10 +281,19 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 	if actorID > 0 {
 		builder.SetCreatedBy(actorID).SetUpdatedBy(actorID)
 	}
+	if publicCreate {
+		builder.SetCreateIdempotencyKey(in.IdempotencyKey).SetCreateIntentHash(in.IntentHash)
+	}
 
 	row, err := builder.Save(ctx)
 	if err != nil {
 		if ent.IsConstraintError(err) {
+			if publicCreate {
+				_ = tx.Rollback()
+				if replayed, found, replayErr := r.resolveWorkflowTaskCreate(ctx, actorID, in.IdempotencyKey, in.IntentHash); replayErr != nil || found {
+					return replayed, replayErr
+				}
+			}
 			return nil, biz.ErrWorkflowTaskExists
 		}
 		return nil, err
@@ -289,6 +308,17 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 	if actorID > 0 {
 		eventBuilder.SetActorID(actorID)
 	}
+	if publicCreate {
+		mutationResult, resultErr := workflowTaskMutationResultMap(entWorkflowTaskToBiz(row))
+		if resultErr != nil {
+			return nil, resultErr
+		}
+		eventBuilder.
+			SetCommandKey("create_task").
+			SetIdempotencyKey(in.IdempotencyKey).
+			SetIntentHash(in.IntentHash).
+			SetMutationResult(mutationResult)
+	}
 	if _, err := eventBuilder.Save(ctx); err != nil {
 		return nil, err
 	}
@@ -298,6 +328,65 @@ func (r *workflowRepo) CreateWorkflowTask(ctx context.Context, in *biz.WorkflowT
 	}
 	tx = nil
 	return entWorkflowTaskToBiz(row), nil
+}
+
+func resolveWorkflowTaskCreateInTx(
+	ctx context.Context,
+	tx *ent.Tx,
+	actorID int,
+	idempotencyKey string,
+	intentHash string,
+) (*biz.WorkflowTask, bool, error) {
+	row, err := tx.WorkflowTask.Query().Where(
+		workflowtask.CreatedBy(actorID),
+		workflowtask.CreateIdempotencyKey(idempotencyKey),
+	).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if row.CreateIntentHash == nil || *row.CreateIntentHash != intentHash {
+		return nil, false, biz.ErrIdempotencyConflict
+	}
+	event, err := tx.WorkflowTaskEvent.Query().Where(
+		workflowtaskevent.TaskID(row.ID),
+		workflowtaskevent.EventType("created"),
+	).Only(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	return workflowTaskMutationReceiptResult(event, intentHash, "create_task", actorID)
+}
+
+func (r *workflowRepo) resolveWorkflowTaskCreate(
+	ctx context.Context,
+	actorID int,
+	idempotencyKey string,
+	intentHash string,
+) (*biz.WorkflowTask, bool, error) {
+	row, err := r.data.postgres.WorkflowTask.Query().Where(
+		workflowtask.CreatedBy(actorID),
+		workflowtask.CreateIdempotencyKey(idempotencyKey),
+	).Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, false, nil
+		}
+		return nil, false, err
+	}
+	if row.CreateIntentHash == nil || *row.CreateIntentHash != intentHash {
+		return nil, false, biz.ErrIdempotencyConflict
+	}
+	event, err := r.data.postgres.WorkflowTaskEvent.Query().Where(
+		workflowtaskevent.TaskID(row.ID),
+		workflowtaskevent.EventType("created"),
+	).Only(ctx)
+	if err != nil {
+		return nil, false, err
+	}
+	return workflowTaskMutationReceiptResult(event, intentHash, "create_task", actorID)
 }
 
 func (r *workflowRepo) UpdateWorkflowTaskStatus(ctx context.Context, in *biz.WorkflowTaskStatusUpdate, actorID int, actorRoleKey string) (*biz.WorkflowTask, error) {

@@ -11,6 +11,30 @@ function isAbortLikeError(error) {
   return error?.name === 'AbortError' || error?.cause?.name === 'AbortError'
 }
 
+function invalidSuccessResponse(httpStatus) {
+  return new RpcError('Invalid JSON-RPC success response from server', {
+    httpStatus,
+    isInvalidResponse: true,
+  })
+}
+
+function validateSuccessResponse(json, expectedId, httpStatus) {
+  if (
+    !json ||
+    typeof json !== 'object' ||
+    Array.isArray(json) ||
+    json.jsonrpc !== '2.0' ||
+    String(json.id) !== expectedId ||
+    !Object.hasOwn(json, 'result') ||
+    !json.result ||
+    typeof json.result !== 'object' ||
+    Array.isArray(json.result)
+  ) {
+    throw invalidSuccessResponse(httpStatus)
+  }
+  return json.result
+}
+
 export function isRpcAbortError(error) {
   return Boolean(error?.isAbortError || isAbortLikeError(error))
 }
@@ -87,7 +111,7 @@ export class JsonRpc {
     }
 
     // 2) Kratos 框架级错误
-    if (typeof json.code === 'number' && json.message) {
+    if (typeof json?.code === 'number' && json.message) {
       const err = RpcError.fromKratos(json)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth)
       if (receiveError) return err
@@ -95,7 +119,7 @@ export class JsonRpc {
     }
 
     // 3) JSON-RPC error 字段
-    if (json.error) {
+    if (json?.error) {
       const err = RpcError.fromJsonRpc(json)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth)
       if (receiveError) return err
@@ -103,7 +127,7 @@ export class JsonRpc {
     }
 
     // 4) 业务错误 result.code != 0
-    const { result } = json
+    const result = validateSuccessResponse(json, id, response.status)
     if (result && typeof result.code === 'number' && result.code !== 0) {
       const err = RpcError.fromBiz(json)
       emitAuthFailureIfNeeded(err, this.authScope, withAuth)

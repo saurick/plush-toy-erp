@@ -18,26 +18,27 @@ type QualityInspection struct {
 }
 
 var qualityInspectionLockedFields = map[string]struct{}{
-	"inspection_no":            {},
-	"purchase_receipt_id":      {},
-	"purchase_receipt_item_id": {},
-	"inventory_lot_id":         {},
-	"production_wip_batch_id":  {},
-	"gate_code":                {},
-	"material_id":              {},
-	"warehouse_id":             {},
-	"source_type":              {},
-	"source_id":                {},
-	"inspection_type":          {},
-	"subject_type":             {},
-	"subject_id":               {},
-	"status":                   {},
-	"result":                   {},
-	"original_lot_status":      {},
-	"inspected_at":             {},
-	"inspector_id":             {},
-	"defect_rate_operator":     {},
-	"defect_rate_percent":      {},
+	"inspection_no":               {},
+	"purchase_receipt_id":         {},
+	"purchase_receipt_item_id":    {},
+	"inventory_lot_id":            {},
+	"production_wip_batch_id":     {},
+	"gate_code":                   {},
+	"material_id":                 {},
+	"warehouse_id":                {},
+	"source_type":                 {},
+	"source_id":                   {},
+	"inspection_type":             {},
+	"subject_type":                {},
+	"subject_id":                  {},
+	"status":                      {},
+	"result":                      {},
+	"original_lot_status":         {},
+	"inspected_at":                {},
+	"inspector_id":                {},
+	"defect_rate_operator":        {},
+	"defect_rate_percent":         {},
+	"correction_of_inspection_id": {},
 }
 
 func (QualityInspection) Hooks() []ent.Hook {
@@ -106,6 +107,7 @@ func (QualityInspection) Annotations() []schema.Annotation {
 				"quality_inspections_defect_rate_operator_valid": "defect_rate_operator IS NULL OR defect_rate_operator IN ('APPROX', 'GT')",
 				"quality_inspections_defect_rate_percent_range":  "defect_rate_percent IS NULL OR (defect_rate_percent >= 0 AND defect_rate_percent <= 100)",
 				"quality_inspections_defect_rate_gt_below_100":   "defect_rate_operator IS NULL OR defect_rate_operator <> 'GT' OR defect_rate_percent < 100",
+				"quality_inspections_superseded_bundle":          "((superseded_at IS NULL AND superseded_by IS NULL AND superseded_reason IS NULL) OR (superseded_at IS NOT NULL AND superseded_by IS NOT NULL AND superseded_reason IS NOT NULL AND length(trim(superseded_reason)) > 0))",
 			},
 		},
 	}
@@ -183,6 +185,22 @@ func (QualityInspection) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Positive(),
+		field.Int("correction_of_inspection_id").
+			Optional().
+			Nillable().
+			Positive().
+			Immutable(),
+		field.Time("superseded_at").
+			Optional().
+			Nillable(),
+		field.Int("superseded_by").
+			Optional().
+			Nillable().
+			Positive(),
+		field.String("superseded_reason").
+			Optional().
+			Nillable().
+			MaxLen(255),
 		field.String("defect_rate_operator").
 			Optional().
 			Nillable().
@@ -252,6 +270,9 @@ func (QualityInspection) Indexes() []ent.Index {
 		index.Fields("subject_type", "subject_id"),
 		index.Fields("status"),
 		index.Fields("inspected_at"),
+		index.Fields("correction_of_inspection_id").
+			Unique().
+			Annotations(entsql.IndexWhere("correction_of_inspection_id IS NOT NULL")),
 		// Only one in-flight inspection may hold the same lot at SUBMITTED status.
 		index.Fields("inventory_lot_id").
 			Unique().

@@ -30,6 +30,11 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 	case "create_production_completion_from_order",
 		"create_production_material_issue_from_order",
 		"create_production_rework_from_completion",
+		"submit_production_exception",
+		"approve_production_exception",
+		"reject_production_exception",
+		"cancel_production_exception",
+		"get_production_exception",
 		"post_production_fact",
 		"cancel_production_fact",
 		"list_production_facts",
@@ -37,10 +42,14 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		return d.handleOperationalFactProduction(ctx, method, id, pm, claims.UserID)
 	case "create_outsourcing_material_issue_from_order",
 		"create_outsourcing_return_receipt_from_order",
+		"create_outsourcing_return_disposition",
+		"post_outsourcing_return_disposition",
+		"cancel_outsourcing_return_disposition",
+		"get_outsourcing_return_disposition",
 		"post_outsourcing_fact",
 		"cancel_outsourcing_fact",
 		"list_outsourcing_facts":
-		return d.handleOperationalFactOutsourcing(ctx, method, id, pm)
+		return d.handleOperationalFactOutsourcing(ctx, method, id, pm, claims.UserID)
 	case "create_shipment_with_items",
 		"get_shipment",
 		"list_shipment_source_candidates",
@@ -53,6 +62,8 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"release_stock_reservation",
 		"list_stock_reservations":
 		return d.handleOperationalFactReservation(ctx, method, id, pm)
+	case "create_sales_return", "approve_sales_return", "receive_sales_return", "cancel_sales_return", "get_sales_return", "list_sales_returns":
+		return d.handleOperationalFactSalesReturn(ctx, method, id, pm, claims.UserID)
 	case "create_receivable_from_shipment",
 		"create_invoice_from_shipment",
 		"create_payable_from_purchase_receipt",
@@ -61,7 +72,8 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"post_finance_fact",
 		"settle_finance_fact",
 		"cancel_finance_fact",
-		"list_finance_facts":
+		"list_finance_facts",
+		"create_finance_payment", "post_finance_payment", "reverse_finance_payment", "get_finance_payment", "list_finance_payments", "get_finance_credit_note", "list_finance_credit_notes", "create_finance_credit_note", "reverse_finance_credit_note":
 		return d.handleOperationalFactFinance(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownOperationalFactResult(method), nil

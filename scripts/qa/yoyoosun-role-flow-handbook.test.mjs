@@ -112,7 +112,7 @@ test("yoyoosun role handbook lists the exact tracked role profiles", () => {
       .size,
     119,
   );
-  assert.equal(registeredPermissionKeys.size, 149);
+  assert.equal(registeredPermissionKeys.size, 161);
   assert.deepEqual(
     [...handbook.matchAll(/<!-- role-profile:([^:]+):start -->/gu)].map(
       (match) => match[1],

@@ -150,6 +150,7 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['materials', 'inventory'],
         ['sales-orders', 'production-orders'],
         ['sales-orders', 'shipments'],
+        ['shipments', 'sales-returns'],
         ['material-bom', 'production-orders'],
         [
           'processing-contracts',
@@ -173,6 +174,9 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['outbound', 'inventory'],
         ['outbound', 'shipments'],
         ['shipments', 'outbound'],
+        ['sales-returns', 'inventory'],
+        ['receivables', 'finance-payments'],
+        ['payables', 'finance-payments'],
       ].map(
         ([
           fromPageKey,
@@ -204,11 +208,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'production-progress',
           'list_production_order_material_requirements',
         ],
-        [
-          'sales-orders',
-          'shipments',
-          'list_shipment_source_candidates',
-        ],
+        ['sales-orders', 'shipments', 'list_shipment_source_candidates'],
         [
           'processing-contracts',
           'quality-inspections',
@@ -267,11 +267,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'inventory',
           'execute_material_supply_purchase_receipt_create',
         ],
-        [
-          'accessories-purchase',
-          'inbound',
-          'add_purchase_receipt_item',
-        ],
+        ['accessories-purchase', 'inbound', 'add_purchase_receipt_item'],
         [
           'accessories-purchase',
           'quality-inspections',
@@ -419,11 +415,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'inventory',
           'execute_finished_goods_delivery_shipment_ship',
         ],
-        [
-          'inbound',
-          'inventory',
-          'execute_material_supply_post_inbound',
-        ],
+        ['inbound', 'inventory', 'execute_material_supply_post_inbound'],
         ['payables', 'payables', 'post_finance_fact'],
         ['receivables', 'receivables', 'post_finance_fact'],
         ['invoices', 'invoices', 'post_finance_fact'],
@@ -532,31 +524,19 @@ export const businessPageFlowDefinitions = Object.freeze(
           'quality-inspections',
           'submit_quality_inspection',
         ],
-        [
-          'quality-inspections',
-          'inventory',
-          'submit_quality_inspection',
-        ],
+        ['quality-inspections', 'inventory', 'submit_quality_inspection'],
         [
           'quality-inspections',
           'quality-inspections',
           'cancel_quality_inspection',
         ],
-        [
-          'quality-inspections',
-          'inventory',
-          'cancel_quality_inspection',
-        ],
+        ['quality-inspections', 'inventory', 'cancel_quality_inspection'],
         [
           'quality-inspections',
           'quality-inspections',
           'pass_quality_inspection',
         ],
-        [
-          'quality-inspections',
-          'inventory',
-          'pass_quality_inspection',
-        ],
+        ['quality-inspections', 'inventory', 'pass_quality_inspection'],
         [
           'quality-inspections',
           'production-progress',
@@ -567,11 +547,7 @@ export const businessPageFlowDefinitions = Object.freeze(
           'quality-inspections',
           'reject_quality_inspection',
         ],
-        [
-          'quality-inspections',
-          'inventory',
-          'reject_quality_inspection',
-        ],
+        ['quality-inspections', 'inventory', 'reject_quality_inspection'],
         [
           'quality-inspections',
           'production-progress',
@@ -613,9 +589,79 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['invoices', 'invoices', 'cancel_finance_fact'],
         ['reconciliation', 'reconciliation', 'settle_finance_fact'],
         ['reconciliation', 'reconciliation', 'cancel_finance_fact'],
+        ['sales-returns', 'sales-returns', 'approve_sales_return'],
+        ['sales-returns', 'sales-returns', 'cancel_sales_return'],
+        ['inventory', 'inventory', 'cancel_inventory_operation'],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'post_purchase_rejection_disposition',
+        ],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'cancel_purchase_rejection_disposition',
+        ],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
           flowType: BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
+      )
+    )
+    .concat(
+      [['shipments', 'sales-returns', 'create_sales_return']].map(
+        ([fromPageKey, toPageKey, action]) =>
+          businessFlow({
+            flowType: BUSINESS_FLOW_TYPES.DOMAIN_GENERATE,
+            fromPageKey,
+            toPageKey,
+            action,
+          })
+      )
+    )
+    .concat(
+      [
+        ['inventory', 'inventory', 'create_inventory_operation'],
+        ['finance-payments', 'finance-payments', 'create_finance_payment'],
+        ['finance-payments', 'finance-payments', 'create_finance_credit_note'],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'create_purchase_rejection_disposition',
+        ],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.UNSCOPED_MUTATION,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
+      )
+    )
+    .concat(
+      [
+        ['inventory', 'inventory', 'post_inventory_operation'],
+        ['sales-returns', 'inventory', 'receive_sales_return'],
+        ['finance-payments', 'finance-payments', 'post_finance_payment'],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.POST_FACT,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
+      )
+    )
+    .concat(
+      [
+        ['finance-payments', 'finance-payments', 'reverse_finance_payment'],
+        ['finance-payments', 'finance-payments', 'reverse_finance_credit_note'],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.FACT_REVERSAL,
           fromPageKey,
           toPageKey,
           action,
@@ -638,21 +684,13 @@ export const businessPageFlowDefinitions = Object.freeze(
           'accessories-purchase',
           'start_material_supply_purchase_order_process',
         ],
-        [
-          'shipments',
-          'shipments',
-          'start_finished_goods_delivery_process',
-        ],
+        ['shipments', 'shipments', 'start_finished_goods_delivery_process'],
         [
           'shipments',
           'shipments',
           'execute_finished_goods_delivery_finance_release',
         ],
-        [
-          'inbound',
-          'inbound',
-          'execute_material_supply_quality_gate',
-        ],
+        ['inbound', 'inbound', 'execute_material_supply_quality_gate'],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
           flowType: BUSINESS_FLOW_TYPES.PROCESS_ORCHESTRATION,
@@ -690,21 +728,9 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['quality-inspections', 'shipments', 'SHIPMENT'],
         ['production-progress', 'production-orders', 'PRODUCTION_ORDER'],
         ['production-progress', 'production-progress', 'PRODUCTION_FACT'],
-        [
-          'processing-contracts',
-          'processing-contracts',
-          'OUTSOURCING_ORDER',
-        ],
-        [
-          'processing-contracts',
-          'processing-contracts',
-          'OUTSOURCING_FACT',
-        ],
-        [
-          'quality-inspections',
-          'processing-contracts',
-          'OUTSOURCING_FACT',
-        ],
+        ['processing-contracts', 'processing-contracts', 'OUTSOURCING_ORDER'],
+        ['processing-contracts', 'processing-contracts', 'OUTSOURCING_FACT'],
+        ['quality-inspections', 'processing-contracts', 'OUTSOURCING_FACT'],
         ['outbound', 'sales-orders', 'SALES_ORDER'],
         ['shipments', 'sales-orders', 'SALES_ORDER'],
         ['inventory', 'inbound', 'PURCHASE_RECEIPT'],
@@ -830,6 +856,19 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
     availabilityNote: '',
   },
+  'sales-returns': {
+    pageRole: BUSINESS_PAGE_ROLES.FACT_OWNER,
+    upstreamPageKeys: ['shipments'],
+    producerActions: ['create_sales_return'],
+    sourceTypes: ['SHIPMENT'],
+    downstreamPageKeys: ['inventory'],
+    taskGroups: [],
+    allowsGenericPageCreate: false,
+    availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
+    taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
+    availabilityNote:
+      '退货审核不改变库存；确认收回才写入库存，取消已收回退货通过反向库存记录恢复。',
+  },
   'material-bom': {
     pageRole: BUSINESS_PAGE_ROLES.OWNER,
     upstreamPageKeys: ['products', 'materials'],
@@ -925,7 +964,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
       '采购来料由入库准备生成，委外回货从委外页面发起；生产 WIP 完工/回仓在工序需要质量关口时原子生成检验草稿；出货前成品检验从草稿出货单按送检批次发起。它们都生成独立质检 Fact，不由 Workflow 任务完成代写。',
   },
   inventory: {
-    pageRole: BUSINESS_PAGE_ROLES.READ_MODEL,
+    pageRole: BUSINESS_PAGE_ROLES.FACT_OWNER,
     upstreamPageKeys: [
       'accessories-purchase',
       'inbound',
@@ -935,7 +974,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
       'outbound',
       'shipments',
     ],
-    producerActions: [],
+    producerActions: ['create_inventory_operation'],
     sourceTypes: [
       'PURCHASE_RECEIPT',
       'PURCHASE_RETURN',
@@ -1087,6 +1126,19 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
     availabilityNote: '',
+  },
+  'finance-payments': {
+    pageRole: BUSINESS_PAGE_ROLES.FACT_OWNER,
+    upstreamPageKeys: ['payables', 'receivables'],
+    producerActions: ['create_finance_payment', 'create_finance_credit_note'],
+    sourceTypes: ['FINANCE_FACT'],
+    downstreamPageKeys: [],
+    taskGroups: [],
+    allowsGenericPageCreate: false,
+    availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
+    taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.NOT_APPLICABLE,
+    availabilityNote:
+      '收付款以真实往来方和币种核销；冲销和红冲保留原事实及反向审计，不替代总账或税控。',
   },
   payables: {
     pageRole: BUSINESS_PAGE_ROLES.FACT_PROCESSING,

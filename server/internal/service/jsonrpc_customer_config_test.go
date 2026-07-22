@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"strings"
 	"testing"
 	"time"
 
@@ -122,6 +123,32 @@ func newCustomerConfigTestDispatcherWithReposAndRuntimeRepo(
 	}, processRuntimeRepo
 }
 
+func TestCustomerConfigRecoverCompensatedProcessDomainCommandContract(t *testing.T) {
+	dispatcher, repo := newCustomerConfigTestDispatcherWithRuntimeRepo(nil, []string{biz.AdminRoleKey})
+	repo.processes[31] = &biz.ProcessInstance{ID: 31, Status: biz.ProcessStatusBlocked}
+	repo.nodes[41] = &biz.ProcessNodeInstance{ID: 41, ProcessInstanceID: 31, NodeType: biz.ProcessNodeTypeDomainCommand, Status: biz.ProcessNodeStatusCompleted, Version: 7}
+	repo.nodesByProcess[31] = []int{41}
+	hashA := strings.Repeat("a", 64)
+	hashB := strings.Repeat("b", 64)
+	params := mustJSONRPCStruct(t, map[string]any{
+		"process_instance_id": float64(31), "process_node_instance_id": float64(41), "expected_version": float64(7),
+		"decision": biz.ProcessDomainCommandRecoveryTerminateAndWithdraw, "expected_result_hash": hashA, "expected_compensation_hash": hashB,
+	})
+	_, res, err := dispatcher.handleCustomerConfig(customerConfigAdminCtx(1, biz.AdminRoleKey), "recover_compensated_process_domain_command", "recover", params)
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("res=%#v err=%v", res, err)
+	}
+	if got := jsonRPCInt(t, jsonRPCNestedMap(t, res, "recovered_node"), "version"); got != 8 {
+		t.Fatalf("version=%d want=8", got)
+	}
+
+	forbidden, _ := newCustomerConfigTestDispatcherWithRuntimeRepo(nil, []string{biz.QualityRoleKey})
+	_, denied, err := forbidden.handleCustomerConfig(customerConfigAdminCtx(1, biz.QualityRoleKey), "recover_compensated_process_domain_command", "denied", params)
+	if err != nil || denied == nil || denied.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("denied=%#v err=%v", denied, err)
+	}
+}
+
 type serviceCustomerConfigRepo struct {
 	activeErr    error
 	revisions    map[string]*biz.CustomerConfigRevision
@@ -144,6 +171,20 @@ type serviceWorkflowRepo struct {
 	nextTaskID  int
 	tasks       map[int]*biz.WorkflowTask
 	taskCodeIDs map[string]int
+}
+
+func (r *serviceProcessRuntimeRepo) RecoverProcessDomainCommandCompensation(_ context.Context, in *biz.ProcessDomainCommandRecovery, actorID int) (*biz.ProcessNodeInstance, error) {
+	if r == nil || in == nil || actorID <= 0 || in.Decision != biz.ProcessDomainCommandRecoveryTerminateAndWithdraw {
+		return nil, biz.ErrBadParam
+	}
+	node := r.nodes[in.ProcessNodeInstanceID]
+	if node == nil || node.ProcessInstanceID != in.ProcessInstanceID || node.Version != in.ExpectedVersion {
+		return nil, biz.ErrProcessNodeInstanceConflict
+	}
+	copy := cloneServiceProcessNodeInstance(node)
+	copy.Version++
+	r.nodes[node.ID] = cloneServiceProcessNodeInstance(copy)
+	return copy, nil
 }
 
 type serviceSalesOrderRepo struct {

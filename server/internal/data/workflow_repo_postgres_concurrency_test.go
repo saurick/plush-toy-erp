@@ -20,6 +20,59 @@ import (
 	"github.com/jackc/pgx/v5/pgconn"
 )
 
+func TestWorkflowPostgresPublicCreateTaskConcurrentSingleWinner(t *testing.T) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	data, client := openPurchaseReceiptPostgresTestData(t)
+	uc := biz.NewWorkflowUsecase(NewWorkflowRepo(data, log.NewStdLogger(io.Discard)))
+	suffix := postgresTestSuffix()
+	create := biz.WorkflowTaskCreate{
+		IdempotencyKey: "workflow-public-create-" + suffix,
+		TaskCode:       "WF-PUBLIC-CREATE-" + suffix,
+		TaskGroup:      "generic",
+		TaskName:       "并发创建",
+		SourceType:     "generic-source",
+		SourceID:       workflowPostgresSourceID(),
+		OwnerRoleKey:   biz.SalesRoleKey,
+		Payload:        map[string]any{},
+	}
+
+	const workers = 8
+	results := make([]*biz.WorkflowTask, workers)
+	errs := make([]error, workers)
+	start := make(chan struct{})
+	var wg sync.WaitGroup
+	for index := 0; index < workers; index++ {
+		wg.Add(1)
+		go func(index int) {
+			defer wg.Done()
+			<-start
+			input := create
+			results[index], errs[index] = uc.CreateTask(ctx, &input, 7)
+		}(index)
+	}
+	close(start)
+	wg.Wait()
+
+	firstID := 0
+	for index, err := range errs {
+		if err != nil {
+			t.Fatalf("concurrent create %d: %v", index, err)
+		}
+		if results[index] == nil || results[index].ID <= 0 {
+			t.Fatalf("concurrent create %d returned %#v", index, results[index])
+		}
+		if firstID == 0 {
+			firstID = results[index].ID
+		} else if results[index].ID != firstID {
+			t.Fatalf("concurrent create returned ids %d and %d", firstID, results[index].ID)
+		}
+	}
+	if count := client.WorkflowTask.Query().Where(workflowtask.TaskCode(create.TaskCode)).CountX(ctx); count != 1 {
+		t.Fatalf("concurrent create persisted %d tasks", count)
+	}
+}
+
 func TestWorkflowPostgresConflictingTerminalUpdatesApplySideEffectsOnce(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

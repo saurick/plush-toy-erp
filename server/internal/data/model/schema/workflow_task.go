@@ -22,6 +22,7 @@ func (WorkflowTask) Annotations() []schema.Annotation {
 			"workflow_tasks_version_positive":        "version > 0",
 			"workflow_tasks_process_anchors_paired":  "((process_instance_id IS NULL AND process_node_instance_id IS NULL) OR (process_instance_id IS NOT NULL AND process_node_instance_id IS NOT NULL))",
 			"workflow_tasks_urge_count_non_negative": "urge_count >= 0",
+			"workflow_tasks_create_intent_bundle":    "((create_idempotency_key IS NULL AND create_intent_hash IS NULL) OR (create_idempotency_key IS NOT NULL AND create_intent_hash IS NOT NULL AND created_by IS NOT NULL AND length(trim(create_idempotency_key)) BETWEEN 1 AND 128 AND length(create_intent_hash) = 64))",
 		}},
 	}
 }
@@ -128,6 +129,17 @@ func (WorkflowTask) Fields() []ent.Field {
 			Optional().
 			Nillable().
 			Positive(),
+		field.String("create_idempotency_key").
+			Optional().
+			Nillable().
+			MaxLen(128).
+			Immutable(),
+		field.String("create_intent_hash").
+			Optional().
+			Nillable().
+			MinLen(64).
+			MaxLen(64).
+			Immutable(),
 		field.Int("updated_by").
 			Optional().
 			Nillable().
@@ -170,5 +182,8 @@ func (WorkflowTask) Indexes() []ent.Index {
 		index.Fields("task_status_key", "critical_path", "due_at", "id"),
 		index.Fields("urge_count", "escalated_at", "id"),
 		index.Fields("due_at"),
+		index.Fields("created_by", "create_idempotency_key").
+			Unique().
+			Annotations(entsql.IndexWhere("create_idempotency_key IS NOT NULL")),
 	}
 }

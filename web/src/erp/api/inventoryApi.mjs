@@ -55,3 +55,27 @@ export async function listInventoryTxns(params = {}, options = {}) {
   const result = await inventoryRpc.call('list_inventory_txns', params, options)
   return dataOf(result)
 }
+
+export async function createInventoryOperation(params = {}) {
+  const result = await inventoryRpc.call('create_inventory_operation', params)
+  return dataOf(result)?.inventory_operation || null
+}
+
+export async function postInventoryOperation(params = {}) {
+  const result = await inventoryRpc.call('post_inventory_operation', params)
+  return dataOf(result)?.inventory_operation || null
+}
+
+export async function cancelInventoryOperation(params = {}) {
+  const result = await inventoryRpc.call('cancel_inventory_operation', params)
+  return dataOf(result)?.inventory_operation || null
+}
+
+export async function getInventoryOperation(params = {}, options = {}) {
+  const result = await inventoryRpc.call(
+    'get_inventory_operation',
+    params,
+    options
+  )
+  return dataOf(result)?.inventory_operation || null
+}

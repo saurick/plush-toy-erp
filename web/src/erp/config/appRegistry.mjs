@@ -24,7 +24,7 @@ export const mobileRoleDefinitions = Object.freeze([
     title: '业务手机待办',
     shortTitle: '业务手机待办',
     label: '业务',
-    description: '跟进客户、款式、待补资料、催料、合同和交期提醒。',
+    description: '跟进客户、销售订单、交期、出货和客户退货事项。',
   },
   {
     roleKey: 'purchase',
@@ -45,14 +45,14 @@ export const mobileRoleDefinitions = Object.freeze([
     title: '仓库手机待办',
     shortTitle: '仓库手机待办',
     label: '仓库',
-    description: '跟进收货、备料、成品入库、待出货和异常件处理。',
+    description: '跟进收货、盘点、调拨、成品入库、待出货和异常件处理。',
   },
   {
     roleKey: 'finance',
     title: '财务手机待办',
     shortTitle: '财务手机待办',
     label: '财务',
-    description: '跟进待对账、待付款、异常费用和结算提醒。',
+    description: '跟进应收应付、真实收付款、多单核销、红冲和对账提醒。',
   },
   {
     roleKey: 'pmc',

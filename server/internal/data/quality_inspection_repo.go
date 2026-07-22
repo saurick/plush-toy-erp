@@ -23,6 +23,7 @@ import (
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptitem"
 	"server/internal/data/model/ent/qualityinspection"
+	"server/internal/data/model/ent/salesreturnitem"
 	"server/internal/data/model/ent/shipmentitem"
 
 	"entgo.io/ent/dialect"
@@ -1379,9 +1380,28 @@ func validateQualityInspectionReferences(ctx context.Context, client *ent.Client
 		return validateOutsourcingReturnQualityInspectionReferences(ctx, client, in)
 	case biz.QualityInspectionSourceProductionWIP:
 		return validateProductionWIPQualityInspectionReferences(ctx, client, in)
+	case biz.QualityInspectionSourceSalesReturn:
+		return validateSalesReturnQualityInspectionReferences(ctx, client, in)
 	default:
 		return biz.ErrBadParam
 	}
+}
+
+func validateSalesReturnQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
+	if client == nil || in == nil || in.SourceID <= 0 || in.InventoryLotID <= 0 || in.WarehouseID <= 0 || in.SubjectID <= 0 ||
+		in.SourceType != biz.QualityInspectionSourceSalesReturn || in.InspectionType != biz.QualityInspectionTypeCustomerReturn ||
+		in.SubjectType != biz.QualityInspectionSubjectProduct || in.MaterialID != 0 || in.PurchaseReceiptID != 0 || in.PurchaseReceiptItemID != nil || in.ProductionWIPBatchID != 0 {
+		return biz.ErrBadParam
+	}
+	parent, err := client.SalesReturn.Get(ctx, in.SourceID)
+	if err != nil || (parent.Status != biz.SalesReturnStatusApproved && parent.Status != biz.SalesReturnStatusReceived) {
+		return biz.ErrBadParam
+	}
+	matched, err := client.SalesReturnItem.Query().Where(salesreturnitem.SalesReturnID(in.SourceID), salesreturnitem.LotID(in.InventoryLotID), salesreturnitem.ProductID(in.SubjectID), salesreturnitem.WarehouseID(in.WarehouseID)).Exist(ctx)
+	if err != nil || !matched {
+		return biz.ErrBadParam
+	}
+	return nil
 }
 
 func validateProductionWIPQualityInspectionReferences(ctx context.Context, client *ent.Client, in *biz.QualityInspectionCreate) error {
@@ -1549,6 +1569,11 @@ func validateSubmittedQualityInspectionLot(lot *ent.InventoryLot, row *ent.Quali
 		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))
 	case biz.QualityInspectionSourceOutsourcingFact:
 		if optionalStringValueOrEmpty(row.InspectionType) != biz.QualityInspectionTypeOutsourcingReturn {
+			return biz.ErrBadParam
+		}
+		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))
+	case biz.QualityInspectionSourceSalesReturn:
+		if optionalStringValueOrEmpty(row.InspectionType) != biz.QualityInspectionTypeCustomerReturn {
 			return biz.ErrBadParam
 		}
 		return validateFinishedGoodsQualityInspectionLot(lot, optionalIntValueOrZero(row.SubjectID))
@@ -1798,29 +1823,33 @@ func entQualityInspectionToBiz(row *ent.QualityInspection) *biz.QualityInspectio
 		return nil
 	}
 	return &biz.QualityInspection{
-		ID:                    row.ID,
-		InspectionNo:          row.InspectionNo,
-		PurchaseReceiptID:     optionalIntValueOrZero(row.PurchaseReceiptID),
-		PurchaseReceiptItemID: row.PurchaseReceiptItemID,
-		InventoryLotID:        optionalIntValueOrZero(row.InventoryLotID),
-		ProductionWIPBatchID:  row.ProductionWipBatchID,
-		GateCode:              row.GateCode,
-		MaterialID:            optionalIntValueOrZero(row.MaterialID),
-		WarehouseID:           optionalIntValueOrZero(row.WarehouseID),
-		SourceType:            row.SourceType,
-		SourceID:              row.SourceID,
-		InspectionType:        row.InspectionType,
-		SubjectType:           row.SubjectType,
-		SubjectID:             row.SubjectID,
-		Status:                row.Status,
-		Result:                row.Result,
-		OriginalLotStatus:     row.OriginalLotStatus,
-		InspectedAt:           row.InspectedAt,
-		InspectorID:           row.InspectorID,
-		DefectRateOperator:    row.DefectRateOperator,
-		DefectRatePercent:     row.DefectRatePercent,
-		DecisionNote:          row.DecisionNote,
-		CreatedAt:             row.CreatedAt,
-		UpdatedAt:             row.UpdatedAt,
+		ID:                       row.ID,
+		InspectionNo:             row.InspectionNo,
+		PurchaseReceiptID:        optionalIntValueOrZero(row.PurchaseReceiptID),
+		PurchaseReceiptItemID:    row.PurchaseReceiptItemID,
+		InventoryLotID:           optionalIntValueOrZero(row.InventoryLotID),
+		ProductionWIPBatchID:     row.ProductionWipBatchID,
+		GateCode:                 row.GateCode,
+		MaterialID:               optionalIntValueOrZero(row.MaterialID),
+		WarehouseID:              optionalIntValueOrZero(row.WarehouseID),
+		SourceType:               row.SourceType,
+		SourceID:                 row.SourceID,
+		InspectionType:           row.InspectionType,
+		SubjectType:              row.SubjectType,
+		SubjectID:                row.SubjectID,
+		Status:                   row.Status,
+		Result:                   row.Result,
+		OriginalLotStatus:        row.OriginalLotStatus,
+		InspectedAt:              row.InspectedAt,
+		InspectorID:              row.InspectorID,
+		DefectRateOperator:       row.DefectRateOperator,
+		DefectRatePercent:        row.DefectRatePercent,
+		DecisionNote:             row.DecisionNote,
+		CorrectionOfInspectionID: row.CorrectionOfInspectionID,
+		SupersededAt:             row.SupersededAt,
+		SupersededBy:             row.SupersededBy,
+		SupersededReason:         row.SupersededReason,
+		CreatedAt:                row.CreatedAt,
+		UpdatedAt:                row.UpdatedAt,
 	}
 }

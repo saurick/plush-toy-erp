@@ -171,6 +171,50 @@ func TestJsonrpcDispatcher_QualityInspectionAPIChangesLotStatusWithoutInventoryT
 	assertLotStatus(t, ctx, client, cancelLotID, biz.InventoryLotActive)
 }
 
+func TestJsonrpcDispatcher_CorrectQualityInspectionResultContract(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "jsonrpc_quality_correction")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	j := newQualityJSONRPCTestData(t, data, workflowJSONRPCAdmin(
+		[]string{biz.QualityRoleKey},
+		biz.PermissionQualityInspectionRead,
+		biz.PermissionQualityExceptionHandle,
+	))
+	receipt, err := j.inventoryUC.CreatePurchaseReceiptDraft(ctx, &biz.PurchaseReceiptCreate{ReceiptNo: "QI-RPC-CORR-R1", SupplierName: "纠错供应商"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = j.inventoryUC.AddPurchaseReceiptItem(ctx, &biz.PurchaseReceiptItemCreate{
+		ReceiptID: receipt.ID, MaterialID: fixtures.materialID, WarehouseID: fixtures.warehouseID,
+		UnitID: fixtures.unitID, LotNo: stringPtr("QI-RPC-CORR-LOT"), Quantity: decimal.NewFromInt(3), IdempotencyKey: "qi-rpc-corr-item",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inspections, _, err := j.inventoryUC.ListQualityInspections(ctx, biz.QualityInspectionFilter{PurchaseReceiptID: receipt.ID, Limit: 10})
+	if err != nil || len(inspections) != 1 {
+		t.Fatalf("inspections=%#v err=%v", inspections, err)
+	}
+	defectRate := decimal.NewFromInt(40)
+	rejected, err := j.inventoryUC.RejectQualityInspection(ctx, &biz.QualityInspectionDecision{
+		InspectionID: inspections[0].ID, Result: biz.QualityInspectionResultReject,
+		DefectRateOperator: stringPtr(biz.QualityInspectionDefectRateOperatorGT), DefectRatePercent: &defectRate,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, res, err := j.handleQuality(workflowJSONRPCAdminContext(), "correct_quality_inspection_result", "correct", mustJSONRPCStruct(t, map[string]any{
+		"id": float64(rejected.ID), "correction_inspection_no": "QI-RPC-CORR-R2", "reason": "仪器校准复核失败",
+	}))
+	if err != nil || res == nil || res.Code != errcode.OK.Code {
+		t.Fatalf("res=%#v err=%v", res, err)
+	}
+	item := jsonRPCNestedMap(t, res, "quality_inspection")
+	if item["status"] != biz.QualityInspectionStatusSubmitted || jsonRPCInt(t, item, "correction_of_inspection_id") != rejected.ID {
+		t.Fatalf("correction=%#v", item)
+	}
+}
+
 func TestJsonrpcDispatcher_OutsourcingReturnQualityInspectionIsSourceDriven(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "jsonrpc_quality_outsourcing_return")

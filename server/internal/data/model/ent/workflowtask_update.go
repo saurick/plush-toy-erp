@@ -1000,6 +1000,12 @@ func (_u *WorkflowTaskUpdate) sqlSave(ctx context.Context) (_node int, err error
 	if _u.mutation.CreatedByCleared() {
 		_spec.ClearField(workflowtask.FieldCreatedBy, field.TypeInt)
 	}
+	if _u.mutation.CreateIdempotencyKeyCleared() {
+		_spec.ClearField(workflowtask.FieldCreateIdempotencyKey, field.TypeString)
+	}
+	if _u.mutation.CreateIntentHashCleared() {
+		_spec.ClearField(workflowtask.FieldCreateIntentHash, field.TypeString)
+	}
 	if value, ok := _u.mutation.UpdatedBy(); ok {
 		_spec.SetField(workflowtask.FieldUpdatedBy, field.TypeInt, value)
 	}
@@ -2133,6 +2139,12 @@ func (_u *WorkflowTaskUpdateOne) sqlSave(ctx context.Context) (_node *WorkflowTa
 	}
 	if _u.mutation.CreatedByCleared() {
 		_spec.ClearField(workflowtask.FieldCreatedBy, field.TypeInt)
+	}
+	if _u.mutation.CreateIdempotencyKeyCleared() {
+		_spec.ClearField(workflowtask.FieldCreateIdempotencyKey, field.TypeString)
+	}
+	if _u.mutation.CreateIntentHashCleared() {
+		_spec.ClearField(workflowtask.FieldCreateIntentHash, field.TypeString)
 	}
 	if value, ok := _u.mutation.UpdatedBy(); ok {
 		_spec.SetField(workflowtask.FieldUpdatedBy, field.TypeInt, value)

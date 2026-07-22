@@ -58,7 +58,7 @@ func (ProductionFact) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{
 			Checks: map[string]string{
-				"production_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK')",
+				"production_facts_type_allowed":        "fact_type IN ('MATERIAL_ISSUE', 'FINISHED_GOODS_RECEIPT', 'REWORK', 'SCRAP')",
 				"production_facts_status_allowed":      "status IN ('DRAFT', 'POSTED', 'CANCELLED')",
 				"production_facts_subject_allowed":     "subject_type IN ('MATERIAL', 'PRODUCT')",
 				"production_facts_sku_subject_allowed": "product_sku_id IS NULL OR subject_type = 'PRODUCT'",

@@ -256,6 +256,58 @@ func TestWorkflowTaskMutationIntentHashNormalizesTransportOnlyPayload(t *testing
 	}
 }
 
+func TestWorkflowTaskCreateIntentHashUsesNormalizedDTOAndActor(t *testing.T) {
+	repo := &stubWorkflowRepo{}
+	uc := NewWorkflowUsecase(repo)
+	base := WorkflowTaskCreate{
+		IdempotencyKey: "  create-task-key-1  ",
+		TaskCode:       "  FOLLOW-UP-201  ",
+		TaskGroup:      "  customer_follow_up  ",
+		TaskName:       "  跟进客户确认  ",
+		SourceType:     "  project-orders  ",
+		SourceID:       201,
+		OwnerRoleKey:   "  sales  ",
+		Payload:        map[string]any{"note": "保持原始业务文本"},
+	}
+	if _, err := uc.CreateTask(context.Background(), &base, 7); err != nil {
+		t.Fatalf("create normalized task: %v", err)
+	}
+	first := *repo.createTaskInput
+	if first.IdempotencyKey != "create-task-key-1" || len(first.IntentHash) != 64 {
+		t.Fatalf("unexpected create identity key=%q hash=%q", first.IdempotencyKey, first.IntentHash)
+	}
+
+	normalized := base
+	normalized.IdempotencyKey = "create-task-key-1"
+	normalized.TaskCode = "FOLLOW-UP-201"
+	normalized.TaskGroup = "customer_follow_up"
+	normalized.TaskName = "跟进客户确认"
+	normalized.SourceType = "project-orders"
+	normalized.OwnerRoleKey = SalesRoleKey
+	if _, err := uc.CreateTask(context.Background(), &normalized, 7); err != nil {
+		t.Fatalf("create equivalent normalized task: %v", err)
+	}
+	if repo.createTaskInput.IntentHash != first.IntentHash {
+		t.Fatalf("equivalent normalized DTO changed hash: %s != %s", repo.createTaskInput.IntentHash, first.IntentHash)
+	}
+
+	changed := normalized
+	changed.Payload = map[string]any{"note": "另一业务意图"}
+	if _, err := uc.CreateTask(context.Background(), &changed, 7); err != nil {
+		t.Fatalf("prepare changed task: %v", err)
+	}
+	if repo.createTaskInput.IntentHash == first.IntentHash {
+		t.Fatal("changed create payload must change intent hash")
+	}
+
+	if _, err := uc.CreateTask(context.Background(), &normalized, 8); err != nil {
+		t.Fatalf("prepare other actor task: %v", err)
+	}
+	if repo.createTaskInput.IntentHash == first.IntentHash {
+		t.Fatal("create actor must participate in intent hash")
+	}
+}
+
 func TestWorkflowTaskMutationIntentHashIncludesUrgeAndBreakGlassSemantics(t *testing.T) {
 	baseUrge := &WorkflowTaskUrge{
 		ID:              10,

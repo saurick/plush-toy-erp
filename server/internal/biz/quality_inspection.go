@@ -27,10 +27,12 @@ const (
 	QualityInspectionSourceShipment        = ShipmentSourceType
 	QualityInspectionSourceOutsourcingFact = OutsourcingFactSourceType
 	QualityInspectionSourceProductionWIP   = ProductionWIPQualitySourceType
+	QualityInspectionSourceSalesReturn     = SalesReturnSourceType
 	QualityInspectionTypeIncoming          = "INCOMING"
 	QualityInspectionTypeFinishedGoods     = "FINISHED_GOODS"
 	QualityInspectionTypeOutsourcingReturn = "OUTSOURCING_RETURN"
 	QualityInspectionTypeProductionStage   = ProductionWIPQualityInspectionType
+	QualityInspectionTypeCustomerReturn    = "CUSTOMER_RETURN"
 	QualityInspectionSubjectMaterial       = "MATERIAL"
 	QualityInspectionSubjectProduct        = InventorySubjectProduct
 	QualityInspectionSubjectWIP            = ProductionWIPQualitySubjectType
@@ -49,29 +51,33 @@ var (
 )
 
 type QualityInspection struct {
-	ID                    int
-	InspectionNo          string
-	PurchaseReceiptID     int
-	PurchaseReceiptItemID *int
-	InventoryLotID        int
-	ProductionWIPBatchID  *int
-	GateCode              *string
-	MaterialID            int
-	WarehouseID           int
-	SourceType            *string
-	SourceID              *int
-	SourceNo              *string
-	InspectionType        *string
-	SubjectType           *string
-	SubjectID             *int
-	Status                string
-	Result                *string
-	OriginalLotStatus     string
-	InspectedAt           *time.Time
-	InspectorID           *int
-	DefectRateOperator    *string
-	DefectRatePercent     *decimal.Decimal
-	DecisionNote          *string
+	ID                       int
+	InspectionNo             string
+	PurchaseReceiptID        int
+	PurchaseReceiptItemID    *int
+	InventoryLotID           int
+	ProductionWIPBatchID     *int
+	GateCode                 *string
+	MaterialID               int
+	WarehouseID              int
+	SourceType               *string
+	SourceID                 *int
+	SourceNo                 *string
+	InspectionType           *string
+	SubjectType              *string
+	SubjectID                *int
+	Status                   string
+	Result                   *string
+	OriginalLotStatus        string
+	InspectedAt              *time.Time
+	InspectorID              *int
+	DefectRateOperator       *string
+	DefectRatePercent        *decimal.Decimal
+	DecisionNote             *string
+	CorrectionOfInspectionID *int
+	SupersededAt             *time.Time
+	SupersededBy             *int
+	SupersededReason         *string
 	// Production-stage list projections are resolved from the immutable route
 	// snapshot and WIP batch. They are read-only display fields, not quality
 	// decision inputs.

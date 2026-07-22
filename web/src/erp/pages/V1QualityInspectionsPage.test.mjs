@@ -157,7 +157,7 @@ test('quality page describes generic and production-stage sources without collap
   assert.match(source, /每张质检单只代表当前在制批次和当前关口/u)
   assert.match(
     source,
-    /首次到货检验不合格会阻止本单入库，现有退供应商草稿只适用于已入库后追加检验不合格/u
+    /首次到货检验不合格可办理退厂或补换，确认后取消尚未入库的收货草稿/u
   )
 })
 

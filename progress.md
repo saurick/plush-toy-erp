@@ -5,10 +5,24 @@
 ## 当前活跃事项
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
-- 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务、九角色权限和页面合同按同一最终树核对，不把相邻差异拆算为独立已交付任务。最新完整 `strict` 已输出 `status=complete`；本记录写入后只需完成文档、diff、数据库守卫和证据一致性收口。
+- 当前独立 Worktree 正在冻结“异常流 V1”整树；schema / migration 只有一个 writer，Git 仍由单一 owner 收口。历史 `strict` 不能证明本轮冻结树，本节下方将记录本轮实际门禁结果。
 - 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 与 133 V5 固定库 `plush_erp_uat_20260716_v5` 均已应用到 `20260722000505`、90 executed、pending 0；两端分别从空业务基线生成同版本、独立 ID 的九阶段数据。旧本地库和旧 133 V5 库均以可恢复改名方式保留，未清理。
 - 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。公网 `admin.yoyoosun.net` 的入口适配容器也已切到同一 V5 web / backend，旧入口容器仅停止并保留为即时回滚点；客户 UAT / 签收仍是独立关口。
-- 当前 Git 由单一 owner 收口；本轮已获提交、推送和 133 部署授权，不创建分支。后续如再修改运行时代码或 migration，必须生成新的不可变 release 并重新走目标环境证据链。
+- 当前 Git 由单一 owner 收口，不创建分支。本轮未获 stage、commit、push、133 发布或客户 UAT 授权；本地 migration 不向共享、目标或生产库 apply。
+
+## 2026-07-22 异常流 V1 本地闭环
+
+完成：在保持 Workflow / Fact 分层的前提下，补齐盘点、仓间调拨和受控人工调整；首次来料拒绝后的退厂 / 补换；委外不合格返厂 / 返工；生产报废、超领和 WIP 让步审批；客户退货 RMA；真实收付款、多单核销、冲正及应收 / 应付红冲。所有新写路径均使用来源锚点、状态机、权限、幂等 intent、version CAS、事务、防负数或下游依赖门禁；已过账事实不物理删除。
+
+完成：普通 `create_task` 纳入网络重放合同，`handleWorkflow` 补齐未登录、disabled 和非管理员负向表测。ProcessRuntime 对已补偿节点只允许 `terminate_and_withdraw_downstream`：仅撤回尚无领域副作用的 active / blocked 下游和关联任务，已完成或已有 effect ref 时 fail closed。质量结果更正保留原判定并生成新待检单；存在已生效处置、财务、出货或客户退货隔离库存下游时拒绝撤销。
+
+完成：库存、质检、客户退货和财务新增正式页面；九岗位端与共享 JSON-RPC wrapper 覆盖断网、408 / 5xx、非法 success、stale / 并发、无权限及失败恢复。客户退货收货进入独立 `HOLD` 批次和 `CUSTOMER_RETURN` 质检，不回写原出货批次。正式能力台账、证据详情、流程运行时台账和 yoyoosun 客户交付矩阵同步为“本地可验证、未发布、未 UAT”。
+
+验证：后端定向 biz / data / service 与 RMA 隔离质检测试已通过；前端本轮文件定向 Prettier、Node `185 / 185`、production build 和 Style L1 `3 / 3` 已通过。`make data` 已完成并确认生成物 / migration 同步，`db-guard` 通过；T0-T7 影响面门禁通过，其中一次性隔离 PostgreSQL 关键事务 `192 / 192`、零失败、零跳过。冻结树 `full.sh` 已输出 `status=complete`，server quick `2702 / 2702`、server all `2862 / 2862`，均为零失败、零跳过；本节写入后的最终整树以随后执行的 `strict.sh` 退出码和本轮交付报告为准，不能沿用历史绿色。
+
+下一步：冻结 schema 后运行最终生成 / migration 守卫和整树门禁；若全部通过，仅报告 `Hand off ready` 并等待用户决定是否提交推送。
+
+阻塞 / 风险：目标 133 发布、目标库 migration apply、真实账号 smoke 和甲方 UAT / 签收未授权且未执行。本轮所有证据仅属于当前本地 Worktree；不代表现有 133 运行镜像包含这些能力。V1 仍不含完整 WMS、物流、银行直连、总账、税控、完整 MES 或客户现场规则验收。
 
 ## 2026-07-22 系统管理员移动岗位身份边界
 

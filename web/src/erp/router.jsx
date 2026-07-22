@@ -83,6 +83,10 @@ const WorkflowBusinessModulePage = lazyRoute(
 )
 const BOMVersionsPage = lazyRoute(() => import('./pages/BOMVersionsPage.jsx'))
 const ShipmentsPage = lazyRoute(() => import('./pages/ShipmentsPage.jsx'))
+const SalesReturnsPage = lazyRoute(() => import('./pages/SalesReturnsPage.jsx'))
+const FinancePaymentsPage = lazyRoute(
+  () => import('./pages/FinancePaymentsPage.jsx')
+)
 const MobileAppLayout = lazyRoute(() => import('./mobile/MobileAppLayout'))
 const MobileRoleTasksPage = lazyRoute(
   () => import('./mobile/pages/MobileRoleTasksPage')
@@ -402,6 +406,10 @@ export default function ERPRouter() {
             />
             <Route path="warehouse/shipments" element={<ShipmentsPage />} />
             <Route
+              path="sales/customer-returns"
+              element={<SalesReturnsPage />}
+            />
+            <Route
               path="purchase/processing-contracts"
               element={<V1OutsourcingOrdersPage />}
             />
@@ -441,6 +449,7 @@ export default function ERPRouter() {
               path="finance/reconciliation"
               element={<V1OperationalFactPage moduleKey="reconciliation" />}
             />
+            <Route path="finance/payments" element={<FinancePaymentsPage />} />
             <Route
               path="finance/payables"
               element={<V1OperationalFactPage moduleKey="payables" />}
