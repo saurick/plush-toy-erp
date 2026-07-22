@@ -167,6 +167,51 @@ func TestWorkflowRepo_GetWorkflowTaskBoardReturnsBoundedExclusiveLanes(t *testin
 	}
 }
 
+func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *testing.T) {
+	ctx := context.Background()
+	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_approval?mode=memory&cache=shared&_fk=1")
+	defer mustCloseEntClient(t, client)
+	repo := NewWorkflowRepo(&Data{postgres: client}, log.NewStdLogger(io.Discard))
+	approvalCapability := biz.PermissionWorkflowTaskApprove
+	fixtures := []struct {
+		code       string
+		group      string
+		sourceType string
+		ownerRole  string
+		capability *string
+		status     string
+	}{
+		{code: "APPROVAL-GENERIC", group: "shipment_finance_release", sourceType: "shipment", ownerRole: biz.FinanceRoleKey, capability: &approvalCapability, status: "ready"},
+		{code: "HUMAN-BOSS", group: "management_review", sourceType: "sales_order", ownerRole: biz.BossRoleKey, status: "ready"},
+		{code: "APPROVAL-LEGACY", group: "order_approval", sourceType: "project-orders", ownerRole: biz.BossRoleKey, status: "blocked"},
+		{code: "APPROVAL-FINISHED", group: "shipment_finance_release", sourceType: "shipment", ownerRole: biz.FinanceRoleKey, capability: &approvalCapability, status: "done"},
+	}
+	for index, fixture := range fixtures {
+		builder := client.WorkflowTask.Create().
+			SetTaskCode(fixture.code).
+			SetTaskGroup(fixture.group).
+			SetTaskName(fixture.code).
+			SetSourceType(fixture.sourceType).
+			SetSourceID(index + 1).
+			SetTaskStatusKey(fixture.status).
+			SetOwnerRoleKey(fixture.ownerRole).
+			SetPayload(map[string]any{})
+		if fixture.capability != nil {
+			builder.SetRequiredCapabilityKey(*fixture.capability)
+		}
+		if _, err := builder.Save(ctx); err != nil {
+			t.Fatalf("create fixture %s: %v", fixture.code, err)
+		}
+	}
+	board, err := repo.GetWorkflowTaskBoard(ctx, biz.WorkflowTaskBoardQuery{ApprovalOnly: true, Limit: 10, SnapshotAt: time.Now()})
+	if err != nil {
+		t.Fatalf("get approval board: %v", err)
+	}
+	if board.Total != 2 || board.Counts.Actionable != 1 || board.Counts.Exception != 1 || board.Counts.Finished != 0 {
+		t.Fatalf("approval board must contain generic and legacy approvals only, got total=%d counts=%#v", board.Total, board.Counts)
+	}
+}
+
 func TestWorkflowRepo_GetWorkflowTaskBoardAppliesVisibilityAndRejectsRemovedStatuses(t *testing.T) {
 	ctx := context.Background()
 	client := enttest.Open(t, dialect.SQLite, "file:workflow_task_board_visibility?mode=memory&cache=shared&_fk=1")

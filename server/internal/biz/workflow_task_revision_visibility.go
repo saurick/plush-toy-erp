@@ -187,6 +187,40 @@ func WorkflowTaskVisibilityScopeIncludesRole(scope *WorkflowTaskVisibilityScope,
 	return false
 }
 
+func WorkflowTaskVisibilityScopeIncludesTask(scope *WorkflowTaskVisibilityScope, task *WorkflowTask) bool {
+	scope = NormalizeWorkflowTaskVisibilityScope(scope)
+	if scope == nil || task == nil {
+		return false
+	}
+	roleKey := NormalizeRoleKey(task.OwnerRoleKey)
+	if roleKey == "" {
+		return false
+	}
+	assigneeVisible := scope.VisibleAssigneeID != nil && task.AssigneeID != nil && *scope.VisibleAssigneeID == *task.AssigneeID
+	if task.ConfigRevision == nil || strings.TrimSpace(*task.ConfigRevision) == "" {
+		if task.ProcessInstanceID != nil || task.ProcessNodeInstanceID != nil {
+			return false
+		}
+		return scope.StandaloneAllowAllOwnerRoles ||
+			workflowRoleKeyInList(roleKey, scope.StandaloneVisibleOwnerRoleKeys) ||
+			assigneeVisible
+	}
+	if task.ProcessInstanceID == nil || *task.ProcessInstanceID <= 0 ||
+		task.ProcessNodeInstanceID == nil || *task.ProcessNodeInstanceID <= 0 {
+		return false
+	}
+	revisionKey := strings.TrimSpace(*task.ConfigRevision)
+	for _, revision := range scope.RevisionRoleScopes {
+		if revision.ConfigRevision != revisionKey {
+			continue
+		}
+		return revision.AllowAllOwnerRoles ||
+			workflowRoleKeyInList(roleKey, revision.VisibleOwnerRoleKeys) ||
+			assigneeVisible
+	}
+	return false
+}
+
 func workflowRoleKeyInList(roleKey string, values []string) bool {
 	for _, value := range values {
 		if NormalizeRoleKey(value) == roleKey {

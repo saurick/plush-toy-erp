@@ -3045,6 +3045,56 @@ export function createStyleL1Scenarios(deps) {
         await assertNoDashboardCenterLocalRefreshButton(page, {
           scenarioName: 'erp-task-board-desktop',
         })
+        const approvalInboxButton = page.getByRole('button', {
+          name: '待我审批',
+          exact: true,
+        })
+        await approvalInboxButton.click()
+        await expectHeading(page, '待我审批')
+        await expectText(
+          page,
+          '只显示服务端登记为审批节点且当前账号可见的事项；审批仍受岗位、指定处理人、配置版本和单据状态约束。'
+        )
+        const approvalInboxLayout = await page.evaluate(() => {
+          const card = document.querySelector('.erp-dashboard-task-board-card')
+          const heading = [...document.querySelectorAll('h1, h2, h3')].find(
+            (element) => element.textContent?.trim() === '待我审批'
+          )
+          const backButton = [...document.querySelectorAll('button')].find(
+            (element) => element.textContent?.trim() === '返回全部任务'
+          )
+          const cardRect = card?.getBoundingClientRect()
+          const headingRect = heading?.getBoundingClientRect()
+          const backButtonRect = backButton?.getBoundingClientRect()
+          return {
+            cardFits:
+              Boolean(card) &&
+              Number(card?.scrollWidth || 0) <= Number(card?.clientWidth || 0),
+            headingVisible:
+              Boolean(cardRect && headingRect) &&
+              headingRect.left >= cardRect.left &&
+              headingRect.right <= cardRect.right,
+            backButtonVisible:
+              Boolean(cardRect && backButtonRect) &&
+              backButtonRect.left >= cardRect.left &&
+              backButtonRect.right <= cardRect.right,
+          }
+        })
+        assert(
+          approvalInboxLayout.cardFits &&
+            approvalInboxLayout.headingVisible &&
+            approvalInboxLayout.backButtonVisible,
+          `待我审批入口存在溢出或不可见控件: ${JSON.stringify(
+            approvalInboxLayout
+          )}`
+        )
+        await page.screenshot({
+          path: path.resolve(outputDir, 'erp-task-board-approval-inbox.png'),
+        })
+        await page
+          .getByRole('button', { name: '返回全部任务', exact: true })
+          .click()
+        await expectHeading(page, '任务看板')
         const navigationTask = await page.evaluate(async () => {
           const response = await fetch('/rpc/workflow', {
             method: 'POST',

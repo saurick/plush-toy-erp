@@ -58,3 +58,17 @@ test('task action drawer explains loading and readonly access before action sele
   assert.match(source, /当前只能查看任务/u)
   assert.match(source, /description=\{readonlyReason/u)
 })
+
+test('task action drawer loads the canonical approval trajectory and uses approval language', () => {
+  assert.match(source, /listWorkflowTaskEvents\(task\.id/u)
+  assert.match(source, /审批轨迹/u)
+  assert.match(source, /最近审批记录/u)
+  assert.match(source, /最近 100 条/u)
+  assert.match(source, /!task\?\.id \|\| !approvalTask/u)
+  assert.match(source, /limit: 100/u)
+  assert.match(source, /event\.event_type === 'status_changed'/u)
+  assert.match(source, /event\.to_status_key === 'done'/u)
+  assert.match(source, /加载审批轨迹失败/u)
+  assert.match(source, /getWorkflowTaskActionMeta\(task, actionMode\)/u)
+  assert.match(source, /approvalTask \? '审批办理' : '任务处理'/u)
+})

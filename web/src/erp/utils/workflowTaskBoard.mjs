@@ -69,6 +69,7 @@ export const DEFAULT_TASK_BOARD_FILTERS = Object.freeze({
   due: 'all',
   sourceType: 'all',
   lane: 'all',
+  mode: 'all',
   page: 1,
 })
 
@@ -113,6 +114,7 @@ const FILTER_QUERY_KEYS = Object.freeze({
   sourceType: 'source',
   lane: 'lane',
   page: 'page',
+  mode: 'mode',
 })
 
 const STATUS_FILTER_VALUES = new Set(
@@ -168,7 +170,9 @@ export function getWorkflowTaskBusinessStatusLabel(task = {}) {
       ''
   ).trim()
   if (explicitLabel) {
-    return BUSINESS_STATUS_VISIBLE_LABEL_OVERRIDES[explicitLabel] || explicitLabel
+    return (
+      BUSINESS_STATUS_VISIBLE_LABEL_OVERRIDES[explicitLabel] || explicitLabel
+    )
   }
 
   const businessStatusKey = String(task.business_status_key || '').trim()
@@ -323,6 +327,7 @@ export function normalizeWorkflowTaskBoardFilters(filters = {}) {
     due: normalizeKnownFilterValue(filters.due, DUE_FILTER_VALUES),
     sourceType: normalizeFilterValue(filters.sourceType),
     lane: normalizeKnownFilterValue(filters.lane, LANE_FILTER_VALUES),
+    mode: filters.mode === 'approval' ? 'approval' : 'all',
     page: normalizePositiveInteger(filters.page),
   }
 }
@@ -334,7 +339,8 @@ export function hasActiveWorkflowTaskBoardFilters(filters = {}) {
     normalized.status !== DEFAULT_TASK_BOARD_FILTERS.status ||
     normalized.role !== DEFAULT_TASK_BOARD_FILTERS.role ||
     normalized.due !== DEFAULT_TASK_BOARD_FILTERS.due ||
-    normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType
+    normalized.sourceType !== DEFAULT_TASK_BOARD_FILTERS.sourceType ||
+    normalized.mode !== DEFAULT_TASK_BOARD_FILTERS.mode
   )
 }
 
@@ -350,6 +356,7 @@ export function readWorkflowTaskBoardFiltersFromSearch(searchParams = '') {
     due: params.get(FILTER_QUERY_KEYS.due),
     sourceType: params.get(FILTER_QUERY_KEYS.sourceType),
     lane: params.get(FILTER_QUERY_KEYS.lane),
+    mode: params.get(FILTER_QUERY_KEYS.mode),
     page: params.get(FILTER_QUERY_KEYS.page),
   })
 }
@@ -385,6 +392,9 @@ export function writeWorkflowTaskBoardFiltersToSearch(
     params.set(FILTER_QUERY_KEYS.lane, normalized.lane)
     params.set(FILTER_QUERY_KEYS.page, String(normalized.page))
   }
+  if (normalized.mode !== DEFAULT_TASK_BOARD_FILTERS.mode) {
+    params.set(FILTER_QUERY_KEYS.mode, normalized.mode)
+  }
 
   return params
 }
@@ -411,6 +421,7 @@ export function buildWorkflowTaskBoardRequest(filters = {}) {
     params.source_type = normalized.sourceType
   }
   if (focused) params.lane_key = normalized.lane
+  if (normalized.mode === 'approval') params.approval_only = true
   return params
 }
 

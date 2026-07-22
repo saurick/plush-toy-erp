@@ -73,3 +73,37 @@ func TestCustomerConfigUsecaseWorkflowTaskRevisionRoleScopesRepositoryErrorFails
 		t.Fatalf("scopes=%#v err=%v", scopes, err)
 	}
 }
+
+func TestWorkflowTaskVisibilityScopeIncludesTaskRequiresCompleteCategoryAnchor(t *testing.T) {
+	assigneeID := 7
+	processID := 11
+	nodeID := 12
+	revision := "rev-a"
+	scope := &WorkflowTaskVisibilityScope{
+		VisibleAssigneeID: &assigneeID,
+		RevisionRoleScopes: []WorkflowTaskRevisionRoleScope{{
+			ConfigRevision: revision,
+			Status:         CustomerConfigStatusActive,
+		}},
+	}
+	standalone := &WorkflowTask{OwnerRoleKey: FinanceRoleKey, AssigneeID: &assigneeID}
+	if !WorkflowTaskVisibilityScopeIncludesTask(scope, standalone) {
+		t.Fatal("standalone assignee should remain visible")
+	}
+	standalone.ProcessInstanceID = &processID
+	if WorkflowTaskVisibilityScopeIncludesTask(scope, standalone) {
+		t.Fatal("partial runtime anchor must fail closed before assignee visibility")
+	}
+	runtime := &WorkflowTask{
+		OwnerRoleKey: FinanceRoleKey, AssigneeID: &assigneeID,
+		ConfigRevision: &revision, ProcessInstanceID: &processID, ProcessNodeInstanceID: &nodeID,
+	}
+	if !WorkflowTaskVisibilityScopeIncludesTask(scope, runtime) {
+		t.Fatal("complete authorized runtime anchor should allow the assignee")
+	}
+	missingRevision := "rev-missing"
+	runtime.ConfigRevision = &missingRevision
+	if WorkflowTaskVisibilityScopeIncludesTask(scope, runtime) {
+		t.Fatal("unknown runtime revision must fail closed before assignee visibility")
+	}
+}

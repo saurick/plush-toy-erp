@@ -74,6 +74,7 @@ type WorkflowTaskBoardQuery struct {
 	Due                  string
 	SourceType           string
 	LaneKey              string
+	ApprovalOnly         bool
 	Limit                int
 	Offset               int
 	VisibleOwnerRoleKeys []string
@@ -142,6 +143,20 @@ type WorkflowTaskStatusUpdate struct {
 	SideEffects       *WorkflowTaskStatusSideEffects
 	BreakGlass        *WorkflowTaskBreakGlassIntent
 	AuditEvent        *RuntimeAuditEventCreate
+}
+
+type WorkflowTaskEvent struct {
+	ID            int
+	TaskID        int
+	TaskVersion   *int
+	EventType     string
+	FromStatusKey *string
+	ToStatusKey   *string
+	ActorRoleKey  *string
+	ActorID       *int
+	Reason        *string
+	Payload       map[string]any
+	CreatedAt     time.Time
 }
 
 type WorkflowTaskBreakGlassIntent struct {
@@ -217,6 +232,10 @@ type WorkflowRepo interface {
 	UrgeWorkflowTask(ctx context.Context, in *WorkflowTaskUrge, actorID int, actorRoleKey string) (*WorkflowTask, error)
 	ListWorkflowBusinessStates(ctx context.Context, filter WorkflowBusinessStateFilter) ([]*WorkflowBusinessState, int, error)
 	UpsertWorkflowBusinessState(ctx context.Context, in *WorkflowBusinessStateUpsert, actorID int) (*WorkflowBusinessState, error)
+}
+
+type WorkflowTaskEventReader interface {
+	ListWorkflowTaskEvents(ctx context.Context, taskID int, limit int) ([]*WorkflowTaskEvent, error)
 }
 
 type WorkflowUsecase struct {

@@ -16,6 +16,7 @@ import {
   resolveMobileTaskStatusLabel,
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
+import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
 
 const ACTION_OPTIONS = Object.freeze([
@@ -81,8 +82,8 @@ function resolveAccessCopy(accessState, accessMessage) {
   return ''
 }
 
-function resolveReasonLabel(action) {
-  if (action === 'done') return '完成反馈'
+function resolveReasonLabel(action, approvalTask = false) {
+  if (action === 'done') return approvalTask ? '审批意见' : '完成反馈'
   if (action === 'blocked') return '阻塞原因'
   if (action === 'rejected') return '退回原因'
   if (action === 'resume') return '阻塞解除说明'
@@ -90,9 +91,11 @@ function resolveReasonLabel(action) {
   return '处理原因'
 }
 
-function resolveReasonPlaceholder(action) {
+function resolveReasonPlaceholder(action, approvalTask = false) {
   if (action === 'done') {
-    return '说明已完成什么、核对结果和需要交接的信息'
+    return approvalTask
+      ? '说明通过依据、核对结果和需要交接的信息'
+      : '说明已完成什么、核对结果和需要交接的信息'
   }
   if (action === 'blocked') return '说明当前卡点、影响和需要的支持'
   if (action === 'rejected') return '说明退回依据和需要补充的内容'
@@ -101,12 +104,12 @@ function resolveReasonPlaceholder(action) {
   return '请填写处理原因'
 }
 
-function validationErrorsFor({ action, reason }) {
+function validationErrorsFor({ action, approvalTask = false, reason }) {
   return {
     action: action ? '' : '请选择本次处理方式',
     reason:
       REASON_REQUIRED_ACTIONS.has(action) && !String(reason || '').trim()
-        ? `${resolveReasonLabel(action)}为必填项`
+        ? `${resolveReasonLabel(action, approvalTask)}为必填项`
         : '',
   }
 }
@@ -166,9 +169,12 @@ export default function MobileTaskActionScreen({
     ? resolveMobileTaskStatusLabel(task)
     : '任务状态暂不可用'
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
+  const approvalTask = isWorkflowApprovalTask(task)
   const reasonRequired = REASON_REQUIRED_ACTIONS.has(effectiveAction)
   const effectiveActionLabel = effectiveAction
-    ? resolveMobileActionLabel(effectiveAction)
+    ? approvalTask && effectiveAction === 'done'
+      ? '审批通过'
+      : resolveMobileActionLabel(effectiveAction)
     : ''
   const submitLabel = effectiveActionLabel
     ? `确认${effectiveActionLabel}`
@@ -238,6 +244,7 @@ export default function MobileTaskActionScreen({
     if (!canSubmit || busy) return
     const errors = validationErrorsFor({
       action: effectiveAction,
+      approvalTask,
       reason,
     })
     setValidationErrors(errors)
@@ -405,7 +412,9 @@ export default function MobileTaskActionScreen({
                         />
                         <ActionIcon className="shrink-0" aria-hidden="true" />
                         <span className="min-w-0 break-words">
-                          {resolveMobileActionLabel(option.key)}
+                          {approvalTask && option.key === 'done'
+                            ? '审批通过'
+                            : resolveMobileActionLabel(option.key)}
                         </span>
                       </label>
                     )
@@ -471,7 +480,7 @@ export default function MobileTaskActionScreen({
                     className="text-lg font-semibold text-slate-950"
                     htmlFor={`${fieldID}-reason`}
                   >
-                    {resolveReasonLabel(effectiveAction)}
+                    {resolveReasonLabel(effectiveAction, approvalTask)}
                   </label>
                   <span
                     className={`text-sm font-semibold ${
@@ -493,7 +502,10 @@ export default function MobileTaskActionScreen({
                   aria-invalid={Boolean(validationErrors.reason)}
                   disabled={busy}
                   maxLength={500}
-                  placeholder={resolveReasonPlaceholder(effectiveAction)}
+                  placeholder={resolveReasonPlaceholder(
+                    effectiveAction,
+                    approvalTask
+                  )}
                   required={reasonRequired}
                   value={reason}
                   onChange={(event) => {
@@ -513,7 +525,6 @@ export default function MobileTaskActionScreen({
                     {String(reason || '').length}/500
                   </span>
                 </div>
-
               </section>
             ) : null}
 

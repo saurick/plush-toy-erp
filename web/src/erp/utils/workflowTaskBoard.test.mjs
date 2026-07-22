@@ -266,6 +266,7 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
     due: 'overdue',
     sourceType: 'inbound',
     lane: 'all',
+    mode: 'all',
     page: 1,
   })
 
@@ -280,6 +281,7 @@ test('workflowTaskBoard: 从 URL 读取任务看板筛选并过滤非法值', ()
       due: 'all',
       sourceType: 'all',
       lane: 'all',
+      mode: 'all',
       page: 1,
     }
   )
@@ -347,6 +349,18 @@ test('workflowTaskBoard: 聚焦请求保留筛选并按每页八条计算 offset
     limit: TASK_BOARD_OVERVIEW_LIMIT,
     offset: 0,
   })
+})
+
+test('workflowTaskBoard: 待我审批使用服务端审批筛选而非分页后本地过滤', () => {
+  assert.deepEqual(buildWorkflowTaskBoardRequest({ mode: 'approval' }), {
+    approval_only: true,
+    limit: TASK_BOARD_OVERVIEW_LIMIT,
+    offset: 0,
+  })
+  assert.equal(
+    writeWorkflowTaskBoardFiltersToSearch('', { mode: 'approval' }).toString(),
+    'mode=approval'
+  )
 })
 
 test('workflowTaskBoard: lane/page 切换不会把上一请求响应交给新筛选建模', () => {
@@ -600,5 +614,19 @@ test('workflowTaskBoard: 审批类 done 使用 approve 权限，催办按 update
       'complete'
     ),
     false
+  )
+})
+
+test('workflowTaskBoard: 所有服务端 approval capability 都使用审批权限', () => {
+  const financeApproval = {
+    task_status_key: 'ready',
+    owner_role_key: 'finance',
+    task_group: 'shipment_finance_release',
+    source_type: 'shipment',
+    required_capability_key: 'workflow.task.approve',
+  }
+  assert.equal(
+    getWorkflowTaskActionPermission('complete', financeApproval),
+    'workflow.task.approve'
   )
 })

@@ -541,6 +541,14 @@ func TestWorkflowStatusActionPermissionMapsUpdateCompleteApproveReject(t *testin
 	if got := WorkflowStatusActionPermission("done", bossApprovalWorkflowTask()); got != PermissionWorkflowTaskApprove {
 		t.Fatalf("boss approval done should require approve, got %s", got)
 	}
+	capability := PermissionWorkflowTaskApprove
+	if got := WorkflowStatusActionPermission("done", &WorkflowTask{
+		TaskGroup:             "shipment_finance_release",
+		OwnerRoleKey:          FinanceRoleKey,
+		RequiredCapabilityKey: &capability,
+	}); got != PermissionWorkflowTaskApprove {
+		t.Fatalf("generic approval node should require approve, got %s", got)
+	}
 }
 
 func TestWorkflowRejectedIsTerminalAndCannotTransitionAgain(t *testing.T) {

@@ -238,7 +238,11 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 		}
 		nodeKey := getStringFromAnyMap(nodeDefinition, "node_key")
 		nodeType := getStringFromAnyMap(nodeDefinition, "node_type")
+		requiredCapabilityKey := getStringFromAnyMap(nodeDefinition, "required_capability_key")
 		if nodeKey == "" || nodeType == "" {
+			return nil, ErrBadParam
+		}
+		if nodeType == ProcessNodeTypeApproval && requiredCapabilityKey != PermissionWorkflowTaskApprove {
 			return nil, ErrBadParam
 		}
 		policySnapshot, err := mapFromAnyValue(nodeDefinition["policy_snapshot"])
@@ -252,7 +256,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 			NodeKey:               nodeKey,
 			NodeType:              nodeType,
 			OwnerPoolKey:          optionalStringPointer(getStringFromAnyMap(nodeDefinition, "owner_pool_key")),
-			RequiredCapabilityKey: optionalStringPointer(getStringFromAnyMap(nodeDefinition, "required_capability_key")),
+			RequiredCapabilityKey: optionalStringPointer(requiredCapabilityKey),
 			FormProfileKey:        optionalStringPointer(getStringFromAnyMap(nodeDefinition, "form_profile_key")),
 			ActionSetKey:          optionalStringPointer(getStringFromAnyMap(nodeDefinition, "action_set_key")),
 			PolicySnapshot:        policySnapshot,
