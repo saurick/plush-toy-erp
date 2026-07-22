@@ -885,6 +885,37 @@ test("scenario password policy rejects values outside 8 to 20 characters before 
   }
 });
 
+test("registered 133 target rejects local-only public and shared admin/demo passwords before login", async () => {
+  const plan = buildManualAcceptanceAccountScenarioPlan({
+    backendURL: CUSTOMER_TRIAL_133_ORIGIN,
+    target: CUSTOMER_TRIAL_133_TARGET,
+    dataVersion: "2026.07.16-v5",
+    runId: "20260716-V5",
+  });
+  for (const [password, adminPassword, expected] of [
+    ["12345678", "guard-pass", /local-only public password/u],
+    ["demo-pass", "12345678", /local-only public password/u],
+    ["same-secret", "same-secret", /must be different/u],
+  ]) {
+    let fetchCount = 0;
+    await assert.rejects(
+      applyManualAcceptanceAccountScenarios(plan, {
+        password,
+        adminPassword,
+        confirmPhrase: MANUAL_ACCEPTANCE_ACCOUNT_CONFIRM_PHRASE,
+        targetConfirmation: manualAcceptanceTargetConfirmation(plan),
+        targetAttestation: customerTrial133Attestation(),
+        fetchImpl: async () => {
+          fetchCount += 1;
+          throw new Error("must not fetch");
+        },
+      }),
+      expected,
+    );
+    assert.equal(fetchCount, 0);
+  }
+});
+
 test("local acceptance adds missing customer capabilities without replacing role selections", async () => {
   const retained = {
     warehouse: "erp.workbench.read",

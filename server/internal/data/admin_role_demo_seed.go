@@ -3,6 +3,7 @@ package data
 import (
 	"context"
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"strings"
@@ -10,6 +11,7 @@ import (
 
 	"server/internal/biz"
 
+	"github.com/jackc/pgx/v5/pgconn"
 	"golang.org/x/crypto/bcrypt"
 )
 
@@ -18,6 +20,121 @@ var (
 	ErrRoleDemoPasswordInvalid  = errors.New("role demo admin password must contain 8-20 characters")
 	ErrStableAdminProtected     = errors.New("stable admin account is not managed by role demo or manual acceptance seeding")
 )
+
+const PublicRoleDemoPassword = "12345678"
+
+type ManualAcceptancePasswordRotationAccount struct {
+	Username        string `json:"username"`
+	AuthVersion     int64  `json:"authVersion"`
+	RevokedSessions int64  `json:"revokedSessions"`
+	PhoneBound      bool   `json:"phoneBound"`
+}
+
+type ManualAcceptancePasswordRotationReceipt struct {
+	OperationID      string                                    `json:"operationId,omitempty"`
+	Target           string                                    `json:"target,omitempty"`
+	DatasetVersion   string                                    `json:"datasetVersion,omitempty"`
+	Release          string                                    `json:"release,omitempty"`
+	MigrationVersion string                                    `json:"migrationVersion,omitempty"`
+	CustomerRevision string                                    `json:"customerRevision,omitempty"`
+	RotatedAt        time.Time                                 `json:"rotatedAt"`
+	Accounts         []ManualAcceptancePasswordRotationAccount `json:"accounts"`
+	Replayed         bool                                      `json:"replayed"`
+}
+
+type ManualAcceptancePasswordRotationOperation struct {
+	MarkerKey        string
+	OperationID      string
+	Target           string
+	DatasetVersion   string
+	Release          string
+	MigrationVersion string
+	CustomerRevision string
+}
+
+func RejectPublicRoleDemoPassword(password string) error {
+	if strings.TrimSpace(password) == PublicRoleDemoPassword {
+		return errors.New("the public role demo password is forbidden outside a registered isolated development database")
+	}
+	return nil
+}
+
+func validateManualAcceptanceRotationOperation(operation ManualAcceptancePasswordRotationOperation) error {
+	values := []string{
+		operation.MarkerKey, operation.OperationID, operation.Target, operation.DatasetVersion,
+		operation.Release, operation.MigrationVersion, operation.CustomerRevision,
+	}
+	nonEmpty := 0
+	for _, value := range values {
+		if strings.TrimSpace(value) != "" {
+			nonEmpty++
+		}
+	}
+	if nonEmpty == 0 {
+		return nil
+	}
+	if nonEmpty != len(values) || len(operation.MarkerKey) > 128 {
+		return errors.New("manual acceptance password rotation operation identity is incomplete")
+	}
+	return nil
+}
+
+func readManualAcceptanceRotationReceipt(
+	ctx context.Context,
+	tx *sql.Tx,
+	operation ManualAcceptancePasswordRotationOperation,
+	adminUsernames []string,
+	demoUsernames []string,
+	expectPhoneBound bool,
+) (*ManualAcceptancePasswordRotationReceipt, error) {
+	var raw string
+	if err := tx.QueryRowContext(ctx,
+		"SELECT marker_value FROM runtime_markers WHERE marker_key = $1 LIMIT 1",
+		operation.MarkerKey,
+	).Scan(&raw); err != nil {
+		return nil, err
+	}
+	var receipt ManualAcceptancePasswordRotationReceipt
+	if err := json.Unmarshal([]byte(raw), &receipt); err != nil {
+		return nil, fmt.Errorf("parse manual acceptance password rotation marker: %w", err)
+	}
+	if receipt.OperationID != operation.OperationID ||
+		receipt.Target != operation.Target ||
+		receipt.DatasetVersion != operation.DatasetVersion ||
+		receipt.Release != operation.Release ||
+		receipt.MigrationVersion != operation.MigrationVersion ||
+		receipt.CustomerRevision != operation.CustomerRevision ||
+		receipt.RotatedAt.IsZero() {
+		return nil, errors.New("manual acceptance password rotation marker identity mismatch")
+	}
+	expectedUsernames := append(append([]string(nil), adminUsernames...), demoUsernames...)
+	if len(receipt.Accounts) != len(expectedUsernames) {
+		return nil, errors.New("manual acceptance password rotation marker account count mismatch")
+	}
+	phoneBoundCount := 0
+	for index, account := range receipt.Accounts {
+		if account.Username != expectedUsernames[index] || account.AuthVersion <= 0 || account.RevokedSessions < 0 {
+			return nil, errors.New("manual acceptance password rotation marker account receipt is invalid")
+		}
+		if account.PhoneBound {
+			phoneBoundCount++
+		}
+	}
+	if (expectPhoneBound && (phoneBoundCount != 1 || receipt.Accounts[0].Username != "admin" || !receipt.Accounts[0].PhoneBound)) ||
+		(!expectPhoneBound && phoneBoundCount != 0) {
+		return nil, errors.New("manual acceptance password rotation marker phone binding mismatch")
+	}
+	receipt.Replayed = false
+	return &receipt, nil
+}
+
+func mapAdminPhoneUniqueViolation(err error) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23505" && pgErr.ConstraintName == "adminuser_phone" {
+		return biz.ErrAdminPhoneExists
+	}
+	return err
+}
 
 type RoleDemoAdminAccountSpec struct {
 	Username string
@@ -59,25 +176,84 @@ func ResetManualAcceptancePasswords(
 	demoUsernames []string,
 	demoPassword string,
 ) error {
+	_, err := RotateManualAcceptancePasswords(ctx, db, adminUsernames, adminPassword, demoUsernames, demoPassword)
+	return err
+}
+
+func RotateManualAcceptancePasswords(
+	ctx context.Context,
+	db *sql.DB,
+	adminUsernames []string,
+	adminPassword string,
+	demoUsernames []string,
+	demoPassword string,
+) (*ManualAcceptancePasswordRotationReceipt, error) {
+	return RotateManualAcceptancePasswordsWithPhoneBinding(
+		ctx, db, adminUsernames, adminPassword, demoUsernames, demoPassword, "", "",
+	)
+}
+
+func RotateManualAcceptancePasswordsWithPhoneBinding(
+	ctx context.Context,
+	db *sql.DB,
+	adminUsernames []string,
+	adminPassword string,
+	demoUsernames []string,
+	demoPassword string,
+	phoneUsername string,
+	phone string,
+) (*ManualAcceptancePasswordRotationReceipt, error) {
+	return RotateManualAcceptancePasswordsWithOperation(
+		ctx, db, adminUsernames, adminPassword, demoUsernames, demoPassword,
+		phoneUsername, phone, ManualAcceptancePasswordRotationOperation{},
+	)
+}
+
+func RotateManualAcceptancePasswordsWithOperation(
+	ctx context.Context,
+	db *sql.DB,
+	adminUsernames []string,
+	adminPassword string,
+	demoUsernames []string,
+	demoPassword string,
+	phoneUsername string,
+	phone string,
+	operation ManualAcceptancePasswordRotationOperation,
+) (*ManualAcceptancePasswordRotationReceipt, error) {
 	if db == nil {
-		return errors.New("ResetManualAcceptancePasswords: missing db")
+		return nil, errors.New("RotateManualAcceptancePasswords: missing db")
 	}
 	adminPassword = strings.TrimSpace(adminPassword)
 	demoPassword = strings.TrimSpace(demoPassword)
 	if len(adminUsernames) > 0 && adminPassword == "" {
-		return errors.New("manual acceptance admin password is required")
+		return nil, errors.New("manual acceptance admin password is required")
 	}
 	if len(demoUsernames) > 0 && demoPassword == "" {
-		return ErrRoleDemoPasswordRequired
+		return nil, ErrRoleDemoPasswordRequired
 	}
 	if len(adminUsernames) > 0 && biz.ValidateAdminPassword(adminPassword) != nil {
-		return errors.New("manual acceptance admin password must contain 8-20 characters")
+		return nil, errors.New("manual acceptance admin password must contain 8-20 characters")
 	}
 	if len(demoUsernames) > 0 && biz.ValidateAdminPassword(demoPassword) != nil {
-		return ErrRoleDemoPasswordInvalid
+		return nil, ErrRoleDemoPasswordInvalid
 	}
 	if len(adminUsernames) > 0 && len(demoUsernames) > 0 && adminPassword == demoPassword {
-		return errors.New("manual acceptance admin and demo passwords must differ")
+		return nil, errors.New("manual acceptance admin and demo passwords must differ")
+	}
+	phoneUsername = strings.TrimSpace(phoneUsername)
+	phone = strings.TrimSpace(phone)
+	if (phoneUsername == "") != (phone == "") {
+		return nil, errors.New("manual acceptance phone username and phone must be provided together")
+	}
+	if phone != "" {
+		normalizedPhone, err := biz.NormalizeLoginPhone(phone)
+		if err != nil {
+			return nil, err
+		}
+		phone = normalizedPhone
+	}
+	if err := validateManualAcceptanceRotationOperation(operation); err != nil {
+		return nil, err
 	}
 
 	type passwordGroup struct {
@@ -95,58 +271,176 @@ func ResetManualAcceptancePasswords(
 		for usernameIndex, rawUsername := range group.usernames {
 			username := strings.TrimSpace(rawUsername)
 			if username == "" {
-				return biz.ErrBadParam
+				return nil, biz.ErrBadParam
 			}
 			if _, exists := seen[username]; exists {
-				return fmt.Errorf("duplicate manual acceptance account: %s", username)
+				return nil, fmt.Errorf("duplicate manual acceptance account: %s", username)
 			}
 			seen[username] = struct{}{}
 			group.usernames[usernameIndex] = username
 		}
+	}
+	if phoneUsername != "" {
+		if _, exists := seen[phoneUsername]; !exists {
+			return nil, fmt.Errorf("manual acceptance phone account not selected for rotation: %s", phoneUsername)
+		}
+	}
+
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if operation.MarkerKey != "" {
+		replayed, err := readManualAcceptanceRotationReceipt(ctx, tx, operation, adminUsernames, demoUsernames, phoneUsername != "")
+		if err == nil {
+			if commitErr := tx.Commit(); commitErr != nil {
+				return nil, commitErr
+			}
+			replayed.Replayed = true
+			return replayed, nil
+		}
+		if !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+	}
+	for groupIndex := range groups {
+		group := &groups[groupIndex]
 		if len(group.usernames) == 0 {
 			continue
 		}
 		hash, err := bcrypt.GenerateFromPassword([]byte(group.password), bcrypt.DefaultCost)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		group.passwordHash = string(hash)
 		group.password = ""
 	}
-
-	tx, err := db.BeginTx(ctx, nil)
-	if err != nil {
-		return err
+	now := time.Now().UTC()
+	receipt := &ManualAcceptancePasswordRotationReceipt{
+		OperationID: operation.OperationID, Target: operation.Target,
+		DatasetVersion: operation.DatasetVersion, Release: operation.Release,
+		MigrationVersion: operation.MigrationVersion, CustomerRevision: operation.CustomerRevision,
+		RotatedAt: now, Accounts: make([]ManualAcceptancePasswordRotationAccount, 0, len(adminUsernames)+len(demoUsernames)),
 	}
-	defer func() { _ = tx.Rollback() }()
-	now := time.Now()
+	phoneAlreadyBound := false
+	if phone != "" {
+		var existingID int
+		var existingUsername string
+		err := tx.QueryRowContext(ctx, "SELECT id, username FROM admin_users WHERE phone = $1 FOR UPDATE", phone).
+			Scan(&existingID, &existingUsername)
+		if err != nil && !errors.Is(err, sql.ErrNoRows) {
+			return nil, err
+		}
+		if err == nil && existingUsername != phoneUsername {
+			return nil, biz.ErrAdminPhoneExists
+		}
+		phoneAlreadyBound = err == nil && existingUsername == phoneUsername
+	}
 	for _, group := range groups {
 		if len(group.usernames) == 0 {
 			continue
 		}
 		for _, username := range group.usernames {
 			var adminID int
-			if err := tx.QueryRowContext(ctx, `
+			var authVersion int64
+			phoneBound := phone != "" && username == phoneUsername
+			query := `
 UPDATE admin_users
 SET password_hash = $2, auth_version = auth_version + 1, updated_at = $3
 WHERE username = $1
-RETURNING id`, username, group.passwordHash, now).Scan(&adminID); err != nil {
-				if errors.Is(err, sql.ErrNoRows) {
-					return fmt.Errorf("manual acceptance account not found: %s", username)
-				}
-				return err
+RETURNING id, auth_version`
+			args := []any{username, group.passwordHash, now}
+			if phoneBound {
+				query = `
+UPDATE admin_users
+SET password_hash = $2, phone = $4, auth_version = auth_version + 1, updated_at = $3
+WHERE username = $1
+RETURNING id, auth_version`
+				args = append(args, phone)
 			}
-			if _, err := tx.ExecContext(ctx, `
+			if err := tx.QueryRowContext(ctx, query, args...).Scan(&adminID, &authVersion); err != nil {
+				if errors.Is(err, sql.ErrNoRows) {
+					return nil, fmt.Errorf("manual acceptance account not found: %s", username)
+				}
+				return nil, mapAdminPhoneUniqueViolation(err)
+			}
+			result, err := tx.ExecContext(ctx, `
 UPDATE admin_sessions
 SET revoked_at = $2, revoke_reason = $3, updated_at = $2
 WHERE admin_user_id = $1
   AND revoked_at IS NULL
-  AND expires_at > $2`, adminID, now, adminSessionRevokeReasonPasswordReset); err != nil {
-				return err
+  AND expires_at > $2`, adminID, now, adminSessionRevokeReasonPasswordReset)
+			if err != nil {
+				return nil, err
 			}
+			revokedSessions, err := result.RowsAffected()
+			if err != nil {
+				return nil, err
+			}
+			payload, err := json.Marshal(map[string]any{
+				"action": "admin_user.password.reset",
+				"actor":  map[string]any{"id": 0, "username": "system:manual-acceptance-password-rotation"},
+				"target": map[string]any{"type": "admin_user", "id": adminID, "key": username},
+				"before": map[string]any{"password_reset": false},
+				"after": map[string]any{
+					"password_reset":        true,
+					"auth_version":          authVersion,
+					"revoked_session_count": revokedSessions,
+					"session_revoke_reason": adminSessionRevokeReasonPasswordReset,
+				},
+			})
+			if err != nil {
+				return nil, err
+			}
+			if _, err := tx.ExecContext(ctx,
+				"INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)",
+				"admin_control_plane", "admin_user.password.reset", "manual_acceptance_password_rotation", string(payload), now,
+			); err != nil {
+				return nil, err
+			}
+			if phoneBound && !phoneAlreadyBound {
+				phonePayload, err := json.Marshal(map[string]any{
+					"action": "admin_user.phone.set",
+					"actor":  map[string]any{"id": 0, "username": "system:manual-acceptance-password-rotation"},
+					"target": map[string]any{"type": "admin_user", "id": adminID, "key": username},
+					"before": map[string]any{"phone_bound": false},
+					"after":  map[string]any{"phone_bound": true},
+				})
+				if err != nil {
+					return nil, err
+				}
+				if _, err := tx.ExecContext(ctx,
+					"INSERT INTO runtime_audit_events (event_type, event_key, source, payload, created_at) VALUES ($1, $2, $3, $4, $5)",
+					"admin_control_plane", "admin_user.phone.set", "manual_acceptance_password_rotation", string(phonePayload), now,
+				); err != nil {
+					return nil, err
+				}
+			}
+			receipt.Accounts = append(receipt.Accounts, ManualAcceptancePasswordRotationAccount{
+				Username: username, AuthVersion: authVersion, RevokedSessions: revokedSessions, PhoneBound: phoneBound,
+			})
 		}
 	}
-	return tx.Commit()
+	if operation.MarkerKey != "" {
+		markerValue, err := json.Marshal(receipt)
+		if err != nil {
+			return nil, err
+		}
+		if len(markerValue) > 4096 {
+			return nil, errors.New("manual acceptance password rotation receipt exceeds runtime marker capacity")
+		}
+		if _, err := tx.ExecContext(ctx,
+			"INSERT INTO runtime_markers (marker_key, marker_value, created_at, updated_at) VALUES ($1, $2, $3, $4)",
+			operation.MarkerKey, string(markerValue), now, now,
+		); err != nil {
+			return nil, err
+		}
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return receipt, nil
 }
 
 func DefaultRoleDemoAdminAccounts(includeDebug bool) []RoleDemoAdminAccountSpec {

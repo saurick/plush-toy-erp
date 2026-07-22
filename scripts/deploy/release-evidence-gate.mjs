@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import fs from "node:fs";
+import crypto from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -9,6 +10,68 @@ const POPULATED_UPGRADE_AUDIT_VERSION = "20260714055504";
 const CUSTOMER_CONFIG_CUTOVER_AUDIT_VERSION = "20260714055825";
 const CUSTOMER_CONFIG_MANIFEST_EVIDENCE_FILE =
   "customer-config-manifest-evidence.json";
+const moduleRepoRoot = path.resolve(
+  path.dirname(fileURLToPath(import.meta.url)),
+  "../..",
+);
+const credentialContractPath = path.join(
+  moduleRepoRoot,
+  "deployments/yoyoosun/env/credential.contract.json",
+);
+
+function loadCredentialContract() {
+  const raw = fs.readFileSync(credentialContractPath);
+  const contract = JSON.parse(raw.toString("utf8"));
+  const admin = contract?.credentials?.admin;
+  const demo = contract?.credentials?.demo;
+  const sms = contract?.smsLoginIdentity;
+  const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
+  const username = /^[A-Za-z0-9_]+$/;
+  const valid =
+    contract?.schemaVersion === "yoyoosun-credential-contract/v1" &&
+    contract?.customerCode === "yoyoosun" &&
+    contract?.target?.key === "customer-trial-133" &&
+    contract?.target?.database === "plush_erp_uat_20260716_v5" &&
+    contract?.target?.datasetVersion === "2026.07.16-v5" &&
+    admin?.username === "admin" &&
+    envKey.test(admin?.environmentVariable || "") &&
+    admin?.keychain?.service === "plush-toy-erp-yoyoosun-admin" &&
+    admin?.keychain?.account === "admin" &&
+    Array.isArray(demo?.usernames) &&
+    demo.usernames.length === 10 &&
+    new Set(demo.usernames).size === 10 &&
+    demo.usernames.every((value) => username.test(value)) &&
+    !demo.usernames.includes(admin.username) &&
+    envKey.test(demo?.environmentVariable || "") &&
+    demo?.keychain?.service === "plush-toy-erp-yoyoosun-demo" &&
+    demo?.keychain?.account === "customer-trial-133" &&
+    sms?.username === admin.username &&
+    sms?.phoneRequiredWhenProviderEnabled === true &&
+    envKey.test(sms?.environmentVariable || "") &&
+    sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
+    sms?.keychain?.account === "customer-trial-133:admin" &&
+    contract?.policy?.passwordsMustDiffer === true &&
+    Array.isArray(contract?.policy?.localOnlyPublicPasswords) &&
+    contract.policy.localOnlyPublicPasswords.length === 1 &&
+    contract.policy.localOnlyPublicPasswords[0] === "12345678" &&
+    contract.policy.rotateAfterCreateRestoreOrRollback === true &&
+    contract.policy.revokeExistingSessionsOnRotation === true &&
+    contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
+    contract?.redaction?.containsSecrets === false &&
+    contract.redaction.storePasswords === false &&
+    contract.redaction.storeTokens === false &&
+    contract.redaction.storePhoneNumber === false &&
+    contract.redaction.storeRawProfiles === false;
+  if (!valid) {
+    throw new Error("credential.contract.json is invalid");
+  }
+  return {
+    contract,
+    sha256: crypto.createHash("sha256").update(raw).digest("hex"),
+  };
+}
+
+const credentialContractEvidence = loadCredentialContract();
 
 export const REQUIRED_FILES = {
   release: "release-evidence.md",
@@ -18,6 +81,7 @@ export const REQUIRED_FILES = {
   backupRestore: "backup-restore-report.json",
   migration: "migration-status.txt",
   smoke: "smoke-test-report.json",
+  credentialRotation: "credential-rotation-report.json",
   rollbackPlan: "rollback-forward-fix-plan.md",
   rollbackRehearsal: "rollback-rehearsal-report.json",
   signoff: "release-signoff-checklist.md",
@@ -764,6 +828,7 @@ function validateEvidenceConsistency(
     backupRestoreContent,
     migrationContent,
     smokeContent,
+    credentialRotationContent,
     rollbackRehearsalContent,
     signoffContent,
     repoRoot,
@@ -792,6 +857,7 @@ function validateEvidenceConsistency(
   );
   const migrationBefore = findMarkdownField(releaseContent, "migrationBefore");
   const migrationAfter = findMarkdownField(releaseContent, "migrationAfter");
+  const releaseGitCommit = findMarkdownField(releaseContent, "gitCommit");
   const backupReleaseVersion = findMarkdownField(
     backupContent,
     "releaseVersion",
@@ -821,6 +887,43 @@ function validateEvidenceConsistency(
     rollbackRehearsalContent,
     errors,
   );
+  const credentialRotationReport = parseJsonEvidence(
+    REQUIRED_FILES.credentialRotation,
+    credentialRotationContent,
+    errors,
+  );
+
+  if (credentialRotationReport) {
+    assert(
+      credentialRotationReport.release === releaseGitCommit,
+      `${REQUIRED_FILES.credentialRotation} release must match ${REQUIRED_FILES.release} gitCommit`,
+      errors,
+    );
+    assert(
+      credentialRotationReport.migrationVersion === migrationAfter,
+      `${REQUIRED_FILES.credentialRotation} migrationVersion must match ${REQUIRED_FILES.release} migrationAfter`,
+      errors,
+    );
+    const smokeCredentialCheck = Array.isArray(smokeReport?.checks)
+      ? smokeReport.checks.find(
+          (check) => check?.name === "credential-login-matrix",
+        )
+      : undefined;
+    if (smokeCredentialCheck?.adminAuthVersion !== null) {
+      const rotationAdmin = Array.isArray(credentialRotationReport.accounts)
+        ? credentialRotationReport.accounts.find(
+            (account) =>
+              account?.username ===
+              credentialContractEvidence.contract.credentials.admin.username,
+          )
+        : undefined;
+      assert(
+        smokeCredentialCheck?.adminAuthVersion === rotationAdmin?.authVersion,
+        `${REQUIRED_FILES.smoke} adminAuthVersion must match ${REQUIRED_FILES.credentialRotation} admin receipt when login exposes auth_version`,
+        errors,
+      );
+    }
+  }
 
   if (backupRestoreReport) {
     const preMigrationStatus = parseMigrationStatus(
@@ -1311,6 +1414,93 @@ function validateSmokeReport(content, errors, absoluteDir) {
       errors,
     );
   }
+  const credentialChecks = checks.filter(
+    (check) => check?.name === "credential-login-matrix",
+  );
+  assert(
+    credentialChecks.length === 1,
+    `${REQUIRED_FILES.smoke} must include exactly one credential-login-matrix check`,
+    errors,
+  );
+  const credentialCheck = credentialChecks[0];
+  if (credentialCheck) {
+    const contract = credentialContractEvidence.contract;
+    const requiredUsernames = [
+      contract.credentials.admin.username,
+      ...contract.credentials.demo.usernames,
+    ];
+    assert(
+      credentialCheck.target === "jsonrpc:auth.admin_login",
+      `${REQUIRED_FILES.smoke} credential-login-matrix target must be jsonrpc:auth.admin_login`,
+      errors,
+    );
+    assert(
+      credentialCheck.adminUsername === contract.credentials.admin.username &&
+        credentialCheck.adminAuthenticated === true &&
+        credentialCheck.adminSuperAdmin === true &&
+        credentialCheck.phoneBound === true,
+      `${REQUIRED_FILES.smoke} credential-login-matrix must prove the admin identity, superadmin status, and bound phone`,
+      errors,
+    );
+    assert(
+      Number(credentialCheck.demoExpected) === 10 &&
+        Number(credentialCheck.demoAuthenticated) === 10 &&
+        Number(credentialCheck.totalExpected) === 11 &&
+        Number(credentialCheck.totalAuthenticated) === 11,
+      `${REQUIRED_FILES.smoke} credential-login-matrix must prove 10/10 demo and 11/11 total logins`,
+      errors,
+    );
+    assert(
+      credentialCheck.uniqueTokensObserved === true,
+      `${REQUIRED_FILES.smoke} credential-login-matrix uniqueTokensObserved must be true`,
+      errors,
+    );
+    const usernames = Array.isArray(credentialCheck.usernames)
+      ? credentialCheck.usernames
+      : [];
+    assert(
+      usernames.length === requiredUsernames.length &&
+        new Set(usernames).size === requiredUsernames.length &&
+        requiredUsernames.every((username) =>
+          usernames.includes(username),
+        ),
+      `${REQUIRED_FILES.smoke} credential-login-matrix usernames must match admin plus the 10 contracted demo identities`,
+      errors,
+    );
+    assert(
+      credentialCheck.adminPasswordSourceEnv ===
+        contract.credentials.admin.environmentVariable &&
+        credentialCheck.demoPasswordSourceEnv ===
+          contract.credentials.demo.environmentVariable &&
+        credentialCheck.smsPhoneSourceEnv ===
+          contract.smsLoginIdentity.environmentVariable,
+      `${REQUIRED_FILES.smoke} credential-login-matrix password source env keys must match the credential contract`,
+      errors,
+    );
+    assert(
+      credentialCheck.credentialContractSchema === contract.schemaVersion &&
+        credentialCheck.credentialContractSha256 ===
+          credentialContractEvidence.sha256 &&
+        credentialCheck.credentialTarget === contract.target.key &&
+        credentialCheck.credentialDatabase === contract.target.database &&
+        credentialCheck.credentialDatasetVersion ===
+          contract.target.datasetVersion,
+      `${REQUIRED_FILES.smoke} credential-login-matrix contract schema/hash/target identity must match credential.contract.json`,
+      errors,
+    );
+    assert(
+      credentialCheck.adminAuthVersion === null ||
+        (Number.isSafeInteger(credentialCheck.adminAuthVersion) &&
+          credentialCheck.adminAuthVersion > 0),
+      `${REQUIRED_FILES.smoke} credential-login-matrix adminAuthVersion must be null or a positive integer`,
+      errors,
+    );
+    assert(
+      credentialCheck.responseBodyStored === false,
+      `${REQUIRED_FILES.smoke} credential-login-matrix responseBodyStored must be false`,
+      errors,
+    );
+  }
   const customerConfigCheck = findCustomerConfigEffectiveSessionCheck(report);
   if (customerConfigCheck) {
     assert(
@@ -1348,6 +1538,110 @@ function validateSmokeReport(content, errors, absoluteDir) {
   assert(
     report.redaction?.containsRawCustomerRows === false,
     `${REQUIRED_FILES.smoke} must declare containsRawCustomerRows=false`,
+    errors,
+  );
+}
+
+function validateCredentialRotationReport(content, errors) {
+  const report = parseJsonEvidence(
+    REQUIRED_FILES.credentialRotation,
+    content,
+    errors,
+  );
+  if (!report) return;
+  const forbiddenKeys = [];
+  const visit = (value, pathPrefix = "") => {
+    if (!value || typeof value !== "object") return;
+    for (const [key, child] of Object.entries(value)) {
+      const fieldPath = pathPrefix ? `${pathPrefix}.${key}` : key;
+      if (key !== "phoneBound" && /(password|secret|token|phone)/iu.test(key)) {
+        forbiddenKeys.push(fieldPath);
+      }
+      visit(child, fieldPath);
+    }
+  };
+  visit(report);
+  assert(
+    forbiddenKeys.length === 0,
+    `${REQUIRED_FILES.credentialRotation} must not contain password/secret/token/phone fields`,
+    errors,
+  );
+  assert(
+    report.target === credentialContractEvidence.contract.target.key &&
+      report.datasetVersion ===
+        credentialContractEvidence.contract.target.datasetVersion,
+    `${REQUIRED_FILES.credentialRotation} target/datasetVersion must match credential.contract.json`,
+    errors,
+  );
+  assert(
+    /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u.test(
+      String(report.operationId ?? ""),
+    ),
+    `${REQUIRED_FILES.credentialRotation} operationId must be a lowercase UUID v4`,
+    errors,
+  );
+  assert(
+    /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$/u.test(
+      String(report.generatedAt ?? ""),
+    ),
+    `${REQUIRED_FILES.credentialRotation} generatedAt must be an ISO timestamp`,
+    errors,
+  );
+  assert(
+    /^[0-9a-f]{40}$/u.test(String(report.release ?? "")),
+    `${REQUIRED_FILES.credentialRotation} release must be a full 40-character Git commit`,
+    errors,
+  );
+  assert(
+    isMeaningful(report.customerRevision) &&
+      isMeaningful(report.migrationVersion) &&
+      Number.isSafeInteger(report.revokedSessions) &&
+      report.revokedSessions >= 0,
+    `${REQUIRED_FILES.credentialRotation} must contain customerRevision, migrationVersion, and a non-negative revokedSessions count`,
+    errors,
+  );
+  assert(
+    Number(report.adminAccounts) === 1 && Number(report.demoAccounts) === 10,
+    `${REQUIRED_FILES.credentialRotation} must prove adminAccounts=1 and demoAccounts=10`,
+    errors,
+  );
+  assert(
+    report.authVersionIncremented === true &&
+      report.auditSource === "manual_acceptance_password_rotation" &&
+      typeof report.replayed === "boolean",
+    `${REQUIRED_FILES.credentialRotation} must prove authVersionIncremented, auditSource, and replayed`,
+    errors,
+  );
+  const accounts = Array.isArray(report.accounts) ? report.accounts : [];
+  const requiredUsernames = [
+    credentialContractEvidence.contract.credentials.admin.username,
+    ...credentialContractEvidence.contract.credentials.demo.usernames,
+  ];
+  assert(
+    accounts.length === 11 &&
+      new Set(accounts.map((account) => account?.username)).size === 11 &&
+      requiredUsernames.every((username) =>
+        accounts.some((account) => account?.username === username),
+      ),
+    `${REQUIRED_FILES.credentialRotation} accounts must contain 11 unique contracted identities`,
+    errors,
+  );
+  assert(
+    accounts.every(
+      (account) =>
+        Number.isSafeInteger(account?.authVersion) && account.authVersion > 1,
+    ),
+    `${REQUIRED_FILES.credentialRotation} every account authVersion must be greater than 1`,
+    errors,
+  );
+  assert(
+    accounts.every(
+      (account) =>
+        account?.phoneBound ===
+        (account?.username ===
+          credentialContractEvidence.contract.credentials.admin.username),
+    ),
+    `${REQUIRED_FILES.credentialRotation} phoneBound must be true only for the contracted admin`,
     errors,
   );
 }
@@ -1581,6 +1875,9 @@ export function validateReleaseEvidenceGate({
       path.join(absoluteDir, REQUIRED_FILES.migration),
     );
     const smokeContent = readText(path.join(absoluteDir, REQUIRED_FILES.smoke));
+    const credentialRotationContent = readText(
+      path.join(absoluteDir, REQUIRED_FILES.credentialRotation),
+    );
     const rollbackPlanContent = readText(
       path.join(absoluteDir, REQUIRED_FILES.rollbackPlan),
     );
@@ -1599,6 +1896,7 @@ export function validateReleaseEvidenceGate({
       [REQUIRED_FILES.backupRestore, backupRestoreContent],
       [REQUIRED_FILES.migration, migrationContent],
       [REQUIRED_FILES.smoke, smokeContent],
+      [REQUIRED_FILES.credentialRotation, credentialRotationContent],
       [REQUIRED_FILES.rollbackPlan, rollbackPlanContent],
       [REQUIRED_FILES.rollbackRehearsal, rollbackRehearsalContent],
       [REQUIRED_FILES.signoff, signoffContent],
@@ -1613,6 +1911,7 @@ export function validateReleaseEvidenceGate({
     validateBackupRestoreReport(backupRestoreContent, errors, absoluteDir);
     validateMigrationStatus(migrationContent, errors);
     validateSmokeReport(smokeContent, errors, absoluteDir);
+    validateCredentialRotationReport(credentialRotationContent, errors);
     validateRollbackPlan(rollbackPlanContent, errors);
     validateRollbackRehearsalReport(rollbackRehearsalContent, errors);
     validateSignoff(signoffContent, errors);
@@ -1624,6 +1923,7 @@ export function validateReleaseEvidenceGate({
         backupRestoreContent,
         migrationContent,
         smokeContent,
+        credentialRotationContent,
         rollbackRehearsalContent,
         signoffContent,
         repoRoot,

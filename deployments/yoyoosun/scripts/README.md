@@ -6,6 +6,7 @@
 | --- | --- |
 | `verify-env.sh` | 校验 env 样例或受控 `.env` 的必需变量和危险配置 |
 | `run-smoke.sh` | 对指定 endpoint 执行 health / route / SMS provider capabilities / customer_config effective session 与真实最小 PDF smoke，并输出脱敏 JSON；支持 `--print-input-template` 只读输出目标 smoke 输入模板 |
+| `rotate-credentials-133.sh` | 从 `credential.contract.json` 指定的 macOS Keychain alias 读取 admin、demo 与 SMS 手机号，经 SSH stdin 临时注入 133 镜像内轮换工具；要求发布 / migration / operation id / 备份 hash 精确绑定，只输出脱敏持久回执 |
 | `cutover-public-web.sh` | yoyoosun 133 公网前端适配层的 plan-first 切流；先验证候选镜像 release、健康和 provider capabilities，失败自动恢复旧容器且保留回滚点 |
 | `collect-evidence.sh` | 生成 release evidence 草稿目录和 backup restore artifact 占位，不采集 secret |
 | `verify-backup-restore.sh` | 检查备份恢复 evidence 是否具备必要字段，不处理备份文件本体 |
@@ -16,6 +17,7 @@
 ```bash
 bash deployments/yoyoosun/scripts/verify-env.sh --example
 bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template
+bash deployments/yoyoosun/scripts/rotate-credentials-133.sh --help
 bash deployments/yoyoosun/scripts/run-smoke.sh \
   --endpoint https://erp.example.invalid \
   --backend-url http://127.0.0.1:8300 \
@@ -45,6 +47,8 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
     --web-url http://127.0.0.1:5175/erp
 node scripts/deploy/release-evidence-gate.mjs --customer yoyoosun --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
+
+133 凭据的无秘密真源是 `deployments/yoyoosun/env/credential.contract.json`。稳定 `admin`、固定十个 demo 和短信身份分别使用合同登记的 Keychain alias；密码和手机号只通过当前进程与 SSH stdin 进入一次性 Compose 容器，不进入服务器 steady `.env`、argv 或 evidence。每次 fresh / restore / rollback 后先完成受控备份，再使用唯一的小写 UUID v4 `operation-id` 运行 `rotate-credentials-133.sh`；命令中断后必须复用同一 operation id，镜像内 durable marker 会返回同一回执而不重复轮换。随后用同一 Keychain 当前值执行正式 `run-smoke.sh`，少于 11/11 真实登录、指定手机号不一致、公开本地密码、合同 hash 漂移或 release gate 缺少 credential matrix 都会失败。
 
 `--print-input-template` 只输出目标 smoke 所需 endpoint、backend URL、releaseVersion、environment、report、客户配置 revision 和 token env 名，不触网、不读取 token、不写 smoke report、不证明 active revision 已读回。
 

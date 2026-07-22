@@ -267,6 +267,16 @@ function materializeCommandFromText({
     if (commandText.includes("--backend-url")) {
       args.push("--backend-url", requireRuntimeUrl(env, "SMOKE_BACKEND_URL"));
     }
+    args.push(
+      "--admin-username",
+      "admin",
+      "--admin-password-env",
+      "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+      "--demo-password-env",
+      "MANUAL_ACCEPTANCE_PASSWORD",
+      "--sms-phone-env",
+      "MANUAL_ACCEPTANCE_SMS_PHONE",
+    );
     if (revision) {
       args.push("--customer-config-revision", revision);
     }
@@ -274,24 +284,34 @@ function materializeCommandFromText({
       args.push("--admin-token-env", "CUSTOMER_CONFIG_ADMIN_TOKEN");
     }
     args.push("--report", path.join(evidenceDir, "smoke-test-report.json"));
+    const secretEnv = {
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: requireEnv(
+        env,
+        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+      ),
+      MANUAL_ACCEPTANCE_PASSWORD: requireEnv(
+        env,
+        "MANUAL_ACCEPTANCE_PASSWORD",
+      ),
+      MANUAL_ACCEPTANCE_SMS_PHONE: requireEnv(
+        env,
+        "MANUAL_ACCEPTANCE_SMS_PHONE",
+      ),
+    };
+    if (commandText.includes("--admin-token-env")) {
+      secretEnv.CUSTOMER_CONFIG_ADMIN_TOKEN = requireEnv(
+        env,
+        "CUSTOMER_CONFIG_ADMIN_TOKEN",
+      );
+    }
+    const secretEnvKeys = Object.keys(secretEnv).sort();
     return {
       cmd,
       args,
-      env: commandText.includes("--admin-token-env")
-        ? {
-            CUSTOMER_CONFIG_ADMIN_TOKEN: requireEnv(
-              env,
-              "CUSTOMER_CONFIG_ADMIN_TOKEN",
-            ),
-          }
-        : {},
-      displayCommand: buildDisplayCommand(
-        cmd,
-        args,
-        commandText.includes("--admin-token-env")
-          ? ["CUSTOMER_CONFIG_ADMIN_TOKEN"]
-          : [],
+      env: Object.fromEntries(
+        secretEnvKeys.map((key) => [key, secretEnv[key]]),
       ),
+      displayCommand: buildDisplayCommand(cmd, args, secretEnvKeys),
     };
   }
   if (commandText.includes("rollback-rehearsal-report.mjs")) {

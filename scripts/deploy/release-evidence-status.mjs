@@ -83,6 +83,12 @@ const CLOSEOUT_EVIDENCE_GROUPS = [
       "证明 migration 前备份、隔离恢复、pre/post migration 状态和命令摘要来自同一批次",
   },
   {
+    id: "credential-rotation",
+    label: "凭据轮换与登录矩阵",
+    files: [REQUIRED_FILES.credentialRotation, REQUIRED_FILES.smoke],
+    reason: "证明 admin 与十个 demo 已轮换、旧会话已撤销且目标环境 11/11 真实登录通过",
+  },
+  {
     id: "target-smoke",
     label: "目标环境 smoke",
     files: [REQUIRED_FILES.smoke],
@@ -253,9 +259,9 @@ function readCustomerConfigSmokeEvidence(absoluteDir) {
 
 function buildSmokeCommand({ evidenceDir, customerConfigRevision = "" }) {
   const customerConfigSmokeArgs = customerConfigRevision
-    ? ` --backend-url <backend-endpoint> --customer-config-revision ${customerConfigRevision} --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN`
+    ? ` --customer-config-revision ${customerConfigRevision} --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN`
     : "";
-  return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <release-version> --environment <environment> --endpoint <public-endpoint>${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
+  return `bash deployments/yoyoosun/scripts/run-smoke.sh --release-version <release-version> --environment <environment> --endpoint <public-endpoint> --backend-url <backend-endpoint> --admin-username admin --admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD --demo-password-env MANUAL_ACCEPTANCE_PASSWORD --sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE${customerConfigSmokeArgs} --report ${evidenceDir}/smoke-test-report.json`;
 }
 
 function buildRollbackRehearsalCommand({

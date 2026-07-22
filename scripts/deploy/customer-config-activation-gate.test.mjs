@@ -12,6 +12,16 @@ import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixt
 const scriptPath = path.resolve(
   new URL("customer-config-activation-gate.mjs", import.meta.url).pathname,
 );
+const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+const credentialContractRaw = fs.readFileSync(
+  path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
+);
+const credentialContract = JSON.parse(credentialContractRaw.toString("utf8"));
+const credentialContractSha256 = crypto
+  .createHash("sha256")
+  .update(credentialContractRaw)
+  .digest("hex");
+const releaseGitCommit = "abc1234000000000000000000000000000000000";
 
 function runActivationGate(root, args) {
   return spawnSync(process.execPath, [scriptPath, ...args], {
@@ -75,7 +85,7 @@ function writeReleaseEvidence(dir, overrides = {}) {
 | customerCode | yoyoosun |
 | releaseVersion | ${overrides.releaseVersion ?? "20260628T2100-config-runtime"} |
 | environment | customer-trial |
-| gitCommit | abc1234 |
+| gitCommit | ${releaseGitCommit} |
 | serverImageDigest | sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
 | webImageDigest | sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb |
 | migrationBefore | 20260601000000 |
@@ -219,7 +229,7 @@ Pending Files: 0
         releaseVersion: "20260628T2100-config-runtime",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 5, passed: 5, failed: overrides.smokeFailed ?? 0 },
+        summary: { total: 6, passed: 6, failed: overrides.smokeFailed ?? 0 },
         checks: [
           {
             name: "server-healthz",
@@ -250,6 +260,37 @@ Pending Files: 0
             responseBodyStored: false,
           },
           {
+            name: "credential-login-matrix",
+            status: "pass",
+            target: "jsonrpc:auth.admin_login",
+            credentialContractSchema: credentialContract.schemaVersion,
+            credentialContractSha256,
+            credentialTarget: credentialContract.target.key,
+            credentialDatabase: credentialContract.target.database,
+            credentialDatasetVersion: credentialContract.target.datasetVersion,
+            adminUsername: credentialContract.credentials.admin.username,
+            adminAuthenticated: true,
+            adminSuperAdmin: true,
+            phoneBound: true,
+            adminAuthVersion: 2,
+            demoExpected: 10,
+            demoAuthenticated: 10,
+            totalExpected: 11,
+            totalAuthenticated: 11,
+            uniqueTokensObserved: true,
+            usernames: [
+              credentialContract.credentials.admin.username,
+              ...credentialContract.credentials.demo.usernames,
+            ],
+            adminPasswordSourceEnv:
+              credentialContract.credentials.admin.environmentVariable,
+            demoPasswordSourceEnv:
+              credentialContract.credentials.demo.environmentVariable,
+            smsPhoneSourceEnv:
+              credentialContract.smsLoginIdentity.environmentVariable,
+            responseBodyStored: false,
+          },
+          {
             name: "template-pdf-render",
             status: "pass",
             target: "/templates/render-pdf",
@@ -262,6 +303,45 @@ Pending Files: 0
           },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(dir, "credential-rotation-report.json"),
+    JSON.stringify(
+      {
+        generatedAt: "2026-06-28T13:20:00Z",
+        operationId: "123e4567-e89b-42d3-a456-426614174000",
+        target: credentialContract.target.key,
+        datasetVersion: credentialContract.target.datasetVersion,
+        migrationVersion: "20260628123354",
+        customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+        release: releaseGitCommit,
+        adminAccounts: 1,
+        demoAccounts: 10,
+        revokedSessions: 1,
+        authVersionIncremented: true,
+        auditSource: "manual_acceptance_password_rotation",
+        phoneBound: true,
+        accounts: [
+          {
+            username: credentialContract.credentials.admin.username,
+            authVersion: 2,
+            revokedSessions: 1,
+            phoneBound: true,
+          },
+          ...credentialContract.credentials.demo.usernames.map(
+            (username, index) => ({
+              username,
+              authVersion: index + 2,
+              revokedSessions: 0,
+              phoneBound: false,
+            }),
+          ),
+        ],
+        replayed: false,
       },
       null,
       2,
@@ -306,7 +386,7 @@ Pending Files: 0
           smokeStatus: "passed",
           smokeReport:
             "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
-          smokeCheckCount: 5,
+          smokeCheckCount: 6,
           evidenceReviewStatus: "passed",
         },
         summary: { rehearsalCompleted: true, rollbackPathStatus: "passed" },

@@ -36,6 +36,10 @@ const VALID_ENV = {
   BACKUP_ID: "backup-20260629T1200",
   SOURCE_POSTGRES_DSN: "postgres://release-source.example.invalid/plush",
   SMOKE_ENDPOINT: "https://erp.example.invalid",
+  SMOKE_BACKEND_URL: "https://backend.example.invalid",
+  MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "admin-secret-distinct",
+  MANUAL_ACCEPTANCE_PASSWORD: "demo-secret-distinct",
+  MANUAL_ACCEPTANCE_SMS_PHONE: "13800138000",
   ROLLBACK_TARGET_RELEASE: "20260628T1200-previous",
   ROLLBACK_TRIGGER_SCENARIO: "smoke failed after activation",
 };
@@ -242,7 +246,7 @@ test("closeout plan marks machine actions runnable when prerequisites are presen
   assert.equal(plan.status.status, "draft");
   assert.equal(plan.summary.blocked, 0);
   assert.equal(plan.summary.runnable, 5);
-  assert.equal(plan.summary.manualOnly, 1);
+  assert.equal(plan.summary.manualOnly, 2);
   assert.equal(
     plan.actions.find((action) => action.id === "production-preflight").canRun,
     true,
@@ -283,6 +287,8 @@ test("closeout plan requires target backend and token for customer config effect
     evidenceDir,
     env: {
       ...VALID_ENV,
+      SMOKE_BACKEND_URL: "",
+      CUSTOMER_CONFIG_ADMIN_TOKEN: "",
     },
   });
 
@@ -363,6 +369,9 @@ test("closeout plan reuses release batch fields from evidence across machine act
       SOURCE_POSTGRES_DSN: "postgres://release-source.example.invalid/plush",
       SMOKE_ENDPOINT: "https://erp.example.invalid",
       SMOKE_BACKEND_URL: "https://backend.example.invalid",
+      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: "admin-secret-distinct",
+      MANUAL_ACCEPTANCE_PASSWORD: "demo-secret-distinct",
+      MANUAL_ACCEPTANCE_SMS_PHONE: "13800138000",
       CUSTOMER_CONFIG_ADMIN_TOKEN: "redacted-token",
       ROLLBACK_TARGET_RELEASE: "20260628T1200-previous",
       ROLLBACK_TRIGGER_SCENARIO: "smoke failed after activation",

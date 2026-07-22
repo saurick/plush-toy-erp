@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -8,6 +9,15 @@ import { validateReleaseEvidenceGate } from "./release-evidence-gate.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
 const gateCli = path.join(repoRoot, "scripts/deploy/release-evidence-gate.mjs");
+const credentialContractRaw = fs.readFileSync(
+  path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
+);
+const credentialContract = JSON.parse(credentialContractRaw.toString("utf8"));
+const credentialContractSha256 = crypto
+  .createHash("sha256")
+  .update(credentialContractRaw)
+  .digest("hex");
+const releaseGitCommit = "a".repeat(40);
 
 function writeValidEvidence(dir, overrides = {}) {
   fs.mkdirSync(dir, { recursive: true });
@@ -20,7 +30,7 @@ function writeValidEvidence(dir, overrides = {}) {
 | customerCode | yoyoosun |
 | releaseVersion | ${overrides.releaseVersion ?? "20260616T1200-test"} |
 | environment | customer-trial |
-| gitCommit | abc1234 |
+| gitCommit | ${releaseGitCommit} |
 | serverImageDigest | sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
 | webImageDigest | sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb |
 | migrationBefore | 20260601000000 |
@@ -164,7 +174,7 @@ Pending Files: 0
         releaseVersion: overrides.smokeReleaseVersion ?? "20260616T1200-test",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 5, passed: 5, failed: 0 },
+        summary: { total: 6, passed: 6, failed: 0 },
         checks: [
           {
             name: "server-healthz",
@@ -205,8 +215,83 @@ Pending Files: 0
             mockDelivery: false,
             responseBodyStored: false,
           },
+          {
+            name: "credential-login-matrix",
+            status: "pass",
+            target: "jsonrpc:auth.admin_login",
+            adminUsername: "admin",
+            adminAuthenticated: true,
+            adminSuperAdmin: true,
+            phoneBound: true,
+            demoExpected: 10,
+            demoAuthenticated: 10,
+            totalExpected: 11,
+            totalAuthenticated: 11,
+            uniqueTokensObserved: true,
+            adminAuthVersion: null,
+            credentialContractSchema: credentialContract.schemaVersion,
+            credentialContractSha256,
+            credentialTarget: credentialContract.target.key,
+            credentialDatabase: credentialContract.target.database,
+            credentialDatasetVersion: credentialContract.target.datasetVersion,
+            usernames: [
+              "admin",
+              "demo_boss",
+              "demo_sales",
+              "demo_purchase",
+              "demo_production",
+              "demo_warehouse",
+              "demo_quality",
+              "demo_finance",
+              "demo_pmc",
+              "demo_engineering",
+              "demo_admin",
+            ],
+            adminPasswordSourceEnv: "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+            demoPasswordSourceEnv: "MANUAL_ACCEPTANCE_PASSWORD",
+            smsPhoneSourceEnv: "MANUAL_ACCEPTANCE_SMS_PHONE",
+            responseBodyStored: false,
+          },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(dir, "credential-rotation-report.json"),
+    JSON.stringify(
+      {
+        generatedAt: "2026-06-16T04:30:00Z",
+        target: credentialContract.target.key,
+        datasetVersion: credentialContract.target.datasetVersion,
+        release: releaseGitCommit,
+        migrationVersion: "20260616000000",
+        customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+        operationId: "123e4567-e89b-42d3-a456-426614174000",
+        adminAccounts: 1,
+        demoAccounts: 10,
+        revokedSessions: 1,
+        authVersionIncremented: true,
+        auditSource: "manual_acceptance_password_rotation",
+        replayed: false,
+        accounts: [
+          {
+            username: credentialContract.credentials.admin.username,
+            authVersion: 2,
+            revokedSessions: 1,
+            phoneBound: true,
+          },
+          ...credentialContract.credentials.demo.usernames.map(
+            (username, index) => ({
+              username,
+              authVersion: index + 2,
+              revokedSessions: 0,
+              phoneBound: false,
+            }),
+          ),
+        ],
       },
       null,
       2,
@@ -251,7 +336,7 @@ Pending Files: 0
           smokeStatus: "passed",
           smokeReport:
             "deployments/yoyoosun/evidence/releases/2026-06-16/smoke-test-report.json",
-          smokeCheckCount: 5,
+          smokeCheckCount: 6,
           evidenceReviewStatus: "passed",
         },
         summary: {
@@ -353,7 +438,6 @@ function setMigrationEvidenceRange(dir, migrationBefore, migrationAfter) {
   restoreReport.restore.migrationBeforeApply = migrationBefore;
   restoreReport.restore.restoreMigrationVersion = migrationAfter;
   fs.writeFileSync(restorePath, JSON.stringify(restoreReport, null, 2));
-
   fs.writeFileSync(
     path.join(dir, "artifacts/migration-status-before-apply.txt"),
     `Current Version: ${migrationBefore}\nPending Files: 1\n`,
@@ -366,6 +450,10 @@ function setMigrationEvidenceRange(dir, migrationBefore, migrationAfter) {
     path.join(dir, "migration-status.txt"),
     `Migration Status: OK\nCurrent Version: ${migrationAfter}\nPending Files: 0\n`,
   );
+  const rotationPath = path.join(dir, "credential-rotation-report.json");
+  const rotationReport = JSON.parse(fs.readFileSync(rotationPath, "utf8"));
+  rotationReport.migrationVersion = migrationAfter;
+  fs.writeFileSync(rotationPath, JSON.stringify(rotationReport, null, 2));
 }
 
 test("release evidence gate accepts filled yoyoosun evidence", () => {
@@ -382,7 +470,7 @@ test("release evidence gate accepts filled yoyoosun evidence", () => {
   });
 
   assert.equal(result.customer, "yoyoosun");
-  assert.equal(result.requiredFiles.length, 10);
+  assert.equal(result.requiredFiles.length, 11);
   assert.equal(result.scope.evidenceOnly, true);
   assert.match(result.scope.readyMeaning, /filled release evidence directory/);
   assert.ok(
@@ -457,7 +545,7 @@ test("release evidence gate rejects invalid release git commit", () => {
   const releasePath = path.join(evidenceDir, "release-evidence.md");
   const release = fs
     .readFileSync(releasePath, "utf8")
-    .replace("| gitCommit | abc1234 |", "| gitCommit | main |");
+    .replace(`| gitCommit | ${releaseGitCommit} |`, "| gitCommit | main |");
   fs.writeFileSync(releasePath, release);
 
   assert.throws(
@@ -868,6 +956,231 @@ for (const [field, value, expectedError] of [
   });
 }
 
+test("release evidence gate requires exactly one credential login matrix", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-credential-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  smoke.checks = smoke.checks.filter(
+    (check) => check.name !== "credential-login-matrix",
+  );
+  smoke.summary.total = smoke.checks.length;
+  smoke.summary.passed = smoke.checks.length;
+  const rehearsalPath = path.join(
+    evidenceDir,
+    "rollback-rehearsal-report.json",
+  );
+  const rehearsal = JSON.parse(fs.readFileSync(rehearsalPath, "utf8"));
+  rehearsal.postCheck.smokeCheckCount = smoke.checks.length;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+  fs.writeFileSync(rehearsalPath, JSON.stringify(rehearsal, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /must include exactly one credential-login-matrix check/,
+  );
+});
+
+test("release evidence gate rejects duplicate credential login matrices", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-credential-duplicate-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+  const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+  const check = smoke.checks.find(
+    (candidate) => candidate.name === "credential-login-matrix",
+  );
+  smoke.checks.push(structuredClone(check));
+  smoke.summary.total = smoke.checks.length;
+  smoke.summary.passed = smoke.checks.length;
+  const rehearsalPath = path.join(
+    evidenceDir,
+    "rollback-rehearsal-report.json",
+  );
+  const rehearsal = JSON.parse(fs.readFileSync(rehearsalPath, "utf8"));
+  rehearsal.postCheck.smokeCheckCount = smoke.checks.length;
+  fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+  fs.writeFileSync(rehearsalPath, JSON.stringify(rehearsal, null, 2));
+
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /must include exactly one credential-login-matrix check/,
+  );
+});
+
+for (const [field, value, expectedError] of [
+  [
+    "demoAuthenticated",
+    9,
+    /credential-login-matrix must prove 10\/10 demo and 11\/11 total logins/,
+  ],
+  [
+    "totalAuthenticated",
+    10,
+    /credential-login-matrix must prove 10\/10 demo and 11\/11 total logins/,
+  ],
+  [
+    "uniqueTokensObserved",
+    false,
+    /credential-login-matrix uniqueTokensObserved must be true/,
+  ],
+  [
+    "phoneBound",
+    false,
+    /credential-login-matrix must prove the admin identity, superadmin status, and bound phone/,
+  ],
+  [
+    "responseBodyStored",
+    true,
+    /credential-login-matrix responseBodyStored must be false/,
+  ],
+  [
+    "credentialContractSha256",
+    "0".repeat(64),
+    /contract schema\/hash\/target identity must match credential\.contract\.json/,
+  ],
+  [
+    "smsPhoneSourceEnv",
+    "WRONG_SMS_PHONE_ENV",
+    /source env keys must match the credential contract/,
+  ],
+  [
+    "adminAuthVersion",
+    3,
+    /adminAuthVersion must match credential-rotation-report\.json admin receipt/,
+  ],
+]) {
+  test(`release evidence gate rejects invalid credential matrix ${field}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-credential-invalid-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    const smokePath = path.join(evidenceDir, "smoke-test-report.json");
+    const smoke = JSON.parse(fs.readFileSync(smokePath, "utf8"));
+    const check = smoke.checks.find(
+      (candidate) => candidate.name === "credential-login-matrix",
+    );
+    check[field] = value;
+    fs.writeFileSync(smokePath, JSON.stringify(smoke, null, 2));
+
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
+test("release evidence gate requires credential rotation report", () => {
+  const root = fs.mkdtempSync(
+    path.join(os.tmpdir(), "release-evidence-gate-rotation-missing-"),
+  );
+  const evidenceDir = path.join(
+    root,
+    "deployments/yoyoosun/evidence/releases/2026-06-16",
+  );
+  writeValidEvidence(evidenceDir);
+  fs.rmSync(path.join(evidenceDir, "credential-rotation-report.json"));
+  assert.throws(
+    () =>
+      validateReleaseEvidenceGate({
+        repoRoot: root,
+        evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+      }),
+    /Missing credential-rotation-report\.json/,
+  );
+});
+
+for (const [name, mutate, expectedError] of [
+  [
+    "release",
+    (report) => (report.release = "b".repeat(40)),
+    /release must match release-evidence\.md gitCommit/,
+  ],
+  [
+    "migration",
+    (report) => (report.migrationVersion = "20260617000000"),
+    /migrationVersion must match release-evidence\.md migrationAfter/,
+  ],
+  [
+    "duplicate account",
+    (report) => (report.accounts[1].username = report.accounts[0].username),
+    /accounts must contain 11 unique contracted identities/,
+  ],
+  [
+    "stale auth version",
+    (report) => (report.accounts[0].authVersion = 1),
+    /every account authVersion must be greater than 1/,
+  ],
+  [
+    "demo phone binding",
+    (report) => (report.accounts[1].phoneBound = true),
+    /phoneBound must be true only for the contracted admin/,
+  ],
+  [
+    "secret field",
+    (report) => (report.accounts[0].accessToken = "must-not-be-stored"),
+    /must not contain password\/secret\/token\/phone fields/,
+  ],
+  [
+    "operation id",
+    (report) => (report.operationId = "not-an-operation-id"),
+    /operationId must be a lowercase UUID v4/,
+  ],
+]) {
+  test(`release evidence gate rejects invalid rotation ${name}`, () => {
+    const root = fs.mkdtempSync(
+      path.join(os.tmpdir(), "release-evidence-gate-rotation-invalid-"),
+    );
+    const evidenceDir = path.join(
+      root,
+      "deployments/yoyoosun/evidence/releases/2026-06-16",
+    );
+    writeValidEvidence(evidenceDir);
+    const reportPath = path.join(
+      evidenceDir,
+      "credential-rotation-report.json",
+    );
+    const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+    mutate(report);
+    fs.writeFileSync(reportPath, JSON.stringify(report, null, 2));
+    assert.throws(
+      () =>
+        validateReleaseEvidenceGate({
+          repoRoot: root,
+          evidenceDir: "deployments/yoyoosun/evidence/releases/2026-06-16",
+        }),
+      expectedError,
+    );
+  });
+}
+
 test("release evidence gate rejects non-pass smoke check", () => {
   const root = fs.mkdtempSync(
     path.join(os.tmpdir(), "release-evidence-gate-smoke-check-bad-"),
@@ -1056,6 +1369,7 @@ test("release evidence gate requires populated upgrade audit when migration cros
   const migrationBefore = "20260710150001";
   const migrationAfter = "20260714055504";
   writeValidEvidence(evidenceDir);
+  setMigrationEvidenceRange(evidenceDir, migrationBefore, migrationAfter);
 
   const releasePath = path.join(evidenceDir, "release-evidence.md");
   fs.writeFileSync(

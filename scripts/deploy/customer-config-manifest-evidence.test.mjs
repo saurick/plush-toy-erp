@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { validateCustomerConfigActivationGate } from "./customer-config-activation-gate.mjs";
 import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
+import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-fixture.mjs";
 import {
   parseCliArgs,
   writeCustomerConfigManifestEvidence,
@@ -304,6 +305,7 @@ Pending Files: 0
 - [x] known limitations reviewed
 `,
   );
+  writeCredentialEvidenceTestFixture(dir);
 }
 
 test("help 输出可运行", () => {

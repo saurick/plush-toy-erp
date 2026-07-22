@@ -95,6 +95,26 @@ docker compose \
 
 命令中的 `<migration>`、`<release>` 必须与对应参数逐字一致。成功回执只证明 1 个单位和 4 个仓库及运行身份；完整 V5 仍由手工验收 runner 在空库门禁通过后，通过正式 API 写入并逐页读回。
 
+### 133 V5 凭据轮换与发布登录门禁
+
+133 的稳定 `admin`、固定十个 demo 和 SMS 登录身份以 `deployments/yoyoosun/env/credential.contract.json` 为无秘密真源。密码和手机号保存在发布工作站 Keychain，禁止写入服务器 steady `.env`。fresh 数据、整库恢复、rollback 或账号造数完成后，必须先创建并校验受控备份，再从发布工作站运行：
+
+```bash
+bash deployments/yoyoosun/scripts/rotate-credentials-133.sh \
+  --ssh-target simon@192.168.0.133 \
+  --expected-release '<40-character-lowercase-git-sha>' \
+  --expected-migration '<14-digit-atlas-version>' \
+  --operation-id '<unique-operation-id>' \
+  --backup-file '/home/simon/plush-toy-erp-v5/backups/<pre-rotation>.dump' \
+  --backup-sha256 '<64-hex>' \
+  --report 'output/customers/yoyoosun/credential-rotation/<operation-id>.json' \
+  --confirm 'ROTATE_YOYOOSUN_CREDENTIALS_133:<release>:<migration>:<operation-id>'
+```
+
+包装脚本只经 SSH stdin 把三项 Keychain 值送入当前远端进程，再由一次性 `app-server` 容器运行 `/app/rotate-manual-acceptance-passwords`。工具会精确核对 release、migration、数据库、客户配置、dataset 和账号集合，在同一事务内更新密码、绑定稳定 `admin` 手机号、递增 `auth_version`、撤销活动会话并写脱敏 audit + immutable runtime marker。网络或 stdout 中断后必须复用同一 `operation-id`；工具会返回已持久化 receipt，不重复轮换。
+
+轮换完成后，以相同 Keychain 当前值运行 `run-smoke.sh`。正式 credential matrix 必须证明合同 hash 一致、手机号与合同输入一致、公开本地密码未使用、稳定 admin 与十个 demo 全部真实登录并得到本轮唯一 token；release gate 缺少或重复 matrix、任一账号失败、报告含 raw response 或合同漂移都必须拒绝切流。该登录矩阵不发送真实短信；短信实际投递仍需独立受控验收。
+
 前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 只启动 `web-desktop` 一个前端实例，并通过 `APP_ID=desktop`、`PORT=5175` 固定入口；岗位任务端统一走 `/m/<role>/tasks`，不再启动 8 个 `APP_ID=mobile-*` 生产容器。
 
 ## 关键环境变量

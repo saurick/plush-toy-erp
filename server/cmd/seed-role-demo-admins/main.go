@@ -30,7 +30,7 @@ type bootstrapConfig struct {
 
 const (
 	resetLocalSuperAdminConfirm = "RESET_LOCAL_SUPER_ADMIN_PASSWORD"
-	defaultRoleDemoPassword     = "12345678"
+	defaultRoleDemoPassword     = data.PublicRoleDemoPassword
 )
 
 func main() {
@@ -143,8 +143,10 @@ func resolveRoleDemoPassword(flagPassword string, getenv func(string) string) (s
 }
 
 func validateRoleDemoPassword(password string, allowProd bool) error {
-	if allowProd && password == defaultRoleDemoPassword {
-		return fmt.Errorf("a non-default explicit role demo password is required with --allow-prod")
+	if allowProd {
+		if err := data.RejectPublicRoleDemoPassword(password); err != nil {
+			return fmt.Errorf("a non-default explicit role demo password is required with --allow-prod: %w", err)
+		}
 	}
 	if biz.ValidateAdminPassword(password) != nil {
 		return fmt.Errorf("role demo password must contain 8-20 characters")
@@ -153,13 +155,14 @@ func validateRoleDemoPassword(password string, allowProd bool) error {
 }
 
 func validateRoleDemoPasswordTarget(password, dsn string, includeDebug, includeManualAcceptanceScenarios bool) error {
-	if password == defaultRoleDemoPassword && includeDebug {
+	isPublicPassword := data.RejectPublicRoleDemoPassword(password) != nil
+	if isPublicPassword && includeDebug {
 		return fmt.Errorf("--include-debug requires a non-default explicit role demo password")
 	}
-	if password == defaultRoleDemoPassword && includeManualAcceptanceScenarios {
+	if isPublicPassword && includeManualAcceptanceScenarios {
 		return fmt.Errorf("--include-manual-acceptance-scenarios requires a non-default explicit role demo password")
 	}
-	if password != defaultRoleDemoPassword {
+	if !isPublicPassword {
 		return nil
 	}
 	if err := devdbguard.RequireLocalAdminResetDSN(dsn); err != nil {
@@ -178,7 +181,7 @@ func validateRoleDemoPasswordTarget(password, dsn string, includeDebug, includeM
 
 func roleDemoAccountsForPassword(password string, includeDebug bool) []data.RoleDemoAdminAccountSpec {
 	accounts := data.DefaultRoleDemoAdminAccounts(includeDebug)
-	if password != defaultRoleDemoPassword {
+	if data.RejectPublicRoleDemoPassword(password) == nil {
 		return accounts
 	}
 	businessAccounts := make([]data.RoleDemoAdminAccountSpec, 0, len(accounts))

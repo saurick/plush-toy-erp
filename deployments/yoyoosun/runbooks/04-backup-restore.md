@@ -51,8 +51,11 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
 6. 在隔离库执行 populated upgrade read-only audit；发现 blocker 时停止，不执行 apply。
 7. 执行 customer config cutover read-only audit；发现遗留流程实例或任务配置 revision 锚点时停止，由人工治理，不执行自动 DML。
 8. 两项审计通过后执行 migration apply，再执行 migration status，确认 migrationAfter 和 pending files。
-9. 执行 smoke query、健康检查和关键页面 smoke。
-10. 写入恢复演练报告。
+9. 完成 customer config active revision 读回，保持客户入口关闭。
+10. 使用发布工作站 Keychain 当前值强制轮换稳定 `admin` 与固定十个 demo，并撤销备份中恢复出的所有旧会话。
+11. 启动 steady 后端并运行真实登录矩阵；只有 11 个账号全部取得新 token，且 SMS provider 指定身份已绑定手机号，才允许恢复 Web 入口。
+12. 执行 smoke query、健康检查和关键页面 smoke。
+13. 写入恢复演练报告。
 
 恢复演练报告必须至少记录：
 

@@ -24,7 +24,9 @@ import (
 const (
 	targetLocalDev         = "local-dev"
 	targetCustomerTrial133 = "customer-trial-133"
+	adminPasswordEnv       = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
 	demoPasswordEnv        = "MANUAL_ACCEPTANCE_PASSWORD"
+	smsPhoneEnv            = "MANUAL_ACCEPTANCE_SMS_PHONE"
 	dsnEnv                 = "POSTGRES_DSN"
 	localAcceptanceDB      = "plush_erp_acceptance_20260716_v5_dev"
 	customerTrial133DB     = "plush_erp_uat_20260716_v5"
@@ -37,6 +39,11 @@ const (
 	customerTrial133ProductVersion    = "customer-trial-133-test-2026.07.16-v5"
 	customerTrial133ApplyPurpose      = "customer_trial_test_apply"
 )
+
+var Version = "dev"
+
+var immutableReleasePattern = regexp.MustCompile(`^[a-f0-9]{40}$`)
+var operationIDPattern = regexp.MustCompile(`^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$`)
 
 var localCustomerConfigRevisionPattern = regexp.MustCompile(
 	`^yoyoosun-customer-package-v[1-9][0-9]*\.local-[a-f0-9]{16}\.runtime-v1$`,
@@ -59,6 +66,8 @@ type options struct {
 	target                   string
 	datasetVersion           string
 	expectedMigrationVersion string
+	expectedRelease          string
+	operationID              string
 	confirm                  string
 	timeout                  time.Duration
 }
@@ -67,6 +76,24 @@ type activeCustomerConfigIdentity struct {
 	revision         string
 	productVersion   string
 	compiledSnapshot map[string]any
+}
+
+type rotationReceipt struct {
+	GeneratedAt            string                                         `json:"generatedAt"`
+	OperationID            string                                         `json:"operationId"`
+	Target                 string                                         `json:"target"`
+	DatasetVersion         string                                         `json:"datasetVersion"`
+	MigrationVersion       string                                         `json:"migrationVersion"`
+	CustomerRevision       string                                         `json:"customerRevision"`
+	Release                string                                         `json:"release"`
+	AdminAccounts          int                                            `json:"adminAccounts"`
+	DemoAccounts           int                                            `json:"demoAccounts"`
+	RevokedSessions        int64                                          `json:"revokedSessions"`
+	AuthVersionIncremented bool                                           `json:"authVersionIncremented"`
+	AuditSource            string                                         `json:"auditSource"`
+	PhoneBound             bool                                           `json:"phoneBound"`
+	Accounts               []data.ManualAcceptancePasswordRotationAccount `json:"accounts"`
+	Replayed               bool                                           `json:"replayed"`
 }
 
 func expectedConfirmation(target, datasetVersion string) string {
@@ -83,11 +110,37 @@ func validateOptions(opts options) error {
 	if strings.TrimSpace(opts.expectedMigrationVersion) == "" {
 		return errors.New("expected-migration-version is required")
 	}
+	if opts.target == targetCustomerTrial133 && !immutableReleasePattern.MatchString(opts.expectedRelease) {
+		return errors.New("expected-release must be a 40-character lowercase git sha for customer-trial-133")
+	}
+	if strings.TrimSpace(opts.operationID) == "" {
+		return errors.New("operation-id is required")
+	}
+	if opts.target == targetCustomerTrial133 && !operationIDPattern.MatchString(opts.operationID) {
+		return errors.New("operation-id must be a lowercase UUID v4 for customer-trial-133")
+	}
+	if len(rotationMarkerKey(opts.operationID)) > 128 {
+		return errors.New("operation-id is too long for the runtime marker key")
+	}
 	if opts.confirm != expectedConfirmation(opts.target, opts.datasetVersion) {
 		return errors.New("confirmation does not match target and dataset version")
 	}
 	if opts.timeout <= 0 || opts.timeout > time.Minute {
 		return errors.New("timeout must be between 1ns and 1m")
+	}
+	return nil
+}
+
+func rotationMarkerKey(operationID string) string {
+	return "manual-acceptance-password-rotation:" + strings.TrimSpace(operationID)
+}
+
+func validateReleaseBinding(opts options, version string) error {
+	if opts.target != targetCustomerTrial133 {
+		return nil
+	}
+	if !immutableReleasePattern.MatchString(opts.expectedRelease) || version != opts.expectedRelease {
+		return errors.New("customer-trial-133 expected release does not match the immutable rotate binary version")
 	}
 	return nil
 }
@@ -140,8 +193,10 @@ func validateTargetDSN(target, datasetVersion, rawDSN string) error {
 		if databaseName != customerTrial133DB {
 			return fmt.Errorf("customer-trial-133 target requires isolated database %s", customerTrial133DB)
 		}
-		if port != customerTrial133Port || (host != "127.0.0.1" && host != "localhost") {
-			return fmt.Errorf("customer-trial-133 target requires the loopback PostgreSQL endpoint on port %s of the 133 host", customerTrial133Port)
+		hostEndpoint := (host == "127.0.0.1" || host == "localhost") && port == customerTrial133Port
+		containerEndpoint := host == "postgres" && port == "5432"
+		if !hostEndpoint && !containerEndpoint {
+			return fmt.Errorf("customer-trial-133 target requires the exact host loopback endpoint on port %s or compose endpoint postgres:5432", customerTrial133Port)
 		}
 	default:
 		return errors.New("unsupported target")
@@ -241,8 +296,10 @@ func validateActiveCustomerConfigIdentity(target string, identity activeCustomer
 func acceptanceAccountUsernames(opts options) (adminUsernames, demoUsernames []string, err error) {
 	demoUsernames = append([]string(nil), demoAcceptanceUsernames...)
 	switch opts.target {
-	case targetLocalDev, targetCustomerTrial133:
+	case targetLocalDev:
 		return nil, demoUsernames, nil
+	case targetCustomerTrial133:
+		return []string{"admin"}, demoUsernames, nil
 	default:
 		return nil, nil, errors.New("unsupported target")
 	}
@@ -293,7 +350,7 @@ func assertAcceptanceAccounts(ctx context.Context, db *sql.DB, adminUsernames, d
 	return nil
 }
 
-func validateRotationPassword(demoPassword string) error {
+func validateRotationPasswords(target, adminPassword, demoPassword string) error {
 	demoPassword = strings.TrimSpace(demoPassword)
 	if demoPassword == "" {
 		return fmt.Errorf("%s is required", demoPasswordEnv)
@@ -301,11 +358,50 @@ func validateRotationPassword(demoPassword string) error {
 	if biz.ValidateAdminPassword(demoPassword) != nil {
 		return fmt.Errorf("%s must contain 8-20 characters", demoPasswordEnv)
 	}
+	if target != targetCustomerTrial133 {
+		return nil
+	}
+	if err := data.RejectPublicRoleDemoPassword(demoPassword); err != nil {
+		return fmt.Errorf("%s is unsafe for %s: %w", demoPasswordEnv, target, err)
+	}
+	adminPassword = strings.TrimSpace(adminPassword)
+	if adminPassword == "" {
+		return fmt.Errorf("%s is required for %s", adminPasswordEnv, target)
+	}
+	if biz.ValidateAdminPassword(adminPassword) != nil {
+		return fmt.Errorf("%s must contain 8-20 characters", adminPasswordEnv)
+	}
+	if err := data.RejectPublicRoleDemoPassword(adminPassword); err != nil {
+		return fmt.Errorf("%s is unsafe for %s: %w", adminPasswordEnv, target, err)
+	}
+	if adminPassword == demoPassword {
+		return errors.New("manual acceptance admin and demo passwords must differ")
+	}
 	return nil
 }
 
-func run(ctx context.Context, opts options, dsn, demoPassword string) error {
+func normalizeRotationSMSPhone(target, rawPhone string) (string, error) {
+	if target != targetCustomerTrial133 {
+		if strings.TrimSpace(rawPhone) != "" {
+			return "", errors.New("MANUAL_ACCEPTANCE_SMS_PHONE is only valid for customer-trial-133")
+		}
+		return "", nil
+	}
+	if strings.TrimSpace(rawPhone) == "" {
+		return "", fmt.Errorf("%s is required for %s", smsPhoneEnv, target)
+	}
+	phone, err := biz.NormalizeLoginPhone(rawPhone)
+	if err != nil {
+		return "", fmt.Errorf("%s is invalid", smsPhoneEnv)
+	}
+	return phone, nil
+}
+
+func run(ctx context.Context, opts options, dsn, adminPassword, demoPassword, smsPhone string) error {
 	if err := validateOptions(opts); err != nil {
+		return err
+	}
+	if err := validateReleaseBinding(opts, Version); err != nil {
 		return err
 	}
 	if err := validateTargetDSN(opts.target, opts.datasetVersion, dsn); err != nil {
@@ -315,7 +411,11 @@ func run(ctx context.Context, opts options, dsn, demoPassword string) error {
 	if err != nil {
 		return err
 	}
-	if err := validateRotationPassword(demoPassword); err != nil {
+	if err := validateRotationPasswords(opts.target, adminPassword, demoPassword); err != nil {
+		return err
+	}
+	normalizedSMSPhone, err := normalizeRotationSMSPhone(opts.target, smsPhone)
+	if err != nil {
 		return err
 	}
 	db, err := sql.Open("pgx", dsn)
@@ -343,18 +443,43 @@ func run(ctx context.Context, opts options, dsn, demoPassword string) error {
 	if err := assertAcceptanceAccounts(ctx, db, adminUsernames, demoUsernames); err != nil {
 		return err
 	}
-	if err := data.ResetManualAcceptancePasswords(
+	phoneUsername := ""
+	if normalizedSMSPhone != "" {
+		phoneUsername = "admin"
+	}
+	passwordReceipt, err := data.RotateManualAcceptancePasswordsWithOperation(
 		ctx,
 		db,
 		adminUsernames,
-		"",
+		adminPassword,
 		demoUsernames,
 		demoPassword,
-	); err != nil {
+		phoneUsername,
+		normalizedSMSPhone,
+		data.ManualAcceptancePasswordRotationOperation{
+			MarkerKey: rotationMarkerKey(opts.operationID), OperationID: opts.operationID,
+			Target: opts.target, DatasetVersion: opts.datasetVersion, Release: opts.expectedRelease,
+			MigrationVersion: version, CustomerRevision: activeConfig.revision,
+		},
+	)
+	if err != nil {
 		return err
 	}
-	fmt.Printf("manual acceptance passwords rotated target=%s dataset_version=%s migration_version=%s customer_revision=%s admin_accounts=%d demo_accounts=%d\n", opts.target, opts.datasetVersion, version, activeConfig.revision, len(adminUsernames), len(demoUsernames))
-	return nil
+	var revokedSessions int64
+	for _, account := range passwordReceipt.Accounts {
+		revokedSessions += account.RevokedSessions
+	}
+	receipt := rotationReceipt{
+		GeneratedAt: passwordReceipt.RotatedAt.Format(time.RFC3339Nano), OperationID: opts.operationID,
+		Target: opts.target, DatasetVersion: opts.datasetVersion,
+		MigrationVersion: version, CustomerRevision: activeConfig.revision,
+		Release:       opts.expectedRelease,
+		AdminAccounts: len(adminUsernames), DemoAccounts: len(demoUsernames),
+		RevokedSessions: revokedSessions, AuthVersionIncremented: true,
+		AuditSource: "manual_acceptance_password_rotation", PhoneBound: normalizedSMSPhone != "", Accounts: passwordReceipt.Accounts,
+		Replayed: passwordReceipt.Replayed,
+	}
+	return json.NewEncoder(os.Stdout).Encode(receipt)
 }
 
 func main() {
@@ -362,6 +487,8 @@ func main() {
 	flag.StringVar(&opts.target, "target", "", "local-dev or customer-trial-133")
 	flag.StringVar(&opts.datasetVersion, "dataset-version", "", "semantic acceptance dataset version")
 	flag.StringVar(&opts.expectedMigrationVersion, "expected-migration-version", "", "exact Atlas migration version")
+	flag.StringVar(&opts.expectedRelease, "expected-release", "", "exact immutable release git sha")
+	flag.StringVar(&opts.operationID, "operation-id", "", "unique idempotency operation id")
 	flag.StringVar(&opts.confirm, "confirm", "", "exact target and dataset-bound confirmation")
 	flag.DurationVar(&opts.timeout, "timeout", 30*time.Second, "database operation timeout")
 	flag.Parse()
@@ -372,7 +499,9 @@ func main() {
 		ctx,
 		opts,
 		os.Getenv(dsnEnv),
+		os.Getenv(adminPasswordEnv),
 		os.Getenv(demoPasswordEnv),
+		os.Getenv(smsPhoneEnv),
 	); err != nil {
 		fmt.Fprintf(os.Stderr, "rotate manual acceptance passwords: %v\n", err)
 		os.Exit(1)

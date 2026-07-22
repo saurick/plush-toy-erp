@@ -43,7 +43,7 @@ fi
 
 mkdir -p "$output_dir"
 
-git_commit="$(git rev-parse --short HEAD 2>/dev/null || echo unknown)"
+git_commit="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
 generated_at="$(date -u +"%Y-%m-%dT%H:%M:%SZ")"
 
 cat >"$output_dir/release-evidence.md" <<EOF
@@ -83,6 +83,7 @@ cat >"$output_dir/release-evidence.md" <<EOF
 | preflight | 待填写 | production-preflight-report.txt |
 | backup | 待填写 | backup-evidence.md |
 | migration | 待填写 | migration-status.txt |
+| credential rotation | 待填写 | credential-rotation-report.json |
 | seed | 待填写 |  |
 | import dry-run / apply | 待填写 |  |
 | smoke | 待填写 | smoke-test-report.json |
@@ -259,6 +260,26 @@ cat >"$output_dir/smoke-test-report.json" <<EOF
     "containsRawCustomerRows": false,
     "notes": "待填写"
   }
+}
+EOF
+
+cat >"$output_dir/credential-rotation-report.json" <<EOF
+{
+  "generatedAt": "$generated_at",
+  "operationId": "待填写",
+  "target": "customer-trial-133",
+  "datasetVersion": "2026.07.16-v5",
+  "migrationVersion": "待填写",
+  "customerRevision": "待填写",
+  "release": "$git_commit",
+  "adminAccounts": 0,
+  "demoAccounts": 0,
+  "revokedSessions": 0,
+  "authVersionIncremented": false,
+  "auditSource": "待填写",
+  "phoneBound": false,
+  "accounts": [],
+  "replayed": false
 }
 EOF
 

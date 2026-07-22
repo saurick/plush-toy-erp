@@ -28,6 +28,7 @@ const ACCOUNT_DATA_VERSION = "2026.07.16-v5";
 const ACCOUNT_RUN_ID = "20260716-V5";
 const MANAGED_ROLE_KEYS = new Set(["sales", "purchase"]);
 const MAX_AUDIT_MINIMUM = 200;
+const LOCAL_ONLY_PUBLIC_PASSWORDS = new Set(["12345678"]);
 
 export const MANUAL_ACCEPTANCE_ROLE_CAPABILITY_BASELINE = Object.freeze(
   yoyoosunRoleFlowMatrix.roles.map((profile) =>
@@ -1091,6 +1092,22 @@ export async function applyManualAcceptanceAccountScenarios(
     adminPassword || process.env.MANUAL_ACCEPTANCE_ADMIN_PASSWORD,
     "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
   );
+  if (
+    resolvedTarget.external &&
+    (LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectivePassword) ||
+      LOCAL_ONLY_PUBLIC_PASSWORDS.has(effectiveAdminPassword))
+  ) {
+    throw new CliError(
+      "customer-trial-133 passwords must not use a local-only public password",
+      2,
+    );
+  }
+  if (resolvedTarget.external && effectivePassword === effectiveAdminPassword) {
+    throw new CliError(
+      "customer-trial-133 admin and demo passwords must be different",
+      2,
+    );
+  }
 
   await assertManualAcceptanceRuntimeIdentityPrecondition({
     policy: safePlan,

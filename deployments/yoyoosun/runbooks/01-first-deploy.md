@@ -48,15 +48,17 @@ sh migrate_online.sh --status-only
 MIGRATION_MAINTENANCE_CONFIRMED=1 sh migrate_online.sh --apply
 ```
 
-10. 启动业务服务：
+10. 全新库先使用一次性 bootstrap 创建稳定 `admin`；随后以 steady env 启动后端，保持 Web / 客户入口关闭，完成客户配置与模拟验收数据。
+11. 按 `credential.contract.json` 从发布工作站 Keychain 临时注入两份不同密码，执行精确目标轮换。轮换必须覆盖稳定 `admin` 与固定十个 demo、递增 `auth_version`、撤销旧会话并生成脱敏回执；密码不得进入 steady `.env`、命令参数、日志或 evidence。
+12. 确认轮换完成后启动全部业务服务：
 
 ```bash
 docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remove-orphans
 ```
 
-11. 执行健康检查、登录 / RBAC smoke 和关键页面 smoke。
-12. 收集 image digest、migration status、config fingerprint、smoke report、known limitations 和 release sign-off checklist。
-13. 客户试用或交付前执行 release evidence gate：
+13. 执行 health / ready 后，使用同一 Keychain 当前值运行正式 smoke。`credential-login-matrix` 必须真实登录稳定 `admin` 与固定十个 demo，逐一核对返回身份和新 token；SMS provider 启用时还必须证明合同指定账号已绑定手机号。任何账号失败都保持入口关闭。
+14. 收集 image digest、migration status、config fingerprint、smoke report、known limitations 和 release sign-off checklist。
+15. 客户试用或交付前执行 release evidence gate：
 
 ```bash
 node scripts/deploy/release-evidence-gate.mjs \
@@ -64,7 +66,7 @@ node scripts/deploy/release-evidence-gate.mjs \
   --evidence-dir deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>
 ```
 
-14. 只在客户确认范围内做客户试用交付确认；客户真实业务验收不作为本地部署步骤的隐式通过项。
+16. 只在客户确认范围内做客户试用交付确认；客户真实业务验收不作为本地部署步骤的隐式通过项。
 
 ## 失败处理
 

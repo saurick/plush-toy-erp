@@ -9,6 +9,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
+import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-fixture.mjs";
 import {
   buildCustomerConfigReadbackPreflightReport,
   buildInputTemplate,
@@ -414,6 +415,7 @@ Pending Files: 0
 - [x] known limitations reviewed
 `,
   );
+  writeCredentialEvidenceTestFixture(dir);
 }
 
 function buildReleaseReport({ root, manifest, evidenceDir, overrides = {} }) {

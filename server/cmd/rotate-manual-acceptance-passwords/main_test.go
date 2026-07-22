@@ -1,6 +1,7 @@
 package main
 
 import (
+	"os"
 	"strings"
 	"testing"
 	"time"
@@ -13,6 +14,8 @@ func validOptions(target string) options {
 		target:                   target,
 		datasetVersion:           "2026.07.16-v5",
 		expectedMigrationVersion: "20260710150001",
+		expectedRelease:          strings.Repeat("a", 40),
+		operationID:              "123e4567-e89b-42d3-a456-426614174000",
 		confirm:                  expectedConfirmation(target, "2026.07.16-v5"),
 		timeout:                  30 * time.Second,
 	}
@@ -29,17 +32,28 @@ func TestValidateOptionsBindsConfirmationToTargetAndVersion(t *testing.T) {
 	if err := validateOptions(opts); err == nil {
 		t.Fatal("expected mismatched target confirmation to fail")
 	}
+	opts = validOptions(targetCustomerTrial133)
+	opts.operationID = "UPPERCASE"
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("unsafe 133 operation id accepted")
+	}
+	if len(rotationMarkerKey(validOptions(targetCustomerTrial133).operationID)) > 128 {
+		t.Fatal("valid operation marker key exceeds runtime marker capacity")
+	}
 }
 
-func TestAcceptanceAccountUsernamesNeverSelectsStableAdmin(t *testing.T) {
+func TestAcceptanceAccountUsernamesSelectsStableAdminOnlyFor133(t *testing.T) {
 	for _, target := range []string{targetLocalDev, targetCustomerTrial133} {
 		opts := validOptions(target)
 		adminUsernames, demoUsernames, err := acceptanceAccountUsernames(opts)
 		if err != nil {
 			t.Fatalf("acceptanceAccountUsernames(%s): %v", target, err)
 		}
-		if len(adminUsernames) != 0 {
-			t.Fatalf("default %s admin usernames = %v, want none", target, adminUsernames)
+		if target == targetLocalDev && len(adminUsernames) != 0 {
+			t.Fatalf("local admin usernames = %v, want none", adminUsernames)
+		}
+		if target == targetCustomerTrial133 && (len(adminUsernames) != 1 || adminUsernames[0] != "admin") {
+			t.Fatalf("133 admin usernames = %v, want stable admin", adminUsernames)
 		}
 		if len(demoUsernames) == 0 {
 			t.Fatalf("%s demo usernames must not be empty", target)
@@ -69,6 +83,8 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 		{name: "local rejects production-like database", target: targetLocalDev, dsn: "postgres://user:secret@192.168.0.106:5432/plush_erp_production?sslmode=disable", wantErr: "plush_erp_acceptance_20260716_v5_dev"},
 		{name: "133 host loopback", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55435/plush_erp_uat_20260716_v5?sslmode=disable"},
 		{name: "133 postgresql URL and escaped password", target: targetCustomerTrial133, dsn: "postgresql://user:secret%40value%3A1@localhost:55435/plush_erp_uat_20260716_v5?sslmode=disable"},
+		{name: "133 exact compose endpoint", target: targetCustomerTrial133, dsn: "postgres://user:secret@postgres:5432/plush_erp_uat_20260716_v5?sslmode=disable"},
+		{name: "133 rejects arbitrary compose host", target: targetCustomerTrial133, dsn: "postgres://user:secret@database:5432/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "exact host"},
 		{name: "133 rejects LAN credentials", target: targetCustomerTrial133, dsn: "postgres://user:secret@192.168.0.133:55435/plush_erp_uat_20260716_v5?sslmode=disable", wantErr: "loopback"},
 		{name: "133 rejects live db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55435/plush_erp?sslmode=disable", wantErr: "isolated database"},
 		{name: "133 wrong db", target: targetCustomerTrial133, dsn: "postgres://user:secret@127.0.0.1:55435/other?sslmode=disable", wantErr: "isolated database"},
@@ -87,9 +103,69 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 	}
 }
 
-func TestValidateRotationPasswordOnlyAcceptsDemoCredential(t *testing.T) {
-	if err := validateRotationPassword("demo-password"); err != nil {
-		t.Fatalf("validateRotationPassword() error = %v", err)
+func TestValidateRotationPasswordsRequiresIndependentNonPublic133Credentials(t *testing.T) {
+	if err := validateRotationPasswords(targetCustomerTrial133, "admin-password", "demo-password"); err != nil {
+		t.Fatalf("validateRotationPasswords() error = %v", err)
+	}
+	for _, test := range []struct{ admin, demo, want string }{
+		{admin: "", demo: "demo-password", want: adminPasswordEnv},
+		{admin: "same-password", demo: "same-password", want: "must differ"},
+		{admin: "admin-password", demo: "12345678", want: "public"},
+		{admin: "12345678", demo: "demo-password", want: "public"},
+	} {
+		err := validateRotationPasswords(targetCustomerTrial133, test.admin, test.demo)
+		if err == nil || !strings.Contains(err.Error(), test.want) {
+			t.Fatalf("validateRotationPasswords(%q,%q) error=%v, want %q", test.admin, test.demo, err, test.want)
+		}
+	}
+	if err := validateRotationPasswords(targetLocalDev, "", "12345678"); err != nil {
+		t.Fatalf("registered isolated local target may use the public credential: %v", err)
+	}
+}
+
+func TestValidateReleaseBindingRequiresExactImmutable133Version(t *testing.T) {
+	opts := validOptions(targetCustomerTrial133)
+	if err := validateReleaseBinding(opts, opts.expectedRelease); err != nil {
+		t.Fatalf("matching release rejected: %v", err)
+	}
+	if err := validateReleaseBinding(opts, strings.Repeat("b", 40)); err == nil {
+		t.Fatal("mismatched rotate binary version accepted")
+	}
+	opts.expectedRelease = "DEV"
+	if err := validateOptions(opts); err == nil {
+		t.Fatal("non-immutable 133 release accepted")
+	}
+}
+
+func TestNormalizeRotationSMSPhoneRequires133IdentityBinding(t *testing.T) {
+	phone, err := normalizeRotationSMSPhone(targetCustomerTrial133, "+86 138-0013-8000")
+	if err != nil || phone != "13800138000" {
+		t.Fatalf("normalizeRotationSMSPhone() = (%q, %v)", phone, err)
+	}
+	if _, err := normalizeRotationSMSPhone(targetCustomerTrial133, ""); err == nil {
+		t.Fatal("133 accepted missing SMS phone")
+	}
+	if _, err := normalizeRotationSMSPhone(targetCustomerTrial133, "12345678"); err == nil {
+		t.Fatal("133 accepted invalid SMS phone")
+	}
+	if _, err := normalizeRotationSMSPhone(targetLocalDev, "13800138000"); err == nil {
+		t.Fatal("local target accepted remote SMS identity binding")
+	}
+}
+
+func TestDockerfileBuildsAndCopiesRotateBinary(t *testing.T) {
+	raw, err := os.ReadFile("../../Dockerfile")
+	if err != nil {
+		t.Fatalf("read Dockerfile: %v", err)
+	}
+	content := string(raw)
+	for _, anchor := range []string{
+		"-o ./bin/rotate-manual-acceptance-passwords ./cmd/rotate-manual-acceptance-passwords",
+		"COPY --from=builder /src/bin/rotate-manual-acceptance-passwords /app/rotate-manual-acceptance-passwords",
+	} {
+		if !strings.Contains(content, anchor) {
+			t.Fatalf("Dockerfile missing rotate binary anchor %q", anchor)
+		}
 	}
 }
 

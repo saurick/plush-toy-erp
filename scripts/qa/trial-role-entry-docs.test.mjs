@@ -75,9 +75,9 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   assertIncludes(seedSource, "demo_admin", "admin role demo seed");
   assertIncludes(trialAccountAudit, "demo_admin", "trial account RBAC audit");
   assert.match(
-    seedCommandSource,
-    /defaultRoleDemoPassword\s*=\s*"12345678"/u,
-    "role demo seed must keep the public default password",
+    `${seedSource}\n${seedCommandSource}`,
+    /PublicRoleDemoPassword\s*=\s*"12345678"[\s\S]*defaultRoleDemoPassword\s*=\s*data\.PublicRoleDemoPassword/u,
+    "role demo seed must keep one shared public default password",
   );
   assertIncludes(
     seedCommandSource,

@@ -467,6 +467,10 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
         checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_VERSION" }),
         checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ENVIRONMENT" }),
         checkRuntimeUrl({ env, key: "SMOKE_ENDPOINT" }),
+        checkRuntimeUrl({ env, key: "SMOKE_BACKEND_URL" }),
+        checkEnv({ env, key: "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" }),
+        checkEnv({ env, key: "MANUAL_ACCEPTANCE_PASSWORD" }),
+        checkEnv({ env, key: "MANUAL_ACCEPTANCE_SMS_PHONE" }),
         checkFile({
           repoRoot,
           filePath: "deployments/yoyoosun/scripts/run-smoke.sh",
@@ -514,6 +518,9 @@ function buildChecksForAction({ action, repoRoot, env, envFile, evidenceDir }) {
           checkEnvOrEvidence({ env, evidenceInputs, key: "RELEASE_ENVIRONMENT" }),
           checkRuntimeUrl({ env, key: "SMOKE_ENDPOINT" }),
           checkRuntimeUrl({ env, key: "SMOKE_BACKEND_URL" }),
+          checkEnv({ env, key: "MANUAL_ACCEPTANCE_ADMIN_PASSWORD" }),
+          checkEnv({ env, key: "MANUAL_ACCEPTANCE_PASSWORD" }),
+          checkEnv({ env, key: "MANUAL_ACCEPTANCE_SMS_PHONE" }),
           checkEnv({ env, key: "CUSTOMER_CONFIG_ADMIN_TOKEN" }),
         );
       }

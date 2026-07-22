@@ -10,6 +10,16 @@
 - 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。公网 `admin.yoyoosun.net` 的入口适配容器也已切到同一 V5 web / backend，旧入口容器仅停止并保留为即时回滚点；客户 UAT / 签收仍是独立关口。
 - 当前 Git 由单一 owner 收口；本轮已获提交、推送和 133 部署授权，不创建分支。后续如再修改运行时代码或 migration，必须生成新的不可变 release 并重新走目标环境证据链。
 
+## 2026-07-22 133 凭据生命周期与登录发布门禁
+
+完成：将 133 的稳定 `admin`、固定十个 demo、短信登录身份、环境变量名和 Keychain alias 收敛到不含秘密的 `credential.contract.json`。133 造数入口在任何网络请求前拒绝公开本地密码 `12345678` 以及 admin / demo 共用密码；本地开发仍可显式使用公开 demo 密码，不把测试便利扩散到非本地环境。
+
+完成：新增镜像内事务化凭据轮换命令和本机受控 wrapper。轮换固定覆盖一个 super admin 与十个 demo，绑定短信手机号、递增 `auth_version`、撤销旧会话并写脱敏审计；小写 UUID v4 operation id 作为 durable marker，同一操作在输出中断后可安全重放而不重复轮换。密码和手机号只从 Keychain 进入当前进程，经 SSH stdin 和一次性 Compose 容器传入，不进入 Git、远端 steady env、argv、token、手机号或响应正文证据。
+
+完成：正式 smoke 对合同 hash、目标库、dataset、admin 手机号、短信 provider 能力及 11 / 11 账号逐一执行真实 JSON-RPC 登录；每个响应必须精确匹配 JSON-RPC id、业务码、账号身份和 admin 手机号，并验证 11 个不同 token。发布 gate 新增轮换回执必需项，交叉核对完整 40 位 commit、migration、目标、账号集合、auth version、手机号绑定和脱敏字段；造数、恢复或回滚后缺轮换回执、任一账号失败、合同漂移或出现公开密码都会 fail closed。
+
+验证：定向 Go 包覆盖 seed、轮换命令和 data transaction；脚本覆盖 Keychain / SSH stdin、未知结果幂等回放、公开密码拒绝、手机号不匹配、JSON-RPC 响应严格性、11 账号登录矩阵及 release evidence gate。最终整仓 `strict` 从头完成，scripts Node 1319 / 1319、server quick 2660 / 2660、server all 2820 / 2820，均为零失败、零跳过；Web、构建、fresh / populated migration、PostgreSQL、ShellCheck、shfmt、YAML、零 warning、密钥扫描和 govulncheck 同轮通过。当前仍只证明本地代码合同，提交、推送、不可变镜像、133 数据库备份与轮换、目标 11 / 11 登录和短信实际投递必须在后续发布步骤完成后分别记录，不能由本节提前代替。
+
 ## 2026-07-22 GitHub CI Linux 测试夹具修复
 
 完成：保留单一 `Strict repository gate` GitHub Actions 门禁和生产预检的 fail-closed 规则。连续失败不是 Actions、依赖安装或 `strict.sh` 编排故障，而是 `bootstrap-production-admin` 测试把部署锁夹具建在 `os.tmpdir()`；Ubuntu 将其解析为 `/tmp`，被生产预检正确拒绝，macOS 的 `/var/folders` 则掩盖了跨平台差异。测试夹具现改用仓库已忽略的 `output/qa-tmp` 私有根并强制 `0700`，同时主动断言不落入 `/tmp`、`/var/tmp` 或 `/dev/shm`；聚合测试 watchdog 只增加调度余量，生产脚本接收的锁等待与共享临时目录拒绝合同未放宽。

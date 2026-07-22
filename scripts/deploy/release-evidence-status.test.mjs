@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -10,6 +11,15 @@ import {
 } from "./release-evidence-status.mjs";
 
 const repoRoot = path.resolve(new URL("../..", import.meta.url).pathname);
+const credentialContractRaw = fs.readFileSync(
+  path.join(repoRoot, "deployments/yoyoosun/env/credential.contract.json"),
+);
+const credentialContract = JSON.parse(credentialContractRaw.toString("utf8"));
+const credentialContractSha256 = crypto
+  .createHash("sha256")
+  .update(credentialContractRaw)
+  .digest("hex");
+const releaseGitCommit = "abc1234000000000000000000000000000000000";
 const scriptPath = path.join(
   repoRoot,
   "scripts/deploy/release-evidence-status.mjs",
@@ -57,7 +67,7 @@ function writeGatePassingEvidence(root) {
 | customerCode | yoyoosun |
 | releaseVersion | 20260616T1200-test |
 | environment | customer-trial |
-| gitCommit | abc1234 |
+| gitCommit | ${releaseGitCommit} |
 | serverImageDigest | sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa |
 | webImageDigest | sha256:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb |
 | migrationBefore | 20260601000000 |
@@ -206,7 +216,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
         releaseVersion: "20260616T1200-test",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 6, passed: 6, failed: 0 },
+        summary: { total: 7, passed: 7, failed: 0 },
         checks: [
           {
             name: "server-healthz",
@@ -237,6 +247,43 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             responseBodyStored: false,
           },
           {
+            name: "credential-login-matrix",
+            status: "pass",
+            target: "jsonrpc:auth.admin_login",
+            adminUsername: "admin",
+            adminAuthenticated: true,
+            adminSuperAdmin: true,
+            phoneBound: true,
+            adminAuthVersion: 2,
+            demoExpected: 10,
+            demoAuthenticated: 10,
+            totalExpected: 11,
+            totalAuthenticated: 11,
+            uniqueTokensObserved: true,
+            credentialContractSchema: credentialContract.schemaVersion,
+            credentialContractSha256,
+            credentialTarget: credentialContract.target.key,
+            credentialDatabase: credentialContract.target.database,
+            credentialDatasetVersion: credentialContract.target.datasetVersion,
+            adminPasswordSourceEnv: "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
+            demoPasswordSourceEnv: "MANUAL_ACCEPTANCE_PASSWORD",
+            smsPhoneSourceEnv: "MANUAL_ACCEPTANCE_SMS_PHONE",
+            usernames: [
+              "admin",
+              "demo_boss",
+              "demo_sales",
+              "demo_purchase",
+              "demo_production",
+              "demo_warehouse",
+              "demo_quality",
+              "demo_finance",
+              "demo_pmc",
+              "demo_engineering",
+              "demo_admin",
+            ],
+            responseBodyStored: false,
+          },
+          {
             name: "template-pdf-render",
             status: "pass",
             target: "/templates/render-pdf",
@@ -258,6 +305,45 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
           },
         ],
         redaction: { containsSecrets: false, containsRawCustomerRows: false },
+      },
+      null,
+      2,
+    ),
+  );
+  fs.writeFileSync(
+    path.join(absoluteDir, "credential-rotation-report.json"),
+    JSON.stringify(
+      {
+        generatedAt: "2026-06-16T04:30:00Z",
+        operationId: "123e4567-e89b-42d3-a456-426614174000",
+        target: credentialContract.target.key,
+        datasetVersion: credentialContract.target.datasetVersion,
+        migrationVersion: "20260616000000",
+        customerRevision: "yoyoosun-customer-package-v7.runtime-manifest-v1",
+        release: releaseGitCommit,
+        adminAccounts: 1,
+        demoAccounts: 10,
+        revokedSessions: 1,
+        authVersionIncremented: true,
+        auditSource: "manual_acceptance_password_rotation",
+        phoneBound: true,
+        accounts: [
+          {
+            username: credentialContract.credentials.admin.username,
+            authVersion: 2,
+            revokedSessions: 1,
+            phoneBound: true,
+          },
+          ...credentialContract.credentials.demo.usernames.map(
+            (username, index) => ({
+              username,
+              authVersion: index + 2,
+              revokedSessions: 0,
+              phoneBound: false,
+            }),
+          ),
+        ],
+        replayed: false,
       },
       null,
       2,
@@ -301,7 +387,7 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
         postCheck: {
           smokeStatus: "passed",
           smokeReport: evidenceDir + "/smoke-test-report.json",
-          smokeCheckCount: 6,
+          smokeCheckCount: 7,
           evidenceReviewStatus: "passed",
           customerConfigEffectiveSession: {
             status: "verified",
@@ -420,21 +506,21 @@ test("release evidence status reports missing evidence directory without throwin
   );
   assert.equal(status.directoryExists, false);
   assert.equal(status.missingFiles.length, status.requiredFileCount);
-  assert.equal(status.closeoutChecklist.length, 6);
+  assert.equal(status.closeoutChecklist.length, 7);
   assert.deepEqual(
     status.closeoutChecklist.map((item) => item.status),
-    ["missing", "missing", "missing", "missing", "missing", "missing"],
+    ["missing", "missing", "missing", "missing", "missing", "missing", "missing"],
   );
   assert.deepEqual(status.closeoutSummary, {
-    total: 6,
-    missing: 6,
+    total: 7,
+    missing: 7,
     presentUnverified: 0,
     attention: 0,
     gateVerified: 0,
-    blockers: 6,
+    blockers: 7,
     ready: false,
   });
-  assert.equal(status.closeoutGateSummary.length, 6);
+  assert.equal(status.closeoutGateSummary.length, 7);
   assert(
     status.closeoutGateSummary.every(
       (item) => item.errorCount === 0 && item.warningCount === 0,
@@ -460,7 +546,7 @@ test("release evidence status reports gate-verified closeout checklist", () => {
   assert.equal(status.status, "ready");
   assert.equal(status.ready, true);
   assert.equal(status.gateReady, true);
-  assert.equal(status.closeoutChecklist.length, 7);
+  assert.equal(status.closeoutChecklist.length, 8);
   assert.deepEqual(
     status.closeoutChecklist.map((item) => item.status),
     [
@@ -471,18 +557,19 @@ test("release evidence status reports gate-verified closeout checklist", () => {
       "gate-verified",
       "gate-verified",
       "gate-verified",
+      "gate-verified",
     ],
   );
   assert.deepEqual(status.closeoutSummary, {
-    total: 7,
+    total: 8,
     missing: 0,
     presentUnverified: 0,
     attention: 0,
-    gateVerified: 7,
+    gateVerified: 8,
     blockers: 0,
     ready: true,
   });
-  assert.equal(status.closeoutGateSummary.length, 7);
+  assert.equal(status.closeoutGateSummary.length, 8);
   assert(
     status.closeoutGateSummary.every(
       (item) => item.errorCount === 0 && item.warningCount === 0,
@@ -621,6 +708,7 @@ test("release evidence status reports draft evidence gate errors", () => {
       "immutable-version",
       "production-preflight",
       "backup-restore-rehearsal",
+      "credential-rotation",
       "target-smoke",
       "rollback-forward-fix",
       "release-signoff",
@@ -742,6 +830,16 @@ test("release evidence status suggests customer config smoke when manifest evide
     /--customer-config-revision yoyoosun-customer-package-v7\.runtime-manifest-v1/,
   );
   assert.match(nextCommands, /--admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN/);
+  assert.match(
+    nextCommands,
+    /--admin-password-env MANUAL_ACCEPTANCE_ADMIN_PASSWORD/,
+  );
+  assert.match(
+    nextCommands,
+    /--demo-password-env MANUAL_ACCEPTANCE_PASSWORD/,
+  );
+  assert.match(nextCommands, /--admin-username admin/);
+  assert.match(nextCommands, /--sms-phone-env MANUAL_ACCEPTANCE_SMS_PHONE/);
   assert.match(
     nextCommands,
     /--report deployments\/yoyoosun\/evidence\/releases\/2026-06-29\/smoke-test-report\.json/,
@@ -1083,7 +1181,7 @@ test("release evidence status CLI supports JSON and fail-on-not-ready", () => {
   assert.match(failResult.stdout, /ready means: release evidence gate passed/);
   assert.match(failResult.stdout, /not proven by this helper:/);
   assert.match(failResult.stdout, /target migration was applied/);
-  assert.match(failResult.stdout, /closeout: 0\/6 gate-verified; blockers=6/);
+  assert.match(failResult.stdout, /closeout: 0\/7 gate-verified; blockers=7/);
   assert.match(failResult.stdout, /closeout evidence checklist:/);
   assert.match(failResult.stdout, /immutable-version: present-unverified/);
   assert.match(failResult.stdout, /closeout gate summary:/);

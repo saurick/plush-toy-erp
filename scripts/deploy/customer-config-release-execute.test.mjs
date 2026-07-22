@@ -9,6 +9,7 @@ import test from "node:test";
 import { fileURLToPath } from "node:url";
 import { buildRuntimeManifest } from "../qa/customer-config-runtime-manifest.mjs";
 import { releaseReadyYoyoosunCustomerPackage } from "./customer-config-test-fixtures.mjs";
+import { writeCredentialEvidenceTestFixture } from "./credential-evidence-test-fixture.mjs";
 import {
   buildInputTemplate,
   parseCliArgs,
@@ -407,6 +408,7 @@ Pending Files: 0
 - [x] known limitations reviewed
 `,
   );
+  writeCredentialEvidenceTestFixture(dir);
 }
 
 test("help 输出可运行", () => {
