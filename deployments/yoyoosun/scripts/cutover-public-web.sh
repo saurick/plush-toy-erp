@@ -6,6 +6,7 @@ image=""
 release=""
 current_container=""
 endpoint=""
+api_origin=""
 execute=0
 confirmation=""
 network="plush-toy-erp-v5_default"
@@ -33,6 +34,10 @@ while [[ $# -gt 0 ]]; do
     endpoint="${2:-}"
     shift 2
     ;;
+  --api-origin)
+    api_origin="${2:-}"
+    shift 2
+    ;;
   --network)
     network="${2:-}"
     shift 2
@@ -46,7 +51,7 @@ while [[ $# -gt 0 ]]; do
     shift 2
     ;;
   -h | --help)
-    echo "用法: bash deployments/yoyoosun/scripts/cutover-public-web.sh --image <immutable-web-image> --release <40sha> --current-container <name> --endpoint <https-url> [--execute --confirm PUBLIC_WEB_CUTOVER:<old>:<40sha>]"
+    echo "用法: bash deployments/yoyoosun/scripts/cutover-public-web.sh --image <immutable-web-image> --release <40sha> --current-container <name> --endpoint <https-url> --api-origin http://app-server:8300 [--execute --confirm PUBLIC_WEB_CUTOVER:<old>:<40sha>]"
     exit 0
     ;;
   *) fail "不支持的参数: $1" ;;
@@ -57,6 +62,7 @@ done
 [[ -n "$image" && "$image" != *:latest && "$image" != *:dev ]] || fail "--image 必须是不可变 tag"
 [[ "$current_container" =~ ^[a-zA-Z0-9][a-zA-Z0-9_.-]+$ ]] || fail "--current-container 不合法"
 [[ "$endpoint" =~ ^https://[^/@[:space:]]+/?$ ]] || fail "--endpoint 必须是无凭据 HTTPS 根地址"
+[[ "$api_origin" == "http://app-server:8300" ]] || fail "--api-origin 必须精确指向 V5 Compose app-server"
 command -v docker >/dev/null 2>&1 || fail "缺少 docker"
 command -v curl >/dev/null 2>&1 || fail "缺少 curl"
 command -v python3 >/dev/null 2>&1 || fail "缺少 python3"
@@ -72,7 +78,7 @@ candidate="plush-toy-erp-web-public-candidate-$short_release"
 next_container="plush-toy-erp-web-public-$short_release"
 confirm_text="PUBLIC_WEB_CUTOVER:$current_container:$release"
 
-echo "[cutover-public-web] plan current=$current_container next=$next_container image=$image network=$network endpoint=$endpoint"
+echo "[cutover-public-web] plan current=$current_container next=$next_container image=$image network=$network endpoint=$endpoint api_origin=app-server:8300"
 if [[ "$execute" -eq 0 ]]; then
   echo "[cutover-public-web] plan-only; execute confirmation: $confirm_text"
   exit 0
@@ -102,6 +108,7 @@ docker run -d \
   --network "$network" \
   --memory 96m \
   --restart no \
+  -e "API_ORIGIN=$api_origin" \
   -p 127.0.0.1:15175:5175 \
   "$image" >/dev/null
 
@@ -135,6 +142,7 @@ if ! docker run -d \
   --network "$network" \
   --memory 96m \
   --restart always \
+  -e "API_ORIGIN=$api_origin" \
   -p 0.0.0.0:5175:5175 \
   "$image" >/dev/null; then
   rollback_old

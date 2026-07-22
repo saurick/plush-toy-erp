@@ -63,6 +63,8 @@ fi
       current,
       "--endpoint",
       "https://admin.yoyoosun.net",
+      "--api-origin",
+      "http://app-server:8300",
       "--execute",
       "--confirm",
       `PUBLIC_WEB_CUTOVER:${current}:${release}`,
@@ -84,4 +86,8 @@ fi
   assert.doesNotMatch(dockerCalls, /State\.Health\.Status/);
   assert.match(dockerCalls, /127\.0\.0\.1:15175:5175/);
   assert.match(dockerCalls, /0\.0\.0\.0:5175:5175/);
+  assert.equal(
+    dockerCalls.match(/API_ORIGIN=http:\/\/app-server:8300/g)?.length,
+    2,
+  );
 });
