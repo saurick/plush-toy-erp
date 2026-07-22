@@ -7,7 +7,7 @@
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
 - 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务、九角色权限和页面合同按同一最终树核对，不把相邻差异拆算为独立已交付任务。最新完整 `strict` 已输出 `status=complete`；本记录写入后只需完成文档、diff、数据库守卫和证据一致性收口。
 - 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 与 133 V5 固定库 `plush_erp_uat_20260716_v5` 均已应用到 `20260722000505`、90 executed、pending 0；两端分别从空业务基线生成同版本、独立 ID 的九阶段数据。旧本地库和旧 133 V5 库均以可恢复改名方式保留，未清理。
-- 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。旧 `plush-toy-erp-prod` 回滚栈未改动，客户 UAT / 签收仍是独立关口。
+- 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。公网 `admin.yoyoosun.net` 的入口适配容器也已切到同一 V5 web / backend，旧入口容器仅停止并保留为即时回滚点；客户 UAT / 签收仍是独立关口。
 - 当前 Git 由单一 owner 收口；本轮已获提交、推送和 133 部署授权，不创建分支。后续如再修改运行时代码或 migration，必须生成新的不可变 release 并重新走目标环境证据链。
 
 ## 2026-07-22 133 V5 发布、同语义造数与目标浏览器验收
@@ -20,7 +20,11 @@
 
 目标证据：当前库有 14 个管理员、272 条 Workflow 任务、45 张销售单、90 张采购单、45 张委外单、54 张采购收货、169 张质检、498 条库存流水、47 张出货和 274 条财务事实；`warehouse / quality` 均为 `ASSIGNED:4`。浏览器验收正式桌面账号 10 / 10、移动岗位 9 / 9、异常账号 3 / 3、页面 50 / 50、页面数据证据 48 / 48；5 份采购 / 加工 / 工程 PDF 均为 HTTP 200、有效 PDF、带 request id 和 25 行来源数据。运行态 preflight 证明四服务唯一、镜像 / release 一致、非 root、Chromium pin / seccomp、health / ready 均通过，fatal 日志扫描为 0。
 
-未做 / 风险：这是 `customer-trial-133` 模拟验收数据与目标技术验收，不是真实客户数据、生产发布或客户 UAT。旧库、旧源码和旧镜像暂未清理；当前根磁盘约 79% 使用、约 21 GiB 可用，后续清理必须继续保留当前版与明确回滚版，不得全局 prune。管理员与岗位临时密码不写入仓库、报告或远端 steady env。
+公网入口纠偏：首次收口只完成了 `127.0.0.1:5185 / 8315` 的隔离 V5 发布，没有切换 `admin.yoyoosun.net` 实际使用的宿主机 `5175` 入口，因此用户看到的仍是 `51dd98ec3c0e` 旧页面；不能把隔离栈绿色写成公网已部署。现已按服务器既有入口适配模式，将 `0.0.0.0:5175` 切到 `plush-toy-erp-web:yoyoosun-20260722-80b77fae-amd64`，接入 `plush-toy-erp-v5_default` 并代理到 V5 `app-server`；新入口容器具备与 Compose web 一致的资源限制、5 秒健康检查和 `always` 重启策略。旧 `51dd98ec3c0e` 入口容器保持 stopped、未删除，回滚只需停止新入口并重新启动旧入口。
+
+公网读回：绕过本机代理后连续 5 次访问 `https://admin.yoyoosun.net/` 均返回新资源 `index.hUVoU3vj.js / index.CmoBVjik.css`，新 JS 为 HTTP 200、旧 JS 为 404，`/healthz` 为 200；133 本机入口 `/rpc` 代理返回 200。真实 Chromium 使用受控 Keychain 管理员凭据从公网登录到 `/erp/dashboard`，显示东莞市永绅玩具有限公司、业务管理、当前菜单和 V5 工作台任务数据，浏览器控制台 0 error / 0 warning。服务器侧新公网入口为 running / healthy，V5 backend 为 running，`/healthz=ok`、`/readyz=ready`。
+
+未做 / 风险：这是 `customer-trial-133` 模拟验收数据与目标技术验收，不是真实客户数据、正式生产配置或客户 UAT。公网入口适配容器沿用服务器既有独立入口模式，不属于 V5 Compose 四服务，也不能替代正式网关 / Cloudflare 配置治理；后续若把该试用环境转为正式生产，必须先按正式客户配置、目标库和入口真源重新发布，不能直接把当前试用开关当生产配置。旧库、旧源码和旧镜像暂未清理；当前根磁盘约 79% 使用、约 21 GiB 可用，后续清理必须继续保留当前版与明确回滚版，不得全局 prune。管理员与岗位临时密码不写入仓库、报告或远端 steady env。
 
 ## 2026-07-22 永绅九角色 P0 权限与本地验收闭环
 
