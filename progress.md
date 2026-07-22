@@ -5,10 +5,22 @@
 ## 当前活跃事项
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
-- 当前独立 Worktree 正在冻结“异常流 V1”整树；schema / migration 只有一个 writer，Git 仍由单一 owner 收口。历史 `strict` 不能证明本轮冻结树，本节下方将记录本轮实际门禁结果。
+- 审批任务与异常流 V1 两个独立 Worktree 已完成 Handoff，并由单一 Git owner 合入本地 `main`；schema / migration 仍保持一个 writer。历史 `strict` 不证明本轮合并树，本节下方只记录实际重跑结果。
 - 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 与 133 V5 固定库 `plush_erp_uat_20260716_v5` 均已应用到 `20260722000505`、90 executed、pending 0；两端分别从空业务基线生成同版本、独立 ID 的九阶段数据。旧本地库和旧 133 V5 库均以可恢复改名方式保留，未清理。
 - 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。公网 `admin.yoyoosun.net` 的入口适配容器也已切到同一 V5 web / backend，旧入口容器仅停止并保留为即时回滚点；客户 UAT / 签收仍是独立关口。
-- 当前 Git 由单一 owner 收口，不创建分支。本轮未获 stage、commit、push、133 发布或客户 UAT 授权；本地 migration 不向共享、目标或生产库 apply。
+- 当前 Git 由单一 owner 收口。用户已授权本轮提交、推送与 133 技术试用发布；在最终 commit / image、目标 migration、health / ready、业务 smoke 和回滚点完成前，现有 133 仍只代表上一发布版本。客户 UAT / 签收仍是独立关口。
+
+## 2026-07-22 双 Worktree Handoff 与组合树审查
+
+完成：将审批任务 Worktree `019f88e2-f9a6-7531-b02b-13e480a163e6` 与异常业务 Worktree `019f88eb-04ca-7861-9bae-7066a995a4b6` 的 Git 改动带回本机并合入 `main`。审批箱按 `workflow.task.approve` capability、revision、责任范围和 `ready / blocked` 状态收口，审批节点由服务端统一识别，事件轨迹只读且限制 100 条。异常流补齐库存操作、来料 / 委外 / 生产异常、客户退货、收付款核销与贷项单；ProcessRuntime 补偿仅在可证明线性且无领域副作用时撤回下游。
+
+审查修复：修正任务事件 assignee 绕过 revision anchor、审批箱混入终态、销售退货路由不一致、ProcessRuntime 把触发节点误算为下游、财务 post / reverse exact replay 不可达、贷项单无读取链路，以及销售退货 / 财务页面误把分页对象当数组导致运行时崩溃。合并后客户配置边界守卫同步锁定普通读取、监督读取和审批 capability scope 的精确调用分工，没有放宽 RBAC、Workflow / Fact 或幂等边界。
+
+验证：`make data` 显示 Ent / Atlas 零漂移，`db-guard` 通过；Web 全量 `1721 / 1721`、异常页面 Style L1 `3 / 3`、一次性隔离 PostgreSQL 关键事务 `192 / 192` 均为零失败、零跳过。合并树从头执行 `full.sh`，scripts Node `1318 / 1318`、Web contract `209 / 209`、server all `2868 / 2868`、关键 PostgreSQL `192 / 192` 均为零失败、零跳过，fresh migration 为 91 executed、pending 0，最终输出 `full status=complete`。最终 `strict.sh` 又从头覆盖 full、ShellCheck、shfmt、YAML、Web 零 warning 和严格 govulncheck；相同测试计数保持零失败、零跳过，最终输出 `strict status=complete`。
+
+下一步：提交并推送通过严格门禁的最终 commit；随后按 `customer-trial-133` 正式发布流程完成备份 / 恢复点、目标迁移、不可变镜像切换、health / ready、真实账号与公网浏览器 smoke。
+
+风险：本节当前仍是本地组合树证据，不等于 133 已包含本轮能力；客户 UAT / 签收不在自动化发布证据内。
 
 ## 2026-07-22 异常流 V1 本地闭环
 

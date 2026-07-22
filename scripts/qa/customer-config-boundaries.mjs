@@ -308,13 +308,16 @@ function validateWorkflowTaskRevisionVisibilityContract() {
   const visibilitySource = readFileSync(repoPath(visibilityPath), "utf8");
   assert(
     (serviceSource.match(/workflowTaskQueryVisibilityScope\(/g) || [])
-      .length === 1 &&
+      .length === 2 &&
       (serviceSource.match(/workflowTaskReadVisibilityScope\(/g) || [])
-        .length === 2 &&
+        .length === 3 &&
+      serviceSource.includes(
+        "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskApprove)",
+      ) &&
       visibilitySource.includes(
         "d.workflowTaskQueryVisibilityScope(ctx, admin, biz.PermissionWorkflowTaskRead)",
       ),
-    `${servicePath} list and board must use the supervised read scope while role-view uses the base revision-aware scope`,
+    `${servicePath} list, ordinary board and event reads must use supervised read scope while role-view and approval board use capability-specific revision-aware scope`,
   );
   assert(
     visibilitySource.includes(
