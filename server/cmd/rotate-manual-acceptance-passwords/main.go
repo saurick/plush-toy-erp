@@ -22,16 +22,17 @@ import (
 )
 
 const (
-	targetLocalDev         = "local-dev"
-	targetCustomerTrial133 = "customer-trial-133"
-	adminPasswordEnv       = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
-	demoPasswordEnv        = "MANUAL_ACCEPTANCE_PASSWORD"
-	smsPhoneEnv            = "MANUAL_ACCEPTANCE_SMS_PHONE"
-	dsnEnv                 = "POSTGRES_DSN"
-	localAcceptanceDB      = "plush_erp_acceptance_20260716_v5_dev"
-	customerTrial133DB     = "plush_erp_uat_20260716_v5"
-	customerTrial133Port   = "55435"
-	currentDatasetVersion  = "2026.07.16-v5"
+	targetLocalDev          = "local-dev"
+	targetCustomerTrial133  = "customer-trial-133"
+	adminPasswordEnv        = "MANUAL_ACCEPTANCE_ADMIN_PASSWORD"
+	demoPasswordEnv         = "MANUAL_ACCEPTANCE_PASSWORD"
+	smsPhoneEnv             = "MANUAL_ACCEPTANCE_SMS_PHONE"
+	registeredAdminPassword = "adminadmin"
+	dsnEnv                  = "POSTGRES_DSN"
+	localAcceptanceDB       = "plush_erp_acceptance_20260716_v5_dev"
+	customerTrial133DB      = "plush_erp_uat_20260716_v5"
+	customerTrial133Port    = "55435"
+	currentDatasetVersion   = "2026.07.16-v5"
 
 	localCustomerConfigProductVersion = "local-customer-package-test-apply"
 	localCustomerConfigApplyPurpose   = "local_test_apply"
@@ -358,11 +359,17 @@ func validateRotationPasswords(target, adminPassword, demoPassword string) error
 	if biz.ValidateAdminPassword(demoPassword) != nil {
 		return fmt.Errorf("%s must contain 8-20 characters", demoPasswordEnv)
 	}
-	if target != targetCustomerTrial133 {
+	if target == targetLocalDev {
+		if demoPassword != data.PublicRoleDemoPassword {
+			return fmt.Errorf("%s must match the registered local test credential", demoPasswordEnv)
+		}
 		return nil
 	}
-	if err := data.RejectPublicRoleDemoPassword(demoPassword); err != nil {
-		return fmt.Errorf("%s is unsafe for %s: %w", demoPasswordEnv, target, err)
+	if target != targetCustomerTrial133 {
+		return errors.New("unsupported target")
+	}
+	if demoPassword != data.PublicRoleDemoPassword {
+		return fmt.Errorf("%s must match the registered customer-trial-133 test credential", demoPasswordEnv)
 	}
 	adminPassword = strings.TrimSpace(adminPassword)
 	if adminPassword == "" {
@@ -371,8 +378,8 @@ func validateRotationPasswords(target, adminPassword, demoPassword string) error
 	if biz.ValidateAdminPassword(adminPassword) != nil {
 		return fmt.Errorf("%s must contain 8-20 characters", adminPasswordEnv)
 	}
-	if err := data.RejectPublicRoleDemoPassword(adminPassword); err != nil {
-		return fmt.Errorf("%s is unsafe for %s: %w", adminPasswordEnv, target, err)
+	if adminPassword != registeredAdminPassword {
+		return fmt.Errorf("%s must match the registered customer-trial-133 test credential", adminPasswordEnv)
 	}
 	if adminPassword == demoPassword {
 		return errors.New("manual acceptance admin and demo passwords must differ")
@@ -388,7 +395,7 @@ func normalizeRotationSMSPhone(target, rawPhone string) (string, error) {
 		return "", nil
 	}
 	if strings.TrimSpace(rawPhone) == "" {
-		return "", fmt.Errorf("%s is required for %s", smsPhoneEnv, target)
+		return "", nil
 	}
 	phone, err := biz.NormalizeLoginPhone(rawPhone)
 	if err != nil {

@@ -28,32 +28,32 @@ function loadCredentialContract() {
   const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
   const username = /^[A-Za-z0-9_]+$/;
   const valid =
-    contract?.schemaVersion === "yoyoosun-credential-contract/v1" &&
+    contract?.schemaVersion === "yoyoosun-credential-contract/v2" &&
     contract?.customerCode === "yoyoosun" &&
     contract?.target?.key === "customer-trial-133" &&
     contract?.target?.database === "plush_erp_uat_20260716_v5" &&
     contract?.target?.datasetVersion === "2026.07.16-v5" &&
     admin?.username === "admin" &&
     envKey.test(admin?.environmentVariable || "") &&
-    admin?.keychain?.service === "plush-toy-erp-yoyoosun-admin" &&
-    admin?.keychain?.account === "admin" &&
+    admin?.credentialSource === "contract-fixed-test" &&
+    admin?.fixedTestPassword === "adminadmin" &&
     Array.isArray(demo?.usernames) &&
     demo.usernames.length === 10 &&
     new Set(demo.usernames).size === 10 &&
     demo.usernames.every((value) => username.test(value)) &&
     !demo.usernames.includes(admin.username) &&
     envKey.test(demo?.environmentVariable || "") &&
-    demo?.keychain?.service === "plush-toy-erp-yoyoosun-demo" &&
-    demo?.keychain?.account === "customer-trial-133" &&
+    demo?.credentialSource === "contract-fixed-test" &&
+    demo?.fixedTestPassword === "12345678" &&
     sms?.username === admin.username &&
-    sms?.phoneRequiredWhenProviderEnabled === true &&
+    sms?.phoneRequiredWhenProviderEnabled === false &&
+    sms?.verifyPhoneIdentityWhenConfigured === true &&
     envKey.test(sms?.environmentVariable || "") &&
     sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
     sms?.keychain?.account === "customer-trial-133:admin" &&
     contract?.policy?.passwordsMustDiffer === true &&
-    Array.isArray(contract?.policy?.localOnlyPublicPasswords) &&
-    contract.policy.localOnlyPublicPasswords.length === 1 &&
-    contract.policy.localOnlyPublicPasswords[0] === "12345678" &&
+    JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) ===
+      JSON.stringify(["local-dev", "customer-trial-133"]) &&
     contract.policy.rotateAfterCreateRestoreOrRollback === true &&
     contract.policy.revokeExistingSessionsOnRotation === true &&
     contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
@@ -1438,8 +1438,9 @@ function validateSmokeReport(content, errors, absoluteDir) {
       credentialCheck.adminUsername === contract.credentials.admin.username &&
         credentialCheck.adminAuthenticated === true &&
         credentialCheck.adminSuperAdmin === true &&
-        credentialCheck.phoneBound === true,
-      `${REQUIRED_FILES.smoke} credential-login-matrix must prove the admin identity, superadmin status, and bound phone`,
+        typeof credentialCheck.phoneConfigured === "boolean" &&
+        credentialCheck.phoneBound === credentialCheck.phoneConfigured,
+      `${REQUIRED_FILES.smoke} credential-login-matrix must prove the admin identity and only require phone binding when configured`,
       errors,
     );
     assert(
@@ -1468,13 +1469,11 @@ function validateSmokeReport(content, errors, absoluteDir) {
       errors,
     );
     assert(
-      credentialCheck.adminPasswordSourceEnv ===
-        contract.credentials.admin.environmentVariable &&
-        credentialCheck.demoPasswordSourceEnv ===
-          contract.credentials.demo.environmentVariable &&
+      credentialCheck.adminPasswordSource === "credential-contract" &&
+        credentialCheck.demoPasswordSource === "credential-contract" &&
         credentialCheck.smsPhoneSourceEnv ===
           contract.smsLoginIdentity.environmentVariable,
-      `${REQUIRED_FILES.smoke} credential-login-matrix password source env keys must match the credential contract`,
+      `${REQUIRED_FILES.smoke} credential-login-matrix credential sources must match the credential contract`,
       errors,
     );
     assert(
@@ -1635,13 +1634,18 @@ function validateCredentialRotationReport(content, errors) {
     errors,
   );
   assert(
+    typeof report.phoneBound === "boolean",
+    `${REQUIRED_FILES.credentialRotation} phoneBound must be boolean`,
+    errors,
+  );
+  assert(
     accounts.every(
       (account) =>
         account?.phoneBound ===
-        (account?.username ===
+        (report.phoneBound && account?.username ===
           credentialContractEvidence.contract.credentials.admin.username),
     ),
-    `${REQUIRED_FILES.credentialRotation} phoneBound must be true only for the contracted admin`,
+    `${REQUIRED_FILES.credentialRotation} account phoneBound values must follow the optional contracted admin binding`,
     errors,
   );
 }

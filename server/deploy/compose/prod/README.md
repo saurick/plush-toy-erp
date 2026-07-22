@@ -97,7 +97,7 @@ docker compose \
 
 ### 133 V5 凭据轮换与发布登录门禁
 
-133 的稳定 `admin`、固定十个 demo 和 SMS 登录身份以 `deployments/yoyoosun/env/credential.contract.json` 为无秘密真源。密码和手机号保存在发布工作站 Keychain，禁止写入服务器 steady `.env`。fresh 数据、整库恢复、rollback 或账号造数完成后，必须先创建并校验受控备份，再从发布工作站运行：
+133 的稳定 `admin`、固定十个 demo 和可选 SMS 登录身份以 `deployments/yoyoosun/env/credential.contract.json` 为真源。该隔离测试目标固定使用 `admin/adminadmin`，十个 demo 共用 `12345678`；两者是公开测试凭据，不进入服务器 steady `.env`，其他 staging / UAT / 生产目标不得复用。手机号仅在发布工作站 Keychain 已人工录入时参与轮换。fresh 数据、整库恢复、rollback 或账号造数完成后，必须先创建并校验受控备份，再从发布工作站运行：
 
 ```bash
 bash deployments/yoyoosun/scripts/rotate-credentials-133.sh \
@@ -111,9 +111,9 @@ bash deployments/yoyoosun/scripts/rotate-credentials-133.sh \
   --confirm 'ROTATE_YOYOOSUN_CREDENTIALS_133:<release>:<migration>:<operation-id>'
 ```
 
-包装脚本只经 SSH stdin 把三项 Keychain 值送入当前远端进程，再由一次性 `app-server` 容器运行 `/app/rotate-manual-acceptance-passwords`。工具会精确核对 release、migration、数据库、客户配置、dataset 和账号集合，在同一事务内更新密码、绑定稳定 `admin` 手机号、递增 `auth_version`、撤销活动会话并写脱敏 audit + immutable runtime marker。网络或 stdout 中断后必须复用同一 `operation-id`；工具会返回已持久化 receipt，不重复轮换。
+包装脚本从合同读取两项固定测试密码，仅在 Keychain 已录入时读取手机号；三项输入只经 SSH stdin 送入当前远端进程，再由一次性 `app-server` 容器运行 `/app/rotate-manual-acceptance-passwords`。工具会精确核对 release、migration、数据库、客户配置、dataset 和账号集合，在同一事务内更新密码、按需绑定稳定 `admin` 手机号、递增 `auth_version`、撤销活动会话并写脱敏 audit + immutable runtime marker。网络或 stdout 中断后必须复用同一 `operation-id`；工具会返回已持久化 receipt，不重复轮换。
 
-轮换完成后，以相同 Keychain 当前值运行 `run-smoke.sh`。正式 credential matrix 必须证明合同 hash 一致、手机号与合同输入一致、公开本地密码未使用、稳定 admin 与十个 demo 全部真实登录并得到本轮唯一 token；release gate 缺少或重复 matrix、任一账号失败、报告含 raw response 或合同漂移都必须拒绝切流。该登录矩阵不发送真实短信；短信实际投递仍需独立受控验收。
+轮换完成后，以合同固定测试凭据运行 `run-smoke.sh`。正式 credential matrix 必须证明合同 hash 一致、稳定 admin 与十个 demo 全部真实登录并得到本轮唯一 token；只有人工录入手机号时才要求手机号与合同输入一致。release gate 缺少或重复 matrix、任一账号失败、已配置手机号不一致、报告含 raw response 或合同漂移都必须拒绝切流。该登录矩阵不发送真实短信；短信实际投递仍需独立受控验收。
 
 前端生产容器不运行 Vite dev server。`WEB_IMAGE` 是一个前端镜像，Compose 只启动 `web-desktop` 一个前端实例，并通过 `APP_ID=desktop`、`PORT=5175` 固定入口；岗位任务端统一走 `/m/<role>/tasks`，不再启动 8 个 `APP_ID=mobile-*` 生产容器。
 

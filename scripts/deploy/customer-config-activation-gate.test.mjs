@@ -271,7 +271,8 @@ Pending Files: 0
             adminUsername: credentialContract.credentials.admin.username,
             adminAuthenticated: true,
             adminSuperAdmin: true,
-            phoneBound: true,
+            phoneConfigured: false,
+            phoneBound: false,
             adminAuthVersion: 2,
             demoExpected: 10,
             demoAuthenticated: 10,
@@ -282,10 +283,8 @@ Pending Files: 0
               credentialContract.credentials.admin.username,
               ...credentialContract.credentials.demo.usernames,
             ],
-            adminPasswordSourceEnv:
-              credentialContract.credentials.admin.environmentVariable,
-            demoPasswordSourceEnv:
-              credentialContract.credentials.demo.environmentVariable,
+            adminPasswordSource: "credential-contract",
+            demoPasswordSource: "credential-contract",
             smsPhoneSourceEnv:
               credentialContract.smsLoginIdentity.environmentVariable,
             responseBodyStored: false,
@@ -324,13 +323,13 @@ Pending Files: 0
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",
-        phoneBound: true,
+        phoneBound: false,
         accounts: [
           {
             username: credentialContract.credentials.admin.username,
             authVersion: 2,
             revokedSessions: 1,
-            phoneBound: true,
+            phoneBound: false,
           },
           ...credentialContract.credentials.demo.usernames.map(
             (username, index) => ({

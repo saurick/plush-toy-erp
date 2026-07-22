@@ -96,7 +96,7 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     yoyoosunTrialAccountChecklist,
-    "客户试用环境必须显式提供独立的非默认密码",
+    "登记的 `customer-trial-133` 测试目标统一使用公开测试密码 `12345678`",
     "yoyoosun trial role demo credential boundary",
   );
   assertIncludes(

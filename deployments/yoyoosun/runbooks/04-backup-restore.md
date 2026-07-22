@@ -53,7 +53,7 @@ SOURCE_POSTGRES_DSN="$(cd server && make print_db_url)" \
 8. 两项审计通过后执行 migration apply，再执行 migration status，确认 migrationAfter 和 pending files。
 9. 完成 customer config active revision 读回，保持客户入口关闭。
 10. 使用发布工作站 Keychain 当前值强制轮换稳定 `admin` 与固定十个 demo，并撤销备份中恢复出的所有旧会话。
-11. 启动 steady 后端并运行真实登录矩阵；只有 11 个账号全部取得新 token，且 SMS provider 指定身份已绑定手机号，才允许恢复 Web 入口。
+11. 启动 steady 后端并运行真实登录矩阵；只有 11 个账号全部取得新 token，且人工录入 SMS 手机号时指定身份绑定读回通过，才允许恢复 Web 入口。未录入手机号不阻断密码登录验收。
 12. 执行 smoke query、健康检查和关键页面 smoke。
 13. 写入恢复演练报告。
 

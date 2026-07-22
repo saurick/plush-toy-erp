@@ -222,7 +222,8 @@ Pending Files: 0
             adminUsername: "admin",
             adminAuthenticated: true,
             adminSuperAdmin: true,
-            phoneBound: true,
+            phoneConfigured: false,
+            phoneBound: false,
             demoExpected: 10,
             demoAuthenticated: 10,
             totalExpected: 11,
@@ -247,8 +248,8 @@ Pending Files: 0
               "demo_engineering",
               "demo_admin",
             ],
-            adminPasswordSourceEnv: "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-            demoPasswordSourceEnv: "MANUAL_ACCEPTANCE_PASSWORD",
+            adminPasswordSource: "credential-contract",
+            demoPasswordSource: "credential-contract",
             smsPhoneSourceEnv: "MANUAL_ACCEPTANCE_SMS_PHONE",
             responseBodyStored: false,
           },
@@ -275,13 +276,14 @@ Pending Files: 0
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",
+        phoneBound: false,
         replayed: false,
         accounts: [
           {
             username: credentialContract.credentials.admin.username,
             authVersion: 2,
             revokedSessions: 1,
-            phoneBound: true,
+            phoneBound: false,
           },
           ...credentialContract.credentials.demo.usernames.map(
             (username, index) => ({
@@ -1044,9 +1046,9 @@ for (const [field, value, expectedError] of [
     /credential-login-matrix uniqueTokensObserved must be true/,
   ],
   [
-    "phoneBound",
-    false,
-    /credential-login-matrix must prove the admin identity, superadmin status, and bound phone/,
+    "phoneConfigured",
+    true,
+    /credential-login-matrix must prove the admin identity and only require phone binding when configured/,
   ],
   [
     "responseBodyStored",
@@ -1061,7 +1063,7 @@ for (const [field, value, expectedError] of [
   [
     "smsPhoneSourceEnv",
     "WRONG_SMS_PHONE_ENV",
-    /source env keys must match the credential contract/,
+    /credential sources must match the credential contract/,
   ],
   [
     "adminAuthVersion",
@@ -1141,7 +1143,7 @@ for (const [name, mutate, expectedError] of [
   [
     "demo phone binding",
     (report) => (report.accounts[1].phoneBound = true),
-    /phoneBound must be true only for the contracted admin/,
+    /account phoneBound values must follow the optional contracted admin binding/,
   ],
   [
     "secret field",

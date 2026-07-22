@@ -253,7 +253,8 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             adminUsername: "admin",
             adminAuthenticated: true,
             adminSuperAdmin: true,
-            phoneBound: true,
+            phoneConfigured: false,
+            phoneBound: false,
             adminAuthVersion: 2,
             demoExpected: 10,
             demoAuthenticated: 10,
@@ -265,8 +266,8 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
             credentialTarget: credentialContract.target.key,
             credentialDatabase: credentialContract.target.database,
             credentialDatasetVersion: credentialContract.target.datasetVersion,
-            adminPasswordSourceEnv: "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-            demoPasswordSourceEnv: "MANUAL_ACCEPTANCE_PASSWORD",
+            adminPasswordSource: "credential-contract",
+            demoPasswordSource: "credential-contract",
             smsPhoneSourceEnv: "MANUAL_ACCEPTANCE_SMS_PHONE",
             usernames: [
               "admin",
@@ -326,13 +327,13 @@ steps=pg_dump source alias -> restore isolated target -> pre-apply atlas status 
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",
-        phoneBound: true,
+        phoneBound: false,
         accounts: [
           {
             username: credentialContract.credentials.admin.username,
             authVersion: 2,
             revokedSessions: 1,
-            phoneBound: true,
+            phoneBound: false,
           },
           ...credentialContract.credentials.demo.usernames.map(
             (username, index) => ({

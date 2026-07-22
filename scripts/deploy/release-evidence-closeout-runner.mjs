@@ -284,20 +284,12 @@ function materializeCommandFromText({
       args.push("--admin-token-env", "CUSTOMER_CONFIG_ADMIN_TOKEN");
     }
     args.push("--report", path.join(evidenceDir, "smoke-test-report.json"));
-    const secretEnv = {
-      MANUAL_ACCEPTANCE_ADMIN_PASSWORD: requireEnv(
-        env,
-        "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-      ),
-      MANUAL_ACCEPTANCE_PASSWORD: requireEnv(
-        env,
-        "MANUAL_ACCEPTANCE_PASSWORD",
-      ),
-      MANUAL_ACCEPTANCE_SMS_PHONE: requireEnv(
-        env,
-        "MANUAL_ACCEPTANCE_SMS_PHONE",
-      ),
-    };
+    const secretEnv = {};
+    if (String(env.MANUAL_ACCEPTANCE_SMS_PHONE ?? "").trim()) {
+      secretEnv.MANUAL_ACCEPTANCE_SMS_PHONE = String(
+        env.MANUAL_ACCEPTANCE_SMS_PHONE,
+      ).trim();
+    }
     if (commandText.includes("--admin-token-env")) {
       secretEnv.CUSTOMER_CONFIG_ADMIN_TOKEN = requireEnv(
         env,

@@ -12,13 +12,13 @@
 
 ## 2026-07-22 133 凭据生命周期与登录发布门禁
 
-完成：将 133 的稳定 `admin`、固定十个 demo、短信登录身份、环境变量名和 Keychain alias 收敛到不含秘密的 `credential.contract.json`。133 造数入口在任何网络请求前拒绝公开本地密码 `12345678` 以及 admin / demo 共用密码；本地开发仍可显式使用公开 demo 密码，不把测试便利扩散到非本地环境。
+完成：将本地开发与登记的 `customer-trial-133` 隔离测试目标收敛到 `credential.contract.json` v2：稳定管理员固定为 `admin/adminadmin`，十个固定 demo 共用 `12345678`。这两组值被明确标记为公开测试凭据，不再从 Keychain 或临时环境变量派生，避免不同 Codex 会话因“加强安全”自行生成、轮换或沿用另一套密码；其他 staging、UAT 与生产目标仍禁止复用。
 
-完成：新增镜像内事务化凭据轮换命令和本机受控 wrapper。轮换固定覆盖一个 super admin 与十个 demo，绑定短信手机号、递增 `auth_version`、撤销旧会话并写脱敏审计；小写 UUID v4 operation id 作为 durable marker，同一操作在输出中断后可安全重放而不重复轮换。密码和手机号只从 Keychain 进入当前进程，经 SSH stdin 和一次性 Compose 容器传入，不进入 Git、远端 steady env、argv、token、手机号或响应正文证据。
+完成：镜像内事务化轮换命令和本机受控 wrapper 固定覆盖一个 super admin 与十个 demo，递增 `auth_version`、撤销旧会话并写脱敏审计；小写 UUID v4 operation id 作为 durable marker，同一操作在输出中断后可安全重放而不重复轮换。公开测试密码由版本化合同读取，不进入服务器 steady env、argv、日志或 evidence；SMS 手机号仅在发布工作站人工录入时临时注入、绑定并读回，未录入不阻断密码登录。
 
-完成：正式 smoke 对合同 hash、目标库、dataset、admin 手机号、短信 provider 能力及 11 / 11 账号逐一执行真实 JSON-RPC 登录；每个响应必须精确匹配 JSON-RPC id、业务码、账号身份和 admin 手机号，并验证 11 个不同 token。发布 gate 新增轮换回执必需项，交叉核对完整 40 位 commit、migration、目标、账号集合、auth version、手机号绑定和脱敏字段；造数、恢复或回滚后缺轮换回执、任一账号失败、合同漂移或出现公开密码都会 fail closed。
+完成：正式 smoke 对合同 hash、目标库、dataset 及 11 / 11 账号逐一执行真实 JSON-RPC 登录；每个响应必须精确匹配 JSON-RPC id、业务码、账号身份，并验证 11 个不同 token。仅当 SMS 手机号已人工配置时才额外核对 admin 手机号。发布 gate 交叉核对完整 40 位 commit、migration、目标、账号集合、auth version、可选手机号绑定和脱敏字段；造数、恢复或回滚后缺轮换回执、任一密码账号失败或合同漂移都会 fail closed。
 
-验证：定向 Go 包覆盖 seed、轮换命令和 data transaction；脚本覆盖 Keychain / SSH stdin、未知结果幂等回放、公开密码拒绝、手机号不匹配、JSON-RPC 响应严格性、11 账号登录矩阵及 release evidence gate。最终整仓 `strict` 从头完成，scripts Node 1319 / 1319、server quick 2660 / 2660、server all 2820 / 2820，均为零失败、零跳过；Web、构建、fresh / populated migration、PostgreSQL、ShellCheck、shfmt、YAML、零 warning、密钥扫描和 govulncheck 同轮通过。当前仍只证明本地代码合同，提交、推送、不可变镜像、133 数据库备份与轮换、目标 11 / 11 登录和短信实际投递必须在后续发布步骤完成后分别记录，不能由本节提前代替。
+验证：定向 Go 包覆盖 133 / 本地精确目标密码、其他目标拒绝、SMS 缺省与非法手机号；脚本覆盖版本化合同、SSH stdin、未知结果幂等回放、可选手机号、JSON-RPC 响应严格性、11 账号登录矩阵及 release evidence gate。最终整仓 `strict` 从头完成，scripts Node 1318 / 1318、server all 2820 / 2820、Web contract 209 / 209、Web all 1711 / 1711，均为零失败、零跳过；构建、真实 Chromium、fresh / populated migration、PostgreSQL、ShellCheck、shfmt、YAML、密钥扫描和 govulncheck 同轮通过。当前修改仍只证明本地代码合同；尚未提交、推送、构建不可变镜像或重新部署 133，目标数据库密码也尚未按新合同轮换。后续必须在取得 Git 收口确认后完成受控备份、发布、事务轮换和公网 11 / 11 登录，SMS 未人工录入时不要求发送或投递验证。
 
 ## 2026-07-22 GitHub CI Linux 测试夹具修复
 

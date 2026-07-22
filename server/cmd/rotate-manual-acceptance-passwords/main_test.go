@@ -103,15 +103,15 @@ func TestValidateTargetDSNSeparatesLocalAnd133(t *testing.T) {
 	}
 }
 
-func TestValidateRotationPasswordsRequiresIndependentNonPublic133Credentials(t *testing.T) {
-	if err := validateRotationPasswords(targetCustomerTrial133, "admin-password", "demo-password"); err != nil {
+func TestValidateRotationPasswordsRequiresRegisteredSimpleTestCredentials(t *testing.T) {
+	if err := validateRotationPasswords(targetCustomerTrial133, "adminadmin", "12345678"); err != nil {
 		t.Fatalf("validateRotationPasswords() error = %v", err)
 	}
 	for _, test := range []struct{ admin, demo, want string }{
-		{admin: "", demo: "demo-password", want: adminPasswordEnv},
-		{admin: "same-password", demo: "same-password", want: "must differ"},
-		{admin: "admin-password", demo: "12345678", want: "public"},
-		{admin: "12345678", demo: "demo-password", want: "public"},
+		{admin: "", demo: "12345678", want: adminPasswordEnv},
+		{admin: "same-password", demo: "same-password", want: "registered"},
+		{admin: "admin-password", demo: "12345678", want: "registered"},
+		{admin: "adminadmin", demo: "demo-password", want: "registered"},
 	} {
 		err := validateRotationPasswords(targetCustomerTrial133, test.admin, test.demo)
 		if err == nil || !strings.Contains(err.Error(), test.want) {
@@ -142,8 +142,8 @@ func TestNormalizeRotationSMSPhoneRequires133IdentityBinding(t *testing.T) {
 	if err != nil || phone != "13800138000" {
 		t.Fatalf("normalizeRotationSMSPhone() = (%q, %v)", phone, err)
 	}
-	if _, err := normalizeRotationSMSPhone(targetCustomerTrial133, ""); err == nil {
-		t.Fatal("133 accepted missing SMS phone")
+	if phone, err := normalizeRotationSMSPhone(targetCustomerTrial133, ""); err != nil || phone != "" {
+		t.Fatalf("133 optional SMS phone = (%q, %v)", phone, err)
 	}
 	if _, err := normalizeRotationSMSPhone(targetCustomerTrial133, "12345678"); err == nil {
 		t.Fatal("133 accepted invalid SMS phone")

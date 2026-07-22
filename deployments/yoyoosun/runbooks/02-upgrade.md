@@ -70,7 +70,7 @@ node scripts/deploy/customer-config-release-readiness.mjs \
 docker compose -f compose.yml --env-file /secure/path/yoyoosun/.env up -d --remove-orphans
 ```
 
-9. 若本轮创建、恢复或重建过数据库，必须在入口关闭状态下使用 Keychain 当前值重新轮换稳定 `admin` 与固定十个 demo，并撤销旧会话；普通应用升级未触碰数据库账号时也必须运行真实登录矩阵，不能复用旧 token 代替密码验证。
+9. 若本轮创建、恢复或重建过数据库，必须在入口关闭状态下使用合同固定测试凭据重新轮换稳定 `admin` 与固定十个 demo，并撤销旧会话；普通应用升级未触碰数据库账号时也必须运行真实登录矩阵，不能复用旧 token 代替密码验证。SMS 手机号未人工录入时不阻断。
 10. 执行 smoke 和日志检查；正式 smoke 必须包含 `credential-login-matrix`，稳定 `admin` 和十个 demo 全部以当前密码取得新 token。全部门禁通过后才执行公网 / 客户入口切流。
 11. 写入 upgrade evidence。
 12. 客户试用或交付前执行 release evidence gate：

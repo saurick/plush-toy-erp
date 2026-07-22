@@ -319,12 +319,8 @@ test("closeout runner report-only keeps target smoke report sanitized", () => {
   assert.equal(payload.results.length, 0);
   assert.equal(payload.plan.executeReady, true);
   assert.deepEqual(payload.plan.actions[0].commands[0].envKeys, [
-    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-    "MANUAL_ACCEPTANCE_PASSWORD",
     "MANUAL_ACCEPTANCE_SMS_PHONE",
   ]);
-  assert.match(content, /MANUAL_ACCEPTANCE_ADMIN_PASSWORD=<redacted>/);
-  assert.match(content, /MANUAL_ACCEPTANCE_PASSWORD=<redacted>/);
   assert.match(content, /MANUAL_ACCEPTANCE_SMS_PHONE=<redacted>/);
   assert.match(
     payload.plan.actions[0].commands[0].displayCommand,
@@ -370,21 +366,11 @@ test("closeout runner report-only keeps customer config smoke token sanitized", 
   assert(smokeCommand);
   assert.deepEqual(smokeCommand.envKeys, [
     "CUSTOMER_CONFIG_ADMIN_TOKEN",
-    "MANUAL_ACCEPTANCE_ADMIN_PASSWORD",
-    "MANUAL_ACCEPTANCE_PASSWORD",
     "MANUAL_ACCEPTANCE_SMS_PHONE",
   ]);
   assert.match(
     smokeCommand.displayCommand,
     /CUSTOMER_CONFIG_ADMIN_TOKEN=<redacted>/,
-  );
-  assert.match(
-    smokeCommand.displayCommand,
-    /MANUAL_ACCEPTANCE_ADMIN_PASSWORD=<redacted>/,
-  );
-  assert.match(
-    smokeCommand.displayCommand,
-    /MANUAL_ACCEPTANCE_PASSWORD=<redacted>/,
   );
   assert.match(
     smokeCommand.displayCommand,

@@ -53,7 +53,8 @@ export function writeCredentialEvidenceTestFixture(
     adminUsername: contract.credentials.admin.username,
     adminAuthenticated: true,
     adminSuperAdmin: true,
-    phoneBound: true,
+    phoneConfigured: false,
+    phoneBound: false,
     adminAuthVersion: 2,
     demoExpected: 10,
     demoAuthenticated: 10,
@@ -64,8 +65,8 @@ export function writeCredentialEvidenceTestFixture(
       contract.credentials.admin.username,
       ...contract.credentials.demo.usernames,
     ],
-    adminPasswordSourceEnv: contract.credentials.admin.environmentVariable,
-    demoPasswordSourceEnv: contract.credentials.demo.environmentVariable,
+    adminPasswordSource: "credential-contract",
+    demoPasswordSource: "credential-contract",
     smsPhoneSourceEnv: contract.smsLoginIdentity.environmentVariable,
     responseBodyStored: false,
   });
@@ -85,7 +86,7 @@ export function writeCredentialEvidenceTestFixture(
     username,
     authVersion: index + 2,
     revokedSessions: index === 0 ? 1 : 0,
-    phoneBound: index === 0,
+    phoneBound: false,
   }));
   fs.writeFileSync(
     path.join(dir, "credential-rotation-report.json"),
@@ -103,7 +104,7 @@ export function writeCredentialEvidenceTestFixture(
         revokedSessions: 1,
         authVersionIncremented: true,
         auditSource: "manual_acceptance_password_rotation",
-        phoneBound: true,
+        phoneBound: false,
         accounts,
         replayed: false,
       },

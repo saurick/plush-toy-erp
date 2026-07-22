@@ -22,7 +22,8 @@ Input template only:
 
 说明:
   做轻量 health / route / auth capabilities / credential login matrix / customer_config effective session smoke；
-  带管理员 token 时还会真实生成最小 PDF，不创建业务事实。密码仅从指定环境变量读取，报告不保存密码、token 或原始 profile。
+  带管理员 token 时还会真实生成最小 PDF，不创建业务事实。测试密码读取凭据合同；
+  短信手机号只有人工录入对应环境变量时才校验。报告不保存密码、token、手机号或原始 profile。
 USAGE
 }
 
@@ -39,9 +40,8 @@ print_input_template() {
   "readsAdminToken": false,
   "secretInputs": [
     "CUSTOMER_CONFIG_ADMIN_TOKEN or the environment variable named by --admin-token-env",
-    "admin password from the environment variable named by --admin-password-env",
-    "demo password from the environment variable named by --demo-password-env",
-    "SMS phone from the environment variable named by --sms-phone-env"
+    "fixed admin and demo test passwords from credential.contract.json",
+    "optional SMS phone from the environment variable named by --sms-phone-env"
   ],
   "requiredInputs": [
     "public ERP endpoint without username/password",
@@ -59,7 +59,7 @@ print_input_template() {
     "server-readyz when --backend-url is provided",
     "login-page",
     "mobile-role-route",
-    "credential-login-matrix (admin + 10 demo identities, 11 unique tokens, exact admin phone binding)",
+    "credential-login-matrix (admin + 10 demo identities and 11 unique tokens; exact admin phone binding only when configured)",
     "auth-sms-capabilities (provider/enabled/not-mock)",
     "customer-config-effective-session when --customer-config-revision is provided",
     "template-pdf-render when --customer-config-revision and an admin token are provided"
@@ -70,7 +70,7 @@ print_input_template() {
   ],
   "requiredReadbackEvidence": [
     "check name=auth-sms-capabilities, target=jsonrpc:auth.capabilities, expectedMode=provider, enabled=true, mockDelivery=false, responseBodyStored=false",
-    "check name=credential-login-matrix, target=jsonrpc:auth.admin_login, totalAuthenticated=11, uniqueTokensObserved=true, phoneBound=true, responseBodyStored=false",
+    "check name=credential-login-matrix, target=jsonrpc:auth.admin_login, totalAuthenticated=11, uniqueTokensObserved=true, phoneConfigured=false or phoneBound=true, responseBodyStored=false",
     "check name=customer-config-effective-session",
     "target=jsonrpc:customer_config.get_effective_session",
     "expectedRevision matches the activated customer config revision",
@@ -188,17 +188,32 @@ try {
 
 reject_url_credentials "--endpoint" "$endpoint"
 validate_http_url "--endpoint" "$endpoint"
-[[ "$release_version" =~ ^[a-f0-9]{40}$ ]] || { echo "[run-smoke] --release-version must be a 40-character lowercase git sha"; exit 1; }
-[[ "$environment" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || { echo "[run-smoke] --environment is invalid"; exit 1; }
-[[ -z "$customer_config_revision" || "$customer_config_revision" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$ ]] || { echo "[run-smoke] --customer-config-revision is invalid"; exit 1; }
-[[ -z "$admin_token_env" || "$admin_token_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || { echo "[run-smoke] --admin-token-env is invalid"; exit 1; }
+[[ "$release_version" =~ ^[a-f0-9]{40}$ ]] || {
+  echo "[run-smoke] --release-version must be a 40-character lowercase git sha"
+  exit 1
+}
+[[ "$environment" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$ ]] || {
+  echo "[run-smoke] --environment is invalid"
+  exit 1
+}
+[[ -z "$customer_config_revision" || "$customer_config_revision" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{0,255}$ ]] || {
+  echo "[run-smoke] --customer-config-revision is invalid"
+  exit 1
+}
+[[ -z "$admin_token_env" || "$admin_token_env" =~ ^[A-Za-z_][A-Za-z0-9_]*$ ]] || {
+  echo "[run-smoke] --admin-token-env is invalid"
+  exit 1
+}
 if [[ -n "$backend_url" ]]; then
   reject_url_credentials "--backend-url" "$backend_url"
   validate_http_url "--backend-url" "$backend_url"
   script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
   credential_contract="$script_dir/../env/credential.contract.json"
-  [[ -f "$credential_contract" ]] || { echo "[run-smoke] credential contract is missing: $credential_contract"; exit 1; }
-  IFS=$'\t' read -r contract_admin_username contract_admin_password_env contract_demo_password_env contract_demo_usernames_csv credential_contract_schema contract_sms_phone_env contract_sms_username contract_target contract_database contract_dataset contract_sha256 < <(
+  [[ -f "$credential_contract" ]] || {
+    echo "[run-smoke] credential contract is missing: $credential_contract"
+    exit 1
+  }
+  IFS=$'\t' read -r contract_admin_username contract_admin_password contract_admin_password_env contract_demo_password contract_demo_password_env contract_demo_usernames_csv credential_contract_schema contract_sms_phone_env contract_target contract_database contract_dataset contract_sha256 < <(
     node - "$credential_contract" <<'NODE'
 const fs = require("node:fs");
 const file = process.argv[2];
@@ -209,7 +224,7 @@ const sms = contract?.smsLoginIdentity;
 const envKey = /^[A-Za-z_][A-Za-z0-9_]*$/;
 const username = /^[A-Za-z0-9_]+$/;
 const valid =
-  contract?.schemaVersion === "yoyoosun-credential-contract/v1" &&
+  contract?.schemaVersion === "yoyoosun-credential-contract/v2" &&
   contract?.customerCode === "yoyoosun" &&
   contract?.target?.key === "customer-trial-133" &&
   contract?.target?.database === "plush_erp_uat_20260716_v5" &&
@@ -222,19 +237,18 @@ const valid =
   new Set(demo.usernames).size === 10 &&
   demo.usernames.every((value) => username.test(value)) &&
   !demo.usernames.includes(admin.username) &&
-  admin?.keychain?.service === "plush-toy-erp-yoyoosun-admin" &&
-  admin?.keychain?.account === "admin" &&
-  demo?.keychain?.service === "plush-toy-erp-yoyoosun-demo" &&
-  demo?.keychain?.account === "customer-trial-133" &&
+  admin?.credentialSource === "contract-fixed-test" &&
+  admin?.fixedTestPassword === "adminadmin" &&
+  demo?.credentialSource === "contract-fixed-test" &&
+  demo?.fixedTestPassword === "12345678" &&
   sms?.username === admin.username &&
   envKey.test(sms?.environmentVariable || "") &&
-  sms?.phoneRequiredWhenProviderEnabled === true &&
+  sms?.phoneRequiredWhenProviderEnabled === false &&
+  sms?.verifyPhoneIdentityWhenConfigured === true &&
   sms?.keychain?.service === "plush-toy-erp-yoyoosun-sms-phone" &&
   sms?.keychain?.account === "customer-trial-133:admin" &&
   contract?.policy?.passwordsMustDiffer === true &&
-  Array.isArray(contract?.policy?.localOnlyPublicPasswords) &&
-  contract.policy.localOnlyPublicPasswords.length === 1 &&
-  contract.policy.localOnlyPublicPasswords[0] === "12345678" &&
+  JSON.stringify(contract?.policy?.registeredSimplePasswordTargets) === JSON.stringify(["local-dev", "customer-trial-133"]) &&
   contract.policy.rotateAfterCreateRestoreOrRollback === true &&
   contract.policy.revokeExistingSessionsOnRotation === true &&
   contract.policy.requireCredentialLoginMatrixBeforeCutover === true &&
@@ -247,12 +261,13 @@ if (!valid) throw new Error("invalid yoyoosun credential contract");
 const crypto = require("node:crypto");
 process.stdout.write([
   admin.username,
+  admin.fixedTestPassword,
   admin.environmentVariable,
+  demo.fixedTestPassword,
   demo.environmentVariable,
   demo.usernames.join(","),
   contract.schemaVersion,
   sms.environmentVariable,
-  sms.username,
   contract.target.key,
   contract.target.database,
   contract.target.datasetVersion,
@@ -260,32 +275,35 @@ process.stdout.write([
 ].join("\t") + "\n");
 NODE
   )
-  [[ "$admin_username" == "$contract_admin_username" ]] || { echo "[run-smoke] --admin-username must match credential contract"; exit 1; }
-  [[ "$admin_password_env" == "$contract_admin_password_env" ]] || { echo "[run-smoke] --admin-password-env must match credential contract"; exit 1; }
-  [[ "$demo_password_env" == "$contract_demo_password_env" ]] || { echo "[run-smoke] --demo-password-env must match credential contract"; exit 1; }
-  [[ "$sms_phone_env" == "$contract_sms_phone_env" ]] || { echo "[run-smoke] --sms-phone-env must match credential contract"; exit 1; }
-  IFS=',' read -r -a demo_usernames <<< "$contract_demo_usernames_csv"
-  admin_password="${!admin_password_env:-}"
-  demo_password="${!demo_password_env:-}"
+  [[ "$admin_username" == "$contract_admin_username" ]] || {
+    echo "[run-smoke] --admin-username must match credential contract"
+    exit 1
+  }
+  [[ "$admin_password_env" == "$contract_admin_password_env" ]] || {
+    echo "[run-smoke] --admin-password-env must match credential contract"
+    exit 1
+  }
+  [[ "$demo_password_env" == "$contract_demo_password_env" ]] || {
+    echo "[run-smoke] --demo-password-env must match credential contract"
+    exit 1
+  }
+  [[ "$sms_phone_env" == "$contract_sms_phone_env" ]] || {
+    echo "[run-smoke] --sms-phone-env must match credential contract"
+    exit 1
+  }
+  IFS=',' read -r -a demo_usernames <<<"$contract_demo_usernames_csv"
   sms_phone="${!sms_phone_env:-}"
+  admin_password="$contract_admin_password"
+  demo_password="$contract_demo_password"
   unset "$admin_password_env" "$demo_password_env" "$sms_phone_env"
-  [[ -n "$admin_password" ]] || { echo "[run-smoke] admin password env is empty: $admin_password_env"; exit 1; }
-  [[ -n "$demo_password" ]] || { echo "[run-smoke] demo password env is empty: $demo_password_env"; exit 1; }
-  [[ "$sms_phone" =~ ^[0-9]{11}$ ]] || { echo "[run-smoke] SMS phone env must contain one normalized 11-digit phone"; exit 1; }
-  [[ "$admin_password" != "$demo_password" ]] || { echo "[run-smoke] admin and demo passwords must differ"; exit 1; }
-  for candidate_password in "$admin_password" "$demo_password"; do
-    if printf '%s' "$candidate_password" | node -e '
-const fs = require("node:fs");
-const contract = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-let raw = "";
-process.stdin.setEncoding("utf8");
-process.stdin.on("data", (chunk) => raw += chunk);
-process.stdin.on("end", () => process.exit(contract.policy.localOnlyPublicPasswords.includes(raw.trim()) ? 0 : 1));
-' "$credential_contract"; then
-      echo "[run-smoke] public local-only passwords are forbidden for customer-trial-133"
-      exit 1
-    fi
-  done
+  [[ -z "$sms_phone" || "$sms_phone" =~ ^[0-9]{11}$ ]] || {
+    echo "[run-smoke] SMS phone env must be empty or contain one normalized 11-digit phone"
+    exit 1
+  }
+  [[ "$admin_password" != "$demo_password" ]] || {
+    echo "[run-smoke] admin and demo passwords must differ"
+    exit 1
+  }
 fi
 
 token=""
@@ -295,11 +313,20 @@ if [[ -n "$customer_config_revision" ]]; then
   fi
   token="${!admin_token_env:-}"
   unset "$admin_token_env"
-  [[ -n "$token" ]] || { echo "[run-smoke] admin token env is empty: $admin_token_env"; exit 1; }
-  [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || { echo "[run-smoke] admin token contains unsupported characters"; exit 1; }
+  [[ -n "$token" ]] || {
+    echo "[run-smoke] admin token env is empty: $admin_token_env"
+    exit 1
+  }
+  [[ "$token" =~ ^[A-Za-z0-9._~+/=-]+$ ]] || {
+    echo "[run-smoke] admin token contains unsupported characters"
+    exit 1
+  }
 fi
 
-[[ "$report" != *$'\n'* && "$report" != *$'\r'* ]] || { echo "[run-smoke] --report is invalid"; exit 1; }
+[[ "$report" != *$'\n'* && "$report" != *$'\r'* ]] || {
+  echo "[run-smoke] --report is invalid"
+  exit 1
+}
 umask 077
 smoke_tmp_dir="$(mktemp -d "${TMPDIR:-/tmp}/yoyoosun-smoke.XXXXXX")"
 chmod 700 "$smoke_tmp_dir"
@@ -359,6 +386,8 @@ if [[ -n "$backend_url" ]]; then
   credential_authenticated=0
   credential_admin_authenticated=false
   credential_admin_phone_bound=false
+  credential_phone_configured=false
+  [[ -n "$sms_phone" ]] && credential_phone_configured=true
   credential_demo_authenticated=0
   credential_unique_tokens=false
   declare -A credential_token_digests=()
@@ -402,12 +431,12 @@ try {
     data?.username === expected &&
     token.length > 0 &&
     (!requireSuperAdmin || (
-      data?.is_super_admin === true && String(data?.phone || "") === expectedPhone
+      data?.is_super_admin === true && (expectedPhone === "" || String(data?.phone || "") === expectedPhone)
     ));
   if (!valid) process.exit(1);
   process.stdout.write([
     crypto.createHash("sha256").update(token).digest("hex"),
-    requireSuperAdmin && String(data?.phone || "") === expectedPhone ? "true" : "false",
+    requireSuperAdmin && expectedPhone !== "" && String(data?.phone || "") === expectedPhone ? "true" : "false",
     Number.isSafeInteger(data?.auth_version) && data.auth_version > 0 ? String(data.auth_version) : "",
   ].join("\t"));
 } catch {
@@ -415,7 +444,7 @@ try {
 }
 ' "$username" "$require_super_admin" "$sms_phone_file" <"$response_file" || true)"
     : >"$response_file"
-    IFS=$'\t' read -r token_digest token_phone_bound token_auth_version <<< "$token_result"
+    IFS=$'\t' read -r token_digest token_phone_bound token_auth_version <<<"$token_result"
     unset token_result
     [[ "$token_digest" =~ ^[a-f0-9]{64}$ ]] || return 1
     [[ -z "${credential_token_digests[$token_digest]+x}" ]] || return 1
@@ -441,7 +470,11 @@ try {
     credential_unique_tokens=true
   fi
   credential_status=fail
-  if [[ "$credential_admin_authenticated" == true && "$credential_admin_phone_bound" == true && "$credential_demo_authenticated" -eq "${#demo_usernames[@]}" && "$credential_unique_tokens" == true ]]; then
+  credential_phone_requirement_satisfied=true
+  if [[ "$credential_phone_configured" == true && "$credential_admin_phone_bound" != true ]]; then
+    credential_phone_requirement_satisfied=false
+  fi
+  if [[ "$credential_admin_authenticated" == true && "$credential_phone_requirement_satisfied" == true && "$credential_demo_authenticated" -eq "${#demo_usernames[@]}" && "$credential_unique_tokens" == true ]]; then
     credential_status=pass
     passed=$((passed + 1))
   else
@@ -451,7 +484,7 @@ try {
   checks+=("credential-login-matrix")
   admin_auth_version_json=null
   [[ "${credential_admin_auth_version:-}" =~ ^[1-9][0-9]*$ ]] && admin_auth_version_json="$credential_admin_auth_version"
-  items+=("{\"name\":\"credential-login-matrix\",\"status\":\"$credential_status\",\"target\":\"jsonrpc:auth.admin_login\",\"credentialContractSchema\":\"$credential_contract_schema\",\"credentialContractSha256\":\"$contract_sha256\",\"credentialTarget\":\"$contract_target\",\"credentialDatabase\":\"$contract_database\",\"credentialDatasetVersion\":\"$contract_dataset\",\"adminUsername\":\"$admin_username\",\"adminAuthenticated\":$credential_admin_authenticated,\"adminSuperAdmin\":$credential_admin_authenticated,\"phoneBound\":$credential_admin_phone_bound,\"adminAuthVersion\":$admin_auth_version_json,\"demoExpected\":${#demo_usernames[@]},\"demoAuthenticated\":$credential_demo_authenticated,\"totalExpected\":$credential_expected,\"totalAuthenticated\":$credential_authenticated,\"uniqueTokensObserved\":$credential_unique_tokens,\"usernames\":$credential_usernames_json,\"adminPasswordSourceEnv\":\"$admin_password_env\",\"demoPasswordSourceEnv\":\"$demo_password_env\",\"smsPhoneSourceEnv\":\"$sms_phone_env\",\"responseBodyStored\":false}")
+  items+=("{\"name\":\"credential-login-matrix\",\"status\":\"$credential_status\",\"target\":\"jsonrpc:auth.admin_login\",\"credentialContractSchema\":\"$credential_contract_schema\",\"credentialContractSha256\":\"$contract_sha256\",\"credentialTarget\":\"$contract_target\",\"credentialDatabase\":\"$contract_database\",\"credentialDatasetVersion\":\"$contract_dataset\",\"adminUsername\":\"$admin_username\",\"adminAuthenticated\":$credential_admin_authenticated,\"adminSuperAdmin\":$credential_admin_authenticated,\"phoneConfigured\":$credential_phone_configured,\"phoneBound\":$credential_admin_phone_bound,\"adminAuthVersion\":$admin_auth_version_json,\"demoExpected\":${#demo_usernames[@]},\"demoAuthenticated\":$credential_demo_authenticated,\"totalExpected\":$credential_expected,\"totalAuthenticated\":$credential_authenticated,\"uniqueTokensObserved\":$credential_unique_tokens,\"usernames\":$credential_usernames_json,\"adminPasswordSource\":\"credential-contract\",\"demoPasswordSource\":\"credential-contract\",\"smsPhoneSourceEnv\":\"$sms_phone_env\",\"responseBodyStored\":false}")
 fi
 
 auth_rpc_base_url="$endpoint"
@@ -569,13 +602,14 @@ try {
     pdf_signature="$(LC_ALL=C dd if="$pdf_body" bs=4 count=1 2>/dev/null || true)"
     if [[ "$pdf_http_code" == "200" && "$pdf_content_type" == "application/pdf" && -s "$pdf_body" && "$pdf_signature" == "%PDF" ]]; then
       pdf_size_bytes="$(wc -c <"$pdf_body" | tr -d '[:space:]')"
-      pdf_sha256="$(node - "$pdf_body" <<'NODE'
+      pdf_sha256="$(
+        node - "$pdf_body" <<'NODE'
 const fs = require("node:fs");
 const crypto = require("node:crypto");
 const file = process.argv[2];
 process.stdout.write(crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex"));
 NODE
-)"
+      )"
       pdf_status="pass"
     fi
   fi

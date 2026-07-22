@@ -302,6 +302,7 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(credentialCheck.adminUsername, "admin");
   assert.equal(credentialCheck.adminAuthenticated, true);
   assert.equal(credentialCheck.adminSuperAdmin, true);
+  assert.equal(credentialCheck.phoneConfigured, true);
   assert.equal(credentialCheck.phoneBound, true);
   assert.equal(credentialCheck.demoExpected, 10);
   assert.equal(credentialCheck.demoAuthenticated, 10);
@@ -313,12 +314,12 @@ test("run smoke writes release-gate compatible report", async () => {
     ...credentialContract.credentials.demo.usernames,
   ]);
   assert.equal(
-    credentialCheck.adminPasswordSourceEnv,
-    credentialContract.credentials.admin.environmentVariable,
+    credentialCheck.adminPasswordSource,
+    "credential-contract",
   );
   assert.equal(
-    credentialCheck.demoPasswordSourceEnv,
-    credentialContract.credentials.demo.environmentVariable,
+    credentialCheck.demoPasswordSource,
+    "credential-contract",
   );
   assert.equal(credentialCheck.responseBodyStored, false);
   assert.match(credentialCheck.credentialContractSha256, /^[a-f0-9]{64}$/);
@@ -521,40 +522,7 @@ for (const [name, fakeEnv, authenticated] of [
   });
 }
 
-test("run smoke rejects every contract-registered public password", async () => {
-  for (const publicPassword of credentialContract.policy
-    .localOnlyPublicPasswords) {
-    const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-public-password-"));
-    const reportPath = path.join(root, "smoke-test-report.json");
-    const result = await runScriptAsync(
-      [
-        "--endpoint",
-        "http://127.0.0.1:19096",
-        "--backend-url",
-        "http://127.0.0.1:18306",
-        "--release-version",
-        releaseSha,
-        "--environment",
-        "customer-trial",
-        "--report",
-        reportPath,
-        ...credentialArgs,
-      ],
-      {
-        env: {
-          ...credentialEnv,
-          [credentialContract.credentials.demo.environmentVariable]:
-            publicPassword,
-        },
-      },
-    );
-    assert.notEqual(result.status, 0);
-    assert.match(result.stdout + result.stderr, /public local-only passwords/);
-    assert.equal(fs.existsSync(reportPath), false);
-  }
-});
-
-test("run smoke rejects equal admin and demo passwords before calling backend", async () => {
+test("run smoke ignores conflicting password env and uses the registered contract credentials", async () => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "run-smoke-same-password-"));
   const reportPath = path.join(root, "smoke-test-report.json");
   const fakeCurlBin = createFakeCurlBin(root);
@@ -581,15 +549,18 @@ test("run smoke rejects equal admin and demo passwords before calling backend", 
           sharedPassword,
         [credentialContract.credentials.demo.environmentVariable]:
           sharedPassword,
-        [credentialContract.smsLoginIdentity.environmentVariable]:
-          "13800138000",
       },
     },
   );
 
-  assert.notEqual(result.status, 0);
-  assert.match(result.stdout + result.stderr, /passwords must differ/);
-  assert.equal(fs.existsSync(reportPath), false);
+  assert.equal(result.status, 0, `${result.stdout}\n${result.stderr}`);
+  const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
+  const check = report.checks.find((item) => item.name === "credential-login-matrix");
+  assert.equal(check.status, "pass");
+  assert.equal(check.phoneConfigured, false);
+  assert.equal(check.phoneBound, false);
+  assert.equal(check.adminPasswordSource, "credential-contract");
+  assert.equal(check.demoPasswordSource, "credential-contract");
 });
 
 test("run smoke keeps backend checks optional", async () => {
