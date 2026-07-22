@@ -424,6 +424,23 @@ func TestValidateProductionBootstrapConfigRejectsMockSMS(t *testing.T) {
 	}
 }
 
+func TestValidateProductionBootstrapConfigRejectsUnknownSMSMode(t *testing.T) {
+	t.Parallel()
+
+	cfg := &conf.Data{
+		Postgres: &conf.Data_Postgres{Dsn: "postgres://postgres:runtime-password@postgres:5432/plush_erp?sslmode=disable"},
+		Auth: &conf.Data_Auth{
+			JwtSecret: productionConfigTestJWTSecret(),
+			Sms:       &conf.Data_Auth_SMS{Mode: "providre"},
+			Admin:     &conf.Data_Auth_Admin{Username: "admin", Password: ""},
+		},
+	}
+	err := validateProductionBootstrapConfig("./configs/prod/config.yaml", cfg, productionConfigTestEnv(nil))
+	if err == nil || !strings.Contains(err.Error(), "must be disabled or provider") {
+		t.Fatalf("expected unknown production sms mode to fail closed, got %v", err)
+	}
+}
+
 func TestValidateProductionBootstrapConfigRequiresAliyunProviderSecrets(t *testing.T) {
 	t.Parallel()
 

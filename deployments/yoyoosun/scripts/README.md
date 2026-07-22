@@ -5,7 +5,8 @@
 | 脚本 | 用途 |
 | --- | --- |
 | `verify-env.sh` | 校验 env 样例或受控 `.env` 的必需变量和危险配置 |
-| `run-smoke.sh` | 对指定 endpoint 执行 health / route / customer_config effective session 与真实最小 PDF smoke，并输出脱敏 JSON；支持 `--print-input-template` 只读输出目标 smoke 输入模板 |
+| `run-smoke.sh` | 对指定 endpoint 执行 health / route / SMS provider capabilities / customer_config effective session 与真实最小 PDF smoke，并输出脱敏 JSON；支持 `--print-input-template` 只读输出目标 smoke 输入模板 |
+| `cutover-public-web.sh` | yoyoosun 133 公网前端适配层的 plan-first 切流；先验证候选镜像 release、健康和 provider capabilities，失败自动恢复旧容器且保留回滚点 |
 | `collect-evidence.sh` | 生成 release evidence 草稿目录和 backup restore artifact 占位，不采集 secret |
 | `verify-backup-restore.sh` | 检查备份恢复 evidence 是否具备必要字段，不处理备份文件本体 |
 | `run-backup-restore-rehearsal.sh` | 执行真实 dump -> 临时 PostgreSQL -> restore -> pre-apply status -> populated upgrade audit -> customer config cutover audit -> migration apply / status -> smoke query，并生成本地脱敏 evidence |

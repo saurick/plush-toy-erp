@@ -358,8 +358,12 @@ func validateProductionBootstrapConfig(confPath string, dataCfg *conf.Data, gete
 	if dataCfg.Auth == nil || strings.TrimSpace(dataCfg.Auth.JwtSecret) == "" {
 		return fmt.Errorf("production preflight failed: APP_JWT_SECRET is required")
 	}
-	if dataCfg.Auth.Sms != nil && strings.EqualFold(strings.TrimSpace(dataCfg.Auth.Sms.Mode), "mock") {
-		return fmt.Errorf("production preflight failed: APP_AUTH_SMS_MODE cannot be mock")
+	smsMode := "disabled"
+	if dataCfg.Auth.Sms != nil && strings.TrimSpace(dataCfg.Auth.Sms.Mode) != "" {
+		smsMode = strings.ToLower(strings.TrimSpace(dataCfg.Auth.Sms.Mode))
+	}
+	if smsMode != "disabled" && smsMode != "provider" {
+		return fmt.Errorf("production preflight failed: APP_AUTH_SMS_MODE must be disabled or provider")
 	}
 	if err := validateProductionAuthSMSProviderConfig(getenv, dataCfg); err != nil {
 		return err

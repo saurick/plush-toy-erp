@@ -1,6 +1,5 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import { spawn, spawnSync } from "node:child_process";
 import test from "node:test";
@@ -22,11 +21,29 @@ const expectedRelease = "a".repeat(40);
 const adminPassword = "FreshAdmin9!";
 const postgresDSN =
   "postgres://postgres:test-production-password@postgres:5432/plush_erp_bootstrap_test?sslmode=disable";
+const fixtureScratchRoot = path.join(repoRoot, "output", "qa-tmp");
+// Aggregate Node tests run files concurrently; this only gives fixture scheduling headroom.
+const fixtureProcessTimeoutMs = 30_000;
+const fixtureReadyTimeoutMs = 15_000;
+
+function createFixtureRoot() {
+  fs.mkdirSync(fixtureScratchRoot, { recursive: true, mode: 0o700 });
+  fs.chmodSync(fixtureScratchRoot, 0o700);
+  const root = fs.realpathSync(
+    fs.mkdtempSync(
+      path.join(fixtureScratchRoot, "bootstrap-production-admin-"),
+    ),
+  );
+  assert.doesNotMatch(
+    root,
+    /^\/(?:tmp|var\/tmp|dev\/shm)(?:\/|$)/u,
+    "bootstrap fixture root must not use a shared temporary directory",
+  );
+  return root;
+}
 
 function writeFixture(t) {
-  const root = fs.mkdtempSync(
-    path.join(fs.realpathSync(os.tmpdir()), "bootstrap-production-admin-"),
-  );
+  const root = createFixtureRoot();
   t.after(() => {
     const advisoryPidPath = path.join(root, "state", "advisory-pid");
     if (fs.existsSync(advisoryPidPath)) {
@@ -506,6 +523,11 @@ function configureTrialFixture(fixture) {
   replaceEnvValues(fixture.envFile, {
     PROJECT_SLUG: trialProject,
     ERP_CUSTOMER_KEY: "yoyoosun",
+    APP_AUTH_SMS_MODE: "provider",
+    APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID: "fixture-access-key-id",
+    APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET: "fixture-access-key-secret",
+    APP_AUTH_SMS_ALIYUN_SIGN_NAME: "fixture-sign-name",
+    APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE: "fixture-template-code",
     POSTGRES_DSN: `postgres://postgres:test-production-password@postgres:5432/${trialDatabase}?sslmode=disable`,
     POSTGRES_DB: trialDatabase,
     POSTGRES_DATA_DIR: fixture.trialDataDir,
@@ -621,7 +643,7 @@ function runHelper(fixture, options = {}) {
     cwd: repoRoot,
     encoding: "utf8",
     env: spec.env,
-    timeout: 15_000,
+    timeout: fixtureProcessTimeoutMs,
   });
 }
 
@@ -719,7 +741,7 @@ function bootstrapLockPath(
   );
 }
 
-async function waitForPath(targetPath, timeoutMs = 5_000) {
+async function waitForPath(targetPath, timeoutMs = fixtureReadyTimeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (!fs.existsSync(targetPath)) {
     if (Date.now() >= deadline) {

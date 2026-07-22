@@ -10,6 +10,14 @@
 - 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。公网 `admin.yoyoosun.net` 的入口适配容器也已切到同一 V5 web / backend，旧入口容器仅停止并保留为即时回滚点；客户 UAT / 签收仍是独立关口。
 - 当前 Git 由单一 owner 收口；本轮已获提交、推送和 133 部署授权，不创建分支。后续如再修改运行时代码或 migration，必须生成新的不可变 release 并重新走目标环境证据链。
 
+## 2026-07-22 GitHub CI Linux 测试夹具修复
+
+完成：保留单一 `Strict repository gate` GitHub Actions 门禁和生产预检的 fail-closed 规则。连续失败不是 Actions、依赖安装或 `strict.sh` 编排故障，而是 `bootstrap-production-admin` 测试把部署锁夹具建在 `os.tmpdir()`；Ubuntu 将其解析为 `/tmp`，被生产预检正确拒绝，macOS 的 `/var/folders` 则掩盖了跨平台差异。测试夹具现改用仓库已忽略的 `output/qa-tmp` 私有根并强制 `0700`，同时主动断言不落入 `/tmp`、`/var/tmp` 或 `/dev/shm`；聚合测试 watchdog 只增加调度余量，生产脚本接收的锁等待与共享临时目录拒绝合同未放宽。
+
+验证：Linux arm64 Node `24.14.0` 容器内 `bootstrap-production-admin` 定向测试 `36 / 36` 通过，`0 fail / 0 skip`；生产预检“拒绝共享临时目录锁”合同 `1 / 1` 通过。`git diff --check` 通过。该证据证明当前工作树的 Linux 根因已修复，不等于远端 CI 已绿色。
+
+下一步 / 风险：需要由当前单一 Git owner 将本修复与同文件现有 SMS 运行合同改动一起审查、精确提交并推送，再等待新 commit 的 GitHub Actions 完整结束；远端 run 通过前仍只能报告“本地与 Linux 等价验证通过”。当前共享工作树还有其他部署改动，本节未 stage、提交、推送、部署或改动数据库。
+
 ## 2026-07-22 133 V5 发布、同语义造数与目标浏览器验收
 
 完成：将整树提交 `80b77faeab566660c77fc23cc66c272096692f16` 推送到 `origin/main`，从该 clean commit 构建并上传 `linux/amd64` server / web 固定标签镜像。源码包与镜像包在上传两端完成 SHA-256 校验；133 当前 V5 release 目录和受控 env 已切换到新镜像，旧源码、旧镜像、旧库及 `plush-toy-erp-prod` 栈均保留为回滚点。
@@ -161,6 +169,14 @@
 当前验证：Node `24.14.0` 下相关页面和导航合同 `97 / 97`、Web ESLint、Vite production build、`git diff --check` 均通过；定向 Style L1 `发票 -> 出货 -> 发票 -> 出货 -> 发票` mock Chromium 场景 `1 / 1` 通过，覆盖 URL 精确参数、RPC number 类型、规范业务单号回显、唯一记录自动选中、清空恢复、无错误提示和无横向溢出，并保存 3 张 `1440 x 900` 视觉证据。Web 全量单测 `1669 / 1671` 通过，另 2 项失败来自共享 worktree 中已退役桌面“异常处理”入口后的旧菜单数 `30 -> 29` 与 Dashboard 元数据数 `4 -> 3` 断言，未加载本轮相关单据代码。
 
 未做 / 风险：本轮未改 schema / migration、后端 Fact / RBAC / menu，也未连接或 apply 数据库。本机 `5175` 当前是未连接客户数据的 Product Core preview，无法提供真实业务记录运行态验收；Style L1 是 mock Chromium，不能替代真实客户 runtime、133 发布读回或客户 UAT。共享工作树 `affected --plan` 因 520 个跨任务文件达到 T8，本任务没有运行或宣称整树 `full / strict` 通过，也未提交、推送或部署。
+
+## 2026-07-22 133 短信登录发布合同与公网切流收口
+
+完成：yoyoosun 新增不含密钥的运行能力合同，固定短信登录为 `provider / enabled / not-mock`。生产 preflight 同时校验受控 env、app 容器实际 env 和公开 `auth.capabilities`，任一降级即阻断；服务端生产启动也改为只接受 `disabled / provider`，拼错或未知 mode 不再静默归一为关闭。正式 yoyoosun smoke 和 release evidence gate 强制包含同一脱敏 capabilities 读回，不再依赖孤立的历史旁证。
+
+完成：新增 plan-first 的 yoyoosun 133 公网前端切流脚本。脚本只接受绑定 40 位 Git SHA 的不可变镜像，先在候选 loopback 端口验证健康和 provider capabilities，再切换 5175；切流失败会尝试恢复旧容器，旧容器保留为回滚点。短信 provider 四项真实值仍只存在于目标服务器受控 `0600` env，不进入代码、测试输出或 evidence。
+
+当前验证：`go test ./cmd/server`、`run-smoke-script.test.mjs` 7 / 7、`production-preflight.test.mjs` 76 / 76、`release-evidence-gate.test.mjs` 67 / 67 通过；公网切流脚本通过 `bash -n`，`git diff --check` 通过。下一步是提交推送当前固定版本，在本地构建 amd64 镜像并传输到 133，安全迁移原有 provider Secret、执行目标 runtime preflight、切流和公网 smoke。真实短信发送仍需受控测试手机号，capabilities 读回不等于阿里云实际送达证明。
 
 ## 2026-07-19 提醒页统一显示更多与刷新边界
 

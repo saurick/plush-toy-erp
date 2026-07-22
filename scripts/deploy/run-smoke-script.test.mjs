@@ -81,6 +81,11 @@ case "$url" in
 {"result":{"code":0,"data":{"session":{"configRevision":"yoyoosun-customer-package-v7.runtime-manifest-v1","source":"active_customer_config_revision","pages":["global-dashboard"],"fieldPolicies":{"customers.default":{},"suppliers.default":{},"sales_orders.default":{}}}}}}
 JSON
     ;;
+  */rpc/auth)
+    cat <<'JSON'
+{"result":{"code":0,"data":{"sms_login":{"enabled":true,"mode":"provider","mock_delivery":false,"disabled_reason":""}}}}
+JSON
+    ;;
   */templates/render-pdf)
     if [[ -n "\${FAKE_PDF_PAYLOAD_OUT:-}" ]]; then
       printf '%s' "$request_data" >"$FAKE_PDF_PAYLOAD_OUT"
@@ -209,10 +214,19 @@ test("run smoke writes release-gate compatible report", async () => {
   assert.equal(report.summary.total, report.checks.length);
   assert.equal(report.summary.passed, report.checks.length);
   assert.equal(report.summary.failed, 0);
-  assert.equal(report.checks.length, 7);
+  assert.equal(report.checks.length, 8);
   assert.ok(report.checks.some((check) => check.name === "server-healthz"));
   assert.ok(report.checks.some((check) => check.name === "server-readyz"));
   assert.ok(report.checks.some((check) => check.name === "mobile-role-route"));
+  const authCheck = report.checks.find(
+    (check) => check.name === "auth-sms-capabilities",
+  );
+  assert.equal(authCheck.target, "jsonrpc:auth.capabilities");
+  assert.equal(authCheck.expectedMode, "provider");
+  assert.equal(authCheck.enabled, true);
+  assert.equal(authCheck.mode, "provider");
+  assert.equal(authCheck.mockDelivery, false);
+  assert.equal(authCheck.responseBodyStored, false);
   for (const check of report.checks) {
     assert.match(check.status, /^pass$/);
     if (check.target.startsWith("http://")) {
@@ -327,13 +341,18 @@ test("run smoke keeps backend checks optional", async () => {
   const report = JSON.parse(fs.readFileSync(reportPath, "utf8"));
   assert.equal(report.endpointAlias, endpoint);
   assert.equal(report.backendEndpointAlias, undefined);
-  assert.equal(report.checks.length, 3);
+  assert.equal(report.checks.length, 4);
   assert.deepEqual(
     report.checks.map((check) => check.name),
-    ["web-healthz", "login-page", "mobile-role-route"],
+    [
+      "web-healthz",
+      "login-page",
+      "mobile-role-route",
+      "auth-sms-capabilities",
+    ],
   );
-  assert.equal(report.summary.total, 3);
-  assert.equal(report.summary.passed, 3);
+  assert.equal(report.summary.total, 4);
+  assert.equal(report.summary.passed, 4);
   assert.equal(report.summary.failed, 0);
 });
 

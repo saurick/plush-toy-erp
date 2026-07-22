@@ -153,6 +153,8 @@ env_source_mode=""
 env_source_sha256=""
 env_snapshot=""
 normalized_env=""
+runtime_contract_file="$root_dir/deployments/yoyoosun/env/runtime.contract.json"
+expected_auth_sms_mode=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -389,6 +391,39 @@ else
 
   [[ "$erp_customer_key" =~ ^[a-z0-9][a-z0-9_-]*$ ]] || fail "ERP_CUSTOMER_KEY 必须是稳定小写 customer key"
   [[ "$erp_customer_key" != "current" ]] || fail "ERP_CUSTOMER_KEY 不能使用旧 current 别名"
+  if [[ "$erp_customer_key" == "yoyoosun" ]]; then
+    command -v python3 >/dev/null 2>&1 || fail "yoyoosun 运行合同校验需要 python3"
+    [[ -f "$runtime_contract_file" && ! -L "$runtime_contract_file" ]] || fail "缺少 yoyoosun 运行合同: $runtime_contract_file"
+    expected_auth_sms_mode="$(
+      python3 - "$runtime_contract_file" <<'PY'
+import json
+import sys
+
+with open(sys.argv[1], "r", encoding="utf-8") as handle:
+    contract = json.load(handle)
+sms = contract.get("auth", {}).get("sms", {})
+expected = sms.get("expectedCapabilities", {})
+valid = (
+    contract.get("schemaVersion") == "yoyoosun-runtime-contract/v1"
+    and contract.get("customerCode") == "yoyoosun"
+    and sms.get("requiredMode") == "provider"
+    and sms.get("requiredSecretEnvKeys") == [
+        "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID",
+        "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET",
+        "APP_AUTH_SMS_ALIYUN_SIGN_NAME",
+        "APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE",
+    ]
+    and expected == {"enabled": True, "mode": "provider", "mockDelivery": False}
+    and contract.get("redaction") == {"containsSecrets": False, "responseBodyStored": False}
+)
+if not valid:
+    raise SystemExit(1)
+print(sms["requiredMode"])
+PY
+    )" || fail "yoyoosun 运行合同结构不合法"
+    [[ "$app_auth_sms_mode" == "$expected_auth_sms_mode" ]] || fail "yoyoosun SMS 模式必须匹配运行合同: expected=$expected_auth_sms_mode actual=${app_auth_sms_mode:-missing}"
+    ok "yoyoosun SMS 运行合同已绑定: mode=$expected_auth_sms_mode contract_sha256=$(sha256_file "$runtime_contract_file")"
+  fi
   validate_absolute_path_without_aliases "POSTGRES_DATA_DIR" "$postgres_data_dir"
   case "$migration_lock_file" in
   /tmp/* | /var/tmp/* | /dev/shm/*)
@@ -732,6 +767,14 @@ if [[ "$runtime_check" -eq 1 ]]; then
   fi
 
   runtime_app_env="$(docker inspect --format '{{range .Config.Env}}{{println .}}{{end}}' "$app_cid" 2>/dev/null || true)"
+  runtime_auth_sms_mode_count="$(printf '%s\n' "$runtime_app_env" | awk -F= '$1 == "APP_AUTH_SMS_MODE" { count++ } END { print count + 0 }')"
+  runtime_auth_sms_mode="$(printf '%s\n' "$runtime_app_env" | awk -F= '$1 == "APP_AUTH_SMS_MODE" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
+  runtime_auth_sms_mode="$(trim "$runtime_auth_sms_mode" | tr '[:upper:]' '[:lower:]')"
+  [[ "$runtime_auth_sms_mode_count" == "1" && "$runtime_auth_sms_mode" == "$app_auth_sms_mode" ]] || fail "app-server 运行态 APP_AUTH_SMS_MODE 与受控 env 不一致"
+  if [[ -n "$expected_auth_sms_mode" ]]; then
+    [[ "$runtime_auth_sms_mode" == "$expected_auth_sms_mode" ]] || fail "app-server 运行态 APP_AUTH_SMS_MODE 与 yoyoosun 运行合同不一致"
+    ok "运行态 SMS 模式匹配合同: mode=$expected_auth_sms_mode"
+  fi
   runtime_bootstrap_admin_once="$(printf '%s\n' "$runtime_app_env" | awk -F= '$1 == "BOOTSTRAP_ADMIN_ONCE" { value = $0; sub(/^[^=]*=/, "", value) } END { print value }')"
   runtime_bootstrap_admin_once="$(trim "$runtime_bootstrap_admin_once" | tr '[:upper:]' '[:lower:]')"
   [[ "$runtime_bootstrap_admin_once" == "false" ]] || fail "app-server 稳态运行时 BOOTSTRAP_ADMIN_ONCE 必须为 false"
@@ -781,6 +824,29 @@ if [[ "$runtime_check" -eq 1 ]]; then
     curl -fsS "http://127.0.0.1:${app_port}/healthz" >/dev/null || fail "healthz 失败"
     curl -fsS "http://127.0.0.1:${app_port}/readyz" >/dev/null || fail "readyz 失败"
     ok "healthz / readyz 通过"
+    if [[ -n "$expected_auth_sms_mode" ]]; then
+      auth_capabilities_response="$(curl -fsS \
+        -H 'Content-Type: application/json' \
+        -d '{"jsonrpc":"2.0","id":"production-preflight","method":"capabilities","params":{}}' \
+        "http://127.0.0.1:${app_port}/rpc/auth" || true)"
+      if ! printf '%s' "$auth_capabilities_response" | python3 -c '
+import json
+import sys
+parsed = json.load(sys.stdin)
+sms = parsed.get("result", {}).get("data", {}).get("sms_login", {})
+ok = parsed.get("result", {}).get("code") == 0 and sms == {
+    "enabled": True,
+    "mode": "provider",
+    "mock_delivery": False,
+    "disabled_reason": "",
+}
+raise SystemExit(0 if ok else 1)
+'; then
+        fail "auth.capabilities 未匹配 yoyoosun provider 运行合同"
+      fi
+      unset auth_capabilities_response
+      ok "auth.capabilities 已读回 provider/enabled/not-mock"
+    fi
   else
     warn "未找到 curl，跳过 healthz / readyz"
   fi

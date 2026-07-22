@@ -11,7 +11,10 @@
 | `APP_JWT_SECRET` | 登录 token 签名 | 生产 `.env` 或 Secret | 泄露后立即轮换并要求重新登录 |
 | `APP_ADMIN_PASSWORD` | 仅首次初始化管理员时临时使用 | 与 `BOOTSTRAP_ADMIN_ONCE=true` 一起受控一次性注入 | 初始化成功写入 marker 后移除，不长期保留 |
 | `BACKUP_ENCRYPTION_KEY` | 备份加密 | 外部密钥管理或受控文件 | 按备份策略轮换 |
-| `SMS_PROVIDER_SECRET` | 短信服务，如启用 | 外部 Secret | 泄露后立即轮换 |
+| `APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID` | 阿里云短信访问标识 | 生产 `.env` 或外部 Secret | 泄露后立即轮换 |
+| `APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET` | 阿里云短信访问密钥 | 生产 `.env` 或外部 Secret | 泄露后立即轮换 |
+| `APP_AUTH_SMS_ALIYUN_SIGN_NAME` | 已审核短信签名 | 生产 `.env` 或外部 Secret | 签名变更后同步更新 |
+| `APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE` | 已审核验证码模板 | 生产 `.env` 或外部 Secret | 模板变更后同步更新 |
 | `OBJECT_STORAGE_SECRET` | 对象存储，如启用 | 外部 Secret | 泄露后立即轮换 |
 
 ## 禁止项

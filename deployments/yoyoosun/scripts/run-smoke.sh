@@ -17,7 +17,7 @@ Input template only:
   bash deployments/yoyoosun/scripts/run-smoke.sh --print-input-template
 
 说明:
-  做轻量 health / route / customer_config effective session smoke；带管理员 token 时还会真实生成最小 PDF，不创建业务事实。
+  做轻量 health / route / auth capabilities / customer_config effective session smoke；带管理员 token 时还会真实生成最小 PDF，不创建业务事实。
 USAGE
 }
 
@@ -50,6 +50,7 @@ print_input_template() {
     "server-readyz when --backend-url is provided",
     "login-page",
     "mobile-role-route",
+    "auth-sms-capabilities (provider/enabled/not-mock)",
     "customer-config-effective-session when --customer-config-revision is provided",
     "template-pdf-render when --customer-config-revision and an admin token are provided"
   ],
@@ -58,6 +59,7 @@ print_input_template() {
     "CUSTOMER_CONFIG_ADMIN_TOKEN='<admin-token>' bash deployments/yoyoosun/scripts/run-smoke.sh --endpoint https://erp.example.invalid --backend-url https://api.example.invalid --release-version <release-version> --environment customer-trial --report deployments/yoyoosun/evidence/releases/<YYYY-MM-DD>/smoke-test-report.json --customer-config-revision yoyoosun-customer-package-v7.runtime-manifest-v1 --admin-token-env CUSTOMER_CONFIG_ADMIN_TOKEN"
   ],
   "requiredReadbackEvidence": [
+    "check name=auth-sms-capabilities, target=jsonrpc:auth.capabilities, expectedMode=provider, enabled=true, mockDelivery=false, responseBodyStored=false",
     "check name=customer-config-effective-session",
     "target=jsonrpc:customer_config.get_effective_session",
     "expectedRevision matches the activated customer config revision",
@@ -181,6 +183,44 @@ for check in "${checks[@]}"; do
   fi
   items+=("{\"name\":\"$name\",\"status\":\"$status\",\"target\":\"$url\",\"httpCode\":\"$http_code\"}")
 done
+
+auth_rpc_base_url="$endpoint"
+if [[ -n "$backend_url" ]]; then
+  auth_rpc_base_url="$backend_url"
+fi
+auth_payload='{"jsonrpc":"2.0","id":"auth-capabilities-smoke","method":"capabilities","params":{}}'
+auth_response="$(
+  curl -k --connect-timeout 2 --max-time 10 --retry 3 --retry-delay 1 --retry-connrefused \
+    -sS \
+    -H "Content-Type: application/json" \
+    -H "Accept: application/json" \
+    -d "$auth_payload" \
+    "$auth_rpc_base_url/rpc/auth" || true
+)"
+auth_status="fail"
+if SMOKE_RESPONSE="$auth_response" node <<'NODE'; then
+try {
+  const parsed = JSON.parse(process.env.SMOKE_RESPONSE || "");
+  const sms = parsed?.result?.data?.sms_login;
+  const ok = parsed?.result?.code === 0 &&
+    sms?.enabled === true &&
+    sms?.mode === "provider" &&
+    sms?.mock_delivery === false;
+  process.exit(ok ? 0 : 1);
+} catch {
+  process.exit(1);
+}
+NODE
+  auth_status="pass"
+fi
+if [[ "$auth_status" == "pass" ]]; then
+  passed=$((passed + 1))
+else
+  failed=$((failed + 1))
+fi
+checks+=("auth-sms-capabilities")
+items+=("{\"name\":\"auth-sms-capabilities\",\"status\":\"$auth_status\",\"target\":\"jsonrpc:auth.capabilities\",\"expectedMode\":\"provider\",\"enabled\":$([[ \"$auth_status\" == \"pass\" ]] && printf true || printf false),\"mode\":\"$([[ \"$auth_status\" == \"pass\" ]] && printf provider || printf unknown)\",\"mockDelivery\":false,\"responseBodyStored\":false}")
+unset auth_response
 
 if [[ -n "$customer_config_revision" ]]; then
   rpc_base_url="$endpoint"

@@ -33,6 +33,8 @@ server/deploy/compose/prod
 | `reports/` | 本地生成的最新检查报告落点；真实报告提交前必须脱敏 |
 | `scripts/` | 针对本资料包的薄脚本，只做 env 校验、smoke、evidence 收集和备份恢复检查 |
 
+`env/runtime.contract.json` 是不含密钥的 yoyoosun 运行能力合同。当前固定要求短信登录为 `provider / enabled / not-mock`；生产 preflight、运行态容器检查、公开 `auth.capabilities` smoke 和 release evidence gate 必须同时满足，不能以页面截图或历史报告替代。
+
 ## 敏感信息规则 / Sensitive Data Rules
 
 本目录禁止提交：

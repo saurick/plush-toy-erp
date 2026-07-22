@@ -342,6 +342,27 @@ function validatePreflightReport(content, errors) {
     errors,
   );
   assert(
+    /\[production-preflight\]\s+ok:\s+yoyoosun SMS 运行合同已绑定:\s+mode=provider\s+contract_sha256=[a-f0-9]{64}/i.test(
+      content,
+    ),
+    `${REQUIRED_FILES.preflight} must bind the yoyoosun provider runtime contract`,
+    errors,
+  );
+  assert(
+    /\[production-preflight\]\s+ok:\s+运行态 SMS 模式匹配合同:\s+mode=provider/.test(
+      content,
+    ),
+    `${REQUIRED_FILES.preflight} must prove runtime SMS mode=provider`,
+    errors,
+  );
+  assert(
+    /\[production-preflight\]\s+ok:\s+auth\.capabilities 已读回 provider\/enabled\/not-mock/.test(
+      content,
+    ),
+    `${REQUIRED_FILES.preflight} must prove provider auth.capabilities readback`,
+    errors,
+  );
+  assert(
     /\[production-preflight\]\s+ok:\s+运行态 ERP_PDF_WARMUP=async/.test(
       content,
     ),
@@ -1258,6 +1279,35 @@ function validateSmokeReport(content, errors, absoluteDir) {
     assert(
       pdfCheck.responseBodyStored === false,
       `${REQUIRED_FILES.smoke} template-pdf-render responseBodyStored must be false`,
+      errors,
+    );
+  }
+  const authSMSChecks = checks.filter(
+    (check) => check?.name === "auth-sms-capabilities",
+  );
+  assert(
+    authSMSChecks.length === 1,
+    `${REQUIRED_FILES.smoke} must include exactly one auth-sms-capabilities check`,
+    errors,
+  );
+  const authSMSCheck = authSMSChecks[0];
+  if (authSMSCheck) {
+    assert(
+      authSMSCheck.target === "jsonrpc:auth.capabilities",
+      `${REQUIRED_FILES.smoke} auth-sms-capabilities target must be jsonrpc:auth.capabilities`,
+      errors,
+    );
+    assert(
+      authSMSCheck.expectedMode === "provider" &&
+        authSMSCheck.mode === "provider" &&
+        authSMSCheck.enabled === true &&
+        authSMSCheck.mockDelivery === false,
+      `${REQUIRED_FILES.smoke} auth-sms-capabilities must prove provider/enabled/not-mock`,
+      errors,
+    );
+    assert(
+      authSMSCheck.responseBodyStored === false,
+      `${REQUIRED_FILES.smoke} auth-sms-capabilities responseBodyStored must be false`,
       errors,
     );
   }

@@ -249,7 +249,22 @@ function configureExactCustomerTrialFixture(
       return replacements.has(key) ? `${key}=${replacements.get(key)}` : line;
     })
     .join("\n");
-  fs.writeFileSync(fixture.envFile, env, "utf8");
+  fs.writeFileSync(
+    fixture.envFile,
+    env
+      .replace("APP_AUTH_SMS_MODE=disabled", "APP_AUTH_SMS_MODE=provider")
+      .replace(
+        "APP_ADMIN_USERNAME=admin",
+        [
+          "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_ID=fixture-access-key-id",
+          "APP_AUTH_SMS_ALIYUN_ACCESS_KEY_SECRET=fixture-access-key-secret",
+          "APP_AUTH_SMS_ALIYUN_SIGN_NAME=fixture-sign-name",
+          "APP_AUTH_SMS_ALIYUN_TEMPLATE_CODE=fixture-template-code",
+          "APP_ADMIN_USERNAME=admin",
+        ].join("\n"),
+      ),
+    "utf8",
+  );
 }
 
 function trialOverrideArgs(fixture) {
@@ -272,6 +287,7 @@ function runTrialPreflight(
       PATH: `${fakeBin}:${process.env.PATH ?? ""}`,
       FAKE_RUNTIME_COMPOSE_PROJECT: "plush-toy-erp-v5",
       FAKE_RUNTIME_EXPECTED_RELEASE: fixture.expectedRelease,
+      FAKE_RUNTIME_AUTH_SMS_MODE: "provider",
       ...env,
     },
   });
@@ -434,6 +450,7 @@ if [[ "\${1:-}" == "inspect" ]]; then
     fi
     if [[ "$cid" == "app-server-cid" ]]; then
       printf 'ERP_PDF_WARMUP=%s\n' "\${FAKE_RUNTIME_PDF_WARMUP:-async}"
+      printf 'APP_AUTH_SMS_MODE=%s\n' "\${FAKE_RUNTIME_AUTH_SMS_MODE:-disabled}"
       printf 'BOOTSTRAP_ADMIN_ONCE=%s\n' "\${FAKE_RUNTIME_BOOTSTRAP_ADMIN_ONCE:-false}"
       printf 'ERP_CUSTOMER_KEY=%s\n' "\${FAKE_RUNTIME_CUSTOMER_KEY:-yoyoosun}"
       printf 'ERP_DEBUG_ENV=%s\n' "\${FAKE_RUNTIME_DEBUG_ENV:-prod}"
@@ -466,7 +483,14 @@ exit 1
   );
   fs.writeFileSync(
     path.join(binDir, "curl"),
-    "#!/usr/bin/env bash\nexit 0\n",
+    `#!/usr/bin/env bash
+set -euo pipefail
+url="\${@: -1}"
+if [[ "$url" == */rpc/auth ]]; then
+  printf '%s\n' '{"result":{"code":0,"data":{"sms_login":{"enabled":true,"mode":"provider","mock_delivery":false,"disabled_reason":""}}}}'
+fi
+exit 0
+`,
     "utf8",
   );
   fs.chmodSync(path.join(binDir, "docker"), 0o755);

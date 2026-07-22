@@ -159,6 +159,9 @@ function writeReleaseEvidence(dir) {
 [production-preflight] ok: Compose、低配部署边界和 migration 脚本通过
 [production-preflight] ok: docker compose config -q 通过
 [production-preflight] ok: Compose 运行服务存在
+[production-preflight] ok: yoyoosun SMS 运行合同已绑定: mode=provider contract_sha256=cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc
+[production-preflight] ok: 运行态 SMS 模式匹配合同: mode=provider
+[production-preflight] ok: auth.capabilities 已读回 provider/enabled/not-mock
 [production-preflight] ok: 运行态 ERP_PDF_WARMUP=async
 [production-preflight] ok: 运行态 Chromium / chromium-common 版本与 Docker exact pin 一致: 150.0.7871.100-1~deb12u1
 [production-preflight] ok: healthz / readyz 通过
@@ -285,7 +288,7 @@ Pending Files: 0
         releaseVersion: "20260628T2200-config-release",
         endpointAlias: "https://erp.example.invalid",
         backendEndpointAlias: "https://api.example.invalid",
-        summary: { total: 4, passed: 4, failed: 0 },
+        summary: { total: 5, passed: 5, failed: 0 },
         checks: [
           {
             name: "server-healthz",
@@ -304,6 +307,16 @@ Pending Files: 0
             status: "pass",
             target: "https://erp.example.invalid/",
             httpCode: "200",
+          },
+          {
+            name: "auth-sms-capabilities",
+            status: "pass",
+            target: "jsonrpc:auth.capabilities",
+            expectedMode: "provider",
+            enabled: true,
+            mode: "provider",
+            mockDelivery: false,
+            responseBodyStored: false,
           },
           {
             name: "template-pdf-render",
@@ -362,7 +375,7 @@ Pending Files: 0
           smokeStatus: "passed",
           smokeReport:
             "deployments/yoyoosun/evidence/releases/2026-06-28/smoke-test-report.json",
-          smokeCheckCount: 4,
+          smokeCheckCount: 5,
           evidenceReviewStatus: "passed",
         },
         summary: { rehearsalCompleted: true, rollbackPathStatus: "passed" },
