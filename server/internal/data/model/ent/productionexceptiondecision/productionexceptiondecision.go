@@ -20,6 +20,8 @@ const (
 	FieldDecisionType = "decision_type"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldExecutionStatus holds the string denoting the execution_status field in the database.
+	FieldExecutionStatus = "execution_status"
 	// FieldProductionOrderID holds the string denoting the production_order_id field in the database.
 	FieldProductionOrderID = "production_order_id"
 	// FieldProductionOrderItemID holds the string denoting the production_order_item_id field in the database.
@@ -52,6 +54,16 @@ const (
 	FieldDecidedAt = "decided_at"
 	// FieldDecisionReason holds the string denoting the decision_reason field in the database.
 	FieldDecisionReason = "decision_reason"
+	// FieldExecutedBy holds the string denoting the executed_by field in the database.
+	FieldExecutedBy = "executed_by"
+	// FieldExecutedAt holds the string denoting the executed_at field in the database.
+	FieldExecutedAt = "executed_at"
+	// FieldReversedBy holds the string denoting the reversed_by field in the database.
+	FieldReversedBy = "reversed_by"
+	// FieldReversedAt holds the string denoting the reversed_at field in the database.
+	FieldReversedAt = "reversed_at"
+	// FieldReverseReason holds the string denoting the reverse_reason field in the database.
+	FieldReverseReason = "reverse_reason"
 	// Table holds the table name of the productionexceptiondecision in the database.
 	Table = "production_exception_decisions"
 )
@@ -62,6 +74,7 @@ var Columns = []string{
 	FieldDecisionNo,
 	FieldDecisionType,
 	FieldStatus,
+	FieldExecutionStatus,
 	FieldProductionOrderID,
 	FieldProductionOrderItemID,
 	FieldProductionMaterialRequirementID,
@@ -78,6 +91,11 @@ var Columns = []string{
 	FieldDecidedBy,
 	FieldDecidedAt,
 	FieldDecisionReason,
+	FieldExecutedBy,
+	FieldExecutedAt,
+	FieldReversedBy,
+	FieldReversedAt,
+	FieldReverseReason,
 }
 
 // ValidColumn reports if the column name is valid (part of the table columns).
@@ -105,6 +123,10 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultExecutionStatus holds the default value on creation for the "execution_status" field.
+	DefaultExecutionStatus string
+	// ExecutionStatusValidator is a validator for the "execution_status" field. It is called by the builders before save.
+	ExecutionStatusValidator func(string) error
 	// ProductionOrderIDValidator is a validator for the "production_order_id" field. It is called by the builders before save.
 	ProductionOrderIDValidator func(int) error
 	// ProductionOrderItemIDValidator is a validator for the "production_order_item_id" field. It is called by the builders before save.
@@ -133,6 +155,12 @@ var (
 	DecidedByValidator func(int) error
 	// DecisionReasonValidator is a validator for the "decision_reason" field. It is called by the builders before save.
 	DecisionReasonValidator func(string) error
+	// ExecutedByValidator is a validator for the "executed_by" field. It is called by the builders before save.
+	ExecutedByValidator func(int) error
+	// ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
+	ReversedByValidator func(int) error
+	// ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
+	ReverseReasonValidator func(string) error
 )
 
 // OrderOption defines the ordering options for the ProductionExceptionDecision queries.
@@ -156,6 +184,11 @@ func ByDecisionType(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByExecutionStatus orders the results by the execution_status field.
+func ByExecutionStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExecutionStatus, opts...).ToFunc()
 }
 
 // ByProductionOrderID orders the results by the production_order_id field.
@@ -236,4 +269,29 @@ func ByDecidedAt(opts ...sql.OrderTermOption) OrderOption {
 // ByDecisionReason orders the results by the decision_reason field.
 func ByDecisionReason(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldDecisionReason, opts...).ToFunc()
+}
+
+// ByExecutedBy orders the results by the executed_by field.
+func ByExecutedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExecutedBy, opts...).ToFunc()
+}
+
+// ByExecutedAt orders the results by the executed_at field.
+func ByExecutedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldExecutedAt, opts...).ToFunc()
+}
+
+// ByReversedBy orders the results by the reversed_by field.
+func ByReversedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReversedBy, opts...).ToFunc()
+}
+
+// ByReversedAt orders the results by the reversed_at field.
+func ByReversedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReversedAt, opts...).ToFunc()
+}
+
+// ByReverseReason orders the results by the reverse_reason field.
+func ByReverseReason(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReverseReason, opts...).ToFunc()
 }

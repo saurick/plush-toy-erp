@@ -20,6 +20,13 @@ test('HelpCenterPage: 使用当前账号岗位和已开放页面生成帮助', (
   assert.match(source, /htmlFor="erp-help-center-role-select"/u)
   assert.match(source, /id="erp-help-center-role-select"/u)
   assert.match(source, /当前没有可直接打开的常用入口/u)
+  assert.match(source, /正常办理案例/u)
+  assert.match(source, /完成标准/u)
+  assert.match(source, /遇到异常怎么办/u)
+  assert.match(source, /退回对象/u)
+  assert.match(source, /异常完成标准/u)
+  assert.match(source, /selectedGuide\.exception\.steps/u)
+  assert.match(source, /当前账号有多个岗位/u)
 })
 
 test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项', () => {
@@ -31,6 +38,11 @@ test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项'
   assert.match(layoutSource, /getAuthenticatedNavigationSections/u)
   assert.match(layoutSource, /item\.access === 'authenticated'/u)
   assert.match(layoutSource, /permissionGovernedVisibleSections/u)
+  assert.match(layoutSource, /getCustomerNavigationPresentation/u)
+  assert.match(layoutSource, /buildRoleGuidedNavigation/u)
+  assert.match(layoutSource, /label: '常用工作'/u)
+  assert.match(layoutSource, /更多功能/u)
+  assert.match(layoutSource, /data-navigation-presentation/u)
   assert.match(
     layoutSource,
     /currentEntry\?\.access === 'authenticated'[\s\S]*return false/u

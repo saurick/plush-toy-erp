@@ -3,6 +3,7 @@ import {
   ArrowUpOutlined,
   BellOutlined,
   CheckSquareOutlined,
+  DesktopOutlined,
   FileTextOutlined,
   InboxOutlined,
   LogoutOutlined,
@@ -49,11 +50,13 @@ export default function MobileTaskListScreen({
   activeViewHasMore,
   activeTasks,
   adminProfile,
+  canEnterDesktop,
   doneTasks,
   filterItems,
   filteredTasks,
   handleLogout,
   handleMainScroll,
+  handleEnterDesktop,
   handleSwitchEntry,
   initialLoading,
   latestTaskUpdate,
@@ -714,14 +717,25 @@ export default function MobileTaskListScreen({
 
         <section className="erp-mobile-card rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <h2 className="text-lg font-semibold text-slate-950">入口与安全</h2>
-          <button
-            type="button"
-            className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
-            onClick={handleSwitchEntry}
-          >
-            <SwapOutlined aria-hidden="true" />
-            切换工作入口
-          </button>
+          {canEnterDesktop ? (
+            <button
+              type="button"
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+              onClick={handleEnterDesktop}
+            >
+              <DesktopOutlined aria-hidden="true" />
+              进入电脑端
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="mt-4 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700"
+              onClick={handleSwitchEntry}
+            >
+              <SwapOutlined aria-hidden="true" />
+              切换工作入口
+            </button>
+          )}
           <button
             type="button"
             data-testid="mobile-role-logout-button"
@@ -805,6 +819,18 @@ export default function MobileTaskListScreen({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <ERPThemeToggle size="small" variant="menu" />
+            {canEnterDesktop ? (
+              <button
+                type="button"
+                className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-xl border border-slate-200 bg-white px-2 py-2 text-sm font-semibold text-slate-700"
+                aria-label="进入电脑端"
+                title="进入电脑端"
+                data-testid="mobile-role-desktop-entry"
+                onClick={handleEnterDesktop}
+              >
+                <SwapOutlined aria-hidden="true" />
+              </button>
+            ) : null}
             <button
               type="button"
               className="inline-flex min-h-11 items-center gap-2 rounded-xl px-2 py-2 text-sm font-semibold text-emerald-700"

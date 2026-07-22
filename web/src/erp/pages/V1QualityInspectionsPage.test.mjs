@@ -157,7 +157,7 @@ test('quality page describes generic and production-stage sources without collap
   assert.match(source, /每张质检单只代表当前在制批次和当前关口/u)
   assert.match(
     source,
-    /首次到货检验不合格可办理退厂或补换，确认后取消尚未入库的收货草稿/u
+    /首次到货检验不合格可按来源行和部分数量办理退厂或补换；补换确认生成新的待收与待检记录，原收货不会因部分处置被整单取消/u
   )
 })
 

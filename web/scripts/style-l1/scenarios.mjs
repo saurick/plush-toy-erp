@@ -2,6 +2,7 @@ import { Buffer } from 'node:buffer'
 
 import { yoyoosunRoleFlowMatrix } from '../../../config/customers/yoyoosun/roleFlowMatrix.mjs'
 import { RpcErrorCode } from '../../src/common/consts/errorCodes.generated.js'
+import { getNavigationSections } from '../../src/erp/config/seedData.mjs'
 
 import { createBusinessFormalScenarios } from './businessFormalScenarios.mjs'
 import { createBusinessRowItemsPreviewScenarios } from './businessRowItemsPreviewScenarios.mjs'
@@ -980,6 +981,50 @@ export function createStyleL1Scenarios(deps) {
     workPools: [],
     source: 'active_customer_config_revision',
   })
+  const customerRoleRuntimeSession = (roleKeys, revision) => {
+    const roleKeySet = new Set(roleKeys)
+    const roles = yoyoosunRoleFlowMatrix.roles.filter((role) =>
+      roleKeySet.has(role.roleKey)
+    )
+    return {
+      ...customerRuntimeEffectiveSession,
+      configRevision: revision,
+      roles: [...roleKeys],
+      pages: [...new Set(roles.flatMap((role) => role.menuSurfaces || []))],
+      actions: [...new Set(roles.flatMap((role) => role.capabilityKeys || []))],
+    }
+  }
+  const customerNavigationItemByKey = new Map(
+    getNavigationSections().flatMap((section) =>
+      section.items.map((item) => [item.key, item])
+    )
+  )
+  const customerRoleAdminProfile = (roleKey, username) => {
+    const role = yoyoosunRoleFlowMatrix.roles.find(
+      (item) => item.roleKey === roleKey
+    )
+    assert(role, `缺少永绅岗位投影: ${roleKey}`)
+    const menus = role.menuSurfaces.map((pageKey) => {
+      const item = customerNavigationItemByKey.get(pageKey)
+      assert(item, `缺少永绅页面映射: ${roleKey}.${pageKey}`)
+      return { key: item.key, label: item.label, path: item.path }
+    })
+    return {
+      id: 1,
+      username,
+      is_super_admin: false,
+      roles: [{ role_key: roleKey, name: role.displayName }],
+      permissions: [...role.capabilityKeys],
+      menus,
+      erp_preferences: { column_orders: {} },
+    }
+  }
+  const roleGuidedCustomerConfig = Object.freeze({
+    desktopMenu: Object.freeze({
+      presentation: 'role_guided',
+      hiddenItemKeys: Object.freeze([]),
+    }),
+  })
   const multiMobileRoleAdminProfile = Object.freeze({
     username: 'style-l1-sales-quality',
     is_super_admin: false,
@@ -1510,6 +1555,105 @@ export function createStyleL1Scenarios(deps) {
           await page.locator('.erp-entry-card').count(),
           0,
           '多岗位登录完成后不应停留在入口选择卡片'
+        )
+      },
+    },
+    {
+      name: 'demo-boss-mobile-direct-desktop-entry',
+      path: '/m/boss/tasks',
+      auth: 'admin',
+      customerKey: 'yoyoosun',
+      adminProfile: customerRoleAdminProfile('boss', 'demo_boss'),
+      effectiveSession: customerRoleRuntimeSession(
+        ['boss'],
+        'style-l1-demo-boss-mobile-desktop-entry'
+      ),
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        const desktopEntry = page.getByTestId('mobile-role-desktop-entry')
+        await page.waitForFunction(
+          () =>
+            Boolean(
+              document.querySelector('.mobile-role-tasks-page') ||
+                document.querySelector(
+                  '[data-mobile-customer-runtime-guard="true"]'
+                )
+            ),
+          null,
+          { timeout: 10_000 }
+        )
+        const entryEvidence = await page.evaluate(() => ({
+          path: window.location.pathname,
+          text: String(document.body?.innerText || '')
+            .replace(/\s+/gu, ' ')
+            .trim()
+            .slice(0, 600),
+          storedMenus: JSON.parse(
+            window.localStorage.getItem('admin_menus') || '[]'
+          ).map((item) => item?.path || item),
+          buttonLabels: Array.from(document.querySelectorAll('button')).map(
+            (button) =>
+              String(
+                button.getAttribute('aria-label') || button.textContent || ''
+              )
+                .replace(/\s+/gu, '')
+                .trim()
+          ),
+        }))
+        assert.equal(
+          await page.locator('.mobile-role-tasks-page').count(),
+          1,
+          `demo_boss 应进入老板手机待办: ${JSON.stringify(entryEvidence)}`
+        )
+        assert.equal(
+          await desktopEntry.count(),
+          1,
+          `demo_boss 应显示电脑端入口: ${JSON.stringify(entryEvidence)}`
+        )
+        await desktopEntry.waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await desktopEntry.getAttribute('aria-label'),
+          '进入电脑端'
+        )
+        const metrics = await desktopEntry.evaluate((node) => {
+          const rect = node.getBoundingClientRect()
+          return {
+            width: rect.width,
+            height: rect.height,
+            right: rect.right,
+            viewportWidth: window.innerWidth,
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          metrics.width >= 44 &&
+            metrics.height >= 44 &&
+            metrics.right <= metrics.viewportWidth + 1 &&
+            metrics.scrollWidth <= metrics.clientWidth + 1,
+          `老板电脑端入口应保持触控尺寸且不溢出: ${JSON.stringify(metrics)}`
+        )
+        await page.getByTestId('mobile-role-nav-mine').click()
+        await page
+          .getByRole('heading', { name: '入口与安全' })
+          .locator('..')
+          .getByRole('button', { name: '进入电脑端' })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'demo-boss-mobile-direct-desktop-entry-mine.png'
+          ),
+          fullPage: true,
+        })
+        await desktopEntry.click()
+        await waitForPath(page, '/erp/dashboard')
+        await expectHeading(page, '工作台')
+        assert.equal(
+          await page.evaluate(() =>
+            window.localStorage.getItem('erp:last_entry_target')
+          ),
+          'desktop'
         )
       },
     },
@@ -2794,6 +2938,248 @@ export function createStyleL1Scenarios(deps) {
         await assertTextAbsent(page, '当前客户有效配置')
         await assertTextAbsent(page, '权限中心')
         await assertTextAbsent(page, '管理员列表')
+      },
+    },
+    {
+      name: 'yoyoosun-sales-role-guided-navigation-help',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      customerConfig: roleGuidedCustomerConfig,
+      adminProfile: {
+        is_super_admin: false,
+        roles: [{ role_key: 'sales', name: '销售' }],
+      },
+      effectiveSession: customerRoleRuntimeSession(
+        ['sales'],
+        'style-l1-role-guided-sales'
+      ),
+      viewport: { width: 1280, height: 720 },
+      verify: async (page) => {
+        await expectText(page, '看板中心')
+        await expectText(page, '工作台')
+        await expectText(page, '任务看板')
+        await expectText(page, '常用工作')
+        await expectText(page, '客户档案')
+        await expectText(page, '销售订单')
+        await expectText(page, '出货单')
+        await expectText(page, '更多功能')
+
+        const menu = page.locator('.erp-admin-menu')
+        assert.equal(
+          await menu.getAttribute('data-navigation-presentation'),
+          'role_guided'
+        )
+        const visibleLeafCount = await menu.evaluate(
+          (node) =>
+            Array.from(node.querySelectorAll('.ant-menu-item')).filter(
+              (item) => item.getClientRects().length > 0
+            ).length
+        )
+        assert.equal(
+          visibleLeafCount,
+          5,
+          `销售岗位首层应先显示两个看板，再显示三个常用业务，实际 ${visibleLeafCount}`
+        )
+        const visibleLeafTexts = await menu.evaluate((node) =>
+          Array.from(node.querySelectorAll('.ant-menu-item'))
+            .filter((item) => item.getClientRects().length > 0)
+            .map((item) => String(item.textContent || '').trim())
+        )
+        assert.deepEqual(
+          visibleLeafTexts,
+          ['工作台', '任务看板', '客户档案', '销售订单', '出货单'],
+          `销售岗位导航应按看板、常用工作的顺序展示: ${JSON.stringify(visibleLeafTexts)}`
+        )
+
+        const moreFunctions = menu
+          .locator('.ant-menu-submenu-title')
+          .filter({ hasText: '更多功能' })
+        const moreFunctionsLabel = String(
+          await moreFunctions.innerText()
+        ).trim()
+        const moreFunctionsCountMatch =
+          moreFunctionsLabel.match(/^更多功能（(\d+)）$/u)
+        assert(
+          moreFunctionsCountMatch,
+          `更多功能应显示已授权页面数量: ${moreFunctionsLabel}`
+        )
+        await moreFunctions.click()
+        await expectText(page, '产品档案')
+        await expectText(page, '库存台账')
+        await expectText(page, '岗位使用帮助')
+        const expandedVisibleLeafCount = await menu.evaluate(
+          (node) =>
+            Array.from(node.querySelectorAll('.ant-menu-item')).filter(
+              (item) => item.getClientRects().length > 0
+            ).length
+        )
+        assert.equal(
+          expandedVisibleLeafCount,
+          visibleLeafCount + Number(moreFunctionsCountMatch[1]),
+          `更多功能数量应与展开后的页面一致：${moreFunctionsLabel}`
+        )
+        const helpMenuItem = menu
+          .locator('.ant-menu-item')
+          .filter({ hasText: '岗位使用帮助' })
+        await helpMenuItem.click()
+        await page.waitForURL((url) => url.pathname === '/erp/help-center')
+        await expectText(page, '正常办理案例')
+        await expectText(page, '完成标准')
+        await expectText(page, '遇到异常怎么办')
+        await expectText(page, '退回对象')
+        await helpMenuItem.scrollIntoViewIfNeeded()
+        await assertNoHorizontalOverflow(
+          page,
+          'yoyoosun-sales-role-guided-navigation-help'
+        )
+      },
+    },
+    {
+      name: 'yoyoosun-boss-role-guided-navigation-desktop',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      customerConfig: roleGuidedCustomerConfig,
+      adminProfile: customerRoleAdminProfile('boss', 'demo_boss'),
+      effectiveSession: customerRoleRuntimeSession(
+        ['boss'],
+        'style-l1-role-guided-boss'
+      ),
+      viewport: { width: 1280, height: 720 },
+      verify: async (page) => {
+        const menu = page.locator('.erp-admin-menu')
+        await expectText(page, '看板中心')
+        await expectText(page, '常用工作')
+        await expectText(page, '更多功能（14）')
+        const visibleLeafTexts = await menu.evaluate((node) =>
+          Array.from(node.querySelectorAll('.ant-menu-item'))
+            .filter((item) => item.getClientRects().length > 0)
+            .map((item) => String(item.textContent || '').trim())
+        )
+        assert.deepEqual(
+          visibleLeafTexts,
+          [
+            '工作台',
+            '任务看板',
+            '业务看板',
+            '销售订单',
+            '采购订单',
+            '质量检验',
+          ],
+          `老板电脑端应有三个看板和三个常用业务: ${JSON.stringify(visibleLeafTexts)}`
+        )
+        await menu
+          .locator('.ant-menu-submenu-title')
+          .filter({ hasText: '更多功能' })
+          .click()
+        await expectText(page, '生产异常')
+        await expectText(page, '岗位使用帮助')
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-boss-role-guided-navigation-desktop.png'
+          ),
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'yoyoosun-boss-role-guided-navigation-desktop'
+        )
+      },
+    },
+    {
+      name: 'yoyoosun-finance-role-guided-navigation-desktop',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      customerConfig: roleGuidedCustomerConfig,
+      adminProfile: customerRoleAdminProfile('finance', 'demo_finance'),
+      effectiveSession: customerRoleRuntimeSession(
+        ['finance'],
+        'style-l1-role-guided-finance'
+      ),
+      viewport: { width: 1280, height: 720 },
+      verify: async (page) => {
+        const menu = page.locator('.erp-admin-menu')
+        const visibleLeafTexts = await menu.evaluate((node) =>
+          Array.from(node.querySelectorAll('.ant-menu-item'))
+            .filter((item) => item.getClientRects().length > 0)
+            .map((item) => String(item.textContent || '').trim())
+        )
+        assert.deepEqual(
+          visibleLeafTexts,
+          ['工作台', '任务看板', '应付管理', '应收管理', '发票管理'],
+          `财务常用工作应突出应付、应收和发票: ${JSON.stringify(visibleLeafTexts)}`
+        )
+        assert.equal(
+          visibleLeafTexts.includes('对账管理'),
+          false,
+          '对账管理在展开更多功能前不应占用财务常用入口'
+        )
+        await menu
+          .locator('.ant-menu-submenu-title')
+          .filter({ hasText: '更多功能' })
+          .click()
+        await menu
+          .locator('.ant-menu-item')
+          .filter({ hasText: '对账管理' })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-finance-role-guided-navigation-desktop.png'
+          ),
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'yoyoosun-finance-role-guided-navigation-desktop'
+        )
+      },
+    },
+    {
+      name: 'yoyoosun-finance-purchase-role-help-mobile-dark',
+      path: '/erp/help-center',
+      auth: 'admin',
+      themeMode: 'dark',
+      customerConfig: roleGuidedCustomerConfig,
+      adminProfile: {
+        is_super_admin: false,
+        roles: [
+          { role_key: 'purchase', name: '采购' },
+          { role_key: 'finance', name: '财务' },
+        ],
+      },
+      effectiveSession: customerRoleRuntimeSession(
+        ['purchase', 'finance'],
+        'style-l1-role-guided-finance-purchase'
+      ),
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectText(page, '当前账号有多个岗位')
+        await expectText(page, '采购')
+        await expectText(page, '正常办理案例')
+        await expectText(page, '异常完成标准')
+
+        await page
+          .locator('.erp-help-center-role-picker .ant-select-selector')
+          .click()
+        await page
+          .locator('.ant-select-item-option')
+          .filter({ hasText: '财务' })
+          .click()
+        await page
+          .locator('.ant-select-dropdown')
+          .waitFor({ state: 'hidden', timeout: 10_000 })
+        await page
+          .locator('[data-role-help-key="finance"]')
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        await expectText(page, '办理发票')
+        await expectText(page, '发现差异时到对账页面记录')
+        await assertTextAbsent(page, '办理收付款与核销')
+        await assertTextAbsent(page, '多笔应收或应付核销')
+        await assertNoHorizontalOverflow(
+          page,
+          'yoyoosun-finance-purchase-role-help-mobile-dark'
+        )
       },
     },
     {
@@ -7817,9 +8203,9 @@ export function createStyleL1Scenarios(deps) {
           },
           {
             path: '/__dev/capability-ledger',
-            heading: '能力台账可视化 / Capability Ledger',
+            heading: '能力真源入口 / Capability Sources',
             rootSelector: '.erp-dev-capability-page',
-            titlePrefix: '能力台账 · ',
+            titlePrefix: '能力真源 · ',
           },
           {
             path: '/__dev/customer-config?customer=yoyoosun',
@@ -7865,7 +8251,6 @@ export function createStyleL1Scenarios(deps) {
                 '.erp-dev-docs-shell',
                 '.erp-dev-testing-shell',
                 '.erp-dev-prototypes-shell',
-                '.erp-dev-capability-shell',
                 '.erp-dev-customer-shell',
               ].join(', ')
             )
@@ -7950,7 +8335,11 @@ export function createStyleL1Scenarios(deps) {
             {
               devNavCount: 1,
               copyActionCount: 1,
-              sourceActionCount: devPage.path === '/__dev/' ? 0 : 1,
+              sourceActionCount:
+                devPage.path === '/__dev/' ||
+                devPage.path === '/__dev/capability-ledger'
+                  ? 0
+                  : 1,
               workspaceRouteCount: 7,
               currentWorkspaceRouteCount: 1,
               workspacePageDisplay: 'block',
@@ -8232,18 +8621,6 @@ export function createStyleL1Scenarios(deps) {
           '客户配置视图切换',
           await readControlGroup(
             '.erp-dev-customer-view-switch',
-            '.erp-dev-task-nav__item'
-          )
-        )
-
-        await gotoScenarioPath(page, '/__dev/capability-ledger', {
-          waitUntil: 'domcontentloaded',
-        })
-        await expectHeading(page, '能力台账可视化 / Capability Ledger')
-        assertButtonGroup(
-          '能力台账视图切换',
-          await readControlGroup(
-            '.erp-dev-capability-view-switch',
             '.erp-dev-task-nav__item'
           )
         )
@@ -9004,416 +9381,218 @@ export function createStyleL1Scenarios(deps) {
       },
     },
     {
-      name: 'dev-capability-select-long-text-desktop',
-      path: '/__dev/capability-ledger',
-      viewport: { width: 1536, height: 900 },
-      verify: async (page) => {
-        await expectHeading(page, '能力台账可视化 / Capability Ledger')
-        const domainSelect = page.locator('.ant-select', {
-          has: page.getByRole('combobox', { name: '按业务域筛选' }),
-        })
-        await domainSelect.click()
-        const longOption = page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '架构 / Architecture · 工作流 / Workflow' })
-        const optionMetrics = await longOption.evaluate((node) => {
-          const content = node.querySelector('.ant-select-item-option-content')
-          const nonLastOption = node.parentElement?.querySelector(
-            '.ant-select-item-option:not(:last-child)'
-          )
-          const optionRect = node.getBoundingClientRect()
-          const contentRect = content?.getBoundingClientRect()
-          const optionStyle = getComputedStyle(node)
-          const style = content ? getComputedStyle(content) : null
-          return {
-            optionHeight: Number(optionRect.height.toFixed(1)),
-            contentHeight: Number((contentRect?.height || 0).toFixed(1)),
-            clientWidth: content?.clientWidth || 0,
-            scrollWidth: content?.scrollWidth || 0,
-            borderRadius: optionStyle.borderRadius,
-            dividerBoxShadow: nonLastOption
-              ? getComputedStyle(nonLastOption).boxShadow
-              : '',
-            paddingBlock: [optionStyle.paddingTop, optionStyle.paddingBottom],
-            paddingInline: [optionStyle.paddingLeft, optionStyle.paddingRight],
-            overflowWrap: style?.overflowWrap || '',
-            textOverflow: style?.textOverflow || '',
-            whiteSpace: style?.whiteSpace || '',
-          }
-        })
-        assert.deepEqual(
-          {
-            overflowWrap: optionMetrics.overflowWrap,
-            textOverflow: optionMetrics.textOverflow,
-            whiteSpace: optionMetrics.whiteSpace,
-          },
-          {
-            overflowWrap: 'anywhere',
-            textOverflow: 'clip',
-            whiteSpace: 'normal',
-          },
-          `下拉选项应允许完整换行，不能继续单行省略: ${JSON.stringify(optionMetrics)}`
-        )
-        assert(
-          optionMetrics.scrollWidth <= optionMetrics.clientWidth + 1 &&
-            optionMetrics.optionHeight >= optionMetrics.contentHeight,
-          `长下拉选项必须完整落在自身盒内，不能横向溢出或覆盖相邻项: ${JSON.stringify(optionMetrics)}`
-        )
-        assert.deepEqual(
-          {
-            borderRadius: optionMetrics.borderRadius,
-            paddingBlock: optionMetrics.paddingBlock,
-            paddingInline: optionMetrics.paddingInline,
-          },
-          {
-            borderRadius: '8px',
-            paddingBlock: ['8px', '8px'],
-            paddingInline: ['10px', '10px'],
-          },
-          `每个下拉选项都应具备一致的可扫描 item 盒模型: ${JSON.stringify(optionMetrics)}`
-        )
-        assert(
-          optionMetrics.dividerBoxShadow.includes('inset'),
-          `非末项下拉选项应保留轻量分隔，避免多行文字与下一项粘连: ${JSON.stringify(optionMetrics)}`
-        )
-        await longOption.click()
-        const selectedMetrics = await domainSelect.evaluate((node) => {
-          const selected = node.querySelector('.ant-select-selection-item')
-          const style = selected ? getComputedStyle(selected) : null
-          return {
-            text: selected?.textContent?.trim() || '',
-            title: selected?.getAttribute('title') || '',
-            textOverflow: style?.textOverflow || '',
-            whiteSpace: style?.whiteSpace || '',
-          }
-        })
-        assert.deepEqual(
-          selectedMetrics,
-          {
-            text: '架构 / Architecture · 工作流 / Workflow',
-            title: '架构 / Architecture · 工作流 / Workflow',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          },
-          `收起态应保持单行稳定高度，并通过 title 提供完整值: ${JSON.stringify(selectedMetrics)}`
-        )
-        await domainSelect.click()
-        await page.keyboard.press('Home')
-        await page.keyboard.press('Enter')
-        await domainSelect.click()
-        const reopenedDropdown = page
-          .locator('.ant-select-dropdown:not(.ant-select-dropdown-hidden)')
-          .last()
-        await reopenedDropdown.waitFor({ state: 'visible' })
-        await page.waitForFunction(() => {
-          const element = Array.from(
-            document.querySelectorAll(
-              '.ant-select-dropdown:not(.ant-select-dropdown-hidden)'
-            )
-          ).at(-1)
-          if (!element) return false
-          const rect = element.getBoundingClientRect()
-          const style = getComputedStyle(element)
-          return (
-            rect.width > 0 &&
-            rect.height > 0 &&
-            style.opacity === '1' &&
-            style.transform === 'none'
-          )
-        })
-        await reopenedDropdown.screenshot({
-          path: 'output/playwright/style-l1/dev-capability-select-long-text-options.png',
-        })
-        await page.keyboard.press('Escape')
-      },
-    },
-    {
       name: 'dev-capability-ledger-dark-desktop',
       path: '/__dev/capability-ledger',
       themeMode: 'dark',
       viewport: { width: 1536, height: 900 },
       verify: async (page) => {
-        await expectHeading(page, '能力台账可视化 / Capability Ledger')
-        await expectText(page, '只显示构建安全的非权威短摘要')
-        await expectText(page, '不读取或打包正式 Markdown / summaries only')
-        await assertTextAbsent(page, '联动读取 4 份 Markdown / 4 linked docs')
-        const readLedgerMetrics = () =>
-          page.evaluate(() => ({
-            view: new URL(location.href).searchParams.get('view'),
-            item: new URL(location.href).searchParams.get('item'),
-            rowCount: document.querySelectorAll('.erp-dev-capability-row')
-              .length,
-            currentRowCount: document.querySelectorAll(
-              '.erp-dev-capability-row[aria-current="true"]'
-            ).length,
-            metricValues: [
-              ...document.querySelectorAll('.erp-dev-capability-metric__value'),
-            ].map((node) => node.textContent?.trim() || ''),
-            diagnosticCount: document.querySelectorAll(
-              '[aria-label="真源诊断"] .ant-alert'
-            ).length,
-            sourceLinks: [
-              ...document.querySelectorAll('.erp-dev-capability-source a'),
-            ].map((link) => link.getAttribute('href') || ''),
-          }))
+        await expectHeading(page, '能力真源入口 / Capability Sources')
+        await expectText(page, '这里只负责带你找到两份正式真源')
+        await expectText(page, '不计算成熟度 · 不复制证据 · 不替代验收')
+        await expectText(page, '产品能力进度台账')
+        await expectText(page, 'yoyoosun 客户能力、交付与差异矩阵')
+        await assertTextAbsent(page, '高成熟度')
+        await assertTextAbsent(page, '按所属层筛选')
 
-        const capabilityMetrics = await readLedgerMetrics()
-        assert.equal(
-          capabilityMetrics.view,
-          'capabilities',
-          `能力台账默认 URL 应归一化为产品能力视图: ${JSON.stringify(capabilityMetrics)}`
-        )
-        assert.equal(
-          capabilityMetrics.rowCount,
-          1,
-          `能力台账开发页只应解析 1 项构建安全短摘要: ${JSON.stringify(capabilityMetrics)}`
-        )
-        assert.equal(
-          capabilityMetrics.currentRowCount,
-          1,
-          `能力台账当前项应向读屏暴露 aria-current: ${JSON.stringify(capabilityMetrics)}`
-        )
-        assert.equal(
-          capabilityMetrics.metricValues[0],
-          '1',
-          `能力台账总数指标异常: ${JSON.stringify(capabilityMetrics)}`
-        )
-        assert.equal(
-          capabilityMetrics.diagnosticCount,
-          0,
-          `构建内短摘要不应出现解析或精确关联诊断: ${JSON.stringify(capabilityMetrics)}`
-        )
-        assert.equal(
-          capabilityMetrics.sourceLinks.length,
-          2,
-          `产品能力视图应同时暴露快查和证据详情真源: ${JSON.stringify(capabilityMetrics)}`
-        )
-
-        await expectText(page, '所属层 / Product Layer')
-        await expectText(page, '业务域 / Domain')
-        await expectText(page, '成熟度 / Maturity')
-        await page
-          .locator('.ant-select', {
-            has: page.getByRole('combobox', { name: '按所属层筛选' }),
-          })
-          .click()
-        await expectText(page, '产品内核 / Product Core')
-        const layerOptionTexts = await page
-          .locator(
-            '.ant-select-dropdown:visible .ant-select-item-option-content'
-          )
-          .allTextContents()
-        assert(
-          layerOptionTexts.every(
-            (value) => value === '全部' || /[\u3400-\u9fff]/u.test(value)
-          ),
-          `所属层下拉不得出现无中文解释的纯英文选项: ${JSON.stringify(layerOptionTexts)}`
-        )
-        await page.keyboard.press('Escape')
-        const domainSelect = page.locator('.ant-select', {
-          has: page.getByRole('combobox', { name: '按业务域筛选' }),
-        })
-        await domainSelect.click()
-        await expectText(page, '架构 / Architecture · 工作流 / Workflow')
-        const domainOptionTexts = await page
-          .locator(
-            '.ant-select-dropdown:visible .ant-select-item-option-content'
-          )
-          .allTextContents()
-        assert(
-          domainOptionTexts.every(
-            (value) => value === '全部' || /[\u3400-\u9fff]/u.test(value)
-          ),
-          `业务域下拉不得出现无中文解释的纯英文选项: ${JSON.stringify(domainOptionTexts)}`
-        )
-        const longDomainOption = page
-          .locator('.ant-select-dropdown:visible .ant-select-item-option')
-          .filter({ hasText: '架构 / Architecture · 工作流 / Workflow' })
-        const longDomainOptionMetrics = await longDomainOption.evaluate(
-          (node) => {
-            const content = node.querySelector(
-              '.ant-select-item-option-content'
-            )
-            const optionRect = node.getBoundingClientRect()
-            const contentRect = content?.getBoundingClientRect()
-            const style = content ? getComputedStyle(content) : null
-            return {
-              optionHeight: Number(optionRect.height.toFixed(1)),
-              contentHeight: Number((contentRect?.height || 0).toFixed(1)),
-              clientWidth: content?.clientWidth || 0,
-              scrollWidth: content?.scrollWidth || 0,
-              overflowWrap: style?.overflowWrap || '',
-              textOverflow: style?.textOverflow || '',
-              whiteSpace: style?.whiteSpace || '',
-            }
-          }
-        )
-        assert.deepEqual(
-          {
-            overflowWrap: longDomainOptionMetrics.overflowWrap,
-            textOverflow: longDomainOptionMetrics.textOverflow,
-            whiteSpace: longDomainOptionMetrics.whiteSpace,
-          },
-          {
-            overflowWrap: 'anywhere',
-            textOverflow: 'clip',
-            whiteSpace: 'normal',
-          },
-          `下拉选项应允许完整换行，不能继续单行省略: ${JSON.stringify(longDomainOptionMetrics)}`
-        )
-        assert(
-          longDomainOptionMetrics.scrollWidth <=
-            longDomainOptionMetrics.clientWidth + 1 &&
-            longDomainOptionMetrics.optionHeight >=
-              longDomainOptionMetrics.contentHeight,
-          `长下拉选项必须完整落在自身盒内，不能横向溢出或覆盖相邻项: ${JSON.stringify(longDomainOptionMetrics)}`
-        )
-        await longDomainOption.click()
-        const selectedDomainMetrics = await page
-          .getByRole('combobox', { name: '按业务域筛选' })
-          .locator('xpath=..')
-          .evaluate((node) => {
-            const selected = node
-              .closest('.ant-select')
-              ?.querySelector('.ant-select-selection-item')
-            const style = selected ? getComputedStyle(selected) : null
-            return {
-              text: selected?.textContent?.trim() || '',
-              title: selected?.getAttribute('title') || '',
-              textOverflow: style?.textOverflow || '',
-              whiteSpace: style?.whiteSpace || '',
-            }
-          })
-        assert.deepEqual(
-          selectedDomainMetrics,
-          {
-            text: '架构 / Architecture · 工作流 / Workflow',
-            title: '架构 / Architecture · 工作流 / Workflow',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-          },
-          `收起态应保持单行稳定高度，并通过 title 提供完整值: ${JSON.stringify(selectedDomainMetrics)}`
-        )
-        await domainSelect.click()
-        await page.keyboard.press('Home')
-        await page.keyboard.press('Enter')
-        await expectText(page, '全部')
-
-        await page.getByRole('button', { name: '查看分布分析' }).click()
-        await page.waitForFunction(
-          () =>
-            new URL(location.href).searchParams.get('analysis') === '1' &&
-            document.querySelectorAll(
-              '.erp-dev-capability-maturity-guide__item'
-            ).length === 9
-        )
-        await expectText(page, '成熟度等级说明')
-        await expectText(page, 'L0–L8 是能力成熟度')
-        const maturityGuideMetrics = await page.evaluate(() => ({
-          levels: [
+        const metrics = await page.evaluate(() => {
+          const grid = document.querySelector('.erp-dev-capability-source-grid')
+          const cards = [
+            ...document.querySelectorAll('.erp-dev-capability-source-card'),
+          ]
+          const links = [
             ...document.querySelectorAll(
-              '.erp-dev-capability-maturity-guide__level'
+              '.erp-dev-capability-source-card__link'
             ),
-          ].map((node) => node.textContent?.trim() || ''),
-          guideText:
-            document.querySelector('.erp-dev-capability-maturity-guide')
-              ?.textContent || '',
-          scrollWidth: document.documentElement.scrollWidth,
-          clientWidth: document.documentElement.clientWidth,
-        }))
-        assert.deepEqual(
-          maturityGuideMetrics.levels,
-          ['L0', 'L1', 'L2', 'L3', 'L4', 'L5', 'L6', 'L7', 'L8'],
-          `成熟度说明必须展示完整等级梯度: ${JSON.stringify(maturityGuideMetrics)}`
-        )
-        assert.match(maturityGuideMetrics.guideText, /style:l1/)
-        assert.match(maturityGuideMetrics.guideText, /T0–T8/)
-        assert(
-          maturityGuideMetrics.scrollWidth <=
-            maturityGuideMetrics.clientWidth + 1,
-          `成熟度说明不应造成页面横向溢出: ${JSON.stringify(maturityGuideMetrics)}`
-        )
-        await assertDarkThemeContrast(page, {
-          scenarioName: 'dev-capability-ledger-dark-desktop-analysis',
-          selector: '.erp-dev-capability-page',
+          ]
+          const cardRects = cards.map((card) => {
+            const rect = card.getBoundingClientRect()
+            return {
+              top: Number(rect.top.toFixed(1)),
+              right: Number(rect.right.toFixed(1)),
+              bottom: Number(rect.bottom.toFixed(1)),
+              left: Number(rect.left.toFixed(1)),
+              width: Number(rect.width.toFixed(1)),
+              height: Number(rect.height.toFixed(1)),
+            }
+          })
+          return {
+            sourceKeys: cards.map(
+              (card) => card.dataset.devCapabilitySource || ''
+            ),
+            hrefs: links.map((link) => link.getAttribute('href') || ''),
+            gridColumns: grid ? getComputedStyle(grid).gridTemplateColumns : '',
+            cardRects,
+            linkCursors: links.map((link) => getComputedStyle(link).cursor),
+            oldMetricCount: document.querySelectorAll(
+              '.erp-dev-capability-metric'
+            ).length,
+            oldViewSwitchCount: document.querySelectorAll(
+              '.erp-dev-capability-view-switch'
+            ).length,
+            filterCount: document.querySelectorAll(
+              '.erp-dev-capability-page .ant-select, .erp-dev-capability-page input'
+            ).length,
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
         })
 
-        await page
-          .locator('.erp-dev-capability-view-switch .erp-dev-task-nav__item')
-          .filter({ hasText: '客户交付' })
-          .click()
-        await page.waitForFunction(
-          () =>
-            new URL(location.href).searchParams.get('view') === 'delivery' &&
-            document.querySelectorAll('.erp-dev-capability-row').length === 1
+        assert.deepEqual(
+          metrics.sourceKeys,
+          ['product-capability', 'yoyoosun-customer-matrix'],
+          `能力真源页只应保留两个正式入口: ${JSON.stringify(metrics)}`
         )
-        const deliveryMetrics = await readLedgerMetrics()
-        assert.equal(
-          deliveryMetrics.view,
-          'delivery',
-          `客户交付视图应写入 URL: ${JSON.stringify(deliveryMetrics)}`
+        assert.deepEqual(
+          metrics.hrefs,
+          [
+            '/__dev/docs?path=docs%2Fproduct%2F%E4%BA%A7%E5%93%81%E8%83%BD%E5%8A%9B%E8%BF%9B%E5%BA%A6%E5%8F%B0%E8%B4%A6.md',
+            '/__dev/docs?path=docs%2Fcustomers%2Fyoyoosun%2F%E5%AE%A2%E6%88%B7%E4%BA%A4%E4%BB%98%E7%9F%A9%E9%98%B5.md',
+          ],
+          `能力真源入口必须直达两份正式 Markdown: ${JSON.stringify(metrics)}`
         )
-        assert.equal(
-          deliveryMetrics.rowCount,
-          1,
-          `客户交付开发视图只应解析 1 项构建安全短摘要: ${JSON.stringify(deliveryMetrics)}`
+        assert(
+          metrics.gridColumns.split(' ').length === 2 &&
+            metrics.cardRects.length === 2 &&
+            Math.abs(metrics.cardRects[0].top - metrics.cardRects[1].top) <=
+              1 &&
+            metrics.cardRects[1].left > metrics.cardRects[0].right &&
+            Math.abs(
+              metrics.cardRects[0].height - metrics.cardRects[1].height
+            ) <= 1,
+          `桌面端应为稳定双列且两卡等高: ${JSON.stringify(metrics)}`
         )
-        assert(deliveryMetrics.item)
+        assert.deepEqual(
+          {
+            linkCursors: metrics.linkCursors,
+            oldMetricCount: metrics.oldMetricCount,
+            oldViewSwitchCount: metrics.oldViewSwitchCount,
+            filterCount: metrics.filterCount,
+          },
+          {
+            linkCursors: ['pointer', 'pointer'],
+            oldMetricCount: 0,
+            oldViewSwitchCount: 0,
+            filterCount: 0,
+          },
+          `入口必须可操作，旧指标、视图切换和筛选不得残留: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.scrollWidth <= metrics.clientWidth + 1,
+          `能力真源桌面页不应横向溢出: ${JSON.stringify(metrics)}`
+        )
 
-        await page
-          .locator('.erp-dev-capability-view-switch .erp-dev-task-nav__item')
-          .filter({ hasText: '客户差异' })
-          .click()
-        await page.waitForFunction(
-          () =>
-            new URL(location.href).searchParams.get('view') === 'delta' &&
-            document.querySelectorAll('.erp-dev-capability-row').length === 1
-        )
-        const deltaMetrics = await readLedgerMetrics()
-        assert.equal(
-          deltaMetrics.view,
-          'delta',
-          `客户差异视图应写入 URL: ${JSON.stringify(deltaMetrics)}`
-        )
-        assert.equal(
-          deltaMetrics.rowCount,
-          1,
-          `客户差异开发视图只应解析 1 项构建安全短摘要: ${JSON.stringify(deltaMetrics)}`
-        )
-
-        await page
-          .getByPlaceholder('搜索能力、风险、证据、下一步或客户项')
-          .fill('__no_match__')
-        await expectText(page, '没有匹配差异')
-        const emptyMetrics = await readLedgerMetrics()
-        assert.equal(
-          emptyMetrics.rowCount,
-          0,
-          `零结果筛选不能回退显示筛选外条目: ${JSON.stringify(emptyMetrics)}`
-        )
-        await page
-          .getByPlaceholder('搜索能力、风险、证据、下一步或客户项')
-          .fill('')
-        await page.goBack({ waitUntil: 'domcontentloaded' })
-        await page.waitForFunction(
-          () =>
-            new URL(location.href).searchParams.get('view') === 'delivery' &&
-            document.querySelectorAll('.erp-dev-capability-row').length === 1
-        )
-        const historyMetrics = await readLedgerMetrics()
-        assert.equal(
-          historyMetrics.rowCount,
-          1,
-          `浏览器后退应恢复客户交付视图: ${JSON.stringify(historyMetrics)}`
-        )
         await assertDarkThemeContrast(page, {
           scenarioName: 'dev-capability-ledger-dark-desktop',
           selector: '.erp-dev-capability-page',
         })
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-capability-sources-dark-desktop.png',
+          fullPage: true,
+        })
+
+        const productLink = page.getByRole('link', {
+          name: '打开正式文档：产品能力进度台账',
+        })
+        await productLink.click()
+        await page.waitForURL((url) => {
+          return (
+            url.pathname === '/__dev/docs' &&
+            url.searchParams.get('path') === 'docs/product/产品能力进度台账.md'
+          )
+        })
+        await page.goBack({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '能力真源入口 / Capability Sources')
+
+        const customerLink = page.getByRole('link', {
+          name: '打开正式文档：yoyoosun 客户能力、交付与差异矩阵',
+        })
+        await customerLink.click()
+        await page.waitForURL((url) => {
+          return (
+            url.pathname === '/__dev/docs' &&
+            url.searchParams.get('path') ===
+              'docs/customers/yoyoosun/客户交付矩阵.md'
+          )
+        })
+        await page.goBack({ waitUntil: 'domcontentloaded' })
+        await expectHeading(page, '能力真源入口 / Capability Sources')
         await assertNoHorizontalOverflow(
           page,
           'dev-capability-ledger-dark-desktop'
         )
+      },
+    },
+    {
+      name: 'dev-capability-sources-mobile',
+      path: '/__dev/capability-ledger',
+      themeMode: 'dark',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '能力真源入口 / Capability Sources')
+        const metrics = await page.evaluate(() => {
+          const grid = document.querySelector('.erp-dev-capability-source-grid')
+          const cards = [
+            ...document.querySelectorAll('.erp-dev-capability-source-card'),
+          ]
+          const links = [
+            ...document.querySelectorAll(
+              '.erp-dev-capability-source-card__link'
+            ),
+          ]
+          const cardRects = cards.map((card) => {
+            const rect = card.getBoundingClientRect()
+            return {
+              top: Number(rect.top.toFixed(1)),
+              bottom: Number(rect.bottom.toFixed(1)),
+              left: Number(rect.left.toFixed(1)),
+              right: Number(rect.right.toFixed(1)),
+              width: Number(rect.width.toFixed(1)),
+            }
+          })
+          const linkRects = links.map((link) => {
+            const rect = link.getBoundingClientRect()
+            return {
+              left: Number(rect.left.toFixed(1)),
+              right: Number(rect.right.toFixed(1)),
+              width: Number(rect.width.toFixed(1)),
+            }
+          })
+          return {
+            gridColumns: grid ? getComputedStyle(grid).gridTemplateColumns : '',
+            cardRects,
+            linkRects,
+            scrollWidth: document.documentElement.scrollWidth,
+            clientWidth: document.documentElement.clientWidth,
+          }
+        })
+
+        assert(
+          metrics.cardRects.length === 2 &&
+            !metrics.gridColumns.includes(' ') &&
+            metrics.cardRects[1].top > metrics.cardRects[0].bottom,
+          `移动端应按阅读顺序改为单列: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.linkRects.every(
+            (link, index) =>
+              Math.abs(link.left - metrics.cardRects[index].left - 14) <= 1 &&
+              Math.abs(metrics.cardRects[index].right - link.right - 14) <= 1
+          ),
+          `移动端主入口应占满卡片内容宽度: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.scrollWidth <= metrics.clientWidth + 1,
+          `能力真源移动页不应横向溢出: ${JSON.stringify(metrics)}`
+        )
+        await assertDarkThemeContrast(page, {
+          scenarioName: 'dev-capability-sources-mobile',
+          selector: '.erp-dev-capability-page',
+        })
+        await page.screenshot({
+          path: 'output/playwright/style-l1/dev-capability-sources-mobile.png',
+          fullPage: true,
+        })
+        await assertNoHorizontalOverflow(page, 'dev-capability-sources-mobile')
       },
     },
     {
@@ -10057,7 +10236,7 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '可用功能')
         await expectText(page, '数据范围')
         await expectText(page, '敏感字段')
-        await expectText(page, '最终有效权限')
+        await expectText(page, '页面与导航')
         await expectText(page, '选择这个岗位可以使用的功能')
         await page.getByRole('tab', { name: '数据范围' }).click()
         await expectText(page, '仓库与库存查看范围已生效')
@@ -10070,9 +10249,20 @@ export function createStyleL1Scenarios(deps) {
           path: 'output/playwright/style-l1/permission-center-policy-tabs.png',
           fullPage: true,
         })
-        await page.getByRole('tab', { name: '最终有效权限' }).click()
+        await page.getByRole('tab', { name: '页面与导航' }).click()
         await expectText(page, '当前客户已启用版本')
-        await expectText(page, '当前可用结果')
+        await expectText(page, '页面可进入，不等于页面内所有操作都可用')
+        await expectText(page, '当前页面结果')
+        await expectText(page, '当前已保存的导航位置')
+        await expectText(page, '看板中心')
+        await expectText(page, '常用工作')
+        await expectText(page, '更多功能（2）')
+        await expectText(page, '工作台')
+        await expectText(page, '任务看板')
+        await expectText(page, '客户档案')
+        await expectText(page, '销售订单')
+        await expectText(page, '库存台账')
+        await expectText(page, '岗位使用帮助')
         const permissionMapMetrics = await page.evaluate(() => {
           const table = document.querySelector(
             '.erp-role-policy-tabs .ant-table'
@@ -10090,14 +10280,44 @@ export function createStyleL1Scenarios(deps) {
               permissionMapMetrics.clientWidth + 1,
           `权限地图表格出现横向溢出: ${JSON.stringify(permissionMapMetrics)}`
         )
+        const navigationPreviewMetrics = await page.evaluate(() => {
+          const preview = document.querySelector('.erp-role-navigation-preview')
+          const grid = preview?.querySelector(
+            '.erp-role-navigation-preview__grid'
+          )
+          const groups = grid?.querySelectorAll(
+            '.erp-role-navigation-preview__group'
+          )
+          const columns = grid
+            ? window.getComputedStyle(grid).gridTemplateColumns
+            : ''
+          return {
+            hasPreview: Boolean(preview),
+            groupCount: groups?.length || 0,
+            columns,
+            scrollWidth: preview?.scrollWidth || 0,
+            clientWidth: preview?.clientWidth || 0,
+          }
+        })
+        assert(
+          navigationPreviewMetrics.hasPreview &&
+            navigationPreviewMetrics.groupCount === 3 &&
+            navigationPreviewMetrics.columns.split(' ').length === 3 &&
+            navigationPreviewMetrics.scrollWidth <=
+              navigationPreviewMetrics.clientWidth + 1,
+          `权限中心导航预览桌面布局异常: ${JSON.stringify(navigationPreviewMetrics)}`
+        )
+        await page.locator('.erp-role-navigation-preview').screenshot({
+          path: 'output/playwright/style-l1/permission-center-navigation-preview.png',
+        })
         await page.waitForTimeout(350)
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-permission-map.png',
           fullPage: true,
         })
         await expectText(page, '当前勾选的功能影响')
-        await expectText(page, '可使用')
-        await expectText(page, '不可使用')
+        await expectText(page, '可进入')
+        await expectText(page, '不可进入')
         await page.getByRole('tab', { name: '可用功能' }).click()
         await assertTextAbsent(page, '当前角色权限尚未保存')
         await assertTextAbsent(page, '角色名称可按岗位调整，职责权限保持统一')
@@ -10347,6 +10567,61 @@ export function createStyleL1Scenarios(deps) {
           true,
           '已注销账号不能再次执行注销或通过普通启停恢复'
         )
+      },
+    },
+    {
+      name: 'permission-center-navigation-mobile-dark',
+      path: '/erp/system/permissions',
+      auth: 'admin',
+      themeMode: 'dark',
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await expectHeading(page, '权限管理')
+        await page.getByRole('tab', { name: '页面与导航' }).click()
+        await expectText(page, '当前已保存的导航位置')
+        await expectText(page, '更多功能（2）')
+        await expectText(page, '岗位使用帮助')
+        const metrics = await page.evaluate(() => {
+          const preview = document.querySelector('.erp-role-navigation-preview')
+          const grid = preview?.querySelector(
+            '.erp-role-navigation-preview__grid'
+          )
+          const previewRect = preview?.getBoundingClientRect()
+          return {
+            columns: grid
+              ? window.getComputedStyle(grid).gridTemplateColumns
+              : '',
+            previewScrollWidth: preview?.scrollWidth || 0,
+            previewClientWidth: preview?.clientWidth || 0,
+            previewLeft: previewRect?.left || 0,
+            previewRight: previewRect?.right || 0,
+            previewWidth: previewRect?.width || 0,
+            viewportWidth: window.innerWidth,
+            documentScrollWidth: document.documentElement.scrollWidth,
+            documentClientWidth: document.documentElement.clientWidth,
+          }
+        })
+        assert(
+          metrics.columns.split(' ').length === 1 &&
+            metrics.previewScrollWidth <= metrics.previewClientWidth + 1 &&
+            metrics.previewLeft >= -1 &&
+            metrics.previewRight <= metrics.viewportWidth + 1 &&
+            metrics.previewWidth <= metrics.viewportWidth + 1 &&
+            metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
+          `权限中心导航预览移动端布局异常: ${JSON.stringify(metrics)}`
+        )
+        await assertERPThemeMode(page, {
+          scenarioName: 'permission-center-navigation-mobile-dark',
+          expectedMode: 'dark',
+          expectedEffectiveTheme: 'dark',
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'permission-center-navigation-mobile-dark'
+        )
+        await page.locator('.erp-role-navigation-preview').screenshot({
+          path: 'output/playwright/style-l1/permission-center-navigation-mobile-dark-preview.png',
+        })
       },
     },
     {

@@ -127,13 +127,10 @@ export function createBusinessFormalScenarios(deps) {
   const confirmVisiblePopconfirm = async (page) => {
     const popconfirm = page.locator('.ant-popconfirm:visible').last()
     await popconfirm.waitFor({ state: 'visible' })
-    const buttons = popconfirm.locator('button')
-    for (let index = 0; index < (await buttons.count()); index += 1) {
-      const candidate = buttons.nth(index)
-      if (compactVisibleText(await candidate.innerText()) === '确认') {
-        await candidate.click()
-        return
-      }
+    const confirmButton = popconfirm.locator('button.ant-btn-primary:visible')
+    if ((await confirmButton.count()) === 1) {
+      await confirmButton.click()
+      return
     }
     throw new Error(
       `确认弹层缺少“确认”按钮: ${String((await popconfirm.innerText()) || '')
@@ -2723,11 +2720,11 @@ export function createBusinessFormalScenarios(deps) {
         await expectButton(page, '列顺序')
         await assertNoListDeleteTrashToolbar(page)
         await assertTextAbsent(page, 'quality_inspections')
-        await expectText(page, '首次到货检验不合格会阻止本单入库')
         await expectText(
           page,
-          '退供应商草稿只适用于已入库后追加检验不合格'
+          '首次到货检验不合格可按来源行和部分数量办理退厂或补换'
         )
+        await expectText(page, '已入库后的不合格仍生成采购退货')
         await expectText(page, 'QI-STYLE-L1')
         await expectText(page, 'PR-STYLE-L1')
         await expectText(page, 'INV-LOT-001')

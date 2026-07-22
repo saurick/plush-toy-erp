@@ -6,9 +6,10 @@
 
 | 任务 | 先读 | 再核对 |
 | --- | --- | --- |
-| 判断某客户资料范围 | `<customer-key>/README.md` | `docs/当前真源与交接顺序.md`、客户目录内交付矩阵 / 差异台账 |
+| 判断某客户资料范围 | `<customer-key>/README.md` | `docs/当前真源与交接顺序.md`、客户目录内客户交付矩阵 |
+| 与现有甲方确认多岗位职责、审批和跨岗流程 | `<customer-key>/甲方角色职责与业务流转确认表.md`（若该客户已建立） | 客户决策日志 / 问题待办、角色技术手册、当前系统流程矩阵 |
 | 做客户导入 dry-run | `<customer-key>/导入策略.md` | 客户私有仓库中的 manifest、导入工具说明、脚本测试 |
-| 判断客户差异是否产品化 | `<customer-key>/客户差异台账.md` | `docs/product/客户差异策略.md`、Product Core 评审 |
+| 判断客户差异是否产品化 | `<customer-key>/客户交付矩阵.md` 的客户差异与决策 | `docs/product/客户差异策略.md`、Product Core 评审 |
 | 做客户私有化资料包 | `<customer-key>/README.md` | `config/customers/<customer-key>/README.md`、`deployments/<customer-key>/README.md` |
 | 实施新增私有化甲方 | `../product/新增甲方客户实施流程.md` | `reference-customer/README.md`、`../../config/private-deployment-template/README.md`、目标客户受控交付资料 |
 
@@ -16,7 +17,7 @@
 
 | 客户 key | 入口 | 当前用途 |
 | --- | --- | --- |
-| `yoyoosun` | `yoyoosun/README.md` | 永绅脱敏客户资料、导入准备、客户差异、试用说明和历史 evidence 索引；原件与私密 manifest 真源在客户专属 Private 仓库 |
+| `yoyoosun` | `yoyoosun/README.md` | 永绅甲方面谈确认表、脱敏客户资料、导入准备、客户差异、试用说明和历史 evidence 索引；原件、签字版与私密 manifest 真源在客户专属 Private 仓库 |
 
 ## 工程参考 / Engineering Reference
 

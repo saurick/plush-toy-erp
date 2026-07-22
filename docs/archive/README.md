@@ -49,3 +49,4 @@
 | `docs/archive/progress-2026-07-15-before-local-admin-default-policy.md` | 本地管理员默认凭据稳定化前的 `progress.md` 完整过程记录归档 |
 | `docs/archive/progress-2026-07-17-before-workflow-source-task-producers.md` | 三类 Workflow 真实业务生产者接入前的 `progress.md` 完整过程记录归档 |
 | `docs/archive/progress-2026-07-18-before-source-lineage-draft-cancellation-closeout.md` | 来源血缘、事实草稿退出和结算边界集中收口前的 `progress.md` 完整过程记录归档 |
+| `docs/archive/progress-2026-07-23-before-exception-flow-v1-final-handoff.md` | 异常流 V1 四项收口最终 Handoff 前的 `progress.md` 完整过程记录归档 |

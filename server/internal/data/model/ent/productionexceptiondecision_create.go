@@ -47,6 +47,20 @@ func (_c *ProductionExceptionDecisionCreate) SetNillableStatus(v *string) *Produ
 	return _c
 }
 
+// SetExecutionStatus sets the "execution_status" field.
+func (_c *ProductionExceptionDecisionCreate) SetExecutionStatus(v string) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetExecutionStatus(v)
+	return _c
+}
+
+// SetNillableExecutionStatus sets the "execution_status" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableExecutionStatus(v *string) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetExecutionStatus(*v)
+	}
+	return _c
+}
+
 // SetProductionOrderID sets the "production_order_id" field.
 func (_c *ProductionExceptionDecisionCreate) SetProductionOrderID(v int) *ProductionExceptionDecisionCreate {
 	_c.mutation.SetProductionOrderID(v)
@@ -215,6 +229,76 @@ func (_c *ProductionExceptionDecisionCreate) SetNillableDecisionReason(v *string
 	return _c
 }
 
+// SetExecutedBy sets the "executed_by" field.
+func (_c *ProductionExceptionDecisionCreate) SetExecutedBy(v int) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetExecutedBy(v)
+	return _c
+}
+
+// SetNillableExecutedBy sets the "executed_by" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableExecutedBy(v *int) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetExecutedBy(*v)
+	}
+	return _c
+}
+
+// SetExecutedAt sets the "executed_at" field.
+func (_c *ProductionExceptionDecisionCreate) SetExecutedAt(v time.Time) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetExecutedAt(v)
+	return _c
+}
+
+// SetNillableExecutedAt sets the "executed_at" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableExecutedAt(v *time.Time) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetExecutedAt(*v)
+	}
+	return _c
+}
+
+// SetReversedBy sets the "reversed_by" field.
+func (_c *ProductionExceptionDecisionCreate) SetReversedBy(v int) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetReversedBy(v)
+	return _c
+}
+
+// SetNillableReversedBy sets the "reversed_by" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableReversedBy(v *int) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetReversedBy(*v)
+	}
+	return _c
+}
+
+// SetReversedAt sets the "reversed_at" field.
+func (_c *ProductionExceptionDecisionCreate) SetReversedAt(v time.Time) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetReversedAt(v)
+	return _c
+}
+
+// SetNillableReversedAt sets the "reversed_at" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableReversedAt(v *time.Time) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetReversedAt(*v)
+	}
+	return _c
+}
+
+// SetReverseReason sets the "reverse_reason" field.
+func (_c *ProductionExceptionDecisionCreate) SetReverseReason(v string) *ProductionExceptionDecisionCreate {
+	_c.mutation.SetReverseReason(v)
+	return _c
+}
+
+// SetNillableReverseReason sets the "reverse_reason" field if the given value is not nil.
+func (_c *ProductionExceptionDecisionCreate) SetNillableReverseReason(v *string) *ProductionExceptionDecisionCreate {
+	if v != nil {
+		_c.SetReverseReason(*v)
+	}
+	return _c
+}
+
 // Mutation returns the ProductionExceptionDecisionMutation object of the builder.
 func (_c *ProductionExceptionDecisionCreate) Mutation() *ProductionExceptionDecisionMutation {
 	return _c.mutation
@@ -256,6 +340,10 @@ func (_c *ProductionExceptionDecisionCreate) defaults() error {
 		v := productionexceptiondecision.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.ExecutionStatus(); !ok {
+		v := productionexceptiondecision.DefaultExecutionStatus
+		_c.mutation.SetExecutionStatus(v)
+	}
 	if _, ok := _c.mutation.Version(); !ok {
 		v := productionexceptiondecision.DefaultVersion
 		_c.mutation.SetVersion(v)
@@ -294,6 +382,14 @@ func (_c *ProductionExceptionDecisionCreate) check() error {
 	if v, ok := _c.mutation.Status(); ok {
 		if err := productionexceptiondecision.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.ExecutionStatus(); !ok {
+		return &ValidationError{Name: "execution_status", err: errors.New(`ent: missing required field "ProductionExceptionDecision.execution_status"`)}
+	}
+	if v, ok := _c.mutation.ExecutionStatus(); ok {
+		if err := productionexceptiondecision.ExecutionStatusValidator(v); err != nil {
+			return &ValidationError{Name: "execution_status", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.execution_status": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.ProductionOrderID(); !ok {
@@ -383,6 +479,21 @@ func (_c *ProductionExceptionDecisionCreate) check() error {
 			return &ValidationError{Name: "decision_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.decision_reason": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ExecutedBy(); ok {
+		if err := productionexceptiondecision.ExecutedByValidator(v); err != nil {
+			return &ValidationError{Name: "executed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.executed_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ReversedBy(); ok {
+		if err := productionexceptiondecision.ReversedByValidator(v); err != nil {
+			return &ValidationError{Name: "reversed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.reversed_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ReverseReason(); ok {
+		if err := productionexceptiondecision.ReverseReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reverse_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.reverse_reason": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -420,6 +531,10 @@ func (_c *ProductionExceptionDecisionCreate) createSpec() (*ProductionExceptionD
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(productionexceptiondecision.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.ExecutionStatus(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutionStatus, field.TypeString, value)
+		_node.ExecutionStatus = value
 	}
 	if value, ok := _c.mutation.ProductionOrderID(); ok {
 		_spec.SetField(productionexceptiondecision.FieldProductionOrderID, field.TypeInt, value)
@@ -484,6 +599,26 @@ func (_c *ProductionExceptionDecisionCreate) createSpec() (*ProductionExceptionD
 	if value, ok := _c.mutation.DecisionReason(); ok {
 		_spec.SetField(productionexceptiondecision.FieldDecisionReason, field.TypeString, value)
 		_node.DecisionReason = &value
+	}
+	if value, ok := _c.mutation.ExecutedBy(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutedBy, field.TypeInt, value)
+		_node.ExecutedBy = &value
+	}
+	if value, ok := _c.mutation.ExecutedAt(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutedAt, field.TypeTime, value)
+		_node.ExecutedAt = &value
+	}
+	if value, ok := _c.mutation.ReversedBy(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReversedBy, field.TypeInt, value)
+		_node.ReversedBy = &value
+	}
+	if value, ok := _c.mutation.ReversedAt(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReversedAt, field.TypeTime, value)
+		_node.ReversedAt = &value
+	}
+	if value, ok := _c.mutation.ReverseReason(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReverseReason, field.TypeString, value)
+		_node.ReverseReason = &value
 	}
 	return _node, _spec
 }

@@ -56,7 +56,7 @@ export const yoyoosunFieldNumberingConfig = Object.freeze({
           key: "supplier_type",
           label: "供应商分类",
           decision: "review_required",
-          source: "产品台账索引.md",
+          source: "字段编号确认清单.md",
           note: "需确认材料供应商、加工厂、客户或临时文本的边界。",
         },
         {

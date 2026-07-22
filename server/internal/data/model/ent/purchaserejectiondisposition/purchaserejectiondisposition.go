@@ -7,6 +7,7 @@ import (
 
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 )
 
 const (
@@ -22,6 +23,8 @@ const (
 	FieldPurchaseReceiptID = "purchase_receipt_id"
 	// FieldPurchaseReceiptItemID holds the string denoting the purchase_receipt_item_id field in the database.
 	FieldPurchaseReceiptItemID = "purchase_receipt_item_id"
+	// FieldReplacementReceiptID holds the string denoting the replacement_receipt_id field in the database.
+	FieldReplacementReceiptID = "replacement_receipt_id"
 	// FieldDispositionType holds the string denoting the disposition_type field in the database.
 	FieldDispositionType = "disposition_type"
 	// FieldStatus holds the string denoting the status field in the database.
@@ -54,8 +57,17 @@ const (
 	FieldCreatedBy = "created_by"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
+	// EdgeReplacementReceipt holds the string denoting the replacement_receipt edge name in mutations.
+	EdgeReplacementReceipt = "replacement_receipt"
 	// Table holds the table name of the purchaserejectiondisposition in the database.
 	Table = "purchase_rejection_dispositions"
+	// ReplacementReceiptTable is the table that holds the replacement_receipt relation/edge.
+	ReplacementReceiptTable = "purchase_rejection_dispositions"
+	// ReplacementReceiptInverseTable is the table name for the PurchaseReceipt entity.
+	// It exists in this package in order to avoid circular dependency with the "purchasereceipt" package.
+	ReplacementReceiptInverseTable = "purchase_receipts"
+	// ReplacementReceiptColumn is the table column denoting the replacement_receipt relation/edge.
+	ReplacementReceiptColumn = "replacement_receipt_id"
 )
 
 // Columns holds all SQL columns for purchaserejectiondisposition fields.
@@ -65,6 +77,7 @@ var Columns = []string{
 	FieldQualityInspectionID,
 	FieldPurchaseReceiptID,
 	FieldPurchaseReceiptItemID,
+	FieldReplacementReceiptID,
 	FieldDispositionType,
 	FieldStatus,
 	FieldQuantity,
@@ -108,6 +121,8 @@ var (
 	PurchaseReceiptIDValidator func(int) error
 	// PurchaseReceiptItemIDValidator is a validator for the "purchase_receipt_item_id" field. It is called by the builders before save.
 	PurchaseReceiptItemIDValidator func(int) error
+	// ReplacementReceiptIDValidator is a validator for the "replacement_receipt_id" field. It is called by the builders before save.
+	ReplacementReceiptIDValidator func(int) error
 	// DispositionTypeValidator is a validator for the "disposition_type" field. It is called by the builders before save.
 	DispositionTypeValidator func(string) error
 	// DefaultStatus holds the default value on creation for the "status" field.
@@ -166,6 +181,11 @@ func ByPurchaseReceiptID(opts ...sql.OrderTermOption) OrderOption {
 // ByPurchaseReceiptItemID orders the results by the purchase_receipt_item_id field.
 func ByPurchaseReceiptItemID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldPurchaseReceiptItemID, opts...).ToFunc()
+}
+
+// ByReplacementReceiptID orders the results by the replacement_receipt_id field.
+func ByReplacementReceiptID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldReplacementReceiptID, opts...).ToFunc()
 }
 
 // ByDispositionType orders the results by the disposition_type field.
@@ -246,4 +266,18 @@ func ByCreatedBy(opts ...sql.OrderTermOption) OrderOption {
 // ByCreatedAt orders the results by the created_at field.
 func ByCreatedAt(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldCreatedAt, opts...).ToFunc()
+}
+
+// ByReplacementReceiptField orders the results by replacement_receipt field.
+func ByReplacementReceiptField(field string, opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newReplacementReceiptStep(), sql.OrderByField(field, opts...))
+	}
+}
+func newReplacementReceiptStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ReplacementReceiptInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.M2O, true, ReplacementReceiptTable, ReplacementReceiptColumn),
+	)
 }

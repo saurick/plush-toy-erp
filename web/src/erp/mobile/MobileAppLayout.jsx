@@ -16,10 +16,12 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { getEffectiveSession } from '../api/customerConfigApi.mjs'
 import {
+  ENTRY_TARGET,
   getEntryConfig,
   getEnabledMobileRoleKeys,
   hasDesktopEntryAccess,
   isMobileRoleEntryEnabled,
+  rememberEntryChoice,
   resolveMobileTasksPath,
 } from '../config/entryConfig.mjs'
 import { useERPWorkspace } from '../context/ERPWorkspaceProvider'
@@ -390,6 +392,12 @@ export default function MobileAppLayout() {
     navigate('/entry?reason=mobile-runtime-unavailable', { replace: true })
   }
 
+  const handleEnterDesktop = () => {
+    if (!canReturnToEntries) return
+    rememberEntryChoice(ENTRY_TARGET.DESKTOP)
+    navigate('/erp/dashboard')
+  }
+
   const handleRetry = () =>
     loadProfile({ showLoading: !canMountCustomerRuntime(adminProfile) })
 
@@ -458,7 +466,15 @@ export default function MobileAppLayout() {
                 </button>
               </div>
             ) : null}
-            <Outlet context={{ adminProfile, handleLogout, loggingOut }} />
+            <Outlet
+              context={{
+                adminProfile,
+                canEnterDesktop: canReturnToEntries,
+                handleEnterDesktop,
+                handleLogout,
+                loggingOut,
+              }}
+            />
           </>
         ) : null}
       </div>

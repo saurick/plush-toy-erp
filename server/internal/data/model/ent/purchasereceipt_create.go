@@ -9,6 +9,7 @@ import (
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/supplier"
@@ -217,6 +218,21 @@ func (_c *PurchaseReceiptCreate) AddQualityInspections(v ...*QualityInspection) 
 		ids[i] = v[i].ID
 	}
 	return _c.AddQualityInspectionIDs(ids...)
+}
+
+// AddReplacementDispositionIDs adds the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity by IDs.
+func (_c *PurchaseReceiptCreate) AddReplacementDispositionIDs(ids ...int) *PurchaseReceiptCreate {
+	_c.mutation.AddReplacementDispositionIDs(ids...)
+	return _c
+}
+
+// AddReplacementDispositions adds the "replacement_dispositions" edges to the PurchaseRejectionDisposition entity.
+func (_c *PurchaseReceiptCreate) AddReplacementDispositions(v ...*PurchaseRejectionDisposition) *PurchaseReceiptCreate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _c.AddReplacementDispositionIDs(ids...)
 }
 
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by IDs.
@@ -480,6 +496,22 @@ func (_c *PurchaseReceiptCreate) createSpec() (*PurchaseReceipt, *sqlgraph.Creat
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges = append(_spec.Edges, edge)
+	}
+	if nodes := _c.mutation.ReplacementDispositionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.ReplacementDispositionsTable,
+			Columns: []string{purchasereceipt.ReplacementDispositionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaserejectiondisposition.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

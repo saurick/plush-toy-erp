@@ -2539,8 +2539,12 @@ func init() {
 	outsourcingreturndispositionDescProductionWipBatchID := outsourcingreturndispositionFields[6].Descriptor()
 	// outsourcingreturndisposition.ProductionWipBatchIDValidator is a validator for the "production_wip_batch_id" field. It is called by the builders before save.
 	outsourcingreturndisposition.ProductionWipBatchIDValidator = outsourcingreturndispositionDescProductionWipBatchID.Validators[0].(func(int) error)
+	// outsourcingreturndispositionDescResultWipBatchID is the schema descriptor for result_wip_batch_id field.
+	outsourcingreturndispositionDescResultWipBatchID := outsourcingreturndispositionFields[7].Descriptor()
+	// outsourcingreturndisposition.ResultWipBatchIDValidator is a validator for the "result_wip_batch_id" field. It is called by the builders before save.
+	outsourcingreturndisposition.ResultWipBatchIDValidator = outsourcingreturndispositionDescResultWipBatchID.Validators[0].(func(int) error)
 	// outsourcingreturndispositionDescReason is the schema descriptor for reason field.
-	outsourcingreturndispositionDescReason := outsourcingreturndispositionFields[7].Descriptor()
+	outsourcingreturndispositionDescReason := outsourcingreturndispositionFields[8].Descriptor()
 	// outsourcingreturndisposition.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
 	outsourcingreturndisposition.ReasonValidator = func() func(string) error {
 		validators := outsourcingreturndispositionDescReason.Validators
@@ -2558,7 +2562,7 @@ func init() {
 		}
 	}()
 	// outsourcingreturndispositionDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	outsourcingreturndispositionDescIdempotencyKey := outsourcingreturndispositionFields[8].Descriptor()
+	outsourcingreturndispositionDescIdempotencyKey := outsourcingreturndispositionFields[9].Descriptor()
 	// outsourcingreturndisposition.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	outsourcingreturndisposition.IdempotencyKeyValidator = func() func(string) error {
 		validators := outsourcingreturndispositionDescIdempotencyKey.Validators
@@ -2576,7 +2580,7 @@ func init() {
 		}
 	}()
 	// outsourcingreturndispositionDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	outsourcingreturndispositionDescIdempotencyPayloadHash := outsourcingreturndispositionFields[9].Descriptor()
+	outsourcingreturndispositionDescIdempotencyPayloadHash := outsourcingreturndispositionFields[10].Descriptor()
 	// outsourcingreturndisposition.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
 	outsourcingreturndisposition.IdempotencyPayloadHashValidator = func() func(string) error {
 		validators := outsourcingreturndispositionDescIdempotencyPayloadHash.Validators
@@ -2595,29 +2599,29 @@ func init() {
 		}
 	}()
 	// outsourcingreturndispositionDescVersion is the schema descriptor for version field.
-	outsourcingreturndispositionDescVersion := outsourcingreturndispositionFields[10].Descriptor()
+	outsourcingreturndispositionDescVersion := outsourcingreturndispositionFields[11].Descriptor()
 	// outsourcingreturndisposition.DefaultVersion holds the default value on creation for the version field.
 	outsourcingreturndisposition.DefaultVersion = outsourcingreturndispositionDescVersion.Default.(int)
 	// outsourcingreturndisposition.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	outsourcingreturndisposition.VersionValidator = outsourcingreturndispositionDescVersion.Validators[0].(func(int) error)
 	// outsourcingreturndispositionDescPostedBy is the schema descriptor for posted_by field.
-	outsourcingreturndispositionDescPostedBy := outsourcingreturndispositionFields[12].Descriptor()
+	outsourcingreturndispositionDescPostedBy := outsourcingreturndispositionFields[13].Descriptor()
 	// outsourcingreturndisposition.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	outsourcingreturndisposition.PostedByValidator = outsourcingreturndispositionDescPostedBy.Validators[0].(func(int) error)
 	// outsourcingreturndispositionDescCancelledBy is the schema descriptor for cancelled_by field.
-	outsourcingreturndispositionDescCancelledBy := outsourcingreturndispositionFields[14].Descriptor()
+	outsourcingreturndispositionDescCancelledBy := outsourcingreturndispositionFields[15].Descriptor()
 	// outsourcingreturndisposition.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	outsourcingreturndisposition.CancelledByValidator = outsourcingreturndispositionDescCancelledBy.Validators[0].(func(int) error)
 	// outsourcingreturndispositionDescCancelReason is the schema descriptor for cancel_reason field.
-	outsourcingreturndispositionDescCancelReason := outsourcingreturndispositionFields[15].Descriptor()
+	outsourcingreturndispositionDescCancelReason := outsourcingreturndispositionFields[16].Descriptor()
 	// outsourcingreturndisposition.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	outsourcingreturndisposition.CancelReasonValidator = outsourcingreturndispositionDescCancelReason.Validators[0].(func(string) error)
 	// outsourcingreturndispositionDescCreatedBy is the schema descriptor for created_by field.
-	outsourcingreturndispositionDescCreatedBy := outsourcingreturndispositionFields[16].Descriptor()
+	outsourcingreturndispositionDescCreatedBy := outsourcingreturndispositionFields[17].Descriptor()
 	// outsourcingreturndisposition.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	outsourcingreturndisposition.CreatedByValidator = outsourcingreturndispositionDescCreatedBy.Validators[0].(func(int) error)
 	// outsourcingreturndispositionDescCreatedAt is the schema descriptor for created_at field.
-	outsourcingreturndispositionDescCreatedAt := outsourcingreturndispositionFields[17].Descriptor()
+	outsourcingreturndispositionDescCreatedAt := outsourcingreturndispositionFields[18].Descriptor()
 	// outsourcingreturndisposition.DefaultCreatedAt holds the default value on creation for the created_at field.
 	outsourcingreturndisposition.DefaultCreatedAt = outsourcingreturndispositionDescCreatedAt.Default.(func() time.Time)
 	permissionFields := schema.Permission{}.Fields()
@@ -3376,28 +3380,48 @@ func init() {
 			return nil
 		}
 	}()
+	// productionexceptiondecisionDescExecutionStatus is the schema descriptor for execution_status field.
+	productionexceptiondecisionDescExecutionStatus := productionexceptiondecisionFields[3].Descriptor()
+	// productionexceptiondecision.DefaultExecutionStatus holds the default value on creation for the execution_status field.
+	productionexceptiondecision.DefaultExecutionStatus = productionexceptiondecisionDescExecutionStatus.Default.(string)
+	// productionexceptiondecision.ExecutionStatusValidator is a validator for the "execution_status" field. It is called by the builders before save.
+	productionexceptiondecision.ExecutionStatusValidator = func() func(string) error {
+		validators := productionexceptiondecisionDescExecutionStatus.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(execution_status string) error {
+			for _, fn := range fns {
+				if err := fn(execution_status); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
 	// productionexceptiondecisionDescProductionOrderID is the schema descriptor for production_order_id field.
-	productionexceptiondecisionDescProductionOrderID := productionexceptiondecisionFields[3].Descriptor()
+	productionexceptiondecisionDescProductionOrderID := productionexceptiondecisionFields[4].Descriptor()
 	// productionexceptiondecision.ProductionOrderIDValidator is a validator for the "production_order_id" field. It is called by the builders before save.
 	productionexceptiondecision.ProductionOrderIDValidator = productionexceptiondecisionDescProductionOrderID.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescProductionOrderItemID is the schema descriptor for production_order_item_id field.
-	productionexceptiondecisionDescProductionOrderItemID := productionexceptiondecisionFields[4].Descriptor()
+	productionexceptiondecisionDescProductionOrderItemID := productionexceptiondecisionFields[5].Descriptor()
 	// productionexceptiondecision.ProductionOrderItemIDValidator is a validator for the "production_order_item_id" field. It is called by the builders before save.
 	productionexceptiondecision.ProductionOrderItemIDValidator = productionexceptiondecisionDescProductionOrderItemID.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescProductionMaterialRequirementID is the schema descriptor for production_material_requirement_id field.
-	productionexceptiondecisionDescProductionMaterialRequirementID := productionexceptiondecisionFields[5].Descriptor()
+	productionexceptiondecisionDescProductionMaterialRequirementID := productionexceptiondecisionFields[6].Descriptor()
 	// productionexceptiondecision.ProductionMaterialRequirementIDValidator is a validator for the "production_material_requirement_id" field. It is called by the builders before save.
 	productionexceptiondecision.ProductionMaterialRequirementIDValidator = productionexceptiondecisionDescProductionMaterialRequirementID.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescProductionWipBatchID is the schema descriptor for production_wip_batch_id field.
-	productionexceptiondecisionDescProductionWipBatchID := productionexceptiondecisionFields[6].Descriptor()
+	productionexceptiondecisionDescProductionWipBatchID := productionexceptiondecisionFields[7].Descriptor()
 	// productionexceptiondecision.ProductionWipBatchIDValidator is a validator for the "production_wip_batch_id" field. It is called by the builders before save.
 	productionexceptiondecision.ProductionWipBatchIDValidator = productionexceptiondecisionDescProductionWipBatchID.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescQualityInspectionID is the schema descriptor for quality_inspection_id field.
-	productionexceptiondecisionDescQualityInspectionID := productionexceptiondecisionFields[7].Descriptor()
+	productionexceptiondecisionDescQualityInspectionID := productionexceptiondecisionFields[8].Descriptor()
 	// productionexceptiondecision.QualityInspectionIDValidator is a validator for the "quality_inspection_id" field. It is called by the builders before save.
 	productionexceptiondecision.QualityInspectionIDValidator = productionexceptiondecisionDescQualityInspectionID.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescReason is the schema descriptor for reason field.
-	productionexceptiondecisionDescReason := productionexceptiondecisionFields[10].Descriptor()
+	productionexceptiondecisionDescReason := productionexceptiondecisionFields[11].Descriptor()
 	// productionexceptiondecision.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
 	productionexceptiondecision.ReasonValidator = func() func(string) error {
 		validators := productionexceptiondecisionDescReason.Validators
@@ -3415,7 +3439,7 @@ func init() {
 		}
 	}()
 	// productionexceptiondecisionDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	productionexceptiondecisionDescIdempotencyKey := productionexceptiondecisionFields[11].Descriptor()
+	productionexceptiondecisionDescIdempotencyKey := productionexceptiondecisionFields[12].Descriptor()
 	// productionexceptiondecision.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	productionexceptiondecision.IdempotencyKeyValidator = func() func(string) error {
 		validators := productionexceptiondecisionDescIdempotencyKey.Validators
@@ -3433,7 +3457,7 @@ func init() {
 		}
 	}()
 	// productionexceptiondecisionDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	productionexceptiondecisionDescIdempotencyPayloadHash := productionexceptiondecisionFields[12].Descriptor()
+	productionexceptiondecisionDescIdempotencyPayloadHash := productionexceptiondecisionFields[13].Descriptor()
 	// productionexceptiondecision.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
 	productionexceptiondecision.IdempotencyPayloadHashValidator = func() func(string) error {
 		validators := productionexceptiondecisionDescIdempotencyPayloadHash.Validators
@@ -3452,27 +3476,39 @@ func init() {
 		}
 	}()
 	// productionexceptiondecisionDescVersion is the schema descriptor for version field.
-	productionexceptiondecisionDescVersion := productionexceptiondecisionFields[13].Descriptor()
+	productionexceptiondecisionDescVersion := productionexceptiondecisionFields[14].Descriptor()
 	// productionexceptiondecision.DefaultVersion holds the default value on creation for the version field.
 	productionexceptiondecision.DefaultVersion = productionexceptiondecisionDescVersion.Default.(int)
 	// productionexceptiondecision.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	productionexceptiondecision.VersionValidator = productionexceptiondecisionDescVersion.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescRequestedBy is the schema descriptor for requested_by field.
-	productionexceptiondecisionDescRequestedBy := productionexceptiondecisionFields[14].Descriptor()
+	productionexceptiondecisionDescRequestedBy := productionexceptiondecisionFields[15].Descriptor()
 	// productionexceptiondecision.RequestedByValidator is a validator for the "requested_by" field. It is called by the builders before save.
 	productionexceptiondecision.RequestedByValidator = productionexceptiondecisionDescRequestedBy.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescRequestedAt is the schema descriptor for requested_at field.
-	productionexceptiondecisionDescRequestedAt := productionexceptiondecisionFields[15].Descriptor()
+	productionexceptiondecisionDescRequestedAt := productionexceptiondecisionFields[16].Descriptor()
 	// productionexceptiondecision.DefaultRequestedAt holds the default value on creation for the requested_at field.
 	productionexceptiondecision.DefaultRequestedAt = productionexceptiondecisionDescRequestedAt.Default.(func() time.Time)
 	// productionexceptiondecisionDescDecidedBy is the schema descriptor for decided_by field.
-	productionexceptiondecisionDescDecidedBy := productionexceptiondecisionFields[16].Descriptor()
+	productionexceptiondecisionDescDecidedBy := productionexceptiondecisionFields[17].Descriptor()
 	// productionexceptiondecision.DecidedByValidator is a validator for the "decided_by" field. It is called by the builders before save.
 	productionexceptiondecision.DecidedByValidator = productionexceptiondecisionDescDecidedBy.Validators[0].(func(int) error)
 	// productionexceptiondecisionDescDecisionReason is the schema descriptor for decision_reason field.
-	productionexceptiondecisionDescDecisionReason := productionexceptiondecisionFields[18].Descriptor()
+	productionexceptiondecisionDescDecisionReason := productionexceptiondecisionFields[19].Descriptor()
 	// productionexceptiondecision.DecisionReasonValidator is a validator for the "decision_reason" field. It is called by the builders before save.
 	productionexceptiondecision.DecisionReasonValidator = productionexceptiondecisionDescDecisionReason.Validators[0].(func(string) error)
+	// productionexceptiondecisionDescExecutedBy is the schema descriptor for executed_by field.
+	productionexceptiondecisionDescExecutedBy := productionexceptiondecisionFields[20].Descriptor()
+	// productionexceptiondecision.ExecutedByValidator is a validator for the "executed_by" field. It is called by the builders before save.
+	productionexceptiondecision.ExecutedByValidator = productionexceptiondecisionDescExecutedBy.Validators[0].(func(int) error)
+	// productionexceptiondecisionDescReversedBy is the schema descriptor for reversed_by field.
+	productionexceptiondecisionDescReversedBy := productionexceptiondecisionFields[22].Descriptor()
+	// productionexceptiondecision.ReversedByValidator is a validator for the "reversed_by" field. It is called by the builders before save.
+	productionexceptiondecision.ReversedByValidator = productionexceptiondecisionDescReversedBy.Validators[0].(func(int) error)
+	// productionexceptiondecisionDescReverseReason is the schema descriptor for reverse_reason field.
+	productionexceptiondecisionDescReverseReason := productionexceptiondecisionFields[24].Descriptor()
+	// productionexceptiondecision.ReverseReasonValidator is a validator for the "reverse_reason" field. It is called by the builders before save.
+	productionexceptiondecision.ReverseReasonValidator = productionexceptiondecisionDescReverseReason.Validators[0].(func(string) error)
 	productionfactHooks := schema.ProductionFact{}.Hooks()
 	productionfact.Hooks[0] = productionfactHooks[0]
 	productionfactFields := schema.ProductionFact{}.Fields()
@@ -4971,8 +5007,12 @@ func init() {
 	purchaserejectiondispositionDescPurchaseReceiptItemID := purchaserejectiondispositionFields[3].Descriptor()
 	// purchaserejectiondisposition.PurchaseReceiptItemIDValidator is a validator for the "purchase_receipt_item_id" field. It is called by the builders before save.
 	purchaserejectiondisposition.PurchaseReceiptItemIDValidator = purchaserejectiondispositionDescPurchaseReceiptItemID.Validators[0].(func(int) error)
+	// purchaserejectiondispositionDescReplacementReceiptID is the schema descriptor for replacement_receipt_id field.
+	purchaserejectiondispositionDescReplacementReceiptID := purchaserejectiondispositionFields[4].Descriptor()
+	// purchaserejectiondisposition.ReplacementReceiptIDValidator is a validator for the "replacement_receipt_id" field. It is called by the builders before save.
+	purchaserejectiondisposition.ReplacementReceiptIDValidator = purchaserejectiondispositionDescReplacementReceiptID.Validators[0].(func(int) error)
 	// purchaserejectiondispositionDescDispositionType is the schema descriptor for disposition_type field.
-	purchaserejectiondispositionDescDispositionType := purchaserejectiondispositionFields[4].Descriptor()
+	purchaserejectiondispositionDescDispositionType := purchaserejectiondispositionFields[5].Descriptor()
 	// purchaserejectiondisposition.DispositionTypeValidator is a validator for the "disposition_type" field. It is called by the builders before save.
 	purchaserejectiondisposition.DispositionTypeValidator = func() func(string) error {
 		validators := purchaserejectiondispositionDescDispositionType.Validators
@@ -4990,7 +5030,7 @@ func init() {
 		}
 	}()
 	// purchaserejectiondispositionDescStatus is the schema descriptor for status field.
-	purchaserejectiondispositionDescStatus := purchaserejectiondispositionFields[5].Descriptor()
+	purchaserejectiondispositionDescStatus := purchaserejectiondispositionFields[6].Descriptor()
 	// purchaserejectiondisposition.DefaultStatus holds the default value on creation for the status field.
 	purchaserejectiondisposition.DefaultStatus = purchaserejectiondispositionDescStatus.Default.(string)
 	// purchaserejectiondisposition.StatusValidator is a validator for the "status" field. It is called by the builders before save.
@@ -5010,11 +5050,11 @@ func init() {
 		}
 	}()
 	// purchaserejectiondispositionDescSupplierID is the schema descriptor for supplier_id field.
-	purchaserejectiondispositionDescSupplierID := purchaserejectiondispositionFields[7].Descriptor()
+	purchaserejectiondispositionDescSupplierID := purchaserejectiondispositionFields[8].Descriptor()
 	// purchaserejectiondisposition.SupplierIDValidator is a validator for the "supplier_id" field. It is called by the builders before save.
 	purchaserejectiondisposition.SupplierIDValidator = purchaserejectiondispositionDescSupplierID.Validators[0].(func(int) error)
 	// purchaserejectiondispositionDescSupplierName is the schema descriptor for supplier_name field.
-	purchaserejectiondispositionDescSupplierName := purchaserejectiondispositionFields[8].Descriptor()
+	purchaserejectiondispositionDescSupplierName := purchaserejectiondispositionFields[9].Descriptor()
 	// purchaserejectiondisposition.SupplierNameValidator is a validator for the "supplier_name" field. It is called by the builders before save.
 	purchaserejectiondisposition.SupplierNameValidator = func() func(string) error {
 		validators := purchaserejectiondispositionDescSupplierName.Validators
@@ -5032,7 +5072,7 @@ func init() {
 		}
 	}()
 	// purchaserejectiondispositionDescReason is the schema descriptor for reason field.
-	purchaserejectiondispositionDescReason := purchaserejectiondispositionFields[9].Descriptor()
+	purchaserejectiondispositionDescReason := purchaserejectiondispositionFields[10].Descriptor()
 	// purchaserejectiondisposition.ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
 	purchaserejectiondisposition.ReasonValidator = func() func(string) error {
 		validators := purchaserejectiondispositionDescReason.Validators
@@ -5050,7 +5090,7 @@ func init() {
 		}
 	}()
 	// purchaserejectiondispositionDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	purchaserejectiondispositionDescIdempotencyKey := purchaserejectiondispositionFields[10].Descriptor()
+	purchaserejectiondispositionDescIdempotencyKey := purchaserejectiondispositionFields[11].Descriptor()
 	// purchaserejectiondisposition.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	purchaserejectiondisposition.IdempotencyKeyValidator = func() func(string) error {
 		validators := purchaserejectiondispositionDescIdempotencyKey.Validators
@@ -5068,7 +5108,7 @@ func init() {
 		}
 	}()
 	// purchaserejectiondispositionDescIdempotencyPayloadHash is the schema descriptor for idempotency_payload_hash field.
-	purchaserejectiondispositionDescIdempotencyPayloadHash := purchaserejectiondispositionFields[11].Descriptor()
+	purchaserejectiondispositionDescIdempotencyPayloadHash := purchaserejectiondispositionFields[12].Descriptor()
 	// purchaserejectiondisposition.IdempotencyPayloadHashValidator is a validator for the "idempotency_payload_hash" field. It is called by the builders before save.
 	purchaserejectiondisposition.IdempotencyPayloadHashValidator = func() func(string) error {
 		validators := purchaserejectiondispositionDescIdempotencyPayloadHash.Validators
@@ -5087,29 +5127,29 @@ func init() {
 		}
 	}()
 	// purchaserejectiondispositionDescVersion is the schema descriptor for version field.
-	purchaserejectiondispositionDescVersion := purchaserejectiondispositionFields[12].Descriptor()
+	purchaserejectiondispositionDescVersion := purchaserejectiondispositionFields[13].Descriptor()
 	// purchaserejectiondisposition.DefaultVersion holds the default value on creation for the version field.
 	purchaserejectiondisposition.DefaultVersion = purchaserejectiondispositionDescVersion.Default.(int)
 	// purchaserejectiondisposition.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	purchaserejectiondisposition.VersionValidator = purchaserejectiondispositionDescVersion.Validators[0].(func(int) error)
 	// purchaserejectiondispositionDescPostedBy is the schema descriptor for posted_by field.
-	purchaserejectiondispositionDescPostedBy := purchaserejectiondispositionFields[14].Descriptor()
+	purchaserejectiondispositionDescPostedBy := purchaserejectiondispositionFields[15].Descriptor()
 	// purchaserejectiondisposition.PostedByValidator is a validator for the "posted_by" field. It is called by the builders before save.
 	purchaserejectiondisposition.PostedByValidator = purchaserejectiondispositionDescPostedBy.Validators[0].(func(int) error)
 	// purchaserejectiondispositionDescCancelledBy is the schema descriptor for cancelled_by field.
-	purchaserejectiondispositionDescCancelledBy := purchaserejectiondispositionFields[16].Descriptor()
+	purchaserejectiondispositionDescCancelledBy := purchaserejectiondispositionFields[17].Descriptor()
 	// purchaserejectiondisposition.CancelledByValidator is a validator for the "cancelled_by" field. It is called by the builders before save.
 	purchaserejectiondisposition.CancelledByValidator = purchaserejectiondispositionDescCancelledBy.Validators[0].(func(int) error)
 	// purchaserejectiondispositionDescCancelReason is the schema descriptor for cancel_reason field.
-	purchaserejectiondispositionDescCancelReason := purchaserejectiondispositionFields[17].Descriptor()
+	purchaserejectiondispositionDescCancelReason := purchaserejectiondispositionFields[18].Descriptor()
 	// purchaserejectiondisposition.CancelReasonValidator is a validator for the "cancel_reason" field. It is called by the builders before save.
 	purchaserejectiondisposition.CancelReasonValidator = purchaserejectiondispositionDescCancelReason.Validators[0].(func(string) error)
 	// purchaserejectiondispositionDescCreatedBy is the schema descriptor for created_by field.
-	purchaserejectiondispositionDescCreatedBy := purchaserejectiondispositionFields[18].Descriptor()
+	purchaserejectiondispositionDescCreatedBy := purchaserejectiondispositionFields[19].Descriptor()
 	// purchaserejectiondisposition.CreatedByValidator is a validator for the "created_by" field. It is called by the builders before save.
 	purchaserejectiondisposition.CreatedByValidator = purchaserejectiondispositionDescCreatedBy.Validators[0].(func(int) error)
 	// purchaserejectiondispositionDescCreatedAt is the schema descriptor for created_at field.
-	purchaserejectiondispositionDescCreatedAt := purchaserejectiondispositionFields[19].Descriptor()
+	purchaserejectiondispositionDescCreatedAt := purchaserejectiondispositionFields[20].Descriptor()
 	// purchaserejectiondisposition.DefaultCreatedAt holds the default value on creation for the created_at field.
 	purchaserejectiondisposition.DefaultCreatedAt = purchaserejectiondispositionDescCreatedAt.Default.(func() time.Time)
 	purchasereturnHooks := schema.PurchaseReturn{}.Hooks()

@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchaserejectiondisposition"
 
 	"entgo.io/ent"
@@ -18,10 +19,11 @@ import (
 // PurchaseRejectionDispositionQuery is the builder for querying PurchaseRejectionDisposition entities.
 type PurchaseRejectionDispositionQuery struct {
 	config
-	ctx        *QueryContext
-	order      []purchaserejectiondisposition.OrderOption
-	inters     []Interceptor
-	predicates []predicate.PurchaseRejectionDisposition
+	ctx                    *QueryContext
+	order                  []purchaserejectiondisposition.OrderOption
+	inters                 []Interceptor
+	predicates             []predicate.PurchaseRejectionDisposition
+	withReplacementReceipt *PurchaseReceiptQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
 	path func(context.Context) (*sql.Selector, error)
@@ -56,6 +58,28 @@ func (_q *PurchaseRejectionDispositionQuery) Unique(unique bool) *PurchaseReject
 func (_q *PurchaseRejectionDispositionQuery) Order(o ...purchaserejectiondisposition.OrderOption) *PurchaseRejectionDispositionQuery {
 	_q.order = append(_q.order, o...)
 	return _q
+}
+
+// QueryReplacementReceipt chains the current query on the "replacement_receipt" edge.
+func (_q *PurchaseRejectionDispositionQuery) QueryReplacementReceipt() *PurchaseReceiptQuery {
+	query := (&PurchaseReceiptClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchaserejectiondisposition.Table, purchaserejectiondisposition.FieldID, selector),
+			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchaserejectiondisposition.ReplacementReceiptTable, purchaserejectiondisposition.ReplacementReceiptColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
 }
 
 // First returns the first PurchaseRejectionDisposition entity from the query.
@@ -245,15 +269,27 @@ func (_q *PurchaseRejectionDispositionQuery) Clone() *PurchaseRejectionDispositi
 		return nil
 	}
 	return &PurchaseRejectionDispositionQuery{
-		config:     _q.config,
-		ctx:        _q.ctx.Clone(),
-		order:      append([]purchaserejectiondisposition.OrderOption{}, _q.order...),
-		inters:     append([]Interceptor{}, _q.inters...),
-		predicates: append([]predicate.PurchaseRejectionDisposition{}, _q.predicates...),
+		config:                 _q.config,
+		ctx:                    _q.ctx.Clone(),
+		order:                  append([]purchaserejectiondisposition.OrderOption{}, _q.order...),
+		inters:                 append([]Interceptor{}, _q.inters...),
+		predicates:             append([]predicate.PurchaseRejectionDisposition{}, _q.predicates...),
+		withReplacementReceipt: _q.withReplacementReceipt.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
 		path: _q.path,
 	}
+}
+
+// WithReplacementReceipt tells the query-builder to eager-load the nodes that are connected to
+// the "replacement_receipt" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *PurchaseRejectionDispositionQuery) WithReplacementReceipt(opts ...func(*PurchaseReceiptQuery)) *PurchaseRejectionDispositionQuery {
+	query := (&PurchaseReceiptClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReplacementReceipt = query
+	return _q
 }
 
 // GroupBy is used to group vertices by one or more fields/columns.
@@ -332,8 +368,11 @@ func (_q *PurchaseRejectionDispositionQuery) prepareQuery(ctx context.Context) e
 
 func (_q *PurchaseRejectionDispositionQuery) sqlAll(ctx context.Context, hooks ...queryHook) ([]*PurchaseRejectionDisposition, error) {
 	var (
-		nodes = []*PurchaseRejectionDisposition{}
-		_spec = _q.querySpec()
+		nodes       = []*PurchaseRejectionDisposition{}
+		_spec       = _q.querySpec()
+		loadedTypes = [1]bool{
+			_q.withReplacementReceipt != nil,
+		}
 	)
 	_spec.ScanValues = func(columns []string) ([]any, error) {
 		return (*PurchaseRejectionDisposition).scanValues(nil, columns)
@@ -341,6 +380,7 @@ func (_q *PurchaseRejectionDispositionQuery) sqlAll(ctx context.Context, hooks .
 	_spec.Assign = func(columns []string, values []any) error {
 		node := &PurchaseRejectionDisposition{config: _q.config}
 		nodes = append(nodes, node)
+		node.Edges.loadedTypes = loadedTypes
 		return node.assignValues(columns, values)
 	}
 	for i := range hooks {
@@ -352,7 +392,46 @@ func (_q *PurchaseRejectionDispositionQuery) sqlAll(ctx context.Context, hooks .
 	if len(nodes) == 0 {
 		return nodes, nil
 	}
+	if query := _q.withReplacementReceipt; query != nil {
+		if err := _q.loadReplacementReceipt(ctx, query, nodes, nil,
+			func(n *PurchaseRejectionDisposition, e *PurchaseReceipt) { n.Edges.ReplacementReceipt = e }); err != nil {
+			return nil, err
+		}
+	}
 	return nodes, nil
+}
+
+func (_q *PurchaseRejectionDispositionQuery) loadReplacementReceipt(ctx context.Context, query *PurchaseReceiptQuery, nodes []*PurchaseRejectionDisposition, init func(*PurchaseRejectionDisposition), assign func(*PurchaseRejectionDisposition, *PurchaseReceipt)) error {
+	ids := make([]int, 0, len(nodes))
+	nodeids := make(map[int][]*PurchaseRejectionDisposition)
+	for i := range nodes {
+		if nodes[i].ReplacementReceiptID == nil {
+			continue
+		}
+		fk := *nodes[i].ReplacementReceiptID
+		if _, ok := nodeids[fk]; !ok {
+			ids = append(ids, fk)
+		}
+		nodeids[fk] = append(nodeids[fk], nodes[i])
+	}
+	if len(ids) == 0 {
+		return nil
+	}
+	query.Where(purchasereceipt.IDIn(ids...))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		nodes, ok := nodeids[n.ID]
+		if !ok {
+			return fmt.Errorf(`unexpected foreign-key "replacement_receipt_id" returned %v`, n.ID)
+		}
+		for i := range nodes {
+			assign(nodes[i], n)
+		}
+	}
+	return nil
 }
 
 func (_q *PurchaseRejectionDispositionQuery) sqlCount(ctx context.Context) (int, error) {
@@ -379,6 +458,9 @@ func (_q *PurchaseRejectionDispositionQuery) querySpec() *sqlgraph.QuerySpec {
 			if fields[i] != purchaserejectiondisposition.FieldID {
 				_spec.Node.Columns = append(_spec.Node.Columns, fields[i])
 			}
+		}
+		if _q.withReplacementReceipt != nil {
+			_spec.Node.AddColumnOnce(purchaserejectiondisposition.FieldReplacementReceiptID)
 		}
 	}
 	if ps := _q.predicates; len(ps) > 0 {

@@ -20,10 +20,10 @@
 - 当前唯一部署真源仍是 `/Users/simon/projects/plush-toy-erp/server/deploy/compose/prod`
 - 当前后端统一走 `8300`
 - 本地开发数据库默认命中 `192.168.0.106:5432/plush_erp`；`192.168.0.133:5435/plush_erp` 是测试 / 目标环境，不作为本地开发默认库
-- 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单已接入独立 `purchase_order` JSON-RPC / RBAC 和 V1 页面，BOM 管理已接入独立 `bom` JSON-RPC / RBAC 和 V1 页面，产品基础信息 / 产品规格已接入 `masterdata` JSON-RPC、`product.* / product_sku.*` RBAC 和 `/erp/master/products` V1 页面，销售订单行 UI/API 已支持从 SKU 选择带出产品 / 单位 / 快照并保存 `product_sku_id`；工序档案已接入 `masterdata` JSON-RPC / `process.*` RBAC 和 `/erp/engineering/processes` V1 页面，采购入库已接入独立 `purchase` JSON-RPC / RBAC、V1 页面和业务看板入库 projection，采购来料与委外回货质量检验已接入独立 `quality` JSON-RPC / RBAC 和 `/erp/production/quality-inspections` V1 页面，库存台账已接入独立只读 `inventory` JSON-RPC / RBAC 和 `/erp/warehouse/inventory` V1 页面，委外订单已接入独立 `outsourcing_order` JSON-RPC / `outsourcing.order.*` RBAC 和 `/erp/purchase/processing-contracts` V1 加工合同源单页面，生产进度、出库管理、应收、应付、发票和对账仍按现有 `operational_fact` facts 接入收窄 V1 页面；余额视图已按 ACTIVE `stock_reservations` 返回已预留和可用量只读 read model；采购入库行可选关联采购订单行做来源追溯；`product_skus` 已具备基础维护和销售订单行选用能力，显式 SKU 已贯通销售订单行、批次、库存流水 / 余额、生产 / 委外事实、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain；历史 `product_sku_id=NULL` 只表示未分规格产品库存，不自动回填、不与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待后续评审；具体目标库是否已 apply 仍以 `make migrate_status` 为准
+- 当前管理员账号 / RBAC 表、工作流协同表、库存 / 采购 / 质检 / 生产 / 委外 / 出货 / 预留 / 财务事实表、`product_skus`、`purchase_orders`、`processes`、`outsourcing_orders` 和 V1 主数据 / 销售订单表已通过 Ent + Atlas 落地；旧普通 `users` 表和 `user` JSON-RPC 普通账号管理链路已退出，账号登录与岗位任务端统一使用 `admin_users`、角色和权限码；旧 `business_records / business_record_items / business_record_events` 表族已由 `20260612112337` migration 删除，普通 `business` JSON-RPC 不再提供旧记录查询或写入，只保留 `dashboard_stats`；采购订单、BOM、产品 / SKU、工序、采购入库、质量检验、库存、委外订单、生产进度、出货、应收、应付、发票、单笔核对、真实收付款、多来源核销和红冲均已有对应 JSON-RPC / RBAC / V1 页面或正式来源入口；余额视图按 ACTIVE `stock_reservations` 返回已预留和可用量，显式 SKU 贯通销售订单行、批次、库存、生产 / 委外、出货与预留，并以产品 + SKU + 仓库 + 单位 + 批次作为精确库存 grain。历史 `product_sku_id=NULL` 不自动回填或与任一 SKU 共池；BOM SKU 粒度、受控导入创建 SKU 和旧库存人工重分类仍待评审；具体目标库是否已 apply 以 `make migrate_status` 为准
 - `出货单` 当前已作为 Shipment Fact V1 正式入口接入 `/erp/warehouse/shipments`，复用 `operational_fact` JSON-RPC 和 `shipment.*` RBAC；品质岗位可在显式提交放行前，从 `DRAFT` 出货单按产品 / SKU、仓库、批次送检粒度生成出货前成品检验，一旦发起就必须合格或让步接收后才能提交放行。提交动作会锁定出货单、校验并冻结当时的检验集合，再生成仓库负责的出货放行任务；任务完成只表示 `shipping_released`，确认出货仍会在同一出货事务内重新核对可信的已完成放行任务、质检、来源数量、预留和可用库存，之后才写 `SHIPPED` 与库存 `OUT`。该可选质检侧链不启动 Workflow，也不替代生产完工质检主链；`出库管理` 已作为收窄的出货出库 / 库存预留 V1 入口复用 `shipments / stock_reservations`
 - 采购订单当前只表达采购承诺，不写库存、批次、应付、发票或付款事实；采购需求、采购订单余额、在途统计、采购合同审批、生产、委外、品质和财务后续仍按真实样本逐步拆；BOM Version 当前只维护工程版本、明细、复制、激活和归档，不生成采购需求、生产任务、库存事实或成本；加工环节 / processes 工序主数据只维护工序编号、名称、类别和可委外 / 可内制 / 需质检标记，不生成委外源单、生产任务、质检事实、库存流水或财务事实
-- Product Core 的来源生成入口已在当前本地工作树收口到源单或已过账事实页：生产订单办理领料 / 完工，已过账完工发起返工；加工合同办理发料 / 回货，回货后发起质检，只有正式质检已通过且结果为合格或让步接收才能生成应付；销售订单创建库存预留；采购入库办理退货 / 调整 / 应付，首次到货 IQC 不合格只阻止本单入库，只有已入库后追加检验不合格才可生成退货；已出货单生成应收 / 发票，已过账应收、应付或发票只提供单笔核对。来源、往来方、物料 / 产品、单位、批次和金额等真源字段由后端派生，通用事实页不恢复无来源万能新增。yoyoosun 当前预览配置包已同步来源办理所需的最小菜单和岗位能力投影，但未开放产品维护菜单，也未执行 customer config 发布 / 激活；这不表示目标环境已发布或客户已签收
+- Product Core 的来源动作已收口到正式源单或事实页：生产订单办理领料 / 完工 / 返工，委外合同办理发料 / 回货 / 质检 / 异常处置，采购入库办理退货 / 调整 / 应付；首次 IQC 拒绝可登记退回供应商 / 供应商补换处置并取消未入库收货，不写库存退货，补换新到货仍需独立来源。已出货来源生成应收 / 发票，真实收付款独立登记并按同往来方同币种分配到多条应收或应付，支持部分核销、冲正和红冲。来源、往来方、物料 / 产品、单位、批次和金额由后端派生，通用事实页不恢复无来源万能新增。yoyoosun 的本地跟踪配置与 133 较早 V5 技术试用必须和当前 HEAD 分开取证；当前财务岗位未获得收付款页面 / 权限，当前后续切片未整体重发，客户 UAT / 签收未完成
 - 生产排程、生产异常和出货放行三类协同任务也已收口到真实来源：生产订单从草稿下达时生成排程任务，返工事实过账时生成生产异常任务，`DRAFT` 出货单由用户显式提交放行时生成出货放行任务。三类任务组和确定性任务编号只允许上述领域动作写入，通用新建任务、流程节点和客户流程配置不能占用；任务完成、阻塞或退回只更新协同结果和业务状态投影，不代写生产、库存、质检、出货或财务事实。来源后续关闭、取消或真实出货时，投影会继续到 `closed / cancelled / shipped`，但不会伪造或改写既有任务处理结论
 - 业务链路调试 seed、按 `debugRunId` 清理和全量业务数据清空仅作为开发验收能力接入后端 `debug` JSON-RPC 域，应用默认全部关闭并由独立 `ERP_DEBUG_*` 开关显式启用；全量清空只允许 local / dev，默认 `dry_run=true`，真实删除还要求固定确认词，远程、共享和生产环境始终拒绝。业务数据清空按 allowlist 执行，覆盖工序档案和委外源单，不删除账号、权限、管理员偏好、配置和数据库结构；按 `debugRunId` 清理还会校验 debug 数据标记
 - 扩展硬件链路、PDA、条码枪、图片识别本轮统一标记为 deferred
@@ -152,12 +152,11 @@ pnpm style:l1
 - 产品完成路线图：[docs/product/产品完成路线图.md](docs/product/产品完成路线图.md)
 - 自动化测试策略：[docs/product/自动化测试策略.md](docs/product/自动化测试策略.md)
 - 正式产品入口与菜单配置计划：[docs/product/正式产品入口与菜单配置计划.md](docs/product/正式产品入口与菜单配置计划.md)
-- 产品台账索引：[docs/product/产品台账索引.md](docs/product/产品台账索引.md)
-- 产品能力进度台账：[docs/product/产品能力进度台账.md](docs/product/产品能力进度台账.md)
+- 产品能力进度台账（全局唯一）：[docs/product/产品能力进度台账.md](docs/product/产品能力进度台账.md)
 - 标准样例客户工程参考：[docs/customers/reference-customer/README.md](docs/customers/reference-customer/README.md)
+- 永绅甲方角色职责与业务流转确认表：[docs/customers/yoyoosun/甲方角色职责与业务流转确认表.md](docs/customers/yoyoosun/甲方角色职责与业务流转确认表.md)
 - 永绅角色、权限与协作流程手册：[docs/customers/yoyoosun/角色能力与流程矩阵.md](docs/customers/yoyoosun/角色能力与流程矩阵.md)
-- 永绅 yoyoosun 客户交付矩阵：[docs/customers/yoyoosun/客户交付矩阵.md](docs/customers/yoyoosun/客户交付矩阵.md)
-- 永绅 yoyoosun 客户差异台账：[docs/customers/yoyoosun/客户差异台账.md](docs/customers/yoyoosun/客户差异台账.md)
+- 永绅 yoyoosun 客户能力、交付与差异矩阵：[docs/customers/yoyoosun/客户交付矩阵.md](docs/customers/yoyoosun/客户交付矩阵.md)
 - 状态 / Workflow / Fact 边界：[docs/architecture/状态工作流事实边界.md](docs/architecture/状态工作流事实边界.md)
 - 永绅 yoyoosun 客户资料边界：[docs/customers/yoyoosun/README.md](docs/customers/yoyoosun/README.md)
 - 外部参考资料：[docs/reference/README.md](docs/reference/README.md)

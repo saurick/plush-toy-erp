@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"time"
 
@@ -42,6 +43,20 @@ func (_c *PurchaseRejectionDispositionCreate) SetPurchaseReceiptID(v int) *Purch
 // SetPurchaseReceiptItemID sets the "purchase_receipt_item_id" field.
 func (_c *PurchaseRejectionDispositionCreate) SetPurchaseReceiptItemID(v int) *PurchaseRejectionDispositionCreate {
 	_c.mutation.SetPurchaseReceiptItemID(v)
+	return _c
+}
+
+// SetReplacementReceiptID sets the "replacement_receipt_id" field.
+func (_c *PurchaseRejectionDispositionCreate) SetReplacementReceiptID(v int) *PurchaseRejectionDispositionCreate {
+	_c.mutation.SetReplacementReceiptID(v)
+	return _c
+}
+
+// SetNillableReplacementReceiptID sets the "replacement_receipt_id" field if the given value is not nil.
+func (_c *PurchaseRejectionDispositionCreate) SetNillableReplacementReceiptID(v *int) *PurchaseRejectionDispositionCreate {
+	if v != nil {
+		_c.SetReplacementReceiptID(*v)
+	}
 	return _c
 }
 
@@ -213,6 +228,11 @@ func (_c *PurchaseRejectionDispositionCreate) SetNillableCreatedAt(v *time.Time)
 	return _c
 }
 
+// SetReplacementReceipt sets the "replacement_receipt" edge to the PurchaseReceipt entity.
+func (_c *PurchaseRejectionDispositionCreate) SetReplacementReceipt(v *PurchaseReceipt) *PurchaseRejectionDispositionCreate {
+	return _c.SetReplacementReceiptID(v.ID)
+}
+
 // Mutation returns the PurchaseRejectionDispositionMutation object of the builder.
 func (_c *PurchaseRejectionDispositionCreate) Mutation() *PurchaseRejectionDispositionMutation {
 	return _c.mutation
@@ -300,6 +320,11 @@ func (_c *PurchaseRejectionDispositionCreate) check() error {
 	if v, ok := _c.mutation.PurchaseReceiptItemID(); ok {
 		if err := purchaserejectiondisposition.PurchaseReceiptItemIDValidator(v); err != nil {
 			return &ValidationError{Name: "purchase_receipt_item_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseRejectionDisposition.purchase_receipt_item_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.ReplacementReceiptID(); ok {
+		if err := purchaserejectiondisposition.ReplacementReceiptIDValidator(v); err != nil {
+			return &ValidationError{Name: "replacement_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseRejectionDisposition.replacement_receipt_id": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.DispositionType(); !ok {
@@ -497,6 +522,23 @@ func (_c *PurchaseRejectionDispositionCreate) createSpec() (*PurchaseRejectionDi
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(purchaserejectiondisposition.FieldCreatedAt, field.TypeTime, value)
 		_node.CreatedAt = value
+	}
+	if nodes := _c.mutation.ReplacementReceiptIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchaserejectiondisposition.ReplacementReceiptTable,
+			Columns: []string{purchaserejectiondisposition.ReplacementReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_node.ReplacementReceiptID = &nodes[0]
+		_spec.Edges = append(_spec.Edges, edge)
 	}
 	return _node, _spec
 }

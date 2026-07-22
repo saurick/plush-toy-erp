@@ -32,6 +32,7 @@ func (OutsourcingReturnDisposition) Fields() []ent.Field {
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(16),
 		immutableDecimalQuantityField("quantity"),
 		field.Int("production_wip_batch_id").Optional().Nillable().Positive().Immutable(),
+		field.Int("result_wip_batch_id").Optional().Nillable().Positive(),
 		field.String("reason").NotEmpty().MaxLen(255).Immutable(),
 		field.String("idempotency_key").NotEmpty().MaxLen(128).Immutable(),
 		field.String("idempotency_payload_hash").NotEmpty().MinLen(64).MaxLen(64).Immutable(),

@@ -19,6 +19,7 @@ import { getActionErrorMessage } from '@/common/utils/errorMessage'
 import {
   createFinanceCreditNote,
   createFinancePayment,
+  getFinanceCreditNote,
   getFinancePayment,
   listFinanceCreditNotes,
   listFinanceFacts,
@@ -399,7 +400,11 @@ export default function FinancePaymentsPage() {
       const credit = reverse
         ? await reverseFinanceCreditNote(attempt.params)
         : await createFinanceCreditNote(attempt.params)
-      if (!credit?.id) throw new Error('红冲结果暂时无法确认')
+      const validCreate = !reverse && Number(credit?.finance_fact_id) === Number(payload.finance_fact_id) && credit?.status === 'POSTED' && Number(credit?.amount) === Number(payload.amount)
+      const validReverse = reverse && Number(credit?.reversal_of_credit_note_id) === Number(currentCredit?.id) && credit?.status === 'REVERSED'
+      if (!credit?.id || (!validCreate && !validReverse)) {
+        throw Object.assign(new Error('红冲结果暂时无法确认'), { isInvalidResponse: true })
+      }
       attemptsRef.current.settle(scope, attempt, null)
       setCurrentCredit({
         ...credit,
@@ -410,6 +415,22 @@ export default function FinancePaymentsPage() {
       message.success(reverse ? '红冲记录已冲销' : '红冲已登记')
     } catch (error) {
       const retained = attemptsRef.current.settle(scope, attempt, error)
+      if (retained && reverse && currentCredit?.id) {
+        try {
+          const sourceCredit = await getFinanceCreditNote({ id: currentCredit.id })
+          const history = await listFinanceCreditNotes({ finance_fact_id: sourceCredit?.finance_fact_id, limit: 50, offset: 0 })
+          const reversal = (history?.credit_notes || []).find((item) => Number(item?.reversal_of_credit_note_id) === Number(currentCredit.id))
+          if (reversal?.status === 'REVERSED') {
+            attemptsRef.current.settle(scope, attempt, null)
+            setCurrentCredit(reversal)
+            setCreditOpen(false)
+            message.success('已重新读取红冲冲销结果')
+            return
+          }
+        } catch {
+          // Keep the frozen intent for an exact retry when readback is unavailable.
+        }
+      }
       message[retained ? 'warning' : 'error'](
         retained
           ? '红冲结果暂时无法确认，请保持内容不变后重试'
@@ -563,7 +584,15 @@ export default function FinancePaymentsPage() {
                 登记红冲
               </Button>
             ) : null}
-            {currentCredit && canReverseCredit ? (
+            {currentCredit &&
+            canReverseCredit &&
+            currentCredit.status === 'POSTED' &&
+            !currentCredit.reversal_of_credit_note_id &&
+            !creditNotes.some(
+              (item) =>
+                Number(item?.reversal_of_credit_note_id) ===
+                Number(currentCredit.id)
+            ) ? (
               <Button danger onClick={() => openCredit(true)}>
                 冲销当前红冲
               </Button>

@@ -47,6 +47,8 @@ const (
 	EdgePurchaseReceiptAdjustments = "purchase_receipt_adjustments"
 	// EdgeQualityInspections holds the string denoting the quality_inspections edge name in mutations.
 	EdgeQualityInspections = "quality_inspections"
+	// EdgeReplacementDispositions holds the string denoting the replacement_dispositions edge name in mutations.
+	EdgeReplacementDispositions = "replacement_dispositions"
 	// EdgeItems holds the string denoting the items edge name in mutations.
 	EdgeItems = "items"
 	// Table holds the table name of the purchasereceipt in the database.
@@ -79,6 +81,13 @@ const (
 	QualityInspectionsInverseTable = "quality_inspections"
 	// QualityInspectionsColumn is the table column denoting the quality_inspections relation/edge.
 	QualityInspectionsColumn = "purchase_receipt_id"
+	// ReplacementDispositionsTable is the table that holds the replacement_dispositions relation/edge.
+	ReplacementDispositionsTable = "purchase_rejection_dispositions"
+	// ReplacementDispositionsInverseTable is the table name for the PurchaseRejectionDisposition entity.
+	// It exists in this package in order to avoid circular dependency with the "purchaserejectiondisposition" package.
+	ReplacementDispositionsInverseTable = "purchase_rejection_dispositions"
+	// ReplacementDispositionsColumn is the table column denoting the replacement_dispositions relation/edge.
+	ReplacementDispositionsColumn = "replacement_receipt_id"
 	// ItemsTable is the table that holds the items relation/edge.
 	ItemsTable = "purchase_receipt_items"
 	// ItemsInverseTable is the table name for the PurchaseReceiptItem entity.
@@ -265,6 +274,20 @@ func ByQualityInspections(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOptio
 	}
 }
 
+// ByReplacementDispositionsCount orders the results by replacement_dispositions count.
+func ByReplacementDispositionsCount(opts ...sql.OrderTermOption) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborsCount(s, newReplacementDispositionsStep(), opts...)
+	}
+}
+
+// ByReplacementDispositions orders the results by replacement_dispositions terms.
+func ByReplacementDispositions(term sql.OrderTerm, terms ...sql.OrderTerm) OrderOption {
+	return func(s *sql.Selector) {
+		sqlgraph.OrderByNeighborTerms(s, newReplacementDispositionsStep(), append([]sql.OrderTerm{term}, terms...)...)
+	}
+}
+
 // ByItemsCount orders the results by items count.
 func ByItemsCount(opts ...sql.OrderTermOption) OrderOption {
 	return func(s *sql.Selector) {
@@ -304,6 +327,13 @@ func newQualityInspectionsStep() *sqlgraph.Step {
 		sqlgraph.From(Table, FieldID),
 		sqlgraph.To(QualityInspectionsInverseTable, FieldID),
 		sqlgraph.Edge(sqlgraph.O2M, false, QualityInspectionsTable, QualityInspectionsColumn),
+	)
+}
+func newReplacementDispositionsStep() *sqlgraph.Step {
+	return sqlgraph.NewStep(
+		sqlgraph.From(Table, FieldID),
+		sqlgraph.To(ReplacementDispositionsInverseTable, FieldID),
+		sqlgraph.Edge(sqlgraph.O2M, false, ReplacementDispositionsTable, ReplacementDispositionsColumn),
 	)
 }
 func newItemsStep() *sqlgraph.Step {

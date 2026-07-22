@@ -8,7 +8,7 @@ export const PINNED_DEV_DOC_PATHS = Object.freeze([
   'docs/项目治理地图.md',
   'docs/product/模块实施治理.md',
   'docs/product/产品完成路线图.md',
-  'docs/product/产品台账索引.md',
+  'docs/product/产品能力进度台账.md',
   'docs/product/自动化测试策略.md',
 ])
 

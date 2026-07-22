@@ -152,6 +152,10 @@
   color: #b26a00;
 }
 
+.erp-help-center-card-heading--warning {
+  color: #b26a00;
+}
+
 .erp-help-center-card-heading .ant-typography {
   margin: 0;
   color: var(--erp-text, #1f2937);
@@ -192,6 +196,31 @@
   line-height: 1.75;
 }
 
+.erp-help-center-workflow--compact {
+  margin-top: 14px;
+}
+
+.erp-help-center-exception-title.ant-typography {
+  margin: 18px 0 8px;
+  color: var(--erp-text, #1f2937);
+}
+
+.erp-help-center-result {
+  display: grid;
+  gap: 6px;
+  margin-top: 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--erp-border, #dfe9e1);
+  border-radius: 12px;
+  background: var(--erp-surface-bg-soft, #f7faf7);
+}
+
+.erp-help-center-result strong {
+  color: var(--erp-text, #1f2937);
+  font-weight: 600;
+  line-height: 1.75;
+}
+
 .erp-help-center-handoff.ant-typography,
 .erp-help-center-cautions,
 .erp-help-center-faq .ant-collapse-content .ant-typography {
@@ -223,6 +252,10 @@
 }
 
 [data-erp-theme='dark'] .erp-help-center-card-heading--secondary {
+  color: #f5c96b;
+}
+
+[data-erp-theme='dark'] .erp-help-center-card-heading--warning {
   color: #f5c96b;
 }
 

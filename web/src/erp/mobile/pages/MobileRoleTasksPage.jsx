@@ -185,7 +185,13 @@ function isMobileTaskMine(activeRoleKey, adminID, task) {
 export default function MobileRoleTasksPage() {
   const navigate = useNavigate()
   const { activeRoleKey } = useERPWorkspace()
-  const { adminProfile, handleLogout, loggingOut } = useOutletContext() || {}
+  const {
+    adminProfile,
+    canEnterDesktop,
+    handleEnterDesktop,
+    handleLogout,
+    loggingOut,
+  } = useOutletContext() || {}
   const canMountCustomerTasks = canMountCustomerRuntime(adminProfile)
   const taskAccessIdentity =
     workflowTaskAdminAccessRequestIdentity(adminProfile)
@@ -874,16 +880,11 @@ export default function MobileRoleTasksPage() {
   })
 
   useEffect(() => {
-    if (
-      initialHistoryRestoreHandledRef.current ||
-      !canMountCustomerTasks
-    ) {
+    if (initialHistoryRestoreHandledRef.current || !canMountCustomerTasks) {
       return
     }
     initialHistoryRestoreHandledRef.current = true
-    if (
-      !isMobileRoleTaskHistoryScope(initialHistoryCandidate, taskScopeKey)
-    ) {
+    if (!isMobileRoleTaskHistoryScope(initialHistoryCandidate, taskScopeKey)) {
       return
     }
     const restoredScreen = MOBILE_TASK_HISTORY_SCREENS.has(
@@ -907,9 +908,7 @@ export default function MobileRoleTasksPage() {
     )
     listScrollTopRef.current = Math.max(
       0,
-      Number(
-        initialHistoryCandidate[MOBILE_TASK_HISTORY_SCROLL_TOP_KEY] || 0
-      )
+      Number(initialHistoryCandidate[MOBILE_TASK_HISTORY_SCROLL_TOP_KEY] || 0)
     )
     lastFocusedTaskIDRef.current = restoredTaskID
     currentTaskScreenRef.current = restoredScreen
@@ -942,8 +941,7 @@ export default function MobileRoleTasksPage() {
     if (restoredScreen === 'action') {
       restoreActionDraft({
         action: restoredAction,
-        reason:
-          initialHistoryCandidate[MOBILE_TASK_HISTORY_REASON_KEY] || '',
+        reason: initialHistoryCandidate[MOBILE_TASK_HISTORY_REASON_KEY] || '',
         taskID: restoredTaskID,
       })
       return
@@ -1692,9 +1690,7 @@ export default function MobileRoleTasksPage() {
             : selectedTaskActionAccess
         }
         onBack={handleDetailBack}
-        onOpenAction={
-          receiptSnapshotOnly ? null : handleOpenSelectedTaskAction
-        }
+        onOpenAction={receiptSnapshotOnly ? null : handleOpenSelectedTaskAction}
         onViewReceipt={
           receiptSnapshotOnly && receiptDetailSnapshot
             ? () => restoreActionReceipt(receiptDetailSnapshot)
@@ -1732,11 +1728,13 @@ export default function MobileRoleTasksPage() {
       activeViewHasMore={activeTaskSlot.has_more}
       activeTasks={activeTasks}
       adminProfile={adminProfile}
+      canEnterDesktop={canEnterDesktop === true}
       doneTasks={doneTasks}
       filterItems={filterItems}
       filteredTasks={filteredTasks}
       handleLogout={handleLogout}
       handleMainScroll={handleMainScroll}
+      handleEnterDesktop={handleEnterDesktop}
       handleSwitchEntry={() => navigate('/entry')}
       initialLoading={initialLoading}
       latestTaskUpdate={latestTaskUpdate}

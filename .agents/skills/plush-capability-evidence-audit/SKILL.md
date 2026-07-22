@@ -12,8 +12,8 @@ description: 项目能力证据审计（plush-toy-erp）。Use for read-only evi
 按问题范围读取，不机械展开全部文件：
 
 1. `AGENTS.md`、`README.md`、`docs/当前真源与交接顺序.md`。
-2. `docs/product/产品能力进度台账.md`、`docs/product/产品能力证据详情.md`。
-3. 涉及 Workflow runtime 时读 `docs/product/流程编排运行时完成度台账.md`；涉及客户时读 `docs/customers/<customer-key>/客户交付矩阵.md` 和对应验收清单。
+2. `docs/product/产品能力进度台账.md`；能力详情继续回到该表链接的专题文档、代码和测试，不维护第二份证据状态台账。
+3. 涉及 Workflow runtime 时读产品能力台账的“流程运行时状态”和 `docs/architecture/状态工作流事实边界.md`；涉及客户状态或差异时读 `docs/customers/<customer-key>/客户交付矩阵.md` 和对应验收清单。
 4. 当前代码、schema/migration、测试与 `git status --short`；历史 changes、`progress.md`、聊天和截图只作辅助证据。
 5. 涉及运行态或发布时，读取正式 release evidence，并核对 target、commit/image、config revision、migration、health/ready、smoke、backup/restore 和 rollback 证据。没有目标环境证据就明确写“未核验”，不以本地结果代替。
 

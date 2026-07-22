@@ -148,6 +148,15 @@ export default function HelpCenterPage() {
         </div>
       </Card>
 
+      {guides.length > 1 ? (
+        <Alert
+          type="info"
+          showIcon
+          message="当前账号有多个岗位"
+          description={`现在显示“${selectedGuide.label}”的办理说明。开始工作前请先选择本次实际办理岗位，采购和财务等职责不要混在同一张单据里操作。`}
+        />
+      ) : null}
+
       <section aria-labelledby="help-priorities-title">
         <div className="erp-help-center-section-head">
           <div>
@@ -198,7 +207,7 @@ export default function HelpCenterPage() {
         >
           <div className="erp-help-center-card-heading">
             <CheckCircleOutlined aria-hidden="true" />
-            <Title level={4}>推荐办理顺序</Title>
+            <Title level={4}>正常办理案例</Title>
           </div>
           <ol className="erp-help-center-workflow">
             {selectedGuide.workflow.map((step, index) => (
@@ -208,19 +217,47 @@ export default function HelpCenterPage() {
               </li>
             ))}
           </ol>
+          <div className="erp-help-center-result">
+            <Text type="secondary">完成标准</Text>
+            <strong>{selectedGuide.completion}</strong>
+          </div>
+          <div className="erp-help-center-result">
+            <Text type="secondary">交接给谁</Text>
+            <strong>{selectedGuide.handoff}</strong>
+          </div>
         </Card>
 
         <Card
           className="erp-page-card erp-help-center-detail-card"
           variant="borderless"
         >
-          <div className="erp-help-center-card-heading">
-            <SwapOutlined aria-hidden="true" />
-            <Title level={4}>交接给谁</Title>
+          <div className="erp-help-center-card-heading erp-help-center-card-heading--warning">
+            <ExclamationCircleOutlined aria-hidden="true" />
+            <Title level={4}>遇到异常怎么办</Title>
           </div>
+          <Title level={5} className="erp-help-center-exception-title">
+            {selectedGuide.exception.title}
+          </Title>
           <Paragraph className="erp-help-center-handoff">
-            {selectedGuide.handoff}
+            <Text strong>什么时候停下来：</Text>
+            {selectedGuide.exception.trigger}
           </Paragraph>
+          <ol className="erp-help-center-workflow erp-help-center-workflow--compact">
+            {selectedGuide.exception.steps.map((step, index) => (
+              <li key={step}>
+                <span>{index + 1}</span>
+                <Text>{step}</Text>
+              </li>
+            ))}
+          </ol>
+          <div className="erp-help-center-result">
+            <Text type="secondary">退回对象</Text>
+            <strong>{selectedGuide.exception.returnTo}</strong>
+          </div>
+          <div className="erp-help-center-result">
+            <Text type="secondary">异常完成标准</Text>
+            <strong>{selectedGuide.exception.doneWhen}</strong>
+          </div>
           <div className="erp-help-center-card-heading erp-help-center-card-heading--secondary">
             <ExclamationCircleOutlined aria-hidden="true" />
             <Title level={4}>操作时要注意</Title>

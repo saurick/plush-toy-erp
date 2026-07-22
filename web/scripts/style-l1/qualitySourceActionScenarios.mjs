@@ -966,7 +966,7 @@ export function createQualitySourceActionScenarios(deps) {
           }
           await expectText(
             page,
-            '首次到货检验不合格会阻止本单入库，现有退供应商草稿只适用于已入库后追加检验不合格'
+            '首次到货检验不合格可按来源行和部分数量办理退厂或补换'
           )
           await selectRow(page, 'QI-INITIAL-REJECT-STYLE-L1')
           const initialRejectReturnButton = await findSelectionActionButton(

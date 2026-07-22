@@ -1092,15 +1092,13 @@ async function verifyDesktopAccount(browser, account) {
       state: 'visible',
       timeout: 15_000,
     })
-    for (const label of visibleCustomerMenuLabels(account.expectedMenus)) {
-      await page
-        .locator('.erp-admin-menu')
-        .getByText(label, { exact: true })
-        .waitFor({ state: 'visible', timeout: 15_000 })
-    }
     const expectedVisibleMenus = visibleCustomerMenuLabels(
       account.expectedMenus
     ).sort((left, right) => left.localeCompare(right, 'zh-CN'))
+    await verifyRoleGuidedMenuStructure(page, account.username)
+    for (const label of visibleCustomerMenuLabels(account.expectedMenus)) {
+      await findVisibleMenuItem(page, label)
+    }
     const expectedVisibleLeafMenus = uniqueStrings([
       ...expectedVisibleMenus,
       ...authenticatedMenuLabels,
@@ -1149,13 +1147,69 @@ async function verifyDesktopAccount(browser, account) {
   }
 }
 
+async function findVisibleMenuItem(page, label) {
+  const menu = page.locator('.erp-admin-menu')
+  const item = menu.locator('.ant-menu-item').filter({ hasText: label }).first()
+  if (await item.isVisible().catch(() => false)) {
+    return item
+  }
+  const moreFunctions = menu
+    .locator('.ant-menu-submenu-title')
+    .filter({ hasText: '更多功能' })
+    .first()
+  if (await moreFunctions.isVisible().catch(() => false)) {
+    const submenu = moreFunctions.locator('..')
+    const submenuClass = String((await submenu.getAttribute('class')) || '')
+    if (!submenuClass.includes('ant-menu-submenu-open')) {
+      await moreFunctions.click()
+    }
+  }
+  await item.waitFor({ state: 'visible', timeout: 15_000 })
+  return item
+}
+
+async function verifyRoleGuidedMenuStructure(page, username) {
+  const menu = page.locator('.erp-admin-menu')
+  if (
+    (await menu.getAttribute('data-navigation-presentation')) !== 'role_guided'
+  ) {
+    return
+  }
+  await menu.getByText('常用工作', { exact: true }).waitFor({
+    state: 'visible',
+    timeout: 15_000,
+  })
+  const metrics = await menu.evaluate((node) => {
+    const submenuByTitle = (title) =>
+      Array.from(node.querySelectorAll('.ant-menu-submenu')).find((submenu) =>
+        Array.from(submenu.children).some(
+          (child) =>
+            child.classList.contains('ant-menu-submenu-title') &&
+            String(child.textContent || '').trim() === title
+        )
+      )
+    const common = submenuByTitle('常用工作')
+    const commonItems = common
+      ? Array.from(common.querySelectorAll('.ant-menu-item')).filter(
+          (item) => item.getClientRects().length > 0
+        )
+      : []
+    return {
+      commonItemCount: commonItems.length,
+      commonLabels: commonItems.map((item) =>
+        String(item.textContent || '').trim()
+      ),
+    }
+  })
+  assert(
+    metrics.commonItemCount > 0 && metrics.commonItemCount <= 3,
+    `${username} 电脑端常用工作应有 1 至 3 个业务入口: ${JSON.stringify(metrics)}`
+  )
+}
+
 async function verifyAllowedRolePages(page, routeAccess) {
   for (const target of routeAccess.allowedPages) {
-    const menuItem = page
-      .locator('.erp-admin-menu .ant-menu-item')
-      .filter({ hasText: target.label })
-      .first()
-    await menuItem.waitFor({ state: 'visible', timeout: 15_000 })
+    const menuItem = await findVisibleMenuItem(page, target.label)
     await menuItem.click()
     await page.waitForURL((url) => url.pathname === target.path, {
       timeout: 15_000,

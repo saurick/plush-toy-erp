@@ -34,7 +34,10 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"approve_production_exception",
 		"reject_production_exception",
 		"cancel_production_exception",
+		"execute_production_exception",
+		"reverse_production_exception",
 		"get_production_exception",
+		"list_production_exceptions",
 		"post_production_fact",
 		"cancel_production_fact",
 		"list_production_facts",
@@ -46,6 +49,7 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 		"post_outsourcing_return_disposition",
 		"cancel_outsourcing_return_disposition",
 		"get_outsourcing_return_disposition",
+		"list_outsourcing_return_dispositions",
 		"post_outsourcing_fact",
 		"cancel_outsourcing_fact",
 		"list_outsourcing_facts":

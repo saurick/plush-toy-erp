@@ -8,6 +8,7 @@ export const yoyoosunMenuConfig = Object.freeze({
     faviconHref: "/customer-assets/yoyoosun/favicon-yoyoosun.svg",
   },
   desktopMenu: {
+    presentation: "role_guided",
     hiddenItemKeys: [],
     sections: [
       {

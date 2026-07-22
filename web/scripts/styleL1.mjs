@@ -711,13 +711,21 @@ async function runScenarioOnce(browser, scenario) {
       : typeof scenario.effectiveSession?.customer?.key === 'string'
         ? scenario.effectiveSession.customer.key.trim()
         : ''
-  if (runtimeCustomerKey) {
-    await page.addInitScript((customerKey) => {
+  const runtimeCustomerConfig =
+    scenario.customerConfig && typeof scenario.customerConfig === 'object'
+      ? scenario.customerConfig
+      : null
+  if (runtimeCustomerKey || runtimeCustomerConfig) {
+    await page.addInitScript(({ customerKey, customerConfig }) => {
       window.__PLUSH_ERP_CUSTOMER_CONFIG__ = {
         ...(window.__PLUSH_ERP_CUSTOMER_CONFIG__ || {}),
-        customerKey,
+        ...(customerConfig || {}),
+        ...(customerKey ? { customerKey } : {}),
       }
-    }, runtimeCustomerKey)
+    }, {
+      customerKey: runtimeCustomerKey,
+      customerConfig: runtimeCustomerConfig,
+    })
   }
 
   page.on('console', (message) => {

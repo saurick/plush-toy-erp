@@ -77,6 +77,8 @@ import BusinessRecordDetailsModal from '../components/business-list/BusinessReco
 import BusinessAttachmentPanel from '../components/business-list/BusinessAttachmentPanel.jsx'
 import QualityInspectionPurchaseReturnModal from '../components/quality-inspections/QualityInspectionPurchaseReturnModal.jsx'
 import PurchaseRejectionDispositionModal from '../components/quality-inspections/PurchaseRejectionDispositionModal.jsx'
+import OutsourcingReturnDispositionModal from '../components/quality-inspections/OutsourcingReturnDispositionModal.jsx'
+import ProductionExceptionRequestModal from '../components/quality-inspections/ProductionExceptionRequestModal.jsx'
 import {
   QualityInspectionCreateForm,
   QualityInspectionDecisionForm,
@@ -354,6 +356,8 @@ export default function V1QualityInspectionsPage() {
   const [purchaseReturnModal, setPurchaseReturnModal] = useState(null)
   const [rejectionDispositionOpen, setRejectionDispositionOpen] =
     useState(false)
+  const [outsourcingDispositionOpen, setOutsourcingDispositionOpen] = useState(false)
+  const [productionExceptionOpen, setProductionExceptionOpen] = useState(false)
   const [purchaseReturnLoading, setPurchaseReturnLoading] = useState(false)
   const [selectedRowPurchaseReceipt, setSelectedRowPurchaseReceipt] =
     useState(null)
@@ -456,6 +460,13 @@ export default function V1QualityInspectionsPage() {
     adminProfile,
     'purchase.return.cancel'
   )
+  const canPostOutsourcingDisposition = hasActionPermission(adminProfile, 'outsourcing.fact.post')
+  const canCancelOutsourcingDisposition = hasActionPermission(adminProfile, 'outsourcing.fact.cancel')
+  const canReadOutsourcingDisposition = hasActionPermission(
+    adminProfile,
+    'outsourcing.fact.read'
+  )
+  const canHandleQualityException = hasActionPermission(adminProfile, 'quality.exception.handle')
   const canReadPurchaseReceipt = hasActionPermission(
     adminProfile,
     'purchase.receipt.read'
@@ -1455,7 +1466,7 @@ export default function V1QualityInspectionsPage() {
       <PageHeaderCard
         compact
         title="质量检验"
-        description="质量检验集中办理采购到货、委外回货、出货关联成品和生产 WIP 分段关口的质量判定。生产 WIP 依次覆盖裁片、皮套、成品、针检、抽检及订单要求的客户验货，每张质检单只代表当前在制批次和当前关口。首次到货检验不合格可办理退厂或补换，确认后取消尚未入库的收货草稿；已入库后的不合格仍生成采购退货并形成库存追溯。"
+        description="质量检验集中办理采购到货、委外回货、出货关联成品和生产 WIP 分段关口的质量判定。生产 WIP 依次覆盖裁片、皮套、成品、针检、抽检及订单要求的客户验货，每张质检单只代表当前在制批次和当前关口。首次到货检验不合格可按来源行和部分数量办理退厂或补换；补换确认生成新的待收与待检记录，原收货不会因部分处置被整单取消。已入库后的不合格仍生成采购退货并形成库存追溯。"
         tags={[
           <Tag color="gold" key="hold">
             已提交：等待判定
@@ -1827,7 +1838,17 @@ export default function V1QualityInspectionsPage() {
               }
               onClick={() => setRejectionDispositionOpen(true)}
             >
-              首次来料退厂
+              首次来料退厂 / 补换
+            </Button>
+          ) : null}
+          {selectedRow?.status === 'REJECTED' && selectedRow?.source_type === 'OUTSOURCING_FACT' && canReadOutsourcingDisposition ? (
+            <Button size="small" danger onClick={() => setOutsourcingDispositionOpen(true)}>
+              委外返厂 / 返工
+            </Button>
+          ) : null}
+          {selectedRow?.status === 'REJECTED' && Number(selectedRow?.production_wip_batch_id || 0) > 0 && canHandleQualityException ? (
+            <Button size="small" danger onClick={() => setProductionExceptionOpen(true)}>
+              申请报废 / 让步
             </Button>
           ) : null}
           {canCreatePurchaseReturn ? (
@@ -1933,6 +1954,23 @@ export default function V1QualityInspectionsPage() {
         canPost={canPostPurchaseReturn}
         canCancel={canCancelPurchaseReturn}
         onClose={() => setRejectionDispositionOpen(false)}
+        onChanged={() => loadRows()}
+      />
+
+      <OutsourcingReturnDispositionModal
+        open={outsourcingDispositionOpen}
+        inspection={selectedRow}
+        canCreate={canHandleQualityException}
+        canPost={canPostOutsourcingDisposition}
+        canCancel={canCancelOutsourcingDisposition}
+        onClose={() => setOutsourcingDispositionOpen(false)}
+        onChanged={() => loadRows()}
+      />
+
+      <ProductionExceptionRequestModal
+        open={productionExceptionOpen}
+        inspection={selectedRow}
+        onClose={() => setProductionExceptionOpen(false)}
         onChanged={() => loadRows()}
       />
 

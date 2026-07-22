@@ -9,12 +9,27 @@ const trialRoles = Object.freeze([
   ["boss", "demo_boss", "mobile.boss.access", "/m/boss/tasks"],
   ["sales", "demo_sales", "mobile.sales.access", "/m/sales/tasks"],
   ["purchase", "demo_purchase", "mobile.purchase.access", "/m/purchase/tasks"],
-  ["production", "demo_production", "mobile.production.access", "/m/production/tasks"],
-  ["warehouse", "demo_warehouse", "mobile.warehouse.access", "/m/warehouse/tasks"],
+  [
+    "production",
+    "demo_production",
+    "mobile.production.access",
+    "/m/production/tasks",
+  ],
+  [
+    "warehouse",
+    "demo_warehouse",
+    "mobile.warehouse.access",
+    "/m/warehouse/tasks",
+  ],
   ["quality", "demo_quality", "mobile.quality.access", "/m/quality/tasks"],
   ["finance", "demo_finance", "mobile.finance.access", "/m/finance/tasks"],
   ["pmc", "demo_pmc", "mobile.pmc.access", "/m/pmc/tasks"],
-  ["engineering", "demo_engineering", "mobile.engineering.access", "/m/engineering/tasks"],
+  [
+    "engineering",
+    "demo_engineering",
+    "mobile.engineering.access",
+    "/m/engineering/tasks",
+  ],
 ]);
 
 function read(relativePath) {
@@ -22,10 +37,7 @@ function read(relativePath) {
 }
 
 function assertIncludes(source, token, context) {
-  assert(
-    source.includes(token),
-    `${context} must include ${token}`,
-  );
+  assert(source.includes(token), `${context} must include ${token}`);
 }
 
 test("trial role docs cover all current role demo accounts and mobile task paths", () => {
@@ -35,17 +47,25 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   const webScriptsReadme = read("web/scripts/README.md");
   const serverConfigDoc = read("server/docs/config.md");
   const testStrategyDoc = read("docs/product/自动化测试策略.md");
-  const yoyoosunTrialRunbook = read("docs/customers/yoyoosun/试用环境执行手册.md");
+  const yoyoosunTrialRunbook = read(
+    "docs/customers/yoyoosun/试用环境执行手册.md",
+  );
   const fastQa = read("scripts/qa/fast.sh");
   const strictQa = read("scripts/qa/strict.sh");
   const trialAccountAuditTest = read("scripts/qa/trial-account-rbac.test.mjs");
-  const trialBrowserSmokeTest = read("web/scripts/trialDemoAccountBrowserSmoke.test.mjs");
+  const trialBrowserSmokeTest = read(
+    "web/scripts/trialDemoAccountBrowserSmoke.test.mjs",
+  );
   const trialAccountAudit = read("scripts/qa/trial-account-rbac.mjs");
-  const trialBrowserSmoke = read("web/scripts/trialDemoAccountBrowserSmoke.mjs");
+  const trialBrowserSmoke = read(
+    "web/scripts/trialDemoAccountBrowserSmoke.mjs",
+  );
   const seedCommandSource = read("server/cmd/seed-role-demo-admins/main.go");
   const seedSource = read("server/internal/data/admin_role_demo_seed.go");
   const rbacSource = read("server/internal/biz/rbac.go");
-  const yoyoosunTrialAccountChecklist = read("docs/customers/yoyoosun/试用账号角色菜单核对清单.md");
+  const yoyoosunTrialAccountChecklist = read(
+    "docs/customers/yoyoosun/试用账号角色菜单核对清单.md",
+  );
 
   for (const [roleKey, username, permissionKey, mobilePath] of trialRoles) {
     assertIncludes(seedSource, username, "admin role demo seed");
@@ -53,11 +73,31 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     assertIncludes(trialAccountAudit, roleKey, "trial account RBAC audit");
     assertIncludes(rbacSource, permissionKey, "RBAC permission registry");
 
-    assertIncludes(scriptReadme, username, "scripts README role demo account table");
-    assertIncludes(scriptReadme, roleKey, "scripts README role demo account table");
-    assertIncludes(serverConfigDoc, username, "server config role demo account docs");
-    assertIncludes(webReadme, mobilePath, "web README single-port mobile task entry list");
-    assertIncludes(trialBrowserSmoke, `username: '${username}'`, "trial browser smoke desktop accounts");
+    assertIncludes(
+      scriptReadme,
+      username,
+      "scripts README role demo account table",
+    );
+    assertIncludes(
+      scriptReadme,
+      roleKey,
+      "scripts README role demo account table",
+    );
+    assertIncludes(
+      serverConfigDoc,
+      username,
+      "server config role demo account docs",
+    );
+    assertIncludes(
+      webReadme,
+      mobilePath,
+      "web README single-port mobile task entry list",
+    );
+    assertIncludes(
+      trialBrowserSmoke,
+      `username: '${username}'`,
+      "trial browser smoke desktop accounts",
+    );
     assertIncludes(
       trialBrowserSmoke,
       `['${username}', '${roleKey}']`,
@@ -66,12 +106,32 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   }
 
   const rootReadme = read("README.md");
-  assertIncludes(rootReadme, "/m/<role>/tasks", "root README mobile task route contract");
-  assertIncludes(rootReadme, "pnpm start", "root README single frontend start command");
-  assertIncludes(rootReadme, "http://localhost:5175/m/engineering/tasks", "root README engineering mobile task URL");
+  assertIncludes(
+    rootReadme,
+    "/m/<role>/tasks",
+    "root README mobile task route contract",
+  );
+  assertIncludes(
+    rootReadme,
+    "pnpm start",
+    "root README single frontend start command",
+  );
+  assertIncludes(
+    rootReadme,
+    "http://localhost:5175/m/engineering/tasks",
+    "root README engineering mobile task URL",
+  );
 
-  assertIncludes(scriptReadme, "demo_admin", "scripts README role demo account table");
-  assertIncludes(serverConfigDoc, "demo_admin", "server config role demo account docs");
+  assertIncludes(
+    scriptReadme,
+    "demo_admin",
+    "scripts README role demo account table",
+  );
+  assertIncludes(
+    serverConfigDoc,
+    "demo_admin",
+    "server config role demo account docs",
+  );
   assertIncludes(seedSource, "demo_admin", "admin role demo seed");
   assertIncludes(trialAccountAudit, "demo_admin", "trial account RBAC audit");
   assert.match(
@@ -96,8 +156,28 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   assertIncludes(
     yoyoosunTrialAccountChecklist,
-    "登记的 `customer-trial-133` 测试目标统一使用公开测试密码 `12345678`",
+    "账号名和凭据只在受控环境配置与授权交付渠道维护",
     "yoyoosun trial role demo credential boundary",
+  );
+  assert.doesNotMatch(
+    yoyoosunTrialAccountChecklist,
+    /12345678|adminadmin/u,
+    "customer trial docs must not publish reusable demo or administrator passwords",
+  );
+  assertIncludes(
+    yoyoosunTrialAccountChecklist,
+    "常用：`应付管理`、`应收管理`、`发票管理`；更多：`对账管理`和来源核对页",
+    "finance trial navigation priority",
+  );
+  assertIncludes(
+    yoyoosunTrialAccountChecklist,
+    "顶部切换按钮和“我的 → 进入电脑端”均可直达",
+    "mobile to desktop entry guidance",
+  );
+  assert.doesNotMatch(
+    yoyoosunTrialAccountChecklist,
+    /`对账\/结算`|`待付款\/应付提醒`|`应收提醒`|`发票\/开票异常`/u,
+    "customer trial docs must not retain retired finance menu labels",
   );
   assertIncludes(
     trialAccountAudit,
@@ -124,12 +204,36 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "buildVerificationReport",
     "trial account RBAC audit sanitized report builder",
   );
-  assertIncludes(trialBrowserSmoke, "username: 'demo_admin'", "trial browser smoke admin account");
-  assertIncludes(trialBrowserSmoke, "expectSuccess: false", "trial browser smoke admin denial");
-  assertIncludes(trialBrowserSmoke, "forbiddenMenus", "trial browser smoke forbidden menu assertions");
-  assertIncludes(trialBrowserSmoke, "'权限管理'", "trial browser smoke non-admin forbidden menus");
-  assertIncludes(trialBrowserSmoke, "'工作台'", "trial browser smoke admin forbidden business menus");
-  assertIncludes(trialBrowserSmoke, "不应看到菜单", "trial browser smoke forbidden menu assertion message");
+  assertIncludes(
+    trialBrowserSmoke,
+    "username: 'demo_admin'",
+    "trial browser smoke admin account",
+  );
+  assertIncludes(
+    trialBrowserSmoke,
+    "expectSuccess: false",
+    "trial browser smoke admin denial",
+  );
+  assertIncludes(
+    trialBrowserSmoke,
+    "forbiddenMenus",
+    "trial browser smoke forbidden menu assertions",
+  );
+  assertIncludes(
+    trialBrowserSmoke,
+    "'权限管理'",
+    "trial browser smoke non-admin forbidden menus",
+  );
+  assertIncludes(
+    trialBrowserSmoke,
+    "'工作台'",
+    "trial browser smoke admin forbidden business menus",
+  );
+  assertIncludes(
+    trialBrowserSmoke,
+    "不应看到菜单",
+    "trial browser smoke forbidden menu assertion message",
+  );
   assertIncludes(
     trialBrowserSmoke,
     "URL must not contain username or password",
@@ -302,7 +406,10 @@ test("trial role docs cover all current role demo accounts and mobile task paths
   );
   for (const [docSource, context] of [
     [webReadme, "web README yoyoosun entry verification boundary"],
-    [webScriptsReadme, "web scripts README yoyoosun entry verification boundary"],
+    [
+      webScriptsReadme,
+      "web scripts README yoyoosun entry verification boundary",
+    ],
   ]) {
     assertIncludes(docSource, "start:yoyoosun --print-plan", context);
     assertIncludes(docSource, "preview:yoyoosun --print-plan", context);
@@ -349,7 +456,10 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     [scriptReadme, "scripts README effective session probe entry"],
     [qaReadme, "scripts qa README effective session probe entry"],
     [webReadme, "web README effective session probe command"],
-    [yoyoosunTrialRunbook, "yoyoosun trial runbook effective session probe command"],
+    [
+      yoyoosunTrialRunbook,
+      "yoyoosun trial runbook effective session probe command",
+    ],
   ]) {
     assertIncludes(
       docSource,
@@ -383,18 +493,74 @@ test("trial role docs cover all current role demo accounts and mobile task paths
     "模拟数据不等于真实 import",
     "yoyoosun trial runbook simulated data boundary",
   );
-  assertIncludes(fastQa, "run-node-tests.mjs", "qa fast automatic scripts test discovery");
-  assertIncludes(fastQa, "trial-account-rbac.mjs", "qa fast trial account syntax check");
-  assertIncludes(fastQa, "trialDemoAccountBrowserSmoke.mjs", "qa fast trial browser syntax check");
-  assertIncludes(fastQa, "node --check", "qa fast executable script syntax check");
-  assertIncludes(strictQa, "scripts/qa/full.sh", "qa strict full superset composition");
-  assertIncludes(strictQa, "QA_BROWSER_SCENARIOS", "qa strict expanded browser gate");
-  assertIncludes(trialAccountAuditTest, "expected single role", "trial account RBAC unit test");
-  assertIncludes(trialAccountAuditTest, "expected single mobile permission", "trial account RBAC unit test");
-  assertIncludes(trialAccountAuditTest, "unexpected debug permissions", "trial account RBAC unit test");
-  assertIncludes(trialBrowserSmokeTest, "CLI input template is no-write", "trial browser smoke unit test");
-  assertIncludes(trialBrowserSmokeTest, "CLI preflight writes sanitized report", "trial browser smoke unit test");
-  assertIncludes(trialBrowserSmokeTest, "report requires credentials before writing", "trial browser smoke report credential guard");
-  assertIncludes(trialBrowserSmokeTest, "report path stays inside repository", "trial browser smoke report path guard");
-  assertIncludes(trialBrowserSmokeTest, "startsDevServer", "trial browser smoke unit test");
+  assertIncludes(
+    fastQa,
+    "run-node-tests.mjs",
+    "qa fast automatic scripts test discovery",
+  );
+  assertIncludes(
+    fastQa,
+    "trial-account-rbac.mjs",
+    "qa fast trial account syntax check",
+  );
+  assertIncludes(
+    fastQa,
+    "trialDemoAccountBrowserSmoke.mjs",
+    "qa fast trial browser syntax check",
+  );
+  assertIncludes(
+    fastQa,
+    "node --check",
+    "qa fast executable script syntax check",
+  );
+  assertIncludes(
+    strictQa,
+    "scripts/qa/full.sh",
+    "qa strict full superset composition",
+  );
+  assertIncludes(
+    strictQa,
+    "QA_BROWSER_SCENARIOS",
+    "qa strict expanded browser gate",
+  );
+  assertIncludes(
+    trialAccountAuditTest,
+    "expected single role",
+    "trial account RBAC unit test",
+  );
+  assertIncludes(
+    trialAccountAuditTest,
+    "expected single mobile permission",
+    "trial account RBAC unit test",
+  );
+  assertIncludes(
+    trialAccountAuditTest,
+    "unexpected debug permissions",
+    "trial account RBAC unit test",
+  );
+  assertIncludes(
+    trialBrowserSmokeTest,
+    "CLI input template is no-write",
+    "trial browser smoke unit test",
+  );
+  assertIncludes(
+    trialBrowserSmokeTest,
+    "CLI preflight writes sanitized report",
+    "trial browser smoke unit test",
+  );
+  assertIncludes(
+    trialBrowserSmokeTest,
+    "report requires credentials before writing",
+    "trial browser smoke report credential guard",
+  );
+  assertIncludes(
+    trialBrowserSmokeTest,
+    "report path stays inside repository",
+    "trial browser smoke report path guard",
+  );
+  assertIncludes(
+    trialBrowserSmokeTest,
+    "startsDevServer",
+    "trial browser smoke unit test",
+  );
 });

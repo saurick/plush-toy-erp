@@ -2,21 +2,15 @@ package biz
 
 import (
 	"context"
-	"errors"
 	"testing"
 
 	"github.com/shopspring/decimal"
 )
 
-func TestOutsourcingDispositionRequiresExplicitReworkBatch(t *testing.T) {
+func TestOutsourcingDispositionAllowsRepositoryToDeriveReworkBatch(t *testing.T) {
 	repo := &outsourcingDispositionRepoStub{}
 	uc := NewOperationalFactUsecase(repo)
 	in := &OutsourcingReturnDispositionCreate{DispositionNo: " OD-1 ", QualityInspectionID: 2, DispositionType: " rework ", Quantity: decimal.NewFromInt(1), Reason: " 返工 ", IdempotencyKey: " od-1 ", CreatedBy: 7}
-	if _, err := uc.CreateOutsourcingReturnDisposition(context.Background(), in); !errors.Is(err, ErrOutsourcingDispositionSourceInvalid) {
-		t.Fatalf("missing batch err=%v", err)
-	}
-	batchID := 9
-	in.ProductionWIPBatchID = &batchID
 	got, err := uc.CreateOutsourcingReturnDisposition(context.Background(), in)
 	if err != nil || got.DispositionType != OutsourcingDispositionRework || repo.hash == "" {
 		t.Fatalf("got=%#v err=%v hash=%q", got, err, repo.hash)

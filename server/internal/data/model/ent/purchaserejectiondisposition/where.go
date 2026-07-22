@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"entgo.io/ent/dialect/sql"
+	"entgo.io/ent/dialect/sql/sqlgraph"
 	"github.com/shopspring/decimal"
 )
 
@@ -73,6 +74,11 @@ func PurchaseReceiptID(v int) predicate.PurchaseRejectionDisposition {
 // PurchaseReceiptItemID applies equality check predicate on the "purchase_receipt_item_id" field. It's identical to PurchaseReceiptItemIDEQ.
 func PurchaseReceiptItemID(v int) predicate.PurchaseRejectionDisposition {
 	return predicate.PurchaseRejectionDisposition(sql.FieldEQ(FieldPurchaseReceiptItemID, v))
+}
+
+// ReplacementReceiptID applies equality check predicate on the "replacement_receipt_id" field. It's identical to ReplacementReceiptIDEQ.
+func ReplacementReceiptID(v int) predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(sql.FieldEQ(FieldReplacementReceiptID, v))
 }
 
 // DispositionType applies equality check predicate on the "disposition_type" field. It's identical to DispositionTypeEQ.
@@ -338,6 +344,36 @@ func PurchaseReceiptItemIDLT(v int) predicate.PurchaseRejectionDisposition {
 // PurchaseReceiptItemIDLTE applies the LTE predicate on the "purchase_receipt_item_id" field.
 func PurchaseReceiptItemIDLTE(v int) predicate.PurchaseRejectionDisposition {
 	return predicate.PurchaseRejectionDisposition(sql.FieldLTE(FieldPurchaseReceiptItemID, v))
+}
+
+// ReplacementReceiptIDEQ applies the EQ predicate on the "replacement_receipt_id" field.
+func ReplacementReceiptIDEQ(v int) predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(sql.FieldEQ(FieldReplacementReceiptID, v))
+}
+
+// ReplacementReceiptIDNEQ applies the NEQ predicate on the "replacement_receipt_id" field.
+func ReplacementReceiptIDNEQ(v int) predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(sql.FieldNEQ(FieldReplacementReceiptID, v))
+}
+
+// ReplacementReceiptIDIn applies the In predicate on the "replacement_receipt_id" field.
+func ReplacementReceiptIDIn(vs ...int) predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(sql.FieldIn(FieldReplacementReceiptID, vs...))
+}
+
+// ReplacementReceiptIDNotIn applies the NotIn predicate on the "replacement_receipt_id" field.
+func ReplacementReceiptIDNotIn(vs ...int) predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(sql.FieldNotIn(FieldReplacementReceiptID, vs...))
+}
+
+// ReplacementReceiptIDIsNil applies the IsNil predicate on the "replacement_receipt_id" field.
+func ReplacementReceiptIDIsNil() predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(sql.FieldIsNull(FieldReplacementReceiptID))
+}
+
+// ReplacementReceiptIDNotNil applies the NotNil predicate on the "replacement_receipt_id" field.
+func ReplacementReceiptIDNotNil() predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(sql.FieldNotNull(FieldReplacementReceiptID))
 }
 
 // DispositionTypeEQ applies the EQ predicate on the "disposition_type" field.
@@ -1213,6 +1249,29 @@ func CreatedAtLT(v time.Time) predicate.PurchaseRejectionDisposition {
 // CreatedAtLTE applies the LTE predicate on the "created_at" field.
 func CreatedAtLTE(v time.Time) predicate.PurchaseRejectionDisposition {
 	return predicate.PurchaseRejectionDisposition(sql.FieldLTE(FieldCreatedAt, v))
+}
+
+// HasReplacementReceipt applies the HasEdge predicate on the "replacement_receipt" edge.
+func HasReplacementReceipt() predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(func(s *sql.Selector) {
+		step := sqlgraph.NewStep(
+			sqlgraph.From(Table, FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, ReplacementReceiptTable, ReplacementReceiptColumn),
+		)
+		sqlgraph.HasNeighbors(s, step)
+	})
+}
+
+// HasReplacementReceiptWith applies the HasEdge predicate on the "replacement_receipt" edge with a given conditions (other predicates).
+func HasReplacementReceiptWith(preds ...predicate.PurchaseReceipt) predicate.PurchaseRejectionDisposition {
+	return predicate.PurchaseRejectionDisposition(func(s *sql.Selector) {
+		step := newReplacementReceiptStep()
+		sqlgraph.HasNeighborsWith(s, step, func(s *sql.Selector) {
+			for _, p := range preds {
+				p(s)
+			}
+		})
+	})
 }
 
 // And groups predicates with the AND operator between them.

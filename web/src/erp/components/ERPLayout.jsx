@@ -51,7 +51,12 @@ import {
   getBusinessModule,
   isCustomerBusinessDataPageKey,
 } from '../config/businessModules.mjs'
+import {
+  getActiveCustomerMenuConfig,
+  getCustomerNavigationPresentation,
+} from '../config/customerMenuConfig.mjs'
 import { resolveMenuPermissionKey } from '../config/menuPermissions.mjs'
+import { buildRoleGuidedNavigation } from '../config/roleGuidedNavigation.mjs'
 import {
   getAuthenticatedNavigationSections,
   getNavigationSections,
@@ -313,6 +318,11 @@ export default function ERPLayout() {
     isSuperAdmin &&
     !requiresConfiguredCustomerRuntime &&
     !effectiveSessionCustomerKey
+  const customerNavigationPresentation = useMemo(
+    () =>
+      getCustomerNavigationPresentation(getActiveCustomerMenuConfig()),
+    []
+  )
   const routeNavigationSections = useMemo(
     () => [
       ...getNavigationSections(isSuperAdmin ? null : undefined),
@@ -577,6 +587,19 @@ export default function ERPLayout() {
     shouldUseProductCoreNavigation,
   ])
 
+  const useRoleGuidedNavigation =
+    customerNavigationPresentation === 'role_guided' &&
+    !isSuperAdmin &&
+    !shouldUseProductCoreNavigation
+  const roleGuidedNavigation = useMemo(
+    () =>
+      buildRoleGuidedNavigation({
+        visibleSections,
+        adminProfile,
+      }),
+    [adminProfile, visibleSections]
+  )
+
   const permissionGovernedVisibleSections = useMemo(
     () =>
       visibleSections
@@ -666,19 +689,59 @@ export default function ERPLayout() {
     visibleSections,
   ])
 
-  const menuItems = useMemo(
-    () =>
-      visibleSections.map((section) => ({
+  const menuItems = useMemo(() => {
+    const buildMenuLeaf = (item) => ({
+      key: item.path,
+      icon: navIconRegistry[item.key] || <FileTextOutlined />,
+      label: item.label,
+    })
+    const buildMenuGroup = (section, keyPrefix = 'group') => ({
+      type: 'group',
+      key: `${keyPrefix}-${section.title}`,
+      label: section.title,
+      children: section.items.map(buildMenuLeaf),
+    })
+
+    if (!useRoleGuidedNavigation) {
+      return visibleSections.map((section) => buildMenuGroup(section))
+    }
+
+    const guidedItems = []
+    if (roleGuidedNavigation.dashboardItems.length > 0) {
+      guidedItems.push({
         type: 'group',
-        key: `group-${section.title}`,
-        label: section.title,
-        children: section.items.map((item) => ({
-          key: item.path,
-          icon: navIconRegistry[item.key] || <FileTextOutlined />,
-          label: item.label,
-        })),
-      })),
-    [visibleSections]
+        key: 'group-role-dashboards',
+        label: '看板中心',
+        children: roleGuidedNavigation.dashboardItems.map(buildMenuLeaf),
+      })
+    }
+    if (roleGuidedNavigation.primaryItems.length > 0) {
+      guidedItems.push({
+        type: 'group',
+        key: 'group-role-primary',
+        label: '常用工作',
+        children: roleGuidedNavigation.primaryItems.map(buildMenuLeaf),
+      })
+    }
+    if (roleGuidedNavigation.secondaryItemCount > 0) {
+      guidedItems.push({
+        key: 'role-more-functions',
+        icon: <AppstoreOutlined />,
+        label: `更多功能（${roleGuidedNavigation.secondaryItemCount}）`,
+        children: roleGuidedNavigation.secondarySections.map((section) =>
+          buildMenuGroup(section, 'role-more-group')
+        ),
+      })
+    }
+    return guidedItems
+  }, [roleGuidedNavigation, useRoleGuidedNavigation, visibleSections])
+
+  const roleGuidedSecondaryContainsCurrent = useMemo(
+    () =>
+      roleGuidedNavigation.secondarySections.some((section) =>
+        section.items.some((item) => item.path === currentMenuPath)
+      ),
+    [currentMenuPath, roleGuidedNavigation.secondarySections]
   )
 
   const selectedKeys =
@@ -856,9 +919,17 @@ export default function ERPLayout() {
       <Menu
         mode="inline"
         selectedKeys={selectedKeys}
+        defaultOpenKeys={
+          useRoleGuidedNavigation && roleGuidedSecondaryContainsCurrent
+            ? ['role-more-functions']
+            : undefined
+        }
         items={menuItems}
         onClick={({ key }) => handleNavigate(String(key || ''))}
         className="erp-admin-menu"
+        data-navigation-presentation={
+          useRoleGuidedNavigation ? 'role_guided' : 'sectioned'
+        }
       />
     </div>
   )

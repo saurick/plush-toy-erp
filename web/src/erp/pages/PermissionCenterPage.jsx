@@ -49,6 +49,11 @@ import {
   normalizePermissionUsage,
 } from '../utils/permissionCenterAccess.mjs'
 import { getRoleDisplayName } from '../utils/roleKeys.mjs'
+import {
+  getAuthenticatedNavigationSections,
+  getNavigationSections,
+} from '../config/seedData.mjs'
+import { buildRoleGuidedNavigationPreview } from '../config/roleGuidedNavigation.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -219,8 +224,8 @@ function PermissionImpactMap({ permissions = [], permissionKeys = [] }) {
       <Alert
         type="info"
         showIcon
-        message="这里按业务页面说明每项功能的影响范围"
-        description="实际能否使用，还要看公司当前启用范围、单据状态和任务负责人。"
+        message="页面可进入，不等于页面内所有操作都可用"
+        description="查看、创建、修改、审核、过账和取消分别控制；最终还要结合公司当前启用范围、数据范围、单据状态和任务负责人。"
       />
       <Table
         rowKey="rowID"
@@ -318,10 +323,10 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
       <Alert
         type={access?.is_final === true ? 'success' : 'warning'}
         showIcon
-        message={`${sourceLabel}：${effectiveCount} 个最终可用页面`}
+        message={`${sourceLabel}：${effectiveCount} 个最终可进入页面`}
         description={
           access?.config_revision
-            ? `当前设置版本：${access.config_revision}`
+            ? `当前设置版本：${access.config_revision}。可进入只表示具备页面入口，页面内每项操作仍会单独校验。`
             : '这里不会把岗位基础权限或未保存的勾选冒充为客户最终权限。'
         }
       />
@@ -346,14 +351,14 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
               ),
           },
           {
-            title: '当前可用结果',
+            title: '当前页面结果',
             dataIndex: 'effective',
             width: 130,
             render: (value) =>
               value === true ? (
-                <Tag color="green">可使用</Tag>
+                <Tag color="green">可进入</Tag>
               ) : (
-                <Tag color="red">不可使用</Tag>
+                <Tag color="red">不可进入</Tag>
               ),
           },
           {
@@ -370,6 +375,116 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
         ]}
       />
     </Space>
+  )
+}
+
+function NavigationPlacementOverview({
+  access = null,
+  roleKey = '',
+  dirty = false,
+  loading = false,
+}) {
+  const normalizedRoleKey = String(roleKey || '').trim()
+  const accessRoleKey = String(access?.role_key || '').trim()
+  if (
+    loading ||
+    (normalizedRoleKey && accessRoleKey && normalizedRoleKey !== accessRoleKey)
+  ) {
+    return (
+      <Alert
+        type="info"
+        showIcon
+        message="正在读取已保存的导航位置"
+        description="读取完成后再按该岗位的最终页面权限生成预览。"
+      />
+    )
+  }
+
+  if (access?.is_final !== true) {
+    return (
+      <Alert
+        type="warning"
+        showIcon
+        message="暂不能生成岗位导航预览"
+        description="需要先有可确认的客户最终页面权限；产品默认权限或未保存勾选不会被当作实际导航。"
+      />
+    )
+  }
+
+  const placement = buildRoleGuidedNavigationPreview({
+    navigationSections: [
+      ...getNavigationSections(),
+      ...getAuthenticatedNavigationSections(),
+    ],
+    effectiveAccess: access,
+    roleKey,
+  })
+  const moreItems = placement.secondarySections.flatMap(
+    (section) => section.items
+  )
+  const groups = [
+    {
+      key: 'dashboards',
+      title: '看板中心',
+      description: '每天开始工作的统一入口',
+      items: placement.dashboardItems,
+    },
+    {
+      key: 'primary',
+      title: '常用工作',
+      description: '岗位高频业务',
+      items: placement.primaryItems,
+    },
+    {
+      key: 'more',
+      title: `更多功能（${moreItems.length}）`,
+      description: '其余已授权的低频页面和岗位帮助',
+      items: moreItems,
+    },
+  ]
+
+  return (
+    <div className="erp-role-navigation-preview">
+      <div className="erp-role-navigation-preview__head">
+        <div>
+          <Text strong>当前已保存的导航位置</Text>
+          <Paragraph type="secondary">
+            权限中心只配置页面和操作权限；看板、常用工作和更多功能由系统按岗位自动排列，位置变化不会增加权限。
+          </Paragraph>
+        </div>
+        <Tag color="green">自动排列</Tag>
+      </div>
+      {dirty ? (
+        <Alert
+          type="warning"
+          showIcon
+          message="下面仍显示已保存结果"
+          description="当前未保存的功能调整不会提前进入导航；保存并重新读取最终权限后，预览会自动更新。"
+        />
+      ) : null}
+      <div className="erp-role-navigation-preview__grid">
+        {groups.map((group) => (
+          <div key={group.key} className="erp-role-navigation-preview__group">
+            <Text strong>{group.title}</Text>
+            <Text type="secondary">{group.description}</Text>
+            <div className="erp-role-navigation-preview__items">
+              {group.items.length > 0 ? (
+                group.items.slice(0, 12).map((item) => (
+                  <Tag key={item.path} color={group.key === 'more' ? undefined : 'blue'}>
+                    {item.label}
+                  </Tag>
+                ))
+              ) : (
+                <Text type="secondary">当前没有可显示页面</Text>
+              )}
+              {group.items.length > 12 ? (
+                <Tag>另有 {group.items.length - 12} 项</Tag>
+              ) : null}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   )
 }
 
@@ -1833,7 +1948,7 @@ export default function PermissionCenterPage() {
             岗位设置
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            设置这个岗位可使用的页面和操作，保存后可分配给员工账号。
+            设置这个岗位可进入的页面和可执行操作；常用与更多功能由系统自动排列。
           </Paragraph>
         </div>
         <Tag color="blue">先设置岗位，再分配账号</Tag>
@@ -2031,7 +2146,7 @@ export default function PermissionCenterPage() {
                           <div>
                             <Text strong>选择这个岗位可以使用的功能</Text>
                             <Paragraph type="secondary">
-                              按业务名称勾选。查看、创建、修改、审核等操作分别控制。
+                              按业务名称勾选。查看、创建、修改、审核等操作分别控制；勾选某项操作不会自动获得该页面的其他操作。
                             </Paragraph>
                           </div>
                           <Tag color="blue">
@@ -2083,7 +2198,7 @@ export default function PermissionCenterPage() {
                   },
                   {
                     key: 'effective-pages',
-                    label: '最终有效权限',
+                    label: '页面与导航',
                     children: (
                       <Space
                         direction="vertical"
@@ -2092,6 +2207,12 @@ export default function PermissionCenterPage() {
                       >
                         <EffectiveRoleAccessOverview
                           access={effectiveRoleAccess}
+                          loading={effectiveRoleAccessLoading}
+                        />
+                        <NavigationPlacementOverview
+                          access={effectiveRoleAccess}
+                          roleKey={selectedRoleKey}
+                          dirty={roleConfigurationDirty}
                           loading={effectiveRoleAccessLoading}
                         />
                         <div>
@@ -2137,7 +2258,7 @@ export default function PermissionCenterPage() {
             员工账号与岗位
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            新账号默认不能进入业务页面，分配岗位后才能使用相应功能。
+            新账号默认不能进入业务页面。分配多个岗位时，员工获得各岗位最终有效页面和操作的合并，仍受客户设置和业务状态限制。
           </Paragraph>
         </div>
         <Space size={8} wrap>
@@ -2345,8 +2466,8 @@ export default function PermissionCenterPage() {
           <Alert
             type="info"
             showIcon
-            message="仅修改岗位"
-            description="修改登录手机号请使用账号列表中的“修改手机号”。"
+            message="多个岗位会合并最终有效权限"
+            description="例如财务兼采购账号可以同时获得两类岗位已放行的页面和操作；页面可见不代表拥有页面内全部按钮。修改登录手机号请使用账号列表中的“修改手机号”。"
           />
           <label>
             <Text strong>岗位</Text>

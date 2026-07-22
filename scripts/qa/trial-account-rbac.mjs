@@ -77,8 +77,7 @@ const roleDisplayNames = Object.freeze({
   admin: "后台管理员",
 });
 
-const getRoleDisplayName = (roleKey) =>
-  roleDisplayNames[roleKey] || "岗位";
+const getRoleDisplayName = (roleKey) => roleDisplayNames[roleKey] || "岗位";
 
 const buildExpectedAccountSummary = ({
   username,
@@ -110,6 +109,7 @@ const buildVerificationAccountSummary = (row) => {
       row.mobileTaskEntry ||
       (hasMobileAccess ? `${role}岗位任务端` : "不开放岗位任务端"),
     mobileAccessVerified: hasMobileAccess,
+    desktopAccessVerified: row.desktopAccessVerified === true,
     debugPermissionCount: row.debug,
     isSuperAdmin: row.super,
     disabled: row.disabled,
@@ -164,6 +164,7 @@ const usage = `用法:
   只读验证 10 个 demo_* 账号能通过真实 /rpc/auth admin_login + me，并核对:
   - 单一预期角色
   - 对应 mobile.<role>.access
+  - 至少一个真实电脑端菜单；老板额外包含工作台和业务看板
   - 无 debug.* 权限
   - 非 super admin
   - 未禁用
@@ -195,8 +196,7 @@ const rpcURLFor = (backendURL) =>
 const healthURLFor = (backendURL) =>
   new URL("/healthz", `${backendURL}/`).toString();
 
-const shellQuote = (value) =>
-  `'${String(value).replaceAll("'", "'\\''")}'`;
+const shellQuote = (value) => `'${String(value).replaceAll("'", "'\\''")}'`;
 
 const rpcCall = async ({ rpcURL, method, params, token }) => {
   const response = await fetch(rpcURL, {
@@ -237,10 +237,17 @@ const readRoleKeys = (admin) =>
     .map((item) => item?.role_key || item?.key || "")
     .filter(Boolean);
 
+const readDesktopMenuPaths = (admin) =>
+  (admin?.menus || [])
+    .map((item) => (typeof item === "string" ? item : item?.path || ""))
+    .map((item) => String(item || "").trim())
+    .filter((item) => item.startsWith("/erp/"));
+
 export const collectAccountFailures = (admin, spec) => {
   const [, expectedRole, expectedMobilePermission] = spec;
   const roleKeys = readRoleKeys(admin);
   const permissionKeys = readPermissionKeys(admin);
+  const desktopMenuPaths = readDesktopMenuPaths(admin);
   const mobilePermissions = permissionKeys
     .filter((item) => item.startsWith("mobile."))
     .sort();
@@ -277,7 +284,23 @@ export const collectAccountFailures = (admin, spec) => {
   if (admin.disabled) {
     failures.push("disabled=true");
   }
-  return { failures, roleKeys, mobilePermissions, debugPermissions };
+  if (desktopMenuPaths.length === 0) {
+    failures.push("no recognized desktop menu");
+  }
+  if (expectedRole === "boss") {
+    for (const requiredPath of ["/erp/dashboard", "/erp/business-dashboard"]) {
+      if (!desktopMenuPaths.includes(requiredPath)) {
+        failures.push(`boss missing desktop menu ${requiredPath}`);
+      }
+    }
+  }
+  return {
+    failures,
+    roleKeys,
+    mobilePermissions,
+    debugPermissions,
+    desktopMenuPaths,
+  };
 };
 
 export const buildInputTemplate = () => ({
@@ -317,6 +340,7 @@ export const buildInputTemplate = () => ({
     "admin_login + me succeeds for every expected demo account",
     "each role account has exactly one expected role and one matching mobile.<role>.access permission",
     "demo_admin has no mobile.* permission",
+    "every demo account has a recognized desktop menu and demo_boss includes workbench plus business dashboard",
     "no checked trial account has debug.* permission, is_super_admin=true, or disabled=true",
     "browser smoke report proves desktop menu projection, mobile task entry access, demo_admin mobile denial, and DEV-only sanitized effective session diagnostic readback",
     "optional --report output is sanitized and must not contain passwords, access tokens, or raw Authorization headers",
@@ -416,7 +440,10 @@ export const buildStaticProjectionReport = ({
     } else {
       Object.assign(checks, {
         adminHasNoExpectedMobilePermission: true,
-        browserMobileDenied: includes("trialBrowserSmoke", "expectSuccess: false"),
+        browserMobileDenied: includes(
+          "trialBrowserSmoke",
+          "expectSuccess: false",
+        ),
       });
     }
 
@@ -607,8 +634,13 @@ const verifyAccount = async ({ rpcURL, password, spec }) => {
     token,
   });
   const admin = meData.admin || meData.user || meData;
-  const { failures, roleKeys, mobilePermissions, debugPermissions } =
-    collectAccountFailures(admin, spec);
+  const {
+    failures,
+    roleKeys,
+    mobilePermissions,
+    debugPermissions,
+    desktopMenuPaths,
+  } = collectAccountFailures(admin, spec);
   if (failures.length > 0) {
     throw new Error(`${username}: ${failures.join("; ")}`);
   }
@@ -620,6 +652,7 @@ const verifyAccount = async ({ rpcURL, password, spec }) => {
       ? `${getRoleDisplayName(roleKeys[0])}岗位任务端`
       : "不开放岗位任务端",
     mobileAccessVerified: mobilePermissions.length > 0,
+    desktopAccessVerified: desktopMenuPaths.length > 0,
     debug: debugPermissions.length,
     super: Boolean(admin.is_super_admin),
     disabled: Boolean(admin.disabled),
@@ -726,7 +759,10 @@ const main = async () => {
   );
 };
 
-if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+if (
+  process.argv[1] &&
+  import.meta.url === pathToFileURL(process.argv[1]).href
+) {
   main().catch((error) => {
     process.stderr.write(
       `[qa:trial-account-rbac][fatal] ${error?.stack || error?.message || error}\n`,

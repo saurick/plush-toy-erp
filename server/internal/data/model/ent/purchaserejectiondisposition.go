@@ -4,6 +4,7 @@ package ent
 
 import (
 	"fmt"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"strings"
 	"time"
@@ -26,6 +27,8 @@ type PurchaseRejectionDisposition struct {
 	PurchaseReceiptID int `json:"purchase_receipt_id,omitempty"`
 	// PurchaseReceiptItemID holds the value of the "purchase_receipt_item_id" field.
 	PurchaseReceiptItemID int `json:"purchase_receipt_item_id,omitempty"`
+	// ReplacementReceiptID holds the value of the "replacement_receipt_id" field.
+	ReplacementReceiptID *int `json:"replacement_receipt_id,omitempty"`
 	// DispositionType holds the value of the "disposition_type" field.
 	DispositionType string `json:"disposition_type,omitempty"`
 	// Status holds the value of the "status" field.
@@ -57,8 +60,31 @@ type PurchaseRejectionDisposition struct {
 	// CreatedBy holds the value of the "created_by" field.
 	CreatedBy int `json:"created_by,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
-	CreatedAt    time.Time `json:"created_at,omitempty"`
+	CreatedAt time.Time `json:"created_at,omitempty"`
+	// Edges holds the relations/edges for other nodes in the graph.
+	// The values are being populated by the PurchaseRejectionDispositionQuery when eager-loading is set.
+	Edges        PurchaseRejectionDispositionEdges `json:"edges"`
 	selectValues sql.SelectValues
+}
+
+// PurchaseRejectionDispositionEdges holds the relations/edges for other nodes in the graph.
+type PurchaseRejectionDispositionEdges struct {
+	// ReplacementReceipt holds the value of the replacement_receipt edge.
+	ReplacementReceipt *PurchaseReceipt `json:"replacement_receipt,omitempty"`
+	// loadedTypes holds the information for reporting if a
+	// type was loaded (or requested) in eager-loading or not.
+	loadedTypes [1]bool
+}
+
+// ReplacementReceiptOrErr returns the ReplacementReceipt value or an error if the edge
+// was not loaded in eager-loading, or loaded but was not found.
+func (e PurchaseRejectionDispositionEdges) ReplacementReceiptOrErr() (*PurchaseReceipt, error) {
+	if e.ReplacementReceipt != nil {
+		return e.ReplacementReceipt, nil
+	} else if e.loadedTypes[0] {
+		return nil, &NotFoundError{label: purchasereceipt.Label}
+	}
+	return nil, &NotLoadedError{edge: "replacement_receipt"}
 }
 
 // scanValues returns the types for scanning values from sql.Rows.
@@ -68,7 +94,7 @@ func (*PurchaseRejectionDisposition) scanValues(columns []string) ([]any, error)
 		switch columns[i] {
 		case purchaserejectiondisposition.FieldQuantity:
 			values[i] = new(decimal.Decimal)
-		case purchaserejectiondisposition.FieldID, purchaserejectiondisposition.FieldQualityInspectionID, purchaserejectiondisposition.FieldPurchaseReceiptID, purchaserejectiondisposition.FieldPurchaseReceiptItemID, purchaserejectiondisposition.FieldSupplierID, purchaserejectiondisposition.FieldVersion, purchaserejectiondisposition.FieldPostedBy, purchaserejectiondisposition.FieldCancelledBy, purchaserejectiondisposition.FieldCreatedBy:
+		case purchaserejectiondisposition.FieldID, purchaserejectiondisposition.FieldQualityInspectionID, purchaserejectiondisposition.FieldPurchaseReceiptID, purchaserejectiondisposition.FieldPurchaseReceiptItemID, purchaserejectiondisposition.FieldReplacementReceiptID, purchaserejectiondisposition.FieldSupplierID, purchaserejectiondisposition.FieldVersion, purchaserejectiondisposition.FieldPostedBy, purchaserejectiondisposition.FieldCancelledBy, purchaserejectiondisposition.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
 		case purchaserejectiondisposition.FieldDispositionNo, purchaserejectiondisposition.FieldDispositionType, purchaserejectiondisposition.FieldStatus, purchaserejectiondisposition.FieldSupplierName, purchaserejectiondisposition.FieldReason, purchaserejectiondisposition.FieldIdempotencyKey, purchaserejectiondisposition.FieldIdempotencyPayloadHash, purchaserejectiondisposition.FieldCancelReason:
 			values[i] = new(sql.NullString)
@@ -118,6 +144,13 @@ func (_m *PurchaseRejectionDisposition) assignValues(columns []string, values []
 				return fmt.Errorf("unexpected type %T for field purchase_receipt_item_id", values[i])
 			} else if value.Valid {
 				_m.PurchaseReceiptItemID = int(value.Int64)
+			}
+		case purchaserejectiondisposition.FieldReplacementReceiptID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field replacement_receipt_id", values[i])
+			} else if value.Valid {
+				_m.ReplacementReceiptID = new(int)
+				*_m.ReplacementReceiptID = int(value.Int64)
 			}
 		case purchaserejectiondisposition.FieldDispositionType:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -234,6 +267,11 @@ func (_m *PurchaseRejectionDisposition) Value(name string) (ent.Value, error) {
 	return _m.selectValues.Get(name)
 }
 
+// QueryReplacementReceipt queries the "replacement_receipt" edge of the PurchaseRejectionDisposition entity.
+func (_m *PurchaseRejectionDisposition) QueryReplacementReceipt() *PurchaseReceiptQuery {
+	return NewPurchaseRejectionDispositionClient(_m.config).QueryReplacementReceipt(_m)
+}
+
 // Update returns a builder for updating this PurchaseRejectionDisposition.
 // Note that you need to call PurchaseRejectionDisposition.Unwrap() before calling this method if this PurchaseRejectionDisposition
 // was returned from a transaction, and the transaction was committed or rolled back.
@@ -268,6 +306,11 @@ func (_m *PurchaseRejectionDisposition) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("purchase_receipt_item_id=")
 	builder.WriteString(fmt.Sprintf("%v", _m.PurchaseReceiptItemID))
+	builder.WriteString(", ")
+	if v := _m.ReplacementReceiptID; v != nil {
+		builder.WriteString("replacement_receipt_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
 	builder.WriteString(", ")
 	builder.WriteString("disposition_type=")
 	builder.WriteString(_m.DispositionType)

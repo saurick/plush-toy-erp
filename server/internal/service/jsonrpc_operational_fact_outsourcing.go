@@ -14,7 +14,7 @@ func (d *jsonrpcDispatcher) handleOperationalFactOutsourcing(
 	actorID int,
 ) (string, *v1.JsonrpcResult, error) {
 	switch method {
-	case "create_outsourcing_return_disposition", "post_outsourcing_return_disposition", "cancel_outsourcing_return_disposition", "get_outsourcing_return_disposition":
+	case "create_outsourcing_return_disposition", "post_outsourcing_return_disposition", "cancel_outsourcing_return_disposition", "get_outsourcing_return_disposition", "list_outsourcing_return_dispositions":
 		return d.handleOutsourcingReturnDisposition(ctx, method, id, pm, actorID)
 	case "create_outsourcing_material_issue_from_order":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionOutsourcingMaterialIssueCreate); res != nil {

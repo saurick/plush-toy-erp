@@ -72,6 +72,19 @@ func TestOperationalFactFinancePaymentCreateAndListContract(t *testing.T) {
 	if err != nil || listedCredits == nil || listedCredits.Code != errcode.OK.Code || jsonRPCInt(t, listedCredits.Data.AsMap(), "total") != 1 {
 		t.Fatalf("listed credits=%#v err=%v", listedCredits, err)
 	}
+	creditParams := mustJSONRPCStruct(t, map[string]any{
+		"credit_note_no": "CN-RPC-DENIED", "finance_fact_id": float64(9), "amount": "10", "reason": "退货红冲", "idempotency_key": "cn-rpc-denied",
+	})
+	_, deniedCredit, err := d.handleOperationalFact(ctx, "create_finance_credit_note", "denied-credit", creditParams)
+	if err != nil || deniedCredit == nil || deniedCredit.Code != errcode.PermissionDenied.Code {
+		t.Fatalf("credit note without dedicated permission=%#v err=%v", deniedCredit, err)
+	}
+	creditAdmin := workflowJSONRPCAdmin([]string{biz.FinanceRoleKey}, biz.PermissionFinanceCreditNoteCreate)
+	creditDispatcher := newOperationalFactJSONRPCTestDataWithRepo(t, creditAdmin, repo)
+	_, allowedCredit, err := creditDispatcher.handleOperationalFact(ctx, "create_finance_credit_note", "allowed-credit", creditParams)
+	if err != nil || allowedCredit == nil || allowedCredit.Code != errcode.OK.Code {
+		t.Fatalf("credit note with dedicated permission=%#v err=%v", allowedCredit, err)
+	}
 	_, invalid, err := d.handleOperationalFact(ctx, "reverse_finance_payment", "invalid", mustJSONRPCStruct(t, map[string]any{"id": float64(31), "expected_version": float64(1), "reason": "冲正", "unexpected": true}))
 	if err != nil || invalid == nil || invalid.Code != errcode.InvalidParam.Code {
 		t.Fatalf("invalid=%#v err=%v", invalid, err)

@@ -13,15 +13,18 @@ import (
 )
 
 const (
-	ProductionExceptionScrap         = "SCRAP"
-	ProductionExceptionOverIssue     = "OVER_ISSUE"
-	ProductionExceptionWIPConcession = "WIP_CONCESSION"
-	ProductionExceptionSubmitted     = "SUBMITTED"
-	ProductionExceptionApproved      = "APPROVED"
-	ProductionExceptionRejected      = "REJECTED"
-	ProductionExceptionCancelled     = "CANCELLED"
-	ProductionExceptionSourceType    = "PRODUCTION_EXCEPTION"
-	ProductionFactScrap              = "SCRAP"
+	ProductionExceptionScrap             = "SCRAP"
+	ProductionExceptionOverIssue         = "OVER_ISSUE"
+	ProductionExceptionWIPConcession     = "WIP_CONCESSION"
+	ProductionExceptionSubmitted         = "SUBMITTED"
+	ProductionExceptionApproved          = "APPROVED"
+	ProductionExceptionRejected          = "REJECTED"
+	ProductionExceptionCancelled         = "CANCELLED"
+	ProductionExceptionExecutionPending  = "PENDING"
+	ProductionExceptionExecutionApplied  = "APPLIED"
+	ProductionExceptionExecutionReversed = "REVERSED"
+	ProductionExceptionSourceType        = "PRODUCTION_EXCEPTION"
+	ProductionFactScrap                  = "SCRAP"
 )
 
 var (
@@ -34,7 +37,7 @@ var (
 
 type ProductionExceptionDecision struct {
 	ID, ProductionOrderID, ProductionOrderItemID, Version, RequestedBy int
-	DecisionNo, DecisionType, Status, Reason                           string
+	DecisionNo, DecisionType, Status, ExecutionStatus, Reason          string
 	ProductionMaterialRequirementID, ProductionWIPBatchID              *int
 	QualityInspectionID, DecidedBy                                     *int
 	RequestedQuantity                                                  decimal.Decimal
@@ -42,6 +45,9 @@ type ProductionExceptionDecision struct {
 	RequestedAt                                                        time.Time
 	DecidedAt                                                          *time.Time
 	DecisionReason                                                     *string
+	ExecutedBy, ReversedBy                                             *int
+	ExecutedAt, ReversedAt                                             *time.Time
+	ReverseReason                                                      *string
 }
 
 type ProductionExceptionSubmit struct {
@@ -57,6 +63,11 @@ type ProductionExceptionMutation struct {
 	ApprovedQuantity             *decimal.Decimal
 	Reason                       string
 }
+type ProductionExceptionFilter struct {
+	Status, ExecutionStatus, DecisionType string
+	ProductionOrderID                     int
+	Limit, Offset                         int
+}
 
 type ProductionExceptionDecisionRepo interface {
 	SubmitProductionException(context.Context, *ProductionExceptionSubmit, string) (*ProductionExceptionDecision, error)
@@ -64,6 +75,31 @@ type ProductionExceptionDecisionRepo interface {
 	RejectProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
 	CancelProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
 	GetProductionException(context.Context, int) (*ProductionExceptionDecision, error)
+}
+type ProductionExceptionExecutionRepo interface {
+	ExecuteProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
+	ReverseProductionException(context.Context, *ProductionExceptionMutation) (*ProductionExceptionDecision, error)
+}
+type ProductionExceptionSourceResolver interface {
+	ResolveProductionExceptionSource(context.Context, *ProductionExceptionSubmit) error
+}
+type ProductionExceptionListRepo interface {
+	ListProductionExceptions(context.Context, ProductionExceptionFilter) ([]*ProductionExceptionDecision, int, error)
+}
+
+func (uc *OperationalFactUsecase) ListProductionExceptions(ctx context.Context, filter ProductionExceptionFilter) ([]*ProductionExceptionDecision, int, error) {
+	if uc == nil || uc.repo == nil || filter.ProductionOrderID < 0 || filter.Offset < 0 {
+		return nil, 0, ErrBadParam
+	}
+	repo, ok := any(uc.repo).(ProductionExceptionListRepo)
+	if !ok {
+		return nil, 0, ErrBadParam
+	}
+	filter.Status, filter.ExecutionStatus, filter.DecisionType = strings.ToUpper(strings.TrimSpace(filter.Status)), strings.ToUpper(strings.TrimSpace(filter.ExecutionStatus)), strings.ToUpper(strings.TrimSpace(filter.DecisionType))
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 50
+	}
+	return repo.ListProductionExceptions(ctx, filter)
 }
 
 func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context, in *ProductionExceptionSubmit) (*ProductionExceptionDecision, error) {
@@ -73,6 +109,12 @@ func (uc *OperationalFactUsecase) SubmitProductionException(ctx context.Context,
 	}
 	n := *in
 	n.DecisionNo, n.DecisionType, n.Reason, n.IdempotencyKey = strings.TrimSpace(n.DecisionNo), strings.ToUpper(strings.TrimSpace(n.DecisionType)), strings.TrimSpace(n.Reason), strings.TrimSpace(n.IdempotencyKey)
+	if n.ProductionOrderID <= 0 || n.ProductionOrderItemID <= 0 {
+		resolver, ok := any(uc.repo).(ProductionExceptionSourceResolver)
+		if !ok || resolver.ResolveProductionExceptionSource(ctx, &n) != nil {
+			return nil, ErrProductionExceptionSourceInvalid
+		}
+	}
 	if n.DecisionNo == "" || n.ProductionOrderID <= 0 || n.ProductionOrderItemID <= 0 || !n.RequestedQuantity.IsPositive() || n.Reason == "" || n.IdempotencyKey == "" || len(n.IdempotencyKey) > 128 || n.RequestedBy <= 0 {
 		return nil, ErrBadParam
 	}
@@ -128,6 +170,32 @@ func (uc *OperationalFactUsecase) CancelProductionException(ctx context.Context,
 	n.Reason = strings.TrimSpace(n.Reason)
 	n.ApprovedQuantity = nil
 	return repo.CancelProductionException(ctx, &n)
+}
+func (uc *OperationalFactUsecase) ExecuteProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
+	if uc == nil || uc.repo == nil || !validProductionExceptionMutation(in, false) {
+		return nil, ErrBadParam
+	}
+	repo, ok := any(uc.repo).(ProductionExceptionExecutionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	n := *in
+	n.Reason = strings.TrimSpace(n.Reason)
+	n.ApprovedQuantity = nil
+	return repo.ExecuteProductionException(ctx, &n)
+}
+func (uc *OperationalFactUsecase) ReverseProductionException(ctx context.Context, in *ProductionExceptionMutation) (*ProductionExceptionDecision, error) {
+	if uc == nil || uc.repo == nil || !validProductionExceptionMutation(in, false) {
+		return nil, ErrBadParam
+	}
+	repo, ok := any(uc.repo).(ProductionExceptionExecutionRepo)
+	if !ok {
+		return nil, ErrBadParam
+	}
+	n := *in
+	n.Reason = strings.TrimSpace(n.Reason)
+	n.ApprovedQuantity = nil
+	return repo.ReverseProductionException(ctx, &n)
 }
 func (uc *OperationalFactUsecase) GetProductionException(ctx context.Context, id int) (*ProductionExceptionDecision, error) {
 	repo, ok := productionExceptionRepo(uc)

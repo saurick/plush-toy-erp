@@ -4,6 +4,7 @@ import (
 	"entgo.io/ent"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
+	"entgo.io/ent/schema/edge"
 	"entgo.io/ent/schema/field"
 	"entgo.io/ent/schema/index"
 	"time"
@@ -29,6 +30,9 @@ func (PurchaseRejectionDisposition) Fields() []ent.Field {
 		field.Int("quality_inspection_id").Positive().Immutable(),
 		field.Int("purchase_receipt_id").Positive().Immutable(),
 		field.Int("purchase_receipt_item_id").Positive().Immutable(),
+		// A supplier replacement is a new pending receipt, while this disposition
+		// remains the audit/source link back to the rejected IQC line.
+		field.Int("replacement_receipt_id").Optional().Nillable().Positive(),
 		field.String("disposition_type").NotEmpty().MaxLen(32).Immutable(),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(16),
 		immutableDecimalQuantityField("quantity"),
@@ -44,9 +48,15 @@ func (PurchaseRejectionDisposition) Fields() []ent.Field {
 		field.Int("created_by").Positive().Immutable(), field.Time("created_at").Default(time.Now).Immutable(),
 	}
 }
+func (PurchaseRejectionDisposition) Edges() []ent.Edge {
+	return []ent.Edge{
+		edge.From("replacement_receipt", PurchaseReceipt.Type).Ref("replacement_dispositions").Field("replacement_receipt_id").Unique().Annotations(entsql.OnDelete(entsql.NoAction)),
+	}
+}
 func (PurchaseRejectionDisposition) Indexes() []ent.Index {
 	return []ent.Index{
 		index.Fields("disposition_no").Unique(), index.Fields("created_by", "idempotency_key").Unique(),
-		index.Fields("quality_inspection_id").Unique().Annotations(entsql.IndexWhere("status <> 'CANCELLED'")),
+		index.Fields("quality_inspection_id", "status"),
+		index.Fields("replacement_receipt_id").Unique().Annotations(entsql.IndexWhere("replacement_receipt_id IS NOT NULL")),
 	}
 }

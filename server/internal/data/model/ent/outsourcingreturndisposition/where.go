@@ -90,6 +90,11 @@ func ProductionWipBatchID(v int) predicate.OutsourcingReturnDisposition {
 	return predicate.OutsourcingReturnDisposition(sql.FieldEQ(FieldProductionWipBatchID, v))
 }
 
+// ResultWipBatchID applies equality check predicate on the "result_wip_batch_id" field. It's identical to ResultWipBatchIDEQ.
+func ResultWipBatchID(v int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldEQ(FieldResultWipBatchID, v))
+}
+
 // Reason applies equality check predicate on the "reason" field. It's identical to ReasonEQ.
 func Reason(v string) predicate.OutsourcingReturnDisposition {
 	return predicate.OutsourcingReturnDisposition(sql.FieldEQ(FieldReason, v))
@@ -508,6 +513,56 @@ func ProductionWipBatchIDIsNil() predicate.OutsourcingReturnDisposition {
 // ProductionWipBatchIDNotNil applies the NotNil predicate on the "production_wip_batch_id" field.
 func ProductionWipBatchIDNotNil() predicate.OutsourcingReturnDisposition {
 	return predicate.OutsourcingReturnDisposition(sql.FieldNotNull(FieldProductionWipBatchID))
+}
+
+// ResultWipBatchIDEQ applies the EQ predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDEQ(v int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldEQ(FieldResultWipBatchID, v))
+}
+
+// ResultWipBatchIDNEQ applies the NEQ predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDNEQ(v int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldNEQ(FieldResultWipBatchID, v))
+}
+
+// ResultWipBatchIDIn applies the In predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDIn(vs ...int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldIn(FieldResultWipBatchID, vs...))
+}
+
+// ResultWipBatchIDNotIn applies the NotIn predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDNotIn(vs ...int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldNotIn(FieldResultWipBatchID, vs...))
+}
+
+// ResultWipBatchIDGT applies the GT predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDGT(v int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldGT(FieldResultWipBatchID, v))
+}
+
+// ResultWipBatchIDGTE applies the GTE predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDGTE(v int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldGTE(FieldResultWipBatchID, v))
+}
+
+// ResultWipBatchIDLT applies the LT predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDLT(v int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldLT(FieldResultWipBatchID, v))
+}
+
+// ResultWipBatchIDLTE applies the LTE predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDLTE(v int) predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldLTE(FieldResultWipBatchID, v))
+}
+
+// ResultWipBatchIDIsNil applies the IsNil predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDIsNil() predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldIsNull(FieldResultWipBatchID))
+}
+
+// ResultWipBatchIDNotNil applies the NotNil predicate on the "result_wip_batch_id" field.
+func ResultWipBatchIDNotNil() predicate.OutsourcingReturnDisposition {
+	return predicate.OutsourcingReturnDisposition(sql.FieldNotNull(FieldResultWipBatchID))
 }
 
 // ReasonEQ applies the EQ predicate on the "reason" field.

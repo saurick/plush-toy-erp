@@ -69,8 +69,8 @@ test('inventory transaction lineage assertions use the visible business labels',
 })
 
 test('quality page assertion preserves the visible incoming-inspection boundary', () => {
-  assert.match(source, /首次到货检验不合格会阻止本单入库/u)
-  assert.match(source, /退供应商草稿只适用于已入库后追加检验不合格/u)
+  assert.match(source, /首次到货检验不合格可按来源行和部分数量办理退厂或补换/u)
+  assert.match(source, /已入库后的不合格仍生成采购退货/u)
   assert.doesNotMatch(source, /不合格退供应商仍走采购退货/u)
 })
 
@@ -158,7 +158,11 @@ test('business-core destructive draft actions confirm through visible popconfirm
   assert.match(source, /const confirmVisiblePopconfirm/u)
   assert.match(source, /const compactVisibleText/u)
   assert.match(source, /compactVisibleText\(await candidate\.innerText\(\)\)/u)
-  assert.match(source, /const buttons = popconfirm\.locator\('button'\)/u)
+  assert.match(
+    source,
+    /const confirmButton = popconfirm\.locator\('button\.ant-btn-primary:visible'\)/u
+  )
+  assert.match(source, /\(await confirmButton\.count\(\)\) === 1/u)
   assert.match(source, /ant-popconfirm:visible/u)
   assert.match(source, /confirmVisiblePopconfirm\(page\)/u)
   assert.doesNotMatch(

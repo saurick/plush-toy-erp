@@ -25,6 +25,7 @@ test("trial account RBAC shape requires one expected role and mobile permission"
       {
         roles: [{ role_key: "sales" }],
         permissions: [{ permission_key: "mobile.sales.access" }],
+        menus: [{ path: "/erp/dashboard" }],
         is_super_admin: false,
         disabled: false,
       },
@@ -67,6 +68,7 @@ test("trial account RBAC shape rejects admin mobile, debug, super admin, and dis
         { permission_key: "mobile.sales.access" },
         { permission_key: "debug.seed" },
       ],
+      menus: [{ path: "/erp/system/permissions" }],
       is_super_admin: true,
       disabled: true,
     },
@@ -77,6 +79,46 @@ test("trial account RBAC shape rejects admin mobile, debug, super admin, and dis
   assert.match(failures, /unexpected debug permissions debug\.seed/);
   assert.match(failures, /is_super_admin=true/);
   assert.match(failures, /disabled=true/);
+});
+
+test("trial account RBAC shape requires desktop menus and guards the boss dashboards", () => {
+  const bossSpec = ["demo_boss", "boss", "mobile.boss.access"];
+  const baseAdmin = {
+    roles: [{ role_key: "boss" }],
+    permissions: [{ permission_key: "mobile.boss.access" }],
+    is_super_admin: false,
+    disabled: false,
+  };
+
+  assert.match(
+    collectAccountFailures({ ...baseAdmin, menus: [] }, bossSpec).failures.join(
+      "\n",
+    ),
+    /no recognized desktop menu/,
+  );
+  assert.match(
+    collectAccountFailures(
+      {
+        ...baseAdmin,
+        menus: [{ path: "/erp/dashboard" }],
+      },
+      bossSpec,
+    ).failures.join("\n"),
+    /boss missing desktop menu \/erp\/business-dashboard/,
+  );
+  assert.deepEqual(
+    collectAccountFailures(
+      {
+        ...baseAdmin,
+        menus: [
+          { path: "/erp/dashboard" },
+          { path: "/erp/business-dashboard" },
+        ],
+      },
+      bossSpec,
+    ).failures,
+    [],
+  );
 });
 
 test("trial account RBAC backend URL rejects embedded credentials", () => {
@@ -156,10 +198,7 @@ test("trial account RBAC input template is no-write and lists required demo role
     template.commands.join("\n"),
     /trialDemoAccountBrowserSmoke\.mjs --report output\/trial-demo-account-browser-smoke\/report\.json/,
   );
-  assert.match(
-    template.commands.join("\n"),
-    /smoke:trial-demo-browser/,
-  );
+  assert.match(template.commands.join("\n"), /smoke:trial-demo-browser/);
   assert.equal(
     template.browserSmokeEvidencePlan.scope,
     "trial-demo-account-browser-smoke-evidence-plan",
@@ -177,9 +216,7 @@ test("trial account RBAC input template is no-write and lists required demo role
       "auth.me role and permission payload",
     ),
   );
-  assert(
-    template.notProvenByThisTemplate.includes("desktop menu projection"),
-  );
+  assert(template.notProvenByThisTemplate.includes("desktop menu projection"));
   assert(
     template.notProvenByThisTemplate.includes(
       "target environment release evidence",
@@ -262,9 +299,7 @@ test("trial account RBAC preflight report is no-login and records blockers", asy
       "auth.me role and permission payload",
     ),
   );
-  assert(
-    report.notProvenByThisPreflight.includes("mobile task entry access"),
-  );
+  assert(report.notProvenByThisPreflight.includes("mobile task entry access"));
   assert(
     report.notProvenByThisPreflight.includes(
       "target environment release evidence",
@@ -435,14 +470,12 @@ test("trial account RBAC CLI preflight writes sanitized report", () => {
   assert.equal(report.scope, "trial-account-rbac-preflight-report");
   assert.equal(report.preflightOnly, true);
   assert.equal(report.passwordEnvPresent, true);
+  assert(report.realRBACCheckRequires.includes("backend health is reachable"));
   assert(
-    report.realRBACCheckRequires.includes("backend health is reachable"),
+    report.notProvenByThisPreflight.includes("backend RBAC authorization"),
   );
-  assert(report.notProvenByThisPreflight.includes("backend RBAC authorization"));
   assert(
-    report.notProvenByThisPreflight.includes(
-      "customer config active revision",
-    ),
+    report.notProvenByThisPreflight.includes("customer config active revision"),
   );
   assert.deepEqual(report.presentPasswordEnvNames, ["TRIAL_ACCOUNT_PASSWORD"]);
   assert.equal(report.readyForRealRBACCheck, false);
@@ -474,6 +507,7 @@ test("trial account RBAC verification report is sanitized", () => {
         username: "demo_sales",
         roles: "sales",
         mobile: "mobile.sales.access",
+        desktopAccessVerified: true,
         debug: 0,
         super: false,
         disabled: false,
@@ -498,6 +532,7 @@ test("trial account RBAC verification report is sanitized", () => {
   assert.equal(report.checkedAccounts[0].role, "业务");
   assert.equal(report.checkedAccounts[0].mobileTaskEntry, "业务岗位任务端");
   assert.equal(report.checkedAccounts[0].mobileAccessVerified, true);
+  assert.equal(report.checkedAccounts[0].desktopAccessVerified, true);
   assert.doesNotMatch(
     JSON.stringify(report),
     /Bearer|access_token|local-demo-password|replace-with-password/i,

@@ -42,6 +42,33 @@ func (_u *OutsourcingReturnDispositionUpdate) SetNillableStatus(v *string) *Outs
 	return _u
 }
 
+// SetResultWipBatchID sets the "result_wip_batch_id" field.
+func (_u *OutsourcingReturnDispositionUpdate) SetResultWipBatchID(v int) *OutsourcingReturnDispositionUpdate {
+	_u.mutation.ResetResultWipBatchID()
+	_u.mutation.SetResultWipBatchID(v)
+	return _u
+}
+
+// SetNillableResultWipBatchID sets the "result_wip_batch_id" field if the given value is not nil.
+func (_u *OutsourcingReturnDispositionUpdate) SetNillableResultWipBatchID(v *int) *OutsourcingReturnDispositionUpdate {
+	if v != nil {
+		_u.SetResultWipBatchID(*v)
+	}
+	return _u
+}
+
+// AddResultWipBatchID adds value to the "result_wip_batch_id" field.
+func (_u *OutsourcingReturnDispositionUpdate) AddResultWipBatchID(v int) *OutsourcingReturnDispositionUpdate {
+	_u.mutation.AddResultWipBatchID(v)
+	return _u
+}
+
+// ClearResultWipBatchID clears the value of the "result_wip_batch_id" field.
+func (_u *OutsourcingReturnDispositionUpdate) ClearResultWipBatchID() *OutsourcingReturnDispositionUpdate {
+	_u.mutation.ClearResultWipBatchID()
+	return _u
+}
+
 // SetVersion sets the "version" field.
 func (_u *OutsourcingReturnDispositionUpdate) SetVersion(v int) *OutsourcingReturnDispositionUpdate {
 	_u.mutation.ResetVersion()
@@ -216,6 +243,11 @@ func (_u *OutsourcingReturnDispositionUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ResultWipBatchID(); ok {
+		if err := outsourcingreturndisposition.ResultWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "result_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.result_wip_batch_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Version(); ok {
 		if err := outsourcingreturndisposition.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.version": %w`, err)}
@@ -256,6 +288,15 @@ func (_u *OutsourcingReturnDispositionUpdate) sqlSave(ctx context.Context) (_nod
 	}
 	if _u.mutation.ProductionWipBatchIDCleared() {
 		_spec.ClearField(outsourcingreturndisposition.FieldProductionWipBatchID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ResultWipBatchID(); ok {
+		_spec.SetField(outsourcingreturndisposition.FieldResultWipBatchID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResultWipBatchID(); ok {
+		_spec.AddField(outsourcingreturndisposition.FieldResultWipBatchID, field.TypeInt, value)
+	}
+	if _u.mutation.ResultWipBatchIDCleared() {
+		_spec.ClearField(outsourcingreturndisposition.FieldResultWipBatchID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Version(); ok {
 		_spec.SetField(outsourcingreturndisposition.FieldVersion, field.TypeInt, value)
@@ -330,6 +371,33 @@ func (_u *OutsourcingReturnDispositionUpdateOne) SetNillableStatus(v *string) *O
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetResultWipBatchID sets the "result_wip_batch_id" field.
+func (_u *OutsourcingReturnDispositionUpdateOne) SetResultWipBatchID(v int) *OutsourcingReturnDispositionUpdateOne {
+	_u.mutation.ResetResultWipBatchID()
+	_u.mutation.SetResultWipBatchID(v)
+	return _u
+}
+
+// SetNillableResultWipBatchID sets the "result_wip_batch_id" field if the given value is not nil.
+func (_u *OutsourcingReturnDispositionUpdateOne) SetNillableResultWipBatchID(v *int) *OutsourcingReturnDispositionUpdateOne {
+	if v != nil {
+		_u.SetResultWipBatchID(*v)
+	}
+	return _u
+}
+
+// AddResultWipBatchID adds value to the "result_wip_batch_id" field.
+func (_u *OutsourcingReturnDispositionUpdateOne) AddResultWipBatchID(v int) *OutsourcingReturnDispositionUpdateOne {
+	_u.mutation.AddResultWipBatchID(v)
+	return _u
+}
+
+// ClearResultWipBatchID clears the value of the "result_wip_batch_id" field.
+func (_u *OutsourcingReturnDispositionUpdateOne) ClearResultWipBatchID() *OutsourcingReturnDispositionUpdateOne {
+	_u.mutation.ClearResultWipBatchID()
 	return _u
 }
 
@@ -520,6 +588,11 @@ func (_u *OutsourcingReturnDispositionUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ResultWipBatchID(); ok {
+		if err := outsourcingreturndisposition.ResultWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "result_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.result_wip_batch_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Version(); ok {
 		if err := outsourcingreturndisposition.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.version": %w`, err)}
@@ -577,6 +650,15 @@ func (_u *OutsourcingReturnDispositionUpdateOne) sqlSave(ctx context.Context) (_
 	}
 	if _u.mutation.ProductionWipBatchIDCleared() {
 		_spec.ClearField(outsourcingreturndisposition.FieldProductionWipBatchID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ResultWipBatchID(); ok {
+		_spec.SetField(outsourcingreturndisposition.FieldResultWipBatchID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedResultWipBatchID(); ok {
+		_spec.AddField(outsourcingreturndisposition.FieldResultWipBatchID, field.TypeInt, value)
+	}
+	if _u.mutation.ResultWipBatchIDCleared() {
+		_spec.ClearField(outsourcingreturndisposition.FieldResultWipBatchID, field.TypeInt)
 	}
 	if value, ok := _u.mutation.Version(); ok {
 		_spec.SetField(outsourcingreturndisposition.FieldVersion, field.TypeInt, value)

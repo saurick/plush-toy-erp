@@ -79,6 +79,20 @@ func (_c *OutsourcingReturnDispositionCreate) SetNillableProductionWipBatchID(v 
 	return _c
 }
 
+// SetResultWipBatchID sets the "result_wip_batch_id" field.
+func (_c *OutsourcingReturnDispositionCreate) SetResultWipBatchID(v int) *OutsourcingReturnDispositionCreate {
+	_c.mutation.SetResultWipBatchID(v)
+	return _c
+}
+
+// SetNillableResultWipBatchID sets the "result_wip_batch_id" field if the given value is not nil.
+func (_c *OutsourcingReturnDispositionCreate) SetNillableResultWipBatchID(v *int) *OutsourcingReturnDispositionCreate {
+	if v != nil {
+		_c.SetResultWipBatchID(*v)
+	}
+	return _c
+}
+
 // SetReason sets the "reason" field.
 func (_c *OutsourcingReturnDispositionCreate) SetReason(v string) *OutsourcingReturnDispositionCreate {
 	_c.mutation.SetReason(v)
@@ -306,6 +320,11 @@ func (_c *OutsourcingReturnDispositionCreate) check() error {
 			return &ValidationError{Name: "production_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.production_wip_batch_id": %w`, err)}
 		}
 	}
+	if v, ok := _c.mutation.ResultWipBatchID(); ok {
+		if err := outsourcingreturndisposition.ResultWipBatchIDValidator(v); err != nil {
+			return &ValidationError{Name: "result_wip_batch_id", err: fmt.Errorf(`ent: validator failed for field "OutsourcingReturnDisposition.result_wip_batch_id": %w`, err)}
+		}
+	}
 	if _, ok := _c.mutation.Reason(); !ok {
 		return &ValidationError{Name: "reason", err: errors.New(`ent: missing required field "OutsourcingReturnDisposition.reason"`)}
 	}
@@ -417,6 +436,10 @@ func (_c *OutsourcingReturnDispositionCreate) createSpec() (*OutsourcingReturnDi
 	if value, ok := _c.mutation.ProductionWipBatchID(); ok {
 		_spec.SetField(outsourcingreturndisposition.FieldProductionWipBatchID, field.TypeInt, value)
 		_node.ProductionWipBatchID = &value
+	}
+	if value, ok := _c.mutation.ResultWipBatchID(); ok {
+		_spec.SetField(outsourcingreturndisposition.FieldResultWipBatchID, field.TypeInt, value)
+		_node.ResultWipBatchID = &value
 	}
 	if value, ok := _c.mutation.Reason(); ok {
 		_spec.SetField(outsourcingreturndisposition.FieldReason, field.TypeString, value)

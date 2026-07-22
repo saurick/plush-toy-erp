@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Alert,
   Button,
@@ -9,6 +9,7 @@ import {
   Popconfirm,
   Select,
   Space,
+  Table,
   Tag,
 } from 'antd'
 import { message } from '@/common/utils/antdApp'
@@ -18,6 +19,7 @@ import {
   cancelPurchaseRejectionDisposition,
   createPurchaseRejectionDisposition,
   getPurchaseRejectionDisposition,
+  listPurchaseRejectionDispositions,
   postPurchaseRejectionDisposition,
 } from '../../api/purchaseApi.mjs'
 import {
@@ -33,7 +35,7 @@ import {
 
 const STATUS_META = Object.freeze({
   DRAFT: { label: '草稿', color: 'blue' },
-  POSTED: { label: '已确认退厂', color: 'green' },
+  POSTED: { label: '已确认', color: 'green' },
   CANCELLED: { label: '已取消', color: 'default' },
 })
 
@@ -53,24 +55,28 @@ export default function PurchaseRejectionDispositionModal({
   useEffect(() => {
     onChangedRef.current = onChanged
   }, [onChanged])
-  const storageKey = useMemo(
-    () =>
-      inspection?.id
-        ? `plush-erp:purchase-rejection:last:v1:${inspection.id}`
-        : '',
-    [inspection?.id]
-  )
+  const [history, setHistory] = useState([])
+  useEffect(() => {
+    if (!record) return
+    form.setFieldsValue({
+      disposition_no: record.disposition_no,
+      disposition_type: record.disposition_type,
+      quantity: record.quantity,
+      reason: record.reason,
+      cancel_reason: '',
+    })
+  }, [form, record])
 
-  const remember = useCallback(
-    (next) => {
-      setRecord(next || null)
-      if (storageKey && next?.id) {
-        window.sessionStorage.setItem(storageKey, String(next.id))
-      }
-      onChangedRef.current?.(next || null)
-    },
-    [storageKey]
-  )
+  const remember = useCallback((next) => {
+    setRecord(next || null)
+    if (next?.id) {
+      setHistory((current) => [
+        next,
+        ...current.filter((item) => Number(item.id) !== Number(next.id)),
+      ])
+    }
+    onChangedRef.current?.(next || null)
+  }, [])
 
   const recover = useCallback(
     async (id, quiet = false) => {
@@ -104,18 +110,24 @@ export default function PurchaseRejectionDispositionModal({
       reason: '首次来料检验不合格',
       cancel_reason: '',
     })
-    const storedID = Number(
-      storageKey ? window.sessionStorage.getItem(storageKey) || 0 : 0
-    )
-    if (storedID > 0) recover(storedID, true)
-  }, [
-    form,
-    inspection?.id,
-    inspection?.inspection_no,
-    open,
-    recover,
-    storageKey,
-  ])
+    listPurchaseRejectionDispositions({
+      quality_inspection_id: Number(inspection?.id || 0),
+      limit: 50,
+      offset: 0,
+    })
+      .then((data) => {
+        const rows = Array.isArray(data?.purchase_rejection_dispositions)
+          ? data.purchase_rejection_dispositions
+          : []
+        setHistory(rows)
+        setRecord(
+          rows.find((item) => item?.status === 'DRAFT') || rows[0] || null
+        )
+      })
+      .catch((error) =>
+        message.error(getActionErrorMessage(error, '读取来料处置记录'))
+      )
+  }, [form, inspection?.id, inspection?.inspection_no, open, recover])
 
   const create = async () => {
     let values
@@ -161,6 +173,21 @@ export default function PurchaseRejectionDispositionModal({
     }
   }
 
+  const prepareNew = () => {
+    setRecord(null)
+    form.setFieldsValue({
+      disposition_no: sourceBusinessActionNo(
+        'IQC-DISP',
+        inspection?.inspection_no || 'QUALITY',
+        sourceBusinessActionUUID()
+      ),
+      disposition_type: 'RETURN_TO_VENDOR',
+      quantity: '',
+      reason: '首次来料检验不合格',
+      cancel_reason: '',
+    })
+  }
+
   const transition = async (action) => {
     if (!record?.id) return
     const cancelReason = String(
@@ -183,7 +210,11 @@ export default function PurchaseRejectionDispositionModal({
               expected_version: record.version,
               reason: cancelReason,
             })
-      if (!next?.id) throw new Error('退厂处置结果暂时无法确认')
+      if (!next?.id) {
+        throw Object.assign(new Error('退厂处置结果暂时无法确认'), {
+          isInvalidResponse: true,
+        })
+      }
       remember(next)
       message.success(action === 'post' ? '退厂处置已确认' : '退厂处置已取消')
     } catch (error) {
@@ -222,9 +253,14 @@ export default function PurchaseRejectionDispositionModal({
               生成处置草稿
             </Button>
           ) : null}
-          {record?.status === 'DRAFT' && canCancel ? (
+          {record && record.status !== 'DRAFT' ? (
+            <Button disabled={loading} onClick={prepareNew}>
+              继续登记
+            </Button>
+          ) : null}
+          {record && record.status !== 'CANCELLED' && canCancel ? (
             <Popconfirm
-              title="确认取消这张退厂处置草稿？"
+              title="确认取消这笔处置？"
               okText="确认取消"
               cancelText="返回"
               onConfirm={() => transition('cancel')}
@@ -237,13 +273,13 @@ export default function PurchaseRejectionDispositionModal({
           {record?.status === 'DRAFT' && canPost ? (
             <Popconfirm
               title="确认退厂处置？"
-              description="确认后会取消首次来料的入库草稿，不会生成库存退货流水。"
+              description="确认后登记当前来源行的处置数量；退厂不会生成库存退货流水，补换会生成新的待收与待检记录。"
               okText="确认处置"
               cancelText="返回"
               onConfirm={() => transition('post')}
             >
               <Button type="primary" loading={loading}>
-                确认退厂
+                确认处置
               </Button>
             </Popconfirm>
           ) : null}
@@ -253,8 +289,45 @@ export default function PurchaseRejectionDispositionModal({
       <Alert
         type="warning"
         showIcon
-        message="该入口只处理首次到货检验不合格：确认后取消尚未入库的收货草稿，不会扣减库存；已入库后的退货仍走采购退货。"
+        message="该入口按当前不合格来源行和数量办理退厂或供应商补换；部分处置不会取消整张收货，补换确认后会生成新的待收与待检记录。"
       />
+      {history.length > 0 ? (
+        <Alert
+          style={{ marginTop: 12 }}
+          type="info"
+          showIcon
+          message={`已登记 ${history.length} 笔处置，累计数量 ${history.filter((item) => item.status !== 'CANCELLED').reduce((sum, item) => sum + Number(item.quantity || 0), 0)}`}
+        />
+      ) : null}
+      {history.length > 0 ? (
+        <Table
+          size="small"
+          rowKey="id"
+          pagination={false}
+          style={{ marginTop: 12 }}
+          dataSource={history}
+          rowSelection={{
+            type: 'radio',
+            selectedRowKeys: record?.id ? [record.id] : [],
+            onChange: (_, rows) => setRecord(rows[0] || null),
+          }}
+          columns={[
+            { title: '处置单号', dataIndex: 'disposition_no' },
+            {
+              title: '方式',
+              dataIndex: 'disposition_type',
+              render: (value) =>
+                value === 'REPLACE' ? '供应商补换' : '退回供应商',
+            },
+            { title: '数量', dataIndex: 'quantity' },
+            {
+              title: '状态',
+              dataIndex: 'status',
+              render: (value) => STATUS_META[value]?.label || '待确认',
+            },
+          ]}
+        />
+      ) : null}
       <Descriptions
         size="small"
         column={{ xs: 1, sm: 2 }}
@@ -333,7 +406,7 @@ export default function PurchaseRejectionDispositionModal({
             disabled={Boolean(record)}
           />
         </Form.Item>
-        {record?.status === 'DRAFT' && canCancel ? (
+        {record && record.status !== 'CANCELLED' && canCancel ? (
           <Form.Item name="cancel_reason" label="取消原因（取消时必填）">
             <Input.TextArea rows={2} maxLength={255} showCount />
           </Form.Item>

@@ -36,6 +36,7 @@ import {
 } from '../components/business-list/BusinessListToolbarActions.jsx'
 import BusinessAttachmentModalButton from '../components/business-list/BusinessAttachmentModalButton.jsx'
 import BusinessRecordDetailsModal from '../components/business-list/BusinessRecordDetailsModal.jsx'
+import ProductionExceptionDecisionPanel from '../components/production-exceptions/ProductionExceptionDecisionPanel.jsx'
 import { getBusinessModule } from '../config/businessModules.mjs'
 import useLatestRequestCoordinator from '../hooks/useLatestRequestCoordinator.js'
 import { hasActionPermission } from '../utils/masterDataOrderView.mjs'
@@ -824,6 +825,10 @@ export default function WorkflowBusinessModulePage({ moduleKey }) {
         stats={stats}
         compact
       />
+
+      {moduleKey === 'production-exceptions' ? (
+        <ProductionExceptionDecisionPanel adminProfile={adminProfile} />
+      ) : null}
 
       <BusinessOperationPanel
         compact

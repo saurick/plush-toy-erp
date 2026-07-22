@@ -81,19 +81,19 @@ export const DEV_HUB_ITEMS = Object.freeze([
   }),
   Object.freeze({
     key: 'capability-ledger',
-    title: '能力台账 / Capability Ledger',
+    title: '能力真源 / Capability Sources',
     group: '产品治理 / Product Governance',
     route: DEV_CAPABILITY_LEDGER_ROUTE,
     source: 'docs/product/产品能力进度台账.md',
-    truthSource: '能力 / 交付台账 Markdown / Ledger Markdown',
-    status: '台账只读 / Read-only ledger',
+    truthSource: '两份正式 Markdown / Two source documents',
+    status: '真源入口 / Source links',
     guardrails: Object.freeze([
-      '只读可视化 / Read-only view',
-      '不替代真源 / Not source of truth',
-      '不接后端 / No backend',
+      '只做导航 / Navigation only',
+      '不复制状态 / No duplicated status',
+      '不进生产构建 / No prod build',
     ]),
     description:
-      '按当前人读台账查看产品能力、证据详情、客户交付和客户差异；review current ledgers without inventing CAP links.',
+      '先进入全局产品能力台账，再进入当前客户能力、交付与差异矩阵；open the two formal sources without maintaining a second dashboard.',
   }),
   Object.freeze({
     key: 'customer-config',

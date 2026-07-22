@@ -224,6 +224,9 @@ func (r *operationalFactRepo) CreateFinanceCreditNote(ctx context.Context, in *b
 	if fact.Status != biz.OperationalFactStatusPosted && fact.Status != biz.OperationalFactStatusSettled {
 		return nil, biz.ErrBadParam
 	}
+	if fact.FactType != biz.FinanceFactReceivable && fact.FactType != biz.FinanceFactPayable {
+		return nil, biz.ErrBadParam
+	}
 	outstanding, err := financeFactOutstanding(ctx, tx.client, fact.ID, fact.Amount)
 	if err != nil {
 		return nil, err
@@ -265,6 +268,13 @@ func (r *operationalFactRepo) ReverseFinanceCreditNote(ctx context.Context, in *
 	}
 	if source.Status != "POSTED" || source.ReversalOfCreditNoteID != nil {
 		return nil, biz.ErrBadParam
+	}
+	alreadyReversed, err := tx.client.FinanceCreditNote.Query().Where(financecreditnote.ReversalOfCreditNoteID(source.ID)).Exist(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if alreadyReversed {
+		return nil, biz.ErrIdempotencyConflict
 	}
 	if err := lockOperationalFactRow(ctx, tx, "finance_facts", source.FinanceFactID, biz.ErrBadParam); err != nil {
 		return nil, err

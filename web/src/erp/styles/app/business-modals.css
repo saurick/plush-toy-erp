@@ -1358,6 +1358,13 @@ body
   margin-bottom: 12px;
 }
 
+.erp-role-policy-tabs,
+.erp-role-policy-tabs > .ant-tabs-content-holder,
+.erp-role-policy-tabs > .ant-tabs-content-holder > .ant-tabs-content,
+.erp-role-policy-tabs .ant-tabs-tabpane {
+  min-width: 0;
+}
+
 .erp-role-policy-boundary__grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1617,6 +1624,57 @@ body
   flex-wrap: wrap;
   gap: 6px;
   min-width: 0;
+}
+
+.erp-role-navigation-preview {
+  display: grid;
+  gap: 12px;
+}
+
+.erp-role-navigation-preview__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.erp-role-navigation-preview__head .ant-typography {
+  margin: 0;
+}
+
+.erp-role-navigation-preview__head .ant-typography-secondary {
+  margin-top: 4px;
+}
+
+.erp-role-navigation-preview__grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.erp-role-navigation-preview__group {
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid #e2ece4;
+  border-radius: 10px;
+  background: #fbfdfb;
+}
+
+.erp-role-navigation-preview__items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+}
+
+.erp-role-navigation-preview__items .ant-tag {
+  max-width: 100%;
+  margin: 0;
+  white-space: normal;
 }
 
 .erp-role-center-footer {

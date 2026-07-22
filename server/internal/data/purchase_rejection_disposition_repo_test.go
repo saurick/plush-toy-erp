@@ -12,7 +12,7 @@ import (
 	"github.com/shopspring/decimal"
 )
 
-func TestPurchaseRejectionDispositionPostsWithoutInventoryAndCancelsDraftReceipt(t *testing.T) {
+func TestPurchaseRejectionDispositionPostsWithoutInventoryAndKeepsDraftReceipt(t *testing.T) {
 	ctx := context.Background()
 	data, client := openInventoryRepoTestData(t, "purchase_rejection_disposition")
 	fixtures := createInventoryTestFixtures(t, ctx, client)
@@ -63,15 +63,15 @@ func TestPurchaseRejectionDispositionPostsWithoutInventoryAndCancelsDraftReceipt
 		t.Fatalf("disposition wrote inventory before=%d after=%d", before, after)
 	}
 	gotReceipt, err := uc.GetPurchaseReceipt(ctx, receipt.ID)
-	if err != nil || gotReceipt.Status != biz.PurchaseReceiptStatusCancelled {
+	if err != nil || gotReceipt.Status != biz.PurchaseReceiptStatusDraft {
 		t.Fatalf("receipt=%#v err=%v", gotReceipt, err)
 	}
 	lot, err := uc.GetInventoryLot(ctx, *item.LotID)
-	if err != nil || lot.Status != biz.InventoryLotDisabled {
+	if err != nil || lot.Status != biz.InventoryLotRejected {
 		t.Fatalf("lot=%#v err=%v", lot, err)
 	}
-	if _, err := uc.CancelPurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionMutation{ID: posted.ID, ExpectedVersion: posted.Version, ActorID: 3, Reason: "错误撤销"}); !errors.Is(err, biz.ErrPurchaseRejectionSourceState) {
-		t.Fatalf("posted cancellation err=%v", err)
+	if cancelled, err := uc.CancelPurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionMutation{ID: posted.ID, ExpectedVersion: posted.Version, ActorID: 3, Reason: "错误撤销"}); err != nil || cancelled.Status != biz.PurchaseRejectionStatusCancelled {
+		t.Fatalf("posted cancellation=%#v err=%v", cancelled, err)
 	}
 }
 
@@ -85,5 +85,53 @@ func TestPurchaseRejectionDispositionRejectsPostedReceiptSource(t *testing.T) {
 	_, err := uc.CreatePurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionCreate{DispositionNo: "PRD-POSTED", QualityInspectionID: rejected.ID, DispositionType: biz.PurchaseRejectionReturnToVendor, Quantity: decimal.NewFromInt(1), Reason: "不得复用已入库退货", IdempotencyKey: "prd-posted", CreatedBy: 1})
 	if !errors.Is(err, biz.ErrPurchaseRejectionSourceState) {
 		t.Fatalf("posted source err=%v", err)
+	}
+}
+
+func TestPurchaseRejectionDispositionAccumulatesAndCreatesReplacementReceipt(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "purchase_rejection_partial_replace")
+	fixtures := createInventoryTestFixtures(t, ctx, client)
+	uc := biz.NewInventoryUsecase(NewInventoryRepo(data, log.NewStdLogger(io.Discard)))
+	receipt, err := uc.CreatePurchaseReceiptWithItems(ctx, &biz.PurchaseReceiptCreate{ReceiptNo: "PR-REJECT-PARTIAL", SupplierName: "补换供应商"}, []*biz.PurchaseReceiptItemCreate{{MaterialID: fixtures.materialID, WarehouseID: fixtures.warehouseID, UnitID: fixtures.unitID, Quantity: decimal.NewFromInt(10)}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inspection := receipt.QualityInspections[0]
+	rejected, err := uc.RejectQualityInspection(ctx, approximateQualityInspectionDecision(inspection.ID, biz.QualityInspectionResultReject))
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := uc.CreatePurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionCreate{DispositionNo: "PRD-PARTIAL-RETURN", QualityInspectionID: rejected.ID, DispositionType: biz.PurchaseRejectionReturnToVendor, Quantity: decimal.NewFromInt(4), Reason: "部分退厂", IdempotencyKey: "prd-partial-return", CreatedBy: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := uc.CreatePurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionCreate{DispositionNo: "PRD-PARTIAL-REPLACE", QualityInspectionID: rejected.ID, DispositionType: biz.PurchaseRejectionReplace, Quantity: decimal.NewFromInt(6), Reason: "剩余补换", IdempotencyKey: "prd-partial-replace", CreatedBy: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := uc.CreatePurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionCreate{DispositionNo: "PRD-OVER", QualityInspectionID: rejected.ID, DispositionType: biz.PurchaseRejectionReturnToVendor, Quantity: decimal.NewFromInt(1), Reason: "不得超量", IdempotencyKey: "prd-over", CreatedBy: 1}); !errors.Is(err, biz.ErrPurchaseRejectionSourceInvalid) {
+		t.Fatalf("over allocation err=%v", err)
+	}
+	if _, err := uc.PostPurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionMutation{ID: first.ID, ExpectedVersion: first.Version, ActorID: 2}); err != nil {
+		t.Fatal(err)
+	}
+	posted, err := uc.PostPurchaseRejectionDisposition(ctx, &biz.PurchaseRejectionDispositionMutation{ID: second.ID, ExpectedVersion: second.Version, ActorID: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if posted.ReplacementReceiptID == nil {
+		t.Fatal("replacement receipt link is required")
+	}
+	replacement, err := uc.GetPurchaseReceipt(ctx, *posted.ReplacementReceiptID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	replacementInspections, _, inspectionErr := uc.ListQualityInspections(ctx, biz.QualityInspectionFilter{PurchaseReceiptID: replacement.ID, Limit: 10})
+	if replacement.Status != biz.PurchaseReceiptStatusDraft || len(replacement.Items) != 1 || !replacement.Items[0].Quantity.Equal(decimal.NewFromInt(6)) || inspectionErr != nil || len(replacementInspections) != 1 {
+		t.Fatalf("replacement=%#v", replacement)
+	}
+	if original, _ := uc.GetPurchaseReceipt(ctx, receipt.ID); original.Status != biz.PurchaseReceiptStatusDraft {
+		t.Fatalf("original status=%s", original.Status)
 	}
 }

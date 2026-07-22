@@ -72,6 +72,30 @@ test('mobile entry session: 岗位入口按账号权限直达且可退出', () =
   assert.match(source, /手机待办只向明确分配的业务岗位开放/u)
 })
 
+test('mobile entry session: 有电脑端菜单的岗位可从任务端直接进入电脑端', () => {
+  const layoutSource = readSource('mobile', 'MobileAppLayout.jsx')
+  const pageSource = readSource('mobile', 'pages', 'MobileRoleTasksPage.jsx')
+  const screenSource = readSource(
+    'mobile',
+    'components',
+    'MobileTaskListScreen.jsx'
+  )
+
+  assert.match(
+    layoutSource,
+    /rememberEntryChoice\(ENTRY_TARGET\.DESKTOP\)[\s\S]*?navigate\('\/erp\/dashboard'\)/u
+  )
+  assert.match(
+    layoutSource,
+    /canEnterDesktop: canReturnToEntries[\s\S]*?handleEnterDesktop/u
+  )
+  assert.match(pageSource, /canEnterDesktop=\{canEnterDesktop === true\}/u)
+  assert.match(pageSource, /handleEnterDesktop=\{handleEnterDesktop\}/u)
+  assert.match(screenSource, /data-testid="mobile-role-desktop-entry"/u)
+  assert.match(screenSource, /aria-label="进入电脑端"/u)
+  assert.match(screenSource, />\s*进入电脑端\s*</u)
+})
+
 test('mobile entry session: 直接访问未分配岗位时按账号业务岗位情况返回入口页', () => {
   const source = readSource('mobile', 'MobileAppLayout.jsx')
 

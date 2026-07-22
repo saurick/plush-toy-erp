@@ -43,6 +43,20 @@ func (_u *ProductionExceptionDecisionUpdate) SetNillableStatus(v *string) *Produ
 	return _u
 }
 
+// SetExecutionStatus sets the "execution_status" field.
+func (_u *ProductionExceptionDecisionUpdate) SetExecutionStatus(v string) *ProductionExceptionDecisionUpdate {
+	_u.mutation.SetExecutionStatus(v)
+	return _u
+}
+
+// SetNillableExecutionStatus sets the "execution_status" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdate) SetNillableExecutionStatus(v *string) *ProductionExceptionDecisionUpdate {
+	if v != nil {
+		_u.SetExecutionStatus(*v)
+	}
+	return _u
+}
+
 // SetApprovedQuantity sets the "approved_quantity" field.
 func (_u *ProductionExceptionDecisionUpdate) SetApprovedQuantity(v decimal.Decimal) *ProductionExceptionDecisionUpdate {
 	_u.mutation.SetApprovedQuantity(v)
@@ -151,6 +165,120 @@ func (_u *ProductionExceptionDecisionUpdate) ClearDecisionReason() *ProductionEx
 	return _u
 }
 
+// SetExecutedBy sets the "executed_by" field.
+func (_u *ProductionExceptionDecisionUpdate) SetExecutedBy(v int) *ProductionExceptionDecisionUpdate {
+	_u.mutation.ResetExecutedBy()
+	_u.mutation.SetExecutedBy(v)
+	return _u
+}
+
+// SetNillableExecutedBy sets the "executed_by" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdate) SetNillableExecutedBy(v *int) *ProductionExceptionDecisionUpdate {
+	if v != nil {
+		_u.SetExecutedBy(*v)
+	}
+	return _u
+}
+
+// AddExecutedBy adds value to the "executed_by" field.
+func (_u *ProductionExceptionDecisionUpdate) AddExecutedBy(v int) *ProductionExceptionDecisionUpdate {
+	_u.mutation.AddExecutedBy(v)
+	return _u
+}
+
+// ClearExecutedBy clears the value of the "executed_by" field.
+func (_u *ProductionExceptionDecisionUpdate) ClearExecutedBy() *ProductionExceptionDecisionUpdate {
+	_u.mutation.ClearExecutedBy()
+	return _u
+}
+
+// SetExecutedAt sets the "executed_at" field.
+func (_u *ProductionExceptionDecisionUpdate) SetExecutedAt(v time.Time) *ProductionExceptionDecisionUpdate {
+	_u.mutation.SetExecutedAt(v)
+	return _u
+}
+
+// SetNillableExecutedAt sets the "executed_at" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdate) SetNillableExecutedAt(v *time.Time) *ProductionExceptionDecisionUpdate {
+	if v != nil {
+		_u.SetExecutedAt(*v)
+	}
+	return _u
+}
+
+// ClearExecutedAt clears the value of the "executed_at" field.
+func (_u *ProductionExceptionDecisionUpdate) ClearExecutedAt() *ProductionExceptionDecisionUpdate {
+	_u.mutation.ClearExecutedAt()
+	return _u
+}
+
+// SetReversedBy sets the "reversed_by" field.
+func (_u *ProductionExceptionDecisionUpdate) SetReversedBy(v int) *ProductionExceptionDecisionUpdate {
+	_u.mutation.ResetReversedBy()
+	_u.mutation.SetReversedBy(v)
+	return _u
+}
+
+// SetNillableReversedBy sets the "reversed_by" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdate) SetNillableReversedBy(v *int) *ProductionExceptionDecisionUpdate {
+	if v != nil {
+		_u.SetReversedBy(*v)
+	}
+	return _u
+}
+
+// AddReversedBy adds value to the "reversed_by" field.
+func (_u *ProductionExceptionDecisionUpdate) AddReversedBy(v int) *ProductionExceptionDecisionUpdate {
+	_u.mutation.AddReversedBy(v)
+	return _u
+}
+
+// ClearReversedBy clears the value of the "reversed_by" field.
+func (_u *ProductionExceptionDecisionUpdate) ClearReversedBy() *ProductionExceptionDecisionUpdate {
+	_u.mutation.ClearReversedBy()
+	return _u
+}
+
+// SetReversedAt sets the "reversed_at" field.
+func (_u *ProductionExceptionDecisionUpdate) SetReversedAt(v time.Time) *ProductionExceptionDecisionUpdate {
+	_u.mutation.SetReversedAt(v)
+	return _u
+}
+
+// SetNillableReversedAt sets the "reversed_at" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdate) SetNillableReversedAt(v *time.Time) *ProductionExceptionDecisionUpdate {
+	if v != nil {
+		_u.SetReversedAt(*v)
+	}
+	return _u
+}
+
+// ClearReversedAt clears the value of the "reversed_at" field.
+func (_u *ProductionExceptionDecisionUpdate) ClearReversedAt() *ProductionExceptionDecisionUpdate {
+	_u.mutation.ClearReversedAt()
+	return _u
+}
+
+// SetReverseReason sets the "reverse_reason" field.
+func (_u *ProductionExceptionDecisionUpdate) SetReverseReason(v string) *ProductionExceptionDecisionUpdate {
+	_u.mutation.SetReverseReason(v)
+	return _u
+}
+
+// SetNillableReverseReason sets the "reverse_reason" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdate) SetNillableReverseReason(v *string) *ProductionExceptionDecisionUpdate {
+	if v != nil {
+		_u.SetReverseReason(*v)
+	}
+	return _u
+}
+
+// ClearReverseReason clears the value of the "reverse_reason" field.
+func (_u *ProductionExceptionDecisionUpdate) ClearReverseReason() *ProductionExceptionDecisionUpdate {
+	_u.mutation.ClearReverseReason()
+	return _u
+}
+
 // Mutation returns the ProductionExceptionDecisionMutation object of the builder.
 func (_u *ProductionExceptionDecisionUpdate) Mutation() *ProductionExceptionDecisionMutation {
 	return _u.mutation
@@ -190,6 +318,11 @@ func (_u *ProductionExceptionDecisionUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ExecutionStatus(); ok {
+		if err := productionexceptiondecision.ExecutionStatusValidator(v); err != nil {
+			return &ValidationError{Name: "execution_status", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.execution_status": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Version(); ok {
 		if err := productionexceptiondecision.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.version": %w`, err)}
@@ -203,6 +336,21 @@ func (_u *ProductionExceptionDecisionUpdate) check() error {
 	if v, ok := _u.mutation.DecisionReason(); ok {
 		if err := productionexceptiondecision.DecisionReasonValidator(v); err != nil {
 			return &ValidationError{Name: "decision_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.decision_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ExecutedBy(); ok {
+		if err := productionexceptiondecision.ExecutedByValidator(v); err != nil {
+			return &ValidationError{Name: "executed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.executed_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReversedBy(); ok {
+		if err := productionexceptiondecision.ReversedByValidator(v); err != nil {
+			return &ValidationError{Name: "reversed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.reversed_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReverseReason(); ok {
+		if err := productionexceptiondecision.ReverseReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reverse_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.reverse_reason": %w`, err)}
 		}
 	}
 	return nil
@@ -222,6 +370,9 @@ func (_u *ProductionExceptionDecisionUpdate) sqlSave(ctx context.Context) (_node
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(productionexceptiondecision.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ExecutionStatus(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutionStatus, field.TypeString, value)
 	}
 	if _u.mutation.ProductionMaterialRequirementIDCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldProductionMaterialRequirementID, field.TypeInt)
@@ -265,6 +416,42 @@ func (_u *ProductionExceptionDecisionUpdate) sqlSave(ctx context.Context) (_node
 	if _u.mutation.DecisionReasonCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldDecisionReason, field.TypeString)
 	}
+	if value, ok := _u.mutation.ExecutedBy(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedExecutedBy(); ok {
+		_spec.AddField(productionexceptiondecision.FieldExecutedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ExecutedByCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldExecutedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ExecutedAt(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExecutedAtCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldExecutedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReversedBy(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReversedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedReversedBy(); ok {
+		_spec.AddField(productionexceptiondecision.FieldReversedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ReversedByCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldReversedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ReversedAt(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReversedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ReversedAtCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldReversedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReverseReason(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReverseReason, field.TypeString, value)
+	}
+	if _u.mutation.ReverseReasonCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldReverseReason, field.TypeString)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{productionexceptiondecision.Label}
@@ -295,6 +482,20 @@ func (_u *ProductionExceptionDecisionUpdateOne) SetStatus(v string) *ProductionE
 func (_u *ProductionExceptionDecisionUpdateOne) SetNillableStatus(v *string) *ProductionExceptionDecisionUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
+	}
+	return _u
+}
+
+// SetExecutionStatus sets the "execution_status" field.
+func (_u *ProductionExceptionDecisionUpdateOne) SetExecutionStatus(v string) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.SetExecutionStatus(v)
+	return _u
+}
+
+// SetNillableExecutionStatus sets the "execution_status" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdateOne) SetNillableExecutionStatus(v *string) *ProductionExceptionDecisionUpdateOne {
+	if v != nil {
+		_u.SetExecutionStatus(*v)
 	}
 	return _u
 }
@@ -407,6 +608,120 @@ func (_u *ProductionExceptionDecisionUpdateOne) ClearDecisionReason() *Productio
 	return _u
 }
 
+// SetExecutedBy sets the "executed_by" field.
+func (_u *ProductionExceptionDecisionUpdateOne) SetExecutedBy(v int) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ResetExecutedBy()
+	_u.mutation.SetExecutedBy(v)
+	return _u
+}
+
+// SetNillableExecutedBy sets the "executed_by" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdateOne) SetNillableExecutedBy(v *int) *ProductionExceptionDecisionUpdateOne {
+	if v != nil {
+		_u.SetExecutedBy(*v)
+	}
+	return _u
+}
+
+// AddExecutedBy adds value to the "executed_by" field.
+func (_u *ProductionExceptionDecisionUpdateOne) AddExecutedBy(v int) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.AddExecutedBy(v)
+	return _u
+}
+
+// ClearExecutedBy clears the value of the "executed_by" field.
+func (_u *ProductionExceptionDecisionUpdateOne) ClearExecutedBy() *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ClearExecutedBy()
+	return _u
+}
+
+// SetExecutedAt sets the "executed_at" field.
+func (_u *ProductionExceptionDecisionUpdateOne) SetExecutedAt(v time.Time) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.SetExecutedAt(v)
+	return _u
+}
+
+// SetNillableExecutedAt sets the "executed_at" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdateOne) SetNillableExecutedAt(v *time.Time) *ProductionExceptionDecisionUpdateOne {
+	if v != nil {
+		_u.SetExecutedAt(*v)
+	}
+	return _u
+}
+
+// ClearExecutedAt clears the value of the "executed_at" field.
+func (_u *ProductionExceptionDecisionUpdateOne) ClearExecutedAt() *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ClearExecutedAt()
+	return _u
+}
+
+// SetReversedBy sets the "reversed_by" field.
+func (_u *ProductionExceptionDecisionUpdateOne) SetReversedBy(v int) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ResetReversedBy()
+	_u.mutation.SetReversedBy(v)
+	return _u
+}
+
+// SetNillableReversedBy sets the "reversed_by" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdateOne) SetNillableReversedBy(v *int) *ProductionExceptionDecisionUpdateOne {
+	if v != nil {
+		_u.SetReversedBy(*v)
+	}
+	return _u
+}
+
+// AddReversedBy adds value to the "reversed_by" field.
+func (_u *ProductionExceptionDecisionUpdateOne) AddReversedBy(v int) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.AddReversedBy(v)
+	return _u
+}
+
+// ClearReversedBy clears the value of the "reversed_by" field.
+func (_u *ProductionExceptionDecisionUpdateOne) ClearReversedBy() *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ClearReversedBy()
+	return _u
+}
+
+// SetReversedAt sets the "reversed_at" field.
+func (_u *ProductionExceptionDecisionUpdateOne) SetReversedAt(v time.Time) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.SetReversedAt(v)
+	return _u
+}
+
+// SetNillableReversedAt sets the "reversed_at" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdateOne) SetNillableReversedAt(v *time.Time) *ProductionExceptionDecisionUpdateOne {
+	if v != nil {
+		_u.SetReversedAt(*v)
+	}
+	return _u
+}
+
+// ClearReversedAt clears the value of the "reversed_at" field.
+func (_u *ProductionExceptionDecisionUpdateOne) ClearReversedAt() *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ClearReversedAt()
+	return _u
+}
+
+// SetReverseReason sets the "reverse_reason" field.
+func (_u *ProductionExceptionDecisionUpdateOne) SetReverseReason(v string) *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.SetReverseReason(v)
+	return _u
+}
+
+// SetNillableReverseReason sets the "reverse_reason" field if the given value is not nil.
+func (_u *ProductionExceptionDecisionUpdateOne) SetNillableReverseReason(v *string) *ProductionExceptionDecisionUpdateOne {
+	if v != nil {
+		_u.SetReverseReason(*v)
+	}
+	return _u
+}
+
+// ClearReverseReason clears the value of the "reverse_reason" field.
+func (_u *ProductionExceptionDecisionUpdateOne) ClearReverseReason() *ProductionExceptionDecisionUpdateOne {
+	_u.mutation.ClearReverseReason()
+	return _u
+}
+
 // Mutation returns the ProductionExceptionDecisionMutation object of the builder.
 func (_u *ProductionExceptionDecisionUpdateOne) Mutation() *ProductionExceptionDecisionMutation {
 	return _u.mutation
@@ -459,6 +774,11 @@ func (_u *ProductionExceptionDecisionUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.ExecutionStatus(); ok {
+		if err := productionexceptiondecision.ExecutionStatusValidator(v); err != nil {
+			return &ValidationError{Name: "execution_status", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.execution_status": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Version(); ok {
 		if err := productionexceptiondecision.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.version": %w`, err)}
@@ -472,6 +792,21 @@ func (_u *ProductionExceptionDecisionUpdateOne) check() error {
 	if v, ok := _u.mutation.DecisionReason(); ok {
 		if err := productionexceptiondecision.DecisionReasonValidator(v); err != nil {
 			return &ValidationError{Name: "decision_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.decision_reason": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ExecutedBy(); ok {
+		if err := productionexceptiondecision.ExecutedByValidator(v); err != nil {
+			return &ValidationError{Name: "executed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.executed_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReversedBy(); ok {
+		if err := productionexceptiondecision.ReversedByValidator(v); err != nil {
+			return &ValidationError{Name: "reversed_by", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.reversed_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.ReverseReason(); ok {
+		if err := productionexceptiondecision.ReverseReasonValidator(v); err != nil {
+			return &ValidationError{Name: "reverse_reason", err: fmt.Errorf(`ent: validator failed for field "ProductionExceptionDecision.reverse_reason": %w`, err)}
 		}
 	}
 	return nil
@@ -508,6 +843,9 @@ func (_u *ProductionExceptionDecisionUpdateOne) sqlSave(ctx context.Context) (_n
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(productionexceptiondecision.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.ExecutionStatus(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutionStatus, field.TypeString, value)
 	}
 	if _u.mutation.ProductionMaterialRequirementIDCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldProductionMaterialRequirementID, field.TypeInt)
@@ -550,6 +888,42 @@ func (_u *ProductionExceptionDecisionUpdateOne) sqlSave(ctx context.Context) (_n
 	}
 	if _u.mutation.DecisionReasonCleared() {
 		_spec.ClearField(productionexceptiondecision.FieldDecisionReason, field.TypeString)
+	}
+	if value, ok := _u.mutation.ExecutedBy(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedExecutedBy(); ok {
+		_spec.AddField(productionexceptiondecision.FieldExecutedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ExecutedByCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldExecutedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ExecutedAt(); ok {
+		_spec.SetField(productionexceptiondecision.FieldExecutedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ExecutedAtCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldExecutedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReversedBy(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReversedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedReversedBy(); ok {
+		_spec.AddField(productionexceptiondecision.FieldReversedBy, field.TypeInt, value)
+	}
+	if _u.mutation.ReversedByCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldReversedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.ReversedAt(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReversedAt, field.TypeTime, value)
+	}
+	if _u.mutation.ReversedAtCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldReversedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.ReverseReason(); ok {
+		_spec.SetField(productionexceptiondecision.FieldReverseReason, field.TypeString, value)
+	}
+	if _u.mutation.ReverseReasonCleared() {
+		_spec.ClearField(productionexceptiondecision.FieldReverseReason, field.TypeString)
 	}
 	_node = &ProductionExceptionDecision{config: _u.config}
 	_spec.Assign = _node.assignValues

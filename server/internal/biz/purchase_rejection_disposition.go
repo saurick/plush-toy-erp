@@ -31,6 +31,7 @@ type PurchaseRejectionDisposition struct {
 	ID                                                            int
 	DispositionNo                                                 string
 	QualityInspectionID, PurchaseReceiptID, PurchaseReceiptItemID int
+	ReplacementReceiptID                                          *int
 	DispositionType, Status                                       string
 	Quantity                                                      decimal.Decimal
 	SupplierID                                                    *int
@@ -56,11 +57,37 @@ type PurchaseRejectionDispositionMutation struct {
 	ID, ExpectedVersion, ActorID int
 	Reason                       string
 }
+type PurchaseRejectionDispositionFilter struct {
+	QualityInspectionID, PurchaseReceiptID int
+	Status                                 string
+	Limit, Offset                          int
+}
 type PurchaseRejectionDispositionRepo interface {
 	CreatePurchaseRejectionDisposition(context.Context, *PurchaseRejectionDispositionCreate, string) (*PurchaseRejectionDisposition, error)
 	PostPurchaseRejectionDisposition(context.Context, *PurchaseRejectionDispositionMutation) (*PurchaseRejectionDisposition, error)
 	CancelPurchaseRejectionDisposition(context.Context, *PurchaseRejectionDispositionMutation) (*PurchaseRejectionDisposition, error)
 	GetPurchaseRejectionDisposition(context.Context, int) (*PurchaseRejectionDisposition, error)
+}
+type PurchaseRejectionDispositionListRepo interface {
+	ListPurchaseRejectionDispositions(context.Context, PurchaseRejectionDispositionFilter) ([]*PurchaseRejectionDisposition, int, error)
+}
+
+func (uc *InventoryUsecase) ListPurchaseRejectionDispositions(ctx context.Context, filter PurchaseRejectionDispositionFilter) ([]*PurchaseRejectionDisposition, int, error) {
+	if uc == nil || uc.repo == nil || filter.QualityInspectionID < 0 || filter.PurchaseReceiptID < 0 || filter.Offset < 0 {
+		return nil, 0, ErrBadParam
+	}
+	repo, ok := any(uc.repo).(PurchaseRejectionDispositionListRepo)
+	if !ok {
+		return nil, 0, ErrBadParam
+	}
+	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	if filter.Status != "" && filter.Status != PurchaseRejectionStatusDraft && filter.Status != PurchaseRejectionStatusPosted && filter.Status != PurchaseRejectionStatusCancelled {
+		return nil, 0, ErrBadParam
+	}
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 50
+	}
+	return repo.ListPurchaseRejectionDispositions(ctx, filter)
 }
 
 func (uc *InventoryUsecase) CreatePurchaseRejectionDisposition(ctx context.Context, in *PurchaseRejectionDispositionCreate) (*PurchaseRejectionDisposition, error) {

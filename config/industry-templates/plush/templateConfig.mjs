@@ -65,7 +65,7 @@ export const plushIndustryTemplateConfig = Object.freeze({
       label: "财务",
       classification: "industry_default_candidate",
       evidence: "operational-fact-target-release-evidence",
-      boundary: "负责来源明确的应收、应付、发票和单笔核对；PAYMENT 当前只读，不开放收付款录入，也不能从出货放行直接生成财务事实。",
+      boundary: "负责来源明确的应收、应付、发票、单笔核对、真实收付款、多来源分配、冲正和红冲；不能从出货放行或 Workflow 任务直接生成财务事实，也不代表银行直连、付款审批、总账或税控。",
     },
     {
       key: "pmc",

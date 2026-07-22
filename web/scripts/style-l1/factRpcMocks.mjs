@@ -532,6 +532,16 @@ export async function installFactRpcMocks(page, context) {
 
     let data = {}
     switch (method) {
+      case 'list_production_exceptions':
+        data = stylePaginatedRpcData([], 'production_exceptions', params)
+        break
+      case 'list_outsourcing_return_dispositions':
+        data = stylePaginatedRpcData(
+          [],
+          'outsourcing_return_dispositions',
+          params
+        )
+        break
       case 'list_production_facts':
         {
           const facts = [
@@ -1485,6 +1495,13 @@ export async function installFactRpcMocks(page, context) {
     let data = {}
     let rpcResult = null
     switch (method) {
+      case 'list_purchase_rejection_dispositions':
+        data = stylePaginatedRpcData(
+          [],
+          'purchase_rejection_dispositions',
+          params
+        )
+        break
       case 'list_purchase_receipts':
         {
           const rows = filteredPurchaseReceipts()

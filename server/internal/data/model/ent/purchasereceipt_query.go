@@ -11,6 +11,7 @@ import (
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/supplier"
@@ -32,6 +33,7 @@ type PurchaseReceiptQuery struct {
 	withPurchaseReturns            *PurchaseReturnQuery
 	withPurchaseReceiptAdjustments *PurchaseReceiptAdjustmentQuery
 	withQualityInspections         *QualityInspectionQuery
+	withReplacementDispositions    *PurchaseRejectionDispositionQuery
 	withItems                      *PurchaseReceiptItemQuery
 	// intermediate query (i.e. traversal path).
 	sql  *sql.Selector
@@ -150,6 +152,28 @@ func (_q *PurchaseReceiptQuery) QueryQualityInspections() *QualityInspectionQuer
 			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, selector),
 			sqlgraph.To(qualityinspection.Table, qualityinspection.FieldID),
 			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceipt.QualityInspectionsTable, purchasereceipt.QualityInspectionsColumn),
+		)
+		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
+		return fromU, nil
+	}
+	return query
+}
+
+// QueryReplacementDispositions chains the current query on the "replacement_dispositions" edge.
+func (_q *PurchaseReceiptQuery) QueryReplacementDispositions() *PurchaseRejectionDispositionQuery {
+	query := (&PurchaseRejectionDispositionClient{config: _q.config}).Query()
+	query.path = func(ctx context.Context) (fromU *sql.Selector, err error) {
+		if err := _q.prepareQuery(ctx); err != nil {
+			return nil, err
+		}
+		selector := _q.sqlQuery(ctx)
+		if err := selector.Err(); err != nil {
+			return nil, err
+		}
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, selector),
+			sqlgraph.To(purchaserejectiondisposition.Table, purchaserejectiondisposition.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceipt.ReplacementDispositionsTable, purchasereceipt.ReplacementDispositionsColumn),
 		)
 		fromU = sqlgraph.SetNeighbors(_q.driver.Dialect(), step)
 		return fromU, nil
@@ -375,6 +399,7 @@ func (_q *PurchaseReceiptQuery) Clone() *PurchaseReceiptQuery {
 		withPurchaseReturns:            _q.withPurchaseReturns.Clone(),
 		withPurchaseReceiptAdjustments: _q.withPurchaseReceiptAdjustments.Clone(),
 		withQualityInspections:         _q.withQualityInspections.Clone(),
+		withReplacementDispositions:    _q.withReplacementDispositions.Clone(),
 		withItems:                      _q.withItems.Clone(),
 		// clone intermediate query.
 		sql:  _q.sql.Clone(),
@@ -423,6 +448,17 @@ func (_q *PurchaseReceiptQuery) WithQualityInspections(opts ...func(*QualityInsp
 		opt(query)
 	}
 	_q.withQualityInspections = query
+	return _q
+}
+
+// WithReplacementDispositions tells the query-builder to eager-load the nodes that are connected to
+// the "replacement_dispositions" edge. The optional arguments are used to configure the query builder of the edge.
+func (_q *PurchaseReceiptQuery) WithReplacementDispositions(opts ...func(*PurchaseRejectionDispositionQuery)) *PurchaseReceiptQuery {
+	query := (&PurchaseRejectionDispositionClient{config: _q.config}).Query()
+	for _, opt := range opts {
+		opt(query)
+	}
+	_q.withReplacementDispositions = query
 	return _q
 }
 
@@ -515,11 +551,12 @@ func (_q *PurchaseReceiptQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 	var (
 		nodes       = []*PurchaseReceipt{}
 		_spec       = _q.querySpec()
-		loadedTypes = [5]bool{
+		loadedTypes = [6]bool{
 			_q.withSupplier != nil,
 			_q.withPurchaseReturns != nil,
 			_q.withPurchaseReceiptAdjustments != nil,
 			_q.withQualityInspections != nil,
+			_q.withReplacementDispositions != nil,
 			_q.withItems != nil,
 		}
 	)
@@ -570,6 +607,15 @@ func (_q *PurchaseReceiptQuery) sqlAll(ctx context.Context, hooks ...queryHook) 
 			func(n *PurchaseReceipt) { n.Edges.QualityInspections = []*QualityInspection{} },
 			func(n *PurchaseReceipt, e *QualityInspection) {
 				n.Edges.QualityInspections = append(n.Edges.QualityInspections, e)
+			}); err != nil {
+			return nil, err
+		}
+	}
+	if query := _q.withReplacementDispositions; query != nil {
+		if err := _q.loadReplacementDispositions(ctx, query, nodes,
+			func(n *PurchaseReceipt) { n.Edges.ReplacementDispositions = []*PurchaseRejectionDisposition{} },
+			func(n *PurchaseReceipt, e *PurchaseRejectionDisposition) {
+				n.Edges.ReplacementDispositions = append(n.Edges.ReplacementDispositions, e)
 			}); err != nil {
 			return nil, err
 		}
@@ -707,6 +753,39 @@ func (_q *PurchaseReceiptQuery) loadQualityInspections(ctx context.Context, quer
 		node, ok := nodeids[*fk]
 		if !ok {
 			return fmt.Errorf(`unexpected referenced foreign-key "purchase_receipt_id" returned %v for node %v`, *fk, n.ID)
+		}
+		assign(node, n)
+	}
+	return nil
+}
+func (_q *PurchaseReceiptQuery) loadReplacementDispositions(ctx context.Context, query *PurchaseRejectionDispositionQuery, nodes []*PurchaseReceipt, init func(*PurchaseReceipt), assign func(*PurchaseReceipt, *PurchaseRejectionDisposition)) error {
+	fks := make([]driver.Value, 0, len(nodes))
+	nodeids := make(map[int]*PurchaseReceipt)
+	for i := range nodes {
+		fks = append(fks, nodes[i].ID)
+		nodeids[nodes[i].ID] = nodes[i]
+		if init != nil {
+			init(nodes[i])
+		}
+	}
+	if len(query.ctx.Fields) > 0 {
+		query.ctx.AppendFieldOnce(purchaserejectiondisposition.FieldReplacementReceiptID)
+	}
+	query.Where(predicate.PurchaseRejectionDisposition(func(s *sql.Selector) {
+		s.Where(sql.InValues(s.C(purchasereceipt.ReplacementDispositionsColumn), fks...))
+	}))
+	neighbors, err := query.All(ctx)
+	if err != nil {
+		return err
+	}
+	for _, n := range neighbors {
+		fk := n.ReplacementReceiptID
+		if fk == nil {
+			return fmt.Errorf(`foreign-key "replacement_receipt_id" is nil for node %v`, n.ID)
+		}
+		node, ok := nodeids[*fk]
+		if !ok {
+			return fmt.Errorf(`unexpected referenced foreign-key "replacement_receipt_id" returned %v for node %v`, *fk, n.ID)
 		}
 		assign(node, n)
 	}

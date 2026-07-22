@@ -595,6 +595,8 @@ test('权限中心角色展示不把 role_key 当用户可见 fallback', () => {
   assert.doesNotMatch(content, /<Text type="secondary">\{roleKey\}<\/Text>/u)
   assert.doesNotMatch(content, /<Tag>\{selectedRoleKey\}<\/Tag>/u)
   assert.match(content, /该岗位决定可使用的页面、手机待办和业务操作/u)
+  assert.match(content, /多个岗位会合并最终有效权限/u)
+  assert.match(content, /页面可见不代表拥有页面内全部按钮/u)
   assert.doesNotMatch(content, /岗位任务端/u)
 })
 
@@ -661,7 +663,10 @@ test('权限中心功能影响只展示业务页面、区域、动作和限制',
   assert.match(impactMap, /title: '页面区域'/u)
   assert.match(impactMap, /title: '可用操作'/u)
   assert.match(impactMap, /title: '使用限制'/u)
-  assert.match(content, /label: '最终有效权限'/u)
+  assert.match(content, /label: '页面与导航'/u)
+  assert.match(content, /页面可进入，不等于页面内所有操作都可用/u)
+  assert.match(content, /buildRoleGuidedNavigationPreview/u)
+  assert.doesNotMatch(content, /label: '最终有效权限'/u)
 })
 
 test('权限中心账号动作统一 account_status 三态并提供可聚焦受限原因', () => {

@@ -25,6 +25,14 @@ export function getActiveCustomerMenuConfig() {
   return null
 }
 
+export function getCustomerNavigationPresentation(
+  customerMenuConfig = getActiveCustomerMenuConfig()
+) {
+  return customerMenuConfig?.desktopMenu?.presentation === 'role_guided'
+    ? 'role_guided'
+    : 'sectioned'
+}
+
 function buildItemRegistry(sections = []) {
   const registry = new Map()
   sections.forEach((section) => {

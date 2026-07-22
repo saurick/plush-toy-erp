@@ -122,10 +122,29 @@ func TestProductionWIPConcessionKeepsRejectedInspectionAndAcceptsBatch(t *testin
 	if err != nil || approved.Status != biz.ProductionExceptionApproved {
 		t.Fatalf("approved=%#v err=%v", approved, err)
 	}
+	if current := f.client.ProductionWIPBatch.GetX(f.ctx, batchID); current.Status != biz.ProductionWIPStatusRejected {
+		t.Fatalf("approval must not change WIP, got %s", current.Status)
+	}
+	applied, err := factUC.ExecuteProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行让步"})
+	if err != nil || applied.ExecutionStatus != biz.ProductionExceptionExecutionApplied {
+		t.Fatalf("applied=%#v err=%v", applied, err)
+	}
 	batch := f.client.ProductionWIPBatch.GetX(f.ctx, batchID)
 	inspection := f.client.QualityInspection.GetX(f.ctx, inspectionID)
 	if batch.Status != biz.ProductionWIPStatusAccepted || inspection.Status != biz.QualityInspectionStatusRejected || inspection.Result == nil || *inspection.Result != biz.QualityInspectionResultReject {
 		t.Fatalf("batch=%#v inspection=%#v", batch, inspection)
+	}
+	child, err := createProductionWIPChildBatch(f.ctx, f.client, batch, batch.ProductionOrderOperationID, "CONCESSION-DOWNSTREAM", biz.ProductionWIPFlowNormal, batch.Quantity, f.actorID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := factUC.ReverseProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: applied.ID, ExpectedVersion: applied.Version, ActorID: f.actorID, Reason: "撤销让步"}); !errors.Is(err, biz.ErrProductionExceptionSourceInvalid) {
+		t.Fatalf("reverse with active downstream err=%v", err)
+	}
+	f.client.ProductionWIPBatch.UpdateOneID(child.ID).SetStatus(biz.ProductionWIPStatusCancelled).AddVersion(1).SaveX(f.ctx)
+	reversed, err := factUC.ReverseProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: applied.ID, ExpectedVersion: applied.Version, ActorID: f.actorID, Reason: "撤销让步"})
+	if err != nil || reversed.ExecutionStatus != biz.ProductionExceptionExecutionReversed || f.client.ProductionWIPBatch.GetX(f.ctx, batchID).Status != biz.ProductionWIPStatusRejected {
+		t.Fatalf("reversed=%#v err=%v", reversed, err)
 	}
 }
 
@@ -134,12 +153,17 @@ func TestProductionWIPScrapIsNonInventoryAndCancelsWholeBatch(t *testing.T) {
 	fixture := f.createWaitingBatch(t, "SCRAP-DECISION", []string{biz.ProductionWIPQualityGateFinishedGoods})
 	factUC := biz.NewOperationalFactUsecase(NewOperationalFactRepo(f.data, log.NewStdLogger(io.Discard)))
 	batchID := fixture.batch.ID
+	f.client.ProductionWIPBatch.UpdateOneID(batchID).SetStatus(biz.ProductionWIPStatusRejected).SaveX(f.ctx)
 	before := f.client.InventoryTxn.Query().CountX(f.ctx)
 	decision, err := factUC.SubmitProductionException(f.ctx, &biz.ProductionExceptionSubmit{DecisionNo: "EX-SCRAP-WIP-1", DecisionType: biz.ProductionExceptionScrap, ProductionOrderID: fixture.order.ID, ProductionOrderItemID: fixture.item.ID, ProductionWIPBatchID: &batchID, RequestedQuantity: fixture.batch.Quantity, Reason: "在制整批报废", IdempotencyKey: "ex-scrap-wip-1", RequestedBy: f.actorID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := factUC.ApproveProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, Reason: "批准报废"}); err != nil {
+	approved, err := factUC.ApproveProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: decision.ID, ExpectedVersion: decision.Version, ActorID: f.actorID, Reason: "批准报废"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := factUC.ExecuteProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行报废"}); err != nil {
 		t.Fatal(err)
 	}
 	batch := f.client.ProductionWIPBatch.GetX(f.ctx, batchID)
@@ -174,8 +198,12 @@ func TestProductionStockedScrapPostsOutAndCancelReverses(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	applied, err := factUC.ExecuteProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "执行成品报废"})
+	if err != nil {
+		t.Fatal(err)
+	}
 	assertProductionStockedScrapBalance(t, f.ctx, inventoryUC, f.productID, warehouse.ID, lot.ID, f.unitID, decimal.NewFromInt(1))
-	if _, err := factUC.CancelProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: approved.ID, ExpectedVersion: approved.Version, ActorID: f.actorID, Reason: "撤销误报废"}); err != nil {
+	if _, err := factUC.ReverseProductionException(f.ctx, &biz.ProductionExceptionMutation{ID: applied.ID, ExpectedVersion: applied.Version, ActorID: f.actorID, Reason: "撤销误报废"}); err != nil {
 		t.Fatal(err)
 	}
 	assertProductionStockedScrapBalance(t, f.ctx, inventoryUC, f.productID, warehouse.ID, lot.ID, f.unitID, decimal.NewFromInt(2))

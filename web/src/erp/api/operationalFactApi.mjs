@@ -203,6 +203,99 @@ export async function cancelOutsourcingFact(params = {}) {
   return dataOf(result)?.outsourcing_fact || null
 }
 
+export async function listOutsourcingReturnDispositions(
+  params = {},
+  options = {}
+) {
+  const result = await operationalFactRpc.call(
+    'list_outsourcing_return_dispositions',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function createOutsourcingReturnDisposition(params = {}) {
+  const result = await operationalFactRpc.call(
+    'create_outsourcing_return_disposition',
+    params
+  )
+  return dataOf(result)?.outsourcing_return_disposition || null
+}
+
+export async function postOutsourcingReturnDisposition(params = {}) {
+  const result = await operationalFactRpc.call(
+    'post_outsourcing_return_disposition',
+    params
+  )
+  return dataOf(result)?.outsourcing_return_disposition || null
+}
+
+export async function cancelOutsourcingReturnDisposition(params = {}) {
+  const result = await operationalFactRpc.call(
+    'cancel_outsourcing_return_disposition',
+    params
+  )
+  return dataOf(result)?.outsourcing_return_disposition || null
+}
+
+export async function listProductionExceptions(params = {}, options = {}) {
+  const result = await operationalFactRpc.call(
+    'list_production_exceptions',
+    params,
+    options
+  )
+  return dataOf(result)
+}
+
+export async function submitProductionException(params = {}) {
+  const result = await operationalFactRpc.call(
+    'submit_production_exception',
+    params
+  )
+  return dataOf(result)?.production_exception || null
+}
+
+async function productionExceptionResult(method, params) {
+  const result = await method(params)
+  return dataOf(result)?.production_exception || null
+}
+export async function approveProductionException(params = {}) {
+  return productionExceptionResult(
+    (request) =>
+      operationalFactRpc.call('approve_production_exception', request),
+    params
+  )
+}
+export async function rejectProductionException(params = {}) {
+  return productionExceptionResult(
+    (request) =>
+      operationalFactRpc.call('reject_production_exception', request),
+    params
+  )
+}
+export async function cancelProductionException(params = {}) {
+  return productionExceptionResult(
+    (request) =>
+      operationalFactRpc.call('cancel_production_exception', request),
+    params
+  )
+}
+export async function executeProductionException(params = {}) {
+  return productionExceptionResult(
+    (request) =>
+      operationalFactRpc.call('execute_production_exception', request),
+    params
+  )
+}
+export async function reverseProductionException(params = {}) {
+  return productionExceptionResult(
+    (request) =>
+      operationalFactRpc.call('reverse_production_exception', request),
+    params
+  )
+}
+
 export async function listShipments(params = {}, options = {}) {
   const result = await operationalFactRpc.call(
     'list_shipments',

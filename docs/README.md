@@ -14,10 +14,10 @@
 | --- | --- | --- |
 | 判断当前能力是否可用 | [当前真源与交接顺序](当前真源与交接顺序.md) | [产品能力进度台账](product/产品能力进度台账.md)、相关代码、migration、测试 |
 | 判断治理维度与口径、职责边界、验证口径或文档真源层级 | [项目治理地图](项目治理地图.md) | [当前真源与交接顺序](当前真源与交接顺序.md)、[模块实施治理](product/模块实施治理.md)、[自动化测试策略](product/自动化测试策略.md)、[AGENTS.md](../AGENTS.md) |
-| 规划下一轮产品实现 | [产品完成路线图](product/产品完成路线图.md) | [产品台账索引](product/产品台账索引.md)、[模块实施治理](product/模块实施治理.md)、对应目录 README |
+| 规划下一轮产品实现 | [产品完成路线图](product/产品完成路线图.md) | [产品能力进度台账](product/产品能力进度台账.md)、[模块实施治理](product/模块实施治理.md)、对应目录 README |
 | 改菜单、页面、原型或信息密度 | [web/README.md](../web/README.md)、[产品原型资产](product/prototypes/README.md) | 对应原型 README、真实运行页、[正式产品入口与菜单配置计划](product/正式产品入口与菜单配置计划.md) |
 | 改 Workflow、状态或 Fact 边界 | [状态 / Workflow / Fact 边界](architecture/状态工作流事实边界.md) | 相关 architecture 评审、[server/README.md](../server/README.md)、usecase / schema / test |
-| 改客户资料、导入或交付资料 | [新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户资料入口](customers/README.md) | [标准样例客户](customers/reference-customer/README.md)、目标客户 README / 差异台账 / 交付矩阵、对应脚本说明；私密 manifest 与原件不在 Product Core |
+| 改客户资料、导入或交付资料 | [新增甲方客户实施流程](product/新增甲方客户实施流程.md)、[客户资料入口](customers/README.md) | [标准样例客户](customers/reference-customer/README.md)、目标客户 README / 客户交付矩阵、对应脚本说明；私密 manifest 与原件不在 Product Core |
 | 改部署、发布或低配运行口径 | [部署约定](部署约定.md) | [server/deploy/README.md](../server/deploy/README.md)、[prod Compose README](../server/deploy/compose/prod/README.md)、[scripts/README.md](../scripts/README.md) |
 | 查全量 Markdown 在哪里 | [文档清单](文档清单.md) | 最近目录 README、`rg` 搜索和当前代码 |
 

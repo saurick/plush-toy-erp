@@ -8,8 +8,8 @@
 | --- | --- | --- |
 | 判断产品长期路线 | `产品完成路线图.md` | `docs/当前真源与交接顺序.md`、当前代码和测试 |
 | 判断多客户角色、字段、模块和流程边界 | `多甲方角色能力与流程编排.md` | `docs/reference/第四次20260627/README.md`、当前代码、migration 和测试 |
-| 判断流程编排 runtime / preview-only 完成度 | `流程编排运行时完成度台账.md` | `../当前真源与交接顺序.md`、Workflow / ProcessRuntime / customer config 代码和测试 |
-| 判断能力成熟度 / 是否可交付 | `产品台账索引.md` | `产品能力进度台账.md` 的快速查阅表和模块交付门禁表、`产品能力证据详情.md`、客户交付矩阵 |
+| 判断流程编排 runtime / preview-only 完成度 | `产品能力进度台账.md` 的“流程运行时状态” | `../当前真源与交接顺序.md`、Workflow / ProcessRuntime / customer config 代码和测试 |
+| 判断能力成熟度 / 是否可交付 | `产品能力进度台账.md` | 客户交付矩阵、对应代码、migration、测试和环境 evidence |
 | 进入新模块实现 | `模块实施治理.md` | 对应 architecture 评审、schema / usecase / API / UI / 测试 |
 | 判断架构层级、数据语义层级、验证层级、测试形态、原型状态等治理口径 | `../项目治理地图.md` | `../当前真源与交接顺序.md`、`模块边界.md`、`自动化测试策略.md`、`prototypes/README.md`、`AGENTS.md` |
 | 判断字段来源、来源带值或明细列语义 | `业务主链路数据流向与字段来源规则.md` | Ent schema、usecase、JSON-RPC、前端表单 / 列表 helper 和测试 |
@@ -17,7 +17,7 @@
 | 判断页面能否出现新建 / 生成 / 登记按钮 | `页面来源生成入口规则.md` | 对应 Source Document / Fact usecase、JSON-RPC、RBAC、L1 页面回归 |
 | 改菜单或正式入口 | `正式产品入口与菜单配置计划.md` | `菜单映射评审表.md`、`正式菜单运行时实施拆分清单.md`、menu / RBAC 代码 |
 | 看页面和交互方向 | `prototypes/README.md` | 对应原型 README、真实运行页、`web/README.md` |
-| 判断客户差异是否能产品化 | `客户实例策略.md`、`客户差异策略.md` | `docs/customers/<customer-key>/客户差异台账.md`、Product Core 评审 |
+| 判断客户差异是否能产品化 | `客户实例策略.md`、`客户差异策略.md` | `docs/customers/<customer-key>/客户交付矩阵.md` 的客户差异与决策、Product Core 评审 |
 | 实施新增私有化甲方 | `新增甲方客户实施流程.md` | `../customers/reference-customer/README.md`、`../../config/private-deployment-template/README.md`、目标客户受控交付资料 |
 
 ## 文档分组 / Document Groups
@@ -25,7 +25,7 @@
 | 分组 | 文档 |
 | --- | --- |
 | 产品路线 | `产品完成路线图.md`、`多甲方角色能力与流程编排.md`、`零到一产品架构.md`、`产品原则.md`、`模块边界.md` |
-| 能力台账 | `产品台账索引.md`、`产品能力进度台账.md`、`产品能力证据详情.md`、`流程编排运行时完成度台账.md` |
+| 能力台账 | `产品能力进度台账.md` |
 | 实施治理 | `模块实施治理.md`、`业务主链路数据流向与字段来源规则.md`、`业务数据生命周期与页面动作规则.md`、`页面来源生成入口规则.md`、`发布门禁.md`、`迁移准备检查清单.md`、`ERP-MVP闭环验收.md` |
 | 菜单与页面 | `正式产品入口与菜单配置计划.md`、`菜单映射评审表.md`、`正式菜单运行时实施拆分清单.md`、`prototypes/` |
 | 产品化策略 | `新增甲方客户实施流程.md`、`客户实例策略.md`、`客户差异策略.md`、`配置与权限策略.md`、`多客户私有化复制包评审.md`、`软件即服务进入门禁评审.md` |

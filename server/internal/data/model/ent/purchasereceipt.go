@@ -58,11 +58,13 @@ type PurchaseReceiptEdges struct {
 	PurchaseReceiptAdjustments []*PurchaseReceiptAdjustment `json:"purchase_receipt_adjustments,omitempty"`
 	// QualityInspections holds the value of the quality_inspections edge.
 	QualityInspections []*QualityInspection `json:"quality_inspections,omitempty"`
+	// ReplacementDispositions holds the value of the replacement_dispositions edge.
+	ReplacementDispositions []*PurchaseRejectionDisposition `json:"replacement_dispositions,omitempty"`
 	// Items holds the value of the items edge.
 	Items []*PurchaseReceiptItem `json:"items,omitempty"`
 	// loadedTypes holds the information for reporting if a
 	// type was loaded (or requested) in eager-loading or not.
-	loadedTypes [5]bool
+	loadedTypes [6]bool
 }
 
 // SupplierOrErr returns the Supplier value or an error if the edge
@@ -103,10 +105,19 @@ func (e PurchaseReceiptEdges) QualityInspectionsOrErr() ([]*QualityInspection, e
 	return nil, &NotLoadedError{edge: "quality_inspections"}
 }
 
+// ReplacementDispositionsOrErr returns the ReplacementDispositions value or an error if the edge
+// was not loaded in eager-loading.
+func (e PurchaseReceiptEdges) ReplacementDispositionsOrErr() ([]*PurchaseRejectionDisposition, error) {
+	if e.loadedTypes[4] {
+		return e.ReplacementDispositions, nil
+	}
+	return nil, &NotLoadedError{edge: "replacement_dispositions"}
+}
+
 // ItemsOrErr returns the Items value or an error if the edge
 // was not loaded in eager-loading.
 func (e PurchaseReceiptEdges) ItemsOrErr() ([]*PurchaseReceiptItem, error) {
-	if e.loadedTypes[4] {
+	if e.loadedTypes[5] {
 		return e.Items, nil
 	}
 	return nil, &NotLoadedError{edge: "items"}
@@ -253,6 +264,11 @@ func (_m *PurchaseReceipt) QueryPurchaseReceiptAdjustments() *PurchaseReceiptAdj
 // QueryQualityInspections queries the "quality_inspections" edge of the PurchaseReceipt entity.
 func (_m *PurchaseReceipt) QueryQualityInspections() *QualityInspectionQuery {
 	return NewPurchaseReceiptClient(_m.config).QueryQualityInspections(_m)
+}
+
+// QueryReplacementDispositions queries the "replacement_dispositions" edge of the PurchaseReceipt entity.
+func (_m *PurchaseReceipt) QueryReplacementDispositions() *PurchaseRejectionDispositionQuery {
+	return NewPurchaseReceiptClient(_m.config).QueryReplacementDispositions(_m)
 }
 
 // QueryItems queries the "items" edge of the PurchaseReceipt entity.

@@ -16,6 +16,18 @@ import (
 
 var _ biz.ProductionExceptionDecisionRepo = (*operationalFactRepo)(nil)
 
+func (r *operationalFactRepo) ResolveProductionExceptionSource(ctx context.Context, in *biz.ProductionExceptionSubmit) error {
+	if in == nil || in.ProductionWIPBatchID == nil {
+		return biz.ErrProductionExceptionSourceInvalid
+	}
+	batch, err := r.data.postgres.ProductionWIPBatch.Get(ctx, *in.ProductionWIPBatchID)
+	if err != nil {
+		return biz.ErrProductionExceptionSourceInvalid
+	}
+	in.ProductionOrderID, in.ProductionOrderItemID = batch.ProductionOrderID, batch.ProductionOrderItemID
+	return nil
+}
+
 func (r *operationalFactRepo) SubmitProductionException(ctx context.Context, in *biz.ProductionExceptionSubmit, hash string) (*biz.ProductionExceptionDecision, error) {
 	if replay, found, err := findProductionExceptionReplay(ctx, r.data.postgres, in, hash); err != nil || found {
 		return replay, err
@@ -140,8 +152,7 @@ func (r *operationalFactRepo) decideProductionException(ctx context.Context, in 
 			return commitProductionException(ctx, tx, row.ID)
 		}
 	}
-	canCancelPostedScrap := target == biz.ProductionExceptionCancelled && row.Status == biz.ProductionExceptionApproved && row.DecisionType == biz.ProductionExceptionScrap && row.QualityInspectionID != nil
-	if (row.Status != biz.ProductionExceptionSubmitted && !canCancelPostedScrap) || row.Version != in.ExpectedVersion {
+	if row.Status != biz.ProductionExceptionSubmitted || row.Version != in.ExpectedVersion {
 		return nil, biz.ErrProductionExceptionInvalidState
 	}
 	if target == biz.ProductionExceptionApproved {
@@ -151,13 +162,6 @@ func (r *operationalFactRepo) decideProductionException(ctx context.Context, in 
 		}
 		if !approved.IsPositive() || approved.GreaterThan(row.RequestedQuantity) {
 			return nil, biz.ErrProductionExceptionApprovalAmount
-		}
-		if err := r.applyProductionExceptionApproval(ctx, tx, row, approved, in.ActorID); err != nil {
-			return nil, err
-		}
-	} else if canCancelPostedScrap {
-		if err := r.reverseStockedProductionScrap(ctx, tx, row, in.ActorID, in.Reason); err != nil {
-			return nil, err
 		}
 	}
 	now := time.Now()
@@ -177,6 +181,110 @@ func (r *operationalFactRepo) decideProductionException(ctx context.Context, in 
 		return nil, biz.ErrProductionExceptionConflict
 	}
 	return commitProductionException(ctx, tx, row.ID)
+}
+
+func (r *operationalFactRepo) ExecuteProductionException(ctx context.Context, in *biz.ProductionExceptionMutation) (*biz.ProductionExceptionDecision, error) {
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "production_exception_decisions", in.ID, biz.ErrProductionExceptionNotFound); err != nil {
+		return nil, err
+	}
+	row, err := tx.client.ProductionExceptionDecision.Get(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if row.ExecutionStatus == biz.ProductionExceptionExecutionApplied && row.ExecutedBy != nil && *row.ExecutedBy == in.ActorID && row.Version == in.ExpectedVersion+1 {
+		return commitProductionException(ctx, tx, row.ID)
+	}
+	if row.Status != biz.ProductionExceptionApproved || row.ExecutionStatus != biz.ProductionExceptionExecutionPending || row.Version != in.ExpectedVersion || row.ApprovedQuantity == nil {
+		return nil, biz.ErrProductionExceptionInvalidState
+	}
+	if row.DecisionType == biz.ProductionExceptionOverIssue {
+		return nil, biz.ErrProductionExceptionInvalidState
+	}
+	if err := r.applyProductionExceptionApproval(ctx, tx, row, *row.ApprovedQuantity, in.ActorID); err != nil {
+		return nil, err
+	}
+	now := time.Now()
+	affected, err := tx.client.ProductionExceptionDecision.Update().Where(productionexceptiondecision.ID(row.ID), productionexceptiondecision.StatusEQ(biz.ProductionExceptionApproved), productionexceptiondecision.ExecutionStatusEQ(biz.ProductionExceptionExecutionPending), productionexceptiondecision.VersionEQ(in.ExpectedVersion)).SetExecutionStatus(biz.ProductionExceptionExecutionApplied).SetExecutedAt(now).SetExecutedBy(in.ActorID).AddVersion(1).Save(ctx)
+	if err != nil || affected != 1 {
+		return nil, biz.ErrProductionExceptionConflict
+	}
+	return commitProductionException(ctx, tx, row.ID)
+}
+
+func (r *operationalFactRepo) ReverseProductionException(ctx context.Context, in *biz.ProductionExceptionMutation) (*biz.ProductionExceptionDecision, error) {
+	tx, err := r.inv.beginInventoryDBTx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackInventoryDBTx(ctx, tx, r.log)
+	if err := lockOperationalFactRow(ctx, tx, "production_exception_decisions", in.ID, biz.ErrProductionExceptionNotFound); err != nil {
+		return nil, err
+	}
+	row, err := tx.client.ProductionExceptionDecision.Get(ctx, in.ID)
+	if err != nil {
+		return nil, err
+	}
+	if row.ExecutionStatus == biz.ProductionExceptionExecutionReversed && row.ReversedBy != nil && *row.ReversedBy == in.ActorID && row.ReverseReason != nil && *row.ReverseReason == in.Reason && row.Version == in.ExpectedVersion+1 {
+		return commitProductionException(ctx, tx, row.ID)
+	}
+	if row.Status != biz.ProductionExceptionApproved || row.ExecutionStatus != biz.ProductionExceptionExecutionApplied || row.Version != in.ExpectedVersion {
+		return nil, biz.ErrProductionExceptionInvalidState
+	}
+	switch row.DecisionType {
+	case biz.ProductionExceptionScrap:
+		if row.QualityInspectionID != nil {
+			if err := r.reverseStockedProductionScrap(ctx, tx, row, in.ActorID, in.Reason); err != nil {
+				return nil, err
+			}
+		} else if err := reverseProductionExceptionWIPStatus(ctx, tx, row, biz.ProductionWIPStatusCancelled, biz.ProductionWIPStatusRejected); err != nil {
+			return nil, err
+		}
+	case biz.ProductionExceptionWIPConcession:
+		if err := reverseProductionExceptionWIPStatus(ctx, tx, row, biz.ProductionWIPStatusAccepted, biz.ProductionWIPStatusRejected); err != nil {
+			return nil, err
+		}
+	default:
+		return nil, biz.ErrProductionExceptionInvalidState
+	}
+	now := time.Now()
+	affected, err := tx.client.ProductionExceptionDecision.Update().Where(productionexceptiondecision.ID(row.ID), productionexceptiondecision.ExecutionStatusEQ(biz.ProductionExceptionExecutionApplied), productionexceptiondecision.VersionEQ(in.ExpectedVersion)).SetExecutionStatus(biz.ProductionExceptionExecutionReversed).SetReversedAt(now).SetReversedBy(in.ActorID).SetReverseReason(in.Reason).AddVersion(1).Save(ctx)
+	if err != nil || affected != 1 {
+		return nil, biz.ErrProductionExceptionConflict
+	}
+	return commitProductionException(ctx, tx, row.ID)
+}
+
+func reverseProductionExceptionWIPStatus(ctx context.Context, tx *inventoryDBTx, row *ent.ProductionExceptionDecision, from, to string) error {
+	if row.ProductionWipBatchID == nil {
+		return biz.ErrProductionExceptionSourceInvalid
+	}
+	if err := lockOperationalFactRow(ctx, tx, "production_wip_batches", *row.ProductionWipBatchID, biz.ErrProductionExceptionSourceInvalid); err != nil {
+		return err
+	}
+	batch, err := tx.client.ProductionWIPBatch.Get(ctx, *row.ProductionWipBatchID)
+	if err != nil || batch.Status != from {
+		return biz.ErrProductionExceptionSourceInvalid
+	}
+	hasActiveChild, err := tx.client.ProductionWIPBatch.Query().Where(
+		productionwipbatch.SourceBatchID(batch.ID),
+		productionwipbatch.StatusNEQ(biz.ProductionWIPStatusCancelled),
+	).Exist(ctx)
+	if err != nil {
+		return err
+	}
+	if hasActiveChild {
+		return biz.ErrProductionExceptionSourceInvalid
+	}
+	affected, err := tx.client.ProductionWIPBatch.Update().Where(productionwipbatch.ID(batch.ID), productionwipbatch.StatusEQ(from), productionwipbatch.VersionEQ(batch.Version)).SetStatus(to).AddVersion(1).Save(ctx)
+	if err != nil || affected != 1 {
+		return biz.ErrProductionExceptionConflict
+	}
+	return nil
 }
 
 func productionExceptionApprovalReplayMatches(row *ent.ProductionExceptionDecision, requested *decimal.Decimal) bool {
@@ -228,7 +336,7 @@ func (r *operationalFactRepo) applyProductionExceptionApproval(ctx context.Conte
 				return err
 			}
 			batch, err := tx.client.ProductionWIPBatch.Get(ctx, *row.ProductionWipBatchID)
-			if err != nil || approved.GreaterThan(batch.Quantity) || !approved.Equal(batch.Quantity) {
+			if err != nil || batch.Status != biz.ProductionWIPStatusRejected || approved.GreaterThan(batch.Quantity) || !approved.Equal(batch.Quantity) {
 				return biz.ErrProductionExceptionApprovalAmount
 			}
 			affected, err := tx.client.ProductionWIPBatch.Update().Where(productionwipbatch.ID(batch.ID), productionwipbatch.StatusEQ(batch.Status), productionwipbatch.VersionEQ(batch.Version)).SetStatus(biz.ProductionWIPStatusCancelled).AddVersion(1).Save(ctx)
@@ -262,6 +370,34 @@ func (r *operationalFactRepo) GetProductionException(ctx context.Context, id int
 	}
 	return entProductionExceptionToBiz(row), err
 }
+func (r *operationalFactRepo) ListProductionExceptions(ctx context.Context, filter biz.ProductionExceptionFilter) ([]*biz.ProductionExceptionDecision, int, error) {
+	query := r.data.postgres.ProductionExceptionDecision.Query()
+	if filter.Status != "" {
+		query = query.Where(productionexceptiondecision.Status(filter.Status))
+	}
+	if filter.ExecutionStatus != "" {
+		query = query.Where(productionexceptiondecision.ExecutionStatus(filter.ExecutionStatus))
+	}
+	if filter.DecisionType != "" {
+		query = query.Where(productionexceptiondecision.DecisionType(filter.DecisionType))
+	}
+	if filter.ProductionOrderID > 0 {
+		query = query.Where(productionexceptiondecision.ProductionOrderID(filter.ProductionOrderID))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Desc(productionexceptiondecision.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.ProductionExceptionDecision, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entProductionExceptionToBiz(row))
+	}
+	return out, total, nil
+}
 
 func commitProductionException(ctx context.Context, tx *inventoryDBTx, id int) (*biz.ProductionExceptionDecision, error) {
 	row, err := tx.client.ProductionExceptionDecision.Get(ctx, id)
@@ -279,5 +415,5 @@ func entProductionExceptionToBiz(row *ent.ProductionExceptionDecision) *biz.Prod
 	if row == nil {
 		return nil
 	}
-	return &biz.ProductionExceptionDecision{ID: row.ID, DecisionNo: row.DecisionNo, DecisionType: row.DecisionType, Status: row.Status, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID, ProductionMaterialRequirementID: row.ProductionMaterialRequirementID, ProductionWIPBatchID: row.ProductionWipBatchID, QualityInspectionID: row.QualityInspectionID, RequestedQuantity: row.RequestedQuantity, ApprovedQuantity: row.ApprovedQuantity, Reason: row.Reason, Version: row.Version, RequestedBy: row.RequestedBy, RequestedAt: row.RequestedAt, DecidedBy: row.DecidedBy, DecidedAt: row.DecidedAt, DecisionReason: row.DecisionReason}
+	return &biz.ProductionExceptionDecision{ID: row.ID, DecisionNo: row.DecisionNo, DecisionType: row.DecisionType, Status: row.Status, ExecutionStatus: row.ExecutionStatus, ProductionOrderID: row.ProductionOrderID, ProductionOrderItemID: row.ProductionOrderItemID, ProductionMaterialRequirementID: row.ProductionMaterialRequirementID, ProductionWIPBatchID: row.ProductionWipBatchID, QualityInspectionID: row.QualityInspectionID, RequestedQuantity: row.RequestedQuantity, ApprovedQuantity: row.ApprovedQuantity, Reason: row.Reason, Version: row.Version, RequestedBy: row.RequestedBy, RequestedAt: row.RequestedAt, DecidedBy: row.DecidedBy, DecidedAt: row.DecidedAt, DecisionReason: row.DecisionReason, ExecutedBy: row.ExecutedBy, ExecutedAt: row.ExecutedAt, ReversedBy: row.ReversedBy, ReversedAt: row.ReversedAt, ReverseReason: row.ReverseReason}
 }

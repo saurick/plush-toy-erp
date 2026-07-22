@@ -113,3 +113,23 @@ func TestFinanceCreditNoteAndReversalPreserveOriginal(t *testing.T) {
 		t.Fatalf("loaded credit=%#v err=%v", loaded, err)
 	}
 }
+
+func TestFinanceCreditNoteAllowsOnlyReceivableAndPayable(t *testing.T) {
+	ctx := context.Background()
+	data, client := openInventoryRepoTestData(t, "finance_credit_note_exact_types")
+	uc := biz.NewOperationalFactUsecase(NewOperationalFactRepo(data, log.NewStdLogger(io.Discard)))
+	for index, factType := range []string{biz.FinanceFactReceivable, biz.FinanceFactPayable, biz.FinanceFactInvoice, biz.FinanceFactPayment, biz.FinanceFactReconciliation} {
+		fact := client.FinanceFact.Create().SetFactNo("CREDIT-TYPE-" + factType).SetFactType(factType).SetStatus(biz.OperationalFactStatusPosted).SetCounterpartyType(biz.FinanceCounterpartyOther).SetAmount(decimal.NewFromInt(10)).SetFeeAmount(decimal.Zero).SetCurrency("CNY").SetIdempotencyKey("credit-type-" + factType).SaveX(ctx)
+		credit, err := uc.CreateFinanceCreditNote(ctx, &biz.FinanceCreditNoteCreate{CreditNoteNo: "CN-TYPE-" + factType, FinanceFactID: fact.ID, Amount: decimal.NewFromInt(1), Reason: "来源类型门禁", IdempotencyKey: "cn-type-" + factType}, index+1)
+		allowed := factType == biz.FinanceFactReceivable || factType == biz.FinanceFactPayable
+		if allowed && (err != nil || credit == nil) {
+			t.Fatalf("allowed type %s credit=%#v err=%v", factType, credit, err)
+		}
+		if !allowed && !errors.Is(err, biz.ErrBadParam) {
+			t.Fatalf("forbidden type %s err=%v", factType, err)
+		}
+	}
+	if count := client.FinanceCreditNote.Query().CountX(ctx); count != 2 {
+		t.Fatalf("credit count=%d want=2", count)
+	}
+}

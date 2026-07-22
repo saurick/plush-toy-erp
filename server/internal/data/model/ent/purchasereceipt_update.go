@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchasereceiptadjustment"
 	"server/internal/data/model/ent/purchasereceiptitem"
+	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"server/internal/data/model/ent/purchasereturn"
 	"server/internal/data/model/ent/qualityinspection"
 	"server/internal/data/model/ent/supplier"
@@ -272,6 +273,21 @@ func (_u *PurchaseReceiptUpdate) AddQualityInspections(v ...*QualityInspection) 
 	return _u.AddQualityInspectionIDs(ids...)
 }
 
+// AddReplacementDispositionIDs adds the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity by IDs.
+func (_u *PurchaseReceiptUpdate) AddReplacementDispositionIDs(ids ...int) *PurchaseReceiptUpdate {
+	_u.mutation.AddReplacementDispositionIDs(ids...)
+	return _u
+}
+
+// AddReplacementDispositions adds the "replacement_dispositions" edges to the PurchaseRejectionDisposition entity.
+func (_u *PurchaseReceiptUpdate) AddReplacementDispositions(v ...*PurchaseRejectionDisposition) *PurchaseReceiptUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReplacementDispositionIDs(ids...)
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by IDs.
 func (_u *PurchaseReceiptUpdate) AddItemIDs(ids ...int) *PurchaseReceiptUpdate {
 	_u.mutation.AddItemIDs(ids...)
@@ -359,6 +375,27 @@ func (_u *PurchaseReceiptUpdate) RemoveQualityInspections(v ...*QualityInspectio
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveQualityInspectionIDs(ids...)
+}
+
+// ClearReplacementDispositions clears all "replacement_dispositions" edges to the PurchaseRejectionDisposition entity.
+func (_u *PurchaseReceiptUpdate) ClearReplacementDispositions() *PurchaseReceiptUpdate {
+	_u.mutation.ClearReplacementDispositions()
+	return _u
+}
+
+// RemoveReplacementDispositionIDs removes the "replacement_dispositions" edge to PurchaseRejectionDisposition entities by IDs.
+func (_u *PurchaseReceiptUpdate) RemoveReplacementDispositionIDs(ids ...int) *PurchaseReceiptUpdate {
+	_u.mutation.RemoveReplacementDispositionIDs(ids...)
+	return _u
+}
+
+// RemoveReplacementDispositions removes "replacement_dispositions" edges to PurchaseRejectionDisposition entities.
+func (_u *PurchaseReceiptUpdate) RemoveReplacementDispositions(v ...*PurchaseRejectionDisposition) *PurchaseReceiptUpdate {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReplacementDispositionIDs(ids...)
 }
 
 // ClearItems clears all "items" edges to the PurchaseReceiptItem entity.
@@ -693,6 +730,51 @@ func (_u *PurchaseReceiptUpdate) sqlSave(ctx context.Context) (_node int, err er
 		}
 		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
+	if _u.mutation.ReplacementDispositionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.ReplacementDispositionsTable,
+			Columns: []string{purchasereceipt.ReplacementDispositionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaserejectiondisposition.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReplacementDispositionsIDs(); len(nodes) > 0 && !_u.mutation.ReplacementDispositionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.ReplacementDispositionsTable,
+			Columns: []string{purchasereceipt.ReplacementDispositionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaserejectiondisposition.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReplacementDispositionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.ReplacementDispositionsTable,
+			Columns: []string{purchasereceipt.ReplacementDispositionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaserejectiondisposition.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _u.mutation.ItemsCleared() {
 		edge := &sqlgraph.EdgeSpec{
 			Rel:     sqlgraph.O2M,
@@ -997,6 +1079,21 @@ func (_u *PurchaseReceiptUpdateOne) AddQualityInspections(v ...*QualityInspectio
 	return _u.AddQualityInspectionIDs(ids...)
 }
 
+// AddReplacementDispositionIDs adds the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity by IDs.
+func (_u *PurchaseReceiptUpdateOne) AddReplacementDispositionIDs(ids ...int) *PurchaseReceiptUpdateOne {
+	_u.mutation.AddReplacementDispositionIDs(ids...)
+	return _u
+}
+
+// AddReplacementDispositions adds the "replacement_dispositions" edges to the PurchaseRejectionDisposition entity.
+func (_u *PurchaseReceiptUpdateOne) AddReplacementDispositions(v ...*PurchaseRejectionDisposition) *PurchaseReceiptUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.AddReplacementDispositionIDs(ids...)
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by IDs.
 func (_u *PurchaseReceiptUpdateOne) AddItemIDs(ids ...int) *PurchaseReceiptUpdateOne {
 	_u.mutation.AddItemIDs(ids...)
@@ -1084,6 +1181,27 @@ func (_u *PurchaseReceiptUpdateOne) RemoveQualityInspections(v ...*QualityInspec
 		ids[i] = v[i].ID
 	}
 	return _u.RemoveQualityInspectionIDs(ids...)
+}
+
+// ClearReplacementDispositions clears all "replacement_dispositions" edges to the PurchaseRejectionDisposition entity.
+func (_u *PurchaseReceiptUpdateOne) ClearReplacementDispositions() *PurchaseReceiptUpdateOne {
+	_u.mutation.ClearReplacementDispositions()
+	return _u
+}
+
+// RemoveReplacementDispositionIDs removes the "replacement_dispositions" edge to PurchaseRejectionDisposition entities by IDs.
+func (_u *PurchaseReceiptUpdateOne) RemoveReplacementDispositionIDs(ids ...int) *PurchaseReceiptUpdateOne {
+	_u.mutation.RemoveReplacementDispositionIDs(ids...)
+	return _u
+}
+
+// RemoveReplacementDispositions removes "replacement_dispositions" edges to PurchaseRejectionDisposition entities.
+func (_u *PurchaseReceiptUpdateOne) RemoveReplacementDispositions(v ...*PurchaseRejectionDisposition) *PurchaseReceiptUpdateOne {
+	ids := make([]int, len(v))
+	for i := range v {
+		ids[i] = v[i].ID
+	}
+	return _u.RemoveReplacementDispositionIDs(ids...)
 }
 
 // ClearItems clears all "items" edges to the PurchaseReceiptItem entity.
@@ -1441,6 +1559,51 @@ func (_u *PurchaseReceiptUpdateOne) sqlSave(ctx context.Context) (_node *Purchas
 			Bidi:    false,
 			Target: &sqlgraph.EdgeTarget{
 				IDSpec: sqlgraph.NewFieldSpec(qualityinspection.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
+	if _u.mutation.ReplacementDispositionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.ReplacementDispositionsTable,
+			Columns: []string{purchasereceipt.ReplacementDispositionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaserejectiondisposition.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.RemovedReplacementDispositionsIDs(); len(nodes) > 0 && !_u.mutation.ReplacementDispositionsCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.ReplacementDispositionsTable,
+			Columns: []string{purchasereceipt.ReplacementDispositionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaserejectiondisposition.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReplacementDispositionsIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.O2M,
+			Inverse: false,
+			Table:   purchasereceipt.ReplacementDispositionsTable,
+			Columns: []string{purchasereceipt.ReplacementDispositionsColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchaserejectiondisposition.FieldID, field.TypeInt),
 			},
 		}
 		for _, k := range nodes {

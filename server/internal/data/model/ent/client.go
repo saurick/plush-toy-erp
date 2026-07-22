@@ -9092,6 +9092,22 @@ func (c *PurchaseReceiptClient) QueryQualityInspections(_m *PurchaseReceipt) *Qu
 	return query
 }
 
+// QueryReplacementDispositions queries the replacement_dispositions edge of a PurchaseReceipt.
+func (c *PurchaseReceiptClient) QueryReplacementDispositions(_m *PurchaseReceipt) *PurchaseRejectionDispositionQuery {
+	query := (&PurchaseRejectionDispositionClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchasereceipt.Table, purchasereceipt.FieldID, id),
+			sqlgraph.To(purchaserejectiondisposition.Table, purchaserejectiondisposition.FieldID),
+			sqlgraph.Edge(sqlgraph.O2M, false, purchasereceipt.ReplacementDispositionsTable, purchasereceipt.ReplacementDispositionsColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
+}
+
 // QueryItems queries the items edge of a PurchaseReceipt.
 func (c *PurchaseReceiptClient) QueryItems(_m *PurchaseReceipt) *PurchaseReceiptItemQuery {
 	query := (&PurchaseReceiptItemClient{config: c.config}).Query()
@@ -9914,6 +9930,22 @@ func (c *PurchaseRejectionDispositionClient) GetX(ctx context.Context, id int) *
 		panic(err)
 	}
 	return obj
+}
+
+// QueryReplacementReceipt queries the replacement_receipt edge of a PurchaseRejectionDisposition.
+func (c *PurchaseRejectionDispositionClient) QueryReplacementReceipt(_m *PurchaseRejectionDisposition) *PurchaseReceiptQuery {
+	query := (&PurchaseReceiptClient{config: c.config}).Query()
+	query.path = func(context.Context) (fromV *sql.Selector, _ error) {
+		id := _m.ID
+		step := sqlgraph.NewStep(
+			sqlgraph.From(purchaserejectiondisposition.Table, purchaserejectiondisposition.FieldID, id),
+			sqlgraph.To(purchasereceipt.Table, purchasereceipt.FieldID),
+			sqlgraph.Edge(sqlgraph.M2O, true, purchaserejectiondisposition.ReplacementReceiptTable, purchaserejectiondisposition.ReplacementReceiptColumn),
+		)
+		fromV = sqlgraph.Neighbors(_m.driver.Dialect(), step)
+		return fromV, nil
+	}
+	return query
 }
 
 // Hooks returns the client hooks.

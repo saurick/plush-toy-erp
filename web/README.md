@@ -310,7 +310,7 @@ pnpm smoke:processing-contract-real-login
 - 采购合同打印工作台
 - 加工合同打印工作台
 
-`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、`admin.me` 与客户 effective session 刷新、当前优先事项 / 风险提醒 / 已办进度展示、岗位任务端不显示技术说明，以及退出登录清空登录态。
+`pnpm smoke:mobile-auth-login-route` 当前覆盖全部 9 个业务岗位任务端入口的未登录拦截、缺少岗位任务端角色授权的旧登录态回登录页、登录页密码入口、后端能力开启时的短信入口、账号密码登录后回跳任务页、`admin.me` 与客户 effective session 刷新、当前优先事项 / 风险提醒 / 已办进度展示、岗位任务端不显示技术说明，以及退出登录清空登录态。有真实电脑端菜单的账号会在任务端顶部和“我的”页看到“进入电脑端”；该入口继续以当前后端菜单投影为准，不按用户名或岗位名硬放行。
 
 缺少浏览器运行条件或只想确认移动端认证回跳 smoke 的执行范围时，可先执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --print-input-template`。该命令只打印岗位任务端角色、phone / iPad 视口、可选环境变量和真实回归命令，不启动 Vite、不启动浏览器、不调用真实后端、不登录、不写数据库。需要留下可保存的 no-write 前置记录时，执行 `node scripts/mobileAuthLoginRouteSmoke.mjs --preflight-report output/mobile-auth-login-route-smoke/preflight.json`；该报告只写本地 JSON，记录脚本存在性、岗位任务端路由计划、phone / iPad 视口计划和 mock RPC 覆盖口径，不调用后端 / JSON-RPC、不读取密码、不保存 token、不写数据库。真实 `pnpm smoke:mobile-auth-login-route` 使用 mock auth / admin / customer-config / workflow RPC 验证生产单端口 `/m/<role>/tasks` 路由、会话刷新和登录回跳，不证明真实后端 RBAC、真实账号或 customer config active revision。
 
@@ -332,8 +332,8 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 当前规则：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。
-- `/erp/help-center` 根据当前有效岗位选择 `src/erp/config/roleHelpContent.mjs` 中的内容，多岗位账号可切换，单岗位账号不显示切换器，常用入口继续与当前可见菜单取交集。
+- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。客户配置可用 `desktopMenu.presentation = 'role_guided'` 依次显示“看板中心”、“常用工作”和“更多功能”：看板仅按最终页面权限固定在最前，常用工作最多放 3 个岗位高频业务，“岗位使用帮助”和其余已授权低频页面折叠到更多功能。权限管理继续只配置页面和操作权限，“页面与导航”用同一 helper 预览已保存的自动排列结果；菜单位置不改变页面、操作权限或直接路由。
+- `/erp/help-center` 根据当前有效岗位选择 `src/erp/config/roleHelpContent.mjs` 中的内容，多岗位账号可切换，单岗位账号不显示切换器，常用入口继续与当前可见菜单取交集。每岗帮助统一展示正常案例、完成标准、异常处理、退回对象和操作注意事项；未知岗位使用安全通用帮助。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径不再注册运行时路由、重定向或权限别名。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。
 
@@ -348,7 +348,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 | `/__dev/docs`              | 当前工作区 Markdown 查看器               | 仓库 Markdown 文件本身                                      |
 | `/__dev/testing`           | 验证层级、当前命令和预设查询             | `docs/product/自动化测试策略.md`                            |
 | `/__dev/prototypes`        | HTML / PNG / 截图原型资产预览            | `docs/product/prototypes/**`                                |
-| `/__dev/capability-ledger` | 产品能力、证据、客户交付和差异台账查看   | 四份正式台账 / 证据 Markdown                                |
+| `/__dev/capability-ledger` | 产品能力与客户矩阵真源入口               | 两份正式 Markdown                                           |
 | `/__dev/customer-config`   | 已登记客户配置包预检、测试应用与发布门禁 | `config/customers/<customer-key>/*` 及 customer config 脚本 |
 
 #### 开发导航 `/__dev`
@@ -374,20 +374,14 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 
 该页只浏览 `docs/product/prototypes` 下的 HTML、PNG 和截图证据，支持分类、分组折叠、当前资产和本地置顶恢复。筛选无结果时预览同步为空；每个资产可打开对应 README、复制仓库路径，并通过隔离 sandbox 预览。全屏预览进入弹窗焦点、圈定 Tab、Escape 关闭并恢复触发按钮。卡片参照范围不是正式菜单、路由、权限或 `seedData` 映射表。
 
-#### 能力台账 `/__dev/capability-ledger`
+#### 能力真源 `/__dev/capability-ledger`
 
-该页只读解析下列四份文档，展示产品能力快查与证据详情、客户交付状态和客户差异分类：
+该页不再解析、复制或统计台账内容，只提供下列两份正式真源的直接入口：
 
 - `docs/product/产品能力进度台账.md`
-- `docs/product/产品能力证据详情.md`
 - `docs/customers/yoyoosun/客户交付矩阵.md`
-- `docs/customers/yoyoosun/客户差异台账.md`
 
-解析按当前表头签名和完全同名的能力标题连接，不依赖章节编号，不恢复或伪造 `CAP-*` 关系。表头漂移、重复入口、详情缺失或孤立标题会显示明确诊断；筛选无结果时不回退到筛选外详情。四份 Markdown 仍是唯一维护入口。
-
-能力台账的产品能力、客户交付和客户差异使用带任务说明的一级视图导航；分布统计默认收起，开发人员需要分析结构时再显式展开，避免分布卡挤占日常“筛选 → 选择 → 查看详情”主路径。展开状态写入 `analysis=1`，可随深链恢复。产品能力分析会从 `docs/product/产品能力进度台账.md` 的正式定义表同屏展示完整 L0–L8 梯度、含义和客户承诺边界；这里的 L0–L8 是能力成熟度，不是 `style:l1` 或 T0–T8 验证层级。
-
-`/__dev` 可见分类、状态、格式和筛选项默认使用“中文主体 / English anchor”。英文原值继续作为 Markdown 真源、筛选值和稳定技术锚点，不直接作为无说明的下拉选项；同一分类在筛选、列表、详情和分布图中复用 `devVisibleLabels.mjs` 的展示口径。能力台账的所属层、业务域、成熟度、交付状态和差异分类必须显示可见字段名，不能只依赖 aria-label 后让多个闭合下拉框都显示无法区分的“全部”。路径、命令、配置 key、API/RPC 名和代码标识保持原文。
+使用顺序固定为：先看产品能力是否成立，再看当前客户是否可见、可试用或已验收；需要实现证据时继续进入专题文档、代码、migration 和测试。本页不维护第二套成熟度、客户状态或验收结论，也不把正式 Markdown 打入前端构建。
 
 #### 测试入口 `/__dev/testing`
 

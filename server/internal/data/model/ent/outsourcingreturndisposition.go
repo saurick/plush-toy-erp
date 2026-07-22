@@ -32,6 +32,8 @@ type OutsourcingReturnDisposition struct {
 	Quantity decimal.Decimal `json:"quantity,omitempty"`
 	// ProductionWipBatchID holds the value of the "production_wip_batch_id" field.
 	ProductionWipBatchID *int `json:"production_wip_batch_id,omitempty"`
+	// ResultWipBatchID holds the value of the "result_wip_batch_id" field.
+	ResultWipBatchID *int `json:"result_wip_batch_id,omitempty"`
 	// Reason holds the value of the "reason" field.
 	Reason string `json:"reason,omitempty"`
 	// IdempotencyKey holds the value of the "idempotency_key" field.
@@ -64,7 +66,7 @@ func (*OutsourcingReturnDisposition) scanValues(columns []string) ([]any, error)
 		switch columns[i] {
 		case outsourcingreturndisposition.FieldQuantity:
 			values[i] = new(decimal.Decimal)
-		case outsourcingreturndisposition.FieldID, outsourcingreturndisposition.FieldQualityInspectionID, outsourcingreturndisposition.FieldOutsourcingReturnFactID, outsourcingreturndisposition.FieldProductionWipBatchID, outsourcingreturndisposition.FieldVersion, outsourcingreturndisposition.FieldPostedBy, outsourcingreturndisposition.FieldCancelledBy, outsourcingreturndisposition.FieldCreatedBy:
+		case outsourcingreturndisposition.FieldID, outsourcingreturndisposition.FieldQualityInspectionID, outsourcingreturndisposition.FieldOutsourcingReturnFactID, outsourcingreturndisposition.FieldProductionWipBatchID, outsourcingreturndisposition.FieldResultWipBatchID, outsourcingreturndisposition.FieldVersion, outsourcingreturndisposition.FieldPostedBy, outsourcingreturndisposition.FieldCancelledBy, outsourcingreturndisposition.FieldCreatedBy:
 			values[i] = new(sql.NullInt64)
 		case outsourcingreturndisposition.FieldDispositionNo, outsourcingreturndisposition.FieldDispositionType, outsourcingreturndisposition.FieldStatus, outsourcingreturndisposition.FieldReason, outsourcingreturndisposition.FieldIdempotencyKey, outsourcingreturndisposition.FieldIdempotencyPayloadHash, outsourcingreturndisposition.FieldCancelReason:
 			values[i] = new(sql.NullString)
@@ -133,6 +135,13 @@ func (_m *OutsourcingReturnDisposition) assignValues(columns []string, values []
 			} else if value.Valid {
 				_m.ProductionWipBatchID = new(int)
 				*_m.ProductionWipBatchID = int(value.Int64)
+			}
+		case outsourcingreturndisposition.FieldResultWipBatchID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field result_wip_batch_id", values[i])
+			} else if value.Valid {
+				_m.ResultWipBatchID = new(int)
+				*_m.ResultWipBatchID = int(value.Int64)
 			}
 		case outsourcingreturndisposition.FieldReason:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -261,6 +270,11 @@ func (_m *OutsourcingReturnDisposition) String() string {
 	builder.WriteString(", ")
 	if v := _m.ProductionWipBatchID; v != nil {
 		builder.WriteString("production_wip_batch_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.ResultWipBatchID; v != nil {
+		builder.WriteString("result_wip_batch_id=")
 		builder.WriteString(fmt.Sprintf("%v", *v))
 	}
 	builder.WriteString(", ")

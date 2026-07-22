@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"server/internal/data/model/ent/predicate"
+	"server/internal/data/model/ent/purchasereceipt"
 	"server/internal/data/model/ent/purchaserejectiondisposition"
 	"time"
 
@@ -25,6 +26,26 @@ type PurchaseRejectionDispositionUpdate struct {
 // Where appends a list predicates to the PurchaseRejectionDispositionUpdate builder.
 func (_u *PurchaseRejectionDispositionUpdate) Where(ps ...predicate.PurchaseRejectionDisposition) *PurchaseRejectionDispositionUpdate {
 	_u.mutation.Where(ps...)
+	return _u
+}
+
+// SetReplacementReceiptID sets the "replacement_receipt_id" field.
+func (_u *PurchaseRejectionDispositionUpdate) SetReplacementReceiptID(v int) *PurchaseRejectionDispositionUpdate {
+	_u.mutation.SetReplacementReceiptID(v)
+	return _u
+}
+
+// SetNillableReplacementReceiptID sets the "replacement_receipt_id" field if the given value is not nil.
+func (_u *PurchaseRejectionDispositionUpdate) SetNillableReplacementReceiptID(v *int) *PurchaseRejectionDispositionUpdate {
+	if v != nil {
+		_u.SetReplacementReceiptID(*v)
+	}
+	return _u
+}
+
+// ClearReplacementReceiptID clears the value of the "replacement_receipt_id" field.
+func (_u *PurchaseRejectionDispositionUpdate) ClearReplacementReceiptID() *PurchaseRejectionDispositionUpdate {
+	_u.mutation.ClearReplacementReceiptID()
 	return _u
 }
 
@@ -177,9 +198,20 @@ func (_u *PurchaseRejectionDispositionUpdate) ClearCancelReason() *PurchaseRejec
 	return _u
 }
 
+// SetReplacementReceipt sets the "replacement_receipt" edge to the PurchaseReceipt entity.
+func (_u *PurchaseRejectionDispositionUpdate) SetReplacementReceipt(v *PurchaseReceipt) *PurchaseRejectionDispositionUpdate {
+	return _u.SetReplacementReceiptID(v.ID)
+}
+
 // Mutation returns the PurchaseRejectionDispositionMutation object of the builder.
 func (_u *PurchaseRejectionDispositionUpdate) Mutation() *PurchaseRejectionDispositionMutation {
 	return _u.mutation
+}
+
+// ClearReplacementReceipt clears the "replacement_receipt" edge to the PurchaseReceipt entity.
+func (_u *PurchaseRejectionDispositionUpdate) ClearReplacementReceipt() *PurchaseRejectionDispositionUpdate {
+	_u.mutation.ClearReplacementReceipt()
+	return _u
 }
 
 // Save executes the query and returns the number of nodes affected by the update operation.
@@ -211,6 +243,11 @@ func (_u *PurchaseRejectionDispositionUpdate) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *PurchaseRejectionDispositionUpdate) check() error {
+	if v, ok := _u.mutation.ReplacementReceiptID(); ok {
+		if err := purchaserejectiondisposition.ReplacementReceiptIDValidator(v); err != nil {
+			return &ValidationError{Name: "replacement_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseRejectionDisposition.replacement_receipt_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := purchaserejectiondisposition.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PurchaseRejectionDisposition.status": %w`, err)}
@@ -299,6 +336,35 @@ func (_u *PurchaseRejectionDispositionUpdate) sqlSave(ctx context.Context) (_nod
 	if _u.mutation.CancelReasonCleared() {
 		_spec.ClearField(purchaserejectiondisposition.FieldCancelReason, field.TypeString)
 	}
+	if _u.mutation.ReplacementReceiptCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchaserejectiondisposition.ReplacementReceiptTable,
+			Columns: []string{purchaserejectiondisposition.ReplacementReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReplacementReceiptIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchaserejectiondisposition.ReplacementReceiptTable,
+			Columns: []string{purchaserejectiondisposition.ReplacementReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
+	}
 	if _node, err = sqlgraph.UpdateNodes(ctx, _u.driver, _spec); err != nil {
 		if _, ok := err.(*sqlgraph.NotFoundError); ok {
 			err = &NotFoundError{purchaserejectiondisposition.Label}
@@ -317,6 +383,26 @@ type PurchaseRejectionDispositionUpdateOne struct {
 	fields   []string
 	hooks    []Hook
 	mutation *PurchaseRejectionDispositionMutation
+}
+
+// SetReplacementReceiptID sets the "replacement_receipt_id" field.
+func (_u *PurchaseRejectionDispositionUpdateOne) SetReplacementReceiptID(v int) *PurchaseRejectionDispositionUpdateOne {
+	_u.mutation.SetReplacementReceiptID(v)
+	return _u
+}
+
+// SetNillableReplacementReceiptID sets the "replacement_receipt_id" field if the given value is not nil.
+func (_u *PurchaseRejectionDispositionUpdateOne) SetNillableReplacementReceiptID(v *int) *PurchaseRejectionDispositionUpdateOne {
+	if v != nil {
+		_u.SetReplacementReceiptID(*v)
+	}
+	return _u
+}
+
+// ClearReplacementReceiptID clears the value of the "replacement_receipt_id" field.
+func (_u *PurchaseRejectionDispositionUpdateOne) ClearReplacementReceiptID() *PurchaseRejectionDispositionUpdateOne {
+	_u.mutation.ClearReplacementReceiptID()
+	return _u
 }
 
 // SetStatus sets the "status" field.
@@ -468,9 +554,20 @@ func (_u *PurchaseRejectionDispositionUpdateOne) ClearCancelReason() *PurchaseRe
 	return _u
 }
 
+// SetReplacementReceipt sets the "replacement_receipt" edge to the PurchaseReceipt entity.
+func (_u *PurchaseRejectionDispositionUpdateOne) SetReplacementReceipt(v *PurchaseReceipt) *PurchaseRejectionDispositionUpdateOne {
+	return _u.SetReplacementReceiptID(v.ID)
+}
+
 // Mutation returns the PurchaseRejectionDispositionMutation object of the builder.
 func (_u *PurchaseRejectionDispositionUpdateOne) Mutation() *PurchaseRejectionDispositionMutation {
 	return _u.mutation
+}
+
+// ClearReplacementReceipt clears the "replacement_receipt" edge to the PurchaseReceipt entity.
+func (_u *PurchaseRejectionDispositionUpdateOne) ClearReplacementReceipt() *PurchaseRejectionDispositionUpdateOne {
+	_u.mutation.ClearReplacementReceipt()
+	return _u
 }
 
 // Where appends a list predicates to the PurchaseRejectionDispositionUpdate builder.
@@ -515,6 +612,11 @@ func (_u *PurchaseRejectionDispositionUpdateOne) ExecX(ctx context.Context) {
 
 // check runs all checks and user-defined validators on the builder.
 func (_u *PurchaseRejectionDispositionUpdateOne) check() error {
+	if v, ok := _u.mutation.ReplacementReceiptID(); ok {
+		if err := purchaserejectiondisposition.ReplacementReceiptIDValidator(v); err != nil {
+			return &ValidationError{Name: "replacement_receipt_id", err: fmt.Errorf(`ent: validator failed for field "PurchaseRejectionDisposition.replacement_receipt_id": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.Status(); ok {
 		if err := purchaserejectiondisposition.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "PurchaseRejectionDisposition.status": %w`, err)}
@@ -619,6 +721,35 @@ func (_u *PurchaseRejectionDispositionUpdateOne) sqlSave(ctx context.Context) (_
 	}
 	if _u.mutation.CancelReasonCleared() {
 		_spec.ClearField(purchaserejectiondisposition.FieldCancelReason, field.TypeString)
+	}
+	if _u.mutation.ReplacementReceiptCleared() {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchaserejectiondisposition.ReplacementReceiptTable,
+			Columns: []string{purchaserejectiondisposition.ReplacementReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		_spec.Edges.Clear = append(_spec.Edges.Clear, edge)
+	}
+	if nodes := _u.mutation.ReplacementReceiptIDs(); len(nodes) > 0 {
+		edge := &sqlgraph.EdgeSpec{
+			Rel:     sqlgraph.M2O,
+			Inverse: true,
+			Table:   purchaserejectiondisposition.ReplacementReceiptTable,
+			Columns: []string{purchaserejectiondisposition.ReplacementReceiptColumn},
+			Bidi:    false,
+			Target: &sqlgraph.EdgeTarget{
+				IDSpec: sqlgraph.NewFieldSpec(purchasereceipt.FieldID, field.TypeInt),
+			},
+		}
+		for _, k := range nodes {
+			edge.Target.Nodes = append(edge.Target.Nodes, k)
+		}
+		_spec.Edges.Add = append(_spec.Edges.Add, edge)
 	}
 	_node = &PurchaseRejectionDisposition{config: _u.config}
 	_spec.Assign = _node.assignValues

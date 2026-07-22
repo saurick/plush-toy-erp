@@ -227,3 +227,12 @@ export async function getPurchaseRejectionDisposition(
   )
   return dataOf(result)?.purchase_rejection_disposition || null
 }
+
+export async function listPurchaseRejectionDispositions(params = {}, options = {}) {
+  const result = await purchaseRpc.call(
+    'list_purchase_rejection_dispositions',
+    params,
+    options
+  )
+  return dataOf(result)
+}

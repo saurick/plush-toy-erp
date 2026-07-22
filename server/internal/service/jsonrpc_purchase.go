@@ -47,7 +47,7 @@ func (d *jsonrpcDispatcher) handlePurchase(
 		"get_purchase_receipt_adjustment",
 		"list_purchase_receipt_adjustments":
 		return d.handlePurchaseReceiptAdjustment(ctx, method, id, pm)
-	case "create_purchase_rejection_disposition", "post_purchase_rejection_disposition", "cancel_purchase_rejection_disposition", "get_purchase_rejection_disposition":
+	case "create_purchase_rejection_disposition", "post_purchase_rejection_disposition", "cancel_purchase_rejection_disposition", "get_purchase_rejection_disposition", "list_purchase_rejection_dispositions":
 		return d.handlePurchaseRejectionDisposition(ctx, method, id, pm, claims.UserID)
 	default:
 		return id, unknownPurchaseResult(method), nil

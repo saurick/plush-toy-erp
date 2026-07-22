@@ -32552,6 +32552,8 @@ type OutsourcingReturnDispositionMutation struct {
 	quantity                      *decimal.Decimal
 	production_wip_batch_id       *int
 	addproduction_wip_batch_id    *int
+	result_wip_batch_id           *int
+	addresult_wip_batch_id        *int
 	reason                        *string
 	idempotency_key               *string
 	idempotency_payload_hash      *string
@@ -32995,6 +32997,76 @@ func (m *OutsourcingReturnDispositionMutation) ResetProductionWipBatchID() {
 	m.production_wip_batch_id = nil
 	m.addproduction_wip_batch_id = nil
 	delete(m.clearedFields, outsourcingreturndisposition.FieldProductionWipBatchID)
+}
+
+// SetResultWipBatchID sets the "result_wip_batch_id" field.
+func (m *OutsourcingReturnDispositionMutation) SetResultWipBatchID(i int) {
+	m.result_wip_batch_id = &i
+	m.addresult_wip_batch_id = nil
+}
+
+// ResultWipBatchID returns the value of the "result_wip_batch_id" field in the mutation.
+func (m *OutsourcingReturnDispositionMutation) ResultWipBatchID() (r int, exists bool) {
+	v := m.result_wip_batch_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldResultWipBatchID returns the old "result_wip_batch_id" field's value of the OutsourcingReturnDisposition entity.
+// If the OutsourcingReturnDisposition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *OutsourcingReturnDispositionMutation) OldResultWipBatchID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldResultWipBatchID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldResultWipBatchID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldResultWipBatchID: %w", err)
+	}
+	return oldValue.ResultWipBatchID, nil
+}
+
+// AddResultWipBatchID adds i to the "result_wip_batch_id" field.
+func (m *OutsourcingReturnDispositionMutation) AddResultWipBatchID(i int) {
+	if m.addresult_wip_batch_id != nil {
+		*m.addresult_wip_batch_id += i
+	} else {
+		m.addresult_wip_batch_id = &i
+	}
+}
+
+// AddedResultWipBatchID returns the value that was added to the "result_wip_batch_id" field in this mutation.
+func (m *OutsourcingReturnDispositionMutation) AddedResultWipBatchID() (r int, exists bool) {
+	v := m.addresult_wip_batch_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearResultWipBatchID clears the value of the "result_wip_batch_id" field.
+func (m *OutsourcingReturnDispositionMutation) ClearResultWipBatchID() {
+	m.result_wip_batch_id = nil
+	m.addresult_wip_batch_id = nil
+	m.clearedFields[outsourcingreturndisposition.FieldResultWipBatchID] = struct{}{}
+}
+
+// ResultWipBatchIDCleared returns if the "result_wip_batch_id" field was cleared in this mutation.
+func (m *OutsourcingReturnDispositionMutation) ResultWipBatchIDCleared() bool {
+	_, ok := m.clearedFields[outsourcingreturndisposition.FieldResultWipBatchID]
+	return ok
+}
+
+// ResetResultWipBatchID resets all changes to the "result_wip_batch_id" field.
+func (m *OutsourcingReturnDispositionMutation) ResetResultWipBatchID() {
+	m.result_wip_batch_id = nil
+	m.addresult_wip_batch_id = nil
+	delete(m.clearedFields, outsourcingreturndisposition.FieldResultWipBatchID)
 }
 
 // SetReason sets the "reason" field.
@@ -33574,7 +33646,7 @@ func (m *OutsourcingReturnDispositionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *OutsourcingReturnDispositionMutation) Fields() []string {
-	fields := make([]string, 0, 18)
+	fields := make([]string, 0, 19)
 	if m.disposition_no != nil {
 		fields = append(fields, outsourcingreturndisposition.FieldDispositionNo)
 	}
@@ -33595,6 +33667,9 @@ func (m *OutsourcingReturnDispositionMutation) Fields() []string {
 	}
 	if m.production_wip_batch_id != nil {
 		fields = append(fields, outsourcingreturndisposition.FieldProductionWipBatchID)
+	}
+	if m.result_wip_batch_id != nil {
+		fields = append(fields, outsourcingreturndisposition.FieldResultWipBatchID)
 	}
 	if m.reason != nil {
 		fields = append(fields, outsourcingreturndisposition.FieldReason)
@@ -33651,6 +33726,8 @@ func (m *OutsourcingReturnDispositionMutation) Field(name string) (ent.Value, bo
 		return m.Quantity()
 	case outsourcingreturndisposition.FieldProductionWipBatchID:
 		return m.ProductionWipBatchID()
+	case outsourcingreturndisposition.FieldResultWipBatchID:
+		return m.ResultWipBatchID()
 	case outsourcingreturndisposition.FieldReason:
 		return m.Reason()
 	case outsourcingreturndisposition.FieldIdempotencyKey:
@@ -33696,6 +33773,8 @@ func (m *OutsourcingReturnDispositionMutation) OldField(ctx context.Context, nam
 		return m.OldQuantity(ctx)
 	case outsourcingreturndisposition.FieldProductionWipBatchID:
 		return m.OldProductionWipBatchID(ctx)
+	case outsourcingreturndisposition.FieldResultWipBatchID:
+		return m.OldResultWipBatchID(ctx)
 	case outsourcingreturndisposition.FieldReason:
 		return m.OldReason(ctx)
 	case outsourcingreturndisposition.FieldIdempotencyKey:
@@ -33775,6 +33854,13 @@ func (m *OutsourcingReturnDispositionMutation) SetField(name string, value ent.V
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetProductionWipBatchID(v)
+		return nil
+	case outsourcingreturndisposition.FieldResultWipBatchID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetResultWipBatchID(v)
 		return nil
 	case outsourcingreturndisposition.FieldReason:
 		v, ok := value.(string)
@@ -33870,6 +33956,9 @@ func (m *OutsourcingReturnDispositionMutation) AddedFields() []string {
 	if m.addproduction_wip_batch_id != nil {
 		fields = append(fields, outsourcingreturndisposition.FieldProductionWipBatchID)
 	}
+	if m.addresult_wip_batch_id != nil {
+		fields = append(fields, outsourcingreturndisposition.FieldResultWipBatchID)
+	}
 	if m.addversion != nil {
 		fields = append(fields, outsourcingreturndisposition.FieldVersion)
 	}
@@ -33896,6 +33985,8 @@ func (m *OutsourcingReturnDispositionMutation) AddedField(name string) (ent.Valu
 		return m.AddedOutsourcingReturnFactID()
 	case outsourcingreturndisposition.FieldProductionWipBatchID:
 		return m.AddedProductionWipBatchID()
+	case outsourcingreturndisposition.FieldResultWipBatchID:
+		return m.AddedResultWipBatchID()
 	case outsourcingreturndisposition.FieldVersion:
 		return m.AddedVersion()
 	case outsourcingreturndisposition.FieldPostedBy:
@@ -33933,6 +34024,13 @@ func (m *OutsourcingReturnDispositionMutation) AddField(name string, value ent.V
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.AddProductionWipBatchID(v)
+		return nil
+	case outsourcingreturndisposition.FieldResultWipBatchID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddResultWipBatchID(v)
 		return nil
 	case outsourcingreturndisposition.FieldVersion:
 		v, ok := value.(int)
@@ -33973,6 +34071,9 @@ func (m *OutsourcingReturnDispositionMutation) ClearedFields() []string {
 	if m.FieldCleared(outsourcingreturndisposition.FieldProductionWipBatchID) {
 		fields = append(fields, outsourcingreturndisposition.FieldProductionWipBatchID)
 	}
+	if m.FieldCleared(outsourcingreturndisposition.FieldResultWipBatchID) {
+		fields = append(fields, outsourcingreturndisposition.FieldResultWipBatchID)
+	}
 	if m.FieldCleared(outsourcingreturndisposition.FieldPostedAt) {
 		fields = append(fields, outsourcingreturndisposition.FieldPostedAt)
 	}
@@ -34004,6 +34105,9 @@ func (m *OutsourcingReturnDispositionMutation) ClearField(name string) error {
 	switch name {
 	case outsourcingreturndisposition.FieldProductionWipBatchID:
 		m.ClearProductionWipBatchID()
+		return nil
+	case outsourcingreturndisposition.FieldResultWipBatchID:
+		m.ClearResultWipBatchID()
 		return nil
 	case outsourcingreturndisposition.FieldPostedAt:
 		m.ClearPostedAt()
@@ -34048,6 +34152,9 @@ func (m *OutsourcingReturnDispositionMutation) ResetField(name string) error {
 		return nil
 	case outsourcingreturndisposition.FieldProductionWipBatchID:
 		m.ResetProductionWipBatchID()
+		return nil
+	case outsourcingreturndisposition.FieldResultWipBatchID:
+		m.ResetResultWipBatchID()
 		return nil
 	case outsourcingreturndisposition.FieldReason:
 		m.ResetReason()
@@ -44072,6 +44179,7 @@ type ProductionExceptionDecisionMutation struct {
 	decision_no                           *string
 	decision_type                         *string
 	status                                *string
+	execution_status                      *string
 	production_order_id                   *int
 	addproduction_order_id                *int
 	production_order_item_id              *int
@@ -44096,6 +44204,13 @@ type ProductionExceptionDecisionMutation struct {
 	adddecided_by                         *int
 	decided_at                            *time.Time
 	decision_reason                       *string
+	executed_by                           *int
+	addexecuted_by                        *int
+	executed_at                           *time.Time
+	reversed_by                           *int
+	addreversed_by                        *int
+	reversed_at                           *time.Time
+	reverse_reason                        *string
 	clearedFields                         map[string]struct{}
 	done                                  bool
 	oldValue                              func(context.Context) (*ProductionExceptionDecision, error)
@@ -44306,6 +44421,42 @@ func (m *ProductionExceptionDecisionMutation) OldStatus(ctx context.Context) (v 
 // ResetStatus resets all changes to the "status" field.
 func (m *ProductionExceptionDecisionMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetExecutionStatus sets the "execution_status" field.
+func (m *ProductionExceptionDecisionMutation) SetExecutionStatus(s string) {
+	m.execution_status = &s
+}
+
+// ExecutionStatus returns the value of the "execution_status" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutionStatus() (r string, exists bool) {
+	v := m.execution_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExecutionStatus returns the old "execution_status" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldExecutionStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExecutionStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExecutionStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExecutionStatus: %w", err)
+	}
+	return oldValue.ExecutionStatus, nil
+}
+
+// ResetExecutionStatus resets all changes to the "execution_status" field.
+func (m *ProductionExceptionDecisionMutation) ResetExecutionStatus() {
+	m.execution_status = nil
 }
 
 // SetProductionOrderID sets the "production_order_id" field.
@@ -45139,6 +45290,293 @@ func (m *ProductionExceptionDecisionMutation) ResetDecisionReason() {
 	delete(m.clearedFields, productionexceptiondecision.FieldDecisionReason)
 }
 
+// SetExecutedBy sets the "executed_by" field.
+func (m *ProductionExceptionDecisionMutation) SetExecutedBy(i int) {
+	m.executed_by = &i
+	m.addexecuted_by = nil
+}
+
+// ExecutedBy returns the value of the "executed_by" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutedBy() (r int, exists bool) {
+	v := m.executed_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExecutedBy returns the old "executed_by" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldExecutedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExecutedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExecutedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExecutedBy: %w", err)
+	}
+	return oldValue.ExecutedBy, nil
+}
+
+// AddExecutedBy adds i to the "executed_by" field.
+func (m *ProductionExceptionDecisionMutation) AddExecutedBy(i int) {
+	if m.addexecuted_by != nil {
+		*m.addexecuted_by += i
+	} else {
+		m.addexecuted_by = &i
+	}
+}
+
+// AddedExecutedBy returns the value that was added to the "executed_by" field in this mutation.
+func (m *ProductionExceptionDecisionMutation) AddedExecutedBy() (r int, exists bool) {
+	v := m.addexecuted_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearExecutedBy clears the value of the "executed_by" field.
+func (m *ProductionExceptionDecisionMutation) ClearExecutedBy() {
+	m.executed_by = nil
+	m.addexecuted_by = nil
+	m.clearedFields[productionexceptiondecision.FieldExecutedBy] = struct{}{}
+}
+
+// ExecutedByCleared returns if the "executed_by" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutedByCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldExecutedBy]
+	return ok
+}
+
+// ResetExecutedBy resets all changes to the "executed_by" field.
+func (m *ProductionExceptionDecisionMutation) ResetExecutedBy() {
+	m.executed_by = nil
+	m.addexecuted_by = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldExecutedBy)
+}
+
+// SetExecutedAt sets the "executed_at" field.
+func (m *ProductionExceptionDecisionMutation) SetExecutedAt(t time.Time) {
+	m.executed_at = &t
+}
+
+// ExecutedAt returns the value of the "executed_at" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutedAt() (r time.Time, exists bool) {
+	v := m.executed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldExecutedAt returns the old "executed_at" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldExecutedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldExecutedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldExecutedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldExecutedAt: %w", err)
+	}
+	return oldValue.ExecutedAt, nil
+}
+
+// ClearExecutedAt clears the value of the "executed_at" field.
+func (m *ProductionExceptionDecisionMutation) ClearExecutedAt() {
+	m.executed_at = nil
+	m.clearedFields[productionexceptiondecision.FieldExecutedAt] = struct{}{}
+}
+
+// ExecutedAtCleared returns if the "executed_at" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) ExecutedAtCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldExecutedAt]
+	return ok
+}
+
+// ResetExecutedAt resets all changes to the "executed_at" field.
+func (m *ProductionExceptionDecisionMutation) ResetExecutedAt() {
+	m.executed_at = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldExecutedAt)
+}
+
+// SetReversedBy sets the "reversed_by" field.
+func (m *ProductionExceptionDecisionMutation) SetReversedBy(i int) {
+	m.reversed_by = &i
+	m.addreversed_by = nil
+}
+
+// ReversedBy returns the value of the "reversed_by" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) ReversedBy() (r int, exists bool) {
+	v := m.reversed_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReversedBy returns the old "reversed_by" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldReversedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReversedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReversedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReversedBy: %w", err)
+	}
+	return oldValue.ReversedBy, nil
+}
+
+// AddReversedBy adds i to the "reversed_by" field.
+func (m *ProductionExceptionDecisionMutation) AddReversedBy(i int) {
+	if m.addreversed_by != nil {
+		*m.addreversed_by += i
+	} else {
+		m.addreversed_by = &i
+	}
+}
+
+// AddedReversedBy returns the value that was added to the "reversed_by" field in this mutation.
+func (m *ProductionExceptionDecisionMutation) AddedReversedBy() (r int, exists bool) {
+	v := m.addreversed_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearReversedBy clears the value of the "reversed_by" field.
+func (m *ProductionExceptionDecisionMutation) ClearReversedBy() {
+	m.reversed_by = nil
+	m.addreversed_by = nil
+	m.clearedFields[productionexceptiondecision.FieldReversedBy] = struct{}{}
+}
+
+// ReversedByCleared returns if the "reversed_by" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) ReversedByCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldReversedBy]
+	return ok
+}
+
+// ResetReversedBy resets all changes to the "reversed_by" field.
+func (m *ProductionExceptionDecisionMutation) ResetReversedBy() {
+	m.reversed_by = nil
+	m.addreversed_by = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldReversedBy)
+}
+
+// SetReversedAt sets the "reversed_at" field.
+func (m *ProductionExceptionDecisionMutation) SetReversedAt(t time.Time) {
+	m.reversed_at = &t
+}
+
+// ReversedAt returns the value of the "reversed_at" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) ReversedAt() (r time.Time, exists bool) {
+	v := m.reversed_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReversedAt returns the old "reversed_at" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldReversedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReversedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReversedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReversedAt: %w", err)
+	}
+	return oldValue.ReversedAt, nil
+}
+
+// ClearReversedAt clears the value of the "reversed_at" field.
+func (m *ProductionExceptionDecisionMutation) ClearReversedAt() {
+	m.reversed_at = nil
+	m.clearedFields[productionexceptiondecision.FieldReversedAt] = struct{}{}
+}
+
+// ReversedAtCleared returns if the "reversed_at" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) ReversedAtCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldReversedAt]
+	return ok
+}
+
+// ResetReversedAt resets all changes to the "reversed_at" field.
+func (m *ProductionExceptionDecisionMutation) ResetReversedAt() {
+	m.reversed_at = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldReversedAt)
+}
+
+// SetReverseReason sets the "reverse_reason" field.
+func (m *ProductionExceptionDecisionMutation) SetReverseReason(s string) {
+	m.reverse_reason = &s
+}
+
+// ReverseReason returns the value of the "reverse_reason" field in the mutation.
+func (m *ProductionExceptionDecisionMutation) ReverseReason() (r string, exists bool) {
+	v := m.reverse_reason
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReverseReason returns the old "reverse_reason" field's value of the ProductionExceptionDecision entity.
+// If the ProductionExceptionDecision object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ProductionExceptionDecisionMutation) OldReverseReason(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReverseReason is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReverseReason requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReverseReason: %w", err)
+	}
+	return oldValue.ReverseReason, nil
+}
+
+// ClearReverseReason clears the value of the "reverse_reason" field.
+func (m *ProductionExceptionDecisionMutation) ClearReverseReason() {
+	m.reverse_reason = nil
+	m.clearedFields[productionexceptiondecision.FieldReverseReason] = struct{}{}
+}
+
+// ReverseReasonCleared returns if the "reverse_reason" field was cleared in this mutation.
+func (m *ProductionExceptionDecisionMutation) ReverseReasonCleared() bool {
+	_, ok := m.clearedFields[productionexceptiondecision.FieldReverseReason]
+	return ok
+}
+
+// ResetReverseReason resets all changes to the "reverse_reason" field.
+func (m *ProductionExceptionDecisionMutation) ResetReverseReason() {
+	m.reverse_reason = nil
+	delete(m.clearedFields, productionexceptiondecision.FieldReverseReason)
+}
+
 // Where appends a list predicates to the ProductionExceptionDecisionMutation builder.
 func (m *ProductionExceptionDecisionMutation) Where(ps ...predicate.ProductionExceptionDecision) {
 	m.predicates = append(m.predicates, ps...)
@@ -45173,7 +45611,7 @@ func (m *ProductionExceptionDecisionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ProductionExceptionDecisionMutation) Fields() []string {
-	fields := make([]string, 0, 19)
+	fields := make([]string, 0, 25)
 	if m.decision_no != nil {
 		fields = append(fields, productionexceptiondecision.FieldDecisionNo)
 	}
@@ -45182,6 +45620,9 @@ func (m *ProductionExceptionDecisionMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, productionexceptiondecision.FieldStatus)
+	}
+	if m.execution_status != nil {
+		fields = append(fields, productionexceptiondecision.FieldExecutionStatus)
 	}
 	if m.production_order_id != nil {
 		fields = append(fields, productionexceptiondecision.FieldProductionOrderID)
@@ -45231,6 +45672,21 @@ func (m *ProductionExceptionDecisionMutation) Fields() []string {
 	if m.decision_reason != nil {
 		fields = append(fields, productionexceptiondecision.FieldDecisionReason)
 	}
+	if m.executed_by != nil {
+		fields = append(fields, productionexceptiondecision.FieldExecutedBy)
+	}
+	if m.executed_at != nil {
+		fields = append(fields, productionexceptiondecision.FieldExecutedAt)
+	}
+	if m.reversed_by != nil {
+		fields = append(fields, productionexceptiondecision.FieldReversedBy)
+	}
+	if m.reversed_at != nil {
+		fields = append(fields, productionexceptiondecision.FieldReversedAt)
+	}
+	if m.reverse_reason != nil {
+		fields = append(fields, productionexceptiondecision.FieldReverseReason)
+	}
 	return fields
 }
 
@@ -45245,6 +45701,8 @@ func (m *ProductionExceptionDecisionMutation) Field(name string) (ent.Value, boo
 		return m.DecisionType()
 	case productionexceptiondecision.FieldStatus:
 		return m.Status()
+	case productionexceptiondecision.FieldExecutionStatus:
+		return m.ExecutionStatus()
 	case productionexceptiondecision.FieldProductionOrderID:
 		return m.ProductionOrderID()
 	case productionexceptiondecision.FieldProductionOrderItemID:
@@ -45277,6 +45735,16 @@ func (m *ProductionExceptionDecisionMutation) Field(name string) (ent.Value, boo
 		return m.DecidedAt()
 	case productionexceptiondecision.FieldDecisionReason:
 		return m.DecisionReason()
+	case productionexceptiondecision.FieldExecutedBy:
+		return m.ExecutedBy()
+	case productionexceptiondecision.FieldExecutedAt:
+		return m.ExecutedAt()
+	case productionexceptiondecision.FieldReversedBy:
+		return m.ReversedBy()
+	case productionexceptiondecision.FieldReversedAt:
+		return m.ReversedAt()
+	case productionexceptiondecision.FieldReverseReason:
+		return m.ReverseReason()
 	}
 	return nil, false
 }
@@ -45292,6 +45760,8 @@ func (m *ProductionExceptionDecisionMutation) OldField(ctx context.Context, name
 		return m.OldDecisionType(ctx)
 	case productionexceptiondecision.FieldStatus:
 		return m.OldStatus(ctx)
+	case productionexceptiondecision.FieldExecutionStatus:
+		return m.OldExecutionStatus(ctx)
 	case productionexceptiondecision.FieldProductionOrderID:
 		return m.OldProductionOrderID(ctx)
 	case productionexceptiondecision.FieldProductionOrderItemID:
@@ -45324,6 +45794,16 @@ func (m *ProductionExceptionDecisionMutation) OldField(ctx context.Context, name
 		return m.OldDecidedAt(ctx)
 	case productionexceptiondecision.FieldDecisionReason:
 		return m.OldDecisionReason(ctx)
+	case productionexceptiondecision.FieldExecutedBy:
+		return m.OldExecutedBy(ctx)
+	case productionexceptiondecision.FieldExecutedAt:
+		return m.OldExecutedAt(ctx)
+	case productionexceptiondecision.FieldReversedBy:
+		return m.OldReversedBy(ctx)
+	case productionexceptiondecision.FieldReversedAt:
+		return m.OldReversedAt(ctx)
+	case productionexceptiondecision.FieldReverseReason:
+		return m.OldReverseReason(ctx)
 	}
 	return nil, fmt.Errorf("unknown ProductionExceptionDecision field %s", name)
 }
@@ -45353,6 +45833,13 @@ func (m *ProductionExceptionDecisionMutation) SetField(name string, value ent.Va
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case productionexceptiondecision.FieldExecutionStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExecutionStatus(v)
 		return nil
 	case productionexceptiondecision.FieldProductionOrderID:
 		v, ok := value.(int)
@@ -45466,6 +45953,41 @@ func (m *ProductionExceptionDecisionMutation) SetField(name string, value ent.Va
 		}
 		m.SetDecisionReason(v)
 		return nil
+	case productionexceptiondecision.FieldExecutedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExecutedBy(v)
+		return nil
+	case productionexceptiondecision.FieldExecutedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetExecutedAt(v)
+		return nil
+	case productionexceptiondecision.FieldReversedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReversedBy(v)
+		return nil
+	case productionexceptiondecision.FieldReversedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReversedAt(v)
+		return nil
+	case productionexceptiondecision.FieldReverseReason:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReverseReason(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ProductionExceptionDecision field %s", name)
 }
@@ -45498,6 +46020,12 @@ func (m *ProductionExceptionDecisionMutation) AddedFields() []string {
 	if m.adddecided_by != nil {
 		fields = append(fields, productionexceptiondecision.FieldDecidedBy)
 	}
+	if m.addexecuted_by != nil {
+		fields = append(fields, productionexceptiondecision.FieldExecutedBy)
+	}
+	if m.addreversed_by != nil {
+		fields = append(fields, productionexceptiondecision.FieldReversedBy)
+	}
 	return fields
 }
 
@@ -45522,6 +46050,10 @@ func (m *ProductionExceptionDecisionMutation) AddedField(name string) (ent.Value
 		return m.AddedRequestedBy()
 	case productionexceptiondecision.FieldDecidedBy:
 		return m.AddedDecidedBy()
+	case productionexceptiondecision.FieldExecutedBy:
+		return m.AddedExecutedBy()
+	case productionexceptiondecision.FieldReversedBy:
+		return m.AddedReversedBy()
 	}
 	return nil, false
 }
@@ -45587,6 +46119,20 @@ func (m *ProductionExceptionDecisionMutation) AddField(name string, value ent.Va
 		}
 		m.AddDecidedBy(v)
 		return nil
+	case productionexceptiondecision.FieldExecutedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddExecutedBy(v)
+		return nil
+	case productionexceptiondecision.FieldReversedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddReversedBy(v)
+		return nil
 	}
 	return fmt.Errorf("unknown ProductionExceptionDecision numeric field %s", name)
 }
@@ -45615,6 +46161,21 @@ func (m *ProductionExceptionDecisionMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(productionexceptiondecision.FieldDecisionReason) {
 		fields = append(fields, productionexceptiondecision.FieldDecisionReason)
+	}
+	if m.FieldCleared(productionexceptiondecision.FieldExecutedBy) {
+		fields = append(fields, productionexceptiondecision.FieldExecutedBy)
+	}
+	if m.FieldCleared(productionexceptiondecision.FieldExecutedAt) {
+		fields = append(fields, productionexceptiondecision.FieldExecutedAt)
+	}
+	if m.FieldCleared(productionexceptiondecision.FieldReversedBy) {
+		fields = append(fields, productionexceptiondecision.FieldReversedBy)
+	}
+	if m.FieldCleared(productionexceptiondecision.FieldReversedAt) {
+		fields = append(fields, productionexceptiondecision.FieldReversedAt)
+	}
+	if m.FieldCleared(productionexceptiondecision.FieldReverseReason) {
+		fields = append(fields, productionexceptiondecision.FieldReverseReason)
 	}
 	return fields
 }
@@ -45651,6 +46212,21 @@ func (m *ProductionExceptionDecisionMutation) ClearField(name string) error {
 	case productionexceptiondecision.FieldDecisionReason:
 		m.ClearDecisionReason()
 		return nil
+	case productionexceptiondecision.FieldExecutedBy:
+		m.ClearExecutedBy()
+		return nil
+	case productionexceptiondecision.FieldExecutedAt:
+		m.ClearExecutedAt()
+		return nil
+	case productionexceptiondecision.FieldReversedBy:
+		m.ClearReversedBy()
+		return nil
+	case productionexceptiondecision.FieldReversedAt:
+		m.ClearReversedAt()
+		return nil
+	case productionexceptiondecision.FieldReverseReason:
+		m.ClearReverseReason()
+		return nil
 	}
 	return fmt.Errorf("unknown ProductionExceptionDecision nullable field %s", name)
 }
@@ -45667,6 +46243,9 @@ func (m *ProductionExceptionDecisionMutation) ResetField(name string) error {
 		return nil
 	case productionexceptiondecision.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case productionexceptiondecision.FieldExecutionStatus:
+		m.ResetExecutionStatus()
 		return nil
 	case productionexceptiondecision.FieldProductionOrderID:
 		m.ResetProductionOrderID()
@@ -45715,6 +46294,21 @@ func (m *ProductionExceptionDecisionMutation) ResetField(name string) error {
 		return nil
 	case productionexceptiondecision.FieldDecisionReason:
 		m.ResetDecisionReason()
+		return nil
+	case productionexceptiondecision.FieldExecutedBy:
+		m.ResetExecutedBy()
+		return nil
+	case productionexceptiondecision.FieldExecutedAt:
+		m.ResetExecutedAt()
+		return nil
+	case productionexceptiondecision.FieldReversedBy:
+		m.ResetReversedBy()
+		return nil
+	case productionexceptiondecision.FieldReversedAt:
+		m.ResetReversedAt()
+		return nil
+	case productionexceptiondecision.FieldReverseReason:
+		m.ResetReverseReason()
 		return nil
 	}
 	return fmt.Errorf("unknown ProductionExceptionDecision field %s", name)
@@ -64060,6 +64654,9 @@ type PurchaseReceiptMutation struct {
 	quality_inspections                 map[int]struct{}
 	removedquality_inspections          map[int]struct{}
 	clearedquality_inspections          bool
+	replacement_dispositions            map[int]struct{}
+	removedreplacement_dispositions     map[int]struct{}
+	clearedreplacement_dispositions     bool
 	items                               map[int]struct{}
 	removeditems                        map[int]struct{}
 	cleareditems                        bool
@@ -64886,6 +65483,60 @@ func (m *PurchaseReceiptMutation) ResetQualityInspections() {
 	m.removedquality_inspections = nil
 }
 
+// AddReplacementDispositionIDs adds the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity by ids.
+func (m *PurchaseReceiptMutation) AddReplacementDispositionIDs(ids ...int) {
+	if m.replacement_dispositions == nil {
+		m.replacement_dispositions = make(map[int]struct{})
+	}
+	for i := range ids {
+		m.replacement_dispositions[ids[i]] = struct{}{}
+	}
+}
+
+// ClearReplacementDispositions clears the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity.
+func (m *PurchaseReceiptMutation) ClearReplacementDispositions() {
+	m.clearedreplacement_dispositions = true
+}
+
+// ReplacementDispositionsCleared reports if the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity was cleared.
+func (m *PurchaseReceiptMutation) ReplacementDispositionsCleared() bool {
+	return m.clearedreplacement_dispositions
+}
+
+// RemoveReplacementDispositionIDs removes the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity by IDs.
+func (m *PurchaseReceiptMutation) RemoveReplacementDispositionIDs(ids ...int) {
+	if m.removedreplacement_dispositions == nil {
+		m.removedreplacement_dispositions = make(map[int]struct{})
+	}
+	for i := range ids {
+		delete(m.replacement_dispositions, ids[i])
+		m.removedreplacement_dispositions[ids[i]] = struct{}{}
+	}
+}
+
+// RemovedReplacementDispositions returns the removed IDs of the "replacement_dispositions" edge to the PurchaseRejectionDisposition entity.
+func (m *PurchaseReceiptMutation) RemovedReplacementDispositionsIDs() (ids []int) {
+	for id := range m.removedreplacement_dispositions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ReplacementDispositionsIDs returns the "replacement_dispositions" edge IDs in the mutation.
+func (m *PurchaseReceiptMutation) ReplacementDispositionsIDs() (ids []int) {
+	for id := range m.replacement_dispositions {
+		ids = append(ids, id)
+	}
+	return
+}
+
+// ResetReplacementDispositions resets all changes to the "replacement_dispositions" edge.
+func (m *PurchaseReceiptMutation) ResetReplacementDispositions() {
+	m.replacement_dispositions = nil
+	m.clearedreplacement_dispositions = false
+	m.removedreplacement_dispositions = nil
+}
+
 // AddItemIDs adds the "items" edge to the PurchaseReceiptItem entity by ids.
 func (m *PurchaseReceiptMutation) AddItemIDs(ids ...int) {
 	if m.items == nil {
@@ -65314,7 +65965,7 @@ func (m *PurchaseReceiptMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PurchaseReceiptMutation) AddedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.supplier != nil {
 		edges = append(edges, purchasereceipt.EdgeSupplier)
 	}
@@ -65326,6 +65977,9 @@ func (m *PurchaseReceiptMutation) AddedEdges() []string {
 	}
 	if m.quality_inspections != nil {
 		edges = append(edges, purchasereceipt.EdgeQualityInspections)
+	}
+	if m.replacement_dispositions != nil {
+		edges = append(edges, purchasereceipt.EdgeReplacementDispositions)
 	}
 	if m.items != nil {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -65359,6 +66013,12 @@ func (m *PurchaseReceiptMutation) AddedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceipt.EdgeReplacementDispositions:
+		ids := make([]ent.Value, 0, len(m.replacement_dispositions))
+		for id := range m.replacement_dispositions {
+			ids = append(ids, id)
+		}
+		return ids
 	case purchasereceipt.EdgeItems:
 		ids := make([]ent.Value, 0, len(m.items))
 		for id := range m.items {
@@ -65371,7 +66031,7 @@ func (m *PurchaseReceiptMutation) AddedIDs(name string) []ent.Value {
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PurchaseReceiptMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.removedpurchase_returns != nil {
 		edges = append(edges, purchasereceipt.EdgePurchaseReturns)
 	}
@@ -65380,6 +66040,9 @@ func (m *PurchaseReceiptMutation) RemovedEdges() []string {
 	}
 	if m.removedquality_inspections != nil {
 		edges = append(edges, purchasereceipt.EdgeQualityInspections)
+	}
+	if m.removedreplacement_dispositions != nil {
+		edges = append(edges, purchasereceipt.EdgeReplacementDispositions)
 	}
 	if m.removeditems != nil {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -65409,6 +66072,12 @@ func (m *PurchaseReceiptMutation) RemovedIDs(name string) []ent.Value {
 			ids = append(ids, id)
 		}
 		return ids
+	case purchasereceipt.EdgeReplacementDispositions:
+		ids := make([]ent.Value, 0, len(m.removedreplacement_dispositions))
+		for id := range m.removedreplacement_dispositions {
+			ids = append(ids, id)
+		}
+		return ids
 	case purchasereceipt.EdgeItems:
 		ids := make([]ent.Value, 0, len(m.removeditems))
 		for id := range m.removeditems {
@@ -65421,7 +66090,7 @@ func (m *PurchaseReceiptMutation) RemovedIDs(name string) []ent.Value {
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PurchaseReceiptMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 5)
+	edges := make([]string, 0, 6)
 	if m.clearedsupplier {
 		edges = append(edges, purchasereceipt.EdgeSupplier)
 	}
@@ -65433,6 +66102,9 @@ func (m *PurchaseReceiptMutation) ClearedEdges() []string {
 	}
 	if m.clearedquality_inspections {
 		edges = append(edges, purchasereceipt.EdgeQualityInspections)
+	}
+	if m.clearedreplacement_dispositions {
+		edges = append(edges, purchasereceipt.EdgeReplacementDispositions)
 	}
 	if m.cleareditems {
 		edges = append(edges, purchasereceipt.EdgeItems)
@@ -65452,6 +66124,8 @@ func (m *PurchaseReceiptMutation) EdgeCleared(name string) bool {
 		return m.clearedpurchase_receipt_adjustments
 	case purchasereceipt.EdgeQualityInspections:
 		return m.clearedquality_inspections
+	case purchasereceipt.EdgeReplacementDispositions:
+		return m.clearedreplacement_dispositions
 	case purchasereceipt.EdgeItems:
 		return m.cleareditems
 	}
@@ -65484,6 +66158,9 @@ func (m *PurchaseReceiptMutation) ResetEdge(name string) error {
 		return nil
 	case purchasereceipt.EdgeQualityInspections:
 		m.ResetQualityInspections()
+		return nil
+	case purchasereceipt.EdgeReplacementDispositions:
+		m.ResetReplacementDispositions()
 		return nil
 	case purchasereceipt.EdgeItems:
 		m.ResetItems()
@@ -69967,6 +70644,8 @@ type PurchaseRejectionDispositionMutation struct {
 	addcreated_by               *int
 	created_at                  *time.Time
 	clearedFields               map[string]struct{}
+	replacement_receipt         *int
+	clearedreplacement_receipt  bool
 	done                        bool
 	oldValue                    func(context.Context) (*PurchaseRejectionDisposition, error)
 	predicates                  []predicate.PurchaseRejectionDisposition
@@ -70272,6 +70951,55 @@ func (m *PurchaseRejectionDispositionMutation) AddedPurchaseReceiptItemID() (r i
 func (m *PurchaseRejectionDispositionMutation) ResetPurchaseReceiptItemID() {
 	m.purchase_receipt_item_id = nil
 	m.addpurchase_receipt_item_id = nil
+}
+
+// SetReplacementReceiptID sets the "replacement_receipt_id" field.
+func (m *PurchaseRejectionDispositionMutation) SetReplacementReceiptID(i int) {
+	m.replacement_receipt = &i
+}
+
+// ReplacementReceiptID returns the value of the "replacement_receipt_id" field in the mutation.
+func (m *PurchaseRejectionDispositionMutation) ReplacementReceiptID() (r int, exists bool) {
+	v := m.replacement_receipt
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldReplacementReceiptID returns the old "replacement_receipt_id" field's value of the PurchaseRejectionDisposition entity.
+// If the PurchaseRejectionDisposition object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *PurchaseRejectionDispositionMutation) OldReplacementReceiptID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldReplacementReceiptID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldReplacementReceiptID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldReplacementReceiptID: %w", err)
+	}
+	return oldValue.ReplacementReceiptID, nil
+}
+
+// ClearReplacementReceiptID clears the value of the "replacement_receipt_id" field.
+func (m *PurchaseRejectionDispositionMutation) ClearReplacementReceiptID() {
+	m.replacement_receipt = nil
+	m.clearedFields[purchaserejectiondisposition.FieldReplacementReceiptID] = struct{}{}
+}
+
+// ReplacementReceiptIDCleared returns if the "replacement_receipt_id" field was cleared in this mutation.
+func (m *PurchaseRejectionDispositionMutation) ReplacementReceiptIDCleared() bool {
+	_, ok := m.clearedFields[purchaserejectiondisposition.FieldReplacementReceiptID]
+	return ok
+}
+
+// ResetReplacementReceiptID resets all changes to the "replacement_receipt_id" field.
+func (m *PurchaseRejectionDispositionMutation) ResetReplacementReceiptID() {
+	m.replacement_receipt = nil
+	delete(m.clearedFields, purchaserejectiondisposition.FieldReplacementReceiptID)
 }
 
 // SetDispositionType sets the "disposition_type" field.
@@ -71031,6 +71759,33 @@ func (m *PurchaseRejectionDispositionMutation) ResetCreatedAt() {
 	m.created_at = nil
 }
 
+// ClearReplacementReceipt clears the "replacement_receipt" edge to the PurchaseReceipt entity.
+func (m *PurchaseRejectionDispositionMutation) ClearReplacementReceipt() {
+	m.clearedreplacement_receipt = true
+	m.clearedFields[purchaserejectiondisposition.FieldReplacementReceiptID] = struct{}{}
+}
+
+// ReplacementReceiptCleared reports if the "replacement_receipt" edge to the PurchaseReceipt entity was cleared.
+func (m *PurchaseRejectionDispositionMutation) ReplacementReceiptCleared() bool {
+	return m.ReplacementReceiptIDCleared() || m.clearedreplacement_receipt
+}
+
+// ReplacementReceiptIDs returns the "replacement_receipt" edge IDs in the mutation.
+// Note that IDs always returns len(IDs) <= 1 for unique edges, and you should use
+// ReplacementReceiptID instead. It exists only for internal usage by the builders.
+func (m *PurchaseRejectionDispositionMutation) ReplacementReceiptIDs() (ids []int) {
+	if id := m.replacement_receipt; id != nil {
+		ids = append(ids, *id)
+	}
+	return
+}
+
+// ResetReplacementReceipt resets all changes to the "replacement_receipt" edge.
+func (m *PurchaseRejectionDispositionMutation) ResetReplacementReceipt() {
+	m.replacement_receipt = nil
+	m.clearedreplacement_receipt = false
+}
+
 // Where appends a list predicates to the PurchaseRejectionDispositionMutation builder.
 func (m *PurchaseRejectionDispositionMutation) Where(ps ...predicate.PurchaseRejectionDisposition) {
 	m.predicates = append(m.predicates, ps...)
@@ -71065,7 +71820,7 @@ func (m *PurchaseRejectionDispositionMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *PurchaseRejectionDispositionMutation) Fields() []string {
-	fields := make([]string, 0, 20)
+	fields := make([]string, 0, 21)
 	if m.disposition_no != nil {
 		fields = append(fields, purchaserejectiondisposition.FieldDispositionNo)
 	}
@@ -71077,6 +71832,9 @@ func (m *PurchaseRejectionDispositionMutation) Fields() []string {
 	}
 	if m.purchase_receipt_item_id != nil {
 		fields = append(fields, purchaserejectiondisposition.FieldPurchaseReceiptItemID)
+	}
+	if m.replacement_receipt != nil {
+		fields = append(fields, purchaserejectiondisposition.FieldReplacementReceiptID)
 	}
 	if m.disposition_type != nil {
 		fields = append(fields, purchaserejectiondisposition.FieldDispositionType)
@@ -71142,6 +71900,8 @@ func (m *PurchaseRejectionDispositionMutation) Field(name string) (ent.Value, bo
 		return m.PurchaseReceiptID()
 	case purchaserejectiondisposition.FieldPurchaseReceiptItemID:
 		return m.PurchaseReceiptItemID()
+	case purchaserejectiondisposition.FieldReplacementReceiptID:
+		return m.ReplacementReceiptID()
 	case purchaserejectiondisposition.FieldDispositionType:
 		return m.DispositionType()
 	case purchaserejectiondisposition.FieldStatus:
@@ -71191,6 +71951,8 @@ func (m *PurchaseRejectionDispositionMutation) OldField(ctx context.Context, nam
 		return m.OldPurchaseReceiptID(ctx)
 	case purchaserejectiondisposition.FieldPurchaseReceiptItemID:
 		return m.OldPurchaseReceiptItemID(ctx)
+	case purchaserejectiondisposition.FieldReplacementReceiptID:
+		return m.OldReplacementReceiptID(ctx)
 	case purchaserejectiondisposition.FieldDispositionType:
 		return m.OldDispositionType(ctx)
 	case purchaserejectiondisposition.FieldStatus:
@@ -71259,6 +72021,13 @@ func (m *PurchaseRejectionDispositionMutation) SetField(name string, value ent.V
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetPurchaseReceiptItemID(v)
+		return nil
+	case purchaserejectiondisposition.FieldReplacementReceiptID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetReplacementReceiptID(v)
 		return nil
 	case purchaserejectiondisposition.FieldDispositionType:
 		v, ok := value.(string)
@@ -71501,6 +72270,9 @@ func (m *PurchaseRejectionDispositionMutation) AddField(name string, value ent.V
 // mutation.
 func (m *PurchaseRejectionDispositionMutation) ClearedFields() []string {
 	var fields []string
+	if m.FieldCleared(purchaserejectiondisposition.FieldReplacementReceiptID) {
+		fields = append(fields, purchaserejectiondisposition.FieldReplacementReceiptID)
+	}
 	if m.FieldCleared(purchaserejectiondisposition.FieldSupplierID) {
 		fields = append(fields, purchaserejectiondisposition.FieldSupplierID)
 	}
@@ -71533,6 +72305,9 @@ func (m *PurchaseRejectionDispositionMutation) FieldCleared(name string) bool {
 // error if the field is not defined in the schema.
 func (m *PurchaseRejectionDispositionMutation) ClearField(name string) error {
 	switch name {
+	case purchaserejectiondisposition.FieldReplacementReceiptID:
+		m.ClearReplacementReceiptID()
+		return nil
 	case purchaserejectiondisposition.FieldSupplierID:
 		m.ClearSupplierID()
 		return nil
@@ -71570,6 +72345,9 @@ func (m *PurchaseRejectionDispositionMutation) ResetField(name string) error {
 		return nil
 	case purchaserejectiondisposition.FieldPurchaseReceiptItemID:
 		m.ResetPurchaseReceiptItemID()
+		return nil
+	case purchaserejectiondisposition.FieldReplacementReceiptID:
+		m.ResetReplacementReceiptID()
 		return nil
 	case purchaserejectiondisposition.FieldDispositionType:
 		m.ResetDispositionType()
@@ -71625,19 +72403,28 @@ func (m *PurchaseRejectionDispositionMutation) ResetField(name string) error {
 
 // AddedEdges returns all edge names that were set/added in this mutation.
 func (m *PurchaseRejectionDispositionMutation) AddedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.replacement_receipt != nil {
+		edges = append(edges, purchaserejectiondisposition.EdgeReplacementReceipt)
+	}
 	return edges
 }
 
 // AddedIDs returns all IDs (to other nodes) that were added for the given edge
 // name in this mutation.
 func (m *PurchaseRejectionDispositionMutation) AddedIDs(name string) []ent.Value {
+	switch name {
+	case purchaserejectiondisposition.EdgeReplacementReceipt:
+		if id := m.replacement_receipt; id != nil {
+			return []ent.Value{*id}
+		}
+	}
 	return nil
 }
 
 // RemovedEdges returns all edge names that were removed in this mutation.
 func (m *PurchaseRejectionDispositionMutation) RemovedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
 	return edges
 }
 
@@ -71649,25 +72436,42 @@ func (m *PurchaseRejectionDispositionMutation) RemovedIDs(name string) []ent.Val
 
 // ClearedEdges returns all edge names that were cleared in this mutation.
 func (m *PurchaseRejectionDispositionMutation) ClearedEdges() []string {
-	edges := make([]string, 0, 0)
+	edges := make([]string, 0, 1)
+	if m.clearedreplacement_receipt {
+		edges = append(edges, purchaserejectiondisposition.EdgeReplacementReceipt)
+	}
 	return edges
 }
 
 // EdgeCleared returns a boolean which indicates if the edge with the given name
 // was cleared in this mutation.
 func (m *PurchaseRejectionDispositionMutation) EdgeCleared(name string) bool {
+	switch name {
+	case purchaserejectiondisposition.EdgeReplacementReceipt:
+		return m.clearedreplacement_receipt
+	}
 	return false
 }
 
 // ClearEdge clears the value of the edge with the given name. It returns an error
 // if that edge is not defined in the schema.
 func (m *PurchaseRejectionDispositionMutation) ClearEdge(name string) error {
+	switch name {
+	case purchaserejectiondisposition.EdgeReplacementReceipt:
+		m.ClearReplacementReceipt()
+		return nil
+	}
 	return fmt.Errorf("unknown PurchaseRejectionDisposition unique edge %s", name)
 }
 
 // ResetEdge resets all changes to the edge with the given name in this mutation.
 // It returns an error if the edge is not defined in the schema.
 func (m *PurchaseRejectionDispositionMutation) ResetEdge(name string) error {
+	switch name {
+	case purchaserejectiondisposition.EdgeReplacementReceipt:
+		m.ResetReplacementReceipt()
+		return nil
+	}
 	return fmt.Errorf("unknown PurchaseRejectionDisposition edge %s", name)
 }
 

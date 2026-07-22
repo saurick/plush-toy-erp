@@ -31,7 +31,13 @@ test('roleHelpContent: 覆盖九个业务岗位和系统管理员且正文各不
     assert(guide.summary)
     assert(guide.priorities.length >= 2)
     assert(guide.workflow.length >= 4)
+    assert(guide.completion)
     assert(guide.handoff)
+    assert(guide.exception?.title)
+    assert(guide.exception?.trigger)
+    assert(guide.exception?.steps?.length >= 2)
+    assert(guide.exception?.returnTo)
+    assert(guide.exception?.doneWhen)
     assert(guide.cautions.length >= 3)
     assert(guide.questions.length >= 2)
     contentSignatures.add(
@@ -39,12 +45,28 @@ test('roleHelpContent: 覆盖九个业务岗位和系统管理员且正文各不
         guide.headline,
         guide.priorities.map((item) => item.title),
         guide.workflow,
+        guide.completion,
         guide.handoff,
+        guide.exception,
         guide.cautions,
       ])
     )
   })
   assert.equal(contentSignatures.size, ROLE_HELP_GUIDES.length)
+  assert(
+    ROLE_HELP_GUIDES[0].questions.some(
+      (item) =>
+        item.question === '页面里没有需要的按钮怎么办？' &&
+        item.answer.includes('不代表拥有页面内所有操作')
+    )
+  )
+  assert(
+    ROLE_HELP_GUIDES[0].questions.some(
+      (item) =>
+        item.question === '常用工作里没找到页面怎么办？' &&
+        item.answer.includes('更多功能')
+    )
+  )
 })
 
 test('roleHelpContent: 快捷入口全部来自当前正式导航', () => {
@@ -147,5 +169,37 @@ test('roleHelpContent: 用户帮助不暴露内部工程术语', () => {
   assert.doesNotMatch(
     visibleCopy,
     /\b(?:RBAC|Workflow|Fact|API|usecase|schema|raw id)\b/iu
+  )
+})
+
+test('roleHelpContent: 永绅岗位帮助不指导未开放或越权动作', () => {
+  const financeCopy = JSON.stringify(getRoleHelpGuide('finance'))
+  const financeGuide = getRoleHelpGuide('finance')
+  const pmcCopy = JSON.stringify(getRoleHelpGuide('pmc'))
+  const warehouseCopy = JSON.stringify(getRoleHelpGuide('warehouse'))
+  const productionGuide = getRoleHelpGuide('production')
+
+  assert.doesNotMatch(financeCopy, /登记真实收付款|多笔应收或应付核销|红冲/u)
+  assert.deepEqual(
+    financeGuide.priorities.slice(0, 3).map((priority) => priority.path),
+    [
+      '/erp/finance/payables',
+      '/erp/finance/receivables',
+      '/erp/finance/invoices',
+    ]
+  )
+  assert.equal(
+    financeGuide.priorities.some(
+      (priority) => priority.path === '/erp/finance/reconciliation'
+    ),
+    false
+  )
+  assert.doesNotMatch(pmcCopy, /发布生产订单/u)
+  assert.doesNotMatch(warehouseCopy, /盘点、调拨|人工调整/u)
+  assert.equal(productionGuide.label, '生产 / 委外')
+  assert(
+    productionGuide.priorities.some(
+      (priority) => priority.path === '/erp/purchase/processing-contracts'
+    )
   )
 })

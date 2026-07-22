@@ -28,6 +28,8 @@ const (
 	FieldQuantity = "quantity"
 	// FieldProductionWipBatchID holds the string denoting the production_wip_batch_id field in the database.
 	FieldProductionWipBatchID = "production_wip_batch_id"
+	// FieldResultWipBatchID holds the string denoting the result_wip_batch_id field in the database.
+	FieldResultWipBatchID = "result_wip_batch_id"
 	// FieldReason holds the string denoting the reason field in the database.
 	FieldReason = "reason"
 	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
@@ -64,6 +66,7 @@ var Columns = []string{
 	FieldStatus,
 	FieldQuantity,
 	FieldProductionWipBatchID,
+	FieldResultWipBatchID,
 	FieldReason,
 	FieldIdempotencyKey,
 	FieldIdempotencyPayloadHash,
@@ -108,6 +111,8 @@ var (
 	StatusValidator func(string) error
 	// ProductionWipBatchIDValidator is a validator for the "production_wip_batch_id" field. It is called by the builders before save.
 	ProductionWipBatchIDValidator func(int) error
+	// ResultWipBatchIDValidator is a validator for the "result_wip_batch_id" field. It is called by the builders before save.
+	ResultWipBatchIDValidator func(int) error
 	// ReasonValidator is a validator for the "reason" field. It is called by the builders before save.
 	ReasonValidator func(string) error
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
@@ -171,6 +176,11 @@ func ByQuantity(opts ...sql.OrderTermOption) OrderOption {
 // ByProductionWipBatchID orders the results by the production_wip_batch_id field.
 func ByProductionWipBatchID(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldProductionWipBatchID, opts...).ToFunc()
+}
+
+// ByResultWipBatchID orders the results by the result_wip_batch_id field.
+func ByResultWipBatchID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldResultWipBatchID, opts...).ToFunc()
 }
 
 // ByReason orders the results by the reason field.

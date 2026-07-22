@@ -485,7 +485,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "delivery_to_settlement.receivable_review",
       ]),
       guardrail:
-        "入库页只用于核对采购入库来源，财务不能创建、调整、确认入库或办理采购退货；财务放行、应收 / 应付草稿和对账线索不等于税控、总账、收付款核销或完整财务系统。",
+        "入库页只用于核对采购入库来源，财务不能创建、调整、确认入库或办理采购退货；财务放行、应收 / 应付草稿和对账线索不等于收付款事实，也不等于银行直连、税控、总账或完整财务系统。收付款及多单核销必须走独立 PAYMENT 动作。",
     }),
     Object.freeze({
       roleKey: "production",

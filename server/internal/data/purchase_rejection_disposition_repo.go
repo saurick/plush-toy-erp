@@ -4,6 +4,7 @@ import (
 	"context"
 	stdsql "database/sql"
 	"errors"
+	"fmt"
 	"time"
 
 	"server/internal/biz"
@@ -49,6 +50,20 @@ func (r *inventoryRepo) CreatePurchaseRejectionDisposition(ctx context.Context, 
 	receipt, item, err := validatePurchaseRejectionSource(ctx, tx.client, inspection, in.Quantity)
 	if err != nil {
 		return nil, err
+	}
+	active, err := tx.client.PurchaseRejectionDisposition.Query().Where(
+		purchaserejectiondisposition.QualityInspectionID(inspection.ID),
+		purchaserejectiondisposition.StatusNEQ(biz.PurchaseRejectionStatusCancelled),
+	).All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	allocated := decimal.Zero
+	for _, disposition := range active {
+		allocated = allocated.Add(disposition.Quantity)
+	}
+	if allocated.Add(in.Quantity).GreaterThan(item.Quantity) {
+		return nil, biz.ErrPurchaseRejectionSourceInvalid
 	}
 	row, err := tx.client.PurchaseRejectionDisposition.Create().SetDispositionNo(in.DispositionNo).SetQualityInspectionID(inspection.ID).SetPurchaseReceiptID(receipt.ID).SetPurchaseReceiptItemID(item.ID).SetDispositionType(in.DispositionType).SetStatus(biz.PurchaseRejectionStatusDraft).SetQuantity(in.Quantity).SetNillableSupplierID(receipt.SupplierID).SetSupplierName(receipt.SupplierName).SetReason(in.Reason).SetIdempotencyKey(in.IdempotencyKey).SetIdempotencyPayloadHash(intentHash).SetCreatedBy(in.CreatedBy).Save(ctx)
 	if err != nil {
@@ -122,18 +137,19 @@ func (r *inventoryRepo) PostPurchaseRejectionDisposition(ctx context.Context, in
 	if receipt.ID != row.PurchaseReceiptID {
 		return nil, biz.ErrPurchaseRejectionSourceInvalid
 	}
-	items, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(receipt.ID)).Order(ent.Asc(purchasereceiptitem.FieldID)).All(ctx)
-	if err != nil {
-		return nil, err
-	}
-	if err := settleDraftPurchaseReceiptCancellation(ctx, tx, receipt, items); err != nil {
-		return nil, err
-	}
-	if err := updatePurchaseReceiptCancelled(ctx, tx, receipt.ID); err != nil {
-		return nil, err
+	if row.DispositionType == biz.PurchaseRejectionReplace {
+		replacementID, err := createPurchaseReplacementReceipt(ctx, tx, receipt, row, in.ActorID)
+		if err != nil {
+			return nil, err
+		}
+		row.ReplacementReceiptID = &replacementID
 	}
 	now := time.Now()
-	affected, err := tx.client.PurchaseRejectionDisposition.Update().Where(purchaserejectiondisposition.ID(row.ID), purchaserejectiondisposition.StatusEQ(biz.PurchaseRejectionStatusDraft), purchaserejectiondisposition.Version(in.ExpectedVersion)).SetStatus(biz.PurchaseRejectionStatusPosted).SetPostedAt(now).SetPostedBy(in.ActorID).AddVersion(1).Save(ctx)
+	update := tx.client.PurchaseRejectionDisposition.Update().Where(purchaserejectiondisposition.ID(row.ID), purchaserejectiondisposition.StatusEQ(biz.PurchaseRejectionStatusDraft), purchaserejectiondisposition.Version(in.ExpectedVersion)).SetStatus(biz.PurchaseRejectionStatusPosted).SetPostedAt(now).SetPostedBy(in.ActorID).AddVersion(1)
+	if row.ReplacementReceiptID != nil {
+		update.SetReplacementReceiptID(*row.ReplacementReceiptID)
+	}
+	affected, err := update.Save(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -165,11 +181,27 @@ func (r *inventoryRepo) CancelPurchaseRejectionDisposition(ctx context.Context, 
 	if row.Status == biz.PurchaseRejectionStatusCancelled {
 		return nil, biz.ErrPurchaseRejectionSourceState
 	}
-	if row.Status != biz.PurchaseRejectionStatusDraft {
+	if row.Status != biz.PurchaseRejectionStatusDraft && row.Status != biz.PurchaseRejectionStatusPosted {
 		return nil, biz.ErrPurchaseRejectionSourceState
 	}
+	if row.Status == biz.PurchaseRejectionStatusPosted && row.ReplacementReceiptID != nil {
+		replacement, err := tx.client.PurchaseReceipt.Get(ctx, *row.ReplacementReceiptID)
+		if err != nil || replacement.Status != biz.PurchaseReceiptStatusDraft {
+			return nil, biz.ErrPurchaseRejectionSourceState
+		}
+		items, err := tx.client.PurchaseReceiptItem.Query().Where(purchasereceiptitem.ReceiptID(replacement.ID)).All(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if err := settleDraftPurchaseReceiptCancellation(ctx, tx, replacement, items); err != nil {
+			return nil, err
+		}
+		if err := updatePurchaseReceiptCancelled(ctx, tx, replacement.ID); err != nil {
+			return nil, err
+		}
+	}
 	now := time.Now()
-	affected, err := tx.client.PurchaseRejectionDisposition.Update().Where(purchaserejectiondisposition.ID(row.ID), purchaserejectiondisposition.StatusEQ(biz.PurchaseRejectionStatusDraft), purchaserejectiondisposition.Version(in.ExpectedVersion)).SetStatus(biz.PurchaseRejectionStatusCancelled).SetCancelledAt(now).SetCancelledBy(in.ActorID).SetCancelReason(in.Reason).AddVersion(1).Save(ctx)
+	affected, err := tx.client.PurchaseRejectionDisposition.Update().Where(purchaserejectiondisposition.ID(row.ID), purchaserejectiondisposition.StatusEQ(row.Status), purchaserejectiondisposition.Version(in.ExpectedVersion)).SetStatus(biz.PurchaseRejectionStatusCancelled).SetCancelledAt(now).SetCancelledBy(in.ActorID).SetCancelReason(in.Reason).AddVersion(1).Save(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -188,6 +220,31 @@ func (r *inventoryRepo) GetPurchaseRejectionDisposition(ctx context.Context, id 
 		return nil, err
 	}
 	return entPurchaseRejectionDispositionToBiz(row), nil
+}
+func (r *inventoryRepo) ListPurchaseRejectionDispositions(ctx context.Context, filter biz.PurchaseRejectionDispositionFilter) ([]*biz.PurchaseRejectionDisposition, int, error) {
+	query := r.data.postgres.PurchaseRejectionDisposition.Query()
+	if filter.QualityInspectionID > 0 {
+		query = query.Where(purchaserejectiondisposition.QualityInspectionID(filter.QualityInspectionID))
+	}
+	if filter.PurchaseReceiptID > 0 {
+		query = query.Where(purchaserejectiondisposition.PurchaseReceiptID(filter.PurchaseReceiptID))
+	}
+	if filter.Status != "" {
+		query = query.Where(purchaserejectiondisposition.Status(filter.Status))
+	}
+	total, err := query.Clone().Count(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	rows, err := query.Order(ent.Desc(purchaserejectiondisposition.FieldID)).Limit(filter.Limit).Offset(filter.Offset).All(ctx)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*biz.PurchaseRejectionDisposition, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, entPurchaseRejectionDispositionToBiz(row))
+	}
+	return out, total, nil
 }
 
 func validatePurchaseRejectionSource(ctx context.Context, client *ent.Client, inspection *ent.QualityInspection, quantity decimal.Decimal) (*ent.PurchaseReceipt, *ent.PurchaseReceiptItem, error) {
@@ -246,5 +303,32 @@ func entPurchaseRejectionDispositionToBiz(row *ent.PurchaseRejectionDisposition)
 	if row == nil {
 		return nil
 	}
-	return &biz.PurchaseRejectionDisposition{ID: row.ID, DispositionNo: row.DispositionNo, QualityInspectionID: row.QualityInspectionID, PurchaseReceiptID: row.PurchaseReceiptID, PurchaseReceiptItemID: row.PurchaseReceiptItemID, DispositionType: row.DispositionType, Status: row.Status, Quantity: row.Quantity, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Reason: row.Reason, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, CreatedBy: row.CreatedBy, Version: row.Version, CreatedAt: row.CreatedAt}
+	return &biz.PurchaseRejectionDisposition{ID: row.ID, DispositionNo: row.DispositionNo, QualityInspectionID: row.QualityInspectionID, PurchaseReceiptID: row.PurchaseReceiptID, PurchaseReceiptItemID: row.PurchaseReceiptItemID, ReplacementReceiptID: row.ReplacementReceiptID, DispositionType: row.DispositionType, Status: row.Status, Quantity: row.Quantity, SupplierID: row.SupplierID, SupplierName: row.SupplierName, Reason: row.Reason, PostedAt: row.PostedAt, PostedBy: row.PostedBy, CancelledAt: row.CancelledAt, CancelledBy: row.CancelledBy, CancelReason: row.CancelReason, CreatedBy: row.CreatedBy, Version: row.Version, CreatedAt: row.CreatedAt}
+}
+
+func createPurchaseReplacementReceipt(ctx context.Context, tx *inventoryDBTx, source *ent.PurchaseReceipt, disposition *ent.PurchaseRejectionDisposition, actorID int) (int, error) {
+	item, err := tx.client.PurchaseReceiptItem.Get(ctx, disposition.PurchaseReceiptItemID)
+	if err != nil {
+		return 0, err
+	}
+	receiptNo := "RPL-" + disposition.DispositionNo
+	if len(receiptNo) > 64 {
+		receiptNo = receiptNo[:64]
+	}
+	note := "供应商补换来源：" + disposition.DispositionNo
+	replacement, err := tx.client.PurchaseReceipt.Create().SetReceiptNo(receiptNo).SetNillableSupplierID(source.SupplierID).SetSupplierName(source.SupplierName).SetStatus(biz.PurchaseReceiptStatusDraft).SetReceivedAt(time.Now()).SetNote(note).SetIdempotencyKey(fmt.Sprintf("PURCHASE_REJECTION:%d:REPLACEMENT", disposition.ID)).SetIdempotencyPayloadHash(disposition.IdempotencyPayloadHash).SetIdempotencyItemCount(1).Save(ctx)
+	if err != nil {
+		return 0, err
+	}
+	amount := item.Amount
+	if item.UnitPrice != nil {
+		calculated := item.UnitPrice.Mul(disposition.Quantity)
+		amount = &calculated
+	}
+	lineNote := fmt.Sprintf("由不合格处置 %s 形成待收；经办人 %d", disposition.DispositionNo, actorID)
+	_, _, err = createPreparedPurchaseReceiptItem(ctx, tx, replacement, &biz.PurchaseReceiptItemCreate{MaterialID: item.MaterialID, WarehouseID: item.WarehouseID, UnitID: item.UnitID, PurchaseOrderItemID: item.PurchaseOrderItemID, Quantity: disposition.Quantity, UnitPrice: item.UnitPrice, Amount: amount, SourceLineNo: item.SourceLineNo, Note: &lineNote, IdempotencyKey: fmt.Sprintf("PURCHASE_REJECTION:%d:REPLACEMENT:ITEM", disposition.ID), IdempotencyPayloadHash: disposition.IdempotencyPayloadHash}, 1)
+	if err != nil {
+		return 0, err
+	}
+	return replacement.ID, nil
 }

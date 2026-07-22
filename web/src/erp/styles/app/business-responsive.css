@@ -528,10 +528,6 @@
     flex-basis: 100%;
   }
 
-  .erp-dev-capability-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .erp-dev-customer-decision-grid,
   .erp-dev-customer-quick-actions,
   .erp-dev-customer-review-list,
@@ -543,15 +539,6 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
-  .erp-dev-capability-shell {
-    grid-template-columns: minmax(240px, 300px) minmax(0, 1fr);
-    height: auto;
-  }
-
-  .erp-dev-capability-detail {
-    grid-column: 1 / -1;
-    min-height: 360px;
-  }
 }
 
 @media screen and (max-width: 980px) {
@@ -721,16 +708,8 @@
     justify-content: flex-start;
   }
 
-  .erp-dev-capability-header {
-    flex-direction: column;
-  }
-
   .erp-dev-customer-header {
     flex-direction: column;
-  }
-
-  .erp-dev-capability-view-switch {
-    width: 100%;
   }
 
   .erp-dev-customer-view-switch {
@@ -745,17 +724,8 @@
     width: 100%;
   }
 
-  .erp-dev-capability-view-switch .ant-segmented-group {
-    width: 100%;
-  }
-
   .erp-dev-customer-view-switch .ant-segmented-group {
     width: 100%;
-  }
-
-  .erp-dev-capability-view-switch .ant-segmented-item {
-    flex: 1 1 0;
-    min-width: 0;
   }
 
   .erp-dev-customer-view-switch .ant-segmented-item {
@@ -763,19 +733,9 @@
     min-width: 0;
   }
 
-  .erp-dev-capability-source {
-    width: 100%;
-    max-width: none;
-  }
-
   .erp-dev-customer-source {
     width: 100%;
     max-width: none;
-  }
-
-  .erp-dev-capability-shell {
-    grid-template-columns: 1fr;
-    min-height: 0;
   }
 
   .erp-dev-customer-panel-grid {
@@ -794,22 +754,10 @@
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-capability-sidebar {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-
   .erp-dev-customer-numbering {
     grid-template-columns: 1fr;
   }
 
-  .erp-dev-capability-filters {
-    grid-column: 1 / -1;
-  }
-
-  .erp-dev-capability-results,
-  .erp-dev-capability-detail {
-    min-height: 420px;
-  }
 }
 
 @media screen and (max-width: 768px) {
@@ -917,6 +865,7 @@
   .erp-role-center-layout,
   .erp-role-center-impact,
   .erp-role-capability-overview__grid,
+  .erp-role-navigation-preview__grid,
   .erp-role-policy-boundary__grid {
     grid-template-columns: 1fr;
   }
@@ -993,25 +942,17 @@
     width: 100%;
   }
 
-  .erp-dev-capability-metrics {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 8px;
-  }
-
   .erp-dev-governance-metric,
-  .erp-dev-testing-metric,
-  .erp-dev-capability-metric {
+  .erp-dev-testing-metric {
     gap: 6px;
     padding: 8px;
   }
 
-  .erp-dev-testing-metric,
-  .erp-dev-capability-metric {
+  .erp-dev-testing-metric {
     grid-template-columns: 30px minmax(0, 1fr);
   }
 
-  .erp-dev-testing-metric__icon,
-  .erp-dev-capability-metric__icon {
+  .erp-dev-testing-metric__icon {
     width: 30px;
     height: 30px;
     border-radius: 9px;
@@ -1019,14 +960,12 @@
   }
 
   .erp-dev-governance-metric__note,
-  .erp-dev-testing-metric__note,
-  .erp-dev-capability-metric__note {
+  .erp-dev-testing-metric__note {
     display: none;
   }
 
   .erp-dev-governance-metric__value,
-  .erp-dev-testing-metric__value,
-  .erp-dev-capability-metric__value {
+  .erp-dev-testing-metric__value {
     font-size: 20px;
   }
 
@@ -1053,45 +992,6 @@
     max-width: 100%;
   }
 
-  .erp-dev-capability-view-switch,
-  .erp-dev-capability-view-switch .ant-segmented {
-    width: 100%;
-  }
-
-  .erp-dev-capability-view-switch .ant-segmented-group {
-    display: grid;
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: 4px;
-  }
-
-  .erp-dev-capability-view-switch .ant-segmented-item {
-    min-width: 0;
-  }
-
-  .erp-dev-capability-view-switch .ant-segmented-item-label {
-    padding-inline: 8px;
-    white-space: normal;
-    word-break: break-word;
-  }
-
-  .erp-dev-capability-source,
-  .erp-dev-capability-row,
-  .erp-dev-capability-row__title,
-  .erp-dev-capability-row__meta,
-  .erp-dev-capability-row__tags,
-  .erp-dev-capability-detail__head,
-  .erp-dev-capability-detail__block,
-  .erp-dev-capability-relation,
-  .erp-dev-capability-panel {
-    overflow-wrap: anywhere;
-  }
-
-  .erp-dev-capability-row__tags .ant-tag,
-  .erp-dev-capability-detail__head .ant-tag {
-    max-width: 100%;
-    white-space: normal;
-  }
-
   .erp-dev-customer-page {
     padding: 12px;
   }
@@ -1112,21 +1012,13 @@
     min-width: 0;
   }
 
-  .erp-dev-capability-header,
-  .erp-dev-capability-metric,
-  .erp-dev-capability-panel,
-  .erp-dev-capability-results,
-  .erp-dev-capability-detail {
+  .erp-dev-capability-header {
     border-radius: 12px;
   }
 
   .erp-dev-customer-header,
   .erp-dev-customer-panel {
     border-radius: 12px;
-  }
-
-  .erp-dev-capability-sidebar {
-    grid-template-columns: 1fr;
   }
 
   .erp-dev-customer-decision-grid,
@@ -1147,21 +1039,6 @@
   .erp-dev-customer-panel--brand {
     align-items: flex-start;
     flex-direction: column;
-  }
-
-  .erp-dev-capability-results__head {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .erp-dev-capability-row__top,
-  .erp-dev-capability-row__meta {
-    align-items: flex-start;
-    flex-direction: column;
-  }
-
-  .erp-dev-capability-detail__title.ant-typography {
-    font-size: 18px;
   }
 
   .erp-dev-customer-view-switch .ant-segmented-item-label {

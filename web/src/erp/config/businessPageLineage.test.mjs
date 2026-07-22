@@ -84,17 +84,20 @@ const NON_LINEAGE_READ_ACTIONS = Object.freeze([
   'list_inventory_txns',
   'list_materials',
   'list_outsourcing_facts',
+  'list_outsourcing_return_dispositions',
   'list_outsourcing_order_items',
   'list_outsourcing_orders',
   'list_processes',
   'list_product_skus',
   'list_production_facts',
+  'list_production_exceptions',
   'list_production_orders',
   'list_products',
   'list_purchase_order_items',
   'list_purchase_orders',
   'list_purchase_receipt_adjustments',
   'list_purchase_receipts',
+  'list_purchase_rejection_dispositions',
   'list_purchase_returns',
   'list_quality_inspections',
   'list_sales_order_items',
@@ -167,15 +170,8 @@ const NON_LINEAGE_BACKEND_ONLY_ACTIONS = Object.freeze([
   // start + execute command. Keep the server command, but do not advertise a
   // second direct UI lifecycle path.
   'submit_sales_order',
-  'approve_production_exception',
-  'cancel_outsourcing_return_disposition',
-  'cancel_production_exception',
   'correct_quality_inspection_result',
-  'create_outsourcing_return_disposition',
-  'post_outsourcing_return_disposition',
   'recover_compensated_process_domain_command',
-  'reject_production_exception',
-  'submit_production_exception',
 ])
 
 test('business page lineage: exactly covers every formal-v1 business module once', () => {
@@ -1276,13 +1272,17 @@ test('business page lineage: workflow inboxes declare exact source task producer
 
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.upstreamPageKeys),
-    [['production-orders'], ['production-progress'], ['shipments']]
+    [
+      ['production-orders'],
+      ['production-progress', 'quality-inspections'],
+      ['shipments'],
+    ]
   )
   assert.deepEqual(
     workflowDefinitions.map((definition) => definition.producerActions),
     [
       ['release_production_order'],
-      ['post_production_fact'],
+      ['post_production_fact', 'submit_production_exception'],
       ['submit_shipment_release'],
     ]
   )

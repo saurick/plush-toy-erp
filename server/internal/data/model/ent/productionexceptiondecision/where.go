@@ -70,6 +70,11 @@ func Status(v string) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldStatus, v))
 }
 
+// ExecutionStatus applies equality check predicate on the "execution_status" field. It's identical to ExecutionStatusEQ.
+func ExecutionStatus(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutionStatus, v))
+}
+
 // ProductionOrderID applies equality check predicate on the "production_order_id" field. It's identical to ProductionOrderIDEQ.
 func ProductionOrderID(v int) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldProductionOrderID, v))
@@ -148,6 +153,31 @@ func DecidedAt(v time.Time) predicate.ProductionExceptionDecision {
 // DecisionReason applies equality check predicate on the "decision_reason" field. It's identical to DecisionReasonEQ.
 func DecisionReason(v string) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldDecisionReason, v))
+}
+
+// ExecutedBy applies equality check predicate on the "executed_by" field. It's identical to ExecutedByEQ.
+func ExecutedBy(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutedBy, v))
+}
+
+// ExecutedAt applies equality check predicate on the "executed_at" field. It's identical to ExecutedAtEQ.
+func ExecutedAt(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutedAt, v))
+}
+
+// ReversedBy applies equality check predicate on the "reversed_by" field. It's identical to ReversedByEQ.
+func ReversedBy(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldReversedBy, v))
+}
+
+// ReversedAt applies equality check predicate on the "reversed_at" field. It's identical to ReversedAtEQ.
+func ReversedAt(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldReversedAt, v))
+}
+
+// ReverseReason applies equality check predicate on the "reverse_reason" field. It's identical to ReverseReasonEQ.
+func ReverseReason(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldReverseReason, v))
 }
 
 // DecisionNoEQ applies the EQ predicate on the "decision_no" field.
@@ -343,6 +373,71 @@ func StatusEqualFold(v string) predicate.ProductionExceptionDecision {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// ExecutionStatusEQ applies the EQ predicate on the "execution_status" field.
+func ExecutionStatusEQ(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusNEQ applies the NEQ predicate on the "execution_status" field.
+func ExecutionStatusNEQ(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusIn applies the In predicate on the "execution_status" field.
+func ExecutionStatusIn(vs ...string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldExecutionStatus, vs...))
+}
+
+// ExecutionStatusNotIn applies the NotIn predicate on the "execution_status" field.
+func ExecutionStatusNotIn(vs ...string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldExecutionStatus, vs...))
+}
+
+// ExecutionStatusGT applies the GT predicate on the "execution_status" field.
+func ExecutionStatusGT(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusGTE applies the GTE predicate on the "execution_status" field.
+func ExecutionStatusGTE(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusLT applies the LT predicate on the "execution_status" field.
+func ExecutionStatusLT(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusLTE applies the LTE predicate on the "execution_status" field.
+func ExecutionStatusLTE(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusContains applies the Contains predicate on the "execution_status" field.
+func ExecutionStatusContains(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldContains(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusHasPrefix applies the HasPrefix predicate on the "execution_status" field.
+func ExecutionStatusHasPrefix(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldHasPrefix(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusHasSuffix applies the HasSuffix predicate on the "execution_status" field.
+func ExecutionStatusHasSuffix(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldHasSuffix(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusEqualFold applies the EqualFold predicate on the "execution_status" field.
+func ExecutionStatusEqualFold(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEqualFold(FieldExecutionStatus, v))
+}
+
+// ExecutionStatusContainsFold applies the ContainsFold predicate on the "execution_status" field.
+func ExecutionStatusContainsFold(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldContainsFold(FieldExecutionStatus, v))
 }
 
 // ProductionOrderIDEQ applies the EQ predicate on the "production_order_id" field.
@@ -1153,6 +1248,281 @@ func DecisionReasonEqualFold(v string) predicate.ProductionExceptionDecision {
 // DecisionReasonContainsFold applies the ContainsFold predicate on the "decision_reason" field.
 func DecisionReasonContainsFold(v string) predicate.ProductionExceptionDecision {
 	return predicate.ProductionExceptionDecision(sql.FieldContainsFold(FieldDecisionReason, v))
+}
+
+// ExecutedByEQ applies the EQ predicate on the "executed_by" field.
+func ExecutedByEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutedBy, v))
+}
+
+// ExecutedByNEQ applies the NEQ predicate on the "executed_by" field.
+func ExecutedByNEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldExecutedBy, v))
+}
+
+// ExecutedByIn applies the In predicate on the "executed_by" field.
+func ExecutedByIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldExecutedBy, vs...))
+}
+
+// ExecutedByNotIn applies the NotIn predicate on the "executed_by" field.
+func ExecutedByNotIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldExecutedBy, vs...))
+}
+
+// ExecutedByGT applies the GT predicate on the "executed_by" field.
+func ExecutedByGT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldExecutedBy, v))
+}
+
+// ExecutedByGTE applies the GTE predicate on the "executed_by" field.
+func ExecutedByGTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldExecutedBy, v))
+}
+
+// ExecutedByLT applies the LT predicate on the "executed_by" field.
+func ExecutedByLT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldExecutedBy, v))
+}
+
+// ExecutedByLTE applies the LTE predicate on the "executed_by" field.
+func ExecutedByLTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldExecutedBy, v))
+}
+
+// ExecutedByIsNil applies the IsNil predicate on the "executed_by" field.
+func ExecutedByIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldExecutedBy))
+}
+
+// ExecutedByNotNil applies the NotNil predicate on the "executed_by" field.
+func ExecutedByNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldExecutedBy))
+}
+
+// ExecutedAtEQ applies the EQ predicate on the "executed_at" field.
+func ExecutedAtEQ(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldExecutedAt, v))
+}
+
+// ExecutedAtNEQ applies the NEQ predicate on the "executed_at" field.
+func ExecutedAtNEQ(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldExecutedAt, v))
+}
+
+// ExecutedAtIn applies the In predicate on the "executed_at" field.
+func ExecutedAtIn(vs ...time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldExecutedAt, vs...))
+}
+
+// ExecutedAtNotIn applies the NotIn predicate on the "executed_at" field.
+func ExecutedAtNotIn(vs ...time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldExecutedAt, vs...))
+}
+
+// ExecutedAtGT applies the GT predicate on the "executed_at" field.
+func ExecutedAtGT(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldExecutedAt, v))
+}
+
+// ExecutedAtGTE applies the GTE predicate on the "executed_at" field.
+func ExecutedAtGTE(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldExecutedAt, v))
+}
+
+// ExecutedAtLT applies the LT predicate on the "executed_at" field.
+func ExecutedAtLT(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldExecutedAt, v))
+}
+
+// ExecutedAtLTE applies the LTE predicate on the "executed_at" field.
+func ExecutedAtLTE(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldExecutedAt, v))
+}
+
+// ExecutedAtIsNil applies the IsNil predicate on the "executed_at" field.
+func ExecutedAtIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldExecutedAt))
+}
+
+// ExecutedAtNotNil applies the NotNil predicate on the "executed_at" field.
+func ExecutedAtNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldExecutedAt))
+}
+
+// ReversedByEQ applies the EQ predicate on the "reversed_by" field.
+func ReversedByEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldReversedBy, v))
+}
+
+// ReversedByNEQ applies the NEQ predicate on the "reversed_by" field.
+func ReversedByNEQ(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldReversedBy, v))
+}
+
+// ReversedByIn applies the In predicate on the "reversed_by" field.
+func ReversedByIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldReversedBy, vs...))
+}
+
+// ReversedByNotIn applies the NotIn predicate on the "reversed_by" field.
+func ReversedByNotIn(vs ...int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldReversedBy, vs...))
+}
+
+// ReversedByGT applies the GT predicate on the "reversed_by" field.
+func ReversedByGT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldReversedBy, v))
+}
+
+// ReversedByGTE applies the GTE predicate on the "reversed_by" field.
+func ReversedByGTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldReversedBy, v))
+}
+
+// ReversedByLT applies the LT predicate on the "reversed_by" field.
+func ReversedByLT(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldReversedBy, v))
+}
+
+// ReversedByLTE applies the LTE predicate on the "reversed_by" field.
+func ReversedByLTE(v int) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldReversedBy, v))
+}
+
+// ReversedByIsNil applies the IsNil predicate on the "reversed_by" field.
+func ReversedByIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldReversedBy))
+}
+
+// ReversedByNotNil applies the NotNil predicate on the "reversed_by" field.
+func ReversedByNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldReversedBy))
+}
+
+// ReversedAtEQ applies the EQ predicate on the "reversed_at" field.
+func ReversedAtEQ(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldReversedAt, v))
+}
+
+// ReversedAtNEQ applies the NEQ predicate on the "reversed_at" field.
+func ReversedAtNEQ(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldReversedAt, v))
+}
+
+// ReversedAtIn applies the In predicate on the "reversed_at" field.
+func ReversedAtIn(vs ...time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldReversedAt, vs...))
+}
+
+// ReversedAtNotIn applies the NotIn predicate on the "reversed_at" field.
+func ReversedAtNotIn(vs ...time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldReversedAt, vs...))
+}
+
+// ReversedAtGT applies the GT predicate on the "reversed_at" field.
+func ReversedAtGT(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldReversedAt, v))
+}
+
+// ReversedAtGTE applies the GTE predicate on the "reversed_at" field.
+func ReversedAtGTE(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldReversedAt, v))
+}
+
+// ReversedAtLT applies the LT predicate on the "reversed_at" field.
+func ReversedAtLT(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldReversedAt, v))
+}
+
+// ReversedAtLTE applies the LTE predicate on the "reversed_at" field.
+func ReversedAtLTE(v time.Time) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldReversedAt, v))
+}
+
+// ReversedAtIsNil applies the IsNil predicate on the "reversed_at" field.
+func ReversedAtIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldReversedAt))
+}
+
+// ReversedAtNotNil applies the NotNil predicate on the "reversed_at" field.
+func ReversedAtNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldReversedAt))
+}
+
+// ReverseReasonEQ applies the EQ predicate on the "reverse_reason" field.
+func ReverseReasonEQ(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEQ(FieldReverseReason, v))
+}
+
+// ReverseReasonNEQ applies the NEQ predicate on the "reverse_reason" field.
+func ReverseReasonNEQ(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNEQ(FieldReverseReason, v))
+}
+
+// ReverseReasonIn applies the In predicate on the "reverse_reason" field.
+func ReverseReasonIn(vs ...string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIn(FieldReverseReason, vs...))
+}
+
+// ReverseReasonNotIn applies the NotIn predicate on the "reverse_reason" field.
+func ReverseReasonNotIn(vs ...string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotIn(FieldReverseReason, vs...))
+}
+
+// ReverseReasonGT applies the GT predicate on the "reverse_reason" field.
+func ReverseReasonGT(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGT(FieldReverseReason, v))
+}
+
+// ReverseReasonGTE applies the GTE predicate on the "reverse_reason" field.
+func ReverseReasonGTE(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldGTE(FieldReverseReason, v))
+}
+
+// ReverseReasonLT applies the LT predicate on the "reverse_reason" field.
+func ReverseReasonLT(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLT(FieldReverseReason, v))
+}
+
+// ReverseReasonLTE applies the LTE predicate on the "reverse_reason" field.
+func ReverseReasonLTE(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldLTE(FieldReverseReason, v))
+}
+
+// ReverseReasonContains applies the Contains predicate on the "reverse_reason" field.
+func ReverseReasonContains(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldContains(FieldReverseReason, v))
+}
+
+// ReverseReasonHasPrefix applies the HasPrefix predicate on the "reverse_reason" field.
+func ReverseReasonHasPrefix(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldHasPrefix(FieldReverseReason, v))
+}
+
+// ReverseReasonHasSuffix applies the HasSuffix predicate on the "reverse_reason" field.
+func ReverseReasonHasSuffix(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldHasSuffix(FieldReverseReason, v))
+}
+
+// ReverseReasonIsNil applies the IsNil predicate on the "reverse_reason" field.
+func ReverseReasonIsNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldIsNull(FieldReverseReason))
+}
+
+// ReverseReasonNotNil applies the NotNil predicate on the "reverse_reason" field.
+func ReverseReasonNotNil() predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldNotNull(FieldReverseReason))
+}
+
+// ReverseReasonEqualFold applies the EqualFold predicate on the "reverse_reason" field.
+func ReverseReasonEqualFold(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldEqualFold(FieldReverseReason, v))
+}
+
+// ReverseReasonContainsFold applies the ContainsFold predicate on the "reverse_reason" field.
+func ReverseReasonContainsFold(v string) predicate.ProductionExceptionDecision {
+	return predicate.ProductionExceptionDecision(sql.FieldContainsFold(FieldReverseReason, v))
 }
 
 // And groups predicates with the AND operator between them.

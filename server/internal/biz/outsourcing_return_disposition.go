@@ -29,13 +29,13 @@ var (
 )
 
 type OutsourcingReturnDisposition struct {
-	ID, QualityInspectionID, OutsourcingReturnFactID, CreatedBy int
-	DispositionNo, DispositionType, Status, Reason              string
-	Quantity                                                    decimal.Decimal
-	ProductionWIPBatchID, PostedBy, CancelledBy                 *int
-	PostedAt, CancelledAt                                       *time.Time
-	CancelReason                                                *string
-	Version                                                     int
+	ID, QualityInspectionID, OutsourcingReturnFactID, CreatedBy   int
+	DispositionNo, DispositionType, Status, Reason                string
+	Quantity                                                      decimal.Decimal
+	ProductionWIPBatchID, ResultWIPBatchID, PostedBy, CancelledBy *int
+	PostedAt, CancelledAt                                         *time.Time
+	CancelReason                                                  *string
+	Version                                                       int
 }
 type OutsourcingReturnDispositionCreate struct {
 	DispositionNo, DispositionType, Reason, IdempotencyKey string
@@ -47,11 +47,37 @@ type OutsourcingReturnDispositionMutation struct {
 	ID, ExpectedVersion, ActorID int
 	Reason                       string
 }
+type OutsourcingReturnDispositionFilter struct {
+	QualityInspectionID, OutsourcingReturnFactID int
+	Status                                       string
+	Limit, Offset                                int
+}
 type OutsourcingReturnDispositionRepo interface {
 	CreateOutsourcingReturnDisposition(context.Context, *OutsourcingReturnDispositionCreate, string) (*OutsourcingReturnDisposition, error)
 	PostOutsourcingReturnDisposition(context.Context, *OutsourcingReturnDispositionMutation) (*OutsourcingReturnDisposition, error)
 	CancelOutsourcingReturnDisposition(context.Context, *OutsourcingReturnDispositionMutation) (*OutsourcingReturnDisposition, error)
 	GetOutsourcingReturnDisposition(context.Context, int) (*OutsourcingReturnDisposition, error)
+}
+type OutsourcingReturnDispositionListRepo interface {
+	ListOutsourcingReturnDispositions(context.Context, OutsourcingReturnDispositionFilter) ([]*OutsourcingReturnDisposition, int, error)
+}
+
+func (uc *OperationalFactUsecase) ListOutsourcingReturnDispositions(ctx context.Context, filter OutsourcingReturnDispositionFilter) ([]*OutsourcingReturnDisposition, int, error) {
+	if uc == nil || uc.repo == nil || filter.QualityInspectionID < 0 || filter.OutsourcingReturnFactID < 0 || filter.Offset < 0 {
+		return nil, 0, ErrBadParam
+	}
+	repo, ok := any(uc.repo).(OutsourcingReturnDispositionListRepo)
+	if !ok {
+		return nil, 0, ErrBadParam
+	}
+	filter.Status = strings.ToUpper(strings.TrimSpace(filter.Status))
+	if filter.Status != "" && filter.Status != OutsourcingDispositionDraft && filter.Status != OutsourcingDispositionPosted && filter.Status != OutsourcingDispositionCancelled {
+		return nil, 0, ErrBadParam
+	}
+	if filter.Limit <= 0 || filter.Limit > 200 {
+		filter.Limit = 50
+	}
+	return repo.ListOutsourcingReturnDispositions(ctx, filter)
 }
 
 func (uc *OperationalFactUsecase) CreateOutsourcingReturnDisposition(ctx context.Context, in *OutsourcingReturnDispositionCreate) (*OutsourcingReturnDisposition, error) {
@@ -67,7 +93,7 @@ func (uc *OperationalFactUsecase) CreateOutsourcingReturnDisposition(ctx context
 	if n.DispositionType == OutsourcingDispositionReturnToVendor && n.ProductionWIPBatchID != nil {
 		return nil, ErrOutsourcingDispositionSourceInvalid
 	}
-	if n.DispositionType == OutsourcingDispositionRework && (n.ProductionWIPBatchID == nil || *n.ProductionWIPBatchID <= 0) {
+	if n.DispositionType == OutsourcingDispositionRework && n.ProductionWIPBatchID != nil && *n.ProductionWIPBatchID <= 0 {
 		return nil, ErrOutsourcingDispositionSourceInvalid
 	}
 	if n.DispositionType != OutsourcingDispositionReturnToVendor && n.DispositionType != OutsourcingDispositionRework {

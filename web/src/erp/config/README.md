@@ -12,7 +12,7 @@
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------- |
 | 正式入口与菜单 | `seedData.mjs`、`menuPermissions.mjs`、`businessModules.mjs`、`appRegistry.mjs`、`entryConfig.mjs`                                  | 桌面菜单、岗位入口、权限码映射和登录入口展示            |
 | 客户配置投影   | `customerMenuConfig.mjs`、`devCustomerConfig.mjs`、`devCustomerConfigRoute.mjs`                                                     | 消费静态客户外观 / 菜单候选和 dev-only 客户配置预检入口 |
-| dev-only 导航  | `devHub.mjs`、`devRoutes.mjs`、`devDocs.mjs`、`devTesting.mjs`、`devGovernance.mjs`、`devPrototypes.mjs`、`devCapabilityLedger.mjs` | `/__dev/*` 本地治理、文档、测试、原型和能力台账入口     |
+| dev-only 导航  | `devHub.mjs`、`devRoutes.mjs`、`devDocs.mjs`、`devTesting.mjs`、`devGovernance.mjs`、`devPrototypes.mjs`、`devCapabilityLedger.mjs` | `/__dev/*` 本地治理、文档、测试、原型和能力真源入口     |
 | 展示配置       | `commandCenter.mjs`、`dashboardModules.mjs`、`workflowStatus.mjs`、`printTemplates.mjs`                                             | 工作台、看板、Workflow 状态和打印模板字段预检展示       |
 
 ## 边界

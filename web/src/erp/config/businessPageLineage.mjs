@@ -602,6 +602,41 @@ export const businessPageFlowDefinitions = Object.freeze(
           'quality-inspections',
           'cancel_purchase_rejection_disposition',
         ],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'post_outsourcing_return_disposition',
+        ],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'cancel_outsourcing_return_disposition',
+        ],
+        [
+          'production-exceptions',
+          'production-exceptions',
+          'approve_production_exception',
+        ],
+        [
+          'production-exceptions',
+          'production-exceptions',
+          'reject_production_exception',
+        ],
+        [
+          'production-exceptions',
+          'production-exceptions',
+          'cancel_production_exception',
+        ],
+        [
+          'production-exceptions',
+          'production-progress',
+          'execute_production_exception',
+        ],
+        [
+          'production-exceptions',
+          'production-progress',
+          'reverse_production_exception',
+        ],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
           flowType: BUSINESS_FLOW_TYPES.LIFECYCLE_TRANSITION,
@@ -612,14 +647,20 @@ export const businessPageFlowDefinitions = Object.freeze(
       )
     )
     .concat(
-      [['shipments', 'sales-returns', 'create_sales_return']].map(
-        ([fromPageKey, toPageKey, action]) =>
-          businessFlow({
-            flowType: BUSINESS_FLOW_TYPES.DOMAIN_GENERATE,
-            fromPageKey,
-            toPageKey,
-            action,
-          })
+      [
+        ['shipments', 'sales-returns', 'create_sales_return'],
+        [
+          'quality-inspections',
+          'production-exceptions',
+          'submit_production_exception',
+        ],
+      ].map(([fromPageKey, toPageKey, action]) =>
+        businessFlow({
+          flowType: BUSINESS_FLOW_TYPES.DOMAIN_GENERATE,
+          fromPageKey,
+          toPageKey,
+          action,
+        })
       )
     )
     .concat(
@@ -631,6 +672,11 @@ export const businessPageFlowDefinitions = Object.freeze(
           'quality-inspections',
           'quality-inspections',
           'create_purchase_rejection_disposition',
+        ],
+        [
+          'quality-inspections',
+          'quality-inspections',
+          'create_outsourcing_return_disposition',
         ],
       ].map(([fromPageKey, toPageKey, action]) =>
         businessFlow({
@@ -953,6 +999,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
       'inbound',
       'inventory',
       'production-progress',
+      'production-exceptions',
       'shipments',
       'payables',
     ],
@@ -1060,8 +1107,8 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   },
   'production-exceptions': {
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,
-    upstreamPageKeys: ['production-progress'],
-    producerActions: ['post_production_fact'],
+    upstreamPageKeys: ['production-progress', 'quality-inspections'],
+    producerActions: ['post_production_fact', 'submit_production_exception'],
     sourceTypes: ['production-progress'],
     downstreamPageKeys: [],
     taskGroups: ['production_exception'],
@@ -1069,7 +1116,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.IMPLEMENTED,
     availabilityNote:
-      '返工生产记录过账时原子生成生产异常待办；普通领料或完工过账不生成异常任务，任务完成也不代替返工事实。',
+      '返工生产记录过账可生成协同待办；报废、超领和在制让步由正式异常申请进入审批，审批不代替库存或在制办理，批准后仍须由对应生产入口确认执行。',
   },
   'shipping-release': {
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,

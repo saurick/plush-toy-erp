@@ -129,6 +129,8 @@ func (PurchaseReceipt) Edges() []ent.Edge {
 			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("quality_inspections", QualityInspection.Type).
 			Annotations(entsql.OnDelete(entsql.NoAction)),
+		edge.To("replacement_dispositions", PurchaseRejectionDisposition.Type).
+			Annotations(entsql.OnDelete(entsql.NoAction)),
 		edge.To("items", PurchaseReceiptItem.Type),
 	}
 }

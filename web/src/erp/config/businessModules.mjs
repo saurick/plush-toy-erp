@@ -237,7 +237,7 @@ export const businessModuleDefinitions = Object.freeze([
     primaryEntity: 'quality_inspections',
     factSource: 'quality_inspections, inventory_lots',
     boundary:
-      '每张质检单只表达一次通用判定，不能代表裁片、皮套、针检、抽检或客户验货全部完成；估算不良比例不会自动换算退货数量；首次到货检验不合格会阻止入库，退供应商只适用于已入库后追加检验不合格；质检状态变化不会增减库存总量。',
+      '每张质检单只表达一次通用判定，不能代表裁片、皮套、针检、抽检或客户验货全部完成；估算不良比例不会自动换算退货数量；首次到货检验不合格会阻止入库，可另行按来源行办理部分退厂或补换；已入库后的不合格才走采购退货。质检状态变化不会自行增减库存总量。',
     sourceRefs: [
       'quality_inspections',
       'inventory_lots',
