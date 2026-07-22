@@ -1122,7 +1122,11 @@ export async function applyManualAcceptanceAccountScenarios(
     backendURL: safePlan.backendURL,
     token: guardToken,
     fetchImpl,
-    allowMutation: !resolvedTarget.external,
+    // Both registered acceptance targets use the audited admin RPC. The 133
+    // attestation and exact confirmation already exclude production targets;
+    // keeping the remote path verify-only would leave a fresh migrated database
+    // at NONE because its four core warehouses are created after migration.
+    allowMutation: true,
   });
   const formalAccountBootstrap = await bootstrapMissingFormalAccounts({
     plan: safePlan,

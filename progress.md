@@ -6,9 +6,21 @@
 
 - 当前真源入口为 `docs/当前真源与交接顺序.md`、对应产品 / 架构文档、当前代码、Atlas migration 和测试；截图、历史任务与本文件不能单独证明运行态。
 - 当前共享 worktree 的并行写任务已经结束，现由单一 Git owner 冻结并收口整树；来源血缘、事实退出、生产路线 / WIP、岗位任务、九角色权限和页面合同按同一最终树核对，不把相邻差异拆算为独立已交付任务。最新完整 `strict` 已输出 `status=complete`；本记录写入后只需完成文档、diff、数据库守卫和证据一致性收口。
-- 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 已从空库应用到 `20260722000505`、90 executed、pending 0，并重新生成 fresh baseline、九阶段数据和浏览器证据；上一份模拟验收库保留为可恢复归档 `plush_erp_acceptance_v5_archive_20260722_0754`。共享库、133 和生产均没有本轮 apply 证据。
-- 当前请求没有授权提交或推送；仍不创建分支、不部署、不执行共享库 / 目标库 migration 或 backfill。提交推送必须先再次取得用户明确同意，目标 health / smoke、固定镜像 readback 和客户 UAT 仍是独立关口。
-- 发布目标仍是内网测试机 `192.168.0.133`；本次提交推送不等于该目标环境已经发布或验收。
+- 登记的专用本地验收库 `plush_erp_acceptance_20260716_v5_dev` 与 133 V5 固定库 `plush_erp_uat_20260716_v5` 均已应用到 `20260722000505`、90 executed、pending 0；两端分别从空业务基线生成同版本、独立 ID 的九阶段数据。旧本地库和旧 133 V5 库均以可恢复改名方式保留，未清理。
+- 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。旧 `plush-toy-erp-prod` 回滚栈未改动，客户 UAT / 签收仍是独立关口。
+- 当前 Git 由单一 owner 收口；本轮已获提交、推送和 133 部署授权，不创建分支。后续如再修改运行时代码或 migration，必须生成新的不可变 release 并重新走目标环境证据链。
+
+## 2026-07-22 133 V5 发布、同语义造数与目标浏览器验收
+
+完成：将整树提交 `80b77faeab566660c77fc23cc66c272096692f16` 推送到 `origin/main`，从该 clean commit 构建并上传 `linux/amd64` server / web 固定标签镜像。源码包与镜像包在上传两端完成 SHA-256 校验；133 当前 V5 release 目录和受控 env 已切换到新镜像，旧源码、旧镜像、旧库及 `plush-toy-erp-prod` 栈均保留为回滚点。
+
+完成：发布前对旧 V5 库生成备份并在本机隔离 PostgreSQL 中完成真实恢复演练。恢复库从 `20260715161753` 应用 14 个 migration 到 `20260722000505`，populated-upgrade、customer-config-cutover 两项只读审计、64 张 public 表 smoke、后端 health / ready 和 Web smoke 均通过。目标停机窗口只停止 V5 app / web；旧固定库可恢复地改名为 `plush_erp_uat_20260716_v5_pre80b77fae`，随后重建同名空库并执行 90 / 90 migration、首个管理员、客户配置 validate / publish / activate / readback 和 exact core bootstrap。
+
+完成：首次 133 dataset fresh run 在 role 阶段发现 migration 先于核心仓库创建，导致 `warehouse / quality` 范围仍为 `NONE`，runner 正确 fail-closed，未进入来源单或 Fact 写入。修复后已注册 local / 133 验收目标统一通过带版本校验和审计的正式 `admin.set_role_data_scopes`，精确绑定 4 个核心仓库；没有直接 SQL 改 RBAC，也没有扩大生产目标。原失败回执和时间锚点保留，通过同批 resume 完成 role、source、task、facts、purchase-quality、attachments 和 readiness。
+
+目标证据：当前库有 14 个管理员、272 条 Workflow 任务、45 张销售单、90 张采购单、45 张委外单、54 张采购收货、169 张质检、498 条库存流水、47 张出货和 274 条财务事实；`warehouse / quality` 均为 `ASSIGNED:4`。浏览器验收正式桌面账号 10 / 10、移动岗位 9 / 9、异常账号 3 / 3、页面 50 / 50、页面数据证据 48 / 48；5 份采购 / 加工 / 工程 PDF 均为 HTTP 200、有效 PDF、带 request id 和 25 行来源数据。运行态 preflight 证明四服务唯一、镜像 / release 一致、非 root、Chromium pin / seccomp、health / ready 均通过，fatal 日志扫描为 0。
+
+未做 / 风险：这是 `customer-trial-133` 模拟验收数据与目标技术验收，不是真实客户数据、生产发布或客户 UAT。旧库、旧源码和旧镜像暂未清理；当前根磁盘约 79% 使用、约 21 GiB 可用，后续清理必须继续保留当前版与明确回滚版，不得全局 prune。管理员与岗位临时密码不写入仓库、报告或远端 steady env。
 
 ## 2026-07-22 永绅九角色 P0 权限与本地验收闭环
 

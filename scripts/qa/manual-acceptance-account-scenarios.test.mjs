@@ -650,6 +650,12 @@ test("registered 133 target reconciles the same three scenario accounts without 
     environment: "remote",
     revision: CUSTOMER_TRIAL_133_CONFIG_REVISION,
   });
+  for (const roleKey of ["warehouse", "quality"]) {
+    const selected = backend.roleState.find((item) => item.role_key === roleKey);
+    selected.data_scopes = [
+      { resource_type: "warehouse", mode: "NONE", resource_ids: [] },
+    ];
+  }
   const plan = buildManualAcceptanceAccountScenarioPlan({
     backendURL: CUSTOMER_TRIAL_133_ORIGIN,
     target: CUSTOMER_TRIAL_133_TARGET,
@@ -671,8 +677,13 @@ test("registered 133 target reconciles the same three scenario accounts without 
   assert.equal(report.target, CUSTOMER_TRIAL_133_TARGET);
   assert.equal(report.dataVersion, "2026.07.16-v5");
   assert.equal(report.runId, "20260716-V5");
-  assert.equal(report.roleCapabilityBaseline.mode, "verify-only");
+  assert.equal(report.roleDataScopeBaseline.mode, "reconcile");
+  assert.equal(report.roleDataScopeBaseline.updated, 2);
   assert.equal(rolePermissionCalls(backend).length, 0);
+  assert.deepEqual(
+    roleDataScopeCalls(backend).map((call) => call.params.role_key),
+    ["warehouse", "quality"],
+  );
   assert.equal(report.summary.created, 3);
   assert.equal(report.scenarios.length, 3);
   assert.equal(report.formalAccountBootstrap.created, 0);
