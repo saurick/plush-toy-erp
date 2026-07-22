@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
-import os from "node:os";
 import path from "node:path";
 import test from "node:test";
 
@@ -16,6 +15,21 @@ const populatedUpgradePreflight = path.join(
 );
 const systemFlock = findCommand("flock");
 const perl = findCommand("perl");
+const fixtureScratchRoot = path.join(repoRoot, "output", "qa-tmp");
+
+function createFixtureRoot() {
+  fs.mkdirSync(fixtureScratchRoot, { recursive: true, mode: 0o700 });
+  fs.chmodSync(fixtureScratchRoot, 0o700);
+  const root = fs.realpathSync(
+    fs.mkdtempSync(path.join(fixtureScratchRoot, "migrate-online-")),
+  );
+  assert.doesNotMatch(
+    root,
+    /^\/(?:tmp|var\/tmp|dev\/shm)(?:\/|$)/u,
+    "migration fixture root must not use a shared temporary directory",
+  );
+  return root;
+}
 
 function findCommand(command) {
   const result = spawnSync("sh", ["-c", `command -v ${command}`], {
@@ -30,9 +44,7 @@ function writeExecutable(filePath, source) {
 }
 
 function createFixture({ useSystemFlock = false } = {}) {
-  const root = fs.realpathSync(
-    fs.mkdtempSync(path.join(os.tmpdir(), "migrate-online-")),
-  );
+  const root = createFixtureRoot();
   const binDir = path.join(root, "bin");
   const migrateDir = path.join(root, "migrations");
   const fixtureMigrateScript = path.join(root, "migrate_online.sh");
@@ -991,6 +1003,27 @@ test("migrate_online 拒绝相对锁路径", () => {
     assert.notEqual(result.status, 0);
     assert.match(result.stderr, /MIGRATION_LOCK_FILE 必须是绝对路径/);
     assert.deepEqual(atlasPhases(fixture.atlasLog), []);
+  } finally {
+    fs.rmSync(fixture.root, { recursive: true, force: true });
+  }
+});
+
+test("migrate_online 拒绝共享临时目录锁", () => {
+  const fixture = createFixture();
+  try {
+    for (const migrationLockFile of [
+      "/tmp/plush-migrate/atlas-migrate.lock",
+      "/var/tmp/plush-migrate/atlas-migrate.lock",
+      "/dev/shm/plush-migrate/atlas-migrate.lock",
+    ]) {
+      const result = runMigration(fixture, ["--status-only"], {
+        MIGRATION_LOCK_FILE: migrationLockFile,
+      });
+
+      assert.notEqual(result.status, 0);
+      assert.match(result.stderr, /MIGRATION_LOCK_FILE 不得位于共享临时目录/u);
+      assert.deepEqual(atlasPhases(fixture.atlasLog), []);
+    }
   } finally {
     fs.rmSync(fixture.root, { recursive: true, force: true });
   }

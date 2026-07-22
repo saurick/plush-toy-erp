@@ -145,6 +145,10 @@ function RootEntryRedirect() {
     )
   }
 
+  if (target === ENTRY_TARGET.MOBILE_TASKS) {
+    return <Navigate to="/entry?reason=mobile-role-unassigned" replace />
+  }
+
   return <Navigate to="/entry" replace />
 }
 

@@ -335,6 +335,12 @@ prepare_migration_lock() {
     ;;
   esac
   case "$MIGRATION_LOCK_FILE" in
+  /tmp/* | /var/tmp/* | /dev/shm/*)
+    echo "ERROR: MIGRATION_LOCK_FILE 不得位于共享临时目录: $MIGRATION_LOCK_FILE" >&2
+    exit 1
+    ;;
+  esac
+  case "$MIGRATION_LOCK_FILE" in
   */../* | */.. | */./* | */.)
     echo "ERROR: MIGRATION_LOCK_FILE 不得包含 . 或 .. 路径段: $MIGRATION_LOCK_FILE" >&2
     exit 1

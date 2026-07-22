@@ -17,6 +17,7 @@ import { JsonRpc } from '@/common/utils/jsonRpc'
 import { getEffectiveSession } from '../api/customerConfigApi.mjs'
 import {
   getEntryConfig,
+  getEnabledMobileRoleKeys,
   hasDesktopEntryAccess,
   isMobileRoleEntryEnabled,
   resolveMobileTasksPath,
@@ -31,7 +32,10 @@ import {
   loadProfileSyncReadWithRetry,
   resolveEffectiveSessionCustomerKey,
 } from '../utils/adminProfileSync.mjs'
-import { hasMobileRolePermission } from '../utils/mobileRolePermissions.mjs'
+import {
+  getAllowedMobileRoleKeys,
+  hasMobileRolePermission,
+} from '../utils/mobileRolePermissions.mjs'
 
 const PROFILE_BOOTSTRAP_RETRY_DELAYS_MS = [200, 600]
 const PROFILE_SYNC_INTERVAL_MS = 60 * 1000
@@ -137,6 +141,10 @@ export default function MobileAppLayout() {
   const mobileRolePermissionAllowed =
     mobileRoleEntryAvailable &&
     hasMobileRolePermission(adminProfile, activeRoleKey)
+  const allowedMobileRoleKeys = getAllowedMobileRoleKeys(
+    adminProfile,
+    getEnabledMobileRoleKeys(entryConfig)
+  )
   const customerRuntimeAvailable = canMountCustomerRuntime(adminProfile)
   const shouldBlockMissingCustomerRuntime =
     profileSyncCompleted &&
@@ -361,13 +369,18 @@ export default function MobileAppLayout() {
       navigate('/entry', { replace: true })
       return
     }
-    navigate('/entry?reason=mobile-role-unavailable', {
+    const reason =
+      allowedMobileRoleKeys.length > 0
+        ? 'mobile-role-unavailable'
+        : 'mobile-role-unassigned'
+    navigate(`/entry?reason=${reason}`, {
       replace: true,
     })
   }, [
     activeRoleKey,
     canUseCurrentMobileRole,
     mobileRoleEntryAvailable,
+    allowedMobileRoleKeys.length,
     navigate,
     profileSyncCompleted,
     shouldBlockMissingCustomerRuntime,

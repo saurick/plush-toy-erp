@@ -6,9 +6,27 @@ import {
   hasMobileRolePermission,
 } from './mobileRolePermissions.mjs'
 
-test('mobileRolePermissions: 超级管理员拥有全部岗位任务端角色权限', () => {
+test('mobileRolePermissions: 超级管理员不自动获得业务岗位任务端入口', () => {
   assert.equal(
-    hasMobileRolePermission({ is_super_admin: true, permissions: [] }, 'boss'),
+    hasMobileRolePermission(
+      {
+        is_super_admin: true,
+        permissions: ['mobile.boss.access'],
+        roles: [{ role_key: 'admin' }],
+      },
+      'boss'
+    ),
+    false
+  )
+  assert.equal(
+    hasMobileRolePermission(
+      {
+        is_super_admin: true,
+        permissions: ['mobile.boss.access'],
+        roles: [{ role_key: 'admin' }, { role_key: 'boss' }],
+      },
+      'boss'
+    ),
     true
   )
 })

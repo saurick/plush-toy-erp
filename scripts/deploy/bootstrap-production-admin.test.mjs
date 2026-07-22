@@ -1139,6 +1139,24 @@ test("bootstrap production admin rejects a non-private lock parent before docker
   assertSecretSafe(result, fixture);
 });
 
+test("bootstrap production admin rejects shared temporary lock roots before docker", (t) => {
+  for (const migrationLockFile of [
+    "/tmp/plush-bootstrap/atlas-migrate.lock",
+    "/var/tmp/plush-bootstrap/atlas-migrate.lock",
+    "/dev/shm/plush-bootstrap/atlas-migrate.lock",
+  ]) {
+    const fixture = writeFixture(t);
+    replaceEnvValues(fixture.envFile, { MIGRATION_LOCK_FILE: migrationLockFile });
+
+    const result = runHelper(fixture);
+
+    assert.notEqual(result.status, 0);
+    assert.match(result.stderr, /lock 不得位于共享临时目录/u);
+    assert.equal(fs.existsSync(fixture.dockerLog), false);
+    assertSecretSafe(result, fixture);
+  }
+});
+
 test("bootstrap production admin rejects missing, local-default and weak secrets before docker", (t) => {
   for (const [password, expected] of [
     ["", /必须通过环境变量 APP_ADMIN_PASSWORD/u],

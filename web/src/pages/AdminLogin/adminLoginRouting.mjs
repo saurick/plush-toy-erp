@@ -27,6 +27,12 @@ export function resolveAdminPostLoginPath({
     return ''
   }
 
+  const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)
+  const allowedRoleKeys = getAllowedMobileRoleKeys(
+    adminProfile,
+    enabledRoleKeys
+  )
+
   if (fromMobileRoleKey && entryTarget === ENTRY_TARGET.MOBILE_TASKS) {
     if (
       isMobileRoleEntryEnabled(fromMobileRoleKey, entryConfig) &&
@@ -37,7 +43,9 @@ export function resolveAdminPostLoginPath({
       }
       return redirectTo
     }
-    return ''
+    return allowedRoleKeys.length > 0
+      ? '/entry?reason=mobile-role-unavailable'
+      : '/entry?reason=mobile-role-unassigned'
   }
 
   if (entryTarget === ENTRY_TARGET.DESKTOP) {
@@ -51,11 +59,6 @@ export function resolveAdminPostLoginPath({
   }
 
   if (entryTarget === ENTRY_TARGET.MOBILE_TASKS) {
-    const enabledRoleKeys = getEnabledMobileRoleKeys(entryConfig)
-    const allowedRoleKeys = getAllowedMobileRoleKeys(
-      adminProfile,
-      enabledRoleKeys
-    )
     const requestedRoleKey = fixedMobileRoleKey
     if (
       requestedRoleKey &&
@@ -74,10 +77,7 @@ export function resolveAdminPostLoginPath({
       }
       return mobileEntryPath
     }
-    if (hasDesktopEntryAccess(adminProfile, entryConfig)) {
-      return '/entry?target=desktop'
-    }
-    return ''
+    return '/entry?reason=mobile-role-unassigned'
   }
 
   return '/entry'

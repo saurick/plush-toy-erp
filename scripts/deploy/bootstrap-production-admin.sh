@@ -186,6 +186,11 @@ acquire_bootstrap_lock() {
   local database="$3"
   local lock_root_mode lock_root_uid
 
+  case "$lock_root" in
+  /tmp/* | /var/tmp/* | /dev/shm/*)
+    fail "admin bootstrap lock 不得位于共享临时目录"
+    ;;
+  esac
   [[ "$lock_root" == /* && "$lock_root" != "/" && "$lock_root" != "/run/lock" ]] || fail "admin bootstrap lock 必须位于专用绝对目录"
   [[ -d "$lock_root" && ! -L "$lock_root" ]] || fail "admin bootstrap lock 目录不存在、不是目录或是符号链接"
   lock_root_mode="$(path_mode "$lock_root")"

@@ -132,6 +132,15 @@ export default function EntrySelectionPage() {
             />
           ) : null}
 
+          {entryReason === 'mobile-role-unassigned' ? (
+            <Alert
+              type="info"
+              showIcon
+              message="当前账号未分配业务岗位"
+              description="手机待办只向明确分配的业务岗位开放。您可以进入电脑端后台，或联系管理员分配业务岗位。"
+            />
+          ) : null}
+
           {entryReason === 'mobile-runtime-unavailable' ? (
             <Alert
               type="info"

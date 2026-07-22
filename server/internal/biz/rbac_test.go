@@ -545,6 +545,24 @@ func TestAdminCanAccessMobileRoleUsesPermissionCode(t *testing.T) {
 	}
 }
 
+func TestAdminCanAccessMobileRoleRequiresExplicitBusinessRoleForSuperAdmin(t *testing.T) {
+	admin := &AdminUser{
+		ID:           1,
+		Username:     "root",
+		IsSuperAdmin: true,
+		Roles:        []AdminRole{{Key: AdminRoleKey}},
+		Permissions:  AllPermissionKeys(),
+	}
+
+	if AdminCanAccessMobileRole(admin, BossRoleKey) {
+		t.Fatal("super admin without boss role must not enter boss mobile tasks")
+	}
+	admin.Roles = append(admin.Roles, AdminRole{Key: BossRoleKey})
+	if !AdminCanAccessMobileRole(admin, BossRoleKey) {
+		t.Fatal("super admin with explicit boss role should enter boss mobile tasks")
+	}
+}
+
 func TestPermissionDefinitionsSeparateDelegableAndControlPlaneCapabilities(t *testing.T) {
 	business, ok := PermissionDefinitionByKey(PermissionWarehouseInventoryRead)
 	if !ok || business.Class != PermissionClassBusiness || !business.Assignable || business.NonProductionOnly {

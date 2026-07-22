@@ -28,7 +28,11 @@ export function hasMobileRolePermission(adminProfile, roleKey) {
     return true
   }
   if (adminProfile?.is_super_admin === true) {
-    return true
+    return normalizeStringList(
+      (adminProfile?.roles || []).map((role) => role?.role_key || role?.key)
+    )
+      .map((assignedRoleKey) => normalizeRoleKey(assignedRoleKey))
+      .includes(normalizedRole)
   }
   const requiredPermission = getMobileRolePermissionKey(normalizedRole)
   if (!requiredPermission) {

@@ -110,6 +110,7 @@ func TestJsonrpcDispatcher_SMSIdentityResponsesPreventEnumeration(t *testing.T) 
 			t.Fatalf("put admin %s: %v", account.username, err)
 		}
 	}
+	repo.byUsername["eligible"].Roles = []biz.AdminRole{{Key: biz.PurchaseRoleKey}}
 	repo.byUsername["no-role"].IsSuperAdmin = false
 	provider := &recordingSMSLoginCodeProvider{delegate: biz.NewLocalSMSLoginCodeProvider("admin")}
 	d := &jsonrpcDispatcher{

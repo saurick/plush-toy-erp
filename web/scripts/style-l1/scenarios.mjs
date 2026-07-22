@@ -995,6 +995,19 @@ export function createStyleL1Scenarios(deps) {
     menus: [{ path: '/erp/dashboard' }],
     erp_preferences: { column_orders: {} },
   })
+  const adminOnlySuperProfile = Object.freeze({
+    id: 1,
+    username: 'style-l1-admin-only',
+    is_super_admin: true,
+    roles: [{ role_key: 'admin', name: '系统管理员' }],
+    permissions: [
+      'system.user.read',
+      'mobile.boss.access',
+      'mobile.sales.access',
+    ],
+    menus: [{ path: '/erp/dashboard' }],
+    erp_preferences: { column_orders: {} },
+  })
   const multiMobileRoleEffectiveSession = Object.freeze({
     ...customerRuntimeEffectiveSession,
     configRevision: 'style-l1-entry-multi-role',
@@ -1498,6 +1511,53 @@ export function createStyleL1Scenarios(deps) {
           0,
           '多岗位登录完成后不应停留在入口选择卡片'
         )
+      },
+    },
+    {
+      name: 'admin-only-mobile-login-role-boundary',
+      path: '/admin-login',
+      mockAdminRpc: true,
+      customerKey: 'yoyoosun',
+      adminProfile: adminOnlySuperProfile,
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await page.getByText('手机端待办', { exact: true }).click()
+        await page.getByLabel('账号').fill('style-l1-admin-only')
+        await page.locator('#password').fill('style-l1-password')
+        await page.getByRole('button', { name: /^登\s*录$/u }).click()
+        await page.waitForURL(
+          (url) =>
+            url.pathname === '/entry' &&
+            url.searchParams.get('reason') === 'mobile-role-unassigned',
+          { timeout: 10_000 }
+        )
+        await expectText(page, '当前账号未分配业务岗位')
+        await expectButton(page, '电脑端')
+        await expectButton(page, '退出登录')
+        await expectNoButton(page, '手机待办')
+        await assertTextAbsent(page, '老板手机待办')
+      },
+    },
+    {
+      name: 'admin-only-mobile-deep-link-role-boundary',
+      path: '/m/boss/tasks',
+      auth: 'admin',
+      adminProfile: adminOnlySuperProfile,
+      effectiveSession: customerRuntimeEffectiveSession,
+      viewport: { width: 390, height: 844 },
+      verify: async (page) => {
+        await page.waitForURL(
+          (url) =>
+            url.pathname === '/entry' &&
+            url.searchParams.get('reason') === 'mobile-role-unassigned',
+          { timeout: 10_000 }
+        )
+        await expectText(page, '当前账号未分配业务岗位')
+        await expectButton(page, '电脑端')
+        await expectButton(page, '退出登录')
+        await expectNoButton(page, '手机待办')
+        await assertTextAbsent(page, '老板手机待办')
       },
     },
     {

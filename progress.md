@@ -10,6 +10,16 @@
 - 133 V5 已运行 release `80b77faeab566660c77fc23cc66c272096692f16` 的 amd64 server / web 镜像；runtime preflight、health / ready、50 页浏览器和 5 份 PDF 验收通过。公网 `admin.yoyoosun.net` 的入口适配容器也已切到同一 V5 web / backend，旧入口容器仅停止并保留为即时回滚点；客户 UAT / 签收仍是独立关口。
 - 当前 Git 由单一 owner 收口；本轮已获提交、推送和 133 部署授权，不创建分支。后续如再修改运行时代码或 migration，必须生成新的不可变 release 并重新走目标环境证据链。
 
+## 2026-07-22 系统管理员移动岗位身份边界
+
+完成：修正 `admin` / `is_super_admin` 登录手机端后被自动投影为第一个 `boss` 岗位的问题。普通账号继续以 `mobile.<role>.access` 作为岗位任务端入口真源；超级管理员的系统全权限不再自动等于九个业务岗位，只有明确绑定对应业务岗位后才能进入该岗位任务端。admin-only 从手机登录、根入口或 `/m/<role>/tasks` 深链进入时保留登录态，统一显示“当前账号未分配业务岗位”，提供电脑端与退出登录，不渲染老板标签或手机待办按钮。
+
+完成：前后端共用边界同步收紧。前端登录跳转、根路由、入口页和移动布局复用同一岗位判定；服务端短信发码 / 登录的 `AdminCanAccessMobileRole` 对超级管理员要求显式业务岗位，避免只靠页面隐藏。普通自定义角色仍按既有权限码投影，不把角色 key 强制等同于标准岗位。README 与角色权限矩阵已同步超级管理员系统兜底不等于业务岗位身份的正式口径。
+
+验证：Node `24.14.0` 下相关前端合同 22 / 22、Web 全量 1715 / 1715，均为 `0 fail / 0 skip`；Web `src` lint 和生产构建通过。`go test ./internal/biz ./internal/service ./internal/server -count=1` 通过。Style L1 在正式端口 `6175` 验证 `admin-only-mobile-login-role-boundary` 与 `admin-only-mobile-deep-link-role-boundary` 两个真实 Chromium 场景通过，覆盖密码登录与已登录深链两条路径。相关 `node --check`、`git diff --check` 通过。
+
+未做 / 风险：本轮未改 schema、migration、数据库或现有业务任务，也未提交、推送、部署或执行 133 / 客户 UAT。`affected --plan` 因共享工作树同时含部署脚本改动保守升级到 T8；本任务没有把其他 writer 的发布链变化算作自身验证。一次独立对整个 `web/scripts/style-l1/scenarios.mjs` 运行 ESLint 命中该文件既有的 3 个非本轮规则错误，正式 `pnpm --dir web lint` 只覆盖 `src` 且已通过；本轮新增场景已由 Node 语法检查与实际 Chromium 执行验证。
+
 ## 2026-07-22 133 凭据生命周期与登录发布门禁
 
 完成：将本地开发与登记的 `customer-trial-133` 隔离测试目标收敛到 `credential.contract.json` v2：稳定管理员固定为 `admin/adminadmin`，十个固定 demo 共用 `12345678`。这两组值被明确标记为公开测试凭据，不再从 Keychain 或临时环境变量派生，避免不同 Codex 会话因“加强安全”自行生成、轮换或沿用另一套密码；其他 staging、UAT 与生产目标仍禁止复用。
@@ -22,11 +32,13 @@
 
 ## 2026-07-22 GitHub CI Linux 测试夹具修复
 
-完成：保留单一 `Strict repository gate` GitHub Actions 门禁和生产预检的 fail-closed 规则。连续失败不是 Actions、依赖安装或 `strict.sh` 编排故障，而是 `bootstrap-production-admin` 测试把部署锁夹具建在 `os.tmpdir()`；Ubuntu 将其解析为 `/tmp`，被生产预检正确拒绝，macOS 的 `/var/folders` 则掩盖了跨平台差异。测试夹具现改用仓库已忽略的 `output/qa-tmp` 私有根并强制 `0700`，同时主动断言不落入 `/tmp`、`/var/tmp` 或 `/dev/shm`；聚合测试 watchdog 只增加调度余量，生产脚本接收的锁等待与共享临时目录拒绝合同未放宽。
+完成：保留单一 `Strict repository gate` GitHub Actions 门禁和生产预检的 fail-closed 规则。连续失败不是 Actions、依赖安装或 `strict.sh` 编排故障，而是 `bootstrap-production-admin` 测试把部署锁夹具建在 `os.tmpdir()`；Ubuntu 将其解析为 `/tmp`，被生产预检正确拒绝，macOS 的 `/var/folders` 则掩盖了跨平台差异。测试夹具现改用仓库已忽略的 `output/qa-tmp` 私有根并强制 `0700`，同时主动断言不落入 `/tmp`、`/var/tmp` 或 `/dev/shm`；聚合测试 watchdog 只增加调度余量，生产脚本接收的锁等待合同未放宽。
 
-验证：Linux arm64 Node `24.14.0` 容器内 `bootstrap-production-admin` 定向测试 `36 / 36` 通过，`0 fail / 0 skip`；生产预检“拒绝共享临时目录锁”合同 `1 / 1` 通过。`git diff --check` 通过。该证据证明当前工作树的 Linux 根因已修复，不等于远端 CI 已绿色。
+彻底性加固：共享临时目录拒绝已从单一生产预检扩展为三层独立 fail-closed 合同：管理员 bootstrap 在创建文件锁前拒绝，`migrate_online.sh` 直接调用时自行拒绝，生产预检继续拒绝配置漂移。三个入口均参数化覆盖 `/tmp`、`/var/tmp`、`/dev/shm`；`migrate-online` 测试夹具也迁入仓库私有测试根，避免同类跨平台回归。全仓核对未发现其他“从 `os.tmpdir()` 派生生产 migration lock 并进入生产预检”的执行路径。
 
-下一步 / 风险：需要由当前单一 Git owner 将本修复与同文件现有 SMS 运行合同改动一起审查、精确提交并推送，再等待新 commit 的 GitHub Actions 完整结束；远端 run 通过前仍只能报告“本地与 Linux 等价验证通过”。当前共享工作树还有其他部署改动，本节未 stage、提交、推送、部署或改动数据库。
+验证：远端 commit `be09bdee` 的 GitHub Actions run `29892090367` 已完整绿色，scripts Node `1289 / 1289`、Web contract `209 / 209`、Web full `1711 / 1711` 均为 `0 fail / 0 skip`，`qa:full` 与 `qa:strict` 均为 `status=complete`。当前进一步加固的本地全量回归为 bootstrap `37 / 37`、migration `60 / 60`、production preflight `76 / 76`，全部 `0 fail / 0 skip`；整树 `qa:strict` 也以 `status=complete` 结束，其中 scripts Node `1292 / 1292`、server quick `2654 / 2654`、server all `2809 / 2809`，均为 `0 fail / 0 skip`。Shell 语法、shellcheck、shfmt、yamllint、Web 零 warning、构建、数据库门禁和 `git diff --check` 均通过。
+
+下一步 / 风险：远端绿色证明原始 Linux CI 根因已修复；本轮新增的三层防御仍只在当前工作树，尚未 stage、提交或推送，因此在进入远端前不能宣称“远端已包含全部彻底性加固”。本轮未部署或改动数据库；即使本类故障闭环，也不能保证未来无关代码、依赖、Runner 或网络故障永不导致 CI 失败。
 
 ## 2026-07-22 133 V5 发布、同语义造数与目标浏览器验收
 

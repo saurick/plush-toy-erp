@@ -758,6 +758,9 @@ func AdminCanAccessMobileRole(admin *AdminUser, roleKey string) bool {
 	if permissionKey == "" {
 		return true
 	}
+	if admin != nil && admin.IsSuperAdmin {
+		return AdminHasRole(admin, roleKey)
+	}
 	return AdminHasPermission(admin, permissionKey)
 }
 

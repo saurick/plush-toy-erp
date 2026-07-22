@@ -1229,20 +1229,29 @@ test("production preflight rejects unstable runtime customer keys", () => {
 });
 
 test("production preflight rejects migration locks in shared temporary directories", () => {
-  const fixture = writeFixture();
-  fs.writeFileSync(
-    fixture.envFile,
-    fs
-      .readFileSync(fixture.envFile, "utf8")
-      .replace(
-        "MIGRATION_LOCK_FILE=/run/lock/plush-toy-erp/atlas-migrate.lock",
-        "MIGRATION_LOCK_FILE=/tmp/atlas-migrate.lock",
-      ),
-  );
-  const result = runPreflight(fixture);
+  for (const migrationLockFile of [
+    "/tmp/plush-preflight/atlas-migrate.lock",
+    "/var/tmp/plush-preflight/atlas-migrate.lock",
+    "/dev/shm/plush-preflight/atlas-migrate.lock",
+  ]) {
+    const fixture = writeFixture();
+    fs.writeFileSync(
+      fixture.envFile,
+      fs
+        .readFileSync(fixture.envFile, "utf8")
+        .replace(
+          "MIGRATION_LOCK_FILE=/run/lock/plush-toy-erp/atlas-migrate.lock",
+          `MIGRATION_LOCK_FILE=${migrationLockFile}`,
+        ),
+    );
+    const result = runPreflight(fixture);
 
-  assert.notEqual(result.status, 0);
-  assert.match(result.stderr, /MIGRATION_LOCK_FILE 不得位于共享临时目录/);
+    assert.notEqual(result.status, 0);
+    assert.match(
+      result.stderr,
+      /MIGRATION_LOCK_FILE 不得位于共享临时目录/u,
+    );
+  }
 });
 
 test("production preflight rejects relative and dot-segment runtime paths", () => {

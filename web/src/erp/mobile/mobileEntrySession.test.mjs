@@ -68,6 +68,17 @@ test('mobile entry session: 岗位入口按账号权限直达且可退出', () =
   assert.doesNotMatch(source, /allowedMobileRoleKeys\.map\(\(roleKey\) =>/u)
   assert.match(source, /authRpc\.call\('logout'\)/u)
   assert.match(source, />\s*退出登录\s*</u)
+  assert.match(source, /当前账号未分配业务岗位/u)
+  assert.match(source, /手机待办只向明确分配的业务岗位开放/u)
+})
+
+test('mobile entry session: 直接访问未分配岗位时按账号业务岗位情况返回入口页', () => {
+  const source = readSource('mobile', 'MobileAppLayout.jsx')
+
+  assert.match(
+    source,
+    /allowedMobileRoleKeys\.length > 0[\s\S]*?'mobile-role-unavailable'[\s\S]*?'mobile-role-unassigned'/u
+  )
 })
 
 test('mobile entry session: 显式桌面和手机深链不再被入口记忆劫持', () => {

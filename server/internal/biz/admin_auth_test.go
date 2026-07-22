@@ -347,7 +347,10 @@ func TestAdminAuthUsecase_SMSRequestDoesNotExposeAccountEligibility(t *testing.T
 
 func TestAdminAuthUsecase_SMSRequestSuppressesDeliveryFailures(t *testing.T) {
 	repo := newMemAdminAuthRepo()
-	admin := &AdminUser{ID: 1, Username: "eligible", Phone: "13800138000", AuthVersion: 1, IsSuperAdmin: true}
+	admin := &AdminUser{
+		ID: 1, Username: "eligible", Phone: "13800138000", AuthVersion: 1, IsSuperAdmin: true,
+		Roles: []AdminRole{{Key: PurchaseRoleKey}},
+	}
 	repo.admins[admin.Username] = admin
 	repo.phones[admin.Phone] = admin
 	uc := NewAdminAuthUsecase(
