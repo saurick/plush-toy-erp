@@ -88590,31 +88590,42 @@ func (m *SalesReturnItemMutation) ResetEdge(name string) error {
 // ShipmentMutation represents an operation that mutates the Shipment nodes in the graph.
 type ShipmentMutation struct {
 	config
-	op                           Op
-	typ                          string
-	id                           *int
-	shipment_no                  *string
-	customer_snapshot            *string
-	status                       *string
-	idempotency_key              *string
-	planned_ship_at              *time.Time
-	shipped_at                   *time.Time
-	total_net_weight_g           *decimal.Decimal
-	requested_total_net_weight_g *decimal.Decimal
-	note                         *string
-	created_at                   *time.Time
-	updated_at                   *time.Time
-	clearedFields                map[string]struct{}
-	sales_order                  *int
-	clearedsales_order           bool
-	customer                     *int
-	clearedcustomer              bool
-	items                        map[int]struct{}
-	removeditems                 map[int]struct{}
-	cleareditems                 bool
-	done                         bool
-	oldValue                     func(context.Context) (*Shipment, error)
-	predicates                   []predicate.Shipment
+	op                                     Op
+	typ                                    string
+	id                                     *int
+	shipment_no                            *string
+	customer_snapshot                      *string
+	status                                 *string
+	finance_release_status                 *string
+	finance_release_version                *int
+	addfinance_release_version             *int
+	finance_released_at                    *time.Time
+	finance_released_by                    *int
+	addfinance_released_by                 *int
+	finance_release_process_instance_id    *int
+	addfinance_release_process_instance_id *int
+	finance_release_process_node_id        *int
+	addfinance_release_process_node_id     *int
+	finance_release_note                   *string
+	idempotency_key                        *string
+	planned_ship_at                        *time.Time
+	shipped_at                             *time.Time
+	total_net_weight_g                     *decimal.Decimal
+	requested_total_net_weight_g           *decimal.Decimal
+	note                                   *string
+	created_at                             *time.Time
+	updated_at                             *time.Time
+	clearedFields                          map[string]struct{}
+	sales_order                            *int
+	clearedsales_order                     bool
+	customer                               *int
+	clearedcustomer                        bool
+	items                                  map[int]struct{}
+	removeditems                           map[int]struct{}
+	cleareditems                           bool
+	done                                   bool
+	oldValue                               func(context.Context) (*Shipment, error)
+	predicates                             []predicate.Shipment
 }
 
 var _ ent.Mutation = (*ShipmentMutation)(nil)
@@ -88932,6 +88943,406 @@ func (m *ShipmentMutation) OldStatus(ctx context.Context) (v string, err error) 
 // ResetStatus resets all changes to the "status" field.
 func (m *ShipmentMutation) ResetStatus() {
 	m.status = nil
+}
+
+// SetFinanceReleaseStatus sets the "finance_release_status" field.
+func (m *ShipmentMutation) SetFinanceReleaseStatus(s string) {
+	m.finance_release_status = &s
+}
+
+// FinanceReleaseStatus returns the value of the "finance_release_status" field in the mutation.
+func (m *ShipmentMutation) FinanceReleaseStatus() (r string, exists bool) {
+	v := m.finance_release_status
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinanceReleaseStatus returns the old "finance_release_status" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFinanceReleaseStatus(ctx context.Context) (v string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinanceReleaseStatus is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinanceReleaseStatus requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinanceReleaseStatus: %w", err)
+	}
+	return oldValue.FinanceReleaseStatus, nil
+}
+
+// ResetFinanceReleaseStatus resets all changes to the "finance_release_status" field.
+func (m *ShipmentMutation) ResetFinanceReleaseStatus() {
+	m.finance_release_status = nil
+}
+
+// SetFinanceReleaseVersion sets the "finance_release_version" field.
+func (m *ShipmentMutation) SetFinanceReleaseVersion(i int) {
+	m.finance_release_version = &i
+	m.addfinance_release_version = nil
+}
+
+// FinanceReleaseVersion returns the value of the "finance_release_version" field in the mutation.
+func (m *ShipmentMutation) FinanceReleaseVersion() (r int, exists bool) {
+	v := m.finance_release_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinanceReleaseVersion returns the old "finance_release_version" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFinanceReleaseVersion(ctx context.Context) (v int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinanceReleaseVersion is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinanceReleaseVersion requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinanceReleaseVersion: %w", err)
+	}
+	return oldValue.FinanceReleaseVersion, nil
+}
+
+// AddFinanceReleaseVersion adds i to the "finance_release_version" field.
+func (m *ShipmentMutation) AddFinanceReleaseVersion(i int) {
+	if m.addfinance_release_version != nil {
+		*m.addfinance_release_version += i
+	} else {
+		m.addfinance_release_version = &i
+	}
+}
+
+// AddedFinanceReleaseVersion returns the value that was added to the "finance_release_version" field in this mutation.
+func (m *ShipmentMutation) AddedFinanceReleaseVersion() (r int, exists bool) {
+	v := m.addfinance_release_version
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ResetFinanceReleaseVersion resets all changes to the "finance_release_version" field.
+func (m *ShipmentMutation) ResetFinanceReleaseVersion() {
+	m.finance_release_version = nil
+	m.addfinance_release_version = nil
+}
+
+// SetFinanceReleasedAt sets the "finance_released_at" field.
+func (m *ShipmentMutation) SetFinanceReleasedAt(t time.Time) {
+	m.finance_released_at = &t
+}
+
+// FinanceReleasedAt returns the value of the "finance_released_at" field in the mutation.
+func (m *ShipmentMutation) FinanceReleasedAt() (r time.Time, exists bool) {
+	v := m.finance_released_at
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinanceReleasedAt returns the old "finance_released_at" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFinanceReleasedAt(ctx context.Context) (v *time.Time, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinanceReleasedAt is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinanceReleasedAt requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinanceReleasedAt: %w", err)
+	}
+	return oldValue.FinanceReleasedAt, nil
+}
+
+// ClearFinanceReleasedAt clears the value of the "finance_released_at" field.
+func (m *ShipmentMutation) ClearFinanceReleasedAt() {
+	m.finance_released_at = nil
+	m.clearedFields[shipment.FieldFinanceReleasedAt] = struct{}{}
+}
+
+// FinanceReleasedAtCleared returns if the "finance_released_at" field was cleared in this mutation.
+func (m *ShipmentMutation) FinanceReleasedAtCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldFinanceReleasedAt]
+	return ok
+}
+
+// ResetFinanceReleasedAt resets all changes to the "finance_released_at" field.
+func (m *ShipmentMutation) ResetFinanceReleasedAt() {
+	m.finance_released_at = nil
+	delete(m.clearedFields, shipment.FieldFinanceReleasedAt)
+}
+
+// SetFinanceReleasedBy sets the "finance_released_by" field.
+func (m *ShipmentMutation) SetFinanceReleasedBy(i int) {
+	m.finance_released_by = &i
+	m.addfinance_released_by = nil
+}
+
+// FinanceReleasedBy returns the value of the "finance_released_by" field in the mutation.
+func (m *ShipmentMutation) FinanceReleasedBy() (r int, exists bool) {
+	v := m.finance_released_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinanceReleasedBy returns the old "finance_released_by" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFinanceReleasedBy(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinanceReleasedBy is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinanceReleasedBy requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinanceReleasedBy: %w", err)
+	}
+	return oldValue.FinanceReleasedBy, nil
+}
+
+// AddFinanceReleasedBy adds i to the "finance_released_by" field.
+func (m *ShipmentMutation) AddFinanceReleasedBy(i int) {
+	if m.addfinance_released_by != nil {
+		*m.addfinance_released_by += i
+	} else {
+		m.addfinance_released_by = &i
+	}
+}
+
+// AddedFinanceReleasedBy returns the value that was added to the "finance_released_by" field in this mutation.
+func (m *ShipmentMutation) AddedFinanceReleasedBy() (r int, exists bool) {
+	v := m.addfinance_released_by
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearFinanceReleasedBy clears the value of the "finance_released_by" field.
+func (m *ShipmentMutation) ClearFinanceReleasedBy() {
+	m.finance_released_by = nil
+	m.addfinance_released_by = nil
+	m.clearedFields[shipment.FieldFinanceReleasedBy] = struct{}{}
+}
+
+// FinanceReleasedByCleared returns if the "finance_released_by" field was cleared in this mutation.
+func (m *ShipmentMutation) FinanceReleasedByCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldFinanceReleasedBy]
+	return ok
+}
+
+// ResetFinanceReleasedBy resets all changes to the "finance_released_by" field.
+func (m *ShipmentMutation) ResetFinanceReleasedBy() {
+	m.finance_released_by = nil
+	m.addfinance_released_by = nil
+	delete(m.clearedFields, shipment.FieldFinanceReleasedBy)
+}
+
+// SetFinanceReleaseProcessInstanceID sets the "finance_release_process_instance_id" field.
+func (m *ShipmentMutation) SetFinanceReleaseProcessInstanceID(i int) {
+	m.finance_release_process_instance_id = &i
+	m.addfinance_release_process_instance_id = nil
+}
+
+// FinanceReleaseProcessInstanceID returns the value of the "finance_release_process_instance_id" field in the mutation.
+func (m *ShipmentMutation) FinanceReleaseProcessInstanceID() (r int, exists bool) {
+	v := m.finance_release_process_instance_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinanceReleaseProcessInstanceID returns the old "finance_release_process_instance_id" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFinanceReleaseProcessInstanceID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinanceReleaseProcessInstanceID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinanceReleaseProcessInstanceID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinanceReleaseProcessInstanceID: %w", err)
+	}
+	return oldValue.FinanceReleaseProcessInstanceID, nil
+}
+
+// AddFinanceReleaseProcessInstanceID adds i to the "finance_release_process_instance_id" field.
+func (m *ShipmentMutation) AddFinanceReleaseProcessInstanceID(i int) {
+	if m.addfinance_release_process_instance_id != nil {
+		*m.addfinance_release_process_instance_id += i
+	} else {
+		m.addfinance_release_process_instance_id = &i
+	}
+}
+
+// AddedFinanceReleaseProcessInstanceID returns the value that was added to the "finance_release_process_instance_id" field in this mutation.
+func (m *ShipmentMutation) AddedFinanceReleaseProcessInstanceID() (r int, exists bool) {
+	v := m.addfinance_release_process_instance_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearFinanceReleaseProcessInstanceID clears the value of the "finance_release_process_instance_id" field.
+func (m *ShipmentMutation) ClearFinanceReleaseProcessInstanceID() {
+	m.finance_release_process_instance_id = nil
+	m.addfinance_release_process_instance_id = nil
+	m.clearedFields[shipment.FieldFinanceReleaseProcessInstanceID] = struct{}{}
+}
+
+// FinanceReleaseProcessInstanceIDCleared returns if the "finance_release_process_instance_id" field was cleared in this mutation.
+func (m *ShipmentMutation) FinanceReleaseProcessInstanceIDCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldFinanceReleaseProcessInstanceID]
+	return ok
+}
+
+// ResetFinanceReleaseProcessInstanceID resets all changes to the "finance_release_process_instance_id" field.
+func (m *ShipmentMutation) ResetFinanceReleaseProcessInstanceID() {
+	m.finance_release_process_instance_id = nil
+	m.addfinance_release_process_instance_id = nil
+	delete(m.clearedFields, shipment.FieldFinanceReleaseProcessInstanceID)
+}
+
+// SetFinanceReleaseProcessNodeID sets the "finance_release_process_node_id" field.
+func (m *ShipmentMutation) SetFinanceReleaseProcessNodeID(i int) {
+	m.finance_release_process_node_id = &i
+	m.addfinance_release_process_node_id = nil
+}
+
+// FinanceReleaseProcessNodeID returns the value of the "finance_release_process_node_id" field in the mutation.
+func (m *ShipmentMutation) FinanceReleaseProcessNodeID() (r int, exists bool) {
+	v := m.finance_release_process_node_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinanceReleaseProcessNodeID returns the old "finance_release_process_node_id" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFinanceReleaseProcessNodeID(ctx context.Context) (v *int, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinanceReleaseProcessNodeID is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinanceReleaseProcessNodeID requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinanceReleaseProcessNodeID: %w", err)
+	}
+	return oldValue.FinanceReleaseProcessNodeID, nil
+}
+
+// AddFinanceReleaseProcessNodeID adds i to the "finance_release_process_node_id" field.
+func (m *ShipmentMutation) AddFinanceReleaseProcessNodeID(i int) {
+	if m.addfinance_release_process_node_id != nil {
+		*m.addfinance_release_process_node_id += i
+	} else {
+		m.addfinance_release_process_node_id = &i
+	}
+}
+
+// AddedFinanceReleaseProcessNodeID returns the value that was added to the "finance_release_process_node_id" field in this mutation.
+func (m *ShipmentMutation) AddedFinanceReleaseProcessNodeID() (r int, exists bool) {
+	v := m.addfinance_release_process_node_id
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// ClearFinanceReleaseProcessNodeID clears the value of the "finance_release_process_node_id" field.
+func (m *ShipmentMutation) ClearFinanceReleaseProcessNodeID() {
+	m.finance_release_process_node_id = nil
+	m.addfinance_release_process_node_id = nil
+	m.clearedFields[shipment.FieldFinanceReleaseProcessNodeID] = struct{}{}
+}
+
+// FinanceReleaseProcessNodeIDCleared returns if the "finance_release_process_node_id" field was cleared in this mutation.
+func (m *ShipmentMutation) FinanceReleaseProcessNodeIDCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldFinanceReleaseProcessNodeID]
+	return ok
+}
+
+// ResetFinanceReleaseProcessNodeID resets all changes to the "finance_release_process_node_id" field.
+func (m *ShipmentMutation) ResetFinanceReleaseProcessNodeID() {
+	m.finance_release_process_node_id = nil
+	m.addfinance_release_process_node_id = nil
+	delete(m.clearedFields, shipment.FieldFinanceReleaseProcessNodeID)
+}
+
+// SetFinanceReleaseNote sets the "finance_release_note" field.
+func (m *ShipmentMutation) SetFinanceReleaseNote(s string) {
+	m.finance_release_note = &s
+}
+
+// FinanceReleaseNote returns the value of the "finance_release_note" field in the mutation.
+func (m *ShipmentMutation) FinanceReleaseNote() (r string, exists bool) {
+	v := m.finance_release_note
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldFinanceReleaseNote returns the old "finance_release_note" field's value of the Shipment entity.
+// If the Shipment object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *ShipmentMutation) OldFinanceReleaseNote(ctx context.Context) (v *string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldFinanceReleaseNote is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldFinanceReleaseNote requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldFinanceReleaseNote: %w", err)
+	}
+	return oldValue.FinanceReleaseNote, nil
+}
+
+// ClearFinanceReleaseNote clears the value of the "finance_release_note" field.
+func (m *ShipmentMutation) ClearFinanceReleaseNote() {
+	m.finance_release_note = nil
+	m.clearedFields[shipment.FieldFinanceReleaseNote] = struct{}{}
+}
+
+// FinanceReleaseNoteCleared returns if the "finance_release_note" field was cleared in this mutation.
+func (m *ShipmentMutation) FinanceReleaseNoteCleared() bool {
+	_, ok := m.clearedFields[shipment.FieldFinanceReleaseNote]
+	return ok
+}
+
+// ResetFinanceReleaseNote resets all changes to the "finance_release_note" field.
+func (m *ShipmentMutation) ResetFinanceReleaseNote() {
+	m.finance_release_note = nil
+	delete(m.clearedFields, shipment.FieldFinanceReleaseNote)
 }
 
 // SetIdempotencyKey sets the "idempotency_key" field.
@@ -89429,7 +89840,7 @@ func (m *ShipmentMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *ShipmentMutation) Fields() []string {
-	fields := make([]string, 0, 13)
+	fields := make([]string, 0, 20)
 	if m.shipment_no != nil {
 		fields = append(fields, shipment.FieldShipmentNo)
 	}
@@ -89444,6 +89855,27 @@ func (m *ShipmentMutation) Fields() []string {
 	}
 	if m.status != nil {
 		fields = append(fields, shipment.FieldStatus)
+	}
+	if m.finance_release_status != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseStatus)
+	}
+	if m.finance_release_version != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseVersion)
+	}
+	if m.finance_released_at != nil {
+		fields = append(fields, shipment.FieldFinanceReleasedAt)
+	}
+	if m.finance_released_by != nil {
+		fields = append(fields, shipment.FieldFinanceReleasedBy)
+	}
+	if m.finance_release_process_instance_id != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseProcessInstanceID)
+	}
+	if m.finance_release_process_node_id != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseProcessNodeID)
+	}
+	if m.finance_release_note != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseNote)
 	}
 	if m.idempotency_key != nil {
 		fields = append(fields, shipment.FieldIdempotencyKey)
@@ -89487,6 +89919,20 @@ func (m *ShipmentMutation) Field(name string) (ent.Value, bool) {
 		return m.CustomerSnapshot()
 	case shipment.FieldStatus:
 		return m.Status()
+	case shipment.FieldFinanceReleaseStatus:
+		return m.FinanceReleaseStatus()
+	case shipment.FieldFinanceReleaseVersion:
+		return m.FinanceReleaseVersion()
+	case shipment.FieldFinanceReleasedAt:
+		return m.FinanceReleasedAt()
+	case shipment.FieldFinanceReleasedBy:
+		return m.FinanceReleasedBy()
+	case shipment.FieldFinanceReleaseProcessInstanceID:
+		return m.FinanceReleaseProcessInstanceID()
+	case shipment.FieldFinanceReleaseProcessNodeID:
+		return m.FinanceReleaseProcessNodeID()
+	case shipment.FieldFinanceReleaseNote:
+		return m.FinanceReleaseNote()
 	case shipment.FieldIdempotencyKey:
 		return m.IdempotencyKey()
 	case shipment.FieldPlannedShipAt:
@@ -89522,6 +89968,20 @@ func (m *ShipmentMutation) OldField(ctx context.Context, name string) (ent.Value
 		return m.OldCustomerSnapshot(ctx)
 	case shipment.FieldStatus:
 		return m.OldStatus(ctx)
+	case shipment.FieldFinanceReleaseStatus:
+		return m.OldFinanceReleaseStatus(ctx)
+	case shipment.FieldFinanceReleaseVersion:
+		return m.OldFinanceReleaseVersion(ctx)
+	case shipment.FieldFinanceReleasedAt:
+		return m.OldFinanceReleasedAt(ctx)
+	case shipment.FieldFinanceReleasedBy:
+		return m.OldFinanceReleasedBy(ctx)
+	case shipment.FieldFinanceReleaseProcessInstanceID:
+		return m.OldFinanceReleaseProcessInstanceID(ctx)
+	case shipment.FieldFinanceReleaseProcessNodeID:
+		return m.OldFinanceReleaseProcessNodeID(ctx)
+	case shipment.FieldFinanceReleaseNote:
+		return m.OldFinanceReleaseNote(ctx)
 	case shipment.FieldIdempotencyKey:
 		return m.OldIdempotencyKey(ctx)
 	case shipment.FieldPlannedShipAt:
@@ -89581,6 +90041,55 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetStatus(v)
+		return nil
+	case shipment.FieldFinanceReleaseStatus:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinanceReleaseStatus(v)
+		return nil
+	case shipment.FieldFinanceReleaseVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinanceReleaseVersion(v)
+		return nil
+	case shipment.FieldFinanceReleasedAt:
+		v, ok := value.(time.Time)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinanceReleasedAt(v)
+		return nil
+	case shipment.FieldFinanceReleasedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinanceReleasedBy(v)
+		return nil
+	case shipment.FieldFinanceReleaseProcessInstanceID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinanceReleaseProcessInstanceID(v)
+		return nil
+	case shipment.FieldFinanceReleaseProcessNodeID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinanceReleaseProcessNodeID(v)
+		return nil
+	case shipment.FieldFinanceReleaseNote:
+		v, ok := value.(string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetFinanceReleaseNote(v)
 		return nil
 	case shipment.FieldIdempotencyKey:
 		v, ok := value.(string)
@@ -89646,6 +90155,18 @@ func (m *ShipmentMutation) SetField(name string, value ent.Value) error {
 // this mutation.
 func (m *ShipmentMutation) AddedFields() []string {
 	var fields []string
+	if m.addfinance_release_version != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseVersion)
+	}
+	if m.addfinance_released_by != nil {
+		fields = append(fields, shipment.FieldFinanceReleasedBy)
+	}
+	if m.addfinance_release_process_instance_id != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseProcessInstanceID)
+	}
+	if m.addfinance_release_process_node_id != nil {
+		fields = append(fields, shipment.FieldFinanceReleaseProcessNodeID)
+	}
 	return fields
 }
 
@@ -89654,6 +90175,14 @@ func (m *ShipmentMutation) AddedFields() []string {
 // was not set, or was not defined in the schema.
 func (m *ShipmentMutation) AddedField(name string) (ent.Value, bool) {
 	switch name {
+	case shipment.FieldFinanceReleaseVersion:
+		return m.AddedFinanceReleaseVersion()
+	case shipment.FieldFinanceReleasedBy:
+		return m.AddedFinanceReleasedBy()
+	case shipment.FieldFinanceReleaseProcessInstanceID:
+		return m.AddedFinanceReleaseProcessInstanceID()
+	case shipment.FieldFinanceReleaseProcessNodeID:
+		return m.AddedFinanceReleaseProcessNodeID()
 	}
 	return nil, false
 }
@@ -89663,6 +90192,34 @@ func (m *ShipmentMutation) AddedField(name string) (ent.Value, bool) {
 // type.
 func (m *ShipmentMutation) AddField(name string, value ent.Value) error {
 	switch name {
+	case shipment.FieldFinanceReleaseVersion:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFinanceReleaseVersion(v)
+		return nil
+	case shipment.FieldFinanceReleasedBy:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFinanceReleasedBy(v)
+		return nil
+	case shipment.FieldFinanceReleaseProcessInstanceID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFinanceReleaseProcessInstanceID(v)
+		return nil
+	case shipment.FieldFinanceReleaseProcessNodeID:
+		v, ok := value.(int)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.AddFinanceReleaseProcessNodeID(v)
+		return nil
 	}
 	return fmt.Errorf("unknown Shipment numeric field %s", name)
 }
@@ -89679,6 +90236,21 @@ func (m *ShipmentMutation) ClearedFields() []string {
 	}
 	if m.FieldCleared(shipment.FieldCustomerSnapshot) {
 		fields = append(fields, shipment.FieldCustomerSnapshot)
+	}
+	if m.FieldCleared(shipment.FieldFinanceReleasedAt) {
+		fields = append(fields, shipment.FieldFinanceReleasedAt)
+	}
+	if m.FieldCleared(shipment.FieldFinanceReleasedBy) {
+		fields = append(fields, shipment.FieldFinanceReleasedBy)
+	}
+	if m.FieldCleared(shipment.FieldFinanceReleaseProcessInstanceID) {
+		fields = append(fields, shipment.FieldFinanceReleaseProcessInstanceID)
+	}
+	if m.FieldCleared(shipment.FieldFinanceReleaseProcessNodeID) {
+		fields = append(fields, shipment.FieldFinanceReleaseProcessNodeID)
+	}
+	if m.FieldCleared(shipment.FieldFinanceReleaseNote) {
+		fields = append(fields, shipment.FieldFinanceReleaseNote)
 	}
 	if m.FieldCleared(shipment.FieldPlannedShipAt) {
 		fields = append(fields, shipment.FieldPlannedShipAt)
@@ -89718,6 +90290,21 @@ func (m *ShipmentMutation) ClearField(name string) error {
 	case shipment.FieldCustomerSnapshot:
 		m.ClearCustomerSnapshot()
 		return nil
+	case shipment.FieldFinanceReleasedAt:
+		m.ClearFinanceReleasedAt()
+		return nil
+	case shipment.FieldFinanceReleasedBy:
+		m.ClearFinanceReleasedBy()
+		return nil
+	case shipment.FieldFinanceReleaseProcessInstanceID:
+		m.ClearFinanceReleaseProcessInstanceID()
+		return nil
+	case shipment.FieldFinanceReleaseProcessNodeID:
+		m.ClearFinanceReleaseProcessNodeID()
+		return nil
+	case shipment.FieldFinanceReleaseNote:
+		m.ClearFinanceReleaseNote()
+		return nil
 	case shipment.FieldPlannedShipAt:
 		m.ClearPlannedShipAt()
 		return nil
@@ -89755,6 +90342,27 @@ func (m *ShipmentMutation) ResetField(name string) error {
 		return nil
 	case shipment.FieldStatus:
 		m.ResetStatus()
+		return nil
+	case shipment.FieldFinanceReleaseStatus:
+		m.ResetFinanceReleaseStatus()
+		return nil
+	case shipment.FieldFinanceReleaseVersion:
+		m.ResetFinanceReleaseVersion()
+		return nil
+	case shipment.FieldFinanceReleasedAt:
+		m.ResetFinanceReleasedAt()
+		return nil
+	case shipment.FieldFinanceReleasedBy:
+		m.ResetFinanceReleasedBy()
+		return nil
+	case shipment.FieldFinanceReleaseProcessInstanceID:
+		m.ResetFinanceReleaseProcessInstanceID()
+		return nil
+	case shipment.FieldFinanceReleaseProcessNodeID:
+		m.ResetFinanceReleaseProcessNodeID()
+		return nil
+	case shipment.FieldFinanceReleaseNote:
+		m.ResetFinanceReleaseNote()
 		return nil
 	case shipment.FieldIdempotencyKey:
 		m.ResetIdempotencyKey()

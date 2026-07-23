@@ -132,13 +132,13 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 		},
 		{
 			roleKey: EngineeringRoleKey,
-				has: []string{
-					PermissionERPPrintTemplateRead,
-					PermissionMaterialRead,
-					PermissionMaterialCreate,
-					PermissionMaterialUpdate,
-					PermissionMaterialDisable,
-					PermissionProcessRead,
+			has: []string{
+				PermissionERPPrintTemplateRead,
+				PermissionMaterialRead,
+				PermissionMaterialCreate,
+				PermissionMaterialUpdate,
+				PermissionMaterialDisable,
+				PermissionProcessRead,
 				PermissionProcessCreate,
 				PermissionProductRead,
 				PermissionBOMRead,
@@ -170,6 +170,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionWorkflowTaskRead,
 				PermissionWorkflowTaskUpdate,
 				PermissionWorkflowTaskComplete,
+				PermissionWorkflowTaskApprove,
 				PermissionWorkflowTaskReject,
 				PermissionPurchaseReceiptRead,
 				PermissionPurchaseReceiptAdjustmentRead,
@@ -177,7 +178,7 @@ func TestBuiltinRoleWorkflowPermissionMatrix(t *testing.T) {
 				PermissionShipmentRead,
 				PermissionMobileFinanceAccess,
 			},
-			omits: []string{PermissionWorkflowTaskApprove, PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderApprove, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionDebugBusinessClear},
+			omits: []string{PermissionPurchaseOrderRead, PermissionPurchaseOrderCreate, PermissionPurchaseOrderUpdate, PermissionPurchaseOrderApprove, PermissionPurchaseReceiptCreate, PermissionPurchaseReceiptAdjustmentCreate, PermissionPurchaseReceiptAdjustmentPost, PermissionPurchaseReceiptAdjustmentCancel, PermissionPurchaseReturnCreate, PermissionPurchaseReturnPost, PermissionPurchaseReturnCancel, PermissionWarehouseInboundRead, PermissionWarehouseInboundConfirm, PermissionDebugBusinessClear},
 		},
 		{
 			roleKey: PMCRoleKey,

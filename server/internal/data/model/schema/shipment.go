@@ -50,6 +50,8 @@ func (Shipment) Annotations() []schema.Annotation {
 		entsql.Annotation{
 			Checks: map[string]string{
 				"shipments_status_allowed":                         "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
+				"shipments_finance_release_status_allowed":         "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED')",
+				"shipments_finance_release_version_positive":       "finance_release_version > 0",
 				"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",
 				"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
 			},
@@ -65,6 +67,13 @@ func (Shipment) Fields() []ent.Field {
 		// Snapshot preserves shipment-time display data; Customer remains the master truth.
 		field.String("customer_snapshot").Optional().Nillable().MaxLen(512),
 		field.String("status").NotEmpty().Default("DRAFT").MaxLen(32),
+		field.String("finance_release_status").NotEmpty().Default("PENDING").MaxLen(32),
+		field.Int("finance_release_version").Positive().Default(1),
+		field.Time("finance_released_at").Optional().Nillable(),
+		field.Int("finance_released_by").Optional().Nillable().Positive(),
+		field.Int("finance_release_process_instance_id").Optional().Nillable().Positive(),
+		field.Int("finance_release_process_node_id").Optional().Nillable().Positive(),
+		field.String("finance_release_note").Optional().Nillable().MaxLen(255),
 		field.String("idempotency_key").NotEmpty().MaxLen(128),
 		field.Time("planned_ship_at").Optional().Nillable(),
 		field.Time("shipped_at").Optional().Nillable(),

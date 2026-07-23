@@ -1586,8 +1586,8 @@ func TestJsonrpcDispatcher_SalesOrderAPIRequiresEnabledModule(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if submitRes == nil || submitRes.Code != errcode.OK.Code || repo.lifecycleStatus != biz.SalesOrderStatusSubmitted {
-		t.Fatalf("expected enabled sales_orders submit OK, res=%#v lifecycle=%s", submitRes, repo.lifecycleStatus)
+	if submitRes == nil || submitRes.Code != errcode.UnknownMethod.Code || repo.lifecycleStatus != "" {
+		t.Fatalf("direct sales submit must stay removed, res=%#v lifecycle=%s", submitRes, repo.lifecycleStatus)
 	}
 	_, enabledCancelRes, err := j.handleSalesOrder(ctx, "cancel_sales_order", "enabled-cancel", mustJSONRPCStruct(t, map[string]any{"id": float64(1)}))
 	if err != nil {

@@ -27,10 +27,7 @@ import {
   normalizeProductionReworkRequest,
   validateProductionReworkResult,
 } from '../utils/productionReworkAction.mjs'
-import {
-  normalizeShipmentReleaseTaskRequest,
-  validateShipmentReleaseTaskResult,
-} from '../utils/workflowSourceTask.mjs'
+import {} from '../utils/workflowSourceTask.mjs'
 import {
   OUTSOURCING_SOURCE_ACTIONS,
   normalizeOutsourcingSourceFactCreateRequest,
@@ -332,15 +329,6 @@ export async function createShipmentWithItems(params = {}) {
     params
   )
   return dataOf(result)?.shipment || null
-}
-
-export async function submitShipmentRelease(params = {}) {
-  const request = normalizeShipmentReleaseTaskRequest(params)
-  const result = await operationalFactRpc.call(
-    'submit_shipment_release',
-    request
-  )
-  return validateShipmentReleaseTaskResult(dataOf(result), request)
 }
 
 export async function shipShipment(params = {}) {

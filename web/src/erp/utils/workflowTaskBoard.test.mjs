@@ -580,6 +580,7 @@ test('workflowTaskBoard: 审批类 done 使用 approve 权限，催办按 update
     owner_role_key: 'boss',
     task_group: 'order_approval',
     source_type: 'project-orders',
+    required_capability_key: 'workflow.task.approve',
   }
   const bossAdmin = {
     id: 12,

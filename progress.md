@@ -10,6 +10,18 @@
 - 133 V5 仍运行固定 release `80b77faeab566660c77fc23cc66c272096692f16` 的技术试用版本；当前异常收口、客户退货 / RMA、收付款及岗位导航后续切片未整体重发，客户 UAT / 签收仍是独立关口。
 - 当前 Git 由单一 owner 完成收口：异常流、岗位导航与能力台账的功能 / 文档主提交为 `6a458cf2`，已推送至 `origin/main`；未部署，也未对共享、133 或生产数据库 apply migration。
 
+## 2026-07-23 审批产品层与领域门禁 Handoff
+
+完成：所有 ProcessRuntime approval 节点统一声明 `workflow.task.approve`；销售订单审批后由唯一领域命令原子激活，采购批准由 `PurchaseOrderUsecase` 唯一承接，出货财务审批写入 Shipment 版本化门禁。桌面审批箱、Workflow、协同 Drawer 和移动岗位端共用来源、意见、状态、版本与轨迹合同；WIP 异常继续走现有生产异常真源，PAYMENT 不伪造审批完成。
+
+Handoff：Codex Worktree 的 86 个文件已带回 Local，并形成审批提交；整合到最新 `main` 时保留异常流、岗位导航和精简文档真源，同时吸收审批领域事实。已删除的 `产品能力证据详情.md` 不恢复，新增事实进入唯一产品能力台账。
+
+Worktree 验证：`go test -count=1 ./...`、前端 `1728 / 1728`、ESLint、Vite build、`make data`、`db-guard`、`agents-size`、`git diff --check` 和真实 Chromium 审批箱场景均通过。该证据只绑定 Worktree 固定树。
+
+Local 合并树验证：`make data` 确认 Ent 与 Atlas 无新增漂移，`affected.sh --run` 覆盖 T0-T7；文档 `12 / 12`、审批 / 浏览器 mock 定向 `38 / 38`、Web `1729 / 1729`、客户配置与私有部署边界 `76 / 76`、隔离 PostgreSQL 关键事务 `192 / 192` 均为零失败、零跳过，ESLint、`db-guard` 和 `git diff --check` 通过。真实 Chromium `erp-task-board-desktop` 场景 `1 / 1` 通过，覆盖待我审批入口、出货财务审批详情和返回任务看板。首轮合并树验证发现并修正已退役直连销售提交白名单、旧审批自动派生断言和 PostgreSQL fixture 全局岗位串数，随后从头复跑绿色。
+
+风险：仅对登记的本地隔离事务测试库应用 latest migration；未对共享、133 或生产数据库 apply，未部署，未执行真实九岗位账号 smoke 或客户 UAT。Worktree 与 Local 浏览器验证使用 Node `26.5.0`，仓库声明 `24.14.x`。
+
 ## 2026-07-23 异常流 V1 四项收口与 Local Handoff
 
 完成：首次 IQC 拒绝改为按精确来源行和部分数量累计办理退厂或供应商补换；补换确认生成新的 DRAFT 收货、单行待收、零余额 HOLD 批次和 SUBMITTED IQC，原收货不整单取消。创建、确认和取消使用幂等 intent、version CAS、来源锁与事务边界，已过账或已有下游的补换链 fail closed。

@@ -25,6 +25,20 @@ const (
 	FieldCustomerSnapshot = "customer_snapshot"
 	// FieldStatus holds the string denoting the status field in the database.
 	FieldStatus = "status"
+	// FieldFinanceReleaseStatus holds the string denoting the finance_release_status field in the database.
+	FieldFinanceReleaseStatus = "finance_release_status"
+	// FieldFinanceReleaseVersion holds the string denoting the finance_release_version field in the database.
+	FieldFinanceReleaseVersion = "finance_release_version"
+	// FieldFinanceReleasedAt holds the string denoting the finance_released_at field in the database.
+	FieldFinanceReleasedAt = "finance_released_at"
+	// FieldFinanceReleasedBy holds the string denoting the finance_released_by field in the database.
+	FieldFinanceReleasedBy = "finance_released_by"
+	// FieldFinanceReleaseProcessInstanceID holds the string denoting the finance_release_process_instance_id field in the database.
+	FieldFinanceReleaseProcessInstanceID = "finance_release_process_instance_id"
+	// FieldFinanceReleaseProcessNodeID holds the string denoting the finance_release_process_node_id field in the database.
+	FieldFinanceReleaseProcessNodeID = "finance_release_process_node_id"
+	// FieldFinanceReleaseNote holds the string denoting the finance_release_note field in the database.
+	FieldFinanceReleaseNote = "finance_release_note"
 	// FieldIdempotencyKey holds the string denoting the idempotency_key field in the database.
 	FieldIdempotencyKey = "idempotency_key"
 	// FieldPlannedShipAt holds the string denoting the planned_ship_at field in the database.
@@ -80,6 +94,13 @@ var Columns = []string{
 	FieldCustomerID,
 	FieldCustomerSnapshot,
 	FieldStatus,
+	FieldFinanceReleaseStatus,
+	FieldFinanceReleaseVersion,
+	FieldFinanceReleasedAt,
+	FieldFinanceReleasedBy,
+	FieldFinanceReleaseProcessInstanceID,
+	FieldFinanceReleaseProcessNodeID,
+	FieldFinanceReleaseNote,
 	FieldIdempotencyKey,
 	FieldPlannedShipAt,
 	FieldShippedAt,
@@ -119,6 +140,22 @@ var (
 	DefaultStatus string
 	// StatusValidator is a validator for the "status" field. It is called by the builders before save.
 	StatusValidator func(string) error
+	// DefaultFinanceReleaseStatus holds the default value on creation for the "finance_release_status" field.
+	DefaultFinanceReleaseStatus string
+	// FinanceReleaseStatusValidator is a validator for the "finance_release_status" field. It is called by the builders before save.
+	FinanceReleaseStatusValidator func(string) error
+	// DefaultFinanceReleaseVersion holds the default value on creation for the "finance_release_version" field.
+	DefaultFinanceReleaseVersion int
+	// FinanceReleaseVersionValidator is a validator for the "finance_release_version" field. It is called by the builders before save.
+	FinanceReleaseVersionValidator func(int) error
+	// FinanceReleasedByValidator is a validator for the "finance_released_by" field. It is called by the builders before save.
+	FinanceReleasedByValidator func(int) error
+	// FinanceReleaseProcessInstanceIDValidator is a validator for the "finance_release_process_instance_id" field. It is called by the builders before save.
+	FinanceReleaseProcessInstanceIDValidator func(int) error
+	// FinanceReleaseProcessNodeIDValidator is a validator for the "finance_release_process_node_id" field. It is called by the builders before save.
+	FinanceReleaseProcessNodeIDValidator func(int) error
+	// FinanceReleaseNoteValidator is a validator for the "finance_release_note" field. It is called by the builders before save.
+	FinanceReleaseNoteValidator func(string) error
 	// IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	IdempotencyKeyValidator func(string) error
 	// NoteValidator is a validator for the "note" field. It is called by the builders before save.
@@ -162,6 +199,41 @@ func ByCustomerSnapshot(opts ...sql.OrderTermOption) OrderOption {
 // ByStatus orders the results by the status field.
 func ByStatus(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldStatus, opts...).ToFunc()
+}
+
+// ByFinanceReleaseStatus orders the results by the finance_release_status field.
+func ByFinanceReleaseStatus(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinanceReleaseStatus, opts...).ToFunc()
+}
+
+// ByFinanceReleaseVersion orders the results by the finance_release_version field.
+func ByFinanceReleaseVersion(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinanceReleaseVersion, opts...).ToFunc()
+}
+
+// ByFinanceReleasedAt orders the results by the finance_released_at field.
+func ByFinanceReleasedAt(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinanceReleasedAt, opts...).ToFunc()
+}
+
+// ByFinanceReleasedBy orders the results by the finance_released_by field.
+func ByFinanceReleasedBy(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinanceReleasedBy, opts...).ToFunc()
+}
+
+// ByFinanceReleaseProcessInstanceID orders the results by the finance_release_process_instance_id field.
+func ByFinanceReleaseProcessInstanceID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinanceReleaseProcessInstanceID, opts...).ToFunc()
+}
+
+// ByFinanceReleaseProcessNodeID orders the results by the finance_release_process_node_id field.
+func ByFinanceReleaseProcessNodeID(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinanceReleaseProcessNodeID, opts...).ToFunc()
+}
+
+// ByFinanceReleaseNote orders the results by the finance_release_note field.
+func ByFinanceReleaseNote(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldFinanceReleaseNote, opts...).ToFunc()
 }
 
 // ByIdempotencyKey orders the results by the idempotency_key field.

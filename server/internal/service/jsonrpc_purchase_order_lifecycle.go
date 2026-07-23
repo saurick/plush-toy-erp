@@ -15,8 +15,6 @@ func (d *jsonrpcDispatcher) handlePurchaseOrderLifecycle(
 	switch method {
 	case "submit_purchase_order":
 		return d.handlePurchaseOrderLifecycleAction(ctx, id, pm, biz.PermissionPurchaseOrderUpdate, d.purchaseOrderUC.SubmitPurchaseOrder)
-	case "approve_purchase_order":
-		return d.handlePurchaseOrderLifecycleAction(ctx, id, pm, biz.PermissionPurchaseOrderApprove, d.purchaseOrderUC.ApprovePurchaseOrder)
 	case "close_purchase_order":
 		return d.handlePurchaseOrderLifecycleAction(ctx, id, pm, biz.PermissionPurchaseOrderUpdate, d.purchaseOrderUC.ClosePurchaseOrder)
 	case "cancel_purchase_order":

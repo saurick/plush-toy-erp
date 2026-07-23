@@ -123,6 +123,7 @@ test('workflow mock authorization uses approve for boss order approval completio
     task_group: 'order_approval',
     source_type: 'project-orders',
     owner_role_key: 'boss',
+    required_capability_key: 'workflow.task.approve',
   })
   const approveOnly = profile({
     actions: ['workflow.task.approve'],

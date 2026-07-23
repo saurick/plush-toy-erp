@@ -88,6 +88,8 @@ var (
 	ErrShipmentReleasePending               = errors.New("shipment release task is not completed")
 	ErrShipmentReleaseRejected              = errors.New("shipment release task was rejected")
 	ErrShipmentReleaseAlreadySubmitted      = errors.New("shipment release was already submitted")
+	ErrShipmentFinanceReleaseRequired       = errors.New("shipment finance approval is required")
+	ErrShipmentFinanceReleaseConflict       = errors.New("shipment finance approval version conflict")
 	ErrShipmentCancellationProcessActive    = errors.New("shipment finished goods delivery process is still active")
 	ErrShipmentCancellationTaskActive       = errors.New("shipment release task is still active")
 	ErrProductionExceptionTaskRequired      = errors.New("production exception task is required")
@@ -158,20 +160,27 @@ type OutsourcingFact struct {
 }
 
 type Shipment struct {
-	ID               int
-	ShipmentNo       string
-	SalesOrderID     *int
-	CustomerID       *int
-	CustomerSnapshot *string
-	Status           string
-	IdempotencyKey   string
-	PlannedShipAt    *time.Time
-	ShippedAt        *time.Time
-	TotalNetWeightG  *decimal.Decimal
-	Note             *string
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	Items            []*ShipmentItem
+	ID                              int
+	ShipmentNo                      string
+	SalesOrderID                    *int
+	CustomerID                      *int
+	CustomerSnapshot                *string
+	Status                          string
+	FinanceReleaseStatus            string
+	FinanceReleaseVersion           int
+	FinanceReleasedAt               *time.Time
+	FinanceReleasedBy               *int
+	FinanceReleaseProcessInstanceID *int
+	FinanceReleaseProcessNodeID     *int
+	FinanceReleaseNote              *string
+	IdempotencyKey                  string
+	PlannedShipAt                   *time.Time
+	ShippedAt                       *time.Time
+	TotalNetWeightG                 *decimal.Decimal
+	Note                            *string
+	CreatedAt                       time.Time
+	UpdatedAt                       time.Time
+	Items                           []*ShipmentItem
 }
 
 type ShipmentItem struct {

@@ -3876,6 +3876,13 @@ var (
 		{Name: "shipment_no", Type: field.TypeString, Size: 64},
 		{Name: "customer_snapshot", Type: field.TypeString, Nullable: true, Size: 512},
 		{Name: "status", Type: field.TypeString, Size: 32, Default: "DRAFT"},
+		{Name: "finance_release_status", Type: field.TypeString, Size: 32, Default: "PENDING"},
+		{Name: "finance_release_version", Type: field.TypeInt, Default: 1},
+		{Name: "finance_released_at", Type: field.TypeTime, Nullable: true},
+		{Name: "finance_released_by", Type: field.TypeInt, Nullable: true},
+		{Name: "finance_release_process_instance_id", Type: field.TypeInt, Nullable: true},
+		{Name: "finance_release_process_node_id", Type: field.TypeInt, Nullable: true},
+		{Name: "finance_release_note", Type: field.TypeString, Nullable: true, Size: 255},
 		{Name: "idempotency_key", Type: field.TypeString, Size: 128},
 		{Name: "planned_ship_at", Type: field.TypeTime, Nullable: true},
 		{Name: "shipped_at", Type: field.TypeTime, Nullable: true},
@@ -3895,13 +3902,13 @@ var (
 		ForeignKeys: []*schema.ForeignKey{
 			{
 				Symbol:     "shipments_customers_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[12]},
+				Columns:    []*schema.Column{ShipmentsColumns[19]},
 				RefColumns: []*schema.Column{CustomersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
 			{
 				Symbol:     "shipments_sales_orders_shipments",
-				Columns:    []*schema.Column{ShipmentsColumns[13]},
+				Columns:    []*schema.Column{ShipmentsColumns[20]},
 				RefColumns: []*schema.Column{SalesOrdersColumns[0]},
 				OnDelete:   schema.SetNull,
 			},
@@ -3915,17 +3922,17 @@ var (
 			{
 				Name:    "shipment_idempotency_key",
 				Unique:  true,
-				Columns: []*schema.Column{ShipmentsColumns[4]},
+				Columns: []*schema.Column{ShipmentsColumns[11]},
 			},
 			{
 				Name:    "shipment_sales_order_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[13]},
+				Columns: []*schema.Column{ShipmentsColumns[20]},
 			},
 			{
 				Name:    "shipment_customer_id",
 				Unique:  false,
-				Columns: []*schema.Column{ShipmentsColumns[12]},
+				Columns: []*schema.Column{ShipmentsColumns[19]},
 			},
 			{
 				Name:    "shipment_status",
@@ -5096,6 +5103,8 @@ func init() {
 	ShipmentsTable.ForeignKeys[1].RefTable = SalesOrdersTable
 	ShipmentsTable.Annotation = &entsql.Annotation{}
 	ShipmentsTable.Annotation.Checks = map[string]string{
+		"shipments_finance_release_status_allowed":        "finance_release_status IN ('PENDING', 'APPROVED', 'REJECTED')",
+		"shipments_finance_release_version_positive":      "finance_release_version > 0",
 		"shipments_requested_total_net_weight_g_positive": "requested_total_net_weight_g IS NULL OR requested_total_net_weight_g > 0",
 		"shipments_status_allowed":                        "status IN ('DRAFT', 'SHIPPED', 'CANCELLED')",
 		"shipments_total_net_weight_g_positive":           "total_net_weight_g IS NULL OR total_net_weight_g > 0",

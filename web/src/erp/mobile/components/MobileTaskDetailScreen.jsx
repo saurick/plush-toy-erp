@@ -10,6 +10,8 @@ import {
   RightOutlined,
 } from '@ant-design/icons'
 import { formatMobileTaskTime } from '../../utils/mobileTaskView.mjs'
+import { listWorkflowTaskEvents } from '../../api/workflowApi.mjs'
+import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 import {
   buildTaskFactRows,
   getMobileRoleLabel,
@@ -44,6 +46,34 @@ export default function MobileTaskDetailScreen({
   selectedSeverity,
   selectedTask,
 }) {
+  const approvalTask = isWorkflowApprovalTask(selectedTask)
+  const [approvalEvents, setApprovalEvents] = React.useState([])
+  const [approvalEventsState, setApprovalEventsState] = React.useState('idle')
+
+  React.useEffect(() => {
+    if (!selectedTask?.id || !approvalTask) {
+      setApprovalEvents([])
+      setApprovalEventsState('idle')
+      return undefined
+    }
+    const controller = new AbortController()
+    setApprovalEventsState('loading')
+    listWorkflowTaskEvents(selectedTask.id, {
+      limit: 100,
+      signal: controller.signal,
+    })
+      .then((items) => {
+        setApprovalEvents(Array.isArray(items) ? items : [])
+        setApprovalEventsState('ready')
+      })
+      .catch(() => {
+        if (controller.signal.aborted) return
+        setApprovalEvents([])
+        setApprovalEventsState('error')
+      })
+    return () => controller.abort()
+  }, [approvalTask, selectedTask?.id])
+
   if (!selectedTask || !selectedSeverity) return null
 
   const factRows = buildTaskFactRows(selectedTask)
@@ -184,6 +214,49 @@ export default function MobileTaskDetailScreen({
             <p className="mt-2 whitespace-pre-wrap break-words text-base leading-7 text-slate-800 [overflow-wrap:anywhere]">
               {completionFeedback}
             </p>
+          </section>
+        ) : null}
+
+        {approvalTask ? (
+          <section
+            className="erp-mobile-card rounded-2xl border border-violet-200 bg-white p-4 shadow-sm"
+            data-testid="mobile-approval-trajectory"
+          >
+            <div className="text-sm font-semibold text-violet-700">
+              审批轨迹
+            </div>
+            {approvalEventsState === 'loading' ? (
+              <p className="mt-3 text-sm text-slate-500">正在加载审批轨迹…</p>
+            ) : approvalEventsState === 'error' ? (
+              <p className="mt-3 text-sm text-red-600">
+                审批轨迹加载失败，请刷新后重试。
+              </p>
+            ) : approvalEvents.length > 0 ? (
+              <div className="mt-3 space-y-2">
+                {approvalEvents.map((event, index) => (
+                  <div
+                    key={event.id || `${event.event_type || 'event'}-${index}`}
+                    className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3"
+                  >
+                    <div className="text-sm font-semibold text-slate-800">
+                      {event.event_label || event.action_label || '审批记录'}
+                    </div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      {formatMobileTaskTime(
+                        event.created_at || event.occurred_at
+                      )}
+                    </div>
+                    {String(event.reason || event.note || '').trim() ? (
+                      <div className="mt-2 whitespace-pre-wrap break-words text-sm text-slate-700">
+                        {String(event.reason || event.note).trim()}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="mt-3 text-sm text-slate-500">暂无审批轨迹。</p>
+            )}
           </section>
         ) : null}
 

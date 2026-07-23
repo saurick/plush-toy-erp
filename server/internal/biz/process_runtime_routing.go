@@ -3,6 +3,7 @@ package biz
 import (
 	"context"
 	"errors"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -184,8 +185,45 @@ func (uc *ProcessRuntimeUsecase) handleActivatedSequentialNode(ctx context.Conte
 		return err
 	case ProcessNodeTypeEnd:
 		return uc.completeEndNodeAndProcess(ctx, activatedNode, actorID)
+	case ProcessNodeTypeDomainCommand:
+		if !boolValueFromAny(activatedNode.PolicySnapshot["execute_after_approval"]) {
+			return nil
+		}
+		instance, err := uc.repo.GetProcessInstance(ctx, activatedNode.ProcessInstanceID)
+		if err != nil {
+			return err
+		}
+		payload, err := automaticProcessDomainCommandPayload(instance)
+		if err != nil {
+			return err
+		}
+		_, err = uc.ExecuteDomainCommandNode(ctx, &ProcessDomainCommandExecution{
+			ProcessInstanceID:     activatedNode.ProcessInstanceID,
+			ProcessNodeInstanceID: activatedNode.ID,
+			ExpectedVersion:       activatedNode.Version,
+			CommandKey:            processDomainCommandKeyFromNode(activatedNode),
+			IdempotencyKey:        fmt.Sprintf("process:%d:node:%d:auto-after-approval", activatedNode.ProcessInstanceID, activatedNode.ID),
+			Payload:               payload,
+		}, actorID)
+		return err
 	default:
 		return nil
+	}
+}
+
+func automaticProcessDomainCommandPayload(instance *ProcessInstance) (map[string]any, error) {
+	if instance == nil || instance.BusinessRefID <= 0 {
+		return nil, ErrBadParam
+	}
+	switch strings.TrimSpace(instance.BusinessRefType) {
+	case "sales_order":
+		return map[string]any{"sales_order_id": instance.BusinessRefID}, nil
+	case "purchase_order":
+		return map[string]any{"purchase_order_id": instance.BusinessRefID}, nil
+	case "shipment":
+		return map[string]any{"shipment_id": instance.BusinessRefID}, nil
+	default:
+		return nil, ErrBadParam
 	}
 }
 

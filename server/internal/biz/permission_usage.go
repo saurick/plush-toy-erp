@@ -382,9 +382,9 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	)
 
 	shipmentReadMethods := append(permissionMethods("operational_fact", "get_shipment", "list_shipments"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
-	shipmentCreateMethods := append(permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items", "submit_shipment_release"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
+	shipmentCreateMethods := append(permissionMethods("operational_fact", "list_shipment_source_candidates", "create_shipment_with_items"), permissionMethods("customer_config", "start_finished_goods_delivery_process")...)
 	addMenu(PermissionShipmentRead, "shipments", "shipments", "出货单", "shipment-list", "出货单列表", permissionControlPage, "允许进入并查看", shipmentReadMethods, businessUsageConditions)
-	addMenu(PermissionShipmentCreate, "shipments", "shipments", "出货单", "create-shipment", "创建出货单或提交出货放行", permissionControlButton, "显示并允许办理", shipmentCreateMethods, businessUsageConditions)
+	addMenu(PermissionShipmentCreate, "shipments", "shipments", "出货单", "create-shipment", "创建出货单或提交出货审批", permissionControlButton, "显示并允许办理", shipmentCreateMethods, businessUsageConditions)
 	addMenu(PermissionShipmentShip, "shipments", "shipment-actions", "出货动作", "ship-shipment", "确认出货", permissionControlButton, "显示并允许确认出货", permissionMethods("operational_fact", "ship_shipment"), businessUsageConditions)
 	addMenu(PermissionShipmentCancel, "shipments", "shipment-actions", "出货动作", "cancel-shipment", "取消出货单", permissionControlButton, "显示并允许取消", permissionMethods("operational_fact", "cancel_shipment"), businessUsageConditions)
 	addMenu(PermissionSalesReturnRead, "sales-returns", "sales-returns", "客户退货", "sales-return-list", "客户退货列表与详情", permissionControlPage, "允许进入并查看", permissionMethods("operational_fact", "get_sales_return", "list_sales_returns"), businessUsageConditions)

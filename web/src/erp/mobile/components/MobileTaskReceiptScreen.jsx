@@ -13,6 +13,7 @@ import {
   resolveTaskSourceLabel,
 } from '../utils/mobileRoleTaskModel.mjs'
 import MobileTaskFlowHeader from './MobileTaskFlowHeader.jsx'
+import { isWorkflowApprovalTask } from '../../utils/workflowTaskActionContract.mjs'
 
 const MOBILE_TASK_RECEIPT_OUTCOMES = Object.freeze({
   CONFIRMED: 'confirmed',
@@ -84,6 +85,7 @@ export default function MobileTaskReceiptScreen({
     : '任务状态暂不可用'
   const taskSource = task ? resolveTaskSourceLabel(task) : '来源信息暂不可用'
   const actionLabel = resolveReceiptActionLabel({ action, outcome, task })
+  const approvalTask = isWorkflowApprovalTask(task)
   const canRetry =
     outcome !== MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED && onRetryConfirm
 
@@ -118,7 +120,9 @@ export default function MobileTaskReceiptScreen({
             <OutcomeIcon />
           </span>
           <h2 className="mt-4 text-2xl font-semibold text-slate-950">
-            {outcomeMeta.title}
+            {approvalTask && outcome === MOBILE_TASK_RECEIPT_OUTCOMES.CONFIRMED
+              ? '审批办理已确认'
+              : outcomeMeta.title}
           </h2>
           <p className="mx-auto mt-2 max-w-md break-words text-base leading-7 text-slate-600 [overflow-wrap:anywhere]">
             {message || outcomeMeta.description}
@@ -234,7 +238,9 @@ export default function MobileTaskReceiptScreen({
         <section className="rounded-2xl border border-blue-200 bg-blue-50 px-4 py-4 text-sm leading-6 text-blue-700">
           <div className="font-semibold">结果边界</div>
           <div className="mt-1 [overflow-wrap:anywhere]">
-            本页只展示这条任务的办理结果；库存、质检、出货、开票和收付款仍以对应单据的办理结果为准。
+            {approvalTask
+              ? '本页确认的是审批任务及审批意见；来源单据状态和后续业务事实仍以对应领域单据与审计记录为准。'
+              : '本页只展示这条任务的办理结果；库存、质检、出货、开票和收付款仍以对应单据的办理结果为准。'}
           </div>
         </section>
       </main>

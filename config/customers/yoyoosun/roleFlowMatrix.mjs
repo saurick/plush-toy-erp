@@ -475,6 +475,7 @@ export const yoyoosunRoleFlowMatrix = Object.freeze({
         "workflow.task.read",
         "workflow.task.update",
         "workflow.task.complete",
+        "workflow.task.approve",
         "workflow.task.reject",
         "mobile.finance.access",
       ]),

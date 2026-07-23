@@ -488,10 +488,47 @@ func (r *operationalFactRepo) RecordShipmentFinanceReleaseProcessCommand(
 	if row.Status != biz.ShipmentStatusDraft {
 		return nil, biz.ErrBadParam
 	}
+	if row.FinanceReleaseStatus == biz.ShipmentFinanceReleaseStatusApproved {
+		if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
+			return nil, err
+		}
+		out, err := shipmentWithItems(ctx, tx.client, row)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.sqlTx.Commit(); err != nil {
+			return nil, err
+		}
+		tx = nil
+		return out, nil
+	}
+	if row.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusPending {
+		return nil, biz.ErrShipmentFinanceReleaseRequired
+	}
+	now := time.Now().UTC()
+	updated, err := tx.client.Shipment.UpdateOneID(id).
+		Where(
+			shipment.FinanceReleaseStatus(biz.ShipmentFinanceReleaseStatusPending),
+			shipment.FinanceReleaseVersion(row.FinanceReleaseVersion),
+		).
+		SetFinanceReleaseStatus(biz.ShipmentFinanceReleaseStatusApproved).
+		SetFinanceReleaseVersion(row.FinanceReleaseVersion + 1).
+		SetFinanceReleasedAt(now).
+		SetFinanceReleasedBy(actorID).
+		SetFinanceReleaseProcessInstanceID(command.ProcessInstance.ID).
+		SetFinanceReleaseProcessNodeID(command.Node.ID).
+		SetFinanceReleaseNote("审批通过").
+		Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrShipmentFinanceReleaseConflict
+		}
+		return nil, err
+	}
 	if err := recordProcessDomainCommandResultInInventoryTx(ctx, tx, command, result, actorID); err != nil {
 		return nil, err
 	}
-	out, err := shipmentWithItems(ctx, tx.client, row)
+	out, err := shipmentWithItems(ctx, tx.client, updated)
 	if err != nil {
 		return nil, err
 	}
@@ -668,16 +705,9 @@ func (r *operationalFactRepo) shipShipment(
 		if err != nil {
 			return nil, err
 		}
-		hasReleaseTask := true
-		if cancelledShippedFact {
-			if err := requireShipmentReleaseTaskDone(ctx, tx, releaseTask); err != nil {
-				return nil, err
-			}
-		} else {
-			_, hasReleaseTask, err = shipmentReleaseTaskForCancellation(ctx, tx, releaseTask)
-			if err != nil {
-				return nil, err
-			}
+		_, hasReleaseTask, err := shipmentReleaseTaskForCancellation(ctx, tx, releaseTask)
+		if err != nil {
+			return nil, err
 		}
 		if cancelledShippedFact {
 			for _, item := range items {
@@ -717,13 +747,8 @@ func (r *operationalFactRepo) shipShipment(
 			}
 			return commitShipment(ctx, tx, parent)
 		}
-		releaseSource := entShipmentToBiz(parent, items)
-		releaseTask, _, err := biz.BuildShipmentReleaseSourceTask(releaseSource)
-		if err != nil {
-			return nil, err
-		}
-		if err := requireShipmentReleaseTaskDone(ctx, tx, releaseTask); err != nil {
-			return nil, err
+		if parent.FinanceReleaseStatus != biz.ShipmentFinanceReleaseStatusApproved {
+			return nil, biz.ErrShipmentFinanceReleaseRequired
 		}
 		if err := validateShipmentFinishedGoodsQualityGate(ctx, tx, parent.ID); err != nil {
 			return nil, err
@@ -748,16 +773,6 @@ func (r *operationalFactRepo) shipShipment(
 		}
 		now := time.Now()
 		if err := updateOperationalFactStatus(ctx, tx, "shipments", id, transition.Target, "shipped_at", &now); err != nil {
-			return nil, err
-		}
-		if err := transitionSourceWorkflowProjection(
-			ctx, tx.client, releaseTask, "shipped", biz.WarehouseRoleKey, actorID,
-			"shipment.ship", map[string]any{
-				"source_document_status": biz.ShipmentStatusShipped,
-				"shipped_at":             now.UTC().Unix(),
-				"inventory_out_posted":   true,
-			},
-		); err != nil {
 			return nil, err
 		}
 	}
@@ -1529,7 +1544,7 @@ func entShipmentToBiz(row *ent.Shipment, itemRows []*ent.ShipmentItem) *biz.Ship
 	for _, item := range itemRows {
 		items = append(items, entShipmentItemToBiz(item))
 	}
-	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, SalesOrderID: row.SalesOrderID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightG: row.TotalNetWeightG, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
+	return &biz.Shipment{ID: row.ID, ShipmentNo: row.ShipmentNo, SalesOrderID: row.SalesOrderID, CustomerID: row.CustomerID, CustomerSnapshot: row.CustomerSnapshot, Status: row.Status, FinanceReleaseStatus: row.FinanceReleaseStatus, FinanceReleaseVersion: row.FinanceReleaseVersion, FinanceReleasedAt: row.FinanceReleasedAt, FinanceReleasedBy: row.FinanceReleasedBy, FinanceReleaseProcessInstanceID: row.FinanceReleaseProcessInstanceID, FinanceReleaseProcessNodeID: row.FinanceReleaseProcessNodeID, FinanceReleaseNote: row.FinanceReleaseNote, IdempotencyKey: row.IdempotencyKey, PlannedShipAt: row.PlannedShipAt, ShippedAt: row.ShippedAt, TotalNetWeightG: row.TotalNetWeightG, Note: row.Note, CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt, Items: items}
 }
 
 func entShipmentItemToBiz(row *ent.ShipmentItem) *biz.ShipmentItem {

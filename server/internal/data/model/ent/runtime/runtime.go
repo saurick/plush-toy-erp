@@ -6213,8 +6213,50 @@ func init() {
 			return nil
 		}
 	}()
+	// shipmentDescFinanceReleaseStatus is the schema descriptor for finance_release_status field.
+	shipmentDescFinanceReleaseStatus := shipmentFields[5].Descriptor()
+	// shipment.DefaultFinanceReleaseStatus holds the default value on creation for the finance_release_status field.
+	shipment.DefaultFinanceReleaseStatus = shipmentDescFinanceReleaseStatus.Default.(string)
+	// shipment.FinanceReleaseStatusValidator is a validator for the "finance_release_status" field. It is called by the builders before save.
+	shipment.FinanceReleaseStatusValidator = func() func(string) error {
+		validators := shipmentDescFinanceReleaseStatus.Validators
+		fns := [...]func(string) error{
+			validators[0].(func(string) error),
+			validators[1].(func(string) error),
+		}
+		return func(finance_release_status string) error {
+			for _, fn := range fns {
+				if err := fn(finance_release_status); err != nil {
+					return err
+				}
+			}
+			return nil
+		}
+	}()
+	// shipmentDescFinanceReleaseVersion is the schema descriptor for finance_release_version field.
+	shipmentDescFinanceReleaseVersion := shipmentFields[6].Descriptor()
+	// shipment.DefaultFinanceReleaseVersion holds the default value on creation for the finance_release_version field.
+	shipment.DefaultFinanceReleaseVersion = shipmentDescFinanceReleaseVersion.Default.(int)
+	// shipment.FinanceReleaseVersionValidator is a validator for the "finance_release_version" field. It is called by the builders before save.
+	shipment.FinanceReleaseVersionValidator = shipmentDescFinanceReleaseVersion.Validators[0].(func(int) error)
+	// shipmentDescFinanceReleasedBy is the schema descriptor for finance_released_by field.
+	shipmentDescFinanceReleasedBy := shipmentFields[8].Descriptor()
+	// shipment.FinanceReleasedByValidator is a validator for the "finance_released_by" field. It is called by the builders before save.
+	shipment.FinanceReleasedByValidator = shipmentDescFinanceReleasedBy.Validators[0].(func(int) error)
+	// shipmentDescFinanceReleaseProcessInstanceID is the schema descriptor for finance_release_process_instance_id field.
+	shipmentDescFinanceReleaseProcessInstanceID := shipmentFields[9].Descriptor()
+	// shipment.FinanceReleaseProcessInstanceIDValidator is a validator for the "finance_release_process_instance_id" field. It is called by the builders before save.
+	shipment.FinanceReleaseProcessInstanceIDValidator = shipmentDescFinanceReleaseProcessInstanceID.Validators[0].(func(int) error)
+	// shipmentDescFinanceReleaseProcessNodeID is the schema descriptor for finance_release_process_node_id field.
+	shipmentDescFinanceReleaseProcessNodeID := shipmentFields[10].Descriptor()
+	// shipment.FinanceReleaseProcessNodeIDValidator is a validator for the "finance_release_process_node_id" field. It is called by the builders before save.
+	shipment.FinanceReleaseProcessNodeIDValidator = shipmentDescFinanceReleaseProcessNodeID.Validators[0].(func(int) error)
+	// shipmentDescFinanceReleaseNote is the schema descriptor for finance_release_note field.
+	shipmentDescFinanceReleaseNote := shipmentFields[11].Descriptor()
+	// shipment.FinanceReleaseNoteValidator is a validator for the "finance_release_note" field. It is called by the builders before save.
+	shipment.FinanceReleaseNoteValidator = shipmentDescFinanceReleaseNote.Validators[0].(func(string) error)
 	// shipmentDescIdempotencyKey is the schema descriptor for idempotency_key field.
-	shipmentDescIdempotencyKey := shipmentFields[5].Descriptor()
+	shipmentDescIdempotencyKey := shipmentFields[12].Descriptor()
 	// shipment.IdempotencyKeyValidator is a validator for the "idempotency_key" field. It is called by the builders before save.
 	shipment.IdempotencyKeyValidator = func() func(string) error {
 		validators := shipmentDescIdempotencyKey.Validators
@@ -6232,15 +6274,15 @@ func init() {
 		}
 	}()
 	// shipmentDescNote is the schema descriptor for note field.
-	shipmentDescNote := shipmentFields[10].Descriptor()
+	shipmentDescNote := shipmentFields[17].Descriptor()
 	// shipment.NoteValidator is a validator for the "note" field. It is called by the builders before save.
 	shipment.NoteValidator = shipmentDescNote.Validators[0].(func(string) error)
 	// shipmentDescCreatedAt is the schema descriptor for created_at field.
-	shipmentDescCreatedAt := shipmentFields[11].Descriptor()
+	shipmentDescCreatedAt := shipmentFields[18].Descriptor()
 	// shipment.DefaultCreatedAt holds the default value on creation for the created_at field.
 	shipment.DefaultCreatedAt = shipmentDescCreatedAt.Default.(func() time.Time)
 	// shipmentDescUpdatedAt is the schema descriptor for updated_at field.
-	shipmentDescUpdatedAt := shipmentFields[12].Descriptor()
+	shipmentDescUpdatedAt := shipmentFields[19].Descriptor()
 	// shipment.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	shipment.DefaultUpdatedAt = shipmentDescUpdatedAt.Default.(func() time.Time)
 	// shipment.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

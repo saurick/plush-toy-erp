@@ -30,6 +30,20 @@ type Shipment struct {
 	CustomerSnapshot *string `json:"customer_snapshot,omitempty"`
 	// Status holds the value of the "status" field.
 	Status string `json:"status,omitempty"`
+	// FinanceReleaseStatus holds the value of the "finance_release_status" field.
+	FinanceReleaseStatus string `json:"finance_release_status,omitempty"`
+	// FinanceReleaseVersion holds the value of the "finance_release_version" field.
+	FinanceReleaseVersion int `json:"finance_release_version,omitempty"`
+	// FinanceReleasedAt holds the value of the "finance_released_at" field.
+	FinanceReleasedAt *time.Time `json:"finance_released_at,omitempty"`
+	// FinanceReleasedBy holds the value of the "finance_released_by" field.
+	FinanceReleasedBy *int `json:"finance_released_by,omitempty"`
+	// FinanceReleaseProcessInstanceID holds the value of the "finance_release_process_instance_id" field.
+	FinanceReleaseProcessInstanceID *int `json:"finance_release_process_instance_id,omitempty"`
+	// FinanceReleaseProcessNodeID holds the value of the "finance_release_process_node_id" field.
+	FinanceReleaseProcessNodeID *int `json:"finance_release_process_node_id,omitempty"`
+	// FinanceReleaseNote holds the value of the "finance_release_note" field.
+	FinanceReleaseNote *string `json:"finance_release_note,omitempty"`
 	// IdempotencyKey holds the value of the "idempotency_key" field.
 	IdempotencyKey string `json:"idempotency_key,omitempty"`
 	// PlannedShipAt holds the value of the "planned_ship_at" field.
@@ -103,11 +117,11 @@ func (*Shipment) scanValues(columns []string) ([]any, error) {
 		switch columns[i] {
 		case shipment.FieldTotalNetWeightG, shipment.FieldRequestedTotalNetWeightG:
 			values[i] = &sql.NullScanner{S: new(decimal.Decimal)}
-		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID:
+		case shipment.FieldID, shipment.FieldSalesOrderID, shipment.FieldCustomerID, shipment.FieldFinanceReleaseVersion, shipment.FieldFinanceReleasedBy, shipment.FieldFinanceReleaseProcessInstanceID, shipment.FieldFinanceReleaseProcessNodeID:
 			values[i] = new(sql.NullInt64)
-		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldIdempotencyKey, shipment.FieldNote:
+		case shipment.FieldShipmentNo, shipment.FieldCustomerSnapshot, shipment.FieldStatus, shipment.FieldFinanceReleaseStatus, shipment.FieldFinanceReleaseNote, shipment.FieldIdempotencyKey, shipment.FieldNote:
 			values[i] = new(sql.NullString)
-		case shipment.FieldPlannedShipAt, shipment.FieldShippedAt, shipment.FieldCreatedAt, shipment.FieldUpdatedAt:
+		case shipment.FieldFinanceReleasedAt, shipment.FieldPlannedShipAt, shipment.FieldShippedAt, shipment.FieldCreatedAt, shipment.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
 		default:
 			values[i] = new(sql.UnknownType)
@@ -162,6 +176,53 @@ func (_m *Shipment) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field status", values[i])
 			} else if value.Valid {
 				_m.Status = value.String
+			}
+		case shipment.FieldFinanceReleaseStatus:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field finance_release_status", values[i])
+			} else if value.Valid {
+				_m.FinanceReleaseStatus = value.String
+			}
+		case shipment.FieldFinanceReleaseVersion:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field finance_release_version", values[i])
+			} else if value.Valid {
+				_m.FinanceReleaseVersion = int(value.Int64)
+			}
+		case shipment.FieldFinanceReleasedAt:
+			if value, ok := values[i].(*sql.NullTime); !ok {
+				return fmt.Errorf("unexpected type %T for field finance_released_at", values[i])
+			} else if value.Valid {
+				_m.FinanceReleasedAt = new(time.Time)
+				*_m.FinanceReleasedAt = value.Time
+			}
+		case shipment.FieldFinanceReleasedBy:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field finance_released_by", values[i])
+			} else if value.Valid {
+				_m.FinanceReleasedBy = new(int)
+				*_m.FinanceReleasedBy = int(value.Int64)
+			}
+		case shipment.FieldFinanceReleaseProcessInstanceID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field finance_release_process_instance_id", values[i])
+			} else if value.Valid {
+				_m.FinanceReleaseProcessInstanceID = new(int)
+				*_m.FinanceReleaseProcessInstanceID = int(value.Int64)
+			}
+		case shipment.FieldFinanceReleaseProcessNodeID:
+			if value, ok := values[i].(*sql.NullInt64); !ok {
+				return fmt.Errorf("unexpected type %T for field finance_release_process_node_id", values[i])
+			} else if value.Valid {
+				_m.FinanceReleaseProcessNodeID = new(int)
+				*_m.FinanceReleaseProcessNodeID = int(value.Int64)
+			}
+		case shipment.FieldFinanceReleaseNote:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field finance_release_note", values[i])
+			} else if value.Valid {
+				_m.FinanceReleaseNote = new(string)
+				*_m.FinanceReleaseNote = value.String
 			}
 		case shipment.FieldIdempotencyKey:
 			if value, ok := values[i].(*sql.NullString); !ok {
@@ -287,6 +348,37 @@ func (_m *Shipment) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("status=")
 	builder.WriteString(_m.Status)
+	builder.WriteString(", ")
+	builder.WriteString("finance_release_status=")
+	builder.WriteString(_m.FinanceReleaseStatus)
+	builder.WriteString(", ")
+	builder.WriteString("finance_release_version=")
+	builder.WriteString(fmt.Sprintf("%v", _m.FinanceReleaseVersion))
+	builder.WriteString(", ")
+	if v := _m.FinanceReleasedAt; v != nil {
+		builder.WriteString("finance_released_at=")
+		builder.WriteString(v.Format(time.ANSIC))
+	}
+	builder.WriteString(", ")
+	if v := _m.FinanceReleasedBy; v != nil {
+		builder.WriteString("finance_released_by=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.FinanceReleaseProcessInstanceID; v != nil {
+		builder.WriteString("finance_release_process_instance_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.FinanceReleaseProcessNodeID; v != nil {
+		builder.WriteString("finance_release_process_node_id=")
+		builder.WriteString(fmt.Sprintf("%v", *v))
+	}
+	builder.WriteString(", ")
+	if v := _m.FinanceReleaseNote; v != nil {
+		builder.WriteString("finance_release_note=")
+		builder.WriteString(*v)
+	}
 	builder.WriteString(", ")
 	builder.WriteString("idempotency_key=")
 	builder.WriteString(_m.IdempotencyKey)

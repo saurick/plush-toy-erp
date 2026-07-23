@@ -235,10 +235,17 @@ func newSalesOrderAcceptanceContract(variantKey string, includeEngineering bool)
 		customerHumanProcessNode(
 			"order_approval",
 			ProcessNodeTypeApproval,
-			"order_approval",
+			"boss",
 			PermissionWorkflowTaskApprove,
 			"sales_order_approval.default",
 			"sales_order_approval",
+		),
+		customerDomainCommandNode(
+			"activate_sales_order",
+			"",
+			PermissionWorkflowTaskApprove,
+			ProcessDomainCommandSalesOrderActivate,
+			"SalesOrderUsecase.ActivateSalesOrderForProcessCommand",
 		),
 	}
 	if includeEngineering {
@@ -288,6 +295,21 @@ func newMaterialSupplyContract() customerProcessContract {
 		FactBoundary:   "no_fact_posting",
 		Guardrail:      "The Product Core creates the receipt source document, evaluates formal line quality decisions and posts inbound inventory only through registered domain usecases.",
 		Nodes: []ProcessNodeInstanceCreate{
+			customerHumanProcessNode(
+				"purchase_order_approval",
+				ProcessNodeTypeApproval,
+				"boss",
+				PermissionWorkflowTaskApprove,
+				"purchase_order_approval.default",
+				"purchase_order_approval",
+			),
+			customerDomainCommandNode(
+				"approve_purchase_order",
+				"",
+				PermissionWorkflowTaskApprove,
+				ProcessDomainCommandPurchaseOrderApprove,
+				"PurchaseOrderUsecase.ApprovePurchaseOrder",
+			),
 			customerDomainCommandNode(
 				"purchase_receipt_source",
 				"purchase_receipt_source",
@@ -333,12 +355,20 @@ func newFinishedGoodsDeliveryContract() customerProcessContract {
 				ProcessDomainCommandFinishedGoodsQualityDecide,
 				"InventoryUsecase.PassQualityInspection/RejectQualityInspection",
 			),
+			customerHumanProcessNode(
+				"shipment_finance_approval",
+				ProcessNodeTypeApproval,
+				"finance",
+				PermissionWorkflowTaskApprove,
+				"shipment_finance_approval.default",
+				"shipment_finance_approval",
+			),
 			customerDomainCommandNode(
 				"shipment_finance_release",
 				"shipment_finance_release",
 				PermissionFinanceReceivableConfirm,
 				ProcessDomainCommandShipmentFinanceRelease,
-				"OperationalFactUsecase.GetShipment",
+				"OperationalFactUsecase.RecordShipmentFinanceRelease",
 			),
 			customerDomainCommandNode(
 				"shipment_execution",
@@ -371,7 +401,7 @@ func customerHumanProcessNode(nodeKey, nodeType, ownerPoolKey, capabilityKey, fo
 }
 
 func customerDomainCommandNode(nodeKey, ownerPoolKey, capabilityKey, commandKey, handler string) ProcessNodeInstanceCreate {
-	return ProcessNodeInstanceCreate{
+	node := ProcessNodeInstanceCreate{
 		NodeKey:               nodeKey,
 		NodeType:              ProcessNodeTypeDomainCommand,
 		OwnerPoolKey:          optionalStringPointer(ownerPoolKey),
@@ -383,4 +413,8 @@ func customerDomainCommandNode(nodeKey, ownerPoolKey, capabilityKey, commandKey,
 			"writes_fact":              false,
 		},
 	}
+	if commandKey == ProcessDomainCommandSalesOrderActivate || commandKey == ProcessDomainCommandPurchaseOrderApprove || commandKey == ProcessDomainCommandShipmentFinanceRelease {
+		node.PolicySnapshot["execute_after_approval"] = true
+	}
+	return node
 }

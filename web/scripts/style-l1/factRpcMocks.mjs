@@ -2230,6 +2230,36 @@ export async function installFactRpcMocks(page, context) {
         }
         break
       }
+      case 'list_task_events': {
+        const taskID = Number(params.task_id || 0)
+        const task = workflowTasks.find((item) => Number(item.id) === taskID)
+        if (
+          !task ||
+          !workflowMockCanViewTask(adminProfile, effectiveSession, task)
+        ) {
+          fail('当前账号不能查看该任务轨迹')
+          break
+        }
+        data = {
+          items: [
+            {
+              id: taskID * 10,
+              task_id: taskID,
+              event_type: 'created',
+              from_status_key: '',
+              to_status_key: task.task_status_key,
+              actor_role_key: task.owner_role_key,
+              reason: '等待审批人核对来源单据与放行条件',
+              task_version: task.version,
+              created_at: Number(task.created_at || nowUnix()),
+            },
+          ],
+          total: 1,
+          limit: Number(params.limit || 100),
+          offset: 0,
+        }
+        break
+      }
       case 'list_role_tasks': {
         if (
           !workflowMockPermissionAllowed(

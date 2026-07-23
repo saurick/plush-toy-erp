@@ -142,6 +142,8 @@ func TestCustomerConfigPostgresCountOpenWorkflowTasksUsesRuntimeTaskCategoriesAn
 	otherRevision := "rev-other-" + suffix
 	ownerPoolKey := "pool-active-" + suffix
 	otherPoolKey := "pool-other-" + suffix
+	ownerRoleKey := "role-active-" + suffix
+	otherRoleKey := "role-other-" + suffix
 	ownerPool := ownerPoolKey
 	otherPool := otherPoolKey
 	blankPool := "  "
@@ -208,18 +210,18 @@ func TestCustomerConfigPostgresCountOpenWorkflowTasksUsesRuntimeTaskCategoriesAn
 		processInstanceID     *int
 		processNodeInstanceID *int
 	}{
-		{revision: &activeRevision, poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready", processInstanceID: intPointer(activeProcessID), processNodeInstanceID: intPointer(activeNodeID)},
-		{revision: &activeRevision, poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready"},
-		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready"},
-		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "blocked"},
-		{ownerRoleKey: biz.SalesRoleKey, status: "ready"},
-		{poolKey: &blankPool, ownerRoleKey: biz.SalesRoleKey, status: "blocked"},
-		{poolKey: &otherPool, ownerRoleKey: biz.SalesRoleKey, status: "ready"},
-		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready", processInstanceID: intPointer(nullRevisionProcessID), processNodeInstanceID: intPointer(nullRevisionNodeID)},
-		{revision: &otherRevision, poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "ready", processInstanceID: intPointer(otherProcessID), processNodeInstanceID: intPointer(otherNodeID)},
-		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "done"},
-		{poolKey: &ownerPool, ownerRoleKey: biz.SalesRoleKey, status: "rejected"},
-		{ownerRoleKey: biz.FinanceRoleKey, status: "ready"},
+		{revision: &activeRevision, poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "ready", processInstanceID: intPointer(activeProcessID), processNodeInstanceID: intPointer(activeNodeID)},
+		{revision: &activeRevision, poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "ready"},
+		{poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "ready"},
+		{poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "blocked"},
+		{ownerRoleKey: ownerRoleKey, status: "ready"},
+		{poolKey: &blankPool, ownerRoleKey: ownerRoleKey, status: "blocked"},
+		{poolKey: &otherPool, ownerRoleKey: ownerRoleKey, status: "ready"},
+		{poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "ready", processInstanceID: intPointer(nullRevisionProcessID), processNodeInstanceID: intPointer(nullRevisionNodeID)},
+		{revision: &otherRevision, poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "ready", processInstanceID: intPointer(otherProcessID), processNodeInstanceID: intPointer(otherNodeID)},
+		{poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "done"},
+		{poolKey: &ownerPool, ownerRoleKey: ownerRoleKey, status: "rejected"},
+		{ownerRoleKey: otherRoleKey, status: "ready"},
 	}
 	for index, fixture := range fixtures {
 		builder := client.WorkflowTask.Create().
@@ -247,9 +249,9 @@ func TestCustomerConfigPostgresCountOpenWorkflowTasksUsesRuntimeTaskCategoriesAn
 		roleKeys []string
 		want     int
 	}{
-		{name: "combined", poolKeys: []string{ownerPoolKey}, roleKeys: []string{biz.SalesRoleKey}, want: 5},
+		{name: "combined", poolKeys: []string{ownerPoolKey}, roleKeys: []string{ownerRoleKey}, want: 5},
 		{name: "explicit pool only", poolKeys: []string{ownerPoolKey}, want: 3},
-		{name: "fallback role only", roleKeys: []string{biz.SalesRoleKey}, want: 2},
+		{name: "fallback role only", roleKeys: []string{ownerRoleKey}, want: 2},
 	}
 	for _, check := range checks {
 		count, err := repo.CountOpenWorkflowTasksByResponsibilities(

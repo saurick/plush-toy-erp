@@ -15,20 +15,20 @@ func TestNormalizeCustomerProcessContractsExpandsCanonicalSalesVariants(t *testi
 		{
 			name:         "approval and PMC",
 			variant:      CustomerProcessVariantSalesApprovalPMC,
-			wantNodeKeys: []string{"submit_sales_order", "order_approval", "order_review", "end"},
+			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "order_review", "end"},
 			wantPoolIndex: map[int]string{
-				1: "order_approval",
-				2: "order_review",
+				1: BossRoleKey,
+				3: "order_review",
 			},
 		},
 		{
 			name:         "approval engineering and PMC",
 			variant:      CustomerProcessVariantSalesApprovalEngineeringPMC,
-			wantNodeKeys: []string{"submit_sales_order", "order_approval", "engineering_data", "order_review", "end"},
+			wantNodeKeys: []string{"submit_sales_order", "order_approval", "activate_sales_order", "engineering_data", "order_review", "end"},
 			wantPoolIndex: map[int]string{
-				1: "order_approval",
-				2: "engineering_data",
-				3: "order_review",
+				1: BossRoleKey,
+				3: "engineering_data",
+				4: "order_review",
 			},
 		},
 	}

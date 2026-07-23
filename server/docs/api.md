@@ -78,13 +78,12 @@ HTTP 路由：
 
 - `list_shipment_source_candidates`
 - `create_shipment_with_items`
-- `submit_shipment_release`
 - `ship_shipment`
 - `cancel_shipment`
 - `get_shipment`
 - `list_shipments`
 
-用途：查询可出货销售订单行、创建出货草稿、显式提交放行、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 与绑定销售订单或订单行的 `create_shipment_with_items` 都要求 `shipment.create + sales_order.read + sales_order_item.read`。`shipments=enabled` 的正式依赖闭包要求 `sales_orders=enabled`；手工漂移为 `read_only / disabled / 缺失` 都会阻断且不调用出货仓储。无销售来源的手工草稿不追加销售来源读取权限，但仍服从 `shipments` 的正式模块依赖闭包。来源候选按关键词、销售订单和分页返回来源身份、订单数量、仅由 `SHIPPED` 累计的已出货量、剩余量与不可选原因；数量均为 `numeric(20,6)` 十进制字符串，不能用无范围的订单明细列表替代。来源绑定的新建请求在同一事务中锁定并校验 ACTIVE 订单、OPEN 来源行、客户、产品 / SKU、单位及本次数量；客户展示快照由服务端从销售订单不可变快照派生，客户端提交值不能覆盖。`get_shipment` 与 `list_shipments` 均只读且要求 `shipment.read`；`submit_shipment_release` 生成 Workflow 任务，`ship_shipment` 才写 `SHIPPED` 与库存 `OUT`，两步不能合并理解。
+用途：查询可出货销售订单行、创建出货草稿、确认真实出货、取消草稿或已出货单，以及按 ID 精确读取或列表查询出货单。`list_shipment_source_candidates` 与绑定销售订单或订单行的 `create_shipment_with_items` 都要求 `shipment.create + sales_order.read + sales_order_item.read`。`get_shipment` 与 `list_shipments` 均只读且要求 `shipment.read`。公开 `submit_shipment_release` 已退出；正式页面使用 `customer_config.start_finished_goods_delivery_process` 启动 active revision，财务审批通过后由绑定领域命令记录 Shipment 财务放行。`ship_shipment` 只有在该门禁为 `APPROVED` 时才写 `SHIPPED` 与库存 `OUT`。
 
 `cancel_shipment` 按原状态分支：`DRAFT -> CANCELLED` 只终止未出库草稿，不写库存；`SHIPPED -> CANCELLED` 才逐行写库存 `REVERSAL`。active `finished_goods_delivery` 流程、未结成品质检、active 出货放行任务或非取消应收 / 发票都会阻断取消；草稿已提交放行时，须先将任务完成或退回。重复取消依真实 `shipped_at` 判断是否曾出库，不会把草稿取消误写成库存冲正。
 
@@ -169,20 +168,11 @@ API 存在不代表正式 Web UI 可达：`add_purchase_receipt_item`、`materia
 | --- | --- | --- | --- | --- |
 | 生产订单从 `DRAFT` 下达到 `RELEASED` | `production_scheduling` | `production-orders` | PMC | `source-production-scheduling-<生产订单ID>` |
 | 来源完工事实创建的返工事实从 `DRAFT` 过账到 `POSTED` | `production_exception` | `production-progress` | 生产 | `source-production-exception-<返工事实ID>` |
-| `DRAFT` 出货单显式提交放行 | `shipment_release` | `shipments` | 仓库 | `source-shipment-release-<出货单ID>` |
+| 历史 `DRAFT` 出货单显式提交放行（公开 producer 已退出） | `shipment_release` | `shipments` | 仓库 | `source-shipment-release-<出货单ID>` |
 
 三类任务 payload 都携带 `source_task_contract=workflow.source-task/v1`、固定 producer 和来源意图摘要。对应 task group 与任务编号前缀是保留命名空间；公开 `workflow.create_task`、ProcessRuntime 显式 / node-key 回退任务组和客户流程人工 / 审批节点均会拒绝占用。该约束防止普通任务冒充来源任务，不把 payload 变成 Production、Shipment、Inventory、Quality 或 Finance 真源。
 
-`operational_fact.submit_shipment_release` 的业务请求只提交：
-
-- `id`：正整数 `DRAFT` 出货单 ID。
-
-后端锁定出货单并校验明细与当时的出货前成品检验集合；没有检验时按当前可选检验策略提交，一旦存在非取消检验，则必须全部达到 `PASSED + PASS / CONCESSION`。成功返回：
-
-- `workflow_task`：来源生成的放行任务。
-- `created`：本次是否新建；精确重放返回同一任务并为 `false`。
-
-前端必须核对任务 ID / version、确定性编号、任务组、来源类型与 ID、仓库责任岗位、task status / business status、`workflow.source-task/v1`、producer 和来源意图摘要；结构不完整或与请求来源不一致时按结果无法确认处理，不能提示提交成功。
+`customer_config.start_finished_goods_delivery_process` 是新的出货审批入口。请求绑定正整数 `shipment_id`、stable business ref 和幂等键；服务端只使用 active revision。流程质量关口、财务 `workflow.task.approve` 节点、`shipment.finance_release` 领域命令、真实出货与应收线索顺序固定，不能从公开 Shipment API 跳过财务放行。
 
 放行任务完成只把协同投影推进到 `shipping_released`，不调用 `ship_shipment`，不写库存、应收或发票。`operational_fact.ship_shipment` 会在同一出货事务内重新核对上述完整来源合同并要求 task status 为 `done`，然后继续校验冻结的质检集合、销售来源数量、库存预留和可用量；全部通过后才写 `SHIPPED` 与库存 `OUT`。真实出货 / 取消冲正会把来源业务投影继续推进到 `shipped / cancelled`，生产订单关闭 / 取消和返工事实取消同理推进到 `closed / cancelled`；这些来源投影不改写既有 task status。
 

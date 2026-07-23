@@ -35,6 +35,10 @@ const (
 	ProcessDomainCommandShipmentShip               = "shipment.ship"
 	ProcessDomainCommandFinanceReceivableLead      = "finance.receivable_lead"
 
+	ShipmentFinanceReleaseStatusPending  = "PENDING"
+	ShipmentFinanceReleaseStatusApproved = "APPROVED"
+	ShipmentFinanceReleaseStatusRejected = "REJECTED"
+
 	ProcessStatusActive    = "active"
 	ProcessStatusCompleted = "completed"
 	ProcessStatusBlocked   = "blocked"

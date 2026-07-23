@@ -2,16 +2,7 @@ export function isWorkflowApprovalTask(task = {}) {
   const requiredCapabilityKey = String(
     task?.required_capability_key || ''
   ).trim()
-  if (requiredCapabilityKey === 'workflow.task.approve') {
-    return true
-  }
-  // Tasks created before ProcessRuntime exposed the generic node contract keep
-  // the former sales-order identity as a read-only classification fallback.
-  return (
-    String(task?.source_type || '').trim() === 'project-orders' &&
-    String(task?.task_group || '').trim() === 'order_approval' &&
-    String(task?.owner_role_key || '').trim() === 'boss'
-  )
+  return requiredCapabilityKey === 'workflow.task.approve'
 }
 
 export const isWorkflowBossOrderApprovalTask = isWorkflowApprovalTask

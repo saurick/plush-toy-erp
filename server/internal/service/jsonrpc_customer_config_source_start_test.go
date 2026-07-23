@@ -86,7 +86,7 @@ func TestCustomerConfigProcessSourceValidationUsesDomainTruth(t *testing.T) {
 			{name: "not found", err: biz.ErrPurchaseOrderNotFound},
 			{name: "wrong id", order: &biz.PurchaseOrder{ID: 5002, PurchaseOrderNo: "PO-5002", LifecycleStatus: biz.PurchaseOrderStatusApproved}, err: biz.ErrBadParam},
 			{name: "wrong state", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: "PO-5001", LifecycleStatus: biz.PurchaseOrderStatusDraft}, err: biz.ErrBadParam},
-			{name: "approved", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: " PO-5001 ", LifecycleStatus: biz.PurchaseOrderStatusApproved}, want: "PO-5001"},
+			{name: "submitted", order: &biz.PurchaseOrder{ID: 5001, PurchaseOrderNo: " PO-5001 ", LifecycleStatus: biz.PurchaseOrderStatusSubmitted}, want: "PO-5001"},
 		} {
 			t.Run(tt.name, func(t *testing.T) {
 				repo := &customerConfigPurchaseOrderSourceRepoStub{order: tt.order}

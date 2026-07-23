@@ -8,12 +8,18 @@ import (
 
 const (
 	ProcessDomainCommandSalesOrderSubmit        = "sales_order.submit"
+	ProcessDomainCommandSalesOrderActivate      = "sales_order.activate_after_approval"
 	SalesOrderProcessCommandOutcomeSubmitted    = "sales_order.submitted"
+	SalesOrderProcessCommandOutcomeActivated    = "sales_order.activated"
 	salesOrderProcessCommandBusinessRefType     = "sales_order"
 	salesOrderProcessCommandPayloadSalesOrderID = "sales_order_id"
 )
 
 type salesOrderSubmitProcessCommandHandler struct {
+	uc *SalesOrderUsecase
+}
+
+type salesOrderActivateProcessCommandHandler struct {
 	uc *SalesOrderUsecase
 }
 
@@ -24,14 +30,72 @@ type SalesOrderSubmitProcessCommandRepo interface {
 	SubmitSalesOrderForProcessCommand(ctx context.Context, salesOrderID int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*SalesOrder, error)
 }
 
+// SalesOrderActivateProcessCommandRepo keeps the approval-owned SUBMITTED to
+// ACTIVE transition and the durable ProcessRuntime result in one transaction.
+// Production code must not expose a second activation write path.
+type SalesOrderActivateProcessCommandRepo interface {
+	ActivateSalesOrderForProcessCommand(ctx context.Context, salesOrderID int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) (*SalesOrder, error)
+}
+
 func RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC *ProcessRuntimeUsecase, salesOrderUC *SalesOrderUsecase) error {
 	if processRuntimeUC == nil || salesOrderUC == nil {
 		return ErrBadParam
 	}
-	return processRuntimeUC.RegisterDomainCommandHandler(
+	if err := processRuntimeUC.RegisterDomainCommandHandler(
 		ProcessDomainCommandSalesOrderSubmit,
 		&salesOrderSubmitProcessCommandHandler{uc: salesOrderUC},
+	); err != nil {
+		return err
+	}
+	return processRuntimeUC.RegisterDomainCommandHandler(
+		ProcessDomainCommandSalesOrderActivate,
+		&salesOrderActivateProcessCommandHandler{uc: salesOrderUC},
 	)
+}
+
+func (h *salesOrderActivateProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
+	if h == nil || h.uc == nil || in == nil || in.ProcessInstance == nil ||
+		strings.TrimSpace(in.CommandKey) != ProcessDomainCommandSalesOrderActivate ||
+		in.ProcessInstance.ProcessKey != ProcessKeySalesOrderAcceptance ||
+		in.ProcessInstance.BusinessRefType != salesOrderProcessCommandBusinessRefType ||
+		in.ProcessInstance.BusinessRefID <= 0 {
+		return ErrBadParam
+	}
+	if err := validateProcessDomainCommandPayloadKeys(in.Payload, salesOrderProcessCommandPayloadSalesOrderID); err != nil {
+		return err
+	}
+	payloadSalesOrderID, hasPayloadSalesOrderID, err := salesOrderIDFromProcessCommandPayload(in.Payload)
+	if err != nil || (hasPayloadSalesOrderID && payloadSalesOrderID != in.ProcessInstance.BusinessRefID) {
+		return ErrBadParam
+	}
+	order, err := h.uc.GetSalesOrder(ctx, in.ProcessInstance.BusinessRefID)
+	if err != nil {
+		return err
+	}
+	if order == nil || order.LifecycleStatus != SalesOrderStatusSubmitted {
+		return ErrBadParam
+	}
+	return nil
+}
+
+func (h *salesOrderActivateProcessCommandHandler) ExecuteProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) (*ProcessDomainCommandResult, error) {
+	if err := h.ValidateProcessDomainCommand(ctx, in, actorID); err != nil {
+		return nil, err
+	}
+	orderID := in.ProcessInstance.BusinessRefID
+	result := &ProcessDomainCommandResult{
+		Outcome:     SalesOrderProcessCommandOutcomeActivated,
+		EffectState: ProcessDomainCommandEffectStateApplied,
+		EffectRef:   &ProcessBusinessRef{RefType: salesOrderProcessCommandBusinessRefType, RefID: orderID},
+	}
+	repo, ok := h.uc.repo.(SalesOrderActivateProcessCommandRepo)
+	if !ok {
+		return nil, ErrProcessDomainCommandHandlerNotFound
+	}
+	if _, err := repo.ActivateSalesOrderForProcessCommand(ctx, orderID, in, result, actorID); err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (h *salesOrderSubmitProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {

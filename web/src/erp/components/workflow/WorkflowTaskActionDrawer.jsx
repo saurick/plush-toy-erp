@@ -84,6 +84,7 @@ export function getWorkflowTaskActionMeta(task = {}, actionMode = '') {
       title: '审批通过',
       buttonLabel: '确认通过',
       successMessage: '审批已通过',
+      requireReason: true,
     }
   }
   if (actionMode === 'reject') {
@@ -598,7 +599,9 @@ export default function WorkflowTaskActionDrawer({
             >
               <div className="erp-task-action-drawer__action-prompt">
                 <strong>最近审批记录</strong>
-                <span>按时间倒序展示最近 100 条处理岗位、意见、状态和版本。</span>
+                <span>
+                  按时间倒序展示最近 100 条处理岗位、意见、状态和版本。
+                </span>
               </div>
               {taskEventsState === 'loading' ? (
                 <Alert type="info" showIcon message="正在加载审批轨迹" />
@@ -614,9 +617,7 @@ export default function WorkflowTaskActionDrawer({
                         : 'blue',
                     children: (
                       <div>
-                        <strong>
-                          {getApprovalEventLabel(event)}
-                        </strong>
+                        <strong>{getApprovalEventLabel(event)}</strong>
                         <Paragraph type="secondary">
                           {getRoleDisplayName(event.actor_role_key, '系统')} ·{' '}
                           {formatEventTime(event.created_at)}
@@ -720,7 +721,11 @@ export default function WorkflowTaskActionDrawer({
                       <strong>{actionMeta.title}</strong>
                     </div>
                     <Tag color={actionMeta.requireReason ? 'orange' : 'green'}>
-                      {actionMeta.requireReason ? '必须填写原因' : '确认即可'}
+                      {actionMeta.requireReason
+                        ? approvalTask && actionMode === 'complete'
+                          ? '必须填写审批意见'
+                          : '必须填写原因'
+                        : '确认即可'}
                     </Tag>
                   </div>
                   <Paragraph className="erp-task-action-drawer__action-copy">
@@ -743,7 +748,11 @@ export default function WorkflowTaskActionDrawer({
                       maxLength={180}
                       showCount
                       disabled={actionSaving || !canSubmitAction}
-                      placeholder="填写原因、影响范围、需要谁协助"
+                      placeholder={
+                        approvalTask && actionMode === 'complete'
+                          ? '填写审批意见和判断依据'
+                          : '填写原因、影响范围、需要谁协助'
+                      }
                       onChange={(event) =>
                         onActionReasonChange?.(event.target.value)
                       }

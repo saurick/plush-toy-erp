@@ -24,10 +24,11 @@ func TestFinishedGoodsDeliveryProcessRunsLocalGoldenChain(t *testing.T) {
 	operationalFactRepo := &finishedGoodsDeliveryGoldenChainOperationalFactRepo{
 		paymentTermDays: processTestIntPtr(30),
 		shipment: &Shipment{
-			ID:         9001,
-			ShipmentNo: "SHIP-GOLDEN-001",
-			CustomerID: processTestIntPtr(501),
-			Status:     ShipmentStatusDraft,
+			ID:                   9001,
+			ShipmentNo:           "SHIP-GOLDEN-001",
+			CustomerID:           processTestIntPtr(501),
+			Status:               ShipmentStatusDraft,
+			FinanceReleaseStatus: ShipmentFinanceReleaseStatusPending,
 		},
 	}
 	processRepo := &memProcessRuntimeRepo{
@@ -281,6 +282,20 @@ func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) ShipShipment(_ con
 	r.shipment.Status = ShipmentStatusShipped
 	copied := *r.shipment
 	return &copied, nil
+}
+
+func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) RecordShipmentFinanceReleaseProcessCommand(_ context.Context, shipmentID int, _ *ProcessDomainCommandInput, _ *ProcessDomainCommandResult, _ int) (*Shipment, error) {
+	if r.shipment == nil || r.shipment.ID != shipmentID {
+		return nil, ErrShipmentNotFound
+	}
+	r.shipment.FinanceReleaseStatus = ShipmentFinanceReleaseStatusApproved
+	r.shipment.FinanceReleaseVersion++
+	copied := *r.shipment
+	return &copied, nil
+}
+
+func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) ShipShipmentForProcessCommand(ctx context.Context, shipmentID int, _ *ProcessDomainCommandInput, _ *ProcessDomainCommandResult, _ int) (*Shipment, error) {
+	return r.ShipShipment(ctx, shipmentID)
 }
 
 func (r *finishedGoodsDeliveryGoldenChainOperationalFactRepo) CreateFinanceFactDraft(_ context.Context, in *FinanceFactCreate) (*FinanceFact, error) {

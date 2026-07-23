@@ -31,9 +31,7 @@ func (d *jsonrpcDispatcher) handleSalesOrder(
 		"get_sales_order",
 		"list_sales_orders":
 		return d.handleSalesOrderDocument(ctx, method, id, pm)
-	case "submit_sales_order",
-		"activate_sales_order",
-		"close_sales_order",
+	case "close_sales_order",
 		"cancel_sales_order":
 		return d.handleSalesOrderLifecycle(ctx, method, id, pm, claims.UserID)
 	case "list_sales_order_items":

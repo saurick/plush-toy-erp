@@ -224,6 +224,18 @@ func (uc *PurchaseOrderUsecase) ApprovePurchaseOrder(ctx context.Context, id int
 	return uc.changePurchaseOrderLifecycle(ctx, id, PurchaseOrderStatusApproved)
 }
 
+func (uc *PurchaseOrderUsecase) ApprovePurchaseOrderForProcessCommand(ctx context.Context, id int, command *ProcessDomainCommandInput, result *ProcessDomainCommandResult, actorID int) error {
+	if uc == nil || uc.repo == nil || id <= 0 || command == nil || result == nil || actorID <= 0 {
+		return ErrBadParam
+	}
+	repo, ok := uc.repo.(PurchaseOrderApproveProcessCommandRepo)
+	if !ok {
+		return ErrProcessDomainCommandHandlerNotFound
+	}
+	_, err := repo.ApprovePurchaseOrderForProcessCommand(ctx, id, command, result, actorID)
+	return err
+}
+
 func (uc *PurchaseOrderUsecase) ClosePurchaseOrder(ctx context.Context, id int) (*PurchaseOrder, error) {
 	return uc.changePurchaseOrderLifecycle(ctx, id, PurchaseOrderStatusClosed)
 }

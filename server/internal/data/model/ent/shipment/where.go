@@ -81,6 +81,41 @@ func Status(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldStatus, v))
 }
 
+// FinanceReleaseStatus applies equality check predicate on the "finance_release_status" field. It's identical to FinanceReleaseStatusEQ.
+func FinanceReleaseStatus(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseVersion applies equality check predicate on the "finance_release_version" field. It's identical to FinanceReleaseVersionEQ.
+func FinanceReleaseVersion(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseVersion, v))
+}
+
+// FinanceReleasedAt applies equality check predicate on the "finance_released_at" field. It's identical to FinanceReleasedAtEQ.
+func FinanceReleasedAt(v time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleasedAt, v))
+}
+
+// FinanceReleasedBy applies equality check predicate on the "finance_released_by" field. It's identical to FinanceReleasedByEQ.
+func FinanceReleasedBy(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleasedBy, v))
+}
+
+// FinanceReleaseProcessInstanceID applies equality check predicate on the "finance_release_process_instance_id" field. It's identical to FinanceReleaseProcessInstanceIDEQ.
+func FinanceReleaseProcessInstanceID(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseProcessInstanceID, v))
+}
+
+// FinanceReleaseProcessNodeID applies equality check predicate on the "finance_release_process_node_id" field. It's identical to FinanceReleaseProcessNodeIDEQ.
+func FinanceReleaseProcessNodeID(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseProcessNodeID, v))
+}
+
+// FinanceReleaseNote applies equality check predicate on the "finance_release_note" field. It's identical to FinanceReleaseNoteEQ.
+func FinanceReleaseNote(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseNote, v))
+}
+
 // IdempotencyKey applies equality check predicate on the "idempotency_key" field. It's identical to IdempotencyKeyEQ.
 func IdempotencyKey(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldEQ(FieldIdempotencyKey, v))
@@ -384,6 +419,386 @@ func StatusEqualFold(v string) predicate.Shipment {
 // StatusContainsFold applies the ContainsFold predicate on the "status" field.
 func StatusContainsFold(v string) predicate.Shipment {
 	return predicate.Shipment(sql.FieldContainsFold(FieldStatus, v))
+}
+
+// FinanceReleaseStatusEQ applies the EQ predicate on the "finance_release_status" field.
+func FinanceReleaseStatusEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusNEQ applies the NEQ predicate on the "finance_release_status" field.
+func FinanceReleaseStatusNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusIn applies the In predicate on the "finance_release_status" field.
+func FinanceReleaseStatusIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFinanceReleaseStatus, vs...))
+}
+
+// FinanceReleaseStatusNotIn applies the NotIn predicate on the "finance_release_status" field.
+func FinanceReleaseStatusNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFinanceReleaseStatus, vs...))
+}
+
+// FinanceReleaseStatusGT applies the GT predicate on the "finance_release_status" field.
+func FinanceReleaseStatusGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusGTE applies the GTE predicate on the "finance_release_status" field.
+func FinanceReleaseStatusGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusLT applies the LT predicate on the "finance_release_status" field.
+func FinanceReleaseStatusLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusLTE applies the LTE predicate on the "finance_release_status" field.
+func FinanceReleaseStatusLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusContains applies the Contains predicate on the "finance_release_status" field.
+func FinanceReleaseStatusContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusHasPrefix applies the HasPrefix predicate on the "finance_release_status" field.
+func FinanceReleaseStatusHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusHasSuffix applies the HasSuffix predicate on the "finance_release_status" field.
+func FinanceReleaseStatusHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusEqualFold applies the EqualFold predicate on the "finance_release_status" field.
+func FinanceReleaseStatusEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseStatusContainsFold applies the ContainsFold predicate on the "finance_release_status" field.
+func FinanceReleaseStatusContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldFinanceReleaseStatus, v))
+}
+
+// FinanceReleaseVersionEQ applies the EQ predicate on the "finance_release_version" field.
+func FinanceReleaseVersionEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseVersion, v))
+}
+
+// FinanceReleaseVersionNEQ applies the NEQ predicate on the "finance_release_version" field.
+func FinanceReleaseVersionNEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFinanceReleaseVersion, v))
+}
+
+// FinanceReleaseVersionIn applies the In predicate on the "finance_release_version" field.
+func FinanceReleaseVersionIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFinanceReleaseVersion, vs...))
+}
+
+// FinanceReleaseVersionNotIn applies the NotIn predicate on the "finance_release_version" field.
+func FinanceReleaseVersionNotIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFinanceReleaseVersion, vs...))
+}
+
+// FinanceReleaseVersionGT applies the GT predicate on the "finance_release_version" field.
+func FinanceReleaseVersionGT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFinanceReleaseVersion, v))
+}
+
+// FinanceReleaseVersionGTE applies the GTE predicate on the "finance_release_version" field.
+func FinanceReleaseVersionGTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFinanceReleaseVersion, v))
+}
+
+// FinanceReleaseVersionLT applies the LT predicate on the "finance_release_version" field.
+func FinanceReleaseVersionLT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFinanceReleaseVersion, v))
+}
+
+// FinanceReleaseVersionLTE applies the LTE predicate on the "finance_release_version" field.
+func FinanceReleaseVersionLTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFinanceReleaseVersion, v))
+}
+
+// FinanceReleasedAtEQ applies the EQ predicate on the "finance_released_at" field.
+func FinanceReleasedAtEQ(v time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleasedAt, v))
+}
+
+// FinanceReleasedAtNEQ applies the NEQ predicate on the "finance_released_at" field.
+func FinanceReleasedAtNEQ(v time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFinanceReleasedAt, v))
+}
+
+// FinanceReleasedAtIn applies the In predicate on the "finance_released_at" field.
+func FinanceReleasedAtIn(vs ...time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFinanceReleasedAt, vs...))
+}
+
+// FinanceReleasedAtNotIn applies the NotIn predicate on the "finance_released_at" field.
+func FinanceReleasedAtNotIn(vs ...time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFinanceReleasedAt, vs...))
+}
+
+// FinanceReleasedAtGT applies the GT predicate on the "finance_released_at" field.
+func FinanceReleasedAtGT(v time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFinanceReleasedAt, v))
+}
+
+// FinanceReleasedAtGTE applies the GTE predicate on the "finance_released_at" field.
+func FinanceReleasedAtGTE(v time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFinanceReleasedAt, v))
+}
+
+// FinanceReleasedAtLT applies the LT predicate on the "finance_released_at" field.
+func FinanceReleasedAtLT(v time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFinanceReleasedAt, v))
+}
+
+// FinanceReleasedAtLTE applies the LTE predicate on the "finance_released_at" field.
+func FinanceReleasedAtLTE(v time.Time) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFinanceReleasedAt, v))
+}
+
+// FinanceReleasedAtIsNil applies the IsNil predicate on the "finance_released_at" field.
+func FinanceReleasedAtIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldFinanceReleasedAt))
+}
+
+// FinanceReleasedAtNotNil applies the NotNil predicate on the "finance_released_at" field.
+func FinanceReleasedAtNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldFinanceReleasedAt))
+}
+
+// FinanceReleasedByEQ applies the EQ predicate on the "finance_released_by" field.
+func FinanceReleasedByEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleasedBy, v))
+}
+
+// FinanceReleasedByNEQ applies the NEQ predicate on the "finance_released_by" field.
+func FinanceReleasedByNEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFinanceReleasedBy, v))
+}
+
+// FinanceReleasedByIn applies the In predicate on the "finance_released_by" field.
+func FinanceReleasedByIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFinanceReleasedBy, vs...))
+}
+
+// FinanceReleasedByNotIn applies the NotIn predicate on the "finance_released_by" field.
+func FinanceReleasedByNotIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFinanceReleasedBy, vs...))
+}
+
+// FinanceReleasedByGT applies the GT predicate on the "finance_released_by" field.
+func FinanceReleasedByGT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFinanceReleasedBy, v))
+}
+
+// FinanceReleasedByGTE applies the GTE predicate on the "finance_released_by" field.
+func FinanceReleasedByGTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFinanceReleasedBy, v))
+}
+
+// FinanceReleasedByLT applies the LT predicate on the "finance_released_by" field.
+func FinanceReleasedByLT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFinanceReleasedBy, v))
+}
+
+// FinanceReleasedByLTE applies the LTE predicate on the "finance_released_by" field.
+func FinanceReleasedByLTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFinanceReleasedBy, v))
+}
+
+// FinanceReleasedByIsNil applies the IsNil predicate on the "finance_released_by" field.
+func FinanceReleasedByIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldFinanceReleasedBy))
+}
+
+// FinanceReleasedByNotNil applies the NotNil predicate on the "finance_released_by" field.
+func FinanceReleasedByNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldFinanceReleasedBy))
+}
+
+// FinanceReleaseProcessInstanceIDEQ applies the EQ predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseProcessInstanceID, v))
+}
+
+// FinanceReleaseProcessInstanceIDNEQ applies the NEQ predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDNEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFinanceReleaseProcessInstanceID, v))
+}
+
+// FinanceReleaseProcessInstanceIDIn applies the In predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFinanceReleaseProcessInstanceID, vs...))
+}
+
+// FinanceReleaseProcessInstanceIDNotIn applies the NotIn predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDNotIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFinanceReleaseProcessInstanceID, vs...))
+}
+
+// FinanceReleaseProcessInstanceIDGT applies the GT predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDGT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFinanceReleaseProcessInstanceID, v))
+}
+
+// FinanceReleaseProcessInstanceIDGTE applies the GTE predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDGTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFinanceReleaseProcessInstanceID, v))
+}
+
+// FinanceReleaseProcessInstanceIDLT applies the LT predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDLT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFinanceReleaseProcessInstanceID, v))
+}
+
+// FinanceReleaseProcessInstanceIDLTE applies the LTE predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDLTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFinanceReleaseProcessInstanceID, v))
+}
+
+// FinanceReleaseProcessInstanceIDIsNil applies the IsNil predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldFinanceReleaseProcessInstanceID))
+}
+
+// FinanceReleaseProcessInstanceIDNotNil applies the NotNil predicate on the "finance_release_process_instance_id" field.
+func FinanceReleaseProcessInstanceIDNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldFinanceReleaseProcessInstanceID))
+}
+
+// FinanceReleaseProcessNodeIDEQ applies the EQ predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseProcessNodeID, v))
+}
+
+// FinanceReleaseProcessNodeIDNEQ applies the NEQ predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDNEQ(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFinanceReleaseProcessNodeID, v))
+}
+
+// FinanceReleaseProcessNodeIDIn applies the In predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFinanceReleaseProcessNodeID, vs...))
+}
+
+// FinanceReleaseProcessNodeIDNotIn applies the NotIn predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDNotIn(vs ...int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFinanceReleaseProcessNodeID, vs...))
+}
+
+// FinanceReleaseProcessNodeIDGT applies the GT predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDGT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFinanceReleaseProcessNodeID, v))
+}
+
+// FinanceReleaseProcessNodeIDGTE applies the GTE predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDGTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFinanceReleaseProcessNodeID, v))
+}
+
+// FinanceReleaseProcessNodeIDLT applies the LT predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDLT(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFinanceReleaseProcessNodeID, v))
+}
+
+// FinanceReleaseProcessNodeIDLTE applies the LTE predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDLTE(v int) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFinanceReleaseProcessNodeID, v))
+}
+
+// FinanceReleaseProcessNodeIDIsNil applies the IsNil predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldFinanceReleaseProcessNodeID))
+}
+
+// FinanceReleaseProcessNodeIDNotNil applies the NotNil predicate on the "finance_release_process_node_id" field.
+func FinanceReleaseProcessNodeIDNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldFinanceReleaseProcessNodeID))
+}
+
+// FinanceReleaseNoteEQ applies the EQ predicate on the "finance_release_note" field.
+func FinanceReleaseNoteEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEQ(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteNEQ applies the NEQ predicate on the "finance_release_note" field.
+func FinanceReleaseNoteNEQ(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNEQ(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteIn applies the In predicate on the "finance_release_note" field.
+func FinanceReleaseNoteIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldIn(FieldFinanceReleaseNote, vs...))
+}
+
+// FinanceReleaseNoteNotIn applies the NotIn predicate on the "finance_release_note" field.
+func FinanceReleaseNoteNotIn(vs ...string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotIn(FieldFinanceReleaseNote, vs...))
+}
+
+// FinanceReleaseNoteGT applies the GT predicate on the "finance_release_note" field.
+func FinanceReleaseNoteGT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGT(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteGTE applies the GTE predicate on the "finance_release_note" field.
+func FinanceReleaseNoteGTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldGTE(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteLT applies the LT predicate on the "finance_release_note" field.
+func FinanceReleaseNoteLT(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLT(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteLTE applies the LTE predicate on the "finance_release_note" field.
+func FinanceReleaseNoteLTE(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldLTE(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteContains applies the Contains predicate on the "finance_release_note" field.
+func FinanceReleaseNoteContains(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContains(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteHasPrefix applies the HasPrefix predicate on the "finance_release_note" field.
+func FinanceReleaseNoteHasPrefix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasPrefix(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteHasSuffix applies the HasSuffix predicate on the "finance_release_note" field.
+func FinanceReleaseNoteHasSuffix(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldHasSuffix(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteIsNil applies the IsNil predicate on the "finance_release_note" field.
+func FinanceReleaseNoteIsNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldIsNull(FieldFinanceReleaseNote))
+}
+
+// FinanceReleaseNoteNotNil applies the NotNil predicate on the "finance_release_note" field.
+func FinanceReleaseNoteNotNil() predicate.Shipment {
+	return predicate.Shipment(sql.FieldNotNull(FieldFinanceReleaseNote))
+}
+
+// FinanceReleaseNoteEqualFold applies the EqualFold predicate on the "finance_release_note" field.
+func FinanceReleaseNoteEqualFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldEqualFold(FieldFinanceReleaseNote, v))
+}
+
+// FinanceReleaseNoteContainsFold applies the ContainsFold predicate on the "finance_release_note" field.
+func FinanceReleaseNoteContainsFold(v string) predicate.Shipment {
+	return predicate.Shipment(sql.FieldContainsFold(FieldFinanceReleaseNote, v))
 }
 
 // IdempotencyKeyEQ applies the EQ predicate on the "idempotency_key" field.

@@ -1,9 +1,8 @@
 import {
-  approvePurchaseOrder,
   cancelPurchaseOrder,
   closePurchaseOrder,
-  submitPurchaseOrder,
 } from '../../api/masterDataOrderApi.mjs'
+import { submitPurchaseOrderApprovalProcess } from '../../api/customerConfigApi.mjs'
 import { isDraftSourceDocument } from '../../utils/sourceDocumentEditing.mjs'
 import { buildPurchaseInboundDraftPreviewRows } from '../../utils/purchaseOrderInboundPreview.mjs'
 import {
@@ -40,14 +39,9 @@ export const PURCHASE_ORDER_LIFECYCLE_ACTIONS = [
     label: '提交',
     permission: 'purchase.order.update',
     nextStatus: 'submitted',
-    run: submitPurchaseOrder,
-  },
-  {
-    key: 'approve',
-    label: '审核',
-    permission: 'purchase.order.approve',
-    nextStatus: 'approved',
-    run: approvePurchaseOrder,
+    run: submitPurchaseOrderApprovalProcess,
+    returnsRecord: false,
+    successMessage: '采购订单已提交，已进入统一审批箱',
   },
   {
     key: 'close',

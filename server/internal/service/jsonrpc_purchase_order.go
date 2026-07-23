@@ -31,7 +31,6 @@ func (d *jsonrpcDispatcher) handlePurchaseOrder(
 		"list_purchase_orders":
 		return d.handlePurchaseOrderDocument(ctx, method, id, pm)
 	case "submit_purchase_order",
-		"approve_purchase_order",
 		"close_purchase_order",
 		"cancel_purchase_order":
 		return d.handlePurchaseOrderLifecycle(ctx, method, id, pm)

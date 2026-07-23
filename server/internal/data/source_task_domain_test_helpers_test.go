@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"testing"
+	"time"
 
 	"server/internal/biz"
 	"server/internal/data/model/ent"
@@ -118,6 +119,7 @@ func completeShipmentReleaseTaskForTest(
 	actorID int,
 ) {
 	t.Helper()
+	approveShipmentFinanceGateForTest(t, ctx, client, shipmentID, actorID)
 	task := client.WorkflowTask.Query().Where(
 		workflowtask.TaskCode(biz.WorkflowSourceTaskCode(biz.WorkflowSourceTaskShipmentReleaseGroup, shipmentID)),
 	).OnlyX(ctx)
@@ -132,4 +134,24 @@ func completeShipmentReleaseTaskForTest(
 	}, actorID, biz.WarehouseRoleKey); err != nil {
 		t.Fatalf("complete shipment release task %d: %v", task.ID, err)
 	}
+}
+
+// approveShipmentFinanceGateForTest isolates unrelated shipment tests from the
+// finance approval workflow. Dedicated process/gate tests exercise the real
+// ProcessRuntime command and audit anchors.
+func approveShipmentFinanceGateForTest(t *testing.T, ctx context.Context, client *ent.Client, shipmentID int, actorID int) {
+	t.Helper()
+	row := client.Shipment.GetX(ctx, shipmentID)
+	if row.FinanceReleaseStatus == biz.ShipmentFinanceReleaseStatusApproved {
+		return
+	}
+	client.Shipment.UpdateOneID(shipmentID).
+		SetFinanceReleaseStatus(biz.ShipmentFinanceReleaseStatusApproved).
+		SetFinanceReleaseVersion(row.FinanceReleaseVersion + 1).
+		SetFinanceReleasedAt(time.Now().UTC()).
+		SetFinanceReleasedBy(actorID).
+		SetFinanceReleaseProcessInstanceID(1).
+		SetFinanceReleaseProcessNodeID(1).
+		SetFinanceReleaseNote("test fixture approval").
+		ExecX(ctx)
 }

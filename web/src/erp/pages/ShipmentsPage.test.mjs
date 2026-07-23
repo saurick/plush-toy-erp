@@ -198,14 +198,13 @@ test('draft shipment can generate a source-bound finished-goods inspection', () 
   assert.match(source, /quality_inspection_id: result\.id/u)
 })
 
-test('draft shipment explicitly submits a strict source-bound release task', () => {
-  assert.match(source, /submitShipmentRelease\(\{ id: selectedRow\.id \}\)/u)
+test('draft shipment starts the versioned finance approval process', () => {
+  assert.match(source, /submitShipmentFinanceApprovalProcess\(\{/u)
   assert.match(source, /const canSubmitShipmentRelease = canRead && canCreate/u)
-  assert.match(source, />\s*提交出货放行\s*</u)
-  assert.match(source, /不会确认出货或扣减库存/u)
-  assert.match(source, /result\.created/u)
-  assert.match(source, /仓库待办已生成/u)
-  assert.match(source, /已有放行任务，本次未重复生成/u)
+  assert.match(source, />\s*提交出货审批\s*</u)
+  assert.match(source, /审批前不能确认出货/u)
+  assert.match(source, /result\.process_instance\?\.id/u)
+  assert.match(source, /质量关口通过后进入财务审批/u)
 })
 
 test('shipment cancellation distinguishes draft exit from shipped reversal', () => {

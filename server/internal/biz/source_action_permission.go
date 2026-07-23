@@ -79,7 +79,6 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 			{PermissionKey: PermissionSalesOrderItemRead, Condition: SourceReadConditionShipmentSalesOrder},
 		},
 	},
-	{Domain: "operational_fact", Method: "submit_shipment_release", Rules: sourceReadRules(PermissionShipmentRead)},
 	{
 		Domain: "production_order", Method: "create_production_order",
 		Rules: productionOrderSourceReadRules(),
@@ -108,7 +107,6 @@ var publicSourceActionReadPermissionContracts = []SourceActionReadPermissionCont
 	{Domain: "customer_config", Method: "execute_material_supply_post_inbound", Rules: sourceReadRules(PermissionPurchaseReceiptRead)},
 	{Domain: "customer_config", Method: "start_finished_goods_delivery_process", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_quality_decide", Rules: sourceReadRules(PermissionShipmentRead, PermissionQualityInspectionRead)},
-	{Domain: "customer_config", Method: "execute_finished_goods_delivery_finance_release", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_shipment_ship", Rules: sourceReadRules(PermissionShipmentRead)},
 	{Domain: "customer_config", Method: "execute_finished_goods_delivery_receivable_lead", Rules: sourceReadRules(PermissionShipmentRead)},
 }

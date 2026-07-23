@@ -349,11 +349,6 @@ export async function getSalesOrder(params = {}, options = {}) {
   return dataOf(result)?.sales_order || null
 }
 
-export async function activateSalesOrder(params = {}) {
-  const result = await salesOrderRpc.call('activate_sales_order', params)
-  return dataOf(result)?.sales_order || null
-}
-
 export async function closeSalesOrder(params = {}) {
   const result = await salesOrderRpc.call('close_sales_order', params)
   return dataOf(result)?.sales_order || null
@@ -444,11 +439,6 @@ export async function getPurchaseOrder(params = {}, options = {}) {
 
 export async function submitPurchaseOrder(params = {}) {
   const result = await purchaseOrderRpc.call('submit_purchase_order', params)
-  return dataOf(result)?.purchase_order || null
-}
-
-export async function approvePurchaseOrder(params = {}) {
-  const result = await purchaseOrderRpc.call('approve_purchase_order', params)
   return dataOf(result)?.purchase_order || null
 }
 

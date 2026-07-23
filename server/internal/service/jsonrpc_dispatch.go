@@ -113,6 +113,9 @@ func newJSONRPCDispatcher(
 	if err := biz.RegisterSalesOrderProcessDomainCommandHandlers(processRuntimeUC, salesOrderUC); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register sales order process command handlers: %v", err))
 	}
+	if err := biz.RegisterPurchaseOrderProcessDomainCommandHandlers(processRuntimeUC, purchaseOrderUC); err != nil {
+		panic(fmt.Sprintf("newJSONRPCDispatcher: register purchase order process command handlers: %v", err))
+	}
 	if err := biz.RegisterPurchaseReceiptProcessDomainCommandHandlers(processRuntimeUC, inventoryUC); err != nil {
 		panic(fmt.Sprintf("newJSONRPCDispatcher: register purchase receipt process command handlers: %v", err))
 	}

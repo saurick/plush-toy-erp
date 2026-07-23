@@ -1778,55 +1778,62 @@ test('style-l1 workflow mutation routes enforce the same permission, owner and a
   assert.equal(allowedSuperUrge.result.code, 0)
 })
 
-test('style-l1 workflow boss approval completion uses approve entitlement', async () => {
-  const createBossApproval = async (call, suffix) =>
-    call('create_task', {
-      task_code: `STYLE-L1-BOSS-APPROVAL-${suffix}`,
-      task_group: 'order_approval',
-      task_name: '老板订单审批',
-      source_type: 'project-orders',
-      source_id: suffix === 'ALLOW' ? 81 : 82,
-      task_status_key: 'ready',
-      owner_role_key: 'boss',
-    })
-  const approveOnlyCall = await workflowMockHarness({
-    id: 9,
-    is_super_admin: false,
-    roles: [{ role_key: 'boss' }],
-    permissions: ['workflow.task.create', 'workflow.task.approve'],
-    effective_session: {
-      actions: ['workflow.task.create', 'workflow.task.approve'],
-      workflow_visible_owner_role_keys_by_capability: workflowScopes('boss', [
-        'workflow.task.create',
-        'workflow.task.approve',
-      ]),
-    },
+test('style-l1 workflow approval completion uses the explicit approve capability', async () => {
+  const approvalFixture = (id) => ({
+    id,
+    task_code: `STYLE-L1-APPROVAL-${id}`,
+    task_group: 'order_approval',
+    task_name: '订单审批',
+    source_type: 'project-orders',
+    source_id: id,
+    task_status_key: 'ready',
+    owner_role_key: 'boss',
+    required_capability_key: 'workflow.task.approve',
+    version: 1,
+    payload: {},
   })
-  const allowedTask = await createBossApproval(approveOnlyCall, 'ALLOW')
+  const approveOnlyCall = await workflowMockHarness(
+    {
+      id: 9,
+      is_super_admin: false,
+      roles: [{ role_key: 'boss' }],
+      permissions: ['workflow.task.create', 'workflow.task.approve'],
+      effective_session: {
+        actions: ['workflow.task.create', 'workflow.task.approve'],
+        workflow_visible_owner_role_keys_by_capability: workflowScopes('boss', [
+          'workflow.task.create',
+          'workflow.task.approve',
+        ]),
+      },
+    },
+    { workflowTaskFixtures: [approvalFixture(81)] }
+  )
   const allowed = await approveOnlyCall('complete_task_action', {
-    task_id: allowedTask.result.data.task.id,
+    task_id: 81,
     expected_version: 1,
     idempotency_key: 'style-l1-boss-approve-only',
     action_key: 'complete',
   })
   assert.equal(allowed.result.code, 0)
 
-  const completeOnlyCall = await workflowMockHarness({
-    id: 10,
-    is_super_admin: false,
-    roles: [{ role_key: 'boss' }],
-    permissions: ['workflow.task.create', 'workflow.task.complete'],
-    effective_session: {
-      actions: ['workflow.task.create', 'workflow.task.complete'],
-      workflow_visible_owner_role_keys_by_capability: workflowScopes('boss', [
-        'workflow.task.create',
-        'workflow.task.complete',
-      ]),
+  const completeOnlyCall = await workflowMockHarness(
+    {
+      id: 10,
+      is_super_admin: false,
+      roles: [{ role_key: 'boss' }],
+      permissions: ['workflow.task.create', 'workflow.task.complete'],
+      effective_session: {
+        actions: ['workflow.task.create', 'workflow.task.complete'],
+        workflow_visible_owner_role_keys_by_capability: workflowScopes('boss', [
+          'workflow.task.create',
+          'workflow.task.complete',
+        ]),
+      },
     },
-  })
-  const deniedTask = await createBossApproval(completeOnlyCall, 'DENY')
+    { workflowTaskFixtures: [approvalFixture(82)] }
+  )
   const denied = await completeOnlyCall('complete_task_action', {
-    task_id: deniedTask.result.data.task.id,
+    task_id: 82,
     expected_version: 1,
     idempotency_key: 'style-l1-boss-complete-only',
     action_key: 'complete',

@@ -325,6 +325,59 @@ func (r *salesOrderRepo) SubmitSalesOrderForProcessCommand(
 	return entSalesOrderToBiz(row), nil
 }
 
+func (r *salesOrderRepo) ActivateSalesOrderForProcessCommand(
+	ctx context.Context,
+	salesOrderID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.SalesOrder, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || salesOrderID <= 0 || command == nil || result == nil || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	record, err := biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	query := tx.SalesOrder.Query().Where(salesorder.ID(salesOrderID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	current, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderNotFound
+		}
+		return nil, err
+	}
+	if current.LifecycleStatus != biz.SalesOrderStatusSubmitted {
+		return nil, biz.ErrBadParam
+	}
+	row, err := tx.SalesOrder.UpdateOneID(salesOrderID).
+		Where(salesorder.Version(current.Version), salesorder.LifecycleStatus(biz.SalesOrderStatusSubmitted)).
+		SetLifecycleStatus(biz.SalesOrderStatusActive).
+		SetVersion(current.Version + 1).
+		Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrSalesOrderConflict
+		}
+		return nil, err
+	}
+	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return entSalesOrderToBiz(row), nil
+}
+
 func (r *salesOrderRepo) cancelSalesOrderLifecycle(ctx context.Context, id int, actorID int) (*biz.SalesOrder, error) {
 	allowedCurrent := salesOrderLifecyclePredecessors(biz.SalesOrderStatusCanceled)
 	if len(allowedCurrent) == 0 {

@@ -263,7 +263,7 @@ func processNodesFromCustomerConfigDefinition(processKey string, definition map[
 		})
 	}
 	if processKey == ProcessKeyMaterialSupply && businessRefType == "purchase_order" {
-		if len(nodes) == 0 || nodes[0].NodeKey != "purchase_receipt_source" {
+		if len(nodes) < 3 || nodes[0].NodeKey != "purchase_order_approval" || nodes[1].NodeKey != "approve_purchase_order" || nodes[2].NodeKey != "purchase_receipt_source" {
 			return nil, ErrBadParam
 		}
 	}
@@ -308,9 +308,18 @@ func customerConfigProcessBusinessRefAllowed(processKey, businessRefType string)
 func customerConfigDomainCommandNodeAllowed(processKey, businessRefType, nodeKey, commandKey string) bool {
 	switch processKey {
 	case ProcessKeySalesOrderAcceptance:
-		return nodeKey == "submit_sales_order" && commandKey == ProcessDomainCommandSalesOrderSubmit
+		switch nodeKey {
+		case "submit_sales_order":
+			return commandKey == ProcessDomainCommandSalesOrderSubmit
+		case "activate_sales_order":
+			return commandKey == ProcessDomainCommandSalesOrderActivate
+		default:
+			return false
+		}
 	case ProcessKeyMaterialSupply:
 		switch nodeKey {
+		case "approve_purchase_order":
+			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseOrderApprove
 		case "purchase_receipt_source":
 			return businessRefType == "purchase_order" && commandKey == ProcessDomainCommandPurchaseReceiptCreate
 		case "incoming_qc":

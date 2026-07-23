@@ -3382,6 +3382,7 @@ export function createStyleL1Scenarios(deps) {
           'workflow.task.read',
           'workflow.task.update',
           'workflow.task.complete',
+          'workflow.task.approve',
         ],
         workflow_visible_owner_role_keys_by_capability: {
           'workflow.task.read': [
@@ -3397,11 +3398,31 @@ export function createStyleL1Scenarios(deps) {
           ],
           'workflow.task.update': ['warehouse'],
           'workflow.task.complete': ['warehouse'],
+          'workflow.task.approve': ['finance'],
         },
         fieldPolicies: {},
         workPools: [],
         source: 'active_customer_config_revision',
       },
+      workflowTaskFixtures: [
+        {
+          id: 9101,
+          task_code: 'shipment-finance-approval-9101',
+          task_group: 'shipment_finance_approval',
+          task_name: '出货财务审批',
+          source_type: 'shipments',
+          source_id: 501,
+          source_no: 'SHIP-L1-501',
+          task_status_key: 'ready',
+          owner_role_key: 'finance',
+          required_capability_key: 'workflow.task.approve',
+          process_instance_id: 701,
+          process_node_instance_id: 702,
+          process_definition_revision_id: 703,
+          version: 1,
+          payload: { approval_scope: 'shipment_finance_release' },
+        },
+      ],
       viewport: { width: 1440, height: 900 },
       verify: async (page) => {
         await expectText(page, '毛绒玩具管理系统')
@@ -3441,6 +3462,8 @@ export function createStyleL1Scenarios(deps) {
           page,
           '只显示服务端登记为审批节点且当前账号可见的事项；审批仍受岗位、指定处理人、配置版本和单据状态约束。'
         )
+        await expectText(page, '出货财务审批')
+        await expectText(page, 'SHIP-L1-501')
         const approvalInboxLayout = await page.evaluate(() => {
           const card = document.querySelector('.erp-dashboard-task-board-card')
           const heading = [...document.querySelectorAll('h1, h2, h3')].find(
@@ -3477,6 +3500,29 @@ export function createStyleL1Scenarios(deps) {
         await page.screenshot({
           path: path.resolve(outputDir, 'erp-task-board-approval-inbox.png'),
         })
+        await page
+          .locator('.erp-task-board-card')
+          .filter({ hasText: '出货财务审批' })
+          .getByRole('button', { name: '查看出货财务审批详情' })
+          .click()
+        await expectText(page, '核对审批事项')
+        await expectText(page, '最近审批记录')
+        await expectText(page, 'SHIP-L1-501')
+        await expectText(page, '等待审批人核对来源单据与放行条件')
+        await page.waitForFunction(() => {
+          const wrapper = document.querySelector('.ant-drawer-content-wrapper')
+          const rect = wrapper?.getBoundingClientRect()
+          return Boolean(
+            rect &&
+              rect.width >= 480 &&
+              rect.left >= 0 &&
+              rect.right <= window.innerWidth
+          )
+        })
+        await page.screenshot({
+          path: path.resolve(outputDir, 'erp-task-board-approval-detail.png'),
+        })
+        await page.keyboard.press('Escape')
         await page
           .getByRole('button', { name: '返回全部任务', exact: true })
           .click()
@@ -3585,7 +3631,7 @@ export function createStyleL1Scenarios(deps) {
           .filter({ hasText: '常规待办' })
           .first()
         await actionableOverviewLane
-          .getByText('已显示前 5 条，共 18 条', { exact: true })
+          .getByText('已显示前 5 条，共 19 条', { exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         assert.equal(
           await actionableOverviewLane.locator('.erp-task-board-card').count(),
@@ -3593,7 +3639,7 @@ export function createStyleL1Scenarios(deps) {
           '任务看板总览每栏最多显示五条任务'
         )
         await actionableOverviewLane
-          .getByRole('button', { name: '查看全部 18 条', exact: true })
+          .getByRole('button', { name: '查看全部 19 条', exact: true })
           .waitFor({ state: 'visible', timeout: 10_000 })
         await page
           .locator('.erp-task-center-metric')

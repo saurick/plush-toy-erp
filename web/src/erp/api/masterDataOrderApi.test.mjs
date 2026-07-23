@@ -179,7 +179,6 @@ test('masterDataOrderApi: sales orders expose only aggregate writes and lifecycl
     'list_sales_orders',
     'save_sales_order_with_items',
     'get_sales_order',
-    'activate_sales_order',
     'close_sales_order',
     'cancel_sales_order',
     'list_sales_order_items',
@@ -774,13 +773,13 @@ test('masterDataOrderApi: purchase order methods do not expose receipt inventory
     'save_purchase_order_with_items',
     'get_purchase_order',
     'submit_purchase_order',
-    'approve_purchase_order',
     'close_purchase_order',
     'cancel_purchase_order',
     'list_purchase_order_items',
   ]) {
     assert.match(source, new RegExp(`call\\(\\s*'${methodName}'`))
   }
+  assert.doesNotMatch(source, /call\(\s*'approve_purchase_order'/u)
 
   const forbiddenActionNames = [
     ['post', 'Purchase', 'Receipt'],

@@ -26,8 +26,8 @@ import {
   listShipmentSourceCandidates,
   listShipments,
   shipShipment,
-  submitShipmentRelease,
 } from '../api/operationalFactApi.mjs'
+import { submitShipmentFinanceApprovalProcess } from '../api/customerConfigApi.mjs'
 import {
   listAllCustomers,
   listAllSalesOrders,
@@ -1090,11 +1090,14 @@ export default function ShipmentsPage() {
     }
     try {
       setSaving(true)
-      const result = await submitShipmentRelease({ id: selectedRow.id })
+      const result = await submitShipmentFinanceApprovalProcess({
+        id: selectedRow.id,
+        shipment_no: selectedRow.shipment_no,
+      })
       message.success(
-        result.created
-          ? '出货放行已提交，仓库待办已生成'
-          : '该出货单已有放行任务，本次未重复生成'
+        result.process_instance?.id
+          ? '出货流程已提交，质量关口通过后进入财务审批'
+          : '出货流程已存在，本次未重复启动'
       )
       await loadRows()
     } catch (error) {
@@ -1554,7 +1557,7 @@ export default function ShipmentsPage() {
             </Button>
           ) : null}
           <Popconfirm
-            title="提交后将生成仓库放行待办，但不会确认出货或扣减库存。是否继续？"
+            title="提交后将启动版本化出货流程；质量关口通过后进入财务审批，审批前不能确认出货。是否继续？"
             onConfirm={submitSelectedShipmentRelease}
             okText="提交放行"
             cancelText="取消"
@@ -1568,7 +1571,7 @@ export default function ShipmentsPage() {
                 saving
               }
             >
-              提交出货放行
+              提交出货审批
             </Button>
           </Popconfirm>
           <Popconfirm
@@ -1603,9 +1606,7 @@ export default function ShipmentsPage() {
               runShipmentAction(
                 selectedRow,
                 cancelShipment,
-                selectedRow?.status === 'DRAFT'
-                  ? '作废出货草稿'
-                  : '撤销已出货'
+                selectedRow?.status === 'DRAFT' ? '作废出货草稿' : '撤销已出货'
               )
             }
             okText="确认"

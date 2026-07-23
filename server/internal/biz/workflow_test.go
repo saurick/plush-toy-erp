@@ -341,7 +341,7 @@ func TestWorkflowUsecase_CreateTaskRejectsNodeLinkWithoutProcessLink(t *testing.
 	}
 }
 
-func TestWorkflowUsecase_CreateBossApprovalTaskDefaultsApproveCapability(t *testing.T) {
+func TestWorkflowUsecase_SalesNamedTaskDoesNotDefaultApproveCapability(t *testing.T) {
 	repo := &stubWorkflowRepo{}
 	uc := NewWorkflowUsecase(repo)
 
@@ -356,38 +356,8 @@ func TestWorkflowUsecase_CreateBossApprovalTaskDefaultsApproveCapability(t *test
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if repo.createTaskInput.RequiredCapabilityKey == nil || *repo.createTaskInput.RequiredCapabilityKey != PermissionWorkflowTaskApprove {
-		t.Fatalf("expected boss approval capability, got %#v", repo.createTaskInput.RequiredCapabilityKey)
-	}
-}
-
-func TestWorkflowUsecase_DerivedTaskInheritsConfigRevisionAndRuntimeAnchors(t *testing.T) {
-	configRevision := "customer-config-yoyoosun-rev-20260629"
-	current := bossApprovalWorkflowTask()
-	current.ConfigRevision = &configRevision
-	repo := &stubWorkflowRepo{currentTask: current}
-	uc := NewWorkflowUsecase(repo)
-
-	_, err := updateWorkflowTaskStatusForTest(t, uc, context.Background(), &WorkflowTaskStatusUpdate{
-		ID:            current.ID,
-		TaskStatusKey: "done",
-		Payload:       map[string]any{},
-	}, 7, BossRoleKey)
-	if err != nil {
-		t.Fatalf("expected nil err, got %v", err)
-	}
-	if repo.updateTaskInput == nil || repo.updateTaskInput.SideEffects == nil || repo.updateTaskInput.SideEffects.DerivedTask == nil {
-		t.Fatalf("expected derived task")
-	}
-	derived := repo.updateTaskInput.SideEffects.DerivedTask
-	if derived.OwnerPoolKey == nil || *derived.OwnerPoolKey != EngineeringRoleKey {
-		t.Fatalf("expected engineering owner pool, got %#v", derived.OwnerPoolKey)
-	}
-	if derived.RequiredCapabilityKey == nil || *derived.RequiredCapabilityKey != PermissionWorkflowTaskComplete {
-		t.Fatalf("expected derived complete capability, got %#v", derived.RequiredCapabilityKey)
-	}
-	if derived.ConfigRevision == nil || *derived.ConfigRevision != configRevision {
-		t.Fatalf("expected inherited config revision, got %#v", derived.ConfigRevision)
+	if repo.createTaskInput.RequiredCapabilityKey == nil || *repo.createTaskInput.RequiredCapabilityKey != PermissionWorkflowTaskComplete {
+		t.Fatalf("expected generic complete capability, got %#v", repo.createTaskInput.RequiredCapabilityKey)
 	}
 }
 
@@ -1546,18 +1516,20 @@ func TestWorkflowUsecase_UrgeTaskAcceptsSupportedActions(t *testing.T) {
 func bossApprovalWorkflowTask() *WorkflowTask {
 	sourceNo := "PO-20260425-001"
 	statusKey := workflowOrderApprovalStatusKey
+	capability := PermissionWorkflowTaskApprove
 	return &WorkflowTask{
-		ID:                101,
-		TaskCode:          "order-approval-88",
-		TaskGroup:         workflowOrderApprovalTaskGroup,
-		TaskName:          "老板审批订单",
-		SourceType:        workflowProjectOrderModuleKey,
-		SourceID:          88,
-		SourceNo:          &sourceNo,
-		BusinessStatusKey: &statusKey,
-		TaskStatusKey:     "ready",
-		OwnerRoleKey:      "boss",
-		Priority:          2,
+		ID:                    101,
+		TaskCode:              "order-approval-88",
+		TaskGroup:             workflowOrderApprovalTaskGroup,
+		TaskName:              "老板审批订单",
+		SourceType:            workflowProjectOrderModuleKey,
+		SourceID:              88,
+		SourceNo:              &sourceNo,
+		BusinessStatusKey:     &statusKey,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          "boss",
+		RequiredCapabilityKey: &capability,
+		Priority:              2,
 		Payload: map[string]any{
 			"record_title":  "企鹅抱枕",
 			"customer_name": "成慧怡",

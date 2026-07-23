@@ -74,13 +74,10 @@ export const BUSINESS_FLOW_TYPES = Object.freeze({
 
 const BACKEND_ONLY_FORMAL_UI_ACTIONS = new Set([
   'add_purchase_receipt_item',
-  'start_material_supply_purchase_order_process',
   'execute_material_supply_purchase_receipt_create',
   'execute_material_supply_quality_gate',
   'execute_material_supply_post_inbound',
-  'start_finished_goods_delivery_process',
   'execute_finished_goods_delivery_quality_decide',
-  'execute_finished_goods_delivery_finance_release',
   'execute_finished_goods_delivery_shipment_ship',
   'execute_finished_goods_delivery_receivable_lead',
 ])
@@ -351,7 +348,6 @@ export const businessPageFlowDefinitions = Object.freeze(
           'outbound',
           'create_stock_reservation_from_sales_order',
         ],
-        ['shipments', 'shipping-release', 'submit_shipment_release'],
         ['inbound', 'payables', 'create_payable_from_purchase_receipt'],
         [
           'processing-contracts',
@@ -460,18 +456,12 @@ export const businessPageFlowDefinitions = Object.freeze(
           'sales-orders',
           'execute_sales_order_acceptance_submit',
         ],
-        ['sales-orders', 'sales-orders', 'activate_sales_order'],
         ['sales-orders', 'sales-orders', 'close_sales_order'],
         ['sales-orders', 'sales-orders', 'cancel_sales_order'],
         [
           'accessories-purchase',
           'accessories-purchase',
           'submit_purchase_order',
-        ],
-        [
-          'accessories-purchase',
-          'accessories-purchase',
-          'approve_purchase_order',
         ],
         [
           'accessories-purchase',
@@ -733,8 +723,8 @@ export const businessPageFlowDefinitions = Object.freeze(
         ['shipments', 'shipments', 'start_finished_goods_delivery_process'],
         [
           'shipments',
-          'shipments',
-          'execute_finished_goods_delivery_finance_release',
+          'shipping-release',
+          'start_finished_goods_delivery_process',
         ],
         ['inbound', 'inbound', 'execute_material_supply_quality_gate'],
       ].map(([fromPageKey, toPageKey, action]) =>
@@ -1121,7 +1111,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
   'shipping-release': {
     pageRole: BUSINESS_PAGE_ROLES.WORKFLOW_INBOX,
     upstreamPageKeys: ['shipments'],
-    producerActions: ['submit_shipment_release'],
+    producerActions: ['start_finished_goods_delivery_process'],
     sourceTypes: ['shipments'],
     downstreamPageKeys: ['shipments'],
     taskGroups: ['shipment_release'],
@@ -1129,7 +1119,7 @@ const LINEAGE_BY_PAGE_KEY = Object.freeze({
     availability: BUSINESS_PAGE_AVAILABILITY.IMPLEMENTED,
     taskProducerStatus: WORKFLOW_TASK_PRODUCER_STATUS.IMPLEMENTED,
     availabilityNote:
-      '草稿出货单由显式提交动作生成仓库放行待办；放行完成只形成可发货协同状态，不等于确认出货、库存扣减或财务事实。',
+      '草稿出货单由页面启动版本化成品出货流程；质量关口通过后生成财务审批，审批完成由领域命令原子记录财务放行，仍不代表已出货或库存扣减。',
   },
   outbound: {
     pageRole: BUSINESS_PAGE_ROLES.FACT_PROCESSING,

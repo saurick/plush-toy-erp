@@ -33,19 +33,8 @@ func isPayableSourceType(sourceType string) bool {
 	}
 }
 
-func isBossOrderApprovalTask(task *WorkflowTask) bool {
-	if task == nil {
-		return false
-	}
-	return strings.TrimSpace(task.SourceType) == workflowProjectOrderModuleKey &&
-		strings.TrimSpace(task.TaskGroup) == workflowOrderApprovalTaskGroup &&
-		strings.TrimSpace(task.OwnerRoleKey) == "boss"
-}
-
 // IsWorkflowApprovalTask classifies approval work from the server-owned
-// capability contract. ProcessRuntime approval nodes and legacy sales-order
-// approval tasks therefore share one permission boundary without relying on a
-// role, task-group, or page-specific name.
+// capability contract without relying on a role, task-group, or page name.
 func IsWorkflowApprovalTask(task *WorkflowTask) bool {
 	if task == nil {
 		return false
@@ -53,7 +42,7 @@ func IsWorkflowApprovalTask(task *WorkflowTask) bool {
 	if task.RequiredCapabilityKey != nil && strings.TrimSpace(*task.RequiredCapabilityKey) == PermissionWorkflowTaskApprove {
 		return true
 	}
-	return isBossOrderApprovalTask(task)
+	return false
 }
 
 func isPurchaseIQCTask(task *WorkflowTask) bool {

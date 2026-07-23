@@ -208,14 +208,7 @@ func applyWorkflowTaskBoardFilters(query *ent.WorkflowTaskQuery, filter biz.Work
 	if filter.ApprovalOnly {
 		query = query.Where(
 			workflowtask.TaskStatusKeyIn("ready", "blocked"),
-			workflowtask.Or(
-				workflowtask.RequiredCapabilityKey(biz.PermissionWorkflowTaskApprove),
-				workflowtask.And(
-					workflowtask.SourceType("project-orders"),
-					workflowtask.TaskGroup("order_approval"),
-					workflowtask.OwnerRoleKey(biz.BossRoleKey),
-				),
-			),
+			workflowtask.RequiredCapabilityKey(biz.PermissionWorkflowTaskApprove),
 		)
 	}
 	if filter.Keyword != "" {

@@ -57,7 +57,6 @@ func (d *jsonrpcDispatcher) handleOperationalFact(
 	case "create_shipment_with_items",
 		"get_shipment",
 		"list_shipment_source_candidates",
-		"submit_shipment_release",
 		"ship_shipment",
 		"cancel_shipment",
 		"list_shipments":

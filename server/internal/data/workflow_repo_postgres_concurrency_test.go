@@ -270,7 +270,7 @@ func TestWorkflowPostgresAttachmentUploadRechecksTaskAfterConcurrentMutation(t *
 	}
 }
 
-func TestWorkflowPostgresConcurrentSameTerminalRetryIsIdempotent(t *testing.T) {
+func TestWorkflowPostgresConcurrentSameApprovalRetryIsIdempotentWithoutDomainSideEffects(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	data, client := openPurchaseReceiptPostgresTestData(t)
@@ -279,24 +279,26 @@ func TestWorkflowPostgresConcurrentSameTerminalRetryIsIdempotent(t *testing.T) {
 	sourceID := workflowPostgresSourceID()
 	sourceNo := "WF-PG-SAME-" + suffix
 	businessStatus := "project_pending"
+	approvalCapability := biz.PermissionWorkflowTaskApprove
 
 	task, err := repo.CreateWorkflowTask(ctx, &biz.WorkflowTaskCreate{
-		TaskCode:          "WF-PG-SAME-" + suffix,
-		TaskGroup:         "order_approval",
-		TaskName:          "老板审批订单",
-		SourceType:        "project-orders",
-		SourceID:          sourceID,
-		SourceNo:          &sourceNo,
-		BusinessStatusKey: &businessStatus,
-		TaskStatusKey:     "ready",
-		OwnerRoleKey:      biz.BossRoleKey,
+		TaskCode:              "WF-PG-SAME-" + suffix,
+		TaskGroup:             "order_approval",
+		TaskName:              "老板审批订单",
+		SourceType:            "project-orders",
+		SourceID:              sourceID,
+		SourceNo:              &sourceNo,
+		BusinessStatusKey:     &businessStatus,
+		TaskStatusKey:         "ready",
+		OwnerRoleKey:          biz.BossRoleKey,
+		RequiredCapabilityKey: &approvalCapability,
 		Payload: map[string]any{
 			"record_title":  "同终态并发幂等验证",
 			"customer_name": "模拟客户",
 		},
 	}, 7)
 	if err != nil {
-		t.Fatalf("create boss approval task: %v", err)
+		t.Fatalf("create approval task: %v", err)
 	}
 
 	barrierRepo := &workflowGetBarrierRepo{
@@ -367,8 +369,8 @@ func TestWorkflowPostgresConcurrentSameTerminalRetryIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("count same-terminal business states: %v", err)
 	}
-	if businessStateCount != 1 {
-		t.Fatalf("same-terminal retry must apply one business-state side effect, got %d", businessStateCount)
+	if businessStateCount != 0 {
+		t.Fatalf("approval retry must not write a sales-specific business-state side effect, got %d", businessStateCount)
 	}
 	derivedTaskCount, err := client.WorkflowTask.Query().
 		Where(
@@ -380,8 +382,8 @@ func TestWorkflowPostgresConcurrentSameTerminalRetryIsIdempotent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("count same-terminal derived tasks: %v", err)
 	}
-	if derivedTaskCount != 1 {
-		t.Fatalf("same-terminal retry must create one engineering task, got %d", derivedTaskCount)
+	if derivedTaskCount != 0 {
+		t.Fatalf("approval retry must not create the retired sales-specific engineering task, got %d", derivedTaskCount)
 	}
 }
 

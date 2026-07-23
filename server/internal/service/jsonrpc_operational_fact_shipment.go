@@ -69,24 +69,6 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 		}
 		item, err := d.operationalFactUC.CreateShipmentDraftWithItems(ctx, in)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
-	case "submit_shipment_release":
-		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentCreate); res != nil {
-			return id, res, nil
-		}
-		if res := d.requireSourceActionReadPermissions(ctx, "operational_fact", method); res != nil {
-			return id, res, nil
-		}
-		if !shipmentItemAllowsOnly(pm, "customer_key", "id") {
-			return id, invalidParamResult(), nil
-		}
-		if res := d.requireCustomerConfigModulesEnabled(ctx, getString(pm, "customer_key"), "shipments", "workflow_tasks"); res != nil {
-			return id, res, nil
-		}
-		task, created, err := d.operationalFactUC.SubmitShipmentRelease(ctx, getInt(pm, "id", 0), actorID)
-		if err != nil {
-			return id, d.mapOperationalFactError(ctx, err), nil
-		}
-		return id, okData(map[string]any{"workflow_task": workflowTaskToMap(task), "created": created}), nil
 	case "ship_shipment":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionShipmentShip); res != nil {
 			return id, res, nil
@@ -95,9 +77,6 @@ func (d *jsonrpcDispatcher) handleOperationalFactShipment(
 			return id, res, nil
 		}
 		shipmentID := getInt(pm, "id", 0)
-		if err := d.operationalFactUC.ValidateShipmentReleaseForShipping(ctx, shipmentID); err != nil {
-			return id, d.mapOperationalFactError(ctx, err), nil
-		}
 		item, err := d.operationalFactUC.ShipShipmentWithActor(ctx, shipmentID, actorID)
 		return id, operationalFactShipmentResult(ctx, d, item, err), nil
 	case "cancel_shipment":
@@ -476,7 +455,7 @@ func shipmentToAny(item *biz.Shipment) map[string]any {
 	for _, line := range item.Items {
 		lines = append(lines, shipmentItemToAny(line))
 	}
-	return map[string]any{"id": item.ID, "shipment_no": item.ShipmentNo, "sales_order_id": optionalIntToAny(item.SalesOrderID), "customer_id": optionalIntToAny(item.CustomerID), "customer_snapshot": optionalStringToAny(item.CustomerSnapshot), "status": item.Status, "idempotency_key": item.IdempotencyKey, "planned_ship_at": optionalUnix(item.PlannedShipAt), "shipped_at": optionalUnix(item.ShippedAt), "total_net_weight_g": optionalDecimalString(item.TotalNetWeightG), "note": optionalStringToAny(item.Note), "items": lines, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
+	return map[string]any{"id": item.ID, "shipment_no": item.ShipmentNo, "sales_order_id": optionalIntToAny(item.SalesOrderID), "customer_id": optionalIntToAny(item.CustomerID), "customer_snapshot": optionalStringToAny(item.CustomerSnapshot), "status": item.Status, "finance_release_status": item.FinanceReleaseStatus, "finance_release_version": item.FinanceReleaseVersion, "finance_released_at": optionalUnix(item.FinanceReleasedAt), "finance_released_by": optionalIntToAny(item.FinanceReleasedBy), "finance_release_process_instance_id": optionalIntToAny(item.FinanceReleaseProcessInstanceID), "finance_release_process_node_id": optionalIntToAny(item.FinanceReleaseProcessNodeID), "finance_release_note": optionalStringToAny(item.FinanceReleaseNote), "idempotency_key": item.IdempotencyKey, "planned_ship_at": optionalUnix(item.PlannedShipAt), "shipped_at": optionalUnix(item.ShippedAt), "total_net_weight_g": optionalDecimalString(item.TotalNetWeightG), "note": optionalStringToAny(item.Note), "items": lines, "created_at": item.CreatedAt.Unix(), "updated_at": item.UpdatedAt.Unix()}
 }
 
 func shipmentItemToAny(item *biz.ShipmentItem) map[string]any {

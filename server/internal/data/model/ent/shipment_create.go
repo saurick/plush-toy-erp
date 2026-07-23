@@ -86,6 +86,104 @@ func (_c *ShipmentCreate) SetNillableStatus(v *string) *ShipmentCreate {
 	return _c
 }
 
+// SetFinanceReleaseStatus sets the "finance_release_status" field.
+func (_c *ShipmentCreate) SetFinanceReleaseStatus(v string) *ShipmentCreate {
+	_c.mutation.SetFinanceReleaseStatus(v)
+	return _c
+}
+
+// SetNillableFinanceReleaseStatus sets the "finance_release_status" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableFinanceReleaseStatus(v *string) *ShipmentCreate {
+	if v != nil {
+		_c.SetFinanceReleaseStatus(*v)
+	}
+	return _c
+}
+
+// SetFinanceReleaseVersion sets the "finance_release_version" field.
+func (_c *ShipmentCreate) SetFinanceReleaseVersion(v int) *ShipmentCreate {
+	_c.mutation.SetFinanceReleaseVersion(v)
+	return _c
+}
+
+// SetNillableFinanceReleaseVersion sets the "finance_release_version" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableFinanceReleaseVersion(v *int) *ShipmentCreate {
+	if v != nil {
+		_c.SetFinanceReleaseVersion(*v)
+	}
+	return _c
+}
+
+// SetFinanceReleasedAt sets the "finance_released_at" field.
+func (_c *ShipmentCreate) SetFinanceReleasedAt(v time.Time) *ShipmentCreate {
+	_c.mutation.SetFinanceReleasedAt(v)
+	return _c
+}
+
+// SetNillableFinanceReleasedAt sets the "finance_released_at" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableFinanceReleasedAt(v *time.Time) *ShipmentCreate {
+	if v != nil {
+		_c.SetFinanceReleasedAt(*v)
+	}
+	return _c
+}
+
+// SetFinanceReleasedBy sets the "finance_released_by" field.
+func (_c *ShipmentCreate) SetFinanceReleasedBy(v int) *ShipmentCreate {
+	_c.mutation.SetFinanceReleasedBy(v)
+	return _c
+}
+
+// SetNillableFinanceReleasedBy sets the "finance_released_by" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableFinanceReleasedBy(v *int) *ShipmentCreate {
+	if v != nil {
+		_c.SetFinanceReleasedBy(*v)
+	}
+	return _c
+}
+
+// SetFinanceReleaseProcessInstanceID sets the "finance_release_process_instance_id" field.
+func (_c *ShipmentCreate) SetFinanceReleaseProcessInstanceID(v int) *ShipmentCreate {
+	_c.mutation.SetFinanceReleaseProcessInstanceID(v)
+	return _c
+}
+
+// SetNillableFinanceReleaseProcessInstanceID sets the "finance_release_process_instance_id" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableFinanceReleaseProcessInstanceID(v *int) *ShipmentCreate {
+	if v != nil {
+		_c.SetFinanceReleaseProcessInstanceID(*v)
+	}
+	return _c
+}
+
+// SetFinanceReleaseProcessNodeID sets the "finance_release_process_node_id" field.
+func (_c *ShipmentCreate) SetFinanceReleaseProcessNodeID(v int) *ShipmentCreate {
+	_c.mutation.SetFinanceReleaseProcessNodeID(v)
+	return _c
+}
+
+// SetNillableFinanceReleaseProcessNodeID sets the "finance_release_process_node_id" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableFinanceReleaseProcessNodeID(v *int) *ShipmentCreate {
+	if v != nil {
+		_c.SetFinanceReleaseProcessNodeID(*v)
+	}
+	return _c
+}
+
+// SetFinanceReleaseNote sets the "finance_release_note" field.
+func (_c *ShipmentCreate) SetFinanceReleaseNote(v string) *ShipmentCreate {
+	_c.mutation.SetFinanceReleaseNote(v)
+	return _c
+}
+
+// SetNillableFinanceReleaseNote sets the "finance_release_note" field if the given value is not nil.
+func (_c *ShipmentCreate) SetNillableFinanceReleaseNote(v *string) *ShipmentCreate {
+	if v != nil {
+		_c.SetFinanceReleaseNote(*v)
+	}
+	return _c
+}
+
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (_c *ShipmentCreate) SetIdempotencyKey(v string) *ShipmentCreate {
 	_c.mutation.SetIdempotencyKey(v)
@@ -256,6 +354,14 @@ func (_c *ShipmentCreate) defaults() error {
 		v := shipment.DefaultStatus
 		_c.mutation.SetStatus(v)
 	}
+	if _, ok := _c.mutation.FinanceReleaseStatus(); !ok {
+		v := shipment.DefaultFinanceReleaseStatus
+		_c.mutation.SetFinanceReleaseStatus(v)
+	}
+	if _, ok := _c.mutation.FinanceReleaseVersion(); !ok {
+		v := shipment.DefaultFinanceReleaseVersion
+		_c.mutation.SetFinanceReleaseVersion(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		if shipment.DefaultCreatedAt == nil {
 			return fmt.Errorf("ent: uninitialized shipment.DefaultCreatedAt (forgotten import ent/runtime?)")
@@ -304,6 +410,42 @@ func (_c *ShipmentCreate) check() error {
 	if v, ok := _c.mutation.Status(); ok {
 		if err := shipment.StatusValidator(v); err != nil {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Shipment.status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.FinanceReleaseStatus(); !ok {
+		return &ValidationError{Name: "finance_release_status", err: errors.New(`ent: missing required field "Shipment.finance_release_status"`)}
+	}
+	if v, ok := _c.mutation.FinanceReleaseStatus(); ok {
+		if err := shipment.FinanceReleaseStatusValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_status", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_status": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.FinanceReleaseVersion(); !ok {
+		return &ValidationError{Name: "finance_release_version", err: errors.New(`ent: missing required field "Shipment.finance_release_version"`)}
+	}
+	if v, ok := _c.mutation.FinanceReleaseVersion(); ok {
+		if err := shipment.FinanceReleaseVersionValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_version", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_version": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.FinanceReleasedBy(); ok {
+		if err := shipment.FinanceReleasedByValidator(v); err != nil {
+			return &ValidationError{Name: "finance_released_by", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_released_by": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.FinanceReleaseProcessInstanceID(); ok {
+		if err := shipment.FinanceReleaseProcessInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_process_instance_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_process_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.FinanceReleaseProcessNodeID(); ok {
+		if err := shipment.FinanceReleaseProcessNodeIDValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_process_node_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_process_node_id": %w`, err)}
+		}
+	}
+	if v, ok := _c.mutation.FinanceReleaseNote(); ok {
+		if err := shipment.FinanceReleaseNoteValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_note", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_note": %w`, err)}
 		}
 	}
 	if _, ok := _c.mutation.IdempotencyKey(); !ok {
@@ -362,6 +504,34 @@ func (_c *ShipmentCreate) createSpec() (*Shipment, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
 		_node.Status = value
+	}
+	if value, ok := _c.mutation.FinanceReleaseStatus(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseStatus, field.TypeString, value)
+		_node.FinanceReleaseStatus = value
+	}
+	if value, ok := _c.mutation.FinanceReleaseVersion(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseVersion, field.TypeInt, value)
+		_node.FinanceReleaseVersion = value
+	}
+	if value, ok := _c.mutation.FinanceReleasedAt(); ok {
+		_spec.SetField(shipment.FieldFinanceReleasedAt, field.TypeTime, value)
+		_node.FinanceReleasedAt = &value
+	}
+	if value, ok := _c.mutation.FinanceReleasedBy(); ok {
+		_spec.SetField(shipment.FieldFinanceReleasedBy, field.TypeInt, value)
+		_node.FinanceReleasedBy = &value
+	}
+	if value, ok := _c.mutation.FinanceReleaseProcessInstanceID(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseProcessInstanceID, field.TypeInt, value)
+		_node.FinanceReleaseProcessInstanceID = &value
+	}
+	if value, ok := _c.mutation.FinanceReleaseProcessNodeID(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseProcessNodeID, field.TypeInt, value)
+		_node.FinanceReleaseProcessNodeID = &value
+	}
+	if value, ok := _c.mutation.FinanceReleaseNote(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseNote, field.TypeString, value)
+		_node.FinanceReleaseNote = &value
 	}
 	if value, ok := _c.mutation.IdempotencyKey(); ok {
 		_spec.SetField(shipment.FieldIdempotencyKey, field.TypeString, value)

@@ -89,20 +89,24 @@ func TestShipmentReleaseSourceTaskOwnsReleaseGate(t *testing.T) {
 	if state.BusinessStatusKey != "shipping_released" {
 		t.Fatalf("completed release state = %#v", state)
 	}
+	client.Shipment.UpdateOneID(shipment.ID).
+		SetFinanceReleaseStatus(biz.ShipmentFinanceReleaseStatusApproved).
+		SetFinanceReleaseVersion(2).
+		SaveX(ctx)
 	shipped, err := operationalUC.ShipShipment(ctx, shipment.ID)
 	if err != nil || shipped.Status != biz.ShipmentStatusShipped {
 		t.Fatalf("ship after completed release shipment=%#v err=%v", shipped, err)
 	}
 	shipmentTask := client.WorkflowTask.GetX(ctx, task.ID)
-	if shipmentTask.BusinessStatusKey == nil || *shipmentTask.BusinessStatusKey != "shipped" {
-		t.Fatalf("shipped task projection = %#v", shipmentTask)
+	if shipmentTask.BusinessStatusKey == nil || *shipmentTask.BusinessStatusKey != "shipping_released" {
+		t.Fatalf("legacy release projection must remain historical after shipment: %#v", shipmentTask)
 	}
 	state = client.WorkflowBusinessState.Query().Where(
 		workflowbusinessstate.SourceType(biz.WorkflowSourceTaskShipmentSourceType),
 		workflowbusinessstate.SourceID(shipment.ID),
 	).OnlyX(ctx)
-	if state.BusinessStatusKey != "shipped" || state.Payload["source_projection_action"] != "shipment.ship" {
-		t.Fatalf("shipped business state = %#v", state)
+	if state.BusinessStatusKey != "shipping_released" {
+		t.Fatalf("legacy release state must not replace the shipment finance gate: %#v", state)
 	}
 	if err := operationalUC.ValidateShipmentReleaseForShipping(ctx, shipment.ID); err != nil {
 		t.Fatalf("shipping replay must preserve completed release: %v", err)

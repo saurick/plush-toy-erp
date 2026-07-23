@@ -2,6 +2,7 @@ import { AUTH_SCOPE } from '@/common/auth/auth'
 import { ADMIN_BASE_PATH } from '@/common/utils/adminRpc'
 import { JsonRpc } from '@/common/utils/jsonRpc'
 import { buildCustomerConfigMutationPayload } from './customerConfigTransition.mjs'
+import { submitPurchaseOrder } from './masterDataOrderApi.mjs'
 
 const customerConfigRpc = new JsonRpc({
   url: 'customer_config',
@@ -117,4 +118,69 @@ export async function submitSalesOrderAcceptanceProcess(params = {}) {
     process_instance: processInstance,
     started_node: startedNode,
   }
+}
+
+export async function startPurchaseOrderApprovalProcess(params = {}) {
+  const result = await customerConfigRpc.call(
+    'start_material_supply_purchase_order_process',
+    params
+  )
+  return dataOf(result)
+}
+
+export async function submitPurchaseOrderApprovalProcess(params = {}) {
+  const purchaseOrderID = Number(params.purchase_order_id || params.id || 0)
+  if (!Number.isSafeInteger(purchaseOrderID) || purchaseOrderID <= 0) {
+    throw new Error('缺少采购订单，无法提交审批')
+  }
+  const submitted = await submitPurchaseOrder({
+    ...params,
+    id: purchaseOrderID,
+  })
+  const processData = await startPurchaseOrderApprovalProcess({
+    customer_key: params.customer_key,
+    purchase_order_id: purchaseOrderID,
+    business_ref_no:
+      String(params.business_ref_no || params.purchase_order_no || '').trim() ||
+      undefined,
+    idempotency_key:
+      String(params.idempotency_key || '').trim() ||
+      `purchase-order-approval/${purchaseOrderID}`,
+  })
+  if (!processData?.process_instance?.id || !processData?.started_node?.id) {
+    throw new Error('采购审批流程启动结果缺少流程节点')
+  }
+  return {
+    purchase_order: submitted,
+    ...processData,
+  }
+}
+
+export async function startFinishedGoodsDeliveryProcess(params = {}) {
+  const result = await customerConfigRpc.call(
+    'start_finished_goods_delivery_process',
+    params
+  )
+  return dataOf(result)
+}
+
+export async function submitShipmentFinanceApprovalProcess(params = {}) {
+  const shipmentID = Number(params.shipment_id || params.id || 0)
+  if (!Number.isSafeInteger(shipmentID) || shipmentID <= 0) {
+    throw new Error('缺少出货单，无法提交财务审批')
+  }
+  const processData = await startFinishedGoodsDeliveryProcess({
+    customer_key: params.customer_key,
+    shipment_id: shipmentID,
+    business_ref_no:
+      String(params.business_ref_no || params.shipment_no || '').trim() ||
+      undefined,
+    idempotency_key:
+      String(params.idempotency_key || '').trim() ||
+      `shipment-finance-approval/${shipmentID}`,
+  })
+  if (!processData?.process_instance?.id || !processData?.started_node?.id) {
+    throw new Error('出货财务审批流程启动结果缺少流程节点')
+  }
+  return processData
 }

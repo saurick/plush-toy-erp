@@ -207,8 +207,8 @@ func TestWorkflowRepo_GetWorkflowTaskBoardApprovalOnlyUsesCapabilityContract(t *
 	if err != nil {
 		t.Fatalf("get approval board: %v", err)
 	}
-	if board.Total != 2 || board.Counts.Actionable != 1 || board.Counts.Exception != 1 || board.Counts.Finished != 0 {
-		t.Fatalf("approval board must contain generic and legacy approvals only, got total=%d counts=%#v", board.Total, board.Counts)
+	if board.Total != 1 || board.Counts.Actionable != 1 || board.Counts.Exception != 0 || board.Counts.Finished != 0 {
+		t.Fatalf("approval board must contain only capability-backed active approvals, got total=%d counts=%#v", board.Total, board.Counts)
 	}
 }
 

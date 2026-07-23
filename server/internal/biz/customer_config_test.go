@@ -1127,7 +1127,7 @@ func TestCustomerConfigUsecaseBuildsProcessInstanceCreateFromActiveProcessDefini
 	if create.ModuleContractSnapshot["source"] != "active_customer_config" {
 		t.Fatalf("module contract snapshot = %#v", create.ModuleContractSnapshot)
 	}
-	if len(create.Nodes) != 4 {
+	if len(create.Nodes) != 5 {
 		t.Fatalf("nodes = %#v", create.Nodes)
 	}
 	if create.Nodes[0].NodeKey != "submit_sales_order" ||
@@ -1135,11 +1135,14 @@ func TestCustomerConfigUsecaseBuildsProcessInstanceCreateFromActiveProcessDefini
 		create.Nodes[0].PolicySnapshot["command_key"] != ProcessDomainCommandSalesOrderSubmit {
 		t.Fatalf("submit node = %#v", create.Nodes[0])
 	}
-	if create.Nodes[1].OwnerPoolKey == nil || *create.Nodes[1].OwnerPoolKey != "order_approval" {
+	if create.Nodes[1].OwnerPoolKey == nil || *create.Nodes[1].OwnerPoolKey != BossRoleKey {
 		t.Fatalf("approval owner pool = %#v", create.Nodes[1].OwnerPoolKey)
 	}
-	if create.Nodes[2].RequiredCapabilityKey == nil || *create.Nodes[2].RequiredCapabilityKey != PermissionWorkflowTaskComplete {
-		t.Fatalf("review capability = %#v", create.Nodes[2].RequiredCapabilityKey)
+	if create.Nodes[2].PolicySnapshot["command_key"] != ProcessDomainCommandSalesOrderActivate {
+		t.Fatalf("activation node = %#v", create.Nodes[2])
+	}
+	if create.Nodes[3].RequiredCapabilityKey == nil || *create.Nodes[3].RequiredCapabilityKey != PermissionWorkflowTaskComplete {
+		t.Fatalf("review capability = %#v", create.Nodes[3].RequiredCapabilityKey)
 	}
 
 	processRepo := &memProcessRuntimeRepo{}
@@ -1194,21 +1197,29 @@ func TestCustomerConfigUsecaseBuildsMaterialSupplyPurchaseOrderProcessInstanceCr
 	if create.BusinessRefType != "purchase_order" || create.BusinessRefID != 5001 {
 		t.Fatalf("business ref = %#v", create)
 	}
-	if len(create.Nodes) != 4 {
+	if len(create.Nodes) != 6 {
 		t.Fatalf("nodes = %#v", create.Nodes)
 	}
-	if create.Nodes[0].NodeKey != "purchase_receipt_source" ||
-		create.Nodes[0].NodeType != ProcessNodeTypeDomainCommand ||
-		create.Nodes[0].PolicySnapshot["command_key"] != ProcessDomainCommandPurchaseReceiptCreate {
-		t.Fatalf("purchase receipt source node = %#v", create.Nodes[0])
+	if create.Nodes[0].NodeKey != "purchase_order_approval" || create.Nodes[0].NodeType != ProcessNodeTypeApproval ||
+		create.Nodes[0].RequiredCapabilityKey == nil || *create.Nodes[0].RequiredCapabilityKey != PermissionWorkflowTaskApprove ||
+		create.Nodes[0].OwnerPoolKey == nil || *create.Nodes[0].OwnerPoolKey != BossRoleKey {
+		t.Fatalf("purchase approval node = %#v", create.Nodes[0])
 	}
-	if create.Nodes[1].NodeKey != "incoming_qc" ||
-		create.Nodes[1].PolicySnapshot["command_key"] != ProcessDomainCommandIncomingQualityGate {
-		t.Fatalf("incoming qc node = %#v", create.Nodes[1])
+	if create.Nodes[1].NodeKey != "approve_purchase_order" ||
+		create.Nodes[1].PolicySnapshot["command_key"] != ProcessDomainCommandPurchaseOrderApprove {
+		t.Fatalf("purchase approval command node = %#v", create.Nodes[1])
 	}
-	if create.Nodes[2].NodeKey != "warehouse_inbound" ||
-		create.Nodes[2].PolicySnapshot["command_key"] != ProcessDomainCommandInventoryPostInbound {
-		t.Fatalf("warehouse inbound node = %#v", create.Nodes[2])
+	if create.Nodes[2].NodeKey != "purchase_receipt_source" ||
+		create.Nodes[2].PolicySnapshot["command_key"] != ProcessDomainCommandPurchaseReceiptCreate {
+		t.Fatalf("purchase receipt source node = %#v", create.Nodes[2])
+	}
+	if create.Nodes[3].NodeKey != "incoming_qc" ||
+		create.Nodes[3].PolicySnapshot["command_key"] != ProcessDomainCommandIncomingQualityGate {
+		t.Fatalf("incoming qc node = %#v", create.Nodes[3])
+	}
+	if create.Nodes[4].NodeKey != "warehouse_inbound" ||
+		create.Nodes[4].PolicySnapshot["command_key"] != ProcessDomainCommandInventoryPostInbound {
+		t.Fatalf("warehouse inbound node = %#v", create.Nodes[4])
 	}
 }
 
@@ -1492,7 +1503,7 @@ func TestCustomerConfigUsecaseExplainProductCoreFinishedGoodsDeliveryDefinition(
 	if !explanation.CanExecuteRuntimeCommands {
 		t.Fatalf("Product Core registered command contracts must be executable: %#v", explanation)
 	}
-	if len(explanation.Nodes) != 5 {
+	if len(explanation.Nodes) != 6 {
 		t.Fatalf("nodes = %#v", explanation.Nodes)
 	}
 	nodeByKey := map[string]CustomerProcessDefinitionNodeExplanation{}
@@ -1539,16 +1550,21 @@ func TestCustomerConfigUsecaseBuildFinishedGoodsDeliveryProcess(t *testing.T) {
 		create.BusinessRefID != 9001 {
 		t.Fatalf("create = %#v", create)
 	}
-	if len(create.Nodes) != 5 {
+	if len(create.Nodes) != 6 {
 		t.Fatalf("nodes = %#v", create.Nodes)
 	}
-	if create.Nodes[0].NodeKey != "finished_goods_quality" ||
-		create.Nodes[0].PolicySnapshot["command_key"] != ProcessDomainCommandFinishedGoodsQualityDecide {
-		t.Fatalf("first node = %#v", create.Nodes[0])
+	if create.Nodes[0].PolicySnapshot["command_key"] != ProcessDomainCommandFinishedGoodsQualityDecide {
+		t.Fatalf("quality node = %#v", create.Nodes[0])
 	}
-	if create.Nodes[1].PolicySnapshot["command_key"] != ProcessDomainCommandShipmentFinanceRelease ||
-		create.Nodes[2].PolicySnapshot["command_key"] != ProcessDomainCommandShipmentShip ||
-		create.Nodes[3].PolicySnapshot["command_key"] != ProcessDomainCommandFinanceReceivableLead {
+	if create.Nodes[1].NodeKey != "shipment_finance_approval" ||
+		create.Nodes[1].NodeType != ProcessNodeTypeApproval ||
+		create.Nodes[1].RequiredCapabilityKey == nil || *create.Nodes[1].RequiredCapabilityKey != PermissionWorkflowTaskApprove ||
+		create.Nodes[1].OwnerPoolKey == nil || *create.Nodes[1].OwnerPoolKey != FinanceRoleKey {
+		t.Fatalf("finance approval node = %#v", create.Nodes[1])
+	}
+	if create.Nodes[2].PolicySnapshot["command_key"] != ProcessDomainCommandShipmentFinanceRelease ||
+		create.Nodes[3].PolicySnapshot["command_key"] != ProcessDomainCommandShipmentShip ||
+		create.Nodes[4].PolicySnapshot["command_key"] != ProcessDomainCommandFinanceReceivableLead {
 		t.Fatalf("command nodes = %#v", create.Nodes)
 	}
 	if create.ModuleContractSnapshot["fact_boundary"] != "no_fact_posting" {

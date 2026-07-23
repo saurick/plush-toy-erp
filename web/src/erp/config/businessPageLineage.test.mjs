@@ -151,25 +151,25 @@ const NON_LINEAGE_CUSTOMER_CONFIG_ACTIONS = Object.freeze([
 const FORMAL_UI_PROCESS_RUNTIME_ACTIONS = Object.freeze([
   'start_sales_order_acceptance_process',
   'execute_sales_order_acceptance_submit',
+  'start_material_supply_purchase_order_process',
+  'start_finished_goods_delivery_process',
 ])
 
 const BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS = Object.freeze([
-  'start_material_supply_purchase_order_process',
   'execute_material_supply_purchase_receipt_create',
   'execute_material_supply_quality_gate',
   'execute_material_supply_post_inbound',
-  'start_finished_goods_delivery_process',
   'execute_finished_goods_delivery_quality_decide',
-  'execute_finished_goods_delivery_finance_release',
   'execute_finished_goods_delivery_shipment_ship',
   'execute_finished_goods_delivery_receivable_lead',
 ])
 
 const NON_LINEAGE_BACKEND_ONLY_ACTIONS = Object.freeze([
-  // The formal sales-order UI submits through the customer-config process
-  // start + execute command. Keep the server command, but do not advertise a
-  // second direct UI lifecycle path.
-  'submit_sales_order',
+  // These corrective commands intentionally remain backend-only until their
+  // dedicated business pages expose a reviewed entrypoint.
+  'approve_production_exception',
+  'cancel_outsourcing_return_disposition',
+  'cancel_production_exception',
   'correct_quality_inspection_result',
   'recover_compensated_process_domain_command',
 ])
@@ -667,7 +667,7 @@ test('business page lineage: real source and lifecycle service actions are class
 })
 
 test('business page lineage: backend-only process commands never claim implemented formal UI reachability', () => {
-  assert.equal(BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS.length, 9)
+  assert.equal(BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS.length, 6)
 
   for (const action of [
     ...BACKEND_ONLY_PROCESS_RUNTIME_ACTIONS,
@@ -699,7 +699,7 @@ test('business page lineage: backend-only process commands never claim implement
   )
 })
 
-test('business page lineage: sales-order submit has one formal UI path through process start and execute', () => {
+test('business page lineage: formal order and shipment process starts are implemented UI paths', () => {
   const customerConfigApiSource = readFileSync(
     new URL('../api/customerConfigApi.mjs', import.meta.url),
     'utf8'
@@ -881,7 +881,6 @@ test('business page lineage: carry-over, generation, WIP quality, and reversal s
     'start_sales_order_acceptance_process',
     'start_material_supply_purchase_order_process',
     'start_finished_goods_delivery_process',
-    'execute_finished_goods_delivery_finance_release',
     'execute_material_supply_quality_gate',
   ]) {
     assert.equal(
@@ -1283,7 +1282,7 @@ test('business page lineage: workflow inboxes declare exact source task producer
     [
       ['release_production_order'],
       ['post_production_fact', 'submit_production_exception'],
-      ['submit_shipment_release'],
+      ['start_finished_goods_delivery_process'],
     ]
   )
   assert.deepEqual(

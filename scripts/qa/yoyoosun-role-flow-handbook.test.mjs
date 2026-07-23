@@ -162,7 +162,7 @@ test("yoyoosun role handbook lists the exact tracked role profiles", () => {
       (total, role) => total + role.capabilityKeys.length,
       0,
     ),
-    280,
+    281,
   );
   assert.equal(
     new Set(yoyoosunRoleFlowMatrix.roles.flatMap((role) => role.capabilityKeys))
@@ -517,7 +517,7 @@ test("yoyoosun role handbook preserves every client-source process checkpoint an
   const requiredBoundaries = [
     "精确行部分退厂 / 补换",
     "补换生成新待收待检链",
-    "不是直连 shipment 的强制领域门禁",
+    "Shipment 版本化强制门禁",
     "包材没有独立采购、IQC、领用 / 耗用事实闭环",
     "永绅 finance 未获收付款页面 / 权限",
     "付款审批、银行直连、总账、税控仍未实现",

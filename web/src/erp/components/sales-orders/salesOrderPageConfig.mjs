@@ -1,5 +1,4 @@
 import {
-  activateSalesOrder,
   cancelSalesOrder,
   closeSalesOrder,
 } from '../../api/masterDataOrderApi.mjs'
@@ -37,13 +36,6 @@ export const SALES_ORDER_LIFECYCLE_ACTIONS = [
     run: submitSalesOrderAcceptanceProcess,
     returnsRecord: false,
     successMessage: '销售订单已提交，已进入老板审批',
-  },
-  {
-    key: 'activate',
-    label: '生效',
-    permission: 'sales_order.activate',
-    nextStatus: 'active',
-    run: activateSalesOrder,
   },
   {
     key: 'close',

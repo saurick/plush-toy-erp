@@ -126,7 +126,6 @@ func TestAllCustomerConfigExecuteMethodsUseProcessRevisionBoundary(t *testing.T)
 	methods := []string{
 		"execute_sales_order_acceptance_submit",
 		"execute_finished_goods_delivery_quality_decide",
-		"execute_finished_goods_delivery_finance_release",
 		"execute_finished_goods_delivery_shipment_ship",
 		"execute_finished_goods_delivery_receivable_lead",
 		"execute_material_supply_purchase_receipt_create",

@@ -86,9 +86,10 @@ func TestShipmentProcessDomainCommandFinanceReleaseBindsUsecase(t *testing.T) {
 	ctx := context.Background()
 	operationalFactRepo := &shipmentProcessOperationalFactRepoStub{
 		shipment: &Shipment{
-			ID:         9001,
-			ShipmentNo: "SHIP-PROCESS-001",
-			Status:     ShipmentStatusDraft,
+			ID:                   9001,
+			ShipmentNo:           "SHIP-PROCESS-001",
+			Status:               ShipmentStatusDraft,
+			FinanceReleaseStatus: ShipmentFinanceReleaseStatusPending,
 		},
 	}
 	processRepo := &memProcessRuntimeRepo{
@@ -271,4 +272,18 @@ func (r *shipmentProcessOperationalFactRepoStub) ShipShipment(_ context.Context,
 	}
 	copied := *r.shipment
 	return &copied, nil
+}
+
+func (r *shipmentProcessOperationalFactRepoStub) RecordShipmentFinanceReleaseProcessCommand(_ context.Context, shipmentID int, _ *ProcessDomainCommandInput, _ *ProcessDomainCommandResult, _ int) (*Shipment, error) {
+	if r.shipment == nil || r.shipment.ID != shipmentID {
+		return nil, ErrShipmentNotFound
+	}
+	r.shipment.FinanceReleaseStatus = ShipmentFinanceReleaseStatusApproved
+	r.shipment.FinanceReleaseVersion++
+	copied := *r.shipment
+	return &copied, nil
+}
+
+func (r *shipmentProcessOperationalFactRepoStub) ShipShipmentForProcessCommand(ctx context.Context, shipmentID int, _ *ProcessDomainCommandInput, _ *ProcessDomainCommandResult, _ int) (*Shipment, error) {
+	return r.ShipShipment(ctx, shipmentID)
 }

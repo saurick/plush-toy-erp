@@ -693,6 +693,10 @@ func BuiltinRoles() []RoleDefinition {
 		{Key: DebugOperatorRoleKey, Name: "调试操作员", Description: "仅限明确开启的本地开发环境分配和使用的调试角色。", Builtin: true, SortOrder: 110, Permissions: []string{PermissionERPBusinessChainDebugRead, PermissionDebugBusinessChainRead, PermissionDebugBusinessChainRun, PermissionDebugSeed, PermissionDebugCleanup, PermissionDebugBusinessClear}},
 	}
 	for index := range roles {
+		switch roles[index].Key {
+		case FinanceRoleKey:
+			roles[index].Permissions = append(roles[index].Permissions, PermissionWorkflowTaskApprove)
+		}
 		if roles[index].Key == PMCRoleKey {
 			roles[index].Permissions = append(roles[index].Permissions, PermissionERPBusinessDashboardRead)
 		}

@@ -17,7 +17,6 @@ func TestValidatePublicWorkflowTaskNamespaceRejectsEveryTransitionMatcherIdentit
 		key  string
 		task *WorkflowTask
 	}{
-		{key: "boss_order_approval", task: bossApprovalWorkflowTask()},
 		{key: "purchase_iqc", task: purchaseIQCWorkflowTask()},
 		{key: "purchase_warehouse_inbound", task: warehouseInboundWorkflowTask()},
 		{key: "outsource_return_tracking", task: outsourceReturnTrackingWorkflowTask()},
@@ -75,7 +74,7 @@ func TestValidatePublicWorkflowTaskNamespaceRejectsEveryTransitionMatcherIdentit
 func TestWorkflowUsecaseCreateTaskKeepsInternalTransitionProducerOpen(t *testing.T) {
 	repo := &stubWorkflowRepo{}
 	uc := NewWorkflowUsecase(repo)
-	create := workflowTaskCreateFromFixture(bossApprovalWorkflowTask())
+	create := workflowTaskCreateFromFixture(purchaseIQCWorkflowTask())
 	task, err := uc.CreateTask(context.Background(), &create, 7)
 	if err != nil {
 		t.Fatalf("CreateTask internal transition producer: %v", err)

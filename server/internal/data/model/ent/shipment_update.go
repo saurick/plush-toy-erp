@@ -120,6 +120,162 @@ func (_u *ShipmentUpdate) SetNillableStatus(v *string) *ShipmentUpdate {
 	return _u
 }
 
+// SetFinanceReleaseStatus sets the "finance_release_status" field.
+func (_u *ShipmentUpdate) SetFinanceReleaseStatus(v string) *ShipmentUpdate {
+	_u.mutation.SetFinanceReleaseStatus(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseStatus sets the "finance_release_status" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFinanceReleaseStatus(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFinanceReleaseStatus(*v)
+	}
+	return _u
+}
+
+// SetFinanceReleaseVersion sets the "finance_release_version" field.
+func (_u *ShipmentUpdate) SetFinanceReleaseVersion(v int) *ShipmentUpdate {
+	_u.mutation.ResetFinanceReleaseVersion()
+	_u.mutation.SetFinanceReleaseVersion(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseVersion sets the "finance_release_version" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFinanceReleaseVersion(v *int) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFinanceReleaseVersion(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleaseVersion adds value to the "finance_release_version" field.
+func (_u *ShipmentUpdate) AddFinanceReleaseVersion(v int) *ShipmentUpdate {
+	_u.mutation.AddFinanceReleaseVersion(v)
+	return _u
+}
+
+// SetFinanceReleasedAt sets the "finance_released_at" field.
+func (_u *ShipmentUpdate) SetFinanceReleasedAt(v time.Time) *ShipmentUpdate {
+	_u.mutation.SetFinanceReleasedAt(v)
+	return _u
+}
+
+// SetNillableFinanceReleasedAt sets the "finance_released_at" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFinanceReleasedAt(v *time.Time) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFinanceReleasedAt(*v)
+	}
+	return _u
+}
+
+// ClearFinanceReleasedAt clears the value of the "finance_released_at" field.
+func (_u *ShipmentUpdate) ClearFinanceReleasedAt() *ShipmentUpdate {
+	_u.mutation.ClearFinanceReleasedAt()
+	return _u
+}
+
+// SetFinanceReleasedBy sets the "finance_released_by" field.
+func (_u *ShipmentUpdate) SetFinanceReleasedBy(v int) *ShipmentUpdate {
+	_u.mutation.ResetFinanceReleasedBy()
+	_u.mutation.SetFinanceReleasedBy(v)
+	return _u
+}
+
+// SetNillableFinanceReleasedBy sets the "finance_released_by" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFinanceReleasedBy(v *int) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFinanceReleasedBy(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleasedBy adds value to the "finance_released_by" field.
+func (_u *ShipmentUpdate) AddFinanceReleasedBy(v int) *ShipmentUpdate {
+	_u.mutation.AddFinanceReleasedBy(v)
+	return _u
+}
+
+// ClearFinanceReleasedBy clears the value of the "finance_released_by" field.
+func (_u *ShipmentUpdate) ClearFinanceReleasedBy() *ShipmentUpdate {
+	_u.mutation.ClearFinanceReleasedBy()
+	return _u
+}
+
+// SetFinanceReleaseProcessInstanceID sets the "finance_release_process_instance_id" field.
+func (_u *ShipmentUpdate) SetFinanceReleaseProcessInstanceID(v int) *ShipmentUpdate {
+	_u.mutation.ResetFinanceReleaseProcessInstanceID()
+	_u.mutation.SetFinanceReleaseProcessInstanceID(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseProcessInstanceID sets the "finance_release_process_instance_id" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFinanceReleaseProcessInstanceID(v *int) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFinanceReleaseProcessInstanceID(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleaseProcessInstanceID adds value to the "finance_release_process_instance_id" field.
+func (_u *ShipmentUpdate) AddFinanceReleaseProcessInstanceID(v int) *ShipmentUpdate {
+	_u.mutation.AddFinanceReleaseProcessInstanceID(v)
+	return _u
+}
+
+// ClearFinanceReleaseProcessInstanceID clears the value of the "finance_release_process_instance_id" field.
+func (_u *ShipmentUpdate) ClearFinanceReleaseProcessInstanceID() *ShipmentUpdate {
+	_u.mutation.ClearFinanceReleaseProcessInstanceID()
+	return _u
+}
+
+// SetFinanceReleaseProcessNodeID sets the "finance_release_process_node_id" field.
+func (_u *ShipmentUpdate) SetFinanceReleaseProcessNodeID(v int) *ShipmentUpdate {
+	_u.mutation.ResetFinanceReleaseProcessNodeID()
+	_u.mutation.SetFinanceReleaseProcessNodeID(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseProcessNodeID sets the "finance_release_process_node_id" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFinanceReleaseProcessNodeID(v *int) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFinanceReleaseProcessNodeID(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleaseProcessNodeID adds value to the "finance_release_process_node_id" field.
+func (_u *ShipmentUpdate) AddFinanceReleaseProcessNodeID(v int) *ShipmentUpdate {
+	_u.mutation.AddFinanceReleaseProcessNodeID(v)
+	return _u
+}
+
+// ClearFinanceReleaseProcessNodeID clears the value of the "finance_release_process_node_id" field.
+func (_u *ShipmentUpdate) ClearFinanceReleaseProcessNodeID() *ShipmentUpdate {
+	_u.mutation.ClearFinanceReleaseProcessNodeID()
+	return _u
+}
+
+// SetFinanceReleaseNote sets the "finance_release_note" field.
+func (_u *ShipmentUpdate) SetFinanceReleaseNote(v string) *ShipmentUpdate {
+	_u.mutation.SetFinanceReleaseNote(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseNote sets the "finance_release_note" field if the given value is not nil.
+func (_u *ShipmentUpdate) SetNillableFinanceReleaseNote(v *string) *ShipmentUpdate {
+	if v != nil {
+		_u.SetFinanceReleaseNote(*v)
+	}
+	return _u
+}
+
+// ClearFinanceReleaseNote clears the value of the "finance_release_note" field.
+func (_u *ShipmentUpdate) ClearFinanceReleaseNote() *ShipmentUpdate {
+	_u.mutation.ClearFinanceReleaseNote()
+	return _u
+}
+
 // SetIdempotencyKey sets the "idempotency_key" field.
 func (_u *ShipmentUpdate) SetIdempotencyKey(v string) *ShipmentUpdate {
 	_u.mutation.SetIdempotencyKey(v)
@@ -372,6 +528,36 @@ func (_u *ShipmentUpdate) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Shipment.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.FinanceReleaseStatus(); ok {
+		if err := shipment.FinanceReleaseStatusValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_status", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_status": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseVersion(); ok {
+		if err := shipment.FinanceReleaseVersionValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_version", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleasedBy(); ok {
+		if err := shipment.FinanceReleasedByValidator(v); err != nil {
+			return &ValidationError{Name: "finance_released_by", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_released_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseProcessInstanceID(); ok {
+		if err := shipment.FinanceReleaseProcessInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_process_instance_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_process_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseProcessNodeID(); ok {
+		if err := shipment.FinanceReleaseProcessNodeIDValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_process_node_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_process_node_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseNote(); ok {
+		if err := shipment.FinanceReleaseNoteValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_note", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_note": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.IdempotencyKey(); ok {
 		if err := shipment.IdempotencyKeyValidator(v); err != nil {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "Shipment.idempotency_key": %w`, err)}
@@ -408,6 +594,54 @@ func (_u *ShipmentUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FinanceReleaseStatus(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FinanceReleaseVersion(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleaseVersion(); ok {
+		_spec.AddField(shipment.FieldFinanceReleaseVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.FinanceReleasedAt(); ok {
+		_spec.SetField(shipment.FieldFinanceReleasedAt, field.TypeTime, value)
+	}
+	if _u.mutation.FinanceReleasedAtCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleasedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.FinanceReleasedBy(); ok {
+		_spec.SetField(shipment.FieldFinanceReleasedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleasedBy(); ok {
+		_spec.AddField(shipment.FieldFinanceReleasedBy, field.TypeInt, value)
+	}
+	if _u.mutation.FinanceReleasedByCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleasedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.FinanceReleaseProcessInstanceID(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseProcessInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleaseProcessInstanceID(); ok {
+		_spec.AddField(shipment.FieldFinanceReleaseProcessInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.FinanceReleaseProcessInstanceIDCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleaseProcessInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.FinanceReleaseProcessNodeID(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseProcessNodeID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleaseProcessNodeID(); ok {
+		_spec.AddField(shipment.FieldFinanceReleaseProcessNodeID, field.TypeInt, value)
+	}
+	if _u.mutation.FinanceReleaseProcessNodeIDCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleaseProcessNodeID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.FinanceReleaseNote(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseNote, field.TypeString, value)
+	}
+	if _u.mutation.FinanceReleaseNoteCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleaseNote, field.TypeString)
 	}
 	if value, ok := _u.mutation.IdempotencyKey(); ok {
 		_spec.SetField(shipment.FieldIdempotencyKey, field.TypeString, value)
@@ -653,6 +887,162 @@ func (_u *ShipmentUpdateOne) SetNillableStatus(v *string) *ShipmentUpdateOne {
 	if v != nil {
 		_u.SetStatus(*v)
 	}
+	return _u
+}
+
+// SetFinanceReleaseStatus sets the "finance_release_status" field.
+func (_u *ShipmentUpdateOne) SetFinanceReleaseStatus(v string) *ShipmentUpdateOne {
+	_u.mutation.SetFinanceReleaseStatus(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseStatus sets the "finance_release_status" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFinanceReleaseStatus(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFinanceReleaseStatus(*v)
+	}
+	return _u
+}
+
+// SetFinanceReleaseVersion sets the "finance_release_version" field.
+func (_u *ShipmentUpdateOne) SetFinanceReleaseVersion(v int) *ShipmentUpdateOne {
+	_u.mutation.ResetFinanceReleaseVersion()
+	_u.mutation.SetFinanceReleaseVersion(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseVersion sets the "finance_release_version" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFinanceReleaseVersion(v *int) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFinanceReleaseVersion(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleaseVersion adds value to the "finance_release_version" field.
+func (_u *ShipmentUpdateOne) AddFinanceReleaseVersion(v int) *ShipmentUpdateOne {
+	_u.mutation.AddFinanceReleaseVersion(v)
+	return _u
+}
+
+// SetFinanceReleasedAt sets the "finance_released_at" field.
+func (_u *ShipmentUpdateOne) SetFinanceReleasedAt(v time.Time) *ShipmentUpdateOne {
+	_u.mutation.SetFinanceReleasedAt(v)
+	return _u
+}
+
+// SetNillableFinanceReleasedAt sets the "finance_released_at" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFinanceReleasedAt(v *time.Time) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFinanceReleasedAt(*v)
+	}
+	return _u
+}
+
+// ClearFinanceReleasedAt clears the value of the "finance_released_at" field.
+func (_u *ShipmentUpdateOne) ClearFinanceReleasedAt() *ShipmentUpdateOne {
+	_u.mutation.ClearFinanceReleasedAt()
+	return _u
+}
+
+// SetFinanceReleasedBy sets the "finance_released_by" field.
+func (_u *ShipmentUpdateOne) SetFinanceReleasedBy(v int) *ShipmentUpdateOne {
+	_u.mutation.ResetFinanceReleasedBy()
+	_u.mutation.SetFinanceReleasedBy(v)
+	return _u
+}
+
+// SetNillableFinanceReleasedBy sets the "finance_released_by" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFinanceReleasedBy(v *int) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFinanceReleasedBy(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleasedBy adds value to the "finance_released_by" field.
+func (_u *ShipmentUpdateOne) AddFinanceReleasedBy(v int) *ShipmentUpdateOne {
+	_u.mutation.AddFinanceReleasedBy(v)
+	return _u
+}
+
+// ClearFinanceReleasedBy clears the value of the "finance_released_by" field.
+func (_u *ShipmentUpdateOne) ClearFinanceReleasedBy() *ShipmentUpdateOne {
+	_u.mutation.ClearFinanceReleasedBy()
+	return _u
+}
+
+// SetFinanceReleaseProcessInstanceID sets the "finance_release_process_instance_id" field.
+func (_u *ShipmentUpdateOne) SetFinanceReleaseProcessInstanceID(v int) *ShipmentUpdateOne {
+	_u.mutation.ResetFinanceReleaseProcessInstanceID()
+	_u.mutation.SetFinanceReleaseProcessInstanceID(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseProcessInstanceID sets the "finance_release_process_instance_id" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFinanceReleaseProcessInstanceID(v *int) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFinanceReleaseProcessInstanceID(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleaseProcessInstanceID adds value to the "finance_release_process_instance_id" field.
+func (_u *ShipmentUpdateOne) AddFinanceReleaseProcessInstanceID(v int) *ShipmentUpdateOne {
+	_u.mutation.AddFinanceReleaseProcessInstanceID(v)
+	return _u
+}
+
+// ClearFinanceReleaseProcessInstanceID clears the value of the "finance_release_process_instance_id" field.
+func (_u *ShipmentUpdateOne) ClearFinanceReleaseProcessInstanceID() *ShipmentUpdateOne {
+	_u.mutation.ClearFinanceReleaseProcessInstanceID()
+	return _u
+}
+
+// SetFinanceReleaseProcessNodeID sets the "finance_release_process_node_id" field.
+func (_u *ShipmentUpdateOne) SetFinanceReleaseProcessNodeID(v int) *ShipmentUpdateOne {
+	_u.mutation.ResetFinanceReleaseProcessNodeID()
+	_u.mutation.SetFinanceReleaseProcessNodeID(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseProcessNodeID sets the "finance_release_process_node_id" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFinanceReleaseProcessNodeID(v *int) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFinanceReleaseProcessNodeID(*v)
+	}
+	return _u
+}
+
+// AddFinanceReleaseProcessNodeID adds value to the "finance_release_process_node_id" field.
+func (_u *ShipmentUpdateOne) AddFinanceReleaseProcessNodeID(v int) *ShipmentUpdateOne {
+	_u.mutation.AddFinanceReleaseProcessNodeID(v)
+	return _u
+}
+
+// ClearFinanceReleaseProcessNodeID clears the value of the "finance_release_process_node_id" field.
+func (_u *ShipmentUpdateOne) ClearFinanceReleaseProcessNodeID() *ShipmentUpdateOne {
+	_u.mutation.ClearFinanceReleaseProcessNodeID()
+	return _u
+}
+
+// SetFinanceReleaseNote sets the "finance_release_note" field.
+func (_u *ShipmentUpdateOne) SetFinanceReleaseNote(v string) *ShipmentUpdateOne {
+	_u.mutation.SetFinanceReleaseNote(v)
+	return _u
+}
+
+// SetNillableFinanceReleaseNote sets the "finance_release_note" field if the given value is not nil.
+func (_u *ShipmentUpdateOne) SetNillableFinanceReleaseNote(v *string) *ShipmentUpdateOne {
+	if v != nil {
+		_u.SetFinanceReleaseNote(*v)
+	}
+	return _u
+}
+
+// ClearFinanceReleaseNote clears the value of the "finance_release_note" field.
+func (_u *ShipmentUpdateOne) ClearFinanceReleaseNote() *ShipmentUpdateOne {
+	_u.mutation.ClearFinanceReleaseNote()
 	return _u
 }
 
@@ -921,6 +1311,36 @@ func (_u *ShipmentUpdateOne) check() error {
 			return &ValidationError{Name: "status", err: fmt.Errorf(`ent: validator failed for field "Shipment.status": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.FinanceReleaseStatus(); ok {
+		if err := shipment.FinanceReleaseStatusValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_status", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_status": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseVersion(); ok {
+		if err := shipment.FinanceReleaseVersionValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_version", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_version": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleasedBy(); ok {
+		if err := shipment.FinanceReleasedByValidator(v); err != nil {
+			return &ValidationError{Name: "finance_released_by", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_released_by": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseProcessInstanceID(); ok {
+		if err := shipment.FinanceReleaseProcessInstanceIDValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_process_instance_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_process_instance_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseProcessNodeID(); ok {
+		if err := shipment.FinanceReleaseProcessNodeIDValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_process_node_id", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_process_node_id": %w`, err)}
+		}
+	}
+	if v, ok := _u.mutation.FinanceReleaseNote(); ok {
+		if err := shipment.FinanceReleaseNoteValidator(v); err != nil {
+			return &ValidationError{Name: "finance_release_note", err: fmt.Errorf(`ent: validator failed for field "Shipment.finance_release_note": %w`, err)}
+		}
+	}
 	if v, ok := _u.mutation.IdempotencyKey(); ok {
 		if err := shipment.IdempotencyKeyValidator(v); err != nil {
 			return &ValidationError{Name: "idempotency_key", err: fmt.Errorf(`ent: validator failed for field "Shipment.idempotency_key": %w`, err)}
@@ -974,6 +1394,54 @@ func (_u *ShipmentUpdateOne) sqlSave(ctx context.Context) (_node *Shipment, err 
 	}
 	if value, ok := _u.mutation.Status(); ok {
 		_spec.SetField(shipment.FieldStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FinanceReleaseStatus(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseStatus, field.TypeString, value)
+	}
+	if value, ok := _u.mutation.FinanceReleaseVersion(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleaseVersion(); ok {
+		_spec.AddField(shipment.FieldFinanceReleaseVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.FinanceReleasedAt(); ok {
+		_spec.SetField(shipment.FieldFinanceReleasedAt, field.TypeTime, value)
+	}
+	if _u.mutation.FinanceReleasedAtCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleasedAt, field.TypeTime)
+	}
+	if value, ok := _u.mutation.FinanceReleasedBy(); ok {
+		_spec.SetField(shipment.FieldFinanceReleasedBy, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleasedBy(); ok {
+		_spec.AddField(shipment.FieldFinanceReleasedBy, field.TypeInt, value)
+	}
+	if _u.mutation.FinanceReleasedByCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleasedBy, field.TypeInt)
+	}
+	if value, ok := _u.mutation.FinanceReleaseProcessInstanceID(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseProcessInstanceID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleaseProcessInstanceID(); ok {
+		_spec.AddField(shipment.FieldFinanceReleaseProcessInstanceID, field.TypeInt, value)
+	}
+	if _u.mutation.FinanceReleaseProcessInstanceIDCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleaseProcessInstanceID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.FinanceReleaseProcessNodeID(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseProcessNodeID, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.AddedFinanceReleaseProcessNodeID(); ok {
+		_spec.AddField(shipment.FieldFinanceReleaseProcessNodeID, field.TypeInt, value)
+	}
+	if _u.mutation.FinanceReleaseProcessNodeIDCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleaseProcessNodeID, field.TypeInt)
+	}
+	if value, ok := _u.mutation.FinanceReleaseNote(); ok {
+		_spec.SetField(shipment.FieldFinanceReleaseNote, field.TypeString, value)
+	}
+	if _u.mutation.FinanceReleaseNoteCleared() {
+		_spec.ClearField(shipment.FieldFinanceReleaseNote, field.TypeString)
 	}
 	if value, ok := _u.mutation.IdempotencyKey(); ok {
 		_spec.SetField(shipment.FieldIdempotencyKey, field.TypeString, value)

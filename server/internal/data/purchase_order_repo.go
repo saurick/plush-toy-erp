@@ -231,6 +231,59 @@ func (r *purchaseOrderRepo) UpdatePurchaseOrderLifecycle(ctx context.Context, id
 	return entPurchaseOrderToBiz(row), nil
 }
 
+func (r *purchaseOrderRepo) ApprovePurchaseOrderForProcessCommand(
+	ctx context.Context,
+	purchaseOrderID int,
+	command *biz.ProcessDomainCommandInput,
+	result *biz.ProcessDomainCommandResult,
+	actorID int,
+) (*biz.PurchaseOrder, error) {
+	if r == nil || r.data == nil || r.data.postgres == nil || purchaseOrderID <= 0 || command == nil || result == nil || actorID <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	record, err := biz.BuildProcessNodeDomainCommandResultRecord(command, result)
+	if err != nil {
+		return nil, err
+	}
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer rollbackEntTx(ctx, tx, r.log)
+	query := tx.PurchaseOrder.Query().Where(purchaseorder.ID(purchaseOrderID))
+	if r.data.sqlDialect == dialect.Postgres {
+		query = query.Where(func(selector *sql.Selector) { selector.ForUpdate() })
+	}
+	current, err := query.Only(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderNotFound
+		}
+		return nil, err
+	}
+	if current.LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
+		return nil, biz.ErrBadParam
+	}
+	row, err := tx.PurchaseOrder.UpdateOneID(purchaseOrderID).
+		Where(purchaseorder.Version(current.Version), purchaseorder.LifecycleStatus(biz.PurchaseOrderStatusSubmitted)).
+		SetLifecycleStatus(biz.PurchaseOrderStatusApproved).
+		SetVersion(current.Version + 1).
+		Save(ctx)
+	if err != nil {
+		if ent.IsNotFound(err) {
+			return nil, biz.ErrPurchaseOrderConflict
+		}
+		return nil, err
+	}
+	if _, err := recordProcessNodeDomainCommandResultWithClient(ctx, tx.Client(), record, actorID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return entPurchaseOrderToBiz(row), nil
+}
+
 func (r *purchaseOrderRepo) settlePurchaseOrderLifecycle(ctx context.Context, id int, lifecycleStatus string) (*biz.PurchaseOrder, error) {
 	allowedCurrent := purchaseOrderLifecyclePredecessors(lifecycleStatus)
 	if len(allowedCurrent) == 0 {

@@ -125,7 +125,6 @@ type workflowTaskTransitionHandler struct {
 }
 
 var workflowTaskTransitionHandlers = []workflowTaskTransitionHandler{
-	{Key: "boss_order_approval", Match: isBossOrderApprovalTask, Apply: (*WorkflowUsecase).applyBossApprovalTransition},
 	{Key: "purchase_iqc", Match: isPurchaseIQCTask, Apply: (*WorkflowUsecase).applyPurchaseIQCTransition},
 	{Key: "purchase_warehouse_inbound", Match: isPurchaseWarehouseInboundTask, Apply: (*WorkflowUsecase).applyPurchaseWarehouseInboundTransition},
 	{Key: "outsource_return_tracking", Match: isOutsourceReturnTrackingTask, Apply: (*WorkflowUsecase).applyOutsourceReturnTrackingTransition},
@@ -172,29 +171,6 @@ func selectWorkflowTaskTransitionHandlerFrom(handlers []workflowTaskTransitionHa
 	return matched, nil
 }
 
-func (uc *WorkflowUsecase) applyBossApprovalTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {
-	switch in.TaskStatusKey {
-	case "done":
-		in.BusinessStatusKey = workflowOrderApprovedStatusKey
-		in.SideEffects = buildBossApprovalDoneSideEffects(current)
-	case "blocked", "rejected":
-		reason := workflowTransitionReason(in, in.TaskStatusKey)
-		if reason == "" {
-			return ErrBadParam
-		}
-		in.Reason = reason
-		if in.TaskStatusKey == "blocked" {
-			in.BusinessStatusKey = "blocked"
-		} else {
-			in.BusinessStatusKey = workflowOrderApprovalStatusKey
-		}
-		in.SideEffects = buildBossApprovalRevisionSideEffects(current, in.TaskStatusKey, reason)
-	default:
-		return nil
-	}
-	return nil
-}
-
 func setWorkflowTransitionReasonPayload(payload map[string]any, taskStatusKey string, reason string) {
 	if payload == nil {
 		return
@@ -215,61 +191,6 @@ func clearWorkflowTransitionReasonPayload(payload map[string]any) {
 	}
 	delete(payload, "blocked_reason")
 	delete(payload, "rejected_reason")
-}
-
-func buildBossApprovalDoneSideEffects(current *WorkflowTask) *WorkflowTaskStatusSideEffects {
-	ownerRoleKey := "engineering"
-	return &WorkflowTaskStatusSideEffects{
-		BusinessState: &WorkflowBusinessStateUpsert{
-			SourceType:        workflowProjectOrderModuleKey,
-			SourceID:          current.SourceID,
-			SourceNo:          workflowTaskSourceNo(current),
-			BusinessStatusKey: workflowOrderApprovedStatusKey,
-			OwnerRoleKey:      &ownerRoleKey,
-			Payload: map[string]any{
-				"record_title":     workflowOrderRecordTitle(current),
-				"approval_task_id": current.ID,
-				"approval_result":  "approved",
-				"critical_path":    true,
-			},
-		},
-		DerivedTask:       buildEngineeringTaskFromApprovedOrder(current),
-		DerivedFromTaskID: current.ID,
-		WorkflowRuleKey:   "boss_approval_done_to_engineering_data",
-	}
-}
-
-func buildBossApprovalRevisionSideEffects(current *WorkflowTask, taskStatusKey string, reason string) *WorkflowTaskStatusSideEffects {
-	ownerRoleKey := BusinessRoleKey
-	businessStatusKey := workflowOrderApprovalStatusKey
-	workflowRuleKey := "boss_approval_rejected_to_order_revision"
-	if taskStatusKey == "blocked" {
-		businessStatusKey = "blocked"
-		workflowRuleKey = "boss_approval_blocked_to_order_revision"
-	}
-	statePayload := map[string]any{
-		"record_title":      workflowOrderRecordTitle(current),
-		"approval_task_id":  current.ID,
-		"approval_result":   "rejected",
-		"decision":          taskStatusKey,
-		"transition_status": taskStatusKey,
-		"critical_path":     true,
-	}
-	setWorkflowTransitionReasonPayload(statePayload, taskStatusKey, reason)
-	return &WorkflowTaskStatusSideEffects{
-		BusinessState: &WorkflowBusinessStateUpsert{
-			SourceType:        workflowProjectOrderModuleKey,
-			SourceID:          current.SourceID,
-			SourceNo:          workflowTaskSourceNo(current),
-			BusinessStatusKey: businessStatusKey,
-			OwnerRoleKey:      &ownerRoleKey,
-			BlockedReason:     &reason,
-			Payload:           statePayload,
-		},
-		DerivedTask:       buildRevisionTaskFromRejectedOrder(current, taskStatusKey, reason),
-		DerivedFromTaskID: current.ID,
-		WorkflowRuleKey:   workflowRuleKey,
-	}
 }
 
 func (uc *WorkflowUsecase) applyPurchaseIQCTransition(current *WorkflowTask, in *WorkflowTaskStatusUpdate) error {

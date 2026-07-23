@@ -62,7 +62,8 @@ func (h *shipmentFinanceReleaseProcessCommandHandler) ValidateProcessDomainComma
 	if err != nil {
 		return err
 	}
-	if shipment == nil || shipment.ID != shipmentID || shipment.Status != ShipmentStatusDraft {
+	if shipment == nil || shipment.ID != shipmentID || shipment.Status != ShipmentStatusDraft ||
+		(shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusPending && shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusApproved) {
 		return ErrBadParam
 	}
 	return nil
@@ -75,14 +76,16 @@ func (h *shipmentFinanceReleaseProcessCommandHandler) ExecuteProcessDomainComman
 	shipmentID, _ := shipmentIDFromProcessCommandPayload(in.Payload)
 	result := &ProcessDomainCommandResult{
 		Outcome:     ShipmentProcessCommandOutcomeFinanceReleased,
-		EffectState: ProcessDomainCommandEffectStateNone,
+		EffectState: ProcessDomainCommandEffectStateApplied,
+		EffectRef:   &ProcessBusinessRef{RefType: shipmentProcessCommandBusinessRefType, RefID: shipmentID},
 	}
 	if repo, ok := h.uc.repo.(ShipmentProcessCommandRepo); ok {
 		if _, err := repo.RecordShipmentFinanceReleaseProcessCommand(ctx, shipmentID, in, result, actorID); err != nil {
 			return nil, err
 		}
+		return result, nil
 	}
-	return result, nil
+	return nil, ErrProcessDomainCommandHandlerNotFound
 }
 
 func (h *shipmentShipProcessCommandHandler) ValidateProcessDomainCommand(ctx context.Context, in *ProcessDomainCommandInput, actorID int) error {
@@ -110,8 +113,8 @@ func (h *shipmentShipProcessCommandHandler) ValidateProcessDomainCommand(ctx con
 		return ErrBadParam
 	}
 	if shipment.Status == ShipmentStatusDraft {
-		if err := h.uc.ValidateShipmentReleaseForShipping(ctx, shipmentID); err != nil {
-			return err
+		if shipment.FinanceReleaseStatus != ShipmentFinanceReleaseStatusApproved {
+			return ErrShipmentFinanceReleaseRequired
 		}
 	}
 	return nil

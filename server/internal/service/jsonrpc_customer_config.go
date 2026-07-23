@@ -598,48 +598,6 @@ func (d *jsonrpcDispatcher) handleCustomerConfig(
 			}),
 		}, nil
 
-	case "execute_finished_goods_delivery_finance_release":
-		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
-			return id, res, nil
-		}
-		admin, res := d.CurrentAdmin(ctx)
-		if res != nil {
-			return id, res, nil
-		}
-		in, ok := finishedGoodsDeliveryFinanceReleaseExecutionFromParams(pm)
-		if !ok {
-			return id, &v1.JsonrpcResult{Code: errcode.InvalidParam.Code, Message: errcode.InvalidParam.Message}, nil
-		}
-		runtimeRevision, res := d.requireCustomerConfigProcessDomainCommandAllowed(ctx, getString(pm, "customer_key"), in, admin)
-		if res != nil {
-			return id, res, nil
-		}
-		completedNode, err := d.processRuntimeUC.ExecuteDomainCommandNode(ctx, in, admin.ID)
-		if err != nil {
-			return id, d.mapCustomerConfigError(ctx, err), nil
-		}
-		nodes, err := d.processRuntimeUC.ListProcessNodeInstances(ctx, in.ProcessInstanceID)
-		if err != nil {
-			return id, d.mapCustomerConfigError(ctx, err), nil
-		}
-		return id, &v1.JsonrpcResult{
-			Code:    errcode.OK.Code,
-			Message: errcode.OK.Message,
-			Data: newDataStruct(map[string]any{
-				"completed_node": processNodeInstanceToMap(completedNode),
-				"nodes":          processNodeInstancesToMaps(nodes),
-				"runtime_boundary": customerConfigProcessRuntimeBoundary(runtimeRevision, map[string]any{
-					"process_key":                       biz.ProcessKeyFinishedGoodsDelivery,
-					"command_key":                       biz.ProcessDomainCommandShipmentFinanceRelease,
-					"executes_domain_command":           true,
-					"writes_finance_fact":               false,
-					"writes_shipment_or_inventory_fact": false,
-					"workflow_task_done_posts_fact":     false,
-					"scope":                             "shipment_finance_release_domain_command",
-				}),
-			}),
-		}, nil
-
 	case "execute_finished_goods_delivery_shipment_ship":
 		if res := d.requireSourceActionRBACReadPermissions(ctx, "customer_config", method); res != nil {
 			return id, res, nil
@@ -1102,7 +1060,7 @@ func (d *jsonrpcDispatcher) purchaseOrderProcessSourceRefNo(ctx context.Context,
 	if err != nil {
 		return nil, err
 	}
-	if order == nil || order.ID != purchaseOrderID || order.LifecycleStatus != biz.PurchaseOrderStatusApproved {
+	if order == nil || order.ID != purchaseOrderID || order.LifecycleStatus != biz.PurchaseOrderStatusSubmitted {
 		return nil, biz.ErrBadParam
 	}
 	return requiredProcessSourceRefNo(order.PurchaseOrderNo)

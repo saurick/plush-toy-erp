@@ -302,8 +302,6 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 		want   string
 	}{
 		{method: "submit_purchase_order", want: biz.PurchaseOrderStatusSubmitted},
-		{method: "approve_purchase_order", want: biz.PurchaseOrderStatusApproved},
-		{method: "close_purchase_order", want: biz.PurchaseOrderStatusClosed},
 	} {
 		_, lifecycleRes, err := j.handlePurchaseOrder(ctx, tc.method, tc.method, mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
 		if err != nil {
@@ -316,6 +314,10 @@ func TestJsonrpcDispatcher_PurchaseOrderAPISavesListsAndTransitions(t *testing.T
 		if got != tc.want {
 			t.Fatalf("%s expected status %s, got %#v", tc.method, tc.want, got)
 		}
+	}
+	_, removedApproveRes, err := j.handlePurchaseOrder(ctx, "approve_purchase_order", "approve-removed", mustJSONRPCStruct(t, map[string]any{"id": float64(orderID)}))
+	if err != nil || removedApproveRes == nil || removedApproveRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("direct purchase approval must stay removed, res=%#v err=%v", removedApproveRes, err)
 	}
 }
 
@@ -370,8 +372,8 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions(t *testing.
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if approveRes == nil || approveRes.Code != errcode.PermissionDenied.Code {
-		t.Fatalf("expected approve permission denied, got %#v", approveRes)
+	if approveRes == nil || approveRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("direct approval endpoint must be absent regardless of permission, got %#v", approveRes)
 	}
 
 	j.adminReader = stubAdminAccountReader{admin: workflowJSONRPCAdmin([]string{biz.BossRoleKey}, biz.PermissionPurchaseOrderApprove)}
@@ -379,8 +381,8 @@ func TestJsonrpcDispatcher_PurchaseOrderAPIRequiresDomainPermissions(t *testing.
 	if err != nil {
 		t.Fatalf("expected nil err, got %v", err)
 	}
-	if approveRes == nil || approveRes.Code != errcode.InvalidParam.Code {
-		t.Fatalf("expected approve usecase to run after permission, got %#v", approveRes)
+	if approveRes == nil || approveRes.Code != errcode.UnknownMethod.Code {
+		t.Fatalf("workflow approval must not reopen the direct approval endpoint, got %#v", approveRes)
 	}
 }
 
