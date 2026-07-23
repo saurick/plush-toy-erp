@@ -20,8 +20,10 @@ import (
 type memAdminManageRepoForData struct {
 	admins                    map[int]*biz.AdminUser
 	rolePerms                 map[string][]string
+	roleNavigation            map[string]biz.RoleNavigationSettings
 	roleVersions              map[string]int
 	lastRolePermissionsChange *biz.RolePermissionsChange
+	lastRoleNavigationChange  *biz.RoleNavigationChange
 	auditLogs                 []biz.RuntimeAuditEvent
 	lastAuditFilter           biz.RuntimeAuditEventListFilter
 	lifecycleErr              error
@@ -31,10 +33,11 @@ var _ biz.AdminManageRepo = (*memAdminManageRepoForData)(nil)
 
 func newMemAdminManageRepoForData() *memAdminManageRepoForData {
 	return &memAdminManageRepoForData{
-		admins:       map[int]*biz.AdminUser{},
-		rolePerms:    map[string][]string{},
-		roleVersions: map[string]int{},
-		auditLogs:    []biz.RuntimeAuditEvent{},
+		admins:         map[int]*biz.AdminUser{},
+		rolePerms:      map[string][]string{},
+		roleNavigation: map[string]biz.RoleNavigationSettings{},
+		roleVersions:   map[string]int{},
+		auditLogs:      []biz.RuntimeAuditEvent{},
 	}
 }
 
@@ -57,20 +60,29 @@ func (r *memAdminManageRepoForData) roleByKey(roleKey string) biz.AdminRole {
 			if permissions == nil {
 				permissions = role.Permissions
 			}
+			navigation := biz.RoleNavigationSettings{
+				Mode:             biz.RoleNavigationModeRecommended,
+				PrimaryMenuPaths: []string{},
+			}
+			if configured, ok := r.roleNavigation[role.Key]; ok {
+				navigation = configured
+			}
 			version := r.roleVersions[role.Key]
 			if version <= 0 {
 				version = role.Version
 			}
 			return biz.AdminRole{
-				Key:         role.Key,
-				Name:        role.Name,
-				Description: role.Description,
-				Builtin:     role.Builtin,
-				Disabled:    role.Disabled,
-				SortOrder:   role.SortOrder,
-				Type:        role.Type,
-				Version:     version,
-				Permissions: biz.NormalizePermissionKeys(permissions),
+				Key:              role.Key,
+				Name:             role.Name,
+				Description:      role.Description,
+				Builtin:          role.Builtin,
+				Disabled:         role.Disabled,
+				SortOrder:        role.SortOrder,
+				Type:             role.Type,
+				Version:          version,
+				NavigationMode:   navigation.Mode,
+				PrimaryMenuPaths: navigation.PrimaryMenuPaths,
+				Permissions:      biz.NormalizePermissionKeys(permissions),
 			}
 		}
 	}
@@ -255,6 +267,36 @@ func (r *memAdminManageRepoForData) SetRolePermissionsWithAudit(ctx context.Cont
 	if err := r.UpdateRolePermissions(ctx, change.RoleKey, change.PermissionKeys); err != nil {
 		return nil, err
 	}
+	r.roleVersions[role.Key] = role.Version + 1
+	updated := r.roleByKey(role.Key)
+	return &updated, nil
+}
+
+func (r *memAdminManageRepoForData) SetRoleNavigationWithAudit(
+	_ context.Context,
+	change *biz.RoleNavigationChange,
+) (*biz.AdminRole, error) {
+	if change == nil || change.ExpectedVersion <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	role := r.roleByKey(change.RoleKey)
+	if role.Key == "" {
+		return nil, biz.ErrRoleNotFound
+	}
+	if role.Version != change.ExpectedVersion {
+		return nil, biz.ErrRoleVersionConflict
+	}
+	settings, err := biz.NormalizeRoleNavigationSettings(
+		change.Mode,
+		change.PrimaryMenuPaths,
+	)
+	if err != nil {
+		return nil, err
+	}
+	cloned := *change
+	cloned.PrimaryMenuPaths = append([]string(nil), change.PrimaryMenuPaths...)
+	r.lastRoleNavigationChange = &cloned
+	r.roleNavigation[role.Key] = settings
 	r.roleVersions[role.Key] = role.Version + 1
 	updated := r.roleByKey(role.Key)
 	return &updated, nil
@@ -810,6 +852,59 @@ func TestJsonrpcDispatcher_AdminSetRolePermissionsRequiresDedicatedPermissionAnd
 	}
 }
 
+func TestJsonrpcDispatcher_AdminSetRoleNavigationUsesRoleManagePermissionAndVersion(t *testing.T) {
+	repo := newMemAdminManageRepoForData()
+	now := time.Now()
+	repo.admins[1] = &biz.AdminUser{
+		ID:        1,
+		Username:  "operator",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+	logger := log.NewStdLogger(io.Discard)
+	dispatcher := &jsonrpcDispatcher{
+		log:           log.NewHelper(log.With(logger, "module", "service.jsonrpc.test")),
+		adminReader:   repo,
+		adminManageUC: biz.NewAdminManageUsecase(repo, logger, tracesdk.NewTracerProvider()),
+	}
+	ctx := biz.NewContextWithClaims(
+		context.Background(),
+		&biz.AuthClaims{UserID: 1, Username: "operator", Role: biz.RoleAdmin},
+	)
+	params, _ := structpb.NewStruct(map[string]any{
+		"role_key": biz.FinanceRoleKey,
+		"mode":     string(biz.RoleNavigationModeCustom),
+		"primary_menu_paths": []any{
+			"/erp/finance/payables",
+			"/erp/finance/receivables",
+			"/erp/finance/invoices",
+			"/erp/finance/reconciliation",
+		},
+		"expected_version": float64(1),
+	})
+
+	_, denied, err := dispatcher.handleAdmin(ctx, "set_role_navigation", "1", params)
+	if err != nil || denied.Code != errcode.PermissionDenied.Code || repo.lastRoleNavigationChange != nil {
+		t.Fatalf("set role navigation without permission = %#v err=%v change=%#v", denied, err, repo.lastRoleNavigationChange)
+	}
+	repo.admins[1].Permissions = []string{biz.PermissionSystemRolePermissionManage}
+	_, allowed, err := dispatcher.handleAdmin(ctx, "set_role_navigation", "2", params)
+	if err != nil || allowed.Code != errcode.OK.Code || repo.lastRoleNavigationChange == nil {
+		t.Fatalf("set role navigation = %#v err=%v change=%#v", allowed, err, repo.lastRoleNavigationChange)
+	}
+	role := allowed.Data.AsMap()["role"].(map[string]any)
+	if role["version"] != float64(2) ||
+		role["navigation_mode"] != string(biz.RoleNavigationModeCustom) ||
+		len(role["primary_menu_paths"].([]any)) != 4 {
+		t.Fatalf("updated role navigation metadata = %#v", role)
+	}
+
+	_, conflict, err := dispatcher.handleAdmin(ctx, "set_role_navigation", "3", params)
+	if err != nil || conflict.Code != errcode.ResourceVersionConflict.Code {
+		t.Fatalf("stale role navigation version = %#v err=%v", conflict, err)
+	}
+}
+
 func TestJsonrpcDispatcher_AdminRBACOptionsExposeRoleAndPermissionMetadata(t *testing.T) {
 	repo := newMemAdminManageRepoForData()
 	now := time.Now()
@@ -840,7 +935,12 @@ func TestJsonrpcDispatcher_AdminRBACOptionsExposeRoleAndPermissionMetadata(t *te
 	}
 	roles := data["role_options"].([]any)
 	sales := find(roles, "role_key", biz.SalesRoleKey)
-	if sales["role_type"] != string(biz.RoleTypeBusinessDefault) || sales["version"] != float64(1) || sales["permissions_editable_by_current_admin"] != true || sales["assignable_by_current_admin"] != true {
+	if sales["role_type"] != string(biz.RoleTypeBusinessDefault) ||
+		sales["version"] != float64(1) ||
+		sales["navigation_mode"] != string(biz.RoleNavigationModeRecommended) ||
+		len(sales["primary_menu_paths"].([]any)) != 0 ||
+		sales["permissions_editable_by_current_admin"] != true ||
+		sales["assignable_by_current_admin"] != true {
 		t.Fatalf("sales role metadata = %#v", sales)
 	}
 	admin := find(roles, "role_key", biz.AdminRoleKey)
@@ -1101,6 +1201,7 @@ func TestJsonrpcDispatcher_AdminMutationsRejectUnknownParams(t *testing.T) {
 		{method: "create", params: map[string]any{"username": "worker", "password": "123456", "actor_id": 9}},
 		{method: "set_roles", params: map[string]any{"id": 2, "role_keys": []any{"sales"}, "permissions": []any{"system.audit.read"}}},
 		{method: "set_role_permissions", params: map[string]any{"role_key": "sales", "permission_keys": []any{}, "expected_version": 1, "customer_key": "other"}},
+		{method: "set_role_navigation", params: map[string]any{"role_key": "sales", "mode": "recommended", "primary_menu_paths": []any{}, "expected_version": 1, "customer_key": "other"}},
 		{method: "set_disabled", params: map[string]any{"id": 2, "disabled": true, "reason": "离岗", "revoked_at": now.Format(time.RFC3339)}},
 		{method: "revoke", params: map[string]any{"id": 2, "reason": "离职", "released_task_count": 999}},
 		{method: "reset_password", params: map[string]any{"id": 2, "password": "123456", "auth_version": 999}},

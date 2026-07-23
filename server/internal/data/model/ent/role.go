@@ -3,6 +3,7 @@
 package ent
 
 import (
+	"encoding/json"
 	"fmt"
 	"server/internal/data/model/ent/role"
 	"strings"
@@ -33,6 +34,10 @@ type Role struct {
 	SortOrder int `json:"sort_order,omitempty"`
 	// Version holds the value of the "version" field.
 	Version int `json:"version,omitempty"`
+	// NavigationMode holds the value of the "navigation_mode" field.
+	NavigationMode role.NavigationMode `json:"navigation_mode,omitempty"`
+	// PrimaryMenuPaths holds the value of the "primary_menu_paths" field.
+	PrimaryMenuPaths []string `json:"primary_menu_paths,omitempty"`
 	// CreatedAt holds the value of the "created_at" field.
 	CreatedAt time.Time `json:"created_at,omitempty"`
 	// UpdatedAt holds the value of the "updated_at" field.
@@ -66,11 +71,13 @@ func (*Role) scanValues(columns []string) ([]any, error) {
 	values := make([]any, len(columns))
 	for i := range columns {
 		switch columns[i] {
+		case role.FieldPrimaryMenuPaths:
+			values[i] = new([]byte)
 		case role.FieldBuiltin, role.FieldDisabled:
 			values[i] = new(sql.NullBool)
 		case role.FieldID, role.FieldSortOrder, role.FieldVersion:
 			values[i] = new(sql.NullInt64)
-		case role.FieldRoleKey, role.FieldName, role.FieldDescription, role.FieldRoleType:
+		case role.FieldRoleKey, role.FieldName, role.FieldDescription, role.FieldRoleType, role.FieldNavigationMode:
 			values[i] = new(sql.NullString)
 		case role.FieldCreatedAt, role.FieldUpdatedAt:
 			values[i] = new(sql.NullTime)
@@ -142,6 +149,20 @@ func (_m *Role) assignValues(columns []string, values []any) error {
 				return fmt.Errorf("unexpected type %T for field version", values[i])
 			} else if value.Valid {
 				_m.Version = int(value.Int64)
+			}
+		case role.FieldNavigationMode:
+			if value, ok := values[i].(*sql.NullString); !ok {
+				return fmt.Errorf("unexpected type %T for field navigation_mode", values[i])
+			} else if value.Valid {
+				_m.NavigationMode = role.NavigationMode(value.String)
+			}
+		case role.FieldPrimaryMenuPaths:
+			if value, ok := values[i].(*[]byte); !ok {
+				return fmt.Errorf("unexpected type %T for field primary_menu_paths", values[i])
+			} else if value != nil && len(*value) > 0 {
+				if err := json.Unmarshal(*value, &_m.PrimaryMenuPaths); err != nil {
+					return fmt.Errorf("unmarshal field primary_menu_paths: %w", err)
+				}
 			}
 		case role.FieldCreatedAt:
 			if value, ok := values[i].(*sql.NullTime); !ok {
@@ -219,6 +240,12 @@ func (_m *Role) String() string {
 	builder.WriteString(", ")
 	builder.WriteString("version=")
 	builder.WriteString(fmt.Sprintf("%v", _m.Version))
+	builder.WriteString(", ")
+	builder.WriteString("navigation_mode=")
+	builder.WriteString(fmt.Sprintf("%v", _m.NavigationMode))
+	builder.WriteString(", ")
+	builder.WriteString("primary_menu_paths=")
+	builder.WriteString(fmt.Sprintf("%v", _m.PrimaryMenuPaths))
 	builder.WriteString(", ")
 	builder.WriteString("created_at=")
 	builder.WriteString(_m.CreatedAt.Format(time.ANSIC))

@@ -332,7 +332,7 @@ STYLE_L1_SCENARIOS=business-menu-groups-desktop pnpm style:l1
 当前规则：
 
 - 不再维护 `web/src/erp/docs/*.md`、`web/src/erp/config/docs.mjs` 或 `docRegistry`。
-- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。客户配置可用 `desktopMenu.presentation = 'role_guided'` 依次显示“看板中心”、“常用工作”和“更多功能”：看板仅按最终页面权限固定在最前，常用工作最多放 3 个岗位高频业务，“岗位使用帮助”和其余已授权低频页面折叠到更多功能。权限管理继续只配置页面和操作权限，“页面与导航”用同一 helper 预览已保存的自动排列结果；菜单位置不改变页面、操作权限或直接路由。
+- 桌面侧栏在权限过滤后附加 `使用帮助 / 岗位使用帮助`；该入口属于登录态壳层能力，不恢复 `erp.help_center.read` 或其他旧权限别名。客户配置可用 `desktopMenu.presentation = 'role_guided'` 依次显示“看板中心”、“常用工作”和“更多功能”：看板仅按最终页面权限固定在最前，岗位帮助固定折叠到更多功能；系统推荐通常选择 3 个岗位高频业务，财务推荐应付、应收、发票、对账 4 个。权限管理的“页面与导航”可为业务岗位选择系统推荐，或从最终可进入页面中自定义并排序 1–5 个常用入口；角色保存的 `navigation_mode / primary_menu_paths` 只控制位置，不改变页面权限、操作权限、客户投影或直接路由。
 - `/erp/help-center` 根据当前有效岗位选择 `src/erp/config/roleHelpContent.mjs` 中的内容，多岗位账号可切换，单岗位账号不显示切换器，常用入口继续与当前可见菜单取交集。每岗帮助统一展示正常案例、完成标准、异常处理、退回对象和操作注意事项；未知岗位使用安全通用帮助。
 - 旧 `/erp/docs/*`、`/erp/qa/*`、`/erp/source-readiness` 和 `/erp/mobile-workbenches` 路径不再注册运行时路由、重定向或权限别名。
 - 仓库级 `docs/product/*`、`docs/architecture/*`、`docs/archive/*` 仍是正式文档体系，但不镜像到前端运行时。

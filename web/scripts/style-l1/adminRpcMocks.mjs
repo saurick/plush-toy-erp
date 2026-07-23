@@ -236,6 +236,8 @@ export async function installAdminRpcMocks(
     permissions_editable_by_current_admin: true,
     disabled: false,
     sort_order: 20,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
     permissions: [
       'erp.workbench.read',
       'field.party_private.read',
@@ -258,6 +260,8 @@ export async function installAdminRpcMocks(
     permissions_editable_by_current_admin: false,
     disabled: false,
     sort_order: 80,
+    navigation_mode: 'recommended',
+    primary_menu_paths: [],
     permissions: allPermissionKeys.filter((key) => key.startsWith('system.')),
   }
   const defaultAdminProfile = {

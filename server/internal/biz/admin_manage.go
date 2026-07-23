@@ -115,6 +115,7 @@ type AdminManageRepo interface {
 	ListPermissions(ctx context.Context) ([]AdminPermission, error)
 	GetRoleByKey(ctx context.Context, roleKey string) (*AdminRole, error)
 	SetRolePermissionsWithAudit(ctx context.Context, change *RolePermissionsChange) (*AdminRole, error)
+	SetRoleNavigationWithAudit(ctx context.Context, change *RoleNavigationChange) (*AdminRole, error)
 	UpdateAdminERPColumnOrder(ctx context.Context, id int, moduleKey string, order []string) error
 	SetAdminPhoneWithAudit(ctx context.Context, change *AdminPhoneChange) (*AdminUser, error)
 	ChangeAdminLifecycle(ctx context.Context, change *AdminLifecycleChange) (updated *AdminUser, releasedTaskCount int, err error)
@@ -320,13 +321,15 @@ func AdminAuditRoleSnapshot(role *AdminRole) map[string]any {
 		return nil
 	}
 	return map[string]any{
-		"role_key":        role.Key,
-		"name":            role.Name,
-		"role_type":       role.Type,
-		"version":         role.Version,
-		"disabled":        role.Disabled,
-		"permission_keys": NormalizePermissionKeys(role.Permissions),
-		"data_scopes":     role.DataScopes,
+		"role_key":           role.Key,
+		"name":               role.Name,
+		"role_type":          role.Type,
+		"version":            role.Version,
+		"disabled":           role.Disabled,
+		"navigation_mode":    role.NavigationMode,
+		"primary_menu_paths": append([]string(nil), role.PrimaryMenuPaths...),
+		"permission_keys":    NormalizePermissionKeys(role.Permissions),
+		"data_scopes":        role.DataScopes,
 	}
 }
 
@@ -505,6 +508,8 @@ func runtimeAuditActionLabelAndRisk(eventKey string) (string, string) {
 		return "密码重置", "high"
 	case "role.permissions.set":
 		return "角色权限变更", "high"
+	case "role.navigation.set":
+		return "岗位菜单布局变更", "warning"
 	case "customer_config.publish":
 		return "客户配置发布", "high"
 	case "customer_config.activate":
@@ -549,6 +554,8 @@ func runtimeAuditSummary(event RuntimeAuditEvent) string {
 		return actor + " 调整了 " + target + " 的账号角色"
 	case "role.permissions.set":
 		return actor + " 调整了 " + target + " 的角色权限"
+	case "role.navigation.set":
+		return actor + " 调整了 " + target + " 的岗位菜单布局"
 	case "customer_config.publish":
 		return actor + " 发布了客户配置 " + target
 	case "customer_config.activate":
@@ -965,6 +972,50 @@ func (uc *AdminManageUsecase) SetRolePermissions(
 		return nil, err
 	}
 	return updated, nil
+}
+
+func (uc *AdminManageUsecase) SetRoleNavigation(
+	ctx context.Context,
+	roleKey string,
+	mode RoleNavigationMode,
+	primaryMenuPaths []string,
+	expectedVersion int,
+) (*AdminRole, error) {
+	operator, err := uc.requireActiveAdmin(ctx)
+	if err != nil {
+		return nil, err
+	}
+	roleKey = NormalizeRoleKey(roleKey)
+	if roleKey == "" || expectedVersion <= 0 {
+		return nil, ErrBadParam
+	}
+	if !operator.IsSuperAdmin && AdminHasRole(operator, roleKey) {
+		return nil, ErrAdminSelfRolePermissionForbidden
+	}
+	role, err := uc.repo.GetRoleByKey(ctx, roleKey)
+	if err != nil {
+		return nil, err
+	}
+	if role == nil || role.Disabled {
+		return nil, ErrRoleNotFound
+	}
+	if IsSystemManagedRole(*role) {
+		return nil, ErrSystemRoleImmutable
+	}
+	if role.Version != expectedVersion {
+		return nil, ErrRoleVersionConflict
+	}
+	settings, err := NormalizeRoleNavigationSettings(mode, primaryMenuPaths)
+	if err != nil {
+		return nil, err
+	}
+	return uc.repo.SetRoleNavigationWithAudit(ctx, &RoleNavigationChange{
+		RoleKey:          roleKey,
+		OperatorID:       operator.ID,
+		ExpectedVersion:  expectedVersion,
+		Mode:             settings.Mode,
+		PrimaryMenuPaths: settings.PrimaryMenuPaths,
+	})
 }
 
 func (uc *AdminManageUsecase) SetPhone(

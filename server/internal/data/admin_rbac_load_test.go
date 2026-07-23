@@ -32,7 +32,9 @@ func TestLoadAdminRBACUsesRolePermissionSource(t *testing.T) {
 				role_type text not null default 'custom',
 				disabled boolean not null default false,
 				sort_order integer not null default 0,
-				version integer not null default 1
+				version integer not null default 1,
+				navigation_mode text not null default 'recommended',
+				primary_menu_paths text not null default '[]'
 			)`,
 		`CREATE TABLE permissions (
 			id integer primary key,
@@ -46,9 +48,9 @@ func TestLoadAdminRBACUsesRolePermissionSource(t *testing.T) {
 			admin_user_id integer not null,
 			role_id integer not null
 		)`,
-		`INSERT INTO roles (id, role_key, name, role_type, disabled, sort_order, version) VALUES
-				(1, 'purchase', '采购', 'business_default', false, 10, 4),
-				(2, 'warehouse', '仓库', 'business_default', true, 20, 2)`,
+		`INSERT INTO roles (id, role_key, name, role_type, disabled, sort_order, version, navigation_mode, primary_menu_paths) VALUES
+				(1, 'purchase', '采购', 'business_default', false, 10, 4, 'custom', '["/erp/purchase/accessories"]'),
+				(2, 'warehouse', '仓库', 'business_default', true, 20, 2, 'recommended', '[]')`,
 		`INSERT INTO permissions (id, permission_key) VALUES
 			(1, 'purchase.receipt.read'),
 			(2, 'warehouse.inventory.read'),
@@ -77,6 +79,11 @@ func TestLoadAdminRBACUsesRolePermissionSource(t *testing.T) {
 	if admin.Roles[0].Type != biz.RoleTypeBusinessDefault || admin.Roles[0].Version != 4 {
 		t.Fatalf("role metadata was not loaded: %#v", admin.Roles[0])
 	}
+	if admin.Roles[0].NavigationMode != biz.RoleNavigationModeCustom ||
+		len(admin.Roles[0].PrimaryMenuPaths) != 1 ||
+		admin.Roles[0].PrimaryMenuPaths[0] != "/erp/purchase/accessories" {
+		t.Fatalf("role navigation metadata was not loaded: %#v", admin.Roles[0])
+	}
 	if !biz.AdminHasPermission(admin, biz.PermissionPurchaseReceiptRead) {
 		t.Fatalf("expected active role permission %s", biz.PermissionPurchaseReceiptRead)
 	}
@@ -101,7 +108,7 @@ func TestLoadAdminRBACSuperAdminGetsAllPermissions(t *testing.T) {
 	if _, err := db.ExecContext(context.Background(), `CREATE TABLE admin_user_roles (admin_user_id integer not null, role_id integer not null)`); err != nil {
 		t.Fatalf("create admin_user_roles failed: %v", err)
 	}
-	if _, err := db.ExecContext(context.Background(), `CREATE TABLE roles (id integer primary key, role_key text not null, name text not null, description text not null default '', builtin boolean not null default false, role_type text not null default 'custom', disabled boolean not null default false, sort_order integer not null default 0, version integer not null default 1)`); err != nil {
+	if _, err := db.ExecContext(context.Background(), `CREATE TABLE roles (id integer primary key, role_key text not null, name text not null, description text not null default '', builtin boolean not null default false, role_type text not null default 'custom', disabled boolean not null default false, sort_order integer not null default 0, version integer not null default 1, navigation_mode text not null default 'recommended', primary_menu_paths text not null default '[]')`); err != nil {
 		t.Fatalf("create roles failed: %v", err)
 	}
 

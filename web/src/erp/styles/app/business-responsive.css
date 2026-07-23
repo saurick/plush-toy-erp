@@ -874,6 +874,26 @@
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .erp-role-navigation-editor__head,
+  .erp-role-navigation-editor__order-item {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .erp-role-navigation-editor__head > .ant-select {
+    width: 100%;
+  }
+
+  .erp-role-navigation-editor__order-item > .ant-space {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    width: 100%;
+  }
+
+  .erp-role-navigation-editor__order-item .ant-btn {
+    width: 100%;
+  }
+
   .erp-role-center-detail__head .ant-btn,
   .erp-role-center-footer .ant-btn {
     width: 100%;

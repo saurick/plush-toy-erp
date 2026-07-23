@@ -225,7 +225,10 @@ func buildBuiltinPermissionUsages() map[string]PermissionUsage {
 	addMenu(PermissionSystemUserDisable, "permission-center", "admin-accounts", "管理员账号", "set-admin-disabled", "临时停用或恢复账号", permissionControlSwitch, "显示并允许切换账号状态", permissionMethods("admin", "set_disabled"), systemUsageConditions)
 	addMenu(PermissionSystemUserRevoke, "permission-center", "admin-accounts", "管理员账号", "revoke-admin", "离职注销账号", permissionControlButton, "显示并允许正式注销", permissionMethods("admin", "revoke"), systemUsageConditions)
 	addMenu(PermissionSystemRoleRead, "permission-center", "role-templates", "角色模板", "role-list", "岗位角色列表", permissionControlPage, "允许进入并查看", permissionMethods("admin", "rbac_options"), systemUsageConditions)
-	addMenu(PermissionSystemRolePermissionManage, "permission-center", "role-templates", "角色模板", "save-role-permissions", "保存业务角色权限", permissionControlButton, "显示并允许保存可委派业务权限", permissionMethods("admin", "set_role_permissions"), systemUsageConditions)
+	add(PermissionSystemRolePermissionManage,
+		menuPermissionSurface("permission-center", "role-templates", "角色模板", "save-role-permissions", "保存业务角色权限", permissionControlButton, "显示并允许保存可委派业务权限", permissionMethods("admin", "set_role_permissions"), systemUsageConditions),
+		menuPermissionSurface("permission-center", "role-templates", "角色模板", "save-role-navigation", "保存岗位菜单布局", permissionControlButton, "显示并允许保存岗位常用入口与顺序", permissionMethods("admin", "set_role_navigation"), systemUsageConditions),
+	)
 	addMenu(PermissionSystemPermissionRead, "permission-center", "role-templates", "角色模板", "permission-list", "功能权限和权限地图", permissionControlPage, "允许进入并查看", permissionMethods("admin", "rbac_options"), systemUsageConditions)
 	addMenu(PermissionSystemAuditRead, "system-audit-logs", "audit-events", "审计事件", "audit-event-list", "审计日志列表", permissionControlPage, "允许进入并查看", permissionMethods("admin", "audit_logs"), systemUsageConditions)
 

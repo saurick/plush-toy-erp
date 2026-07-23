@@ -5492,12 +5492,16 @@ func init() {
 	role.DefaultVersion = roleDescVersion.Default.(int)
 	// role.VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	role.VersionValidator = roleDescVersion.Validators[0].(func(int) error)
+	// roleDescPrimaryMenuPaths is the schema descriptor for primary_menu_paths field.
+	roleDescPrimaryMenuPaths := roleFields[9].Descriptor()
+	// role.DefaultPrimaryMenuPaths holds the default value on creation for the primary_menu_paths field.
+	role.DefaultPrimaryMenuPaths = roleDescPrimaryMenuPaths.Default.([]string)
 	// roleDescCreatedAt is the schema descriptor for created_at field.
-	roleDescCreatedAt := roleFields[8].Descriptor()
+	roleDescCreatedAt := roleFields[10].Descriptor()
 	// role.DefaultCreatedAt holds the default value on creation for the created_at field.
 	role.DefaultCreatedAt = roleDescCreatedAt.Default.(func() time.Time)
 	// roleDescUpdatedAt is the schema descriptor for updated_at field.
-	roleDescUpdatedAt := roleFields[9].Descriptor()
+	roleDescUpdatedAt := roleFields[11].Descriptor()
 	// role.DefaultUpdatedAt holds the default value on creation for the updated_at field.
 	role.DefaultUpdatedAt = roleDescUpdatedAt.Default.(func() time.Time)
 	// role.UpdateDefaultUpdatedAt holds the default value on update for the updated_at field.

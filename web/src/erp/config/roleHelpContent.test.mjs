@@ -180,19 +180,15 @@ test('roleHelpContent: 永绅岗位帮助不指导未开放或越权动作', () 
   const productionGuide = getRoleHelpGuide('production')
 
   assert.doesNotMatch(financeCopy, /登记真实收付款|多笔应收或应付核销|红冲/u)
+  assert.equal(financeGuide.recommendedPrimaryLimit, 4)
   assert.deepEqual(
-    financeGuide.priorities.slice(0, 3).map((priority) => priority.path),
+    financeGuide.priorities.slice(0, 4).map((priority) => priority.path),
     [
       '/erp/finance/payables',
       '/erp/finance/receivables',
       '/erp/finance/invoices',
+      '/erp/finance/reconciliation',
     ]
-  )
-  assert.equal(
-    financeGuide.priorities.some(
-      (priority) => priority.path === '/erp/finance/reconciliation'
-    ),
-    false
   )
   assert.doesNotMatch(pmcCopy, /发布生产订单/u)
   assert.doesNotMatch(warehouseCopy, /盘点、调拨|人工调整/u)

@@ -958,6 +958,8 @@
 [data-erp-theme='dark'] .erp-role-center-detail__head,
 [data-erp-theme='dark'] .erp-role-center-metrics > div,
 [data-erp-theme='dark'] .erp-role-center-impact > div,
+[data-erp-theme='dark'] .erp-role-navigation-editor,
+[data-erp-theme='dark'] .erp-role-navigation-editor__order-item,
 [data-erp-theme='dark'] .erp-role-navigation-preview__group,
 [data-erp-theme='dark'] .erp-role-center-footer,
 [data-erp-theme='dark'] .erp-role-capability-overview,
@@ -968,6 +970,14 @@
   border-color: var(--erp-border);
   background: var(--erp-surface-bg);
   color: var(--erp-text);
+}
+
+[data-erp-theme='dark']
+  .erp-role-navigation-editor__order-item
+  > span
+  > strong {
+  background: #163522;
+  color: #86efac;
 }
 
 [data-erp-theme='dark'] .erp-role-capability-card--enabled {

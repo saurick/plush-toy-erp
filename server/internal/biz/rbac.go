@@ -215,17 +215,19 @@ type RoleDefinition struct {
 }
 
 type AdminRole struct {
-	ID          int
-	Key         string
-	Name        string
-	Description string
-	Builtin     bool
-	Disabled    bool
-	SortOrder   int
-	Type        RoleType
-	Version     int
-	Permissions []string
-	DataScopes  []RoleDataScope
+	ID               int
+	Key              string
+	Name             string
+	Description      string
+	Builtin          bool
+	Disabled         bool
+	SortOrder        int
+	Type             RoleType
+	Version          int
+	NavigationMode   RoleNavigationMode
+	PrimaryMenuPaths []string
+	Permissions      []string
+	DataScopes       []RoleDataScope
 }
 
 type AdminPermission struct {

@@ -78,13 +78,13 @@ export async function installSystemRpcMocks(page, context) {
         break
       case 'set_role_permissions':
         salesRole.version += 1
+        salesRole.permissions = Array.isArray(params.permission_keys)
+          ? params.permission_keys
+          : salesRole.permissions
         data = {
           role: {
             ...salesRole,
             role_key: params.role_key || salesRole.role_key,
-            permissions: Array.isArray(params.permission_keys)
-              ? params.permission_keys
-              : salesRole.permissions,
           },
         }
         break
@@ -93,6 +93,17 @@ export async function installSystemRpcMocks(page, context) {
         salesRole.data_scopes = Array.isArray(params.data_scopes)
           ? params.data_scopes
           : salesRole.data_scopes
+        data = { role: { ...salesRole } }
+        break
+      case 'set_role_navigation':
+        salesRole.version += 1
+        salesRole.navigation_mode =
+          params.mode === 'custom' ? 'custom' : 'recommended'
+        salesRole.primary_menu_paths =
+          salesRole.navigation_mode === 'custom' &&
+          Array.isArray(params.primary_menu_paths)
+            ? params.primary_menu_paths
+            : []
         data = { role: { ...salesRole } }
         break
       case 'set_erp_column_order': {

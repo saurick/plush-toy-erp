@@ -3438,6 +3438,8 @@ var (
 		{Name: "disabled", Type: field.TypeBool, Default: false},
 		{Name: "sort_order", Type: field.TypeInt, Default: 0},
 		{Name: "version", Type: field.TypeInt, Default: 1},
+		{Name: "navigation_mode", Type: field.TypeEnum, Enums: []string{"recommended", "custom"}, Default: "recommended"},
+		{Name: "primary_menu_paths", Type: field.TypeJSON, Default: map[string]schema.Expr{"postgres": "'[]'::jsonb", "sqlite3": "'[]'"}},
 		{Name: "created_at", Type: field.TypeTime},
 		{Name: "updated_at", Type: field.TypeTime},
 	}
@@ -5060,8 +5062,9 @@ func init() {
 	}
 	RolesTable.Annotation = &entsql.Annotation{}
 	RolesTable.Annotation.Checks = map[string]string{
-		"roles_role_type_allowed": "role_type IN ('system', 'business_default', 'custom')",
-		"roles_version_positive":  "version > 0",
+		"roles_navigation_mode_allowed": "navigation_mode IN ('recommended', 'custom')",
+		"roles_role_type_allowed":       "role_type IN ('system', 'business_default', 'custom')",
+		"roles_version_positive":        "version > 0",
 	}
 	RoleDataScopesTable.ForeignKeys[0].RefTable = RolesTable
 	RoleDataScopesTable.Annotation = &entsql.Annotation{}

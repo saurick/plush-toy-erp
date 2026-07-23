@@ -999,7 +999,11 @@ export function createStyleL1Scenarios(deps) {
       section.items.map((item) => [item.key, item])
     )
   )
-  const customerRoleAdminProfile = (roleKey, username) => {
+  const customerRoleAdminProfile = (
+    roleKey,
+    username,
+    { navigationMode = 'recommended', primaryMenuPaths = [] } = {}
+  ) => {
     const role = yoyoosunRoleFlowMatrix.roles.find(
       (item) => item.roleKey === roleKey
     )
@@ -1013,7 +1017,14 @@ export function createStyleL1Scenarios(deps) {
       id: 1,
       username,
       is_super_admin: false,
-      roles: [{ role_key: roleKey, name: role.displayName }],
+      roles: [
+        {
+          role_key: roleKey,
+          name: role.displayName,
+          navigation_mode: navigationMode,
+          primary_menu_paths: primaryMenuPaths,
+        },
+      ],
       permissions: [...role.capabilityKeys],
       menus,
       erp_preferences: { column_orders: {} },
@@ -3099,6 +3110,50 @@ export function createStyleL1Scenarios(deps) {
       viewport: { width: 1280, height: 720 },
       verify: async (page) => {
         const menu = page.locator('.erp-admin-menu')
+        const moreFunctions = menu
+          .locator('.ant-menu-submenu-title')
+          .filter({ hasText: '更多功能' })
+          .first()
+        const moreFunctionsRoot = moreFunctions.locator('..')
+        const moreFunctionsIsOpen = async () =>
+          String(
+            (await moreFunctionsRoot.getAttribute('class')) || ''
+          ).includes('ant-menu-submenu-open')
+        assert.equal(
+          await menu.getAttribute('data-navigation-presentation'),
+          'role_guided',
+          '财务后台必须使用岗位导航分层'
+        )
+        assert.equal(
+          await moreFunctionsIsOpen(),
+          false,
+          '财务首次进入工作台时更多功能应保持折叠'
+        )
+        const menuMetrics = await menu.evaluate((node) => {
+          const menuRect = node.getBoundingClientRect()
+          const moreTitle = Array.from(
+            node.querySelectorAll('.ant-menu-submenu-title')
+          ).find((item) => String(item.textContent || '').includes('更多功能'))
+          const moreTitleRect = moreTitle?.getBoundingClientRect()
+          return {
+            clientWidth: node.clientWidth,
+            scrollWidth: node.scrollWidth,
+            menuRight: menuRect.right,
+            moreTitleHeight: moreTitleRect?.height || 0,
+            moreTitleRight: moreTitleRect?.right || 0,
+          }
+        })
+        assert.equal(
+          menuMetrics.scrollWidth <= menuMetrics.clientWidth + 1,
+          true,
+          `财务侧栏不应产生横向溢出: ${JSON.stringify(menuMetrics)}`
+        )
+        assert.equal(
+          menuMetrics.moreTitleHeight >= 40 &&
+            menuMetrics.moreTitleRight <= menuMetrics.menuRight + 1,
+          true,
+          `更多功能入口应保持可点击且不越界: ${JSON.stringify(menuMetrics)}`
+        )
         const visibleLeafTexts = await menu.evaluate((node) =>
           Array.from(node.querySelectorAll('.ant-menu-item'))
             .filter((item) => item.getClientRects().length > 0)
@@ -3106,32 +3161,123 @@ export function createStyleL1Scenarios(deps) {
         )
         assert.deepEqual(
           visibleLeafTexts,
-          ['工作台', '任务看板', '应付管理', '应收管理', '发票管理'],
-          `财务常用工作应突出应付、应收和发票: ${JSON.stringify(visibleLeafTexts)}`
+          [
+            '工作台',
+            '任务看板',
+            '应付管理',
+            '应收管理',
+            '发票管理',
+            '对账管理',
+          ],
+          `财务系统推荐应突出应付、应收、发票和对账: ${JSON.stringify(visibleLeafTexts)}`
         )
-        assert.equal(
-          visibleLeafTexts.includes('对账管理'),
-          false,
-          '对账管理在展开更多功能前不应占用财务常用入口'
-        )
-        await menu
-          .locator('.ant-menu-submenu-title')
-          .filter({ hasText: '更多功能' })
-          .click()
-        await menu
-          .locator('.ant-menu-item')
-          .filter({ hasText: '对账管理' })
-          .waitFor({ state: 'visible', timeout: 10_000 })
         await page.screenshot({
           path: path.resolve(
             outputDir,
-            'yoyoosun-finance-role-guided-navigation-desktop.png'
+            'yoyoosun-finance-role-guided-navigation-default.png'
+          ),
+          fullPage: true,
+        })
+        await moreFunctions.click()
+        const customerItem = menu
+          .locator('.ant-menu-item')
+          .filter({ hasText: '客户档案' })
+          .first()
+        await customerItem.waitFor({ state: 'visible', timeout: 10_000 })
+        await customerItem.click()
+        await waitForPath(page, '/erp/master/partners/customers')
+        await page
+          .getByRole('heading', { name: '客户档案', exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await moreFunctionsIsOpen(),
+          true,
+          '访问更多功能里的页面时应保持展开以显示当前位置'
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-finance-role-guided-navigation-secondary-active.png'
+          ),
+          fullPage: true,
+        })
+        await page
+          .reload({ waitUntil: 'domcontentloaded' })
+          .then(() => page.waitForLoadState('networkidle').catch(() => {}))
+        await page
+          .getByRole('heading', { name: '客户档案', exact: true })
+          .waitFor({ state: 'visible', timeout: 10_000 })
+        assert.equal(
+          await moreFunctionsIsOpen(),
+          true,
+          '刷新更多功能页面后仍应展开并显示当前位置'
+        )
+        await menu
+          .locator('.ant-menu-item')
+          .filter({ hasText: '工作台' })
+          .first()
+          .click()
+        await waitForPath(page, '/erp/dashboard')
+        assert.equal(
+          await moreFunctionsIsOpen(),
+          false,
+          '返回看板或常用工作后更多功能应自动收起'
+        )
+        await customerItem.waitFor({
+          state: 'hidden',
+          timeout: 10_000,
+        })
+        await assertNoHorizontalOverflow(
+          page,
+          'yoyoosun-finance-role-guided-navigation-desktop'
+        )
+      },
+    },
+    {
+      name: 'yoyoosun-finance-custom-navigation-desktop',
+      path: '/erp/dashboard',
+      auth: 'admin',
+      customerConfig: roleGuidedCustomerConfig,
+      adminProfile: customerRoleAdminProfile('finance', 'demo_finance', {
+        navigationMode: 'custom',
+        primaryMenuPaths: [
+          '/erp/finance/reconciliation',
+          '/erp/finance/invoices',
+          '/erp/finance/payables',
+        ],
+      }),
+      effectiveSession: customerRoleRuntimeSession(
+        ['finance'],
+        'style-l1-role-guided-finance-custom'
+      ),
+      viewport: { width: 1280, height: 720 },
+      verify: async (page) => {
+        const menu = page.locator('.erp-admin-menu')
+        const visibleLeafTexts = await menu.evaluate((node) =>
+          Array.from(node.querySelectorAll('.ant-menu-item'))
+            .filter((item) => item.getClientRects().length > 0)
+            .map((item) => String(item.textContent || '').trim())
+        )
+        assert.deepEqual(
+          visibleLeafTexts,
+          ['工作台', '任务看板', '对账管理', '发票管理', '应付管理'],
+          `财务自定义常用入口应按保存顺序显示且不自动补满: ${JSON.stringify(visibleLeafTexts)}`
+        )
+        assert.equal(
+          visibleLeafTexts.includes('应收管理'),
+          false,
+          '未选为常用的应收管理应保留在更多功能'
+        )
+        await page.screenshot({
+          path: path.resolve(
+            outputDir,
+            'yoyoosun-finance-custom-navigation-desktop.png'
           ),
           fullPage: true,
         })
         await assertNoHorizontalOverflow(
           page,
-          'yoyoosun-finance-role-guided-navigation-desktop'
+          'yoyoosun-finance-custom-navigation-desktop'
         )
       },
     },
@@ -10299,10 +10445,12 @@ export function createStyleL1Scenarios(deps) {
         await expectText(page, '当前客户已启用版本')
         await expectText(page, '页面可进入，不等于页面内所有操作都可用')
         await expectText(page, '当前页面结果')
-        await expectText(page, '当前已保存的导航位置')
+        await expectText(page, '设置岗位常用入口')
+        await expectText(page, '系统按岗位推荐高频页面')
+        await expectText(page, '导航位置预览')
         await expectText(page, '看板中心')
         await expectText(page, '常用工作')
-        await expectText(page, '更多功能（2）')
+        await expectText(page, '更多功能（1）')
         await expectText(page, '工作台')
         await expectText(page, '任务看板')
         await expectText(page, '客户档案')
@@ -10356,6 +10504,43 @@ export function createStyleL1Scenarios(deps) {
         await page.locator('.erp-role-navigation-preview').screenshot({
           path: 'output/playwright/style-l1/permission-center-navigation-preview.png',
         })
+        await page
+          .locator(
+            '.erp-role-navigation-editor__head > .ant-select .ant-select-selector'
+          )
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '自定义常用' })
+          .click()
+        await page.keyboard.press('Escape')
+        await page.waitForTimeout(350)
+        await expectText(page, '已选 3/5')
+        await page.getByRole('button', { name: '上移 库存台账' }).click()
+        await page.getByRole('button', { name: '上移 库存台账' }).click()
+        const customPrimaryOrder = await page.evaluate(() => {
+          const groups = Array.from(
+            document.querySelectorAll('.erp-role-navigation-preview__group')
+          )
+          const primaryGroup = groups.find((group) =>
+            String(group.textContent || '').includes('常用工作')
+          )
+          return Array.from(
+            primaryGroup?.querySelectorAll('.ant-tag') || []
+          ).map((item) => String(item.textContent || '').trim())
+        })
+        assert.deepEqual(
+          customPrimaryOrder,
+          ['库存台账', '客户档案', '销售订单'],
+          `权限中心应即时按自定义顺序预览常用入口: ${JSON.stringify(customPrimaryOrder)}`
+        )
+        await page.locator('.erp-role-navigation-editor').screenshot({
+          path: 'output/playwright/style-l1/permission-center-navigation-custom.png',
+        })
+        await page.getByRole('button', { name: '保存岗位设置' }).click()
+        await expectText(page, '岗位设置已更新，相关账号刷新后生效')
+        await expectText(page, '自定义常用')
+        await expectText(page, '已保存')
         await page.waitForTimeout(350)
         await page.screenshot({
           path: 'output/playwright/style-l1/permission-center-permission-map.png',
@@ -10624,11 +10809,28 @@ export function createStyleL1Scenarios(deps) {
       verify: async (page) => {
         await expectHeading(page, '权限管理')
         await page.getByRole('tab', { name: '页面与导航' }).click()
-        await expectText(page, '当前已保存的导航位置')
-        await expectText(page, '更多功能（2）')
+        await expectText(page, '设置岗位常用入口')
+        await expectText(page, '导航位置预览')
+        await expectText(page, '更多功能（1）')
         await expectText(page, '岗位使用帮助')
+        await page
+          .locator(
+            '.erp-role-navigation-editor__head > .ant-select .ant-select-selector'
+          )
+          .click()
+        await page
+          .locator('.ant-select-dropdown:visible .ant-select-item-option')
+          .filter({ hasText: '自定义常用' })
+          .click()
+        await page.keyboard.press('Escape')
+        await page.waitForTimeout(350)
+        await expectText(page, '已选 3/5')
         const metrics = await page.evaluate(() => {
           const preview = document.querySelector('.erp-role-navigation-preview')
+          const editor = document.querySelector('.erp-role-navigation-editor')
+          const orderItem = editor?.querySelector(
+            '.erp-role-navigation-editor__order-item'
+          )
           const grid = preview?.querySelector(
             '.erp-role-navigation-preview__grid'
           )
@@ -10645,6 +10847,11 @@ export function createStyleL1Scenarios(deps) {
             viewportWidth: window.innerWidth,
             documentScrollWidth: document.documentElement.scrollWidth,
             documentClientWidth: document.documentElement.clientWidth,
+            editorScrollWidth: editor?.scrollWidth || 0,
+            editorClientWidth: editor?.clientWidth || 0,
+            orderItemDirection: orderItem
+              ? window.getComputedStyle(orderItem).flexDirection
+              : '',
           }
         })
         assert(
@@ -10655,6 +10862,11 @@ export function createStyleL1Scenarios(deps) {
             metrics.previewWidth <= metrics.viewportWidth + 1 &&
             metrics.documentScrollWidth <= metrics.documentClientWidth + 1,
           `权限中心导航预览移动端布局异常: ${JSON.stringify(metrics)}`
+        )
+        assert(
+          metrics.editorScrollWidth <= metrics.editorClientWidth + 1 &&
+            metrics.orderItemDirection === 'column',
+          `权限中心常用入口编辑器移动端布局异常: ${JSON.stringify(metrics)}`
         )
         await assertERPThemeMode(page, {
           scenarioName: 'permission-center-navigation-mobile-dark',
@@ -10667,6 +10879,9 @@ export function createStyleL1Scenarios(deps) {
         )
         await page.locator('.erp-role-navigation-preview').screenshot({
           path: 'output/playwright/style-l1/permission-center-navigation-mobile-dark-preview.png',
+        })
+        await page.locator('.erp-role-navigation-editor').screenshot({
+          path: 'output/playwright/style-l1/permission-center-navigation-mobile-dark-editor.png',
         })
       },
     },

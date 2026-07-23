@@ -13,6 +13,7 @@ import (
 
 	"entgo.io/ent/dialect/sql"
 	"entgo.io/ent/dialect/sql/sqlgraph"
+	"entgo.io/ent/dialect/sql/sqljson"
 	"entgo.io/ent/schema/field"
 )
 
@@ -155,6 +156,32 @@ func (_u *RoleUpdate) AddVersion(v int) *RoleUpdate {
 	return _u
 }
 
+// SetNavigationMode sets the "navigation_mode" field.
+func (_u *RoleUpdate) SetNavigationMode(v role.NavigationMode) *RoleUpdate {
+	_u.mutation.SetNavigationMode(v)
+	return _u
+}
+
+// SetNillableNavigationMode sets the "navigation_mode" field if the given value is not nil.
+func (_u *RoleUpdate) SetNillableNavigationMode(v *role.NavigationMode) *RoleUpdate {
+	if v != nil {
+		_u.SetNavigationMode(*v)
+	}
+	return _u
+}
+
+// SetPrimaryMenuPaths sets the "primary_menu_paths" field.
+func (_u *RoleUpdate) SetPrimaryMenuPaths(v []string) *RoleUpdate {
+	_u.mutation.SetPrimaryMenuPaths(v)
+	return _u
+}
+
+// AppendPrimaryMenuPaths appends value to the "primary_menu_paths" field.
+func (_u *RoleUpdate) AppendPrimaryMenuPaths(v []string) *RoleUpdate {
+	_u.mutation.AppendPrimaryMenuPaths(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *RoleUpdate) SetUpdatedAt(v time.Time) *RoleUpdate {
 	_u.mutation.SetUpdatedAt(v)
@@ -265,6 +292,11 @@ func (_u *RoleUpdate) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Role.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.NavigationMode(); ok {
+		if err := role.NavigationModeValidator(v); err != nil {
+			return &ValidationError{Name: "navigation_mode", err: fmt.Errorf(`ent: validator failed for field "Role.navigation_mode": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -309,6 +341,17 @@ func (_u *RoleUpdate) sqlSave(ctx context.Context) (_node int, err error) {
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(role.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.NavigationMode(); ok {
+		_spec.SetField(role.FieldNavigationMode, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.PrimaryMenuPaths(); ok {
+		_spec.SetField(role.FieldPrimaryMenuPaths, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedPrimaryMenuPaths(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, role.FieldPrimaryMenuPaths, value)
+		})
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(role.FieldUpdatedAt, field.TypeTime, value)
@@ -504,6 +547,32 @@ func (_u *RoleUpdateOne) AddVersion(v int) *RoleUpdateOne {
 	return _u
 }
 
+// SetNavigationMode sets the "navigation_mode" field.
+func (_u *RoleUpdateOne) SetNavigationMode(v role.NavigationMode) *RoleUpdateOne {
+	_u.mutation.SetNavigationMode(v)
+	return _u
+}
+
+// SetNillableNavigationMode sets the "navigation_mode" field if the given value is not nil.
+func (_u *RoleUpdateOne) SetNillableNavigationMode(v *role.NavigationMode) *RoleUpdateOne {
+	if v != nil {
+		_u.SetNavigationMode(*v)
+	}
+	return _u
+}
+
+// SetPrimaryMenuPaths sets the "primary_menu_paths" field.
+func (_u *RoleUpdateOne) SetPrimaryMenuPaths(v []string) *RoleUpdateOne {
+	_u.mutation.SetPrimaryMenuPaths(v)
+	return _u
+}
+
+// AppendPrimaryMenuPaths appends value to the "primary_menu_paths" field.
+func (_u *RoleUpdateOne) AppendPrimaryMenuPaths(v []string) *RoleUpdateOne {
+	_u.mutation.AppendPrimaryMenuPaths(v)
+	return _u
+}
+
 // SetUpdatedAt sets the "updated_at" field.
 func (_u *RoleUpdateOne) SetUpdatedAt(v time.Time) *RoleUpdateOne {
 	_u.mutation.SetUpdatedAt(v)
@@ -627,6 +696,11 @@ func (_u *RoleUpdateOne) check() error {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Role.version": %w`, err)}
 		}
 	}
+	if v, ok := _u.mutation.NavigationMode(); ok {
+		if err := role.NavigationModeValidator(v); err != nil {
+			return &ValidationError{Name: "navigation_mode", err: fmt.Errorf(`ent: validator failed for field "Role.navigation_mode": %w`, err)}
+		}
+	}
 	return nil
 }
 
@@ -688,6 +762,17 @@ func (_u *RoleUpdateOne) sqlSave(ctx context.Context) (_node *Role, err error) {
 	}
 	if value, ok := _u.mutation.AddedVersion(); ok {
 		_spec.AddField(role.FieldVersion, field.TypeInt, value)
+	}
+	if value, ok := _u.mutation.NavigationMode(); ok {
+		_spec.SetField(role.FieldNavigationMode, field.TypeEnum, value)
+	}
+	if value, ok := _u.mutation.PrimaryMenuPaths(); ok {
+		_spec.SetField(role.FieldPrimaryMenuPaths, field.TypeJSON, value)
+	}
+	if value, ok := _u.mutation.AppendedPrimaryMenuPaths(); ok {
+		_spec.AddModifier(func(u *sql.UpdateBuilder) {
+			sqljson.Append(u, role.FieldPrimaryMenuPaths, value)
+		})
 	}
 	if value, ok := _u.mutation.UpdatedAt(); ok {
 		_spec.SetField(role.FieldUpdatedAt, field.TypeTime, value)

@@ -338,6 +338,10 @@ func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any 
 	item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
 	isDebugRole := biz.IsDebugRole(item)
 	isSystemRole := biz.IsSystemManagedRole(item)
+	navigation := biz.NormalizePersistedRoleNavigationSettings(
+		item.NavigationMode,
+		item.PrimaryMenuPaths,
+	)
 	out := map[string]any{
 		"id":                   item.ID,
 		"role_key":             item.Key,
@@ -348,6 +352,8 @@ func adminRoleToMap(item biz.AdminRole, includePermissions bool) map[string]any 
 		"sort_order":           item.SortOrder,
 		"role_type":            string(item.Type),
 		"version":              item.Version,
+		"navigation_mode":      string(navigation.Mode),
+		"primary_menu_paths":   toAnySliceString(navigation.PrimaryMenuPaths),
 		"data_scopes":          roleDataScopesToAny(item.DataScopes),
 		"permissions_editable": !item.Disabled && !isSystemRole,
 		"assignable":           !item.Disabled && (!isSystemRole || isDebugRole),

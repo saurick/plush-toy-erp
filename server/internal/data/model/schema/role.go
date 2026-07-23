@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"entgo.io/ent"
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/entsql"
 	"entgo.io/ent/schema"
 	"entgo.io/ent/schema/edge"
@@ -24,8 +25,9 @@ func (Role) Edges() []ent.Edge {
 func (Role) Annotations() []schema.Annotation {
 	return []schema.Annotation{
 		entsql.Annotation{Checks: map[string]string{
-			"roles_role_type_allowed": "role_type IN ('system', 'business_default', 'custom')",
-			"roles_version_positive":  "version > 0",
+			"roles_role_type_allowed":       "role_type IN ('system', 'business_default', 'custom')",
+			"roles_version_positive":        "version > 0",
+			"roles_navigation_mode_allowed": "navigation_mode IN ('recommended', 'custom')",
 		}},
 	}
 }
@@ -53,6 +55,15 @@ func (Role) Fields() []ent.Field {
 		field.Int("version").
 			Default(1).
 			Positive(),
+		field.Enum("navigation_mode").
+			Values("recommended", "custom").
+			Default("recommended"),
+		field.JSON("primary_menu_paths", []string{}).
+			Default([]string{}).
+			Annotations(entsql.DefaultExprs(map[string]string{
+				dialect.Postgres: "'[]'::jsonb",
+				dialect.SQLite:   "'[]'",
+			})),
 		field.Time("created_at").
 			Default(time.Now).
 			Immutable(),

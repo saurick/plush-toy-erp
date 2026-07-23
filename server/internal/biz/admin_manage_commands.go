@@ -21,6 +21,14 @@ type RolePermissionsChange struct {
 	PermissionKeys  []string
 }
 
+type RoleNavigationChange struct {
+	RoleKey          string
+	OperatorID       int
+	ExpectedVersion  int
+	Mode             RoleNavigationMode
+	PrimaryMenuPaths []string
+}
+
 type RoleDataScopesChangeCommand struct {
 	RoleKey         string
 	OperatorID      int

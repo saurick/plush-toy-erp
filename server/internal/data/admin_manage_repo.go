@@ -276,7 +276,8 @@ func (r *adminManageRepo) SetAdminRolesWithAudit(ctx context.Context, change *bi
 
 func (r *adminManageRepo) ListRoles(ctx context.Context) ([]biz.AdminRole, error) {
 	rows, err := r.data.sqldb.QueryContext(ctx, `
-SELECT id, role_key, name, description, builtin, role_type, disabled, sort_order, version
+SELECT id, role_key, name, description, builtin, role_type, disabled, sort_order, version,
+       navigation_mode, primary_menu_paths
 FROM roles
 ORDER BY sort_order ASC, id ASC`)
 	if err != nil {
@@ -289,11 +290,30 @@ ORDER BY sort_order ASC, id ASC`)
 	out := []biz.AdminRole{}
 	for rows.Next() {
 		var item biz.AdminRole
-		if err := rows.Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Builtin, &item.Type, &item.Disabled, &item.SortOrder, &item.Version); err != nil {
+		var primaryMenuPathsJSON string
+		if err := rows.Scan(
+			&item.ID,
+			&item.Key,
+			&item.Name,
+			&item.Description,
+			&item.Builtin,
+			&item.Type,
+			&item.Disabled,
+			&item.SortOrder,
+			&item.Version,
+			&item.NavigationMode,
+			&primaryMenuPathsJSON,
+		); err != nil {
 			return nil, err
 		}
 		item.Key = biz.NormalizeRoleKey(item.Key)
 		item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
+		settings := biz.NormalizePersistedRoleNavigationSettings(
+			item.NavigationMode,
+			decodeRolePrimaryMenuPaths(primaryMenuPathsJSON),
+		)
+		item.NavigationMode = settings.Mode
+		item.PrimaryMenuPaths = settings.PrimaryMenuPaths
 		item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
 		if err != nil {
 			return nil, err
@@ -397,9 +417,23 @@ func (r *adminManageRepo) GetRoleByKey(ctx context.Context, roleKey string) (*bi
 		return nil, biz.ErrBadParam
 	}
 	var item biz.AdminRole
+	var primaryMenuPathsJSON string
 	err := r.data.sqldb.QueryRowContext(ctx, `
-SELECT id, role_key, name, description, builtin, role_type, disabled, sort_order, version
-FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(&item.ID, &item.Key, &item.Name, &item.Description, &item.Builtin, &item.Type, &item.Disabled, &item.SortOrder, &item.Version)
+SELECT id, role_key, name, description, builtin, role_type, disabled, sort_order, version,
+       navigation_mode, primary_menu_paths
+FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(
+		&item.ID,
+		&item.Key,
+		&item.Name,
+		&item.Description,
+		&item.Builtin,
+		&item.Type,
+		&item.Disabled,
+		&item.SortOrder,
+		&item.Version,
+		&item.NavigationMode,
+		&primaryMenuPathsJSON,
+	)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			return nil, biz.ErrRoleNotFound
@@ -408,6 +442,12 @@ FROM roles WHERE role_key = $1 LIMIT 1`, roleKey).Scan(&item.ID, &item.Key, &ite
 	}
 	item.Key = biz.NormalizeRoleKey(item.Key)
 	item.Type = biz.NormalizeRoleType(item.Type, item.Key, item.Builtin)
+	settings := biz.NormalizePersistedRoleNavigationSettings(
+		item.NavigationMode,
+		decodeRolePrimaryMenuPaths(primaryMenuPathsJSON),
+	)
+	item.NavigationMode = settings.Mode
+	item.PrimaryMenuPaths = settings.PrimaryMenuPaths
 	item.Permissions, err = r.loadRolePermissionKeys(ctx, item.ID)
 	if err != nil {
 		return nil, err
@@ -635,6 +675,97 @@ func (r *adminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, chang
 	auditEvent, err := biz.BuildAdminControlAuditEvent(
 		operator,
 		"role.permissions.set",
+		"role",
+		after.ID,
+		after.Key,
+		biz.AdminAuditRoleSnapshot(before),
+		biz.AdminAuditRoleSnapshot(after),
+	)
+	if err != nil {
+		return nil, err
+	}
+	if err := createRuntimeAuditEventInTx(ctx, tx, auditEvent); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	tx = nil
+	return after, nil
+}
+
+func (r *adminManageRepo) SetRoleNavigationWithAudit(
+	ctx context.Context,
+	change *biz.RoleNavigationChange,
+) (*biz.AdminRole, error) {
+	if change == nil || change.OperatorID <= 0 || change.ExpectedVersion <= 0 {
+		return nil, biz.ErrBadParam
+	}
+	roleKey := biz.NormalizeRoleKey(change.RoleKey)
+	if roleKey == "" {
+		return nil, biz.ErrBadParam
+	}
+	settings, err := biz.NormalizeRoleNavigationSettings(
+		change.Mode,
+		change.PrimaryMenuPaths,
+	)
+	if err != nil {
+		return nil, err
+	}
+
+	tx, err := r.data.postgres.Tx(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { r.rollbackAdminManageTx(ctx, tx) }()
+
+	operator, err := r.loadOperatorForUpdate(ctx, tx, change.OperatorID)
+	if err != nil {
+		return nil, err
+	}
+	if !operator.IsSuperAdmin && biz.AdminHasRole(operator, roleKey) {
+		return nil, biz.ErrAdminSelfRolePermissionForbidden
+	}
+	roleRow, err := r.loadRoleForUpdate(ctx, tx, roleKey)
+	if err != nil {
+		return nil, err
+	}
+	if roleRow.Disabled {
+		return nil, biz.ErrRoleNotFound
+	}
+	if biz.IsSystemManagedRole(mapEntAdminRole(roleRow)) {
+		return nil, biz.ErrSystemRoleImmutable
+	}
+	if roleRow.Version != change.ExpectedVersion {
+		return nil, biz.ErrRoleVersionConflict
+	}
+	before, err := r.loadRoleSnapshotFromRowInTx(ctx, tx, roleRow)
+	if err != nil {
+		return nil, err
+	}
+
+	affected, err := tx.Role.Update().Where(
+		role.ID(roleRow.ID),
+		role.Version(change.ExpectedVersion),
+		role.Disabled(false),
+	).
+		SetNavigationMode(role.NavigationMode(settings.Mode)).
+		SetPrimaryMenuPaths(settings.PrimaryMenuPaths).
+		AddVersion(1).
+		Save(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if affected == 0 {
+		return nil, biz.ErrRoleVersionConflict
+	}
+	after, err := r.loadRoleSnapshotInTx(ctx, tx, roleRow.ID)
+	if err != nil {
+		return nil, err
+	}
+	auditEvent, err := biz.BuildAdminControlAuditEvent(
+		operator,
+		"role.navigation.set",
 		"role",
 		after.ID,
 		after.Key,
@@ -1116,18 +1247,24 @@ func resolvePermissionIDsInTx(ctx context.Context, tx *ent.Tx, permissionKeys []
 
 func mapEntAdminRole(row *ent.Role) biz.AdminRole {
 	roleKey := biz.NormalizeRoleKey(row.RoleKey)
+	settings := biz.NormalizePersistedRoleNavigationSettings(
+		biz.RoleNavigationMode(row.NavigationMode),
+		row.PrimaryMenuPaths,
+	)
 	return biz.AdminRole{
-		ID:          row.ID,
-		Key:         roleKey,
-		Name:        row.Name,
-		Description: row.Description,
-		Builtin:     row.Builtin,
-		Disabled:    row.Disabled,
-		SortOrder:   row.SortOrder,
-		Type:        biz.NormalizeRoleType(biz.RoleType(row.RoleType), roleKey, row.Builtin),
-		Version:     row.Version,
-		Permissions: []string{},
-		DataScopes:  []biz.RoleDataScope{},
+		ID:               row.ID,
+		Key:              roleKey,
+		Name:             row.Name,
+		Description:      row.Description,
+		Builtin:          row.Builtin,
+		Disabled:         row.Disabled,
+		SortOrder:        row.SortOrder,
+		Type:             biz.NormalizeRoleType(biz.RoleType(row.RoleType), roleKey, row.Builtin),
+		Version:          row.Version,
+		NavigationMode:   settings.Mode,
+		PrimaryMenuPaths: settings.PrimaryMenuPaths,
+		Permissions:      []string{},
+		DataScopes:       []biz.RoleDataScope{},
 	}
 }
 
@@ -1580,6 +1717,17 @@ func stringPtrOrNil(value string) *string {
 		return nil
 	}
 	return &value
+}
+
+func decodeRolePrimaryMenuPaths(raw string) []string {
+	var paths []string
+	if strings.TrimSpace(raw) == "" {
+		return []string{}
+	}
+	if err := json.Unmarshal([]byte(raw), &paths); err != nil {
+		return []string{}
+	}
+	return paths
 }
 
 func decodeAdminERPPreferences(raw string) biz.AdminERPPreferences {

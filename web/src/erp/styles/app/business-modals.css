@@ -1626,6 +1626,77 @@ body
   min-width: 0;
 }
 
+.erp-role-navigation-editor {
+  display: grid;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border: 1px solid #dce8df;
+  border-radius: 12px;
+  background: #f8fbf9;
+}
+
+.erp-role-navigation-editor__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.erp-role-navigation-editor__head > div {
+  min-width: 0;
+}
+
+.erp-role-navigation-editor__head .ant-typography {
+  margin: 0;
+}
+
+.erp-role-navigation-editor__head .ant-typography-secondary {
+  margin-top: 4px;
+}
+
+.erp-role-navigation-editor__head > .ant-select {
+  width: 180px;
+}
+
+.erp-role-navigation-editor__order {
+  display: grid;
+  gap: 8px;
+}
+
+.erp-role-navigation-editor__order-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid #e2ece4;
+  border-radius: 9px;
+  background: #fff;
+}
+
+.erp-role-navigation-editor__order-item > span {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.erp-role-navigation-editor__order-item > span > strong {
+  display: inline-grid;
+  width: 24px;
+  height: 24px;
+  place-items: center;
+  border-radius: 999px;
+  background: #eaf5ed;
+  color: #166534;
+}
+
 .erp-role-navigation-preview {
   display: grid;
   gap: 12px;

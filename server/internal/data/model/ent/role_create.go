@@ -10,6 +10,7 @@ import (
 	"server/internal/data/model/ent/roledatascope"
 	"time"
 
+	"entgo.io/ent/dialect"
 	"entgo.io/ent/dialect/sql/sqlgraph"
 	"entgo.io/ent/schema/field"
 )
@@ -117,6 +118,26 @@ func (_c *RoleCreate) SetNillableVersion(v *int) *RoleCreate {
 	return _c
 }
 
+// SetNavigationMode sets the "navigation_mode" field.
+func (_c *RoleCreate) SetNavigationMode(v role.NavigationMode) *RoleCreate {
+	_c.mutation.SetNavigationMode(v)
+	return _c
+}
+
+// SetNillableNavigationMode sets the "navigation_mode" field if the given value is not nil.
+func (_c *RoleCreate) SetNillableNavigationMode(v *role.NavigationMode) *RoleCreate {
+	if v != nil {
+		_c.SetNavigationMode(*v)
+	}
+	return _c
+}
+
+// SetPrimaryMenuPaths sets the "primary_menu_paths" field.
+func (_c *RoleCreate) SetPrimaryMenuPaths(v []string) *RoleCreate {
+	_c.mutation.SetPrimaryMenuPaths(v)
+	return _c
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (_c *RoleCreate) SetCreatedAt(v time.Time) *RoleCreate {
 	_c.mutation.SetCreatedAt(v)
@@ -219,6 +240,14 @@ func (_c *RoleCreate) defaults() {
 		v := role.DefaultVersion
 		_c.mutation.SetVersion(v)
 	}
+	if _, ok := _c.mutation.NavigationMode(); !ok {
+		v := role.DefaultNavigationMode
+		_c.mutation.SetNavigationMode(v)
+	}
+	if _, ok := _c.mutation.PrimaryMenuPaths(); !ok {
+		v := role.DefaultPrimaryMenuPaths
+		_c.mutation.SetPrimaryMenuPaths(v)
+	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
 		v := role.DefaultCreatedAt()
 		_c.mutation.SetCreatedAt(v)
@@ -278,6 +307,20 @@ func (_c *RoleCreate) check() error {
 	if v, ok := _c.mutation.Version(); ok {
 		if err := role.VersionValidator(v); err != nil {
 			return &ValidationError{Name: "version", err: fmt.Errorf(`ent: validator failed for field "Role.version": %w`, err)}
+		}
+	}
+	if _, ok := _c.mutation.NavigationMode(); !ok {
+		return &ValidationError{Name: "navigation_mode", err: errors.New(`ent: missing required field "Role.navigation_mode"`)}
+	}
+	if v, ok := _c.mutation.NavigationMode(); ok {
+		if err := role.NavigationModeValidator(v); err != nil {
+			return &ValidationError{Name: "navigation_mode", err: fmt.Errorf(`ent: validator failed for field "Role.navigation_mode": %w`, err)}
+		}
+	}
+	switch _c.driver.Dialect() {
+	case dialect.MySQL, dialect.SQLite:
+		if _, ok := _c.mutation.PrimaryMenuPaths(); !ok {
+			return &ValidationError{Name: "primary_menu_paths", err: errors.New(`ent: missing required field "Role.primary_menu_paths"`)}
 		}
 	}
 	if _, ok := _c.mutation.CreatedAt(); !ok {
@@ -343,6 +386,14 @@ func (_c *RoleCreate) createSpec() (*Role, *sqlgraph.CreateSpec) {
 	if value, ok := _c.mutation.Version(); ok {
 		_spec.SetField(role.FieldVersion, field.TypeInt, value)
 		_node.Version = value
+	}
+	if value, ok := _c.mutation.NavigationMode(); ok {
+		_spec.SetField(role.FieldNavigationMode, field.TypeEnum, value)
+		_node.NavigationMode = value
+	}
+	if value, ok := _c.mutation.PrimaryMenuPaths(); ok {
+		_spec.SetField(role.FieldPrimaryMenuPaths, field.TypeJSON, value)
+		_node.PrimaryMenuPaths = value
 	}
 	if value, ok := _c.mutation.CreatedAt(); ok {
 		_spec.SetField(role.FieldCreatedAt, field.TypeTime, value)

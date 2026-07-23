@@ -415,6 +415,26 @@ func VersionLTE(v int) predicate.Role {
 	return predicate.Role(sql.FieldLTE(FieldVersion, v))
 }
 
+// NavigationModeEQ applies the EQ predicate on the "navigation_mode" field.
+func NavigationModeEQ(v NavigationMode) predicate.Role {
+	return predicate.Role(sql.FieldEQ(FieldNavigationMode, v))
+}
+
+// NavigationModeNEQ applies the NEQ predicate on the "navigation_mode" field.
+func NavigationModeNEQ(v NavigationMode) predicate.Role {
+	return predicate.Role(sql.FieldNEQ(FieldNavigationMode, v))
+}
+
+// NavigationModeIn applies the In predicate on the "navigation_mode" field.
+func NavigationModeIn(vs ...NavigationMode) predicate.Role {
+	return predicate.Role(sql.FieldIn(FieldNavigationMode, vs...))
+}
+
+// NavigationModeNotIn applies the NotIn predicate on the "navigation_mode" field.
+func NavigationModeNotIn(vs ...NavigationMode) predicate.Role {
+	return predicate.Role(sql.FieldNotIn(FieldNavigationMode, vs...))
+}
+
 // CreatedAtEQ applies the EQ predicate on the "created_at" field.
 func CreatedAtEQ(v time.Time) predicate.Role {
 	return predicate.Role(sql.FieldEQ(FieldCreatedAt, v))

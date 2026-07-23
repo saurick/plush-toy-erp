@@ -43,6 +43,13 @@ test('HelpCenterPage: 通用帮助由登录壳追加且不依赖业务权限项'
   assert.match(layoutSource, /label: '常用工作'/u)
   assert.match(layoutSource, /更多功能/u)
   assert.match(layoutSource, /data-navigation-presentation/u)
+  assert.match(layoutSource, /openKeys=\{useRoleGuidedNavigation/u)
+  assert.match(layoutSource, /onOpenChange=\{\(nextOpenKeys\)/u)
+  assert.match(
+    layoutSource,
+    /roleGuidedSecondaryContainsCurrent[\s\S]*setRoleGuidedOpenKeys/u
+  )
+  assert.doesNotMatch(layoutSource, /defaultOpenKeys=/u)
   assert.match(
     layoutSource,
     /currentEntry\?\.access === 'authenticated'[\s\S]*return false/u

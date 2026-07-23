@@ -21,6 +21,7 @@ type stubAdminManageRepo struct {
 	adminsByPhone        map[string]*AdminUser
 	customRoles          map[string]AdminRole
 	rolePerms            map[string][]string
+	roleNavigation       map[string]RoleNavigationSettings
 	roleVersions         map[string]int
 	auditEvents          []RuntimeAuditEvent
 	nextID               int
@@ -33,14 +34,15 @@ var _ AdminManageRepo = (*stubAdminManageRepo)(nil)
 
 func newStubAdminManageRepo() *stubAdminManageRepo {
 	return &stubAdminManageRepo{
-		adminsByID:    map[int]*AdminUser{},
-		adminsByName:  map[string]*AdminUser{},
-		adminsByPhone: map[string]*AdminUser{},
-		customRoles:   map[string]AdminRole{},
-		rolePerms:     map[string][]string{},
-		roleVersions:  map[string]int{},
-		auditEvents:   []RuntimeAuditEvent{},
-		nextID:        10,
+		adminsByID:     map[int]*AdminUser{},
+		adminsByName:   map[string]*AdminUser{},
+		adminsByPhone:  map[string]*AdminUser{},
+		customRoles:    map[string]AdminRole{},
+		rolePerms:      map[string][]string{},
+		roleNavigation: map[string]RoleNavigationSettings{},
+		roleVersions:   map[string]int{},
+		auditEvents:    []RuntimeAuditEvent{},
+		nextID:         10,
 	}
 }
 
@@ -63,16 +65,25 @@ func (r *stubAdminManageRepo) roleByKey(roleKey string) AdminRole {
 			if permissions == nil {
 				permissions = role.Permissions
 			}
+			navigation := RoleNavigationSettings{
+				Mode:             RoleNavigationModeRecommended,
+				PrimaryMenuPaths: []string{},
+			}
+			if configured, ok := r.roleNavigation[role.Key]; ok {
+				navigation = configured
+			}
 			return AdminRole{
-				Key:         role.Key,
-				Name:        role.Name,
-				Description: role.Description,
-				Builtin:     role.Builtin,
-				Disabled:    role.Disabled,
-				SortOrder:   role.SortOrder,
-				Type:        role.Type,
-				Version:     max(role.Version, r.roleVersions[role.Key]),
-				Permissions: NormalizePermissionKeys(permissions),
+				Key:              role.Key,
+				Name:             role.Name,
+				Description:      role.Description,
+				Builtin:          role.Builtin,
+				Disabled:         role.Disabled,
+				SortOrder:        role.SortOrder,
+				Type:             role.Type,
+				Version:          max(role.Version, r.roleVersions[role.Key]),
+				NavigationMode:   navigation.Mode,
+				PrimaryMenuPaths: navigation.PrimaryMenuPaths,
+				Permissions:      NormalizePermissionKeys(permissions),
 			}
 		}
 	}
@@ -328,6 +339,33 @@ func (r *stubAdminManageRepo) SetRolePermissionsWithAudit(ctx context.Context, c
 	if err := r.RecordRuntimeAuditEvent(ctx, event); err != nil {
 		return nil, err
 	}
+	return &updated, nil
+}
+
+func (r *stubAdminManageRepo) SetRoleNavigationWithAudit(
+	_ context.Context,
+	change *RoleNavigationChange,
+) (*AdminRole, error) {
+	if change == nil || change.ExpectedVersion <= 0 {
+		return nil, ErrBadParam
+	}
+	role := r.roleByKey(change.RoleKey)
+	if role.Key == "" {
+		return nil, ErrRoleNotFound
+	}
+	if role.Version != change.ExpectedVersion {
+		return nil, ErrRoleVersionConflict
+	}
+	settings, err := NormalizeRoleNavigationSettings(
+		change.Mode,
+		change.PrimaryMenuPaths,
+	)
+	if err != nil {
+		return nil, err
+	}
+	r.roleNavigation[role.Key] = settings
+	r.roleVersions[role.Key] = role.Version + 1
+	updated := r.roleByKey(role.Key)
 	return &updated, nil
 }
 
@@ -1115,6 +1153,75 @@ func TestAdminManageUsecase_SetRolePermissionsRejectsOwnBusinessRole(t *testing.
 	}
 	if len(repo.auditEvents) != 0 {
 		t.Fatalf("rejected own-role permission change wrote audit events: %#v", repo.auditEvents)
+	}
+}
+
+func TestAdminManageUsecase_SetRoleNavigationEnforcesRoleBoundaryAndVersion(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "root", IsSuperAdmin: true}
+	repo.adminsByName["root"] = repo.adminsByID[1]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+
+	adminRole := repo.roleByKey(AdminRoleKey)
+	if _, err := uc.SetRoleNavigation(
+		ctx,
+		AdminRoleKey,
+		RoleNavigationModeCustom,
+		[]string{"/erp/system/permissions"},
+		adminRole.Version,
+	); !errors.Is(err, ErrSystemRoleImmutable) {
+		t.Fatalf("system role navigation mutation error = %v, want ErrSystemRoleImmutable", err)
+	}
+	financeRole := repo.roleByKey(FinanceRoleKey)
+	if _, err := uc.SetRoleNavigation(
+		ctx,
+		FinanceRoleKey,
+		RoleNavigationModeCustom,
+		[]string{"/erp/finance/reconciliation"},
+		financeRole.Version+1,
+	); !errors.Is(err, ErrRoleVersionConflict) {
+		t.Fatalf("stale role navigation version error = %v, want ErrRoleVersionConflict", err)
+	}
+	updated, err := uc.SetRoleNavigation(
+		ctx,
+		FinanceRoleKey,
+		RoleNavigationModeCustom,
+		[]string{
+			"/erp/finance/payables",
+			"/erp/finance/reconciliation",
+		},
+		financeRole.Version,
+	)
+	if err != nil {
+		t.Fatalf("SetRoleNavigation() error = %v", err)
+	}
+	if updated.NavigationMode != RoleNavigationModeCustom ||
+		!slices.Equal(updated.PrimaryMenuPaths, []string{
+			"/erp/finance/payables",
+			"/erp/finance/reconciliation",
+		}) {
+		t.Fatalf("updated role navigation = %#v", updated)
+	}
+}
+
+func TestAdminManageUsecase_SetRoleNavigationRejectsOwnBusinessRole(t *testing.T) {
+	repo := newStubAdminManageRepo()
+	repo.adminsByID[1] = &AdminUser{ID: 1, Username: "operator"}
+	repo.applyAdminRoles(repo.adminsByID[1], []string{AdminRoleKey, FinanceRoleKey})
+	repo.adminsByName["operator"] = repo.adminsByID[1]
+	uc := NewAdminManageUsecase(repo, log.NewStdLogger(io.Discard), tracesdk.NewTracerProvider())
+	ctx := NewContextWithClaims(context.Background(), &AuthClaims{UserID: 1, Role: RoleAdmin})
+	financeRole := repo.roleByKey(FinanceRoleKey)
+
+	if _, err := uc.SetRoleNavigation(
+		ctx,
+		FinanceRoleKey,
+		RoleNavigationModeCustom,
+		[]string{"/erp/finance/reconciliation"},
+		financeRole.Version,
+	); !errors.Is(err, ErrAdminSelfRolePermissionForbidden) {
+		t.Fatalf("own business role navigation change error = %v, want ErrAdminSelfRolePermissionForbidden", err)
 	}
 }
 

@@ -53,7 +53,13 @@ import {
   getAuthenticatedNavigationSections,
   getNavigationSections,
 } from '../config/seedData.mjs'
-import { buildRoleGuidedNavigationPreview } from '../config/roleGuidedNavigation.mjs'
+import {
+  buildRoleGuidedNavigationPreview,
+  isRoleNavigationCustomizablePath,
+  MAX_ROLE_PRIMARY_LIMIT,
+  normalizeRoleNavigationSettings,
+  ROLE_NAVIGATION_MODES,
+} from '../config/roleGuidedNavigation.mjs'
 
 const { Paragraph, Text, Title } = Typography
 
@@ -119,8 +125,237 @@ function buildWarehouseScopeSignature(mode, warehouseIds = []) {
     .join(',')}`
 }
 
+function buildRoleNavigationSignature(mode, primaryMenuPaths = []) {
+  const normalizedMode =
+    mode === ROLE_NAVIGATION_MODES.CUSTOM
+      ? ROLE_NAVIGATION_MODES.CUSTOM
+      : ROLE_NAVIGATION_MODES.RECOMMENDED
+  const normalizedPaths =
+    normalizedMode === ROLE_NAVIGATION_MODES.CUSTOM
+      ? normalizeStringList(primaryMenuPaths)
+      : []
+  return `${normalizedMode}:${normalizedPaths.join('\n')}`
+}
+
+function getEffectiveRoleNavigationPathSet(access = null) {
+  return new Set(
+    (Array.isArray(access?.pages) ? access.pages : [])
+      .filter(
+        (page) =>
+          page?.effective === true &&
+          isRoleNavigationCustomizablePath(page?.path)
+      )
+      .map((page) => String(page?.path || '').trim())
+      .filter(Boolean)
+  )
+}
+
+function buildRoleNavigationOptions(access = null, selectedPaths = []) {
+  const navigationItems = [
+    ...getNavigationSections(),
+    ...getAuthenticatedNavigationSections(),
+  ].flatMap((section) => (Array.isArray(section?.items) ? section.items : []))
+  const itemByPath = new Map(
+    navigationItems
+      .filter((item) => isRoleNavigationCustomizablePath(item?.path))
+      .map((item) => [item.path, item])
+  )
+  const effectivePaths = getEffectiveRoleNavigationPathSet(access)
+  const paths = [
+    ...effectivePaths,
+    ...normalizeStringList(selectedPaths).filter(
+      (path) => !effectivePaths.has(path)
+    ),
+  ]
+  return paths.map((path) => {
+    const item = itemByPath.get(path)
+    const effective = effectivePaths.has(path)
+    return {
+      value: path,
+      label: item?.label || path,
+      effective,
+    }
+  })
+}
+
 function getRoleKey(role = {}) {
   return String(role?.role_key || role?.key || '').trim()
+}
+
+function RoleNavigationEditor({
+  mode = ROLE_NAVIGATION_MODES.RECOMMENDED,
+  primaryMenuPaths = [],
+  options = [],
+  disabled = false,
+  unavailablePaths = [],
+  onModeChange,
+  onPrimaryMenuPathsChange,
+}) {
+  const selectedPathSet = new Set(primaryMenuPaths)
+  const optionMap = new Map(options.map((option) => [option.value, option]))
+  const customDisabled = disabled || mode !== ROLE_NAVIGATION_MODES.CUSTOM
+  const selectOptions = options.map((option) => ({
+    value: option.value,
+    label: option.effective ? option.label : `${option.label}（当前不可进入）`,
+    disabled:
+      !option.effective ||
+      (primaryMenuPaths.length >= MAX_ROLE_PRIMARY_LIMIT &&
+        !selectedPathSet.has(option.value)),
+  }))
+
+  const updateSelectedPaths = (nextValues = []) => {
+    const nextValueSet = new Set(normalizeStringList(nextValues))
+    const nextPaths = [
+      ...primaryMenuPaths.filter((path) => nextValueSet.has(path)),
+      ...normalizeStringList(nextValues).filter(
+        (path) => !selectedPathSet.has(path)
+      ),
+    ].slice(0, MAX_ROLE_PRIMARY_LIMIT)
+    if (nextValueSet.size > MAX_ROLE_PRIMARY_LIMIT) {
+      message.warning(`常用工作最多选择 ${MAX_ROLE_PRIMARY_LIMIT} 个页面`)
+    }
+    onPrimaryMenuPathsChange?.(nextPaths)
+  }
+
+  const movePath = (path, offset) => {
+    const currentIndex = primaryMenuPaths.indexOf(path)
+    const nextIndex = currentIndex + offset
+    if (
+      currentIndex < 0 ||
+      nextIndex < 0 ||
+      nextIndex >= primaryMenuPaths.length
+    ) {
+      return
+    }
+    const nextPaths = [...primaryMenuPaths]
+    ;[nextPaths[currentIndex], nextPaths[nextIndex]] = [
+      nextPaths[nextIndex],
+      nextPaths[currentIndex],
+    ]
+    onPrimaryMenuPathsChange?.(nextPaths)
+  }
+
+  return (
+    <div className="erp-role-navigation-editor">
+      <div className="erp-role-navigation-editor__head">
+        <div>
+          <Text strong>设置岗位常用入口</Text>
+          <Paragraph type="secondary">
+            页面和操作权限决定“能不能用”；这里仅决定已授权页面放在“常用工作”还是“更多功能”。
+          </Paragraph>
+        </div>
+        <Select
+          aria-label="岗位导航排列方式"
+          value={mode}
+          disabled={disabled}
+          onChange={onModeChange}
+          options={[
+            {
+              value: ROLE_NAVIGATION_MODES.RECOMMENDED,
+              label: '系统推荐',
+            },
+            {
+              value: ROLE_NAVIGATION_MODES.CUSTOM,
+              label: '自定义常用',
+            },
+          ]}
+        />
+      </div>
+      {mode === ROLE_NAVIGATION_MODES.RECOMMENDED ? (
+        <Alert
+          type="info"
+          showIcon
+          message="系统按岗位推荐高频页面"
+          description="财务默认显示应付、应收、发票和对账；其他岗位默认显示约 3 个高频页面。看板始终在最前，岗位帮助始终放在更多功能。"
+        />
+      ) : (
+        <Space direction="vertical" size={12} style={{ width: '100%' }}>
+          <Select
+            aria-label="选择岗位常用页面"
+            mode="multiple"
+            allowClear
+            value={primaryMenuPaths}
+            disabled={customDisabled}
+            options={selectOptions}
+            placeholder="选择 1 至 5 个已授权页面"
+            onChange={updateSelectedPaths}
+            style={{ width: '100%' }}
+          />
+          <Text type="secondary">
+            已选 {primaryMenuPaths.length}/{MAX_ROLE_PRIMARY_LIMIT}；使用“上移 /
+            下移”调整侧栏顺序。
+          </Text>
+          {unavailablePaths.length > 0 ? (
+            <Alert
+              type="warning"
+              showIcon
+              message="有常用入口已不在当前最终权限中"
+              description="请移除标记为“当前不可进入”的页面后再保存；系统运行时也不会显示这些入口。"
+            />
+          ) : null}
+          <div className="erp-role-navigation-editor__order">
+            {primaryMenuPaths.length > 0 ? (
+              primaryMenuPaths.map((path, index) => {
+                const option = optionMap.get(path)
+                return (
+                  <div
+                    key={path}
+                    className="erp-role-navigation-editor__order-item"
+                  >
+                    <span>
+                      <Text strong>{index + 1}</Text>
+                      <Text>{option?.label || path}</Text>
+                      {option?.effective === false ? (
+                        <Tag color="orange">当前不可进入</Tag>
+                      ) : null}
+                    </span>
+                    <Space size={4}>
+                      <Button
+                        size="small"
+                        disabled={customDisabled || index === 0}
+                        aria-label={`上移 ${option?.label || path}`}
+                        onClick={() => movePath(path, -1)}
+                      >
+                        上移
+                      </Button>
+                      <Button
+                        size="small"
+                        disabled={
+                          customDisabled ||
+                          index === primaryMenuPaths.length - 1
+                        }
+                        aria-label={`下移 ${option?.label || path}`}
+                        onClick={() => movePath(path, 1)}
+                      >
+                        下移
+                      </Button>
+                      <Button
+                        size="small"
+                        disabled={customDisabled}
+                        aria-label={`移除 ${option?.label || path}`}
+                        onClick={() =>
+                          onPrimaryMenuPathsChange?.(
+                            primaryMenuPaths.filter((item) => item !== path)
+                          )
+                        }
+                      >
+                        移除
+                      </Button>
+                    </Space>
+                  </div>
+                )
+              })
+            ) : (
+              <Empty
+                image={Empty.PRESENTED_IMAGE_SIMPLE}
+                description="请选择至少一个常用页面"
+              />
+            )}
+          </div>
+        </Space>
+      )}
+    </div>
+  )
 }
 
 function getRoleVisibleName(role = {}) {
@@ -381,6 +616,8 @@ function EffectiveRoleAccessOverview({ access = null, loading = false }) {
 function NavigationPlacementOverview({
   access = null,
   roleKey = '',
+  navigationMode = ROLE_NAVIGATION_MODES.RECOMMENDED,
+  primaryMenuPaths = [],
   dirty = false,
   loading = false,
 }) {
@@ -418,6 +655,8 @@ function NavigationPlacementOverview({
     ],
     effectiveAccess: access,
     roleKey,
+    navigationMode,
+    primaryMenuPaths,
   })
   const moreItems = placement.secondarySections.flatMap(
     (section) => section.items
@@ -447,19 +686,27 @@ function NavigationPlacementOverview({
     <div className="erp-role-navigation-preview">
       <div className="erp-role-navigation-preview__head">
         <div>
-          <Text strong>当前已保存的导航位置</Text>
+          <Text strong>导航位置预览</Text>
           <Paragraph type="secondary">
-            权限中心只配置页面和操作权限；看板、常用工作和更多功能由系统按岗位自动排列，位置变化不会增加权限。
+            看板固定在最前，岗位帮助固定在更多功能；常用入口只从当前最终可进入页面中排列，不会增加权限。
           </Paragraph>
         </div>
-        <Tag color="green">自动排列</Tag>
+        <Tag
+          color={
+            navigationMode === ROLE_NAVIGATION_MODES.CUSTOM ? 'purple' : 'green'
+          }
+        >
+          {navigationMode === ROLE_NAVIGATION_MODES.CUSTOM
+            ? '自定义常用'
+            : '系统推荐'}
+        </Tag>
       </div>
       {dirty ? (
         <Alert
           type="warning"
           showIcon
-          message="下面仍显示已保存结果"
-          description="当前未保存的功能调整不会提前进入导航；保存并重新读取最终权限后，预览会自动更新。"
+          message="当前显示尚未保存的布局草稿"
+          description="常用入口和顺序会立即预览；未保存的功能权限仍要保存并重新读取最终权限后才会进入导航。"
         />
       ) : null}
       <div className="erp-role-navigation-preview__grid">
@@ -470,7 +717,10 @@ function NavigationPlacementOverview({
             <div className="erp-role-navigation-preview__items">
               {group.items.length > 0 ? (
                 group.items.slice(0, 12).map((item) => (
-                  <Tag key={item.path} color={group.key === 'more' ? undefined : 'blue'}>
+                  <Tag
+                    key={item.path}
+                    color={group.key === 'more' ? undefined : 'blue'}
+                  >
                     {item.label}
                   </Tag>
                 ))
@@ -862,6 +1112,11 @@ export default function PermissionCenterPage() {
   const [selectedRolePermissionKeys, setSelectedRolePermissionKeys] = useState(
     []
   )
+  const [selectedRoleNavigationMode, setSelectedRoleNavigationMode] = useState(
+    ROLE_NAVIGATION_MODES.RECOMMENDED
+  )
+  const [selectedRolePrimaryMenuPaths, setSelectedRolePrimaryMenuPaths] =
+    useState([])
   const [selectedWarehouseScopeMode, setSelectedWarehouseScopeMode] =
     useState('NONE')
   const [selectedWarehouseScopeIDs, setSelectedWarehouseScopeIDs] = useState([])
@@ -915,6 +1170,19 @@ export default function PermissionCenterPage() {
   const rolePermissionsDirty =
     buildPermissionSignature(selectedRolePermissionKeys) !==
     buildPermissionSignature(selectedRoleSavedPermissionKeys)
+  const selectedRoleSavedNavigation = useMemo(
+    () => normalizeRoleNavigationSettings(selectedRole || {}),
+    [selectedRole]
+  )
+  const roleNavigationDirty =
+    buildRoleNavigationSignature(
+      selectedRoleNavigationMode,
+      selectedRolePrimaryMenuPaths
+    ) !==
+    buildRoleNavigationSignature(
+      selectedRoleSavedNavigation.mode,
+      selectedRoleSavedNavigation.primaryMenuPaths
+    )
   const selectedRoleSavedWarehouseScope = useMemo(
     () => getRoleWarehouseScope(selectedRole || {}),
     [selectedRole]
@@ -928,7 +1196,8 @@ export default function PermissionCenterPage() {
       selectedRoleSavedWarehouseScope.mode,
       selectedRoleSavedWarehouseScope.warehouseIds
     )
-  const roleConfigurationDirty = rolePermissionsDirty || roleDataScopeDirty
+  const roleConfigurationDirty =
+    rolePermissionsDirty || roleDataScopeDirty || roleNavigationDirty
   const roleDataScopeInvalid =
     selectedWarehouseScopeMode === 'ASSIGNED' &&
     selectedWarehouseScopeIDs.length === 0
@@ -942,6 +1211,50 @@ export default function PermissionCenterPage() {
         .filter((option) => option.value > 0),
     [warehouseScopeOptions]
   )
+  const effectiveRoleNavigationPathSet = useMemo(
+    () => getEffectiveRoleNavigationPathSet(effectiveRoleAccess),
+    [effectiveRoleAccess]
+  )
+  const roleNavigationOptions = useMemo(
+    () =>
+      buildRoleNavigationOptions(
+        effectiveRoleAccess,
+        selectedRolePrimaryMenuPaths
+      ),
+    [effectiveRoleAccess, selectedRolePrimaryMenuPaths]
+  )
+  const unavailableRoleNavigationPaths = useMemo(
+    () =>
+      effectiveRoleAccess?.is_final === true
+        ? selectedRolePrimaryMenuPaths.filter(
+            (path) => !effectiveRoleNavigationPathSet.has(path)
+          )
+        : [],
+    [
+      effectiveRoleAccess?.is_final,
+      effectiveRoleNavigationPathSet,
+      selectedRolePrimaryMenuPaths,
+    ]
+  )
+  const recommendedRolePrimaryMenuPaths = useMemo(() => {
+    if (effectiveRoleAccess?.is_final !== true || !selectedRoleKey) {
+      return []
+    }
+    return buildRoleGuidedNavigationPreview({
+      navigationSections: [
+        ...getNavigationSections(),
+        ...getAuthenticatedNavigationSections(),
+      ],
+      effectiveAccess: effectiveRoleAccess,
+      roleKey: selectedRoleKey,
+      navigationMode: ROLE_NAVIGATION_MODES.RECOMMENDED,
+    }).primaryItems.map((item) => item.path)
+  }, [effectiveRoleAccess, selectedRoleKey])
+  const roleNavigationInvalid =
+    roleNavigationDirty &&
+    selectedRoleNavigationMode === ROLE_NAVIGATION_MODES.CUSTOM &&
+    (selectedRolePrimaryMenuPaths.length === 0 ||
+      unavailableRoleNavigationPaths.length > 0)
 
   const confirmDiscardRoleChanges = useCallback(
     ({ title, content, onDiscard, onKeepEditing }) => {
@@ -957,6 +1270,10 @@ export default function PermissionCenterPage() {
         cancelText: '继续编辑',
         onOk: () => {
           setSelectedRolePermissionKeys(selectedRoleSavedPermissionKeys)
+          setSelectedRoleNavigationMode(selectedRoleSavedNavigation.mode)
+          setSelectedRolePrimaryMenuPaths(
+            selectedRoleSavedNavigation.primaryMenuPaths
+          )
           setSelectedWarehouseScopeMode(selectedRoleSavedWarehouseScope.mode)
           setSelectedWarehouseScopeIDs(
             selectedRoleSavedWarehouseScope.warehouseIds
@@ -970,6 +1287,7 @@ export default function PermissionCenterPage() {
     [
       roleConfigurationDirty,
       selectedRoleSavedPermissionKeys,
+      selectedRoleSavedNavigation,
       selectedRoleSavedWarehouseScope,
     ]
   )
@@ -1230,12 +1548,18 @@ export default function PermissionCenterPage() {
   useEffect(() => {
     if (!selectedRole) {
       setSelectedRolePermissionKeys([])
+      setSelectedRoleNavigationMode(ROLE_NAVIGATION_MODES.RECOMMENDED)
+      setSelectedRolePrimaryMenuPaths([])
       return
     }
     if (roleSaveConflict?.roleKey === selectedRoleKey) {
       return
     }
     setSelectedRolePermissionKeys(selectedRoleSavedPermissionKeys)
+    setSelectedRoleNavigationMode(selectedRoleSavedNavigation.mode)
+    setSelectedRolePrimaryMenuPaths(
+      selectedRoleSavedNavigation.primaryMenuPaths
+    )
     setSelectedWarehouseScopeMode(selectedRoleSavedWarehouseScope.mode)
     setSelectedWarehouseScopeIDs(selectedRoleSavedWarehouseScope.warehouseIds)
   }, [
@@ -1243,6 +1567,7 @@ export default function PermissionCenterPage() {
     selectedRole,
     selectedRoleKey,
     selectedRoleSavedPermissionKeys,
+    selectedRoleSavedNavigation,
     selectedRoleSavedWarehouseScope,
   ])
 
@@ -1484,7 +1809,8 @@ export default function PermissionCenterPage() {
       !selectedRoleKey ||
       selectedRoleReadOnly ||
       !expectedVersion ||
-      !roleConfigurationDirty
+      !roleConfigurationDirty ||
+      roleNavigationInvalid
     ) {
       if (selectedRoleReadOnlyReason) {
         message.info(selectedRoleReadOnlyReason)
@@ -1495,18 +1821,20 @@ export default function PermissionCenterPage() {
     try {
       let nextVersion = expectedVersion
       if (rolePermissionsDirty) {
+        const previousVersion = nextVersion
         const permissionResult = await adminRpc.call('set_role_permissions', {
           role_key: selectedRoleKey,
           permission_keys: normalizeStringList(selectedRolePermissionKeys),
           expected_version: nextVersion,
         })
         nextVersion = Number(permissionResult?.data?.role?.version || 0)
-        if (!Number.isInteger(nextVersion) || nextVersion <= expectedVersion) {
+        if (!Number.isInteger(nextVersion) || nextVersion <= previousVersion) {
           throw new Error('岗位版本回读失败')
         }
       }
       if (roleDataScopeDirty) {
-        await adminRpc.call('set_role_data_scopes', {
+        const previousVersion = nextVersion
+        const dataScopeResult = await adminRpc.call('set_role_data_scopes', {
           role_key: selectedRoleKey,
           data_scopes: [
             {
@@ -1520,8 +1848,28 @@ export default function PermissionCenterPage() {
           ],
           expected_version: nextVersion,
         })
+        nextVersion = Number(dataScopeResult?.data?.role?.version || 0)
+        if (!Number.isInteger(nextVersion) || nextVersion <= previousVersion) {
+          throw new Error('岗位版本回读失败')
+        }
       }
-      message.success('岗位可用功能已更新')
+      if (roleNavigationDirty) {
+        const previousVersion = nextVersion
+        const navigationResult = await adminRpc.call('set_role_navigation', {
+          role_key: selectedRoleKey,
+          mode: selectedRoleNavigationMode,
+          primary_menu_paths:
+            selectedRoleNavigationMode === ROLE_NAVIGATION_MODES.CUSTOM
+              ? selectedRolePrimaryMenuPaths
+              : [],
+          expected_version: nextVersion,
+        })
+        nextVersion = Number(navigationResult?.data?.role?.version || 0)
+        if (!Number.isInteger(nextVersion) || nextVersion <= previousVersion) {
+          throw new Error('岗位版本回读失败')
+        }
+      }
+      message.success('岗位设置已更新，相关账号刷新后生效')
       setRoleSaveConflict(null)
       await loadData()
       await loadEffectiveRoleAccess(selectedRoleKey)
@@ -1536,7 +1884,7 @@ export default function PermissionCenterPage() {
         )
         return
       }
-      message.error(getActionErrorMessage(err, '更新岗位可用功能'))
+      message.error(getActionErrorMessage(err, '更新岗位设置'))
     } finally {
       setSaving(false)
     }
@@ -1948,7 +2296,7 @@ export default function PermissionCenterPage() {
             岗位设置
           </Title>
           <Paragraph type="secondary" style={{ margin: '6px 0 0' }}>
-            设置这个岗位可进入的页面和可执行操作；常用与更多功能由系统自动排列。
+            设置岗位可使用的页面、操作和数据范围，也可以调整常用入口与顺序。
           </Paragraph>
         </div>
         <Tag color="blue">先设置岗位，再分配账号</Tag>
@@ -2033,6 +2381,7 @@ export default function PermissionCenterPage() {
                       !selectedRoleKey ||
                       !roleConfigurationDirty ||
                       roleDataScopeInvalid ||
+                      roleNavigationInvalid ||
                       selectedRoleReadOnly
                     }
                     onClick={saveRolePermissions}
@@ -2209,9 +2558,41 @@ export default function PermissionCenterPage() {
                           access={effectiveRoleAccess}
                           loading={effectiveRoleAccessLoading}
                         />
+                        <RoleNavigationEditor
+                          mode={selectedRoleNavigationMode}
+                          primaryMenuPaths={selectedRolePrimaryMenuPaths}
+                          options={roleNavigationOptions}
+                          unavailablePaths={unavailableRoleNavigationPaths}
+                          disabled={
+                            !canManageRolePermissions ||
+                            selectedRoleReadOnly ||
+                            effectiveRoleAccess?.is_final !== true
+                          }
+                          onModeChange={(nextMode) => {
+                            setSelectedRoleNavigationMode(nextMode)
+                            if (
+                              nextMode === ROLE_NAVIGATION_MODES.CUSTOM &&
+                              selectedRolePrimaryMenuPaths.length === 0
+                            ) {
+                              setSelectedRolePrimaryMenuPaths(
+                                recommendedRolePrimaryMenuPaths
+                              )
+                            }
+                            if (
+                              nextMode === ROLE_NAVIGATION_MODES.RECOMMENDED
+                            ) {
+                              setSelectedRolePrimaryMenuPaths([])
+                            }
+                          }}
+                          onPrimaryMenuPathsChange={
+                            setSelectedRolePrimaryMenuPaths
+                          }
+                        />
                         <NavigationPlacementOverview
                           access={effectiveRoleAccess}
                           roleKey={selectedRoleKey}
+                          navigationMode={selectedRoleNavigationMode}
+                          primaryMenuPaths={selectedRolePrimaryMenuPaths}
                           dirty={roleConfigurationDirty}
                           loading={effectiveRoleAccessLoading}
                         />

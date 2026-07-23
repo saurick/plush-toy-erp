@@ -77980,28 +77980,31 @@ func (m *QualityInspectionMutation) ResetEdge(name string) error {
 // RoleMutation represents an operation that mutates the Role nodes in the graph.
 type RoleMutation struct {
 	config
-	op                 Op
-	typ                string
-	id                 *int
-	role_key           *string
-	name               *string
-	description        *string
-	builtin            *bool
-	role_type          *role.RoleType
-	disabled           *bool
-	sort_order         *int
-	addsort_order      *int
-	version            *int
-	addversion         *int
-	created_at         *time.Time
-	updated_at         *time.Time
-	clearedFields      map[string]struct{}
-	data_scopes        map[int]struct{}
-	removeddata_scopes map[int]struct{}
-	cleareddata_scopes bool
-	done               bool
-	oldValue           func(context.Context) (*Role, error)
-	predicates         []predicate.Role
+	op                       Op
+	typ                      string
+	id                       *int
+	role_key                 *string
+	name                     *string
+	description              *string
+	builtin                  *bool
+	role_type                *role.RoleType
+	disabled                 *bool
+	sort_order               *int
+	addsort_order            *int
+	version                  *int
+	addversion               *int
+	navigation_mode          *role.NavigationMode
+	primary_menu_paths       *[]string
+	appendprimary_menu_paths []string
+	created_at               *time.Time
+	updated_at               *time.Time
+	clearedFields            map[string]struct{}
+	data_scopes              map[int]struct{}
+	removeddata_scopes       map[int]struct{}
+	cleareddata_scopes       bool
+	done                     bool
+	oldValue                 func(context.Context) (*Role, error)
+	predicates               []predicate.Role
 }
 
 var _ ent.Mutation = (*RoleMutation)(nil)
@@ -78430,6 +78433,93 @@ func (m *RoleMutation) ResetVersion() {
 	m.addversion = nil
 }
 
+// SetNavigationMode sets the "navigation_mode" field.
+func (m *RoleMutation) SetNavigationMode(rm role.NavigationMode) {
+	m.navigation_mode = &rm
+}
+
+// NavigationMode returns the value of the "navigation_mode" field in the mutation.
+func (m *RoleMutation) NavigationMode() (r role.NavigationMode, exists bool) {
+	v := m.navigation_mode
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldNavigationMode returns the old "navigation_mode" field's value of the Role entity.
+// If the Role object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleMutation) OldNavigationMode(ctx context.Context) (v role.NavigationMode, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldNavigationMode is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldNavigationMode requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldNavigationMode: %w", err)
+	}
+	return oldValue.NavigationMode, nil
+}
+
+// ResetNavigationMode resets all changes to the "navigation_mode" field.
+func (m *RoleMutation) ResetNavigationMode() {
+	m.navigation_mode = nil
+}
+
+// SetPrimaryMenuPaths sets the "primary_menu_paths" field.
+func (m *RoleMutation) SetPrimaryMenuPaths(s []string) {
+	m.primary_menu_paths = &s
+	m.appendprimary_menu_paths = nil
+}
+
+// PrimaryMenuPaths returns the value of the "primary_menu_paths" field in the mutation.
+func (m *RoleMutation) PrimaryMenuPaths() (r []string, exists bool) {
+	v := m.primary_menu_paths
+	if v == nil {
+		return
+	}
+	return *v, true
+}
+
+// OldPrimaryMenuPaths returns the old "primary_menu_paths" field's value of the Role entity.
+// If the Role object wasn't provided to the builder, the object is fetched from the database.
+// An error is returned if the mutation operation is not UpdateOne, or the database query fails.
+func (m *RoleMutation) OldPrimaryMenuPaths(ctx context.Context) (v []string, err error) {
+	if !m.op.Is(OpUpdateOne) {
+		return v, errors.New("OldPrimaryMenuPaths is only allowed on UpdateOne operations")
+	}
+	if m.id == nil || m.oldValue == nil {
+		return v, errors.New("OldPrimaryMenuPaths requires an ID field in the mutation")
+	}
+	oldValue, err := m.oldValue(ctx)
+	if err != nil {
+		return v, fmt.Errorf("querying old value for OldPrimaryMenuPaths: %w", err)
+	}
+	return oldValue.PrimaryMenuPaths, nil
+}
+
+// AppendPrimaryMenuPaths adds s to the "primary_menu_paths" field.
+func (m *RoleMutation) AppendPrimaryMenuPaths(s []string) {
+	m.appendprimary_menu_paths = append(m.appendprimary_menu_paths, s...)
+}
+
+// AppendedPrimaryMenuPaths returns the list of values that were appended to the "primary_menu_paths" field in this mutation.
+func (m *RoleMutation) AppendedPrimaryMenuPaths() ([]string, bool) {
+	if len(m.appendprimary_menu_paths) == 0 {
+		return nil, false
+	}
+	return m.appendprimary_menu_paths, true
+}
+
+// ResetPrimaryMenuPaths resets all changes to the "primary_menu_paths" field.
+func (m *RoleMutation) ResetPrimaryMenuPaths() {
+	m.primary_menu_paths = nil
+	m.appendprimary_menu_paths = nil
+}
+
 // SetCreatedAt sets the "created_at" field.
 func (m *RoleMutation) SetCreatedAt(t time.Time) {
 	m.created_at = &t
@@ -78590,7 +78680,7 @@ func (m *RoleMutation) Type() string {
 // order to get all numeric fields that were incremented/decremented, call
 // AddedFields().
 func (m *RoleMutation) Fields() []string {
-	fields := make([]string, 0, 10)
+	fields := make([]string, 0, 12)
 	if m.role_key != nil {
 		fields = append(fields, role.FieldRoleKey)
 	}
@@ -78614,6 +78704,12 @@ func (m *RoleMutation) Fields() []string {
 	}
 	if m.version != nil {
 		fields = append(fields, role.FieldVersion)
+	}
+	if m.navigation_mode != nil {
+		fields = append(fields, role.FieldNavigationMode)
+	}
+	if m.primary_menu_paths != nil {
+		fields = append(fields, role.FieldPrimaryMenuPaths)
 	}
 	if m.created_at != nil {
 		fields = append(fields, role.FieldCreatedAt)
@@ -78645,6 +78741,10 @@ func (m *RoleMutation) Field(name string) (ent.Value, bool) {
 		return m.SortOrder()
 	case role.FieldVersion:
 		return m.Version()
+	case role.FieldNavigationMode:
+		return m.NavigationMode()
+	case role.FieldPrimaryMenuPaths:
+		return m.PrimaryMenuPaths()
 	case role.FieldCreatedAt:
 		return m.CreatedAt()
 	case role.FieldUpdatedAt:
@@ -78674,6 +78774,10 @@ func (m *RoleMutation) OldField(ctx context.Context, name string) (ent.Value, er
 		return m.OldSortOrder(ctx)
 	case role.FieldVersion:
 		return m.OldVersion(ctx)
+	case role.FieldNavigationMode:
+		return m.OldNavigationMode(ctx)
+	case role.FieldPrimaryMenuPaths:
+		return m.OldPrimaryMenuPaths(ctx)
 	case role.FieldCreatedAt:
 		return m.OldCreatedAt(ctx)
 	case role.FieldUpdatedAt:
@@ -78742,6 +78846,20 @@ func (m *RoleMutation) SetField(name string, value ent.Value) error {
 			return fmt.Errorf("unexpected type %T for field %s", value, name)
 		}
 		m.SetVersion(v)
+		return nil
+	case role.FieldNavigationMode:
+		v, ok := value.(role.NavigationMode)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetNavigationMode(v)
+		return nil
+	case role.FieldPrimaryMenuPaths:
+		v, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unexpected type %T for field %s", value, name)
+		}
+		m.SetPrimaryMenuPaths(v)
 		return nil
 	case role.FieldCreatedAt:
 		v, ok := value.(time.Time)
@@ -78856,6 +78974,12 @@ func (m *RoleMutation) ResetField(name string) error {
 		return nil
 	case role.FieldVersion:
 		m.ResetVersion()
+		return nil
+	case role.FieldNavigationMode:
+		m.ResetNavigationMode()
+		return nil
+	case role.FieldPrimaryMenuPaths:
+		m.ResetPrimaryMenuPaths()
 		return nil
 	case role.FieldCreatedAt:
 		m.ResetCreatedAt()

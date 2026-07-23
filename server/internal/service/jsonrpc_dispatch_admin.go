@@ -257,6 +257,39 @@ func (d *jsonrpcDispatcher) handleAdmin(
 			}),
 		}, nil
 
+	case "set_role_navigation":
+		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemRolePermissionManage); res != nil {
+			return id, res, nil
+		}
+		if res := rejectUnknownAdminParams(pm, "role_key", "mode", "primary_menu_paths", "expected_version"); res != nil {
+			return id, res, nil
+		}
+		primaryMenuPaths, ok := getStrictStringSlice(pm, "primary_menu_paths", true)
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		expectedVersion, ok := getRequiredJSONRPCPositiveInt(pm, "expected_version")
+		if !ok {
+			return id, invalidAdminParamResult(), nil
+		}
+		role, err := d.adminManageUC.SetRoleNavigation(
+			ctx,
+			getString(pm, "role_key"),
+			biz.RoleNavigationMode(getString(pm, "mode")),
+			primaryMenuPaths,
+			expectedVersion,
+		)
+		if err != nil {
+			return id, d.mapAdminManageError(ctx, err), nil
+		}
+		return id, &v1.JsonrpcResult{
+			Code:    errcode.OK.Code,
+			Message: errcode.OK.Message,
+			Data: newDataStruct(map[string]any{
+				"role": adminRoleToMap(*role, true),
+			}),
+		}, nil
+
 	case "set_phone":
 		if res := d.RequireAdminPermission(ctx, biz.PermissionSystemUserUpdate); res != nil {
 			return id, res, nil

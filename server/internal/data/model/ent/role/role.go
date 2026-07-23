@@ -31,6 +31,10 @@ const (
 	FieldSortOrder = "sort_order"
 	// FieldVersion holds the string denoting the version field in the database.
 	FieldVersion = "version"
+	// FieldNavigationMode holds the string denoting the navigation_mode field in the database.
+	FieldNavigationMode = "navigation_mode"
+	// FieldPrimaryMenuPaths holds the string denoting the primary_menu_paths field in the database.
+	FieldPrimaryMenuPaths = "primary_menu_paths"
 	// FieldCreatedAt holds the string denoting the created_at field in the database.
 	FieldCreatedAt = "created_at"
 	// FieldUpdatedAt holds the string denoting the updated_at field in the database.
@@ -59,6 +63,8 @@ var Columns = []string{
 	FieldDisabled,
 	FieldSortOrder,
 	FieldVersion,
+	FieldNavigationMode,
+	FieldPrimaryMenuPaths,
 	FieldCreatedAt,
 	FieldUpdatedAt,
 }
@@ -92,6 +98,8 @@ var (
 	DefaultVersion int
 	// VersionValidator is a validator for the "version" field. It is called by the builders before save.
 	VersionValidator func(int) error
+	// DefaultPrimaryMenuPaths holds the default value on creation for the "primary_menu_paths" field.
+	DefaultPrimaryMenuPaths []string
 	// DefaultCreatedAt holds the default value on creation for the "created_at" field.
 	DefaultCreatedAt func() time.Time
 	// DefaultUpdatedAt holds the default value on creation for the "updated_at" field.
@@ -124,6 +132,32 @@ func RoleTypeValidator(rt RoleType) error {
 		return nil
 	default:
 		return fmt.Errorf("role: invalid enum value for role_type field: %q", rt)
+	}
+}
+
+// NavigationMode defines the type for the "navigation_mode" enum field.
+type NavigationMode string
+
+// NavigationModeRecommended is the default value of the NavigationMode enum.
+const DefaultNavigationMode = NavigationModeRecommended
+
+// NavigationMode values.
+const (
+	NavigationModeRecommended NavigationMode = "recommended"
+	NavigationModeCustom      NavigationMode = "custom"
+)
+
+func (nm NavigationMode) String() string {
+	return string(nm)
+}
+
+// NavigationModeValidator is a validator for the "navigation_mode" field enum values. It is called by the builders before save.
+func NavigationModeValidator(nm NavigationMode) error {
+	switch nm {
+	case NavigationModeRecommended, NavigationModeCustom:
+		return nil
+	default:
+		return fmt.Errorf("role: invalid enum value for navigation_mode field: %q", nm)
 	}
 }
 
@@ -173,6 +207,11 @@ func BySortOrder(opts ...sql.OrderTermOption) OrderOption {
 // ByVersion orders the results by the version field.
 func ByVersion(opts ...sql.OrderTermOption) OrderOption {
 	return sql.OrderByField(FieldVersion, opts...).ToFunc()
+}
+
+// ByNavigationMode orders the results by the navigation_mode field.
+func ByNavigationMode(opts ...sql.OrderTermOption) OrderOption {
+	return sql.OrderByField(FieldNavigationMode, opts...).ToFunc()
 }
 
 // ByCreatedAt orders the results by the created_at field.

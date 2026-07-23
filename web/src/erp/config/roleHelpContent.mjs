@@ -15,7 +15,7 @@ const commonQuestions = Object.freeze([
   {
     question: '常用工作里没找到页面怎么办？',
     answer:
-      '看板统一放在最前，“岗位使用帮助”和其他已授权的低频页面会放在“更多功能”。放置位置只为了好找，不会增加或减少权限。',
+      '看板统一放在最前，“岗位使用帮助”和其他已授权的低频页面会放在“更多功能”。管理员也可以在权限管理中调整岗位常用入口和顺序；放置位置只为了好找，不会增加或减少权限。',
   },
   {
     question: '任务显示完成，为什么业务记录还没变化？',
@@ -315,6 +315,7 @@ export const ROLE_HELP_GUIDES = Object.freeze([
     headline: '从已发生的业务结果办理应收、应付、发票和对账。',
     summary:
       '财务岗位帮助聚焦来源核对、过账、结清、取消和单笔对账，不替代银行或税控系统。',
+    recommendedPrimaryLimit: 4,
     priorities: [
       {
         title: '跟进应付',
@@ -333,6 +334,12 @@ export const ROLE_HELP_GUIDES = Object.freeze([
         description: '从已出货记录生成并办理发票业务记录。',
         path: '/erp/finance/invoices',
         actionLabel: '打开发票管理',
+      },
+      {
+        title: '处理对账',
+        description: '核对已过账财务记录，登记、确认和完成单笔核对。',
+        path: '/erp/finance/reconciliation',
+        actionLabel: '打开对账管理',
       },
     ],
     workflow: [
